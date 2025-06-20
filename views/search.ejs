@@ -1,0 +1,24 @@
+<form method="get">
+    <input type="text" name="search" id="search" value="<%= values.search || "" %>" placeholder="Paieška" />
+    <button type="submit" value="Ieškoti" class="main">Ieškoti</button>
+    <details id="paieskosNustatymai" 
+        <% if (usedHiddenFields) { %>
+        open
+        <% } %>
+    >
+        <summary></summary>
+        <div class="settingai">
+            <%- include('inputs/text', { label: 'Pirkėjo kodas', name: 'perkanciosiosOrganizacijosKodas', placeholder: 'Nenurodyta', values }) %>
+            <%- include('inputs/text', { label: 'Tiekėjo kodas', name: 'tiekejoKodas', placeholder: 'Nenurodyta', values }) %>
+
+            <%- include('inputs/date', { label: 'Sudaryta nuo:', name: 'sudarymoDataNuo', values }) %>
+            <%- include('inputs/date', { label: 'Sudaryta iki:', name: 'sudarymoDataIki', values }) %>
+
+            <%- include('inputs/number', { label: 'Vertė nuo:', name: 'verteNuo', placeholder: 'Nenurodyta', values }) %>
+            <%- include('inputs/number', { label: 'Vertė iki:', name: 'verteIki', placeholder: 'Nenurodyta', values }) %>
+
+            <%- include('inputs/text', { label: 'Unikalus ID:', name: 'sutartiesUnikalusID', placeholder: 'Nenurodyta', values }) %>
+            <%- include('inputs/checkbox', { label: 'Kiti bruožai:', name: 'tikSuDokumentais', boxLabel: 'Tik su dokumentais', values }) %>
+        </div>
+    </details>
+</form>

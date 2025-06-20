@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<%- include('head.ejs') %>
+		<meta property="og:title" content="Duomenys"/>
+		<meta property="og:description" content="Neoficialus tiek pavienių, tiek visų viešųjų pirkimų duomenų parsisiuntimas." /> 
+		<meta
+			name="description"
+			content="Neoficialus tiek pavienių, tiek visų viešųjų pirkimų duomenų parsisiuntimas."
+		/>
+		<meta property="og:type" content="website" />
+	</head>
+	<body>
+		<%- include('header.ejs') %>
+		<main>
+			<h1>Duomenys</h1>
+			<p>
+				Jokiems šioje svetainėje pateiktiems duomenims nėra taikomas jokios rūšies garantijos.
+			</p>
+			<p>
+				Jie yra bendrinami siekiant padidinti viešųjų pirkimų skaidrumą ir padidinti valstybinių duomenų prieinamumą.
+			</p>
+			<h2>Pavieniai pirkimai</h2>
+			<p>
+				Pavienių pirkimų duomenys pasiekiami .json formatu pagal sutarties unikalų ID. Pvz.: 
+				<pre><a href="https://viespirkiai.top/pirkimas/2007700250.json">https://viespirkiai.top/pirkimas/<i><b>2007700250</b></i>.json</a></pre>
+			</p>
+
+
+
+			<h2>Visi pirkimai</h2>
+			<p>
+				Visus viešuosius pirkimus galima parsisiųsti .jsonl.gz formatu. 
+			</p>
+			<p>
+				Duomenų eksportai:
+				<pre><a href="https://vp-r2.martynasv.lt/viesi-duomenys/2025-06-19.jsonl.gz">2025-06-19.jsonl.gz</a></pre>
+			</p>
+
+			<br>
+			Neradote ko ieškote? Susisiekite <a href="mailto:sveiki@viespirkiai.top">sveiki@viespirkiai.top</a>
+
+		</main>
+	  <%- include('footer.ejs') %>
+	</body>
+</html>
