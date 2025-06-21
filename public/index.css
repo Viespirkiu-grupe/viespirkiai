@@ -75,6 +75,7 @@ html {
 	color-scheme: light;
 	background-color: var(--white);
 	color: var(--black);
+	overflow-x: hidden;
 }
 
 header,
