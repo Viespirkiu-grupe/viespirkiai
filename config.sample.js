@@ -13,5 +13,10 @@ export default {
     ],
     typesenseApiKey: "password",
     typesenseCollection: "viespirkiai",
+    mysqlHost: "localhost",
+    mysqlUser: "viespirkiai",
+    mysqlPassword: "viespirkiai",
+    mysqlDatabase: "viespirkiai",
+    mysqlPort: 9022,
     port: 9019,
 }
