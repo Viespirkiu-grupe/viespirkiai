@@ -35,13 +35,13 @@ Vertė: <%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, ma
 
         <div style="flex: 1;">
           <h2><u>Pirkėjas</u></h2>
-					<h3><a href="/pirkejas/<%= purchase.perkanciosiosOrganizacijosKodas %>"><%= purchase.perkanciojiOrganizacija %></a></h3>
+					<h3><a href="/asmuo/<%= purchase.perkanciosiosOrganizacijosKodas %>"><%= purchase.perkanciojiOrganizacija %></a></h3>
 					<pre><%= purchase.perkanciosiosOrganizacijosKodas %></pre>
 				</div>
         
         <div style="flex: 1;">
 					<h2><u>Tiekėjas</u></h2>
-					<h3><a href="/tiekejas/<%= purchase.tiekejoKodas %>"> <%= purchase.tiekejas %> </a> </h3>
+					<h3><a href="/asmuo/<%= purchase.tiekejoKodas %>"> <%= purchase.tiekejas %> </a> </h3>
 					<pre><%= purchase.tiekejoKodas %></pre>
 				</div>
 
@@ -121,6 +121,7 @@ Vertė: <%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, ma
             <p>Pateiktų dokumentų nėra.</p>
             <% } %>
           </div>
+        </div>
     </section>
 		</main>
     <%- include('footer.ejs') %>

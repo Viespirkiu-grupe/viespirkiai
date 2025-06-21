@@ -13,9 +13,12 @@ wireproxy/proxy.wg
 # Typesense
 typesense/data
 
-# Export
+# Export / import
 export.jsonl
 export.jsonl.gz
+
+*.csv
+*.zip
 
 # Plausible
 plausible/clickhouse
@@ -26,3 +29,6 @@ plausible/plausible-conf.env
 
 # Konfiguracija
 config.js
+
+# Mysql
+mysql/mysql_data

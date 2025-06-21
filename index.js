@@ -34,6 +34,9 @@ app.use("/duomenys", duomenysRouter);
 import analitikaRouter from "./routes/analitika.js";
 app.use("/analitika", analitikaRouter);
 
+import asmuoRouter from "./routes/asmuo.js";
+app.use("/asmuo", asmuoRouter);
+
 // Scraper
 
 import { periodicallySyncData } from "./scrape.js";
