@@ -26,6 +26,11 @@ asmuoRouter.get("/:id", async (req, res) => {
 			let aprasymas = "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas fiziniam asmeniui.";
 			res.render("netikrasAsmuo", { customHead: config.customHead, asmuo: { id }, pavadinimas, aprasymas });
 			return;
+		}else if(id == 803){
+			let pavadinimas = "CVP IS užsienio įmonė";
+			let aprasymas = "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas užsienio įmonei.";
+			res.render("netikrasAsmuo", { customHead: config.customHead, asmuo: { id }, pavadinimas, aprasymas });
+			return;
 		}
 		return res.status(404).send("Not found");
 	}
