@@ -1,8 +1,9 @@
+// https://atvira.sodra.lt/imones/rinkiniai/index.html
+
 import fs from 'fs';
 import path from 'path';
 import { createPool } from 'mysql2/promise';
 import readline from 'readline';
-import csv from 'csv-parser';
 
 const filename = process.argv[2];
 if (!filename) {
@@ -51,9 +52,9 @@ const insertBatch = async (rows) => {
 
   const sql = `
     INSERT INTO sodra (
-      code, jarCode, name, municipality, ecoActCode,
-      ecoActName, month, avgWage, numInsured, avgWage2,
-      numInsured2, tax, importFile
+      code, jarKodas, pavadinimas, savivaldybe, ekonominesVeiklosKodas,
+      ekonominesVeiklosPavadinimas, data, vidutinisAtlyginimas, draustieji, vidutinisAtlyginimas2,
+      draustieji2, imokuSuma, importFile
     ) VALUES ${rows.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}
   `;
 
