@@ -16,6 +16,17 @@ asmuoRouter.get("/:id", async (req, res) => {
 	);
 
 	if (jarRezultatai.length === 0) {
+		if(id == 807){
+			let pavadinimas = "CVP IS kitas asmuo";
+			let aprasymas = "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas kitam asmeniui.";
+			res.render("netikrasAsmuo", { customHead: config.customHead, asmuo: { id }, pavadinimas, aprasymas });
+			return;
+		}else if(id == 809){
+			let pavadinimas = "CVP IS fizinis asmuo";
+			let aprasymas = "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas fiziniam asmeniui.";
+			res.render("netikrasAsmuo", { customHead: config.customHead, asmuo: { id }, pavadinimas, aprasymas });
+			return;
+		}
 		return res.status(404).send("Not found");
 	}
 
