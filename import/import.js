@@ -1,5 +1,5 @@
-import { viespirkiai } from "./database.js";
-import { addDocumentToSearch } from "./typesense.js";
+import { viespirkiai } from "../mongo/mongoDb.js";
+import { addDocumentToSearch } from "../typesense/typesense.js";
 
 export async function importArray(data) {
 	let operations = [];

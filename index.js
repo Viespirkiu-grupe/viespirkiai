@@ -37,20 +37,10 @@ app.use("/analitika", analitikaRouter);
 import asmuoRouter from "./routes/asmuo.js";
 app.use("/asmuo", asmuoRouter);
 
-// Scraper
-
-import { periodicallySyncData } from "./scrape.js";
-
-if(config.scrape){
-	periodicallySyncData(config.scrapeInverval);
-}
-
 // Search database
 
-import { ensureSearchCollection } from "./typesense.js";
+import { ensureSearchCollection } from "./typesense/typesense.js";
 await ensureSearchCollection();
-
-// Ready!
 
 app.listen(PORT, () =>
 	console.log(`Server running at http://localhost:${PORT}`)

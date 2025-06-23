@@ -1,6 +1,6 @@
 import Typesense from "typesense";
-import { viespirkiai } from "./database.js";
-import config from "./utils/config.js";
+import { viespirkiai } from "../mongo/mongoDb.js";
+import config from "../utils/config.js";
 
 const client = new Typesense.Client({
 	nodes: config.typesenseNodes,

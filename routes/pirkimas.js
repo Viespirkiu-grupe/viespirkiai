@@ -1,6 +1,6 @@
 import express from "express";
 import { dataToLithuanianTime } from "../utils/time.js";
-import { viespirkiai } from "../database.js";
+import { viespirkiai } from "../mongo/mongoDb.js";
 import config from '../utils/config.js';
 import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 
@@ -8,6 +8,7 @@ const pirkimasRouter = express.Router();
 
 pirkimasRouter.get("/:id", async (req, res) => {
 	const { id } = req.params;
+
 	let purchase = await viespirkiai.findOne({
 		sutartiesUnikalusID: parseInt(id),
 	});

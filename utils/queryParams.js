@@ -1,3 +1,11 @@
+/**
+ * Middleware to clean empty query parameters from the request.
+ * If any empty parameters are found, it redirects to the same path with cleaned query parameters.
+ * @param {Request} req
+ * @param {Response} res
+ * @param {Function} next
+ * @returns {void|Response}
+ */
 export default function cleanEmptyQueryParams(req, res, next) {
 	const originalQuery = req.query;
 	const cleanedQuery = {};

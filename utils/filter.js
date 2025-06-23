@@ -1,3 +1,8 @@
+/**
+ * Builds a Typesense filter from the provided query object.
+ * @param {Object} query 
+ * @returns {Object}
+ */
 export function buildTypesenseFilter(query) {
 	const filters = [];
 	const values = {};
@@ -86,6 +91,12 @@ export function buildTypesenseFilter(query) {
 	};
 }
 
+
+/**
+ * Builds a MongoDB filter from the provided query object.
+ * @param {Object} query 
+ * @returns {Object}
+ */
 export function buildMongoFilter(query) {
 	const filter = {};
 	const values = {};

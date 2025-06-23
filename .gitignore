@@ -28,7 +28,7 @@ plausible/event-data
 plausible/plausible-conf.env
 
 # Konfiguracija
-config.js
+/config.js
 
 # Mysql
 mysql/mysql_data

@@ -1,6 +1,6 @@
-import { viespirkiai } from "./database.js";
+import { viespirkiai } from "../mongo/mongoDb.js";
 import { createWriteStream } from "fs";
-import { config } from "./utils/config.js";
+import { config } from "../utils/config.js";
 import { join } from "path";
 
 const cursor = viespirkiai.find().stream();

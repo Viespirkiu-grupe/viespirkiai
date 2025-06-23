@@ -1,9 +1,9 @@
 import express from "express";
-import { viespirkiai } from "../database.js";
+import { viespirkiai } from "../mongo/mongoDb.js";
 import cleanEmptyQueryParams from "../utils/queryParams.js";
 import { arrayToLithuanianTime } from "../utils/time.js";
 import { buildTypesenseFilter, buildMongoFilter } from "../utils/filter.js";
-import { searchDocuments } from "../typesense.js";
+import { searchDocuments } from "../typesense/typesense.js";
 import config from '../utils/config.js';
 import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 
@@ -13,7 +13,7 @@ const indexRouter = express.Router();
 let pirkimuSkaicius = await viespirkiai.estimatedDocumentCount();
 
 indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
-	const startTime = performance.now();
+	const startas = performance.now();
 
 	const page = parseInt(req.query.page) || 1;
 	const limit = 50;
@@ -69,7 +69,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
 
 	results = arrayToLithuanianTime(results);
 
-	let trukme = (performance.now() - startTime) / 1000;
+	let trukme = (performance.now() - startas) / 1000;
 	let numberOfResults = `${total} rezultatai(-ai) per ${trukme.toFixed(
 		2
 	)}s <pre style="display: inline;">(${engine})</pre>`;

@@ -1,10 +1,10 @@
 import { parseHTML } from "linkedom";
 import { writeFile } from "fs/promises";
-import { importArray } from "./import.js";
+import { importArray } from "../import/import.js";
 import fetch from 'node-fetch';
 import pkg from 'https-proxy-agent';
 const { HttpsProxyAgent } = pkg;
-import config from "./utils/config.js";
+import config from "../utils/config.js";
 
 let proxyAgent = null;
 if(config.scrapeProxy){
@@ -232,10 +232,9 @@ async function requestLatestData() {
 	}
 }
 
-// End the script if not imported
+// If this script is run directly, start the periodic sync
 if (import.meta.url === `file://${process.argv[1]}`) {
-	await requestLatestData();
-	process.exit(0);
+	periodicallySyncData(60);
 }
 
 export function periodicallySyncData(interval = 60) {
