@@ -22,7 +22,11 @@
             <td>
               <div class="limit">
                 <a href="/pirkimas/<%= item.sutartiesUnikalusID %>">
-                  <%= item.pavadinimas %>
+                  <% if(item.pavadinimas.length < 1) { %>
+                    <i>Nenurodyta</i>
+                  <% } else { %>
+                    <%= item.pavadinimas %>
+                  <% } %> 
                 </a>
               </div>
             </td>

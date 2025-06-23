@@ -25,7 +25,13 @@ Vertė: <%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, ma
 	<body>
     <%- include('header.ejs') %>
 		<main>
-			<h1><%= purchase.pavadinimas %> už <u> <%= Number( purchase.faktineIvykdimoVerte || purchase.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> € </u></h1>
+			<h1>
+        <% if (purchase.pavadinimas.length < 1) { %>
+          <i>Nenurodyta</i>
+        <% } else { %>
+          <%= purchase.pavadinimas %> 
+        <% } %>
+        už <u> <%= Number( purchase.faktineIvykdimoVerte || purchase.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> € </u></h1>
 
 			<a href="/pirkimas/<%= purchase.sutartiesUnikalusID %>.json">↗ JSON</a>
       &nbsp;
