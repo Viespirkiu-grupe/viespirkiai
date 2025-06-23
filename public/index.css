@@ -45,7 +45,7 @@
 
 /* === Pagrindiniai === */
 
-:root{
+:root {
 	--link: #009;
 	--black: #000;
 	--dark-gray: #333;
@@ -87,6 +87,10 @@ header {
 	margin-bottom: 24px;
 }
 
+section h1 {
+	font-size: 2em;
+}
+
 h1.viespirkiai {
 	font-family: "Comic Sans MS", "Comic Relief", cursive, sans-serif;
 	font-size: 3em;
@@ -104,11 +108,23 @@ a.noStyle {
 	color: inherit;
 }
 
+sub,
+sup {
+	font-size: 12px;
+}
+
+sup {
+	font-style: italic;
+	font-weight: normal;
+	color: var(--dark-gray);
+}
+
 pre {
 	font-size: larger;
 }
 
 footer {
+	margin-top: 32px;
 	min-height: 64px;
 	display: flex;
 	justify-content: space-evenly;
@@ -364,4 +380,71 @@ input {
 
 .pagination-link:hover {
 	text-decoration: underline;
+}
+
+/* === Asmuo grid === */
+
+.asmuo-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	grid-template-areas:
+		"pavadinimas pavadinimas pavadinimas"
+		"metaduomenys metaduomenys zemelapis"
+		"info-1 info-2 zemelapis"
+		"info-3 info-4 info-5";
+	gap: 10px;
+}
+
+@media (max-width: 768px) {
+	.asmuo-grid {
+		grid-template-columns: repeat(2, 1fr);
+		grid-template-areas:
+			"pavadinimas pavadinimas"
+			"metaduomenys metaduomenys"
+			"zemelapis zemelapis"
+			"info-1 info-2"
+			"info-3 info-4"
+			"info-5 info-5";
+	}
+}
+
+.item {
+	padding: 10px;
+	background: #ddd;
+	text-align: center;
+	font-weight: bold;
+}
+
+.pavadinimas {
+	grid-area: pavadinimas;
+}
+.pavadinimas h1{
+	margin-bottom: 12px;
+}
+.metaduomenys {
+	grid-area: metaduomenys;
+}
+.zemelapis {
+	grid-area: zemelapis;
+	height: 100%; /* allow internal height scaling */
+	min-height: 300px; /* fallback height */
+}
+#map {
+  width: 100%;
+  height: 100%;
+}
+.info-1 {
+	grid-area: info-1;
+}
+.info-2 {
+	grid-area: info-2;
+}
+.info-3 {
+	grid-area: info-3;
+}
+.info-4 {
+	grid-area: info-4;
+}
+.info-5 {
+	grid-area: info-5;
 }
