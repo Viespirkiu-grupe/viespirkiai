@@ -1,11 +1,19 @@
 export function fixHtmlEntities(data) {
     if (typeof data === "string") {
-        return data
-            .replace(/&amp;/g, "&")
-            .replace(/&lt;/g, "<")
-            .replace(/&gt;/g, ">")
-            .replace(/&quot;/g, '"')
-            .replace(/&#39;/g, "'");
+        return data.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&#160;|&nbsp;|&euro;|\\"/g, match => {
+            const entities = {
+            "&amp;": "&",
+            "&lt;": "<",
+            "&gt;": ">",
+            "&quot;": '"',
+            "&#39;": "'",
+            "&#160;": " ",
+            "&nbsp;": " ",
+            "&euro;": "€",
+            '\\"': '"'
+            };
+            return entities[match];
+        });
     } else if (Array.isArray(data)) {
         return data.map(fixHtmlEntities);
     } else if (data && typeof data === "object") {
