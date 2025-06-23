@@ -5,6 +5,7 @@ import { arrayToLithuanianTime } from "../utils/time.js";
 import { buildTypesenseFilter, buildMongoFilter } from "../utils/filter.js";
 import { searchDocuments } from "../typesense.js";
 import config from '../utils/config.js';
+import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 
 
 const indexRouter = express.Router();
@@ -54,6 +55,12 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
 			.toArray();
 
 		engine = "MongoDB";
+	}
+
+	for(let i = 0; i < results.length; i++) {
+		results[i].pavadinimas = fixHtmlEntities(results[i].pavadinimas);
+		results[i].perkanciojiOrganizacija = fixHtmlEntities(results[i].perkanciojiOrganizacija);
+		results[i].tiekejas = fixHtmlEntities(results[i].tiekejas);
 	}
 
 	values.search = req.query.search || "";
