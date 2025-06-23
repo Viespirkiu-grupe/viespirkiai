@@ -37,6 +37,9 @@ app.use("/analitika", analitikaRouter);
 import asmuoRouter from "./routes/asmuo.js";
 app.use("/asmuo", asmuoRouter);
 
+import kodasRouter from "./routes/kodas.js";
+app.use("/kodas", kodasRouter);
+
 // Search database
 
 import { ensureSearchCollection } from "./typesense/typesense.js";
