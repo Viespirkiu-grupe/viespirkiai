@@ -40,6 +40,9 @@ app.use("/asmuo", asmuoRouter);
 import kodasRouter from "./routes/kodas.js";
 app.use("/kodas", kodasRouter);
 
+import korespondencijaRouter from "./routes/korespondencija.js";
+app.use("/korespondencija", korespondencijaRouter);
+
 // Search database
 
 import { ensureSearchCollection } from "./typesense/typesense.js";
