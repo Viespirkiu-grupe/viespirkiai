@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<%- include('head.ejs', {
+      customPageName: eksportas.pavadinimas,
+      customHead
+    }) %>
+    <meta property="og:title" content="<%- eksportas.pavadinimas %>" />
+    <meta property="og:description" content="Duomenų eksporto parsisiuntimas" />
+		<meta
+			name="description"
+			content="Duomenų eksporto parsisiuntimas"/>
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Viešpirkiai" />    
+	</head>
+	<body>
+    <%- include('header.ejs') %>
+		<main>
+			<h1><%- eksportas.pavadinimas %></h1>
+
+      <section style="display: flex; width: 100%;">
+
+        <div style="flex: 1;">
+          <h2><u>Parsisiuntimas</u></h2>
+          <h3>Magnet nuoroda</h3>
+					<a href="<%= eksportas.link %>">Parsisiųsti</a><br>
+          <h3>Torrent failas</h3>
+          <a href="/eksportai/<%= eksportas.id %>.torrent">Parsisiųsti</a>
+				</div>
+
+        <div style="flex: 1;">
+          <h2><u>Data</u></h2>
+					<%= eksportas.data.toLtDate() %><br><br>
+          <h2><u>Dydis</u></h2>
+          <%= eksportas.dydisMB %> MB <i>(compressed)</i>
+				</div>
+        
+
+        <div style="flex: 1;" class="mobileHide"></div>
+      </section>
+
+      
+		</main>
+    <%- include('footer.ejs') %>
+	</body>
+</html>

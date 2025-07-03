@@ -1,0 +1,34 @@
+# Nodejs
+node_modules
+
+# MongoDB
+mongo/data
+
+# Scraping
+lastPage.txt
+
+# VPN / Proxy
+wireproxy/proxy.wg
+
+# Typesense
+typesense/data
+
+# Export / import
+export.jsonl
+export.jsonl.gz
+
+*.csv
+*.zip
+
+# Plausible
+plausible/clickhouse
+plausible/db-data
+plausible/event-logs
+plausible/event-data
+plausible/plausible-conf.env
+
+# Konfiguracija
+/config.js
+
+# Mysql
+mysql/mysql_data

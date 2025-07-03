@@ -1,0 +1,57 @@
+services:
+  plausible_db:
+    # Plausible v2.1.1 was tested against PostgreSQL versions 15 and 16
+    # https://github.com/plausible/analytics/blob/v2.1.1/.github/workflows/elixir.yml#L21-L32
+    image: postgres:16-alpine
+    restart: always
+    volumes:
+      - ./db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: pg_isready
+      start_interval: 2s
+      start_period: 1m
+
+  plausible_events_db:
+    image: clickhouse/clickhouse-server:24.3.3.102-alpine
+    restart: always
+    volumes:
+      - ./event-data:/var/lib/clickhouse
+      - ./event-logs:/var/log/clickhouse-server
+      - ./clickhouse/clickhouse-config.xml:/etc/clickhouse-server/config.d/logging.xml:ro
+      - ./clickhouse/clickhouse-user-config.xml:/etc/clickhouse-server/users.d/logging.xml:ro
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1
+      start_interval: 2s
+      start_period: 1m
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  plausible:
+    image: ghcr.io/plausible/community-edition:v2.1.1
+    restart: always
+    command: sh -c "/entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://127.0.0.1:8000 || exit 1
+      start_interval: 2s
+      start_period: 1m
+    depends_on:
+      plausible_db:
+        condition: service_healthy
+      plausible_events_db:
+        condition: service_healthy
+    ports:
+      - 9025:8000
+    env_file:
+      - plausible-conf.env
+
+volumes:
+  db-data:
+    driver: local
+  event-data:
+    driver: local
+  event-logs:
+    driver: local

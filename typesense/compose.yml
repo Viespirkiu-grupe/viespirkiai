@@ -1,0 +1,14 @@
+services:
+  typesense:
+    image: typesense/typesense:28.0
+    container_name: typesense
+    command: "--data-dir /data --api-key=pinigaiibala --enable-cors"
+    ports:
+      - "9021:8108"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 3048M

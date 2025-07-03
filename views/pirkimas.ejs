@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<%- include('head.ejs', {
+      customPageName: purchase.pavadinimas,
+      customHead
+    }) %>
+    <meta property="og:title" content="<%= purchase.pavadinimas %> už <%= Number( purchase.faktineIvykdimoVerte || purchase.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €" />
+    <meta property="og:description" content="Sutartis: <%= purchase.sutartiesUnikalusID %> 
+Pirkėjas: <%= purchase.perkanciojiOrganizacija %>
+Tiekėjas: <%= purchase.tiekejas %>.
+Galioja: nuo <%= new Date(purchase.sudarymoData).toISOString().slice(0,10) %> iki <%= new Date(purchase.galiojimoData).toISOString().slice(0,10) %>.
+Vertė: <%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €." />
+		<meta
+			name="description"
+			content="Sutartis: <%= purchase.sutartiesUnikalusID %> 
+Pirkėjas: <%= purchase.perkanciojiOrganizacija %>
+Tiekėjas: <%= purchase.tiekejas %>.
+Galioja: nuo <%= new Date(purchase.sudarymoData).toISOString().slice(0,10) %> iki <%= new Date(purchase.galiojimoData).toISOString().slice(0,10) %>.
+Vertė: <%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €."
+		/>
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Viešpirkiai" />    
+	</head>
+	<body>
+    <%- include('header.ejs') %>
+		<main>
+			<h1>
+        <% if (purchase.pavadinimas.length < 1) { %>
+          <i>Nenurodyta</i>
+        <% } else { %>
+          <%= purchase.pavadinimas %> 
+        <% } %>
+        už <u> <%= Number( purchase.faktineIvykdimoVerte || purchase.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> € </u></h1>
+
+			<a href="/pirkimas/<%= purchase.sutartiesUnikalusID %>.json">↗ JSON</a>
+      &nbsp;
+      <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= purchase.sutartiesUnikalusID %>">↗ CVP IS</a>
+
+      <section style="display: flex; width: 100%;">
+
+        <div style="flex: 1;">
+          <h2><u>Pirkėjas</u></h2>
+					<h3><a href="/asmuo/<%= purchase.perkanciosiosOrganizacijosKodas %>"><%= purchase.perkanciojiOrganizacija %></a></h3>
+					<pre><%= purchase.perkanciosiosOrganizacijosKodas %></pre>
+				</div>
+        
+        <div style="flex: 1;">
+					<h2><u>Tiekėjas</u></h2>
+					<h3><a href="/asmuo/<%= purchase.tiekejoKodas %>"> <%= purchase.tiekejas %> </a> </h3>
+					<pre><%= purchase.tiekejoKodas %></pre>
+				</div>
+
+        <div style="flex: 1;" class="mobileHide"></div>
+      </section>
+
+      <br>
+
+      <section style="display: flex; width: 100%; flex-wrap: wrap;">
+
+      <div style="flex: 1;">
+        <h2><u>Sutartis</u></h2>
+        <div style="min-height: 24px; display: block;">
+          <pre><%= purchase.sutartiesNumeris %></pre>
+        </div>
+          <div>
+            <h3>Sudaryta ir galioja:</h3>
+            <%= new Date(purchase.sudarymoData).toISOString().slice(0,10) %> 
+            –
+            <%= new Date(purchase.galiojimoData).toISOString().slice(0,10) %> 
+          </div>
+          <div>
+            <h3>Vertė <i>(numatyta / faktinė)</i>:</h3>
+            <%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> € / <%= purchase.faktineIvykdimoVerte ? purchase.faktineIvykdimoVerte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €" : "Nenurodyta" %>
+          </div>
+          <div>
+            <h3>Kategorija:</h3>
+            <%= purchase.kategorija %> 
+          </div>
+          <div>
+            <h3>BVPŽ:</h3>
+            <pre style="display: inline;"><%= purchase.bvpzKodas %></pre> – <%= purchase.bvpzPavadinimas %>
+          </div>
+          <div>
+            <h3>Faktinė įvykdimo data:</h3>
+            <%= purchase.faktineIvykdimoData || "Nenurodyta" %>
+          </div>
+        </div>
+
+        <div style="flex: 1;">
+          <h2><u>Pranešimas</u></h2>
+          <div style="min-height: 24px; display: block;">
+            <pre style="display: inline-block; margin: 0;"><%= purchase.sutartiesUnikalusID %></pre>
+            (<a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= purchase.sutartiesUnikalusID %>">
+              ↗ CVP IS
+            </a>)
+          </div>
+          <div>
+            <h3>Paskelbta:</h3>
+            <%= purchase.paskelbimoData %>
+          </div>
+          <div>
+            <h3>Redaguota:</h3>
+            <%= purchase.paskutinioRedagavimoData %>
+          </div>
+          <div>
+            <h3>Atnaujinta:</h3>
+            <%= purchase.paskutinioAtnaujinimoData %>
+          </div>
+        </div>
+
+      <div class="mobileBreak">
+            <h2><u>Dokumentai</u></h2>
+            <i>Dokumentai nėra saugojami „Viešpirkiai“ serveriuose. <br> Jie parsiunčiami tiesiogiai iš <a href="http://eviesiejipirkimai.lt">eviesiejipirkimai.lt</a></i>
+            <div class="dokumentai">
+
+            
+            <% if (purchase.dokumentai && purchase.dokumentai.length > 0) { %>
+            <ul>
+              <% purchase.dokumentai.forEach(doc => { %>
+              <li>
+                <a href="<%= doc.url %>" target="_blank"><%= doc.pavadinimas %></a>
+              </li>
+              <% }); %>
+            </ul>
+            <% } else { %>
+            <p>Pateiktų dokumentų nėra.</p>
+            <% } %>
+          </div>
+        </div>
+    </section>
+		</main>
+    <%- include('footer.ejs') %>
+	</body>
+</html>

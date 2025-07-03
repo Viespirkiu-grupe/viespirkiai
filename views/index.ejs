@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="lt">
+	<head>
+		<%- include('head.ejs', {customHead}) %>
+		<meta
+			name="description"
+			content="Neoficialus viešųjų pirkimų sutarčių portalas."
+		/>
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content="Viešpirkiai" />
+		<meta
+			property="og:description"
+			content="Neoficialus viešųjų pirkimų sutarčių portalas."
+		/>
+	</head>
+	<body>
+		<%- include('header.ejs') %>
+		<main>
+			<%- include('search.ejs', {values, usedHiddenFields, numberOfResults}) %>
+			<%- include('results.ejs', {data, currentPage, pageCount, queryParams}) %>
+		</main>
+		<%- include('footer.ejs') %>
+	</body>
+</html>

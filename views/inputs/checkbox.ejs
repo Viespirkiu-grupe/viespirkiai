@@ -1,0 +1,15 @@
+<div>
+    <h2><%= label %></h2>
+    <div style="display: flex; align-items: center; justify-content: flex-start;">
+        <label for="<%= name %>" style="display: flex; align-items: center; gap: 0.5rem;">
+            <input
+                type="checkbox"
+                name="<%= name %>"
+                id="<%= name %>"
+                value="true"
+                <% if (values[name]) { %> checked <% } %>
+            />
+            <%= boxLabel || label %>
+        </label>
+    </div>
+</div>

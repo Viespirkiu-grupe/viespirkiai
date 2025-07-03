@@ -1,0 +1,14 @@
+[Interface]
+PrivateKey = ///
+Address = ///
+MTU = ///
+DNS = ///
+
+[Peer]
+PublicKey = ///
+AllowedIPs = ///
+Endpoint = ///
+PersistentKeepalive = ///
+
+[http]
+BindAddress = 127.0.0.1:8001

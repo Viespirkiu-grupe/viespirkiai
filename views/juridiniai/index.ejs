@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="lt">
+	<head>
+		<%- include('../head.ejs', {customHead}) %>
+		<meta
+			name="description"
+			content="Juridinių asmenų paieška."
+		/>
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content="Viešpirkiai" />
+		<meta
+			property="og:description"
+			content="Juridinių asmenų paieška."
+		/>
+	</head>
+	<body>
+		<%- include('../header.ejs', {hideSubtext: false}) %>
+		<main>
+			<%- include('search.ejs', {values}) %>
+            <% if(typeof data !== "undefined") { %>
+			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams}) %>
+            <% } %>
+		</main>
+		<%- include('../footer.ejs') %>
+	</body>
+</html>

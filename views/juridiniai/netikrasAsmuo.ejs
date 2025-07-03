@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<%- include('../head.ejs', {
+      customPageName: "CVP IS netikras asmuo",
+      customHead
+    }) %>
+    <meta property="og:title" content="CVP IS netikras asmuo" />
+    <meta property="og:description" content="Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas." />
+		<meta name="description" content="Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas."/>
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Viešpirkiai" />    
+	</head>
+	<body>
+    <%- include('../header.ejs') %>
+		<main>
+      <div class="asmuo-grid">
+        <section class="pavadinimas">
+          <h1><%= pavadinimas %> (<pre style="display: inline;"><%= asmuo.id %></pre>)</h1>
+        </section>
+        <section class="metaduomenys">
+          <a href="/pirkejas/<%= asmuo.id %>">↗ Pirkimai</a>
+          &nbsp;
+          <a href="/tiekejas/<%= asmuo.id %>">↗ Pardavimai</a>
+
+          <br><br>
+
+          <i><%= aprasymas %></i>
+        </section>
+		</main>
+    <%- include('../footer.ejs') %>
+	</body>
+</html>

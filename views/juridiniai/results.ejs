@@ -1,0 +1,58 @@
+<div class="numberOfResults">
+    <%- numberOfResults %>
+</div>
+
+<div class="tableContainer">
+<table>
+    <thead>
+        <tr>
+            <th>Pavadinimas</th>
+            <th>Forma</th>
+            <th>Reg. data</th>
+            <th>Adresas</th>
+            <th>Duomenys</th>
+        </tr>
+    </thead>
+    <tbody>
+        <% data.forEach(item => { %>
+        <tr>
+            <td>
+              <div class="limit">
+                <a href="/asmuo/<%= item.jarKodas %>">
+                  <% if(item.pavadinimas.length < 1) { %>
+                    <i>Nenurodyta</i>
+                  <% } else { %>
+                    <%= item.pavadinimas %>
+                  <% } %> 
+                </a>
+              </div>
+            </td>
+            <td>
+              <div class="limit">
+                <%= item.formosPavadinimas %>
+              </div>
+            </td>
+            <td>
+              <div class="limit" style="white-space: nowrap;">
+                <%= item.registravimoData.substr(0, 10) %>
+              </div>
+            </td>
+            <td>
+              <div class="limit">
+                <%= item.adresas %>
+              </div>
+            </td>
+            <td>
+              <div class="limit" style="white-space: nowrap;">
+                <%= item.duomenuData.substr(0, 10) %>
+              </div>
+            </td>
+        </tr>
+        <% }); %>
+    </tbody>
+</table>
+</div>
+
+<%- include('../pagination.ejs', {
+    currentPage, pageCount, queryParams
+}) %>

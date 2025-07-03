@@ -1,0 +1,51 @@
+<% 
+const totalPages = pageCount;
+const current = currentPage;
+const maxVisible = 6;
+const half = Math.floor(maxVisible / 2);
+
+let start = Math.max(1, current - half);
+let end = Math.min(totalPages, current + half);
+
+if (current <= half) {
+    end = Math.min(totalPages, maxVisible);
+}
+if (current + half > totalPages) {
+    start = Math.max(1, totalPages - maxVisible + 1);
+}
+
+function pageLink(page) {
+    return `?page=${page}`;
+}
+%>
+
+<nav class="pagination">
+	<% if (current > 1) { %>
+        <a href="<%= pageLink(current - 1) + queryParams%>" 
+           class="pagination-link">
+            Atgal
+        </a>
+	<% } else { %>
+	    <span class="pagination-link disabled">Atgal</span>
+	<% } %> 
+    
+    <% for(let i = start; i <= end; i++) { %> 
+        <% if (i === current) { %>
+            <span class="pagination-link current"><%= i %></span>
+        <% } else { %>
+            <a href="<%= pageLink(i) + queryParams%>" 
+            class="pagination-link">
+                <%= i %>
+            </a>
+        <% } %> 
+    <% } %> 
+    
+    <% if (current < totalPages) { %>
+        <a href="<%= pageLink(current + 1) + queryParams%>" 
+           class="pagination-link">
+           Kitas
+        </a>
+	<% } else { %>
+	    <span class="pagination-link disabled">Kitas</span>
+	<% } %>
+</nav>

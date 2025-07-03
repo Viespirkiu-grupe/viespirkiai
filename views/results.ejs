@@ -1,0 +1,72 @@
+<div class="numberOfResults">
+    <%- numberOfResults %>
+</div>
+
+<div class="tableContainer">
+<table>
+    <thead>
+        <tr>
+            <th>Tipas</th>
+            <th>Pavadinimas</th>
+            <th>Vertė</th>
+            <th>Perkanti organizacija</th>
+            <th>Tiekėjas</th>
+            <th>Redaguota</th>
+            <th>Failai</th>
+        </tr>
+    </thead>
+    <tbody>
+        <% data.forEach(item => { %>
+        <tr>
+            <td class="center"><%= item.tipas %></td>
+            <td>
+              <div class="limit">
+                <a href="/pirkimas/<%= item.sutartiesUnikalusID %>">
+                  <% if(item.pavadinimas.length < 1) { %>
+                    <i>Nenurodyta</i>
+                  <% } else { %>
+                    <%= item.pavadinimas %>
+                  <% } %> 
+                </a>
+              </div>
+            </td>
+            <td class="center oneLine">
+              <% if(Number(item.verte) > 10000) { %>
+                <u><%= Number(item.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</u>
+              <% } else { %>
+                <%= Number(item.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
+              <% } %>
+            </td>
+            <td>
+              <div class="limit">
+                <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>"><%= item.perkanciojiOrganizacija %></a>
+              </div>
+            </td>
+            <td>
+              <div class="limit">
+                <a href="/asmuo/<%= item.tiekejoKodas %>"> <%= item.tiekejas || "Nenurodytas" %> </a>
+              </div>
+            </td>
+            <td class="center oneLine">
+              <% if (item.paskutinioRedagavimoData) { %>
+                <%= item.paskutinioRedagavimoData %> 
+              <% } else { %>
+                -
+              <% } %>
+            </td>
+            <td class="center">
+            <% if (item.dokumentuKiekis === 0) { %>
+            –
+            <% } else { %>
+            <%= item.dokumentuKiekis %>
+            <% } %>
+            </td>
+        </tr>
+        <% }); %>
+    </tbody>
+</table>
+</div>
+
+<%- include('pagination.ejs', {
+    currentPage, pageCount, queryParams
+}) %>

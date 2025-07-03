@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<%- include('../head.ejs', {
+      customPageName: asmuo.jar.name,
+      customHead
+    }) %>
+    <% if(asmuo.jar.koordinates) { %>
+      <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <% } %>
+    <meta property="og:title" content="<%= asmuo.jar.name %>" />
+    <meta property="og:description" content="<%= aprasas %>" />
+		<meta name="description" content="<%= aprasas %>"/>
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Viešpirkiai" />    
+	</head>
+	<body>
+    <%- include('../header.ejs') %>
+		<main>
+      <div class="asmuo-grid">
+        <section class="pavadinimas">
+          <h1><%= asmuo.jar.pavadinimas %>
+            <sup>(<%= asmuo.jar.duomenuData %>)</sup>
+          </h1>
+        </section>
+        <section class="metaduomenys">
+          <% if(asmuo.sodra && asmuo.sodra.ekonominesVeiklosPavadinimas) { %>
+            <%= asmuo.sodra.ekonominesVeiklosPavadinimas %> (<pre style="display: inline;"><%= asmuo.sodra.ekonominesVeiklosKodas %></pre>)
+            <br><br>
+          <% } %>
+
+
+          <a href="/asmuo/<%= asmuo.jar.jarKodas %>.json">↗ JSON</a>
+          
+          <% if(asmuo.sodra && asmuo.sodra.kodas) { %>
+            &nbsp;
+            <a href="https://atvira.sodra.lt/imones/detaliai/index.html?code=<%= asmuo.sodra.kodas %>">↗ SODRA</a>
+          <% } %>
+
+          &nbsp;
+          <a href="/pirkejas/<%= asmuo.jar.jarKodas %>">↗ Pirkimai</a>
+          &nbsp;
+          <a href="/tiekejas/<%= asmuo.jar.jarKodas %>">↗ Pardavimai</a>
+
+
+          <% if(asmuo.sodra && asmuo.sodra.data) { %>
+            <p><i>Duomenys <%= asmuo.sodra.data %>, nebent nurodyta kitaip.</i></p>
+          <% } %>
+        </section>
+        <section class="zemelapis"> 
+          <% if (asmuo?.jar?.koordinates) { %>
+          <div id="map" data-x="<%= asmuo.jar.koordinates.x %>" data-y="<%= asmuo.jar.koordinates.y %>"></div>
+          <script>
+            const map = L.map('map').setView([document.getElementById('map').dataset.y, document.getElementById('map').dataset.x], 16);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);  
+
+            const marker = L.marker([document.getElementById('map').dataset.y, document.getElementById('map').dataset.x]).addTo(map);
+          </script>
+        <% } %>
+        </section>
+        <section class="info-1">
+          <h2><u>Kodai</u></h2>
+          <h3>Juridinių asmenų registras<sup>(<%= asmuo.jar.duomenuData %>)</sup></h3>
+					<pre style="display: inline;"><%= asmuo.jar.jarKodas %></pre> (<%= asmuo.jar.formosPavadinimas %>)
+                
+          <% if(asmuo.sodra && asmuo.sodra.kodas) { %>
+            <h3>Sodra</h3>
+            <pre><%= asmuo.sodra.kodas %></pre>
+          <% } %>
+        </section>
+        <section class="info-2">
+          <h2><u>Veikla</u>
+            <sup>(<%= asmuo.jar.duomenuData %>)</sup>
+          </h2>
+          <h3>Įregistruota</h3>
+            <%= asmuo.jar.registravimoData %>
+          <h3>Vieta</h3>
+          <% if (asmuo.jar.koordinates) { %>
+            <a href="https://www.openstreetmap.org/?mlat=<%= asmuo.jar.koordinates.y %>&mlon=<%= asmuo.jar.koordinates.x %>&zoom=16" target="_blank">
+              <%= asmuo.jar.adresas %>
+            </a>
+          <% } else { %>
+            <%= asmuo.jar.adresas %>
+          <% } %>
+        </section>
+        <section class="info-3">
+          <h2><u>Darbuotojai</u></h2>
+          <% if(asmuo.sodra && asmuo.sodra.draustieji) { %>
+            <h3>Darbo sutartys</h3>
+              <%= asmuo.sodra.draustieji %> &nbsp;
+            <h3>Autorinės ir kitos sutartys</h3>
+              <%= asmuo.sodra.draustieji2 || 0 %>
+            <h3>Viso</h3>
+              <%= asmuo.sodra.draustieji + asmuo.sodra.draustieji2 %>
+          <% } else { %>
+            <i>Nėra duomenų</i>
+          <% } %>
+        </section>
+        <section class="info-4">
+          <h2><u>Vid. atlyginimai</u></h2>
+            <% if(asmuo.sodra && asmuo.sodra.vidutinisAtlyginimas) { %>
+              <h3>Darbo sutartys</h3>
+                <% if(asmuo.sodra.vidutinisAtlyginimas) { %>
+                  <%= asmuo.sodra.vidutinisAtlyginimas.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %> €/mėn.
+                <% } else { %>
+                  <i>Nėra duomenų</i>
+                <% } %>
+              <h3>Autorinės ir kitos sutartys</h3>
+                <% if (asmuo.sodra.vidutinisAtlyginimas2) { %>
+                  <%= asmuo.sodra.vidutinisAtlyginimas2.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %> €/mėn.
+                <% } else { %>
+                  <i>Nėra duomenų</i>
+                <% } %>
+              <h3>Bendrai</h3>
+              <%= asmuo.sodra.bendrasVidutinisAtlyginimas.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €/mėn. %>
+            <% } else { %>
+              <i>Nėra duomenų</i>
+            <% } %>
+        </section>
+        <section class="info-5">
+          <h2><u>Mokėjimai</u></h2>
+          <h3>Mokesčiai (VMI)</h3>
+            <% if(asmuo.mokesciai && asmuo.mokesciai.suma) { %>
+              <%= asmuo.mokesciai.suma.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> € 
+              <sup>(<%= asmuo.mokesciai.data %>)</sup>
+            <% } else { %>
+              <i>Nėra duomenų</i>
+            <% } %>
+          <h3>Atlyginimai</h3>
+            <% if(asmuo.sodra && asmuo.sodra.atlyginimuIslaidos) { %>
+              <%= asmuo.sodra.atlyginimuIslaidos.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €/mėn.<br>
+            <% } else { %>
+              <i>Nėra duomenų</i>
+            <% } %>
+          <h3>SODRA įmokos</h3>
+            <% if(asmuo.sodra && asmuo.sodra.imokuSuma) { %>
+              <%= asmuo.sodra.imokuSuma.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
+            <% } else { %>
+              <i>Nėra duomenų</i>
+            <% } %>
+        </section>
+      </div>
+
+
+
+
+
+      <section style="display: flex; width: 100%; flex-wrap: wrap;">
+        <div style="flex: 1;">
+
+				</div>
+
+        <div style="flex: 1;">
+					
+        </div>
+
+        <div class="mobileBreak">
+          
+        </div>
+      </section>
+
+		</main>
+    <%- include('../footer.ejs') %>
+	</body>
+</html>
