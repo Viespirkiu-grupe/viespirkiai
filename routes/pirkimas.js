@@ -18,6 +18,15 @@ pirkimasRouter.get("/:id", async (req, res) => {
 	purchase.perkanciojiOrganizacija = fixHtmlEntities(purchase.perkanciojiOrganizacija);
 	purchase.tiekejas = fixHtmlEntities(purchase.tiekejas);
 
+	if(purchase.dokumentai && purchase.dokumentai.length > 0) {
+		purchase.dokumentai = purchase.dokumentai.map(doc => {
+			doc.dok_id = doc.url.match(/dok_id=(\d+)/)[1];
+			doc.file_id = doc.url.match(/file_id=(\d+)/)[1];
+			doc.proxyUrl = `https://proxy.viespirkiai.top/${doc.dok_id}/${doc.file_id}`;
+			return doc;
+		});
+	}
+
 	if (req.path.endsWith(".json")) {
 		const formattedJson = JSON.stringify(purchase, null, 2);
 		res.setHeader("Content-Type", "application/json");

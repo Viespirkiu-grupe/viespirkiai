@@ -111,7 +111,6 @@ Vertė: <%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, ma
 
       <div class="mobileBreak">
             <h2><u>Dokumentai</u></h2>
-            <i>Dokumentai nėra saugojami „Viešpirkiai“ serveriuose. <br> Jie parsiunčiami tiesiogiai iš <a href="http://eviesiejipirkimai.lt">eviesiejipirkimai.lt</a></i>
             <div class="dokumentai">
 
             
@@ -119,7 +118,8 @@ Vertė: <%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, ma
             <ul>
               <% purchase.dokumentai.forEach(doc => { %>
               <li>
-                <a href="<%= doc.url %>" target="_blank"><%= doc.pavadinimas %></a>
+                <a href="<%= doc.proxyUrl %>" target="_blank"><%= doc.pavadinimas %></a>
+                (<a href="<%= doc.url %>">↗ CVP IS</a>)
               </li>
               <% }); %>
             </ul>
