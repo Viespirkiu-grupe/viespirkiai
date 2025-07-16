@@ -22,7 +22,7 @@ pirkimasRouter.get("/:id", async (req, res) => {
 		purchase.dokumentai = purchase.dokumentai.map(doc => {
 			doc.dok_id = doc.url.match(/dok_id=(\d+)/)[1];
 			doc.file_id = doc.url.match(/file_id=(\d+)/)[1];
-			doc.proxyUrl = `https://proxy.viespirkiai.top/${doc.dok_id}/${doc.file_id}`;
+			doc.proxyUrl = `https://failai.viespirkiai.top/${doc.dok_id}/${doc.file_id}`;
 			return doc;
 		});
 	}
