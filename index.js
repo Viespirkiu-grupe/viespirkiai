@@ -49,6 +49,9 @@ app.use("/korespondencija", korespondencijaRouter);
 import eksportaiRouter from "./routes/eksportai.js";
 app.use("/eksportai", eksportaiRouter);
 
+import failasRouter from "./routes/failas.js";
+app.use("/failas", failasRouter);
+
 // Search database
 
 import { ensureSearchCollection } from "./typesense/typesense.js";
