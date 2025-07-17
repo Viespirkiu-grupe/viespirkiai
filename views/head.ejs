@@ -1,9 +1,27 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link rel="stylesheet" href="/index.css?v33" />
+<%- include('css.ejs') %>
 <title>
 	<%= typeof customPageName !== 'undefined' && customPageName ? customPageName +
 	' – ' : '' %>Viešpirkiai
 </title>
-<meta property="og:site_name" content="Viešpirkiai" />   
+<meta property="og:site_name" content="Viešpirkiai" />
+<script>
+if (!navigator.connection?.saveData) {
+  const prefetched = new Set();
+
+  document.addEventListener('mouseover', (e) => {
+    const link = e.target.closest('a[href]');
+    if (
+      link &&
+      link.href.startsWith(location.origin) &&
+      !prefetched.has(link.href)
+    ) {
+      fetch(link.href).catch(() => {});
+      prefetched.add(link.href);
+    }
+  });
+}
+</script>
+
 <%- customHead %> 

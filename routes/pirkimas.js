@@ -35,6 +35,7 @@ pirkimasRouter.get("/:id", async (req, res) => {
 
 	purchase = dataToLithuanianTime(purchase);
 
+	res.set('Cache-Control', 'public, max-age=7200, s-maxage=7200');
 	res.render("pirkimas", { purchase, customHead: config.customHead });
 });
 

@@ -1,5 +1,9 @@
 <header>
-	<h1 class="viespirkiai"><a href="/" class="noStyle">Viešpirkiai</a></h1>
+	<h1 class="viespirkiai">
+		<a href="/" class="noStyle">
+			<%- include('viespirkiaiLogo.ejs') %>
+		</a>
+	</h1>
 
 	<% if(typeof hideSubtext == "undefined" || hideSubtext == false) { %>
 		CVP IS sudarytų sutarčių duomenų kopija

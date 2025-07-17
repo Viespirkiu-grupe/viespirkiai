@@ -150,6 +150,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
 		return; 
 	}
 
+	res.set('Cache-Control', 'public, max-age=10, s-maxage=10');
 	res.render("index", {
 		data: results,
 		values,

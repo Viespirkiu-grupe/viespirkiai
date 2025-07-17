@@ -168,6 +168,7 @@ asmuoRouter.get("/:id", async (req, res) => {
 		}
 	}
 
+	res.set('Cache-Control', 'public, max-age=7200, s-maxage=7200');
 	res.render("juridiniai/asmuo", { asmuo, customHead: config.customHead, aprasas });
 });
 

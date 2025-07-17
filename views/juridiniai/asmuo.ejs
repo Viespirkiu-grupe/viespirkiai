@@ -6,8 +6,22 @@
       customHead
     }) %>
     <% if(asmuo.jar.koordinates) { %>
-      <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-      <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+      <link rel="preload" href="https://unpkg.com/leaflet/dist/leaflet.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+      <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" /></noscript>
+      <script defer src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+      <script defer>
+            window.addEventListener('DOMContentLoaded', () => {
+
+            const map = L.map('map').setView([document.getElementById('map').dataset.y, document.getElementById('map').dataset.x], 16);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);  
+
+            const marker = L.marker([document.getElementById('map').dataset.y, document.getElementById('map').dataset.x]).addTo(map);
+
+          });
+      </script>
     <% } %>
     <meta property="og:title" content="<%= asmuo.jar.name %>" />
     <meta property="og:description" content="<%= aprasas %>" />
@@ -49,16 +63,8 @@
           <% } %>
         </section>
         <section class="zemelapis"> 
-          <% if (asmuo?.jar?.koordinates) { %>
+        <% if (asmuo?.jar?.koordinates) { %>
           <div id="map" data-x="<%= asmuo.jar.koordinates.x %>" data-y="<%= asmuo.jar.koordinates.y %>"></div>
-          <script>
-            const map = L.map('map').setView([document.getElementById('map').dataset.y, document.getElementById('map').dataset.x], 16);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);  
-
-            const marker = L.marker([document.getElementById('map').dataset.y, document.getElementById('map').dataset.x]).addTo(map);
-          </script>
         <% } %>
         </section>
         <section class="info-1">
