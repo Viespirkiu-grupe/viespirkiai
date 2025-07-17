@@ -31,10 +31,13 @@
               </div>
             </td>
             <td class="center oneLine">
-              <% if(Number(item.verte) > 10000) { %>
-                <u><%= Number(item.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</u>
+              <% 
+              const verte = item.faktineIvykdimoVerte || item.verte;
+              if(Number(verte) > 10000) { 
+              %>
+              <u><%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</u>
               <% } else { %>
-                <%= Number(item.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
+              <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
               <% } %>
             </td>
             <td>
