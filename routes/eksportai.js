@@ -4,7 +4,7 @@ import config from "../config.js";
 
 const eksportaiRouter = express.Router();
 
-eksportaiRouter.get("/:id", async (req, res) => {
+eksportaiRouter.get("/:id", async (req, res, next) => {
 	// It might end with .torrent, then give the torrent file
 	let { id } = req.params;
 	let torrent = false;
@@ -16,7 +16,7 @@ eksportaiRouter.get("/:id", async (req, res) => {
 	let [row] = await mysql.execute("SELECT * FROM eksportai WHERE id = ?;", [id]);
 
 	if (row.length === 0) {
-		return res.status(404).send("Not found");
+		return next();
 	}
 
 	row = row[0];

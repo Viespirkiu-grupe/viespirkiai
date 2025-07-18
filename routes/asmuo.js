@@ -4,7 +4,7 @@ import { mysql } from "../mysql/mysql.js";
 
 const asmuoRouter = express.Router();
 
-asmuoRouter.get("/:id", async (req, res) => {
+asmuoRouter.get("/:id", async (req, res, next) => {
 	let { id } = req.params;
 
 	if (id.endsWith(".json")) {
@@ -55,7 +55,7 @@ asmuoRouter.get("/:id", async (req, res) => {
 			res.render("juridiniai/netikrasAsmuo", { customHead: config.customHead, asmuo: { id }, pavadinimas, aprasymas });
 			return;
 		}
-		return res.status(404).send("Not found");
+		return next();
 	}
 
 	let jar = jarRezultatai[0];

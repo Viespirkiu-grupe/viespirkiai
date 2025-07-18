@@ -52,6 +52,15 @@ app.use("/eksportai", eksportaiRouter);
 import failasRouter from "./routes/failas.js";
 app.use("/failas", failasRouter);
 
+import kontaktaiRouter from "./routes/kontaktai.js";
+app.use("/kontaktai", kontaktaiRouter);
+
+app.use((req, res, next) => {
+  res.status(404).render("404", {
+        customHead: config.customHead,
+    });
+});
+
 // Search database
 
 import { ensureSearchCollection } from "./typesense/typesense.js";

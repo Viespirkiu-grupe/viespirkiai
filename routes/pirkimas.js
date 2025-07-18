@@ -6,13 +6,13 @@ import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 
 const pirkimasRouter = express.Router();
 
-pirkimasRouter.get("/:id", async (req, res) => {
+pirkimasRouter.get("/:id", async (req, res, next) => {
 	const { id } = req.params;
 
 	let purchase = await viespirkiai.findOne({
 		sutartiesUnikalusID: parseInt(id),
 	});
-	if (!purchase) return res.status(404).send("Not found");
+	if (!purchase) return next();
 
 	purchase.pavadinimas = fixHtmlEntities(purchase.pavadinimas);
 	purchase.perkanciojiOrganizacija = fixHtmlEntities(purchase.perkanciojiOrganizacija);

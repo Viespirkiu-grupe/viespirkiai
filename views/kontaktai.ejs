@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<%- include('head.ejs') %>
+		<meta property="og:title" content="Kontaktai"/>
+		<meta property="og:description" content="Viešpirkiai projekto kontaktinė informacija." /> 
+		<meta
+			name="description"
+			content="Viešpirkiai projekto kontaktinė informacija."
+		/>
+		<meta property="og:type" content="website" />
+	</head>
+	<body>
+		<%- include('header.ejs') %>
+		<main>
+			<h1>Kontaktai</h1>
+            <section>
+                <%- include('signalQr.ejs') %>
+                <h2>Signal</h2>
+                <p>
+                    Galite lengvai susisiekti su mumis Signal programėlėje – <a href="https://signal.me/#eu/owm5rTu2SjNCZifQAxmJO9yW95ImS1c7jxI5b07r-ZWtW7waKAhBZohZKhTmTZts">viespirkiai.52</a>.
+                </p>
+
+            </section>
+            <section>
+                <h2>Mastodon</h2>
+                <p>
+                    Taip pat, mus visada galite rasti Mastodon tinkle – <a rel="me" href="https://river.group.lt/@viespirkiai">@viespirkiai@river.group.lt</a>.
+                </p>
+            </section>
+            <section>
+                <h2>Elektroninis paštas</h2>
+                <p>
+                    Arba, jeigu turite asmeninių klausimų ar prašymų – rašykite <a href="mailto:sveiki@viespirkiai.top">sveiki@viespirkiai.top</a>.
+                </p>
+            </section>
+            
+
+            
+
+
+
+		</main>
+		<%- include('footer.ejs') %>
+	</body>
+</html>

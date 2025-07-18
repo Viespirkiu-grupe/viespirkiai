@@ -112,12 +112,16 @@ pre {
 	font-size: larger;
 }
 
-footer {
-	margin-top: 32px;
-	min-height: 64px;
+footer div{
+	display: block;
 	display: flex;
-	justify-content: space-evenly;
+	justify-content: center;
 	align-items: center;
+}
+
+footer {
+	margin-block: 32px;
+	min-height: 64px;
 }
 
 header {
@@ -447,5 +451,24 @@ input[type="search"]::-webkit-search-cancel-button {
   -webkit-appearance: none;
   appearance: none;
   display: none;
+}
+
+.signal-qr{
+	display: block;
+	float: right;
+	margin: 16px;
+	width: 150px;
+	height: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+	.signal-qr {
+		filter: invert(1);
+	}
+}
+
+footer a{
+	display: inline-block;
+	margin: 0 8px;
 }
 </style>
