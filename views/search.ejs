@@ -1,5 +1,8 @@
 <form method="get">
-    <input type="text" name="search" id="search" value="<%= values.search || "" %>" placeholder="Paieška" />
+    <input type="search" name="search" id="search"
+        value="<%= values.search || '' %>"
+        placeholder="Paieška"
+        enterkeyhint="search" />
     <button type="submit" value="Ieškoti" class="main">Ieškoti</button>
     <details id="paieskosNustatymai" 
         <% if (usedHiddenFields) { %>
@@ -21,4 +24,12 @@
             <%- include('inputs/checkbox', { label: 'Kiti bruožai:', name: 'tikSuDokumentais', boxLabel: 'Tik su dokumentais', values }) %>
         </div>
     </details>
+    <script>
+        document.getElementById('search').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // prevent newline
+            this.form.submit(); // submit manually
+        }
+        });
+    </script>
 </form>

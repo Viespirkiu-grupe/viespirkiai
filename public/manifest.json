@@ -1,0 +1,68 @@
+{
+	"short_name": "Viešpirkiai",
+	"name": "Viešpirkiai",
+	"icons": [
+		{
+			"src": "/icons/icon.svg",
+			"type": "image/svg+xml",
+			"sizes": "794x794"
+		},
+		{
+			"src": "/icons/icon.png",
+			"type": "image/png",
+			"sizes": "794x794"
+		},
+		{
+			"src": "/icons/maskable_icon_x128.png",
+			"type": "image/png",
+			"sizes": "128x128",
+			"purpose": "maskable"
+		},
+		{
+			"src": "/icons/maskable_icon_x384.png",
+			"type": "image/png",
+			"sizes": "384x384",
+			"purpose": "maskable"
+		}
+	],
+	"id": "/",
+	"start_url": "/",
+	"background_color": "#ffffff",
+	"display": "minimal-ui",
+	"scope": "/",
+	"theme_color": "#ffffff",
+	"shortcuts": [
+		{
+			"name": "Juridiniai asmenys",
+			"short_name": "Juridiniai",
+			"description": "Atverti juridinių asmenų paiešką",
+			"url": "/juridiniai",
+			"icons": [{ "src": "/icons/icon.png", "sizes": "794x794" }]
+		}
+	],
+	"description": "Viešpirkiai pilietinė iniciatyva",
+	"screenshots": [
+		{
+			"src": "/icons/screenshot1.png",
+			"sizes": "1080x2400",
+			"type": "image/png"
+		},
+		{
+			"src": "/icons/screenshot2.png",
+			"sizes": "1080x2400",
+			"type": "image/png"
+		},
+		{
+			"src": "/icons/screenshot3.png",
+			"sizes": "1080x2400",
+			"type": "image/png"
+		},
+        {
+			"src": "/icons/screenshotd1.png",
+			"sizes": "2736x1585",
+			"type": "image/png",
+            "form_factor": "wide"
+		}
+
+	]
+}

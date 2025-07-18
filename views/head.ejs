@@ -6,6 +6,11 @@
 	' – ' : '' %>Viešpirkiai
 </title>
 <meta property="og:site_name" content="Viešpirkiai" />
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+
 <script>
 if (!navigator.connection?.saveData) {
   const prefetched = new Set();
@@ -21,6 +26,10 @@ if (!navigator.connection?.saveData) {
       prefetched.add(link.href);
     }
   });
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js');
 }
 </script>
 
