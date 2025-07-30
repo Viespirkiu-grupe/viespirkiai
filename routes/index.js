@@ -9,7 +9,14 @@ import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 
 const indexRouter = express.Router();
 
-let pirkimuSkaicius = await viespirkiai.estimatedDocumentCount();
+let sutarciuSkaicius;
+
+async function atnaujintiSutarciuSkaiciu(){
+	sutarciuSkaicius = await viespirkiai.estimatedDocumentCount();
+};
+
+await atnaujintiSutarciuSkaiciu();
+setInterval(atnaujintiSutarciuSkaiciu, 15 * 60 * 1000); // 15min
 
 indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
 	const startas = performance.now();
@@ -68,7 +75,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
 		);
 
 		if (Object.keys(filter).length === 0) {
-			var total = pirkimuSkaicius;
+			var total = sutarciuSkaicius;
 		} else {
 			var total = await viespirkiai.countDocuments(filter);
 		}
