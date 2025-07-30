@@ -32,3 +32,6 @@ plausible/plausible-conf.env
 
 # Mysql
 mysql/mysql_data
+
+# Viešlaiškiai
+public/vieslaiskiai
