@@ -1,3 +1,7 @@
+/*
+Randa JAR adresų koordinates ir įrašo į adresai (MySQL) lentelę.
+*/
+
 import { mysql } from "../mysql/mysql.js";
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
@@ -7,6 +11,7 @@ const USER_AGENT = "Viespirkiai/1.0 (sveiki@viespirkiai.top)";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 while (true) {
+	// Randame JAR įrašą, kuriam reikia adreso koordinačių
 	const [rows] = await mysql.execute(`
     SELECT jarKodas, adresas FROM jar
     WHERE adresoId IS NULL AND adresas IS NOT NULL
@@ -15,68 +20,78 @@ while (true) {
 
 	if (rows.length === 0) {
 		console.log("No more rows to process");
-		break;
+		break; // Baigta
 	}
 
-	for (const { jarKodas, adresas } of rows) {
-		// Patikriname ar adresas jau egizstuojantis
-		const [[existing]] = await mysql.execute(
-			"SELECT id FROM adresai WHERE adresas = ? LIMIT 1",
-			[adresas]
-		);
+	let { jarKodas, adresas } = rows[0];
 
-		let adresasId;
+	// Patikriname ar adresas jau egizstuojantis
+	const [[existing]] = await mysql.execute(
+		"SELECT id FROM adresai WHERE adresas = ? LIMIT 1",
+		[adresas]
+	);
 
-		if (existing) {
-			adresasId = existing.id;
-		} else {
-			console.log(`Užklausiama dėl: ${adresas}`);
-			const normalizedAddress = await minimalAddress(adresas);
-			console.log(`Suprastintas adresas: ${normalizedAddress}`);
+	if (existing) {
+		// Adresas jau yra, atnaujiname JAR įrašą
+		var adresoId = existing.id;
+	} else {
+		// Suformuojame užklausą į Nominatim
+		console.log(`Užklausiama dėl: ${adresas}`);
+		const normalizedAddress = await supaprastintasAdresas(adresas);
+		console.log(`Suprastintas adresas: ${normalizedAddress}`);
 
-			const url = new URL(NOMINATIM_URL);
-			url.searchParams.set("q", normalizedAddress);
-			url.searchParams.set("format", "json");
-			url.searchParams.set("limit", "1");
+		const url = new URL(NOMINATIM_URL);
+		url.searchParams.set("q", normalizedAddress);
+		url.searchParams.set("format", "json");
+		url.searchParams.set("limit", "1");
 
-			try {
-				const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-				const data = await res.json();
+		try {
+			// Atliekame užklausą
+			const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+			const data = await res.json();
 
-				if (!data.length) {
-					console.warn(`No geocode result for: ${adresas}`);
-					adresasId = -1;
-					// process.exit(1);
-				} else {
-					const { lat, lon } = data[0];
-					console.log(`lat=${lat}, lon=${lon}`);
+			if (!data.length) {
+				console.warn(`No geocode result for: ${adresas}`);
+				var adresoId = -1; // Adresas nerastas
+			} else {
+				// Įterpiame rastą adresą į duomenų bazę
+				const { lat, lon } = data[0];
+				console.log(`lat=${lat}, lon=${lon}`);
 
-					const [result] = await mysql.execute(
-						"INSERT INTO adresai (taskas, adresas) VALUES (POINT(?, ?), ?)",
-						[parseFloat(lon), parseFloat(lat), adresas]
-					);
+				const [result] = await mysql.execute(
+					"INSERT INTO adresai (taskas, adresas) VALUES (POINT(?, ?), ?)",
+					[parseFloat(lon), parseFloat(lat), adresas]
+				);
 
-					adresasId = result.insertId;
-				}
-			} catch (e) {
-				console.error(`Klaida vykdant užklausą ${adresas}:`, e);
-				continue;
+				var adresoId = result.insertId; 
 			}
+		} catch (e) {
+			console.error(`Klaida vykdant užklausą ${adresas}:`, e);
+
+			// Palaukiame 60s ir tęsiame ciklą
+			await sleep(60000);
+
+			continue;
 		}
-
-		// Atnaujiname JAR įrašą su adreso ID
-		await mysql.execute("UPDATE jar SET adresoId = ? WHERE jarKodas = ?", [
-			adresasId,
-			jarKodas,
-		]);
-
-		console.log(`Atnaujintas jar ${jarKodas} → adresoId=${adresasId}`);
-		console.log(`---`);
-		await sleep(SLEEP_MS);
 	}
+
+	// Atnaujiname JAR įrašą su adreso ID
+	await mysql.execute("UPDATE jar SET adresoId = ? WHERE jarKodas = ?", [
+		adresoId,
+		jarKodas,
+	]);
+
+	console.log(`Atnaujintas jar ${jarKodas} → adresoId=${adresoId}`);
+	console.log(`---`);
+	await sleep(SLEEP_MS);
 }
 
-async function minimalAddress(raw) {
+/**
+ * Supaprastina adresą, pakeičia linksnį.
+ * @param {string} raw - Originalus adresas
+ * @returns {Promise<string>} Supaprastintas adresas
+ */
+async function supaprastintasAdresas(raw) {
 	// Kaimų ir viensėdžių pavadinimai turi būt konvertuojami į vardininko linksnį
 	for (const prefix of ["k.", "vs."]) {
 		const match = raw.match(
@@ -84,40 +99,42 @@ async function minimalAddress(raw) {
 		);
 
 		if (match) {
+			// Randame tinkamą linksnį
 			let place = match[1].trim();
 			const [[found]] = await mysql.execute(
 				"SELECT pavadinimas FROM gyvenamosVietoves WHERE pavadinimas_k = ? LIMIT 1",
 				[place]
 			);
 
+			// Pakeičiame
 			if (found && found.pavadinimas) {
 				raw = raw.replace(place, found.pavadinimas);
 			}
 		}
 	}
 
-  // Išimtys
-  // Maigės -> P. Cvirkos
-  raw = raw.replace(/\bMaigės\b/gi, "P. Cvirkos");
-
-	// Panaikiname k.
-	raw = raw.replace(/\bk\.\s*/gi, "");
-
-	// Panaikiname glž. st.
-	raw = raw.replace(/\bglž\.\s*/gi, "");
+	
+	raw = raw.replace(/\bk\.\s*/gi, ""); // Panaikiname k.
+	raw = raw.replace(/\bvs\.\s*/gi, ""); // Panaikiname vs.
+	raw = raw.replace(/\bglž\.\s*/gi, "");	// Panaikiname glž. st.
 
 	// Panaikiname LT- pašto kodo prefiksą
 	const postcodeMatch = raw.match(/LT-(\d{5})/i);
 	const postcode = postcodeMatch ? postcodeMatch[1] : "";
 
-	// Match full street name + house number/range
+	// Išimtis – Maigės -> P. Cvirkos
+	raw = raw.replace(/\bMaigės\b/gi, "P. Cvirkos");
+
+	// Randame adreso numerį
 	const streetNumberMatch = raw.match(
 		/([\p{L}\s.'\-]+?\d+[A-Za-z]?(-\d+[A-Za-z]?)?)/iu
 	);
+
 	const streetNumber = (
 		streetNumberMatch ? streetNumberMatch[1].trim() : ""
 	).replace(/-\d+[A-Za-z]?$/, "");
 
+	// Suformuojame galutinį adresą
 	let addr = "";
 
 	if (streetNumber) addr += streetNumber;
@@ -129,3 +146,4 @@ async function minimalAddress(raw) {
 }
 
 await mysql.end();
+process.exit(0); // Baigta

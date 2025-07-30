@@ -1,13 +1,19 @@
 import { viespirkiai } from "../mongo/mongoDb.js";
 import { addDocumentToSearch } from "../typesense/typesense.js";
 
+/**
+ * Importuoja sutarčių duomenys į MongoDB ir Typesense.
+ * @param {Array} data - Duomenų masyvas, kuriame yra sutarčių informacija.
+ * @returns {Promise<void>}
+ */
 export async function importArray(data) {
+	// Paruošiame duomenis įrašymui į MongoDB ir Typesense
 	let operations = [];
 	let items = [];
 	for (let i = 0; i < data.length; i++) {
 		let item = data[i];
 
-		// Parse numeric fields
+		// Skaičiai
 		item.verte =
 			typeof item.verte === "string"
 				? parseFloat(item.verte.replace(/,/g, "."))
@@ -18,7 +24,7 @@ export async function importArray(data) {
 				? parseFloat(item.faktineIvykdimoVerte.replace(/,/g, "."))
 				: null;
 
-		// Parse dates
+		// Datos
 		const dateFields = [
 			"sudarymoData",
 			"galiojimoData",
@@ -33,15 +39,15 @@ export async function importArray(data) {
 			}
 		}
 
-		// Parse ID
+		// ID
 		item.sutartiesUnikalusID = item.sutartiesUnikalusID
 			? parseInt(item.sutartiesUnikalusID, 10)
 			: null;
 
-		// Skip if no unique ID
+		// Praleidžiame be unikalaus ID (nors tokių neturėtų būti)
 		if (!item.sutartiesUnikalusID) continue;
 
-		// Prepare bulk upsert operation
+		// Įrašome operacijas
 		operations.push({
 			updateOne: {
 				filter: { sutartiesUnikalusID: item.sutartiesUnikalusID },
@@ -54,19 +60,18 @@ export async function importArray(data) {
 	}
 
 	if (operations.length > 0) {
-		// Insert into mongoDB
+		// Įterpiame į MongoDB
 		let startTime = Date.now();
 		await viespirkiai.bulkWrite(operations);
-		let endTime = Date.now();
-		console.log(`MondoDB bulkWrite took ${endTime - startTime}ms`);
+		console.log(`MondoDB bulkWrite užtruko ${Date.now() - startTime}ms`);
 
-		// Insert into Typesense
+		// Įterpiame į Typesense
 		let startTypesenseTime = Date.now();
 		for (const item of items) {
 			await addDocumentToSearch(item);
 		}
-		let endTypesenseTime = Date.now();
-		console.log(`Typesense addDocument took ${endTypesenseTime - startTypesenseTime}ms`);
-		console.log(`Inserted/Updated ${operations.length} records.`);
+
+		console.log(`Typesense addDocument užtruko ${Date.now() - startTypesenseTime}ms`);
+		console.log(`Įterpti / atnaujinti ${operations.length} įrašai.`);
 	}
 }

@@ -1,3 +1,6 @@
+/*
+Periodiškai atsiunčia ir importuoja sutartis iš eViesiejiPirkimai.lt svetainės.
+*/
 import { parseHTML } from "linkedom";
 import { writeFile } from "fs/promises";
 import { importArray } from "../import/import.js";
@@ -6,35 +9,31 @@ import pkg from 'https-proxy-agent';
 const { HttpsProxyAgent } = pkg;
 import config from "../utils/config.js";
 
+// Nustatome proxy, jei yra
 let proxyAgent = null;
 if(config.scrapeProxy){
 	proxyAgent = new HttpsProxyAgent(config.scrapeProxy);
 }
 
-async function scrapePage(page = 0) {
-	page *= 50; // Nurodomas offset
-
-	let kiekis = 49; // Paprašai 50, gausi 51
-	if (page == 0) {
-		kiekis = 50; // Pirmame puslapyje teisingai
-	}
-
-	const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&filter_limit=${kiekis}&order_field=date&order_dir=asc&limitstart=${page}`;
-	console.log(`[Import#${page/50}] ${url}`);
-
+/**
+ * Parsisiunčia ir nuskaito sutartis iš eViesiejiPirkimai.lt svetainės.
+ * @param {string} url 
+ * @returns {Promise<Object[]>} Sutartys
+ */
+export async function scrapePage(url) {
 	let start = new Date();
 
-	let response;
+	// Atliekama užklausa
 	if(proxyAgent){
-		response = await fetch(url, { agent: proxyAgent });
+		var response = await fetch(url, { agent: proxyAgent });
 	}else{
-		response = await fetch(url);
+		var response = await fetch(url);
 	}
 	const html = await response.text();
 
-	let end = new Date();
-	console.log(`[Import#${page/50}] Response time: ${end - start}ms`);
+	console.log(`[Import] Užklausos laikas: ${new Date() - start}ms`);
 	
+	// Nuskaitomas HTML
 	const { document } = parseHTML(html);
 
 	const table = document.querySelector("#lenetele_table");
@@ -43,6 +42,7 @@ async function scrapePage(page = 0) {
 	const result = [];
 	let collecting = false;
 
+	// Nuskaitome duomenis
 	for (let i = 0; i < rows.length; i++) {
 		const row = rows[i];
 		if (!collecting) {
@@ -64,6 +64,7 @@ async function scrapePage(page = 0) {
 		}
 	}
 
+	// Sujungiame informaciją į sutartis
 	let sutartys = [];
 
 	for (const [mainRow, extraRow] of result) {
@@ -184,47 +185,71 @@ async function scrapePage(page = 0) {
 	return sutartys;
 }
 
+/**
+ * Importuoja sutartis iš eViesiejiPirkimai.lt svetainės pagal nurodytą puslapį.
+ * @param {number} page - Puslapis, kurį reikia importuoti
+ * @returns {number} Importuotų įrašų skaičius
+ */
 async function importPage(page = 0){
 	let start = new Date();
 
-	let data = await scrapePage(page);
+	// Sudarome puslapio URL
+	let limitstart = page * 50; // Puslapiuose yra po 50 įrašų, todėl dauginame iš 50
+
+	let kiekis = 49; // Valstybinė magija – paprašai 50, gausi 51
+	if (page == 0) {
+		kiekis = 50; // ... išskyrus pirmame puslapyje
+	}
+
+	const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&filter_limit=${kiekis}&order_field=date&order_dir=asc&limitstart=${limitstart}`;
+	console.log(`[Import#${page/50}] ${url}`);
+
+	// Nuskaitome puslapį
+	let data = await scrapePage(url);
+
+	// Jei nėra duomenų, grąžina 0
 	if (data.length === 0) {
 		console.log(`[Import#${page}] No data found.`);
 		return 0;
 	}
+
+	// Importuojame duomenis į duomenų bazę
 	await importArray(data);
 
-	let end = new Date();
-
-	console.log(`[Import#${page}] Imported in ${end - start}ms.`);
+	console.log(`[Import#${page}] Imported in ${new Date() - start}ms.`);
 	console.log(`[Import#${page}] Imported ${data.length} records.`);
 
 	return data.length;
 }
 
+/**
+ * Atsiunčia naujausias sutartis iš eViesiejiPirkimai.lt svetainės.
+ * @returns {Promise<void>}
+ */
 async function requestLatestData() {
-	// Read the last fully processed page from lastPage.txt
-	let page = 0;
+	// Nuskaitome paskutinio puslapio numerį iš ./lastPage.txt
 	try {
 		const lastPageFile = await import('fs/promises').then(fs => 
 			fs.readFile('lastPage.txt', 'utf-8'));
-		page = parseInt(lastPageFile.trim(), 10) + 1;
+		var page = parseInt(lastPageFile.trim(), 10) + 1;
 		if (isNaN(page)) page = 0;
-		console.log(`Starting from page ${page} based on lastPage.txt`);
+		console.log(`Pradedama nuo ${page} pagal lastPage.txt`);
 	} catch (error) {
-		console.log('No lastPage.txt found, starting from page 0');
+		console.log('Nerastas lastPage.txt, pradedama nuo 0');
+		var page = 0;
 	}
 
-	// Download data from the next pages
+	// Siunčiame puslapius tol, kol yra duomenų
 	while (true) {
-		console.log(`[Import#${page}] Importing.`);
+		console.log(`[Import#${page}] Importuojama.`);
 
 		if (await importPage(page) < 50) {
-			console.log(`[Import#${page}] Page isn't full. Stopping.`);
+			console.log(`[Import#${page}] Puslapis nėra pilnas.`);
 			return;
 		} else {
-			console.log(`[Import#${page}] Page imported successfully.`);
-			// Write the last processed page to lastPage.txt
+			console.log(`[Import#${page}] Pilnai importuotas.`);
+
+			// Išsaugome puslapio numerį į lastPage.txt
 			await writeFile('lastPage.txt', page.toString());
 			page++;
 		}
@@ -232,42 +257,46 @@ async function requestLatestData() {
 	}
 }
 
-// If this script is run directly, start the periodic sync
+// Jeigu šis failas yra paleistas tiesiogiai, kartojame periodiškai
 if (import.meta.url === `file://${process.argv[1]}`) {
 	periodicallySyncData(60);
 }
 
+/**
+ * Periodiškai atsiunčia ir importuoja sutartis iš eViesiejiPirkimai.lt svetainės.
+ * @param {number} interval - Intervalas sekundėmis, kas kiek laiko atsiųsti duomenis
+ */
 export function periodicallySyncData(interval = 60) {
-	let isRunning = false;
+	let darDirba = false;
 	
 	// Run once immediately
 	(async () => {
-		console.log(`Initial data sync.`);
-		isRunning = true;
+		console.log(`Pradinis duomenų atnaujinimas.`);
+		darDirba = true;
 		try {
 			await requestLatestData();
-		} catch (error) {
-			console.error("Error during initial data sync:", error);
+		} catch (err) {
+			console.error(err);
 		} finally {
-			isRunning = false;
+			darDirba = false;
 		}
 	})();
 	
-	// Set up periodic sync
+	// Kartojame kas interval sekundžių
 	setInterval(async () => {
-		console.log(`Periodic data sync.`);
-		if (isRunning) {
-			console.log("Previous sync still in progress, skipping this interval");
+		console.log(`Periodinis duomenų atnaujinmas.`);
+		if (darDirba) {
+			console.log("Dar vyksta ankstesnis atnaujinimas, praleidžiame šį ciklą.");
 			return;
 		}
 		
-		isRunning = true;
+		darDirba = true;
 		try {
 			await requestLatestData();
-		} catch (error) {
-			console.error("Error during periodic data sync:", error);
+		} catch (err) {
+			console.error(err);
 		} finally {
-			isRunning = false;
+			darDirba = false;
 		}
 	}, interval * 1000);
 }

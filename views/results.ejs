@@ -1,6 +1,16 @@
-<div class="numberOfResults">
+<section class="preResultOptions">
+  <div class="numberOfResults">
     <%- numberOfResults %>
-</div>
+  </div>
+
+  <% if(galimaEksportuoti){ %>
+    <div class="exportOptions">
+      <a href="/?<%- queryParams %>&json=true&limit=max" class="exportLink">↗ JSON</a>&nbsp;
+      <a href="/?<%- queryParams %>&jsonl=true&limit=max" class="exportLink">↗ JSONL</a>&nbsp;
+      <a href="/?<%- queryParams %>&csv=true&limit=max" class="exportLink">↗ CSV</a>
+    </div>
+  <% } %>
+</section>
 
 <div class="tableContainer">
 <table>

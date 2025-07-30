@@ -18,7 +18,7 @@
 		<main>
 			<%- include('search.ejs', {values}) %>
             <% if(typeof data !== "undefined") { %>
-			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams}) %>
+			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
             <% } %>
 		</main>
 		<%- include('../footer.ejs') %>

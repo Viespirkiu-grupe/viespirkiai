@@ -83,6 +83,8 @@ export function buildTypesenseFilter(query) {
 		}
 	}
 
+	values.search = query.search || "";
+
 	return {
 		filterBy: filters.join(" && "),
 		values,
@@ -190,6 +192,8 @@ export function buildMongoFilter(query) {
 			queryParams.push(`${key}=${encodeURIComponent(query[key])}`);
 		}
 	}
+
+	values.search = query.search || "";
 
 	return {
 		filter,

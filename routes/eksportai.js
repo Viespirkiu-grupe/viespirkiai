@@ -5,22 +5,28 @@ import config from "../config.js";
 const eksportaiRouter = express.Router();
 
 eksportaiRouter.get("/:id", async (req, res, next) => {
-	// It might end with .torrent, then give the torrent file
 	let { id } = req.params;
+
+	// Ar tai yra .torrent failas?
 	let torrent = false;
 	if (id.endsWith(".torrent")) {
 		torrent = true;
 		id = id.slice(0, -8);
 	}
 
-	let [row] = await mysql.execute("SELECT * FROM eksportai WHERE id = ?;", [id]);
+	// Gauname eksportą pagal ID
+	let [row] = await mysql.execute("SELECT * FROM eksportai WHERE id = ?;", [
+		id,
+	]);
 
+	// 404
 	if (row.length === 0) {
 		return next();
 	}
 
 	row = row[0];
 
+	// Siunčiame .torrent failą
 	if (torrent) {
 		res.setHeader("Content-Type", "application/x-bittorrent");
 		res.setHeader(
@@ -28,12 +34,14 @@ eksportaiRouter.get("/:id", async (req, res, next) => {
 			`attachment; filename="${row.pavadinimas}.torrent"`
 		);
 		res.send(row.torrent);
-	} else {
-		res.render("eksportas.ejs", {
-			eksportas: row,
-			customHead: config.customHead
-		});
+		return;
 	}
+
+	// Atvaizduojame informaciją
+	res.render("eksportas.ejs", {
+		eksportas: row,
+		customHead: config.customHead,
+	});
 });
 
 export default eksportaiRouter;

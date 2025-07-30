@@ -1,71 +1,89 @@
-// https://data.gov.lt/datasets/673/#info
-
+/*
+Importuoja mokėtų mokesčių duomenis iš CSV failo į MySQL duomenų bazę.
+https://data.gov.lt/datasets/673/
+*/
 import fs from 'fs';
 import { mysql } from "../mysql/mysql.js";
 import readline from 'readline';
 
+// Patikrina, ar nurodytas CSV failo pavadinimas
 const filename = process.argv[2];
 if (!filename) {
-  console.error('Usage: node import-csv.mjs <file.csv>');
+  console.error('Naudojimas: node importMoketiMokesciai.js <file.csv>');
   process.exit(1);
 }
 
-
-const clean = (val) => {
-  if (val === '' || val === undefined) return null;
-
-  const hasWrappingQuotes = val.startsWith('"') && val.endsWith('"');
-  if (hasWrappingQuotes) {
-    // Remove the outer quotes and unescape inner quotes
-    return val.slice(1, -1).replace(/""/g, '"');
-  }
-
-  return val;
-};
-
-
-const sanitize = (val, type = 'text') => {
-  if (val === '' || val === undefined) return null;
-  if (type === 'int') return parseInt(val) || null;
-  if (type === 'float') return parseFloat(val) || null;
-  return clean(val);
-};
-
-let count = 0;
-let isFirstLine = true;
-const batchSize = 100;
-let batch = [];
-
-const insertBatch = async (rows) => {
-  if (rows.length === 0) return;
-
-  const sql = `
-    INSERT INTO mokesciai (
-      _id, id, mm_kodas_id, jarKodas, pavadinimas,
-      formosPavadinimas, apskritis, savivaldybe, metai, menuo,
-      suma, duomenuData
-    ) VALUES ${rows.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}
-  `;
-
-  const values = rows.flat();
-
-  try {
-    await mysql.execute(sql, values);
-    count += rows.length;
-    if (count % 1000 === 0) {
-      console.log(`${count} rows inserted...`);
-    }
-  } catch (err) {
-    console.error(`Batch insert failed after ${count} rows:`, err.message);
-  }
-};
-
+// Nuskaito CSV failą liniją po linijos
 const rl = readline.createInterface({
   input: fs.createReadStream(filename),
   crlfDelay: Infinity
 });
 
-const parseCSVLine = (line) => {
+
+
+let isFirstLine = true;
+const batchSize = 100;
+let batch = [];
+for await (const line of rl) {
+  if (isFirstLine) {
+    isFirstLine = false;
+    continue;
+  }
+
+  // Nuskaitome eilutės laukus
+  const fields = parseCSVLine(line);
+
+  // Patikriname, ar yra pakankamai laukų
+  if (fields.length < 12) {
+    console.warn(`Skipping malformed line: ${line}`);
+    continue;
+  }
+
+  // Išvalome duomenys
+  const [
+    _id, id, mm_kodas_id, jarCode, pavadinimas,
+      tipas, apskritis, savivaldybe, metai, menuo,
+      suma, atnaujinta
+  ] = fields.map(clean);
+
+  const row = [
+    _id,
+    id,
+    mm_kodas_id,
+    jarCode,
+    pavadinimas,
+    tipas,
+    apskritis,
+    savivaldybe,
+    metai,
+    menuo,
+    suma,
+    atnaujinta
+  ];
+
+  batch.push(row);
+
+  // Kai susikaupia pakankamai eilučių, įterpiame jas į duomenų bazę
+  if (batch.length === batchSize) {
+    await insertBatch(batch);
+    batch = [];
+  }
+}
+
+// Įterpiame likusias eilutes, jei tokių yra
+if (batch.length > 0) {
+  await insertBatch(batch);
+}
+
+console.log(`Įterptos eilutės: ${eilute}`);
+await mysql.end();
+
+/**
+ * Nuskaito CSV eilutę.
+ * @param {string} line - CSV eilutė.
+ * @returns {Array} - Išanalizuoti laukai.
+ */
+function parseCSVLine(line){
   const result = [];
   let field = '';
   let inQuotes = false;
@@ -96,53 +114,48 @@ const parseCSVLine = (line) => {
   return result;
 };
 
+/**
+ * Išvalo CSV lauką, pašalindamas tuščias reikšmes ir apdorodamas kabutes.
+ * @param {string} val - CSV lauko reikšmė.
+ * @returns {string|null} - Išvalyta reikšmė arba null, jei reikšmė yra tuščia.
+ */
+function clean(val) {
+	if (val === "" || val === undefined) return null;
 
-for await (const line of rl) {
-  if (isFirstLine) {
-    isFirstLine = false;
-    continue;
-  }
+	const hasWrappingQuotes = val.startsWith('"') && val.endsWith('"');
+	if (hasWrappingQuotes) {
+		return val.slice(1, -1).replace(/""/g, '"');
+	}
 
-  const fields = parseCSVLine(line);
-
-  if (fields.length < 12) {
-    console.warn(`Skipping malformed line: ${line}`);
-    continue;
-  }
-
-  const [
-    _id, id, mm_kodas_id, jarCode, pavadinimas,
-      tipas, apskritis, savivaldybe, metai, menuo,
-      suma, atnaujinta
-  ] = fields.map(clean);
-
-  const row = [
-    _id,
-    id,
-    mm_kodas_id,
-    jarCode,
-    pavadinimas,
-    tipas,
-    apskritis,
-    savivaldybe,
-    metai,
-    menuo,
-    suma,
-    atnaujinta
-  ];
-
-  batch.push(row);
-
-  if (batch.length === batchSize) {
-    await insertBatch(batch);
-    batch = [];
-  }
+	return val;
 }
 
-// Insert any remaining rows
-if (batch.length > 0) {
-  await insertBatch(batch);
-}
+let eilute = 0;
+/**
+ * Įterpia duomenų grupę į MySQL duomenų bazę.
+ * @param {Array} rows - Duomenų grupė, kurią reikia įterpti.
+ * @returns {Promise<void>}
+ */
+const insertBatch = async (rows) => {
+  if (rows.length === 0) return;
 
-console.log(`Done. Total rows inserted: ${count}`);
-await mysql.end();
+  const sql = `
+    INSERT INTO mokesciai (
+      _id, id, mm_kodas_id, jarKodas, pavadinimas,
+      formosPavadinimas, apskritis, savivaldybe, metai, menuo,
+      suma, duomenuData
+    ) VALUES ${rows.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}
+  `;
+
+  const values = rows.flat();
+
+  try {
+    await mysql.execute(sql, values);
+    eilute += rows.length;
+    if (eilute % 1000 === 0) {
+      console.log(`${eilute} rows inserted...`);
+    }
+  } catch (err) {
+    console.error(`Batch insert failed after ${eilute} rows:`, err.message);
+  }
+};

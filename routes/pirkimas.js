@@ -9,15 +9,20 @@ const pirkimasRouter = express.Router();
 pirkimasRouter.get("/:id", async (req, res, next) => {
 	const { id } = req.params;
 
+	// Randamas pirkimas pagal unikalų ID
 	let purchase = await viespirkiai.findOne({
 		sutartiesUnikalusID: parseInt(id),
 	});
+
+	// 404
 	if (!purchase) return next();
 
+	// Pataisomi HTML entities
 	purchase.pavadinimas = fixHtmlEntities(purchase.pavadinimas);
 	purchase.perkanciojiOrganizacija = fixHtmlEntities(purchase.perkanciojiOrganizacija);
 	purchase.tiekejas = fixHtmlEntities(purchase.tiekejas);
 
+	// Pridedame dokumentų adresus
 	if(purchase.dokumentai && purchase.dokumentai.length > 0) {
 		purchase.dokumentai = purchase.dokumentai.map(doc => {
 			doc.dok_id = doc.url.match(/dok_id=(\d+)/)[1];
@@ -27,13 +32,15 @@ pirkimasRouter.get("/:id", async (req, res, next) => {
 		});
 	}
 
+	// Formatuojame datas
+	purchase = dataToLithuanianTime(purchase);
+
+	// Jei prašoma JSON formato, grąžiname JSON
 	if (req.path.endsWith(".json")) {
 		const formattedJson = JSON.stringify(purchase, null, 2);
 		res.setHeader("Content-Type", "application/json");
 		return res.send(formattedJson);
 	}
-
-	purchase = dataToLithuanianTime(purchase);
 
 	res.set('Cache-Control', 'public, max-age=7200, s-maxage=7200');
 	res.render("pirkimas", { purchase, customHead: config.customHead });

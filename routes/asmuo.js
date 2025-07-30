@@ -17,53 +17,69 @@ asmuoRouter.get("/:id", async (req, res, next) => {
 		[id]
 	);
 
-	if (jarRezultatai.length === 0) {
-		const specAtvejai = {
-			801: {
-				pavadinimas: "CVP IS pilietis",
-				aprasymas: "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas piliečiui."
-			},
-			802: {
-				pavadinimas: "CVP IS ūkininkas",
-				aprasymas: "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas ūkininkui."
-			},
-			803: {
-				pavadinimas: "CVP IS užsienio įmonė",
-				aprasymas: "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas užsienio įmonei."
-			},
-			804: {
-				pavadinimas: "CVP IS Lietuvos respublikos ambasada",
-				aprasymas: "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas Lietuvos respublikos ambasadai."
-			},
-			807: {
-				pavadinimas: "CVP IS kitas asmuo",
-				aprasymas: "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas kitam asmeniui."
-			},
-			808: {
-				pavadinimas: "CVP IS Europos komisijos atstovybė Lietuvoje",
-				aprasymas: "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas Europos komisijos atstovybei Lietuvoje."
-			},
-			809: {
-				pavadinimas: "CVP IS fizinis asmuo",
-				aprasymas: "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas fiziniam asmeniui."
-			},
-			
-		};
+	// Specialūs atvejai
+	const specAtvejai = {
+		801: {
+			pavadinimas: "CVP IS pilietis",
+			aprasymas:
+				"Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas piliečiui.",
+		},
+		802: {
+			pavadinimas: "CVP IS ūkininkas",
+			aprasymas:
+				"Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas ūkininkui.",
+		},
+		803: {
+			pavadinimas: "CVP IS užsienio įmonė",
+			aprasymas:
+				"Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas užsienio įmonei.",
+		},
+		804: {
+			pavadinimas: "CVP IS Lietuvos respublikos ambasada",
+			aprasymas:
+				"Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas Lietuvos respublikos ambasadai.",
+		},
+		807: {
+			pavadinimas: "CVP IS kitas asmuo",
+			aprasymas:
+				"Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas kitam asmeniui.",
+		},
+		808: {
+			pavadinimas: "CVP IS Europos komisijos atstovybė Lietuvoje",
+			aprasymas:
+				"Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas Europos komisijos atstovybei Lietuvoje.",
+		},
+		809: {
+			pavadinimas: "CVP IS fizinis asmuo",
+			aprasymas:
+				"Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas fiziniam asmeniui.",
+		},
+	};
 
-		if (specAtvejai[id]) {
-			const { pavadinimas, aprasymas } = specAtvejai[id];
-			res.render("juridiniai/netikrasAsmuo", { customHead: config.customHead, asmuo: { id }, pavadinimas, aprasymas });
-			return;
-		}
+	if (specAtvejai[id]) {
+		const { pavadinimas, aprasymas } = specAtvejai[id];
+		res.render("juridiniai/netikrasAsmuo", {
+			customHead: config.customHead,
+			asmuo: { id },
+			pavadinimas,
+			aprasymas,
+		});
+		return;
+	}
+
+	// 404
+	if (jarRezultatai.length === 0) {
 		return next();
 	}
 
+	// Formatuojame JAR datas
 	let jar = jarRezultatai[0];
 	jar.registravimoData = jar.registravimoData.toLtDate();
 	jar.duomenuData = jar.duomenuData.toLtDate();
 	jar.statusasNuo = jar.statusasNuo.toLtDate();
 
-	if(jar.adresoId && jar.adresoId > 0) {
+	// Adreso koordinatės
+	if (jar.adresoId && jar.adresoId > 0) {
 		const [adresasRezultatai] = await mysql.execute(
 			"SELECT * FROM adresai WHERE id = ?;",
 			[jar.adresoId]
@@ -82,35 +98,46 @@ asmuoRouter.get("/:id", async (req, res, next) => {
 
 	let sodra;
 	if (sodraRezultatai.length > 0) {
-		sodra = {
-			kodas: sodraRezultatai[0].kodas,
-			jarKodas: sodraRezultatai[0].jarKodas,
-			pavadinimas: sodraRezultatai[0].pavadinimas,
-			savivaldybe: sodraRezultatai[0].savivaldybe,
-			ekonominesVeiklosKodas: sodraRezultatai[0].ekonominesVeiklosKodas,
-			ekonominesVeiklosPavadinimas: sodraRezultatai[0].ekonominesVeiklosPavadinimas,
-			vidutinisAtlyginimas: sodraRezultatai[0].vidutinisAtlyginimas,
-			vidutinisAtlyginimas2: sodraRezultatai[0].vidutinisAtlyginimas2,
-			data: `${sodraRezultatai[0].data.toString().slice(0, 4)}-${sodraRezultatai[0].data
-				.toString()
-				.slice(4, 6)}`,
-			draustieji: sodraRezultatai[0].draustieji,
-			draustieji2: sodraRezultatai[0].draustieji2,
-			bendrasVidutinisAtlyginimas:
-				(sodraRezultatai[0].vidutinisAtlyginimas * sodraRezultatai[0].draustieji +
-					sodraRezultatai[0].vidutinisAtlyginimas2 * sodraRezultatai[0].draustieji2) /
-				(sodraRezultatai[0].draustieji + sodraRezultatai[0].draustieji2),
-			bendrasDraustujuSkaicius: sodraRezultatai[0].draustieji + sodraRezultatai[0].draustieji2,
-			imokuSuma: sodraRezultatai[0].imokuSuma,
-		};
+		const [pirmas] = sodraRezultatai;
 
-		sodra.atlyginimuIslaidos =
-			parseFloat((sodra.bendrasVidutinisAtlyginimas * sodra.bendrasDraustujuSkaicius).toFixed(2));
+		const formatDate = (date) =>
+			`${date}`.slice(0, 4) + "-" + `${date}`.slice(4, 6);
+
+		const naudojamiNaujausi = [
+			"kodas",
+			"jarKodas",
+			"pavadinimas",
+			"savivaldybe",
+			"ekonominesVeiklosKodas",
+			"ekonominesVeiklosPavadinimas",
+			"vidutinisAtlyginimas",
+			"vidutinisAtlyginimas2",
+			"draustieji",
+			"draustieji2",
+			"imokuSuma",
+		];
+
+		sodra = Object.fromEntries(
+			naudojamiNaujausi.map((key) => [key, pirmas[key]])
+		);
+
+		sodra.data = formatDate(pirmas.data);
+
+		sodra.bendrasDraustujuSkaicius = pirmas.draustieji + pirmas.draustieji2;
+
+		sodra.bendrasVidutinisAtlyginimas =
+			(pirmas.vidutinisAtlyginimas * pirmas.draustieji +
+				pirmas.vidutinisAtlyginimas2 * pirmas.draustieji2) /
+			sodra.bendrasDraustujuSkaicius;
+
+		sodra.atlyginimuIslaidos = parseFloat(
+			(
+				sodra.bendrasVidutinisAtlyginimas * sodra.bendrasDraustujuSkaicius
+			).toFixed(2)
+		);
 
 		sodra.duomenys = sodraRezultatai.map((row) => ({
-			data: `${row.data.toString().slice(0, 4)}-${row.data
-				.toString()
-				.slice(4, 6)}`,
+			data: formatDate(row.data),
 			vidutinisAtlyginimas: row.vidutinisAtlyginimas,
 			draustieji: row.draustieji,
 			vidutinisAtlyginimas2: row.vidutinisAtlyginimas2,
@@ -126,19 +153,29 @@ asmuoRouter.get("/:id", async (req, res, next) => {
 	);
 
 	let mokesciai;
+
 	if (mokesciaiRezultatai.length > 0) {
+		const naujausias = mokesciaiRezultatai[0];
+
+		const naudojamiNaujausi = [
+			"pavadinimas",
+			"jarKodas",
+			"formosPavadinimas",
+			"suma",
+		];
+
 		mokesciai = {
-			pavadinimas: mokesciaiRezultatai[0].pavadinimas,
-			jarKodas: mokesciaiRezultatai[0].jarKodas,
-			formosPavadinimas: mokesciaiRezultatai[0].formosPavadinimas,
-			data: `${mokesciaiRezultatai[0].metai}-${mokesciaiRezultatai[0].menuo
+			...Object.fromEntries(
+				naudojamiNaujausi.map((key) => [key, naujausias[key]])
+			),
+			data: `${naujausias.metai}-${naujausias.menuo
 				.toString()
 				.padStart(2, "0")}`,
-			duomenuData: mokesciaiRezultatai[0].duomenuData.toLocaleDateString('lt-LT', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-			suma: mokesciaiRezultatai[0].suma,
+			duomenuData: naujausias.duomenuData.toLtDate(),
+
 			duomenys: mokesciaiRezultatai.map((row) => ({
 				data: `${row.metai}-${row.menuo.toString().padStart(2, "0")}`,
-				duomenuData: row.duomenuData.toLocaleDateString('lt-LT', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+				duomenuData: row.duomenuData.toLtDate(),
 				suma: row.suma,
 			})),
 		};
@@ -146,7 +183,9 @@ asmuoRouter.get("/:id", async (req, res, next) => {
 
 	// Asmuo
 	let asmuo = {
-		jar, sodra, mokesciai
+		jar,
+		sodra,
+		mokesciai,
 	};
 
 	// JSON
@@ -158,18 +197,28 @@ asmuoRouter.get("/:id", async (req, res, next) => {
 
 	// Aprašas
 	let aprasas = `${jar.pavadinimas} (${jar.jarKodas})`;
-	if(asmuo?.jar?.adresas) {
+
+	// Adresas
+	if (asmuo?.jar?.adresas) {
 		aprasas += `\nAdresas: ${jar.adresas}`;
 	}
-	if(asmuo?.sodra?.numInsured) {
+
+	// Darbuotojai, atlyginimai
+	if (asmuo?.sodra?.numInsured) {
 		aprasas += `\nSodra: ${asmuo.sodra.numInsured} darbuotojų`;
-		if(asmuo.sodra.avgWage) {
-			aprasas += `, vidutinis atlyginimas: ${asmuo.sodra.avgWage.toFixed(2)} €/mėn.`;
+		if (asmuo.sodra.avgWage) {
+			aprasas += `, vidutinis atlyginimas: ${asmuo.sodra.avgWage.toFixed(
+				2
+			)} €/mėn.`;
 		}
 	}
 
-	res.set('Cache-Control', 'public, max-age=7200, s-maxage=7200');
-	res.render("juridiniai/asmuo", { asmuo, customHead: config.customHead, aprasas });
+	res.set("Cache-Control", "public, max-age=7200, s-maxage=7200");
+	res.render("juridiniai/asmuo", {
+		asmuo,
+		customHead: config.customHead,
+		aprasas,
+	});
 });
 
 export default asmuoRouter;

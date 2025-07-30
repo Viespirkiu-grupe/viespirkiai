@@ -45,15 +45,22 @@ const schema = {
 
 let collectionInitialized = false;
 
+/**
+ * Užtikrina, kad Typesense kolekcija būtų sukurta ir atnaujinta.
+ * Jei kolekcija jau egzistuoja, bet schema nesutampa, ji bus perrašyta.
+ * @returns {Promise<void>}
+ */
 export async function ensureSearchCollection() {
 	if (collectionInitialized) return;
 
 	try {
+		// Patikriname, ar kolekcija jau egzistuoja
 		const existing = await client.collections(COLLECTION).retrieve();
 
 		const existingVersion = existing.metadata?.version ?? 0;
 
 		if (existingVersion !== SCHEMA_VERSION) {
+			// Versija nesutampa
 			console.log(
 				`[Typesense] Existing schema version: ${existingVersion}, Expected: ${SCHEMA_VERSION}`
 			);
@@ -61,25 +68,39 @@ export async function ensureSearchCollection() {
 			console.log(
 				"[Typesense] Schema version mismatch. Replacing collection..."
 			);
+
+			// Ištriname esamą kolekciją ir sukuriame naują su atnaujinta schema
 			await client.collections(COLLECTION).delete();
 			await client.collections().create(schema);
 
-            migrateAllDocumentsToTypesenseFromCollection(viespirkiai);
-
+			migrateAllDocumentsToTypesenseFromCollection(viespirkiai); // FUNKCIJA NEEGZISTUOJA
 		}
 	} catch (err) {
+		// Jei kolekcija neegzistuoja, sukuriame ją
 		console.log("[Typesense] Collection not found, creating...");
 		await client.collections().create(schema);
+		migrateAllDocumentsToTypesenseFromCollection(viespirkiai); // FUNKCIJA NEEGZISTUOJA
 	}
 
 	collectionInitialized = true;
 }
 
+/**
+ * Konvertuoja datą į Unix timestamp (sekundėmis nuo 1970-01-01).
+ * @param {Date|string} date - Data, kurią reikia konvertuoti
+ * @returns {number} Unix timestamp
+ */
 function toUnixTimestamp(date) {
 	const ts = new Date(date).getTime();
 	return Number.isFinite(ts) ? Math.floor(ts / 1000) : 0;
 }
 
+/**
+ * Prideda dokumentą į Typesense paieškos kolekciją.
+ * @param {Object} doc - Dokumentas, kurį reikia pridėti
+ * @returns {Promise<void>}
+ * @throws {Error} Jei nepavyksta pridėti dokumento
+ */
 export async function addDocumentToSearch(doc) {
 	const tsDoc = {
 		id: doc.sutartiesUnikalusID?.toString() || "",
@@ -120,6 +141,16 @@ export async function addDocumentToSearch(doc) {
 	return client.collections(COLLECTION).documents().upsert(tsDoc);
 }
 
+/**
+ * Ieško dokumentų pagal užklausą.
+ * @param {string} query - Paieškos užklausa
+ * @param {Object} options - Papildomi paieškos parametrai
+ * @param {number} options.limit - Rezultatų skaičius vienoje puslapyje (numatytas 50)
+ * @param {number} options.page - Puslapio numeris (numatytas 1)
+ * @param {string} options.sortBy - Rikiavimo kriterijus (numatytas "sudarymoData:desc")
+ * @param {string} options.filterBy - Filtravimo kriterijus
+ * @returns {Promise<Object>} Paieškos rezultatai ir bendras įrašų skaičius
+ */
 export async function searchDocuments(query, options = {}) {
 	const {
 		limit = 50,

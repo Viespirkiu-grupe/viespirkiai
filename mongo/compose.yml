@@ -10,8 +10,8 @@ services:
     volumes:
       - ./data:/data/db
     restart: unless-stopped
-    # deploy:
-    #   resources:
-    #     limits:
-    #       memory: 256M
+    deploy:
+      resources:
+        limits:
+          memory: 1000M
     #       cpus: '1'

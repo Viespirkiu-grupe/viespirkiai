@@ -1,11 +1,21 @@
+/**
+ * Eksportuoja MongoDB sutartis į JSONL failą.
+ */
 import { viespirkiai } from "../mongo/mongoDb.js";
 import { createWriteStream } from "fs";
-import config from "../utils/config.js";
-import { join } from "path";
+import { resolve } from "path";
+
+// Get the export file path from the command line arguments
+const filePathArg = process.argv[2];
+if (!filePathArg) {
+	console.error("Usage: node exportSutartysJsonl.js <output-file-path>");
+	process.exit(1);
+}
+
+const exportPath = resolve(process.cwd(), filePathArg);
+const exportStream = createWriteStream(exportPath);
 
 const cursor = viespirkiai.find().stream();
-const exportStream = createWriteStream(join(process.cwd(), config.exportFile));
-
 let count = 0;
 let isPaused = false;
 

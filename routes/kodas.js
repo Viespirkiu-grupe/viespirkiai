@@ -1,5 +1,4 @@
 import express from 'express';
-import config from '../utils/config.js';
 
 const kodasRouter = express.Router();
 

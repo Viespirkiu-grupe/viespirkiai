@@ -1,19 +1,30 @@
+/**
+ * Importuoja sutarčių dokumentų duomenis iš MongoDB į MySQL.
+ * Dokumentai yra susieti su sutartimis pagal dokId ir fileId.
+ */
 import { mysql } from "../mysql/mysql.js";
 import { viespirkiai } from "../mongo/mongoDb.js";
 
-var index = 1;
-async function doOne() {
-	// Get a document where dokumentaiMysql is not true from mongo
+var importFailoNumeris = 1;
+/**
+ * Atlieka vieną importavimo operaciją.
+ * Ieško vieno mongo dokumento, kuris dar neturi dokumentų įrašų MySQL.
+ * Jei randa, įrašo dokumentus į MySQL failų lentelę
+ * ir pažymi mongo dokumentą kaip apdorotą.
+ * @returns {Promise<boolean>} true jei pavyko įrašyti dokumentus, false jei nėra daugiau dokumentų
+ */
+async function importuotiVienaDokumenta() {
+	// Randame sutartį, kur dokumentaiMysql is not true
     const mongoDoc = await viespirkiai.findOne({
         dokumentaiMysql: { $ne: true },
-      //  dokumentuKiekis: { $gt: 0 },
     });
 
 	if (!mongoDoc) {
-		console.log("No documents found where dokumentaiMysql is not true.");
+		console.log("Visi dokumentai jau įkelti į MySQL.");
 		return false;
 	}
 
+	// Suformatuojame dokumentus
 	let dokumentai = mongoDoc.dokumentai;
 	for (let i = 0; i < dokumentai.length; i++) {
 		const doc = dokumentai[i];
@@ -24,11 +35,10 @@ async function doOne() {
 	}
 
 	if (!dokumentai || dokumentai.length === 0) {
-        // console.log(mongoDoc.pavadinimas)
-		console.log(`${index} No documents found in the mongo document.`);
-        index++;
+		console.log(`[${importFailoNumeris}] Sutartis neturi dokumentų.`);
+        importFailoNumeris++;
 
-		// Set dokumentaiMysql to true
+		// Nustatome dokumentaiMysql kaip true
 		await viespirkiai.updateOne(
 			{ _id: mongoDoc._id },
 			{ $set: { dokumentaiMysql: true } }
@@ -36,6 +46,7 @@ async function doOne() {
 		return true;
 	}
 
+	// Įrašome dokumentus į MySQL
 	const placeholders = dokumentai.map(() => "(?, ?, ?, ?)").join(", ");
 	const values = dokumentai.flatMap((doc) => [
 		doc.dokId,
@@ -49,16 +60,18 @@ async function doOne() {
 		values
 	);
 
+	// Nustatome dokumentaiMysql kaip true
 	await viespirkiai.updateOne(
 		{ _id: mongoDoc._id },
 		{ $set: { dokumentaiMysql: true } }
 	);
 
-    console.log(`${index} / Inserted documents into MySQL.`);
-    index++;
+    console.log(`[${importFailoNumeris}] Į MySQL įterpti dokumentai.`);
+    importFailoNumeris++;
     return true;
 }
 
-while (await doOne()) {
-    // Repeat while true is returned
+while (await importuotiVienaDokumenta()) {
+    // Kartoti, kol yra dokumentų
 }
+process.exit(0); // Baigta

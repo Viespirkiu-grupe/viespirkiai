@@ -342,12 +342,6 @@ input {
 
 /* === Rezultatai === */
 
-.numberOfResults {
-	margin-block: 16px;
-	font-style: italic;
-	padding-left: 8px;
-}
-
 .pagination {
 	font-weight: bold;
 	display: flex;
@@ -470,5 +464,28 @@ input[type="search"]::-webkit-search-cancel-button {
 footer a{
 	display: inline-block;
 	margin: 0 8px;
+}
+
+section.preResultOptions{
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	margin-block: 16px;
+	padding-left: 8px;
+}
+
+@media (max-width: 768px) {
+	section.preResultOptions{
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 8px;
+	}
+}
+
+.numberOfResults {
+	/* margin-block: 16px; */
+	font-style: italic;
+	/* padding-left: 8px; */
 }
 </style>

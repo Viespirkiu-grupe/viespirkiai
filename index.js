@@ -56,9 +56,17 @@ import kontaktaiRouter from "./routes/kontaktai.js";
 app.use("/kontaktai", kontaktaiRouter);
 
 app.use((req, res, next) => {
-  res.status(404).render("404", {
-        customHead: config.customHead,
-    });
+	res.status(404).render("404", {
+		customHead: config.customHead,
+	});
+});
+
+app.use((err, req, res, next) => {
+  console.log(req.path)
+  console.error(err);
+	res.status(500).render("500", {
+		customHead: config.customHead,
+	});
 });
 
 // Search database
