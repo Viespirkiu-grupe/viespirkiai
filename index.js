@@ -12,6 +12,13 @@ const PORT = config.port || 8000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+app.use((req, res, next) => {
+  const onionBase = 'http://viespirk6fj2pukym5gv5pqsuzc77jaudkbddxvqjjoetph337dhyrqd.onion';
+  res.setHeader('Onion-Location', onionBase + req.originalUrl);
+
+  next();
+});
+
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname, "public")));
