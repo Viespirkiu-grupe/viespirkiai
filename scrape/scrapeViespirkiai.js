@@ -4,35 +4,65 @@ Periodiškai atsiunčia ir importuoja sutartis iš eViesiejiPirkimai.lt svetain�
 import { parseHTML } from "linkedom";
 import { writeFile } from "fs/promises";
 import { importArray } from "../import/import.js";
-import fetch from 'node-fetch';
-import pkg from 'https-proxy-agent';
+import fetch from "node-fetch";
+import pkg from "https-proxy-agent";
 const { HttpsProxyAgent } = pkg;
+import { SocksProxyAgent } from 'socks-proxy-agent';
 import config from "../utils/config.js";
 
 // Nustatome proxy, jei yra
 let proxyAgent = null;
-if(config.scrapeProxy){
-	proxyAgent = new HttpsProxyAgent(config.scrapeProxy);
+
+if (config.scrapeProxy) {
+  if (config.scrapeProxy.startsWith("http://") || config.scrapeProxy.startsWith("https://")) {
+    proxyAgent = new HttpsProxyAgent(config.scrapeProxy, {
+      rejectUnauthorized: false, // allow self-signed certs
+    });
+  } else if (config.scrapeProxy.startsWith("socks5://") || config.scrapeProxy.startsWith("socks://")) {
+    proxyAgent = new SocksProxyAgent(config.scrapeProxy, { rejectUnauthorized: false });
+  } else {
+    throw new Error("Unsupported proxy protocol: " + config.scrapeProxy);
+  }
 }
+
 
 /**
  * Parsisiunčia ir nuskaito sutartis iš eViesiejiPirkimai.lt svetainės.
- * @param {string} url 
+ * @param {string} url
  * @returns {Promise<Object[]>} Sutartys
  */
 export async function scrapePage(url) {
 	let start = new Date();
 
 	// Atliekama užklausa
-	if(proxyAgent){
-		var response = await fetch(url, { agent: proxyAgent });
-	}else{
+	if (proxyAgent) {
+		// process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+		// var response = await fetch("https://example.com", { agent: proxyAgent });
+		// let test = await response.text();
+		// console.log(test);
+
+		var response = await fetch(url, {
+			agent: proxyAgent,
+			headers: {
+				"User-Agent":
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+					"AppleWebKit/537.36 (KHTML, like Gecko) " +
+					"Chrome/115.0.0.0 Safari/537.36",
+				Accept:
+					"text/html,application/xhtml+xml,application/xml;" +
+					"q=0.9,image/webp,image/apng,*/*;q=0.8",
+				"Accept-Language": "en-US,en;q=0.9",
+				"Accept-Encoding": "gzip, deflate, br",
+				Connection: "keep-alive",
+			},
+		});
+	} else {
 		var response = await fetch(url);
 	}
 	const html = await response.text();
 
 	console.log(`[Import] Užklausos laikas: ${new Date() - start}ms`);
-	
+
 	// Nuskaitomas HTML
 	const { document } = parseHTML(html);
 
@@ -142,13 +172,19 @@ export async function scrapePage(url) {
 						sutartis.bvpzKodas = galimaiKodas;
 						sutartis.bvpzPavadinimas = "";
 					} else {
-						if(tr.innerHTML.match(/<td class="text-end"><i><b>BVPŽ kodas:<\/b><\/i><\/td><td>(.*)<\/td>/)){
+						if (
+							tr.innerHTML.match(
+								/<td class="text-end"><i><b>BVPŽ kodas:<\/b><\/i><\/td><td>(.*)<\/td>/
+							)
+						) {
 							sutartis.bvpzKodas = undefined;
-							sutartis.bvpzPavadinimas = tr.innerHTML.match(/<td class="text-end"><i><b>BVPŽ kodas:<\/b><\/i><\/td><td>(.*)<\/td>/)[1];
-						}else if(galimaiKodas.match(/^[0-9]{8}-[0-9]$/)){
+							sutartis.bvpzPavadinimas = tr.innerHTML.match(
+								/<td class="text-end"><i><b>BVPŽ kodas:<\/b><\/i><\/td><td>(.*)<\/td>/
+							)[1];
+						} else if (galimaiKodas.match(/^[0-9]{8}-[0-9]$/)) {
 							sutartis.bvpzKodas = galimaiKodas;
 							sutartis.bvpzPavadinimas = "";
-						}else{
+						} else {
 							console.log("Nerastas BVPŽ kodas: " + galimaiKodas + "END");
 							console.log(tr.innerHTML);
 						}
@@ -190,7 +226,7 @@ export async function scrapePage(url) {
  * @param {number} page - Puslapis, kurį reikia importuoti
  * @returns {number} Importuotų įrašų skaičius
  */
-async function importPage(page = 0){
+async function importPage(page = 0) {
 	let start = new Date();
 
 	// Sudarome puslapio URL
@@ -202,7 +238,7 @@ async function importPage(page = 0){
 	}
 
 	const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&filter_limit=${kiekis}&order_field=date&order_dir=asc&limitstart=${limitstart}`;
-	console.log(`[Import#${page/50}] ${url}`);
+	console.log(`[Import#${page / 50}] ${url}`);
 
 	// Nuskaitome puslapį
 	let data = await scrapePage(url);
@@ -229,13 +265,14 @@ async function importPage(page = 0){
 async function requestLatestData() {
 	// Nuskaitome paskutinio puslapio numerį iš ./lastPage.txt
 	try {
-		const lastPageFile = await import('fs/promises').then(fs => 
-			fs.readFile('lastPage.txt', 'utf-8'));
+		const lastPageFile = await import("fs/promises").then((fs) =>
+			fs.readFile("lastPage.txt", "utf-8")
+		);
 		var page = parseInt(lastPageFile.trim(), 10) + 1;
 		if (isNaN(page)) page = 0;
 		console.log(`Pradedama nuo ${page} pagal lastPage.txt`);
 	} catch (error) {
-		console.log('Nerastas lastPage.txt, pradedama nuo 0');
+		console.log("Nerastas lastPage.txt, pradedama nuo 0");
 		var page = 0;
 	}
 
@@ -243,17 +280,19 @@ async function requestLatestData() {
 	while (true) {
 		console.log(`[Import#${page}] Importuojama.`);
 
-		if (await importPage(page) < 50) {
+		if ((await importPage(page)) < 50) {
 			console.log(`[Import#${page}] Puslapis nėra pilnas.`);
 			return;
 		} else {
 			console.log(`[Import#${page}] Pilnai importuotas.`);
 
 			// Išsaugome puslapio numerį į lastPage.txt
-			await writeFile('lastPage.txt', page.toString());
+			await writeFile("lastPage.txt", page.toString());
 			page++;
 		}
 		console.log(`[Import#${page}] --------------------------`);
+		// Wait for like 10s
+		await new Promise((resolve) => setTimeout(resolve, 10000));
 	}
 }
 
@@ -268,7 +307,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
  */
 export function periodicallySyncData(interval = 60) {
 	let darDirba = false;
-	
+
 	// Run once immediately
 	(async () => {
 		console.log(`Pradinis duomenų atnaujinimas.`);
@@ -281,7 +320,7 @@ export function periodicallySyncData(interval = 60) {
 			darDirba = false;
 		}
 	})();
-	
+
 	// Kartojame kas interval sekundžių
 	setInterval(async () => {
 		console.log(`Periodinis duomenų atnaujinmas.`);
@@ -289,7 +328,7 @@ export function periodicallySyncData(interval = 60) {
 			console.log("Dar vyksta ankstesnis atnaujinimas, praleidžiame šį ciklą.");
 			return;
 		}
-		
+
 		darDirba = true;
 		try {
 			await requestLatestData();

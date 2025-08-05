@@ -20,6 +20,7 @@
     "mysql2": "^3.14.1",
     "node-fetch": "^3.3.2",
     "p-limit": "^6.2.0",
+    "socks-proxy-agent": "^8.0.5",
     "typesense": "^2.0.3"
   },
   "type": "module"
