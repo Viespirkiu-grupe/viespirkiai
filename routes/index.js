@@ -201,7 +201,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
     }
 
     let galimaEksportuoti = true;
-    if (req.query.search && numberOfResults > MAX_TYPESENSE_LIMIT) {
+    if (req.query.search && total > MAX_TYPESENSE_LIMIT) {
         galimaEksportuoti = false;
     } else if (total > MAX_MONGO_LIMIT) {
         galimaEksportuoti = false;
