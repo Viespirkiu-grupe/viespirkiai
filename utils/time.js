@@ -72,3 +72,15 @@ Date.prototype.toLtDate = function () {
 		day: "2-digit",
 	});
 };
+
+Date.prototype.toLtTime = function () {
+	return this.toLocaleTimeString("lt-LT", {
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+	});
+}
+
+Date.prototype.toLtDateTime = function () {
+	return this.toLtDate() + " " + this.toLtTime();
+}

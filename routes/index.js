@@ -11,209 +11,217 @@ const indexRouter = express.Router();
 
 let sutarciuSkaicius;
 
-async function atnaujintiSutarciuSkaiciu(){
-	sutarciuSkaicius = await viespirkiai.estimatedDocumentCount();
-};
+async function atnaujintiSutarciuSkaiciu() {
+    sutarciuSkaicius = await viespirkiai.estimatedDocumentCount();
+}
 
 await atnaujintiSutarciuSkaiciu();
 setInterval(atnaujintiSutarciuSkaiciu, 15 * 60 * 1000); // 15min
 
 indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
-	const startas = performance.now();
+    const startas = performance.now();
 
-	// Limitas, kiek rodyti viename puslapyje
-	let limit = 50;
-	const MAX_MONGO_LIMIT = 10000;
-	const MAX_TYPESENSE_LIMIT = 250;
+    // Limitas, kiek rodyti viename puslapyje
+    let limit = 50;
+    const MAX_MONGO_LIMIT = 10000;
+    const MAX_TYPESENSE_LIMIT = 250;
 
-	if (req.query.limit == "max" && req.query.search) {
-		limit = MAX_TYPESENSE_LIMIT;
-	} else if (req.query.limit == "max") {
-		limit = MAX_MONGO_LIMIT;
-	} else if (
-		parseInt(req.query.limit) > MAX_TYPESENSE_LIMIT &&
-		req.query.search
-	) {
-		return res
-			.status(400)
-			.send(
-				`Limitas per didelis. Maksimalus limitas tekstinėms paieškoms po ${MAX_TYPESENSE_LIMIT} rezultatų puslapyje.`
-			);
-	} else if (parseInt(req.query.limit) > MAX_MONGO_LIMIT) {
-		return res
-			.status(400)
-			.send(
-				`Limitas per didelis. Maksimalus limitas ne tekstinėms paieškoms yra ${MAX_MONGO_LIMIT} rezultatų puslapyje.`
-			);
-	} else if (parseInt(req.query.limit) > 0) {
-		limit = parseInt(req.query.limit) || limit;
-	}
+    if (req.query.limit == "max" && req.query.search) {
+        limit = MAX_TYPESENSE_LIMIT;
+    } else if (req.query.limit == "max") {
+        limit = MAX_MONGO_LIMIT;
+    } else if (
+        parseInt(req.query.limit) > MAX_TYPESENSE_LIMIT &&
+        req.query.search
+    ) {
+        return res
+            .status(400)
+            .send(
+                `Limitas per didelis. Maksimalus limitas tekstinėms paieškoms po ${MAX_TYPESENSE_LIMIT} rezultatų puslapyje.`,
+            );
+    } else if (parseInt(req.query.limit) > MAX_MONGO_LIMIT) {
+        return res
+            .status(400)
+            .send(
+                `Limitas per didelis. Maksimalus limitas ne tekstinėms paieškoms yra ${MAX_MONGO_LIMIT} rezultatų puslapyje.`,
+            );
+    } else if (parseInt(req.query.limit) > 0) {
+        limit = parseInt(req.query.limit) || limit;
+    }
 
-	// Puslapis, kurį rodyti
-	const page = parseInt(req.query.page) || 1;
-	const skip = (page - 1) * limit;
+    // Puslapis, kurį rodyti
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
 
-	if (req.query.search) {
-		// Tekstinė paieška – Typesense
-		var { filterBy, values, queryParams, usedHiddenFields } =
-			buildTypesenseFilter(req.query);
+    if (req.query.search) {
+        // Tekstinė paieška – Typesense
+        var { filterBy, values, queryParams, usedHiddenFields } =
+            buildTypesenseFilter(req.query);
 
-		queryParams += `&search=${encodeURIComponent(req.query.search)}`;
+        queryParams += `&search=${encodeURIComponent(req.query.search)}`;
 
-		var { results, total } = await searchDocuments(req.query.search || "*", {
-			page: page,
-			filterBy,
-			sortBy: "paskutinioRedagavimoData:desc",
-			limit,
-		});
+        var { results, total } = await searchDocuments(
+            req.query.search || "*",
+            {
+                page: page,
+                filterBy,
+                sortBy: "paskutinioRedagavimoData:desc",
+                limit,
+            },
+        );
 
-		var paieškosVariklis = "Typesense";
-	} else {
-		// Ne tekstinė paieška – MongoDB
-		var { filter, values, queryParams, usedHiddenFields } = buildMongoFilter(
-			req.query
-		);
+        var paieškosVariklis = "Typesense";
+    } else {
+        // Ne tekstinė paieška – MongoDB
+        var { filter, values, queryParams, usedHiddenFields } =
+            buildMongoFilter(req.query);
 
-		if (Object.keys(filter).length === 0) {
-			var total = sutarciuSkaicius;
-		} else {
-			var total = await viespirkiai.countDocuments(filter);
-		}
+        if (Object.keys(filter).length === 0) {
+            var total = sutarciuSkaicius;
+        } else {
+            var total = await viespirkiai.countDocuments(filter);
+        }
 
-		var results = await viespirkiai
-			.find(filter)
-			.sort({ paskutinioRedagavimoData: -1 })
-			.skip(skip)
-			.limit(limit)
-			.toArray();
+        var results = await viespirkiai
+            .find(filter)
+            .sort({ paskutinioRedagavimoData: -1 })
+            .skip(skip)
+            .limit(limit)
+            .toArray();
 
-		var paieškosVariklis = "MongoDB";
-	}
+        var paieškosVariklis = "MongoDB";
+    }
 
-	// Pataisomi HTML simboliai
-	for (let i = 0; i < results.length; i++) {
-		results[i].pavadinimas = fixHtmlEntities(results[i].pavadinimas);
-		results[i].perkanciojiOrganizacija = fixHtmlEntities(
-			results[i].perkanciojiOrganizacija
-		);
-		results[i].tiekejas = fixHtmlEntities(results[i].tiekejas);
-	}
+    // Pataisomi HTML simboliai
+    for (let i = 0; i < results.length; i++) {
+        results[i].pavadinimas = fixHtmlEntities(results[i].pavadinimas);
+        results[i].perkanciojiOrganizacija = fixHtmlEntities(
+            results[i].perkanciojiOrganizacija,
+        );
+        results[i].tiekejas = fixHtmlEntities(results[i].tiekejas);
+    }
 
-	// Pakeičiame datų formatą į lietuvišką
-	results = arrayToLithuanianTime(results);
+    // Pakeičiame datų formatą į lietuvišką
+    results = arrayToLithuanianTime(results);
 
-	// Paieškos užklausos informacija
-	let trukme = ((performance.now() - startas) / 1000).toFixed(2) + "s";
-	let rodomiRezultatai = results.length;
-	if (rodomiRezultatai < total) {
-		var numberOfResults = `Rodomi ${rodomiRezultatai} iš ${total} rezultatų <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
-	} else {
-		var numberOfResults = `${total} rezultatas(-ai) <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
-	}
+    // Paieškos užklausos informacija
+    let trukme = ((performance.now() - startas) / 1000).toFixed(2) + "s";
+    let rodomiRezultatai = results.length;
+    if (rodomiRezultatai < total) {
+        var numberOfResults = `Rodomi ${rodomiRezultatai} iš ${total} rezultatų <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
+    } else {
+        var numberOfResults = `${total} rezultatas(-ai) <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
+    }
 
-	// Jei prašo JSON
-	if (req.query.json) {
-		return res.json(results);
-	}
+    // Jei prašo JSON
+    if (req.query.json) {
+        return res.json(results);
+    }
 
-	// Jei prašo JSONL
-	if (req.query.jsonl) {
-		res.setHeader("Content-Type", "application/x-ndjson");
-		res.setHeader(
-			"Content-Disposition",
-			`attachment; filename=viespirkiai-${new Date().toISOString()}.jsonl`
-		);
-		for (const result of results) {
-			res.write(JSON.stringify(result) + "\n");
-		}
-		return res.end();
-	}
+    // Jei prašo JSONL
+    if (req.query.jsonl) {
+        res.setHeader("Content-Type", "application/x-ndjson");
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename=viespirkiai-${new Date().toISOString()}.jsonl`,
+        );
+        for (const result of results) {
+            res.write(JSON.stringify(result) + "\n");
+        }
+        return res.end();
+    }
 
-	// Jei prašo CSV
-	if (req.query.csv) {
-		res.setHeader("Content-Type", "text/csv");
-		res.setHeader(
-			"Content-Disposition",
-			`attachment; filename=viespirkiai-${new Date().toISOString()}.csv`
-		);
-		res.setHeader("Content-Transfer-Encoding", "binary");
+    // Jei prašo CSV
+    if (req.query.csv) {
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename=viespirkiai-${new Date().toISOString()}.csv`,
+        );
+        res.setHeader("Content-Transfer-Encoding", "binary");
 
-		const escapeCSV = (value) => `"${String(value).replace(/"/g, '""')}"`;
+        const escapeCSV = (value) => {
+            if (value == null) return "";
+            if (typeof value === "number") return value; // keep as number
+            const str = String(value);
+            return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+        };
 
-		const formatDate = (value) => {
-			if (!value) return "";
-			const date = new Date(value);
-			return isNaN(date) ? "" : date.toISOString().split("T")[0];
-		};
+        const formatDate = (value) => {
+            if (!value) return "";
+            const date = new Date(value);
+            return isNaN(date) ? "" : date.toISOString().split("T")[0];
+        };
 
-		const header =
-			[
-				"Tipas",
-				"Kategorija",
-				"Pavadinimas",
-				"Numatyta vertė",
-				"Faktinė vertė",
-				"Pirkėjo pavadinimas",
-				"Pirkėjo kodas",
-				"Tiekėjo pavadinimas",
-				"Tiekėjo kodas",
-				"Sudarymo data",
-				"Faktinė įvykdymo data",
-				"Redagavimo data",
-				"BVPZ kodas",
-				"Sutarties numeris",
-				"Unikalus ID",
-			].join(",") + "\n";
+        const header =
+            [
+                "Tipas",
+                "Kategorija",
+                "Pavadinimas",
+                "Numatyta vertė",
+                "Faktinė vertė",
+                "Pirkėjo pavadinimas",
+                "Pirkėjo kodas",
+                "Tiekėjo pavadinimas",
+                "Tiekėjo kodas",
+                "Sudarymo data",
+                "Faktinė įvykdymo data",
+                "Redagavimo data",
+                "BVPZ kodas",
+                "Sutarties numeris",
+                "Unikalus ID",
+            ].join(",") + "\n";
 
-		res.write(header);
+        res.write(header);
 
-		for (const row of results) {
-			const values = [
-				row.tipas,
-				row.kategorija,
-				row.pavadinimas,
-				row.verte,
-				row.faktineVerte || "",
-				row.perkanciojiOrganizacija,
-				row.perkanciosiosOrganizacijosKodas,
-				row.tiekejas,
-				row.tiekejoKodas,
-				formatDate(row.sudarymoData),
-				formatDate(row.faktineIvykdymoData),
-				formatDate(row.paskutinioRedagavimoData),
-				row.bvpzKodas || "",
-				row.sutartiesNumeris || "",
-				row.sutartiesUnikalusID,
-			];
-			const csvLine = values.map(escapeCSV).join(",") + "\n";
-			res.write(csvLine);
-		}
+        for (const row of results) {
+            const values = [
+                row.tipas,
+                row.kategorija,
+                row.pavadinimas,
+                row.verte,
+                row.faktineVerte || "",
+                row.perkanciojiOrganizacija,
+                row.perkanciosiosOrganizacijosKodas,
+                row.tiekejas,
+                row.tiekejoKodas,
+                formatDate(row.sudarymoData),
+                formatDate(row.faktineIvykdymoData),
+                formatDate(row.paskutinioRedagavimoData),
+                row.bvpzKodas || "",
+                row.sutartiesNumeris || "",
+                row.sutartiesUnikalusID,
+            ];
+            const csvLine = values.map(escapeCSV).join(",") + "\n";
+            res.write(csvLine);
+        }
 
-		res.end();
-		return;
-	}
+        res.end();
+        return;
+    }
 
-	let galimaEksportuoti = true;
-	if (req.query.search && numberOfResults > MAX_TYPESENSE_LIMIT) {
-		galimaEksportuoti = false;
-	}else if (total > MAX_MONGO_LIMIT) {
-		galimaEksportuoti = false;
-	}
+    let galimaEksportuoti = true;
+    if (req.query.search && numberOfResults > MAX_TYPESENSE_LIMIT) {
+        galimaEksportuoti = false;
+    } else if (total > MAX_MONGO_LIMIT) {
+        galimaEksportuoti = false;
+    }
 
-	const totalPages = Math.ceil(total / limit);
+    const totalPages = Math.ceil(total / limit);
 
-	res.set("Cache-Control", "public, max-age=10, s-maxage=10");
-	res.render("index", {
-		data: results,
-		values,
-		usedHiddenFields,
-		currentPage: page,
-		pageCount: totalPages,
-		numberOfResults,
-		queryParams,
-		customHead: config.customHead,
-		galimaEksportuoti
-	});
+    res.set("Cache-Control", "public, max-age=10, s-maxage=10");
+    res.render("index", {
+        data: results,
+        values,
+        usedHiddenFields,
+        currentPage: page,
+        pageCount: totalPages,
+        numberOfResults,
+        queryParams,
+        customHead: config.customHead,
+        galimaEksportuoti,
+        naujaPaieska: req.query.naujaPaieska || true,
+    });
 });
 
 export default indexRouter;
