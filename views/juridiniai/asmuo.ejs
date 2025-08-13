@@ -25,11 +25,24 @@
       </script>
     <% } %>
 
-    <meta property="og:title" content="<%= asmuo.jar.name %>" />
-    <meta property="og:description" content="<%= aprasas %>" />
-	<meta name="description" content="<%= aprasas %>"/>
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Viešpirkiai" />
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <style>
+        .chart {
+        background-color: #fff;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .chart {
+                filter: invert(1) hue-rotate(180deg);
+            }
+
+            .apexcharts-tooltip, .apexcharts-tooltip-title{
+                background: rgba(255, 255, 255, 0.96) !important;
+                color: #000 !important;
+            }
+        }
+
+    </style>
 </head>
 <body>
     <%- include('../header.ejs') %>
@@ -170,6 +183,133 @@
             <% } %>
         </section>
       </div>
+
+        <h2><u>Vidutinis darbo užmokestis</u></h2>
+        <i>Neatskaičius mokesčių, €/mėn.</i>
+        <div class="col-2 mobile-col-1">
+            <section style="width: 100%;">
+                <h3>Darbo sutartys, valstybės tarnautojai</h3>
+                <div id="vidAtlyginimoDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+            </section>
+            <section style="width: 100%;">
+                <h3>Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
+                <div id="vidAtlyginimoIIDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+            </section>
+        </div>
+
+        <h2 style="margin-bottom: 0px;"><u>Darbuotojų skaičius</u></h2>
+        <div class="col-2 mobile-col-1">
+            <section style="width: 100%;">
+                <h3>Darbo sutartys, valstybės tarnautojai</h3>
+                <div id="darbuotojuSkaiciausDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+            </section>
+            <section style="width: 100%;">
+                <h3>Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
+                <div id="darbuotojuSkaiciausIIDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+            </section>
+        </div>
+
+        <h2 style="margin-bottom: 0px;"><u>SODRA įmokos</u></h2>
+        <div class="col-2 mobile-col-1">
+            <section style="width: 100%;">
+                <div id="sodraImokosDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+            </section>
+            <section style="width: 100%;">
+            </section>
+        </div>
+
+        <script defer>
+        const labels = [
+          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+            '<%= item.data %>-01'<%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+          <% }) %>
+        ];
+
+        const data1 = [
+          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+            <%= item.vidutinisAtlyginimas || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+          <% }) %>
+        ];
+
+        const data2 = [
+          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+            <%= item.vidutinisAtlyginimas2 || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+          <% }) %>
+        ];
+
+        const data3 = [
+          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+            <%= item.draustieji || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+          <% }) %>
+        ];
+
+        const data4 = [
+          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+            <%= item.draustieji2 || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+          <% }) %>
+        ];
+
+        const data5 = [
+          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+            <%= item.imokuSuma || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+          <% }) %>
+        ];
+
+        function renderChart(elementId, seriesData) {
+          const options = {
+            chart: {
+              type: 'line',
+              height: 400,
+              toolbar: { show: false },
+              zoom: {
+                enabled: false
+              },
+              fontFamily: 'Ubuntu',
+            },
+            series: [{ name: '', data: seriesData }],
+            xaxis: {
+                  type: 'datetime',
+                  categories: labels,
+                            tickAmount: 6,
+                  labels: {
+                    style: { colors: '#000' },
+                },
+
+            },
+            tooltip: {
+              x: {
+                format: 'yyyy-MM'
+              },
+              enabled: true
+            },
+
+
+
+            yaxis: { labels: { style: { colors: '#000' }, min: 0 } },
+            stroke: { curve: 'smooth', width: 2 },
+            markers: { size: 5 },
+            colors: ['#000'],
+            grid: { borderColor: '#e0e0e0' },
+            theme: {
+                mode: 'light',
+                monochrome: {
+                    enabled: false,
+                    color: '#000000',
+                    shadeTo: 'dark',
+                    shadeIntensity: 0.65
+                },
+            }
+          };
+          const chart = new ApexCharts(document.querySelector('#' + elementId), options);
+          chart.render();
+        }
+
+        renderChart('vidAtlyginimoDiagrama', data1);
+        renderChart('vidAtlyginimoIIDiagrama', data2);
+        renderChart('darbuotojuSkaiciausDiagrama', data3);
+        renderChart('darbuotojuSkaiciausIIDiagrama', data4);
+        renderChart('sodraImokosDiagrama', data5)
+        </script>
 	</main>
     <%- include('../footer.ejs') %>
 </body>

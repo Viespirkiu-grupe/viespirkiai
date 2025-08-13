@@ -96,7 +96,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
 
     // SODRA
     const [sodraRezultatai] = await mysql.execute(
-        "SELECT * FROM sodra WHERE jarKodas = ? ORDER BY data DESC;",
+        "SELECT * FROM sodra WHERE jarKodas = ? ORDER BY data ASC;",
         [id],
     );
 
@@ -153,7 +153,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
 
     // VMI
     const [mokesciaiRezultatai] = await mysql.execute(
-        "SELECT * FROM mokesciai WHERE jarKodas = ? ORDER BY metai DESC, menuo DESC;",
+        "SELECT * FROM mokesciai WHERE jarKodas = ? ORDER BY metai ASC, menuo ASC;",
         [id],
     );
 
