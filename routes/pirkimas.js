@@ -39,7 +39,7 @@ pirkimasRouter.get("/pirkimas/:id", async (req, res, next) => {
     purchase = dataToLithuanianTime(purchase);
 
     const contractTypes = {
-        TSP: "Tarptautinis, supaprastintas pirkimas",
+        TSP: "Tarptautinis arba supaprastintas pirkimas",
         MVP: "Mažos vertės pirkimas",
         ŽS: "Žodinė sutartis",
         MVPŽ: "Mažos vertės žodinis pirkimas",
