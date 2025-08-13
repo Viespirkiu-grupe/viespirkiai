@@ -1,14 +1,12 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<%- include('head.ejs') %>
-		<meta property="og:title" content="Duomenys"/>
-		<meta property="og:description" content="Neoficialus tiek pavienių, tiek visų viešųjų pirkimų duomenų parsisiuntimas." /> 
-		<meta
-			name="description"
-			content="Neoficialus tiek pavienių, tiek visų viešųjų pirkimų duomenų parsisiuntimas."
-		/>
-		<meta property="og:type" content="website" />
+    	<%- include('head.ejs', {
+            pageTitle: "Duomenys",
+            pageDescription: `Viešai prieinami pirkimų, juridinių asmenų duomenys bei jų šaltiniai`,
+            pageImage: `https://viespirkiai.top/duomenys.png`,
+            customHead
+        }) %>
 	</head>
 	<body>
 		<%- include('header.ejs') %>
@@ -24,7 +22,7 @@
 			<section>
 				<h2>Pavieniai pirkimai</h2>
 				<p>
-					Pavienių pirkimų duomenys pasiekiami .json formatu pagal sutarties unikalų ID. Pvz.: 
+					Pavienių pirkimų duomenys pasiekiami .json formatu pagal sutarties unikalų ID. Pvz.:
 					<pre><a href="https://viespirkiai.top/pirkimas/2007700250.json">https://viespirkiai.top/pirkimas/<i><b>2007700250</b></i>.json</a></pre>
 				</p>
 			</section>
@@ -32,7 +30,7 @@
 			<section>
 				<h2>Juridiniai asmenys</h2>
 				<p>
-					Juridinių asmenų duomenys pasiekiami .json formatu pagal juridinio asmens JAR kodą. Pvz.: 
+					Juridinių asmenų duomenys pasiekiami .json formatu pagal juridinio asmens JAR kodą. Pvz.:
 					<pre><a href="https://viespirkiai.top/asmuo/110053842.json">https://viespirkiai.top/asmuo/<i><b>110053842</b></i>.json</a></pre>
 				</p>
 			</section>
@@ -65,7 +63,7 @@
 				<h2 id="duomenu-saltiniai">Duomenų šaltiniai</h2>
 				<ul>
 					<li>
-						Intitucijų viešųjų pirkimų sutartys: 
+						Intitucijų viešųjų pirkimų sutartys:
 						<ul>
 							<li>
 								<a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109"> Viešųjų pirkimų tarnyba </a>
@@ -73,7 +71,7 @@
 						</ul>
 					</li>
 					<li>
-						Juridinių asmenų informacija: 
+						Juridinių asmenų informacija:
 						<ul>
 							<li>
 								<a href="https://atvira.sodra.lt/imones/rinkiniai/index.html">SODRA</a>
@@ -84,7 +82,7 @@
 							<li>
 								<a href="https://data.gov.lt/datasets/1484/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
 							</li>
-							
+
 						</ul>
 					</li>
 					<li>

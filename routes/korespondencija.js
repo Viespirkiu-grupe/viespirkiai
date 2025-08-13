@@ -1,8 +1,8 @@
-import express from 'express';
+import express from "express";
 
 const korespondencijaRouter = express.Router();
 
-korespondencijaRouter.get("/", async (req, res) => {
+korespondencijaRouter.get("/korespondencija", async (req, res) => {
     res.redirect("https://github.com/Viespirkiu-grupe/korespondencija/issues");
 });
 

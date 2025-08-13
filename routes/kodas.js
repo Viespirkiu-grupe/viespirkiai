@@ -1,8 +1,8 @@
-import express from 'express';
+import express from "express";
 
 const kodasRouter = express.Router();
 
-kodasRouter.get("/", async (req, res) => {
+kodasRouter.get("/kodas", async (req, res) => {
     res.redirect("https://github.com/Viespirkiu-grupe/viespirkiai");
 });
 

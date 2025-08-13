@@ -1,17 +1,12 @@
 <!DOCTYPE html>
 <html lang="lt">
 	<head>
-		<%- include('head.ejs', {customHead}) %>
-		<meta
-			name="description"
-			content="Neoficialus viešųjų pirkimų sutarčių portalas."
-		/>
-		<meta property="og:type" content="website" />
-		<meta property="og:title" content="Viešpirkiai" />
-		<meta
-			property="og:description"
-			content="Neoficialus viešųjų pirkimų sutarčių portalas."
-		/>
+	    <%- include('head.ejs', {
+            pageTitle: "Viešpirkiai",
+            pageDescription: `  `,
+            pageImage: `https://viespirkiai.top/index.png`,
+            customHead
+        }) %>
 	</head>
 	<body>
 		<%- include('header.ejs') %>

@@ -1,14 +1,27 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<%- include('head.ejs') %>
-		<meta property="og:title" content="Kontaktai"/>
-		<meta property="og:description" content="Viešpirkiai projekto kontaktinė informacija." /> 
-		<meta
-			name="description"
-			content="Viešpirkiai projekto kontaktinė informacija."
-		/>
-		<meta property="og:type" content="website" />
+ <%- include('head.ejs', {
+            pageTitle: "Kontaktai",
+            pageDescription: `  `,
+            pageImage: `https://viespirkiai.top/kontaktai.png`,
+            customHead
+        }) %>
+		<style>
+            .signal-qr{
+     			display: block;
+     			float: right;
+     			margin: 16px;
+     			width: 150px;
+     			height: auto;
+            }
+
+            @media (prefers-color-scheme: dark) {
+     			.signal-qr {
+        				filter: invert(1);
+     			}
+            }
+        </style>
 	</head>
 	<body>
 		<%- include('header.ejs') %>
@@ -34,9 +47,9 @@
                     Arba, jeigu turite asmeninių klausimų ar prašymų – rašykite <a href="mailto:sveiki@viespirkiai.top">sveiki@viespirkiai.top</a>.
                 </p>
             </section>
-            
 
-            
+
+
 
 
 

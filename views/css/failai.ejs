@@ -1,0 +1,20 @@
+<style>
+.failu-statistika {
+    display: grid;
+    grid-template-areas:
+        "visi parsiusti diagrama"
+        "klaida neparsiusti diagrama";
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 600px) {
+    .failu-statistika {
+        grid-template-areas:
+            "diagrama diagrama"
+            "visi parsiusti"
+            "klaida neparsiusti";
+        grid-template-columns: 1fr 1fr;
+    }
+}
+</style>

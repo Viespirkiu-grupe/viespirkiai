@@ -1,0 +1,30 @@
+<style>
+:root {
+	--link: #009;
+	--black: #000;
+	--dark-gray: #333;
+	--gray: #565656;
+	--light-gray: #ccc;
+	--lighter-gray: #f2f2f2;
+	--white: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--link: #e6e6ff;
+		--black: #fff;
+		--dark-gray: #ddd;
+		--gray: #aaa;
+		--light-gray: #666;
+		--lighter-gray: #444;
+		--white: #000;
+	}
+}
+
+body,
+html {
+	color-scheme: light;
+	background-color: var(--white);
+	color: var(--black);
+}
+</style>

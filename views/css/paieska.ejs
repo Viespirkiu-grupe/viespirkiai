@@ -1,0 +1,104 @@
+<style>
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+form h1{
+	text-align: center;
+}
+
+#search {
+	font-size: larger;
+	font-family: inherit;
+	margin-bottom: 16px;
+	width: min(100%, 400px);
+	margin: 0 auto 16px auto;
+	display: block;
+	border-radius: 6px;
+	border: 1px solid var(--black);
+	padding: 8px 16px;
+}
+
+button {
+	font-size: larger;
+	font-family: inherit;
+	padding: 8px 16px;
+	background-color: var(--lighter-gray);
+	color: var(--black);
+	border: none;
+	border-radius: 6px;
+	cursor: pointer;
+	border: 1px solid var(--black);
+}
+button.main {
+	display: block;
+	margin: 16px auto;
+}
+
+#paieskosNustatymai {
+	margin: 0 auto;
+	width: min(100%, 900px);
+	padding: 16px;
+}
+
+#paieskosNustatymai summary::before {
+	content: "Rodyti papildomus nustatymus";
+}
+
+#paieskosNustatymai[open] summary::before {
+	content: "Slėpti papildomus nustatymus";
+}
+
+#paieskosNustatymai summary {
+	list-style: none;
+	cursor: pointer;
+	text-decoration: underline;
+	text-align: center;
+}
+
+#paieskosNustatymai summary::-webkit-details-marker {
+	display: none;
+}
+
+.settingai {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+}
+
+.settingai > div:nth-child(odd) {
+	grid-row: 1;
+}
+
+.settingai > div:nth-child(even) {
+	grid-row: 2;
+}
+
+.settingai input {
+	width: 90%;
+	height: 1.5em;
+}
+.settingai input[type="checkbox"] {
+	width: auto;
+}
+
+input {
+	font-size: 1em;
+	padding: 4px;
+	border: 1px solid var(--light-gray);
+	background-color: var(--lighter-gray);
+	color: var(--black);
+	border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+	.settingai {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	.settingai > div {
+		grid-row: auto !important;
+	}
+}
+</style>

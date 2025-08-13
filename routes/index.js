@@ -6,6 +6,7 @@ import { buildTypesenseFilter, buildMongoFilter } from "../utils/filter.js";
 import { searchDocuments } from "../typesense/typesense.js";
 import config from "../utils/config.js";
 import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
+import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 
 const indexRouter = express.Router();
 
@@ -222,6 +223,16 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
         galimaEksportuoti,
         naujaPaieska: req.query.naujaPaieska || true,
     });
+});
+
+indexRouter.get("/index.png", async (req, res) => {
+    return await serveOpenGraphImage(
+        res,
+        "Pirkimų skelbimų paieška",
+        "Viešpirkiai",
+        "",
+        "viespirkiai.top",
+    );
 });
 
 export default indexRouter;
