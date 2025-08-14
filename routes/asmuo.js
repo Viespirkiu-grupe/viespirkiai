@@ -102,7 +102,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
 
     let sodra;
     if (sodraRezultatai.length > 0) {
-        const [pirmas] = sodraRezultatai;
+        const pirmas = sodraRezultatai.at(-1);
 
         const formatDate = (date) =>
             `${date}`.slice(0, 4) + "-" + `${date}`.slice(4, 6);
@@ -160,7 +160,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
     let mokesciai;
 
     if (mokesciaiRezultatai.length > 0) {
-        const naujausias = mokesciaiRezultatai[0];
+        const naujausias = mokesciaiRezultatai.at(-1);
 
         const naudojamiNaujausi = [
             "pavadinimas",
@@ -186,11 +186,20 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         };
     }
 
+    let regitra = [];
+    const [regitraRezultatai] = await mysql.execute(
+        "SELECT * FROM regitra WHERE jarKodas = ? ORDER BY pirmosiosRegistracijosData ASC;",
+        [id],
+    );
+
+    regitra = regitraRezultatai;
+
     // Asmuo
     let asmuo = {
         jar,
         sodra,
         mokesciai,
+        regitra,
     };
 
     // JSON

@@ -26,6 +26,76 @@
     <% } %>
 
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script defer>
+        function renderChart(elementId, labelData, seriesData, customOptions = {}) {
+          const options = {
+            chart: {
+              type: 'line',
+              height: 400,
+              toolbar: { show: false },
+              zoom: {
+                enabled: false
+              },
+              fontFamily: 'Ubuntu',
+            },
+            series: [{ name: customOptions.seriesName || '', data: seriesData }],
+            xaxis: {
+                  type: 'datetime',
+                  categories: labelData,
+                  tickAmount: 6,
+                  labels: {
+                    style: { colors: '#000' },
+                    format: 'yyyy-MM'
+                },
+
+            },
+            tooltip: {
+              x: {
+                format: 'yyyy-MM'
+              },
+              enabled: true
+            },
+            yaxis: { labels: { style: { colors: '#000' }, min: 0 } },
+            stroke: { curve: 'smooth', width: 2 },
+            markers: { size: 5 },
+            colors: ['#000'],
+            grid: { borderColor: '#e0e0e0' },
+            theme: {
+                mode: 'light',
+                monochrome: {
+                    enabled: false,
+                    color: '#000000',
+                    shadeTo: 'dark',
+                    shadeIntensity: 0.65
+                },
+            },
+          };
+
+          function deepMerge(target, source) {
+            for (const key in source) {
+              if (
+                source[key] &&
+                typeof source[key] === 'object' &&
+                !Array.isArray(source[key])
+              ) {
+                if (!target[key]) target[key] = {};
+                deepMerge(target[key], source[key]);
+              } else {
+                target[key] = source[key];
+              }
+            }
+            return target;
+          }
+
+          let fullOptions = deepMerge(
+            structuredClone(options), // avoid mutating original
+            customOptions
+          );
+
+          const chart = new ApexCharts(document.querySelector('#' + elementId), fullOptions);
+          chart.render();
+      }
+    </script>
     <style>
         .chart {
         background-color: #fff;
@@ -41,7 +111,6 @@
                 color: #000 !important;
             }
         }
-
     </style>
 </head>
 <body>
@@ -183,133 +252,208 @@
             <% } %>
         </section>
       </div>
+        <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
+            <script defer>
+                const sodraLabels = [
+                <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+                    '<%= item.data %>-01'<%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+                <% }) %>
+                ];
+            </script>
+        <% } %>
 
         <h2><u>Vidutinis darbo užmokestis</u></h2>
         <i>Neatskaičius mokesčių, €/mėn.</i>
         <div class="col-2 mobile-col-1">
             <section style="width: 100%;">
-                <h3>Darbo sutartys, valstybės tarnautojai</h3>
-                <div id="vidAtlyginimoDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+                <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
+                    <h3>Darbo sutartys, valstybės tarnautojai</h3>
+                    <div id="vidAtlyginimoDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+
+                    <script defer>
+                      const atlyginimai = [
+                        <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+                          <%= item.vidutinisAtlyginimas || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+                        <% }) %>
+                      ];
+
+                      renderChart('vidAtlyginimoDiagrama', sodraLabels, atlyginimai, {seriesName: "EUR"});
+                    </script>
+                <% } else { %>
+                    <i>Nėra duomenų</i>
+                <% } %>
             </section>
             <section style="width: 100%;">
-                <h3>Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
-                <div id="vidAtlyginimoIIDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+                <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
+                    <h3>Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
+                    <div id="vidAtlyginimoIIDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+
+                    <script defer>
+                      const atlyginimaiII = [
+                        <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+                          <%= item.vidutinisAtlyginimas2 || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+                        <% }) %>
+                      ];
+
+                      renderChart('vidAtlyginimoIIDiagrama', sodraLabels, atlyginimaiII, {seriesName: "EUR"});
+                    </script>
+                <% } else { %>
+                    <i>Nėra duomenų</i>
+                <% } %>
             </section>
         </div>
 
         <h2 style="margin-bottom: 0px;"><u>Darbuotojų skaičius</u></h2>
         <div class="col-2 mobile-col-1">
             <section style="width: 100%;">
-                <h3>Darbo sutartys, valstybės tarnautojai</h3>
-                <div id="darbuotojuSkaiciausDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+                <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
+                    <h3>Darbo sutartys, valstybės tarnautojai</h3>
+                    <div id="darbuotojuSkaiciausDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+
+                    <script defer>
+                      const darbuotojai = [
+                        <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+                          <%= item.draustieji || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+                        <% }) %>
+                      ];
+
+                      renderChart('darbuotojuSkaiciausDiagrama', sodraLabels, darbuotojai);
+                    </script>
+                <% } else { %>
+                    <i>Nėra duomenų</i>
+                <% } %>
             </section>
             <section style="width: 100%;">
-                <h3>Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
-                <div id="darbuotojuSkaiciausIIDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+                <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
+                    <h3>Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
+                    <div id="darbuotojuSkaiciausIIDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+
+                    <script defer>
+                      const darbuotojaiII = [
+                        <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+                          <%= item.draustieji2 || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+                        <% }) %>
+                      ];
+
+                      renderChart('darbuotojuSkaiciausIIDiagrama', sodraLabels, darbuotojaiII);
+                    </script>
+                <% } else { %>
+                    <i>Nėra duomenų</i>
+                <% } %>
             </section>
         </div>
 
-        <h2 style="margin-bottom: 0px;"><u>SODRA įmokos</u></h2>
         <div class="col-2 mobile-col-1">
             <section style="width: 100%;">
-                <div id="sodraImokosDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+                <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
+                    <h2><u>SODRA įmokos</u></h2>
+                    <div id="sodraImokosDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+
+                    <script defer>
+                      const sodraImokos = [
+                        <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+                          <%= item.imokuSuma || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+                        <% }) %>
+                      ];
+
+                      renderChart('sodraImokosDiagrama', sodraLabels, sodraImokos, {seriesName: "EUR"})
+                    </script>
+                <% } else { %>
+                    <i>Nėra duomenų</i>
+                <% } %>
             </section>
             <section style="width: 100%;">
+                <% if(asmuo.mokesciai && asmuo.mokesciai.duomenys && asmuo.mokesciai.duomenys.length > 0) { %>
+                    <h2><u>VMI įmokos</u></h2>
+                    <div id="vmiMokesciuDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+
+                    <script defer>
+                      const vmiLabels = [
+                        <% asmuo.mokesciai.duomenys.forEach((item, i) => { %>
+                          '<%= item.data %>-01'<%= i < asmuo.mokesciai.duomenys.length - 1 ? ',' : '' %>
+                        <% }) %>
+                      ];
+
+                      const vmiData = [
+                        <% asmuo.mokesciai.duomenys.forEach((item, i) => { %>
+                          <%= item.suma || "null" %><%= i < asmuo.mokesciai.duomenys.length - 1 ? ',' : '' %>
+                        <% }) %>
+                      ];
+
+                      // Find last label
+                      const lastLabel = vmiLabels[vmiLabels.length - 1];
+                      const lastDate = new Date(lastLabel);
+                      const lastMonth = lastDate.getMonth() + 1; // JS months start at 0
+
+                      // Add annotation only if it's not December
+                      let annotations = {};
+                      if (lastMonth !== 12) {
+                        const startOfYear = new Date(lastDate.getFullYear(), 0, 1);
+
+                        annotations = {
+                          xaxis: [
+                            {
+                              x: startOfYear.getTime(),
+                              borderColor: '#777',
+                              label: {
+                                style: {
+                                  color: '#000',
+                                },
+                                position: 'bottom',
+                                text: 'Nebaigti duomenys:'
+                              }
+                            }
+                          ]
+                        };
+                      }
+
+                      renderChart('vmiMokesciuDiagrama', vmiLabels, vmiData, { annotations, seriesName: "EUR" });
+                    </script>
+                <% } else { %>
+                    <i>Nėra duomenų</i>
+                <% } %>
             </section>
         </div>
 
-        <script defer>
-        const labels = [
-          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
-            '<%= item.data %>-01'<%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
-          <% }) %>
-        ];
-
-        const data1 = [
-          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
-            <%= item.vidutinisAtlyginimas || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
-          <% }) %>
-        ];
-
-        const data2 = [
-          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
-            <%= item.vidutinisAtlyginimas2 || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
-          <% }) %>
-        ];
-
-        const data3 = [
-          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
-            <%= item.draustieji || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
-          <% }) %>
-        ];
-
-        const data4 = [
-          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
-            <%= item.draustieji2 || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
-          <% }) %>
-        ];
-
-        const data5 = [
-          <% asmuo.sodra.duomenys.forEach((item, i) => { %>
-            <%= item.imokuSuma || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
-          <% }) %>
-        ];
-
-        function renderChart(elementId, seriesData) {
-          const options = {
-            chart: {
-              type: 'line',
-              height: 400,
-              toolbar: { show: false },
-              zoom: {
-                enabled: false
-              },
-              fontFamily: 'Ubuntu',
-            },
-            series: [{ name: '', data: seriesData }],
-            xaxis: {
-                  type: 'datetime',
-                  categories: labels,
-                            tickAmount: 6,
-                  labels: {
-                    style: { colors: '#000' },
-                },
-
-            },
-            tooltip: {
-              x: {
-                format: 'yyyy-MM'
-              },
-              enabled: true
-            },
-
-
-
-            yaxis: { labels: { style: { colors: '#000' }, min: 0 } },
-            stroke: { curve: 'smooth', width: 2 },
-            markers: { size: 5 },
-            colors: ['#000'],
-            grid: { borderColor: '#e0e0e0' },
-            theme: {
-                mode: 'light',
-                monochrome: {
-                    enabled: false,
-                    color: '#000000',
-                    shadeTo: 'dark',
-                    shadeIntensity: 0.65
-                },
-            }
-          };
-          const chart = new ApexCharts(document.querySelector('#' + elementId), options);
-          chart.render();
-        }
-
-        renderChart('vidAtlyginimoDiagrama', data1);
-        renderChart('vidAtlyginimoIIDiagrama', data2);
-        renderChart('darbuotojuSkaiciausDiagrama', data3);
-        renderChart('darbuotojuSkaiciausIIDiagrama', data4);
-        renderChart('sodraImokosDiagrama', data5)
-        </script>
+        <% if(asmuo.regitra && asmuo.regitra.length > 0){ %>
+            <h2><u>Transporto priemonės</u></h2>
+            <div class="tableContainer">
+            <table style="width: auto; min-width: 70vw;">
+                <thead>
+                    <tr>
+                        <th>Marke</th>
+                        <th>Pavadinimas</th>
+                        <th>Kategorija</th>
+                        <th>Degalai</th>
+                        <th>Galia (kW)</th>
+                        <th>Vietos</th>
+                        <th>Pirmoji registracija</th>
+                        <th>Savininkas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% asmuo.regitra.forEach(function(auto){ %>
+                        <%
+                          let savinikas = "Ne";
+                          if(auto.valdymoTeise == "A"){
+                              savininkas = "Taip";
+                          }
+                        %>
+                        <tr>
+                            <td><%= auto.marke %></td>
+                            <td><%= auto.komercinisPavadinimas %></td>
+                            <td class="center"><%= auto.kategorijaKlase %></td>
+                            <td class="center"><%= auto.degalai || "-" %></td>
+                            <td class="center"><%= auto.galia || "-" %></td>
+                            <td class="center"><%= (Number(auto.sedimuVietuSkaicius) + Number(auto.stovimuVietuSkaicius)) || "-" %></td>
+                            <td class="center"><%= auto.pirmosiosRegistracijosData || "-" %></td>
+                            <td class="center"><%= savininkas %></td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+            </div>
+        <% } %>
 	</main>
     <%- include('../footer.ejs') %>
 </body>
