@@ -135,9 +135,10 @@
             <% if(asmuo.sodra && asmuo.sodra.kodas) { %>
                 <a href="https://atvira.sodra.lt/imones/detaliai/index.html?code=<%= asmuo.sodra.kodas %>">↗ SODRA</a>&nbsp;
             <% } %>
+            <a href="https://liteko.teismai.lt/viesasprendimupaieska/paieska.aspx?txt=<%= asmuo.jar.jarKodas %>">↗ Bylos</a>&nbsp;
 
             <a href="/pirkejas/<%= asmuo.jar.jarKodas %>">↗ Pirkimai</a>&nbsp;
-            <a href="/tiekejas/<%= asmuo.jar.jarKodas %>">↗ Pardavimai</a>
+            <a href="/tiekejas/<%= asmuo.jar.jarKodas %>">↗ Pardavimai</a>&nbsp;
           </div>
 
           <% if(asmuo.sodra && asmuo.sodra.data) { %>
