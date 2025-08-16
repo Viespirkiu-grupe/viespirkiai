@@ -1,5 +1,48 @@
-<form method="get">
-    <h1>Juridinių asmenų paieška<sup>BETA</sup></h1>
+<form method="get" id="juridiniaiSearch">
+    <h1>Juridinių asmenų paieška</h1>
     <input type="text" name="search" id="search" value="<%= values.search || "" %>" placeholder="Paieška" />
     <button type="submit" value="Ieškoti" class="main">Ieškoti</button>
 </form>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("juridiniaiSearch");
+  const input = document.getElementById("search");
+  const results = document.getElementById("juridiniaiRezultatai");
+  let controller;
+  let debounceTimer;
+
+  input.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      const query = input.value.trim();
+      if (!query) {
+        results.innerHTML = "";
+        history.replaceState(null, "", window.location.pathname);
+        return;
+      }
+
+      if (controller) controller.abort();
+      controller = new AbortController();
+
+      try {
+        const base = form.getAttribute("action") || window.location.pathname;
+        const url = new URL(base, window.location.origin);
+        url.searchParams.set("search", query);
+        url.searchParams.set("tikRezultatai", "true");
+
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error("Network error");
+        results.innerHTML = await res.text();
+
+        // Update the URL without `tikRezultatai`
+        url.searchParams.delete("tikRezultatai");
+        history.replaceState(null, "", url);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          results.innerHTML = "<p>Klaida gaunant duomenis.</p>";
+        }
+      }
+    }, 100);
+  });
+});
+</script>

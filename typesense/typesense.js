@@ -3,44 +3,43 @@ import { viespirkiai } from "../mongo/mongoDb.js";
 import config from "../utils/config.js";
 
 const client = new Typesense.Client({
-	nodes: config.typesenseNodes,
-	apiKey: config.typesenseApiKey,
-	connectionTimeoutSeconds: 5,
+    nodes: config.typesenseNodes,
+    apiKey: config.typesenseApiKey,
+    connectionTimeoutSeconds: 5000,
 });
 
-const COLLECTION = config.typesenseCollection;
-
+const COLLECTION = "viespirkiai";
 const SCHEMA_VERSION = 5;
 
 const schema = {
-	name: COLLECTION,
-	fields: [
-		{ name: "id", type: "string" },
-		{ name: "tipas", type: "string", facet: true },
-		{ name: "pavadinimas", type: "string" },
-		{ name: "kategorija", type: "string", facet: true },
-		{ name: "perkanciojiOrganizacija", type: "string" },
-		{ name: "perkanciosiosOrganizacijosKodas", type: "string" },
-		{ name: "tiekejas", type: "string" },
-		{ name: "tiekejoKodas", type: "string" },
-		{ name: "verte", type: "float", facet: true },
-		{ name: "faktineIvykdimoVerte", type: "float", facet: true },
-		{ name: "faktineIvykdimoData", type: "int64" },
-		{ name: "dokumentuKiekis", type: "int32", facet: true },
-		{ name: "paskutinioAtnaujinimoData", type: "int64" },
-		{ name: "paskutinioRedagavimoData", type: "int64" },
-		{ name: "sudarymoData", type: "int64" },
-		{ name: "galiojimoData", type: "int64" },
-		{ name: "bvpzKodas", type: "string", facet: true },
-		{ name: "bvpzPavadinimas", type: "string" },
-		{ name: "paskelbimoData", type: "int64" },
-		{ name: "sutartiesNumeris", type: "string" },
-		{ name: "sutartiesUnikalusID", type: "int32" },
-	],
-	default_sorting_field: "paskutinioRedagavimoData",
-	metadata: {
-		version: SCHEMA_VERSION,
-	},
+    name: COLLECTION,
+    fields: [
+        { name: "id", type: "string" },
+        { name: "tipas", type: "string", facet: true },
+        { name: "pavadinimas", type: "string" },
+        { name: "kategorija", type: "string", facet: true },
+        { name: "perkanciojiOrganizacija", type: "string" },
+        { name: "perkanciosiosOrganizacijosKodas", type: "string" },
+        { name: "tiekejas", type: "string" },
+        { name: "tiekejoKodas", type: "string" },
+        { name: "verte", type: "float", facet: true },
+        { name: "faktineIvykdimoVerte", type: "float", facet: true },
+        { name: "faktineIvykdimoData", type: "int64" },
+        { name: "dokumentuKiekis", type: "int32", facet: true },
+        { name: "paskutinioAtnaujinimoData", type: "int64" },
+        { name: "paskutinioRedagavimoData", type: "int64" },
+        { name: "sudarymoData", type: "int64" },
+        { name: "galiojimoData", type: "int64" },
+        { name: "bvpzKodas", type: "string", facet: true },
+        { name: "bvpzPavadinimas", type: "string" },
+        { name: "paskelbimoData", type: "int64" },
+        { name: "sutartiesNumeris", type: "string" },
+        { name: "sutartiesUnikalusID", type: "int32" },
+    ],
+    default_sorting_field: "paskutinioRedagavimoData",
+    metadata: {
+        version: SCHEMA_VERSION,
+    },
 };
 
 let collectionInitialized = false;
@@ -51,38 +50,38 @@ let collectionInitialized = false;
  * @returns {Promise<void>}
  */
 export async function ensureSearchCollection() {
-	if (collectionInitialized) return;
+    if (collectionInitialized) return;
 
-	try {
-		// Patikriname, ar kolekcija jau egzistuoja
-		const existing = await client.collections(COLLECTION).retrieve();
+    try {
+        // Patikriname, ar kolekcija jau egzistuoja
+        const existing = await client.collections(COLLECTION).retrieve();
 
-		const existingVersion = existing.metadata?.version ?? 0;
+        const existingVersion = existing.metadata?.version ?? 0;
 
-		if (existingVersion !== SCHEMA_VERSION) {
-			// Versija nesutampa
-			console.log(
-				`[Typesense] Existing schema version: ${existingVersion}, Expected: ${SCHEMA_VERSION}`
-			);
+        if (existingVersion !== SCHEMA_VERSION) {
+            // Versija nesutampa
+            console.log(
+                `[Typesense] Existing schema version: ${existingVersion}, Expected: ${SCHEMA_VERSION}`,
+            );
 
-			console.log(
-				"[Typesense] Schema version mismatch. Replacing collection..."
-			);
+            console.log(
+                "[Typesense] Schema version mismatch. Replacing collection...",
+            );
 
-			// Ištriname esamą kolekciją ir sukuriame naują su atnaujinta schema
-			await client.collections(COLLECTION).delete();
-			await client.collections().create(schema);
+            // Ištriname esamą kolekciją ir sukuriame naują su atnaujinta schema
+            await client.collections(COLLECTION).delete();
+            await client.collections().create(schema);
 
-			migrateAllDocumentsToTypesenseFromCollection(viespirkiai); // FUNKCIJA NEEGZISTUOJA
-		}
-	} catch (err) {
-		// Jei kolekcija neegzistuoja, sukuriame ją
-		console.log("[Typesense] Collection not found, creating...");
-		await client.collections().create(schema);
-		migrateAllDocumentsToTypesenseFromCollection(viespirkiai); // FUNKCIJA NEEGZISTUOJA
-	}
+            migrateAllDocumentsToTypesenseFromCollection(viespirkiai); // FUNKCIJA NEEGZISTUOJA
+        }
+    } catch (err) {
+        // Jei kolekcija neegzistuoja, sukuriame ją
+        console.log("[Typesense] Collection not found, creating...");
+        await client.collections().create(schema);
+        migrateAllDocumentsToTypesenseFromCollection(viespirkiai); // FUNKCIJA NEEGZISTUOJA
+    }
 
-	collectionInitialized = true;
+    collectionInitialized = true;
 }
 
 /**
@@ -91,8 +90,8 @@ export async function ensureSearchCollection() {
  * @returns {number} Unix timestamp
  */
 function toUnixTimestamp(date) {
-	const ts = new Date(date).getTime();
-	return Number.isFinite(ts) ? Math.floor(ts / 1000) : 0;
+    const ts = new Date(date).getTime();
+    return Number.isFinite(ts) ? Math.floor(ts / 1000) : 0;
 }
 
 /**
@@ -102,43 +101,48 @@ function toUnixTimestamp(date) {
  * @throws {Error} Jei nepavyksta pridėti dokumento
  */
 export async function addDocumentToSearch(doc) {
-	const tsDoc = {
-		id: doc.sutartiesUnikalusID?.toString() || "",
+    const tsDoc = {
+        id: doc.sutartiesUnikalusID?.toString() || "",
 
-		tipas: doc.tipas || "",
-		pavadinimas: doc.pavadinimas || "",
-		kategorija: doc.kategorija || "",
+        tipas: doc.tipas || "",
+        pavadinimas: doc.pavadinimas || "",
+        kategorija: doc.kategorija || "",
 
-		perkanciojiOrganizacija: doc.perkanciojiOrganizacija || "",
-		perkanciosiosOrganizacijosKodas: doc.perkanciosiosOrganizacijosKodas || "",
+        perkanciojiOrganizacija: doc.perkanciojiOrganizacija || "",
+        perkanciosiosOrganizacijosKodas:
+            doc.perkanciosiosOrganizacijosKodas || "",
 
-		tiekejas: doc.tiekejas || "",
-		tiekejoKodas: doc.tiekejoKodas || "",
+        tiekejas: doc.tiekejas || "",
+        tiekejoKodas: doc.tiekejoKodas || "",
 
-		verte: typeof doc.verte === "number" ? doc.verte : 0,
-		faktineIvykdimoVerte:
-			typeof doc.faktineIvykdimoVerte === "number"
-				? doc.faktineIvykdimoVerte
-				: 0,
+        verte: typeof doc.verte === "number" ? doc.verte : 0,
+        faktineIvykdimoVerte:
+            typeof doc.faktineIvykdimoVerte === "number"
+                ? doc.faktineIvykdimoVerte
+                : 0,
 
-		sudarymoData: toUnixTimestamp(doc.sudarymoData),
-		galiojimoData: toUnixTimestamp(doc.galiojimoData),
-		paskelbimoData: toUnixTimestamp(doc.paskelbimoData),
-		paskutinioAtnaujinimoData: toUnixTimestamp(doc.paskutinioAtnaujinimoData),
-		paskutinioRedagavimoData: toUnixTimestamp(doc.paskutinioRedagavimoData),
-		faktineIvykdimoData: toUnixTimestamp(doc.faktineIvykdimoData),
+        sudarymoData: toUnixTimestamp(doc.sudarymoData),
+        galiojimoData: toUnixTimestamp(doc.galiojimoData),
+        paskelbimoData: toUnixTimestamp(doc.paskelbimoData),
+        paskutinioAtnaujinimoData: toUnixTimestamp(
+            doc.paskutinioAtnaujinimoData,
+        ),
+        paskutinioRedagavimoData: toUnixTimestamp(doc.paskutinioRedagavimoData),
+        faktineIvykdimoData: toUnixTimestamp(doc.faktineIvykdimoData),
 
-		bvpzKodas: doc.bvpzKodas || "",
-		bvpzPavadinimas: doc.bvpzPavadinimas || "",
+        bvpzKodas: doc.bvpzKodas || "",
+        bvpzPavadinimas: doc.bvpzPavadinimas || "",
 
-		sutartiesNumeris: doc.sutartiesNumeris || "",
-		sutartiesUnikalusID:
-			typeof doc.sutartiesUnikalusID === "number" ? doc.sutartiesUnikalusID : 0,
+        sutartiesNumeris: doc.sutartiesNumeris || "",
+        sutartiesUnikalusID:
+            typeof doc.sutartiesUnikalusID === "number"
+                ? doc.sutartiesUnikalusID
+                : 0,
 
-		dokumentuKiekis: doc.dokumentuKiekis || 0,
-	};
+        dokumentuKiekis: doc.dokumentuKiekis || 0,
+    };
 
-	return client.collections(COLLECTION).documents().upsert(tsDoc);
+    return client.collections(COLLECTION).documents().upsert(tsDoc);
 }
 
 /**
@@ -152,23 +156,131 @@ export async function addDocumentToSearch(doc) {
  * @returns {Promise<Object>} Paieškos rezultatai ir bendras įrašų skaičius
  */
 export async function searchDocuments(query, options = {}) {
-	const {
-		limit = 50,
-		page = 1,
-		sortBy = "sudarymoData:desc",
-		filterBy = "",
-	} = options;
+    const {
+        limit = 50,
+        page = 1,
+        sortBy = "sudarymoData:desc",
+        filterBy = "",
+    } = options;
 
-	let results = await client.collections(COLLECTION).documents().search({
-		q: query,
-		query_by: "pavadinimas,perkanciojiOrganizacija,tiekejas,bvpzPavadinimas",
-		sort_by: sortBy,
-		filter_by: filterBy,
-		per_page: limit,
-		page: page,
-	});
+    let results = await client.collections(COLLECTION).documents().search({
+        q: query,
+        query_by:
+            "pavadinimas,perkanciojiOrganizacija,tiekejas,bvpzPavadinimas",
+        sort_by: sortBy,
+        filter_by: filterBy,
+        per_page: limit,
+        page: page,
+    });
 
-	let documents = results.hits.map((hit) => hit.document);
+    let documents = results.hits.map((hit) => hit.document);
 
-	return { results: documents, total: results.found };
+    return { results: documents, total: results.found };
+}
+
+///////////////////////////
+
+const JAR_COLLECTION = "viespirkiaiJAR";
+const JAR_SCHEMA_VERSION = 7;
+
+const jar_schema = {
+    name: JAR_COLLECTION,
+    fields: [
+        { name: "id", type: "string" },
+        { name: "jarKodas", type: "string" },
+        { name: "pavadinimas", type: "string" },
+        { name: "adresas", type: "string" },
+        { name: "registravimoData", type: "int64" },
+        { name: "formosKodas", type: "int64", facet: true },
+        { name: "formosPavadinimas", type: "string", facet: true },
+        { name: "statusoKodas", type: "int64", facet: true },
+        { name: "statusoPavadinimas", type: "string", facet: true },
+        { name: "statusasNuo", type: "int64" },
+        { name: "duomenuData", type: "int64" },
+        { name: "adresoId", type: "int64" },
+    ],
+    default_sorting_field: "registravimoData",
+    metadata: {
+        version: JAR_SCHEMA_VERSION,
+    },
+};
+
+let jarCollectionInitialized = false;
+
+export async function ensureJarCollection() {
+    if (jarCollectionInitialized) return;
+
+    try {
+        // Patikriname, ar kolekcija jau egzistuoja
+        const existing = await client.collections(JAR_COLLECTION).retrieve();
+
+        const existingVersion = existing.metadata?.version ?? 0;
+
+        if (existingVersion !== JAR_SCHEMA_VERSION) {
+            // Versija nesutampa
+            console.log(
+                `[Typesense] Existing schema version: ${existingVersion}, Expected: ${JAR_SCHEMA_VERSION}`,
+            );
+
+            console.log(
+                "[Typesense] Schema version mismatch. Replacing collection...",
+            );
+
+            // Ištriname esamą kolekciją ir sukuriame naują su atnaujinta schema
+            await client.collections(JAR_COLLECTION).delete();
+            await client.collections().create(jar_schema);
+
+            // migrateAllDocumentsToTypesenseFromCollection(viespirkiai); // FUNKCIJA NEEGZISTUOJA
+        }
+    } catch (err) {
+        // Jei kolekcija neegzistuoja, sukuriame ją
+        console.log("[Typesense] Collection not found, creating...");
+        await client.collections().create(jar_schema);
+        // migrateAllDocumentsToTypesenseFromCollection(viespirkiai); // FUNKCIJA NEEGZISTUOJA
+    }
+
+    jarCollectionInitialized = true;
+}
+
+export async function addDocumentsToJarSearch(givenArray) {
+    let documents = [];
+    for (const doc of givenArray) {
+        const tsDoc = {
+            id: doc.jarKodas?.toString() || doc.pavadinimas,
+            jarKodas: doc.jarKodas?.toString() || "",
+            pavadinimas: doc.pavadinimas || "",
+            adresas: doc.adresas || "",
+            registravimoData: toUnixTimestamp(doc.registravimoData),
+            formosKodas: doc.formosKodas || 0,
+            formosPavadinimas: doc.formosPavadinimas || "",
+            statusoKodas: doc.statusoKodas || 0,
+            statusoPavadinimas: doc.statusoPavadinimas || "",
+            statusasNuo: toUnixTimestamp(doc.statusasNuo),
+            duomenuData: toUnixTimestamp(doc.duomenuData),
+            adresoId: doc.adresoId || 0,
+        };
+        documents.push(tsDoc);
+    }
+
+    return client
+        .collections(JAR_COLLECTION)
+        .documents()
+        .import(documents, { action: "upsert" });
+}
+
+export async function searchJarDocuments(query, options = {}) {
+    const { limit = 50, page = 1, sortBy = "", filterBy = "" } = options;
+
+    let results = await client.collections(JAR_COLLECTION).documents().search({
+        q: query,
+        query_by: "pavadinimas,adresas",
+        sort_by: sortBy,
+        filter_by: filterBy,
+        per_page: limit,
+        page: page,
+    });
+
+    let documents = results.hits.map((hit) => hit.document);
+
+    return { results: documents, total: results.found };
 }

@@ -4,6 +4,7 @@ import config from "../utils/config.js";
 import { mysql } from "../mysql/mysql.js";
 import { arrayToLithuanianTime } from "../utils/time.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
+import { searchJarDocuments } from "../typesense/typesense.js";
 
 const juridiniaiRouter = express.Router();
 
@@ -32,32 +33,36 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
 
         let queryParams = `&search=${encodeURIComponent(req.query.search)}`;
 
-        // Vienu metu gauname rezultatus ir jų skaičių
-        const [[rows], [response]] = await Promise.all([
-            mysql.query(
-                `(
-				SELECT * FROM jar WHERE adresas LIKE CONCAT('%', ?, '%')
-			)
-			UNION
-			(
-				SELECT * FROM jar WHERE pavadinimas LIKE CONCAT('%', ?, '%')
-			)
-			LIMIT ? OFFSET ?`,
-                [req.query.search, req.query.search, limit, skip],
-            ),
+        //      // Vienu metu gauname rezultatus ir jų skaičių
+        //      const [[rows], [response]] = await Promise.all([
+        //          mysql.query(
+        //              `(
+        // 	SELECT * FROM jar WHERE adresas LIKE CONCAT('%', ?, '%')
+        // )
+        // UNION
+        // (
+        // 	SELECT * FROM jar WHERE pavadinimas LIKE CONCAT('%', ?, '%')
+        // )
+        // LIMIT ? OFFSET ?`,
+        //              [req.query.search, req.query.search, limit, skip],
+        //          ),
 
-            mysql.query(
-                `SELECT COUNT(*) AS total FROM (
-				SELECT jarKodas FROM jar WHERE adresas LIKE CONCAT('%', ?, '%')
-				UNION
-				SELECT jarKodas FROM jar WHERE pavadinimas LIKE CONCAT('%', ?, '%')
-			) AS combined`,
-                [req.query.search, req.query.search],
-            ),
-        ]);
+        //          mysql.query(
+        //              `SELECT COUNT(*) AS total FROM (
+        // 	SELECT jarKodas FROM jar WHERE adresas LIKE CONCAT('%', ?, '%')
+        // 	UNION
+        // 	SELECT jarKodas FROM jar WHERE pavadinimas LIKE CONCAT('%', ?, '%')
+        // ) AS combined`,
+        //              [req.query.search, req.query.search],
+        //          ),
+        //      ]);
 
-        var results = rows;
-        var total = response[0].total || 0;
+        //      var results = rows;
+        //      var total = response[0].total || 0;
+
+        let { results, total } = await searchJarDocuments(req.query.search, {});
+
+        // console.log(results, total);
 
         // Jei prašoma JSON
         if (req.query.json) {
@@ -105,12 +110,26 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
         let trukme = ((performance.now() - startas) / 1000).toFixed(2) + "s";
         let rodomiRezultatai = results.length;
         if (rodomiRezultatai < total) {
-            var numberOfResults = `Rodomi ${rodomiRezultatai} iš ${total} rezultatų <pre style="display: inline;">(${trukme}, Mysql)</pre>`;
+            var numberOfResults = `Rodomi ${rodomiRezultatai} iš ${total} rezultatų <pre style="display: inline;">(${trukme}, Typesense)</pre>`;
         } else {
-            var numberOfResults = `${total} rezultatas(-ai) <pre style="display: inline;">(${trukme}, Mysql)</pre>`;
+            var numberOfResults = `${total} rezultatas(-ai) <pre style="display: inline;">(${trukme}, Typesense)</pre>`;
         }
 
         let galimaEksportuoti = total > 0 && total <= MAX_LIMIT;
+
+        if (req.query.tikRezultatai) {
+            res.render("juridiniai/results", {
+                customHead: config.customHead,
+                values,
+                data: results,
+                queryParams,
+                numberOfResults,
+                currentPage: page,
+                pageCount: Math.ceil(total / limit),
+                galimaEksportuoti,
+            });
+            return;
+        }
 
         res.render("juridiniai/index", {
             customHead: config.customHead,

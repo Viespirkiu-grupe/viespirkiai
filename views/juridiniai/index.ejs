@@ -12,9 +12,11 @@
 		<%- include('../header.ejs', {hideSubtext: false}) %>
 		<main>
 			<%- include('search.ejs', {values}) %>
-            <% if(typeof data !== "undefined") { %>
-			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
-            <% } %>
+			<section id="juridiniaiRezultatai">
+                <% if(typeof data !== "undefined") { %>
+    			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
+                <% } %>
+			</section>
 		</main>
 		<%- include('../footer.ejs') %>
 	</body>

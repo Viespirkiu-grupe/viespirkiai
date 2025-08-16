@@ -51,8 +51,12 @@ app.use((err, req, res, next) => {
 });
 
 // Search database
-import { ensureSearchCollection } from "./typesense/typesense.js";
+import {
+    ensureSearchCollection,
+    ensureJarCollection,
+} from "./typesense/typesense.js";
 await ensureSearchCollection();
+await ensureJarCollection();
 
 app.listen(PORT, () =>
     console.log(`Server running at http://localhost:${PORT}`),

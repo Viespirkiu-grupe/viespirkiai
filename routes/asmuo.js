@@ -2,6 +2,7 @@ import express from "express";
 import config from "../utils/config.js";
 import { mysql } from "../mysql/mysql.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
+import { viespirkiai } from "../mongo/mongoDb.js";
 
 const asmuoRouter = express.Router();
 
@@ -194,12 +195,145 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
 
     regitra = regitraRezultatai;
 
+    let teismoNuosprendziai = [];
+    const [teismoNuosprendziaiRezultatai] = await mysql.execute(
+        `SELECT b.*, bd.*
+        FROM bylos b
+        JOIN bylosDalyviai bd ON bd.bylosId = b.id
+        WHERE bd.kodas = ?
+        ORDER BY b.data DESC;`,
+        [id],
+    );
+
+    teismoNuosprendziai = teismoNuosprendziaiRezultatai;
+
+    // Formatuojame teismo nuosprendžius
+    teismoNuosprendziai = teismoNuosprendziai.map((nuosprendis) => {
+        return {
+            ...nuosprendis,
+            // bylojeKaip	rašyti iš didžiosios
+            bylojeKaip: nuosprendis.bylojeKaip
+                ? nuosprendis.bylojeKaip.charAt(0).toUpperCase() +
+                  nuosprendis.bylojeKaip.slice(1)
+                : "",
+            bylosRusis: nuosprendis.bylosRusis
+                ? nuosprendis.bylosRusis.charAt(0).toUpperCase() +
+                  nuosprendis.bylosRusis.slice(1)
+                : "",
+        };
+    });
+
+    let sutartys = {
+        pirkejas: [],
+        tiekejas: [],
+    };
+
+    let pirkimaiCursor = viespirkiai.find({
+        perkanciosiosOrganizacijosKodas: String(id),
+    });
+
+    sutartys.pirkejas = await pirkimaiCursor.toArray();
+
+    let tiekimaiCursor = viespirkiai.find({
+        tiekejoKodas: String(id),
+    });
+
+    sutartys.tiekejas = await tiekimaiCursor.toArray();
+
+    function getYearlyTotals(contracts) {
+        const totals = {};
+        contracts.forEach((c) => {
+            if (c.tipas === "SP") return; // skip SP contracts
+            const year = new Date(c.sudarymoData).getFullYear();
+            if (!totals[year]) totals[year] = 0;
+            totals[year] += c.verte || 0;
+        });
+        // Convert to array of objects sorted by year, rounding totals
+        return Object.entries(totals)
+            .map(([year, total]) => ({
+                year: Number(year),
+                total: Math.round(total * 100) / 100,
+            }))
+            .sort((a, b) => a.year - b.year);
+    }
+
+    function getTop10ByjarKodas(contracts, jarKodasField) {
+        const sums = {};
+        contracts.forEach((c) => {
+            if (c.tipas === "SP") return; // skip SP contracts
+            const jarKodas = c[jarKodasField];
+            if (!sums[jarKodas]) sums[jarKodas] = 0;
+            sums[jarKodas] += c.verte || 0;
+        });
+        // Convert to array of { jarKodas, total }, round totals, sort descending
+        return Object.entries(sums)
+            .map(([jarKodas, total]) => ({
+                jarKodas,
+                total: Math.round(total * 100) / 100,
+            }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 10);
+    }
+
+    // Usage with your data:
+    const pirkimaiKasMetus = getYearlyTotals(sutartys.pirkejas);
+    const tiekimaiKasMetus = getYearlyTotals(sutartys.tiekejas);
+
+    const topTiekejai = getTop10ByjarKodas(sutartys.pirkejas, "tiekejoKodas");
+    const topPirkejai = getTop10ByjarKodas(
+        sutartys.tiekejas,
+        "perkanciosiosOrganizacijosKodas",
+    );
+
+    for (let topTiekejoId in topTiekejai) {
+        if (specAtvejai[topTiekejai[topTiekejoId].jarKodas]) {
+            topTiekejai[topTiekejoId].pavadinimas =
+                specAtvejai[topTiekejai[topTiekejoId].jarKodas].pavadinimas;
+            continue;
+        }
+        const [jarTiekejoRezultatai] = await mysql.execute(
+            "SELECT * FROM jar WHERE jarKodas = ?;",
+            [topTiekejai[topTiekejoId].jarKodas],
+        );
+        if (jarTiekejoRezultatai.length > 0) {
+            topTiekejai[topTiekejoId].pavadinimas =
+                jarTiekejoRezultatai[0].pavadinimas;
+        } else {
+            topTiekejai[topTiekejoId].pavadinimas = "Nežinomas";
+        }
+    }
+
+    for (let topPirkejoId in topPirkejai) {
+        if (specAtvejai[topPirkejai[topPirkejoId].jarKodas]) {
+            topPirkejai[topPirkejoId].pavadinimas =
+                specAtvejai[topPirkejai[topPirkejoId].jarKodas].pavadinimas;
+            continue;
+        }
+        const [jarPirkejoRezultatai] = await mysql.execute(
+            "SELECT * FROM jar WHERE jarKodas = ?;",
+            [topPirkejai[topPirkejoId].jarKodas],
+        );
+        if (jarPirkejoRezultatai.length > 0) {
+            topPirkejai[topPirkejoId].pavadinimas =
+                jarPirkejoRezultatai[0].pavadinimas;
+        } else {
+            topPirkejai[topPirkejoId].pavadinimas = "Nežinomas";
+        }
+    }
+
     // Asmuo
     let asmuo = {
         jar,
         sodra,
         mokesciai,
         regitra,
+        teismoNuosprendziai,
+        sutartys: {
+            pirkimaiKasMetus,
+            tiekimaiKasMetus,
+            topPirkejai,
+            topTiekejai,
+        },
     };
 
     // JSON
