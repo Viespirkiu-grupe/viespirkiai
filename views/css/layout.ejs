@@ -17,12 +17,18 @@
     }
 
     header aside {
-    	position: absolute;
-    	top: 0;
-    	right: 0;
-    	padding: 8px 16px;
+        display: flex;
+        justify-content: right;
+        flex-wrap: wrap;
+        gap: 4px;
+    	padding: 8px 8px;
     	margin-top: 8px;
     }
+
+    header aside a{
+        margin-left: 8px;
+    }
+
 
     main{
         flex-grow: 2;
@@ -39,6 +45,7 @@
     	display: flex;
     	justify-content: center;
     	align-items: center;
+     flex-wrap: wrap;
     }
 
     footer a{
