@@ -1,5 +1,6 @@
 import config from "./utils/config.js";
 import express from "express";
+import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
@@ -19,11 +20,18 @@ app.use((req, res, next) => {
     next();
 });
 
+// Favicon SVG
+const faviconSVG = fs.readFileSync("./public/icons/icon.svg", "utf8");
+app.locals.faviconSVG = encodeURIComponent(faviconSVG);
+
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 // Static routes
 app.use(express.static(path.join(__dirname, "public")));
+
+// Cookies
+app.use(cookieParser());
 
 // Auto-load all routes from /routes
 const routesPath = path.join(__dirname, "routes");

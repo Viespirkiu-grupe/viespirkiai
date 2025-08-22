@@ -9,9 +9,9 @@
     }) %>
 
     <% if(asmuo.jar.koordinates) { %>
-      <link rel="preload" href="https://unpkg.com/leaflet/dist/leaflet.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
-      <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" /></noscript>
-      <script defer src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+      <link rel="preload" href="/dist/leaflet.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+      <noscript><link rel="stylesheet" href="/dist/leaflet.css" /></noscript>
+      <script defer src="/dist/leaflet.js"></script>
 
       <script defer>
         window.addEventListener('DOMContentLoaded', () => {
@@ -25,7 +25,7 @@
       </script>
     <% } %>
 
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="/dist/apexcharts.js"></script>
     <script defer>
         function renderChart(elementId, labelData, seriesData, customOptions = {}) {
           const options = {

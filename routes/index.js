@@ -211,6 +211,29 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
     const totalPages = Math.ceil(total / limit);
 
     res.set("Cache-Control", "public, max-age=10, s-maxage=10");
+
+    let naujaPaieska;
+
+    if (req.query.naujaPaieska !== undefined) {
+        // query param takes priority
+        naujaPaieska = req.query.naujaPaieska === "true";
+    } else if (req.cookies.naujaPaieska !== undefined) {
+        // fallback to cookie
+        naujaPaieska = req.cookies.naujaPaieska === "true";
+    } else {
+        // default
+        naujaPaieska = true;
+    }
+
+    if (naujaPaieska === false) {
+        res.cookie("naujaPaieska", "false", {
+            httpOnly: true,
+            sameSite: "Lax",
+        });
+    } else {
+        res.clearCookie("naujaPaieska");
+    }
+
     res.render("index", {
         data: results,
         values,
@@ -221,7 +244,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
         queryParams,
         customHead: config.customHead,
         galimaEksportuoti,
-        naujaPaieska: req.query.naujaPaieska || true,
+        naujaPaieska,
     });
 });
 

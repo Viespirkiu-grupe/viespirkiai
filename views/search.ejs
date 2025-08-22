@@ -4,7 +4,7 @@
         placeholder="Paieška"
         enterkeyhint="search" />
     <button type="submit" value="Ieškoti" class="main">Ieškoti</button>
-    <details id="paieskosNustatymai" 
+    <details id="paieskosNustatymai"
         <% if (usedHiddenFields) { %>
         open
         <% } %>
@@ -21,7 +21,12 @@
             <%- include('inputs/number', { label: 'Vertė iki:', name: 'verteIki', placeholder: 'Nenurodyta', values }) %>
 
             <%- include('inputs/text', { label: 'Unikalus ID:', name: 'sutartiesUnikalusID', placeholder: 'Nenurodyta', values }) %>
-            <%- include('inputs/checkbox', { label: 'Kiti bruožai:', name: 'tikSuDokumentais', boxLabel: 'Tik su dokumentais', values }) %>
+            <div>
+                <h2>Kita</h2>
+                <%- include('inputs/checkbox', {name: 'tikSuDokumentais', boxLabel: 'Tik su dokumentais', values }) %>
+                <%- include('inputs/checkbox', {name: 'tikIt', boxLabel: 'Tik IT pirkimai*', values }) %>
+                <p>* Veikia tik ne tekstinėse paieškose</p>
+            </div>
         </div>
     </details>
     <script>
