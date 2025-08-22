@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+	<head>
+        <%- include('head.ejs', {
+            pageTitle: "Viešlaiškiai",
+            pageDescription: `Viešpirkių iniciatyvos viešlaiškiai`,
+            pageImage: `https://viespirkiai.top/vieslaiskiai/vieslaiskiai.png`,
+            customHead
+        }) %>
+        <style>
+            .vieslaiskiai {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 20px;
+            }
+            .vieslaiskis {
+                flex: 1 1 300px;
+                aspect-ratio: sqrt(2);
+                max-width: 700px;
+                min-width: 300px;
+                overflow: hidden;
+                border-radius: 10px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            }
+
+            .vieslaiskis img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+                display: block;
+            }
+        </style>
+	</head>
+	<body>
+		<%- include('header.ejs') %>
+		<main>
+			<h1>Viešlaiškiai</h1>
+            <section class="vieslaiskiai">
+                <% vieslaiskiai.forEach(vieslaiskis => { %>
+                    <article class="vieslaiskis">
+                        <a href="<%= vieslaiskis.nuoroda %>">
+                            <img src="<%= vieslaiskis.nuotrauka %>" alt="<%= vieslaiskis.pavadinimas %>">
+                        </a>
+                    </article>
+                <% }) %>
+            </section>
+		</main>
+		<%- include('footer.ejs', {
+		    neoficialus: false
+		}) %>
+	</body>
+</html>
