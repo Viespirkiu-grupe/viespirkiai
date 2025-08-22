@@ -22,7 +22,27 @@
                 overflow: hidden;
                 border-radius: 10px;
                 box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                transition: all 0.2s ease-in-out;
             }
+
+            .vieslaiskis:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            }
+
+            @media (prefers-color-scheme: dark){
+                .vieslaiskis {
+                    box-shadow: 0 4px 8px rgba(255, 255, 255, 0.2);
+                }
+
+                .vieslaiskis:hover {
+                    box-shadow: 0 8px 16px rgba(255, 255, 255, 0.3);
+                }
+            }
+
+
+
+
 
             .vieslaiskis img {
                 width: 100%;
