@@ -38,7 +38,7 @@
 <% } %>
 
 
-<script>
+<script defer>
 if (!navigator.connection?.saveData) {
   const prefetched = new Set();
 
@@ -58,7 +58,9 @@ if (!navigator.connection?.saveData) {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/service-worker.js');
 }
+
 </script>
 
 <%- customHead %>
+
 <%- include('css.ejs') %>

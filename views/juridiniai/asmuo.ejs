@@ -9,91 +9,132 @@
     }) %>
 
     <% if(asmuo.jar.koordinates) { %>
-      <link rel="preload" href="/dist/leaflet.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
-      <noscript><link rel="stylesheet" href="/dist/leaflet.css" /></noscript>
-      <script defer src="/dist/leaflet.js"></script>
-
-      <script defer>
+        <script>
         window.addEventListener('DOMContentLoaded', () => {
-          const map = L.map('map').setView([document.getElementById('map').dataset.y, document.getElementById('map').dataset.x], 16);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          }).addTo(map);
+          // 1. Load Leaflet CSS
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = '/dist/leaflet.css';
+          document.head.appendChild(link);
 
-          const marker = L.marker([document.getElementById('map').dataset.y, document.getElementById('map').dataset.x]).addTo(map);
+          // 2. Load Leaflet JS dynamically
+          const script = document.createElement('script');
+          script.src = '/dist/leaflet.js';
+          script.defer = true;
+          script.onload = () => {
+            // 3. Initialize map after JS is ready
+            const mapEl = document.getElementById('map');
+            const map = L.map('map').setView([mapEl.dataset.y, mapEl.dataset.x], 16);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            L.marker([mapEl.dataset.y, mapEl.dataset.x]).addTo(map);
+          };
+          document.body.appendChild(script);
         });
-      </script>
+        </script>
     <% } %>
 
-    <script src="/dist/apexcharts.js"></script>
     <script defer>
-        function renderChart(elementId, labelData, seriesData, customOptions = {}) {
-          const options = {
-            chart: {
-              type: 'line',
-              height: 400,
-              toolbar: { show: false },
-              zoom: {
-                enabled: false
-              },
-              fontFamily: 'Ubuntu',
-            },
-            series: [{ name: customOptions.seriesName || '', data: seriesData }],
-            xaxis: {
-                  type: 'datetime',
-                  categories: labelData,
-                  tickAmount: 6,
-                  labels: {
-                    style: { colors: '#000' },
-                    format: 'yyyy-MM'
-                },
+      let apexPromise;
 
-            },
-            tooltip: {
-              x: {
-                format: 'yyyy-MM'
-              },
-              enabled: true
-            },
-            yaxis: { labels: { style: { colors: '#000' }, min: 0 } },
-            stroke: { curve: 'smooth', width: 2 },
-            markers: { size: 5 },
-            colors: ['#000'],
-            grid: { borderColor: '#e0e0e0' },
-            theme: {
-                mode: 'light',
-                monochrome: {
-                    enabled: false,
-                    color: '#000000',
-                    shadeTo: 'dark',
-                    shadeIntensity: 0.65
-                },
-            },
-          };
+      function loadApexCharts() {
+        if (window.ApexCharts) return Promise.resolve(window.ApexCharts);
+        if (apexPromise) return apexPromise; // already loading
 
-          function deepMerge(target, source) {
-            for (const key in source) {
-              if (
-                source[key] &&
-                typeof source[key] === 'object' &&
-                !Array.isArray(source[key])
-              ) {
-                if (!target[key]) target[key] = {};
-                deepMerge(target[key], source[key]);
-              } else {
-                target[key] = source[key];
-              }
-            }
-            return target;
+        apexPromise = new Promise((resolve, reject) => {
+          function startLoading() {
+            const script = document.createElement('script');
+            script.src = '/dist/apexcharts.js';
+            script.defer = true;
+            script.onload = () => resolve(window.ApexCharts);
+            script.onerror = reject;
+            document.body.appendChild(script);
           }
 
-          let fullOptions = deepMerge(
-            structuredClone(options), // avoid mutating original
-            customOptions
-          );
+          if (document.readyState === 'loading') {
+            window.addEventListener('DOMContentLoaded', startLoading);
+          } else {
+            startLoading();
+          }
+        });
 
-          const chart = new ApexCharts(document.querySelector('#' + elementId), fullOptions);
-          chart.render();
+        return apexPromise;
+      }
+
+
+
+      function deepMerge(target, source) {
+        for (const key in source) {
+          if (
+            source[key] &&
+            typeof source[key] === 'object' &&
+            !Array.isArray(source[key])
+          ) {
+            if (!target[key]) target[key] = {};
+            deepMerge(target[key], source[key]);
+          } else {
+            target[key] = source[key];
+          }
+        }
+        return target;
+      }
+
+      async function renderChart(elementId, labelData, seriesData, customOptions = {}) {
+        const options = {
+          chart: {
+            type: 'line',
+            height: 400,
+            toolbar: { show: false },
+            zoom: {
+              enabled: false
+            },
+            fontFamily: 'Ubuntu',
+          },
+          series: [{ name: customOptions.seriesName || '', data: seriesData }],
+          xaxis: {
+                type: 'datetime',
+                categories: labelData,
+                tickAmount: 6,
+                labels: {
+                  style: { colors: '#000' },
+                  format: 'yyyy-MM'
+              },
+
+          },
+          tooltip: {
+            x: {
+              format: 'yyyy-MM'
+            },
+            enabled: true
+          },
+          yaxis: { labels: { style: { colors: '#000' }, min: 0 } },
+          stroke: { curve: 'smooth', width: 2 },
+          markers: { size: 5 },
+          colors: ['#000'],
+          grid: { borderColor: '#e0e0e0' },
+          theme: {
+              mode: 'light',
+              monochrome: {
+                  enabled: false,
+                  color: '#000000',
+                  shadeTo: 'dark',
+                  shadeIntensity: 0.65
+              },
+          },
+        };
+
+        let fullOptions = deepMerge(
+          structuredClone(options), // avoid mutating original
+          customOptions
+        );
+
+        await loadApexCharts();
+
+        const chart = new ApexCharts(document.querySelector('#' + elementId), fullOptions);
+        chart.render();
       }
     </script>
     <style>
