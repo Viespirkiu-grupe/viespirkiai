@@ -67,12 +67,18 @@ button.main {
 	grid-template-columns: repeat(4, 1fr);
 }
 
-.settingai > div:nth-child(odd) {
-	grid-row: 1;
+/* Zig-zag for the first 8 items */
+.settingai > div:nth-child(-n+8):nth-child(odd) {
+  grid-row: 1;
 }
 
-.settingai > div:nth-child(even) {
-	grid-row: 2;
+.settingai > div:nth-child(-n+8):nth-child(even) {
+  grid-row: 2;
+}
+
+/* Items from 9 onward flow naturally */
+.settingai > div:nth-child(n+9) {
+  grid-row: auto;
 }
 
 .settingai input {
@@ -83,13 +89,20 @@ button.main {
 	width: auto;
 }
 
-input {
+input, select {
 	font-size: 1em;
 	padding: 4px;
 	border: 1px solid var(--light-gray);
 	background-color: var(--lighter-gray);
 	color: var(--black);
 	border-radius: 4px;
+}
+
+.settingai select{
+   	width: 94%;
+   	height: 2em;
+
+
 }
 
 @media (max-width: 768px) {

@@ -13,10 +13,32 @@
 		<main>
 			<%- include('search.ejs', {values, usedHiddenFields, numberOfResults}) %>
 			<% if(naujaPaieska) { %>
-			    <%- include('resultsModern.ejs', {values, usedHiddenFields, data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
+			    <%- include('resultsModern.ejs', {zinomasRezultatuSkaicius, values, usedHiddenFields, data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
 			<% } else { %>
-			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
+			    <%- include('results.ejs', {zinomasRezultatuSkaicius, data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
 			<% } %>
+			<script>
+   			const span = document.querySelector('.rezultatai-nezinomas-total');
+
+                if (span && !span.classList.contains('spin')) {
+                    span.classList.add('spin');
+
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('rezultatuSkaiciausPatikslinimas', 'true');
+
+                    fetch(url)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.zinomasRezultatuSkaicius) {
+                                span.textContent = data.total;
+                                span.className = ''; // remove all classes
+                            } else {
+                                span.classList.remove('spin'); // stop spinning if still unknown
+                            }
+                        })
+                        .catch(() => span.classList.remove('spin')); // stop spinning on error
+                }
+			</script>
 		</main>
 		<%- include('footer.ejs') %>
 	</body>

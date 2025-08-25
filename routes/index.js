@@ -24,7 +24,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
 
     // Limitas, kiek rodyti viename puslapyje
     let limit = 50;
-    const MAX_MONGO_LIMIT = 10000;
+    const MAX_MONGO_LIMIT = 100_000;
     const MAX_TYPESENSE_LIMIT = 250;
 
     if (req.query.limit == "max" && req.query.search) {
@@ -54,6 +54,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
+    let zinomasRezultatuSkaicius = true;
     if (req.query.search) {
         // Tekstinė paieška – Typesense
         var { filterBy, values, queryParams, usedHiddenFields } =
@@ -80,15 +81,43 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
         if (Object.keys(filter).length === 0) {
             var total = sutarciuSkaicius;
         } else {
-            var total = await viespirkiai.countDocuments(filter);
+            if (!req.query.csv && !req.query.jsonl) {
+                var total;
+                try {
+                    if (req.query.rezultatuSkaiciausPatikslinimas) {
+                        total = await viespirkiai.countDocuments(filter, {
+                            maxTimeMS: 20_000,
+                        });
+                    } else {
+                        total = await viespirkiai.countDocuments(filter, {
+                            maxTimeMS: 250,
+                        });
+                    }
+                } catch (err) {
+                    if (err.code === 50) {
+                        total = 100000;
+                        zinomasRezultatuSkaicius = false;
+                    } else {
+                        throw err;
+                    }
+                }
+            }
         }
 
-        var results = await viespirkiai
-            .find(filter)
-            .sort({ paskutinioRedagavimoData: -1 })
-            .skip(skip)
-            .limit(limit)
-            .toArray();
+        if (req.query.csv || req.query.jsonl) {
+            var results = viespirkiai
+                .find(filter)
+                .sort({ paskutinioRedagavimoData: -1 })
+                .skip(skip)
+                .limit(limit);
+        } else {
+            var results = await viespirkiai
+                .find(filter)
+                .sort({ paskutinioRedagavimoData: -1 })
+                .skip(skip)
+                .limit(limit)
+                .toArray();
+        }
 
         var paieškosVariklis = "MongoDB";
     }
@@ -108,15 +137,16 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
     // Paieškos užklausos informacija
     let trukme = ((performance.now() - startas) / 1000).toFixed(2) + "s";
     let rodomiRezultatai = results.length;
+    let rodomasTotal;
+    if (zinomasRezultatuSkaicius) {
+        rodomasTotal = total;
+    } else {
+        rodomasTotal = `<span class="rezultatai-nezinomas-total"> ? </span>`;
+    }
     if (rodomiRezultatai < total) {
-        var numberOfResults = `Rodomi ${rodomiRezultatai} iš ${total} rezultatų <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
+        var numberOfResults = `Rodomi ${rodomiRezultatai} iš ${rodomasTotal} rezultatų <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
     } else {
         var numberOfResults = `${total} rezultatas(-ai) <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
-    }
-
-    // Jei prašo JSON
-    if (req.query.json) {
-        return res.json(results);
     }
 
     // Jei prašo JSONL
@@ -126,9 +156,19 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
             "Content-Disposition",
             `attachment; filename=viespirkiai-${new Date().toISOString()}.jsonl`,
         );
-        for (const result of results) {
-            res.write(JSON.stringify(result) + "\n");
+
+        let count = 0;
+        for await (const result of results) {
+            const line = JSON.stringify(result) + "\n";
+            if (!res.write(line)) {
+                // wait until the buffer is drained
+                await new Promise((resolve) => res.once("drain", resolve));
+            }
+            // optional: flush periodically if using Express
+            count++;
+            if (count % 1000 === 0 && res.flush) res.flush();
         }
+
         return res.end();
     }
 
@@ -175,7 +215,8 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
 
         res.write(header);
 
-        for (const row of results) {
+        let count = 0;
+        for await (const row of results) {
             const values = [
                 row.tipas,
                 row.kategorija,
@@ -194,10 +235,29 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
                 row.sutartiesUnikalusID,
             ];
             const csvLine = values.map(escapeCSV).join(",") + "\n";
-            res.write(csvLine);
+            if (!res.write(csvLine)) {
+                // backpressure: wait for drain before continuing
+                await new Promise((resolve) => res.once("drain", resolve));
+            }
+
+            count++;
+            // flush every 1000 rows if flush function exists
+            if (count % 1000 === 0 && res.flush) {
+                console.log("flush", count);
+                res.flush();
+            }
         }
 
         res.end();
+        return;
+    }
+
+    if (req.query.rezultatuSkaiciausPatikslinimas) {
+        res.json({
+            zinomasRezultatuSkaicius,
+            total,
+            numberOfResults,
+        });
         return;
     }
 
@@ -241,6 +301,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
         currentPage: page,
         pageCount: totalPages,
         numberOfResults,
+        zinomasRezultatuSkaicius,
         queryParams,
         customHead: config.customHead,
         galimaEksportuoti,

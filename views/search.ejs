@@ -24,8 +24,45 @@
             <div>
                 <h2>Kita</h2>
                 <%- include('inputs/checkbox', {name: 'tikSuDokumentais', boxLabel: 'Tik su dokumentais', values }) %>
-                <%- include('inputs/checkbox', {name: 'tikIt', boxLabel: 'Tik IT pirkimai*', values }) %>
-                <p>* Veikia tik ne tekstinėse paieškose</p>
+            </div>
+            <div>
+                <h2>BVPŽ prefiksas*</h2>
+                <select
+                    name="bvpzPrefiksas"
+                    id="bvpzPrefiksas"
+                    value="<%= values["bvpzPrefiksas"] || "" %>"
+                >
+                    <% let rastasPasirinkimas = false; %>
+                    <% if(values["bvpzPrefiksas"] == "" || values["bvpzPrefiksas"] == "kitas") { %>
+                        <% rastasPasirinkimas = true; %>
+                        <option value="" selected>Visi / nurodytas žemiau</option>
+                    <% } else { %>
+                        <option value="">Visi / nurodytas žemiau</option>
+                    <% } %>
+
+                    <% if(values["bvpzPrefiksas"] == "48 72") { %>
+                        <% rastasPasirinkimas = true; %>
+                        <option value="48 72" selected>Informacinės technologijos</option>
+                    <% } else { %>
+                        <option value="48 72">Informacinės technologijos</option>
+                    <% } %>
+
+                    <% if(values["bvpzPrefiksas"] == "3360 3361 3362 3363 3364 3365 3366 3367 33690 33691") { %>
+                        <% rastasPasirinkimas = true; %>
+                        <option value="3360 3361 3362 3363 3364 3365 3366 3367 33690 33691" selected>Vaistai</option>
+                    <% } else { %>
+                        <option value="3360 3361 3362 3363 3364 3365 3366 3367 33690 33691">Vaistai</option>
+                    <% } %>
+                </select>
+                <i style="width: 100%; text-align: center; display: inline-block; margin-block: 8px;">arba</i>
+                <input type="text"
+                    name="bvpzPrefiksasKitas"
+                    id="bvpzPrefiksasKitas"
+                    value="<%= values["bvpzPrefiksasKitas"] || "" %>"
+                    placeholder="Nenurodyta"
+                />
+                <p>* Veikia tik ne tekstinėse paieškose, žr. <a href="/bvpz">BVPŽ</a></p>
+
             </div>
         </div>
     </details>

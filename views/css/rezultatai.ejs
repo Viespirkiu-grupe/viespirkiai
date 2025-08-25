@@ -124,4 +124,19 @@ section.preResultOptions{
 .rezultatas-bottom a:hover {
     text-decoration: underline;
 }
+
+.rezultatai-nezinomas-total{
+    display: inline-flex;
+    justify-content: center;
+    min-width: 16px;
+}
+
+.rezultatai-nezinomas-total.spin {
+    animation: spin 0.5s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
 </style>

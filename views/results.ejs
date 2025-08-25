@@ -5,7 +5,6 @@
 
   <% if(galimaEksportuoti){ %>
     <div class="exportOptions">
-      <a href="/?<%- queryParams %>&json=true&limit=max" class="exportLink">↗ JSON</a>&nbsp;
       <a href="/?<%- queryParams %>&jsonl=true&limit=max" class="exportLink">↗ JSONL</a>&nbsp;
       <a href="/?<%- queryParams %>&csv=true&limit=max" class="exportLink">↗ CSV</a>
     </div>
@@ -36,14 +35,14 @@
                     <i>Nenurodyta</i>
                   <% } else { %>
                     <%= item.pavadinimas %>
-                  <% } %> 
+                  <% } %>
                 </a>
               </div>
             </td>
             <td class="center oneLine">
-              <% 
+              <%
               const verte = item.faktineIvykdimoVerte || item.verte;
-              if(Number(verte) > 10000) { 
+              if(Number(verte) > 10000) {
               %>
               <u><%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</u>
               <% } else { %>
@@ -62,7 +61,7 @@
             </td>
             <td class="center oneLine">
               <% if (item.paskutinioRedagavimoData) { %>
-                <%= item.paskutinioRedagavimoData %> 
+                <%= item.paskutinioRedagavimoData %>
               <% } else { %>
                 -
               <% } %>

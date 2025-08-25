@@ -22,7 +22,8 @@ app.use((req, res, next) => {
 
 // Favicon SVG
 const faviconSVG = fs.readFileSync("./public/icons/icon.svg", "utf8");
-app.locals.faviconSVG = encodeURIComponent(faviconSVG);
+app.locals.faviconSVG = faviconSVG;
+app.locals.faviconSVGURLEncoded = encodeURIComponent(faviconSVG);
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));

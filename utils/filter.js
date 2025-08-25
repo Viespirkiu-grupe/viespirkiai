@@ -181,12 +181,48 @@ export function buildMongoFilter(query) {
             isBoolean: true,
         },
         {
-            key: "tikIt",
-            apply: () => {
-                filter.bvpzKodas = { $regex: /^(48|72)/ };
-                usedHiddenFields = true;
+            key: "bvpzPrefiksas",
+            apply: (val) => {
+                const prefixes = val
+                    .split(" ")
+                    .map((p) => p.trim())
+                    .filter((p) => p.length > 0);
+
+                if (prefixes.length > 0) {
+                    filter.$or = prefixes.map((prefix) => {
+                        const start = prefix;
+                        const end = String(parseInt(prefix, 10) + 1).padStart(
+                            prefix.length,
+                            "0",
+                        );
+                        return { bvpzKodas: { $gte: start, $lt: end } };
+                    });
+                    usedHiddenFields = true;
+                }
             },
-            isBoolean: true,
+            isBoolean: false,
+        },
+        {
+            key: "bvpzPrefiksasKitas",
+            apply: (val) => {
+                const prefixes = val
+                    .split(" ")
+                    .map((p) => p.trim())
+                    .filter((p) => p.length > 0);
+
+                if (prefixes.length > 0) {
+                    filter.$or = prefixes.map((prefix) => {
+                        const start = prefix;
+                        const end = String(parseInt(prefix, 10) + 1).padStart(
+                            prefix.length,
+                            "0",
+                        );
+                        return { bvpzKodas: { $gte: start, $lt: end } };
+                    });
+                    usedHiddenFields = true;
+                }
+            },
+            isBoolean: false,
         },
     ];
 
