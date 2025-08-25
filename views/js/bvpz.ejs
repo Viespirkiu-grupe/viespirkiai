@@ -1,0 +1,165 @@
+<script>
+/**
+ * Loads all CVP codes from a JSON file and displays them
+ * @returns {Promise<void>}
+ */
+async function bvpzLoadData() {
+  const data = await fetch("/dist/cpv.json").then(r => r.json());
+  const container = document.getElementById("tree");
+  container.classList.remove("loading");
+  bvpzBuildTree(data, container);
+}
+bvpzLoadData();
+
+/**
+ * Recursively builds a dom tree structure from the provided nodes
+ * @param {Array} nodes - The nodes to build the tree from
+ * @param {HTMLElement} container - The container to append the tree to
+ */
+function bvpzBuildTree(nodes, container) {
+  nodes.forEach(node => {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+
+    let toggle = false;
+    if (node.children && node.children.length > 0) {
+      toggle = document.createElement("span");
+      toggle.className = "toggle-icon";
+      toggle.textContent = "▶";
+
+      summary.insertBefore(toggle, summary.firstChild);
+    } else {
+      details.className = "no-children";
+    }
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.cpv = node.attributes.cpv_mask;
+    checkbox.addEventListener("change", () => {
+      const allChildCheckboxes = details.querySelectorAll("details input[type=checkbox]");
+      allChildCheckboxes.forEach(cb => cb.checked = checkbox.checked);
+
+      bvpzUpdateOutput();
+    });
+
+    const label = document.createElement("label");
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(decodeHTMLEntities(node.label)));
+
+    if(toggle){
+      summary.appendChild(toggle);
+    }
+    summary.appendChild(label);
+    details.appendChild(summary);
+
+    if (node.children) {
+      bvpzBuildTree(node.children, details);
+    }
+
+    container.appendChild(details);
+  });
+}
+
+/**
+ * Decodes HTML entities in a string
+ * @param {string} str - The string to decode
+ * @returns {string} - The decoded string
+ */
+function decodeHTMLEntities(str) {
+  const txt = document.createElement("textarea");
+  txt.innerHTML = str;
+  return txt.value;
+}
+
+/**
+ * Updates the output area with the selected codes
+ * @returns {void}
+ */
+function bvpzUpdateOutput() {
+  const container = document.getElementById("tree");
+  const selected = bvpzCollectSelected(container);
+  document.getElementById("pasirinkti-kodai").textContent = selected.join(" ");
+  document.getElementById("jeiPasirinkti").style.display = selected.length > 0 ? "block" : "none";
+  document.getElementById("jeiNera").style.display = selected.length === 0 ? "block" : "none";
+}
+
+/**
+ * Collects selected codes from the tree
+ * @param {HTMLElement} element - The root element to start collecting from
+ * @returns {Array<string>} - An array of selected codes
+ */
+ function bvpzCollectSelected(root) {
+   return Array.from(root.children).flatMap(child => bvpzCollectMinimal(child).prefixes);
+ }
+
+ /**
+  * Recursively collects selected codes from a node
+  * @param {HTMLElement} node - The node to collect fromq
+  * @returns {{selected: boolean, prefixes: Array<string>}} - An object containing whether the node is selected and an array of selected codes
+  */
+function bvpzCollectMinimal(node) {
+  const result = [];
+  const checkbox = node.querySelector(":scope > summary label input[type=checkbox]");
+  if (!checkbox) return { selected: false, prefixes: [] };
+
+  const children = Array.from(node.querySelectorAll(":scope > details"));
+  let allChildrenSelected = true;
+  let collected = [];
+
+  for (const child of children) {
+    const { selected, prefixes } = bvpzCollectMinimal(child);
+    if (!selected) allChildrenSelected = false;
+    collected.push(...prefixes);
+  }
+
+  if (checkbox.checked) {
+    if (children.length === 0 || allChildrenSelected) {
+      return { selected: true, prefixes: [checkbox.dataset.cpv] };
+    } else {
+      return { selected: false, prefixes: [checkbox.dataset.cpv + "0", ...collected] };
+    }
+  } else {
+    return { selected: false, prefixes: collected };
+  }
+}
+
+/**
+ * Applies a selection of codes to the tree
+ * @param {HTMLElement} treeElement - The root element of the tree
+ * @param {Array<string>} selectedPrefixes - An array of selected codes or prefixes
+ */
+function bvpzApplySelection(treeElement, selectedPrefixes) {
+  const allCheckboxes = treeElement.querySelectorAll("input[type=checkbox]");
+
+  allCheckboxes.forEach(checkbox => {
+    const prefix = checkbox.dataset.cpv;
+
+    let checked = false;
+
+    for (const sel of selectedPrefixes) {
+      if (sel.endsWith("0")) {
+        if (sel.slice(0, -1) === prefix) {
+          checked = true;
+          break;
+        }
+      } else {
+        if (prefix.startsWith(sel)) {
+          checked = true;
+          break;
+        }
+      }
+    }
+
+    checkbox.checked = checked;
+  });
+
+  bvpzUpdateOutput();
+}
+
+/**
+ * Clears all selections on the tree
+ */
+function bvpzClear(){
+  bvpzApplySelection(document.querySelector("#tree"), [])
+}
+</script>

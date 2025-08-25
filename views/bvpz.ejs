@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+	<head>
+        <%- include('head.ejs', {
+            pageTitle: "BVPŽ kodų paieška",
+            pageDescription: `  `,
+            pageImage: `https://viespirkiai.top/bvpz.png`,
+            customHead
+        }) %>
+		<style>
+            body{
+                padding-bottom: 72px;
+            }
+        </style>
+	</head>
+	<body>
+		<%- include('header.ejs') %>
+		<main>
+            <section class="bvpzList">
+                <h1>BVPŽ kodai</h1>
+                Sąraše galite ieškoti naudodamiesi naršyklės paieškos funkcija (dažniausiai <kbr>Ctrl</kbr>+<kbr>F</kbr>).
+                <br><br>
+                <div id="tree" class="loading">
+                    <div class="spinner" style="display: none;">
+                        <%- faviconSVG %>
+                    </div>
+                </div>
+                <div id="output">
+                    <div class="left">
+                        <div id="jeiPasirinkti" style="display:none;">
+                            <div style="margin-bottom: 8px;"><b><u>Pasirinkimas:</u></b></div>
+                            <span id="pasirinkti-kodai"></span>
+                        </div>
+                        <div id="jeiNera">
+                            <i>Pasirinkite kodus</i>
+                        </div>
+                    </div>
+                    <div class="right">
+                        <button onclick="bvpzClear()">Išvalyti</button>
+                        <button onclick="navigator.clipboard.writeText(document.getElementById('pasirinkti-kodai').textContent).then(() => { })">Kopijuoti</button>
+                    </div>
+                </div>
+            </section>
+            <%- include('js/bvpz.ejs') %>
+		</main>
+		<%- include('footer.ejs') %>
+	</body>
+</html>

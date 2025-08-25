@@ -1,0 +1,230 @@
+<style>
+/* Kortelės */
+.bvpzList details {
+    background: var(--shade-1);
+    box-shadow: 2px 2px 6px var(--shade-7);
+    padding: 10px 0;
+    margin: 1px 0;
+}
+
+@media (prefers-color-scheme: dark) {
+    .bvpzList details {
+        box-shadow: none;
+    }
+}
+
+.bvpzList details.no-children {
+    padding-left: 52px;
+    padding-bottom: 0px;
+}
+
+.bvpzList details[open]:not(.no-children) {
+padding-bottom: 0px;
+}
+
+
+/* Kortelės pavainimas */
+.bvpzList summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    padding: 8px;
+}
+
+.bvpzList summary::-webkit-details-marker {
+    display: none;
+}
+
+.bvpzList details[open] > summary{
+    padding-bottom: 16px;
+}
+
+.bvpzList details.no-children > summary{
+    padding-bottom: 16px;
+}
+
+.bvpzList label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+
+/* Toggle icon */
+.bvpzList .toggle-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-inline: 16px;
+    font-weight: bold;
+    transition: transform 0.2s;
+}
+
+.bvpzList details[open] > summary > .toggle-icon {
+    transform: rotate(90deg);
+}
+
+
+
+/* Checkbox */
+.bvpzList input[type="checkbox"] {
+margin-right: 8px;
+width: 20px;
+min-width: 20px;
+height: 20px;
+min-height: 20px;
+-webkit-appearance: none;
+-moz-appearance: none;
+appearance: none;
+border: 2px solid var(--black);
+background-color: var(--white);
+cursor: pointer;
+position: relative;
+border-radius: 2px;
+transition: background-color 0.2s ease-in-our;
+}
+
+.bvpzList input[type="checkbox"]:checked {
+background-color: var(--black);
+}
+
+.bvpzList input[type="checkbox"]:checked::after {
+content: '';
+position: absolute;
+top: 3px;
+left: 6px;
+width: 3px;
+height: 7px;
+border: solid var(--white);
+border-width: 0 2px 2px 0;
+transform: rotate(45deg);
+}
+
+
+
+/* Atspalviai */
+.bvpzList details details {
+background: var(--shade-2);
+}
+
+.bvpzList details details details {
+background: var(--shade-3);
+}
+
+.bvpzList details details details details {
+background: var(--shade-4);
+}
+
+.bvpzList details details details details details {
+background: var(--shade-5);
+}
+
+.bvpzList details details details details details details {
+background: var(--shade-6);
+}
+
+.bvpzList details details details details details details details {
+    background: var(--shade-7);
+}
+
+/* Indentacija */
+.bvpzList details {
+    --indent-by: 36px;
+}
+
+.bvpzList details details summary{
+    padding-left: calc(var(--indent-by) * 1);
+}
+
+.bvpzList details details details summary{
+    padding-left: calc(var(--indent-by) * 2);
+}
+
+.bvpzList details details details details summary{
+    padding-left: calc(var(--indent-by) * 3);
+}
+
+.bvpzList details details details details details summary{
+    padding-left: calc(var(--indent-by) * 4);
+}
+
+.bvpzList details details details details details details summary{
+    padding-left: calc(var(--indent-by) * 5);
+}
+
+.bvpzList details details details details details details details summary{
+    padding-left: calc(var(--indent-by) * 6);
+}
+
+.bvpzList details details details details details details details details summary{
+    padding-left: calc(var(--indent-by) * 7);
+}
+
+/* Apačia */
+.bvpzList #output {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    border-top: 1px solid var(--black);
+    padding: 12px;
+    height: 72px;
+    width: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.bvpzList #output .left {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.bvpzList #pasirinkti-kodai {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.bvpzList #output .right {
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+}
+
+/* Loading */
+
+.bvpzList #tree.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: min(400px, 60vh);
+    position: relative;
+    background: none;
+}
+
+.bvpzList #tree.loading .spinner {
+    width: 48px;
+    height: 48px;
+    display: flex  !important;
+    justify-content: center;
+    align-items: center;
+    animation: spin 1s linear infinite;
+}
+
+.bvpzList #tree.loading .spinner svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+</style>
