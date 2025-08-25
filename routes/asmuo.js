@@ -383,6 +383,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         asmuo,
         customHead: config.customHead,
         aprasas,
+        queryParams: req.query,
     });
 });
 

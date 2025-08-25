@@ -139,7 +139,7 @@
     </script>
     <style>
         .chart {
-        background-color: #fff;
+            background-color: #fff;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -306,7 +306,7 @@
 
         <h2><u>Vidutinis darbo užmokestis</u></h2>
         <i>Neatskaičius mokesčių, €/mėn.</i>
-        <div class="col-2 mobile-col-1">
+        <div class="col-2 mobile-col-1" id="uzmokestis">
             <section style="width: 100%;">
                 <h3>Darbo sutartys, valstybės tarnautojai</h3>
                 <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
@@ -346,7 +346,7 @@
         </div>
 
         <h2 style="margin-bottom: 0px;"><u>Darbuotojų skaičius</u></h2>
-        <div class="col-2 mobile-col-1">
+        <div class="col-2 mobile-col-1" id="darbuotojai">
             <section style="width: 100%;">
                 <h3>Darbo sutartys, valstybės tarnautojai</h3>
                 <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
@@ -385,7 +385,7 @@
             </section>
         </div>
 
-        <div class="col-2 mobile-col-1">
+        <div class="col-2 mobile-col-1" id="imokos">
             <section style="width: 100%;">
                 <h2><u>SODRA įmokos</u></h2>
                 <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
@@ -458,7 +458,7 @@
         </div>
 
         <h2><u>Viešųjų pirkimų sutartys</u></h2>
-        <div class="col-2 mobile-col-1">
+        <div class="col-2 mobile-col-1" id="sutartys">
             <section style="width: 100%;">
                 <h3>Pirkimai per metus</h3>
                 <% if(asmuo.sutartys && asmuo.sutartys.pirkimaiKasMetus	 && asmuo.sutartys.pirkimaiKasMetus.length > 0) { %>
@@ -533,8 +533,7 @@
                     <i class="diagrama-nera-duomenu">Nėra duomenų</i>
                 <% } %>
             </section>
-        </div>
-        <div class="col-2 mobile-col-1" style="gap: 8px;">
+
             <section style="width: 100%;">
                 <h3>TOP 10 tiekėjų</h3>
                 <% if(asmuo.sutartys && asmuo.sutartys.topTiekejai && asmuo.sutartys.topTiekejai.length > 0) { %>
@@ -608,82 +607,101 @@
         </div>
 
         <% if(asmuo.regitra && asmuo.regitra.length > 0){ %>
-            <h2><u>Transporto priemonės</u></h2>
-            <div class="tableContainer">
-            <table style="width: auto; min-width: 70vw;">
-                <thead>
-                    <tr>
-                        <th>Marke</th>
-                        <th>Pavadinimas</th>
-                        <th>Kategorija</th>
-                        <th>Degalai</th>
-                        <th>Galia (kW)</th>
-                        <th>Vietos</th>
-                        <th>Pirmoji registracija</th>
-                        <th>Savininkas</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% asmuo.regitra.forEach(function(auto){ %>
-                        <%
-                          let savinikas = "Ne";
-                          if(auto.valdymoTeise == "A"){
-                              savininkas = "Taip";
-                          }
-                        %>
-                        <tr>
-                            <td><%= auto.marke %></td>
-                            <td><%= auto.komercinisPavadinimas %></td>
-                            <td class="center"><%= auto.kategorijaKlase %></td>
-                            <td class="center"><%= auto.degalai || "-" %></td>
-                            <td class="center"><%= auto.galia || "-" %></td>
-                            <td class="center"><%= (Number(auto.sedimuVietuSkaicius) + Number(auto.stovimuVietuSkaicius)) || "-" %></td>
-                            <td class="center"><%= auto.pirmosiosRegistracijosData || "-" %></td>
-                            <td class="center"><%= savininkas || "?" %></td>
-                        </tr>
-                    <% }) %>
-                </tbody>
-            </table>
+            <div id="regitra">
+                <h2><u>Transporto priemonės</u></h2>
+                <div class="tableContainer">
+                    <table style="width: auto; min-width: 70vw;">
+                        <thead>
+                            <tr>
+                                <th>Marke</th>
+                                <th>Pavadinimas</th>
+                                <th>Kategorija</th>
+                                <th>Degalai</th>
+                                <th>Galia (kW)</th>
+                                <th>Vietos</th>
+                                <th>Pirmoji registracija</th>
+                                <th>Savininkas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% asmuo.regitra.forEach(function(auto){ %>
+                                <%
+                                let savinikas = "Ne";
+                                if(auto.valdymoTeise == "A"){
+                                    savininkas = "Taip";
+                                }
+                                %>
+                                <tr>
+                                    <td><%= auto.marke %></td>
+                                    <td><%= auto.komercinisPavadinimas %></td>
+                                    <td class="center"><%= auto.kategorijaKlase %></td>
+                                    <td class="center"><%= auto.degalai || "-" %></td>
+                                    <td class="center"><%= auto.galia || "-" %></td>
+                                    <td class="center"><%= (Number(auto.sedimuVietuSkaicius) + Number(auto.stovimuVietuSkaicius)) || "-" %></td>
+                                    <td class="center"><%= auto.pirmosiosRegistracijosData || "-" %></td>
+                                    <td class="center"><%= savininkas || "?" %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         <% } %>
+
         <% if(asmuo.teismoNuosprendziai	 && asmuo.teismoNuosprendziai.length > 0){ %>
-            <h2><u>Teismo nuosprendžiai</u></h2>
-            <i>Šiuo metu importuojami teismo nuosprendžių duomenys, todėl gali būti, kad ne visi nuosprendžiai yra rodomi.</i><br><br>
-            <div class="tableContainer">
-            <table style="width: auto; min-width: 70vw;">
-                <thead>
-                    <tr>
-                        <th>Bylos numeris</th>
-                        <th>Rūšis</th>
-                        <th>Data</th>
-                        <th>Rolė</th>
-                        <th>Teismas</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% asmuo.teismoNuosprendziai.forEach(function(nuosprendis){ %>
-                        <tr>
-                            <td>
-                                <a href="https://liteko.teismai.lt/viesasprendimupaieska/<%= nuosprendis.fileHref %>" target="_blank">
-                                    <%= nuosprendis.bylosNumeris %>
-                                </a>
-                            </td>
-                            <td style="max-width: 30ch;"><%= nuosprendis.bylosRusis %></td>
-                            <td class="center"><%= nuosprendis.data.toLtDate() %></td>
-                            <% if(nuosprendis.bylojeKaip == "Atsakovas") { %>
-                                <td style="max-width: 30ch;">
-                                    <u>
-                                        <%= nuosprendis.bylojeKaip %>
-                                    </u>
-                                </td>
-                            <% } else { %>
-                                <td style="max-width: 30ch;"><%= nuosprendis.bylojeKaip %></td>
-                            <% } %>
-                            <td style="max-width: 40ch;"><%= nuosprendis.teismas %></td>
-                        </tr>
-                    <% }) %>
-                </tbody>
-            </table>
+            <div id="teismai">
+                <h2><u>Teismo nuosprendžiai</u></h2>
+                <i>Šiuo metu importuojami teismo nuosprendžių duomenys, todėl gali būti, kad ne visi nuosprendžiai yra rodomi.</i><br><br>
+                    <% if(queryParams.nuosprendziaiLimit == "max") {queryParams.nuosprendziaiLimit = 10000000} %>
+                    <% let nuosprendziaiLimit = queryParams.nuosprendziaiLimit || 25; %>
+                    <% if(asmuo.teismoNuosprendziai.length > nuosprendziaiLimit) { %>
+                        <i>
+                            Rodomi tik <%= nuosprendziaiLimit %> naujausi nuosprendžiai.
+                            <a href="?nuosprendziaiLimit=max#teismai">
+                                Rodyti visus (<%= asmuo.teismoNuosprendziai.length %>)
+                            </a>
+                        </i>
+                        <br><br>
+                    <% } %>
+                <div class="tableContainer">
+                    <table style="width: auto; min-width: 70vw;">
+                        <thead>
+                            <tr>
+                                <th>Bylos numeris</th>
+                                <th>Rūšis</th>
+                                <th>Data</th>
+                                <th>Rolė</th>
+                                <th>Teismas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% let count = 0; %>
+                            <% asmuo.teismoNuosprendziai.forEach(function(nuosprendis){ %>
+                                <% if(count >= nuosprendziaiLimit) return; %>
+                                <% count++; %>
+                                <tr>
+                                    <td>
+                                        <a href="https://liteko.teismai.lt/viesasprendimupaieska/<%= nuosprendis.fileHref %>" target="_blank">
+                                            <%= nuosprendis.bylosNumeris %>
+                                        </a>
+                                    </td>
+                                    <td style="max-width: 30ch;"><%= nuosprendis.bylosRusis %></td>
+                                    <td class="center"><%= nuosprendis.data.toLtDate() %></td>
+                                    <% if(nuosprendis.bylojeKaip == "Atsakovas") { %>
+                                        <td style="max-width: 30ch;">
+                                            <u>
+                                                <%= nuosprendis.bylojeKaip %>
+                                            </u>
+                                        </td>
+                                    <% } else { %>
+                                        <td style="max-width: 30ch;"><%= nuosprendis.bylojeKaip %></td>
+                                    <% } %>
+                                    <td style="max-width: 40ch;"><%= nuosprendis.teismas %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         <% } %>
 	</main>
