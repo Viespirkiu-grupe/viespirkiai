@@ -633,7 +633,15 @@
                                 %>
                                 <tr>
                                     <td><%= auto.marke %></td>
-                                    <td><%= auto.komercinisPavadinimas %></td>
+                                    <% if(auto.komercinisPavadinimas == "Nuasmeninta") { %>}
+                                        <td><%= auto.komercinisPavadinimas %></td>
+                                    <% } else { %>
+                                        <td>
+                                            <a href="https://duckduckgo.com/?t=h_&q=<%- encodeURIComponent(auto.marke) + " " + encodeURIComponent(auto.komercinisPavadinimas) %>&ia=images&iax=images" target="_blank" rel="noopener noreferrer">
+                                                <%= auto.komercinisPavadinimas %>
+                                            </a>
+                                        </td>
+                                    <% } %>
                                     <td class="center"><%= auto.kategorijaKlase %></td>
                                     <td class="center"><%= auto.degalai || "-" %></td>
                                     <td class="center"><%= auto.galia || "-" %></td>
