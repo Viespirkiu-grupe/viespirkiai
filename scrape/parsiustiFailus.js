@@ -3,22 +3,13 @@ Parsisiunčia duomenų bazėje nurodytus failus į viešdėžes.
 */
 
 import { mysql } from "../mysql/mysql.js";
+import { log } from "../utils/log.js";
 
-while (true) {
-    try {
-        var result = await parsiustiFaila();
-    } catch (error) {
-        console.error("Klaida vykdant parsisiuntimą:", error);
-        // Palaukiam 60s
-        await new Promise((resolve) => setTimeout(resolve, 60000));
-        continue; // Tęsiame ciklą
-    }
-
-    if (result === false) {
-        process.exit(0); // Visi failai jau parsiųsti
-    }
-}
-
+/**
+ * Blokuoja funkcijos vykdymą darbo valandomis (07:45–17:15, darbo dienomis).
+ * Jei funkcija iškviečiama darbo valandomis, išmetamas klaidos pranešimas.
+ * @throws {Error} Jei funkcija iškviečiama darbo valandomis.
+ */
 function blockDuringWorkingHours() {
     const now = new Date();
     const day = now.getDay(); // 0 = Sunday, 6 = Saturday
@@ -44,7 +35,7 @@ function blockDuringWorkingHours() {
  * Parsiunčia vieną neparsiųstą failą į viešdėžę.
  * @returns {Promise<boolean>} true jei pavyko parsisiųsti failą, false jei nėra failų parsisiuntimui
  */
-async function parsiustiFaila() {
+export async function parsiustiFaila() {
     blockDuringWorkingHours();
     let startTime = Date.now();
 
@@ -57,11 +48,11 @@ async function parsiustiFaila() {
         failas = failas[0];
     }
 
-    console.log(`Parsiunčiamas: ${failas.id} – ${failas.pavadinimas}`);
-
     if (!failas) {
-        console.log("Nėra failų parsisiuntimui.");
+        log("Nėra failų parsisiuntimui.");
         return false; // Visi failai jau parsiųsti
+    } else {
+        log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
     }
 
     // Randame dėžę, kuri dar turi vietos
@@ -93,7 +84,7 @@ async function parsiustiFaila() {
         var { md5, size } = await response.json();
 
         if (!response.ok || !md5) {
-            throw new Error("Nepavyko gauti parsisiuntimo informacijos.");
+            throw new Error("Nepavyko gauti failo.");
         }
 
         // Atnaujiname informaciją apie failą
@@ -107,11 +98,11 @@ async function parsiustiFaila() {
             failas.id,
         ]);
 
-        return true;
+        throw error;
     }
 
-    console.log(
-        `Failas ${failas.pavadinimas} (${failas.id}) parsisiųstas ir atnaujintas: md5=${md5}, dydis=${size}, saugojama=${deze.pavadinimas}`,
+    log(
+        `Failas ${failas.pavadinimas} (${failas.id}) parsisiųstas ir atnaujintas (dydis=${size}B)`,
     );
 
     // Atnaujiname dėžės dydį
@@ -129,6 +120,6 @@ async function parsiustiFaila() {
         deze.id,
     ]);
 
-    console.log(`Parsiuntimo laikas: ${Date.now() - startTime} ms`);
-    return true; // Pavyko parsisiųsti failą
+    log(`Parsiuntimas užtruko: ${Date.now() - startTime} ms`);
+    return true;
 }

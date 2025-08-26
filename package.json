@@ -19,12 +19,14 @@
     "mime": "^4.0.7",
     "mongodb": "^6.16.0",
     "mysql2": "^3.14.1",
+    "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
     "p-limit": "^6.2.0",
     "p-queue": "^8.1.0",
     "puppeteer": "^24.16.1",
     "socks-proxy-agent": "^8.0.5",
-    "typesense": "^2.0.3"
+    "typesense": "^2.0.3",
+    "xml-to-json-stream": "^1.1.0"
   },
   "type": "module"
 }

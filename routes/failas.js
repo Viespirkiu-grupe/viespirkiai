@@ -155,6 +155,15 @@ failasRouter.get("/failas/:dokId/:fileId/download", async (req, res, next) => {
 
     // Persiunčiame failą
     const nodeStream = Readable.fromWeb(failasBlob.body);
+    nodeStream.on("error", (err) => {
+        console.error("Stream error:", err);
+        if (!res.headersSent) {
+            res.status(500).send("Error streaming file.");
+        } else {
+            res.destroy(err);
+        }
+    });
+
     nodeStream.pipe(res);
 });
 

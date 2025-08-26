@@ -3,6 +3,7 @@ Randa JAR adresų koordinates ir įrašo į adresai (MySQL) lentelę.
 */
 
 import { mysql } from "../mysql/mysql.js";
+import { log } from "../utils/log.js";
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const SLEEP_MS = 1001;
@@ -10,18 +11,19 @@ const USER_AGENT = "Viespirkiai/1.0 (sveiki@viespirkiai.top)";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-while (true) {
+export async function atrastiJarAdresoKoordinates() {
     let reikiaLaukti = false;
+
     // Randame JAR įrašą, kuriam reikia adreso koordinačių
     const [rows] = await mysql.execute(`
-    SELECT jarKodas, adresas FROM jar
-    WHERE adresoId IS NULL AND adresas IS NOT NULL
-    LIMIT 1
-  `);
+      SELECT jarKodas, adresas FROM jar
+      WHERE adresoId IS NULL AND adresas IS NOT NULL
+      LIMIT 1
+    `);
 
     if (rows.length === 0) {
-        console.log("No more rows to process");
-        break; // Baigta
+        log("Visų JAR adresų koordinatės jau rastos.");
+        return false;
     }
 
     let { jarKodas, adresas } = rows[0];
@@ -37,9 +39,9 @@ while (true) {
         var adresoId = existing.id;
     } else {
         // Suformuojame užklausą į Nominatim
-        console.log(`Užklausiama dėl: ${adresas}`);
+        log(`Užklausiama dėl: ${adresas}`);
         const normalizedAddress = await supaprastintasAdresas(adresas);
-        console.log(`Suprastintas adresas: ${normalizedAddress}`);
+        log(`Suprastintas adresas: ${normalizedAddress}`);
 
         const url = new URL(NOMINATIM_URL);
         url.searchParams.set("q", normalizedAddress);
@@ -60,7 +62,7 @@ while (true) {
             } else {
                 // Įterpiame rastą adresą į duomenų bazę
                 const { lat, lon } = data[0];
-                console.log(`lat=${lat}, lon=${lon}`);
+                log(`Adresas rastas: lat=${lat}, lon=${lon}`);
 
                 const [result] = await mysql.execute(
                     "INSERT INTO adresai (taskas, adresas) VALUES (POINT(?, ?), ?)",
@@ -72,10 +74,7 @@ while (true) {
         } catch (e) {
             console.error(`Klaida vykdant užklausą ${adresas}:`, e);
 
-            // Palaukiame 60s ir tęsiame ciklą
-            await sleep(60000);
-
-            continue;
+            throw e;
         }
     }
 
@@ -85,8 +84,7 @@ while (true) {
         jarKodas,
     ]);
 
-    console.log(`Atnaujintas jar ${jarKodas} → adresoId=${adresoId}`);
-    console.log(`---`);
+    log(`Atnaujintas jar ${jarKodas} → adresoId=${adresoId}`);
     if (reikiaLaukti) {
         await sleep(SLEEP_MS);
     }
@@ -149,6 +147,3 @@ async function supaprastintasAdresas(raw) {
 
     return addr;
 }
-
-await mysql.end();
-process.exit(0); // Baigta

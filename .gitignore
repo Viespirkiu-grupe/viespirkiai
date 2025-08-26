@@ -4,8 +4,8 @@ node_modules
 # MongoDB
 mongo/data
 
-# Scraping
-lastPage.txt
+# Tasks
+taskState
 
 # VPN / Proxy
 wireproxy/proxy.wg

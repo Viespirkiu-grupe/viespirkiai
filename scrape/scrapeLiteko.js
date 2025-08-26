@@ -1,10 +1,10 @@
 import { parseHTML } from "linkedom";
 import { mysql } from "../mysql/mysql.js";
+import { log } from "../utils/log.js";
 
 async function nuskaitytiDiena(data) {
     let startTime = new Date();
-    // Extract an interval like this from the input date object:
-    // 2025.04.01 00:00:00 – 2025.04.01 23:59:59
+
     let dataNuo = new Date(data);
     dataNuo = dataNuo.toISOString().split("T")[0] + " 00:00:00";
 
@@ -15,10 +15,8 @@ async function nuskaitytiDiena(data) {
     const encodedDataNuo = encodeURIComponent(dataNuo);
     const encodedDataIki = encodeURIComponent(dataIki);
 
-    // Build URL dynamically
+    // Build URL
     let url = `https://liteko.teismai.lt/viesasprendimupaieska/paieska.aspx?nuo=${encodedDataNuo}&iki=${encodedDataIki}`;
-
-    //https://liteko.teismai.lt/viesasprendimupaieska/paieska.aspx?detali=&bnr=&byloseilesnr=&procesinisnr=&eilnr=False&tid=&trid=&br=&dr=&nuo=2025.04.01+00%3a00%3a00&iki=2025.04.02+00%3a00%3a00&teis=&tk=&bb=&rakt=&txt=&kat=&term=&ikir=False
 
     let response = await fetch(url);
     if (!response.ok) {
@@ -40,7 +38,7 @@ async function nuskaitytiDiena(data) {
         10,
     );
 
-    console.log("prižadėjo rezultatu", rezultatuSkaicius);
+    log(`Puslapis prižadėjo ${rezultatuSkaicius} rezultatų`);
 
     let bylos = rezultataiToJson(document);
     if (rezultatuSkaicius > 50) {
@@ -191,13 +189,8 @@ async function nuskaitytiDiena(data) {
 
     let duration = new Date() - startTime;
 
-    console.log(
-        "Nuskaitytos",
-        bylos.length,
-        dataNuo.substr(0, 10),
-        "dienos bylos per",
-        (duration / 1000).toFixed(3),
-        "sekundžių",
+    log(
+        `Nuskaitytos ${bylos.length} ${dataNuo.substr(0, 10)} dienos bylos per ${(duration / 1000).toFixed(3)} sekundžių`,
     );
 
     return bylos;
@@ -304,9 +297,6 @@ async function insertBatch(rows) {
     try {
         await mysql.execute(sql, values);
         eilute += rows.length;
-        if (eilute % 1000 === 0) {
-            console.log(`Įterpta ${eilute} eilučių...`);
-        }
     } catch (err) {
         console.error(`Įterpimas nepavyko po ${eilute} eilučių:`, err.message);
     }
@@ -337,7 +327,6 @@ async function importuotiDiena(date) {
     await insertBatch(rows);
 }
 
-// await importuotiDiena(new Date("2025-04-01"));
 async function scrapeAllDays(startDate) {
     if (!startDate) {
         // Check database for the last scraped date
@@ -366,14 +355,28 @@ async function scrapeAllDays(startDate) {
                 startDate.toISOString().split("T")[0],
                 err.message,
             );
-            // Optional: break or continue depending on whether you want to skip on errors
         }
 
-        // Next day
         startDate.setDate(startDate.getDate() + 1);
     }
 
-    console.log("Visos dienos nuskaitytos.");
+    log("Visos dienos nuskaitytos.");
 }
 
-await scrapeAllDays(new Date("2005-01-06"));
+export async function litekoScrapeLatestDays(days = 90) {
+    // Check database for the last scraped date
+    const [rows] = await mysql.execute(
+        "SELECT MAX(data) AS lastDate FROM bylos",
+    );
+
+    let startDate;
+    if (rows[0].lastDate) {
+        startDate = new Date(rows[0].lastDate);
+        startDate.setDate(startDate.getDate() - days);
+    } else {
+        // If nothing in DB, start from the very beginning
+        startDate = new Date("2005-01-06");
+    }
+
+    await scrapeAllDays(startDate);
+}

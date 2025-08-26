@@ -1,9 +1,10 @@
 import { parseHTML } from "linkedom";
+import { log } from "../utils/log.js";
 import { mysql } from "../mysql/mysql.js";
 
 async function nuskaitytiNutarti(link) {
     let url = "https://liteko.teismai.lt/viesasprendimupaieska/" + link;
-    console.log(url);
+    log(`Nuskaitoma byla ${url}`);
     let response = await fetch(url);
     if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -59,14 +60,14 @@ async function nuskaitytiNutarti(link) {
     return { salys, kategorijos };
 }
 
-async function surastiBylosSalis() {
+export async function surastiBylosSalis() {
     let start = new Date();
     let [byla] = await mysql.query(
         "SELECT * FROM bylos WHERE juridiniuNuskaitymas < 1 OR juridiniuNuskaitymas IS NULL LIMIT 1",
     );
 
     if (!byla.length) {
-        console.log("Visos bylos nuskaitytos.");
+        log("Visos bylos nuskaitytos.");
         return false;
     }
 
@@ -96,12 +97,14 @@ async function surastiBylosSalis() {
     );
 
     let duration = new Date() - start;
-    console.log(
-        `Processed byla ID ${byla[0].id} — ${salys.length} participants inserted. Duration: ${(duration / 1000).toFixed(3)}s`,
+    log(
+        `Nuskaityta byla ID ${byla[0].id} — ${salys.length} dalyviai. Užtruko: ${(duration / 1000).toFixed(3)}s`,
     );
     return true;
 }
 
-while (await surastiBylosSalis()) {
-    // Do
+if (import.meta.url === `file://${process.argv[1]}`) {
+    while (await surastiBylosSalis()) {
+        // Do
+    }
 }
