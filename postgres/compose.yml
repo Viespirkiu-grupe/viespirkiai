@@ -1,0 +1,23 @@
+services:
+    db:
+        image: postgres:latest
+        container_name: viespirkiaiPostgres
+        environment:
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: secret
+            POSTGRES_DB: mydb
+        ports:
+            - "9118:5432"
+        volumes:
+            - ./pgdata:/var/lib/postgresql/data
+
+    pgadmin:
+        image: dpage/pgadmin4
+        container_name: viespirkiaiPgadmin
+        environment:
+            PGADMIN_DEFAULT_EMAIL: admin@viespirkiai.top
+            PGADMIN_DEFAULT_PASSWORD: secret
+        ports:
+            - "9119:80"
+        depends_on:
+            - db

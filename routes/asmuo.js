@@ -3,6 +3,7 @@ import config from "../utils/config.js";
 import { mysql } from "../mysql/mysql.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 import { viespirkiai } from "../mongo/mongoDb.js";
+import { postgres } from "../postgres/postgres.js";
 
 const asmuoRouter = express.Router();
 
@@ -321,6 +322,93 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         }
     }
 
+    // Finansinės ataskaitos
+    let finansai = {};
+
+    const jarRes = await postgres.query(
+        `SELECT "id" FROM "jar" WHERE "jarKodas" = $1`,
+        [id],
+    );
+
+    if (jarRes.rows && jarRes.rows.length > 0) {
+        const jarId = jarRes.rows[0].id;
+
+        const balansoRes = await postgres.query(
+            `SELECT *
+                 FROM "balansoAtaskaitos"
+                 WHERE "jarId" = $1
+                 ORDER BY "laikotarpisNuo" DESC, "lineTypeId" ASC`,
+            [jarId],
+        );
+
+        if (balansoRes.rows && balansoRes.rows.length > 0) {
+            finansai.balansai = balansoRes.rows;
+        }
+
+        const pelnoNuostoliuRes = await postgres.query(
+            `SELECT *
+                 FROM "pelnoNuostoliuAtaskaitos"
+                 WHERE "jarId" = $1
+                 ORDER BY "laikotarpisNuo" DESC, "lineTypeId" ASC`,
+            [jarId],
+        );
+
+        if (pelnoNuostoliuRes.rows && pelnoNuostoliuRes.rows.length > 0) {
+            finansai.pelnasNuostoliai = pelnoNuostoliuRes.rows;
+        }
+
+        const sentenceCase = (text) =>
+            text
+                .replace(/([^.!?]*[.!?]*)/g, (sentence) =>
+                    sentence.trim()
+                        ? sentence.trim().charAt(0).toUpperCase() +
+                          sentence.trim().slice(1).toLowerCase() +
+                          " "
+                        : "",
+                )
+                .trim();
+
+        const grouped = {};
+
+        // iterate both types
+        for (const type of ["balansai", "pelnasNuostoliai"]) {
+            for (const entry of finansai?.[type] || []) {
+                // key by period + submission date + template
+                const key = `${entry.laikotarpisNuo}_${entry.laikotarpisIki}_${entry.duomenuData}_${entry.templateId}`;
+
+                // create or overwrite period object
+                grouped[key] = grouped[key] || {
+                    laikotarpisNuo: entry.laikotarpisNuo,
+                    laikotarpisIki: entry.laikotarpisIki,
+                    duomenuData: entry.duomenuData,
+                    templateId: entry.templateId,
+                    templateName: sentenceCase(entry.templateName),
+                    standards: {},
+                };
+
+                // ensure standard object exists
+                const standards = grouped[key].standards;
+                standards[entry.standardId] = standards[entry.standardId] || {
+                    standardId: entry.standardId,
+                    standardName: sentenceCase(entry.standardName),
+                    lines: [],
+                };
+
+                // push only relevant fields
+                standards[entry.standardId].lines.push({
+                    lineTypeId: entry.lineTypeId,
+                    lineName: sentenceCase(entry.lineName),
+                    reiksme: entry.reiksme,
+                });
+            }
+        }
+
+        finansai = Object.values(grouped).map((period) => ({
+            ...period,
+            standards: Object.values(period.standards),
+        }));
+    }
+
     // Asmuo
     let asmuo = {
         jar,
@@ -334,6 +422,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
             topPirkejai,
             topTiekejai,
         },
+        finansai,
     };
 
     // JSON

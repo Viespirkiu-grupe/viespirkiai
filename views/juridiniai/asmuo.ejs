@@ -662,17 +662,17 @@
             <div id="teismai">
                 <h2><u>Teismo nuosprendžiai</u></h2>
                 <i>Šiuo metu importuojami teismo nuosprendžių duomenys, todėl gali būti, kad ne visi nuosprendžiai yra rodomi.</i><br><br>
-                    <% if(queryParams.nuosprendziaiLimit == "max") {queryParams.nuosprendziaiLimit = 10000000} %>
-                    <% let nuosprendziaiLimit = queryParams.nuosprendziaiLimit || 25; %>
-                    <% if(asmuo.teismoNuosprendziai.length > nuosprendziaiLimit) { %>
-                        <i>
-                            Rodomi tik <%= nuosprendziaiLimit %> naujausi nuosprendžiai.
-                            <a href="?nuosprendziaiLimit=max#teismai">
-                                Rodyti visus (<%= asmuo.teismoNuosprendziai.length %>)
-                            </a>
-                        </i>
-                        <br><br>
-                    <% } %>
+                <% if(queryParams.nuosprendziaiLimit == "max") {queryParams.nuosprendziaiLimit = 10000000} %>
+                <% let nuosprendziaiLimit = queryParams.nuosprendziaiLimit || 25; %>
+                <% if(asmuo.teismoNuosprendziai.length > nuosprendziaiLimit) { %>
+                    <i>
+                        Rodomi tik <%= nuosprendziaiLimit %> naujausi nuosprendžiai.
+                        <a href="?nuosprendziaiLimit=max#teismai">
+                            Rodyti visus (<%= asmuo.teismoNuosprendziai.length %>)
+                        </a>
+                    </i>
+                    <br><br>
+                <% } %>
                 <div class="tableContainer">
                     <table style="width: auto; min-width: 70vw;">
                         <thead>
@@ -712,6 +712,49 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        <% } %>
+
+        <% if(asmuo.finansai && asmuo.finansai.length > 0){ %>
+            <div id="finansai">
+                <h2><u>Finansinės ataskaitos</u></h2>
+                <% if(queryParams.finansaiLimit == "max") {queryParams.finansaiLimit = 10000000} %>
+                <% let finansaiLimit = queryParams.finansaiLimit || 1; %>
+                <% if(asmuo.finansai.length > finansaiLimit) { %>
+                    <i>
+                        Rodoma tik paskutinė finansinė ataskaita.
+                        <a href="?finansaiLimit=max#finansai">
+                            Rodyti visas (<%= asmuo.finansai.length %>)
+                        </a>
+                    </i>
+                    <br>
+                <% } %>
+
+                <section>
+                    <% let count = 0; %>
+
+                    <% asmuo.finansai.forEach(laikotarpis => { %>
+                        <% if(count >= finansaiLimit) return; %>
+                        <% count++; %>
+
+                        <h3><%= laikotarpis.templateName %> <sup>(<%= laikotarpis.templateId %>, <%= laikotarpis.duomenuData %>)</sup></h3>
+                        <i><%= laikotarpis.laikotarpisNuo %> – <%= laikotarpis.laikotarpisIki %> </i>
+                        <section class="col-2 mobile-col-1">
+                            <% laikotarpis.standards.forEach(standard => { %>
+                                <section>
+                                    <h4><%= standard.standardName %> <sup>(<%= standard.standardId %>)</sup></h4>
+                                    <% standard.lines.forEach(line => { %>
+                                        <div>
+                                        <h5><%= line.lineName %> <sup>(<%= line.lineTypeId %>)</sup></h5>
+                                        <%= new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(line.reiksme) %>
+                                        </div>
+                                    <% }); %>
+                                </section>
+                            <% }); %>
+                        </section>
+                        <br>
+                    <% }) %>
+                </section>
             </div>
         <% } %>
 	</main>

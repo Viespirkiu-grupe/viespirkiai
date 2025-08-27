@@ -1,6 +1,6 @@
 /*
-Importuoja Jar duomenis iš JSONL failo į PostgreSQL.
-https://get.data.gov.lt/datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo
+Importuoja PelnoAtaskaitos duomenis iš JSONL failo į PostgreSQL.
+https://data.gov.lt/datasets/1666/
 */
 import fs from "fs";
 import readline from "readline";
@@ -8,7 +8,9 @@ import { postgres } from "../postgres/postgres.js";
 
 const filename = process.argv[2];
 if (!filename) {
-    console.error("Naudojimas: node importJar.js <file.jsonl>");
+    console.error(
+        "Naudojimas: node importPelnoNuostoliuAtaskaitos.js <file.jsonl>",
+    );
     process.exit(1);
 }
 
@@ -16,6 +18,7 @@ const BATCH_SIZE = 100; // kiek eilučių įterpti vienu metu
 let batch = [];
 let inserted = 0;
 
+// Read JSONL line by line
 const rl = readline.createInterface({
     input: fs.createReadStream(filename),
     crlfDelay: Infinity,
@@ -23,7 +26,6 @@ const rl = readline.createInterface({
 
 for await (const line of rl) {
     if (!line.trim()) continue; // skip empty lines
-
     let obj;
     try {
         obj = JSON.parse(line);
@@ -38,16 +40,19 @@ for await (const line of rl) {
 
     // Map JSON fields to table columns
     const row = [
-        obj._id ?? null, // id
-        obj.ja_kodas ?? null, // jarKodas
-        obj.ja_pavadinimas ?? null, // pavadinimas
-        obj.pilnas_adresas ?? null, // adresas
-        obj.adresas?._id ?? null, // adresasId
-        obj.reg_data ?? null, // registravimoData
-        obj.isreg_data ?? null, // isregistravimoData
+        obj.juridinis_asmuo?._id ?? null, // jarId
         obj.forma?._id ?? null, // formaId
         obj.statusas?._id ?? null, // statusasId
-        obj.stat_data ?? null, // statusasData
+        obj.template_id ?? null, // templateId
+        obj.template_name ?? null, // templateName
+        obj.standard_id ?? null, // standardId
+        obj.standard_name ?? null, // standardName
+        obj.line_type_id ?? null, // lineTypeId
+        obj.line_name ?? null, // lineName
+        obj.reiksme ?? null, // reiksme
+        obj.laikotarpis_nuo ?? null, // laikotarpisNuo
+        obj.laikotarpis_iki ?? null, // laikotarpisIki
+        obj.reg_date ?? null, // duomenuData
     ];
 
     batch.push(row);
@@ -65,8 +70,6 @@ if (batch.length > 0) {
 
 console.log(`Viso įterpta eilučių: ${inserted}`);
 await postgres.end();
-
-// --- Functions ---
 
 async function insertBatch(rows) {
     if (rows.length === 0) return;
@@ -87,11 +90,12 @@ async function insertBatch(rows) {
     const flatValues = rows.flat();
 
     const sql = `
-        INSERT INTO "jar" (
-            "id", "jarKodas", "pavadinimas", "adresas", "adresasId",
-            "registravimoData", "isregistravimoData", "formaId", "statusasId", "statusasData"
+        INSERT INTO "pelnoNuostoliuAtaskaitos" (
+            "jarId", "formaId", "statusasId", "templateId", "templateName",
+            "standardId", "standardName", "lineTypeId", "lineName", "reiksme",
+            "laikotarpisNuo", "laikotarpisIki", "duomenuData"
         ) VALUES ${placeholders}
-        ON CONFLICT ("jarKodas") DO NOTHING
+        ON CONFLICT ("jarId", "lineName", "laikotarpisNuo", "laikotarpisIki", "duomenuData") DO NOTHING
     `;
 
     try {
