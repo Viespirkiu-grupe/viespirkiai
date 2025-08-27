@@ -715,16 +715,24 @@
             </div>
         <% } %>
 
-        <% if(asmuo.finansai && asmuo.finansai.length > 0){ %>
+        <% if(asmuo.istatinisKapitalas && asmuo.istatinisKapitalas.reiksme	) { %>
+            <div id="kapitalas">
+                <h2><u>Įstatinis kapitalas</u></h2>
+                <%= asmuo.istatinisKapitalas.reiksme.toLocaleString('lt-LT', { style: 'currency', currency: asmuo.istatinisKapitalas.valiuta }) %>
+                <sup>(<%= asmuo.istatinisKapitalas.data %>)</sup>
+            </div>
+        <% } %>
+
+        <% if(asmuo.finansinesAtaskaitos && asmuo.finansinesAtaskaitos.length > 0){ %>
             <div id="finansai">
                 <h2><u>Finansinės ataskaitos</u></h2>
                 <% if(queryParams.finansaiLimit == "max") {queryParams.finansaiLimit = 10000000} %>
                 <% let finansaiLimit = queryParams.finansaiLimit || 1; %>
-                <% if(asmuo.finansai.length > finansaiLimit) { %>
+                <% if(asmuo.finansinesAtaskaitos.length > finansaiLimit) { %>
                     <i>
                         Rodoma tik paskutinė finansinė ataskaita.
                         <a href="?finansaiLimit=max#finansai">
-                            Rodyti visas (<%= asmuo.finansai.length %>)
+                            Rodyti visas (<%= asmuo.finansinesAtaskaitos.length %>)
                         </a>
                     </i>
                     <br>
@@ -733,7 +741,7 @@
                 <section>
                     <% let count = 0; %>
 
-                    <% asmuo.finansai.forEach(laikotarpis => { %>
+                    <% asmuo.finansinesAtaskaitos.forEach(laikotarpis => { %>
                         <% if(count >= finansaiLimit) return; %>
                         <% count++; %>
 

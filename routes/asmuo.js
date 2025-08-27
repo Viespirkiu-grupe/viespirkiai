@@ -23,6 +23,18 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         [id],
     );
 
+    // JAR ID
+    let jarId;
+
+    const jarRes = await postgres.query(
+        `SELECT "id" FROM "jar" WHERE "jarKodas" = $1`,
+        [id],
+    );
+
+    if (jarRes.rows && jarRes.rows.length > 0) {
+        jarId = jarRes.rows[0].id;
+    }
+
     // Specialūs atvejai
     const specAtvejai = {
         801: {
@@ -323,16 +335,9 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
     }
 
     // Finansinės ataskaitos
-    let finansai = {};
+    let finansinesAtaskaitos = {};
 
-    const jarRes = await postgres.query(
-        `SELECT "id" FROM "jar" WHERE "jarKodas" = $1`,
-        [id],
-    );
-
-    if (jarRes.rows && jarRes.rows.length > 0) {
-        const jarId = jarRes.rows[0].id;
-
+    if (jarId) {
         const balansoRes = await postgres.query(
             `SELECT *
                  FROM "balansoAtaskaitos"
@@ -342,7 +347,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         );
 
         if (balansoRes.rows && balansoRes.rows.length > 0) {
-            finansai.balansai = balansoRes.rows;
+            finansinesAtaskaitos.balansai = balansoRes.rows;
         }
 
         const pelnoNuostoliuRes = await postgres.query(
@@ -354,7 +359,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         );
 
         if (pelnoNuostoliuRes.rows && pelnoNuostoliuRes.rows.length > 0) {
-            finansai.pelnasNuostoliai = pelnoNuostoliuRes.rows;
+            finansinesAtaskaitos.pelnasNuostoliai = pelnoNuostoliuRes.rows;
         }
 
         const sentenceCase = (text) =>
@@ -372,7 +377,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
 
         // iterate both types
         for (const type of ["balansai", "pelnasNuostoliai"]) {
-            for (const entry of finansai?.[type] || []) {
+            for (const entry of finansinesAtaskaitos?.[type] || []) {
                 // key by period + submission date + template
                 const key = `${entry.laikotarpisNuo}_${entry.laikotarpisIki}_${entry.duomenuData}_${entry.templateId}`;
 
@@ -403,10 +408,37 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
             }
         }
 
-        finansai = Object.values(grouped).map((period) => ({
+        finansinesAtaskaitos = Object.values(grouped).map((period) => ({
             ...period,
             standards: Object.values(period.standards),
         }));
+    }
+
+    // Istatinis kapitalas
+    let istatinisKapitalas = {};
+
+    if (jarId) {
+        const istatinisKapitalasRes = await postgres.query(
+            `SELECT data, reiksme, valiuta
+                 FROM "istatinisKapitalas"
+                 WHERE "jarId" = $1
+                 ORDER BY "data" DESC`,
+            [jarId],
+        );
+
+        // Overwrite valiuta Lt → LTL, Eur → EUR
+        istatinisKapitalasRes.rows.forEach((row) => {
+            if (row.valiuta === "Lt") row.valiuta = "LTL";
+            else if (row.valiuta === "Eur") row.valiuta = "EUR";
+        });
+
+        if (
+            istatinisKapitalasRes.rows &&
+            istatinisKapitalasRes.rows.length > 0
+        ) {
+            istatinisKapitalas = { ...istatinisKapitalasRes.rows[0] }; // clone row 0
+            istatinisKapitalas.duomenys = istatinisKapitalasRes.rows; // safe, no self-ref
+        }
     }
 
     // Asmuo
@@ -422,7 +454,8 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
             topPirkejai,
             topTiekejai,
         },
-        finansai,
+        finansinesAtaskaitos,
+        istatinisKapitalas,
     };
 
     // JSON
