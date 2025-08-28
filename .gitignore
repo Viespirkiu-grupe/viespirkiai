@@ -19,6 +19,7 @@ export.jsonl.gz
 
 *.csv
 *.zip
+*.jsonl
 
 # Plausible
 plausible/clickhouse
