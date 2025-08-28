@@ -2,7 +2,7 @@
  * Importuoja sutarčių dokumentų duomenis iš MongoDB į MySQL.
  * Dokumentai yra susieti su sutartimis pagal dokId ir fileId.
  */
-import { mysql } from "../mysql/mysql.js";
+import { postgres } from "../postgres/postgres.js";
 import { viespirkiai } from "../mongo/mongoDb.js";
 import { log } from "../utils/log.js";
 
@@ -50,16 +50,23 @@ async function importuotiVienaDokumenta() {
     }
 
     // Įrašome dokumentus į MySQL
-    const placeholders = dokumentai.map(() => "(?, ?, ?, ?)").join(", ");
-    const values = dokumentai.flatMap((doc) => [
-        doc.dokId,
-        doc.fileId,
-        doc.pavadinimas,
-        doc.extension,
-    ]);
+    // dokumentai = array of objects to insert
+    const values = [];
+    const placeholders = dokumentai
+        .map((doc, idx) => {
+            const base = idx * 4;
+            values.push(doc.dokId, doc.fileId, doc.pavadinimas, doc.extension);
+            return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`;
+        })
+        .join(", ");
 
-    const result = await mysql.query(
-        `INSERT INTO failai (dokId, fileId, pavadinimas, extension) VALUES ${placeholders}`,
+    await postgres.query(
+        `INSERT INTO failai ("dokId", "fileId", pavadinimas, extension)
+       VALUES ${placeholders}
+       ON CONFLICT ("dokId", "fileId")
+       DO UPDATE SET
+         pavadinimas = EXCLUDED.pavadinimas,
+         extension = EXCLUDED.extension;`,
         values,
     );
 

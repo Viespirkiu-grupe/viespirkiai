@@ -1,5 +1,6 @@
 import express from "express";
 import { mysql } from "../mysql/mysql.js";
+import { postgres } from "../postgres/postgres.js";
 import config from "../config.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 
@@ -19,23 +20,24 @@ eksportaiRouter.get("/eksportai/:id", async (req, res, next) => {
     }
 
     // Gauname eksportą pagal ID
-    let [row] = await mysql.execute("SELECT * FROM eksportai WHERE id = ?;", [
-        id,
-    ]);
+    const { rows } = await postgres.query(
+        "SELECT * FROM eksportai WHERE id = $1;",
+        [id],
+    );
 
     // 404
-    if (row.length === 0) {
+    if (rows.length === 0) {
         return next();
     }
 
-    row = row[0];
+    let row = rows[0];
 
     // Siunčiame .torrent failą
     if (torrent) {
         res.setHeader("Content-Type", "application/x-bittorrent");
         res.setHeader(
             "Content-Disposition",
-            `attachment; filename="${row.pavadinimas}.torrent"`,
+            `attachment; filename="${encodeURIComponent(row.pavadinimas)}.torrent"`,
         );
         res.send(row.torrent);
         return;

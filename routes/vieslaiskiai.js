@@ -1,14 +1,16 @@
 import express from "express";
 import config from "../utils/config.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
-import { mysql } from "../mysql/mysql.js";
+import { postgres } from "../postgres/postgres.js";
 
 const vieslaiskiaiRouter = express.Router();
 
 vieslaiskiaiRouter.get("/vieslaiskiai", async (req, res) => {
-    const [vieslaiskiai] = await mysql.execute(
+    const vieslaiskiaiRes = await postgres.query(
         "SELECT * FROM vieslaiskiai ORDER BY id DESC;",
     );
+
+    const vieslaiskiai = vieslaiskiaiRes.rows;
 
     res.render("vieslaiskiai", {
         customHead: config.customHead,

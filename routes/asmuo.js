@@ -1,6 +1,5 @@
 import express from "express";
 import config from "../utils/config.js";
-import { mysql } from "../mysql/mysql.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 import { viespirkiai } from "../mongo/mongoDb.js";
 import { postgres } from "../postgres/postgres.js";
@@ -17,13 +16,13 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         id = id.slice(0, -4);
     }
 
-    // JAR
-    const [jarRezultatai] = await mysql.execute(
-        "SELECT * FROM jar WHERE jarKodas = ?;",
+    // Detalus JAR
+    const { rows: jarRezultatai } = await postgres.query(
+        `SELECT * FROM "jarCsv" WHERE "jarKodas" = $1`,
         [id],
     );
 
-    // JAR ID
+    // data.gov.lt ID JAR
     let jarId;
 
     const jarRes = await postgres.query(
@@ -92,25 +91,31 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
 
     // Formatuojame JAR datas
     let jar = jarRezultatai[0];
-    jar.registravimoData = jar.registravimoData.toLtDate();
-    jar.duomenuData = jar.duomenuData.toLtDate();
-    jar.statusasNuo = jar.statusasNuo.toLtDate();
+    jar.registravimoData = new Date(jar.registravimoData).toLtDate();
+    jar.duomenuData = new Date(jar.duomenuData).toLtDate();
+    jar.statusasNuo = new Date(jar.statusasNuo).toLtDate();
 
     // Adreso koordinatės
     if (jar.adresoId && jar.adresoId > 0) {
-        const [adresasRezultatai] = await mysql.execute(
-            "SELECT * FROM adresai WHERE id = ?;",
+        const { rows: adresasRezultatai } = await postgres.query(
+            `SELECT latitude, longitude FROM adresai WHERE id = $1`,
             [jar.adresoId],
         );
+
         if (adresasRezultatai.length > 0) {
-            jar.koordinates = adresasRezultatai[0].taskas;
+            const row = adresasRezultatai[0];
+            jar.koordinates = {
+                y: parseFloat(row.latitude),
+                x: parseFloat(row.longitude),
+            };
         }
+
         delete jar.adresoId;
     }
 
     // SODRA
-    const [sodraRezultatai] = await mysql.execute(
-        "SELECT * FROM sodra WHERE jarKodas = ? ORDER BY data ASC;",
+    const { rows: sodraRezultatai } = await postgres.query(
+        `SELECT * FROM sodra WHERE "jarKodas" = $1 ORDER BY "data" ASC`,
         [id],
     );
 
@@ -166,8 +171,8 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
     }
 
     // VMI
-    const [mokesciaiRezultatai] = await mysql.execute(
-        "SELECT * FROM mokesciai WHERE jarKodas = ? ORDER BY metai ASC, menuo ASC;",
+    const { rows: mokesciaiRezultatai } = await postgres.query(
+        `SELECT * FROM mokesciai WHERE "jarKodas" = $1 ORDER BY "metai" ASC, "menuo" ASC;`,
         [id],
     );
 
@@ -190,35 +195,32 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
             data: `${naujausias.metai}-${naujausias.menuo
                 .toString()
                 .padStart(2, "0")}`,
-            duomenuData: naujausias.duomenuData.toLtDate(),
+            duomenuData: new Date(naujausias.duomenuData).toLtDate(),
 
             duomenys: mokesciaiRezultatai.map((row) => ({
                 data: `${row.metai}-${row.menuo.toString().padStart(2, "0")}`,
-                duomenuData: row.duomenuData.toLtDate(),
+                duomenuData: new Date(row.duomenuData).toLtDate(),
                 suma: row.suma,
             })),
         };
     }
 
     let regitra = [];
-    const [regitraRezultatai] = await mysql.execute(
-        "SELECT * FROM regitra WHERE jarKodas = ? ORDER BY pirmosiosRegistracijosData ASC;",
+    const { rows } = await postgres.query(
+        `SELECT * FROM regitra WHERE "jarKodas" = $1 ORDER BY "pirmosiosRegistracijosData" ASC;`,
         [id],
     );
 
-    regitra = regitraRezultatai;
+    regitra = rows;
 
-    let teismoNuosprendziai = [];
-    const [teismoNuosprendziaiRezultatai] = await mysql.execute(
+    let { rows: teismoNuosprendziai } = await postgres.query(
         `SELECT b.*, bd.*
-        FROM bylos b
-        JOIN bylosDalyviai bd ON bd.bylosId = b.id
-        WHERE bd.kodas = ?
-        ORDER BY b.data DESC;`,
+         FROM "bylos" b
+         JOIN "bylosDalyviai" bd ON bd."bylosId" = b.id
+         WHERE bd."kodas" = $1
+         ORDER BY b."data" DESC`,
         [id],
     );
-
-    teismoNuosprendziai = teismoNuosprendziaiRezultatai;
 
     // Formatuojame teismo nuosprendžius
     teismoNuosprendziai = teismoNuosprendziai.map((nuosprendis) => {
@@ -304,10 +306,11 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
                 specAtvejai[topTiekejai[topTiekejoId].jarKodas].pavadinimas;
             continue;
         }
-        const [jarTiekejoRezultatai] = await mysql.execute(
-            "SELECT * FROM jar WHERE jarKodas = ?;",
+        const { rows: jarTiekejoRezultatai } = await postgres.query(
+            `SELECT * FROM "jarCsv" WHERE "jarKodas" = $1`,
             [topTiekejai[topTiekejoId].jarKodas],
         );
+
         if (jarTiekejoRezultatai.length > 0) {
             topTiekejai[topTiekejoId].pavadinimas =
                 jarTiekejoRezultatai[0].pavadinimas;
@@ -322,10 +325,12 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
                 specAtvejai[topPirkejai[topPirkejoId].jarKodas].pavadinimas;
             continue;
         }
-        const [jarPirkejoRezultatai] = await mysql.execute(
-            "SELECT * FROM jar WHERE jarKodas = ?;",
+
+        const { rows: jarPirkejoRezultatai } = await postgres.query(
+            `SELECT * FROM "jarCsv" WHERE "jarKodas" = $1`,
             [topPirkejai[topPirkejoId].jarKodas],
         );
+
         if (jarPirkejoRezultatai.length > 0) {
             topPirkejai[topPirkejoId].pavadinimas =
                 jarPirkejoRezultatai[0].pavadinimas;

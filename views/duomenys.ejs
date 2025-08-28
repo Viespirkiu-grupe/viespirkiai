@@ -49,7 +49,7 @@
 						<% eksportai.forEach(eksportas => { %>
 							<tr>
 								<td><a href="/eksportai/<%= eksportas.id %>"><%= eksportas.pavadinimas %></a></td>
-								<td class="center" style="width: 10ch;"><%= eksportas.data.toLocaleDateString('lt-LT') %></td>
+								<td class="center" style="width: 10ch;"><%= new Date(eksportas.data).toLocaleDateString('lt-LT') %></td>
 								<td class="center" style="width: 10ch;"><%= eksportas.dydisMB %> MB</td>
 							</tr>
 						<% }); %>

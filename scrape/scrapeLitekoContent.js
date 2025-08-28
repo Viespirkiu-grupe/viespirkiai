@@ -1,15 +1,17 @@
 import { parseHTML } from "linkedom";
 import { log } from "../utils/log.js";
-import { mysql } from "../mysql/mysql.js";
+import { postgres } from "../postgres/postgres.js";
 
 async function nuskaitytiNutarti(link) {
     let url = "https://liteko.teismai.lt/viesasprendimupaieska/" + link;
     log(`Nuskaitoma byla ${url}`);
+
     let response = await fetch(url);
     if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
     }
     let text = await response.text();
+
     let { document } = parseHTML(text);
     let saliuLentele;
 
@@ -60,46 +62,85 @@ async function nuskaitytiNutarti(link) {
     return { salys, kategorijos };
 }
 
-export async function surastiBylosSalis() {
-    let start = new Date();
-    let [byla] = await mysql.query(
-        "SELECT * FROM bylos WHERE juridiniuNuskaitymas < 1 OR juridiniuNuskaitymas IS NULL LIMIT 1",
+let rollingAverage = [];
+
+export async function surastiBylosSalis(batchSize = 1000, concurrency = 4) {
+    const { rows: bylos } = await postgres.query(
+        `SELECT * FROM bylos
+         WHERE "juridiniuNuskaitymas" < 1 OR "juridiniuNuskaitymas" IS NULL
+         LIMIT $1`,
+        [batchSize],
     );
 
-    if (!byla.length) {
+    if (!bylos.length) {
         log("Visos bylos nuskaitytos.");
         return false;
     }
 
-    let { salys } = await nuskaitytiNutarti(byla[0].fileHref);
+    let index = 0;
+    let processedThisSecond = 0;
 
-    if (salys.length > 0) {
-        var values = salys.map((s) => [
-            byla[0].id,
-            s.pavadinimas || "",
-            s.kodas || "",
-            s.bylojeKaip || "",
-        ]);
+    // Log throughput every second
+    const interval = setInterval(() => {
+        log(`Processed ${processedThisSecond} bylos in the last second`);
+        processedThisSecond = 0;
+    }, 1000);
 
-        let placeholders = values.map(() => "(?, ?, ?, ?)").join(", ");
-        let flatValues = values.flat();
+    const processByla = async (byla) => {
+        const start = Date.now();
+        let { salys } = await nuskaitytiNutarti(byla.fileHref);
 
-        await mysql.query(
-            `INSERT INTO bylosDalyviai (bylosId, pavadinimas, kodas, bylojeKaip) VALUES ${placeholders}`,
-            flatValues,
+        if (salys.length > 0) {
+            const values = salys.map((s) => [
+                byla.id,
+                s.pavadinimas || "",
+                s.kodas || "",
+                s.bylojeKaip || "",
+            ]);
+            const flatValues = values.flat();
+            const placeholders = values
+                .map(
+                    (_, i) =>
+                        `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`,
+                )
+                .join(", ");
+
+            await postgres.query(
+                `INSERT INTO "bylosDalyviai" ("bylosId", "pavadinimas", "kodas", "bylojeKaip") VALUES ${placeholders}`,
+                flatValues,
+            );
+        }
+
+        await postgres.query(
+            `UPDATE "bylos" SET "juridiniuNuskaitymas" = 1 WHERE "id" = $1`,
+            [byla.id],
         );
-    }
 
-    // Update juridiniuNuskaitymas to 1
-    await mysql.query(
-        `UPDATE bylos SET juridiniuNuskaitymas = 1 WHERE id = ?`,
-        [byla[0].id],
-    );
+        const duration = Date.now() - start;
+        rollingAverage.push(duration);
+        if (rollingAverage.length > 100)
+            rollingAverage = rollingAverage.slice(-100);
 
-    let duration = new Date() - start;
-    log(
-        `Nuskaityta byla ID ${byla[0].id} — ${salys.length} dalyviai. Užtruko: ${(duration / 1000).toFixed(3)}s`,
-    );
+        processedThisSecond++;
+
+        log(
+            `Nuskaityta byla ID ${byla.id} — ${salys.length} dalyviai. ` +
+                `Užtruko: ${(duration / 1000).toFixed(3)}s`,
+        );
+    };
+
+    const workers = Array(Math.min(concurrency, bylos.length))
+        .fill(0)
+        .map(async () => {
+            while (index < bylos.length) {
+                const current = bylos[index++];
+                await processByla(current);
+            }
+        });
+
+    await Promise.all(workers);
+    clearInterval(interval);
+
     return true;
 }
 

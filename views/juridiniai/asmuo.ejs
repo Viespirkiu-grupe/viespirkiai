@@ -635,7 +635,7 @@
                                 %>
                                 <tr>
                                     <td><%= auto.marke %></td>
-                                    <% if(auto.komercinisPavadinimas == "Nuasmeninta") { %>}
+                                    <% if(auto.komercinisPavadinimas == "Nuasmeninta") { %>
                                         <td><%= auto.komercinisPavadinimas %></td>
                                     <% } else { %>
                                         <td>
@@ -696,7 +696,7 @@
                                         </a>
                                     </td>
                                     <td style="max-width: 30ch;"><%= nuosprendis.bylosRusis %></td>
-                                    <td class="center"><%= nuosprendis.data.toLtDate() %></td>
+                                    <td class="center"><%= new Date(nuosprendis.data).toLtDate() %></td>
                                     <% if(nuosprendis.bylojeKaip == "Atsakovas") { %>
                                         <td style="max-width: 30ch;">
                                             <u>

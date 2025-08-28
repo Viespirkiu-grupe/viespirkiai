@@ -2,7 +2,7 @@
 Parsisiunčia duomenų bazėje nurodytus failus į viešdėžes.
 */
 
-import { mysql } from "../mysql/mysql.js";
+import { postgres } from "../postgres/postgres.js";
 import { log } from "../utils/log.js";
 
 /**
@@ -40,33 +40,29 @@ export async function parsiustiFaila() {
     let startTime = Date.now();
 
     // Randame failą, kuris dar neparsiųstas
-    let [failas] = await mysql.execute(
+    const failasRes = await postgres.query(
         "SELECT * FROM failai WHERE parsiustas = 0 ORDER BY id DESC LIMIT 1",
     );
 
-    if (Array.isArray(failas)) {
-        failas = failas[0];
+    if (failasRes.rows.length === 0) {
+        // No file found
+        return;
     }
 
-    if (!failas) {
-        log("Nėra failų parsisiuntimui.");
-        return false; // Visi failai jau parsiųsti
-    } else {
-        log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
-    }
+    const failas = failasRes.rows[0];
+
+    log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
 
     // Randame dėžę, kuri dar turi vietos
-    let [deze] = await mysql.execute(
+    const dezeRes = await postgres.query(
         "SELECT * FROM dezes WHERE used < max LIMIT 1",
     );
 
-    if (Array.isArray(deze)) {
-        deze = deze[0];
-    }
-
-    if (!deze) {
+    if (dezeRes.rows.length === 0) {
         throw new Error("Nėra dėžių parsisiuntimui.");
     }
+
+    const deze = dezeRes.rows[0];
 
     try {
         // Pateikiame parsisiuntimo užklausą
@@ -88,15 +84,16 @@ export async function parsiustiFaila() {
         }
 
         // Atnaujiname informaciją apie failą
-        await mysql.execute(
-            "UPDATE failai SET parsiustas = 1, md5 = ?, dydis = ?, saugojama = ? WHERE id = ?",
+        await postgres.query(
+            "UPDATE failai SET parsiustas = 1, md5 = $1, dydis = $2, saugojama = $3 WHERE id = $4",
             [md5, size, deze.pavadinimas, failas.id],
         );
     } catch (error) {
         console.error("Klaida parsisiunčiant failą:", error);
-        await mysql.execute("UPDATE failai SET parsiustas = -1 WHERE id = ?", [
-            failas.id,
-        ]);
+        await postgres.query(
+            "UPDATE failai SET parsiustas = -1 WHERE id = $1",
+            [failas.id],
+        );
 
         throw error;
     }
@@ -115,7 +112,7 @@ export async function parsiustiFaila() {
     });
     let { totalSizeBytes } = await usedReq.json();
 
-    await mysql.execute("UPDATE dezes SET used = ? WHERE id = ?", [
+    await postgres.query("UPDATE dezes SET used = $1 WHERE id = $2", [
         totalSizeBytes,
         deze.id,
     ]);

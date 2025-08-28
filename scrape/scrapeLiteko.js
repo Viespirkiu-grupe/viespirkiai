@@ -1,5 +1,5 @@
 import { parseHTML } from "linkedom";
-import { mysql } from "../mysql/mysql.js";
+import { postgres } from "../postgres/postgres.js";
 import { log } from "../utils/log.js";
 
 async function nuskaitytiDiena(data) {
@@ -284,18 +284,24 @@ var eilute = 0;
 async function insertBatch(rows) {
     if (rows.length === 0) return;
 
-    const rowPlaceholders = `(${Array(10).fill("?").join(", ")})`;
+    const rowPlaceholders = `($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`;
     const sql = `
-    INSERT IGNORE INTO bylos (
-        bylosNumeris, bylosRusis, data, teisejai, salys,
-        citavimasKitoseBylose, teismas, teismoRumai, fileText, fileHref
-    ) VALUES ${Array(rows.length).fill(rowPlaceholders).join(", ")}
-  `;
+         INSERT INTO bylos (
+             "bylosNumeris", "bylosRusis", data, teisejai, salys,
+             "citavimasKitoseBylose", teismas, "teismoRumai", "fileText", "fileHref"
+         ) VALUES ${rows
+             .map(
+                 (_, i) =>
+                     `($${i * 10 + 1},$${i * 10 + 2},$${i * 10 + 3},$${i * 10 + 4},$${i * 10 + 5},$${i * 10 + 6},$${i * 10 + 7},$${i * 10 + 8},$${i * 10 + 9},$${i * 10 + 10})`,
+             )
+             .join(", ")}
+         ON CONFLICT ("bylosNumeris") DO NOTHING
+     `;
 
     const values = rows.flat();
 
     try {
-        await mysql.execute(sql, values);
+        await postgres.query(sql, values);
         eilute += rows.length;
     } catch (err) {
         console.error(`Įterpimas nepavyko po ${eilute} eilučių:`, err.message);
@@ -330,8 +336,8 @@ async function importuotiDiena(date) {
 async function scrapeAllDays(startDate) {
     if (!startDate) {
         // Check database for the last scraped date
-        const [rows] = await mysql.execute(
-            "SELECT MAX(data) AS lastDate FROM bylos",
+        const { rows } = await postgres.query(
+            `SELECT MAX(data) AS "lastDate" FROM bylos`,
         );
 
         if (rows[0].lastDate) {
@@ -365,8 +371,8 @@ async function scrapeAllDays(startDate) {
 
 export async function litekoScrapeLatestDays(days = 90) {
     // Check database for the last scraped date
-    const [rows] = await mysql.execute(
-        "SELECT MAX(data) AS lastDate FROM bylos",
+    const { rows } = await postgres.query(
+        `SELECT MAX(data) AS "lastDate" FROM bylos`,
     );
 
     let startDate;

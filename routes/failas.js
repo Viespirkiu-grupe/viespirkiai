@@ -1,5 +1,6 @@
 import express from "express";
 import { mysql } from "../mysql/mysql.js";
+import { postgres } from "../postgres/postgres.js";
 import { Readable } from "stream";
 import mime from "mime";
 import config from "../utils/config.js";
@@ -13,25 +14,26 @@ let statistika = {
 };
 
 async function atnaujintiStatistika() {
-    const [visi, parsiusti, klaida, dydis] = await Promise.all([
-        mysql.execute("SELECT COUNT(*) AS total FROM failai;"),
-        mysql.execute(
+    const [visiRes, parsiustiRes, klaidaRes, dydisRes] = await Promise.all([
+        postgres.query("SELECT COUNT(*) AS total FROM failai;"),
+        postgres.query(
             "SELECT COUNT(*) AS total FROM failai WHERE parsiustas = 1;",
         ),
-        mysql.execute(
+        postgres.query(
             "SELECT COUNT(*) AS total FROM failai WHERE parsiustas = -1;",
         ),
-        mysql.execute(
+        postgres.query(
             "SELECT SUM(dydis) AS total FROM failai WHERE parsiustas = 1;",
         ),
     ]);
 
-    const visiKiekis = visi[0][0].total;
-    const parsiustiKiekis = parsiusti[0][0].total;
-    const klaidaKiekis = klaida[0][0].total;
+    // PostgreSQL returns rows as .rows array
+    const visiKiekis = parseInt(visiRes.rows[0].total, 10);
+    const parsiustiKiekis = parseInt(parsiustiRes.rows[0].total, 10);
+    const klaidaKiekis = parseInt(klaidaRes.rows[0].total, 10);
     const neparsiustiKiekis = visiKiekis - parsiustiKiekis - klaidaKiekis;
 
-    const parsiustiDydis = dydis[0][0].total || 0;
+    const parsiustiDydis = parseFloat(dydisRes.rows[0].total) || 0;
     const vidutinisDydis =
         parsiustiKiekis > 0 ? parsiustiDydis / parsiustiKiekis : 0;
     const visuDydis = vidutinisDydis * visiKiekis;
@@ -46,10 +48,10 @@ async function atnaujintiStatistika() {
     };
 
     statistika.dydziai = {
-        visi: parseFloat(parseFloat(visuDydis).toFixed(2)),
-        parsiusti: parseFloat(parseFloat(parsiustiDydis).toFixed(2)),
-        klaida: parseFloat(parseFloat(klaidaDydis).toFixed(2)),
-        neparsiusti: parseFloat(parseFloat(neparsiustiDydis).toFixed(2)),
+        visi: parseFloat(visuDydis.toFixed(2)),
+        parsiusti: parseFloat(parsiustiDydis.toFixed(2)),
+        klaida: parseFloat(klaidaDydis.toFixed(2)),
+        neparsiusti: parseFloat(neparsiustiDydis.toFixed(2)),
     };
 
     statistika.atnaujinta = new Date();
@@ -99,34 +101,33 @@ failasRouter.get("/failas/:dokId/:fileId/download", async (req, res, next) => {
     let { dokId, fileId } = req.params;
 
     // Randame failą
-    const [failasRezultatai] = await mysql.execute(
-        "SELECT * FROM failai WHERE dokId = ? AND fileId = ?;",
+    const failasRezultatai = await postgres.query(
+        'SELECT * FROM failai WHERE "dokId" = $1 AND "fileId" = $2;',
         [dokId, fileId],
     );
 
     // 404
-    if (failasRezultatai.length === 0) {
+    if (failasRezultatai.rows.length === 0) {
         return next();
     }
 
-    let failas = failasRezultatai[0];
+    const failas = failasRezultatai.rows[0];
 
     // Patikriname, ar failas yra parsiųstas
     if (failas.parsiustas === 0) {
         return res.status(404).send("Failas dar neparsiųstas.");
     }
 
-    // Randame dėžę, kurioje saugomas failas
-    let [deze] = await mysql.execute(
-        "SELECT * FROM dezes WHERE pavadinimas = ? LIMIT 1",
+    const dezeRes = await postgres.query(
+        "SELECT * FROM dezes WHERE pavadinimas = $1 LIMIT 1",
         [failas.saugojama],
     );
 
-    if (deze.length === 0) {
+    if (dezeRes.rows.length === 0) {
         return res.status(404).send("Dėžė nerasta.");
     }
 
-    deze = deze[0];
+    const deze = dezeRes.rows[0];
 
     // Parsiunčiame failą
     const fileUrl = `${deze.url}/file/${failas.md5}.${failas.extension}`;

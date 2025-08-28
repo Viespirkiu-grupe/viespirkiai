@@ -2,7 +2,7 @@
 Randa JAR adresų koordinates ir įrašo į adresai (MySQL) lentelę.
 */
 
-import { mysql } from "../mysql/mysql.js";
+import { postgres } from "../postgres/postgres.js";
 import { log } from "../utils/log.js";
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
@@ -15,9 +15,10 @@ export async function atrastiJarAdresoKoordinates() {
     let reikiaLaukti = false;
 
     // Randame JAR įrašą, kuriam reikia adreso koordinačių
-    const [rows] = await mysql.execute(`
-      SELECT jarKodas, adresas FROM jar
-      WHERE adresoId IS NULL AND adresas IS NOT NULL
+    const { rows } = await postgres.query(`
+      SELECT "jarKodas", adresas
+      FROM "jarCsv"
+      WHERE "adresoId" IS NULL AND adresas IS NOT NULL
       LIMIT 1
     `);
 
@@ -28,15 +29,15 @@ export async function atrastiJarAdresoKoordinates() {
 
     let { jarKodas, adresas } = rows[0];
 
-    // Patikriname ar adresas jau egizstuojantis
-    const [[existing]] = await mysql.execute(
-        "SELECT id FROM adresai WHERE adresas = ? LIMIT 1",
+    /// Patikriname ar adresas jau egzistuojantis
+    const { rows: existingRows } = await postgres.query(
+        `SELECT id FROM adresai WHERE adresas = $1 LIMIT 1`,
         [adresas],
     );
 
-    if (existing) {
+    if (existingRows.length > 0) {
         // Adresas jau yra, atnaujiname JAR įrašą
-        var adresoId = existing.id;
+        var adresoId = existingRows[0].id;
     } else {
         // Suformuojame užklausą į Nominatim
         log(`Užklausiama dėl: ${adresas}`);
@@ -64,12 +65,12 @@ export async function atrastiJarAdresoKoordinates() {
                 const { lat, lon } = data[0];
                 log(`Adresas rastas: lat=${lat}, lon=${lon}`);
 
-                const [result] = await mysql.execute(
-                    "INSERT INTO adresai (taskas, adresas) VALUES (POINT(?, ?), ?)",
-                    [parseFloat(lon), parseFloat(lat), adresas],
+                await postgres.query(
+                    `INSERT INTO adresai (latitude, longitude, adresas) VALUES ($1, $2, $3)`,
+                    [parseFloat(lat), parseFloat(lon), adresas],
                 );
 
-                var adresoId = result.insertId;
+                var adresoId = rows[0].id;
             }
         } catch (e) {
             console.error(`Klaida vykdant užklausą ${adresas}:`, e);
@@ -79,15 +80,17 @@ export async function atrastiJarAdresoKoordinates() {
     }
 
     // Atnaujiname JAR įrašą su adreso ID
-    await mysql.execute("UPDATE jar SET adresoId = ? WHERE jarKodas = ?", [
-        adresoId,
-        jarKodas,
-    ]);
+    await postgres.query(
+        `UPDATE "jarCsv" SET "adresoId" = $1 WHERE "jarKodas" = $2`,
+        [adresoId, jarKodas],
+    );
 
     log(`Atnaujintas jar ${jarKodas} → adresoId=${adresoId}`);
     if (reikiaLaukti) {
         await sleep(SLEEP_MS);
     }
+
+    return true;
 }
 
 /**
@@ -105,14 +108,14 @@ async function supaprastintasAdresas(raw) {
         if (match) {
             // Randame tinkamą linksnį
             let place = match[1].trim();
-            const [[found]] = await mysql.execute(
-                "SELECT pavadinimas FROM gyvenamosVietoves WHERE pavadinimas_k = ? LIMIT 1",
+            const { rows: foundRows } = await postgres.query(
+                `SELECT "pavadinimas" FROM "gyvenamosVietoves" WHERE "pavadinimasK" = $1 LIMIT 1`,
                 [place],
             );
 
             // Pakeičiame
-            if (found && found.pavadinimas) {
-                raw = raw.replace(place, found.pavadinimas);
+            if (foundRows.length > 0 && foundRows[0].pavadinimas) {
+                raw = raw.replace(place, foundRows[0].pavadinimas);
             }
         }
     }
@@ -146,4 +149,19 @@ async function supaprastintasAdresas(raw) {
     addr += (addr ? ", " : "") + "Lithuania";
 
     return addr;
+}
+
+// If ran directly
+if (import.meta.url.endsWith(process.argv[1])) {
+    (async () => {
+        try {
+            while (await atrastiJarAdresoKoordinates()) {
+                // Kartojame, kol yra įrašų
+            }
+            process.exit(0);
+        } catch (e) {
+            console.error("Klaida:", e);
+            process.exit(1);
+        }
+    })();
 }
