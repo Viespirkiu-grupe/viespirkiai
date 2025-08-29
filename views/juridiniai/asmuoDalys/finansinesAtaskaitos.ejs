@@ -1,0 +1,42 @@
+ <% if(asmuo.finansinesAtaskaitos && asmuo.finansinesAtaskaitos.length > 0){ %>
+     <div id="finansai">
+         <h2><u>Finansinės ataskaitos</u></h2>
+         <% if(queryParams.finansaiLimit == "max") {queryParams.finansaiLimit = 10000000} %>
+         <% let finansaiLimit = queryParams.finansaiLimit || 1; %>
+         <% if(asmuo.finansinesAtaskaitos.length > finansaiLimit) { %>
+             <i>
+                 Rodoma tik paskutinė finansinė ataskaita.
+                 <a href="?finansaiLimit=max#finansai">
+                     Rodyti visas (<%= asmuo.finansinesAtaskaitos.length %>)
+                 </a>
+             </i>
+             <br>
+         <% } %>
+
+         <section>
+             <% let count = 0; %>
+
+             <% asmuo.finansinesAtaskaitos.forEach(laikotarpis => { %>
+                 <% if(count >= finansaiLimit) return; %>
+                 <% count++; %>
+
+                 <h3><%= laikotarpis.templateName %> <sup>(<%= laikotarpis.templateId %>, <%= laikotarpis.duomenuData %>)</sup></h3>
+                 <i><%= laikotarpis.laikotarpisNuo %> – <%= laikotarpis.laikotarpisIki %> </i>
+                 <section class="col-2 mobile-col-1">
+                     <% laikotarpis.standards.forEach(standard => { %>
+                         <section>
+                             <h4><%= standard.standardName %> <sup>(<%= standard.standardId %>)</sup></h4>
+                             <% standard.lines.forEach(line => { %>
+                                 <div>
+                                 <h5><%= line.lineName %> <sup>(<%= line.lineTypeId %>)</sup></h5>
+                                 <%= new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(line.reiksme) %>
+                                 </div>
+                             <% }); %>
+                         </section>
+                     <% }); %>
+                 </section>
+                 <br>
+             <% }) %>
+         </section>
+     </div>
+ <% } %>

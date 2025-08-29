@@ -1,0 +1,150 @@
+<h2><u>Viešųjų pirkimų sutartys</u></h2>
+<div class="col-2 mobile-col-1" id="sutartys">
+    <section style="width: 100%;">
+        <h3>Pirkimai per metus</h3>
+        <% if(asmuo.sutartys && asmuo.sutartys.pirkimaiKasMetus	 && asmuo.sutartys.pirkimaiKasMetus.length > 0) { %>
+            <div id="pirkimaiPerMetus" class="chart" style="width: 100%; height: 400px;"></div>
+
+            <script defer>
+              const pirkimaiKasMetusLabels = [
+                <% asmuo.sutartys.pirkimaiKasMetus.forEach((item, i) => { %>
+                  '<%= item.year %>',
+                <% }) %>
+              ];
+
+              const pirkimaiKasMetus = [
+                <% asmuo.sutartys.pirkimaiKasMetus.forEach((item, i) => { %>
+                  <%= item.total || "null" %>,
+                <% }) %>
+              ];
+
+              renderChart('pirkimaiPerMetus', pirkimaiKasMetusLabels, pirkimaiKasMetus, {
+                seriesName: "EUR",
+                xaxis: {
+                      labels: {
+                        format: 'yyyy'
+                    },
+
+                },
+                tooltip: {
+                  x: {
+                    format: 'yyyy'
+                  },
+                },
+              });
+            </script>
+        <% } else { %>
+            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+        <% } %>
+    </section>
+    <section style="width: 100%;">
+        <h3>Pardavimai per metus</h3>
+        <% if(asmuo.sutartys && asmuo.sutartys.tiekimaiKasMetus && asmuo.sutartys.tiekimaiKasMetus.length > 0) { %>
+            <div id="pardavimaiPerMetus" class="chart" style="width: 100%; height: 400px;"></div>
+
+            <script defer>
+              const pardavimaiKasMetusLabels = [
+                <% asmuo.sutartys.tiekimaiKasMetus.forEach((item, i) => { %>
+                  '<%= item.year %>',
+                <% }) %>
+              ];
+
+              const pardavimaiKasMetus = [
+                <% asmuo.sutartys.tiekimaiKasMetus.forEach((item, i) => { %>
+                  <%= item.total || "null" %>,
+                <% }) %>
+              ];
+
+              renderChart('pardavimaiPerMetus', pardavimaiKasMetusLabels, pardavimaiKasMetus, {
+                seriesName: "EUR",
+                xaxis: {
+                      labels: {
+                        format: 'yyyy'
+                    },
+
+                },
+                tooltip: {
+                  x: {
+                    format: 'yyyy'
+                  },
+                },
+              });
+            </script>
+        <% } else { %>
+            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+        <% } %>
+    </section>
+</div>
+
+<div class="col-2 mobile-col-1" style="gap: 16px;">
+    <section style="width: 100%;">
+        <h3>TOP 10 tiekėjų</h3>
+        <% if(asmuo.sutartys && asmuo.sutartys.topTiekejai && asmuo.sutartys.topTiekejai.length > 0) { %>
+            <table style="width: 100%; min-width: 0px;">
+                <thead>
+                    <tr>
+                        <th>Vieta</th>
+                        <th>Tiekėjas</th>
+                        <th>Suma</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% let id = 1; %>
+                    <% asmuo.sutartys.topTiekejai.forEach(function(tiekejas){ %>
+                        <tr>
+                            <td class="center" style="width: 5ch;"><%= id %></td>
+                            <td>
+                                <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                    <a href="/?perkanciosiosOrganizacijosKodas=<%= asmuo.jar.jarKodas || "" %>&tiekejoKodas=<%= tiekejas.jarKodas %>">
+                                        <%= tiekejas.pavadinimas %>
+                                    </a>
+                                </div>
+                            </td>
+                            <td class="center" style="width: 9ch;">
+                                <%= tiekejas.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) %>
+                            </td>
+                        </tr>
+                        <% id++; %>
+                    <% }) %>
+                </tbody>
+            </table>
+        <% } else { %>
+            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+        <% } %>
+    </section>
+    <section style="width: 100%;">
+        <h3>TOP 10 pirkėjų</h3>
+        <% if(asmuo.sutartys && asmuo.sutartys.topPirkejai && asmuo.sutartys.topPirkejai.length > 0) { %>
+            <table style="width: 100%; min-width: 0px;">
+                <thead>
+                    <tr>
+                        <th>Vieta</th>
+                        <th>Pirkėjas</th>
+                        <th>Suma</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% let id = 1; %>
+                    <% asmuo.sutartys.topPirkejai.forEach(function(pirkejas){ %>
+                        <tr>
+                            <td class="center" style="width: 5ch;"><%= id %></td>
+                            <td>
+                                <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                    <a href="/?perkanciosiosOrganizacijosKodas=<%= pirkejas.jarKodas %>&tiekejoKodas=<%= asmuo.jar.jarKodas || "" %>">
+                                        <%= pirkejas.pavadinimas %>
+                                    </a>
+                                </div>
+                            </td>
+                            <td class="center" style="width: 9ch;">
+                                <%= pirkejas.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) %>
+                            </td>
+                        </tr>
+                        <% id++; %>
+                    <% }) %>
+                </tbody>
+            </table>
+        <% } else { %>
+            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+        <% } %>
+    </section>
+</div>

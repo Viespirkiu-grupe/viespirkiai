@@ -326,6 +326,11 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
             continue;
         }
 
+        if (!topPirkejai[topPirkejoId].jarKodas) {
+            topPirkejai[topPirkejoId].pavadinimas = "Nežinomas";
+            continue;
+        }
+
         const { rows: jarPirkejoRezultatai } = await postgres.query(
             `SELECT * FROM "jarCsv" WHERE "jarKodas" = $1`,
             [topPirkejai[topPirkejoId].jarKodas],

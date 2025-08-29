@@ -1,0 +1,49 @@
+<% if(asmuo.regitra && asmuo.regitra.length > 0){ %>
+    <div id="regitra">
+        <h2><u>Transporto priemonės</u></h2>
+        <div class="tableContainer">
+            <table style="width: auto; min-width: 70vw;">
+                <thead>
+                    <tr>
+                        <th>Marke</th>
+                        <th>Pavadinimas</th>
+                        <th>Kategorija</th>
+                        <th>Degalai</th>
+                        <th>Galia (kW)</th>
+                        <th>Vietos</th>
+                        <th>Pirmoji registracija</th>
+                        <th>Savininkas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% asmuo.regitra.forEach(function(auto){ %>
+                        <%
+                        let savinikas = "Ne";
+                        if(auto.valdymoTeise == "A"){
+                            savininkas = "Taip";
+                        }
+                        %>
+                        <tr>
+                            <td><%= auto.marke %></td>
+                            <% if(auto.komercinisPavadinimas == "Nuasmeninta") { %>
+                                <td><%= auto.komercinisPavadinimas %></td>
+                            <% } else { %>
+                                <td>
+                                    <a href="https://duckduckgo.com/?t=h_&q=<%- encodeURIComponent(auto.marke) + " " + encodeURIComponent(auto.komercinisPavadinimas) %>&ia=images&iax=images" target="_blank" rel="noopener noreferrer">
+                                        <%= auto.komercinisPavadinimas %>
+                                    </a>
+                                </td>
+                            <% } %>
+                            <td class="center"><%= auto.kategorijaKlase %></td>
+                            <td class="center"><%= auto.degalai || "-" %></td>
+                            <td class="center"><%= auto.galia || "-" %></td>
+                            <td class="center"><%= (Number(auto.sedimuVietuSkaicius) + Number(auto.stovimuVietuSkaicius)) || "-" %></td>
+                            <td class="center"><%= auto.pirmosiosRegistracijosData || "-" %></td>
+                            <td class="center"><%= savininkas || "?" %></td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+<% } %>

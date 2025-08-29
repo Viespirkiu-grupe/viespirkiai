@@ -1,0 +1,56 @@
+<% if(asmuo.teismoNuosprendziai	 && asmuo.teismoNuosprendziai.length > 0){ %>
+    <div id="teismai">
+        <h2><u>Teismo nuosprendžiai</u></h2>
+        <i>Šiuo metu importuojami teismo nuosprendžių duomenys, todėl gali būti, kad ne visi nuosprendžiai yra rodomi.</i><br><br>
+        <% if(queryParams.nuosprendziaiLimit == "max") {queryParams.nuosprendziaiLimit = 10000000} %>
+        <% let nuosprendziaiLimit = queryParams.nuosprendziaiLimit || 25; %>
+        <% if(asmuo.teismoNuosprendziai.length > nuosprendziaiLimit) { %>
+            <i>
+                Rodomi tik <%= nuosprendziaiLimit %> naujausi nuosprendžiai.
+                <a href="?nuosprendziaiLimit=max#teismai">
+                    Rodyti visus (<%= asmuo.teismoNuosprendziai.length %>)
+                </a>
+            </i>
+            <br><br>
+        <% } %>
+        <div class="tableContainer">
+            <table style="width: auto; min-width: 70vw;">
+                <thead>
+                    <tr>
+                        <th>Bylos numeris</th>
+                        <th>Rūšis</th>
+                        <th>Data</th>
+                        <th>Rolė</th>
+                        <th>Teismas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% let count = 0; %>
+                    <% asmuo.teismoNuosprendziai.forEach(function(nuosprendis){ %>
+                        <% if(count >= nuosprendziaiLimit) return; %>
+                        <% count++; %>
+                        <tr>
+                            <td>
+                                <a href="https://liteko.teismai.lt/viesasprendimupaieska/<%= nuosprendis.fileHref %>" target="_blank">
+                                    <%= nuosprendis.bylosNumeris %>
+                                </a>
+                            </td>
+                            <td style="max-width: 30ch;"><%= nuosprendis.bylosRusis %></td>
+                            <td class="center"><%= new Date(nuosprendis.data).toLtDate() %></td>
+                            <% if(nuosprendis.bylojeKaip == "Atsakovas") { %>
+                                <td style="max-width: 30ch;">
+                                    <u>
+                                        <%= nuosprendis.bylojeKaip %>
+                                    </u>
+                                </td>
+                            <% } else { %>
+                                <td style="max-width: 30ch;"><%= nuosprendis.bylojeKaip %></td>
+                            <% } %>
+                            <td style="max-width: 40ch;"><%= nuosprendis.teismas %></td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+<% } %>

@@ -1,0 +1,7 @@
+<% if(asmuo.istatinisKapitalas && asmuo.istatinisKapitalas.reiksme	) { %>
+    <div id="kapitalas">
+        <h2><u>Įstatinis kapitalas</u></h2>
+        <%= asmuo.istatinisKapitalas.reiksme.toLocaleString('lt-LT', { style: 'currency', currency: asmuo.istatinisKapitalas.valiuta }) %>
+        <sup>(<%= asmuo.istatinisKapitalas.data %>)</sup>
+    </div>
+<% } %>

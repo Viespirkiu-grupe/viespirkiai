@@ -1,0 +1,71 @@
+ <div class="col-2 mobile-col-1" id="imokos">
+     <section style="width: 100%;">
+         <h2><u>SODRA įmokos</u></h2>
+         <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
+             <div id="sodraImokosDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+
+             <script defer>
+               const sodraImokos = [
+                 <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+                   <%= item.imokuSuma || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+                 <% }) %>
+               ];
+
+               renderChart('sodraImokosDiagrama', sodraLabels, sodraImokos, {seriesName: "EUR"})
+             </script>
+         <% } else { %>
+             <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+         <% } %>
+     </section>
+     <section style="width: 100%;">
+         <h2><u>VMI įmokos</u></h2>
+         <% if(asmuo.mokesciai && asmuo.mokesciai.duomenys && asmuo.mokesciai.duomenys.length > 0) { %>
+             <div id="vmiMokesciuDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+
+             <script defer>
+               const vmiLabels = [
+                 <% asmuo.mokesciai.duomenys.forEach((item, i) => { %>
+                   '<%= item.data %>-01'<%= i < asmuo.mokesciai.duomenys.length - 1 ? ',' : '' %>
+                 <% }) %>
+               ];
+
+               const vmiData = [
+                 <% asmuo.mokesciai.duomenys.forEach((item, i) => { %>
+                   <%= item.suma || "null" %><%= i < asmuo.mokesciai.duomenys.length - 1 ? ',' : '' %>
+                 <% }) %>
+               ];
+
+               // Find last label
+               const lastLabel = vmiLabels[vmiLabels.length - 1];
+               const lastDate = new Date(lastLabel);
+               const lastMonth = lastDate.getMonth() + 1; // JS months start at 0
+
+               // Add annotation only if it's not December
+               let annotations = {};
+               if (lastMonth !== 12) {
+                 const startOfYear = new Date(lastDate.getFullYear(), 0, 1);
+
+                 annotations = {
+                   xaxis: [
+                     {
+                       x: startOfYear.getTime(),
+                       borderColor: '#777',
+                       label: {
+                         style: {
+                           color: '#000',
+                         },
+                         position: 'bottom',
+                         text: 'Nebaigti duomenys:'
+                       }
+                     }
+                   ]
+                 };
+               }
+
+               renderChart('vmiMokesciuDiagrama', vmiLabels, vmiData, { annotations, seriesName: "EUR" });
+             </script>
+         <% } else { %>
+             <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+         <% } %>
+     </section>
+ </div>
