@@ -64,10 +64,10 @@ async function nuskaitytiNutarti(link) {
 
 let rollingAverage = [];
 
-export async function surastiBylosSalis(batchSize = 1000, concurrency = 4) {
+export async function surastiBylosSalis(batchSize = 1) {
     const { rows: bylos } = await postgres.query(
         `SELECT * FROM bylos
-         WHERE "juridiniuNuskaitymas" < 1 OR "juridiniuNuskaitymas" IS NULL
+         WHERE "juridiniuNuskaitymas" = 0 OR "juridiniuNuskaitymas" IS NULL
          LIMIT $1`,
         [batchSize],
     );
@@ -77,69 +77,57 @@ export async function surastiBylosSalis(batchSize = 1000, concurrency = 4) {
         return false;
     }
 
-    let index = 0;
-    let processedThisSecond = 0;
+    for (const byla of bylos) {
+        try {
+            var start = Date.now();
+            var { salys } = await nuskaitytiNutarti(byla.fileHref);
 
-    // Log throughput every second
-    const interval = setInterval(() => {
-        log(`Processed ${processedThisSecond} bylos in the last second`);
-        processedThisSecond = 0;
-    }, 1000);
+            if (salys.length > 0) {
+                const values = salys
+                    .map((s) => [
+                        byla.id,
+                        s.pavadinimas || "",
+                        s.kodas || "",
+                        s.bylojeKaip || "",
+                    ])
+                    .flat();
 
-    const processByla = async (byla) => {
-        const start = Date.now();
-        let { salys } = await nuskaitytiNutarti(byla.fileHref);
+                const placeholders = salys
+                    .map(
+                        (_, i) =>
+                            `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`,
+                    )
+                    .join(", ");
 
-        if (salys.length > 0) {
-            const values = salys.map((s) => [
-                byla.id,
-                s.pavadinimas || "",
-                s.kodas || "",
-                s.bylojeKaip || "",
-            ]);
-            const flatValues = values.flat();
-            const placeholders = values
-                .map(
-                    (_, i) =>
-                        `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`,
-                )
-                .join(", ");
-
+                await postgres.query(
+                    `INSERT INTO "bylosDalyviai" ("bylosId", "pavadinimas", "kodas", "bylojeKaip") VALUES ${placeholders}`,
+                    values,
+                );
+            }
             await postgres.query(
-                `INSERT INTO "bylosDalyviai" ("bylosId", "pavadinimas", "kodas", "bylojeKaip") VALUES ${placeholders}`,
-                flatValues,
+                `UPDATE "bylos" SET "juridiniuNuskaitymas" = 1 WHERE "id" = $1`,
+                [byla.id],
             );
+        } catch (e) {
+            await postgres.query(
+                `UPDATE "bylos" SET "juridiniuNuskaitymas" = -1 WHERE "id" = $1`,
+                [byla.id],
+            );
+            console.log(e);
+            log(`Klaida nuskaitant bylą ID ${byla.id}: ${e.message}`);
+            throw e;
         }
-
-        await postgres.query(
-            `UPDATE "bylos" SET "juridiniuNuskaitymas" = 1 WHERE "id" = $1`,
-            [byla.id],
-        );
 
         const duration = Date.now() - start;
         rollingAverage.push(duration);
         if (rollingAverage.length > 100)
             rollingAverage = rollingAverage.slice(-100);
 
-        processedThisSecond++;
-
         log(
             `Nuskaityta byla ID ${byla.id} — ${salys.length} dalyviai. ` +
                 `Užtruko: ${(duration / 1000).toFixed(3)}s`,
         );
-    };
-
-    const workers = Array(Math.min(concurrency, bylos.length))
-        .fill(0)
-        .map(async () => {
-            while (index < bylos.length) {
-                const current = bylos[index++];
-                await processByla(current);
-            }
-        });
-
-    await Promise.all(workers);
-    clearInterval(interval);
+    }
 
     return true;
 }

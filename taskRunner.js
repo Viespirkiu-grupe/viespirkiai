@@ -45,6 +45,8 @@ import { litekoScrapeLatestDays } from "./scrape/scrapeLiteko.js";
 tasks.push({
     name: "scrapeLiteko",
     schedule: "0 */6 * * *",
+    cooldown: 60,
+    errorCooldown: 10,
     job: async () => {
         await litekoScrapeLatestDays(90);
     },
