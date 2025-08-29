@@ -1,5 +1,4 @@
 import express from "express";
-import { mysql } from "../mysql/mysql.js";
 import { postgres } from "../postgres/postgres.js";
 import { Readable } from "stream";
 import mime from "mime";

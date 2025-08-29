@@ -1,7 +1,6 @@
 import express from "express";
 import cleanEmptyQueryParams from "../utils/queryParams.js";
 import config from "../utils/config.js";
-import { mysql } from "../mysql/mysql.js";
 import { arrayToLithuanianTime } from "../utils/time.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 import { searchJarDocuments } from "../typesense/typesense.js";

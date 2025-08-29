@@ -1,6 +1,5 @@
 import express from "express";
 import config from "../utils/config.js";
-import { mysql } from "../mysql/mysql.js";
 import { postgres } from "../postgres/postgres.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 
