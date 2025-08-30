@@ -273,7 +273,7 @@ async function importPage(page = 0) {
 
 /**
  * Atsiunčia naujausias sutartis iš eViesiejiPirkimai.lt svetainės.
- * @returns {Promise<void>}
+ * @returns {Promise}
  */
 export async function requestLatestEviesiejipirkimaiData() {
     // Nuskaitome paskutinio puslapio numerį iš ./taskState/scrapeEviesiejipirkimaiSutartys.txt
@@ -294,7 +294,7 @@ export async function requestLatestEviesiejipirkimaiData() {
     while (true) {
         if ((await importPage(page)) < 50) {
             log(`Puslapis ${page} nėra pilnas.`);
-            return;
+            return false;
         } else {
             log(`Puslapis ${page} pilnas.`);
 
@@ -305,7 +305,7 @@ export async function requestLatestEviesiejipirkimaiData() {
             );
             page++;
         }
-        // Wait for like 10s
-        await new Promise((resolve) => setTimeout(resolve, 10000));
+        // Wait for like 1s
+        await new Promise((resolve) => setTimeout(resolve, 1));
     }
 }

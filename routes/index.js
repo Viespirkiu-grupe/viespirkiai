@@ -144,9 +144,9 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
         rodomasTotal = `<span class="rezultatai-nezinomas-total"> ? </span>`;
     }
     if (rodomiRezultatai < total) {
-        var numberOfResults = `Rodomi ${rodomiRezultatai} iš ${rodomasTotal} rezultatų <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
+        var numberOfResults = `Rodomi ${rodomiRezultatai} iš ${Number(rodomasTotal).linksniuotiK(["rezultato", "rezultatų"])} <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
     } else {
-        var numberOfResults = `${total} rezultatas(-ai) <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
+        var numberOfResults = `${Number(total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
     }
 
     // Jei prašo JSONL
@@ -183,8 +183,15 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
 
         const escapeCSV = (value) => {
             if (value == null) return "";
-            if (typeof value === "number") return value; // keep as number
-            const str = String(value);
+
+            let str;
+            if (typeof value === "number") {
+                str = String(value);
+            } else {
+                str = String(value);
+            }
+
+            // jei yra kabutės, kableliai arba naujos eilutės, apgaubiam kabutėmis
             return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
         };
 

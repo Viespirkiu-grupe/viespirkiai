@@ -15,9 +15,10 @@ const tasks = [];
 import { requestLatestEviesiejipirkimaiData } from "./scrape/scrapeViespirkiai.js";
 tasks.push({
     name: "scrapeEviesiejipirkimaiSutartys",
-    schedule: "*/1 * * * *",
+    mode: "asap",
+    cooldown: 60,
     job: async () => {
-        await requestLatestEviesiejipirkimaiData();
+        return requestLatestEviesiejipirkimaiData();
     },
 });
 
@@ -81,7 +82,6 @@ for (const task of tasks) {
             while (true) {
                 try {
                     const result = await task.job();
-
                     if (result === false) {
                         // no data, wait normal cooldown
                         await new Promise((r) => setTimeout(r, cooldown));

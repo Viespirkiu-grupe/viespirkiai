@@ -2,89 +2,9 @@ import express from "express";
 import { postgres } from "../postgres/postgres.js";
 import { Readable } from "stream";
 import mime from "mime";
-import config from "../utils/config.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 
 const failasRouter = express.Router();
-
-let statistika = {
-    dydziai: {},
-    kiekiai: {},
-};
-
-async function atnaujintiStatistika() {
-    const [visiRes, parsiustiRes, klaidaRes, dydisRes] = await Promise.all([
-        postgres.query("SELECT COUNT(*) AS total FROM failai;"),
-        postgres.query(
-            "SELECT COUNT(*) AS total FROM failai WHERE parsiustas = 1;",
-        ),
-        postgres.query(
-            "SELECT COUNT(*) AS total FROM failai WHERE parsiustas = -1;",
-        ),
-        postgres.query(
-            "SELECT SUM(dydis) AS total FROM failai WHERE parsiustas = 1;",
-        ),
-    ]);
-
-    // PostgreSQL returns rows as .rows array
-    const visiKiekis = parseInt(visiRes.rows[0].total, 10);
-    const parsiustiKiekis = parseInt(parsiustiRes.rows[0].total, 10);
-    const klaidaKiekis = parseInt(klaidaRes.rows[0].total, 10);
-    const neparsiustiKiekis = visiKiekis - parsiustiKiekis - klaidaKiekis;
-
-    const parsiustiDydis = parseFloat(dydisRes.rows[0].total) || 0;
-    const vidutinisDydis =
-        parsiustiKiekis > 0 ? parsiustiDydis / parsiustiKiekis : 0;
-    const visuDydis = vidutinisDydis * visiKiekis;
-    const neparsiustiDydis = visuDydis - parsiustiDydis;
-    const klaidaDydis = vidutinisDydis * klaidaKiekis;
-
-    statistika.kiekiai = {
-        visi: visiKiekis,
-        parsiusti: parsiustiKiekis,
-        klaida: klaidaKiekis,
-        neparsiusti: neparsiustiKiekis,
-    };
-
-    statistika.dydziai = {
-        visi: parseFloat(visuDydis.toFixed(2)),
-        parsiusti: parseFloat(parsiustiDydis.toFixed(2)),
-        klaida: parseFloat(klaidaDydis.toFixed(2)),
-        neparsiusti: parseFloat(neparsiustiDydis.toFixed(2)),
-    };
-
-    statistika.atnaujinta = new Date();
-}
-
-setInterval(atnaujintiStatistika, 1000 * 60 * 5); // kas 5 min.
-atnaujintiStatistika(); // paleidimas iš karto
-
-failasRouter.get("/failas", async (req, res) => {
-    let humanStatistika = structuredClone(statistika);
-    humanStatistika.dydziai = Object.fromEntries(
-        Object.entries(humanStatistika.dydziai).map(([key, value]) => {
-            if (value < 1024) {
-                return [key, `${value} B`];
-            } else if (value < 1024 * 1024) {
-                return [`${key}`, `${(value / 1024).toFixed(2)} KB`];
-            } else if (value < 1024 * 1024 * 1024) {
-                return [`${key}`, `${(value / (1024 * 1024)).toFixed(2)} MB`];
-            } else {
-                return [
-                    `${key}`,
-                    `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`,
-                ];
-            }
-        }),
-    );
-
-    // Render the failai page with the statistics
-    res.render("failai/failai", {
-        title: "Failai",
-        statistika: humanStatistika,
-        customHead: config.customHead,
-    });
-});
 
 failasRouter.get("/failas.png", async (req, res) => {
     return await serveOpenGraphImage(

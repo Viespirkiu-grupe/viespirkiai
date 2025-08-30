@@ -1,16 +1,18 @@
 <style>
 .failu-statistika {
+    margin-block: 16px;
     display: grid;
     grid-template-areas:
+        "pavadinimas pavadinimas pavadinimas"
         "visi parsiusti diagrama"
         "klaida neparsiusti diagrama";
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 1rem;
 }
 
 @media (max-width: 600px) {
     .failu-statistika {
         grid-template-areas:
+            "pavadinimas pavadinimas"
             "diagrama diagrama"
             "visi parsiusti"
             "klaida neparsiusti";
