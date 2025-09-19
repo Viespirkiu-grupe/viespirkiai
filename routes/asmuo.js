@@ -1,12 +1,29 @@
 import express from "express";
 import config from "../utils/config.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
-import { viespirkiai } from "../mongo/mongoDb.js";
 import { postgres } from "../postgres/postgres.js";
+import { gautiAdresoKoordinatesPagalId } from "./asmuoDalys/adresai.js";
+import { gautiSodrosDuomenis } from "./asmuoDalys/sodra.js";
+import { gautiVmiDuomenis } from "./asmuoDalys/vmi.js";
+import { gautiRegitrosDuomenis } from "./asmuoDalys/regitra.js";
+import { gautiTeismoNuosprendzius } from "./asmuoDalys/teismoNuosprendziai.js";
+import { gautiSutarciuDuomenis } from "./asmuoDalys/sutartys.js";
+import { gautiFinansuDuomenis } from "./asmuoDalys/finansai.js";
+import { gautiIstatiniKapitala } from "./asmuoDalys/istatinisKapitalas.js";
+import { gautiDarboSkelbimus } from "./asmuoDalys/darboSkelbimai.js";
+import { gautiDarboGrafikaPagalSutarciuRedagavima } from "./asmuoDalys/darboGrafikas.js";
+import Timings from "../utils/timings.js";
 
 const asmuoRouter = express.Router();
 
 asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
+    // Id turi būti <=9 skaitmenys, jei ne – 404
+    if (!/^\d{1,9}(\.json|\.png)?$/.test(req.params.id)) {
+        return next();
+    }
+
+    let timings = new Timings();
+
     let { id } = req.params;
 
     if (id.endsWith(".json")) {
@@ -16,19 +33,23 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         id = id.slice(0, -4);
     }
 
+    timings.start("jar");
     // Detalus JAR
     const { rows: jarRezultatai } = await postgres.query(
         `SELECT * FROM "jarCsv" WHERE "jarKodas" = $1`,
         [id],
     );
+    timings.end("jar");
 
     // data.gov.lt ID JAR
     let jarId;
 
+    timings.start("jarCsv");
     const jarRes = await postgres.query(
         `SELECT "id" FROM "jar" WHERE "jarKodas" = $1`,
         [id],
     );
+    timings.end("jarCsv");
 
     if (jarRes.rows && jarRes.rows.length > 0) {
         jarId = jarRes.rows[0].id;
@@ -95,377 +116,55 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
     jar.duomenuData = new Date(jar.duomenuData).toLtDate();
     jar.statusasNuo = new Date(jar.statusasNuo).toLtDate();
 
-    // Adreso koordinatės
-    if (jar.adresoId && jar.adresoId > 0) {
-        const { rows: adresasRezultatai } = await postgres.query(
-            `SELECT latitude, longitude FROM adresai WHERE id = $1`,
-            [jar.adresoId],
-        );
-
-        if (adresasRezultatai.length > 0) {
-            const row = adresasRezultatai[0];
-            jar.koordinates = {
-                y: parseFloat(row.latitude),
-                x: parseFloat(row.longitude),
-            };
-        }
-
-        delete jar.adresoId;
-    }
-
-    // SODRA
-    const { rows: sodraRezultatai } = await postgres.query(
-        `SELECT * FROM sodra WHERE "jarKodas" = $1 ORDER BY "data" ASC`,
-        [id],
-    );
-
-    let sodra;
-    if (sodraRezultatai.length > 0) {
-        const pirmas = sodraRezultatai.at(-1);
-
-        const formatDate = (date) =>
-            `${date}`.slice(0, 4) + "-" + `${date}`.slice(4, 6);
-
-        const naudojamiNaujausi = [
-            "kodas",
-            "jarKodas",
-            "pavadinimas",
-            "savivaldybe",
-            "ekonominesVeiklosKodas",
-            "ekonominesVeiklosPavadinimas",
-            "vidutinisAtlyginimas",
-            "vidutinisAtlyginimas2",
-            "draustieji",
-            "draustieji2",
-            "imokuSuma",
-        ];
-
-        sodra = Object.fromEntries(
-            naudojamiNaujausi.map((key) => [key, pirmas[key]]),
-        );
-
-        sodra.data = formatDate(pirmas.data);
-
-        sodra.bendrasDraustujuSkaicius = pirmas.draustieji + pirmas.draustieji2;
-
-        sodra.bendrasVidutinisAtlyginimas =
-            (pirmas.vidutinisAtlyginimas * pirmas.draustieji +
-                pirmas.vidutinisAtlyginimas2 * pirmas.draustieji2) /
-            sodra.bendrasDraustujuSkaicius;
-
-        sodra.atlyginimuIslaidos = parseFloat(
-            (
-                sodra.bendrasVidutinisAtlyginimas *
-                sodra.bendrasDraustujuSkaicius
-            ).toFixed(2),
-        );
-
-        sodra.duomenys = sodraRezultatai.map((row) => ({
-            data: formatDate(row.data),
-            vidutinisAtlyginimas: row.vidutinisAtlyginimas,
-            draustieji: row.draustieji,
-            vidutinisAtlyginimas2: row.vidutinisAtlyginimas2,
-            draustieji2: row.draustieji2,
-            imokuSuma: row.imokuSuma,
-        }));
-    }
-
-    // VMI
-    const { rows: mokesciaiRezultatai } = await postgres.query(
-        `SELECT * FROM mokesciai WHERE "jarKodas" = $1 ORDER BY "metai" ASC, "menuo" ASC;`,
-        [id],
-    );
-
-    let mokesciai;
-
-    if (mokesciaiRezultatai.length > 0) {
-        const naujausias = mokesciaiRezultatai.at(-1);
-
-        const naudojamiNaujausi = [
-            "pavadinimas",
-            "jarKodas",
-            "formosPavadinimas",
-            "suma",
-        ];
-
-        mokesciai = {
-            ...Object.fromEntries(
-                naudojamiNaujausi.map((key) => [key, naujausias[key]]),
-            ),
-            data: `${naujausias.metai}-${naujausias.menuo
-                .toString()
-                .padStart(2, "0")}`,
-            duomenuData: new Date(naujausias.duomenuData).toLtDate(),
-
-            duomenys: mokesciaiRezultatai.map((row) => ({
-                data: `${row.metai}-${row.menuo.toString().padStart(2, "0")}`,
-                duomenuData: new Date(row.duomenuData).toLtDate(),
-                suma: row.suma,
-            })),
-        };
-    }
-
-    let regitra = [];
-    const { rows } = await postgres.query(
-        `SELECT * FROM regitra WHERE "jarKodas" = $1 ORDER BY "pirmosiosRegistracijosData" ASC;`,
-        [id],
-    );
-
-    regitra = rows;
-
-    let { rows: teismoNuosprendziai } = await postgres.query(
-        `SELECT b.*, bd.*
-         FROM "bylos" b
-         JOIN "bylosDalyviai" bd ON bd."bylosId" = b.id
-         WHERE bd."kodas" = $1
-         ORDER BY b."data" DESC`,
-        [id],
-    );
-
-    // Formatuojame teismo nuosprendžius
-    teismoNuosprendziai = teismoNuosprendziai.map((nuosprendis) => {
-        return {
-            ...nuosprendis,
-            // bylojeKaip	rašyti iš didžiosios
-            bylojeKaip: nuosprendis.bylojeKaip
-                ? nuosprendis.bylojeKaip.charAt(0).toUpperCase() +
-                  nuosprendis.bylojeKaip.slice(1)
-                : "",
-            bylosRusis: nuosprendis.bylosRusis
-                ? nuosprendis.bylosRusis.charAt(0).toUpperCase() +
-                  nuosprendis.bylosRusis.slice(1)
-                : "",
-        };
-    });
-
-    let sutartys = {
-        pirkejas: [],
-        tiekejas: [],
+    const taskMap = {
+        adresai: async () => {
+            if (jar.adresoId && jar.adresoId > 0) {
+                jar.koordinates = await gautiAdresoKoordinatesPagalId(
+                    jar.adresoId,
+                );
+            }
+            delete jar.adresoId;
+        },
+        sodra: async () => gautiSodrosDuomenis(id),
+        vmi: async () => gautiVmiDuomenis(id),
+        regitra: async () => gautiRegitrosDuomenis(req, id),
+        teismoNuosprendziai: async () => gautiTeismoNuosprendzius(req, id),
+        sutartys: async () => gautiSutarciuDuomenis(id),
+        finansai: async () => gautiFinansuDuomenis(jarId),
+        istatinisKapitalas: async () => gautiIstatiniKapitala(jarId),
+        darboSkelbimai: async () => gautiDarboSkelbimus(req, id),
+        darboGrafikas: async () => gautiDarboGrafikaPagalSutarciuRedagavima(id),
     };
 
-    let pirkimaiCursor = viespirkiai.find({
-        perkanciosiosOrganizacijosKodas: String(id),
-    });
-
-    sutartys.pirkejas = await pirkimaiCursor.toArray();
-
-    let tiekimaiCursor = viespirkiai.find({
-        tiekejoKodas: String(id),
-    });
-
-    sutartys.tiekejas = await tiekimaiCursor.toArray();
-
-    function getYearlyTotals(contracts) {
-        const totals = {};
-        contracts.forEach((c) => {
-            if (c.tipas === "SP") return; // skip SP contracts
-            const year = new Date(c.sudarymoData).getFullYear();
-            if (!totals[year]) totals[year] = 0;
-            totals[year] += c.verte || 0;
-        });
-        // Convert to array of objects sorted by year, rounding totals
-        return Object.entries(totals)
-            .map(([year, total]) => ({
-                year: Number(year),
-                total: Math.round(total * 100) / 100,
-            }))
-            .sort((a, b) => a.year - b.year);
-    }
-
-    function getTop10ByjarKodas(contracts, jarKodasField) {
-        const sums = {};
-        contracts.forEach((c) => {
-            if (c.tipas === "SP") return; // skip SP contracts
-            const jarKodas = c[jarKodasField];
-            if (!sums[jarKodas]) sums[jarKodas] = 0;
-            sums[jarKodas] += c.verte || 0;
-        });
-        // Convert to array of { jarKodas, total }, round totals, sort descending
-        return Object.entries(sums)
-            .map(([jarKodas, total]) => ({
-                jarKodas,
-                total: Math.round(total * 100) / 100,
-            }))
-            .sort((a, b) => b.total - a.total)
-            .slice(0, 10);
-    }
-
-    // Usage with your data:
-    const pirkimaiKasMetus = getYearlyTotals(sutartys.pirkejas);
-    const tiekimaiKasMetus = getYearlyTotals(sutartys.tiekejas);
-
-    const topTiekejai = getTop10ByjarKodas(sutartys.pirkejas, "tiekejoKodas");
-    const topPirkejai = getTop10ByjarKodas(
-        sutartys.tiekejas,
-        "perkanciosiosOrganizacijosKodas",
+    // Run all tasks in parallel with timings
+    const timedTasks = Object.fromEntries(
+        Object.entries(taskMap).map(([key, fn]) => [
+            key,
+            (async () => {
+                timings.start(key);
+                const result = await fn();
+                timings.end(key);
+                return result;
+            })(),
+        ]),
     );
 
-    for (let topTiekejoId in topTiekejai) {
-        if (specAtvejai[topTiekejai[topTiekejoId].jarKodas]) {
-            topTiekejai[topTiekejoId].pavadinimas =
-                specAtvejai[topTiekejai[topTiekejoId].jarKodas].pavadinimas;
-            continue;
-        }
-        const { rows: jarTiekejoRezultatai } = await postgres.query(
-            `SELECT * FROM "jarCsv" WHERE "jarKodas" = $1`,
-            [topTiekejai[topTiekejoId].jarKodas],
-        );
+    const results = await Promise.allSettled(Object.values(timedTasks));
 
-        if (jarTiekejoRezultatai.length > 0) {
-            topTiekejai[topTiekejoId].pavadinimas =
-                jarTiekejoRezultatai[0].pavadinimas;
-        } else {
-            topTiekejai[topTiekejoId].pavadinimas = "Nežinomas";
-        }
-    }
+    // Map results back to keys cleanly
+    const data = Object.fromEntries(
+        Object.keys(timedTasks).map((key, i) => [
+            key,
+            results[i].status === "fulfilled" ? results[i].value : null,
+        ]),
+    );
 
-    for (let topPirkejoId in topPirkejai) {
-        if (specAtvejai[topPirkejai[topPirkejoId].jarKodas]) {
-            topPirkejai[topPirkejoId].pavadinimas =
-                specAtvejai[topPirkejai[topPirkejoId].jarKodas].pavadinimas;
-            continue;
-        }
-
-        if (!topPirkejai[topPirkejoId].jarKodas) {
-            topPirkejai[topPirkejoId].pavadinimas = "Nežinomas";
-            continue;
-        }
-
-        const { rows: jarPirkejoRezultatai } = await postgres.query(
-            `SELECT * FROM "jarCsv" WHERE "jarKodas" = $1`,
-            [topPirkejai[topPirkejoId].jarKodas],
-        );
-
-        if (jarPirkejoRezultatai.length > 0) {
-            topPirkejai[topPirkejoId].pavadinimas =
-                jarPirkejoRezultatai[0].pavadinimas;
-        } else {
-            topPirkejai[topPirkejoId].pavadinimas = "Nežinomas";
-        }
-    }
-
-    // Finansinės ataskaitos
-    let finansinesAtaskaitos = {};
-
-    if (jarId) {
-        const balansoRes = await postgres.query(
-            `SELECT *
-                 FROM "balansoAtaskaitos"
-                 WHERE "jarId" = $1
-                 ORDER BY "laikotarpisNuo" DESC, "lineTypeId" ASC`,
-            [jarId],
-        );
-
-        if (balansoRes.rows && balansoRes.rows.length > 0) {
-            finansinesAtaskaitos.balansai = balansoRes.rows;
-        }
-
-        const pelnoNuostoliuRes = await postgres.query(
-            `SELECT *
-                 FROM "pelnoNuostoliuAtaskaitos"
-                 WHERE "jarId" = $1
-                 ORDER BY "laikotarpisNuo" DESC, "lineTypeId" ASC`,
-            [jarId],
-        );
-
-        if (pelnoNuostoliuRes.rows && pelnoNuostoliuRes.rows.length > 0) {
-            finansinesAtaskaitos.pelnasNuostoliai = pelnoNuostoliuRes.rows;
-        }
-
-        const sentenceCase = (text) =>
-            text
-                .replace(/([^.!?]*[.!?]*)/g, (sentence) =>
-                    sentence.trim()
-                        ? sentence.trim().charAt(0).toUpperCase() +
-                          sentence.trim().slice(1).toLowerCase() +
-                          " "
-                        : "",
-                )
-                .trim();
-
-        const grouped = {};
-
-        // iterate both types
-        for (const type of ["balansai", "pelnasNuostoliai"]) {
-            for (const entry of finansinesAtaskaitos?.[type] || []) {
-                // key by period + submission date + template
-                const key = `${entry.laikotarpisNuo}_${entry.laikotarpisIki}_${entry.duomenuData}_${entry.templateId}`;
-
-                // create or overwrite period object
-                grouped[key] = grouped[key] || {
-                    laikotarpisNuo: entry.laikotarpisNuo,
-                    laikotarpisIki: entry.laikotarpisIki,
-                    duomenuData: entry.duomenuData,
-                    templateId: entry.templateId,
-                    templateName: sentenceCase(entry.templateName),
-                    standards: {},
-                };
-
-                // ensure standard object exists
-                const standards = grouped[key].standards;
-                standards[entry.standardId] = standards[entry.standardId] || {
-                    standardId: entry.standardId,
-                    standardName: sentenceCase(entry.standardName),
-                    lines: [],
-                };
-
-                // push only relevant fields
-                standards[entry.standardId].lines.push({
-                    lineTypeId: entry.lineTypeId,
-                    lineName: sentenceCase(entry.lineName),
-                    reiksme: entry.reiksme,
-                });
-            }
-        }
-
-        finansinesAtaskaitos = Object.values(grouped).map((period) => ({
-            ...period,
-            standards: Object.values(period.standards),
-        }));
-    }
-
-    // Istatinis kapitalas
-    let istatinisKapitalas = {};
-
-    if (jarId) {
-        const istatinisKapitalasRes = await postgres.query(
-            `SELECT data, reiksme, valiuta
-                 FROM "istatinisKapitalas"
-                 WHERE "jarId" = $1
-                 ORDER BY "data" DESC`,
-            [jarId],
-        );
-
-        // Overwrite valiuta Lt → LTL, Eur → EUR
-        istatinisKapitalasRes.rows.forEach((row) => {
-            if (row.valiuta === "Lt") row.valiuta = "LTL";
-            else if (row.valiuta === "Eur") row.valiuta = "EUR";
-        });
-
-        if (
-            istatinisKapitalasRes.rows &&
-            istatinisKapitalasRes.rows.length > 0
-        ) {
-            istatinisKapitalas = { ...istatinisKapitalasRes.rows[0] }; // clone row 0
-            istatinisKapitalas.duomenys = istatinisKapitalasRes.rows; // safe, no self-ref
-        }
-    }
+    res.setHeader("Server-Timing", timings.serverTiming());
 
     // Asmuo
     let asmuo = {
         jar,
-        sodra,
-        mokesciai,
-        regitra,
-        teismoNuosprendziai,
-        sutartys: {
-            pirkimaiKasMetus,
-            tiekimaiKasMetus,
-            topPirkejai,
-            topTiekejai,
-        },
-        finansinesAtaskaitos,
-        istatinisKapitalas,
+        ...data,
     };
 
     // JSON

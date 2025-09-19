@@ -1,5 +1,5 @@
 # Viešpirkiai
 
-https://viespirkiai.top projekto kodas.
+Pilietinės iniciatyvos Viešpirkiai puslapio https://viespirkiai.top kodas.
 
-![](./brandingas/viešpirkiai.png)
+Daugiau informacijos el. paštu viespirkiai@viespirkiai.top

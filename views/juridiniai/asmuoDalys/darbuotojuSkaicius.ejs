@@ -1,18 +1,8 @@
-<% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
-    <script defer>
-        const sodraLabels = [
-        <% asmuo.sodra.duomenys.forEach((item, i) => { %>
-            '<%= item.data %>-01'<%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
-        <% }) %>
-        ];
-    </script>
-<% } %>
-
 <h2 style="margin-bottom: 0px;"><u>Darbuotojų skaičius</u></h2>
 <div class="col-2 mobile-col-1" id="darbuotojai">
     <section style="width: 100%;">
         <h3>Darbo sutartys, valstybės tarnautojai</h3>
-        <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
+        <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0 && asmuo.sodra.turejoDraustuju) { %>
             <div id="darbuotojuSkaiciausDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
 
             <script defer>
@@ -30,7 +20,7 @@
     </section>
     <section style="width: 100%;">
         <h3>Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
-        <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
+        <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0 && asmuo.sodra.turejoDraustuju2) { %>
             <div id="darbuotojuSkaiciausIIDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
 
             <script defer>

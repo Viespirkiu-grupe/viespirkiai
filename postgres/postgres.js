@@ -17,7 +17,7 @@ export const postgres = new Pool({
     password: config.pgPassword,
     database: config.pgDatabase,
     port: config.pgPort,
-    max: 10, // max connections
+    max: 50, // max connections
     idleTimeoutMillis: 30000, // close idle clients after 30s
     connectionTimeoutMillis: 2000, // fail if connection takes longer
 });

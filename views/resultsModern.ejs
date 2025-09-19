@@ -16,27 +16,63 @@
     </div>
 
     <% data.forEach(item => { %>
-        <div class="rezultatas">
-            <div class="rezultatas-top">
-                <span><%= item.tipas %></span>
-                <span><%= item.kategorija %></span>
-                <span>
-                    <% if (item.paskutinioRedagavimoData) { %>
-                        <%= item.paskutinioRedagavimoData %>
-                    <% } else { %>
-                        -
-                    <% } %>
-                </span>
-                <span>
-                    <% if (item.dokumentuKiekis === 0) { %>
+        <article class="rezultatas" aria-label="<%= item.tipoPavadinimas %>">
+            <dl class="rezultatas-top">
+              <div>
+                <dt class="visually-hidden">Tipas</dt>
+                <dd><%= item.tipas %></dd>
+              </div>
 
-                    <% } else { %>
-                        <%= item.dokumentuKiekis %> dok.
-                    <% } %>
-                </span>
+              <div>
+                <dt class="visually-hidden">Kategorija</dt>
+                <dd><%= item.kategorija %></dd>
+              </div>
 
-            </div>
-            <div class="rezultatas-title">
+              <div>
+                <dt class="visually-hidden">Sutarties galiojimas</dt>
+                <dd>
+                  <abbr aria-hidden="true" title="Sutarties galiojimas">Sut.</abbr>
+                  <% if(item.sudarymoData && item.galiojimoData) {  %>
+                    <% let sudarymoData = new Date(item.sudarymoData).toISOString().slice(0,10); %>
+                    <% let galiojimoData = new Date(item.galiojimoData).toISOString().slice(0,10); %>
+
+                    <% if(sudarymoData == galiojimoData) { %>
+                      <time datetime="<%= sudarymoData %>"><%= sudarymoData %></time>
+                    <% } else { %>
+                      <time datetime="<%= sudarymoData %>"><%= sudarymoData %></time> –
+                      <time datetime="<%= galiojimoData %>"><%= galiojimoData %></time>
+                    <% } %>
+                  <% } else { %>
+                    -
+                  <% } %>
+                </dd>
+              </div>
+
+              <div>
+                <dt class="visually-hidden">Redagavimo data</dt>
+                <dd>
+                  <abbr aria-hidden="true" title="Redagavimo data">Red.</abbr>
+                  <% if (item.paskutinioRedagavimoData) { %>
+                    <time datetime="<%= item.paskutinioRedagavimoData %>"><%= item.paskutinioRedagavimoData %></time>
+                  <% } else { %>
+                    -
+                  <% } %>
+                </dd>
+              </div>
+
+              <div>
+                <dt class="visually-hidden">Dokumentai</dt>
+                <dd>
+                  <% if (item.dokumentuKiekis === 0) { %>
+                    <span class="visually-hidden">Nėra</span>
+                  <% } else { %>
+                    <%= item.dokumentuKiekis %> <abbr aria-hidden="true" title="Dokumentai">dok.</abbr>
+                  <% } %>
+                </dd>
+              </div>
+            </dl>
+
+            <h3 class="rezultatas-title">
                 <a href="/pirkimas/<%= item.sutartiesUnikalusID %>">
                     <span>
                         <%
@@ -56,7 +92,7 @@
                         <% } %>
                     </span>
                 </a>
-            </div>
+            </h3>
             <div class="rezultatas-bottom">
                 <span>
                     <b> Pirkėjas: </b>
@@ -67,7 +103,7 @@
                     <a href="/asmuo/<%= item.tiekejoKodas %>"><%= item.tiekejas || "Nenurodytas" %></a>
                 </span>
             </div>
-        </div>
+        </article>
     <% }); %>
 </div>
 

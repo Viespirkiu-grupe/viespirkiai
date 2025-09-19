@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="lt">
+	<head>
+	<%- include('../head.ejs', {
+        pageTitle: "Failų paieška",
+        pageDescription: ``,
+        pageImage: `https://viespirkiai.top/failai.png`,
+        customHead
+    }) %>
+	</head>
+	<body>
+		<%- include('../header.ejs', {hideSubtext: false}) %>
+		<main>
+			<%- include('search.ejs', {values}) %>
+			<section id="failaiRezultatai">
+                <% if(typeof data !== "undefined") { %>
+    			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti, search}) %>
+                <% } else { %>
+                    <script>
+                      window.addEventListener('DOMContentLoaded', () => {
+                        const search = document.getElementById('search');
+                        if (search) search.focus();
+                      });
+                    </script>
+                    <div class="col-3 mobile-col-1" style="text-align: center; margin-top: 64px; margin-bottom: 48px;">
+                        <section>
+                            <h3><u>Indeksuoti</u></h3>
+                            <div style="font-size: 48px; font-weight: bold; margin-bottom: 18px;">
+                                <%= (statistika.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2) %>%
+                            </div>
+                            <div style="font-size: 18px; margin-bottom: 18px;">
+                                <%= Number(statistika.nuskaitymas.zodziai.total).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
+                            </div>
+                            <div style="font-size: 18px; margin-bottom: 18px;">
+                                <%= Number(statistika.nuskaitymas.zodziai.failuSuZodziaisDalis/100 * statistika.failai.kiekiai.visi).linksniuoti(["failas", "failai", "failų", "failo"]) %>
+                            </div>
+                            <div style="font-size: 24px; margin-bottom: 18px;">
+                                <%= Number(Number(statistika.failai.dydziai.visi * (statistika.nuskaitymas.zodziai.failuSuZodziaisDalis/100)).toFixed(2)).convertUnit({from: "B", to: "GB"}) %>
+                            </div>
+                        </section>
+                        <section>
+                            <h3><u>Parsiųsti</u></h3>
+                            <div style="font-size: 48px; font-weight: bold; margin-bottom: 18px;">
+                                <%= ((statistika.failai.kiekiai.parsiusti / statistika.failai.kiekiai.visi)*100).toFixed(2) %>%
+                            </div>
+                            <div style="font-size: 18px; margin-bottom: 18px;">
+                                <%= Number(Number(statistika.failai.kiekiai.parsiusti * statistika.nuskaitymas.zodziai.vidurkisNeNulis).toFixed(0)).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>*
+                            </div>
+                            <div style="font-size: 18px; margin-bottom: 18px;">
+                                <%= Number(statistika.failai.kiekiai.parsiusti).linksniuoti(["failas", "failai", "failų", "failo"]) %>
+                            </div>
+                            <div style="font-size: 24px; margin-bottom: 18px;">
+                                <%= Number(Number(statistika.failai.dydziai.parsiusti).toFixed(2)).convertUnit({from: "B", to: "GB"}) %>
+                            </div>
+                        </section>
+                        <section>
+                            <h3><u>Neparsiųsti</u></h3>
+                            <div style="font-size: 48px; font-weight: bold; margin-bottom: 18px;">
+                                <%= (((statistika.failai.kiekiai.neparsiusti / statistika.failai.kiekiai.visi))*100).toFixed(2) %>%
+                            </div>
+                            <div style="font-size: 18px; margin-bottom: 18px;">
+                                <%= Number(Number(statistika.failai.kiekiai.neparsiusti * statistika.nuskaitymas.zodziai.vidurkisNeNulis).toFixed(0)).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>*
+                            </div>
+                            <div style="font-size: 18px; margin-bottom: 18px;">
+                                <%= Number(statistika.failai.kiekiai.neparsiusti).linksniuoti(["failas", "failai", "failų", "failo"]) %>
+                            </div>
+                            <div style="font-size: 24px; margin-bottom: 18px;">
+                                <%= Number(Number(statistika.failai.dydziai.neparsiusti).toFixed(2)).convertUnit({from: "B", to: "GB"}) %>*
+                            </div>
+                        </section>
+                    </div>
+                    <div class="col-3 mobile-col-1">
+                        <section></section>
+                        <section style="text-align: center; font-size: 14px; color: #666; margin-bottom: 48px;">
+                            * Tikėtini skaičiai<br><br>
+                                Šiuo metu indeksuojami tik PDF failai turintys teksto sluoksnį.<br><br>
+                                Teksto paieška vykdoma ieškant faile visų paminėtų žodžių. <br> Jeigu svarbu, kad žodžiai būtų iš eilės – apsupkite paieškos užklausą kabutėmis. <br><br>
+                                Iš anksto atsiprašome už sistemos greitį ir linkime kantrybės.
+
+                        </section>
+                        <section></section>
+                    </div>
+
+                <% } %>
+			</section>
+		</main>
+		<%- include('../footer.ejs') %>
+	</body>
+</html>

@@ -1,5 +1,4 @@
 import Typesense from "typesense";
-import { viespirkiai } from "../mongo/mongoDb.js";
 import config from "../utils/config.js";
 
 const client = new Typesense.Client({
@@ -71,14 +70,11 @@ export async function ensureSearchCollection() {
             // Ištriname esamą kolekciją ir sukuriame naują su atnaujinta schema
             await client.collections(COLLECTION).delete();
             await client.collections().create(schema);
-
-            migrateAllDocumentsToTypesenseFromCollection(viespirkiai); // FUNKCIJA NEEGZISTUOJA
         }
     } catch (err) {
         // Jei kolekcija neegzistuoja, sukuriame ją
         console.log("[Typesense] Collection not found, creating...");
         await client.collections().create(schema);
-        migrateAllDocumentsToTypesenseFromCollection(viespirkiai); // FUNKCIJA NEEGZISTUOJA
     }
 
     collectionInitialized = true;
@@ -146,6 +142,62 @@ export async function addDocumentToSearch(doc) {
 }
 
 /**
+ * Prideda kelis dokumentus į Typesense paieškos kolekciją.
+ * @param {Object[]} docs - Dokumentų masyvas
+ * @returns {Promise<void>}
+ * @throws {Error} Jei nepavyksta pridėti dokumentų
+ */
+export async function addDocumentsToSearch(docs) {
+    if (!Array.isArray(docs) || docs.length === 0) return;
+
+    const tsDocs = docs.map((doc) => ({
+        id: doc.sutartiesUnikalusID?.toString() || "",
+
+        tipas: doc.tipas || "",
+        pavadinimas: doc.pavadinimas || "",
+        kategorija: doc.kategorija || "",
+
+        perkanciojiOrganizacija: doc.perkanciojiOrganizacija || "",
+        perkanciosiosOrganizacijosKodas:
+            doc.perkanciosiosOrganizacijosKodas || "",
+
+        tiekejas: doc.tiekejas || "",
+        tiekejoKodas: doc.tiekejoKodas || "",
+
+        verte: typeof doc.verte === "number" ? doc.verte : 0,
+        faktineIvykdimoVerte:
+            typeof doc.faktineIvykdimoVerte === "number"
+                ? doc.faktineIvykdimoVerte
+                : 0,
+
+        sudarymoData: toUnixTimestamp(doc.sudarymoData),
+        galiojimoData: toUnixTimestamp(doc.galiojimoData),
+        paskelbimoData: toUnixTimestamp(doc.paskelbimoData),
+        paskutinioAtnaujinimoData: toUnixTimestamp(
+            doc.paskutinioAtnaujinimoData,
+        ),
+        paskutinioRedagavimoData: toUnixTimestamp(doc.paskutinioRedagavimoData),
+        faktineIvykdimoData: toUnixTimestamp(doc.faktineIvykdimoData),
+
+        bvpzKodas: doc.bvpzKodas || "",
+        bvpzPavadinimas: doc.bvpzPavadinimas || "",
+
+        sutartiesNumeris: doc.sutartiesNumeris || "",
+        sutartiesUnikalusID:
+            typeof doc.sutartiesUnikalusID === "number"
+                ? doc.sutartiesUnikalusID
+                : 0,
+
+        dokumentuKiekis: doc.dokumentuKiekis || 0,
+    }));
+
+    return client
+        .collections(COLLECTION)
+        .documents()
+        .import(tsDocs, { action: "upsert" });
+}
+
+/**
  * Ieško dokumentų pagal užklausą.
  * @param {string} query - Paieškos užklausa
  * @param {Object} options - Papildomi paieškos parametrai
@@ -207,6 +259,11 @@ const jar_schema = {
 
 let jarCollectionInitialized = false;
 
+/**
+ * Užtikrina, kad JAR Typesense kolekcija būtų sukurta ir atnaujinta.
+ * Jei kolekcija jau egzistuoja, bet schema nesutampa, ji bus perrašyta.
+ * @returns {Promise<void>}
+ */
 export async function ensureJarCollection() {
     if (jarCollectionInitialized) return;
 
@@ -242,6 +299,12 @@ export async function ensureJarCollection() {
     jarCollectionInitialized = true;
 }
 
+/**
+ * Prideda kelis JAR dokumentus į Typesense paieškos kolekciją.
+ * @param {Object[]} givenArray - Dokumentų masyvas
+ * @returns {Promise<void>}
+ * @throws {Error} Jei nepavyksta pridėti dokumentų
+ */
 export async function addDocumentsToJarSearch(givenArray) {
     let documents = [];
     for (const doc of givenArray) {
@@ -268,6 +331,15 @@ export async function addDocumentsToJarSearch(givenArray) {
         .import(documents, { action: "upsert" });
 }
 
+/** Ieško JAR dokumentų pagal užklausą.
+ * @param {string} query - Paieškos užklausa
+ * @param {Object} options - Papildomi paieškos parametrai
+ * @param {number} options.limit - Rezultatų skaičius vienoje puslapyje (numatytas 50)
+ * @param {number} options.page - Puslapio numeris (numatytas 1)
+ * @param {string} options.sortBy - Rikiavimo kriterijus (numatytas "")
+ * @param {string} options.filterBy - Filtravimo kriterijus (numatytas "")
+ * @returns {Promise<Object>} Paieškos rezultatai ir bendras įrašų skaičius
+ */
 export async function searchJarDocuments(query, options = {}) {
     const { limit = 50, page = 1, sortBy = "", filterBy = "" } = options;
 

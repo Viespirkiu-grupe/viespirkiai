@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="lt">
+	<head>
+	<%- include('../head.ejs', {
+        pageTitle: "Failas",
+        pageDescription: ``,
+        pageImage: `https://viespirkiai.top/failai.png`,
+        customHead
+    }) %>
+	</head>
+	<body>
+		<%- include('../header.ejs', {hideSubtext: false}) %>
+		<main>
+            <% if(failas.metaduomenys && failas.metaduomenys.Title) { %>
+			    <i><%= failas.pavadinimas %></i>
+			<% } %>
+			<h1>
+			    <%= failas.metaduomenys.Title || failas.pavadinimas %>
+			</h1>
+		    <div class="col-2-strict mobile-col-1" style="gap: 16px;">
+				<section>
+    				<div>
+         			    <a href="/failas/<%= failas.dokId %>/<%= failas.fileId %>.json">↗ JSON</a>
+    				</div>
+                    <div>
+                       <h2 style="margin-bottom: 0px;"><u>Failas</u></h2>
+                       <div class="col-2-strict">
+                           <div>
+                               <h3>Formatas</h3>
+                               <%= failas.extension %>
+                           </div>
+                           <div>
+                               <h3>Dydis</h3>
+                               <%= failas.dydis.convertUnit("B") %>
+                           </div>
+                           <div>
+                               <h3>MD5</h3>
+                               <span style="overflow-wrap: anywhere; font-family: monospace;"><%= failas.md5 %></span>
+                           </div>
+                           <div>
+                               <h3>Šaltinis</h3>
+                            <a href="/pirkimas/<%= failas.dokId %>">Sutartis <%= failas.dokId %></a>
+                           </div>
+                       </div>
+                    </div>
+                    <div>
+                       <h2 style="margin-bottom: 0px;"><u>Dokumentas</u></h2>
+                       <div class="col-2">
+                           <div>
+                               <h3>Puslapių skaičius</h3>
+                               <%= failas.metaduomenys.pageCount || "-" %>
+                           </div>
+                           <div>
+                               <h3>Žodžių skaičius</h3>
+                               <%= failas.metaduomenys.wordCount || "-" %>
+                           </div>
+                           <div>
+                               <h3>Programa</h3>
+                               <%= failas.metaduomenys.Producer || "-" %>
+                           </div>
+                           <div>
+                               <h3>Autorius</h3>
+                               <%= failas.metaduomenys.Author || "-" %>
+                           </div>
+                       </div>
+                    </div>
+                    <div>
+                       <h2 style="margin-bottom: 0px;"><u>Turinys</u></h2>
+                       <div style="width: 100%; max-width: 90vw;">
+                           <div>
+                               <h3>El. pašto adresai</h3>
+                               <% failas.metaduomenys.emails.forEach(email => { %>
+                                      <div>
+                                          <a href="mailto:<%= email.email %>"><%= email.email %></a>
+                                          <sup>
+                                              <%= email.pages.join(', ') %> psl.
+                                          </sup>
+                                      </div>
+                                <% }) %>
+                               <% if(failas.metaduomenys.emails.length == 0) { %>
+                                   <div>
+                                       <i>El. p. adresų dokumente nerasta</i>
+                                   </div>
+                               <% } %>
+                           </div>
+                           <div>
+                               <h3>Nuorodos</h3>
+                               <% failas.metaduomenys.links
+                                   .filter(link => !link.uri.startsWith('mailto:'))
+                                   .forEach(link => { %>
+                                   <div style="display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; align-items: center;">
+                                       <a href="<%= link.uri %>" target="_blank" title="<%= link.uri %>"
+                                          style="flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                           <%= link.uri %>
+                                       </a>
+                                       <sup style="flex-shrink: 0; margin-left: 4px;">
+                                           <%= link.pages.join(', ') %> psl.
+                                       </sup>
+                                   </div>
+                               <% }) %>
+                               <% if(failas.metaduomenys.links.length == 0) { %>
+                                   <div>
+                                       <i>Nuorodų dokumente nerasta</i>
+                                   </div>
+                               <% } %>
+                           </div>
+                       </div>
+                    </div>
+                    <br>
+				</section>
+				<section>
+                    <% let pdfSearch = query.search || ''; %>
+				    <div>
+                        <a href="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.dokId}/${failas.fileId}/download`) %>#search=<%= encodeURIComponent(pdfSearch) %>">↗ Padidinti</a>
+                        &nbsp;
+                        <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                        &nbsp;
+                        <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
+                        &nbsp;
+                    </div>
+                    <div>
+                        <iframe
+                    src="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.dokId}/${failas.fileId}/download`) %>#search=<%= encodeURIComponent(pdfSearch) %>"
+                    width="100%"
+                    height="800"
+                    style="border: none; height: 70vh; margin-block: 16px; width: 100% !important; max-width: 100% !important; box-sizing: border-box; display: block; overflow-x: hidden !important;"
+                    ></iframe>
+                    </div>
+				</section>
+			</div>
+		</main>
+		<%- include('../footer.ejs') %>
+	</body>
+</html>

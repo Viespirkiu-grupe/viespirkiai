@@ -82,8 +82,8 @@
         return target;
       }
 
-      async function renderChart(elementId, labelData, seriesData, customOptions = {}) {
-        const options = {
+      async function renderChart(elementId, labelData, seriesData, customOptions = {}, noOptions = false) {
+        let options = {
           chart: {
             type: 'line',
             height: 400,
@@ -93,7 +93,6 @@
             },
             fontFamily: 'Ubuntu',
           },
-          series: [{ name: customOptions.seriesName || '', data: seriesData }],
           xaxis: {
                 type: 'datetime',
                 categories: labelData,
@@ -126,12 +125,28 @@
           },
         };
 
+        if(noOptions) {
+            options = {};
+        }
+
+        if(!options.xaxis) options.xaxis = {};
+        options.xaxis.categories = labelData;
+
+        // Check if seriesData is a flat Array
+        if(Array.isArray(seriesData) && (seriesData.length === 0 || typeof seriesData[0] !== 'object')) {
+            options.series = [{ name: customOptions.seriesName || '', data: seriesData }];
+        }else{
+            options.series = seriesData;
+        }
+
         let fullOptions = deepMerge(
           structuredClone(options), // avoid mutating original
           customOptions
         );
 
         await loadApexCharts();
+
+        console.log(elementId, fullOptions)
 
         const chart = new ApexCharts(document.querySelector('#' + elementId), fullOptions);
         chart.render();
@@ -296,6 +311,15 @@
       </div>
 
 
+      <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0) { %>
+          <script defer>
+              const sodraLabels = [
+              <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+                  '<%= item.data %>-01'<%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+              <% }) %>
+              ];
+          </script>
+      <% } %>
 
        <%- include("asmuoDalys/vidutinisDarboUzmokestis.ejs") %>
 
@@ -305,13 +329,18 @@
 
        <%- include("asmuoDalys/sutartys.ejs") %>
 
-       <%- include("asmuoDalys/regitra.ejs") %>
-
-       <%- include("asmuoDalys/teismoNuosprendziai.ejs") %>
+       <%- include("asmuoDalys/darboGrafikas.ejs") %>
 
        <%- include("asmuoDalys/istatinisKapitalas.ejs") %>
 
        <%- include("asmuoDalys/finansinesAtaskaitos.ejs") %>
+
+       <%- include("asmuoDalys/darboSkelbimai.ejs") %>
+
+       <%- include("asmuoDalys/regitra.ejs") %>
+
+       <%- include("asmuoDalys/teismoNuosprendziai.ejs") %>
+
 
 	</main>
     <%- include('../footer.ejs') %>

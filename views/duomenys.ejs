@@ -19,21 +19,24 @@
 				Jie yra bendrinami siekiant padidinti viešųjų pirkimų skaidrumą ir padidinti valstybinių duomenų prieinamumą.
 			</p>
 
-			<section>
-				<h2>Pavieniai pirkimai</h2>
-				<p>
-					Pavienių pirkimų duomenys pasiekiami .json formatu pagal sutarties unikalų ID. Pvz.:
-					<pre><a href="https://viespirkiai.top/pirkimas/2007700250.json">https://viespirkiai.top/pirkimas/<i><b>2007700250</b></i>.json</a></pre>
-				</p>
-			</section>
+			<h2>API</h2>
+			<div class="col-2 mobile-col-1">
+    			<section>
+    				<h3>Pavieniai pirkimai</h3>
+    				<p>
+    					Pavienių pirkimų duomenys pasiekiami .json formatu pagal sutarties unikalų ID. Pvz.:
+    					<pre><a href="https://viespirkiai.top/pirkimas/2007700250.json">https://viespirkiai.top/pirkimas/<i><b>2007700250</b></i>.json</a></pre>
+    				</p>
+    			</section>
 
-			<section>
-				<h2>Juridiniai asmenys</h2>
-				<p>
-					Juridinių asmenų duomenys pasiekiami .json formatu pagal juridinio asmens JAR kodą. Pvz.:
-					<pre><a href="https://viespirkiai.top/asmuo/110053842.json">https://viespirkiai.top/asmuo/<i><b>110053842</b></i>.json</a></pre>
-				</p>
-			</section>
+    			<section>
+    				<h3>Juridiniai asmenys</h3>
+    				<p>
+    					Juridinių asmenų duomenys pasiekiami .json formatu pagal juridinio asmens JAR kodą. Pvz.:
+    					<pre><a href="https://viespirkiai.top/asmuo/110053842.json">https://viespirkiai.top/asmuo/<i><b>110053842</b></i>.json</a></pre>
+    				</p>
+    			</section>
+            </div>
 
 			<section>
 				<h2>Duomenų eksportai</h2>
@@ -55,72 +58,97 @@
 						<% }); %>
 					</tbody>
 				</table>
-				<br>
-				Neradote ko ieškote? Susisiekite <a href="mailto:sveiki@viespirkiai.top">sveiki@viespirkiai.top</a>
+				Nėra norimo duomenų eksporto? <a href="/kontaktai">Susisiekite</a>.
 			</section>
+			<br>
 
 			<section>
 				<h2 id="duomenu-saltiniai">Duomenų šaltiniai</h2>
-				<ul>
-					<li>
-						Intitucijų viešųjų pirkimų sutartys:
-						<ul>
-							<li>
-								<a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109"> Viešųjų pirkimų tarnyba </a>
-							</li>
-						</ul>
-					</li>
-					<li>
-						Juridinių asmenų informacija:
-						<ul>
-							<li>
-								<a href="https://atvira.sodra.lt/imones/rinkiniai/index.html">SODRA</a>
-							</li>
-							<li>
-								<a href="https://data.gov.lt/datasets/673/">VMI / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
-							</li>
-							<li>
-								<a href="https://data.gov.lt/datasets/1484/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
-							</li>
-							<li>
-								<a href="https://data.gov.lt/datasets/1806/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
-							</li>
-							<li>
-								<a href="https://data.gov.lt/datasets/1666/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
-							</li>
-							<li>
-								<a href="https://data.gov.lt/datasets/1570/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
-							</li>
-						</ul>
-					</li>
-					<li>
-						Adresų informacija:
-						<ul>
-							<li>
-								<a href="https://data.gov.lt/datasets/1287/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
-							</li>
-							<li>
-								WGS84 koordinatės iš <a href="https://nominatim.org/">Nominatim</a> (© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>)
-							</li>
-						</ul>
-					</li>
-					<li>
-					    Juridinių asmenų transporto priemonių informacija:
-					    <ul>
-							<li>
-							    <a href="https://www.regitra.lt/imone/atviri-duomenys/">Regitra</a>
-							</li>
-						</ul>
-					</li>
-					<li>
-					    Teismo nuosprendžių informacija:
-					    <ul>
-							<li>
-							    <a href="https://liteko.teismai.lt/viesasprendimupaieska/detalipaieska.aspx?detali=2">LITEKO</a>
-							</li>
-						</ul>
-					</li>
-				</ul>
+				<p>
+				    Šioje svetainėje pateikiami duomenys yra surenkami iš viešai prieinamų šaltinių. <br>
+					Informaciją mes vizualizuojame ir pateikiame patogesne forma.
+				</p>
+				<div class="col-2-flex mobile-col-1">
+					<section>
+					    <h3>Juridinių asmenų informacija</h3>
+						<h4>Įregistruoti asmenys</h4>
+						<a href="https://data.gov.lt/datasets/1484/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
+
+						<h4>Soclialinis draudimas, atlyginimai, darbuotojai</h4>
+						<a href="https://atvira.sodra.lt/imones/rinkiniai/index.html">Atvira SODRA</a>
+
+						<h4>Mokesčiai</h4>
+						<a href="https://data.gov.lt/datasets/673/">VMI / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
+
+						<h4>Finansai, pelnas, nuostoliai</h4>
+						<a href="https://data.gov.lt/datasets/1806/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)<br>
+						<a href="https://data.gov.lt/datasets/1666/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
+
+						<h4>Įstatinis kapitalas</h4>
+						<a href="https://data.gov.lt/datasets/1570/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
+
+						<h4>Transporto priemonės</h4>
+		                <a href="https://www.regitra.lt/imone/atviri-duomenys/">Regitra</a>
+
+						<h4>Teismo nuosprendžiai</h4>
+		                <a href="https://liteko.teismai.lt/viesasprendimupaieska/detalipaieska.aspx?detali=2">LITEKO</a>
+					</section>
+					<section>
+             			<h3>Viešųjų pirkimų duomenys</h3>
+             			<a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109">CVP IS / Viešųjų pirkimų tarnyba </a>
+              		</section>
+					<section>
+					    <h3>Adresų koordinatės</h3>
+						<h4>Koordinatės, žemėlapiai</h4>
+						<a href="https://nominatim.org/">Nominatim</a> (© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>)<br>
+						<a href="https://openstreetmap.org/">OpenStreetMap</a> (© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>)
+
+						<h4>Vietovių liknsniavimas</h4>
+						<a href="https://data.gov.lt/datasets/1287/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
+					</section>
+				</div>
+			</section>
+			<br>
+			<section>
+				<h2 id="programineIranga">Naudojama programinė įranga</h2>
+				<br>
+				    Visas mūsų projektas pastatytas naudojant atviro kodo programinę įrangą.
+				<div class="col-2 mobile-col-1">
+				    <section>
+						<h3>Operacinė sistema</h3>
+						<a href="https://ubuntu.com/download/server"> Ubuntu Server 24.04 LTS </a>
+					</section>
+					<section>
+					    <h3>Duomenų bazės</h3>
+						<a href="https://www.postgresql.org/">PostgreSQL</a><br>
+						<a href="https://typesense.org/">Typesense</a><br>
+					</section>
+					<section>
+					    <h3>Programavimo kalbos</h3>
+						<a href="https://nodejs.org/en">JavaScript / NodeJS</a><br>
+					</section>
+					<section>
+					    <h3>Failų sistema</h3>
+						<a href="https://en.wikipedia.org/wiki/ZFS">ZFS</a><br>
+					</section>
+					<section>
+					    <h3>Komunikavimo priemonės</h3>
+						<a href="https://www.postfix.org/">Postfix</a><br>
+						<a href="https://signal.org/">Signal</a><br>
+						<a href="https://matrix.org/">Matrix</a><br>
+						<a href="joinmastodon.org">Mastodon</a><br>
+					</section>
+					<section>
+					    <h3>Komandoje naudojami įrankiai</h3>
+						<a href="https://nextcloud.com/">Nextcloud</a><br>
+						<a href="https://www.onlyoffice.com/">OnlyOffice</a><br>
+					</section>
+
+				</div>
+				<p>
+				    Dėkojame visiems, kurie prisideda duomenimis, resursais, patobulinimais ar kitais būdais. <br>
+					Deja, bet šių asmenų negalime minėti.
+				</p>
 			</section>
 		</main>
 		<%- include('footer.ejs') %>

@@ -1,4 +1,3 @@
-import puppeteer from "puppeteer";
 import PQueue from "p-queue";
 import config from "./config.js";
 
@@ -10,6 +9,7 @@ const queue = new PQueue({ concurrency: 4 });
 
 async function initBrowser() {
     if (!browserPromise) {
+        const puppeteer = await import("puppeteer");
         browserPromise = puppeteer.launch({
             headless: "new",
             args: [
@@ -22,6 +22,15 @@ async function initBrowser() {
     return browserPromise;
 }
 
+/**
+ * Generates an Open Graph image by rendering a local URL with Puppeteer.
+ * Uses a queue to limit concurrency.
+ * @param {string} tipas - Type
+ * @param {string} pavadinimas - Title
+ * @param {string} aprasymas - Description
+ * @param {string} id - ID
+ * @returns {Promise<Buffer>} - PNG image buffer
+ */
 export async function getOpenGraphImage(tipas, pavadinimas, aprasymas, id) {
     return queue.add(async () => {
         const url =

@@ -3,6 +3,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { convertUnit } from "./utils/units.js";
 import { linksniuoti } from "./utils/linksniai.js";
+import { log } from "./utils/log.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
@@ -36,13 +37,18 @@ app.use(express.static(path.join(__dirname, "public")));
 // Cookies
 app.use(cookieParser());
 
-// Auto-load all routes from /routes
+// Auto-load all routes from /routes (in parallel)
 const routesPath = path.join(__dirname, "routes");
-for (const file of fs.readdirSync(routesPath)) {
-    if (file.endsWith(".js")) {
-        const { default: router } = await import(`./routes/${file}`);
-        app.use(router); // Each router defines its own base path
-    }
+const files = fs.readdirSync(routesPath).filter((file) => file.endsWith(".js"));
+
+for (const file of files) {
+    const start = Date.now();
+
+    const { default: router } = await import(`./routes/${file}`);
+    app.use(router);
+
+    const duration = Date.now() - start;
+    log(`${file} loaded in ${duration}ms`);
 }
 
 // 404

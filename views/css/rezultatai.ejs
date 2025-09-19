@@ -76,13 +76,18 @@ section.preResultOptions{
     font-size: 14px;
     color: var(--gray);
     display: flex;
-    gap: 8px;
-    margin-bottom: 4px;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 6px;
+}
+
+.rezultatas-top a{
+    color: var(--gray);
 }
 
 .rezultatas-top span{
     display: inline-block;
-    padding-right: 4px;
+    padding-right: 8px;
     padding-block: 2px;
 }
 
@@ -93,6 +98,7 @@ section.preResultOptions{
     align-items: baseline;
     gap: 6px;
     margin-bottom: 6px;
+    margin-top: 0px;
 }
 
 .rezultatas-title a {
@@ -138,5 +144,9 @@ section.preResultOptions{
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+.excerpt {
+    color: var(--gray);
 }
 </style>

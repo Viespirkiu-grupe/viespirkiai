@@ -1,19 +1,27 @@
 import express from "express";
-import { viespirkiai } from "../mongo/mongoDb.js";
 import cleanEmptyQueryParams from "../utils/queryParams.js";
 import { arrayToLithuanianTime } from "../utils/time.js";
-import { buildTypesenseFilter, buildMongoFilter } from "../utils/filter.js";
+import { buildTypesenseFilter, buildPostgresFilter } from "../utils/filter.js";
 import { searchDocuments } from "../typesense/typesense.js";
 import config from "../utils/config.js";
 import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
+import { postgres } from "../postgres/postgres.js";
+import QueryStream from "pg-query-stream";
+import { Readable } from "stream";
 
 const indexRouter = express.Router();
 
-let sutarciuSkaicius;
+let postgresSutarciuSkaicius;
 
 async function atnaujintiSutarciuSkaiciu() {
-    sutarciuSkaicius = await viespirkiai.estimatedDocumentCount();
+    postgresSutarciuSkaicius = Number(
+        (
+            await postgres.query(`
+      SELECT * FROM "eiluciuSkaiciai" WHERE "tableName" = 'sutartys';
+    `)
+        ).rows[0].rowCount,
+    );
 }
 
 await atnaujintiSutarciuSkaiciu();
@@ -24,13 +32,13 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
 
     // Limitas, kiek rodyti viename puslapyje
     let limit = 50;
-    const MAX_MONGO_LIMIT = 100_000;
+    const MAX_POSTGRES_LIMIT = 1000_000;
     const MAX_TYPESENSE_LIMIT = 250;
 
     if (req.query.limit == "max" && req.query.search) {
         limit = MAX_TYPESENSE_LIMIT;
     } else if (req.query.limit == "max") {
-        limit = MAX_MONGO_LIMIT;
+        limit = MAX_POSTGRES_LIMIT;
     } else if (
         parseInt(req.query.limit) > MAX_TYPESENSE_LIMIT &&
         req.query.search
@@ -40,11 +48,11 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
             .send(
                 `Limitas per didelis. Maksimalus limitas tekstinėms paieškoms po ${MAX_TYPESENSE_LIMIT} rezultatų puslapyje.`,
             );
-    } else if (parseInt(req.query.limit) > MAX_MONGO_LIMIT) {
+    } else if (parseInt(req.query.limit) > MAX_POSTGRES_LIMIT) {
         return res
             .status(400)
             .send(
-                `Limitas per didelis. Maksimalus limitas ne tekstinėms paieškoms yra ${MAX_MONGO_LIMIT} rezultatų puslapyje.`,
+                `Limitas per didelis. Maksimalus limitas ne tekstinėms paieškoms yra ${MAX_POSTGRES_LIMIT} rezultatų puslapyje.`,
             );
     } else if (parseInt(req.query.limit) > 0) {
         limit = parseInt(req.query.limit) || limit;
@@ -72,67 +80,78 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
             },
         );
 
+        results = arrayToLithuanianTime(results);
+
         var paieškosVariklis = "Typesense";
     } else {
-        // Ne tekstinė paieška – MongoDB
-        var { filter, values, queryParams, usedHiddenFields } =
-            buildMongoFilter(req.query);
+        // Ne tekstinė paieška – Postgres
+        var {
+            sql,
+            sqlCount,
+            params,
+            values,
+            queryParams,
+            usedHiddenFields,
+            visiIrasai,
+        } = buildPostgresFilter(req.query, limit, page);
 
-        if (Object.keys(filter).length === 0) {
-            var total = sutarciuSkaicius;
-        } else {
-            if (!req.query.csv && !req.query.jsonl) {
-                var total;
-                try {
-                    if (req.query.rezultatuSkaiciausPatikslinimas) {
-                        total = await viespirkiai.countDocuments(filter, {
-                            maxTimeMS: 20_000,
-                        });
-                    } else {
-                        total = await viespirkiai.countDocuments(filter, {
-                            maxTimeMS: 250,
-                        });
-                    }
-                } catch (err) {
-                    if (err.code === 50) {
-                        total = 100000;
-                        zinomasRezultatuSkaicius = false;
-                    } else {
-                        throw err;
-                    }
-                }
-            }
-        }
-
+        var results, total;
         if (req.query.csv || req.query.jsonl) {
-            var results = viespirkiai
-                .find(filter)
-                .sort({ paskutinioRedagavimoData: -1 })
-                .skip(skip)
-                .limit(limit);
-        } else {
-            var results = await viespirkiai
-                .find(filter)
-                .sort({ paskutinioRedagavimoData: -1 })
-                .skip(skip)
-                .limit(limit)
-                .toArray();
-        }
+            var client = await postgres.connect();
 
-        var paieškosVariklis = "MongoDB";
+            const query = new QueryStream(sql, params);
+            var results = client.query(query);
+        } else {
+            if (visiIrasai) {
+                let resultsRes = await postgres.query(sql, params);
+                results = resultsRes.rows;
+                total = postgresSutarciuSkaicius;
+            } else {
+                const [resultsRes, countRes] = await Promise.all([
+                    postgres.query(sql, params), // full results
+                    postgres.query(sqlCount, params.slice(0, -2)), // count without limit
+                ]);
+
+                results = resultsRes.rows;
+                total =
+                    params.length === 1
+                        ? postgresSutarciuSkaicius // only limit param, no filters
+                        : parseInt(countRes.rows[0].count, 10);
+            }
+
+            // change sutartiesUnikalusId to sutartiesUnikalusID
+            results = results.map((result) => {
+                result.sutartiesUnikalusID = result.sutartiesUnikalusId;
+                delete result.sutartiesUnikalusId;
+                return result;
+            });
+        }
+        var paieškosVariklis = "PostgreSQL";
     }
 
-    // Pataisomi HTML simboliai
     for (let i = 0; i < results.length; i++) {
         results[i].pavadinimas = fixHtmlEntities(results[i].pavadinimas);
         results[i].perkanciojiOrganizacija = fixHtmlEntities(
             results[i].perkanciojiOrganizacija,
         );
         results[i].tiekejas = fixHtmlEntities(results[i].tiekejas);
-    }
 
-    // Pakeičiame datų formatą į lietuvišką
-    results = arrayToLithuanianTime(results);
+        const contractTypes = {
+            TSP: "Tarptautinis arba supaprastintas pirkimas",
+            MVP: "Mažos vertės pirkimas",
+            ŽS: "Žodinė sutartis",
+            MVPŽ: "Mažos vertės žodinis pirkimas",
+            SPŽ: "Supaprastintos vertės žodinis pirkimas",
+            PPS: "Pagrindinė pirkimo sutartis",
+            VS: "Vidaus sandoris",
+            SP: "Sutarties pakeitimas",
+            PSĮ: "Pirkimas iš susijusios įmonės",
+            "ILGALAIKĖ MVPŽ": "Ilgalaikė mažos vertės žodinė sutartis",
+        };
+
+        const tipo = (results[i].tipas || "").trim().toUpperCase();
+        results[i].tipoPavadinimas = contractTypes[tipo] || tipo;
+    }
 
     // Paieškos užklausos informacija
     let trukme = ((performance.now() - startas) / 1000).toFixed(2) + "s";
@@ -158,18 +177,28 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
         );
 
         let count = 0;
-        for await (const result of results) {
-            const line = JSON.stringify(result) + "\n";
-            if (!res.write(line)) {
-                // wait until the buffer is drained
-                await new Promise((resolve) => res.once("drain", resolve));
-            }
-            // optional: flush periodically if using Express
-            count++;
-            if (count % 1000 === 0 && res.flush) res.flush();
-        }
 
-        return res.end();
+        try {
+            results.on("data", (row) => {
+                row.sutartiesUnikalusID = row.sutartiesUnikalusId;
+                delete row.sutartiesUnikalusId;
+
+                const line = JSON.stringify(row) + "\n";
+
+                res.write(line);
+
+                count++;
+                if (count % 1000 === 0 && res.flush) res.flush();
+            });
+
+            await new Promise((resolve, reject) => {
+                results.on("end", resolve);
+                results.on("error", reject);
+            });
+        } finally {
+            client.release();
+            return res.end();
+        }
     }
 
     // Jei prašo CSV
@@ -183,15 +212,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
 
         const escapeCSV = (value) => {
             if (value == null) return "";
-
-            let str;
-            if (typeof value === "number") {
-                str = String(value);
-            } else {
-                str = String(value);
-            }
-
-            // jei yra kabutės, kableliai arba naujos eilutės, apgaubiam kabutėmis
+            const str = String(value);
             return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
         };
 
@@ -223,40 +244,46 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
         res.write(header);
 
         let count = 0;
-        for await (const row of results) {
-            const values = [
-                row.tipas,
-                row.kategorija,
-                row.pavadinimas,
-                row.verte,
-                row.faktineVerte || "",
-                row.perkanciojiOrganizacija,
-                row.perkanciosiosOrganizacijosKodas,
-                row.tiekejas,
-                row.tiekejoKodas,
-                formatDate(row.sudarymoData),
-                formatDate(row.faktineIvykdymoData),
-                formatDate(row.paskutinioRedagavimoData),
-                row.bvpzKodas || "",
-                row.sutartiesNumeris || "",
-                row.sutartiesUnikalusID,
-            ];
-            const csvLine = values.map(escapeCSV).join(",") + "\n";
-            if (!res.write(csvLine)) {
-                // backpressure: wait for drain before continuing
-                await new Promise((resolve) => res.once("drain", resolve));
-            }
 
-            count++;
-            // flush every 1000 rows if flush function exists
-            if (count % 1000 === 0 && res.flush) {
-                console.log("flush", count);
-                res.flush();
-            }
+        try {
+            results.on("data", (row) => {
+                row.sutartiesUnikalusID = row.sutartiesUnikalusId;
+                delete row.sutartiesUnikalusId;
+
+                const values = [
+                    row.tipas,
+                    row.kategorija,
+                    row.pavadinimas,
+                    row.verte,
+                    row.faktineVerte || "",
+                    row.perkanciojiOrganizacija,
+                    row.perkanciosiosOrganizacijosKodas,
+                    row.tiekejas,
+                    row.tiekejoKodas,
+                    formatDate(row.sudarymoData),
+                    formatDate(row.faktineIvykdymoData),
+                    formatDate(row.paskutinioRedagavimoData),
+                    row.bvpzKodas || "",
+                    row.sutartiesNumeris || "",
+                    row.sutartiesUnikalusID,
+                ];
+
+                const csvLine = values.map(escapeCSV).join(",") + "\n";
+
+                res.write(csvLine);
+
+                count++;
+                if (count % 1000 === 0 && res.flush) res.flush();
+            });
+
+            await new Promise((resolve, reject) => {
+                results.on("end", resolve);
+                results.on("error", reject);
+            });
+        } finally {
+            client.release();
+            return res.end();
         }
-
-        res.end();
-        return;
     }
 
     if (req.query.rezultatuSkaiciausPatikslinimas) {
@@ -271,7 +298,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
     let galimaEksportuoti = true;
     if (req.query.search && total > MAX_TYPESENSE_LIMIT) {
         galimaEksportuoti = false;
-    } else if (total > MAX_MONGO_LIMIT) {
+    } else if (total > MAX_POSTGRES_LIMIT) {
         galimaEksportuoti = false;
     }
 

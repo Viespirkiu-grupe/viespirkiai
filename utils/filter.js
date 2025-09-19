@@ -94,89 +94,100 @@ export function buildTypesenseFilter(query) {
 }
 
 /**
- * Builds a MongoDB filter from the provided query object.
+ * Builds a PostgreSQL filter from the provided query object.
  * @param {Object} query
  * @returns {Object}
  */
-export function buildMongoFilter(query) {
-    const filter = {};
+export function buildPostgresFilter(query, limit, page = 1) {
+    const whereClauses = [];
+    const params = [];
     const values = {};
     const queryParams = [];
     let usedHiddenFields = false;
+    let visiIrasai = true;
+
+    const addParam = (key, val) => {
+        params.push(val);
+        return `$${params.length}`;
+    };
 
     const config = [
         {
-            key: "search",
-            apply: (val) => {
-                filter.$text = { $search: `"${val}"` };
-            },
-        },
-        {
             key: "perkanciosiosOrganizacijosKodas",
             apply: (val) => {
-                filter.perkanciosiosOrganizacijosKodas = val;
+                whereClauses.push(
+                    `"perkanciosiosOrganizacijosKodas" = ${addParam("perkanciosiosOrganizacijosKodas", val)}`,
+                );
                 usedHiddenFields = true;
+                visiIrasai = false;
             },
         },
         {
             key: "tiekejoKodas",
             apply: (val) => {
-                filter.tiekejoKodas = val;
+                whereClauses.push(
+                    `"tiekejoKodas" = ${addParam("tiekejoKodas", val)}`,
+                );
                 usedHiddenFields = true;
+                visiIrasai = false;
             },
         },
         {
             key: "sudarymoDataNuo",
             apply: (val) => {
-                filter.sudarymoData = {
-                    ...filter.sudarymoData,
-                    $gte: new Date(val),
-                };
+                whereClauses.push(
+                    `"sudarymoData" >= ${addParam("sudarymoDataNuo", val)}`,
+                );
                 usedHiddenFields = true;
+                visiIrasai = false;
             },
         },
         {
             key: "sudarymoDataIki",
             apply: (val) => {
-                filter.sudarymoData = {
-                    ...filter.sudarymoData,
-                    $lte: new Date(val),
-                };
+                whereClauses.push(
+                    `"sudarymoData" <= ${addParam("sudarymoDataIki", val)}`,
+                );
                 usedHiddenFields = true;
+                visiIrasai = false;
             },
         },
         {
             key: "verteNuo",
             apply: (val) => {
-                filter.verte = {
-                    ...filter.verte,
-                    $gte: parseFloat(val.replace(/,/g, ".")),
-                };
+                const num = parseFloat(val.replace(",", "."));
+                whereClauses.push(`"verte" >= ${addParam("verteNuo", num)}`);
                 usedHiddenFields = true;
+                visiIrasai = false;
             },
         },
         {
             key: "verteIki",
             apply: (val) => {
-                filter.verte = {
-                    ...filter.verte,
-                    $lte: parseFloat(val.replace(/,/g, ".")),
-                };
+                const num = parseFloat(val.replace(",", "."));
+                whereClauses.push(`"verte" <= ${addParam("verteIki", num)}`);
                 usedHiddenFields = true;
+                visiIrasai = false;
             },
         },
         {
             key: "sutartiesUnikalusID",
             apply: (val) => {
-                filter.sutartiesUnikalusID = parseInt(val, 10);
+                const num = parseInt(val, 10);
+                whereClauses.push(
+                    `"sutartiesUnikalusId" = ${addParam("sutartiesUnikalusId", num)}`,
+                );
                 usedHiddenFields = true;
+                visiIrasai = false;
             },
         },
         {
             key: "tikSuDokumentais",
             apply: () => {
-                filter.dokumentuKiekis = { $gt: 0 };
+                whereClauses.push(`"dokumentuKiekis" > 0`);
+                values["tikSuDokumentais"] = true;
                 usedHiddenFields = true;
+                visiIrasai = false;
             },
             isBoolean: true,
         },
@@ -186,21 +197,26 @@ export function buildMongoFilter(query) {
                 const prefixes = val
                     .split(" ")
                     .map((p) => p.trim())
-                    .filter((p) => p.length > 0);
-
+                    .filter(Boolean);
                 if (prefixes.length > 0) {
-                    filter.$or = prefixes.map((prefix) => {
+                    const ors = prefixes.map((prefix, i) => {
                         const start = prefix;
                         const end = String(parseInt(prefix, 10) + 1).padStart(
                             prefix.length,
                             "0",
                         );
-                        return { bvpzKodas: { $gte: start, $lt: end } };
+                        const startParam = addParam(
+                            `bvpzPrefiksasStart${i}`,
+                            start,
+                        );
+                        const endParam = addParam(`bvpzPrefiksasEnd${i}`, end);
+                        return `("bvpzKodas" >= ${startParam} AND "bvpzKodas" < ${endParam})`;
                     });
+                    whereClauses.push(`(${ors.join(" OR ")})`);
                     usedHiddenFields = true;
+                    visiIrasai = false;
                 }
             },
-            isBoolean: false,
         },
         {
             key: "bvpzPrefiksasKitas",
@@ -208,29 +224,48 @@ export function buildMongoFilter(query) {
                 const prefixes = val
                     .split(" ")
                     .map((p) => p.trim())
-                    .filter((p) => p.length > 0);
-
+                    .filter(Boolean);
                 if (prefixes.length > 0) {
-                    filter.$or = prefixes.map((prefix) => {
+                    const ors = prefixes.map((prefix, i) => {
                         const start = prefix;
                         const end = String(parseInt(prefix, 10) + 1).padStart(
                             prefix.length,
                             "0",
                         );
-                        return { bvpzKodas: { $gte: start, $lt: end } };
+                        const startParam = addParam(
+                            `bvpzPrefiksasKitasStart${i}`,
+                            start,
+                        );
+                        const endParam = addParam(
+                            `bvpzPrefiksasKitasEnd${i}`,
+                            end,
+                        );
+                        return `("bvpzKodas" >= ${startParam} AND "bvpzKodas" < ${endParam})`;
                     });
+                    whereClauses.push(`(${ors.join(" OR ")})`);
                     usedHiddenFields = true;
+                    visiIrasai = false;
                 }
             },
-            isBoolean: false,
+        },
+        {
+            key: "search",
+            apply: (val) => {
+                const term = `%${val}%`;
+                const param = addParam("search", term);
+                whereClauses.push(
+                    `("pavadinimas" ILIKE ${param} OR "aprasymas" ILIKE ${param})`,
+                );
+                visiIrasai = false;
+            },
         },
     ];
 
     for (const { key, apply, isBoolean } of config) {
         if (isBoolean && query[key] !== undefined) {
             apply();
-            values[key] = true;
             queryParams.push(`${key}=true`);
+            values[key] = "true";
         } else if (query[key]?.length > 0) {
             apply(query[key]);
             values[key] = query[key];
@@ -240,10 +275,21 @@ export function buildMongoFilter(query) {
 
     values.search = query.search || "";
 
+    const where = whereClauses.length
+        ? "WHERE " + whereClauses.join(" AND ")
+        : "";
+
+    const limitParam = addParam("limit", limit);
+    const offsetVal = Math.max((page - 1) * limit, 0);
+    const offsetParam = addParam("offset", offsetVal);
+
     return {
-        filter,
+        sql: `SELECT * FROM sutartys ${where} ORDER BY "paskutinioRedagavimoData" DESC LIMIT ${limitParam} OFFSET ${offsetParam};`,
+        sqlCount: `SELECT COUNT(*) FROM sutartys ${where};`,
+        params,
         values,
         queryParams: queryParams.length ? "&" + queryParams.join("&") : "",
         usedHiddenFields,
+        visiIrasai,
     };
 }

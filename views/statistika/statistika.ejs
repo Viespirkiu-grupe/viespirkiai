@@ -13,7 +13,7 @@
 		<main>
 			<h1>Statistika</h1>
 
-            <i>Duomenys atnaujinti: <%= statistika.atnaujinta.toLtDateTime() %> </i><br><br>
+            <i>Duomenys atnaujinti: <%= new Date(statistika.atnaujinta).toLtDateTime() %> </i><br><br>
             <i>* Pažymėtos numatomos arba apytikslės vertės </i>
 
             <div>
@@ -27,7 +27,7 @@
                                 <th>Indekso dydis</th>
                                 <th>Visas dydis</th>
                                 <th>Eilutės*</th>
-                            </th>
+                            </tr>
                         </thead>
                         <tbody>
                             <% statistika.lenteles.forEach(lentele => { %>
@@ -49,6 +49,86 @@
                     </table>
                 </div>
             </div>
+
+            <div>
+                <h2>Failų nuskaitymas</h2>
+                <div class="tableContainer">
+                    <table style="width: auto; max-width: 100%; min-width: auto;">
+                        <thead>
+                            <tr>
+                                <th>Nuskaitymo lygmuo</th>
+                                <th>Failų skaičius</th>
+                                <th>Dalis</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% statistika.nuskaitymas.pagalVersija.forEach(versija => { %>
+                                    <tr>
+                                        <td><%= versija.status %></td>
+                                        <td class="center no-wrap"><%= Number(versija.kiekis).toLocaleString('lt-LT') %></td>
+                                        <td class="center no-wrap"><%= Number(versija.procentai).toLocaleString('lt-LT') %> %</td>
+
+                                    </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <h3>Nuskaitymo eilėje</h3>
+                <p><%= Number(statistika.nuskaitymas.likoNuskaityti).linksniuoti(["failas", "failai", "failų", "failo"]) %> laukia nuskaitymo</p>
+            </div>
+
+            <div>
+                <h2>Failų lentelėje indeksuoti žodžiai</h2>
+                <div class="col-2">
+                    <section>
+                        <h3><u>Iš viso</u></h3>
+                        <%= Number(statistika.nuskaitymas.zodziai.total).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
+                    </section>
+
+                    <section>
+                        <h3><u>Vidurkis</u></h3>
+                        <%= Number(statistika.nuskaitymas.zodziai.vidurkis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
+                    </section>
+
+                    <section>
+                        <h3><u>Vidurkis (be 0)</u></h3>
+                        <%= Number(statistika.nuskaitymas.zodziai.vidurkisNeNulis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
+                    </section>
+
+                    <section>
+                        <h3><u>Failų su žodžiais dalis (nuo visų)</u></h3>
+                        <%= Number(statistika.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2) %> %
+                    </section>
+                </div>
+                <br><br>
+
+            </div>
+
+            <div>
+                <h2>TOP 10 failų extension</h2>
+                <div class="tableContainer">
+                    <table style="width: auto; max-width: 100%; min-width: auto;">
+                        <thead>
+                            <tr>
+                                <th>Extension</th>
+                                <th>Failų skaičius</th>
+                                <th>Dalis</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% statistika.topExtension.forEach(extension => { %>
+                                    <tr>
+                                        <td><%= extension.ext %></td>
+                                        <td class="center no-wrap"><%= Number(extension.row_count).toLocaleString('lt-LT') %></td>
+                                        <td class="center no-wrap"><%= Number(extension.percent).toLocaleString('lt-LT') %> %</td>
+
+                                    </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
 
             <div class="failu-statistika">
                 <div style="grid-area: pavadinimas;">

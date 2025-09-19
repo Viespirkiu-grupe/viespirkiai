@@ -1,6 +1,15 @@
-<% if(asmuo.regitra && asmuo.regitra.length > 0){ %>
-    <div id="regitra">
+<% if(asmuo.regitra && asmuo.regitra.rows > 0){ %>
+    <div id="transportoPriemones">
         <h2><u>Transporto priemonės</u></h2>
+        <% if(asmuo.regitra.rows > asmuo.regitra.limit) { %>
+            <i>
+                Rodomos tik <%= Number(asmuo.regitra.limit).linksniuoti(["transporto priemonė", "transporto priemonės", "transporto priemonių"]) %>.
+                <a href="?transportoPriemonesLimit=max#transportoPriemones">
+                    Rodyti visas (<%= asmuo.regitra.rows %>)
+                </a>
+            </i>
+            <br><br>
+        <% } %>
         <div class="tableContainer">
             <table style="width: auto; min-width: 70vw;">
                 <thead>
@@ -16,9 +25,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <% asmuo.regitra.forEach(function(auto){ %>
+                    <% asmuo.regitra.transportoPriemones.forEach(function(auto){ %>
                         <%
-                        let savinikas = "Ne";
+                        var savininkas = "Ne";
                         if(auto.valdymoTeise == "A"){
                             savininkas = "Taip";
                         }

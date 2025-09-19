@@ -17,11 +17,14 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
         <%- include('header.ejs') %>
 
 		<main>
-			<h1>
+		    <div class="subtext">
+				<%= purchase.tipoPavadinimas %>
+			</div>
+			<h1 style="margin-top: 12px;">
                 <% if (purchase.pavadinimas.length < 1) { %>
-                <i>Nenurodyta</i>
+                    <i>Nenurodyta</i>
                 <% } else { %>
-                <%= purchase.pavadinimas %>
+                    <%= purchase.pavadinimas %>
                 <% } %>
                 už <u> <%= Number( purchase.faktineIvykdimoVerte || purchase.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> € </u>
 			</h1>
@@ -52,6 +55,8 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
                 <div class="mobile-hide"></div>
             </section>
 
+            <a href="/?tiekejoKodas=<%= purchase.tiekejoKodas %>&perkanciosiosOrganizacijosKodas=<%= purchase.perkanciosiosOrganizacijosKodas %>">↗ Tarpusavio sutartys</a>
+
             <br>
 
             <section class="col-3 mobile-col-2">
@@ -63,20 +68,35 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
                     </div>
 
                     <div>
-                        <h3>Vertė <i>(numatyta / faktinė)</i>:</h3>
-                        <%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> € / <%= purchase.faktineIvykdimoVerte ? purchase.faktineIvykdimoVerte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €" : "Nenurodyta" %>
+                        <h3 style="margin-bottom: 4px;">Vertė:</h3>
+                        <div class="col-2">
+                            <section>
+                                <h4>Numatyta</h4>
+                                <%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
+                            </section>
+                            <section>
+                                <h4>Faktinė</h4>
+                                <%= purchase.faktineIvykdimoVerte ? purchase.faktineIvykdimoVerte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €" : "Nenurodyta" %>
+                            </section>
+                        </div>
                     </div>
 
                     <div>
-                        <h3>Sudaryta ir galioja:</h3>
-                        <%= new Date(purchase.sudarymoData).toISOString().slice(0,10) %>
-                        –
-                        <%= new Date(purchase.galiojimoData).toISOString().slice(0,10) %>
-                    </div>
-
-                    <div>
-                        <h3>Faktinė įvykdimo data:</h3>
-                        <%= purchase.faktineIvykdimoData || "Nenurodyta" %>
+                        <h3 style="margin-bottom: 4px;">Terminai:</h3>
+                        <div class="col-2" style="row-gap: 8px;">
+                            <section>
+                                <h4>Sudaryta</h4>
+                                <%= new Date(purchase.sudarymoData).toISOString().slice(0,10) %>
+                            </section>
+                            <section>
+                                <h4>Galioja iki</h4>
+                                <%= new Date(purchase.galiojimoData).toISOString().slice(0,10) %>
+                            </section>
+                            <section>
+                                <h4>Faktinė įvykdymo data</h4>
+                                <%= purchase.faktineIvykdimoData || "Nenurodyta" %>
+                            </section>
+                        </div>
                     </div>
                 </div>
 
@@ -84,7 +104,7 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
                     <h2><u>Pranešimas</u></h2>
 
                     <div style="min-height: 24px; display: block;">
-                        <pre style="display: inline-block; margin: 0;"><%= purchase.sutartiesUnikalusID %></pre>
+                        <pre style="display: inline-block; margin-block: 4px;"><%= purchase.sutartiesUnikalusID %></pre>
                         (<a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= purchase.sutartiesUnikalusID %>">
                             ↗ CVP IS
                         </a>)
@@ -101,8 +121,8 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
                     </div>
 
                     <div>
-                        <h3>Atnaujinta:</h3>
-                        <%= purchase.paskutinioAtnaujinimoData %>
+                        <h3>Pirkimo numeris:</h3>
+                        <%= purchase.pirkimoNumeris || "Nenurodytas" %>
                     </div>
                 </div>
 
@@ -110,18 +130,22 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
                     <h2><u>Klasifikacija</u></h2>
 
                     <div>
-                        <h3>Tipas:</h3>
-                        <%= purchase.tipas %>
-                    </div>
-
-                    <div>
                         <h3>Kategorija:</h3>
                         <%= purchase.kategorija %>
                     </div>
 
+
+                    <div>
+                        <h3>Tipas:</h3>
+                        <%= purchase.tipas %> (<i><%= purchase.tipoPavadinimas %></i>)
+                    </div>
+
+
                     <div>
                         <h3>BVPŽ:</h3>
-                        <pre style="display: inline;"><%= purchase.bvpzKodas %></pre> – <%= purchase.bvpzPavadinimas %>
+                        <h4><%= purchase.bvpzPavadinimas %></h4>
+                        <pre><%= purchase.bvpzKodas %></pre>
+                        <a href="/bvpz">↗ BVPŽ kodai</a>
                     </div>
                 </div>
 
@@ -133,13 +157,95 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
                         <ul class="file-list">
                             <% purchase.dokumentai.forEach(doc => { %>
                                 <li>
-                                    <a href="<%= doc.proxyUrl %>" target="_blank"><%= doc.pavadinimas %></a>
-                                    (<a href="<%= doc.url %>">↗ CVP IS</a>)
+                                    <% if(doc.parsiustas & doc.nuskaitytas) { %>
+                                        <a href="/failas/<%= doc.dok_id %>/<%= doc.file_id %>"><%= doc.pavadinimas %></a>
+                                        (<a href="<%= doc.proxyUrl %>">↗ Failas</a>, <a href="<%= doc.url %>">↗ CVP IS</a>)
+                                    <% } else { %>
+                                        <a href="<%= doc.proxyUrl %>" target="_blank"><%= doc.pavadinimas %></a>
+                                        (<a href="<%= doc.url %>">↗ CVP IS</a>)
+                                    <% } %>
                                 </li>
                             <% }); %>
                         </ul>
                     <% } else { %>
                         <p>Pateiktų dokumentų nėra.</p>
+                    <% } %>
+                </div>
+            </section>
+            <section>
+                <div>
+                    <h2><u>Panašios sutartys</u></h2><br>
+                    <% if(purchase.panasiosSutartys && purchase.panasiosSutartys.length > 0) { %>
+                        <% purchase.panasiosSutartys.forEach(item => { %>
+                            <div class="rezultatas">
+                                <div class="rezultatas-top">
+                                    <span><%= item.tipas %></span>
+                                    <span><%= item.kategorija %></span>
+                                    <span>
+                                        <% if(item.sudarymoData && item.galiojimoData) {  %>
+                                            <% let sudarymoData = new Date(item.sudarymoData).toISOString().slice(0,10); %>
+                                            <% let galiojimoData = new Date(item.galiojimoData).toISOString().slice(0,10); %>
+
+                                            <% if(sudarymoData == galiojimoData) { %>
+                                                Sut. <%= sudarymoData %>
+                                            <% } else { %>
+                                                Sut. <%= sudarymoData %> - <%= galiojimoData %>
+                                            <% } %>
+                                        <% } else { %>
+                                            -
+                                        <% } %>
+                                    </span>
+                                    <span>
+                                        <% if (item.paskutinioRedagavimoData) { %>
+                                            Red. <%= item.paskutinioRedagavimoData %>
+                                        <% } else { %>
+                                            -
+                                        <% } %>
+                                    </span>
+                                    <span>
+                                        <% if (item.dokumentuKiekis === 0) { %>
+
+                                        <% } else { %>
+                                            <%= item.dokumentuKiekis %> dok.
+                                        <% } %>
+                                    </span>
+
+                                </div>
+                                <div class="rezultatas-title">
+                                    <a href="/pirkimas/<%= item.sutartiesUnikalusId %>">
+                                        <span>
+                                            <%
+                                                const verte = item.faktineIvykdimoVerte || item.verte;
+                                                if(Number(verte) > 10000) {
+                                            %>
+                                                <u><%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</u>
+                                            <% } else { %>
+                                                <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
+                                            <% } %>
+                                        </span>&nbsp;
+                                        <span>
+                                            <% if(item.pavadinimas.length < 1) { %>
+                                                <i>Nenurodyta</i>
+                                            <% } else { %>
+                                                <%= item.pavadinimas %>
+                                            <% } %>
+                                        </span>
+                                    </a>
+                                </div>
+                                <div class="rezultatas-bottom">
+                                    <span>
+                                        <b> Pirkėjas: </b>
+                                        <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>"><%= item.perkanciojiOrganizacija %></a>
+                                    </span>
+                                    <span>
+                                        <b> Tiekėjas: </b>
+                                        <a href="/asmuo/<%= item.tiekejoKodas %>"><%= item.tiekejas || "Nenurodytas" %></a>
+                                    </span>
+                                </div>
+                            </div>
+                        <% }); %>
+                    <% } else { %>
+                        <i>Panašių sutarčių nerasta.</i>
                     <% } %>
                 </div>
             </section>

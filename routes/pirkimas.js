@@ -1,22 +1,76 @@
 import express from "express";
 import { dataToLithuanianTime } from "../utils/time.js";
-import { viespirkiai } from "../mongo/mongoDb.js";
 import config from "../utils/config.js";
 import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
+import { postgres } from "../postgres/postgres.js";
 
 const pirkimasRouter = express.Router();
 
 pirkimasRouter.get("/pirkimas/:id", async (req, res, next) => {
     const { id } = req.params;
 
-    // Randamas pirkimas pagal unikalų ID
-    let purchase = await viespirkiai.findOne({
-        sutartiesUnikalusID: parseInt(id),
-    });
+    let purchase = await postgres
+        .query(
+            'SELECT * FROM sutartys WHERE "sutartiesUnikalusId" = $1 LIMIT 1',
+            [parseInt(id)],
+        )
+        .then((result) => result.rows[0]);
 
     // 404
     if (!purchase) return next();
+
+    // Panašios sutartys
+    const similarContracts = await postgres
+        .query(
+            `SELECT *
+        FROM sutartys
+        WHERE "sutartiesUnikalusId" != $1
+          AND "perkanciosiosOrganizacijosKodas" = $2
+          AND "tiekejoKodas" = $3
+          AND verte = $4
+        ORDER BY "paskutinioRedagavimoData" DESC`,
+            [
+                purchase.sutartiesUnikalusId,
+                purchase.perkanciosiosOrganizacijosKodas,
+                purchase.tiekejoKodas,
+                purchase.verte,
+            ],
+        )
+        .then((result) => result.rows);
+
+    if (similarContracts.length > 0) {
+        purchase.panasiosSutartys = similarContracts;
+    }
+
+    // Failų būsena
+    await Promise.all(
+        purchase.dokumentai.map(async (failas) => {
+            failas.dok_id = failas.url.match(/dok_id=(\d+)/)[1];
+            failas.file_id = failas.url.match(/file_id=(\d+)/)[1];
+            failas.proxyUrl = `https://failai.viespirkiai.top/${failas.dok_id}/${failas.file_id}`;
+
+            const failoBusena = await postgres
+                .query(
+                    `SELECT
+              "dokId",
+              "fileId",
+              ("parsiustas" > 0) AS parsiustas,
+              ("nuskaitytas" IS NOT NULL AND "nuskaitytas" > 0) AS nuskaitytas
+          FROM failai
+          WHERE "dokId" = $1
+            AND "fileId" = $2`,
+                    [failas.dok_id, failas.file_id],
+                )
+                .then((result) => result.rows[0]);
+
+            failas.parsiustas = failoBusena?.parsiustas || false;
+            failas.nuskaitytas = failoBusena?.nuskaitytas || false;
+        }),
+    );
+
+    purchase.sutartiesUnikalusID = purchase.sutartiesUnikalusId;
+    delete purchase.sutartiesUnikalusId;
 
     // Pataisomi HTML entities
     purchase.pavadinimas = fixHtmlEntities(purchase.pavadinimas);
@@ -25,18 +79,8 @@ pirkimasRouter.get("/pirkimas/:id", async (req, res, next) => {
     );
     purchase.tiekejas = fixHtmlEntities(purchase.tiekejas);
 
-    // Pridedame dokumentų adresus
-    if (purchase.dokumentai && purchase.dokumentai.length > 0) {
-        purchase.dokumentai = purchase.dokumentai.map((doc) => {
-            doc.dok_id = doc.url.match(/dok_id=(\d+)/)[1];
-            doc.file_id = doc.url.match(/file_id=(\d+)/)[1];
-            doc.proxyUrl = `https://failai.viespirkiai.top/${doc.dok_id}/${doc.file_id}`;
-            return doc;
-        });
-    }
-
     // Formatuojame datas
-    purchase = dataToLithuanianTime(purchase);
+    // purchase = dataToLithuanianTime(purchase);
 
     const contractTypes = {
         TSP: "Tarptautinis arba supaprastintas pirkimas",

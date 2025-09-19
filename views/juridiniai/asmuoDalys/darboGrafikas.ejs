@@ -1,0 +1,116 @@
+<% if(asmuo.darboGrafikas && asmuo.darboGrafikas.turiPirkimu) { %>
+<h2><u>Buhalterijos darbo grafikas</u></h2>
+<div class="col-2 mobile-col-1" id="darboGrafikas">
+    <section style="width: 100%;">
+        <h3>Pagal savaitės dieną</h3>
+        <% if(asmuo.darboGrafikas && asmuo.darboGrafikas.pagalSavaitesDienas && asmuo.darboGrafikas.pagalSavaitesDienas.length > 0) { %>
+            <div id="darboGrafikasPagalSavaitesDienas" class="chart" style="width: 100%; height: 400px;"></div>
+
+            <script defer>
+              const darboGrafikasPagalSavaitesDienasLabels = [
+                <% asmuo.darboGrafikas.pagalSavaitesDienas.forEach((item, i) => { %>
+                  '<%= item.day_name %>',
+                <% }) %>
+              ];
+
+              const darboGrafikasPagalSavaitesDienas = [
+                <% asmuo.darboGrafikas.pagalSavaitesDienas.forEach((item, i) => { %>
+                  <%= item.contracts_count || "null" %>,
+                <% }) %>
+              ];
+
+              renderChart('darboGrafikasPagalSavaitesDienas', darboGrafikasPagalSavaitesDienasLabels, darboGrafikasPagalSavaitesDienas, {
+                chart: {
+                  type: 'line',
+                  height: 400,
+                  toolbar: { show: false },
+                  zoom: {
+                    enabled: false
+                  },
+                  fontFamily: 'Ubuntu',
+                },
+                seriesName: "Sutarčių skelbimų redagavimai",
+                xaxis: {
+                    type: 'category',
+
+                },
+                tooltip: {
+                  enabled: true
+                },
+                yaxis: { labels: { style: { colors: '#000' }, min: 0 } },
+                stroke: { curve: 'smooth', width: 2 },
+                markers: { size: 5 },
+                colors: ['#000'],
+                grid: { borderColor: '#e0e0e0' },
+                theme: {
+                    mode: 'light',
+                    monochrome: {
+                        enabled: false,
+                        color: '#000000',
+                        shadeTo: 'dark',
+                        shadeIntensity: 0.65
+                    },
+                },
+              }, true);
+            </script>
+        <% } else { %>
+            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+        <% } %>
+    </section>
+    <section style="width: 100%;">
+        <h3>Pagal valandas</h3>
+        <% if(asmuo.darboGrafikas && asmuo.darboGrafikas.pagalValandas && asmuo.darboGrafikas.pagalValandas.length > 0) { %>
+            <div id="darboGrafikaspagalValandas" class="chart" style="width: 100%; height: 400px;"></div>
+
+            <script defer>
+              const darboGrafikaspagalValandasLabels = [
+                <% asmuo.darboGrafikas.pagalValandas.forEach((item, i) => { %>
+                  '<%= item.hour %>:00',
+                <% }) %>
+              ];
+
+              const darboGrafikaspagalValandas = [
+                <% asmuo.darboGrafikas.pagalValandas.forEach((item, i) => { %>
+                  <%= item.contracts_count || "null" %>,
+                <% }) %>
+              ];
+
+              renderChart('darboGrafikaspagalValandas', darboGrafikaspagalValandasLabels, darboGrafikaspagalValandas, {
+                chart: {
+                  type: 'line',
+                  height: 400,
+                  toolbar: { show: false },
+                  zoom: {
+                    enabled: false
+                  },
+                  fontFamily: 'Ubuntu',
+                },
+                seriesName: "Sutarčių skelbimų redagavimai",
+                xaxis: {
+                    type: 'category',
+                },
+                tooltip: {
+                  enabled: true
+                },
+                yaxis: { labels: { style: { colors: '#000' }, min: 0 } },
+                stroke: { curve: 'smooth', width: 2 },
+                markers: { size: 5 },
+                colors: ['#000'],
+                grid: { borderColor: '#e0e0e0' },
+                theme: {
+                    mode: 'light',
+                    monochrome: {
+                        enabled: false,
+                        color: '#000000',
+                        shadeTo: 'dark',
+                        shadeIntensity: 0.65
+                    },
+                },
+              }, true);
+            </script>
+        <% } else { %>
+            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+        <% } %>
+    </section>
+</div>
+<% } %>

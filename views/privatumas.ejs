@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+	<head>
+    	<%- include('head.ejs', {
+            pageTitle: "Privatumo politika",
+            pageDescription: `Viešpirkiai puslapio privatumo politika`,
+            pageImage: `https://viespirkiai.top/privatumas.png`,
+            customHead
+        }) %>
+	</head>
+	<body>
+		<%- include('header.ejs') %>
+		<main>
+			<h1>Privatumo politika</h1>
+			<h2>
+			    Vartotojų duomenys
+			</h2>
+
+			<h3>Kokiu tikslu renkami ir rodomi duomenis?</h3>
+			    Viešuoju interesu – siekiant užtikrinti skaidrumą ir prieigą prie viešųjų pirkimų dokumentų, informacijos apie viešuosius pirkimus, juridinius asmenis.<br><br>
+
+				Primename Bendrąjo duomenų apsaugos reglamento 86 straipsnį:
+				<blockquote>
+			        Valdžios institucijos arba viešosios įstaigos ar privačios įstaigos turimuose oficialiuose dokumentuose,
+					reikalinguose užduočiai, vykdomai dėl viešojo intereso, atlikti, esantys asmens duomenys šios institucijos arba
+					įstaigos gali būti atskleisti laikantis Sąjungos ar valstybės narės teisės, kuri taikoma tai valdžios institucijai
+					arba įstaigai, siekiant visuomenės teisę susipažinti su oficialiais dokumentais suderinti su teise į asmens duomenų
+					apsaugą pagal šį reglamentą.
+				</blockquote>
+			<br>
+
+			<h3>Ar Viešpirkiai renka asmeninius puslapio vartotojų duomenis?</h3>
+			<span style="font-size: 28px;">Ne.</span>
+			<br><br>
+
+			<h3>Atvaizduojama nenuasmeninta informacija, ką daryti?</h3>
+			<p>
+			Duomenys automatiškai renkami <b><u>tik iš viešų šaltinių</u></b>, todėl tiketina, kad nuasmeninimo klaida buvo atlikta institucijai juos viešinant.<br>
+			Prašome susisiekti su atitinkama institucija ir Viešpirkiais. Daugiau apie tai –
+			<a href="/kontaktai#informacijosTikslumas">kontaktų puslapio skiltyje informacijos tikslumas / pašalinimai</a>.
+			</p>
+			<br>
+
+			<h3>Kokie slapukai naudojami?</h3>
+			<p>
+                Naudojami tik būtiniausi slapukai, reikalingi puslapio veikimui.<br><br>
+                Svetainės apsaugai ir paslaugų užtikrinimui naudojamas „Cloudflare“, kuris kartais nustato būtinuosius saugumo slapukus
+                (pvz., „cf_clearance“) siekiant atskirti žmones nuo automatizuoto srauto. Plausible Analitika slapukų nenaudoja.<br> <br>
+                Naudojami funkciniai slapukai: <br>
+                <ul>
+                    <li>
+                        <code>naujaPaieska</code> – jei <code>false</code> – informuoja, kad paieškos rezultatus reikia atvaizduoti lentele. Jei <code>true</code> – slapukas ištrinamas.
+                    </li>
+                </ul>
+            </p>
+
+            <br>
+            <h3>Kiti klausimai</h3>
+            <p>
+                Susisiekite – <a href="/kontaktai">kontaktų puslapis</a>.
+            </p>
+
+		</main>
+		<%- include('footer.ejs', {
+		  neoficialus: false
+		}) %>
+	</body>
+</html>

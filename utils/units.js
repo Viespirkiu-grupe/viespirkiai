@@ -11,10 +11,13 @@ export const UNITS = {
         units: ["mm", "cm", "m", "km"],
         factors: [10, 100, 1000],
     },
-    // Add more categories as needed
 };
 
-// Helper: find category based on a unit string
+/**
+ * Find the category for a given unit.
+ * @param {string} unit - The unit to find the category for.
+ * @returns {string|null} - The category name or null if not found.
+ */
 function findCategory(unit) {
     for (const [category, config] of Object.entries(UNITS)) {
         if (config.units.includes(unit)) return category;
@@ -22,7 +25,16 @@ function findCategory(unit) {
     return null;
 }
 
-// Core conversion function
+/**
+ * Convert a value from one unit to another within a specified category.
+ * @param {number} value - The numeric value to convert.
+ * @param {string|object} categoryOrOptions - The category name or options object.
+ * @param {object} [options] - Options for conversion if category is provided.
+ * @param {string|number} [options.from] - The unit or index to convert from.
+ * @param {string|number} [options.to] - The unit or index to convert to, or "auto".
+ * @param {number} [options.precision=2] - Decimal places in the result.
+ * @returns {string} - The converted value with unit.
+ */
 export function convertUnit(value, categoryOrOptions, options = {}) {
     let category, opts;
 
@@ -74,7 +86,6 @@ export function convertUnit(value, categoryOrOptions, options = {}) {
     }
 }
 
-// Extend Number.prototype
 Number.prototype.convertUnit = function (categoryOrOptions, options) {
     return convertUnit(this.valueOf(), categoryOrOptions, options);
 };

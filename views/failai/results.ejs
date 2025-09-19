@@ -1,0 +1,39 @@
+<div class="results">
+    <section class="preResultOptions">
+      <div class="numberOfResults">
+        <%- numberOfResults %>
+      </div>
+    </section>
+    <% data.forEach(item => { %>
+        <div class="rezultatas">
+            <div class="rezultatas-top">
+                <span><%= item.extension.toUpperCase() %></span>
+                <span><%= item.dydis.convertUnit("B") %></span>
+                <% if(item.metaduomenys.pageCount){ %>
+                    <span><%= Number(item.metaduomenys.pageCount).toLocaleString("lt-LT") || "-" %> p.</span>
+                <% } %>
+                <span><%= Number(item.zodziuSkaicius).toLocaleString("lt-LT") || "-" %> ž.</span>
+            </div>
+            <div class="rezultatas-title">
+                <a href="/failas/<%= item.dokId %>/<%= item.fileId %>?search=<%= encodeURIComponent(search) %>">
+                    <span>
+                        <%= item.metaduomenys.Title || item.pavadinimas %>
+                    </span>
+                </a>
+            </div>
+            <div class="rezultatas-bottom">
+                <div style="text-align: justify;" class="excerpt">
+                    <%- item.excerpt %>
+                </div>
+                <div>
+                    <a href="/pirkimas/<%= item.dokId %>">↗ Sutartis</a>
+                </div>
+            </div>
+        </div>
+    <% }); %>
+</div>
+
+
+<%- include('../pagination.ejs', {
+    currentPage, pageCount, queryParams
+}) %>

@@ -1,9 +1,6 @@
 # Nodejs
 node_modules
 
-# MongoDB
-mongo/data
-
 # Tasks
 taskState
 
@@ -13,10 +10,7 @@ wireproxy/proxy.wg
 # Typesense
 typesense/data
 
-# Export / import
-export.jsonl
-export.jsonl.gz
-
+# Exports / datasets
 *.csv
 *.zip
 *.jsonl
@@ -31,12 +25,12 @@ plausible/plausible-conf.env
 # Konfiguracija
 /config.js
 
-# Mysql
-mysql/mysql_data
-
 # Viešlaiškiai
 public/vieslaiskiai
 
 # Old
 old
 backup
+
+# Temp
+tmp/*

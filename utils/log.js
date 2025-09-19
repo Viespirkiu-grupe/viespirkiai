@@ -1,8 +1,12 @@
-// logger.js
 import path from "path";
 import crypto from "crypto";
 
-// Pick a pastel color based on caller filename
+/**
+ * Generate a pastel color based on a seed string.
+ * Uses HSL to ensure pastel shades.
+ * @param {string} seed - The seed string to generate the color from.
+ * @returns {string} - The ANSI escape code for the generated color.
+ */
 function pastelColor(seed) {
     const hash = crypto
         .createHash("md5")
@@ -20,7 +24,13 @@ function pastelColor(seed) {
     )}m`;
 }
 
-// Convert HSL → RGB
+/**
+ * Convert HSL to RGB.
+ * @param {number} h - Hue (0-360)
+ * @param {number} s - Saturation (0-1)
+ * @param {number} l - Lightness (0-1)
+ * @returns {number[]} - Array of RGB values [r, g, b] (0-255)
+ */
 function hslToRgb(h, s, l) {
     const c = (1 - Math.abs(2 * l - 1)) * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
@@ -41,7 +51,10 @@ function hslToRgb(h, s, l) {
     ];
 }
 
-// Extract caller file name
+/**
+ * Get the filename of the caller function.
+ * @returns {string} - The filename of the caller.
+ */
 function getCallerFile() {
     const origPrepareStackTrace = Error.prepareStackTrace;
     Error.prepareStackTrace = (_, stack) => stack;
@@ -54,6 +67,10 @@ function getCallerFile() {
     return path.basename(caller.getFileName());
 }
 
+/** Log a message with timestamp and caller file, color-coded.
+ * @param {string} text - The message to log.
+ * @param {object} options - Additional options (currently unused).
+ */
 export function log(text, options = {}) {
     const time = new Date().toLocaleTimeString("lt-LT", {
         hour12: false,

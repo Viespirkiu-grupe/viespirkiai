@@ -1,8 +1,11 @@
-<form method="get">
+<form method="get" role="search">
+    <label for="search" class="visually-hidden">Paieška</label>
     <input type="search" name="search" id="search"
         value="<%= values.search || '' %>"
         placeholder="Paieška"
-        enterkeyhint="search" />
+        enterkeyhint="search"
+        aria-label="Paieška"
+ />
     <button type="submit" value="Ieškoti" class="main">Ieškoti</button>
     <details id="paieskosNustatymai"
         <% if (usedHiddenFields) { %>

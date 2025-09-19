@@ -1,9 +1,9 @@
 <header>
-	<aside>
-		<a href="/juridiniai">↗ Juridiniai a.</a>
-		<a href="/duomenys">↗ Duomenys</a>
-		<a href="/vieslaiskiai">↗ Viešlaiškiai</a>
-	</aside>
+	<nav class="aside" aria-label="Puslapio nuorodos">
+		<a href="/juridiniai"><span aria-hidden="true">↗</span>  Juridiniai a.</a>
+		<a href="/duomenys"><span aria-hidden="true">↗</span>  Duomenys</a>
+		<a href="/vieslaiskiai"><span aria-hidden="true">↗</span>  Viešlaiškiai</a>
+	</nav>
 
 	<h1 class="viespirkiai">
 		<a href="/" class="noStyle">
@@ -12,6 +12,8 @@
 	</h1>
 
 	<% if(typeof hideSubtext == "undefined" || hideSubtext == false) { %>
-		CVP IS sudarytų sutarčių duomenų kopija
+	    <span role="doc-subtitle">
+			Pilietinė pirkimų analizės iniciatyva
+		</span>
 	<% } %>
 </header>

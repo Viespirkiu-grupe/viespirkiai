@@ -1,0 +1,38 @@
+<% if(asmuo.darboSkelbimai && asmuo.darboSkelbimai.rows > 0){ %>
+    <div id="darboSkelbimai">
+        <h2><u>Darbo skelbimai</u></h2>
+        <% if(asmuo.darboSkelbimai.rows > asmuo.darboSkelbimai.limit) { %>
+            <i>
+                Rodomi tik <%= Number(asmuo.darboSkelbimai.limit).linksniuoti(["naujausias skelbimas", "naujausi skelbimai", "naujausių skelbimų"]) %>.
+                <a href="?darboSkelbimaiLimit=max#darboSkelbimai">
+                    Rodyti visus (<%= asmuo.darboSkelbimai.rows %>)
+                </a>
+            </i>
+        <% } %>
+
+        <div class="results" style="margin-inline: 0px;">
+            <% let count = 0; %>
+            <% asmuo.darboSkelbimai.skelbimai.forEach(function(skelbimas){ %>
+                <div class="rezultatas">
+                    <div class="rezultatas-top">
+                        <span>
+                            Paskelbta:
+                            <%= skelbimas.ikelimoData %>
+                        </span>
+                        <span>
+                            Galioja:
+                            <%= skelbimas.galiojaNuo || "nežinoma" %> –
+                            <%= skelbimas.galiojaIki || "nežinoma" %>
+                        </span>
+                    </div>
+                    <div class="rezultatas-title">
+                        <%= skelbimas.profesijosPareigybesPav || "Profesijos pareigybės pavadinimas nenurodytas" %>
+                    </div>
+                    <div class="rezultatas-bottom" style="text-align: justify;">
+                        <%= skelbimas.darboAprasymasLt	|| "Darbo aprašymas nenurodytas" %>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    </div>
+<% } %>

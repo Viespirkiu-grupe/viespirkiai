@@ -11,7 +11,18 @@
                  <% }) %>
                ];
 
-               renderChart('sodraImokosDiagrama', sodraLabels, sodraImokos, {seriesName: "EUR"})
+               renderChart('sodraImokosDiagrama', sodraLabels, sodraImokos, {seriesName: "",  yaxis: {
+                 min: 0,
+                 labels: {
+                     formatter: function (value) {
+                       if(typeof value == "number"){
+                         return value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' });
+                       }else{
+                         return "Nėra duomenų";
+                       }
+                     }
+                  },
+               }});
              </script>
          <% } else { %>
              <i class="diagrama-nera-duomenu">Nėra duomenų</i>
@@ -62,7 +73,18 @@
                  };
                }
 
-               renderChart('vmiMokesciuDiagrama', vmiLabels, vmiData, { annotations, seriesName: "EUR" });
+               renderChart('vmiMokesciuDiagrama', vmiLabels, vmiData, { annotations, seriesName: "",  yaxis: {
+                 min: 0,
+                 labels: {
+                     formatter: function (value) {
+                       if(typeof value == "number"){
+                         return value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' });
+                       }else{
+                         return "Nėra duomenų";
+                       }
+                     }
+                  },
+               }});
              </script>
          <% } else { %>
              <i class="diagrama-nera-duomenu">Nėra duomenų</i>

@@ -12,7 +12,7 @@ try {
 
 const tasks = [];
 
-import { requestLatestEviesiejipirkimaiData } from "./scrape/scrapeViespirkiai.js";
+import { requestLatestEviesiejipirkimaiData } from "./tasks/sutartys/scrape.js";
 tasks.push({
     name: "scrapeEviesiejipirkimaiSutartys",
     mode: "asap",
@@ -22,16 +22,7 @@ tasks.push({
     },
 });
 
-import { importuotiDokumentus } from "./import/importFailai.js";
-tasks.push({
-    name: "dokumentuImportas",
-    schedule: "*/1 * * * *",
-    job: async () => {
-        await importuotiDokumentus();
-    },
-});
-
-import { parsiustiFaila } from "./scrape/parsiustiFailus.js";
+import { parsiustiFaila } from "./tasks/failai/parsiusti.js";
 tasks.push({
     name: "failuParsiuntimas",
     mode: "asap",
@@ -42,16 +33,26 @@ tasks.push({
     },
 });
 
-import { litekoScrapeLatestDays } from "./scrape/scrapeLiteko.js";
+tasks.push({
+    name: "failuParsiuntimas2",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 5,
+    job: async () => {
+        return parsiustiFaila();
+    },
+});
+
+import { litekoScrapeLatestDays } from "./tasks/liteko/scrape.js";
 tasks.push({
     name: "scrapeLiteko",
-    schedule: "* */2 * * *",
+    schedule: "0 */6 * * *",
     job: async () => {
         await litekoScrapeLatestDays(90);
     },
 });
 
-import { surastiBylosSalis } from "./scrape/scrapeLitekoContent.js";
+import { surastiBylosSalis } from "./tasks/liteko/scrapeContent.js";
 tasks.push({
     name: "scrapeLitekoSalys",
     mode: "asap",
@@ -62,7 +63,7 @@ tasks.push({
     },
 });
 
-import { atrastiJarAdresoKoordinates } from "./scrape/scrapeAdresai.js";
+import { atrastiJarAdresoKoordinates } from "./tasks/adresai/scrape.js";
 tasks.push({
     name: "scrapeJarAdresoKoordinates",
     mode: "asap",
@@ -70,6 +71,56 @@ tasks.push({
     errorCooldown: 10,
     job: async () => {
         return atrastiJarAdresoKoordinates();
+    },
+});
+
+import { nuskaitytiVienoDokumentoDuomenis } from "./tasks/failai/nuskaitytiTeksta.js";
+tasks.push({
+    name: "nuskaitytiDokumentoTekstaViespirkis",
+    mode: "asap",
+    cooldown: 10,
+    errorCooldown: 2,
+    job: async () => {
+        return nuskaitytiVienoDokumentoDuomenis(1);
+    },
+});
+
+tasks.push({
+    name: "nuskaitytiDokumentoTekstaViespirkisRDP",
+    mode: "asap",
+    cooldown: 10,
+    errorCooldown: 2,
+    job: async () => {
+        return nuskaitytiVienoDokumentoDuomenis(2);
+    },
+});
+
+tasks.push({
+    name: "nuskaitytiDokumentoTekstaViespirkisRFC",
+    mode: "asap",
+    cooldown: 10,
+    errorCooldown: 2,
+    job: async () => {
+        return nuskaitytiVienoDokumentoDuomenis(3);
+    },
+});
+
+tasks.push({
+    name: "nuskaitytiDokumentoTekstaMeskaAntDviracio",
+    mode: "asap",
+    cooldown: 10,
+    errorCooldown: 2,
+    job: async () => {
+        return nuskaitytiVienoDokumentoDuomenis(4);
+    },
+});
+
+import { atnaujintiStatistika } from "./tasks/statistika/atnaujinti.js";
+tasks.push({
+    name: "atnaujintiStatistika",
+    schedule: "*/10 * * * *",
+    job: async () => {
+        await atnaujintiStatistika();
     },
 });
 

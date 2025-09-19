@@ -7,21 +7,21 @@ import { DateTime } from "luxon";
  * @returns {String|null|undefined} - A formatted date string or the original input if null/undefined.
  */
 export function toLithuanianTime(utcDate) {
-	if (utcDate === null || utcDate === undefined || utcDate === "") {
-		return utcDate;
-	}
+    if (utcDate === null || utcDate === undefined || utcDate === "") {
+        return utcDate;
+    }
 
-	// If utcDate is a number, assume it's a Unix timestamp in seconds
-	if (typeof utcDate === "number") {
-		return DateTime.fromSeconds(utcDate, { zone: "utc" })
-			.setZone("Europe/Vilnius")
-			.toFormat("yyyy-MM-dd HH:mm:ss");
-	}
+    // If utcDate is a number, assume it's a Unix timestamp in seconds
+    if (typeof utcDate === "number") {
+        return DateTime.fromSeconds(utcDate, { zone: "utc" })
+            .setZone("Europe/Vilnius")
+            .toFormat("yyyy-MM-dd HH:mm:ss");
+    }
 
-	// Otherwise, treat it as a Date object
-	return DateTime.fromJSDate(utcDate, { zone: "utc" })
-		.setZone("Europe/Vilnius")
-		.toFormat("yyyy-MM-dd HH:mm:ss");
+    // Otherwise, treat it as a Date object
+    return DateTime.fromJSDate(utcDate, { zone: "utc" })
+        .setZone("Europe/Vilnius")
+        .toFormat("yyyy-MM-dd HH:mm:ss");
 }
 
 /**
@@ -33,22 +33,22 @@ export function toLithuanianTime(utcDate) {
  * @returns {Object}
  */
 export function dataToLithuanianTime(item) {
-	const keys = [
-		"sudarymoData",
-		"galiojimoData",
-		"faktineIvykdimoData",
-		"paskelbimoData",
-		"paskutinioAtnaujinimoData",
-		"paskutinioRedagavimoData",
-		"duomenuData",
-		"statusasNuo",
-		"registravimoData"
-	];
+    const keys = [
+        "sudarymoData",
+        "galiojimoData",
+        "faktineIvykdimoData",
+        "paskelbimoData",
+        "paskutinioAtnaujinimoData",
+        "paskutinioRedagavimoData",
+        "duomenuData",
+        "statusasNuo",
+        "registravimoData",
+    ];
 
-	keys.forEach((key) => {
-		item[key] = toLithuanianTime(item[key]);
-	});
-	return item;
+    keys.forEach((key) => {
+        item[key] = toLithuanianTime(item[key]);
+    });
+    return item;
 }
 
 /**
@@ -58,29 +58,25 @@ export function dataToLithuanianTime(item) {
  * @returns {Array}
  */
 export function arrayToLithuanianTime(data) {
-	return data.map(dataToLithuanianTime);
+    return data.map(dataToLithuanianTime);
 }
 
-/**
- * Converts a Date object to a Lithuanian date string in the format "yyyy-mm-dd".
- * @returns {Date}
- */
 Date.prototype.toLtDate = function () {
-	return this.toLocaleDateString("lt-LT", {
-		year: "numeric",
-		month: "2-digit",
-		day: "2-digit",
-	});
+    return this.toLocaleDateString("lt-LT", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    });
 };
 
 Date.prototype.toLtTime = function () {
-	return this.toLocaleTimeString("lt-LT", {
-		hour: "2-digit",
-		minute: "2-digit",
-		second: "2-digit",
-	});
-}
+    return this.toLocaleTimeString("lt-LT", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+    });
+};
 
 Date.prototype.toLtDateTime = function () {
-	return this.toLtDate() + " " + this.toLtTime();
-}
+    return this.toLtDate() + " " + this.toLtTime();
+};

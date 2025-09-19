@@ -1,25 +1,47 @@
-export function linksniuoti(number, cases = ["įrašas", "įrašai", "įrašų"]) {
+/**
+ * Linksniavimo funkcijos lietuvių kalbai
+ * @param {number} number - Skaičius, kurį reikia linksniuoti
+ * @param {string[]} cases - Linksnių formos masyvas: ["įrašas", "įrašai", "įrašų", "įrašo"]
+ * @returns {string} - Suformatuotas skaičius su tinkama linksnio forma
+ */
+export function linksniuoti(
+    number,
+    cases = ["įrašas", "įrašai", "įrašų", "įrašo"],
+) {
     const n = Math.abs(Number(number));
+    const str = number.toString();
+    const hasFraction = str.includes(".") || str.includes(",");
 
-    // Determine correct Lithuanian plural form
     let form;
-    if (n % 10 === 1 && n % 100 !== 11) {
-        form = cases[0]; // singular
+    if (hasFraction && n !== 0) {
+        // many (trupmeninė dalis)
+        form = cases[3];
+    } else if (n % 10 === 1 && !(n % 100 >= 11 && n % 100 <= 19)) {
+        // one
+        form = cases[0];
     } else if (
-        [2, 3, 4, 5, 6, 7, 8, 9].includes(n % 10) &&
+        n % 10 >= 2 &&
+        n % 10 <= 9 &&
         !(n % 100 >= 11 && n % 100 <= 19)
     ) {
-        form = cases[1]; // few
+        // few
+        form = cases[1];
     } else {
-        form = cases[2]; // many
+        // other
+        form = cases[2];
     }
 
-    // Format number with spaces (Lithuanian style)
     const formattedNumber = n.toLocaleString("lt-LT").replace(/\u00A0/g, " ");
 
     return `${formattedNumber} ${form}`;
 }
 
+/**
+ * Linksniavimo funkcija lietuvių kalbai, skirtas skaičiams naudojamiems su kilmininku
+ * @param {number} number - Skaičius, kurį reikia linksniuoti
+ * @param {string[]} cases - Linksnių formos masyvas: ["įrašo", "įrašų"]
+ * @returns {string} - Suformatuotas skaičius su tinkama linksnio forma
+ */
 export function linksniuotiK(number, cases = ["įrašo", "įrašų"]) {
     const n = Math.abs(Number(number));
 
@@ -36,7 +58,6 @@ export function linksniuotiK(number, cases = ["įrašo", "įrašų"]) {
     return `${formattedNumber} ${form}`;
 }
 
-// Extend Number.prototype
 Number.prototype.linksniuoti = function (cases) {
     return linksniuoti(this.valueOf(), cases);
 };

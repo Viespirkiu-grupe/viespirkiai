@@ -8,8 +8,15 @@
 		<a href="/kodas">↗ Kodas</a>
     </div>
     <div>
-      <% if(typeof neoficialus == "undefined" || neoficialus) { %>
-        <p style="text-align: center; line-height: 1.5;"><i>Šis puslapis nėra oficialus. <br> Rekomenduojame tikrinti pateiktą informaciją.</i></p>
+		<a href="/privatumas">↗ Privatumo politika</a>
+    </div>
+    <div>
+        <% if(typeof neoficialus == "undefined" || neoficialus) { %>
+            <p style="text-align: center; line-height: 1.5;"><i>
+                Rekomenduojame tikrinti pateiktą informaciją. Ji buvo automatiškai surinkta remiantis tik viešais šaltiniais, gali būti pasenusi, klaidinga.
+                <br>Jeigu yra priežastis, kodėl tokia ji turėtų būti neskelbiama, šalinama ar pataisyta – prašome susisiekti.
+                    Daugiau informacijos rasite <a style="margin-inline: 0px;" href="/kontaktai#informacijosTikslumas">kontaktų puslapyje</a>.
+            </i></p>
         <% } %>
     </div>
 </footer>
