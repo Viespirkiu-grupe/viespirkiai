@@ -5,24 +5,20 @@
              <div id="sodraImokosDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
 
              <script defer>
-               const sodraImokos = [
-                 <% asmuo.sodra.duomenys.forEach((item, i) => { %>
-                   <%= item.imokuSuma || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
-                 <% }) %>
-               ];
+                const sodraImokos = [
+                  <% asmuo.sodra.duomenys.forEach((item, i) => { %>
+                    <%= item.imokuSuma || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
+                  <% }) %>
+                ];
 
-               renderChart('sodraImokosDiagrama', sodraLabels, sodraImokos, {seriesName: "",  yaxis: {
-                 min: 0,
-                 labels: {
-                     formatter: function (value) {
-                       if(typeof value == "number"){
-                         return value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' });
-                       }else{
-                         return "Nėra duomenų";
-                       }
-                     }
-                  },
-               }});
+                displayChart({
+                  element: document.querySelector('#sodraImokosDiagrama'),
+                  type: 'line-datetime',
+                  labels: sodraLabels,
+                  series: sodraImokos,
+                  flags: ['yEUR', 'yMin0']
+                })
+
              </script>
          <% } else { %>
              <i class="diagrama-nera-duomenu">Nėra duomenų</i>
@@ -30,19 +26,19 @@
      </section>
      <section style="width: 100%;">
          <h2><u>VMI įmokos</u></h2>
-         <% if(asmuo.mokesciai && asmuo.mokesciai.duomenys && asmuo.mokesciai.duomenys.length > 0) { %>
+         <% if(asmuo.vmi && asmuo.vmi.duomenys && asmuo.vmi.duomenys.length > 0) { %>
              <div id="vmiMokesciuDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
 
              <script defer>
                const vmiLabels = [
-                 <% asmuo.mokesciai.duomenys.forEach((item, i) => { %>
-                   '<%= item.data %>-01'<%= i < asmuo.mokesciai.duomenys.length - 1 ? ',' : '' %>
+                 <% asmuo.vmi.duomenys.forEach((item, i) => { %>
+                   '<%= item.data %>-01'<%= i < asmuo.vmi.duomenys.length - 1 ? ',' : '' %>
                  <% }) %>
                ];
 
                const vmiData = [
-                 <% asmuo.mokesciai.duomenys.forEach((item, i) => { %>
-                   <%= item.suma || "null" %><%= i < asmuo.mokesciai.duomenys.length - 1 ? ',' : '' %>
+                 <% asmuo.vmi.duomenys.forEach((item, i) => { %>
+                   <%= item.suma || "null" %><%= i < asmuo.vmi.duomenys.length - 1 ? ',' : '' %>
                  <% }) %>
                ];
 
@@ -73,18 +69,14 @@
                  };
                }
 
-               renderChart('vmiMokesciuDiagrama', vmiLabels, vmiData, { annotations, seriesName: "",  yaxis: {
-                 min: 0,
-                 labels: {
-                     formatter: function (value) {
-                       if(typeof value == "number"){
-                         return value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' });
-                       }else{
-                         return "Nėra duomenų";
-                       }
-                     }
-                  },
-               }});
+               displayChart({
+                 element: document.querySelector('#vmiMokesciuDiagrama'),
+                 type: 'line-datetime',
+                 labels: vmiLabels,
+                 series: vmiData,
+                 flags: ['yEUR', 'yMin0'],
+                 customOptions: { annotations }
+               })
              </script>
          <% } else { %>
              <i class="diagrama-nera-duomenu">Nėra duomenų</i>

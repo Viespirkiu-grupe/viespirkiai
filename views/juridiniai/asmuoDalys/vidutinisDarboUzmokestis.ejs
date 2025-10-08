@@ -13,18 +13,13 @@
                  <% }) %>
                ];
 
-               renderChart('vidAtlyginimoDiagrama', sodraLabels, atlyginimai, {seriesName: "",  yaxis: {
-                 min: 0,
-                 labels: {
-                     formatter: function (value) {
-                       if(typeof value == "number"){
-                         return value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) + "/mėn.";
-                       }else{
-                         return "Nėra duomenų";
-                       }
-                     }
-                  },
-               }});
+               displayChart({
+                 element: document.querySelector('#vidAtlyginimoDiagrama'),
+                 type: 'line-datetime',
+                 labels: sodraLabels,
+                 series: atlyginimai,
+                 flags: ['yEURMen', 'yMin0']
+               })
              </script>
          <% } else { %>
              <i class="diagrama-nera-duomenu">Nėra duomenų</i>
@@ -42,18 +37,13 @@
                  <% }) %>
                ];
 
-               renderChart('vidAtlyginimoIIDiagrama', sodraLabels, atlyginimaiII, {seriesName: "",  yaxis: {
-                 min: 0,
-                 labels: {
-                     formatter: function (value) {
-                       if(typeof value == "number"){
-                         return value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) + "/mėn.";
-                       }else{
-                         return "Nėra duomenų";
-                       }
-                     }
-                  },
-               }});
+               displayChart({
+                 element: document.querySelector('#vidAtlyginimoIIDiagrama'),
+                 type: 'line-datetime',
+                 labels: sodraLabels,
+                 series: atlyginimaiII,
+                 flags: ['yEURMen', 'yMin0']
+               })
              </script>
          <% } else { %>
              <i class="diagrama-nera-duomenu">Nėra duomenų</i>

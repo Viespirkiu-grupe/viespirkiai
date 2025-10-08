@@ -8,6 +8,8 @@
           customHead
     }) %>
 
+	<%- include('../js/charts.ejs') %>
+
     <% if(asmuo.jar.koordinates) { %>
         <script>
         window.addEventListener('DOMContentLoaded', () => {
@@ -36,138 +38,6 @@
         });
         </script>
     <% } %>
-
-    <script defer>
-      let apexPromise;
-
-      function loadApexCharts() {
-        if (window.ApexCharts) return Promise.resolve(window.ApexCharts);
-        if (apexPromise) return apexPromise; // already loading
-
-        apexPromise = new Promise((resolve, reject) => {
-          function startLoading() {
-            const script = document.createElement('script');
-            script.src = '/dist/apexcharts.js';
-            script.defer = true;
-            script.onload = () => resolve(window.ApexCharts);
-            script.onerror = reject;
-            document.body.appendChild(script);
-          }
-
-          if (document.readyState === 'loading') {
-            window.addEventListener('DOMContentLoaded', startLoading);
-          } else {
-            startLoading();
-          }
-        });
-
-        return apexPromise;
-      }
-
-
-
-      function deepMerge(target, source) {
-        for (const key in source) {
-          if (
-            source[key] &&
-            typeof source[key] === 'object' &&
-            !Array.isArray(source[key])
-          ) {
-            if (!target[key]) target[key] = {};
-            deepMerge(target[key], source[key]);
-          } else {
-            target[key] = source[key];
-          }
-        }
-        return target;
-      }
-
-      async function renderChart(elementId, labelData, seriesData, customOptions = {}, noOptions = false) {
-        let options = {
-          chart: {
-            type: 'line',
-            height: 400,
-            toolbar: { show: false },
-            zoom: {
-              enabled: false
-            },
-            fontFamily: 'Ubuntu',
-          },
-          xaxis: {
-                type: 'datetime',
-                categories: labelData,
-                tickAmount: 6,
-                labels: {
-                  style: { colors: '#000' },
-                  format: 'yyyy-MM'
-              },
-
-          },
-          tooltip: {
-            x: {
-              format: 'yyyy-MM'
-            },
-            enabled: true
-          },
-          yaxis: { labels: { style: { colors: '#000' }, min: 0 } },
-          stroke: { curve: 'smooth', width: 2 },
-          markers: { size: 5 },
-          colors: ['#000'],
-          grid: { borderColor: '#e0e0e0' },
-          theme: {
-              mode: 'light',
-              monochrome: {
-                  enabled: false,
-                  color: '#000000',
-                  shadeTo: 'dark',
-                  shadeIntensity: 0.65
-              },
-          },
-        };
-
-        if(noOptions) {
-            options = {};
-        }
-
-        if(!options.xaxis) options.xaxis = {};
-        options.xaxis.categories = labelData;
-
-        // Check if seriesData is a flat Array
-        if(Array.isArray(seriesData) && (seriesData.length === 0 || typeof seriesData[0] !== 'object')) {
-            options.series = [{ name: customOptions.seriesName || '', data: seriesData }];
-        }else{
-            options.series = seriesData;
-        }
-
-        let fullOptions = deepMerge(
-          structuredClone(options), // avoid mutating original
-          customOptions
-        );
-
-        await loadApexCharts();
-
-        console.log(elementId, fullOptions)
-
-        const chart = new ApexCharts(document.querySelector('#' + elementId), fullOptions);
-        chart.render();
-      }
-    </script>
-    <style>
-        .chart {
-            background-color: #fff;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            .chart {
-                filter: invert(1) hue-rotate(180deg);
-            }
-
-            .apexcharts-tooltip, .apexcharts-tooltip-title{
-                background: rgba(255, 255, 255, 0.96) !important;
-                color: #000 !important;
-            }
-        }
-    </style>
 </head>
 <body>
     <%- include('../header.ejs') %>
@@ -197,9 +67,7 @@
             <a href="/tiekejas/<%= asmuo.jar.jarKodas %>">↗ Pardavimai</a>&nbsp;
           </div>
 
-          <% if(asmuo.sodra && asmuo.sodra.data) { %>
-            <p><i>Duomenys <%= asmuo.sodra.data %>, nebent nurodyta kitaip.</i></p>
-          <% } %>
+            <p><i>Duomenys gali būti pasenę.</i></p>
         </section>
 
         <section style="grid-area: zemelapis; height: 100%; min-height: 300px;">
@@ -341,6 +209,7 @@
 
        <%- include("asmuoDalys/teismoNuosprendziai.ejs") %>
 
+       <%- include("asmuoDalys/vtekDeklaracijos.ejs") %>
 
 	</main>
     <%- include('../footer.ejs') %>

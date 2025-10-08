@@ -18,20 +18,13 @@
                 <% }) %>
               ];
 
-              renderChart('pirkimaiPerMetus', pirkimaiKasMetusLabels, pirkimaiKasMetus, {
-                seriesName: "EUR",
-                xaxis: {
-                      labels: {
-                        format: 'yyyy'
-                    },
-
-                },
-                tooltip: {
-                  x: {
-                    format: 'yyyy'
-                  },
-                },
-              });
+              displayChart({
+                element: document.querySelector('#pirkimaiPerMetus'),
+                type: 'line-datetime',
+                labels: pirkimaiKasMetusLabels,
+                series: pirkimaiKasMetus,
+                flags: ['yEUR', 'yMin0', 'xYear']
+              })
             </script>
         <% } else { %>
             <i class="diagrama-nera-duomenu">Nėra duomenų</i>
@@ -55,20 +48,13 @@
                 <% }) %>
               ];
 
-              renderChart('pardavimaiPerMetus', pardavimaiKasMetusLabels, pardavimaiKasMetus, {
-                seriesName: "EUR",
-                xaxis: {
-                      labels: {
-                        format: 'yyyy'
-                    },
-
-                },
-                tooltip: {
-                  x: {
-                    format: 'yyyy'
-                  },
-                },
-              });
+              displayChart({
+                element: document.querySelector('#pardavimaiPerMetus'),
+                type: 'line-datetime',
+                labels: pardavimaiKasMetusLabels,
+                series: pardavimaiKasMetus,
+                flags: ['yEUR', 'yMin0', 'xYear']
+              })
             </script>
         <% } else { %>
             <i class="diagrama-nera-duomenu">Nėra duomenų</i>
@@ -79,6 +65,7 @@
 <div class="col-2 mobile-col-1" style="gap: 16px;">
     <section style="width: 100%;">
         <h3>TOP 10 tiekėjų</h3>
+        <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topTiekejai.csv">↗ CSV</a> &nbsp; <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topTiekejai.jsonl">↗ JSONL</a>
         <% if(asmuo.sutartys && asmuo.sutartys.topTiekejai && asmuo.sutartys.topTiekejai.length > 0) { %>
             <table style="width: 100%; min-width: 0px;">
                 <thead>
@@ -86,6 +73,7 @@
                         <th>Vieta</th>
                         <th>Tiekėjas</th>
                         <th>Suma</th>
+                        <th>Sut. sk.</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -103,6 +91,9 @@
                             <td class="center" style="width: 9ch;">
                                 <%= tiekejas.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) %>
                             </td>
+                            <td class="center" style="width: 7ch;">
+                                <%= tiekejas.count.toLocaleString('lt-LT') %>
+                            </td>
                         </tr>
                         <% id++; %>
                     <% }) %>
@@ -114,6 +105,7 @@
     </section>
     <section style="width: 100%;">
         <h3>TOP 10 pirkėjų</h3>
+        <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topPirkejai.csv">↗ CSV</a> &nbsp; <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topPirkejai.jsonl">↗ JSONL</a>
         <% if(asmuo.sutartys && asmuo.sutartys.topPirkejai && asmuo.sutartys.topPirkejai.length > 0) { %>
             <table style="width: 100%; min-width: 0px;">
                 <thead>
@@ -121,6 +113,7 @@
                         <th>Vieta</th>
                         <th>Pirkėjas</th>
                         <th>Suma</th>
+                        <th>Sut. sk.</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -137,6 +130,9 @@
                             </td>
                             <td class="center" style="width: 9ch;">
                                 <%= pirkejas.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) %>
+                            </td>
+                            <td class="center" style="width: 7ch;">
+                                <%= pirkejas.count.toLocaleString('lt-LT') %>
                             </td>
                         </tr>
                         <% id++; %>

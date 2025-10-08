@@ -12,9 +12,9 @@ export async function gautiDarboSkelbimus(req, jarKodas) {
     // Run count and fetch in parallel
     const [darboSkelbimaiCountResult, darboSkelbimaiRows] = await Promise.all([
         postgres.query(
-            `SELECT COUNT(*) AS total
-           FROM "darboVietos"
-           WHERE "jarKodas" = $1;`,
+            `SELECT "count" AS total
+               FROM "darboVietosCounts"
+               WHERE "jarKodas" = $1;`,
             [jarKodas],
         ),
         postgres.query(
@@ -29,7 +29,7 @@ export async function gautiDarboSkelbimus(req, jarKodas) {
 
     return {
         limit: useLimit ? limit : "max",
-        rows: parseInt(darboSkelbimaiCountResult.rows[0].total, 10), // total matching rows
-        skelbimai: darboSkelbimaiRows.rows, // limited rows
+        rows: darboSkelbimaiCountResult.rows[0]?.total ?? 0,
+        skelbimai: darboSkelbimaiRows.rows,
     };
 }

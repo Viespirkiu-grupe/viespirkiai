@@ -126,6 +126,8 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
                 currentPage: page,
                 pageCount: Math.ceil(total / limit),
                 galimaEksportuoti,
+                req,
+                usedHiddenFields: false,
             });
             return;
         }
@@ -139,11 +141,15 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
             currentPage: page,
             pageCount: Math.ceil(total / limit),
             galimaEksportuoti,
+            req,
+            usedHiddenFields: false,
         });
     } else {
         res.render("juridiniai/index", {
             customHead: config.customHead,
             values: {},
+            req,
+            usedHiddenFields: false,
         });
     }
 });

@@ -12,7 +12,13 @@
                 <% }) %>
               ];
 
-              renderChart('darbuotojuSkaiciausDiagrama', sodraLabels, darbuotojai);
+              displayChart({
+                element: document.querySelector('#darbuotojuSkaiciausDiagrama'),
+                type: 'line-datetime',
+                labels: sodraLabels,
+                series: darbuotojai,
+                flags: ['yMin0']
+              })
             </script>
         <% } else { %>
             <i class="diagrama-nera-duomenu">Nėra duomenų</i>
@@ -30,7 +36,13 @@
                 <% }) %>
               ];
 
-              renderChart('darbuotojuSkaiciausIIDiagrama', sodraLabels, darbuotojaiII);
+              displayChart({
+                element: document.querySelector('#darbuotojuSkaiciausIIDiagrama'),
+                type: 'line-datetime',
+                labels: sodraLabels,
+                series: darbuotojaiII,
+                flags: ['yMin0']
+              })
             </script>
         <% } else { %>
             <i class="diagrama-nera-duomenu">Nėra duomenų</i>

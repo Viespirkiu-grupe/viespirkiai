@@ -8,9 +8,9 @@ export async function gautiTeismoNuosprendzius(req, jarKodas) {
     // Run count and fetch in parallel
     const [countResult, rowsResult] = await Promise.all([
         postgres.query(
-            `SELECT COUNT(*) AS total
-            FROM "bylosDalyviai"
-            WHERE "kodas" = $1::text;`,
+            `SELECT "count" AS total
+                 FROM "bylosDalyviaiCounts"
+                 WHERE "jarKodas" = $1::text;`,
             [jarKodas],
         ),
         postgres.query(
@@ -26,7 +26,7 @@ export async function gautiTeismoNuosprendzius(req, jarKodas) {
 
     return {
         limit: teismoUseLimit ? teismoLimit : "max",
-        rows: parseInt(countResult.rows[0].total, 10), // total matching rows
+        rows: countResult.rows[0]?.total ?? 0, // total matching rows
         nuosprendziai: rowsResult.rows.map((nuosprendis) => ({
             ...nuosprendis,
             // Capitalize first letter of bylojeKaip

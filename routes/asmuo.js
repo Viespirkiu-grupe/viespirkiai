@@ -11,7 +11,9 @@ import { gautiSutarciuDuomenis } from "./asmuoDalys/sutartys.js";
 import { gautiFinansuDuomenis } from "./asmuoDalys/finansai.js";
 import { gautiIstatiniKapitala } from "./asmuoDalys/istatinisKapitalas.js";
 import { gautiDarboSkelbimus } from "./asmuoDalys/darboSkelbimai.js";
-import { gautiDarboGrafikaPagalSutarciuRedagavima } from "./asmuoDalys/darboGrafikas.js";
+import { gautiVtekDeklaracijas } from "./asmuoDalys/vtekDeklaracijos.js";
+
+import { log } from "../utils/log.js";
 import Timings from "../utils/timings.js";
 
 const asmuoRouter = express.Router();
@@ -129,11 +131,11 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         vmi: async () => gautiVmiDuomenis(id),
         regitra: async () => gautiRegitrosDuomenis(req, id),
         teismoNuosprendziai: async () => gautiTeismoNuosprendzius(req, id),
-        sutartys: async () => gautiSutarciuDuomenis(id),
+        sutartys: async () => gautiSutarciuDuomenis(req, id),
         finansai: async () => gautiFinansuDuomenis(jarId),
         istatinisKapitalas: async () => gautiIstatiniKapitala(jarId),
         darboSkelbimai: async () => gautiDarboSkelbimus(req, id),
-        darboGrafikas: async () => gautiDarboGrafikaPagalSutarciuRedagavima(id),
+        vtek: async () => gautiVtekDeklaracijas(id),
     };
 
     // Run all tasks in parallel with timings
@@ -148,6 +150,21 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
             })(),
         ]),
     );
+    // const timedTasks = {};
+
+    // for (const [key, fn] of Object.entries(taskMap)) {
+    //     const start = Date.now();
+    //     try {
+    //         const result = await fn();
+    //         const duration = Date.now() - start;
+    //         log(`Task "${key}" finished in ${duration} ms`);
+    //         timedTasks[key] = { result, duration, error: null };
+    //     } catch (err) {
+    //         const duration = Date.now() - start;
+    //         console.error(`Task "${key}" failed after ${duration} ms:`, err);
+    //         timedTasks[key] = { result: null, duration, error: err };
+    //     }
+    // }
 
     const results = await Promise.allSettled(Object.values(timedTasks));
 
@@ -217,5 +234,119 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         queryParams: req.query,
     });
 });
+
+asmuoRouter.get(
+    [
+        "/asmuo/:jarKodas/sutartys/topPirkejai.csv",
+        "/asmuo/:jarKodas/sutartys/topPirkejai.jsonl",
+    ],
+    async (req, res, next) => {
+        // jarKodas turi būti <=9 skaitmenys, jei ne – 404
+        if (!/^\d{1,9}$/.test(req.params.jarKodas)) {
+            return next();
+        }
+
+        let sutartys = await gautiSutarciuDuomenis(
+            { ...req, query: { sutartysLimit: "max" } },
+            req.params.jarKodas,
+        );
+
+        if (!sutartys) {
+            return next();
+        }
+
+        if (!sutartys.topPirkejai) {
+            sutartys.topPirkejai = [];
+        }
+
+        if (req.path.endsWith(".csv")) {
+            res.setHeader("Content-Type", "text/csv; charset=utf-8");
+            res.setHeader(
+                "Content-Disposition",
+                `attachment; filename="top-pirkejai-${req.params.jarKodas}.csv"`,
+            );
+            // CSV
+            let csv = `jarKodas,pavadinimas,suma,kiekis\n`;
+            for (let p of sutartys.topPirkejai) {
+                csv += `"${p.jarKodas}","${p.pavadinimas.replaceAll(
+                    `"`,
+                    `""`,
+                )}",${p.total},${p.count}\n`;
+            }
+            return res.send(csv);
+        } else if (req.path.endsWith(".jsonl")) {
+            res.setHeader("Content-Type", "application/jsonl; charset=utf-8");
+            res.setHeader(
+                "Content-Disposition",
+                `attachment; filename="top-pirkejai-${req.params.jarKodas}.jsonl"`,
+            );
+            // JSONL
+            let jsonl = "";
+            for (let p of sutartys.topPirkejai) {
+                jsonl += JSON.stringify(p) + "\n";
+            }
+            return res.send(jsonl);
+        } else {
+            return next();
+        }
+    },
+);
+
+asmuoRouter.get(
+    [
+        "/asmuo/:jarKodas/sutartys/topTiekejai.csv",
+        "/asmuo/:jarKodas/sutartys/topTiekejai.jsonl",
+    ],
+    async (req, res, next) => {
+        // jarKodas turi būti <=9 skaitmenys, jei ne – 404
+        if (!/^\d{1,9}$/.test(req.params.jarKodas)) {
+            return next();
+        }
+
+        let sutartys = await gautiSutarciuDuomenis(
+            { ...req, query: { sutartysLimit: "max" } },
+            req.params.jarKodas,
+        );
+
+        if (!sutartys) {
+            return next();
+        }
+
+        if (!sutartys.topTiekejai) {
+            sutartys.topTiekejai = [];
+        }
+
+        if (req.path.endsWith(".csv")) {
+            res.setHeader("Content-Type", "text/csv; charset=utf-8");
+            res.setHeader(
+                "Content-Disposition",
+                `attachment; filename="top-tiekejai-${req.params.jarKodas}.csv"`,
+            );
+            // CSV
+            let csv = `jarKodas,pavadinimas,suma,kiekis\n`;
+            for (let p of sutartys.topTiekejai) {
+                csv += `"${p.jarKodas}","${p.pavadinimas.replaceAll(
+                    `"`,
+                    `""`,
+                )}",${p.total},${p.count}\n`;
+            }
+            return res.send(csv);
+        } else if (req.path.endsWith(".jsonl")) {
+            res.setHeader("Content-Type", "application/jsonl; charset=utf-8");
+            res.setHeader(
+                "Content-Disposition",
+                `attachment; filename="top-tiekejai-${req.params.jarKodas}.jsonl"`,
+            );
+            // JSONL
+            let jsonl = "";
+            for (let p of sutartys.topTiekejai) {
+                jsonl += JSON.stringify(p) + "\n";
+            }
+            return res.send(jsonl);
+        } else {
+            return next();
+        }
+    },
+);
 
 export default asmuoRouter;

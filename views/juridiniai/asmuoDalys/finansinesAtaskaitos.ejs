@@ -28,8 +28,6 @@
                        return index !== -1 ? pardavimaiKasMetus[index] : null;
                      });
 
-
-
                        renderChart('pardavimoPajamos', mergedLabels, [
                          {name: "Pardavimo pajamos", data: finalPardavimoPajamosVertes},
                          {name: "Viešjų pirkimų pardavimai", data: finalViesujuPirkimuPardavimaiKasMetus}
@@ -87,6 +85,14 @@
                              <% }) %>
                            ];
 
+                           let hasValuesUnderZero = false;
+                            for(let i = 0; i < grynasisPelnasVertes.length; i++){
+                              if(grynasisPelnasVertes[i] !== null && grynasisPelnasVertes[i] < 0){
+                                hasValuesUnderZero = true;
+                                break;
+                              }
+                            }
+
                            renderChart('grynasisPelnas', grynasisPelnasLabels, grynasisPelnasVertes, {
                              seriesName: "",
                              xaxis: {
@@ -95,7 +101,7 @@
                                 },
                              },
                              yaxis: {
-                               min: 0,
+                               min: hasValuesUnderZero ? undefined : 0,
                                labels: {
                                    formatter: function (value) {
                                      return value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' });
