@@ -1,6 +1,6 @@
 services:
     db:
-        image: postgres:latest
+        image: postgres:17
         container_name: viespirkiaiPostgres
         environment:
             POSTGRES_USER: admin
@@ -10,6 +10,7 @@ services:
             - "9118:5432"
         volumes:
             - ./pgdata:/var/lib/postgresql/data
+
 
     pgadmin:
         image: dpage/pgadmin4
