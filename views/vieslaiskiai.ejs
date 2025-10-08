@@ -66,59 +66,21 @@
             </section><br><br>
             <section class="ziniasklaida results" style="margin-inline: initial;">
                 <h2>Žiniasklaidoje</h2>
-                <div class="rezultatas">
-                    <div class="rezultatas-top">
-                        <span>LRT</span>
-                        <span>2025-09-17</span>
-                        <span><a href="/vieslaiskiai/3.pdf">Auksinė nacionalinė duomenų pelkė</a></span>
+                <% vieslaiskiaiZiniasklaidoje.forEach(rezultatas => { %>
+                    <div class="rezultatas">
+                        <div class="rezultatas-top">
+                            <span><%= rezultatas.saltinis %></span>
+                            <span><%= rezultatas.date %></span>
+                            <span><a href="<%= rezultatas.vieslaiskisLink %>"><%= rezultatas.vieslaiskis %></a></span>
+                        </div>
+                        <div class="rezultatas-title">
+                            <a href="<%= rezultatas.link %>">
+                                <%= rezultatas.pavadinimas %>
+                            </a>
+                        </div>
+                        <div class="rezultatas-bottom"></div>
                     </div>
-                    <div class="rezultatas-title">
-                        <a href="https://www.lrt.lt/naujienos/lietuvoje/2/2681230/buves-simonytes-patarejas-isidarbino-imoneje-kur-valstybe-sudare-milijonu-vertes-sutartis">
-                            Buvęs Šimonytės patarėjas įsidarbino įmonėje, kur valstybė sudarė milijonų vertės sutartis
-                        </a>
-                    </div>
-                    <div class="rezultatas-bottom"></div>
-                </div>
-                <div class="rezultatas">
-                    <div class="rezultatas-top">
-                        <span>Delfi</span>
-                        <span>2025-09-17</span>
-                        <span><a href="/vieslaiskiai/3.pdf">Auksinė nacionalinė duomenų pelkė</a></span>
-                    </div>
-                    <div class="rezultatas-title">
-                        <a href="https://www.delfi.lt/news/daily/lithuania/buves-simonytes-patarejas-isidarbino-imoneje-is-kurios-pirkta-uz-desimtis-milijonu-120144035">
-                            Buvęs Šimonytės patarėjas įsidarbino įmonėje, iš kurios pirkta už dešimtis milijonų
-                        </a>
-                    </div>
-                    <div class="rezultatas-bottom"></div>
-                </div>
-                <div class="rezultatas">
-                    <div class="rezultatas-top">
-                        <span>LRT</span>
-                        <span>2025-09-02</span>
-                        <span><a href="/vieslaiskiai/2.pdf">Konfigūruojama konkurencija</a></span>
-                    </div>
-                    <div class="rezultatas-title">
-                        <a href="https://www.lrt.lt/naujienos/lietuvoje/2/2681230/buves-simonytes-patarejas-isidarbino-imoneje-kur-valstybe-sudare-milijonu-vertes-sutartis">
-                            Žiniasklaida: 9,5 mln. eurų vertės VU pirkimą laimėjo dėstytojo įmonė
-                        </a>
-                    </div>
-                    <div class="rezultatas-bottom"></div>
-                </div>
-                <div class="rezultatas">
-                    <div class="rezultatas-top">
-                        <span>Delfi</span>
-                        <span>2025-09-02</span>
-                        <span><a href="/vieslaiskiai/2.pdf">Konfigūruojama konkurencija</a></span>
-                    </div>
-                    <div class="rezultatas-title">
-                        <a href="https://www.delfi.lt/news/daily/lithuania/kelia-klausima-del-beveik-9-5-milijonu-vertes-vu-pirkimo-kodel-laimejo-destytojo-vadovaujama-imone-120138238">
-                            Kelia klausimą dėl beveik 9,5 milijonų vertės VU pirkimo: kodėl laimėjo dėstytojo vadovaujama įmonė?
-                        </a>
-                    </div>
-                    <div class="rezultatas-bottom"></div>
-
-                </div>
+                <% }) %>
             </section>
 		</main>
 		<%- include('footer.ejs', {
