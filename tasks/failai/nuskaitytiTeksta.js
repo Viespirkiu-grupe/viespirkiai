@@ -32,7 +32,11 @@ function cleanMetadata(obj) {
  * @returns {Promise<Object>} - The result from the document reader service.
  * @throws Will throw an error if the document reader service fails or returns an invalid response.
  */
-async function nuskaitytiDokNuskaitytojuje(url, nuskaitytojoId = null) {
+async function nuskaitytiDokNuskaitytojuje(
+    url,
+    nuskaitytojoId = null,
+    extension = "pdf",
+) {
     if (nuskaitytojoId) {
         // Get a specific row from "dokNuskaitytojai"
         let nuskaitytojaiRes = await postgres.query(
@@ -63,8 +67,8 @@ async function nuskaitytiDokNuskaitytojuje(url, nuskaitytojoId = null) {
     }
 
     // Fetch the given url GET ?url=url&apiKey=apiKey
-    let fetchUrl = `${nuskaitytojas.url}/?url=${encodeURIComponent(url)}&apiKey=${encodeURIComponent(nuskaitytojas.apiKey)}`;
-    log(`Dokumentas nuskaitomas ${nuskaitytojas.pavadinimas}`);
+    let fetchUrl = `${nuskaitytojas.url}/?url=${encodeURIComponent(url)}&apiKey=${encodeURIComponent(nuskaitytojas.apiKey)}&extension=${encodeURIComponent(extension)}`;
+    log(`Dokumentas ${url} nuskaitomas ${nuskaitytojas.pavadinimas}`);
     let response = await fetch(fetchUrl, {
         method: "GET",
         headers: {
@@ -100,10 +104,10 @@ async function nuskaitytiDokNuskaitytojuje(url, nuskaitytojoId = null) {
 }
 
 const REFILL_THRESHOLD = 5;
-const BUCKET_SIZE = 50;
+const BUCKET_SIZE = 1000;
 const IN_PROGRESS_TIMEOUT = 10 * 60 * 1000; // 10 min
 
-const nuskaitymoVersija = 3;
+const nuskaitymoVersija = 5;
 
 // In-memory tracking
 let kibirelis = [];
@@ -130,8 +134,8 @@ async function fillBucket() {
              WHERE (nuskaitytas IS NULL OR nuskaitytas < $1)
                AND (nuskaitytas IS NULL OR nuskaitytas >= 0)
                AND parsiustas = 1
-               AND extension = 'pdf'
-             ORDER BY nuskaitytas NULLS FIRST
+               AND extension IN ('pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt')
+               ORDER BY nuskaitytas NULLS FIRST
              LIMIT $2`,
             [nuskaitymoVersija, limit * 2], // fetch extra to avoid duplicates
         );
@@ -206,13 +210,17 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         return false;
     }
 
-    let url = `https://viespirkiai.top/failas/${dokumentas.dokId}/${dokumentas.fileId}/download`;
+    let url = `https://failai-direct.viespirkiai.top/${dokumentas.dokId}/${dokumentas.fileId}`;
     let viesasUrl = `https://failai.viespirkiai.top/${dokumentas.dokId}/${dokumentas.fileId}`;
 
     log(viesasUrl);
 
     try {
-        let results = await nuskaitytiDokNuskaitytojuje(url, nuskaitytojoId);
+        let results = await nuskaitytiDokNuskaitytojuje(
+            url,
+            nuskaitytojoId,
+            dokumentas.extension,
+        );
 
         var tekstas = results.pages;
         var metadata = results.metadata;
@@ -221,14 +229,18 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     } catch (e) {
         console.error("Klaida nuskaitymo metu:", e);
 
-        // Try to set nuskaitytas = -1
+        let kodas = -1;
+        if (e.message.includes("No password given")) {
+            kodas = -2; // password protected
+        }
+
         if (dokumentas && dokumentas.id) {
             try {
                 await postgres.query(
                     `UPDATE failai
-                           SET nuskaitytas = -1
-                           WHERE id = $1;`,
-                    [dokumentas.id],
+                           SET nuskaitytas = $1
+                           WHERE id = $2;`,
+                    [kodas, dokumentas.id],
                 );
                 doneWithFile(dokumentas.id);
             } catch (updateErr) {
@@ -242,6 +254,29 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         throw e; // rethrow after marking failure
     }
 
+    // Tekstas is a json array of pages, join to single string
+    let sujungtasTekstas = tekstas.join("");
+    if (!metadata.wordCount) {
+        metadata.wordCount = sujungtasTekstas
+            .split(/\s+/)
+            .filter(Boolean).length;
+    }
+
+    if (!metadata.characterCount) {
+        metadata.characterCount = sujungtasTekstas.length;
+    }
+
+    let reikalingasOcr = dokumentas.ocrState; // Nereikalingas
+    if (
+        metadata?.wordCount == 0 &&
+        dokumentas.extension == "pdf" &&
+        dokumentas.ocrState === null &&
+        dokumentas.ocrText === null
+    ) {
+        reikalingasOcr = 0; // Reikalingas
+    }
+    log(`${dokumentas.id} - ${dokumentas.ocrState} o ocr ${reikalingasOcr}`);
+
     // Update the row
     await postgres.query(
         `UPDATE failai
@@ -251,16 +286,31 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             "zodziuSkaicius" = $4,
             "puslapiuSkaicius" = $5,
             "jarKodai" = $6,
-            "ibanNumeriai" = $7
-        WHERE id = $8;`,
+            "ibanNumeriai" = $7,
+            links = $8,
+            emails = $9,
+            domains = $10,
+            telefonai = $11,
+            "hasSloppyRedactions" = $12,
+            "simboliuSkaicius" = $13,
+            "ocrState" = $14
+        WHERE id = $15;`,
         [
             nuskaitymoVersija,
             truncateTo1MB(tekstas),
             metadata,
-            metadata.wordCount,
-            metadata.pageCount,
-            metadata.jarKodai,
-            metadata.ibanNumeriai,
+            metadata?.wordCount,
+            metadata?.pageCount,
+
+            metadata?.jarKodai?.map((o) => o.code) || [],
+            metadata?.ibanNumeriai?.map((o) => o.iban) || [],
+            metadata?.links?.map((o) => o.uri) || [],
+            metadata?.emails?.map((o) => o.email) || [],
+            metadata?.domains || [],
+            metadata?.telefonai?.map((o) => o.phone) || [],
+            metadata?.sloppyRedactions?.length > 0 || false,
+            metadata?.characterCount || 0,
+            reikalingasOcr,
             dokumentas.id,
         ],
     );

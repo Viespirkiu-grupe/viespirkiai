@@ -1,0 +1,59 @@
+    <div>
+        <% if(values.search == "" && usedHiddenFields == false) { %>
+            <h2><u>Naujausi sprendimai dėl neskelbiamų derybų</u></h2>
+        <% } %>
+        <section class="preResultOptions">
+        <div class="numberOfResults">
+            <%- numberOfResults %>
+        </div>
+        </section>
+    </div>
+    <% data.forEach(item => { %>
+        <article class="rezultatas" aria-label="<%= item.jarPavadinimas %>">
+            <dl class="rezultatas-top">
+                <div>
+                    <dt class="visually-hidden">Data</dt>
+                    <dd>
+                        <% if(item.data) { %>
+                            <time datetime="<%= item.data %>"><%= item.data %></time>
+                        <% } else { %>
+                            -
+                        <% } %>
+                    </dd>
+                </div>
+
+                <div>
+                    <dt class="visually-hidden">Išvada</dt>
+                    <dd><%= item.isvada || '-' %></dd>
+                </div>
+            </dl>
+
+            <h3 class="rezultatas-title">
+                <a href="https://eviesiejipirkimai.lt/<%= item.link %>">
+                    <span>
+                        <% if(item.aprasymas && item.aprasymas.length > 0) { %>
+                            <%= item.aprasymas %>
+                        <% } else { %>
+                            <i>Nenurodyta</i>
+                        <% } %>
+                    </span>
+                </a>
+            </h3>
+
+            <div class="rezultatas-bottom">
+                <span>
+                    <b>Perkančioji organizacija: </b>
+                    <% if(item.jarKodas && item.jarPavadinimas) { %>
+                        <a href="/asmuo/<%= item.jarKodas %>"><%= item.jarPavadinimas %></a>
+                    <% } else { %>
+                        <i>Nenurodyta</i>
+                    <% } %>
+                </span>
+            </div>
+        </article>
+    <% }); %>
+
+
+<%- include('../pagination.ejs', {
+    currentPage, pageCount, queryParams
+}) %>

@@ -1,0 +1,21 @@
+<style>
+.tabs{
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;       /* enable horizontal scrolling */
+    white-space: nowrap;    /* prevent wrapping */
+    -webkit-overflow-scrolling: touch; /* smooth scrolling on mobile */
+    margin-right: -24px;
+}
+.tabs a{
+    color: var(--gray);
+        flex-shrink: 0;         /* prevent links from shrinking */
+}
+.tabs a.active{
+    font-weight: 700;
+    color: var(--black);
+}
+.tabs a:hover{
+    color: var(--black);
+}
+</style>

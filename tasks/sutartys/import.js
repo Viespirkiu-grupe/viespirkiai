@@ -150,9 +150,15 @@ export async function importArray(data) {
 
                 const baseIndex = failaiValues.length;
                 failaiPlaceholders.push(
-                    `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4})`,
+                    `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5})`,
                 );
-                failaiValues.push(dokId, fileId, pavadinimas, extension);
+                failaiValues.push(
+                    dokId,
+                    fileId,
+                    pavadinimas,
+                    extension,
+                    "sutartys",
+                );
             });
         });
 
@@ -208,7 +214,7 @@ export async function importArray(data) {
 
         if (failaiValues.length > 0) {
             await postgres.query(
-                `INSERT INTO failai ("dokId", "fileId", "pavadinimas", "extension")
+                `INSERT INTO failai ("dokId", "fileId", "pavadinimas", "extension", "saltinis")
                  VALUES ${failaiPlaceholders.join(", ")}
                  ON CONFLICT ("dokId", "fileId") DO NOTHING`,
                 failaiValues,

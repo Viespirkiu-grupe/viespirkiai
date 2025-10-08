@@ -37,6 +37,10 @@ app.use(express.static(path.join(__dirname, "public")));
 // Cookies
 app.use(cookieParser());
 
+// JSON
+app.use(express.json({ limit: "10MB" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
 // Auto-load all routes from /routes (in parallel)
 const routesPath = path.join(__dirname, "routes");
 const files = fs.readdirSync(routesPath).filter((file) => file.endsWith(".js"));

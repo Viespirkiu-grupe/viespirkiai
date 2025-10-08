@@ -1,0 +1,6 @@
+<div class="tabs">
+  <a href="/" class="<%= req.path === '/' ? 'active' : '' %>">Sutartys</a>
+  <a href="/failai" class="<%= req.path.startsWith('/failai') ? 'active' : '' %>">Failai</a>
+  <a href="/juridiniai" class="<%= req.path.startsWith('/juridiniai') ? 'active' : '' %>">Juridiniai asmenys</a>
+  <a href="/neskelbiamos" class="<%= req.path.startsWith('/neskelbiamos') ? 'active' : '' %>">Neskelbiamos derybos</a>
+</div>

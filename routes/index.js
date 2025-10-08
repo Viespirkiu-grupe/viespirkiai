@@ -15,13 +15,15 @@ const indexRouter = express.Router();
 let postgresSutarciuSkaicius;
 
 async function atnaujintiSutarciuSkaiciu() {
-    postgresSutarciuSkaicius = Number(
-        (
-            await postgres.query(`
+    try {
+        postgresSutarciuSkaicius = Number(
+            (
+                await postgres.query(`
       SELECT * FROM "eiluciuSkaiciai" WHERE "tableName" = 'sutartys';
     `)
-        ).rows[0].rowCount,
-    );
+            ).rows[0].rowCount,
+        );
+    } catch (e) {}
 }
 
 await atnaujintiSutarciuSkaiciu();
@@ -95,28 +97,73 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
             visiIrasai,
         } = buildPostgresFilter(req.query, limit, page);
 
-        var results, total;
+        var results, total, client;
         if (req.query.csv || req.query.jsonl) {
-            var client = await postgres.connect();
+            client = await postgres.connect();
 
             const query = new QueryStream(sql, params);
             var results = client.query(query);
+        } else if (req.query.rezultatuSkaiciausPatikslinimas) {
+            let count = await postgres.query(sqlCount, params.slice(0, -2));
+            total =
+                params.length === 1
+                    ? postgresSutarciuSkaicius
+                    : parseInt(count.rows[0].count, 10);
+            zinomasRezultatuSkaicius = true;
+            results = [];
         } else {
             if (visiIrasai) {
+                // all results, no count needed
                 let resultsRes = await postgres.query(sql, params);
                 results = resultsRes.rows;
                 total = postgresSutarciuSkaicius;
+                zinomasRezultatuSkaicius = true;
             } else {
-                const [resultsRes, countRes] = await Promise.all([
-                    postgres.query(sql, params), // full results
-                    postgres.query(sqlCount, params.slice(0, -2)), // count without limit
-                ]);
+                // borrow a dedicated client for the count query
+                const countClient = await postgres.connect();
+
+                // start both queries immediately
+                const resultsPromise = postgres.query(sql, params);
+                const countPromise = countClient.query(
+                    sqlCount,
+                    params.slice(0, -2),
+                );
+
+                // wait for results first
+                const resultsStart = Date.now();
+                const resultsRes = await resultsPromise;
+                const resultsTime = Date.now() - resultsStart; // in ms
+
+                // now wait for count query, giving it resultsTime + 0.5  s
+                try {
+                    const countRes = await Promise.race([
+                        countPromise,
+                        new Promise((_, reject) =>
+                            setTimeout(
+                                () => reject(new Error("timeout")),
+                                resultsTime + 500,
+                            ),
+                        ),
+                    ]);
+
+                    total =
+                        params.length === 1
+                            ? postgresSutarciuSkaicius
+                            : parseInt(countRes.rows[0].count, 10);
+                    zinomasRezultatuSkaicius = true;
+                } catch (err) {
+                    // cancel count query if still running
+                    try {
+                        await pg.CancelQuery(countClient, countPromise);
+                    } catch (_) {}
+
+                    total = null;
+                    zinomasRezultatuSkaicius = false;
+                } finally {
+                    countClient.release();
+                }
 
                 results = resultsRes.rows;
-                total =
-                    params.length === 1
-                        ? postgresSutarciuSkaicius // only limit param, no filters
-                        : parseInt(countRes.rows[0].count, 10);
             }
 
             // change sutartiesUnikalusId to sutartiesUnikalusID
@@ -156,16 +203,34 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
     // Paieškos užklausos informacija
     let trukme = ((performance.now() - startas) / 1000).toFixed(2) + "s";
     let rodomiRezultatai = results.length;
-    let rodomasTotal;
-    if (zinomasRezultatuSkaicius) {
-        rodomasTotal = total;
-    } else {
-        rodomasTotal = `<span class="rezultatai-nezinomas-total"> ? </span>`;
+    if (req.query.rezultatuSkaiciausPatikslinimas) {
+        rodomiRezultatai = limit;
     }
-    if (rodomiRezultatai < total) {
-        var numberOfResults = `Rodomi ${rodomiRezultatai} iš ${Number(rodomasTotal).linksniuotiK(["rezultato", "rezultatų"])} <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
+    let rodomasTotal = zinomasRezultatuSkaicius
+        ? total
+        : `<span class="rezultatai-nezinomas-total"> ? </span>`;
+
+    let numberOfResults;
+
+    if (zinomasRezultatuSkaicius) {
+        if (rodomiRezultatai < total) {
+            numberOfResults = `Rodomi ${rodomiRezultatai} iš ${Number(rodomasTotal).linksniuotiK(["rezultato", "rezultatų"])} <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
+        } else {
+            numberOfResults = `${Number(rodomasTotal).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
+        }
     } else {
-        var numberOfResults = `${Number(total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
+        // total unknown
+        numberOfResults = `Rodomi ${rodomiRezultatai} iš ${rodomasTotal} rezultatų <pre style="display: inline;"> (${trukme}, ${paieškosVariklis})</pre>`;
+        total = 10_000; // for pagination
+    }
+
+    if (req.query.rezultatuSkaiciausPatikslinimas) {
+        res.json({
+            zinomasRezultatuSkaicius,
+            total,
+            numberOfResults,
+        });
+        return;
     }
 
     // Jei prašo JSONL
@@ -286,15 +351,6 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
         }
     }
 
-    if (req.query.rezultatuSkaiciausPatikslinimas) {
-        res.json({
-            zinomasRezultatuSkaicius,
-            total,
-            numberOfResults,
-        });
-        return;
-    }
-
     let galimaEksportuoti = true;
     if (req.query.search && total > MAX_TYPESENSE_LIMIT) {
         galimaEksportuoti = false;
@@ -340,6 +396,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
         customHead: config.customHead,
         galimaEksportuoti,
         naujaPaieska,
+        req,
     });
 });
 

@@ -3,6 +3,7 @@ import cleanEmptyQueryParams from "../utils/queryParams.js";
 import config from "../utils/config.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 import { postgres } from "../postgres/postgres.js";
+import { gautiStatistika } from "./statistika.js";
 
 const failaiSearchRouter = express.Router();
 
@@ -28,14 +29,11 @@ failaiSearchRouter.get("/failai", cleanEmptyQueryParams, async (req, res) => {
     if (req.query.search) {
         const searchTerm = req.query.search;
 
-        try {
-            const quoteMatch = searchTerm.match(/^"(.*)"$/);
-            const tsQueryFunc = quoteMatch
-                ? "phraseto_tsquery"
-                : "plainto_tsquery";
-            const cleanSearch = quoteMatch ? quoteMatch[1] : searchTerm;
+        const quoteMatch = searchTerm.match(/^"(.*)"$/);
+        const tsQueryFunc = quoteMatch ? "phraseto_tsquery" : "plainto_tsquery";
+        var cleanSearch = quoteMatch ? quoteMatch[1] : searchTerm;
 
-            const queryText = `
+        const queryText = `
               SELECT
                   f.*,
                   CASE
@@ -60,76 +58,145 @@ failaiSearchRouter.get("/failai", cleanEmptyQueryParams, async (req, res) => {
               LIMIT $2 OFFSET $3;
           `;
 
-            const totalQuery = `
+        const totalQuery = `
             SELECT COUNT(*)
             FROM failai
             WHERE nuskaitytas >= 0
               AND search_index @@ ${tsQueryFunc}('simple', $1);
           `;
 
-            const [resultsRes, totalRes] = await Promise.all([
-                postgres.query(queryText, [cleanSearch, limit, skip]),
-                postgres.query(totalQuery, [cleanSearch]),
-            ]);
+        let params = [cleanSearch, limit, skip];
 
-            // Process results
-            const results = resultsRes.rows.map((row) => {
+        try {
+            ////
+            // borrow a dedicated client for the count query
+            var countClient = await postgres.connect();
+
+            // start both queries immediately
+            const resultsPromise = postgres.query(queryText, params);
+            const countPromise = countClient.query(
+                totalQuery,
+                params.slice(0, -2),
+            );
+
+            // wait for results first
+            var resultsRes = await resultsPromise;
+
+            // now wait for count query, giving it 0.5  s
+            try {
+                let totalRes;
+                if (req.query.rezultatuSkaiciausPatikslinimas) {
+                    totalRes = await countPromise;
+                } else {
+                    totalRes = await Promise.race([
+                        countPromise,
+                        new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error("timeout")), 500),
+                        ),
+                    ]);
+                }
+
+                var total = parseInt(totalRes.rows[0].count, 10);
+
+                // Paieškos užklausos informacija
+                let trukme = (
+                    (performance.now() - startas) / 1000 +
+                    Number(req.query.trukme || 0)
+                ).toFixed(2);
+                let rodomiRezultatai = resultsRes.rows.length;
+                var numberOfResults =
+                    rodomiRezultatai < total
+                        ? `Rodomi ${rodomiRezultatai} iš ${Number(total).linksniuotiK(["rezultato", "rezultatų"])} <pre style="display: inline;" data-duration="${trukme}">(${trukme}s, PostgresSQL)</pre>`
+                        : `${Number(total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} <pre style="display: inline;" data-duration="${trukme}">(${trukme}s, PostgresSQL)</pre>`;
+
+                if (req.query.rezultatuSkaiciausPatikslinimas) {
+                    return res.json({
+                        zinomasRezultatuSkaicius: true,
+                        total,
+                        numberOfResults,
+                    });
+                }
+            } catch (err) {
+                // cancel count query if still running
                 try {
-                    row.tekstas = JSON.parse(row.tekstas).join(" ");
-                } catch (e) {}
-
-                delete row.saugojama;
-                row.excerpt = makeExcerpt(row.tekstas, searchTerm);
-                return row;
-            });
-
-            const total = parseInt(totalRes.rows[0].count, 10);
-
-            // Paieškos užklausos informacija
-            const trukme =
-                ((performance.now() - startas) / 1000).toFixed(2) + "s";
-            const rodomiRezultatai = results.length;
-            const numberOfResults =
-                rodomiRezultatai < total
-                    ? `Rodomi ${rodomiRezultatai} iš ${Number(total).linksniuotiK(["rezultato", "rezultatų"])} <pre style="display: inline;">(${trukme}, Postgres)</pre>`
-                    : `${Number(total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} <pre style="display: inline;">(${trukme}, Postgres)</pre>`;
-
-            if (req.query.json) {
-                res.json({
-                    data: results,
-                    currentPage: page,
-                    pageCount: Math.ceil(total / limit),
-                });
-                return;
+                    await pg.CancelQuery(countClient, countPromise);
+                } catch (_) {}
             }
 
-            res.render("failai/index", {
-                customHead: config.customHead,
-                values: { search: searchTerm },
+            let rodomiRezultatai = resultsRes.rows.length;
+
+            let trukme = ((performance.now() - startas) / 1000).toFixed(2);
+
+            // total unknown
+            var numberOfResults = `Rodomi ${rodomiRezultatai} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <pre data-duration="${trukme}" style="display: inline;"> (${trukme}s, PostgreSQL)</pre>`;
+            total = 10_000; // for pagination
+        } finally {
+            countClient.release();
+        }
+
+        //////
+
+        // const [resultsRes, totalRes] = await Promise.all([
+        //     postgres.query(queryText, [cleanSearch, limit, skip]),
+        //     postgres.query(totalQuery, [cleanSearch]),
+        // ]);
+
+        // Process results
+        const results = resultsRes.rows.map((row) => {
+            try {
+                row.tekstas = JSON.parse(row.tekstas).join(" ");
+            } catch (e) {}
+
+            delete row.saugojama;
+
+            if (row?.metaduomenys?.signatures) {
+                row.metaduomenys.signatures.forEach((sig) => {
+                    if (sig.signerFullDistinguishedName) {
+                        sig.signerFullDistinguishedName =
+                            sig.signerFullDistinguishedName.replace(
+                                /\d{4,}/g,
+                                "",
+                            );
+                    }
+                });
+            }
+
+            row.excerpt = makeExcerpt(row.tekstas, searchTerm);
+            return row;
+        });
+
+        if (req.query.json) {
+            res.json({
                 data: results,
-                queryParams: `&search=${encodeURIComponent(searchTerm)}`,
-                query: req.query,
-                search: cleanSearch,
-                numberOfResults,
                 currentPage: page,
                 pageCount: Math.ceil(total / limit),
-                galimaEksportuoti: false,
             });
-        } catch (err) {
-            console.error(err);
-            res.status(500);
+            return;
         }
-    } else {
-        let statistikaRes = await postgres.query(
-            `SELECT * FROM statistika ORDER BY timestamp DESC LIMIT 1;`,
-        );
 
-        let statistika = statistikaRes.rows[0].data;
+        res.render("failai/index", {
+            customHead: config.customHead,
+            values: { search: searchTerm },
+            data: results,
+            queryParams: `&search=${encodeURIComponent(searchTerm)}`,
+            query: req.query,
+            search: cleanSearch,
+            numberOfResults,
+            currentPage: page,
+            pageCount: Math.ceil(total / limit),
+            galimaEksportuoti: false,
+            req,
+            usedHiddenFields: false,
+        });
+    } else {
+        let statistika = await gautiStatistika();
 
         res.render("failai/index", {
             customHead: config.customHead,
             values: {},
             statistika,
+            req,
+            usedHiddenFields: false,
         });
     }
 });

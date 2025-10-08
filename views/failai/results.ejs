@@ -1,4 +1,4 @@
-<div class="results">
+<div>
     <section class="preResultOptions">
       <div class="numberOfResults">
         <%- numberOfResults %>
@@ -33,6 +33,35 @@
     <% }); %>
 </div>
 
+<script>
+			const span = document.querySelector('.rezultatai-nezinomas-total');
+
+             if (span && !span.classList.contains('spin')) {
+                 span.classList.add('spin');
+
+                 const url = new URL(window.location.href);
+                 url.searchParams.set('rezultatuSkaiciausPatikslinimas', 'true');
+
+                 // Get data-duration from pre in .numberOfResults
+                 const trukme = document.querySelector('.numberOfResults pre')?.getAttribute('data-duration');
+                 console.log(document.querySelector('.numberOfResults pre'))
+                 if (trukme) {
+                     url.searchParams.set('trukme', trukme);
+                 }
+
+                 fetch(url)
+                     .then(res => res.json())
+                     .then(data => {
+                         if (data.zinomasRezultatuSkaicius) {
+                             span.className = ''; // remove all classes
+                             document.querySelector(".numberOfResults").innerHTML = data.numberOfResults;
+                         } else {
+                             span.classList.remove('spin'); // stop spinning if still unknown
+                         }
+                     })
+                     .catch(() => span.classList.remove('spin')); // stop spinning on error
+             }
+			</script>
 
 <%- include('../pagination.ejs', {
     currentPage, pageCount, queryParams

@@ -39,7 +39,7 @@ button.main {
 
 #paieskosNustatymai {
 	margin: 0 auto;
-	width: min(100%, 900px);
+	width: min(100%, 1000px);
 	padding: 16px;
 }
 
@@ -64,20 +64,20 @@ button.main {
 
 .settingai {
 	display: grid;
-	grid-template-columns: repeat(4, 1fr);
+	grid-template-columns: repeat(5, 1fr);
 }
 
 /* Zig-zag for the first 8 items */
-.settingai > div:nth-child(-n+8):nth-child(odd) {
+.settingai > div:nth-child(-n+10):nth-child(odd) {
   grid-row: 1;
 }
 
-.settingai > div:nth-child(-n+8):nth-child(even) {
+.settingai > div:nth-child(-n+10):nth-child(even) {
   grid-row: 2;
 }
 
 /* Items from 9 onward flow naturally */
-.settingai > div:nth-child(n+9) {
+.settingai > div:nth-child(n+11) {
   grid-row: auto;
 }
 

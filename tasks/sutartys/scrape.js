@@ -233,7 +233,7 @@ export async function scrapePage(url) {
 /**
  * Importuoja sutartis iš eViesiejiPirkimai.lt svetainės pagal nurodytą puslapį.
  * @param {number} page - Puslapis, kurį reikia importuoti
- * @returns {number} Importuotų įrašų skaičius
+ * @returns {Promise<number>} Importuotų sutarčių skaičius
  */
 async function importPage(page = 0) {
     let start = new Date();
@@ -246,7 +246,7 @@ async function importPage(page = 0) {
         kiekis = 50; // ... išskyrus pirmame puslapyje
     }
 
-    const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&filter_limit=${kiekis}&order_field=date&order_dir=asc&limitstart=${limitstart}`;
+    const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&filter_limit=${kiekis}&limitstart=${limitstart}`;
     log(`Importuojamas puslapis ${page} ${url}`);
 
     // Nuskaitome puslapį
@@ -275,35 +275,42 @@ async function importPage(page = 0) {
  */
 export async function requestLatestEviesiejipirkimaiData() {
     // Nuskaitome paskutinio puslapio numerį iš ./taskState/scrapeEviesiejipirkimaiSutartys.txt
-    try {
-        const lastPageFile = await import("fs/promises").then((fs) =>
-            fs.readFile(
-                "./taskState/scrapeEviesiejipirkimaiSutartys.txt",
-                "utf-8",
-            ),
-        );
-        var page = parseInt(lastPageFile.trim(), 10) + 1;
-        if (isNaN(page)) page = 0;
-    } catch (error) {
-        var page = 0;
-    }
+    // try {
+    //     const lastPageFile = await import("fs/promises").then((fs) =>
+    //         fs.readFile(
+    //             "./taskState/scrapeEviesiejipirkimaiSutartys.txt",
+    //             "utf-8",
+    //         ),
+    //     );
+    //     var page = parseInt(lastPageFile.trim(), 10) + 1;
+    //     if (isNaN(page)) page = 0;
+    // } catch (error) {
+    //     var page = 0;
+    // }
 
     // Siunčiame puslapius tol, kol yra duomenų
-    while (true) {
-        if ((await importPage(page)) < 50) {
-            log(`Puslapis ${page} nėra pilnas.`);
-            return false;
-        } else {
-            log(`Puslapis ${page} pilnas.`);
+    // while (true) {
+    //     if ((await importPage(page)) < 50) {
+    //         log(`Puslapis ${page} nėra pilnas.`);
+    //         return false;
+    //     } else {
+    //         log(`Puslapis ${page} pilnas.`);
 
-            // Išsaugome puslapio numerį į ./taskState/scrapeEviesiejipirkimaiSutartys.txt
-            await writeFile(
-                "./taskState/scrapeEviesiejipirkimaiSutartys.txt",
-                page.toString(),
-            );
-            page++;
-        }
-        // Wait for like 1s
-        await new Promise((resolve) => setTimeout(resolve, 1));
+    //         // Išsaugome puslapio numerį į ./taskState/scrapeEviesiejipirkimaiSutartys.txt
+    //         await writeFile(
+    //             "./taskState/scrapeEviesiejipirkimaiSutartys.txt",
+    //             page.toString(),
+    //         );
+    //         page++;
+    //     }
+    //     // Wait for like 1s
+    //     await new Promise((resolve) => setTimeout(resolve, 1));
+    // }
+    //
+    // Atnaujiname paskutinius 5 puslapius
+    for (let page = 0; page < 5; page++) {
+        await importPage(page);
+        log(`Importuotas puslapis ${page}`);
     }
+    return false;
 }

@@ -1,8 +1,9 @@
 <form method="get" role="search">
+    <h1>Sutarčių paieška</h1>
     <label for="search" class="visually-hidden">Paieška</label>
     <input type="search" name="search" id="search"
         value="<%= values.search || '' %>"
-        placeholder="Paieška"
+        placeholder="Ieškokite"
         enterkeyhint="search"
         aria-label="Paieška"
  />
@@ -28,7 +29,7 @@
                 <h2>Kita</h2>
                 <%- include('inputs/checkbox', {name: 'tikSuDokumentais', boxLabel: 'Tik su dokumentais', values }) %>
             </div>
-            <div>
+            <div style="grid-row: span 2;">
                 <h2>BVPŽ prefiksas*</h2>
                 <select
                     name="bvpzPrefiksas"

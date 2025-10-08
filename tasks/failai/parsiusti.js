@@ -11,6 +11,7 @@ import { log } from "../../utils/log.js";
  * @throws {Error} Jei funkcija iškviečiama darbo valandomis.
  */
 function blockDuringWorkingHours() {
+    return true; // disable blocking
     const now = new Date();
     const day = now.getDay(); // 0 = Sunday, 6 = Saturday
     const hours = now.getHours();
@@ -120,11 +121,17 @@ function doneWithFile(failasId) {
     }
 }
 
+let failai = 0;
+let dydis = 0;
+let start = 0;
+
 /**
  * Parsiunčia vieną neparsiųstą failą į viešdėžę.
  * @returns {Promise<boolean>} true jei pavyko parsisiųsti failą, false jei nėra failų parsisiuntimui
  */
-export async function parsiustiFaila() {
+export async function parsiustiFaila(
+    customUrl = "https://eviesiejipirkimai.lt/download.php?dok_id=$DOK_ID&file_id=$FILE_ID",
+) {
     try {
         blockDuringWorkingHours();
     } catch (e) {
@@ -150,6 +157,13 @@ export async function parsiustiFaila() {
 
     try {
         // Pateikiame parsisiuntimo užklausą
+        if (start == 0) {
+            start = Date.now();
+        }
+        let url = customUrl
+            .replace("$DOK_ID", failas.dokId)
+            .replace("$FILE_ID", failas.fileId);
+
         let response = await fetch(`${deze.url}/download-url`, {
             method: "POST",
             headers: {
@@ -157,7 +171,7 @@ export async function parsiustiFaila() {
                 "x-api-key": deze.apiKey,
             },
             body: JSON.stringify({
-                url: `http://localhost:9029/${failas.dokId}/${failas.fileId}`,
+                url,
             }),
         });
 
@@ -166,6 +180,14 @@ export async function parsiustiFaila() {
         if (!response.ok || !md5) {
             throw new Error("Nepavyko gauti failo.");
         }
+
+        dydis += size;
+        failai++;
+        // Calculate mbps
+        let duration = (Date.now() - start) / 1000;
+        let mbps = (dydis / 1024 / 1024 / duration).toFixed(2);
+
+        log(`${mbps} Mbps`);
 
         // Atnaujiname informaciją apie failą
         await postgres.query(

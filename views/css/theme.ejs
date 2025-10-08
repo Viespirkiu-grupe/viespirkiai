@@ -43,4 +43,23 @@ html {
 	background-color: var(--white);
 	color: var(--black);
 }
+
+@view-transition {
+  navigation: auto;
+}
+
+body {
+  view-transition-name: fast;
+  view-transition-duration: 100ms;
+  view-transition-timing-function: ease-in-out;
+}
+
+@view-transition-group fast {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+}
+
 </style>

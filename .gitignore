@@ -22,6 +22,12 @@ plausible/event-logs
 plausible/event-data
 plausible/plausible-conf.env
 
+# Postgres
+pgdata
+
+# Typesense
+typesense/typesense
+
 # Konfiguracija
 /config.js
 

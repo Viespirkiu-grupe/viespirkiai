@@ -13,9 +13,15 @@
 		<main>
 			<%- include('search.ejs', {values, usedHiddenFields, numberOfResults}) %>
 			<% if(naujaPaieska) { %>
-			    <%- include('resultsModern.ejs', {zinomasRezultatuSkaicius, values, usedHiddenFields, data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
+                <div class="results">
+     			    <%- include('tabs.ejs') %>
+     			    <%- include('resultsModern.ejs', {zinomasRezultatuSkaicius, values, usedHiddenFields, data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
+                </div>
 			<% } else { %>
-			    <%- include('results.ejs', {zinomasRezultatuSkaicius, data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
+                <div class="results">
+     			    <%- include('tabs.ejs') %>
+     			    <%- include('results.ejs', {zinomasRezultatuSkaicius, data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
+                </div>
 			<% } %>
 			<script>
    			const span = document.querySelector('.rezultatai-nezinomas-total');
@@ -30,8 +36,8 @@
                         .then(res => res.json())
                         .then(data => {
                             if (data.zinomasRezultatuSkaicius) {
-                                span.textContent = data.total;
                                 span.className = ''; // remove all classes
+                                document.querySelector(".numberOfResults").innerHTML = data.numberOfResults;
                             } else {
                                 span.classList.remove('spin'); // stop spinning if still unknown
                             }

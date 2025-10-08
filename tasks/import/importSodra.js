@@ -139,12 +139,23 @@ async function insertBatch(rows) {
         .join(", ");
 
     const sql = `
-    INSERT INTO sodra (
-      kodas, "jarKodas", pavadinimas, savivaldybe, "ekonominesVeiklosKodas",
-      "ekonominesVeiklosPavadinimas", data, "vidutinisAtlyginimas", draustieji, "vidutinisAtlyginimas2",
-      draustieji2, "imokuSuma", "importFile"
-    ) VALUES ${placeholders}
-  `;
+      INSERT INTO sodra (
+        kodas, "jarKodas", pavadinimas, savivaldybe, "ekonominesVeiklosKodas",
+        "ekonominesVeiklosPavadinimas", data, "vidutinisAtlyginimas", draustieji,
+        "vidutinisAtlyginimas2", draustieji2, "imokuSuma", "importFile"
+      ) VALUES ${placeholders}
+      ON CONFLICT ("kodas", "jarKodas", "data") DO UPDATE SET
+        pavadinimas = EXCLUDED.pavadinimas,
+        savivaldybe = EXCLUDED.savivaldybe,
+        "ekonominesVeiklosKodas" = EXCLUDED."ekonominesVeiklosKodas",
+        "ekonominesVeiklosPavadinimas" = EXCLUDED."ekonominesVeiklosPavadinimas",
+        "vidutinisAtlyginimas" = EXCLUDED."vidutinisAtlyginimas",
+        draustieji = EXCLUDED.draustieji,
+        "vidutinisAtlyginimas2" = EXCLUDED."vidutinisAtlyginimas2",
+        draustieji2 = EXCLUDED.draustieji2,
+        "imokuSuma" = EXCLUDED."imokuSuma",
+        "importFile" = EXCLUDED."importFile";
+    `;
 
     const values = rows.flat();
 
