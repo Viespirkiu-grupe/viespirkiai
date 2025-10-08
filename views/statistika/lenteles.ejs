@@ -1,0 +1,33 @@
+<div>
+    <h2>Lentelės</h2>
+    <div class="tableContainer" style="max-width: 95vw;">
+        <table style="width: auto; max-width: 100%; min-width: auto;">
+            <thead>
+                <tr>
+                    <th>Pavadinimas</th>
+                    <th>Duomenų dydis</th>
+                    <th>Indekso dydis</th>
+                    <th>Visas dydis</th>
+                    <th>Eilutės*</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% statistika.lenteles.forEach(lentele => { %>
+                    <% if(lentele.tableName == "Iš viso") { %>
+                        <tr class="bold underline">
+                    <% } else { %>
+                        <tr>
+                    <% } %>
+
+                            <td><%= lentele.tableName %></td>
+                            <td class="center no-wrap"><%= Number(lentele.dataSize).convertUnit("B") %></td>
+                            <td class="center no-wrap"><%= Number(lentele.indexSize).convertUnit("B") %></td>
+                            <td class="center no-wrap"><%= Number(lentele.totalSize).convertUnit("B") %></td>
+                            <td class="center no-wrap"><%= Number(lentele.approxRowCount).toLocaleString('lt-LT') %></td>
+
+                        </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    </div>
+</div>

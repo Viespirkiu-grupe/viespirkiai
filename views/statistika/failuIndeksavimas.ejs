@@ -1,0 +1,28 @@
+<div>
+    <h3>Indeksavimas</h3>
+    <p>Surašymas duomenų bazėje, kad būtų galima greičiau ieškoti.</p>
+    <h4 style="padding-top: 12px;">Žodžiai</h4>
+    <div class="col-2">
+        <section>
+            <h3><u>Iš viso</u></h3>
+            <%= Number(statistika.nuskaitymas.zodziai.total).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
+        </section>
+
+        <section>
+            <h3><u>Vidurkis</u></h3>
+            <%= Number(statistika.nuskaitymas.zodziai.vidurkis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
+        </section>
+
+        <section>
+            <h3><u>Vidurkis (be 0)</u></h3>
+            <%= Number(statistika.nuskaitymas.zodziai.vidurkisNeNulis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
+        </section>
+
+        <section>
+            <h3><u>Failų su žodžiais dalis (nuo visų)</u></h3>
+            <%= Number(statistika.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2) %> %
+        </section>
+    </div>
+    <br><br>
+
+</div>

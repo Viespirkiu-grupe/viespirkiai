@@ -7,215 +7,42 @@
             pageImage: `https://viespirkiai.top/statistika.png`,
             customHead
         }) %>
+      <!--<meta http-equiv="refresh" content="1">-->
 	</head>
 	<body>
-		<%- include('../header.ejs') %>
-		<main>
-			<h1>Statistika</h1>
+        <%- include('../header.ejs') %>
+        <main>
+            <h1>Statistika</h1>
+            <button id="liveUpdate" style="font-size: inherit; background-color: var(--lighter-gray)">Tiesioginis atnaujinimas (įjungti, kas 0.25s)</button><br><br>
+            <%- include('./main.ejs') %>
+        </main>
+        <%- include('../footer.ejs') %>
+        <script>
+            let latestRequest = 0;
+            let intervalId = null;
+            const button = document.getElementById('liveUpdate');
 
-            <i>Duomenys atnaujinti: <%= new Date(statistika.atnaujinta).toLtDateTime() %> </i><br><br>
-            <i>* Pažymėtos numatomos arba apytikslės vertės </i>
-
-            <div>
-                <h2>Lentelės</h2>
-                <div class="tableContainer">
-                    <table style="width: auto; max-width: 100%; min-width: auto;">
-                        <thead>
-                            <tr>
-                                <th>Pavadinimas</th>
-                                <th>Duomenų dydis</th>
-                                <th>Indekso dydis</th>
-                                <th>Visas dydis</th>
-                                <th>Eilutės*</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% statistika.lenteles.forEach(lentele => { %>
-                                <% if(lentele.tableName == "Iš viso") { %>
-                                    <tr class="bold underline">
-                                <% } else { %>
-                                    <tr>
-                                <% } %>
-
-                                        <td><%= lentele.tableName %></td>
-                                        <td class="center no-wrap"><%= Number(lentele.dataSize).convertUnit("B") %></td>
-                                        <td class="center no-wrap"><%= Number(lentele.indexSize).convertUnit("B") %></td>
-                                        <td class="center no-wrap"><%= Number(lentele.totalSize).convertUnit("B") %></td>
-                                        <td class="center no-wrap"><%= Number(lentele.approxRowCount).toLocaleString('lt-LT') %></td>
-
-                                    </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div>
-                <h2>Failų nuskaitymas</h2>
-                <div class="tableContainer">
-                    <table style="width: auto; max-width: 100%; min-width: auto;">
-                        <thead>
-                            <tr>
-                                <th>Nuskaitymo lygmuo</th>
-                                <th>Failų skaičius</th>
-                                <th>Dalis</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% statistika.nuskaitymas.pagalVersija.forEach(versija => { %>
-                                    <tr>
-                                        <td><%= versija.status %></td>
-                                        <td class="center no-wrap"><%= Number(versija.kiekis).toLocaleString('lt-LT') %></td>
-                                        <td class="center no-wrap"><%= Number(versija.procentai).toLocaleString('lt-LT') %> %</td>
-
-                                    </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                </div>
-                <h3>Nuskaitymo eilėje</h3>
-                <p><%= Number(statistika.nuskaitymas.likoNuskaityti).linksniuoti(["failas", "failai", "failų", "failo"]) %> laukia nuskaitymo</p>
-            </div>
-
-            <div>
-                <h2>Failų lentelėje indeksuoti žodžiai</h2>
-                <div class="col-2">
-                    <section>
-                        <h3><u>Iš viso</u></h3>
-                        <%= Number(statistika.nuskaitymas.zodziai.total).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
-                    </section>
-
-                    <section>
-                        <h3><u>Vidurkis</u></h3>
-                        <%= Number(statistika.nuskaitymas.zodziai.vidurkis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
-                    </section>
-
-                    <section>
-                        <h3><u>Vidurkis (be 0)</u></h3>
-                        <%= Number(statistika.nuskaitymas.zodziai.vidurkisNeNulis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
-                    </section>
-
-                    <section>
-                        <h3><u>Failų su žodžiais dalis (nuo visų)</u></h3>
-                        <%= Number(statistika.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2) %> %
-                    </section>
-                </div>
-                <br><br>
-
-            </div>
-
-            <div>
-                <h2>TOP 10 failų extension</h2>
-                <div class="tableContainer">
-                    <table style="width: auto; max-width: 100%; min-width: auto;">
-                        <thead>
-                            <tr>
-                                <th>Extension</th>
-                                <th>Failų skaičius</th>
-                                <th>Dalis</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% statistika.topExtension.forEach(extension => { %>
-                                    <tr>
-                                        <td><%= extension.ext %></td>
-                                        <td class="center no-wrap"><%= Number(extension.row_count).toLocaleString('lt-LT') %></td>
-                                        <td class="center no-wrap"><%= Number(extension.percent).toLocaleString('lt-LT') %> %</td>
-
-                                    </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-
-            <div class="failu-statistika">
-                <div style="grid-area: pavadinimas;">
-                    <h2>Failų parsiuntimas</h2>
-                </div>
-                <section style="grid-area: visi;">
-                    <h3><u>Visi failai</u></h3>
-                    <h4>Kiekis</h4>
-                    <p><%= statistika.failai.kiekiai.visi %></p>
-                    <h4>Dydis*</h4>
-                    <p><%= statistika.failai.dydziai.visi %></p>
-                </section>
-
-                <section style="grid-area: parsiusti;">
-                    <h3><u>Parsiųsti failai</u></h3>
-                    <h4>Kiekis</h4>
-                    <p><%= statistika.failai.kiekiai.parsiusti %></p>
-                    <h4>Dydis</h4>
-                    <p><%= statistika.failai.dydziai.parsiusti %></p>
-                </section>
-
-                <section style="grid-area: klaida;">
-                    <h3><u>Neparsiųsti (klaida) failai</u></h3>
-                    <h4>Kiekis</h4>
-                    <p><%= statistika.failai.kiekiai.klaida %></p>
-                    <h4>Dydis*</h4>
-                    <p><%= statistika.failai.dydziai.klaida %></p>
-                </section>
-
-                <section style="grid-area: neparsiusti;">
-                    <h3><u>Neparsiųsti failai</u></h3>
-                    <h4>Kiekis</h4>
-                    <p><%= statistika.failai.kiekiai.neparsiusti %></p>
-                    <h4>Dydis*</h4>
-                    <p><%= statistika.failai.dydziai.neparsiusti %></p>
-                </section>
-
-                <section style="grid-area: diagrama;">
-                    <div id="failuPieChart" style="width: 100%; height: auto; min-height: 400px;"></div>
-
-                    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js" defer></script>
-                    <script defer>
-                      function getCssColor(selector) {
-                        const el = document.querySelector(selector);
-                        if (!el) return '#000'; // fallback
-                        return getComputedStyle(el).color || '#000';
-                      }
-
-                      window.addEventListener('load', () => {
-                          // Load the Visualization API and the corechart package.
-                          google.charts.load('current', { packages: ['corechart'] });
-
-                          // Set a callback to run when the Google Visualization API is loaded.
-                          google.charts.setOnLoadCallback(drawChart);
-
-                          function drawChart() {
-                          // Create the data table.
-                          const data = google.visualization.arrayToDataTable([
-                              ['Status', 'Kiekis'],
-                              ['Parsiųsti', <%= statistika.failai.kiekiai.parsiusti %>],
-                              ['Neparsiųsti', <%= statistika.failai.kiekiai.neparsiusti %>],
-                              ['Klaida', <%= statistika.failai.kiekiai.klaida %>]
-                          ]);
-
-                          // Set chart options
-                          const textColor = getCssColor('body');  // or your container selector
-                          const options = {
-                              pieHole: 0.4,
-                              legend: {
-                                  position: 'bottom',
-                                  textStyle: { color: textColor }, // light gray text for dark background
-                              },
-                              chartArea: { left: 20, top: 20, width: '90%', height: '80%' },
-                              sliceVisibilityThreshold: 0,
-                              backgroundColor: 'transparent',
-                              colors: ['#28a745', '#ffc107', '#dc3545']  // green, yellow, red
-                          };
-
-                          // Instantiate and draw our chart, passing in some options.
-                          const chart = new google.visualization.PieChart(document.getElementById('failuPieChart'));
-                          chart.draw(data, options);
-                          }
-                      });
-                    </script>
-                </section>
-            </div>
-		</main>
-		<%- include('../footer.ejs') %>
-	</body>
+            button.addEventListener('click', () => {
+            if (intervalId) {
+                // Stop updating
+                clearInterval(intervalId);
+                intervalId = null;
+                button.textContent = "Tiesioginis atnaujinimas (įjungti)";
+            } else {
+                // Start updating
+                intervalId = setInterval(() => {
+                const requestId = ++latestRequest;
+                fetch('/statistika?innerOnly=true')
+                    .then(response => response.text())
+                    .then(data => {
+                    if (requestId === latestRequest) {
+                        document.querySelector('.replacableContent').outerHTML = data;
+                    }
+                    });
+                }, 250);
+                button.textContent = "Tiesioginis atnaujinimas (išjungti)";
+            }
+            });
+        </script>
+    </body>
 </html>

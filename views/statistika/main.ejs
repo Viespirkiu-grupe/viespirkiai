@@ -1,0 +1,30 @@
+<div class="replacableContent">
+    <i>
+        Duomenys atnaujinti:
+        <%
+        const d = new Date(statistika.atnaujinta);
+        const pad = n => n.toString().padStart(2,'0');
+        const padMs = n => n.toString().padStart(3,'0');
+        const formatted = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${padMs(d.getMilliseconds())}`;
+        %>
+        <%= formatted %>
+    </i><br><br>
+
+    <i>* Pažymėtos numatomos arba apytikslės vertės </i>
+
+    <div class="col-auto mobile-col-1">
+        <div>
+            <h2>Failai</h2>
+            <%- include('failuNuskaitymas.ejs') %>
+            <%- include('ocrNuskaitymas.ejs') %>
+        </div>
+        <div>
+            <h2 style="visibility: hidden;">Failai</h2>
+            <%- include('failuIndeksavimas.ejs') %>
+            <%- include('failuParsiuntimas.ejs') %>
+            <%- include('failuExtension.ejs') %>
+        </div>
+        <%- include('lenteles.ejs') %>
+
+    </div>
+</div>
