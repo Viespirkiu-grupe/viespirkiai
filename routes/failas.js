@@ -86,7 +86,6 @@ failasRouter.post("/failas/ocr/submit", async (req, res, next) => {
         typeof tekstas !== "object" ||
         typeof duration !== "number"
     ) {
-        console.log(req.body);
         return res
             .status(400)
             .send(

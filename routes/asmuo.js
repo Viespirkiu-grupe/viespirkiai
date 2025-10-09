@@ -117,6 +117,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
     jar.registravimoData = new Date(jar.registravimoData).toLtDate();
     jar.duomenuData = new Date(jar.duomenuData).toLtDate();
     jar.statusasNuo = new Date(jar.statusasNuo).toLtDate();
+    jar.jarId = jarId;
 
     const taskMap = {
         adresai: async () => {

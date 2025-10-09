@@ -135,8 +135,12 @@
             format: 'yyyy'
           }
         }
-      }
-
+      },
+      'yMinAuto': {
+        yaxis: {
+          min: undefined
+        }
+      },
   }
 
   async function displayChart(data) {
@@ -163,7 +167,7 @@
 
     if(data.series){
       // Check if series is a flat Array
-      if(Array.isArray(data.series) && (data.series.length === 0 || typeof data.series[0] !== 'object' || typeof data.series[0] !== 'number')) {
+      if(Array.isArray(data.series) && (data.series.length === 0 || !data.series[0]?.data)) {
           mergedOptions.series = [{ name: customOptions.seriesName || '', data: data.series }];
       }else{
           mergedOptions.series = data.series;

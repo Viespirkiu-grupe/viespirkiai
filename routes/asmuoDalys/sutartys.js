@@ -4,8 +4,6 @@ export async function gautiSutarciuDuomenis(req, jarKodas) {
     let sutartysLimit = parseInt(req.query.sutartysLimit, 10) || 10;
     const sutartysUseLimit = !(req.query.sutartysLimit === "max");
 
-    console.log(sutartysLimit, sutartysUseLimit);
-
     if (sutartysUseLimit == false) {
         sutartysLimit = 1000000;
     }

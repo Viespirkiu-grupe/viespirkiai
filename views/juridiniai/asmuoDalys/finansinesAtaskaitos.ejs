@@ -28,35 +28,19 @@
                        return index !== -1 ? pardavimaiKasMetus[index] : null;
                      });
 
-                       renderChart('pardavimoPajamos', mergedLabels, [
-                         {name: "Pardavimo pajamos", data: finalPardavimoPajamosVertes},
-                         {name: "Viešjų pirkimų pardavimai", data: finalViesujuPirkimuPardavimaiKasMetus}
-                       ], {
-                         seriesName: "",
-                         xaxis: {
-                               labels: {
-                                 format: 'yyyy'
-                             },
-                         },
-                         yaxis: {
-                           min: 0,
-                           labels: {
-                               formatter: function (value) {
-                                 if(typeof value == "number"){
-                                   return value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' });
-                                 }else{
-                                   return "Nėra duomenų";
-                                 }
-                               }
-                            },
-                         },
-                         tooltip: {
-                           x: {
-                             format: 'yyyy'
-                           },
-                         },
+
+                     displayChart({
+                       element: document.querySelector('#pardavimoPajamos'),
+                       labels: mergedLabels,
+                       series: [
+                          {name: "Pardavimo pajamos", data: finalPardavimoPajamosVertes},
+                          {name: "Viešjų pirkimų pardavimai", data: finalViesujuPirkimuPardavimaiKasMetus}
+                       ],
+                       flags: ['yEUR', 'yMin0'],
+                       customOptions: {
                          colors: ['#000000', '#999999']
-                       });
+                       }
+                     })
                      </script>
                  <% } else { %>
                      <i class="diagrama-nera-duomenu">Nėra duomenų</i>
@@ -85,35 +69,42 @@
                              <% }) %>
                            ];
 
-                           let hasValuesUnderZero = false;
+                           let finansinesAtaskaitosHasValuesUnderZero = false;
                             for(let i = 0; i < grynasisPelnasVertes.length; i++){
                               if(grynasisPelnasVertes[i] !== null && grynasisPelnasVertes[i] < 0){
-                                hasValuesUnderZero = true;
+                                finansinesAtaskaitosHasValuesUnderZero = true;
                                 break;
                               }
                             }
 
-                           renderChart('grynasisPelnas', grynasisPelnasLabels, grynasisPelnasVertes, {
-                             seriesName: "",
-                             xaxis: {
-                                labels: {
-                                     format: 'yyyy'
-                                },
-                             },
-                             yaxis: {
-                               min: hasValuesUnderZero ? undefined : 0,
-                               labels: {
-                                   formatter: function (value) {
-                                     return value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' });
-                                   }
-                                },
-                             },
-                             tooltip: {
-                               x: {
-                                 format: 'yyyy'
-                               },
-                             },
-                           });
+                            let finansinesAtaskaitosAnnotations = {};
+                            if(finansinesAtaskaitosHasValuesUnderZero){
+                              finansinesAtaskaitosAnnotations = {
+                                yaxis: [
+                                    {
+                                      y: 0,
+                                      y2: -100000000,
+                                      borderColor: 'red',
+                                      borderWidth: 2,
+                                      label: {
+                                        borderColor: 'red',
+                                        style: {
+                                          color: '#fff',
+                                          background: 'red',
+                                        },
+                                        text: 'Nuostoliai'
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                            displayChart({
+                              element: document.querySelector('#grynasisPelnas'),
+                              labels: grynasisPelnasLabels,
+                              series: grynasisPelnasVertes,
+                              flags: ['yEUR', 'yMinAuto'],
+                              customOptions: { annotations: finansinesAtaskaitosAnnotations }
+                            })
                          </script>
                      <% } else { %>
                          <i class="diagrama-nera-duomenu">Nėra duomenų</i>

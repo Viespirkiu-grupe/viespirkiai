@@ -38,8 +38,8 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(cookieParser());
 
 // JSON
-app.use(express.json({ limit: "10MB" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "100MB" }));
+app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
 // Auto-load all routes from /routes (in parallel)
 const routesPath = path.join(__dirname, "routes");
