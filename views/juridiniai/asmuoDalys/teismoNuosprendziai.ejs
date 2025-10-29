@@ -1,6 +1,6 @@
 <% if(asmuo.teismoNuosprendziai	 && asmuo.teismoNuosprendziai.rows > 0){ %>
     <div id="teismai">
-        <h2><u>Teismo nuosprendžiai</u></h2>
+        <h2><u><a href="#teismai" class="hashHref">Teismo nuosprendžiai</a></u></h2>
         <% if(asmuo.teismoNuosprendziai.rows > asmuo.teismoNuosprendziai.limit) { %>
             <i>
                 Rodomi tik <%= Number(asmuo.teismoNuosprendziai.limit).linksniuoti(["naujausias nuosprendis", "naujausi nuosprendžiai", "naujausių nuosprendžių"]) %>.

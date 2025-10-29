@@ -1,6 +1,6 @@
 <% if(asmuo.darboSkelbimai && asmuo.darboSkelbimai.rows > 0){ %>
     <div id="darboSkelbimai">
-        <h2><u>Darbo skelbimai</u></h2>
+        <h2><a href="#darboSkelbimai" class="hashHref"><u>Darbo skelbimai</u></a></h2>
         <% if(asmuo.darboSkelbimai.rows > asmuo.darboSkelbimai.limit) { %>
             <i>
                 Rodomi tik <%= Number(asmuo.darboSkelbimai.limit).linksniuoti(["naujausias skelbimas", "naujausi skelbimai", "naujausių skelbimų"]) %>.

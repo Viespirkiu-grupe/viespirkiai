@@ -1,7 +1,7 @@
-<h2><u>Viešųjų pirkimų sutartys</u></h2>
+<h2><u><a href="#sutartys" class="hashHref">Viešųjų pirkimų sutartys</a></u></h2>
 <div class="col-2 mobile-col-1" id="sutartys">
     <section style="width: 100%;">
-        <h3>Pirkimai per metus</h3>
+        <h3><a href="#pirkimaiPagalMetus" id="pirkimaiPagalMetus" class="hashHref">Pirkimai per metus</a></h3>
         <% if(asmuo.sutartys && asmuo.sutartys.pirkimaiKasMetus	 && asmuo.sutartys.pirkimaiKasMetus.length > 0) { %>
             <div id="pirkimaiPerMetus" class="chart" style="width: 100%; height: 400px;"></div>
 
@@ -31,7 +31,7 @@
         <% } %>
     </section>
     <section style="width: 100%;">
-        <h3>Pardavimai per metus</h3>
+        <h3><a href="#pardavimaiPagalMetus" id="pardavimaiPagalMetus" class="hashHref">Pardavimai per metus</a></h3>
         <% if(asmuo.sutartys && asmuo.sutartys.tiekimaiKasMetus && asmuo.sutartys.tiekimaiKasMetus.length > 0) { %>
             <div id="pardavimaiPerMetus" class="chart" style="width: 100%; height: 400px;"></div>
 
@@ -64,7 +64,7 @@
 
 <div class="col-2 mobile-col-1" style="gap: 16px;">
     <section style="width: 100%;">
-        <h3>TOP 10 tiekėjų</h3>
+        <h3><a href="#topTiekejai" id="topTiekejai" class="hashHref">TOP 10 tiekėjų</a></h3>
         <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topTiekejai.csv">↗ CSV</a> &nbsp; <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topTiekejai.jsonl">↗ JSONL</a>
         <% if(asmuo.sutartys && asmuo.sutartys.topTiekejai && asmuo.sutartys.topTiekejai.length > 0) { %>
             <table style="width: 100%; min-width: 0px;">
@@ -104,7 +104,7 @@
         <% } %>
     </section>
     <section style="width: 100%;">
-        <h3>TOP 10 pirkėjų</h3>
+        <h3><a href="#topPirkejai" id="topPirkejai" class="hashHref">TOP 10 pirkėjų</a></h3>
         <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topPirkejai.csv">↗ CSV</a> &nbsp; <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topPirkejai.jsonl">↗ JSONL</a>
         <% if(asmuo.sutartys && asmuo.sutartys.topPirkejai && asmuo.sutartys.topPirkejai.length > 0) { %>
             <table style="width: 100%; min-width: 0px;">

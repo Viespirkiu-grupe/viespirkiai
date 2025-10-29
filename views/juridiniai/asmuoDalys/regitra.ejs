@@ -1,6 +1,6 @@
 <% if(asmuo.regitra && asmuo.regitra.rows > 0){ %>
     <div id="transportoPriemones">
-        <h2><u>Transporto priemonės</u></h2>
+        <h2><a href="#transportoPriemones" class="hashHref"><u>Transporto priemonės</u></a></h2>
         <% if(asmuo.regitra.rows > asmuo.regitra.limit) { %>
             <i>
                 Rodomos tik <%= Number(asmuo.regitra.limit).linksniuoti(["transporto priemonė", "transporto priemonės", "transporto priemonių"]) %>.
