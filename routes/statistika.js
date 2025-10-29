@@ -19,7 +19,31 @@ export async function gautiStatistika() {
 
     let statistika = {};
 
-    let failaiCountsRes = await postgres.query(`SELECT * FROM "failaiCounts";`);
+    const [
+        failaiCountsRes,
+        lentelesRes,
+        topDokNuskaitytojaiRes,
+        tokOcrNuskaitytojaiRes,
+    ] = await Promise.all([
+        postgres.query(`SELECT * FROM "failaiCounts";`),
+        postgres.query(
+            `SELECT
+            s.relname AS "tableName",
+            pg_table_size(s.relid) AS "dataSize",
+            pg_indexes_size(s.relid) AS "indexSize",
+            pg_table_size(s.relid) + pg_indexes_size(s.relid) AS "totalSize",
+            st.n_live_tup AS "approxRowCount"
+          FROM pg_catalog.pg_statio_user_tables s
+          JOIN pg_catalog.pg_stat_user_tables st ON s.relid = st.relid
+          ORDER BY s.relname ASC;`,
+        ),
+        postgres.query(
+            `SELECT "nuskaitytidokumentai", "viesasPavadinimas" FROM "dokNuskaitytojai" ORDER BY "nuskaitytidokumentai" DESC LIMIT 100;`,
+        ),
+        postgres.query(
+            `SELECT "nuskaitytiDokumentai", "viesasPavadinimas", "pavadinimas" FROM "ocrNuskaitytojai" ORDER BY "nuskaitytiDokumentai" DESC LIMIT 100;`,
+        ),
+    ]);
 
     const counts = failaiCountsRes.rows.reduce((acc, row) => {
         const { metrika, eilute, verte } = row;
@@ -53,18 +77,6 @@ export async function gautiStatistika() {
                 (counts.visi - counts.parsiusti - counts.klaida),
         },
     };
-
-    const lentelesRes = await postgres.query(
-        `SELECT
-          s.relname AS "tableName",
-          pg_table_size(s.relid) AS "dataSize",
-          pg_indexes_size(s.relid) AS "indexSize",
-          pg_total_relation_size(s.relid) AS "totalSize",
-          st.n_live_tup AS "approxRowCount"
-        FROM pg_catalog.pg_statio_user_tables s
-        JOIN pg_catalog.pg_stat_user_tables st ON s.relid = st.relid
-        ORDER BY s.relname ASC;`,
-    );
 
     statistika.lenteles = lentelesRes.rows;
 
@@ -176,20 +188,13 @@ export async function gautiStatistika() {
         } else if (item.state === "-3") {
             return { ...item, state: "Rezervuota (-3)" };
         } else if (item.state === "NULL") {
-            return { ...item, state: "Nenustatyta (NULL)" };
+            return { ...item, state: "Nenustatyta / nereikia (NULL)" };
         } else {
             return item;
         }
     });
 
-    let topDokNuskaitytojaiRes = await postgres.query(
-        `SELECT "nuskaitytidokumentai", "viesasPavadinimas" FROM "dokNuskaitytojai" ORDER BY "nuskaitytidokumentai" DESC LIMIT 10;`,
-    );
     statistika.topDokNuskaitytojai = topDokNuskaitytojaiRes.rows;
-
-    let tokOcrNuskaitytojaiRes = await postgres.query(
-        `SELECT "nuskaitytiDokumentai", "viesasPavadinimas", "pavadinimas" FROM "ocrNuskaitytojai" ORDER BY "nuskaitytiDokumentai" DESC LIMIT 10;`,
-    );
 
     statistika.topOcrNuskaitytojai = tokOcrNuskaitytojaiRes.rows;
 
