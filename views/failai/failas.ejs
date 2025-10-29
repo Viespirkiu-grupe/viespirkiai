@@ -88,20 +88,22 @@
                            </div>
                            <div>
                                <h3>Nuorodos</h3>
-                               <% failas.metaduomenys.links
-                                   .filter(link => !link.uri.startsWith('mailto:'))
-                                   .forEach(link => { %>
-                                   <div style="display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; align-items: center;">
-                                       <a href="<%= link.uri %>" target="_blank" title="<%= link.uri %>"
-                                          style="flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                           <%= link.uri %>
-                                       </a>
-                                       <sup style="flex-shrink: 0; margin-left: 4px;">
-                                           <%= link.pages.join(', ') %> psl.
-                                       </sup>
-                                   </div>
-                               <% }) %>
-                               <% if(failas.metaduomenys.links.length == 0) { %>
+                               <% if(failas.metaduomenys.links){ %>
+                                <% failas.metaduomenys.links
+                                    .filter(link => !link.uri.startsWith('mailto:'))
+                                    .forEach(link => { %>
+                                    <div style="display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; align-items: center;">
+                                        <a href="<%= link.uri %>" target="_blank" title="<%= link.uri %>"
+                                            style="flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            <%= link.uri %>
+                                        </a>
+                                        <sup style="flex-shrink: 0; margin-left: 4px;">
+                                            <%= link.pages.join(', ') %> psl.
+                                        </sup>
+                                    </div>
+                                <% }) %>
+                                 <% } %>
+                               <% if(!failas.metaduomenys.links || failas.metaduomenys.links.length == 0) { %>
                                    <div>
                                        <i>Nuorodų dokumente nerasta</i>
                                    </div>
@@ -109,6 +111,7 @@
                            </div>
                            <div>
                                <h3>El. pašto adresai</h3>
+                               <% if(failas.metaduomenys.emails){ %>
                                <% failas.metaduomenys.emails.forEach(email => { %>
                                       <div>
                                           <a href="mailto:<%= email.email %>"><%= email.email %></a>
@@ -117,7 +120,8 @@
                                           </sup>
                                       </div>
                                 <% }) %>
-                               <% if(failas.metaduomenys.emails.length == 0) { %>
+                                 <% } %>
+                               <% if(!failas.metaduomenys.emails || failas.metaduomenys.emails.length == 0) { %>
                                    <div>
                                        <i>El. p. adresų dokumente nerasta</i>
                                    </div>
@@ -161,7 +165,7 @@
                                     </div>
                                 <% }) %>
                                  <% } %>
-                               <% if(failas.metaduomenys.ibanNumeriai.length == 0) { %>
+                               <% if(!failas.metaduomenys.ibanNumeriai || failas.metaduomenys.ibanNumeriai.length == 0) { %>
                                    <div>
                                        <i>IBAN numerių dokumente nerasta</i>
                                    </div>
@@ -208,6 +212,41 @@
                       style="border: none; height: 70vh; margin-block: 16px; width: 100% !important; max-width: 100% !important; box-sizing: border-box; display: block; overflow-x: hidden !important;"
                       ></iframe>
                       </div>
+                    <% } else if (failas.extension == "zip"){ %>
+                        <div>
+                            <div>
+                                <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                                &nbsp;
+                                <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
+                                &nbsp;
+                            </div>
+                            <div style="margin-block: 16px;">
+                                <i>Archyvo peržiūra <sup>BETA</sup></i>
+                            </div>
+                            <% function renderFiles(files, parentPath = '') { %>
+                              <% files.forEach(file => { %>
+                                <% if (file.isDirectory) { %>
+                                  <details open style="padding-block: 4px;">
+                                    <summary><%= file.name %></summary>
+                                    <div style="padding-left: 20px;">
+                                      <% renderFiles(file.children, file.path) %>
+                                    </div>
+                                  </details>
+                                <% } else { %>
+                                  <div style="padding-block: 4px;">
+                                    <a href="https://failai.viespirkiai.top/<%= failas.id %>/<%= file.path %>" target="_blank">
+                                      <%= file.name %>
+                                    </a>
+                                    (<%= file.extension %>, <%= (file.size / 1024).toFixed(1) %> KB)
+                                  </div>
+                                <% } %>
+                              <% }) %>
+                            <% } %>
+
+                            <%- renderFiles(failas.metaduomenys.filesTree) %>
+
+                        </div>
+
                     <% } else { %>
                         <div>
                             <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
