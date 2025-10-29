@@ -4,11 +4,14 @@ import config from "../utils/config.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 import { postgres } from "../postgres/postgres.js";
 import { gautiStatistika } from "./statistika.js";
+import Timings from "../utils/timings.js";
 
 const failaiSearchRouter = express.Router();
 
 failaiSearchRouter.get("/failai", cleanEmptyQueryParams, async (req, res) => {
     const startas = performance.now();
+    let timings = new Timings();
+    timings.start("limits");
 
     const page = parseInt(req.query.page) || 1;
     let limit = 50;
@@ -25,6 +28,8 @@ failaiSearchRouter.get("/failai", cleanEmptyQueryParams, async (req, res) => {
     }
 
     const skip = (page - 1) * limit;
+
+    timings.end("limits");
 
     if (req.query.search) {
         const searchTerm = req.query.search;
@@ -189,9 +194,13 @@ failaiSearchRouter.get("/failai", cleanEmptyQueryParams, async (req, res) => {
             usedHiddenFields: false,
         });
     } else {
+        timings.start("statistika");
         let statistika = await gautiStatistika();
+        timings.end("statistika");
 
-        res.render("failai/index", {
+        res.setHeader("Server-Timing", timings.serverTiming());
+
+        res.renderCompiled("failai/index", {
             customHead: config.customHead,
             values: {},
             statistika,

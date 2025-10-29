@@ -1,7 +1,7 @@
 import process from "process";
 import { Buffer } from "buffer";
 import { log } from "../../utils/log.js";
-import { postgres } from "../../postgres/postgres.js";
+import { postgres, parsePgArray } from "../../postgres/postgres.js";
 
 /**
  * Cleans metadata object by removing null characters and trimming strings.
@@ -36,6 +36,7 @@ async function nuskaitytiDokNuskaitytojuje(
     url,
     nuskaitytojoId = null,
     extension = "pdf",
+    dokumentas,
 ) {
     if (nuskaitytojoId) {
         // Get a specific row from "dokNuskaitytojai"
@@ -67,13 +68,40 @@ async function nuskaitytiDokNuskaitytojuje(
     }
 
     // Fetch the given url GET ?url=url&apiKey=apiKey
-    let fetchUrl = `${nuskaitytojas.url}/?url=${encodeURIComponent(url)}&apiKey=${encodeURIComponent(nuskaitytojas.apiKey)}&extension=${encodeURIComponent(extension)}`;
+    // let fetchUrl = `${nuskaitytojas.url}/?url=${encodeURIComponent(url)}&apiKey=${encodeURIComponent(nuskaitytojas.apiKey)}&extension=${encodeURIComponent(extension)}`;
+    // log(`Dokumentas ${url} nuskaitomas ${nuskaitytojas.pavadinimas}`);
+    // let response = await fetch(fetchUrl, {
+    //     method: "GET",
+    //     headers: {
+    //         Accept: "application/json",
+    //     },
+    //     timeout: 5 * 60 * 1000, // 5 minutes
+    // });
+
+    let fetchUrl = `${nuskaitytojas.url}/extract`;
     log(`Dokumentas ${url} nuskaitomas ${nuskaitytojas.pavadinimas}`);
+
+    let body = {
+        url: url,
+        apiKey: nuskaitytojas.apiKey,
+        extension: extension,
+    };
+
+    if (dokumentas.ocrText && dokumentas.ocrText.length > 0) {
+        try {
+            body.puslapiai = parsePgArray(dokumentas.ocrText);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
     let response = await fetch(fetchUrl, {
-        method: "GET",
+        method: "POST",
         headers: {
+            "Content-Type": "application/json",
             Accept: "application/json",
         },
+        body: JSON.stringify(body),
         timeout: 5 * 60 * 1000, // 5 minutes
     });
 
@@ -107,7 +135,7 @@ const REFILL_THRESHOLD = 5;
 const BUCKET_SIZE = 1000;
 const IN_PROGRESS_TIMEOUT = 10 * 60 * 1000; // 10 min
 
-const nuskaitymoVersija = 5;
+const nuskaitymoVersija = 7;
 
 // In-memory tracking
 let kibirelis = [];
@@ -134,7 +162,7 @@ async function fillBucket() {
              WHERE (nuskaitytas IS NULL OR nuskaitytas < $1)
                AND (nuskaitytas IS NULL OR nuskaitytas >= 0)
                AND parsiustas = 1
-               AND extension IN ('pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt')
+               AND extension IN ('pdf', 'prn', 'docx', 'odt', 'docm', 'dotx', 'doc', 'dot', 'rtf', 'xlsx', 'xlsm', 'xlsb', 'xls', 'csv', 'pptx', 'ppsx', 'ppt', 'zip', 'txt', 'url', 'msg', 'eml', '7z')
                ORDER BY nuskaitytas NULLS FIRST
              LIMIT $2`,
             [nuskaitymoVersija, limit * 2], // fetch extra to avoid duplicates
@@ -220,6 +248,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             url,
             nuskaitytojoId,
             dokumentas.extension,
+            dokumentas,
         );
 
         var tekstas = results.pages;
@@ -255,7 +284,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     }
 
     // Tekstas is a json array of pages, join to single string
-    let sujungtasTekstas = tekstas.join("");
+    let sujungtasTekstas = (tekstas || []).join("");
     if (!metadata.wordCount) {
         metadata.wordCount = sujungtasTekstas
             .split(/\s+/)

@@ -1,5 +1,5 @@
 import express from "express";
-import { postgres } from "../postgres/postgres.js";
+import { postgres, parsePgArray } from "../postgres/postgres.js";
 import { Readable } from "stream";
 import mime from "mime";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
@@ -28,7 +28,7 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
 
     // Gauname 1 failą SELECT * FROM failai WHERE "ocrState" = 0; ir atnaujiname jo būseną į -3
     // Kad kiti nepasiimtų to paties failo, naudojame RETURNING
-    const failasRes = await postgres.query(
+    var failasRes = await postgres.query(
         `WITH cte AS (
           SELECT id
           FROM failai
@@ -46,7 +46,28 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
     );
 
     if (failasRes.rows.length === 0) {
-        return res.status(204).send("Nėra OCR laukiančių failų.");
+        failasRes = await postgres.query(
+            `WITH cte AS (
+          SELECT id
+          FROM failai
+          WHERE "ocrState" IS NULL
+            AND "nuskaitytas" >= 6
+            AND "extension" = 'pdf'
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED
+        )
+        UPDATE failai
+        SET "ocrState" = -3,
+            "ocrNode" = $1,
+            "ocrLockTimestamp" = (NOW() AT TIME ZONE 'Europe/Vilnius')
+        WHERE id IN (SELECT id FROM cte)
+        RETURNING *;`,
+            [user.pavadinimas],
+        );
+
+        if (failasRes.rows.length === 0) {
+            return res.status(204).send("Nėra OCR laukiančių failų.");
+        }
     }
 
     const failas = failasRes.rows[0];
@@ -511,6 +532,10 @@ failasRouter.get("/failas/:dokId/:fileId", async (req, res, next) => {
         });
     }
 
+    if (failas?.ocrText) {
+        failas.ocrText = parsePgArray(failas.ocrText);
+    }
+
     if (requestsJson) {
         return res.json(failas);
     }
@@ -571,6 +596,10 @@ failasRouter.get("/failas/:id", async (req, res, next) => {
                     sig.signerFullDistinguishedName.replace(/\d{4,}/g, "");
             }
         });
+    }
+
+    if (failas?.ocrText) {
+        failas.ocrText = parsePgArray(failas.ocrText);
     }
 
     if (requestsJson) {
