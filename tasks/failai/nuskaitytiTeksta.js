@@ -336,7 +336,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             metadata?.links?.map((o) => o.uri) || [],
             metadata?.emails?.map((o) => o.email) || [],
             metadata?.domains || [],
-            metadata?.telefonai?.map((o) => o.phone) || [],
+            metadata?.telefonai?.map((o) => o.numeris) || [],
             metadata?.sloppyRedactions?.length > 0 || false,
             metadata?.characterCount || 0,
             reikalingasOcr,
