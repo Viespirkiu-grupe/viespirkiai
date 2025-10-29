@@ -3,10 +3,12 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { convertUnit } from "./utils/units.js";
 import { linksniuoti } from "./utils/linksniai.js";
+import ejs from "ejs";
 import { log } from "./utils/log.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import fsPromises from "fs/promises";
 
 const app = express();
 const PORT = config.port || 8000;
@@ -28,8 +30,37 @@ const faviconSVG = fs.readFileSync("./public/icons/icon.svg", "utf8");
 app.locals.faviconSVG = faviconSVG;
 app.locals.faviconSVGURLEncoded = encodeURIComponent(faviconSVG);
 
+// EJS
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+
+const templateCache = new Map();
+
+app.use((req, res, next) => {
+    res.renderCompiled = async (viewName, data = {}) => {
+        const viewsDir = req.app.get("views");
+        const engine = req.app.get("view engine");
+        const filePath = path.join(viewsDir, `${viewName}.${engine}`);
+
+        let templateFn = templateCache.get(filePath);
+
+        if (!templateFn) {
+            const templateStr = await fsPromises.readFile(filePath, "utf-8");
+            templateFn = ejs.compile(templateStr, {
+                filename: filePath,
+                cache: true,
+            });
+            templateCache.set(filePath, templateFn);
+        }
+
+        const mergedData = { ...req.app.locals, ...res.locals, ...data };
+
+        const html = templateFn(mergedData);
+        res.send(html);
+    };
+
+    next();
+});
 
 // Static routes
 app.use(express.static(path.join(__dirname, "public")));

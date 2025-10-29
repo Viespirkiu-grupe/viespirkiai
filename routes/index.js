@@ -384,7 +384,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
         res.clearCookie("naujaPaieska");
     }
 
-    res.render("index", {
+    res.renderCompiled("index", {
         data: results,
         values,
         usedHiddenFields,
