@@ -21,30 +21,30 @@ export async function gautiSutarciuDuomenis(req, jarKodas) {
             client.query(
                 `
                 SELECT
-                  "year",
-                  ROUND(SUM("total")::numeric, 2) AS total
-                FROM public."sutartysSumosMetai"
+                    "metai" AS "year",
+                    ROUND(SUM("total")::numeric, 2) AS total
+                FROM public."sutartysSumosMetaiPirkejas"
                 WHERE "perkanciosiosOrganizacijosKodas" = $1
                   AND "tipas" <> 'SP'
-                  AND "year" >= 2000
-                  AND "year" <= EXTRACT(YEAR FROM CURRENT_DATE) + 1
-                GROUP BY "year"
-                ORDER BY "year" ASC;
+                  AND "metai" >= 2000
+                  AND "metai" <= EXTRACT(YEAR FROM CURRENT_DATE) + 1
+                GROUP BY "metai"
+                ORDER BY "metai" ASC;
       `,
                 [jarKodas],
             ),
             client.query(
                 `
                 SELECT
-                  "year",
-                  ROUND(SUM("total")::numeric, 2) AS total
-                FROM public."sutartysSumosMetai"
+                    "metai" AS "year",
+                    ROUND(SUM("total")::numeric, 2) AS total
+                FROM public."sutartysSumosMetaiTiekejas"
                 WHERE "tiekejoKodas" = $1
                   AND "tipas" <> 'SP'
-                  AND "year" >= 2000
-                  AND "year" <= EXTRACT(YEAR FROM CURRENT_DATE) + 1
-                GROUP BY "year"
-                ORDER BY "year" ASC;
+                  AND "metai" >= 2000
+                  AND "metai" <= EXTRACT(YEAR FROM CURRENT_DATE) + 1
+                GROUP BY "metai"
+                ORDER BY "metai" ASC;
       `,
                 [jarKodas],
             ),
