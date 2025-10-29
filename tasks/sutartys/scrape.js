@@ -2,7 +2,7 @@
 Periodiškai atsiunčia ir importuoja sutartis iš eViesiejiPirkimai.lt svetainės.
 */
 import { parseHTML } from "linkedom";
-import { writeFile } from "fs/promises";
+import { postgres } from "../../postgres/postgres.js";
 import { importArray } from "./import.js";
 import fetch from "node-fetch";
 import pkg from "https-proxy-agent";
@@ -10,6 +10,7 @@ const { HttpsProxyAgent } = pkg;
 import { SocksProxyAgent } from "socks-proxy-agent";
 import config from "../../utils/config.js";
 import { log } from "../../utils/log.js";
+import { DateTime } from "luxon";
 
 // Nustatome proxy, jei yra
 let proxyAgent = null;
@@ -266,7 +267,15 @@ async function importPage(page = 0) {
     );
     log(`Importuotos ${data.length} sutartys.`);
 
-    return data.length;
+    let naujausioAtnaujinimoTimestamp = data
+        .map((d) => d.paskutinioRedagavimoData)
+        .sort()
+        .pop();
+
+    return {
+        length: data.length,
+        naujausioAtnaujinimoTimestamp,
+    };
 }
 
 /**
@@ -274,42 +283,39 @@ async function importPage(page = 0) {
  * @returns {Promise}
  */
 export async function requestLatestEviesiejipirkimaiData() {
-    // Nuskaitome paskutinio puslapio numerį iš ./taskState/scrapeEviesiejipirkimaiSutartys.txt
-    // try {
-    //     const lastPageFile = await import("fs/promises").then((fs) =>
-    //         fs.readFile(
-    //             "./taskState/scrapeEviesiejipirkimaiSutartys.txt",
-    //             "utf-8",
-    //         ),
-    //     );
-    //     var page = parseInt(lastPageFile.trim(), 10) + 1;
-    //     if (isNaN(page)) page = 0;
-    // } catch (error) {
-    //     var page = 0;
-    // }
+    let naujausioAtnaujinimoTimestampRes = await postgres.query(
+        `SELECT max("paskutinioRedagavimoData") FROM sutartys;`,
+    );
+    let naujausioAtnaujinimoTimestamp =
+        naujausioAtnaujinimoTimestampRes.rows[0].max; // String formatas "YYYY-MM-DD HH:MM:SS"
 
-    // Siunčiame puslapius tol, kol yra duomenų
-    // while (true) {
-    //     if ((await importPage(page)) < 50) {
-    //         log(`Puslapis ${page} nėra pilnas.`);
-    //         return false;
-    //     } else {
-    //         log(`Puslapis ${page} pilnas.`);
+    if (!naujausioAtnaujinimoTimestamp) {
+        naujausioAtnaujinimoTimestamp = "1970-01-01 00:00:00";
+    }
 
-    //         // Išsaugome puslapio numerį į ./taskState/scrapeEviesiejipirkimaiSutartys.txt
-    //         await writeFile(
-    //             "./taskState/scrapeEviesiejipirkimaiSutartys.txt",
-    //             page.toString(),
-    //         );
-    //         page++;
-    //     }
-    //     // Wait for like 1s
-    //     await new Promise((resolve) => setTimeout(resolve, 1));
-    // }
-    //
-    // Atnaujiname paskutinius 5 puslapius
+    naujausioAtnaujinimoTimestamp = DateTime.fromSQL(
+        naujausioAtnaujinimoTimestamp,
+        {
+            zone: "Europe/Vilnius",
+        },
+    );
+
     for (let page = 0; page < 5; page++) {
-        await importPage(page);
+        let data = await importPage(page);
+
+        // Patikriname ar data.naujausioAtnaujinimoTimestamp yra bent 15min senesnis už naujausioAtnaujinimoTimestamp
+        // Jei taip, stabdome importą, jau atsikasėme viską
+        if (
+            DateTime.fromJSDate(data.naujausioAtnaujinimoTimestamp).plus({
+                minutes: 15,
+            }) < naujausioAtnaujinimoTimestamp
+        ) {
+            log(
+                `Sustabdomas importas, nes pasiektas 15min senesnis įrašas nei naujausias duomenų bazėje.`,
+            );
+            return false;
+        }
+
         log(`Importuotas puslapis ${page}`);
     }
     return false;
