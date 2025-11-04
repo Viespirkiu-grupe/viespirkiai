@@ -1,0 +1,15 @@
+<form method="get" id="failaiSearch">
+    <h1>Nepatikimų ir melagingą informaciją pateikusių tiekėjų paieška<sup>BETA</sup></h1>
+    <input type="text" name="search" id="search" value="<%= values.search || "" %>" placeholder="Ieškokite" />
+    <button type="submit" value="Ieškoti" class="main">Ieškoti</button>
+    <details id="paieskosNustatymai"
+        <% if (usedHiddenFields || false) { %>
+        open
+        <% } %>
+    >
+        <summary></summary>
+        <div class="settingai">
+           Papildomų nustatymų nėra.
+        </div>
+    </details>
+</form>

@@ -1,0 +1,73 @@
+<% if(asmuo.nepatikimi && asmuo.nepatikimi.length > 0 ) { %>
+    <div id="nepatikimi">
+        <h2><a href="#nepatikimi" class="hashHref"><u>Nepatikimų tiekėjų sąrašas</u></a></h2>
+
+        <div class="results" style="margin-inline: 0px;">
+            <% let count = 0; %>
+            <% asmuo.nepatikimi.forEach(function(nepatikimas){ %>
+                <div class="rezultatas">
+                    <div class="rezultatas-top">
+                        <span>
+                            Įvesta:
+                            <%= nepatikimas.duomenuIvedimoData %>
+                        </span>
+                        <span>
+                            Galioja:
+                            <%= nepatikimas.dataNuoKuriosSkaiciuojama || "nežinoma" %> –
+                            <%= nepatikimas.itrauktaIki || "nežinoma" %>
+                        </span>
+                        <span>
+                            Paskutinį kartą matyta sąraše:
+                            <%= nepatikimas.paskutiniKartaMatytaSarase %>
+                        </span>
+                    </div>
+                    <div class="rezultatas-title">
+                        <% if(nepatikimas.pagrindimas) { %>
+                            <%= (nepatikimas.pagrindimas.itraukimoPriezastis?.[0].toUpperCase() + nepatikimas.pagrindimas.itraukimoPriezastis?.slice(1) || '') || "Įraukimo priežastis nenurodyta" %>
+                        <% } else { %>
+                            Įraukimo priežastis nenurodyta
+                        <% } %>
+                    </div>
+                    <div class="rezultatas-bottom" style="text-align: justify;">
+                        <span>
+                            <b>Pirkėjas:</b> <%= nepatikimas.pirkimoVykdytojoPavadinimas || "nenurodytas" %>
+                        </span>
+                        <span>
+                            <b>Pirkimo numeris:</b> <%= nepatikimas.pirkimoNumeris	|| "nenurodytas" %>
+                        </span>
+                        <% if(nepatikimas.teismoSprendimoLink && nepatikimas.teismoSprendimoLink.length > 5){ %>
+                            <span>
+                                <b>Teismo sprendimas:</b>
+                                <a href="<%= nepatikimas.teismoSprendimoLink %>" target="_blank" rel="noopener noreferrer">
+                                    Peržiūrėti sprendimą
+                                </a>
+                            </span>
+                        <% } %>
+                        <% if(nepatikimas.pagrindimas && nepatikimas.pagrindimas.tiekejoPaaiskinimas && nepatikimas.pagrindimas.tiekejoPaaiskinimas.length > 3){ %>
+                            <span>
+                            <b>Tiekėjo paaiškinimas:</b>
+                            <% if(nepatikimas.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda && nepatikimas.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda.length > 3) { %>
+                                    <a href="<%= nepatikimas.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda %>" target="_blank" rel="noopener noreferrer" style>
+                                        ↗ Peržiūrėti tiekėjo paaiškinimo dokumentą (<%= nepatikimas.pagrindimas.paaiskinimoPateikimoData || "Data nenurodyta" %>)
+                                    </a>
+                            <% } %>
+                            </span>
+                            <% if(nepatikimas.pagrindimas.tiekejoPaaiskinimas && nepatikimas.pagrindimas.tiekejoPaaiskinimas.length > 3) { %>
+                                <div>
+                                    <blockquote>
+                                        <%= nepatikimas.pagrindimas.tiekejoPaaiskinimas %>
+                                    </blockquote>
+                                    <% if(nepatikimas.pagrindimas.paaiskinimoPateikimoData) {%>
+                                        <div style="text-align: right; font-size: 0.9em;">
+                                            <i> (Pateiktas: <%= nepatikimas.pagrindimas.paaiskinimoPateikimoData %>)</i>
+                                        </div>
+                                    <% } %>
+                                </div>
+                            <% } %>
+                        <% } %>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    </div>
+<% } %>

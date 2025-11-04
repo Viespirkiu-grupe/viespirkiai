@@ -1,0 +1,65 @@
+<% if(asmuo.melagingi && asmuo.melagingi.length > 0 ) { %>
+    <div id="melagiai">
+        <h2><a href="#melagiai" class="hashHref"><u>Melagingą informaciją pateikusių tiekėjų sąrašas</u></a></h2>
+
+        <div class="results" style="margin-inline: 0px;">
+            <% let count = 0; %>
+            <% asmuo.melagingi.forEach(function(melagis){ %>
+                <div class="rezultatas">
+                    <div class="rezultatas-top">
+                        <span>
+                            Įvesta:
+                            <%= melagis.duomenuIvedimoData %>
+                        </span>
+                        <span>
+                            Galioja:
+                            <%= melagis.dataNuoKuriosSkaiciuojamasTerminas || "nežinoma" %> –
+                            <%= melagis.itrauktasIki || "nežinoma" %>
+                        </span>
+                        <span>
+                            Paskutinį kartą matyta sąraše:
+                            <%= melagis.paskutiniKartaMatytaSarase %>
+                        </span>
+                    </div>
+                    <div class="rezultatas-title">
+                        <% if(melagis.pagrindimas) { %>
+                            <%= melagis.pagrindimas.irasymoPagrindas || "Įraukimo pagrindas nenurodytas" %>
+                        <% } else { %>
+                            Įraukimo pagrindas nenurodytas
+                        <% } %>
+                    </div>
+                    <div class="rezultatas-bottom" style="text-align: justify;">
+                        <span>
+                            <b>Pirkėjas:</b> <%= melagis.pirkimoVykdytojoPavadinimas || "nenurodytas" %>
+                        </span>
+                        <span>
+                            <b>Pirkimo numeris:</b> <%= melagis.pirkimoNumeris	|| "nenurodytas" %>
+                        </span>
+                        <% if(melagis.pagrindimas && melagis.pagrindimas.tiekejoPaaiskinimas && melagis.pagrindimas.tiekejoPaaiskinimas.length > 3){ %>
+                            <span>
+                            <b>Tiekėjo paaiškinimas:</b>
+                            <% if(melagis.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda && melagis.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda.length > 3) { %>
+                                    <a href="<%= melagis.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda %>" target="_blank" rel="noopener noreferrer" style>
+                                        ↗ Peržiūrėti tiekėjo paaiškinimo dokumentą (<%= melagis.pagrindimas.paaiskinimoPateikimoData || "Data nenurodyta" %>)
+                                    </a>
+                            <% } %>
+                            </span>
+                            <% if(melagis.pagrindimas.tiekejoPaaiskinimas && melagis.pagrindimas.tiekejoPaaiskinimas.length > 3) { %>
+                                <div>
+                                    <blockquote>
+                                        <%= melagis.pagrindimas.tiekejoPaaiskinimas %>
+                                    </blockquote>
+                                    <% if(melagis.pagrindimas.paaiskinimoPateikimoData) {%>
+                                        <div style="text-align: right; font-size: 0.9em;">
+                                            <i> (Pateiktas: <%= melagis.pagrindimas.paaiskinimoPateikimoData %>)</i>
+                                        </div>
+                                    <% } %>
+                                </div>
+                            <% } %>
+                        <% } %>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    </div>
+<% } %>

@@ -1,0 +1,99 @@
+    <div>
+        <% if(values.search == "" && usedHiddenFields == false) { %>
+            <h2><u>Naujausi įrašai</u></h2>
+        <% } %>
+        <section class="preResultOptions">
+        <div class="numberOfResults">
+            <%- numberOfResults %>
+        </div>
+        </section>
+    </div>
+    <% data.forEach(item => { %>
+        <div class="rezultatas">
+            <div class="rezultatas-top">
+                <span>
+                    <%= item.saltinis %>
+                </span>
+                <span>
+                    Galioja:
+                    <%= item.dataNuoKuriosSkaiciuojama || "nežinoma" %> –
+                    <%= item.itrauktasIki || "nežinoma" %>
+                </span>
+                <span>
+                    Įvesta:
+                    <%= item.duomenuIvedimoData || "nežinoma" %>
+                </span>
+                <span>
+                    Paskutinį kartą matyta sąraše:
+                    <%= item.paskutiniKartaMatytaSarase %>
+                </span>
+            </div>
+            <div class="rezultatas-title">
+                <% if(item.saltinis == "Nepatikimas") { %>
+                    <a href="/asmuo/<%= item.tiekejoJarKodas %>#nepatikimi">
+                        <%= item.tiekejoPavadinimas %>
+                    </a>
+                <% } else if(item.saltinis == "Melagingas") { %>
+                    <a href="/asmuo/<%= item.tiekejoJarKodas %>#melagiai">
+                        <%= item.tiekejoPavadinimas %>
+                    </a>
+                <% } else { %>
+                    <a href="/asmuo/<%= item.tiekejoJarKodas %>">
+                        <%= item.tiekejoPavadinimas %>
+                    </a>
+                <% } %>
+            </div>
+            <div class="rezultatas-bottom" style="text-align: justify;">
+                <% if(item.irasymoPagrindas && item.irasymoPagrindas.length > 3){ %>
+                    <span>
+                        <%= item.irasymoPagrindas %>
+                    </span>
+                <% } else if(item.itraukimoPriezastis && item.itraukimoPriezastis.length > 3){ %>
+                    <span>
+                        <%= item.itraukimoPriezastis.charAt(0).toUpperCase() + item.itraukimoPriezastis.slice(1) %>
+                    </span>
+                <% } %>
+                <span>
+                    <b>Pirkėjas:</b> <%= item.pirkimoVykdytojoPavadinimas || "nenurodytas" %>
+                </span>
+                <span>
+                    <b>Pirkimo numeris:</b> <%= item.pirkimoNumeris	|| "nenurodytas" %>
+                </span>
+                <% if(item.teismoSprendimoLink && item.teismoSprendimoLink.length > 5){ %>
+                    <span>
+                        <b>Teismo sprendimas:</b>
+                        <a href="<%= item.teismoSprendimoLink %>" target="_blank" rel="noopener noreferrer">
+                            Peržiūrėti sprendimą
+                        </a>
+                    </span>
+                <% } %>
+                <% if(item.pagrindimas && item.pagrindimas.tiekejoPaaiskinimas && item.pagrindimas.tiekejoPaaiskinimas.length > 3){ %>
+                    <span>
+                    <b>Tiekėjo paaiškinimas:</b>
+                    <% if(item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda && item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda.length > 3) { %>
+                            <a href="<%= item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda %>" target="_blank" rel="noopener noreferrer" style>
+                                ↗ Peržiūrėti tiekėjo paaiškinimo dokumentą (<%= item.pagrindimas.paaiskinimoPateikimoData || "Data nenurodyta" %>)
+                            </a>
+                    <% } %>
+                    </span>
+                    <% if(item.pagrindimas.tiekejoPaaiskinimas && item.pagrindimas.tiekejoPaaiskinimas.length > 3) { %>
+                        <div>
+                            <blockquote>
+                                <%= item.pagrindimas.tiekejoPaaiskinimas %>
+                            </blockquote>
+                            <% if(item.pagrindimas.paaiskinimoPateikimoData) {%>
+                                <div style="text-align: right; font-size: 0.9em;">
+                                    <i> (Pateiktas: <%= item.pagrindimas.paaiskinimoPateikimoData %>)</i>
+                                </div>
+                            <% } %>
+                        </div>
+                    <% } %>
+                <% } %>
+            </div>
+        </div>
+    <% }); %>
+
+
+<%- include('../pagination.ejs', {
+    currentPage, pageCount, queryParams
+}) %>
