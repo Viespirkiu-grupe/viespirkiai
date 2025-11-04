@@ -146,7 +146,7 @@ export async function parsiustiFaila(
 
     // Randame dėžę, kuri dar turi vietos
     const dezeRes = await postgres.query(
-        "SELECT * FROM dezes WHERE used < max LIMIT 1",
+        `SELECT * FROM dezes WHERE used < max ORDER BY "priority" DESC LIMIT 1`,
     );
 
     if (dezeRes.rows.length === 0) {
