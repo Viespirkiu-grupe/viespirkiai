@@ -139,6 +139,7 @@ failasRouter.post("/failas/ocr/submit", async (req, res, next) => {
     await postgres.query(
         `UPDATE failai
         SET "ocrState" = 1,
+            "nuskaitytas" = 0,
             "ocrText" = LEFT($1, 1048576),
             "ocrLockTimestamp" = NULL,
             "ocrDuration" = $2,
