@@ -8,6 +8,7 @@ import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 import { postgres } from "../postgres/postgres.js";
 import QueryStream from "pg-query-stream";
+import ejs from "ejs";
 import { Readable } from "stream";
 
 const indexRouter = express.Router();
@@ -29,7 +30,7 @@ async function atnaujintiSutarciuSkaiciu() {
 await atnaujintiSutarciuSkaiciu();
 setInterval(atnaujintiSutarciuSkaiciu, 15 * 60 * 1000); // 15min
 
-indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
+indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
     const startas = performance.now();
 
     // Limitas, kiek rodyti viename puslapyje
@@ -62,7 +63,6 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
 
     // Puslapis, kurį rodyti
     const page = parseInt(req.query.page) || 1;
-    const skip = (page - 1) * limit;
 
     let zinomasRezultatuSkaicius = true;
     if (req.query.search) {
@@ -225,11 +225,29 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res) => {
     }
 
     if (req.query.rezultatuSkaiciausPatikslinimas) {
-        res.json({
-            zinomasRezultatuSkaicius,
-            total,
-            numberOfResults,
-        });
+        res.render(
+            "pagination",
+            {
+                currentPage: page,
+                pageCount: Math.ceil(total / limit),
+                numberOfResults,
+                total,
+                queryParams,
+            },
+            (err, html) => {
+                if (err) {
+                    return next(err);
+                }
+
+                res.json({
+                    zinomasRezultatuSkaicius,
+                    total,
+                    numberOfResults,
+
+                    pagination: html,
+                });
+            },
+        );
         return;
     }
 

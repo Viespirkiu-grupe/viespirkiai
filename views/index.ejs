@@ -38,6 +38,7 @@
                             if (data.zinomasRezultatuSkaicius) {
                                 span.className = ''; // remove all classes
                                 document.querySelector(".numberOfResults").innerHTML = data.numberOfResults;
+                                document.querySelector("nav.pagination").innerHTML = data.pagination;
                             } else {
                                 span.classList.remove('spin'); // stop spinning if still unknown
                             }

@@ -24,7 +24,6 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
         limit = parseInt(req.query.limit) || limit;
     }
 
-    const skip = (page - 1) * limit;
     if (req.query.search) {
         let values = {
             search: req.query.search,
@@ -59,7 +58,9 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
         //      var results = rows;
         //      var total = response[0].total || 0;
 
-        let { results, total } = await searchJarDocuments(req.query.search, {});
+        let { results, total } = await searchJarDocuments(req.query.search, {
+            page,
+        });
 
         // console.log(results, total);
 
