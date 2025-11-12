@@ -13,10 +13,14 @@
 		<main>
             <% if(failas.metaduomenys && failas.metaduomenys.Title) { %>
 			    <i><%= failas.pavadinimas %></i>
+				<h1>
+				    <%= failas.metaduomenys.Title %>
+				</h1>
+			<% } else { %>
+    			<h1>
+    			    <%= failas.pavadinimas %>
+    			</h1>
 			<% } %>
-			<h1>
-			    <%= failas.metaduomenys.Title || failas.pavadinimas %>
-			</h1>
 		    <div class="col-2-strict mobile-col-1" style="gap: 16px;">
 				<section>
     				<div>
@@ -31,11 +35,15 @@
                            </div>
                            <div>
                                <h3>Dydis</h3>
-                               <%= failas.dydis.convertUnit("B") %>
+                                <% if(failas.dydis) { %>
+                                    <%= failas.dydis.convertUnit("B") %>
+                                <% } else { %>
+                                   -
+                                <% } %>
                            </div>
                            <div>
                                <h3>MD5</h3>
-                               <span style="overflow-wrap: anywhere; font-family: monospace;"><%= failas.md5 %></span>
+                               <span style="overflow-wrap: anywhere; font-family: monospace;"><%= failas.md5 || "-" %></span>
                            </div>
                            <div>
                                <h3>Šaltinis</h3>
@@ -43,6 +51,7 @@
                            </div>
                        </div>
                     </div>
+                    <% if(failas.metaduomenys) { %>
                     <div>
                        <h2 style="margin-bottom: 0px;"><u>Dokumentas</u></h2>
                        <div class="col-2">
@@ -191,6 +200,11 @@
                            </div>
                        </div>
                     </div>
+                    <% } else { %>
+                        <div style="text-align: center; margin-block: 64px;">
+                            <i>Dokumento metaduomenų nėra</i>
+                        </div>
+                    <% } %>
                     <br>
 				</section>
 				<section>
