@@ -242,10 +242,7 @@ async function importPage(page = 0) {
     // Sudarome puslapio URL
     let limitstart = page * 50; // Puslapiuose yra po 50 įrašų, todėl dauginame iš 50
 
-    let kiekis = 49; // Valstybinė magija – paprašai 50, gausi 51
-    if (page == 0) {
-        kiekis = 50; // ... išskyrus pirmame puslapyje
-    }
+    let kiekis = 50;
 
     const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&filter_limit=${kiekis}&limitstart=${limitstart}`;
     log(`Importuojamas puslapis ${page} ${url}`);
@@ -319,4 +316,35 @@ export async function requestLatestEviesiejipirkimaiData() {
         log(`Importuotas puslapis ${page}`);
     }
     return false;
+}
+
+export async function scrapePagesStarting(page = 0) {
+    let yraIrasu = true;
+    while (yraIrasu) {
+        let data = await importPage(page);
+        if (data.length === 0) {
+            yraIrasu = false;
+            log(`Nėra daugiau įrašų, baigiamas nuskaitymas.`);
+        } else {
+            log(
+                `Importuotas puslapis ${page}, atkasta iki ${data.naujausioAtnaujinimoTimestamp}`,
+            );
+            page++;
+        }
+    }
+}
+
+// If ran directly, scrapePagesStarting given the argument
+if (
+    import.meta.url === process.argv[1] ||
+    import.meta.url === `file://${process.argv[1]}`
+) {
+    let page = 0;
+    if (process.argv.length >= 3) {
+        page = parseInt(process.argv[2]);
+    }
+    scrapePagesStarting(page).then(() => {
+        log("Baigtas visų puslapių nuskaitymas.");
+        process.exit(0);
+    });
 }
