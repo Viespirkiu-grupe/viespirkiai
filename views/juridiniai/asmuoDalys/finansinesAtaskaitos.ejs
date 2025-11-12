@@ -6,7 +6,7 @@
              <section style="width: 100%;">
                  <h3><a href="#pardavimoPajamos" id="pardavimoPajamos" class="hashHref">Pardavimo pajamos</a></h3>
                  <% if(asmuo.finansai.lentele && asmuo.finansai.lentele.metai.length > 0 && asmuo.finansai.lentele.duomenys["Pardavimo pajamos"]) { %>
-                     <div id="pardavimoPajamos" class="chart" style="width: 100%; height: 400px;"></div>
+                     <div id="pardavimoPajamosChart" class="chart" style="width: 100%; height: 400px;"></div>
 
                      <script defer>
                      // Create a map directly from EJS
@@ -30,7 +30,7 @@
 
 
                      displayChart({
-                       element: document.querySelector('#pardavimoPajamos'),
+                       element: document.querySelector('#pardavimoPajamosChart'),
                        labels: mergedLabels,
                        series: [
                           {name: "Pardavimo pajamos", data: finalPardavimoPajamosVertes},
