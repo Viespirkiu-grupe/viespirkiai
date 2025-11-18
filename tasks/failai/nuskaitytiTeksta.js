@@ -162,8 +162,12 @@ async function fillBucket() {
              WHERE (nuskaitytas IS NULL OR nuskaitytas < $1)
                AND (nuskaitytas IS NULL OR nuskaitytas >= 0)
                AND parsiustas = 1
-               AND extension IN ('pdf', 'prn', 'docx', 'odt', 'docm', 'dotx', 'doc', 'dot', 'rtf', 'xlsx', 'xlsm', 'xlsb', 'xls', 'csv', 'pptx', 'ppsx', 'ppt', 'zip', 'txt', 'url', 'msg', 'eml', '7z')
-               ORDER BY nuskaitytas NULLS FIRST
+               AND LOWER(extension) = ANY(ARRAY[
+                     'pdf','prn','docx','odt','docm','dotx','doc','dot','rtf',
+                     'xlsx','xlsm','xlsb','xls','csv','pptx','ppsx','ppt',
+                     'zip','txt','url','msg','eml','7z'
+                 ])
+                 ORDER BY nuskaitytas NULLS FIRST
              LIMIT $2`,
             [nuskaitymoVersija, limit * 2], // fetch extra to avoid duplicates
         );

@@ -293,3 +293,221 @@ export function buildPostgresFilter(query, limit, page = 1) {
         visiIrasai,
     };
 }
+
+/**
+ * Builds a PostgreSQL file search filter from the provided query object.
+ * Supports full-text search with phrase ("...") and plain text queries.
+ * @param {Object} query
+ * @param {number} limit
+ * @param {number} page
+ * @returns {Object}
+ */
+export function buildPostgresFailaiSearchFilter(query, limit, page = 1) {
+    const whereClauses = [];
+    const params = [];
+    const values = {};
+    const queryParams = [];
+    let usedHiddenFields = false;
+    let visiIrasai = true;
+
+    const addParam = (key, val) => {
+        params.push(val);
+        return `$${params.length}`;
+    };
+
+    // Basic filter config
+    const config = [
+        {
+            key: "extension",
+            apply: (val) => {
+                whereClauses.push(
+                    `LOWER("extension") = LOWER(${addParam("extension", val)})`,
+                );
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
+            key: "md5",
+            apply: (val) => {
+                whereClauses.push(`"md5" = ${addParam("md5", val)}`);
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
+            key: "puslapiaiMin",
+            apply: (val) => {
+                const num = parseInt(val, 10);
+                whereClauses.push(
+                    `"puslapiuSkaicius" >= ${addParam("puslapiaiMin", num)}`,
+                );
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
+            key: "puslapiaiMax",
+            apply: (val) => {
+                const num = parseInt(val, 10);
+                whereClauses.push(
+                    `"puslapiuSkaicius" <= ${addParam("puslapiaiMax", num)}`,
+                );
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
+            key: "saltinis",
+            apply: (val) => {
+                if (val == "sutartys") {
+                    // NULL also counts as "sutartys"
+                    whereClauses.push(
+                        `("saltinis" = ${addParam("saltinis", val)} OR "saltinis" IS NULL)`,
+                    );
+                    usedHiddenFields = true;
+                    visiIrasai = false;
+                    return;
+                }
+
+                whereClauses.push(`"saltinis" = ${addParam("saltinis", val)}`);
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
+            key: "telefonas",
+            apply: (val) => {
+                whereClauses.push(
+                    `${addParam("telefonas", val)} = ANY("telefonai")`,
+                );
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
+            key: "email",
+            apply: (val) => {
+                whereClauses.push(`${addParam("email", val)} = ANY("emails")`);
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
+            key: "domain",
+            apply: (val) => {
+                whereClauses.push(
+                    `${addParam("domain", val)} = ANY("domains")`,
+                );
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
+            key: "iban",
+            apply: (val) => {
+                whereClauses.push(
+                    `${addParam("iban", val)} = ANY("ibanNumeriai")`,
+                );
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
+            key: "jarKodas",
+            apply: (val) => {
+                whereClauses.push(
+                    `${addParam("jarKodas", val)} = ANY("jarKodai")`,
+                );
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+    ];
+
+    // Apply non-search filters
+    for (const { key, apply, isBoolean } of config) {
+        if (isBoolean && query[key] !== undefined) {
+            apply();
+            queryParams.push(`${key}=true`);
+            values[key] = "true";
+        } else if (query[key]?.length > 0) {
+            apply(query[key]);
+            values[key] = query[key];
+            queryParams.push(`${key}=${encodeURIComponent(query[key])}`);
+        }
+    }
+
+    // Full-text search logic
+    let tsQueryFunc = null;
+    let cleanSearch = null;
+
+    if (query.search?.length > 0) {
+        const quoteMatch = query.search.match(/^"(.*)"$/);
+        tsQueryFunc = quoteMatch ? "phraseto_tsquery" : "plainto_tsquery";
+        cleanSearch = quoteMatch ? quoteMatch[1] : query.search;
+
+        whereClauses.push(
+            `f.search_index @@ ${tsQueryFunc}('simple', ${addParam("search", cleanSearch)})`,
+        );
+        visiIrasai = false;
+    }
+
+    values.search = query.search || "";
+
+    //WHERE clause
+    let where = whereClauses.length
+        ? "WHERE " + whereClauses.join(" AND ")
+        : "";
+
+    if (query.search?.length > 0) {
+        where = whereClauses.length
+            ? "WHERE f.nuskaitytas >= 0 AND " + whereClauses.join(" AND ")
+            : "WHERE f.nuskaitytas >= 0";
+    }
+
+    // Pagination
+    const limitParam = addParam("limit", limit);
+    const offsetVal = Math.max((page - 1) * limit, 0);
+    const offsetParam = addParam("offset", offsetVal);
+
+    queryParams.push(`search=${encodeURIComponent(query.search || "")}`);
+
+    console.log(queryParams);
+
+    return {
+        sql: `
+            SELECT
+                f.*,
+                CASE
+                    WHEN fp.salinti = true THEN '451 – Pašalinta'
+                    ELSE f.pavadinimas
+                END AS pavadinimas,
+                CASE
+                    WHEN fp.salinti = true THEN '451 – Pašalinta'
+                    ELSE f.tekstas
+                END AS tekstas,
+                CASE
+                    WHEN fp.salinti = true THEN '{}'::jsonb
+                    ELSE f.metaduomenys
+                END AS metaduomenys
+            FROM failai f
+            LEFT JOIN "failuPasalinimai" fp
+                   ON fp."dokId" = f."dokId"
+                  AND fp."fileId" = f."fileId"
+                  AND fp.salinti = true
+            ${where}
+            LIMIT ${limitParam} OFFSET ${offsetParam};
+        `,
+        sqlCount: `
+            SELECT COUNT(*)
+            FROM failai f
+            ${where};
+        `,
+        params,
+        values,
+        queryParams: queryParams.length ? "&" + queryParams.join("&") : "",
+        usedHiddenFields,
+        visiIrasai,
+    };
+}

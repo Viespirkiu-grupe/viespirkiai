@@ -38,14 +38,21 @@ function findCategory(unit) {
 export function convertUnit(value, categoryOrOptions, options = {}) {
     let category, opts;
 
-    if (typeof categoryOrOptions === "string" && UNITS[categoryOrOptions]) {
-        category = categoryOrOptions;
-        opts = options;
+    if (typeof categoryOrOptions === "string") {
+        // check if it's a known category
+        if (UNITS[categoryOrOptions]) {
+            category = categoryOrOptions;
+            opts = options;
+        } else {
+            // assume it's a unit
+            opts = { from: categoryOrOptions, ...options };
+            category = findCategory(categoryOrOptions) || "data";
+        }
     } else if (typeof categoryOrOptions === "object") {
         opts = categoryOrOptions;
         if (opts.from) category = findCategory(opts.from);
         if (!category && opts.to) category = findCategory(opts.to);
-        if (!category) category = "data"; // default fallback
+        if (!category) category = "data"; // fallback
     } else {
         category = "data";
         opts = {};

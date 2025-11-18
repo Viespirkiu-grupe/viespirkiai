@@ -142,9 +142,9 @@
                                 <% failas.metaduomenys.telefonai
                                     .forEach(telefonas => { %>
                                     <div style="display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; align-items: center;">
-                                        <a href="tel:<%= telefonas.phone %>" target="_blank" title="<%= telefonas.phone %>"
+                                        <a href="tel:<%= telefonas.numeris %>" target="_blank" title="<%= telefonas.numeris %>"
                                             style="flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                            <%= telefonas.phone %>
+                                            <%= telefonas.numeris %>
                                         </a>
                                         <sup style="flex-shrink: 0; margin-left: 4px;">
                                             <%= telefonas.pages.join(', ') %> psl.
@@ -164,9 +164,9 @@
                                 <% failas.metaduomenys.ibanNumeriai
                                     .forEach(iban => { %>
                                     <div style="display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; align-items: center;">
-                                        <a href="iban:<%= iban.iban %>" target="_blank" title="<%= iban.iban %>"
+                                        <a href="iban:<%= iban.numeris %>" target="_blank" title="<%= iban.numeris %>"
                                             style="flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                            <%= iban.iban %>
+                                            <%= iban.numeris %>
                                         </a>
                                         <sup style="flex-shrink: 0; margin-left: 4px;">
                                             <%= iban.pages.join(', ') %> psl.
@@ -208,6 +208,7 @@
                     <br>
 				</section>
 				<section>
+				    <% failas.extension = failas.extension.toLowerCase(); %>
 				    <% if(failas.extension == "pdf") { %>
                       <% let pdfSearch = query.search || ''; %>
   				    <div>
@@ -261,6 +262,129 @@
 
                         </div>
 
+                    <% } else if(failas.extension == "mp4") { %>
+                        <div>
+                            <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                            &nbsp;
+                            <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
+                            &nbsp;
+                        </div>
+                        <div style="margin-top: 16px;">
+                            <video width="100%" height="auto" controls style="max-height: 70vh; margin-top: 16px;">
+                                <source src="https://failai.viespirkiai.top/<%= failas.id %>" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                    <% } else if(failas.extension == "jpg" || failas.extension == "jpeg" || failas.extension == "png" || failas.extension == "bmp" || failas.extension == "gif") { %>
+                            <div>
+                                <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                                &nbsp;
+                                <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
+                                &nbsp;
+                            </div>
+                            <div style="margin-top: 16px;">
+                                <img src="https://failai.viespirkiai.top/<%= failas.id %>" alt="" style="max-width: 100%; margin-top: 16px;">
+                            </div>
+                    <% } else if(failas.extension == "url") { %>
+                        <div>
+                            <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                            &nbsp;
+                            <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
+                            &nbsp;
+                        </div>
+                        <div style="margin-top: 16px;">
+                            <h3>Nuoroda</h3>
+                            <a href="<%= failas.metaduomenys.links[0].uri %>"><%= failas.metaduomenys.links[0].uri %></a>
+                        </div>
+                    <% } else if(failas.extension == "txt") { %>
+                        <div>
+                            <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                            &nbsp;
+                            <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
+                            &nbsp;
+                        </div>
+                        <div style="margin-top: 16px; max-width: 90vw; overflow-x: auto; background-color: var(--lighter-gray); padding: 16px; border-radius: 8px;">
+                            <%
+                           if(failas.tekstas){
+                                failas.tekstas = failas.tekstas.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                           }
+                           // Try to parse file tekstas as an array, add hr between pages
+                           try {
+                               let pages = JSON.parse(failas.tekstas);
+                               if(Array.isArray(pages)){
+                                   failas.tekstas = pages.map((pageText, index) => {
+                                       return pageText;
+                                   }).join('');
+                               }
+                           } catch(e) {
+                               // Not an array, do nothing
+                           }
+                            %>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word;"><%= failas.tekstas || "" %></pre>
+                        </div>
+                    <% } else if(failas.extension == "html" || failas.extension == "htm") { %>
+                        <div>
+                            <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                            &nbsp;
+                            <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
+                            &nbsp;
+                        </div>
+                        <div style="margin-top: 16px; max-width: 90vw; overflow-x: auto; background-color: var(--lighter-gray); padding: 16px; border-radius: 8px;">
+                            <iframe
+                              src="https://failai.viespirkiai.top/<%= failas.id %>"
+                              width="100%"
+                              height="600"
+                              style="border: none; margin-top: 16px;"
+                            ></iframe>
+                        </div>
+                    <% } else if(failas.extension == "eml" || failas.extension == "msg") { %>
+                        <div>
+                            <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                            &nbsp;
+                            <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
+                            &nbsp;
+                        </div>
+                        <div style="margin-top: 16px; max-width: 90vw; overflow-x: auto; background-color: var(--lighter-gray); padding: 16px; border-radius: 8px;">
+                            <div>
+                                <h2 style="margin-block: 0;"><u><%= failas.metaduomenys.subject || "-" %></u></h2><br>
+
+                                <b>Nuo:</b> <%= failas.metaduomenys.from.name || "-" %> &lt;<a href="mailto:<%= failas.metaduomenys.from.email || "-" %>"><%= failas.metaduomenys.from.email || "-" %></a>&gt;<br>
+                                <% if(!Array.isArray(failas.metaduomenys.to)) { %>
+                                    <b>Kam:</b> <%= failas.metaduomenys.to.name || "-" %> &lt;<a href="mailto:<%= failas.metaduomenys.to.email || "-" %>"><%= failas.metaduomenys.to.email || "-" %></a>&gt;<br>
+                                <% } else { %>
+                                    <% failas.metaduomenys.to.forEach(to => { %>
+                                        <b>Kam:</b> <%= to.name || "-" %> &lt;<a href="mailto:<%= to.email || "-" %>"><%= to.email || "-" %></a>&gt;<br>
+                                    <% }) %>
+                                <% } %>
+
+                                <b>Data:</b> <%= new Date(failas.metaduomenys.date || failas.metaduomenys.messageDeliveryTime).toLtDateTime() || "-" %><br>
+
+                                <% if(failas.metaduomenys.html){ %>
+                                    <div style="margin-top: 16px; padding: 8px; border-radius: 4px;">
+                                        <iframe
+                                            srcdoc="<%= failas.metaduomenys.html.replace(/"/g, '&quot;') %>"
+                                            width="100%"
+                                            height="400"
+                                            style="border: none;"
+                                        ></iframe>
+                                    </div>
+                                <% } else { %>
+                                    <div style="font-family: monospace; white-space: pre-wrap; word-wrap: break-word; margin-top: 16px; border-top: 1px solid var(--gray); padding-top: 16px;"><%= failas.metaduomenys.text || failas.metaduomenys.body %></div>
+                                <% } %>
+
+                                <% if(failas.metaduomenys.attachments) { %>
+                                    <h2>Priedai</h2>
+                                    <% failas.metaduomenys.attachments.forEach(attachment => { %>
+                                        <div style="margin-top: 8px;">
+                                            <a href="#">
+                                                <%= attachment.name %>
+                                            </a>
+                                        </div>
+                                    <% }) %>
+
+                                <% } %>
+                            </div>
+                        </div>
                     <% } else { %>
                         <div>
                             <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>

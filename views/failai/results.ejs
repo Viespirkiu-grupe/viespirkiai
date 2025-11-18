@@ -8,8 +8,8 @@
         <div class="rezultatas">
             <div class="rezultatas-top">
                 <span><%= item.extension.toUpperCase() %></span>
-                <span><%= item.dydis.convertUnit("B") %></span>
-                <% if(item.metaduomenys.pageCount){ %>
+                <span><%= (item.dydis || 0).convertUnit("B") %></span>
+                <% if(item.metaduomenys && item.metaduomenys.pageCount){ %>
                     <span><%= Number(item.metaduomenys.pageCount).toLocaleString("lt-LT") || "-" %> p.</span>
                 <% } %>
                 <span><%= Number(item.zodziuSkaicius).toLocaleString("lt-LT") || "-" %> ž.</span>
@@ -17,7 +17,11 @@
             <div class="rezultatas-title">
                 <a href="/failas/<%= item.dokId %>/<%= item.fileId %>?search=<%= encodeURIComponent(search) %>">
                     <span>
-                        <%= item.metaduomenys.Title || item.pavadinimas %>
+                        <% if(item.metaduomenys) { %>
+                            <%= item.metaduomenys.Title || item.pavadinimas %>
+                        <% } else { %>
+                            <%= item.pavadinimas %>
+                        <% } %>
                     </span>
                 </a>
             </div>

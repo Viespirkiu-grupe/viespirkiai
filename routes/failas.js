@@ -9,10 +9,21 @@ const failasRouter = express.Router();
 
 failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
     // Get the apiKey from query params
-    const { apiKey } = req.query;
+    let { apiKey, version } = req.query;
 
     if (!apiKey || typeof apiKey !== "string") {
         return res.status(400).send("API raktas privalomas.");
+    }
+
+    if (!version) {
+        version = 1;
+    }
+
+    // Version has to be a number between 1 and 2
+    version = Number(version);
+    if (isNaN(version) || version < 1 || version > 2) {
+        console.log("NET VERSIJA");
+        return res.status(400).send("Neteisinga versija.");
     }
 
     // Check if the apiKey exists in the database
@@ -46,13 +57,14 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
     );
 
     if (failasRes.rows.length === 0) {
-        failasRes = await postgres.query(
-            `WITH cte AS (
+        if (version == 1) {
+            failasRes = await postgres.query(
+                `WITH cte AS (
           SELECT id
           FROM failai
           WHERE "ocrState" IS NULL
             AND "nuskaitytas" >= 6
-            AND "extension" = 'pdf'
+            AND LOWER("extension") = 'pdf'
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         )
@@ -62,8 +74,28 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
             "ocrLockTimestamp" = (NOW() AT TIME ZONE 'Europe/Vilnius')
         WHERE id IN (SELECT id FROM cte)
         RETURNING *;`,
-            [user.pavadinimas],
-        );
+                [user.pavadinimas],
+            );
+        } else if (version == 2) {
+            failasRes = await postgres.query(
+                `WITH cte AS (
+        SELECT id
+        FROM failai
+        WHERE "ocrState" IS NULL
+          AND "nuskaitytas" >= 6
+          AND LOWER("extension") IN ('pdf', 'jpg', 'jpeg')
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE failai
+      SET "ocrState" = -3,
+          "ocrNode" = $1,
+          "ocrLockTimestamp" = (NOW() AT TIME ZONE 'Europe/Vilnius')
+      WHERE id IN (SELECT id FROM cte)
+      RETURNING *;`,
+                [user.pavadinimas],
+            );
+        }
 
         if (failasRes.rows.length === 0) {
             return res.status(204).send("Nėra OCR laukiančių failų.");

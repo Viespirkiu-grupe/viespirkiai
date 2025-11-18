@@ -9,7 +9,36 @@
     >
         <summary></summary>
         <div class="settingai">
-           Papildomų nustatymų nėra.
+            <%- include('../inputs/text', { label: 'Extension', name: 'extension', placeholder: 'Visi', values }) %>
+            <%- include('../inputs/text', { label: 'MD5', name: 'md5', placeholder: 'd41d8cd98...', values }) %>
+            <%- include('../inputs/text', { label: 'Puslapių nuo', name: 'puslapiaiMin', placeholder: '0', values }) %>
+            <%- include('../inputs/text', { label: 'Puslapių iki', name: 'puslapiaiMax', placeholder: '∞', values }) %>
+            <div>
+                <h2>Šaltinis</h2>
+                <select
+                    name="saltinis"
+                    id="saltinis"
+                    value="<%= values["saltinis"] || "" %>"
+                >
+                    <% if(values["saltinis"] == "" || !values["saltinis"]) { %>
+                        <option value="" selected>Visi</option>
+                    <% } else { %>
+                        <option value="">Visi</option>
+                    <% } %>
+
+                    <% if(values["saltinis"] == "sutartys") { %>
+                        <option value="sutartys" selected>Sutartys</option>
+                    <% } else { %>
+                        <option value="sutartys">Sutartys</option>
+                    <% } %>
+                </select>
+            </div>
+            <%- include('../inputs/text', { label: 'Tel. numeris', name: 'telefonas', placeholder: '+37060000000', values }) %>
+            <%- include('../inputs/text', { label: 'El. paštas', name: 'email', placeholder: 'viespirkiai@viespirkiai.top ', values }) %>
+            <%- include('../inputs/text', { label: 'Domenas', name: 'domain', placeholder: 'viespirkiai.top', values }) %>
+            <%- include('../inputs/text', { label: 'IBAN numeris', name: 'iban', placeholder: 'LT0000000000...', values }) %>
+            <%- include('../inputs/text', { label: 'JAR kodas', name: 'jarKodas', placeholder: '000000000', values }) %>
+
         </div>
     </details>
 </form>

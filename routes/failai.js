@@ -5,6 +5,7 @@ import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 import { postgres } from "../postgres/postgres.js";
 import { gautiStatistika } from "./statistika.js";
 import Timings from "../utils/timings.js";
+import { buildPostgresFailaiSearchFilter } from "../utils/filter.js";
 
 const failaiSearchRouter = express.Router();
 
@@ -36,48 +37,24 @@ failaiSearchRouter.get(
 
         timings.end("limits");
 
-        if (req.query.search) {
+        console.log(typeof req.query, req.query);
+        // Check if req.query has keys
+        if (Object.keys(req.query).length > 0) {
             const searchTerm = req.query.search;
 
-            const quoteMatch = searchTerm.match(/^"(.*)"$/);
-            const tsQueryFunc = quoteMatch
-                ? "phraseto_tsquery"
-                : "plainto_tsquery";
-            var cleanSearch = quoteMatch ? quoteMatch[1] : searchTerm;
+            // Remove quotes from search and trim whitespace
+            let cleanSearch = (searchTerm || "").trim();
+            cleanSearch.replace(/\s+/g, " ");
 
-            const queryText = `
-              SELECT
-                  f.*,
-                  CASE
-                      WHEN fp.salinti = true THEN '451 – Pašalinta'
-                      ELSE f.pavadinimas
-                  END AS pavadinimas,
-                  CASE
-                      WHEN fp.salinti = true THEN '451 – Pašalinta'
-                      ELSE f.tekstas
-                  END AS tekstas,
-                  CASE
-                      WHEN fp.salinti = true THEN '{}'::jsonb
-                      ELSE f.metaduomenys
-                  END AS metaduomenys
-              FROM failai f
-              LEFT JOIN "failuPasalinimai" fp
-                     ON fp."dokId" = f."dokId"
-                    AND fp."fileId" = f."fileId"
-                    AND fp.salinti = true
-              WHERE f.nuskaitytas >= 0
-                AND f.search_index @@ ${tsQueryFunc}('simple', $1)
-              LIMIT $2 OFFSET $3;
-          `;
-
-            const totalQuery = `
-            SELECT COUNT(*)
-            FROM failai
-            WHERE nuskaitytas >= 0
-              AND search_index @@ ${tsQueryFunc}('simple', $1);
-          `;
-
-            let params = [cleanSearch, limit, skip];
+            var {
+                sql,
+                sqlCount,
+                params,
+                values,
+                queryParams,
+                usedHiddenFields,
+                visiIrasai,
+            } = buildPostgresFailaiSearchFilter(req.query, limit, page);
 
             try {
                 ////
@@ -85,9 +62,9 @@ failaiSearchRouter.get(
                 var countClient = await postgres.connect();
 
                 // start both queries immediately
-                const resultsPromise = postgres.query(queryText, params);
+                const resultsPromise = postgres.query(sql, params);
                 const countPromise = countClient.query(
-                    totalQuery,
+                    sqlCount,
                     params.slice(0, -2),
                 );
 
@@ -132,7 +109,7 @@ failaiSearchRouter.get(
                                 pageCount: Math.ceil(total / limit),
                                 numberOfResults,
                                 total,
-                                queryParams: "",
+                                queryParams,
                             },
                             (err, html) => {
                                 if (err) {
@@ -210,9 +187,9 @@ failaiSearchRouter.get(
 
             res.render("failai/index", {
                 customHead: config.customHead,
-                values: { search: searchTerm },
+                values,
                 data: results,
-                queryParams: `&search=${encodeURIComponent(searchTerm)}`,
+                queryParams,
                 query: req.query,
                 search: cleanSearch,
                 numberOfResults,
@@ -220,7 +197,7 @@ failaiSearchRouter.get(
                 pageCount: Math.ceil(total / limit),
                 galimaEksportuoti: false,
                 req,
-                usedHiddenFields: false,
+                usedHiddenFields,
             });
         } else {
             timings.start("statistika");
@@ -240,8 +217,12 @@ failaiSearchRouter.get(
     },
 );
 
-function makeExcerpt(text, searchTerm, maxChars = 250, leading = 25) {
+function makeExcerpt(text = "", searchTerm = "", maxChars = 250, leading = 25) {
     let regex;
+
+    if (text == null) {
+        return "";
+    }
 
     if (/^".+"$/.test(searchTerm.trim())) {
         // Quoted: exact phrase
