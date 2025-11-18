@@ -7,42 +7,44 @@
             pageImage: `https://viespirkiai.top/statistika.png`,
             customHead
         }) %>
-      <!--<meta http-equiv="refresh" content="1">-->
+      <%- include('../js/idiomorph.ejs') %>
 	</head>
 	<body>
         <%- include('../header.ejs') %>
         <main>
             <h1>Statistika</h1>
-            <button id="liveUpdate" style="font-size: inherit; background-color: var(--lighter-gray)">Tiesioginis atnaujinimas (įjungti, kas 0.25s)</button><br><br>
+            <button id="liveUpdate" style="font-size: inherit; background-color: var(--lighter-gray)">Tiesioginis atnaujinimas (įjungti)</button><br><br>
             <%- include('./main.ejs') %>
         </main>
         <%- include('../footer.ejs') %>
         <script>
-            let latestRequest = 0;
-            let intervalId = null;
-            const button = document.getElementById('liveUpdate');
+            let evtSource = null;
+            const button = document.getElementById("liveUpdate");
 
-            button.addEventListener('click', () => {
-            if (intervalId) {
-                // Stop updating
-                clearInterval(intervalId);
-                intervalId = null;
-                button.textContent = "Tiesioginis atnaujinimas (įjungti)";
-            } else {
-                // Start updating
-                intervalId = setInterval(() => {
-                const requestId = ++latestRequest;
-                fetch('/statistika?innerOnly=true')
-                    .then(response => response.text())
-                    .then(data => {
-                    if (requestId === latestRequest) {
-                        document.querySelector('.replacableContent').outerHTML = data;
-                    }
-                    });
-                }, 250);
+            button.addEventListener("click", () => {
+                if (evtSource) {
+                    // Stop SSE updates
+                    evtSource.close();
+                    evtSource = null;
+                    button.textContent = "Tiesioginis atnaujinimas (įjungti)";
+                    return;
+                }
+
+                // Start SSE live updates
+                evtSource = new EventSource("/statistika/sse");
+
+                evtSource.onmessage = (e) => {
+                    const html = JSON.parse(e.data);
+                    Idiomorph.morph(document.querySelector(".replacableContent"), html);
+                };
+
+                evtSource.onerror = () => {
+                    console.warn("SSE connection lost, attempting reconnect...");
+                };
+
                 button.textContent = "Tiesioginis atnaujinimas (išjungti)";
-            }
             });
         </script>
+
     </body>
 </html>

@@ -1,5 +1,32 @@
 <div>
-    <h2>Lentelės</h2>
+    <h2>Duomenų bazė</h2>
+    <i>Nuo paskutinio įjungimo (<%= statistika.database.uptime_seconds.convertUnit('s') %>)</i>
+    <h3><u>Aprkrova</u></h3>
+    <h4>Atliktos užklausos</h4>
+    <p><%= Number(statistika.database.xact_commit).toLocaleString('lt-LT') %></p>
+
+    <h4>Cache'ingas</h4>
+    <%
+    const hits = BigInt(statistika.database.blks_hit);
+    const reads = BigInt(statistika.database.blks_read);
+    const total = hits + reads;
+    const rate = total === 0n ? 0 : Number(hits * 100n / total);
+    %>
+    <p>Cache hit rate: <%= rate.toFixed(2) %>% (<%= hits.toLocaleString('lt-LT') %> / <%= total.toLocaleString('lt-LT') %> blocks)</p>
+
+    <h4>Įterptos eilutės</h4>
+    <p><%= Number(statistika.database.tup_inserted).toLocaleString('lt-LT') %></p>
+
+    <h4>Atnaujintos eilutės</h4>
+    <p><%= Number(statistika.database.tup_updated).toLocaleString('lt-LT') %></p>
+
+    <h4>Ištrintos eilutės</h4>
+    <p><%= Number(statistika.database.tup_deleted).toLocaleString('lt-LT') %></p>
+
+    <h4>Skaitytos eilutės</h4>
+    <p><%= Number(statistika.database.tup_fetched).toLocaleString('lt-LT') %></p>
+
+    <h3><u>Lentelės</u></h3>
     <div class="tableContainer" style="max-width: 95vw;">
         <table style="width: auto; max-width: 100%; min-width: auto;">
             <thead>

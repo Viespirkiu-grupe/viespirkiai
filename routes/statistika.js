@@ -13,7 +13,7 @@ export async function gautiStatistika() {
     const now = Date.now();
 
     // Return cached result if it's still valid
-    if (cache && now - cacheTime < 100) {
+    if (cache && now - cacheTime < 50) {
         return cache;
     }
 
@@ -23,7 +23,8 @@ export async function gautiStatistika() {
         failaiCountsRes,
         lentelesRes,
         topDokNuskaitytojaiRes,
-        tokOcrNuskaitytojaiRes,
+        topOcrNuskaitytojaiRes,
+        databaseRes,
     ] = await Promise.all([
         postgres.query(`SELECT * FROM "failaiCounts";`),
         postgres.query(
@@ -42,6 +43,27 @@ export async function gautiStatistika() {
         ),
         postgres.query(
             `SELECT "nuskaitytiDokumentai", "viesasPavadinimas", "pavadinimas" FROM "ocrNuskaitytojai" ORDER BY "nuskaitytiDokumentai" DESC LIMIT 100;`,
+        ),
+        postgres.query(
+            `SELECT
+                current_database() AS db,
+                xact_commit,
+                xact_rollback,
+                blks_read,
+                blks_hit,
+                tup_returned,
+                tup_fetched,
+                tup_inserted,
+                tup_updated,
+                tup_deleted,
+                conflicts,
+                deadlocks,
+                temp_files,
+                temp_bytes,
+                extract(epoch from now() - stats_reset) AS stats_age_seconds,
+                extract(epoch from now() - pg_postmaster_start_time()) AS uptime_seconds
+            FROM pg_stat_database
+            WHERE datname = current_database();`,
         ),
     ]);
 
@@ -196,13 +218,15 @@ export async function gautiStatistika() {
 
     statistika.topDokNuskaitytojai = topDokNuskaitytojaiRes.rows;
 
-    statistika.topOcrNuskaitytojai = tokOcrNuskaitytojaiRes.rows;
+    statistika.topOcrNuskaitytojai = topOcrNuskaitytojaiRes.rows;
 
     // OCR rezervacijų skaičius
     statistika.topOcrNuskaitytojai.forEach((item) => {
         item.rezervuota = counts.checkedOutBy?.[item.pavadinimas] ?? 0;
         delete item.pavadinimas;
     });
+
+    statistika.database = databaseRes.rows[0];
 
     statistika.atnaujinta = new Date();
 
@@ -249,6 +273,50 @@ statistikaRouter.get("/statistika", async (req, res) => {
         statistika: humanStatistika,
         customHead: config.customHead,
     });
+});
+
+statistikaRouter.get("/statistika/sse", async (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    let running = true;
+    req.on("close", () => (running = false));
+
+    const formatDydziai = (dydziai) =>
+        Object.fromEntries(
+            Object.entries(dydziai).map(([key, value]) => {
+                if (value < 1024) return [key, `${value} B`];
+                if (value < 1024 ** 2)
+                    return [key, `${(value / 1024).toFixed(2)} KB`];
+                if (value < 1024 ** 3)
+                    return [key, `${(value / 1024 ** 2).toFixed(2)} MB`];
+                return [key, `${(value / 1024 ** 3).toFixed(2)} GB`];
+            }),
+        );
+
+    const sendUpdate = async () => {
+        const statistika = await gautiStatistika();
+        const human = structuredClone(statistika);
+        human.failai.dydziai = formatDydziai(human.failai.dydziai);
+
+        req.app.render(
+            "statistika/main",
+            { statistika: human },
+            (err, html) => {
+                if (err) {
+                    console.error("Rendering error:", err);
+                    return;
+                }
+                res.write(`data: ${JSON.stringify(html)}\n\n`);
+            },
+        );
+    };
+
+    const interval = setInterval(async () => {
+        if (!running) return clearInterval(interval);
+        await sendUpdate();
+    }, 100);
 });
 
 statistikaRouter.get("/statistika.png", async (req, res) => {
