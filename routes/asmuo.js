@@ -14,6 +14,7 @@ import { gautiDarboSkelbimus } from "./asmuoDalys/darboSkelbimai.js";
 import { gautiVtekDeklaracijas } from "./asmuoDalys/vtekDeklaracijos.js";
 import { gautiNepatikimuTiekejuIrasus } from "./asmuoDalys/nepatikimiTiekejai.js";
 import { gautiMelaginguTiekejuIrasus } from "./asmuoDalys/melagingiTiekejai.js";
+import { gautiJadisDalyvius } from "./asmuoDalys/jadis.js";
 
 import { log } from "../utils/log.js";
 import Timings from "../utils/timings.js";
@@ -141,6 +142,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         vtek: async () => gautiVtekDeklaracijas(id),
         nepatikimi: async () => gautiNepatikimuTiekejuIrasus(id),
         melagingi: async () => gautiMelaginguTiekejuIrasus(id),
+        jadis: async () => gautiJadisDalyvius(jarId),
     };
 
     // Run all tasks in parallel with timings
