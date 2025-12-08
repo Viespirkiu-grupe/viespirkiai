@@ -67,17 +67,6 @@ async function nuskaitytiDokNuskaitytojuje(
         var nuskaitytojas = nuskaitytojaiRes.rows[0];
     }
 
-    // Fetch the given url GET ?url=url&apiKey=apiKey
-    // let fetchUrl = `${nuskaitytojas.url}/?url=${encodeURIComponent(url)}&apiKey=${encodeURIComponent(nuskaitytojas.apiKey)}&extension=${encodeURIComponent(extension)}`;
-    // log(`Dokumentas ${url} nuskaitomas ${nuskaitytojas.pavadinimas}`);
-    // let response = await fetch(fetchUrl, {
-    //     method: "GET",
-    //     headers: {
-    //         Accept: "application/json",
-    //     },
-    //     timeout: 5 * 60 * 1000, // 5 minutes
-    // });
-
     let fetchUrl = `${nuskaitytojas.url}/extract`;
     log(`Dokumentas ${url} nuskaitomas ${nuskaitytojas.pavadinimas}`);
 
@@ -108,9 +97,10 @@ async function nuskaitytiDokNuskaitytojuje(
     // JSON response, if status is 200, return json (.result)
     if (response.status !== 200) {
         let text = await response.text();
-        throw new Error(
+        log(
             `Nuskaitytojo klaida: ${response.status} ${response.statusText} - ${text}`,
         );
+        throw new Error(`Nuskaitytojo klaida: ${response.status} ${text}`);
     }
 
     let data = await response.json();
@@ -260,11 +250,14 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
 
         metadata = cleanMetadata(metadata);
     } catch (e) {
-        console.error("Klaida nuskaitymo metu:", e);
-
         let kodas = -1;
         if (e.message.includes("No password given")) {
             kodas = -2; // password protected
+        } else if (
+            e.message.includes("The PDF file is empty") ||
+            dokumentas.dydis == 0
+        ) {
+            kodas = -3; // empty pdf
         }
 
         if (dokumentas && dokumentas.id) {
@@ -284,7 +277,11 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             }
         }
 
-        throw e; // rethrow after marking failure
+        if (kodas == -2 || kodas == -3) {
+            return true; // Brokuotas dokumentas
+        } else {
+            throw e; // (Galimai) brokuotas nuskaitymas
+        }
     }
 
     // Tekstas is a json array of pages, join to single string

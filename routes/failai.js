@@ -37,7 +37,6 @@ failaiSearchRouter.get(
 
         timings.end("limits");
 
-        console.log(typeof req.query, req.query);
         // Check if req.query has keys
         if (Object.keys(req.query).length > 0) {
             const searchTerm = req.query.search;

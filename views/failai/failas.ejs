@@ -227,7 +227,7 @@
                       style="border: none; height: 70vh; margin-block: 16px; width: 100% !important; max-width: 100% !important; box-sizing: border-box; display: block; overflow-x: hidden !important;"
                       ></iframe>
                       </div>
-                    <% } else if (failas.extension == "zip"){ %>
+                    <% } else if (failas.nuskaitytas > 0 && (failas.extension == "zip" || failas.extension == "7z")){ %>
                         <div>
                             <div>
                                 <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>

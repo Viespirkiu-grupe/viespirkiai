@@ -5,33 +5,6 @@ Parsisiunčia duomenų bazėje nurodytus failus į viešdėžes.
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 
-/**
- * Blokuoja funkcijos vykdymą darbo valandomis (07:45–17:15, darbo dienomis).
- * Jei funkcija iškviečiama darbo valandomis, išmetamas klaidos pranešimas.
- * @throws {Error} Jei funkcija iškviečiama darbo valandomis.
- */
-function blockDuringWorkingHours() {
-    return true; // disable blocking
-    const now = new Date();
-    const day = now.getDay(); // 0 = Sunday, 6 = Saturday
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-
-    // Check if it's a weekday
-    if (day >= 1 && day <= 5) {
-        // Convert time to minutes since midnight
-        const currentMinutes = hours * 60 + minutes;
-        const start = 7 * 60 + 45; // 07:45
-        const end = 17 * 60 + 15; // 17:15
-
-        if (currentMinutes >= start && currentMinutes <= end) {
-            throw new Error(
-                "Function is blocked during working hours (07:45–17:15, weekdays).",
-            );
-        }
-    }
-}
-
 let kibirelis = [];
 const BUCKET_SIZE = 50;
 const REFILL_THRESHOLD = 5;
@@ -129,20 +102,26 @@ let start = 0;
  * Parsiunčia vieną neparsiųstą failą į viešdėžę.
  * @returns {Promise<boolean>} true jei pavyko parsisiųsti failą, false jei nėra failų parsisiuntimui
  */
-export async function parsiustiFaila(
-    customUrl = "https://eviesiejipirkimai.lt/download.php?dok_id=$DOK_ID&file_id=$FILE_ID",
-) {
-    try {
-        blockDuringWorkingHours();
-    } catch (e) {
-        return false;
-    }
+export async function parsiustiFaila() {
     let startTime = Date.now();
 
     const failas = await getFromBucket();
     if (!failas) return false;
 
     log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
+
+    // Randame proxy
+    const proxyRes = await postgres.query(`
+      SELECT * FROM "sutarciuFailuParsiuntejai" WHERE enabled = true ORDER BY RANDOM() LIMIT 1;`);
+
+    if (proxyRes.rows.length === 0) {
+        throw new Error("Nėra prieinamų sutarčių failų parsisiuntimui.");
+    }
+
+    const proxy = proxyRes.rows[0];
+    const customUrl = proxy.url;
+
+    log(`Naudojama ${proxy.pavadinimas}`);
 
     // Randame dėžę, kuri dar turi vietos
     const dezeRes = await postgres.query(

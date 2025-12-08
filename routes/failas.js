@@ -22,7 +22,6 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
     // Version has to be a number between 1 and 2
     version = Number(version);
     if (isNaN(version) || version < 1 || version > 2) {
-        console.log("NET VERSIJA");
         return res.status(400).send("Neteisinga versija.");
     }
 
