@@ -20,7 +20,10 @@ export function buildTypesenseFilter(query) {
         {
             key: "tiekejoKodas",
             apply: (val) => {
-                filters.push(`tiekejoKodas:=${val}`);
+                // filter either main code or any in additional codes array
+                filters.push(
+                    `(tiekejoKodas:=${val} || papildomiTiekejaiKodai:=[${val}])`,
+                );
                 usedHiddenFields = true;
             },
         },
@@ -65,6 +68,15 @@ export function buildTypesenseFilter(query) {
             key: "tikSuDokumentais",
             apply: () => {
                 filters.push(`dokumentuKiekis:>0`);
+                usedHiddenFields = true;
+            },
+            isBoolean: true,
+        },
+        {
+            key: "ignoruotiSp",
+            apply: () => {
+                // tipas shouldn't be "SP"
+                filters.push(`tipas:!=SP`);
                 usedHiddenFields = true;
             },
             isBoolean: true,
@@ -126,7 +138,7 @@ export function buildPostgresFilter(query, limit, page = 1) {
             key: "tiekejoKodas",
             apply: (val) => {
                 whereClauses.push(
-                    `"tiekejoKodas" = ${addParam("tiekejoKodas", val)}`,
+                    `("tiekejoKodas" = ${addParam("tiekejoKodas", val)} OR "papildomiTiekejaiKodai" @> ARRAY[${addParam("tiekejoKodas", val)}])`,
                 );
                 usedHiddenFields = true;
                 visiIrasai = false;
@@ -258,6 +270,16 @@ export function buildPostgresFilter(query, limit, page = 1) {
                 );
                 visiIrasai = false;
             },
+        },
+        {
+            key: "ignoruotiSp",
+            apply: () => {
+                // tipas shouldn't be "SP"
+                whereClauses.push(`"tipas" != 'SP'`);
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+            isBoolean: true,
         },
     ];
 
@@ -472,8 +494,6 @@ export function buildPostgresFailaiSearchFilter(query, limit, page = 1) {
     const offsetParam = addParam("offset", offsetVal);
 
     queryParams.push(`search=${encodeURIComponent(query.search || "")}`);
-
-    console.log(queryParams);
 
     return {
         sql: `

@@ -1,0 +1,70 @@
+<section>
+    <h2>Rezultatų analizė<sup>BETA</sup></h2>
+    <section style="width: 100%;" class="col-3">
+        <% if(analize.tipai) { %>
+            <div>
+            <h2><u><a href="#tipai" id="tipai" class="hashHref">Sutarčių tipai</a></u></h2>
+            <div id="analizeTipaiDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+
+            <script defer>
+               const tipaiLabels = <%- JSON.stringify(analize.tipai.map(t => t.tipas)) %>;
+               const tipaiValues = <%- JSON.stringify(analize.tipai.map(t => t.count)) %>;
+
+               console.log(tipaiLabels, tipaiValues)
+
+               displayChart({
+                 element: document.querySelector('#analizeTipaiDiagrama'),
+                 type: 'pie',
+                 labels: tipaiLabels,
+                 series: tipaiValues,
+                 flags: ["colors"]
+               })
+            </script>
+            </div>
+        <% } else { %>
+            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+        <% } %>
+        <% if(analize.sumosVsDatos) { %>
+            <div>
+            <h2><u><a href="#sumosVsDatos" id="sumosVsDatos" class="hashHref">Sumų ir datų pasiskirstymas</a></u><sub>&nbsp;log</sub></h2>
+            <div id="sumosVsDatosDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+
+            <script defer>
+                let sumosVsDatosSeries = <%- JSON.stringify(analize.sumosVsDatos.map(i => [i.data, i.suma])) %>;
+                  // Convert the first element of each pair to a Date object
+                sumosVsDatosSeries = sumosVsDatosSeries.map(i => [new Date(i[0]), i[1]]);
+
+               displayChart({
+                 element: document.querySelector('#sumosVsDatosDiagrama'),
+                 type: 'scatter',
+                 labels: [],
+                 series: sumosVsDatosSeries,
+                 flags: ["colors", "xAxisYearMonth", "yEUR", "yAxisLog"]
+               })
+            </script>
+            </div>
+        <% } else { %>
+            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+        <% } %>
+
+        <% if(analize.metinesSumos) { %>
+            <div>
+            <h2><u><a href="#metinesSumos" id="metinesSumos" class="hashHref">Sumos pagal metus</a></u></h2>
+            <div id="metinesSumosDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+
+            <script defer>
+               displayChart({
+                 element: document.querySelector('#metinesSumosDiagrama'),
+                 type: 'line-datetime',
+                 labels: <%- JSON.stringify(analize.metinesSumos.map(i => i.metai)) %>,
+                 series: <%- JSON.stringify(analize.metinesSumos.map(i => i.suma)) %>,
+                 flags: ["xAxisYearMonth", "yEUR"]
+               })
+            </script>
+            </div>
+        <% } else { %>
+            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+        <% } %>
+    </section>
+    <span class="subtext">Ši analizė yra BETA versijoje ir gali turėti klaidų. Jei pastebėjote klaidą arba turite pasiūlymų, prašome <a href="/kontaktai">susisiekti</a>.</span>
+</section>

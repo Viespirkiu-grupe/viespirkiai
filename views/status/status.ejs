@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+	<head>
+    	<%- include('../head.ejs', {
+            pageTitle: "Ar veikia eviesiejipirkimai.lt?",
+            pageDescription: ` `,
+            pageImage: `https://viespirkiai.top/status/eviesiejipirkimai.lt.png`,
+            customHead
+        }) %>
+      <%- include('../js/idiomorph.ejs') %>
+	  <%- include('../js/charts.ejs') %>
+	</head>
+	<body>
+        <%- include('../header.ejs') %>
+        <main>
+            <div style="text-align: center; margin-bottom: 40px;">
+                <h1>Ar veikia eviesiejipirkimai.lt?</h1>
+                <% if(status.paskutinisGedimas.per5min){ %>
+                    <h2 style="font-size: 36px;">Tikriausiai NE</h2>
+
+                    <div><i>Per paskutines 5min fiksavome sutrikimų</i></div>
+                <% } else { %>
+                    <h2 style="font-size: 36px;">Tikriausiai TAIP</h2>
+
+                    <div><i>Per paskutines 5min sutrikimų nefiksavome</i></div>
+                <% } %>
+            </div>
+
+            <h2>Istoriniai duomenys</h2>
+            <h3>Skaičiavimo metodologija</h3>
+            <p style="text-align: justify;">
+                Sistemos veikimas yra tikrinamas bent kas 2 minutes.
+                Jeigu pateikiama klaida (šiuo atveju užrašas „Vyksta sistemos atnaujinimo darbai“),
+                tada tai yra fiksuojama duomenų bazėje.   <br>
+
+                Kai tarp fiksavimų yra mažiau nei 5 minutės, jie yra apjungiami ir skaičiuojama trukmė (gali būti
+                apjungti ir keli jeigu kartojasi). <br> Laikoma, kad gedimas prasidėjo gavus pirmąjį klaidos pranešimą ir pasibaigė iškart po paskutinio (sistemos naudai).
+            </p>
+            <% if(status.apjungti && status.apjungti.length > 0){ %>
+                <div class=" col-2 mobile-col-1" style="margin-inline: 0px;">
+                    <% status.apjungti.forEach((diena) => { %>
+                        <div class="rezultatas">
+                            <div class="rezultatas-top">
+                                <span>
+                                    <%= diena.day %>
+                                </span>
+                                <span>
+                                    <%= Number(diena.merged_incidents).linksniuoti(["gedimas", "gedimai", "gedimų", "gedimo"]) %>
+                                </span>
+                                <span>
+                                    <%= Number(diena.unmerged_events).linksniuoti(["fiksavimas", "fiksavimai", "fiksavimų", "fiksavimo"]) %>
+                                </span>
+                            </div>
+                            <div class="rezultatas-title">
+                                Neveikė bent
+                                <!-- diena.total_duration = {hours, minutes, seconds} (all might not be present) -->
+                                <%= diena.total_duration.hours ? diena.total_duration.hours + "h " : "" %>
+                                <%= diena.total_duration.minutes ? diena.total_duration.minutes + "min " : "" %>
+                                <%= diena.total_duration.seconds ? diena.total_duration.seconds + "s " : "" %>
+                            </div>
+                            <div class="rezultatas-bottom" style="text-align: justify;">
+                                <div>
+                                    <div id="Gedimai<%= diena.day.replaceAll("-", "") %>Diagrama" class="chart" style="width: 100%; height: 200px;"></div>
+
+                                    <script defer>
+                                    let Intervals<%= diena.day.replaceAll("-", "") %> =
+                                        <%- JSON.stringify(diena.intervals) %>;
+
+                                        let Annotations<%= diena.day.replaceAll("-", "") %> =
+                                            Intervals<%= diena.day.replaceAll("-", "") %>.map(interval => {
+                                                const start = new Date(interval.start_time);
+                                                const end = new Date(interval.end_time);
+
+                                                // construct UTC timestamp using local Lithuanian time
+                                                const x = Date.UTC(
+                                                    start.getFullYear(), start.getMonth(), start.getDate(),
+                                                    start.getHours(), start.getMinutes(), start.getSeconds()
+                                                );
+                                                const x2 = Date.UTC(
+                                                    end.getFullYear(), end.getMonth(), end.getDate(),
+                                                    end.getHours(), end.getMinutes(), end.getSeconds()
+                                                );
+
+                                                return {
+                                                    x, x2,
+                                                    fillColor: '#FF4560',
+                                                    borderColor: '#777',
+                                                };
+                                            });
+
+
+                                    console.log(Annotations<%= diena.day.replaceAll("-", "") %>)
+
+                                    // Add an annotation for now (current time)
+                                    function todayLT() {
+                                        const now = new Date();
+                                        const parts = new Intl.DateTimeFormat('en-CA', {
+                                            timeZone: 'Europe/Vilnius',
+                                            year: 'numeric',
+                                            month: '2-digit',
+                                            day: '2-digit'
+                                        }).formatToParts(now);
+
+                                        let year, month, day;
+                                        for (const part of parts) {
+                                            if (part.type === 'year') year = part.value;
+                                            if (part.type === 'month') month = part.value;
+                                            if (part.type === 'day') day = part.value;
+                                        }
+
+                                        return `${year}-${month}-${day}`; // Lithuanian date in YYYY-MM-DD
+                                    }
+
+
+                                    if(todayLT() === "<%= diena.day %>") {
+                                      console.log("YRA")
+                                        Annotations<%= diena.day.replaceAll("-", "") %>.push({
+                                            x: Date.UTC(
+                                                new Date().getFullYear(), new Date().getMonth(), new Date().getDate(),
+                                                new Date().getHours(), new Date().getMinutes(), new Date().getSeconds()
+                                            ),
+                                            label: {
+                                                text: 'Dabar',
+                                                style: {
+                                                  color: '#000',
+                                                },
+                                            },
+                                            borderColor: '#777',
+                                        });
+                                    }
+
+                                    displayChart({
+                                      element: document.querySelector('#Gedimai<%= diena.day.replaceAll("-", "") %>Diagrama'),
+                                      type: 'line-datetime',
+                                      labels: <%- JSON.stringify(diena.timestamps.map(t => new Date(t + 'Z').getTime())) %>,
+                                      series: <%- JSON.stringify(diena.timestamps.map(() => 1)) %>,
+                                      flags: ["xAxisHourMinute", "yAxisNoLabel", "noLine"],
+                                      customOptions: {
+                                        tooltip: {
+                                          y: {
+                                              title: {
+                                                formatter: function (val) {
+                                                  return "Fiksuotas sutrikimas"
+                                                }
+                                              }
+                                            },
+                                        },
+                                        chart: {
+                                          height: 200,
+                                        },
+                                        annotations: {
+                                          xaxis: Annotations<%= diena.day.replaceAll("-", "") %>
+                                        },
+                                        colors: ['#FF4560'],
+                                        yaxis: {
+                                          min: 0,
+                                          max: 2,
+                                          tickAmount: 1,
+                                          labels: {
+                                            formatter: function (val) {
+                                              return "";
+                                            }
+                                          }
+                                        },
+                                        xaxis: {
+                                          min: Date.UTC(
+                                              <%= diena.day.substring(0,4) %>,
+                                              <%= parseInt(diena.day.substring(5,7)) - 1 %>,
+                                              <%= diena.day.substring(8,10) %>,
+                                              0, 0, 0
+                                          ),
+
+                                          max: Date.UTC(
+                                              <%= diena.day.substring(0,4) %>,
+                                              <%= parseInt(diena.day.substring(5,7)) - 1 %>,
+                                              <%= diena.day.substring(8,10) %>,
+                                              23, 59, 59
+                                          ),
+                                        }
+                                      }
+
+                                      })
+                                    </script>
+                                </div>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } %>
+        </main>
+        <%- include('../footer.ejs') %>
+    </body>
+</html>

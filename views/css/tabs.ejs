@@ -1,21 +1,55 @@
 <style>
-.tabs{
-    display: flex;
-    gap: 16px;
-    overflow-x: auto;       /* enable horizontal scrolling */
-    white-space: nowrap;    /* prevent wrapping */
-    -webkit-overflow-scrolling: touch; /* smooth scrolling on mobile */
-    margin-right: -24px;
+.tabs-container {
+    width: 100vw;                     /* full viewport width */
+    overflow-x: auto;                  /* allow horizontal scroll */
+    -webkit-overflow-scrolling: touch; /* smooth scroll on mobile */
+    padding-inline: 16px;                /* space before first tab */
+    box-sizing: border-box;
+    scrollbar-width: none;             /* hide scrollbar in Firefox */
+    margin-block: 48px;
 }
-.tabs a{
+
+.tabs a:last-child {
+    margin-right: 16px;                /* space after last tab */
+}
+
+.tabs-container::-webkit-scrollbar {
+    display: none;                     /* hide scrollbar in Chrome/Safari */
+}
+
+.tabs {
+    display: flex;                     /* row of tabs */
+    gap: 28px;                         /* space between tabs */
+    min-width: max-content;            /* force overflow if too wide */
+    justify-content: center;
+    border-bottom: 1px solid var(--light-gray);
+}
+
+.tabs a {
+    flex: 0 0 auto;                    /* prevent shrinking */
+    text-decoration: none;
+    padding-bottom: 16px;
     color: var(--gray);
-        flex-shrink: 0;         /* prevent links from shrinking */
+    position: relative;
 }
-.tabs a.active{
+
+.tabs a.active {
     font-weight: 700;
     color: var(--black);
 }
-.tabs a:hover{
+
+.tabs a.active::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--black);
+}
+
+.tabs a:hover {
     color: var(--black);
 }
+
 </style>

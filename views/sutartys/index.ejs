@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="lt">
+	<head>
+	    <%- include('../head.ejs', {
+            pageTitle: "Sutarčių paieška",
+            pageDescription: `Pilietinė viešųjų pirkimų analizės iniciatyva. Prieinamai patiekiamos viešųjų pirkimų sutartys bei kita susijusi informacija.`,
+            pageImage: `https://viespirkiai.top/index.png`,
+            customHead
+        }) %>
+
+		<% if(typeof analize != 'undefined' && analize){ %>
+		    <%- include('../js/charts.ejs') %>
+		<% } %>
+	</head>
+	<body>
+		<%- include('../header.ejs') %>
+		<main>
+			<%- include('search.ejs', {values, usedHiddenFields, numberOfResults}) %>
+
+			<% if(typeof analize != 'undefined' && analize){ %>
+			    <%- include('analize.ejs') %>
+			<% } %>
+
+            <div class="results">
+ 			    <%- include('results.ejs', {zinomasRezultatuSkaicius, values, usedHiddenFields, data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
+            </div>
+			<script>
+   			const span = document.querySelector('.rezultatai-nezinomas-total');
+
+                if (span && !span.classList.contains('spin')) {
+                    span.classList.add('spin');
+
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('rezultatuSkaiciausPatikslinimas', 'true');
+
+                    fetch(url)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.zinomasRezultatuSkaicius) {
+                                span.className = ''; // remove all classes
+                                document.querySelector(".numberOfResults").innerHTML = data.numberOfResults;
+                                document.querySelector("nav.pagination").innerHTML = data.pagination;
+                            } else {
+                                span.classList.remove('spin'); // stop spinning if still unknown
+                            }
+                        })
+                        .catch(() => span.classList.remove('spin')); // stop spinning on error
+                }
+			</script>
+		</main>
+		<%- include('../footer.ejs') %>
+	</body>
+</html>
