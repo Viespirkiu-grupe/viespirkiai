@@ -34,6 +34,9 @@ typesense/typesense
 # Viešlaiškiai
 public/vieslaiskiai
 
+# Veiklos ataskaitos
+public/veiklosAtaskaitos
+
 # Old
 old
 backup
