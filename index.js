@@ -9,12 +9,17 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import fsPromises from "fs/promises";
+import htmlMinifyMiddleware from "./utils/minifyHtml.js";
 
 const app = express();
 const PORT = config.port || 8000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+app.set("trust proxy", 1);
+
+app.use(htmlMinifyMiddleware());
 
 // Onion-location header
 app.use((req, res, next) => {
@@ -63,6 +68,14 @@ app.use((req, res, next) => {
 });
 
 // Static routes
+app.use(
+    "/fontai",
+    express.static(path.join(__dirname, "public/fontai"), {
+        maxAge: "1y",
+        immutable: true,
+    }),
+);
+
 app.use(express.static(path.join(__dirname, "public")));
 
 // Cookies
@@ -107,9 +120,17 @@ import {
     ensureSearchCollection,
     ensureJarCollection,
 } from "./typesense/typesense.js";
-await ensureSearchCollection();
-await ensureJarCollection();
 
-app.listen(PORT, () =>
-    console.log(`Server running at http://localhost:${PORT}`),
-);
+const isMain = process.env.RUN_DIRECTLY === "true";
+
+// Only listen if this file is run directly
+if (import.meta.url === `file://${process.argv[1]}` || isMain) {
+    await ensureSearchCollection();
+    await ensureJarCollection();
+
+    app.listen(PORT, () =>
+        console.log(`Server running independently at http://localhost:${PORT}`),
+    );
+}
+
+export default app;
