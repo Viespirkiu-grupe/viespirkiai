@@ -60,7 +60,6 @@ vieslaiskiaiRouter.get("/vieslaiskiai/:id", async (req, res, next) => {
         );
 
         let frontmatter = yaml.load(frontmatterMatch[1]);
-        console.log(frontmatter);
 
         // Remove frontmatter from markdownContent
         markdownContent = markdownContent.replace(frontmatterMatch[0], "");
