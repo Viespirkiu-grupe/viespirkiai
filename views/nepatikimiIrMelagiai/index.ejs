@@ -13,7 +13,6 @@
 		<main>
 			<%- include('search.ejs', {values}) %>
 			<div class="results">
-                <%- include('../tabs.ejs') %>
                 <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti, search}) %>
 			</div>
 		</main>
