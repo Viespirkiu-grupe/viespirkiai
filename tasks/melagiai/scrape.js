@@ -1,13 +1,18 @@
+/*
+Parsiunčia ir importuoja nepatikimų melagingą informaciją pateikusių tiekėjų sąrašą iš VPT XLSX į PostgreSQL duomenų bazę.
+*/
+
 import * as XLSX from "xlsx";
 import path from "node:path";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 
-const fileUrl =
+const FILE_URL =
     "https://vptlt-my.sharepoint.com/:x:/g/personal/it_vpt_lt/EZq--smR_6tHof1To-3DORMBxag2A4HJXspXMUeNfJ36fw?e=fZ5xGy&download=1";
 
 export async function importuotiMelagingusTiekejus() {
-    const firstResponse = await fetch(fileUrl, {
+    // Atliekame užklausą
+    const firstResponse = await fetch(FILE_URL, {
         method: "GET",
         redirect: "manual",
     });
@@ -18,7 +23,7 @@ export async function importuotiMelagingusTiekejus() {
     if (!location) throw new Error("No redirect location returned");
 
     const secondResponse = await fetch(
-        `https://${new URL(fileUrl).host}${location}`,
+        `https://${new URL(FILE_URL).host}${location}`,
         {
             method: "GET",
             headers: { Cookie: cookie ?? "" },
@@ -32,6 +37,7 @@ export async function importuotiMelagingusTiekejus() {
 
     log(`Fetched ${filename}, size: ${fileBuffer.length} bytes`);
 
+    // Nuskaitome duomenis iš XLSX
     const workbook = XLSX.read(fileBuffer, { type: "buffer" });
 
     let melagiai = XLSX.utils.sheet_to_json(
@@ -45,6 +51,7 @@ export async function importuotiMelagingusTiekejus() {
         { defval: null },
     );
 
+    // Konvertuojame stulpelius į Objektą
     melagiai.forEach((row) => {
         const keyNamesToReplace = {
             "Įtraukimų skaičius": "atvejoNr",
@@ -141,7 +148,6 @@ export async function importuotiMelagingusTiekejus() {
         });
 
         // Convert excel integer dates to yyyy-mm-dd
-        // Don't use XLSX.SSF.parse_date_code
         const excelDateKeys = [
             "duomenuIvedimoData",
             "sutartiesNutraukimoData",
@@ -162,6 +168,7 @@ export async function importuotiMelagingusTiekejus() {
         });
     });
 
+    // Įrašome duomenis į PostgreSQL
     for (let data of melagiai) {
         // Convert conflict columns to strings to ensure ON CONFLICT works
         const pirkimoNumeris =
@@ -273,8 +280,7 @@ export async function importuotiMelagingusTiekejus() {
     log("Importuoti melagingi tiekėjai");
 }
 
-// If ran directly, run the import function and then close postgres pool
-
+// CLI
 if (
     import.meta.url === process.argv[1] ||
     import.meta.url === `file://${process.argv[1]}`

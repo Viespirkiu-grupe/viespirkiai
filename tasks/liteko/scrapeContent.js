@@ -1,3 +1,7 @@
+/*
+Parsiunčia bylų turinį iš Liteko sistemos ir įterpia jį į Postgres duomenų bazę.
+*/
+
 import { parseHTML } from "linkedom";
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";

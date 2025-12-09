@@ -1,3 +1,7 @@
+/*
+Parsiunčia bylų metaduomenis iš Liteko sistemos ir įterpia jas į Postgres duomenų bazę.
+*/
+
 import { parseHTML } from "linkedom";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";

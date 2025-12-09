@@ -1,3 +1,7 @@
+/*
+Parsiunčia ir įdeda į duomenų bazę neskelbiamas derybas iš eviesiejipirkimai.lt
+*/
+
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
@@ -8,7 +12,7 @@ import { SocksProxyAgent } from "socks-proxy-agent";
 import config from "../../utils/config.js";
 import crypto from "crypto";
 
-// Nustatome proxy, jei yra
+// Nustatome proxy
 let proxyAgent = null;
 
 if (config.scrapeProxy) {
@@ -31,12 +35,18 @@ if (config.scrapeProxy) {
     }
 }
 
+/**
+ * Nuskaityti neskelbiamas derybas nuo nurodyto puslapio
+ * @param {number} start Puslapio numeris (0, 1, 2, ...)
+ * @returns {Promise<Array>} Grąžina neskelbiamas derybas
+ */
 async function nuskaitytiNeskelbiamasDerybasNuo(start = 0) {
     let url = `https://eviesiejipirkimai.lt/index.php?option=com_profile&task=sutikimai&filter_limit=50&Itemid=98&limitstart=${start * 50}`;
 
     log(url);
     let startTime = new Date();
 
+    // Atliekama užklausa
     if (proxyAgent) {
         var response = await fetch(url, {
             agent: proxyAgent,
@@ -106,6 +116,9 @@ async function nuskaitytiNeskelbiamasDerybasNuo(start = 0) {
     return neskelbiamosDerybos;
 }
 
+/**
+ * Nuskaityti visas neskelbiamas derybas ir įdėti į duomenų bazę
+ */
 export async function nuskaitytiVisasNeskelbiamasDerybas() {
     let page = 0;
     let allDerybos = [];
@@ -169,5 +182,3 @@ export async function nuskaitytiVisasNeskelbiamasDerybas() {
         await postgres.query(query, values);
     }
 }
-
-await nuskaitytiVisasNeskelbiamasDerybas();

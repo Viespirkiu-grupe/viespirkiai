@@ -1,6 +1,9 @@
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 
+/**
+ * Išvalo rezervuotas OCR užduotis, kurios buvo rezervuotos daugiau nei prieš 6 valandas.
+ */
 export async function pravalytiOcrRezervacijas() {
     await postgres.query(`UPDATE failai
     SET

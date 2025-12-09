@@ -1,13 +1,18 @@
+/*
+Parsiunčia ir importuoja nepatikimų tiekėjų sąrašą iš VPT XLSX į PostgreSQL duomenų bazę.
+*/
+
 import * as XLSX from "xlsx";
 import path from "node:path";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 
-const fileUrl =
+const FILE_URL =
     "https://vptlt-my.sharepoint.com/:x:/g/personal/it_vpt_lt/EcX5fHG_a3hIiSKACcIXMjsBerJ0ThaXIR_i1zE61VM_SA?e=DjLbEy&download=1";
 
 export async function importuotiNepatikimusTiekejus() {
-    const firstResponse = await fetch(fileUrl, {
+    // Atliekama užklausa
+    const firstResponse = await fetch(FILE_URL, {
         method: "GET",
         redirect: "manual",
     });
@@ -18,7 +23,7 @@ export async function importuotiNepatikimusTiekejus() {
     if (!location) throw new Error("No redirect location returned");
 
     const secondResponse = await fetch(
-        `https://${new URL(fileUrl).host}${location}`,
+        `https://${new URL(FILE_URL).host}${location}`,
         {
             method: "GET",
             headers: { Cookie: cookie ?? "" },
@@ -32,6 +37,7 @@ export async function importuotiNepatikimusTiekejus() {
 
     log(`Fetched ${filename}, size: ${fileBuffer.length} bytes`);
 
+    // Nuskaitome duomenis iš XLSX failo
     const workbook = XLSX.read(fileBuffer, { type: "buffer" });
 
     let nepatikimi = XLSX.utils.sheet_to_json(
@@ -45,6 +51,7 @@ export async function importuotiNepatikimusTiekejus() {
         { defval: null },
     );
 
+    // Pervadiname stulpelius, sudarome Objektą
     nepatikimi.forEach((row) => {
         const keyNamesToReplace = {
             "Įtraukimo, į Nepatikimų tiekėjų sąrašą, atvejų skaičius":
@@ -77,7 +84,6 @@ export async function importuotiNepatikimusTiekejus() {
         }
 
         // Convert excel integer dates to yyyy-mm-dd
-        // Don't use XLSX.SSF.parse_date_code
         const excelDateKeys = [
             "duomenuIvedimoData",
             "sutartiesNutraukimoData",
@@ -153,6 +159,7 @@ export async function importuotiNepatikimusTiekejus() {
         });
     });
 
+    // Įrašome duomenis į PostgreSQL
     for (let data of nepatikimi) {
         const today = new Date().toLocaleDateString("lt-LT", {
             timeZone: "Europe/Vilnius",
@@ -264,7 +271,7 @@ export async function importuotiNepatikimusTiekejus() {
     log("Importuoti nepatikimi tiekejai");
 }
 
-// If ran directly, run the import function and then close pg connection after
+// CLI
 if (
     import.meta.url === process.argv[1] ||
     import.meta.url === `file://${process.argv[1]}`

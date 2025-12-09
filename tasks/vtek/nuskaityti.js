@@ -1,17 +1,29 @@
+/*
+ * Nuskaito privačių interesų deklraracijų duomenis pagal duomenų bazėje esančius UUID
+ */
+
 import { postgres } from "../../postgres/postgres.js";
 import { spawn } from "child_process";
 import { log } from "../../utils/log.js";
 
+/**
+ * Nuskaito vieną VTEK deklaraciją iš išorinio šaltinio pagal duomenų bazėje esančius UUID
+ * ir įrašo duomenis atgal į duomenų bazę.
+ * @returns {Promise<boolean>} Grąžina true, jei buvo nuskaityta deklaracija, false jei nėra daugiau deklaracijų.
+ */
 export async function nuskaitytiVtekDeklaracija() {
+    // Paimame vieną deklaracijos UUID iš duomenų bazės
     let deklaracijaRes = await postgres.query(
         "SELECT * FROM vtek WHERE nuskaitytas IS NULL LIMIT 1",
     );
     if (deklaracijaRes.rowCount === 0) return false;
 
+    // Sudarome URL
     let deklaracija = deklaracijaRes.rows[0];
     let url = `https://pinreg.vtek.lt/external/deklaracijos/${deklaracija.uuid}/view/viesa`;
     log(url);
 
+    // Atliekame HTTP užklausą naudodami curl
     let data = await new Promise((resolve, reject) => {
         const curl = spawn("curl", [
             "-s",
@@ -60,6 +72,7 @@ export async function nuskaitytiVtekDeklaracija() {
         });
     });
 
+    // Apdorojame gautus duomenis
     let asmuo = data.teikejas.vardas + " " + data.teikejas.pavarde;
     let sutuoktinis =
         [data.sutuoktinis?.vardas, data.sutuoktinis?.pavarde]
@@ -83,6 +96,7 @@ export async function nuskaitytiVtekDeklaracija() {
     });
     let pateikimoData = data.pateikimoData;
 
+    // Įrašome duomenis į duomenų bazę
     await postgres.query(
         `UPDATE vtek SET
             nuskaitytas = 1,
@@ -106,8 +120,7 @@ export async function nuskaitytiVtekDeklaracija() {
         ],
     );
 
-    log(`Nuskaitytas ${deklaracija.uuid} t.y. ${asmuo}`);
-
+    log(`Nuskaityta deklaracija ${deklaracija.uuid} t.y. ${asmuo}`);
     return true;
 }
 
