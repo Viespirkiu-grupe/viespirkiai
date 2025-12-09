@@ -1,14 +1,14 @@
 import Typesense from "typesense";
 import config from "../utils/config.js";
 
-const client = new Typesense.Client({
+export const client = new Typesense.Client({
     nodes: config.typesenseNodes,
     apiKey: config.typesenseApiKey,
     connectionTimeoutSeconds: 5000,
 });
 
-const COLLECTION = "viespirkiai";
-const SCHEMA_VERSION = 5;
+const COLLECTION = "sutartys";
+const SCHEMA_VERSION = 7;
 
 const schema = {
     name: COLLECTION,
@@ -33,7 +33,12 @@ const schema = {
         { name: "bvpzPavadinimas", type: "string" },
         { name: "paskelbimoData", type: "int64" },
         { name: "sutartiesNumeris", type: "string" },
-        { name: "sutartiesUnikalusID", type: "int32" },
+        { name: "sutartiesUnikalusId", type: "int32" },
+        { name: "papildomiTiekejai", type: "string[]" },
+        { name: "papildomiTiekejaiKodai", type: "string[]" },
+        { name: "papildomiBvpzKodai", type: "string[]" },
+        { name: "papildomiBvpzPavadinimai", type: "string[]" },
+        { name: "paskutiniKartaMatyta", type: "int64" },
     ],
     default_sorting_field: "paskutinioRedagavimoData",
     metadata: {
@@ -130,12 +135,14 @@ export async function addDocumentToSearch(doc) {
         bvpzPavadinimas: doc.bvpzPavadinimas || "",
 
         sutartiesNumeris: doc.sutartiesNumeris || "",
-        sutartiesUnikalusID:
-            typeof doc.sutartiesUnikalusID === "number"
-                ? doc.sutartiesUnikalusID
-                : 0,
-
+        sutartiesUnikalusId: doc.sutartiesUnikalusID.toString(),
         dokumentuKiekis: doc.dokumentuKiekis || 0,
+        pirkimoNumeris: doc.pirkimoNumeris || "",
+        papildomiTiekejai: doc.papildomiTiekejai || [],
+        papildomiTiekejaiKodai: doc.papildomiTiekejaiKodai || [],
+        papildomiBvpzKodai: doc.papildomiBvpzKodai || [],
+        papildomiBvpzPavadinimai: doc.papildomiBvpzPavadinimai || [],
+        paskutiniKartaMatyta: toUnixTimestamp(doc.paskutiniKartaMatyta),
     };
 
     return client.collections(COLLECTION).documents().upsert(tsDoc);
@@ -183,12 +190,14 @@ export async function addDocumentsToSearch(docs) {
         bvpzPavadinimas: doc.bvpzPavadinimas || "",
 
         sutartiesNumeris: doc.sutartiesNumeris || "",
-        sutartiesUnikalusID:
-            typeof doc.sutartiesUnikalusID === "number"
-                ? doc.sutartiesUnikalusID
-                : 0,
-
+        sutartiesUnikalusId: doc.sutartiesUnikalusID,
         dokumentuKiekis: doc.dokumentuKiekis || 0,
+        pirkimoNumeris: doc.pirkimoNumeris || "",
+        papildomiTiekejai: doc.papildomiTiekejai || [],
+        papildomiTiekejaiKodai: doc.papildomiTiekejaiKodai || [],
+        papildomiBvpzKodai: doc.papildomiBvpzKodai || [],
+        papildomiBvpzPavadinimai: doc.papildomiBvpzPavadinimai || [],
+        paskutiniKartaMatyta: toUnixTimestamp(doc.paskutiniKartaMatyta),
     }));
 
     return client
@@ -201,7 +210,7 @@ export async function addDocumentsToSearch(docs) {
  * Ieško dokumentų pagal užklausą.
  * @param {string} query - Paieškos užklausa
  * @param {Object} options - Papildomi paieškos parametrai
- * @param {number} options.limit - Rezultatų skaičius vienoje puslapyje (numatytas 50)
+ * @param {number} options.limit - Rezultatų skaičius (numatytas 50)
  * @param {number} options.page - Puslapio numeris (numatytas 1)
  * @param {string} options.sortBy - Rikiavimo kriterijus (numatytas "sudarymoData:desc")
  * @param {string} options.filterBy - Filtravimo kriterijus
@@ -215,19 +224,65 @@ export async function searchDocuments(query, options = {}) {
         filterBy = "",
     } = options;
 
-    let results = await client.collections(COLLECTION).documents().search({
-        q: query,
-        query_by:
-            "pavadinimas,perkanciojiOrganizacija,tiekejas,bvpzPavadinimas",
-        sort_by: sortBy,
-        filter_by: filterBy,
-        per_page: limit,
-        page: page,
-    });
+    const PAGE_SIZE = 250;
 
-    let documents = results.hits.map((hit) => hit.document);
+    // If limit <= 250, do the normal single request
+    if (limit <= PAGE_SIZE) {
+        let results = await client.collections(COLLECTION).documents().search({
+            q: query,
+            query_by:
+                "pavadinimas,perkanciojiOrganizacija,tiekejas,bvpzPavadinimas,papildomiTiekejai,papildomiBvpzPavadinimai",
+            sort_by: sortBy,
+            filter_by: filterBy,
+            per_page: limit,
+            page: page,
+        });
 
-    return { results: documents, total: results.found };
+        return {
+            results: results.hits.map((hit) => hit.document),
+            total: results.found,
+        };
+    }
+
+    // Otherwise fetch page by page
+    let allDocs = [];
+    let total = null;
+
+    let remaining = limit;
+    let currentPage = page;
+
+    while (remaining > 0) {
+        const size = Math.min(PAGE_SIZE, remaining);
+
+        const results = await client
+            .collections(COLLECTION)
+            .documents()
+            .search({
+                q: query,
+                query_by:
+                    "pavadinimas,perkanciojiOrganizacija,tiekejas,bvpzPavadinimas,papildomiTiekejai,papildomiBvpzPavadinimai",
+                sort_by: sortBy,
+                filter_by: filterBy,
+                per_page: size,
+                page: currentPage,
+            });
+
+        // Extract total once
+        if (total === null) total = results.found;
+
+        // Append batch
+        for (const hit of results.hits) {
+            allDocs.push(hit.document);
+        }
+
+        // Stop early if Typesense returned fewer results than requested
+        if (results.hits.length < size) break;
+
+        remaining -= size;
+        currentPage++;
+    }
+
+    return { results: allDocs, total };
 }
 
 ///////////////////////////

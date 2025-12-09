@@ -76,7 +76,7 @@
 
   const typeChartDefaults = {
     'line-datetime': {
-      chart: { type: 'line' },
+      chart: { type: 'line', height: 350 },
       xaxis: {
             type: 'datetime',
             tickAmount: 6,
@@ -89,6 +89,19 @@
           format: 'yyyy-MM'
         }
       },
+    },
+    'pie': {
+      chart: { type: 'pie', height: 350 },
+      labels: [],
+      legend: {
+        position: 'bottom'
+      },
+      dataLabels: {
+        enabled: true
+      }
+    },
+    'scatter': {
+      chart: { type: 'scatter', height: 350 },
     }
   }
 
@@ -141,6 +154,57 @@
           min: undefined
         }
       },
+      '50shadesOfGray': {
+        colors: ['#111111', '#333333', '#555555', '#777777', '#999999', '#BBBBBB', '#DDDDDD']
+      },
+      'colors': {
+        colors: ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+      },
+      'xAxisYearMonth': {
+        xaxis: {
+              type: 'datetime',
+              tickAmount: 6,
+              labels: {
+                format: 'yyyy-MM'
+            },
+        },
+        tooltip: {
+          x: {
+            format: 'yyyy-MM'
+          }
+        },
+      },
+      "yAxisLog": {
+        yaxis: {
+          logarithmic: true,
+        }
+      },
+      "xAxisHourMinute": {
+        xaxis: {
+              type: 'datetime',
+              tickAmount: 6,
+              labels: {
+                format: 'HH:mm'
+            },
+        },
+        tooltip: {
+          x: {
+            format: 'HH:mm'
+          }
+        },
+      },
+      "yAxisNoLabel": {
+        yaxis: {
+          labels: {
+            show: false
+          }
+        }
+      },
+      "noLine": {
+        stroke: {
+          width: 0
+        },
+      }
   }
 
   async function displayChart(data) {
@@ -167,7 +231,9 @@
 
     if(data.series){
       // Check if series is a flat Array
-      if(Array.isArray(data.series) && (data.series.length === 0 || !data.series[0]?.data)) {
+      console.log(data.series, typeof data.series, Array.isArray(data.series))
+      if(Array.isArray(data.series) && (data.series.length === 0 || !data.series[0]?.data) && data.type != 'pie') {
+        console.log("Wrapping series in object with name");
           mergedOptions.series = [{ name: customOptions.seriesName || '', data: data.series }];
       }else{
           mergedOptions.series = data.series;
@@ -184,9 +250,11 @@
       }
     }
 
-    if(data.labels){
+    if(data.labels && data.type !== 'pie'){
       mergedOptions.xaxis = mergedOptions.xaxis || {};
       mergedOptions.xaxis.categories = data.labels;
+    }else{
+      mergedOptions.labels = data.labels;
     }
 
     if(data.customOptions){
@@ -194,6 +262,7 @@
     }
 
     await loadApexCharts();
+    console.log(data.element, mergedOptions)
     const chart = new ApexCharts(data.element, mergedOptions);
     chart.render();
   }

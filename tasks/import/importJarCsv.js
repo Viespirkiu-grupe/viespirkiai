@@ -5,8 +5,12 @@ https://data.gov.lt/datasets/1484/ (CSV pirmas, tiesioginis)
 import fs from "fs";
 import readline from "readline";
 import { postgres } from "../../postgres/postgres.js";
-import { addDocumentsToJarSearch } from "../../typesense/typesense.js";
+import {
+    addDocumentsToJarSearch,
+    ensureJarCollection,
+} from "../../typesense/typesense.js";
 
+await ensureJarCollection();
 var eilute = 0;
 
 // Patikrina, ar nurodytas CSV failo pavadinimas
