@@ -1,6 +1,35 @@
+/*
+Importuoja sutarčių duomenis į Postgres ir Typesense.
+*/
+
 import { addDocumentsToSearch } from "../../typesense/typesense.js";
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
+
+/**
+ * Konvertuoja datą į Postgres timestamp formatą.
+ * @param {Date|string|null} date - Data, kurią reikia konvertuoti.
+ * @returns {string|null}
+ */
+function toPostgresTimestamp(date) {
+    if (!date) return null;
+    const d = new Date(date);
+    if (isNaN(d)) return null;
+    return (
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ` +
+        `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`
+    );
+}
+
+/**
+ * Grąžina datą be laiko komponento.
+ * @param {Date|null} d - Data, iš kurios reikia pašalinti laiką.
+ * @returns {Date|null}
+ */
+function dateOnly(d) {
+    if (!d) return null;
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
 
 /**
  * Importuoja sutarčių duomenys į Postgres ir Typesense.
@@ -8,8 +37,9 @@ import { postgres } from "../../postgres/postgres.js";
  * @returns {Promise<void>}
  */
 export async function importArray(data) {
-    let operations = [];
     let items = [];
+
+    // Aptvarkome duomenų tipus
     for (let i = 0; i < data.length; i++) {
         let item = data[i];
 
@@ -36,7 +66,7 @@ export async function importArray(data) {
         for (const field of dateFields) {
             if (item[field]) {
                 const d = new Date(item[field]);
-                item[field] = isNaN(d) ? null : d; // replace invalid dates with null
+                item[field] = isNaN(d) ? null : d; // Replace invalid dates with null
             }
         }
 
@@ -48,19 +78,10 @@ export async function importArray(data) {
         // Praleidžiame be unikalaus ID (nors tokių neturėtų būti)
         if (!item.sutartiesUnikalusID) continue;
 
-        // Įrašome operacijas
-        operations.push({
-            updateOne: {
-                filter: { sutartiesUnikalusID: item.sutartiesUnikalusID },
-                update: { $set: item },
-                upsert: true,
-            },
-        });
-
         items.push(item);
     }
 
-    if (operations.length > 0) {
+    if (items.length > 0) {
         // Įterpiame į Typesense
         let startTypesenseTime = Date.now();
         await addDocumentsToSearch(items);
@@ -72,27 +93,15 @@ export async function importArray(data) {
         // Įterpiame į Postgres
         let startPostgresTime = Date.now();
 
-        function toPostgresTimestamp(date) {
-            if (!date) return null;
-            const d = new Date(date);
-            if (isNaN(d)) return null;
-            return (
-                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ` +
-                `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`
-            );
-        }
-
-        function dateOnly(d) {
-            if (!d) return null;
-            return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        }
-
+        // Į lentelę sutartys
         const values = [];
         const placeholders = [];
 
+        // Į lentelę failai
         const failaiValues = [];
         const failaiPlaceholders = [];
 
+        // Paruošiame duomenis įterpimui
         items.forEach((item, i) => {
             const faktineIvykdimoVerte =
                 typeof item.faktineIvykdimoVerte === "string" &&
@@ -105,9 +114,9 @@ export async function importArray(data) {
             const pirkimoNumeris =
                 item.pirkimoNumeris?.replace(/\x00/g, "").trim() || null;
 
-            const baseIndex = i * 22;
+            const baseIndex = i * 27;
             placeholders.push(
-                `(${Array.from({ length: 22 }, (_, j) => `$${baseIndex + j + 1}`).join(",")})`,
+                `(${Array.from({ length: 27 }, (_, j) => `$${baseIndex + j + 1}`).join(",")})`,
             );
 
             values.push(
@@ -133,6 +142,11 @@ export async function importArray(data) {
                 item.tiekejoKodas,
                 item.tipas,
                 item.verte,
+                item.papildomiTiekejai,
+                item.papildomiTiekejaiKodai,
+                item.papildomiBvpzKodai,
+                item.papildomiBvpzPavadinimai,
+                item.paskutiniKartaMatyta,
             );
 
             if (!item.dokumentai || !Array.isArray(item.dokumentai)) return;
@@ -162,6 +176,7 @@ export async function importArray(data) {
             });
         });
 
+        // Įterpiame (UPSERT) duomenis
         await postgres.query(
             `INSERT INTO "sutartys" (
               "sutartiesUnikalusId",
@@ -185,7 +200,12 @@ export async function importArray(data) {
               "tiekejas",
               "tiekejoKodas",
               "tipas",
-              "verte"
+              "verte",
+              "papildomiTiekejai",
+              "papildomiTiekejaiKodai",
+              "papildomiBvpzKodai",
+              "papildomiBvpzPavadinimai",
+              "paskutiniKartaMatyta"
             ) VALUES ${placeholders.join(",")}
             ON CONFLICT ("sutartiesUnikalusId") DO UPDATE SET
               "pirkimoNumeris" = EXCLUDED."pirkimoNumeris",
@@ -208,7 +228,12 @@ export async function importArray(data) {
               "tiekejas" = EXCLUDED."tiekejas",
               "tiekejoKodas" = EXCLUDED."tiekejoKodas",
               "tipas" = EXCLUDED."tipas",
-              "verte" = EXCLUDED."verte"`,
+              "verte" = EXCLUDED."verte",
+              "papildomiTiekejai" = EXCLUDED."papildomiTiekejai",
+              "papildomiTiekejaiKodai" = EXCLUDED."papildomiTiekejaiKodai",
+              "papildomiBvpzKodai" = EXCLUDED."papildomiBvpzKodai",
+              "papildomiBvpzPavadinimai" = EXCLUDED."papildomiBvpzPavadinimai",
+              "paskutiniKartaMatyta" = EXCLUDED."paskutiniKartaMatyta"`,
             values,
         );
 

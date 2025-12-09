@@ -46,11 +46,27 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
    					<pre><%= purchase.perkanciosiosOrganizacijosKodas %></pre>
 				</div>
 
-                <div>
-					<h2><u>Tiekėjas</u></h2>
-					<h3><a href="/asmuo/<%= purchase.tiekejoKodas %>"> <%= purchase.tiekejas %> </a> </h3>
-					<pre><%= purchase.tiekejoKodas %></pre>
-				</div>
+				<% if(!purchase.papildomiTiekejai || purchase.papildomiTiekejai.length == 0) { %>
+                    <div>
+    					<h2><u>Tiekėjas</u></h2>
+    					<h3><a href="/asmuo/<%= purchase.tiekejoKodas %>"> <%= purchase.tiekejas %> </a> </h3>
+    					<pre><%= purchase.tiekejoKodas %></pre>
+    				</div>
+				<% } else { %>
+                    <div>
+                        <h2><u>Tiekėjai</u></h2>
+                        <div>
+                            <h3><a href="/asmuo/<%= purchase.tiekejoKodas %>"> <%= purchase.tiekejas %> </a> </h3>
+                           	<pre><%= purchase.tiekejoKodas %></pre>
+                        </div>
+                        <% for (let i = 0; i < purchase.papildomiTiekejai.length; i++) { %>
+                            <div style="margin-top: 12px;">
+                                <h3><a href="/asmuo/<%= purchase.papildomiTiekejaiKodai[i] %>"> <%= purchase.papildomiTiekejai[i] %> </a> </h3>
+                               	<pre><%= purchase.papildomiTiekejaiKodai[i] %></pre>
+                            </div>
+                        <% } %>
+                    </div>
+                <% } %>
 
                 <div class="mobile-hide"></div>
             </section>
@@ -142,9 +158,23 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
 
 
                     <div>
-                        <h3>BVPŽ:</h3>
-                        <h4><%= purchase.bvpzPavadinimas %></h4>
-                        <pre><%= purchase.bvpzKodas %></pre>
+                        <% if(!purchase.papildomiBvpzKodai || purchase.papildomiBvpzKodai.length == 0) { %>
+                            <h3>BVPŽ:</h3>
+                            <h4><%= purchase.bvpzPavadinimas %></h4>
+                            <pre><%= purchase.bvpzKodas %></pre>
+                        <% } else { %>
+                            <h3>BVPŽ:</h3>
+                            <div>
+                                <h4><%= purchase.bvpzPavadinimas %></h4>
+                                <pre><%= purchase.bvpzKodas %></pre>
+                            </div>
+                            <% for (let i = 0; i < purchase.papildomiBvpzKodai.length; i++) { %>
+                                <div style="margin-top: 12px;">
+                                    <h4><%= purchase.papildomiBvpzPavadinimai[i] %></h4>
+                                    <pre><%= purchase.papildomiBvpzKodai[i] %></pre>
+                                </div>
+                            <% } %>
+                        <% } %>
                         <a href="/bvpz">↗ BVPŽ kodai</a>
                     </div>
                 </div>

@@ -1,6 +1,8 @@
 /*
-Periodiškai atsiunčia ir importuoja sutartis iš eViesiejiPirkimai.lt svetainės.
+Duomenų iš eViesiejiPirkimai.lt nuskaitymas (scrapinimas)
+Kaip argumentą galima pateikti puslapio numerį, nuo kurio pradėti nuskaitymą.
 */
+
 import { parseHTML } from "linkedom";
 import { postgres } from "../../postgres/postgres.js";
 import { importArray } from "./import.js";
@@ -12,7 +14,7 @@ import config from "../../utils/config.js";
 import { log } from "../../utils/log.js";
 import { DateTime } from "luxon";
 
-// Nustatome proxy, jei yra
+// Naudojame proxy, jei yra
 let proxyAgent = null;
 
 if (config.scrapeProxy) {
@@ -49,7 +51,7 @@ export async function scrapePage(url) {
             agent: proxyAgent,
             headers: {
                 "User-Agent":
-                    "Viespirkiai.top nuskaitymas, 1-2 uzkl. per min, <viespirkiai@viespirkiai.top>",
+                    "Viespirkiai.top nuskaitymas +<viespirkiai@viespirkiai.top>",
                 Accept:
                     "text/html,application/xhtml+xml,application/xml;" +
                     "q=0.9,image/webp,image/apng,*/*;q=0.8",
@@ -67,6 +69,49 @@ export async function scrapePage(url) {
 
     // Nuskaitomas HTML
     const { document } = parseHTML(html);
+
+    // Check if document contains a h2 containing text "Vykdomi sistemos atnaujinimo darbai"
+    if (
+        [...document.querySelectorAll("h2")].some((h2) =>
+            h2.textContent.includes("Vyksta sistemos atnaujinimo darbai"),
+        )
+    ) {
+        log(`Svetainėje vykdomi sistemos atnaujinimo darbai`);
+        await postgres.query(
+            `INSERT INTO "eviesiejipirkimaiGedimai" ("timestamp", "tipas") VALUES ($1, $2);`,
+            [
+                new Date().toLocaleString("lt-LT", {
+                    timeZone: "Europe/Vilnius",
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                }),
+                "sistemosAtnaujinimoDarbai",
+            ],
+        );
+        throw new Error("Svetainėje vykdomi sistemos atnaujinimo darbai");
+    } else if (!document.querySelector("#lenetele_table")) {
+        log(`Nerasta lentelė`);
+        await postgres.query(
+            `INSERT INTO "eviesiejipirkimaiGedimai" ("timestamp", "tipas") VALUES ($1, $2);`,
+            [
+                new Date().toLocaleString("lt-LT", {
+                    timeZone: "Europe/Vilnius",
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                }),
+                "nerastaLentele",
+            ],
+        );
+        throw new Error("Nerasta lentelė");
+    }
 
     const table = document.querySelector("#lenetele_table");
     const rows = [...table.querySelectorAll("tr")];
@@ -121,7 +166,6 @@ export async function scrapePage(url) {
                     .querySelectorAll("td")[3]
                     .querySelector("a")
                     ?.innerHTML.trimEnd() ?? "",
-
             tiekejoKodas:
                 mainRow.querySelectorAll("td")[3].querySelectorAll("a")[1]
                     ?.innerHTML ?? "",
@@ -146,6 +190,18 @@ export async function scrapePage(url) {
             dokumentuKiekis: 0,
         };
 
+        sutartis.papildomiTiekejai = [];
+        sutartis.papildomiTiekejaiKodai = [];
+
+        let papildomiTiekejaiTD = mainRow.querySelectorAll("td")[3];
+        let papildomiTiekejaiLinks = papildomiTiekejaiTD.querySelectorAll("a");
+        for (let j = 2; j < papildomiTiekejaiLinks.length; j += 2) {
+            let tiekejas = papildomiTiekejaiLinks[j].innerHTML.trimEnd();
+            let tiekejoKodas = papildomiTiekejaiLinks[j + 1].innerHTML;
+            sutartis.papildomiTiekejai.push(tiekejas);
+            sutartis.papildomiTiekejaiKodai.push(tiekejoKodas);
+        }
+
         let ekstriniaiDuomenys = extraRow
             .querySelector("table")
             .querySelectorAll("tr");
@@ -164,36 +220,66 @@ export async function scrapePage(url) {
                 }
             } else if (tekstas.includes("BVPŽ kodas")) {
                 try {
-                    sutartis.bvpzKodas = tr
-                        .querySelectorAll("td")[1]
-                        .querySelector("a").innerHTML;
-                    sutartis.bvpzPavadinimas = ((td) => {
-                        td.querySelector("a")?.remove();
-                        return td.textContent.trim();
-                    })(tr.querySelectorAll("td")[1]);
-                } catch (e) {
-                    let galimaiKodas = tr.querySelectorAll("td")[1].innerHTML;
-                    if (
-                        galimaiKodas.match(/^[0-9-]+$/) ||
-                        galimaiKodas.length < 15
-                    ) {
-                        sutartis.bvpzKodas = galimaiKodas;
-                        sutartis.bvpzPavadinimas = "";
-                    } else {
-                        if (
-                            tr.innerHTML.match(
-                                /<td class="text-end"><i><b>BVPŽ kodas:<\/b><\/i><\/td><td>(.*)<\/td>/,
-                            )
-                        ) {
-                            sutartis.bvpzKodas = undefined;
-                            sutartis.bvpzPavadinimas = tr.innerHTML.match(
-                                /<td class="text-end"><i><b>BVPŽ kodas:<\/b><\/i><\/td><td>(.*)<\/td>/,
-                            )[1];
-                        } else if (galimaiKodas.match(/^[0-9]{8}-[0-9]$/)) {
-                            sutartis.bvpzKodas = galimaiKodas;
-                            sutartis.bvpzPavadinimas = "";
+                    const td = tr.querySelectorAll("td")[1];
+                    const nodes = Array.from(td.childNodes);
+
+                    sutartis.papildomiBvpzKodai = [];
+                    sutartis.papildomiBvpzPavadinimai = [];
+
+                    if (nodes.length > 0) {
+                        // Find first <a>
+                        let firstLinkIndex = nodes.findIndex(
+                            (n) => n.nodeName === "A",
+                        );
+                        if (firstLinkIndex >= 0) {
+                            sutartis.bvpzKodas =
+                                nodes[firstLinkIndex].textContent.trim();
+                            sutartis.bvpzPavadinimas = nodes
+                                .slice(0, firstLinkIndex)
+                                .map((n) => n.textContent)
+                                .join(" ")
+                                .trim();
+
+                            // Any additional codes/names
+                            for (
+                                let i = firstLinkIndex + 1;
+                                i < nodes.length;
+                                i++
+                            ) {
+                                if (nodes[i].nodeName === "A") {
+                                    sutartis.papildomiBvpzKodai.push(
+                                        nodes[i].textContent.trim(),
+                                    );
+
+                                    // Name is text node **before** this <a>
+                                    let prevText = "";
+                                    for (let j = i - 1; j >= 0; j--) {
+                                        if (
+                                            nodes[j].nodeType === 3 &&
+                                            nodes[j].textContent.trim()
+                                        ) {
+                                            // text node
+                                            prevText =
+                                                nodes[j].textContent.trim();
+                                            break;
+                                        }
+                                    }
+                                    sutartis.papildomiBvpzPavadinimai.push(
+                                        prevText,
+                                    );
+                                }
+                            }
+                        } else {
+                            // No <a> found
+                            sutartis.bvpzKodas = "";
+                            sutartis.bvpzPavadinimas = td.textContent.trim();
                         }
                     }
+                } catch (e) {
+                    sutartis.papildomiBvpzKodai = [];
+                    sutartis.papildomiBvpzPavadinimai = [];
+                    sutartis.bvpzKodas = "";
+                    sutartis.bvpzPavadinimas = "";
                 }
             } else if (tekstas.includes("Paskutinio redagavimo data")) {
                 sutartis.paskutinioRedagavimoData =
@@ -223,6 +309,10 @@ export async function scrapePage(url) {
             } else {
                 throw new Error("Nerastas laukelis: " + tr.innerHTML);
             }
+        });
+
+        sutartis.paskutiniKartaMatyta = new Date().toLocaleString("lt-LT", {
+            timeZone: "Europe/Vilnius",
         });
 
         sutartys.push(sutartis);
@@ -297,7 +387,7 @@ export async function requestLatestEviesiejipirkimaiData() {
         },
     );
 
-    for (let page = 0; page < 5; page++) {
+    for (let page = 0; page < 50; page++) {
         let data = await importPage(page);
 
         // Patikriname ar data.naujausioAtnaujinimoTimestamp yra bent 15min senesnis už naujausioAtnaujinimoTimestamp
@@ -334,6 +424,53 @@ export async function scrapePagesStarting(page = 0) {
     }
 }
 
+export async function scrapePagesSequential(startPage = 0, batchSize = 20) {
+    let page = startPage;
+    let yraIrasu = true;
+
+    while (yraIrasu) {
+        let batchResults;
+        while (true) {
+            try {
+                const batchPromises = [];
+                for (let i = 0; i < batchSize; i++) {
+                    const limitstart = (page + i) * 50;
+                    const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&filter_limit=50&limitstart=${limitstart}`;
+                    log(`Scraping page ${page + i} ${url}`);
+                    batchPromises.push(scrapePage(url));
+                }
+
+                batchResults = await Promise.all(batchPromises);
+                break; // success, exit loop
+            } catch (err) {
+                log(`Batch failed, retrying in 60s: ${err}`);
+                await new Promise((res) => setTimeout(res, 60000));
+            }
+        }
+
+        const batchData = batchResults.flat();
+
+        if (batchData.length === 0) {
+            yraIrasu = false;
+            log("No more records, scraping finished.");
+        } else {
+            // wait for DB insert before continuing
+            await importArray(batchData);
+
+            const latestTimestamp = batchData
+                .map((d) => d.paskutinioRedagavimoData)
+                .sort()
+                .pop();
+
+            log(
+                `Imported batch ending with page ${page + batchSize - 1}, latest update: ${latestTimestamp}, total contracts: ${batchData.length}`,
+            );
+
+            page += batchSize;
+        }
+    }
+}
+
 // If ran directly, scrapePagesStarting given the argument
 if (
     import.meta.url === process.argv[1] ||
@@ -343,7 +480,7 @@ if (
     if (process.argv.length >= 3) {
         page = parseInt(process.argv[2]);
     }
-    scrapePagesStarting(page).then(() => {
+    scrapePagesSequential(page).then(() => {
         log("Baigtas visų puslapių nuskaitymas.");
         process.exit(0);
     });
