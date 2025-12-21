@@ -2,23 +2,21 @@ services:
     db:
         image: postgres:17
         container_name: viespirkiaiPostgres
-        environment:
-            POSTGRES_USER: admin
-            POSTGRES_PASSWORD: secret
-            POSTGRES_DB: mydb
+        env_file:
+            - ../.env
         ports:
             - "9118:5432"
         volumes:
             - ./pgdata:/var/lib/postgresql/data
 
-
     pgadmin:
         image: dpage/pgadmin4
-        container_name: viespirkiaiPgadmin
-        environment:
-            PGADMIN_DEFAULT_EMAIL: admin@viespirkiai.top
-            PGADMIN_DEFAULT_PASSWORD: secret
+        container_name: viespirkiaiPgadmin  
+        env_file:
+            - ../.env
         ports:
             - "9119:80"
         depends_on:
             - db
+        volumes:
+            - ./pgadmin-data:/var/lib/pgadmin

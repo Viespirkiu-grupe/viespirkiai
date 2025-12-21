@@ -24,12 +24,14 @@ plausible/plausible-conf.env
 
 # Postgres
 pgdata
+pgadmin-data
 
 # Typesense
 typesense/typesense
 
 # Konfiguracija
 /config.js
+.env
 
 # Viešlaiškiai
 public/vieslaiskiai
