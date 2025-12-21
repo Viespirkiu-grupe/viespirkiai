@@ -43,6 +43,52 @@ pirkimasRouter.get("/pirkimas/:id", async (req, res, next) => {
         purchase.panasiosSutartys = similarContracts;
     }
 
+    let sabisSutartys = await postgres.query(
+        `SELECT *
+         FROM "sabisSutartys"
+         WHERE "vpId" = $1;`,
+        [purchase.sutartiesUnikalusId],
+    );
+
+    sabisSutartys = sabisSutartys.rows;
+
+    await Promise.all(
+        sabisSutartys.map(async (sabisSutartis) => {
+            const result = await postgres.query(
+                `SELECT *
+                 FROM "sabisSutarciuSalys"
+                 WHERE "sutartiesId" = $1;`,
+                [sabisSutartis.sutartiesId],
+            );
+            sabisSutartis.salys = result.rows;
+        }),
+    );
+
+    await Promise.all(
+        sabisSutartys.map(async (sabisSutartis) => {
+            const result = await postgres.query(
+                `SELECT * FROM "sabisSaskaitos" WHERE "sutartiesUid" = $1;`,
+                [sabisSutartis.sutartiesUid],
+            );
+
+            let saskaitos = result.rows;
+
+            await Promise.all(
+                saskaitos.map(async (saskaita) => {
+                    const itemResult = await postgres.query(
+                        `SELECT * FROM "sabisSaskaituSalys" WHERE "sfId" = $1;`,
+                        [saskaita.sfId],
+                    );
+                    saskaita.salys = itemResult.rows;
+                }),
+            );
+
+            sabisSutartis.saskaitos = saskaitos;
+        }),
+    );
+
+    purchase.sabisSutartys = sabisSutartys;
+
     // Failų būsena
     await Promise.all(
         purchase.dokumentai.map(async (failas) => {

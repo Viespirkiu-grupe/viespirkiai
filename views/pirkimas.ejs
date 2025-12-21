@@ -202,6 +202,90 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
                     <% } %>
                 </div>
             </section>
+
+            <section>
+                <div>
+                    <h2><u>SABIS sutartys<sup>BETA</sup></u></h2><br>
+                    <% if(purchase.sabisSutartys && purchase.sabisSutartys.length > 0) { %>
+                        <% purchase.sabisSutartys.forEach(item => { %>
+                            <div class="rezultatas">
+                                <div class="rezultatas-top">
+                                    <span><%= item.tipas %></span>
+                                    <span><%= item.sutartiesNumeris %></span>
+                                    <span>
+                                        <% if(item.sutartiesPasirasymoData && item.sutartiesGaliojimoData) {  %>
+                                            <% let sutartiesPasirasymoData = new Date(item.sutartiesPasirasymoData).toISOString().slice(0,10); %>
+                                            <% let sutartiesGaliojimoData = new Date(item.sutartiesGaliojimoData).toISOString().slice(0,10); %>
+
+                                            <% if(sutartiesPasirasymoData == sutartiesGaliojimoData) { %>
+                                                Sut. <%= sutartiesPasirasymoData %>
+                                            <% } else { %>
+                                                Sut. <%= sutartiesPasirasymoData %> - <%= sutartiesGaliojimoData %>
+                                            <% } %>
+                                        <% } else { %>
+                                            -
+                                        <% } %>
+                                    </span>
+                                    <span>
+                                        <% if (item.sutartiesId) { %>
+                                            <%= item.sutartiesId %>
+                                        <% } %>
+                                    </span>
+                                </div>
+                                <div class="rezultatas-title">
+                                    <span>
+                                        <%
+                                            const suma = item.suma;
+                                            if(Number(suma) > 10000) {
+                                        %>
+                                            <u><%= Number(suma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</u>
+                                        <% } else { %>
+                                            <%= Number(suma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
+                                        <% } %>
+                                    </span>&nbsp;
+                                    <span>
+                                        <% if(item.pavadinimas.length < 1) { %>
+                                            <i>Nenurodyta</i>
+                                        <% } else { %>
+                                            <%= item.pavadinimas %>
+                                        <% } %>
+                                    </span>
+                                </div>
+                                <div class="rezultatas-bottom">
+                                    <% item.salys.forEach(salis => { %>
+                                        <span>
+                                            <b><%= salis.tipas %></b>
+                                            <%= salis.validusJarKodas || salis.validusAsmensKodas || salis.kitasKodas || salis.pavadinimas  %>
+                                        </span>
+                                    <% }); %>
+
+                                    <% if(item.saskaitos && item.saskaitos.length > 0) { %>
+                                        <span>
+                                            <h3> Sąskaitos:</h3>
+                                            <span>
+                                                <% item.saskaitos.forEach(saskaita => { %>
+                                                    <div>
+                                                        <h4><%= saskaita.sfTipas %> Nr. <%= saskaita.sfNumeris %></h4>
+                                                        ID: <i><%= saskaita.sfId %> </i><br>
+                                                        <% if(saskaita.valiuta == "Euras" || saskaita.valiuta == "EUR") {  saskaita.valiuta = "€" } %>
+                                                        <%= Number(saskaita.bendraSfSuma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> <%= saskaita.valiuta %> (su <%= saskaita.pvm %> PVM)
+                                                        <br>
+                                                        <i><%= saskaita.sfBusena %> (<%= saskaita.sfBusenoData %>)</i>
+                                                    </div>
+                                                <% }); %>
+                                            </span>
+
+                                        </span>
+                                    <% } %>
+                                </div>
+                            </div>
+                        <% }); %>
+                    <% } else { %>
+                        <i>Panašių sutarčių nerasta.</i>
+                    <% } %>
+                </div>
+            </section>
+
             <section>
                 <div>
                     <h2><u>Panašios sutartys</u></h2><br>
