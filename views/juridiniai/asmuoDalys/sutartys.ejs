@@ -1,7 +1,7 @@
 <h2><u><a href="#sutartys" class="hashHref">Viešųjų pirkimų sutartys</a></u></h2>
 <div class="col-2 mobile-col-1" id="sutartys">
     <section style="width: 100%;">
-        <h3><a href="#pirkimaiPagalMetus" id="pirkimaiPagalMetus" class="hashHref">Pirkimai per metus</a></h3>
+        <h3><a href="#pirkimaiPagalMetus" id="pirkimaiPagalMetus" class="hashHref">Numatytos pirkimų vertės pagal metus</a></h3>
         <% if(asmuo.sutartys && asmuo.sutartys.pirkimaiKasMetus	 && asmuo.sutartys.pirkimaiKasMetus.length > 0) { %>
             <div id="pirkimaiPerMetus" class="chart" style="width: 100%; height: 400px;"></div>
 
@@ -31,7 +31,7 @@
         <% } %>
     </section>
     <section style="width: 100%;">
-        <h3><a href="#pardavimaiPagalMetus" id="pardavimaiPagalMetus" class="hashHref">Pardavimai per metus</a></h3>
+        <h3><a href="#pardavimaiPagalMetus" id="pardavimaiPagalMetus" class="hashHref">Numatytos pardavimų vertės pagal metus</a></h3>
         <% if(asmuo.sutartys && asmuo.sutartys.tiekimaiKasMetus && asmuo.sutartys.tiekimaiKasMetus.length > 0) { %>
             <div id="pardavimaiPerMetus" class="chart" style="width: 100%; height: 400px;"></div>
 
