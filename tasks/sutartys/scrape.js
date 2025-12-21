@@ -65,6 +65,25 @@ export async function scrapePage(url) {
     }
     const html = await response.text();
 
+    if (response.status === 403) {
+        await postgres.query(
+            `INSERT INTO "eviesiejipirkimaiGedimai" ("timestamp", "tipas") VALUES ($1, $2);`,
+            [
+                new Date().toLocaleString("lt-LT", {
+                    timeZone: "Europe/Vilnius",
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                }),
+                "403",
+            ],
+        );
+        throw new Error("Gauta 403 klaida, užklausa blokuojama");
+    }
+
     log(`Užklausos laikas: ${((new Date() - start) / 1000).toFixed(2)}s`);
 
     // Nuskaitomas HTML
