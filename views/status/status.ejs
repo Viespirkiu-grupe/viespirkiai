@@ -57,6 +57,7 @@
                                 <%= diena.total_duration.hours ? diena.total_duration.hours + "h " : "" %>
                                 <%= diena.total_duration.minutes ? diena.total_duration.minutes + "min " : "" %>
                                 <%= diena.total_duration.seconds ? diena.total_duration.seconds + "s " : "" %>
+                                <%= diena.total_duration.hours || diena.total_duration.minutes || diena.total_duration.seconds ? "" : "0s" %>
                             </div>
                             <div class="rezultatas-bottom" style="text-align: justify;">
                                 <div>
