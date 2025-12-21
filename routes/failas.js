@@ -105,7 +105,7 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
 
     res.json({
         id: failas.id,
-        uri: `/${failas.dokId}/${failas.fileId}/`,
+        uri: `/${failas.md5}`,
         expires: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
         extension: failas.extension,
     });
@@ -226,19 +226,27 @@ failasRouter.get(
             return res.status(403).send("Neteisingas API raktas.");
         }
 
-        const reverseProxy = reverseProxyRes.rows[0];
-
         const { id, dokId, fileId } = req.params;
 
-        let finalId;
+        // Check if id looks like md5
+        let isMd5 = false;
+        if (id && /^[a-f0-9]{32}$/.test(id)) {
+            isMd5 = true;
+        }
+
         let failasRezultatai;
-        if (id) {
+        if (id && !isMd5) {
             if (isNaN(id)) {
                 return next();
             }
 
             failasRezultatai = await postgres.query(
                 'SELECT * FROM failai WHERE "id" = $1;',
+                [id],
+            );
+        } else if (id && isMd5) {
+            failasRezultatai = await postgres.query(
+                'SELECT * FROM failai WHERE "md5" = $1 LIMIT 1;',
                 [id],
             );
         } else if (dokId && fileId) {
@@ -263,7 +271,7 @@ failasRouter.get(
 
         const removalCheck = await postgres.query(
             'SELECT 1 FROM "failuPasalinimai" WHERE "failoId" = $1 AND salinti = true LIMIT 1;',
-            [id],
+            [failas.id],
         );
 
         const hasToBeRemoved = removalCheck.rows.length > 0;
@@ -311,7 +319,7 @@ failasRouter.get(
     },
 );
 
-failasRouter.get("/failas/:id/download", async (req, res, next) => {
+failasRouter.get("/failas/:id/preview", async (req, res, next) => {
     let { id } = req.params;
 
     if (isNaN(id)) {
@@ -353,24 +361,16 @@ failasRouter.get("/failas/:id/download", async (req, res, next) => {
         return res.status(404).send("Failas nepavykęs parsiųsti.");
     }
 
-    const dezeRes = await postgres.query(
-        "SELECT * FROM dezes WHERE pavadinimas = $1 LIMIT 1",
-        [failas.saugojama],
-    );
-
-    if (dezeRes.rows.length === 0) {
-        return res.status(404).send("Dėžė nerasta.");
+    let argumentai = [];
+    if (String(failas.extension).toLowerCase() !== "pdf") {
+        argumentai.push("convertTo=pdf");
     }
 
-    const deze = dezeRes.rows[0];
+    argumentai = argumentai.join("&");
 
     // Parsiunčiame failą
-    const fileUrl = `${deze.url}/file/${failas.md5}.${failas.extension}`;
-    let failasBlob = await fetch(fileUrl, {
-        headers: {
-            "x-api-key": deze.apiKey,
-        },
-    });
+    const fileUrl = `https://failai-direct.viespirkiai.top/${failas.md5}?${argumentai}`;
+    let failasBlob = await fetch(fileUrl);
 
     if (!failasBlob.ok) {
         console.error("Failed to fetch file:", failasBlob.statusText);
@@ -390,12 +390,10 @@ failasRouter.get("/failas/:id/download", async (req, res, next) => {
     const contentType =
         mime.getType(failas.extension) || "application/octet-stream";
 
-    res.setHeader("Content-Type", contentType);
-
-    const contentLength = Number(failas.dydis);
-    if (!Number.isNaN(contentLength)) {
-        res.setHeader("Content-Length", contentLength);
-    }
+    res.setHeader(
+        "Content-Type",
+        failasBlob.headers.get("Content-Type") || contentType,
+    );
 
     // Persiunčiame failą
     const nodeStream = Readable.fromWeb(failasBlob.body);

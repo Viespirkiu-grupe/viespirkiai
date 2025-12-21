@@ -110,9 +110,17 @@ export async function parsiustiFaila() {
 
     log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
 
+    let saltinis = failas.saltinis;
+    if (!saltinis) {
+        saltinis = "sutartys";
+    }
+
     // Randame proxy
-    const proxyRes = await postgres.query(`
-      SELECT * FROM "sutarciuFailuParsiuntejai" WHERE enabled = true ORDER BY RANDOM() LIMIT 1;`);
+    const proxyRes = await postgres.query(
+        `
+      SELECT * FROM "sutarciuFailuParsiuntejai" WHERE enabled = true AND tipas = $1 ORDER BY RANDOM() LIMIT 1;`,
+        [saltinis],
+    );
 
     if (proxyRes.rows.length === 0) {
         throw new Error("Nėra prieinamų sutarčių failų parsisiuntimui.");
@@ -139,9 +147,19 @@ export async function parsiustiFaila() {
         if (start == 0) {
             start = Date.now();
         }
-        let url = customUrl
-            .replace("$DOK_ID", failas.dokId)
-            .replace("$FILE_ID", failas.fileId);
+
+        let url;
+        if (saltinis == "sutartys") {
+            url = customUrl
+                .replace("$DOK_ID", failas.dokId)
+                .replace("$FILE_ID", failas.fileId);
+        } else if (saltinis == "neskelbiamosDerybos") {
+            url = customUrl.replace("$saltinioId", failas.saltinioId);
+        } else {
+            throw new Error(`Nežinomas šaltinis: ${saltinis}`);
+        }
+
+        console.log(url);
 
         let response = await fetch(`${deze.url}/download-url`, {
             method: "POST",

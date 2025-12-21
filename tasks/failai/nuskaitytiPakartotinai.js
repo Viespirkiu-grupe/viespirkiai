@@ -9,7 +9,7 @@ export async function nuskaitytiPakartotinai(kiekis = 100) {
         let query = `WITH to_update AS (
       SELECT id
       FROM failai
-      WHERE nuskaitytas = -1
+      WHERE nuskaitytas = -1 OR nuskaitytas = -4
       LIMIT $1
   )
   UPDATE failai f

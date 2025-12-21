@@ -241,7 +241,7 @@ export async function importArray(data) {
             await postgres.query(
                 `INSERT INTO failai ("dokId", "fileId", "pavadinimas", "extension", "saltinis")
                  VALUES ${failaiPlaceholders.join(", ")}
-                 ON CONFLICT ("dokId", "fileId") DO NOTHING`,
+                 ON CONFLICT ("dokId", "fileId") WHERE ("dokId" IS NOT NULL AND "fileId" IS NOT NULL) DO NOTHING;`,
                 failaiValues,
             );
         }

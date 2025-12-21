@@ -54,6 +54,12 @@
                             <% } else { %>
                                 <option value="sutartys">Sutartys</option>
                             <% } %>
+
+                            <% if(values["saltinis"] == "neskelbiamosDerybos") { %>
+                                <option value="neskelbiamosDerybos" selected>Neskelbiamos derybos</option>
+                            <% } else { %>
+                                <option value="neskelbiamosDerybos">Neskelbiamos derybos</option>
+                            <% } %>
                         </select>
                     </div>
                 </div>

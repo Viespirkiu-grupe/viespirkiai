@@ -262,4 +262,45 @@ failaiSearchRouter.get("/failai.png", async (req, res) => {
     );
 });
 
+failaiSearchRouter.get(
+    ["/failai/list/md5/:md5", "/failai/list/md5/"],
+    async (req, res) => {
+        // Validate md5
+        let md5 = req.params.md5;
+        if (!md5) {
+            md5 = "00000000000000000000000000000000";
+        }
+
+        if (!/^[a-fA-F0-9]{32}$/.test(md5)) {
+            return res.status(400).send("Neteisingas MD5 formatas.");
+        }
+
+        // Find up to limit (default 100) md5 hashes after the given one
+        const limit = parseInt(req.query.limit) || 100;
+        // Max limit 10,000
+        if (limit > 10_000) {
+            return res
+                .status(400)
+                .send("Limitas per didelis. Maksimalus limitas yra 10000.");
+        }
+
+        const query = `
+    SELECT id, md5, dydis, pavadinimas, extension
+    FROM failai
+    WHERE md5 > $1 AND parsiustas = 1
+    ORDER BY md5 ASC
+    LIMIT $2
+  `;
+
+        try {
+            const result = await postgres.query(query, [md5, limit]);
+            const failaiList = result.rows;
+            res.json({ failai: failaiList });
+        } catch (err) {
+            console.error(err);
+            res.status(500).send("Klaida vykdant užklausą.");
+        }
+    },
+);
+
 export default failaiSearchRouter;

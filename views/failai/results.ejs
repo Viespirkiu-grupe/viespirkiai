@@ -15,7 +15,7 @@
                 <span><%= Number(item.zodziuSkaicius).toLocaleString("lt-LT") || "-" %> ž.</span>
             </div>
             <div class="rezultatas-title">
-                <a href="/failas/<%= item.dokId %>/<%= item.fileId %>?search=<%= encodeURIComponent(search) %>">
+                <a href="/failas/<%= item.id %>?search=<%= encodeURIComponent(search) %>">
                     <span>
                         <% if(item.metaduomenys) { %>
                             <%= item.metaduomenys.Title || item.pavadinimas %>
@@ -30,7 +30,9 @@
                     <%- item.excerpt %>
                 </div>
                 <div>
-                    <a href="/pirkimas/<%= item.dokId %>">↗ Sutartis</a>
+                    <% if(item.dokId){ %>
+                        <a href="/pirkimas/<%= item.dokId %>">↗ Sutartis</a>
+                    <% } %>
                 </div>
             </div>
         </div>

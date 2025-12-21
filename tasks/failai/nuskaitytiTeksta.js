@@ -232,8 +232,8 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         return false;
     }
 
-    let url = `https://failai-direct.viespirkiai.top/${dokumentas.dokId}/${dokumentas.fileId}`;
-    let viesasUrl = `https://failai.viespirkiai.top/${dokumentas.dokId}/${dokumentas.fileId}`;
+    let url = `https://failai-direct.viespirkiai.top/${dokumentas.md5}`;
+    let viesasUrl = `https://failai.viespirkiai.top/${dokumentas.md5}`;
 
     log(viesasUrl);
 
@@ -257,7 +257,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             e.message.includes("The PDF file is empty") ||
             dokumentas.dydis == 0
         ) {
-            kodas = -3; // empty pdf
+            kodas = -4; // empty pdf
         }
 
         if (dokumentas && dokumentas.id) {

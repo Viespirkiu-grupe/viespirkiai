@@ -47,7 +47,17 @@
                            </div>
                            <div>
                                <h3>Šaltinis</h3>
-                               <a href="/pirkimas/<%= failas.dokId %>">Sutartis <%= failas.dokId %></a>
+                               <% var originalusLinkas = null; %>
+                               <% var originalusLinkasPavadinimas = null; %>
+                               <% if(failas.saltinis == "sutartys" || !failas.saltinis){ %>
+                                   <a href="/pirkimas/<%= failas.dokId %>">Sutartis <%= failas.dokId %></a>
+                                   <% originalusLinkas = `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dokId}&file_id=${failas.fileId}`; %>
+                                   <% originalusLinkasPavadinimas = "CVP IS"; %>
+                               <% } else if(failas.saltinis == "neskelbiamosDerybos") { %>
+                                    <a href="/neskelbiamos">Neskelbiamos derybos</a>
+                                    <% originalusLinkas = `https://eviesiejipirkimai.lt/${failas.saltinioId}`; %>
+                                    <% originalusLinkasPavadinimas = "CVP IS"; %>
+                               <% } %>
                            </div>
                        </div>
                     </div>
@@ -209,19 +219,25 @@
 				</section>
 				<section>
 				    <% failas.extension = failas.extension.toLowerCase(); %>
-				    <% if(failas.extension == "pdf") { %>
-                      <% let pdfSearch = query.search || ''; %>
+					<% const libreFormats = ["doc", "docx", "odt", "rtf", "xls", "xlsx", "ods", "ppt", "pptx", "odp"]; %>
+				    <% if(failas.extension === "pdf" || libreFormats.includes(failas.extension)) { %>
+                    <% let pdfSearch = query.search || ''; %>
   				    <div>
-                          <a href="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/download`) %>#search=<%= encodeURIComponent(pdfSearch) %>">↗ Padidinti</a>
+                          <a href="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(pdfSearch) %>">↗ Padidinti</a>
                           &nbsp;
-                          <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                          <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
                           &nbsp;
-                          <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
-                          &nbsp;
+                          <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
+                              <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
+                              &nbsp;
+                          <% } %>
                       </div>
                       <div>
+                    <% if(libreFormats.includes(failas.extension)) { %>
+                        <br><i>Dokumentas buvo konvertuotas į PDF formatą naudojant LibreOffice, todėl gali būti atvaizduojamas iškraipytas.</i>
+                    <% } %>
                           <iframe
-                      src="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/download`) %>#search=<%= encodeURIComponent(pdfSearch) %>"
+                      src="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(pdfSearch) %>"
                       width="100%"
                       height="800"
                       style="border: none; height: 70vh; margin-block: 16px; width: 100% !important; max-width: 100% !important; box-sizing: border-box; display: block; overflow-x: hidden !important;"
@@ -230,10 +246,12 @@
                     <% } else if (failas.nuskaitytas > 0 && (failas.extension == "zip" || failas.extension == "7z")){ %>
                         <div>
                             <div>
-                                <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                                <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
                                 &nbsp;
-                                <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
-                                &nbsp;
+                                <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
+                                    <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
+                                    &nbsp;
+                                <% } %>
                             </div>
                             <div style="margin-block: 16px;">
                                 <i>Archyvo peržiūra <sup>BETA</sup></i>
@@ -264,7 +282,7 @@
 
                     <% } else if(failas.extension == "mp4") { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
                             <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
                             &nbsp;
@@ -277,20 +295,24 @@
                         </div>
                     <% } else if(failas.extension == "jpg" || failas.extension == "jpeg" || failas.extension == "png" || failas.extension == "bmp" || failas.extension == "gif") { %>
                             <div>
-                                <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                                <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
                                 &nbsp;
-                                <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
-                                &nbsp;
+                                <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
+                                    <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
+                                    &nbsp;
+                                <% } %>
                             </div>
                             <div style="margin-top: 16px;">
                                 <img src="https://failai.viespirkiai.top/<%= failas.id %>" alt="" style="max-width: 100%; margin-top: 16px;">
                             </div>
                     <% } else if(failas.extension == "url") { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
-                            <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
-                            &nbsp;
+                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
+                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
+                                &nbsp;
+                            <% } %>
                         </div>
                         <div style="margin-top: 16px;">
                             <h3>Nuoroda</h3>
@@ -298,10 +320,12 @@
                         </div>
                     <% } else if(failas.extension == "txt") { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
-                            <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
-                            &nbsp;
+                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
+                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
+                                &nbsp;
+                            <% } %>
                         </div>
                         <div style="margin-top: 16px; max-width: 90vw; overflow-x: auto; background-color: var(--lighter-gray); padding: 16px; border-radius: 8px;">
                             <%
@@ -324,10 +348,12 @@
                         </div>
                     <% } else if(failas.extension == "html" || failas.extension == "htm") { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
-                            <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
-                            &nbsp;
+                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
+                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
+                                &nbsp;
+                            <% } %>
                         </div>
                         <div style="margin-top: 16px; max-width: 90vw; overflow-x: auto; background-color: var(--lighter-gray); padding: 16px; border-radius: 8px;">
                             <iframe
@@ -339,10 +365,12 @@
                         </div>
                     <% } else if(failas.extension == "eml" || failas.extension == "msg") { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
-                            <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
-                            &nbsp;
+                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
+                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
+                                &nbsp;
+                            <% } %>
                         </div>
                         <div style="margin-top: 16px; max-width: 90vw; overflow-x: auto; background-color: var(--lighter-gray); padding: 16px; border-radius: 8px;">
                             <div>
@@ -387,10 +415,12 @@
                         </div>
                     <% } else { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.dokId %>/<%= failas.fileId %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
-                            <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
-                            &nbsp;
+                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
+                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
+                                &nbsp;
+                            <% } %>
                         </div>
                         <div style="margin-top: 16px;">
                             <i>Peržiūra nepalaikoma šio formato failams. Spustelėkite nuorodą „Failas“, jei norite jį atsisiųsti.</i>
