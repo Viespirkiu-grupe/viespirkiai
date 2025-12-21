@@ -180,5 +180,60 @@ export async function nuskaitytiVisasNeskelbiamasDerybas() {
         `;
 
         await postgres.query(query, values);
+
+        const failai = [];
+        allDerybos.forEach((deryba) => {
+            failai.push({
+                saltinis: "neskelbiamosDerybos",
+                saltinioId: deryba.link.replace(
+                    "https://eviesiejipirkimai.lt/sutikimai_laikini/",
+                    "",
+                ),
+                pavadinimas: deryba.link.split("/").pop().split("?")[0],
+                extension: deryba.link
+                    .split("/")
+                    .pop()
+                    .split("?")[0]
+                    .split(".")
+                    .pop(),
+            });
+        });
+        console.log(allDerybos.length, failai.length);
+        const failaiValues = [];
+        const failaiPlaceholders = failai
+            .map((f, i) => {
+                const start = i * 4 + 1;
+                failaiValues.push(f.saltinis);
+                failaiValues.push(f.saltinioId);
+                failaiValues.push(f.pavadinimas);
+                failaiValues.push(f.extension);
+                return `($${start}, $${start + 1}, $${start + 2}, $${start + 3})`;
+            })
+            .join(", ");
+
+        const failaiQuery = `
+            INSERT INTO public."failai"
+            ("saltinis", "saltinioId", "pavadinimas", "extension")
+            VALUES ${failaiPlaceholders}
+            ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND "saltinioId" IS NOT NULL) DO NOTHING;
+            `;
+
+        await postgres.query(failaiQuery, failaiValues);
     }
+}
+
+// CLI
+if (
+    import.meta.url === process.argv[1] ||
+    import.meta.url === `file://${process.argv[1]}`
+) {
+    nuskaitytiVisasNeskelbiamasDerybas()
+        .then(() => {
+            log("Nuskaitymas baigtas");
+            postgres.end();
+        })
+        .catch((err) => {
+            console.error("Klaida nuskaitant:", err);
+            postgres.end();
+        });
 }

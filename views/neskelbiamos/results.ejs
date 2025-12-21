@@ -29,14 +29,18 @@
             </dl>
 
             <h3 class="rezultatas-title">
-                <a href="https://eviesiejipirkimai.lt/<%= item.link %>">
-                    <span>
-                        <% if(item.aprasymas && item.aprasymas.length > 0) { %>
-                            <%= item.aprasymas %>
-                        <% } else { %>
-                            <i>Nenurodyta</i>
-                        <% } %>
-                    </span>
+                <% if(item.failoId) { %>
+                    <a href="/failas/<%= item.failoId %>">
+                <% } else { %>
+                    <a href="https://eviesiejipirkimai.lt/<%= item.link %>">
+                <% } %>
+                        <span>
+                            <% if(item.aprasymas && item.aprasymas.length > 0) { %>
+                                <%= item.aprasymas %>
+                            <% } else { %>
+                                <i>Nenurodyta</i>
+                            <% } %>
+                        </span>
                 </a>
             </h3>
 

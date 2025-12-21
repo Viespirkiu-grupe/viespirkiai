@@ -41,11 +41,14 @@ neskelbiamosDerybosRouter.get(
             cleanSearch = quoteMatch ? quoteMatch[1] : searchTerm;
 
             queryText = `
-                    SELECT *
-                    FROM public."neskelbiamosDerybos" nd
-                    WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
-                    LIMIT $2 OFFSET $3;
-                `;
+                SELECT nd.*, f.id AS "failoId"
+                FROM public."neskelbiamosDerybos" nd
+                LEFT JOIN public."failai" f
+                    ON replace(nd.link, 'https://eviesiejipirkimai.lt/', '') = f."saltinioId"
+                    AND f."parsiustas" = 1
+                WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
+                LIMIT $2 OFFSET $3;
+            `;
 
             totalQuery = `
                     SELECT COUNT(*)
@@ -60,11 +63,14 @@ neskelbiamosDerybosRouter.get(
         } else {
             // No search term: get newest entries
             queryText = `
-                 SELECT *
-                 FROM public."neskelbiamosDerybos"
-                 ORDER BY data DESC NULLS LAST
-                 LIMIT $1 OFFSET $2;
-             `;
+                SELECT nd.*, f.id AS "failoId"
+                FROM public."neskelbiamosDerybos" nd
+                LEFT JOIN public."failai" f
+                    ON replace(nd.link, 'https://eviesiejipirkimai.lt/', '') = f."saltinioId"
+                    AND f."parsiustas" = 1
+                ORDER BY nd.data DESC NULLS LAST
+                LIMIT $1 OFFSET $2;
+            `;
 
             totalQuery = `
                  SELECT COUNT(*)
