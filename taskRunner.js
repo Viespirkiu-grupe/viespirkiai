@@ -34,7 +34,17 @@ tasks.push({
     name: "failuParsiuntimas",
     mode: "asap",
     cooldown: 60,
-    errorCooldown: 10,
+    errorCooldown: 0,
+    job: async () => {
+        return parsiustiFaila();
+    },
+});
+
+tasks.push({
+    name: "failuParsiuntimas2",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 0,
     job: async () => {
         return parsiustiFaila();
     },
@@ -81,6 +91,429 @@ tasks.push({
     errorCooldown: 10,
     job: async () => {
         return atrastiJarAdresoKoordinates();
+    },
+});
+
+// Sync ADP changes
+import { syncAdpChanges } from "./tasks/adp/syncChanges.js";
+tasks.push({
+    name: "syncAdpSaskaitosSalys",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "sabisSaskaituSalys",
+            dataset:
+                "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SaskaituSalys",
+            mapping: {
+                _type: "_type",
+                _id: "_id",
+                _revision: "_revision",
+                id: "id",
+                sf_id: "sfId",
+                tipas: "tipas",
+                validus_asmens_kodas: "validusAsmensKodas",
+                validus_jar_kodas: "validusJarKodas",
+                kitas_kodas: "kitasKodas",
+                kitas_kodas_paaiskinimas: "kitasKodasPaaiskinimas",
+                pavadinimas: "pavadinimas",
+                ne_pvm_moketojas: "nePvmMoketojas",
+                veiklos_vieta: "veiklosVieta",
+                data: "data",
+            },
+            limit: 1000,
+        });
+    },
+});
+
+tasks.push({
+    name: "syncAdpSutartysSalys",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "sabisSutarciuSalys",
+            dataset:
+                "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SutarciuSalys",
+            mapping: {
+                _type: "_type",
+                _id: "_id",
+                _revision: "_revision",
+                id: "id",
+                sutarties_id: "sutartiesId",
+                tipas: "tipas",
+                validus_asmens_kodas: "validusAsmensKodas",
+                validus_jar_kodas: "validusJarKodas",
+                kitas_kodas: "kitasKodas",
+                pavadinimas: "pavadinimas",
+                ne_pvm_moketojas: "nePvmMoketojas",
+                veiklos_vieta: "veiklosVieta",
+                data: "data",
+            },
+            limit: 1000,
+        });
+    },
+});
+
+tasks.push({
+    name: "syncAdpSabisSaskaitos",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "sabisSaskaitos",
+            dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/Saskaitos",
+            mapping: {
+                _id: "_id",
+                _revision: "_revision",
+                id: "id",
+                sf_id: "sfId",
+                israsymo_data: "israsymoData",
+                sf_pozymis: "sfPozymis",
+                sf_tipas: "sfTipas",
+                sf_numeris: "sfNumeris",
+                sutarties_uid: "sutartiesUid",
+                sutarties_numeris: "sutartiesNumeris",
+                cpv_kodas: "cpvKodas",
+                cpv_pav: "cpvPav",
+                sf_apmokejimo_terminas: "sfApmokejimoTerminas",
+                pvm: "pvm",
+                suma_be_pvm: "sumaBePvm",
+                suma_pvm: "sumaPvm",
+                bendra_sf_suma: "bendraSfSuma",
+                valiuta: "valiuta",
+                sf_busena: "sfBusena",
+                sf_buseno_data: "sfBusenoData",
+            },
+            limit: 1000,
+        });
+    },
+});
+
+tasks.push({
+    name: "syncAdpSabisSutartys",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "sabisSutartys",
+            dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/Sutartys",
+            mapping: {
+                _type: "_type",
+                _id: "_id",
+                _revision: "_revision",
+                sutarties_id: "sutartiesId",
+                sutarties_uid: "sutartiesUid",
+                vp_id: "vpId",
+                tipas: "tipas",
+                sutarties_numeris: "sutartiesNumeris",
+                pavadinimas: "pavadinimas",
+                cpv_kodas: "cpvKodas",
+                cpv_pav: "cpvPav",
+                sutarties_pasirasymo_data: "sutartiesPasirasymoData",
+                sutarties_galiojimo_data: "sutartiesGaliojimoData",
+                suma: "suma",
+            },
+            limit: 500,
+        });
+    },
+});
+
+tasks.push({
+    name: "syncAdpBalansoAtaskaitos",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "balansoAtaskaitos",
+            dataset: "datasets/gov/rc/jar/balanso_ataskaitos/BalansoAtaskaita",
+            mapping: {
+                _id: "_id",
+                "juridinis_asmuo._id": "jarId",
+                "forma._id": "formaId",
+                "statusas._id": "statusasId",
+                template_id: "templateId",
+                template_name: "templateName",
+                standard_id: "standardId",
+                standard_name: "standardName",
+                line_type_id: "lineTypeId",
+                line_name: "lineName",
+                reiksme: "reiksme",
+                laikotarpis_nuo: "laikotarpisNuo",
+                laikotarpis_iki: "laikotarpisIki",
+                reg_date: "duomenuData",
+            },
+            limit: 2500,
+        });
+    },
+});
+tasks.push({
+    name: "syncAdpGyvenamojiVietove",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "gyvenamosVietoves",
+            dataset: "datasets/gov/rc/ar/gyvenamojivietove/GyvenamojiVietove",
+            columns: [
+                "_id",
+                "gyvKodas",
+                "tipas",
+                "tipoSantrumpa",
+                "pavadinimasK",
+                "pavadinimas",
+                "seniunija",
+                "savivaldybe",
+                "gyvNuo",
+                "gyvIki",
+            ],
+            mapping: {
+                _id: "_id",
+                gyv_kodas: "gyvKodas",
+                tipas: "tipas",
+                tipo_santrumpa: "tipoSantrumpa",
+                pavadinimas_k: "pavadinimasK",
+                pavadinimas: "pavadinimas",
+                "seniunija._id": "seniunija",
+                "savivaldybe._id": "savivaldybe",
+                gyv_nuo: "gyvNuo",
+                gyv_iki: "gyvIki",
+            },
+            limit: 1000,
+        });
+    },
+});
+
+tasks.push({
+    name: "syncAdpIstatinisKapitalas",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "istatinisKapitalas",
+            dataset: "datasets/gov/rc/jar/ja_kapitalas/JuridinisAsmuoKapitalas",
+            mapping: {
+                _id: "_id",
+                "juridinis_asmuo._id": "jarId",
+                "forma._id": "formaId",
+                data_nuo: "data",
+                reiksme: "reiksme",
+                valiuta: "valiuta",
+            },
+            limit: 1000,
+        });
+    },
+});
+
+tasks.push({
+    name: "syncAdpJadis",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "jadis",
+            dataset: "datasets/gov/rc/jadis/dalyviai/Dalyvis",
+            mapping: {
+                _id: "_id",
+                "juridinis_asmuo._id": "jarId",
+                "form_kodas._id": "formaId",
+                "stat_statusas._id": "statusasId",
+                lr_fiziniai: "lrFiziniai",
+                lr_juridiniai: "lrJuridiniai",
+                uzsienio_fiziniai: "uzsienioFiziniai",
+                uzsienio_juridiniai: "uzsienioJuridiniai",
+            },
+            limit: 1000,
+        });
+    },
+});
+
+tasks.push({
+    name: "syncAdpJar",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "jar",
+            dataset: "datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo",
+            mapping: {
+                _id: "_id",
+                ja_kodas: "jarKodas",
+                ja_pavadinimas: "pavadinimas",
+                pilnas_adresas: "adresas",
+                "adresas._id": "adresasId",
+                reg_data: "registravimoData",
+                isreg_data: "isregistravimoData",
+                "forma._id": "formaId",
+                "statusas._id": "statusasId",
+                stat_data: "statusasData",
+            },
+            limit: 1000,
+        });
+    },
+});
+
+tasks.push({
+    name: "syncAdpMokesciai",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "mokesciai",
+            dataset: "datasets/gov/vmi/ja_mokesciai/Moketojas",
+            mapping: {
+                _id: "_id",
+                id: "id",
+                "mm_kodas._id": "mm_kodas_id",
+                jarKodas: "jarKodas",
+                pavadinimas: "pavadinimas",
+                tipas: "formosPavadinimas",
+                "apskritis._id": "apskritis",
+                "savivaldybe._id": "savivaldybe",
+                metai: "metai",
+                menuo: "menuo",
+                suma: "suma",
+                atnaujinta: "duomenuData",
+            },
+            limit: 1000,
+        });
+    },
+});
+
+tasks.push({
+    name: "syncAdpPelnoNuostoliuAtaskaitos",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "pelnoNuostoliuAtaskaitos",
+            dataset: "datasets/gov/rc/jar/pelno_ataskaitos/PelnoAtaskaita",
+            mapping: {
+                _id: "_id",
+                "juridinis_asmuo._id": "jarId",
+                "forma._id": "formaId",
+                "statusas._id": "statusasId",
+                template_id: "templateId",
+                template_name: "templateName",
+                standard_id: "standardId",
+                standard_name: "standardName",
+                line_type_id: "lineTypeId",
+                line_name: "lineName",
+                reiksme: "reiksme",
+                laikotarpis_nuo: "laikotarpisNuo",
+                laikotarpis_iki: "laikotarpisIki",
+                reg_date: "duomenuData",
+            },
+            limit: 1000,
+        });
+    },
+});
+
+tasks.push({
+    name: "syncAdpDarboVietos",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "darboVietos",
+            dataset: "datasets/gov/uzt/ldv/Vieta",
+            mapping: {
+                _type: "_type",
+                _id: "_id",
+                _revision: "_revision",
+                darbo_vietos_id: "darboVietosId",
+                ikelimo_data: "ikelimoData",
+                profesijos_pareigybes_kodas: "profesijosPareigybesKodas",
+                profesijos_pareigybes_pav: "profesijosPareigybesPav",
+                darbo_aprasymas_lt: "darboAprasymasLt",
+                galioja_nuo: "galiojaNuo",
+                galioja_iki: "galiojaIki",
+                ar_aktuali_siandien: "arAktualiSiandien",
+                ar_uzpildyta: "arUzpildyta",
+                pageidaujama_darbo_pradzia: "pageidaujamaDarboPradzia",
+                darbo_vietu_skaicius: "darboVietuSkaicius",
+                darbo_vietos_adresas: "darboVietosAdresas",
+                darbo_vietos_sav_pav: "darboVietosSavPav",
+                registravimo_pagrindo_kodas: "registravimoPagrindoKodas",
+                registravimo_pagrindo_pav: "registravimoPagrindoPav",
+                registravimo_budo_kodas: "registravimoBudoKodas",
+                registravimo_budo_pav: "registravimoBudoPav",
+                pageidavimo_pateikimo_kodas: "pageidavimoPateikimoKodas",
+                pageidavimo_pateikimo_pav: "pageidavimoPateikimoPav",
+                ar_papildomai_remia: "arPapildomaiRemia",
+                ar_darbina_po_mokymu: "arDarbinaPoMokymu",
+                ar_apmoka_keliones: "arApmokaKeliones",
+                ar_apgyvendina: "arApgyvendina",
+                ar_maitina: "arMaitina",
+                rizikos_lt: "rizikosLt",
+                jar_kodas: "jarKodas",
+                darbdavys: "darbdavys",
+                teisinio_statuso_kodas: "teisinioStatusoKodas",
+                teisinio_statuso_pav: "teisinioStatusoPav",
+                teisines_formos_kodas: "teisinesFormosKodas",
+                teisines_formos_pav: "teisinesFormosPav",
+                imones_iregistravimas: "imonesIregistravimas",
+                darbdavio_bustine: "darbdavioBustine",
+                reik_darbo_patirtis: "reikDarboPatirtis",
+                reik_kompetencijos_lt: "reikKompetencijosLt",
+                reik_gebejimai: "reikGebejimai",
+                reik_issilavinimo_kodas: "reikIssilavinimoKodas",
+                reik_issilavinimo_pav: "reikIssilavinimoPav",
+                reik_mok_progr_kodas: "reikMokProgrKodas",
+                reik_mok_progr_pav: "reikMokProgrPav",
+            },
+            limit: 1000,
+        });
+    },
+});
+
+tasks.push({
+    name: "syncAdpGyvenamojiVietove",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return syncAdpChanges({
+            table: "gyvenamosVietoves",
+            dataset: "datasets/gov/rc/ar/gyvenamojivietove/GyvenamojiVietove",
+            columns: [
+                "_id",
+                "gyvKodas",
+                "tipas",
+                "tipoSantrumpa",
+                "pavadinimasK",
+                "pavadinimas",
+                "seniunija",
+                "savivaldybe",
+                "gyvNuo",
+                "gyvIki",
+            ],
+            mapping: {
+                _id: "_id",
+                gyv_kodas: "gyvKodas",
+                tipas: "tipas",
+                tipo_santrumpa: "tipoSantrumpa",
+                pavadinimas_k: "pavadinimasK",
+                pavadinimas: "pavadinimas",
+                "seniunija._id": "seniunija",
+                "savivaldybe._id": "savivaldybe",
+                gyv_nuo: "gyvNuo",
+                gyv_iki: "gyvIki",
+            },
+            limit: 1000,
+        });
     },
 });
 
@@ -176,7 +609,7 @@ async function syncDokNuskaitytojai() {
                     taskKey,
                     async () => nuskaitytiVienoDokumentoDuomenis(row.id),
                     10, // or row.cooldown if you store it in DB
-                    10, // or row.errorCooldown if you store it in DB
+                    1, // or row.errorCooldown if you store it in DB
                 );
             }
         }

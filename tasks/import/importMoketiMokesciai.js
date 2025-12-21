@@ -1,188 +1,129 @@
+#!/usr/bin/env node
 /*
-Importuoja mokėtų mokesčių duomenis iš CSV failo į Postgres.
+Importuoja mokėtų mokesčių duomenis tiesiai iš data.gov.lt API į Postgres
 https://data.gov.lt/datasets/673/
 */
-import fs from "fs";
 import { postgres } from "../../postgres/postgres.js";
-import readline from "readline";
 
-let eilute = 0;
+const BASE = "https://get.data.gov.lt/datasets/gov/vmi/ja_mokesciai/Moketojas";
+const LIMIT = 10_000;
+const BATCH_SIZE = 200;
 
-// Patikrina, ar nurodytas CSV failo pavadinimas
-const filename = process.argv[2];
-if (!filename) {
-    console.error("Naudojimas: node importMoketiMokesciai.js <file.csv>");
-    process.exit(1);
-}
+async function fetchPage(pageToken = null) {
+    const params = [`limit(${LIMIT})`];
+    if (pageToken) params.push(`page("${pageToken}")`);
 
-// Nuskaito CSV failą liniją po linijos
-const rl = readline.createInterface({
-    input: fs.createReadStream(filename),
-    crlfDelay: Infinity,
-});
+    const url = `${BASE}?${params.join("&")}`;
+    const res = await fetch(url);
 
-let isFirstLine = true;
-const batchSize = 100;
-let batch = [];
-for await (const line of rl) {
-    if (isFirstLine) {
-        isFirstLine = false;
-        continue;
+    if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
     }
 
-    // Nuskaitome eilutės laukus
-    const fields = parseCSVLine(line);
-
-    // Patikriname, ar yra pakankamai laukų
-    if (fields.length < 12) {
-        console.warn(`Skipping malformed line: ${line}`);
-        continue;
-    }
-
-    // Išvalome duomenys
-    const [
-        _id,
-        id,
-        mm_kodas_id,
-        jarCode,
-        pavadinimas,
-        tipas,
-        apskritis,
-        savivaldybe,
-        metai,
-        menuo,
-        suma,
-        atnaujinta,
-    ] = fields.map(clean);
-
-    const row = [
-        _id,
-        id,
-        mm_kodas_id,
-        jarCode,
-        pavadinimas,
-        tipas,
-        apskritis,
-        savivaldybe,
-        metai,
-        menuo,
-        suma,
-        atnaujinta,
-    ];
-
-    batch.push(row);
-
-    // Kai susikaupia pakankamai eilučių, įterpiame jas į duomenų bazę
-    if (batch.length === batchSize) {
-        await insertBatch(batch);
-        batch = [];
-    }
+    return res.json();
 }
 
-// Įterpiame likusias eilutes, jei tokių yra
-if (batch.length > 0) {
-    await insertBatch(batch);
-}
+let totalProcessed = 0;
+let pageNr = 1;
 
-console.log(`Įterptos eilutės: ${eilute}`);
-await postgres.end();
+async function main() {
+    let nextPage = null;
 
-/**
- * Nuskaito CSV eilutę.
- * @param {string} line - CSV eilutė.
- * @returns {Array} - Išanalizuoti laukai.
- */
-function parseCSVLine(line) {
-    const result = [];
-    let field = "";
-    let inQuotes = false;
+    while (true) {
+        const data = await fetchPage(nextPage);
 
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        const nextChar = line[i + 1];
-
-        if (char === '"') {
-            if (inQuotes && nextChar === '"') {
-                // Escaped double quote ("")
-                field += '"';
-                i++; // Skip the next quote
-            } else {
-                // Toggle quote state
-                inQuotes = !inQuotes;
-            }
-        } else if (char === "," && !inQuotes) {
-            // End of field
-            result.push(field);
-            field = "";
-        } else {
-            field += char;
+        if (!data._data || data._data.length === 0) {
+            console.log("Baigta. Daugiau duomenų nėra.");
+            break;
         }
+
+        console.log(`→ Page ${pageNr}: ${data._data.length} įrašų`);
+
+        let batch = [];
+
+        for (const obj of data._data) {
+            batch.push([
+                obj._id ?? null, // _id
+                obj.id ?? null, // id
+                obj.mm_kodas?._id ?? null, // mm_kodas_id
+                obj.id ?? null, // jarKodas (VMI naudoja tą patį)
+                obj.pavadinimas ?? null, // pavadinimas
+                obj.tipas ?? null, // formosPavadinimas
+                obj.apskritis?._id ?? null, // apskritis
+                obj.savivaldybe?._id ?? null, // savivaldybe
+                obj.metai ?? null, // metai
+                obj.menuo ?? null, // menuo
+                obj.suma ?? null, // suma
+                obj.atnaujinta ?? null, // duomenuData
+            ]);
+
+            if (batch.length === BATCH_SIZE) {
+                await insertBatch(batch);
+                batch = [];
+            }
+        }
+
+        if (batch.length > 0) {
+            await insertBatch(batch);
+        }
+
+        nextPage = data._page?.next;
+        if (!nextPage) break;
+
+        pageNr++;
     }
 
-    result.push(field); // last field
-    return result;
+    console.log("DONE. Iš viso apdorota:", totalProcessed);
 }
 
-/**
- * Išvalo CSV lauką, pašalindamas tuščias reikšmes ir apdorodamas kabutes.
- * @param {string} val - CSV lauko reikšmė.
- * @returns {string|null} - Išvalyta reikšmė arba null, jei reikšmė yra tuščia.
- */
-function clean(val) {
-    if (val === "" || val === undefined) return null;
-
-    const hasWrappingQuotes = val.startsWith('"') && val.endsWith('"');
-    if (hasWrappingQuotes) {
-        return val.slice(1, -1).replace(/""/g, '"');
-    }
-
-    return val;
-}
-
-/**
- * Įterpia duomenų grupę į Postgres duomenų bazę.
- * @param {Array} rows - Duomenų grupė, kurią reikia įterpti.
- * @returns {Promise<void>}
- */
 async function insertBatch(rows) {
     if (rows.length === 0) return;
 
-    const values = rows.flat(); // flatten [[row1...], [row2...]] into a single array
+    const numColumns = rows[0].length;
 
     const placeholders = rows
-        .map(
-            (_, i) =>
-                `(${Array.from({ length: 12 }, (_, j) => `$${i * 12 + j + 1}`).join(", ")})`,
-        )
+        .map((_, rowIndex) => {
+            const start = rowIndex * numColumns + 1;
+            return `(${Array.from(
+                { length: numColumns },
+                (_, colIndex) => `$${start + colIndex}`,
+            ).join(", ")})`;
+        })
         .join(", ");
 
     const sql = `
-      INSERT INTO mokesciai (
-        "_id", id, "mm_kodas_id", "jarKodas", pavadinimas,
-        "formosPavadinimas", apskritis, savivaldybe, metai, menuo,
-        suma, "duomenuData"
-      ) VALUES ${placeholders}
-      ON CONFLICT ("_id") DO UPDATE SET
-        id = EXCLUDED.id,
-        "mm_kodas_id" = EXCLUDED."mm_kodas_id",
-        "jarKodas" = EXCLUDED."jarKodas",
-        pavadinimas = EXCLUDED.pavadinimas,
-        "formosPavadinimas" = EXCLUDED."formosPavadinimas",
-        apskritis = EXCLUDED.apskritis,
-        savivaldybe = EXCLUDED.savivaldybe,
-        metai = EXCLUDED.metai,
-        menuo = EXCLUDED.menuo,
-        suma = EXCLUDED.suma,
-        "duomenuData" = EXCLUDED."duomenuData";
+        INSERT INTO mokesciai (
+            "_id", id, "mm_kodas_id", "jarKodas", pavadinimas,
+            "formosPavadinimas", apskritis, savivaldybe,
+            metai, menuo, suma, "duomenuData"
+        )
+        VALUES ${placeholders}
+        ON CONFLICT ("_id") DO UPDATE SET
+            id = EXCLUDED.id,
+            "mm_kodas_id" = EXCLUDED."mm_kodas_id",
+            "jarKodas" = EXCLUDED."jarKodas",
+            pavadinimas = EXCLUDED.pavadinimas,
+            "formosPavadinimas" = EXCLUDED."formosPavadinimas",
+            apskritis = EXCLUDED.apskritis,
+            savivaldybe = EXCLUDED.savivaldybe,
+            metai = EXCLUDED.metai,
+            menuo = EXCLUDED.menuo,
+            suma = EXCLUDED.suma,
+            "duomenuData" = EXCLUDED."duomenuData"
     `;
 
     try {
-        await postgres.query(sql, values);
-        eilute += Number(rows.length);
-        console.log(`${eilute} rows inserted...`);
-        if (eilute % 1000 === 0) {
+        await postgres.query(sql, rows.flat());
+        totalProcessed += rows.length;
+
+        if (totalProcessed % 1000 === 0) {
+            console.log(`✓ Processed ${totalProcessed}`);
         }
     } catch (err) {
-        console.error(`Batch insert failed after ${eilute} rows:`, err.message);
+        console.error(`Insert failed at ${totalProcessed} rows:`, err.message);
+        throw err;
     }
 }
+
+await main();
+await postgres.end();

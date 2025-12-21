@@ -1,75 +1,80 @@
+#!/usr/bin/env node
 /*
-Importuoja PelnoAtaskaitos duomenis iš JSONL failo į PostgreSQL.
+Importuoja PelnoAtaskaitos duomenis tiesiai iš data.gov.lt API į PostgreSQL
 https://data.gov.lt/datasets/1666/
 */
-import fs from "fs";
-import readline from "readline";
 import { postgres } from "../../postgres/postgres.js";
 
-const filename = process.argv[2];
-if (!filename) {
-    console.error(
-        "Naudojimas: node importPelnoNuostoliuAtaskaitos.js <file.jsonl>",
-    );
-    process.exit(1);
+const BASE =
+    "https://get.data.gov.lt/datasets/gov/rc/jar/pelno_ataskaitos/PelnoAtaskaita";
+const LIMIT = 10_000;
+const BATCH_SIZE = 200;
+
+let totalProcessed = 0;
+let pageNr = 1;
+
+async function fetchPage(pageToken = null) {
+    const params = [`limit(${LIMIT})`];
+    if (pageToken) params.push(`page("${pageToken}")`);
+
+    const url = `${BASE}?${params.join("&")}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    }
+    return res.json();
 }
 
-const BATCH_SIZE = 100; // kiek eilučių įterpti vienu metu
-let batch = [];
-let inserted = 0;
+async function main() {
+    let nextPage = null;
 
-// Read JSONL line by line
-const rl = readline.createInterface({
-    input: fs.createReadStream(filename),
-    crlfDelay: Infinity,
-});
+    while (true) {
+        const data = await fetchPage(nextPage);
 
-for await (const line of rl) {
-    if (!line.trim()) continue; // skip empty lines
-    let obj;
-    try {
-        obj = JSON.parse(line);
-    } catch (err) {
-        console.warn(
-            "Skipping malformed line:",
-            line.slice(0, 100),
-            err.message,
-        );
-        continue;
+        if (!data._data || data._data.length === 0) {
+            console.log("Baigta. Daugiau duomenų nėra.");
+            break;
+        }
+
+        console.log(`→ Page ${pageNr}: ${data._data.length} įrašų`);
+
+        let batch = [];
+
+        for (const obj of data._data) {
+            batch.push([
+                obj.juridinis_asmuo?._id ?? null, // jarId
+                obj.forma?._id ?? null, // formaId
+                obj.statusas?._id ?? null, // statusasId
+                obj.template_id ?? null, // templateId
+                obj.template_name ?? null, // templateName
+                obj.standard_id ?? null, // standardId
+                obj.standard_name ?? null, // standardName
+                obj.line_type_id ?? null, // lineTypeId
+                obj.line_name ?? null, // lineName
+                obj.reiksme ?? null, // reiksme
+                obj.laikotarpis_nuo ?? null, // laikotarpisNuo
+                obj.laikotarpis_iki ?? null, // laikotarpisIki
+                obj.reg_date ?? null, // duomenuData
+            ]);
+
+            if (batch.length === BATCH_SIZE) {
+                await insertBatch(batch);
+                batch = [];
+            }
+        }
+
+        if (batch.length > 0) {
+            await insertBatch(batch);
+        }
+
+        nextPage = data._page?.next;
+        if (!nextPage) break;
+
+        pageNr++;
     }
 
-    // Map JSON fields to table columns
-    const row = [
-        obj.juridinis_asmuo?._id ?? null, // jarId
-        obj.forma?._id ?? null, // formaId
-        obj.statusas?._id ?? null, // statusasId
-        obj.template_id ?? null, // templateId
-        obj.template_name ?? null, // templateName
-        obj.standard_id ?? null, // standardId
-        obj.standard_name ?? null, // standardName
-        obj.line_type_id ?? null, // lineTypeId
-        obj.line_name ?? null, // lineName
-        obj.reiksme ?? null, // reiksme
-        obj.laikotarpis_nuo ?? null, // laikotarpisNuo
-        obj.laikotarpis_iki ?? null, // laikotarpisIki
-        obj.reg_date ?? null, // duomenuData
-    ];
-
-    batch.push(row);
-
-    if (batch.length >= BATCH_SIZE) {
-        await insertBatch(batch);
-        batch = [];
-    }
+    console.log("DONE. Iš viso apdorota:", totalProcessed);
 }
-
-// Insert any remaining rows
-if (batch.length > 0) {
-    await insertBatch(batch);
-}
-
-console.log(`Viso įterpta eilučių: ${inserted}`);
-await postgres.end();
 
 async function insertBatch(rows) {
     if (rows.length === 0) return;
@@ -79,15 +84,12 @@ async function insertBatch(rows) {
     const placeholders = rows
         .map((_, rowIndex) => {
             const start = rowIndex * numColumns + 1;
-            const rowPlaceholders = Array.from(
+            return `(${Array.from(
                 { length: numColumns },
                 (_, colIndex) => `$${start + colIndex}`,
-            );
-            return `(${rowPlaceholders.join(", ")})`;
+            ).join(", ")})`;
         })
         .join(", ");
-
-    const flatValues = rows.flat();
 
     const sql = `
         INSERT INTO "pelnoNuostoliuAtaskaitos" (
@@ -99,10 +101,19 @@ async function insertBatch(rows) {
     `;
 
     try {
-        await postgres.query(sql, flatValues);
-        inserted += rows.length;
-        console.log(`Įterpta ${inserted} eilučių...`);
+        await postgres.query(sql, rows.flat());
+        totalProcessed += rows.length;
+        if (totalProcessed % 1000 === 0) {
+            console.log(`✓ Apdorota ${totalProcessed} įrašų`);
+        }
     } catch (err) {
-        console.error("Įterpimas nepavyko:", err.message);
+        console.error(
+            `Įterpimas nepavyko po ${totalProcessed} įrašų:`,
+            err.message,
+        );
+        throw err;
     }
 }
+
+await main();
+await postgres.end();

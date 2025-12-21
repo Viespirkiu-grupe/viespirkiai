@@ -51,13 +51,13 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
 
     timings.start("jarCsv");
     const jarRes = await postgres.query(
-        `SELECT "id" FROM "jar" WHERE "jarKodas" = $1`,
+        `SELECT "_id" FROM "jar" WHERE "jarKodas" = $1`,
         [id],
     );
     timings.end("jarCsv");
 
     if (jarRes.rows && jarRes.rows.length > 0) {
-        jarId = jarRes.rows[0].id;
+        jarId = jarRes.rows[0]._id;
     }
 
     // Specialūs atvejai

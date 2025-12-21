@@ -1,66 +1,74 @@
+#!/usr/bin/env node
 /*
-Importuoja įstatinį kapitalą iš JSONL failo į PostgreSQL.
+Importuoja įstatinį kapitalą tiesiai iš data.gov.lt API į Postgres su puslapiavimu
 https://data.gov.lt/datasets/1570/
 */
-import fs from "fs";
-import readline from "readline";
 import { postgres } from "../../postgres/postgres.js";
 
-const filename = process.argv[2];
-if (!filename) {
-    console.error("Naudojimas: node importIstatinisKapitalas.js <file.jsonl>");
-    process.exit(1);
-}
-
+const BASE =
+    "https://get.data.gov.lt/datasets/gov/rc/jar/ja_kapitalas/JuridinisAsmuoKapitalas";
+const LIMIT = 10_000;
 const BATCH_SIZE = 100;
-let batch = [];
-let inserted = 0;
 
-const rl = readline.createInterface({
-    input: fs.createReadStream(filename),
-    crlfDelay: Infinity,
-});
+async function fetchPage(pageToken = null) {
+    const params = [`limit(${LIMIT})`];
+    if (pageToken) params.push(`page("${pageToken}")`);
 
-for await (const line of rl) {
-    if (!line.trim()) continue;
+    const url = `${BASE}?${params.join("&")}`;
+    const res = await fetch(url);
 
-    let obj;
-    try {
-        obj = JSON.parse(line);
-    } catch (err) {
-        console.warn(
-            "Skipping malformed line:",
-            line.slice(0, 100),
-            err.message,
-        );
-        continue;
+    if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
     }
 
-    // Map JSON fields to table columns
-    const row = [
-        obj["juridinis_asmuo"]?._id ?? null, // jarId
-        obj["forma"]?._id ?? null, // formaId
-        obj["data_nuo"] ?? null, // data
-        obj["reiksme"] ?? null, // reiksme
-        obj["valiuta"] ?? null, // valiuta
-    ];
+    return res.json();
+}
 
-    batch.push(row);
+let totalInserted = 0;
+let pageNr = 1;
 
-    if (batch.length >= BATCH_SIZE) {
-        await insertBatch(batch);
-        batch = [];
+async function main() {
+    let nextPage = null;
+
+    while (true) {
+        const data = await fetchPage(nextPage);
+
+        if (!data._data || data._data.length === 0) {
+            console.log("Baigta. Daugiau duomenų nėra.");
+            break;
+        }
+
+        console.log(`→ Page ${pageNr}: ${data._data.length} įrašų`);
+
+        let batch = [];
+
+        for (const obj of data._data) {
+            batch.push([
+                obj.juridinis_asmuo?._id ?? null, // jarId
+                obj.forma?._id ?? null, // formaId
+                obj.data_nuo ?? null, // data
+                obj.reiksme ?? null, // reiksme
+                obj.valiuta ?? null, // valiuta
+            ]);
+
+            if (batch.length === BATCH_SIZE) {
+                await insertBatch(batch);
+                batch = [];
+            }
+        }
+
+        if (batch.length > 0) {
+            await insertBatch(batch);
+        }
+
+        nextPage = data._page?.next;
+        if (!nextPage) break;
+
+        pageNr++;
     }
+
+    console.log("DONE. Iš viso įterpta:", totalInserted);
 }
-
-if (batch.length > 0) {
-    await insertBatch(batch);
-}
-
-console.log(`Viso įterpta eilučių: ${inserted}`);
-await postgres.end();
-
-// --- Functions ---
 
 async function insertBatch(rows) {
     if (rows.length === 0) return;
@@ -70,28 +78,33 @@ async function insertBatch(rows) {
     const placeholders = rows
         .map((_, rowIndex) => {
             const start = rowIndex * numColumns + 1;
-            const rowPlaceholders = Array.from(
+            return `(${Array.from(
                 { length: numColumns },
                 (_, colIndex) => `$${start + colIndex}`,
-            );
-            return `(${rowPlaceholders.join(", ")})`;
+            ).join(", ")})`;
         })
         .join(", ");
-
-    const flatValues = rows.flat();
 
     const sql = `
         INSERT INTO "istatinisKapitalas" (
             "jarId", "formaId", "data", "reiksme", "valiuta"
-        ) VALUES ${placeholders}
+        )
+        VALUES ${placeholders}
         ON CONFLICT ("jarId", "data", "reiksme") DO NOTHING
     `;
 
     try {
-        await postgres.query(sql, flatValues);
-        inserted += rows.length;
-        console.log(`Įterpta ${inserted} eilučių...`);
+        await postgres.query(sql, rows.flat());
+        totalInserted += rows.length;
+
+        if (totalInserted % 1000 === 0) {
+            console.log(`✓ Inserted ${totalInserted}`);
+        }
     } catch (err) {
-        console.error("Įterpimas nepavyko:", err.message);
+        console.error(`Insert failed at ${totalInserted} rows:`, err.message);
+        throw err;
     }
 }
+
+await main();
+await postgres.end();
