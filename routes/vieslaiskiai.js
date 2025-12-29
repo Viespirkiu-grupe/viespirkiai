@@ -84,7 +84,7 @@ vieslaiskiaiRouter.get("/vieslaiskiai/vieslaiskiai.png", async (req, res) => {
         "Viešlaiškiai",
         "Viešpirkių iniciatyvos viešlaiškiai",
         "",
-        "viespirkiai.top/vieslaiskiai",
+        "viespirkiai.org/vieslaiskiai",
     );
 });
 

@@ -1,5 +1,5 @@
 # Viešpirkiai
 
-Pilietinės iniciatyvos Viešpirkiai puslapio https://viespirkiai.top kodas.
+Pilietinės iniciatyvos Viešpirkiai puslapio https://viespirkiai.org kodas.
 
-Daugiau informacijos el. paštu viespirkiai@viespirkiai.top
+Daugiau informacijos el. paštu viespirkiai@viespirkiai.org

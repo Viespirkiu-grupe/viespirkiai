@@ -51,7 +51,7 @@ export async function scrapePage(url) {
             agent: proxyAgent,
             headers: {
                 "User-Agent":
-                    "Viespirkiai.top nuskaitymas +<viespirkiai@viespirkiai.top>",
+                    "Viespirkiai.org nuskaitymas +<viespirkiai@viespirkiai.org>",
                 Accept:
                     "text/html,application/xhtml+xml,application/xml;" +
                     "q=0.9,image/webp,image/apng,*/*;q=0.8",

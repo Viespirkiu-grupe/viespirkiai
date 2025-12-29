@@ -4,7 +4,7 @@
 	<%- include('../head.ejs', {
         pageTitle: "Failų paieška",
         pageDescription: ``,
-        pageImage: `https://viespirkiai.top/failai.png`,
+        pageImage: `https://viespirkiai.org/failai.png`,
         customHead
     }) %>
 	</head>
@@ -24,11 +24,7 @@
                     </script>
                     <div>
                         <h2><u>Failų statistika</u></h2>
-                        <section class="preResultOptions">
-                        <div class="numberOfResults">
-                            <i>Statistika atnaujinta: <%= new Date(statistika.atnaujinta).toLtDateTime() %> </i>
-                        </div>
-                        </section>
+                        <i>Statistika atnaujinta: <%= new Date(statistika.atnaujinta).toLtDateTime() %> </i>
                         <div class="col-3 mobile-col-1" style="text-align: center; margin-bottom: 48px;">
                             <section>
                                 <h3><u>Indeksuoti</u></h3>

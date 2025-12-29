@@ -211,7 +211,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
             Adresas: ${asmuo.jar.adresas}<br>
             Vid. atlyginimas ${asmuo?.sodra?.vidutinisAtlyginimas || "nežinomas"} (€/mėn)<br>
             Dirba ${asmuo?.sodra?.draustieji || "nežinomas skaičius"} darb.`,
-            `viespirkiai.top/asmuo/${asmuo.jar.jarKodas}`,
+            `viespirkiai.org/asmuo/${asmuo.jar.jarKodas}`,
         );
     }
 

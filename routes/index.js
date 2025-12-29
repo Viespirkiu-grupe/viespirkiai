@@ -531,7 +531,7 @@ indexRouter.get("/index.png", async (req, res) => {
         "Pirkimų skelbimų paieška",
         "Viešpirkiai",
         "",
-        "viespirkiai.top",
+        "viespirkiai.org",
     );
 });
 

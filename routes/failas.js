@@ -56,14 +56,14 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
     );
 
     if (failasRes.rows.length === 0) {
-        if (version == 1) {
+        if (version == 1 || version == 2) {
             failasRes = await postgres.query(
                 `WITH cte AS (
           SELECT id
           FROM failai
           WHERE "ocrState" IS NULL
             AND "nuskaitytas" >= 6
-            AND LOWER("extension") = 'pdf'
+            AND LOWER("extension") IN ('pdf', 'jpg', 'jpeg', 'png', 'bmp', 'gif', 'odg', 'pub', 'webp', 'heic')
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         )
@@ -75,26 +75,27 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
         RETURNING *;`,
                 [user.pavadinimas],
             );
-        } else if (version == 2) {
-            failasRes = await postgres.query(
-                `WITH cte AS (
-        SELECT id
-        FROM failai
-        WHERE "ocrState" IS NULL
-          AND "nuskaitytas" >= 6
-          AND LOWER("extension") IN ('pdf', 'jpg', 'jpeg')
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED
-      )
-      UPDATE failai
-      SET "ocrState" = -3,
-          "ocrNode" = $1,
-          "ocrLockTimestamp" = (NOW() AT TIME ZONE 'Europe/Vilnius')
-      WHERE id IN (SELECT id FROM cte)
-      RETURNING *;`,
-                [user.pavadinimas],
-            );
         }
+        //   else if (version == 2) {
+        //       failasRes = await postgres.query(
+        //           `WITH cte AS (
+        //   SELECT id
+        //   FROM failai
+        //   WHERE "ocrState" IS NULL
+        //     AND "nuskaitytas" >= 6
+        //     AND LOWER("extension") IN ('pdf', 'jpg', 'jpeg')
+        //   LIMIT 1
+        //   FOR UPDATE SKIP LOCKED
+        // )
+        // UPDATE failai
+        // SET "ocrState" = -3,
+        //     "ocrNode" = $1,
+        //     "ocrLockTimestamp" = (NOW() AT TIME ZONE 'Europe/Vilnius')
+        // WHERE id IN (SELECT id FROM cte)
+        // RETURNING *;`,
+        //           [user.pavadinimas],
+        //       );
+        //   }
 
         if (failasRes.rows.length === 0) {
             return res.status(204).send("Nėra OCR laukiančių failų.");
@@ -103,9 +104,35 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
 
     const failas = failasRes.rows[0];
 
+    let urlParams = [];
+    if (
+        [
+            "jpg",
+            "jpeg",
+            "png",
+            "bmp",
+            "gif",
+            "odg",
+            "pub",
+            "webp",
+            "heic",
+        ].includes(String(failas.extension).toLowerCase())
+    ) {
+        urlParams.push("convertTo=pdf");
+    }
+
+    let urlParamsString = urlParams.join("&");
+    if (urlParamsString.length > 0) {
+        urlParamsString = `?${urlParamsString}`;
+    }
+
+    const uri = `/${failas.md5}${urlParamsString}`;
+
+    console.log(uri);
+
     res.json({
         id: failas.id,
-        uri: `/${failas.md5}`,
+        uri,
         expires: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
         extension: failas.extension,
     });
@@ -199,7 +226,7 @@ failasRouter.get("/failas.png", async (req, res) => {
         "Failai",
         "Failų parsisiuntimo statistika",
         "",
-        "viespirkiai.top/failas",
+        "viespirkiai.org/failas",
     );
 });
 
@@ -369,7 +396,7 @@ failasRouter.get("/failas/:id/preview", async (req, res, next) => {
     argumentai = argumentai.join("&");
 
     // Parsiunčiame failą
-    const fileUrl = `https://failai-direct.viespirkiai.top/${failas.md5}?${argumentai}`;
+    const fileUrl = `https://failai.viespirkiai.org/${failas.md5}?${argumentai}`;
     let failasBlob = await fetch(fileUrl);
 
     if (!failasBlob.ok) {

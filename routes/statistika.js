@@ -325,7 +325,7 @@ statistikaRouter.get("/statistika.png", async (req, res) => {
         "Statistika",
         "Viešpirkių statistika",
         "",
-        "viespirkiai.top/statistika",
+        "viespirkiai.org/statistika",
     );
 });
 

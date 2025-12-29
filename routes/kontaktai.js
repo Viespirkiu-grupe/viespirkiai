@@ -16,7 +16,7 @@ kontaktaiRouter.get("/kontaktai.png", async (req, res) => {
         "Viešpirkiai pilietinė iniciatyva",
         "Kontaktai",
         "",
-        "viespirkiai.top/kontaktai",
+        "viespirkiai.org/kontaktai",
     );
 });
 

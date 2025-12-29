@@ -16,7 +16,7 @@ bvpzRouter.get("/bvpz.png", async (req, res) => {
         "Viešpirkiai pilietinė iniciatyva",
         "BVPŽ kodų paieška",
         "",
-        "viespirkiai.top/bvpz",
+        "viespirkiai.org/bvpz",
     );
 });
 

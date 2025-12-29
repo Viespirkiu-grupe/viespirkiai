@@ -16,7 +16,7 @@ privatumasRouter.get("/privatumas.png", async (req, res) => {
         "",
         "Privatumo politika",
         "Viešpirkiai puslapio privatumo politika",
-        "viespirkiai.top/privatumas",
+        "viespirkiai.org/privatumas",
     );
 });
 

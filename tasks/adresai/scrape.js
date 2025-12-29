@@ -7,7 +7,7 @@ import { log } from "../../utils/log.js";
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const SLEEP_MS = 1001;
-const USER_AGENT = "Viespirkiai/1.0 (sveiki@viespirkiai.top)";
+const USER_AGENT = "Viespirkiai/1.0 (sveiki@viespirkiai.org)";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

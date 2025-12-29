@@ -161,7 +161,7 @@ juridiniaiRouter.get("/juridiniai.png", async (req, res) => {
         "",
         "Juridinių asmenų paieška",
         "",
-        "viespirkiai.top/juridiniai",
+        "viespirkiai.org/juridiniai",
     );
 });
 

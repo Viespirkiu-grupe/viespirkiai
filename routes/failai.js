@@ -258,7 +258,7 @@ failaiSearchRouter.get("/failai.png", async (req, res) => {
         "",
         "Failų paieška",
         "",
-        "viespirkiai.top/failai",
+        "viespirkiai.org/failai",
     );
 });
 

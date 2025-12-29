@@ -47,7 +47,7 @@ eksportaiRouter.get("/eksportai/:id", async (req, res, next) => {
             "Duomenų eksportas",
             row.pavadinimas,
             "Galite parsisiųsti šį duomenų eksportą",
-            `viespirkiai.top/eksportas/${row.id}`,
+            `viespirkiai.org/eksportas/${row.id}`,
         );
     }
 

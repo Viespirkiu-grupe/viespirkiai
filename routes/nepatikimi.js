@@ -44,25 +44,23 @@ nepatikimiIrMelagiaiRouter.get(
             queryText = `SELECT *
             FROM (
                 SELECT
-                nd."atvejoNr",
-                nd."duomenuIvedimoData" AS "duomenuIvedimoData_alias",
-                nd."pirkimoVykdytojoPavadinimas",
-                nd."tiekejoPavadinimas",
-                nd."tiekejoJarKodas",
-                nd."pirkimoNumeris",
-                nd."sutartiesNutraukimoData"::date,
-                nd."dataNuoKuriosSkaiciuojama"::date,
-                nd."itrauktaIki"::date AS "itrauktasIki",
-                nd."teismoData"::date,
-                nd."teismoSprendimoData"::date,
-                nd."teismoSprendimoLink",
-                nd.metai,
-                nd."paskutiniKartaMatytaSarase",
-                NULL::text AS "irasymoPagrindas",
-                'Nepatikimas' AS "saltinis",
-                p.*
+                    nd."atvejoNr",
+                    nd."duomenuIvedimoData" AS "duomenuIvedimoData",
+                    nd."pirkimoVykdytojoPavadinimas",
+                    nd."tiekejoPavadinimas",
+                    nd."tiekejoJarKodas",
+                    nd."pirkimoNumeris",
+                    nd."sutartiesNutraukimoData"::date,
+                    nd."dataNuoKuriosSkaiciuojama"::date,
+                    nd."itrauktaIki"::date AS "itrauktasIki",
+                    nd."teismoData"::date,
+                    nd."teismoSprendimoData"::date,
+                    nd."teismoSprendimoLink",
+                    nd.metai,
+                    nd."paskutiniKartaMatytaSarase",
+                    'Nepatikimas' AS "saltinis"
                 FROM public."nepatikimiTiekejai" nd
-                INNER JOIN public."nepatikimiTiekejaiPagrindimai" p
+                LEFT JOIN public."nepatikimiTiekejaiPagrindimai" p
                     ON p."tiekejoJarKodas" = nd."tiekejoJarKodas"
                    AND p."pirkimoNumeris" = nd."pirkimoNumeris"
                 WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
@@ -70,30 +68,28 @@ nepatikimiIrMelagiaiRouter.get(
                 UNION ALL
 
                 SELECT
-                nd."atvejoNr",
-                nd."duomenuIvedimoData" AS "duomenuIvedimoData_alias",
-                nd."pirkimoVykdytojoPavadinimas",
-                nd."tiekejoPavadinimas",
-                nd."tiekejoJarKodas",
-                nd."pirkimoNumeris",
-                NULL::date AS "sutartiesNutraukimoData",
-                nd."dataNuoKuriosSkaiciuojamasTerminas"::date AS "dataNuoKuriosSkaiciuojama",
-                nd."itrauktasIki"::date,
-                nd."teismoData"::date,
-                NULL::date AS "teismoSprendimoData",
-                nd."teismoSprendimoLink",
-                nd.metai,
-                nd."paskutiniKartaMatytaSarase",
-                nd."irasymoPagrindas",
-                'Melagingas' AS "saltinis",
-                p.*
+                    nd."atvejoNr",
+                    nd."duomenuIvedimoData" AS "duomenuIvedimoData",
+                    nd."pirkimoVykdytojoPavadinimas",
+                    nd."tiekejoPavadinimas",
+                    nd."tiekejoJarKodas",
+                    nd."pirkimoNumeris",
+                    NULL::date AS "sutartiesNutraukimoData",
+                    nd."dataNuoKuriosSkaiciuojamasTerminas"::date AS "dataNuoKuriosSkaiciuojama",
+                    nd."itrauktasIki"::date,
+                    nd."teismoData"::date,
+                    NULL::date AS "teismoSprendimoData",
+                    nd."teismoSprendimoLink",
+                    nd.metai,
+                    nd."paskutiniKartaMatytaSarase",
+                    'Melagingas' AS "saltinis"
                 FROM public."melagingiTiekejai" nd
-                INNER JOIN public."melagingiTiekejaiPagrindimai" p
+                LEFT JOIN public."melagingiTiekejaiPagrindimai" p
                     ON p."tiekejoJarKodas" = nd."tiekejoJarKodas"
                    AND p."pirkimoNumeris" = nd."pirkimoNumeris"
                 WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
             ) t
-            ORDER BY t."duomenuIvedimoData_alias" DESC NULLS LAST
+            ORDER BY "duomenuIvedimoData" DESC NULLS LAST
             LIMIT $2 OFFSET $3;
             `;
 
@@ -124,7 +120,7 @@ nepatikimiIrMelagiaiRouter.get(
             FROM (
                 SELECT
                     nd."atvejoNr",
-                    nd."duomenuIvedimoData" AS "duomenuIvedimoData_alias",
+                    nd."duomenuIvedimoData" AS "duomenuIvedimoData",
                     nd."pirkimoVykdytojoPavadinimas",
                     nd."tiekejoPavadinimas",
                     nd."tiekejoJarKodas",
@@ -138,8 +134,7 @@ nepatikimiIrMelagiaiRouter.get(
                     nd.metai,
                     nd."paskutiniKartaMatytaSarase",
                     NULL::text AS "irasymoPagrindas",
-                    'Nepatikimas' AS "saltinis",
-                    p.*
+                    'Nepatikimas' AS "saltinis"
                 FROM public."nepatikimiTiekejai" nd
                 INNER JOIN public."nepatikimiTiekejaiPagrindimai" p
                     ON p."tiekejoJarKodas" = nd."tiekejoJarKodas"
@@ -149,7 +144,7 @@ nepatikimiIrMelagiaiRouter.get(
 
                 SELECT
                     nd."atvejoNr",
-                    nd."duomenuIvedimoData" AS "duomenuIvedimoData_alias",
+                    nd."duomenuIvedimoData" AS "duomenuIvedimoData",
                     nd."pirkimoVykdytojoPavadinimas",
                     nd."tiekejoPavadinimas",
                     nd."tiekejoJarKodas",
@@ -163,14 +158,13 @@ nepatikimiIrMelagiaiRouter.get(
                     nd.metai,
                     nd."paskutiniKartaMatytaSarase",
                     nd."irasymoPagrindas",
-                    'Melagingas' AS "saltinis",
-                    p.*
+                    'Melagingas' AS "saltinis"
                 FROM public."melagingiTiekejai" nd
                 INNER JOIN public."melagingiTiekejaiPagrindimai" p
                     ON p."tiekejoJarKodas" = nd."tiekejoJarKodas"
                    AND p."pirkimoNumeris" = nd."pirkimoNumeris"
             ) t
-            ORDER BY t."duomenuIvedimoData_alias" DESC NULLS LAST
+            ORDER BY "duomenuIvedimoData" DESC NULLS LAST
             LIMIT $1 OFFSET $2;
          `;
 
@@ -270,7 +264,7 @@ nepatikimiIrMelagiaiRouter.get("/failai.png", async (req, res) => {
         "",
         "Failų paieška",
         "",
-        "viespirkiai.top/failai",
+        "viespirkiai.org/failai",
     );
 });
 

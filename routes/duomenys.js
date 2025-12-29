@@ -21,7 +21,7 @@ duomenysRouter.get("/duomenys.png", async (req, res) => {
         "Viešai prieinami",
         "Duomenys",
         "Čia galite pasiekti mūsų duomenų eksportus bei sužinoti apie naudojamus šaltinius",
-        "viespirkiai.top/duomenys",
+        "viespirkiai.org/duomenys",
     );
 });
 

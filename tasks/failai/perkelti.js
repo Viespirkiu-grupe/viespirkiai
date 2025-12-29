@@ -40,7 +40,7 @@ export async function perkeltiFailus(from, to, kiekis = 1) {
         const dezeFrom = dezeFromRes.rows[0];
 
         try {
-            let url = `https://failai-direct.viespirkiai.top/${failas.id}`;
+            let url = `https://failai.viespirkiai.org/${failas.id}`;
 
             console.log(url);
 

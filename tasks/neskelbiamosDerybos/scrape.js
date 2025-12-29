@@ -51,8 +51,7 @@ async function nuskaitytiNeskelbiamasDerybasNuo(start = 0) {
         var response = await fetch(url, {
             agent: proxyAgent,
             headers: {
-                "User-Agent":
-                    "Viespirkiai.top nuskaitymas, 1-2 uzkl. per min, <viespirkiai@viespirkiai.top>",
+                "User-Agent": "Viespirkiai.org <viespirkiai@viespirkiai.org>",
                 Accept:
                     "text/html,application/xhtml+xml,application/xml;" +
                     "q=0.9,image/webp,image/apng,*/*;q=0.8",

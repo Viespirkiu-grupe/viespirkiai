@@ -4,7 +4,7 @@
 	<%- include('../head.ejs', {
         pageTitle: "Juridinių asmenų paieška",
         pageDescription: ``,
-        pageImage: `https://viespirkiai.top/juridiniai.png`,
+        pageImage: `https://viespirkiai.org/juridiniai.png`,
         customHead
     }) %>
 	</head>
@@ -12,7 +12,7 @@
 		<%- include('../header.ejs', {hideSubtext: false}) %>
 		<main>
 			<%- include('search.ejs', {values}) %>
-			<section id="juridiniaiRezultatai" class="results">
+			<section class="results" id="juridiniaiRezultatai">
                 <% if(typeof data !== "undefined") { %>
     			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
                 <% } else { %>

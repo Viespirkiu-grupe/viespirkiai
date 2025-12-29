@@ -8,7 +8,7 @@
           pageDescription: `Sutartis nr. ${purchase.sutartiesNumeris}
 Sudaryta: ${new Date(purchase.sudarymoData).toISOString().slice(0,10)}
 Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
-          pageImage: `https://viespirkiai.top/pirkimas/${purchase.sutartiesUnikalusID}.png`,
+          pageImage: `https://viespirkiai.org/pirkimas/${purchase.sutartiesUnikalusID}.png`,
           pageAuthor: purchase.perkanciojiOrganizacija,
           customHead
         }) %>
@@ -34,7 +34,7 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
                 &nbsp;
                 <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= purchase.sutartiesUnikalusID %>">↗ CVP IS</a>
                 &nbsp;
-                <a href="mailto:pranesti@viespirkiai.top?subject=Dėl sutarties%20nr.%20<%= purchase.sutartiesUnikalusID %>&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.top/pirkimas/<%= purchase.sutartiesUnikalusID %>">
+                <a href="mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20<%= purchase.sutartiesUnikalusID %>&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/<%= purchase.sutartiesUnikalusID %>">
                     ↗ Pranešti
                 </a>
 			</div>

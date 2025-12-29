@@ -17,7 +17,7 @@
 <div class="resultsNauji">
     <% data.forEach(item => { %>
         <article class="rezultatas" aria-label="<%= item.tipoPavadinimas %>">
-            <a href="/pirkimas/<%= item.sutartiesUnikalusId %>" class="fullIndentLink"></a>
+            <a href="/sutartis/<%= item.sutartiesUnikalusId %>" class="fullIndentLink"></a>
             <div class="rezultatas-left">
                 <dl class="rezultatas-top">
                 <div>
@@ -76,7 +76,7 @@
                         </div>
                     </div>
                     <h3 class="rezultatas-title">
-                        <a href="/pirkimas/<%= item.sutartiesUnikalusId %>">
+                        <a href="/sutartis/<%= item.sutartiesUnikalusId %>">
                             <span>
                                 <% if(item.pavadinimas.length < 1) { %>
                                     <i>Nenurodyta</i>

@@ -1,66 +1,53 @@
-<section class="preResultOptions">
-  <div class="numberOfResults">
-    <%- numberOfResults %>
-  </div>
+<div>
+    <section class="preResultOptions">
+        <div class="numberOfResults">
+            <%- numberOfResults %>
+        </div>
 
-  <% if(galimaEksportuoti){ %>
-    <div class="exportOptions">
-      <a href="/juridiniai?<%- queryParams %>&json=true&limit=max" class="exportLink">↗ JSON</a>&nbsp;
-      <a href="/juridiniai?<%- queryParams %>&jsonl=true&limit=max" class="exportLink">↗ JSONL</a>&nbsp;
-      <a href="/juridiniai?<%- queryParams %>&csv=true&limit=max" class="exportLink">↗ CSV</a>
-    </div>
-  <% } %>
-</section>
+        <% if(galimaEksportuoti){ %>
+            <div class="exportOptions">
+            <a href="/juridiniai?<%- queryParams %>&json=true&limit=max" class="exportLink">↗ JSON</a>&nbsp;
+            <a href="/juridiniai?<%- queryParams %>&jsonl=true&limit=max" class="exportLink">↗ JSONL</a>&nbsp;
+            <a href="/juridiniai?<%- queryParams %>&csv=true&limit=max" class="exportLink">↗ CSV</a>
+            </div>
+        <% } %>
+    </section>
+</div>
 
-<div class="tableContainer">
-<table>
-    <thead>
-        <tr>
-            <th>Pavadinimas</th>
-            <th>Forma</th>
-            <th>Reg. data</th>
-            <th>Adresas</th>
-            <th>Duomenys</th>
-        </tr>
-    </thead>
-    <tbody>
-        <% data.forEach(item => { %>
-            <tr>
-                <td>
-                    <div class="limit">
-                        <a href="/asmuo/<%= item.jarKodas %>">
-                        <% if(item.pavadinimas.length < 1) { %>
-                            <i>Nenurodyta</i>
-                        <% } else { %>
-                            <%= item.pavadinimas %>
-                        <% } %>
-                        </a>
+<div class="resultsNauji">
+    <% data.forEach(item => { %>
+        <article class="rezultatas" aria-label="<%= item.formosPavadinimas %>">
+            <a href="/asmuo/<%= item.jarKodas %>" class="fullIndentLink"></a>
+
+            <div class="rezultatas-left">
+                <dl class="rezultatas-top">
+                    <div>
+                        <dt class="visually-hidden">Tipas</dt>
+                        <dd><%= item.formosPavadinimas %></dd>
                     </div>
-                </td>
-                <td>
-                    <div class="limit">
-                        <%= item.formosPavadinimas %>
+                </dl>
+
+                <h3 class="rezultatas-title">
+                    <a href="/asmuo/<%= item.jarKodas %>">
+                        <span>
+                            <% if (!item.pavadinimas || item.pavadinimas.length === 0) { %>
+                                <i>Nenurodyta</i>
+                            <% } else { %>
+                                <%= item.pavadinimas %>
+                            <% } %>
+                        </span>
+                    </a>
+                </h3>
+
+                <div class="rezultatas-bottom">
+                    <div>
+                        <b>Adresas:</b>
+                        <span><%- item.adresas %></span>
                     </div>
-                </td>
-                <td>
-                    <div class="limit" style="white-space: nowrap;">
-                        <%= item.registravimoData.substr(0, 10) %>
-                    </div>
-                </td>
-                <td>
-                    <div class="limit">
-                        <%= item.adresas %>
-                    </div>
-                </td>
-                <td>
-                    <div class="limit" style="white-space: nowrap;">
-                        <%= item.duomenuData.substr(0, 10) %>
-                    </div>
-                </td>
-            </tr>
-        <% }); %>
-    </tbody>
-</table>
+                </div>
+            </div>
+        </article>
+    <% }); %>
 </div>
 
 <%- include('../pagination.ejs', {

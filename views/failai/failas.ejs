@@ -4,7 +4,7 @@
 	<%- include('../head.ejs', {
         pageTitle: "Failas",
         pageDescription: ``,
-        pageImage: `https://viespirkiai.top/failai.png`,
+        pageImage: `https://viespirkiai.org/failai.png`,
         customHead
     }) %>
 	</head>
@@ -219,13 +219,13 @@
 				</section>
 				<section>
 				    <% failas.extension = failas.extension.toLowerCase(); %>
-					<% const libreFormats = ["doc", "docx", "odt", "rtf", "xls", "xlsx", "ods", "ppt", "pptx", "odp"]; %>
+					<% const libreFormats = ["doc", "docx", "odt", "rtf", "xls", "xlsx", "xlsb", "ods", "ppt", "pptx", "ppsx", "odp", "odg", "pub", "pages", "xlt", "dot", "docm", "dotx"]; %>
 				    <% if(failas.extension === "pdf" || libreFormats.includes(failas.extension)) { %>
                     <% let pdfSearch = query.search || ''; %>
   				    <div>
                           <a href="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(pdfSearch) %>">↗ Padidinti</a>
                           &nbsp;
-                          <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
+                          <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                           &nbsp;
                           <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
                               <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
@@ -246,7 +246,7 @@
                     <% } else if (failas.nuskaitytas > 0 && (failas.extension == "zip" || failas.extension == "7z")){ %>
                         <div>
                             <div>
-                                <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
+                                <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                                 &nbsp;
                                 <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
                                     <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
@@ -267,7 +267,7 @@
                                   </details>
                                 <% } else { %>
                                   <div style="padding-block: 4px;">
-                                    <a href="https://failai.viespirkiai.top/<%= failas.id %>/<%= file.path %>" target="_blank">
+                                    <a href="https://failai.viespirkiai.org/<%= failas.id %>/<%= file.path %>" target="_blank">
                                       <%= file.name %>
                                     </a>
                                     (<%= file.extension %>, <%= (file.size / 1024).toFixed(1) %> KB)
@@ -282,20 +282,20 @@
 
                     <% } else if(failas.extension == "mp4") { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
                             <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
                             &nbsp;
                         </div>
                         <div style="margin-top: 16px;">
                             <video width="100%" height="auto" controls style="max-height: 70vh; margin-top: 16px;">
-                                <source src="https://failai.viespirkiai.top/<%= failas.id %>" type="video/mp4">
+                                <source src="https://failai.viespirkiai.org/<%= failas.id %>" type="video/mp4">
                                 Your browser does not support the video tag.
                             </video>
                         </div>
-                    <% } else if(failas.extension == "jpg" || failas.extension == "jpeg" || failas.extension == "png" || failas.extension == "bmp" || failas.extension == "gif") { %>
+                    <% } else if(["jpg", "jpeg", "png", "bmp", "gif", "tif", "tiff", "jfif", "heic", "webp"].includes(String(failas.extension).toLowerCase())) { %>
                             <div>
-                                <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
+                                <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                                 &nbsp;
                                 <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
                                     <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
@@ -303,11 +303,16 @@
                                 <% } %>
                             </div>
                             <div style="margin-top: 16px;">
-                                <img src="https://failai.viespirkiai.top/<%= failas.id %>" alt="" style="max-width: 100%; margin-top: 16px;">
+                                <% let convertString = "";
+                                if(["heic"].includes(String(failas.extension).toLowerCase())){
+                                  convertString = `?convertTo=jpeg`
+                                }
+                                %>
+                                <img src="https://failai.viespirkiai.org/<%= failas.id %><%= convertString %>" alt="" style="max-width: 100%; margin-top: 16px;">
                             </div>
                     <% } else if(failas.extension == "url") { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
                             <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
                                 <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
@@ -320,7 +325,7 @@
                         </div>
                     <% } else if(failas.extension == "txt") { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
                             <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
                                 <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
@@ -348,7 +353,7 @@
                         </div>
                     <% } else if(failas.extension == "html" || failas.extension == "htm") { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
                             <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
                                 <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
@@ -357,7 +362,7 @@
                         </div>
                         <div style="margin-top: 16px; max-width: 90vw; overflow-x: auto; background-color: var(--lighter-gray); padding: 16px; border-radius: 8px;">
                             <iframe
-                              src="https://failai.viespirkiai.top/<%= failas.id %>"
+                              src="https://failai.viespirkiai.org/<%= failas.id %>"
                               width="100%"
                               height="600"
                               style="border: none; margin-top: 16px;"
@@ -365,7 +370,7 @@
                         </div>
                     <% } else if(failas.extension == "eml" || failas.extension == "msg") { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
                             <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
                                 <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
@@ -415,7 +420,7 @@
                         </div>
                     <% } else { %>
                         <div>
-                            <a href="https://failai.viespirkiai.top/<%= failas.id %>">↗ Failas</a>
+                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
                             <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
                                 <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
