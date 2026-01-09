@@ -227,7 +227,8 @@ form#searchForm:has(#searchNustatymaiToggle:checked) label#searchNustatymaiToggl
 	}
 }
 
-.nustatymai .nustatymai-top input {
+.nustatymai .nustatymai-top input,
+.nustatymai .nustatymai-bottom input{
 	width: 90%;
 	height: 1.5em;
 }
@@ -305,6 +306,46 @@ input, select{
 .toggleInputContainer .toggleInput:checked + .toggleSlider::before {
     transform: translateX(20px);
 }
+
+.nustatymai-divider {
+    width: 100%;
+    border: none;
+    border-bottom: 1px solid var(--light-gray);
+    margin: 0;
+}
+
+.nustatymai-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px; /* lowered vertical and horizontal gap */
+    flex-wrap: wrap;
+}
+
+.nustatymai-inputs {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.nustatymai-subtext {
+    margin-top: 4px; /* smaller vertical gap */
+}
+
+/* Mobile: stack everything in one column */
+@media (max-width: 768px) {
+    .nustatymai-row {
+        flex-direction: column;
+        gap: 6px; /* smaller vertical gap on mobile */
+    }
+    .nustatymai-inputs {
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
+
+
 
 select {
     width: 98%;

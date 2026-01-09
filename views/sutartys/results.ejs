@@ -92,19 +92,17 @@
                         <b> Pirkėjas: </b>
                         <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>"><%= item.perkanciojiOrganizacija %></a>
                     </div>
-    				<% if(!item.papildomiTiekejai || item.papildomiTiekejai.length == 0) { %>
+    				<% if(!item.tiekejai.length == 1) { %>
                         <div>
                             <b> Tiekėjas: </b>
-                            <a href="/asmuo/<%= item.tiekejoKodas %>"><%= item.tiekejas || "Nenurodytas" %></a>
+                            <a href="/asmuo/<%= item.tiekejaiKodai[0] %>"><%= item.tiekejai[0] || "Nenurodytas" %></a>
                         </div>
                     <% } else { %>
                         <div style="display:flex; align-items:flex-start;">
                             <b style="margin-right: 10px;">Tiekėjai:</b>
                             <div style="display:flex; flex-direction:column; gap: 8px;">
-                                <a href="/asmuo/<%= item.tiekejoKodas %>" style="padding-block: 0;"><%= item.tiekejas || "Nenurodytas" %></a>
-
-                                <% for (let i = 0; i < item.papildomiTiekejai.length; i++) { %>
-                                    <a href="/asmuo/<%= item.papildomiTiekejaiKodai[i] %>" style="padding-block: 0;"><%= item.papildomiTiekejai[i] || "Nenurodytas" %></a>
+                                <% for (let i = 0; i < item.tiekejai.length; i++) { %>
+                                    <a href="/asmuo/<%= item.tiekejaiKodai[i] %>" style="padding-block: 0;"><%= item.tiekejai[i] || "Nenurodytas" %></a>
                                 <% } %>
                             </div>
                         </div>

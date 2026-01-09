@@ -105,19 +105,24 @@
                 </div>
             </div>
             <div class="nustatymai-bottom">
-                <hr style="width: 100%; border: none; border-bottom: 1px solid var(--light-gray); margin: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; gap: 32px;">
-                    <%- include('../inputsNew/text', { label: 'Unikalus ID:', name: 'sutartiesUnikalusID', placeholder: 'Nenurodyta', values }) %>
-                    <div>
-                        <%- include('../inputsNew/toggle', {name: 'tikSuDokumentais', label: "Tik su dokumentais", values }) %>
-                        <%- include('../inputsNew/toggle', {name: 'ignoruotiSp', label: "Nerodyti pakeitimų (SP)", values }) %>
+                <hr class="nustatymai-divider" />
+
+                <div class="nustatymai-row">
+                    <div class="nustatymai-inputs">
+                        <%- include('../inputsNew/number', { label: 'Unikalus ID:', name: 'sutartiesUnikalusID', placeholder: 'Nenurodyta', values }) %>
+                        <%- include('../inputsNew/text', { label: 'Sut. numeris:', name: 'sutartiesNumeris', placeholder: 'Nenurodyta', values }) %>
+                    </div>
+
+                    <div class="nustatymai-toggles">
+                        <%- include('../inputsNew/toggle', { name: 'tikSuDokumentais', label: "Tik su dokumentais", values }) %>
+                        <%- include('../inputsNew/toggle', { name: 'ignoruotiSp', label: "Nerodyti pakeitimų (SP)", values }) %>
                     </div>
                 </div>
-                <div>
+
+                <div class="nustatymai-subtext">
                     <p class="subtext"><sup>1</sup> Veikia tik ne tekstinėse paieškose</p>
                 </div>
             </div>
-
         </div>
 
 

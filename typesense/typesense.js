@@ -231,7 +231,7 @@ export async function searchDocuments(query, options = {}) {
         let results = await client.collections(COLLECTION).documents().search({
             q: query,
             query_by:
-                "pavadinimas,perkanciojiOrganizacija,tiekejas,bvpzPavadinimas,papildomiTiekejai,papildomiBvpzPavadinimai",
+                "sutartiesNumeris,pavadinimas,perkanciojiOrganizacija,tiekejas,bvpzPavadinimas,papildomiTiekejai,papildomiBvpzPavadinimai",
             sort_by: sortBy,
             filter_by: filterBy,
             per_page: limit,
@@ -260,7 +260,7 @@ export async function searchDocuments(query, options = {}) {
             .search({
                 q: query,
                 query_by:
-                    "pavadinimas,perkanciojiOrganizacija,tiekejas,bvpzPavadinimas,papildomiTiekejai,papildomiBvpzPavadinimai",
+                    "sutartiesNumeris,pavadinimas,perkanciojiOrganizacija,tiekejas,bvpzPavadinimas,papildomiTiekejai,papildomiBvpzPavadinimai",
                 sort_by: sortBy,
                 filter_by: filterBy,
                 per_page: size,

@@ -28,6 +28,13 @@ export function buildTypesenseFilter(query) {
             },
         },
         {
+            key: "sutartiesNumeris",
+            apply: (val) => {
+                filters.push(`sutartiesNumeris:=${val}`);
+                usedHiddenFields = true;
+            },
+        },
+        {
             key: "sudarymoDataNuo",
             apply: (val) => {
                 const ts = Math.floor(new Date(val).getTime() / 1000);
@@ -60,8 +67,11 @@ export function buildTypesenseFilter(query) {
         {
             key: "sutartiesUnikalusID",
             apply: (val) => {
-                filters.push(`sutartiesUnikalusID:=${parseInt(val, 10)}`);
-                usedHiddenFields = true;
+                const n = Number(val);
+                if (Number.isInteger(n)) {
+                    filters.push(`sutartiesUnikalusID:=${n}`);
+                    usedHiddenFields = true;
+                }
             },
         },
         {
@@ -145,6 +155,16 @@ export function buildPostgresFilter(query, limit, page = 1) {
             },
         },
         {
+            key: "sutartiesNumeris",
+            apply: (val) => {
+                whereClauses.push(
+                    `"sutartiesNumeris" = ${addParam("sutartiesNumeris", val)}`,
+                );
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
             key: "sudarymoDataNuo",
             apply: (val) => {
                 whereClauses.push(
@@ -185,7 +205,9 @@ export function buildPostgresFilter(query, limit, page = 1) {
         {
             key: "sutartiesUnikalusID",
             apply: (val) => {
-                const num = parseInt(val, 10);
+                const num = Number(val);
+                if (!Number.isInteger(num)) return;
+
                 whereClauses.push(
                     `"sutartiesUnikalusId" = ${addParam("sutartiesUnikalusId", num)}`,
                 );

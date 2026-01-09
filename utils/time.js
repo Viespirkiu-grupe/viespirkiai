@@ -7,7 +7,12 @@ import { DateTime } from "luxon";
  * @returns {String|null|undefined} - A formatted date string or the original input if null/undefined.
  */
 export function toLithuanianTime(utcDate) {
-    if (utcDate === null || utcDate === undefined || utcDate === "") {
+    if (
+        utcDate === null ||
+        utcDate === undefined ||
+        utcDate === "" ||
+        utcDate === 0
+    ) {
         return utcDate;
     }
 
