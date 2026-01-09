@@ -26,6 +26,7 @@ tasks.push({
     job: async () => {
         return requestLatestEviesiejipirkimaiData();
     },
+    nextTaskId: "failuParsiuntimas",
 });
 
 // eViesiejiPirkimai.lt failai
@@ -76,7 +77,7 @@ tasks.push({
 import { pravalytiOcrRezervacijas } from "./tasks/ocr/pravalytiRezervacijas.js";
 tasks.push({
     name: "pravalytiOcrRezervacijas",
-    schedule: "*/5 * * * *",
+    schedule: "*/1 * * * *",
     job: async () => {
         return pravalytiOcrRezervacijas();
     },
@@ -551,8 +552,14 @@ tasks.push({
 import { nuskaitytiVienoDokumentoDuomenis } from "./tasks/failai/nuskaitytiTeksta.js";
 
 const runningTasks = new Map();
-function startAsapTask(id, jobFn, cooldownSec = 60, errorCooldownSec = 300) {
-    if (runningTasks.has(id)) return; // already running
+function startAsapTask(
+    id,
+    jobFn,
+    cooldownSec = 60,
+    errorCooldownSec = 300,
+    nextTaskId,
+) {
+    if (runningTasks.has(id)) return;
 
     const controller = { cancelled: false };
     controller.promise = (async function loop() {
@@ -563,14 +570,26 @@ function startAsapTask(id, jobFn, cooldownSec = 60, errorCooldownSec = 300) {
             try {
                 const result = await jobFn();
 
+                // try to start next task immediately if specified
+                if (nextTaskId && !runningTasks.has(nextTaskId)) {
+                    const nextTask = tasks.find((t) => t.name === nextTaskId);
+                    if (nextTask) {
+                        startAsapTask(
+                            nextTask.name,
+                            nextTask.job,
+                            nextTask.cooldown,
+                            nextTask.errorCooldown,
+                            nextTask.nextTask,
+                        );
+                    }
+                }
+
+                // wait cooldown only if job returned false
                 if (result === false) {
-                    // no data → wait normal cooldown
                     await new Promise((r) => setTimeout(r, cooldown));
                 }
-                // if result === true → skip cooldown, run immediately
             } catch (err) {
                 console.error(`ASAP Task ${id} failed:`, err.message);
-                // on error → wait longer cooldown
                 await new Promise((r) => setTimeout(r, errorCooldown));
             }
         }
@@ -637,6 +656,7 @@ for (const task of tasks) {
             task.job,
             task.cooldown ?? 60,
             task.errorCooldown ?? 300,
+            task.nextTaskId ?? null,
         );
     } else {
         // Cron-based tasks
