@@ -220,7 +220,7 @@
 				<section>
 				    <% failas.extension = failas.extension.toLowerCase(); %>
 					<% const libreFormats = ["doc", "docx", "odt", "rtf", "xls", "xlsx", "xlsb", "ods", "ppt", "pptx", "ppsx", "odp", "odg", "pub", "pages", "xlt", "dot", "docm", "dotx"]; %>
-				    <% if(failas.extension === "pdf" || libreFormats.includes(failas.extension)) { %>
+				    <% if(failas.extension === "pdf" || failas.extension === "prn" || libreFormats.includes(failas.extension)) { %>
                     <% let pdfSearch = query.search || ''; %>
   				    <div>
                           <a href="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(pdfSearch) %>">↗ Padidinti</a>
@@ -368,7 +368,7 @@
                               style="border: none; margin-top: 16px;"
                             ></iframe>
                         </div>
-                    <% } else if(failas.extension == "eml" || failas.extension == "msg") { %>
+                    <% } else if((failas.extension == "eml" || failas.extension == "msg") && failas.metaduomenys) { %>
                         <div>
                             <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
@@ -381,7 +381,7 @@
                             <div>
                                 <h2 style="margin-block: 0;"><u><%= failas.metaduomenys.subject || "-" %></u></h2><br>
 
-                                <b>Nuo:</b> <%= failas.metaduomenys.from.name || "-" %> &lt;<a href="mailto:<%= failas.metaduomenys.from.email || "-" %>"><%= failas.metaduomenys.from.email || "-" %></a>&gt;<br>
+                                <b>Nuo:</b> <%= failas.metaduomenys?.from?.name || "-" %> &lt;<a href="mailto:<%= failas.metaduomenys?.from?.email || "-" %>"><%= failas.metaduomenys.from.email || "-" %></a>&gt;<br>
                                 <% if(!Array.isArray(failas.metaduomenys.to)) { %>
                                     <b>Kam:</b> <%= failas.metaduomenys.to.name || "-" %> &lt;<a href="mailto:<%= failas.metaduomenys.to.email || "-" %>"><%= failas.metaduomenys.to.email || "-" %></a>&gt;<br>
                                 <% } else { %>
@@ -395,21 +395,26 @@
                                 <% if(failas.metaduomenys.html){ %>
                                     <div style="margin-top: 16px; padding: 8px; border-radius: 4px;">
                                         <iframe
-                                            srcdoc="<%= failas.metaduomenys.html.replace(/"/g, '&quot;') %>"
+                                            srcdoc="<%= String(failas.metaduomenys.html).replace(/"/g, '&quot;') %>"
                                             width="100%"
                                             height="400"
                                             style="border: none;"
                                         ></iframe>
                                     </div>
                                 <% } else { %>
-                                    <div style="font-family: monospace; white-space: pre-wrap; word-wrap: break-word; margin-top: 16px; border-top: 1px solid var(--gray); padding-top: 16px;"><%= failas.metaduomenys.text || failas.metaduomenys.body %></div>
+                                    <div style="font-family: monospace; white-space: pre-wrap; word-wrap: break-word; margin-top: 16px; border-top: 1px solid var(--gray); padding-top: 16px;">
+                                        <%- (failas.metaduomenys.text || failas.metaduomenys.body || "")
+                                            .replace(/</g, "&lt;")
+                                            .replace(/>/g, "&gt;")
+                                            .replace(/\r?\n/g, "<br>") %>
+                                    </div>
                                 <% } %>
 
                                 <% if(failas.metaduomenys.attachments) { %>
                                     <h2>Priedai</h2>
                                     <% failas.metaduomenys.attachments.forEach(attachment => { %>
                                         <div style="margin-top: 8px;">
-                                            <a href="#">
+                                            <a href="https://failai.viespirkiai.org/<%= failas.id %>/<%= attachment.name %>" target="_blank">
                                                 <%= attachment.name %>
                                             </a>
                                         </div>
