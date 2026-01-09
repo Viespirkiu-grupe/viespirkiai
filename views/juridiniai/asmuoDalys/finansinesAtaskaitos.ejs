@@ -112,30 +112,32 @@
                  </section>
          </div>
 
-         <table style="width: auto;">
-             <thead>
-                 <tr>
-                     <th>Eilutė</th>
-                     <% asmuo.finansai.lentele.metai.forEach(function(year) { %>
-                         <th><%= year %></th>
-                     <% }); %>
-                 </tr>
-             </thead>
-             <tbody>
-                 <% for (let lineName in asmuo.finansai.lentele.duomenys) { %>
-                     <tr>
-                         <td><%= lineName %></td>
-                         <% asmuo.finansai.lentele.duomenys[lineName].forEach(function(value) { %>
-                            <% if(lineName == "Pelningumas"){ %>
-                                 <td class="center"><span style="display: inline-block; padding: 4px;"><%= (value !== undefined && value !== null) ? (value).toFixed(2) + '%' : '–' %></span></td>
-                            <% } else { %>
-                                <td class="center"><span style="display: inline-block; padding: 4px;"><%= (value !== undefined && value !== null) ? value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) : '–' %></span></td>
-                            <% } %>
-                         <% }); %>
-                     </tr>
-                 <% } %>
-             </tbody>
-         </table>
+         <div class="tableContainer">
+            <table style="width: auto;">
+                <thead>
+                    <tr>
+                        <th>Eilutė</th>
+                        <% asmuo.finansai.lentele.metai.forEach(function(year) { %>
+                            <th><%= year %></th>
+                        <% }); %>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% for (let lineName in asmuo.finansai.lentele.duomenys) { %>
+                        <tr>
+                            <td><%= lineName %></td>
+                            <% asmuo.finansai.lentele.duomenys[lineName].forEach(function(value) { %>
+                                <% if(lineName == "Pelningumas"){ %>
+                                    <td class="center"><span style="display: inline-block; padding: 4px;"><%= (value !== undefined && value !== null) ? (value).toFixed(2) + '%' : '–' %></span></td>
+                                <% } else { %>
+                                    <td class="center"><span style="display: inline-block; padding: 4px;"><%= (value !== undefined && value !== null) ? value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) : '–' %></span></td>
+                                <% } %>
+                            <% }); %>
+                        </tr>
+                    <% } %>
+                </tbody>
+            </table>
+         </div>
 
          <% if(queryParams.finansaiLimit == "max") {queryParams.finansaiLimit = 10000000} %>
          <% let finansaiLimit = queryParams.finansaiLimit || 1; %>
