@@ -1,6 +1,7 @@
 import express from "express";
 import { postgres, parsePgArray } from "../postgres/postgres.js";
 import { Readable } from "stream";
+import { Buffer } from "buffer";
 import mime from "mime";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 import config from "../utils/config.js";
@@ -61,9 +62,9 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
                 `WITH cte AS (
           SELECT id
           FROM failai
-          WHERE "ocrState" IS NULL
+          WHERE ("ocrState" IS NULL OR "ocrState" = 0)
             AND "nuskaitytas" >= 6
-            AND LOWER("extension") IN ('pdf', 'jpg', 'jpeg', 'png', 'bmp', 'gif', 'odg', 'pub', 'webp', 'heic')
+            AND LOWER("extension") IN ('pdf', 'jpg', 'jpeg', 'png', 'bmp', 'gif', 'odg', 'pub', 'webp', 'heic', 'docx', 'pub', 'doc', 'odt', 'docm', 'rtf', 'pptx', 'odg', 'ppt', 'dotx', 'pages', 'ppsx')
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         )
@@ -105,19 +106,7 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
     const failas = failasRes.rows[0];
 
     let urlParams = [];
-    if (
-        [
-            "jpg",
-            "jpeg",
-            "png",
-            "bmp",
-            "gif",
-            "odg",
-            "pub",
-            "webp",
-            "heic",
-        ].includes(String(failas.extension).toLowerCase())
-    ) {
+    if (!failas.extension || String(failas.extension).toLowerCase() !== "pdf") {
         urlParams.push("convertTo=pdf");
     }
 
@@ -127,8 +116,6 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
     }
 
     const uri = `/${failas.md5}${urlParamsString}`;
-
-    console.log(uri);
 
     res.json({
         id: failas.id,
@@ -389,7 +376,7 @@ failasRouter.get("/failas/:id/preview", async (req, res, next) => {
     }
 
     let argumentai = [];
-    if (String(failas.extension).toLowerCase() !== "pdf") {
+    if (!["pdf", "prn"].includes(String(failas.extension).toLowerCase())) {
         argumentai.push("convertTo=pdf");
     }
 
@@ -589,6 +576,27 @@ failasRouter.get("/failas/:dokId/:fileId", async (req, res, next) => {
         });
     }
 
+    if (failas?.metaduomenys?.attachments) {
+        failas.metaduomenys.attachments.forEach((attachment) => {
+            if (/=\?UTF-8\?Q\?.+\?=/i.test(attachment.name)) {
+                attachment.name = attachment.name.replace(
+                    /=\?UTF-8\?Q\?(.+?)\?=/i,
+                    (_, encoded) => {
+                        // replace underscores with spaces
+                        const qp = encoded.replace(/_/g, " ");
+                        // convert =XX to bytes
+                        const bytes = qp.replace(
+                            /=([0-9A-Fa-f]{2})/g,
+                            (_, hex) => String.fromCharCode(parseInt(hex, 16)),
+                        );
+                        // decode UTF-8 properly
+                        return Buffer.from(bytes, "binary").toString("utf8");
+                    },
+                );
+            }
+        });
+    }
+
     if (failas?.ocrText) {
         failas.ocrText = parsePgArray(failas.ocrText);
     }
@@ -651,6 +659,27 @@ failasRouter.get("/failas/:id", async (req, res, next) => {
             if (sig.signerFullDistinguishedName) {
                 sig.signerFullDistinguishedName =
                     sig.signerFullDistinguishedName.replace(/\d{4,}/g, "");
+            }
+        });
+    }
+
+    if (failas?.metaduomenys?.attachments) {
+        failas.metaduomenys.attachments.forEach((attachment) => {
+            if (/=\?UTF-8\?Q\?.+\?=/i.test(attachment.name)) {
+                attachment.name = attachment.name.replace(
+                    /=\?UTF-8\?Q\?(.+?)\?=/i,
+                    (_, encoded) => {
+                        // replace underscores with spaces
+                        const qp = encoded.replace(/_/g, " ");
+                        // convert =XX to bytes
+                        const bytes = qp.replace(
+                            /=([0-9A-Fa-f]{2})/g,
+                            (_, hex) => String.fromCharCode(parseInt(hex, 16)),
+                        );
+                        // decode UTF-8 properly
+                        return Buffer.from(bytes, "binary").toString("utf8");
+                    },
+                );
             }
         });
     }
