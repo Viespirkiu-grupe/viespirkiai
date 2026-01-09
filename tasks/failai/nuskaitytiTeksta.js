@@ -125,7 +125,7 @@ const REFILL_THRESHOLD = 5;
 const BUCKET_SIZE = 1000;
 const IN_PROGRESS_TIMEOUT = 10 * 60 * 1000; // 10 min
 
-const nuskaitymoVersija = 7;
+const nuskaitymoVersija = 8;
 
 // In-memory tracking
 let kibirelis = [];
@@ -153,9 +153,10 @@ async function fillBucket() {
                AND (nuskaitytas IS NULL OR nuskaitytas >= 0)
                AND parsiustas = 1
                AND LOWER(extension) = ANY(ARRAY[
-                     'pdf','prn','docx','odt','docm','dotx','doc','dot','rtf',
+                     'pdf','prn','docx','odt','docm','dotx','doc','dot','rtf', 'pages',
                      'xlsx','xlsm','xlsb','xls','csv','pptx','ppsx','ppt',
-                     'zip','txt','url','msg','eml','7z'
+                     'zip', 'adoc', 'bdoc', 'edoc', 'txt','url','msg','eml','7z', 'jpg', 'jpeg',
+                     'png', 'tif', 'tiff', 'odg', 'pub'
                  ])
                  ORDER BY nuskaitytas NULLS FIRST
              LIMIT $2`,
@@ -232,8 +233,8 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         return false;
     }
 
-    let url = `https://failai-direct.viespirkiai.top/${dokumentas.md5}`;
-    let viesasUrl = `https://failai.viespirkiai.top/${dokumentas.md5}`;
+    let url = `https://failai.viespirkiai.org/${dokumentas.md5}`;
+    let viesasUrl = `https://failai.viespirkiai.org/${dokumentas.md5}`;
 
     log(viesasUrl);
 
