@@ -5,15 +5,6 @@
     <h4>Atliktos užklausos</h4>
     <p><%= Number(statistika.database.xact_commit).toLocaleString('lt-LT') %></p>
 
-    <h4>Cache'ingas</h4>
-    <%
-    const hits = BigInt(statistika.database.blks_hit);
-    const reads = BigInt(statistika.database.blks_read);
-    const total = hits + reads;
-    const rate = total === 0n ? 0 : Number(hits * 100n / total);
-    %>
-    <p>Cache hit rate: <%= rate.toFixed(2) %>% (<%= hits.toLocaleString('lt-LT') %> / <%= total.toLocaleString('lt-LT') %> blocks)</p>
-
     <h4>Įterptos eilutės</h4>
     <p><%= Number(statistika.database.tup_inserted).toLocaleString('lt-LT') %></p>
 
