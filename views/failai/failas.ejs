@@ -57,7 +57,11 @@
                                     <a href="/neskelbiamos">Neskelbiamos derybos</a>
                                     <% originalusLinkas = `https://eviesiejipirkimai.lt/${failas.saltinioId}`; %>
                                     <% originalusLinkasPavadinimas = "CVP IS"; %>
-                               <% } %>
+                                <% } else if(failas.saltinis == "archive") { %>
+                                    <a href="/failas/<%= failas.parent %>">Archyvo <%= failas.parent %> viduje</a>
+                                    <% originalusLinkas = `/failas/${failas.parent}`; %>
+                                    <% originalusLinkasPavadinimas = "Šaltinis"; %>
+                                <% } %>
                            </div>
                        </div>
                     </div>
