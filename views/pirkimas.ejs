@@ -6,8 +6,8 @@
                       .toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                       + " € " + purchase.pavadinimas,
           pageDescription: `Sutartis nr. ${purchase.sutartiesNumeris}
-Sudaryta: ${new Date(purchase.sudarymoData).toISOString().slice(0,10)}
-Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
+Sudaryta: ${new String(purchase.sudarymoData).slice(0,10)}
+Galioja iki: ${new String(purchase.galiojimoData).slice(0,10)}`,
           pageImage: `https://viespirkiai.org/pirkimas/${purchase.sutartiesUnikalusID}.png`,
           pageAuthor: purchase.perkanciojiOrganizacija,
           customHead
@@ -49,8 +49,17 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
 				<% if(!purchase.papildomiTiekejai || purchase.papildomiTiekejai.length == 0) { %>
                     <div>
     					<h2><u>Tiekėjas</u></h2>
+                        <% if(purchase.tiekejasPatikslinimas && purchase.tiekejasPatikslinimas != purchase.tiekejas){ %>
+                            <div>
+                                <%= purchase.tiekejasPatikslinimas %>
+                            </div>
+                        <% } %>
     					<h3><a href="/asmuo/<%= purchase.tiekejoKodas %>"> <%= purchase.tiekejas %> </a> </h3>
+                        <% if(purchase.tiekejasSalis){ %>
+                            <%= purchase.tiekejasSalis %>
+                        <% } %>
     					<pre><%= purchase.tiekejoKodas %></pre>
+
     				</div>
 				<% } else { %>
                     <div>
@@ -102,11 +111,11 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
                         <div class="col-2" style="row-gap: 8px;">
                             <section>
                                 <h4>Sudaryta</h4>
-                                <%= new Date(purchase.sudarymoData).toISOString().slice(0,10) %>
+                                <%= new String(purchase.sudarymoData).slice(0,10) %>
                             </section>
                             <section>
                                 <h4>Galioja iki</h4>
-                                <%= new Date(purchase.galiojimoData).toISOString().slice(0,10) %>
+                                <%= new String(purchase.galiojimoData).slice(0,10) %>
                             </section>
                             <section>
                                 <h4>Faktinė įvykdymo data</h4>
@@ -214,8 +223,8 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
                                     <span><%= item.sutartiesNumeris %></span>
                                     <span>
                                         <% if(item.sutartiesPasirasymoData && item.sutartiesGaliojimoData) {  %>
-                                            <% let sutartiesPasirasymoData = new Date(item.sutartiesPasirasymoData).toISOString().slice(0,10); %>
-                                            <% let sutartiesGaliojimoData = new Date(item.sutartiesGaliojimoData).toISOString().slice(0,10); %>
+                                            <% let sutartiesPasirasymoData = new String(item.sutartiesPasirasymoData).slice(0,10); %>
+                                            <% let sutartiesGaliojimoData = new String(item.sutartiesGaliojimoData).slice(0,10); %>
 
                                             <% if(sutartiesPasirasymoData == sutartiesGaliojimoData) { %>
                                                 Sut. <%= sutartiesPasirasymoData %>
@@ -297,8 +306,8 @@ Galioja iki: ${new Date(purchase.galiojimoData).toISOString().slice(0,10)}`,
                                     <span><%= item.kategorija %></span>
                                     <span>
                                         <% if(item.sudarymoData && item.galiojimoData) {  %>
-                                            <% let sudarymoData = new Date(item.sudarymoData).toISOString().slice(0,10); %>
-                                            <% let galiojimoData = new Date(item.galiojimoData).toISOString().slice(0,10); %>
+                                            <% let sudarymoData = new String(item.sudarymoData).slice(0,10); %>
+                                            <% let galiojimoData = new String(item.galiojimoData).slice(0,10); %>
 
                                             <% if(sudarymoData == galiojimoData) { %>
                                                 Sut. <%= sudarymoData %>

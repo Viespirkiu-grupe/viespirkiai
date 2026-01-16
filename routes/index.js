@@ -301,8 +301,8 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
 
         const formatDate = (value) => {
             if (!value) return "";
-            const date = new Date(value);
-            return isNaN(date) ? "" : date.toISOString().split("T")[0];
+            // If value is already a string like "2025-12-31" or "2025-12-31 00:00:00"
+            return value.toString().slice(0, 10);
         };
 
         const header =

@@ -35,8 +35,8 @@
                     <dd>
                     <abbr aria-hidden="true" title="Sutarties galiojimas">Sut.</abbr>
                     <% if(item.sudarymoData && item.galiojimoData) {  %>
-                        <% let sudarymoData = new Date(item.sudarymoData).toISOString().slice(0,10); %>
-                        <% let galiojimoData = new Date(item.galiojimoData).toISOString().slice(0,10); %>
+                        <% let sudarymoData = new String(item.sudarymoData).slice(0,10); %>
+                        <% let galiojimoData = new String(item.galiojimoData).slice(0,10); %>
 
                         <% if(sudarymoData == galiojimoData) { %>
                         <time datetime="<%= sudarymoData %>"><%= sudarymoData %></time>
