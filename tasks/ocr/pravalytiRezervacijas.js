@@ -29,7 +29,12 @@ export async function pravalytiOcrRezervacijas() {
         [limit],
     );
 
-    return res.rowCount;
+    if (res.rowCount > 0) {
+        log(`Išvalytos ${res.rowCount} OCR rezervacijos`);
+        return true;
+    } else {
+        return false;
+    }
 }
 
 // jei vykdomas tiesiogiai
@@ -39,6 +44,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         do {
             updated = await pravalytiOcrRezervacijas();
             log(`Išvalytos ${updated} rezervuotos OCR užduotys.`);
-        } while (updated > 0);
+        } while (updated);
     })();
 }

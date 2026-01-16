@@ -77,7 +77,9 @@ tasks.push({
 import { pravalytiOcrRezervacijas } from "./tasks/ocr/pravalytiRezervacijas.js";
 tasks.push({
     name: "pravalytiOcrRezervacijas",
-    schedule: "*/1 * * * *",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
     job: async () => {
         return pravalytiOcrRezervacijas();
     },
