@@ -39,26 +39,8 @@
             </div>
 
 			<section>
-				<h2>Duomenų eksportai</h2>
-				<table style="width: auto; min-width: auto;">
-					<thead>
-						<tr>
-							<th>Pavadnimas</th>
-							<th>Data</th>
-							<th>Dydis</th>
-						</tr>
-					</thead>
-					<tbody>
-						<% eksportai.forEach(eksportas => { %>
-							<tr>
-								<td><a href="/eksportai/<%= eksportas.id %>"><%= eksportas.pavadinimas %></a></td>
-								<td class="center" style="width: 10ch;"><%= new Date(eksportas.data).toLocaleDateString('lt-LT') %></td>
-								<td class="center" style="width: 10ch;"><%= eksportas.dydisMB %> MB</td>
-							</tr>
-						<% }); %>
-					</tbody>
-				</table>
-				Nėra norimo duomenų eksporto? <a href="/kontaktai">Susisiekite</a>.
+                <h2 id="duomenu-eksportas">Duomenų eksportai</h2>
+				<a href="/kontaktai">Susisiekite</a>
 			</section>
 			<br>
 
@@ -106,7 +88,14 @@
 					</section>
 					<section>
              			<h3>Viešųjų pirkimų duomenys</h3>
-             			<a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109">CVP IS / Viešųjų pirkimų tarnyba </a>
+             			<a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109">CVP IS (sena) / Viešųjų pirkimų tarnyba </a><br>
+             			<a href="https://viesiejipirkimai.lt">CVP IS (nauja) / Viešųjų pirkimų tarnyba </a><br>
+             			<a href="https://vpt.lrv.lt/lt/statistika-ir-analize/pirkimu-ir-sutarciu-duomenys-1/sutarciu-duomenys/">Sutarčių duomenys / Viešųjų pirkimų tarnyba </a><br>
+             			<a href="https://eviesiejipirkimai.lt/index.php?option=com_profile&Itemid=86&task=sutikimai&Itemid=98">Neskelbiamos darybos / Viešųjų pirkimų tarnyba </a><br>
+             			<a href="https://vpt.lrv.lt/lt/nuorodos/kiti-duomenys/powerbi/melaginga-informacija-pateikusiu-tiekeju-sarasas-3/">Melagingą informaciją pateikusių tiekėjų sąrašas / Viešųjų pirkimų tarnyba </a><br>
+             			<a href="https://vpt.lrv.lt/lt/nuorodos/kiti-duomenys/powerbi/nepatikimi-tiekejai-1/">Nepatikimų tiekėjų sąrašas / Viešųjų pirkimų tarnyba </a>
+
+
               		</section>
 					<section>
 					    <h3>Adresų koordinatės</h3>
@@ -117,6 +106,14 @@
 						<h4>Vietovių liknsniavimas</h4>
 						<a href="https://data.gov.lt/datasets/1287/">Registrų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
 					</section>
+					<section>
+             			<h3>Domenų savininkai</h3>
+             			<a href="https://www.domreg.lt/">Kauno technologijos universiteto Interneto paslaugų centras / DOMREG</a>
+              		</section>
+   					<section>
+             			<h3>SABIS sąskaitos</h3>
+             			<a href="https://data.gov.lt/datasets/3924/">Nacionalinis bendrųjų funkcijų centras / data.gov.lt</a> (<a href="https://creativecommons.org/licenses/by/4.0/deed.lt">Creative Commons Attribution 4.0</a>)
+               	    </section>
 				</div>
 			</section>
 			<br>
