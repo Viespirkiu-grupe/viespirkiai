@@ -88,7 +88,11 @@ export async function gautiStatistika() {
             visi: counts.visi,
             klaida: counts.klaida,
             parsiusti: counts.parsiusti,
-            neparsiusti: counts.visi - counts.parsiusti - counts.klaida,
+            neparsiusti:
+                counts.visi -
+                counts.parsiusti -
+                counts.klaida -
+                counts.extracted,
         },
         dydziai: {
             visi: (counts.dydis / counts.parsiusti) * counts.visi,
@@ -96,7 +100,10 @@ export async function gautiStatistika() {
             parsiusti: counts.dydis,
             neparsiusti:
                 (counts.dydis / counts.parsiusti) *
-                (counts.visi - counts.parsiusti - counts.klaida),
+                (counts.visi -
+                    counts.parsiusti -
+                    counts.klaida -
+                    counts.extracted),
         },
     };
 
@@ -128,12 +135,10 @@ export async function gautiStatistika() {
             vidurkis: counts.zodziuSuma / counts.zodziuKiekis,
             failaiSuZodziais: counts.zodziuKiekisNeNulis,
             failaiBeZodziu:
-                statistika.failai.kiekiai.parsiusti -
-                counts.zodziuKiekisNeNulis,
+                statistika.failai.kiekiai.visi - counts.zodziuKiekisNeNulis,
             vidurkisNeNulis: counts.zodziuSuma / counts.zodziuKiekisNeNulis,
             failuSuZodziaisDalis:
-                (counts.zodziuKiekisNeNulis /
-                    statistika.failai.kiekiai.parsiusti) *
+                (counts.zodziuKiekisNeNulis / statistika.failai.kiekiai.visi) *
                 100,
         },
     };
@@ -146,8 +151,7 @@ export async function gautiStatistika() {
             return {
                 status,
                 kiekis,
-                procentai:
-                    (kiekis / statistika.failai.kiekiai.parsiusti) * 100 || 0,
+                procentai: (kiekis / statistika.failai.kiekiai.visi) * 100 || 0,
             };
         })
         .sort((a, b) => {

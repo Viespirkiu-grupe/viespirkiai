@@ -18,33 +18,41 @@
         </main>
         <%- include('../footer.ejs') %>
         <script>
-            let evtSource = null;
-            const button = document.getElementById("liveUpdate");
+        let evtSource = null;
+        const button = document.getElementById("liveUpdate");
 
-            button.addEventListener("click", () => {
-                if (evtSource) {
-                    // Stop SSE updates
-                    evtSource.close();
-                    evtSource = null;
-                    button.textContent = "Tiesioginis atnaujinimas (įjungti)";
-                    return;
-                }
+        const startSSE = () => {
+            evtSource = new EventSource("/statistika/sse");
 
-                // Start SSE live updates
-                evtSource = new EventSource("/statistika/sse");
+            evtSource.onmessage = (e) => {
+                const html = JSON.parse(e.data);
+                Idiomorph.morph(document.querySelector(".replacableContent"), html);
+            };
 
-                evtSource.onmessage = (e) => {
-                    const html = JSON.parse(e.data);
-                    Idiomorph.morph(document.querySelector(".replacableContent"), html);
-                };
+            evtSource.onerror = () => {
+                console.warn("SSE connection lost, attempting reconnect...");
+                evtSource.close();
+                evtSource = null;
+                // Retry after 2 seconds if still toggled on
+                setTimeout(() => {
+                    if (button.textContent.includes("išjungti")) startSSE();
+                }, 2000);
+            };
+        };
 
-                evtSource.onerror = () => {
-                    console.warn("SSE connection lost, attempting reconnect...");
-                };
+        button.addEventListener("click", () => {
+            if (evtSource) {
+                // Stop SSE updates
+                evtSource.close();
+                evtSource = null;
+                button.textContent = "Tiesioginis atnaujinimas (įjungti)";
+                return;
+            }
 
-                button.textContent = "Tiesioginis atnaujinimas (išjungti)";
-            });
+            // Start SSE live updates
+            button.textContent = "Tiesioginis atnaujinimas (išjungti)";
+            startSSE();
+        });
         </script>
-
     </body>
 </html>

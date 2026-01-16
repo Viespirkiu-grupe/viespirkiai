@@ -3,32 +3,44 @@ Failus nuskaitytus su klaidomis (-1) nustato kaip nenučítytus (0)
 */
 
 import { postgres } from "../../postgres/postgres.js";
+import { log } from "../../utils/log.js";
 
-export async function nuskaitytiPakartotinai(kiekis = 100) {
+async function nuskaitytiPakartotinai(kiekis = 10, workerId) {
+    const query = `
+        WITH to_update AS (
+            SELECT id
+            FROM failai
+            WHERE nuskaitytas = -1 OR nuskaitytas = -4
+            LIMIT $1
+            FOR UPDATE SKIP LOCKED
+        )
+        UPDATE failai f
+        SET nuskaitytas = 0
+        FROM to_update t
+        WHERE f.id = t.id;
+    `;
+
     try {
-        let query = `WITH to_update AS (
-      SELECT id
-      FROM failai
-      WHERE nuskaitytas = -1 OR nuskaitytas = -4
-      LIMIT $1
-  )
-  UPDATE failai f
-  SET nuskaitytas = 0
-  FROM to_update t
-  WHERE f.id = t.id;`;
-
-        // Return true if any rows were updated, false if not
-        let updateRes = await postgres.query(query, [kiekis]);
-        console.log(`Updated ${updateRes.rowCount}`);
-        return updateRes.rowCount > 0;
+        const res = await postgres.query(query, [kiekis]);
+        if (res.rowCount > 0) {
+            log(`Worker ${workerId} updated ${res.rowCount}`);
+        }
+        return res.rowCount; // number of rows updated
     } catch (err) {
-        console.error(err);
-        return true;
+        console.error(`Worker ${workerId} error:`, err);
+        return 0;
     }
 }
 
-while (await nuskaitytiPakartotinai()) {
-    // Repeat
+async function worker(workerId) {
+    while ((await nuskaitytiPakartotinai(10, workerId)) > 0) {
+        // keep processing until no rows left
+    }
 }
 
-postgres.end();
+const CONCURRENCY = 5;
+
+// start 5 concurrent workers with IDs 1..5
+await Promise.all(Array.from({ length: CONCURRENCY }, (_, i) => worker(i + 1)));
+
+await postgres.end();

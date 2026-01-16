@@ -149,16 +149,15 @@ async function fillBucket() {
         const res = await postgres.query(
             `SELECT *
              FROM failai
-             WHERE (nuskaitytas IS NULL OR nuskaitytas < $1)
+             WHERE parsiustas IN (1, -5)
+                AND LOWER(extension) = ANY(ARRAY[
+                   'pdf','prn','docx','odt','docm','dotx','doc','dot','rtf', 'pages',
+                   'xlsx','xlsm','xlsb','xls','csv','pptx','ppsx','ppt',
+                   'zip', 'adoc', 'bdoc', 'edoc', 'txt','url','msg','eml','7z', 'jpg', 'jpeg',
+                   'png', 'tif', 'tiff', 'odg', 'pub'
+               ])
                AND (nuskaitytas IS NULL OR nuskaitytas >= 0)
-               AND parsiustas = 1
-               AND LOWER(extension) = ANY(ARRAY[
-                     'pdf','prn','docx','odt','docm','dotx','doc','dot','rtf', 'pages',
-                     'xlsx','xlsm','xlsb','xls','csv','pptx','ppsx','ppt',
-                     'zip', 'adoc', 'bdoc', 'edoc', 'txt','url','msg','eml','7z', 'jpg', 'jpeg',
-                     'png', 'tif', 'tiff', 'odg', 'pub'
-                 ])
-                 ORDER BY nuskaitytas NULLS FIRST
+               AND (nuskaitytas IS NULL OR nuskaitytas < $1)
              LIMIT $2`,
             [nuskaitymoVersija, limit * 2], // fetch extra to avoid duplicates
         );
@@ -265,7 +264,8 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             try {
                 await postgres.query(
                     `UPDATE failai
-                           SET nuskaitytas = $1
+                           SET nuskaitytas = $1,
+                           "nuskaitymasTimestamp" = NOW()
                            WHERE id = $2;`,
                     [kodas, dokumentas.id],
                 );
@@ -308,6 +308,68 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     }
     log(`${dokumentas.id} - ${dokumentas.ocrState} o ocr ${reikalingasOcr}`);
 
+    if (
+        ["zip", "7z"].includes(dokumentas.extension) &&
+        dokumentas.parent === null
+    ) {
+        let children = [];
+        // Flatten metada.filesTree if it exists on children, do not add isDirectory=true, files that begin with . or _
+        if (metadata.filesTree && Array.isArray(metadata.filesTree)) {
+            const flattenFiles = (files) => {
+                for (const file of files) {
+                    if (file.isDirectory && Array.isArray(file.children)) {
+                        flattenFiles(file.children);
+                    } else {
+                        if (
+                            !file.name.startsWith(".") &&
+                            !file.name.startsWith("_")
+                        ) {
+                            children.push({
+                                pavadinimas: file.name,
+                                extension: file.name.includes(".")
+                                    ? file.name.split(".").pop().toLowerCase()
+                                    : "",
+
+                                dydis: file.size || 0,
+                                md5: file.md5,
+                                saltinioId: file.path,
+                                parent: dokumentas.id,
+                                parsiustas: -5, // Extracted, no need to download
+                                saltinis: "archive",
+                            });
+                        }
+                    }
+                }
+            };
+            flattenFiles(metadata.filesTree);
+        }
+
+        // Insert into postgres
+        for (const child of children) {
+            console.log(child);
+
+            await postgres.query(
+                `INSERT INTO failai (
+                    pavadinimas, extension, dydis, md5,
+                    "saltinioId", parent, parsiustas, saltinis
+                ) VALUES (
+                   $1, $2, $3, $4, $5, $6, $7, $8
+                )
+                ON CONFLICT ("saltinioId", parent) WHERE saltinis = 'archive' DO NOTHING;`,
+                [
+                    child.pavadinimas,
+                    child.extension,
+                    child.dydis,
+                    child.md5,
+                    child.saltinioId,
+                    child.parent,
+                    child.parsiustas,
+                    child.saltinis,
+                ],
+            );
+        }
+    }
+
     // Update the row
     await postgres.query(
         `UPDATE failai
@@ -324,7 +386,8 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             telefonai = $11,
             "hasSloppyRedactions" = $12,
             "simboliuSkaicius" = $13,
-            "ocrState" = $14
+            "ocrState" = $14,
+            "nuskaitymasTimestamp" = NOW()
         WHERE id = $15;`,
         [
             nuskaitymoVersija,

@@ -305,8 +305,62 @@ failasRouter.get(
             return res.status(404).send("Failas nepavykęs parsiųsti.");
         }
 
-        // Randame dėžę
+        if (failas.parent || failas.parsiustas === -5) {
+            let parentRes = await postgres.query(
+                "SELECT * FROM failai WHERE id = $1 LIMIT 1;",
+                [failas.parent],
+            );
+            if (parentRes.rows.length === 0) {
+                return res.status(404).send("Tėvinis failas nerastas.");
+            }
 
+            const dezeRes = await postgres.query(
+                "SELECT * FROM dezes WHERE pavadinimas = $1 LIMIT 1",
+                [parentRes.rows[0].saugojama],
+            );
+
+            if (dezeRes.rows.length === 0) {
+                return res.status(404).send("Dėžė nerasta.");
+            }
+
+            const deze = dezeRes.rows[0];
+
+            if (
+                ["zip"].includes(
+                    String(parentRes.rows[0].extension).toLowerCase(),
+                )
+            ) {
+                return res.json({
+                    fileUrl: `${deze.url}/file/${parentRes.rows[0].md5}.${parentRes.rows[0].extension}?extract=${encodeURIComponent(failas.saltinioId)}`,
+                    extension: failas.extension,
+                    fileName: failas.pavadinimas,
+                    contentType:
+                        mime.getType(failas.extension) ||
+                        "application/octet-stream",
+                    contentLength: Number(failas.dydis) || undefined,
+                });
+            }
+
+            // Provide the reverse proxy information
+            return res.json({
+                fileUrl: `${deze.url}/file/${parentRes.rows[0].md5}.${parentRes.rows[0].extension}`,
+                extract: `${failas.saltinioId}`,
+                extension: failas.extension,
+                fileName: failas.pavadinimas,
+                containerExtension: String(
+                    parentRes.rows[0].extension,
+                ).toLowerCase(),
+                contentType:
+                    mime.getType(failas.extension) ||
+                    "application/octet-stream",
+                contentLength: Number(failas.dydis) || undefined,
+                headers: {
+                    "x-api-key": deze.apiKey,
+                },
+            });
+        }
+
+        // Randame dėžę
         const dezeRes = await postgres.query(
             "SELECT * FROM dezes WHERE pavadinimas = $1 LIMIT 1",
             [failas.saugojama],

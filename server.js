@@ -1,8 +1,8 @@
 import cluster from "cluster";
 import config from "./utils/config.js";
+import http from "http";
 
 const WORKERS_COUNT = 4;
-
 const PORT = config.port || 8000;
 
 if (cluster.isPrimary) {
@@ -17,9 +17,17 @@ if (cluster.isPrimary) {
         cluster.fork();
     });
 } else {
-    import("./index.js").then(({ default: app }) => {
-        app.listen(PORT, () => {
+    // dynamic import in an async IIFE
+    (async () => {
+        const { default: app } = await import("./index.js");
+
+        const server = http.createServer(app);
+
+        // set 24h max request duration
+        server.setTimeout(24 * 60 * 60 * 1000);
+
+        server.listen(PORT, () => {
             console.log(`Worker ${process.pid} running on port ${PORT}`);
         });
-    });
+    })();
 }

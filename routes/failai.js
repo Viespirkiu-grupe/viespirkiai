@@ -216,6 +216,34 @@ failaiSearchRouter.get(
     },
 );
 
+failaiSearchRouter.get("/failai/statistika/sse", async (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    res.write("retry: 1000\n\n"); // client reconnect delay (ms)
+
+    let running = true;
+    req.on("close", () => (running = false));
+
+    const sendUpdate = async () => {
+        const statistika = await gautiStatistika();
+
+        req.app.render("failai/statistika", { statistika }, (err, html) => {
+            if (err) {
+                console.error("Rendering error:", err);
+                return;
+            }
+            res.write(`data: ${JSON.stringify(html)}\n\n`);
+        });
+    };
+
+    const interval = setInterval(async () => {
+        if (!running) return clearInterval(interval);
+        await sendUpdate();
+    }, 250);
+});
+
 function makeExcerpt(text = "", searchTerm = "", maxChars = 250, leading = 25) {
     let regex;
 
