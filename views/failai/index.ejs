@@ -17,14 +17,13 @@
                 <% if(typeof data !== "undefined") { %>
     			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti, search}) %>
                 <% } else { %>
-                    <script>
-                      window.addEventListener('DOMContentLoaded', () => {
-                        const search = document.getElementById('search');
-                        if (search) search.focus();
-                      });
-                    </script>
              		<%- include('statistika.ejs') %>
                     <script>
+                        window.addEventListener('DOMContentLoaded', () => {
+                          const search = document.getElementById('search');
+                          if (search) search.focus();
+                        });
+
                         let evtSource;
 
                         const connect = () => {
