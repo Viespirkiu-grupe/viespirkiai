@@ -19,6 +19,44 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
     // 404
     if (!purchase) return next();
 
+    // Tiekėjo subjekto patikslinimas
+    const sutartysAtviriDuomenys = await postgres.query(
+        `SELECT *
+         FROM "sutartysAtviriDuomenys"
+         WHERE "dokId" = $1
+         LIMIT 1;`,
+        [purchase.sutartiesUnikalusId],
+    );
+
+    if (sutartysAtviriDuomenys.rowCount > 0) {
+        if (sutartysAtviriDuomenys.rows[0].tiekPavPatikslinimas) {
+            purchase.tiekejasPatikslinimas =
+                sutartysAtviriDuomenys.rows[0].tiekPavPatikslinimas;
+        }
+        if (sutartysAtviriDuomenys.rows[0].tiekSalis) {
+            purchase.tiekejasSalis = sutartysAtviriDuomenys.rows[0].tiekSalis;
+        }
+    }
+
+    const sutartysAtviriDuomenysImp = await postgres.query(
+        `SELECT *
+         FROM "sutartysAtviriDuomenysImp"
+         WHERE "dokId" = $1
+         LIMIT 1;`,
+        [purchase.sutartiesUnikalusId],
+    );
+
+    if (sutartysAtviriDuomenysImp.rowCount > 0) {
+        if (sutartysAtviriDuomenysImp.rows[0].tiekSbjPatikslinimas) {
+            purchase.tiekejasPatikslinimas =
+                sutartysAtviriDuomenysImp.rows[0].tiekSbjPatikslinimas;
+        }
+        if (sutartysAtviriDuomenysImp.rows[0].tiekSalis) {
+            purchase.tiekejasSalis =
+                sutartysAtviriDuomenysImp.rows[0].tiekSalis;
+        }
+    }
+
     // Panašios sutartys
     const similarContracts = await postgres
         .query(
