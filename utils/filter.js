@@ -75,6 +75,13 @@ export function buildTypesenseFilter(query) {
             },
         },
         {
+            key: "tipas",
+            apply: (val) => {
+                filters.push(`tipas:=${val}`);
+                usedHiddenFields = true;
+            },
+        },
+        {
             key: "tikSuDokumentais",
             apply: () => {
                 filters.push(`dokumentuKiekis:>0`);
@@ -211,6 +218,14 @@ export function buildPostgresFilter(query, limit, page = 1) {
                 whereClauses.push(
                     `"sutartiesUnikalusId" = ${addParam("sutartiesUnikalusId", num)}`,
                 );
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
+            key: "tipas",
+            apply: (val) => {
+                whereClauses.push(`"tipas" = ${addParam("tipas", val)}`);
                 usedHiddenFields = true;
                 visiIrasai = false;
             },
