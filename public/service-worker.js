@@ -1,40 +1,23 @@
 const CACHE_NAME = "network-first-cache-v1";
-const CACHE_URLS = [
-	"/", // Išsaugojame tik pagrindinį puslapį
-];
+const CACHE_URLS = ["/"]; // Only cache the main page
 
-// Įdiegiame ir išsaugome pagrindinius failus į talpyklą
+// Install event: cache only the main page
 self.addEventListener("install", (event) => {
-	event.waitUntil(
-		caches.open(CACHE_NAME).then((cache) => cache.addAll(CACHE_URLS))
-	);
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => cache.addAll(CACHE_URLS)),
+    );
 });
 
-// Tinklas pirmiausia, jei nepavyksta, grąžiname iš talpyklos
+// Fetch event
 self.addEventListener("fetch", (event) => {
-	event.respondWith(
-		fetch(event.request)
-			.then((networkResponse) => {
-        // Išsaugome atsakymą į talpyklą
-				const resClone = networkResponse.clone();
-				caches.open(CACHE_NAME).then((cache) => {
-					cache.put(event.request, resClone);
-				});
-				return networkResponse;
-			})
-			.catch(() => {
-        // Jei tinklo užklausa nepavyko, grąžiname iš talpyklos
-				return caches.match(event.request).then((cachedResponse) => {
-					if (cachedResponse) {
-						return cachedResponse;
-					}
-					// Jei nėra talpyklos, grąžiname klaidos atsakymą
-					return new Response("Offline and no cached version available.", {
-						status: 503,
-						statusText: "Nepasiekiama",
-						headers: { "Content-Type": "text/plain" },
-					});
-				});
-			})
-	);
+    const url = new URL(event.request.url);
+
+    // Serve "/" from cache if offline
+    if (event.request.method === "GET" && url.pathname === "/") {
+        event.respondWith(fetch(event.request).catch(() => caches.match("/")));
+        return;
+    }
+
+    // For all other requests, just fetch from network
+    event.respondWith(fetch(event.request));
 });
