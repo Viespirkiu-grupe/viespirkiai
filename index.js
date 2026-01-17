@@ -19,7 +19,9 @@ const __dirname = path.dirname(__filename);
 
 app.set("trust proxy", 1);
 
-app.use(htmlMinifyMiddleware());
+if (config.enableMinification !== false) {
+    app.use(htmlMinifyMiddleware());
+}
 
 // Onion-location header
 app.use((req, res, next) => {

@@ -5,7 +5,7 @@ const PORT = config.port || 8000;
 let browserPromise;
 
 // Queue: max 4 pages at the same time
-const queue = new PQueue({ concurrency: 4 });
+const queue = new PQueue({ concurrency: 1 });
 
 async function initBrowser() {
     if (!browserPromise) {

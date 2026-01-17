@@ -2,7 +2,7 @@ import cluster from "cluster";
 import config from "./utils/config.js";
 import http from "http";
 
-const WORKERS_COUNT = 4;
+const WORKERS_COUNT = config.workerCount;
 const PORT = config.port || 8000;
 
 if (cluster.isPrimary) {
