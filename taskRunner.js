@@ -520,6 +520,26 @@ tasks.push({
     },
 });
 
+import { nuskaitytiInformaciniusLeidinius } from "./tasks/informaciniaiLeidiniai/scrape.js";
+tasks.push({
+    name: "nuskaitytiInformaciniusLeidinius",
+    schedule: "0 */3 * * *",
+    job: async () => {
+        await nuskaitytiInformaciniusLeidinius();
+    },
+});
+
+import { nuskaitytiInformaciniLeidini } from "./tasks/informaciniaiLeidiniai/scrapeContent.js";
+tasks.push({
+    name: "nuskaitytiInformaciniLeidini",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 10,
+    job: async () => {
+        return nuskaitytiInformaciniLeidini();
+    },
+});
+
 // eViesiejiPirkimai.lt neskelbiamos derybos
 import { nuskaitytiVisasNeskelbiamasDerybas } from "./tasks/neskelbiamosDerybos/scrape.js";
 tasks.push({
