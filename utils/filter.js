@@ -437,9 +437,12 @@ export function buildPostgresFailaiSearchFilter(query, limit, page = 1) {
         {
             key: "telefonas",
             apply: (val) => {
-                whereClauses.push(
-                    `${addParam("telefonas", val)} = ANY("telefonai")`,
-                );
+                whereClauses.push(`
+                  EXISTS (
+                    SELECT 1 FROM "failaiTelefonai" ft
+                    WHERE ft.id = f.id AND ft.telefonas = ${addParam("telefonas", val)}
+                  )
+                `);
                 usedHiddenFields = true;
                 visiIrasai = false;
             },
@@ -447,7 +450,12 @@ export function buildPostgresFailaiSearchFilter(query, limit, page = 1) {
         {
             key: "email",
             apply: (val) => {
-                whereClauses.push(`${addParam("email", val)} = ANY("emails")`);
+                whereClauses.push(`
+                  EXISTS (
+                    SELECT 1 FROM "failaiEmails" fe
+                    WHERE fe.id = f.id AND fe.email = ${addParam("email", val)}
+                  )
+                `);
                 usedHiddenFields = true;
                 visiIrasai = false;
             },
@@ -455,9 +463,12 @@ export function buildPostgresFailaiSearchFilter(query, limit, page = 1) {
         {
             key: "domain",
             apply: (val) => {
-                whereClauses.push(
-                    `${addParam("domain", val)} = ANY("domains")`,
-                );
+                whereClauses.push(`
+                  EXISTS (
+                    SELECT 1 FROM "failaiDomains" fd
+                    WHERE fd.id = f.id AND fd.domain = ${addParam("domain", val)}
+                  )
+                `);
                 usedHiddenFields = true;
                 visiIrasai = false;
             },
@@ -465,9 +476,12 @@ export function buildPostgresFailaiSearchFilter(query, limit, page = 1) {
         {
             key: "iban",
             apply: (val) => {
-                whereClauses.push(
-                    `${addParam("iban", val)} = ANY("ibanNumeriai")`,
-                );
+                whereClauses.push(`
+                  EXISTS (
+                    SELECT 1 FROM "failaiIban" fi
+                    WHERE fi.id = f.id AND fi.iban = ${addParam("iban", val)}
+                  )
+                `);
                 usedHiddenFields = true;
                 visiIrasai = false;
             },
@@ -475,9 +489,12 @@ export function buildPostgresFailaiSearchFilter(query, limit, page = 1) {
         {
             key: "jarKodas",
             apply: (val) => {
-                whereClauses.push(
-                    `${addParam("jarKodas", val)} = ANY("jarKodai")`,
-                );
+                whereClauses.push(`
+                  EXISTS (
+                    SELECT 1 FROM "failaiJarKodai" fj
+                    WHERE fj.id = f.id AND fj.jarKodas = ${addParam("jarKodas", val)}
+                  )
+                `);
                 usedHiddenFields = true;
                 visiIrasai = false;
             },

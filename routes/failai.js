@@ -81,7 +81,7 @@ failaiSearchRouter.get(
                             new Promise((_, reject) =>
                                 setTimeout(
                                     () => reject(new Error("timeout")),
-                                    500,
+                                    250,
                                 ),
                             ),
                         ]);
@@ -156,8 +156,6 @@ failaiSearchRouter.get(
                 try {
                     row.tekstas = JSON.parse(row.tekstas).join(" ");
                 } catch (e) {}
-
-                delete row.saugojama;
 
                 if (row?.metaduomenys?.signatures) {
                     row.metaduomenys.signatures.forEach((sig) => {

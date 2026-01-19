@@ -155,6 +155,17 @@ export async function parsiustiFaila() {
                 .replace("$FILE_ID", failas.fileId);
         } else if (saltinis == "neskelbiamosDerybos") {
             url = customUrl.replace("$saltinioId", failas.saltinioId);
+            // https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=$VERSION_ID&documentId=$DOC_ID
+        } else if (saltinis == "cvpIs") {
+            // Split saltinioId into 3 parts: cvpIsId, documentId, versionId
+            const parts = failas.saltinioId.split("/");
+            const cvpIsId = parts[0];
+            const documentId = parts[1];
+            const versionId = parts[2];
+            url = customUrl
+                .replace("$CVPIS_ID", cvpIsId)
+                .replace("$DOC_ID", documentId)
+                .replace("$VERSION_ID", versionId);
         } else {
             throw new Error(`Nežinomas šaltinis: ${saltinis}`);
         }
@@ -167,6 +178,7 @@ export async function parsiustiFaila() {
                 "Content-Type": "application/json",
                 "x-api-key": deze.apiKey,
             },
+            redirect: "manual",
             body: JSON.stringify({
                 url,
             }),
@@ -174,7 +186,7 @@ export async function parsiustiFaila() {
 
         var { md5, size } = await response.json();
 
-        if (!response.ok || !md5) {
+        if (!response.ok || !md5 || response.status !== 200) {
             throw new Error("Nepavyko gauti failo.");
         }
 
@@ -186,10 +198,18 @@ export async function parsiustiFaila() {
 
         log(`${mbps} Mbps`);
 
+        // Įterpiame į failaiDezes (columns: md5, deze, dydis) jei nėra
+        await postgres.query(
+            `INSERT INTO "failaiDezes" (md5, deze, dydis)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (md5, deze) DO NOTHING`,
+            [md5, deze.pavadinimas, size],
+        );
+
         // Atnaujiname informaciją apie failą
         await postgres.query(
-            "UPDATE failai SET parsiustas = 1, md5 = $1, dydis = $2, saugojama = $3 WHERE id = $4",
-            [md5, size, deze.pavadinimas, failas.id],
+            "UPDATE failai SET parsiustas = 1, md5 = $1, dydis = $2 WHERE id = $3",
+            [md5, size, failas.id],
         );
     } catch (error) {
         console.error("Klaida parsisiunčiant failą:", error);

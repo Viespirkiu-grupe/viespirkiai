@@ -214,7 +214,7 @@ export async function nuskaitytiVisasNeskelbiamasDerybas() {
             INSERT INTO public."failai"
             ("saltinis", "saltinioId", "pavadinimas", "extension")
             VALUES ${failaiPlaceholders}
-            ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND "saltinioId" IS NOT NULL) DO NOTHING;
+            ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL) DO NOTHING;
             `;
 
         await postgres.query(failaiQuery, failaiValues);

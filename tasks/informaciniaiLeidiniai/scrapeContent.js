@@ -26,7 +26,7 @@ export async function nuskaitytiInformaciniLeidini() {
     const rows = response.rows;
     if (rows.length === 0) {
         log("Nėra naujų informacinių leidinių nuskaitymui.");
-        return;
+        return false;
     }
 
     const leidinys = rows[0];
@@ -34,7 +34,7 @@ export async function nuskaitytiInformaciniLeidini() {
         `Nuskaitymas informacinio leidinio oid ${leidinys.oid}, data: ${leidinys.data}`,
     );
 
-    const parsed = await parseInformacinisLeidinys(leidinys.nuoroda);
+    let parsed = await parseInformacinisLeidinys(leidinys.nuoroda);
     // For each row add
     // leidinioOid: leidinys.oid
     // leidinioLink: leidinys.nuoroda
@@ -69,6 +69,17 @@ export async function nuskaitytiInformaciniLeidini() {
                 duplicates,
             ).join(", ")}`,
         );
+    }
+
+    // Find rows where jarKodas is NULL or missing, remove them
+    const beforeCount = parsed.length;
+    parsed = parsed.filter(
+        (item) =>
+            item.jarKodas != null && item.jarKodas.toString().trim() !== "",
+    );
+    const afterCount = parsed.length;
+    if (beforeCount !== afterCount) {
+        log(`Pašalinta ${beforeCount - afterCount} įrašų be jarKodas`);
     }
 
     // Insert in batches

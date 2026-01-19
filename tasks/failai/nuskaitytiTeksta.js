@@ -370,6 +370,95 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         }
     }
 
+    try {
+        await postgres.query("BEGIN");
+
+        const docId = dokumentas.id;
+
+        // Delete old entries
+        await postgres.query(`DELETE FROM "failaiIban" WHERE id = $1`, [docId]);
+        await postgres.query(`DELETE FROM "failaiJarKodai" WHERE id = $1`, [
+            docId,
+        ]);
+        await postgres.query(`DELETE FROM "failaiLinks" WHERE id = $1`, [
+            docId,
+        ]);
+        await postgres.query(`DELETE FROM "failaiEmails" WHERE id = $1`, [
+            docId,
+        ]);
+        await postgres.query(`DELETE FROM "failaiDomains" WHERE id = $1`, [
+            docId,
+        ]);
+        await postgres.query(`DELETE FROM "failaiTelefonai" WHERE id = $1`, [
+            docId,
+        ]);
+
+        // Insert new failaiIban
+        if (metadata?.ibanNumeriai?.length) {
+            for (const { numeris, pages } of metadata.ibanNumeriai) {
+                await postgres.query(
+                    `INSERT INTO "failaiIban"(id, iban, puslapiai) VALUES ($1, $2, $3)`,
+                    [docId, numeris, pages],
+                );
+            }
+        }
+
+        // Insert new failaiJarKodai
+        if (metadata?.jarKodai?.length) {
+            for (const { code, pages } of metadata.jarKodai) {
+                await postgres.query(
+                    `INSERT INTO "failaiJarKodai"(id, jarKodas, puslapiai) VALUES ($1, $2, $3)`,
+                    [docId, code, pages],
+                );
+            }
+        }
+
+        // Insert new failaiLinks
+        if (metadata?.links?.length) {
+            for (const { uri, pages } of metadata.links) {
+                await postgres.query(
+                    `INSERT INTO "failaiLinks"(id, link, puslapiai) VALUES ($1, $2, $3)`,
+                    [docId, uri, pages],
+                );
+            }
+        }
+
+        // Insert new failaiEmails
+        if (metadata?.emails?.length) {
+            for (const { email, pages } of metadata.emails) {
+                await postgres.query(
+                    `INSERT INTO "failaiEmails"(id, email, puslapiai) VALUES ($1, $2, $3)`,
+                    [docId, email, pages],
+                );
+            }
+        }
+
+        // Insert new failaiDomains (no puslapiai)
+        if (metadata?.domains?.length) {
+            for (const domain of metadata.domains) {
+                await postgres.query(
+                    `INSERT INTO "failaiDomains"(id, domain) VALUES ($1, $2)`,
+                    [docId, domain],
+                );
+            }
+        }
+
+        // Insert new failaiTelefonai
+        if (metadata?.telefonai?.length) {
+            for (const { numeris, pages } of metadata.telefonai) {
+                await postgres.query(
+                    `INSERT INTO "failaiTelefonai"(id, telefonas, puslapiai) VALUES ($1, $2, $3)`,
+                    [docId, numeris, pages],
+                );
+            }
+        }
+
+        await postgres.query("COMMIT");
+    } catch (e) {
+        await postgres.query("ROLLBACK");
+        throw e;
+    }
+
     // Update the row
     await postgres.query(
         `UPDATE failai
@@ -378,31 +467,16 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             metaduomenys = $3,
             "zodziuSkaicius" = $4,
             "puslapiuSkaicius" = $5,
-            "jarKodai" = $6,
-            "ibanNumeriai" = $7,
-            links = $8,
-            emails = $9,
-            domains = $10,
-            telefonai = $11,
-            "hasSloppyRedactions" = $12,
-            "simboliuSkaicius" = $13,
-            "ocrState" = $14,
+            "simboliuSkaicius" = $6,
+            "ocrState" = $7,
             "nuskaitymasTimestamp" = NOW()
-        WHERE id = $15;`,
+        WHERE id = $8;`,
         [
             nuskaitymoVersija,
             truncateTo1MB(tekstas),
             metadata,
             metadata?.wordCount,
             metadata?.pageCount,
-
-            metadata?.jarKodai?.map((o) => o.code) || [],
-            metadata?.ibanNumeriai?.map((o) => o.iban) || [],
-            metadata?.links?.map((o) => o.uri) || [],
-            metadata?.emails?.map((o) => o.email) || [],
-            metadata?.domains || [],
-            metadata?.telefonai?.map((o) => o.numeris) || [],
-            metadata?.sloppyRedactions?.length > 0 || false,
             metadata?.characterCount || 0,
             reikalingasOcr,
             dokumentas.id,
