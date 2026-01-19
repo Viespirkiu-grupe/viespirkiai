@@ -1,6 +1,7 @@
 services:
     db:
-        image: postgres:17
+#        image: postgres:17
+        build: .
         container_name: viespirkiaiPostgres
         env_file:
             - ../.env
@@ -11,7 +12,7 @@ services:
 
     pgadmin:
         image: dpage/pgadmin4
-        container_name: viespirkiaiPgadmin  
+        container_name: viespirkiaiPgadmin
         env_file:
             - ../.env
         ports:
@@ -20,3 +21,7 @@ services:
             - db
         volumes:
             - ./pgadmin-data:/var/lib/pgadmin
+        deploy:
+          resources:
+             limits:
+                memory: 2G
