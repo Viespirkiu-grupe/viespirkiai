@@ -2,6 +2,7 @@ export const UNITS = {
     data: {
         units: ["B", "KB", "MB", "GB", "TB", "PB"],
         factors: Array(5).fill(1024),
+        subdividable: false,
     },
     time: {
         units: ["s", "min", "h", "d"],
@@ -69,7 +70,7 @@ export function convertUnit(value, categoryOrOptions, options = {}) {
             : opts.from || 0;
     if (index === -1) throw new Error(`Unknown from-unit: ${opts.from}`);
 
-    const precision = opts.precision ?? 2;
+    let precision = opts.precision ?? 2;
     const to = opts.to ?? "auto";
 
     if (to === "auto") {
@@ -77,6 +78,11 @@ export function convertUnit(value, categoryOrOptions, options = {}) {
             val /= factors[index];
             index++;
         }
+
+        if (index == 0 && config.subdividable == false) {
+            precision = 0;
+        }
+
         return `${val.toFixed(precision)} ${units[index]}`;
     } else {
         let toIndex = typeof to === "string" ? units.indexOf(to) : to;
@@ -89,6 +95,11 @@ export function convertUnit(value, categoryOrOptions, options = {}) {
             index--;
             val *= factors[index];
         }
+
+        if (index == 0 && config.subdividable == false) {
+            precision = 0;
+        }
+
         return `${val.toFixed(precision)} ${units[toIndex]}`;
     }
 }
