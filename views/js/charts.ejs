@@ -102,6 +102,9 @@
     },
     'scatter': {
       chart: { type: 'scatter', height: 350 },
+    },
+    'treemap': {
+      chart: { type: 'treemap', height: 350 },
     }
   }
 
@@ -203,6 +206,20 @@
       "noLine": {
         stroke: {
           width: 0
+        },
+      },
+      'xAxisDay': {
+        xaxis: {
+              type: 'datetime',
+              tickAmount: 6,
+              labels: {
+                format: 'yyyy-MM-dd'
+            },
+        },
+        tooltip: {
+          x: {
+            format: 'yyyy-MM-dd'
+          }
         },
       }
   }
