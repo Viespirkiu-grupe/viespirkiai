@@ -35,13 +35,17 @@ export async function atrastiJarAdresoKoordinates() {
 
     /// Patikriname ar adresas jau egzistuojantis
     const { rows: existingRows } = await postgres.query(
-        `SELECT id FROM adresai WHERE adresas = $1 LIMIT 1`,
+        `SELECT id, latitude, longitude
+       FROM adresai
+       WHERE adresas = $1
+       LIMIT 1`,
         [adresas],
     );
 
     if (existingRows.length > 0) {
-        // Adresas jau yra, atnaujiname JAR įrašą
         var adresoId = existingRows[0].id;
+        var lat = existingRows[0].latitude;
+        var lon = existingRows[0].longitude;
     } else {
         // Suformuojame užklausą į Nominatim
         log(`Užklausiama dėl: ${adresas}`);
@@ -66,15 +70,17 @@ export async function atrastiJarAdresoKoordinates() {
                 var adresoId = -1; // Adresas nerastas
             } else {
                 // Įterpiame rastą adresą į duomenų bazę
-                const { lat, lon } = data[0];
+                var { lat, lon } = data[0];
                 log(`Adresas rastas: lat=${lat}, lon=${lon}`);
 
-                await postgres.query(
-                    `INSERT INTO adresai (latitude, longitude, adresas) VALUES ($1, $2, $3)`,
+                const insertRes = await postgres.query(
+                    `INSERT INTO adresai (latitude, longitude, adresas)
+                   VALUES ($1, $2, $3)
+                   RETURNING id`,
                     [parseFloat(lat), parseFloat(lon), adresas],
                 );
 
-                var adresoId = rows[0].id;
+                var adresoId = insertRes.rows[0].id;
             }
         } catch (e) {
             console.error(`Klaida vykdant užklausą ${adresas}:`, e);
@@ -83,10 +89,16 @@ export async function atrastiJarAdresoKoordinates() {
         }
     }
 
-    // Atnaujiname JAR įrašą su adreso ID
+    // Atnaujiname JAR įrašą su adresu
     await postgres.query(
-        `UPDATE "jarCsv" SET "adresoId" = $1 WHERE "jarKodas" = $2`,
-        [adresoId, jarKodas],
+        `
+      UPDATE "jarCsv"
+      SET
+        "adresoId" = $1,
+        location = ST_SetSRID(ST_MakePoint($2, $3), 4326)
+      WHERE "jarKodas" = $4
+      `,
+        [adresoId, lon, lat, jarKodas],
     );
 
     log(`Atnaujintas jar ${jarKodas} → adresoId=${adresoId}`);

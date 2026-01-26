@@ -44,6 +44,10 @@
                         <b>Adresas:</b>
                         <span><%- item.adresas %></span>
                     </div>
+                    <div>
+                        <b>Registruota:</b>
+                        <span><%= new Date(item.registravimoData).toLtDate() %></span>
+                    </div>
                 </div>
             </div>
         </article>

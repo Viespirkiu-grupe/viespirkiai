@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <%- include('../head.ejs', {
+        pageTitle: "Top adresai pagal įmonių skaičių",
+        pageDescription: "",
+        pageImage: `https://viespirkiai.org/juridiniai.png`,
+        customHead: ""
+    }) %>
+</head>
+<body>
+    <%- include('../header.ejs', {hideSubtext: false}) %>
+
+    <main>
+        <h1 class="center">Top adresai pagal įmonių skaičių</h1>
+        <%- include('../tabs.ejs') %>
+
+        <div class="main-center">
+            <p>Žemiau pateikiami adresai, kuriuose registruota daugiausiai įmonių.
+            <p> Įprastai užsiregistruoti juose galima susimokėjus mokestį. Tokie adresai leidžia formaliai registruoti įmonę, neskelbiant tikros veiklos vietos. </p>
+        </div>
+        <div class="results">
+            <div>
+                <section class="preResultOptions">
+                    <div class="numberOfResults">
+                        <%- numberOfResults %>
+                    </div>
+                </section>
+            </div>
+
+            <div class="resultsNauji">
+                <% adresai.forEach(item => { %>
+                    <article class="rezultatas" aria-label="<%= item.adresas %>">
+                        <a href="/juridiniai?adresas=<%= item.adresas %>" class="fullIndentLink"></a>
+                        <div class="rezultatas-left">
+                            <h3 class="rezultatas-title">
+                                <a href="/juridiniai?adresas=<%= item.adresas %>">
+                                    <span><%= item.adresas %></span>
+                                </a>
+                            </h3>
+                            <div class="rezultatas-bottom">
+                                <div>
+                                    <b>Juridinių asmenų skaičius:</b>
+                                    <span><%= item.count %></span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                <% }) %>
+            </div>
+            <%- include('../pagination.ejs', {
+                currentPage, pageCount, queryParams
+            }) %>
+
+        </div>
+    </main>
+
+    <%- include('../footer.ejs') %>
+</body>
+</html>

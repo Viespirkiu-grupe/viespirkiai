@@ -9,6 +9,11 @@ services:
             - "9118:5432"
         volumes:
             - ./pgdata:/var/lib/postgresql/data
+        deploy:
+          resources:
+             limits:
+                memory: 9G
+
 
     pgadmin:
         image: dpage/pgadmin4

@@ -1,9 +1,11 @@
 import express from "express";
 import cleanEmptyQueryParams from "../utils/queryParams.js";
 import config from "../utils/config.js";
-import { arrayToLithuanianTime } from "../utils/time.js";
+import { toLithuanianTime } from "../utils/time.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 import { searchJarDocuments } from "../typesense/typesense.js";
+import { createCanvas } from "canvas";
+import { postgres } from "../postgres/postgres.js";
 
 const juridiniaiRouter = express.Router();
 
@@ -24,47 +26,73 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
         limit = parseInt(req.query.limit) || limit;
     }
 
-    if (req.query.search) {
+    var searchEngine = "Typesense";
+
+    if (
+        req.query.search ||
+        (req.query.location && req.query.locationRadius) ||
+        req.query.adresas
+    ) {
         let values = {
-            search: req.query.search,
+            search: req.query.search || "",
         };
 
-        let queryParams = `&search=${encodeURIComponent(req.query.search)}`;
+        let queryParams = `&`;
 
-        //      // Vienu metu gauname rezultatus ir jų skaičių
-        //      const [[rows], [response]] = await Promise.all([
-        //          mysql.query(
-        //              `(
-        // 	SELECT * FROM jar WHERE adresas LIKE CONCAT('%', ?, '%')
-        // )
-        // UNION
-        // (
-        // 	SELECT * FROM jar WHERE pavadinimas LIKE CONCAT('%', ?, '%')
-        // )
-        // LIMIT ? OFFSET ?`,
-        //              [req.query.search, req.query.search, limit, skip],
-        //          ),
+        if (req.query.search) {
+            var { results, total } = await searchJarDocuments(
+                req.query.search,
+                {
+                    page,
+                },
+            );
+            results.forEach((item) => {
+                item.registravimoData = toLithuanianTime(
+                    item.registravimoData,
+                ).split(" ")[0];
+            });
+        } else if (req.query.location && req.query.locationRadius) {
+            searchEngine = "PostgreSQL";
+            const [lat, lon] = req.query.location.split(",").map(Number);
+            const radius = parseFloat(req.query.locationRadius); // in meters
 
-        //          mysql.query(
-        //              `SELECT COUNT(*) AS total FROM (
-        // 	SELECT jarKodas FROM jar WHERE adresas LIKE CONCAT('%', ?, '%')
-        // 	UNION
-        // 	SELECT jarKodas FROM jar WHERE pavadinimas LIKE CONCAT('%', ?, '%')
-        // ) AS combined`,
-        //              [req.query.search, req.query.search],
-        //          ),
-        //      ]);
+            const { rows, rowCount } = await postgres.query(
+                `
+                    SELECT *
+                    FROM public."jarCsv"
+                    WHERE location IS NOT NULL
+                      AND ST_DWithin(
+                          location::geography,
+                          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+                          $3
+                      )
+                    `,
+                [lon, lat, radius],
+            );
 
-        //      var results = rows;
-        //      var total = response[0].total || 0;
+            results = rows;
+            total = rowCount;
 
-        let { results, total } = await searchJarDocuments(req.query.search, {
-            page,
-        });
+            // add to queryParams for pagination/links
+            queryParams += `&location=${lat},${lon}&locationRadius=${radius}`;
+        } else if (req.query.adresas) {
+            searchEngine = "PostgreSQL";
+            const { rows, rowCount } = await postgres.query(
+                `
+                    SELECT *
+                    FROM public."jarCsv"
+                    WHERE "adresas" = $1 ORDER BY "registravimoData" DESC
+                    `,
+                [req.query.adresas],
+            );
 
-        // console.log(results, total);
+            results = rows;
+            total = rowCount;
 
-        // Jei prašoma JSON
+            // add to queryParams for pagination/links
+            queryParams += `&adresas=${encodeURIComponent(req.query.adresas)}`;
+        }
+
         if (req.query.json) {
             return res.json(results);
         }
@@ -103,16 +131,13 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
             return res.end();
         }
 
-        // Pakeičiame datų formatus
-        results = arrayToLithuanianTime(results);
-
         // Paieškos užklausos informacija
         let trukme = ((performance.now() - startas) / 1000).toFixed(2) + "s";
         let rodomiRezultatai = results.length;
         if (rodomiRezultatai < total) {
-            var numberOfResults = `Rodomi ${rodomiRezultatai} iš ${total} rezultatų <pre style="display: inline;">(${trukme}, Typesense)</pre>`;
+            var numberOfResults = `Rodomi ${rodomiRezultatai} iš ${total} rezultatų <pre style="display: inline;">(${trukme}, ${searchEngine})</pre>`;
         } else {
-            var numberOfResults = `${total} rezultatas(-ai) <pre style="display: inline;">(${trukme}, Typesense)</pre>`;
+            var numberOfResults = `${total} rezultatas(-ai) <pre style="display: inline;">(${trukme}, ${searchEngine})</pre>`;
         }
 
         let galimaEksportuoti = total > 0 && total <= MAX_LIMIT;
@@ -163,6 +188,152 @@ juridiniaiRouter.get("/juridiniai.png", async (req, res) => {
         "",
         "viespirkiai.org/juridiniai",
     );
+});
+
+const TILE_SIZE = 256;
+const OVERSAMPLE = 4; // draw z+2 tiles inside the z tile
+
+juridiniaiRouter.get("/juridiniai/map/tiles/:z/:x/:y.png", async (req, res) => {
+    const z = parseInt(req.params.z);
+    const x = parseInt(req.params.x);
+    const y = parseInt(req.params.y);
+
+    const targetZoom = z + OVERSAMPLE;
+    const scale = 2 ** OVERSAMPLE; // number of subtiles per tile
+
+    const minTileX = x * scale;
+    const maxTileX = minTileX + scale - 1;
+    const minTileY = y * scale;
+    const maxTileY = minTileY + scale - 1;
+
+    try {
+        const { rows } = await postgres.query(
+            `
+            SELECT "tileX", "tileY", "pointCount"
+            FROM public."jarCsvLocationTiles"
+            WHERE "zoom" = $1
+              AND "tileX" BETWEEN $2 AND $3
+              AND "tileY" BETWEEN $4 AND $5
+            `,
+            [targetZoom, minTileX, maxTileX, minTileY, maxTileY],
+        );
+
+        const canvas = createCanvas(TILE_SIZE, TILE_SIZE);
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+        const maxCount = Math.max(...rows.map((r) => r.pointCount), 1);
+
+        for (const row of rows) {
+            // fractional position inside the tile (0–1)
+            const fx = (row.tileX - minTileX) / scale;
+            const fy = (row.tileY - minTileY) / scale;
+
+            const fw = 1 / scale;
+            const fh = 1 / scale;
+
+            // scale to 256x256
+            const px = fx * TILE_SIZE;
+            const py = fy * TILE_SIZE;
+            const pw = fw * TILE_SIZE;
+            const ph = fh * TILE_SIZE;
+
+            const intensity =
+                Math.log10(row.pointCount + 1) / Math.log10(maxCount + 1);
+
+            const green = Math.round(255 * (1 - intensity));
+            ctx.fillStyle = `rgba(255,${green},0,${Math.min(Math.max(intensity, 0), 1)})`;
+
+            ctx.fillRect(px, py, pw, ph);
+        }
+
+        res.setHeader("Content-Type", "image/png");
+        canvas.pngStream().pipe(res);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Error generating tile");
+    }
+});
+
+juridiniaiRouter.get("/juridiniai/map/viewport", async (req, res) => {
+    try {
+        const minLat = parseFloat(req.query.minLat);
+        const minLon = parseFloat(req.query.minLon);
+        const maxLat = parseFloat(req.query.maxLat);
+        const maxLon = parseFloat(req.query.maxLon);
+
+        if (
+            Number.isNaN(minLat) ||
+            Number.isNaN(minLon) ||
+            Number.isNaN(maxLat) ||
+            Number.isNaN(maxLon)
+        ) {
+            return res.status(400).send("Invalid viewport bounds");
+        }
+
+        // Get distinct coordinates
+        const { rows } = await postgres.query(
+            `
+            SELECT DISTINCT ST_Y(location) AS lat, ST_X(location) AS lon
+            FROM public."jarCsv"
+            WHERE location IS NOT NULL
+              AND ST_X(location) BETWEEN $1 AND $2
+              AND ST_Y(location) BETWEEN $3 AND $4
+            `,
+            [minLon, maxLon, minLat, maxLat],
+        );
+
+        // Return as array of [lat, lon]
+        const locations = rows.map((r) => [r.lat, r.lon]);
+        res.json({ locations });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Error fetching points");
+    }
+});
+
+juridiniaiRouter.get("/juridiniai/topAdresai", async (req, res) => {
+    let page = parseInt(req.query.page) || 1;
+    const limit = 50;
+    const offset = (page - 1) * limit;
+
+    let start = performance.now();
+    let adresaiRes = await postgres.query(
+        `
+        SELECT *
+        FROM "jarCsvTopAdresai"
+        ORDER BY count DESC
+        LIMIT $1 OFFSET $2
+    `,
+        [limit, offset],
+    );
+
+    let adresaiCountRes = await postgres.query(`
+        SELECT COUNT(*) AS total
+        FROM "jarCsvTopAdresai"
+    `);
+    let end = performance.now();
+
+    const trukme = ((end - start) / 1000).toFixed(2) + "s";
+    const rodomiRezultatai = adresaiRes.rowCount;
+    const numberOfResults =
+        rodomiRezultatai < parseInt(adresaiCountRes.rows[0].total)
+            ? `Rodomi ${rodomiRezultatai} iš ${Number(adresaiCountRes.rows[0].total).linksniuotiK(["rezultato", "rezultatų"])} <pre style="display: inline;">(${trukme}, PostgreSQL)</pre>`
+            : `${Number(adresaiCountRes.rows[0].total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} <pre style="display: inline;">(${trukme}, PostgreSQL)</pre>`;
+
+    let adresai = adresaiRes.rows;
+    let totalAdresaiCount = parseInt(adresaiCountRes.rows[0].total);
+
+    res.render("juridiniai/topAdresai", {
+        adresai,
+        totalAdresaiCount,
+        numberOfResults,
+        customHead: config.customHead,
+        currentPage: page,
+        pageCount: Math.ceil(totalAdresaiCount / limit),
+        req,
+        queryParams: "",
+    });
 });
 
 export default juridiniaiRouter;
