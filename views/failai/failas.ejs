@@ -35,7 +35,7 @@
                            </div>
                            <div>
                                <h3>Dydis</h3>
-                                <% if(failas.dydis) { %>
+                                <% if(failas.dydis || failas.dydis == 0) { %>
                                     <%= failas.dydis.convertUnit("B") %>
                                 <% } else { %>
                                    -
@@ -60,7 +60,14 @@
                                 <% } else if(failas.saltinis == "archive") { %>
                                     <a href="/failas/<%= failas.parent %>">Archyvo <%= failas.parent %> viduje</a>
                                     <% originalusLinkas = `/failas/${failas.parent}`; %>
-                                    <% originalusLinkasPavadinimas = "Šaltinis"; %>
+                                    <% originalusLinkasPavadinimas = "Archyvas"; %>
+                                <% } else if(failas.saltinis == "cvpIs") { %>
+                                    <% let pirkimoId = failas.saltinioId.split('/')[0]; %>
+                                    <% let documentId = failas.saltinioId.split('/')[1]; %>
+                                    <% let versionId = failas.saltinioId.split('/')[2]; %>
+                                    <a href="https://viesiejipirkimai.lt/epps/cft/listContractDocuments.do?resourceId=<%= pirkimoId %>">Viešasis pirkimas <%= pirkimoId %></a>
+                                    <% originalusLinkas = `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${versionId}&documentId=${documentId}`; %>
+                                    <% originalusLinkasPavadinimas = "CVP IS"; %>
                                 <% } %>
                            </div>
                        </div>
@@ -288,8 +295,10 @@
                         <div>
                             <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
-                            <a href="https://eviesiejipirkimai.lt/download.php?dok_id=<%= failas.dokId %>&file_id=<%= failas.fileId %>">↗ CVP IS</a>
-                            &nbsp;
+                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
+                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
+                                &nbsp;
+                            <% } %>
                         </div>
                         <div style="margin-top: 16px;">
                             <video width="100%" height="auto" controls style="max-height: 70vh; margin-top: 16px;">
@@ -355,7 +364,7 @@
                             %>
                             <pre style="white-space: pre-wrap; word-wrap: break-word;"><%= failas.tekstas || "" %></pre>
                         </div>
-                    <% } else if(failas.extension == "html" || failas.extension == "htm") { %>
+                    <% } else if(failas.extension == "html" || failas.extension == "htm" || failas.extension == "svg") { %>
                         <div>
                             <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
                             &nbsp;
