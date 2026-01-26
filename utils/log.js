@@ -67,6 +67,29 @@ function getCallerFile() {
     return path.basename(caller.getFileName());
 }
 
+/**
+ * Get the caller filename prefixed with its folder.
+ * @returns {string} - folder/filename of the caller.
+ */
+function getCallerFileFolder() {
+    const origPrepareStackTrace = Error.prepareStackTrace;
+    Error.prepareStackTrace = (_, stack) => stack;
+
+    const err = new Error();
+    const stack = err.stack;
+
+    Error.prepareStackTrace = origPrepareStackTrace;
+
+    // stack[0] = this function, stack[1] = wrapper/log, stack[2] = caller
+    const caller = stack[2];
+    const filePath = caller.getFileName();
+
+    const dir = path.basename(path.dirname(filePath));
+    const file = path.basename(filePath);
+
+    return `${dir}/${file}`;
+}
+
 /** Log a message with timestamp and caller file, color-coded.
  * @param {string} text - The message to log.
  * @param {object} options - Additional options (currently unused).
@@ -79,7 +102,7 @@ export function log(text, options = {}) {
         second: "2-digit",
     });
 
-    const caller = getCallerFile();
+    const caller = getCallerFileFolder();
     const color = pastelColor(caller);
     const reset = "\x1b[0m";
     const gray = "\x1b[90m";
