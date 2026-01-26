@@ -184,9 +184,14 @@ export async function parsiustiFaila() {
             }),
         });
 
+        if (!response.ok || response.status !== 200) {
+            console.log(await response.text());
+            throw new Error("Nepavyko parsisiųsti failo.");
+        }
+
         var { md5, size } = await response.json();
 
-        if (!response.ok || !md5 || response.status !== 200) {
+        if (!md5) {
             throw new Error("Nepavyko gauti failo.");
         }
 
@@ -244,4 +249,20 @@ export async function parsiustiFaila() {
     log(`Parsiuntimas užtruko: ${Date.now() - startTime} ms`);
     doneWithFile(failas.id);
     return true;
+}
+
+// If called directly, run parsiustiFaila once
+if (
+    import.meta.url === process.argv[1] ||
+    import.meta.url === `file://${process.argv[1]}`
+) {
+    (async () => {
+        try {
+            await parsiustiFaila();
+            process.exit(0);
+        } catch (error) {
+            console.error("Klaida:", error);
+            process.exit(1);
+        }
+    })();
 }

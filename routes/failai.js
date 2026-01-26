@@ -329,4 +329,118 @@ failaiSearchRouter.get(
     },
 );
 
+failaiSearchRouter.get("/failai/map", async (req, res) => {
+    // Query lat/lon from PostGIS
+    const response = await postgres.query(`
+      SELECT ST_Y(location::geometry) AS lat,
+             ST_X(location::geometry) AS lon
+      FROM public.failai
+      WHERE location IS NOT NULL;
+    `);
+
+    // Convert to Leaflet-friendly [lat, lon] arrays
+    const locations = response.rows.map((row) => [row.lat, row.lon]);
+
+    res.render("failai/map", {
+        locations,
+        customHead: config.customHead,
+        req,
+    });
+});
+
+failaiSearchRouter.get("/failai/topExtension", async (req, res) => {
+    let page = parseInt(req.query.page) || 1;
+    const limit = 50;
+    const offset = (page - 1) * limit;
+
+    let start = performance.now();
+    let extensionRes = await postgres.query(
+        `
+        SELECT *
+        FROM "failaiStatsExtension"
+        ORDER BY count DESC
+        LIMIT $1 OFFSET $2
+    `,
+        [limit, offset],
+    );
+
+    let extensionCountRes = await postgres.query(`
+        SELECT COUNT(*) AS total
+        FROM "failaiStatsExtension"
+    `);
+    let end = performance.now();
+
+    const trukme = ((end - start) / 1000).toFixed(2) + "s";
+    const rodomiRezultatai = extensionRes.rowCount;
+    const numberOfResults =
+        rodomiRezultatai < parseInt(extensionCountRes.rows[0].total)
+            ? `Rodomi ${rodomiRezultatai} iš ${Number(extensionCountRes.rows[0].total).linksniuotiK(["rezultato", "rezultatų"])} <pre style="display: inline;">(${trukme}, PostgreSQL)</pre>`
+            : `${Number(extensionCountRes.rows[0].total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} <pre style="display: inline;">(${trukme}, PostgreSQL)</pre>`;
+
+    let extension = extensionRes.rows;
+    let totalExtensionCount = parseInt(extensionCountRes.rows[0].total);
+
+    res.render("failai/topExtension", {
+        extension,
+        totalExtensionCount,
+        numberOfResults,
+        customHead: config.customHead,
+        currentPage: page,
+        pageCount: Math.ceil(totalExtensionCount / limit),
+        req,
+        queryParams: "",
+    });
+});
+
+failaiSearchRouter.get("/failai/ocr", async (req, res) => {
+    let ocrStatsRes = await postgres.query(
+        `SELECT * FROM "failaiOcrStats" ORDER BY count DESC`,
+    );
+
+    let ocrStats = ocrStatsRes.rows;
+    // Capitalize first letter of tipas
+    ocrStats = ocrStats.map((stat) => {
+        return {
+            ...stat,
+            tipas: stat.tipas.charAt(0).toUpperCase() + stat.tipas.slice(1),
+        };
+    });
+
+    // Add id based on tipas
+    const idMap = {
+        Baigta: 1,
+        Nepalaikoma: "-",
+        Galima: "-",
+        Rezervuota: -3,
+        Rekomenduojama: 0,
+        Nepavyko: -1,
+    };
+    ocrStats = ocrStats.map((stat) => {
+        return {
+            ...stat,
+            id: idMap[stat.tipas],
+        };
+    });
+
+    let ocrStatsDayRes = await postgres.query(
+        `SELECT * FROM "failaiOcrRezultataiStatsDay" ORDER BY date DESC`,
+    );
+
+    let ocrStatsDay = ocrStatsDayRes.rows;
+
+    let ocrNuskaitytojaiRes = await postgres.query(
+        `SELECT "nuskaitytiDokumentai", "viesasPavadinimas", "pavadinimas", "rezervacijos" FROM "ocrNuskaitytojai" ORDER BY "nuskaitytiDokumentai" DESC LIMIT 100;`,
+    );
+
+    let ocrNuskaitytojai = ocrNuskaitytojaiRes.rows;
+
+    res.render("failai/ocr", {
+        ocrStats,
+        ocrStatsDay,
+        ocrNuskaitytojai,
+        customHead: config.customHead,
+        req,
+    });
+});
+
 export default failaiSearchRouter;

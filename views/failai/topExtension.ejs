@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <%- include('../head.ejs', {
+        pageTitle: "Dažniausi failų plėtiniai",
+        pageDescription: "",
+        pageImage: `https://viespirkiai.org/failai.png`,
+        customHead: ""
+    }) %>
+</head>
+<body>
+    <%- include('../header.ejs', {hideSubtext: false}) %>
+
+    <main>
+        <h1 class="center">Dažniausi failų plėtiniai</h1>
+        <%- include('../tabs.ejs') %>
+
+        <div class="results">
+            <div>
+                <section class="preResultOptions">
+                    <div class="numberOfResults">
+                        <%- numberOfResults %>
+                    </div>
+                </section>
+            </div>
+
+            <div class="resultsNauji col-3 mobile-col-1">
+                <% extension.forEach(item => { %>
+                    <article class="rezultatas" aria-label="<%= item.extension %>">
+                        <a href="/failai?extension=<%= item.extension %>" class="fullIndentLink"></a>
+                        <div class="rezultatas-left">
+                            <h3 class="rezultatas-title">
+                                <a href="/failai?extension=<%= item.extension %>">
+                                    <span><%= item.extension %></span>
+                                </a>
+                            </h3>
+                            <div class="rezultatas-bottom">
+                                <div>
+                                    <span><%= Number(item.count).linksniuoti(["failas", "failai", "failų", "failo"]) %></span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                <% }) %>
+            </div>
+            <%- include('../pagination.ejs', {
+                currentPage, pageCount, queryParams
+            }) %>
+
+        </div>
+    </main>
+
+    <%- include('../footer.ejs') %>
+</body>
+</html>

@@ -18,6 +18,12 @@
     			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti, search}) %>
                 <% } else { %>
              		<%- include('statistika.ejs') %>
+               <div>
+         			<a href="/failai/topExtension">↗ Dažniausi plėtiniai</a>&nbsp;
+         			<a href="/failai/ocr">↗ OCR būsena</a>&nbsp;
+         			<a href="/failai/map">↗ Failų žemėlapis</a>&nbsp;
+               </div>
+
                     <script>
                         window.addEventListener('DOMContentLoaded', () => {
                           const search = document.getElementById('search');

@@ -37,6 +37,10 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
 
     const user = userRes.rows[0];
 
+    if (user.rezervacijos > 500) {
+        return res.status(429).send("Per daug rezervacijų.");
+    }
+
     // Gauname 1 failą SELECT * FROM failai WHERE "ocrState" = 0; ir atnaujiname jo būseną į -3
     // Kad kiti nepasiimtų to paties failo, naudojame RETURNING
     var failasRes = await postgres.query(
@@ -64,7 +68,7 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
           FROM failai
           WHERE ("ocrState" IS NULL OR "ocrState" = 0)
             AND "nuskaitytas" >= 6
-            AND LOWER("extension") IN ('pdf', 'jpg', 'jpeg', 'png', 'bmp', 'gif', 'odg', 'pub', 'webp', 'heic', 'docx', 'pub', 'doc', 'odt', 'docm', 'rtf', 'pptx', 'odg', 'ppt', 'dotx', 'pages', 'ppsx')
+            AND LOWER("extension") IN ('pdf', 'jpg', 'jpeg', 'png', 'bmp', 'gif', 'odg', 'webp', 'heic')
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         )
@@ -77,29 +81,30 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
                 [user.pavadinimas],
             );
         }
-        //   else if (version == 2) {
-        //       failasRes = await postgres.query(
-        //           `WITH cte AS (
-        //   SELECT id
-        //   FROM failai
-        //   WHERE "ocrState" IS NULL
-        //     AND "nuskaitytas" >= 6
-        //     AND LOWER("extension") IN ('pdf', 'jpg', 'jpeg')
-        //   LIMIT 1
-        //   FOR UPDATE SKIP LOCKED
-        // )
-        // UPDATE failai
-        // SET "ocrState" = -3,
-        //     "ocrNode" = $1,
-        //     "ocrLockTimestamp" = (NOW() AT TIME ZONE 'Europe/Vilnius')
-        // WHERE id IN (SELECT id FROM cte)
-        // RETURNING *;`,
-        //           [user.pavadinimas],
-        //       );
-        //   }
 
         if (failasRes.rows.length === 0) {
-            return res.status(204).send("Nėra OCR laukiančių failų.");
+            failasRes = await postgres.query(
+                `WITH cte AS (
+                    SELECT id
+                    FROM failai
+                    WHERE ("ocrState" IS NULL OR "ocrState" = 0)
+                      AND "nuskaitytas" >= 6
+                      AND LOWER("extension") IN ('pub', 'doc', 'odt', 'docm', 'rtf', 'pptx', 'odg', 'ppt', 'dotx', 'pages', 'ppsx', 'docx')
+                    LIMIT 1
+                    FOR UPDATE SKIP LOCKED
+                  )
+                  UPDATE failai
+                  SET "ocrState" = -3,
+                      "ocrNode" = $1,
+                      "ocrLockTimestamp" = (NOW() AT TIME ZONE 'Europe/Vilnius')
+                  WHERE id IN (SELECT id FROM cte)
+                  RETURNING *;`,
+                [user.pavadinimas],
+            );
+
+            if (failasRes.rows.length === 0) {
+                return res.status(204).send("Nėra OCR laukiančių failų.");
+            }
         }
     }
 
@@ -185,12 +190,9 @@ failasRouter.post("/failas/ocr/submit", async (req, res, next) => {
         `UPDATE failai
         SET "ocrState" = 1,
             "nuskaitytas" = 0,
-            "ocrText" = LEFT($1, 1048576),
-            "ocrLockTimestamp" = NULL,
-            "ocrDuration" = $2,
-            "ocrTimestamp" = (NOW() AT TIME ZONE 'Europe/Vilnius')
-        WHERE id = $3;`,
-        [tekstas, duration, id],
+            "ocrLockTimestamp" = NULL
+        WHERE id = $1;`,
+        [id],
     );
 
     // Calculate counts
@@ -363,7 +365,7 @@ failasRouter.get(
             const deze = dezeRes.rows[0];
 
             if (
-                ["zip"].includes(
+                ["zip", "7z"].includes(
                     String(parentRes.rows[0].extension).toLowerCase(),
                 )
             ) {
@@ -658,7 +660,7 @@ async function aptarnautiFailą(req, res, next, failas, requestsJson = false) {
 }
 
 async function fetchFailasMetadata(id) {
-    const [iban, jarKodai, links, emails, domains, telefonai] =
+    const [iban, jarKodai, links, emails, domains, telefonai, metaduomenys] =
         await Promise.all([
             postgres.query(
                 `SELECT iban, puslapiai
@@ -702,6 +704,14 @@ async function fetchFailasMetadata(id) {
        ORDER BY COALESCE(puslapiai[1], 9999), telefonas ASC`,
                 [id],
             ),
+            postgres.query(
+                `SELECT metaduomenys
+       FROM "failaiNuskaitymai"
+       WHERE failas = $1
+       ORDER BY id DESC
+       LIMIT 1`,
+                [id],
+            ),
         ]);
 
     return {
@@ -711,6 +721,9 @@ async function fetchFailasMetadata(id) {
         emails: emails.rows,
         domains: domains.rows.map((r) => r.domain),
         telefonai: telefonai.rows,
+        metaduomenys: metaduomenys.rows.length
+            ? metaduomenys.rows[0].metaduomenys
+            : null,
     };
 }
 

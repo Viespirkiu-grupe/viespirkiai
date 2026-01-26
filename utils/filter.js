@@ -514,6 +514,26 @@ export function buildPostgresFailaiSearchFilter(query, limit, page = 1) {
         }
     }
 
+    if (query.location && query.locationRadius != null) {
+        const [latStr, lonStr] = query.location.split(","); // expect "lat,lon"
+        const lat = parseFloat(latStr);
+        const lon = parseFloat(lonStr);
+        const radius = parseFloat(query.locationRadius);
+
+        if (!isNaN(lat) && !isNaN(lon) && !isNaN(radius)) {
+            whereClauses.push(`
+              location IS NOT NULL AND
+              ST_DWithin(
+                location::geography,
+                ST_SetSRID(ST_MakePoint(${addParam("lon", lon)}, ${addParam("lat", lat)}), 4326)::geography,
+                ${addParam("radius", radius)}
+              )
+            `);
+            usedHiddenFields = true;
+            visiIrasai = false;
+        }
+    }
+
     // Full-text search logic
     let tsQueryFunc = null;
     let cleanSearch = null;

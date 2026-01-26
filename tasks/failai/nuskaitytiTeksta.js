@@ -76,12 +76,24 @@ async function nuskaitytiDokNuskaitytojuje(
         extension: extension,
     };
 
-    if (dokumentas.ocrText && dokumentas.ocrText.length > 0) {
-        try {
-            body.puslapiai = parsePgArray(dokumentas.ocrText);
-        } catch (e) {
-            console.error(e);
+    try {
+        const res = await postgres.query(
+            `SELECT *
+             FROM "failaiOcrRezultatai"
+             WHERE failas = $1
+             ORDER BY id DESC
+             LIMIT 1`,
+            [dokumentas.id],
+        );
+
+        if (res.rows.length > 0) {
+            const latestEntry = res.rows[0];
+            body.puslapiai = latestEntry.tekstas
+                ? parsePgArray(latestEntry.tekstas)
+                : [];
         }
+    } catch (e) {
+        console.error(e);
     }
 
     let response = await fetch(fetchUrl, {
@@ -370,93 +382,156 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         }
     }
 
+    let client;
     try {
-        await postgres.query("BEGIN");
+        client = await postgres.connect();
+        await client.query("BEGIN");
 
         const docId = dokumentas.id;
 
         // Delete old entries
-        await postgres.query(`DELETE FROM "failaiIban" WHERE id = $1`, [docId]);
-        await postgres.query(`DELETE FROM "failaiJarKodai" WHERE id = $1`, [
+        await client.query(`DELETE FROM "failaiIban" WHERE id = $1`, [docId]);
+        await client.query(`DELETE FROM "failaiJarKodai" WHERE id = $1`, [
             docId,
         ]);
-        await postgres.query(`DELETE FROM "failaiLinks" WHERE id = $1`, [
+        await client.query(`DELETE FROM "failaiLinks" WHERE id = $1`, [docId]);
+        await client.query(`DELETE FROM "failaiEmails" WHERE id = $1`, [docId]);
+        await client.query(`DELETE FROM "failaiDomains" WHERE id = $1`, [
             docId,
         ]);
-        await postgres.query(`DELETE FROM "failaiEmails" WHERE id = $1`, [
-            docId,
-        ]);
-        await postgres.query(`DELETE FROM "failaiDomains" WHERE id = $1`, [
-            docId,
-        ]);
-        await postgres.query(`DELETE FROM "failaiTelefonai" WHERE id = $1`, [
+        await client.query(`DELETE FROM "failaiTelefonai" WHERE id = $1`, [
             docId,
         ]);
 
-        // Insert new failaiIban
+        // helper: bulk insert (max 100 rows per call)
+        async function bulkInsert({ table, columns, rows, client }) {
+            if (!rows.length) return;
+
+            const values = [];
+            const placeholders = rows.map((row, i) => {
+                const base = i * columns.length;
+                columns.forEach((col) => values.push(row[col]));
+                return `(${columns.map((_, j) => `$${base + j + 1}`).join(", ")})`;
+            });
+
+            await client.query(
+                `INSERT INTO "${table}"(${columns.join(", ")}) VALUES ${placeholders.join(", ")}`,
+                values,
+            );
+        }
+
+        // IBAN
         if (metadata?.ibanNumeriai?.length) {
-            for (const { numeris, pages } of metadata.ibanNumeriai) {
-                await postgres.query(
-                    `INSERT INTO "failaiIban"(id, iban, puslapiai) VALUES ($1, $2, $3)`,
-                    [docId, numeris, pages],
-                );
+            for (let i = 0; i < metadata.ibanNumeriai.length; i += 100) {
+                await bulkInsert({
+                    table: "failaiIban",
+                    columns: ["id", "iban", "puslapiai"],
+                    rows: metadata.ibanNumeriai.slice(i, i + 100).map((x) => ({
+                        id: docId,
+                        iban: x.numeris,
+                        puslapiai: x.pages,
+                    })),
+                    client,
+                });
             }
         }
 
-        // Insert new failaiJarKodai
+        // JAR kodai
         if (metadata?.jarKodai?.length) {
-            for (const { code, pages } of metadata.jarKodai) {
-                await postgres.query(
-                    `INSERT INTO "failaiJarKodai"(id, jarKodas, puslapiai) VALUES ($1, $2, $3)`,
-                    [docId, code, pages],
-                );
+            for (let i = 0; i < metadata.jarKodai.length; i += 100) {
+                await bulkInsert({
+                    table: "failaiJarKodai",
+                    columns: ["id", "jarKodas", "puslapiai"],
+                    rows: metadata.jarKodai.slice(i, i + 100).map((x) => ({
+                        id: docId,
+                        jarKodas: x.code,
+                        puslapiai: x.pages,
+                    })),
+                    client,
+                });
             }
         }
 
-        // Insert new failaiLinks
+        // Links
         if (metadata?.links?.length) {
-            for (const { uri, pages } of metadata.links) {
-                await postgres.query(
-                    `INSERT INTO "failaiLinks"(id, link, puslapiai) VALUES ($1, $2, $3)`,
-                    [docId, uri, pages],
-                );
+            for (let i = 0; i < metadata.links.length; i += 100) {
+                await bulkInsert({
+                    table: "failaiLinks",
+                    columns: ["id", "link", "puslapiai"],
+                    rows: metadata.links.slice(i, i + 100).map((x) => ({
+                        id: docId,
+                        link: x.uri,
+                        puslapiai: x.pages,
+                    })),
+                    client,
+                });
             }
         }
 
-        // Insert new failaiEmails
+        // Emails
         if (metadata?.emails?.length) {
-            for (const { email, pages } of metadata.emails) {
-                await postgres.query(
-                    `INSERT INTO "failaiEmails"(id, email, puslapiai) VALUES ($1, $2, $3)`,
-                    [docId, email, pages],
-                );
+            for (let i = 0; i < metadata.emails.length; i += 100) {
+                await bulkInsert({
+                    table: "failaiEmails",
+                    columns: ["id", "email", "puslapiai"],
+                    rows: metadata.emails.slice(i, i + 100).map((x) => ({
+                        id: docId,
+                        email: x.email,
+                        puslapiai: x.pages,
+                    })),
+                    client,
+                });
             }
         }
 
-        // Insert new failaiDomains (no puslapiai)
+        // Domains
         if (metadata?.domains?.length) {
-            for (const domain of metadata.domains) {
-                await postgres.query(
-                    `INSERT INTO "failaiDomains"(id, domain) VALUES ($1, $2)`,
-                    [docId, domain],
-                );
+            for (let i = 0; i < metadata.domains.length; i += 100) {
+                await bulkInsert({
+                    table: "failaiDomains",
+                    columns: ["id", "domain"],
+                    rows: metadata.domains.slice(i, i + 100).map((domain) => ({
+                        id: docId,
+                        domain,
+                    })),
+                    client,
+                });
             }
         }
 
-        // Insert new failaiTelefonai
+        // Telefonai
         if (metadata?.telefonai?.length) {
-            for (const { numeris, pages } of metadata.telefonai) {
-                await postgres.query(
-                    `INSERT INTO "failaiTelefonai"(id, telefonas, puslapiai) VALUES ($1, $2, $3)`,
-                    [docId, numeris, pages],
-                );
+            for (let i = 0; i < metadata.telefonai.length; i += 100) {
+                await bulkInsert({
+                    table: "failaiTelefonai",
+                    columns: ["id", "telefonas", "puslapiai"],
+                    rows: metadata.telefonai.slice(i, i + 100).map((x) => ({
+                        id: docId,
+                        telefonas: x.numeris,
+                        puslapiai: x.pages,
+                    })),
+                    client,
+                });
             }
         }
 
-        await postgres.query("COMMIT");
+        await client.query("COMMIT");
     } catch (e) {
-        await postgres.query("ROLLBACK");
+        if (client) await client.query("ROLLBACK");
         throw e;
+    } finally {
+        if (client) client.release();
+    }
+
+    let location = null;
+
+    if (
+        metadata?.exif?.GPSLatitude?.description != null &&
+        metadata?.exif?.GPSLongitude?.description != null
+    ) {
+        const lat = parseFloat(metadata.exif.GPSLatitude.description);
+        const lon = parseFloat(metadata.exif.GPSLongitude.description);
+        location = `POINT(${lon} ${lat})`; // WKT format
     }
 
     // Update the row
@@ -469,8 +544,9 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             "puslapiuSkaicius" = $5,
             "simboliuSkaicius" = $6,
             "ocrState" = $7,
+            location = ST_GeomFromText($8, 4326),
             "nuskaitymasTimestamp" = NOW()
-        WHERE id = $8;`,
+        WHERE id = $9;`,
         [
             nuskaitymoVersija,
             truncateTo1MB(tekstas),
@@ -479,7 +555,31 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             metadata?.pageCount,
             metadata?.characterCount || 0,
             reikalingasOcr,
+            location,
             dokumentas.id,
+        ],
+    );
+
+    await postgres.query(
+        `INSERT INTO "failaiNuskaitymai"
+            (failas, versija, metaduomenys, "timestamp", "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", location)
+         VALUES ($1, $2, $3, NOW() AT TIME ZONE 'Europe/Vilnius', $4, $5, $6, ST_GeomFromText($7, 4326))
+         ON CONFLICT (failas, versija, "metaduomenysHash")
+         DO UPDATE SET
+            metaduomenys = EXCLUDED.metaduomenys,
+            "timestamp" = EXCLUDED."timestamp",
+            "zodziuSkaicius" = EXCLUDED."zodziuSkaicius",
+            "puslapiuSkaicius" = EXCLUDED."puslapiuSkaicius",
+            "simboliuSkaicius" = EXCLUDED."simboliuSkaicius",
+             location = EXCLUDED.location;`,
+        [
+            dokumentas.id, // failas
+            nuskaitymoVersija, // versija
+            metadata, // metaduomenys
+            metadata?.wordCount, // zodziuSkaicius
+            metadata?.pageCount, // puslapiuSkaicius
+            metadata?.characterCount || 0, // simboliuSkaicius
+            location, // location
         ],
     );
 
