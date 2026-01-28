@@ -51,6 +51,7 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
                     item.registravimoData,
                 ).split(" ")[0];
             });
+            queryParams += `search=${encodeURIComponent(req.query.search)}`;
         } else if (req.query.location && req.query.locationRadius) {
             searchEngine = "PostgreSQL";
             const [lat, lon] = req.query.location.split(",").map(Number);
