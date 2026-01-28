@@ -62,7 +62,7 @@
                     </dd>
                 </div>
                 </dl>
-                <div style=""> <!-- display: flex; justify-content: space-between; align-items: flex-start; -->
+                <div>
                     <div class="rezultatas-right">
                         <div class="suma">
                             <%
@@ -92,7 +92,7 @@
                         <b> Pirkėjas: </b>
                         <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>"><%= item.perkanciojiOrganizacija %></a>
                     </div>
-    				<% if(!item.tiekejai.length == 1) { %>
+    				<% if(item.tiekejai.length == 1) { %>
                         <div>
                             <b> Tiekėjas: </b>
                             <a href="/asmuo/<%= item.tiekejaiKodai[0] %>"><%= item.tiekejai[0] || "Nenurodytas" %></a>
