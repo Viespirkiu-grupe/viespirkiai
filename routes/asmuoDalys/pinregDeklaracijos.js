@@ -1,9 +1,9 @@
 import { postgres } from "../../postgres/postgres.js";
 
-export async function gautiVtekDeklaracijas(jarKodas) {
+export async function gautiPinregDeklaracijas(jarKodas) {
     let deklaracijosRes = await postgres.query(
         `SELECT *
-  FROM public.vtek
+  FROM public.pinreg
   WHERE "darbovietesJar" @> ARRAY[$1]
      OR "juridiniaiRysiaiJar" @> ARRAY[$2]
      OR "sutuoktinisDarbovietesJar" @> ARRAY[$3]

@@ -1,11 +1,11 @@
  <h2 id="pinreg"><a href="#pinreg" class="hashHref"><u>Privačių interesų deklaracijos</u></a></h2>
  <% let pinregLimit = Number(queryParams.pinregLimit) || 3; %>
  <% if(queryParams.pinregLimit == "max") {pinregLimit = 10000000} %>
- <% if(asmuo.vtek.rysiaiSuJa.length > pinregLimit || asmuo.vtek.darbovietes.length > pinregLimit || asmuo.vtek.sutuoktinioDarbovietes.length > pinregLimit) { %>
+ <% if(asmuo.pinreg.rysiaiSuJa.length > pinregLimit || asmuo.pinreg.darbovietes.length > pinregLimit || asmuo.pinreg.sutuoktinioDarbovietes.length > pinregLimit) { %>
      <i>
          Rodomos tik po paskutinės 3 privačių interesų deklaracijos.
          <a href="?pinregLimit=max#pinreg">
-             Rodyti visas (<%= asmuo.vtek.rysiaiSuJa.length + asmuo.vtek.darbovietes.length + asmuo.vtek.sutuoktinioDarbovietes.length %>)
+             Rodyti visas (<%= asmuo.pinreg.rysiaiSuJa.length + asmuo.pinreg.darbovietes.length + asmuo.pinreg.sutuoktinioDarbovietes.length %>)
          </a>
      </i>
      <br>
@@ -15,7 +15,7 @@
      <section class="results" style="margin-inline: initial;">
          <h3 style="margin-bottom: 0px;">Ryšiai su juridiniais asmenimis</h3>
          <% let i = 0; %>
-         <% asmuo.vtek.rysiaiSuJa.forEach(rysys =>  { %>
+         <% asmuo.pinreg.rysiaiSuJa.forEach(rysys =>  { %>
             <% i++; if(i > pinregLimit) { return; } %>
              <div class="rezultatas">
                  <div class="rezultatas-top">
@@ -37,7 +37,7 @@
      <section class="results" style="margin-inline: initial;">
          <h3 style="margin-bottom: 0px;">Darbovietės</h3>
          <% let j = 0; %>
-         <% asmuo.vtek.darbovietes.forEach(darboviete =>  { %>
+         <% asmuo.pinreg.darbovietes.forEach(darboviete =>  { %>
              <% j++; if(j > pinregLimit) { return; } %>
              <div class="rezultatas">
                  <div class="rezultatas-top">
@@ -63,7 +63,7 @@
      <section class="results" style="margin-inline: initial;">
          <h3 style="margin-bottom: 0px;">Sutuoktinių darbovietės</h3>
          <% let k = 0; %>
-         <% asmuo.vtek.sutuoktinioDarbovietes.forEach(darboviete =>  { %>
+         <% asmuo.pinreg.sutuoktinioDarbovietes.forEach(darboviete =>  { %>
              <% k++; if(k > pinregLimit) { return; } %>
              <div class="rezultatas">
                  <div class="rezultatas-top">

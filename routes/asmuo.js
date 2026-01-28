@@ -11,7 +11,7 @@ import { gautiSutarciuDuomenis } from "./asmuoDalys/sutartys.js";
 import { gautiFinansuDuomenis } from "./asmuoDalys/finansai.js";
 import { gautiIstatiniKapitala } from "./asmuoDalys/istatinisKapitalas.js";
 import { gautiDarboSkelbimus } from "./asmuoDalys/darboSkelbimai.js";
-import { gautiVtekDeklaracijas } from "./asmuoDalys/vtekDeklaracijos.js";
+import { gautiPinregDeklaracijas } from "./asmuoDalys/pinregDeklaracijos.js";
 import { gautiNepatikimuTiekejuIrasus } from "./asmuoDalys/nepatikimiTiekejai.js";
 import { gautiMelaginguTiekejuIrasus } from "./asmuoDalys/melagingiTiekejai.js";
 import { gautiJadisDalyvius } from "./asmuoDalys/jadis.js";
@@ -140,7 +140,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         finansai: async () => gautiFinansuDuomenis(jarId),
         istatinisKapitalas: async () => gautiIstatiniKapitala(jarId),
         darboSkelbimai: async () => gautiDarboSkelbimus(req, id),
-        vtek: async () => gautiVtekDeklaracijas(id),
+        pinreg: async () => gautiPinregDeklaracijas(id),
         nepatikimi: async () => gautiNepatikimuTiekejuIrasus(id),
         melagingi: async () => gautiMelaginguTiekejuIrasus(id),
         jadis: async () => gautiJadisDalyvius(jarId),
