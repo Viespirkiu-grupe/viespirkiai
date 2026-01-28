@@ -4,7 +4,7 @@ https://www.regitra.lt/imone/atviri-duomenys/
 */
 import fs from "fs";
 import readline from "readline";
-import { mysql } from "../mysql/mysql.js";
+import { postgres } from "../../postgres/postgres.js";
 
 // Patikrina, ar nurodytas CSV failo pavadinimas
 const filename = process.argv[2];
@@ -57,7 +57,7 @@ if (batch.length > 0) {
 }
 
 console.log(`Įterptos eilutės: ${eilute}`);
-await mysql.end();
+await postgres.end();
 
 /**
  * Nuskaito CSV eilutę.
@@ -113,24 +113,35 @@ function clean(val) {
 
 var eilute = 0;
 /**
- * Įterpia duomenų grupę į MySQL duomenų bazę.
+ * Įterpia duomenų grupę į Postgres duomenų bazę.
  * @param {Array} rows - Duomenų grupė, kurią reikia įterpti.
  * @returns {Promise<void>}
  */
 async function insertBatch(rows) {
     if (rows.length === 0) return;
 
-    const rowPlaceholders = `(${Array(69).fill("?").join(", ")})`;
+    // Number of columns per row
+    const numCols = 69;
+
+    // Generate the placeholders for multiple rows
+    const rowPlaceholders = (rowIndex) =>
+        `(${Array.from({ length: numCols }, (_, i) => `$${rowIndex * numCols + i + 1}`).join(", ")})`;
+
+    // Generate the full VALUES string
+    const valuesPlaceholders = rows
+        .map((_, i) => rowPlaceholders(i))
+        .join(", ");
+
     const sql = `
-    INSERT INTO regitra (
-      marke, komercinisPavadinimas, gamintojoPavadinimas, gamintojoPavadinimasBazinis, tipas, variantas, versija, EsTipoPatvirtinimoNr, NacTipoPatvirtinimoNr, IndividualusPatvirtinimoNr, Interpoliacija, vairasDesineje, kategorijaPilna, kategorijaKlase, kebuloKodas, specKodas, kebuloKodasEs, nuosavaMase, nuosavaMaseBazine, maksimaliMase, maksimaliMaseF2, maksimaliMaseF5, bandomojiMase, darbinisTuris, galia, sukiuSkaicius, galiaElektrine, degalai, degaluRezimas, arElektrine, hibridoKategorija, pavaruDezesTipas, CO2Kiekis, CO2KiekisWLTP, ekoNaujovesKodas, CO2SumazejimasNEDC, CO2SumazejimasWLTP, elektrEnergijosSanaudosNEDC, elektrEnergijosSanaudosWLTPE, elektrEnergijosSanaudosWLTPH, elektrineRidaNEDC, elektrineRidaWLTPE, elektrineRidaWLTPH, tersaluLygis, tersaluNorminioAktoNumeris, ratuBaze, priekinesAsiesVezesPlotis, galinesAsiesVezesPlotis, galiosMasesSantykis, maksGreitis, sedimuVietuSkaicius, stovimuVietuSkaicius, gamybosMetai, modelioMetai, pirmosiosRegistracijosData, pirmosiosRegistracijosLietuvojeData, paskutinesRegistracijosData, dalyvavimoEismeStatusas, kilmesSalis, valdymoTeise, jarKodas, jarPavadinimas, savivaldybe, apskritis, valdymoTeiseSavininkas, jarSavininkasKodas, jarSavininkasPavadinimas, savininkasSavivaldybe, savininkasApskritis
-    ) VALUES ${Array(rows.length).fill(rowPlaceholders).join(", ")}
+      INSERT INTO regitra (
+        "marke", "komercinisPavadinimas", "gamintojoPavadinimas", "gamintojoPavadinimasBazinis", "tipas", "variantas", "versija", "EsTipoPatvirtinimoNr", "NacTipoPatvirtinimoNr", "IndividualusPatvirtinimoNr", "Interpoliacija", "vairasDesineje", "kategorijaPilna", "kategorijaKlase", "kebuloKodas", "specKodas", "kebuloKodasEs", "nuosavaMase", "nuosavaMaseBazine", "maksimaliMase", "maksimaliMaseF2", "maksimaliMaseF5", "bandomojiMase", "darbinisTuris", "galia", "sukiuSkaicius", "galiaElektrine", "degalai", "degaluRezimas", "arElektrine", "hibridoKategorija", "pavaruDezesTipas", "CO2Kiekis", "CO2KiekisWLTP", "ekoNaujovesKodas", "CO2SumazejimasNEDC", "CO2SumazejimasWLTP", "elektrEnergijosSanaudosNEDC", "elektrEnergijosSanaudosWLTPE", "elektrEnergijosSanaudosWLTPH", "elektrineRidaNEDC", "elektrineRidaWLTPE", "elektrineRidaWLTPH", "tersaluLygis", "tersaluNorminioAktoNumeris", "ratuBaze", "priekinesAsiesVezesPlotis", "galinesAsiesVezesPlotis", "galiosMasesSantykis", "maksGreitis", "sedimuVietuSkaicius", "stovimuVietuSkaicius", "gamybosMetai", "modelioMetai", "pirmosiosRegistracijosData", "pirmosiosRegistracijosLietuvojeData", "paskutinesRegistracijosData", "dalyvavimoEismeStatusas", "kilmesSalis", "valdymoTeise", "jarKodas", "jarPavadinimas", "savivaldybe", "apskritis", "valdymoTeiseSavininkas", "jarSavininkasKodas", "jarSavininkasPavadinimas", "savininkasSavivaldybe", "savininkasApskritis"
+      ) VALUES ${valuesPlaceholders}
   `;
 
     const values = rows.flat();
 
     try {
-        await mysql.execute(sql, values);
+        await postgres.query(sql, values);
         eilute += rows.length;
         if (eilute % 1000 === 0) {
             console.log(`Įterpta ${eilute} eilučių...`);
