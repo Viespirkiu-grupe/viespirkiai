@@ -4,6 +4,16 @@ import { log } from "./utils/log.js";
 
 const tasks = [];
 
+// CPVA projektai
+import { nuskaitytiCpvaProjektaiTiekejai } from "./tasks/cpva/scrapeProjektai.js";
+tasks.push({
+    name: "nuskaitytiCpvaProjektaiTiekejai",
+    schedule: "0 */1 * * *",
+    job: async () => {
+        await nuskaitytiCpvaProjektaiTiekejai();
+    },
+});
+
 // VTEK deklaracijos
 import { nuskaitytiVtekDeklaracija } from "./tasks/vtek/nuskaityti.js";
 tasks.push({
@@ -13,6 +23,17 @@ tasks.push({
     errorCooldown: 10,
     job: async () => {
         return nuskaitytiVtekDeklaracija();
+    },
+});
+
+import { getNewestPinreg } from "./tasks/vtek/scrapeNewest.js";
+tasks.push({
+    name: "getNewestPinreg",
+    schedule: "0 */1 * * *",
+    job: async () => {
+        let weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        await getNewestPinreg(weekAgo);
     },
 });
 

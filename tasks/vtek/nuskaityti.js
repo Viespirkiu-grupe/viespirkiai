@@ -14,7 +14,7 @@ import { log } from "../../utils/log.js";
 export async function nuskaitytiVtekDeklaracija() {
     // Paimame vieną deklaracijos UUID iš duomenų bazės
     let deklaracijaRes = await postgres.query(
-        "SELECT * FROM vtek WHERE nuskaitytas IS NULL LIMIT 1",
+        "SELECT * FROM pinreg WHERE nuskaitytas IS NULL LIMIT 1",
     );
     if (deklaracijaRes.rowCount === 0) return false;
 
@@ -49,7 +49,7 @@ export async function nuskaitytiVtekDeklaracija() {
                     `Klaida nuskaityti deklaracija ${deklaracija.uuid}: ${status}`,
                 );
                 await postgres.query(
-                    "UPDATE vtek SET nuskaitytas = -1 WHERE uuid = $1",
+                    "UPDATE pinreg SET nuskaitytas = -1 WHERE uuid = $1",
                     [deklaracija.uuid],
                 );
                 return reject(
@@ -98,7 +98,7 @@ export async function nuskaitytiVtekDeklaracija() {
 
     // Įrašome duomenis į duomenų bazę
     await postgres.query(
-        `UPDATE vtek SET
+        `UPDATE pinreg SET
             nuskaitytas = 1,
             json = $1,
             asmuo = $2,
@@ -119,6 +119,196 @@ export async function nuskaitytiVtekDeklaracija() {
             deklaracija.uuid,
         ],
     );
+
+    let deklaracijosJson = data;
+    const rysiaiSuJaRows = (deklaracijosJson.rysiaiSuJa || []).map((rysys) => ({
+        jarKodas: rysys.jaKodas,
+        deklaracija: deklaracijosJson.accessUuid,
+        pavadinimas: rysys.pavadinimas,
+        rysioPradzia: rysys.rysioPradzia,
+        rysioPabaiga: rysys.rysioPabaiga || null,
+        duomenuSaltinis: rysys.duomenuSaltinis || null,
+        registruotaLietuvoje: rysys.registruotaLietuvoje,
+        jaTeisinesFormosKodas: rysys.jaTeisinesFormosKodas,
+        jaTeisinesFormosPavadinimas: rysys.jaTeisinesFormosPavadinimas,
+        uzpildytaAutomatiskai: rysys.uzpildytaAutomatiskai,
+        kienoRysys: rysys.kienoRysys,
+        pastabos: rysys.pastabos,
+        rysioPobudzioPavadinimas: rysys.rysioPobudzioPavadinimas,
+        dalyvavimoVpInformacija: rysys.dalyvavimoVpInformacija,
+        dalyvaujaViesuosePirkimuose: rysys.dalyvaujaViesuosePirkimuose,
+    }));
+
+    // Delete existing rows for this deklaracija
+    await postgres.query(
+        `DELETE FROM "pinregRysiaiSuJa" WHERE "deklaracija" = $1`,
+        [deklaracijosJson.accessUuid],
+    );
+
+    // Insert updated rows for rysiaiSuJa
+    for (const row of rysiaiSuJaRows) {
+        await postgres.query(
+            `INSERT INTO "pinregRysiaiSuJa"
+                        (
+                            "jarKodas", "deklaracija", "pavadinimas", "rysioPradzia", "rysioPabaiga",
+                            "duomenuSaltinis", "registruotaLietuvoje", "jaTeisinesFormosKodas",
+                            "jaTeisinesFormosPavadinimas", "uzpildytaAutomatiskai", "kienoRysys",
+                            "pastabos", "rysioPobudzioPavadinimas", "dalyvavimoVpInformacija",
+                            "dalyvaujaViesuosePirkimuose"
+                        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+            [
+                row.jarKodas,
+                row.deklaracija,
+                row.pavadinimas,
+                row.rysioPradzia,
+                row.rysioPabaiga,
+                row.duomenuSaltinis
+                    ? JSON.stringify(row.duomenuSaltinis)
+                    : null,
+                row.registruotaLietuvoje,
+                row.jaTeisinesFormosKodas,
+                row.jaTeisinesFormosPavadinimas,
+                row.uzpildytaAutomatiskai,
+                row.kienoRysys,
+                row.pastabos,
+                row.rysioPobudzioPavadinimas,
+                row.dalyvavimoVpInformacija,
+                row.dalyvaujaViesuosePirkimuose,
+            ],
+        );
+    }
+
+    const pinregSutuoktinioDarbovietesRows = (
+        deklaracijosJson.sutuoktinioDarbovietes || []
+    ).flatMap((darboviete) => {
+        const uuid = deklaracijosJson.accessUuid;
+        const jarKodas = darboviete.jaKodas || darboviete.jarKodas;
+
+        return (darboviete.pareigos || []).map((pareiga) => ({
+            jarKodas,
+            deklaracija: uuid,
+            deklaruojancioVardas: deklaracijosJson.teikejas?.vardas || null,
+            deklaruojancioPavarde: deklaracijosJson.teikejas?.pavarde || null,
+            sutuoktinioVardas: deklaracijosJson.sutuoktinis?.vardas || null,
+            sutuoktinioPavarde: deklaracijosJson.sutuoktinis?.pavarde || null,
+            pavadinimas: darboviete.pavadinimas,
+            rysioPradzia: darboviete.rysioPradzia,
+            darbovietesTipas: darboviete.darbovietesTipas,
+            duomenuSaltiniai: darboviete.duomenuSaltiniai || [],
+            privaluDeklaruoti: darboviete.privaluDeklaruoti,
+            yraJuridinisAsmuo: darboviete.yraJuridinisAsmuo,
+            registruotaLietuvoje: darboviete.registruotaLietuvoje,
+            uzpildytaAutomatiskai: darboviete.uzpildytaAutomatiskai,
+            jaTeisinesFormosPavadinimas: darboviete.jaTeisinesFormosPavadinimas,
+            pareigos: pareiga.pareigos,
+            teisejoKodas: pareiga.teisejoKodas,
+            pareiguTipasPavadinimas: pareiga.pareiguTipasPavadinimas,
+        }));
+    });
+
+    // Delete existing rows for this deklaracija
+    await postgres.query(
+        `DELETE FROM "pinregSutuoktiniuDarbovietes" WHERE "deklaracija" = $1`,
+        [deklaracijosJson.accessUuid],
+    );
+
+    // Insert updated rows for spouse workplaces
+    for (const row of pinregSutuoktinioDarbovietesRows) {
+        await postgres.query(
+            `INSERT INTO "pinregSutuoktiniuDarbovietes"
+                        (
+                            "jarKodas", "deklaracija", "deklaruojancioVardas", "deklaruojancioPavarde",
+                            "sutuoktinioVardas", "sutuoktinioPavarde", "pavadinimas", "rysioPradzia",
+                            "darbovietesTipas", "duomenuSaltiniai", "privaluDeklaruoti", "yraJuridinisAsmuo",
+                            "registruotaLietuvoje", "uzpildytaAutomatiskai", "jaTeisinesFormosPavadinimas",
+                            "pareigos", "teisejoKodas", "pareiguTipasPavadinimas"
+                        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+            [
+                row.jarKodas,
+                row.deklaracija,
+                row.deklaruojancioVardas,
+                row.deklaruojancioPavarde,
+                row.sutuoktinioVardas,
+                row.sutuoktinioPavarde,
+                row.pavadinimas,
+                row.rysioPradzia,
+                row.darbovietesTipas,
+                JSON.stringify(row.duomenuSaltiniai),
+                row.privaluDeklaruoti,
+                row.yraJuridinisAsmuo,
+                row.registruotaLietuvoje,
+                row.uzpildytaAutomatiskai,
+                row.jaTeisinesFormosPavadinimas,
+                row.pareigos,
+                row.teisejoKodas,
+                row.pareiguTipasPavadinimas,
+            ],
+        );
+    }
+
+    const pinregDarbovietesRows = (deklaracijosJson.darbovietes || []).flatMap(
+        (darboviete) => {
+            const uuid = deklaracijosJson.accessUuid;
+            const jarKodas = darboviete.jaKodas || darboviete.jarKodas;
+
+            return (darboviete.pareigos || []).map((pareiga) => ({
+                jarKodas,
+                deklaracija: uuid,
+                vardas: deklaracijosJson.teikejas.vardas,
+                pavarde: deklaracijosJson.teikejas.pavarde,
+                pavadinimas: darboviete.pavadinimas,
+                rysioPradzia: darboviete.rysioPradzia,
+                darbovietesTipas: darboviete.darbovietesTipas,
+                duomenuSaltiniai: darboviete.duomenuSaltiniai || [],
+                privaluDeklaruoti: darboviete.privaluDeklaruoti,
+                yraJuridinisAsmuo: darboviete.yraJuridinisAsmuo,
+                registruotaLietuvoje: darboviete.registruotaLietuvoje,
+                uzpildytaAutomatiskai: darboviete.uzpildytaAutomatiskai,
+                jaTeisinesFormosPavadinimas:
+                    darboviete.jaTeisinesFormosPavadinimas,
+                pareigos: pareiga.pareigos,
+                teisejoKodas: pareiga.teisejoKodas,
+                pareiguTipasPavadinimas: pareiga.pareiguTipasPavadinimas,
+            }));
+        },
+    );
+
+    // Delete existing rows for this deklaracija
+    await postgres.query(
+        `DELETE FROM "pinregDarbovietes" WHERE "deklaracija" = $1`,
+        [deklaracijosJson.accessUuid],
+    );
+
+    // Insert updated rows
+    for (const row of pinregDarbovietesRows) {
+        await postgres.query(
+            `INSERT INTO "pinregDarbovietes"
+                        (
+                            "jarKodas", "deklaracija", "vardas", "pavarde", "pavadinimas", "rysioPradzia",
+                            "darbovietesTipas", "duomenuSaltiniai", "privaluDeklaruoti", "yraJuridinisAsmuo",
+                            "registruotaLietuvoje", "uzpildytaAutomatiskai", "jaTeisinesFormosPavadinimas",
+                            "pareigos", "teisejoKodas", "pareiguTipasPavadinimas"
+                        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+            [
+                row.jarKodas,
+                row.deklaracija,
+                row.vardas,
+                row.pavarde,
+                row.pavadinimas,
+                row.rysioPradzia,
+                row.darbovietesTipas,
+                JSON.stringify(row.duomenuSaltiniai),
+                row.privaluDeklaruoti,
+                row.yraJuridinisAsmuo,
+                row.registruotaLietuvoje,
+                row.uzpildytaAutomatiskai,
+                row.jaTeisinesFormosPavadinimas,
+                row.pareigos,
+                row.teisejoKodas,
+                row.pareiguTipasPavadinimas,
+            ],
+        );
+    }
 
     log(`Nuskaityta deklaracija ${deklaracija.uuid} t.y. ${asmuo}`);
     return true;

@@ -1,5 +1,5 @@
 /*
- * Sukelia privačių interesų deklaracijų UUID iš failo uuids.txt į VTEK lentelę
+ * Sukelia privačių interesų deklaracijų UUID iš failo uuids.txt į pinreg lentelę
  * UUID galima gauti iš paieškos puslapių requestų failų naudojant šią komandą (Linux):
  * grep -hoE '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' *.har | sort -u > uuids.txt
  */
@@ -50,7 +50,7 @@ async function sukeltiUuid(failoPavadinimas) {
  */
 async function insertBatch(batch) {
     const placeholders = batch.map((_, i) => `($${i + 1})`).join(", ");
-    const query = `INSERT INTO vtek (uuid) VALUES ${placeholders} ON CONFLICT DO NOTHING;`;
+    const query = `INSERT INTO pinreg (uuid) VALUES ${placeholders} ON CONFLICT DO NOTHING;`;
     await postgres.query(query, batch);
 }
 

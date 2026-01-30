@@ -212,6 +212,51 @@ Galioja iki: ${new String(purchase.galiojimoData).slice(0,10)}`,
                 </div>
             </section>
 
+            <div class="col-2 mobile-col-1">
+            <% if(purchase.cpvaProjektuSutartys && purchase.cpvaProjektuSutartys.length > 0) { %>
+            <section>
+                <div>
+                    <h2><u>Europos sąjungos projektai<sup>BETA</sup></u></h2><br>
+                    <% purchase.cpvaProjektuSutartys.forEach(projektoSutartis => { %>
+                        <div class="rezultatas">
+                            <div class="rezultatas-top">
+                                <span><%= projektoSutartis.projektoNr || "" %></span>
+                                <% if(projektoSutartis?.projektas) { %>
+                                    <span><%= projektoSutartis?.projektas?.projektoVeikluPradziosData || "" %> - <%= projektoSutartis?.projektas?.projektoVeikluPabaigosData || "" %></span>
+                                <% } %>
+                            </div>
+                            <div class="rezultatas-title">
+                                <span>
+                                    <a href="https://2021.esinvesticijos.lt/projektu-sritis/projektu-sarasas?query=<%= projektoSutartis.projektoNr %>">
+                                        <%= projektoSutartis?.projektas?.projektoPavadinimas || projektoSutartis.pirkimoObjektas || "" %>
+                                    </a>
+                                </span>
+                            </div>
+                            <div class="rezultatas-bottom">
+                                <% if(projektoSutartis.projektas && projektoSutartis.projektas.projektoVykdytojas) { %>
+                                    <% if(projektoSutartis.projektas.projektoVykdytojas) { %>
+                                        <span>
+                                            <b>Projekto vykdytojas:</b>
+                                            <a href="/asmuo/<%= projektoSutartis.projektas.projektoVykdytojoKodas %>">
+                                                <%= projektoSutartis?.projektas?.projektoVykdytojas  %>
+                                            </a>
+                                        </span>
+                                    <% } %>
+                                    <% if(projektoSutartis.projektas.isViso) { %>
+                                        <span>
+                                            <b>Bendra projekto suma:</b>
+                                            <%= Number(projektoSutartis.projektas.isViso).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€
+                                        </span>
+                                    <% } %>
+                                <% } %>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            </section>
+            <% } %>
+
+
             <section>
                 <div>
                     <h2><u>SABIS sutartys<sup>BETA</sup></u></h2><br>
@@ -247,9 +292,9 @@ Galioja iki: ${new String(purchase.galiojimoData).slice(0,10)}`,
                                             const suma = item.suma;
                                             if(Number(suma) > 10000) {
                                         %>
-                                            <u><%= Number(suma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</u>
+                                            <u><%= Number(suma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€</u>
                                         <% } else { %>
-                                            <%= Number(suma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
+                                            <%= Number(suma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€
                                         <% } %>
                                     </span>&nbsp;
                                     <span>
@@ -277,7 +322,7 @@ Galioja iki: ${new String(purchase.galiojimoData).slice(0,10)}`,
                                                         <h4><%= saskaita.sfTipas %> Nr. <%= saskaita.sfNumeris %></h4>
                                                         ID: <i><%= saskaita.sfId %> </i><br>
                                                         <% if(saskaita.valiuta == "Euras" || saskaita.valiuta == "EUR") {  saskaita.valiuta = "€" } %>
-                                                        <%= Number(saskaita.bendraSfSuma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> <%= saskaita.valiuta %> (su <%= saskaita.pvm %> PVM)
+                                                        <%= Number(saskaita.bendraSfSuma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;<%= saskaita.valiuta %> (su <%= saskaita.pvm %> PVM)
                                                         <br>
                                                         <i><%= saskaita.sfBusena %> (<%= saskaita.sfBusenoData %>)</i>
                                                     </div>
@@ -372,6 +417,7 @@ Galioja iki: ${new String(purchase.galiojimoData).slice(0,10)}`,
                     <% } %>
                 </div>
             </section>
+            </div>
 		</main>
 
         <%- include('footer.ejs') %>

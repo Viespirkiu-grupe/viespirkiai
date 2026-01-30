@@ -155,6 +155,29 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
     purchase.sutartiesUnikalusID = purchase.sutartiesUnikalusId;
     delete purchase.sutartiesUnikalusId;
 
+    purchase.cpvaProjektuSutartys = [];
+    if (purchase.pirkimoNumeris) {
+        let cpvaProjektaiRes = await postgres.query(
+            `SELECT *
+             FROM "cpvaProjektuSutartys"
+             WHERE "pirkimoNrCvpis" = $1;`,
+            [purchase.pirkimoNumeris],
+        );
+        purchase.cpvaProjektuSutartys = cpvaProjektaiRes.rows;
+    }
+
+    for (let projektoSutartis of purchase.cpvaProjektuSutartys) {
+        let projektasRes = await postgres.query(
+            `SELECT *
+             FROM "cpvaProjektuSarasas"
+             WHERE "projektoNr" = $1;`,
+            [projektoSutartis.projektoNr],
+        );
+        if (projektasRes.rows.length > 0) {
+            projektoSutartis.projektas = projektasRes.rows[0];
+        }
+    }
+
     // Pataisomi HTML entities
     purchase.pavadinimas = fixHtmlEntities(purchase.pavadinimas);
     purchase.perkanciojiOrganizacija = fixHtmlEntities(
