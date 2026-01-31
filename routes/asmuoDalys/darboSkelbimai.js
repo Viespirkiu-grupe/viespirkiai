@@ -12,7 +12,7 @@ export async function gautiDarboSkelbimus(req, jarKodas) {
     // Run count and fetch in parallel
     const [darboSkelbimaiCountResult, darboSkelbimaiRows] = await Promise.all([
         postgres.query(
-            `SELECT "count" AS total
+            `SELECT "rowCount" AS total
                FROM "darboVietaCount"
                WHERE "jarKodas" = $1;`,
             [jarKodas],
