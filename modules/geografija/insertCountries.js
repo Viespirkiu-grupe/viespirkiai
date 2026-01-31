@@ -1,10 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
-import {
-    buildNodeWayMaps,
-    extractWays,
-    walkWays,
-} from "../../utils/geography.js";
+import { buildNodeWayMaps, extractWays, walkWays } from "./utils.js";
 
 const overpassQuery = `
 [out:json][timeout:180];
@@ -18,6 +14,20 @@ out skel qt;
 
 const COUNTRY_DATA_VERSION = 1;
 
+/**
+ * Updates country boundaries in the database from the Overpass API.
+ *
+ * - Checks the current version in "geografiniaiPlotaiVersijos"; exits if up to date.
+ * - Deletes existing country entries.
+ * - Fetches new OSM data via Overpass API using a predefined query.
+ * - Builds node and way maps, extracts outer and inner ways for each relation.
+ * - Connects ways into closed rings and constructs MultiPolygon GeoJSON.
+ * - Inserts new country geometries into "geografiniaiPlotai".
+ *
+ * @async
+ * @returns {Promise<boolean>} True when update completes successfully or if data is already up to date.
+ * @throws {Error} If the Overpass API request fails.
+ */
 async function updateCountries() {
     const { rows } = await postgres.query(
         `SELECT versija
@@ -77,6 +87,7 @@ async function updateCountries() {
     }
 
     log("Atnaujintos šalių ribos");
+    return true;
 }
 
 if (

@@ -106,15 +106,15 @@ tasks.push({
     },
 });
 
-// JAR adresų koordinatės iš Nominatim / OpenStreetMap
-import { atrastiJarAdresoKoordinates } from "./tasks/adresai/scrape.js";
+// jarCsv koordinatės
+import { geolocateJarCsv } from "./modules/juridiniai/findCoordinates.js";
 tasks.push({
-    name: "scrapeJarAdresoKoordinates",
+    name: "geolocateJarCsv",
     mode: "asap",
-    cooldown: 60 * 60,
-    errorCooldown: 10,
+    cooldown: 60,
+    errorCooldown: 60,
     job: async () => {
-        return atrastiJarAdresoKoordinates();
+        return geolocateJarCsv();
     },
 });
 

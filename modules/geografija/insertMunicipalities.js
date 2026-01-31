@@ -1,10 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
-import {
-    buildNodeWayMaps,
-    extractWays,
-    walkWays,
-} from "../../utils/geography.js";
+import { buildNodeWayMaps, extractWays, walkWays } from "./utils.js";
 
 const overpassQuery = `
 [out:json][timeout:180];
@@ -20,6 +16,21 @@ out skel qt;
 
 const MUNICIPALITY_DATA_VERSION = 1;
 
+/**
+ * Updates municipality boundaries in the database from the Overpass API.
+ *
+ * - Checks the current version in "geografiniaiPlotaiVersijos"; exits if up to date.
+ * - Deletes existing municipality entries.
+ * - Fetches new OSM data via Overpass API using a predefined query.
+ * - Builds node and way maps, extracts outer and inner ways for each relation.
+ * - Connects ways into closed rings and constructs MultiPolygon GeoJSON.
+ * - Inserts new municipality geometries into "geografiniaiPlotai".
+ * - Updates the version in "geografiniaiPlotaiVersijos".
+ *
+ * @async
+ * @returns {Promise<boolean>} True when update completes successfully or if data is already up to date.
+ * @throws {Error} If the Overpass API request fails.
+ */
 async function updateMunicipalities() {
     const { rows } = await postgres.query(
         `SELECT versija
@@ -89,6 +100,7 @@ async function updateMunicipalities() {
     }
 
     log("Atnaujintos savivaldybių ribos");
+    return true;
 }
 
 if (

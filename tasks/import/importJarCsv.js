@@ -57,11 +57,13 @@ for await (const line of rl) {
 
     // Išvalome duomenys
     const row = fields.map(clean);
+    row.push(toBaseCompanyName(row[1])); // pridedame bazinį pavadinimą
 
     batch.push(row);
     typesenseBatch.push({
         jarKodas: row[0],
         pavadinimas: row[1],
+        pavadinimasBase: row[10],
         adresas: row[2],
         registravimoData: row[3],
         formosKodas: Number(row[4]),
@@ -88,6 +90,42 @@ if (batch.length > 0) {
 }
 
 console.log(`Įterptos eilutės: ${eilute}`);
+
+function toBaseCompanyName(name) {
+    const companyTypes = [
+        "UAB",
+        "AB",
+        "MB",
+        "IĮ",
+        "VšĮ",
+        "ŽŪB",
+        "KŪB",
+        "Uždaroji akcinė bendrovė",
+        "Akcinė bendrovė",
+        "Mažoji bendrija",
+        "Individuali įmonė",
+        "Viešoji įstaiga",
+        "Žemės ūkio bendrovė",
+        "Kooperatinė ūkinė bendrovė",
+    ];
+
+    if (!name) return "";
+
+    let cleaned = name
+        .replace(/["“”„]/g, "")
+        .replace(/,/g, "")
+        .trim();
+
+    // Pašalina visus prefiksus, nepriklausomai nuo case
+    companyTypes.forEach((type) => {
+        const pattern = type.replace(/\s+/g, "\\s+"); // tarpai gali būti vienas ar keli
+        const regex = new RegExp(pattern, "gi");
+        cleaned = cleaned.replace(regex, "");
+    });
+
+    // Normalizuoja tarpus
+    return cleaned.replace(/\s+/g, " ").trim();
+}
 
 /**
  * Nuskaito CSV eilutę.
@@ -149,17 +187,20 @@ export async function insertBatch(rows) {
     if (rows.length === 0) return;
 
     const placeholders = rows
-        .map(
-            (_, i) =>
-                `($${i * 10 + 1}, $${i * 10 + 2}, $${i * 10 + 3}, $${i * 10 + 4}, $${i * 10 + 5},
-                  $${i * 10 + 6}, $${i * 10 + 7}, $${i * 10 + 8}, $${i * 10 + 9}, $${i * 10 + 10})`,
-        )
+        .map((_, i) => {
+            const start = i * 11 + 1; // 11 vietoj 10, nes pridėjome vieną
+            const rowPlaceholders = Array.from(
+                { length: 11 },
+                (_, j) => `$${start + j}`,
+            );
+            return `(${rowPlaceholders.join(", ")})`;
+        })
         .join(", ");
 
     const sql = `
         INSERT INTO "jarCsv" (
             "jarKodas", "pavadinimas", "adresas", "registravimoData", "formosKodas",
-            "formosPavadinimas", "statusoKodas", "statusoPavadinimas", "statusasNuo", "duomenuData"
+            "formosPavadinimas", "statusoKodas", "statusoPavadinimas", "statusasNuo", "duomenuData", "pavadinimasBase"
         ) VALUES ${placeholders}
         ON CONFLICT ("jarKodas") DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas",
@@ -170,7 +211,8 @@ export async function insertBatch(rows) {
             "statusoKodas" = EXCLUDED."statusoKodas",
             "statusoPavadinimas" = EXCLUDED."statusoPavadinimas",
             "statusasNuo" = EXCLUDED."statusasNuo",
-            "duomenuData" = EXCLUDED."duomenuData"
+            "duomenuData" = EXCLUDED."duomenuData",
+            "pavadinimasBase" = EXCLUDED."pavadinimasBase"
     `;
 
     const values = rows.flat();

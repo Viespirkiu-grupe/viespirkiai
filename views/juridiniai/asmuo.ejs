@@ -10,7 +10,7 @@
 
 	<%- include('../js/charts.ejs') %>
 
-    <% if(asmuo.jar.koordinates) { %>
+    <% if(asmuo.jar.location) { %>
         <script>
         window.addEventListener('DOMContentLoaded', () => {
           // 1. Load Leaflet CSS
@@ -71,8 +71,8 @@
         </section>
 
         <section style="grid-area: zemelapis; height: 100%; min-height: 300px;">
-            <% if (asmuo?.jar?.koordinates) { %>
-                <div id="map" style="  width: 100%; height: 100%;" data-x="<%= asmuo.jar.koordinates.x %>" data-y="<%= asmuo.jar.koordinates.y %>"></div>
+            <% if (asmuo?.jar?.location) { %>
+              <div id="map" style="width: 100%; height: 100%;" data-x="<%= asmuo.jar.location[1] %>" data-y="<%= asmuo.jar.location[0] %>"></div>
             <% } %>
         </section>
 

@@ -77,23 +77,27 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         id = id.slice(0, -4);
     }
 
-    timings.start("jar");
+    timings.start("jarCsv");
     // Detalus JAR
     const { rows: jarRezultatai } = await postgres.query(
-        `SELECT * FROM "jarCsv" WHERE "jarKodas" = $1`,
+        `SELECT *,
+                    ST_X(location::geometry) AS lon,
+                    ST_Y(location::geometry) AS lat
+             FROM "jarCsv"
+             WHERE "jarKodas" = $1
+             LIMIT 1`,
         [id],
     );
-    timings.end("jar");
+    timings.end("jarCsv");
 
     // data.gov.lt ID JAR
     let jarId;
-
-    timings.start("jarCsv");
+    timings.start("jar");
     const jarRes = await postgres.query(
         `SELECT "_id" FROM "jar" WHERE "jarKodas" = $1`,
         [id],
     );
-    timings.end("jarCsv");
+    timings.end("jar");
 
     if (jarRes.rows && jarRes.rows.length > 0) {
         jarId = jarRes.rows[0]._id;
@@ -115,22 +119,22 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         return next();
     }
 
-    // Formatuojame JAR datas
     let jar = jarRezultatai[0];
+    // Nustatome koordinates
+    jar.location =
+        jar.lat !== null && jar.lon !== null ? [jar.lat, jar.lon] : undefined;
+
+    // Remove temporary lon/lat fields
+    delete jar.lon;
+    delete jar.lat;
+
+    // Formatuojame JAR datas
     jar.registravimoData = new Date(jar.registravimoData).toLtDate();
     jar.duomenuData = new Date(jar.duomenuData).toLtDate();
     jar.statusasNuo = new Date(jar.statusasNuo).toLtDate();
     jar.jarId = jarId;
 
     const taskMap = {
-        adresai: async () => {
-            if (jar.adresoId && jar.adresoId > 0) {
-                jar.koordinates = await gautiAdresoKoordinatesPagalId(
-                    jar.adresoId,
-                );
-            }
-            delete jar.adresoId;
-        },
         sodra: async () => gautiSodrosDuomenis(id),
         vmi: async () => gautiVmiDuomenis(id),
         regitra: async () => gautiRegitrosDuomenis(req, id),
