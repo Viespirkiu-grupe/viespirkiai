@@ -81,6 +81,13 @@ export async function importArray(data) {
         items.push(item);
     }
 
+    // If there are items with duplicate sutartiesUnikalusID, keep the last
+    const uniqueItemsMap = new Map();
+    for (const item of items) {
+        uniqueItemsMap.set(item.sutartiesUnikalusID, item);
+    }
+    items = Array.from(uniqueItemsMap.values());
+
     if (items.length > 0) {
         // Įterpiame į Typesense
         let startTypesenseTime = Date.now();

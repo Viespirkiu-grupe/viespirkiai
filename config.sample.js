@@ -5,6 +5,7 @@ export default {
     typesenseNodes: [{ host: "localhost", port: 1234, protocol: "http" }],
     typesenseApiKey: "",
     typesenseCollection: "",
+    typesenseUp: true,
     port: 8080,
     pgHost: "localhost",
     pgUser: "admin",

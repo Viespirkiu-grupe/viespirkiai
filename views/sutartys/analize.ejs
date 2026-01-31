@@ -1,5 +1,6 @@
 <section>
     <h2>Rezultatų analizė<sup>BETA</sup></h2>
+    <a href="/?<%- queryParams %>&xlsx=true&analize=true">↗ XLSX</a>
     <section style="width: 100%;" class="col-3">
         <% if(analize.tipai) { %>
             <div>
@@ -21,9 +22,8 @@
                })
             </script>
             </div>
-        <% } else { %>
-            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
         <% } %>
+
         <% if(analize.sumosVsDatos) { %>
             <div>
             <h2><u><a href="#sumosVsDatos" id="sumosVsDatos" class="hashHref">Sumų ir datų pasiskirstymas</a></u><sub>&nbsp;log</sub></h2>
@@ -43,8 +43,6 @@
                })
             </script>
             </div>
-        <% } else { %>
-            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
         <% } %>
 
         <% if(analize.metinesSumos) { %>
@@ -62,8 +60,69 @@
                })
             </script>
             </div>
-        <% } else { %>
-            <i class="diagrama-nera-duomenu">Nėra duomenų</i>
+        <% } %>
+
+        <% if(analize.topTiekejai) { %>
+            <div>
+                <h2><u><a href="#topTiekejai" id="topTiekejai" class="hashHref">Top tiekėjai</a></u></h2>
+                <div class="tableContainer">
+                    <table class="dataTable" style="min-width: 0; width: auto;">
+                        <thead>
+                            <tr>
+                                <th>Tiekėjas</th>
+                                <th>Vertės suma</th>
+                                <th>Sut. sk.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% let count = 0; %>
+                            <% analize.topTiekejai.forEach(tiekejas => { %>
+                                <% count++; if(count > 10) return; %>
+                                <tr>
+                                    <td>
+                                        <a href="/asmuo/<%= tiekejas.kodas %>">
+                                            <%= tiekejas.tiekejas %>
+                                        </a>
+                                    </td>
+                                    <td><%= tiekejas.suma.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</td>
+                                    <td><%= tiekejas.kiekis %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        <% } %>
+        <% if(analize.topPirkejai) { %>
+            <div>
+                <h2><u><a href="#topPirkejai" id="topPirkejai" class="hashHref">Top pirkėjai</a></u></h2>
+                <div class="tableContainer">
+                    <table class="dataTable" style="min-width: 0; width: auto;">
+                        <thead>
+                            <tr>
+                                <th>Pirkėjas</th>
+                                <th>Vertės suma</th>
+                                <th>Sut. sk.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% let count = 0; %>
+                            <% analize.topPirkejai.forEach(pirkejas => { %>
+                                <% count++; if(count > 10) return; %>
+                                <tr>
+                                    <td>
+                                        <a href="/asmuo/<%= pirkejas.kodas %>">
+                                            <%= pirkejas.pirkejas %>
+                                        </a>
+                                    </td>
+                                    <td><%= pirkejas.suma.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</td>
+                                    <td><%= pirkejas.kiekis %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         <% } %>
     </section>
     <span class="subtext">Ši analizė yra BETA versijoje ir gali turėti klaidų. Jei pastebėjote klaidą arba turite pasiūlymų, prašome <a href="/kontaktai">susisiekti</a>.</span>

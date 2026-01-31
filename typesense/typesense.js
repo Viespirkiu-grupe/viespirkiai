@@ -8,7 +8,7 @@ export const client = new Typesense.Client({
 });
 
 const COLLECTION = "sutartys";
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 const schema = {
     name: COLLECTION,
@@ -16,7 +16,7 @@ const schema = {
         { name: "id", type: "string" },
         { name: "tipas", type: "string", facet: true },
         { name: "pavadinimas", type: "string" },
-        { name: "kategorija", type: "string", facet: true },
+        { name: "kategorija", type: "string" },
         { name: "perkanciojiOrganizacija", type: "string" },
         { name: "perkanciosiosOrganizacijosKodas", type: "string" },
         { name: "tiekejas", type: "string" },
@@ -29,7 +29,7 @@ const schema = {
         { name: "paskutinioRedagavimoData", type: "int64" },
         { name: "sudarymoData", type: "int64" },
         { name: "galiojimoData", type: "int64" },
-        { name: "bvpzKodas", type: "string", facet: true },
+        { name: "bvpzKodas", type: "string" },
         { name: "bvpzPavadinimas", type: "string" },
         { name: "paskelbimoData", type: "int64" },
         { name: "sutartiesNumeris", type: "string" },
@@ -39,6 +39,7 @@ const schema = {
         { name: "papildomiBvpzKodai", type: "string[]" },
         { name: "papildomiBvpzPavadinimai", type: "string[]" },
         { name: "paskutiniKartaMatyta", type: "int64" },
+        { name: "pirkimoNumeris", type: "string" },
     ],
     default_sorting_field: "paskutinioRedagavimoData",
     metadata: {
@@ -143,6 +144,7 @@ export async function addDocumentToSearch(doc) {
         papildomiBvpzKodai: doc.papildomiBvpzKodai || [],
         papildomiBvpzPavadinimai: doc.papildomiBvpzPavadinimai || [],
         paskutiniKartaMatyta: toUnixTimestamp(doc.paskutiniKartaMatyta),
+        pirkimoNumeris: doc.pirkimoNumeris || "",
     };
 
     return client.collections(COLLECTION).documents().upsert(tsDoc);
@@ -288,7 +290,7 @@ export async function searchDocuments(query, options = {}) {
 ///////////////////////////
 
 const JAR_COLLECTION = "viespirkiaiJAR";
-const JAR_SCHEMA_VERSION = 7;
+const JAR_SCHEMA_VERSION = 10;
 
 const jar_schema = {
     name: JAR_COLLECTION,
@@ -296,12 +298,13 @@ const jar_schema = {
         { name: "id", type: "string" },
         { name: "jarKodas", type: "string" },
         { name: "pavadinimas", type: "string" },
+        { name: "pavadinimasBase", type: "string", optional: true },
         { name: "adresas", type: "string" },
         { name: "registravimoData", type: "int64" },
-        { name: "formosKodas", type: "int64", facet: true },
-        { name: "formosPavadinimas", type: "string", facet: true },
-        { name: "statusoKodas", type: "int64", facet: true },
-        { name: "statusoPavadinimas", type: "string", facet: true },
+        { name: "formosKodas", type: "int64" },
+        { name: "formosPavadinimas", type: "string" },
+        { name: "statusoKodas", type: "int64" },
+        { name: "statusoPavadinimas", type: "string" },
         { name: "statusasNuo", type: "int64" },
         { name: "duomenuData", type: "int64" },
         { name: "adresoId", type: "int64" },
@@ -395,19 +398,92 @@ export async function addDocumentsToJarSearch(givenArray) {
  * @param {string} options.filterBy - Filtravimo kriterijus (numatytas "")
  * @returns {Promise<Object>} Paieškos rezultatai ir bendras įrašų skaičius
  */
+function levenshtein(a, b) {
+    const matrix = Array.from({ length: b.length + 1 }, () =>
+        Array(a.length + 1).fill(0),
+    );
+
+    for (let i = 0; i <= b.length; i++) matrix[i][0] = i;
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            const cost =
+                a[j - 1].toLowerCase() === b[i - 1].toLowerCase() ? 0 : 1;
+            matrix[i][j] = Math.min(
+                matrix[i - 1][j] + 1, // deletion
+                matrix[i][j - 1] + 1, // insertion
+                matrix[i - 1][j - 1] + cost, // substitution
+            );
+        }
+    }
+    return matrix[b.length][a.length];
+}
+
 export async function searchJarDocuments(query, options = {}) {
     const { limit = 50, page = 1, sortBy = "", filterBy = "" } = options;
+    const baseQuery = toBaseCompanyName(query);
 
-    let results = await client.collections(JAR_COLLECTION).documents().search({
-        q: query,
-        query_by: "pavadinimas,adresas",
-        sort_by: sortBy,
-        filter_by: filterBy,
-        per_page: limit,
-        page: page,
-    });
+    const results = await client
+        .collections(JAR_COLLECTION)
+        .documents()
+        .search({
+            q: baseQuery,
+            query_by: "pavadinimasBase,pavadinimas,adresas",
+            sort_by: sortBy,
+            filter_by: filterBy,
+            per_page: limit,
+            page: page,
+        });
 
     let documents = results.hits.map((hit) => hit.document);
 
+    // Only rank by Levenshtein if all results fit on one page
+    if (results.found <= limit) {
+        documents.sort((a, b) => {
+            const nameA = a.pavadinimasBase || a.pavadinimas;
+            const nameB = b.pavadinimasBase || b.pavadinimas;
+            return (
+                levenshtein(baseQuery, nameA) - levenshtein(baseQuery, nameB)
+            );
+        });
+    }
+
     return { results: documents, total: results.found };
+}
+
+function toBaseCompanyName(name) {
+    const companyTypes = [
+        "UAB",
+        "AB",
+        "MB",
+        "IĮ",
+        "VšĮ",
+        "ŽŪB",
+        "KŪB",
+        "Uždaroji akcinė bendrovė",
+        "Akcinė bendrovė",
+        "Mažoji bendrija",
+        "Individuali įmonė",
+        "Viešoji įstaiga",
+        "Žemės ūkio bendrovė",
+        "Kooperatinė ūkinė bendrovė",
+    ];
+
+    if (!name) return "";
+
+    let cleaned = name
+        .replace(/["“”„]/g, "")
+        .replace(/,/g, "")
+        .trim();
+
+    // Pašalina visus prefiksus, nepriklausomai nuo case
+    companyTypes.forEach((type) => {
+        const pattern = type.replace(/\s+/g, "\\s+"); // tarpai gali būti vienas ar keli
+        const regex = new RegExp(pattern, "gi");
+        cleaned = cleaned.replace(regex, "");
+    });
+
+    // Normalizuoja tarpus
+    return cleaned.replace(/\s+/g, " ").trim();
 }

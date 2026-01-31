@@ -8,7 +8,9 @@ import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 import { postgres } from "../postgres/postgres.js";
 import QueryStream from "pg-query-stream";
+import { specAtvejai } from "./asmuo.js";
 import Timings from "../utils/timings.js";
+import * as XLSX from "xlsx";
 
 const indexRouter = express.Router();
 
@@ -60,7 +62,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
 
     let zinomasRezultatuSkaicius = true;
-    if (req.query.search) {
+    if (req.query.search && config.typesenseUp) {
         timings.start("typesense");
         // Tekstinė paieška – Typesense
         var { filterBy, values, queryParams, usedHiddenFields } =
@@ -485,13 +487,300 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
                 analize.metinesSumos[metai] += parseFloat(result.verte) || 0;
             }
         });
+
         // Convert to array and sort by year
         analize.metinesSumos = Object.entries(analize.metinesSumos)
             .map(([metai, suma]) => ({ metai, suma }))
             .sort((a, b) => a.metai - b.metai);
+
+        /// Top tiekėjai pagal sumas + sutarčių kiekis, ignoruojant tipas = 'SP'
+        analize.topTiekejai = {};
+
+        results.forEach((result) => {
+            if (result.tipas === "SP") return;
+
+            const tiekejai = result.tiekejai || [];
+            const kodai = result.tiekejaiKodai || [];
+            const verte =
+                parseFloat(result.faktineIvykdymoVerte) ||
+                parseFloat(result.verte) ||
+                0;
+
+            tiekejai.forEach((tiekejas, i) => {
+                const kodas = kodai[i];
+                if (!kodas) return;
+
+                if (specAtvejai[kodas]) {
+                    tiekejas = specAtvejai[kodas].pavadinimas;
+                }
+
+                if (!analize.topTiekejai[kodas]) {
+                    analize.topTiekejai[kodas] = {
+                        kodas,
+                        tiekejas,
+                        suma: 0,
+                        kiekis: 0,
+                    };
+                }
+
+                analize.topTiekejai[kodas].suma += verte;
+                analize.topTiekejai[kodas].kiekis += 1;
+            });
+        });
+
+        analize.topTiekejai = Object.values(analize.topTiekejai).sort(
+            (a, b) => b.suma - a.suma,
+        );
+
+        /// Top pirkėjai pagal sumas + sutarčių kiekis, ignoruojant tipas = 'SP'
+        analize.topPirkejai = {};
+
+        results.forEach((result) => {
+            if (result.tipas === "SP") return;
+
+            const kodas = result.perkanciosiosOrganizacijosKodas;
+            if (!kodas) return;
+
+            const pirkejas = result.perkanciojiOrganizacija || "Nežinomas";
+            const verte =
+                parseFloat(result.faktineIvykdymoVerte) ||
+                parseFloat(result.verte) ||
+                0;
+
+            if (!analize.topPirkejai[kodas]) {
+                analize.topPirkejai[kodas] = {
+                    kodas,
+                    pirkejas,
+                    suma: 0,
+                    kiekis: 0,
+                };
+            }
+
+            analize.topPirkejai[kodas].suma += verte;
+            analize.topPirkejai[kodas].kiekis += 1;
+        });
+
+        analize.topPirkejai = Object.values(analize.topPirkejai).sort(
+            (a, b) => b.suma - a.suma,
+        );
+    }
+
+    if (req.query.analize && req.query.xlsx) {
+        const workbook = XLSX.utils.book_new();
+
+        function generateTopTiekejaiSheet(topTiekejai) {
+            // Prepare data
+            const topTiekejaiForXlsx = topTiekejai.map((row) => ({
+                "Tiekėjo kodas": row.kodas,
+                "Tiekėjo pavadinimas": row.tiekejas,
+                "Sutarčių verčių suma": row.suma,
+                "Sutarčių skaičius": row.kiekis,
+            }));
+
+            // Create sheet
+            const topTiekejaiSheet = XLSX.utils.json_to_sheet(
+                topTiekejaiForXlsx,
+                {
+                    cellDates: true,
+                },
+            );
+
+            // Column widths
+            topTiekejaiSheet["!cols"] = [
+                { wch: 18 },
+                { wch: 45 },
+                { wch: 22 },
+                { wch: 20 },
+            ];
+
+            // Force numeric types
+            const range = XLSX.utils.decode_range(topTiekejaiSheet["!ref"]);
+            for (let r = range.s.r + 1; r <= range.e.r; r++) {
+                // Sutarčių verčių suma (column C = 2)
+                const sumCell =
+                    topTiekejaiSheet[XLSX.utils.encode_cell({ r, c: 2 })];
+                if (sumCell) {
+                    sumCell.t = "n";
+                    sumCell.v = parseFloat(sumCell.v) || 0;
+                    sumCell.z = "€#,##0.00";
+                }
+
+                // Sutarčių skaičius (column D = 3)
+                const countCell =
+                    topTiekejaiSheet[XLSX.utils.encode_cell({ r, c: 3 })];
+                if (countCell) {
+                    countCell.t = "n";
+                    countCell.v = parseInt(countCell.v) || 0;
+                }
+            }
+
+            // Apply autofilter
+            topTiekejaiSheet["!autofilter"] = { ref: topTiekejaiSheet["!ref"] };
+            return topTiekejaiSheet;
+        }
+
+        // Append sheet
+        XLSX.utils.book_append_sheet(
+            workbook,
+            generateTopTiekejaiSheet(analize.topTiekejai),
+            "Top tiekėjai",
+        );
+
+        function generateTopPirkejaiSheet(topPirkejai) {
+            // Prepare data with renamed columns
+            const topPirkejaiForXlsx = topPirkejai.map((row) => ({
+                "Pirkėjo kodas": row.kodas,
+                "Pirkėjo pavadinimas": row.pirkejas,
+                "Sutarčių verčių suma": row.suma,
+                "Sutarčių skaičius": row.kiekis,
+            }));
+
+            // Create sheet
+            const topPirkejaiSheet = XLSX.utils.json_to_sheet(
+                topPirkejaiForXlsx,
+                {
+                    cellDates: true,
+                },
+            );
+
+            // Column widths
+            topPirkejaiSheet["!cols"] = [
+                { wch: 18 }, // Pirkėjo kodas
+                { wch: 45 }, // Pirkėjo pavadinimas
+                { wch: 22 }, // Sutarčių verčių suma
+                { wch: 20 }, // Sutarčių skaičius
+            ];
+
+            // Force numeric types and format
+            const range = XLSX.utils.decode_range(topPirkejaiSheet["!ref"]);
+            for (let r = range.s.r + 1; r <= range.e.r; r++) {
+                // Sutarčių verčių suma (column C = 2)
+                const sumCell =
+                    topPirkejaiSheet[XLSX.utils.encode_cell({ r, c: 2 })];
+                if (sumCell) {
+                    sumCell.t = "n";
+                    sumCell.v = parseFloat(sumCell.v) || 0;
+                    sumCell.z = "€#,##0.00";
+                }
+
+                // Sutarčių skaičius (column D = 3)
+                const countCell =
+                    topPirkejaiSheet[XLSX.utils.encode_cell({ r, c: 3 })];
+                if (countCell) {
+                    countCell.t = "n";
+                    countCell.v = parseInt(countCell.v) || 0;
+                }
+            }
+
+            // Apply autofilter
+            topPirkejaiSheet["!autofilter"] = { ref: topPirkejaiSheet["!ref"] };
+            return topPirkejaiSheet;
+        }
+
+        // Append sheet
+        XLSX.utils.book_append_sheet(
+            workbook,
+            generateTopPirkejaiSheet(analize.topPirkejai),
+            "Top pirkėjai",
+        );
+
+        function generateMetinesSumosSheet(metinesSumos) {
+            // Prepare data with renamed columns
+            const data = metinesSumos.map((row) => ({
+                Metai: row.metai,
+                "Sutarčių verčių suma": row.suma,
+            }));
+
+            // Create sheet
+            const sheet = XLSX.utils.json_to_sheet(data, { cellDates: true });
+
+            // Set column widths
+            sheet["!cols"] = [
+                { wch: 12 }, // Metai
+                { wch: 22 }, // Sutarčių verčių suma
+            ];
+
+            // Force numeric type for suma and format €
+            const range = XLSX.utils.decode_range(sheet["!ref"]);
+            for (let r = range.s.r + 1; r <= range.e.r; r++) {
+                const sumCell = sheet[XLSX.utils.encode_cell({ r, c: 1 })]; // column B
+                if (sumCell) {
+                    sumCell.t = "n";
+                    sumCell.v = parseFloat(sumCell.v) || 0;
+                    sumCell.z = "€#,##0.00";
+                }
+            }
+
+            // Apply autofilter
+            sheet["!autofilter"] = { ref: sheet["!ref"] };
+            return sheet;
+        }
+
+        XLSX.utils.book_append_sheet(
+            workbook,
+            generateMetinesSumosSheet(analize.metinesSumos),
+            "Metinės sumos",
+        );
+
+        function generateTipaiSheet(tipai) {
+            // Prepare data with renamed columns
+            const data = tipai.map((row) => ({
+                Tipas: row.tipas,
+                "Sutarčių skaičius": row.count,
+            }));
+
+            // Create sheet
+            const sheet = XLSX.utils.json_to_sheet(data, { cellDates: true });
+
+            // Set column widths
+            sheet["!cols"] = [
+                { wch: 12 }, // Tipas
+                { wch: 20 }, // Sutarčių skaičius
+            ];
+
+            // Force numeric type for counts
+            const range = XLSX.utils.decode_range(sheet["!ref"]);
+            for (let r = range.s.r + 1; r <= range.e.r; r++) {
+                const countCell = sheet[XLSX.utils.encode_cell({ r, c: 1 })]; // column B
+                if (countCell) {
+                    countCell.t = "n";
+                    countCell.v = parseInt(countCell.v) || 0;
+                }
+            }
+
+            // Apply autofilter
+            sheet["!autofilter"] = { ref: sheet["!ref"] };
+            return sheet;
+        }
+
+        XLSX.utils.book_append_sheet(
+            workbook,
+            generateTipaiSheet(analize.tipai),
+            "Sutarčių tipai",
+        );
+
+        const xlsxBuffer = XLSX.write(workbook, {
+            type: "buffer",
+            bookType: "xlsx",
+        });
+
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename=viespirkiai-analize-${new Date().toISOString()}.xlsx`,
+        );
+        res.setHeader(
+            "Content-Type",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        );
+
+        return res.send(xlsxBuffer);
     }
 
     res.setHeader("Server-Timing", timings.serverTiming());
+
+    if (req.query.json) {
+        return res.json({ results, analize });
+    }
 
     res.renderCompiled("sutartys/index", {
         data: results,

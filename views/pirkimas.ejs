@@ -147,7 +147,30 @@ Galioja iki: ${new String(purchase.galiojimoData).slice(0,10)}`,
 
                     <div>
                         <h3>Pirkimo numeris:</h3>
-                        <%= purchase.pirkimoNumeris || "Nenurodytas" %>
+                        <% if(purchase.cvpisPirkimas){ %>
+                            <% if(purchase.cvpisPirkimas.type == 'Pmc'){ %>
+                                <a href="https://viesiejipirkimai.lt/epps/pmc/viewPmc.do?resourceId=<%= purchase.cvpisPirkimas.pirkimoId %>">
+                                    <%= purchase.pirkimoNumeris  %>
+                                </a>
+                            <% } %>
+                            <% if(purchase.cvpisPirkimas.type == 'CfTWS'){ %>
+                                <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTWS.do?resourceId=<%= purchase.cvpisPirkimas.pirkimoId %>">
+                                    <%= purchase.pirkimoNumeris  %>
+                                </a>
+                            <% } %>
+                            <% if(purchase.cvpisPirkimas.type == 'CfTDPSWS'){ %>
+                                <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTDPSWS.do?resourceId=<%= purchase.cvpisPirkimas.pirkimoId %>">
+                                    <%= purchase.pirkimoNumeris  %>
+                                </a>
+                            <% } %>
+                        <% } else if (purchase.cvppPirkimas) { %>
+                            <a href="<%= purchase.cvppPirkimas.link %>">
+                                <%= purchase.pirkimoNumeris  %>
+                            </a>
+                        <% } else { %>
+                            <%= purchase.pirkimoNumeris || "Nenurodytas" %>
+                        <% } %>
+
                     </div>
                 </div>
 

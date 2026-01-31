@@ -178,6 +178,22 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
         }
     }
 
+    let cvppPirkimas = await postgres.query(
+        `SELECT * FROM "cvppViesiejiPirkimai" WHERE "pirkimoNumeris" = $1`,
+        [purchase.pirkimoNumeris],
+    );
+    if (cvppPirkimas.rowCount > 0) {
+        purchase.cvppPirkimas = cvppPirkimas.rows[0];
+    }
+
+    let cvpisPirkimas = await postgres.query(
+        `SELECT * FROM "viesiejiPirkimai" WHERE "pirkimoId" = $1`,
+        [purchase.pirkimoNumeris],
+    );
+    if (cvpisPirkimas.rowCount > 0) {
+        purchase.cvpisPirkimas = cvpisPirkimas.rows[0];
+    }
+
     // Pataisomi HTML entities
     purchase.pavadinimas = fixHtmlEntities(purchase.pavadinimas);
     purchase.perkanciojiOrganizacija = fixHtmlEntities(

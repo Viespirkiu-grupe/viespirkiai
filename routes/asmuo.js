@@ -22,6 +22,44 @@ import Timings from "../utils/timings.js";
 
 const asmuoRouter = express.Router();
 
+export const specAtvejai = {
+    801: {
+        pavadinimas: "CVP IS pilietis",
+        aprasymas:
+            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas piliečiui.",
+    },
+    802: {
+        pavadinimas: "CVP IS ūkininkas",
+        aprasymas:
+            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas ūkininkui.",
+    },
+    803: {
+        pavadinimas: "CVP IS užsienio įmonė",
+        aprasymas:
+            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas užsienio įmonei.",
+    },
+    804: {
+        pavadinimas: "CVP IS Lietuvos respublikos ambasada",
+        aprasymas:
+            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas Lietuvos respublikos ambasadai.",
+    },
+    807: {
+        pavadinimas: "CVP IS kitas asmuo",
+        aprasymas:
+            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas kitam asmeniui.",
+    },
+    808: {
+        pavadinimas: "CVP IS Europos komisijos atstovybė Lietuvoje",
+        aprasymas:
+            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas Europos komisijos atstovybei Lietuvoje.",
+    },
+    809: {
+        pavadinimas: "CVP IS fizinis asmuo",
+        aprasymas:
+            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas fiziniam asmeniui.",
+    },
+};
+
 asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
     // Id turi būti <=9 skaitmenys, jei ne – 404
     if (!/^\d{1,9}(\.json|\.png)?$/.test(req.params.id)) {
@@ -60,45 +98,6 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
     if (jarRes.rows && jarRes.rows.length > 0) {
         jarId = jarRes.rows[0]._id;
     }
-
-    // Specialūs atvejai
-    const specAtvejai = {
-        801: {
-            pavadinimas: "CVP IS pilietis",
-            aprasymas:
-                "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas piliečiui.",
-        },
-        802: {
-            pavadinimas: "CVP IS ūkininkas",
-            aprasymas:
-                "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas ūkininkui.",
-        },
-        803: {
-            pavadinimas: "CVP IS užsienio įmonė",
-            aprasymas:
-                "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas užsienio įmonei.",
-        },
-        804: {
-            pavadinimas: "CVP IS Lietuvos respublikos ambasada",
-            aprasymas:
-                "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas Lietuvos respublikos ambasadai.",
-        },
-        807: {
-            pavadinimas: "CVP IS kitas asmuo",
-            aprasymas:
-                "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas kitam asmeniui.",
-        },
-        808: {
-            pavadinimas: "CVP IS Europos komisijos atstovybė Lietuvoje",
-            aprasymas:
-                "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas Europos komisijos atstovybei Lietuvoje.",
-        },
-        809: {
-            pavadinimas: "CVP IS fizinis asmuo",
-            aprasymas:
-                "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas fiziniam asmeniui.",
-        },
-    };
 
     if (specAtvejai[id]) {
         const { pavadinimas, aprasymas } = specAtvejai[id];
@@ -139,7 +138,7 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
         sutartys: async () => gautiSutarciuDuomenis(req, id),
         finansai: async () => gautiFinansuDuomenis(jarId),
         istatinisKapitalas: async () => gautiIstatiniKapitala(jarId),
-        darboSkelbimai: async () => gautiDarboSkelbimus(req, id),
+        // darboSkelbimai: async () => gautiDarboSkelbimus(req, id),
         pinreg: async () => gautiPinregDeklaracijas(id),
         nepatikimi: async () => gautiNepatikimuTiekejuIrasus(id),
         melagingi: async () => gautiMelaginguTiekejuIrasus(id),

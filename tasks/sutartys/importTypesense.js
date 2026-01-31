@@ -99,6 +99,7 @@ async function importToTypesense() {
                 papildomiBvpzKodai: doc.papildomiBvpzKodai || [],
                 papildomiBvpzPavadinimai: doc.papildomiBvpzPavadinimai || [],
                 paskutiniKartaMatyta: toUnixTimestamp(doc.paskutiniKartaMatyta),
+                pirkimoNumeris: doc.pirkimoNumeris || "",
             };
         });
 

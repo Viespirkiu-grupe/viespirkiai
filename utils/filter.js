@@ -98,6 +98,13 @@ export function buildTypesenseFilter(query) {
             },
             isBoolean: true,
         },
+        {
+            key: "pirkimoNumeris",
+            apply: (val) => {
+                filters.push(`pirkimoNumeris:=${val}`);
+                usedHiddenFields = true;
+            },
+        },
     ];
 
     for (const { key, apply, isBoolean } of config) {
@@ -146,6 +153,16 @@ export function buildPostgresFilter(query, limit, page = 1) {
             apply: (val) => {
                 whereClauses.push(
                     `"perkanciosiosOrganizacijosKodas" = ${addParam("perkanciosiosOrganizacijosKodas", val)}`,
+                );
+                usedHiddenFields = true;
+                visiIrasai = false;
+            },
+        },
+        {
+            key: "pirkimoNumeris",
+            apply: (val) => {
+                whereClauses.push(
+                    `"pirkimoNumeris" = ${addParam("pirkimoNumeris", val)}`,
                 );
                 usedHiddenFields = true;
                 visiIrasai = false;
@@ -300,10 +317,10 @@ export function buildPostgresFilter(query, limit, page = 1) {
         {
             key: "search",
             apply: (val) => {
-                const term = `%${val}%`;
+                const term = val.replace(/'/g, "''"); // escape single quotes
                 const param = addParam("search", term);
                 whereClauses.push(
-                    `("pavadinimas" ILIKE ${param} OR "aprasymas" ILIKE ${param})`,
+                    `"search_tsv" @@ plainto_tsquery('simple', ${param})`,
                 );
                 visiIrasai = false;
             },
