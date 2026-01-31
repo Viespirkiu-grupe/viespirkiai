@@ -13,15 +13,15 @@ export async function gautiDarboSkelbimus(req, jarKodas) {
     const [darboSkelbimaiCountResult, darboSkelbimaiRows] = await Promise.all([
         postgres.query(
             `SELECT "count" AS total
-               FROM "darboVietosCounts"
+               FROM "darboVietaCount"
                WHERE "jarKodas" = $1;`,
             [jarKodas],
         ),
         postgres.query(
             `SELECT *
-           FROM "darboVietos"
-           WHERE "jarKodas" = $1
-           ORDER BY "ikelimoData" DESC
+           FROM "darboVieta"
+           WHERE "jar_kodas" = $1
+           ORDER BY "ikelimo_data" DESC
            ${useLimit ? "LIMIT $2" : ""};`,
             useLimit ? [jarKodas, limit] : [jarKodas],
         ),
