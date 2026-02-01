@@ -1,11 +1,11 @@
 import express from "express";
 import cleanEmptyQueryParams from "../utils/queryParams.js";
 import config from "../utils/config.js";
-import { toLithuanianTime } from "../utils/time.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
-import { searchJarDocuments } from "../typesense/typesense.js";
 import { createCanvas } from "canvas";
 import { postgres } from "../postgres/postgres.js";
+import { searchJar } from "../modules/juridiniai/search.js";
+import { findSingleJuridinis } from "../modules/juridiniai/search.js";
 
 const juridiniaiRouter = express.Router();
 
@@ -26,71 +26,24 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
         limit = parseInt(req.query.limit) || limit;
     }
 
-    var searchEngine = "Typesense";
-
     if (
         req.query.search ||
         (req.query.location && req.query.locationRadius) ||
         req.query.adresas
     ) {
-        let values = {
-            search: req.query.search || "",
-        };
+        // Use the refactored function
+        const { results, total, searchEngine } = await searchJar(req.query, {
+            page,
+        });
 
-        let queryParams = `&`;
-
+        // Build queryParams for pagination/links outside the function
+        let queryParams = "&";
         if (req.query.search) {
-            var { results, total } = await searchJarDocuments(
-                req.query.search,
-                {
-                    page,
-                },
-            );
-            results.forEach((item) => {
-                item.registravimoData = toLithuanianTime(
-                    item.registravimoData,
-                ).split(" ")[0];
-            });
             queryParams += `search=${encodeURIComponent(req.query.search)}`;
         } else if (req.query.location && req.query.locationRadius) {
-            searchEngine = "PostgreSQL";
-            const [lat, lon] = req.query.location.split(",").map(Number);
-            const radius = parseFloat(req.query.locationRadius); // in meters
-
-            const { rows, rowCount } = await postgres.query(
-                `
-                    SELECT *
-                    FROM public."jarCsv"
-                    WHERE location IS NOT NULL
-                      AND ST_DWithin(
-                          location::geography,
-                          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-                          $3
-                      )
-                    `,
-                [lon, lat, radius],
-            );
-
-            results = rows;
-            total = rowCount;
-
-            // add to queryParams for pagination/links
-            queryParams += `&location=${lat},${lon}&locationRadius=${radius}`;
+            const [lat, lon] = req.query.location.split(",");
+            queryParams += `&location=${lat},${lon}&locationRadius=${req.query.locationRadius}`;
         } else if (req.query.adresas) {
-            searchEngine = "PostgreSQL";
-            const { rows, rowCount } = await postgres.query(
-                `
-                    SELECT *
-                    FROM public."jarCsv"
-                    WHERE "adresas" = $1 ORDER BY "registravimoData" DESC
-                    `,
-                [req.query.adresas],
-            );
-
-            results = rows;
-            total = rowCount;
-
-            // add to queryParams for pagination/links
             queryParams += `&adresas=${encodeURIComponent(req.query.adresas)}`;
         }
 
@@ -146,7 +99,7 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
         if (req.query.tikRezultatai) {
             res.render("juridiniai/results", {
                 customHead: config.customHead,
-                values,
+                values: req.query,
                 data: results,
                 queryParams,
                 numberOfResults,
@@ -161,7 +114,7 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
 
         res.render("juridiniai/index", {
             customHead: config.customHead,
-            values,
+            values: req.query,
             data: results,
             queryParams,
             numberOfResults,
@@ -335,6 +288,33 @@ juridiniaiRouter.get("/juridiniai/topAdresai", async (req, res) => {
         req,
         queryParams: "",
     });
+});
+
+juridiniaiRouter.get("/juridiniai/match", async (req, res) => {
+    try {
+        const { q, similarityThreshold } = req.query;
+
+        if (!q) {
+            return res
+                .status(400)
+                .json({ error: "Missing query parameter: q" });
+        }
+
+        const result = await findSingleJuridinis(q, {
+            similarityThreshold: similarityThreshold
+                ? Number(similarityThreshold)
+                : undefined,
+        });
+
+        if (!result) {
+            return res.status(404).json(null);
+        }
+
+        res.json(result);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Internal server error" });
+    }
 });
 
 export default juridiniaiRouter;

@@ -102,8 +102,8 @@
             <%= asmuo.jar.registravimoData %>
 
           <h3>Vieta</h3>
-          <% if (asmuo.jar.koordinates) { %>
-            <a href="https://www.openstreetmap.org/?mlat=<%= asmuo.jar.koordinates.y %>&mlon=<%= asmuo.jar.koordinates.x %>&zoom=16" target="_blank">
+          <% if (asmuo.jar.location) { %>
+            <a href="https://www.openstreetmap.org/?mlat=<%= asmuo.jar.location[0] %>&mlon=<%= asmuo.jar.location[1] %>&zoom=16" target="_blank">
               <%= asmuo.jar.adresas %>
             </a>
           <% } else { %>
@@ -215,6 +215,7 @@
        <section class="col-2 mobile-col-1">
             <%- include("asmuoDalys/darboSkelbimai.ejs") %>
             <%- include("asmuoDalys/rcPranesimai.ejs") %>
+            <%- include("asmuoDalys/domenai.ejs") %>
         </section>
 
        <%- include("asmuoDalys/regitra.ejs") %>

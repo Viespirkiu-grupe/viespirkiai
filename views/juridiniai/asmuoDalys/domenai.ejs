@@ -1,0 +1,42 @@
+<% if(asmuo.domenai && asmuo.domenai.count > 0){ %>
+    <div id="domenai">
+        <h2><a href="#domenai" class="hashHref"><u>.lt domenai</u></a></h2>
+        <i> Pagal savininko pavadinimo panašumą. </i>
+        <% if(asmuo.domenai.count > asmuo.domenai.rows.length) { %>
+            <i>
+                Rodomi tik <%= Number(asmuo.domenai.limit).linksniuoti(["domenas", "domenai", "domenų"]) %>.
+                <a href="?domenaiLimit=max#domenai">
+                    Rodyti visus (<%= asmuo.domenai.count %>)
+                </a>
+            </i>
+        <% } %>
+
+        <div class="results" style="margin-inline: 0px;">
+            <% let count = 0; %>
+            <% asmuo.domenai.rows.forEach(function(domenas){ %>
+                <div class="rezultatas">
+                    <div class="rezultatas-top">
+                        <span>
+                            Registruota:
+                            <%= String(domenas.created).split(" ")[0] %> – <%= String(domenas.expired).split(" ")[0] %>
+                        </span>
+                        <span>
+                            Duomenų data:
+                            <%= String(domenas.domregData).split(" ")[0] %>
+                        </span>
+                    </div>
+                    <div class="rezultatas-title">
+                        <a href="https://www.domreg.lt/paslaugos/whois/?search=<%= domenas.domain %>"><%= domenas.domain %></a>
+                    </div>
+                    <div class="rezultatas-bottom">
+                        <div>
+                            <b>Savininkas:</b>
+                            <%= domenas.savininkas %>
+                        </div>
+
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    </div>
+<% } %>

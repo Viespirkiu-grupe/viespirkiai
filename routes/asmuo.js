@@ -1,200 +1,88 @@
 import express from "express";
 import config from "../utils/config.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
-import { postgres } from "../postgres/postgres.js";
-import { gautiAdresoKoordinatesPagalId } from "./asmuoDalys/adresai.js";
-import { gautiSodrosDuomenis } from "./asmuoDalys/sodra.js";
-import { gautiVmiDuomenis } from "./asmuoDalys/vmi.js";
-import { gautiRegitrosDuomenis } from "./asmuoDalys/regitra.js";
-import { gautiTeismoNuosprendzius } from "./asmuoDalys/teismoNuosprendziai.js";
-import { gautiSutarciuDuomenis } from "./asmuoDalys/sutartys.js";
-import { gautiFinansuDuomenis } from "./asmuoDalys/finansai.js";
-import { gautiIstatiniKapitala } from "./asmuoDalys/istatinisKapitalas.js";
-import { gautiDarboSkelbimus } from "./asmuoDalys/darboSkelbimai.js";
-import { gautiPinregDeklaracijas } from "./asmuoDalys/pinregDeklaracijos.js";
-import { gautiNepatikimuTiekejuIrasus } from "./asmuoDalys/nepatikimiTiekejai.js";
-import { gautiMelaginguTiekejuIrasus } from "./asmuoDalys/melagingiTiekejai.js";
-import { gautiJadisDalyvius } from "./asmuoDalys/jadis.js";
-import { gautiRcPranesimus } from "./asmuoDalys/rcPranesimai.js";
-
-import { log } from "../utils/log.js";
-import Timings from "../utils/timings.js";
+import { gautiSutarciuDuomenisPagalJarKoda } from "../modules/sutartys/pagalJarKoda.js";
+import { getJuridinisInfo } from "../modules/juridiniai/getJuridinisInfo.js";
 
 const asmuoRouter = express.Router();
 
-export const specAtvejai = {
-    801: {
-        pavadinimas: "CVP IS pilietis",
-        aprasymas:
-            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas piliečiui.",
-    },
-    802: {
-        pavadinimas: "CVP IS ūkininkas",
-        aprasymas:
-            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas ūkininkui.",
-    },
-    803: {
-        pavadinimas: "CVP IS užsienio įmonė",
-        aprasymas:
-            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas užsienio įmonei.",
-    },
-    804: {
-        pavadinimas: "CVP IS Lietuvos respublikos ambasada",
-        aprasymas:
-            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas Lietuvos respublikos ambasadai.",
-    },
-    807: {
-        pavadinimas: "CVP IS kitas asmuo",
-        aprasymas:
-            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas kitam asmeniui.",
-    },
-    808: {
-        pavadinimas: "CVP IS Europos komisijos atstovybė Lietuvoje",
-        aprasymas:
-            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas Europos komisijos atstovybei Lietuvoje.",
-    },
-    809: {
-        pavadinimas: "CVP IS fizinis asmuo",
-        aprasymas:
-            "Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas fiziniam asmeniui.",
-    },
-};
-
-asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
+asmuoRouter.get("/asmuo/:jarKodas", async (req, res, next) => {
     // Id turi būti <=9 skaitmenys, jei ne – 404
-    if (!/^\d{1,9}(\.json|\.png)?$/.test(req.params.id)) {
+    if (!/^\d{1,9}(\.json|\.png)?$/.test(req.params.jarKodas)) {
         return next();
     }
 
-    let timings = new Timings();
+    let { jarKodas } = req.params;
 
-    let { id } = req.params;
-
-    if (id.endsWith(".json")) {
-        id = id.slice(0, -5);
+    if (jarKodas.endsWith(".json")) {
+        jarKodas = jarKodas.slice(0, -5);
     }
-    if (id.endsWith(".png")) {
-        id = id.slice(0, -4);
+    if (jarKodas.endsWith(".png")) {
+        jarKodas = jarKodas.slice(0, -4);
     }
 
-    timings.start("jarCsv");
-    // Detalus JAR
-    const { rows: jarRezultatai } = await postgres.query(
-        `SELECT *,
-                    ST_X(location::geometry) AS lon,
-                    ST_Y(location::geometry) AS lat
-             FROM "jarCsv"
-             WHERE "jarKodas" = $1
-             LIMIT 1`,
-        [id],
-    );
-    timings.end("jarCsv");
+    let limitai;
+    if (req.query.limitai == "false") {
+        limitai = {};
+    } else {
+        limitai = {
+            regitra: {
+                limit: req.query.regitraLimit || 5,
+            },
+            teismoNuosprendziai: {
+                limit: req.query.teismoNuosprendziaiLimit || 10,
+            },
+            sutartys: {
+                limit: req.query.sutartysLimit || 10,
+            },
+            darboSkelbimai: {
+                limit: req.query.darboSkelbimaiLimit || 5,
+            },
+            rcPranesimai: {
+                limit: req.query.rcPranesimaiLimit || 3,
+            },
+            domenai: {
+                limit: req.query.domenaiLimit || 3,
+            },
+            pinreg: {
+                limit: req.query.pinregLimit || 3,
+            },
+        };
 
-    // data.gov.lt ID JAR
-    let jarId;
-    timings.start("jar");
-    const jarRes = await postgres.query(
-        `SELECT "_id" FROM "jar" WHERE "jarKodas" = $1`,
-        [id],
-    );
-    timings.end("jar");
-
-    if (jarRes.rows && jarRes.rows.length > 0) {
-        jarId = jarRes.rows[0]._id;
+        let keys = [
+            "regitraLimit",
+            "teismoNuosprendziaiLimit",
+            "sutartysLimit",
+            "darboSkelbimaiLimit",
+            "rcPranesimaiLimit",
+            "domenaiLimit",
+            "pinregLimit",
+        ];
+        // Remove limits for keys set to 'max'
+        for (let key of keys) {
+            if (req.query[key] == "max") {
+                let limitKey = key.replace("Limit", "");
+                limitai[limitKey] = { limit: null };
+            }
+        }
     }
 
-    if (specAtvejai[id]) {
-        const { pavadinimas, aprasymas } = specAtvejai[id];
-        res.render("juridiniai/netikrasAsmuo", {
+    let juridinioInfo = await getJuridinisInfo(jarKodas, limitai);
+    if (juridinioInfo.special) {
+        return res.render("juridiniai/netikrasAsmuo", {
             customHead: config.customHead,
-            asmuo: { id },
-            pavadinimas,
-            aprasymas,
+            asmuo: { id: jarKodas },
+            pavadinimas: juridinioInfo.pavadinimas,
+            aprasymas: juridinioInfo.aprasymas,
         });
-        return;
-    }
-
-    // 404
-    if (jarRezultatai.length === 0) {
+    } else if (juridinioInfo.error == 404) {
         return next();
     }
 
-    let jar = jarRezultatai[0];
-    // Nustatome koordinates
-    jar.location =
-        jar.lat !== null && jar.lon !== null ? [jar.lat, jar.lon] : undefined;
-
-    // Remove temporary lon/lat fields
-    delete jar.lon;
-    delete jar.lat;
-
-    // Formatuojame JAR datas
-    jar.registravimoData = new Date(jar.registravimoData).toLtDate();
-    jar.duomenuData = new Date(jar.duomenuData).toLtDate();
-    jar.statusasNuo = new Date(jar.statusasNuo).toLtDate();
-    jar.jarId = jarId;
-
-    const taskMap = {
-        sodra: async () => gautiSodrosDuomenis(id),
-        vmi: async () => gautiVmiDuomenis(id),
-        regitra: async () => gautiRegitrosDuomenis(req, id),
-        teismoNuosprendziai: async () => gautiTeismoNuosprendzius(req, id),
-        sutartys: async () => gautiSutarciuDuomenis(req, id),
-        finansai: async () => gautiFinansuDuomenis(jarId),
-        istatinisKapitalas: async () => gautiIstatiniKapitala(jarId),
-        darboSkelbimai: async () => gautiDarboSkelbimus(req, id),
-        pinreg: async () => gautiPinregDeklaracijas(id),
-        nepatikimi: async () => gautiNepatikimuTiekejuIrasus(id),
-        melagingi: async () => gautiMelaginguTiekejuIrasus(id),
-        jadis: async () => gautiJadisDalyvius(jarId),
-        rcPranesimai: async () => gautiRcPranesimus(req, id),
-    };
-
-    // Run all tasks in parallel with timings
-    const timedTasks = Object.fromEntries(
-        Object.entries(taskMap).map(([key, fn]) => [
-            key,
-            (async () => {
-                timings.start(key);
-                const result = await fn();
-                timings.end(key);
-                return result;
-            })(),
-        ]),
-    );
-    // const timedTasks = {};
-
-    // for (const [key, fn] of Object.entries(taskMap)) {
-    //     const start = Date.now();
-    //     try {
-    //         const result = await fn();
-    //         const duration = Date.now() - start;
-    //         log(`Task "${key}" finished in ${duration} ms`);
-    //         timedTasks[key] = { result, duration, error: null };
-    //     } catch (err) {
-    //         const duration = Date.now() - start;
-    //         console.error(`Task "${key}" failed after ${duration} ms:`, err);
-    //         timedTasks[key] = { result: null, duration, error: err };
-    //     }
-    // }
-
-    const results = await Promise.allSettled(Object.values(timedTasks));
-
-    // Map results back to keys cleanly
-    const data = Object.fromEntries(
-        Object.keys(timedTasks).map((key, i) => [
-            key,
-            results[i].status === "fulfilled" ? results[i].value : null,
-        ]),
-    );
+    let asmuo = juridinioInfo.asmuo;
+    let timings = juridinioInfo.timings;
 
     res.setHeader("Server-Timing", timings.serverTiming());
-
-    // Asmuo
-    let asmuo = {
-        jar,
-        ...data,
-    };
 
     // JSON
     if (req.path.endsWith(".json")) {
@@ -221,11 +109,11 @@ asmuoRouter.get("/asmuo/:id", async (req, res, next) => {
     }
 
     // Aprašas
-    let aprasas = `${jar.pavadinimas} (${jar.jarKodas})`;
+    let aprasas = `${asmuo.jar.pavadinimas} (${asmuo.jar.jarKodas})`;
 
     // Adresas
     if (asmuo?.jar?.adresas) {
-        aprasas += `\nAdresas: ${jar.adresas}`;
+        aprasas += `\nAdresas: ${asmuo.jar.adresas}`;
     }
 
     // Darbuotojai, atlyginimai
@@ -258,8 +146,7 @@ asmuoRouter.get(
             return next();
         }
 
-        let sutartys = await gautiSutarciuDuomenis(
-            { ...req, query: { sutartysLimit: "max" } },
+        let sutartys = await gautiSutarciuDuomenisPagalJarKoda(
             req.params.jarKodas,
         );
 
@@ -315,8 +202,7 @@ asmuoRouter.get(
             return next();
         }
 
-        let sutartys = await gautiSutarciuDuomenis(
-            { ...req, query: { sutartysLimit: "max" } },
+        let sutartys = await gautiSutarciuDuomenisPagalJarKoda(
             req.params.jarKodas,
         );
 

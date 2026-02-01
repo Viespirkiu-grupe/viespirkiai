@@ -8,7 +8,7 @@ import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 import { postgres } from "../postgres/postgres.js";
 import QueryStream from "pg-query-stream";
-import { specAtvejai } from "./asmuo.js";
+import { specialJarCodes } from "../modules/juridiniai/specialJarCodes.js";
 import Timings from "../utils/timings.js";
 import * as XLSX from "xlsx";
 
@@ -510,8 +510,8 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
                 const kodas = kodai[i];
                 if (!kodas) return;
 
-                if (specAtvejai[kodas]) {
-                    tiekejas = specAtvejai[kodas].pavadinimas;
+                if (specialJarCodes[kodas]) {
+                    tiekejas = specialJarCodes[kodas].pavadinimas;
                 }
 
                 if (!analize.topTiekejai[kodas]) {

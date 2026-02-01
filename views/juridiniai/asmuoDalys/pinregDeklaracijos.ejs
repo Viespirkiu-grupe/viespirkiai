@@ -1,11 +1,9 @@
  <h2 id="pinreg"><a href="#pinreg" class="hashHref"><u>Privačių interesų deklaracijos</u></a></h2>
- <% let pinregLimit = Number(queryParams.pinregLimit) || 3; %>
- <% if(queryParams.pinregLimit == "max") {pinregLimit = 10000000} %>
- <% if(asmuo.pinreg.rysiaiSuJa.length > pinregLimit || asmuo.pinreg.darbovietes.length > pinregLimit || asmuo.pinreg.sutuoktinioDarbovietes.length > pinregLimit) { %>
+ <% if(asmuo.pinreg.total > asmuo.pinreg.limit) { %>
      <i>
-         Rodomos tik po paskutinės 3 privačių interesų deklaracijos.
+         Rodomos tik po paskutinės <%= asmuo.pinreg.limit %> privačių interesų deklaracijos.
          <a href="?pinregLimit=max#pinreg">
-             Rodyti visas (<%= asmuo.pinreg.rysiaiSuJa.length + asmuo.pinreg.darbovietes.length + asmuo.pinreg.sutuoktinioDarbovietes.length %>)
+             Rodyti visas (<%= asmuo.pinreg.total %>)
          </a>
      </i>
      <br>
@@ -14,9 +12,7 @@
  <div class="col-3 mobile-col-1">
      <section class="results" style="margin-inline: initial;">
          <h3 style="margin-bottom: 0px;">Ryšiai su juridiniais asmenimis</h3>
-         <% let i = 0; %>
          <% asmuo.pinreg.rysiaiSuJa.forEach(rysys =>  { %>
-            <% i++; if(i > pinregLimit) { return; } %>
              <div class="rezultatas">
                  <div class="rezultatas-top">
                      <span>Nuo <%= rysys.rysioPradzia %></span>
@@ -36,9 +32,7 @@
      </section>
      <section class="results" style="margin-inline: initial;">
          <h3 style="margin-bottom: 0px;">Darbovietės</h3>
-         <% let j = 0; %>
          <% asmuo.pinreg.darbovietes.forEach(darboviete =>  { %>
-             <% j++; if(j > pinregLimit) { return; } %>
              <div class="rezultatas">
                  <div class="rezultatas-top">
                      <span>Nuo <%= darboviete.rysioPradzia %></span>
@@ -50,21 +44,14 @@
                      </a>
                  </div>
                  <div class="rezultatas-bottom">
-                     <% let pirmas = true; %>
-                     <% darboviete.pareigos.forEach(pareigos => { %>
-                          <%= pareigos.pareigos && pareigos.pareigos[0].toUpperCase() + pareigos.pareigos.slice(1); %>
-                          <% if (!pirmas) { %>, <% } %>
-                          <% pirmas = false; %>
-                     <% }) %>
+                     <%= darboviete.pareigos %>
                  </div>
              </div>
          <% }) %>
      </section>
      <section class="results" style="margin-inline: initial;">
          <h3 style="margin-bottom: 0px;">Sutuoktinių darbovietės</h3>
-         <% let k = 0; %>
          <% asmuo.pinreg.sutuoktinioDarbovietes.forEach(darboviete =>  { %>
-             <% k++; if(k > pinregLimit) { return; } %>
              <div class="rezultatas">
                  <div class="rezultatas-top">
                      <span>Nuo <%= darboviete.rysioPradzia %></span>
@@ -78,11 +65,7 @@
                  </div>
                  <div class="rezultatas-bottom">
                      <% let pirmas = true; %>
-                     <% darboviete.pareigos.forEach(pareigos => { %>
-                          <%= pareigos.pareigos && pareigos.pareigos[0].toUpperCase() + pareigos.pareigos.slice(1); %>
-                          <% if (!pirmas) { %>, <% } %>
-                          <% pirmas = false; %>
-                     <% }) %>
+                     <%= darboviete.pareigos %>
                  </div>
              </div>
          <% }) %>

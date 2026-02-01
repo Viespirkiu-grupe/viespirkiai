@@ -5,7 +5,7 @@ import { log } from "./utils/log.js";
 const tasks = [];
 
 // CPVA projektai
-import { nuskaitytiCpvaProjektaiTiekejai } from "./tasks/cpva/scrapeProjektai.js";
+import { nuskaitytiCpvaProjektaiTiekejai } from "./modules/cpva/scrapeProjektai.js";
 tasks.push({
     name: "nuskaitytiCpvaProjektaiTiekejai",
     schedule: "0 */1 * * *",
@@ -15,7 +15,7 @@ tasks.push({
 });
 
 // VTEK deklaracijos
-import { nuskaitytiVtekDeklaracija } from "./tasks/vtek/nuskaityti.js";
+import { nuskaitytiVtekDeklaracija } from "./modules/vtek/nuskaityti.js";
 tasks.push({
     name: "nuskaitytiVtekDeklaracijas",
     mode: "asap",
@@ -26,7 +26,7 @@ tasks.push({
     },
 });
 
-import { getNewestPinreg } from "./tasks/vtek/scrapeNewest.js";
+import { getNewestPinreg } from "./modules/vtek/scrapeNewest.js";
 tasks.push({
     name: "getNewestPinreg",
     schedule: "0 */1 * * *",
@@ -38,7 +38,7 @@ tasks.push({
 });
 
 // eViesiejiPirkimai.lt sutartys
-import { requestLatestEviesiejipirkimaiData } from "./tasks/sutartys/scrape.js";
+import { requestLatestEviesiejipirkimaiData } from "./modules/sutartys/scrape.js";
 tasks.push({
     name: "scrapeEviesiejipirkimaiSutartys",
     mode: "asap",
@@ -51,7 +51,7 @@ tasks.push({
 });
 
 // eViesiejiPirkimai.lt failai
-import { parsiustiFaila } from "./tasks/failai/parsiusti.js";
+import { parsiustiFaila } from "./modules/failai/parsiusti.js";
 tasks.push({
     name: "failuParsiuntimas",
     mode: "asap",
@@ -73,7 +73,7 @@ tasks.push({
 });
 
 // LITEKO bylų metaduomenys (paieškos rezultatai)
-import { litekoScrapeLatestDays } from "./tasks/liteko/scrape.js";
+import { litekoScrapeLatestDays } from "./modules/liteko/scrape.js";
 tasks.push({
     name: "scrapeLiteko",
     schedule: "0 */6 * * *",
@@ -83,7 +83,7 @@ tasks.push({
 });
 
 // LITEKO bylų duomenys (individualios bylos informacija)
-import { surastiBylosSalis } from "./tasks/liteko/scrapeContent.js";
+import { surastiBylosSalis } from "./modules/liteko/scrapeContent.js";
 tasks.push({
     name: "scrapeLitekoSalys",
     mode: "asap",
@@ -95,7 +95,7 @@ tasks.push({
 });
 
 // Pravalyti OCR rezervacijas
-import { pravalytiOcrRezervacijas } from "./tasks/ocr/pravalytiRezervacijas.js";
+import { pravalytiOcrRezervacijas } from "./modules/ocr/pravalytiRezervacijas.js";
 tasks.push({
     name: "pravalytiOcrRezervacijas",
     mode: "asap",
@@ -119,7 +119,7 @@ tasks.push({
 });
 
 // Sync ADP changes
-import { syncAdpChanges } from "./tasks/adp/syncChanges.js";
+import { syncAdpChanges } from "./modules/adp/syncChanges.js";
 tasks.push({
     name: "syncAdpSaskaitosSalys",
     mode: "asap",
@@ -556,7 +556,7 @@ tasks.push({
     },
 });
 
-import { nuskaitytiInformaciniusLeidinius } from "./tasks/informaciniaiLeidiniai/scrape.js";
+import { nuskaitytiInformaciniusLeidinius } from "./modules/registruCentrasPranesimai/scrape.js";
 tasks.push({
     name: "nuskaitytiInformaciniusLeidinius",
     schedule: "0 */3 * * *",
@@ -565,7 +565,7 @@ tasks.push({
     },
 });
 
-import { nuskaitytiInformaciniLeidini } from "./tasks/informaciniaiLeidiniai/scrapeContent.js";
+import { nuskaitytiInformaciniLeidini } from "./modules/registruCentrasPranesimai/scrapeContent.js";
 tasks.push({
     name: "nuskaitytiInformaciniLeidini",
     mode: "asap",
@@ -577,7 +577,7 @@ tasks.push({
 });
 
 // eViesiejiPirkimai.lt neskelbiamos derybos
-import { nuskaitytiVisasNeskelbiamasDerybas } from "./tasks/neskelbiamosDerybos/scrape.js";
+import { nuskaitytiVisasNeskelbiamasDerybas } from "./modules/neskelbiamosDerybos/scrape.js";
 tasks.push({
     name: "nuskaitytiVisasNeskelbiamasDerybas",
     schedule: "0 */3 * * *",
@@ -587,7 +587,7 @@ tasks.push({
 });
 
 // vpt.lrv.lt (SharePoint) melagingi tiekėjai
-import { importuotiMelagingusTiekejus } from "./tasks/melagiai/scrape.js";
+import { importuotiMelagingusTiekejus } from "./modules/vptSarasai/melagingiScrape.js";
 tasks.push({
     name: "importuotiMelagingusTiekejus",
     schedule: "0 */1 * * *",
@@ -597,7 +597,7 @@ tasks.push({
 });
 
 // vpt.lrv.lt (SharePoint) nepatikimi tiekėjai
-import { importuotiNepatikimusTiekejus } from "./tasks/nepatikimi/scrape.js";
+import { importuotiNepatikimusTiekejus } from "./modules/vptSarasai/nepatikimiScrape.js";
 tasks.push({
     name: "importuotiNepatikimusTiekejus",
     schedule: "0 */1 * * *",
@@ -607,7 +607,7 @@ tasks.push({
 });
 
 // Failų turinio nuskaitymas
-import { nuskaitytiVienoDokumentoDuomenis } from "./tasks/failai/nuskaitytiTeksta.js";
+import { nuskaitytiVienoDokumentoDuomenis } from "./modules/failai/nuskaitytiTeksta.js";
 
 const runningTasks = new Map();
 function startAsapTask(
