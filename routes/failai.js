@@ -358,6 +358,7 @@ failaiSearchRouter.get("/failai/topExtension", async (req, res) => {
         `
         SELECT *
         FROM "failaiStatsExtension"
+        WHERE count > 0
         ORDER BY count DESC
         LIMIT $1 OFFSET $2
     `,
@@ -366,7 +367,7 @@ failaiSearchRouter.get("/failai/topExtension", async (req, res) => {
 
     let extensionCountRes = await postgres.query(`
         SELECT COUNT(*) AS total
-        FROM "failaiStatsExtension"
+        FROM "failaiStatsExtension" WHERE count > 0
     `);
     let end = performance.now();
 
