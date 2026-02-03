@@ -16,6 +16,7 @@ import { gautiJadisDalyvius } from "../jadis/jadisDuomenys.js";
 import { gautiRcPranesimusPagalJarKoda } from "../registruCentrasPranesimai/rcPranesimai.js";
 import { gautiSutarciuDuomenisPagalJarKoda } from "../sutartys/pagalJarKoda.js";
 import { rastiDomenusPagalJarKoda } from "../domenai/rastiPagalJarKoda.js";
+import { rastiKotisPagalGavejoKoda } from "../kotis/getByJarKodas.js";
 
 export async function getJuridinisInfo(jarKodas, options = {}) {
     let timings = options.timings || new Timings();
@@ -102,6 +103,7 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
             gautiRcPranesimusPagalJarKoda(jarKodas, options?.rcPranesimai),
         domenai: async () =>
             rastiDomenusPagalJarKoda(jarKodas, options?.domenai),
+        kotis: async () => rastiKotisPagalGavejoKoda(jarKodas, options?.kotis),
     };
 
     // Run all tasks in parallel with timings

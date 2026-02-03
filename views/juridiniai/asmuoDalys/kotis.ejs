@@ -1,0 +1,38 @@
+<% if(asmuo.kotis && asmuo.kotis.count > 0){ %>
+    <div id="kotis">
+        <h2><a href="#kotis" class="hashHref"><u>Valstybės pagalba (KOTIS)</u></a></h2>
+        <% if(asmuo.kotis.count > asmuo.kotis.rows.length) { %>
+            <i>
+                Rodomi tik <%= Number(asmuo.kotis.limit).linksniuoti(["įrašas", "įrašai", "įrašų"]) %>.
+
+                <a href="?kotisLimit=max#kotis">
+                    Rodyti visus (<%= asmuo.kotis.count %>)
+                </a>
+            </i>
+        <% } %>
+
+        <div class="results" style="margin-inline: 0px;">
+            <% asmuo.kotis.rows.forEach(function(item){ %>
+                <div class="rezultatas">
+                    <div class="rezultatas-top">
+                        <span>
+                            <%= item.teikejas %>
+                        </span>
+                        <span>
+                            <%= String(item.suteikimoData).split(" ")[0] %>
+                        </span>
+
+                    </div>
+                    <div class="rezultatas-title">
+                        <a href="https://kotis.kt.gov.lt/paraiskos/view_item/id.<%= item.id %>">
+                             <%= new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(item.suma) %>
+                        </a>
+                    </div>
+                    <div class="rezultatas-bottom">
+                        <%= item.pagalbosForma %>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    </div>
+<% } %>

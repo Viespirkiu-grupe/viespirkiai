@@ -47,6 +47,7 @@ asmuoRouter.get("/asmuo/:jarKodas", async (req, res, next) => {
             pinreg: {
                 limit: req.query.pinregLimit || 3,
             },
+            kotis: { limit: req.query.kotisLimit || 3 },
         };
 
         let keys = [
@@ -57,6 +58,7 @@ asmuoRouter.get("/asmuo/:jarKodas", async (req, res, next) => {
             "rcPranesimaiLimit",
             "domenaiLimit",
             "pinregLimit",
+            "kotisLimit",
         ];
         // Remove limits for keys set to 'max'
         for (let key of keys) {
