@@ -127,7 +127,7 @@ export async function findSingleJuridinis(queryStr, options = {}) {
         .search({
             q: baseQuery,
             query_by: "pavadinimasBase,pavadinimas,adresas",
-            per_page: 10, // small page since we only need the top matches
+            per_page: 100, // small page since we only need the top matches
             page: 1,
         });
 
@@ -135,8 +135,8 @@ export async function findSingleJuridinis(queryStr, options = {}) {
 
     // Rank by Levenshtein distance
     documents.sort((a, b) => {
-        const nameA = a.pavadinimasBase || a.pavadinimas;
-        const nameB = b.pavadinimasBase || b.pavadinimas;
+        const nameA = a.pavadinimasBase || toBaseCompanyName(a.pavadinimas);
+        const nameB = b.pavadinimasBase || toBaseCompanyName(b.pavadinimas);
         return levenshtein(baseQuery, nameA) - levenshtein(baseQuery, nameB);
     });
 
@@ -146,7 +146,7 @@ export async function findSingleJuridinis(queryStr, options = {}) {
 
     // Check similarity threshold
     const distance = levenshtein(
-        baseQuery,
+        toBaseCompanyName(baseQuery),
         toBaseCompanyName(bestMatch.pavadinimas),
     );
     if (toBaseCompanyName(bestMatch.pavadinimas) == "") return null;
@@ -169,6 +169,7 @@ function toBaseCompanyName(name) {
         "AB",
         "MB",
         "IĮ",
+        "VĮ",
         "VšĮ",
         "ŽŪB",
         "KŪB",
@@ -180,6 +181,12 @@ function toBaseCompanyName(name) {
         "Žemės ūkio bendrovė",
         "Kooperatinė ūkinė bendrovė",
     ];
+
+    // filial. → filialas
+    name = name.replace(/filial\./gi, "filialas");
+
+    // remove anything in  (...)
+    name = name.replace(/\(.*?\)/g, "");
 
     // 1. Remove quotes, commas
     let cleaned = name
@@ -200,4 +207,8 @@ function toBaseCompanyName(name) {
 
     // 4. Normalize spaces
     return cleanedAscii.replace(/\s+/g, " ").trim();
+}
+
+if (import.meta.url.endsWith(process.argv[1])) {
+    await findSingleJuridinis("UAB „Biuro“");
 }
