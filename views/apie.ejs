@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+	<head>
+ <%- include('head.ejs', {
+            pageTitle: "Apie mus",
+            pageDescription: `Esame pilietinė iniciatyva užsiimanti viešųjų pirkimų ir kitos viešosios informacijos skaidrinimu.`,
+            pageImage: `https://viespirkiai.org/apie.png`,
+            customHead
+        }) %>
+ <style>
+ .word-cloud {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 2rem 3rem;
+   justify-content: center;
+   align-items: center;
+   padding: 2rem;
+ }
+
+ .word-cloud span {
+   font-size: calc(var(--size) * 1rem);
+   transition: transform 0.3s, color 0.3s;
+   cursor: default;
+
+   /* pseudo-random shift/rotation using --r */
+   transform: translate(
+       calc(sin(var(--r) * 6.28) * 20px),
+       calc(cos(var(--r) * 6.28) * 10px)
+     )
+     rotate(calc((var(--r) - 0.5) * 30deg));
+ }
+
+ .word-cloud span:hover {
+   transform: scale(1.2);
+ }
+
+ /* responsive adjustments */
+ @media (max-width: 768px) {
+   .word-cloud span {
+     font-size: calc(var(--size) * 0.8rem);
+   }
+ }
+
+ @media (max-width: 480px) {
+   .word-cloud span {
+     font-size: calc(var(--size) * 0.6rem);
+   }
+ }
+
+ </style>
+
+	</head>
+	<body>
+		<%- include('header.ejs') %>
+		<main>
+			<h1 style="text-align: center;">Apie mus</h1>
+			<div class="col-2 mobile-col-1" style="gap: 32px;">
+    			<section style="text-align: justify;">
+    			    <h2><u>Kas mes?</u></h2>
+    				<p>Trumpai – esame pilietinė iniciatyva užsiimanti viešųjų pirkimų ir kitos viešosios informacijos skaidrinimu.</p>
+
+    				<p>Šis projektas gimė dėl paprasčiausio nepasitenkinimo Viešųjų pirkimų tarnybos sutarčių viešinimo sistema (ji yra lėta, nepatogi, neaiški, reguliariai stringanti).
+        				Kartu su bendraminčiais nusprendėme padaryti šią ir kitą demokratinės valstybės klestėjimui svarbią informaciją daug lengviau prieinamą.</p>
+
+                    <p>Taip pat, matydami įvarias problemas bei sritis, kur galima tobulėti, skelbiame iniciatyvos narių nuomones vadinamas <a href="/vieslaiskiai">„viešlaiškiais“</a>. Kviečiame paskaityti.</p>
+
+                    <div class="word-cloud">
+                      <span style="--size:2; --r:0.72">skaidrumas</span>
+                      <span style="--size:2; --r:0.33">atviri duomenys</span>
+                      <span style="--size:2; --r:0.57">atsakomybė</span>
+                      <span style="--size:1.8; --r:0.91">lėšų taupymas</span>
+                      <span style="--size:1.8; --r:0.12">atviras kodas</span>
+                      <span style="--size:2; --r:0.44">efektyvumas</span>
+                      <span style="--size:1.7; --r:0.66">prieinamumas</span>
+                      <span style="--size:2; --r:0.29">sąžiningumas</span>
+                      <span style="--size:1.8; --r:0.81">patikimumas</span>
+                      <span style="--size:2; --r:0.53">kokybė</span>
+                      <span style="--size:1.7; --r:0.14">viešumas</span>
+                      <span style="--size:1.6; --r:0.97">rizikų mažinimas</span>
+                      <span style="--size:1.8; --r:0.38">atsakinga kontrolė</span>
+                    </div>
+                    <br>
+                        <section class="veiklosAtaskaitos results" style="margin-inline: initial;">
+                            <h2 style="margin-bottom: 0;"><u>Veiklos ataskaitos</u></h2>
+                            <div class="rezultatas">
+                                <div class="rezultatas-top">
+                                    <span>2025-12-03</span>
+                                </div>
+                                <div class="rezultatas-title">
+                                    <a href="/veiklosAtaskaitos/0.5.pdf">
+                                        Pusės metų veiklos ataskaita
+                                    </a>
+                                </div>
+                                <div class="rezultatas-bottom"></div>
+                            </div>
+                        </section>
+    			</section>
+                <section style="text-align: justify;">
+    			    <h2><u>Dažniausiai užduodami klausimai</u></h2>
+                    <div>
+                        <h3>Kodėl dirbate anonimiškai?</h3>
+                        <p>Viešųjų pirkimų sritis dažnai yra susijusi su dideliais pinigais bei interesais.
+                        Dėl šios priežasties norime apsaugoti iniciatyvos narių tapatybes nuo galimų neigiamų pasekmių.</p>
+                    </div>
+                    <div>
+                        <h3>Kaip galėčiau prisidėti?</h3>
+                        <ul>
+                            <li><a href="https://github.com/viespirkiu-grupe">Programavimas</a> (pagrinde <i>JavaScript</i> ir <i>Go</i>)</li>
+                            <li><a href="https://github.com/Viespirkiu-grupe/goviesdeze">Duomenų saugojimas</a> (jeigu turite bent 1000GB vietos su neribotu internetu; viešas IP nereikalingas)</li>
+                            <li><a href="https://github.com/viespirkiu-grupe/ocr">Dokumentų OCR</a> (ypač jei turite pigios elektros)</li>
+                            <li>Duomenų analizė(s)</li>
+                        </ul>
+                        Aišku, jeigu turite kitokių idėjų, kaip galėtumėte prisidėti, susisiekite – <a href="/kontaktai">kontaktai</a>.
+                    </div>
+                    <div>
+                        <h3>Kas jus išlaiko?</h3>
+                        <p>Išsilaikome patys iš to ką mūsų iniciatyvos nariai atsineša, padaro ar prijungia.</p>
+                    </div>
+                    <div>
+                        <h3>Kaip galėčiau paaukoti?</h3>
+                        <p>Pinigų neimame. Galite prisidėti prie iniciatyvos saugodami duomenis arba atlikdami dokumentų OCR.</p>
+                    </div>
+                    <div>
+                        <h3>Įtariu neskaidrius veiksmus, ar galiu susisiekti?</h3>
+                        Žinoma: <a href="/kontaktai">kontaktų puslapis</a>
+                    </div>
+                    <div>
+                        <h3>Ar gerbiate susisiekiančių asmenų anonimiškumą?</h3>
+                        <p>Taip.</p>
+                    </div>
+                    <div>
+                        <h3>Turiu pasiūlymą / skundą / idėją...</h3>
+                        <a href="/kontaktai">Laukiame.</a>
+                    </div>
+                    <div>
+                        <h3>Neradau atsakymo / turiu <i>„durną“</i> klausimą</h3>
+                        <a href="/kontaktai">Susisiekite, tikrai atsakysime.</a>
+                    </div>
+    			</section>
+			</div>
+
+		</main>
+		<%- include('footer.ejs', {neoficialus: false}) %>
+	</body>
+</html>
