@@ -19,16 +19,11 @@ export async function gautiStatistika() {
 
     let statistika = {};
 
-    const [
-        failaiCountsRes,
-        lentelesRes,
-        topDokNuskaitytojaiRes,
-        topOcrNuskaitytojaiRes,
-        databaseRes,
-    ] = await Promise.all([
-        postgres.query(`SELECT * FROM "failaiCounts";`),
-        postgres.query(
-            `SELECT
+    const [failaiCountsRes, lentelesRes, topDokNuskaitytojaiRes, databaseRes] =
+        await Promise.all([
+            postgres.query(`SELECT * FROM "failaiCounts";`),
+            postgres.query(
+                `SELECT
             s.relname AS "tableName",
             pg_table_size(s.relid) AS "dataSize",
             pg_indexes_size(s.relid) AS "indexSize",
@@ -37,15 +32,12 @@ export async function gautiStatistika() {
           FROM pg_catalog.pg_statio_user_tables s
           JOIN pg_catalog.pg_stat_user_tables st ON s.relid = st.relid
           ORDER BY s.relname ASC;`,
-        ),
-        postgres.query(
-            `SELECT "nuskaitytidokumentai", "viesasPavadinimas" FROM "dokNuskaitytojai" ORDER BY "nuskaitytidokumentai" DESC LIMIT 100;`,
-        ),
-        postgres.query(
-            `SELECT "nuskaitytiDokumentai", "viesasPavadinimas", "pavadinimas" FROM "ocrNuskaitytojai" ORDER BY "nuskaitytiDokumentai" DESC LIMIT 100;`,
-        ),
-        postgres.query(
-            `SELECT
+            ),
+            postgres.query(
+                `SELECT "nuskaitytidokumentai", "viesasPavadinimas" FROM "dokNuskaitytojai" ORDER BY "nuskaitytidokumentai" DESC LIMIT 100;`,
+            ),
+            postgres.query(
+                `SELECT
                 current_database() AS db,
                 xact_commit,
                 xact_rollback,
@@ -64,8 +56,8 @@ export async function gautiStatistika() {
                 extract(epoch from now() - pg_postmaster_start_time()) AS uptime_seconds
             FROM pg_stat_database
             WHERE datname = current_database();`,
-        ),
-    ]);
+            ),
+        ]);
 
     const counts = failaiCountsRes.rows.reduce((acc, row) => {
         const { metrika, eilute, verte } = row;
@@ -186,49 +178,7 @@ export async function gautiStatistika() {
     statistika.nuskaitymas.zodziuSkaicius =
         statistika.nuskaitymas.zodziai.total;
 
-    // Top 10 extension pagal counts.extension keys
-    statistika.topExtension = Object.entries(counts.extension)
-        .map(([extension, count]) => ({
-            ext: extension,
-            row_count: count,
-            percent: (count / statistika.failai.kiekiai.visi) * 100,
-        }))
-        .sort((a, b) => b.row_count - a.row_count)
-        .slice(0, 10);
-
-    statistika.ocrState = Object.entries(counts.ocrState)
-        .map(([state, count]) => ({
-            state: state,
-            count: count,
-            percent: (count / statistika.failai.kiekiai.visi) * 100,
-        }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-
-    // Replace 0 → Galima nuskaityti (0), 1 → Nuskaityta (1), -3 → Rezervuota (-3)
-    statistika.ocrState = statistika.ocrState.map((item) => {
-        if (item.state === "0") {
-            return { ...item, state: "Galima nuskaityti (0)" };
-        } else if (item.state === "1") {
-            return { ...item, state: "Nuskaityta (1)" };
-        } else if (item.state === "-3") {
-            return { ...item, state: "Rezervuota (-3)" };
-        } else if (item.state === "NULL") {
-            return { ...item, state: "Nenustatyta / nereikia (NULL)" };
-        } else {
-            return item;
-        }
-    });
-
     statistika.topDokNuskaitytojai = topDokNuskaitytojaiRes.rows;
-
-    statistika.topOcrNuskaitytojai = topOcrNuskaitytojaiRes.rows;
-
-    // OCR rezervacijų skaičius
-    statistika.topOcrNuskaitytojai.forEach((item) => {
-        item.rezervuota = counts.checkedOutBy?.[item.pavadinimas] ?? 0;
-        delete item.pavadinimas;
-    });
 
     statistika.database = databaseRes.rows[0];
 
