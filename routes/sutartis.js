@@ -234,7 +234,7 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
             `${Number(purchase.faktineIvykdimoVerte || purchase.verte).toLocaleString("lt-LT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € &nbsp; ${purchase.pavadinimas}`,
             `Pirkėjas: ${purchase.perkanciojiOrganizacija}<br>
             Tiekėjas: ${purchase.tiekejas}`,
-            `viespirkiai.org/pirkimas/${purchase.sutartiesUnikalusID}`,
+            `viespirkiai.org/sutartis/${purchase.sutartiesUnikalusID}`,
         );
     }
 

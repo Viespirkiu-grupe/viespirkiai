@@ -8,7 +8,7 @@
           pageDescription: `Sutartis nr. ${purchase.sutartiesNumeris}
 Sudaryta: ${new String(purchase.sudarymoData).slice(0,10)}
 Galioja iki: ${new String(purchase.galiojimoData).slice(0,10)}`,
-          pageImage: `https://viespirkiai.org/pirkimas/${purchase.sutartiesUnikalusID}.png`,
+          pageImage: `https://viespirkiai.org/sutartis/${purchase.sutartiesUnikalusID}.png`,
           pageAuthor: purchase.perkanciojiOrganizacija,
           customHead
         }) %>
@@ -30,7 +30,7 @@ Galioja iki: ${new String(purchase.galiojimoData).slice(0,10)}`,
 			</h1>
 
 			<div>
-    			<a href="/pirkimas/<%= purchase.sutartiesUnikalusID %>.json">↗ JSON</a>
+    			<a href="/sutartis/<%= purchase.sutartiesUnikalusID %>.json">↗ JSON</a>
                 &nbsp;
                 <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= purchase.sutartiesUnikalusID %>">↗ CVP IS</a>
                 &nbsp;
@@ -403,7 +403,7 @@ Galioja iki: ${new String(purchase.galiojimoData).slice(0,10)}`,
 
                                 </div>
                                 <div class="rezultatas-title">
-                                    <a href="/pirkimas/<%= item.sutartiesUnikalusId %>">
+                                    <a href="/sutartis/<%= item.sutartiesUnikalusId %>">
                                         <span>
                                             <%
                                                 const verte = item.faktineIvykdimoVerte || item.verte;

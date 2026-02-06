@@ -107,3 +107,10 @@ export function convertUnit(value, categoryOrOptions, options = {}) {
 Number.prototype.convertUnit = function (categoryOrOptions, options) {
     return convertUnit(this.valueOf(), categoryOrOptions, options);
 };
+
+// Put a space every 3 digits
+Number.prototype.displayWithSpaces = function () {
+    return this.valueOf()
+        .toString()
+        .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+};

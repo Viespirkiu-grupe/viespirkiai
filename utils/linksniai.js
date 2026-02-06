@@ -36,6 +36,36 @@ export function linksniuoti(
     return `${formattedNumber} ${form}`;
 }
 
+export function linksniuotiOnly(
+    number,
+    cases = ["įrašas", "įrašai", "įrašų", "įrašo"],
+) {
+    const n = Math.abs(Number(number));
+    const str = number.toString();
+    const hasFraction = str.includes(".") || str.includes(",");
+
+    let form;
+    if (hasFraction && n !== 0) {
+        // many (trupmeninė dalis)
+        form = cases[3];
+    } else if (n % 10 === 1 && !(n % 100 >= 11 && n % 100 <= 19)) {
+        // one
+        form = cases[0];
+    } else if (
+        n % 10 >= 2 &&
+        n % 10 <= 9 &&
+        !(n % 100 >= 11 && n % 100 <= 19)
+    ) {
+        // few
+        form = cases[1];
+    } else {
+        // other
+        form = cases[2];
+    }
+
+    return `${form}`;
+}
+
 /**
  * Linksniavimo funkcija lietuvių kalbai, skirtas skaičiams naudojamiems su kilmininku
  * @param {number} number - Skaičius, kurį reikia linksniuoti
@@ -60,6 +90,10 @@ export function linksniuotiK(number, cases = ["įrašo", "įrašų"]) {
 
 Number.prototype.linksniuoti = function (cases) {
     return linksniuoti(this.valueOf(), cases);
+};
+
+Number.prototype.linksniuotiOnly = function (cases) {
+    return linksniuotiOnly(this.valueOf(), cases);
 };
 
 Number.prototype.linksniuotiK = function (cases) {

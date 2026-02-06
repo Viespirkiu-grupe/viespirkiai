@@ -8,6 +8,52 @@
             customHead
         }) %>
         <%- include('../js/idiomorph.ejs') %>
+       	<%- include('../js/charts.ejs') %>
+        <style>
+        .failaiStatistika {
+            display: flex;
+            flex-direction: column;
+            gap: 48px;
+            margin-block: 24px;
+            align-items: center;
+            width: 100%;
+        }
+
+        .failaiStatistika .stat-row {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .failaiStatistika .stat-number {
+            font-size: 5em;
+            font-weight: bold;
+        }
+
+        @media (max-width: 600px) {
+            .failaiStatistika .stat-number {
+                font-size: 3em;
+            }
+        }
+
+        .failaiStatistika .stat-text {
+            font-size: 1.4em;
+        }
+
+
+        .failaiStatistika .stat-row:nth-child(1) {
+            transform: translateX(0vw);
+        }
+
+        .failaiStatistika .stat-row:nth-child(2) {
+            transform: translateX(15vw);
+        }
+
+        .failaiStatistika .stat-row:nth-child(3) {
+            transform: translateX(-10vw);
+        }
+
+
+        </style>
 	</head>
 	<body>
 		<%- include('../header.ejs', {hideSubtext: false}) %>
@@ -17,13 +63,7 @@
                 <% if(typeof data !== "undefined") { %>
     			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti, search}) %>
                 <% } else { %>
-             		<%- include('statistika.ejs') %>
-               <div>
-         			<a href="/failai/topExtension">↗ Dažniausi plėtiniai</a>&nbsp;
-         			<a href="/failai/ocr">↗ OCR būsena</a>&nbsp;
-         			<a href="/failai/map">↗ Failų žemėlapis</a>&nbsp;
-               </div>
-
+                    <%- include('statistika.ejs') %>
                     <script>
                         window.addEventListener('DOMContentLoaded', () => {
                           const search = document.getElementById('search');

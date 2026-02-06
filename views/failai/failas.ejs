@@ -50,7 +50,7 @@
                                <% var originalusLinkas = null; %>
                                <% var originalusLinkasPavadinimas = null; %>
                                <% if(failas.saltinis == "sutartys" || !failas.saltinis){ %>
-                                   <a href="/pirkimas/<%= failas.dokId %>">Sutartis <%= failas.dokId %></a>
+                                   <a href="/sutartis/<%= failas.dokId %>">Sutartis <%= failas.dokId %></a>
                                    <% originalusLinkas = `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dokId}&file_id=${failas.fileId}`; %>
                                    <% originalusLinkasPavadinimas = "CVP IS"; %>
                                <% } else if(failas.saltinis == "neskelbiamosDerybos") { %>
