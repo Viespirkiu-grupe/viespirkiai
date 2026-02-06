@@ -18,6 +18,8 @@ export default class Timings {
             this.timings[name] = {
                 start: performance.now(),
             };
+        } else {
+            this.timings[name].start = performance.now();
         }
     }
 
