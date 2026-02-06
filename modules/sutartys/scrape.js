@@ -50,8 +50,7 @@ export async function scrapePage(url) {
         var response = await fetch(url, {
             agent: proxyAgent,
             headers: {
-                "User-Agent":
-                    "Viespirkiai.org nuskaitymas +<viespirkiai@viespirkiai.org>",
+                "User-Agent": "Viespirkiai.org +<viespirkiai@viespirkiai.org>",
                 Accept:
                     "text/html,application/xhtml+xml,application/xml;" +
                     "q=0.9,image/webp,image/apng,*/*;q=0.8",
@@ -337,7 +336,13 @@ export async function scrapePage(url) {
         sutartys.push(sutartis);
     }
 
-    return sutartys;
+    let totalEl = document.querySelector(".counter");
+    // <div class="counter">Puslapis 1 iš 331 (3305)</div>
+    let total = totalEl?.textContent.match(
+        /Puslapis \d+ iš \d+ \((\d+)\)/,
+    )?.[1];
+
+    return { sutartys, total };
 }
 
 /**
@@ -345,7 +350,7 @@ export async function scrapePage(url) {
  * @param {number} page - Puslapis, kurį reikia importuoti
  * @returns {Promise<number>} Importuotų sutarčių skaičius
  */
-async function importPage(page = 0) {
+async function scrapeDay(page = 0) {
     let start = new Date();
 
     // Sudarome puslapio URL
@@ -357,29 +362,29 @@ async function importPage(page = 0) {
     log(`Importuojamas puslapis ${page} ${url}`);
 
     // Nuskaitome puslapį
-    let data = await scrapePage(url);
+    let { sutartys } = await scrapePage(url);
 
     // Jei nėra duomenų, grąžina 0
-    if (data.length === 0) {
+    if (sutartys.length === 0) {
         log(`Nėra įrašų`);
         return 0;
     }
 
     // Importuojame duomenis į duomenų bazę
-    await importArray(data);
+    await importArray(sutartys);
 
     log(
         `Puslapio ${page} importas užtruko ${((new Date() - start) / 1000).toFixed(2)}s.`,
     );
-    log(`Importuotos ${data.length} sutartys.`);
+    log(`Importuotos ${sutartys.length} sutartys.`);
 
-    let naujausioAtnaujinimoTimestamp = data
+    let naujausioAtnaujinimoTimestamp = sutartys
         .map((d) => d.paskutinioRedagavimoData)
         .sort()
         .pop();
 
     return {
-        length: data.length,
+        length: sutartys.length,
         naujausioAtnaujinimoTimestamp,
     };
 }
@@ -407,7 +412,7 @@ export async function requestLatestEviesiejipirkimaiData() {
     );
 
     for (let page = 0; page < 50; page++) {
-        let data = await importPage(page);
+        let data = await scrapeDay(page);
 
         // Patikriname ar data.naujausioAtnaujinimoTimestamp yra bent 15min senesnis už naujausioAtnaujinimoTimestamp
         // Jei taip, stabdome importą, jau atsikasėme viską
@@ -430,7 +435,7 @@ export async function requestLatestEviesiejipirkimaiData() {
 export async function scrapePagesStarting(page = 0) {
     let yraIrasu = true;
     while (yraIrasu) {
-        let data = await importPage(page);
+        let data = await scrapeDay(page);
         if (data.length === 0) {
             yraIrasu = false;
             log(`Nėra daugiau įrašų, baigiamas nuskaitymas.`);
@@ -467,7 +472,7 @@ export async function scrapePagesSequential(startPage = 0, batchSize = 20) {
             }
         }
 
-        const batchData = batchResults.flat();
+        const sutartys = batchData.flatMap((item) => item.sutartys ?? []);
 
         if (batchData.length === 0) {
             yraIrasu = false;

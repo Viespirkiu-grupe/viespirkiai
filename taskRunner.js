@@ -4,6 +4,22 @@ import { log } from "./utils/log.js";
 
 const tasks = [];
 
+import { isVptWorkingHours } from "./modules/sutartys/isWorkingHours.js";
+import { cvpIsScrapeLeastRecentDate } from "./modules/sutartys/scrapeDay.js";
+tasks.push({
+    name: "sutartysScrapeLeastRecentDate",
+    mode: "asap",
+    cooldown: 30,
+    errorCooldown: 30,
+    job: async () => {
+        if (!isVptWorkingHours()) {
+            return await cvpIsScrapeLeastRecentDate();
+        } else {
+            return false;
+        }
+    },
+});
+
 // CPVA projektai
 import { nuskaitytiCpvaProjektaiTiekejai } from "./modules/cpva/scrapeProjektai.js";
 tasks.push({
