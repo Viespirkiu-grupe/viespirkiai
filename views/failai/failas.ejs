@@ -334,7 +334,13 @@
                         </div>
                         <div style="margin-top: 16px;">
                             <h3>Nuoroda</h3>
-                            <a href="<%= failas.metaduomenys.links[0].uri %>"><%= failas.metaduomenys.links[0].uri %></a>
+                            <% if (failas.metaduomenys?.links?.[0]?.uri) { %>
+                              <a href="<%= encodeURI(failas.metaduomenys.links[0].uri) %>">
+                                <%= failas.metaduomenys.links[0].uri %>
+                              </a>
+                            <% } else { %>
+                              <i>Nenurodyta</i>
+                            <% } %>
                         </div>
                     <% } else if(failas.extension == "txt") { %>
                         <div>
