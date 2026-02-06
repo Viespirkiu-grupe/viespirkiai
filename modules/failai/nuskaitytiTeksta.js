@@ -5,21 +5,22 @@ import { postgres, parsePgArray } from "../../postgres/postgres.js";
 
 /**
  * Cleans metadata object by removing null characters and trimming strings.
- * Recursively processes nested objects.
- * @param {Object} obj - The metadata object to clean.
- * @returns {Object} - The cleaned metadata object.
+ * Recursively processes nested objects and arrays.
+ * @param {any} obj - The metadata object to clean.
+ * @returns {any} - The cleaned metadata object.
  */
 function cleanMetadata(obj) {
-    for (const key in obj) {
-        if (!obj.hasOwnProperty(key)) continue;
-
-        const value = obj[key];
-        if (typeof value === "string") {
-            // Remove null chars and trim
-            obj[key] = value.replace(/\u0000/g, "").trim();
-        } else if (typeof value === "object" && value !== null) {
-            // Recursively clean nested objects
-            cleanMetadata(value);
+    if (typeof obj === "string") {
+        return obj.replace(/\u0000/g, "").trim();
+    } else if (Array.isArray(obj)) {
+        return obj.map(cleanMetadata);
+    } else if (obj && typeof obj === "object") {
+        for (const key in obj) {
+            if (!Object.hasOwn(obj, key)) continue;
+            const cleanKey = key.replace(/\u0000/g, "");
+            const value = obj[key];
+            obj[cleanKey] = cleanMetadata(value);
+            if (cleanKey !== key) delete obj[key];
         }
     }
     return obj;
@@ -415,7 +416,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             });
 
             await client.query(
-                `INSERT INTO "${table}"(${columns.join(", ")}) VALUES ${placeholders.join(", ")}`,
+                `INSERT INTO "${table}"(${columns.join(", ")}) VALUES ${placeholders.join(", ")} ON CONFLICT DO NOTHING`,
                 values,
             );
         }
