@@ -337,6 +337,8 @@ export function buildPostgresFilter(query, limit, page = 1) {
         },
     ];
 
+    whereClauses.push(`NOT "istrinta"`);
+
     for (const { key, apply, isBoolean } of config) {
         if (isBoolean && query[key] !== undefined) {
             apply();

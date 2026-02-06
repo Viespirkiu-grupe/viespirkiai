@@ -19,7 +19,6 @@ export async function cvpIsScrpeById(unikalusId, options = {}) {
     let sutartys;
     ({ sutartys, timings } = await cvpIsScrapePageContent(url, { timings }));
     if (sutartys.length === 0) {
-        console.log(`[Import] Nerasta.`);
         return { count: 0, timings };
     }
 

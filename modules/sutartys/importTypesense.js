@@ -62,6 +62,8 @@ async function fetchSutartysBatches(batchSize, onBatch) {
  */
 async function importToTypesense() {
     await fetchSutartysBatches(BATCH_SIZE, async (batch) => {
+        // Remove docs where istrinta = true
+        batch = batch.filter((doc) => !doc.istrinta);
         const formattedDocs = batch.map((doc) => {
             return {
                 id: doc.sutartiesUnikalusId?.toString() || "",

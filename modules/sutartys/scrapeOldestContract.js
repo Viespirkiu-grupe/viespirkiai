@@ -2,6 +2,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import { cvpIsScrpeById } from "./atnaujintiPagalUnikalu.js";
 import Timings from "../../utils/timings.js";
+import { typesense } from "../../typesense/typesense.js";
 
 export async function cvpIsScrapeOldestContract() {
     let timings = new Timings();
@@ -41,6 +42,13 @@ export async function cvpIsScrapeOldestContract() {
              WHERE "sutartiesUnikalusId" = $1;`,
             [id],
         );
+        const doc = await typesense
+            .collections("sutartys")
+            .documents(id)
+            .retrieve();
+        if (doc) {
+            await typesense.collections("sutartys").documents(id).delete();
+        }
     } else {
         throw new Error(
             `Unexpected additional contracts: ${count} for ID ${id}`,
