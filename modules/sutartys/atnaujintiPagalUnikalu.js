@@ -17,13 +17,13 @@ async function importID(unikalusID) {
     // Parsiunčia
     const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_show=1&filter_limit=10&filter_dok_id=${unikalusID}`;
     let data = await scrapePage(url);
-    if (data.length === 0) {
+    if (data.sutartys.length === 0) {
         console.log(`[Import] Nerasta.`);
         return 0;
     }
 
     // Importuoja
-    await importArray(data);
+    await importArray(data.sutartys);
 
     let end = new Date();
     console.log(`[Import] Importavimas užtruko ${end - start}ms.`);

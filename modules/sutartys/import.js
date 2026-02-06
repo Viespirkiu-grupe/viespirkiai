@@ -121,9 +121,9 @@ export async function importArray(data) {
             const pirkimoNumeris =
                 item.pirkimoNumeris?.replace(/\x00/g, "").trim() || null;
 
-            const baseIndex = i * 27;
+            const baseIndex = i * 28;
             placeholders.push(
-                `(${Array.from({ length: 27 }, (_, j) => `$${baseIndex + j + 1}`).join(",")})`,
+                `(${Array.from({ length: 28 }, (_, j) => `$${baseIndex + j + 1}`).join(",")})`,
             );
 
             values.push(
@@ -153,6 +153,7 @@ export async function importArray(data) {
                 item.papildomiTiekejaiKodai,
                 item.papildomiBvpzKodai,
                 item.papildomiBvpzPavadinimai,
+                item.paskutiniKartaMatyta,
                 item.paskutiniKartaMatyta,
             );
 
@@ -212,7 +213,8 @@ export async function importArray(data) {
               "papildomiTiekejaiKodai",
               "papildomiBvpzKodai",
               "papildomiBvpzPavadinimai",
-              "paskutiniKartaMatyta"
+              "paskutiniKartaMatyta",
+              "paskutiniKartaAtnaujinta"
             ) VALUES ${placeholders.join(",")}
             ON CONFLICT ("sutartiesUnikalusId") DO UPDATE SET
               "pirkimoNumeris" = EXCLUDED."pirkimoNumeris",
@@ -240,7 +242,8 @@ export async function importArray(data) {
               "papildomiTiekejaiKodai" = EXCLUDED."papildomiTiekejaiKodai",
               "papildomiBvpzKodai" = EXCLUDED."papildomiBvpzKodai",
               "papildomiBvpzPavadinimai" = EXCLUDED."papildomiBvpzPavadinimai",
-              "paskutiniKartaMatyta" = EXCLUDED."paskutiniKartaMatyta"`,
+              "paskutiniKartaMatyta" = EXCLUDED."paskutiniKartaMatyta",
+              "paskutiniKartaAtnaujinta" = EXCLUDED."paskutiniKartaAtnaujinta";`,
             values,
         );
 
