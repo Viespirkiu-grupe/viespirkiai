@@ -34,11 +34,10 @@ typesense/typesense
 /config.js
 .env
 
-# Viešlaiškiai
+# Viešinami dokumentai
 public/vieslaiskiai
-
-# Veiklos ataskaitos
 public/veiklosAtaskaitos
+public/specialus
 
 # Old
 old
