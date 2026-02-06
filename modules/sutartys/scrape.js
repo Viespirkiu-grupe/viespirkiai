@@ -350,7 +350,6 @@ export async function cvpIsScrapePageContent(url, options = {}) {
 async function cvpIsScrapePage(page = 0, options = {}) {
     let timings = options.timings || new Timings();
     timings.start("cvpIsScrapePage");
-    let start = new Date();
 
     // Sudarome puslapio URL
     let limitstart = page * 50; // Puslapiuose yra po 50 įrašų, todėl dauginame iš 50
