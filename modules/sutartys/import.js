@@ -3,8 +3,8 @@ Importuoja sutarčių duomenis į Postgres ir Typesense.
 */
 
 import { addDocumentsToSearch } from "../../typesense/typesense.js";
-import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
+import Timings from "../../utils/timings.js";
 
 /**
  * Konvertuoja datą į Postgres timestamp formatą.
@@ -36,10 +36,12 @@ function dateOnly(d) {
  * @param {Array} data - Duomenų masyvas, kuriame yra sutarčių informacija.
  * @returns {Promise<void>}
  */
-export async function importArray(data) {
-    let items = [];
+export async function cvpIsImportArray(data, options = {}) {
+    let timings = options.timings || new Timings();
+    timings.start("importDataCleanup");
 
     // Aptvarkome duomenų tipus
+    let items = [];
     for (let i = 0; i < data.length; i++) {
         let item = data[i];
 
@@ -87,18 +89,14 @@ export async function importArray(data) {
         uniqueItemsMap.set(item.sutartiesUnikalusID, item);
     }
     items = Array.from(uniqueItemsMap.values());
+    timings.end("importDataCleanup");
 
     if (items.length > 0) {
         // Įterpiame į Typesense
+        timings.start("importTypesenseUpsert");
         let startTypesenseTime = Date.now();
         await addDocumentsToSearch(items);
-
-        log(
-            `Typesense addDocument užtruko ${Date.now() - startTypesenseTime}ms`,
-        );
-
-        // Įterpiame į Postgres
-        let startPostgresTime = Date.now();
+        timings.end("importTypesenseUpsert");
 
         // Į lentelę sutartys
         const values = [];
@@ -185,6 +183,7 @@ export async function importArray(data) {
         });
 
         // Įterpiame (UPSERT) duomenis
+        timings.start("importPostgresUpsert");
         await postgres.query(
             `INSERT INTO "sutartys" (
               "sutartiesUnikalusId",
@@ -246,7 +245,9 @@ export async function importArray(data) {
               "paskutiniKartaAtnaujinta" = EXCLUDED."paskutiniKartaAtnaujinta";`,
             values,
         );
+        timings.end("importPostgresUpsert");
 
+        timings.start("importPostgresFailaiUpsert");
         if (failaiValues.length > 0) {
             await postgres.query(
                 `INSERT INTO failai ("dokId", "fileId", "pavadinimas", "extension", "saltinis")
@@ -255,7 +256,8 @@ export async function importArray(data) {
                 failaiValues,
             );
         }
-
-        log(`Postgres užtruko ${Date.now() - startPostgresTime}ms`);
+        timings.end("importPostgresFailaiUpsert");
     }
+
+    return { timings };
 }

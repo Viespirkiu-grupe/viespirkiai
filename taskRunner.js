@@ -20,6 +20,21 @@ tasks.push({
     },
 });
 
+import { cvpIsScrapeOldestContract } from "./modules/sutartys/scrapeOldestContract.js";
+tasks.push({
+    name: "sutartysScrapeOldestContract",
+    mode: "asap",
+    cooldown: 30,
+    errorCooldown: 30,
+    job: async () => {
+        if (!isVptWorkingHours()) {
+            return await cvpIsScrapeOldestContract();
+        } else {
+            return false;
+        }
+    },
+});
+
 // CPVA projektai
 import { nuskaitytiCpvaProjektaiTiekejai } from "./modules/cpva/scrapeProjektai.js";
 tasks.push({
@@ -54,14 +69,14 @@ tasks.push({
 });
 
 // eViesiejiPirkimai.lt sutartys
-import { requestLatestEviesiejipirkimaiData } from "./modules/sutartys/scrape.js";
+import { cvpIsRequestLatest } from "./modules/sutartys/scrape.js";
 tasks.push({
     name: "scrapeEviesiejipirkimaiSutartys",
     mode: "asap",
     cooldown: 60,
     errorCooldown: 60,
     job: async () => {
-        return requestLatestEviesiejipirkimaiData();
+        return cvpIsRequestLatest();
     },
     nextTaskId: "failuParsiuntimas",
 });
@@ -663,7 +678,7 @@ function startAsapTask(
                     await new Promise((r) => setTimeout(r, cooldown));
                 }
             } catch (err) {
-                console.error(`ASAP Task ${id} failed:`, err.message);
+                console.error(`ASAP Task ${id} failed\n`, err);
                 await new Promise((r) => setTimeout(r, errorCooldown));
             }
         }

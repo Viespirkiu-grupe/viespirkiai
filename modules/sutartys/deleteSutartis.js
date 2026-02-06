@@ -2,7 +2,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { client } from "../../typesense/typesense.js";
 import { deleteFile } from "../failai/deleteFile.js";
 
-async function deleteSutartis(id) {
+async function cvpIsDeleteSutartis(id) {
     // Check if sutartis exists in sutartys table
     const sutartis = await postgres.query(
         `SELECT * FROM sutartys WHERE "sutartiesUnikalusId" = $1`,
@@ -65,6 +65,6 @@ if (
         process.exit(1);
     }
 
-    await deleteSutartis(id);
+    await cvpIsDeleteSutartis(id);
     await postgres.end();
 }

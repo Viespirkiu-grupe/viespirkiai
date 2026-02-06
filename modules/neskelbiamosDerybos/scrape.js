@@ -5,35 +5,7 @@ Parsiunčia ir įdeda į duomenų bazę neskelbiamas derybas iš eviesiejipirkim
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
-import fetch from "node-fetch";
-import pkg from "https-proxy-agent";
-const { HttpsProxyAgent } = pkg;
-import { SocksProxyAgent } from "socks-proxy-agent";
-import config from "../../utils/config.js";
 import crypto from "crypto";
-
-// Nustatome proxy
-let proxyAgent = null;
-
-if (config.scrapeProxy) {
-    if (
-        config.scrapeProxy.startsWith("http://") ||
-        config.scrapeProxy.startsWith("https://")
-    ) {
-        proxyAgent = new HttpsProxyAgent(config.scrapeProxy, {
-            rejectUnauthorized: false, // allow self-signed certs
-        });
-    } else if (
-        config.scrapeProxy.startsWith("socks5://") ||
-        config.scrapeProxy.startsWith("socks://")
-    ) {
-        proxyAgent = new SocksProxyAgent(config.scrapeProxy, {
-            rejectUnauthorized: false,
-        });
-    } else {
-        throw new Error("Unsupported proxy protocol: " + config.scrapeProxy);
-    }
-}
 
 /**
  * Nuskaityti neskelbiamas derybas nuo nurodyto puslapio
@@ -41,28 +13,32 @@ if (config.scrapeProxy) {
  * @returns {Promise<Array>} Grąžina neskelbiamas derybas
  */
 async function nuskaitytiNeskelbiamasDerybasNuo(start = 0) {
-    let url = `https://eviesiejipirkimai.lt/index.php?option=com_profile&task=sutikimai&filter_limit=50&Itemid=98&limitstart=${start * 50}`;
+    let scrapeProxyRes = await postgres.query(
+        `SELECT * FROM "scrapeProxies" WHERE site = 'eviesiejipirkimai' AND enabled = true AND type = 'httpReverse';`,
+    );
+    let proxy =
+        scrapeProxyRes.rows[
+            Math.floor(Math.random() * scrapeProxyRes.rows.length)
+        ];
 
-    log(url);
+    let url = `/index.php?option=com_profile&task=sutikimai&filter_limit=50&Itemid=98&limitstart=${start * 50}`;
+    let requestUrl;
+    if (proxy) {
+        requestUrl = proxy.url + url;
+    } else {
+        requestUrl = "https://eviesiejipirkimai.lt" + url;
+    }
+
     let startTime = new Date();
 
     // Atliekama užklausa
-    if (proxyAgent) {
-        var response = await fetch(url, {
-            agent: proxyAgent,
-            headers: {
-                "User-Agent": "Viespirkiai.org <viespirkiai@viespirkiai.org>",
-                Accept:
-                    "text/html,application/xhtml+xml,application/xml;" +
-                    "q=0.9,image/webp,image/apng,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept-Encoding": "gzip, deflate, br",
-                Connection: "keep-alive",
-            },
-        });
-    } else {
-        var response = await fetch(url);
-    }
+    var response = await fetch(requestUrl, {
+        headers: {
+            "User-Agent":
+                "Pilietine iniciatyva Viespirkiai <viespirkiai@viespirkiai.org>",
+        },
+    });
+
     const html = await response.text();
 
     log(`Užklausos laikas: ${((new Date() - startTime) / 1000).toFixed(2)}s`);

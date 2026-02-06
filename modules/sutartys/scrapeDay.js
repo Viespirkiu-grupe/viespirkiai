@@ -1,9 +1,9 @@
-import { scrapePage } from "./scrape.js";
-import { importArray } from "./import.js";
+import { cvpIsScrapePageContent } from "./scrape.js";
+import { cvpIsImportArray } from "./import.js";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 
-async function scrapeDay(date = new Date().toISOString().slice(0, 10)) {
+async function cvpIsScrapeDay(date = new Date().toISOString().slice(0, 10)) {
     // Validate date
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         throw new Error("Neteisingas datos formatas, turi būti YYYY-MM-DD");
@@ -18,14 +18,13 @@ async function scrapeDay(date = new Date().toISOString().slice(0, 10)) {
         let kiekis = 50;
 
         const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&filter_limit=${kiekis}&limitstart=${limitstart}&filter_contractdate_from=${date}&filter_contractdate_to=${date}`;
-        log(`Importuojamas puslapis ${page} iš ${date} ${url}`);
 
         // Nuskaitome puslapį
-        let { sutartys, total } = await scrapePage(url);
+        let { sutartys, total } = await cvpIsScrapePageContent(url);
         sutarciuSkaicius += sutartys.length;
 
         // Importuojame duomenis į duomenų bazę
-        await importArray(sutartys);
+        await cvpIsImportArray(sutartys);
 
         // Jei nėra duomenų, grąžina 0
         if (sutartys.length === 0 || sutarciuSkaicius >= total || !total) {
@@ -33,7 +32,7 @@ async function scrapeDay(date = new Date().toISOString().slice(0, 10)) {
         }
 
         log(
-            `Puslapio ${page} importas užtruko ${((new Date() - start) / 1000).toFixed(2)}s, ${date}: ${sutarciuSkaicius}/${total || sutarciuSkaicius}`,
+            `Puslapio ${date} / ${page} importas užtruko ${((new Date() - start) / 1000).toFixed(2)}s, ${date}: ${sutarciuSkaicius}/${total || sutarciuSkaicius}`,
         );
         page++;
     }
@@ -61,7 +60,7 @@ export async function cvpIsScrapeLeastRecentDate() {
     log(
         `Scrape'inama data ${date} (scrape'inta ${dateRes.rows[0].scrapeTimestamp}, count: ${dateRes.rows[0].count})`,
     );
-    let result = await scrapeDay(date);
+    let result = await cvpIsScrapeDay(date);
 
     // Update the scrape timestamp and count
     await postgres.query(

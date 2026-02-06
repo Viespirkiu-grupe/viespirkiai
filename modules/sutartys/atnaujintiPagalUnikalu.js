@@ -2,43 +2,41 @@
 Atnaujiną sutarties informaciją pagal unikalų ID (CLI argumentas) iš eviesiejipirkimai.lt
 */
 
-import { importArray } from "./import.js";
-import { scrapePage } from "./scrape.js";
+import { cvpIsImportArray } from "./import.js";
+import { cvpIsScrapePageContent } from "./scrape.js";
 import { postgres } from "../../postgres/postgres.js";
+import Timings from "../../utils/timings.js";
 
 /**
  * Parsiunčia ir importuoja nurodytą sutartį pagal unikalų ID.
- * @param {string} unikalusID - Unikalus ID sutarties
+ * @param {string} unikalusId - Unikalus ID sutarties
  * @returns {Promise<number>} Importuotų įrašų skaičius
  */
-async function importID(unikalusID) {
-    let start = new Date();
+export async function cvpIsScrpeById(unikalusId, options = {}) {
+    let timings = options.timings || new Timings();
 
-    // Parsiunčia
-    const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_show=1&filter_limit=10&filter_dok_id=${unikalusID}`;
-    let data = await scrapePage(url);
-    if (data.sutartys.length === 0) {
+    const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_show=1&filter_limit=10&filter_dok_id=${unikalusId}`;
+    let sutartys;
+    ({ sutartys, timings } = await cvpIsScrapePageContent(url, { timings }));
+    if (sutartys.length === 0) {
         console.log(`[Import] Nerasta.`);
-        return 0;
+        return { count: 0, timings };
     }
 
     // Importuoja
-    await importArray(data.sutartys);
+    ({ timings } = await cvpIsImportArray(sutartys, { timings }));
 
-    let end = new Date();
-    console.log(`[Import] Importavimas užtruko ${end - start}ms.`);
-
-    return data.length;
+    return { count: sutartys.length, timings };
 }
 
 // Jeigu pateiktas argumentas
 if (process.argv.length > 2) {
-    const unikalusID = process.argv[2];
-    console.log(`Importuojama sutartis: ${unikalusID}`);
-    importID(unikalusID)
+    const unikalusId = process.argv[2];
+    console.log(`Importuojama sutartis: ${unikalusId}`);
+    cvpIsScrpeById(unikalusId)
         .then((count) => {
             // Pavyko
-            console.log(`Importuotas ${count} įrašas sutarčiai: ${unikalusID}`);
+            console.log(`Importuotas ${count} įrašas sutarčiai: ${unikalusId}`);
             postgres.end();
         })
         .catch((err) => {

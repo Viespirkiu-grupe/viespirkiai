@@ -5,66 +5,55 @@ Kaip argumentą galima pateikti puslapio numerį, nuo kurio pradėti nuskaitymą
 
 import { parseHTML } from "linkedom";
 import { postgres } from "../../postgres/postgres.js";
-import { importArray } from "./import.js";
-import fetch from "node-fetch";
-import pkg from "https-proxy-agent";
-const { HttpsProxyAgent } = pkg;
-import { SocksProxyAgent } from "socks-proxy-agent";
-import config from "../../utils/config.js";
+import { cvpIsImportArray } from "./import.js";
 import { log } from "../../utils/log.js";
 import { DateTime } from "luxon";
-
-// Naudojame proxy, jei yra
-let proxyAgent = null;
-
-if (config.scrapeProxy) {
-    if (
-        config.scrapeProxy.startsWith("http://") ||
-        config.scrapeProxy.startsWith("https://")
-    ) {
-        proxyAgent = new HttpsProxyAgent(config.scrapeProxy, {
-            rejectUnauthorized: false, // allow self-signed certs
-        });
-    } else if (
-        config.scrapeProxy.startsWith("socks5://") ||
-        config.scrapeProxy.startsWith("socks://")
-    ) {
-        proxyAgent = new SocksProxyAgent(config.scrapeProxy, {
-            rejectUnauthorized: false,
-        });
-    } else {
-        throw new Error("Unsupported proxy protocol: " + config.scrapeProxy);
-    }
-}
+import Timings from "../../utils/timings.js";
 
 /**
  * Parsisiunčia ir nuskaito sutartis iš eViesiejiPirkimai.lt svetainės.
  * @param {string} url
  * @returns {Promise<Object[]>} Sutartys
  */
-export async function scrapePage(url) {
-    let start = new Date();
+export async function cvpIsScrapePageContent(url, options = {}) {
+    let timings = options.timings || new Timings();
+    timings.start("cvpIsScrapePageContent");
 
-    // Atliekama užklausa
-    if (proxyAgent) {
-        var response = await fetch(url, {
-            agent: proxyAgent,
-            headers: {
-                "User-Agent": "Viespirkiai.org +<viespirkiai@viespirkiai.org>",
-                Accept:
-                    "text/html,application/xhtml+xml,application/xml;" +
-                    "q=0.9,image/webp,image/apng,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept-Encoding": "gzip, deflate, br",
-                Connection: "keep-alive",
-            },
-        });
-    } else {
-        var response = await fetch(url);
+    timings.start("findProxy");
+    let scrapeProxyRes = await postgres.query(
+        `SELECT * FROM "scrapeProxies" WHERE site = 'eviesiejipirkimai' AND enabled = true AND type = 'httpReverse';`,
+    );
+    let proxy =
+        scrapeProxyRes.rows[
+            Math.floor(Math.random() * scrapeProxyRes.rows.length)
+        ];
+
+    let requestUrl = url;
+    if (proxy) {
+        const urlObj = new URL(url);
+        const proxyUrlObj = new URL(proxy.url);
+        urlObj.host = proxyUrlObj.host;
+        urlObj.protocol = proxyUrlObj.protocol;
+        requestUrl = urlObj.toString();
     }
-    const html = await response.text();
+    timings.end("findProxy");
+
+    timings.start("cvpIsRequest");
+    var response = await fetch(requestUrl, {
+        headers: {
+            "User-Agent":
+                "Pilietine iniciatyva Viespirkiai +<viespirkiai@viespirkiai.org>",
+            Accept:
+                "text/html,application/xhtml+xml,application/xml;" +
+                "q=0.9,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            Connection: "keep-alive",
+        },
+    });
 
     if (response.status === 403) {
+        timings.start("insertCvpIsGedimai");
         await postgres.query(
             `INSERT INTO "eviesiejipirkimaiGedimai" ("timestamp", "tipas") VALUES ($1, $2);`,
             [
@@ -80,13 +69,16 @@ export async function scrapePage(url) {
                 "403",
             ],
         );
+        timings.end("insertCvpIsGedimai");
         throw new Error("Gauta 403 klaida, užklausa blokuojama");
     }
 
-    log(`Užklausos laikas: ${((new Date() - start) / 1000).toFixed(2)}s`);
+    const html = await response.text();
+    timings.end("cvpIsRequest");
 
-    // Nuskaitomas HTML
+    timings.start("parseHtml");
     const { document } = parseHTML(html);
+    timings.end("parseHtml");
 
     // Check if document contains a h2 containing text "Vykdomi sistemos atnaujinimo darbai"
     if (
@@ -95,6 +87,7 @@ export async function scrapePage(url) {
         )
     ) {
         log(`Svetainėje vykdomi sistemos atnaujinimo darbai`);
+        timings.start("insertCvpIsGedimai");
         await postgres.query(
             `INSERT INTO "eviesiejipirkimaiGedimai" ("timestamp", "tipas") VALUES ($1, $2);`,
             [
@@ -110,9 +103,11 @@ export async function scrapePage(url) {
                 "sistemosAtnaujinimoDarbai",
             ],
         );
+        timings.end("insertCvpIsGedimai");
         throw new Error("Svetainėje vykdomi sistemos atnaujinimo darbai");
     } else if (!document.querySelector("#lenetele_table")) {
         log(`Nerasta lentelė`);
+        timings.start("insertCvpIsGedimai");
         await postgres.query(
             `INSERT INTO "eviesiejipirkimaiGedimai" ("timestamp", "tipas") VALUES ($1, $2);`,
             [
@@ -128,6 +123,7 @@ export async function scrapePage(url) {
                 "nerastaLentele",
             ],
         );
+        timings.end("insertCvpIsGedimai");
         throw new Error("Nerasta lentelė");
     }
 
@@ -342,7 +338,8 @@ export async function scrapePage(url) {
         /Puslapis \d+ iš \d+ \((\d+)\)/,
     )?.[1];
 
-    return { sutartys, total };
+    timings.end("cvpIsScrapePageContent");
+    return { sutartys, total, timings };
 }
 
 /**
@@ -350,7 +347,9 @@ export async function scrapePage(url) {
  * @param {number} page - Puslapis, kurį reikia importuoti
  * @returns {Promise<number>} Importuotų sutarčių skaičius
  */
-async function scrapeDay(page = 0) {
+async function cvpIsScrapePage(page = 0, options = {}) {
+    let timings = options.timings || new Timings();
+    timings.start("cvpIsScrapePage");
     let start = new Date();
 
     // Sudarome puslapio URL
@@ -362,7 +361,8 @@ async function scrapeDay(page = 0) {
     log(`Importuojamas puslapis ${page} ${url}`);
 
     // Nuskaitome puslapį
-    let { sutartys } = await scrapePage(url);
+    let sutartys;
+    ({ sutartys, timings } = await cvpIsScrapePageContent(url, { timings }));
 
     // Jei nėra duomenų, grąžina 0
     if (sutartys.length === 0) {
@@ -371,12 +371,12 @@ async function scrapeDay(page = 0) {
     }
 
     // Importuojame duomenis į duomenų bazę
-    await importArray(sutartys);
+    ({ timings } = await cvpIsImportArray(sutartys, { timings }));
+    timings.end("cvpIsScrapePage");
 
     log(
-        `Puslapio ${page} importas užtruko ${((new Date() - start) / 1000).toFixed(2)}s.`,
+        `Puslapio ${page} atnaujinimas užtruko ${timings.humanDuration("cvpIsScrapePage")}, ${sutartys.length} sut.`,
     );
-    log(`Importuotos ${sutartys.length} sutartys.`);
 
     let naujausioAtnaujinimoTimestamp = sutartys
         .map((d) => d.paskutinioRedagavimoData)
@@ -386,6 +386,7 @@ async function scrapeDay(page = 0) {
     return {
         length: sutartys.length,
         naujausioAtnaujinimoTimestamp,
+        timings,
     };
 }
 
@@ -393,7 +394,9 @@ async function scrapeDay(page = 0) {
  * Atsiunčia naujausias sutartis iš eViesiejiPirkimai.lt svetainės.
  * @returns {Promise}
  */
-export async function requestLatestEviesiejipirkimaiData() {
+export async function cvpIsRequestLatest(options = {}) {
+    let timings = options.timings || new Timings();
+    timings.start("cvpIsNewestTimestamp");
     let naujausioAtnaujinimoTimestampRes = await postgres.query(
         `SELECT max("paskutinioRedagavimoData") FROM sutartys;`,
     );
@@ -410,9 +413,12 @@ export async function requestLatestEviesiejipirkimaiData() {
             zone: "Europe/Vilnius",
         },
     );
+    timings.end("cvpIsNewestTimestamp");
 
     for (let page = 0; page < 50; page++) {
-        let data = await scrapeDay(page);
+        timings.start("cvpIsRequestLatest");
+        let data = await cvpIsScrapePage(page, { timings });
+        timings = data.timings;
 
         // Patikriname ar data.naujausioAtnaujinimoTimestamp yra bent 15min senesnis už naujausioAtnaujinimoTimestamp
         // Jei taip, stabdome importą, jau atsikasėme viską
@@ -427,15 +433,18 @@ export async function requestLatestEviesiejipirkimaiData() {
             return false;
         }
 
-        log(`Importuotas puslapis ${page}`);
+        timings.end("cvpIsRequestLatest");
+        log(
+            `Importuotas puslapis ${page} per ${timings.humanDuration("cvpIsRequestLatest")}, naujausias atnaujinimas: ${data.naujausioAtnaujinimoTimestamp}`,
+        );
     }
     return false;
 }
 
-export async function scrapePagesStarting(page = 0) {
+export async function cvpIsScrapePagesStarting(page = 0) {
     let yraIrasu = true;
     while (yraIrasu) {
-        let data = await scrapeDay(page);
+        let data = await cvpIsScrapePage(page);
         if (data.length === 0) {
             yraIrasu = false;
             log(`Nėra daugiau įrašų, baigiamas nuskaitymas.`);
@@ -448,7 +457,10 @@ export async function scrapePagesStarting(page = 0) {
     }
 }
 
-export async function scrapePagesSequential(startPage = 0, batchSize = 20) {
+export async function cvpIsScrapePagesSequential(
+    startPage = 0,
+    batchSize = 20,
+) {
     let page = startPage;
     let yraIrasu = true;
 
@@ -461,7 +473,7 @@ export async function scrapePagesSequential(startPage = 0, batchSize = 20) {
                     const limitstart = (page + i) * 50;
                     const url = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&filter_limit=50&limitstart=${limitstart}`;
                     log(`Scraping page ${page + i} ${url}`);
-                    batchPromises.push(scrapePage(url));
+                    batchPromises.push(cvpIsScrapePageContent(url));
                 }
 
                 batchResults = await Promise.all(batchPromises);
@@ -479,7 +491,7 @@ export async function scrapePagesSequential(startPage = 0, batchSize = 20) {
             log("No more records, scraping finished.");
         } else {
             // wait for DB insert before continuing
-            await importArray(batchData);
+            await cvpIsImportArray(batchData);
 
             const latestTimestamp = batchData
                 .map((d) => d.paskutinioRedagavimoData)
@@ -504,7 +516,7 @@ if (
     if (process.argv.length >= 3) {
         page = parseInt(process.argv[2]);
     }
-    scrapePagesSequential(page).then(() => {
+    cvpIsScrapePagesSequential(page).then(() => {
         log("Baigtas visų puslapių nuskaitymas.");
         process.exit(0);
     });
