@@ -4,6 +4,7 @@ Parsisiunčia duomenų bazėje nurodytus failus į viešdėžes.
 
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import Timings from "../../utils/timings.js";
 
 let kibirelis = [];
 const BUCKET_SIZE = 50;
@@ -102,39 +103,22 @@ let start = 0;
  * Parsiunčia vieną neparsiųstą failą į viešdėžę.
  * @returns {Promise<boolean>} true jei pavyko parsisiųsti failą, false jei nėra failų parsisiuntimui
  */
-export async function parsiustiFaila() {
-    let startTime = Date.now();
+export async function parsiustiFaila(options = {}) {
+    let timings = options.timings || new Timings();
 
+    timings.start("getFileFromBucket");
     const failas = await getFromBucket();
+    timings.end("getFileFromBucket");
     if (!failas) return false;
 
     log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
 
-    let saltinis = failas.saltinis;
-    if (!saltinis) {
-        saltinis = "sutartys";
-    }
-
-    // Randame proxy
-    const proxyRes = await postgres.query(
-        `
-      SELECT * FROM "sutarciuFailuParsiuntejai" WHERE enabled = true AND tipas = $1 ORDER BY RANDOM() LIMIT 1;`,
-        [saltinis],
-    );
-
-    if (proxyRes.rows.length === 0) {
-        throw new Error("Nėra prieinamų sutarčių failų parsisiuntimui.");
-    }
-
-    const proxy = proxyRes.rows[0];
-    const customUrl = proxy.url;
-
-    log(`Naudojama ${proxy.pavadinimas}`);
-
     // Randame dėžę, kuri dar turi vietos
+    timings.start("getDeze");
     const dezeRes = await postgres.query(
         `SELECT * FROM dezes WHERE used < max ORDER BY "priority" DESC LIMIT 1`,
     );
+    timings.end("getDeze");
 
     if (dezeRes.rows.length === 0) {
         throw new Error("Nėra dėžių parsisiuntimui.");
@@ -148,30 +132,61 @@ export async function parsiustiFaila() {
             start = Date.now();
         }
 
+        async function getProxyBySite() {
+            timings.start("getProxyBySite");
+            const proxyRes = await postgres.query(
+                `SELECT * FROM "scrapeProxies" WHERE enabled = true AND site = $1 AND type = 'httpReverse'`,
+                [saltinis],
+            );
+            if (proxyRes.rows.length === 0) {
+                return null;
+            }
+            timings.end("getProxyBySite");
+            return proxyRes.rows[
+                Math.floor(Math.random() * proxyRes.rows.length)
+            ];
+        }
+
         let url;
+        let saltinis = failas.saltinis;
+        if (!saltinis) {
+            saltinis = "sutartys";
+        }
         if (saltinis == "sutartys") {
-            url = customUrl
-                .replace("$DOK_ID", failas.dokId)
-                .replace("$FILE_ID", failas.fileId);
+            let proxy = await getProxyBySite("eviesiejipirkimai");
+            if (!proxy) {
+                // https://eviesiejipirkimai.lt/download.php?dok_id=$DOK_ID&file_id=$FILE_ID
+                url = `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dokId}&file_id=${failas.fileId}`;
+            } else {
+                url =
+                    proxy.url +
+                    `/download.php?dok_id=${failas.dokId}&file_id=${failas.fileId}`;
+            }
         } else if (saltinis == "neskelbiamosDerybos") {
-            url = customUrl.replace("$saltinioId", failas.saltinioId);
-            // https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=$VERSION_ID&documentId=$DOC_ID
+            let proxy = await getProxyBySite("eviesiejipirkimai");
+            if (!proxy) {
+                url = `https://eviesiejipirkimai.lt/${failas.saltinioId}`;
+            } else {
+                url = proxy.url + `/${failas.saltinioId}`;
+            }
         } else if (saltinis == "cvpIs") {
-            // Split saltinioId into 3 parts: cvpIsId, documentId, versionId
             const parts = failas.saltinioId.split("/");
-            const cvpIsId = parts[0];
             const documentId = parts[1];
             const versionId = parts[2];
-            url = customUrl
-                .replace("$CVPIS_ID", cvpIsId)
-                .replace("$DOC_ID", documentId)
-                .replace("$VERSION_ID", versionId);
+
+            let proxy = await getProxyBySite("viesiejipirkimai");
+            if (!proxy) {
+                url = `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${versionId}&documentId=${documentId}`;
+            } else {
+                url =
+                    proxy.url +
+                    `/epps/cft/downloadDocumentVersion.do?versionId=${versionId}&documentId=${documentId}`;
+            }
         } else {
             throw new Error(`Nežinomas šaltinis: ${saltinis}`);
         }
 
-        console.log(url);
-
+        timings.start("fetchDownloadUrl");
         let response = await fetch(`${deze.url}/download-url`, {
             method: "POST",
             headers: {
@@ -183,6 +198,7 @@ export async function parsiustiFaila() {
                 url,
             }),
         });
+        timings.end("fetchDownloadUrl");
 
         if (!response.ok || response.status !== 200) {
             console.log(await response.text());
@@ -195,33 +211,31 @@ export async function parsiustiFaila() {
             throw new Error("Nepavyko gauti failo.");
         }
 
-        dydis += size;
-        failai++;
-        // Calculate mbps
-        let duration = (Date.now() - start) / 1000;
-        let mbps = (dydis / 1024 / 1024 / duration).toFixed(2);
-
-        log(`${mbps} Mbps`);
-
         // Įterpiame į failaiDezes (columns: md5, deze, dydis) jei nėra
+        timings.start("insertIntoFailaiDezes");
         await postgres.query(
             `INSERT INTO "failaiDezes" (md5, deze, dydis)
              VALUES ($1, $2, $3)
              ON CONFLICT (md5, deze) DO NOTHING`,
             [md5, deze.pavadinimas, size],
         );
+        timings.end("insertIntoFailaiDezes");
 
         // Atnaujiname informaciją apie failą
+        timings.start("updateFailas");
         await postgres.query(
             "UPDATE failai SET parsiustas = 1, md5 = $1, dydis = $2 WHERE id = $3",
             [md5, size, failas.id],
         );
+        timings.end("updateFailas");
     } catch (error) {
         console.error("Klaida parsisiunčiant failą:", error);
+        timings.start("updateFailas");
         await postgres.query(
             "UPDATE failai SET parsiustas = -1 WHERE id = $1",
             [failas.id],
         );
+        timings.end("updateFailas");
         doneWithFile(failas.id);
 
         throw error;
@@ -232,6 +246,7 @@ export async function parsiustiFaila() {
     );
 
     // Atnaujiname dėžės dydį
+    timings.start("updateDezeUsage");
     let usedReq = await fetch(`${deze.url}/storage-usage`, {
         method: "GET",
         headers: {
@@ -245,8 +260,9 @@ export async function parsiustiFaila() {
         totalSizeBytes,
         deze.id,
     ]);
+    timings.end("updateDezeUsage");
 
-    log(`Parsiuntimas užtruko: ${Date.now() - startTime} ms`);
+    log(`Parsiuntimas užtruko: ${timings.humanDuration("fetchDownloadUrl")}`);
     doneWithFile(failas.id);
     return true;
 }
