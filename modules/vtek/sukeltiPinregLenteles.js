@@ -51,6 +51,8 @@ async function sukeltiPinregLenteles() {
                     dalyvaujaViesuosePirkimuose:
                         rysys.dalyvaujaViesuosePirkimuose,
                     pateikimoData: deklaracija.pateikimoData,
+                    vardas: deklaracija.teikejas?.vardas || null,
+                    pavarde: deklaracija.teikejas?.pavarde || null,
                 }),
             );
 
@@ -69,8 +71,8 @@ async function sukeltiPinregLenteles() {
                         "duomenuSaltinis", "registruotaLietuvoje", "jaTeisinesFormosKodas",
                         "jaTeisinesFormosPavadinimas", "uzpildytaAutomatiskai", "kienoRysys",
                         "pastabos", "rysioPobudzioPavadinimas", "dalyvavimoVpInformacija",
-                        "dalyvaujaViesuosePirkimuose", "pateikimoData"
-                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, $16)`,
+                        "dalyvaujaViesuosePirkimuose", "pateikimoData", "vardas", "pavarde"
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
                     [
                         row.jarKodas,
                         row.deklaracija,
@@ -90,6 +92,8 @@ async function sukeltiPinregLenteles() {
                         row.dalyvavimoVpInformacija,
                         row.dalyvaujaViesuosePirkimuose,
                         row.pateikimoData,
+                        row.vardas,
+                        row.pavarde,
                     ],
                 );
             }

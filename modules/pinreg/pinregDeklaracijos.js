@@ -137,10 +137,13 @@ export async function gautiPinregDeklaracijasPagalJarKoda(
 
     // Process pinregRysiaiSuJa data
     rysiaiRows.forEach((row) => {
+        const asmuo = formatName(
+            `${row.vardas || "-"} ${row.pavarde || "-"}`.trim(),
+        );
         rysiaiSuJa.push({
             ...row,
             uuid: row.deklaracija,
-            asmuo: formatName(row.pavadinimas || ""), // if there's a person field, otherwise adjust
+            asmuo,
             pateikimoData: row.pateikimoData,
         });
     });

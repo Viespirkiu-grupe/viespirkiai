@@ -138,6 +138,8 @@ export async function nuskaitytiVtekDeklaracija() {
         dalyvavimoVpInformacija: rysys.dalyvavimoVpInformacija,
         dalyvaujaViesuosePirkimuose: rysys.dalyvaujaViesuosePirkimuose,
         pateikimoData: deklaracijosJson.pateikimoData,
+        vardas: deklaracijosJson.teikejas.vardas,
+        pavarde: deklaracijosJson.teikejas.pavarde,
     }));
 
     // Delete existing rows for this deklaracija
@@ -155,8 +157,8 @@ export async function nuskaitytiVtekDeklaracija() {
                             "duomenuSaltinis", "registruotaLietuvoje", "jaTeisinesFormosKodas",
                             "jaTeisinesFormosPavadinimas", "uzpildytaAutomatiskai", "kienoRysys",
                             "pastabos", "rysioPobudzioPavadinimas", "dalyvavimoVpInformacija",
-                            "dalyvaujaViesuosePirkimuose", "pateikimoData"
-                        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+                            "dalyvaujaViesuosePirkimuose", "pateikimoData", "vardas", "pavarde"
+                        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
             [
                 row.jarKodas,
                 row.deklaracija,
@@ -176,6 +178,8 @@ export async function nuskaitytiVtekDeklaracija() {
                 row.dalyvavimoVpInformacija,
                 row.dalyvaujaViesuosePirkimuose,
                 row.pateikimoData,
+                row.vardas,
+                row.pavarde,
             ],
         );
     }
