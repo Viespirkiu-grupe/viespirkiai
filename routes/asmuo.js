@@ -48,6 +48,9 @@ asmuoRouter.get("/asmuo/:jarKodas", async (req, res, next) => {
                 limit: req.query.pinregLimit || 3,
             },
             kotis: { limit: req.query.kotisLimit || 3 },
+            esInvesticijos: {
+                limit: req.query.esInvesticijosLimit || 5,
+            },
         };
 
         let keys = [

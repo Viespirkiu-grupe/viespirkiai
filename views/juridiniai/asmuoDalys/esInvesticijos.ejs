@@ -1,0 +1,56 @@
+<% if(asmuo.esInvesticijos && asmuo.esInvesticijos.count > 0){ %>
+    <div id="esInvesticijos">
+        <h2><a href="#esInvesticijos" class="hashHref"><u>ES investicijos (2014 programa)</u></a></h2>
+        <% if(asmuo.esInvesticijos.count > asmuo.esInvesticijos.rows.length) { %>
+            <i>
+                Rodomos tik <%= Number(asmuo.esInvesticijos.limit).linksniuoti(["paraiška", "paraiškos", "paraiškų"]) %>.
+
+                <a href="?esInvesticijosLimit=max#esInvesticijos">
+                    Rodyti visus (<%= asmuo.esInvesticijos.count %>)
+                </a>
+            </i>
+        <% } %>
+
+        <div class="results" style="margin-inline: 0px;">
+            <% asmuo.esInvesticijos.rows.forEach(function(item){ %>
+                <div class="rezultatas">
+                    <div class="rezultatas-top">
+                        <span>
+                            <%= item.pareiskejas %>
+                        </span>
+                        <span>
+                            <%= item.kodas %>
+                        </span>
+                        <span>
+                            Iki <%= item.pabaigosData instanceof Date
+                                ? item.pabaigosData.toISOString().slice(0, 10)
+                                : item.pabaigosData
+                                    ? new Date(item.pabaigosData).toISOString().slice(0, 10)
+                                    : 'nenurodyta'
+                            %>
+                        </span>
+
+                    </div>
+                    <div class="rezultatas-title">
+                        <a href="https://2014.esinvesticijos.lt/lt/finansavimas/paraiskos_ir_projektai/<%= item.slug %>">
+                            <%
+                            const suma =
+                                typeof item.galutineSuma === 'number' && Number.isFinite(item.galutineSuma)
+                                    ? item.galutineSuma
+                                    : null;
+                            %>
+                            <% if (suma !== null) { %>
+                                <%= new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(suma) %> –
+                            <% } %>
+
+                             <%= item.pavadinimas %>
+                        </a>
+                    </div>
+                    <div class="rezultatas-bottom">
+                        <%= item.busena %>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    </div>
+<% } %>

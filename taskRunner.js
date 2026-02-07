@@ -4,6 +4,26 @@ import { log } from "./utils/log.js";
 
 const tasks = [];
 
+import { rastiEsInvesticijosPareiskejoJarKoda } from "./modules/2014esinvesticijos/rastiPareiskejuKodus.js";
+tasks.push({
+    name: "rastiEsInvesticijosPareiskejoJarKoda",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 10,
+    job: async () => {
+        return await rastiEsInvesticijosPareiskejoJarKoda();
+    },
+});
+
+import { update2014EsInvesticijosData } from "./modules/2014esinvesticijos/scrape.js";
+tasks.push({
+    name: "update2014EsInvesticijosData",
+    schedule: "47 */3 * * *",
+    job: async () => {
+        await update2014EsInvesticijosData();
+    },
+});
+
 import { isVptWorkingHours } from "./modules/sutartys/isWorkingHours.js";
 import { cvpIsScrapeLeastRecentDate } from "./modules/sutartys/scrapeDay.js";
 tasks.push({
