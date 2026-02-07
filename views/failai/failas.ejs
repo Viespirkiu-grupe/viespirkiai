@@ -287,7 +287,9 @@
                               <% }) %>
                             <% } %>
 
-                            <%- renderFiles(failas.metaduomenys.filesTree) %>
+                            <% if (failas.metaduomenys && failas.metaduomenys.filesTree) { %>
+                                <%- renderFiles(failas.metaduomenys.filesTree) %>
+                            <% } %>
 
                         </div>
 
