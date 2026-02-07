@@ -121,8 +121,37 @@ export function buildTypesenseFilter(query) {
 
     values.search = query.search || "";
 
+    // Allowed sortable columns
+    const sortableColumns = new Set([
+        "paskutinioRedagavimoData",
+        "sudarymoData",
+        "suma",
+        "paskelbimoData",
+    ]);
+
+    let sortBy;
+    if (query.sort) {
+        usedHiddenFields = true;
+        values.sort = query.sort;
+        const col = sortableColumns.has(query.sort)
+            ? query.sort
+            : "paskutinioRedagavimoData";
+        const dir = (query.sortDir || "desc").toLowerCase();
+        const sortDir = ["asc", "desc"].includes(dir) ? dir : "desc";
+        values.sortDir = sortDir;
+
+        sortBy = `${col}:${sortDir}`;
+        queryParams.push(`sort=${encodeURIComponent(col)}`);
+        queryParams.push(`sortDir=${encodeURIComponent(sortDir)}`);
+    } else {
+        sortBy = "paskutinioRedagavimoData:desc"; // default
+    }
+
+    sortBy = sortBy.replace("suma", "verte");
+
     return {
         filterBy: filters.join(" && "),
+        sortBy,
         values,
         queryParams: queryParams.length ? "&" + queryParams.join("&") : "",
         usedHiddenFields,
@@ -337,7 +366,7 @@ export function buildPostgresFilter(query, limit, page = 1) {
         },
     ];
 
-    whereClauses.push(`NOT "istrinta"`);
+    whereClauses.push(`NOT COALESCE("istrinta", false)`);
 
     for (const { key, apply, isBoolean } of config) {
         if (isBoolean && query[key] !== undefined) {
@@ -353,16 +382,47 @@ export function buildPostgresFilter(query, limit, page = 1) {
 
     values.search = query.search || "";
 
+    // WHERE
     const where = whereClauses.length
         ? "WHERE " + whereClauses.join(" AND ")
         : "";
 
+    // PAGINATION
     const limitParam = addParam("limit", limit);
     const offsetVal = Math.max((page - 1) * limit, 0);
     const offsetParam = addParam("offset", offsetVal);
 
+    // ORDER
+    const sortableColumns = new Set([
+        "paskutinioRedagavimoData",
+        "sudarymoData",
+        "suma",
+        "paskelbimoData",
+    ]);
+
+    let sortColumn, sortDir;
+
+    if (query.sort) {
+        values.sort = query.sort;
+        usedHiddenFields = true;
+        sortColumn = sortableColumns.has(query.sort)
+            ? query.sort
+            : "paskutinioRedagavimoData";
+        sortDir = (query.sortDir || "desc").toLowerCase();
+        if (!["asc", "desc"].includes(sortDir)) sortDir = "desc";
+        values.sortDir = sortDir;
+
+        queryParams.push(`sort=${encodeURIComponent(sortColumn)}`);
+        queryParams.push(`sortDir=${encodeURIComponent(sortDir)}`);
+    } else {
+        sortColumn = "paskutinioRedagavimoData";
+        sortDir = "desc";
+    }
+
+    const orderBy = `"${sortColumn}" ${sortDir.toUpperCase()} NULLS LAST`;
+
     return {
-        sql: `SELECT * FROM sutartys ${where} ORDER BY "paskutinioRedagavimoData" DESC LIMIT ${limitParam} OFFSET ${offsetParam};`,
+        sql: `SELECT * FROM sutartys ${where} ORDER BY ${orderBy} LIMIT ${limitParam} OFFSET ${offsetParam};`,
         sqlCount: `SELECT COUNT(*) FROM sutartys ${where};`,
         params,
         values,

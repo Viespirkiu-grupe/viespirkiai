@@ -112,6 +112,34 @@
                         <%- include('../inputsNew/number', { label: 'Unikalus ID', name: 'sutartiesUnikalusID', placeholder: 'Nenurodyta', values }) %>
                         <%- include('../inputsNew/text', { label: 'Sut. numeris', name: 'sutartiesNumeris', placeholder: 'Nenurodyta', values }) %>
                         <%- include('../inputsNew/text', { label: 'Pirkimo numeris', name: 'pirkimoNumeris', placeholder: 'Nenurodyta', values }) %>
+                        <div class="inputContainer selectInputContainer" style="margin-block: 0;">
+                            <label class="inputLabel selectInputLabel" for="sort">Rikiuoti pagal</label>
+                            <select name="sort" id="sort" style="margin-right: 8px;">
+                                <option value="" <%= !values["sort"] ? "selected" : "" %>>Pasirinkite stulpelį</option>
+                                <%
+                                    const options = [
+                                        { value: "paskutinioRedagavimoData", label: "Paskutinio redagavimo data" },
+                                        { value: "sudarymoData", label: "Sudarymo data" },
+                                        { value: "suma", label: "Suma" },
+                                        { value: "paskelbimoData", label: "Paskelbimo data" }
+                                    ];
+                                    options.forEach(opt => {
+                                %>
+                                    <option value="<%= opt.value %>" <%= values["sort"] === opt.value ? "selected" : "" %>>
+                                        <%= opt.label %>
+                                    </option>
+                                <% }) %>
+                            </select>
+
+                            <%- include('../inputsNew/sort', {
+                                label: '',
+                                name: 'sortDir',
+                                placeholder: 'Pasirinkite kryptį',
+                                values
+                            }) %>
+                        </div>
+
+
                     </div>
 
                     <div class="nustatymai-toggles">

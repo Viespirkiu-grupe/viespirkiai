@@ -65,7 +65,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
     if (req.query.search && config.typesenseUp) {
         timings.start("typesense");
         // Tekstinė paieška – Typesense
-        var { filterBy, values, queryParams, usedHiddenFields } =
+        var { filterBy, sortBy, values, queryParams, usedHiddenFields } =
             buildTypesenseFilter(req.query);
 
         queryParams += `&search=${encodeURIComponent(req.query.search)}`;
@@ -75,7 +75,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
             {
                 page: page,
                 filterBy,
-                sortBy: "paskutinioRedagavimoData:desc",
+                sortBy,
                 limit,
             },
         );
