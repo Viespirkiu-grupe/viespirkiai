@@ -6,24 +6,32 @@
 export function isVptWorkingHours() {
     const now = new Date();
 
-    // Lithuania local time
-    const ltDate = new Date(
-        now.toLocaleString("en-GB", { timeZone: "Europe/Vilnius" }),
+    const parts = Object.fromEntries(
+        new Intl.DateTimeFormat("en-GB", {
+            timeZone: "Europe/Vilnius",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            weekday: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+        })
+            .formatToParts(now)
+            .map((p) => [p.type, p.value]),
     );
-    const day = ltDate.getDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
-    const hours = ltDate.getHours();
-    const minutes = ltDate.getMinutes();
 
-    // Weekends
+    const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const day = dayMap[parts.weekday];
+    const hours = Number(parts.hour);
+    const minutes = Number(parts.minute);
+
+    // Weekend
     if (day === 0 || day === 6) return false;
 
-    const year = ltDate.getFullYear();
-    const pad2 = (n) => String(n).padStart(2, "0");
-    const todayStr = `${year}-${pad2(ltDate.getMonth() + 1)}-${pad2(
-        ltDate.getDate(),
-    )}`;
+    const year = Number(parts.year);
+    const todayStr = `${parts.year}-${parts.month}-${parts.day}`;
 
-    // Fixed holidays
     const fixedHolidays = [
         `${year}-01-01`,
         `${year}-02-16`,
@@ -38,45 +46,43 @@ export function isVptWorkingHours() {
         `${year}-12-26`,
     ];
 
-    // Movable holidays (Easter-based)
     const easterStr = getEasterDate(year);
     const movableHolidays = [
-        addDaysStr(easterStr, -2), // Good Friday
-        addDaysStr(easterStr, 1), // Easter Monday
-        addDaysStr(easterStr, 39), // Ascension Day
-        addDaysStr(easterStr, 49), // Pentecost
+        addDaysStr(easterStr, -2),
+        addDaysStr(easterStr, 1),
+        addDaysStr(easterStr, 39),
+        addDaysStr(easterStr, 49),
     ];
 
-    const allHolidays = [...fixedHolidays, ...movableHolidays];
+    if ([...fixedHolidays, ...movableHolidays].includes(todayStr)) {
+        return false;
+    }
 
-    if (allHolidays.includes(todayStr)) return false;
-
-    // Working hours
     let openMinutes, closeMinutes;
     if (day >= 1 && day <= 4) {
-        openMinutes = 8 * 60; // 08:00
-        closeMinutes = 17 * 60; // 17:00
-    } else if (day === 5) {
         openMinutes = 8 * 60;
-        closeMinutes = 15 * 60 + 45; // 15:45
+        closeMinutes = 17 * 60;
     } else {
-        return false;
+        openMinutes = 8 * 60;
+        closeMinutes = 15 * 60 + 45;
     }
 
     const nowMinutes = hours * 60 + minutes;
     return nowMinutes >= openMinutes && nowMinutes < closeMinutes;
 
-    // --- Helper functions ---
-    function addDaysStr(dateStr, n) {
-        const [y, m, d] = dateStr.split("-").map(Number);
-        const date = new Date(y, m - 1, d);
-        date.setDate(date.getDate() + n);
-        return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
-            date.getDate(),
-        )}`;
+    function pad2(n) {
+        return String(n).padStart(2, "0");
     }
 
-    // Returns Easter Sunday as a string YYYY-MM-DD
+    function addDaysStr(dateStr, n) {
+        const [y, m, d] = dateStr.split("-").map(Number);
+        const date = new Date(Date.UTC(y, m - 1, d));
+        date.setUTCDate(date.getUTCDate() + n);
+        return `${date.getUTCFullYear()}-${pad2(
+            date.getUTCMonth() + 1,
+        )}-${pad2(date.getUTCDate())}`;
+    }
+
     function getEasterDate(year) {
         const f = Math.floor,
             G = year % 19,
