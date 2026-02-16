@@ -254,7 +254,7 @@
                       style="border: none; height: 70vh; margin-block: 16px; width: 100% !important; max-width: 100% !important; box-sizing: border-box; display: block; overflow-x: hidden !important;"
                       ></iframe>
                       </div>
-                    <% } else if (failas.nuskaitytas > 0 && (failas.extension == "zip" || failas.extension == "7z")){ %>
+                    <% } else if (failas.nuskaitytas > 0 && (failas.extension == "zip" || failas.extension == "7z" || failas.extension == "rar" || failas.extension == "adoc")){ %>
                         <div>
                             <div>
                                 <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
@@ -267,29 +267,38 @@
                             <div style="margin-block: 16px;">
                                 <i>Archyvo peržiūra <sup>BETA</sup></i>
                             </div>
-                            <% function renderFiles(files, parentPath = '') { %>
+                            <% function renderFiles(files) { %>
                               <% files.forEach(file => { %>
                                 <% if (file.isDirectory) { %>
                                   <details open style="padding-block: 4px;">
                                     <summary><%= file.name %></summary>
                                     <div style="padding-left: 20px;">
-                                      <% renderFiles(file.children, file.path) %>
+                                      <% if (file.children && file.children.length) { %>
+                                        <%- renderFiles(file.children) %>
+                                      <% } %>
                                     </div>
                                   </details>
                                 <% } else { %>
                                   <div style="padding-block: 4px;">
-                                    <a href="https://failai.viespirkiai.org/<%= failas.id %>/<%= file.path %>" target="_blank">
-                                      <%= file.name %>
-                                    </a>
-                                    (<%= file.extension %>, <%= (file.size / 1024).toFixed(1) %> KB)
+                                      <% if(file.id) { %>
+                                          <a href="/failas/<%= file.id %>">
+                                              <%= file.name %>
+                                          </a>
+                                      <% } else { %>
+                                        <a href="https://failai.viespirkiai.org/<%= failas.id %>/<%= file.path %>" target="_blank">
+                                            <%= file.name %>
+                                        </a>
+                                      <% } %>
+                                      (<%= file.extension %>, <%= (file.size / 1024).toFixed(1) %> KB)
                                   </div>
                                 <% } %>
                               <% }) %>
                             <% } %>
 
                             <% if (failas.metaduomenys && failas.metaduomenys.filesTree) { %>
-                                <%- renderFiles(failas.metaduomenys.filesTree) %>
+                              <%- renderFiles(failas.metaduomenys.filesTree) %>
                             <% } %>
+
 
                         </div>
 

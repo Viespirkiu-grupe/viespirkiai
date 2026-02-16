@@ -138,7 +138,7 @@ const REFILL_THRESHOLD = 5;
 const BUCKET_SIZE = 1000;
 const IN_PROGRESS_TIMEOUT = 10 * 60 * 1000; // 10 min
 
-const nuskaitymoVersija = 8;
+const nuskaitymoVersija = 9;
 
 // In-memory tracking
 let kibirelis = [];
@@ -166,11 +166,12 @@ async function fillBucket() {
                 AND LOWER(extension) = ANY(ARRAY[
                    'pdf','prn','docx','odt','docm','dotx','doc','dot','rtf', 'pages',
                    'xlsx','xlsm','xlsb','xls','csv','pptx','ppsx','ppt',
-                   'zip', 'adoc', 'bdoc', 'edoc', 'txt','url','msg','eml','7z', 'jpg', 'jpeg',
+                   'zip', 'adoc', 'bdoc', 'edoc', 'txt','url','msg','eml','7z', 'jpg', 'jpeg', 'adoc', 'rar',
                    'png', 'tif', 'tiff', 'odg', 'pub'
                ])
                AND (nuskaitytas IS NULL OR nuskaitytas >= 0)
                AND (nuskaitytas IS NULL OR nuskaitytas < $1)
+               ORDER BY nuskaitytas NULLS FIRST
              LIMIT $2`,
             [nuskaitymoVersija, limit * 2], // fetch extra to avoid duplicates
         );
@@ -322,7 +323,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     log(`${dokumentas.id} - ${dokumentas.ocrState} o ocr ${reikalingasOcr}`);
 
     if (
-        ["zip", "7z"].includes(dokumentas.extension) &&
+        ["zip", "7z", "rar", "adoc"].includes(dokumentas.extension) &&
         dokumentas.parent === null
     ) {
         let children = [];
@@ -359,8 +360,6 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
 
         // Insert into postgres
         for (const child of children) {
-            console.log(child);
-
             await postgres.query(
                 `INSERT INTO failai (
                     pavadinimas, extension, dydis, md5,

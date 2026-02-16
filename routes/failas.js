@@ -365,7 +365,7 @@ failasRouter.get(
             const deze = dezeRes.rows[0];
 
             if (
-                ["zip", "7z"].includes(
+                ["zip", "7z", "adoc", "rar"].includes(
                     String(parentRes.rows[0].extension).toLowerCase(),
                 )
             ) {
@@ -646,6 +646,61 @@ async function aptarnautiFailą(req, res, next, failas, requestsJson = false) {
 
     if (failas?.ocrText) {
         failas.ocrText = parsePgArray(failas.ocrText);
+    }
+
+    if (failas?.metaduomenys?.files) {
+        let paths = [];
+        for (const file of failas.metaduomenys.files) {
+            if (file.path) {
+                paths.push(file.path);
+            }
+        }
+        // Find in the table failai where saltinioId = path and parent = failas.id
+        if (paths.length > 0) {
+            const relatedFilesRes = await postgres.query(
+                `SELECT * FROM failai WHERE parent = $1 AND "saltinioId" = ANY($2)`,
+                [failas.id, paths],
+            );
+            const relatedFiles = relatedFilesRes.rows;
+            failas.metaduomenys.files = failas.metaduomenys.files.map(
+                (file) => {
+                    if (file.path) {
+                        // Set the id
+                        const relatedFile = relatedFiles.find(
+                            (f) => f.saltinioId === file.path,
+                        );
+                        if (relatedFile) {
+                            file.id = relatedFile.id;
+                        }
+                    }
+                    return file;
+                },
+            );
+        }
+
+        // Enrich each node with the corresponding file id
+        function enrichFilesTreeNode(tree) {
+            if (tree.path) {
+                const relatedFile = failas.metaduomenys.files.find(
+                    (f) => f.path === tree.path,
+                );
+                if (relatedFile) {
+                    tree.id = relatedFile.id;
+                }
+            }
+
+            if (tree.children && Array.isArray(tree.children)) {
+                tree.children.forEach(enrichFilesTreeNode);
+            }
+        }
+
+        // Handle the top-level array
+        if (
+            failas.metaduomenys.filesTree &&
+            Array.isArray(failas.metaduomenys.filesTree)
+        ) {
+            failas.metaduomenys.filesTree.forEach(enrichFilesTreeNode);
+        }
     }
 
     if (requestsJson) {
