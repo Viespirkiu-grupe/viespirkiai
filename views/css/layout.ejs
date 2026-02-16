@@ -98,9 +98,9 @@
     }
 
     .col-2-strict {
-        --gap: 8px;
+        --gap: 24px;
         display: grid;
-        grid-template-columns: calc(50% - 0.5 * var(--gap)) calc(50% - 0.5 * var(--gap));
+        grid-template-columns: calc(50% - var(--gap)) calc(50% - var(--gap));
         gap: var(--gap);
     }
 
@@ -126,6 +126,13 @@
         .mobile-col-1 {
             display: grid;
             grid-template-columns: repeat(1, 1fr);
+        }
+
+        .mobile-col-1-strict {
+            --gap: 8px;
+            display: grid;
+            grid-template-columns: calc(100% - 0.5 * var(--gap));
+            gap: var(--gap);
         }
 
         .mobile-wide-2 {
