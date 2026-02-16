@@ -4,13 +4,17 @@ import { cvpIsScrpeById } from "./atnaujintiPagalUnikalu.js";
 import Timings from "../../utils/timings.js";
 import { typesense } from "../../typesense/typesense.js";
 
-export async function cvpIsScrapeOldestContract() {
+export async function cvpIsScrapeOldestDeletedContract() {
     let timings = new Timings();
     timings.start("findOldestScrapedSutartis");
     let oldestRes = await postgres.query(`SELECT *
-      FROM public.sutartys
-      ORDER BY "paskutiniKartaAtnaujinta" ASC NULLS FIRST
-      LIMIT 1;`);
+    FROM public."sutartys"
+    WHERE "istrinta" = true
+      AND "paskutiniKartaAtnaujinta" < (
+        timezone('Europe/Vilnius', now()) - INTERVAL '1 hour'
+      )
+    ORDER BY "paskutiniKartaAtnaujinta" ASC NULLS FIRST
+    LIMIT 1;`);
     timings.end("findOldestScrapedSutartis");
 
     if (oldestRes.rows.length === 0) {
@@ -42,6 +46,7 @@ export async function cvpIsScrapeOldestContract() {
              WHERE "sutartiesUnikalusId" = $1;`,
             [id],
         );
+
         let doc = null;
         try {
             doc = await typesense
@@ -74,6 +79,7 @@ if (
     import.meta.url === process.argv[1] ||
     import.meta.url === `file://${process.argv[1]}`
 ) {
-    await cvpIsScrapeOldestContract();
+    while (await cvpIsScrapeOldestDeletedContract()) {}
+
     postgres.end();
 }
