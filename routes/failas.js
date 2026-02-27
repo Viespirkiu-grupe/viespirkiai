@@ -567,7 +567,7 @@ failasRouter.get("/failas/:dokId/:fileId", async (req, res, next) => {
 
     const failas = failasRezultatai.rows[0];
 
-    await aptarnautiFailą(req, res, next, failas, requestsJson);
+    res.redirect(301, `/failas/${failas.id}${requestsJson ? ".json" : ""}`);
 });
 
 failasRouter.get("/failas/:id", async (req, res, next) => {
