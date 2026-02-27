@@ -3,6 +3,7 @@ services:
 #        image: postgres:17
         build: .
         container_name: viespirkiaiPostgres
+        restart: unless-stopped
         env_file:
             - ../.env
         ports:
@@ -17,6 +18,7 @@ services:
 
     pgadmin:
         image: dpage/pgadmin4
+        restart: unless-stopped
         container_name: viespirkiaiPgadmin
         env_file:
             - ../.env
