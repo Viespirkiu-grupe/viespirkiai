@@ -65,19 +65,19 @@ tasks.push({
     },
 });
 
-// VTEK deklaracijos
-import { nuskaitytiVtekDeklaracija } from "./modules/vtek/nuskaityti.js";
+// PINREG deklaracijos
+import { nuskaitytiPinregDeklaracija } from "./modules/pinreg/nuskaityti.js";
 tasks.push({
-    name: "nuskaitytiVtekDeklaracijas",
+    name: "nuskaitytiPinregDeklaracijas",
     mode: "asap",
     cooldown: 60,
     errorCooldown: 10,
     job: async () => {
-        return nuskaitytiVtekDeklaracija();
+        return nuskaitytiPinregDeklaracija();
     },
 });
 
-import { getNewestPinreg } from "./modules/vtek/scrapeNewest.js";
+import { getNewestPinreg } from "./modules/pinreg/scrapeNewest.js";
 tasks.push({
     name: "getNewestPinreg",
     schedule: "0 */1 * * *",
