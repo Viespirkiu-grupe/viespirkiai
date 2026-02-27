@@ -414,8 +414,10 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
                 return `(${columns.map((_, j) => `$${base + j + 1}`).join(", ")})`;
             });
 
+            let quotedColumns = columns.map((col) => `"${col}"`).join(", ");
+
             await client.query(
-                `INSERT INTO "${table}"(${columns.join(", ")}) VALUES ${placeholders.join(", ")} ON CONFLICT DO NOTHING`,
+                `INSERT INTO "${table}"(${quotedColumns}) VALUES ${placeholders.join(", ")} ON CONFLICT DO NOTHING`,
                 values,
             );
         }

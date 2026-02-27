@@ -47,7 +47,7 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
         `WITH cte AS (
           SELECT id
           FROM failai
-          WHERE "ocrState" = 0
+          WHERE "ocrState" = 0 AND COALESCE("ocrBandymai", 0) < 3
           LIMIT 1
           FOR UPDATE SKIP LOCKED
        )
@@ -69,6 +69,7 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
           WHERE ("ocrState" IS NULL OR "ocrState" = 0)
             AND "nuskaitytas" >= 6
             AND LOWER("extension") IN ('pdf', 'jpg', 'jpeg', 'png', 'bmp', 'gif', 'odg', 'webp', 'heic')
+            AND COALESCE("ocrBandymai", 0) < 3
           LIMIT 1
           FOR UPDATE SKIP LOCKED
         )
@@ -90,6 +91,7 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
                     WHERE ("ocrState" IS NULL OR "ocrState" = 0)
                       AND "nuskaitytas" >= 6
                       AND LOWER("extension") IN ('pub', 'doc', 'odt', 'docm', 'rtf', 'pptx', 'odg', 'ppt', 'dotx', 'pages', 'ppsx', 'docx')
+                      AND COALESCE("ocrBandymai", 0) < 3
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
                   )
@@ -365,7 +367,7 @@ failasRouter.get(
             const deze = dezeRes.rows[0];
 
             if (
-                ["zip", "7z", "adoc", "rar"].includes(
+                ["zip", "adoc", "rar"].includes(
                     String(parentRes.rows[0].extension).toLowerCase(),
                 )
             ) {
@@ -725,10 +727,10 @@ async function fetchFailasMetadata(id) {
                 [id],
             ),
             postgres.query(
-                `SELECT jarKodas, puslapiai
+                `SELECT "jarKodas", puslapiai
        FROM "failaiJarKodai"
        WHERE id = $1
-       ORDER BY COALESCE(puslapiai[1], 9999), jarKodas ASC`,
+       ORDER BY COALESCE(puslapiai[1], 9999), "jarKodas" ASC`,
                 [id],
             ),
             postgres.query(

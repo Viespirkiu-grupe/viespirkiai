@@ -28,7 +28,7 @@ async function nuskaitytiPakartotinai(kiekis = 10, workerId) {
         return res.rowCount; // number of rows updated
     } catch (err) {
         console.error(`Worker ${workerId} error:`, err);
-        return 0;
+        return 1;
     }
 }
 

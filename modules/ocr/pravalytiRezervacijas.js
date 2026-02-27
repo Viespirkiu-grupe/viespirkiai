@@ -21,11 +21,12 @@ export async function pravalytiOcrRezervacijas() {
         SET
             "ocrState" = 0,
             "ocrLockTimestamp" = NULL,
-            "ocrNode" = NULL
+            "ocrNode" = NULL,
+            "ocrBandymai" = COALESCE(f."ocrBandymai", 0) + 1
         FROM to_update t
         WHERE f."id" = t."id"
         RETURNING f."id";
-    `,
+        `,
         [limit],
     );
 

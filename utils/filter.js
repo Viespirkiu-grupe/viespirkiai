@@ -571,7 +571,7 @@ export function buildPostgresFailaiSearchFilter(query, limit, page = 1) {
                 whereClauses.push(`
                   EXISTS (
                     SELECT 1 FROM "failaiJarKodai" fj
-                    WHERE fj.id = f.id AND fj.jarKodas = ${addParam("jarKodas", val)}
+                    WHERE fj.id = f.id AND fj."jarKodas" = ${addParam("jarKodas", val)}
                   )
                 `);
                 usedHiddenFields = true;
