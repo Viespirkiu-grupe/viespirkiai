@@ -34,7 +34,10 @@ export async function rastiDomenusPagalJarKoda(jarKodas, options = {}) {
             domregNs: row.domregNs,
         });
     }
-    let domenaiCount = parseInt(domenaiCountRes.rows[0].count);
+    let domenaiCount = 0;
+    if (domenaiCountRes.rows[0]) {
+        domenaiCount = parseInt(domenaiCountRes.rows[0].count);
+    }
 
     return {
         limit,

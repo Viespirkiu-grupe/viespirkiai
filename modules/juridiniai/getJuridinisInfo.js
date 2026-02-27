@@ -115,7 +115,15 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
             key,
             (async () => {
                 timings.start(key);
-                const result = await fn();
+                let result;
+                try {
+                    result = await fn();
+                } catch (e) {
+                    console.error(
+                        `Error in task ${key} for JAR ${jarKodas}:`,
+                        e,
+                    );
+                }
                 timings.end(key);
                 return result;
             })(),

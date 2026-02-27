@@ -25,49 +25,41 @@ asmuoRouter.get("/asmuo/:jarKodas", async (req, res, next) => {
     if (req.query.limitai == "false") {
         limitai = {};
     } else {
-        limitai = {
-            regitra: {
-                limit: req.query.regitraLimit || 5,
-            },
-            teismoNuosprendziai: {
-                limit: req.query.teismoNuosprendziaiLimit || 10,
-            },
-            sutartys: {
-                limit: req.query.sutartysLimit || 10,
-            },
-            darboSkelbimai: {
-                limit: req.query.darboSkelbimaiLimit || 5,
-            },
-            rcPranesimai: {
-                limit: req.query.rcPranesimaiLimit || 3,
-            },
-            domenai: {
-                limit: req.query.domenaiLimit || 3,
-            },
-            pinreg: {
-                limit: req.query.pinregLimit || 3,
-            },
-            kotis: { limit: req.query.kotisLimit || 3 },
-            esInvesticijos: {
-                limit: req.query.esInvesticijosLimit || 5,
-            },
+        const defaults = {
+            regitra: 5,
+            teismoNuosprendziai: 10,
+            sutartys: 10,
+            darboSkelbimai: 5,
+            rcPranesimai: 3,
+            domenai: 3,
+            pinreg: 3,
+            kotis: 3,
+            esInvesticijos: 5,
         };
 
-        let keys = [
-            "regitraLimit",
-            "teismoNuosprendziaiLimit",
-            "sutartysLimit",
-            "darboSkelbimaiLimit",
-            "rcPranesimaiLimit",
-            "domenaiLimit",
-            "pinregLimit",
-            "kotisLimit",
-        ];
-        // Remove limits for keys set to 'max'
-        for (let key of keys) {
-            if (req.query[key] == "max") {
-                let limitKey = key.replace("Limit", "");
-                limitai[limitKey] = { limit: null };
+        const map = {
+            transportoPriemonesLimit: "regitra",
+            teismoNuosprendziaiLimit: "teismoNuosprendziai",
+            sutartysLimit: "sutartys",
+            darboSkelbimaiLimit: "darboSkelbimai",
+            rcPranesimaiLimit: "rcPranesimai",
+            domenaiLimit: "domenai",
+            pinregLimit: "pinreg",
+            kotisLimit: "kotis",
+            esInvesticijosLimit: "esInvesticijos",
+        };
+
+        limitai = {};
+
+        for (const [queryKey, key] of Object.entries(map)) {
+            const val = req.query[queryKey];
+            if (val === "max") {
+                limitai[key] = { limit: null };
+            } else if (val !== undefined) {
+                const n = Number(val);
+                limitai[key] = { limit: Number.isNaN(n) ? defaults[key] : n };
+            } else {
+                limitai[key] = { limit: defaults[key] };
             }
         }
     }
