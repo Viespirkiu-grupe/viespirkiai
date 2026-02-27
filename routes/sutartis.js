@@ -131,7 +131,7 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
         purchase.dokumentai.map(async (failas) => {
             failas.dok_id = failas.url.match(/dok_id=(\d+)/)[1];
             failas.file_id = failas.url.match(/file_id=(\d+)/)[1];
-            failas.proxyUrl = `https://failai.viespirkiai.org/${failas.dok_id}/${failas.file_id}`;
+            failas.proxyUrl = `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dok_id}&file_id=${failas.file_id}`;
 
             const failoBusena = await postgres
                 .query(
@@ -139,7 +139,8 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
               "dokId",
               "fileId",
               ("parsiustas" > 0) AS parsiustas,
-              ("nuskaitytas" IS NOT NULL AND "nuskaitytas" > 0) AS nuskaitytas
+              ("nuskaitytas" IS NOT NULL AND "nuskaitytas" > 0) AS nuskaitytas,
+              id
           FROM failai
           WHERE "dokId" = $1
             AND "fileId" = $2`,
@@ -149,6 +150,10 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
 
             failas.parsiustas = failoBusena?.parsiustas || false;
             failas.nuskaitytas = failoBusena?.nuskaitytas || false;
+            if (failoBusena?.parsiustas) {
+                failas.id = failoBusena.id;
+                failas.proxyUrl = `https://failai.viespirkiai.org/${failas.id}`;
+            }
         }),
     );
 
