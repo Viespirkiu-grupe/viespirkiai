@@ -462,7 +462,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
                     columns: ["id", "link", "puslapiai"],
                     rows: metadata.links.slice(i, i + 100).map((x) => ({
                         id: docId,
-                        link: x.uri,
+                        link: x.uri?.slice(0, 1024),
                         puslapiai: x.pages,
                     })),
                     client,
