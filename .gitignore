@@ -13,6 +13,7 @@ typesense/data
 # Exports / datasets
 *.csv
 *.zip
+!modules/bvpz/cpv.zip
 *.jsonl
 *.txt
 
