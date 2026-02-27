@@ -221,7 +221,8 @@ export async function cvpIsScrapePageContent(url, options = {}) {
             .querySelectorAll("tr");
         ekstriniaiDuomenys.forEach((tr) => {
             let tekstas = tr.innerHTML;
-            if (tekstas.includes("Paskelbimo data")) {
+            let pavadinimas = tr.querySelectorAll("b")[0].innerHTML.trim();
+            if (pavadinimas.includes("Paskelbimo data")) {
                 sutartis.paskelbimoData =
                     tr.querySelectorAll("td")[1].querySelector("span")
                         ?.innerHTML ?? "";
@@ -232,7 +233,7 @@ export async function cvpIsScrapePageContent(url, options = {}) {
                         .querySelector("span")
                         .title.replace("Paskutinio atnaujinimo data ", "");
                 }
-            } else if (tekstas.includes("BVPŽ kodas")) {
+            } else if (pavadinimas.includes("BVPŽ kodas")) {
                 try {
                     const td = tr.querySelectorAll("td")[1];
                     const nodes = Array.from(td.childNodes);
@@ -295,19 +296,19 @@ export async function cvpIsScrapePageContent(url, options = {}) {
                     sutartis.bvpzKodas = "";
                     sutartis.bvpzPavadinimas = "";
                 }
-            } else if (tekstas.includes("Paskutinio redagavimo data")) {
+            } else if (pavadinimas.includes("Paskutinio redagavimo data")) {
                 sutartis.paskutinioRedagavimoData =
                     tr.querySelectorAll("td")[1].innerHTML;
-            } else if (tekstas.includes("Sutarties unikalus ID")) {
+            } else if (pavadinimas.includes("Sutarties unikalus ID")) {
                 sutartis.sutartiesUnikalusID =
                     tr.querySelectorAll("td")[1].innerHTML;
-            } else if (tekstas.includes("Sutarties numeris")) {
+            } else if (pavadinimas.includes("Sutarties numeris")) {
                 sutartis.sutartiesNumeris =
                     tr.querySelectorAll("td")[1].innerHTML;
-            } else if (tekstas.includes("Pirkimo numeris")) {
+            } else if (pavadinimas.includes("Pirkimo numeris")) {
                 sutartis.pirkimoNumeris =
                     tr.querySelectorAll("td")[1].innerHTML;
-            } else if (tekstas.includes("Dokumentai")) {
+            } else if (pavadinimas.includes("Dokumentai")) {
                 let dokumentuLink = tr
                     .querySelectorAll("td")[1]
                     .querySelectorAll("a");
