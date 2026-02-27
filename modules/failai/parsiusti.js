@@ -30,7 +30,29 @@ async function fillBucket() {
         const res = await postgres.query(
             `SELECT *
              FROM failai
-             WHERE parsiustas = 0
+             WHERE (parsiustas = 0 OR parsiustas = -1 OR parsiustas IS NULL)
+               AND (
+                   "parsiuntimoBandymai" IS NULL
+                   OR "paskutinisParsiuntimoBandymas" IS NULL
+                   OR (
+                       COALESCE("parsiuntimoBandymai", 0) < 6
+                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '1 hour'
+                   )
+                   OR (
+                       COALESCE("parsiuntimoBandymai", 0) >= 6
+                       AND COALESCE("parsiuntimoBandymai", 0) < 30
+                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '3 hours'
+                   )
+                   OR (
+                       COALESCE("parsiuntimoBandymai", 0) >= 30
+                       AND COALESCE("parsiuntimoBandymai", 0) < 54
+                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '1 day'
+                   )
+                   OR (
+                       COALESCE("parsiuntimoBandymai", 0) >= 54
+                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '3 days'
+                   )
+               )
              ORDER BY id DESC
              LIMIT $1`,
             [limit * 2],
@@ -232,7 +254,11 @@ export async function parsiustiFaila(options = {}) {
         console.error("Klaida parsisiunčiant failą:", error);
         timings.start("updateFailas");
         await postgres.query(
-            "UPDATE failai SET parsiustas = -1 WHERE id = $1",
+            `UPDATE failai
+             SET parsiustas = -1,
+                 "parsiuntimoBandymai" = COALESCE("parsiuntimoBandymai", 0) + 1,
+                 "paskutinisParsiuntimoBandymas" = (now() AT TIME ZONE 'Europe/Vilnius')
+             WHERE id = $1`,
             [failas.id],
         );
         timings.end("updateFailas");
