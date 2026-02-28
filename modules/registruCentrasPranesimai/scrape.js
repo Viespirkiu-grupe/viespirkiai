@@ -33,16 +33,17 @@ export async function nuskaitytiInformaciniusLeidinius() {
     log(`Rasta leidinių: ${leidiniai.length}`);
 
     if (leidiniai.length > 0) {
+        let paramIndex = 1;
+        const params = [];
         const values = leidiniai
             .map((l) => {
-                const { data, atnaujintas } = parseData(l.data); // assuming original l.data has both
-                return `(
-          '${l.oid}',
-          '${data}',
-          '${l.numeris.replace(/'/g, "''")}',
-          '${l.nuoroda.replace(/'/g, "''")}',
-          ${atnaujintas ? `'${atnaujintas}'` : "NULL"}
-        )`;
+                const { data, atnaujintas } = parseData(l.data);
+                params.push(l.oid, data, l.numeris, l.nuoroda, atnaujintas);
+                const placeholders = Array.from(
+                    { length: 5 },
+                    () => `$${paramIndex++}`,
+                ).join(",");
+                return `(${placeholders})`;
             })
             .join(",");
 
@@ -57,7 +58,7 @@ export async function nuskaitytiInformaciniusLeidinius() {
           "atnaujintas" = EXCLUDED."atnaujintas";
         `;
 
-        await postgres.query(query);
+        await postgres.query(query, params);
     }
 
     log("Duomenys įrašyti į duomenų bazę");
