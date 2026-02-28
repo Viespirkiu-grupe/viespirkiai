@@ -1,5 +1,39 @@
 import { parseHTML } from "linkedom";
 
+const DATE_KEYS_CFTDPSWS = new Set([
+    "susipazinimoSuPasiulymaisData",
+    "paaiskinimuTerminoPabaiga",
+    "pasiulymuArbaParaiskuDalyvautiPirkimePateikimoTerminas",
+    "paskelbimoIrArbaKvietimoData",
+    "laimetojoNustatymoData",
+    "pasiulymuPateikimoTerminas",
+    "kvsGaliojimoDataIrLaikas",
+    "dpsGaliojimoDataIrLaikas",
+]);
+
+const DATE_KEYS_PMC = new Set([
+    "susipazinimoSuPasiulymaisData",
+    "paaiskinimuTerminoPabaiga",
+    "pasiulymuArbaParaiskuDalyvautiPirkimePateikimoTerminas",
+    "paskelbimoIrArbaKvietimoData",
+    "laimetojoNustatymoData",
+    "pasiulymuPateikimoTerminas",
+]);
+
+const DATE_KEYS_CFTWS = new Set([
+    "susipazinimoSuPasiulymaisData",
+    "paaiskinimuTerminoPabaiga",
+    "pasiulymuArbaParaiskuDalyvautiPirkimePateikimoTerminas",
+    "paskelbimoIrArbaKvietimoData",
+    "laimetojoNustatymoData",
+]);
+
+/**
+ * Converts label text into a normalized camelCase key.
+ * Lithuanian letters are transliterated and punctuation removed.
+ * @param {string} str
+ * @returns {string}
+ */
 function toCamelCase(str) {
     const map = {
         ą: "a",
@@ -40,15 +74,23 @@ function toCamelCase(str) {
         .join("");
 }
 
+/**
+ * Converts dd/mm/yyyy to yyyy-mm-dd.
+ * @param {string | null | undefined} dateStr
+ * @returns {string | null}
+ */
 function formatShortDate(dateStr) {
-    // Converts dd/mm/yyyy → yyyy-mm-dd
     if (!dateStr) return null;
     const [d, m, y] = dateStr.trim().split("/");
     if (!d || !m || !y) return null;
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
 }
 
-// Format date "dd/mm/yyyy hh:mm" or "dd/mm/yyyy hh:mm:ss" → "yyyy-mm-dd hh:mm:ss" (seconds optional)
+/**
+ * Converts dd/mm/yyyy hh:mm(:ss) to yyyy-mm-dd hh:mm(:ss).
+ * @param {string | null | undefined} dateStr
+ * @returns {string | null}
+ */
 function formatDate(dateStr) {
     if (!dateStr) return null;
     const [datePart, timePart] = dateStr.trim().split(" ");
@@ -59,6 +101,38 @@ function formatDate(dateStr) {
         : `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
 }
 
+/**
+ * Parses a numeric value from text, converting commas to dots.
+ * Returns null for non-positive or invalid values.
+ * @param {string} text
+ * @returns {number | null}
+ */
+function parseNumberValue(text) {
+    const n = Number(text.replace(",", ".").replace(/\.$/, "").trim());
+    return n > 0 ? n : null;
+}
+
+/**
+ * Extracts buyer details from a definition list item.
+ * @param {Element} dd
+ * @param {Record<string, any>} result
+ * @returns {void}
+ */
+function extractPirkimoVykdytojas(dd, result) {
+    const a = dd.querySelector("a");
+    if (!a) return;
+
+    const href = a.getAttribute("href") || "";
+    const idMatch = href.match(/id=(\d+)/);
+    result.pirkimoVykdytojasId = idMatch ? idMatch[1] : null;
+    result.pirkimoVykdytojasPavadinimas = a.textContent.trim();
+}
+
+/**
+ * Parses CfTDPSWS purchase details page.
+ * @param {string} text
+ * @returns {Promise<Record<string, any> | null>}
+ */
 export async function parseCfTDPSWS(text) {
     const { document } = parseHTML(text);
     const lentele = document.querySelector("dl.row");
@@ -71,15 +145,10 @@ export async function parseCfTDPSWS(text) {
     for (let i = 0; i < dts.length; i++) {
         const key = toCamelCase(dts[i].textContent);
         const dd = dds[i];
+        const ddText = dd.textContent.trim();
 
         if (key === "pirkimoVykdytojoPavadinimas") {
-            const a = dd.querySelector("a");
-            if (a) {
-                const href = a.getAttribute("href");
-                const idMatch = href.match(/id=(\d+)/);
-                result.pirkimoVykdytojasId = idMatch ? idMatch[1] : null;
-                result.pirkimoVykdytojasPavadinimas = a.textContent.trim();
-            }
+            extractPirkimoVykdytojas(dd, result);
         } else if (key === "bvpzKodai") {
             const lines = dd.textContent
                 .split("\n")
@@ -103,38 +172,26 @@ export async function parseCfTDPSWS(text) {
             key == "suteiktaVertemaksimaliDPSVerte" ||
             key == "bendraSutarciuVerte"
         ) {
-            const n = Number(
-                dd.textContent.replace(",", ".").replace(/\.$/, "").trim(),
-            );
-            result[key] = n > 0 ? n : null;
+            result[key] = parseNumberValue(ddText);
         } else if (key.startsWith("kategorijadalisPavadinimas")) {
             if (!result.kategorijaDalys) result.kategorijaDalys = [];
-            result.kategorijaDalys.push(dd.textContent.trim());
+            result.kategorijaDalys.push(ddText);
         } else if (key.startsWith("daliuPavadinimas")) {
             if (!result.daliuPavadinimai) result.daliuPavadinimai = [];
-            result.daliuPavadinimai.push(dd.textContent.trim());
-        } else if (
-            key === "susipazinimoSuPasiulymaisData" ||
-            key === "paaiskinimuTerminoPabaiga" ||
-            key === "pasiulymuArbaParaiskuDalyvautiPirkimePateikimoTerminas" ||
-            key === "paskelbimoIrArbaKvietimoData" ||
-            key === "laimetojoNustatymoData" ||
-            key === "pasiulymuPateikimoTerminas" ||
-            key === "kvsGaliojimoDataIrLaikas" ||
-            key === "dpsGaliojimoDataIrLaikas"
-        ) {
-            result[key] = formatDate(dd.textContent);
+            result.daliuPavadinimai.push(ddText);
+        } else if (DATE_KEYS_CFTDPSWS.has(key)) {
+            result[key] = formatDate(ddText);
         } else if (key === "pirkimuSuvestinesNuoroda") {
-            result[key] = dd.textContent.trim();
+            result[key] = ddText;
         } else {
-            result[key] = dd.textContent.trim();
+            result[key] = ddText;
         }
 
         if (
             key ===
             "pasiulymuVertinimoKriterijaiPasirinktasVertinimoKriterijusBusTaikomasVisomsPirkimoDalimskategorijoms"
         ) {
-            result["pasiulymuVertinimoKriterijai"] = dd.textContent.trim();
+            result["pasiulymuVertinimoKriterijai"] = ddText;
             delete result[key];
         }
     }
@@ -142,6 +199,11 @@ export async function parseCfTDPSWS(text) {
     return result;
 }
 
+/**
+ * Parses PMC purchase details page.
+ * @param {string} text
+ * @returns {Promise<Record<string, any> | null>}
+ */
 export async function parsePmc(text) {
     const { document } = parseHTML(text);
     const lentele = document.querySelector("dl.row");
@@ -154,15 +216,10 @@ export async function parsePmc(text) {
     for (let i = 0; i < dts.length; i++) {
         const key = toCamelCase(dts[i].textContent);
         const dd = dds[i];
+        const ddText = dd.textContent.trim();
 
         if (key === "pirkimoVykdytojoPavadinimas") {
-            const a = dd.querySelector("a");
-            if (a) {
-                const href = a.getAttribute("href");
-                const idMatch = href.match(/id=(\d+)/);
-                result.pirkimoVykdytojasId = idMatch ? idMatch[1] : null;
-                result.pirkimoVykdytojasPavadinimas = a.textContent.trim();
-            }
+            extractPirkimoVykdytojas(dd, result);
         } else if (key === "bvpzKodai") {
             const lines = dd.textContent
                 .split("\n")
@@ -181,30 +238,20 @@ export async function parsePmc(text) {
                 result.bvzpKodaiPavadinimai.push(pavadinimas.trim());
             }
         } else if (key === "numatomaVerteEUR") {
-            const n = Number(
-                dd.textContent.replace(",", ".").replace(/\.$/, "").trim(),
-            );
-            result[key] = n > 0 ? n : null;
-        } else if (
-            key === "susipazinimoSuPasiulymaisData" ||
-            key === "paaiskinimuTerminoPabaiga" ||
-            key === "pasiulymuArbaParaiskuDalyvautiPirkimePateikimoTerminas" ||
-            key === "paskelbimoIrArbaKvietimoData" ||
-            key === "laimetojoNustatymoData" ||
-            key === "pasiulymuPateikimoTerminas"
-        ) {
-            result[key] = formatDate(dd.textContent);
+            result[key] = parseNumberValue(ddText);
+        } else if (DATE_KEYS_PMC.has(key)) {
+            result[key] = formatDate(ddText);
         } else if (key === "pirkimuSuvestinesNuoroda") {
-            result[key] = dd.textContent.trim();
+            result[key] = ddText;
         } else {
-            result[key] = dd.textContent.trim();
+            result[key] = ddText;
         }
 
         if (
             key ===
             "pasiulymuVertinimoKriterijaiPasirinktasVertinimoKriterijusBusTaikomasVisomsPirkimoDalimskategorijoms"
         ) {
-            result["pasiulymuVertinimoKriterijai"] = dd.textContent.trim();
+            result["pasiulymuVertinimoKriterijai"] = ddText;
             delete result[key];
         }
     }
@@ -212,6 +259,11 @@ export async function parsePmc(text) {
     return result;
 }
 
+/**
+ * Parses CfTWS purchase details page.
+ * @param {string} text
+ * @returns {Promise<Record<string, any> | null>}
+ */
 export async function parseCfTWS(text) {
     const { document } = parseHTML(text);
     const lentele = document.querySelector("dl.row");
@@ -224,15 +276,10 @@ export async function parseCfTWS(text) {
     for (let i = 0; i < dts.length; i++) {
         const key = toCamelCase(dts[i].textContent);
         const dd = dds[i];
+        const ddText = dd.textContent.trim();
 
         if (key === "pirkimoVykdytojoPavadinimas") {
-            const a = dd.querySelector("a");
-            if (a) {
-                const href = a.getAttribute("href");
-                const idMatch = href.match(/id=(\d+)/);
-                result.pirkimoVykdytojasId = idMatch ? idMatch[1] : null;
-                result.pirkimoVykdytojasPavadinimas = a.textContent.trim();
-            }
+            extractPirkimoVykdytojas(dd, result);
         } else if (key === "bvpKodai") {
             const items = dd.textContent.split(",");
             result.bvpzKodai = [];
@@ -245,29 +292,20 @@ export async function parseCfTWS(text) {
                 );
             }
         } else if (key === "numatomaVerteEUR") {
-            const n = Number(
-                dd.textContent.replace(",", ".").replace(/\.$/, "").trim(),
-            );
-            result[key] = n > 0 ? n : null;
-        } else if (
-            key === "susipazinimoSuPasiulymaisData" ||
-            key === "paaiskinimuTerminoPabaiga" ||
-            key === "pasiulymuArbaParaiskuDalyvautiPirkimePateikimoTerminas" ||
-            key === "paskelbimoIrArbaKvietimoData" ||
-            key === "laimetojoNustatymoData"
-        ) {
-            result[key] = formatDate(dd.textContent);
+            result[key] = parseNumberValue(ddText);
+        } else if (DATE_KEYS_CFTWS.has(key)) {
+            result[key] = formatDate(ddText);
         } else if (key === "pirkimuSuvestinesNuoroda") {
-            result[key] = dd.textContent.trim();
+            result[key] = ddText;
         } else {
-            result[key] = dd.textContent.trim();
+            result[key] = ddText;
         }
 
         if (
             key ===
             "pasiulymuVertinimoKriterijaiPasirinktasVertinimoKriterijusBusTaikomasVisomsPirkimoDalimskategorijoms"
         ) {
-            result["pasiulymuVertinimoKriterijai"] = dd.textContent.trim();
+            result["pasiulymuVertinimoKriterijai"] = ddText;
             delete result[key];
         }
     }
@@ -275,6 +313,11 @@ export async function parseCfTWS(text) {
     return result;
 }
 
+/**
+ * Parses contract notices table.
+ * @param {string} htmlText
+ * @returns {Promise<Array<object>>}
+ */
 export async function parseSkelbimai(htmlText) {
     const { document } = parseHTML(htmlText);
     const skelbimai = [];
@@ -310,6 +353,11 @@ export async function parseSkelbimai(htmlText) {
     return skelbimai;
 }
 
+/**
+ * Parses contract documents list.
+ * @param {string} htmlText
+ * @returns {Promise<Array<object>>}
+ */
 export async function parseFailai(htmlText) {
     const { document } = parseHTML(htmlText);
     const failai = [];
@@ -352,6 +400,11 @@ export async function parseFailai(htmlText) {
     return failai;
 }
 
+/**
+ * Parses document versions list.
+ * @param {string} htmlText
+ * @returns {Promise<Array<object>>}
+ */
 export async function parseVersijos(htmlText) {
     const { document } = parseHTML(htmlText);
     const versijos = [];

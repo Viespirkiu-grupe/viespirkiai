@@ -88,6 +88,80 @@ tasks.push({
     },
 });
 
+// eViesiejiPirkimai.lt viešieji pirkimai
+import { updateCFTS } from "./modules/viesiejiPirkimai/scrape.js";
+import {
+    processCfTDPSWS,
+    processOldestCfTDPSWSOffHours,
+} from "./modules/viesiejiPirkimai/scrapeCfTDPSWS.js";
+import {
+    processCfTWS,
+    processOldestCfTWSOffHours,
+} from "./modules/viesiejiPirkimai/scrapeCfTWS.js";
+import {
+    processPmc,
+    processOldestPmcOffHours,
+} from "./modules/viesiejiPirkimai/scrapePmc.js";
+import { cleanReservations } from "./modules/viesiejiPirkimai/cleanReservations.js";
+tasks.push({
+    name: "updateCFTS",
+    schedule: "0 */1 * * *",
+    job: async () => {
+        await updateCFTS();
+    },
+});
+
+tasks.push({
+    name: "processCfTDPSWS",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return processCfTDPSWS();
+    },
+});
+tasks.push({
+    name: "processCfTWS",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return processCfTWS();
+    },
+});
+tasks.push({
+    name: "processPmc",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return processPmc();
+    },
+});
+
+const addAsapWorkers = (baseName, count, job) => {
+    for (let i = 1; i <= count; i += 1) {
+        const suffix = i === 1 ? "" : String(i);
+        tasks.push({
+            name: `${baseName}${suffix}`,
+            mode: "asap",
+            cooldown: 60,
+            errorCooldown: 60,
+            job,
+        });
+    }
+};
+
+addAsapWorkers("processCfTDPSWSOldestOffHours", 24, () =>
+    processOldestCfTDPSWSOffHours(),
+);
+addAsapWorkers("processCfTWSOldestOffHours", 24, () =>
+    processOldestCfTWSOffHours(),
+);
+addAsapWorkers("processPmcOldestOffHours", 24, () =>
+    processOldestPmcOffHours(),
+);
+
 // eViesiejiPirkimai.lt sutartys
 import { cvpIsRequestLatest } from "./modules/sutartys/scrape.js";
 tasks.push({
@@ -154,6 +228,16 @@ tasks.push({
     errorCooldown: 60,
     job: async () => {
         return pravalytiOcrRezervacijas();
+    },
+});
+
+tasks.push({
+    name: "cleanViesiejiPirkimaiReservations",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return cleanReservations();
     },
 });
 
