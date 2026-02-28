@@ -61,11 +61,19 @@
                                 <option value="neskelbiamosDerybos">Neskelbiamos derybos</option>
                             <% } %>
 
+                            <% if(values["saltinis"] == "cvpIs") { %>
+                                <option value="cvpIs" selected>Viešasis pirkimas</option>
+                            <% } else { %>
+                                <option value="cvpIs">Viešasis pirkimas</option>
+                            <% } %>
+
                             <% if(values["saltinis"] == "archive") { %>
                                 <option value="archive" selected>Failas archyvo viduje</option>
                             <% } else { %>
                                 <option value="archive">Failas archyvo viduje</option>
                             <% } %>
+
+
                         </select>
                     </div>
                 </div>
