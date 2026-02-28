@@ -1,0 +1,47 @@
+services:
+    typesense:
+        image: typesense/typesense:28.0
+        container_name: viespirkiai_typesense
+        command: "--data-dir /data --api-key=${TYPESENSE_API_KEY} --enable-cors"
+        ports:
+            - "9021:8108" # Not directly reachable from outside
+        volumes:
+            - ./typesense/data:/data
+        restart: unless-stopped
+        deploy:
+            resources:
+                limits:
+                    memory: 5048M
+    postgres:
+        build:
+            context: ./postgres
+            dockerfile: Dockerfile
+        container_name: viespirkiai_postgres
+        restart: unless-stopped
+        env_file:
+            - .env
+        ports:
+            - "9118:5432" # Not directly reachable from outside
+        volumes:
+            - ./postgres/pgdata:/var/lib/postgresql/data
+        deploy:
+            resources:
+                limits:
+                    memory: 9G
+
+    pgadmin:
+        image: dpage/pgadmin4
+        container_name: viespirkiai_pgadmin
+        restart: unless-stopped
+        env_file:
+            - .env
+        ports:
+            - "9119:80" # Not directly reachable from outside
+        depends_on:
+            - postgres
+        volumes:
+            - ./postgres/pgadmin-data:/var/lib/pgadmin
+        deploy:
+            resources:
+                limits:
+                    memory: 2G
