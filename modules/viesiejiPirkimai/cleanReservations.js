@@ -54,8 +54,11 @@ export async function cleanReservations({
 if (import.meta.url === `file://${process.argv[1]}`) {
     (async () => {
         try {
-            const result = await cleanReservations();
-            console.log(JSON.stringify(result));
+            let result = await cleanReservations();
+            log(`Finished cleaning reservations: ${result.total} total`);
+            for (const [type, count] of Object.entries(result.perType)) {
+                log(`  ${type}: ${count}`);
+            }
         } finally {
             await postgres.end();
         }

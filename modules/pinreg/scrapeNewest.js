@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
 import { spawn } from "child_process";
+import { log } from "../../utils/log.js";
 
 const BASE_URL = "https://pinreg.vtek.lt/external/deklaracijos/viesa";
 const PARAMS_BASE =
@@ -43,7 +44,7 @@ export async function getNewestPinreg(upTo = null) {
         const url = `${BASE_URL}?${PARAMS_BASE}&puslapioNr=${page}`;
 
         const { status, data } = await curlFetch(url);
-        console.log(`→ Page ${page} [${status}]`);
+        log(`Page ${page} [${status}]`);
 
         if (status !== "200") break;
 
@@ -51,20 +52,20 @@ export async function getNewestPinreg(upTo = null) {
         try {
             json = JSON.parse(data);
         } catch {
-            console.log("💥 JSON parse failed, stopping prefix");
+            log("JSON parse failed, stopping prefix");
             break;
         }
 
         const items = json?.content ?? [];
         if (items.length === 0) {
-            console.log("🛑 empty page, stopping");
+            log("Empty page, stopping");
             break;
         }
 
         // Find the last item by pateikimoData
         const lastItem = items[items.length - 1];
         lastDate = new Date(lastItem.pateikimoData);
-        console.log(`Last item date: ${lastDate.toISOString()}`);
+        log(`Last item date: ${lastDate.toISOString()}`);
 
         for (const row of items) {
             if (row.accessUuid) {

@@ -203,7 +203,6 @@ async function nuskaitytiKotisPuslapi(day, page, minAmount) {
         };
     });
 
-    // console.log(data);
     await upsertKotis(data);
     return data;
 }

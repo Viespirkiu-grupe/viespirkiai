@@ -11,8 +11,6 @@
                const tipaiLabels = <%- JSON.stringify(analize.tipai.map(t => t.tipas)) %>;
                const tipaiValues = <%- JSON.stringify(analize.tipai.map(t => t.count)) %>;
 
-               console.log(tipaiLabels, tipaiValues)
-
                displayChart({
                  element: document.querySelector('#analizeTipaiDiagrama'),
                  type: 'pie',

@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
 import PQueue from "p-queue";
+import { log } from "../../utils/log.js";
 
 const queue = new PQueue({ concurrency: 32 });
 
@@ -34,7 +35,7 @@ async function sukeltiPinregLenteles() {
             deklaracijos.map((deklaracija) =>
                 queue.add(async () => {
                     count++;
-                    console.log(deklaracija.accessUuid, count);
+                    log(`${deklaracija.accessUuid}, ${count}`);
 
                     // Delete old entries for this declaration
                     await postgres.query(

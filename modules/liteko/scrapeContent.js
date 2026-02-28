@@ -128,7 +128,7 @@ export async function surastiBylosSalis(batchSize = 1) {
                 `UPDATE "bylos" SET "juridiniuNuskaitymas" = -1 WHERE "id" = $1`,
                 [byla.id],
             );
-            console.log(e);
+            console.error(e);
             log(`Klaida nuskaitant bylą ID ${byla.id}: ${e.message}`);
             throw e;
         }

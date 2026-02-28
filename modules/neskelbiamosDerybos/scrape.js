@@ -173,7 +173,7 @@ export async function nuskaitytiVisasNeskelbiamasDerybas() {
                     .pop(),
             });
         });
-        console.log(allDerybos.length, failai.length);
+
         const failaiValues = [];
         const failaiPlaceholders = failai
             .map((f, i) => {

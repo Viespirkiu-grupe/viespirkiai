@@ -205,9 +205,7 @@ async function getFromBucket() {
     bucketIds.delete(dokumentas.id);
 
     const timeout = setTimeout(() => {
-        console.log(
-            `Timeout: releasing dokumentas ${dokumentas.id} back to bucket`,
-        );
+        log(`Timeout: releasing dokumentas ${dokumentas.id} back to bucket`);
         if (!bucketIds.has(dokumentas.id)) {
             kibirelis.push(dokumentas);
             bucketIds.add(dokumentas.id);

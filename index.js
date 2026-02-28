@@ -1,8 +1,9 @@
 import config from "./utils/config.js";
 import express from "express";
 import cookieParser from "cookie-parser";
-import { convertUnit } from "./utils/units.js";
-import { linksniuoti } from "./utils/linksniai.js";
+import { convertUnit } from "./utils/units.js"; // Modifies protorypes, keep
+import { linksniuoti } from "./utils/linksniai.js"; // Modifies protorypes, keep
+import { log } from "./utils/log.js";
 import ejs from "ejs";
 import { log } from "./utils/log.js";
 import path from "path";
@@ -110,7 +111,7 @@ app.use((req, res, next) => {
 
 // 500
 app.use((err, req, res, next) => {
-    console.log(req.path);
+    log(`Error 500: ${req.path}`);
     console.error(err);
     res.status(500).render("500", {
         customHead: config.customHead,
@@ -131,7 +132,7 @@ if (import.meta.url === `file://${process.argv[1]}` || isMain) {
     await ensureJarCollection();
 
     app.listen(PORT, () =>
-        console.log(`Server running independently at http://localhost:${PORT}`),
+        log(`Server running independently at http://localhost:${PORT}`),
     );
 }
 

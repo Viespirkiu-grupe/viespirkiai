@@ -11,7 +11,7 @@ export async function perkeltiFailus(from, to, kiekis = 1) {
         const failas = failasRes.rows[0];
 
         if (!failas) {
-            console.log(`Nėra daugiau failų perkelti iš "${from}" į "${to}".`);
+            log(`Nėra daugiau failų perkelti iš "${from}" į "${to}".`);
             break;
         }
 
@@ -42,7 +42,7 @@ export async function perkeltiFailus(from, to, kiekis = 1) {
         try {
             let url = `https://failai.viespirkiai.org/${failas.id}`;
 
-            console.log(url);
+            log(url);
 
             let response = await fetch(`${dezeTo.url}/download-url`, {
                 method: "POST",
@@ -78,7 +78,7 @@ export async function perkeltiFailus(from, to, kiekis = 1) {
                 throw new Error("Nepavyko ištrinti seno failo.");
             }
 
-            console.log(md5);
+            log(md5);
 
             // Atnaujiname informaciją apie failą
             await postgres.query(
@@ -132,9 +132,7 @@ export async function perkeltiFailus(from, to, kiekis = 1) {
 const args = process.argv.slice(2);
 
 if (args.length < 2) {
-    console.log(
-        "Naudojimas: node perkeltiFailus.js <iš_dėžės> <į_dėžę> [kiekis]",
-    );
+    log("Naudojimas: node perkeltiFailus.js <iš_dėžės> <į_dėžę> [kiekis]");
     process.exit(1);
 }
 
@@ -144,7 +142,7 @@ const kiekis = args[2] ? parseInt(args[2], 10) : 1;
 
 perkeltiFailus(from, to, kiekis)
     .then(() => {
-        console.log("Viskas baigta.");
+        log("Viskas baigta.");
         process.exit(0);
     })
     .catch((error) => {

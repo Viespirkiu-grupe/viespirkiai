@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { client } from "../../typesense/typesense.js";
 import { deleteFile } from "../failai/deleteFile.js";
+import { log } from "../../utils/log.js";
 
 async function cvpIsDeleteSutartis(id) {
     // Check if sutartis exists in sutartys table
@@ -10,7 +11,7 @@ async function cvpIsDeleteSutartis(id) {
     );
 
     if (!sutartis) {
-        console.log(`Sutartis with id ${id} does not exist in sutartys table.`);
+        log(`Sutartis with id ${id} does not exist in sutartys table.`);
         return;
     }
 
@@ -23,11 +24,11 @@ async function cvpIsDeleteSutartis(id) {
 
     const files = filesRes.rows;
     if (files.length === 0) {
-        console.log(`No files associated with sutartis id ${id}.`);
+        log(`No files associated with sutartis id ${id}.`);
     }
 
     for (const file of files) {
-        console.log(
+        log(
             `Deleting file with id ${file.id} associated with sutartis id ${id}.`,
         );
         await deleteFile(file.id);
@@ -42,7 +43,7 @@ async function cvpIsDeleteSutartis(id) {
     // Delete it from Typesense as well
     try {
         await client.collections("sutartys").documents(id).delete();
-        console.log(`Deleted sutartis with id ${id} from Typesense.`);
+        log(`Deleted sutartis with id ${id} from Typesense.`);
     } catch (error) {
         console.error(
             `Error deleting sutartis with id ${id} from Typesense:`,
@@ -50,7 +51,7 @@ async function cvpIsDeleteSutartis(id) {
         );
     }
 
-    console.log(`Deleted sutartis with id ${id} from sutartys table.`);
+    log(`Deleted sutartis with id ${id} from sutartys table.`);
 }
 
 if (

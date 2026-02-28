@@ -4,6 +4,7 @@ Importuoja įstatinį kapitalą tiesiai iš data.gov.lt API į Postgres su pusla
 https://data.gov.lt/datasets/1570/
 */
 import { postgres } from "../../postgres/postgres.js";
+import { log } from "../../utils/log.js";
 
 const BASE =
     "https://get.data.gov.lt/datasets/gov/rc/jar/ja_kapitalas/JuridinisAsmuoKapitalas";
@@ -34,11 +35,11 @@ async function main() {
         const data = await fetchPage(nextPage);
 
         if (!data._data || data._data.length === 0) {
-            console.log("Baigta. Daugiau duomenų nėra.");
+            log("Baigta. Daugiau duomenų nėra.");
             break;
         }
 
-        console.log(`→ Page ${pageNr}: ${data._data.length} įrašų`);
+        log(`→ Page ${pageNr}: ${data._data.length} įrašų`);
 
         let batch = [];
 
@@ -67,7 +68,7 @@ async function main() {
         pageNr++;
     }
 
-    console.log("DONE. Iš viso įterpta:", totalInserted);
+    log("DONE. Iš viso įterpta:", totalInserted);
 }
 
 async function insertBatch(rows) {
@@ -98,7 +99,7 @@ async function insertBatch(rows) {
         totalInserted += rows.length;
 
         if (totalInserted % 1000 === 0) {
-            console.log(`✓ Inserted ${totalInserted}`);
+            log(`Inserted ${totalInserted}`);
         }
     } catch (err) {
         console.error(`Insert failed at ${totalInserted} rows:`, err.message);

@@ -88,9 +88,7 @@ async function getFromBucket() {
     // mark in progresskibirelis
     const timeout = setTimeout(
         () => {
-            console.log(
-                `Timeout: releasing failas ${failas.id} back to bucket`,
-            );
+            log(`Timeout: releasing failas ${failas.id} back to bucket`);
             if (!bucketIds.has(failas.id)) {
                 kibirelis.push(failas);
                 bucketIds.add(failas.id);
@@ -223,7 +221,7 @@ export async function parsiustiFaila(options = {}) {
         timings.end("fetchDownloadUrl");
 
         if (!response.ok || response.status !== 200) {
-            console.log(await response.text());
+            log(await response.text());
             throw new Error("Nepavyko parsisiųsti failo.");
         }
 

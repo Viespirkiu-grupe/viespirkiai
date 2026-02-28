@@ -5,6 +5,7 @@ https://www.regitra.lt/imone/atviri-duomenys/
 import fs from "fs";
 import readline from "readline";
 import { postgres } from "../../postgres/postgres.js";
+import { log } from "../../utils/log.js";
 
 // Patikrina, ar nurodytas CSV failo pavadinimas
 const filename = process.argv[2];
@@ -33,7 +34,6 @@ for await (const line of rl) {
     // Nuskaitome eilutės laukus
     const fields = parseCSVLine(line);
 
-    // console.log(fields, fields.length);
     if (fields.length < 69) {
         console.warn(`Skipping malformed line: ${line}`);
         continue;
@@ -56,7 +56,7 @@ if (batch.length > 0) {
     await insertBatch(batch);
 }
 
-console.log(`Įterptos eilutės: ${eilute}`);
+log(`Įterptos eilutės: ${eilute}`);
 await postgres.end();
 
 /**
@@ -144,7 +144,7 @@ async function insertBatch(rows) {
         await postgres.query(sql, values);
         eilute += rows.length;
         if (eilute % 1000 === 0) {
-            console.log(`Įterpta ${eilute} eilučių...`);
+            log(`Įterpta ${eilute} eilučių...`);
         }
     } catch (err) {
         console.error(`Įterpimas nepavyko po ${eilute} eilučių:`, err.message);

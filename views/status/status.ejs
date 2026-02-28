@@ -88,10 +88,6 @@
                                                     borderColor: '#777',
                                                 };
                                             });
-
-
-                                    console.log(Annotations<%= diena.day.replaceAll("-", "") %>)
-
                                     // Add an annotation for now (current time)
                                     function todayLT() {
                                         const now = new Date();
@@ -114,7 +110,6 @@
 
 
                                     if(todayLT() === "<%= diena.day %>") {
-                                      console.log("YRA")
                                         Annotations<%= diena.day.replaceAll("-", "") %>.push({
                                             x: Date.UTC(
                                                 new Date().getFullYear(), new Date().getMonth(), new Date().getDate(),

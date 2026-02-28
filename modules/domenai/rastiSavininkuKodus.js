@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
+import { log } from "../../utils/log.js";
 
 async function rastiSavininkuKodus() {
     let res = await postgres.query(
@@ -14,7 +15,7 @@ async function rastiSavininkuKodus() {
 
     let juridinisRes = await findSingleJuridinis(domenas.savininkas);
     if (juridinisRes === null) {
-        console.log(
+        log(
             `Savininko kodas nerastas: ${domenas.savininkas} (domenas: ${domenas.domain})`,
         );
         await postgres.query(
@@ -22,7 +23,7 @@ async function rastiSavininkuKodus() {
             [domenas.savininkas],
         );
     } else {
-        console.log(
+        log(
             `Savininko kodas rastas: ${domenas.savininkas} -> ${juridinisRes.jarKodas} (${juridinisRes.pavadinimas}) (domenas: ${domenas.domain})`,
         );
         await postgres.query(

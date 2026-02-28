@@ -1,7 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
 import { spawn } from "child_process";
-import { readFile, writeFile, appendFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { log } from "../../utils/log.js";
 
 const BASE_URL = "https://pinreg.vtek.lt/external/deklaracijos/viesa";
 const PARAMS_BASE =
@@ -70,7 +69,7 @@ function curlFetch(url) {
 }
 
 async function crawlPrefix(prefix) {
-    console.log(`\n=== pavarde=${prefix} ===`);
+    log(`Pavarde: ${prefix}`);
     let page = 1;
     let escalate = false;
 
@@ -78,7 +77,7 @@ async function crawlPrefix(prefix) {
         const url = `${BASE_URL}?${PARAMS_BASE}&pavarde=${prefix}&puslapioNr=${page}`;
 
         const { status, data } = await curlFetch(url);
-        console.log(`→ ${prefix} page ${page} [${status}]`);
+        log(`${prefix} page ${page} [${status}]`);
 
         if (status !== "200") break;
 
@@ -86,13 +85,13 @@ async function crawlPrefix(prefix) {
         try {
             json = JSON.parse(data);
         } catch {
-            console.log("💥 JSON parse failed, stopping prefix");
+            log("JSON parse failed, stopping prefix");
             break;
         }
 
         const items = json?.content ?? [];
         if (items.length === 0) {
-            console.log("🛑 empty page, stopping");
+            log("Empty page, stopping");
             break;
         }
 
@@ -102,7 +101,6 @@ async function crawlPrefix(prefix) {
                     `INSERT INTO pinreg (uuid) VALUES ($1) ON CONFLICT DO NOTHING;`,
                     [row.accessUuid],
                 );
-                await appendFile(UUID_FILE, row.accessUuid + "\n");
             }
         }
 
@@ -124,14 +122,14 @@ for (const l1 of LETTERS) {
     const esc1 = await crawlPrefix(l1);
     if (!esc1) continue;
 
-    console.log(`⚠️ escalating → 2 letters: ${l1}`);
+    log(`Escalating → 2 letters: ${l1}`);
 
     for (const l2 of LETTERS) {
         const p2 = l1 + l2;
         const esc2 = await crawlPrefix(p2);
         if (!esc2) continue;
 
-        console.log(`🔥 escalating → 3 letters: ${p2}`);
+        log(`Escalating → 3 letters: ${p2}`);
 
         for (const l3 of LETTERS) {
             await crawlPrefix(p2 + l3);
@@ -139,4 +137,5 @@ for (const l1 of LETTERS) {
     }
 }
 
-console.log("\n✅ done");
+log("Done");
+postgres.end();

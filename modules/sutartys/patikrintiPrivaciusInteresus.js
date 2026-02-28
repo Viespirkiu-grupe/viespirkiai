@@ -6,6 +6,7 @@ import {
     findMatchingRysiaiSuJa,
 } from "../pinreg/tikrintiInteresuKonfliktus.js";
 import { gautiPinregDeklaracijasPagalVardaPavarde } from "../pinreg/pagalVarda.js";
+import { log } from "../../utils/log.js";
 
 async function patikrintiPrivaciusInteresus(unikalusId) {
     let sutartisRes = await postgres.query(
@@ -66,11 +67,9 @@ async function checkAllByPirkejas(pirkejoKodas) {
             sutartis.sutartiesUnikalusId,
         );
         if (konfliktai && konfliktai.length > 0) {
-            console.log(
+            log(
                 `https://viespirkiai.org/sutartis/${sutartis.sutartiesUnikalusId}`,
             );
-        } else {
-            // console.log(`${sutartis.sutartiesUnikalusId} neturi`);
         }
     }
 }

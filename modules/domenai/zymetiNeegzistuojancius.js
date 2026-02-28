@@ -1,4 +1,5 @@
 import { postgres } from "../../postgres/postgres.js";
+import { log } from "../../utils/log.js";
 import fs from "fs";
 import readline from "readline";
 
@@ -17,15 +18,13 @@ async function updateDomain(domain, lineNumber) {
         );
 
         if (res.rowCount === 0) {
-            console.log(`Line ${lineNumber}: ${domain} not found, skipping`);
+            log(`Line ${lineNumber}: ${domain} not found, skipping`);
             return;
         }
 
         const currentValue = res.rows[0].domregNuskaitymas;
         if (currentValue === 1) {
-            console.log(
-                `Line ${lineNumber}: ${domain} domregNuskaitymas=1, skipping`,
-            );
+            log(`Line ${lineNumber}: ${domain} domregNuskaitymas=1, skipping`);
             return;
         }
 
@@ -35,7 +34,7 @@ async function updateDomain(domain, lineNumber) {
              WHERE domain = $1`,
             [domain],
         );
-        console.log(`Line ${lineNumber}: updated ${domain} to -404`);
+        log(`Line ${lineNumber}: updated ${domain} to -404`);
     } catch (err) {
         console.error(
             `Line ${lineNumber}: error updating ${domain}`,
@@ -60,7 +59,7 @@ async function main() {
         }
     }
 
-    console.log("All domains processed.");
+    log("All domains processed.");
     await postgres.end();
 }
 

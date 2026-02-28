@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import fs from "fs";
 import readline from "readline";
+import { log } from "../../utils/log.js";
 
 const [, , filename, saltinioPavadinimas] = process.argv;
 
@@ -25,7 +26,7 @@ async function upsertDomain(domain, lineNumber) {
                 updated = NOW()`,
             [domain, saltinioPavadinimas],
         );
-        console.log(`Line ${lineNumber}: upserted ${domain}`);
+        log(`Line ${lineNumber}: upserted ${domain}`);
     } catch (err) {
         console.error(
             `Line ${lineNumber}: error upserting ${domain}`,
@@ -51,7 +52,7 @@ async function main() {
         }
     }
 
-    console.log("All domains processed.");
+    log("All domains processed.");
     await postgres.end();
 }
 

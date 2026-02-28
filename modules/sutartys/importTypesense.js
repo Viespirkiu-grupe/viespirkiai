@@ -7,6 +7,7 @@ import {
     ensureSearchCollection,
 } from "../../typesense/typesense.js";
 import { postgres } from "../../postgres/postgres.js";
+import { log } from "../../utils/log.js";
 
 /**
  * Konvertuoja datą į Unix timestamp (sekundėmis nuo 1970-01-01).
@@ -43,7 +44,7 @@ async function fetchSutartysBatches(batchSize, onBatch) {
             if (res.rows.length === 0) break;
 
             // log progress for this batch
-            console.log(
+            log(
                 `Processing batch #${batchNumber}, ${res.rows.length} rows, last ID: ${res.rows[res.rows.length - 1].sutartiesUnikalusId}`,
             );
 
@@ -110,13 +111,13 @@ async function importToTypesense() {
             .documents()
             .import(formattedDocs, { action: "upsert" });
 
-        console.log(`Imported batch of ${formattedDocs.length} documents`);
+        log(`Imported batch of ${formattedDocs.length} documents`);
     });
 }
 
 importToTypesense()
     .then(() => {
-        console.log("All rows imported successfully!");
+        log("All rows imported successfully!");
         postgres.end();
     })
     .catch((err) => {

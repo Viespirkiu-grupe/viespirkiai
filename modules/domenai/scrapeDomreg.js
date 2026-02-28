@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import { SocksProxyAgent } from "socks-proxy-agent";
+import { log } from "../../utils/log.js";
 import fetch from "node-fetch";
 
 const torAddress = "socks5h://127.0.0.1:9050";
@@ -13,7 +14,7 @@ const res = await fetch("https://api.ipify.org?format=json", {
 });
 
 const data = await res.json();
-console.log("IP used:", data);
+log("IP used:", data);
 
 import net from "net";
 
@@ -67,7 +68,7 @@ export async function nuskaitytiDomregDomena() {
         return false;
     }
 
-    console.log(domenas.domain);
+    log(domenas.domain);
 
     if (domenas) {
         try {

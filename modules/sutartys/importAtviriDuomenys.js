@@ -1,4 +1,3 @@
-// importAtviriDuomenys.js
 import path from "node:path";
 import { parseCSV } from "../../utils/csv.js";
 import { postgres } from "../../postgres/postgres.js";
@@ -191,5 +190,5 @@ if (process.argv[1] === path.resolve(process.argv[1])) {
         await insertBatch(batch);
     }
 
-    console.log("Import finished.");
+    log("Import finished.");
 }

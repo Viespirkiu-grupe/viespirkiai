@@ -1,4 +1,5 @@
 import { postgres } from "../../postgres/postgres.js";
+import { log } from "../../utils/log.js";
 
 export async function parsiustiPakartotinai(kiekis = 100) {
     try {
@@ -15,7 +16,7 @@ export async function parsiustiPakartotinai(kiekis = 100) {
 
         // Return true if any rows were updated, false if not
         let updateRes = await postgres.query(query, [kiekis]);
-        console.log(`Updated ${updateRes.rowCount}`);
+        log(`Updated ${updateRes.rowCount}`);
         return updateRes.rowCount > 0;
     } catch (err) {
         console.error(err);

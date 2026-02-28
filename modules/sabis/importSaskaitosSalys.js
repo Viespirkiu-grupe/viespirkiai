@@ -1,4 +1,5 @@
 import { postgres } from "../../postgres/postgres.js";
+import { log } from "../../utils/log.js";
 
 const BASE =
     "https://get.data.gov.lt/datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SaskaituSalys";
@@ -51,7 +52,7 @@ async function insertBatch(rows) {
 
     await postgres.query(sql, rows.flat());
     totalInserted += rows.length;
-    console.log(`✓ Inserted ${totalInserted}`);
+    log(`Inserted ${totalInserted}`);
 }
 
 async function main() {
@@ -62,7 +63,7 @@ async function main() {
         const data = await fetchPage(nextPage);
         if (!data._data || !data._data.length) break;
 
-        console.log(`→ Page ${pageNr}: ${data._data.length} įrašų`);
+        log(`Page ${pageNr}: ${data._data.length} įrašų`);
         let batch = [];
 
         for (const r of data._data) {
@@ -96,7 +97,7 @@ async function main() {
         pageNr++;
     }
 
-    console.log("DONE. Iš viso įterpta:", totalInserted);
+    log(`DONE. Iš viso įterpta: ${totalInserted}`);
     await postgres.end();
 }
 

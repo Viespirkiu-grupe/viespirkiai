@@ -225,16 +225,6 @@
   }
 
   async function displayChart(data) {
-    // let data = {
-    //   element: document.querySelector('...'),
-    //   type: 'line-datetime',
-    //   labels: [...],
-    //   series: [...],
-    //   customOptions: { ... }, // Passed to ApexCharts
-    //   noDefaults: false, // If true, no default options are applied
-    //   flags: ['yEUR'], // Any flags to modify behavior
-    // }
-
     if (!data || !data.element || !data.labels || !data.series) {
       console.error('Invalid data for displayChart:', data);
       return;
@@ -248,9 +238,7 @@
 
     if(data.series){
       // Check if series is a flat Array
-      console.log(data.series, typeof data.series, Array.isArray(data.series))
       if(Array.isArray(data.series) && (data.series.length === 0 || !data.series[0]?.data) && data.type != 'pie') {
-        console.log("Wrapping series in object with name");
           mergedOptions.series = [{ name: customOptions.seriesName || '', data: data.series }];
       }else{
           mergedOptions.series = data.series;
@@ -279,7 +267,6 @@
     }
 
     await loadApexCharts();
-    console.log(data.element, mergedOptions)
     const chart = new ApexCharts(data.element, mergedOptions);
     chart.render();
   }

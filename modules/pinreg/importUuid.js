@@ -7,6 +7,7 @@
 import fs from "fs";
 import readline from "readline";
 import { postgres } from "../../postgres/postgres.js";
+import { log } from "../../utils/log.js";
 
 const BATCH_SIZE = 1000;
 const FILE_NAME = "uuids.txt";
@@ -41,7 +42,7 @@ async function sukeltiUuid(failoPavadinimas) {
         count += batch.length;
     }
 
-    console.log(`Inserted ${count} UUIDs (duplicates ignored).`);
+    log(`Inserted ${count} UUIDs (duplicates ignored).`);
 }
 
 /**

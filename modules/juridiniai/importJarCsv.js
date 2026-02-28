@@ -5,6 +5,7 @@ https://data.gov.lt/datasets/1484/ (CSV pirmas, tiesioginis)
 import fs from "fs";
 import readline from "readline";
 import { postgres } from "../../postgres/postgres.js";
+import { log } from "../../utils/log.js";
 import {
     addDocumentsToJarSearch,
     ensureJarCollection,
@@ -89,7 +90,7 @@ if (batch.length > 0) {
     await insertBatch(batch);
 }
 
-console.log(`Įterptos eilutės: ${eilute}`);
+log(`Įterptos eilutės: ${eilute}`);
 
 function toBaseCompanyName(name) {
     const companyTypes = [
@@ -220,7 +221,7 @@ export async function insertBatch(rows) {
     try {
         await postgres.query(sql, values);
         eilute = eilute + rows.length;
-        console.log(`Įterpta ${eilute} eilučių...`);
+        log(`Įterpta ${eilute} eilučių...`);
     } catch (err) {
         console.error(`Įterpimas nepavyko po ${eilute} eilučių:`, err.message);
     }

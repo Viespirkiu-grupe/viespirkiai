@@ -4,6 +4,7 @@ Importuoja Užimtumo tarnybos darbo vietas tiesiai iš API į PostgreSQL
 https://data.gov.lt/datasets/2894/
 */
 import { postgres } from "../../postgres/postgres.js";
+import { log } from "../../utils/log.js";
 
 const BASE = "https://get.data.gov.lt/datasets/gov/uzt/ldv/Vieta";
 const LIMIT = 100_000;
@@ -31,11 +32,11 @@ async function main() {
         const data = await fetchPage(nextPage);
 
         if (!data._data || data._data.length === 0) {
-            console.log("Baigta. Daugiau duomenų nėra.");
+            log("Baigta. Daugiau duomenų nėra.");
             break;
         }
 
-        console.log(`→ Page ${pageNr}: ${data._data.length} įrašų`);
+        log(`Page ${pageNr}: ${data._data.length} įrašų`);
 
         let batch = [];
 
@@ -102,7 +103,7 @@ async function main() {
         pageNr++;
     }
 
-    console.log("DONE. Iš viso apdorota:", totalProcessed);
+    log(`DONE. Iš viso apdorota: ${totalProcessed}`);
 }
 
 async function insertBatch(rows) {
@@ -142,7 +143,7 @@ async function insertBatch(rows) {
         await postgres.query(sql, rows.flat());
         totalProcessed += rows.length;
         if (totalProcessed % 1000 === 0) {
-            console.log(`✓ Apdorota ${totalProcessed} įrašų`);
+            log(`Importuota ${totalProcessed} įrašų`);
         }
     } catch (err) {
         console.error(

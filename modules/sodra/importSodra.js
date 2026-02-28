@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { postgres } from "../../postgres/postgres.js";
 import readline from "readline";
+import { log } from "../../utils/log.js";
 
 // Check CSV filename
 const filename = process.argv[2];
@@ -80,7 +81,7 @@ if (batch.length > 0) {
     await insertBatch(batch);
 }
 
-console.log(`Inserted rows: ${eilute}`);
+log(`Inserted rows: ${eilute}`);
 await postgres.end();
 
 /* ----------------------- Helpers ----------------------- */
@@ -163,7 +164,7 @@ async function insertBatch(rows) {
         await postgres.query(sql, values);
         eilute += rows.length;
         if (eilute % 1000 === 0) {
-            console.log(`Inserted ${eilute} rows...`);
+            log(`Inserted ${eilute} rows...`);
         }
     } catch (err) {
         console.error(`Insert failed after ${eilute} rows:`, err.message);

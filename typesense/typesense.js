@@ -1,5 +1,6 @@
 import Typesense from "typesense";
 import config from "../utils/config.js";
+import { log } from "../utils/log.js";
 
 export const client = new Typesense.Client({
     nodes: config.typesenseNodes,
@@ -67,13 +68,11 @@ export async function ensureSearchCollection() {
 
         if (existingVersion !== SCHEMA_VERSION) {
             // Versija nesutampa
-            console.log(
-                `[Typesense] Existing schema version: ${existingVersion}, Expected: ${SCHEMA_VERSION}`,
+            log(
+                `Existing schema version: ${existingVersion}, Expected: ${SCHEMA_VERSION}`,
             );
 
-            console.log(
-                "[Typesense] Schema version mismatch. Replacing collection...",
-            );
+            log("Schema version mismatch. Replacing collection...");
 
             // Ištriname esamą kolekciją ir sukuriame naują su atnaujinta schema
             await client.collections(COLLECTION).delete();
@@ -81,7 +80,7 @@ export async function ensureSearchCollection() {
         }
     } catch (err) {
         // Jei kolekcija neegzistuoja, sukuriame ją
-        console.log("[Typesense] Collection not found, creating...");
+        log("Collection not found, creating...");
         await client.collections().create(schema);
     }
 
@@ -334,13 +333,11 @@ export async function ensureJarCollection() {
 
         if (existingVersion !== JAR_SCHEMA_VERSION) {
             // Versija nesutampa
-            console.log(
-                `[Typesense] Existing schema version: ${existingVersion}, Expected: ${JAR_SCHEMA_VERSION}`,
+            log(
+                `Existing schema version: ${existingVersion}, Expected: ${JAR_SCHEMA_VERSION}`,
             );
 
-            console.log(
-                "[Typesense] Schema version mismatch. Replacing collection...",
-            );
+            log("Schema version mismatch. Replacing collection...");
 
             // Ištriname esamą kolekciją ir sukuriame naują su atnaujinta schema
             await client.collections(JAR_COLLECTION).delete();
@@ -350,7 +347,7 @@ export async function ensureJarCollection() {
         }
     } catch (err) {
         // Jei kolekcija neegzistuoja, sukuriame ją
-        console.log("[Typesense] Collection not found, creating...");
+        log("Collection not found, creating...");
         await client.collections().create(jar_schema);
         // migrateAllDocumentsToTypesenseFromCollection(viespirkiai); // FUNKCIJA NEEGZISTUOJA
     }

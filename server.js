@@ -1,19 +1,20 @@
 import cluster from "cluster";
 import config from "./utils/config.js";
 import http from "http";
+import { log } from "./utils/log.js";
 
 const WORKERS_COUNT = config.workerCount;
 const PORT = config.port || 8000;
 
 if (cluster.isPrimary) {
-    console.log(`Primary ${process.pid} is running`);
+    log(`Primary ${process.pid} is running`);
 
     for (let i = 0; i < WORKERS_COUNT; i++) {
         cluster.fork();
     }
 
     cluster.on("exit", (worker, code, signal) => {
-        console.log(`Worker ${worker.process.pid} died, restarting...`);
+        log(`Worker ${worker.process.pid} died, restarting...`);
         cluster.fork();
     });
 } else {
@@ -27,7 +28,7 @@ if (cluster.isPrimary) {
         server.setTimeout(24 * 60 * 60 * 1000);
 
         server.listen(PORT, () => {
-            console.log(`Worker ${process.pid} running on port ${PORT}`);
+            log(`Worker ${process.pid} running on port ${PORT}`);
         });
     })();
 }
