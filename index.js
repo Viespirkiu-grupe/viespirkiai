@@ -3,7 +3,6 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { convertUnit } from "./utils/units.js"; // Modifies protorypes, keep
 import { linksniuoti } from "./utils/linksniai.js"; // Modifies protorypes, keep
-import { log } from "./utils/log.js";
 import ejs from "ejs";
 import { log } from "./utils/log.js";
 import path from "path";
