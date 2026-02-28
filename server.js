@@ -24,8 +24,8 @@ if (cluster.isPrimary) {
 
         const server = http.createServer(app);
 
-        // set 24h max request duration
-        server.setTimeout(24 * 60 * 60 * 1000);
+        // set 1h max request duration
+        server.setTimeout(60 * 60 * 1000);
 
         server.listen(PORT, () => {
             log(`Worker ${process.pid} running on port ${PORT}`);

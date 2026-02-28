@@ -10,14 +10,14 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import fsPromises from "fs/promises";
 import htmlMinifyMiddleware from "./utils/minifyHtml.js";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
 const app = express();
 const PORT = config.port || 8000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-app.set("trust proxy", 1);
 
 if (config.enableMinification !== false) {
     app.use(htmlMinifyMiddleware());
@@ -28,6 +28,38 @@ app.use((req, res, next) => {
     const onionBase =
         "http://viespirk6fj2pukym5gv5pqsuzc77jaudkbddxvqjjoetph337dhyrqd.onion";
     res.setHeader("Onion-Location", onionBase + req.originalUrl);
+
+    next();
+});
+
+// Security headers
+app.use(
+    helmet({
+        contentSecurityPolicy: false, // disables CSP entirely
+    }),
+);
+
+// Rate limit
+const globalLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 min
+    max: 600, // max requests per IP
+    message: "Too many requests",
+});
+app.use(globalLimiter);
+
+app.set("trust proxy", config.proxyIp);
+app.use((req, res, next) => {
+    let ip = req.socket.remoteAddress; // default
+
+    const xff = req.headers["x-forwarded-for"];
+    if (xff) {
+        const ips = xff.split(",").map((s) => s.trim());
+        const lastHop = ips[ips.length - 1]; // IP of the last proxy
+        if (lastHop === config.proxyIp) {
+            // trust the first IP in X-Forwarded-For
+            ip = ips[0];
+        }
+    }
 
     next();
 });
@@ -84,8 +116,8 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(cookieParser());
 
 // JSON
-app.use(express.json({ limit: "100MB" }));
-app.use(express.urlencoded({ extended: true, limit: "100mb" }));
+app.use(express.json({ limit: "25MB" }));
+app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
 // Auto-load all routes from /routes (in parallel)
 const routesPath = path.join(__dirname, "routes");

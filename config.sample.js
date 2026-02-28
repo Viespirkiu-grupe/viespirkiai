@@ -16,4 +16,5 @@ export default {
     pgMaxConnections: 16,
     enableMinification: false,
     workerCount: 2,
+    proxyIp: "127.0.0.1",
 };
