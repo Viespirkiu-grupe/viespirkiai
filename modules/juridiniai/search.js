@@ -118,7 +118,10 @@ export async function findSingleJuridinis(queryStr, options = {}) {
     const { similarityThreshold = 1 } = options;
     if (!queryStr) return null;
 
-    const baseQuery = toBaseCompanyName(queryStr);
+    const baseQuery = toBaseCompanyName(queryStr).replace(
+        /([:"<>=&|!()\[\]{}~*?\\/])/g,
+        "\\$1",
+    );
 
     // Perform Typesense search
     const resultsRaw = await typesense

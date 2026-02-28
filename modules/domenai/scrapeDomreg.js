@@ -3,22 +3,11 @@ import config from "../../utils/config.js";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { log } from "../../utils/log.js";
 import fetch from "node-fetch";
-
-const torAddress = "socks5h://127.0.0.1:9050";
-let proxyAgent = new SocksProxyAgent(torAddress, {
-    rejectUnauthorized: false, // allow self-signed certs
-});
-
-const res = await fetch("https://api.ipify.org?format=json", {
-    agent: proxyAgent,
-});
-
-const data = await res.json();
-log("IP used:", data);
-
 import net from "net";
 
-export function newTorIdentity(password = config.torPassword || "") {
+let proxyAgent = new SocksProxyAgent(config.torAddress);
+
+export function newTorIdentity(password = config.torPassword) {
     return new Promise((resolve, reject) => {
         const socket = net.connect(9051, "127.0.0.1");
 

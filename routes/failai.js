@@ -43,7 +43,7 @@ failaiSearchRouter.get(
 
             // Remove quotes from search and trim whitespace
             let cleanSearch = (searchTerm || "").trim();
-            cleanSearch.replace(/\s+/g, " ");
+            cleanSearch = cleanSearch.replace(/\s+/g, " ");
 
             var {
                 sql,
@@ -126,12 +126,7 @@ failaiSearchRouter.get(
                         );
                         return;
                     }
-                } catch (err) {
-                    // cancel count query if still running
-                    try {
-                        await pg.CancelQuery(countClient, countPromise);
-                    } catch (_) {}
-                }
+                } catch (err) {}
 
                 let rodomiRezultatai = resultsRes.rows.length;
 
@@ -141,7 +136,9 @@ failaiSearchRouter.get(
                 var numberOfResults = `Rodomi ${rodomiRezultatai} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <pre data-duration="${trukme}" style="display: inline;"> (${trukme}s, PostgreSQL)</pre>`;
                 total = 10_000; // for pagination
             } finally {
-                countClient.release();
+                if (countClient) {
+                    countClient.release();
+                }
             }
 
             //////
@@ -248,6 +245,9 @@ function makeExcerpt(text = "", searchTerm = "", maxChars = 250, leading = 25) {
     if (text == null) {
         return "";
     }
+
+    // remove HTML tags
+    text = text.replace(/<[^>]+>/g, "");
 
     if (/^".+"$/.test(searchTerm.trim())) {
         // Quoted: exact phrase

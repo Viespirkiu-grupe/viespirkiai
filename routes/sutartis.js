@@ -9,6 +9,11 @@ const sutartisRouter = express.Router();
 sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
     const { id } = req.params;
 
+    // If id is not a number – return 404
+    if (isNaN(parseInt(id))) {
+        return next();
+    }
+
     let purchase = await postgres
         .query(
             'SELECT * FROM sutartys WHERE "sutartiesUnikalusId" = $1 LIMIT 1',
@@ -129,9 +134,14 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
     // Failų būsena
     await Promise.all(
         purchase.dokumentai.map(async (failas) => {
-            failas.dok_id = failas.url.match(/dok_id=(\d+)/)[1];
-            failas.file_id = failas.url.match(/file_id=(\d+)/)[1];
-            failas.proxyUrl = `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dok_id}&file_id=${failas.file_id}`;
+            const dokIdMatch = failas.url.match(/dok_id=(\d+)/);
+            const fileIdMatch = failas.url.match(/file_id=(\d+)/);
+            failas.dok_id = dokIdMatch ? dokIdMatch[1] : "";
+            failas.file_id = fileIdMatch ? fileIdMatch[1] : "";
+            failas.proxyUrl =
+                failas.dok_id && failas.file_id
+                    ? `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dok_id}&file_id=${failas.file_id}`
+                    : "";
 
             const failoBusena = await postgres
                 .query(

@@ -163,11 +163,6 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
 
                     zinomasRezultatuSkaicius = true;
                 } catch (err) {
-                    // timeout or error → cancel count query if still running
-                    try {
-                        await pg.CancelQuery(countClient, countPromise);
-                    } catch (_) {}
-
                     total = null;
                     zinomasRezultatuSkaicius = false;
                 } finally {

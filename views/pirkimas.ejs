@@ -220,7 +220,7 @@ Galioja iki: ${new String(purchase.galiojimoData).slice(0,10)}`,
                             <% purchase.dokumentai.forEach(doc => { %>
                                 <li>
                                     <% if(doc.id && doc.parsiustas && doc.nuskaitytas){ %>
-                                        <a href="/failas/<%= doc.id %>""><%= doc.pavadinimas %></a>
+                                        <a href="/failas/<%= doc.id %>"><%= doc.pavadinimas %></a>
                                         (<a href="<%= doc.proxyUrl %>">↗ Failas</a>, <a href="<%= doc.url %>">↗ CVP IS</a>)
                                     <% } else if(doc.parsiustas && doc.nuskaitytas) { %>
                                         <a href="/failas/<%= doc.dok_id %>/<%= doc.file_id %>"><%= doc.pavadinimas %></a>

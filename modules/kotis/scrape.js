@@ -158,7 +158,9 @@ async function nuskaitytiKotisPuslapi(day, page, minAmount) {
     }
 
     let lentele = document.querySelector(".table > tbody:nth-child(2)");
-    // Assume 'lentele' is a DOM element containing <tr> rows (excluding header)
+    if (!lentele) {
+        throw new Error(`Nepavyko rasti duomenų lentelės puslapyje ${url}`);
+    }
     const rows = lentele.querySelectorAll("tr");
 
     const data = Array.from(rows).map((row) => {

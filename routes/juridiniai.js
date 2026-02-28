@@ -78,7 +78,10 @@ juridiniaiRouter.get("/juridiniai", cleanEmptyQueryParams, async (req, res) => {
                 delete item.adresoId;
                 const csvRow =
                     Object.values(item)
-                        .map((value) => `"${value}"`)
+                        .map(
+                            (value) =>
+                                `"${`${value ?? ""}`.replace(/"/g, '""')}"`,
+                        )
                         .join(",") + "\n";
                 res.write(csvRow);
             });

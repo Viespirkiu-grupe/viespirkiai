@@ -73,7 +73,7 @@ tasks.push({
     cooldown: 60,
     errorCooldown: 10,
     job: async () => {
-        return nuskaitytiPinregDeklaracija();
+        return await nuskaitytiPinregDeklaracija();
     },
 });
 
@@ -653,44 +653,6 @@ tasks.push({
     },
 });
 
-tasks.push({
-    name: "syncAdpGyvenamojiVietove",
-    mode: "asap",
-    cooldown: 60,
-    errorCooldown: 60,
-    job: async () => {
-        return syncAdpChanges({
-            table: "gyvenamosVietoves",
-            dataset: "datasets/gov/rc/ar/gyvenamojivietove/GyvenamojiVietove",
-            columns: [
-                "_id",
-                "gyvKodas",
-                "tipas",
-                "tipoSantrumpa",
-                "pavadinimasK",
-                "pavadinimas",
-                "seniunija",
-                "savivaldybe",
-                "gyvNuo",
-                "gyvIki",
-            ],
-            mapping: {
-                _id: "_id",
-                gyv_kodas: "gyvKodas",
-                tipas: "tipas",
-                tipo_santrumpa: "tipoSantrumpa",
-                pavadinimas_k: "pavadinimasK",
-                pavadinimas: "pavadinimas",
-                "seniunija._id": "seniunija",
-                "savivaldybe._id": "savivaldybe",
-                gyv_nuo: "gyvNuo",
-                gyv_iki: "gyvIki",
-            },
-            limit: 1000,
-        });
-    },
-});
-
 import { nuskaitytiInformaciniusLeidinius } from "./modules/registruCentrasPranesimai/scrape.js";
 tasks.push({
     name: "nuskaitytiInformaciniusLeidinius",
@@ -772,7 +734,7 @@ function startAsapTask(
                             nextTask.job,
                             nextTask.cooldown,
                             nextTask.errorCooldown,
-                            nextTask.nextTask,
+                            nextTask.nextTaskId,
                         );
                     }
                 }
@@ -802,38 +764,40 @@ function stopAsapTask(id) {
 
 // --- Periodic sync of dokumentų nuskaitytojai from Postgres ---
 async function syncDokNuskaitytojai() {
-    const rows = await postgres.query(`
+    try {
+        const rows = await postgres.query(`
         SELECT *
         FROM "dokNuskaitytojai"
         WHERE enabled = true
     `);
 
-    const dbIds = new Set();
+        const dbIds = new Set();
 
-    // Start new ASAP tasks
-    for (const row of rows.rows) {
-        for (let i = 0; i < row.concurrency; i++) {
-            const taskKey = `nuskaitytiDokumenta-${row.id}-${i}`;
-            dbIds.add(taskKey);
+        // Start new ASAP tasks
+        for (const row of rows.rows) {
+            for (let i = 0; i < row.concurrency; i++) {
+                const taskKey = `nuskaitytiDokumenta-${row.id}-${i}`;
+                dbIds.add(taskKey);
 
-            if (!runningTasks.has(taskKey)) {
-                startAsapTask(
-                    taskKey,
-                    async () => nuskaitytiVienoDokumentoDuomenis(row.id),
-                    10, // or row.cooldown if you store it in DB
-                    1, // or row.errorCooldown if you store it in DB
-                );
+                if (!runningTasks.has(taskKey)) {
+                    startAsapTask(
+                        taskKey,
+                        async () => nuskaitytiVienoDokumentoDuomenis(row.id),
+                        10, // or row.cooldown if you store it in DB
+                        1, // or row.errorCooldown if you store it in DB
+                    );
+                }
             }
         }
-    }
 
-    // Stop tasks that no longer exist or disabled
-    for (const id of runningTasks.keys()) {
-        if (!dbIds.has(id) && id.startsWith("nuskaitytiDokumenta")) {
-            log(`Stopping task ${id}`);
-            stopAsapTask(id);
+        // Stop tasks that no longer exist or disabled
+        for (const id of runningTasks.keys()) {
+            if (!dbIds.has(id) && id.startsWith("nuskaitytiDokumenta")) {
+                log(`Stopping task ${id}`);
+                stopAsapTask(id);
+            }
         }
-    }
+    } catch (e) {}
 }
 
 // Initial sync
@@ -852,6 +816,13 @@ for (const task of tasks) {
             task.nextTaskId ?? null,
         );
     } else {
+        if (!task.schedule) {
+            console.error(
+                `Task ${task.name} has no mode and no schedule — skipping`,
+            );
+            continue;
+        }
+
         // Cron-based tasks
         let running = false;
 

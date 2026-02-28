@@ -4,7 +4,8 @@ const pirkejasRouter = express.Router();
 
 pirkejasRouter.get("/pirkejas/:kodas", async (req, res) => {
     const { kodas } = req.params;
-    res.redirect(`/?perkanciosiosOrganizacijosKodas=${kodas}`);
+    const safeKodas = encodeURIComponent(kodas);
+    res.redirect(`/?perkanciosiosOrganizacijosKodas=${safeKodas}`);
 });
 
 export default pirkejasRouter;

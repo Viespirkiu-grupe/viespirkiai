@@ -21,6 +21,7 @@ const rl = readline.createInterface({
 });
 
 let arPirmaEilute = true;
+let eilute = 0;
 const ITERPIMO_DYDIS = 100; // Po tiek eilučių įterpiama į duomenų bazę vienu metu
 let batch = [];
 
@@ -111,7 +112,6 @@ function clean(val) {
     return val;
 }
 
-var eilute = 0;
 /**
  * Įterpia duomenų grupę į Postgres duomenų bazę.
  * @param {Array} rows - Duomenų grupė, kurią reikia įterpti.

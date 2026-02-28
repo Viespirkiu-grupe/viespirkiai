@@ -10,6 +10,7 @@ import { parseHTML } from "linkedom";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { toAscii, toCamelCase } from "../../utils/text.js";
+import { spawn } from "child_process";
 
 function cleanRows(rows) {
     return rows.map((row) => {
@@ -58,7 +59,7 @@ export async function nuskaitytiCpvaProjektaiTiekejai() {
         ["-k", "-fsSL", resolvedFileUrl],
         {
             encoding: "buffer",
-            maxBuffer: 1024 * 1024 * 50, // 50 MB
+            maxBuffer: 1024 * 1024 * 250, // 250 MB
         },
     );
 
@@ -229,13 +230,7 @@ async function insertProjektuSarasas(rows) {
             Number(row.didziausiaGalimaTinkamuFinansuotiIslaiduSumaIsViso),
         ];
 
-        try {
-            await postgres.query(sql, values);
-        } catch (err) {
-            log(
-                `Klaida įterpiant projekto nr ${row.projektoNr}: ${err.message}`,
-            );
-        }
+        await postgres.query(sql, values);
         count++;
     }
 }

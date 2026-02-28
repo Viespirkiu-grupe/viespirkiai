@@ -1,3 +1,9 @@
+function sanitizeForTypesense(value) {
+    if (typeof value !== "string") return value;
+    // Escape special characters used in Typesense queries
+    return value.replace(/([:"<>=&|!()\[\]{}~*?\\/])/g, "\\$1");
+}
+
 /**
  * Builds a Typesense filter from the provided query object.
  * @param {Object} query
@@ -113,7 +119,7 @@ export function buildTypesenseFilter(query) {
             values[key] = true;
             queryParams.push(`${key}=true`);
         } else if (query[key]?.length > 0) {
-            apply(query[key]);
+            apply(sanitizeForTypesense(query[key]));
             values[key] = query[key];
             queryParams.push(`${key}=${encodeURIComponent(query[key])}`);
         }
@@ -346,8 +352,7 @@ export function buildPostgresFilter(query, limit, page = 1) {
         {
             key: "search",
             apply: (val) => {
-                const term = val.replace(/'/g, "''"); // escape single quotes
-                const param = addParam("search", term);
+                const param = addParam("search", val);
                 whereClauses.push(
                     `"search_tsv" @@ plainto_tsquery('simple', ${param})`,
                 );

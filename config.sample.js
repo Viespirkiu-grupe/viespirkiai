@@ -17,4 +17,5 @@ export default {
     enableMinification: false,
     workerCount: 2,
     proxyIp: "127.0.0.1",
+    torAddress: "socks5h://127.0.0.1:9050",
 };

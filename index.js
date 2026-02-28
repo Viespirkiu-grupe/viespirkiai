@@ -12,6 +12,10 @@ import fsPromises from "fs/promises";
 import htmlMinifyMiddleware from "./utils/minifyHtml.js";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import {
+    ensureSearchCollection,
+    ensureJarCollection,
+} from "./typesense/typesense.js";
 
 const app = express();
 const PORT = config.port || 8000;
@@ -23,12 +27,14 @@ if (config.enableMinification !== false) {
     app.use(htmlMinifyMiddleware());
 }
 
-// Onion-location header
 app.use((req, res, next) => {
     const onionBase =
         "http://viespirk6fj2pukym5gv5pqsuzc77jaudkbddxvqjjoetph337dhyrqd.onion";
-    res.setHeader("Onion-Location", onionBase + req.originalUrl);
 
+    // encode the path and query
+    const safeUrl = onionBase + encodeURI(req.originalUrl);
+
+    res.setHeader("Onion-Location", safeUrl);
     next();
 });
 
@@ -148,12 +154,6 @@ app.use((err, req, res, next) => {
         customHead: config.customHead,
     });
 });
-
-// Search database
-import {
-    ensureSearchCollection,
-    ensureJarCollection,
-} from "./typesense/typesense.js";
 
 const isMain = process.env.RUN_DIRECTLY === "true";
 

@@ -31,16 +31,19 @@ async function nuskaitytiNutarti(link) {
         }
     });
 
-    let salys = Array.from(saliuLentele.querySelectorAll("tbody tr")).map(
-        (tr) => {
-            let tds = tr.querySelectorAll("td");
-            return {
-                pavadinimas: tds[0]?.textContent.trim() || "",
-                kodas: tds[1]?.textContent.trim() || "",
-                bylojeKaip: tds[2]?.textContent.trim() || "",
-            };
-        },
-    );
+    let salys = [];
+    if (saliuLentele) {
+        salys = Array.from(saliuLentele.querySelectorAll("tbody tr")).map(
+            (tr) => {
+                let tds = tr.querySelectorAll("td");
+                return {
+                    pavadinimas: tds[0]?.textContent.trim() || "",
+                    kodas: tds[1]?.textContent.trim() || "",
+                    bylojeKaip: tds[2]?.textContent.trim() || "",
+                };
+            },
+        );
+    }
 
     let nutartiesTekstas = document.querySelector(
         "#ctl00_ContentPlaceHolder1_txthtml",

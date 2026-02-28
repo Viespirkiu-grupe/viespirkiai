@@ -160,8 +160,6 @@ export async function cvpIsScrapePageContent(url, options = {}) {
 
     for (const [mainRow, extraRow] of result) {
         let sutartis = {
-            tipas: mainRow.querySelectorAll("td")[1].querySelector("a")
-                .innerHTML,
             pavadinimas: mainRow
                 .querySelectorAll("td")[1]
                 .querySelector("a")

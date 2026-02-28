@@ -35,17 +35,22 @@ export async function gautiSodrosDuomenis(jarKodas) {
 
         sodra.bendrasDraustujuSkaicius = pirmas.draustieji + pirmas.draustieji2;
 
-        sodra.bendrasVidutinisAtlyginimas =
-            (pirmas.vidutinisAtlyginimas * pirmas.draustieji +
-                pirmas.vidutinisAtlyginimas2 * pirmas.draustieji2) /
-            sodra.bendrasDraustujuSkaicius;
+        if (sodra.bendrasDraustujuSkaicius > 0) {
+            sodra.bendrasVidutinisAtlyginimas =
+                (pirmas.vidutinisAtlyginimas * pirmas.draustieji +
+                    pirmas.vidutinisAtlyginimas2 * pirmas.draustieji2) /
+                sodra.bendrasDraustujuSkaicius;
 
-        sodra.atlyginimuIslaidos = parseFloat(
-            (
-                sodra.bendrasVidutinisAtlyginimas *
-                sodra.bendrasDraustujuSkaicius
-            ).toFixed(2),
-        );
+            sodra.atlyginimuIslaidos = parseFloat(
+                (
+                    sodra.bendrasVidutinisAtlyginimas *
+                    sodra.bendrasDraustujuSkaicius
+                ).toFixed(2),
+            );
+        } else {
+            sodra.bendrasVidutinisAtlyginimas = undefined;
+            sodra.atlyginimuIslaidos = undefined;
+        }
 
         sodra.duomenys = sodraRezultatai.map((row) => ({
             data: formatDate(row.data),

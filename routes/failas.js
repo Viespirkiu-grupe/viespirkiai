@@ -134,7 +134,12 @@ failasRouter.post("/failas/ocr/checkout", async (req, res, next) => {
 
 failasRouter.post("/failas/ocr/submit", async (req, res, next) => {
     // Get the apiKey from query params
-    const { apiKey } = req.query;
+    let apiKey = req.query.apiKey;
+
+    // fallback to Bearer token
+    if (!apiKey && req.headers.authorization?.startsWith("Bearer ")) {
+        apiKey = req.headers.authorization.slice(7).trim();
+    }
 
     if (!apiKey || typeof apiKey !== "string") {
         return res.status(400).send("API raktas privalomas.");
@@ -164,6 +169,14 @@ failasRouter.post("/failas/ocr/submit", async (req, res, next) => {
             .send(
                 "Neteisingi arba trūkstami parametrai: id, tekstas, duration.",
             );
+    }
+
+    // Validate that tekstas contains strings
+    if (
+        !Array.isArray(tekstas) ||
+        !tekstas.every((t) => typeof t === "string")
+    ) {
+        return res.status(400).send("Tekstas turi būti stringų masyvas.");
     }
 
     // Find the file by id and check if it's locked by this user

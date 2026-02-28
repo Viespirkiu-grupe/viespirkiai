@@ -4,7 +4,8 @@ const tiekejasRouter = express.Router();
 
 tiekejasRouter.get("/tiekejas/:kodas", async (req, res) => {
     const { kodas } = req.params;
-    res.redirect(`/?tiekejoKodas=${kodas}`);
+    const safeKodas = encodeURIComponent(kodas);
+    res.redirect(`/?tiekejoKodas=${safeKodas}`);
 });
 
 export default tiekejasRouter;

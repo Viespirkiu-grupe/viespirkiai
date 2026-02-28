@@ -78,7 +78,6 @@ async function main() {
     }
 
     log("DONE. Iš viso įterpta:", totalInserted);
-    await postgres.end();
 }
 
 async function insertBatch(rows) {

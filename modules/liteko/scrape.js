@@ -56,109 +56,18 @@ async function nuskaitytiDiena(data) {
             "#__VIEWSTATEGENERATOR",
         )?.value;
 
-        const pageButtons = [
-            null,
-            "01",
-            "02",
-            "03",
-            "04",
-            "05",
-            "06",
-            "07",
-            "08",
-            "09",
-            "10",
-            "02",
-            "03",
-            "04",
-            "05",
-            "06",
-            "07",
-            "08",
-            "09",
-            "10",
-            "11",
-            "02",
-            "03",
-            "04",
-            "05",
-            "06",
-            "07",
-            "08",
-            "09",
-            "10",
-            "11",
-            "02",
-            "03",
-            "04",
-            "05",
-            "06",
-            "07",
-            "08",
-            "09",
-            "10",
-            "11",
-            "02",
-            "03",
-            "04",
-            "05",
-            "06",
-            "07",
-            "08",
-            "09",
-            "10",
-            "11",
-            "02",
-            "03",
-            "04",
-            "05",
-            "06",
-            "07",
-            "08",
-            "09",
-            "10",
-            "11",
-            "02",
-            "03",
-            "04",
-            "05",
-            "06",
-            "07",
-            "08",
-            "09",
-            "10",
-            "11",
-            "02",
-            "03",
-            "04",
-            "05",
-            "06",
-            "07",
-            "08",
-            "09",
-            "10",
-            "11",
-            "02",
-            "03",
-            "04",
-            "05",
-            "06",
-            "07",
-            "08",
-            "09",
-            "10",
-            "11",
-            "02",
-            "03",
-            "04",
-            "05",
-            "06",
-            "07",
-            "08",
-            "09",
-            "10",
-            "11",
-        ];
+        function getPageButton(i) {
+            if (i === 0) return null;
+
+            // first block
+            if (i <= 10) {
+                return String(i).padStart(2, "0");
+            }
+
+            // repeating blocks: 02–11
+            const n = ((i - 11) % 10) + 2;
+            return String(n).padStart(2, "0");
+        }
 
         for (let i = 1; i <= rezultatuSkaicius / 50; i++) {
             // pad with a 0
@@ -168,7 +77,7 @@ async function nuskaitytiDiena(data) {
 
             postBody.append(
                 "__EVENTTARGET",
-                `ctl00$ContentPlaceHolder1$listRez$RadDataPager1$ctl00$ctl${pageButtons[i]}`,
+                `ctl00$ContentPlaceHolder1$listRez$RadDataPager1$ctl00$ctl${getPageButton(i)}`,
             );
 
             postBody.append("__VIEWSTATE", viewState);

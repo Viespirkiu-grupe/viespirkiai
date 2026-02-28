@@ -434,6 +434,7 @@
                                 <% } else { %>
                                     <div style="font-family: monospace; white-space: pre-wrap; word-wrap: break-word; margin-top: 16px; border-top: 1px solid var(--gray); padding-top: 16px;">
                                         <%- (failas.metaduomenys.text || failas.metaduomenys.body || "")
+                                            .replace(/&/g, "&amp;")
                                             .replace(/</g, "&lt;")
                                             .replace(/>/g, "&gt;")
                                             .replace(/\r?\n/g, "<br>") %>
