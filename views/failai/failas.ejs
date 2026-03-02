@@ -61,6 +61,10 @@
                                     <a href="/failas/<%= failas.parent %>">Archyvo <%= failas.parent %> viduje</a>
                                     <% originalusLinkas = `/failas/${failas.parent}`; %>
                                     <% originalusLinkasPavadinimas = "Archyvas"; %>
+                                <% } else if(failas.saltinis == "mvpAprasai") { %>
+                                      <a href="https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp?&Itemid=112">MVP tvarkos aprašai</a>
+                                      <% originalusLinkas = `https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp?&Itemid=112`; %>
+                                      <% originalusLinkasPavadinimas = "VPM IS"; %>
                                 <% } else if(failas.saltinis == "cvpIs") { %>
                                     <% let pirkimoId = failas.saltinioId.split('/')[0]; %>
                                     <% let documentId = failas.saltinioId.split('/')[1]; %>

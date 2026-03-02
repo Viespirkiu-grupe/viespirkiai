@@ -30,7 +30,7 @@ async function fillBucket() {
         const res = await postgres.query(
             `SELECT *
              FROM failai
-             WHERE (parsiustas = 0 OR parsiustas = -1 OR parsiustas IS NULL)
+             WHERE parsiustas = 0 OR ((parsiustas = -1 OR parsiustas IS NULL)
                AND (
                    "parsiuntimoBandymai" IS NULL
                    OR "paskutinisParsiuntimoBandymas" IS NULL
@@ -52,7 +52,7 @@ async function fillBucket() {
                        COALESCE("parsiuntimoBandymai", 0) >= 54
                        AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '3 days'
                    )
-               )
+               ))
              ORDER BY id DESC
              LIMIT $1`,
             [limit * 2],
@@ -201,6 +201,13 @@ export async function parsiustiFaila(options = {}) {
                 url =
                     proxy.url +
                     `/epps/cft/downloadDocumentVersion.do?versionId=${versionId}&documentId=${documentId}`;
+            }
+        } else if (saltinis == "mvpAprasai") {
+            let proxy = await getProxyBySite("mwEviesiejipirkimai");
+            if (!proxy) {
+                url = `https://mw.eviesiejipirkimai.lt/${failas.saltinioId}`;
+            } else {
+                url = proxy.url + `/${failas.saltinioId}`;
             }
         } else {
             throw new Error(`Nežinomas šaltinis: ${saltinis}`);

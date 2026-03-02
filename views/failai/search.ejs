@@ -62,9 +62,15 @@
                             <% } %>
 
                             <% if(values["saltinis"] == "cvpIs") { %>
-                                <option value="cvpIs" selected>Viešasis pirkimas</option>
+                                <option value="cvpIs" selected>Viešieji pirkimai</option>
                             <% } else { %>
-                                <option value="cvpIs">Viešasis pirkimas</option>
+                                <option value="cvpIs">Viešieji pirkimai</option>
+                            <% } %>
+
+                            <% if(values["saltinis"] == "mvpAprasai") { %>
+                                <option value="mvpAprasai" selected>MVP tvarkos aprašai</option>
+                            <% } else { %>
+                                <option value="mvpAprasai">MVP tvarkos aprašai</option>
                             <% } %>
 
                             <% if(values["saltinis"] == "archive") { %>
