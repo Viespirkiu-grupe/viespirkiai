@@ -209,7 +209,7 @@ async function processCfTDPSWSRecord(cft, options = {}) {
         UPDATE public."viesiejiPirkimai"
         SET "turinioNuskaitymas" = 1,
             "turinioNuskaitymoData" = NOW(),
-            scrapeReservation = NULL,
+            "scrapeReservation" = NULL,
             turinys = $1
         WHERE "pirkimoId" = $2
         `,
@@ -231,7 +231,7 @@ async function processCfTDPSWSRecord(cft, options = {}) {
       UPDATE public."viesiejiPirkimai"
       SET "turinioNuskaitymas" = $1,
           "turinioNuskaitymoData" = NOW(),
-          scrapeReservation = NULL
+          "scrapeReservation" = NULL
       WHERE "pirkimoId" = $2
       `,
             [status, cft.pirkimoId],
