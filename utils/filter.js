@@ -424,7 +424,7 @@ export function buildPostgresFilter(query, limit, page = 1) {
         sortDir = "desc";
     }
 
-    const orderBy = `"${sortColumn}" ${sortDir.toUpperCase()} NULLS LAST`;
+    const orderBy = `"${sortColumn}" ${sortDir.toUpperCase()}`;
 
     return {
         sql: `SELECT * FROM sutartys ${where} ORDER BY ${orderBy} LIMIT ${limitParam} OFFSET ${offsetParam};`,
