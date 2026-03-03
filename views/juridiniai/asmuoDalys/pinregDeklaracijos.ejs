@@ -1,7 +1,17 @@
  <h2 id="pinreg"><a href="#pinreg" class="hashHref"><u>Privačių interesų deklaracijos</u></a></h2>
- <% if(asmuo.pinreg.total > asmuo.pinreg.limit) { %>
+ <%
+ // Determine if each category is truncated
+ const rysiaiTruncated = asmuo.pinreg.counts.rysiaiSuJa > asmuo.pinreg.rysiaiSuJa.length;
+ const darbovietesTruncated = asmuo.pinreg.counts.darbovietes > asmuo.pinreg.darbovietes.length;
+ const sutuoktinioTruncated = asmuo.pinreg.counts.sutuoktiniuDarbovietes > asmuo.pinreg.sutuoktinioDarbovietes.length;
+
+ // Show the global "limited" message only if any category is truncated
+ const anyTruncated = rysiaiTruncated || darbovietesTruncated || sutuoktinioTruncated;
+ %>
+
+ <% if (anyTruncated) { %>
      <i>
-         Rodomos tik po paskutinės <%= asmuo.pinreg.limit %> privačių interesų deklaracijos.
+         Rodomos tik po <%= asmuo.pinreg.limit %> deklaracijos.
          <a href="?pinregLimit=max#pinreg">
              Rodyti visas (<%= asmuo.pinreg.total %>)
          </a>
@@ -10,7 +20,7 @@
  <% } %>
 
  <div class="col-3 mobile-col-1">
-     <section class="results" style="margin-inline: initial;">
+     <section class="results" style="margin-inline: initial; margin-block: 0;">
          <h3 style="margin-bottom: 0px;">Ryšiai su juridiniais asmenimis</h3>
          <% asmuo.pinreg.rysiaiSuJa.forEach(rysys =>  { %>
              <div class="rezultatas">
@@ -30,7 +40,7 @@
              </div>
          <% }) %>
      </section>
-     <section class="results" style="margin-inline: initial;">
+     <section class="results" style="margin-inline: initial; margin-block: 0;">
          <h3 style="margin-bottom: 0px;">Darbovietės</h3>
          <% asmuo.pinreg.darbovietes.forEach(darboviete =>  { %>
              <div class="rezultatas">
@@ -49,7 +59,7 @@
              </div>
          <% }) %>
      </section>
-     <section class="results" style="margin-inline: initial;">
+     <section class="results" style="margin-inline: initial; margin-block: 0;">
          <h3 style="margin-bottom: 0px;">Sutuoktinių darbovietės</h3>
          <% asmuo.pinreg.sutuoktinioDarbovietes.forEach(darboviete =>  { %>
              <div class="rezultatas">
