@@ -211,6 +211,202 @@ failaiSearchRouter.get(
     },
 );
 
+failaiSearchRouter.get("/failai/neparsiunciami", async (req, res, next) => {
+    try {
+        // Pagination params
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        let limit = Math.max(1, parseInt(req.query.limit) || 250);
+        if (req.query.limit === "max") {
+            limit = 1_000_000;
+        }
+        const offset = (page - 1) * limit;
+
+        // Optional source filter (saltinis), taken from search.ejs <select name="saltinis">
+        const saltinis =
+            typeof req.query.saltinis !== "undefined" &&
+            req.query.saltinis !== ""
+                ? req.query.saltinis
+                : null;
+
+        // Build WHERE clause dynamically to allow optional saltinis filter
+        const whereClauses = ["parsiustas = -1"];
+        const paramsBase = [];
+        if (saltinis) {
+            if (saltinis === "sutartys") {
+                // When filtering for 'sutartys', include rows where saltinis IS NULL as well
+                whereClauses.push(
+                    `("saltinis" = $${paramsBase.length + 1} OR "saltinis" IS NULL)`,
+                );
+                paramsBase.push(saltinis);
+            } else {
+                whereClauses.push(`"saltinis" = $${paramsBase.length + 1}`);
+                paramsBase.push(saltinis);
+            }
+        }
+        const whereSQL = whereClauses.join(" AND ");
+
+        // Count total rows for pagination
+        const countQuery = `SELECT COUNT(*) AS total FROM failai WHERE ${whereSQL}`;
+        const countRes = await postgres.query(countQuery, paramsBase);
+        const total = parseInt(countRes.rows[0].total, 10) || 0;
+        const pageCount = Math.max(1, Math.ceil(total / limit));
+
+        // If CSV export requested -> return CSV (full export with reasonable cap)
+        if (typeof req.query.csv !== "undefined") {
+            // Allow optional csvLimit, otherwise cap at 10000
+            const csvLimit = Math.min(
+                100000,
+                Math.max(1, parseInt(req.query.csvLimit) || 10000),
+            );
+            const csvParams = paramsBase.slice();
+            csvParams.push(csvLimit);
+
+            const selectCSV = `
+                SELECT id, pavadinimas, extension, "saltinioId", "saltinis", "parsiuntimoBandymai", "paskutinisParsiuntimoBandymas"
+                FROM failai
+                WHERE ${whereSQL}
+                ORDER BY COALESCE("paskutinisParsiuntimoBandymas", to_timestamp(0)) DESC
+                LIMIT $${csvParams.length}
+            `;
+
+            const rowsRes = await postgres.query(selectCSV, csvParams);
+            const rows = rowsRes.rows || [];
+
+            // Build CSV content (escape double quotes)
+            const escape = (v) => {
+                if (v === null || typeof v === "undefined") return "";
+                let s = String(v);
+                if (
+                    s.includes('"') ||
+                    s.includes(",") ||
+                    s.includes("\n") ||
+                    s.includes("\r")
+                ) {
+                    s = s.replace(/"/g, '""');
+                    return `"${s}"`;
+                }
+                return s;
+            };
+
+            const header = [
+                "id",
+                "pavadinimas",
+                "plėtinys",
+                "saltinioId",
+                "saltinis",
+                "parsiuntimoBandymai",
+                "paskutinisParsiuntimoBandymas",
+            ];
+            const lines = [header.join(",")];
+
+            for (const r of rows) {
+                const line = [
+                    escape(r.id),
+                    escape(r.pavadinimas),
+                    escape(r.extension), // note: kept as extension in DB, header uses 'plėtinys'
+                    escape(r.saltinioId),
+                    escape(r.saltinis),
+                    escape(r.parsiuntimoBandymai),
+                    escape(r.paskutinisParsiuntimoBandymas),
+                ].join(",");
+                lines.push(line);
+            }
+
+            // Prepend UTF-8 BOM so Excel/other clients recognize UTF-8 and Lithuanian letters correctly
+            const csvContent = "\uFEFF" + lines.join("\r\n");
+            res.setHeader("Content-Type", "text/csv; charset=utf-8");
+            res.setHeader(
+                "Content-Disposition",
+                `attachment; filename="neparsiunciami_${new Date().toISOString().slice(0, 10)}.csv"`,
+            );
+            return res.send(csvContent);
+        }
+
+        // Normal paginated select
+        const params = paramsBase.slice();
+        params.push(limit);
+        params.push(offset);
+
+        const selectQuery = `
+            SELECT id, pavadinimas, extension, "saltinioId", "saltinis", "parsiuntimoBandymai", "paskutinisParsiuntimoBandymas", "dokId", "fileId"
+            FROM failai
+            WHERE ${whereSQL}
+            ORDER BY COALESCE("paskutinisParsiuntimoBandymas", to_timestamp(0)) DESC
+            LIMIT $${params.length - 1} OFFSET $${params.length}
+        `;
+
+        const result = await postgres.query(selectQuery, params);
+        const files = (result.rows || []).map((r) => {
+            // default source to 'sutartys' if missing
+            const saltinisVal = r.saltinis || "sutartys";
+
+            // Build a public link for the source id similar to modules/failai/parsiusti.js logic
+            let saltinioLink = "";
+            try {
+                if (saltinisVal === "sutartys") {
+                    // prefer dokId/fileId if present
+                    if (r.dokId && r.fileId) {
+                        saltinioLink = `https://eviesiejipirkimai.lt/download.php?dok_id=${r.dokId}&file_id=${r.fileId}`;
+                    } else if (r.saltinioId) {
+                        // fallback to using saltinioId path
+                        saltinioLink = `https://eviesiejipirkimai.lt/${r.saltinioId}`;
+                    }
+                } else if (saltinisVal === "neskelbiamosDerybos") {
+                    if (r.saltinioId)
+                        saltinioLink = `https://eviesiejipirkimai.lt/${r.saltinioId}`;
+                } else if (saltinisVal === "cvpIs") {
+                    const parts = (r.saltinioId || "").split("/");
+                    // expected format like /some/{documentId}/{versionId}
+                    if (parts.length >= 3) {
+                        const documentId = parts[1];
+                        const versionId = parts[2];
+                        saltinioLink = `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${versionId}&documentId=${documentId}`;
+                    }
+                } else if (saltinisVal === "mvpAprasai") {
+                    if (r.saltinioId)
+                        saltinioLink = `https://mw.eviesiejipirkimai.lt/${r.saltinioId}`;
+                } else if (saltinisVal === "archive") {
+                    // archive - no public link (could be implemented if desired)
+                    saltinioLink = "";
+                }
+            } catch (e) {
+                saltinioLink = "";
+            }
+
+            // Provide plėtinys alias and normalized saltinis + link for the view
+            return {
+                ...r,
+                pletinys: r.extension,
+                saltinis: saltinisVal,
+                saltinioLink,
+            };
+        });
+
+        // Prepare queryParams for pagination links (preserve saltinis and limit)
+        const preservedParams = [];
+        if (saltinis)
+            preservedParams.push(`saltinis=${encodeURIComponent(saltinis)}`);
+        if (req.query.limit)
+            preservedParams.push(
+                `limit=${encodeURIComponent(req.query.limit)}`,
+            );
+        const queryParams = preservedParams.join("&");
+
+        res.render("failai/neparsiunciami", {
+            files,
+            customHead: config.customHead,
+            req,
+            currentPage: page,
+            pageCount,
+            total,
+            queryParams,
+            saltinis: saltinis || "",
+        });
+    } catch (err) {
+        return next(err);
+    }
+});
+
 failaiSearchRouter.get("/failai/statistika/sse", async (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");

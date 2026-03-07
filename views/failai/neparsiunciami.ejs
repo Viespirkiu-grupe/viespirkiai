@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <%- include('../head.ejs', {
+        pageTitle: "Neparsiunciami failai",
+        pageDescription: "Sąrašas failų, kurių parsisiuntimas nepavyko (parsiustas = -1).",
+        pageImage: ``,
+        customHead
+    }) %>
+    <style>
+        /* Full width table and responsive horizontal scroll wrapper */
+        .neparsiunciami-table {
+            margin-top: 16px;
+            table-layout: fixed; /* enable ellipsis trimming */
+        }
+
+        /* name should ellipsize from end (show start) */
+        td.truncate {
+            max-width: 320px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 820px) {
+            /* keep columns visible and allow horizontal scroll via .table-wrapper */
+            .neparsiunciami-table th.saltinio-id,
+            .neparsiunciami-table td.saltinio-id {
+                display: table-cell;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../header.ejs', { hideSubtext: false }) %>
+    <h1 class="center">Failai, kurių nepavyko parsiųsti</h1>
+    <%- include('../tabs.ejs') %>
+    <main>
+        <section>
+            <div class="controls">
+                <b><u>Filtravimas</u></b>
+                <div>
+                    <form method="get" action="/failai/neparsiunciami">
+                        <div class="nustatymai">
+                            <div class="nustatymai-top">
+                                <div>
+                                    <div class="inputContainer selectInputContainer">
+                                        <label for="saltinis" class="inputLabel">Šaltinis</label>
+                                        <select id="saltinis" name="saltinis">
+                                            <option value="" <%= (!saltinis) ? 'selected' : '' %>>Visi</option>
+                                            <option value="sutartys" <%= (saltinis === 'sutartys') ? 'selected' : '' %>>Sutartys</option>
+                                            <option value="neskelbiamosDerybos" <%= (saltinis === 'neskelbiamosDerybos') ? 'selected' : '' %>>Neskelbiamos derybos</option>
+                                            <option value="cvpIs" <%= (saltinis === 'cvpIs') ? 'selected' : '' %>>Viešieji pirkimai</option>
+                                            <option value="mvpAprasai" <%= (saltinis === 'mvpAprasai') ? 'selected' : '' %>>MVP tvarkos aprašai</option>
+                                            <option value="archive" <%= (saltinis === 'archive') ? 'selected' : '' %>>Failas archyvo viduje</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" style="padding:6px 10px;">Ieškoti</button>
+                    </form><br>
+
+                    <section class="preResultOptions" style="max-width: unset;">
+                        <div class="numberOfResults">
+                            <i>
+                            <% if (typeof files !== 'undefined' && files.length) { %>
+                                <% if (typeof total !== 'undefined') { %>
+                                    Rodoma <%= files.length %> iš <%= total %> įrašų
+                                <% } else { %>
+                                    Rodoma <%= files.length %> įrašų
+                                <% } %>
+                            <% } else { %>
+                                Įrašų nėra
+                            <% } %>
+                            </i>
+                        </div>
+
+                        <div>
+                            <a href="<%= `/failai/neparsiunciami?csv=true&${queryParams}&limit=max` %>">↗ CSV</a>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+            <table class="neparsiunciami-table">
+                <thead>
+                    <tr>
+                        <th>Id</th>
+                        <th>Pavadinimas</th>
+                        <th>Plėtinys</th>
+                        <th>Šaltinis</th>
+                        <th>Šaltinio nuoroda</th>
+                        <th>Bandymai</th>
+                        <th>Paskutinis bandymas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (!files || files.length === 0) { %>
+                        <tr>
+                            <td colspan="7" style="text-align:center;padding:30px 12px;">
+                                Nėra neparsiunčiamų failų.
+                            </td>
+                        </tr>
+                    <% } else { %>
+                        <% files.forEach(function(file) { %>
+                            <tr>
+                                <td>
+                                    <% if (file.id) { %>
+                                        <a href="/failas/<%= file.id %>"><%= file.id %></a>
+                                    <% } else { %>
+                                        -
+                                    <% } %>
+                                </td>
+                                <td class="truncate">
+                                    <%= file.pavadinimas ? file.pavadinimas : '-' %>
+                                </td>
+                                <td><%= file.extension || '' %></td>
+                                <td><%= file.saltinis || 'sutartys' %></td>
+                                <td class="truncate">
+                                    <% if (file.saltinioLink) { %>
+                                          <a href="<%= file.saltinioLink %>"><%= file.saltinioLink || file.saltinioId %></a>
+                                    <% } %>
+                                </td>
+                                <td><%= (file.parsiuntimoBandymai === null || typeof file.parsiuntimoBandymai === 'undefined') ? 0 : file.parsiuntimoBandymai %></td>
+                                <td>
+                                    <% if (file.paskutinisParsiuntimoBandymas) { %>
+                                        <% try { %>
+                                            <%= (new Date(file.paskutinisParsiuntimoBandymas)).toLocaleString('lt-LT') %>
+                                        <% } catch(e) { %>
+                                            <%= file.paskutinisParsiuntimoBandymas %>
+                                        <% } %>
+                                    <% } else { %>
+                                        -
+                                    <% } %>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    <% } %>
+                </tbody>
+            </table>
+
+            <div style="margin-top:18px;">
+                <%- include('../pagination.ejs', { currentPage: currentPage || 1, pageCount: pageCount || 1, queryParams: '' }) %>
+            </div>
+        </section>
+    </main>
+
+    <%- include('../footer.ejs') %>
+</body>
+</html>

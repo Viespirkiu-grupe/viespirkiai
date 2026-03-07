@@ -233,7 +233,7 @@
                     <br>
 				</section>
 				<section>
-				    <% failas.extension = failas.extension.toLowerCase(); %>
+				    <% failas.extension = (failas.extension || "").toLowerCase(); %>
 					<% const libreFormats = ["doc", "docx", "odt", "rtf", "xls", "xlsx", "xlsb", "ods", "ppt", "pptx", "ppsx", "odp", "odg", "pub", "pages", "xlt", "dot", "docm", "dotx"]; %>
 				    <% if(failas.extension === "pdf" || failas.extension === "prn" || libreFormats.includes(failas.extension)) { %>
                     <% let pdfSearch = query.search || ''; %>
