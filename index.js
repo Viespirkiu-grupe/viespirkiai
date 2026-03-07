@@ -11,6 +11,8 @@ import fs from "fs";
 import fsPromises from "fs/promises";
 import htmlMinifyMiddleware from "./utils/minifyHtml.js";
 import helmet from "helmet";
+import { realpathSync } from "fs";
+import { resolve } from "path";
 import rateLimit from "express-rate-limit";
 import {
     ensureSearchCollection,
@@ -27,16 +29,16 @@ if (config.enableMinification !== false) {
     app.use(htmlMinifyMiddleware());
 }
 
-app.use((req, res, next) => {
-    const onionBase =
-        "http://viespirk6fj2pukym5gv5pqsuzc77jaudkbddxvqjjoetph337dhyrqd.onion";
+if (config.onionAddress) {
+    app.use((req, res, next) => {
+        const onionBase = config.onionAddress;
+        // encode the path and query
+        const safeUrl = onionBase + encodeURI(req.originalUrl);
 
-    // encode the path and query
-    const safeUrl = onionBase + encodeURI(req.originalUrl);
-
-    res.setHeader("Onion-Location", safeUrl);
-    next();
-});
+        res.setHeader("Onion-Location", safeUrl);
+        next();
+    });
+}
 
 // Security headers
 app.use(
@@ -83,6 +85,10 @@ const templateCache = new Map();
 
 app.use((req, res, next) => {
     res.renderCompiled = async (viewName, data = {}) => {
+        if (config.dev) {
+            return res.render(viewName, data);
+        }
+
         const viewsDir = req.app.get("views");
         const engine = req.app.get("view engine");
         const filePath = path.join(viewsDir, `${viewName}.${engine}`);
@@ -108,13 +114,20 @@ app.use((req, res, next) => {
 });
 
 // Static routes
-app.use(
-    "/fontai",
-    express.static(path.join(__dirname, "public/fontai"), {
-        maxAge: "1y",
-        immutable: true,
-    }),
-);
+if (config.dev) {
+    app.use(
+        "/fontai",
+        express.static(path.join(__dirname, "public/fontai"), {}),
+    );
+} else {
+    app.use(
+        "/fontai",
+        express.static(path.join(__dirname, "public/fontai"), {
+            maxAge: "1y",
+            immutable: true,
+        }),
+    );
+}
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -155,13 +168,18 @@ app.use((err, req, res, next) => {
     });
 });
 
-const isMain = process.env.RUN_DIRECTLY === "true";
+const currentFile = fileURLToPath(import.meta.url);
+const entryFile = realpathSync(resolve(process.argv[1]));
 
-// Only listen if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}` || isMain) {
+// Handle running as `node .` or `node dir/`
+const isDirectRun =
+    currentFile === entryFile ||
+    currentFile === resolve(entryFile, "index.js") ||
+    entryFile === resolve(currentFile, ".."); // dir match
+
+if (isDirectRun) {
     await ensureSearchCollection();
     await ensureJarCollection();
-
     app.listen(PORT, () =>
         log(`Server running independently at http://localhost:${PORT}`),
     );

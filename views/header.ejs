@@ -9,13 +9,23 @@
 	<h1 class="viespirkiai">
 		<a href="/" class="noStyle">
 		    <span class="visually-hidden">Viešpirkiai</span>
-			<%- include('viespirkiaiLogoLaisvasZodis.svg') %>
+			<% if(CONFIG.dev == true) { %>
+                <div style="transform: rotate(180deg) translateY(-20px);">
+                    <%- include('viespirkiaiLogoLaisvasZodis.svg') %>
+                </div>
+			<% } else { %>
+			    <%- include('viespirkiaiLogoLaisvasZodis.svg') %>
+			<% } %>
 		</a>
 	</h1>
 
 	<% if(typeof hideSubtext == "undefined" || hideSubtext == false) { %>
 	    <span role="doc-subtitle">
-					Pilietinė viešųjų pirkimų analizės inciatyva
+			<% if(CONFIG.dev == true) { %>
+                Darbinė sistemos versija
+			<% } else { %>
+                Pilietinė viešųjų pirkimų analizės inciatyva
+			<% } %>
 		</span>
 	<% } %>
 </header>
