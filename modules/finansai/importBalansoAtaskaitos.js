@@ -122,4 +122,4 @@ async function insertBatch(rows) {
 }
 
 await main();
-postgres.end();
+await postgres.end();

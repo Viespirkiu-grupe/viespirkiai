@@ -12,7 +12,7 @@ import {
 } from "../../typesense/typesense.js";
 
 await ensureJarCollection();
-var eilute = 0;
+let eilute = 0;
 
 // Patikrina, ar nurodytas CSV failo pavadinimas
 const filename = process.argv[2];
@@ -36,7 +36,6 @@ const rl = readline.createInterface({
     crlfDelay: Infinity,
 });
 
-let arPirmaEilute = true;
 const ITERPIMO_DYDIS = 100; // Po tiek eilučių įterpiama į duomenų bazę vienu metu
 let batch = [];
 let typesenseBatch = [];
@@ -88,6 +87,7 @@ for await (const line of rl) {
 // Įterpiame likusias eilutes, jei tokių yra
 if (batch.length > 0) {
     await insertBatch(batch);
+    await addDocumentsToJarSearch(typesenseBatch);
 }
 
 log(`Įterptos eilutės: ${eilute}`);
@@ -218,11 +218,7 @@ export async function insertBatch(rows) {
 
     const values = rows.flat();
 
-    try {
-        await postgres.query(sql, values);
-        eilute = eilute + rows.length;
-        log(`Įterpta ${eilute} eilučių...`);
-    } catch (err) {
-        console.error(`Įterpimas nepavyko po ${eilute} eilučių:`, err.message);
-    }
+    await postgres.query(sql, values);
+    eilute = eilute + rows.length;
+    log(`Įterpta ${eilute} eilučių...`);
 }

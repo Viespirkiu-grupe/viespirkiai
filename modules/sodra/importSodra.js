@@ -160,13 +160,9 @@ async function insertBatch(rows) {
 
     const values = rows.flat();
 
-    try {
-        await postgres.query(sql, values);
-        eilute += rows.length;
-        if (eilute % 1000 === 0) {
-            log(`Inserted ${eilute} rows...`);
-        }
-    } catch (err) {
-        console.error(`Insert failed after ${eilute} rows:`, err.message);
+    await postgres.query(sql, values);
+    eilute += rows.length;
+    if (eilute % 1000 === 0) {
+        log(`Inserted ${eilute} rows...`);
     }
 }

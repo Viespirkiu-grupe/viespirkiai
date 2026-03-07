@@ -89,15 +89,15 @@ async function updateMunicipalities() {
              VALUES ($1, $2, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($3), 4326)))`,
             [tipas, pavadinimas, JSON.stringify(geojson)],
         );
+    }
 
-        await postgres.query(
-            `INSERT INTO "geografiniaiPlotaiVersijos" ("tipas", "versija")
+    await postgres.query(
+        `INSERT INTO "geografiniaiPlotaiVersijos" ("tipas", "versija")
                 VALUES ('savivaldybe', $1)
                 ON CONFLICT ("tipas")
                 DO UPDATE SET "versija" = EXCLUDED."versija"`,
-            [MUNICIPALITY_DATA_VERSION],
-        );
-    }
+        [MUNICIPALITY_DATA_VERSION],
+    );
 
     log("Atnaujintos savivaldybių ribos");
     return true;
@@ -108,5 +108,5 @@ if (
     import.meta.url === `file://${process.argv[1]}`
 ) {
     await updateMunicipalities();
-    postgres.end();
+    await postgres.end();
 }

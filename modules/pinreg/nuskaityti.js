@@ -156,55 +156,59 @@ export async function nuskaitytiPinregDeklaracija() {
 
     if (!allRows.length) return true;
 
-    // Delete old juridiniaiRysiai rows
-    await postgres.query(
-        `DELETE FROM "pinregJuridiniaiRysiai" WHERE "deklaracija" = $1`,
-        [data.accessUuid],
-    );
-
-    const columns = [
-        "irasoTipas",
-        "jarKodas",
-        "deklaracija",
-        "vardas",
-        "pavarde",
-        "pavadinimas",
-        "rysioPradzia",
-        "rysioPabaiga",
-        "duomenuSaltinis",
-        "registruotaLietuvoje",
-        "jaTeisinesFormosKodas",
-        "jaTeisinesFormosPavadinimas",
-        "uzpildytaAutomatiskai",
-        "susijusioAsmensVardas",
-        "susijusioAsmensPavarde",
-        "pareigos",
-        "teisejoKodas",
-        "darbovietesTipas",
-        "kienoRysys",
-        "pastabos",
-        "rysioPobudzioPavadinimas",
-        "dalyvavimoVpInformacija",
-        "dalyvaujaViesuosePirkimuose",
-        "pateikimoData",
-    ];
-
-    const valuesPlaceholders = allRows
-        .map(
-            (_, idx) =>
-                `(${columns.map((__, i) => `$${idx * columns.length + i + 1}`).join(",")})`,
-        )
-        .join(",");
-
-    const params = allRows.flatMap((r) => columns.map((c) => r[c] ?? null));
-
-    await postgres.query(
-        `INSERT INTO "pinregJuridiniaiRysiai" (${columns
-            .map((c) => `"${c}"`)
-            .join(",")}) VALUES ${valuesPlaceholders}`,
-        params,
-    );
-
+    const client = await postgres.connect();
+    try {
+        await client.query("BEGIN");
+        await client.query(
+            `DELETE FROM "pinregJuridiniaiRysiai" WHERE "deklaracija" = $1`,
+            [data.accessUuid],
+        );
+        const columns = [
+            "irasoTipas",
+            "jarKodas",
+            "deklaracija",
+            "vardas",
+            "pavarde",
+            "pavadinimas",
+            "rysioPradzia",
+            "rysioPabaiga",
+            "duomenuSaltinis",
+            "registruotaLietuvoje",
+            "jaTeisinesFormosKodas",
+            "jaTeisinesFormosPavadinimas",
+            "uzpildytaAutomatiskai",
+            "susijusioAsmensVardas",
+            "susijusioAsmensPavarde",
+            "pareigos",
+            "teisejoKodas",
+            "darbovietesTipas",
+            "kienoRysys",
+            "pastabos",
+            "rysioPobudzioPavadinimas",
+            "dalyvavimoVpInformacija",
+            "dalyvaujaViesuosePirkimuose",
+            "pateikimoData",
+        ];
+        const valuesPlaceholders = allRows
+            .map(
+                (_, idx) =>
+                    `(${columns.map((__, i) => `$${idx * columns.length + i + 1}`).join(",")})`,
+            )
+            .join(",");
+        const params = allRows.flatMap((r) => columns.map((c) => r[c] ?? null));
+        await client.query(
+            `INSERT INTO "pinregJuridiniaiRysiai" (${columns
+                .map((c) => `"${c}"`)
+                .join(",")}) VALUES ${valuesPlaceholders}`,
+            params,
+        );
+        await client.query("COMMIT");
+    } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+    } finally {
+        client.release();
+    }
     log(`Nuskaityta deklaracija ${deklaracija.uuid}`);
     return true;
 }

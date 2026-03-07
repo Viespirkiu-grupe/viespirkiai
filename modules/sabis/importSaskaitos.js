@@ -119,4 +119,3 @@ async function main() {
 }
 
 await main();
-await postgres.end();
