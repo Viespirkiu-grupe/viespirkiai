@@ -287,6 +287,30 @@ tasks.push({
 });
 
 tasks.push({
+    name: "syncJarFormos",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return await syncAdpChanges({
+            table: "jarFormos",
+            dataset: "datasets/gov/rc/jar/formos_statusai/Forma",
+            mapping: {
+                _id: "_id",
+                _revision: "_revision",
+                kodas: "kodas",
+                pavadinimas: "pavadinimas",
+                pav_ilgas: "pavIlgas",
+                name: "name",
+                tipas: "tipas",
+                type: "type",
+            },
+            limit: 1000,
+        });
+    },
+});
+
+tasks.push({
     name: "syncAdpSutartysSalys",
     mode: "asap",
     cooldown: 60,

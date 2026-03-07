@@ -44,9 +44,7 @@
 	<main>
       <div class="grid-asmuo">
         <section style="grid-area: pavadinimas;">
-          <h1 style="margin-bottom: 12px;"><%= asmuo.jar.pavadinimas %>
-            <sup>(<%= asmuo.jar.duomenuData %>)</sup>
-          </h1>
+          <h1 style="margin-bottom: 12px;"><%= asmuo.jar.pavadinimas %></h1>
         </section>
 
         <section style="grid-area: metaduomenys;">
@@ -81,7 +79,6 @@
 
             <h3>
                 Juridinių asmenų registras
-                <sup>(<%= asmuo.jar.duomenuData %>)</sup>
             </h3>
 
     		<pre style="display: inline;"><%= asmuo.jar.jarKodas %></pre>
@@ -94,21 +91,21 @@
         </section>
 
         <section style="grid-area: veikla;">
-          <h2><u>Veikla</u>
-            <sup>(<%= asmuo.jar.duomenuData %>)</sup>
-          </h2>
+          <h2><u>Veikla</u></h2>
 
           <h3>Įregistruota</h3>
             <%= asmuo.jar.registravimoData %>
 
-          <h3>Vieta</h3>
+          <h3>Adresas</h3>
           <% if (asmuo.jar.location) { %>
             <a href="https://www.openstreetmap.org/?mlat=<%= asmuo.jar.location[0] %>&mlon=<%= asmuo.jar.location[1] %>&zoom=16" target="_blank">
               <%= asmuo.jar.adresas %>
             </a>
-          <% } else { %>
+          <% } else if(asmuo.jar.adresas){ %>
             <%= asmuo.jar.adresas %>
-          <% } %>
+          <% } else { %>
+              -
+            <% } %>
         </section>
 
         <section style="grid-area: darbuotojai;">
