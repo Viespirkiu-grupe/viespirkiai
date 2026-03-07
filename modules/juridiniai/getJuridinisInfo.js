@@ -39,7 +39,7 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
     let jarId;
     timings.start("jar");
     const jarRes = await postgres.query(
-        `SELECT "_id" FROM "jar" WHERE "jarKodas" = $1`,
+        `SELECT * FROM "jar" WHERE "jarKodas" = $1`,
         [jarKodas],
     );
     timings.end("jar");
@@ -59,17 +59,17 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
     }
 
     // 404
-    if (jarRezultatai.length === 0) {
+    if (jarRezultatai.length === 0 && jarRes.rows.length === 0) {
         return {
             error: 404,
             timings,
         };
     }
 
-    let jar = jarRezultatai[0];
+    let jar = jarRezultatai[0] || jarRes.rows[0];
     // Nustatome koordinates
     jar.location =
-        jar.lat !== null && jar.lon !== null ? [jar.lat, jar.lon] : undefined;
+        jar.lat != null && jar.lon != null ? [jar.lat, jar.lon] : undefined;
 
     // Remove temporary lon/lat fields
     delete jar.lon;
