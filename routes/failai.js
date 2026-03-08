@@ -262,7 +262,7 @@ failaiSearchRouter.get("/failai/neparsiunciami", async (req, res, next) => {
             csvParams.push(csvLimit);
 
             const selectCSV = `
-                SELECT id, pavadinimas, extension, "saltinioId", "saltinis", "parsiuntimoBandymai", "paskutinisParsiuntimoBandymas"
+                SELECT id, pavadinimas, extension, "saltinioId", "saltinis", "parsiuntimoBandymai", "paskutinisParsiuntimoBandymas", "dokId", "fileId"
                 FROM failai
                 WHERE ${whereSQL}
                 ORDER BY COALESCE("paskutinisParsiuntimoBandymas", to_timestamp(0)) DESC
@@ -272,7 +272,6 @@ failaiSearchRouter.get("/failai/neparsiunciami", async (req, res, next) => {
             const rowsRes = await postgres.query(selectCSV, csvParams);
             const rows = rowsRes.rows || [];
 
-            // Build CSV content (escape double quotes)
             const escape = (v) => {
                 if (v === null || typeof v === "undefined") return "";
                 let s = String(v);
@@ -292,24 +291,50 @@ failaiSearchRouter.get("/failai/neparsiunciami", async (req, res, next) => {
                 "id",
                 "pavadinimas",
                 "plėtinys",
-                "saltinioId",
                 "saltinis",
+                "saltinioNuoroda",
                 "parsiuntimoBandymai",
                 "paskutinisParsiuntimoBandymas",
             ];
             const lines = [header.join(",")];
 
             for (const r of rows) {
-                const line = [
-                    escape(r.id),
-                    escape(r.pavadinimas),
-                    escape(r.extension), // note: kept as extension in DB, header uses 'plėtinys'
-                    escape(r.saltinioId),
-                    escape(r.saltinis),
-                    escape(r.parsiuntimoBandymai),
-                    escape(r.paskutinisParsiuntimoBandymas),
-                ].join(",");
-                lines.push(line);
+                const saltinisVal = r.saltinis || "sutartys";
+                let saltinioLink = "";
+                try {
+                    if (saltinisVal === "sutartys") {
+                        if (r.dokId && r.fileId) {
+                            saltinioLink = `https://eviesiejipirkimai.lt/download.php?dok_id=${r.dokId}&file_id=${r.fileId}`;
+                        } else if (r.saltinioId) {
+                            saltinioLink = `https://eviesiejipirkimai.lt/${r.saltinioId}`;
+                        }
+                    } else if (saltinisVal === "neskelbiamosDerybos") {
+                        if (r.saltinioId)
+                            saltinioLink = `https://eviesiejipirkimai.lt/${r.saltinioId}`;
+                    } else if (saltinisVal === "cvpIs") {
+                        const parts = (r.saltinioId || "").split("/");
+                        if (parts.length >= 3) {
+                            saltinioLink = `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${parts[2]}&documentId=${parts[1]}`;
+                        }
+                    } else if (saltinisVal === "mvpAprasai") {
+                        if (r.saltinioId)
+                            saltinioLink = `https://mw.eviesiejipirkimai.lt/${r.saltinioId}`;
+                    }
+                } catch (e) {
+                    saltinioLink = "";
+                }
+
+                lines.push(
+                    [
+                        escape(r.id),
+                        escape(r.pavadinimas),
+                        escape(r.extension),
+                        escape(saltinisVal),
+                        escape(saltinioLink),
+                        escape(r.parsiuntimoBandymai),
+                        escape(r.paskutinisParsiuntimoBandymas),
+                    ].join(","),
+                );
             }
 
             // Prepend UTF-8 BOM so Excel/other clients recognize UTF-8 and Lithuanian letters correctly
