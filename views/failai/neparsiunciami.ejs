@@ -8,12 +8,6 @@
         customHead
     }) %>
     <style>
-        /* Full width table and responsive horizontal scroll wrapper */
-        .neparsiunciami-table {
-            margin-top: 16px;
-            table-layout: fixed; /* enable ellipsis trimming */
-        }
-
         /* name should ellipsize from end (show start) */
         td.truncate {
             max-width: 320px;
@@ -84,67 +78,69 @@
                 </div>
             </div>
 
-            <div class="table-wrapper">
-            <table class="neparsiunciami-table">
-                <thead>
-                    <tr>
-                        <th>Id</th>
-                        <th>Pavadinimas</th>
-                        <th>Plėtinys</th>
-                        <th>Šaltinis</th>
-                        <th>Šaltinio nuoroda</th>
-                        <th>Bandymai</th>
-                        <th>Paskutinis bandymas</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% if (!files || files.length === 0) { %>
+            <div class="table-wrapper" style="overflow-x: auto;">
+                <table class="neparsiunciami-table">
+                    <thead>
                         <tr>
-                            <td colspan="7" style="text-align:center;padding:30px 12px;">
-                                Nėra neparsiunčiamų failų.
-                            </td>
+                            <th>Id</th>
+                            <th>Pavadinimas</th>
+                            <th>Plėtinys</th>
+                            <th>Šaltinis</th>
+                            <th>Šaltinio nuoroda</th>
+                            <th>Bandymai</th>
+                            <th>Paskutinis bandymas</th>
                         </tr>
-                    <% } else { %>
-                        <% files.forEach(function(file) { %>
+                    </thead>
+                    <tbody>
+                        <% if (!files || files.length === 0) { %>
                             <tr>
-                                <td>
-                                    <% if (file.id) { %>
-                                        <a href="/failas/<%= file.id %>"><%= file.id %></a>
-                                    <% } else { %>
-                                        -
-                                    <% } %>
-                                </td>
-                                <td class="truncate">
-                                    <%= file.pavadinimas ? file.pavadinimas : '-' %>
-                                </td>
-                                <td><%= file.extension || '' %></td>
-                                <td><%= file.saltinis || 'sutartys' %></td>
-                                <td class="truncate">
-                                    <% if (file.saltinioLink) { %>
-                                          <a href="<%= file.saltinioLink %>"><%= file.saltinioLink || file.saltinioId %></a>
-                                    <% } %>
-                                </td>
-                                <td><%= (file.parsiuntimoBandymai === null || typeof file.parsiuntimoBandymai === 'undefined') ? 0 : file.parsiuntimoBandymai %></td>
-                                <td>
-                                    <% if (file.paskutinisParsiuntimoBandymas) { %>
-                                        <% try { %>
-                                            <%= (new Date(file.paskutinisParsiuntimoBandymas)).toLocaleString('lt-LT') %>
-                                        <% } catch(e) { %>
-                                            <%= file.paskutinisParsiuntimoBandymas %>
-                                        <% } %>
-                                    <% } else { %>
-                                        -
-                                    <% } %>
+                                <td colspan="7" style="text-align:center;padding:30px 12px;">
+                                    Nėra neparsiunčiamų failų.
                                 </td>
                             </tr>
-                        <% }) %>
-                    <% } %>
-                </tbody>
-            </table>
+                        <% } else { %>
+                            <% files.forEach(function(file) { %>
+                                <tr>
+                                    <td>
+                                        <% if (file.id) { %>
+                                            <a href="/failas/<%= file.id %>"><%= file.id %></a>
+                                        <% } else { %>
+                                            -
+                                        <% } %>
+                                    </td>
+                                    <td class="truncate">
+                                        <%= file.pavadinimas ? file.pavadinimas : '-' %>
+                                    </td>
+                                    <td style="max-width: 8ch;" class="truncate"><%= file.extension || '' %></td>
+                                    <td class="center"><%= file.saltinis || 'sutartys' %></td>
+                                    <td class="truncate">
+                                        <% if (file.saltinioLink) { %>
+                                            <a href="<%= file.saltinioLink %>"><%= file.saltinioLink || file.saltinioId %></a>
+                                        <% } %>
+                                    </td>
+                                    <td class="center"><%= (file.parsiuntimoBandymai === null || typeof file.parsiuntimoBandymai === 'undefined') ? 0 : file.parsiuntimoBandymai %></td>
+                                    <td class="center" style="max-width: 12px; width: auto;">
+                                        <% if (file.paskutinisParsiuntimoBandymas) { %>
+                                            <% try { %>
+                                                <%= (new Date(file.paskutinisParsiuntimoBandymas)).toLocaleString('lt-LT') %>
+                                            <% } catch(e) { %>
+                                                <%= file.paskutinisParsiuntimoBandymas %>
+                                            <% } %>
+                                        <% } else { %>
+                                            -
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
 
             <div style="margin-top:18px;">
                 <%- include('../pagination.ejs', { currentPage: currentPage || 1, pageCount: pageCount || 1, queryParams: '' }) %>
             </div>
+
         </section>
     </main>
 
