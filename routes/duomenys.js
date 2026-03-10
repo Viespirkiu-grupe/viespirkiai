@@ -7,6 +7,7 @@ const duomenysRouter = express.Router();
 duomenysRouter.get("/duomenys", async (req, res) => {
     res.render("duomenys", {
         customHead: config.customHead,
+        req,
     });
 });
 

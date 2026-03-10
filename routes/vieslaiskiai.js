@@ -22,6 +22,7 @@ vieslaiskiaiRouter.get("/vieslaiskiai", async (req, res) => {
         customHead: config.customHead,
         vieslaiskiai,
         vieslaiskiaiZiniasklaidoje,
+        req,
     });
 });
 

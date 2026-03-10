@@ -12,17 +12,6 @@
 		<%- include('header.ejs') %>
 		<main>
 			<%- include('search.ejs', {values, usedHiddenFields, numberOfResults}) %>
-			<% if(naujaPaieska) { %>
-                <div class="results">
-     			    <%- include('tabs.ejs') %>
-     			    <%- include('resultsModern.ejs', {zinomasRezultatuSkaicius, values, usedHiddenFields, data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
-                </div>
-			<% } else { %>
-                <div class="results">
-     			    <%- include('tabs.ejs') %>
-     			    <%- include('results.ejs', {zinomasRezultatuSkaicius, data, currentPage, pageCount, queryParams, galimaEksportuoti}) %>
-                </div>
-			<% } %>
 			<script>
    			const span = document.querySelector('.rezultatai-nezinomas-total');
 

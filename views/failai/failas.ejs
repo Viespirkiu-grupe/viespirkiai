@@ -1,479 +1,384 @@
 <!DOCTYPE html>
 <html lang="lt">
-	<head>
-	<%- include('../head.ejs', {
-        pageTitle: "Failas",
-        pageDescription: ``,
-        pageImage: `https://viespirkiai.org/failai.png`,
-        customHead
-    }) %>
-	</head>
-	<body>
-		<%- include('../header.ejs', {hideSubtext: false}) %>
-		<main>
-            <% if(failas.metaduomenys && failas.metaduomenys.Title) { %>
-			    <i><%= failas.pavadinimas %></i>
-				<h1>
-				    <%= failas.metaduomenys.Title %>
-				</h1>
-			<% } else { %>
-    			<h1>
-    			    <%= failas.pavadinimas %>
-    			</h1>
-			<% } %>
-		    <div class="col-2-strict mobile-col-1" style="gap: 16px;">
-				<section>
-    				<div>
-         			    <a href="/failas/<%= failas.id %>.json">↗ JSON</a>
-    				</div>
-                    <div>
-                       <h2 style="margin-bottom: 0px;"><u>Failas</u></h2>
-                       <div class="col-2-strict">
-                           <div>
-                               <h3>Formatas</h3>
-                               <%= failas.extension %>
-                           </div>
-                           <div>
-                               <h3>Dydis</h3>
-                                <% if(failas.dydis || failas.dydis == 0) { %>
-                                    <%= failas.dydis.convertUnit("B") %>
-                                <% } else { %>
-                                   -
-                                <% } %>
-                           </div>
-                           <div>
-                               <h3>MD5</h3>
-                               <span style="overflow-wrap: anywhere; font-family: monospace;"><%= failas.md5 || "-" %></span>
-                           </div>
-                           <div>
-                               <h3>Šaltinis</h3>
-                               <% var originalusLinkas = null; %>
-                               <% var originalusLinkasPavadinimas = null; %>
-                               <% if(failas.saltinis == "sutartys" || !failas.saltinis){ %>
-                                   <a href="/sutartis/<%= failas.dokId %>">Sutartis <%= failas.dokId %></a>
-                                   <% originalusLinkas = `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dokId}&file_id=${failas.fileId}`; %>
-                                   <% originalusLinkasPavadinimas = "CVP IS"; %>
-                               <% } else if(failas.saltinis == "neskelbiamosDerybos") { %>
-                                    <a href="/neskelbiamos">Neskelbiamos derybos</a>
-                                    <% originalusLinkas = `https://eviesiejipirkimai.lt/${failas.saltinioId}`; %>
-                                    <% originalusLinkasPavadinimas = "CVP IS"; %>
-                                <% } else if(failas.saltinis == "archive") { %>
-                                    <a href="/failas/<%= failas.parent %>">Archyvo <%= failas.parent %> viduje</a>
-                                    <% originalusLinkas = `/failas/${failas.parent}`; %>
-                                    <% originalusLinkasPavadinimas = "Archyvas"; %>
-                                <% } else if(failas.saltinis == "mvpAprasai") { %>
-                                      <a href="https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp?&Itemid=112">MVP tvarkos aprašai</a>
-                                      <% originalusLinkas = `https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp?&Itemid=112`; %>
-                                      <% originalusLinkasPavadinimas = "VPM IS"; %>
-                                <% } else if(failas.saltinis == "cvpIs") { %>
-                                    <% let pirkimoId = failas.saltinioId.split('/')[0]; %>
-                                    <% let documentId = failas.saltinioId.split('/')[1]; %>
-                                    <% let versionId = failas.saltinioId.split('/')[2]; %>
-                                    <a href="https://viesiejipirkimai.lt/epps/cft/listContractDocuments.do?resourceId=<%= pirkimoId %>">Viešasis pirkimas <%= pirkimoId %></a>
-                                    <% originalusLinkas = `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${versionId}&documentId=${documentId}`; %>
-                                    <% originalusLinkasPavadinimas = "CVP IS"; %>
-                                <% } %>
-                           </div>
-                       </div>
-                    </div>
-                    <% if(failas.metaduomenys) { %>
-                    <div>
-                       <h2 style="margin-bottom: 0px;"><u>Dokumentas</u></h2>
-                       <div class="col-2">
-                           <div>
-                               <h3>Puslapių skaičius</h3>
-                               <%= failas.metaduomenys.pageCount || "-" %>
-                           </div>
-                           <div>
-                               <h3>Žodžių skaičius</h3>
-                               <%= failas.metaduomenys.wordCount || "-" %>
-                           </div>
-                           <div>
-                               <h3>Programa</h3>
-                               <%= failas.metaduomenys.Producer || "-" %>
-                           </div>
-                           <div>
-                               <h3>Autorius</h3>
-                               <%= failas.metaduomenys.Author || "-" %>
-                           </div>
-                       </div>
-                    </div>
-                    <div>
-                       <h2 style="margin-bottom: 0px;"><u>Turinys</u></h2>
-                       <div style="width: 100%; max-width: 90vw;">
-                           <div>
-                               <h3>Interneto puslapiai</h3>
-                               <% if(failas.metaduomenys.domains){ %>
-                                    <% failas.metaduomenys.domains
-                                        .forEach(domain => { %>
-                                        <div>
-                                            <a href="https://<%= domain %>" target="_blank" title="<%= domain %>"
-                                                style="flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                                <%= domain %>
-                                            </a>
-                                        </div>
-                                    <% }) %>
-                                <% } %>
-                               <% if(!failas.metaduomenys.domains || failas.metaduomenys.domains.length == 0) { %>
-                                   <div>
-                                       <i>Interneto puslapių dokumente nerasta</i>
-                                   </div>
-                               <% } %>
-                           </div>
-                           <div>
-                               <h3>Nuorodos</h3>
-                               <% if(failas.metaduomenys.links){ %>
-                                <% failas.metaduomenys.links
-                                    .filter(link => !link.uri.startsWith('mailto:'))
-                                    .forEach(link => { %>
-                                    <div style="display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; align-items: center;">
-                                        <a href="<%= link.uri %>" target="_blank" title="<%= link.uri %>"
-                                            style="flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                            <%= link.uri %>
-                                        </a>
-                                        <sup style="flex-shrink: 0; margin-left: 4px;">
-                                            <%= link.pages.join(', ') %> psl.
-                                        </sup>
-                                    </div>
-                                <% }) %>
-                                 <% } %>
-                               <% if(!failas.metaduomenys.links || failas.metaduomenys.links.length == 0) { %>
-                                   <div>
-                                       <i>Nuorodų dokumente nerasta</i>
-                                   </div>
-                               <% } %>
-                           </div>
-                           <div>
-                               <h3>El. pašto adresai</h3>
-                               <% if(failas.metaduomenys.emails){ %>
-                               <% failas.metaduomenys.emails.forEach(email => { %>
-                                      <div>
-                                          <a href="mailto:<%= email.email %>"><%= email.email %></a>
-                                          <sup>
-                                              <%= email.pages.join(', ') %> psl.
-                                          </sup>
-                                      </div>
-                                <% }) %>
-                                 <% } %>
-                               <% if(!failas.metaduomenys.emails || failas.metaduomenys.emails.length == 0) { %>
-                                   <div>
-                                       <i>El. p. adresų dokumente nerasta</i>
-                                   </div>
-                               <% } %>
-                           </div>
-                           <div>
-                               <h3>Telefono numeriai</h3>
-                               <% if(failas.metaduomenys.telefonai){ %>
-                                <% failas.metaduomenys.telefonai
-                                    .forEach(telefonas => { %>
-                                    <div style="display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; align-items: center;">
-                                        <a href="tel:<%= telefonas.numeris %>" target="_blank" title="<%= telefonas.numeris %>"
-                                            style="flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                            <%= telefonas.numeris %>
-                                        </a>
-                                        <sup style="flex-shrink: 0; margin-left: 4px;">
-                                            <%= telefonas.pages.join(', ') %> psl.
-                                        </sup>
-                                    </div>
-                                <% }) %>
-                               <% } %>
-                               <% if(!failas.metaduomenys.telefonai || failas.metaduomenys.telefonai.length == 0) { %>
-                                   <div>
-                                       <i>Telefono numerių dokumente nerasta</i>
-                                   </div>
-                               <% } %>
-                           </div>
-                           <div>
-                               <% if(failas.metaduomenys.ibanNumeriai && failas.metaduomenys.ibanNumeriai.length > 0 && failas.metaduomenys.ibanNumeriai[0].pages){ %>
-                                <h3>IBAN numeriai</h3>
-                                <% failas.metaduomenys.ibanNumeriai
-                                    .forEach(iban => { %>
-                                    <div style="display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; align-items: center;">
-                                        <a href="iban:<%= iban.numeris %>" target="_blank" title="<%= iban.numeris %>"
-                                            style="flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                            <%= iban.numeris %>
-                                        </a>
-                                        <sup style="flex-shrink: 0; margin-left: 4px;">
-                                            <%= iban.pages.join(', ') %> psl.
-                                        </sup>
-                                    </div>
-                                <% }) %>
-                                 <% } %>
-                               <% if(!failas.metaduomenys.ibanNumeriai || failas.metaduomenys.ibanNumeriai.length == 0) { %>
-                                   <div>
-                                       <i>IBAN numerių dokumente nerasta</i>
-                                   </div>
-                               <% } %>
-                           </div>
-                           <div>
-                               <h3>Parašai</h3>
-                               <i>Viešpirkiai netikrina skaitmeninių parašų galiojimo.</i>
-                                <% if(failas.metaduomenys.signatures){ %>
-                                    <% failas.metaduomenys.signatures
-                                        .forEach(signature => { %>
-                                        <div>
-                                                <h4><%= signature.signerCertificateCommonName %></h4>
-                                                <%= signature.signingTime %>
-                                        </div>
-                                    <% }) %>
-                                <% } %>
-                               <% if(!failas.metaduomenys.signatures || failas.metaduomenys.signatures.length == 0) { %>
-                                   <div>
-                                       <i>Parašų dokumente nerasta</i>
-                                   </div>
-                               <% } %>
-                           </div>
-                       </div>
-                    </div>
-                    <% } else { %>
-                        <div style="text-align: center; margin-block: 64px;">
-                            <i>Dokumento metaduomenų nėra</i>
-                        </div>
-                    <% } %>
-                    <br>
-				</section>
-				<section>
-				    <% failas.extension = (failas.extension || "").toLowerCase(); %>
-					<% const libreFormats = ["doc", "docx", "odt", "rtf", "xls", "xlsx", "xlsb", "ods", "ppt", "pptx", "ppsx", "odp", "odg", "pub", "pages", "xlt", "dot", "docm", "dotx"]; %>
-				    <% if(failas.extension === "pdf" || failas.extension === "prn" || libreFormats.includes(failas.extension)) { %>
-                    <% let pdfSearch = query.search || ''; %>
-  				    <div>
-                          <a href="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(pdfSearch) %>">↗ Padidinti</a>
-                          &nbsp;
-                          <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
-                          &nbsp;
-                          <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
-                              <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
-                              &nbsp;
-                          <% } %>
+<head>
+  <%- include('../head.ejs', {
+    pageTitle: "Failas",
+    pageDescription: ``,
+    pageImage: `https://viespirkiai.org/failai.png`,
+    customHead
+  }) %>
+  <style>
+    .failas-grid {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: var(--space-5);
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .failas-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .failas-grid iframe {
+        height: 50vh;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .failas-grid {
+        grid-template-columns: 1fr;
+      }
+      .failas-grid > div:last-child {
+        order: -1;
+      }
+      .failas-grid iframe {
+        height: 50vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <%- include('../header.ejs', {hideSubtext: false}) %>
+  <main>
+    <%
+      failas.extension = (failas.extension || "").toLowerCase();
+      const libreFormats = ["doc","docx","odt","rtf","xls","xlsx","xlsb","ods","ppt","pptx","ppsx","odp","odg","pub","pages","xlt","dot","docm","dotx"];
+      const imageFormats = ["jpg","jpeg","png","bmp","gif","tif","tiff","jfif","heic","webp"];
+      const archiveFormats = ["zip","7z","rar","adoc"];
+      let originalusLinkas = null;
+      let originalusLinkasPavadinimas = null;
+      if (failas.saltinis == "sutartys" || !failas.saltinis) {
+        originalusLinkas = `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dokId}&file_id=${failas.fileId}`;
+        originalusLinkasPavadinimas = "CVP IS";
+      } else if (failas.saltinis == "neskelbiamosDerybos") {
+        originalusLinkas = `https://eviesiejipirkimai.lt/${failas.saltinioId}`;
+        originalusLinkasPavadinimas = "CVP IS";
+      } else if (failas.saltinis == "archive") {
+        originalusLinkas = `/failas/${failas.parent}`;
+        originalusLinkasPavadinimas = "Archyvas";
+      } else if (failas.saltinis == "mvpAprasai") {
+        originalusLinkas = `https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp?&Itemid=112`;
+        originalusLinkasPavadinimas = "VPM IS";
+      } else if (failas.saltinis == "cvpIs") {
+        let pirkimoId = failas.saltinioId.split('/')[0];
+        let documentId = failas.saltinioId.split('/')[1];
+        let versionId = failas.saltinioId.split('/')[2];
+        originalusLinkas = `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${versionId}&documentId=${documentId}`;
+        originalusLinkasPavadinimas = "CVP IS";
+      }
+    %>
+
+    <!-- Page header -->
+    <div class="page-header">
+      <div>
+        <% if (failas.metaduomenys?.Title) { %>
+          <p class="text-muted text-sm mb-1"><%= failas.pavadinimas %></p>
+          <h1 class="mb-0"><%= failas.metaduomenys.Title %></h1>
+        <% } else { %>
+          <h1 class="mb-0"><%= failas.pavadinimas %></h1>
+        <% } %>
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-center">
+        <a href="/failas/<%= failas.id %>.json" class="btn btn-outline btn-sm">↗ JSON</a>
+        <a href="https://failai.viespirkiai.org/<%= failas.id %>" class="btn btn-outline btn-sm">↗ Failas</a>
+        <% if (failas.extension === "pdf" || libreFormats.includes(failas.extension)) { %>
+          <a href="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(query.search || '') %>" class="btn btn-outline btn-sm">↗ Padidinti</a>
+        <% } %>
+        <% if (originalusLinkas && originalusLinkasPavadinimas) { %>
+          <a href="<%= originalusLinkas %>" class="btn btn-outline btn-sm">↗ <%= originalusLinkasPavadinimas %></a>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="failas-grid mb-6">
+      <!-- Left: metadata -->
+      <div style="display:flex; flex-direction:column; gap:var(--space-4);">
+
+        <div>
+          <h2 class="mb-3 no-style">Failas</h2>
+          <dl class="kv-list">
+            <dt>Formatas</dt>
+            <dd><span class="cell-mono"><%= failas.extension || "—" %></span></dd>
+            <dt>Dydis</dt>
+            <dd>
+              <% if (failas.dydis || failas.dydis == 0) { %>
+                <span class="cell-mono"><%= failas.dydis.convertUnit("B") %></span>
+              <% } else { %>—<% } %>
+            </dd>
+            <dt>MD5</dt>
+            <dd><span class="cell-mono" style="overflow-wrap:anywhere;"><%= failas.md5 || "—" %></span></dd>
+            <dt>Šaltinis</dt>
+            <dd>
+              <% if (failas.saltinis == "sutartys" || !failas.saltinis) { %>
+                <a href="/sutartis/<%= failas.dokId %>">Sutartis <%= failas.dokId %></a>
+              <% } else if (failas.saltinis == "neskelbiamosDerybos") { %>
+                <a href="/neskelbiamos">Neskelbiamos derybos</a>
+              <% } else if (failas.saltinis == "archive") { %>
+                <a href="/failas/<%= failas.parent %>">Archyvas <%= failas.parent %></a>
+              <% } else if (failas.saltinis == "mvpAprasai") { %>
+                <a href="https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp?&Itemid=112">MVP tvarkos aprašai</a>
+              <% } else if (failas.saltinis == "cvpIs") { %>
+                <% let pirkimoId = failas.saltinioId.split('/')[0]; %>
+                <a href="https://viesiejipirkimai.lt/epps/cft/listContractDocuments.do?resourceId=<%= pirkimoId %>">Viešasis pirkimas <%= pirkimoId %></a>
+              <% } %>
+            </dd>
+          </dl>
+        </div>
+
+        <% if (failas.metaduomenys) { %>
+          <div>
+            <h2 class="mb-3 no-style">Dokumentas</h2>
+            <dl class="kv-list">
+              <dt>Puslapių skaičius</dt>
+              <dd><span class="cell-mono"><%= failas.metaduomenys.pageCount || "—" %></span></dd>
+              <dt>Žodžių skaičius</dt>
+              <dd><span class="cell-mono"><%= failas.metaduomenys.wordCount || "—" %></span></dd>
+              <dt>Programa</dt>
+              <dd><%= failas.metaduomenys.Producer || "—" %></dd>
+              <dt>Autorius</dt>
+              <dd><%= failas.metaduomenys.Author || "—" %></dd>
+            </dl>
+          </div>
+
+          <div>
+            <h2 class="mb-3 no-style">Turinys</h2>
+            <dl class="kv-list">
+
+              <dt>Interneto puslapiai</dt>
+              <dd>
+                <% if (failas.metaduomenys.domains?.length > 0) { %>
+                  <div class="d-flex flex-col gap-1">
+                    <% failas.metaduomenys.domains.forEach(domain => { %>
+                      <a href="https://<%= domain %>" target="_blank" class="cell-truncate"><%= domain %></a>
+                    <% }) %>
+                  </div>
+                <% } else { %>
+                  <em class="text-muted">Nerasta</em>
+                <% } %>
+              </dd>
+
+              <dt>Nuorodos</dt>
+              <dd>
+                <% const links = (failas.metaduomenys.links || []).filter(l => !l.uri.startsWith('mailto:')); %>
+                <% if (links.length > 0) { %>
+                  <div class="d-flex flex-col gap-1">
+                    <% links.forEach(link => { %>
+                      <div class="d-flex gap-2 align-center">
+                        <a href="<%= link.uri %>" target="_blank" class="cell-truncate"><%= link.uri.length > 50 ? link.uri.slice(0, 50) + '…' : link.uri %></a>
+                        <sup class="text-muted text-xs" style="flex-shrink:0;"><%= link.pages.join(', ') %> psl.</sup>
                       </div>
+                    <% }) %>
+                  </div>
+                <% } else { %>
+                  <em class="text-muted">Nerasta</em>
+                <% } %>
+              </dd>
+
+              <dt>El. paštas</dt>
+              <dd>
+                <% if (failas.metaduomenys.emails?.length > 0) { %>
+                  <div class="d-flex flex-col gap-1">
+                    <% failas.metaduomenys.emails.forEach(email => { %>
+                      <div class="d-flex gap-2 align-center">
+                        <a href="mailto:<%= email.email %>"><%= email.email %></a>
+                        <sup class="text-muted text-xs" style="flex-shrink:0;"><%= email.pages.join(', ') %> psl.</sup>
+                      </div>
+                    <% }) %>
+                  </div>
+                <% } else { %>
+                  <em class="text-muted">Nerasta</em>
+                <% } %>
+              </dd>
+
+              <dt>Telefonai</dt>
+              <dd>
+                <% if (failas.metaduomenys.telefonai?.length > 0) { %>
+                  <div class="d-flex flex-col gap-1">
+                    <% failas.metaduomenys.telefonai.forEach(tel => { %>
+                      <div class="d-flex gap-2 align-center">
+                        <a href="tel:<%= tel.numeris %>"><%= tel.numeris %></a>
+                        <sup class="text-muted text-xs" style="flex-shrink:0;"><%= tel.pages.join(', ') %> psl.</sup>
+                      </div>
+                    <% }) %>
+                  </div>
+                <% } else { %>
+                  <em class="text-muted">Nerasta</em>
+                <% } %>
+              </dd>
+
+              <% if (failas.metaduomenys.ibanNumeriai?.length > 0 && failas.metaduomenys.ibanNumeriai[0].pages) { %>
+                <dt>IBAN</dt>
+                <dd>
+                  <div class="d-flex flex-col gap-1">
+                    <% failas.metaduomenys.ibanNumeriai.forEach(iban => { %>
+                      <div class="d-flex gap-2 align-center">
+                        <span class="cell-mono"><%= iban.numeris %></span>
+                        <sup class="text-muted text-xs" style="flex-shrink:0;"><%= iban.pages.join(', ') %> psl.</sup>
+                      </div>
+                    <% }) %>
+                  </div>
+                </dd>
+              <% } %>
+
+              <dt>Parašai</dt>
+              <dd>
+                <% if (failas.metaduomenys.signatures?.length > 0) { %>
+                  <p class="text-muted text-xs mb-2"><em>Viešpirkiai netikrina skaitmeninių parašų galiojimo.</em></p>
+                  <div class="d-flex flex-col gap-1">
+                    <% failas.metaduomenys.signatures.forEach(sig => { %>
                       <div>
-                    <% if(libreFormats.includes(failas.extension)) { %>
-                        <br><i>Dokumentas buvo konvertuotas į PDF formatą naudojant LibreOffice, todėl gali būti atvaizduojamas iškraipytas.</i>
-                    <% } %>
-                          <iframe
-                      src="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(pdfSearch) %>"
-                      width="100%"
-                      height="800"
-                      style="border: none; height: 70vh; margin-block: 16px; width: 100% !important; max-width: 100% !important; box-sizing: border-box; display: block; overflow-x: hidden !important;"
-                      ></iframe>
+                        <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
+                        <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>
                       </div>
-                    <% } else if (failas.nuskaitytas > 0 && (failas.extension == "zip" || failas.extension == "7z" || failas.extension == "rar" || failas.extension == "adoc")){ %>
-                        <div>
-                            <div>
-                                <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
-                                &nbsp;
-                                <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
-                                    <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
-                                    &nbsp;
-                                <% } %>
-                            </div>
-                            <div style="margin-block: 16px;">
-                                <i>Archyvo peržiūra <sup>BETA</sup></i>
-                            </div>
-                            <% function renderFiles(files) { %>
-                              <% files.forEach(file => { %>
-                                <% if (file.isDirectory) { %>
-                                  <details open style="padding-block: 4px;">
-                                    <summary><%= file.name %></summary>
-                                    <div style="padding-left: 20px;">
-                                      <% if (file.children && file.children.length) { %>
-                                        <%- renderFiles(file.children) %>
-                                      <% } %>
-                                    </div>
-                                  </details>
-                                <% } else { %>
-                                  <div style="padding-block: 4px;">
-                                      <% if(file.id) { %>
-                                          <a href="/failas/<%= file.id %>">
-                                              <%= file.name %>
-                                          </a>
-                                      <% } else { %>
-                                        <a href="https://failai.viespirkiai.org/<%= failas.id %>/<%= file.path %>" target="_blank">
-                                            <%= file.name %>
-                                        </a>
-                                      <% } %>
-                                      (<%= file.extension %>, <%= (file.size / 1024).toFixed(1) %> KB)
-                                  </div>
-                                <% } %>
-                              <% }) %>
-                            <% } %>
+                    <% }) %>
+                  </div>
+                <% } else { %>
+                  <em class="text-muted">Nerasta</em>
+                <% } %>
+              </dd>
 
-                            <% if (failas.metaduomenys && failas.metaduomenys.filesTree) { %>
-                              <%- renderFiles(failas.metaduomenys.filesTree) %>
-                            <% } %>
+            </dl>
+          </div>
+        <% } else { %>
+          <p class="text-muted text-sm" style="text-align:center; margin-block:var(--space-6);">
+            <em>Dokumento metaduomenų nėra</em>
+          </p>
+        <% } %>
 
+      </div>
 
-                        </div>
+      <!-- Right: preview -->
+      <div>
+        <% if (failas.extension === "pdf" || failas.extension === "prn" || libreFormats.includes(failas.extension)) { %>
+          <% if (libreFormats.includes(failas.extension)) { %>
+            <p class="text-muted text-xs mb-3"><em>Dokumentas konvertuotas į PDF naudojant LibreOffice, gali būti atvaizduojamas iškraipytas.</em></p>
+          <% } %>
+          <iframe
+            src="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(query.search || '') %>"
+            style="border:none; width:100%; height:70vh; display:block; border-radius:var(--radius-md);"
+          ></iframe>
 
-                    <% } else if(failas.extension == "mp4") { %>
-                        <div>
-                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
-                            &nbsp;
-                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
-                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
-                                &nbsp;
-                            <% } %>
-                        </div>
-                        <div style="margin-top: 16px;">
-                            <video width="100%" height="auto" controls style="max-height: 70vh; margin-top: 16px;">
-                                <source src="https://failai.viespirkiai.org/<%= failas.id %>" type="video/mp4">
-                                Your browser does not support the video tag.
-                            </video>
-                        </div>
-                    <% } else if(["jpg", "jpeg", "png", "bmp", "gif", "tif", "tiff", "jfif", "heic", "webp"].includes(String(failas.extension).toLowerCase())) { %>
-                            <div>
-                                <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
-                                &nbsp;
-                                <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
-                                    <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
-                                    &nbsp;
-                                <% } %>
-                            </div>
-                            <div style="margin-top: 16px;">
-                                <% let convertString = "";
-                                if(["heic"].includes(String(failas.extension).toLowerCase())){
-                                  convertString = `?convertTo=jpeg`
-                                }
-                                %>
-                                <img src="https://failai.viespirkiai.org/<%= failas.id %><%= convertString %>" alt="" style="max-width: 100%; margin-top: 16px;">
-                            </div>
-                    <% } else if(failas.extension == "url") { %>
-                        <div>
-                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
-                            &nbsp;
-                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
-                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
-                                &nbsp;
-                            <% } %>
-                        </div>
-                        <div style="margin-top: 16px;">
-                            <h3>Nuoroda</h3>
-                            <% if (failas.metaduomenys?.links?.[0]?.uri) { %>
-                              <a href="<%= encodeURI(failas.metaduomenys.links[0].uri) %>">
-                                <%= failas.metaduomenys.links[0].uri %>
-                              </a>
-                            <% } else { %>
-                              <i>Nenurodyta</i>
-                            <% } %>
-                        </div>
-                    <% } else if(failas.extension == "txt") { %>
-                        <div>
-                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
-                            &nbsp;
-                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
-                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
-                                &nbsp;
-                            <% } %>
-                        </div>
-                        <div style="margin-top: 16px; max-width: 90vw; overflow-x: auto; background-color: var(--lighter-gray); padding: 16px; border-radius: 8px;">
-                            <%
-                           if(failas.tekstas){
-                                failas.tekstas = failas.tekstas.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                           }
-                           // Try to parse file tekstas as an array, add hr between pages
-                           try {
-                               let pages = JSON.parse(failas.tekstas);
-                               if(Array.isArray(pages)){
-                                   failas.tekstas = pages.map((pageText, index) => {
-                                       return pageText;
-                                   }).join('');
-                               }
-                           } catch(e) {
-                               // Not an array, do nothing
-                           }
-                            %>
-                            <pre style="white-space: pre-wrap; word-wrap: break-word;"><%= failas.tekstas || "" %></pre>
-                        </div>
-                    <% } else if(failas.extension == "html" || failas.extension == "htm" || failas.extension == "svg") { %>
-                        <div>
-                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
-                            &nbsp;
-                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
-                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
-                                &nbsp;
-                            <% } %>
-                        </div>
-                        <div style="margin-top: 16px; max-width: 90vw; overflow-x: auto; background-color: var(--lighter-gray); padding: 16px; border-radius: 8px;">
-                            <iframe
-                              src="https://failai.viespirkiai.org/<%= failas.id %>"
-                              width="100%"
-                              height="600"
-                              style="border: none; margin-top: 16px;"
-                            ></iframe>
-                        </div>
-                    <% } else if((failas.extension == "eml" || failas.extension == "msg") && failas.metaduomenys) { %>
-                        <div>
-                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
-                            &nbsp;
-                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
-                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
-                                &nbsp;
-                            <% } %>
-                        </div>
-                        <div style="margin-top: 16px; max-width: 90vw; overflow-x: auto; background-color: var(--lighter-gray); padding: 16px; border-radius: 8px;">
-                            <div>
-                                <h2 style="margin-block: 0;"><u><%= failas.metaduomenys.subject || "-" %></u></h2><br>
+        <% } else if (failas.nuskaitytas > 0 && archiveFormats.includes(failas.extension)) { %>
+          <p class="text-muted text-sm mb-3"><em>Archyvo peržiūra <sup>BETA</sup></em></p>
+          <%
+            function renderFiles(files) {
+              let html = '';
+              files.forEach(file => {
+                if (file.isDirectory) {
+                  html += `<details open style="padding-block:4px;">`;
+                  html += `<summary class="fw-bold">${file.name}</summary>`;
+                  html += `<div style="padding-left:var(--space-4);">`;
+                  if (file.children?.length) html += renderFiles(file.children);
+                  html += `</div></details>`;
+                } else {
+                  const href = file.id
+                    ? `/failas/${file.id}`
+                    : `https://failai.viespirkiai.org/${failas.id}/${file.path}`;
+                  html += `<div style="padding-block:4px;">`;
+                  html += `<a href="${href}">${file.name}</a>`;
+                  html += ` <span class="text-muted text-xs">(${file.extension}, ${(file.size/1024).toFixed(1)} KB)</span>`;
+                  html += `</div>`;
+                }
+              });
+              return html;
+            }
+          %>
+          <% if (failas.metaduomenys?.filesTree) { %>
+            <%- renderFiles(failas.metaduomenys.filesTree) %>
+          <% } %>
 
-                                <b>Nuo:</b> <%= failas.metaduomenys?.from?.name || "-" %> &lt;<a href="mailto:<%= failas.metaduomenys?.from?.email || "-" %>"><%= failas.metaduomenys.from.email || "-" %></a>&gt;<br>
-                                <% if(!Array.isArray(failas.metaduomenys.to)) { %>
-                                    <b>Kam:</b> <%= failas.metaduomenys.to.name || "-" %> &lt;<a href="mailto:<%= failas.metaduomenys.to.email || "-" %>"><%= failas.metaduomenys.to.email || "-" %></a>&gt;<br>
-                                <% } else { %>
-                                    <% failas.metaduomenys.to.forEach(to => { %>
-                                        <b>Kam:</b> <%= to.name || "-" %> &lt;<a href="mailto:<%= to.email || "-" %>"><%= to.email || "-" %></a>&gt;<br>
-                                    <% }) %>
-                                <% } %>
+        <% } else if (failas.extension === "mp4") { %>
+          <video controls style="width:100%; max-height:70vh; border-radius:var(--radius-md); display:block;">
+            <source src="https://failai.viespirkiai.org/<%= failas.id %>" type="video/mp4">
+          </video>
 
-                                <b>Data:</b> <%= new Date(failas.metaduomenys.date || failas.metaduomenys.messageDeliveryTime).toLtDateTime() || "-" %><br>
+        <% } else if (imageFormats.includes(failas.extension)) { %>
+          <%
+            let convertString = "";
+            if (failas.extension === "heic") convertString = "?convertTo=jpeg";
+          %>
+          <img src="https://failai.viespirkiai.org/<%= failas.id %><%= convertString %>" alt="" style="max-width:100%; border-radius:var(--radius-md);">
 
-                                <% if(failas.metaduomenys.html){ %>
-                                    <div style="margin-top: 16px; padding: 8px; border-radius: 4px;">
-                                        <iframe
-                                            srcdoc="<%= String(failas.metaduomenys.html).replace(/"/g, '&quot;') %>"
-                                            width="100%"
-                                            height="400"
-                                            style="border: none;"
-                                        ></iframe>
-                                    </div>
-                                <% } else { %>
-                                    <div style="font-family: monospace; white-space: pre-wrap; word-wrap: break-word; margin-top: 16px; border-top: 1px solid var(--gray); padding-top: 16px;">
-                                        <%- (failas.metaduomenys.text || failas.metaduomenys.body || "")
-                                            .replace(/&/g, "&amp;")
-                                            .replace(/</g, "&lt;")
-                                            .replace(/>/g, "&gt;")
-                                            .replace(/\r?\n/g, "<br>") %>
-                                    </div>
-                                <% } %>
+        <% } else if (failas.extension === "url") { %>
+          <dl class="kv-list">
+            <dt>Nuoroda</dt>
+            <dd>
+              <% if (failas.metaduomenys?.links?.[0]?.uri) { %>
+                <a href="<%= encodeURI(failas.metaduomenys.links[0].uri) %>"><%= failas.metaduomenys.links[0].uri %></a>
+              <% } else { %>
+                <em class="text-muted">Nenurodyta</em>
+              <% } %>
+            </dd>
+          </dl>
 
-                                <% if(failas.metaduomenys.attachments) { %>
-                                    <h2>Priedai</h2>
-                                    <% failas.metaduomenys.attachments.forEach(attachment => { %>
-                                        <div style="margin-top: 8px;">
-                                            <a href="https://failai.viespirkiai.org/<%= failas.id %>/<%= attachment.name %>" target="_blank">
-                                                <%= attachment.name %>
-                                            </a>
-                                        </div>
-                                    <% }) %>
+        <% } else if (failas.extension === "txt") { %>
+          <%
+            if (failas.tekstas) {
+              failas.tekstas = failas.tekstas.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+              try {
+                let pages = JSON.parse(failas.tekstas);
+                if (Array.isArray(pages)) failas.tekstas = pages.join('');
+              } catch(e) {}
+            }
+          %>
+          <div style="background:var(--lightest-gray); border:var(--border); border-radius:var(--radius-md); padding:var(--space-4); overflow-x:auto;">
+            <pre style="white-space:pre-wrap; word-wrap:break-word; font-family:var(--font-mono); font-size:var(--text-sm); margin:0;"><%= failas.tekstas || "" %></pre>
+          </div>
 
-                                <% } %>
-                            </div>
-                        </div>
-                    <% } else { %>
-                        <div>
-                            <a href="https://failai.viespirkiai.org/<%= failas.id %>">↗ Failas</a>
-                            &nbsp;
-                            <% if(originalusLinkas && originalusLinkasPavadinimas) { %>
-                                <a href="<%= originalusLinkas %>">↗ <%= originalusLinkasPavadinimas %></a>
-                                &nbsp;
-                            <% } %>
-                        </div>
-                        <div style="margin-top: 16px;">
-                            <i>Peržiūra nepalaikoma šio formato failams. Spustelėkite nuorodą „Failas“, jei norite jį atsisiųsti.</i>
-                        </div>
-                    <% } %>
-				</section>
-			</div>
-		</main>
-		<%- include('../footer.ejs') %>
-	</body>
+        <% } else if (["html","htm","svg"].includes(failas.extension)) { %>
+          <iframe
+            src="https://failai.viespirkiai.org/<%= failas.id %>"
+            style="width:100%; height:600px; border:var(--border); border-radius:var(--radius-md);"
+          ></iframe>
+
+        <% } else if ((failas.extension === "eml" || failas.extension === "msg") && failas.metaduomenys) { %>
+          <div style="background:var(--lightest-gray); border:var(--border); border-radius:var(--radius-md); padding:var(--space-4);">
+            <h2 class="mb-3"><%= failas.metaduomenys.subject || "—" %></h2>
+            <dl class="kv-list mb-4">
+              <dt>Nuo</dt>
+              <dd>
+                <%= failas.metaduomenys?.from?.name || "—" %>
+                &lt;<a href="mailto:<%= failas.metaduomenys?.from?.email %>"><%= failas.metaduomenys?.from?.email || "—" %></a>&gt;
+              </dd>
+              <dt>Kam</dt>
+              <dd>
+                <% const toList = Array.isArray(failas.metaduomenys.to) ? failas.metaduomenys.to : [failas.metaduomenys.to]; %>
+                <% toList.forEach(to => { %>
+                  <div><%= to.name || "—" %> &lt;<a href="mailto:<%= to.email %>"><%= to.email || "—" %></a>&gt;</div>
+                <% }) %>
+              </dd>
+              <dt>Data</dt>
+              <dd><%= new Date(failas.metaduomenys.date || failas.metaduomenys.messageDeliveryTime).toLtDateTime() || "—" %></dd>
+            </dl>
+
+            <% if (failas.metaduomenys.html) { %>
+              <iframe
+                srcdoc="<%= String(failas.metaduomenys.html).replace(/"/g, '&quot;') %>"
+                style="width:100%; height:400px; border:var(--border); border-radius:var(--radius-sm);"
+              ></iframe>
+            <% } else { %>
+              <pre style="white-space:pre-wrap; word-wrap:break-word; font-family:var(--font-mono); font-size:var(--text-sm); border-top:var(--border); padding-top:var(--space-3);"><%- (failas.metaduomenys.text || failas.metaduomenys.body || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\r?\n/g,"<br>") %></pre>
+            <% } %>
+
+            <% if (failas.metaduomenys.attachments?.length > 0) { %>
+              <h3 class="mt-4 mb-2">Priedai</h3>
+              <div class="d-flex flex-col gap-1">
+                <% failas.metaduomenys.attachments.forEach(att => { %>
+                  <a href="https://failai.viespirkiai.org/<%= failas.id %>/<%= att.name %>" target="_blank"><%= att.name %></a>
+                <% }) %>
+              </div>
+            <% } %>
+          </div>
+
+        <% } else { %>
+          <p class="text-muted text-sm"><em>Peržiūra nepalaikoma šio formato failams. Spustelėkite „Failas", jei norite jį atsisiųsti.</em></p>
+        <% } %>
+      </div>
+
+    </div>
+  </main>
+  <%- include('../footer.ejs') %>
+</body>
 </html>

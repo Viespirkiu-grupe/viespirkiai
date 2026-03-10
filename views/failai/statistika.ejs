@@ -1,47 +1,33 @@
-<div id="failaiStatistika">
-    <h2><u>Failų statistika</u></h2>
-    <i>Statistika atnaujinta: <%= new Date(statistika.atnaujinta).toLtDateTime() %> </i><br><br>
-    <div>
-	<a href="/failai/topExtension">↗ Dažniausi plėtiniai</a>&nbsp;
-	<a href="/failai/ocr">↗ OCR būsena</a>&nbsp;
-	<a href="/failai/map">↗ Failų žemėlapis</a>&nbsp;
+<div id="failaiStatistika" class="mt-6">
+
+  <p class="text-muted text-sm" style="text-align:center;">
+    Statistika atnaujinta: <%= new Date(statistika.atnaujinta).toLtDateTime() %>
+  </p>
+
+  <div class="failai-statistika">
+    <div class="stat-row">
+      <div class="stat-number"><%= Number(statistika.nuskaitymas.zodziai.total).displayWithSpaces() %></div>
+      <div class="stat-text"><%= Number(statistika.nuskaitymas.zodziai.total).linksniuotiOnly(["žodis", "žodžiai", "žodžių", "žodžio"]) %> teksto</div>
     </div>
-
-    <div class="failaiStatistika">
-        <div class="stat-row">
-            <div class="stat-number">
-                <%= Number(statistika.nuskaitymas.zodziai.total).displayWithSpaces() %>
-            </div>
-            <div class="stat-text">
-                <%= Number(statistika.nuskaitymas.zodziai.total).linksniuotiOnly(["žodis", "žodžiai", "žodžių", "žodžio"]) %> teksto
-            </div>
-        </div>
-
-        <div class="stat-row">
-            <div class="stat-number">
-                <%= Number(Number(statistika.failai.dydziai.visi * (statistika.nuskaitymas.zodziai.failaiSuZodziais / statistika.failai.kiekiai.visi)).toFixed(2)).convertUnit({from: "B", to: "GB"}) %>
-            </div>
-            <div class="stat-text">
-                duomenų
-            </div>
-        </div>
-
-        <div class="stat-row">
-            <div class="stat-number">
-                <%= Number(statistika.nuskaitymas.zodziai.failaiSuZodziais).displayWithSpaces() %>
-            </div>
-            <div class="stat-text">
-                <%= Number(statistika.nuskaitymas.zodziai.failaiSuZodziais).linksniuotiOnly(["failas", "failai", "failų", "failo"]) %>
-            </div>
-        </div>
+    <div class="stat-row">
+      <div class="stat-number"><%= Number(Number(statistika.failai.dydziai.visi * (statistika.nuskaitymas.zodziai.failaiSuZodziais / statistika.failai.kiekiai.visi)).toFixed(2)).convertUnit({from: "B", to: "GB"}) %></div>
+      <div class="stat-text">duomenų</div>
     </div>
-
-
-    <div class="col-3 mobile-col-1">
-        <section></section>
-        <section style="text-align: center; font-size: 14px; color: #666; margin-bottom: 48px;">
-                Teksto paieška vykdoma ieškant faile visų paminėtų žodžių. <br> Jeigu svarbu, kad žodžiai būtų iš eilės – apsupkite paieškos užklausą kabutėmis. <br><br>
-        </section>
-        <section></section>
+    <div class="stat-row">
+      <div class="stat-number"><%= Number(statistika.nuskaitymas.zodziai.failaiSuZodziais).displayWithSpaces() %></div>
+      <div class="stat-text"><%= Number(statistika.nuskaitymas.zodziai.failaiSuZodziais).linksniuotiOnly(["failas", "failai", "failų", "failo"]) %></div>
     </div>
+  </div>
+
+  <p class="text-muted text-sm mb-6" style="text-align:center; max-width:480px; margin-inline:auto;">
+    Teksto paieška vykdoma ieškant faile visų paminėtų žodžių.<br>
+    Jeigu svarbu, kad žodžiai būtų iš eilės – apsupkite paieškos užklausą kabutėmis.
+  </p>
+
+  <div class="d-flex gap-2 justify-center mb-6">
+    <a href="/failai/topExtension" class="btn btn-outline btn-sm">↗ Dažniausi plėtiniai</a>
+    <a href="/failai/ocr" class="btn btn-outline btn-sm">↗ OCR būsena</a>
+    <a href="/failai/map" class="btn btn-outline btn-sm">↗ Failų žemėlapis</a>
+  </div>
+
 </div>

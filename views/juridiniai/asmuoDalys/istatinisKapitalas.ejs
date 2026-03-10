@@ -1,7 +1,0 @@
-<% if(asmuo.istatinisKapitalas && asmuo.istatinisKapitalas.reiksme	) { %>
-    <div id="kapitalas">
-        <h2><a href="#kapitalas" class="hashHref"><u>Įstatinis kapitalas</u></a></h2>
-        <%= asmuo.istatinisKapitalas.reiksme.toLocaleString('lt-LT', { style: 'currency', currency: asmuo.istatinisKapitalas.valiuta }) %>
-        <sup>(<%= asmuo.istatinisKapitalas.data %>)</sup>
-    </div>
-<% } %>

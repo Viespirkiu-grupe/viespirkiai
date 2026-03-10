@@ -1,0 +1,50 @@
+<style>
+:root {
+	--link: #009;
+	--black: #000;
+	--dark-gray: #333;
+	--gray: #565656;
+	--light-gray: #ccc;
+	--lighter-gray: #f2f2f2;
+	--white: #fff;
+
+	--shade-1: rgba(0, 0, 0, 0.0);
+	--shade-2: rgba(0, 0, 0, 0.03);
+	--shade-3: rgba(0, 0, 0, 0.04);
+	--shade-4: rgba(0, 0, 0, 0.05);
+	--shade-5: rgba(0, 0, 0, 0.055);
+	--shade-6: rgba(0, 0, 0, 0.06);
+	--shade-7: rgba(0, 0, 0, 0.065);
+
+	font-size: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--link: #e6e6ff;
+		--black: #fff;
+		--dark-gray: #ddd;
+		--gray: #aaa;
+		--light-gray: #666;
+		--lighter-gray: #444;
+		--white: #000;
+
+		--shade-1: rgba(255, 255, 255, 0.06);
+		--shade-2: rgba(255, 255, 255, 0.07);
+		--shade-3: rgba(255, 255, 255, 0.075);
+		--shade-4: rgba(255, 255, 255, 0.080);
+		--shade-5: rgba(255, 255, 255, 0.085);
+		--shade-6: rgba(255, 255, 255, 0.090);
+		--shade-7: rgba(255, 255, 255, 0.095);
+	}
+}
+
+body,
+html {
+	color-scheme: light dark;
+	background-color: var(--white);
+	color: var(--black);
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+</style>

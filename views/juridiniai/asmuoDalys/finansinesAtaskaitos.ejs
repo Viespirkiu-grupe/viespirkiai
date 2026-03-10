@@ -1,180 +1,138 @@
- <% if(asmuo.finansai && asmuo.finansai.ataskaitos && asmuo.finansai.ataskaitos.length > 0){ %>
-     <div id="finansai">
-         <h2><a href="#finansai" class="hashHref"><u>Finansinės ataskaitos</u></a></h2>
+<% if (asmuo.finansai?.ataskaitos?.length > 0) { %>
+<div class="page-section" id="finansai">
+  <h2><a href="#finansai" class="no-style">Finansinės ataskaitos</a></h2>
 
-         <div class="col-2 mobile-col-1" id="sutartys">
-             <section style="width: 100%;">
-                 <h3><a href="#pardavimoPajamos" id="pardavimoPajamos" class="hashHref">Pardavimo pajamos</a></h3>
-                 <% if(asmuo.finansai.lentele && asmuo.finansai.lentele.metai.length > 0 && asmuo.finansai.lentele.duomenys["Pardavimo pajamos"]) { %>
-                     <div id="pardavimoPajamosChart" class="chart" style="width: 100%; height: 400px;"></div>
+  <div class="grid-2 mb-6">
 
-                     <script defer>
-                     // Create a map directly from EJS
-                     const pardavimoPajamosMap = {
-                       <% asmuo.finansai.lentele.metai.forEach((metai, i) => { %>
-                         '<%= metai %>': <%= asmuo.finansai.lentele.duomenys["Pardavimo pajamos"][i] ?? "null" %>,
-                       <% }) %>
-                     };
+    <div>
+      <h3 class="text-sm fw-bold mb-3">Pardavimo pajamos</h3>
+      <% if (asmuo.finansai.lentele?.metai?.length > 0 && asmuo.finansai.lentele.duomenys["Pardavimo pajamos"]) { %>
+        <div class="chart-frame">
+          <div id="pardavimoPajamosChart" class="chart" style="height:300px;"></div>
+        </div>
+        <script defer>
+          if (typeof pardavimaiKasMetusLabels === 'undefined') var pardavimaiKasMetusLabels = [];
+          if (typeof pardavimaiKasMetus === 'undefined') var pardavimaiKasMetus = [];
 
-                     // Then align with merged labels
-                     const mergedLabels = Array.from(new Set([...Object.keys(pardavimoPajamosMap), ...pardavimaiKasMetusLabels]))
-                                               .map(Number)
-                                               .sort((a,b)=>a-b)
-                                               .map(String);
+          const pardavimoPajamosMap = {
+            <% asmuo.finansai.lentele.metai.forEach((metai, i) => { %>
+              '<%= metai %>': <%= asmuo.finansai.lentele.duomenys["Pardavimo pajamos"][i] ?? "null" %>,
+            <% }) %>
+          };
+          const mergedLabels = Array.from(new Set([...Object.keys(pardavimoPajamosMap), ...pardavimaiKasMetusLabels])).map(Number).sort((a,b)=>a-b).map(String);
+          displayChart({
+            element: document.querySelector('#pardavimoPajamosChart'),
+            labels: mergedLabels,
+            series: [
+              { name: "Pardavimo pajamos", data: mergedLabels.map(l => pardavimoPajamosMap[l] ?? null) },
+              { name: "Viešųjų pirkimų pardavimai", data: mergedLabels.map(l => { const i = pardavimaiKasMetusLabels.indexOf(l); return i !== -1 ? pardavimaiKasMetus[i] : null; }) }
+            ],
+            flags: ['yEUR', 'yMin0'],
+            customOptions: { colors: ['#000000', '#999999'] }
+          });
+        </script>
+      <% } else { %>
+        <div class="chart-empty">Nėra duomenų</div>
+      <% } %>
+    </div>
 
-                     const finalPardavimoPajamosVertes = mergedLabels.map(label => pardavimoPajamosMap[label] ?? null);
-                     const finalViesujuPirkimuPardavimaiKasMetus = mergedLabels.map(label => {
-                       const index = pardavimaiKasMetusLabels.indexOf(label);
-                       return index !== -1 ? pardavimaiKasMetus[index] : null;
-                     });
+    <div>
+      <h3 class="text-sm fw-bold mb-3">Grynasis pelnas (nuostoliai)</h3>
+      <% if (asmuo.finansai.lentele?.metai?.length > 0) { %>
+        <div class="chart-frame">
+          <div id="grynasisPelnas" class="chart" style="height:300px;"></div>
+        </div>
+        <script defer>
+          const grynasisPelnasLabels = [<% asmuo.finansai.lentele.metai.forEach((item, i) => { %>'<%= item %>'<%= i < asmuo.finansai.lentele.metai.length - 1 ? ',' : '' %><% }) %>];
+          const pelnoDuomenys = <%- JSON.stringify(asmuo.finansai.lentele.duomenys["Grynasis pelnas (nuostoliai)"] ?? asmuo.finansai.lentele.duomenys["Ataskaitinių metų pelnas (nuostoliai)"] ?? []) %>;
+          const grynasisPelnasVertes = pelnoDuomenys.map(v => v ?? null);
+          const hasNegative = grynasisPelnasVertes.some(v => v !== null && v < 0);
+          displayChart({
+            element: document.querySelector('#grynasisPelnas'),
+            labels: grynasisPelnasLabels,
+            series: grynasisPelnasVertes,
+            flags: ['yEUR', 'yMinAuto'],
+            customOptions: { annotations: hasNegative ? { yaxis: [{ y: 0, y2: -100000000, borderColor: 'red', borderWidth: 2, label: { borderColor: 'red', style: { color: '#fff', background: 'red' }, text: 'Nuostoliai' } }] } : {} }
+          });
+        </script>
+      <% } else { %>
+        <div class="chart-empty">Nėra duomenų</div>
+      <% } %>
+    </div>
 
+  </div>
 
-                     displayChart({
-                       element: document.querySelector('#pardavimoPajamosChart'),
-                       labels: mergedLabels,
-                       series: [
-                          {name: "Pardavimo pajamos", data: finalPardavimoPajamosVertes},
-                          {name: "Viešjų pirkimų pardavimai", data: finalViesujuPirkimuPardavimaiKasMetus}
-                       ],
-                       flags: ['yEUR', 'yMin0'],
-                       customOptions: {
-                         colors: ['#000000', '#999999']
-                       }
-                     })
-                     </script>
-                 <% } else { %>
-                     <i class="diagrama-nera-duomenu">Nėra duomenų</i>
-                 <% } %>
-             </section>
-                 <section style="width: 100%;">
-                     <h3><a href="#pelnas" id="pelnas" class="hashHref">Grynasis pelnas (nuostoliai)</a></h3>
-                     <% if(asmuo.finansai.lentele && asmuo.finansai.lentele.metai.length > 0) { %>
-                         <div id="grynasisPelnas" class="chart" style="width: 100%; height: 400px;"></div>
+  <div class="table-wrapper mb-5">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Eilutė</th>
+          <% asmuo.finansai.lentele.metai.forEach(year => { %>
+            <th class="cell-right"><%= year %></th>
+          <% }) %>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const lineName in asmuo.finansai.lentele.duomenys) { %>
+          <tr>
+            <td><%= lineName %></td>
+            <% asmuo.finansai.lentele.duomenys[lineName].forEach(value => { %>
+              <td class="cell-mono cell-right">
+                <% if (value === undefined || value === null) { %>
+                  <span class="text-muted">—</span>
+                <% } else if (lineName === "Pelningumas") { %>
+                  <%= value.toFixed(2) %>%
+                <% } else { %>
+                  <%= value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) %>
+                <% } %>
+              </td>
+            <% }) %>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
 
-                         <script defer>
-                           const grynasisPelnasLabels = [
-                             <% asmuo.finansai.lentele.metai.forEach((item) => { %>
-                               '<%= item %>',
-                             <% }) %>
-                           ];
+  <% if (queryParams.finansaiLimit == "max") { queryParams.finansaiLimit = 10000000; } %>
+  <% const finansaiLimit = queryParams.finansaiLimit || 1; %>
 
-                           const grynasisPelnasVertes = [
-                             <%
-                               const pelnoDuomenys = asmuo.finansai.lentele.duomenys["Grynasis pelnas (nuostoliai)"]
-                                                     ?? asmuo.finansai.lentele.duomenys["Ataskaitinių metų pelnas (nuostoliai)"]
-                                                     ?? [];
-                               pelnoDuomenys.forEach((item, idx) => {
-                             %>
-                               <%= item != null ? item : "null" %><%= idx < pelnoDuomenys.length - 1 ? ',' : '' %>
-                             <% }) %>
-                           ];
+  <% if (asmuo.finansai.ataskaitos.length > finansaiLimit) { %>
+    <p class="text-muted text-sm mb-4">
+      Rodoma tik paskutinė finansinė ataskaita.
+      <a href="?finansaiLimit=max#finansai">Rodyti visas (<%= asmuo.finansai.ataskaitos.length %>)</a>
+    </p>
+  <% } %>
 
-                           let finansinesAtaskaitosHasValuesUnderZero = false;
-                            for(let i = 0; i < grynasisPelnasVertes.length; i++){
-                              if(grynasisPelnasVertes[i] !== null && grynasisPelnasVertes[i] < 0){
-                                finansinesAtaskaitosHasValuesUnderZero = true;
-                                break;
-                              }
-                            }
+  <% let count = 0; %>
+  <% asmuo.finansai.ataskaitos.forEach(laikotarpis => { %>
+    <% if (count >= finansaiLimit) return; %>
+    <% count++; %>
 
-                            let finansinesAtaskaitosAnnotations = {};
-                            if(finansinesAtaskaitosHasValuesUnderZero){
-                              finansinesAtaskaitosAnnotations = {
-                                yaxis: [
-                                    {
-                                      y: 0,
-                                      y2: -100000000,
-                                      borderColor: 'red',
-                                      borderWidth: 2,
-                                      label: {
-                                        borderColor: 'red',
-                                        style: {
-                                          color: '#fff',
-                                          background: 'red',
-                                        },
-                                        text: 'Nuostoliai'
-                                    }
-                                  }
-                                ]
-                              }
-                            }
-                            displayChart({
-                              element: document.querySelector('#grynasisPelnas'),
-                              labels: grynasisPelnasLabels,
-                              series: grynasisPelnasVertes,
-                              flags: ['yEUR', 'yMinAuto'],
-                              customOptions: { annotations: finansinesAtaskaitosAnnotations }
-                            })
-                         </script>
-                     <% } else { %>
-                         <i class="diagrama-nera-duomenu">Nėra duomenų</i>
-                     <% } %>
-                 </section>
-         </div>
+    <div class="subsection">
+      <h3>
+        <%= laikotarpis.templateName %>
+        <span class="text-muted text-xs fw-normal">(<%= laikotarpis.templateId %>, <%= laikotarpis.duomenuData %>)</span>
+      </h3>
+      <p class="text-muted text-sm mb-4"><%= laikotarpis.laikotarpisNuo %> – <%= laikotarpis.laikotarpisIki %></p>
 
-         <div class="tableContainer">
-            <table style="width: auto;">
-                <thead>
-                    <tr>
-                        <th>Eilutė</th>
-                        <% asmuo.finansai.lentele.metai.forEach(function(year) { %>
-                            <th><%= year %></th>
-                        <% }); %>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% for (let lineName in asmuo.finansai.lentele.duomenys) { %>
-                        <tr>
-                            <td><%= lineName %></td>
-                            <% asmuo.finansai.lentele.duomenys[lineName].forEach(function(value) { %>
-                                <% if(lineName == "Pelningumas"){ %>
-                                    <td class="center"><span style="display: inline-block; padding: 4px;"><%= (value !== undefined && value !== null) ? (value).toFixed(2) + '%' : '–' %></span></td>
-                                <% } else { %>
-                                    <td class="center"><span style="display: inline-block; padding: 4px;"><%= (value !== undefined && value !== null) ? value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) : '–' %></span></td>
-                                <% } %>
-                            <% }); %>
-                        </tr>
-                    <% } %>
-                </tbody>
-            </table>
-         </div>
+      <div class="grid-2">
+        <% laikotarpis.standards.forEach(standard => { %>
+          <div class="card">
+            <div class="card-body">
+              <div class="section-title mb-3"><%= standard.standardName %> <span class="text-muted fw-normal">(<%= standard.standardId %>)</span></div>
+              <dl class="kv-list">
+                <% standard.lines.forEach(line => { %>
+                  <dt><%= line.lineName %> <span class="text-muted text-xs">(<%= line.lineTypeId %>)</span></dt>
+                  <dd><span class="cell-mono"><%= new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(line.reiksme) %></span></dd>
+                <% }) %>
+              </dl>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
 
-         <% if(queryParams.finansaiLimit == "max") {queryParams.finansaiLimit = 10000000} %>
-         <% let finansaiLimit = queryParams.finansaiLimit || 1; %>
-         <% if(asmuo.finansai.ataskaitos.length > finansaiLimit) { %>
-             <i>
-                 Rodoma tik paskutinė finansinė ataskaita.
-                 <a href="?finansaiLimit=max#finansai">
-                     Rodyti visas (<%= asmuo.finansai.ataskaitos.length %>)
-                 </a>
-             </i>
-             <br>
-         <% } %>
+  <% }) %>
 
-         <section>
-             <% let count = 0; %>
-
-             <% asmuo.finansai.ataskaitos.forEach(laikotarpis => { %>
-                 <% if(count >= finansaiLimit) return; %>
-                 <% count++; %>
-
-                 <h3><%= laikotarpis.templateName %> <sup>(<%= laikotarpis.templateId %>, <%= laikotarpis.duomenuData %>)</sup></h3>
-                 <i><%= laikotarpis.laikotarpisNuo %> – <%= laikotarpis.laikotarpisIki %> </i>
-                 <section class="col-2 mobile-col-1">
-                     <% laikotarpis.standards.forEach(standard => { %>
-                         <section>
-                             <h4><%= standard.standardName %> <sup>(<%= standard.standardId %>)</sup></h4>
-                             <% standard.lines.forEach(line => { %>
-                                 <div>
-                                 <h5><%= line.lineName %> <sup>(<%= line.lineTypeId %>)</sup></h5>
-                                 <%= new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(line.reiksme) %>
-                                 </div>
-                             <% }); %>
-                         </section>
-                     <% }); %>
-                 </section>
-                 <br>
-             <% }) %>
-         </section>
-     </div>
- <% } %>
+</div>
+<% } %>

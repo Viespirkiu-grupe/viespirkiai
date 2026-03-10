@@ -1,71 +1,64 @@
 <!DOCTYPE html>
 <html lang="lt">
-	<head>
-    	<%- include('../head.ejs', {
-            pageTitle: "Failų žemėlapis",
-            pageDescription: ``,
-            pageImage: `https://viespirkiai.org/failai.png`,
-            customHead
-        }) %>
-	</head>
-	<body>
-		<%- include('../header.ejs', {hideSubtext: false}) %>
-		<main>
-		<section>
-            <h1 class="center">Failų žemėlapis</h1>
-		    <%- include('../tabs.ejs') %>
-            <p>Dalis paviešintų failų turi geografinę informaciją apie jų sukūrimo vietą.</p>
-            <p>Norėdami peržiūrėti failus tam tikroje vietovėje, spustelėkite žemėlapyje esančius taškus.</p><br>
-            <div id="map" style="height: 70vh; border-radius: 8px;"></div>
+<head>
+  <%- include('../head.ejs', {
+    pageTitle: "Failų žemėlapis",
+    pageDescription: ``,
+    pageImage: `https://viespirkiai.org/failai.png`,
+    customHead
+  }) %>
+</head>
+<body>
+  <%- include('../header.ejs', {hideSubtext: false}) %>
+  <main>
 
-            <script>
-            window.addEventListener('DOMContentLoaded', () => {
-              // Load Leaflet CSS
-              const link = document.createElement('link');
-              link.rel = 'stylesheet';
-              link.href = '/dist/leaflet.css';
-              document.head.appendChild(link);
+    <div class="page-header">
+      <h1 class="mb-0">Failų žemėlapis</h1>
+    </div>
 
-              // Load Leaflet JS
-              const script = document.createElement('script');
-              script.src = '/dist/leaflet.js';
-              script.defer = true;
-              script.onload = () => {
-                const mapEl = document.getElementById('map');
-                const locationsArray = <%- JSON.stringify(locations) %>;
+    <p class="text-muted text-sm mb-4">
+      Dalis paviešintų failų turi geografinę informaciją apie jų sukūrimo vietą.
+      Norėdami peržiūrėti failus tam tikroje vietovėje, spustelėkite žemėlapyje esančius taškus.
+    </p>
 
-                const map = L.map('map').setView([55.1694, 23.8813], 7); // Centered on Lithuania
+    <div id="map" class="map-container map-lg"></div>
 
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                  attribution: '&copy; OpenStreetMap contributors'
-                }).addTo(map);
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = '/dist/leaflet.css';
+        document.head.appendChild(link);
 
+        const script = document.createElement('script');
+        script.src = '/dist/leaflet.js';
+        script.defer = true;
+        script.onload = () => {
+          const locationsArray = <%- JSON.stringify(locations) %>;
+          const map = L.map('map').setView([55.1694, 23.8813], 7);
 
-                // Add all points as small blue circles
-                const layerGroup = L.layerGroup();
-                locationsArray.forEach(([lat, lon]) => {
-                  let circle = L.circleMarker([lat, lon], {
-                    radius: 2,          // small circle
-                    color: 'black',      // outline color
-                    fillColor: 'black',  // fill color
-                    fillOpacity: 0.5
-                  }).addTo(layerGroup);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+          }).addTo(map);
 
-                  circle.on('click', () => {
-                    const url = `/failai?location=${lat},${lon}&locationRadius=100`;
-                    window.location.href = url;
-                  });
-                });
-                layerGroup.addTo(map);
-              };
-              document.body.appendChild(script);
-            });
-            </script>
+          const layerGroup = L.layerGroup();
+          locationsArray.forEach(([lat, lon]) => {
+            L.circleMarker([lat, lon], {
+              radius: 2,
+              color: 'black',
+              fillColor: 'black',
+              fillOpacity: 0.5
+            })
+            .on('click', () => { window.location.href = `/failai?location=${lat},${lon}&locationRadius=100`; })
+            .addTo(layerGroup);
+          });
+          layerGroup.addTo(map);
+        };
+        document.body.appendChild(script);
+      });
+    </script>
 
-
-
-		</section>
-		</main>
-		<%- include('../footer.ejs') %>
-	</body>
+  </main>
+  <%- include('../footer.ejs') %>
+</body>
 </html>

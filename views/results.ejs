@@ -1,84 +1,59 @@
-<section class="preResultOptions">
-  <div class="numberOfResults">
-    <%- numberOfResults %>
-  </div>
-
-  <% if(galimaEksportuoti){ %>
-    <div class="exportOptions">
-      <a href="/?<%- queryParams %>&jsonl=true&limit=max" class="exportLink">↗ JSONL</a>&nbsp;
-      <a href="/?<%- queryParams %>&csv=true&limit=max" class="exportLink">↗ CSV</a>
+<div class="d-flex justify-between align-center mb-4">
+  <span class="text-muted text-sm"><%- numberOfResults %></span>
+  <% if (galimaEksportuoti) { %>
+    <div class="d-flex gap-3">
+      <a href="/?<%- queryParams %>&jsonl=true&limit=max" class="btn btn-ghost btn-sm">↗ JSONL</a>
+      <a href="/?<%- queryParams %>&csv=true&limit=max" class="btn btn-ghost btn-sm">↗ CSV</a>
     </div>
   <% } %>
-</section>
-
-<div class="tableContainer">
-<table>
-    <thead>
-        <tr>
-            <th>Tipas</th>
-            <th>Pavadinimas</th>
-            <th>Vertė</th>
-            <th>Perkanti organizacija</th>
-            <th>Tiekėjas</th>
-            <th>Redaguota</th>
-            <th>Failai</th>
-        </tr>
-    </thead>
-    <tbody>
-        <% data.forEach(item => { %>
-        <tr>
-            <td class="center"><%= item.tipas %></td>
-            <td>
-              <div class="limit">
-                <a href="/sutartis/<%= item.sutartiesUnikalusID %>">
-                  <% if(item.pavadinimas.length < 1) { %>
-                    <i>Nenurodyta</i>
-                  <% } else { %>
-                    <%= item.pavadinimas %>
-                  <% } %>
-                </a>
-              </div>
-            </td>
-            <td class="center oneLine">
-              <%
-              const verte = item.faktineIvykdimoVerte || item.verte;
-              if(Number(verte) > 10000) {
-              %>
-              <u><%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</u>
-              <% } else { %>
-              <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
-              <% } %>
-            </td>
-            <td>
-              <div class="limit">
-                <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>"><%= item.perkanciojiOrganizacija %></a>
-              </div>
-            </td>
-            <td>
-              <div class="limit">
-                <a href="/asmuo/<%= item.tiekejoKodas %>"> <%= item.tiekejas || "Nenurodytas" %> </a>
-              </div>
-            </td>
-            <td class="center oneLine">
-              <% if (item.paskutinioRedagavimoData) { %>
-                <%= item.paskutinioRedagavimoData %>
-              <% } else { %>
-                -
-              <% } %>
-            </td>
-            <td class="center">
-            <% if (item.dokumentuKiekis === 0) { %>
-            –
-            <% } else { %>
-            <%= item.dokumentuKiekis %>
-            <% } %>
-            </td>
-        </tr>
-        <% }); %>
-    </tbody>
-</table>
 </div>
 
-<%- include('pagination.ejs', {
-    currentPage, pageCount, queryParams
-}) %>
+<div class="table-container">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th>Tipas</th>
+        <th>Pavadinimas</th>
+        <th class="cell-right">Vertė</th>
+        <th>Perkanti organizacija</th>
+        <th>Tiekėjas</th>
+        <th>Redaguota</th>
+        <th class="cell-center">Failai</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% data.forEach(item => { %>
+        <tr>
+          <td class="cell-center cell-nowrap"><%= item.tipas %></td>
+          <td class="cell-truncate">
+            <a href="/sutartis/<%= item.sutartiesUnikalusID %>">
+              <% if (item.pavadinimas.length < 1) { %><em>Nenurodyta</em><% } else { %><%= item.pavadinimas %><% } %>
+            </a>
+          </td>
+          <td class="cell-mono cell-right cell-nowrap">
+            <% const verte = item.faktineIvykdimoVerte || item.verte; %>
+            <% if (Number(verte) > 10000) { %>
+              <strong><%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</strong>
+            <% } else { %>
+              <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
+            <% } %>
+          </td>
+          <td class="cell-truncate">
+            <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>"><%= item.perkanciojiOrganizacija %></a>
+          </td>
+          <td class="cell-truncate">
+            <a href="/asmuo/<%= item.tiekejoKodas %>"><%= item.tiekejas || "Nenurodytas" %></a>
+          </td>
+          <td class="cell-muted cell-nowrap">
+            <%= item.paskutinioRedagavimoData || "—" %>
+          </td>
+          <td class="cell-center cell-muted">
+            <%= item.dokumentuKiekis || "—" %>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('pagination.ejs', { currentPage, pageCount, queryParams }) %>

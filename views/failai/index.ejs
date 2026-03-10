@@ -1,99 +1,82 @@
 <!DOCTYPE html>
 <html lang="lt">
-	<head>
-    	<%- include('../head.ejs', {
-            pageTitle: "Failų paieška",
-            pageDescription: ``,
-            pageImage: `https://viespirkiai.org/failai.png`,
-            customHead
-        }) %>
-        <%- include('../js/idiomorph.ejs') %>
-       	<%- include('../js/charts.ejs') %>
-        <style>
-        .failaiStatistika {
-            display: flex;
-            flex-direction: column;
-            gap: 48px;
-            margin-block: 24px;
-            align-items: center;
-            width: 100%;
-        }
+  <head>
+    <%- include('../head.ejs', {
+      pageTitle: "Failų paieška",
+      pageDescription: ``,
+      pageImage: `https://viespirkiai.org/failai.png`,
+      customHead
+    }) %>
+    <%- include('../js/idiomorph.ejs') %>
+    <%- include('../js/charts.ejs') %>
+    <style>
+      .failai-statistika {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-6);
+        margin-block: var(--space-5);
+        align-items: center;
+        width: 100%;
+      }
+      .failai-statistika .stat-row {
+        display: flex;
+        flex-direction: column;
+      }
+      .failai-statistika .stat-number {
+        font-size: 5em;
+        font-weight: 700;
+        line-height: 1;
+      }
+      .failai-statistika .stat-text {
+        font-size: var(--text-lg);
+        color: var(--gray);
+      }
+      .failai-statistika .stat-row:nth-child(1) { transform: translateX(0); }
+      .failai-statistika .stat-row:nth-child(2) { transform: translateX(15vw); }
+      .failai-statistika .stat-row:nth-child(3) { transform: translateX(-10vw); }
 
-        .failaiStatistika .stat-row {
-            display: flex;
-            flex-direction: column;
-        }
+      @media (max-width: 600px) {
+        .failai-statistika .stat-number { font-size: 3em; }
+        .failai-statistika .stat-row:nth-child(2),
+        .failai-statistika .stat-row:nth-child(3) { transform: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <%- include('../header.ejs', {hideSubtext: false}) %>
+    <main>
+      <%- include('search.ejs', {values}) %>
+      <section id="failaiRezultatai" class="results">
+        <% if (typeof data !== "undefined") { %>
+            <div class="max-w-lg center mx-auto">
+                <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti, search}) %>
+            </div>
+        <% } else { %>
+          <%- include('statistika.ejs') %>
+          <script>
+            window.addEventListener('DOMContentLoaded', () => {
+              const search = document.getElementById('search');
+              if (search) search.focus();
+            });
 
-        .failaiStatistika .stat-number {
-            font-size: 5em;
-            font-weight: bold;
-        }
-
-        @media (max-width: 600px) {
-            .failaiStatistika .stat-number {
-                font-size: 3em;
-            }
-        }
-
-        .failaiStatistika .stat-text {
-            font-size: 1.4em;
-        }
-
-
-        .failaiStatistika .stat-row:nth-child(1) {
-            transform: translateX(0vw);
-        }
-
-        .failaiStatistika .stat-row:nth-child(2) {
-            transform: translateX(15vw);
-        }
-
-        .failaiStatistika .stat-row:nth-child(3) {
-            transform: translateX(-10vw);
-        }
-
-
-        </style>
-	</head>
-	<body>
-		<%- include('../header.ejs', {hideSubtext: false}) %>
-		<main>
-			<%- include('search.ejs', {values}) %>
-			<section id="failaiRezultatai" class="results">
-                <% if(typeof data !== "undefined") { %>
-    			    <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti, search}) %>
-                <% } else { %>
-                    <%- include('statistika.ejs') %>
-                    <script>
-                        window.addEventListener('DOMContentLoaded', () => {
-                          const search = document.getElementById('search');
-                          if (search) search.focus();
-                        });
-
-                        let evtSource;
-
-                        const connect = () => {
-                            evtSource = new EventSource("/failai/statistika/sse");
-
-                            evtSource.onmessage = (e) => {
-                                const html = JSON.parse(e.data);
-                                const target = document.getElementById("failaiStatistika");
-                                if (target) {
-                                    Idiomorph.morph(target, html);
-                                }
-                            };
-
-                            evtSource.onerror = () => {
-                                evtSource.close();
-                                setTimeout(connect, 2000);
-                            };
-                        };
-
-                        connect();
-                    </script>
-                <% } %>
-			</section>
-		</main>
-		<%- include('../footer.ejs') %>
-	</body>
+            let evtSource;
+            const connect = () => {
+              evtSource = new EventSource("/failai/statistika/sse");
+              evtSource.onmessage = (e) => {
+                const html = JSON.parse(e.data);
+                const target = document.getElementById("failaiStatistika");
+                if (target) Idiomorph.morph(target, html);
+              };
+              evtSource.onerror = () => {
+                evtSource.close();
+                setTimeout(connect, 2000);
+              };
+            };
+            connect();
+          </script>
+        <% } %>
+      </section>
+    </main>
+    <%- include('../footer.ejs') %>
+  </body>
 </html>

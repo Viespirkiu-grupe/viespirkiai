@@ -1,54 +1,54 @@
-<div>
+<div class="page-section">
+  <h3 class="mb-1"><a href="#turinio-nuskaitymas" id="turinio-nuskaitymas" class="no-style">Turinio nuskaitymas</a></h3>
+  <p class="text-muted text-sm mb-4">Failų teksto, metaduomenų nuskaitymas</p>
+
+  <div class="grid-2">
+
     <div>
-        <h3>Turinio nuskaitymas</h3>
-        <p>Failų teksto, metaduomenų nuskaitymas</p>
-    </div>
-    <div class="col-2 mobile-col-1">
-        <div>
-            <h4>Pagal būsena</h4>
-            <div class="tableContainer">
-                <table style="width: auto; max-width: 100%; min-width: auto;">
-                    <thead>
-                        <tr>
-                            <th>Nuskaitymas</th>
-                            <th>Failai</th>
-                            <th>Dalis</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <% statistika.nuskaitymas.pagalVersija.forEach(versija => { %>
-                                <tr>
-                                    <td><%= versija.status %></td>
-                                    <td class="center no-wrap"><%= Number(versija.kiekis).toLocaleString('lt-LT') %></td>
-                                    <td class="center no-wrap"><%= Number(versija.procentai).toLocaleString('lt-LT') %> %</td>
-                                </tr>
-                        <% }) %>
-                    </tbody>
-                </table>
-            </div>
-
-        </div>
-        <div>
-            <h4>Pagal nuskaitytoją</h4>
-            <div class="tableContainer">
-                <table style="width: auto; max-width: 100%; min-width: auto;">
-                    <thead>
-                        <tr>
-                            <th>Nuskaitytojas</th>
-                            <th>Failų skaičius</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <% statistika.topDokNuskaitytojai.forEach(nuskaitytojas => { %>
-                                <tr>
-                                    <td><%= nuskaitytojas.viesasPavadinimas %></td>
-                                    <td class="center no-wrap"><%= Number(nuskaitytojas.nuskaitytidokumentai).toLocaleString('lt-LT') %></td>
-                                </tr>
-                        <% }) %>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+      <p class="text-sm fw-bold mb-3">Pagal būseną</p>
+      <div class="table-wrapper">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Nuskaitymas</th>
+              <th class="cell-right">Failai</th>
+              <th class="cell-right">Dalis</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% statistika.nuskaitymas.pagalVersija.forEach(versija => { %>
+              <tr>
+                <td><%= versija.status %></td>
+                <td class="cell-mono cell-right cell-nowrap"><%= Number(versija.kiekis).toLocaleString('lt-LT') %></td>
+                <td class="cell-mono cell-right cell-nowrap"><%= Number(versija.procentai).toLocaleString('lt-LT') %> %</td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
     </div>
 
+    <div>
+      <p class="text-sm fw-bold mb-3">Pagal nuskaitytoją</p>
+      <div class="table-wrapper">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Nuskaitytojas</th>
+              <th class="cell-right">Failų skaičius</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% statistika.topDokNuskaitytojai.forEach(nuskaitytojas => { %>
+              <tr>
+                <td><%= nuskaitytojas.viesasPavadinimas %></td>
+                <td class="cell-mono cell-right cell-nowrap"><%= Number(nuskaitytojas.nuskaitytidokumentai).toLocaleString('lt-LT') %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
 </div>

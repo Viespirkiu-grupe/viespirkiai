@@ -1,105 +1,89 @@
 <div>
-    <section class="preResultOptions">
-        <div class="numberOfResults">
-            <%- numberOfResults %>
-        </div>
-    </section>
-</div>
+  <div class="d-flex justify-between align-center mb-4">
+    <span class="text-muted text-sm"><em class="numberOfResults"><%- numberOfResults %></em></span>
+  </div>
 
-<div class="resultsNauji">
-    <% data.forEach(item => { %>
-        <article class="rezultatas" aria-label="<%= item.extension %>">
-            <a href="/failas/<%= item.id %>?search=<%= encodeURIComponent(search) %>" class="fullIndentLink"></a>
+  <% if (data.length === 0) { %>
+    <div class="empty-state">
+      <p class="text-muted">Rezultatų nerasta.</p>
+    </div>
+  <% } else { %>
 
-            <div class="rezultatas-left">
-                <dl class="rezultatas-top">
-                    <div>
-                        <dt class="visually-hidden">Formatas</dt>
-                        <dd><%= item.extension.toUpperCase() %></dd>
-                    </div>
+    <div class="result-list">
+      <% data.forEach(item => { %>
+        <article class="result-card card-clickable" aria-label="<%= item.extension %>">
+          <a href="/failas/<%= item.id %>?search=<%= encodeURIComponent(search) %>" class="card-overlay-link"><%= item.pavadinimas %></a>
 
-                    <div class="vertical-line-spacer"></div>
-
-                    <div>
-                        <dt class="visually-hidden">Dydis</dt>
-                        <dd><%= (item.dydis || 0).convertUnit("B") %></dd>
-                    </div>
-
-                    <% if (item.metaduomenys && item.metaduomenys.pageCount) { %>
-                        <div class="vertical-line-spacer"></div>
-                        <div>
-                            <dt class="visually-hidden">Puslapiai</dt>
-                            <dd><%= Number(item.metaduomenys.pageCount).toLocaleString("lt-LT") %> p.</dd>
-                        </div>
-                    <% } %>
-
-                    <div class="vertical-line-spacer"></div>
-
-                    <div>
-                        <dt class="visually-hidden">Žodžiai</dt>
-                        <dd><%= Number(item.zodziuSkaicius).toLocaleString("lt-LT") || "-" %> ž.</dd>
-                    </div>
-                </dl>
-
-                <h3 class="rezultatas-title">
-                    <a href="/failas/<%= item.id %>?search=<%= encodeURIComponent(search) %>">
-                        <span>
-                            <% if (item.metaduomenys) { %>
-                                <%= item.metaduomenys.Title || item.pavadinimas %>
-                            <% } else { %>
-                                <%= item.pavadinimas %>
-                            <% } %>
-                        </span>
-                    </a>
-                </h3>
-
-                <div class="rezultatas-bottom">
-                    <div class="excerpt" style="text-align: justify;">
-                        <%- item.excerpt %>
-                    </div>
-
-                    <% if (item.dokId) { %>
-                        <div>
-                            <a href="/sutartis/<%= item.dokId %>">↗ Sutartis</a>
-                        </div>
-                    <% } %>
+          <div class="result-card-body">
+            <dl class="result-card-meta">
+              <div>
+                <dt class="visually-hidden">Formatas</dt>
+                <dd><%= item.extension.toUpperCase() %></dd>
+              </div>
+              <div>
+                <dt class="visually-hidden">Dydis</dt>
+                <dd><%= (item.dydis || 0).convertUnit("B") %></dd>
+              </div>
+              <% if (item.metaduomenys && item.metaduomenys.pageCount) { %>
+                <div>
+                  <dt class="visually-hidden">Puslapiai</dt>
+                  <dd><%= Number(item.metaduomenys.pageCount).toLocaleString("lt-LT") %> p.</dd>
                 </div>
+              <% } %>
+              <div>
+                <dt class="visually-hidden">Žodžiai</dt>
+                <dd><%= Number(item.zodziuSkaicius).toLocaleString("lt-LT") || "—" %> ž.</dd>
+              </div>
+            </dl>
+
+            <h3 class="result-card-title">
+              <% if (item.metaduomenys) { %>
+                <%= item.metaduomenys.Title || item.pavadinimas %>
+              <% } else { %>
+                <%= item.pavadinimas %>
+              <% } %>
+            </h3>
+
+            <% if (item.excerpt) { %>
+              <div class="text-sm text-muted mt-2" style="text-align: justify;">
+                <%- item.excerpt %>
+              </div>
+            <% } %>
+
+            <div class="result-card-footer">
+              <% if (item.dokId) { %>
+                <span><a href="/sutartis/<%= item.dokId %>" style="position:relative;z-index:1;">↗ Sutartis</a></span>
+              <% } %>
             </div>
+          </div>
         </article>
-    <% }); %>
+      <% }); %>
+    </div>
+
+    <script>
+      const span = document.querySelector('.rezultatai-nezinomas-total');
+      if (span && !span.classList.contains('spin')) {
+        span.classList.add('spin');
+        const url = new URL(window.location.href);
+        url.searchParams.set('rezultatuSkaiciausPatikslinimas', 'true');
+        const trukme = document.querySelector('.numberOfResults pre')?.getAttribute('data-duration');
+        if (trukme) url.searchParams.set('trukme', trukme);
+        fetch(url)
+          .then(res => res.json())
+          .then(data => {
+            if (data.zinomasRezultatuSkaicius) {
+              span.className = '';
+              document.querySelector(".numberOfResults").innerHTML = data.numberOfResults;
+              document.querySelector("nav.pagination").innerHTML = data.pagination;
+            } else {
+              span.classList.remove('spin');
+            }
+          })
+          .catch(() => span.classList.remove('spin'));
+      }
+    </script>
+
+    <%- include('../pagination.ejs', { currentPage, pageCount, queryParams }) %>
+
+  <% } %>
 </div>
-
-
-<script>
-			const span = document.querySelector('.rezultatai-nezinomas-total');
-
-             if (span && !span.classList.contains('spin')) {
-                 span.classList.add('spin');
-
-                 const url = new URL(window.location.href);
-                 url.searchParams.set('rezultatuSkaiciausPatikslinimas', 'true');
-
-                 // Get data-duration from pre in .numberOfResults
-                 const trukme = document.querySelector('.numberOfResults pre')?.getAttribute('data-duration');
-                 if (trukme) {
-                     url.searchParams.set('trukme', trukme);
-                 }
-
-                 fetch(url)
-                     .then(res => res.json())
-                     .then(data => {
-                         if (data.zinomasRezultatuSkaicius) {
-                             span.className = ''; // remove all classes
-                             document.querySelector(".numberOfResults").innerHTML = data.numberOfResults;
-                             document.querySelector("nav.pagination").innerHTML = data.pagination;
-                         } else {
-                             span.classList.remove('spin'); // stop spinning if still unknown
-                         }
-                     })
-                     .catch(() => span.classList.remove('spin')); // stop spinning on error
-             }
-			</script>
-
-<%- include('../pagination.ejs', {
-    currentPage, pageCount, queryParams
-}) %>

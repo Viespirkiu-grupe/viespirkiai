@@ -1,60 +1,44 @@
 <!DOCTYPE html>
 <html lang="lt">
 <head>
-    <%- include('../head.ejs', {
-        pageTitle: "Top adresai pagal įmonių skaičių",
-        pageDescription: "",
-        pageImage: `https://viespirkiai.org/juridiniai.png`,
-        customHead: ""
-    }) %>
+  <%- include('../head.ejs', {
+    pageTitle: "Top adresai pagal įmonių skaičių",
+    pageDescription: "",
+    pageImage: `https://viespirkiai.org/juridiniai.png`,
+    customHead: ""
+  }) %>
 </head>
 <body>
-    <%- include('../header.ejs', {hideSubtext: false}) %>
+  <%- include('../header.ejs', { hideSubtext: false }) %>
+  <main>
 
-    <main>
-        <h1 class="center">Top adresai pagal įmonių skaičių</h1>
-        <%- include('../tabs.ejs') %>
+    <div class="page-header">
+      <h1 class="mb-0">Top adresai pagal įmonių skaičių</h1>
+    </div>
 
-        <div class="main-center">
-            <p>Žemiau pateikiami adresai, kuriuose registruota daugiausiai įmonių.
-            <p> Įprastai užsiregistruoti juose galima susimokėjus mokestį. Tokie adresai leidžia formaliai registruoti įmonę, neskelbiant tikros veiklos vietos. </p>
-        </div>
-        <div class="results">
-            <div>
-                <section class="preResultOptions">
-                    <div class="numberOfResults">
-                        <%- numberOfResults %>
-                    </div>
-                </section>
-            </div>
+    <p class="text-muted mb-5 max-w-content">
+      Žemiau pateikiami adresai, kuriuose registruota daugiausiai įmonių.
+      Įprastai užsiregistruoti juose galima susimokėjus mokestį — tokie adresai leidžia
+      formaliai registruoti įmonę, neskelbiant tikros veiklos vietos.
+    </p>
 
-            <div class="resultsNauji">
-                <% adresai.forEach(item => { %>
-                    <article class="rezultatas" aria-label="<%= item.adresas %>">
-                        <a href="/juridiniai?adresas=<%= item.adresas %>" class="fullIndentLink"></a>
-                        <div class="rezultatas-left">
-                            <h3 class="rezultatas-title">
-                                <a href="/juridiniai?adresas=<%= item.adresas %>">
-                                    <span><%= item.adresas %></span>
-                                </a>
-                            </h3>
-                            <div class="rezultatas-bottom">
-                                <div>
-                                    <b>Juridinių asmenų skaičius:</b>
-                                    <span><%= item.count %></span>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                <% }) %>
-            </div>
-            <%- include('../pagination.ejs', {
-                currentPage, pageCount, queryParams
-            }) %>
+    <div class="text-muted text-sm mb-3"><em class="numberOfResults"><%- numberOfResults %></em></div>
 
-        </div>
-    </main>
+    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3);">
+      <% adresai.forEach(item => { %>
+        <article class="card card-clickable">
+          <a href="/juridiniai?adresas=<%= item.adresas %>" class="card-overlay-link"><%= item.adresas %></a>
+          <div class="card-body">
+            <h3 class="text-sm fw-bold mb-2 mt-1"><%= item.adresas %></h3>
+            <p class="text-muted text-sm mb-0"><span class="cell-mono"><%= item.count %></span> įmonės</p>
+          </div>
+        </article>
+      <% }) %>
+    </div>
 
-    <%- include('../footer.ejs') %>
+    <%- include('../pagination.ejs', { currentPage, pageCount, queryParams }) %>
+
+  </main>
+  <%- include('../footer.ejs') %>
 </body>
 </html>

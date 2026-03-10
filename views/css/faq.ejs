@@ -1,0 +1,30 @@
+<style>
+.faq {
+    display: flex;
+    flex-direction: column;
+}
+
+.faq-item {
+    padding-block: var(--space-4);
+    border-bottom: var(--border);
+}
+
+.faq-item:first-child { padding-top: 0; }
+.faq-item:last-child  { border-bottom: none; }
+
+.faq-question {
+    font-size: var(--text-base);
+    font-weight: 600;
+    margin-bottom: var(--space-2);
+    color: var(--black);
+}
+
+.faq-answer {
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+    line-height: 1.65;
+}
+
+.faq-answer p:last-child,
+.faq-answer ul:last-child { margin-bottom: 0; }
+</style>

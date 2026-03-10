@@ -1,51 +1,41 @@
-<% if(asmuo.teismoNuosprendziai	 && asmuo.teismoNuosprendziai.rows > 0){ %>
-    <div id="teismai">
-        <h2><u><a href="#teismai" class="hashHref">Teismo nuosprendžiai</a></u></h2>
-        <% if(asmuo.teismoNuosprendziai.rows > asmuo.teismoNuosprendziai.limit) { %>
-            <i>
-                Rodomi tik <%= Number(asmuo.teismoNuosprendziai.limit).linksniuoti(["naujausias nuosprendis", "naujausi nuosprendžiai", "naujausių nuosprendžių"]) %>.
-                <a href="?teismoNuosprendziaiLimit=max#teismai">
-                    Rodyti visus (<%= asmuo.teismoNuosprendziai.rows %>)
-                </a>
-            </i>
-            <br><br>
-        <% } %>
-        <div class="tableContainer">
-            <table style="width: auto; min-width: 70vw;">
-                <thead>
-                    <tr>
-                        <th>Bylos numeris</th>
-                        <th>Rūšis</th>
-                        <th>Data</th>
-                        <th>Rolė</th>
-                        <th>Teismas</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% let count = 0; %>
-                    <% asmuo.teismoNuosprendziai.nuosprendziai.forEach(function(nuosprendis){ %>
-                        <tr>
-                            <td>
-                                <a href="https://liteko.teismai.lt/viesasprendimupaieska/<%= nuosprendis.fileHref %>" target="_blank">
-                                    <%= nuosprendis.bylosNumeris %>
-                                </a>
-                            </td>
-                            <td style="max-width: 30ch;"><%= nuosprendis.bylosRusis %></td>
-                            <td class="center"><%= new Date(nuosprendis.data).toLtDate() %></td>
-                            <% if(nuosprendis.bylojeKaip == "Atsakovas") { %>
-                                <td style="max-width: 30ch;">
-                                    <u>
-                                        <%= nuosprendis.bylojeKaip %>
-                                    </u>
-                                </td>
-                            <% } else { %>
-                                <td style="max-width: 30ch;"><%= nuosprendis.bylojeKaip %></td>
-                            <% } %>
-                            <td style="max-width: 40ch;"><%= nuosprendis.teismas %></td>
-                        </tr>
-                    <% }) %>
-                </tbody>
-            </table>
-        </div>
-    </div>
+<% if (asmuo.teismoNuosprendziai?.rows > 0) { %>
+<div class="page-section" id="teismai">
+  <h2><a href="#teismai" class="no-style">Teismo nuosprendžiai</a></h2>
+
+  <% if (asmuo.teismoNuosprendziai.rows > asmuo.teismoNuosprendziai.limit) { %>
+    <p class="text-muted text-sm mb-4">
+      Rodomi tik <%= Number(asmuo.teismoNuosprendziai.limit).linksniuoti(["naujausias nuosprendis", "naujausi nuosprendžiai", "naujausių nuosprendžių"]) %>.
+      <a href="?teismoNuosprendziaiLimit=max#teismai">Rodyti visus (<%= asmuo.teismoNuosprendziai.rows %>)</a>
+    </p>
+  <% } %>
+
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Bylos numeris</th>
+          <th>Rūšis</th>
+          <th class="cell-center">Data</th>
+          <th>Rolė</th>
+          <th>Teismas</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% asmuo.teismoNuosprendziai.nuosprendziai.forEach(nuosprendis => { %>
+          <tr>
+            <td class="cell-nowrap">
+              <a href="https://liteko.teismai.lt/viesasprendimupaieska/<%= nuosprendis.fileHref %>" target="_blank"><%= nuosprendis.bylosNumeris %></a>
+            </td>
+            <td class="cell-truncate" style="max-width:30ch;"><%= nuosprendis.bylosRusis %></td>
+            <td class="cell-center cell-mono cell-nowrap"><%= new Date(nuosprendis.data).toLtDate() %></td>
+            <td class="cell-truncate<%= nuosprendis.bylojeKaip === 'Atsakovas' ? ' fw-bold' : '' %>" style="max-width:30ch;">
+              <%= nuosprendis.bylojeKaip %>
+            </td>
+            <td class="cell-truncate" style="max-width:40ch;"><%= nuosprendis.teismas %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
 <% } %>

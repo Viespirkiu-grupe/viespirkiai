@@ -1,9 +1,4 @@
-<div>
-    <h2><%= label %></h2>
-    <input
-        type="date"
-        name="<%= name %>"
-        id="<%= name %>"
-        value="<%= values[name] || "" %>"
-    />
+<div class="form-group">
+  <label class="form-label" for="<%= name %>"><%= label %></label>
+  <input type="date" class="form-control" name="<%= name %>" id="<%= name %>" value="<%= values[name] || '' %>">
 </div>

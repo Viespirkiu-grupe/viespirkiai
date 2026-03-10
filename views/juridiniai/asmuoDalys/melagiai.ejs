@@ -1,65 +1,55 @@
-<% if(asmuo.melagingi && asmuo.melagingi.length > 0 ) { %>
-    <div id="melagiai">
-        <h2><a href="#melagiai" class="hashHref"><u>Melagingą informaciją pateikusių tiekėjų sąrašas</u></a></h2>
+<% if (asmuo.melagingi?.length > 0) { %>
+<div class="page-section" id="melagiai">
+  <h2><a href="#melagiai" class="no-style">Melagingą informaciją pateikusių tiekėjų sąrašas</a></h2>
 
-        <div class="results" style="margin-inline: 0px;">
-            <% let count = 0; %>
-            <% asmuo.melagingi.forEach(function(melagis){ %>
-                <div class="rezultatas">
-                    <div class="rezultatas-top">
-                        <span>
-                            Įvesta:
-                            <%= melagis.duomenuIvedimoData %>
-                        </span>
-                        <span>
-                            Galioja:
-                            <%= melagis.dataNuoKuriosSkaiciuojamasTerminas || "nežinoma" %> –
-                            <%= melagis.itrauktasIki || "nežinoma" %>
-                        </span>
-                        <span>
-                            Paskutinį kartą matyta sąraše:
-                            <%= melagis.paskutiniKartaMatytaSarase %>
-                        </span>
-                    </div>
-                    <div class="rezultatas-title">
-                        <% if(melagis.pagrindimas) { %>
-                            <%= melagis.pagrindimas.irasymoPagrindas || "Įraukimo pagrindas nenurodytas" %>
-                        <% } else { %>
-                            Įraukimo pagrindas nenurodytas
-                        <% } %>
-                    </div>
-                    <div class="rezultatas-bottom" style="text-align: justify;">
-                        <span>
-                            <b>Pirkėjas:</b> <%= melagis.pirkimoVykdytojoPavadinimas || "nenurodytas" %>
-                        </span>
-                        <span>
-                            <b>Pirkimo numeris:</b> <%= melagis.pirkimoNumeris	|| "nenurodytas" %>
-                        </span>
-                        <% if(melagis.pagrindimas && melagis.pagrindimas.tiekejoPaaiskinimas && melagis.pagrindimas.tiekejoPaaiskinimas.length > 3){ %>
-                            <span>
-                            <b>Tiekėjo paaiškinimas:</b>
-                            <% if(melagis.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda && melagis.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda.length > 3) { %>
-                                    <a href="<%= melagis.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda %>" target="_blank" rel="noopener noreferrer" style>
-                                        ↗ Peržiūrėti tiekėjo paaiškinimo dokumentą (<%= melagis.pagrindimas.paaiskinimoPateikimoData || "Data nenurodyta" %>)
-                                    </a>
-                            <% } %>
-                            </span>
-                            <% if(melagis.pagrindimas.tiekejoPaaiskinimas && melagis.pagrindimas.tiekejoPaaiskinimas.length > 3) { %>
-                                <div>
-                                    <blockquote>
-                                        <%= melagis.pagrindimas.tiekejoPaaiskinimas %>
-                                    </blockquote>
-                                    <% if(melagis.pagrindimas.paaiskinimoPateikimoData) {%>
-                                        <div style="text-align: right; font-size: 0.9em;">
-                                            <i> (Pateiktas: <%= melagis.pagrindimas.paaiskinimoPateikimoData %>)</i>
-                                        </div>
-                                    <% } %>
-                                </div>
-                            <% } %>
-                        <% } %>
-                    </div>
-                </div>
-            <% }) %>
+  <div class="result-list">
+    <% asmuo.melagingi.forEach(melagis => { %>
+      <article class="result-card">
+        <div class="result-card-body">
+
+          <dl class="result-card-meta">
+            <div>
+              <dt class="visually-hidden">Įvesta</dt>
+              <dd>Įvesta <%= melagis.duomenuIvedimoData %></dd>
+            </div>
+            <div>
+              <dt class="visually-hidden">Galioja</dt>
+              <dd><%= melagis.dataNuoKuriosSkaiciuojamasTerminas || "nežinoma" %> – <%= melagis.itrauktasIki || "nežinoma" %></dd>
+            </div>
+            <div>
+              <dt class="visually-hidden">Paskutinį kartą matyta</dt>
+              <dd>Matyta <%= melagis.paskutiniKartaMatytaSarase %></dd>
+            </div>
+          </dl>
+
+          <h3 class="result-card-title">
+            <% if (melagis.pagrindimas?.irasymoPagrindas) { %>
+              <%= melagis.pagrindimas.irasymoPagrindas %>
+            <% } else { %>
+              <em class="text-muted">Įtraukimo pagrindas nenurodytas</em>
+            <% } %>
+          </h3>
+
+          <div class="result-card-footer">
+            <span><strong>Pirkėjas:</strong> <%= melagis.pirkimoVykdytojoPavadinimas || "nenurodytas" %></span>
+            <span><strong>Pirkimo nr.:</strong> <%= melagis.pirkimoNumeris || "nenurodytas" %></span>
+            <% if (melagis.pagrindimas?.tiekejoPaaiskinimoDokumentoNuoroda?.length > 3) { %>
+              <span><a href="<%= melagis.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda %>" target="_blank" rel="noopener noreferrer">↗ Tiekėjo paaiškinimo dokumentas (<%= melagis.pagrindimas.paaiskinimoPateikimoData || "data nenurodyta" %>)</a></span>
+            <% } %>
+          </div>
+
+          <% if (melagis.pagrindimas?.tiekejoPaaiskinimas?.length > 3) { %>
+            <blockquote class="mt-3">
+              <%= melagis.pagrindimas.tiekejoPaaiskinimas %>
+            </blockquote>
+            <% if (melagis.pagrindimas.paaiskinimoPateikimoData) { %>
+              <p class="text-muted text-xs mt-1" style="text-align:right;">Pateiktas: <%= melagis.pagrindimas.paaiskinimoPateikimoData %></p>
+            <% } %>
+          <% } %>
+
         </div>
-    </div>
+      </article>
+    <% }) %>
+  </div>
+</div>
 <% } %>

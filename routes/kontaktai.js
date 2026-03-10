@@ -7,6 +7,7 @@ const kontaktaiRouter = express.Router();
 kontaktaiRouter.get("/kontaktai", async (req, res) => {
     res.render("kontaktai", {
         customHead: config.customHead,
+        req,
     });
 });
 

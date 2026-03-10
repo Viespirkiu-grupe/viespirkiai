@@ -1,90 +1,53 @@
 <!DOCTYPE html>
 <html>
-	<head>
-        <%- include('head.ejs', {
-            pageTitle: "Viešlaiškiai",
-            pageDescription: `Viešpirkių iniciatyvos viešlaiškiai`,
-            pageImage: `https://viespirkiai.org/vieslaiskiai/vieslaiskiai.png`,
-            customHead
-        }) %>
-        <style>
-            .vieslaiskiai {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 20px;
-            }
-            .vieslaiskis {
-                flex: 1 1 300px;
-                aspect-ratio: sqrt(2);
-                max-width: 700px;
-                min-width: 300px;
-                overflow: hidden;
-                border-radius: 10px;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-                transition: all 0.2s ease-in-out;
-            }
+<head>
+  <%- include('head.ejs', {
+      pageTitle: "Viešlaiškiai",
+      pageDescription: `Viešpirkių iniciatyvos viešlaiškiai`,
+      pageImage: `https://viespirkiai.org/vieslaiskiai/vieslaiskiai.png`,
+      customHead
+  }) %>
+</head>
+<body>
+  <%- include('header.ejs') %>
+  <main>
 
-            .vieslaiskis:hover {
-                transform: translateY(-5px);
-                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-            }
+    <div class="page-header">
+      <h1>Viešlaiškiai</h1>
+    </div>
 
-            @media (prefers-color-scheme: dark){
-                .vieslaiskis {
-                    box-shadow: 0 4px 8px rgba(255, 255, 255, 0.2);
-                }
+    <p class="text-muted mb-6">Mūsų iniciatyvos subjektyvios vertinančiosios nuomonės apie kai kuriuos viešuosius pirkimus arba su jais susijusias problemas.</p>
 
-                .vieslaiskis:hover {
-                    box-shadow: 0 8px 16px rgba(255, 255, 255, 0.3);
-                }
-            }
+    <section class="vieslaiskiai mb-7">
+      <% vieslaiskiai.forEach(vieslaiskis => { %>
+        <article class="vieslaiskis">
+          <a href="<%= vieslaiskis.nuoroda %>">
+            <img src="<%= vieslaiskis.nuotrauka %>" alt="<%= vieslaiskis.pavadinimas %>">
+          </a>
+        </article>
+      <% }) %>
+    </section>
 
-            .vieslaiskis img {
-                width: 100%;
-                height: 100%;
-                object-fit: contain;
-                display: block;
-            }
-        </style>
-	</head>
-	<body>
-		<%- include('header.ejs') %>
-		<main>
-			<h1>Viešlaiškiai</h1>
-			<div>
-			    Mūsų iniciatyvos subjektyvios vertinančiosios nuomonės apie kai kuriuos viešuosius pirkimus arba su jais susijusias problemas.
-			</div><br>
-            <section class="vieslaiskiai">
-                <% vieslaiskiai.forEach(vieslaiskis => { %>
-                    <article class="vieslaiskis">
-                        <a href="<%= vieslaiskis.nuoroda %>">
-                            <img src="<%= vieslaiskis.nuotrauka %>" alt="<%= vieslaiskis.pavadinimas %>">
-                        </a>
-                    </article>
-                <% }) %>
-            </section><br><br>
-            <section class="ziniasklaida results" style="margin-inline: initial;">
-                <h2>Žiniasklaidoje</h2>
-                <% vieslaiskiaiZiniasklaidoje.forEach(rezultatas => { %>
-                    <div class="rezultatas">
-                        <div class="rezultatas-top">
-                            <span><%= rezultatas.saltinis %></span>
-                            <span><%= rezultatas.date %></span>
-                            <span><a href="<%= rezultatas.vieslaiskisLink %>"><%= rezultatas.vieslaiskis %></a></span>
-                        </div>
-                        <div class="rezultatas-title">
-                            <a href="<%= rezultatas.link %>">
-                                <%= rezultatas.pavadinimas %>
-                            </a>
-                        </div>
-                        <div class="rezultatas-bottom"></div>
-                    </div>
-                <% }) %>
-            </section>
-		</main>
-		<%- include('footer.ejs', {
-		    neoficialus: false
-		}) %>
-	</body>
+    <section>
+      <h2>Žiniasklaidoje</h2>
+      <div class="result-list">
+        <% vieslaiskiaiZiniasklaidoje.forEach(rezultatas => { %>
+          <article class="result-card card-clickable">
+            <a href="<%= rezultatas.link %>" class="card-overlay-link"><%= rezultatas.pavadinimas %></a>
+            <div class="result-card-body">
+              <div class="result-card-meta">
+                <span><%= rezultatas.saltinis %></span>
+                <span><%= rezultatas.date %></span>
+                <span><a href="<%= rezultatas.vieslaiskisLink %>" style="position:relative; z-index:1;"><%= rezultatas.vieslaiskis %></a></span>
+              </div>
+              <h3 class="result-card-title"><%= rezultatas.pavadinimas %></h3>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+
+  </main>
+  <%- include('footer.ejs', { neoficialus: false }) %>
+</body>
 </html>

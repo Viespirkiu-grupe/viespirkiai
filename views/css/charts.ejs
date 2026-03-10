@@ -1,0 +1,44 @@
+<style>
+.chart-frame {
+    min-height: calc(365px + calc(var(--space-2) * 3.5));
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--lightest-gray);
+    overflow: visible;
+    flex: 1;
+    padding: var(--space-3);
+    margin-block: var(--space-2)
+}
+
+.chart-empty {
+    min-height: 365px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray);
+    font-size: var(--text-sm);
+    font-style: italic;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--lightest-gray);
+    flex: 1;
+    margin-block: var(--space-2);
+}
+
+@media (max-width: 600px) {
+    .chart-frame {
+        min-height: 300px;
+        font-size: var(--text-xs);
+    }
+    .chart-empty {
+        min-height: 300px;
+        font-size: var(--text-xs);
+    }
+
+}
+
+.chart-frame .chart {
+    position: relative;
+    z-index: 1;
+}
+</style>

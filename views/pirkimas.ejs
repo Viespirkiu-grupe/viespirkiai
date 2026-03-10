@@ -1,451 +1,335 @@
 <!DOCTYPE html>
 <html>
-	<head>
-    	<%- include('head.ejs', {
-          pageTitle: Number(purchase.faktineIvykdimoVerte || purchase.verte)
-                      .toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                      + " € " + purchase.pavadinimas,
-          pageDescription: `Sutartis nr. ${purchase.sutartiesNumeris}
+<head>
+  <%- include('head.ejs', {
+      pageTitle: Number(purchase.faktineIvykdimoVerte || purchase.verte)
+                  .toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  + " € " + purchase.pavadinimas,
+      pageDescription: `Sutartis nr. ${purchase.sutartiesNumeris}
 Sudaryta: ${new String(purchase.sudarymoData).slice(0,10)}
 Galioja iki: ${new String(purchase.galiojimoData).slice(0,10)}`,
-          pageImage: `https://viespirkiai.org/sutartis/${purchase.sutartiesUnikalusID}.png`,
-          pageAuthor: purchase.perkanciojiOrganizacija,
-          customHead
-        }) %>
-	</head>
-	<body>
-        <%- include('header.ejs') %>
+      pageImage: `https://viespirkiai.org/sutartis/${purchase.sutartiesUnikalusID}.png`,
+      pageAuthor: purchase.perkanciojiOrganizacija,
+      customHead
+  }) %>
+</head>
+<body>
+  <%- include('header.ejs') %>
+  <main>
 
-		<main>
-		    <div class="subtext">
-				<%= purchase.tipoPavadinimas %>
-			</div>
-			<h1 style="margin-top: 12px;">
-                <% if (purchase.pavadinimas.length < 1) { %>
-                    <i>Nenurodyta</i>
-                <% } else { %>
-                    <%= purchase.pavadinimas %>
-                <% } %>
-                už <u> <%= Number( purchase.faktineIvykdimoVerte || purchase.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> € </u>
-			</h1>
-
-			<div>
-    			<a href="/sutartis/<%= purchase.sutartiesUnikalusID %>.json">↗ JSON</a>
-                &nbsp;
-                <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= purchase.sutartiesUnikalusID %>">↗ CVP IS</a>
-                &nbsp;
-                <a href="mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20<%= purchase.sutartiesUnikalusID %>&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/<%= purchase.sutartiesUnikalusID %>">
-                    ↗ Pranešti
-                </a>
-			</div>
-
-            <section class="col-3 mobile-col-2">
-                <div>
-                    <h2><u>Pirkėjas</u></h2>
-   					<h3><a href="/asmuo/<%= purchase.perkanciosiosOrganizacijosKodas %>"><%= purchase.perkanciojiOrganizacija %></a></h3>
-   					<pre><%= purchase.perkanciosiosOrganizacijosKodas %></pre>
-				</div>
-
-				<% if(!purchase.papildomiTiekejai || purchase.papildomiTiekejai.length == 0) { %>
-                    <div>
-    					<h2><u>Tiekėjas</u></h2>
-                        <% if(purchase.tiekejasPatikslinimas && purchase.tiekejasPatikslinimas != purchase.tiekejas){ %>
-                            <div>
-                                <%= purchase.tiekejasPatikslinimas %>
-                            </div>
-                        <% } %>
-    					<h3><a href="/asmuo/<%= purchase.tiekejoKodas %>"> <%= purchase.tiekejas %> </a> </h3>
-                        <% if(purchase.tiekejasSalis){ %>
-                            <%= purchase.tiekejasSalis %>
-                        <% } %>
-    					<pre><%= purchase.tiekejoKodas %></pre>
-
-    				</div>
-				<% } else { %>
-                    <div>
-                        <h2><u>Tiekėjai</u></h2>
-                        <div>
-                            <h3><a href="/asmuo/<%= purchase.tiekejoKodas %>"> <%= purchase.tiekejas %> </a> </h3>
-                           	<pre><%= purchase.tiekejoKodas %></pre>
-                        </div>
-                        <% for (let i = 0; i < purchase.papildomiTiekejai.length; i++) { %>
-                            <div style="margin-top: 12px;">
-                                <h3><a href="/asmuo/<%= purchase.papildomiTiekejaiKodai[i] %>"> <%= purchase.papildomiTiekejai[i] %> </a> </h3>
-                               	<pre><%= purchase.papildomiTiekejaiKodai[i] %></pre>
-                            </div>
-                        <% } %>
-                    </div>
-                <% } %>
-
-                <div class="mobile-hide"></div>
-            </section>
-
-            <a href="/?tiekejoKodas=<%= purchase.tiekejoKodas %>&perkanciosiosOrganizacijosKodas=<%= purchase.perkanciosiosOrganizacijosKodas %>">↗ Tarpusavio sutartys</a>
-
-            <br>
-
-            <section class="col-3 mobile-col-2">
-                <div>
-                    <h2><u>Sutartis</u></h2>
-
-                    <div style="min-height: 24px; display: block;">
-                        <pre><%= purchase.sutartiesNumeris %></pre>
-                    </div>
-
-                    <div>
-                        <h3 style="margin-bottom: 4px;">Vertė:</h3>
-                        <div class="col-2">
-                            <section>
-                                <h4>Numatyta</h4>
-                                <%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
-                            </section>
-                            <section>
-                                <h4>Faktinė</h4>
-                                <%= purchase.faktineIvykdimoVerte ? purchase.faktineIvykdimoVerte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €" : "Nenurodyta" %>
-                            </section>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h3 style="margin-bottom: 4px;">Terminai:</h3>
-                        <div class="col-2" style="row-gap: 8px;">
-                            <section>
-                                <h4>Sudaryta</h4>
-                                <%= new String(purchase.sudarymoData).slice(0,10) %>
-                            </section>
-                            <section>
-                                <h4>Galioja iki</h4>
-                                <%= new String(purchase.galiojimoData).slice(0,10) %>
-                            </section>
-                            <section>
-                                <h4>Faktinė įvykdymo data</h4>
-                                <%= purchase.faktineIvykdimoData || "Nenurodyta" %>
-                            </section>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <h2><u>Pranešimas</u></h2>
-
-                    <div style="min-height: 24px; display: block;">
-                        <pre style="display: inline-block; margin-block: 4px;"><%= purchase.sutartiesUnikalusID %></pre>
-                        (<a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= purchase.sutartiesUnikalusID %>">
-                            ↗ CVP IS
-                        </a>)
-                    </div>
-
-                    <div>
-                        <h3>Paskelbta:</h3>
-                        <%= purchase.paskelbimoData %>
-                    </div>
-
-                    <div>
-                        <h3>Redaguota:</h3>
-                        <%= purchase.paskutinioRedagavimoData %>
-                    </div>
-
-                    <div>
-                        <h3>Pirkimo numeris:</h3>
-                        <% if(purchase.cvpisPirkimas){ %>
-                            <% if(purchase.cvpisPirkimas.type == 'Pmc'){ %>
-                                <a href="https://viesiejipirkimai.lt/epps/pmc/viewPmc.do?resourceId=<%= purchase.cvpisPirkimas.pirkimoId %>">
-                                    <%= purchase.pirkimoNumeris  %>
-                                </a>
-                            <% } %>
-                            <% if(purchase.cvpisPirkimas.type == 'CfTWS'){ %>
-                                <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTWS.do?resourceId=<%= purchase.cvpisPirkimas.pirkimoId %>">
-                                    <%= purchase.pirkimoNumeris  %>
-                                </a>
-                            <% } %>
-                            <% if(purchase.cvpisPirkimas.type == 'CfTDPSWS'){ %>
-                                <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTDPSWS.do?resourceId=<%= purchase.cvpisPirkimas.pirkimoId %>">
-                                    <%= purchase.pirkimoNumeris  %>
-                                </a>
-                            <% } %>
-                        <% } else if (purchase.cvppPirkimas) { %>
-                            <a href="<%= purchase.cvppPirkimas.link %>">
-                                <%= purchase.pirkimoNumeris  %>
-                            </a>
-                        <% } else { %>
-                            <%= purchase.pirkimoNumeris || "Nenurodytas" %>
-                        <% } %>
-
-                    </div>
-                </div>
-
-                <div class="mobile-wide-2">
-                    <h2><u>Klasifikacija</u></h2>
-
-                    <div>
-                        <h3>Kategorija:</h3>
-                        <%= purchase.kategorija %>
-                    </div>
+    <div class="page-header">
+      <div>
+        <p class="subtext mb-1"><%= purchase.tipoPavadinimas %></p>
+        <h1 class="mb-0">
+          <% if (purchase.pavadinimas.length < 1) { %>
+            <em>Nenurodyta</em>
+          <% } else { %>
+            <%= purchase.pavadinimas %>
+          <% } %>
+          už <span class="amount"><%= Number(purchase.faktineIvykdimoVerte || purchase.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€</span>
+        </h1>
+      </div>
+      <div class="d-flex gap-3 align-center">
+        <a href="/sutartis/<%= purchase.sutartiesUnikalusID %>.json" class="btn btn-outline btn-sm">↗ JSON</a>
+        <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= purchase.sutartiesUnikalusID %>" class="btn btn-outline btn-sm">↗ CVP IS</a>
+        <a href="mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20<%= purchase.sutartiesUnikalusID %>&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/<%= purchase.sutartiesUnikalusID %>" class="btn btn-outline btn-sm">↗ Pranešti</a>
+      </div>
+    </div>
 
 
-                    <div>
-                        <h3>Tipas:</h3>
-                        <%= purchase.tipas %> (<i><%= purchase.tipoPavadinimas %></i>)
-                    </div>
+    <!-- Pirkėjas / Tiekėjas -->
+    <div class="mb-6">
 
+    <div class="grid-3">
+      <section>
+        <h2>Pirkėjas</h2>
+        <h3><a href="/asmuo/<%= purchase.perkanciosiosOrganizacijosKodas %>"><%= purchase.perkanciojiOrganizacija %></a></h3>
+        <span class="text-muted"><%= purchase.perkanciosiosOrganizacijosKodas %></span>
+      </section>
 
-                    <div>
-                        <% if(!purchase.papildomiBvpzKodai || purchase.papildomiBvpzKodai.length == 0) { %>
-                            <h3>BVPŽ:</h3>
-                            <h4><%= purchase.bvpzPavadinimas %></h4>
-                            <pre><%= purchase.bvpzKodas %></pre>
-                        <% } else { %>
-                            <h3>BVPŽ:</h3>
-                            <div>
-                                <h4><%= purchase.bvpzPavadinimas %></h4>
-                                <pre><%= purchase.bvpzKodas %></pre>
-                            </div>
-                            <% for (let i = 0; i < purchase.papildomiBvpzKodai.length; i++) { %>
-                                <div style="margin-top: 12px;">
-                                    <h4><%= purchase.papildomiBvpzPavadinimai[i] %></h4>
-                                    <pre><%= purchase.papildomiBvpzKodai[i] %></pre>
-                                </div>
-                            <% } %>
-                        <% } %>
-                        <a href="/bvpz">↗ BVPŽ kodai</a>
-                    </div>
-                </div>
-
-                <div class="wide-3 mobile-wide-2">
-                    <br>
-                    <h2><u>Dokumentai</u></h2>
-
-                    <% if (purchase.dokumentai && purchase.dokumentai.length > 0) { %>
-                        <ul class="file-list">
-                            <% purchase.dokumentai.forEach(doc => { %>
-                                <li>
-                                    <% if(doc.id && doc.parsiustas && doc.nuskaitytas){ %>
-                                        <a href="/failas/<%= doc.id %>"><%= doc.pavadinimas %></a>
-                                        (<a href="<%= doc.proxyUrl %>">↗ Failas</a>, <a href="<%= doc.url %>">↗ CVP IS</a>)
-                                    <% } else if(doc.parsiustas && doc.nuskaitytas) { %>
-                                        <a href="/failas/<%= doc.dok_id %>/<%= doc.file_id %>"><%= doc.pavadinimas %></a>
-                                        (<a href="<%= doc.proxyUrl %>">↗ Failas</a>, <a href="<%= doc.url %>">↗ CVP IS</a>)
-                                    <% } else { %>
-                                        <a href="<%= doc.proxyUrl %>" target="_blank"><%= doc.pavadinimas %></a>
-                                        (<a href="<%= doc.url %>">↗ CVP IS</a>)
-                                    <% } %>
-                                </li>
-                            <% }); %>
-                        </ul>
-                    <% } else { %>
-                        <p>Pateiktų dokumentų nėra.</p>
-                    <% } %>
-                </div>
-            </section>
-
-            <div class="col-2 mobile-col-1">
-            <% if(purchase.cpvaProjektuSutartys && purchase.cpvaProjektuSutartys.length > 0) { %>
-            <section>
-                <div>
-                    <h2><u>Europos sąjungos projektai<sup>BETA</sup></u></h2><br>
-                    <% purchase.cpvaProjektuSutartys.forEach(projektoSutartis => { %>
-                        <div class="rezultatas">
-                            <div class="rezultatas-top">
-                                <span><%= projektoSutartis.projektoNr || "" %></span>
-                                <% if(projektoSutartis?.projektas) { %>
-                                    <span><%= projektoSutartis?.projektas?.projektoVeikluPradziosData || "" %> - <%= projektoSutartis?.projektas?.projektoVeikluPabaigosData || "" %></span>
-                                <% } %>
-                            </div>
-                            <div class="rezultatas-title">
-                                <span>
-                                    <a href="https://2021.esinvesticijos.lt/projektu-sritis/projektu-sarasas?query=<%= projektoSutartis.projektoNr %>">
-                                        <%= projektoSutartis?.projektas?.projektoPavadinimas || projektoSutartis.pirkimoObjektas || "" %>
-                                    </a>
-                                </span>
-                            </div>
-                            <div class="rezultatas-bottom">
-                                <% if(projektoSutartis.projektas && projektoSutartis.projektas.projektoVykdytojas) { %>
-                                    <% if(projektoSutartis.projektas.projektoVykdytojas) { %>
-                                        <span>
-                                            <b>Projekto vykdytojas:</b>
-                                            <a href="/asmuo/<%= projektoSutartis.projektas.projektoVykdytojoKodas %>">
-                                                <%= projektoSutartis?.projektas?.projektoVykdytojas  %>
-                                            </a>
-                                        </span>
-                                    <% } %>
-                                    <% if(projektoSutartis.projektas.isViso) { %>
-                                        <span>
-                                            <b>Bendra projekto suma:</b>
-                                            <%= Number(projektoSutartis.projektas.isViso).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€
-                                        </span>
-                                    <% } %>
-                                <% } %>
-                            </div>
-                        </div>
-                    <% }); %>
-                </div>
-            </section>
-            <% } %>
-
-
-            <section>
-                <div>
-                    <h2><u>SABIS sutartys<sup>BETA</sup></u></h2><br>
-                    <% if(purchase.sabisSutartys && purchase.sabisSutartys.length > 0) { %>
-                        <% purchase.sabisSutartys.forEach(item => { %>
-                            <div class="rezultatas">
-                                <div class="rezultatas-top">
-                                    <span><%= item.tipas %></span>
-                                    <span><%= item.sutartiesNumeris %></span>
-                                    <span>
-                                        <% if(item.sutartiesPasirasymoData && item.sutartiesGaliojimoData) {  %>
-                                            <% let sutartiesPasirasymoData = new String(item.sutartiesPasirasymoData).slice(0,10); %>
-                                            <% let sutartiesGaliojimoData = new String(item.sutartiesGaliojimoData).slice(0,10); %>
-
-                                            <% if(sutartiesPasirasymoData == sutartiesGaliojimoData) { %>
-                                                Sut. <%= sutartiesPasirasymoData %>
-                                            <% } else { %>
-                                                Sut. <%= sutartiesPasirasymoData %> - <%= sutartiesGaliojimoData %>
-                                            <% } %>
-                                        <% } else { %>
-                                            -
-                                        <% } %>
-                                    </span>
-                                    <span>
-                                        <% if (item.sutartiesId) { %>
-                                            <%= item.sutartiesId %>
-                                        <% } %>
-                                    </span>
-                                </div>
-                                <div class="rezultatas-title">
-                                    <span>
-                                        <%
-                                            const suma = item.suma;
-                                            if(Number(suma) > 10000) {
-                                        %>
-                                            <u><%= Number(suma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€</u>
-                                        <% } else { %>
-                                            <%= Number(suma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€
-                                        <% } %>
-                                    </span>&nbsp;
-                                    <span>
-                                        <% if(item.pavadinimas.length < 1) { %>
-                                            <i>Nenurodyta</i>
-                                        <% } else { %>
-                                            <%= item.pavadinimas %>
-                                        <% } %>
-                                    </span>
-                                </div>
-                                <div class="rezultatas-bottom">
-                                    <% item.salys.forEach(salis => { %>
-                                        <span>
-                                            <b><%= salis.tipas %></b>
-                                            <%= salis.validusJarKodas || salis.validusAsmensKodas || salis.kitasKodas || salis.pavadinimas  %>
-                                        </span>
-                                    <% }); %>
-
-                                    <% if(item.saskaitos && item.saskaitos.length > 0) { %>
-                                        <span>
-                                            <h3> Sąskaitos:</h3>
-                                            <span>
-                                                <% item.saskaitos.forEach(saskaita => { %>
-                                                    <div>
-                                                        <h4><%= saskaita.sfTipas %> Nr. <%= saskaita.sfNumeris %></h4>
-                                                        ID: <i><%= saskaita.sfId %> </i><br>
-                                                        <% if(saskaita.valiuta == "Euras" || saskaita.valiuta == "EUR") {  saskaita.valiuta = "€" } %>
-                                                        <%= Number(saskaita.bendraSfSuma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;<%= saskaita.valiuta %> (su <%= saskaita.pvm %> PVM)
-                                                        <br>
-                                                        <i><%= saskaita.sfBusena %> (<%= saskaita.sfBusenoData %>)</i>
-                                                    </div>
-                                                <% }); %>
-                                            </span>
-
-                                        </span>
-                                    <% } %>
-                                </div>
-                            </div>
-                        <% }); %>
-                    <% } else { %>
-                        <i>Panašių sutarčių nerasta.</i>
-                    <% } %>
-                </div>
-            </section>
-
-            <section>
-                <div>
-                    <h2><u>Panašios sutartys</u></h2><br>
-                    <% if(purchase.panasiosSutartys && purchase.panasiosSutartys.length > 0) { %>
-                        <% purchase.panasiosSutartys.forEach(item => { %>
-                            <div class="rezultatas">
-                                <div class="rezultatas-top">
-                                    <span><%= item.tipas %></span>
-                                    <span><%= item.kategorija %></span>
-                                    <span>
-                                        <% if(item.sudarymoData && item.galiojimoData) {  %>
-                                            <% let sudarymoData = new String(item.sudarymoData).slice(0,10); %>
-                                            <% let galiojimoData = new String(item.galiojimoData).slice(0,10); %>
-
-                                            <% if(sudarymoData == galiojimoData) { %>
-                                                Sut. <%= sudarymoData %>
-                                            <% } else { %>
-                                                Sut. <%= sudarymoData %> - <%= galiojimoData %>
-                                            <% } %>
-                                        <% } else { %>
-                                            -
-                                        <% } %>
-                                    </span>
-                                    <span>
-                                        <% if (item.paskutinioRedagavimoData) { %>
-                                            Red. <%= item.paskutinioRedagavimoData %>
-                                        <% } else { %>
-                                            -
-                                        <% } %>
-                                    </span>
-                                    <span>
-                                        <% if (item.dokumentuKiekis === 0) { %>
-
-                                        <% } else { %>
-                                            <%= item.dokumentuKiekis %> dok.
-                                        <% } %>
-                                    </span>
-
-                                </div>
-                                <div class="rezultatas-title">
-                                    <a href="/sutartis/<%= item.sutartiesUnikalusId %>">
-                                        <span>
-                                            <%
-                                                const verte = item.faktineIvykdimoVerte || item.verte;
-                                                if(Number(verte) > 10000) {
-                                            %>
-                                                <u><%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</u>
-                                            <% } else { %>
-                                                <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
-                                            <% } %>
-                                        </span>&nbsp;
-                                        <span>
-                                            <% if(item.pavadinimas.length < 1) { %>
-                                                <i>Nenurodyta</i>
-                                            <% } else { %>
-                                                <%= item.pavadinimas %>
-                                            <% } %>
-                                        </span>
-                                    </a>
-                                </div>
-                                <div class="rezultatas-bottom">
-                                    <span>
-                                        <b> Pirkėjas: </b>
-                                        <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>"><%= item.perkanciojiOrganizacija %></a>
-                                    </span>
-                                    <span>
-                                        <b> Tiekėjas: </b>
-                                        <a href="/asmuo/<%= item.tiekejoKodas %>"><%= item.tiekejas || "Nenurodytas" %></a>
-                                    </span>
-                                </div>
-                            </div>
-                        <% }); %>
-                    <% } else { %>
-                        <i>Panašių sutarčių nerasta.</i>
-                    <% } %>
-                </div>
-            </section>
+      <section>
+        <% if (!purchase.papildomiTiekejai || purchase.papildomiTiekejai.length == 0) { %>
+          <h2>Tiekėjas</h2>
+          <% if (purchase.tiekejasPatikslinimas && purchase.tiekejasPatikslinimas != purchase.tiekejas) { %>
+            <p class="text-muted text-sm mb-1"><%= purchase.tiekejasPatikslinimas %></p>
+          <% } %>
+          <h3><a href="/asmuo/<%= purchase.tiekejoKodas %>"><%= purchase.tiekejas %></a></h3>
+          <% if (purchase.tiekejasSalis) { %>
+            <p class="text-muted text-sm"><%= purchase.tiekejasSalis %></p>
+          <% } %>
+          <span class="text-muted"><%= purchase.tiekejoKodas %></span>
+        <% } else { %>
+          <h2>Tiekėjai</h2>
+          <div class="mb-3">
+            <h3><a href="/asmuo/<%= purchase.tiekejoKodas %>"><%= purchase.tiekejas %></a></h3>
+            <span class="text-muted"><%= purchase.tiekejoKodas %></span>
+          </div>
+          <% for (let i = 0; i < purchase.papildomiTiekejai.length; i++) { %>
+            <div class="mt-3">
+              <h3><a href="/asmuo/<%= purchase.papildomiTiekejaiKodai[i] %>"><%= purchase.papildomiTiekejai[i] %></a></h3>
+              <span class="text-muted"><%= purchase.papildomiTiekejaiKodai[i] %></span>
             </div>
-		</main>
+          <% } %>
+        <% } %>
+      </section>
+    </div>
 
-        <%- include('footer.ejs') %>
-	</body>
+      <div class="mt-4">
+        <a href="/?tiekejoKodas=<%= purchase.tiekejoKodas %>&perkanciosiosOrganizacijosKodas=<%= purchase.perkanciosiosOrganizacijosKodas %>" class="btn btn-outline btn-sm">↗ Tarpusavio sutartys</a>
+      </div>
+
+    </div>
+
+
+    <!-- Sutartis / Pranešimas / Klasifikacija / Dokumentai -->
+    <div class="grid-3 mb-7">
+
+      <section>
+        <h2>Sutartis</h2>
+        <span class="text-muted mb-4 d-block"><%= purchase.sutartiesNumeris %></span>
+
+        <h3 class="mb-2">Vertė</h3>
+        <dl class="kv-list mb-4">
+          <dt>Numatyta</dt>
+          <dd class="cell-mono"><%= purchase.verte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</dd>
+          <dt>Faktinė</dt>
+          <dd class="cell-mono"><%= purchase.faktineIvykdimoVerte ? purchase.faktineIvykdimoVerte.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €" : "Nenurodyta" %></dd>
+        </dl>
+
+        <h3 class="mb-2">Terminai</h3>
+        <dl class="kv-list">
+          <dt>Sudaryta</dt>
+          <dd><%= new String(purchase.sudarymoData).slice(0,10) %></dd>
+          <dt>Galioja iki</dt>
+          <dd><%= new String(purchase.galiojimoData).slice(0,10) %></dd>
+          <dt>Faktinė įvykdymo data</dt>
+          <dd><%= purchase.faktineIvykdimoData || "Nenurodyta" %></dd>
+        </dl>
+      </section>
+
+      <section>
+        <h2>Pranešimas</h2>
+        <div class="d-flex align-center gap-2 mb-4">
+          <span class="text-muted"><%= purchase.sutartiesUnikalusID %></span>
+          <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= purchase.sutartiesUnikalusID %>" class="text-sm">↗ CVP IS</a>
+        </div>
+
+        <dl class="kv-list mb-4">
+          <dt>Paskelbta</dt>
+          <dd><%= purchase.paskelbimoData %></dd>
+          <dt>Redaguota</dt>
+          <dd><%= purchase.paskutinioRedagavimoData %></dd>
+          <dt>Pirkimo numeris</dt>
+          <dd>
+            <% if (purchase.cvpisPirkimas) { %>
+              <% if (purchase.cvpisPirkimas.type == 'Pmc') { %>
+                <a href="https://viesiejipirkimai.lt/epps/pmc/viewPmc.do?resourceId=<%= purchase.cvpisPirkimas.pirkimoId %>"><%= purchase.pirkimoNumeris %></a>
+              <% } else if (purchase.cvpisPirkimas.type == 'CfTWS') { %>
+                <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTWS.do?resourceId=<%= purchase.cvpisPirkimas.pirkimoId %>"><%= purchase.pirkimoNumeris %></a>
+              <% } else if (purchase.cvpisPirkimas.type == 'CfTDPSWS') { %>
+                <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTDPSWS.do?resourceId=<%= purchase.cvpisPirkimas.pirkimoId %>"><%= purchase.pirkimoNumeris %></a>
+              <% } %>
+            <% } else if (purchase.cvppPirkimas) { %>
+              <a href="<%= purchase.cvppPirkimas.link %>"><%= purchase.pirkimoNumeris %></a>
+            <% } else { %>
+              <%= purchase.pirkimoNumeris || "Nenurodytas" %>
+            <% } %>
+          </dd>
+        </dl>
+      </section>
+
+      <section>
+        <h2>Klasifikacija</h2>
+        <dl class="kv-list mb-4">
+          <dt>Kategorija</dt>
+          <dd><%= purchase.kategorija %></dd>
+          <dt>Tipas</dt>
+          <dd><%= purchase.tipas %> <span class="text-muted">(<em><%= purchase.tipoPavadinimas %></em>)</span></dd>
+        </dl>
+
+        <h3 class="mb-2">BVPŽ</h3>
+        <div class="mb-2">
+          <div class="fw-medium"><%= purchase.bvpzPavadinimas %></div>
+          <span class="text-muted"><%= purchase.bvpzKodas %></span>
+        </div>
+        <% if (purchase.papildomiBvpzKodai && purchase.papildomiBvpzKodai.length > 0) { %>
+          <% for (let i = 0; i < purchase.papildomiBvpzKodai.length; i++) { %>
+            <div class="mb-2">
+              <div class="fw-medium"><%= purchase.papildomiBvpzPavadinimai[i] %></div>
+              <span class="text-muted"><%= purchase.papildomiBvpzKodai[i] %></span>
+            </div>
+          <% } %>
+        <% } %>
+        <a href="/bvpz" class="text-sm">↗ BVPŽ kodai</a>
+      </section>
+
+      <section class="span-full">
+        <h2>Dokumentai</h2>
+        <% if (purchase.dokumentai && purchase.dokumentai.length > 0) { %>
+          <ul class="file-list">
+            <% purchase.dokumentai.forEach(doc => { %>
+              <li>
+                <% if (doc.id && doc.parsiustas && doc.nuskaitytas) { %>
+                  <a href="/failas/<%= doc.id %>"><%= doc.pavadinimas %></a>
+                  <span class="text-muted text-sm ms-2">(<a href="<%= doc.proxyUrl %>">↗ Failas</a>, <a href="<%= doc.url %>">↗ CVP IS</a>)</span>
+                <% } else if (doc.parsiustas && doc.nuskaitytas) { %>
+                  <a href="/failas/<%= doc.dok_id %>/<%= doc.file_id %>"><%= doc.pavadinimas %></a>
+                  <span class="text-muted text-sm ms-2">(<a href="<%= doc.proxyUrl %>">↗ Failas</a>, <a href="<%= doc.url %>">↗ CVP IS</a>)</span>
+                <% } else { %>
+                  <a href="<%= doc.proxyUrl %>" target="_blank"><%= doc.pavadinimas %></a>
+                  <span class="text-muted text-sm ms-2">(<a href="<%= doc.url %>">↗ CVP IS</a>)</span>
+                <% } %>
+              </li>
+            <% }); %>
+          </ul>
+        <% } else { %>
+          <p class="text-muted">Pateiktų dokumentų nėra.</p>
+        <% } %>
+      </section>
+
+    </div>
+
+
+    <!-- ES projektai / SABIS / Panašios sutartys -->
+    <div class="grid-2">
+
+      <% if (purchase.cpvaProjektuSutartys && purchase.cpvaProjektuSutartys.length > 0) { %>
+      <section>
+        <h2>Europos sąjungos projektai <sup>BETA</sup></h2>
+        <div class="result-list mt-4">
+          <% purchase.cpvaProjektuSutartys.forEach(projektoSutartis => { %>
+            <article class="result-card">
+              <div class="result-card-body">
+                <div class="result-card-meta">
+                  <span><%= projektoSutartis.projektoNr || "" %></span>
+                  <% if (projektoSutartis?.projektas) { %>
+                    <span><%= projektoSutartis?.projektas?.projektoVeikluPradziosData || "" %> — <%= projektoSutartis?.projektas?.projektoVeikluPabaigosData || "" %></span>
+                  <% } %>
+                </div>
+                <h3 class="result-card-title">
+                  <a href="https://2021.esinvesticijos.lt/projektu-sritis/projektu-sarasas?query=<%= projektoSutartis.projektoNr %>">
+                    <%= projektoSutartis?.projektas?.projektoPavadinimas || projektoSutartis.pirkimoObjektas || "" %>
+                  </a>
+                </h3>
+              </div>
+              <% if (projektoSutartis.projektas) { %>
+                <div class="result-card-sidebar">
+                  <% if (projektoSutartis.projektas.projektoVykdytojas) { %>
+                    <span class="text-sm"><a href="/asmuo/<%= projektoSutartis.projektas.projektoVykdytojoKodas %>"><%= projektoSutartis.projektas.projektoVykdytojas %></a></span>
+                  <% } %>
+                  <% if (projektoSutartis.projektas.isViso) { %>
+                    <span class="amount amount-sm"><%= Number(projektoSutartis.projektas.isViso).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</span>
+                  <% } %>
+                </div>
+              <% } %>
+            </article>
+          <% }); %>
+        </div>
+      </section>
+      <% } %>
+
+
+      <section>
+        <h2>SABIS sutartys <sup>BETA</sup></h2>
+        <% if (purchase.sabisSutartys && purchase.sabisSutartys.length > 0) { %>
+          <div class="result-list mt-4">
+            <% purchase.sabisSutartys.forEach(item => { %>
+              <article class="result-card">
+                <div class="result-card-body">
+                  <div class="result-card-meta">
+                    <span><%= item.tipas %></span>
+                    <span><%= item.sutartiesNumeris %></span>
+                    <span>
+                      <% if (item.sutartiesPasirasymoData && item.sutartiesGaliojimoData) { %>
+                        <% let d1 = new String(item.sutartiesPasirasymoData).slice(0,10); %>
+                        <% let d2 = new String(item.sutartiesGaliojimoData).slice(0,10); %>
+                        Sut. <%= d1 %><%= d1 != d2 ? ' — ' + d2 : '' %>
+                      <% } else { %>—<% } %>
+                    </span>
+                  </div>
+                  <h3 class="result-card-title">
+                    <% const sabisVerte = item.suma; %>
+                    <span class="amount-sm <%= Number(sabisVerte) > 10000 ? 'fw-bold' : '' %>">
+                      <%= Number(sabisVerte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
+                    </span>
+                    &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>
+                  </h3>
+                  <div class="d-flex flex-wrap gap-2 mt-2">
+                    <% item.salys.forEach(salis => { %>
+                      <span class="text-sm"><strong><%= salis.tipas %></strong> <%= salis.validusJarKodas || salis.validusAsmensKodas || salis.kitasKodas || salis.pavadinimas %></span>
+                    <% }); %>
+                  </div>
+                  <% if (item.saskaitos && item.saskaitos.length > 0) { %>
+                    <div class="mt-3">
+                      <p class="section-title mb-2">Sąskaitos</p>
+                      <% item.saskaitos.forEach(saskaita => { %>
+                        <div class="kv-list mb-2">
+                          <dt><%= saskaita.sfTipas %> Nr. <%= saskaita.sfNumeris %></dt>
+                          <dd>
+                            <% if (saskaita.valiuta == "Euras" || saskaita.valiuta == "EUR") { saskaita.valiuta = "€" } %>
+                            <span class="cell-mono"><%= Number(saskaita.bendraSfSuma).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> <%= saskaita.valiuta %></span>
+                            <span class="text-muted text-sm">(su <%= saskaita.pvm %> PVM)</span><br>
+                            <span class="subtext"><%= saskaita.sfBusena %> (<%= saskaita.sfBusenoData %>)</span>
+                          </dd>
+                        </div>
+                      <% }); %>
+                    </div>
+                  <% } %>
+                </div>
+              </article>
+            <% }); %>
+          </div>
+        <% } else { %>
+          <p class="text-muted mt-4"><em>Panašių sutarčių nerasta.</em></p>
+        <% } %>
+      </section>
+
+
+      <section>
+        <h2>Panašios sutartys</h2>
+        <% if (purchase.panasiosSutartys && purchase.panasiosSutartys.length > 0) { %>
+          <div class="result-list mt-4">
+            <% purchase.panasiosSutartys.forEach(item => { %>
+              <article class="result-card card-clickable">
+                <a href="/sutartis/<%= item.sutartiesUnikalusId %>" class="card-overlay-link"><%= item.pavadinimas %></a>
+                <div class="result-card-body">
+                  <div class="result-card-meta">
+                    <span><%= item.tipas %></span>
+                    <span><%= item.kategorija %></span>
+                    <span>
+                      <% if (item.sudarymoData && item.galiojimoData) { %>
+                        <% let d1 = new String(item.sudarymoData).slice(0,10); %>
+                        <% let d2 = new String(item.galiojimoData).slice(0,10); %>
+                        Sut. <%= d1 %><%= d1 != d2 ? ' — ' + d2 : '' %>
+                      <% } else { %>—<% } %>
+                    </span>
+                    <% if (item.dokumentuKiekis > 0) { %>
+                      <span><%= item.dokumentuKiekis %> dok.</span>
+                    <% } %>
+                  </div>
+                  <h3 class="result-card-title">
+                    <% const verte = item.faktineIvykdimoVerte || item.verte; %>
+                    <span class="cell-mono <%= Number(verte) > 10000 ? 'fw-bold' : '' %>">
+                      <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
+                    </span>
+                    &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>
+                  </h3>
+                  <div class="d-flex gap-3 mt-2 text-sm">
+                    <span><strong>Pirkėjas:</strong> <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>" style="position:relative;z-index:1;"><%= item.perkanciojiOrganizacija %></a></span>
+                    <span><strong>Tiekėjas:</strong> <a href="/asmuo/<%= item.tiekejoKodas %>" style="position:relative;z-index:1;"><%= item.tiekejas || "Nenurodytas" %></a></span>
+                  </div>
+                </div>
+              </article>
+            <% }); %>
+          </div>
+        <% } else { %>
+          <p class="text-muted mt-4"><em>Panašių sutarčių nerasta.</em></p>
+        <% } %>
+      </section>
+
+    </div>
+
+  </main>
+  <%- include('footer.ejs') %>
+</body>
 </html>

@@ -1,126 +1,72 @@
-    <div>
-        <section class="preResultOptions">
-            <div class="numberOfResults">
-                <%- numberOfResults %>
+<div class="mt-6 max-w-lg center mx-auto">
+  <div class="d-flex justify-between align-center mb-4">
+    <span class="text-muted text-sm"><em class="numberOfResults"><%- numberOfResults %></em></span>
+  </div>
+
+  <% if (data.length === 0) { %>
+    <div class="empty-state">
+      <p class="text-muted">Rezultatų nerasta.</p>
+    </div>
+  <% } else { %>
+
+    <div class="result-list">
+      <% data.forEach(item => { %>
+        <%
+          let asmuoLink = "/asmuo/" + item.tiekejoJarKodas;
+          if (item.saltinis === "Nepatikimas") asmuoLink += "#nepatikimi";
+          else if (item.saltinis === "Melagingas") asmuoLink += "#melagiai";
+        %>
+        <article class="result-card card-clickable" aria-label="<%= item.tiekejoPavadinimas %>">
+          <a href="<%= asmuoLink %>" class="card-overlay-link"><%= item.tiekejoPavadinimas %></a>
+
+          <div class="result-card-body">
+            <dl class="result-card-meta">
+              <div>
+                <dt class="visually-hidden">Šaltinis</dt>
+                <dd><%= item.saltinis %></dd>
+              </div>
+              <div>
+                <dt class="visually-hidden">Galiojimas</dt>
+                <dd><%= item.dataNuoKuriosSkaiciuojama || "nežinoma" %> – <%= item.itrauktasIki || "nežinoma" %></dd>
+              </div>
+              <div>
+                <dt class="visually-hidden">Įvesta</dt>
+                <dd>Įvesta <%= item.duomenuIvedimoData || "nežinoma" %></dd>
+              </div>
+              <div>
+                <dt class="visually-hidden">Paskutinį kartą matyta</dt>
+                <dd>Matyta <%= item.paskutiniKartaMatytaSarase %></dd>
+              </div>
+            </dl>
+
+            <h3 class="result-card-title"><%= item.tiekejoPavadinimas %></h3>
+
+            <% if (item.irasymoPagrindas && item.irasymoPagrindas.length > 3) { %>
+              <p class="text-sm mt-2" style="text-align:justify;"><%= item.irasymoPagrindas %></p>
+            <% } else if (item.itraukimoPriezastis && item.itraukimoPriezastis.length > 3) { %>
+              <p class="text-sm mt-2" style="text-align:justify;"><%= item.itraukimoPriezastis.charAt(0).toUpperCase() + item.itraukimoPriezastis.slice(1) %></p>
+            <% } %>
+
+            <% if (item.pagrindimas?.tiekejoPaaiskinimas?.length > 3) { %>
+              <blockquote class="mt-3"><%= item.pagrindimas.tiekejoPaaiskinimas %></blockquote>
+              <% if (item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda?.length > 3) { %>
+                <a href="<%= item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda %>" target="_blank" rel="noopener noreferrer" class="text-sm" style="position:relative;z-index:1;">↗ Peržiūrėti dokumentą (<%= item.pagrindimas.paaiskinimoPateikimoData || "Data nenurodyta" %>)</a>
+              <% } %>
+            <% } %>
+
+            <div class="result-card-footer">
+              <span><strong>Pirkėjas:</strong> <%= item.pirkimoVykdytojoPavadinimas || "nenurodytas" %></span>
+              <span><strong>Pirkimo nr.:</strong> <%= item.pirkimoNumeris || "nenurodytas" %></span>
+              <% if (item.teismoSprendimoLink?.length > 5) { %>
+                <span><a href="<%= item.teismoSprendimoLink %>" target="_blank" rel="noopener noreferrer" style="position:relative;z-index:1;">↗ Teismo sprendimas</a></span>
+              <% } %>
             </div>
-        </section>
-    </div>
-    <div class="resultsNauji">
-        <% data.forEach(item => { %>
-            <article class="rezultatas" aria-label="<%= item.tiekejoPavadinimas %>">
-                <%
-                    let asmuoLink = "/asmuo/" + item.tiekejoJarKodas;
-                    if (item.saltinis === "Nepatikimas") asmuoLink += "#nepatikimi";
-                    else if (item.saltinis === "Melagingas") asmuoLink += "#melagiai";
-                %>
-                <a href="<%= asmuoLink %>" class="fullIndentLink"></a>
-
-                <div class="rezultatas-left">
-                    <dl class="rezultatas-top">
-                        <div>
-                            <dt class="visually-hidden">Šaltinis</dt>
-                            <dd><%= item.saltinis %></dd>
-                        </div>
-
-                        <div class="vertical-line-spacer"></div>
-
-                        <div>
-                            <dt class="visually-hidden">Galiojimas</dt>
-                            <dd>
-                                <%= item.dataNuoKuriosSkaiciuojama || "nežinoma" %> –
-                                <%= item.itrauktasIki || "nežinoma" %>
-                            </dd>
-                        </div>
-
-                        <div class="vertical-line-spacer"></div>
-
-                        <div>
-                            <dt class="visually-hidden">Įvesta</dt>
-                            <dd>Įvesta <%= item.duomenuIvedimoData || "nežinoma" %></dd>
-                        </div>
-
-                        <div class="vertical-line-spacer"></div>
-
-                        <div>
-                            <dt class="visually-hidden">Paskutinį kartą matyta</dt>
-                            <dd>Paskutinį kartą matyta <%= item.paskutiniKartaMatytaSarase %></dd>
-                        </div>
-                    </dl>
-
-                    <h3 class="rezultatas-title">
-                        <a href="<%= asmuoLink %>">
-                            <span><%= item.tiekejoPavadinimas %></span>
-                        </a>
-                    </h3>
-
-                    <div class="rezultatas-bottom" style="text-align: justify;">
-                        <% if (item.irasymoPagrindas && item.irasymoPagrindas.length > 3) { %>
-                            <div><%= item.irasymoPagrindas %></div>
-                        <% } else if (item.itraukimoPriezastis && item.itraukimoPriezastis.length > 3) { %>
-                            <div>
-                                <%= item.itraukimoPriezastis.charAt(0).toUpperCase() + item.itraukimoPriezastis.slice(1) %>
-                            </div>
-                        <% } %>
-
-                        <div>
-                            <b>Pirkėjas:</b>
-                            <%= item.pirkimoVykdytojoPavadinimas || "nenurodytas" %>
-                        </div>
-
-                        <div>
-                            <b>Pirkimo numeris:</b>
-                            <%= item.pirkimoNumeris || "nenurodytas" %>
-                        </div>
-
-                        <% if (item.teismoSprendimoLink && item.teismoSprendimoLink.length > 5) { %>
-                            <div>
-                                <b>Teismo sprendimas:</b>
-                                <a href="<%= item.teismoSprendimoLink %>" target="_blank" rel="noopener noreferrer">
-                                    Peržiūrėti sprendimą
-                                </a>
-                            </div>
-                        <% } %>
-
-                        <% if (
-                            item.pagrindimas &&
-                            item.pagrindimas.tiekejoPaaiskinimas &&
-                            item.pagrindimas.tiekejoPaaiskinimas.length > 3
-                        ) { %>
-                            <div>
-                                <b>Tiekėjo paaiškinimas:</b>
-                                <% if (
-                                    item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda &&
-                                    item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda.length > 3
-                                ) { %>
-                                    <div>
-                                        <a href="<%= item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda %>"
-                                           target="_blank"
-                                           rel="noopener noreferrer">
-                                            ↗ Peržiūrėti dokumentą
-                                            (<%= item.pagrindimas.paaiskinimoPateikimoData || "Data nenurodyta" %>)
-                                        </a>
-                                    </div>
-                                <% } %>
-
-                                <blockquote>
-                                    <%= item.pagrindimas.tiekejoPaaiskinimas %>
-                                </blockquote>
-
-                                <% if (item.pagrindimas.paaiskinimoPateikimoData) { %>
-                                    <div style="text-align: right; font-size: 0.9em;">
-                                        <i>(Pateiktas: <%= item.pagrindimas.paaiskinimoPateikimoData %>)</i>
-                                    </div>
-                                <% } %>
-                            </div>
-                        <% } %>
-                    </div>
-                </div>
-            </article>
-        <% }); %>
+          </div>
+        </article>
+      <% }); %>
     </div>
 
+    <%- include('../pagination.ejs', { currentPage, pageCount, queryParams }) %>
 
-
-<%- include('../pagination.ejs', {
-    currentPage, pageCount, queryParams
-}) %>
+  <% } %>
+</div>

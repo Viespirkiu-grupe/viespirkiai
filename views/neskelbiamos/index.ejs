@@ -1,21 +1,22 @@
 <!DOCTYPE html>
 <html lang="lt">
-	<head>
-	<%- include('../head.ejs', {
-        pageTitle: "Neskelbiamų derybų paieška",
-        pageDescription: ``,
-        pageImage: `https://viespirkiai.org/index.png`,
-        customHead
-    }) %>
-	</head>
-	<body>
-		<%- include('../header.ejs', {hideSubtext: false}) %>
-		<main>
-			<%- include('search.ejs', {values}) %>
-			<div class="results">
-                <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti, search}) %>
-			</div>
-		</main>
-		<%- include('../footer.ejs') %>
-	</body>
+<head>
+  <%- include('../head.ejs', {
+    pageTitle: "Neskelbiamų derybų paieška",
+    pageDescription: ``,
+    pageImage: `https://viespirkiai.org/index.png`,
+    customHead
+  }) %>
+</head>
+<body>
+  <%- include('../header.ejs', { hideSubtext: false }) %>
+
+  <main>
+
+    <%- include('search.ejs', { values }) %>
+
+      <%- include('results.ejs', { data, currentPage, pageCount, queryParams, galimaEksportuoti, search }) %>
+  </main>
+  <%- include('../footer.ejs') %>
+</body>
 </html>

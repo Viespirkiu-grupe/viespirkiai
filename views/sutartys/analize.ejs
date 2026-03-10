@@ -1,127 +1,128 @@
-<section>
-    <h2>Rezultatų analizė<sup>BETA</sup></h2>
-    <a href="/?<%- queryParams %>&xlsx=true&analize=true">↗ XLSX</a>
-    <section style="width: 100%;" class="col-3">
-        <% if(analize.tipai) { %>
-            <div>
-            <h2><u><a href="#tipai" id="tipai" class="hashHref">Sutarčių tipai</a></u></h2>
-            <div id="analizeTipaiDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+<% if (analize) { %>
+<div class="page-section" id="analize">
+  <div class="d-flex justify-between align-center mb-5">
+    <h2 class="mb-0"><a href="#analize" class="no-style">Rezultatų analizė <sup>BETA</sup></a></h2>
+    <a href="/?<%- queryParams %>&xlsx=true&analize=true" class="btn btn-outline btn-sm">↗ XLSX</a>
+  </div>
 
-            <script defer>
-               const tipaiLabels = <%- JSON.stringify(analize.tipai.map(t => t.tipas)) %>;
-               const tipaiValues = <%- JSON.stringify(analize.tipai.map(t => t.count)) %>;
+  <div class="grid-3">
 
-               displayChart({
-                 element: document.querySelector('#analizeTipaiDiagrama'),
-                 type: 'pie',
-                 labels: tipaiLabels,
-                 series: tipaiValues,
-                 flags: ["colors"]
-               })
-            </script>
-            </div>
-        <% } %>
+    <% if (analize.tipai) { %>
+      <div style="display:flex; flex-direction:column; min-height:350px;">
+        <h3 class="text-sm fw-bold mb-3"><a href="#tipai" id="tipai" class="no-style">Sutarčių tipai</a></h3>
+        <div class="chart-frame">
+          <div id="analizeTipaiDiagrama" class="chart" style="height:350px;"></div>
+        </div>
+        <script defer>
+          displayChart({
+            element: document.querySelector('#analizeTipaiDiagrama'),
+            type: 'pie',
+            labels: <%- JSON.stringify(analize.tipai.map(t => t.tipas)) %>,
+            series: <%- JSON.stringify(analize.tipai.map(t => t.count)) %>,
+            flags: ['colors'],
+          });
+        </script>
+      </div>
+    <% } %>
 
-        <% if(analize.sumosVsDatos) { %>
-            <div>
-            <h2><u><a href="#sumosVsDatos" id="sumosVsDatos" class="hashHref">Sumų ir datų pasiskirstymas</a></u><sub>&nbsp;log</sub></h2>
-            <div id="sumosVsDatosDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+    <% if (analize.sumosVsDatos) { %>
+      <div style="display:flex; flex-direction:column; min-height:350px;">
+        <h3 class="text-sm fw-bold mb-3"><a href="#sumosVsDatos" id="sumosVsDatos" class="no-style">Sumų ir datų pasiskirstymas <sub>log</sub></a></h3>
+        <div class="chart-frame">
+          <div id="sumosVsDatosDiagrama" class="chart" style="height:350px;"></div>
+        </div>
+        <script defer>
+          const sumosVsDatosSeries = <%- JSON.stringify(analize.sumosVsDatos.map(i => [i.data, i.suma])) %>
+            .map(i => [new Date(i[0]), i[1]]);
+          displayChart({
+            element: document.querySelector('#sumosVsDatosDiagrama'),
+            type: 'scatter',
+            labels: [],
+            series: sumosVsDatosSeries,
+            flags: ['colors', 'xAxisYearMonth', 'yEUR', 'yAxisLog'],
+          });
+        </script>
+      </div>
+    <% } %>
 
-            <script defer>
-                let sumosVsDatosSeries = <%- JSON.stringify(analize.sumosVsDatos.map(i => [i.data, i.suma])) %>;
-                  // Convert the first element of each pair to a Date object
-                sumosVsDatosSeries = sumosVsDatosSeries.map(i => [new Date(i[0]), i[1]]);
+    <% if (analize.metinesSumos) { %>
+      <div style="display:flex; flex-direction:column; min-height:350px;">
+        <h3 class="text-sm fw-bold mb-3"><a href="#metinesSumos" id="metinesSumos" class="no-style">Sumos pagal metus</a></h3>
+        <div class="chart-frame">
+          <div id="metinesSumosDiagrama" class="chart" style="height:350px;"></div>
+        </div>
+        <script defer>
+          displayChart({
+            element: document.querySelector('#metinesSumosDiagrama'),
+            type: 'line-datetime',
+            labels: <%- JSON.stringify(analize.metinesSumos.map(i => i.metai)) %>,
+            series: <%- JSON.stringify(analize.metinesSumos.map(i => i.suma)) %>,
+            flags: ['xAxisYearMonth', 'yEUR'],
+          });
+        </script>
+      </div>
+    <% } %>
 
-               displayChart({
-                 element: document.querySelector('#sumosVsDatosDiagrama'),
-                 type: 'scatter',
-                 labels: [],
-                 series: sumosVsDatosSeries,
-                 flags: ["colors", "xAxisYearMonth", "yEUR", "yAxisLog"]
-               })
-            </script>
-            </div>
-        <% } %>
+    <% if (analize.topTiekejai) { %>
+      <div>
+        <h3 class="text-sm fw-bold mb-3"><a href="#topTiekejai" id="topTiekejai" class="no-style">Top tiekėjai</a></h3>
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Tiekėjas</th>
+                <th class="cell-right">Suma</th>
+                <th class="cell-right">Sut.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% analize.topTiekejai.slice(0, 10).forEach((tiekejas, i) => { %>
+                <tr>
+                  <td class="cell-mono text-muted"><%= i + 1 %></td>
+                  <td class="cell-truncate"><a href="/asmuo/<%= tiekejas.kodas %>"><%= tiekejas.tiekejas %></a></td>
+                  <td class="cell-mono cell-right"><%= tiekejas.suma.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %> €</td>
+                  <td class="cell-mono cell-right"><%= tiekejas.kiekis %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% } %>
 
-        <% if(analize.metinesSumos) { %>
-            <div>
-            <h2><u><a href="#metinesSumos" id="metinesSumos" class="hashHref">Sumos pagal metus</a></u></h2>
-            <div id="metinesSumosDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+    <% if (analize.topPirkejai) { %>
+      <div>
+        <h3 class="text-sm fw-bold mb-3"><a href="#topPirkejai" id="topPirkejai" class="no-style">Top pirkėjai</a></h3>
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Pirkėjas</th>
+                <th class="cell-right">Suma</th>
+                <th class="cell-right">Sut.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% analize.topPirkejai.slice(0, 10).forEach((pirkejas, i) => { %>
+                <tr>
+                  <td class="cell-mono text-muted"><%= i + 1 %></td>
+                  <td class="cell-truncate"><a href="/asmuo/<%= pirkejas.kodas %>"><%= pirkejas.pirkejas %></a></td>
+                  <td class="cell-mono cell-right"><%= pirkejas.suma.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %> €</td>
+                  <td class="cell-mono cell-right"><%= pirkejas.kiekis %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% } %>
 
-            <script defer>
-               displayChart({
-                 element: document.querySelector('#metinesSumosDiagrama'),
-                 type: 'line-datetime',
-                 labels: <%- JSON.stringify(analize.metinesSumos.map(i => i.metai)) %>,
-                 series: <%- JSON.stringify(analize.metinesSumos.map(i => i.suma)) %>,
-                 flags: ["xAxisYearMonth", "yEUR"]
-               })
-            </script>
-            </div>
-        <% } %>
+  </div>
 
-        <% if(analize.topTiekejai) { %>
-            <div>
-                <h2><u><a href="#topTiekejai" id="topTiekejai" class="hashHref">Top tiekėjai</a></u></h2>
-                <div class="tableContainer">
-                    <table class="dataTable" style="min-width: 0; width: auto;">
-                        <thead>
-                            <tr>
-                                <th>Tiekėjas</th>
-                                <th>Vertės suma</th>
-                                <th>Sut. sk.</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% let count = 0; %>
-                            <% analize.topTiekejai.forEach(tiekejas => { %>
-                                <% count++; if(count > 10) return; %>
-                                <tr>
-                                    <td>
-                                        <a href="/asmuo/<%= tiekejas.kodas %>">
-                                            <%= tiekejas.tiekejas %>
-                                        </a>
-                                    </td>
-                                    <td><%= tiekejas.suma.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</td>
-                                    <td><%= tiekejas.kiekis %></td>
-                                </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        <% } %>
-        <% if(analize.topPirkejai) { %>
-            <div>
-                <h2><u><a href="#topPirkejai" id="topPirkejai" class="hashHref">Top pirkėjai</a></u></h2>
-                <div class="tableContainer">
-                    <table class="dataTable" style="min-width: 0; width: auto;">
-                        <thead>
-                            <tr>
-                                <th>Pirkėjas</th>
-                                <th>Vertės suma</th>
-                                <th>Sut. sk.</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% let count = 0; %>
-                            <% analize.topPirkejai.forEach(pirkejas => { %>
-                                <% count++; if(count > 10) return; %>
-                                <tr>
-                                    <td>
-                                        <a href="/asmuo/<%= pirkejas.kodas %>">
-                                            <%= pirkejas.pirkejas %>
-                                        </a>
-                                    </td>
-                                    <td><%= pirkejas.suma.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</td>
-                                    <td><%= pirkejas.kiekis %></td>
-                                </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        <% } %>
-    </section>
-    <span class="subtext">Ši analizė yra BETA versijoje ir gali turėti klaidų. Jei pastebėjote klaidą arba turite pasiūlymų, prašome <a href="/kontaktai">susisiekti</a>.</span>
-</section>
+  <p class="text-muted text-xs mt-5">
+    Ši analizė yra BETA versijoje ir gali turėti klaidų. Jei pastebėjote klaidą arba turite pasiūlymų, prašome <a href="/kontaktai">susisiekti</a>.
+  </p>
+</div>
+<% } %>

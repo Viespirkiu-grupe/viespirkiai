@@ -1,22 +1,18 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<%- include('head.ejs') %>
-		<meta property="og:title" content="Vidinė serverio klaida"/>
-		<meta property="og:description" content="Vidinė serverio klaida." /> 
-		<meta
-			name="description"
-			content="Vidinė serverio klaida."
-		/>
-		<meta property="og:type" content="website" />
-	</head>
-	<body>
-		<%- include('header.ejs') %>
-		<main>
-			<h1>500</h1>
-            <p><i>Vidinė serverio klaida.</i></p>
-            <p><i>Jeigu bandėte atlikti paiešką, ji tikriausiai užtruko per ilgai. Bandykite naudoti tikslesnius paieškos kriterijus.</i></p>
-		</main>
-		<%- include('footer.ejs') %>
-	</body>
+<head>
+  <%- include('head.ejs') %>
+</head>
+<body>
+  <%- include('header.ejs') %>
+  <main>
+    <div class="empty-state">
+      <div class="empty-state-icon">500</div>
+      <h2>Vidinė serverio klaida</h2>
+      <p class="text-muted">Jeigu bandėte atlikti paiešką, ji tikriausiai užtruko per ilgai.</p>
+      <p class="text-muted">Bandykite naudoti tikslesnius paieškos kriterijus.</p>
+    </div>
+  </main>
+  <%- include('footer.ejs') %>
+</body>
 </html>

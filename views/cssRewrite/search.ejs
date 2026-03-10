@@ -1,0 +1,358 @@
+<style>
+/* ── Reset / global ── */
+
+input[type="search"]::-webkit-search-cancel-button {
+    appearance: none;
+    display: none;
+}
+
+input[type="search"]:focus {
+    outline: none;
+}
+
+input, select, textarea {
+    font-family: inherit;
+    font-size: 14px;
+    padding: 8px;
+    margin-block: 4px;
+    border: 1px solid var(--light-gray);
+    border-radius: 4px;
+    background-color: var(--white);
+    color: var(--gray);
+}
+
+textarea {
+    resize: vertical;
+}
+
+select {
+    width: 98%;
+    min-height: 39px;
+}
+
+button, input[type="submit"] {
+    user-select: none;
+}
+
+button {
+    font-size: larger;
+    font-family: inherit;
+    padding: 8px 16px;
+    background-color: var(--lighter-gray);
+    color: var(--black);
+    border: 1px solid var(--black);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+button.main {
+    display: block;
+    margin: 16px auto;
+}
+
+sup {
+    display: inline-block;
+    font-size: 0.8em;
+    line-height: 1;
+    vertical-align: baseline;
+    transform: translateY(-0.5em);
+}
+
+div.center {
+    display: flex;
+    justify-content: center;
+}
+
+:root {
+    interpolate-size: allow-keywords;
+}
+
+
+/* ── Search form ── */
+
+form h1 {
+    text-align: center;
+}
+
+div.searchField {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: fit-content;
+    padding: 8px 8px 8px 24px;
+    border: 1px solid var(--light-gray);
+    border-radius: 8px;
+}
+
+.searchField {
+    width: min(70vw, 700px);
+}
+
+div.searchField input[type="search"]#search {
+    width: min(calc(70vw * 0.6), calc(700px * 0.6));
+    margin: 0;
+    padding: 8px;
+    border: none;
+    background: var(--white);
+    font-size: larger;
+}
+
+div.searchField button.main {
+    margin: 0;
+    padding: 12px 16px;
+    background: var(--black);
+    color: var(--white);
+    border-radius: 6px;
+    font-size: inherit;
+}
+
+div.searchField .searchIcon,
+div.searchField .searchIcon svg {
+    color: var(--gray);
+    font-size: larger;
+}
+
+div.searchField .searchIcon {
+    min-width: 24px;
+    min-height: 24px;
+    border-radius: 6px;
+}
+
+div.searchField label.searchIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 42px;
+    min-height: 42px;
+    height: 100%;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--gray);
+    font-size: larger;
+}
+
+div.searchField .vertical-line-spacer {
+    width: 1px;
+    height: 100%;
+    background-color: var(--light-gray);
+}
+
+
+/* ── Search settings panel ── */
+
+#searchNustatymai {
+    display: grid;
+    overflow: hidden;
+    max-width: 1000px;
+    margin: 16px auto 0;
+    height: 0;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: height 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+#searchNustatymaiToggle:checked + #searchNustatymai {
+    height: auto;
+    opacity: 1;
+    transform: scale(1);
+}
+
+form#searchForm:has(#searchNustatymaiToggle:checked) label#searchNustatymaiToggleButton,
+form#searchForm:has(#searchNustatymaiToggle:checked) label#searchNustatymaiToggleButton svg {
+    background-color: var(--black);
+    color: var(--white);
+}
+
+
+/* ── Nustatymai layout ── */
+
+.nustatymai .nustatymai-top {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+.nustatymai-top > div {
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 900px) {
+    .nustatymai .nustatymai-top {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.nustatymai .nustatymai-top input,
+.nustatymai .nustatymai-bottom input {
+    width: 90%;
+    height: 1.5em;
+}
+
+.nustatymai .nustatymai-category {
+    position: relative;
+    padding-block: 12px;
+    margin-bottom: 0;
+    font-weight: bold;
+    box-sizing: border-box;
+}
+
+.nustatymai .nustatymai-category::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--light-gray);
+    pointer-events: none;
+}
+
+.nustatymai-divider {
+    width: 100%;
+    margin: 0;
+    border: none;
+    border-bottom: 1px solid var(--light-gray);
+}
+
+.nustatymai-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.nustatymai-inputs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.nustatymai-subtext {
+    margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+    .nustatymai-row {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .nustatymai-inputs {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
+
+/* ── Input labels & containers ── */
+
+.inputLabel {
+    display: block;
+    padding-block: 6px;
+    font-size: 14px;
+    color: var(--gray);
+}
+
+.inputContainer {
+    margin-block: 16px;
+}
+
+
+/* ── Toggle switch ── */
+
+.toggleInputContainer {
+    padding: 6px;
+}
+
+.toggleInputContainer .toggleInput {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+}
+
+.toggleInputContainer .toggleSlider {
+    position: relative;
+    width: 40px;
+    height: 20px;
+    background-color: var(--light-gray);
+    border-radius: 20px;
+    transition: background-color 0.2s;
+}
+
+.toggleInputContainer .toggleSlider::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background-color: var(--white);
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+
+.toggleInputContainer .toggleInput:checked + .toggleSlider {
+    background-color: var(--black);
+}
+
+.toggleInputContainer .toggleInput:checked + .toggleSlider::before {
+    transform: translateX(20px);
+}
+
+
+/* ── Legacy settings (settingai) ── */
+
+#paieskosNustatymai {
+    width: min(100%, 1000px);
+    margin: 0 auto;
+    padding: 16px;
+}
+
+#paieskosNustatymai summary {
+    list-style: none;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: underline;
+}
+
+#paieskosNustatymai summary::-webkit-details-marker {
+    display: none;
+}
+
+#paieskosNustatymai summary::before {
+    content: "Rodyti papildomus nustatymus";
+}
+
+#paieskosNustatymai[open] summary::before {
+    content: "Slėpti papildomus nustatymus";
+}
+
+.settingai {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+}
+
+.settingai > div:nth-child(-n+10):nth-child(odd)  { grid-row: 1; }
+.settingai > div:nth-child(-n+10):nth-child(even) { grid-row: 2; }
+.settingai > div:nth-child(n+11)                  { grid-row: auto; }
+
+.settingai input       { width: 90%; height: 1.5em; }
+.settingai input[type="checkbox"] { width: auto; }
+.settingai select      { height: 2.6em; }
+
+@media (max-width: 1000px) {
+    .settingai {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .settingai > div {
+        grid-row: auto !important;
+    }
+}
+</style>

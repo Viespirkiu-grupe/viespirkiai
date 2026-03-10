@@ -1,132 +1,104 @@
 <div>
-    <section class="preResultOptions">
-        <div class="numberOfResults">
-            <i>
-            <%- numberOfResults %>
-            </i>
-        </div>
+  <div class="d-flex justify-between align-center mb-4">
+    <span class="text-muted text-sm"><em class="numberOfResults"><%- numberOfResults %></em></span>
+    <% if (galimaEksportuoti) { %>
+      <div class="d-flex gap-3">
+        <a href="/?<%- queryParams %>&jsonl=true&limit=max" class="btn btn-outline btn-sm">↗ JSONL</a>
+        <a href="/?<%- queryParams %>&csv=true&limit=max" class="btn btn-outline btn-sm">↗ CSV</a>
+      </div>
+    <% } %>
+  </div>
 
-        <% if(galimaEksportuoti){ %>
-            <div class="export-options">
-                <a href="/?<%- queryParams %>&jsonl=true&limit=max" class="exportLink">↗ JSONL</a>&nbsp;
-                <a href="/?<%- queryParams %>&csv=true&limit=max" class="exportLink">↗ CSV</a>
-            </div>
-        <% } %>
+  <% if (data.length === 0) { %>
+    <div class="empty-state">
+      <p class="text-muted">Rezultatų nerasta.</p>
     </div>
+  <% } else { %>
 
-<div class="resultsNauji">
-    <% data.forEach(item => { %>
-        <article class="rezultatas" aria-label="<%= item.tipoPavadinimas %>">
-            <a href="/sutartis/<%= item.sutartiesUnikalusId %>" class="fullIndentLink"></a>
-            <div class="rezultatas-left">
-                <dl class="rezultatas-top">
-                <div>
-                    <dt class="visually-hidden">Tipas</dt>
-                    <dd><%= item.tipas %></dd>
-                </div>
-                <div class="vertical-line-spacer"></div>
-                <div>
-                    <dt class="visually-hidden">Kategorija</dt>
-                    <dd><%= item.kategorija %></dd>
-                </div>
-                <div class="vertical-line-spacer"></div>
-                <div>
-                    <dt class="visually-hidden">Sutarties galiojimas</dt>
-                    <dd>
-                    <abbr aria-hidden="true" title="Sutarties galiojimas">Sut.</abbr>
-                    <% if(item.sudarymoData && item.galiojimoData) {  %>
-                        <% let sudarymoData = new String(item.sudarymoData).slice(0,10); %>
-                        <% let galiojimoData = new String(item.galiojimoData).slice(0,10); %>
+    <div class="result-list">
+      <% data.forEach(item => { %>
+        <article class="result-card card-clickable" aria-label="<%= item.tipoPavadinimas %>">
+          <a href="/sutartis/<%= item.sutartiesUnikalusId %>" class="card-overlay-link"><%= item.pavadinimas %></a>
 
-                        <% if(sudarymoData == galiojimoData) { %>
-                        <time datetime="<%= sudarymoData %>"><%= sudarymoData %></time>
-                        <% } else { %>
-                        <time datetime="<%= sudarymoData %>"><%= sudarymoData %></time> –
-                        <time datetime="<%= galiojimoData %>"><%= galiojimoData %></time>
-                        <% } %>
-                    <% } else { %>
-                        -
-                    <% } %>
-                    </dd>
-                </div>
+          <div class="result-card-body">
 
+            <dl class="result-card-meta">
+              <div>
+                <dt class="visually-hidden">Tipas</dt>
+                <dd><%= item.tipas %></dd>
+              </div>
+              <div>
+                <dt class="visually-hidden">Kategorija</dt>
+                <dd><%= item.kategorija %></dd>
+              </div>
+              <div>
+                <dt class="visually-hidden">Sutarties galiojimas</dt>
+                <dd>
+                  <abbr aria-hidden="true" title="Sutarties galiojimas">Sut.</abbr>
+                  <% if (item.sudarymoData && item.galiojimoData) { %>
+                    <% const d1 = String(item.sudarymoData).slice(0, 10); %>
+                    <% const d2 = String(item.galiojimoData).slice(0, 10); %>
+                    <time datetime="<%= d1 %>"><%= d1 %></time><% if (d1 !== d2) { %> – <time datetime="<%= d2 %>"><%= d2 %></time><% } %>
+                  <% } else { %>—<% } %>
+                </dd>
+              </div>
+              <% if (item.dokumentuKiekis > 0) { %>
                 <div>
-                    <dt class="visually-hidden">Dokumentai</dt>
-                    <dd>
-                    <% if (item.dokumentuKiekis === 0) { %>
-                        <span class="visually-hidden">Nėra</span>
-                    <% } else { %>
-                        <div class="vertical-line-spacer"></div>
-                        <%= item.dokumentuKiekis %> <abbr aria-hidden="true" title="Dokumentai">dok.</abbr>
-                    <% } %>
-                    </dd>
+                  <dt class="visually-hidden">Dokumentai</dt>
+                  <dd><%= item.dokumentuKiekis %> <abbr aria-hidden="true" title="Dokumentai">dok.</abbr></dd>
                 </div>
-                </dl>
-                <div>
-                    <div class="rezultatas-right">
-                        <div class="suma">
-                            <%
-                                const verte = item.faktineIvykdimoVerte || item.verte;
-                                if(Number(verte) > 10000) {
-                            %>
-                                <u><%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€</u>
-                            <% } else { %>
-                                <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€
-                            <% } %>
-                        </div>
-                    </div>
-                    <h3 class="rezultatas-title">
-                        <a href="/sutartis/<%= item.sutartiesUnikalusId %>">
-                            <span>
-                                <% if(item.pavadinimas.length < 1) { %>
-                                    <i>Nenurodyta</i>
-                                <% } else { %>
-                                    <%= item.pavadinimas %>
-                                <% } %>
-                            </span>
-                        </a>
-                    </h3>
-                </div>
-                <div class="rezultatas-bottom">
-                    <div>
-                        <b> Pirkėjas: </b>
-                        <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>"><%= item.perkanciojiOrganizacija %></a>
-                    </div>
-    				<% if(item.tiekejai.length == 1) { %>
-                        <div>
-                            <b> Tiekėjas: </b>
-                            <a href="/asmuo/<%= item.tiekejaiKodai[0] %>"><%= item.tiekejai[0] || "Nenurodytas" %></a>
-                        </div>
-                    <% } else { %>
-                        <div style="display:flex; align-items:flex-start;">
-                            <b style="margin-right: 10px;">Tiekėjai:</b>
-                            <div style="display:flex; flex-direction:column; gap: 8px;">
-                                <% for (let i = 0; i < item.tiekejai.length; i++) { %>
-                                    <a href="/asmuo/<%= item.tiekejaiKodai[i] %>" style="padding-block: 0;"><%= item.tiekejai[i] || "Nenurodytas" %></a>
-                                <% } %>
-                            </div>
-                        </div>
-                    <% } %>
+              <% } %>
+            </dl>
 
-                    <div class="subtext">
-                        <% if (item.paskutinioRedagavimoData) { %>
-                            <time datetime="<%= item.paskutinioRedagavimoData %>"><%= item.paskutinioRedagavimoData %></time>
-                        <% } else { %>
-                            -
-                        <% } %>
-                    </div>
-                </div>
+            <div class="d-flex align-baseline gap-3">
+              <h3 class="result-card-title">
+              <span class="amount<%= Number(item.faktineIvykdimoVerte || item.verte) > 10000 ? ' fw-bold' : '' %>">
+                <%= Number(item.faktineIvykdimoVerte || item.verte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>&nbsp;€
+              </span>
+                <% if (item.pavadinimas.length < 1) { %><em>Nenurodyta</em><% } else { %><%= item.pavadinimas %><% } %>
+              </h3>
             </div>
+
+            <div class="result-card-footer">
+              <span>
+                <strong>Pirkėjas:</strong>
+                <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>">
+                  <%= item.perkanciojiOrganizacija?.slice(0, 80) %><%= item.perkanciojiOrganizacija?.length > 80 ? '…' : '' %>
+                </a>
+              </span>
+              <% if (item.tiekejai.length === 1) { %>
+                <span>
+                  <strong>Tiekėjas:</strong>
+                  <a href="/asmuo/<%= item.tiekejaiKodai[0] %>">
+                    <%= (item.tiekejai[0] || 'Nenurodytas').slice(0, 80) %><%= (item.tiekejai[0] || '').length > 80 ? '…' : '' %>
+                  </a>
+                </span>
+              <% } else { %>
+                <span class="d-flex align-start gap-2">
+                  <strong>Tiekėjai:</strong>
+                  <span class="d-flex flex-col gap-1">
+                    <% for (let i = 0; i < item.tiekejai.length; i++) { %>
+                      <a href="/asmuo/<%= item.tiekejaiKodai[i] %>">
+                        <%= (item.tiekejai[i] || 'Nenurodytas').slice(0, 80) %><%= (item.tiekejai[i] || '').length > 80 ? '…' : '' %>
+                      </a>
+                    <% } %>
+                  </span>
+                </span>
+              <% } %>
+            </div>
+
+            <div class="text-muted text-sm mt-4">
+              <% if (item.paskutinioRedagavimoData) { %>
+                <time datetime="<%= item.paskutinioRedagavimoData %>"><%= item.paskutinioRedagavimoData %></time>
+              <% } else { %>—<% } %>
+            </div>
+
+          </div>
         </article>
-    <% }); %>
-</div>
-
-<% if(data.length === 0) { %>
-    <div class="no-results">
-        <p>Rezultatų nerasta.</p>
+      <% }) %>
     </div>
-<% } else { %>
-    <%- include('pagination.ejs', {
-        currentPage, pageCount, queryParams
-    }) %>
-<% } %>
+
+    <%- include('pagination.ejs', { currentPage, pageCount, queryParams }) %>
+
+  <% } %>
+</div>

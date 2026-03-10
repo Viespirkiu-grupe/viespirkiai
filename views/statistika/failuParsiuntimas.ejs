@@ -1,36 +1,54 @@
-<div>
-    <h3>Parsiuntimas</h3>
-    <div class="col-2 mobile-col-2">
-        <section>
-            <h3><u>Visi failai</u></h3>
-            <h4>Kiekis</h4>
-            <p><%= statistika.failai.kiekiai.visi %></p>
-            <h4>Dydis*</h4>
-            <p><%= statistika.failai.dydziai.visi %></p>
-        </section>
+<div class="page-section">
+  <h3 class="text-sm fw-bold mb-3">Parsiuntimas</h3>
+  <div class="grid-2">
 
-        <section>
-            <h3><u>Parsiųsti failai</u></h3>
-            <h4>Kiekis</h4>
-            <p><%= statistika.failai.kiekiai.parsiusti %></p>
-            <h4>Dydis</h4>
-            <p><%= statistika.failai.dydziai.parsiusti %></p>
-        </section>
-
-        <section>
-            <h3><u>Neparsiųsti (klaida) failai</u></h3>
-            <h4>Kiekis</h4>
-            <p><%= statistika.failai.kiekiai.klaida %></p>
-            <h4>Dydis*</h4>
-            <p><%= statistika.failai.dydziai.klaida %></p>
-        </section>
-
-        <section>
-            <h3><u>Neparsiųsti failai</u></h3>
-            <h4>Kiekis</h4>
-            <p><%= statistika.failai.kiekiai.neparsiusti %></p>
-            <h4>Dydis*</h4>
-            <p><%= statistika.failai.dydziai.neparsiusti %></p>
-        </section>
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title mb-3">Visi failai</div>
+        <dl class="kv-list">
+          <dt>Kiekis</dt>
+          <dd><span class="cell-mono"><%= statistika.failai.kiekiai.visi %></span></dd>
+          <dt>Dydis *</dt>
+          <dd><span class="cell-mono"><%= statistika.failai.dydziai.visi %></span></dd>
+        </dl>
+      </div>
     </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title mb-3">Parsiųsti failai</div>
+        <dl class="kv-list">
+          <dt>Kiekis</dt>
+          <dd><span class="cell-mono"><%= statistika.failai.kiekiai.parsiusti %></span></dd>
+          <dt>Dydis</dt>
+          <dd><span class="cell-mono"><%= statistika.failai.dydziai.parsiusti %></span></dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title mb-3">Neparsiųsti (klaida)</div>
+        <dl class="kv-list">
+          <dt>Kiekis</dt>
+          <dd><span class="cell-mono"><%= statistika.failai.kiekiai.klaida %></span></dd>
+          <dt>Dydis *</dt>
+          <dd><span class="cell-mono"><%= statistika.failai.dydziai.klaida %></span></dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title mb-3">Neparsiųsti</div>
+        <dl class="kv-list">
+          <dt>Kiekis</dt>
+          <dd><span class="cell-mono"><%= statistika.failai.kiekiai.neparsiusti %></span></dd>
+          <dt>Dydis *</dt>
+          <dd><span class="cell-mono"><%= statistika.failai.dydziai.neparsiusti %></span></dd>
+        </dl>
+      </div>
+    </div>
+
+  </div>
 </div>

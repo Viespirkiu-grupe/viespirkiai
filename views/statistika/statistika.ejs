@@ -1,58 +1,59 @@
 <!DOCTYPE html>
-<html>
-	<head>
-    	<%- include('../head.ejs', {
-            pageTitle: "Statistika",
-            pageDescription: ` `,
-            pageImage: `https://viespirkiai.org/statistika.png`,
-            customHead
-        }) %>
-      <%- include('../js/idiomorph.ejs') %>
-	</head>
-	<body>
-        <%- include('../header.ejs') %>
-        <main>
-            <h1>Statistika</h1>
-            <button id="liveUpdate" style="font-size: inherit; background-color: var(--lighter-gray)">Tiesioginis atnaujinimas (įjungti)</button><br><br>
-            <%- include('./main.ejs') %>
-        </main>
-        <%- include('../footer.ejs') %>
-        <script>
-        let evtSource = null;
-        const button = document.getElementById("liveUpdate");
+<html lang="lt">
+<head>
+  <%- include('../head.ejs', {
+    pageTitle: "Statistika",
+    pageDescription: ` `,
+    pageImage: `https://viespirkiai.org/statistika.png`,
+    customHead
+  }) %>
+  <%- include('../js/idiomorph.ejs') %>
+</head>
+<body>
+  <%- include('../header.ejs') %>
+  <main>
 
-        const startSSE = () => {
-            evtSource = new EventSource("/statistika/sse");
+    <div class="page-header">
+      <h1 class="mb-0">Statistika</h1>
+      <button id="liveUpdate" class="btn btn-outline btn-sm">▶ Tiesioginis atnaujinimas</button>
+    </div>
 
-            evtSource.onmessage = (e) => {
-                const html = JSON.parse(e.data);
-                Idiomorph.morph(document.querySelector(".replacableContent"), html);
-            };
+    <%- include('./main.ejs') %>
 
-            evtSource.onerror = () => {
-                console.warn("SSE connection lost, attempting reconnect...");
-                evtSource.close();
-                evtSource = null;
-                // Retry after 2 seconds if still toggled on
-                setTimeout(() => {
-                    if (button.textContent.includes("išjungti")) startSSE();
-                }, 2000);
-            };
-        };
+  </main>
+  <%- include('../footer.ejs') %>
 
-        button.addEventListener("click", () => {
-            if (evtSource) {
-                // Stop SSE updates
-                evtSource.close();
-                evtSource = null;
-                button.textContent = "Tiesioginis atnaujinimas (įjungti)";
-                return;
-            }
+  <script>
+    let evtSource = null;
+    const button = document.getElementById("liveUpdate");
 
-            // Start SSE live updates
-            button.textContent = "Tiesioginis atnaujinimas (išjungti)";
-            startSSE();
-        });
-        </script>
-    </body>
+    const stopSSE = () => {
+      if (!evtSource) return;
+      evtSource.close();
+      evtSource = null;
+      button.textContent = "▶ Tiesioginis atnaujinimas";
+      button.classList.remove("btn-primary");
+      button.classList.add("btn-outline");
+    };
+
+    const startSSE = () => {
+      evtSource = new EventSource("/statistika/sse");
+      button.textContent = "⏸ Tiesioginis atnaujinimas";
+      button.classList.remove("btn-outline");
+      button.classList.add("btn-primary");
+
+      evtSource.onmessage = e => {
+        Idiomorph.morph(document.querySelector(".replacableContent"), JSON.parse(e.data));
+      };
+
+      evtSource.onerror = () => {
+        evtSource.close();
+        evtSource = null;
+        setTimeout(() => { if (button.classList.contains("btn-primary")) startSSE(); }, 2000);
+      };
+    };
+
+    button.addEventListener("click", () => evtSource ? stopSSE() : startSSE());
+  </script>
+</body>
 </html>

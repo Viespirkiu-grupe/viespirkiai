@@ -1,0 +1,23 @@
+<style>
+.swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--space-3);
+}
+
+.swatch {
+    border: var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    font-size: var(--text-xs);
+}
+
+.swatch-color {
+    height: 48px;
+    border-bottom: var(--border);
+}
+
+.swatch-info  { padding: var(--space-2); background: var(--white); }
+.swatch-name  { font-weight: 600; color: var(--black); }
+.swatch-value { color: var(--gray); font-family: var(--font-mono); }
+</style>

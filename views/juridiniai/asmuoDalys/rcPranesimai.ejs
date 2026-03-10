@@ -1,44 +1,44 @@
-<% if(asmuo.rcPranesimai && asmuo.rcPranesimai.rows > 0){ %>
-    <div id="rcPranesimai">
-        <h2><a href="#rcPranesimai" class="hashHref"><u>Registrų centro pranešimai</u></a></h2>
-        <% if(asmuo.rcPranesimai.rows > asmuo.rcPranesimai.limit) { %>
-            <i>
-                Rodomi tik <%= Number(asmuo.rcPranesimai.limit).linksniuoti(["naujausias pranešimas", "naujausi pranešimai", "naujausių pranešimų"]) %>.
-                <a href="?rcPranesimaiLimit=max#rcPranesimai">
-                    Rodyti visus (<%= asmuo.rcPranesimai.rows %>)
-                </a>
-            </i>
-        <% } %>
+<% if (asmuo.rcPranesimai?.rows > 0) { %>
+<div class="page-section" id="rcPranesimai">
+  <h2><a href="#rcPranesimai" class="no-style">Registrų centro pranešimai</a></h2>
 
-        <div class="results" style="margin-inline: 0px;">
-            <% let count = 0; %>
-            <% asmuo.rcPranesimai.pranesimai.forEach(function(pranesimas){ %>
-                <div class="rezultatas">
-                    <div class="rezultatas-top">
-                        <span>
-                            Paskelbta:
-                            <%= pranesimas.leidinioData %></a>
-                        </span>
-                        <span>
-                            Leidinys:
-                            <a href="<%= pranesimas.leidinioLink %>"><%= pranesimas.leidinioNumeris %></a>
-                        </span>
-                    </div>
-                    <div class="rezultatas-title">
-                        <%= pranesimas.subtitle || pranesimas.title %>
-                    </div>
-                    <div class="rezultatas-bottom" style="text-align: justify;">
-                        <%- (pranesimas.text || "")
-                              .replace(/&/g, "&amp;")
-                              .replace(/</g, "&lt;")
-                              .replace(/>/g, "&gt;")
-                              .replace(/"/g, "&quot;")
-                              .replace(/'/g, "&#39;")
-                              .replace(/\r?\n/g, "<br>") %>
+  <% if (asmuo.rcPranesimai.rows > asmuo.rcPranesimai.limit) { %>
+    <p class="text-muted text-sm mb-4">
+      Rodomi tik <%= Number(asmuo.rcPranesimai.limit).linksniuoti(["naujausias pranešimas", "naujausi pranešimai", "naujausių pranešimų"]) %>.
+      <a href="?rcPranesimaiLimit=max#rcPranesimai">Rodyti visus (<%= asmuo.rcPranesimai.rows %>)</a>
+    </p>
+  <% } %>
 
-                    </div>
-                </div>
-            <% }) %>
+  <div class="result-list">
+    <% asmuo.rcPranesimai.pranesimai.forEach(pranesimas => { %>
+      <article class="result-card">
+        <div class="result-card-body">
+          <dl class="result-card-meta">
+            <div>
+              <dt class="visually-hidden">Paskelbta</dt>
+              <dd>Paskelbta <%= pranesimas.leidinioData %></dd>
+            </div>
+            <div>
+              <dt class="visually-hidden">Leidinys</dt>
+              <dd><a href="<%= pranesimas.leidinioLink %>" style="position:relative;z-index:1;"><%= pranesimas.leidinioNumeris %></a></dd>
+            </div>
+          </dl>
+
+          <h3 class="result-card-title"><%= pranesimas.subtitle || pranesimas.title %></h3>
+
+          <% if (pranesimas.text) { %>
+            <p class="text-sm text-muted mt-2" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;">
+              <%= pranesimas.text
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#39;") %>
+            </p>
+          <% } %>
         </div>
-    </div>
+      </article>
+    <% }) %>
+  </div>
+</div>
 <% } %>

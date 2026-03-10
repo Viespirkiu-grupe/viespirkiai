@@ -1,10 +1,10 @@
 <script defer>
   let apexPromise;
+  const renderedCharts = [];
 
   function loadApexCharts() {
     if (window.ApexCharts) return Promise.resolve(window.ApexCharts);
-    if (apexPromise) return apexPromise; // already loading
-
+    if (apexPromise) return apexPromise;
     apexPromise = new Promise((resolve, reject) => {
       function startLoading() {
         const script = document.createElement('script');
@@ -14,24 +14,16 @@
         script.onerror = reject;
         document.body.appendChild(script);
       }
-
-      if (document.readyState === 'loading') {
-        window.addEventListener('DOMContentLoaded', startLoading);
-      } else {
-        startLoading();
-      }
+      document.readyState === 'loading'
+        ? window.addEventListener('DOMContentLoaded', startLoading)
+        : startLoading();
     });
-
     return apexPromise;
   }
 
   function deepMerge(target, source) {
     for (const key in source) {
-      if (
-        source[key] &&
-        typeof source[key] === 'object' &&
-        !Array.isArray(source[key])
-      ) {
+      if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
         if (!target[key]) target[key] = {};
         deepMerge(target[key], source[key]);
       } else {
@@ -41,249 +33,198 @@
     return target;
   }
 
-  const globalChartDefaults = {
-    chart: {
-      height: 400,
-      toolbar: { show: false },
-      zoom: {
-        enabled: false
+  function getIsDark() {
+    const scheme = document.querySelector('meta[data-scheme]')?.dataset.scheme || 'auto';
+    if (scheme === 'dark') return true;
+    if (scheme === 'light') return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  function getThemeTokens(isDark) {
+    return {
+      foreground:  isDark ? '#f2f2f2' : '#0f0f0f',
+      labelColor:  isDark ? '#aaaaaa' : '#777777',
+      gridColor:   isDark ? '#2e2e2e' : '#e0e0e0',
+      tooltipBg:   isDark ? '#1e1e1e' : '#ffffff',
+      tooltipText: isDark ? '#f2f2f2' : '#0f0f0f',
+      tooltipBorder: isDark ? '#2e2e2e' : '#d4d4d4',
+    };
+  }
+
+  // Categorical palette — works on both light and dark backgrounds
+  const CATEGORICAL_COLORS = [
+    '#4e79a7','#f28e2b','#e15759','#76b7b2',
+    '#59a14f','#edc948','#b07aa1','#ff9da7',
+    '#9c755f','#bab0ac',
+  ];
+
+  // Grays that are always visible: avoid extremes that match background
+  function getShadesOfGray(isDark) {
+    return isDark
+      ? ['#ffffff', '#e0e0e0', '#c0c0c0', '#a0a0a0', '#808080', '#606060', '#484848']
+      : ['#222222', '#404040', '#585858', '#707070', '#888888', '#a0a0a0', '#b8b8b8'];
+  }
+
+  const eurFormatter = v => typeof v === 'number'
+    ? v.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' })
+    : 'Nėra duomenų';
+
+  function buildGlobalDefaults(isDark) {
+    const t = getThemeTokens(isDark);
+    return {
+      chart: {
+        toolbar: { show: false },
+        zoom: { enabled: false },
+        fontFamily: 'Ubuntu, system-ui, sans-serif',
+        background: 'transparent',
+        height: 350,
+        foreColor: t.labelColor,
       },
-      fontFamily: 'Ubuntu',
-    },
-    tooltip: {
-      enabled: true
-    },
-    xaxis: {
-      labels: {
-        style: { colors: '#000' },
+      tooltip: {
+        enabled: true,
+        theme: isDark ? 'dark' : 'light',
+        style: { fontFamily: 'Ubuntu, system-ui, sans-serif' },
       },
-    },
-    yaxis: { labels: { style: { colors: '#000' }} },
-    stroke: { curve: 'smooth', width: 2 },
-    markers: { size: 5 },
-    colors: ['#000'],
-    grid: { borderColor: '#e0e0e0' },
-    theme: {
-        mode: 'light',
-        monochrome: {
-            enabled: false,
-            color: '#000000',
-            shadeTo: 'dark',
-            shadeIntensity: 0.65
-        },
-    },
+      xaxis: { labels: { style: { colors: t.labelColor } } },
+      yaxis: { labels: { style: { colors: t.labelColor } } },
+      stroke: { curve: 'smooth', width: 2 },
+      markers: { size: 4 },
+      colors: [t.foreground],
+      grid: { borderColor: t.gridColor },
+      theme: { mode: isDark ? 'dark' : 'light' },
+      legend: { labels: { colors: t.labelColor } },
+    };
   }
 
   const typeChartDefaults = {
     'line-datetime': {
-      chart: { type: 'line', height: 350 },
-      xaxis: {
-            type: 'datetime',
-            tickAmount: 6,
-            labels: {
-              format: 'yyyy-MM'
-          },
-      },
-      tooltip: {
-        x: {
-          format: 'yyyy-MM'
-        }
-      },
+      chart: { type: 'line' },
+      xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'yyyy-MM' } },
+      tooltip: { x: { format: 'yyyy-MM' } },
     },
     'pie': {
-      chart: { type: 'pie', height: 350 },
-      labels: [],
-      legend: {
-        position: 'bottom'
-      },
-      dataLabels: {
-        enabled: true
-      }
+      chart: { type: 'pie' },
+      legend: { position: 'bottom' },
+      dataLabels: { enabled: true },
+      colors: CATEGORICAL_COLORS,
     },
-    'scatter': {
-      chart: { type: 'scatter', height: 350 },
-    },
-    'treemap': {
-      chart: { type: 'treemap', height: 350 },
-    }
-  }
+    'scatter': { chart: { type: 'scatter' } },
+    'treemap': { chart: { type: 'treemap' } },
+  };
 
   const chartFlagDefaults = {
-    'yEUR': {
-      yaxis: {
-        min: 0,
-        labels: {
-            formatter: function (value) {
-              if(typeof value == "number"){
-                return value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' });
-              }else{
-                return "Nėra duomenų";
-              }
-            }
-         },
-      },
-      'yEURMen': {
-        yaxis: {
-          min: 0,
-          labels: {
-              formatter: function (value) {
-                if(typeof value == "number"){
-                  return value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) + ' / men.';
-                }else{
-                  return "Nėra duomenų";
-                }
-              }
-          },
-        }
-      },
-    },
-    'yMin0': {
-        yaxis: { min: 0 }
-      },
-      'xYear': {
-        xaxis: {
-          labels: {
-            format: 'yyyy'
-          }
-        },
-        tooltip: {
-          x: {
-            format: 'yyyy'
-          }
-        }
-      },
-      'yMinAuto': {
-        yaxis: {
-          min: undefined
-        }
-      },
-      '50shadesOfGray': {
-        colors: ['#111111', '#333333', '#555555', '#777777', '#999999', '#BBBBBB', '#DDDDDD']
-      },
-      'colors': {
-        colors: ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-      },
-      'xAxisYearMonth': {
-        xaxis: {
-              type: 'datetime',
-              tickAmount: 6,
-              labels: {
-                format: 'yyyy-MM'
-            },
-        },
-        tooltip: {
-          x: {
-            format: 'yyyy-MM'
-          }
-        },
-      },
-      "yAxisLog": {
-        yaxis: {
-          logarithmic: true,
-        }
-      },
-      "xAxisHourMinute": {
-        xaxis: {
-              type: 'datetime',
-              tickAmount: 6,
-              labels: {
-                format: 'HH:mm'
-            },
-        },
-        tooltip: {
-          x: {
-            format: 'HH:mm'
-          }
-        },
-      },
-      "yAxisNoLabel": {
-        yaxis: {
-          labels: {
-            show: false
-          }
-        }
-      },
-      "noLine": {
-        stroke: {
-          width: 0
-        },
-      },
-      'xAxisDay': {
-        xaxis: {
-              type: 'datetime',
-              tickAmount: 6,
-              labels: {
-                format: 'yyyy-MM-dd'
-            },
-        },
-        tooltip: {
-          x: {
-            format: 'yyyy-MM-dd'
-          }
-        },
+    'yEUR':           { yaxis: { labels: { formatter: eurFormatter } } },
+    'yEURMen':        { yaxis: { labels: { formatter: v => typeof v === 'number' ? eurFormatter(v) + ' / mėn.' : 'Nėra duomenų' } } },
+    'yMin0':          { yaxis: { min: 0 } },
+    'yMinAuto':       { yaxis: { min: undefined } },
+    'xYear':          { xaxis: { labels: { format: 'yyyy' } }, tooltip: { x: { format: 'yyyy' } } },
+    'xAxisYearMonth': { xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'yyyy-MM' } }, tooltip: { x: { format: 'yyyy-MM' } } },
+    'xAxisDay':       { xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'yyyy-MM-dd' } }, tooltip: { x: { format: 'yyyy-MM-dd' } } },
+    'xAxisHourMinute':{ xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'HH:mm' } }, tooltip: { x: { format: 'HH:mm' } } },
+    'yAxisLog':       { yaxis: { logarithmic: true } },
+    'yAxisNoLabel':   { yaxis: { labels: { show: false } } },
+    'noLine':         { stroke: { width: 0 } },
+    'colors':         { colors: CATEGORICAL_COLORS },
+  };
+
+  function buildOptions(data, isDark) {
+    let options = structuredClone(buildGlobalDefaults(isDark));
+
+    if (data.type && typeChartDefaults[data.type]) {
+      options = deepMerge(options, structuredClone(typeChartDefaults[data.type]));
+    }
+
+    for (const flag of (data.flags || [])) {
+      if (flag === '50shadesOfGray') {
+        options = deepMerge(options, { colors: getShadesOfGray(isDark) });
+      } else if (flag in chartFlagDefaults) {
+        options = deepMerge(options, chartFlagDefaults[flag]);
       }
+    }
+
+    if (data.type !== 'pie') {
+      options.xaxis = options.xaxis || {};
+      options.xaxis.categories = data.labels;
+      if (Array.isArray(data.series) && (data.series.length === 0 || !data.series[0]?.data)) {
+        options.series = [{ name: data.customOptions?.seriesName || '', data: data.series }];
+      } else {
+        options.series = data.series;
+      }
+    } else {
+      options.labels = data.labels;
+      options.series = data.series;
+    }
+
+    if (data.customOptions) {
+      options = deepMerge(options, data.customOptions);
+    }
+
+    return options;
   }
 
   async function displayChart(data) {
-    if (!data || !data.element || !data.labels || !data.series) {
-      console.error('Invalid data for displayChart:', data);
+    if (!data?.element || !data?.labels || !data?.series) {
+      console.error('displayChart: missing required fields', data);
       return;
     }
-
-    let customOptions = data?.customOptions || {};
-    let noDefaults = data?.noDefaults || false;
-    let flags = data?.flags || [];
-
-    let mergedOptions = noDefaults ? {} : structuredClone(globalChartDefaults);
-
-    if(data.series){
-      // Check if series is a flat Array
-      if(Array.isArray(data.series) && (data.series.length === 0 || !data.series[0]?.data) && data.type != 'pie') {
-          mergedOptions.series = [{ name: customOptions.seriesName || '', data: data.series }];
-      }else{
-          mergedOptions.series = data.series;
-      }
-    }
-
-    if (!noDefaults && data.type && typeChartDefaults[data.type]) {
-      mergedOptions = deepMerge(mergedOptions, typeChartDefaults[data.type]);
-    }
-
-    for (let flag of flags) {
-      if (flag in chartFlagDefaults) {
-        mergedOptions = deepMerge(mergedOptions, chartFlagDefaults[flag]);
-      }
-    }
-
-    if(data.labels && data.type !== 'pie'){
-      mergedOptions.xaxis = mergedOptions.xaxis || {};
-      mergedOptions.xaxis.categories = data.labels;
-    }else{
-      mergedOptions.labels = data.labels;
-    }
-
-    if(data.customOptions){
-      mergedOptions = deepMerge(mergedOptions, customOptions);
-    }
-
     await loadApexCharts();
-    const chart = new ApexCharts(data.element, mergedOptions);
+    const chart = new ApexCharts(data.element, buildOptions(data, getIsDark()));
     chart.render();
+    renderedCharts.push({ chart, data });
   }
+
+  function updateAllCharts() {
+    const isDark = getIsDark();
+    const t = getThemeTokens(isDark);
+    for (const { chart, data } of renderedCharts) {
+      const flags = data.flags || [];
+      let colors;
+      if (flags.includes('colors') || data.type === 'pie') {
+        colors = CATEGORICAL_COLORS;
+      } else if (flags.includes('50shadesOfGray')) {
+        colors = getShadesOfGray(isDark);
+      } else {
+        colors = [t.foreground];
+      }
+      chart.updateOptions({
+        chart: { foreColor: t.labelColor },
+        tooltip: { theme: isDark ? 'dark' : 'light' },
+        xaxis: { labels: { style: { colors: t.labelColor } } },
+        yaxis: { labels: { style: { colors: t.labelColor } } },
+        grid: { borderColor: t.gridColor },
+        theme: { mode: isDark ? 'dark' : 'light' },
+        legend: { labels: { colors: t.labelColor } },
+        colors,
+      }, false, true);
+    }
+  }
+
+  const schemeMeta = document.querySelector('meta[data-scheme]');
+  if (schemeMeta) {
+    new MutationObserver(updateAllCharts)
+      .observe(schemeMeta, { attributes: true, attributeFilter: ['data-scheme'] });
+  }
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const scheme = document.querySelector('meta[data-scheme]')?.dataset.scheme;
+    if (!scheme || scheme === 'auto') updateAllCharts();
+  });
 </script>
 <style>
-    .chart {
-        background-color: #fff;
-    }
+  .chart { background-color: transparent; }
 
-    @media (prefers-color-scheme: dark) {
-        .chart {
-            filter: invert(1) hue-rotate(180deg);
-        }
+  :root:has(meta[data-scheme="dark"]) .apexcharts-tooltip,
+  :root:has(meta[data-scheme="dark"]) .apexcharts-tooltip-title {
+    background: #1e1e1e !important;
+    color: #f2f2f2 !important;
+    border-color: #2e2e2e !important;
+  }
 
-        .apexcharts-tooltip, .apexcharts-tooltip-title{
-            background: rgba(255, 255, 255, 0.96) !important;
-            color: #000 !important;
-        }
+  @media (prefers-color-scheme: dark) {
+    :root:not(:has(meta[data-scheme="light"])) .apexcharts-tooltip,
+    :root:not(:has(meta[data-scheme="light"])) .apexcharts-tooltip-title {
+      background: #1e1e1e !important;
+      color: #f2f2f2 !important;
+      border-color: #2e2e2e !important;
     }
+  }
 </style>

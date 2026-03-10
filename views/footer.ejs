@@ -1,22 +1,18 @@
 <footer>
-    <div>
-        <a rel="me" href="https://www.facebook.com/profile.php?id=100003117510876">↗ Facebook</a>
-        <a rel="me" href="https://river.group.lt/@viespirkiai">↗ Mastodon</a>
-        <a href="/duomenys#duomenu-saltiniai">↗ Duomenų šaltiniai</a>
-        <a href="/kontaktai">↗ Kontaktai</a>
-        <a href="/analitika">↗ Analitika</a>
-		<a href="/kodas">↗ Kodas</a>
-    </div>
-    <div>
-		<a href="/privatumas">↗ Privatumo politika</a>
-    </div>
-    <div>
-        <% if(typeof neoficialus == "undefined" || neoficialus) { %>
-            <p style="text-align: center; line-height: 1.5;"><i>
-                Rekomenduojame tikrinti pateiktą informaciją. Ji buvo automatiškai surinkta remiantis tik viešais šaltiniais, gali būti pasenusi, klaidinga.
-                <br>Jeigu yra priežastis, kodėl tokia ji turėtų būti neskelbiama, šalinama ar pataisyta – prašome susisiekti.
-                    Daugiau informacijos rasite <a style="margin-inline: 0px;" href="/kontaktai#informacijosTikslumas">kontaktų puslapyje</a>.
-            </i></p>
-        <% } %>
-    </div>
+  <div class="footer-inner">
+    <a href="https://www.facebook.com/profile.php?id=100003117510876" rel="me">↗ Facebook</a>
+    <a href="https://river.group.lt/@viespirkiai" rel="me">↗ Mastodon</a>
+    <a href="/duomenys#duomenu-saltiniai">↗ Duomenų šaltiniai</a>
+    <a href="/kontaktai">↗ Kontaktai</a>
+    <a href="/analitika">↗ Analitika</a>
+    <a href="/kodas">↗ Kodas</a>
+    <a href="/privatumas">↗ Privatumo politika</a>
+  </div>
+  <% if(typeof neoficialus == "undefined" || neoficialus) { %>
+    <p class="text-center text-sm text-muted mt-4"><em>
+      Rekomenduojame tikrinti pateiktą informaciją. Ji buvo automatiškai surinkta remiantis tik viešais šaltiniais, gali būti pasenusi, klaidinga.
+      <br>Jeigu yra priežastis, kodėl tokia ji turėtų būti neskelbiama, šalinama ar pataisyta – prašome susisiekti.
+      Daugiau informacijos rasite <a href="/kontaktai#informacijosTikslumas">kontaktų puslapyje</a>.
+    </em></p>
+  <% } %>
 </footer>

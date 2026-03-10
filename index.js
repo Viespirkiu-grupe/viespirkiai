@@ -19,6 +19,9 @@ import {
     ensureJarCollection,
 } from "./typesense/typesense.js";
 
+import { highlightCode } from "./utils/highlightCode.js";
+globalThis.highlightCode = highlightCode;
+
 const app = express();
 const PORT = config.port || 8000;
 
@@ -114,25 +117,23 @@ app.use((req, res, next) => {
 });
 
 // Static routes
-if (config.dev) {
-    app.use(
-        "/fontai",
-        express.static(path.join(__dirname, "public/fontai"), {}),
-    );
-} else {
-    app.use(
-        "/fontai",
-        express.static(path.join(__dirname, "public/fontai"), {
-            maxAge: "1y",
-            immutable: true,
-        }),
-    );
-}
+app.use(
+    "/fontai",
+    express.static(path.join(__dirname, "public/fontai"), {
+        maxAge: "1y",
+        immutable: true,
+    }),
+);
 
 app.use(express.static(path.join(__dirname, "public")));
 
 // Cookies
 app.use(cookieParser());
+
+app.use((req, res, next) => {
+    res.locals.colorScheme = req.cookies?.colorScheme || "auto";
+    next();
+});
 
 // JSON
 app.use(express.json({ limit: "25MB" }));

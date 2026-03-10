@@ -1,28 +1,27 @@
 <div class="replacableContent">
-    <i>
-        Duomenys atnaujinti:
-        <%
-        const d = new Date(statistika.atnaujinta);
-        const pad = n => n.toString().padStart(2,'0');
-        const padMs = n => n.toString().padStart(3,'0');
-        const formatted = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${padMs(d.getMilliseconds())}`;
-        %>
-        <%= formatted %>
-    </i><br><br>
+  <%
+    const d = new Date(statistika.atnaujinta);
+    const pad = n => n.toString().padStart(2, '0');
+    const padMs = n => n.toString().padStart(3, '0');
+    const formatted = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${padMs(d.getMilliseconds())}`;
+  %>
 
-    <i>* Pažymėtos numatomos arba apytikslės vertės </i>
+  <div class="d-flex justify-between align-center mb-5">
+    <p class="text-muted text-sm mb-0">Atnaujinta: <span class="cell-mono"><%= formatted %></span></p>
+    <p class="text-muted text-xs mb-0">* Pažymėtos numatomos arba apytikslės vertės</p>
+  </div>
 
-    <div class="col-auto mobile-col-1">
-        <div>
-            <h2>Failai</h2>
-            <%- include('failuNuskaitymas.ejs') %>
-        </div>
-        <div>
-            <h2 style="visibility: hidden;">Failai</h2>
-            <%- include('failuIndeksavimas.ejs') %>
-            <%- include('failuParsiuntimas.ejs') %>
-        </div>
-        <%- include('lenteles.ejs') %>
-
+  <div class="grid-2 mb-6">
+    <div>
+      <h2 class="mb-4">Failai</h2>
+      <%- include('failuNuskaitymas.ejs') %>
     </div>
+    <div>
+      <%- include('failuIndeksavimas.ejs') %>
+      <%- include('failuParsiuntimas.ejs') %>
+    </div>
+  </div>
+
+  <%- include('lenteles.ejs') %>
+
 </div>

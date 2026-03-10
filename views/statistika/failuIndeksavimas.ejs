@@ -1,28 +1,37 @@
-<div>
-    <h3>Indeksavimas</h3>
-    <p>Surašymas duomenų bazėje, kad būtų galima greičiau ieškoti.</p>
-    <h4 style="padding-top: 12px;">Žodžiai</h4>
-    <div class="col-2">
-        <section>
-            <h3><u>Iš viso</u></h3>
-            <%= Number(statistika.nuskaitymas.zodziai.total).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
-        </section>
+<div class="page-section">
+  <h3 class="mb-1"><a href="#indeksavimas" id="indeksavimas" class="no-style">Indeksavimas</a></h3>
+  <p class="text-muted text-sm mb-4">Surašymas duomenų bazėje, kad būtų galima greičiau ieškoti.</p>
 
-        <section>
-            <h3><u>Vidurkis</u></h3>
-            <%= Number(statistika.nuskaitymas.zodziai.vidurkis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
-        </section>
+  <p class="text-sm fw-bold mb-3">Žodžiai</p>
+  <div class="grid-2">
 
-        <section>
-            <h3><u>Vidurkis (be 0)</u></h3>
-            <%= Number(statistika.nuskaitymas.zodziai.vidurkisNeNulis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %>
-        </section>
-
-        <section>
-            <h3><u>Failų su žodžiais dalis (nuo visų)</u></h3>
-            <%= Number(statistika.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2) %> %
-        </section>
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title mb-2">Iš viso</div>
+        <span class="cell-mono"><%= Number(statistika.nuskaitymas.zodziai.total).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %></span>
+      </div>
     </div>
-    <br><br>
 
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title mb-2">Vidurkis</div>
+        <span class="cell-mono"><%= Number(statistika.nuskaitymas.zodziai.vidurkis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title mb-2">Vidurkis (be 0)</div>
+        <span class="cell-mono"><%= Number(statistika.nuskaitymas.zodziai.vidurkisNeNulis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title mb-2">Failų su žodžiais dalis</div>
+        <span class="cell-mono"><%= Number(statistika.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2) %> %</span>
+      </div>
+    </div>
+
+  </div>
 </div>

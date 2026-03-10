@@ -1,0 +1,121 @@
+<style>
+/* ── Layout ── */
+
+header,
+main {
+    padding-inline: 16px;
+}
+
+header {
+    margin-bottom: 24px;
+}
+
+
+/* ── Typography ── */
+
+a {
+    color: var(--link);
+    padding-block: 4px;
+}
+
+a.noStyle {
+    text-decoration: none;
+    color: inherit;
+}
+
+.hashHref { color: inherit; }
+
+p  { line-height: 1.5; }
+h2 { margin-bottom: 14px; }
+h3 { margin-block: 16px; }
+h4 { margin-block: 12px; }
+dd { margin-left: 0; }
+
+section h1     { font-size: 2em; }
+h1.viespirkiai { font-size: 3em; margin-block: 4px; }
+
+sub, sup { font-size: 12px; }
+
+sup {
+    font-style: italic;
+    font-weight: normal;
+    color: var(--dark-gray);
+}
+
+pre {
+    font-size: inherit;
+    padding-left: 4px;
+}
+
+mark {
+    display: inline;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+    color: var(--black);
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+blockquote {
+    margin-inline: 0;
+    padding-left: 16px;
+    border-left: 4px solid var(--light-gray);
+    color: var(--dark-gray);
+    font-style: italic;
+}
+
+summary { cursor: pointer; }
+
+
+/* ── File list ── */
+
+ul.file-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+ul.file-list li { margin-bottom: 8px; }
+ul.file-list li a { color: var(--dark-gray); }
+ul.file-list li a:hover { text-decoration: underline; }
+
+
+/* ── Keyboard key ── */
+
+kbr {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 0.8em;
+    line-height: 1.2;
+    color: var(--black);
+    background-color: var(--lighter-gray);
+    border: 1px solid var(--light-gray);
+    border-radius: 4px;
+}
+
+
+/* ── Utility ── */
+
+.bold      { font-weight: bold; }
+.underline { text-decoration: underline; }
+.no-wrap   { text-wrap: nowrap; }
+
+.subtext {
+    font-size: 0.9em;
+    font-style: italic;
+    color: var(--gray);
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+</style>

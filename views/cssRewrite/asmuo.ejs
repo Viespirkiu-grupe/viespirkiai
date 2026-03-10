@@ -1,0 +1,33 @@
+<style>
+.grid-asmuo {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-areas:
+        "pavadinimas  pavadinimas  pavadinimas"
+        "metaduomenys metaduomenys zemelapis"
+        "kodai        veikla       zemelapis"
+        "darbuotojai  atlyginimai  mokejimai";
+    gap: 10px;
+    padding-bottom: 10px;
+}
+
+@media (max-width: 768px) {
+    .grid-asmuo {
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-areas:
+            "pavadinimas  pavadinimas"
+            "metaduomenys metaduomenys"
+            "zemelapis    zemelapis"
+            "kodai        veikla"
+            "darbuotojai  atlyginimai"
+            "mokejimai    mokejimai";
+    }
+}
+
+.diagrama-nera-duomenu {
+    display: inline-block;
+    width: 100%;
+    margin-block: 64px;
+    text-align: center;
+}
+</style>

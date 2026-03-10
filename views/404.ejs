@@ -1,21 +1,17 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<%- include('head.ejs') %>
-		<meta property="og:title" content="Puslapis nerastas"/>
-		<meta property="og:description" content="Puslapis nerastas." /> 
-		<meta
-			name="description"
-			content="Puslapis nerastas."
-		/>
-		<meta property="og:type" content="website" />
-	</head>
-	<body>
-		<%- include('header.ejs') %>
-		<main>
-			<h1>404</h1>
-            <p><i>Puslapis kurio ieškote nerastas.</i></p>
-		</main>
-		<%- include('footer.ejs') %>
-	</body>
+<head>
+  <%- include('head.ejs') %>
+</head>
+<body>
+  <%- include('header.ejs') %>
+  <main>
+    <div class="empty-state">
+      <div class="empty-state-icon">404</div>
+      <h2>Puslapis nerastas</h2>
+      <p class="text-muted">Puslapis kurio ieškote nerastas.</p>
+    </div>
+  </main>
+  <%- include('footer.ejs') %>
+</body>
 </html>

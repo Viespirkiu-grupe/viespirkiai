@@ -618,17 +618,11 @@ failaiSearchRouter.get("/failai/ocr", async (req, res) => {
     let ocrStatsRes = await postgres.query(
         `SELECT * FROM "failaiOcrStats" ORDER BY count DESC`,
     );
-
     let ocrStats = ocrStatsRes.rows;
-    // Capitalize first letter of tipas
-    ocrStats = ocrStats.map((stat) => {
-        return {
-            ...stat,
-            tipas: stat.tipas.charAt(0).toUpperCase() + stat.tipas.slice(1),
-        };
-    });
-
-    // Add id based on tipas
+    ocrStats = ocrStats.map((stat) => ({
+        ...stat,
+        tipas: stat.tipas.charAt(0).toUpperCase() + stat.tipas.slice(1),
+    }));
     const idMap = {
         Baigta: 1,
         Nepalaikoma: "-",
@@ -637,23 +631,31 @@ failaiSearchRouter.get("/failai/ocr", async (req, res) => {
         Rekomenduojama: 0,
         Nepavyko: -1,
     };
-    ocrStats = ocrStats.map((stat) => {
-        return {
-            ...stat,
-            id: idMap[stat.tipas],
-        };
-    });
+    ocrStats = ocrStats.map((stat) => ({
+        ...stat,
+        id: idMap[stat.tipas],
+    }));
 
     let ocrStatsDayRes = await postgres.query(
         `SELECT * FROM "failaiOcrRezultataiStatsDay" ORDER BY date DESC`,
     );
-
     let ocrStatsDay = ocrStatsDayRes.rows;
 
     let ocrNuskaitytojaiRes = await postgres.query(
-        `SELECT "nuskaitytiDokumentai", "viesasPavadinimas", "pavadinimas", "rezervacijos" FROM "ocrNuskaitytojai" ORDER BY "nuskaitytiDokumentai" DESC LIMIT 100;`,
+        `SELECT
+            n."nuskaitytiDokumentai",
+            n."viesasPavadinimas",
+            n."pavadinimas",
+            n."rezervacijos",
+            COALESCE(SUM(s.results), 0) AS "results",
+            COALESCE(SUM(s.pages),   0) AS "pages",
+            COALESCE(SUM(s.words),   0) AS "words"
+        FROM "ocrNuskaitytojai" n
+        LEFT JOIN "failaiOcrRezultataiStatsDayNode" s ON s.node = n.pavadinimas
+        GROUP BY n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos"
+        ORDER BY n."nuskaitytiDokumentai" DESC
+        LIMIT 100`,
     );
-
     let ocrNuskaitytojai = ocrNuskaitytojaiRes.rows;
 
     res.render("failai/ocr", {

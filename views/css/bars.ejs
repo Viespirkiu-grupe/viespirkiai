@@ -1,0 +1,69 @@
+<style>
+.action-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    border-top: var(--border);
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    z-index: var(--z-sticky);
+}
+
+.action-bar-left {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.action-bar-codes {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--gray);
+}
+
+.action-bar-right {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+}
+
+.action-bar-popup-wrap { position: relative; }
+
+.action-bar-popup {
+    position: absolute;
+    bottom: calc(100% + var(--space-2));
+    right: 0;
+    background: var(--white);
+    border: var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    min-width: 200px;
+    overflow: hidden;
+    display: none;
+}
+
+.action-bar-popup.open { display: block; }
+
+.action-bar-popup a {
+    display: block;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--black);
+    text-decoration: none;
+}
+
+.action-bar-popup a:hover { background: var(--lightest-gray); }
+
+/* Sticky table header helper */
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    background: var(--white);
+}
+</style>

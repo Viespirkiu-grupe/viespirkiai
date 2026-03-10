@@ -1,59 +1,54 @@
-<div>
-    <section class="preResultOptions">
-        <div class="numberOfResults">
-            <%- numberOfResults %>
+<div class="mt-6 max-w-lg center mx-auto">
+    <div>
+    <div class="d-flex justify-between align-center mb-4">
+        <span class="text-muted text-sm"><em class="numberOfResults"><%- numberOfResults %></em></span>
+        <% if (galimaEksportuoti) { %>
+        <div class="d-flex gap-3">
+            <a href="/juridiniai?<%- queryParams %>&json=true&limit=max" class="btn btn-ghost btn-sm">↗ JSON</a>
+            <a href="/juridiniai?<%- queryParams %>&jsonl=true&limit=max" class="btn btn-ghost btn-sm">↗ JSONL</a>
+            <a href="/juridiniai?<%- queryParams %>&csv=true&limit=max" class="btn btn-ghost btn-sm">↗ CSV</a>
         </div>
-
-        <% if(galimaEksportuoti){ %>
-            <div class="exportOptions">
-            <a href="/juridiniai?<%- queryParams %>&json=true&limit=max" class="exportLink">↗ JSON</a>&nbsp;
-            <a href="/juridiniai?<%- queryParams %>&jsonl=true&limit=max" class="exportLink">↗ JSONL</a>&nbsp;
-            <a href="/juridiniai?<%- queryParams %>&csv=true&limit=max" class="exportLink">↗ CSV</a>
-            </div>
         <% } %>
-    </section>
-</div>
+    </div>
 
-<div class="resultsNauji">
-    <% data.forEach(item => { %>
-        <article class="rezultatas" aria-label="<%= item.formosPavadinimas %>">
-            <a href="/asmuo/<%= item.jarKodas %>" class="fullIndentLink"></a>
+    <% if (data.length === 0) { %>
+        <div class="empty-state">
+        <p class="text-muted">Rezultatų nerasta.</p>
+        </div>
+    <% } else { %>
 
-            <div class="rezultatas-left">
-                <dl class="rezultatas-top">
-                    <div>
-                        <dt class="visually-hidden">Tipas</dt>
-                        <dd><%= item.formosPavadinimas %></dd>
-                    </div>
+        <div class="result-list">
+        <% data.forEach(item => { %>
+            <article class="result-card card-clickable" aria-label="<%= item.formosPavadinimas %>">
+            <a href="/asmuo/<%= item.jarKodas %>" class="card-overlay-link"><%= item.pavadinimas %></a>
+
+            <div class="result-card-body">
+                <dl class="result-card-meta">
+                <div>
+                    <dt class="visually-hidden">Tipas</dt>
+                    <dd><%= item.formosPavadinimas %></dd>
+                </div>
                 </dl>
 
-                <h3 class="rezultatas-title">
-                    <a href="/asmuo/<%= item.jarKodas %>">
-                        <span>
-                            <% if (!item.pavadinimas || item.pavadinimas.length === 0) { %>
-                                <i>Nenurodyta</i>
-                            <% } else { %>
-                                <%= item.pavadinimas %>
-                            <% } %>
-                        </span>
-                    </a>
+                <h3 class="result-card-title">
+                <% if (!item.pavadinimas || item.pavadinimas.length === 0) { %>
+                    <em>Nenurodyta</em>
+                <% } else { %>
+                    <%= item.pavadinimas %>
+                <% } %>
                 </h3>
 
-                <div class="rezultatas-bottom">
-                    <div>
-                        <b>Adresas:</b>
-                        <span><%- item.adresas %></span>
-                    </div>
-                    <div>
-                        <b>Registruota:</b>
-                        <span><%= new Date(item.registravimoData).toLtDate() %></span>
-                    </div>
+                <div class="result-card-footer">
+                <span><strong>Adresas:</strong> <%- item.adresas %></span>
+                <span><strong>Registruota:</strong> <%= new Date(item.registravimoData).toLtDate() %></span>
                 </div>
             </div>
-        </article>
-    <% }); %>
-</div>
+            </article>
+        <% }); %>
+        </div>
 
-<%- include('../pagination.ejs', {
-    currentPage, pageCount, queryParams
-}) %>
+        <%- include('../pagination.ejs', { currentPage, pageCount, queryParams }) %>
+
+    <% } %>
+    </div>
+</div>

@@ -7,6 +7,7 @@ const apieRouter = express.Router();
 apieRouter.get("/apie", async (req, res) => {
     res.render("apie", {
         customHead: config.customHead,
+        req,
     });
 });
 

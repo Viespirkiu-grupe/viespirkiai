@@ -1,51 +1,50 @@
-<div>
-    <h2>Duomenų bazė</h2>
-    <i>Nuo paskutinio įjungimo (<%= statistika.database.uptime_seconds.convertUnit('s') %>)</i>
-    <h3><u>Apkrova</u></h3>
-    <h4>Atliktos užklausos</h4>
-    <p><%= Number(statistika.database.xact_commit).toLocaleString('lt-LT') %></p>
+<div class="page-section">
+  <h2 class="mb-1"><a href="#duomenuBaze" id="duomenuBaze" class="no-style">Duomenų bazė</a></h2>
+  <p class="text-muted text-sm mb-4">Nuo paskutinio įjungimo (<%= statistika.database.uptime_seconds.convertUnit('s') %>)</p>
 
-    <h4>Įterptos eilutės</h4>
-    <p><%= Number(statistika.database.tup_inserted).toLocaleString('lt-LT') %></p>
+  <div class="grid-2 mb-5" style="align-items:start;">
 
-    <h4>Atnaujintos eilutės</h4>
-    <p><%= Number(statistika.database.tup_updated).toLocaleString('lt-LT') %></p>
-
-    <h4>Ištrintos eilutės</h4>
-    <p><%= Number(statistika.database.tup_deleted).toLocaleString('lt-LT') %></p>
-
-    <h4>Skaitytos eilutės</h4>
-    <p><%= Number(statistika.database.tup_fetched).toLocaleString('lt-LT') %></p>
-
-    <h3><u>Lentelės</u></h3>
-    <div class="tableContainer" style="max-width: 95vw;">
-        <table style="width: auto; max-width: 100%; min-width: auto;">
-            <thead>
-                <tr>
-                    <th>Pavadinimas</th>
-                    <th>Duomenų dydis</th>
-                    <th>Indekso dydis</th>
-                    <th>Visas dydis</th>
-                    <th>Eilutės*</th>
-                </tr>
-            </thead>
-            <tbody>
-                <% statistika.lenteles.forEach(lentele => { %>
-                    <% if(lentele.tableName == "Iš viso") { %>
-                        <tr class="bold underline">
-                    <% } else { %>
-                        <tr>
-                    <% } %>
-
-                            <td><%= lentele.tableName %></td>
-                            <td class="center no-wrap"><%= Number(lentele.dataSize).convertUnit("B") %></td>
-                            <td class="center no-wrap"><%= Number(lentele.indexSize).convertUnit("B") %></td>
-                            <td class="center no-wrap"><%= Number(lentele.totalSize).convertUnit("B") %></td>
-                            <td class="center no-wrap"><%= Number(lentele.approxRowCount).toLocaleString('lt-LT') %></td>
-
-                        </tr>
-                <% }) %>
-            </tbody>
-        </table>
+    <div>
+      <h3 class="text-sm fw-bold mb-3">Apkrova</h3>
+      <dl class="kv-list">
+        <dt>Atliktos užklausos</dt>
+        <dd><span class="cell-mono"><%= Number(statistika.database.xact_commit).toLocaleString('lt-LT') %></span></dd>
+        <dt>Įterptos eilutės</dt>
+        <dd><span class="cell-mono"><%= Number(statistika.database.tup_inserted).toLocaleString('lt-LT') %></span></dd>
+        <dt>Atnaujintos eilutės</dt>
+        <dd><span class="cell-mono"><%= Number(statistika.database.tup_updated).toLocaleString('lt-LT') %></span></dd>
+        <dt>Ištrintos eilutės</dt>
+        <dd><span class="cell-mono"><%= Number(statistika.database.tup_deleted).toLocaleString('lt-LT') %></span></dd>
+        <dt>Skaitytos eilutės</dt>
+        <dd><span class="cell-mono"><%= Number(statistika.database.tup_fetched).toLocaleString('lt-LT') %></span></dd>
+      </dl>
     </div>
+
+  </div>
+
+  <h3 class="text-sm fw-bold mb-3">Lentelės</h3>
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Pavadinimas</th>
+          <th class="cell-right">Duomenų dydis</th>
+          <th class="cell-right">Indekso dydis</th>
+          <th class="cell-right">Visas dydis</th>
+          <th class="cell-right">Eilutės *</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% statistika.lenteles.forEach(lentele => { %>
+          <tr class="<%= lentele.tableName === 'Iš viso' ? 'fw-bold' : '' %>">
+            <td><%= lentele.tableName %></td>
+            <td class="cell-mono cell-right cell-nowrap"><%= Number(lentele.dataSize).convertUnit("B") %></td>
+            <td class="cell-mono cell-right cell-nowrap"><%= Number(lentele.indexSize).convertUnit("B") %></td>
+            <td class="cell-mono cell-right cell-nowrap"><%= Number(lentele.totalSize).convertUnit("B") %></td>
+            <td class="cell-mono cell-right cell-nowrap"><%= Number(lentele.approxRowCount).toLocaleString('lt-LT') %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
 </div>

@@ -1,83 +1,89 @@
- <h2 id="pinreg"><a href="#pinreg" class="hashHref"><u>Privačių interesų deklaracijos</u></a></h2>
- <%
- // Determine if each category is truncated
- const rysiaiTruncated = asmuo.pinreg.counts.rysiaiSuJa > asmuo.pinreg.rysiaiSuJa.length;
- const darbovietesTruncated = asmuo.pinreg.counts.darbovietes > asmuo.pinreg.darbovietes.length;
- const sutuoktinioTruncated = asmuo.pinreg.counts.sutuoktiniuDarbovietes > asmuo.pinreg.sutuoktinioDarbovietes.length;
+<div class="page-section" id="pinreg">
+  <h2><a href="#pinreg" class="no-style">Privačių interesų deklaracijos</a></h2>
+  <%
+    const rysiaiTruncated = asmuo.pinreg.counts.rysiaiSuJa > asmuo.pinreg.rysiaiSuJa.length;
+    const darbovietesTruncated = asmuo.pinreg.counts.darbovietes > asmuo.pinreg.darbovietes.length;
+    const sutuoktinioTruncated = asmuo.pinreg.counts.sutuoktiniuDarbovietes > asmuo.pinreg.sutuoktinioDarbovietes.length;
+    const anyTruncated = rysiaiTruncated || darbovietesTruncated || sutuoktinioTruncated;
+  %>
+  <% if (anyTruncated) { %>
+    <p class="text-muted text-sm mb-4">
+      Rodomos tik po <%= asmuo.pinreg.limit %> deklaracijos.
+      <a href="?pinregLimit=max#pinreg">Rodyti visas (<%= asmuo.pinreg.total %>)</a>
+    </p>
+  <% } %>
 
- // Show the global "limited" message only if any category is truncated
- const anyTruncated = rysiaiTruncated || darbovietesTruncated || sutuoktinioTruncated;
- %>
+  <div class="grid-3">
 
- <% if (anyTruncated) { %>
-     <i>
-         Rodomos tik po <%= asmuo.pinreg.limit %> deklaracijos.
-         <a href="?pinregLimit=max#pinreg">
-             Rodyti visas (<%= asmuo.pinreg.total %>)
-         </a>
-     </i>
-     <br>
- <% } %>
+    <div>
+      <h3 class="text-sm fw-bold mb-3">Ryšiai su juridiniais asmenimis</h3>
+      <% if (asmuo.pinreg.rysiaiSuJa.length > 0) { %>
+        <div class="result-list">
+          <% asmuo.pinreg.rysiaiSuJa.forEach(rysys => { %>
+            <article class="result-card card-clickable">
+              <a href="https://pinreg.vtek.lt/app/pid-perziura/<%= rysys.uuid %>" class="card-overlay-link"><%= rysys.asmuo %></a>
+              <div class="result-card-body">
+                <dl class="result-card-meta">
+                  <div><dt class="visually-hidden">Nuo</dt><dd>Nuo <%= rysys.rysioPradzia %></dd></div>
+                  <div><dt class="visually-hidden">Kas</dt><dd><%= rysys.kienoRysys && rysys.kienoRysys[0].toUpperCase() + rysys.kienoRysys.slice(1).toLowerCase() %></dd></div>
+                  <div><dt class="visually-hidden">Pateikta</dt><dd><%= new Date(rysys.pateikimoData).toLtDateTime() %></dd></div>
+                </dl>
+                <h3 class="result-card-title"><%= rysys.asmuo %></h3>
+                <div class="result-card-footer"><span><%= rysys.rysioPobudzioPavadinimas %></span></div>
+              </div>
+            </article>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p class="text-muted text-sm">Nėra duomenų</p>
+      <% } %>
+    </div>
 
- <div class="col-3 mobile-col-1">
-     <section class="results" style="margin-inline: initial; margin-block: 0;">
-         <h3 style="margin-bottom: 0px;">Ryšiai su juridiniais asmenimis</h3>
-         <% asmuo.pinreg.rysiaiSuJa.forEach(rysys =>  { %>
-             <div class="rezultatas">
-                 <div class="rezultatas-top">
-                     <span>Nuo <%= rysys.rysioPradzia %></span>
-                     <span><%= rysys.kienoRysys && rysys.kienoRysys[0].toUpperCase() + rysys.kienoRysys.slice(1).toLowerCase(); %></span>
-                     <span><%= new Date(rysys.pateikimoData).toLtDateTime() %></span>
-                 </div>
-                 <div class="rezultatas-title">
-                     <a href="https://pinreg.vtek.lt/app/pid-perziura/<%= rysys.uuid %>">
-                         <%= rysys.asmuo %>
-                     </a>
-                 </div>
-                 <div class="rezultatas-bottom">
-                     <%= rysys.rysioPobudzioPavadinimas %>
-                 </div>
-             </div>
-         <% }) %>
-     </section>
-     <section class="results" style="margin-inline: initial; margin-block: 0;">
-         <h3 style="margin-bottom: 0px;">Darbovietės</h3>
-         <% asmuo.pinreg.darbovietes.forEach(darboviete =>  { %>
-             <div class="rezultatas">
-                 <div class="rezultatas-top">
-                     <span>Nuo <%= darboviete.rysioPradzia %></span>
-                     <span><%= new Date(darboviete.pateikimoData).toLtDateTime() %></span>
-                 </div>
-                 <div class="rezultatas-title">
-                     <a href="https://pinreg.vtek.lt/app/pid-perziura/<%= darboviete.uuid %>">
-                         <%=  darboviete.asmuo %>
-                     </a>
-                 </div>
-                 <div class="rezultatas-bottom">
-                     <%= darboviete.pareigos %>
-                 </div>
-             </div>
-         <% }) %>
-     </section>
-     <section class="results" style="margin-inline: initial; margin-block: 0;">
-         <h3 style="margin-bottom: 0px;">Sutuoktinių darbovietės</h3>
-         <% asmuo.pinreg.sutuoktinioDarbovietes.forEach(darboviete =>  { %>
-             <div class="rezultatas">
-                 <div class="rezultatas-top">
-                     <span>Nuo <%= darboviete.rysioPradzia %></span>
-                     <span><%= new Date(darboviete.pateikimoData).toLtDateTime() %></span>
-                 </div>
-                 <div class="rezultatas-title">
-                     <a href="https://pinreg.vtek.lt/app/pid-perziura/<%= darboviete.uuid %>">
-                         <%=  darboviete.asmuo %> –
-                         <%=  darboviete.sutuoktinis %>
-                     </a>
-                 </div>
-                 <div class="rezultatas-bottom">
-                     <% let pirmas = true; %>
-                     <%= darboviete.pareigos %>
-                 </div>
-             </div>
-         <% }) %>
-     </section>
- </div>
+    <div>
+      <h3 class="text-sm fw-bold mb-3">Darbovietės</h3>
+      <% if (asmuo.pinreg.darbovietes.length > 0) { %>
+        <div class="result-list">
+          <% asmuo.pinreg.darbovietes.forEach(darboviete => { %>
+            <article class="result-card card-clickable">
+              <a href="https://pinreg.vtek.lt/app/pid-perziura/<%= darboviete.uuid %>" class="card-overlay-link"><%= darboviete.asmuo %></a>
+              <div class="result-card-body">
+                <dl class="result-card-meta">
+                  <div><dt class="visually-hidden">Nuo</dt><dd>Nuo <%= darboviete.rysioPradzia %></dd></div>
+                  <div><dt class="visually-hidden">Pateikta</dt><dd><%= new Date(darboviete.pateikimoData).toLtDateTime() %></dd></div>
+                </dl>
+                <h3 class="result-card-title"><%= darboviete.asmuo %></h3>
+                <div class="result-card-footer"><span><%= darboviete.pareigos %></span></div>
+              </div>
+            </article>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p class="text-muted text-sm">Nėra duomenų</p>
+      <% } %>
+    </div>
+
+    <div>
+      <h3 class="text-sm fw-bold mb-3">Sutuoktinių darbovietės</h3>
+      <% if (asmuo.pinreg.sutuoktinioDarbovietes.length > 0) { %>
+        <div class="result-list">
+          <% asmuo.pinreg.sutuoktinioDarbovietes.forEach(darboviete => { %>
+            <article class="result-card card-clickable">
+              <a href="https://pinreg.vtek.lt/app/pid-perziura/<%= darboviete.uuid %>" class="card-overlay-link"><%= darboviete.asmuo %></a>
+              <div class="result-card-body">
+                <dl class="result-card-meta">
+                  <div><dt class="visually-hidden">Nuo</dt><dd>Nuo <%= darboviete.rysioPradzia %></dd></div>
+                  <div><dt class="visually-hidden">Pateikta</dt><dd><%= new Date(darboviete.pateikimoData).toLtDateTime() %></dd></div>
+                </dl>
+                <h3 class="result-card-title"><%= darboviete.asmuo %> – <%= darboviete.sutuoktinis %></h3>
+                <div class="result-card-footer"><span><%= darboviete.pareigos %></span></div>
+              </div>
+            </article>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p class="text-muted text-sm">Nėra duomenų</p>
+      <% } %>
+    </div>
+
+  </div>
+</div>

@@ -1,52 +1,47 @@
- <h2><u><a href="#uzmokestis" class="hashHref">Vidutinis darbo užmokestis</a></u></h2>
- <i>Neatskaičius mokesčių, €/mėn.</i>
- <div class="col-2 mobile-col-1" id="uzmokestis">
-     <section style="width: 100%;">
-         <h3><a href="#vduDarboSutartys" id="vduDarboSutartys" class="hashHref">Darbo sutartys, valstybės tarnautojai</a></h3>
-         <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0 && asmuo.sodra.turejoAtlyginimu) { %>
-             <div id="vidAtlyginimoDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+<div class="page-section" id="uzmokestis">
+  <h2><a href="#uzmokestis" class="no-style">Vidutinis darbo užmokestis</a></h2>
+  <p class="text-muted text-sm mb-5">Neatskaičius mokesčių, €/mėn.</p>
 
-             <script defer>
-               const atlyginimai = [
-                 <% asmuo.sodra.duomenys.forEach((item, i) => { %>
-                   <%= item.vidutinisAtlyginimas || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
-                 <% }) %>
-               ];
+  <div class="grid-2">
+    <div style="display:flex; flex-direction:column; min-height:350px;">
+      <h3 class="text-sm fw-bold mb-3">Darbo sutartys, valstybės tarnautojai</h3>
+      <% if (asmuo.sodra?.duomenys?.length > 0 && asmuo.sodra.turejoAtlyginimu) { %>
+        <div class="chart-frame">
+          <div id="vidAtlyginimoDiagrama" class="chart" style="height:300px;"></div>
+        </div>
+        <script defer>
+          displayChart({
+            element: document.querySelector('#vidAtlyginimoDiagrama'),
+            type: 'line-datetime',
+            labels: sodraLabels,
+            series: [<% asmuo.sodra.duomenys.forEach((item, i) => { %><%= item.vidutinisAtlyginimas || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %><% }) %>],
+            flags: ['yEURMen', 'yMin0']
+          });
+        </script>
+      <% } else { %>
+        <div class="chart-empty">Nėra duomenų</div>
+      <% } %>
+    </div>
 
-               displayChart({
-                 element: document.querySelector('#vidAtlyginimoDiagrama'),
-                 type: 'line-datetime',
-                 labels: sodraLabels,
-                 series: atlyginimai,
-                 flags: ['yEURMen', 'yMin0']
-               })
-             </script>
-         <% } else { %>
-             <i class="diagrama-nera-duomenu">Nėra duomenų</i>
-         <% } %>
-     </section>
-     <section style="width: 100%;">
-         <h3><a href="#vduKita" id="vduKita" class="hashHref">Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</a></h3>
-         <% if(asmuo.sodra && asmuo.sodra.duomenys && asmuo.sodra.duomenys.length > 0 && asmuo.sodra.turejoAtlyginimu2) { %>
-             <div id="vidAtlyginimoIIDiagrama" class="chart" style="width: 100%; height: 400px;"></div>
+    <div style="display:flex; flex-direction:column; min-height:350px;">
+      <h3 class="text-sm fw-bold mb-3">Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
+      <% if (asmuo.sodra?.duomenys?.length > 0 && asmuo.sodra.turejoAtlyginimu2) { %>
+        <div class="chart-frame">
+          <div id="vidAtlyginimoIIDiagrama" class="chart" style="height:300px;"></div>
+        </div>
+        <script defer>
+          displayChart({
+            element: document.querySelector('#vidAtlyginimoIIDiagrama'),
+            type: 'line-datetime',
+            labels: sodraLabels,
+            series: [<% asmuo.sodra.duomenys.forEach((item, i) => { %><%= item.vidutinisAtlyginimas2 || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %><% }) %>],
+            flags: ['yEURMen', 'yMin0']
+          });
+        </script>
+      <% } else { %>
+        <div class="chart-empty">Nėra duomenų</div>
+      <% } %>
+    </div>
 
-             <script defer>
-               const atlyginimaiII = [
-                 <% asmuo.sodra.duomenys.forEach((item, i) => { %>
-                   <%= item.vidutinisAtlyginimas2 || "null" %><%= i < asmuo.sodra.duomenys.length - 1 ? ',' : '' %>
-                 <% }) %>
-               ];
-
-               displayChart({
-                 element: document.querySelector('#vidAtlyginimoIIDiagrama'),
-                 type: 'line-datetime',
-                 labels: sodraLabels,
-                 series: atlyginimaiII,
-                 flags: ['yEURMen', 'yMin0']
-               })
-             </script>
-         <% } else { %>
-             <i class="diagrama-nera-duomenu">Nėra duomenų</i>
-         <% } %>
-     </section>
- </div>
+  </div>
+</div>
