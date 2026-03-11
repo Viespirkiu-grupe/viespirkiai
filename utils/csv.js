@@ -78,38 +78,40 @@ export async function* parseCSV(path, encoding = "utf8") {
     const stream = fs.createReadStream(path, { encoding });
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
 
-    let headers = /** @type {string[] | undefined} */ (undefined);
-    let delimiter = /** @type {string} */ (",");
+    let headers = undefined;
+    let delimiter = ",";
     let buffer = "";
 
-    for await (const line of rl) {
-        // First non-empty line is the header
-        if (!headers) {
-            delimiter = detectDelimiter(line);
-            headers = parseLine(line, delimiter).map((h) =>
-                (h ?? "").replace(/^\uFEFF/, "").trim(),
-            );
-            continue;
+    try {
+        for await (const line of rl) {
+            if (!headers) {
+                delimiter = detectDelimiter(line);
+                headers = parseLine(line, delimiter).map((h) =>
+                    (h ?? "").replace(/^\uFEFF/, "").trim(),
+                );
+                continue;
+            }
+
+            if (!line.trim()) continue;
+
+            buffer += (buffer ? "\n" : "") + line;
+
+            const quoteCount = (buffer.match(/"/g) ?? []).length;
+            if (quoteCount % 2 !== 0) continue;
+
+            const values = parseLine(buffer, delimiter);
+            const row = {};
+            for (let i = 0; i < headers.length; i++) {
+                const val = values[i] ?? "";
+                row[headers[i]] = val === "NULL" ? null : val;
+            }
+
+            yield row;
+            buffer = "";
         }
-
-        if (!line.trim()) continue;
-
-        buffer += (buffer ? "\n" : "") + line;
-
-        // Wait until quotes are balanced before treating buffer as a full row
-        const quoteCount = (buffer.match(/"/g) ?? []).length;
-        if (quoteCount % 2 !== 0) continue;
-
-        const values = parseLine(buffer, delimiter);
-        /** @type {Record<string, string | null>} */
-        const row = {};
-        for (let i = 0; i < headers.length; i++) {
-            const val = values[i] ?? "";
-            row[headers[i]] = val === "NULL" ? null : val;
-        }
-
-        yield row;
-        buffer = "";
+    } finally {
+        rl.close();
+        stream.destroy();
     }
 }
 

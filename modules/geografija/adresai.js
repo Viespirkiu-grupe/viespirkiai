@@ -1,136 +1,254 @@
 import { postgres } from "../../postgres/postgres.js";
 
 /**
- * Supaprastina adresą, pakeičia linksnį į naudojamą OpenStreetMap
- * @param {string} raw - Originalus adresas
- * @returns {Promise<string>} Supaprastintas adresas
+ * Looks up coordinates for a Lithuanian address using the AR database tables.
+ *
+ * @param {string} raw - Raw address string e.g. "Vilnius, Savanorių pr. 178, LT-03154"
+ * @returns {Promise<{ location: [number, number] } | undefined>}
  */
-export async function supaprastintiLtAdresa(raw) {
-    // Kaimų ir viensėdžių pavadinimai turi būt konvertuojami į vardininko linksnį
-    for (const prefix of ["k.", "vs."]) {
-        const match = raw.match(
-            new RegExp(`([\\p{L}\\s.'\\-]+?)\\s*${prefix}`, "iu"),
+export async function getAddressCoords(raw) {
+    if (!raw.trim()) return undefined;
+
+    const normalized = raw.replace(/(\d+)\s+K\d+/g, "$1");
+    const parts = normalized.split(/,\s*/);
+
+    async function getCenterByName(name) {
+        const { rows: r0 } = await postgres.query(
+            `SELECT ST_Y(ST_Centroid("geometrija"::geometry)) AS lat,
+               ST_X(ST_Centroid("geometrija"::geometry)) AS lon
+        FROM "arGyvenvietesRibos"
+        WHERE "pavadinimas" ILIKE $1
+        LIMIT 1`,
+            [`${name.trim()}%`],
         );
+        if (r0.length) return { location: [r0[0].lat, r0[0].lon] };
 
-        if (match) {
-            // Randame tinkamą linksnį
-            let place = match[1].trim();
-            const { rows: foundRows } = await postgres.query(
-                `SELECT "pavadinimas" FROM "gyvenamosVietoves" WHERE "pavadinimasK" = $1 LIMIT 1`,
-                [place],
+        const { rows: r1 } = await postgres.query(
+            `SELECT ST_Y(ST_Centroid("geometrija"::geometry)) AS lat,
+               ST_X(ST_Centroid("geometrija"::geometry)) AS lon
+        FROM "arGyvenvietesRibos" gyv
+        JOIN "gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
+        WHERE gv."pavadinimas" ILIKE $1
+        LIMIT 1`,
+            [`${name.trim()}%`],
+        );
+        if (r1.length) return { location: [r1[0].lat, r1[0].lon] };
+
+        const { rows: r2 } = await postgres.query(
+            `SELECT ST_Y(ST_Centroid("geometrija"::geometry)) AS lat,
+               ST_X(ST_Centroid("geometrija"::geometry)) AS lon
+        FROM "arSavivaldybes"
+        WHERE "pavadinimas" ILIKE $1
+        LIMIT 1`,
+            [`${name.trim()}%`],
+        );
+        if (r2.length) return { location: [r2[0].lat, r2[0].lon] };
+
+        return undefined;
+    }
+
+    const savMatch = raw.match(
+        /^(.+?)\s+(?:miesto\s+)?savivaldybės\s+teritorija$/i,
+    );
+    if (savMatch) return getCenterByName(savMatch[1]);
+
+    let city, street, nr;
+    for (let i = parts.length - 1; i >= 1; i--) {
+        // Allow apartment suffixes like -R53, -K3, -12A etc.
+        const streetMatch = parts[i].match(
+            /^(.+?)\s+(\d+[A-Za-z]?)(?:-[A-Za-z]?\d+[A-Za-z]?)?\s*$/,
+        );
+        if (streetMatch && !parts[i].match(/^LT-\d{5}$/i)) {
+            street = streetMatch[1];
+            nr = streetMatch[2];
+            city = parts[i - 1];
+            break;
+        }
+    }
+
+    if (!street || !nr) {
+        const lastPart = parts[parts.length - 1];
+        const placeName = lastPart
+            .replace(/\s*(r\.\s*sav\.|sav\.|sen\.|mstl\.).*$/i, "")
+            .trim();
+        if (placeName) return getCenterByName(placeName);
+        return undefined;
+    }
+
+    if (street.match(/\bk\.\s*$/i)) {
+        return getCenterByName(street);
+    }
+
+    const postcode = normalized.match(/LT-(\d{5})/i)?.[1];
+    const cityIsVillage = city?.match(/\bk\.\s*$/i);
+
+    const streetVariants = [street.trim()];
+    const fullNameMatch = street.match(
+        /^([A-ZÁČĘĖĮŠŲŪŽ][a-záčęėįšųūž]+(?:\s+[A-ZÁČĘĖĮŠŲŪŽ][a-záčęėįšųūž]+)*)\s+(g\.|pr\.|al\.|pl\.|tak\.|kel\.|skg\.|a\.)$/,
+    );
+    if (fullNameMatch) {
+        const words = fullNameMatch[1].split(/\s+/);
+        const suffix = fullNameMatch[2];
+        if (words.length >= 2) {
+            streetVariants.push(
+                `${words[0][0]}. ${words.slice(1).join(" ")} ${suffix}`,
             );
-
-            // Pakeičiame
-            if (foundRows.length > 0 && foundRows[0].pavadinimas) {
-                raw = raw.replace(place, foundRows[0].pavadinimas);
+            for (const word of words) {
+                const v = `${word} ${suffix}`;
+                if (!streetVariants.includes(v)) streetVariants.push(v);
             }
         }
     }
 
-    raw = raw.replace(/\bk\.\s*/gi, ""); // Panaikiname k.
-    raw = raw.replace(/\bvs\.\s*/gi, ""); // Panaikiname vs.
-    raw = raw.replace(/\bglž\.\s*/gi, ""); // Panaikiname glž. st.
-
-    // Panaikiname LT- pašto kodo prefiksą
-    const postcodeMatch = raw.match(/LT-(\d{5})/i);
-    const postcode = postcodeMatch ? postcodeMatch[1] : "";
-
-    // Išimtis – Maigės -> P. Cvirkos
-    raw = raw.replace(/\bMaigės\b/gi, "P. Cvirkos");
-
-    // Randame adreso numerį
-    const streetNumberMatch = raw.match(
-        /([\p{L}\s.'\-]+?\d+[A-Za-z]?(-\d+[A-Za-z]?)?)/iu,
-    );
-
-    const streetNumber = (
-        streetNumberMatch ? streetNumberMatch[1].trim() : ""
-    ).replace(/-\d+[A-Za-z]?$/, "");
-
-    // Suformuojame galutinį adresą
-    let addr = "";
-
-    if (streetNumber) addr += streetNumber;
-    if (postcode) addr += (addr ? ", " : "") + postcode;
-
-    addr += (addr ? ", " : "") + "Lithuania";
-
-    return addr;
-}
-
-const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
-const USER_AGENT = "Viespirkiai (viespirkiai@viespirkiai.org)";
-/**
- * Get coordinates for a simplified address using Nominatim with caching.
- *
- * Checks the "nominatimCache" table first. If a cached result exists, it returns
- * it immediately. If not, queries the Nominatim API, stores the result in the cache,
- * and indicates whether it was a cache hit or a fresh lookup.
- *
- * @param {string} address - The simplified address to geocode.
- * @async
- * @returns {Promise<{ location: [number, number], hit: boolean } | undefined>}
- * Returns an object with:
- * - `location`: [latitude, longitude] coordinates of the address.
- * - `hit`: `true` if the result came from cache, `false` if it was freshly fetched.
- * Returns `undefined` if the address could not be geocoded.
- */
-export async function getAddressCoords(address) {
-    // Check cache first
-    const { rows } = await postgres.query(
-        `SELECT ST_X(point::geometry) AS lon, ST_Y(point::geometry) AS lat, exists
-       FROM "nominatimCache"
-       WHERE address = $1
-       LIMIT 1`,
-        [address],
-    );
-
-    if (rows.length) {
-        const row = rows[0];
-
-        if (!row.exists || row.lon === null || row.lat === null)
-            return undefined;
-
-        return {
-            location: [row.lat, row.lon], // [latitude, longitude]
-            hit: true,
-        };
-    }
-
-    try {
-        const url = new URL(NOMINATIM_URL);
-        url.searchParams.set("q", address);
-        url.searchParams.set("format", "json");
-        url.searchParams.set("limit", "1");
-
-        const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-        const data = await res.json();
-
-        if (!data.length) {
-            // Cache failed lookup
-            await postgres.query(
-                `INSERT INTO "nominatimCache" (address, exists) VALUES ($1, false)`,
-                [address],
+    for (const streetVariant of streetVariants) {
+        // City via gyvenamosVietoves (towns/cities)
+        if (!cityIsVillage && city) {
+            const { rows } = await postgres.query(
+                `SELECT ST_X(a."geometrija"::geometry) AS lon,
+                 ST_Y(a."geometrija"::geometry) AS lat
+          FROM "arPastataiSklypaiAdresai" p
+          JOIN "arAdresai" a ON a."kodas" = p."kodas"
+          JOIN "arGatves" g ON g."kodas" = p."gatKodas"
+          JOIN "arGyvenvietesRibos" gyv ON gyv."kodas" = g."gyvKodas"
+          JOIN "gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
+          WHERE p."nr" = $1
+            AND g."pavadinimas" ILIKE $2
+            AND gv."pavadinimas" ILIKE $3
+          LIMIT 1`,
+                [nr, `${streetVariant}%`, `${city.trim()}%`],
             );
-            return undefined;
+            if (rows.length) return { location: [rows[0].lat, rows[0].lon] };
         }
 
-        const lat = parseFloat(data[0].lat);
-        const lon = parseFloat(data[0].lon);
+        // Village city — match directly against arGyvenvietesRibos pavadinimas
+        if (cityIsVillage && city) {
+            const { rows } = await postgres.query(
+                `SELECT ST_X(a."geometrija"::geometry) AS lon,
+                 ST_Y(a."geometrija"::geometry) AS lat
+          FROM "arPastataiSklypaiAdresai" p
+          JOIN "arAdresai" a ON a."kodas" = p."kodas"
+          JOIN "arGatves" g ON g."kodas" = p."gatKodas"
+          JOIN "arGyvenvietesRibos" gyv ON gyv."kodas" = g."gyvKodas"
+          WHERE p."nr" = $1
+            AND g."pavadinimas" ILIKE $2
+            AND gyv."pavadinimas" ILIKE $3
+          LIMIT 1`,
+                [nr, `${streetVariant}%`, `${city.trim()}%`],
+            );
+            if (rows.length) return { location: [rows[0].lat, rows[0].lon] };
+        }
 
-        // Cache successful lookup
-        await postgres.query(
-            `INSERT INTO "nominatimCache" (address, point, exists)
-             VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326), true)`,
-            [address, lon, lat],
+        // Postcode fallback
+        if (postcode) {
+            const { rows } = await postgres.query(
+                `SELECT ST_X(a."geometrija"::geometry) AS lon,
+                 ST_Y(a."geometrija"::geometry) AS lat
+          FROM "arPastataiSklypaiAdresai" p
+          JOIN "arAdresai" a ON a."kodas" = p."kodas"
+          JOIN "arGatves" g ON g."kodas" = p."gatKodas"
+          WHERE p."nr" = $1
+            AND p."pastoKodas" = $2
+            AND g."pavadinimas" ILIKE $3
+          LIMIT 1`,
+                [nr, `LT-${postcode}`, `${streetVariant}%`],
+            );
+            if (rows.length) return { location: [rows[0].lat, rows[0].lon] };
+        }
+
+        // No postcode, no village — city + street + nr
+        if (!postcode && !cityIsVillage && city) {
+            const { rows } = await postgres.query(
+                `SELECT ST_X(a."geometrija"::geometry) AS lon,
+                 ST_Y(a."geometrija"::geometry) AS lat
+          FROM "arPastataiSklypaiAdresai" p
+          JOIN "arAdresai" a ON a."kodas" = p."kodas"
+          JOIN "arGatves" g ON g."kodas" = p."gatKodas"
+          JOIN "arGyvenvietesRibos" gyv ON gyv."kodas" = g."gyvKodas"
+          JOIN "gyvenamosVietoves" gv ON gyv."pavadinimas" ILIKE gv."pavadinimasK" || '%'
+          WHERE p."nr" = $1
+            AND g."pavadinimas" ILIKE $2
+            AND gv."pavadinimas" ILIKE $3
+          LIMIT 1`,
+                [nr, `${streetVariant}%`, `${city.trim()}%`],
+            );
+            if (rows.length) return { location: [rows[0].lat, rows[0].lon] };
+        }
+    }
+
+    return undefined;
+}
+
+if (process.argv[1] === new URL(import.meta.url).pathname) {
+    const arg = process.argv[2];
+
+    if (arg === "--test") {
+        const { rows } = await postgres.query(
+            `SELECT "adresas" FROM "jarCsv"
+           WHERE "adresas" IS NOT NULL
+           ORDER BY RANDOM()
+           LIMIT 1000`,
         );
 
-        return {
-            location: [lat, lon],
-            hit: false,
-        };
-    } catch (e) {
-        console.error("Nominatim request failed:", e);
-        return undefined;
+        let found = 0;
+        let notFound = 0;
+
+        for (const { adresas } of rows) {
+            const result = await getAddressCoords(adresas);
+            if (result) {
+                found++;
+                console.log(`✓ ${adresas}`);
+                console.log(
+                    `  https://www.openstreetmap.org/?mlat=${result.location[0]}&mlon=${result.location[1]}#map=17/${result.location[0]}/${result.location[1]}`,
+                );
+            } else {
+                notFound++;
+                const normalized = adresas.replace(/(\d+)\s+K\d+/g, "$1");
+                const parts = normalized.split(/,\s*/);
+
+                let city, street, nr;
+                for (let i = parts.length - 1; i >= 1; i--) {
+                    const streetMatch = parts[i].match(
+                        /^(.+?)\s+(\d+[A-Za-z]?)(?:-\d+[A-Za-z]?)?\s*$/,
+                    );
+                    if (streetMatch && !parts[i].match(/^LT-\d{5}$/i)) {
+                        street = streetMatch[1];
+                        nr = streetMatch[2];
+                        city = parts[i - 1];
+                        break;
+                    }
+                }
+
+                console.log(`✗ ${adresas}`);
+                console.log(`  parts: ${JSON.stringify(parts)}`);
+                console.log(`  → city="${city}" street="${street}" nr="${nr}"`);
+            }
+        }
+
+        console.log(
+            `\n  found: ${found}/${rows.length}, not found: ${notFound}/${rows.length}`,
+        );
+    } else {
+        const address = arg;
+
+        if (!address) {
+            console.error("Usage: node adresai.js <address>");
+            console.error("       node adresai.js --test");
+            process.exit(1);
+        }
+
+        const result = await getAddressCoords(address);
+
+        if (result) {
+            console.log(`✓ ${address}`);
+            console.log(`  lat: ${result.location[0]}`);
+            console.log(`  lon: ${result.location[1]}`);
+            console.log(
+                `  https://www.openstreetmap.org/?mlat=${result.location[0]}&mlon=${result.location[1]}#map=17/${result.location[0]}/${result.location[1]}`,
+            );
+        } else {
+            console.log(`✗ Not found: ${address}`);
+        }
     }
+
+    await postgres.end();
 }
