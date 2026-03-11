@@ -6,211 +6,213 @@ import { postgres } from "../postgres/postgres.js";
 
 const nepatikimiIrMelagiaiRouter = express.Router();
 
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 250;
+
+/**
+ * @param {{ limit?: string }} query
+ * @returns {{ limit: number } | { error: string }}
+ */
+function parseLimit(query) {
+    if (query.limit === "max") return { limit: MAX_LIMIT };
+    const n = parseInt(query.limit);
+    if (n > MAX_LIMIT)
+        return {
+            error: `Limitas per didelis. Maksimalus limitas yra ${MAX_LIMIT}.`,
+        };
+    if (n > 0) return { limit: n };
+    return { limit: DEFAULT_LIMIT };
+}
+
+/**
+ * @param {string} searchTerm
+ * @returns {{ tsQueryFunc: string, cleanSearch: string }}
+ */
+function parseSearch(searchTerm) {
+    const quoteMatch = searchTerm.match(/^"(.*)"$/);
+    return {
+        tsQueryFunc: quoteMatch ? "phraseto_tsquery" : "plainto_tsquery",
+        cleanSearch: quoteMatch ? quoteMatch[1] : searchTerm,
+    };
+}
+
+const NEPATIKIMAS_COLS = `
+    nd."atvejoNr",
+    nd."duomenuIvedimoData",
+    nd."pirkimoVykdytojoPavadinimas",
+    nd."tiekejoPavadinimas",
+    nd."tiekejoJarKodas",
+    nd."pirkimoNumeris",
+    nd."sutartiesNutraukimoData"::date,
+    nd."dataNuoKuriosSkaiciuojama"::date,
+    nd."itrauktaIki"::date AS "itrauktasIki",
+    nd."teismoData"::date,
+    nd."teismoSprendimoData"::date,
+    nd."teismoSprendimoLink",
+    nd.metai,
+    nd."paskutiniKartaMatytaSarase"`;
+
+const MELAGINGAS_COLS = `
+    nd."atvejoNr",
+    nd."duomenuIvedimoData",
+    nd."pirkimoVykdytojoPavadinimas",
+    nd."tiekejoPavadinimas",
+    nd."tiekejoJarKodas",
+    nd."pirkimoNumeris",
+    NULL::date AS "sutartiesNutraukimoData",
+    nd."dataNuoKuriosSkaiciuojamasTerminas"::date AS "dataNuoKuriosSkaiciuojama",
+    nd."itrauktasIki"::date,
+    nd."teismoData"::date,
+    NULL::date AS "teismoSprendimoData",
+    nd."teismoSprendimoLink",
+    nd.metai,
+    nd."paskutiniKartaMatytaSarase"`;
+
+/**
+ * @param {string} tsQueryFunc
+ * @param {number} limitParam - param index for limit
+ * @param {number} offsetParam - param index for offset
+ * @returns {string}
+ */
+function searchResultsQuery(tsQueryFunc, limitParam, offsetParam) {
+    return `
+        SELECT * FROM (
+            SELECT ${NEPATIKIMAS_COLS}, NULL::text AS "irasymoPagrindas", 'Nepatikimas' AS "saltinis"
+            FROM public."nepatikimiTiekejai" nd
+            LEFT JOIN public."nepatikimiTiekejaiPagrindimai" p
+                ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
+            WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
+
+            UNION ALL
+
+            SELECT ${MELAGINGAS_COLS}, nd."irasymoPagrindas", 'Melagingas' AS "saltinis"
+            FROM public."melagingiTiekejai" nd
+            LEFT JOIN public."melagingiTiekejaiPagrindimai" p
+                ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
+            WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
+        ) t
+        ORDER BY "duomenuIvedimoData" DESC NULLS LAST
+        LIMIT $${limitParam} OFFSET $${offsetParam}`;
+}
+
+/**
+ * @returns {string}
+ */
+function defaultResultsQuery() {
+    return `
+        SELECT * FROM (
+            SELECT ${NEPATIKIMAS_COLS}, NULL::text AS "irasymoPagrindas", 'Nepatikimas' AS "saltinis"
+            FROM public."nepatikimiTiekejai" nd
+            INNER JOIN public."nepatikimiTiekejaiPagrindimai" p
+                ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
+
+            UNION ALL
+
+            SELECT ${MELAGINGAS_COLS}, nd."irasymoPagrindas", 'Melagingas' AS "saltinis"
+            FROM public."melagingiTiekejai" nd
+            INNER JOIN public."melagingiTiekejaiPagrindimai" p
+                ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
+        ) t
+        ORDER BY "duomenuIvedimoData" DESC NULLS LAST
+        LIMIT $1 OFFSET $2`;
+}
+
+/**
+ * @param {{ cleanSearch: string, tsQueryFunc: string, limit: number, skip: number }} params
+ * @returns {Promise<{ rows: object[], total: number }>}
+ */
+async function queryNepatikimi({ cleanSearch, tsQueryFunc, limit, skip }) {
+    if (cleanSearch) {
+        const [resultsRes, totalRes] = await Promise.all([
+            postgres.query(searchResultsQuery(tsQueryFunc, 2, 3), [
+                cleanSearch,
+                limit,
+                skip,
+            ]),
+            postgres.query(
+                `SELECT COUNT(*) FROM (
+                    SELECT 1 FROM public."nepatikimiTiekejai" WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)
+                    UNION ALL
+                    SELECT 1 FROM public."melagingiTiekejai" WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)
+                ) t`,
+                [cleanSearch],
+            ),
+        ]);
+        return {
+            rows: resultsRes.rows,
+            total: parseInt(totalRes.rows[0].count, 10),
+        };
+    }
+
+    const [resultsRes, totalRes] = await Promise.all([
+        postgres.query(defaultResultsQuery(), [limit, skip]),
+        postgres.query(`
+            SELECT (SELECT COUNT(*) FROM public."nepatikimiTiekejai") +
+                   (SELECT COUNT(*) FROM public."melagingiTiekejai") AS count`),
+    ]);
+    return {
+        rows: resultsRes.rows,
+        total: parseInt(totalRes.rows[0].count, 10),
+    };
+}
+
+/**
+ * @param {{ rows: object[], total: number, elapsed: number }} params
+ * @returns {string}
+ */
+function buildNumberOfResults({ rows, total, elapsed }) {
+    const trukme = (elapsed / 1000).toFixed(2) + "s";
+    const source = `<pre style="display: inline;">(${trukme}, PostgreSQL)</pre>`;
+    if (rows.length < total)
+        return `Rodomi ${rows.length} iš ${Number(total).linksniuotiK(["rezultato", "rezultatų"])} ${source}`;
+    return `${Number(total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} ${source}`;
+}
+
 nepatikimiIrMelagiaiRouter.get(
     "/nepatikimi",
     cleanEmptyQueryParams,
     async (req, res) => {
         const startas = performance.now();
 
+        const parsedLimit = parseLimit(req.query);
+        if ("error" in parsedLimit)
+            return res.status(400).send(parsedLimit.error);
+        const { limit } = parsedLimit;
+
         const page = parseInt(req.query.page) || 1;
-        let limit = 50;
-        const MAX_LIMIT = 250;
-
-        if (req.query.limit === "max") {
-            limit = MAX_LIMIT;
-        } else if (parseInt(req.query.limit) > MAX_LIMIT) {
-            return res
-                .status(400)
-                .send(
-                    `Limitas per didelis. Maksimalus limitas yra ${MAX_LIMIT}.`,
-                );
-        } else if (parseInt(req.query.limit) > 0) {
-            limit = parseInt(req.query.limit) || limit;
-        }
-
         const skip = (page - 1) * limit;
 
-        let queryText, totalQuery, query2Text, total2Query;
-        let cleanSearch = "";
-        let searchTerm = req.query.search || "";
-        if (req.query.search) {
-            const quoteMatch = searchTerm.match(/^"(.*)"$/);
-            const tsQueryFunc = quoteMatch
-                ? "phraseto_tsquery"
-                : "plainto_tsquery";
-            cleanSearch = quoteMatch ? quoteMatch[1] : searchTerm;
+        const searchTerm = req.query.search || "";
+        const { tsQueryFunc, cleanSearch } = searchTerm
+            ? parseSearch(searchTerm)
+            : { tsQueryFunc: "", cleanSearch: "" };
 
-            // Merged results query
-            queryText = `SELECT *
-            FROM (
-                SELECT
-                    nd."atvejoNr",
-                    nd."duomenuIvedimoData" AS "duomenuIvedimoData",
-                    nd."pirkimoVykdytojoPavadinimas",
-                    nd."tiekejoPavadinimas",
-                    nd."tiekejoJarKodas",
-                    nd."pirkimoNumeris",
-                    nd."sutartiesNutraukimoData"::date,
-                    nd."dataNuoKuriosSkaiciuojama"::date,
-                    nd."itrauktaIki"::date AS "itrauktasIki",
-                    nd."teismoData"::date,
-                    nd."teismoSprendimoData"::date,
-                    nd."teismoSprendimoLink",
-                    nd.metai,
-                    nd."paskutiniKartaMatytaSarase",
-                    'Nepatikimas' AS "saltinis"
-                FROM public."nepatikimiTiekejai" nd
-                LEFT JOIN public."nepatikimiTiekejaiPagrindimai" p
-                    ON p."tiekejoJarKodas" = nd."tiekejoJarKodas"
-                   AND p."pirkimoNumeris" = nd."pirkimoNumeris"
-                WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
+        const { rows, total } = await queryNepatikimi({
+            cleanSearch,
+            tsQueryFunc,
+            limit,
+            skip,
+        });
 
-                UNION ALL
-
-                SELECT
-                    nd."atvejoNr",
-                    nd."duomenuIvedimoData" AS "duomenuIvedimoData",
-                    nd."pirkimoVykdytojoPavadinimas",
-                    nd."tiekejoPavadinimas",
-                    nd."tiekejoJarKodas",
-                    nd."pirkimoNumeris",
-                    NULL::date AS "sutartiesNutraukimoData",
-                    nd."dataNuoKuriosSkaiciuojamasTerminas"::date AS "dataNuoKuriosSkaiciuojama",
-                    nd."itrauktasIki"::date,
-                    nd."teismoData"::date,
-                    NULL::date AS "teismoSprendimoData",
-                    nd."teismoSprendimoLink",
-                    nd.metai,
-                    nd."paskutiniKartaMatytaSarase",
-                    'Melagingas' AS "saltinis"
-                FROM public."melagingiTiekejai" nd
-                LEFT JOIN public."melagingiTiekejaiPagrindimai" p
-                    ON p."tiekejoJarKodas" = nd."tiekejoJarKodas"
-                   AND p."pirkimoNumeris" = nd."pirkimoNumeris"
-                WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
-            ) t
-            ORDER BY "duomenuIvedimoData" DESC NULLS LAST
-            LIMIT $2 OFFSET $3;
-            `;
-
-            // Merged total count query
-            totalQuery = `
-              SELECT COUNT(*)
-              FROM (
-                  SELECT 1
-                  FROM public."nepatikimiTiekejai"
-                  WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)
-
-                  UNION ALL
-
-                  SELECT 1
-                  FROM public."melagingiTiekejai"
-                  WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)
-              ) AS t;
-            `;
-
-            var [resultsRes, totalRes] = await Promise.all([
-                postgres.query(queryText, [cleanSearch, limit, skip]),
-                postgres.query(totalQuery, [cleanSearch]),
-            ]);
-        } else {
-            // No search term: get newest entries
-            // Merged results query (no search term)
-            queryText = `SELECT *
-            FROM (
-                SELECT
-                    nd."atvejoNr",
-                    nd."duomenuIvedimoData" AS "duomenuIvedimoData",
-                    nd."pirkimoVykdytojoPavadinimas",
-                    nd."tiekejoPavadinimas",
-                    nd."tiekejoJarKodas",
-                    nd."pirkimoNumeris",
-                    nd."sutartiesNutraukimoData"::date,
-                    nd."dataNuoKuriosSkaiciuojama"::date,
-                    nd."itrauktaIki"::date AS "itrauktasIki",
-                    nd."teismoData"::date,
-                    nd."teismoSprendimoData"::date,
-                    nd."teismoSprendimoLink",
-                    nd.metai,
-                    nd."paskutiniKartaMatytaSarase",
-                    NULL::text AS "irasymoPagrindas",
-                    'Nepatikimas' AS "saltinis"
-                FROM public."nepatikimiTiekejai" nd
-                INNER JOIN public."nepatikimiTiekejaiPagrindimai" p
-                    ON p."tiekejoJarKodas" = nd."tiekejoJarKodas"
-                   AND p."pirkimoNumeris" = nd."pirkimoNumeris"
-
-                UNION ALL
-
-                SELECT
-                    nd."atvejoNr",
-                    nd."duomenuIvedimoData" AS "duomenuIvedimoData",
-                    nd."pirkimoVykdytojoPavadinimas",
-                    nd."tiekejoPavadinimas",
-                    nd."tiekejoJarKodas",
-                    nd."pirkimoNumeris",
-                    NULL::date AS "sutartiesNutraukimoData",
-                    nd."dataNuoKuriosSkaiciuojamasTerminas"::date AS "dataNuoKuriosSkaiciuojama",
-                    nd."itrauktasIki"::date,
-                    nd."teismoData"::date,
-                    NULL::date AS "teismoSprendimoData",
-                    nd."teismoSprendimoLink",
-                    nd.metai,
-                    nd."paskutiniKartaMatytaSarase",
-                    nd."irasymoPagrindas",
-                    'Melagingas' AS "saltinis"
-                FROM public."melagingiTiekejai" nd
-                INNER JOIN public."melagingiTiekejaiPagrindimai" p
-                    ON p."tiekejoJarKodas" = nd."tiekejoJarKodas"
-                   AND p."pirkimoNumeris" = nd."pirkimoNumeris"
-            ) t
-            ORDER BY "duomenuIvedimoData" DESC NULLS LAST
-            LIMIT $1 OFFSET $2;
-         `;
-
-            // Merged total count query
-            totalQuery = `
-              SELECT
-                  (SELECT COUNT(*) FROM public."nepatikimiTiekejai") +
-                  (SELECT COUNT(*) FROM public."melagingiTiekejai") AS count;
-            `;
-
-            var [resultsRes, totalRes] = await Promise.all([
-                postgres.query(queryText, [limit, skip]),
-                postgres.query(totalQuery),
-            ]);
-        }
-
-        // Process results
-        const results = resultsRes.rows;
-
-        const total = parseInt(totalRes.rows[0].count, 10);
-
-        // Paieškos užklausos informacija
-        const trukme = ((performance.now() - startas) / 1000).toFixed(2) + "s";
-        const rodomiRezultatai = results.length;
-        const numberOfResults =
-            rodomiRezultatai < total
-                ? `Rodomi ${rodomiRezultatai} iš ${Number(total).linksniuotiK(["rezultato", "rezultatų"])} <pre style="display: inline;">(${trukme}, PostgreSQL)</pre>`
-                : `${Number(total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} <pre style="display: inline;">(${trukme}, PostgreSQL)</pre>`;
-
-        if (req.query.json) {
-            res.json({
-                data: results,
+        if (req.query.json)
+            return res.json({
+                data: rows,
                 currentPage: page,
                 pageCount: Math.ceil(total / limit),
             });
-            return;
-        }
 
         res.render("nepatikimiIrMelagiai/index", {
             customHead: config.customHead,
             values: { search: searchTerm },
-            data: results,
+            data: rows,
             queryParams: `&search=${encodeURIComponent(searchTerm)}`,
             query: req.query,
             search: cleanSearch,
-            numberOfResults,
+            numberOfResults: buildNumberOfResults({
+                rows,
+                total,
+                elapsed: performance.now() - startas,
+            }),
             currentPage: page,
             pageCount: Math.ceil(total / limit),
             galimaEksportuoti: false,
@@ -220,13 +222,13 @@ nepatikimiIrMelagiaiRouter.get(
     },
 );
 
-nepatikimiIrMelagiaiRouter.get("/failai.png", async (req, res) => {
+nepatikimiIrMelagiaiRouter.get("/nepatikimi.png", async (req, res) => {
     return await serveOpenGraphImage(
         res,
         "",
-        "Failų paieška",
+        "Nepatikimi ir melagiai",
         "",
-        "viespirkiai.org/failai",
+        "viespirkiai.org/nepatikimi",
     );
 });
 

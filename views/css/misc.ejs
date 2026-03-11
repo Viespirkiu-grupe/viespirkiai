@@ -153,4 +153,19 @@ ul.file-list li a:hover { text-decoration: underline; }
     font-family: inherit;
     font-size: inherit;
 }
+
+.rezultatai-nezinomas-total{
+    display: inline-block;
+    padding-inline: var(--space-2);
+}
+
+.rezultatai-nezinomas-total.spin {
+    display: inline-block;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
 </style>

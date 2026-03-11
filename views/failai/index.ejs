@@ -48,7 +48,7 @@
       <%- include('search.ejs', {values}) %>
       <section id="failaiRezultatai" class="results">
         <% if (typeof data !== "undefined") { %>
-            <div class="max-w-lg center mx-auto">
+            <div class="mt-6 max-w-lg center mx-auto">
                 <%- include('results.ejs', {data, currentPage, pageCount, queryParams, galimaEksportuoti, search}) %>
             </div>
         <% } else { %>

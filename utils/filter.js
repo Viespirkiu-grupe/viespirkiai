@@ -1,691 +1,421 @@
+/**
+ * Escapes special characters for safe use in Typesense filter_by expressions.
+ * @param {string} value
+ * @returns {string}
+ */
 function sanitizeForTypesense(value) {
     if (typeof value !== "string") return value;
-    // Escape special characters used in Typesense queries
     return value.replace(/([:"<>=&|!()\[\]{}~*?\\/])/g, "\\$1");
 }
 
 /**
- * Builds a Typesense filter from the provided query object.
- * @param {Object} query
- * @returns {Object}
+ * Coerces a raw string value to a number, replacing commas with dots.
+ * Returns null if the result is NaN.
+ * @param {string} raw
+ * @returns {number | null}
  */
-export function buildTypesenseFilter(query) {
-    const filters = [];
-    const values = {};
-    const queryParams = [];
-    let usedHiddenFields = false;
-
-    const config = [
-        {
-            key: "perkanciosiosOrganizacijosKodas",
-            apply: (val) => {
-                filters.push(`perkanciosiosOrganizacijosKodas:=${val}`);
-                usedHiddenFields = true;
-            },
-        },
-        {
-            key: "tiekejoKodas",
-            apply: (val) => {
-                // filter either main code or any in additional codes array
-                filters.push(
-                    `(tiekejoKodas:=${val} || papildomiTiekejaiKodai:=[${val}])`,
-                );
-                usedHiddenFields = true;
-            },
-        },
-        {
-            key: "sutartiesNumeris",
-            apply: (val) => {
-                filters.push(`sutartiesNumeris:=${val}`);
-                usedHiddenFields = true;
-            },
-        },
-        {
-            key: "sudarymoDataNuo",
-            apply: (val) => {
-                const ts = Math.floor(new Date(val).getTime() / 1000);
-                filters.push(`sudarymoData:>=${ts}`);
-                usedHiddenFields = true;
-            },
-        },
-        {
-            key: "sudarymoDataIki",
-            apply: (val) => {
-                const ts = Math.floor(new Date(val).getTime() / 1000);
-                filters.push(`sudarymoData:<=${ts}`);
-                usedHiddenFields = true;
-            },
-        },
-        {
-            key: "verteNuo",
-            apply: (val) => {
-                filters.push(`verte:>=${parseFloat(val.replace(",", "."))}`);
-                usedHiddenFields = true;
-            },
-        },
-        {
-            key: "verteIki",
-            apply: (val) => {
-                filters.push(`verte:<=${parseFloat(val.replace(",", "."))}`);
-                usedHiddenFields = true;
-            },
-        },
-        {
-            key: "sutartiesUnikalusID",
-            apply: (val) => {
-                const n = Number(val);
-                if (Number.isInteger(n)) {
-                    filters.push(`sutartiesUnikalusID:=${n}`);
-                    usedHiddenFields = true;
-                }
-            },
-        },
-        {
-            key: "tipas",
-            apply: (val) => {
-                filters.push(`tipas:=${val}`);
-                usedHiddenFields = true;
-            },
-        },
-        {
-            key: "tikSuDokumentais",
-            apply: () => {
-                filters.push(`dokumentuKiekis:>0`);
-                usedHiddenFields = true;
-            },
-            isBoolean: true,
-        },
-        {
-            key: "ignoruotiSp",
-            apply: () => {
-                // tipas shouldn't be "SP"
-                filters.push(`tipas:!=SP`);
-                usedHiddenFields = true;
-            },
-            isBoolean: true,
-        },
-        {
-            key: "pirkimoNumeris",
-            apply: (val) => {
-                filters.push(`pirkimoNumeris:=${val}`);
-                usedHiddenFields = true;
-            },
-        },
-    ];
-
-    for (const { key, apply, isBoolean } of config) {
-        if (isBoolean && query[key] !== undefined) {
-            apply();
-            values[key] = true;
-            queryParams.push(`${key}=true`);
-        } else if (query[key]?.length > 0) {
-            apply(sanitizeForTypesense(query[key]));
-            values[key] = query[key];
-            queryParams.push(`${key}=${encodeURIComponent(query[key])}`);
-        }
-    }
-
-    values.search = query.search || "";
-
-    // Allowed sortable columns
-    const sortableColumns = new Set([
-        "paskutinioRedagavimoData",
-        "sudarymoData",
-        "suma",
-        "paskelbimoData",
-    ]);
-
-    let sortBy;
-    if (query.sort) {
-        usedHiddenFields = true;
-        values.sort = query.sort;
-        const col = sortableColumns.has(query.sort)
-            ? query.sort
-            : "paskutinioRedagavimoData";
-        const dir = (query.sortDir || "desc").toLowerCase();
-        const sortDir = ["asc", "desc"].includes(dir) ? dir : "desc";
-        values.sortDir = sortDir;
-
-        sortBy = `${col}:${sortDir}`;
-        queryParams.push(`sort=${encodeURIComponent(col)}`);
-        queryParams.push(`sortDir=${encodeURIComponent(sortDir)}`);
-    } else {
-        sortBy = "paskutinioRedagavimoData:desc"; // default
-    }
-
-    sortBy = sortBy.replace("suma", "verte");
-
-    return {
-        filterBy: filters.join(" && "),
-        sortBy,
-        values,
-        queryParams: queryParams.length ? "&" + queryParams.join("&") : "",
-        usedHiddenFields,
-    };
+function coerceNumber(raw) {
+    const n = parseFloat(String(raw).replace(",", "."));
+    return isNaN(n) ? null : n;
 }
 
 /**
- * Builds a PostgreSQL filter from the provided query object.
- * @param {Object} query
- * @returns {Object}
+ * Coerces a raw string value to an integer.
+ * Returns null if the result is NaN.
+ * @param {string} raw
+ * @returns {number | null}
  */
-export function buildPostgresFilter(query, limit, page = 1) {
-    const whereClauses = [];
-    const params = [];
-    const values = {};
-    const queryParams = [];
-    let usedHiddenFields = false;
-    let visiIrasai = true;
-
-    const addParam = (key, val) => {
-        params.push(val);
-        return `$${params.length}`;
-    };
-
-    const config = [
-        {
-            key: "perkanciosiosOrganizacijosKodas",
-            apply: (val) => {
-                whereClauses.push(
-                    `"perkanciosiosOrganizacijosKodas" = ${addParam("perkanciosiosOrganizacijosKodas", val)}`,
-                );
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "pirkimoNumeris",
-            apply: (val) => {
-                whereClauses.push(
-                    `"pirkimoNumeris" = ${addParam("pirkimoNumeris", val)}`,
-                );
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "tiekejoKodas",
-            apply: (val) => {
-                whereClauses.push(
-                    `("tiekejoKodas" = ${addParam("tiekejoKodas", val)} OR "papildomiTiekejaiKodai" @> ARRAY[${addParam("tiekejoKodas", val)}])`,
-                );
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "sutartiesNumeris",
-            apply: (val) => {
-                whereClauses.push(
-                    `"sutartiesNumeris" = ${addParam("sutartiesNumeris", val)}`,
-                );
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "sudarymoDataNuo",
-            apply: (val) => {
-                whereClauses.push(
-                    `"sudarymoData" >= ${addParam("sudarymoDataNuo", val)}`,
-                );
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "sudarymoDataIki",
-            apply: (val) => {
-                whereClauses.push(
-                    `"sudarymoData" <= ${addParam("sudarymoDataIki", val)}`,
-                );
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "verteNuo",
-            apply: (val) => {
-                const num = parseFloat(val.replace(",", "."));
-                whereClauses.push(`"verte" >= ${addParam("verteNuo", num)}`);
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "verteIki",
-            apply: (val) => {
-                const num = parseFloat(val.replace(",", "."));
-                whereClauses.push(`"verte" <= ${addParam("verteIki", num)}`);
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "sutartiesUnikalusID",
-            apply: (val) => {
-                const num = Number(val);
-                if (!Number.isInteger(num)) return;
-
-                whereClauses.push(
-                    `"sutartiesUnikalusId" = ${addParam("sutartiesUnikalusId", num)}`,
-                );
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "tipas",
-            apply: (val) => {
-                whereClauses.push(`"tipas" = ${addParam("tipas", val)}`);
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "tikSuDokumentais",
-            apply: () => {
-                whereClauses.push(`"dokumentuKiekis" > 0`);
-                values["tikSuDokumentais"] = true;
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-            isBoolean: true,
-        },
-        {
-            key: "bvpzPrefiksas",
-            apply: (val) => {
-                const prefixes = val
-                    .split(" ")
-                    .map((p) => p.trim())
-                    .filter(Boolean);
-                if (prefixes.length > 0) {
-                    const ors = prefixes.map((prefix, i) => {
-                        const start = prefix;
-                        const end = String(parseInt(prefix, 10) + 1).padStart(
-                            prefix.length,
-                            "0",
-                        );
-                        const startParam = addParam(
-                            `bvpzPrefiksasStart${i}`,
-                            start,
-                        );
-                        const endParam = addParam(`bvpzPrefiksasEnd${i}`, end);
-                        return `("bvpzKodas" >= ${startParam} AND "bvpzKodas" < ${endParam})`;
-                    });
-                    whereClauses.push(`(${ors.join(" OR ")})`);
-                    usedHiddenFields = true;
-                    visiIrasai = false;
-                }
-            },
-        },
-        {
-            key: "bvpzPrefiksasKitas",
-            apply: (val) => {
-                const prefixes = val
-                    .split(" ")
-                    .map((p) => p.trim())
-                    .filter(Boolean);
-                if (prefixes.length > 0) {
-                    const ors = prefixes.map((prefix, i) => {
-                        const start = prefix;
-                        const end = String(parseInt(prefix, 10) + 1).padStart(
-                            prefix.length,
-                            "0",
-                        );
-                        const startParam = addParam(
-                            `bvpzPrefiksasKitasStart${i}`,
-                            start,
-                        );
-                        const endParam = addParam(
-                            `bvpzPrefiksasKitasEnd${i}`,
-                            end,
-                        );
-                        return `("bvpzKodas" >= ${startParam} AND "bvpzKodas" < ${endParam})`;
-                    });
-                    whereClauses.push(`(${ors.join(" OR ")})`);
-                    usedHiddenFields = true;
-                    visiIrasai = false;
-                }
-            },
-        },
-        {
-            key: "search",
-            apply: (val) => {
-                const param = addParam("search", val);
-                whereClauses.push(
-                    `"search_tsv" @@ plainto_tsquery('simple', ${param})`,
-                );
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "ignoruotiSp",
-            apply: () => {
-                // tipas shouldn't be "SP"
-                whereClauses.push(`"tipas" != 'SP'`);
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-            isBoolean: true,
-        },
-    ];
-
-    whereClauses.push(`NOT COALESCE("istrinta", false)`);
-
-    for (const { key, apply, isBoolean } of config) {
-        if (isBoolean && query[key] !== undefined) {
-            apply();
-            queryParams.push(`${key}=true`);
-            values[key] = "true";
-        } else if (query[key]?.length > 0) {
-            apply(query[key]);
-            values[key] = query[key];
-            queryParams.push(`${key}=${encodeURIComponent(query[key])}`);
-        }
-    }
-
-    values.search = query.search || "";
-
-    // WHERE
-    const where = whereClauses.length
-        ? "WHERE " + whereClauses.join(" AND ")
-        : "";
-
-    // PAGINATION
-    const limitParam = addParam("limit", limit);
-    const offsetVal = Math.max((page - 1) * limit, 0);
-    const offsetParam = addParam("offset", offsetVal);
-
-    // ORDER
-    const sortableColumns = new Set([
-        "paskutinioRedagavimoData",
-        "sudarymoData",
-        "suma",
-        "paskelbimoData",
-    ]);
-
-    let sortColumn, sortDir;
-
-    if (query.sort) {
-        values.sort = query.sort;
-        usedHiddenFields = true;
-        sortColumn = sortableColumns.has(query.sort)
-            ? query.sort
-            : "paskutinioRedagavimoData";
-        sortDir = (query.sortDir || "desc").toLowerCase();
-        if (!["asc", "desc"].includes(sortDir)) sortDir = "desc";
-        values.sortDir = sortDir;
-
-        queryParams.push(`sort=${encodeURIComponent(sortColumn)}`);
-        queryParams.push(`sortDir=${encodeURIComponent(sortDir)}`);
-    } else {
-        sortColumn = "paskutinioRedagavimoData";
-        sortDir = "desc";
-    }
-
-    const orderBy = `"${sortColumn}" ${sortDir.toUpperCase()}`;
-
-    return {
-        sql: `SELECT * FROM sutartys ${where} ORDER BY ${orderBy} LIMIT ${limitParam} OFFSET ${offsetParam};`,
-        sqlCount: `SELECT COUNT(*) FROM sutartys ${where};`,
-        params,
-        values,
-        queryParams: queryParams.length ? "&" + queryParams.join("&") : "",
-        usedHiddenFields,
-        visiIrasai,
-    };
+function coerceInteger(raw) {
+    const n = parseInt(raw, 10);
+    return isNaN(n) ? null : n;
 }
 
 /**
- * Builds a PostgreSQL file search filter from the provided query object.
- * Supports full-text search with phrase ("...") and plain text queries.
- * @param {Object} query
- * @param {number} limit
- * @param {number} page
- * @returns {Object}
+ * Coerces a raw string to a Unix timestamp (seconds).
+ * Returns null if the date is invalid.
+ * @param {string} raw
+ * @returns {number | null}
  */
-export function buildPostgresFailaiSearchFilter(query, limit, page = 1) {
-    const whereClauses = [];
-    const params = [];
-    const values = {};
-    const queryParams = [];
-    let usedHiddenFields = false;
-    let visiIrasai = true;
+function coerceTimestamp(raw) {
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000);
+}
 
-    const addParam = (key, val) => {
-        params.push(val);
-        return `$${params.length}`;
-    };
+/**
+ * Coerces a raw string to an ISO date string.
+ * Returns null if the date is invalid.
+ * @param {string} raw
+ * @returns {string | null}
+ */
+function coerceDate(raw) {
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
 
-    // Basic filter config
-    const config = [
-        {
-            key: "extension",
-            apply: (val) => {
-                whereClauses.push(
-                    `LOWER("extension") = LOWER(${addParam("extension", val)})`,
-                );
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
+/**
+ * Built-in comparison types. Each type defines how to render a filter into
+ * a Postgres WHERE fragment and a Typesense filter_by fragment, and optionally
+ * how to coerce the raw query string value before use.
+ *
+ * @type {Record<string, {
+ *   coerce?: (raw: string) => unknown,
+ *   pg: (col: string, addParam: (val: unknown) => string, val: unknown) => string,
+ *   ts: (col: string, val: unknown) => string,
+ * }>}
+ */
+const COMPARISON_TYPES = {
+    eq: {
+        pg: (col, addParam, val) => `${col} = ${addParam(val)}`,
+        ts: (col, val) => `${col}:=${val}`,
+    },
+    lowereq: {
+        pg: (col, addParam, val) => `LOWER(${col}) = LOWER(${addParam(val)})`,
+        ts: (col, val) => `${col}:=${val.toLowerCase()}`,
+    },
+    neq: {
+        pg: (col, addParam, val) => `${col} != ${addParam(val)}`,
+        ts: (col, val) => `${col}:!=${val}`,
+    },
+    gt: {
+        pg: (col, addParam, val) => `${col} > ${addParam(val)}`,
+        ts: (col, val) => `${col}:>${val}`,
+    },
+    gte: {
+        pg: (col, addParam, val) => `${col} >= ${addParam(val)}`,
+        ts: (col, val) => `${col}:>=${val}`,
+    },
+    lt: {
+        pg: (col, addParam, val) => `${col} < ${addParam(val)}`,
+        ts: (col, val) => `${col}:<${val}`,
+    },
+    lte: {
+        pg: (col, addParam, val) => `${col} <= ${addParam(val)}`,
+        ts: (col, val) => `${col}:<=${val}`,
+    },
+    gte_number: {
+        coerce: coerceNumber,
+        pg: (col, addParam, val) => `${col} >= ${addParam(val)}`,
+        ts: (col, val) => `${col}:>=${val}`,
+    },
+    lte_number: {
+        coerce: coerceNumber,
+        pg: (col, addParam, val) => `${col} <= ${addParam(val)}`,
+        ts: (col, val) => `${col}:<=${val}`,
+    },
+    gte_date: {
+        coerce: coerceDate,
+        pg: (col, addParam, val) => `${col} >= ${addParam(val)}`,
+        ts: (col, val) => `${col}:>=${coerceTimestamp(val)}`,
+    },
+    lte_date: {
+        coerce: coerceDate,
+        pg: (col, addParam, val) => `${col} <= ${addParam(val)}`,
+        ts: (col, val) => `${col}:<=${coerceTimestamp(val)}`,
+    },
+    integer: {
+        coerce: coerceInteger,
+        pg: (col, addParam, val) => `${col} = ${addParam(val)}`,
+        ts: (col, val) => `${col}:=${val}`,
+    },
+    like: {
+        pg: (col, addParam, val) => `${col} ILIKE ${addParam(`%${val}%`)}`,
+        ts: (col, val) => `${col}:=${val}`,
+    },
+    boolean: {
+        pg: (col, addParam, val) =>
+            `${col} = ${addParam(val === true || val === "true")}`,
+        ts: (col, val) => `${col}:=${val ? "true" : "false"}`,
+    },
+    /** Postgres full-text search using plainto_tsquery or phraseto_tsquery (auto-detected). */
+    tsvector: {
+        pg: (col, addParam, val) => {
+            const quoteMatch = val.match(/^"(.*)"$/);
+            const fn = quoteMatch ? "phraseto_tsquery" : "plainto_tsquery";
+            const clean = quoteMatch ? quoteMatch[1] : val;
+            return `${col} @@ ${fn}('simple', ${addParam(clean)})`;
         },
-        {
-            key: "md5",
-            apply: (val) => {
-                whereClauses.push(`"md5" = ${addParam("md5", val)}`);
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
+        ts: (col, val) => `${col}:=${val}`,
+    },
+    /** Postgres array containment: column @> ARRAY[value] */
+    array_contains: {
+        pg: (col, addParam, val) => `${col} @> ARRAY[${addParam(val)}]`,
+        ts: (col, val) => `${col}:=[${val}]`,
+    },
+    /** Postgres EXISTS subquery. Requires `subquery` to be set on the field definition. */
+    exists: {
+        pg: (col, addParam, val, extra) =>
+            `EXISTS (${extra.subquery(addParam, val)})`,
+        ts: (col, val) => `${col}:=${val}`,
+    },
+    /** Postgres ST_DWithin spatial filter. Expects val = "lat,lon" and extra.radius param key. */
+    geo_radius: {
+        pg: (col, addParam, val, extra) => {
+            const [lat, lon] = val.split(",").map(parseFloat);
+            const radius = parseFloat(extra.radius);
+            if ([lat, lon, radius].some(isNaN)) return null;
+            return `${col} IS NOT NULL AND ST_DWithin(${col}::geography, ST_SetSRID(ST_MakePoint(${addParam(lon)}, ${addParam(lat)}), 4326)::geography, ${addParam(radius)})`;
         },
-        {
-            key: "puslapiaiMin",
-            apply: (val) => {
-                const num = parseInt(val, 10);
-                whereClauses.push(
-                    `"puslapiuSkaicius" >= ${addParam("puslapiaiMin", num)}`,
-                );
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "puslapiaiMax",
-            apply: (val) => {
-                const num = parseInt(val, 10);
-                whereClauses.push(
-                    `"puslapiuSkaicius" <= ${addParam("puslapiaiMax", num)}`,
-                );
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "saltinis",
-            apply: (val) => {
-                if (val == "sutartys") {
-                    // NULL also counts as "sutartys"
-                    whereClauses.push(
-                        `("saltinis" = ${addParam("saltinis", val)} OR "saltinis" IS NULL)`,
+        ts: () => null,
+    },
+    /**
+     * Splits a space-separated string of numeric prefixes and generates range
+     * conditions for each, matching any value that starts with that prefix.
+     * Expects the column to be lexicographically comparable (e.g. a code string).
+     */
+    prefix_range: {
+        pg: (col, addParam, val) => {
+            const ors = val
+                .split(" ")
+                .map((p) => p.trim())
+                .filter(Boolean)
+                .map((prefix) => {
+                    const end = String(parseInt(prefix, 10) + 1).padStart(
+                        prefix.length,
+                        "0",
                     );
-                    usedHiddenFields = true;
-                    visiIrasai = false;
-                    return;
-                }
+                    return `(${col} >= ${addParam(prefix)} AND ${col} < ${addParam(end)})`;
+                });
+            return ors.length ? `(${ors.join(" OR ")})` : null;
+        },
+        ts: (col, val) => {
+            const ors = val
+                .split(" ")
+                .map((p) => p.trim())
+                .filter(Boolean)
+                .map((prefix) => `${col}:=${prefix}*`);
+            return ors.length ? `(${ors.join(" || ")})` : null;
+        },
+    },
+};
 
-                whereClauses.push(`"saltinis" = ${addParam("saltinis", val)}`);
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "telefonas",
-            apply: (val) => {
-                whereClauses.push(`
-                  EXISTS (
-                    SELECT 1 FROM "failaiTelefonai" ft
-                    WHERE ft.id = f.id AND ft.telefonas = ${addParam("telefonas", val)}
-                  )
-                `);
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "email",
-            apply: (val) => {
-                whereClauses.push(`
-                  EXISTS (
-                    SELECT 1 FROM "failaiEmails" fe
-                    WHERE fe.id = f.id AND fe.email = ${addParam("email", val)}
-                  )
-                `);
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "domain",
-            apply: (val) => {
-                whereClauses.push(`
-                  EXISTS (
-                    SELECT 1 FROM "failaiDomains" fd
-                    WHERE fd.id = f.id AND fd.domain = ${addParam("domain", val)}
-                  )
-                `);
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "iban",
-            apply: (val) => {
-                whereClauses.push(`
-                  EXISTS (
-                    SELECT 1 FROM "failaiIban" fi
-                    WHERE fi.id = f.id AND fi.iban = ${addParam("iban", val)}
-                  )
-                `);
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-        {
-            key: "jarKodas",
-            apply: (val) => {
-                whereClauses.push(`
-                  EXISTS (
-                    SELECT 1 FROM "failaiJarKodai" fj
-                    WHERE fj.id = f.id AND fj."jarKodas" = ${addParam("jarKodas", val)}
-                  )
-                `);
-                usedHiddenFields = true;
-                visiIrasai = false;
-            },
-        },
-    ];
+/**
+ * @typedef {object} FieldDefinition
+ * @property {string} key - Query param key to read from the request.
+ * @property {string} [col] - Column/field name in the database. Defaults to `key`.
+ * @property {string} [tsCol] - Typesense field name if different from `col`.
+ * @property {keyof COMPARISON_TYPES | string} [type="eq"] - Comparison type.
+ * @property {boolean} [isBoolean] - Triggered by presence of the key rather than its value.
+ * @property {boolean} [hidden] - Sets usedHiddenFields when this filter is applied.
+ * @property {boolean} [pgOnly] - Only applies to Postgres queries.
+ * @property {boolean} [tsOnly] - Only applies to Typesense queries.
+ * @property {Function} [coerce] - Custom coercion function overriding the type default.
+ * @property {object} [extra] - Extra data passed to the type renderer (e.g. subquery, radius).
+ * @property {string} [pgOverride] - Raw Postgres WHERE fragment, bypasses type system entirely.
+ * @property {string} [tsOverride] - Raw Typesense filter fragment, bypasses type system.
+ */
 
-    // Apply non-search filters
-    for (const { key, apply, isBoolean } of config) {
-        if (isBoolean && query[key] !== undefined) {
-            apply();
-            queryParams.push(`${key}=true`);
-            values[key] = "true";
-        } else if (query[key]?.length > 0) {
-            apply(query[key]);
-            values[key] = query[key];
-            queryParams.push(`${key}=${encodeURIComponent(query[key])}`);
-        }
+/**
+ * @typedef {object} SortConfig
+ * @property {string} default - Default sort column.
+ * @property {string} [defaultDir="desc"] - Default sort direction.
+ * @property {string[]} allowed - Allowed sort column names.
+ * @property {Record<string, string>} [pgAliases] - Maps query column names to Postgres column names.
+ * @property {Record<string, string>} [tsAliases] - Maps query column names to Typesense field names.
+ */
+
+/**
+ * @typedef {object} FilterBuilderOptions
+ * @property {FieldDefinition[]} fields - Filter field definitions.
+ * @property {SortConfig} sort - Sort configuration.
+ * @property {Record<string, object>} [customTypes] - Additional or overriding comparison types.
+ */
+
+/**
+ * @typedef {object} BuildOptions
+ * @property {string} [table] - Postgres FROM clause (required for SQL generation).
+ * @property {string} [select="*"] - Postgres SELECT expression.
+ * @property {string[]} [fixedWhere=[]] - WHERE clauses always applied regardless of query.
+ * @property {number} [limit] - Rows per page (required for SQL generation).
+ * @property {number} [page=1] - Current page number.
+ */
+
+/**
+ * @typedef {object} BuiltFilter
+ * @property {string} sql - Postgres SELECT query string.
+ * @property {string} sqlCount - Postgres COUNT query string.
+ * @property {unknown[]} params - Positional Postgres params.
+ * @property {string} filterBy - Typesense filter_by string.
+ * @property {string} sortBy - Typesense sort_by string.
+ * @property {string} orderBy - Postgres ORDER BY clause fragment.
+ * @property {object} values - Resolved values for SSR form repopulation.
+ * @property {string} queryParams - URL query string fragment for pagination links.
+ * @property {boolean} usedHiddenFields - Whether any hidden filters were applied.
+ * @property {boolean} visiIrasai - True when no filters narrowed the result set.
+ */
+
+export class FilterBuilder {
+    /**
+     * Creates a reusable filter builder that produces both Postgres and Typesense
+     * query representations from a single declarative field definition list.
+     * @param {FilterBuilderOptions} options
+     */
+    constructor({ fields, sort, customTypes = {} }) {
+        this.fields = fields;
+        this.sort = sort;
+        this.types = { ...COMPARISON_TYPES, ...customTypes };
     }
 
-    if (query.location && query.locationRadius != null) {
-        const [latStr, lonStr] = query.location.split(","); // expect "lat,lon"
-        const lat = parseFloat(latStr);
-        const lon = parseFloat(lonStr);
-        const radius = parseFloat(query.locationRadius);
+    /**
+     * Builds Postgres SQL, Typesense filter_by, resolved values, and pagination
+     * metadata from an Express-style query object.
+     * @param {object} query - Express request query object.
+     * @param {BuildOptions} [options={}]
+     * @returns {BuiltFilter}
+     */
+    build(
+        query,
+        {
+            table,
+            select = "*",
+            fixedWhere = [],
+            limit,
+            page = 1,
+            sort = true,
+        } = {},
+    ) {
+        const params = [];
+        const addParam = (val) => {
+            params.push(val);
+            return `$${params.length}`;
+        };
+        const whereClauses = [...fixedWhere];
+        const tsFilters = [];
+        const values = {};
+        const queryParams = [];
+        let usedHiddenFields = false;
+        let visiIrasai = true;
 
-        if (!isNaN(lat) && !isNaN(lon) && !isNaN(radius)) {
-            whereClauses.push(`
-              location IS NOT NULL AND
-              ST_DWithin(
-                location::geography,
-                ST_SetSRID(ST_MakePoint(${addParam("lon", lon)}, ${addParam("lat", lat)}), 4326)::geography,
-                ${addParam("radius", radius)}
-              )
-            `);
-            usedHiddenFields = true;
+        for (const field of this.fields) {
+            const raw = query[field.key];
+            const active = field.isBoolean
+                ? raw !== undefined
+                : raw?.length > 0;
+            if (!active) continue;
+
+            const type = this.types[field.type ?? "eq"];
+            if (!type) throw new Error(`Unknown filter type: ${field.type}`);
+
+            const coerce = field.coerce ?? type.coerce ?? ((v) => v);
+            const val = field.isBoolean ? true : coerce(raw);
+            if (val === null) continue;
+
+            const col = field.col ?? `"${field.key}"`;
+            const tsCol = field.tsCol ?? field.col ?? field.key;
+
+            if (!field.tsOnly) {
+                const pgFragment = field.pgOverride
+                    ? field.pgOverride(addParam, val)
+                    : type.pg(col, addParam, val, field.extra ?? {});
+                if (pgFragment) whereClauses.push(pgFragment);
+            }
+
+            if (!field.pgOnly) {
+                const tsFragment = field.tsOverride
+                    ? field.tsOverride(val)
+                    : type.ts(
+                          tsCol,
+                          sanitizeForTypesense(String(val)),
+                          field.extra ?? {},
+                      );
+                if (tsFragment) tsFilters.push(tsFragment);
+            }
+
+            if (field.hidden) usedHiddenFields = true;
             visiIrasai = false;
+
+            if (field.isBoolean) {
+                values[field.key] = true;
+                queryParams.push(`${field.key}=true`);
+            } else {
+                values[field.key] = raw;
+                queryParams.push(`${field.key}=${encodeURIComponent(raw)}`);
+            }
         }
-    }
 
-    // Full-text search logic
-    let tsQueryFunc = null;
-    let cleanSearch = null;
-
-    if (query.search?.length > 0) {
-        const quoteMatch = query.search.match(/^"(.*)"$/);
-        tsQueryFunc = quoteMatch ? "phraseto_tsquery" : "plainto_tsquery";
-        cleanSearch = quoteMatch ? quoteMatch[1] : query.search;
-
-        whereClauses.push(
-            `f.search_index @@ ${tsQueryFunc}('simple', ${addParam("search", cleanSearch)})`,
+        const { orderBy, sortBy } = this._resolveSort(
+            query,
+            values,
+            queryParams,
         );
-        visiIrasai = false;
+
+        const where = whereClauses.length
+            ? "WHERE " + whereClauses.join(" AND ")
+            : "";
+        const qStr = queryParams.length ? "&" + queryParams.join("&") : "";
+
+        let sql = "";
+        let sqlCount = `SELECT COUNT(*) FROM ${table} ${where};`;
+
+        if (table) {
+            const orderClause = sort && orderBy ? ` ORDER BY ${orderBy}` : "";
+            if (limit) {
+                const limitParam = addParam(limit);
+                const offsetParam = addParam(Math.max((page - 1) * limit, 0));
+                sql = `SELECT ${select} FROM ${table} ${where} ${orderClause} LIMIT ${limitParam} OFFSET ${offsetParam};`;
+            } else {
+                sql = `SELECT ${select} FROM ${table} ${where} ${orderClause};`;
+            }
+        }
+
+        return {
+            sql,
+            sqlCount,
+            params,
+            filterBy: tsFilters.join(" && "),
+            sortBy,
+            orderBy,
+            values,
+            queryParams: qStr,
+            usedHiddenFields,
+            visiIrasai,
+        };
     }
 
-    values.search = query.search || "";
+    /**
+     * Resolves sort column and direction from query params, validating against
+     * the configured allowed list and falling back to configured defaults.
+     * Mutates `values` and `queryParams` with the resolved sort state.
+     * @param {object} query
+     * @param {object} values
+     * @param {string[]} queryParams
+     * @returns {{ orderBy: string, sortBy: string }}
+     */
+    _resolveSort(query, values, queryParams) {
+        if (!this.sort || !this.sort.default) {
+            return { orderBy: null, sortBy: null };
+        }
 
-    //WHERE clause
-    let where = whereClauses.length
-        ? "WHERE " + whereClauses.join(" AND ")
-        : "";
+        const {
+            default: def,
+            defaultDir = "desc",
+            allowed,
+            pgAliases = {},
+            tsAliases = {},
+        } = this.sort;
+        const allowedSet = new Set(allowed);
 
-    if (query.search?.length > 0) {
-        where = whereClauses.length
-            ? "WHERE f.nuskaitytas >= 0 AND " + whereClauses.join(" AND ")
-            : "WHERE f.nuskaitytas >= 0";
+        const col = query.sort && allowedSet.has(query.sort) ? query.sort : def;
+        const dir = ["asc", "desc"].includes(
+            (query.sortDir || "").toLowerCase(),
+        )
+            ? query.sortDir.toLowerCase()
+            : defaultDir;
+
+        if (query.sort) {
+            values.sort = col;
+            values.sortDir = dir;
+            queryParams.push(
+                `sort=${encodeURIComponent(col)}`,
+                `sortDir=${encodeURIComponent(dir)}`,
+            );
+        }
+
+        const pgCol = pgAliases[col] ?? col;
+        const tsCol = tsAliases[col] ?? col;
+
+        return {
+            orderBy: `"${pgCol}" ${dir.toUpperCase()}`,
+            sortBy: `${tsCol}:${dir}`,
+        };
     }
-
-    // Pagination
-    const limitParam = addParam("limit", limit);
-    const offsetVal = Math.max((page - 1) * limit, 0);
-    const offsetParam = addParam("offset", offsetVal);
-
-    queryParams.push(`search=${encodeURIComponent(query.search || "")}`);
-
-    return {
-        sql: `
-            SELECT
-                f.*,
-                CASE
-                    WHEN fp.salinti = true THEN '451 – Pašalinta'
-                    ELSE f.pavadinimas
-                END AS pavadinimas,
-                CASE
-                    WHEN fp.salinti = true THEN '451 – Pašalinta'
-                    ELSE f.tekstas
-                END AS tekstas,
-                CASE
-                    WHEN fp.salinti = true THEN '{}'::jsonb
-                    ELSE f.metaduomenys
-                END AS metaduomenys
-            FROM failai f
-            LEFT JOIN "failuPasalinimai" fp
-                   ON fp."dokId" = f."dokId"
-                  AND fp."fileId" = f."fileId"
-                  AND fp.salinti = true
-            ${where}
-            LIMIT ${limitParam} OFFSET ${offsetParam};
-        `,
-        sqlCount: `
-            SELECT COUNT(*)
-            FROM failai f
-            ${where};
-        `,
-        params,
-        values,
-        queryParams: queryParams.length ? "&" + queryParams.join("&") : "",
-        usedHiddenFields,
-        visiIrasai,
-    };
 }

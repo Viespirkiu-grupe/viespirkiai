@@ -1,215 +1,207 @@
 import express from "express";
 import cleanEmptyQueryParams from "../utils/queryParams.js";
-import { arrayToLithuanianTime } from "../utils/time.js";
-import { buildTypesenseFilter, buildPostgresFilter } from "../utils/filter.js";
-import { searchDocuments } from "../typesense/typesense.js";
 import config from "../utils/config.js";
-import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
-import { postgres } from "../postgres/postgres.js";
-import QueryStream from "pg-query-stream";
-import { specialJarCodes } from "../modules/juridiniai/specialJarCodes.js";
+import { objectsToCsvStream } from "../utils/csv.js";
+import { objectsToJsonlStream } from "../utils/jsonl.js";
+import { Transform } from "node:stream";
 import Timings from "../utils/timings.js";
-import * as XLSX from "xlsx";
+import {
+    aptvarkytiRezultata,
+    buildAnalize,
+    buildAnalizeXlsx,
+} from "../modules/sutartys/rezultatai.js";
+import {
+    searchSutartys,
+    countSutartys,
+} from "../modules/sutartys/searchSutartys.js";
 
 const indexRouter = express.Router();
 
+const DEFAULT_LIMIT = 50;
+const MAX_TYPESENSE_LIMIT = 5_000;
+const MAX_POSTGRES_LIMIT = 1_000_000;
+
+/**
+ * @param {object} query
+ * @returns {{ limit: number } | { error: string }}
+ */
+function parseLimit(query) {
+    const hasSearch = !!query.search;
+    if (query.limit === "max")
+        return { limit: hasSearch ? MAX_TYPESENSE_LIMIT : MAX_POSTGRES_LIMIT };
+    const n = parseInt(query.limit);
+    if (hasSearch && n > MAX_TYPESENSE_LIMIT)
+        return {
+            error: `Limitas per didelis. Maksimalus limitas tekstinėms paieškoms po ${MAX_TYPESENSE_LIMIT} rezultatų puslapyje.`,
+        };
+    if (n > MAX_POSTGRES_LIMIT)
+        return {
+            error: `Limitas per didelis. Maksimalus limitas ne tekstinėms paieškoms yra ${MAX_POSTGRES_LIMIT} rezultatų puslapyje.`,
+        };
+    if (n > 0) return { limit: n };
+    return { limit: DEFAULT_LIMIT };
+}
+
+/**
+ * @param {{ shown: number, total: number | null, elapsed: number, engine: string, limit: number }} params
+ * @returns {{ numberOfResults: string, total: number }}
+ */
+function buildNumberOfResults({ shown, total, elapsed, engine }) {
+    const trukme = (elapsed / 1000).toFixed(2) + "s";
+    const source = `<pre style="display: inline;">(${trukme}, ${engine})</pre>`;
+    if (total == null) {
+        return {
+            numberOfResults: `Rodomi ${shown} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <pre style="display: inline;"> (${trukme}, ${engine})</pre>`,
+            total: 10_000,
+        };
+    }
+    if (shown < total)
+        return {
+            numberOfResults: `Rodomi ${shown} iš ${Number(total).linksniuotiK(["rezultato", "rezultatų"])} ${source}`,
+            total,
+        };
+    return {
+        numberOfResults: `${Number(total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} ${source}`,
+        total,
+    };
+}
+const CSV_HEADERS = [
+    "Tipas",
+    "Kategorija",
+    "Pavadinimas",
+    "Numatyta vertė",
+    "Faktinė vertė",
+    "Pirkėjo pavadinimas",
+    "Pirkėjo kodas",
+    "Tiekėjų pavadinimai",
+    "Tiekėjų kodai",
+    "Sudarymo data",
+    "Faktinė įvykdymo data",
+    "Redagavimo data",
+    "BVPZ kodai",
+    "Sutarties numeris",
+    "Unikalus ID",
+];
+
+/**
+ * @param {object} r
+ * @returns {Record<string, unknown>}
+ */
+function resultToCsvObject(r) {
+    const fmt = (v) => (v ? v.toString().slice(0, 10) : "");
+    return {
+        Tipas: r.tipas,
+        Kategorija: r.kategorija,
+        Pavadinimas: r.pavadinimas,
+        "Numatyta vertė": r.verte,
+        "Faktinė vertė": r.faktineVerte || "",
+        "Pirkėjo pavadinimas": r.perkanciojiOrganizacija,
+        "Pirkėjo kodas": r.perkanciosiosOrganizacijosKodas,
+        "Tiekėjų pavadinimai": r.tiekejai.join("; "),
+        "Tiekėjų kodai": r.tiekejaiKodai.join("; "),
+        "Sudarymo data": fmt(r.sudarymoData),
+        "Faktinė įvykdymo data": fmt(r.faktineIvykdymoData),
+        "Redagavimo data": fmt(r.paskutinioRedagavimoData),
+        "BVPZ kodai": r.bvpzKodai.join("; ") || "",
+        "Sutarties numeris": r.sutartiesNumeris || "",
+        "Unikalus ID": r.sutartiesUnikalusId,
+    };
+}
+
+async function serveCsvStream(res, stream, client) {
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=viespirkiai-${new Date().toISOString()}.csv`,
+    );
+    res.setHeader("Content-Transfer-Encoding", "binary");
+
+    stream
+        .pipe(
+            new Transform({
+                objectMode: true,
+                transform(row, _enc, cb) {
+                    cb(null, resultToCsvObject(aptvarkytiRezultata(row)));
+                },
+            }),
+        )
+        .pipe(objectsToCsvStream())
+        .pipe(res);
+
+    await new Promise((resolve, reject) => {
+        res.on("finish", resolve);
+        res.on("error", reject);
+        stream.on("error", reject);
+    }).finally(() => client.release());
+}
+
+async function serveJsonlStream(res, stream, client) {
+    res.setHeader("Content-Type", "application/x-ndjson");
+    res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=viespirkiai-${new Date().toISOString()}.jsonl`,
+    );
+
+    stream
+        .pipe(
+            new Transform({
+                objectMode: true,
+                transform(row, _enc, cb) {
+                    cb(null, aptvarkytiRezultata(row));
+                },
+            }),
+        )
+        .pipe(objectsToJsonlStream())
+        .pipe(res);
+
+    await new Promise((resolve, reject) => {
+        res.on("finish", resolve);
+        res.on("error", reject);
+        stream.on("error", reject);
+    }).finally(() => client.release());
+}
+
 indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
-    let timings = new Timings();
+    const timings = new Timings();
     timings.start("req");
 
-    timings.start("sutarciuSkaicius");
-    let postgresSutarciuSkaicius = Number(
-        (
-            await postgres.query(`
-              SELECT * FROM "eiluciuSkaiciai" WHERE "tableName" = 'sutartys';
-            `)
-        ).rows[0].rowCount,
-    );
-    timings.end("sutarciuSkaicius");
-
-    const startas = performance.now();
-
-    // Limitas, kiek rodyti viename puslapyje
-    let limit = 50;
-    const MAX_POSTGRES_LIMIT = 1000_000;
-    const MAX_TYPESENSE_LIMIT = 5_000;
-
-    if (req.query.limit == "max" && req.query.search) {
-        limit = MAX_TYPESENSE_LIMIT;
-    } else if (req.query.limit == "max") {
-        limit = MAX_POSTGRES_LIMIT;
-    } else if (
-        parseInt(req.query.limit) > MAX_TYPESENSE_LIMIT &&
-        req.query.search
-    ) {
-        return res
-            .status(400)
-            .send(
-                `Limitas per didelis. Maksimalus limitas tekstinėms paieškoms po ${MAX_TYPESENSE_LIMIT} rezultatų puslapyje.`,
-            );
-    } else if (parseInt(req.query.limit) > MAX_POSTGRES_LIMIT) {
-        return res
-            .status(400)
-            .send(
-                `Limitas per didelis. Maksimalus limitas ne tekstinėms paieškoms yra ${MAX_POSTGRES_LIMIT} rezultatų puslapyje.`,
-            );
-    } else if (parseInt(req.query.limit) > 0) {
-        limit = parseInt(req.query.limit) || limit;
-    }
-
-    // Puslapis, kurį rodyti
+    const parsedLimit = parseLimit(req.query);
+    if ("error" in parsedLimit) return res.status(400).send(parsedLimit.error);
+    const { limit } = parsedLimit;
     const page = parseInt(req.query.page) || 1;
+    const engine =
+        req.query.search && config.typesenseUp ? "typesense" : "postgres";
 
-    let zinomasRezultatuSkaicius = true;
-    if (req.query.search && config.typesenseUp) {
-        timings.start("typesense");
-        // Tekstinė paieška – Typesense
-        var { filterBy, sortBy, values, queryParams, usedHiddenFields } =
-            buildTypesenseFilter(req.query);
+    if (req.query.csv || req.query.jsonl) {
+        timings.start("stream");
 
-        queryParams += `&search=${encodeURIComponent(req.query.search)}`;
-
-        var { results, total } = await searchDocuments(
-            req.query.search || "*",
-            {
-                page: page,
-                filterBy,
-                sortBy,
-                limit,
-            },
+        const { stream, client, values, queryParams } = await searchSutartys(
+            req.query,
+            { limit: null, page, stream: true, sort: false },
         );
-        timings.end("typesense");
+        timings.end("stream");
 
-        timings.start("dateConversion");
-        results = arrayToLithuanianTime(results);
-        timings.end("dateConversion");
-
-        var paieškosVariklis = "Typesense";
-    } else {
-        // Ne tekstinė paieška – Postgres
-        timings.start("postgres");
-        var {
-            sql,
-            sqlCount,
-            params,
-            values,
-            queryParams,
-            usedHiddenFields,
-            visiIrasai,
-        } = buildPostgresFilter(req.query, limit, page);
-
-        var results, total, client, streaming;
-        streaming = false;
-        if (req.query.csv || req.query.jsonl) {
-            streaming = true;
-            client = await postgres.connect();
-
-            const query = new QueryStream(sql, params);
-            var results = client.query(query);
-        } else if (req.query.rezultatuSkaiciausPatikslinimas) {
-            let count = await postgres.query(sqlCount, params.slice(0, -2));
-            total =
-                params.length === 1
-                    ? postgresSutarciuSkaicius
-                    : parseInt(count.rows[0].count, 10);
-            zinomasRezultatuSkaicius = true;
-            results = [];
-        } else {
-            if (visiIrasai) {
-                // all results, no count needed
-                let resultsRes = await postgres.query(sql, params);
-                results = resultsRes.rows;
-                total = postgresSutarciuSkaicius;
-                zinomasRezultatuSkaicius = true;
-            } else {
-                // borrow a dedicated client for the count query
-                const countClient = await postgres.connect();
-
-                // start both queries immediately
-                const resultsPromise = postgres.query(sql, params);
-                const countPromise = countClient.query(
-                    sqlCount,
-                    params.slice(0, -2),
-                );
-
-                const resultsStart = Date.now();
-
-                let resultsRes;
-                try {
-                    // wait for results first
-                    resultsRes = await resultsPromise;
-                } finally {
-                    // measure how long it took
-                    var resultsTime = Date.now() - resultsStart;
-                }
-
-                try {
-                    // wait for count with timeout = resultsTime + 500ms
-                    const countRes = await Promise.race([
-                        countPromise,
-                        new Promise((_, reject) =>
-                            setTimeout(
-                                () => reject(new Error("timeout")),
-                                resultsTime + 100,
-                            ),
-                        ),
-                    ]);
-
-                    total =
-                        params.length === 1
-                            ? postgresSutarciuSkaicius
-                            : parseInt(countRes.rows[0].count, 10);
-
-                    zinomasRezultatuSkaicius = true;
-                } catch (err) {
-                    total = null;
-                    zinomasRezultatuSkaicius = false;
-                } finally {
-                    countClient.release();
-                }
-
-                results = resultsRes.rows;
-            }
-            timings.end("postgres");
-        }
-        var paieškosVariklis = "PostgreSQL";
-    }
-
-    if (!streaming) {
-        timings.start("postProcessing");
-        results = results.map(aptvarkytiRezultata);
-        timings.end("postProcessing");
-
-        timings.start("requestInformation");
-        // Paieškos užklausos informacija
-        var trukme = ((performance.now() - startas) / 1000).toFixed(2) + "s";
-        var rodomiRezultatai = results.length;
-        if (req.query.rezultatuSkaiciausPatikslinimas) {
-            rodomiRezultatai = limit;
-        }
-        var rodomasTotal = zinomasRezultatuSkaicius
-            ? total
-            : `<span class="rezultatai-nezinomas-total"> ? </span>`;
-
-        var numberOfResults;
-
-        if (zinomasRezultatuSkaicius) {
-            if (rodomiRezultatai < total) {
-                numberOfResults = `Rodomi ${rodomiRezultatai} iš ${Number(rodomasTotal).linksniuotiK(["rezultato", "rezultatų"])} <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
-            } else {
-                numberOfResults = `${Number(rodomasTotal).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} <pre style="display: inline;">(${trukme}, ${paieškosVariklis})</pre>`;
-            }
-        } else {
-            // total unknown
-            numberOfResults = `Rodomi ${rodomiRezultatai} iš ${rodomasTotal} rezultatų <pre style="display: inline;"> (${trukme}, ${paieškosVariklis})</pre>`;
-            total = 10_000; // for pagination
-        }
-        timings.end("requestInformation");
+        if (req.query.jsonl) return serveJsonlStream(res, stream, client);
+        if (req.query.csv) return serveCsvStream(res, stream, client);
     }
 
     if (req.query.rezultatuSkaiciausPatikslinimas) {
-        res.render(
+        const startas = performance.now();
+        const [total, { values, queryParams }] = await Promise.all([
+            countSutartys(req.query),
+            searchSutartys(req.query, { limit: 1, page, engine }),
+        ]);
+        const elapsed =
+            performance.now() - startas + Number(req.query.trukme || 0);
+        const { numberOfResults } = buildNumberOfResults({
+            shown: limit,
+            total,
+            elapsed,
+            engine,
+            limit,
+        });
+        return res.render(
             "pagination",
             {
                 currentPage: page,
@@ -219,546 +211,39 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
                 queryParams,
             },
             (err, html) => {
-                if (err) {
-                    return next(err);
-                }
-
-                res.json({
-                    zinomasRezultatuSkaicius,
-                    total,
-                    numberOfResults,
-
-                    pagination: html,
-                });
+                if (err) return next(err);
+                res.json({ total, numberOfResults, pagination: html });
             },
         );
-        return;
     }
 
-    // Jei prašo JSONL
-    if (req.query.jsonl) {
-        if (req.query.search) {
-            res.setHeader("Content-Type", "application/x-ndjson");
-            res.setHeader(
-                "Content-Disposition",
-                `attachment; filename=viespirkiai-${new Date().toISOString()}.jsonl`,
-            );
+    timings.start(engine);
+    const startas = performance.now();
+    const { results, total, values, queryParams } = await searchSutartys(
+        req.query,
+        { limit, page, engine },
+    );
+    timings.end(engine);
 
-            results.forEach((rezultatas) => {
-                const line = JSON.stringify(rezultatas) + "\n";
-                res.write(line);
-            });
+    const elapsed = performance.now() - startas + Number(req.query.trukme || 0);
+    const { numberOfResults } = buildNumberOfResults({
+        shown: results.length,
+        total,
+        elapsed,
+        engine,
+        limit,
+    });
 
-            return res.end();
-        } else {
-            res.setHeader("Content-Type", "application/x-ndjson");
-            res.setHeader(
-                "Content-Disposition",
-                `attachment; filename=viespirkiai-${new Date().toISOString()}.jsonl`,
-            );
-
-            let count = 0;
-
-            try {
-                results.on("data", (row) => {
-                    let rezultatas = aptvarkytiRezultata(row);
-                    const line = JSON.stringify(rezultatas) + "\n";
-
-                    res.write(line);
-
-                    count++;
-                    if (count % 1000 === 0 && res.flush) res.flush();
-                });
-
-                await new Promise((resolve, reject) => {
-                    results.on("end", resolve);
-                    results.on("error", reject);
-                });
-            } finally {
-                client.release();
-                return res.end();
-            }
-        }
-    }
-
-    // Jei prašo CSV
-    if (req.query.csv) {
-        res.setHeader("Content-Type", "text/csv");
-        res.setHeader(
-            "Content-Disposition",
-            `attachment; filename=viespirkiai-${new Date().toISOString()}.csv`,
-        );
-        res.setHeader("Content-Transfer-Encoding", "binary");
-
-        const escapeCSV = (value) => {
-            if (value == null) return "";
-            const str = String(value);
-            return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-        };
-
-        const formatDate = (value) => {
-            if (!value) return "";
-            // If value is already a string like "2025-12-31" or "2025-12-31 00:00:00"
-            return value.toString().slice(0, 10);
-        };
-
-        const header =
-            [
-                "Tipas",
-                "Kategorija",
-                "Pavadinimas",
-                "Numatyta vertė",
-                "Faktinė vertė",
-                "Pirkėjo pavadinimas",
-                "Pirkėjo kodas",
-                "Tiekėjų pavadinimai",
-                "Tiekėjų kodai",
-                "Sudarymo data",
-                "Faktinė įvykdymo data",
-                "Redagavimo data",
-                "BVPZ kodai",
-                "Sutarties numeris",
-                "Unikalus ID",
-            ].join(",") + "\n";
-
-        res.write(header);
-
-        if (req.query.search) {
-            for (let i = 0; i < results.length; i++) {
-                let row = results[i];
-
-                const values = [
-                    row.tipas,
-                    row.kategorija,
-                    row.pavadinimas,
-                    row.verte,
-                    row.faktineVerte || "",
-                    row.perkanciojiOrganizacija,
-                    row.perkanciosiosOrganizacijosKodas,
-                    row.tiekejai.join("; "),
-                    row.tiekejaiKodai.join("; "),
-                    formatDate(row.sudarymoData),
-                    formatDate(row.faktineIvykdymoData),
-                    formatDate(row.paskutinioRedagavimoData),
-                    row.bvpzKodai.join("; ") || "",
-                    row.sutartiesNumeris || "",
-                    row.sutartiesUnikalusId,
-                ];
-
-                const csvLine = values.map(escapeCSV).join(",") + "\n";
-
-                res.write(csvLine);
-            }
-
-            return res.end();
-        } else {
-            let count = 0;
-
-            try {
-                results.on("data", (row) => {
-                    row = aptvarkytiRezultata(row);
-
-                    const values = [
-                        row.tipas,
-                        row.kategorija,
-                        row.pavadinimas,
-                        row.verte,
-                        row.faktineVerte || "",
-                        row.perkanciojiOrganizacija,
-                        row.perkanciosiosOrganizacijosKodas,
-                        row.tiekejai.join("; "),
-                        row.tiekejaiKodai.join("; "),
-                        formatDate(row.sudarymoData),
-                        formatDate(row.faktineIvykdymoData),
-                        formatDate(row.paskutinioRedagavimoData),
-                        row.bvpzKodai.join("; ") || "",
-                        row.sutartiesNumeris || "",
-                        row.sutartiesUnikalusId,
-                    ];
-
-                    const csvLine = values.map(escapeCSV).join(",") + "\n";
-
-                    res.write(csvLine);
-
-                    count++;
-                    if (count % 1000 === 0 && res.flush) res.flush();
-                });
-
-                await new Promise((resolve, reject) => {
-                    results.on("end", resolve);
-                    results.on("error", reject);
-                });
-            } finally {
-                client.release();
-                return res.end();
-            }
-        }
-    }
-
-    let galimaEksportuoti = true;
-    if (req.query.search && total > MAX_TYPESENSE_LIMIT) {
-        galimaEksportuoti = false;
-    } else if (total > MAX_POSTGRES_LIMIT) {
-        galimaEksportuoti = false;
-    }
-
-    const totalPages = Math.ceil(total / limit);
-
-    res.set("Cache-Control", "public, max-age=10, s-maxage=10");
-
-    let naujaPaieska;
-
-    if (req.query.naujaPaieska !== undefined) {
-        // query param takes priority
-        naujaPaieska = req.query.naujaPaieska === "true";
-    } else if (req.cookies.naujaPaieska !== undefined) {
-        // fallback to cookie
-        naujaPaieska = req.cookies.naujaPaieska === "true";
-    } else {
-        // default
-        naujaPaieska = true;
-    }
-
-    if (naujaPaieska === false) {
-        res.cookie("naujaPaieska", "false", {
-            httpOnly: true,
-            sameSite: "Lax",
-        });
-    } else {
-        res.clearCookie("naujaPaieska");
-    }
-
-    let analize;
-    if (req.query.analize) {
-        analize = {};
-
-        // Find top tipas in results
-        analize.tipai = {};
-
-        results.forEach((result) => {
-            const tipas = result.tipas || "Nežinomas";
-            if (!analize.tipai[tipas]) {
-                analize.tipai[tipas] = 0;
-            }
-            analize.tipai[tipas]++;
+    if (req.query.json)
+        return res.json({
+            results,
+            analize: req.query.analize ? buildAnalize(results) : undefined,
         });
 
-        // Convert to array and sort by count
-        analize.tipai = Object.entries(analize.tipai)
-            .map(([tipas, count]) => ({ tipas, count }))
-            .sort((a, b) => b.count - a.count);
+    const analize = req.query.analize ? buildAnalize(results) : undefined;
 
-        // Sumos vs datos, array of {data, suma}
-        analize.sumosVsDatos = {};
-
-        results.forEach((result) => {
-            const data = result.sudarymoData
-                ? new Date(result.sudarymoData).toISOString().split("T")[0]
-                : "Nežinoma";
-            if (!analize.sumosVsDatos[data]) {
-                analize.sumosVsDatos[data] = 0;
-            }
-            analize.sumosVsDatos[data] += parseFloat(result.verte) || 0;
-        });
-
-        // Convert to array and sort by date
-        analize.sumosVsDatos = Object.entries(analize.sumosVsDatos)
-            .map(([data, suma]) => ({ data, suma }))
-            .sort((a, b) => new Date(a.data) - new Date(b.data));
-
-        // Suma pagal metus kur tipas != SP
-        analize.metinesSumos = {};
-
-        results.forEach((result) => {
-            const data = result.sudarymoData
-                ? new Date(result.sudarymoData)
-                : null;
-            const tipas = result.tipas ? result.tipas.trim().toUpperCase() : "";
-            if (data && tipas !== "SP") {
-                const metai = data.getFullYear();
-                if (!analize.metinesSumos[metai]) {
-                    analize.metinesSumos[metai] = 0;
-                }
-                analize.metinesSumos[metai] += parseFloat(result.verte) || 0;
-            }
-        });
-
-        // Convert to array and sort by year
-        analize.metinesSumos = Object.entries(analize.metinesSumos)
-            .map(([metai, suma]) => ({ metai, suma }))
-            .sort((a, b) => a.metai - b.metai);
-
-        /// Top tiekėjai pagal sumas + sutarčių kiekis, ignoruojant tipas = 'SP'
-        analize.topTiekejai = {};
-
-        results.forEach((result) => {
-            if (result.tipas === "SP") return;
-
-            const tiekejai = result.tiekejai || [];
-            const kodai = result.tiekejaiKodai || [];
-            const verte =
-                parseFloat(result.faktineIvykdymoVerte) ||
-                parseFloat(result.verte) ||
-                0;
-
-            tiekejai.forEach((tiekejas, i) => {
-                const kodas = kodai[i];
-                if (!kodas) return;
-
-                if (specialJarCodes[kodas]) {
-                    tiekejas = specialJarCodes[kodas].pavadinimas;
-                }
-
-                if (!analize.topTiekejai[kodas]) {
-                    analize.topTiekejai[kodas] = {
-                        kodas,
-                        tiekejas,
-                        suma: 0,
-                        kiekis: 0,
-                    };
-                }
-
-                analize.topTiekejai[kodas].suma += verte;
-                analize.topTiekejai[kodas].kiekis += 1;
-            });
-        });
-
-        analize.topTiekejai = Object.values(analize.topTiekejai).sort(
-            (a, b) => b.suma - a.suma,
-        );
-
-        /// Top pirkėjai pagal sumas + sutarčių kiekis, ignoruojant tipas = 'SP'
-        analize.topPirkejai = {};
-
-        results.forEach((result) => {
-            if (result.tipas === "SP") return;
-
-            const kodas = result.perkanciosiosOrganizacijosKodas;
-            if (!kodas) return;
-
-            const pirkejas = result.perkanciojiOrganizacija || "Nežinomas";
-            const verte =
-                parseFloat(result.faktineIvykdymoVerte) ||
-                parseFloat(result.verte) ||
-                0;
-
-            if (!analize.topPirkejai[kodas]) {
-                analize.topPirkejai[kodas] = {
-                    kodas,
-                    pirkejas,
-                    suma: 0,
-                    kiekis: 0,
-                };
-            }
-
-            analize.topPirkejai[kodas].suma += verte;
-            analize.topPirkejai[kodas].kiekis += 1;
-        });
-
-        analize.topPirkejai = Object.values(analize.topPirkejai).sort(
-            (a, b) => b.suma - a.suma,
-        );
-    }
-
-    if (req.query.analize && req.query.xlsx) {
-        const workbook = XLSX.utils.book_new();
-
-        function generateTopTiekejaiSheet(topTiekejai) {
-            // Prepare data
-            const topTiekejaiForXlsx = topTiekejai.map((row) => ({
-                "Tiekėjo kodas": row.kodas,
-                "Tiekėjo pavadinimas": row.tiekejas,
-                "Sutarčių verčių suma": row.suma,
-                "Sutarčių skaičius": row.kiekis,
-            }));
-
-            // Create sheet
-            const topTiekejaiSheet = XLSX.utils.json_to_sheet(
-                topTiekejaiForXlsx,
-                {
-                    cellDates: true,
-                },
-            );
-
-            // Column widths
-            topTiekejaiSheet["!cols"] = [
-                { wch: 18 },
-                { wch: 45 },
-                { wch: 22 },
-                { wch: 20 },
-            ];
-
-            // Force numeric types
-            const range = XLSX.utils.decode_range(topTiekejaiSheet["!ref"]);
-            for (let r = range.s.r + 1; r <= range.e.r; r++) {
-                // Sutarčių verčių suma (column C = 2)
-                const sumCell =
-                    topTiekejaiSheet[XLSX.utils.encode_cell({ r, c: 2 })];
-                if (sumCell) {
-                    sumCell.t = "n";
-                    sumCell.v = parseFloat(sumCell.v) || 0;
-                    sumCell.z = "€#,##0.00";
-                }
-
-                // Sutarčių skaičius (column D = 3)
-                const countCell =
-                    topTiekejaiSheet[XLSX.utils.encode_cell({ r, c: 3 })];
-                if (countCell) {
-                    countCell.t = "n";
-                    countCell.v = parseInt(countCell.v) || 0;
-                }
-            }
-
-            // Apply autofilter
-            topTiekejaiSheet["!autofilter"] = { ref: topTiekejaiSheet["!ref"] };
-            return topTiekejaiSheet;
-        }
-
-        // Append sheet
-        XLSX.utils.book_append_sheet(
-            workbook,
-            generateTopTiekejaiSheet(analize.topTiekejai),
-            "Top tiekėjai",
-        );
-
-        function generateTopPirkejaiSheet(topPirkejai) {
-            // Prepare data with renamed columns
-            const topPirkejaiForXlsx = topPirkejai.map((row) => ({
-                "Pirkėjo kodas": row.kodas,
-                "Pirkėjo pavadinimas": row.pirkejas,
-                "Sutarčių verčių suma": row.suma,
-                "Sutarčių skaičius": row.kiekis,
-            }));
-
-            // Create sheet
-            const topPirkejaiSheet = XLSX.utils.json_to_sheet(
-                topPirkejaiForXlsx,
-                {
-                    cellDates: true,
-                },
-            );
-
-            // Column widths
-            topPirkejaiSheet["!cols"] = [
-                { wch: 18 }, // Pirkėjo kodas
-                { wch: 45 }, // Pirkėjo pavadinimas
-                { wch: 22 }, // Sutarčių verčių suma
-                { wch: 20 }, // Sutarčių skaičius
-            ];
-
-            // Force numeric types and format
-            const range = XLSX.utils.decode_range(topPirkejaiSheet["!ref"]);
-            for (let r = range.s.r + 1; r <= range.e.r; r++) {
-                // Sutarčių verčių suma (column C = 2)
-                const sumCell =
-                    topPirkejaiSheet[XLSX.utils.encode_cell({ r, c: 2 })];
-                if (sumCell) {
-                    sumCell.t = "n";
-                    sumCell.v = parseFloat(sumCell.v) || 0;
-                    sumCell.z = "€#,##0.00";
-                }
-
-                // Sutarčių skaičius (column D = 3)
-                const countCell =
-                    topPirkejaiSheet[XLSX.utils.encode_cell({ r, c: 3 })];
-                if (countCell) {
-                    countCell.t = "n";
-                    countCell.v = parseInt(countCell.v) || 0;
-                }
-            }
-
-            // Apply autofilter
-            topPirkejaiSheet["!autofilter"] = { ref: topPirkejaiSheet["!ref"] };
-            return topPirkejaiSheet;
-        }
-
-        // Append sheet
-        XLSX.utils.book_append_sheet(
-            workbook,
-            generateTopPirkejaiSheet(analize.topPirkejai),
-            "Top pirkėjai",
-        );
-
-        function generateMetinesSumosSheet(metinesSumos) {
-            // Prepare data with renamed columns
-            const data = metinesSumos.map((row) => ({
-                Metai: row.metai,
-                "Sutarčių verčių suma": row.suma,
-            }));
-
-            // Create sheet
-            const sheet = XLSX.utils.json_to_sheet(data, { cellDates: true });
-
-            // Set column widths
-            sheet["!cols"] = [
-                { wch: 12 }, // Metai
-                { wch: 22 }, // Sutarčių verčių suma
-            ];
-
-            // Force numeric type for suma and format €
-            const range = XLSX.utils.decode_range(sheet["!ref"]);
-            for (let r = range.s.r + 1; r <= range.e.r; r++) {
-                const sumCell = sheet[XLSX.utils.encode_cell({ r, c: 1 })]; // column B
-                if (sumCell) {
-                    sumCell.t = "n";
-                    sumCell.v = parseFloat(sumCell.v) || 0;
-                    sumCell.z = "€#,##0.00";
-                }
-            }
-
-            // Apply autofilter
-            sheet["!autofilter"] = { ref: sheet["!ref"] };
-            return sheet;
-        }
-
-        XLSX.utils.book_append_sheet(
-            workbook,
-            generateMetinesSumosSheet(analize.metinesSumos),
-            "Metinės sumos",
-        );
-
-        function generateTipaiSheet(tipai) {
-            // Prepare data with renamed columns
-            const data = tipai.map((row) => ({
-                Tipas: row.tipas,
-                "Sutarčių skaičius": row.count,
-            }));
-
-            // Create sheet
-            const sheet = XLSX.utils.json_to_sheet(data, { cellDates: true });
-
-            // Set column widths
-            sheet["!cols"] = [
-                { wch: 12 }, // Tipas
-                { wch: 20 }, // Sutarčių skaičius
-            ];
-
-            // Force numeric type for counts
-            const range = XLSX.utils.decode_range(sheet["!ref"]);
-            for (let r = range.s.r + 1; r <= range.e.r; r++) {
-                const countCell = sheet[XLSX.utils.encode_cell({ r, c: 1 })]; // column B
-                if (countCell) {
-                    countCell.t = "n";
-                    countCell.v = parseInt(countCell.v) || 0;
-                }
-            }
-
-            // Apply autofilter
-            sheet["!autofilter"] = { ref: sheet["!ref"] };
-            return sheet;
-        }
-
-        XLSX.utils.book_append_sheet(
-            workbook,
-            generateTipaiSheet(analize.tipai),
-            "Sutarčių tipai",
-        );
-
-        const xlsxBuffer = XLSX.write(workbook, {
-            type: "buffer",
-            bookType: "xlsx",
-        });
-
+    if (analize && req.query.xlsx) {
+        const buf = buildAnalizeXlsx(analize);
         res.setHeader(
             "Content-Disposition",
             `attachment; filename=viespirkiai-analize-${new Date().toISOString()}.xlsx`,
@@ -767,97 +252,38 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
             "Content-Type",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         );
-
-        return res.send(xlsxBuffer);
+        return res.send(buf);
     }
 
+    let galimaEksportuoti =
+        engine === "typesense"
+            ? total <= MAX_TYPESENSE_LIMIT
+            : total <= MAX_POSTGRES_LIMIT;
+
+    res.set("Cache-Control", "private, max-age=10, s-maxage=10");
     res.setHeader("Server-Timing", timings.serverTiming());
 
-    if (req.query.json) {
-        return res.json({ results, analize });
+    if (Object.keys(values).length == 0) {
+        galimaEksportuoti = false;
     }
 
     res.renderCompiled("sutartys/index", {
         data: results,
         values,
-        usedHiddenFields,
         currentPage: page,
-        pageCount: totalPages,
+        pageCount: Math.ceil((total || 100_000) / limit),
         numberOfResults,
-        zinomasRezultatuSkaicius,
         queryParams,
         customHead: config.customHead,
         galimaEksportuoti,
-        naujaPaieska,
+        usedHiddenFields: Object.keys(values).some(
+            (k) =>
+                k !== "search" && values[k] !== "" && values[k] !== undefined,
+        ),
         req,
         analize,
     });
 });
-
-function aptvarkytiRezultata(rezultatas) {
-    if (rezultatas.id) {
-        rezultatas.sutartiesUnikalusId = rezultatas.id;
-        delete rezultatas.id;
-    }
-    if (rezultatas.sutartiesUnikalusID) {
-        rezultatas.id = rezultatas.sutartiesUnikalusID;
-        delete rezultatas.sutartiesUnikalusID;
-    }
-
-    rezultatas.bvpzKodai = [rezultatas.bvpzKodas];
-    if (rezultatas.papildomiBvpzKodai) {
-        rezultatas.bvpzKodai.push(...rezultatas.papildomiBvpzKodai);
-        delete rezultatas.papildomiBvpzKodai;
-    }
-    delete rezultatas.bvpzKodas;
-
-    rezultatas.bvpzPavadinimai = [rezultatas.bvpzPavadinimas];
-    if (rezultatas.papildomiBvpzPavadinimai) {
-        rezultatas.bvpzPavadinimai.push(...rezultatas.papildomiBvpzPavadinimai);
-        delete rezultatas.papildomiBvpzPavadinimai;
-    }
-    delete rezultatas.bvpzPavadinimas;
-
-    rezultatas.tiekejai = [rezultatas.tiekejas];
-    if (rezultatas.papildomiTiekejai) {
-        rezultatas.tiekejai.push(...rezultatas.papildomiTiekejai);
-        delete rezultatas.papildomiTiekejai;
-    }
-    delete rezultatas.tiekejas;
-
-    rezultatas.tiekejaiKodai = [rezultatas.tiekejoKodas];
-    if (rezultatas.papildomiTiekejaiKodai) {
-        rezultatas.tiekejaiKodai.push(...rezultatas.papildomiTiekejaiKodai);
-        delete rezultatas.papildomiTiekejaiKodai;
-    }
-    delete rezultatas.tiekejoKodas;
-
-    rezultatas.pavadinimas = fixHtmlEntities(rezultatas.pavadinimas);
-    rezultatas.perkanciojiOrganizacija = fixHtmlEntities(
-        rezultatas.perkanciojiOrganizacija,
-    );
-    rezultatas.tiekejai = rezultatas.tiekejai.map((tiekejas) =>
-        fixHtmlEntities(tiekejas),
-    );
-
-    const contractTypes = {
-        TSP: "Tarptautinis arba supaprastintas pirkimas",
-        MVP: "Mažos vertės pirkimas",
-        ŽS: "Žodinė sutartis",
-        MVPŽ: "Mažos vertės žodinis pirkimas",
-        SPŽ: "Supaprastintos vertės žodinis pirkimas",
-        PPS: "Pagrindinė pirkimo sutartis",
-        VS: "Vidaus sandoris",
-        SP: "Sutarties pakeitimas",
-        PSĮ: "Pirkimas iš susijusios įmonės",
-        "ILGALAIKĖ MVPŽ": "Ilgalaikė mažos vertės žodinė sutartis",
-    };
-
-    const tipo = (rezultatas.tipas || "").trim().toUpperCase();
-    rezultatas.tipoPavadinimas = contractTypes[tipo] || tipo;
-
-    return rezultatas;
-}
 
 indexRouter.get("/index.png", async (req, res) => {
     return await serveOpenGraphImage(

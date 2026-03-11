@@ -253,7 +253,7 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
         );
     }
 
-    res.set("Cache-Control", "public, max-age=7200, s-maxage=7200");
+    res.set("Cache-Control", "private, max-age=7200, s-maxage=7200");
     res.render("pirkimas", { purchase, customHead: config.customHead });
 });
 

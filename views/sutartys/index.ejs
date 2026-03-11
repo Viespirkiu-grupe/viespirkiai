@@ -22,7 +22,7 @@
     <% } %>
 
     <div class="mt-6 max-w-lg center mx-auto">
-      <%- include('results.ejs', { zinomasRezultatuSkaicius, values, usedHiddenFields, data, currentPage, pageCount, queryParams, galimaEksportuoti }) %>
+      <%- include('results.ejs') %>
     </div>
 
     <script>
@@ -31,10 +31,11 @@
         span.classList.add('spin');
         const url = new URL(window.location.href);
         url.searchParams.set('rezultatuSkaiciausPatikslinimas', 'true');
+        console.log(url)
         fetch(url)
           .then(res => res.json())
           .then(data => {
-            if (data.zinomasRezultatuSkaicius) {
+            if (data.total) {
               span.className = '';
               document.querySelector('.numberOfResults').innerHTML = data.numberOfResults;
               document.querySelector('ul.pagination').innerHTML = data.pagination;
