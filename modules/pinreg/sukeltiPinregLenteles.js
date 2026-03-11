@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import PQueue from "p-queue";
 import { log } from "../../utils/log.js";
+import { deklaracijaToRysiai, upsertRysiai } from "./rysiaiUtils.js";
 
 const queue = new PQueue({ concurrency: 32 });
 
@@ -43,164 +44,22 @@ async function sukeltiPinregLenteles() {
                         [deklaracija.accessUuid],
                     );
 
-                    // Merge all rows into one array
-                    const allRows = [
-                        // KITI_RYSIAI_SU_JA
-                        ...(deklaracija.rysiaiSuJa || []).map((r) => ({
-                            irasoTipas: "KITI_RYSIAI_SU_JA",
-                            jarKodas: r.jaKodas,
-                            deklaracija: deklaracija.accessUuid,
-                            vardas: deklaracija.teikejas?.vardas || null,
-                            pavarde: deklaracija.teikejas?.pavarde || null,
-                            pavadinimas: r.pavadinimas,
-                            rysioPradzia: r.rysioPradzia,
-                            rysioPabaiga: r.rysioPabaiga || null,
-                            duomenuSaltinis: r.duomenuSaltinis || null,
-                            registruotaLietuvoje: r.registruotaLietuvoje,
-                            jaTeisinesFormosKodas: r.jaTeisinesFormosKodas,
-                            jaTeisinesFormosPavadinimas:
-                                r.jaTeisinesFormosPavadinimas,
-                            uzpildytaAutomatiskai: r.uzpildytaAutomatiskai,
-                            kienoRysys: r.kienoRysys,
-                            pastabos: r.pastabos,
-                            rysioPobudzioPavadinimas:
-                                r.rysioPobudzioPavadinimas,
-                            dalyvavimoVpInformacija: r.dalyvavimoVpInformacija,
-                            dalyvaujaViesuosePirkimuose:
-                                r.dalyvaujaViesuosePirkimuose,
-                            susijusioAsmensVardas: null,
-                            susijusioAsmensPavarde: null,
-                            pareigos: null,
-                            teisejoKodas: null,
-                            darbovietesTipas: null,
-                            pateikimoData: deklaracija.pateikimoData,
-                        })),
+                    const allRows = deklaracijaToRysiai(deklaracija);
 
-                        // SUTUOKTINIO_DARBOVIETE
-                        ...(deklaracija.sutuoktinioDarbovietes || []).flatMap(
-                            (d) =>
-                                (d.pareigos || []).map((p) => ({
-                                    irasoTipas: "SUTUOKTINIO_DARBOVIETE",
-                                    jarKodas: d.jaKodas || d.jarKodas,
-                                    deklaracija: deklaracija.accessUuid,
-                                    susijusioAsmensVardas:
-                                        deklaracija.teikejas?.vardas || null,
-                                    susijusioAsmensPavarde:
-                                        deklaracija.teikejas?.pavarde || null,
-                                    vardas:
-                                        deklaracija.sutuoktinis?.vardas || null,
-                                    pavarde:
-                                        deklaracija.sutuoktinis?.pavarde ||
-                                        null,
-                                    pavadinimas: d.pavadinimas,
-                                    rysioPradzia: d.rysioPradzia,
-                                    rysioPabaiga: null,
-                                    duomenuSaltinis: JSON.stringify(
-                                        d.duomenuSaltiniai || [],
-                                    ),
-                                    registruotaLietuvoje:
-                                        d.registruotaLietuvoje,
-                                    uzpildytaAutomatiskai:
-                                        d.uzpildytaAutomatiskai,
-                                    jaTeisinesFormosPavadinimas:
-                                        d.jaTeisinesFormosPavadinimas,
-                                    pareigos: p.pareigos,
-                                    teisejoKodas: p.teisejoKodas,
-                                    darbovietesTipas: d.darbovietesTipas,
-                                    jaTeisinesFormosKodas: null,
-                                    kienoRysys: null,
-                                    pastabos: null,
-                                    rysioPobudzioPavadinimas: null,
-                                    dalyvavimoVpInformacija: null,
-                                    dalyvaujaViesuosePirkimuose: null,
-                                    pateikimoData: deklaracija.pateikimoData,
-                                })),
-                        ),
-
-                        // DEKLARUOJANCIO_DARBOVIETE
-                        ...(deklaracija.darbovietes || []).flatMap((d) =>
-                            (d.pareigos || []).map((p) => ({
-                                irasoTipas: "DEKLARUOJANCIO_DARBOVIETE",
-                                jarKodas: d.jaKodas || d.jarKodas,
-                                deklaracija: deklaracija.accessUuid,
-                                vardas: deklaracija.teikejas.vardas,
-                                pavarde: deklaracija.teikejas.pavarde,
-                                pavadinimas: d.pavadinimas,
-                                rysioPradzia: d.rysioPradzia,
-                                rysioPabaiga: null,
-                                duomenuSaltinis: JSON.stringify(
-                                    d.duomenuSaltiniai || [],
-                                ),
-                                registruotaLietuvoje: d.registruotaLietuvoje,
-                                uzpildytaAutomatiskai: d.uzpildytaAutomatiskai,
-                                jaTeisinesFormosPavadinimas:
-                                    d.jaTeisinesFormosPavadinimas,
-                                pareigos: p.pareigos,
-                                teisejoKodas: p.teisejoKodas,
-                                darbovietesTipas: d.darbovietesTipas,
-                                jaTeisinesFormosKodas: null,
-                                susijusioAsmensVardas: null,
-                                susijusioAsmensPavarde: null,
-                                kienoRysys: null,
-                                pastabos: null,
-                                rysioPobudzioPavadinimas: null,
-                                dalyvavimoVpInformacija: null,
-                                dalyvaujaViesuosePirkimuose: null,
-                                pateikimoData: deklaracija.pateikimoData,
-                            })),
-                        ),
-                    ];
-
-                    if (allRows.length) {
-                        const columns = [
-                            "irasoTipas",
-                            "jarKodas",
-                            "deklaracija",
-                            "vardas",
-                            "pavarde",
-                            "pavadinimas",
-                            "rysioPradzia",
-                            "rysioPabaiga",
-                            "duomenuSaltinis",
-                            "registruotaLietuvoje",
-                            "jaTeisinesFormosKodas",
-                            "jaTeisinesFormosPavadinimas",
-                            "uzpildytaAutomatiskai",
-                            "susijusioAsmensVardas",
-                            "susijusioAsmensPavarde",
-                            "pareigos",
-                            "teisejoKodas",
-                            "darbovietesTipas",
-                            "kienoRysys",
-                            "pastabos",
-                            "rysioPobudzioPavadinimas",
-                            "dalyvavimoVpInformacija",
-                            "dalyvaujaViesuosePirkimuose",
-                            "pateikimoData",
-                        ];
-
-                        const valuesPlaceholders = allRows
-                            .map(
-                                (_, idx) =>
-                                    `(${columns
-                                        .map(
-                                            (__, i) =>
-                                                `$${idx * columns.length + i + 1}`,
-                                        )
-                                        .join(",")})`,
-                            )
-                            .join(",");
-
-                        const params = allRows.flatMap((r) =>
-                            columns.map((c) => r[c] ?? null),
+                    const client = await postgres.connect();
+                    try {
+                        await client.query("BEGIN");
+                        await upsertRysiai(
+                            client,
+                            deklaracija.accessUuid,
+                            allRows,
                         );
-
-                        await postgres.query(
-                            `INSERT INTO "pinregJuridiniaiRysiai" (${columns
-                                .map((c) => `"${c}"`)
-                                .join(",")}) VALUES ${valuesPlaceholders}`,
-                            params,
-                        );
+                        await client.query("COMMIT");
+                    } catch (err) {
+                        await client.query("ROLLBACK");
+                        throw err;
+                    } finally {
+                        client.release();
                     }
                 }),
             ),
