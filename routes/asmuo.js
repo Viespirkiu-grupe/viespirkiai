@@ -29,6 +29,7 @@ function parseLimitai(query) {
         pinreg: 3,
         kotis: 3,
         esInvesticijos: 5,
+        mvpAprasai: 1,
     };
     const map = {
         transportoPriemonesLimit: "regitra",
@@ -40,6 +41,7 @@ function parseLimitai(query) {
         pinregLimit: "pinreg",
         kotisLimit: "kotis",
         esInvesticijosLimit: "esInvesticijos",
+        mvpAprasaiLimit: "mvpAprasai",
     };
 
     return Object.fromEntries(
