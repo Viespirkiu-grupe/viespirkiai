@@ -16,6 +16,7 @@ typesense/data
 !modules/bvpz/cpv.zip
 *.jsonl
 *.txt
+!pgbouncer/userlist.txt
 
 # Plausible
 plausible/clickhouse

@@ -20,6 +20,7 @@ export const postgres = new Pool({
     max: config.pgMaxConnections, // max connections
     idleTimeoutMillis: 30000, // close idle clients after 30s
     connectionTimeoutMillis: 2000, // fail if connection takes longer
+    statement_cache_size: 0, // for pgbouncer
 });
 
 export function parsePgArray(str) {
