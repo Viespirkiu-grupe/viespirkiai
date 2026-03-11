@@ -1,0 +1,86 @@
+import { postgres } from "../../postgres/postgres.js";
+import { log } from "../../utils/log.js";
+import { getArDataSources } from "./adresuRegistrasDataSources.js";
+import { createInterface } from "readline";
+import { Readable } from "stream";
+
+const BATCH_SIZE = 1000;
+
+async function updatePastataiSklypaiAdresai() {
+    await postgres.query(`TRUNCATE "arPastataiSklypaiAdresai"`);
+
+    const sources = await getArDataSources();
+    const entry = sources.buildingAddresses.find(
+        (r) =>
+            r.name ===
+            "Žemės sklypams ir / ar pastatams suteikti adresai visoje LR teritorijoje",
+    );
+
+    const res = await fetch(entry.csv);
+    if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+
+    const rl = createInterface({
+        input: Readable.fromWeb(res.body),
+        crlfDelay: Infinity,
+    });
+
+    let headers = null;
+    let delimiter = "|";
+    let batch = [];
+    let total = 0;
+
+    const flushBatch = async () => {
+        if (!batch.length) return;
+        const values = [];
+        const params = [];
+        let p = 1;
+        for (const row of batch) {
+            values.push(
+                `($${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++})`,
+            );
+            params.push(
+                row.SAV_KODAS || null,
+                row.AOB_KODAS,
+                row.GYV_KODAS || null,
+                row.GAT_KODAS || null,
+                row.NR || null,
+                row.KORPUSO_NR || null,
+                row.PASTO_KODAS || null,
+                row.AOB_NUO || null,
+            );
+        }
+        await postgres.query(
+            `INSERT INTO "arPastataiSklypaiAdresai" ("savKodas", "kodas", "gyvKodas", "gatKodas", "nr", "korpusoNr", "pastoKodas", "aobNuo")
+       VALUES ${values.join(", ")}`,
+            params,
+        );
+        total += batch.length;
+        log(`Įkelta ${total}`);
+        batch = [];
+    };
+
+    for await (const line of rl) {
+        if (!line.trim()) continue;
+        if (!headers) {
+            headers = line.split(delimiter);
+            continue;
+        }
+        const values = line.split(delimiter);
+        const row = {};
+        for (let i = 0; i < headers.length; i++) {
+            row[headers[i]] = values[i] || null;
+        }
+        batch.push(row);
+        if (batch.length >= BATCH_SIZE) await flushBatch();
+    }
+
+    await flushBatch();
+
+    log("Atnaujinti pastatų ir sklypų adresai");
+    return true;
+}
+
+if (process.argv[1] === new URL(import.meta.url).pathname) {
+    await updatePastataiSklypaiAdresai();
+    await postgres.end();
+}

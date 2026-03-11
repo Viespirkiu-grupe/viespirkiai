@@ -30,8 +30,11 @@
         "pdfjs-dist": "^5.4.530",
         "pg": "^8.16.3",
         "pg-query-stream": "^4.10.3",
+        "proj4": "^2.20.4",
         "puppeteer": "^24.16.1",
         "socks-proxy-agent": "^8.0.5",
+        "stream-chain": "^3.4.1",
+        "stream-json": "^1.9.1",
         "typesense": "^2.0.3",
         "xlsx": "^0.18.5",
         "xml-to-json-stream": "^1.1.0"

@@ -66,13 +66,21 @@ async function refillQueue() {
     refillPromise = (async () => {
         const { rows } = await postgres.query(
             `
-            SELECT *
-            FROM public."viesiejiPirkimai"
-            WHERE type = 'Pmc'
-              AND ("turinioNuskaitymas" IS NULL OR "turinioNuskaitymas" = 0)
-            FOR UPDATE SKIP LOCKED
-            LIMIT $1
-            `,
+       WITH candidate AS (
+         SELECT "pirkimoId"
+         FROM public."viesiejiPirkimai"
+         WHERE type = 'Pmc'
+           AND ("turinioNuskaitymas" IS NULL OR "turinioNuskaitymas" = 0)
+         FOR UPDATE SKIP LOCKED
+         LIMIT $1
+       )
+       UPDATE public."viesiejiPirkimai" v
+       SET "turinioNuskaitymas" = -2,
+           "scrapeReservation" = NOW()
+       FROM candidate
+       WHERE v."pirkimoId" = candidate."pirkimoId"
+       RETURNING v.*;
+       `,
             [QUEUE_SIZE],
         );
 

@@ -12,12 +12,14 @@ services:
             resources:
                 limits:
                     memory: 5048M
+
     postgres:
         build:
             context: ./postgres
             dockerfile: Dockerfile
         container_name: viespirkiai_postgres
         restart: unless-stopped
+        shm_size: "512mb"
         env_file:
             - .env
         ports:
@@ -27,7 +29,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 9G
+                    memory: 10G
 
     pgadmin:
         image: dpage/pgadmin4
@@ -45,3 +47,22 @@ services:
             resources:
                 limits:
                     memory: 2G
+
+    pgbouncer:
+        build:
+            context: ./pgbouncer
+            dockerfile: Dockerfile
+        container_name: viespirkiai_pgbouncer
+        restart: unless-stopped
+        env_file:
+            - .env
+        environment:
+            - POSTGRES_HOST=postgres
+        ports:
+            - "9120:6432"
+        depends_on:
+            - postgres
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
