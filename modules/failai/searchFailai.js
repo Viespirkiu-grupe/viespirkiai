@@ -80,8 +80,13 @@ const failaiFilter = new FilterBuilder({
         {
             key: "search",
             col: `f.search_index`,
-            type: "tsvector",
-            pgOnly: true,
+            hidden: true,
+            pgOverride: (addParam, val) => {
+                const quoteMatch = val.match(/^"(.*)"$/);
+                const fn = quoteMatch ? "phraseto_tsquery" : "plainto_tsquery";
+                const clean = quoteMatch ? quoteMatch[1] : val;
+                return `f.search_index @@ ${fn}('simple', ${addParam(clean)}) AND f.nuskaitytas >= 0`;
+            },
         },
     ],
 });
