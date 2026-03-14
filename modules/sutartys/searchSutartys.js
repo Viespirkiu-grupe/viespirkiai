@@ -4,20 +4,8 @@ import { postgres } from "../../postgres/postgres.js";
 import { FilterBuilder } from "../../utils/filter.js";
 import { fixHtmlEntities } from "../../utils/fixHtmlEntities.js";
 import { Readable, Transform } from "node:stream";
+import { CONTRACT_TYPES } from "./contractTypes.js";
 import QueryStream from "pg-query-stream";
-
-const CONTRACT_TYPES = {
-    TSP: "Tarptautinis arba supaprastintas pirkimas",
-    MVP: "Mažos vertės pirkimas",
-    ŽS: "Žodinė sutartis",
-    MVPŽ: "Mažos vertės žodinis pirkimas",
-    SPŽ: "Supaprastintos vertės žodinis pirkimas",
-    PPS: "Pagrindinė pirkimo sutartis",
-    VS: "Vidaus sandoris",
-    SP: "Sutarties pakeitimas",
-    PSĮ: "Pirkimas iš susijusios įmonės",
-    "ILGALAIKĖ MVPŽ": "Ilgalaikė mažos vertės žodinė sutartis",
-};
 
 const sutartysFilter = new FilterBuilder({
     fields: [

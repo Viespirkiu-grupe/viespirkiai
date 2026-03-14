@@ -2,6 +2,7 @@ import express from "express";
 import config from "../utils/config.js";
 import { fixHtmlEntities } from "../utils/fixHtmlEntities.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
+import { CONTRACT_TYPES } from "../modules/sutartys/contractTypes.js";
 import { postgres } from "../postgres/postgres.js";
 
 const sutartisRouter = express.Router();
@@ -14,7 +15,7 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
         return next();
     }
 
-    let purchase = await postgres
+    let sutartis = await postgres
         .query(
             'SELECT * FROM sutartys WHERE "sutartiesUnikalusId" = $1 LIMIT 1',
             [parseInt(id)],
@@ -22,7 +23,7 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
         .then((result) => result.rows[0]);
 
     // 404
-    if (!purchase) return next();
+    if (!sutartis) return next();
 
     // Tiekėjo subjekto patikslinimas
     const sutartysAtviriDuomenys = await postgres.query(
@@ -30,16 +31,16 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
          FROM "sutartysAtviriDuomenys"
          WHERE "dokId" = $1
          LIMIT 1;`,
-        [purchase.sutartiesUnikalusId],
+        [sutartis.sutartiesUnikalusId],
     );
 
     if (sutartysAtviriDuomenys.rowCount > 0) {
         if (sutartysAtviriDuomenys.rows[0].tiekPavPatikslinimas) {
-            purchase.tiekejasPatikslinimas =
+            sutartis.tiekejasPatikslinimas =
                 sutartysAtviriDuomenys.rows[0].tiekPavPatikslinimas;
         }
         if (sutartysAtviriDuomenys.rows[0].tiekSalis) {
-            purchase.tiekejasSalis = sutartysAtviriDuomenys.rows[0].tiekSalis;
+            sutartis.tiekejasSalis = sutartysAtviriDuomenys.rows[0].tiekSalis;
         }
     }
 
@@ -48,16 +49,16 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
          FROM "sutartysAtviriDuomenysImp"
          WHERE "dokId" = $1
          LIMIT 1;`,
-        [purchase.sutartiesUnikalusId],
+        [sutartis.sutartiesUnikalusId],
     );
 
     if (sutartysAtviriDuomenysImp.rowCount > 0) {
         if (sutartysAtviriDuomenysImp.rows[0].tiekSbjPatikslinimas) {
-            purchase.tiekejasPatikslinimas =
+            sutartis.tiekejasPatikslinimas =
                 sutartysAtviriDuomenysImp.rows[0].tiekSbjPatikslinimas;
         }
         if (sutartysAtviriDuomenysImp.rows[0].tiekSalis) {
-            purchase.tiekejasSalis =
+            sutartis.tiekejasSalis =
                 sutartysAtviriDuomenysImp.rows[0].tiekSalis;
         }
     }
@@ -73,23 +74,23 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
           AND verte = $4
         ORDER BY "paskutinioRedagavimoData" DESC`,
             [
-                purchase.sutartiesUnikalusId,
-                purchase.perkanciosiosOrganizacijosKodas,
-                purchase.tiekejoKodas,
-                purchase.verte,
+                sutartis.sutartiesUnikalusId,
+                sutartis.perkanciosiosOrganizacijosKodas,
+                sutartis.tiekejoKodas,
+                sutartis.verte,
             ],
         )
         .then((result) => result.rows);
 
     if (similarContracts.length > 0) {
-        purchase.panasiosSutartys = similarContracts;
+        sutartis.panasiosSutartys = similarContracts;
     }
 
     let sabisSutartys = await postgres.query(
         `SELECT *
          FROM "sabisSutartys"
          WHERE "vpId" = $1;`,
-        [purchase.sutartiesUnikalusId],
+        [sutartis.sutartiesUnikalusId],
     );
 
     sabisSutartys = sabisSutartys.rows;
@@ -129,11 +130,11 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
         }),
     );
 
-    purchase.sabisSutartys = sabisSutartys;
+    sutartis.sabisSutartys = sabisSutartys;
 
     // Failų būsena
     await Promise.all(
-        purchase.dokumentai.map(async (failas) => {
+        sutartis.dokumentai.map(async (failas) => {
             const dokIdMatch = failas.url.match(/dok_id=(\d+)/);
             const fileIdMatch = failas.url.match(/file_id=(\d+)/);
             failas.dok_id = dokIdMatch ? dokIdMatch[1] : "";
@@ -167,21 +168,21 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
         }),
     );
 
-    purchase.sutartiesUnikalusID = purchase.sutartiesUnikalusId;
-    delete purchase.sutartiesUnikalusId;
+    sutartis.sutartiesUnikalusID = sutartis.sutartiesUnikalusId;
+    delete sutartis.sutartiesUnikalusId;
 
-    purchase.cpvaProjektuSutartys = [];
-    if (purchase.pirkimoNumeris) {
+    sutartis.cpvaProjektuSutartys = [];
+    if (sutartis.pirkimoNumeris) {
         let cpvaProjektaiRes = await postgres.query(
             `SELECT *
              FROM "cpvaProjektuSutartys"
              WHERE "pirkimoNrCvpis" = $1;`,
-            [purchase.pirkimoNumeris],
+            [sutartis.pirkimoNumeris],
         );
-        purchase.cpvaProjektuSutartys = cpvaProjektaiRes.rows;
+        sutartis.cpvaProjektuSutartys = cpvaProjektaiRes.rows;
     }
 
-    for (let projektoSutartis of purchase.cpvaProjektuSutartys) {
+    for (let projektoSutartis of sutartis.cpvaProjektuSutartys) {
         let projektasRes = await postgres.query(
             `SELECT *
              FROM "cpvaProjektuSarasas"
@@ -195,49 +196,33 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
 
     let cvppPirkimas = await postgres.query(
         `SELECT * FROM "cvppViesiejiPirkimai" WHERE "pirkimoNumeris" = $1`,
-        [purchase.pirkimoNumeris],
+        [sutartis.pirkimoNumeris],
     );
     if (cvppPirkimas.rowCount > 0) {
-        purchase.cvppPirkimas = cvppPirkimas.rows[0];
+        sutartis.cvppPirkimas = cvppPirkimas.rows[0];
     }
 
     let cvpisPirkimas = await postgres.query(
         `SELECT * FROM "viesiejiPirkimai" WHERE "pirkimoId" = $1`,
-        [purchase.pirkimoNumeris],
+        [sutartis.pirkimoNumeris],
     );
     if (cvpisPirkimas.rowCount > 0) {
-        purchase.cvpisPirkimas = cvpisPirkimas.rows[0];
+        sutartis.cvpisPirkimas = cvpisPirkimas.rows[0];
     }
 
     // Pataisomi HTML entities
-    purchase.pavadinimas = fixHtmlEntities(purchase.pavadinimas);
-    purchase.perkanciojiOrganizacija = fixHtmlEntities(
-        purchase.perkanciojiOrganizacija,
+    sutartis.pavadinimas = fixHtmlEntities(sutartis.pavadinimas);
+    sutartis.perkanciojiOrganizacija = fixHtmlEntities(
+        sutartis.perkanciojiOrganizacija,
     );
-    purchase.tiekejas = fixHtmlEntities(purchase.tiekejas);
+    sutartis.tiekejas = fixHtmlEntities(sutartis.tiekejas);
 
-    // Formatuojame datas
-    // purchase = dataToLithuanianTime(purchase);
-
-    const contractTypes = {
-        TSP: "Tarptautinis arba supaprastintas pirkimas",
-        MVP: "Mažos vertės pirkimas",
-        ŽS: "Žodinė sutartis",
-        MVPŽ: "Mažos vertės žodinis pirkimas",
-        SPŽ: "Supaprastintos vertės žodinis pirkimas",
-        PPS: "Pagrindinė pirkimo sutartis",
-        VS: "Vidaus sandoris",
-        SP: "Sutarties pakeitimas",
-        PSĮ: "Pirkimas iš susijusios įmonės",
-        "ILGALAIKĖ MVPŽ": "Ilgalaikė mažos vertės žodinė sutartis",
-    };
-
-    const tipo = (purchase.tipas || "").trim().toUpperCase();
-    purchase.tipoPavadinimas = contractTypes[tipo] || tipo;
+    const tipo = (sutartis.tipas || "").trim().toUpperCase();
+    sutartis.tipoPavadinimas = CONTRACT_TYPES[tipo] || tipo;
 
     // Jei prašoma JSON formato, grąžiname JSON
     if (req.path.endsWith(".json")) {
-        const formattedJson = JSON.stringify(purchase, null, 2);
+        const formattedJson = JSON.stringify(sutartis, null, 2);
         res.setHeader("Content-Type", "application/json");
         return res.send(formattedJson);
     }
@@ -245,16 +230,20 @@ sutartisRouter.get("/sutartis/:id", async (req, res, next) => {
     if (req.path.endsWith(".png")) {
         return await serveOpenGraphImage(
             res,
-            purchase.tipoPavadinimas,
-            `${Number(purchase.faktineIvykdimoVerte || purchase.verte).toLocaleString("lt-LT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € &nbsp; ${purchase.pavadinimas}`,
-            `Pirkėjas: ${purchase.perkanciojiOrganizacija}<br>
-            Tiekėjas: ${purchase.tiekejas}`,
-            `viespirkiai.org/sutartis/${purchase.sutartiesUnikalusID}`,
+            sutartis.tipoPavadinimas,
+            `${Number(sutartis.faktineIvykdimoVerte || sutartis.verte).toLocaleString("lt-LT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € &nbsp; ${sutartis.pavadinimas}`,
+            `Pirkėjas: ${sutartis.perkanciojiOrganizacija}<br>
+            Tiekėjas: ${sutartis.tiekejas}`,
+            `viespirkiai.org/sutartis/${sutartis.sutartiesUnikalusID}`,
         );
     }
 
     res.set("Cache-Control", "private, max-age=7200, s-maxage=7200");
-    res.render("pirkimas", { purchase, customHead: config.customHead });
+    res.render("sutartys/sutartis", {
+        sutartis,
+        customHead: config.customHead,
+        req,
+    });
 });
 
 export default sutartisRouter;

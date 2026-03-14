@@ -1,19 +1,7 @@
 import { fixHtmlEntities } from "../../utils/fixHtmlEntities.js";
 import { specialJarCodes } from "../juridiniai/specialJarCodes.js";
+import { CONTRACT_TYPES } from "./contractTypes.js";
 import * as XLSX from "xlsx";
-
-const CONTRACT_TYPES = {
-    TSP: "Tarptautinis arba supaprastintas pirkimas",
-    MVP: "Mažos vertės pirkimas",
-    ŽS: "Žodinė sutartis",
-    MVPŽ: "Mažos vertės žodinis pirkimas",
-    SPŽ: "Supaprastintos vertės žodinis pirkimas",
-    PPS: "Pagrindinė pirkimo sutartis",
-    VS: "Vidaus sandoris",
-    SP: "Sutarties pakeitimas",
-    PSĮ: "Pirkimas iš susijusios įmonės",
-    "ILGALAIKĖ MVPŽ": "Ilgalaikė mažos vertės žodinė sutartis",
-};
 
 /**
  * @param {object} r
