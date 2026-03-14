@@ -38,6 +38,28 @@
       }
     }
   </style>
+  <% if (failas.location) { %>
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/dist/leaflet.css';
+      document.head.appendChild(link);
+      const script = document.createElement('script');
+      script.src = '/dist/leaflet.js';
+      script.defer = true;
+      script.onload = () => {
+        const mapEl = document.getElementById('failas-map');
+        const map = L.map('failas-map').setView([mapEl.dataset.lat, mapEl.dataset.lon], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        L.marker([mapEl.dataset.lat, mapEl.dataset.lon]).addTo(map);
+      };
+      document.body.appendChild(script);
+    });
+    </script>
+  <% } %>
 </head>
 <body>
   <%- include('../header.ejs', {hideSubtext: false}) %>
@@ -126,6 +148,24 @@
             </dd>
           </dl>
         </div>
+
+        <% if (failas.location) { %>
+          <div>
+            <h2 class="mb-3 no-style">Vieta</h2>
+            <div
+              id="failas-map"
+              class="map-container"
+              style="height:220px; border-radius:var(--radius-md);"
+              data-lat="<%= failas.location.lat %>"
+              data-lon="<%= failas.location.lon %>"
+            ></div>
+            <p class="text-muted text-xs mt-2">
+              <a href="https://www.openstreetmap.org/?mlat=<%= failas.location.lat %>&mlon=<%= failas.location.lon %>&zoom=14" target="_blank">
+                <%= failas.location.lat.toFixed(5) %>, <%= failas.location.lon.toFixed(5) %>
+              </a>
+            </p>
+          </div>
+        <% } %>
 
         <% if (failas.metaduomenys) { %>
           <div>

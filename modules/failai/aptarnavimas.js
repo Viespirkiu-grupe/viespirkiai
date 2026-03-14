@@ -1,6 +1,7 @@
 import { Buffer } from "buffer";
 import { postgres, parsePgArray } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
+import { parseWKBPoint } from "../geografija/utils.js";
 
 /**
  * Decodes a quoted-printable encoded attachment name.
@@ -146,6 +147,10 @@ export async function aptarnautiFailą(
     });
 
     if (failas.ocrText) failas.ocrText = parsePgArray(failas.ocrText);
+
+    if (failas.location) {
+        failas.location = parseWKBPoint(failas.location);
+    }
 
     await resolveRelatedFiles(failas);
 

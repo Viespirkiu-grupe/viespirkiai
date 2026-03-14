@@ -88,6 +88,25 @@ const failaiFilter = new FilterBuilder({
                 return `f.search_index @@ ${fn}('simple', ${addParam(clean)}) AND f.nuskaitytas >= 0`;
             },
         },
+        {
+            key: "location",
+            hidden: true,
+            pgOnly: true,
+            pgOverride: (addParam, val, query) => {
+                const [latStr, lngStr] = val.split(",");
+                const lat = parseFloat(latStr);
+                const lng = parseFloat(lngStr);
+                if (isNaN(lat) || isNaN(lng)) return null;
+
+                const radius = parseFloat(query?.locationRadius) || 10;
+
+                return `ST_DWithin(
+                    f.location,
+                    ST_SetSRID(ST_MakePoint(${addParam(lng)}, ${addParam(lat)}), 4326)::geography,
+                    ${addParam(radius)}
+                )`;
+            },
+        },
     ],
 });
 

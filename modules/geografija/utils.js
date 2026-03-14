@@ -145,3 +145,41 @@ export function walkWays(ways) {
 
     return rings;
 }
+
+/**
+ * Parses a PostGIS EWKB hex string into a lat/lng coordinate pair.
+ * Supports both standard WKB and EWKB (with embedded SRID).
+ * Handles little-endian and big-endian byte orders.
+ * Also accepts a plain "lat,lon" string as a fallback.
+ *
+ * @param {string} hex - PostGIS WKB/EWKB hex string or a "lat,lon" string.
+ * @returns {{ lat: number, lon: number } | null} Parsed coordinate pair, or null if invalid.
+ *
+ * @example
+ * parseWKBPoint("0101000020E6100000A9722910B24B374050D287DFEBF64B40");
+ * // { lat: 55.846302..., lon: 23.319561... }
+ *
+ * @example
+ * parseWKBPoint("55.84630277777778,23.31956111111111");
+ * // { lat: 55.846302..., lon: 23.319561... }
+ */
+export function parseWKBPoint(hex) {
+    if (!hex) return null;
+    const str = hex.trim();
+
+    if (str.includes(",")) {
+        const [latStr, lngStr] = str.split(",");
+        const lat = parseFloat(latStr);
+        const lon = parseFloat(lngStr);
+        return isNaN(lat) || isNaN(lon) ? null : { lat, lon };
+    }
+
+    const buf = Buffer.from(str, "hex");
+    if (buf.length < 25) return null;
+
+    const isLE = buf[0] === 1;
+    const lon = isLE ? buf.readDoubleLE(9) : buf.readDoubleBE(9);
+    const lat = isLE ? buf.readDoubleLE(17) : buf.readDoubleBE(17);
+
+    return { lat, lon };
+}

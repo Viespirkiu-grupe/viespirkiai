@@ -304,7 +304,7 @@ export class FilterBuilder {
 
             if (!field.tsOnly) {
                 const pgFragment = field.pgOverride
-                    ? field.pgOverride(addParam, val)
+                    ? field.pgOverride(addParam, val, query)
                     : type.pg(col, addParam, val, field.extra ?? {});
                 if (pgFragment) whereClauses.push(pgFragment);
             }

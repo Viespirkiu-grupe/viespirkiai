@@ -51,12 +51,14 @@ app.use(
 );
 
 // Rate limit
-const globalLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 min
-    max: 600, // max requests per IP
-    message: "Too many requests",
-});
-app.use(globalLimiter);
+if (!config.dev) {
+    const globalLimiter = rateLimit({
+        windowMs: 1 * 60 * 1000, // 1 min
+        max: 600, // max requests per IP
+        message: "Too many requests",
+    });
+    app.use(globalLimiter);
+}
 
 app.set("trust proxy", config.proxyIp);
 app.use((req, res, next) => {
