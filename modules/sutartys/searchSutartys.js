@@ -3,6 +3,7 @@ import { searchDocuments } from "../../typesense/typesense.js";
 import { postgres } from "../../postgres/postgres.js";
 import { FilterBuilder } from "../../utils/filter.js";
 import { fixHtmlEntities } from "../../utils/fixHtmlEntities.js";
+import { Readable, Transform } from "node:stream";
 import QueryStream from "pg-query-stream";
 
 const CONTRACT_TYPES = {
@@ -134,6 +135,18 @@ export async function searchSutartys(
     if (engine === "typesense") {
         const { filterBy, sortBy, values, queryParams } =
             sutartysFilter.build(query);
+
+        if (stream) {
+            return {
+                results: [],
+                total: null,
+                values,
+                queryParams,
+                stream: Readable.from(streamTypesenseResults(query)),
+                client: null,
+            };
+        }
+
         const { results: raw, total } = await searchDocuments(
             query.search || "*",
             { page, filterBy, sortBy, limit },
@@ -166,7 +179,14 @@ export async function searchSutartys(
             total: null,
             values,
             queryParams,
-            stream: client.query(new QueryStream(sql, params)),
+            stream: client.query(new QueryStream(sql, params)).pipe(
+                new Transform({
+                    objectMode: true,
+                    transform(row, _enc, cb) {
+                        cb(null, aptvarkytiRezultata(row));
+                    },
+                }),
+            ),
             client,
         };
     }
@@ -245,4 +265,37 @@ export function aptvarkytiRezultata(r) {
     r.tipoPavadinimas = CONTRACT_TYPES[tipo] || tipo;
 
     return r;
+}
+
+/**
+ * Async generator that paginates through ALL Typesense results.
+ * Yields one processed row at a time.
+ * @param {object} query
+ * @returns {AsyncGenerator<object>}
+ */
+export async function* streamTypesenseResults(query) {
+    const { filterBy, sortBy } = sutartysFilter.build(query);
+    const pageSize = 250;
+    let page = 1;
+    let fetched = 0;
+    let total = Infinity;
+
+    while (fetched < total) {
+        const { results, total: t } = await searchDocuments(
+            query.search || "*",
+            { page, filterBy, sortBy, limit: pageSize },
+        );
+
+        if (page === 1) total = t;
+        if (!results.length) break;
+
+        for (const row of arrayToLithuanianTime(results).map(
+            aptvarkytiRezultata,
+        )) {
+            yield row;
+        }
+
+        fetched += results.length;
+        page++;
+    }
 }

@@ -7,7 +7,6 @@ import { objectsToJsonlStream } from "../utils/jsonl.js";
 import { Transform } from "node:stream";
 import Timings from "../utils/timings.js";
 import {
-    aptvarkytiRezultata,
     buildAnalize,
     buildAnalizeXlsx,
 } from "../modules/sutartys/rezultatai.js";
@@ -122,7 +121,7 @@ async function serveCsvStream(res, stream, client) {
             new Transform({
                 objectMode: true,
                 transform(row, _enc, cb) {
-                    cb(null, resultToCsvObject(aptvarkytiRezultata(row)));
+                    cb(null, resultToCsvObject(row));
                 },
             }),
         )
@@ -133,7 +132,11 @@ async function serveCsvStream(res, stream, client) {
         res.on("finish", resolve);
         res.on("error", reject);
         stream.on("error", reject);
-    }).finally(() => client.release());
+    }).finally(() => {
+        if (client) {
+            client.release();
+        }
+    });
 }
 
 async function serveJsonlStream(res, stream, client) {
@@ -143,23 +146,17 @@ async function serveJsonlStream(res, stream, client) {
         `attachment; filename=viespirkiai-${new Date().toISOString()}.jsonl`,
     );
 
-    stream
-        .pipe(
-            new Transform({
-                objectMode: true,
-                transform(row, _enc, cb) {
-                    cb(null, aptvarkytiRezultata(row));
-                },
-            }),
-        )
-        .pipe(objectsToJsonlStream())
-        .pipe(res);
+    stream.pipe(objectsToJsonlStream()).pipe(res);
 
     await new Promise((resolve, reject) => {
         res.on("finish", resolve);
         res.on("error", reject);
         stream.on("error", reject);
-    }).finally(() => client.release());
+    }).finally(() => {
+        if (client) {
+            client.release();
+        }
+    });
 }
 
 indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
@@ -178,7 +175,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
 
         const { stream, client, values, queryParams } = await searchSutartys(
             req.query,
-            { limit: null, page, stream: true, sort: false },
+            { limit: null, page, stream: true, sort: false, engine },
         );
         timings.end("stream");
 
