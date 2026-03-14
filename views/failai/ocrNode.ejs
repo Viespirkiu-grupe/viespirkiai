@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+  <%- include('../head.ejs', {
+    pageTitle: `OCR nuskaitytojas – ${nuskaitytojas.viesasPavadinimas}`,
+    pageDescription: "",
+    pageImage: `https://viespirkiai.org/failai.png`,
+    customHead: ""
+  }) %>
+  <%- include('../js/charts.ejs') %>
+</head>
+<body>
+  <%- include('../header.ejs', {hideSubtext: false}) %>
+  <main>
+
+    <div class="page-header">
+      <h1 class="mb-0">
+        <a href="/failai/ocr" class="breadcrumb-link">OCR būsena</a>
+        <span class="breadcrumb-sep">›</span>
+        <%= nuskaitytojas.viesasPavadinimas %>
+      </h1>
+    </div>
+
+    <div class="page-section">
+      <h2 class="mb-3">Nuskaitytojas</h2>
+      <div class="card" style="max-width: 360px;">
+        <div class="card-body">
+            <dl class="kv-list">
+              <dt>Dokumentai</dt>
+              <dd><span class="cell-mono"><%= Number(nuskaitytojas.nuskaitytiDokumentai).toLocaleString('lt-LT') %></span></dd>
+              <dt>Puslapiai</dt>
+              <dd><span class="cell-mono"><%= Number(nuskaitytojas.pages).toLocaleString('lt-LT') %></span></dd>
+              <dt>Žodžiai</dt>
+              <dd><span class="cell-mono"><%= Number(nuskaitytojas.words).toLocaleString('lt-LT') %></span></dd>
+              <dt>Rezervacijos</dt>
+              <dd><span class="cell-mono"><%= Number(nuskaitytojas.rezervacijos).toLocaleString('lt-LT') %></span></dd>
+            </dl>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const ocrStatsDay     = <%- JSON.stringify(ocrStatsDay) %>;
+      const ocrLabels       = ocrStatsDay.map(item => item.date);
+      const ocrResults      = ocrStatsDay.map(item => item.results);
+      const ocrResultsPages = ocrStatsDay.map(item => item.pages);
+      const ocrResultsWords = ocrStatsDay.map(item => item.words);
+    </script>
+
+    <div class="grid-2">
+
+      <div class="page-section" style="display:flex; flex-direction:column; min-height:350px;">
+        <h2 class="mb-3"><a href="#rezultatai" id="rezultatai" class="no-style">Rezultatų skaičius</a></h2>
+        <div class="chart-frame">
+          <div id="ocrStatsDayDiagrama" class="chart" style="height:350px;"></div>
+        </div>
+        <script defer>
+          displayChart({
+            element: document.querySelector('#ocrStatsDayDiagrama'),
+            type: 'line-datetime',
+            labels: ocrLabels,
+            series: ocrResults,
+            flags: ['yMin0', 'xAxisDay', 'numbersWithSpaces'],
+          });
+        </script>
+      </div>
+
+      <div class="page-section" style="display:flex; flex-direction:column; min-height:350px;">
+        <h2 class="mb-3"><a href="#puslapiai" id="puslapiai" class="no-style">Puslapių skaičius</a></h2>
+        <div class="chart-frame">
+          <div id="ocrStatsDayPagesDiagrama" class="chart" style="height:350px;"></div>
+        </div>
+        <script defer>
+          displayChart({
+            element: document.querySelector('#ocrStatsDayPagesDiagrama'),
+            type: 'line-datetime',
+            labels: ocrLabels,
+            series: ocrResultsPages,
+            flags: ['yMin0', 'xAxisDay', 'numbersWithSpaces'],
+          });
+        </script>
+      </div>
+
+      <div class="page-section" style="display:flex; flex-direction:column; min-height:350px;">
+        <h2 class="mb-3"><a href="#zodziai" id="zodziai" class="no-style">Žodžių skaičius</a></h2>
+        <div class="chart-frame">
+          <div id="ocrStatsDayWordsDiagrama" class="chart" style="height:350px;"></div>
+        </div>
+        <script defer>
+          displayChart({
+            element: document.querySelector('#ocrStatsDayWordsDiagrama'),
+            type: 'line-datetime',
+            labels: ocrLabels,
+            series: ocrResultsWords,
+            flags: ['yMin0', 'xAxisDay', 'numbersWithSpaces'],
+          });
+        </script>
+      </div>
+
+    </div>
+
+  </main>
+  <%- include('../footer.ejs') %>
+</body>
+</html>

@@ -125,6 +125,7 @@
     'yAxisNoLabel':   { yaxis: { labels: { show: false } } },
     'noLine':         { stroke: { width: 0 } },
     'colors':         { colors: CATEGORICAL_COLORS },
+    'numbersWithSpaces': { yaxis: { labels: { formatter: v => typeof v === 'number' ? v.toLocaleString('lt-LT') : 'Nėra duomenų' } } }
   };
 
   function buildOptions(data, isDark) {

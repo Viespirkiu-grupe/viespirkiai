@@ -22,12 +22,14 @@
       <div class="grid-2" style="align-items:start;">
 
         <div>
-          <h2 class="mb-3"><a href="#nuskaitytojai" id="nuskaitytojai" class="no-style">OCR nuskaitytojai</a></h2>
-          <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3);">
+          <h2 class="mb-4"><a href="#nuskaitytojai" id="nuskaitytojai" class="no-style">OCR nuskaitytojai</a></h2>
+          <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3); padding-top: var(--space-1);">
             <% ocrNuskaitytojai.forEach(nuskaitytojas => { %>
               <div class="card">
                 <div class="card-body">
-                  <div class="section-title mb-2"><%= nuskaitytojas.viesasPavadinimas %></div>
+                    <div class="section-title mb-2">
+                      <a href="/failai/ocr/<%= nuskaitytojas.id %>"><%= nuskaitytojas.viesasPavadinimas %></a>
+                    </div>
                   <dl class="kv-list">
                     <dt>Dokumentai</dt>
                     <dd><span class="cell-mono"><%= Number(nuskaitytojas.results).toLocaleString('lt-LT') %></span></dd>
@@ -128,7 +130,7 @@
             type: 'line-datetime',
             labels: ocrLabels,
             series: ocrResults,
-            flags: ['yMin0', 'xAxisDay'],
+            flags: ['yMin0', 'xAxisDay', 'numbersWithSpaces'],
           });
         </script>
       </div>
@@ -144,7 +146,7 @@
             type: 'line-datetime',
             labels: ocrLabels,
             series: ocrResultsPages,
-            flags: ['yMin0', 'xAxisDay'],
+            flags: ['yMin0', 'xAxisDay', 'numbersWithSpaces'],
           });
         </script>
       </div>
@@ -160,7 +162,7 @@
             type: 'line-datetime',
             labels: ocrLabels,
             series: ocrResultsWords,
-            flags: ['yMin0', 'xAxisDay'],
+            flags: ['yMin0', 'xAxisDay', 'numbersWithSpaces'],
           });
         </script>
       </div>

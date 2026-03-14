@@ -491,12 +491,12 @@ failaiSearchRouter.get("/failai/ocr", async (req, res) => {
                 `SELECT * FROM "failaiOcrRezultataiStatsDay" ORDER BY date DESC`,
             ),
             postgres.query(
-                `SELECT n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos",
+                `SELECT n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos",
                     COALESCE(SUM(s.results), 0) AS "results", COALESCE(SUM(s.pages), 0) AS "pages", COALESCE(SUM(s.words), 0) AS "words"
-             FROM "ocrNuskaitytojai" n
-             LEFT JOIN "failaiOcrRezultataiStatsDayNode" s ON s.node = n.pavadinimas
-             GROUP BY n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos"
-             ORDER BY n."nuskaitytiDokumentai" DESC LIMIT 100`,
+                 FROM "ocrNuskaitytojai" n
+                 LEFT JOIN "failaiOcrRezultataiStatsDayNode" s ON s.node = n.pavadinimas
+                 GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos"
+                 ORDER BY n."nuskaitytiDokumentai" DESC LIMIT 100`,
             ),
         ]);
 
@@ -510,6 +510,43 @@ failaiSearchRouter.get("/failai/ocr", async (req, res) => {
         ocrStats,
         ocrStatsDay: ocrStatsDayRes.rows,
         ocrNuskaitytojai: ocrNuskaitytojaiRes.rows,
+        req,
+    });
+});
+
+failaiSearchRouter.get("/failai/ocr/:id", async (req, res, next) => {
+    const nodeId = parseInt(req.params.id, 10);
+    if (isNaN(nodeId)) return next();
+
+    const [nuskaitytojasRes, ocrStatsDayRes] = await Promise.all([
+        postgres.query(
+            `SELECT n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos",
+              COALESCE(SUM(s.results), 0) AS "results", COALESCE(SUM(s.pages), 0) AS "pages", COALESCE(SUM(s.words), 0) AS "words"
+           FROM "ocrNuskaitytojai" n
+           LEFT JOIN "failaiOcrRezultataiStatsDayNode" s ON s.node = n.pavadinimas
+           WHERE n.id = $1
+           GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos"`,
+            [nodeId],
+        ),
+        postgres.query(
+            `SELECT s.* FROM "failaiOcrRezultataiStatsDayNode" s
+             JOIN "ocrNuskaitytojai" n ON n.pavadinimas = s.node
+             WHERE n.id = $1
+             ORDER BY s.date DESC`,
+            [nodeId],
+        ),
+    ]);
+
+    if (!nuskaitytojasRes.rows.length) {
+        return next();
+    }
+
+    const nuskaitytojas = nuskaitytojasRes.rows[0];
+
+    res.render("failai/ocrNode", {
+        customHead: config.customHead,
+        nuskaitytojas,
+        ocrStatsDay: ocrStatsDayRes.rows,
         req,
     });
 });
