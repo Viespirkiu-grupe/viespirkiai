@@ -286,7 +286,9 @@ export class FilterBuilder {
         let visiIrasai = true;
 
         for (const field of this.fields) {
-            const raw = query[field.key];
+            const rawQuery = query[field.key];
+            const raw = field.enum ? (field.enum[rawQuery] ?? null) : rawQuery;
+
             const active = field.isBoolean
                 ? raw !== undefined
                 : raw?.length > 0;
@@ -327,8 +329,10 @@ export class FilterBuilder {
                 values[field.key] = true;
                 queryParams.push(`${field.key}=true`);
             } else {
-                values[field.key] = raw;
-                queryParams.push(`${field.key}=${encodeURIComponent(raw)}`);
+                values[field.key] = rawQuery;
+                queryParams.push(
+                    `${field.key}=${encodeURIComponent(rawQuery)}`,
+                );
             }
         }
 

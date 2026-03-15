@@ -41,6 +41,8 @@
         <div class="action-bar-popup-wrap">
           <button class="btn btn-primary btn-sm" id="bvpzSearchBtn">Ieškoti ↑</button>
           <div class="action-bar-popup" id="bvpzSearchDropdown">
+            <a href="#" onclick="bvpzSearch('viesiejiPirkimaiTeikimas'); return false;">Viešieji pirkimai (pasiūlymų teikimas)</a>
+            <a href="#" onclick="bvpzSearch('viesiejiPirkimai'); return false;">Viešieji pirkimai</a>
             <a href="#" onclick="bvpzSearch('sutartys'); return false;">Sutartys</a>
           </div>
         </div>
@@ -264,9 +266,15 @@
        * @param {string} target
        */
       function bvpzSearch(target) {
-        const codes = document.getElementById("pasirinkti-kodai").textContent.trim();
-        if (!codes) return;
-        window.location.href = `/?bvpzPrefiksasKitas=${encodeURIComponent(codes)}`;
+          const codes = document.getElementById("pasirinkti-kodai").textContent.trim();
+          if (!codes) return;
+          if (target === "sutartys") {
+              window.location.href = `/?bvpzPrefiksasKitas=${encodeURIComponent(codes)}`;
+          } else if (target === "viesiejiPirkimai") {
+              window.location.href = `/viesiejiPirkimai?bvpzPrefiksai=${encodeURIComponent(codes)}`;
+          } else if (target === "viesiejiPirkimaiTeikimas") {
+              window.location.href = `/viesiejiPirkimai?statusas=teikimas&bvpzPrefiksai=${encodeURIComponent(codes)}`;
+          }
       }
 
       document.getElementById("bvpzSearchBtn").addEventListener("click", e => {

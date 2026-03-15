@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+  <%- include('../head.ejs', {
+      pageTitle: "Viešųjų pirkimų paieška",
+      pageDescription: `Pilietinė viešųjų pirkimų analizės iniciatyva. Prieinamai patiekiami viešieji pirkimai bei kita susijusi informacija.`,
+      pageImage: `https://viespirkiai.org/index.png`,
+      customHead
+  }) %>
+</head>
+<body>
+  <%- include('../header.ejs') %>
+  <main>
+    <%- include('search.ejs', { values, usedHiddenFields, numberOfResults }) %>
+    <div class="mt-6 max-w-lg center mx-auto">
+      <%- include('results.ejs') %>
+    </div>
+    <script>
+      const span = document.querySelector('.rezultatai-nezinomas-total');
+      if (span && !span.classList.contains('spin')) {
+        span.classList.add('spin');
+        const url = new URL(window.location.href);
+        url.searchParams.set('rezultatuSkaiciausPatikslinimas', 'true');
+        fetch(url)
+          .then(res => res.json())
+          .then(data => {
+            if (data.total) {
+              span.className = '';
+              document.querySelector('.numberOfResults').innerHTML = data.numberOfResults;
+              document.querySelector('ul.pagination').innerHTML = data.pagination;
+            } else {
+              span.classList.remove('spin');
+            }
+          })
+          .catch(() => span.classList.remove('spin'));
+      }
+    </script>
+  </main>
+  <%- include('../footer.ejs') %>
+</body>
+</html>

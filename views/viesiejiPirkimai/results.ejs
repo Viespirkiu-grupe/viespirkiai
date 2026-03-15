@@ -1,0 +1,91 @@
+<div>
+  <div class="d-flex justify-between align-center mb-4">
+    <span class="text-muted text-sm"><em class="numberOfResults"><%- numberOfResults %></em></span>
+    <% if (galimaEksportuoti) { %>
+      <div class="d-flex gap-3">
+        <a href="/viesieji-pirkimai/?<%- queryParams %>&jsonl=true&limit=max" class="btn btn-outline btn-sm">↗ JSONL</a>
+        <a href="/viesieji-pirkimai/?<%- queryParams %>&csv=true&limit=max" class="btn btn-outline btn-sm">↗ CSV</a>
+      </div>
+    <% } %>
+  </div>
+
+  <% if (data.length === 0) { %>
+    <div class="empty-state">
+      <p class="text-muted">Rezultatų nerasta.</p>
+    </div>
+  <% } else { %>
+
+    <div class="result-list">
+      <% data.forEach(item => { %>
+        <article class="result-card card-clickable" aria-label="<%= item.pavadinimas || 'Viešasis pirkimas' %>">
+          <a href="/viesiejiPirkimai/<%= item.pirkimoId %>" class="card-overlay-link"><%= item.pavadinimas %></a>
+
+          <div class="result-card-body">
+
+            <dl class="result-card-meta">
+              <% if (item.statusas) { %>
+                <div>
+                  <dt class="visually-hidden">Statusas</dt>
+                  <dd class="<%= item.statusas === 'Vykdomas' ? 'badge-active' : '' %>"><%= item.statusas %></dd>
+                </div>
+              <% } %>
+              <% if (item.pirkimoBudas) { %>
+                <div>
+                  <dt class="visually-hidden">Pirkimo būdas</dt>
+                  <dd><%= item.pirkimoBudas %></dd>
+                </div>
+              <% } %>
+              <% if (item.paskelbimoData) { %>
+                <div>
+                  <dt class="visually-hidden">Paskelbimo data</dt>
+                  <dd>
+                    <abbr aria-hidden="true" title="Paskelbimo data">Paskelb.</abbr>
+                    <time datetime="<%= String(item.paskelbimoData).slice(0, 10) %>"><%= String(item.paskelbimoData).slice(0, 10) %></time>
+                  </dd>
+                </div>
+              <% } %>
+            </dl>
+
+            <div class="d-flex align-baseline gap-3">
+              <h3 class="result-card-title">
+                <% if (!item.pavadinimas || item.pavadinimas.length < 1) { %><em>Nenurodyta</em><% } else { %><%= item.pavadinimas %><% } %>
+              </h3>
+            </div>
+
+            <div class="result-card-footer">
+              <% if (item.pirkimoVykdytojas) { %>
+                <span>
+                  <strong>Vykdytojas:</strong>
+                  <%= item.pirkimoVykdytojas.slice(0, 80) %><%= item.pirkimoVykdytojas.length > 80 ? '…' : '' %>
+                </span>
+              <% } %>
+              <% if (item.pasiulymuPateikimoTerminas) { %>
+                <span>
+                  <strong>Pasiūlymų terminas:</strong>
+                  <time datetime="<%= String(item.pasiulymuPateikimoTerminas).slice(0, 10) %>">
+                    <%= String(item.pasiulymuPateikimoTerminas).slice(0, 16).replace('T', ' ') %>
+                  </time>
+                </span>
+              <% } %>
+              <% if (item.numatomaBendraPirkimoVerte) { %>
+                <span>
+                  <strong>Numatoma vertė:</strong>
+                  <span>
+                    <%= Number(item.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>&nbsp;€
+                  </span>
+                </span>
+              <% } %>
+              <% if (item.informacija && item.informacija !== item.pavadinimas) { %>
+                <%= item.informacija %>
+              <% } %>
+            </div>
+
+          </div>
+        </article>
+      <% }) %>
+    </div>
+
+    <%- include('pagination.ejs', { currentPage, pageCount, queryParams }) %>
+
+  <% } %>
+</div>

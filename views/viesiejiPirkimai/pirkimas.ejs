@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <%- include('../head.ejs', {
+      pageTitle: (pirkimas.numatomaBendraPirkimoVerte
+          ? Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " € "
+          : "") + pirkimas.pavadinimas,
+      pageDescription: `${pirkimas.pirkimoBudas || ""}\nPaskelbta: ${String(pirkimas.paskelbimoData).slice(0,10)}\nVykdytojas: ${pirkimas.pirkimoVykdytojas}`,
+      pageImage: `https://viespirkiai.org/index.png`,
+      pageAuthor: pirkimas.pirkimoVykdytojas,
+      customHead
+  }) %>
+</head>
+<body>
+  <%- include('../header.ejs') %>
+  <main>
+
+    <% const t = pirkimas.turinys || {}; %>
+
+    <div class="page-header">
+      <div>
+        <p class="subtext mb-1"><%= pirkimas.pirkimoBudas %><% if (pirkimas.statusas) { %> · <span class="text-muted"><%= pirkimas.statusas %></span><% } %></p>
+        <h1 class="mb-0">
+          <% if (!pirkimas.pavadinimas || pirkimas.pavadinimas.length < 1) { %>
+            <em>Nenurodyta</em>
+          <% } else { %>
+            <%= pirkimas.pavadinimas %>
+          <% } %>
+          <% if (pirkimas.numatomaBendraPirkimoVerte) { %>
+            už <span class="amount"><%= Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>&nbsp;€</span>
+          <% } %>
+        </h1>
+      </div>
+      <div class="d-flex gap-3 align-center">
+        <% if (pirkimas.type === 'Pmc') { %>
+          <a href="https://viesiejipirkimai.lt/epps/pmc/viewPmc.do?resourceId=<%= pirkimas.pirkimoId %>" class="btn btn-outline btn-sm" target="_blank">↗ CVP IS</a>
+        <% } else if (pirkimas.type === 'CfTWS') { %>
+          <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTWS.do?resourceId=<%= pirkimas.pirkimoId %>" class="btn btn-outline btn-sm" target="_blank">↗ CVP IS</a>
+        <% } else if (pirkimas.type === 'CfTDPSWS') { %>
+          <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTDPSWS.do?resourceId=<%= pirkimas.pirkimoId %>" class="btn btn-outline btn-sm" target="_blank">↗ CVP IS</a>
+        <% } %>
+        <a href="/viesiejiPirkimai/<%= pirkimas.pirkimoId %>.json" class="btn btn-outline btn-sm">↗ JSON</a>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <div class="text-muted mb-4 text-sm">
+        <i>BETA versija, galimos problemos bei netikslumai, apie kuriuos maloniai prašome pranešti <a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a><br>
+            Duomenys atnaujinti <%= String(pirkimas.turinioNuskaitymoData).slice(0, 16).replace('T', ' ') %></i>
+      </div>
+      <% if (pirkimas.informacija && pirkimas.informacija !== pirkimas.pavadinimas) { %>
+        <div class="text-justify">
+          <%= pirkimas.informacija %>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="grid-3 mb-6">
+
+      <!-- Vykdytojas -->
+      <section>
+        <h2>Pirkimo vykdytojas</h2>
+        <h3>
+          <% if (pirkimas.jarKodas) { %>
+            <a href="/asmuo/<%= pirkimas.jarKodas %>"><%= pirkimas.vykdytojoPavadinimas || pirkimas.pirkimoVykdytojas %></a>
+          <% } else { %>
+            <%= pirkimas.vykdytojoPavadinimas || pirkimas.pirkimoVykdytojas %>
+          <% } %>
+        </h3>
+        <% if (pirkimas.jarKodas) { %>
+          <span class="text-muted"><%= pirkimas.jarKodas %></span>
+        <% } %>
+        <% if (t.kontaktinisAsmuo) { %>
+          <p class="text-muted text-sm mt-2"><%= t.kontaktinisAsmuo %></p>
+        <% } %>
+        <% if (t.pirkimuSuvestinesNuoroda) { %>
+          <p class="text-sm mt-2">
+            <a href="https://viesiejipirkimai.lt/epps/app/viewPublication.do?selectedId=<%= t.pirkimuSuvestinesNuoroda %>" target="_blank">↗ Pirkimų suvestinė</a>
+          </p>
+        <% } %>
+      </section>
+
+      <!-- Terminai -->
+      <section>
+          <h2>Terminai</h2>
+          <% const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Vilnius' })); %>
+          <% const dot = (dateStr) => {
+              if (!dateStr) return '';
+              const d = new Date(dateStr);
+              return !isNaN(d.getTime()) && d < now ? 'active' : '';
+          }; %>
+          <% const timelineItems = [
+              pirkimas.paskelbimoData         && { date: pirkimas.paskelbimoData,          label: 'Paskelbta' },
+              t.paskelbimoIrArbaKvietimoData  && { date: t.paskelbimoIrArbaKvietimoData,   label: 'Kvietimo data' },
+              t.paaiskinimuTerminoPabaiga     && { date: t.paaiskinimuTerminoPabaiga,       label: 'Paaiškinimų terminas' },
+              pirkimas.pasiulymuPateikimoTerminas && { date: pirkimas.pasiulymuPateikimoTerminas, label: 'Pasiūlymų teikimo terminas' },
+              t.susipazinimoSuPasiulymaisData && { date: t.susipazinimoSuPasiulymaisData,   label: 'Susipažinimo data' },
+              t.laimetojoNustatymoData        && { date: t.laimetojoNustatymoData,          label: 'Laimėtojas nustatytas' },
+              t.dpsGaliojimoDataIrLaikas      && { date: t.dpsGaliojimoDataIrLaikas,        label: 'DPS galiojimas' },
+              t.kvsGaliojimoDataIrLaikas      && { date: t.kvsGaliojimoDataIrLaikas,        label: 'KVS galiojimas' },
+          ].filter(Boolean); %>
+
+          <ul class="timeline">
+            <% timelineItems.forEach((item, i) => {
+                const isPast = !isNaN(new Date(item.date).getTime()) && new Date(item.date) < now;
+                const nextIsPast = i + 1 < timelineItems.length && !isNaN(new Date(timelineItems[i+1].date).getTime()) && new Date(timelineItems[i+1].date) < now;
+            %>
+              <li class="timeline-item<%= nextIsPast ? ' line-active' : '' %>">
+                <span class="timeline-dot<%= isPast ? ' active' : '' %>"></span>
+                <div class="timeline-body">
+                  <div class="timeline-date"><%= String(item.date).slice(0, 16).replace('T', ' ') %></div>
+                  <strong><%= item.label %></strong>
+                </div>
+              </li>
+            <% }) %>
+          </ul>
+      </section>
+
+      <!-- Klasifikacija -->
+      <section>
+        <h2>Klasifikacija</h2>
+        <dl class="kv-list mb-4">
+          <% if (pirkimas.statusas) { %>
+            <dt>Statusas</dt>
+            <dd><%= pirkimas.statusas %></dd>
+          <% } %>
+          <% if (pirkimas.pirkimoObjektoTipas) { %>
+            <dt>Objekto tipas</dt>
+            <dd><%= pirkimas.pirkimoObjektoTipas %></dd>
+          <% } %>
+          <% if (t.direktyva) { %>
+            <dt>Direktyva</dt>
+            <dd><%= t.direktyva %></dd>
+          <% } %>
+          <% if (t.nutsKodai) { %>
+            <dt>NUTS kodas</dt>
+            <dd><%= t.nutsKodai %></dd>
+          <% } %>
+          <% if (pirkimas.esFinansavimas !== null && pirkimas.esFinansavimas !== undefined) { %>
+            <dt>ES finansavimas</dt>
+            <dd><%= pirkimas.esFinansavimas ? 'Taip' : 'Ne' %></dd>
+          <% } %>
+          <% if (t.pasiulymuVertinimoKriterijai) { %>
+            <dt>Vertinimo kriterijai</dt>
+            <dd><%= t.pasiulymuVertinimoKriterijai %></dd>
+          <% } %>
+          <% if (t.virsArbaZemiauTarptautinioPirkimoVertesRibos) { %>
+            <dt>Tarpt. vertės riba</dt>
+            <dd><%= t.virsArbaZemiauTarptautinioPirkimoVertesRibos %></dd>
+          <% } %>
+        </dl>
+
+        <% if (pirkimas.bvpzKodai && pirkimas.bvpzKodai.length > 0) { %>
+          <h3 class="mb-2">BVPŽ kodai</h3>
+          <% const bvpzPavadinimai = t.bvpzKodaiPavadinimai || []; %>
+          <% pirkimas.bvpzKodai.forEach((kodas, i) => { %>
+            <div class="mb-2">
+              <% if (bvpzPavadinimai[i]) { %>
+                <div class="fw-medium"><%= bvpzPavadinimai[i] %></div>
+              <% } %>
+              <span class="text-muted"><%= kodas %></span>
+            </div>
+          <% }) %>
+          <a href="/bvpz" class="text-sm">↗ BVPŽ kodai</a>
+        <% } %>
+      </section>
+
+      <!-- Vertė -->
+      <% const fmtVerte = (v) => {
+          const n = Number(v);
+          return v != null && v !== '' && !isNaN(n) && n > 0 ? n.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' : null;
+      }; %>
+      <% const hasVerte = fmtVerte(pirkimas.numatomaBendraPirkimoVerte) || fmtVerte(t.numatomaVerteEUR) || fmtVerte(t.bendraSutarciuVerte) || fmtVerte(t.suteiktaVertemaksimaliDPSVerte); %>
+      <% if (hasVerte) { %>
+        <section>
+          <h2>Vertė</h2>
+          <dl class="kv-list">
+            <% const numatoma = fmtVerte(pirkimas.numatomaBendraPirkimoVerte) || fmtVerte(t.numatomaVerteEUR); %>
+            <% if (numatoma) { %>
+              <dt>Numatoma</dt>
+              <dd class="cell-mono"><%= numatoma %></dd>
+            <% } %>
+            <% if (fmtVerte(t.bendraSutarciuVerte)) { %>
+              <dt>Bendra sutarčių</dt>
+              <dd class="cell-mono"><%= fmtVerte(t.bendraSutarciuVerte) %></dd>
+            <% } %>
+            <% if (fmtVerte(t.suteiktaVertemaksimaliDPSVerte)) { %>
+              <dt>Maksimali DPS</dt>
+              <dd class="cell-mono"><%= fmtVerte(t.suteiktaVertemaksimaliDPSVerte) %></dd>
+            <% } %>
+          </dl>
+        </section>
+      <% } %>
+
+      <!-- Sąlygos -->
+      <% const hasKita = t.eAukcionuSukurimas || t.pirkimasSkaidomasIDaliuDPSIKategorijas || t.leidziamaPateiktisAlternatyviusPasiulymus || t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais || t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus || t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims; %>
+      <% if (hasKita) { %>
+        <section>
+          <h2>Sąlygos</h2>
+          <dl class="kv-list">
+            <% if (t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims) { %>
+              <dt>Sutarties tipas</dt>
+              <dd><%= t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims %></dd>
+            <% } %>
+            <% if (t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus) { %>
+              <dt>Sutarties trukmė</dt>
+              <dd><%= t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus %></dd>
+            <% } %>
+            <% if (t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais) { %>
+              <dt>Pasiūlymo galiojimas</dt>
+              <dd><%= t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais %></dd>
+            <% } %>
+            <% if (t.eAukcionuSukurimas) { %>
+              <dt>El. aukcionas</dt>
+              <dd><%= t.eAukcionuSukurimas %></dd>
+            <% } %>
+            <% if (t.leidziamaPateiktisAlternatyviusPasiulymus) { %>
+              <dt>Alternatyvūs pasiūlymai</dt>
+              <dd><%= t.leidziamaPateiktisAlternatyviusPasiulymus %></dd>
+            <% } %>
+            <% if (t.pirkimasSkaidomasIDaliuDPSIKategorijas) { %>
+              <dt>Skaidoma į dalis</dt>
+              <dd><%= t.pirkimasSkaidomasIDaliuDPSIKategorijas %></dd>
+            <% } %>
+          </dl>
+        </section>
+      <% } %>
+
+    </div>
+
+    <!-- Dokumentai -->
+    <% const failai = t.failai; %>
+    <% if (failai && failai.length > 0) { %>
+      <section class="mb-7">
+        <h2>Dokumentai</h2>
+        <ul class="file-list mt-4">
+          <% failai.forEach(failas => { %>
+            <% const versija = failas.versijos?.[failas.versijos.length - 1]; %>
+            <% const saltinioId = versija ? `${pirkimas.pirkimoId}/${failas.dokumentasId}/${versija.versionId}` : null; %>
+            <% const lokalus = saltinioId ? lokalusFailai[saltinioId] : null; %>
+            <% const cvpisUrl = `https://viesiejipirkimai.lt/epps/cft/viewDocumentVersions.do?resourceId=${failas.dokumentasId}`; %>
+            <li>
+              <% if (lokalus?.parsiustas && lokalus?.nuskaitytas) { %>
+                <a href="/failas/<%= lokalus.id %>"><%= failas.dokumentasPavadinimas || failas.pavadinimas %></a>
+                <span class="text-muted text-sm ms-2">(<a href="/failas/<%= lokalus.id %>/turinys">↗ Failas</a>, <a href="<%= cvpisUrl %>" target="_blank">↗ CVP IS</a>)</span>
+              <% } else { %>
+                <a href="<%= cvpisUrl %>" target="_blank"><%= failas.dokumentasPavadinimas || failas.pavadinimas %></a>
+                <span class="text-muted text-sm ms-2">(<a href="<%= cvpisUrl %>" target="_blank">↗ CVP IS</a>)</span>
+              <% } %>
+              <% if (versija) { %>
+                <span class="text-muted text-sm ms-2"><%= versija.ikelimoData %><% if (versija.statusas) { %> · <%= versija.statusas %><% } %></span>
+              <% } %>
+              <% if (failas.aprasymas) { %>
+                <span class="text-muted text-sm ms-2"><%= failas.aprasymas %></span>
+              <% } %>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+
+    <!-- Skelbimai -->
+    <% const skelbimai = t.skelbimai; %>
+    <% if (skelbimai && skelbimai.length > 0) { %>
+      <section class="mb-7">
+        <h2>Skelbimai</h2>
+        <ul class="file-list mt-4">
+          <% skelbimai.forEach(skelbimas => { %>
+            <li>
+              <% if (skelbimas.downloadHref) { %>
+                <a href="https://viesiejipirkimai.lt<%= skelbimas.downloadHref %>" target="_blank"><%= skelbimas.tipas || 'Skelbimas' %></a>
+              <% } else { %>
+                <%= skelbimas.tipas || 'Skelbimas' %>
+              <% } %>
+              <span class="text-muted text-sm ms-2">
+                <%= skelbimas.paskelbimoData ? String(skelbimas.paskelbimoData).slice(0,10) : '' %>
+                <% if (skelbimas.statusas) { %> · <%= skelbimas.statusas %><% } %>
+              </span>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+
+    <!-- TED nuorodos -->
+    <% if (t.tedNuorodosIPaskelbtusPranesimus) { %>
+      <% const tedUrls = t.tedNuorodosIPaskelbtusPranesimus.split(/\s+/).filter(s => s.startsWith('http')); %>
+      <% if (tedUrls.length > 0) { %>
+        <section class="mb-7">
+          <h2>TED nuorodos</h2>
+          <ul class="file-list mt-4">
+            <% tedUrls.forEach(url => { %>
+              <li><a href="<%= url %>" target="_blank"><%= url %></a></li>
+            <% }) %>
+          </ul>
+        </section>
+      <% } %>
+    <% } %>
+
+  </main>
+  <%- include('../footer.ejs') %>
+</body>
+</html>
