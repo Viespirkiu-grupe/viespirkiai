@@ -236,8 +236,7 @@
         <ul class="file-list mt-4">
           <% failai.forEach(failas => { %>
             <% const versija = failas.versijos?.[failas.versijos.length - 1]; %>
-            <% const saltinioId = versija ? `${pirkimas.pirkimoId}/${failas.dokumentasId}/${versija.versionId}` : null; %>
-            <% const lokalus = saltinioId ? lokalusFailai[saltinioId] : null; %>
+            <% const lokalus = versija; %>
             <% const cvpisUrl = `https://viesiejipirkimai.lt/epps/cft/viewDocumentVersions.do?resourceId=${failas.dokumentasId}`; %>
             <li>
               <% if (lokalus?.parsiustas && lokalus?.nuskaitytas) { %>

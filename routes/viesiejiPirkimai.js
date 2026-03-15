@@ -248,7 +248,6 @@ viesiejiPirkimaiRouter.get(
 viesiejiPirkimaiRouter.get("/viesiejiPirkimai/:id", async (req, res, next) => {
     const id = req.params.id.replace(/\.json$/, "");
     const isJson = req.params.id.endsWith(".json");
-
     const { rows } = await postgres.query(
         `
         SELECT p.*, v.pavadinimas AS "vykdytojoPavadinimas", v."jarKodas"
@@ -258,12 +257,9 @@ viesiejiPirkimaiRouter.get("/viesiejiPirkimai/:id", async (req, res, next) => {
         `,
         [id],
     );
-
     const pirkimas = rows[0];
     if (!pirkimas) return res.status(404).render("404");
-    if (isJson) return res.json(pirkimas);
 
-    // Build saltinioId prefixes for all versions and look up local files
     const failai = pirkimas.turinys?.failai ?? [];
     const saltinioIds = failai.flatMap((failas) =>
         (failas.versijos ?? []).map(
@@ -271,21 +267,51 @@ viesiejiPirkimaiRouter.get("/viesiejiPirkimai/:id", async (req, res, next) => {
         ),
     );
 
-    let lokalusFailai = {};
     if (saltinioIds.length) {
         const { rows: failaiRows } = await postgres.query(
             `SELECT * FROM public."failai"
              WHERE saltinis = 'cvpIs' AND "saltinioId" = ANY($1)`,
             [saltinioIds],
         );
-        lokalusFailai = Object.fromEntries(
+        const lokalusFailai = Object.fromEntries(
             failaiRows.map((f) => [f.saltinioId, f]),
         );
+        for (const failas of failai) {
+            for (const versija of failas.versijos ?? []) {
+                const saltinioId = `${id}/${failas.dokumentasId}/${versija.versionId}`;
+                const lokalus = lokalusFailai[saltinioId];
+                if (lokalus) {
+                    const {
+                        id,
+                        filename,
+                        extension,
+                        parsiustas,
+                        nuskaitytas,
+                        zodziuSkaicius,
+                        puslapiuSkaicius,
+                        dydis,
+                        md5,
+                    } = lokalus;
+                    Object.assign(versija, {
+                        id,
+                        filename,
+                        extension,
+                        parsiustas,
+                        nuskaitytas,
+                        zodziuSkaicius,
+                        puslapiuSkaicius,
+                        dydis,
+                        md5,
+                    });
+                }
+            }
+        }
     }
+
+    if (isJson) return res.json(pirkimas);
 
     res.renderCompiled("viesiejiPirkimai/pirkimas", {
         pirkimas,
-        lokalusFailai,
         customHead: config.customHead,
         req,
     });

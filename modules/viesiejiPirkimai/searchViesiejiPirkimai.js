@@ -216,5 +216,8 @@ export function aptvarkytiRezultata(r) {
     r.pavadinimas = fixHtmlEntities(r.pavadinimas ?? "");
     r.pirkimoVykdytojas = fixHtmlEntities(r.pirkimoVykdytojas ?? "");
     r.informacija = fixHtmlEntities(r.informacija ?? "");
+
+    if (r.turinys && r.turinys.failai) delete r.turinys.failai;
+
     return r;
 }
