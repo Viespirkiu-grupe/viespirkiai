@@ -139,6 +139,17 @@ tasks.push({
     },
 });
 
+import { processNextVykdytojas } from "./modules/viesiejiPirkimai/viesiejiPirkimaiVykdytojaiScrape.js";
+tasks.push({
+    name: "processNextVykdytojas",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return processNextVykdytojas();
+    },
+});
+
 const addAsapWorkers = (baseName, count, job) => {
     for (let i = 1; i <= count; i += 1) {
         const suffix = i === 1 ? "" : String(i);

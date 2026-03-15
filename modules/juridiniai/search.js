@@ -176,6 +176,8 @@ function toBaseCompanyName(name) {
         "VšĮ",
         "ŽŪB",
         "KŪB",
+        "SĮ",
+        "BĮ",
         "Uždaroji akcinė bendrovė",
         "Akcinė bendrovė",
         "Mažoji bendrija",
@@ -183,10 +185,21 @@ function toBaseCompanyName(name) {
         "Viešoji įstaiga",
         "Žemės ūkio bendrovė",
         "Kooperatinė ūkinė bendrovė",
+        "Biudžetinė įstaiga",
+        "Savivaldybės įmonė",
     ];
 
     // filial. → filialas
     name = name.replace(/filial\./gi, "filialas");
+    name = name.replace(
+        /prie LR finansų ministerijos/i,
+        "prie Lietuvos Respublikos finansų ministerijos",
+    );
+    name = name.replace(
+        /PRIE SADM/i,
+        "prie Socialinės apsaugos ir darbo ministerijos",
+    );
+    name = name.replace(/PRIE KAM/i, "prie Krašto apsaugos ministerijos");
 
     // remove anything in  (...)
     name = name.replace(/\(.*?\)/g, "");

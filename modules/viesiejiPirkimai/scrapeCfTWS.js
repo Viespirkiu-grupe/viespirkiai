@@ -3,6 +3,7 @@ import pLimit from "p-limit";
 import Timings from "../../utils/timings.js";
 import { log } from "../../utils/log.js";
 import { isVptWorkingHours } from "../sutartys/isWorkingHours.js";
+import { NUSKAITYMO_VERSIJA } from "./parsers.js";
 import {
     parseCfTWS,
     parseFailai,
@@ -230,16 +231,43 @@ async function processCfTWSRecord(cft, options = {}) {
         timings.end("upsertFiles");
 
         timings.start("updatePurchase");
+        if (result.pirkimoVykdytojasId) {
+            await postgres.query(
+                `
+                INSERT INTO public."viesiejiPirkimaiVykdytojai" (id)
+                VALUES ($1)
+                ON CONFLICT (id) DO NOTHING
+                `,
+                [result.pirkimoVykdytojasId],
+            );
+        }
         await postgres.query(
             `
-      UPDATE public."viesiejiPirkimai"
-      SET "turinioNuskaitymas" = 1,
-          "turinioNuskaitymoData" = NOW(),
-          "scrapeReservation" = NULL,
-          turinys = $1
-      WHERE "pirkimoId" = $2
-      `,
-            [result, cft.pirkimoId],
+            UPDATE public."viesiejiPirkimai"
+            SET "turinioNuskaitymas" = ${NUSKAITYMO_VERSIJA},
+                "turinioNuskaitymoData" = NOW(),
+                "scrapeReservation" = NULL,
+                turinys = $1,
+                "numatomaVerteEUR" = $3,
+                "bvpzKodai" = $4,
+                "pirkimoObjektoTipas" = $5,
+                "esFinansavimas" = $6,
+                "pirkimoVykdytojasId" = $7
+            WHERE "pirkimoId" = $2
+            `,
+            [
+                result,
+                cft.pirkimoId,
+                result.numatomaVerteEUR ?? null,
+                result.bvpzKodai ?? [],
+                result.pirkimoObjektoTipas ?? null,
+                result.esFinansavimas === "Taip"
+                    ? true
+                    : result.esFinansavimas === "Ne"
+                      ? false
+                      : null,
+                result.pirkimoVykdytojasId ?? null,
+            ],
         );
         timings.end("updatePurchase");
 
@@ -291,11 +319,12 @@ export async function processOldestCfTWSOffHours(options = {}) {
                 SELECT "pirkimoId"
                 FROM public."viesiejiPirkimai"
                 WHERE type = 'CfTWS'
-                  AND ("turinioNuskaitymas" = 1 OR "turinioNuskaitymas" = -1)
-                  AND "turinioNuskaitymoData" IS NOT NULL
-                  AND "turinioNuskaitymoData" <=
-                      (now() AT TIME ZONE 'Europe/Vilnius') - INTERVAL '12 hours'
-                ORDER BY "turinioNuskaitymoData" ASC
+                  AND "turinioNuskaitymas" != -2
+                  AND (
+                      ("turinioNuskaitymas" < ${NUSKAITYMO_VERSIJA} AND "turinioNuskaitymas" >= 0)
+                      OR "turinioNuskaitymoData" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '12 hours'
+                  )
+                ORDER BY "turinioNuskaitymoData" ASC NULLS LAST
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
             )
