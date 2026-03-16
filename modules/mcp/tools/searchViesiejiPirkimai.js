@@ -75,6 +75,13 @@ export async function handler(params) {
 
     const { results } = await searchViesiejiPirkimai(query, { limit, page });
 
+    // Delete results[].turinys.failai
+    for (const r of results) {
+        if (r.turinys && r.turinys.failai) {
+            delete r.turinys.failai;
+        }
+    }
+
     return {
         content: [
             {

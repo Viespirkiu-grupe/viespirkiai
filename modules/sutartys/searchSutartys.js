@@ -252,6 +252,10 @@ export function aptvarkytiRezultata(r) {
     const tipo = (r.tipas || "").trim().toUpperCase();
     r.tipoPavadinimas = CONTRACT_TYPES[tipo] || tipo;
 
+    if (r.dokumentai) {
+        delete r.dokumentai;
+    }
+
     return r;
 }
 

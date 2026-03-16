@@ -3,7 +3,7 @@ import { searchFailai, countFailai } from "../../failai/searchFailai.js";
 
 export const name = "search_failai";
 export const description =
-    "Ieško viešųjų pirkimų sutarčių dokumentų (failų). Palaiko pilno teksto paiešką, filtravimą pagal plėtinį, šaltinį, telefoną, el. paštą, domeną, IBAN, JAR kodą ir kt.";
+    "Venk šio route jeigu eini iš kitos viešpirkių dalies, yra aiškiai duoti failų ID / md5, geriau naudok get_failas. Ieško viešųjų pirkimų sutarčių dokumentų (failų). Palaiko pilno teksto paiešką, filtravimą pagal plėtinį, telefoną, el. paštą, domeną, IBAN, JAR kodą ir kt.";
 
 export const schema = {
     search: z

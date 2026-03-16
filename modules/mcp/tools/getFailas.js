@@ -6,7 +6,7 @@ const PREVIEW_PAGES = 3;
 
 export const name = "get_failas";
 export const description =
-    "Grąžina išsamią informaciją apie viešojo pirkimo sutarties dokumentą pagal jo ID. Apima metaduomenis, IBAN numerius, JAR kodus, el. pašto adresus, nuorodas ir parašus. Tekstas grąžinamas po 3 puslapius — naudokite get_failas_tekstas norėdami gauti daugiau.";
+    "Grąžina išsamią informaciją apie viešojo pirkimo sutarties dokumentą pagal jo ID arba md5. Apima metaduomenis, IBAN numerius, JAR kodus, el. pašto adresus, nuorodas ir parašus. Tekstas grąžinamas po 3 puslapius — naudokite get_failas_tekstas norėdami gauti daugiau.";
 
 export const schema = {
     id: z
