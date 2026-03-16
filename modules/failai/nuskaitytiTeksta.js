@@ -2,6 +2,7 @@ import process from "process";
 import { Buffer } from "buffer";
 import { log } from "../../utils/log.js";
 import { postgres, parsePgArray } from "../../postgres/postgres.js";
+import config from "../../utils/config.js";
 
 /**
  * Cleans metadata object by removing null characters and trimming strings.
@@ -244,7 +245,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         return false;
     }
 
-    let url = `https://failai.viespirkiai.org/${dokumentas.md5}`;
+    let url = `${config.internalFileBase}/${dokumentas.md5}`;
     let viesasUrl = `https://failai.viespirkiai.org/${dokumentas.md5}`;
 
     log(viesasUrl);

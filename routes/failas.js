@@ -183,7 +183,7 @@ failasRouter.get("/failas/:id/preview", async (req, res, next) => {
     );
     await streamRemoteFile(
         res,
-        `https://failai.viespirkiai.org/${failas.md5}${needsConversion ? "?convertTo=pdf" : ""}`,
+        `${config.internalFileBase}/${failas.md5}${needsConversion ? "?convertTo=pdf" : ""}`,
         {
             contentType:
                 mime.getType(failas.extension) || "application/octet-stream",

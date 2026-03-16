@@ -20,4 +20,5 @@ export default {
     torAddress: "socks5h://127.0.0.1:9050",
     dev: false,
     onionAddress: undefined,
+    internalFileBase: "https://failai.viespirkiai.org",
 };
