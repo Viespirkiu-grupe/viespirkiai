@@ -86,8 +86,6 @@ export async function handler({ pirkimoId }) {
         );
     }
 
-    console.log(rows[0].turinys?.failai);
-
     return {
         content: [
             {
