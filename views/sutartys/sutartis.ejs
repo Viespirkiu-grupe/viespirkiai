@@ -123,19 +123,40 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
           <dd>
             <% if (sutartis.cvpisPirkimas) { %>
               <% if (sutartis.cvpisPirkimas.type == 'Pmc') { %>
-                <a href="https://viesiejipirkimai.lt/epps/pmc/viewPmc.do?resourceId=<%= sutartis.cvpisPirkimas.pirkimoId %>"><%= sutartis.pirkimoNumeris %></a>
+                <a href="/viesiejiPirkimai/<%= sutartis.cvpisPirkimas.pirkimoId %>"><%= sutartis.pirkimoNumeris %></a>
               <% } else if (sutartis.cvpisPirkimas.type == 'CfTWS') { %>
-                <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTWS.do?resourceId=<%= sutartis.cvpisPirkimas.pirkimoId %>"><%= sutartis.pirkimoNumeris %></a>
+                <a href="/viesiejiPirkimai/<%= sutartis.cvpisPirkimas.pirkimoId %>"><%= sutartis.pirkimoNumeris %></a>
               <% } else if (sutartis.cvpisPirkimas.type == 'CfTDPSWS') { %>
-                <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTDPSWS.do?resourceId=<%= sutartis.cvpisPirkimas.pirkimoId %>"><%= sutartis.pirkimoNumeris %></a>
+                <a href="/viesiejiPirkimai/<%= sutartis.cvpisPirkimas.pirkimoId %>"><%= sutartis.pirkimoNumeris %></a>
               <% } %>
             <% } else if (sutartis.cvppPirkimas) { %>
-              <a href="<%= sutartis.cvppPirkimas.link %>"><%= sutartis.pirkimoNumeris %></a>
+              <a href="https://cvpp.eviesiejipirkimai.lt/<%= sutartis.cvppPirkimas.link %>"><%= sutartis.pirkimoNumeris %></a>
             <% } else { %>
               <%= sutartis.pirkimoNumeris || "Nenurodytas" %>
             <% } %>
           </dd>
         </dl>
+
+        <% if (sutartis.cvpisPirkimas) { %>
+            <section>
+                <br>
+                <h2>Viešasis pirkimas</h2>
+                <div class="d-flex align-center gap-2 mb-4">
+                <a href="/viesiejiPirkimai/<%= sutartis.cvpisPirkimas.pirkimoId %>">
+                    <span><%= sutartis.cvpisPirkimas.pavadinimas %></span>
+                </a>
+                </div>
+                <dl class="kv-list mb-4">
+                <dt>Pasiūlymų pateikimo terminas</dt>
+                <dd><%= new String(sutartis.cvpisPirkimas.pasiulymuPateikimoTerminas).slice(0,10) %></dd>
+                <dt>Numatoma vertė</dt>
+                <dd class="cell-mono"><%= Number(sutartis.cvpisPirkimas.numatomaVerteEUR).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</dd>
+                </dl>
+                <% if (sutartis.cvpisPirkimas.informacija) { %>
+                <p class="text-muted text-sm"><%= sutartis.cvpisPirkimas.informacija %></p>
+                <% } %>
+            </section>
+        <% } %>
       </section>
 
       <section>
