@@ -27,6 +27,9 @@
 .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--col-gap); }
 
 .grid-auto { display: flex; flex-wrap: wrap; gap: var(--col-gap); }
+.grid-auto > * {
+    flex: 1 1 var(--col-min, 300px);
+}
 
 /* Responsive */
 @media (max-width: 992px) {
