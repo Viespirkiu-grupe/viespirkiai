@@ -37,8 +37,20 @@
       </div>
       <div class="action-bar-right">
         <button class="btn btn-ghost btn-sm" onclick="bvpzClear()">Išvalyti</button>
-        <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('pasirinkti-kodai').textContent)">Kopijuoti</button>
-        <div class="action-bar-popup-wrap">
+        <button
+          class="btn btn-outline btn-sm"
+          onclick="
+            navigator.clipboard.writeText(document.getElementById('pasirinkti-kodai').textContent);
+            this.textContent = 'Nukopijuota ✓';
+            this.classList.add('btn-success');
+            this.classList.remove('btn-outline');
+            setTimeout(() => {
+              this.textContent = 'Kopijuoti';
+              this.classList.remove('btn-success');
+              this.classList.add('btn-outline');
+            }, 2000);
+          "
+        >Kopijuoti</button>        <div class="action-bar-popup-wrap">
           <button class="btn btn-primary btn-sm" id="bvpzSearchBtn">Ieškoti ↑</button>
           <div class="action-bar-popup" id="bvpzSearchDropdown">
             <a href="#" onclick="bvpzSearch('viesiejiPirkimaiTeikimas'); return false;">Viešieji pirkimai (pasiūlymų teikimas)</a>
