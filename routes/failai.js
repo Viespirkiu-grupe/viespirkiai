@@ -6,21 +6,13 @@ import { postgres } from "../postgres/postgres.js";
 import { gautiStatistika } from "./statistika.js";
 import Timings from "../utils/timings.js";
 import { searchFailai, countFailai } from "../modules/failai/searchFailai.js";
+import { OCR_STATES } from "../modules/failai/ocr.js";
 
 const failaiSearchRouter = express.Router();
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 250;
 const COUNT_TIMEOUT_MS = 250;
-
-const OCR_ID_MAP = {
-    Baigta: 1,
-    Nepalaikoma: "-",
-    Galima: "-",
-    Rezervuota: -3,
-    Rekomenduojama: 0,
-    Nepavyko: -1,
-};
 
 /**
  * @param {{ limit?: string }} query
@@ -501,8 +493,10 @@ failaiSearchRouter.get("/failai/ocr", async (req, res) => {
         ]);
 
     const ocrStats = ocrStatsRes.rows.map((stat) => {
-        const tipas = stat.tipas.charAt(0).toUpperCase() + stat.tipas.slice(1);
-        return { ...stat, tipas, id: OCR_ID_MAP[tipas] };
+        const state = OCR_STATES.find(
+            (s) => s.camel === stat.tipas || s.text === stat.tipas,
+        );
+        return { ...stat, ...state };
     });
 
     res.render("failai/ocr", {

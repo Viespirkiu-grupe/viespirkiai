@@ -1,5 +1,17 @@
 import { postgres } from "../../postgres/postgres.js";
 
+export const OCR_BANDYMAI = 4;
+
+export const OCR_STATES = [
+    { id: 1, camel: "baigta", text: "Baigta" },
+    { id: 0, camel: "rekomenduojama", text: "Rekomenduojama" },
+    { id: -1, camel: "nepavyko", text: "Nepavyko" },
+    { id: -3, camel: "rezervuota", text: "Rezervuota" },
+    { id: -6, camel: "virsijoBandymus", text: "Viršijo bandymus" },
+    { id: null, camel: "galima", text: "Galima" },
+    { id: null, camel: "nepalaikoma", text: "Nepalaikoma" },
+];
+
 const OCR_IMAGE_EXTS = [
     "pdf",
     "jpg",
@@ -31,7 +43,7 @@ function checkoutQuery(extraWhere = "") {
         WITH cte AS (
             SELECT id FROM failai
             WHERE ("ocrState" IS NULL OR "ocrState" = 0)
-              AND COALESCE("ocrBandymai", 0) < 3
+              AND COALESCE("ocrBandymai", 0) < ${Number(OCR_BANDYMAI)}
               ${extraWhere}
             LIMIT 1
             FOR UPDATE SKIP LOCKED

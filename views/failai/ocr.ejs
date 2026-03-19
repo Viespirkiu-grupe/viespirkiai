@@ -75,7 +75,7 @@
                 <% ocrStats.forEach(status => { %>
                   <tr>
                     <td class="cell-mono cell-center"><%= status.id %></td>
-                    <td><%= status.tipas %></td>
+                    <td><%= status.text %></td>
                     <td class="cell-mono cell-right"><%= status.count.toLocaleString('lt-LT') %></td>
                   </tr>
                 <% }) %>

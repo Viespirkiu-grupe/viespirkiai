@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import { OCR_BANDYMAI } from "../failai/ocr.js";
 
 /**
  * Išvalo rezervuotas OCR užduotis, kurios buvo rezervuotos daugiau nei prieš 3 valandas.
@@ -19,7 +20,10 @@ export async function pravalytiOcrRezervacijas() {
         )
         UPDATE failai f
         SET
-            "ocrState" = 0,
+            "ocrState" = CASE
+                WHEN COALESCE(f."ocrBandymai", 0) + 1 >= ${Number(OCR_BANDYMAI)} THEN -6
+                ELSE 0
+            END,
             "ocrLockTimestamp" = NULL,
             "ocrNode" = NULL,
             "ocrBandymai" = COALESCE(f."ocrBandymai", 0) + 1
