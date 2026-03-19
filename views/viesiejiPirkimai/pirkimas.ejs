@@ -228,74 +228,145 @@
 
     </div>
 
-    <!-- Dokumentai -->
-    <% const failai = t.failai; %>
-    <% if (failai && failai.length > 0) { %>
-      <section class="mb-7">
-        <h2>Dokumentai</h2>
-        <ul class="file-list mt-4">
-          <% failai.forEach(failas => { %>
-            <% const versija = failas.versijos?.[failas.versijos.length - 1]; %>
-            <% const lokalus = versija; %>
-            <% const cvpisUrl = `https://viesiejipirkimai.lt/epps/cft/viewDocumentVersions.do?resourceId=${failas.dokumentasId}`; %>
-            <li>
-              <% if (lokalus?.parsiustas && lokalus?.nuskaitytas) { %>
-                <a href="/failas/<%= lokalus.id %>"><%= failas.dokumentasPavadinimas || failas.pavadinimas %></a>
-                <span class="text-muted text-sm ms-2">(<a href="/failas/<%= lokalus.id %>/turinys">↗ Failas</a>, <a href="<%= cvpisUrl %>" target="_blank">↗ CVP IS</a>)</span>
-              <% } else { %>
-                <a href="<%= cvpisUrl %>" target="_blank"><%= failas.dokumentasPavadinimas || failas.pavadinimas %></a>
-                <span class="text-muted text-sm ms-2">(<a href="<%= cvpisUrl %>" target="_blank">↗ CVP IS</a>)</span>
-              <% } %>
-              <% if (versija) { %>
-                <span class="text-muted text-sm ms-2"><%= versija.ikelimoData %><% if (versija.statusas) { %> · <%= versija.statusas %><% } %></span>
-              <% } %>
-              <% if (failas.aprasymas) { %>
-                <span class="text-muted text-sm ms-2"><%= failas.aprasymas %></span>
-              <% } %>
-            </li>
-          <% }) %>
-        </ul>
-      </section>
-    <% } %>
-
-    <!-- Skelbimai -->
-    <% const skelbimai = t.skelbimai; %>
-    <% if (skelbimai && skelbimai.length > 0) { %>
-      <section class="mb-7">
-        <h2>Skelbimai</h2>
-        <ul class="file-list mt-4">
-          <% skelbimai.forEach(skelbimas => { %>
-            <li>
-              <% if (skelbimas.downloadHref) { %>
-                <a href="https://viesiejipirkimai.lt<%= skelbimas.downloadHref %>" target="_blank"><%= skelbimas.tipas || 'Skelbimas' %></a>
-              <% } else { %>
-                <%= skelbimas.tipas || 'Skelbimas' %>
-              <% } %>
-              <span class="text-muted text-sm ms-2">
-                <%= skelbimas.paskelbimoData ? String(skelbimas.paskelbimoData).slice(0,10) : '' %>
-                <% if (skelbimas.statusas) { %> · <%= skelbimas.statusas %><% } %>
-              </span>
-            </li>
-          <% }) %>
-        </ul>
-      </section>
-    <% } %>
-
-    <!-- TED nuorodos -->
-    <% if (t.tedNuorodosIPaskelbtusPranesimus) { %>
-      <% const tedUrls = t.tedNuorodosIPaskelbtusPranesimus.split(/\s+/).filter(s => s.startsWith('http')); %>
-      <% if (tedUrls.length > 0) { %>
+    <section class="grid-2">
+        <!-- Dokumentai -->
+        <% const failai = t.failai; %>
+        <% if (failai && failai.length > 0) { %>
         <section class="mb-7">
-          <h2>TED nuorodos</h2>
-          <ul class="file-list mt-4">
-            <% tedUrls.forEach(url => { %>
-              <li><a href="<%= url %>" target="_blank"><%= url %></a></li>
+            <h2>Dokumentai</h2>
+            <ul class="file-list mt-4">
+            <% failai.forEach(failas => { %>
+                <% const versija = failas.versijos?.[failas.versijos.length - 1]; %>
+                <% const lokalus = versija; %>
+                <% const cvpisUrl = `https://viesiejipirkimai.lt/epps/cft/viewDocumentVersions.do?resourceId=${failas.dokumentasId}`; %>
+                <li>
+                <% if (lokalus?.parsiustas && lokalus?.nuskaitytas) { %>
+                    <a href="/failas/<%= lokalus.id %>"><%= failas.dokumentasPavadinimas || failas.pavadinimas %></a>
+                    <span class="text-muted text-sm ms-2">(<a href="/failas/<%= lokalus.id %>/turinys">↗ Failas</a>, <a href="<%= cvpisUrl %>" target="_blank">↗ CVP IS</a>)</span>
+                <% } else { %>
+                    <a href="<%= cvpisUrl %>" target="_blank"><%= failas.dokumentasPavadinimas || failas.pavadinimas %></a>
+                    <span class="text-muted text-sm ms-2">(<a href="<%= cvpisUrl %>" target="_blank">↗ CVP IS</a>)</span>
+                <% } %>
+                <% if (versija) { %>
+                    <span class="text-muted text-sm ms-2"><%= versija.ikelimoData %><% if (versija.statusas) { %> · <%= versija.statusas %><% } %></span>
+                <% } %>
+                <% if (failas.aprasymas) { %>
+                    <span class="text-muted text-sm ms-2"><%= failas.aprasymas %></span>
+                <% } %>
+                </li>
             <% }) %>
-          </ul>
+            </ul>
         </section>
-      <% } %>
-    <% } %>
+        <% } %>
 
+        <!-- Skelbimai -->
+        <% const skelbimai = t.skelbimai; %>
+        <% if (skelbimai && skelbimai.length > 0) { %>
+        <section class="mb-7">
+            <h2>Skelbimai</h2>
+            <ul class="file-list mt-4">
+            <% skelbimai.forEach(skelbimas => { %>
+                <li>
+                <% if (skelbimas.downloadHref) { %>
+                    <a href="https://viesiejipirkimai.lt<%= skelbimas.downloadHref %>" target="_blank"><%= skelbimas.tipas || 'Skelbimas' %></a>
+                <% } else { %>
+                    <%= skelbimas.tipas || 'Skelbimas' %>
+                <% } %>
+                <span class="text-muted text-sm ms-2">
+                    <%= skelbimas.paskelbimoData ? String(skelbimas.paskelbimoData).slice(0,10) : '' %>
+                    <% if (skelbimas.statusas) { %> · <%= skelbimas.statusas %><% } %>
+                </span>
+                </li>
+            <% }) %>
+            </ul>
+        </section>
+        <% } %>
+
+        <!-- TED nuorodos -->
+        <% if (t.tedNuorodosIPaskelbtusPranesimus) { %>
+        <% const tedUrls = t.tedNuorodosIPaskelbtusPranesimus.split(/\s+/).filter(s => s.startsWith('http')); %>
+        <% if (tedUrls.length > 0) { %>
+            <section class="mb-7">
+            <h2>TED nuorodos</h2>
+            <ul class="file-list mt-4">
+                <% tedUrls.forEach(url => { %>
+                <li><a href="<%= url %>" target="_blank"><%= url %></a></li>
+                <% }) %>
+            </ul>
+            </section>
+        <% } %>
+        <% } %>
+
+        <% if (pirkimas.sutartys && pirkimas.sutartys.length > 0) { %>
+        <section class="mb-7">
+            <h2>Sutartys</h2>
+            <div class="result-list mt-4">
+            <% pirkimas.sutartys.forEach(item => { %>
+                <article class="result-card card-clickable">
+                <a href="/sutartis/<%= item.sutartiesUnikalusId %>" class="card-overlay-link"><%= item.pavadinimas %></a>
+                <div class="result-card-body">
+                    <dl class="result-card-meta">
+                      <div>
+                        <dt class="visually-hidden">Tipas</dt>
+                        <dd><%= item.tipas %></dd>
+                      </div>
+                      <div>
+                        <dt class="visually-hidden">Kategorija</dt>
+                        <dd><%= item.kategorija %></dd>
+                      </div>
+                      <div>
+                        <dt class="visually-hidden">Sutarties galiojimas</dt>
+                        <dd>
+                          <abbr aria-hidden="true" title="Sutarties galiojimas">Sut.</abbr>
+                          <% if (item.sudarymoData && item.galiojimoData) { %>
+                            <% const d1 = String(item.sudarymoData).slice(0, 10); %>
+                            <% const d2 = String(item.galiojimoData).slice(0, 10); %>
+                            <time datetime="<%= d1 %>"><%= d1 %></time><% if (d1 !== d2) { %> – <time datetime="<%= d2 %>"><%= d2 %></time><% } %>
+                          <% } else { %>—<% } %>
+                        </dd>
+                      </div>
+                      <% if (item.dokumentuKiekis > 0) { %>
+                        <div>
+                          <dt class="visually-hidden">Dokumentai</dt>
+                          <dd><%= item.dokumentuKiekis %> <abbr aria-hidden="true" title="Dokumentai">dok.</abbr></dd>
+                        </div>
+                      <% } %>
+                    </dl>
+                    <h3 class="result-card-title">
+                    <% const verte = item.faktineIvykdimoVerte || item.verte; %>
+                    <span class="cell-mono <%= Number(verte) > 10000 ? 'fw-bold' : '' %>">
+                        <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€
+                    </span>
+                    &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>
+                    </h3>
+                    <div class="d-flex gap-3 mt-2 text-sm">
+                        <% if (item.tiekejai.length === 1) { %>
+                          <span>
+                            <strong>Tiekėjas:</strong>
+                            <a href="/asmuo/<%= item.tiekejaiKodai[0] %>">
+                              <%= (item.tiekejai[0] || 'Nenurodytas').slice(0, 80) %><%= (item.tiekejai[0] || '').length > 80 ? '…' : '' %>
+                            </a>
+                          </span>
+                        <% } else { %>
+                          <span class="d-flex align-start gap-2">
+                            <strong>Tiekėjai:</strong>
+                            <span class="d-flex flex-col gap-1">
+                              <% for (let i = 0; i < item.tiekejai.length; i++) { %>
+                                <a href="/asmuo/<%= item.tiekejaiKodai[i] %>">
+                                  <%= (item.tiekejai[i] || 'Nenurodytas').slice(0, 80) %><%= (item.tiekejai[i] || '').length > 80 ? '…' : '' %>
+                                </a>
+                              <% } %>
+                            </span>
+                          </span>
+                        <% } %>
+                    </div>
+                </div>
+                </article>
+            <% }) %>
+            </div>
+        </section>
+        <% } %>
+        </section>
   </main>
   <%- include('../footer.ejs') %>
 </body>

@@ -15,6 +15,7 @@ import {
     PIRKIMO_BUDAS,
 } from "../modules/viesiejiPirkimai/viesiejiPirkimaiEnums.js";
 import { postgres } from "../postgres/postgres.js";
+import { searchSutartys } from "../modules/sutartys/searchSutartys.js";
 
 const viesiejiPirkimaiRouter = express.Router();
 
@@ -307,6 +308,12 @@ viesiejiPirkimaiRouter.get("/viesiejiPirkimai/:id", async (req, res, next) => {
             }
         }
     }
+
+    let sutartysRes = await searchSutartys({
+        pirkimoNumeris: pirkimas.pirkimoId,
+    });
+
+    pirkimas.sutartys = sutartysRes.results;
 
     if (isJson) return res.json(pirkimas);
 
