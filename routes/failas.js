@@ -45,19 +45,15 @@ failasRouter.post("/failas/ocr/checkout", async (req, res) => {
         extension: failas.extension,
     });
 });
-
 failasRouter.post("/failas/ocr/submit", async (req, res) => {
     const apiKey =
         req.query.apiKey ??
         (req.headers.authorization?.startsWith("Bearer ")
             ? req.headers.authorization.slice(7).trim()
             : null);
-
     const { user, error, message } = await validateOcrApiKey(apiKey);
     if (error) return res.status(error).send(message);
-
     const { id, tekstas, duration } = req.body;
-
     if (
         typeof id !== "number" ||
         typeof duration !== "number" ||
@@ -70,47 +66,69 @@ failasRouter.post("/failas/ocr/submit", async (req, res) => {
                 "Neteisingi arba trūkstami parametrai: id, tekstas, duration.",
             );
 
-    const failasRes = await postgres.query(
-        `SELECT * FROM failai WHERE id = $1 AND "ocrNode" = $2 AND "ocrState" = -3 LIMIT 1`,
-        [id, user.pavadinimas],
-    );
-    if (!failasRes.rows.length)
-        return res
-            .status(404)
-            .send("Failas nerastas arba neužrakintas šiam vartotojui.");
+    const client = await postgres.connect();
+    try {
+        await client.query("BEGIN");
 
-    const failas = failasRes.rows[0];
-    const puslapiuSkaicius = tekstas.length;
-    const zodziuSkaicius = tekstas.reduce(
-        (sum, page) => sum + page.split(/\s+/).filter(Boolean).length,
-        0,
-    );
-
-    await Promise.all([
-        postgres.query(
-            `UPDATE failai SET "ocrState" = 1, "nuskaitytas" = 0, "ocrLockTimestamp" = NULL WHERE id = $1`,
+        const debugRes = await client.query(
+            `SELECT "lockedBy", "lockedAt" FROM public."failaiOcrQueue" WHERE id = $1`,
             [id],
-        ),
-        postgres.query(
-            `INSERT INTO "failaiOcrRezultatai" (failas, tekstas, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
-             VALUES ($1, $2, $3, NOW() AT TIME ZONE 'Europe/Vilnius', $4, $5, $6, $7)`,
-            [
-                id,
-                tekstas,
-                user.pavadinimas,
-                failas.ocrLockTimestamp,
-                duration,
-                puslapiuSkaicius,
-                zodziuSkaicius,
-            ],
-        ),
-        postgres.query(
-            `UPDATE "ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
-            [user.id],
-        ),
-    ]);
+        );
 
-    res.json({ status: "ok" });
+        const queueRes = await client.query(
+            `DELETE FROM public."failaiOcrQueue"
+             WHERE id = $1 AND "lockedBy" = $2
+             RETURNING "lockedAt"`,
+            [id, user.pavadinimas],
+        );
+        if (!queueRes.rows.length) {
+            await client.query("ROLLBACK");
+            return res
+                .status(404)
+                .send("Failas nerastas arba neužrakintas šiam vartotojui.");
+        }
+
+        const { lockedAt } = queueRes.rows[0];
+        const puslapiuSkaicius = tekstas.length;
+        const zodziuSkaicius = tekstas.reduce(
+            (sum, page) => sum + page.split(/\s+/).filter(Boolean).length,
+            0,
+        );
+
+        await Promise.all([
+            client.query(
+                `UPDATE failai
+                 SET "ocrState" = 1, "nuskaitytas" = 0, "ocrLockTimestamp" = NULL
+                 WHERE id = $1`,
+                [id],
+            ),
+            client.query(
+                `INSERT INTO "failaiOcrRezultatai" (failas, tekstas, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
+                 VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7)`,
+                [
+                    id,
+                    tekstas,
+                    user.pavadinimas,
+                    lockedAt,
+                    duration,
+                    puslapiuSkaicius,
+                    zodziuSkaicius,
+                ],
+            ),
+            client.query(
+                `UPDATE "ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
+                [user.id],
+            ),
+        ]);
+
+        await client.query("COMMIT");
+        res.json({ status: "ok" });
+    } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+    } finally {
+        client.release();
+    }
 });
 
 failasRouter.get("/failas.png", async (req, res) => {

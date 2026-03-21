@@ -1,7 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
+import config from "../../utils/config.js";
 
-export const OCR_BANDYMAI = 4;
-
+export const OCR_BANDYMAI = config.ocrBandymai || 5;
 export const OCR_STATES = [
     { id: 1, camel: "baigta", text: "Baigta" },
     { id: 0, camel: "rekomenduojama", text: "Rekomenduojama" },
@@ -12,7 +12,7 @@ export const OCR_STATES = [
     { id: null, camel: "nepalaikoma", text: "Nepalaikoma" },
 ];
 
-const OCR_IMAGE_EXTS = [
+export const OCR_IMAGE_EXTS = [
     "pdf",
     "jpg",
     "jpeg",
@@ -23,7 +23,8 @@ const OCR_IMAGE_EXTS = [
     "webp",
     "heic",
 ];
-const OCR_DOC_EXTS = [
+
+export const OCR_DOC_EXTS = [
     "pub",
     "doc",
     "odt",
@@ -38,47 +39,39 @@ const OCR_DOC_EXTS = [
     "docx",
 ];
 
-function checkoutQuery(extraWhere = "") {
-    return `
-        WITH cte AS (
-            SELECT id FROM failai
-            WHERE ("ocrState" IS NULL OR "ocrState" = 0)
-              AND COALESCE("ocrBandymai", 0) < ${Number(OCR_BANDYMAI)}
-              ${extraWhere}
+export async function checkoutNextFile(nodeName) {
+    const result = await postgres.query(
+        `WITH cte AS (
+            SELECT q.id FROM public."failaiOcrQueue" q
+            WHERE q."lockedBy" IS NULL
+              AND q.bandymai < $2
+            ORDER BY q.priority, q.id
             LIMIT 1
             FOR UPDATE SKIP LOCKED
+        ),
+        locked AS (
+            UPDATE public."failaiOcrQueue" q
+            SET "lockedBy" = $1,
+                "lockedAt" = NOW()
+            FROM cte
+            WHERE q.id = cte.id
+            RETURNING q.id
         )
-        UPDATE failai
+        UPDATE public.failai
         SET "ocrState" = -3,
             "ocrNode" = $1,
-            "ocrLockTimestamp" = (NOW() AT TIME ZONE 'Europe/Vilnius')
-        WHERE id IN (SELECT id FROM cte)
-        RETURNING *`;
-}
+            "ocrLockTimestamp" = NOW() AT TIME ZONE 'Europe/Vilnius'
+            WHERE id = (SELECT id FROM locked)
+        RETURNING *`,
+        [nodeName, OCR_BANDYMAI],
+    );
 
-export async function checkoutNextFile(nodeName, version) {
-    const inExts = (exts) =>
-        `AND "nuskaitytas" >= 6 AND LOWER("extension") IN (${exts.map((e) => `'${e}'`).join(",")})`;
-
-    // Priority 1: any pending file with no extension filter
-    let result = await postgres.query(checkoutQuery(`AND "ocrState" = 0`), [
-        nodeName,
-    ]);
-    if (result.rows.length) return result.rows[0];
-
-    // Priority 2 (v1+v2): image/PDF formats
-    if (version >= 1) {
-        result = await postgres.query(checkoutQuery(inExts(OCR_IMAGE_EXTS)), [
-            nodeName,
-        ]);
-        if (result.rows.length) return result.rows[0];
+    if (!result.rows.length) {
+        return null;
     }
 
-    // Priority 3: document formats
-    result = await postgres.query(checkoutQuery(inExts(OCR_DOC_EXTS)), [
-        nodeName,
-    ]);
-    return result.rows[0] ?? null;
+    const failas = result.rows[0];
+    return failas;
 }
 
 export function buildFileUri(failas) {

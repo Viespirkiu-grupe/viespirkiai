@@ -3,43 +3,59 @@ import { log } from "../../utils/log.js";
 import { OCR_BANDYMAI } from "../failai/ocr.js";
 
 /**
- * Išvalo rezervuotas OCR užduotis, kurios buvo rezervuotos daugiau nei prieš 3 valandas.
- * Vykdo po 100 eilučių vienu metu.
+ * Išvalo užstrigusias OCR užduotis iš eilės (lockedAt > 1 valanda).
+ * Atnaujina bandymai, perkelia atgal į eilę arba pašalina jei viršijo bandymus.
  */
 export async function pravalytiOcrRezervacijas() {
     const limit = 10;
 
     const res = await postgres.query(
         `
-        WITH to_update AS (
-            SELECT "id"
-            FROM failai
-            WHERE "ocrState" = -3
-              AND "ocrLockTimestamp" <= (now() AT TIME ZONE 'Europe/Vilnius' - interval '1 hours')
+        WITH stale AS (
+            SELECT id, bandymai
+            FROM public."failaiOcrQueue"
+            WHERE "lockedBy" IS NOT NULL
+              AND "lockedAt" <= NOW() - INTERVAL '1 hour'
             LIMIT $1
+            FOR UPDATE SKIP LOCKED
+        ),
+        updated_queue AS (
+            UPDATE public."failaiOcrQueue" q
+            SET "lockedBy" = NULL,
+                "lockedAt" = NULL,
+                bandymai   = s.bandymai + 1
+            FROM stale s
+            WHERE q.id = s.id
+            RETURNING q.id, s.bandymai + 1 AS new_bandymai
+        ),
+        exceeded AS (
+            DELETE FROM public."failaiOcrQueue"
+            WHERE id IN (
+                SELECT id FROM updated_queue WHERE new_bandymai >= $2
+            )
+            RETURNING id
         )
-        UPDATE failai f
-        SET
-            "ocrState" = CASE
-                WHEN COALESCE(f."ocrBandymai", 0) + 1 >= ${Number(OCR_BANDYMAI)} THEN -6
-                ELSE 0
-            END,
-            "ocrLockTimestamp" = NULL,
-            "ocrNode" = NULL,
-            "ocrBandymai" = COALESCE(f."ocrBandymai", 0) + 1
-        FROM to_update t
-        WHERE f."id" = t."id"
-        RETURNING f."id";
+        UPDATE public.failai f
+        SET "ocrBandymai"      = uq.new_bandymai,
+            "ocrState"         = CASE WHEN uq.new_bandymai >= $2 THEN -6 ELSE 0 END,
+            "ocrNode"          = NULL,
+            "ocrLockTimestamp" = NULL
+        FROM updated_queue uq
+        WHERE f.id = uq.id
+        RETURNING f.id, uq.new_bandymai, f."ocrState"
         `,
-        [limit],
+        [limit, OCR_BANDYMAI],
     );
 
     if (res.rowCount > 0) {
-        log(`Išvalytos ${res.rowCount} OCR rezervacijos`);
+        const exceeded = res.rows.filter((r) => r.ocrState === -6).length;
+        const requeued = res.rowCount - exceeded;
+        log(
+            `Išvalytos ${res.rowCount} OCR rezervacijos: ${requeued} grąžinta į eilę, ${exceeded} viršijo bandymus`,
+        );
         return true;
-    } else {
-        return false;
     }
+    return false;
 }
 
 // jei vykdomas tiesiogiai
@@ -48,7 +64,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         let updated;
         do {
             updated = await pravalytiOcrRezervacijas();
-            log(`Išvalytos ${updated} rezervuotos OCR užduotys.`);
+            log(`Išvalytos rezervuotos OCR užduotys.`);
         } while (updated);
     })();
 }

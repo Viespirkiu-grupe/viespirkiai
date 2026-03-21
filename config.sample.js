@@ -21,4 +21,5 @@ export default {
     dev: false,
     onionAddress: undefined,
     internalFileBase: "https://failai.viespirkiai.org",
+    ocrBandymai: 5,
 };
