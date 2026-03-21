@@ -1,6 +1,6 @@
 import { parseHTML } from "linkedom";
 
-export const NUSKAITYMO_VERSIJA = 6;
+export const NUSKAITYMO_VERSIJA = 7;
 
 const DATE_KEYS_CFTDPSWS = new Set([
     "susipazinimoSuPasiulymaisData",
@@ -202,7 +202,15 @@ function parseDlRow(text, handleField) {
         if (key === "pirkimoVykdytojoPavadinimas") {
             extractPirkimoVykdytojas(dd, result);
         } else if (!handleField(key, dd, ddText, result)) {
-            result[key] = ddText;
+            // Special-case: TED links must be an array of full hrefs (not truncated link text)
+            if (key === "tedNuorodosIPaskelbtusPranesimus") {
+                const urls = Array.from(dd.querySelectorAll("a"))
+                    .map((a) => (a.getAttribute("href") || "").trim())
+                    .filter(Boolean);
+                result[key] = urls.length ? urls : [];
+            } else {
+                result[key] = ddText;
+            }
         }
     }
 
