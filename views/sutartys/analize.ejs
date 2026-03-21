@@ -2,7 +2,7 @@
 <div class="page-section" id="analize">
   <div class="d-flex justify-between align-center mb-5">
     <h2 class="mb-0"><a href="#analize" class="no-style">Rezultatų analizė <sup>BETA</sup></a></h2>
-    <a href="/?<%- queryParams %>&xlsx=true&analize=true" class="btn btn-outline btn-sm">↗ XLSX</a>
+    <a href="/?<%- queryParams %>&limit=<%- values.limit %>&xlsx=true&analize=true" class="btn btn-outline btn-sm">↗ XLSX</a>
   </div>
 
   <div class="grid-3">
@@ -81,7 +81,7 @@
                 <tr>
                   <td class="cell-mono text-muted"><%= i + 1 %></td>
                   <td class="cell-truncate"><a href="/asmuo/<%= tiekejas.kodas %>"><%= tiekejas.tiekejas %></a></td>
-                  <td class="cell-mono cell-right"><%= tiekejas.suma.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %> €</td>
+                  <td class="cell-mono cell-right"><%= tiekejas.suma.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>&nbsp;€</td>
                   <td class="cell-mono cell-right"><%= tiekejas.kiekis %></td>
                 </tr>
               <% }) %>
@@ -108,8 +108,8 @@
               <% analize.topPirkejai.slice(0, 10).forEach((pirkejas, i) => { %>
                 <tr>
                   <td class="cell-mono text-muted"><%= i + 1 %></td>
-                  <td class="cell-truncate"><a href="/asmuo/<%= pirkejas.kodas %>"><%= pirkejas.pirkejas %></a></td>
-                  <td class="cell-mono cell-right"><%= pirkejas.suma.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %> €</td>
+                  <td><div class="cell-truncate"><a href="/asmuo/<%= pirkejas.kodas %>"><%= pirkejas.pirkejas %></a></div></td>
+                  <td class="cell-mono cell-right"><%= pirkejas.suma.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>&nbsp;€</td>
                   <td class="cell-mono cell-right"><%= pirkejas.kiekis %></td>
                 </tr>
               <% }) %>

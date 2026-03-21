@@ -6,10 +6,7 @@ import { objectsToCsvStream } from "../utils/csv.js";
 import { objectsToJsonlStream } from "../utils/jsonl.js";
 import { Transform } from "node:stream";
 import Timings from "../utils/timings.js";
-import {
-    buildAnalize,
-    buildAnalizeXlsx,
-} from "../modules/sutartys/rezultatai.js";
+import { buildAnalize, buildAnalizeXlsx } from "../modules/sutartys/analize.js";
 import {
     searchSutartys,
     countSutartys,
@@ -240,7 +237,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
     const analize = req.query.analize ? buildAnalize(results) : undefined;
 
     if (analize && req.query.xlsx) {
-        const buf = buildAnalizeXlsx(analize);
+        const buf = await buildAnalizeXlsx(analize, results);
         res.setHeader(
             "Content-Disposition",
             `attachment; filename=viespirkiai-analize-${new Date().toISOString()}.xlsx`,
@@ -263,6 +260,7 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
     if (Object.keys(values).length == 0) {
         galimaEksportuoti = false;
     }
+    values.limit = limit;
 
     res.renderCompiled("sutartys/index", {
         data: results,
