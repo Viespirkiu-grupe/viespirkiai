@@ -1,6 +1,6 @@
 import { parseHTML } from "linkedom";
 
-export const NUSKAITYMO_VERSIJA = 5;
+export const NUSKAITYMO_VERSIJA = 6;
 
 const DATE_KEYS_CFTDPSWS = new Set([
     "susipazinimoSuPasiulymaisData",
