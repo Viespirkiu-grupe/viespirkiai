@@ -19,6 +19,41 @@
 
     <!-- Nuskaitytojai + pie -->
     <div class="page-section">
+        <% if (ocrPerMinute) { %>
+        <div class="page-section">
+          <h2 class="mb-3">
+            <a href="#perMinute" id="perMinute" class="no-style">Sparta (<%= ocrPerMinute.date %>)</a>
+          </h2>
+          <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3);">
+            <div class="card">
+              <div class="card-body">
+                <div class="section-title mb-2">Dokumentai</div>
+                <div style="display:flex; align-items:baseline; gap:0.3rem;">
+                  <span class="cell-mono" style="font-size:1.6rem; font-weight:600;"><%= Number(ocrPerMinute.results).toLocaleString('lt-LT') %></span>
+                  <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">/min.</span>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-body">
+                <div class="section-title mb-2">Puslapiai</div>
+                <div style="display:flex; align-items:baseline; gap:0.3rem;">
+                  <span class="cell-mono" style="font-size:1.6rem; font-weight:600;"><%= Number(ocrPerMinute.pages).toLocaleString('lt-LT') %></span>
+                  <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">/min.</span>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-body">
+                <div class="section-title mb-2">Žodžiai</div>
+                <div style="display:flex; align-items:baseline; gap:0.3rem;">
+                  <span class="cell-mono" style="font-size:1.6rem; font-weight:600;"><%= Number(ocrPerMinute.words).toLocaleString('lt-LT') %></span>
+                  <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">/min.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% } %>
       <div class="grid-2" style="align-items:start;">
 
         <div>
@@ -57,7 +92,7 @@
             displayChart({
               element: document.querySelector('#ocrStatsDiagrama'),
               type: 'pie',
-              labels: <%- JSON.stringify(ocrStats.map(s => s.tipas)) %>,
+              labels: <%- JSON.stringify(ocrStats.map(s => s.text)) %>,
               series: <%- JSON.stringify(ocrStats.map(s => s.count)) %>,
               flags: ['colors'],
             });
@@ -74,7 +109,7 @@
               <tbody>
                 <% ocrStats.forEach(status => { %>
                   <tr>
-                    <td class="cell-mono cell-center"><%= status.id %></td>
+                    <td class="cell-mono cell-center"><%= status.id || "-" %></td>
                     <td><%= status.text %></td>
                     <td class="cell-mono cell-right"><%= status.count.toLocaleString('lt-LT') %></td>
                   </tr>

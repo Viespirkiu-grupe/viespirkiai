@@ -439,6 +439,23 @@ failaiSearchRouter.get("/failai/map", async (req, res) => {
     });
 });
 
+failaiSearchRouter.get("/failai/galerija", async (req, res) => {
+    const { rows } = await postgres.query(`
+      SELECT * FROM failai
+      WHERE "ocrState" = 1
+        AND ("zodziuSkaicius" IS NULL OR "zodziuSkaicius" <= 10)
+        AND lower(extension) = ANY(ARRAY['jpg','jpeg','png','bmp','gif','webp','heic'])
+      ORDER BY random()
+      LIMIT 50    `);
+    const seen = new Set();
+    const images = rows.filter((r) => !seen.has(r.id) && seen.add(r.id));
+    res.render("failai/galerija", {
+        images,
+        customHead: config.customHead,
+        req,
+    });
+});
+
 failaiSearchRouter.get("/failai/topExtension", async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const offset = (page - 1) * DEFAULT_LIMIT;
@@ -499,10 +516,22 @@ failaiSearchRouter.get("/failai/ocr", async (req, res) => {
         return { ...stat, ...state };
     });
 
+    const ocrStatsDay = ocrStatsDayRes.rows;
+    const latestDay = ocrStatsDay[0]; // jau ORDER BY date DESC
+    const ocrPerMinute = latestDay
+        ? {
+              date: latestDay.date,
+              results: (latestDay.results / 1440).toFixed(2),
+              pages: (latestDay.pages / 1440).toFixed(2),
+              words: (latestDay.words / 1440).toFixed(2),
+          }
+        : null;
+
     res.render("failai/ocr", {
         customHead: config.customHead,
         ocrStats,
-        ocrStatsDay: ocrStatsDayRes.rows,
+        ocrStatsDay,
+        ocrPerMinute,
         ocrNuskaitytojai: ocrNuskaitytojaiRes.rows,
         req,
     });
