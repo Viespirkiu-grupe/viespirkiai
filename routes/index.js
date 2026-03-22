@@ -273,7 +273,10 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
         galimaEksportuoti,
         usedHiddenFields: Object.keys(values).some(
             (k) =>
-                k !== "search" && values[k] !== "" && values[k] !== undefined,
+                k !== "search" &&
+                k !== "limit" &&
+                values[k] !== "" &&
+                values[k] !== undefined,
         ),
         req,
         analize,
