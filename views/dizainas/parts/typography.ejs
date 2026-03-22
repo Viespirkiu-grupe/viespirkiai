@@ -1,0 +1,131 @@
+<!-- TYPOGRAPHY -->
+<section class="section" id="typography">
+  <h2>Typography</h2>
+  <p class="text-muted text-sm mb-5">Ubuntu for UI text, default monospace for numbers and code.</p>
+
+  <div class="preview preview-col">
+    <h1 class="m-0">Heading 1 — 38px / 700</h1>
+    <h2 class="m-0">Heading 2 — 30px / 700</h2>
+    <h3 class="m-0">Heading 3 — 24px / 700</h3>
+    <h4 class="m-0">Heading 4 — 20px / 700</h4>
+    <h5 class="m-0">Heading 5 — 17px / 700</h5>
+    <p class="lead m-0">Lead paragraph — larger intro text at 17px</p>
+    <p class="m-0">Body text — 15px / 400. Used for all standard reading content. Line height 1.55.</p>
+    <p class="text-muted m-0">Muted text — secondary information</p>
+    <p class="subtext m-0">Subtext — italic small captions</p>
+    <p class="section-title m-0">Section title label</p>
+    <p class="m-0"><a href="#">Link text</a> · <a href="#" class="no-style">no-style link</a></p>
+    <p class="m-0"><code>inline code</code> · <kbd>Ctrl+K</kbd> · <mark>highlighted</mark></p>
+    <blockquote class="m-0">Blockquote — sourced excerpt or quoted text from a procurement document.</blockquote>
+  </div>
+
+  <div class="subsection">
+    <h3>El. pašto adresai</h3>
+    <p class="text-muted text-sm mb-4">
+      Naudojama failų metaduomenyse (pvz. <code>failai/failas.ejs</code>) parodyti rastus el. pašto adresus su puslapiais.
+    </p>
+
+    <div class="preview preview-col">
+      <dl class="kv-list">
+        <dt>El. paštas</dt>
+        <dd class="email-list">
+          <div class="d-flex flex-col gap-1">
+            <div class="d-flex gap-2 align-center email-item">
+              <a class="email-link" href="mailto:info@example.com">info@example.com</a>
+              <sup class="text-muted text-xs email-pages" style="flex-shrink:0;">1, 3 psl.</sup>
+            </div>
+            <div class="d-flex gap-2 align-center email-item">
+              <a class="email-link" href="mailto:pirkimai@perku.lt">pirkimai@perku.lt</a>
+              <sup class="text-muted text-xs email-pages" style="flex-shrink:0;">2 psl.</sup>
+            </div>
+            <div class="d-flex gap-2 align-center email-item">
+              <a class="email-link" href="mailto:juridinis.skyrius@org.lt">juridinis.skyrius@org.lt</a>
+              <sup class="text-muted text-xs email-pages" style="flex-shrink:0;">7, 8, 9 psl.</sup>
+            </div>
+          </div>
+        </dd>
+      </dl>
+    </div>
+
+    <pre class="code-block"><code class="hljs language-html"><%- highlightCode(`
+<dl class="kv-list">
+  <dt>El. paštas</dt>
+  <dd class="email-list">
+    <div class="d-flex flex-col gap-1">
+      <div class="d-flex gap-2 align-center email-item">
+        <a class="email-link" href="mailto:info@example.com">info@example.com</a>
+        <sup class="text-muted text-xs email-pages" style="flex-shrink:0;">1, 3 psl.</sup>
+      </div>
+    </div>
+  </dd>
+</dl>
+`) %></code></pre>
+  </div>
+
+  <div class="subsection">
+    <h3>El. laiškas</h3>
+    <p class="text-muted text-sm mb-4">
+      Pilnas el. laiško peržiūros blokas (pvz. <code>.eml</code> / <code>.msg</code>), naudojamas failų puslapyje.
+    </p>
+
+    <div class="preview preview-col">
+      <div class="email-message" style="background:var(--lightest-gray); border:var(--border); border-radius:var(--radius-md); padding:var(--space-4);">
+        <h2 class="mb-2" style="margin-top:0;">Klausimas dėl pirkimo dokumentų</h2>
+        <dl class="kv-list mb-4">
+          <dt>Nuo</dt>
+          <dd>Jonas Jonaitis &lt;<a href="mailto:jonas@example.com">jonas@example.com</a>&gt;</dd>
+          <dt>Kam</dt>
+          <dd>
+            <div>Perkančioji organizacija &lt;<a href="mailto:pirkimai@org.lt">pirkimai@org.lt</a>&gt;</div>
+            <div>Teisininkai &lt;<a href="mailto:teise@org.lt">teise@org.lt</a>&gt;</div>
+          </dd>
+          <dt>Data</dt>
+          <dd>2024-01-12 10:34</dd>
+        </dl>
+
+        <iframe
+          srcdoc="<p>Sveiki,</p><p>prašome patikslinti pasiūlymų pateikimo terminą.</p><p>Pagarbiai,<br>Jonas</p>"
+          style="width:100%; height:320px; border:var(--border); border-radius:var(--radius-sm);"
+        ></iframe>
+
+        <h3 class="mt-4 mb-2">Priedai</h3>
+        <div class="d-flex flex-col gap-1">
+          <a href="#" class="no-style">priedas-1.pdf</a>
+          <a href="#" class="no-style">specifikacija.docx</a>
+        </div>
+      </div>
+    </div>
+
+    <pre class="code-block"><code class="hljs language-html"><%- highlightCode(`
+&lt;%- include('partials/email-message.ejs', { metaduomenys: failas.metaduomenys, failasId: failas.id }) %&gt;
+`) %></code></pre>
+  </div>
+
+  <div class="subsection">
+    <h3>PDF peržiūra</h3>
+    <p class="text-muted text-sm mb-4">
+      PDF peržiūra per <code>pdf.js</code> viewer (naudojama failo puslapyje).
+    </p>
+
+    <div class="preview preview-col">
+      <div class="chart-frame" style="padding:0;">
+        <iframe
+          src="/dist/pdfjs/web/viewer.html?file=%2Ffailas%2F123%2Fpreview#search=pirkimas"
+          style="border:none; width:100%; height:420px; display:block; border-radius:var(--radius-md);"
+        ></iframe>
+      </div>
+    </div>
+
+    <pre class="code-block"><code class="hljs language-html"><%- highlightCode(`
+&lt;%- include('partials/pdf-preview.ejs', {
+  failasId: failas.id,
+  search: (query && query.search) ? query.search : '',
+  height: '70vh',
+  border: 'none',
+  rounded: true
+}) %&gt;
+`) %></code></pre>
+  </div>
+
+  <pre class="code-block"><code class="hljs language-html"><%- highlightCode(include('../snippets/typography.html')) %></code></pre>
+</section>

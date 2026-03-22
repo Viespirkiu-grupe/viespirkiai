@@ -309,6 +309,32 @@ viesiejiPirkimaiRouter.get("/viesiejiPirkimai/:id", async (req, res, next) => {
         }
     }
 
+    // Normalize skelbimai.downloadHref to absolute URLs (used by file cards in the view)
+    if (
+        pirkimas?.turinys?.skelbimai &&
+        Array.isArray(pirkimas.turinys.skelbimai)
+    ) {
+        pirkimas.turinys.skelbimai = pirkimas.turinys.skelbimai.map((s) => {
+            if (!s || typeof s !== "object") return s;
+
+            const raw = s.downloadHref;
+            if (!raw || typeof raw !== "string") return s;
+
+            const href = raw.trim();
+            if (!href) return s;
+
+            // Keep absolute URLs as-is
+            if (/^https?:\/\//i.test(href)) return s;
+
+            // Convert relative → absolute
+            const path = href.startsWith("/") ? href : `/${href}`;
+            return {
+                ...s,
+                downloadHref: `https://viesiejipirkimai.lt${path}`,
+            };
+        });
+    }
+
     let sutartysRes = await searchSutartys({
         pirkimoNumeris: pirkimas.pirkimoId,
     });

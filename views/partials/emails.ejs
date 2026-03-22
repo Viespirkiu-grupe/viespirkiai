@@ -1,0 +1,31 @@
+<%
+  // Reusable email list partial for file metadata.
+  // Expected locals:
+  // - emails: Array<{ email: string, pages?: number[] }>
+  // - title?: string (optional; default: "El. paštas")
+  // - emptyText?: string (optional; default: "Nerasta")
+
+  // Avoid TDZ/shadowing: do not declare `const title` when a `title` local may exist.
+  const __title = (typeof title !== 'undefined' && title) ? title : 'El. paštas';
+  const __emptyText = (typeof emptyText !== 'undefined' && emptyText) ? emptyText : 'Nerasta';
+  const __list = Array.isArray(emails) ? emails : [];
+%>
+
+<dt><%= __title %></dt>
+<dd class="email-list">
+  <% if (__list.length > 0) { %>
+    <div class="d-flex flex-col gap-1">
+      <% __list.forEach(item => { %>
+        <% if (!item || !item.email) return; %>
+        <div class="d-flex gap-2 align-center email-item">
+          <a class="email-link" href="mailto:<%= item.email %>"><%= item.email %></a>
+          <% if (Array.isArray(item.pages) && item.pages.length > 0) { %>
+            <sup class="text-muted text-xs email-pages" style="flex-shrink:0;"><%= item.pages.join(', ') %> psl.</sup>
+          <% } %>
+        </div>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <em class="text-muted"><%= __emptyText %></em>
+  <% } %>
+</dd>

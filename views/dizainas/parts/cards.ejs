@@ -1,0 +1,117 @@
+<!-- CARDS -->
+<section class="section" id="cards">
+  <h2>Cards</h2>
+  <p class="text-muted text-sm mb-5">Standard cards, clickable result cards for search-result lists.</p>
+
+  <div class="subsection">
+    <h3>Standard Card</h3>
+    <div class="preview">
+      <div class="card" style="width:300px;">
+        <div class="card-header">
+          <h4>Sutarties detalės</h4>
+          <span class="badge badge-success">Aktyvi</span>
+        </div>
+        <div class="card-body">
+          <p class="text-muted text-sm m-0">Viešojo pirkimo sutarties pagrindinė informacija ir sąlygos.</p>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-secondary btn-sm">Atšaukti</button>
+          <button class="btn btn-primary btn-sm">Peržiūrėti</button>
+        </div>
+      </div>
+    </div>
+    <pre class="code-block"><code class="hljs language-html"><%- highlightCode(include('../snippets/card.html')) %></code></pre>
+  </div>
+
+  <div class="subsection">
+    <h3>Result Card List</h3>
+    <div class="preview preview-col p-0">
+      <div class="result-list">
+        <article class="result-card card-clickable">
+          <a href="#" class="card-overlay-link">Pirkimas #1</a>
+          <div class="result-card-body">
+            <div class="result-card-meta">
+              <span>VĮ Registrų centras</span>
+              <span>2024-03-01</span>
+              <span>Atviras konkursas</span>
+            </div>
+            <h3 class="result-card-title">IT infrastruktūros atnaujinimas</h3>
+            <p class="result-card-excerpt">Serverių ir tinklo įrangos pirkimas pagal viešojo pirkimo procedūrą...</p>
+          </div>
+          <div class="result-card-sidebar">
+            <span class="amount">€ 84,200</span>
+            <span class="amount-label">sutarties vertė</span>
+            <span class="badge badge-success">Aktyvi</span>
+          </div>
+        </article>
+
+        <article class="result-card card-clickable">
+          <a href="#" class="card-overlay-link">Pirkimas #2</a>
+          <div class="result-card-body">
+            <div class="result-card-meta">
+              <span>Lietuvos automobilių kelių direkcija</span>
+              <span>2024-01-15</span>
+            </div>
+            <h3 class="result-card-title">Kelių priežiūros paslaugos 2024</h3>
+            <p class="result-card-excerpt">Valstybinių kelių priežiūros ir remonto darbai šiaurės regione...</p>
+          </div>
+          <div class="result-card-sidebar">
+            <span class="amount">€ 1,240,000</span>
+            <span class="amount-label">sutarties vertė</span>
+            <span class="badge badge-warning">Vykdoma</span>
+          </div>
+        </article>
+      </div>
+    </div>
+    <pre class="code-block"><code class="hljs language-html"><%- highlightCode(include('../snippets/card-result.html')) %></code></pre>
+  </div>
+
+  <div class="subsection">
+    <h3>File Card</h3>
+    <p class="text-muted text-sm mb-3">Dokumentų kortelė su overlay-link clickability ir atskiromis veiksmų nuorodomis.</p>
+    <div class="preview preview-col">
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <%- include('../../partials/file-card.ejs', {
+          title: 'report.pdf',
+          href: '/failas/123',
+          meta: 'PDF · 4.2 MB',
+          ext: 'pdf',
+          actions: [
+            { href: 'https://failai.viespirkiai.org/123', text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+            { href: 'https://cvpp.eviesiejipirkimai.lt/', text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
+          ]
+        }) %>
+
+        <%- include('../../partials/file-card.ejs', {
+          title: 'document.docx',
+          href: '/failas/456',
+          meta: 'DOCX · 128 KB',
+          ext: 'docx',
+          actions: [
+            { href: 'https://failai.viespirkiai.org/456', text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+            { href: 'https://cvpp.eviesiejipirkimai.lt/', text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
+          ]
+        }) %>
+      </div>
+    </div>
+    <pre class="code-block"><code class="hljs language-html"><%- highlightCode(`
+<article class="file-card card-clickable">
+  <a href="/failas/123" class="card-overlay-link">report.pdf</a>
+
+  <!-- icon + text are non-interactive, overlay receives the click -->
+  <svg class="file-card-icon file-card-z" viewBox="0 0 96 72" aria-hidden="true">...</svg>
+
+  <div class="file-card-body file-card-z">
+    <div class="file-card-title">report.pdf</div>
+    <div class="file-card-meta">PDF · 4.2 MB</div>
+  </div>
+
+  <!-- actions are real links above overlay -->
+  <div class="file-card-actions-col">
+    <a class="file-card-action" href="https://failai.viespirkiai.org/123" target="_blank" rel="noopener noreferrer">↗ Failas</a>
+    <a class="file-card-action" href="https://cvpp.eviesiejipirkimai.lt/" target="_blank" rel="noopener noreferrer">↗ CVP IS</a>
+  </div>
+</article>
+`.trim()) %></code></pre>
+  </div>
+</section>

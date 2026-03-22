@@ -234,28 +234,45 @@
         <% if (failai && failai.length > 0) { %>
         <section class="mb-7">
             <h2>Dokumentai</h2>
-            <ul class="file-list mt-4">
-            <% failai.forEach(failas => { %>
+
+            <div class="d-flex flex-col gap-2 mt-4">
+              <% failai.forEach(failas => { %>
                 <% const versija = failas.versijos?.[failas.versijos.length - 1]; %>
                 <% const lokalus = versija; %>
+                <% const title = failas.dokumentasPavadinimas || failas.pavadinimas || '—'; %>
+                <% const ext = (versija?.formatas || (title.includes('.') ? title.split('.').pop() : '') || '').toLowerCase(); %>
+
                 <% const cvpisUrl = `https://viesiejipirkimai.lt/epps/cft/viewDocumentVersions.do?resourceId=${failas.dokumentasId}`; %>
-                <li>
+
                 <% if (lokalus?.parsiustas && lokalus?.nuskaitytas) { %>
-                    <a href="/failas/<%= lokalus.id %>"><%= failas.dokumentasPavadinimas || failas.pavadinimas %></a>
-                    <span class="text-muted text-sm ms-2">(<a href="/failas/<%= lokalus.id %>/turinys">↗ Failas</a>, <a href="<%= cvpisUrl %>" target="_blank">↗ CVP IS</a>)</span>
+                  <div style="min-width:0;">
+                    <%- include('../partials/file-card.ejs', {
+                      title,
+                      href: `/failas/${lokalus.id}`,
+                      meta: ext ? `${ext.toUpperCase()}${versija?.ikelimoData ? ' · ' + versija.ikelimoData : ''}${versija?.statusas ? ' · ' + versija.statusas : ''}` : `${versija?.ikelimoData || ''}${versija?.statusas ? ' · ' + versija.statusas : ''}`.trim(),
+                      ext,
+                      actions: [
+                        { href: `https://failai.viespirkiai.org/${lokalus.id}`, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+                        { href: cvpisUrl, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
+                      ]
+                    }) %>
+                  </div>
                 <% } else { %>
-                    <a href="<%= cvpisUrl %>" target="_blank"><%= failas.dokumentasPavadinimas || failas.pavadinimas %></a>
-                    <span class="text-muted text-sm ms-2">(<a href="<%= cvpisUrl %>" target="_blank">↗ CVP IS</a>)</span>
+                  <div style="min-width:0;">
+                    <%- include('../partials/file-card.ejs', {
+                      title,
+                      href: cvpisUrl,
+                      meta: ext ? `${ext.toUpperCase()}` : '',
+                      ext,
+                      actions: [
+                        { href: cvpisUrl, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
+                      ]
+                    }) %>
+                  </div>
                 <% } %>
-                <% if (versija) { %>
-                    <span class="text-muted text-sm ms-2"><%= versija.ikelimoData %><% if (versija.statusas) { %> · <%= versija.statusas %><% } %></span>
-                <% } %>
-                <% if (failas.aprasymas) { %>
-                    <span class="text-muted text-sm ms-2"><%= failas.aprasymas %></span>
-                <% } %>
-                </li>
-            <% }) %>
-            </ul>
+
+              <% }) %>
+            </div>
         </section>
         <% } %>
 
@@ -264,27 +281,40 @@
         <% if (skelbimai && skelbimai.length > 0) { %>
         <section class="mb-7">
             <h2>Skelbimai</h2>
-            <ul class="file-list mt-4">
-            <% skelbimai.forEach(skelbimas => { %>
-                <li>
-                <% if (skelbimas.downloadHref) { %>
-                    <a href="https://viesiejipirkimai.lt<%= skelbimas.downloadHref %>" target="_blank"><%= skelbimas.tipas || 'Skelbimas' %></a>
-                <% } else { %>
-                    <%= skelbimas.tipas || 'Skelbimas' %>
-                <% } %>
-                <span class="text-muted text-sm ms-2">
-                    <%= skelbimas.paskelbimoData ? String(skelbimas.paskelbimoData).slice(0,10) : '' %>
-                    <% if (skelbimas.statusas) { %> · <%= skelbimas.statusas %><% } %>
-                </span>
-                </li>
-            <% }) %>
-            </ul>
+
+            <div class="d-flex flex-col gap-2 mt-4">
+              <% skelbimai.forEach(skelbimas => { %>
+                <%
+                  const pavadinimas = (skelbimas.tipas || 'Skelbimas').trim();
+                  const isNacionalinis = pavadinimas.toLowerCase().startsWith('nacionalinis');
+                  const isEu = !isNacionalinis;
+                  const title = pavadinimas;
+                  const ext = isNacionalinis ? 'tedLt' : 'tedEu';
+                  const meta = isNacionalinis ? 'tedLt' : 'tedEu';
+
+                  const href = skelbimas.downloadHref || '#';
+
+                  const actions = [];
+                %>
+
+                <div style="min-width:0;">
+                  <%- include('../partials/file-card.ejs', {
+                    title,
+                    href,
+                    meta,
+                    ext,
+                    actions,
+                    titleTwoLines: true,
+                    hideMeta: true
+                  }) %>
+                </div>
+              <% }) %>
+            </div>
         </section>
         <% } %>
 
-        <!-- TED nuorodos -->
-        <% if (t.tedNuorodosIPaskelbtusPranesimus) { %>
-        <% const tedUrls = t.tedNuorodosIPaskelbtusPranesimus.split(/\s+/).filter(s => s.startsWith('http')); %>
+
+        <% const tedUrls = Array.isArray(t.tedNuorodosIPaskelbtusPranesimus) ? t.tedNuorodosIPaskelbtusPranesimus : []; %>
         <% if (tedUrls.length > 0) { %>
             <section class="mb-7">
             <h2>TED nuorodos</h2>
@@ -294,7 +324,6 @@
                 <% }) %>
             </ul>
             </section>
-        <% } %>
         <% } %>
 
         <% if (pirkimas.sutartys && pirkimas.sutartys.length > 0) { %>

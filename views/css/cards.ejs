@@ -4,7 +4,7 @@
     border: var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
-    transition: box-shadow var(--transition);
+    transition: box-shadow var(--transition), border-color var(--transition);
 }
 
 .card-hover:hover { box-shadow: var(--shadow-md); }
@@ -35,9 +35,12 @@
     gap: var(--space-2);
 }
 
-/* Clickable card via overlay link */
+/* Clickable card via overlay link
+   Consistent stacking order:
+   - Overlay link covers the whole card (click target) and sits behind content.
+   - Real interactive/content elements sit above the overlay (remain clickable). */
 .card-clickable { position: relative; }
-.card-clickable:hover { box-shadow: inset 0 0 0 2px var(--black); }
+.card-clickable:hover { box-shadow: none; }
 
 .card-overlay-link {
     position: absolute;
@@ -46,6 +49,7 @@
     text-indent: -9999px;
 }
 
+/* Put regular content above the overlay link */
 .card-clickable a:not(.card-overlay-link),
 .card-clickable button,
 .card-clickable span {

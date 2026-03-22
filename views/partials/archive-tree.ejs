@@ -1,0 +1,129 @@
+<%
+/**
+ * Archive tree viewer (ZIP/RAR/7z) rendered as CPV-tree-like details/summary.
+ *
+ * Expected locals:
+ * - filesTree: Array<{
+ *     name: string,
+ *     path?: string,
+ *     id?: string|number,
+ *     extension?: string,
+ *     size?: number,
+ *     isDirectory?: boolean,
+ *     children?: Array<...>
+ *   }>
+ * - failasId: string|number (used to build fallback download URLs)
+ *
+ * Optional locals:
+ * - openByDefault?: boolean (default true)  // whether directories render expanded
+ * - rootClass?: string (default "")         // extra class on the root wrapper
+ *
+ * Notes:
+ * - Uses `.archive-tree` CSS (see views/css/components/archive-tree.ejs).
+ * - Leaves use `details.no-children` to mirror CPV tree alignment rules.
+ */
+
+const __failasId = (typeof failasId !== 'undefined' && failasId !== null) ? String(failasId) : '';
+const __openByDefault = (typeof openByDefault !== 'undefined') ? !!openByDefault : true;
+const __rootClass = (typeof rootClass !== 'undefined' && rootClass) ? String(rootClass) : '';
+const __tree = Array.isArray(filesTree) ? filesTree : [];
+
+function __formatSize(bytes) {
+  const b = Number(bytes);
+  if (!Number.isFinite(b) || b < 0) return '';
+  if (b < 1024) return `${b} B`;
+  const kb = b / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  const gb = mb / 1024;
+  return `${gb.toFixed(1)} GB`;
+}
+
+function __escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function __renderNodes(nodes) {
+  if (!Array.isArray(nodes) || nodes.length === 0) return '';
+
+  let html = '';
+  nodes.forEach(node => {
+    if (!node) return;
+
+    const isDir = !!node.isDirectory || Array.isArray(node.children);
+    const name = node.name || '—';
+    const safeName = __escapeHtml(name);
+    const children = Array.isArray(node.children) ? node.children : [];
+
+    if (isDir) {
+      const hasChildren = children.length > 0;
+      const openAttr = __openByDefault ? ' open' : '';
+      const noChildrenClass = hasChildren ? '' : ' class="no-children"';
+      const countText = hasChildren ? `(${children.length})` : '';
+      const safeCount = __escapeHtml(countText);
+
+      html += `<details${openAttr}${noChildrenClass}>`;
+      html += `<summary>`;
+      if (hasChildren) {
+        html += `<span class="archive-toggle">▶</span>`;
+      }
+      html += `<span class="archive-name">${safeName}</span>`;
+      if (countText) {
+        html += `<span class="archive-meta">${safeCount}</span>`;
+      }
+      html += `</summary>`;
+
+      if (hasChildren) {
+        html += `<div class="archive-children">`;
+        html += __renderNodes(children);
+        html += `</div>`;
+      }
+      html += `</details>`;
+      return;
+    }
+
+    const ext = node.extension || (String(name).includes('.') ? String(name).split('.').pop() : '');
+    const sizeText = __formatSize(node.size);
+    const metaParts = [];
+    if (ext) metaParts.push(String(ext));
+    if (sizeText) metaParts.push(sizeText);
+    const metaText = metaParts.join(' · ');
+    const safeMeta = __escapeHtml(metaText);
+
+    const href = node.id
+      ? `/failas/${__escapeHtml(node.id)}`
+      : (__failasId && node.path)
+        ? `https://failai.viespirkiai.org/${__escapeHtml(__failasId)}/${__escapeHtml(node.path)}`
+        : '#';
+
+    html += `<details class="no-children">`;
+    html += `<summary>`;
+    html += `<span class="archive-name">`;
+    html += `<a href="${href}" class="cell-truncate">${safeName}</a>`;
+    html += `</span>`;
+    if (metaText) {
+      html += `<span class="archive-meta">${safeMeta}</span>`;
+    }
+    html += `</summary>`;
+    html += `</details>`;
+  });
+
+  return html;
+}
+%>
+
+<div class="archive-tree <%= __rootClass %>">
+  <% if (__tree.length > 0) { %>
+    <div class="archive-root">
+      <%- __renderNodes(__tree) %>
+    </div>
+  <% } else { %>
+    <em class="text-muted">Nerasta</em>
+  <% } %>
+</div>

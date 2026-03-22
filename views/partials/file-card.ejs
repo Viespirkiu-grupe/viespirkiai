@@ -1,0 +1,242 @@
+<%
+/**
+ * File Card partial (SVG icon + overlay-link clickable pattern)
+ * -----------------------------------------------------------------------------
+ * Matches the provided mock:
+ * - Left: large 96x72 SVG icon block
+ * - Middle: name + meta
+ * - Right: actions column (Failas / CVP IS) as real links
+ * - Whole card clickable via the existing `.card-clickable` + `.card-overlay-link`
+ *
+ * Expected locals:
+ *  - title: string (required)
+ *  - href: string  (required; card main href)
+ *
+ * Optional locals:
+ *  - meta: string (default "")
+ *  - ext: string  (default derived from title)
+ *  - size: "sm" | "md" | "lg" (default "md")
+ *  - muted: boolean (default false)
+ *  - className: string (default "")
+ *  - titleAttr: string (default title)
+ *  - ariaLabel: string (optional; applied to the overlay link)
+ *  - actions: Array<{ href: string, text: string, target?: string, rel?: string }> (default [])
+ *
+ * Display options:
+ *  - titleTwoLines: boolean (default false) - lets title wrap to 2 lines (clamped)
+ *  - hideMeta: boolean (default false)      - hides the meta line entirely
+ */
+
+const __title = (typeof title !== 'undefined' && title) ? String(title) : '';
+const __href = (typeof href !== 'undefined' && href) ? String(href) : '';
+const __meta = (typeof meta !== 'undefined' && meta) ? String(meta) : '';
+
+const __size = (typeof size !== 'undefined' && size) ? String(size) : 'md';
+const __muted = (typeof muted !== 'undefined') ? !!muted : false;
+const __className = (typeof className !== 'undefined' && className) ? String(className) : '';
+
+const __titleTwoLines = (typeof titleTwoLines !== 'undefined') ? !!titleTwoLines : false;
+const __hideMeta = (typeof hideMeta !== 'undefined') ? !!hideMeta : false;
+
+const __titleAttr = (typeof titleAttr !== 'undefined' && titleAttr) ? String(titleAttr) : __title;
+const __ariaLabel = (typeof ariaLabel !== 'undefined' && ariaLabel) ? String(ariaLabel) : '';
+
+const __actions = (typeof actions !== 'undefined' && Array.isArray(actions)) ? actions : [];
+
+function __escape(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\\"/g, '&quot;');
+}
+
+function __escapeAttrStrict(s) {
+  // Strict attribute escaping for href/src/etc.
+  // Keep it minimal and predictable.
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Last-mile href cleanup:
+ * Sometimes upstream values already contain HTML entities (e.g. "&amp;") as literal text.
+ * If EJS escapes again, the browser can receive a URL containing literal "amp;".
+ * Decode the most common entities once before escaping for the attribute.
+ */
+function __decodeBasicEntities(s) {
+  return String(s)
+    .replace(/&amp;/g, '&')
+    .replace(/&#38;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+function __escapeAttr(s) {
+  return __escape(s).replace(/'/g, '&#39;');
+}
+
+function __getExtFromTitle(t) {
+  const s = String(t || '');
+  const idx = s.lastIndexOf('.');
+  if (idx === -1 || idx === s.length - 1) return '';
+  return s.slice(idx + 1).toLowerCase();
+}
+
+const __ext = (typeof ext !== 'undefined' && ext) ? String(ext).toLowerCase() : __getExtFromTitle(__title);
+const __extUpper = __ext ? __ext.toUpperCase() : '';
+
+function __svgId(prefix) {
+  return prefix + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+function __iconTheme(e) {
+  const x = (e || '').toLowerCase();
+
+  if (x === 'pdf') return { type: 'pdf', base: 'var(--shade-5)', fold2: 'var(--shade-6)', fill: 'var(--shade-5)' };
+  if (['doc', 'docx', 'odt', 'rtf', 'dot', 'dotx', 'docm'].includes(x)) return { type: 'doc', base: '#1a2a4a', fold2: '#2e5fa3', fill: '#1a2a4a' };
+  if (['xls', 'xlsx', 'xlsb', 'ods', 'xlt'].includes(x)) return { type: 'xls', base: '#1a3020', fold2: '#2e7a3e', fill: '#1a3020' };
+  if (['ppt', 'pptx', 'ppsx', 'odp'].includes(x)) return { type: 'ppt', base: '#3a2414', fold2: '#d35400', fill: '#3a2414' };
+  if (['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tif', 'tiff', 'webp', 'svg', 'heic', 'jfif'].includes(x)) return { type: 'img', base: 'var(--shade-5)', fold2: 'var(--shade-6)', fill: 'var(--shade-5)' };
+  if (['zip', '7z', 'rar'].includes(x)) return { type: 'zip', base: '#2e2010', fold2: '#8a6020', fill: '#2e2010' };
+  if (['txt', 'csv', 'log', 'json', 'xml', 'md'].includes(x)) return { type: 'txt', base: 'var(--shade-5)', fold2: 'var(--shade-6)', fill: 'var(--shade-5)' };
+  if (x === 'tedeu') return { type: 'tedeu', base: '#1a3a8c', fold2: '#0d2260', fill: '#1a3a8c' };
+  if (x === 'tedlt') return { type: 'tedlt', base: '#f5cb35', fold2: '#c9a820', fill: '#f5cb35' };
+
+  return { type: 'generic', base: 'var(--shade-5)', fold2: 'var(--shade-6)', fill: 'var(--shade-5)' };
+}
+
+const __theme = __iconTheme(__ext);
+const __clipOuter = __svgId('fc-clip');
+const __clipInner = __svgId('fc-iclip');
+
+const __outerClasses = [
+  'file-card',
+  'card-clickable',
+  __size === 'sm' ? 'file-card-sm' : '',
+  __size === 'lg' ? 'file-card-lg' : '',
+  __muted ? 'file-card-muted' : '',
+  __titleTwoLines ? 'file-card-title-2l' : '',
+  __hideMeta ? 'file-card-hide-meta' : '',
+  __className
+].filter(Boolean).join(' ');
+
+const __innerZIndexClass = 'file-card-z';
+%>
+
+<% if (__title && __href) { %>
+  <article class="<%= __outerClasses %>" aria-label="<%= __escape(__titleAttr) %>">
+    <a
+      href="<%- __escapeAttrStrict(__decodeBasicEntities(__href)) %>"
+      class="card-overlay-link"
+      <% if (__ariaLabel) { %>aria-label="<%= __escape(__ariaLabel) %>"<% } %>
+    ><%= __title %></a>
+
+    <svg class="file-card-icon <%= __innerZIndexClass %>" viewBox="0 0 96 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" overflow="hidden"
+      shape-rendering="geometricPrecision"
+      text-rendering="geometricPrecision"
+      style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; border-radius:16px;display:block">
+      <defs>
+        <clipPath id="<%= __clipOuter %>">
+          <path d="M-28,-36 L14,-36 L28,-22 L28,44 L-28,44 Z"/>
+        </clipPath>
+        <% if (__theme.type === 'img') { %>
+          <clipPath id="<%= __clipInner %>"><rect x="-28" y="-36" width="56" height="80" rx="9"/></clipPath>
+        <% } %>
+      </defs>
+      <g transform="translate(44,52) rotate(-10)" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision;">
+        <g clip-path="url(#<%= __clipOuter %>)">
+          <rect x="-28" y="-36" width="56" height="80" rx="9" fill="<%= __theme.base %>"/>
+        </g>
+        <polygon points="14,-36 28,-22 14,-22" fill="<%= __theme.fold2 %>"/>
+        <% if (__theme.type === 'pdf') { %>
+          <rect x="-28" y="-8" width="56" height="14" fill="#c0392b"/>
+          <text x="0" y="1.5" font-family="system-ui,sans-serif" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">PDF</text>
+        <% } else if (__theme.type === 'doc') { %>
+          <rect x="-16" y="-10" width="30" height="3.5" rx="1.5" fill="#2e5fa3" opacity="0.9"/>
+          <rect x="-16" y="0"   width="22" height="3.5" rx="1.5" fill="#2e5fa3" opacity="0.6"/>
+          <rect x="-16" y="10"  width="26" height="3.5" rx="1.5" fill="#2e5fa3" opacity="0.6"/>
+        <% } else if (__theme.type === 'xls') { %>
+          <rect x="-14" y="-18" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+          <rect x="2"   y="-18" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+          <rect x="-14" y="-7"  width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+          <rect x="2"   y="-7"  width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+          <rect x="-14" y="4"   width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+          <rect x="2"   y="4"   width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+        <% } else if (__theme.type === 'zip') { %>
+          <rect x="-6" y="-23" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+          <rect x=" 2" y="-16" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+          <rect x="-6" y="-9"  width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+          <rect x=" 2" y="-2"  width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+          <rect x="-6" y=" 5"  width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+          <rect x="-6" y="15"  width="16" height="8" rx="2.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+        <% } else if (__theme.type === 'img') { %>
+          <g clip-path="url(#<%= __clipInner %>)">
+            <circle cx="14" cy="-20" r="5" fill="none" stroke="var(--dark-gray)" stroke-width="1.3"/>
+            <polygon points="-28,44 -4,-4 18,44" fill="none" stroke="var(--dark-gray)" stroke-width="1.3" stroke-linejoin="round"/>
+            <polygon points="-16,44 8,6 32,44" fill="<%= __theme.base %>" stroke="var(--dark-gray)" stroke-width="1.3" stroke-linejoin="round"/>
+          </g>
+          <% } else if (__theme.type === 'tedeu') { %>
+            <defs>
+              <path id="star_<%= __clipOuter %>" d="M0,-3.2 L0.76,-1.05 L3.04,-1.05 L1.22,0.40 L1.88,2.59 L0,1.13 L-1.88,2.59 L-1.22,0.40 L-3.04,-1.05 L-0.76,-1.05 Z"/>
+            </defs>
+            <g transform="translate(0,4)">
+              <use href="#star_<%= __clipOuter %>" transform="rotate(0)   translate(0,-18) rotate(0)"   fill="#FFD700"/>
+              <use href="#star_<%= __clipOuter %>" transform="rotate(30)  translate(0,-18) rotate(-30)"  fill="#FFD700"/>
+              <use href="#star_<%= __clipOuter %>" transform="rotate(60)  translate(0,-18) rotate(-60)"  fill="#FFD700"/>
+              <use href="#star_<%= __clipOuter %>" transform="rotate(90)  translate(0,-18) rotate(-90)"  fill="#FFD700"/>
+              <use href="#star_<%= __clipOuter %>" transform="rotate(120) translate(0,-18) rotate(-120)" fill="#FFD700"/>
+              <use href="#star_<%= __clipOuter %>" transform="rotate(150) translate(0,-18) rotate(-150)" fill="#FFD700"/>
+              <use href="#star_<%= __clipOuter %>" transform="rotate(180) translate(0,-18) rotate(-180)" fill="#FFD700"/>
+              <use href="#star_<%= __clipOuter %>" transform="rotate(210) translate(0,-18) rotate(-210)" fill="#FFD700"/>
+              <use href="#star_<%= __clipOuter %>" transform="rotate(240) translate(0,-18) rotate(-240)" fill="#FFD700"/>
+              <use href="#star_<%= __clipOuter %>" transform="rotate(270) translate(0,-18) rotate(-270)" fill="#FFD700"/>
+              <use href="#star_<%= __clipOuter %>" transform="rotate(300) translate(0,-18) rotate(-300)" fill="#FFD700"/>
+              <use href="#star_<%= __clipOuter %>" transform="rotate(330) translate(0,-18) rotate(-330)" fill="#FFD700"/>
+            </g>
+          <% } else if (__theme.type === 'tedlt') { %>
+            <clipPath id="<%= __clipOuter %>_inner"><rect x="-28" y="-36" width="56" height="80" rx="9"/></clipPath>
+            <g clip-path="url(#<%= __clipOuter %>_inner)">
+              <rect x="-28" y="-12" width="56" height="26" fill="#006a44"/>
+              <rect x="-28" y="14"  width="56" height="30" fill="#c1272d"/>
+            </g>
+        <% } %>
+      </g>
+    </svg>
+
+    <div class="file-card-body <%= __innerZIndexClass %>">
+      <div class="file-card-title"><%= __title %></div>
+      <% if (!__hideMeta) { %>
+        <% if (__meta) { %>
+          <div class="file-card-meta"><%= __meta %></div>
+        <% } else if (__extUpper) { %>
+          <div class="file-card-meta"><%= __extUpper %></div>
+        <% } %>
+      <% } %>
+    </div>
+
+    <% if (__actions && __actions.length > 0) { %>
+      <div class="file-card-actions-col <%= __innerZIndexClass %>" aria-label="Veiksmai">
+        <% __actions.forEach(a => { %>
+          <% if (!a || !a.href || !a.text) return; %>
+          <a
+            class="file-card-action"
+            href="<%= __escapeAttr(a.href) %>"
+            <% if (a.target) { %>target="<%= __escapeAttr(a.target) %>"<% } %>
+            <% if (a.rel) { %>rel="<%= __escapeAttr(a.rel) %>"<% } %>
+          ><%= a.text %></a>
+        <% }) %>
+      </div>
+    <% } %>
+  </article>
+<% } else if (__title) { %>
+  <div class="text-muted text-sm"><em>Trūksta failo nuorodos.</em></div>
+<% } else { %>
+  <div class="text-muted text-sm"><em>Trūksta failo pavadinimo.</em></div>
+<% } %>

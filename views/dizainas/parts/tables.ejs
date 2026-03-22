@@ -1,0 +1,42 @@
+<!-- TABLES -->
+<section class="section" id="tables">
+  <h2>Tables</h2>
+  <p class="text-muted text-sm mb-5">Responsive, scrollable tables with sortable headers, row states, and cell utilities.</p>
+
+  <div class="preview preview-col">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable asc">Pirkėjas</th>
+            <th class="sortable">Suma</th>
+            <th>Data</th>
+            <th class="cell-center">Statusas</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="cell-clamp">UAB Viešųjų pirkimų centras, Vilnius</div></td>
+            <td class="cell-mono">€ 124,500.00</td>
+            <td class="cell-nowrap">2024-03-15</td>
+            <td class="cell-center"><span class="badge badge-success">Aktyvi</span></td>
+          </tr>
+          <tr class="row-warning">
+            <td>VĮ Registrų centras</td>
+            <td class="cell-mono">€ 48,200.00</td>
+            <td class="cell-nowrap">2024-02-01</td>
+            <td class="cell-center"><span class="badge badge-warning">Laukiama</span></td>
+          </tr>
+          <tr class="row-danger">
+            <td>AB Lietuvos paštas</td>
+            <td class="cell-mono">€ 9,800.00</td>
+            <td class="cell-nowrap">2023-11-20</td>
+            <td class="cell-center"><span class="badge badge-danger">Atmesta</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <pre class="code-block"><code class="hljs language-html"><%- highlightCode(include('../snippets/table.html')) %></code></pre>
+</section>

@@ -103,6 +103,20 @@ ul.file-list li a:hover { text-decoration: underline; }
 /* User select */
 .user-select-none { user-select: none; }
 
+/* Email list component (failai/parts/emails.ejs) */
+.email-list .email-item {
+    min-width: 0;
+}
+
+.email-list .email-link {
+    min-width: 0;
+    display: inline-block;
+}
+
+.email-list .email-pages {
+    white-space: nowrap;
+}
+
 /* Signal QR */
 .signal-qr {
     display: block;
@@ -167,5 +181,9 @@ ul.file-list li a:hover { text-decoration: underline; }
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+:target {
+    scroll-margin-top: 80px; /* match your header height */
 }
 </style>

@@ -1,0 +1,171 @@
+<%
+/**
+ * Shared Leaflet single-point map partial.
+ *
+ * This partial outputs:
+ * 1) (Optional) <script> loader+init for Leaflet (loads /dist/leaflet.css + /dist/leaflet.js once)
+ * 2) The map container DOM for a single marker
+ * 3) (Optional) an OpenStreetMap "lat, lon" / address link under the map
+ *
+ * Expected locals:
+ * - id: string (DOM id for the map container; must be unique on the page)
+ * - lat: number|string
+ * - lon: number|string
+ *
+ * Optional locals:
+ * - zoom: number (default 14)
+ * - height: string (default "220px") // any CSS height value
+ * - className: string (default "map-container")
+ * - style: string (default "") // appended to inline style
+ * - showLink: boolean (default true)
+ * - linkText: string (default "lat, lon") // "auto" uses "lat, lon" with 5 decimals if possible
+ * - linkZoom: number (default zoom)
+ * - initScript: boolean (default true) // if false, only outputs the container+link (no JS)
+ *
+ * Notes:
+ * - If you render multiple maps on one page, you can pass initScript=false for all but the first,
+ *   or keep it true; the script guards against duplicate loading and init.
+ * - Uses Leaflet global `L` from /dist/leaflet.js.
+ */
+const __id = (typeof id !== 'undefined' && id) ? String(id) : '';
+const __latRaw = (typeof lat !== 'undefined' && lat !== null) ? lat : '';
+const __lonRaw = (typeof lon !== 'undefined' && lon !== null) ? lon : '';
+const __zoom = (typeof zoom !== 'undefined' && zoom !== null) ? Number(zoom) : 14;
+const __height = (typeof height !== 'undefined' && height) ? String(height) : '220px';
+const __className = (typeof className !== 'undefined' && className) ? String(className) : 'map-container';
+const __styleExtra = (typeof style !== 'undefined' && style) ? String(style) : '';
+const __showLink = (typeof showLink !== 'undefined') ? !!showLink : true;
+const __linkZoom = (typeof linkZoom !== 'undefined' && linkZoom !== null) ? Number(linkZoom) : __zoom;
+const __linkText = (typeof linkText !== 'undefined' && linkText) ? String(linkText) : 'auto';
+const __initScript = (typeof initScript !== 'undefined') ? !!initScript : true;
+
+const __latNum = Number(__latRaw);
+const __lonNum = Number(__lonRaw);
+const __hasCoords = Number.isFinite(__latNum) && Number.isFinite(__lonNum) && !!__id;
+
+function __fmtCoord(n) {
+  return Number.isFinite(n) ? n.toFixed(5) : String(n);
+}
+
+const __computedLinkText = (__linkText === 'auto')
+  ? `${__fmtCoord(__latNum)}, ${__fmtCoord(__lonNum)}`
+  : __linkText;
+
+const __containerStyle =
+  `height:${__height};` +
+  ( __styleExtra ? ` ${__styleExtra}` : '' );
+
+%>
+
+<% if (__initScript) { %>
+<script>
+/**
+ * Shared Leaflet loader + single-point init.
+ * - Loads /dist/leaflet.css and /dist/leaflet.js once
+ * - Exposes window.__vpInitLeafletPointMap(id, lat, lon, zoom)
+ */
+(function () {
+  if (!window.__vpLeafletLoader) {
+    window.__vpLeafletLoader = {
+      cssLoaded: false,
+      jsLoading: false,
+      jsLoaded: false,
+      queue: [],
+    };
+
+    function loadCssOnce() {
+      if (window.__vpLeafletLoader.cssLoaded) return;
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/dist/leaflet.css';
+      document.head.appendChild(link);
+      window.__vpLeafletLoader.cssLoaded = true;
+    }
+
+    function loadJsOnce(cb) {
+      if (window.__vpLeafletLoader.jsLoaded) return cb();
+      window.__vpLeafletLoader.queue.push(cb);
+      if (window.__vpLeafletLoader.jsLoading) return;
+      window.__vpLeafletLoader.jsLoading = true;
+
+      var script = document.createElement('script');
+      script.src = '/dist/leaflet.js';
+      script.defer = true;
+      script.onload = function () {
+        window.__vpLeafletLoader.jsLoaded = true;
+        window.__vpLeafletLoader.jsLoading = false;
+
+        var q = window.__vpLeafletLoader.queue.slice();
+        window.__vpLeafletLoader.queue.length = 0;
+        q.forEach(function (fn) { try { fn(); } catch (e) {} });
+      };
+      document.body.appendChild(script);
+    }
+
+    window.__vpInitLeafletPointMap = function (id, lat, lon, zoom) {
+      if (!id) return;
+      var el = document.getElementById(id);
+      if (!el) return;
+
+      // Prevent re-init if partial is rendered twice or navigated via cache.
+      if (el.dataset && el.dataset.leafletInited === '1') return;
+      if (el.dataset) el.dataset.leafletInited = '1';
+
+      // Coerce coordinates
+      var latN = Number(lat);
+      var lonN = Number(lon);
+      if (!isFinite(latN) || !isFinite(lonN)) return;
+
+      loadCssOnce();
+      loadJsOnce(function () {
+        if (!window.L || !window.L.map) return;
+
+        var map = L.map(id, { zoomAnimation: true, markerZoomAnimation: true })
+          .setView([latN, lonN], Number(zoom) || 14);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        L.marker([latN, lonN]).addTo(map);
+      });
+    };
+  }
+})();
+</script>
+<% } %>
+
+<% if (__hasCoords) { %>
+  <div
+    id="<%= __id %>"
+    class="<%= __className %>"
+    style="<%= __containerStyle %>"
+    data-lat="<%= __latNum %>"
+    data-lon="<%= __lonNum %>"
+    data-zoom="<%= __zoom %>"
+  ></div>
+
+  <% if (__showLink) { %>
+    <p class="text-muted text-xs mt-2">
+      <a
+        href="https://www.openstreetmap.org/?mlat=<%= __latNum %>&mlon=<%= __lonNum %>&zoom=<%= __linkZoom %>"
+        target="_blank"
+      ><%= __computedLinkText %></a>
+    </p>
+  <% } %>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      if (typeof window.__vpInitLeafletPointMap === 'function') {
+        window.__vpInitLeafletPointMap(
+          "<%= __id %>",
+          "<%= __latNum %>",
+          "<%= __lonNum %>",
+          "<%= __zoom %>"
+        );
+      }
+    });
+  </script>
+<% } else { %>
+  <em class="text-muted">Nenurodyta</em>
+<% } %>

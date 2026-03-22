@@ -1,0 +1,68 @@
+<!-- FORMS -->
+<section class="section" id="forms">
+  <h2>Forms</h2>
+  <p class="text-muted text-sm mb-5">Input controls, labels, validation states, search bar, and toggle switch.</p>
+
+  <div class="subsection">
+    <h3>Basic Inputs</h3>
+    <div class="preview preview-col" style="max-width:480px;">
+      <div class="form-group">
+        <label class="form-label required">Pirkimo pavadinimas</label>
+        <input type="text" class="form-control" placeholder="Įveskite pavadinimą">
+        <span class="form-hint">Oficialus sutarties pavadinimas</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Suma</label>
+        <div class="input-group">
+          <span class="input-group-text">€</span>
+          <input type="number" class="form-control" placeholder="0.00">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Statusas</label>
+        <select class="form-control">
+          <option>Visi</option>
+          <option>Aktyvūs</option>
+          <option>Baigti</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Pastabos</label>
+        <textarea class="form-control" rows="3" placeholder="Papildoma informacija..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Klaida</label>
+        <input type="text" class="form-control is-invalid" value="Neteisinga reikšmė">
+        <span class="form-error">Šis laukas yra privalomas</span>
+      </div>
+    </div>
+    <pre class="code-block"><code class="hljs language-html"><%- highlightCode(include('../snippets/forms-inputs.html')) %></code></pre>
+  </div>
+
+  <div class="subsection">
+    <h3>Checkboxes, Radios & Toggle</h3>
+    <div class="preview">
+      <div class="d-flex flex-col gap-2">
+        <label class="form-check"><input type="checkbox" class="form-check-input" checked> Skelbiamos derybos</label>
+        <label class="form-check"><input type="checkbox" class="form-check-input"> Neskelbiamos derybos</label>
+        <label class="form-check"><input type="radio" class="form-check-input" name="r" checked> Juridinis asmuo</label>
+        <label class="form-check"><input type="radio" class="form-check-input" name="r"> Fizinis asmuo</label>
+        <label class="form-switch"><input type="checkbox"><span class="switch-track"></span> Rodyti tik aktyvius</label>
+      </div>
+    </div>
+    <pre class="code-block"><code class="hljs language-html"><%- highlightCode(include('../snippets/forms-checks.html')) %></code></pre>
+  </div>
+
+  <div class="subsection">
+    <h3>Search Bar</h3>
+    <div class="preview">
+      <div class="search-bar w-100 w-full" style="max-width:500px;">
+        <span class="search-icon" style="font-size: var(--text-lg); line-height: 1;">⌕</span>
+        <input type="search" placeholder="Ieškoti pirkimų, įmonių...">
+        <div class="vr"></div>
+        <button class="btn btn-primary btn-sm">Ieškoti</button>
+      </div>
+    </div>
+    <pre class="code-block"><code class="hljs language-html"><%- highlightCode(include('../snippets/forms-search.html')) %></code></pre>
+  </div>
+</section>

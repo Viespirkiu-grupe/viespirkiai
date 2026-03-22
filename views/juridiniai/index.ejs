@@ -7,6 +7,7 @@
         pageImage: `https://viespirkiai.org/juridiniai.png`,
         customHead
     }) %>
+  <%- include('../partials/leaflet-head.ejs') %>
 	</head>
 	<body>
 		<%- include('../header.ejs', {hideSubtext: false}) %>
@@ -27,17 +28,9 @@
 
                     <script>
                     window.addEventListener('DOMContentLoaded', () => {
-                      // Load Leaflet CSS
-                      const link = document.createElement('link');
-                      link.rel = 'stylesheet';
-                      link.href = '/dist/leaflet.css';
-                      document.head.appendChild(link);
+                      const start = () => {
+                        if (!window.L || !window.L.map) return;
 
-                      // Load Leaflet JS
-                      const script = document.createElement('script');
-                      script.src = '/dist/leaflet.js';
-                      script.defer = true;
-                      script.onload = () => {
                         const mapEl = document.getElementById('map');
 
                         const map = L.map('map', {
@@ -91,7 +84,6 @@
                                   interactive: true
                               }).addTo(layerGroup);
 
-
                                 circle.on('click', () => {
                                     // Redirect to juridiniai
                                     const url = `/juridiniai?location=${lat},${lon}&locationRadius=10`;
@@ -102,9 +94,13 @@
                             window.juridiniaiLayer = layerGroup;
                             map.addLayer(layerGroup);
                         });
-
                       };
-                      document.body.appendChild(script);
+
+                      if (typeof window.__vpLeafletLoad === 'function') {
+                        window.__vpLeafletLoad().then(start).catch(() => {});
+                      } else {
+                        start();
+                      }
                     });
                     </script>
 

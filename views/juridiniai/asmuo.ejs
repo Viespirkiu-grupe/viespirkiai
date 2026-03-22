@@ -9,26 +9,7 @@
   }) %>
   <%- include('../js/charts.ejs') %>
   <% if (asmuo.jar.location) { %>
-    <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = '/dist/leaflet.css';
-      document.head.appendChild(link);
-      const script = document.createElement('script');
-      script.src = '/dist/leaflet.js';
-      script.defer = true;
-      script.onload = () => {
-        const mapEl = document.getElementById('asmuo-map');
-        const map = L.map('asmuo-map').setView([mapEl.dataset.y, mapEl.dataset.x], 16);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
-        L.marker([mapEl.dataset.y, mapEl.dataset.x]).addTo(map);
-      };
-      document.body.appendChild(script);
-    });
-    </script>
+    <%- include('../partials/map-point-head.ejs', { mapId: 'asmuo-map', latAttr: 'y', lonAttr: 'x', zoom: 16 }) %>
   <% } %>
 </head>
 <body>

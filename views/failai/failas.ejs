@@ -39,26 +39,7 @@
     }
   </style>
   <% if (failas.location) { %>
-    <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = '/dist/leaflet.css';
-      document.head.appendChild(link);
-      const script = document.createElement('script');
-      script.src = '/dist/leaflet.js';
-      script.defer = true;
-      script.onload = () => {
-        const mapEl = document.getElementById('failas-map');
-        const map = L.map('failas-map').setView([mapEl.dataset.lat, mapEl.dataset.lon], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
-        L.marker([mapEl.dataset.lat, mapEl.dataset.lon]).addTo(map);
-      };
-      document.body.appendChild(script);
-    });
-    </script>
+    <%- include('../partials/map-point-head.ejs', { mapId: 'failas-map', latAttr: 'lat', lonAttr: 'lon', zoom: 14 }) %>
   <% } %>
 </head>
 <body>
@@ -152,18 +133,19 @@
         <% if (failas.location) { %>
           <div>
             <h2 class="mb-3 no-style">Vieta</h2>
-            <div
-              id="failas-map"
-              class="map-container"
-              style="height:220px; border-radius:var(--radius-md);"
-              data-lat="<%= failas.location.lat %>"
-              data-lon="<%= failas.location.lon %>"
-            ></div>
-            <p class="text-muted text-xs mt-2">
-              <a href="https://www.openstreetmap.org/?mlat=<%= failas.location.lat %>&mlon=<%= failas.location.lon %>&zoom=14" target="_blank">
-                <%= failas.location.lat.toFixed(5) %>, <%= failas.location.lon.toFixed(5) %>
-              </a>
-            </p>
+            <%- include('../partials/map-point.ejs', {
+              id: 'failas-map',
+              lat: failas.location.lat,
+              lon: failas.location.lon,
+              zoom: 14,
+              height: '220px',
+              className: 'map-container',
+              style: 'border-radius:var(--radius-md);',
+              showLink: true,
+              linkText: 'auto',
+              linkZoom: 14,
+              initScript: false
+            }) %>
           </div>
         <% } %>
 
@@ -216,21 +198,7 @@
                 <% } %>
               </dd>
 
-              <dt>El. paštas</dt>
-              <dd>
-                <% if (failas.metaduomenys.emails?.length > 0) { %>
-                  <div class="d-flex flex-col gap-1">
-                    <% failas.metaduomenys.emails.forEach(email => { %>
-                      <div class="d-flex gap-2 align-center">
-                        <a href="mailto:<%= email.email %>"><%= email.email %></a>
-                        <sup class="text-muted text-xs" style="flex-shrink:0;"><%= email.pages.join(', ') %> psl.</sup>
-                      </div>
-                    <% }) %>
-                  </div>
-                <% } else { %>
-                  <em class="text-muted">Nerasta</em>
-                <% } %>
-              </dd>
+              <%- include('../partials/emails.ejs', { emails: failas.metaduomenys.emails }) %>
 
               <dt>Telefonai</dt>
               <dd>
@@ -295,39 +263,22 @@
           <% if (libreFormats.includes(failas.extension)) { %>
             <p class="text-muted text-xs mb-3"><em>Dokumentas konvertuotas į PDF naudojant LibreOffice, gali būti atvaizduojamas iškraipytas.</em></p>
           <% } %>
-          <iframe
-            src="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(query.search || '') %>"
-            style="border:none; width:100%; height:70vh; display:block; border-radius:var(--radius-md);"
-          ></iframe>
+          <%- include('../partials/pdf-preview.ejs', {
+            failasId: failas.id,
+            search: (query && query.search) ? query.search : '',
+            height: '70vh',
+            border: 'none',
+            rounded: true
+          }) %>
 
         <% } else if (failas.nuskaitytas > 0 && archiveFormats.includes(failas.extension)) { %>
-          <p class="text-muted text-sm mb-3"><em>Archyvo peržiūra <sup>BETA</sup></em></p>
-          <%
-            function renderFiles(files) {
-              let html = '';
-              files.forEach(file => {
-                if (file.isDirectory) {
-                  html += `<details open style="padding-block:4px;">`;
-                  html += `<summary class="fw-bold">${file.name}</summary>`;
-                  html += `<div style="padding-left:var(--space-4);">`;
-                  if (file.children?.length) html += renderFiles(file.children);
-                  html += `</div></details>`;
-                } else {
-                  const href = file.id
-                    ? `/failas/${file.id}`
-                    : `https://failai.viespirkiai.org/${failas.id}/${file.path}`;
-                  html += `<div style="padding-block:4px;">`;
-                  html += `<a href="${href}">${file.name}</a>`;
-                  html += ` <span class="text-muted text-xs">(${file.extension}, ${(file.size/1024).toFixed(1)} KB)</span>`;
-                  html += `</div>`;
-                }
-              });
-              return html;
-            }
-          %>
-          <% if (failas.metaduomenys?.filesTree) { %>
-            <%- renderFiles(failas.metaduomenys.filesTree) %>
-          <% } %>
+          <p class="text-muted text-sm mb-3"><em>Archyvo peržiūra</em></p>
+
+          <%- include('../partials/archive-tree.ejs', {
+            filesTree: failas.metaduomenys?.filesTree,
+            failasId: failas.id,
+            openByDefault: true
+          }) %>
 
         <% } else if (failas.extension === "mp4") { %>
           <video controls style="width:100%; max-height:70vh; border-radius:var(--radius-md); display:block;">
@@ -374,43 +325,7 @@
           ></iframe>
 
         <% } else if ((failas.extension === "eml" || failas.extension === "msg") && failas.metaduomenys) { %>
-          <div style="background:var(--lightest-gray); border:var(--border); border-radius:var(--radius-md); padding:var(--space-4);">
-            <h2 class="mb-3"><%= failas.metaduomenys.subject || "—" %></h2>
-            <dl class="kv-list mb-4">
-              <dt>Nuo</dt>
-              <dd>
-                <%= failas.metaduomenys?.from?.name || "—" %>
-                &lt;<a href="mailto:<%= failas.metaduomenys?.from?.email %>"><%= failas.metaduomenys?.from?.email || "—" %></a>&gt;
-              </dd>
-              <dt>Kam</dt>
-              <dd>
-                <% const toList = Array.isArray(failas.metaduomenys.to) ? failas.metaduomenys.to : [failas.metaduomenys.to]; %>
-                <% toList.forEach(to => { %>
-                  <div><%= to.name || "—" %> &lt;<a href="mailto:<%= to.email %>"><%= to.email || "—" %></a>&gt;</div>
-                <% }) %>
-              </dd>
-              <dt>Data</dt>
-              <dd><%= new Date(failas.metaduomenys.date || failas.metaduomenys.messageDeliveryTime).toLtDateTime() || "—" %></dd>
-            </dl>
-
-            <% if (failas.metaduomenys.html) { %>
-              <iframe
-                srcdoc="<%= String(failas.metaduomenys.html).replace(/"/g, '&quot;') %>"
-                style="width:100%; height:400px; border:var(--border); border-radius:var(--radius-sm);"
-              ></iframe>
-            <% } else { %>
-              <pre style="white-space:pre-wrap; word-wrap:break-word; font-family:var(--font-mono); font-size:var(--text-sm); border-top:var(--border); padding-top:var(--space-3);"><%- (failas.metaduomenys.text || failas.metaduomenys.body || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\r?\n/g,"<br>") %></pre>
-            <% } %>
-
-            <% if (failas.metaduomenys.attachments?.length > 0) { %>
-              <h3 class="mt-4 mb-2">Priedai</h3>
-              <div class="d-flex flex-col gap-1">
-                <% failas.metaduomenys.attachments.forEach(att => { %>
-                  <a href="https://failai.viespirkiai.org/<%= failas.id %>/<%= att.name %>" target="_blank"><%= att.name %></a>
-                <% }) %>
-              </div>
-            <% } %>
-          </div>
+          <%- include('../partials/email-message.ejs', { metaduomenys: failas.metaduomenys, failasId: failas.id }) %>
 
         <% } else { %>
           <p class="text-muted text-sm"><em>Peržiūra nepalaikoma šio formato failams. Spustelėkite „Failas", jei norite jį atsisiųsti.</em></p>

@@ -187,22 +187,49 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
       <section class="span-full">
         <h2>Dokumentai</h2>
         <% if (sutartis.dokumentai && sutartis.dokumentai.length > 0) { %>
-          <ul class="file-list">
+          <div class="d-flex flex-col gap-2">
             <% sutartis.dokumentai.forEach(doc => { %>
-              <li>
-                <% if (doc.id && doc.parsiustas && doc.nuskaitytas) { %>
-                  <a href="/failas/<%= doc.id %>"><%= doc.pavadinimas %></a>
-                  <span class="text-muted text-sm ms-2">(<a href="<%= doc.proxyUrl %>">↗ Failas</a>, <a href="<%= doc.url %>">↗ CVP IS</a>)</span>
-                <% } else if (doc.parsiustas && doc.nuskaitytas) { %>
-                  <a href="/failas/<%= doc.dok_id %>/<%= doc.file_id %>"><%= doc.pavadinimas %></a>
-                  <span class="text-muted text-sm ms-2">(<a href="<%= doc.proxyUrl %>">↗ Failas</a>, <a href="<%= doc.url %>">↗ CVP IS</a>)</span>
-                <% } else { %>
-                  <a href="<%= doc.proxyUrl %>" target="_blank"><%= doc.pavadinimas %></a>
-                  <span class="text-muted text-sm ms-2">(<a href="<%= doc.url %>">↗ CVP IS</a>)</span>
-                <% } %>
-              </li>
+              <%
+                const title = doc.pavadinimas || "—";
+                const ext = (doc.extension || (title.includes('.') ? title.split('.').pop() : '') || '').toLowerCase();
+                const meta = ext ? `${ext.toUpperCase()}` : '';
+                let href = '';
+                let actions = [];
+              %>
+
+              <% if (doc.id && doc.parsiustas && doc.nuskaitytas) { %>
+                <% href = `/failas/${doc.id}`; %>
+                <%
+                  actions = [
+                    { href: `https://failai.viespirkiai.org/${doc.id}`, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+                    { href: doc.url, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
+                  ];
+                %>
+
+              <% } else if (doc.parsiustas && doc.nuskaitytas) { %>
+                <% href = `/failas/${doc.dok_id}/${doc.file_id}`; %>
+                <%
+                  actions = [
+                    { href: `https://failai.viespirkiai.org/${doc.dok_id}/${doc.file_id}`, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+                    { href: doc.url, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
+                  ];
+                %>
+
+              <% } else { %>
+                <% href = doc.proxyUrl; %>
+                <%
+                  actions = [
+                    { href: doc.proxyUrl, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+                    { href: doc.url, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
+                  ];
+                %>
+              <% } %>
+
+              <div style="min-width:0;">
+                <%- include('../partials/file-card.ejs', { title, href, meta, ext, iconLabel: true, actions }) %>
+              </div>
             <% }); %>
-          </ul>
+          </div>
         <% } else { %>
           <p class="text-muted">Pateiktų dokumentų nėra.</p>
         <% } %>

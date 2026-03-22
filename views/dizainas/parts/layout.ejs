@@ -1,0 +1,39 @@
+<!-- LAYOUT -->
+<section class="section" id="layout">
+  <h2>Layout & Grid</h2>
+  <p class="text-muted text-sm mb-5">12-column flex grid with responsive breakpoints at 992px (md) and 768px (sm).</p>
+
+  <div class="subsection">
+    <h3>12-Column Row</h3>
+    <div class="preview preview-col gap-2">
+      <div class="row text-xs">
+        <div class="col-6 bg-light p-2 rounded">col-6</div>
+        <div class="col-6 bg-light p-2 rounded">col-6</div>
+      </div>
+      <div class="row text-xs">
+        <div class="col-4 bg-light p-2 rounded">col-4</div>
+        <div class="col-4 bg-light p-2 rounded">col-4</div>
+        <div class="col-4 bg-light p-2 rounded">col-4</div>
+      </div>
+      <div class="row text-xs">
+        <div class="col-3 bg-light p-2 rounded">col-3</div>
+        <div class="col-6 bg-light p-2 rounded">col-6</div>
+        <div class="col-3 bg-light p-2 rounded">col-3</div>
+      </div>
+    </div>
+    <pre class="code-block"><code class="hljs language-html"><%- highlightCode(include('../snippets/layout-row.html')) %></code></pre>
+  </div>
+
+  <div class="subsection">
+    <h3>CSS Grid Shorthand</h3>
+    <div class="preview preview-col">
+      <div class="grid-4 text-xs">
+        <div class="bg-light p-2 rounded">grid-4</div>
+        <div class="bg-light p-2 rounded">grid-4</div>
+        <div class="bg-light p-2 rounded">grid-4</div>
+        <div class="bg-light p-2 rounded">grid-4</div>
+      </div>
+    </div>
+    <pre class="code-block"><code class="hljs language-html"><%- highlightCode(include('../snippets/layout-grid.html')) %></code></pre>
+  </div>
+</section>
