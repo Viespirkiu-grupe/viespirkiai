@@ -4,6 +4,17 @@ import { log } from "./utils/log.js";
 
 const tasks = [];
 
+import { nuskaitytiSeniausiaTedNotice } from "./modules/ted/scrapeNotice.js";
+tasks.push({
+    name: "nuskaitytiSeniausiaTedNotice",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 10,
+    job: async () => {
+        return await nuskaitytiSeniausiaTedNotice();
+    },
+});
+
 import { rastiEsInvesticijosPareiskejoJarKoda } from "./modules/2014esinvesticijos/rastiPareiskejuKodus.js";
 tasks.push({
     name: "rastiEsInvesticijosPareiskejoJarKoda",

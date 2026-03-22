@@ -5,6 +5,7 @@ import { log } from "../../utils/log.js";
 import { isVptWorkingHours } from "../sutartys/isWorkingHours.js";
 import { parsePmc, parseFailai, parseVersijos } from "./parsers.js";
 import { NUSKAITYMO_VERSIJA } from "./parsers.js";
+import { extractTedNoticeNumber } from "./parsers.js";
 
 const WINDOW_MS = 5000; // fixed smoothing window
 const timestamps = [];
@@ -210,6 +211,34 @@ async function processPmcRecord(cft, options = {}) {
             await postgres.query(failaiQuery, failaiValues);
         }
         timings.end("upsertFiles");
+
+        const tedNoticeNumbers = [
+            ...new Set(
+                result?.tedNuorodosIPaskelbtusPranesimus
+                    ?.map(extractTedNoticeNumber)
+                    .filter(Boolean) ?? [],
+            ),
+        ];
+
+        if (tedNoticeNumbers.length > 0) {
+            const values = [];
+            const placeholders = tedNoticeNumbers
+                .map((n, i) => {
+                    const start = i + 1;
+                    values.push(n);
+                    return `($${start})`;
+                })
+                .join(", ");
+
+            await postgres.query(
+                `
+                INSERT INTO "tedNotices" ("tedNoticeNumber")
+                VALUES ${placeholders}
+                ON CONFLICT ("tedNoticeNumber") DO NOTHING;
+                `,
+                values,
+            );
+        }
 
         timings.start("updatePurchase");
         if (result.pirkimoVykdytojasId) {

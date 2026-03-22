@@ -1,6 +1,6 @@
 import { parseHTML } from "linkedom";
 
-export const NUSKAITYMO_VERSIJA = 7;
+export const NUSKAITYMO_VERSIJA = 9;
 
 const DATE_KEYS_CFTDPSWS = new Set([
     "susipazinimoSuPasiulymaisData",
@@ -414,4 +414,9 @@ export async function parseVersijos(htmlText) {
     }
 
     return versijos;
+}
+
+export function extractTedNoticeNumber(url) {
+    const match = url.match(/NOTICE:(\d{6}-\d{4})/);
+    return match?.[1] || null;
 }
