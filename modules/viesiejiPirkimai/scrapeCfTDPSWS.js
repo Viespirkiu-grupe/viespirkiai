@@ -256,7 +256,7 @@ async function processCfTDPSWSRecord(cft, options = {}) {
             `
             UPDATE public."viesiejiPirkimai"
             SET "turinioNuskaitymas" = ${NUSKAITYMO_VERSIJA},
-                "turinioNuskaitymoData" = NOW(),
+                "turinioNuskaitymoData" = (now() AT TIME ZONE 'Europe/Vilnius'),
                 "scrapeReservation" = NULL,
                 turinys = $1,
                 "numatomaVerteEUR" = $3,
