@@ -60,8 +60,8 @@ export async function nuskaitytiPinregDeklaracija() {
 
     // Žymime nuskaitytą
     await postgres.query(
-        `UPDATE pinreg SET nuskaitytas = 1, json = $1 WHERE uuid = $2`,
-        [data, deklaracija.uuid],
+        `UPDATE pinreg SET nuskaitytas = 1, json = $1, "pateikimoData" = $2 WHERE uuid = $3`,
+        [data, data.pateikimoData ?? null, deklaracija.uuid],
     );
 
     const allRows = deklaracijaToRysiai(data);
