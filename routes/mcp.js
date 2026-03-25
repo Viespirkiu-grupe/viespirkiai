@@ -1,10 +1,17 @@
 import express from "express";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createMcpServer } from "../modules/mcp/server.js";
 
 const mcpRouter = express.Router();
 
+let mcpImports = null;
+
 mcpRouter.post("/mcp", async (req, res) => {
+    if (!mcpImports) {
+        mcpImports = await Promise.all([
+            import("@modelcontextprotocol/sdk/server/streamableHttp.js"),
+            import("../modules/mcp/server.js"),
+        ]);
+    }
+    const [{ StreamableHTTPServerTransport }, { createMcpServer }] = mcpImports;
     const server = await createMcpServer();
     const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,

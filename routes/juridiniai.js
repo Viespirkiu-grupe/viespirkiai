@@ -2,7 +2,8 @@ import express from "express";
 import cleanEmptyQueryParams from "../utils/queryParams.js";
 import config from "../utils/config.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
-import { createCanvas } from "canvas";
+import { Worker } from "worker_threads";
+import { fileURLToPath } from "url";
 import { postgres } from "../postgres/postgres.js";
 import {
     searchJar,
@@ -15,6 +16,30 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 250;
 const TILE_SIZE = 256;
 const OVERSAMPLE = 4;
+
+const TILE_WORKER_PATH = fileURLToPath(
+    new URL("../utils/tileWorker.js", import.meta.url),
+);
+
+/**
+ * Offloads canvas tile rendering to a worker thread.
+ * @param {object[]} rows
+ * @param {{ TILE_SIZE: number, scale: number, minTileX: number, minTileY: number }} opts
+ * @returns {Promise<Buffer>}
+ */
+function renderTile(rows, opts) {
+    return new Promise((resolve, reject) => {
+        const worker = new Worker(TILE_WORKER_PATH, {
+            workerData: { rows, ...opts },
+        });
+        worker.once("message", resolve);
+        worker.once("error", reject);
+        worker.once("exit", (code) => {
+            if (code !== 0)
+                reject(new Error(`Tile worker exited with code ${code}`));
+        });
+    });
+}
 
 /**
  * @param {{ limit?: string }} query
@@ -175,27 +200,11 @@ juridiniaiRouter.get("/juridiniai/map/tiles/:z/:x/:y.png", async (req, res) => {
         [z + OVERSAMPLE, minTileX, maxTileX, minTileY, maxTileY],
     );
 
-    const canvas = createCanvas(TILE_SIZE, TILE_SIZE);
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, TILE_SIZE, TILE_SIZE);
-
-    const maxCount = Math.max(...rows.map((r) => r.pointCount), 1);
-
-    for (const row of rows) {
-        const fx = (row.tileX - minTileX) / scale;
-        const fy = (row.tileY - minTileY) / scale;
-        const px = fx * TILE_SIZE;
-        const py = fy * TILE_SIZE;
-        const pw = TILE_SIZE / scale;
-        const ph = TILE_SIZE / scale;
-        const intensity =
-            Math.log10(row.pointCount + 1) / Math.log10(maxCount + 1);
-        ctx.fillStyle = `rgba(255,${Math.round(255 * (1 - intensity))},0,${Math.min(Math.max(intensity, 0), 1)})`;
-        ctx.fillRect(px, py, pw, ph);
-    }
+    // Render PNG in a worker thread to keep the event loop free
+    const buffer = await renderTile(rows, { TILE_SIZE, scale, minTileX, minTileY });
 
     res.setHeader("Content-Type", "image/png");
-    canvas.pngStream().pipe(res);
+    res.end(buffer);
 });
 
 juridiniaiRouter.get("/juridiniai/map/viewport", async (req, res) => {

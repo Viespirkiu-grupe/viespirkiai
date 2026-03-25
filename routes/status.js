@@ -94,13 +94,15 @@ async function fetchPaskutinisGedimas() {
  */
 function enrichApjungti(apjungti, timestamps, intervalai) {
     const byDay = Map.groupBy(timestamps, (ts) => toIsoDay(new Date(ts)));
+    // Pre-index intervals by day for O(n+m) instead of O(n×m)
+    const intervalsByDay = Map.groupBy(intervalai, (i) =>
+        toIsoDay(new Date(i.start_time)),
+    );
 
     for (const item of apjungti) {
         const day = toIsoDay(new Date(item.day));
         item.timestamps = byDay.get(day) ?? [];
-        item.intervals = intervalai.filter(
-            (i) => toIsoDay(new Date(i.start_time)) === day,
-        );
+        item.intervals = intervalsByDay.get(day) ?? [];
     }
 }
 
@@ -118,7 +120,12 @@ statusRouter.get("/status/:pavadinimas", async (req, res, next) => {
             fetchIntervalai(),
             postgres
                 .query(
-                    `SELECT "timestamp" FROM public."eviesiejipirkimaiGedimai" ORDER BY "timestamp" DESC`,
+                    // Group by day server-side — avoids loading every raw timestamp into Node.js memory
+                    `SELECT "timestamp"::date AS day,
+                            MAX("timestamp") AS "timestamp"
+                     FROM public."eviesiejipirkimaiGedimai"
+                     GROUP BY "timestamp"::date
+                     ORDER BY day DESC`,
                 )
                 .then((r) => r.rows.map((r) => r.timestamp)),
             fetchPaskutinisGedimas(),

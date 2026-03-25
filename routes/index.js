@@ -6,13 +6,18 @@ import { objectsToCsvStream } from "../utils/csv.js";
 import { objectsToJsonlStream } from "../utils/jsonl.js";
 import { Transform } from "node:stream";
 import Timings from "../utils/timings.js";
-import { buildAnalize, buildAnalizeXlsx } from "../modules/sutartys/analize.js";
 import {
     searchSutartys,
     countSutartys,
 } from "../modules/sutartys/searchSutartys.js";
 
 const indexRouter = express.Router();
+
+let analizeModule = null;
+async function getAnalizeModule() {
+    if (!analizeModule) analizeModule = await import("../modules/sutartys/analize.js");
+    return analizeModule;
+}
 
 const DEFAULT_LIMIT = 50;
 const MAX_TYPESENSE_LIMIT = 5_000;
@@ -228,16 +233,19 @@ indexRouter.get("/", cleanEmptyQueryParams, async (req, res, next) => {
         limit,
     });
 
-    if (req.query.json)
+    if (req.query.json) {
+        const analizeMod = req.query.analize ? await getAnalizeModule() : null;
         return res.json({
             results,
-            analize: req.query.analize ? buildAnalize(results) : undefined,
+            analize: analizeMod ? analizeMod.buildAnalize(results) : undefined,
         });
+    }
 
-    const analize = req.query.analize ? buildAnalize(results) : undefined;
+    const analizeMod = req.query.analize ? await getAnalizeModule() : null;
+    const analize = analizeMod ? analizeMod.buildAnalize(results) : undefined;
 
     if (analize && req.query.xlsx) {
-        const buf = await buildAnalizeXlsx(analize, results);
+        const buf = await analizeMod.buildAnalizeXlsx(analize, results);
         res.setHeader(
             "Content-Disposition",
             `attachment; filename=viespirkiai-analize-${new Date().toISOString()}.xlsx`,

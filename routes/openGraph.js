@@ -1,13 +1,16 @@
 import express from "express";
-import createDOMPurify from "dompurify";
-import { JSDOM } from "jsdom";
-
-const window = new JSDOM("").window;
-const DOMPurify = createDOMPurify(window);
 
 const openGraphRouter = express.Router();
 
+let DOMPurify = null;
+
 openGraphRouter.get("/openGraph", async (req, res) => {
+    if (!DOMPurify) {
+        const { default: createDOMPurify } = await import("dompurify");
+        const { JSDOM } = await import("jsdom");
+        DOMPurify = createDOMPurify(new JSDOM("").window);
+    }
+
     const { tipas, pavadinimas, aprasymas, id } = req.query;
 
     const safePavadinimas = DOMPurify.sanitize(pavadinimas || "");

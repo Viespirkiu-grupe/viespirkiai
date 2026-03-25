@@ -23,32 +23,7 @@ import { mvpAprasaiPagalJarKoda } from "../mvpTvarkosAprasai/getByJar.js";
 export async function getJuridinisInfo(jarKodas, options = {}) {
     let timings = options.timings || new Timings();
 
-    timings.start("jarCsv");
-    // Detalus JAR
-    const { rows: jarRezultatai } = await postgres.query(
-        `SELECT *,
-                    ST_X(location::geometry) AS lon,
-                    ST_Y(location::geometry) AS lat
-             FROM "jarCsv"
-             WHERE "jarKodas" = $1
-             LIMIT 1`,
-        [jarKodas],
-    );
-    timings.end("jarCsv");
-
-    // data.gov.lt ID JAR
-    let jarId;
-    timings.start("jar");
-    const jarRes = await postgres.query(
-        `SELECT * FROM "jar" WHERE "jarKodas" = $1`,
-        [jarKodas],
-    );
-    timings.end("jar");
-
-    if (jarRes.rows && jarRes.rows.length > 0) {
-        jarId = jarRes.rows[0]._id;
-    }
-
+    // Check special codes first — pure in-memory, no DB needed
     if (specialJarCodes[jarKodas]) {
         const { pavadinimas, aprasymas } = specialJarCodes[jarKodas];
         return {
@@ -57,6 +32,36 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
             aprasymas,
             timings,
         };
+    }
+
+    // Fetch jarCsv and jar in parallel — they are independent
+    timings.start("jarCsv");
+    timings.start("jar");
+    const [
+        { rows: jarRezultatai },
+        jarRes,
+    ] = await Promise.all([
+        postgres.query(
+            `SELECT *,
+                        ST_X(location::geometry) AS lon,
+                        ST_Y(location::geometry) AS lat
+                 FROM "jarCsv"
+                 WHERE "jarKodas" = $1
+                 LIMIT 1`,
+            [jarKodas],
+        ),
+        postgres.query(
+            `SELECT * FROM "jar" WHERE "jarKodas" = $1`,
+            [jarKodas],
+        ),
+    ]);
+    timings.end("jarCsv");
+    timings.end("jar");
+
+    // data.gov.lt ID JAR
+    let jarId;
+    if (jarRes.rows && jarRes.rows.length > 0) {
+        jarId = jarRes.rows[0]._id;
     }
 
     // 404

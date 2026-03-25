@@ -22,4 +22,5 @@ export default {
     onionAddress: undefined,
     internalFileBase: "https://failai.viespirkiai.org",
     ocrBandymai: 5,
+    parallelRouteLoading: true, // false = sequential (easier to debug startup order)
 };

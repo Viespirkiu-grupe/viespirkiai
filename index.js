@@ -141,19 +141,34 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: "25MB" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
-// Auto-load all routes from /routes (in parallel)
+// Auto-load all routes from /routes
 const routesPath = path.join(__dirname, "routes");
 const files = fs.readdirSync(routesPath).filter((file) => file.endsWith(".js"));
 
-for (const file of files) {
-    const start = Date.now();
-
-    const { default: router } = await import(`./routes/${file}`);
-    app.use(router);
-
-    const duration = Date.now() - start;
-    log(`${file} loaded in ${duration}ms`);
+const loadStart = Date.now();
+if (config.parallelRouteLoading !== false) {
+    // Parallel: all imports fire at once, registered in original order afterwards
+    const routeModules = await Promise.all(
+        files.map(async (file) => {
+            const start = Date.now();
+            const mod = await import(`./routes/${file}`);
+            log(`${file} loaded in ${Date.now() - start}ms`);
+            return mod;
+        })
+    );
+    for (let i = 0; i < files.length; i++) {
+        app.use(routeModules[i].default);
+    }
+} else {
+    // Sequential: one route at a time (useful for debugging startup order)
+    for (const file of files) {
+        const start = Date.now();
+        const { default: router } = await import(`./routes/${file}`);
+        app.use(router);
+        log(`${file} loaded in ${Date.now() - start}ms`);
+    }
 }
+log(`All ${files.length} routes loaded in ${Date.now() - loadStart}ms`);
 
 // 404
 app.use((req, res, next) => {
