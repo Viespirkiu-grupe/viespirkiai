@@ -519,12 +519,24 @@ failaiSearchRouter.get("/failai/ocr", async (req, res) => {
     const ocrStatsDay = ocrStatsDayRes.rows;
     const latestDay = ocrStatsDay[0]; // jau ORDER BY date DESC
     const ocrPerMinute = latestDay
-        ? {
-              date: latestDay.date,
-              results: (latestDay.results / 1440).toFixed(2),
-              pages: (latestDay.pages / 1440).toFixed(2),
-              words: (latestDay.words / 1440).toFixed(2),
-          }
+        ? (() => {
+              const nowLT = new Date(
+                  new Date().toLocaleString("en-US", {
+                      timeZone: "Europe/Vilnius",
+                  }),
+              );
+              const todayLT = nowLT.toISOString().slice(0, 10);
+              const isToday = latestDay.date === todayLT;
+              const minutes = isToday
+                  ? nowLT.getHours() * 60 + nowLT.getMinutes() || 1
+                  : 1440;
+              return {
+                  date: latestDay.date,
+                  results: (latestDay.results / minutes).toFixed(2),
+                  pages: (latestDay.pages / minutes).toFixed(2),
+                  words: (latestDay.words / minutes).toFixed(2),
+              };
+          })()
         : null;
 
     res.render("failai/ocr", {
