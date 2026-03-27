@@ -253,4 +253,42 @@ failasRouter.get("/failas/:id", async (req, res, next) => {
     return aptarnautiFailą(req, res, next, failas, requestsJson);
 });
 
+failasRouter.get("/cvpp/fileProxy/:lid/:dvid", async (req, res) => {
+    const { lid, dvid } = req.params;
+    const url = `https://pirkimai.eviesiejipirkimai.lt/app/docmgmt/downloadPublicDocument.asp?FMT=5&AT=3&LID=${lid}&DVID=${dvid}`;
+
+    const cookieRes = await fetch(url, { redirect: "manual" });
+    const cookies =
+        cookieRes.headers.getSetCookie?.() ??
+        (cookieRes.headers.get("set-cookie")
+            ? [cookieRes.headers.get("set-cookie")]
+            : []);
+    const cookieHeader = cookies.map((c) => c.split(";")[0]).join("; ");
+
+    const fileRes = await fetch(url, {
+        headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+    });
+    if (!fileRes.ok)
+        return res.status(fileRes.status).send("Nepavyko gauti failo.");
+
+    const contentType =
+        fileRes.headers.get("content-type") || "application/octet-stream";
+    const contentDisposition =
+        fileRes.headers.get("content-disposition") ||
+        `attachment; filename="${dvid}_${lid}"`;
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", contentDisposition);
+    res.setHeader("Cache-Control", "private, max-age=86400, immutable");
+
+    const { Readable } = await import("stream");
+    const stream = Readable.fromWeb(fileRes.body);
+    stream.on("error", (err) => {
+        console.error("Stream error:", err);
+        if (!res.headersSent) res.status(500).send("Error streaming file.");
+        else res.destroy(err);
+    });
+    stream.pipe(res);
+});
+
 export default failasRouter;

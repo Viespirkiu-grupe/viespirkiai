@@ -73,13 +73,24 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
                 el
                     .querySelector(".notice-search-item-header img")
                     ?.getAttribute("src")
-                    ?.match(/flag_(\w+)\.gif/)?.[1]
+                    ?.match(/flag_(\w+)\.(?:gif|png)/)?.[1]
                     .replace(/_./g, (m) => m[1].toUpperCase()) || null,
             link:
                 el
-                    .querySelector(".notice-search-item-header a")
+                    .querySelector(
+                        ".notice-search-item-header a:not(.pull-right)",
+                    )
+                    ?.getAttribute("href") || "",
+            dokumentaiLink:
+                el
+                    .querySelector(".notice-search-item-header a.doc-icon")
                     ?.getAttribute("href") || "",
         };
+
+        console.log(skelbimas.link, skelbimas.dokumentaiLink);
+        if (skelbimas.link && skelbimas.link.startsWith("/")) {
+            skelbimas.link = `https://cvpp.eviesiejipirkimai.lt${skelbimas.link}`;
+        }
         skelbimai.push(skelbimas);
     });
 
@@ -89,9 +100,9 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
     const placeholders = [];
 
     skelbimai.forEach((s, i) => {
-        const idx = i * 10; // 10 columns
+        const idx = i * 11; // 11 columns
         placeholders.push(
-            `($${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, $${idx + 9}, $${idx + 10})`,
+            `($${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, $${idx + 9}, $${idx + 10}, $${idx + 11})`,
         );
         values.push(
             s.skelbimoKodas,
@@ -104,12 +115,13 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
             s.paskelbimoData,
             s.zenkliukas,
             s.link,
+            s.dokumentaiLink,
         );
     });
 
     await postgres.query(
         `INSERT INTO "cvppViesiejiPirkimai"
-        ("skelbimoKodas", pavadinimas, "pirkimoVykdytojas", "pirkimoVykdytojoLink", "skelbimoTipas", "pirkimoNumeris", "pasiulymuPateikimoTerminas", "paskelbimoData", zenkliukas, link)
+        ("skelbimoKodas", pavadinimas, "pirkimoVykdytojas", "pirkimoVykdytojoLink", "skelbimoTipas", "pirkimoNumeris", "pasiulymuPateikimoTerminas", "paskelbimoData", zenkliukas, link, "dokumentaiLink")
         VALUES ${placeholders.join(", ")}
         ON CONFLICT ("skelbimoKodas") DO UPDATE SET
           pavadinimas = EXCLUDED.pavadinimas,
@@ -120,7 +132,8 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
           "pasiulymuPateikimoTerminas" = EXCLUDED."pasiulymuPateikimoTerminas",
           "paskelbimoData" = EXCLUDED."paskelbimoData",
           zenkliukas = EXCLUDED.zenkliukas,
-          link = EXCLUDED.link`,
+          link = EXCLUDED.link,
+          "dokumentaiLink" = EXCLUDED."dokumentaiLink"`,
         values,
     );
 

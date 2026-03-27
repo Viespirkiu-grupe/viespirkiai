@@ -219,6 +219,26 @@ tasks.push({
     },
 });
 
+tasks.push({
+    name: "failuParsiuntimas3",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 0,
+    job: async () => {
+        return parsiustiFaila();
+    },
+});
+
+tasks.push({
+    name: "failuParsiuntimas4",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 0,
+    job: async () => {
+        return parsiustiFaila();
+    },
+});
+
 // LITEKO bylų metaduomenys (paieškos rezultatai)
 import { litekoScrapeLatestDays } from "./modules/liteko/scrape.js";
 tasks.push({

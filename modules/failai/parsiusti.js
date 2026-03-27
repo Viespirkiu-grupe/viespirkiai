@@ -209,6 +209,15 @@ export async function parsiustiFaila(options = {}) {
             } else {
                 url = proxy.url + `/${failas.saltinioId}`;
             }
+        } else if (saltinis == "cvpp") {
+            let proxy = await getProxyBySite("cvpp");
+            if (!proxy) {
+                throw new Error(
+                    `Nerasta proxy CVPP šaltiniui. Šaltinis: ${saltinis}`,
+                ); // CVPP šaltiniui proxy yra būtina
+            }
+            const [dvid, lid] = failas.saltinioId.split("/");
+            url = proxy.url + `/${lid}/${dvid}`;
         } else {
             throw new Error(`Nežinomas šaltinis: ${saltinis}`);
         }
