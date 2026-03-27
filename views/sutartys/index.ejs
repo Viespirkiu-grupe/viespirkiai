@@ -35,7 +35,7 @@
         fetch(url)
           .then(res => res.json())
           .then(data => {
-            if (data.total) {
+            if (data.total !== undefined) {
               span.className = '';
               document.querySelector('.numberOfResults').innerHTML = data.numberOfResults;
               document.querySelector('ul.pagination').innerHTML = data.pagination;
