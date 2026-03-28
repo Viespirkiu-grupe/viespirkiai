@@ -19,6 +19,7 @@ import { rastiDomenusPagalJarKoda } from "../domenai/rastiPagalJarKoda.js";
 import { rastiKotisPagalGavejoKoda } from "../kotis/getByJarKodas.js";
 import { getEsInvesticijosByJar } from "../2014esinvesticijos/getEsInvesticijosByJar.js";
 import { mvpAprasaiPagalJarKoda } from "../mvpTvarkosAprasai/getByJar.js";
+import { getVdiPazeidimai } from "../vdi/getPazeidimai.js";
 
 export async function getJuridinisInfo(jarKodas, options = {}) {
     let timings = options.timings || new Timings();
@@ -37,10 +38,7 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
     // Fetch jarCsv and jar in parallel — they are independent
     timings.start("jarCsv");
     timings.start("jar");
-    const [
-        { rows: jarRezultatai },
-        jarRes,
-    ] = await Promise.all([
+    const [{ rows: jarRezultatai }, jarRes] = await Promise.all([
         postgres.query(
             `SELECT *,
                         ST_X(location::geometry) AS lon,
@@ -50,10 +48,7 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
                  LIMIT 1`,
             [jarKodas],
         ),
-        postgres.query(
-            `SELECT * FROM "jar" WHERE "jarKodas" = $1`,
-            [jarKodas],
-        ),
+        postgres.query(`SELECT * FROM "jar" WHERE "jarKodas" = $1`, [jarKodas]),
     ]);
     timings.end("jarCsv");
     timings.end("jar");
@@ -115,6 +110,8 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
             getEsInvesticijosByJar(jarKodas, options?.esInvesticijos),
         mvpAprasai: async () =>
             mvpAprasaiPagalJarKoda(jarKodas, options?.mvpAprasai),
+        vdiPazeidimai: async () =>
+            getVdiPazeidimai(jarKodas, options?.vdiPazeidimai),
     };
 
     // Run all tasks in parallel with timings
