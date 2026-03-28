@@ -7,7 +7,7 @@
     font-family: var(--font-mono);
     font-size: 13px;
     line-height: 1.6;
-    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    border-radius: var(--radius-lg);
     border: var(--border);
     border-top: none;
     max-width: 100%;
@@ -19,9 +19,8 @@
     display: block;
 }
 
-.code-block-standalone {
-    border-radius: var(--radius-lg);
-    border-top: var(--border);
+.code-block-integrated-top {
+    border-radius: 0 0 var(--radius-lg);
 }
 
 pre code.hljs{display:block;overflow-x:auto;padding:1em}code.hljs{padding:5px 5px}/*!
