@@ -26,35 +26,34 @@ async function fillBucket() {
     try {
         const limit = BUCKET_SIZE - kibirelis.length;
         if (limit <= 0) return;
-
         const res = await postgres.query(
-            `SELECT *
-             FROM failai
-             WHERE parsiustas = 0 OR ((parsiustas = -1 OR parsiustas IS NULL)
-               AND (
-                   "parsiuntimoBandymai" IS NULL
-                   OR "paskutinisParsiuntimoBandymas" IS NULL
-                   OR (
-                       COALESCE("parsiuntimoBandymai", 0) < 6
-                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '1 hour'
-                   )
-                   OR (
-                       COALESCE("parsiuntimoBandymai", 0) >= 6
-                       AND COALESCE("parsiuntimoBandymai", 0) < 30
-                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '3 hours'
-                   )
-                   OR (
-                       COALESCE("parsiuntimoBandymai", 0) >= 30
-                       AND COALESCE("parsiuntimoBandymai", 0) < 54
-                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '1 day'
-                   )
-                   OR (
-                       COALESCE("parsiuntimoBandymai", 0) >= 54
-                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '3 days'
-                   )
-               ))
-             ORDER BY id DESC
-             LIMIT $1`,
+            `(
+                SELECT * FROM failai
+                WHERE parsiustas = 0
+                   OR ((parsiustas = -1 OR parsiustas IS NULL)
+                       AND COALESCE("parsiuntimoBandymai", 0) = 0)
+                ORDER BY id DESC
+                LIMIT $1
+            )
+            UNION ALL
+            (
+                SELECT * FROM failai
+                WHERE (parsiustas = -1 OR parsiustas IS NULL)
+                  AND COALESCE("parsiuntimoBandymai", 0) > 0
+                  AND (
+                      (COALESCE("parsiuntimoBandymai", 0) < 6
+                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '1 hour')
+                      OR (COALESCE("parsiuntimoBandymai", 0) < 30
+                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '3 hours')
+                      OR (COALESCE("parsiuntimoBandymai", 0) < 54
+                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '1 day')
+                      OR "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '3 days'
+                  )
+                ORDER BY id DESC
+                LIMIT $1
+            )
+            ORDER BY id DESC
+            LIMIT $1`,
             [limit * 2],
         );
 
