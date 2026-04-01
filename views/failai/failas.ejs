@@ -323,6 +323,8 @@
             <pre style="white-space:pre-wrap; word-wrap:break-word; font-family:var(--font-mono); font-size:var(--text-sm); margin:0;"><%= failas.tekstas || "" %></pre>
           </div>
 
+        <% } else if (failas.extension === "fax" && failas.md5 === 'e083b15bc91cd24583955d3493347f7a') { %>
+            <%- include('./specialCases/fax.ejs') %>
         <% } else if (["html","htm","svg"].includes(failas.extension)) { %>
           <iframe
             src="https://failai.viespirkiai.org/<%= failas.id %>"
