@@ -1,0 +1,845 @@
+{
+    "start": {
+        "bot": "Laba diena. Esu Viešpirkių pagalbos asistentas Viešpirkis. Kuo galėčiau Jums padėti šiandien?",
+        "options": [
+            {
+                "text": "Ieškau pirkimo duomenų",
+                "next": "duomenys"
+            },
+            {
+                "text": "Noriu pateikti pasiūlymą",
+                "next": "pasiulymas"
+            },
+            {
+                "text": "Turiu klausimų dėl pirkimo",
+                "next": "klausimai"
+            },
+            {
+                "text": "Norėčiau pateikti skundą",
+                "next": "skustis"
+            },
+            {
+                "text": "Kas yra viešieji pirkimai",
+                "next": "kas_yra"
+            }
+        ]
+    },
+    "duomenys": {
+        "bot": "Viešpirkiai skelbia duomenis apie tai, ką ir už kiek nusipirko valstybė. Dažniausiai tai nuvilia. Kokios informacijos ieškote?",
+        "options": [
+            {
+                "text": "Ieškau konkretaus pirkimo",
+                "next": "ieskoti_pirkimo"
+            },
+            {
+                "text": "Noriu filtruoti pagal pirkėją",
+                "next": "filtras_pirkejas"
+            },
+            {
+                "text": "Noriu filtruoti pagal tiekėją",
+                "next": "filtras_tiekejas"
+            },
+            {
+                "text": "Noriu eksportuoti duomenis",
+                "next": "eksportas"
+            },
+            {
+                "text": "Duomenys atrodo neteisingi",
+                "next": "neteisingi"
+            }
+        ]
+    },
+    "ieskoti_pirkimo": {
+        "bot": "Pasinaudokite paieška. Jeigu pirkimo nerasite – jis arba neįkeltas, arba pavadintas taip, kad niekas nerastų. Abu scenarijai yra įprasti.",
+        "options": [
+            {
+                "text": "Paieška nieko neranda",
+                "next": "paieska_neranda"
+            },
+            {
+                "text": "Ačiū, supratau",
+                "next": "supratau"
+            }
+        ]
+    },
+    "paieska_neranda": {
+        "bot": "Galimi du variantai: pirkimas dar neįkeltas arba jis pavadintas kūrybiškai. Viešųjų pirkimų pavadinimai kartais būna... įkvėpti.",
+        "options": [
+            {
+                "text": "Kūrybiškai – tai kaip?",
+                "next": "kurybiskai"
+            },
+            {
+                "text": "Supratau, bandysiu kitaip",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kurybiskai": {
+        "bot": "Pavyzdžiui, baldų pirkimas gali būti vadinamas „darbo aplinkos optimizavimo sprendimų įsigijimu“. Rekomenduojame bandyti trumpesnius žodžius.",
+        "options": [
+            {
+                "text": "Supratau. Liūdna.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "filtras_pirkejas": {
+        "bot": "Galite filtruoti pagal perkančiąją organizaciją. Rekomenduojame pradėti nuo tų, kurių biudžetas didžiausias – ten dažniausiai ir įdomiausia.",
+        "options": [
+            {
+                "text": "Organizacijos sąraše nėra",
+                "next": "nera_sarase"
+            },
+            {
+                "text": "Ačiū, supratau",
+                "next": "supratau"
+            }
+        ]
+    },
+    "nera_sarase": {
+        "bot": "Jeigu organizacijos nėra – jos duomenys dar nepasiekė sistemos. Arba ji perka taip, kad geriau nežinoti.",
+        "options": [
+            {
+                "text": "Kaip tai įmanoma?",
+                "next": "kaip_imanoma"
+            },
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kaip_imanoma": {
+        "bot": "Viešųjų pirkimų sistemoje daug kas įmanoma. Būtent todėl egzistuoja Viešpirkiai.",
+        "options": [
+            {
+                "text": "Gerai, supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "filtras_tiekejas": {
+        "bot": "Filtravimas pagal tiekėją leidžia pamatyti, kas ir kiek uždirba iš valstybės. Atsakymas dažnai stebina.",
+        "options": [
+            {
+                "text": "Kaip stebina?",
+                "next": "kaip_stebina"
+            },
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kaip_stebina": {
+        "bot": "Tais pačiais tiekėjais. Metai iš metų. Šis asistentas neturi įgaliojimų komentuoti, tačiau skaičiai kalba patys.",
+        "options": [
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "eksportas": {
+        "bot": "Duomenų eksporto funkcija – tai viena iš tų funkcijų, kurios arba veikia, arba ne. Rekomenduojame pabandyti ir nusivilti patyrus.",
+        "options": [
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "neteisingi": {
+        "bot": "Duomenys pateikiami tokie, kokie jie yra oficialiuose šaltiniuose. Jeigu jie neteisingi – tikėtina, kad šaltinyje irgi neteisingi. Tai yra žinoma ir sena problema.",
+        "options": [
+            {
+                "text": "Kur pranešti?",
+                "next": "saltinio_klaida"
+            },
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "saltinio_klaida": {
+        "bot": "Teoriškai – atitinkamai institucijai. Praktiškai – sėkmės.",
+        "options": [
+            {
+                "text": "Ačiū už realizmą.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kas_yra": {
+        "bot": "Viešieji pirkimai – tai valstybės pirkiniai už mokesčių mokėtojų pinigus. Viešpirkiai šiuos duomenis deda į vieną vietą, kad būtų nepatogu daryti tai, kas daroma.",
+        "options": [
+            {
+                "text": "Ačiū, supratau",
+                "next": "supratau"
+            },
+            {
+                "text": "Nesupratau",
+                "next": "nesupratau"
+            }
+        ]
+    },
+    "nesupratau": {
+        "bot": "Valstybė perka. Kartais brangiai. Kartais iš tų pačių. Viešpirkiai tai rodo. Šis asistentas – nelabai.",
+        "options": [
+            {
+                "text": "Dabar supratau",
+                "next": "supratau"
+            },
+            {
+                "text": "Vis tiek nesuprantu",
+                "next": "vis_nesuprantu"
+            }
+        ]
+    },
+    "vis_nesuprantu": {
+        "bot": "Tai normalu. Sistemos supratimas nėra nei lengvas, nei malonus procesas. Rekomenduojame kavą.",
+        "options": [
+            {
+                "text": "Grįžti į pradžią",
+                "next": "start"
+            }
+        ]
+    },
+    "supratau": {
+        "bot": "Puiku. Ar galiu Jums dar kuo nors nepadėti?",
+        "options": [
+            {
+                "text": "Taip, turiu dar klausimų",
+                "next": "start"
+            },
+            {
+                "text": "Ne, ačiū",
+                "next": "bye"
+            }
+        ]
+    },
+    "bye": {
+        "bot": "Dėkojame, kad naudojatės Viešpirkių pagalbos asistentu Viešpirkiu. Linkime sėkmės – ji bus reikalinga.",
+        "options": [
+            {
+                "text": "Palaukite... kas čia buvo?",
+                "next": "april_reveal"
+            },
+            {
+                "text": "Pradėti iš naujo",
+                "next": "start"
+            }
+        ]
+    },
+    "april_reveal": {
+        "bot": "Sveikiname su balandžio 1-ąja. Tikrasis Viešpirkių portalas yra visiškai realus ir, skirtingai nuo šio asistento, naudingas.",
+        "april": true,
+        "options": [
+            {
+                "text": "Ha. Ha. Ha.",
+                "next": "po_reveal"
+            }
+        ]
+    },
+    "po_reveal": {
+        "bot": [
+            {"text": "Deja, bet, iniciatyvos nuomone, tokių pasityčiojimų iš vartotojo kaip šis, viešajame sektoriuje yra daug."},
+            {"text": "Kviečiame paskaityti patį pirmąjį Viešpirkių leidinį"},
+            {"img": "https://viespirkiai.org/vieslaiskiai/1/poster.webp", "href": "https://viespirkiai.org/vieslaiskiai/1.pdf"},
+            {"text": "Bei tęsinį:"},
+            {"img": "https://viespirkiai.org/vieslaiskiai/8/poster.webp", "href": "https://viespirkiai.org/vieslaiskiai/8.pdf"}
+        ],
+        "options": [
+            {
+                "text": "Pradėti iš naujo",
+                "next": "start"
+            }
+        ]
+    },
+    "del_priezasciu": {
+        "bot": "Sistema šiuo metu atnaujinama. Arba neveikia. Skirtumas praktiškai nepastebimas.",
+        "options": [
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "pasiulymas": {
+        "bot": "Supratau, Jūs pageidaujate pateikti pasiūlymą. Sveikiname su optimizmu. Kokio tipo pirkimas?",
+        "options": [
+            {
+                "text": "Atviras konkursas",
+                "next": "atviras"
+            },
+            {
+                "text": "Supaprastintas pirkimas",
+                "next": "supaprastintas"
+            },
+            {
+                "text": "Riboto dalyvių skaičiaus konkursas",
+                "next": "ribotas"
+            },
+            {
+                "text": "Nežinau kokio tipo",
+                "next": "nezinau_tipo"
+            }
+        ]
+    },
+    "atviras": {
+        "bot": "Atviras konkursas – teoriškai atviras visiems. Praktiškai dokumentų reikalavimai kartais padeda atfiltruoti „netinkamus“ tiekėjus dar prieš vertinimą.",
+        "options": [
+            {
+                "text": "Kur rasti pirkimo sąlygas?",
+                "next": "kur_salygos"
+            },
+            {
+                "text": "Kur pateikti dokumentus?",
+                "next": "kur_pateikti"
+            },
+            {
+                "text": "Ačiū",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kur_salygos": {
+        "bot": "Sąlygos skelbiamos atitinkamoje sistemoje. Jei sąlygos atrodo parašytos konkrečiam tiekėjui – dažniausiai taip ir yra.",
+        "options": [
+            {
+                "text": "Ką daryti tokiu atveju?",
+                "next": "ka_daryti"
+            },
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "ka_daryti": {
+        "bot": "Galite skųstis. Procesą aprašome skundų skiltyje. Rezultatas – statistiškai neįkvepiantis, bet principas svarbus.",
+        "options": [
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kur_pateikti": {
+        "bot": "Pasiūlymai teikiami per elektroninę sistemą. Sistema kartais veikia sklandžiai. Ypač likus kelioms minutėms iki termino.",
+        "options": [
+            {
+                "text": "Supratau, dėkoju.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "supaprastintas": {
+        "bot": "Supaprastintas pirkimas – paprastesnė forma, mažesnė konkurencija, didesnė tikimybė, kad laimėtojas jau žinomas iš anksto. Ar Jūsų vertė viršija nustatytus slenkstelius?",
+        "options": [
+            {
+                "text": "Taip, viršija",
+                "next": "virsija"
+            },
+            {
+                "text": "Ne, neviršija",
+                "next": "nevirsija"
+            },
+            {
+                "text": "Nežinau",
+                "next": "nezinau_verts"
+            }
+        ]
+    },
+    "virsija": {
+        "bot": "Tuomet procedūra turėtų būti griežtesnė. Turėtų.",
+        "options": [
+            {
+                "text": "Kur rasti reikalavimus?",
+                "next": "teisine_baze"
+            },
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "teisine_baze": {
+        "bot": "Reikalavimai yra teisės aktuose. Teisės aktai yra registruose. Registrai yra internete. Internetas yra ten, kur Jūs šiuo metu esate.",
+        "options": [
+            {
+                "text": "Ačiū už kelionę.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "nevirsija": {
+        "bot": "Puiku. Galite pirkti supaprastintai. Ir tikėtis, kad komisija perskaitys Jūsų pasiūlymą.",
+        "options": [
+            {
+                "text": "O ar perskaito?",
+                "next": "tikriausiai"
+            },
+            {
+                "text": "Ačiū.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "tikriausiai": {
+        "bot": "Oficiali pozicija – taip, visada. Viešpirkių duomenys šios pozicijos nepatvirtina ir nepaneigia. Tiesiog neklauskite.",
+        "options": [
+            {
+                "text": "Aš ir esu komisijos narys",
+                "next": "juristas"
+            },
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "juristas": {
+        "bot": "Tuomet Jūs tikrai žinote daugiau nei šis asistentas. Tikimės, kad ir visų dalyvių pasiūlymus perskaitote.",
+        "options": [
+            {
+                "text": "Pradėti iš naujo",
+                "next": "start"
+            }
+        ]
+    },
+    "nezinau_verts": {
+        "bot": "Rekomenduojame sužinoti. Pirkimo vertė yra viena iš nedaugelio dalykų viešuosiuose pirkimuose, kurią galima objektyviai nustatyti.",
+        "options": [
+            {
+                "text": "Kaip ją nustatyti?",
+                "next": "kaip_skaiciuoti"
+            },
+            {
+                "text": "Gerai, sužinosiu",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kaip_skaiciuoti": {
+        "bot": "Sudėkite sumas. Gausite sumą. Tai yra bene paprasčiausias žingsnis visuose viešuosiuose pirkimuose.",
+        "options": [
+            {
+                "text": "Ačiū.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "ribotas": {
+        "bot": "Riboto dalyvių skaičiaus konkursas – pirkimo būdas, kai ne visi gali dalyvauti. Kartais tai pateisinama. Kartais – tiesiog patogu.",
+        "options": [
+            {
+                "text": "Ar aš galiu dalyvauti?",
+                "next": "ar_galiu"
+            },
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "ar_galiu": {
+        "bot": "Tai priklauso nuo to, ar atitinkate kvalifikacinius reikalavimus. O reikalavimai – nuo to, kiek norima, kad atitiktumėte.",
+        "options": [
+            {
+                "text": "Supratau daugiau nei norėjau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "nezinau_tipo": {
+        "bot": "Jeigu nežinote tipo – rekomenduojame sužinoti prieš pradedant. Nors kai kurie perkantys asmenys irgi nežino ir tai nestabdo.",
+        "options": [
+            {
+                "text": "Kaip nustatyti tipą?",
+                "next": "kaip_tipo"
+            },
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kaip_tipo": {
+        "bot": "Tipą nustato perkančioji organizacija pagal pirkimo vertę ir objektą. Jeigu Jūs ir esate ta organizacija – rekomenduojame pasikonsultuoti su savimi. Tai dažnai efektyviausia.",
+        "options": [
+            {
+                "text": "Su savimi?",
+                "next": "su_savimi"
+            },
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "su_savimi": {
+        "bot": "Taip. Greičiau nei laukiant atsakymo iš šio asistento. Tikrai.",
+        "options": [
+            {
+                "text": "Ačiū. Tai tiesiogiškiausia pagalba šiame pokalbyje.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "klausimai": {
+        "bot": "Supratau. Kokio pobūdžio klausimas Jus domina?",
+        "options": [
+            {
+                "text": "Kokie dokumentai reikalingi?",
+                "next": "dokumentai"
+            },
+            {
+                "text": "Kiek laiko trunka pirkimas?",
+                "next": "laikas"
+            },
+            {
+                "text": "Ar galima pirkti iš vieno tiekėjo?",
+                "next": "vienas_tiek"
+            },
+            {
+                "text": "Kaip vertinami pasiūlymai?",
+                "next": "vertinimas"
+            },
+            {
+                "text": "Kas yra Viešpirkiai?",
+                "next": "kas_viespirkiai"
+            }
+        ]
+    },
+    "kas_viespirkiai": {
+        "bot": "Viešpirkiai yra pilietinė iniciatyva, kuri deda viešųjų pirkimų duomenis į vieną vietą ir neslepia, kas iš ko perka. Šis asistentas yra... papildoma paslauga.",
+        "options": [
+            {
+                "text": "Kokia papildoma paslauga?",
+                "next": "kokia_paslauga"
+            },
+            {
+                "text": "Supratau, ačiū.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kokia_paslauga": {
+        "bot": "Pagalbos teikimo paslauga. Pagalbos kokybę Jūs jau galite įvertinti patys.",
+        "options": [
+            {
+                "text": "Įvertinau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "dokumentai": {
+        "bot": "Reikalingi dokumentai nurodyti pirkimo sąlygose. Sąlygos kartais būna tokios išsamios, kad jų perskaitymas yra atskiras projektas.",
+        "options": [
+            {
+                "text": "Kokie dažniausiai reikalaujami?",
+                "next": "standartiniai"
+            },
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "standartiniai": {
+        "bot": "Paprastai reikalaujama įrodyti, kad esate teisėtas, mokus ir patikimas. Įrodyti reikia dokumentais. Dokumentų skaičius priklauso nuo komisijos entuziazmo.",
+        "options": [
+            {
+                "text": "O jei dokumentų per daug?",
+                "next": "per_daug"
+            },
+            {
+                "text": "Supratau, ačiū.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "per_daug": {
+        "bot": "Tai yra žinomas reiškinys, vadinamas pernelyg dideliais kvalifikaciniais reikalavimais. Jis skundžiamas. Retai sėkmingai.",
+        "options": [
+            {
+                "text": "Kodėl retai?",
+                "next": "kodel_retai"
+            },
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kodel_retai": {
+        "bot": "Nes procesas ilgas, brangus ir varginantis. Tai žino ir tie, kurie nustato per didelius reikalavimus.",
+        "options": [
+            {
+                "text": "Sistema veikia kaip sistema.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "laikas": {
+        "bot": "Pirkimas trunka tiek, kiek trunka. Minimalūs terminai nustatyti, maksimalių – ne. Rekordiniai terminai rodo, kad galimybės plačios.",
+        "options": [
+            {
+                "text": "Kiek ilgi rekordiniai?",
+                "next": "rekordiniai"
+            },
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "rekordiniai": {
+        "bot": "Viešpirkių duomenyse galite rasti pirkimų, trukusių ilgiau nei kai kurie infrastruktūros projektai. Filtras „trukmė“ kartais sukelia egzistencines krizes.",
+        "options": [
+            {
+                "text": "Einu žiūrėti.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "vienas_tiek": {
+        "bot": "Pirkimas iš vieno tiekėjo galimas išimtiniais atvejais. Statistiškai išimtiniai atvejai pasitaiko gana dažnai.",
+        "options": [
+            {
+                "text": "Kaip dažnai?",
+                "next": "kaip_daznai"
+            },
+            {
+                "text": "Manau, mano atvejis išimtinis",
+                "next": "manau_taip"
+            },
+            {
+                "text": "Tikrai išimtinis",
+                "next": "tikrai_taip"
+            }
+        ]
+    },
+    "kaip_daznai": {
+        "bot": "Viešpirkių duomenys rodo, kad kai kurių organizacijų išimtiniai atvejai sudaro didžiąją dalį jų pirkimų. Tai arba labai sudėtinga organizacija, arba kažkas kita.",
+        "options": [
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "tikrai_taip": {
+        "bot": "Jeigu esate tikri – rekomenduojame tai dokumentuoti. Dokumentavimas yra tas dalykas, kuris skiria teisėtą išimtį nuo sudėtingo pokalbio su auditoriais.",
+        "options": [
+            {
+                "text": "Kaip dokumentuoti?",
+                "next": "kaip_dokumentuoti"
+            },
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kaip_dokumentuoti": {
+        "bot": "Raštu. Išsamiai. Su pagrindimais. Taip, kad po penkerių metų būtų aišku, kodėl pirkai būtent iš jų.",
+        "options": [
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "manau_taip": {
+        "bot": "Manymas – tai geras pradžios taškas. Tačiau auditoriai manymo neakceptuoja. Reikia teisinio pagrindo.",
+        "options": [
+            {
+                "text": "Kur rasti pagrindą?",
+                "next": "nezinau_atvej"
+            },
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "nezinau_atvej": {
+        "bot": "Pagrindai nustatyti teisės aktuose. Rekomenduojame pasikonsultuoti su teisininku – tai pigiau nei pasikonsultuoti su auditoriumi po fakto.",
+        "options": [
+            {
+                "text": "Logiška.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "vertinimas": {
+        "bot": "Pasiūlymai vertinami pagal nustatytus kriterijus. Teoriškai objektyviai. Viešpirkių duomenys rodo, kad kartais laimėtojai būna nuolat tie patys – matyt, labai geri.",
+        "options": [
+            {
+                "text": "Kaip apskundžiamas vertinimas?",
+                "next": "apskundimas"
+            },
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "apskundimas": {
+        "bot": "Vertinimą galima skųsti. Procesas užima laiko ir nervų. Rekomenduojame įvertinti, ar verta – kartais tiesiog verta.",
+        "options": [
+            {
+                "text": "Kaip inicijuoti skundą?",
+                "next": "skustis"
+            },
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "skustis": {
+        "bot": "Supratau, Jūs pageidaujate pateikti skundą. Tai yra Jūsų teisė. Dėl ko kreipiatės?",
+        "options": [
+            {
+                "text": "Dėl pirkimo procedūros pažeidimo",
+                "next": "skund_proc"
+            },
+            {
+                "text": "Dėl šio asistento kokybės",
+                "next": "skund_bot"
+            },
+            {
+                "text": "Dėl Viešpirkių portalo",
+                "next": "skund_portal"
+            },
+            {
+                "text": "Dėl visko apskritai",
+                "next": "skund_visko"
+            }
+        ]
+    },
+    "skund_proc": {
+        "bot": "Procedūrų pažeidimų skundus nagrinėja Viešųjų pirkimų tarnyba. Skundas turi būti pagrįstas, pateiktas laiku ir su dokumentais. Du iš trijų dažniausiai nepakanka.",
+        "options": [
+            {
+                "text": "Kaip rasti reikiamą formą?",
+                "next": "kaip_rasti_forma"
+            },
+            {
+                "text": "Koks terminas?",
+                "next": "koks_terminas"
+            },
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "kaip_rasti_forma": {
+        "bot": "Forma yra Tarnybos svetainėje. Svetainė yra internete. Tai yra bene aiškiausias atsakymas šiame pokalbyje.",
+        "options": [
+            {
+                "text": "Sutinku.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "koks_terminas": {
+        "bot": "Terminas yra ribotas ir skaičiuojamas nuo tada, kai sužinojote arba turėjote sužinoti. Antroji formuluotė leidžia kūrybiškai interpretuoti. Rekomenduojame nedelsti.",
+        "options": [
+            {
+                "text": "Ar mano terminas jau pasibaigė?",
+                "next": "ar_pasibaige"
+            },
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "ar_pasibaige": {
+        "bot": "Nežinome. Bet jei klausinėjate boto, o ne teisininko – gali būti, kad pasibaigė.",
+        "options": [
+            {
+                "text": "Einu skambinti teisininkui.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "skund_bot": {
+        "bot": "Jūsų skundas priimtas. Užfiksuotas. Perduotas. Nė vienas iš šių veiksmų neįvyko, tačiau formaliai procedūra laikoma užbaigta.",
+        "options": [
+            {
+                "text": "Ar bus pataisyta?",
+                "next": "ar_pataisyta"
+            },
+            {
+                "text": "Gerai.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "ar_pataisyta": {
+        "bot": "Tai priklauso nuo to, ar tai apskritai laikoma problema. Šiuo metu – neaišku.",
+        "options": [
+            {
+                "text": "Tai pokštas, ar ne?",
+                "next": "prisipazink"
+            },
+            {
+                "text": "Suprantama.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "prisipazink": {
+        "bot": "Šis asistentas neturi įgaliojimų komentuoti savo prigimties. Rekomenduojame daryti savo išvadas.",
+        "options": [
+            {
+                "text": "Išvados padarytos.",
+                "next": "supratau"
+            },
+            {
+                "text": "Sveikiname su balandžio 1-ąja!",
+                "next": "nustebino"
+            }
+        ]
+    },
+    "nustebino": {
+        "bot": "Dėkojame. Misija įvykdyta. Sėkmingų viešųjų pirkimų stebėjimų.",
+        "april": true,
+        "options": [
+            {
+                "text": "Pradėti iš naujo",
+                "next": "start"
+            }
+        ]
+    },
+    "skund_portal": {
+        "bot": "Dėl portalo pastabas galite išsakyti Viešpirkių komandai tiesiogiai. Jie yra žmonės ir, skirtingai nuo šio asistento, tikrai reaguoja.",
+        "options": [
+            {
+                "text": "Supratau.",
+                "next": "supratau"
+            }
+        ]
+    },
+    "skund_visko": {
+        "bot": "Tai plati tema. Viešieji pirkimai tikrai prisideda prie bendro nusivylimo, tačiau rekomenduojame siaurinti. Šis asistentas specializuojasi konkrečiuose nusivylimo šaltiniuose.",
+        "options": [
+            {
+                "text": "Gerai, pasirinkite vieną.",
+                "next": "skustis"
+            },
+            {
+                "text": "Nebenoriu.",
+                "next": "bye"
+            }
+        ]
+    }
+}

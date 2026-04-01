@@ -127,7 +127,11 @@ app.use(
     }),
 );
 
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), {
+    setHeaders: (res) => {
+        res.setHeader("Cache-Control", "no-store");
+    }
+}));
 
 // Cookies
 app.use(cookieParser());
