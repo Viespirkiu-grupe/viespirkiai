@@ -96,6 +96,10 @@ function buildSaltinioLink(row) {
             if (parts.length >= 3)
                 return `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${parts[2]}&documentId=${parts[1]}`;
         }
+        if (saltinis === 'cvpp'){
+            const [dvid, lid] = row.saltinioId.split("/");
+            return `https://pirkimai.eviesiejipirkimai.lt/app/docmgmt/downloadPublicDocument.asp?FMT=5&AT=3&LID=${lid}&DVID=${dvid}`;
+        }
         if (saltinis === "mvpAprasai" && row.saltinioId)
             return `https://mw.eviesiejipirkimai.lt/${row.saltinioId}`;
     } catch {

@@ -5,6 +5,9 @@ Parsisiunčia duomenų bazėje nurodytus failus į viešdėžes.
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import Timings from "../../utils/timings.js";
+import { Agent } from "undici";
+
+const slowAgent = new Agent({ headersTimeout: 30 * 60_000 }); // 30 min
 
 let kibirelis = [];
 const BUCKET_SIZE = 50;
@@ -42,9 +45,9 @@ async function fillBucket() {
                   AND COALESCE("parsiuntimoBandymai", 0) > 0
                   AND (
                       (COALESCE("parsiuntimoBandymai", 0) < 6
-                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '1 hour')
-                      OR (COALESCE("parsiuntimoBandymai", 0) < 30
                        AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '3 hours')
+                      OR (COALESCE("parsiuntimoBandymai", 0) < 30
+                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '12 hours')
                       OR (COALESCE("parsiuntimoBandymai", 0) < 54
                        AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '1 day')
                       OR "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '3 days'
@@ -52,7 +55,6 @@ async function fillBucket() {
                 ORDER BY id DESC
                 LIMIT $1
             )
-            ORDER BY id DESC
             LIMIT $1`,
             [limit * 2],
         );
@@ -222,17 +224,26 @@ export async function parsiustiFaila(options = {}) {
         }
 
         timings.start("fetchDownloadUrl");
-        let response = await fetch(`${deze.url}/download-url`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-api-key": deze.apiKey,
-            },
-            redirect: "manual",
-            body: JSON.stringify({
-                url,
-            }),
-        });
+        let response;
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 1000 * 60 * 9); // 9min
+        try {
+            response = await fetch(`${deze.url}/download-url`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": deze.apiKey,
+                },
+                redirect: "manual",
+                body: JSON.stringify({
+                    url,
+                }),
+                signal: controller.signal,
+                dispatcher: slowAgent
+            });
+        } finally {
+            clearTimeout(fetchTimeout);
+        }
         timings.end("fetchDownloadUrl");
 
         if (!response.ok || response.status !== 200) {
