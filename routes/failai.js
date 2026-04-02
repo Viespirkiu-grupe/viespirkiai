@@ -467,7 +467,7 @@ failaiSearchRouter.get("/failai/topExtension", async (req, res) => {
 
     const [extensionRes, countRes] = await Promise.all([
         postgres.query(
-            `SELECT * FROM "failaiStatsExtension" WHERE count > 0 ORDER BY count DESC LIMIT $1 OFFSET $2`,
+            `SELECT * FROM "failaiStatsExtension" WHERE count > 0 ORDER BY count DESC, extension ASC LIMIT $1 OFFSET $2`,
             [DEFAULT_LIMIT, offset],
         ),
         postgres.query(
