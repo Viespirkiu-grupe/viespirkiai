@@ -562,6 +562,28 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     );
 
     await postgres.query(
+        `INSERT INTO "failaiTekstas" (id, tekstas, pavadinimas, extension, saltinis, "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius")
+        SELECT $1, $2, pavadinimas, extension, saltinis, $3, $4, $5
+        FROM failai
+        WHERE id = $1
+        ON CONFLICT (id) DO UPDATE SET
+            tekstas            = EXCLUDED.tekstas,
+            pavadinimas        = EXCLUDED.pavadinimas,
+            extension          = EXCLUDED.extension,
+            saltinis           = EXCLUDED.saltinis,
+            "zodziuSkaicius"   = EXCLUDED."zodziuSkaicius",
+            "puslapiuSkaicius" = EXCLUDED."puslapiuSkaicius",
+            "simboliuSkaicius" = EXCLUDED."simboliuSkaicius";`,
+        [
+            dokumentas.id,
+            truncateTo1MB(tekstas),
+            metadata?.wordCount,
+            metadata?.pageCount,
+            metadata?.characterCount || 0,
+        ],
+    );
+
+    await postgres.query(
         `INSERT INTO "failaiNuskaitymai"
             (failas, versija, metaduomenys, "timestamp", "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", location)
          VALUES ($1, $2, $3, NOW() AT TIME ZONE 'Europe/Vilnius', $4, $5, $6, ST_GeomFromText($7, 4326))
