@@ -1,0 +1,44 @@
+<%
+  // Reusable domain list partial with collapsible overflow.
+  // Expected locals:
+  // - domains: Array<string>
+  // - title?: string (optional; default: "Interneto puslapiai")
+  // - maxItems?: number (optional; default: 3)
+  // - emptyText?: string (optional; default: "Nerasta")
+
+  const __title = typeof title !== 'undefined' ? title : 'Interneto puslapiai';
+  const __emptyText = typeof emptyText !== 'undefined' ? emptyText : 'Nerasta';
+  const __list = Array.isArray(domains) ? domains : [];
+  const __maxItems = typeof maxItems !== 'undefined' ? maxItems : 3;
+
+  const __visibleItems = __list.slice(0, __maxItems);
+  const __hiddenCount = Math.max(0, __list.length - __maxItems);
+  const __hasHidden = __hiddenCount > 0;
+%>
+
+<dt><%= __title %></dt>
+<dd class="domain-list">
+  <% if (__list.length > 0) { %>
+    <div class="d-flex flex-col gap-1">
+      <% __visibleItems.forEach(domain => { %>
+        <% if (!domain) return; %>
+        <a href="https://<%= domain %>" target="_blank" class="cell-truncate"><%= domain %></a>
+      <% }) %>
+    </div>
+    <% if (__hasHidden) { %>
+      <details class="domain-list-details" style="margin-top:var(--space-2);">
+        <summary class="domain-list-summary">
+          <span class="text-muted text-xs fw-bold">+ <%= __hiddenCount %> daugiau</span>
+        </summary>
+        <div class="domain-list-expanded d-flex flex-col gap-1" style="margin-top:var(--space-2);">
+          <% __list.slice(__maxItems).forEach(domain => { %>
+            <% if (!domain) return; %>
+            <a href="https://<%= domain %>" target="_blank" class="cell-truncate"><%= domain %></a>
+          <% }) %>
+        </div>
+      </details>
+    <% } %>
+  <% } else { %>
+    <em class="text-muted"><%= __emptyText %></em>
+  <% } %>
+</dd>

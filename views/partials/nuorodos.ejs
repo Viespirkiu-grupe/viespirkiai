@@ -1,0 +1,10 @@
+<%- include('./contact-list.ejs', {
+  items: (links || []).map(l => ({ 
+    value: l.uri.length > 50 ? l.uri.slice(0, 50) + '…' : l.uri,
+    fullValue: l.uri,
+    pages: l.pages
+  })),
+  title: typeof title !== 'undefined' ? title : 'Nuorodos',
+  type: 'link',
+  emptyText: typeof emptyText !== 'undefined' ? emptyText : 'Nerasta'
+}) %>

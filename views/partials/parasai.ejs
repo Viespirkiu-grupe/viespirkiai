@@ -1,0 +1,53 @@
+<%
+  // Reusable signature list partial with collapsible overflow.
+  // Expected locals:
+  // - signatures: Array<{ signerCertificateCommonName: string, signingTime: string }>
+  // - title?: string (optional; default: "Parašai")
+  // - disclaimerText?: string (optional; default warning about signature validation)
+  // - maxItems?: number (optional; default: 3)
+  // - emptyText?: string (optional; default: "Nerasta")
+
+  const __title = typeof title !== 'undefined' ? title : 'Parašai';
+  const __emptyText = typeof emptyText !== 'undefined' ? emptyText : 'Nerasta';
+  const __disclaimerText = typeof disclaimerText !== 'undefined' ? disclaimerText : 'Viešpirkiai netikrina skaitmeninių parašų galiojimo.';
+  const __list = Array.isArray(signatures) ? signatures : [];
+  const __maxItems = typeof maxItems !== 'undefined' ? maxItems : 3;
+
+  const __visibleItems = __list.slice(0, __maxItems);
+  const __hiddenCount = Math.max(0, __list.length - __maxItems);
+  const __hasHidden = __hiddenCount > 0;
+%>
+
+<dt><%= __title %></dt>
+<dd class="signature-list">
+  <% if (__list.length > 0) { %>
+    <p class="text-muted text-xs mb-2"><em><%= __disclaimerText %></em></p>
+    <div class="d-flex flex-col gap-1">
+      <% __visibleItems.forEach(sig => { %>
+        <% if (!sig || !sig.signerCertificateCommonName) return; %>
+        <div>
+          <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
+          <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>
+        </div>
+      <% }) %>
+    </div>
+    <% if (__hasHidden) { %>
+      <details class="signature-list-details" style="margin-top:var(--space-2);">
+        <summary class="signature-list-summary">
+          <span class="text-muted text-xs fw-bold">+ <%= __hiddenCount %> daugiau</span>
+        </summary>
+        <div class="signature-list-expanded d-flex flex-col gap-1" style="margin-top:var(--space-2);">
+          <% __list.slice(__maxItems).forEach(sig => { %>
+            <% if (!sig || !sig.signerCertificateCommonName) return; %>
+            <div>
+              <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
+              <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>
+            </div>
+          <% }) %>
+        </div>
+      </details>
+    <% } %>
+  <% } else { %>
+    <em class="text-muted"><%= __emptyText %></em>
+  <% } %>
+</dd>

@@ -173,84 +173,19 @@
             <h2 class="mb-3 no-style">Turinys</h2>
             <dl class="kv-list">
 
-              <dt>Interneto puslapiai</dt>
-              <dd>
-                <% if (failas.metaduomenys.domains?.length > 0) { %>
-                  <div class="d-flex flex-col gap-1">
-                    <% failas.metaduomenys.domains.forEach(domain => { %>
-                      <a href="https://<%= domain %>" target="_blank" class="cell-truncate"><%= domain %></a>
-                    <% }) %>
-                  </div>
-                <% } else { %>
-                  <em class="text-muted">Nerasta</em>
-                <% } %>
-              </dd>
+              <%- include('../partials/domenai.ejs', { domains: failas.metaduomenys.domains }) %>
 
-              <dt>Nuorodos</dt>
-              <dd>
-                <% const links = (failas.metaduomenys.links || []).filter(l => !l.uri.startsWith('mailto:')); %>
-                <% if (links.length > 0) { %>
-                  <div class="d-flex flex-col gap-1">
-                    <% links.forEach(link => { %>
-                      <div class="d-flex gap-2 align-center">
-                        <a href="<%= link.uri %>" target="_blank" class="cell-truncate"><%= link.uri.length > 50 ? link.uri.slice(0, 50) + '…' : link.uri %></a>
-                        <sup class="text-muted text-xs" style="flex-shrink:0;"><%= link.pages.join(', ') %> psl.</sup>
-                      </div>
-                    <% }) %>
-                  </div>
-                <% } else { %>
-                  <em class="text-muted">Nerasta</em>
-                <% } %>
-              </dd>
+              <%- include('../partials/nuorodos.ejs', { links: (failas.metaduomenys.links || []).filter(l => !l.uri.startsWith('mailto:')) }) %>
 
               <%- include('../partials/emails.ejs', { emails: failas.metaduomenys.emails }) %>
 
-              <dt>Telefonai</dt>
-              <dd>
-                <% if (failas.metaduomenys.telefonai?.length > 0) { %>
-                  <div class="d-flex flex-col gap-1">
-                    <% failas.metaduomenys.telefonai.forEach(tel => { %>
-                      <div class="d-flex gap-2 align-center">
-                        <a href="tel:<%= tel.numeris %>"><%= tel.numeris %></a>
-                        <sup class="text-muted text-xs" style="flex-shrink:0;"><%= tel.pages.join(', ') %> psl.</sup>
-                      </div>
-                    <% }) %>
-                  </div>
-                <% } else { %>
-                  <em class="text-muted">Nerasta</em>
-                <% } %>
-              </dd>
+              <%- include('../partials/telefonai.ejs', { telefonai: failas.metaduomenys.telefonai }) %>
 
               <% if (failas.metaduomenys.ibanNumeriai?.length > 0 && failas.metaduomenys.ibanNumeriai[0].pages) { %>
-                <dt>IBAN</dt>
-                <dd>
-                  <div class="d-flex flex-col gap-1">
-                    <% failas.metaduomenys.ibanNumeriai.forEach(iban => { %>
-                      <div class="d-flex gap-2 align-center">
-                        <span class="cell-mono"><%= iban.numeris %></span>
-                        <sup class="text-muted text-xs" style="flex-shrink:0;"><%= iban.pages.join(', ') %> psl.</sup>
-                      </div>
-                    <% }) %>
-                  </div>
-                </dd>
+                <%- include('../partials/ibanNumeriai.ejs', { ibanNumeriai: failas.metaduomenys.ibanNumeriai }) %>
               <% } %>
 
-              <dt>Parašai</dt>
-              <dd>
-                <% if (failas.metaduomenys.signatures?.length > 0) { %>
-                  <p class="text-muted text-xs mb-2"><em>Viešpirkiai netikrina skaitmeninių parašų galiojimo.</em></p>
-                  <div class="d-flex flex-col gap-1">
-                    <% failas.metaduomenys.signatures.forEach(sig => { %>
-                      <div>
-                        <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
-                        <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>
-                      </div>
-                    <% }) %>
-                  </div>
-                <% } else { %>
-                  <em class="text-muted">Nerasta</em>
-                <% } %>
-              </dd>
+              <%- include('../partials/parasai.ejs', { signatures: failas.metaduomenys.signatures }) %>
 
             </dl>
           </div>
