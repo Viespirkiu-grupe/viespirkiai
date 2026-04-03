@@ -197,7 +197,7 @@ tasks.push({
     nextTaskId: "failuParsiuntimas",
 });
 
-// eViesiejiPirkimai.lt failai
+// Failų parsiuntimas
 import { parsiustiFaila } from "./modules/failai/parsiusti.js";
 tasks.push({
     name: "failuParsiuntimas",
@@ -208,6 +208,17 @@ tasks.push({
         return parsiustiFaila();
     },
 });
+
+import { pravalytiParsiuntimoRezervacijas } from "./modules/failai/pravalytiParsiuntimuRezervacijas.js";
+tasks.push({
+    name: "pravalytiParsiuntimoRezervacijas",
+    mode: "asap",
+    cooldown: 60,
+    errorCooldown: 60,
+    job: async () => {
+        return pravalytiParsiuntimoRezervacijas();
+    },
+}); 
 
 
 // LITEKO bylų metaduomenys (paieškos rezultatai)

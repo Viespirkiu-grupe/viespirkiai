@@ -141,25 +141,6 @@ function processSearchResults(rows, searchTerm) {
     });
 }
 
-/**
- * @param {string[]} params
- * @returns {string}
- */
-function buildWhereClause(saltinis) {
-    const clauses = ["parsiustas = -1"];
-    const params = [];
-    if (saltinis) {
-        if (saltinis === "sutartys") {
-            clauses.push(
-                `("saltinis" = $${params.length + 1} OR "saltinis" IS NULL)`,
-            );
-        } else {
-            clauses.push(`"saltinis" = $${params.length + 1}`);
-        }
-        params.push(saltinis);
-    }
-    return { whereSQL: clauses.join(" AND "), params };
-}
 
 failaiSearchRouter.get(
     "/failai",
@@ -279,7 +260,26 @@ failaiSearchRouter.get(
     },
 );
 
+
 failaiSearchRouter.get("/failai/neparsiunciami", async (req, res, next) => {
+    /**
+     * @param {string[]} params
+     * @returns {string}
+     */
+    function buildWhereClause(saltinis) {
+        const clauses = [];
+        const params = [];
+        if (saltinis) {
+            if (saltinis === "sutartys") {
+                clauses.push(`(f.saltinis = $${params.length + 1} OR f.saltinis IS NULL)`);
+            } else {
+                clauses.push(`f.saltinis = $${params.length + 1}`);
+            }
+            params.push(saltinis);
+        }
+        return { whereSQL: clauses.length ? `WHERE ${clauses.join(" AND ")}` : "", params };
+    }
+
     const parsedLimit = parseLimit(req.query, 250, 1_000_000);
     if ("error" in parsedLimit) return res.status(400).send(parsedLimit.error);
     const { limit } = parsedLimit;
@@ -291,7 +291,10 @@ failaiSearchRouter.get("/failai/neparsiunciami", async (req, res, next) => {
     const { whereSQL, params: baseParams } = buildWhereClause(saltinis);
 
     const countRes = await postgres.query(
-        `SELECT COUNT(*) AS total FROM failai WHERE ${whereSQL}`,
+        `SELECT COUNT(*) AS total
+        FROM public."failaiParsiuntimoQueue" q
+        JOIN public.failai f ON f.id = q.id
+        ${whereSQL}`,
         baseParams,
     );
     const total = parseInt(countRes.rows[0].total, 10) || 0;
@@ -305,10 +308,15 @@ failaiSearchRouter.get("/failai/neparsiunciami", async (req, res, next) => {
         const csvParams = [...baseParams, csvLimit];
 
         const rowsRes = await postgres.query(
-            `SELECT id, pavadinimas, extension, "saltinioId", "saltinis", "parsiuntimoBandymai", "paskutinisParsiuntimoBandymas", "dokId", "fileId"
-             FROM failai WHERE ${whereSQL}
-             ORDER BY COALESCE("paskutinisParsiuntimoBandymas", to_timestamp(0)) DESC
-             LIMIT $${csvParams.length}`,
+            `SELECT f.id, f.pavadinimas, f.extension, f."saltinioId", f.saltinis,
+                    q.bandymai AS "parsiuntimoBandymai",
+                    q."paskutinisBandymas" AS "paskutinisParsiuntimoBandymas",
+                    q.state, f."dokId", f."fileId"
+            FROM public."failaiParsiuntimoQueue" q
+            JOIN public.failai f ON f.id = q.id
+            ${whereSQL}
+            ORDER BY q."paskutinisBandymas" ASC NULLS FIRST
+            LIMIT $${csvParams.length}`,
             csvParams,
         );
 
@@ -353,10 +361,15 @@ failaiSearchRouter.get("/failai/neparsiunciami", async (req, res, next) => {
 
     const params = [...baseParams, limit, offset];
     const result = await postgres.query(
-        `SELECT id, pavadinimas, extension, "saltinioId", "saltinis", "parsiuntimoBandymai", "paskutinisParsiuntimoBandymas", "dokId", "fileId"
-         FROM failai WHERE ${whereSQL}
-         ORDER BY COALESCE("paskutinisParsiuntimoBandymas", to_timestamp(0)) DESC
-         LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        `SELECT f.id, f.pavadinimas, f.extension, f."saltinioId", f.saltinis,
+                q.bandymai AS "parsiuntimoBandymai",
+                q."paskutinisBandymas" AS "paskutinisParsiuntimoBandymas",
+                q.state, f."dokId", f."fileId"
+        FROM public."failaiParsiuntimoQueue" q
+        JOIN public.failai f ON f.id = q.id
+        ${whereSQL}
+        ORDER BY q."paskutinisBandymas" ASC NULLS FIRST
+        LIMIT $${params.length - 1} OFFSET $${params.length}`,
         params,
     );
 

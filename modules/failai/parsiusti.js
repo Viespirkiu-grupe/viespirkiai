@@ -8,117 +8,7 @@ import Timings from "../../utils/timings.js";
 import { Agent } from "undici";
 
 const slowAgent = new Agent({ headersTimeout: 30 * 60_000 }); // 30 min
-
-let kibirelis = [];
-const BUCKET_SIZE = 50;
-const REFILL_THRESHOLD = 5;
-const inProgress = new Map();
-const bucketIds = new Set();
-
-let filling = false;
-
-/**
- * Užpildo kibirėlį naujais failais iš duomenų bazės.
- * Jei kibirėlis jau pilnas arba užpildymo procesas vyksta, funkcija nieko nedaro.
- * @returns {Promise<void>}
- */
-async function fillBucket() {
-    if (filling) return;
-    filling = true;
-
-    try {
-        const limit = BUCKET_SIZE - kibirelis.length;
-        if (limit <= 0) return;
-        const res = await postgres.query(
-            `(
-                SELECT * FROM failai
-                WHERE parsiustas = 0
-                   OR ((parsiustas = -1 OR parsiustas IS NULL)
-                       AND COALESCE("parsiuntimoBandymai", 0) = 0)
-                ORDER BY id DESC
-                LIMIT $1
-            )
-            UNION ALL
-            (
-                SELECT * FROM failai
-                WHERE (parsiustas = -1 OR parsiustas IS NULL)
-                  AND COALESCE("parsiuntimoBandymai", 0) > 0
-                  AND (
-                      (COALESCE("parsiuntimoBandymai", 0) < 6
-                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '3 hours')
-                      OR (COALESCE("parsiuntimoBandymai", 0) < 30
-                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '12 hours')
-                      OR (COALESCE("parsiuntimoBandymai", 0) < 54
-                       AND "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '1 day')
-                      OR "paskutinisParsiuntimoBandymas" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '3 days'
-                  )
-                ORDER BY id DESC
-                LIMIT $1
-            )
-            LIMIT $1`,
-            [limit * 2],
-        );
-
-        for (const row of res.rows) {
-            if (!bucketIds.has(row.id) && !inProgress.has(row.id)) {
-                kibirelis.push(row);
-                bucketIds.add(row.id);
-                if (kibirelis.length >= BUCKET_SIZE) break;
-            }
-        }
-    } finally {
-        filling = false;
-    }
-}
-
-/**
- * Paima vieną failą iš kibirėlio.
- * Jei kibirėlis tuščias, užpildo jį naujais failais.
- * @returns {Promise<Object|null>} Failo objektas arba null, jei nėra failų.
- */
-async function getFromBucket() {
-    if (kibirelis.length < REFILL_THRESHOLD) {
-        await fillBucket(); // refill async
-    }
-
-    const failas = kibirelis.shift();
-    if (!failas) return null;
-
-    bucketIds.delete(failas.id);
-
-    // mark in progresskibirelis
-    const timeout = setTimeout(
-        () => {
-            log(`Timeout: releasing failas ${failas.id} back to bucket`);
-            if (!bucketIds.has(failas.id)) {
-                kibirelis.push(failas);
-                bucketIds.add(failas.id);
-            }
-            inProgress.delete(failas.id);
-        },
-        10 * 60 * 1000,
-    );
-
-    inProgress.set(failas.id, timeout);
-
-    return failas;
-}
-
-/**
- * Pažymi failą kaip baigtą ir pašalina jį iš in-progress sąrašo.
- * @param {number} failasId - Failo ID.
- */
-function doneWithFile(failasId) {
-    const timeout = inProgress.get(failasId);
-    if (timeout) {
-        clearTimeout(timeout);
-        inProgress.delete(failasId);
-    }
-}
-
-let failai = 0;
-let dydis = 0;
-let start = 0;
+const nodeName = process.env.NODE_NAME || "default";
 
 /**
  * Parsiunčia vieną neparsiųstą failą į viešdėžę.
@@ -128,9 +18,37 @@ export async function parsiustiFaila(options = {}) {
     let timings = options.timings || new Timings();
 
     timings.start("getFileFromBucket");
-    const failas = await getFromBucket();
+
+    const result = await postgres.query(
+        `WITH cte AS (
+            SELECT q.id FROM public."failaiParsiuntimoQueue" q
+            WHERE q."lockedBy" IS NULL
+            AND (
+                q.state = 0
+                OR (q.state = -1 AND (
+                    (q.bandymai < 6   AND q."paskutinisBandymas" <= NOW() - interval '3 hours')
+                    OR (q.bandymai < 30  AND q."paskutinisBandymas" <= NOW() - interval '12 hours')
+                    OR (q.bandymai < 54  AND q."paskutinisBandymas" <= NOW() - interval '1 day')
+                    OR q."paskutinisBandymas" <= NOW() - interval '3 days'
+                ))
+            )
+            ORDER BY q.bandymai, q.id
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+        ),
+        locked AS (
+            UPDATE public."failaiParsiuntimoQueue" q
+            SET "lockedBy" = $1, "lockedAt" = NOW()
+            FROM cte WHERE q.id = cte.id
+            RETURNING q.id
+        )
+        SELECT f.* FROM public.failai f
+        WHERE f.id = (SELECT id FROM locked)`,
+        [nodeName],
+    );
+    if (!result.rows.length) return false;
+    const failas = result.rows[0];
     timings.end("getFileFromBucket");
-    if (!failas) return false;
 
     log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
 
@@ -149,20 +67,14 @@ export async function parsiustiFaila(options = {}) {
 
     try {
         // Pateikiame parsisiuntimo užklausą
-        if (start == 0) {
-            start = Date.now();
-        }
-
-        async function getProxyBySite() {
-            timings.start("getProxyBySite");
+        async function getProxyBySite(site) {
             const proxyRes = await postgres.query(
                 `SELECT * FROM "scrapeProxies" WHERE enabled = true AND site = $1 AND type = 'httpReverse'`,
-                [saltinis],
+                [site],
             );
             if (proxyRes.rows.length === 0) {
                 return null;
             }
-            timings.end("getProxyBySite");
             return proxyRes.rows[
                 Math.floor(Math.random() * proxyRes.rows.length)
             ];
@@ -175,6 +87,7 @@ export async function parsiustiFaila(options = {}) {
         }
         if (saltinis == "sutartys") {
             let proxy = await getProxyBySite("eviesiejipirkimai");
+
             if (!proxy) {
                 // https://eviesiejipirkimai.lt/download.php?dok_id=$DOK_ID&file_id=$FILE_ID
                 url = `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dokId}&file_id=${failas.fileId}`;
@@ -270,24 +183,28 @@ export async function parsiustiFaila(options = {}) {
         // Atnaujiname informaciją apie failą
         timings.start("updateFailas");
         await postgres.query(
-            "UPDATE failai SET parsiustas = 1, md5 = $1, dydis = $2 WHERE id = $3",
+            `UPDATE failai SET parsiustas = 1, md5 = $1, dydis = $2 WHERE id = $3`,
             [md5, size, failas.id],
+        );
+        await postgres.query(
+            `DELETE FROM public."failaiParsiuntimoQueue" WHERE id = $1`,
+            [failas.id],
         );
         timings.end("updateFailas");
     } catch (error) {
         console.error("Klaida parsisiunčiant failą:", error);
         timings.start("updateFailas");
         await postgres.query(
-            `UPDATE failai
-             SET parsiustas = -1,
-                 "parsiuntimoBandymai" = COALESCE("parsiuntimoBandymai", 0) + 1,
-                 "paskutinisParsiuntimoBandymas" = (now() AT TIME ZONE 'Europe/Vilnius')
-             WHERE id = $1`,
+            `UPDATE public."failaiParsiuntimoQueue"
+            SET state = -1,
+                bandymai = bandymai + 1,
+                "paskutinisBandymas" = NOW(),
+                "lockedBy" = NULL,
+                "lockedAt" = NULL
+            WHERE id = $1`,
             [failas.id],
         );
         timings.end("updateFailas");
-        doneWithFile(failas.id);
-
         throw error;
     }
 
@@ -313,7 +230,6 @@ export async function parsiustiFaila(options = {}) {
     timings.end("updateDezeUsage");
 
     log(`Parsiuntimas užtruko: ${timings.humanDuration("fetchDownloadUrl")}`);
-    doneWithFile(failas.id);
     return true;
 }
 

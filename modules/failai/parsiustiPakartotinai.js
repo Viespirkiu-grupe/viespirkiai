@@ -3,29 +3,24 @@ import { log } from "../../utils/log.js";
 
 export async function parsiustiPakartotinai(kiekis = 100) {
     try {
-        let query = `WITH to_update AS (
-      SELECT id
-      FROM failai
-      WHERE parsiustas = -1
-      LIMIT $1
-  )
-  UPDATE failai f
-  SET parsiustas = 0
-  FROM to_update t
-  WHERE f.id = t.id;`;
+        const res = await postgres.query(`
+            UPDATE public."failaiParsiuntimoQueue"
+            SET state = 0
+            WHERE id IN (
+                SELECT id FROM public."failaiParsiuntimoQueue"
+                WHERE state = -1
+                  AND "lockedBy" IS NULL
+                LIMIT $1
+            )
+        `, [kiekis]);
 
-        // Return true if any rows were updated, false if not
-        let updateRes = await postgres.query(query, [kiekis]);
-        log(`Updated ${updateRes.rowCount}`);
-        return updateRes.rowCount > 0;
+        log(`Updated ${res.rowCount}`);
+        return res.rowCount > 0;
     } catch (err) {
         console.error(err);
         return true;
     }
 }
 
-while (await parsiustiPakartotinai()) {
-    // Repeat
-}
-
-postgres.end();
+while (await parsiustiPakartotinai()) {}
+await postgres.end();
