@@ -79,13 +79,18 @@ const failaiFilter = new FilterBuilder({
         },
         {
             key: "search",
-            col: `f.search_index`,
             hidden: true,
             pgOverride: (addParam, val) => {
                 const quoteMatch = val.match(/^"(.*)"$/);
-                const fn = quoteMatch ? "phraseto_tsquery" : "plainto_tsquery";
                 const clean = quoteMatch ? quoteMatch[1] : val;
-                return `f.search_index @@ ${fn}('simple', ${addParam(clean)}) AND f.nuskaitytas >= 0`;
+                const query = quoteMatch
+                    ? `'${clean}'`
+                    : clean.trim().split(/\s+/).join(' & ');
+                return `EXISTS (
+                    SELECT 1 FROM "failaiTekstas" ft
+                    WHERE ft.id = f.id
+                    AND ft.tekstas ### ${addParam(query)}
+                )`;
             },
         },
         {
