@@ -4,6 +4,9 @@ import { log } from "../../utils/log.js";
 import { postgres, parsePgArray } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 
+const nodeName = process.env.NODE_NAME || "default";
+const nuskaitymoVersija = 9;
+
 /**
  * Cleans metadata object by removing null characters and trimming strings.
  * Recursively processes nested objects and arrays.
@@ -75,7 +78,7 @@ async function nuskaitytiDokNuskaitytojuje(
     let body = {
         url: url,
         apiKey: nuskaitytojas.apiKey,
-        extension: extension,
+        extension: extension,   
     };
 
     try {
@@ -135,102 +138,6 @@ async function nuskaitytiDokNuskaitytojuje(
     return data.result;
 }
 
-const REFILL_THRESHOLD = 5;
-const BUCKET_SIZE = 1000;
-const IN_PROGRESS_TIMEOUT = 10 * 60 * 1000; // 10 min
-
-const nuskaitymoVersija = 9;
-
-// In-memory tracking
-let kibirelis = [];
-const inProgress = new Map();
-const bucketIds = new Set();
-let filling = false;
-
-/**
- * Fills the bucket with documents that need to be processed.
- * Ensures no duplicates and respects the bucket size limit.
- * @returns {Promise<void>}
- */
-async function fillBucket() {
-    if (filling) return;
-    filling = true;
-
-    try {
-        const limit = BUCKET_SIZE - kibirelis.length;
-        if (limit <= 0) return;
-
-        const res = await postgres.query(
-            `SELECT *
-             FROM failai
-             WHERE parsiustas IN (1, -5)
-                AND LOWER(extension) = ANY(ARRAY[
-                   'pdf','prn','docx','odt','docm','dotx','doc','dot','rtf', 'pages',
-                   'xlsx','xlsm','xlsb','xls','csv','pptx','ppsx','ppt',
-                   'zip', 'adoc', 'bdoc', 'edoc', 'txt','url','msg','eml','7z', 'jpg', 'jpeg', 'adoc', 'rar',
-                   'png', 'tif', 'tiff', 'odg', 'pub'
-               ])
-               AND (nuskaitytas IS NULL OR nuskaitytas >= 0)
-               AND (nuskaitytas IS NULL OR nuskaitytas < $1)
-               ORDER BY nuskaitytas NULLS FIRST
-             LIMIT $2`,
-            [nuskaitymoVersija, limit * 2], // fetch extra to avoid duplicates
-        );
-
-        for (const row of res.rows) {
-            if (!bucketIds.has(row.id) && !inProgress.has(row.id)) {
-                kibirelis.push(row);
-                bucketIds.add(row.id);
-                if (kibirelis.length >= BUCKET_SIZE) break;
-            }
-        }
-    } finally {
-        filling = false;
-    }
-}
-
-/**
- * Retrieves a document from the bucket for processing.
- * If the bucket is below the refill threshold, it triggers a refill.
- * Sets a timeout to return the document to the bucket if not processed in time.
- * @returns {Promise<Object|null>} - The document object or null if none available.
- */
-async function getFromBucket() {
-    if (kibirelis.length < REFILL_THRESHOLD) {
-        fillBucket(); // async refill
-    }
-
-    const dokumentas = kibirelis.shift();
-    if (!dokumentas) return null;
-
-    bucketIds.delete(dokumentas.id);
-
-    const timeout = setTimeout(() => {
-        log(`Timeout: releasing dokumentas ${dokumentas.id} back to bucket`);
-        if (!bucketIds.has(dokumentas.id)) {
-            kibirelis.push(dokumentas);
-            bucketIds.add(dokumentas.id);
-        }
-        inProgress.delete(dokumentas.id);
-    }, IN_PROGRESS_TIMEOUT);
-
-    inProgress.set(dokumentas.id, timeout);
-
-    return dokumentas;
-}
-
-/**
- * Marks a document as done processing, clearing its timeout.
- * @param {number} failasId - The ID of the document that has been processed.
- */
-function doneWithFile(failasId) {
-    const timeout = inProgress.get(failasId);
-    if (timeout) {
-        clearTimeout(timeout);
-        inProgress.delete(failasId);
-    }
-}
-
 /**
  * Main function to read and process a single document from the bucket.
  * @param {number|null} nuskaitytojoId - Optional ID of a specific document reader to use.
@@ -239,11 +146,49 @@ function doneWithFile(failasId) {
 export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     let start = new Date();
 
-    const dokumentas = await getFromBucket();
+    const result = await postgres.query(
+            `WITH first AS (
+        SELECT q.id FROM public."failaiNuskaitymoQueue" q
+        WHERE q."lockedBy" IS NULL
+        AND q.versija >= 0
+        AND q.versija < $2
+        ORDER BY q.versija ASC, q.id DESC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+    ),
+    second AS (
+        SELECT q.id FROM public."failaiNuskaitymoQueue" q
+        WHERE q."lockedBy" IS NULL
+        AND q.versija < 0
+        AND (
+            (q.bandymai < 6   AND q."paskutinisBandymas" <= NOW() - interval '3 hours')
+            OR (q.bandymai < 30  AND q."paskutinisBandymas" <= NOW() - interval '12 hours')
+            OR q."paskutinisBandymas" <= NOW() - interval '1 day'
+        ) 
+        ORDER BY q.bandymai ASC, q.id DESC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+    ),
+    cte AS (
+        SELECT id FROM first
+        UNION ALL
+        SELECT id FROM second
+        LIMIT 1
+    ),
+    locked AS (
+        UPDATE public."failaiNuskaitymoQueue" q
+        SET "lockedBy" = $1, "lockedAt" = NOW()
+        FROM cte WHERE q.id = cte.id
+        RETURNING q.id
+    )
+    SELECT f.* FROM public.failai f
+    WHERE f.id = (SELECT id FROM locked)`,
+        [nodeName, nuskaitymoVersija],
+    );
 
-    if (!dokumentas) {
-        return false;
-    }
+
+    if (!result.rows.length) return false;
+    const dokumentas = result.rows[0];
 
     let url = `${config.internalFileBase}/${dokumentas.md5}`;
     let viesasUrl = `https://failai.viespirkiai.org/${dokumentas.md5}`;
@@ -275,14 +220,21 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
 
         if (dokumentas && dokumentas.id) {
             try {
+               await postgres.query(
+                    `UPDATE public."failaiNuskaitymoQueue"
+                    SET versija          = $2,
+                        bandymai         = bandymai + 1,
+                        "paskutinisBandymas" = NOW(),
+                        "lockedBy"       = NULL,
+                        "lockedAt"       = NULL
+                    WHERE id = $1`,
+                    [dokumentas.id, kodas],
+                );
+                // still update failai for the error code
                 await postgres.query(
-                    `UPDATE failai
-                           SET nuskaitytas = $1,
-                           "nuskaitymasTimestamp" = NOW()
-                           WHERE id = $2;`,
+                    `UPDATE failai SET nuskaitytas = $1, "nuskaitymasTimestamp" = NOW() WHERE id = $2`,
                     [kodas, dokumentas.id],
                 );
-                doneWithFile(dokumentas.id);
             } catch (updateErr) {
                 console.error(
                     "Nepavyko pažymėti klaidingo nuskaitymo:",
@@ -291,7 +243,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             }
         }
 
-        if (kodas == -2 || kodas == -3) {
+        if (kodas == -2 || kodas == -4) {
             return true; // Brokuotas dokumentas
         } else {
             throw e; // (Galimai) brokuotas nuskaitymas
@@ -310,14 +262,13 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         metadata.characterCount = sujungtasTekstas.length;
     }
 
-    let reikalingasOcr = dokumentas.ocrState; // Nereikalingas
+    let reikalingasOcr = dokumentas.ocrState; // Nereikalingas / nebūtinas
     if (
         metadata?.wordCount == 0 &&
         dokumentas.extension == "pdf" &&
-        dokumentas.ocrState === null &&
-        dokumentas.ocrText === null
+        dokumentas.ocrState === null
     ) {
-        reikalingasOcr = 0; // Reikalingas
+        reikalingasOcr = 0; // Rekomenduojamas
     }
     log(`${dokumentas.id} - ${dokumentas.ocrState} o ocr ${reikalingasOcr}`);
 
@@ -606,7 +557,17 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         ],
     );
 
-    doneWithFile(dokumentas.id);
+    await postgres.query(
+        `UPDATE public."failaiNuskaitymoQueue"
+        SET versija    = $2,
+            bandymai   = 0,
+            "paskutinisBandymas" = NULL,
+            "lockedBy" = NULL,
+            "lockedAt" = NULL
+        WHERE id = $1`,
+        [dokumentas.id, nuskaitymoVersija],
+    );
+
 
     log(
         `Nuskaitytas dokumentas ${dokumentas.id} / ${dokumentas.pavadinimas} per ${((new Date() - start) / 1000).toFixed(3)}s, ${metadata.wordCount} žodž.`,
