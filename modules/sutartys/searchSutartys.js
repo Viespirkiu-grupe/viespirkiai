@@ -23,6 +23,7 @@ const sutartysFilter = new FilterBuilder({
         {
             key: "sutartiesUnikalusID",
             col: `"sutartiesUnikalusId"`,
+            tsCol: "sutartiesUnikalusId",
             type: "integer",
             hidden: true,
         },
@@ -30,17 +31,19 @@ const sutartysFilter = new FilterBuilder({
         {
             key: "sudarymoDataNuo",
             col: `"sudarymoData"`,
+            tsCol: "sudarymoData",
             type: "gte_date",
             hidden: true,
         },
         {
             key: "sudarymoDataIki",
             col: `"sudarymoData"`,
+            tsCol: "sudarymoData",
             type: "lte_date",
             hidden: true,
         },
-        { key: "verteNuo", col: `"verte"`, type: "gte_number", hidden: true },
-        { key: "verteIki", col: `"verte"`, type: "lte_number", hidden: true },
+        { key: "verteNuo", col: `"verte"`, tsCol: "verte", type: "gte_number", hidden: true },
+        { key: "verteIki", col: `"verte"`, tsCol: "verte", type: "lte_number", hidden: true },
         {
             key: "tikSuDokumentais",
             isBoolean: true,
