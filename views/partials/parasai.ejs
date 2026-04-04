@@ -24,10 +24,16 @@
     <p class="text-muted text-xs mb-2"><em><%= __disclaimerText %></em></p>
     <div class="d-flex flex-col gap-1">
       <% __visibleItems.forEach(sig => { %>
-        <% if (!sig || !sig.signerCertificateCommonName) return; %>
+        <% if (!sig) return; %>
         <div>
-          <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
-          <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>
+          <% if (sig.signerCertificateCommonName) { %>
+            <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
+          <% } else { %>
+            <span class="fw-bold text-muted">Nežinomas pasirašytojas</span>
+          <% } %>
+          <% if (sig.signingTime) { %>
+            <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>
+          <% } %>
         </div>
       <% }) %>
     </div>
@@ -38,10 +44,16 @@
         </summary>
         <div class="signature-list-expanded d-flex flex-col gap-1" style="margin-top:var(--space-2);">
           <% __list.slice(__maxItems).forEach(sig => { %>
-            <% if (!sig || !sig.signerCertificateCommonName) return; %>
+            <% if (!sig) return; %>
             <div>
-              <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
-              <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>
+              <% if (sig.signerCertificateCommonName) { %>
+                <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
+              <% } else { %>
+                <span class="fw-bold text-muted">Nežinomas pasirašytojas</span>
+              <% } %>
+              <% if (sig.signingTime) { %>
+                <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>
+              <% } %>
             </div>
           <% }) %>
         </div>
