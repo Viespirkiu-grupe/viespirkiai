@@ -130,7 +130,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
                 <a href="/viesiejiPirkimai/<%= sutartis.cvpisPirkimas.pirkimoId %>"><%= sutartis.pirkimoNumeris %></a>
               <% } %>
             <% } else if (sutartis.cvppPirkimas) { %>
-              <a href="https://cvpp.eviesiejipirkimai.lt/<%= sutartis.cvppPirkimas.link %>"><%= sutartis.pirkimoNumeris %></a>
+              <a href="<%= sutartis.cvppPirkimas.link %>"><%= sutartis.pirkimoNumeris %></a>
             <% } else { %>
               <%= sutartis.pirkimoNumeris || "Nenurodytas" %>
             <% } %>
