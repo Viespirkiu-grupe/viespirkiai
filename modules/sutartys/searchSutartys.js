@@ -82,6 +82,7 @@ const sutartysFilter = new FilterBuilder({
             "suma",
         ],
         pgAliases: { suma: "verte" },
+        tsAliases: { suma: "verte" },
     },
 });
 
