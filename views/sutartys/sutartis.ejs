@@ -146,11 +146,15 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
                     <span><%= sutartis.cvpisPirkimas.pavadinimas %></span>
                 </a>
                 </div>
-                <dl class="kv-list mb-4">
-                <dt>Pasiūlymų pateikimo terminas</dt>
-                <dd><%= new String(sutartis.cvpisPirkimas.pasiulymuPateikimoTerminas).slice(0,10) %></dd>
-                <dt>Numatoma vertė</dt>
-                <dd class="cell-mono"><%= Number(sutartis.cvpisPirkimas.numatomaVerteEUR).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</dd>
+                <dl class="kv-list">
+                <% if (sutartis.cvpisPirkimas.pasiulymuPateikimoTerminas) { %>
+                  <dt>Pasiūlymų pateikimo terminas</dt>
+                  <dd><%= new String(sutartis.cvpisPirkimas.pasiulymuPateikimoTerminas).slice(0,10) %></dd>
+                <% } %>
+                <% if (sutartis.cvpisPirkimas.numatomaVerteEUR && Number(sutartis.cvpisPirkimas.numatomaVerteEUR) > 0) { %>
+                  <dt>Numatoma vertė</dt>
+                  <dd class="cell-mono"><%= Number(sutartis.cvpisPirkimas.numatomaVerteEUR).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €</dd>
+                <% } %>
                 </dl>
                 <% if (sutartis.cvpisPirkimas.informacija) { %>
                 <p class="text-muted text-sm"><%= sutartis.cvpisPirkimas.informacija %></p>
