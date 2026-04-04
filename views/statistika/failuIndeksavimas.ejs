@@ -8,28 +8,28 @@
     <div class="card">
       <div class="card-body">
         <div class="section-title mb-2">Iš viso</div>
-        <span class="cell-mono"><%= Number(statistika.nuskaitymas.zodziai.total).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %></span>
+        <span class="cell-mono" data-stat="nuskaitymas.zodziai.total"><%= Number(statistika.nuskaitymas.zodziai.total).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %></span>
       </div>
     </div>
 
     <div class="card">
       <div class="card-body">
         <div class="section-title mb-2">Vidurkis</div>
-        <span class="cell-mono"><%= Number(statistika.nuskaitymas.zodziai.vidurkis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %></span>
+        <span class="cell-mono" data-stat="nuskaitymas.zodziai.vidurkis"><%= Number(statistika.nuskaitymas.zodziai.vidurkis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %></span>
       </div>
     </div>
 
     <div class="card">
       <div class="card-body">
         <div class="section-title mb-2">Vidurkis (be 0)</div>
-        <span class="cell-mono"><%= Number(statistika.nuskaitymas.zodziai.vidurkisNeNulis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %></span>
+        <span class="cell-mono" data-stat="nuskaitymas.zodziai.vidurkisNeNulis"><%= Number(statistika.nuskaitymas.zodziai.vidurkisNeNulis).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]) %></span>
       </div>
     </div>
 
     <div class="card">
       <div class="card-body">
         <div class="section-title mb-2">Failų su žodžiais dalis</div>
-        <span class="cell-mono"><%= Number(statistika.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2) %> %</span>
+        <span class="cell-mono" data-stat="nuskaitymas.zodziai.failuSuZodziaisDalis"><%= Number(statistika.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2) %> %</span>
       </div>
     </div>
 

@@ -7,7 +7,6 @@
       pageImage: `https://viespirkiai.org/failai.png`,
       customHead
     }) %>
-    <%- include('../js/idiomorph.ejs') %>
     <%- include('../js/charts.ejs') %>
     <style>
       .failai-statistika {
@@ -60,16 +59,28 @@
             });
 
             let evtSource;
+            const setText = (key, value) => {
+              const el = document.querySelector(`[data-stat="${key}"]`);
+              if (el && value !== undefined) el.textContent = value;
+            };
+
+            const updateStatistika = (payload) => {
+              setText("atnaujinta", payload.atnaujinta);
+              setText("totalWordsNumber", payload.totalWordsNumber);
+              setText("totalWordsLabel", payload.totalWordsLabel);
+              setText("dataSize", payload.dataSize);
+              setText("filesWithWordsNumber", payload.filesWithWordsNumber);
+              setText("filesWithWordsLabel", payload.filesWithWordsLabel);
+            };
+
             const connect = () => {
               evtSource = new EventSource("/failai/statistika/sse");
               evtSource.onmessage = (e) => {
-                const html = JSON.parse(e.data);
-                const target = document.getElementById("failaiStatistika");
-                if (target) Idiomorph.morph(target, html);
+                updateStatistika(JSON.parse(e.data));
               };
               evtSource.onerror = () => {
                 evtSource.close();
-                setTimeout(connect, 2000);
+                setTimeout(connect, 500);
               };
             };
             connect();

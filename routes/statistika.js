@@ -2,12 +2,184 @@ import express from "express";
 import { postgres } from "../postgres/postgres.js";
 import config from "../utils/config.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
-import { log } from "../utils/log.js";
 
 const statistikaRouter = express.Router();
 
 let cache = null;
 let cacheTime = 0;
+
+function formatBytes(value) {
+    if (value < 1024) {
+        return `${value} B`;
+    }
+    if (value < 1024 * 1024) {
+        return `${(value / 1024).toFixed(2)} KB`;
+    }
+    if (value < 1024 * 1024 * 1024) {
+        return `${(value / (1024 * 1024)).toFixed(2)} MB`;
+    }
+    return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function formatDateTime(dateInput) {
+    return new Date(dateInput).toLocaleString("lt-LT", { hour12: false });
+}
+
+function humanizeStatistika(statistika) {
+    let humanStatistika = structuredClone(statistika);
+    humanStatistika.failai.dydziai = Object.fromEntries(
+        Object.entries(humanStatistika.failai.dydziai).map(([key, value]) => {
+            return [key, formatBytes(value)];
+        }),
+    );
+
+    return humanStatistika;
+}
+
+function buildSsePayload(humanStatistika) {
+    return {
+        atnaujinta: formatDateTime(humanStatistika.atnaujinta),
+        failai: humanStatistika.failai,
+        nuskaitymas: {
+            zodziai: {
+                total: Number(humanStatistika.nuskaitymas.zodziai.total).linksniuoti([
+                    "žodis",
+                    "žodžiai",
+                    "žodžių",
+                    "žodžio",
+                ]),
+                vidurkis: Number(
+                    humanStatistika.nuskaitymas.zodziai.vidurkis,
+                ).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]),
+                vidurkisNeNulis: Number(
+                    humanStatistika.nuskaitymas.zodziai.vidurkisNeNulis,
+                ).linksniuoti(["žodis", "žodžiai", "žodžių", "žodžio"]),
+                failuSuZodziaisDalis: `${Number(
+                    humanStatistika.nuskaitymas.zodziai.failuSuZodziaisDalis,
+                ).toFixed(2)} %`,
+            },
+            pagalVersija: humanStatistika.nuskaitymas.pagalVersija.map(
+                (versija) => ({
+                    status: versija.status,
+                    kiekis: Number(versija.kiekis).toLocaleString("lt-LT"),
+                    procentai: `${Number(versija.procentai).toLocaleString("lt-LT")} %`,
+                }),
+            ),
+        },
+        topDokNuskaitytojai: humanStatistika.topDokNuskaitytojai.map(
+            (nuskaitytojas) => ({
+                viesasPavadinimas: nuskaitytojas.viesasPavadinimas,
+                nuskaitytidokumentai: Number(
+                    nuskaitytojas.nuskaitytidokumentai,
+                ).toLocaleString("lt-LT"),
+            }),
+        ),
+        database: {
+            uptime: Number(humanStatistika.database.uptime_seconds).convertUnit(
+                "s",
+            ),
+            xact_commit: Number(
+                humanStatistika.database.xact_commit,
+            ).toLocaleString("lt-LT"),
+            tup_inserted: Number(
+                humanStatistika.database.tup_inserted,
+            ).toLocaleString("lt-LT"),
+            tup_updated: Number(
+                humanStatistika.database.tup_updated,
+            ).toLocaleString("lt-LT"),
+            tup_deleted: Number(
+                humanStatistika.database.tup_deleted,
+            ).toLocaleString("lt-LT"),
+            tup_fetched: Number(
+                humanStatistika.database.tup_fetched,
+            ).toLocaleString("lt-LT"),
+        },
+        lenteles: humanStatistika.lenteles.map((lentele) => ({
+            tableName: lentele.tableName,
+            dataSize: Number(lentele.dataSize).convertUnit("B"),
+            indexSize: Number(lentele.indexSize).convertUnit("B"),
+            totalSize: Number(lentele.totalSize).convertUnit("B"),
+            approxRowCount: Number(lentele.approxRowCount).toLocaleString("lt-LT"),
+            isTotal: lentele.tableName === "Iš viso",
+        })),
+    };
+}
+
+function isObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function deepEqual(a, b) {
+    if (a === b) {
+        return true;
+    }
+
+    if (Array.isArray(a) && Array.isArray(b)) {
+        if (a.length !== b.length) {
+            return false;
+        }
+
+        for (let i = 0; i < a.length; i += 1) {
+            if (!deepEqual(a[i], b[i])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (isObject(a) && isObject(b)) {
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+
+        if (keysA.length !== keysB.length) {
+            return false;
+        }
+
+        for (const key of keysA) {
+            if (!Object.prototype.hasOwnProperty.call(b, key)) {
+                return false;
+            }
+
+            if (!deepEqual(a[key], b[key])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+function diffPayload(prev, next) {
+    if (prev === null) {
+        return next;
+    }
+
+    if (deepEqual(prev, next)) {
+        return undefined;
+    }
+
+    if (Array.isArray(next)) {
+        return next;
+    }
+
+    if (isObject(next) && isObject(prev)) {
+        const diff = {};
+
+        for (const key of Object.keys(next)) {
+            const childDiff = diffPayload(prev[key], next[key]);
+            if (childDiff !== undefined) {
+                diff[key] = childDiff;
+            }
+        }
+
+        return Object.keys(diff).length > 0 ? diff : undefined;
+    }
+
+    return next;
+}
 
 export async function gautiStatistika() {
     const now = Date.now();
@@ -21,7 +193,7 @@ export async function gautiStatistika() {
 
     const [failaiCountsRes, lentelesRes, topDokNuskaitytojaiRes, databaseRes] =
         await Promise.all([
-            postgres.query(`SELECT * FROM "failaiCounts";`),
+            postgres.query(`SELECT metrika, eilute, verte FROM "failaiCounts";`),
             postgres.query(
                 `SELECT
             s.relname AS "tableName",
@@ -160,7 +332,6 @@ export async function gautiStatistika() {
 
     const nuskaitytaKiekis = statistika.nuskaitymas.pagalVersija.reduce(
         (sum, obj) => {
-            const statusNum = Number(obj.status);
             if (
                 obj.status === String(didziausiasStatusas) ||
                 (obj.status !== "Nenuskaityta" && isNaN(Number(obj.status)))
@@ -196,24 +367,7 @@ statistikaRouter.get("/statistika.json", async (req, res) => {
 
 statistikaRouter.get("/statistika", async (req, res) => {
     let statistika = await gautiStatistika();
-
-    let humanStatistika = structuredClone(statistika);
-    humanStatistika.failai.dydziai = Object.fromEntries(
-        Object.entries(humanStatistika.failai.dydziai).map(([key, value]) => {
-            if (value < 1024) {
-                return [key, `${value} B`];
-            } else if (value < 1024 * 1024) {
-                return [`${key}`, `${(value / 1024).toFixed(2)} KB`];
-            } else if (value < 1024 * 1024 * 1024) {
-                return [`${key}`, `${(value / (1024 * 1024)).toFixed(2)} MB`];
-            } else {
-                return [
-                    `${key}`,
-                    `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`,
-                ];
-            }
-        }),
-    );
+    let humanStatistika = humanizeStatistika(statistika);
 
     if (req.query.innerOnly) {
         return res.render("statistika/main", {
@@ -230,45 +384,58 @@ statistikaRouter.get("/statistika", async (req, res) => {
 });
 
 statistikaRouter.get("/statistika/sse", async (req, res) => {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    if (typeof res.flushHeaders === "function") {
+        res.flushHeaders();
+    }
+    res.write("retry: 1000\n\n");
 
     let running = true;
-    req.on("close", () => (running = false));
+    let lastPayload = null;
+    let lastTimestampOnlySentAt = 0;
+    const heartbeat = setInterval(() => {
+        if (!running) {
+            return;
+        }
+        res.write(": ping\n\n");
+    }, 15000);
 
-    const formatDydziai = (dydziai) =>
-        Object.fromEntries(
-            Object.entries(dydziai).map(([key, value]) => {
-                if (value < 1024) return [key, `${value} B`];
-                if (value < 1024 ** 2)
-                    return [key, `${(value / 1024).toFixed(2)} KB`];
-                if (value < 1024 ** 3)
-                    return [key, `${(value / 1024 ** 2).toFixed(2)} MB`];
-                return [key, `${(value / 1024 ** 3).toFixed(2)} GB`];
-            }),
-        );
+    req.on("close", () => {
+        running = false;
+        clearInterval(heartbeat);
+    });
 
     const sendUpdate = async () => {
         const statistika = await gautiStatistika();
-        const human = structuredClone(statistika);
-        human.failai.dydziai = formatDydziai(human.failai.dydziai);
+        const humanStatistika = humanizeStatistika(statistika);
+        const nextPayload = buildSsePayload(humanStatistika);
+        const payloadDelta = diffPayload(lastPayload, nextPayload);
 
-        req.app.render(
-            "statistika/main",
-            { statistika: human },
-            (err, html) => {
-                if (err) {
-                    console.error("Rendering error:", err);
-                    return;
-                }
-                res.write(`data: ${JSON.stringify(html)}\n\n`);
-            },
-        );
+        if (payloadDelta === undefined) {
+            return;
+        }
+
+        const keys = Object.keys(payloadDelta);
+        if (keys.length === 1 && keys[0] === "atnaujinta") {
+            const now = Date.now();
+            if (now - lastTimestampOnlySentAt < 1000) {
+                return;
+            }
+            lastTimestampOnlySentAt = now;
+        }
+
+        lastPayload = nextPayload;
+        res.write(`data: ${JSON.stringify(payloadDelta)}\n\n`);
     };
 
     const interval = setInterval(async () => {
-        if (!running) return clearInterval(interval);
+        if (!running) {
+            clearInterval(interval);
+            return;
+        }
         await sendUpdate();
     }, 100);
 });

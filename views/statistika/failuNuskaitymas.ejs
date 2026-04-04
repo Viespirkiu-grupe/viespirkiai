@@ -15,7 +15,7 @@
               <th class="cell-right">Dalis</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="pagalVersijaBody">
             <% statistika.nuskaitymas.pagalVersija.forEach(versija => { %>
               <tr>
                 <td><%= versija.status %></td>
@@ -38,7 +38,7 @@
               <th class="cell-right">Failų skaičius</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="topNuskaitytojaiBody">
             <% statistika.topDokNuskaitytojai.forEach(nuskaitytojas => { %>
               <tr>
                 <td><%= nuskaitytojas.viesasPavadinimas %></td>

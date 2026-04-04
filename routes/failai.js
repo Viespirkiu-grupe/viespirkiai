@@ -14,6 +14,109 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 250;
 const COUNT_TIMEOUT_MS = 250;
 
+function buildFailaiStatistikaPayload(statistika) {
+    const totalWords = Number(statistika.nuskaitymas.zodziai.total);
+    const failaiSuZodziais = Number(statistika.nuskaitymas.zodziai.failaiSuZodziais);
+    const visiFailai = Number(statistika.failai.kiekiai.visi);
+    const visiDydziai = Number(statistika.failai.dydziai.visi);
+    const duomenuBaitai =
+        visiDydziai *
+        (visiFailai > 0 ? failaiSuZodziais / visiFailai : 0);
+
+    return {
+        atnaujinta: new Date(statistika.atnaujinta).toLtDateTime(),
+        totalWordsNumber: totalWords.displayWithSpaces(),
+        totalWordsLabel: `${totalWords.linksniuotiOnly(["žodis", "žodžiai", "žodžių", "žodžio"])} teksto`,
+        dataSize: Number(Number(duomenuBaitai.toFixed(2))).convertUnit({
+            from: "B",
+            to: "GB",
+        }),
+        filesWithWordsNumber: failaiSuZodziais.displayWithSpaces(),
+        filesWithWordsLabel: failaiSuZodziais.linksniuotiOnly([
+            "failas",
+            "failai",
+            "failų",
+            "failo",
+        ]),
+    };
+}
+
+function isObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function deepEqual(a, b) {
+    if (a === b) {
+        return true;
+    }
+
+    if (Array.isArray(a) && Array.isArray(b)) {
+        if (a.length !== b.length) {
+            return false;
+        }
+
+        for (let i = 0; i < a.length; i += 1) {
+            if (!deepEqual(a[i], b[i])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (isObject(a) && isObject(b)) {
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+
+        if (keysA.length !== keysB.length) {
+            return false;
+        }
+
+        for (const key of keysA) {
+            if (!Object.prototype.hasOwnProperty.call(b, key)) {
+                return false;
+            }
+
+            if (!deepEqual(a[key], b[key])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+function diffPayload(prev, next) {
+    if (prev === null) {
+        return next;
+    }
+
+    if (deepEqual(prev, next)) {
+        return undefined;
+    }
+
+    if (Array.isArray(next)) {
+        return next;
+    }
+
+    if (isObject(next) && isObject(prev)) {
+        const diff = {};
+
+        for (const key of Object.keys(next)) {
+            const childDiff = diffPayload(prev[key], next[key]);
+            if (childDiff !== undefined) {
+                diff[key] = childDiff;
+            }
+        }
+
+        return Object.keys(diff).length > 0 ? diff : undefined;
+    }
+
+    return next;
+}
+
 /**
  * @param {{ limit?: string }} query
  * @returns {{ limit: number } | { error: string }}
@@ -393,24 +496,54 @@ failaiSearchRouter.get("/failai/neparsiunciami", async (req, res, next) => {
 });
 
 failaiSearchRouter.get("/failai/statistika/sse", async (req, res) => {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    if (typeof res.flushHeaders === "function") {
+        res.flushHeaders();
+    }
     res.write("retry: 1000\n\n");
 
     let running = true;
-    req.on("close", () => (running = false));
+    let lastPayload = null;
+    let lastTimestampOnlySentAt = 0;
+    const heartbeat = setInterval(() => {
+        if (!running) {
+            return;
+        }
+        res.write(": ping\n\n");
+    }, 15000);
+
+    req.on("close", () => {
+        running = false;
+        clearInterval(heartbeat);
+    });
 
     const interval = setInterval(async () => {
-        if (!running) return clearInterval(interval);
+        if (!running) {
+            clearInterval(interval);
+            return;
+        }
         const statistika = await gautiStatistika();
-        req.app.render("failai/statistika", { statistika }, (err, html) => {
-            if (err) {
-                console.error("Rendering error:", err);
+        const nextPayload = buildFailaiStatistikaPayload(statistika);
+        const payloadDelta = diffPayload(lastPayload, nextPayload);
+
+        if (payloadDelta === undefined) {
+            return;
+        }
+
+        const keys = Object.keys(payloadDelta);
+        if (keys.length === 1 && keys[0] === "atnaujinta") {
+            const now = Date.now();
+            if (now - lastTimestampOnlySentAt < 1000) {
                 return;
             }
-            res.write(`data: ${JSON.stringify(html)}\n\n`);
-        });
+            lastTimestampOnlySentAt = now;
+        }
+
+        lastPayload = nextPayload;
+        res.write(`data: ${JSON.stringify(payloadDelta)}\n\n`);
     }, 250);
 });
 
