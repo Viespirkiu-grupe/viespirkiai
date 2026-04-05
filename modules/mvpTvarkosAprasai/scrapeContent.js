@@ -155,34 +155,28 @@ export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
         );
 
         if (merged.length > 0) {
-            const failaiValues = [];
-            const failaiPlaceholders = [];
-
-            merged.forEach((f, i) => {
-                const idx = i * 4;
-                failaiPlaceholders.push(
-                    `($${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4})`,
-                );
-
-                failaiValues.push(
-                    f.saltinis != null ? f.saltinis : null,
-                    f.saltinioId != null ? f.saltinioId : null,
-                    f.pavadinimas != null ? f.pavadinimas : null,
-                    f.extension != null ? f.extension : null,
-                );
-            });
-
-            const failaiQuery = `
-            INSERT INTO public."failai"
-            ("saltinis", "saltinioId", "pavadinimas", "extension")
-            VALUES ${failaiPlaceholders.join(",")}
-            ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL) DO NOTHING;
-            `;
-
-            await postgres.query(failaiQuery, failaiValues);
-            log(
-                `Inserted ${merged.length} rows into public.failai (duplicates ignored)`,
+            const existsResult = await postgres.query(
+                `SELECT "saltinis", "saltinioId" FROM failai
+         WHERE ("saltinis", "saltinioId") IN (${merged.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(', ')})
+           AND saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL`,
+                merged.flatMap(f => [f.saltinis, f.saltinioId])
             );
+
+            const existingSet = new Set(existsResult.rows.map(r => `${r.saltinis}:${r.saltinioId}`));
+            const toInsert = merged.filter(f => !existingSet.has(`${f.saltinis}:${f.saltinioId}`));
+
+            if (toInsert.length > 0) {
+                const placeholders = toInsert.map((_, i) =>
+                    `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`
+                );
+                await postgres.query(
+                    `INSERT INTO failai ("saltinis", "saltinioId", "pavadinimas", "extension")
+             VALUES ${placeholders.join(', ')}
+             ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL) DO NOTHING`,
+                    toInsert.flatMap(f => [f.saltinis ?? null, f.saltinioId ?? null, f.pavadinimas ?? null, f.extension ?? null])
+                );
+                log(`Inserted ${toInsert.length} rows into public.failai (duplicates ignored)`);
+            }
         }
     } catch (err) {
         console.error("Klaida insertinant i failai:", err);

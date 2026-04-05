@@ -52,7 +52,7 @@ export async function cvpIsImportArray(data, options = {}) {
                 : null;
         item.faktineIvykdimoVerte =
             typeof item.faktineIvykdimoVerte === "string" &&
-            item.faktineIvykdimoVerte !== ""
+                item.faktineIvykdimoVerte !== ""
                 ? parseFloat(item.faktineIvykdimoVerte.replace(/,/g, "."))
                 : null;
 
@@ -103,18 +103,17 @@ export async function cvpIsImportArray(data, options = {}) {
         const placeholders = [];
 
         // Į lentelę failai
-        const failaiValues = [];
-        const failaiPlaceholders = [];
+        const newFailai = [];
 
         // Paruošiame duomenis įterpimui
         items.forEach((item, i) => {
             const faktineIvykdimoVerte =
                 typeof item.faktineIvykdimoVerte === "string" &&
-                item.faktineIvykdimoVerte !== ""
+                    item.faktineIvykdimoVerte !== ""
                     ? parseFloat(item.faktineIvykdimoVerte.replace(/,/g, "."))
                     : typeof item.faktineIvykdimoVerte === "number"
-                      ? item.faktineIvykdimoVerte
-                      : null;
+                        ? item.faktineIvykdimoVerte
+                        : null;
 
             const pirkimoNumeris =
                 item.pirkimoNumeris?.replace(/\x00/g, "").trim() || null;
@@ -161,24 +160,14 @@ export async function cvpIsImportArray(data, options = {}) {
                 const fileIdMatch = (d.url || "").match(/file_id=(\d+)/);
                 if (!fileIdMatch) return;
                 const fileId = parseInt(fileIdMatch[1], 10);
-
-                const extension = d.pavadinimas
-                    ? d.pavadinimas.split(".").pop()
-                    : null;
                 const dokId = item.sutartiesUnikalusID;
-                const pavadinimas = d.pavadinimas || null;
-
-                const baseIndex = failaiValues.length;
-                failaiPlaceholders.push(
-                    `($${baseIndex + 1}, $${baseIndex + 2}, $${baseIndex + 3}, $${baseIndex + 4}, $${baseIndex + 5})`,
-                );
-                failaiValues.push(
+                newFailai.push({
                     dokId,
                     fileId,
-                    pavadinimas,
-                    extension,
-                    "sutartys",
-                );
+                    pavadinimas: d.pavadinimas || null,
+                    extension: d.pavadinimas ? d.pavadinimas.split(".").pop() : null,
+                    saltinis: "sutartys",
+                });
             });
         });
 
@@ -248,13 +237,29 @@ export async function cvpIsImportArray(data, options = {}) {
         timings.end("importPostgresUpsert");
 
         timings.start("importPostgresFailaiUpsert");
-        if (failaiValues.length > 0) {
-            await postgres.query(
-                `INSERT INTO failai ("dokId", "fileId", "pavadinimas", "extension", "saltinis")
-                 VALUES ${failaiPlaceholders.join(", ")}
-                 ON CONFLICT ("dokId", "fileId") WHERE ("dokId" IS NOT NULL AND "fileId" IS NOT NULL) DO NOTHING;`,
-                failaiValues,
+        if (newFailai.length > 0) {
+            const existsResult = await postgres.query(
+                `SELECT "dokId", "fileId" FROM failai
+         WHERE ("dokId", "fileId") IN (${newFailai.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(', ')})
+           AND "dokId" IS NOT NULL AND "fileId" IS NOT NULL`,
+                newFailai.flatMap(r => [r.dokId, r.fileId])
             );
+
+            const existingSet = new Set(existsResult.rows.map(r => `${r.dokId}:${r.fileId}`));
+
+            const toInsert = newFailai.filter(r => !existingSet.has(`${r.dokId}:${r.fileId}`));
+
+            if (toInsert.length > 0) {
+                const placeholders = toInsert.map((_, i) =>
+                    `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`
+                );
+                await postgres.query(
+                    `INSERT INTO failai ("dokId", "fileId", "pavadinimas", "extension", "saltinis")
+             VALUES ${placeholders.join(', ')}
+             ON CONFLICT ("dokId", "fileId") WHERE ("dokId" IS NOT NULL AND "fileId" IS NOT NULL) DO NOTHING`,
+                    toInsert.flatMap(r => [r.dokId, r.fileId, r.pavadinimas, r.extension, r.saltinis])
+                );
+            }
         }
         timings.end("importPostgresFailaiUpsert");
     }

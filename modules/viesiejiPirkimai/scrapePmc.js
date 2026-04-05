@@ -33,8 +33,8 @@ export function getRpsFormatted() {
     return rate < 10
         ? rate.toFixed(2)
         : rate < 100
-          ? rate.toFixed(1)
-          : String(Math.round(rate));
+            ? rate.toFixed(1)
+            : String(Math.round(rate));
 }
 
 /**
@@ -189,26 +189,27 @@ async function processPmcRecord(cft, options = {}) {
 
         timings.start("upsertFiles");
         if (failaiFlat.length > 0) {
-            const failaiValues = [];
-            const failaiPlaceholders = failaiFlat
-                .map((f, i) => {
-                    const start = i * 4 + 1;
-                    failaiValues.push(f.saltinis);
-                    failaiValues.push(f.saltinioId);
-                    failaiValues.push(f.pavadinimas);
-                    failaiValues.push(f.extension);
-                    return `($${start}, $${start + 1}, $${start + 2}, $${start + 3})`;
-                })
-                .join(", ");
+            const existsResult = await postgres.query(
+                `SELECT "saltinis", "saltinioId" FROM failai
+         WHERE ("saltinis", "saltinioId") IN (${failaiFlat.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(', ')})
+           AND saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL`,
+                failaiFlat.flatMap(f => [f.saltinis, f.saltinioId])
+            );
 
-            const failaiQuery = `
-            INSERT INTO public."failai"
-            ("saltinis", "saltinioId", "pavadinimas", "extension")
-            VALUES ${failaiPlaceholders}
-            ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL) DO NOTHING;
-            `;
+            const existingSet = new Set(existsResult.rows.map(r => `${r.saltinis}:${r.saltinioId}`));
+            const toInsert = failaiFlat.filter(f => !existingSet.has(`${f.saltinis}:${f.saltinioId}`));
 
-            await postgres.query(failaiQuery, failaiValues);
+            if (toInsert.length > 0) {
+                const placeholders = toInsert.map((_, i) =>
+                    `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`
+                );
+                await postgres.query(
+                    `INSERT INTO failai ("saltinis", "saltinioId", "pavadinimas", "extension")
+             VALUES ${placeholders.join(', ')}
+             ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL) DO NOTHING`,
+                    toInsert.flatMap(f => [f.saltinis, f.saltinioId, f.pavadinimas, f.extension])
+                );
+            }
         }
         timings.end("upsertFiles");
 
@@ -274,8 +275,8 @@ async function processPmcRecord(cft, options = {}) {
                 result.esFinansavimas === "Taip"
                     ? true
                     : result.esFinansavimas === "Ne"
-                      ? false
-                      : null,
+                        ? false
+                        : null,
                 result.pirkimoVykdytojasId ?? null,
             ],
         );
@@ -376,7 +377,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         } else {
             await Promise.all(
                 Array.from({ length: WORKERS }, async () => {
-                    while (await processPmc()) {}
+                    while (await processPmc()) { }
                 }),
             );
         }

@@ -310,25 +310,34 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
 
         // Insert into postgres
         for (const child of children) {
+            // Check if file already exists
+            const existsRes = await postgres.query(
+            `SELECT id FROM failai WHERE "saltinioId" = $1 AND parent = $2 AND saltinis = 'archive'`,
+            [child.saltinioId, child.parent],
+            );
+
+            // Only insert if it doesn't exist
+            if (existsRes.rows.length === 0) {
             await postgres.query(
                 `INSERT INTO failai (
-                    pavadinimas, extension, dydis, md5,
-                    "saltinioId", parent, parsiustas, saltinis
+                pavadinimas, extension, dydis, md5,
+                "saltinioId", parent, parsiustas, saltinis
                 ) VALUES (
                    $1, $2, $3, $4, $5, $6, $7, $8
                 )
                 ON CONFLICT ("saltinioId", parent) WHERE saltinis = 'archive' DO NOTHING;`,
                 [
-                    child.pavadinimas,
-                    child.extension,
-                    child.dydis,
-                    child.md5,
-                    child.saltinioId,
-                    child.parent,
-                    child.parsiustas,
-                    child.saltinis,
+                child.pavadinimas,
+                child.extension,
+                child.dydis,
+                child.md5,
+                child.saltinioId,
+                child.parent,
+                child.parsiustas,
+                child.saltinis,
                 ],
             );
+            }
         }
     }
 

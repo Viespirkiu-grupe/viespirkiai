@@ -18,7 +18,7 @@ async function nuskaitytiNeskelbiamasDerybasNuo(start = 0) {
     );
     let proxy =
         scrapeProxyRes.rows[
-            Math.floor(Math.random() * scrapeProxyRes.rows.length)
+        Math.floor(Math.random() * scrapeProxyRes.rows.length)
         ];
 
     let url = `/index.php?option=com_profile&task=sutikimai&filter_limit=50&Itemid=98&limitstart=${start * 50}`;
@@ -174,26 +174,29 @@ export async function nuskaitytiVisasNeskelbiamasDerybas() {
             });
         });
 
-        const failaiValues = [];
-        const failaiPlaceholders = failai
-            .map((f, i) => {
-                const start = i * 4 + 1;
-                failaiValues.push(f.saltinis);
-                failaiValues.push(f.saltinioId);
-                failaiValues.push(f.pavadinimas);
-                failaiValues.push(f.extension);
-                return `($${start}, $${start + 1}, $${start + 2}, $${start + 3})`;
-            })
-            .join(", ");
+        if (failai.length > 0) {
+            const existsResult = await postgres.query(
+                `SELECT "saltinis", "saltinioId" FROM failai
+         WHERE ("saltinis", "saltinioId") IN (${failai.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(', ')})
+           AND saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL`,
+                failai.flatMap(f => [f.saltinis, f.saltinioId])
+            );
 
-        const failaiQuery = `
-            INSERT INTO public."failai"
-            ("saltinis", "saltinioId", "pavadinimas", "extension")
-            VALUES ${failaiPlaceholders}
-            ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL) DO NOTHING;
-            `;
+            const existingSet = new Set(existsResult.rows.map(r => `${r.saltinis}:${r.saltinioId}`));
+            const toInsert = failai.filter(f => !existingSet.has(`${f.saltinis}:${f.saltinioId}`));
 
-        await postgres.query(failaiQuery, failaiValues);
+            if (toInsert.length > 0) {
+                const placeholders = toInsert.map((_, i) =>
+                    `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`
+                );
+                await postgres.query(
+                    `INSERT INTO failai ("saltinis", "saltinioId", "pavadinimas", "extension")
+             VALUES ${placeholders.join(', ')}
+             ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL) DO NOTHING`,
+                    toInsert.flatMap(f => [f.saltinis, f.saltinioId, f.pavadinimas, f.extension])
+                );
+            }
+        }
     }
 }
 
