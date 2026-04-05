@@ -14,6 +14,7 @@ import {
     STATUSAS,
     PIRKIMO_BUDAS,
 } from "../modules/viesiejiPirkimai/viesiejiPirkimaiEnums.js";
+import { buildTedNoticeViewModel } from "../modules/ted/viewer.js";
 import { postgres } from "../postgres/postgres.js";
 import { searchSutartys } from "../modules/sutartys/searchSutartys.js";
 
@@ -333,6 +334,78 @@ viesiejiPirkimaiRouter.get("/viesiejiPirkimai/:id", async (req, res, next) => {
                 downloadHref: `https://viesiejipirkimai.lt${path}`,
             };
         });
+    }
+
+    // Build TED notice cards that point to internal viewer when parsed content exists.
+    if (Array.isArray(pirkimas?.turinys?.tedNuorodosIPaskelbtusPranesimus)) {
+        const tedUrls = pirkimas.turinys.tedNuorodosIPaskelbtusPranesimus.filter(
+            (u) => typeof u === "string" && u.trim().length > 0,
+        );
+        pirkimas.turinys.tedSkelbimai = [];
+        pirkimas.turinys.tedNuorodosIsorines = [];
+
+        const parseTedNoticeNumber = (url) => {
+            const trimmed = String(url).trim();
+            const noticeMatch = trimmed.match(/NOTICE:(\d+-\d{4})/i);
+            if (noticeMatch?.[1]) return noticeMatch[1];
+
+            const fallbackMatch = trimmed.match(/(\d{4,}-\d{4})/);
+            return fallbackMatch?.[1] || null;
+        };
+
+        const tedNoticeNumbers = [
+            ...new Set(
+                tedUrls
+                    .map((url) => parseTedNoticeNumber(url))
+                    .filter(Boolean),
+            ),
+        ];
+
+        if (tedNoticeNumbers.length > 0) {
+            const { rows: tedRows } = await postgres.query(
+                `SELECT "tedNoticeNumber", turinys
+                 FROM public."tedNotices"
+                 WHERE "tedNoticeNumber" = ANY($1)
+                   AND turinys IS NOT NULL`,
+                [tedNoticeNumbers],
+            );
+
+            const availableNotices = new Map(
+                tedRows.map((r) => [r.tedNoticeNumber, r.turinys]),
+            );
+
+            tedUrls.forEach((url) => {
+                    const tedNoticeNumber = parseTedNoticeNumber(url);
+                    if (!tedNoticeNumber || !availableNotices.has(tedNoticeNumber)) {
+                        pirkimas.turinys.tedNuorodosIsorines.push(url);
+                        return;
+                    }
+
+                    let pavadinimas = "TED skelbimas";
+                    const tedTurinys = availableNotices.get(tedNoticeNumber);
+                    if (tedTurinys) {
+                        try {
+                            const tedView = buildTedNoticeViewModel(tedTurinys);
+                            pavadinimas =
+                                tedView?.documentTypeLabel ||
+                                tedView?.subTypeDescription ||
+                                pavadinimas;
+                        } catch {
+                            // Keep a generic title if XML parsing fails.
+                        }
+                    }
+
+                    pirkimas.turinys.tedSkelbimai.push({
+                        pavadinimas,
+                        numeris: tedNoticeNumber,
+                        downloadHref: `/ted/${tedNoticeNumber}`,
+                        originalHref: url,
+                    });
+                });
+        } else {
+            pirkimas.turinys.tedSkelbimai = [];
+            pirkimas.turinys.tedNuorodosIsorines = tedUrls;
+        }
     }
 
     let sutartysRes = await searchSutartys({

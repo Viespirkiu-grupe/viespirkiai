@@ -312,18 +312,56 @@
             </div>
         </section>
         <% } %>
-
-
-        <% const tedUrls = Array.isArray(t.tedNuorodosIPaskelbtusPranesimus) ? t.tedNuorodosIPaskelbtusPranesimus : []; %>
-        <% if (tedUrls.length > 0) { %>
-            <section class="mb-7">
+        <% const tedSkelbimai = Array.isArray(t.tedSkelbimai) ? t.tedSkelbimai : []; %>
+        <% const tedIsorinesNuorodos = Array.isArray(t.tedNuorodosIsorines) ? t.tedNuorodosIsorines : []; %>
+        <% if (tedSkelbimai.length > 0 || tedIsorinesNuorodos.length > 0) { %>
+        <section class="mb-7">
             <h2>TED nuorodos</h2>
-            <ul class="file-list mt-4">
-                <% tedUrls.forEach(url => { %>
-                <li><a href="<%= url %>" target="_blank"><%= url %></a></li>
-                <% }) %>
-            </ul>
-            </section>
+
+            <% const tedKorteles = [
+              ...tedSkelbimai,
+              ...tedIsorinesNuorodos.map(url => {
+                const m = String(url).match(/NOTICE:(\d+-\d{4})/i) || String(url).match(/(\d{4,}-\d{4})/);
+                const id = m && m[1] ? m[1] : null;
+                return {
+                  pavadinimas: 'TED skelbimas',
+                  numeris: id,
+                  downloadHref: url,
+                  originalHref: url,
+                };
+              })
+            ]; %>
+
+            <div class="d-flex flex-col gap-2 mt-4">
+              <% tedKorteles.forEach(skelbimas => { %>
+                <%
+                  const href = skelbimas.downloadHref || '#';
+                  const hrefMatch = String(href).match(/\/ted\/(\d+-\d{4})/i) || String(href).match(/NOTICE:(\d+-\d{4})/i) || String(href).match(/(\d{4,}-\d{4})/);
+                  const numeris = skelbimas.numeris || (hrefMatch && hrefMatch[1] ? hrefMatch[1] : null);
+                  const pavadinimas = (skelbimas.pavadinimas || 'TED skelbimas').trim();
+                  const title = pavadinimas;
+                  const ext = 'tedEu';
+                  const meta = numeris || '';
+                  const originalHref = skelbimas.originalHref;
+                  const actions = originalHref ? [
+                    { href: originalHref, text: '↗ TED', target: '_blank', rel: 'noopener noreferrer' },
+                  ] : [];
+                %>
+
+                <div style="min-width:0;">
+                  <%- include('../partials/file-card.ejs', {
+                    title,
+                    href,
+                    meta,
+                    ext,
+                    actions,
+                    titleTwoLines: true,
+                    hideMeta: false
+                  }) %>
+                </div>
+              <% }) %>
+            </div>
+        </section>
         <% } %>
 
         <% if (pirkimas.sutartys && pirkimas.sutartys.length > 0) { %>
