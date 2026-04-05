@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="lt">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= pageTitle %><% if (noticeId) { %> – <%= noticeId %><% } %></title>
+  <%- include('../css.ejs') %>
+  <%- include('partials/notice-styles') %>
+</head>
+
+<body>
+  <%- include('../header.ejs') %>
+  <main>
+    <div class="container container-fluid">
+      <div class="page-header">
+        <div>
+          <p class="subtext"><%= documentTypeLabel %><% if (subTypeDescription) { %> &middot; <%= subTypeDescription %><% } %></p>
+          <h1>
+            <%= pageTitle %>
+            <% if (procScope.value) { %>&nbsp;<span class="amount"><%= procScope.value.values[0] %></span><% } %>
+          </h1>
+        </div>
+        <div class="text-muted text-sm">
+          <% if (noticeId) { %>ID: <%= noticeId %><br><% } %>
+          <% if (issueDateText) { %>Išleista: <%= issueDateText %><% } %>
+        </div>
+      </div>
+
+      <div class="<%= hasLocation ? 'grid-4' : 'grid-3' %> mt-5">
+
+        <section>
+          <h2>Perkančioji organizacija</h2>
+          <% if (primaryOrg) { %>
+          <h3 class="mb-1"><% if (primaryOrg.reg) { %><a href="/asmuo/<%= primaryOrg.reg %>"><%= primaryOrg.label %></a><% } else { %><%= primaryOrg.label %><% } %></h3>
+          <% if (primaryOrg.reg) { %><p class="text-muted text-sm mb-1"><%= primaryOrg.reg %></p><% } %>
+          <% if (primaryOrg.city) { %><p class="text-sm text-muted mb-0"><%= primaryOrg.city %></p><% } %>
+          <% if (primaryOrg.email) { %><p class="text-sm mb-1"><a href="mailto:<%= primaryOrg.email %>"><%= primaryOrg.email %></a></p><% } %>
+          <% if (primaryOrg.url) { %><p class="text-sm mb-0"><a href="<%= primaryOrg.url %>" target="_blank" rel="noopener"><%= primaryOrg.url %></a></p><% } %>
+          <% } %>
+        </section>
+
+        <section>
+          <h2>Pirkimo objektas</h2>
+          <% if (procScope.description) { %><p class="text-sm"><%= procScope.description %></p><% } %>
+          <% if (procScope.internalId || procScope.contractType || procScope.otherObj) { %><p class="text-sm text-muted"><%= [procScope.internalId, procScope.contractType, procScope.otherObj].filter(Boolean).join(' · ') %></p><% } %>
+          <% if (procScope.addInfo) { %><p class="text-sm text-muted"><%= procScope.addInfo %></p><% } %>
+          <% if (procScope.bvpzKodas) { %>
+          <h3 class="mb-2">BVPŽ</h3>
+          <div class="d-flex flex-col gap-2">
+          <div>
+            <div class="fw-medium"><%= procScope.bvpzPavadinimas %><% if (procScope.bvpzKodas) { %> <span class="text-muted fw-normal text-xs"><%= procScope.bvpzKodas %></span><% } %></div>
+          </div>
+          <% if (procScope.papildomiBvpzKodai && procScope.papildomiBvpzKodai.length > 0) { %>
+          <% for (let i = 0; i < procScope.papildomiBvpzKodai.length; i++) { %>
+          <div>
+            <div class="fw-medium"><%= procScope.papildomiBvpzPavadinimai[i] %><% if (procScope.papildomiBvpzKodai[i]) { %> <span class="text-muted fw-normal text-xs"><%= procScope.papildomiBvpzKodai[i] %></span><% } %></div>
+          </div>
+          <% } %>
+          <% } %>
+          </div>
+          <% } %>
+        </section>
+
+        <% if (hasLocation) { %>
+        <section>
+          <h2>Vykdymo vieta</h2>
+          <%- include('partials/address-fields', { addrFields: procScope.addrFields }) %>
+        </section>
+        <% } %>
+
+        <section>
+          <h2>Terminai</h2>
+          <ul class="timeline">
+            <% timelineItems.forEach((item, i) => {
+            const past = item.date && new Date(item.date + 'T00:00:00') < Date.now()
+            const nextPast = timelineItems[i+1] && timelineItems[i+1].date && new Date(timelineItems[i+1].date + 'T00:00:00') < Date.now()
+          %>
+            <li class="timeline-item<%= nextPast ? ' line-active' : '' %>">
+              <span class="timeline-dot<%= past ? ' active' : '' %>"></span>
+              <div class="timeline-body">
+                <div class="timeline-date"><%= item.text %></div>
+                <strong><%= item.label %></strong>
+              </div>
+            </li>
+            <% }) %>
+          </ul>
+        </section>
+
+      </div>
+
+      <div class="d-flex flex-col gap-4">
+        <% visibleSections.forEach(section => { %>
+        <%- include('partials/section', { section }) %>
+        <% }) %>
+      </div>
+
+    </div>
+  </main>
+  <%- include('../footer.ejs') %>
+</body>
+
+</html>

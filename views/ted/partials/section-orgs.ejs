@@ -1,0 +1,50 @@
+<%
+const sectionId = section.nodeId.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()
+const ORG_FIELD_PREFIXES = ['BT-500','BT-501','BT-502','BT-503','BT-505','BT-506','BT-507','BT-508','BT-510','BT-512','BT-513','BT-514','BT-610','BT-10-','BT-11-','BT-740']
+function hasOrgData(group) {
+  return group.fields.some(f => ORG_FIELD_PREFIXES.some(p => f.fieldId.startsWith(p)))
+}
+
+function getOrgId(group) {
+  return group.fields.find(f => f.fieldId === 'OPT-200-Organization-Company')?.values?.[0] ?? null
+}
+
+const SECTION_ROLE = {
+  'ND-ContractingParty':   'Pirkėjas',
+  'ND-ReviewBody':         'Peržiūros institucija',
+  'ND-MediationBody':      'Tarpininkas',
+  'ND-ReviewOrganization': 'Peržiūros organizacija',
+}
+const sectionRoleLabel = SECTION_ROLE[section.nodeId] || null
+
+function getRole(group) {
+  if (sectionRoleLabel) return sectionRoleLabel
+  const orgId = getOrgId(group)
+  if (orgId && buyerOrgId && orgId === buyerOrgId) return 'Pirkėjas'
+  if (orgId && reviewBodyOrgIds && reviewBodyOrgIds.has(orgId)) return 'Peržiūros institucija'
+  if (orgId && mediationBodyOrgIds && mediationBodyOrgIds.has(orgId)) return 'Tarpininkavimo institucija'
+  if (orgId && eSenderOrgIds && eSenderOrgIds.has(orgId)) return 'TED siuntėjas'
+  const hasCpFields = group.fields.some(f => f.fieldId.startsWith('BT-10-') || f.fieldId.startsWith('BT-11-') || f.fieldId === 'BT-508-Procedure-Buyer')
+  if (hasCpFields) return 'Pirkėjas'
+  return null
+}
+
+function sortOrder(group) {
+  const role = getRole(group)
+  if (role === 'Pirkėjas') return 0
+  if (role === 'TED siuntėjas') return 2
+  return 1
+}
+
+const orgGroups = section.groups.filter(hasOrgData).sort((a, b) => sortOrder(a) - sortOrder(b))
+%>
+<% if (orgGroups.length) { %>
+<section id="<%= sectionId %>">
+  <h2><%= section.title %></h2>
+  <div class="grid-3">
+    <% orgGroups.forEach((group, idx) => { %>
+      <%- include('org-group', { group, idx, roleLabel: getRole(group) }) %>
+    <% }) %>
+  </div>
+</section>
+<% } %>

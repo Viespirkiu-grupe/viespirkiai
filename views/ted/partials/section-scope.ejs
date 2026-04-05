@@ -1,0 +1,48 @@
+<%
+const sectionId = 'pirkimo-objektas'
+function f(id) { return (section.fields.find(x => x.fieldId === id)?.values || []).join(', ') }
+const internalId  = f('BT-22-Procedure')
+const contractType= f('BT-23-Procedure')
+const description = f('BT-24-Procedure')
+const mainCpv     = f('BT-262-Procedure')
+const addCpv      = f('BT-263-Procedure')
+const addInfo     = f('BT-300-Procedure')
+const otherObjects= f('BT-531-Procedure')
+const addrFields  = section.fields.filter(x => x.parentNodeId === 'ND-ProcedurePlacePerformance' || x.parentNodeId === 'ND-ProcedurePlacePerformanceAdditionalInformation')
+function splitCpv(value) {
+  const text = String(value || '').trim()
+  if (!text) return { code: '', label: '' }
+  const parts = text.split(' \u2013 ')
+  return parts.length > 1
+    ? { code: parts[0].trim(), label: parts.slice(1).join(' \u2013 ').trim() }
+    : { code: text, label: '' }
+}
+const mainCpvParts = splitCpv(mainCpv)
+const addCpvParts = addCpv
+  ? addCpv.split(',').map((item) => item.trim()).filter(Boolean).map(splitCpv)
+  : []
+%>
+<section id="<%= sectionId %>">
+  <h2>Pirkimo objektas</h2>
+  <% if (description) { %><p><%= description %></p><% } %>
+  <% if (internalId || contractType) { %><p class="text-sm text-muted"><%= [internalId, contractType].filter(Boolean).join(' · ') %></p><% } %>
+  <% if (addInfo) { %><p class="text-sm text-muted"><%= addInfo %></p><% } %>
+  <% if (mainCpvParts.code) { %>
+    <h3 class="mb-2">BVPŽ</h3>
+    <div class="d-flex flex-col gap-2">
+      <div>
+        <div class="fw-medium"><%= mainCpvParts.label || mainCpvParts.code %><% if (mainCpvParts.code) { %> <span class="text-muted fw-normal text-xs"><%= mainCpvParts.code %></span><% } %></div>
+      </div>
+      <% addCpvParts.forEach((cpvItem) => { %>
+        <div>
+          <div class="fw-medium"><%= cpvItem.label || cpvItem.code %><% if (cpvItem.code) { %> <span class="text-muted fw-normal text-xs"><%= cpvItem.code %></span><% } %></div>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+  <% if (otherObjects) { %><p class="text-sm text-muted">Taip pat: <%= otherObjects %></p><% } %>
+  <% if (addrFields.length) { %>
+    <p class="section-title text-sm">Vykdymo vieta</p>
+    <%- include('address-fields', { addrFields }) %>
+  <% } %>
+</section>

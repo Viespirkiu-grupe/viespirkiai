@@ -8,6 +8,7 @@
     "description": "",
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.27.1",
+        "@xmldom/xmldom": "^0.9.8",
         "adm-zip": "^0.5.16",
         "canvas": "^3.2.1",
         "cookie-parser": "^1.4.7",
@@ -41,6 +42,7 @@
         "undici": "^7.24.6",
         "xlsx": "^0.18.5",
         "xml-to-json-stream": "^1.1.0",
+        "xpath": "^0.0.34",
         "zod": "^4.3.6"
     },
     "type": "module"

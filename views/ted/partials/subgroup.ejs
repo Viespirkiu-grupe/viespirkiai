@@ -1,0 +1,70 @@
+<%
+function f(id) { return (sg.fields.find(x => x.fieldId === id)?.values || []).join(', ') }
+function fArr(id) { return sg.fields.find(x => x.fieldId === id)?.values || [] }
+%>
+
+<% if (sg.nodeId === 'ND-LotPlacePerformance' || sg.nodeId === 'ND-PartPlacePerformance') { %>
+  <%- include('address-fields', { addrFields: sg.fields }) %>
+
+<% } else if (sg.nodeId === 'ND-SelectionCriteria') { %>
+  <%
+  const type    = f('BT-809-Lot')
+  const desc    = f('BT-750-Lot')
+  const stage2  = f('BT-40-Lot')
+  const threshItems = (sg.items || []).map(item => {
+    const n = (item.fields.find(x => x.fieldId === 'BT-752-Lot-ThresholdNumber')?.values || []).join('')
+    const t = (item.fields.find(x => x.fieldId === 'BT-7532-Lot')?.values || []).join('')
+    return t && n ? `${t}: ${n}` : (t || n)
+  }).filter(Boolean)
+  const meta = [...threshItems, stage2 && stage2 !== 'false' ? '2-as etapas' : null].filter(Boolean).join(' · ')
+  %>
+  <% if (type) { %><p class="fw-medium text-sm" style="margin-bottom:var(--space-1)"><%= type %></p><% } %>
+  <% if (desc) { %><p class="text-sm text-muted" style="margin-bottom:var(--space-1)"><%= desc %></p><% } %>
+  <% if (meta) { %><p class="text-xs text-muted" style="margin-bottom:0"><%= meta %></p><% } %>
+
+<% } else if (sg.nodeId === 'ND-LotAwardCriterion' || sg.nodeId === 'ND-LotsGroupAwardCriterion') { %>
+  <%
+  const name    = f('BT-734-Lot') || f('BT-734-LotsGroup')
+  const type    = f('BT-539-Lot') || f('BT-539-LotsGroup')
+  const weight  = f('BT-541-Lot-WeightNumber') || f('BT-541-LotsGroup-WeightNumber')
+  const desc    = f('BT-540-Lot') || f('BT-540-LotsGroup')
+  %>
+  <% if (weight || type) { %><p class="fw-medium text-sm" style="margin-bottom:var(--space-1)"><% if (weight) { %><span class="amount amount-sm"><%= weight %>%</span> &ndash; <% } %><%= type || '' %></p><% } %>
+  <% if (name) { %><p class="text-sm" style="margin-bottom:var(--space-1)"><%= name %></p><% } %>
+  <% if (desc) { %><p class="text-sm text-muted" style="margin-bottom:0"><%= desc %></p><% } %>
+
+<% } else if (sg.nodeId === 'ND-LotProcurementDocument' || sg.nodeId === 'ND-PartProcurementDocument') { %>
+  <%
+  const docId   = f('OPT-140-Lot')   || f('OPT-140-Part')
+  const access  = f('BT-14-Lot')     || f('BT-14-Part')
+  const url     = sg.fields.find(x => x.fieldId === 'BT-15-Lot'  || x.fieldId === 'BT-15-Part'
+                                    || x.fieldId === 'BT-615-Lot' || x.fieldId === 'BT-615-Part')
+  const langs   = fArr('BT-708-Lot').concat(fArr('BT-708-Part'))
+  const uLangs  = fArr('BT-737-Lot').concat(fArr('BT-737-Part'))
+  %>
+  <% if (docId) { %><p class="fw-medium text-sm" style="margin-bottom:var(--space-1)"><%= docId %></p><% } %>
+  <% if (url) { url.values.forEach(v => { %><p class="text-sm" style="margin-bottom:var(--space-1)"><a href="<%- v %>" target="_blank" rel="noopener"><%= shortUrl(v) %></a></p><% }) } %>
+  <% if (access) { %><p class="text-sm text-muted" style="margin-bottom:var(--space-1)"><%= access %></p><% } %>
+  <% const allLangs = [...langs, ...uLangs.filter(l => !langs.includes(l)).map(l => `${l} (neofic.)`)] %>
+  <% if (allLangs.length) { %><p class="text-xs text-muted" style="margin-bottom:0"><%= allLangs.join(', ') %></p><% } %>
+
+<% } else if (sg.nodeId === 'ND-EEDProcurementDetailsLot' || sg.nodeId === 'ND-EEDProcurementDetailsLotResult') { %>
+  <%
+  const listA = fArr('BT-811(a)-Lot')
+  const listB = fArr('BT-811(b)-Lot')
+  const rest  = sg.fields.filter(x => x.fieldId !== 'BT-811(a)-Lot' && x.fieldId !== 'BT-811(b)-Lot')
+  %>
+  <dl class="kv-list">
+    <% listA.forEach((v, i) => { %><dt><%= v %></dt><dd><%= listB[i] || '' %></dd><% }) %>
+    <% if (listA.length === 0) { rest.forEach(fv => { %><dt><%= fv.name %></dt><dd><%= fv.values.join(', ') %></dd><% }) } %>
+  </dl>
+
+<% } else { %>
+  <%- include('kv-list', { fields: sg.fields }) %>
+  <% (sg.items || []).forEach(item => { %>
+    <div>
+      <p class="section-title text-muted">#<%= item.index %></p>
+      <%- include('kv-list', { fields: item.fields }) %>
+    </div>
+  <% }) %>
+<% } %>

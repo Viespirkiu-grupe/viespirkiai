@@ -1,0 +1,589 @@
+{
+  "ublVersion" : "2.3",
+  "sdkVersion" : "1.14.0",
+  "metadataDatabase" : {
+    "version" : "1.14.1",
+    "createdOn" : "2025-12-02T14:47:40"
+  },
+  "noticeSubTypes" : [ {
+    "documentType" : "PIN",
+    "legalBasis" : "32014L0024",
+    "formType" : "planning",
+    "type" : "pin-buyer",
+    "description" : "Notice of the publication of a prior information notice on a buyer profile - general directive",
+    "subTypeId" : "1",
+    "_label" : "notice|name|1",
+    "viewTemplateIds" : [ "1", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32014L0025",
+    "formType" : "planning",
+    "type" : "pin-buyer",
+    "description" : "Notice of the publication of a periodic indicative notice on a buyer profile - sectoral directive",
+    "subTypeId" : "2",
+    "_label" : "notice|name|2",
+    "viewTemplateIds" : [ "2", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32009L0081",
+    "formType" : "planning",
+    "type" : "pin-buyer",
+    "description" : "Notice of the publication of a prior information notice on a buyer profile - defence directive",
+    "subTypeId" : "3",
+    "_label" : "notice|name|3",
+    "viewTemplateIds" : [ "3", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32014L0024",
+    "formType" : "planning",
+    "type" : "pin-only",
+    "description" : "Prior information notice used only for information – general directive",
+    "subTypeId" : "4",
+    "_label" : "notice|name|4",
+    "viewTemplateIds" : [ "4", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32014L0025",
+    "formType" : "planning",
+    "type" : "pin-only",
+    "description" : "Periodic indicative notice used only for information – sectoral directive",
+    "subTypeId" : "5",
+    "_label" : "notice|name|5",
+    "viewTemplateIds" : [ "5", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32009L0081",
+    "formType" : "planning",
+    "type" : "pin-only",
+    "description" : "Prior information notice used only for information – defence directive",
+    "subTypeId" : "6",
+    "_label" : "notice|name|6",
+    "viewTemplateIds" : [ "6", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32014L0024",
+    "formType" : "planning",
+    "type" : "pin-rtl",
+    "description" : "Prior information notice used to shorten time limits for receipt of tenders – general directive",
+    "subTypeId" : "7",
+    "_label" : "notice|name|7",
+    "viewTemplateIds" : [ "7", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32014L0025",
+    "formType" : "planning",
+    "type" : "pin-rtl",
+    "description" : "Periodic indicative notice used to shorten time limits for receipt of tenders – sectoral directive",
+    "subTypeId" : "8",
+    "_label" : "notice|name|8",
+    "viewTemplateIds" : [ "8", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32009L0081",
+    "formType" : "planning",
+    "type" : "pin-rtl",
+    "description" : "Prior information notice used to shorten time limits for receipt of tenders – defence directive",
+    "subTypeId" : "9",
+    "_label" : "notice|name|9",
+    "viewTemplateIds" : [ "9", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32014L0024",
+    "formType" : "competition",
+    "type" : "pin-cfc-standard",
+    "description" : "Prior information notice used as a call for competition - general directive, standard regime",
+    "subTypeId" : "10",
+    "_label" : "notice|name|10",
+    "viewTemplateIds" : [ "10", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32014L0025",
+    "formType" : "competition",
+    "type" : "pin-cfc-standard",
+    "description" : "Periodic indicative notice used as a call for competition - sectoral directive, standard regime",
+    "subTypeId" : "11",
+    "_label" : "notice|name|11",
+    "viewTemplateIds" : [ "11", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32014L0024",
+    "formType" : "competition",
+    "type" : "pin-cfc-social",
+    "description" : "Prior information notice used as a call for competition - general directive, light regime",
+    "subTypeId" : "12",
+    "_label" : "notice|name|12",
+    "viewTemplateIds" : [ "12", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32014L0025",
+    "formType" : "competition",
+    "type" : "pin-cfc-social",
+    "description" : "Periodic indicative notice used as a call for competition - sectoral directive, light regime",
+    "subTypeId" : "13",
+    "_label" : "notice|name|13",
+    "viewTemplateIds" : [ "13", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32014L0023",
+    "formType" : "competition",
+    "type" : "pin-cfc-social",
+    "description" : "Prior information notice used as a call for competition - concessions directive, light regime",
+    "subTypeId" : "14",
+    "_label" : "notice|name|14",
+    "viewTemplateIds" : [ "14", "summary" ]
+  }, {
+    "documentType" : "CN",
+    "legalBasis" : "32014L0025",
+    "formType" : "competition",
+    "type" : "qu-sy",
+    "description" : "Notice on the existence of a qualification system – sectoral directive",
+    "subTypeId" : "15",
+    "_label" : "notice|name|15",
+    "viewTemplateIds" : [ "15", "summary" ]
+  }, {
+    "documentType" : "CN",
+    "legalBasis" : "32014L0024",
+    "formType" : "competition",
+    "type" : "cn-standard",
+    "description" : "Contract notice – general directive, standard regime",
+    "subTypeId" : "16",
+    "_label" : "notice|name|16",
+    "viewTemplateIds" : [ "16", "summary" ]
+  }, {
+    "documentType" : "CN",
+    "legalBasis" : "32014L0025",
+    "formType" : "competition",
+    "type" : "cn-standard",
+    "description" : "Contract notice – sectoral directive, standard regime",
+    "subTypeId" : "17",
+    "_label" : "notice|name|17",
+    "viewTemplateIds" : [ "17", "summary" ]
+  }, {
+    "documentType" : "CN",
+    "legalBasis" : "32009L0081",
+    "formType" : "competition",
+    "type" : "cn-standard",
+    "description" : "Contract notice – defence directive, standard regime",
+    "subTypeId" : "18",
+    "_label" : "notice|name|18",
+    "viewTemplateIds" : [ "18", "summary" ]
+  }, {
+    "documentType" : "CN",
+    "legalBasis" : "32014L0023",
+    "formType" : "competition",
+    "type" : "cn-standard",
+    "description" : "Concession notice – concessions directive, standard regime",
+    "subTypeId" : "19",
+    "_label" : "notice|name|19",
+    "viewTemplateIds" : [ "19", "summary" ]
+  }, {
+    "documentType" : "CN",
+    "legalBasis" : "32014L0024",
+    "formType" : "competition",
+    "type" : "cn-social",
+    "description" : "Contract notice – general directive, light regime",
+    "subTypeId" : "20",
+    "_label" : "notice|name|20",
+    "viewTemplateIds" : [ "20", "summary" ]
+  }, {
+    "documentType" : "CN",
+    "legalBasis" : "32014L0025",
+    "formType" : "competition",
+    "type" : "cn-social",
+    "description" : "Contract notice – sectoral directive, light regime",
+    "subTypeId" : "21",
+    "_label" : "notice|name|21",
+    "viewTemplateIds" : [ "21", "summary" ]
+  }, {
+    "documentType" : "CN",
+    "legalBasis" : "32009L0081",
+    "formType" : "competition",
+    "type" : "subco",
+    "description" : "Subcontract notice – defence directive",
+    "subTypeId" : "22",
+    "_label" : "notice|name|22",
+    "viewTemplateIds" : [ "22", "summary" ]
+  }, {
+    "documentType" : "CN",
+    "legalBasis" : "32014L0024",
+    "formType" : "competition",
+    "type" : "cn-desg",
+    "description" : "Design contest notice – general directive, design",
+    "subTypeId" : "23",
+    "_label" : "notice|name|23",
+    "viewTemplateIds" : [ "23", "summary" ]
+  }, {
+    "documentType" : "CN",
+    "legalBasis" : "32014L0025",
+    "formType" : "competition",
+    "type" : "cn-desg",
+    "description" : "Design contest notice – sectoral directive, design",
+    "subTypeId" : "24",
+    "_label" : "notice|name|24",
+    "viewTemplateIds" : [ "24", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0024",
+    "formType" : "dir-awa-pre",
+    "type" : "veat",
+    "description" : "Voluntary ex-ante transparency notice – general directive",
+    "subTypeId" : "25",
+    "_label" : "notice|name|25",
+    "viewTemplateIds" : [ "25", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0025",
+    "formType" : "dir-awa-pre",
+    "type" : "veat",
+    "description" : "Voluntary ex-ante transparency notice – sectoral directive",
+    "subTypeId" : "26",
+    "_label" : "notice|name|26",
+    "viewTemplateIds" : [ "26", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32009L0081",
+    "formType" : "dir-awa-pre",
+    "type" : "veat",
+    "description" : "Voluntary ex-ante transparency notice – defence directive",
+    "subTypeId" : "27",
+    "_label" : "notice|name|27",
+    "viewTemplateIds" : [ "27", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0023",
+    "formType" : "dir-awa-pre",
+    "type" : "veat",
+    "description" : "Voluntary ex-ante transparency notice – concession directive",
+    "subTypeId" : "28",
+    "_label" : "notice|name|28",
+    "viewTemplateIds" : [ "28", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0024",
+    "formType" : "result",
+    "type" : "can-standard",
+    "description" : "Contract award notice – general directive, standard regime",
+    "subTypeId" : "29",
+    "_label" : "notice|name|29",
+    "viewTemplateIds" : [ "29", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0025",
+    "formType" : "result",
+    "type" : "can-standard",
+    "description" : "Contract award notice – sectoral directive, standard regime",
+    "subTypeId" : "30",
+    "_label" : "notice|name|30",
+    "viewTemplateIds" : [ "30", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32009L0081",
+    "formType" : "result",
+    "type" : "can-standard",
+    "description" : "Contract award notice – defence directive, standard regime",
+    "subTypeId" : "31",
+    "_label" : "notice|name|31",
+    "viewTemplateIds" : [ "31", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0023",
+    "formType" : "result",
+    "type" : "can-standard",
+    "description" : "Concession award notice – concession directive, standard regime",
+    "subTypeId" : "32",
+    "_label" : "notice|name|32",
+    "viewTemplateIds" : [ "32", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0024",
+    "formType" : "result",
+    "type" : "can-social",
+    "description" : "Contract award notice – general directive, light regime",
+    "subTypeId" : "33",
+    "_label" : "notice|name|33",
+    "viewTemplateIds" : [ "33", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0025",
+    "formType" : "result",
+    "type" : "can-social",
+    "description" : "Contract award notice – sectoral directive, light regime",
+    "subTypeId" : "34",
+    "_label" : "notice|name|34",
+    "viewTemplateIds" : [ "34", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0023",
+    "formType" : "result",
+    "type" : "can-social",
+    "description" : "Concession award notice – concessions directive, light regime",
+    "subTypeId" : "35",
+    "_label" : "notice|name|35",
+    "viewTemplateIds" : [ "35", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0024",
+    "formType" : "result",
+    "type" : "can-desg",
+    "description" : "Design contest result notice – general directive, design",
+    "subTypeId" : "36",
+    "_label" : "notice|name|36",
+    "viewTemplateIds" : [ "36", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0025",
+    "formType" : "result",
+    "type" : "can-desg",
+    "description" : "Design contest result notice – sectoral directive, design",
+    "subTypeId" : "37",
+    "_label" : "notice|name|37",
+    "viewTemplateIds" : [ "37", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0024",
+    "formType" : "cont-modif",
+    "type" : "can-modif",
+    "description" : "Contract modification notice – general directive",
+    "subTypeId" : "38",
+    "_label" : "notice|name|38",
+    "viewTemplateIds" : [ "38", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0025",
+    "formType" : "cont-modif",
+    "type" : "can-modif",
+    "description" : "Contract modification notice – sectoral directive",
+    "subTypeId" : "39",
+    "_label" : "notice|name|39",
+    "viewTemplateIds" : [ "39", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32014L0023",
+    "formType" : "cont-modif",
+    "type" : "can-modif",
+    "description" : "Contract modification notice – concessions directive",
+    "subTypeId" : "40",
+    "_label" : "notice|name|40",
+    "viewTemplateIds" : [ "40", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32024R2509",
+    "formType" : "competition",
+    "type" : "pin-cfc-standard",
+    "description" : "Call for expressions of interest",
+    "subTypeId" : "CEI",
+    "_label" : "notice|name|CEI",
+    "viewTemplateIds" : [ "CEI", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "other",
+    "formType" : "consultation",
+    "type" : "pmc",
+    "description" : "Voluntary Pre-market Consultation Notice",
+    "subTypeId" : "E1",
+    "_label" : "notice|name|E1",
+    "viewTemplateIds" : [ "E1", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "other",
+    "formType" : "planning",
+    "type" : "pin-only",
+    "description" : "Voluntary Prior Information Notice",
+    "subTypeId" : "E2",
+    "_label" : "notice|name|E2",
+    "viewTemplateIds" : [ "E2", "summary" ]
+  }, {
+    "documentType" : "CN",
+    "legalBasis" : "other",
+    "formType" : "competition",
+    "type" : "cn-standard",
+    "description" : "Voluntary Contract Notice",
+    "subTypeId" : "E3",
+    "_label" : "notice|name|E3",
+    "viewTemplateIds" : [ "E3", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "other",
+    "formType" : "result",
+    "type" : "can-standard",
+    "description" : "Voluntary Award Notice",
+    "subTypeId" : "E4",
+    "_label" : "notice|name|E4",
+    "viewTemplateIds" : [ "E4", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "other",
+    "formType" : "completion",
+    "type" : "compl",
+    "description" : "Voluntary Completion Notice",
+    "subTypeId" : "E5",
+    "_label" : "notice|name|E5",
+    "viewTemplateIds" : [ "E5", "summary" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32009L0081",
+    "formType" : "cont-modif",
+    "type" : "can-modif",
+    "description" : "Voluntary Contract Modification Notice",
+    "subTypeId" : "E6",
+    "_label" : "notice|name|E6",
+    "viewTemplateIds" : [ "E6", "summary" ]
+  }, {
+    "documentType" : "PIN",
+    "legalBasis" : "32007R1370",
+    "formType" : "planning",
+    "type" : "pin-tran",
+    "description" : "Planning notice for public passenger transport services by rail and by road",
+    "subTypeId" : "T01",
+    "_label" : "notice|name|T01",
+    "viewTemplateIds" : [ "summary", "T01" ]
+  }, {
+    "documentType" : "CAN",
+    "legalBasis" : "32007R1370",
+    "formType" : "result",
+    "type" : "can-tran",
+    "description" : "Result notice for public passenger transport services by rail and by road",
+    "subTypeId" : "T02",
+    "_label" : "notice|name|T02",
+    "viewTemplateIds" : [ "summary", "T02" ]
+  }, {
+    "documentType" : "BRIN",
+    "legalBasis" : "31985R2137",
+    "formType" : "bri",
+    "type" : "brin-eeig",
+    "description" : "Notice containing information relevant to Formation or Completion of the liquidation of a EEIG.",
+    "subTypeId" : "X01",
+    "_label" : "notice|name|X01",
+    "viewTemplateIds" : [ "summary", "X01" ]
+  }, {
+    "documentType" : "BRIN",
+    "legalBasis" : "32001R2157",
+    "formType" : "bri",
+    "type" : "brin-ecs",
+    "description" : "Notice containing information about Registration, Deletion, Transfer-registration or Transfer-deletion of a European Company or European Cooperative Society",
+    "subTypeId" : "X02",
+    "_label" : "notice|name|X02",
+    "viewTemplateIds" : [ "summary", "X02" ]
+  } ],
+  "documentTypes" : [ {
+    "id" : "BRIN",
+    "namespace" : "http://data.europa.eu/p27/eforms-business-registration-information-notice/1",
+    "rootElement" : "BusinessRegistrationInformationNotice",
+    "schemaLocation" : "schemas/maindoc/EFORMS-BusinessRegistrationInformationNotice.xsd",
+    "additionalNamespaces" : [ {
+      "prefix" : "cac",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonAggregateComponents-2.3.xsd"
+    }, {
+      "prefix" : "cbc",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonBasicComponents-2.3.xsd"
+    }, {
+      "prefix" : "ext",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonExtensionComponents-2.3.xsd"
+    }, {
+      "prefix" : "efext",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extensions/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionApex-2.3.xsd"
+    }, {
+      "prefix" : "efac",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extension-aggregate-components/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionAggregateComponents-2.3.xsd"
+    }, {
+      "prefix" : "efbc",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extension-basic-components/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionBasicComponents-2.3.xsd"
+    } ]
+  }, {
+    "id" : "CAN",
+    "namespace" : "urn:oasis:names:specification:ubl:schema:xsd:ContractAwardNotice-2",
+    "rootElement" : "ContractAwardNotice",
+    "schemaLocation" : "schemas/maindoc/UBL-ContractAwardNotice-2.3.xsd",
+    "additionalNamespaces" : [ {
+      "prefix" : "cac",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonAggregateComponents-2.3.xsd"
+    }, {
+      "prefix" : "cbc",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonBasicComponents-2.3.xsd"
+    }, {
+      "prefix" : "ext",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonExtensionComponents-2.3.xsd"
+    }, {
+      "prefix" : "efext",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extensions/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionApex-2.3.xsd"
+    }, {
+      "prefix" : "efac",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extension-aggregate-components/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionAggregateComponents-2.3.xsd"
+    }, {
+      "prefix" : "efbc",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extension-basic-components/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionBasicComponents-2.3.xsd"
+    } ]
+  }, {
+    "id" : "CN",
+    "namespace" : "urn:oasis:names:specification:ubl:schema:xsd:ContractNotice-2",
+    "rootElement" : "ContractNotice",
+    "schemaLocation" : "schemas/maindoc/UBL-ContractNotice-2.3.xsd",
+    "additionalNamespaces" : [ {
+      "prefix" : "cac",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonAggregateComponents-2.3.xsd"
+    }, {
+      "prefix" : "cbc",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonBasicComponents-2.3.xsd"
+    }, {
+      "prefix" : "ext",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonExtensionComponents-2.3.xsd"
+    }, {
+      "prefix" : "efext",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extensions/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionApex-2.3.xsd"
+    }, {
+      "prefix" : "efac",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extension-aggregate-components/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionAggregateComponents-2.3.xsd"
+    }, {
+      "prefix" : "efbc",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extension-basic-components/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionBasicComponents-2.3.xsd"
+    } ]
+  }, {
+    "id" : "PIN",
+    "namespace" : "urn:oasis:names:specification:ubl:schema:xsd:PriorInformationNotice-2",
+    "rootElement" : "PriorInformationNotice",
+    "schemaLocation" : "schemas/maindoc/UBL-PriorInformationNotice-2.3.xsd",
+    "additionalNamespaces" : [ {
+      "prefix" : "cac",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonAggregateComponents-2.3.xsd"
+    }, {
+      "prefix" : "cbc",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonBasicComponents-2.3.xsd"
+    }, {
+      "prefix" : "ext",
+      "uri" : "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2",
+      "schemaLocation" : "schemas/common/UBL-CommonExtensionComponents-2.3.xsd"
+    }, {
+      "prefix" : "efext",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extensions/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionApex-2.3.xsd"
+    }, {
+      "prefix" : "efac",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extension-aggregate-components/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionAggregateComponents-2.3.xsd"
+    }, {
+      "prefix" : "efbc",
+      "uri" : "http://data.europa.eu/p27/eforms-ubl-extension-basic-components/1",
+      "schemaLocation" : "schemas/common/EFORMS-ExtensionBasicComponents-2.3.xsd"
+    } ]
+  } ]
+}

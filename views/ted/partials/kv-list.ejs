@@ -1,0 +1,6 @@
+<dl class="kv-list">
+<% fields.forEach(fv => { %>
+  <dt><%= fv.name %></dt>
+  <dd><% if (fv.type === 'url') { %><% fv.values.forEach(v => { %><a href="<%- v %>" target="_blank" rel="noopener"><%= shortUrl(v) %></a> <% }) %><% } else if (fv.type === 'email') { %><% fv.values.forEach(v => { %><a href="mailto:<%- v %>"><%= v %></a> <% }) %><% } else { %><%- fv.values.map(v => escapeHtml(v)).join('<br>') %><% } %></dd>
+<% }) %>
+</dl>

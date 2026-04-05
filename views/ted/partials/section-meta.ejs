@@ -1,0 +1,25 @@
+<%
+function f(id) { return (section.fields.find(x => x.fieldId === id)?.values || []).join(', ') }
+const legalBasis  = f('BT-01-notice')
+const noticeType  = f('BT-02-notice')
+const sentDate    = f('BT-05(a)-notice')
+const noticeId    = f('BT-701-notice')
+const langs       = f('BT-702(a)-notice')
+const version     = f('BT-757-notice')
+const items = [
+  sentDate   && { label: 'Išsiųsta',    value: sentDate },
+  noticeType && { label: 'Rūšis',       value: noticeType },
+  legalBasis && { label: 'Pagrindas',   value: legalBasis },
+  langs      && { label: 'Kalbos',      value: langs },
+  version    && { label: 'Versija',     value: version },
+  noticeId   && { label: 'ID',          value: noticeId },
+].filter(Boolean)
+%>
+<section id="skelbimo-informacija">
+  <h2>Skelbimo informacija</h2>
+  <dl class="kv-list">
+    <% items.forEach(item => { %>
+      <dt><%= item.label %></dt><dd><%= item.value %></dd>
+    <% }) %>
+  </dl>
+</section>
