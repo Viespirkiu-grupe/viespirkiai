@@ -168,6 +168,23 @@ tasks.push({
     },
 });
 
+import { nuskaitytiDomregDomena } from "./modules/domenai/scrapeDomreg.js";
+tasks.push({
+    name: "nuskaitytiDomregDomena",
+    mode: "asap",
+    cooldown: 30,
+    errorCooldown: 10,
+    job: async () => {
+        const processed = await nuskaitytiDomregDomena();
+
+        if (processed) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+
+        return processed;
+    },
+});
+
 import { getNewestPinreg } from "./modules/pinreg/scrapeNewest.js";
 tasks.push({
     name: "getNewestPinreg",
