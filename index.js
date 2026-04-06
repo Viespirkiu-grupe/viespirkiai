@@ -1,8 +1,8 @@
 import config from "./utils/config.js";
 import express from "express";
 import cookieParser from "cookie-parser";
-import { convertUnit } from "./utils/units.js"; // Modifies protorypes, keep
-import { linksniuoti } from "./utils/linksniai.js"; // Modifies protorypes, keep
+import { convertUnit } from "./utils/units.js"; // Modifies prototypes, keep
+import { linksniuoti } from "./utils/linksniai.js"; // Modifies prototypes, keep
 import ejs from "ejs";
 import { log } from "./utils/log.js";
 import path from "path";
@@ -28,10 +28,12 @@ const PORT = config.port || 8000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Minification
 if (config.enableMinification !== false) {
     app.use(htmlMinifyMiddleware());
 }
 
+// Onion-Location header
 if (config.onionAddress) {
     app.use((req, res, next) => {
         const onionBase = config.onionAddress;
@@ -60,6 +62,7 @@ if (!config.dev) {
     app.use(globalLimiter);
 }
 
+// Reverse proxy
 app.set("trust proxy", config.proxyIp);
 app.use((req, res, next) => {
     let ip = req.socket.remoteAddress; // default
@@ -193,7 +196,7 @@ app.use((err, req, res, next) => {
 const currentFile = fileURLToPath(import.meta.url);
 const entryFile = realpathSync(resolve(process.argv[1]));
 
-// Handle running as `node .` or `node dir/`
+// Handle running as `node .` or `node dir/` (independently) vs being imported by server.js (cluster mode)
 const isDirectRun =
     currentFile === entryFile ||
     currentFile === resolve(entryFile, "index.js") ||

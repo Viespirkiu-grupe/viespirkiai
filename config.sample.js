@@ -1,26 +1,37 @@
 export default {
-    scrapeProxy: "http://localhost:9102",
-    customHead: ``,
-    analitikaUrl: "",
+    customHead: ``, // Įterpiama į head
+    analitikaUrl: ``, // /analitika redirectina į šį URL (pvz. Plausible)
+    onionAddress: undefined, // Tor locator header
+
+    // Typesense paieška sutartims bei juridiniams
+    typesenseUp: true, // Išjungti jeigu nenaudojama / nepasiekiema
     typesenseNodes: [{ host: "localhost", port: 9021, protocol: "http" }],
     typesenseApiKey: "CHANGE_ME",
     typesenseCollection: "viespirkiai",
-    typesenseUp: true,
+
+    // HTTP
     port: 9019,
+    proxyIp: "127.0.0.1", // Trust reverse proxy
+
+    // App
+    enableMinification: false,
+    parallelRouteLoading: true,
+    workerCount: 2,
+    dev: false,
+    
+    // PostgreSQL
     pgHost: "localhost",
     pgUser: "admin",
     pgPassword: "CHANGE_ME",
     pgDatabase: "viespirkiai",
     pgPort: 9118,
-    torPassword: "CHANGE_ME",
     pgMaxConnections: 16,
-    enableMinification: false,
-    workerCount: 2,
-    proxyIp: "127.0.0.1",
+    
+    // Scraping
     torAddress: "socks5h://127.0.0.1:9050",
-    dev: false,
-    onionAddress: undefined,
+    torPassword: "CHANGE_ME",
+
+    // Failai
     internalFileBase: "https://failai.viespirkiai.org",
     ocrBandymai: 5,
-    parallelRouteLoading: true, // false = sequential (easier to debug startup order)
 };
