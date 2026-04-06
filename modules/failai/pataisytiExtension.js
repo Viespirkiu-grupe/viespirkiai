@@ -28,6 +28,19 @@ const MIME_TO_EXTENSION = {
     "image/png": "png",
     "video/mp4": "mp4",
     "image/bmp": "bmp",
+    "image/vnd.dwg": "dwg",
+    "application/zip": "zip",
+    "application/x-rar": "rar",
+    "text/rtf": "rtf",
+};
+
+const EBVPD_ESPD_RE = /(ebvpd|espd)/i;
+const EBVPD_ESPD_MIME_TO_EXTENSION = {
+    "application/xml": "xml",
+    "text/xml": "xml",
+    "application/zip": "zip",
+    "application/x-zip": "zip",
+    "application/x-zip-compressed": "zip",
 };
 
 const MIME_DETECT_BYTES = 1024 * 1024; // 1MB
@@ -104,6 +117,7 @@ const uniqueExts = extRows.map((r) => r.extension);
 async function processRows(rows) {
     for (const row of rows) {
         const currentExt = (row.extension ?? "").replace(/^\./, "");
+        const isEbvpdOrEspd = EBVPD_ESPD_RE.test(row.pavadinimas ?? "");
         log(
             `Processing id=${row.id} "${row.pavadinimas}" (extension: "${currentExt}")`,
         );
@@ -115,7 +129,9 @@ async function processRows(rows) {
         }
         log(`id=${row.id} — detected mime: ${mime}`);
 
-        const detectedExt = MIME_TO_EXTENSION[mime];
+        const detectedExt =
+            MIME_TO_EXTENSION[mime] ??
+            (isEbvpdOrEspd ? EBVPD_ESPD_MIME_TO_EXTENSION[mime] : undefined);
         if (!detectedExt) {
             unknownMimes.set(mime, (unknownMimes.get(mime) ?? 0) + 1);
             totalSkipped++;
@@ -167,7 +183,7 @@ if (BOTTOM_UP) {
         await processRows(rows);
     }
 } else if (EXTENSION !== undefined) {
-        const { rows } = await postgres.query(
+    const { rows } = await postgres.query(
         `SELECT id, pavadinimas, lower(extension) AS extension
          FROM failai
          WHERE (parsiustas = 1 OR parsiustas = -5)
