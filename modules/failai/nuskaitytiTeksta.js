@@ -499,18 +499,16 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     await postgres.query(
         `UPDATE failai
         SET nuskaitytas = $1,
-            tekstas = $2,
-            metaduomenys = $3,
-            "zodziuSkaicius" = $4,
-            "puslapiuSkaicius" = $5,
-            "simboliuSkaicius" = $6,
-            "ocrState" = $7,
-            location = ST_GeomFromText($8, 4326),
+            metaduomenys = $2,
+            "zodziuSkaicius" = $3,
+            "puslapiuSkaicius" = $4,
+            "simboliuSkaicius" = $5,
+            "ocrState" = $6,
+            location = ST_GeomFromText($7, 4326),
             "nuskaitymasTimestamp" = NOW()
-        WHERE id = $9;`,
+        WHERE id = $8;`,
         [
             nuskaitymoVersija,
-            truncateTo1MB(tekstas),
             metadata,
             metadata?.wordCount,
             metadata?.pageCount,
