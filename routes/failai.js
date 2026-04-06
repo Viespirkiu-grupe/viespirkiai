@@ -200,7 +200,15 @@ function buildSaltinioLink(row) {
                 return `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${parts[2]}&documentId=${parts[1]}`;
         }
         if (saltinis === 'cvpp'){
-            const [dvid, lid] = row.saltinioId.split("/");
+            const parts = String(row.saltinioId || "")
+                .split("/")
+                .filter(Boolean);
+            if (parts.length >= 3 && parts[0]) {
+                return `https://pirkimai.eviesiejipirkimai.lt/app/rfq/rwlentrance_s.asp?PID=${encodeURIComponent(parts[0])}&B=PPO`;
+            }
+            const dvid = parts.length >= 3 ? parts[1] : parts[0];
+            const lid = parts.length >= 3 ? parts[2] : parts[1];
+            if (!dvid || !lid) return "";
             return `https://pirkimai.eviesiejipirkimai.lt/app/docmgmt/downloadPublicDocument.asp?FMT=5&AT=3&LID=${lid}&DVID=${dvid}`;
         }
         if (saltinis === "mvpAprasai" && row.saltinioId)

@@ -130,7 +130,15 @@ export async function parsiustiFaila(options = {}) {
                     `Nerasta proxy CVPP šaltiniui. Šaltinis: ${saltinis}`,
                 ); // CVPP šaltiniui proxy yra būtina
             }
-            const [dvid, lid] = failas.saltinioId.split("/");
+            const parts = String(failas.saltinioId || "")
+                .split("/")
+                .filter(Boolean);
+            const dvid = parts.length >= 3 ? parts[1] : parts[0];
+            const lid = parts.length >= 3 ? parts[2] : parts[1];
+            if (!dvid || !lid)
+                throw new Error(
+                    `Netinkamas CVPP saltinioId formatas: ${failas.saltinioId}`,
+                );
             url = proxy.url + `/${lid}/${dvid}`;
         } else {
             throw new Error(`Nežinomas šaltinis: ${saltinis}`);

@@ -71,7 +71,11 @@
         originalusLinkas = `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${versionId}&documentId=${documentId}`;
         originalusLinkasPavadinimas = "CVP IS";
       } else if (failas.saltinis == "cvpp"){
-        originalusLinkas = `https://cvpp.eviesiejipirkimai.lt`;
+        const parts = String(failas.saltinioId || "").split('/').filter(Boolean);
+        const pid = parts.length >= 3 ? parts[0] : null;
+        originalusLinkas = pid
+          ? `https://pirkimai.eviesiejipirkimai.lt/app/rfq/rwlentrance_s.asp?PID=${encodeURIComponent(pid)}&B=PPO`
+          : `https://cvpp.eviesiejipirkimai.lt`;
         originalusLinkasPavadinimas = "CVPP";
       }
     %>
@@ -129,7 +133,7 @@
                 <% let pirkimoId = failas.saltinioId.split('/')[0]; %>
                 <a href="/viesiejiPirkimai/<%= pirkimoId %>">Viešasis pirkimas <%= pirkimoId %></a>
               <% } else if (failas.saltinis == "cvpp") { %>
-                <a href="https://cvpp.eviesiejipirkimai.lt">CVPP viešasis pirkimas</a>
+                <a href="<%= originalusLinkas %>">CVPP viešasis pirkimas</a>
               <% } %>
             </dd>
           </dl>
