@@ -127,7 +127,7 @@
                 <a href="https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp?&Itemid=112">MVP tvarkos aprašai</a>
               <% } else if (failas.saltinis == "cvpIs") { %>
                 <% let pirkimoId = failas.saltinioId.split('/')[0]; %>
-                <a href="https://viesiejipirkimai.lt/epps/cft/listContractDocuments.do?resourceId=<%= pirkimoId %>">Viešasis pirkimas <%= pirkimoId %></a>
+                <a href="/viesiejiPirkimai/<%= pirkimoId %>">Viešasis pirkimas <%= pirkimoId %></a>
               <% } else if (failas.saltinis == "cvpp") { %>
                 <a href="https://cvpp.eviesiejipirkimai.lt">CVPP viešasis pirkimas</a>
               <% } %>
