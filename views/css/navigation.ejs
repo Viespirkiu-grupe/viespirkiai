@@ -259,7 +259,7 @@ html:has(body.nav-open) {
   }
 }
 
-header {
+body > header {
   position: fixed;
   top: 0;
   left: 0;
@@ -277,10 +277,10 @@ body:has(.navbar) {
 }
 
 @media (max-width: 1200px) {
-  header {
+  body > header {
     transition: transform var(--transition-slow);
   }
-  header.nav-hidden {
+  body > header.nav-hidden {
     transform: translateY(-100%);
   }
 }

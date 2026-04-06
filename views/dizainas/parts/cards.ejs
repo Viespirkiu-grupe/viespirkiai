@@ -8,15 +8,15 @@
     <div class="preview">
       <div class="card" style="width:300px;">
         <div class="card-header">
-          <h4>Sutarties detalės</h4>
-          <span class="badge badge-success">Aktyvi</span>
+          <h4>Contract details</h4>
+          <span class="badge badge-success">Active</span>
         </div>
         <div class="card-body">
-          <p class="text-muted text-sm m-0">Viešojo pirkimo sutarties pagrindinė informacija ir sąlygos.</p>
+          <p class="text-muted text-sm m-0">Core information and terms of a public procurement contract.</p>
         </div>
         <div class="card-footer">
-          <button class="btn btn-secondary btn-sm">Atšaukti</button>
-          <button class="btn btn-primary btn-sm">Peržiūrėti</button>
+          <button class="btn btn-secondary btn-sm">Cancel</button>
+          <button class="btn btn-primary btn-sm">View</button>
         </div>
       </div>
     </div>
@@ -28,37 +28,37 @@
     <div class="preview preview-col p-0">
       <div class="result-list">
         <article class="result-card card-clickable">
-          <a href="#" class="card-overlay-link">Pirkimas #1</a>
+          <a href="#" class="card-overlay-link">Procurement #1</a>
           <div class="result-card-body">
             <div class="result-card-meta">
-              <span>VĮ Registrų centras</span>
+              <span>State Enterprise Centre of Registers</span>
               <span>2024-03-01</span>
-              <span>Atviras konkursas</span>
+              <span>Open tender</span>
             </div>
-            <h3 class="result-card-title">IT infrastruktūros atnaujinimas</h3>
-            <p class="result-card-excerpt">Serverių ir tinklo įrangos pirkimas pagal viešojo pirkimo procedūrą...</p>
+            <h3 class="result-card-title">IT Infrastructure Upgrade</h3>
+            <p class="result-card-excerpt">Procurement of server and network equipment under a public tender process...</p>
           </div>
           <div class="result-card-sidebar">
             <span class="amount">€ 84,200</span>
-            <span class="amount-label">sutarties vertė</span>
-            <span class="badge badge-success">Aktyvi</span>
+            <span class="amount-label">contract value</span>
+            <span class="badge badge-success">Active</span>
           </div>
         </article>
 
         <article class="result-card card-clickable">
-          <a href="#" class="card-overlay-link">Pirkimas #2</a>
+          <a href="#" class="card-overlay-link">Procurement #2</a>
           <div class="result-card-body">
             <div class="result-card-meta">
-              <span>Lietuvos automobilių kelių direkcija</span>
+              <span>Lithuanian Road Administration</span>
               <span>2024-01-15</span>
             </div>
-            <h3 class="result-card-title">Kelių priežiūros paslaugos 2024</h3>
-            <p class="result-card-excerpt">Valstybinių kelių priežiūros ir remonto darbai šiaurės regione...</p>
+            <h3 class="result-card-title">Road Maintenance Services 2024</h3>
+            <p class="result-card-excerpt">Maintenance and repair works for state roads in the northern region...</p>
           </div>
           <div class="result-card-sidebar">
             <span class="amount">€ 1,240,000</span>
-            <span class="amount-label">sutarties vertė</span>
-            <span class="badge badge-warning">Vykdoma</span>
+            <span class="amount-label">contract value</span>
+            <span class="badge badge-warning">In progress</span>
           </div>
         </article>
       </div>
@@ -68,7 +68,7 @@
 
   <div class="subsection">
     <h3>File Card</h3>
-    <p class="text-muted text-sm mb-3">Dokumentų kortelė su overlay-link clickability ir atskiromis veiksmų nuorodomis.</p>
+    <p class="text-muted text-sm mb-3">Document card with clickable overlay behavior and separate action links.</p>
     <div class="preview preview-col">
       <div style="display:flex; flex-direction:column; gap:12px;">
         <%- include('../../partials/file-card.ejs', {
@@ -77,7 +77,7 @@
           meta: 'PDF · 4.2 MB',
           ext: 'pdf',
           actions: [
-            { href: 'https://failai.viespirkiai.org/123', text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+            { href: 'https://failai.viespirkiai.org/123', text: '↗ File', target: '_blank', rel: 'noopener noreferrer' },
             { href: 'https://cvpp.eviesiejipirkimai.lt/', text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
           ]
         }) %>
@@ -88,7 +88,7 @@
           meta: 'DOCX · 128 KB',
           ext: 'docx',
           actions: [
-            { href: 'https://failai.viespirkiai.org/456', text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+            { href: 'https://failai.viespirkiai.org/456', text: '↗ File', target: '_blank', rel: 'noopener noreferrer' },
             { href: 'https://cvpp.eviesiejipirkimai.lt/', text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
           ]
         }) %>
@@ -108,7 +108,7 @@
 
   <!-- actions are real links above overlay -->
   <div class="file-card-actions-col">
-    <a class="file-card-action" href="https://failai.viespirkiai.org/123" target="_blank" rel="noopener noreferrer">↗ Failas</a>
+    <a class="file-card-action" href="https://failai.viespirkiai.org/123" target="_blank" rel="noopener noreferrer">↗ File</a>
     <a class="file-card-action" href="https://cvpp.eviesiejipirkimai.lt/" target="_blank" rel="noopener noreferrer">↗ CVP IS</a>
   </div>
 </article>

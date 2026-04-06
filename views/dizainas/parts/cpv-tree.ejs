@@ -2,12 +2,12 @@
 <section class="section" id="cpv-tree">
   <h2>CPV Tree</h2>
   <p class="text-muted text-sm mb-5">
-    Išskleidžiamas CPV (Common Procurement Vocabulary) medžio komponentas su <code>&lt;details&gt;</code>/<code>&lt;summary&gt;</code>.
-    Palaiko „leaf“ įrašus (be vaikų) ir išskleidimo indikatorių per <code>.cpv-toggle</code>.
+    Expandable CPV (Common Procurement Vocabulary) tree component based on <code>&lt;details&gt;</code>/<code>&lt;summary&gt;</code>.
+    Supports leaf records (without children) and uses <code>.cpv-toggle</code> as the expand indicator.
   </p>
 
   <div class="subsection">
-    <h3>Pavyzdys</h3>
+    <h3>Example</h3>
 
     <div class="preview preview-col" style="max-width: 720px;">
       <div class="cpv-tree">
@@ -16,7 +16,7 @@
             <span class="cpv-toggle">▶</span>
             <label>
               <input type="checkbox" class="form-check-input" data-cpv="03">
-              <span class="cpv-code">03<span class="cpv-code-dim">000000</span></span>&nbsp;Žemės ūkio, ūkininkavimo, žvejybos, miškininkystės ir susiję produktai
+              <span class="cpv-code">03<span class="cpv-code-dim">000000</span></span>&nbsp;Agricultural, farming, fishing, forestry and related products
             </label>
           </summary>
 
@@ -25,7 +25,7 @@
               <span class="cpv-toggle">▶</span>
               <label>
                 <input type="checkbox" class="form-check-input" data-cpv="031">
-                <span class="cpv-code">031<span class="cpv-code-dim">00000</span></span>&nbsp;Žemės ūkio ir sodininkystės produktai
+                <span class="cpv-code">031<span class="cpv-code-dim">00000</span></span>&nbsp;Agricultural and horticultural products
               </label>
             </summary>
 
@@ -34,7 +34,7 @@
                 <span class="cpv-toggle">▶</span>
                 <label>
                   <input type="checkbox" class="form-check-input" data-cpv="03111">
-                  <span class="cpv-code">03111<span class="cpv-code-dim">000</span></span>&nbsp;Sėklos
+                  <span class="cpv-code">03111<span class="cpv-code-dim">000</span></span>&nbsp;Seeds
                 </label>
               </summary>
 
@@ -42,7 +42,7 @@
                 <summary>
                   <label>
                     <input type="checkbox" class="form-check-input" data-cpv="031111">
-                    <span class="cpv-code">031111<span class="cpv-code-dim">00</span></span>&nbsp;Sojos pupelės
+                    <span class="cpv-code">031111<span class="cpv-code-dim">00</span></span>&nbsp;Soybeans
                   </label>
                 </summary>
               </details>
@@ -51,7 +51,7 @@
                 <summary>
                   <label>
                     <input type="checkbox" class="form-check-input" data-cpv="031112">
-                    <span class="cpv-code">031112<span class="cpv-code-dim">00</span></span>&nbsp;Žemės riešutai
+                    <span class="cpv-code">031112<span class="cpv-code-dim">00</span></span>&nbsp;Peanuts
                   </label>
                 </summary>
               </details>
@@ -60,7 +60,7 @@
                 <summary>
                   <label>
                     <input type="checkbox" class="form-check-input" data-cpv="031113">
-                    <span class="cpv-code">031113<span class="cpv-code-dim">00</span></span>&nbsp;Saulėgrąžų sėklos
+                    <span class="cpv-code">031113<span class="cpv-code-dim">00</span></span>&nbsp;Sunflower seeds
                   </label>
                 </summary>
               </details>
@@ -72,7 +72,7 @@
               <span class="cpv-toggle">▶</span>
               <label>
                 <input type="checkbox" class="form-check-input" data-cpv="032">
-                <span class="cpv-code">032<span class="cpv-code-dim">00000</span></span>&nbsp;Javai, bulvės, daržovės, vaisiai ir riešutai
+                <span class="cpv-code">032<span class="cpv-code-dim">00000</span></span>&nbsp;Cereals, potatoes, vegetables, fruit and nuts
               </label>
             </summary>
 
@@ -80,7 +80,7 @@
               <summary>
                 <label>
                   <input type="checkbox" class="form-check-input" data-cpv="032121">
-                  <span class="cpv-code">032121<span class="cpv-code-dim">00</span></span>&nbsp;Bulvės
+                  <span class="cpv-code">032121<span class="cpv-code-dim">00</span></span>&nbsp;Potatoes
                 </label>
               </summary>
             </details>
@@ -89,7 +89,7 @@
               <summary>
                 <label>
                   <input type="checkbox" class="form-check-input" data-cpv="032222">
-                  <span class="cpv-code">032222<span class="cpv-code-dim">00</span></span>&nbsp;Citrusų vaisiai
+                  <span class="cpv-code">032222<span class="cpv-code-dim">00</span></span>&nbsp;Citrus fruit
                 </label>
               </summary>
             </details>
@@ -98,7 +98,7 @@
 
         <div class="cpv-tree loading" style="display:none;">
           <span class="spinner"></span>
-          <span class="text-muted text-sm ms-2">Kraunama...</span>
+          <span class="text-muted text-sm ms-2">Loading...</span>
         </div>
       </div>
     </div>
@@ -110,7 +110,7 @@
       <span class="cpv-toggle">▶</span>
       <label>
         <input type="checkbox" class="form-check-input" data-cpv="03">
-        <span class="cpv-code">03<span class="cpv-code-dim">000000</span></span>&nbsp;Žemės ūkio, ūkininkavimo, žvejybos, miškininkystės ir susiję produktai
+        <span class="cpv-code">03<span class="cpv-code-dim">000000</span></span>&nbsp;Agricultural, farming, fishing, forestry and related products
       </label>
     </summary>
 
@@ -118,7 +118,7 @@
       <summary>
         <label>
           <input type="checkbox" class="form-check-input" data-cpv="031111">
-          <span class="cpv-code">031111<span class="cpv-code-dim">00</span></span>&nbsp;Sojos pupelės
+          <span class="cpv-code">031111<span class="cpv-code-dim">00</span></span>&nbsp;Soybeans
         </label>
       </summary>
     </details>

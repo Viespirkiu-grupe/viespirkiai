@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <%- include('../../head.ejs', {
+        pageTitle: 'Design - ' + selectedPage.label,
+        pageDescription: selectedPage.description,
+        pageImage: 'https://viespirkiai.org/dizainas.png',
+        customHead
+    }) %>
+    <%- include('../../js/charts.ejs') %>
+</head>
+<body>
+    <%- include('../../header.ejs', {hideSubtext: true}) %>
+
+    <main class="dizainas-docs-layout">
+        <div class="dizainas-docs-grid">
+            <aside class="dizainas-docs-sidebar self-start">
+                <%- include('../partials/sidebar.ejs') %>
+            </aside>
+
+            <section class="min-w-0 dizainas-docs-stack">
+                <header class="docs-page-header">
+                    <p class="docs-kicker">
+                        <a href="/dizainas/<%= selectedSection.slug %>/<%= selectedSection.pages[0].slug %>" class="docs-kicker-link"><%= selectedSection.label %></a>
+                        <span class="docs-kicker-sep">/</span>
+                        <span><%= selectedPage.label %></span>
+                    </p>
+                    <h1 class="docs-title"><%= selectedPage.label %></h1>
+                    <p class="docs-summary"><%= selectedPage.description %></p>
+                </header>
+
+                <%- include('../parts/cpv-tree.ejs') %>
+
+                <nav class="docs-pager" aria-label="Page navigation">
+                    <% if (previousPage) { %>
+                        <a href="<%= previousPage.url %>" class="docs-pager-link prev">
+                            <span class="docs-pager-kicker">Previous</span>
+                            <span class="docs-pager-title"><%= previousPage.label %></span>
+                        </a>
+                    <% } else { %>
+                        <div class="docs-pager-spacer"></div>
+                    <% } %>
+
+                    <% if (nextPage) { %>
+                        <a href="<%= nextPage.url %>" class="docs-pager-link next">
+                            <span class="docs-pager-kicker">Next</span>
+                            <span class="docs-pager-title"><%= nextPage.label %></span>
+                        </a>
+                    <% } else { %>
+                        <div class="docs-pager-spacer"></div>
+                    <% } %>
+                </nav>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

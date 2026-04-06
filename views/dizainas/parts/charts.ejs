@@ -2,8 +2,8 @@
 <section class="section" id="charts">
   <h2>Charts</h2>
   <p class="text-muted text-sm mb-5">
-    Diagramų komponentai naudoja <code>ApexCharts</code> per helperį <code>displayChart()</code> (žr. <code>views/js/charts.ejs</code>).
-    Apačioje pateikti keli baziniai tipai ir <code>.chart-frame</code> apvalkalas.
+    Chart components use <code>ApexCharts</code> through the <code>displayChart()</code> helper (see <code>views/js/charts.ejs</code>).
+    Below are a few core chart types wrapped in <code>.chart-frame</code>.
   </p>
 
   <div class="subsection">
@@ -18,13 +18,13 @@
         displayChart({
           element: document.querySelector('#designPieChart'),
           type: 'pie',
-          labels: ['Aktyvūs', 'Laukiama', 'Atmesta', 'Archyvas'],
+          labels: ['Active', 'Pending', 'Rejected', 'Archive'],
           series: [42, 18, 7, 12],
           flags: ['colors'],
         });
       } else {
         const el = document.querySelector('#designPieChart');
-        if (el) el.outerHTML = '<div class="chart-empty">Trūksta <code>displayChart()</code> (įkelk <code>views/js/charts.ejs</code> į puslapį)</div>';
+        if (el) el.outerHTML = '<div class="chart-empty">Missing <code>displayChart()</code> (load <code>views/js/charts.ejs</code> on this page)</div>';
       }
     </script>
     <pre class="code-block"><code class="hljs language-html"><%- highlightCode(`
@@ -35,7 +35,7 @@
   displayChart({
     element: document.querySelector('#pie'),
     type: 'pie',
-    labels: ['Aktyvūs', 'Laukiama', 'Atmesta', 'Archyvas'],
+    labels: ['Active', 'Pending', 'Rejected', 'Archive'],
     series: [42, 18, 7, 12],
     flags: ['colors'],
   });
@@ -66,7 +66,7 @@
         });
       } else {
         const el = document.querySelector('#designLineChart');
-        if (el) el.outerHTML = '<div class="chart-empty">Trūksta <code>displayChart()</code> (įkelk <code>views/js/charts.ejs</code> į puslapį)</div>';
+        if (el) el.outerHTML = '<div class="chart-empty">Missing <code>displayChart()</code> (load <code>views/js/charts.ejs</code> on this page)</div>';
       }
     </script>
     <pre class="code-block"><code class="hljs language-html"><%- highlightCode(`
@@ -115,7 +115,7 @@
         });
       } else {
         const el = document.querySelector('#designTreemapChart');
-        if (el) el.outerHTML = '<div class="chart-empty">Trūksta <code>displayChart()</code> (įkelk <code>views/js/charts.ejs</code> į puslapį)</div>';
+        if (el) el.outerHTML = '<div class="chart-empty">Missing <code>displayChart()</code> (load <code>views/js/charts.ejs</code> on this page)</div>';
       }
     </script>
     <pre class="code-block"><code class="hljs language-html"><%- highlightCode(`
