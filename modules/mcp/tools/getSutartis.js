@@ -5,7 +5,7 @@ import { CONTRACT_TYPES } from "../../sutartys/contractTypes.js";
 
 export const name = "get_sutartis";
 export const description =
-    "Grąžina išsamią informaciją apie vieną viešojo pirkimo sutartį pagal jos unikalų ID. Apima pirkėjo, tiekėjo, vertės, terminų, BVPŽ kodų, dokumentų, SABIS sutarčių ir ES projektų duomenis.";
+    "Grąžina išsamią informaciją apie vieną viešojo pirkimo sutartį pagal jos unikalų ID. Apima pirkėjo, tiekėjo, vertės, terminų, BVPŽ kodų, dokumentų, SABIS sutarčių ir ES projektų duomenis. Sumos - eurais.";
 export const schema = {
     id: z.number().int().positive().describe("Sutarties unikalus ID"),
 };

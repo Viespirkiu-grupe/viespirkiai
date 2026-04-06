@@ -1,6 +1,11 @@
 import express from "express";
+import config from "../utils/config.js";
 
 const mcpRouter = express.Router();
+
+mcpRouter.get("/mcp", (req, res) => {
+    res.render("mcp", { customHead: config.customHead });
+});
 
 let mcpImports = null;
 

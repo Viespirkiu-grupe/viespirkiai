@@ -3,7 +3,7 @@ import { postgres } from "../../../postgres/postgres.js";
 import { aptvarkytiRezultata } from "../../viesiejiPirkimai/searchViesiejiPirkimai.js";
 
 export const name = "get_viesasis_pirkimas";
-export const description = `Grąžina išsamią informaciją apie vieną viešąjį pirkimą pagal pirkimo ID. Apima turinį, failus (sieti tik pagal versijos md5 arba verijos key "id", get_failas), vykdytojo duomenis. Po to norint atidaryti failą jau turi md5 / failo numerinį id, todėl naudok get_file! (ne search_files!)`;
+export const description = `Grąžina išsamią informaciją apie vieną viešąjį pirkimą pagal pirkimo ID. Apima turinį, failus (sieti tik pagal versijos md5 arba verijos key "id", get_failas), vykdytojo duomenis. Po to norint atidaryti failą jau turi md5 / failo numerinį id, todėl naudok get_file! (ne search_files!) Sumos - eurais.`;
 
 export const schema = {
     pirkimoId: z.string().describe("Viešojo pirkimo ID"),

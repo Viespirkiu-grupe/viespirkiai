@@ -7,7 +7,7 @@ import {
 
 export const name = "search_viesieji_pirkimai";
 export const description =
-    "Ieško viešųjų pirkimų skelbimų. Palaiko paiešką pagal pavadinimą, pirkėjo JAR kodą, statusą, pirkimo būdą, datą, vertę ir BVPŽ kodus. Veikia kartu su get_viesasis_pirkimas";
+    "Ieško viešųjų pirkimų skelbimų. Palaiko paiešką pagal pavadinimą, pirkėjo JAR kodą, statusą, pirkimo būdą, datą, vertę ir BVPŽ kodus. Veikia kartu su get_viesasis_pirkimas. Sumos - eurais.";
 
 export const schema = {
     search: z.string().optional().describe("Pilno teksto paieška"),
