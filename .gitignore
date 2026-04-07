@@ -48,3 +48,7 @@ backup
 
 # Temp
 tmp/*
+
+# Tailwind CSS build output
+public/dist/tailwind.css
+public/dist/tailwind.css.map
