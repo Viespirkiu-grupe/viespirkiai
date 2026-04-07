@@ -58,6 +58,7 @@ let collectionInitialized = false;
  * @returns {Promise<void>}
  */
 export async function ensureSearchCollection() {
+    if (!config.typesenseUp) return;
     if (collectionInitialized) return;
 
     try {
@@ -323,6 +324,7 @@ let jarCollectionInitialized = false;
  * @returns {Promise<void>}
  */
 export async function ensureJarCollection() {
+    if (!config.typesenseUp) return;
     if (jarCollectionInitialized) return;
 
     try {
