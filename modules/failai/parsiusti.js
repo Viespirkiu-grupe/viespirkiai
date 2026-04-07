@@ -55,7 +55,14 @@ export async function parsiustiFaila(options = {}) {
     // Randame dėžę, kuri dar turi vietos
     timings.start("getDeze");
     const dezeRes = await postgres.query(
-        `SELECT * FROM dezes WHERE used < max ORDER BY "priority" DESC LIMIT 1`,
+        `
+    SELECT d.*, a."apiKey"
+    FROM public.dezes d
+    JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+    WHERE d.used < d.max
+    ORDER BY d."priority" DESC
+    LIMIT 1
+    `,
     );
     timings.end("getDeze");
 

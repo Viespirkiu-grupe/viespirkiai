@@ -43,42 +43,50 @@ async function nuskaitytiDokNuskaitytojuje(
     extension = "pdf",
     dokumentas,
 ) {
+    let nuskaitytojas;
+
     if (nuskaitytojoId) {
-        // Get a specific row from "dokNuskaitytojai"
-        let nuskaitytojaiRes = await postgres.query(
-            `SELECT *
-             FROM "dokNuskaitytojai"
-             WHERE id = $1;`,
+        const res = await postgres.query(
+            `
+            SELECT d.*, a."apiKey"
+            FROM public."dokNuskaitytojai" d
+            JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+            WHERE d.id = $1
+            `,
             [nuskaitytojoId],
         );
 
-        if (nuskaitytojaiRes.rows.length == 0) {
+        if (res.rows.length === 0) {
             throw new Error("Nėra nuskaitytojo su tokiu ID.");
         }
 
-        var nuskaitytojas = nuskaitytojaiRes.rows[0];
+        nuskaitytojas = res.rows[0];
     } else {
-        let nuskaitytojaiRes = await postgres.query(
-            `SELECT *
-           FROM "dokNuskaitytojai"
-           ORDER BY RANDOM()
-           LIMIT 1;`,
+        const res = await postgres.query(
+            `
+            SELECT d.*, a."apiKey"
+            FROM public."dokNuskaitytojai" d
+            JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+            ORDER BY RANDOM()
+            LIMIT 1
+            `,
         );
 
-        if (nuskaitytojaiRes.rows.length == 0) {
+        if (res.rows.length === 0) {
             throw new Error("Nėra nuskaitytojų.");
         }
 
-        var nuskaitytojas = nuskaitytojaiRes.rows[0];
+        nuskaitytojas = res.rows[0];
     }
 
-    let fetchUrl = `${nuskaitytojas.url}/extract`;
+    const fetchUrl = `${nuskaitytojas.url}/extract`;
+
     log(`Dokumentas ${url} nuskaitomas ${nuskaitytojas.pavadinimas}`);
 
-    let body = {
-        url: url,
+    const body = {
+        url,
         apiKey: nuskaitytojas.apiKey,
-        extension: extension,   
+        extension,
     };
 
     try {

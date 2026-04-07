@@ -9,7 +9,6 @@ export async function deleteFile(id) {
         throw new Error("File not found");
     }
     const file = res.rows[0];
-
     const failaiDezesRes = await postgres.query(
         `SELECT * FROM "failaiDezes" WHERE md5 = $1;`,
         [file.md5],
@@ -18,13 +17,21 @@ export async function deleteFile(id) {
 
     for (let failaiDeze of failaiDezes) {
         const dezeRes = await postgres.query(
-            `SELECT * FROM dezes WHERE pavadinimas = $1;`,
+            `
+        SELECT d.*, a."apiKey"
+        FROM dezes d
+        JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+        WHERE d.pavadinimas = $1
+        LIMIT 1
+        `,
             [failaiDeze.deze],
         );
         const deze = dezeRes.rows[0];
 
-        let url = `${deze.url}/file/${file.md5}.${file.extension}`;
-        let apiKey = deze.apiKey;
+        if (!deze) continue;
+
+        const url = `${deze.url}/file/${file.md5}.${file.extension}`;
+        const apiKey = deze.apiKey;
 
         log(url);
 
@@ -43,6 +50,7 @@ export async function deleteFile(id) {
             [file.md5, failaiDeze.deze],
         );
     }
+
 
     // Finally, delete the file record from failai table
     await postgres.query(`DELETE FROM failai WHERE id = $1;`, [id]);

@@ -24,12 +24,15 @@ export async function findFailas({ id, dokId, fileId }) {
 
 export async function getDezeForMd5(md5) {
     const result = await postgres.query(
-        `SELECT f.md5, f.deze, f.dydis, d.url, d.speed, d."apiKey"
-         FROM "failaiDezes" f
-         JOIN dezes d ON f.deze = d.pavadinimas
-         WHERE f.md5 = $1
-         ORDER BY -LN(random()) / NULLIF(d.speed, 0)
-         LIMIT 1`,
+        `
+        SELECT f.md5, f.deze, f.dydis, d.url, d.speed, a."apiKey"
+        FROM "failaiDezes" f
+        JOIN dezes d ON f.deze = d.pavadinimas
+        JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+        WHERE f.md5 = $1
+        ORDER BY -LN(random()) / NULLIF(d.speed, 0)
+        LIMIT 1
+        `,
         [md5],
     );
     return result.rows[0] ?? null;

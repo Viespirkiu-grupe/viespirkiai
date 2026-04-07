@@ -5,13 +5,21 @@ export async function validateOcrApiKey(apiKey) {
         return { error: 400, message: "API raktas privalomas." };
 
     const result = await postgres.query(
-        `SELECT * FROM "ocrNuskaitytojai" WHERE "apiKey" = $1 LIMIT 1`,
+        `
+        SELECT o.*
+        FROM public."ocrNuskaitytojai" o
+        JOIN public."apiRaktai" a ON a.id = o."apiRaktasId"
+        WHERE a."apiKey" = $1
+        LIMIT 1
+        `,
         [apiKey],
     );
+
     if (!result.rows.length)
         return { error: 403, message: "Neteisingas API raktas." };
 
     const user = result.rows[0];
+
     if (user.rezervacijos > 500)
         return { error: 429, message: "Per daug rezervacijų." };
 
@@ -22,10 +30,19 @@ export async function validateReverseProxyApiKey(authHeader) {
     if (!authHeader?.startsWith("Bearer "))
         return { error: 400, message: "API raktas privalomas." };
 
+    const apiKey = authHeader.slice(7);
+
     const result = await postgres.query(
-        `SELECT * FROM "reverseProxies" WHERE "apiKey" = $1 LIMIT 1`,
-        [authHeader.slice(7)],
+        `
+        SELECT r.*
+        FROM public."reverseProxies" r
+        JOIN public."apiRaktai" a ON a.id = r."apiRaktasId"
+        WHERE a."apiKey" = $1
+        LIMIT 1
+        `,
+        [apiKey],
     );
+
     if (!result.rows.length)
         return { error: 403, message: "Neteisingas API raktas." };
 
