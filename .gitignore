@@ -35,6 +35,7 @@ typesense/typesense
 # Konfiguracija
 /config.js
 .env
+.vscode
 
 # Viešinami dokumentai
 public/vieslaiskiai
