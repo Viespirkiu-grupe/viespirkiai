@@ -47,3 +47,6 @@ backup
 
 # Temp
 tmp/*
+
+# Quickwit
+quickwit/qwdata

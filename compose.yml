@@ -66,3 +66,22 @@ services:
             resources:
                 limits:
                     memory: 256M
+
+    quickwit:
+        image: quickwit/quickwit
+        container_name: quickwit
+        ports:
+            - "7280:7280"
+        volumes:
+            - ./quickwit/qwdata:/quickwit/qwdata
+            - ./quickwit/quickwit.yaml:/quickwit/config/quickwit.yaml
+        command: run
+        environment:
+            - QW_DATA_DIR=/quickwit/qwdata
+            - QW_CONFIG=/quickwit/config/quickwit.yaml
+        restart: unless-stopped
+        deploy:
+            resources:
+                limits:
+                  memory: 6g
+

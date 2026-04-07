@@ -26,6 +26,9 @@ export default {
     pgDatabase: "viespirkiai",
     pgPort: 9118,
     pgMaxConnections: 16,
+
+    // Quickwit
+    quickwitUrl: "http://localhost:7280",
     
     // Scraping
     torAddress: "socks5h://127.0.0.1:9050",
