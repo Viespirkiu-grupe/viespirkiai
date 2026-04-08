@@ -138,7 +138,7 @@ function parseLimit(query, defaultLimit = DEFAULT_LIMIT, maxLimit = MAX_LIMIT) {
  */
 function buildNumberOfResults({ rows, total, elapsed, engine = "PostgreSQL" }) {
     const trukme = (elapsed / 1000).toFixed(2);
-    const source = `<pre style="display: inline;" data-duration="${trukme}">(${trukme}s, ${engine})</pre>`;
+    const source = `<pre class="inline" data-duration="${trukme}">(${trukme}s, ${engine})</pre>`;
     if (rows.length < total)
         return `Rodomi ${rows.length} iš ${Number(total).linksniuotiK(["rezultato", "rezultatų"])} ${source}`;
     return `${Number(total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} ${source}`;
@@ -344,7 +344,7 @@ failaiSearchRouter.get(
         } catch {
             total = 10_000;
             const trukme = ((performance.now() - startas) / 1000).toFixed(2);
-            numberOfResults = `Rodomi ${results.length} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <pre data-duration="${trukme}" style="display: inline;"> (${trukme}s, PostgreSQL)</pre>`;
+            numberOfResults = `Rodomi ${results.length} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <pre data-duration="${trukme}" class="inline"> (${trukme}s, PostgreSQL)</pre>`;
         }
 
         if (req.query.json)
