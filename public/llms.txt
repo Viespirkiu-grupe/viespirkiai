@@ -1,0 +1,21 @@
+# Viešpirkiai
+ 
+> Viešpirkiai (viespirkiai.org) yra lietuviška pilietinė iniciatyva, skirta viešųjų pirkimų skaidrumui. Platforma renka, indeksuoja ir publikuoja Lietuvos viešųjų pirkimų duomenis iš CVP IS, TED ir VPT. Prieinama per Model Context Protocol (MCP) serverį adresu https://viespirkiai.org/mcp.
+ 
+Duomenys renkami automatiškai iš viešų šaltinių. Rekomenduojama tikrinti pateiktą informaciją — ji gali būti pasenusi arba klaidinga. Jeigu yra priežastis, kodėl tam tikra informacija turėtų būti neskelbiama, šalinama ar pataisyta, prašome susisiekti: viespirkiai@viespirkiai.org.
+ 
+## MCP įrankiai
+ 
+Šie įrankiai prieinami per MCP serverį (`https://viespirkiai.org/mcp`):
+ 
+- [search_sutartys](https://viespirkiai.org/sutartys): Viešųjų pirkimų sutarčių paieška pagal pirkėją, tiekėją, sumą, laikotarpį ir kitus filtrus
+- [get_sutartis](https://viespirkiai.org/sutartys): Išsami informacija apie vieną sutartį pagal unikalų ID — pirkėjas, tiekėjas, suma, pridėti dokumentai
+- [search_viesieji_pirkimai](https://viespirkiai.org/viesieji-pirkimai): CVP IS viešųjų pirkimų skelbimų paieška
+- [get_viesasis_pirkimas](https://viespirkiai.org/viesieji-pirkimai): Išsami informacija apie vieną viešąjį pirkimą pagal ID
+- [search_failai](https://viespirkiai.org/failai): Pilnatekstė paieška sutarčių dokumentuose (BM25); apima OCR rezultatus
+- [get_failas](https://viespirkiai.org/failai): Išsami informacija apie vieną dokumentą pagal ID
+- [get_failas_tekstas](https://viespirkiai.org/failai): Dokumento teksto puslapiai — skaitymas, naršymas archyvuose
+- [search_juridiniai](https://viespirkiai.org/juridiniai): Juridinių asmenų (įmonių) registro duomenų paieška
+- [get_juridinis](https://viespirkiai.org/juridiniai): Įmonės profilis — bendra informacija, Sodra, VMI, finansinės ataskaitos, teismo nuosprendžiai, darbo skelbimai
+- [get_pinreg_asmuo](https://viespirkiai.org/privatūs-interesai): PINREG privačių interesų deklaracijos pagal asmens vardą ir pavardę — ryšiai su verslu, darbovietės, sutuoktinių ryšiai
+- [get_pinreg_jar](https://viespirkiai.org/privatūs-interesai): PINREG privačių interesų deklaracijos pagal juridinio asmens kodą
