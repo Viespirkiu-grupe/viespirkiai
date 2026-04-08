@@ -9,6 +9,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import fsPromises from "fs/promises";
+import crypto from "crypto";
 import htmlMinifyMiddleware from "./utils/minifyHtml.js";
 import helmet from "helmet";
 import { realpathSync } from "fs";
@@ -85,6 +86,20 @@ const faviconSVG = fs.readFileSync("./public/icons/icon.svg", "utf8");
 app.locals.faviconSVG = faviconSVG;
 app.locals.faviconSVGURLEncoded = encodeURIComponent(faviconSVG);
 
+// CSS cache buster
+const tailwindCssPath = path.join(__dirname, "public/dist/tailwind.css");
+const computeCssMd5 = () =>
+    crypto.createHash("md5").update(fs.readFileSync(tailwindCssPath)).digest("hex");
+
+if (config.dev) {
+    app.use((_req, res, next) => {
+        res.locals.tailwindCssBuster = computeCssMd5();
+        next();
+    });
+} else {
+    app.locals.tailwindCssBuster = computeCssMd5();
+}
+
 // EJS
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -131,9 +146,13 @@ app.use(
 );
 
 app.use(express.static(path.join(__dirname, "public"), {
-    setHeaders: (res) => {
-        res.setHeader("Cache-Control", "no-store");
-    }
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith("/dist/tailwind.css")) {
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else {
+            res.setHeader("Cache-Control", "no-store");
+        }
+    },
 }));
 
 // Cookies
