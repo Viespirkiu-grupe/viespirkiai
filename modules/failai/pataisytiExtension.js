@@ -32,6 +32,8 @@ const MIME_TO_EXTENSION = {
     "application/zip": "zip",
     "application/x-rar": "rar",
     "text/rtf": "rtf",
+    "application/vnd.oasis.opendocument.spreadsheet": "ods",
+    "text/xml": "xml"
 };
 
 const EBVPD_ESPD_RE = /(ebvpd|espd)/i;

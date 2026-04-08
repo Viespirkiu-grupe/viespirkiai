@@ -1,5 +1,6 @@
 import { parsiustiFaila } from "../modules/failai/parsiusti.js";
 import { pravalytiParsiuntimoRezervacijas } from "../modules/failai/pravalytiParsiuntimuRezervacijas.js";
+import { processFailaiIndexQueue } from "../modules/failai/quickwitProcessIndexQueue.js";
 
 export default [
     {
@@ -25,4 +26,12 @@ export default [
         errorCooldown: 60,
         job: pravalytiParsiuntimoRezervacijas,
     },
+    {
+        name: "quickwitProcessIndexQueue",
+        mode: "asap",
+        priority: 5,
+        cooldown: 30,
+        errorCooldown: 30,
+        job: processFailaiIndexQueue,
+    }
 ];
