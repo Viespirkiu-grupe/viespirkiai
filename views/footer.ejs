@@ -8,6 +8,12 @@
     <a href="/analitika">↗ Analitika</a>
     <a href="/kodas">↗ Kodas</a>
     <a href="/privatumas">↗ Privatumo politika</a>
+    <button onclick="
+      const meta = document.querySelector('meta[data-font]');
+      const next = meta.dataset.font === 'comic' ? 'ubuntu' : 'comic';
+      meta.dataset.font = next;
+      document.cookie = 'font=' + next + ';path=/;max-age=31536000';
+    ">↗ Pakeisti šriftą</button>
   </div>
   <% if(typeof neoficialus == "undefined" || neoficialus) { %>
     <p class="text-center text-sm text-muted mt-4"><em>

@@ -1,29 +1,29 @@
 @layer base {
     :root {
         /* --- Color palette --- */
-        --white:          #ffffff;
-        --black:          #0f0f0f;
-        --dark-gray:      #444444;
-        --gray:           #777777;
-        --light-gray:     #d4d4d4;
-        --lighter-gray:   #f0f0f0;
-        --link:           #1a6fc4;
+        --white: #ffffff;
+        --black: #0f0f0f;
+        --dark-gray: #444444;
+        --gray: #777777;
+        --light-gray: #d4d4d4;
+        --lighter-gray: #f0f0f0;
+        --link: #1a6fc4;
 
         /* --- Semantic colors --- */
-        --color-primary:        #0f0f0f;
-        --color-primary-hover:  #333333;
-        --color-secondary:      #f0f0f0;
-        --color-secondary-hover:#e0e0e0;
-        --color-success:        #1a7f4b;
-        --color-success-bg:     #edf7f1;
-        --color-warning:        #9a6500;
-        --color-warning-bg:     #fff8e6;
-        --color-danger:         #c0392b;
-        --color-danger-bg:      #fdf0ee;
-        --color-info:           #1a6fc4;
-        --color-info-bg:        #eef4fc;
-        --color-muted:          #777777;
-        --color-muted-bg:       #f5f5f5;
+        --color-primary: #0f0f0f;
+        --color-primary-hover: #333333;
+        --color-secondary: #f0f0f0;
+        --color-secondary-hover: #e0e0e0;
+        --color-success: #1a7f4b;
+        --color-success-bg: #edf7f1;
+        --color-warning: #9a6500;
+        --color-warning-bg: #fff8e6;
+        --color-danger: #c0392b;
+        --color-danger-bg: #fdf0ee;
+        --color-info: #1a6fc4;
+        --color-info-bg: #eef4fc;
+        --color-muted: #777777;
+        --color-muted-bg: #f5f5f5;
 
         /* --- Depth shades (for nested cards) --- */
         --shade-1: #ffffff;
@@ -35,58 +35,58 @@
         --shade-7: #d4d4d4;
 
         /* --- Spacing scale --- */
-        --space-1:   4px;
-        --space-2:   8px;
-        --space-3:  12px;
-        --space-4:  16px;
-        --space-5:  28px;
-        --space-6:  40px;
-        --space-7:  56px;
-        --space-8:  80px;
+        --space-1: 4px;
+        --space-2: 8px;
+        --space-3: 12px;
+        --space-4: 16px;
+        --space-5: 28px;
+        --space-6: 40px;
+        --space-7: 56px;
+        --space-8: 80px;
 
         /* --- Typography --- */
-        --font-sans:   "Ubuntu", system-ui, sans-serif;
-        --font-mono:   monospace;
-        --text-xs:     11px;
-        --text-sm:     13px;
-        --text-base:   15px;
-        --text-md:     17px;
-        --text-lg:     20px;
-        --text-xl:     18px;
-        --text-2xl:    24px;
-        --text-3xl:    31px;
+        --font-sans: "Ubuntu", system-ui, sans-serif;
+        --font-mono: monospace;
+        --text-xs: 11px;
+        --text-sm: 13px;
+        --text-base: 15px;
+        --text-md: 17px;
+        --text-lg: 20px;
+        --text-xl: 18px;
+        --text-2xl: 24px;
+        --text-3xl: 31px;
         --line-height: 1.55;
 
         /* --- Border & radius --- */
-        --border:           1px solid var(--light-gray);
-        --border-dark:      1px solid var(--black);
-        --border-focus:     2px solid var(--black);
-        --radius-sm:        3px;
-        --radius-md:        6px;
-        --radius-lg:        10px;
-        --radius-xl:        16px;
-        --radius-pill:      999px;
+        --border: 1px solid var(--light-gray);
+        --border-dark: 1px solid var(--black);
+        --border-focus: 2px solid var(--black);
+        --radius-sm: 3px;
+        --radius-md: 6px;
+        --radius-lg: 10px;
+        --radius-xl: 16px;
+        --radius-pill: 999px;
 
         /* --- Shadows --- */
-        --shadow-xs:  0 1px 2px rgba(0,0,0,0.06);
-        --shadow-sm:  0 1px 4px rgba(0,0,0,0.09);
-        --shadow-md:  0 4px 12px rgba(0,0,0,0.10);
-        --shadow-lg:  0 8px 24px rgba(0,0,0,0.12);
+        --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.06);
+        --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.09);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.10);
+        --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
 
         /* --- Transitions --- */
         --transition: 0.18s ease;
         --transition-slow: 0.3s ease;
 
         /* --- Layout --- */
-        --max-width:     1280px;
+        --max-width: 1280px;
         --content-width: 860px;
-        --sidebar-pct:   7%;
-        --z-dropdown:    100;
-        --z-sticky:      200;
-        --z-modal:       300;
-        --z-toast:       400;
-        --z-tooltip:     500;
-        --z-sticky:     2000;
+        --sidebar-pct: 7%;
+        --z-dropdown: 100;
+        --z-sticky: 200;
+        --z-modal: 300;
+        --z-toast: 400;
+        --z-tooltip: 500;
+        --z-sticky: 2000;
 
         --col-gap: var(--space-6);
 
@@ -95,19 +95,19 @@
 
     @media (prefers-color-scheme: dark) {
         :root {
-            --white:        #111111;
-            --black:        #f2f2f2;
-            --dark-gray:    #bbbbbb;
-            --gray:         #888888;
-            --light-gray:   #2e2e2e;
+            --white: #111111;
+            --black: #f2f2f2;
+            --dark-gray: #bbbbbb;
+            --gray: #888888;
+            --light-gray: #2e2e2e;
             --lighter-gray: #1e1e1e;
-            --link:         #6ab0f5;
+            --link: #6ab0f5;
 
             --color-success-bg: #0e2a1a;
             --color-warning-bg: #2a1f00;
-            --color-danger-bg:  #2a0e0a;
-            --color-info-bg:    #0e1f2a;
-            --color-muted-bg:   #1a1a1a;
+            --color-danger-bg: #2a0e0a;
+            --color-info-bg: #0e1f2a;
+            --color-muted-bg: #1a1a1a;
 
             --shade-1: #1a1a1a;
             --shade-2: #1e1e1e;
@@ -121,18 +121,18 @@
 
     :root:has(meta[data-scheme="dark"]) {
         color-scheme: dark;
-        --white:        #111111;
-        --black:        #f2f2f2;
-        --dark-gray:    #bbbbbb;
-        --gray:         #888888;
-        --light-gray:   #2e2e2e;
+        --white: #111111;
+        --black: #f2f2f2;
+        --dark-gray: #bbbbbb;
+        --gray: #888888;
+        --light-gray: #2e2e2e;
         --lighter-gray: #1e1e1e;
-        --link:         #6ab0f5;
+        --link: #6ab0f5;
         --color-success-bg: #0e2a1a;
         --color-warning-bg: #2a1f00;
-        --color-danger-bg:  #2a0e0a;
-        --color-info-bg:    #0e1f2a;
-        --color-muted-bg:   #1a1a1a;
+        --color-danger-bg: #2a0e0a;
+        --color-info-bg: #0e1f2a;
+        --color-muted-bg: #1a1a1a;
         --shade-1: #1a1a1a;
         --shade-2: #1e1e1e;
         --shade-3: #222222;
@@ -144,18 +144,18 @@
 
     :root:has(meta[data-scheme="light"]) {
         color-scheme: light;
-        --white:          #ffffff;
-        --black:          #0f0f0f;
-        --dark-gray:      #444444;
-        --gray:           #777777;
-        --light-gray:     #d4d4d4;
-        --lighter-gray:   #f0f0f0;
-        --link:           #1a6fc4;
+        --white: #ffffff;
+        --black: #0f0f0f;
+        --dark-gray: #444444;
+        --gray: #777777;
+        --light-gray: #d4d4d4;
+        --lighter-gray: #f0f0f0;
+        --link: #1a6fc4;
         --color-success-bg: #edf7f1;
         --color-warning-bg: #fff8e6;
-        --color-danger-bg:  #fdf0ee;
-        --color-info-bg:    #eef4fc;
-        --color-muted-bg:   #f5f5f5;
+        --color-danger-bg: #fdf0ee;
+        --color-info-bg: #eef4fc;
+        --color-muted-bg: #f5f5f5;
         --shade-1: #ffffff;
         --shade-2: #f9f9f9;
         --shade-3: #f2f2f2;
@@ -166,24 +166,69 @@
     }
 
     @font-face {
-    	font-family: "Ubuntu";
-    	font-style: normal;
-    	font-weight: 400;
-    	font-display: swap;
-    	src: url(/fontai/4iCs6KVjbNBYlgoKcQ72j00.woff2) format("woff2");
-    	unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
-    		U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
-    		U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+        font-family: "Ubuntu";
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url(/fontai/4iCs6KVjbNBYlgoKcQ72j00.woff2) format("woff2");
+        unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+            U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+            U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
     }
 
     @font-face {
-    	font-family: "Ubuntu";
-    	font-style: normal;
-    	font-weight: 400;
-    	font-display: swap;
-    	src: url(/fontai/4iCs6KVjbNBYlgoKfw72.woff2) format("woff2");
-    	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    		U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
-    		U+2212, U+2215, U+FEFF, U+FFFD;
+        font-family: "Ubuntu";
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url(/fontai/4iCs6KVjbNBYlgoKfw72.woff2) format("woff2");
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+            U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+            U+2212, U+2215, U+FEFF, U+FFFD;
     }
+
+    /* latin-ext */
+    @font-face {
+        font-family: 'Comic Relief';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url(/fontai/BCauqZkHrvL55SZ8uaEhHMYGVRhgPgs.woff2) format('woff2');
+        unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+
+    /* latin */
+    @font-face {
+        font-family: 'Comic Relief';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url(/fontai/BCauqZkHrvL55SZ8uaEhHMYGWxhg.woff2) format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+
+    /* latin-ext */
+    @font-face {
+        font-family: 'Comic Relief';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url(/fontai/BCaxqZkHrvL55SZ8uaEhHMYO4D11DyojE1w.woff2) format('woff2');
+        unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+
+    /* latin */
+    @font-face {
+        font-family: 'Comic Relief';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url(/fontai/BCaxqZkHrvL55SZ8uaEhHMYO4D11ASoj.woff2) format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+
+    :root:has(meta[data-font="comic"]) {
+        --font-sans: 'Comic Relief', sans-serif;
+    }
+
 }

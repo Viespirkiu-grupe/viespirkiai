@@ -141,6 +141,7 @@ app.use(cookieParser());
 
 app.use((req, res, next) => {
     res.locals.colorScheme = req.cookies?.colorScheme || "auto";
+    res.locals.font = req.cookies?.font || "ubuntu";
     next();
 });
 

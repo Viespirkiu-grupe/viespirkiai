@@ -31,12 +31,15 @@
         gap: var(--space-4);
     }
     
-    footer a {
+    footer a,
+    footer button {
+        all: unset;
         color: var(--gray);
         font-size: var(--text-sm);
-        text-decoration: none;
+        cursor: pointer;
     }
-    footer a:hover { text-decoration: underline; }
+    footer a:hover,
+    footer button:hover { text-decoration: underline; }
     
     .page-header {
         display: flex;
