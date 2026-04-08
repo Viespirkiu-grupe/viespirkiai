@@ -8,13 +8,12 @@ Daugiau informacijos el. paštu viespirkiai@viespirkiai.org
 
 ## Tailwind CSS
 
-Tailwind is set up as an additional stylesheet and is generated into `public/dist/tailwind.css`.
+Tailwind v4 is set up as an additional stylesheet and is generated into `public/dist/tailwind.css`.
 The existing legacy CSS is still active and loaded after Tailwind.
 
 ### Documentation
 
 - Tailwind docs: https://tailwindcss.com/docs
-- Tailwind color docs: https://tailwindcss.com/docs/customizing-colors
 
 ### Commands
 
@@ -32,6 +31,6 @@ npm run watch:tailwind
 
 ### Project setup files
 
-- Tailwind config: `tailwind.config.cjs`
 - PostCSS config: `postcss.config.cjs`
-- Tailwind input file: `styles/tailwind.css`
+- Tailwind entry file: `styles/tailwind.css` — imports, `@theme`, and `@source` directives
+- Custom component .css files stay at `styles` folder
