@@ -1,0 +1,115 @@
+@layer components {
+    /* ── Archive Tree (ZIP/RAR/7z) ───────────────────────────────────────────────
+       Based on CPV tree DOM patterns (details/summary + toggle icon + mono meta).
+       Intended markup (example):
+    
+       <div class="archive-tree">
+         <details open>
+           <summary>
+             <span class="archive-toggle">▶</span>
+             <span class="archive-name">folder</span>
+             <span class="archive-meta">(3)</span>
+           </summary>
+           <div class="archive-children">
+             <details class="no-children">
+               <summary>
+                 <span class="archive-name">file.pdf</span>
+                 <span class="archive-meta">pdf · 12.4 KB</span>
+               </summary>
+             </details>
+           </div>
+         </details>
+       </div>
+    */
+    
+    /* Wrapper */
+    .archive-tree {
+      font-size: var(--text-sm);
+    }
+    
+    /* Nesting indentation mirrors CPV tree */
+    .archive-tree details { margin-left: var(--space-5); }
+    .archive-tree > details,
+    .archive-tree > .archive-root > details { margin-left: 0; }
+    
+    /* Summary row */
+    .archive-tree summary {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2);
+      border-radius: var(--radius-sm);
+      list-style: none;
+      user-select: none;
+      cursor: pointer;
+    }
+    
+    .archive-tree summary::-webkit-details-marker { display: none; }
+    .archive-tree summary:hover { background: var(--lightest-gray); }
+    
+    /* Leaves (no children): align name with other rows (reserve toggle width) */
+    .archive-tree details.no-children > summary {
+      padding-left: calc(18px + var(--space-2));
+    }
+    
+    /* Toggle chevron */
+    .archive-toggle {
+      font-size: 10px;
+      color: var(--gray);
+      width: 18px;
+      flex-shrink: 0;
+      text-align: center;
+      transition: transform var(--transition);
+    }
+    
+    .archive-tree details[open] > summary .archive-toggle {
+      transform: rotate(90deg);
+    }
+    
+    /* Name + meta line */
+    .archive-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    /* Optional code-like metadata: extension, size, etc. */
+    .archive-meta {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--gray);
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    
+    /* Children container (if you wrap with a div) */
+    .archive-children {
+      padding-left: var(--space-4);
+    }
+    
+    /* Links inside tree (files) */
+    .archive-tree a {
+      color: inherit;
+      text-decoration: none;
+    }
+    
+    .archive-tree a:hover {
+      text-decoration: underline;
+    }
+    
+    /* Loading state (optional parity with CPV tree) */
+    .archive-tree.loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+    }
+    
+    /* Compact variant (optional) */
+    .archive-tree.compact summary {
+      padding: var(--space-1) var(--space-2);
+      gap: var(--space-2);
+    }
+}

@@ -1,0 +1,16 @@
+@layer components {
+    .preview {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: var(--space-3);
+        padding: var(--space-5);
+        background: var(--white);
+        border: var(--border);
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+    
+    .preview-col  { flex-direction: column; align-items: stretch; }
+    .preview-dark { background: #1a1a1a; }
+    .preview-gray { background: var(--lighter-gray); }
+}
