@@ -29,7 +29,7 @@ const addCpvParts = addCpv
   <% if (addInfo) { %><p class="text-sm text-muted"><%= addInfo %></p><% } %>
   <% if (mainCpvParts.code) { %>
     <h3 class="mb-2">BVPŽ</h3>
-    <div class="d-flex flex-col gap-2">
+    <div class="flex flex-col gap-2">
       <div>
         <div class="fw-medium"><%= mainCpvParts.label || mainCpvParts.code %><% if (mainCpvParts.code) { %> <span class="text-muted fw-normal text-xs"><%= mainCpvParts.code %></span><% } %></div>
       </div>

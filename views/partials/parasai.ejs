@@ -22,7 +22,7 @@
 <dd class="signature-list">
   <% if (__list.length > 0) { %>
     <p class="text-muted text-xs mb-2"><em><%= __disclaimerText %></em></p>
-    <div class="d-flex flex-col gap-1">
+    <div class="flex flex-col gap-1">
       <% __visibleItems.forEach(sig => { %>
         <% if (!sig) return; %>
         <div>
@@ -42,7 +42,7 @@
         <summary class="signature-list-summary">
           <span class="text-muted text-xs fw-bold">+ <%= __hiddenCount %> daugiau</span>
         </summary>
-        <div class="signature-list-expanded d-flex flex-col gap-1" style="margin-top:var(--space-2);">
+        <div class="signature-list-expanded flex flex-col gap-1" style="margin-top:var(--space-2);">
           <% __list.slice(__maxItems).forEach(sig => { %>
             <% if (!sig) return; %>
             <div>

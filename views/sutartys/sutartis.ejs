@@ -19,8 +19,9 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
 
     <div class="page-header">
       <div>
-        <p class="subtext mb-1"><%= sutartis.tipoPavadinimas %></p>
-        <h1 class="mb-0">
+        <p class="subtext"><%= sutartis.tipoPavadinimas %></p>
+
+        <h1>
           <% if (sutartis.pavadinimas.length < 1) { %>
             <em>Nenurodyta</em>
           <% } else { %>
@@ -29,7 +30,8 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
           už <span class="amount"><%= Number(sutartis.faktineIvykdimoVerte || sutartis.verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€</span>
         </h1>
       </div>
-      <div class="d-flex gap-3 align-center">
+
+      <div class="flex gap-3 align-center">
         <a href="/sutartis/<%= sutartis.sutartiesUnikalusID %>.json" class="btn btn-outline btn-sm">↗ JSON</a>
         <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= sutartis.sutartiesUnikalusID %>" class="btn btn-outline btn-sm">↗ CVP IS</a>
         <a href="mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20<%= sutartis.sutartiesUnikalusID %>&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/<%= sutartis.sutartiesUnikalusID %>" class="btn btn-outline btn-sm">↗ Pranešti</a>
@@ -86,7 +88,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
 
       <section>
         <h2>Sutartis</h2>
-        <span class="text-muted mb-4 d-block"><%= sutartis.sutartiesNumeris %></span>
+        <span class="text-muted mb-4 block"><%= sutartis.sutartiesNumeris %></span>
 
         <h3 class="mb-2">Vertė</h3>
         <dl class="kv-list mb-4">
@@ -109,7 +111,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
 
       <section>
         <h2>Pranešimas</h2>
-        <div class="d-flex align-center gap-2 mb-4">
+        <div class="flex align-center gap-2 mb-4">
           <span class="text-muted"><%= sutartis.sutartiesUnikalusID %></span>
           <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= sutartis.sutartiesUnikalusID %>" class="text-sm">↗ CVP IS</a>
         </div>
@@ -141,7 +143,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
             <section>
                 <br>
                 <h2>Viešasis pirkimas</h2>
-                <div class="d-flex align-center gap-2 mb-4">
+                <div class="flex align-center gap-2 mb-4">
                 <a href="/viesiejiPirkimai/<%= sutartis.cvpisPirkimas.pirkimoId %>">
                     <span><%= sutartis.cvpisPirkimas.pavadinimas %></span>
                 </a>
@@ -191,7 +193,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
       <section class="span-full">
         <h2>Dokumentai</h2>
         <% if (sutartis.dokumentai && sutartis.dokumentai.length > 0) { %>
-          <div class="d-flex flex-col gap-2">
+          <div class="flex flex-col gap-2">
             <% sutartis.dokumentai.forEach(doc => { %>
               <%
                 const title = doc.pavadinimas || "—";
@@ -315,7 +317,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
                     </span>
                     &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>
                   </h3>
-                  <div class="d-flex flex-wrap gap-2 mt-2">
+                  <div class="flex flex-wrap gap-2 mt-2">
                     <% item.salys.forEach(salis => { %>
                       <span class="text-sm"><strong><%= salis.tipas %></strong> <%= salis.validusJarKodas || salis.validusAsmensKodas || salis.kitasKodas || salis.pavadinimas %></span>
                     <% }); %>
@@ -375,7 +377,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
                     </span>
                     &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>
                   </h3>
-                  <div class="d-flex gap-3 mt-2 text-sm">
+                  <div class="flex gap-3 mt-2 text-sm">
                     <span><strong>Pirkėjas:</strong> <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>" style="position:relative;z-index:1;"><%= item.perkanciojiOrganizacija %></a></span>
                     <span><strong>Tiekėjas:</strong> <a href="/asmuo/<%= item.tiekejoKodas %>" style="position:relative;z-index:1;"><%= item.tiekejas || "Nenurodytas" %></a></span>
                   </div>

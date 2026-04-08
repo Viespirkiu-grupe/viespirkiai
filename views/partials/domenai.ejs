@@ -19,7 +19,7 @@
 <dt><%= __title %></dt>
 <dd class="domain-list">
   <% if (__list.length > 0) { %>
-    <div class="d-flex flex-col gap-1">
+    <div class="flex flex-col gap-1">
       <% __visibleItems.forEach(domain => { %>
         <% if (!domain) return; %>
         <a href="https://<%= domain %>" target="_blank" class="cell-truncate"><%= domain %></a>
@@ -30,7 +30,7 @@
         <summary class="domain-list-summary">
           <span class="text-muted text-xs fw-bold">+ <%= __hiddenCount %> daugiau</span>
         </summary>
-        <div class="domain-list-expanded d-flex flex-col gap-1" style="margin-top:var(--space-2);">
+        <div class="domain-list-expanded flex flex-col gap-1" style="margin-top:var(--space-2);">
           <% __list.slice(__maxItems).forEach(domain => { %>
             <% if (!domain) return; %>
             <a href="https://<%= domain %>" target="_blank" class="cell-truncate"><%= domain %></a>

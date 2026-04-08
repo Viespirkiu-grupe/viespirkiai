@@ -1,8 +1,8 @@
 <div>
-  <div class="d-flex justify-between align-center mb-4">
+  <div class="flex justify-between align-center mb-4">
     <span class="text-muted text-sm"><em class="numberOfResults"><%- numberOfResults %></em></span>
     <% if (galimaEksportuoti) { %>
-      <div class="d-flex gap-3">
+      <div class="flex gap-3">
         <a href="/viesieji-pirkimai/?<%- queryParams %>&jsonl=true&limit=max" class="btn btn-outline btn-sm">↗ JSONL</a>
         <a href="/viesieji-pirkimai/?<%- queryParams %>&csv=true&limit=max" class="btn btn-outline btn-sm">↗ CSV</a>
       </div>
@@ -46,7 +46,7 @@
               <% } %>
             </dl>
 
-            <div class="d-flex align-baseline gap-3">
+            <div class="flex align-baseline gap-3">
               <h3 class="result-card-title">
                 <% if (!item.pavadinimas || item.pavadinimas.length < 1) { %><em>Nenurodyta</em><% } else { %><%= item.pavadinimas %><% } %>
               </h3>

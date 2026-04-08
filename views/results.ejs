@@ -1,7 +1,7 @@
-<div class="d-flex justify-between align-center mb-4">
+<div class="flex justify-between align-center mb-4">
   <span class="text-muted text-sm"><%- numberOfResults %></span>
   <% if (galimaEksportuoti) { %>
-    <div class="d-flex gap-3">
+    <div class="flex gap-3">
       <a href="/?<%- queryParams %>&jsonl=true&limit=max" class="btn btn-ghost btn-sm">↗ JSONL</a>
       <a href="/?<%- queryParams %>&csv=true&limit=max" class="btn btn-ghost btn-sm">↗ CSV</a>
     </div>

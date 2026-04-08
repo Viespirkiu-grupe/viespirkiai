@@ -19,7 +19,7 @@
 
     <div class="page-header">
       <div>
-        <p class="subtext mb-1"><%= pirkimas.pirkimoBudas %><% if (pirkimas.statusas) { %> · <span class="text-muted"><%= pirkimas.statusas %></span><% } %></p>
+        <p class="subtext"><%= pirkimas.pirkimoBudas %><% if (pirkimas.statusas) { %> · <span class="text-muted"><%= pirkimas.statusas %></span><% } %></p>
         <h1 class="mb-0">
           <% if (!pirkimas.pavadinimas || pirkimas.pavadinimas.length < 1) { %>
             <em>Nenurodyta</em>
@@ -31,7 +31,7 @@
           <% } %>
         </h1>
       </div>
-      <div class="d-flex gap-3 align-center">
+      <div class="flex gap-3 align-center">
         <% if (pirkimas.type === 'Pmc') { %>
           <a href="https://viesiejipirkimai.lt/epps/pmc/viewPmc.do?resourceId=<%= pirkimas.pirkimoId %>" class="btn btn-outline btn-sm" target="_blank">↗ CVP IS</a>
         <% } else if (pirkimas.type === 'CfTWS') { %>
@@ -235,7 +235,7 @@
         <section class="mb-7">
             <h2>Dokumentai</h2>
 
-            <div class="d-flex flex-col gap-2 mt-4">
+            <div class="flex flex-col gap-2 mt-4">
               <% failai.forEach(failas => { %>
                 <% const versija = failas.versijos?.[failas.versijos.length - 1]; %>
                 <% const lokalus = versija; %>
@@ -245,7 +245,7 @@
                 <% const cvpisUrl = `https://viesiejipirkimai.lt/epps/cft/viewDocumentVersions.do?resourceId=${failas.dokumentasId}`; %>
 
                 <% if (lokalus?.parsiustas && lokalus?.nuskaitytas) { %>
-                  <div style="min-width:0;">
+                  <div class="min-w-0">
                     <%- include('../partials/file-card.ejs', {
                       title,
                       href: `/failas/${lokalus.id}`,
@@ -258,7 +258,7 @@
                     }) %>
                   </div>
                 <% } else { %>
-                  <div style="min-width:0;">
+                  <div class="min-w-0">
                     <%- include('../partials/file-card.ejs', {
                       title,
                       href: cvpisUrl,
@@ -282,7 +282,7 @@
         <section class="mb-7">
             <h2>Skelbimai</h2>
 
-            <div class="d-flex flex-col gap-2 mt-4">
+            <div class="flex flex-col gap-2 mt-4">
               <% skelbimai.forEach(skelbimas => { %>
                 <%
                   const pavadinimas = (skelbimas.tipas || 'Skelbimas').trim();
@@ -297,7 +297,7 @@
                   const actions = [];
                 %>
 
-                <div style="min-width:0;">
+                <div class="min-w-0">
                   <%- include('../partials/file-card.ejs', {
                     title,
                     href,
@@ -332,7 +332,7 @@
               })
             ]; %>
 
-            <div class="d-flex flex-col gap-2 mt-4">
+            <div class="flex flex-col gap-2 mt-4">
               <% tedKorteles.forEach(skelbimas => { %>
                 <%
                   const href = skelbimas.downloadHref || '#';
@@ -348,7 +348,7 @@
                   ] : [];
                 %>
 
-                <div style="min-width:0;">
+                <div class="min-w-0">
                   <%- include('../partials/file-card.ejs', {
                     title,
                     href,
@@ -406,7 +406,7 @@
                     </span>
                     &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>
                     </h3>
-                    <div class="d-flex gap-3 mt-2 text-sm">
+                    <div class="flex gap-3 mt-2 text-sm">
                         <% if (item.tiekejai.length === 1) { %>
                           <span>
                             <strong>Tiekėjas:</strong>
@@ -415,9 +415,9 @@
                             </a>
                           </span>
                         <% } else { %>
-                          <span class="d-flex align-start gap-2">
+                          <span class="flex align-start gap-2">
                             <strong>Tiekėjai:</strong>
-                            <span class="d-flex flex-col gap-1">
+                            <span class="flex flex-col gap-1">
                               <% for (let i = 0; i < item.tiekejai.length; i++) { %>
                                 <a href="/asmuo/<%= item.tiekejaiKodai[i] %>">
                                   <%= (item.tiekejai[i] || 'Nenurodytas').slice(0, 80) %><%= (item.tiekejai[i] || '').length > 80 ? '…' : '' %>
