@@ -8,7 +8,7 @@ Disallow: /
 User-agent: anthropic-ai
 Disallow: /
 
-‍User-agent: Claude-Web
+User-agent: Claude-Web
 Disallow: /
 
 User-agent: ClaudeBot
