@@ -2,7 +2,10 @@
     "name": "viespirkiai",
     "version": "1.0.0",
     "main": "index.js",
-    "scripts": {},
+    "scripts": {
+        "build:tailwind": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css",
+        "watch:tailwind": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --watch"
+    },
     "keywords": [],
     "author": "",
     "description": "",
@@ -45,5 +48,11 @@
         "xpath": "^0.0.34",
         "zod": "^4.3.6"
     },
-    "type": "module"
+    "type": "module",
+    "devDependencies": {
+        "@tailwindcss/cli": "4.2.2",
+        "@tailwindcss/postcss": "4.2.2",
+        "postcss": "^8.5.8",
+        "tailwindcss": "4.2.2"
+    }
 }

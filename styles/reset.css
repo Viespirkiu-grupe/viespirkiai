@@ -1,0 +1,57 @@
+@layer base {
+    *, *::before, *::after {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+        overflow-x: hidden;
+    }
+
+    body {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        font-family: var(--font-sans);
+        font-size: var(--text-base);
+        line-height: var(--line-height);
+        color: var(--black);
+        background-color: var(--white);
+    }
+
+    main {
+        flex-grow: 1;
+    }
+
+    ul, ol {
+        padding-left: var(--space-5);
+    }
+
+    dd {
+        margin-left: 0;
+    }
+
+    dl {
+        margin-block-start: unset;
+        margin-block-end: unset;
+    }
+
+    hr {
+        border: none;
+        border-top: var(--border);
+        margin: var(--space-5) 0;
+    }
+
+    :focus-visible {
+        outline: var(--border-focus);
+        outline-offset: 2px;
+        border-radius: var(--radius-sm);
+    }
+
+    :root {
+        interpolate-size: allow-keywords;
+    }
+
+    input[type="search"]::-webkit-search-cancel-button {
+        display: none;
+    }
+}

@@ -1,0 +1,175 @@
+@layer components {
+    /* Empty state */
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: var(--space-4);
+        min-height: 20vh;
+        color: var(--gray);
+        text-align: center;
+    }
+    
+    .empty-state-icon { font-size: 48px; margin-bottom: var(--space-3); opacity: 0.4; }
+    .empty-state h3   { color: var(--dark-gray); }
+    
+    /* File list */
+    ul.file-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    ul.file-list li { margin-bottom: var(--space-2); }
+    ul.file-list li a:hover { text-decoration: underline; }
+    
+    /* Divider with label */
+    .divider {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        color: var(--gray);
+        font-size: var(--text-sm);
+        margin-block: var(--space-4);
+    }
+    .divider::before, .divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--light-gray);
+    }
+    
+    /* Border utilities */
+    .border       { border: var(--border); }
+    .border-top   { border-top: var(--border); }
+    .border-bottom{ border-bottom: var(--border); }
+    .border-0     { border: none !important; }
+    
+    /* Border radius */
+    .rounded    { border-radius: var(--radius-md); }
+    .rounded-lg { border-radius: var(--radius-lg); }
+    .rounded-xl { border-radius: var(--radius-xl); }
+    .rounded-pill{ border-radius: var(--radius-pill); }
+    .rounded-0  { border-radius: 0; }
+    
+    /* Background utilities */
+    .bg-white   { background-color: var(--white); }
+    .bg-light   { background-color: var(--lighter-gray); }
+    .bg-success { background-color: var(--color-success-bg); }
+    .bg-warning { background-color: var(--color-warning-bg); }
+    .bg-danger  { background-color: var(--color-danger-bg); }
+    .bg-info    { background-color: var(--color-info-bg); }
+    
+    /* Shadow utilities */
+    .shadow-sm { box-shadow: var(--shadow-sm); }
+    .shadow-md { box-shadow: var(--shadow-md); }
+    .shadow-lg { box-shadow: var(--shadow-lg); }
+    .shadow-0  { box-shadow: none; }
+    
+    /* Overflow */
+    .overflow-hidden { overflow: hidden; }
+    .overflow-auto   { overflow: auto; }
+    .overflow-x-auto { overflow-x: auto; }
+    
+    /* Position */
+    .position-relative { position: relative; }
+    .position-absolute { position: absolute; }
+    .position-fixed    { position: fixed; }
+    
+    /* Width / height */
+    .w-100    { width: 100%; }
+    .w-auto   { width: auto; }
+    .h-100    { height: 100%; }
+    .min-w-0  { min-width: 0; }
+    
+    /* Cursor */
+    .cursor-pointer { cursor: pointer; }
+    .cursor-default { cursor: default; }
+    
+    /* User select */
+    .user-select-none { user-select: none; }
+    
+    /* Email list component (failai/parts/emails.ejs) */
+    .email-list .email-item {
+        min-width: 0;
+    }
+    
+    .email-list .email-link {
+        min-width: 0;
+        display: inline-block;
+    }
+    
+    .email-list .email-pages {
+        white-space: nowrap;
+    }
+    
+    /* Signal QR */
+    .signal-qr {
+        display: block;
+        float: right;
+        margin: var(--space-4);
+        width: 200px;
+        height: auto;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+        .signal-qr { filter: invert(1); }
+    }
+    
+    /* Viešlaiškiai */
+    .vieslaiskiai {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: var(--space-4);
+        margin-bottom: var(--space-7);
+    }
+    
+    .vieslaiskis {
+        flex: 1 1 300px;
+        aspect-ratio: sqrt(2) / 1;
+        max-width: 700px;
+        min-width: 300px;
+        overflow: hidden;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+        transition: transform var(--transition), box-shadow var(--transition);
+    }
+    
+    .vieslaiskis:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .vieslaiskis img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+    }
+    
+    .numberOfResults pre {
+        all: unset;
+        font-family: inherit;
+        font-size: inherit;
+    }
+    
+    .rezultatai-nezinomas-total{
+        display: inline-block;
+        padding-inline: var(--space-2);
+    }
+    
+    .rezultatai-nezinomas-total.spin {
+        display: inline-block;
+        animation: spin 0.6s linear infinite;
+    }
+    
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    
+    :target {
+        scroll-margin-top: 80px; /* match your header height */
+    }
+}

@@ -1,0 +1,64 @@
+@layer components {
+    .alert {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-3);
+        padding: var(--space-3) var(--space-4);
+        border-radius: var(--radius-lg);
+        border: 1px solid transparent;
+        font-size: var(--text-sm);
+        margin-bottom: var(--space-4);
+    }
+    
+    .alert-icon { flex-shrink: 0; margin-top: 1px; }
+    
+    .alert-body { flex: 1; }
+    .alert-title { font-weight: 600; margin-bottom: var(--space-1); }
+    
+    .alert-success { background: var(--color-success-bg); color: var(--color-success); border-color: var(--color-success); }
+    .alert-warning { background: var(--color-warning-bg); color: var(--color-warning); border-color: var(--color-warning); }
+    .alert-danger  { background: var(--color-danger-bg);  color: var(--color-danger);  border-color: var(--color-danger); }
+    .alert-info    { background: var(--color-info-bg);    color: var(--color-info);    border-color: var(--color-info); }
+    .alert-muted   { background: var(--color-muted-bg);   color: var(--color-muted);   border-color: var(--light-gray); }
+    
+    /* Toast */
+    .toast-container {
+        position: fixed;
+        bottom: var(--space-5);
+        right: var(--space-5);
+        z-index: var(--z-toast);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        max-width: 360px;
+    }
+    
+    .toast {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-3);
+        padding: var(--space-3) var(--space-4);
+        background: var(--white);
+        border: var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-lg);
+        font-size: var(--text-sm);
+        animation: toast-in var(--transition-slow) ease forwards;
+    }
+    
+    @keyframes toast-in {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    
+    .toast-close {
+        margin-left: auto;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--gray);
+        padding: 0;
+        font-size: var(--text-md);
+        line-height: 1;
+    }
+}

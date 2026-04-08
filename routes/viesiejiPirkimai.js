@@ -44,10 +44,10 @@ function parseLimit(query) {
  */
 function buildNumberOfResults({ shown, total, elapsed }) {
     const trukme = (elapsed / 1000).toFixed(2) + "s";
-    const source = `<pre style="display: inline;">(${trukme}, postgres)</pre>`;
+    const source = `<pre class="inline">(${trukme}, postgres)</pre>`;
     if (total == null) {
         return {
-            numberOfResults: `Rodomi ${shown} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <pre style="display: inline;"> (${trukme}, postgres)</pre>`,
+            numberOfResults: `Rodomi ${shown} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <pre class="inline"> (${trukme}, postgres)</pre>`,
             total: 10_000,
         };
     }

@@ -87,7 +87,7 @@ const __failasId = (typeof failasId !== 'undefined' && failasId !== null) ? Stri
 
   <% if (__attachments.length > 0) { %>
     <h3 class="mt-4 mb-2">Priedai</h3>
-    <div class="d-flex flex-col gap-1">
+    <div class="flex flex-col gap-1">
       <% __attachments.forEach(att => { %>
         <% if (!att || !att.name) return; %>
         <a href="https://failai.viespirkiai.org/<%= __failasId %>/<%= att.name %>" target="_blank"><%= att.name %></a>

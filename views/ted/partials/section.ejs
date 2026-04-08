@@ -49,7 +49,7 @@
     <% } %>
     <% const isLotSection = section.nodeId === 'ND-Lot' || section.nodeId === 'ND-Part' %>
     <% const isLotsGroupSection = section.nodeId === 'ND-LotsGroup' %>
-    <div class="d-flex flex-col gap-4">
+    <div class="flex flex-col gap-4">
       <% section.groups.forEach((group, idx) => { %>
         <% if (isLotSection) { %>
           <%- include('lot-group', { group, idx, totalGroups: section.groups.length }) %>

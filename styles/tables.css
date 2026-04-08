@@ -1,0 +1,83 @@
+@layer components {
+    .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        border: var(--border);
+        border-radius: var(--radius-lg);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--text-sm);
+    }
+
+    table th, table td {
+        padding: var(--space-2) var(--space-3);
+        border: var(--border);
+        vertical-align: middle;
+        text-align: left;
+    }
+
+    table thead th {
+        background-color: var(--lighter-gray);
+        font-weight: 600;
+        font-size: var(--text-xs);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--dark-gray);
+        white-space: nowrap;
+    }
+
+    table tbody tr:hover { background-color: var(--shade-2); }
+
+    .table-striped tbody tr:nth-child(even) { background-color: var(--shade-2); }
+
+    .table-bordered th, .table-bordered td { border: var(--border); }
+
+    .table-sm th, .table-sm td { padding: var(--space-1) var(--space-2); }
+
+    .table-lg th, .table-lg td { padding: var(--space-3) var(--space-4); }
+
+    .table-fixed { table-layout: fixed; }
+
+    td.cell-center, th.cell-center { text-align: center; }
+    td.cell-right,  th.cell-right  { text-align: right; }
+    td.cell-mono   { font-family: var(--font-mono); }
+
+    /* Sortable column header */
+    th.sortable {
+        cursor: pointer;
+        user-select: none;
+    }
+    th.sortable::after {
+        content: " ↕";
+        font-size: var(--text-xs);
+        color: var(--gray);
+    }
+    th.sortable.asc::after  { content: " ↑"; color: var(--black); }
+    th.sortable.desc::after { content: " ↓"; color: var(--black); }
+
+    /* Clamp long cell content */
+    td .cell-clamp {
+        max-height: 4ch;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-word;
+    }
+
+    td.cell-nowrap {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 200px;
+    }
+
+    /* Row states */
+    tr.row-success td { background-color: var(--color-success-bg); }
+    tr.row-warning td { background-color: var(--color-warning-bg); }
+    tr.row-danger  td { background-color: var(--color-danger-bg); }
+}

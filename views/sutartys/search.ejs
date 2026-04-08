@@ -1,17 +1,21 @@
 <form method="get" role="search" id="searchForm">
   <h1 class="mb-5">Sutarčių paieška</h1>
 
-  <div class="search-bar mb-2">
-    <label for="search" class="visually-hidden">Paieška</label>
-    <svg class="search-icon" width="20" height="20" viewBox="0 1 24 23" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M10.502 2C5.80753 2 2.00195 5.80558 2.00195 10.5C2.00195 15.1944 5.80753 19 10.502 19C12.4884 19 14.3169 18.3176 15.7637 17.176L20.5877 22C20.9783 22.3905 21.6114 22.3905 22.002 22C22.3925 21.6095 22.3925 20.9763 22.002 20.5858L17.1779 15.7618C18.3196 14.3149 19.002 12.4865 19.002 10.5C19.002 5.80558 15.1964 2 10.502 2ZM4.00195 10.5C4.00195 6.91015 6.9121 4 10.502 4C14.0918 4 17.002 6.91015 17.002 10.5C17.002 12.2952 16.2755 13.9188 15.0981 15.0962C13.9208 16.2736 12.2972 17 10.502 17C6.9121 17 4.00195 14.0899 4.00195 10.5Z" fill="currentColor"/>
-    </svg>
-    <input type="search" name="search" id="search"
+  <div class="search-bar">
+    <label for="search">
+      <svg class="search-icon" width="20" height="20" viewBox="0 1 24 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M10.502 2C5.80753 2 2.00195 5.80558 2.00195 10.5C2.00195 15.1944 5.80753 19 10.502 19C12.4884 19 14.3169 18.3176 15.7637 17.176L20.5877 22C20.9783 22.3905 21.6114 22.3905 22.002 22C22.3925 21.6095 22.3925 20.9763 22.002 20.5858L17.1779 15.7618C18.3196 14.3149 19.002 12.4865 19.002 10.5C19.002 5.80558 15.1964 2 10.502 2ZM4.00195 10.5C4.00195 6.91015 6.9121 4 10.502 4C14.0918 4 17.002 6.91015 17.002 10.5C17.002 12.2952 16.2755 13.9188 15.0981 15.0962C13.9208 16.2736 12.2972 17 10.502 17C6.9121 17 4.00195 14.0899 4.00195 10.5Z" fill="currentColor"/>
+      </svg>
+
+      <span class="sr-only">Paieška</span>
+    </label>
+
+    <input type="search" name="search" id="search" class="search-bar__input"
       value="<%= values.search || '' %>"
       placeholder="Tekstinė paieška"
       enterkeyhint="search"
-      aria-label="Paieška"
     />
+
     <label for="searchNustatymaiToggle" class="btn btn-ghost btn-icon" title="Filtrai" aria-label="Rodyti filtrus">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path fill-rule="evenodd" clip-rule="evenodd" d="M11.9999 3C11.4476 3 10.9999 3.44772 10.9999 4V6.17072C9.83476 6.58259 9 7.6938 9 8.99998C9 10.3062 9.83476 11.4174 10.9999 11.8292L10.9999 20C10.9999 20.5523 11.4476 21 11.9999 21C12.5522 21 12.9999 20.5523 12.9999 20V11.8293C14.1651 11.4175 15 10.3062 15 8.99998C15 7.69373 14.1651 6.58246 12.9999 6.17066V4C12.9999 3.44772 12.5522 3 11.9999 3ZM12 7.99998C11.4477 7.99998 11 8.4477 11 8.99998C11 9.55227 11.4477 9.99998 12 9.99998C12.5523 9.99998 13 9.55227 13 8.99998C13 8.4477 12.5523 7.99998 12 7.99998Z" fill="currentColor"/>
@@ -19,6 +23,7 @@
         <path fill-rule="evenodd" clip-rule="evenodd" d="M3.9999 20C3.9999 20.5523 4.44762 21 4.9999 21C5.55219 21 5.9999 20.5523 5.9999 20V17.8293C7.16515 17.4175 8 16.3062 8 15C8 13.6937 7.16515 12.5825 5.9999 12.1707L5.9999 4C5.9999 3.44772 5.55219 3 4.9999 3C4.44762 3 3.9999 3.44772 3.9999 4L3.9999 12.1707C2.83476 12.5826 2 13.6938 2 15C2 16.3062 2.83476 17.4174 3.9999 17.8292L3.9999 20ZM5 14C4.44772 14 4 14.4477 4 15C4 15.5523 4.44772 16 5 16C5.55229 16 6 15.5523 6 15C6 14.4477 5.55229 14 5 14Z" fill="currentColor"/>
       </svg>
     </label>
+
     <button type="submit" class="btn btn-primary">Ieškoti</button>
   </div>
 
@@ -49,7 +54,7 @@
           <div class="filter-group">
             <div class="filter-group-label">Klasifikacija</div>
             <div class="form-group">
-              <label class="form-label d-flex justify-between" for="bvpzPrefiksas">
+              <label class="form-label flex justify-between" for="bvpzPrefiksas">
                 <span>BVPŽ prefiksas <sup>1</sup></span>
                 <a href="/bvpz" class="text-sm">Žr. BVPŽ</a>
               </label>
@@ -59,7 +64,7 @@
                 <option value="3360 3361 3362 3363 3364 3365 3366 3367 33690 33691" <%= values["bvpzPrefiksas"] == "3360 3361 3362 3363 3364 3365 3366 3367 33690 33691" ? 'selected' : '' %>>Vaistai</option>
               </select>
             </div>
-            <div class="d-flex align-center gap-2">
+            <div class="flex align-center gap-2">
               <span class="text-muted text-xs"><em>arba</em></span>
             </div>
             <div class="form-group">

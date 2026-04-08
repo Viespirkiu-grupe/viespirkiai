@@ -122,7 +122,7 @@
       <p class="section-title mb-3">Model Context Protocol</p>
       <h1 class="mb-3">Viešpirkiai Jūsų DI programoje</h1>
       <p class="lead mb-5">Leiskite savo DI asistentui pačiam rasti atsakymus viešųjų pirkimų duomenyse</p>
-      <div class="d-inline-flex align-center border rounded-lg overflow-hidden bg-light">
+      <div class="inline-flex align-center border rounded-lg overflow-hidden bg-light">
         <code class="px-4 py-3" style="background: transparent; border: none;">https://viespirkiai.org/mcp</code>
         <button class="btn btn-primary rounded-0 border-0" style="border-left: var(--border);" onclick="navigator.clipboard.writeText('https://viespirkiai.org/mcp').then(() => { this.textContent = '✓ Nukopijuota'; setTimeout(() => this.textContent = 'Kopijuoti URL', 1500); })">Kopijuoti URL</button>
       </div>
@@ -188,27 +188,27 @@
 
             <div class="mcp-msg mcp-msg-ai">
               <div class="mcp-tool"><span>↗↙</span> Searched available tools</div>
-              <p class="text-sm text-muted mb-0" style="padding-inline: var(--space-1);">Pirmiausia ieškosiu sutarčių dokumentuose pagal Remigijaus Žemaitaičio vardą ir pavardę.</p>
+              <p class="text-sm text-muted mb-0 px-1">Pirmiausia ieškosiu sutarčių dokumentuose pagal Remigijaus Žemaitaičio vardą ir pavardę.</p>
             </div>
 
             <div class="mcp-msg mcp-msg-ai">
               <div class="mcp-tool"><span>↗↙</span> Search failai</div>
-              <p class="text-sm text-muted mb-0" style="padding-inline: var(--space-1);">Pastebiu, kad daugelis dokumentų susiję su JAR kodu 306660048 ir el. paštu r*********@hotmail.com. Pažiūrėkime kas slepiasi po šiuo kodu ir detaliau patikrinkime kelis svarbiausius dokumentus.</p>
+              <p class="text-sm text-muted mb-0 px-1">Pastebiu, kad daugelis dokumentų susiję su JAR kodu 306660048 ir el. paštu r*********@hotmail.com. Pažiūrėkime kas slepiasi po šiuo kodu ir detaliau patikrinkime kelis svarbiausius dokumentus.</p>
             </div>
 
             <div class="mcp-msg mcp-msg-ai">
               <div class="mcp-tool"><span>↗↙</span> Get juridinis</div>
-              <p class="text-sm text-muted mb-0" style="padding-inline: var(--space-1);">Dabar pažvelkime į konkrečius dokumentus, ypač tuos, kuriuose figūruoja el. paštas r*********@hotmail.com — tai sutartys 2561 ir 2562. Taip pat patikrinsime didžiausią išlaidų dalį — nežinomus tiekėjus.</p>
+              <p class="text-sm text-muted mb-0 px-1">Dabar pažvelkime į konkrečius dokumentus, ypač tuos, kuriuose figūruoja el. paštas r*********@hotmail.com — tai sutartys 2561 ir 2562. Taip pat patikrinsime didžiausią išlaidų dalį — nežinomus tiekėjus.</p>
             </div>
 
             <div class="mcp-msg mcp-msg-ai">
               <div class="mcp-tool"><span>↗↙</span> Used Viešpirkiai integration</div>
-              <p class="text-sm text-muted mb-0" style="padding-inline: var(--space-1);">Turiu pakankamai duomenų, kad galėčiau pateikti išsamią ataskaitą. Patikrinsiu dar vieną sutartį su el. paštu r*********@hotmail.com.</p>
+              <p class="text-sm text-muted mb-0 px-1">Turiu pakankamai duomenų, kad galėčiau pateikti išsamią ataskaitą. Patikrinsiu dar vieną sutartį su el. paštu r*********@hotmail.com.</p>
             </div>
 
             <div class="mcp-msg mcp-msg-ai">
               <div class="mcp-tool"><span>↗↙</span> Get sutartis</div>
-              <p class="text-sm text-muted mb-0" style="padding-inline: var(--space-1);">Dabar turiu išsamų vaizdą. Pateikiu analizę.</p>
+              <p class="text-sm text-muted mb-0 px-1">Dabar turiu išsamų vaizdą. Pateikiu analizę.</p>
             </div>
 
             <div class="mcp-msg mcp-msg-ai">
@@ -278,11 +278,11 @@
     </div>
 
     <!-- Setup -->
-    <div class="px-7 py-6 d-flex flex-wrap align-start gap-5 mcp-mobile-px" style="align-items: stretch;">
+    <div class="px-7 py-6 flex flex-wrap align-start gap-5 mcp-mobile-px" style="align-items: stretch;">
       <div>
         <p>Pridėkite šį MCP serverį</p>
 
-        <div class="d-inline-flex align-center border rounded-lg overflow-hidden bg-light mb-4">
+        <div class="inline-flex align-center border rounded-lg overflow-hidden bg-light mb-4">
           <code class="px-4 py-3" style="background: transparent; border: none;">https://viespirkiai.org/mcp</code>
           <button class="btn btn-primary rounded-0 border-0" style="border-left: var(--border);" onclick="navigator.clipboard.writeText('https://viespirkiai.org/mcp').then(() => { this.textContent = '✓ Nukopijuota'; setTimeout(() => this.textContent = 'Kopijuoti URL', 1500); })">Kopijuoti URL</button>
         </div>
@@ -290,7 +290,7 @@
         <p>arba konfigūraciją</p>
         <div >
           <div class="border rounded-lg overflow-hidden" style="min-width: 280px;">
-            <div class="bg-light px-4 py-2 border-bottom d-flex align-center justify-between">
+            <div class="bg-light px-4 py-2 border-bottom flex align-center justify-between">
               <span class="text-xs text-muted" style="font-family: var(--font-mono);">.mcp.json</span>
               <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(this.closest('div').nextElementSibling.textContent.trim()).then(() => { this.textContent = '✓'; setTimeout(() => this.textContent = 'Kopijuoti', 1500); })">Kopijuoti</button>
             </div>

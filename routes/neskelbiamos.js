@@ -122,7 +122,7 @@ function makeExcerpt(text, searchTerm, maxChars = 250, leading = 25) {
  */
 function buildNumberOfResults({ rows, total, limit, page, elapsed }) {
     const trukme = (elapsed / 1000).toFixed(2) + "s";
-    const source = `<pre style="display: inline;">(${trukme}, PostgreSQL)</pre>`;
+    const source = `<pre class="inline">(${trukme}, PostgreSQL)</pre>`;
     if (rows.length < total)
         return `Rodomi ${rows.length} iš ${Number(total).linksniuotiK(["rezultato", "rezultatų"])} ${source}`;
     return `${Number(total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} ${source}`;

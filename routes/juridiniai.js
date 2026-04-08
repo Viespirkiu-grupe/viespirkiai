@@ -76,7 +76,7 @@ function buildQueryParams(query) {
  */
 function buildNumberOfResults({ results, total, elapsed, searchEngine }) {
     const trukme = (elapsed / 1000).toFixed(2) + "s";
-    const source = `<pre style="display: inline;">(${trukme}, ${searchEngine})</pre>`;
+    const source = `<pre class="inline">(${trukme}, ${searchEngine})</pre>`;
     if (results.length < total)
         return `Rodomi ${results.length} iš ${total} rezultatų ${source}`;
     return `${total} rezultatas(-ai) ${source}`;
@@ -244,7 +244,7 @@ juridiniaiRouter.get("/juridiniai/topAdresai", async (req, res) => {
     const total = parseInt(countRes.rows[0].total, 10);
     const elapsed = performance.now() - startas;
     const trukme = (elapsed / 1000).toFixed(2) + "s";
-    const source = `<pre style="display: inline;">(${trukme}, PostgreSQL)</pre>`;
+    const source = `<pre class="inline">(${trukme}, PostgreSQL)</pre>`;
     const numberOfResults =
         adresaiRes.rowCount < total
             ? `Rodomi ${adresaiRes.rowCount} iš ${Number(total).linksniuotiK(["rezultato", "rezultatų"])} ${source}`

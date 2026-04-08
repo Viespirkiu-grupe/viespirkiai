@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme inline {
+    --color-white: var(--white);
+    --color-black: var(--black);
+    --color-muted: var(--gray);
+    --color-gray: var(--gray);
+}
+
+@source "../views/**/*.ejs";
+@source "../routes/**/*.js";
+@source "../public/**/*.js";
+
+@import "./variables.css";
+@import "./reset.css";
+@import "./typography.css";
+@import "./layout.css";
+@import "./spacing.css";
+@import "./grid.css";
+@import "./buttons.css";
+@import "./forms.css";
+@import "./tables.css";
+@import "./cards.css";
+@import "./navigation.css";
+@import "./badges.css";
+@import "./cpv-tree.css";
+@import "./toasts.css";
+@import "./modals.css";
+@import "./spinners.css";
+@import "./data.css";
+@import "./bars.css";
+@import "./misc.css";
+@import "./code.css";
+@import "./preview.css";
+@import "./swatches.css";
+@import "./view-transitions.css";
+@import "./map.css";
+@import "./charts.css";
+@import "./faq.css";
+@import "./wordcloud.css";
+@import "./print.css";
+@import "./components/file-card.css";
+@import "./components/archive-tree.css";
+@import "./components/hljs.css";

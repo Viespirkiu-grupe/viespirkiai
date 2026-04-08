@@ -1,0 +1,36 @@
+@layer components {
+    .word-cloud {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-5) var(--space-6);
+        justify-content: center;
+        align-items: center;
+        padding: var(--space-5) 0;
+    }
+
+    .word-cloud span {
+        font-size: calc(var(--size) * 1rem);
+        color: var(--dark-gray);
+        cursor: default;
+        transform:
+            translate(
+                calc(sin(var(--r) * 6.28) * 20px),
+                calc(cos(var(--r) * 6.28) * 10px)
+            )
+            rotate(calc((var(--r) - 0.5) * 30deg));
+        transition: transform var(--transition), color var(--transition);
+
+        &:hover {
+            transform: scale(1.2);
+            color: var(--black);
+        }
+
+        @media (max-width: 768px) {
+            font-size: calc(var(--size) * 0.8rem);
+        }
+
+        @media (max-width: 480px) {
+            font-size: calc(var(--size) * 0.6rem);
+        }
+    }
+}
