@@ -27,15 +27,15 @@
           <div class="result-card-body">
             <dl class="result-card-meta">
               <div>
-                <dt class="visually-hidden">Tipas</dt>
+                <dt class="sr-only">Tipas</dt>
                 <dd><%= item.tipas %></dd>
               </div>
               <div>
-                <dt class="visually-hidden">Kategorija</dt>
+                <dt class="sr-only">Kategorija</dt>
                 <dd><%= item.kategorija %></dd>
               </div>
               <div>
-                <dt class="visually-hidden">Sutarties galiojimas</dt>
+                <dt class="sr-only">Sutarties galiojimas</dt>
                 <dd>
                   <abbr aria-hidden="true" title="Sutarties galiojimas">Sut.</abbr>
                   <% if (item.sudarymoData && item.galiojimoData) { %>
@@ -46,7 +46,7 @@
                 </dd>
               </div>
               <div>
-                <dt class="visually-hidden">Redagavimo data</dt>
+                <dt class="sr-only">Redagavimo data</dt>
                 <dd>
                   <abbr aria-hidden="true" title="Redagavimo data">Red.</abbr>
                   <% if (item.paskutinioRedagavimoData) { %>
@@ -56,7 +56,7 @@
               </div>
               <% if (item.dokumentuKiekis > 0) { %>
                 <div>
-                  <dt class="visually-hidden">Dokumentai</dt>
+                  <dt class="sr-only">Dokumentai</dt>
                   <dd><%= item.dokumentuKiekis %> <abbr aria-hidden="true" title="Dokumentai">dok.</abbr></dd>
                 </div>
               <% } %>

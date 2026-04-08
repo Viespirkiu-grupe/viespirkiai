@@ -18,7 +18,7 @@
           <div class="result-card-body">
             <dl class="result-card-meta">
               <div>
-                <dt class="visually-hidden">Data</dt>
+                <dt class="sr-only">Data</dt>
                 <dd>
                   <% if (item.data) { %>
                     <time datetime="<%= item.data %>"><%= item.data %></time>
@@ -26,7 +26,7 @@
                 </dd>
               </div>
               <div>
-                <dt class="visually-hidden">Išvada</dt>
+                <dt class="sr-only">Išvada</dt>
                 <dd><%= item.isvada || '—' %></dd>
               </div>
             </dl>

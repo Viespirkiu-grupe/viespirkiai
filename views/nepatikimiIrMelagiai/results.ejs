@@ -22,19 +22,19 @@
           <div class="result-card-body">
             <dl class="result-card-meta">
               <div>
-                <dt class="visually-hidden">Šaltinis</dt>
+                <dt class="sr-only">Šaltinis</dt>
                 <dd><%= item.saltinis %></dd>
               </div>
               <div>
-                <dt class="visually-hidden">Galiojimas</dt>
+                <dt class="sr-only">Galiojimas</dt>
                 <dd><%= item.dataNuoKuriosSkaiciuojama || "nežinoma" %> – <%= item.itrauktasIki || "nežinoma" %></dd>
               </div>
               <div>
-                <dt class="visually-hidden">Įvesta</dt>
+                <dt class="sr-only">Įvesta</dt>
                 <dd>Įvesta <%= item.duomenuIvedimoData || "nežinoma" %></dd>
               </div>
               <div>
-                <dt class="visually-hidden">Paskutinį kartą matyta</dt>
+                <dt class="sr-only">Paskutinį kartą matyta</dt>
                 <dd>Matyta <%= item.paskutiniKartaMatytaSarase %></dd>
               </div>
             </dl>

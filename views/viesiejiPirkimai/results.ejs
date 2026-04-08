@@ -25,19 +25,19 @@
             <dl class="result-card-meta">
               <% if (item.statusas) { %>
                 <div>
-                  <dt class="visually-hidden">Statusas</dt>
+                  <dt class="sr-only">Statusas</dt>
                   <dd class="<%= item.statusas === 'Vykdomas' ? 'badge-active' : '' %>"><%= item.statusas %></dd>
                 </div>
               <% } %>
               <% if (item.pirkimoBudas) { %>
                 <div>
-                  <dt class="visually-hidden">Pirkimo būdas</dt>
+                  <dt class="sr-only">Pirkimo būdas</dt>
                   <dd><%= item.pirkimoBudas %></dd>
                 </div>
               <% } %>
               <% if (item.paskelbimoData) { %>
                 <div>
-                  <dt class="visually-hidden">Paskelbimo data</dt>
+                  <dt class="sr-only">Paskelbimo data</dt>
                   <dd>
                     <abbr aria-hidden="true" title="Paskelbimo data">Paskelb.</abbr>
                     <time datetime="<%= String(item.paskelbimoData).slice(0, 10) %>"><%= String(item.paskelbimoData).slice(0, 10) %></time>

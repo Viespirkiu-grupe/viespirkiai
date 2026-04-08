@@ -17,21 +17,21 @@
           <div class="result-card-body">
             <dl class="result-card-meta">
               <div>
-                <dt class="visually-hidden">Formatas</dt>
+                <dt class="sr-only">Formatas</dt>
                 <dd><%= item.extension.toUpperCase() %></dd>
               </div>
               <div>
-                <dt class="visually-hidden">Dydis</dt>
+                <dt class="sr-only">Dydis</dt>
                 <dd><%= (item.dydis || 0).convertUnit("B") %></dd>
               </div>
               <% if (item.metaduomenys && item.metaduomenys.pageCount) { %>
                 <div>
-                  <dt class="visually-hidden">Puslapiai</dt>
+                  <dt class="sr-only">Puslapiai</dt>
                   <dd><%= Number(item.metaduomenys.pageCount).toLocaleString("lt-LT") %> p.</dd>
                 </div>
               <% } %>
               <div>
-                <dt class="visually-hidden">Žodžiai</dt>
+                <dt class="sr-only">Žodžiai</dt>
                 <dd><%= Number(item.zodziuSkaicius).toLocaleString("lt-LT") || "—" %> ž.</dd>
               </div>
             </dl>

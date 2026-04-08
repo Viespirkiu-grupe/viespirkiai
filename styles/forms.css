@@ -1,0 +1,28 @@
+@layer components {
+    /* Search bar */
+    .search-bar {
+        @apply inline-flex items-center bg-white;
+
+        gap: var(--space-3);
+        padding: var(--space-2) var(--space-2) var(--space-2) var(--space-5);
+        border: var(--border);
+        border-radius: var(--radius-lg);
+
+        &:has(.search-bar__input:focus-visible) {
+            @apply outline-2;
+        }
+
+        svg.search-icon {
+            @apply text-gray;
+        }
+
+        input[type="search"] {
+            @apply flex-1 w-full min-w-50 border-0 bg-transparent font-sans text-base text-black outline-none! placeholder:text-gray;
+        }
+
+        .search-icon,
+        .btn {
+            @apply shrink-0;
+        }
+    }
+}

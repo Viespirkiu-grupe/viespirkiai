@@ -26,11 +26,11 @@
         <div class="result-card-body">
           <dl class="result-card-meta">
             <div>
-              <dt class="visually-hidden">Teisės aktas</dt>
+              <dt class="sr-only">Teisės aktas</dt>
               <dd><%= pazeidimas.teisesAktas %></dd>
             </div>
             <div>
-              <dt class="visually-hidden">Straipsnis</dt>
+              <dt class="sr-only">Straipsnis</dt>
               <dd><%= pazeidimas.straipsnis %> str.<% if (pazeidimas.dalis) { %> <%= pazeidimas.dalis %> d.<% } %></dd>
             </div>
             <% if (pazeidimas.pirmaKarta) { %>

@@ -24,9 +24,9 @@
               <a href="https://pinreg.vtek.lt/app/pid-perziura/<%= rysys.uuid %>" class="card-overlay-link"><%= rysys.asmuo %></a>
               <div class="result-card-body">
                 <dl class="result-card-meta">
-                  <div><dt class="visually-hidden">Nuo</dt><dd>Nuo <%= rysys.rysioPradzia %></dd></div>
-                  <div><dt class="visually-hidden">Kas</dt><dd><%= rysys.kienoRysys && rysys.kienoRysys[0].toUpperCase() + rysys.kienoRysys.slice(1).toLowerCase() %></dd></div>
-                  <div><dt class="visually-hidden">Pateikta</dt><dd><%= new Date(rysys.pateikimoData).toLtDateTime() %></dd></div>
+                  <div><dt class="sr-only">Nuo</dt><dd>Nuo <%= rysys.rysioPradzia %></dd></div>
+                  <div><dt class="sr-only">Kas</dt><dd><%= rysys.kienoRysys && rysys.kienoRysys[0].toUpperCase() + rysys.kienoRysys.slice(1).toLowerCase() %></dd></div>
+                  <div><dt class="sr-only">Pateikta</dt><dd><%= new Date(rysys.pateikimoData).toLtDateTime() %></dd></div>
                 </dl>
                 <h3 class="result-card-title"><%= rysys.asmuo %></h3>
                 <div class="result-card-footer"><span><%= rysys.rysioPobudzioPavadinimas %></span></div>
@@ -48,8 +48,8 @@
               <a href="https://pinreg.vtek.lt/app/pid-perziura/<%= darboviete.uuid %>" class="card-overlay-link"><%= darboviete.asmuo %></a>
               <div class="result-card-body">
                 <dl class="result-card-meta">
-                  <div><dt class="visually-hidden">Nuo</dt><dd>Nuo <%= darboviete.rysioPradzia %></dd></div>
-                  <div><dt class="visually-hidden">Pateikta</dt><dd><%= new Date(darboviete.pateikimoData).toLtDateTime() %></dd></div>
+                  <div><dt class="sr-only">Nuo</dt><dd>Nuo <%= darboviete.rysioPradzia %></dd></div>
+                  <div><dt class="sr-only">Pateikta</dt><dd><%= new Date(darboviete.pateikimoData).toLtDateTime() %></dd></div>
                 </dl>
                 <h3 class="result-card-title"><%= darboviete.asmuo %></h3>
                 <div class="result-card-footer"><span><%= darboviete.pareigos %></span></div>
@@ -71,8 +71,8 @@
               <a href="https://pinreg.vtek.lt/app/pid-perziura/<%= darboviete.uuid %>" class="card-overlay-link"><%= darboviete.asmuo %></a>
               <div class="result-card-body">
                 <dl class="result-card-meta">
-                  <div><dt class="visually-hidden">Nuo</dt><dd>Nuo <%= darboviete.rysioPradzia %></dd></div>
-                  <div><dt class="visually-hidden">Pateikta</dt><dd><%= new Date(darboviete.pateikimoData).toLtDateTime() %></dd></div>
+                  <div><dt class="sr-only">Nuo</dt><dd>Nuo <%= darboviete.rysioPradzia %></dd></div>
+                  <div><dt class="sr-only">Pateikta</dt><dd><%= new Date(darboviete.pateikimoData).toLtDateTime() %></dd></div>
                 </dl>
                 <h3 class="result-card-title"><%= darboviete.asmuo %> – <%= darboviete.sutuoktinis %></h3>
                 <div class="result-card-footer"><span><%= darboviete.pareigos %></span></div>
