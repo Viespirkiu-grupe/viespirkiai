@@ -7,7 +7,7 @@
         align-items: center;
         padding: var(--space-5) 0;
     }
-    
+
     .word-cloud span {
         font-size: calc(var(--size) * 1rem);
         color: var(--dark-gray);
@@ -19,18 +19,18 @@
             )
             rotate(calc((var(--r) - 0.5) * 30deg));
         transition: transform var(--transition), color var(--transition);
-    }
-    
-    .word-cloud span:hover {
-        transform: scale(1.2);
-        color: var(--black);
-    }
-    
-    @media (max-width: 768px) {
-        .word-cloud span { font-size: calc(var(--size) * 0.8rem); }
-    }
-    
-    @media (max-width: 480px) {
-        .word-cloud span { font-size: calc(var(--size) * 0.6rem); }
+
+        &:hover {
+            transform: scale(1.2);
+            color: var(--black);
+        }
+
+        @media (max-width: 768px) {
+            font-size: calc(var(--size) * 0.8rem);
+        }
+
+        @media (max-width: 480px) {
+            font-size: calc(var(--size) * 0.6rem);
+        }
     }
 }

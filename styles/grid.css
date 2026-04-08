@@ -4,7 +4,7 @@
         flex-wrap: wrap;
         gap: var(--col-gap);
     }
-    
+
     /* Columns — desktop */
     .col     { flex: 1 1 0; min-width: 0; }
     .col-1   { flex: 0 0 calc(8.333% - var(--col-gap));  max-width: calc(8.333% - var(--col-gap)); }
@@ -19,18 +19,18 @@
     .col-10  { flex: 0 0 calc(83.333% - var(--col-gap)); max-width: calc(83.333% - var(--col-gap)); }
     .col-11  { flex: 0 0 calc(91.666% - var(--col-gap)); max-width: calc(91.666% - var(--col-gap)); }
     .col-12  { flex: 0 0 100%; max-width: 100%; }
-    
+
     /* Grid columns shorthand */
     .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--col-gap); }
     .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--col-gap); }
     .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--col-gap); }
     .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--col-gap); }
-    
+
     .grid-auto { display: flex; flex-wrap: wrap; gap: var(--col-gap); }
     .grid-auto > * {
         flex: 1 1 var(--col-min, 300px);
     }
-    
+
     /* Responsive */
     @media (max-width: 992px) {
         .col-md-1  { flex: 0 0 calc(8.333% - var(--col-gap)); }
@@ -41,31 +41,28 @@
         .col-md-12 { flex: 0 0 100%; }
         .grid-3, .grid-4, .grid-5 { grid-template-columns: repeat(2, 1fr); }
     }
-    
+
     @media (max-width: 768px) {
         .col-sm-12 { flex: 0 0 100%; max-width: 100%; }
         .col-sm-6  { flex: 0 0 calc(50% - var(--col-gap)); }
         .grid-2, .grid-3, .grid-4, .grid-5 { grid-template-columns: 1fr; }
         .row.row-sm-col { flex-direction: column; }
     }
-    
+
     @media (max-width: 480px) {
         .col-xs-12 { flex: 0 0 100%; max-width: 100%; }
     }
-    
+
     /* Gap modifiers */
     .gap-0 { gap: 0; }
-    .gap-1 { gap: var(--space-1); }
-    .gap-2 { gap: var(--space-2); }
-    .gap-3 { gap: var(--space-3); }
     .gap-4 { gap: var(--col-gap); }
     .gap-5 { gap: var(--space-5); }
-    
+
     /* Span */
     .span-2 { grid-column: span 2; }
     .span-3 { grid-column: span 3; }
     .span-full { grid-column: 1 / -1; }
-    
+
     /* Divider */
     .vr {
         width: 1px;
