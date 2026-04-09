@@ -92,10 +92,11 @@
     .result-card-title {
         font-size: var(--text-xl);
         font-weight: 700;
-        margin-bottom: var(--space-2);
         display: flex;
         align-items: baseline;
         gap: var(--space-2);
+
+        @apply mt-2;
     }
 
     .result-card-title a {

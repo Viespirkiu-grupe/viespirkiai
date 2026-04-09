@@ -22,11 +22,10 @@
         flex-wrap: wrap;
         gap: var(--space-3);
         margin-bottom: var(--space-5);
-        padding-bottom: var(--space-4);
         border-bottom: var(--border);
-    }
 
-    .page-header h1 { margin-bottom: 0; }
+        @apply pt-7 pb-4;
+    }
 
     .section { margin-block: var(--space-7); }
     .section-sm { margin-block: var(--space-5); }

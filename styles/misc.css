@@ -11,8 +11,9 @@
         text-align: center;
     }
 
-    .empty-state-icon { font-size: 48px; margin-bottom: var(--space-3); opacity: 0.4; }
-    .empty-state h3   { color: var(--dark-gray); }
+    .empty-state-icon {
+        @apply text-6xl mb-0 opacity-40;
+    }
 
     /* File list */
     ul.file-list {
