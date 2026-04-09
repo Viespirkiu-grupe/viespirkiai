@@ -1,13 +1,19 @@
 import { postgres } from "../postgres/postgres.js";
 import config from "../utils/config.js";
 
-const QW_URL = config.quickwitUrl;
+const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
+
+// Dead ratio is stable between index compactions — cache it for 60 s.
+const _deadRatioCache = new Map(); // lentele → { value, expiresAt }
 
 /**
  * Get dead ratio for a table across all shards.
- * Used to estimate live hit count from Quickwit's total.
+ * Result is cached for 60 s to avoid a Postgres roundtrip on every search.
  */
 async function getDeadRatio(lentele) {
+  const cached = _deadRatioCache.get(lentele);
+  if (cached && Date.now() < cached.expiresAt) return cached.value;
+
   const { rows } = await postgres.query(
     `SELECT
        SUM("gyvosEilutes") AS gyva,
@@ -18,8 +24,9 @@ async function getDeadRatio(lentele) {
   );
   const { gyva, mirusi } = rows[0];
   const total = Number(gyva) + Number(mirusi);
-  if (!total) return 0;
-  return Number(mirusi) / total;
+  const value = total ? Number(mirusi) / total : 0;
+  _deadRatioCache.set(lentele, { value, expiresAt: Date.now() + 60_000 });
+  return value;
 }
 
 // ── HTTP helpers ─────────────────────────────────────────────────────────────
@@ -338,7 +345,8 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
 
         if (numHitsMax === null) numHitsMax = data.num_hits ?? 0;
 
-        const live = await filterLive(hits);
+        // Skip the filterLive Postgres roundtrip when nothing is dead.
+        const live = deadRatio === 0 ? hits : await filterLive(hits);
         liveHits.push(...live);
 
         if (hits.length < fetchSize) break;
@@ -355,6 +363,23 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
         elapsedTimeMicros: totalElapsed,
         requests
     };
+}
+
+// ── Count ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns an estimated live document count for a table matching `params.query`.
+ * Uses max_hits:0 so Quickwit returns only the total without fetching documents.
+ *
+ * @param {string} lentele
+ * @param {object} params - Quickwit search body (must include `query`)
+ * @returns {Promise<number>}
+ */
+export async function countDocs(lentele, params) {
+    const deadRatio = await getDeadRatio(lentele);
+    const data = await qwSearch(`${lentele}_*`, { ...params, max_hits: 0 });
+    const numHits = data.num_hits ?? 0;
+    return Math.round(numHits * (1 - deadRatio));
 }
 
 // ── Shard stats ───────────────────────────────────────────────────────────────

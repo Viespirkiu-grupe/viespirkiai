@@ -28,6 +28,7 @@ export default {
     pgMaxConnections: 16,
 
     // Quickwit
+    quickwitUp: true,
     quickwitUrl: "http://localhost:7280",
     
     // Scraping
