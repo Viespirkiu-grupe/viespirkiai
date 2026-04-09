@@ -1,11 +1,11 @@
-<div class="page-section" id="imokos">
+<div class="page-section mb-6" id="imokos">
   <div class="grid-2">
 
-    <div style="display:flex; flex-direction:column; min-height:350px;">
+    <div class="flex flex-col min-h-[350px]">
       <h2 class="mb-4"><a href="#sodraImokos" id="sodraImokos" class="no-style">SODRA įmokos</a></h2>
       <% if (asmuo.sodra?.duomenys?.length > 0) { %>
         <div class="chart-frame">
-          <div id="sodraImokosDiagrama" class="chart" style="height:350px;"></div>
+          <div id="sodraImokosDiagrama" class="chart h-[350px]"></div>
         </div>
         <script defer>
           displayChart({
@@ -21,11 +21,11 @@
       <% } %>
     </div>
 
-    <div style="display:flex; flex-direction:column; min-height:350px;">
+    <div class="flex flex-col min-h-[350px]">
       <h2 class="mb-4"><a href="#vmiImokos" id="vmiImokos" class="no-style">VMI įmokos</a></h2>
       <% if (asmuo.vmi?.duomenys?.length > 0) { %>
         <div class="chart-frame">
-          <div id="vmiMokesciuDiagrama" class="chart" style="height:350px;"></div>
+          <div id="vmiMokesciuDiagrama" class="chart h-[350px]"></div>
         </div>
         <script defer>
           const vmiLabels = [<% asmuo.vmi.duomenys.forEach((item, i) => { %>'<%= item.data %>-01'<%= i < asmuo.vmi.duomenys.length - 1 ? ',' : '' %><% }) %>];

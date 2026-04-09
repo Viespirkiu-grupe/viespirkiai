@@ -1,6 +1,6 @@
 <% if (analize) { %>
 <div class="page-section" id="analize">
-  <div class="flex justify-between align-center mb-5">
+  <div class="flex justify-between items-center mb-5">
     <h2 class="mb-0"><a href="#analize" class="no-style">Rezultatų analizė <sup>BETA</sup></a></h2>
     <a href="/?<%- queryParams %>&limit=<%- values.limit %>&xlsx=true&analize=true" class="btn btn-outline btn-sm">↗ XLSX</a>
   </div>
@@ -8,10 +8,10 @@
   <div class="grid-3">
 
     <% if (analize.tipai) { %>
-      <div style="display:flex; flex-direction:column; min-height:350px;">
+      <div class="flex flex-col min-h-[350px]">
         <h3 class="text-sm fw-bold mb-3"><a href="#tipai" id="tipai" class="no-style">Sutarčių tipai</a></h3>
         <div class="chart-frame">
-          <div id="analizeTipaiDiagrama" class="chart" style="height:350px;"></div>
+          <div id="analizeTipaiDiagrama" class="chart h-[350px]"></div>
         </div>
         <script defer>
           displayChart({
@@ -26,10 +26,10 @@
     <% } %>
 
     <% if (analize.sumosVsDatos) { %>
-      <div style="display:flex; flex-direction:column; min-height:350px;">
+      <div class="flex flex-col min-h-[350px]">
         <h3 class="text-sm fw-bold mb-3"><a href="#sumosVsDatos" id="sumosVsDatos" class="no-style">Sumų ir datų pasiskirstymas <sub>log</sub></a></h3>
         <div class="chart-frame">
-          <div id="sumosVsDatosDiagrama" class="chart" style="height:350px;"></div>
+          <div id="sumosVsDatosDiagrama" class="chart h-[350px]"></div>
         </div>
         <script defer>
           const sumosVsDatosSeries = <%- JSON.stringify(analize.sumosVsDatos.map(i => [i.data, i.suma])) %>
@@ -46,10 +46,10 @@
     <% } %>
 
     <% if (analize.metinesSumos) { %>
-      <div style="display:flex; flex-direction:column; min-height:350px;">
+      <div class="flex flex-col min-h-[350px]">
         <h3 class="text-sm fw-bold mb-3"><a href="#metinesSumos" id="metinesSumos" class="no-style">Sumos pagal metus</a></h3>
         <div class="chart-frame">
-          <div id="metinesSumosDiagrama" class="chart" style="height:350px;"></div>
+          <div id="metinesSumosDiagrama" class="chart h-[350px]"></div>
         </div>
         <script defer>
           displayChart({

@@ -1,6 +1,6 @@
 <div class="mt-6 max-w-lg center mx-auto">
-  <div class="flex justify-between align-center mb-4">
-    <span class="text-muted text-sm"><em class="numberOfResults"><%- numberOfResults %></em></span>
+  <div class="flex justify-between items-center mb-4">
+    <span class="text-muted text-sm numberOfResults"><%- numberOfResults %></span>
   </div>
 
   <% if (data.length === 0) { %>
@@ -16,30 +16,33 @@
           if (item.saltinis === "Nepatikimas") asmuoLink += "#nepatikimi";
           else if (item.saltinis === "Melagingas") asmuoLink += "#melagiai";
         %>
-        <article class="result-card card-clickable" aria-label="<%= item.tiekejoPavadinimas %>">
-          <a href="<%= asmuoLink %>" class="card-overlay-link"><%= item.tiekejoPavadinimas %></a>
-
+        <article class="result-card card-clickable">
           <div class="result-card-body">
             <dl class="result-card-meta">
               <div>
                 <dt class="sr-only">Šaltinis</dt>
                 <dd><%= item.saltinis %></dd>
               </div>
+
               <div>
                 <dt class="sr-only">Galiojimas</dt>
                 <dd><%= item.dataNuoKuriosSkaiciuojama || "nežinoma" %> – <%= item.itrauktasIki || "nežinoma" %></dd>
               </div>
+
               <div>
-                <dt class="sr-only">Įvesta</dt>
-                <dd>Įvesta <%= item.duomenuIvedimoData || "nežinoma" %></dd>
+                <dt class="sr-only">Pirmą kartą įvesta</dt>
+                <dd>Įvesta: <%= item.duomenuIvedimoData || "nežinoma" %></dd>
               </div>
+
               <div>
                 <dt class="sr-only">Paskutinį kartą matyta</dt>
-                <dd>Matyta <%= item.paskutiniKartaMatytaSarase %></dd>
+                <dd>Matyta: <%= item.paskutiniKartaMatytaSarase %></dd>
               </div>
             </dl>
 
-            <h3 class="result-card-title"><%= item.tiekejoPavadinimas %></h3>
+            <h3 class="result-card-title">
+              <a href="<%= asmuoLink %>"><%= item.tiekejoPavadinimas %></a>
+            </h3>
 
             <% if (item.irasymoPagrindas && item.irasymoPagrindas.length > 3) { %>
               <p class="text-sm mt-2" style="text-align:justify;"><%= item.irasymoPagrindas %></p>
