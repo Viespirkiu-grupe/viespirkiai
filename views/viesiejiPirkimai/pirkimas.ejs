@@ -33,13 +33,13 @@
       </div>
       <div class="flex gap-3 items-center">
         <% if (pirkimas.type === 'Pmc') { %>
-          <a href="https://viesiejipirkimai.lt/epps/pmc/viewPmc.do?resourceId=<%= pirkimas.pirkimoId %>" class="btn btn-outline btn-sm" target="_blank">↗ CVP IS</a>
+          <a href="https://viesiejipirkimai.lt/epps/pmc/viewPmc.do?resourceId=<%= pirkimas.pirkimoId %>" class="btn btn-outline btn-sm" target="_blank" aria-label="Peržiūrėti CVP IS puslapį">↗ CVP IS</a>
         <% } else if (pirkimas.type === 'CfTWS') { %>
-          <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTWS.do?resourceId=<%= pirkimas.pirkimoId %>" class="btn btn-outline btn-sm" target="_blank">↗ CVP IS</a>
+          <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTWS.do?resourceId=<%= pirkimas.pirkimoId %>" class="btn btn-outline btn-sm" target="_blank" aria-label="Peržiūrėti CVP IS puslapį">↗ CVP IS</a>
         <% } else if (pirkimas.type === 'CfTDPSWS') { %>
-          <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTDPSWS.do?resourceId=<%= pirkimas.pirkimoId %>" class="btn btn-outline btn-sm" target="_blank">↗ CVP IS</a>
+          <a href="https://viesiejipirkimai.lt/epps/cft/prepareViewCfTDPSWS.do?resourceId=<%= pirkimas.pirkimoId %>" class="btn btn-outline btn-sm" target="_blank" aria-label="Peržiūrėti CVP IS puslapį">↗ CVP IS</a>
         <% } %>
-        <a href="/viesiejiPirkimai/<%= pirkimas.pirkimoId %>.json" class="btn btn-outline btn-sm">↗ JSON</a>
+        <a href="/viesiejiPirkimai/<%= pirkimas.pirkimoId %>.json" class="btn btn-outline btn-sm" aria-label="Peržiūrėti pirkimo JSON duomenis">↗ JSON</a>
       </div>
     </div>
 
@@ -370,8 +370,7 @@
             <div class="result-list mt-4">
             <% pirkimas.sutartys.forEach(item => { %>
                 <article class="result-card card-clickable">
-                <a href="/sutartis/<%= item.sutartiesUnikalusId %>" class="card-overlay-link"><%= item.pavadinimas %></a>
-                <div class="result-card-body">
+                  <div class="result-card-body">
                     <dl class="result-card-meta">
                       <div>
                         <dt class="sr-only">Tipas</dt>
@@ -399,13 +398,17 @@
                         </div>
                       <% } %>
                     </dl>
+
                     <h3 class="result-card-title">
-                    <% const verte = item.faktineIvykdimoVerte || item.verte; %>
-                    <span class="cell-mono <%= Number(verte) > 10000 ? 'fw-bold' : '' %>">
-                        <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€
-                    </span>
-                    &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>
+                      <a href="/sutartis/<%= item.sutartiesUnikalusId %>">
+                        <% const verte = item.faktineIvykdimoVerte || item.verte; %>
+                        <span class="cell-mono <%= Number(verte) > 10000 ? 'fw-bold' : '' %>">
+                            <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>&nbsp;€
+                        </span>
+                        &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>
+                      </a>
                     </h3>
+
                     <div class="flex gap-3 mt-2 text-sm">
                         <% if (item.tiekejai.length === 1) { %>
                           <span>

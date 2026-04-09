@@ -1,5 +1,5 @@
 <% if (asmuo.vdiPazeidimai?.count > 0) { %>
-<div class="page-section" id="vdiPazeidimai">
+<div class="page-section mb-6" id="vdiPazeidimai">
   <h2><a href="#vdiPazeidimai" class="no-style">Darbo teisės pažeidimai</a></h2>
   <% if (asmuo.vdiPazeidimai.count > asmuo.vdiPazeidimai.rows.length) { %>
     <p class="text-muted text-sm mb-4">
@@ -39,9 +39,10 @@
             </div>
             <% } %>
           </dl>
+
           <h3 class="result-card-title">
             <% if (pazeidimas.kiekis > 1) { %>
-              <span style="font-weight:700;margin-right:0.25em;"><%= pazeidimas.kiekis %>&times;</span>
+              <span class="font-bold mr-1"><%= pazeidimas.kiekis %>&times;</span>
             <% } %>
             <%= pazeidimas.pavadinimas %>
           </h3>

@@ -29,9 +29,12 @@
     <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3);">
       <% adresai.forEach(item => { %>
         <article class="card card-clickable">
-          <a href="/juridiniai?adresas=<%= item.adresas %>" class="card-overlay-link"><%= item.adresas %></a>
           <div class="card-body">
-            <h3 class="text-sm fw-bold mb-2 mt-1"><%= item.adresas %></h3>
+            <h3 class="text-sm fw-bold mb-2 mt-1">
+              <a href="/juridiniai?adresas=<%= item.adresas %>">
+                <%= item.adresas %>
+              </a>
+            </h3>
             <p class="text-muted text-sm mb-0"><span class="cell-mono"><%= item.count %></span> įmonės</p>
           </div>
         </article>

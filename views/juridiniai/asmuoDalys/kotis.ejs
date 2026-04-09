@@ -1,5 +1,5 @@
 <% if (asmuo.kotis?.count > 0) { %>
-<div class="page-section" id="kotis">
+<div class="page-section mb-6" id="kotis">
   <h2><a href="#kotis" class="no-style">Valstybės pagalba (KOTIS)</a></h2>
 
   <% if (asmuo.kotis.count > asmuo.kotis.rows.length) { %>
@@ -12,7 +12,7 @@
   <div class="result-list">
     <% asmuo.kotis.rows.forEach(item => { %>
       <article class="result-card card-clickable">
-        <a href="https://kotis.kt.gov.lt/paraiskos/view_item/id.<%= item.id %>" class="card-overlay-link"><%= item.teikejas %></a>
+
         <div class="result-card-body">
           <dl class="result-card-meta">
             <div>
@@ -26,7 +26,9 @@
           </dl>
 
           <h3 class="result-card-title">
-            <span class="cell-mono"><%= new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(item.suma) %></span>
+            <a href="https://kotis.kt.gov.lt/paraiskos/view_item/id.<%= item.id %>">
+              <span class="cell-mono"><%= new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(item.suma) %></span>
+            </a>
           </h3>
 
           <div class="result-card-footer">

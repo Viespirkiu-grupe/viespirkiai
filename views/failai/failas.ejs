@@ -90,14 +90,34 @@
           <h1 class="mb-0"><%= failas.pavadinimas %></h1>
         <% } %>
       </div>
+
       <div class="flex flex-wrap gap-2 items-center">
-        <a href="/failas/<%= failas.id %>.json" class="btn btn-outline btn-sm">↗ JSON</a>
-        <a href="https://failai.viespirkiai.org/<%= failas.id %>" class="btn btn-outline btn-sm">↗ Failas</a>
+        <a href="/failas/<%= failas.id %>.json"
+          class="btn btn-outline btn-sm"
+          aria-label="Atsisiųsti failo metaduomenis JSON formatu">
+          <span aria-hidden="true">↗</span> JSON
+        </a>
+
+        <a href="https://failai.viespirkiai.org/<%= failas.id %>"
+          class="btn btn-outline btn-sm"
+          aria-label="Atsisiųsti failą">
+          <span aria-hidden="true">↗</span> Failas
+        </a>
+
         <% if (failas.extension === "pdf" || libreFormats.includes(failas.extension)) { %>
-          <a href="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(query.search || '') %>" class="btn btn-outline btn-sm">↗ Padidinti</a>
+          <a href="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(query.search || '') %>"
+            class="btn btn-outline btn-sm"
+            aria-label="Atidaryti PDF peržiūrą">
+            <span aria-hidden="true">↗</span> Padidinti
+          </a>
         <% } %>
+
         <% if (originalusLinkas && originalusLinkasPavadinimas) { %>
-          <a href="<%= originalusLinkas %>" class="btn btn-outline btn-sm">↗ <%= originalusLinkasPavadinimas %></a>
+          <a href="<%= originalusLinkas %>"
+            class="btn btn-outline btn-sm"
+            aria-label="Atidaryti <%= originalusLinkasPavadinimas %>">
+            <span aria-hidden="true">↗</span> <%= originalusLinkasPavadinimas %>
+          </a>
         <% } %>
       </div>
     </div>

@@ -32,9 +32,9 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
       </div>
 
       <div class="flex gap-3 items-center">
-        <a href="/sutartis/<%= sutartis.sutartiesUnikalusID %>.json" class="btn btn-outline btn-sm">↗ JSON</a>
-        <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= sutartis.sutartiesUnikalusID %>" class="btn btn-outline btn-sm">↗ CVP IS</a>
-        <a href="mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20<%= sutartis.sutartiesUnikalusID %>&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/<%= sutartis.sutartiesUnikalusID %>" class="btn btn-outline btn-sm">↗ Pranešti</a>
+        <a href="/sutartis/<%= sutartis.sutartiesUnikalusID %>.json" class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties JSON duomenis">↗ JSON</a>
+        <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= sutartis.sutartiesUnikalusID %>" class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties CVP IS duomenis">↗ CVP IS</a>
+        <a href="mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20<%= sutartis.sutartiesUnikalusID %>&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/<%= sutartis.sutartiesUnikalusID %>" class="btn btn-outline btn-sm" aria-label="Pranešti apie sutartį">↗ Pranešti</a>
       </div>
     </div>
 
@@ -77,7 +77,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
     </div>
 
       <div class="mt-4">
-        <a href="/?tiekejoKodas=<%= sutartis.tiekejoKodas %>&perkanciosiosOrganizacijosKodas=<%= sutartis.perkanciosiosOrganizacijosKodas %>" class="btn btn-outline btn-sm">↗ Tarpusavio sutartys</a>
+        <a href="/?tiekejoKodas=<%= sutartis.tiekejoKodas %>&perkanciosiosOrganizacijosKodas=<%= sutartis.perkanciosiosOrganizacijosKodas %>" class="btn btn-outline btn-sm" aria-label="Peržiūrėti tarpusavio sutartis">↗ Tarpusavio sutartys</a>
       </div>
 
     </div>
@@ -260,7 +260,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
             <% } else { %>
               <div class="result-list mt-4">
                 <% sutartis.cpvaProjektuSutartys.forEach(projektoSutartis => { %>
-                  <article class="result-card">
+                  <article class="result-card card-clickable">
                     <div class="result-card-body">
                       <div class="result-card-meta">
                         <span><%= projektoSutartis.projektoNr || "" %></span>
@@ -268,6 +268,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
                           <span><%= projektoSutartis?.projektas?.projektoVeikluPradziosData || "" %> — <%= projektoSutartis?.projektas?.projektoVeikluPabaigosData || "" %></span>
                         <% } %>
                       </div>
+
                       <h3 class="result-card-title">
                         <a href="https://2021.esinvesticijos.lt/projektu-sritis/projektu-sarasas?query=<%= projektoSutartis.projektoNr %>">
                           <%= projektoSutartis?.projektas?.projektoPavadinimas || projektoSutartis.pirkimoObjektas || "" %>
@@ -354,7 +355,6 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
           <div class="result-list mt-4">
             <% sutartis.panasiosSutartys.forEach(item => { %>
               <article class="result-card card-clickable">
-                <a href="/sutartis/<%= item.sutartiesUnikalusId %>" class="card-overlay-link"><%= item.pavadinimas %></a>
                 <div class="result-card-body">
                   <div class="result-card-meta">
                     <span><%= item.tipas %></span>
@@ -370,13 +370,17 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
                       <span><%= item.dokumentuKiekis %> dok.</span>
                     <% } %>
                   </div>
+
                   <h3 class="result-card-title">
-                    <% const verte = item.faktineIvykdimoVerte || item.verte; %>
-                    <span class="cell-mono <%= Number(verte) > 10000 ? 'fw-bold' : '' %>">
-                      <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
-                    </span>
-                    &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>
+                    <a href="/sutartis/<%= item.sutartiesUnikalusId %>">
+                      <% const verte = item.faktineIvykdimoVerte || item.verte; %>
+                      <span class="cell-mono <%= Number(verte) > 10000 ? 'fw-bold' : '' %>">
+                        <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
+                      </span>
+                      &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>
+                    </a>
                   </h3>
+
                   <div class="flex gap-3 mt-2 text-sm">
                     <span><strong>Pirkėjas:</strong> <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>" style="position:relative;z-index:1;"><%= item.perkanciojiOrganizacija %></a></span>
                     <span><strong>Tiekėjas:</strong> <a href="/asmuo/<%= item.tiekejoKodas %>" style="position:relative;z-index:1;"><%= item.tiekejas || "Nenurodytas" %></a></span>

@@ -1,12 +1,12 @@
-<div class="page-section" id="sutartys">
+<div class="page-section mb-6" id="sutartys">
     <h2><a href="#sutartys" class="no-style">Viešųjų pirkimų sutartys</a></h2>
     <div class="grid-2 mb-6">
 
-      <div style="display:flex; flex-direction:column; min-height:350px;">
+      <div class="flex flex-col min-h-[350px]">
         <h3 class="text-sm fw-bold mb-3">Numatytos pirkimų vertės pagal metus</h3>
         <% if (asmuo.sutartys?.pirkimaiKasMetus?.length > 0) { %>
           <div class="chart-frame">
-            <div id="pirkimaiPerMetus" class="chart" style="height:350px;"></div>
+            <div id="pirkimaiPerMetus" class="chart h-[350px]"></div>
           </div>
           <script defer>
             displayChart({
@@ -22,11 +22,11 @@
         <% } %>
       </div>
 
-      <div style="display:flex; flex-direction:column; min-height:350px;">
+      <div class="flex flex-col min-h-[350px]">
         <h3 class="text-sm fw-bold mb-3">Numatytos pardavimų vertės pagal metus</h3>
         <% if (asmuo.sutartys?.tiekimaiKasMetus?.length > 0) { %>
           <div class="chart-frame">
-            <div id="pardavimaiPerMetus" class="chart" style="height:350px;"></div>
+            <div id="pardavimaiPerMetus" class="chart h-[350px]"></div>
           </div>
           <script defer>
             var pardavimaiKasMetusLabels = [<% asmuo.sutartys.tiekimaiKasMetus.forEach((item, i) => { %>'<%= item.year %>'<%= i < asmuo.sutartys.tiekimaiKasMetus.length - 1 ? ',' : '' %><% }) %>];
@@ -51,12 +51,12 @@
         <div class="flex justify-between items-center mb-3">
           <h3 class="text-sm fw-bold mb-0">TOP 10 tiekėjų</h3>
           <div class="flex gap-2">
-            <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topTiekejai.csv" class="btn btn-outline btn-sm">↗ CSV</a>
-            <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topTiekejai.jsonl" class="btn btn-outline btn-sm">↗ JSONL</a>
+            <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topTiekejai.csv" class="btn btn-outline btn-sm" aria-label="Atsisiųsti TOP 10 tiekėjų CSV">↗ CSV</a>
+            <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topTiekejai.jsonl" class="btn btn-outline btn-sm" aria-label="Atsisiųsti TOP 10 tiekėjų JSONL">↗ JSONL</a>
           </div>
         </div>
         <% if (asmuo.sutartys?.topTiekejai?.length > 0) { %>
-          <div class="table-wrapper" style="flex:1;">
+          <div class="table-wrapper flex-1">
             <table class="table">
               <thead>
                 <tr>
@@ -71,7 +71,7 @@
                   <tr>
                     <td class="cell-mono text-muted"><%= i + 1 %></td>
                     <td class="cell-truncate">
-                      <a href="/?perkanciosiosOrganizacijosKodas=<%= asmuo.jar.jarKodas %>&tiekejoKodas=<%= tiekejas.jarKodas %>"><%= tiekejas.pavadinimas %></a>
+                      <a href="/?perkanciosiosOrganizacijosKodas=<%= asmuo.jar.jarKodas %>&tiekejoKodas=<%= tiekejas.jarKodas %>" aria-label="Peržiūrėti tiekėjo <%= tiekejas.pavadinimas %> sutartis"><%= tiekejas.pavadinimas %></a>
                     </td>
                     <td class="cell-mono cell-right"><%= tiekejas.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) %></td>
                     <td class="cell-mono cell-right"><%= tiekejas.count.toLocaleString('lt-LT') %></td>
@@ -81,7 +81,7 @@
             </table>
           </div>
         <% } else { %>
-          <div class="chart-empty" style="flex:1;">Nėra duomenų</div>
+          <div class="chart-empty flex-1">Nėra duomenų</div>
         <% } %>
       </div>
 
@@ -89,8 +89,8 @@
         <div class="flex justify-between items-center mb-3">
           <h3 class="text-sm fw-bold mb-0">TOP 10 pirkėjų</h3>
           <div class="flex gap-2">
-            <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topPirkejai.csv" class="btn btn-outline btn-sm">↗ CSV</a>
-            <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topPirkejai.jsonl" class="btn btn-outline btn-sm">↗ JSONL</a>
+            <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topPirkejai.csv" class="btn btn-outline btn-sm" aria-label="Atsisiųsti TOP 10 pirkėjų CSV">↗ CSV</a>
+            <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topPirkejai.jsonl" class="btn btn-outline btn-sm" aria-label="Atsisiųsti TOP 10 pirkėjų JSONL">↗ JSONL</a>
           </div>
         </div>
         <% if (asmuo.sutartys?.topPirkejai?.length > 0) { %>
@@ -109,7 +109,7 @@
                   <tr>
                     <td class="cell-mono text-muted"><%= i + 1 %></td>
                     <td class="cell-truncate">
-                      <a href="/?perkanciosiosOrganizacijosKodas=<%= pirkejas.jarKodas %>&tiekejoKodas=<%= asmuo.jar.jarKodas %>"><%= pirkejas.pavadinimas %></a>
+                      <a href="/?perkanciosiosOrganizacijosKodas=<%= pirkejas.jarKodas %>&tiekejoKodas=<%= asmuo.jar.jarKodas %>" aria-label="Peržiūrėti pirkėjo <%= pirkejas.pavadinimas %> sutartis"><%= pirkejas.pavadinimas %></a>
                     </td>
                     <td class="cell-mono cell-right"><%= pirkejas.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) %></td>
                     <td class="cell-mono cell-right"><%= pirkejas.count.toLocaleString('lt-LT') %></td>
