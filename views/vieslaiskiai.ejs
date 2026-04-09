@@ -11,18 +11,17 @@
 <body>
   <%- include('header.ejs') %>
   <main>
-
     <div class="page-header">
       <h1>Viešlaiškiai</h1>
     </div>
 
     <p class="text-muted mb-6">Mūsų iniciatyvos subjektyvios vertinančiosios nuomonės apie kai kuriuos viešuosius pirkimus arba su jais susijusias problemas.</p>
 
-    <section class="vieslaiskiai mb-7">
+    <section class="flex flex-wrap justify-center gap-4 mb-28">
       <% vieslaiskiai.forEach(vieslaiskis => { %>
-        <article class="vieslaiskis">
-          <a href="<%= vieslaiskis.nuoroda %>">
-            <img src="<%= vieslaiskis.nuotrauka %>" alt="<%= vieslaiskis.pavadinimas %>">
+        <article class="flex-[1_1_300px] aspect-[1.414/1] max-w-175 min-w-75 rounded-lg shadow-md transition-all duration-300 hover:-translate-y-1.25 hover:shadow-lg">
+          <a href="<%= vieslaiskis.nuoroda %>" class="bg-muted size-full block text-black">
+            <img class="size-full object-contain block" src="<%= vieslaiskis.nuotrauka %>" alt="<%= vieslaiskis.pavadinimas %> (PDF)">
           </a>
         </article>
       <% }) %>
@@ -30,24 +29,34 @@
 
     <section>
       <h2>Žiniasklaidoje</h2>
+
       <div class="result-list">
         <% vieslaiskiaiZiniasklaidoje.forEach(rezultatas => { %>
           <article class="result-card card-clickable">
-            <a href="<%= rezultatas.link %>" class="card-overlay-link"><%= rezultatas.pavadinimas %></a>
+            <a href="<%= rezultatas.link %>" class="card-overlay-link" aria-hidden="true" tabindex="-1"></a>
+
             <div class="result-card-body">
               <div class="result-card-meta">
                 <span><%= rezultatas.saltinis %></span>
                 <span><%= rezultatas.date %></span>
-                <span><a href="<%= rezultatas.vieslaiskisLink %>" style="position:relative; z-index:1;"><%= rezultatas.vieslaiskis %></a></span>
+                <span>
+                  <a href="<%= rezultatas.vieslaiskisLink %>" class="position-relative z-1">
+                    <%= rezultatas.vieslaiskis %>
+                    <span class="sr-only">(PDF)</span>
+                  </a>
+                </span>
               </div>
-              <h3 class="result-card-title"><%= rezultatas.pavadinimas %></h3>
+
+              <h3 class="result-card-title">
+                <a href="<%= rezultatas.link %>" class="pointer-events-none"><%= rezultatas.pavadinimas %></a>
+              </h3>
             </div>
           </article>
         <% }) %>
       </div>
     </section>
-
   </main>
+
   <%- include('footer.ejs', { neoficialus: false }) %>
 </body>
 </html>

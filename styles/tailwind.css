@@ -5,6 +5,13 @@
     --color-black: var(--black);
     --color-muted: var(--gray);
     --color-gray: var(--gray);
+    --color-border: var(--light-gray);
+    --color-dark: var(--black);
+    --color-focus: var(--black);
+}
+
+@utility border-focus {
+    border: var(--border-focus);
 }
 
 @source "../views/**/*.ejs";
