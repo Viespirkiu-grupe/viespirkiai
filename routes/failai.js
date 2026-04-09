@@ -136,12 +136,40 @@ function parseLimit(query, defaultLimit = DEFAULT_LIMIT, maxLimit = MAX_LIMIT) {
  * @param {{ rows: object[], total: number, elapsed: number, engine?: string }} params
  * @returns {string}
  */
-function buildNumberOfResults({ rows, total, elapsed, engine = "PostgreSQL" }) {
+function buildNumberOfResults({ rows, total, elapsed, engine = "PostgreSQL", approximate = false }) {
     const trukme = (elapsed / 1000).toFixed(2);
     const source = `<pre class="inline" data-duration="${trukme}">(${trukme}s, ${engine})</pre>`;
+    if (approximate) {
+        const rounded = Math.round(total / 100) * 100 || total;
+        return `Apie ${Number(rounded).linksniuotiK(["rezultato", "rezultatų"])} ${source}`;
+    }
     if (rows.length < total)
         return `Rodomi ${rows.length} iš ${Number(total).linksniuotiK(["rezultato", "rezultatų"])} ${source}`;
     return `${Number(total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} ${source}`;
+}
+
+// Maps each Lithuanian char (and its ASCII equivalent) to a character class
+// that matches both forms, for use in case-insensitive regexes.
+const LT_FOLD_CLASS = {
+    a: '[aą]', ą: '[aą]',
+    c: '[cč]', č: '[cč]',
+    e: '[eęė]', ę: '[eęė]', ė: '[eęė]',
+    i: '[iį]', į: '[iį]',
+    s: '[sš]', š: '[sš]',
+    u: '[uųū]', ų: '[uųū]', ū: '[uųū]',
+    z: '[zž]', ž: '[zž]',
+};
+
+function foldAwareEscape(word) {
+    let result = '';
+    for (const ch of word) {
+        if (/[.*+?^${}()|[\]\\]/.test(ch)) {
+            result += '\\' + ch;
+        } else {
+            result += LT_FOLD_CLASS[ch.toLowerCase()] ?? ch;
+        }
+    }
+    return result;
 }
 
 /**
@@ -158,11 +186,11 @@ function makeExcerpt(text = "", searchTerm = "", maxChars = 250, leading = 25) {
     const isPhrase = /^".+"$/.test(searchTerm.trim());
     const inner = isPhrase ? searchTerm.trim().slice(1, -1) : null;
     const regex = isPhrase
-        ? new RegExp(`(${inner.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi")
+        ? new RegExp(`(${foldAwareEscape(inner)})`, "gi")
         : new RegExp(
               `(${searchTerm
                   .split(/\s+/)
-                  .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+                  .map(foldAwareEscape)
                   .join("|")})`,
               "gi",
           );
@@ -242,6 +270,10 @@ function processSearchResults(rows, searchTerm) {
         try {
             row.tekstas = JSON.parse(row.tekstas).join(" ");
         } catch {}
+        if (row.tekstas) {
+            if (row.tekstas.startsWith('["')) row.tekstas = row.tekstas.slice(2);
+            if (row.tekstas.endsWith('"]')) row.tekstas = row.tekstas.slice(0, -2);
+        }
         row.metaduomenys?.signatures?.forEach((sig) => {
             if (sig.signerFullDistinguishedName)
                 sig.signerFullDistinguishedName =
@@ -290,12 +322,20 @@ failaiSearchRouter.get(
             values,
             queryParams,
             usedHiddenFields,
+            total: searchTotal,
+            approximate = false,
+            engine,
         } = await searchFailai(req.query, { limit, page });
 
         const results = processSearchResults(rawResults, searchTerm);
 
         let total, numberOfResults;
-        const countPromise = countFailai(req.query);
+        // If searchFailai already returned a total (e.g. from Quickwit), use it
+        // directly; otherwise race countFailai against the timeout.
+        const countPromise =
+            searchTotal !== null
+                ? Promise.resolve(searchTotal)
+                : countFailai(req.query);
 
         try {
             const totalRes = req.query.rezultatuSkaiciausPatikslinimas
@@ -317,7 +357,8 @@ failaiSearchRouter.get(
                 rows: results,
                 total,
                 elapsed,
-                engine: "PostgreSQL",
+                engine,
+                approximate,
             });
 
             if (req.query.rezultatuSkaiciausPatikslinimas) {
@@ -344,7 +385,7 @@ failaiSearchRouter.get(
         } catch {
             total = 10_000;
             const trukme = ((performance.now() - startas) / 1000).toFixed(2);
-            numberOfResults = `Rodomi ${results.length} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <pre data-duration="${trukme}" class="inline"> (${trukme}s, PostgreSQL)</pre>`;
+            numberOfResults = `Rodomi ${results.length} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <pre data-duration="${trukme}" class="inline"> (${trukme}s, ${engine})</pre>`;
         }
 
         if (req.query.json)
