@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="lt">
 <head>
   <%- include('head.ejs', {
       pageTitle: "MCP serveris",
@@ -122,9 +121,9 @@
       <p class="section-title mb-3">Model Context Protocol</p>
       <h1 class="mb-3">Viešpirkiai Jūsų DI programoje</h1>
       <p class="lead mb-5">Leiskite savo DI asistentui pačiam rasti atsakymus viešųjų pirkimų duomenyse</p>
-      <div class="inline-flex align-center border rounded-lg overflow-hidden bg-light">
-        <code class="px-4 py-3" style="background: transparent; border: none;">https://viespirkiai.org/mcp</code>
-        <button class="btn btn-primary rounded-0 border-0" style="border-left: var(--border);" onclick="navigator.clipboard.writeText('https://viespirkiai.org/mcp').then(() => { this.textContent = '✓ Nukopijuota'; setTimeout(() => this.textContent = 'Kopijuoti URL', 1500); })">Kopijuoti URL</button>
+      <div class="inline-flex align-center border rounded-lg bg-light max-w-full">
+        <code class="px-4 py-3 border-none bg-transparent overflow-auto">https://viespirkiai.org/mcp</code>
+        <button class="btn btn-primary rounded-0 border-0 border-l-border rounded-r-lg" onclick="navigator.clipboard.writeText('https://viespirkiai.org/mcp').then(() => { this.textContent = '✓ Nukopijuota'; setTimeout(() => this.textContent = 'Kopijuoti URL', 1500); })">Kopijuoti URL</button>
       </div>
     </div>
 
@@ -279,15 +278,16 @@
 
     <!-- Setup -->
     <div class="px-7 py-6 flex flex-wrap align-start gap-5 mcp-mobile-px" style="align-items: stretch;">
-      <div>
-        <p>Pridėkite šį MCP serverį</p>
+      <div class="max-w-full">
+        <p>Pridėkite šį MCP serverį:</p>
 
-        <div class="inline-flex align-center border rounded-lg overflow-hidden bg-light mb-4">
-          <code class="px-4 py-3" style="background: transparent; border: none;">https://viespirkiai.org/mcp</code>
-          <button class="btn btn-primary rounded-0 border-0" style="border-left: var(--border);" onclick="navigator.clipboard.writeText('https://viespirkiai.org/mcp').then(() => { this.textContent = '✓ Nukopijuota'; setTimeout(() => this.textContent = 'Kopijuoti URL', 1500); })">Kopijuoti URL</button>
+        <div class="inline-flex align-center border rounded-lg bg-light max-w-full mb-4">
+          <code class="px-4 py-3 border-none bg-transparent overflow-auto">https://viespirkiai.org/mcp</code>
+          <button class="btn btn-primary rounded-0 border-0 border-l-border rounded-r-lg" onclick="navigator.clipboard.writeText('https://viespirkiai.org/mcp').then(() => { this.textContent = '✓ Nukopijuota'; setTimeout(() => this.textContent = 'Kopijuoti URL', 1500); })">Kopijuoti URL</button>
         </div>
-        <br><br>
-        <p>arba konfigūraciją</p>
+
+        <p>arba konfigūraciją:</p>
+
         <div >
           <div class="border rounded-lg overflow-hidden" style="min-width: 280px;">
             <div class="bg-light px-4 py-2 border-bottom flex align-center justify-between">
@@ -304,23 +304,32 @@
           </div>
         </div>
       </div>
+
       <div>
         <div style="display: flex; justify-content: space-between; flex-direction: column; height: 100%;">
           <div>
-            <h3 style="display:inline-block; margin-top: 0;">Claude</h3>&nbsp;<i class="text-muted text-sm">(išskyrus free)</i>
+            <h3 class="inline-block">Claude</h3> <i class="text-muted text-sm">(išskyrus free)</i>
             <p class="mb-5">Settings → Connectors → Add custom connector</p>
-            <br>
           </div>
+
           <div>
-            <p><i>Naudojate Viešpirkių MCP kitur?</i><br><i>Kažkas neveikia?</i><br><i>Turite pasiūlymų?</i><br><i>Tiesiog norite paklausti?</i></p>
-            <p style="margin-bottom: 0;">Parašykite <a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a>!</p>
+            <p>
+              <i>Naudojate Viešpirkių MCP kitur?</i><br>
+              <i>Kažkas neveikia?</i><br>
+              <i>Turite pasiūlymų?</i><br>
+              <i>Tiesiog norite paklausti?</i>
+            </p>
+
+            <p>Parašykite <a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a>!</p>
           </div>
         </div>
       </div>
     </div>
-    <i class="text-muted text-sm">Primename, kad dirbtinis intelektas yra dirbtinis intelektas ir atsakymai gali būti klaidingi.</i>
+
+    <p class="text-muted text-sm">
+      <em>Primename, kad dirbtinis intelektas yra dirbtinis intelektas ir atsakymai gali būti klaidingi.</em>
+    </p>
   </main>
   <%- include('footer.ejs') %>
 </body>
-
 </html>

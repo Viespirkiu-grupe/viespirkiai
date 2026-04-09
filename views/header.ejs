@@ -6,7 +6,7 @@
 %>
 <header>
   <nav class="navbar">
-    <a href="/" class="navbar-brand no-style" style="display: flex;">
+    <a href="/" class="navbar-brand no-style flex">
       <span class="sr-only">Viešpirkiai</span>
       <% if (CONFIG.dev == true) { %>
         <div style="transform: rotate(180deg);"><%- include('viespirkiaiLogoLaisvasZodis.svg') %></div>
@@ -15,22 +15,23 @@
       <% } %>
     </a>
 
-    <ul class="navbar-nav navbar-main">
-      <li><a href="/"                   class="<%= isActive('/') %>">Sutartys</a></li>
-      <li><a href="/viesiejiPirkimai"   class="<%= isActive('/viesiejiPirkimai') %>">Viešieji pirkimai</a></li>
-      <li><a href="/failai"             class="<%= isActive('/failai') %>">Failai</a></li>
-      <li><a href="/juridiniai"         class="<%= isActive('/juridiniai') %>">Juridiniai</a></li>
-      <li><a href="/neskelbiamos"       class="<%= isActive('/neskelbiamos') %>">Neskelbiamos</a></li>
-      <li><a href="/nepatikimi"         class="<%= isActive('/nepatikimi') %>">Nepatikimi ir melagiai</a></li>
+    <ul class="navbar-nav navbar-main mr-2">
+      <li><a href="/"                 class="<%= isActive('/') %>"                 <%= isActive('/') === 'active'                 ? 'aria-current="page"' : '' %>>Sutartys</a></li>
+      <li><a href="/viesiejiPirkimai" class="<%= isActive('/viesiejiPirkimai') %>" <%= isActive('/viesiejiPirkimai') === 'active'  ? 'aria-current="page"' : '' %>>Viešieji pirkimai</a></li>
+      <li><a href="/failai"           class="<%= isActive('/failai') %>"           <%= isActive('/failai') === 'active'           ? 'aria-current="page"' : '' %>>Failai</a></li>
+      <li><a href="/juridiniai"       class="<%= isActive('/juridiniai') %>"       <%= isActive('/juridiniai') === 'active'       ? 'aria-current="page"' : '' %>>Juridiniai</a></li>
+      <li><a href="/neskelbiamos"     class="<%= isActive('/neskelbiamos') %>"     <%= isActive('/neskelbiamos') === 'active'     ? 'aria-current="page"' : '' %>>Neskelbiamos</a></li>
+      <li><a href="/nepatikimi"       class="<%= isActive('/nepatikimi') %>"       <%= isActive('/nepatikimi') === 'active'       ? 'aria-current="page"' : '' %>>Nepatikimi ir melagiai</a></li>
     </ul>
 
     <div class="navbar-actions">
       <ul class="navbar-nav">
-        <li><a href="/apie"         class="<%= isActive('/apie') %>">Apie</a></li>
-        <li><a href="/kontaktai"    class="<%= isActive('/kontaktai') %>">Kontaktai</a></li>
-        <li><a href="/duomenys"     class="<%= isActive('/duomenys') %>">Duomenys</a></li>
-        <li><a href="/vieslaiskiai" class="<%= isActive('/vieslaiskiai') %>">Viešlaiškiai</a></li>
+        <li><a href="/apie"         class="<%= isActive('/apie') %>"         <%= isActive('/apie') === 'active'         ? 'aria-current="page"' : '' %>>Apie</a></li>
+        <li><a href="/kontaktai"    class="<%= isActive('/kontaktai') %>"    <%= isActive('/kontaktai') === 'active'    ? 'aria-current="page"' : '' %>>Kontaktai</a></li>
+        <li><a href="/duomenys"     class="<%= isActive('/duomenys') %>"     <%= isActive('/duomenys') === 'active'     ? 'aria-current="page"' : '' %>>Duomenys</a></li>
+        <li><a href="/vieslaiskiai" class="<%= isActive('/vieslaiskiai') %>" <%= isActive('/vieslaiskiai') === 'active' ? 'aria-current="page"' : '' %>>Viešlaiškiai</a></li>
       </ul>
+
       <button class="navbar-scheme-toggle" id="schemeToggle" aria-label="Perjungti temą" onclick="
         const meta = document.querySelector('meta[data-scheme]');
         const isDark = meta.dataset.scheme === 'dark' ||
@@ -86,17 +87,17 @@
 
   <div class="navbar-mobile" id="navMobile" aria-hidden="true">
     <ul class="navbar-mobile-nav">
-      <li><a href="/"                   class="<%= isActive('/') %>">Sutartys</a></li>
-      <li><a href="/viesiejiPirkimai"   class="<%= isActive('/viesiejiPirkimai') %>">Viešieji pirkimai</a></li>
-      <li><a href="/failai"             class="<%= isActive('/failai') %>">Failai</a></li>
-      <li><a href="/juridiniai"         class="<%= isActive('/juridiniai') %>">Juridiniai asmenys</a></li>
-      <li><a href="/neskelbiamos"       class="<%= isActive('/neskelbiamos') %>">Neskelbiamos derybos</a></li>
-      <li><a href="/nepatikimi"         class="<%= isActive('/nepatikimi') %>">Nepatikimi ir melagiai</a></li>
+      <li><a href="/"                 class="<%= isActive('/') %>"                 <%= isActive('/') === 'active'                 ? 'aria-current="page"' : '' %>>Sutartys</a></li>
+      <li><a href="/viesiejiPirkimai" class="<%= isActive('/viesiejiPirkimai') %>" <%= isActive('/viesiejiPirkimai') === 'active'  ? 'aria-current="page"' : '' %>>Viešieji pirkimai</a></li>
+      <li><a href="/failai"           class="<%= isActive('/failai') %>"           <%= isActive('/failai') === 'active'           ? 'aria-current="page"' : '' %>>Failai</a></li>
+      <li><a href="/juridiniai"       class="<%= isActive('/juridiniai') %>"       <%= isActive('/juridiniai') === 'active'       ? 'aria-current="page"' : '' %>>Juridiniai asmenys</a></li>
+      <li><a href="/neskelbiamos"     class="<%= isActive('/neskelbiamos') %>"     <%= isActive('/neskelbiamos') === 'active'     ? 'aria-current="page"' : '' %>>Neskelbiamos derybos</a></li>
+      <li><a href="/nepatikimi"       class="<%= isActive('/nepatikimi') %>"       <%= isActive('/nepatikimi') === 'active'       ? 'aria-current="page"' : '' %>>Nepatikimi ir melagiai</a></li>
       <li class="navbar-mobile-divider"></li>
-      <li><a href="/apie"               class="<%= isActive('/apie') %>">Apie</a></li>
-      <li><a href="/kontaktai"          class="<%= isActive('/kontaktai') %>">Kontaktai</a></li>
-      <li><a href="/duomenys"           class="<%= isActive('/duomenys') %>">Duomenys</a></li>
-      <li><a href="/vieslaiskiai"       class="<%= isActive('/vieslaiskiai') %>">Viešlaiškiai</a></li>
+      <li><a href="/apie"             class="<%= isActive('/apie') %>"             <%= isActive('/apie') === 'active'             ? 'aria-current="page"' : '' %>>Apie</a></li>
+      <li><a href="/kontaktai"        class="<%= isActive('/kontaktai') %>"        <%= isActive('/kontaktai') === 'active'        ? 'aria-current="page"' : '' %>>Kontaktai</a></li>
+      <li><a href="/duomenys"         class="<%= isActive('/duomenys') %>"         <%= isActive('/duomenys') === 'active'         ? 'aria-current="page"' : '' %>>Duomenys</a></li>
+      <li><a href="/vieslaiskiai"     class="<%= isActive('/vieslaiskiai') %>"     <%= isActive('/vieslaiskiai') === 'active'     ? 'aria-current="page"' : '' %>>Viešlaiškiai</a></li>
     </ul>
   </div>
 </header>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="lt">
 <head>
   <%- include('head.ejs', {
       pageTitle: "Viešlaiškiai",
@@ -17,10 +17,10 @@
 
     <p class="text-muted mb-6">Mūsų iniciatyvos subjektyvios vertinančiosios nuomonės apie kai kuriuos viešuosius pirkimus arba su jais susijusias problemas.</p>
 
-    <section class="flex flex-wrap justify-center gap-4 mb-28">
+    <section class="flex flex-wrap justify-center gap-4 mb-16">
       <% vieslaiskiai.forEach(vieslaiskis => { %>
-        <article class="flex-[1_1_300px] aspect-[1.414/1] max-w-175 min-w-75 rounded-lg shadow-md transition-all duration-300 hover:-translate-y-1.25 hover:shadow-lg">
-          <a href="<%= vieslaiskis.nuoroda %>" class="bg-muted size-full block text-black">
+        <article class="flex-[1_1_300px] aspect-[1.414/1] max-w-175 min-w-75 shadow-md rounded-lg transition-all duration-300 hover:-translate-y-1.25 hover:shadow-lg">
+          <a href="<%= vieslaiskis.nuoroda %>" class="bg-muted size-full block text-black rounded-lg overflow-hidden">
             <img class="size-full object-contain block" src="<%= vieslaiskis.nuotrauka %>" alt="<%= vieslaiskis.pavadinimas %> (PDF)">
           </a>
         </article>

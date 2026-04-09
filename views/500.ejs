@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="lt">
 <head>
   <%- include('head.ejs') %>
 </head>
@@ -8,11 +8,17 @@
   <main>
     <div class="empty-state">
       <div class="empty-state-icon">500</div>
+
       <h2>Vidinė serverio klaida</h2>
-      <p class="text-muted">Jeigu bandėte atlikti paiešką, ji tikriausiai užtruko per ilgai.</p>
-      <p class="text-muted">Bandykite naudoti tikslesnius paieškos kriterijus.</p>
+
+      <p class="text-muted">
+        Jeigu bandėte atlikti paiešką, ji tikriausiai užtruko per ilgai.
+        <br>
+        Bandykite naudoti tikslesnius paieškos kriterijus.
+      </p>
     </div>
   </main>
+
   <%- include('footer.ejs') %>
 </body>
 </html>

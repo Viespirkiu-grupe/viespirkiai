@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="lt">
 <head>
   <%- include('head.ejs', {
       pageTitle: "Duomenys",
@@ -8,6 +8,7 @@
       customHead
   }) %>
 </head>
+
 <body>
   <%- include('header.ejs') %>
   <main>
@@ -21,15 +22,16 @@
       <div class="alert-body">Jokiems šioje svetainėje pateiktiems duomenims nėra taikomas jokios rūšies garantijos. Jie yra bendrinami siekiant padidinti viešųjų pirkimų skaidrumą ir padidinti valstybinių duomenų prieinamumą.</div>
     </div>
 
-
     <section class="page-section" id="api">
       <h2>API</h2>
+
       <div class="grid-2">
         <section>
           <h3>Sutartys</h3>
           <p>Pavienių sutarčių duomenys pasiekiami <code>.json</code> formatu pagal sutarties unikalų ID:</p>
           <a href="https://viespirkiai.org/sutartis/2007700250.json">https://viespirkiai.org/sutartis/<strong>2007700250</strong>.json</a>
         </section>
+
         <section>
           <h3>Juridiniai asmenys</h3>
           <p>Juridinių asmenų duomenys pasiekiami <code>.json</code> formatu pagal juridinio asmens JAR kodą:</p>
@@ -38,22 +40,21 @@
       </div>
     </section>
 
-    <div class="my-5"></div>
-
+    <hr class="my-5"></hr>
 
     <section class="page-section" id="duomenu-eksportas">
       <h2>Duomenų eksportai</h2>
       <p><a href="/kontaktai">Susisiekite</a></p>
     </section>
 
+    <hr class="my-5"></hr>
 
     <section class="page-section" id="duomenu-saltiniai">
       <h2>Duomenų šaltiniai</h2>
       <p class="text-muted text-sm mb-5">Šioje svetainėje pateikiami duomenys yra surenkami iš viešai prieinamų šaltinių. Informaciją mes vizualizuojame ir pateikiame patogesne forma.</p>
 
       <div class="grid-2">
-
-        <section>
+        <section class="space-y-4">
           <h3>Juridinių asmenų informacija</h3>
 
           <div class="subsection">
@@ -126,9 +127,9 @@
         </section>
 
         <div class="flex flex-col gap-5">
-
           <section>
             <h3>Viešųjų pirkimų duomenys</h3>
+
             <ul class="file-list">
               <li><a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109">CVP IS (sena) / Viešųjų pirkimų tarnyba</a></li>
               <li><a href="https://viesiejipirkimai.lt">CVP IS (nauja) / Viešųjų pirkimų tarnyba</a></li>
@@ -179,6 +180,7 @@
       </div>
     </section>
 
+    <hr class="my-5"></hr>
 
     <section class="page-section" id="programineIranga">
       <h2>Naudojama programinė įranga</h2>
@@ -230,8 +232,8 @@
 
       <p class="text-muted text-sm mt-5">Dėkojame visiems, kurie prisideda duomenimis, resursais, patobulinimais ar kitais būdais.</p>
     </section>
-
   </main>
+
   <%- include('footer.ejs') %>
 </body>
 </html>

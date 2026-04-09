@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="lt">
 <head>
   <%- include('head.ejs', {
       pageTitle: "Privatumo politika",
@@ -8,18 +8,17 @@
       customHead
   }) %>
 </head>
+
 <body>
   <%- include('header.ejs') %>
   <main>
-
     <div class="page-header">
       <h1>Privatumo politika</h1>
     </div>
 
     <div class="faq">
-
       <div class="faq-item">
-        <h3 class="faq-question">Kokiu tikslu renkami ir rodomi duomenys?</h3>
+        <h2 class="faq-question">Kokiu tikslu renkami ir rodomi duomenys?</h2>
         <div class="faq-answer">
           <p>Viešuoju interesu – siekiant užtikrinti skaidrumą ir prieigą prie viešųjų pirkimų dokumentų, informacijos apie viešuosius pirkimus, juridinius asmenis.</p>
           <p>Primename Bendrąjo duomenų apsaugos reglamento 86 straipsnį:</p>
@@ -34,14 +33,14 @@
       </div>
 
       <div class="faq-item">
-        <h3 class="faq-question">Ar Viešpirkiai renka asmeninius puslapio vartotojų duomenis?</h3>
+        <h2 class="faq-question">Ar Viešpirkiai renka asmeninius puslapio vartotojų duomenis?</h2>
         <div class="faq-answer">
           <p class="text-3xl fw-bold">Ne.</p>
         </div>
       </div>
 
       <div class="faq-item">
-        <h3 class="faq-question">Atvaizduojama nenuasmeninta informacija, ką daryti?</h3>
+        <h2 class="faq-question">Atvaizduojama nenuasmeninta informacija, ką daryti?</h2>
         <div class="faq-answer">
           <p>Duomenys automatiškai renkami <strong>tik iš viešų šaltinių</strong>, todėl tikėtina, kad nuasmeninimo klaida buvo atlikta institucijai juos viešinant.</p>
           <p>Prašome susisiekti su atitinkama institucija ir Viešpirkiais. Daugiau apie tai – <a href="/kontaktai#informacijosTikslumas">kontaktų puslapio skiltyje informacijos tikslumas / pašalinimai</a>.</p>
@@ -49,7 +48,7 @@
       </div>
 
       <div class="faq-item">
-        <h3 class="faq-question">Kokie slapukai naudojami?</h3>
+        <h2 class="faq-question">Kokie slapukai naudojami?</h2>
         <div class="faq-answer">
           <p>Naudojami tik būtiniausi slapukai, reikalingi puslapio veikimui.</p>
           <p>Svetainės apsaugai ir paslaugų užtikrinimui naudojamas „Cloudflare", kuris kartais nustato būtinuosius saugumo slapukus (pvz., <code>cf_clearance</code>) siekiant atskirti žmones nuo automatizuoto srauto. Plausible Analitika slapukų nenaudoja.</p>
@@ -61,15 +60,14 @@
       </div>
 
       <div class="faq-item">
-        <h3 class="faq-question">Kiti klausimai</h3>
+        <h2 class="faq-question">Kiti klausimai</h2>
         <div class="faq-answer">
           <p>Susisiekite – <a href="/kontaktai">kontaktų puslapis</a>.</p>
         </div>
       </div>
-
     </div>
-
   </main>
+
   <%- include('footer.ejs', { neoficialus: false }) %>
 </body>
 </html>
