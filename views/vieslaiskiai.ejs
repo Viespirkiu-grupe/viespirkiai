@@ -33,14 +33,12 @@
       <div class="result-list">
         <% vieslaiskiaiZiniasklaidoje.forEach(rezultatas => { %>
           <article class="result-card card-clickable">
-            <a href="<%= rezultatas.link %>" class="card-overlay-link" aria-hidden="true" tabindex="-1"></a>
-
             <div class="result-card-body">
               <div class="result-card-meta">
                 <span><%= rezultatas.saltinis %></span>
                 <span><%= rezultatas.date %></span>
                 <span>
-                  <a href="<%= rezultatas.vieslaiskisLink %>" class="position-relative z-1">
+                  <a href="<%= rezultatas.vieslaiskisLink %>" class="relative z-1">
                     <%= rezultatas.vieslaiskis %>
                     <span class="sr-only">(PDF)</span>
                   </a>
@@ -48,7 +46,7 @@
               </div>
 
               <h3 class="result-card-title">
-                <a href="<%= rezultatas.link %>" class="pointer-events-none"><%= rezultatas.pavadinimas %></a>
+                <a href="<%= rezultatas.link %>"><%= rezultatas.pavadinimas %></a>
               </h3>
             </div>
           </article>

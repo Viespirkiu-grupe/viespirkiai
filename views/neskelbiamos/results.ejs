@@ -1,5 +1,5 @@
 <div class="mt-6 max-w-lg center mx-auto">
-  <div class="flex justify-between align-center mb-4">
+  <div class="flex justify-between items-center mb-4">
     <span class="text-muted text-sm"><em class="numberOfResults"><%- numberOfResults %></em></span>
   </div>
 
@@ -12,9 +12,7 @@
     <div class="result-list">
       <% data.forEach(item => { %>
         <% const href = item.failoId ? `/failas/${item.failoId}` : `https://eviesiejipirkimai.lt/${item.link}`; %>
-        <article class="result-card card-clickable" aria-label="<%= item.jarPavadinimas %>">
-          <a href="<%= href %>" class="card-overlay-link"><%= item.aprasymas %></a>
-
+        <article class="result-card card-clickable">
           <div class="result-card-body">
             <dl class="result-card-meta">
               <div>
@@ -25,6 +23,7 @@
                   <% } else { %>—<% } %>
                 </dd>
               </div>
+
               <div>
                 <dt class="sr-only">Išvada</dt>
                 <dd><%= item.isvada || '—' %></dd>
@@ -33,7 +32,7 @@
 
             <h3 class="result-card-title">
               <% if (item.aprasymas && item.aprasymas.length > 0) { %>
-                <%= item.aprasymas %>
+                <a href="<%= href %>"><%= item.aprasymas %></a>
               <% } else { %>
                 <em>Nenurodyta</em>
               <% } %>
@@ -42,7 +41,7 @@
             <div class="result-card-footer">
               <span><strong>Perkančioji organizacija:</strong>
                 <% if (item.jarKodas && item.jarPavadinimas) { %>
-                  <a href="/asmuo/<%= item.jarKodas %>" style="position:relative;z-index:1;"><%= item.jarPavadinimas %></a>
+                  <a href="/asmuo/<%= item.jarKodas %>" class="relative z-1"><%= item.jarPavadinimas %></a>
                 <% } else { %>
                   <em>Nenurodyta</em>
                 <% } %>

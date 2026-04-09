@@ -17,11 +17,8 @@
 
     <div class="result-list">
       <% data.forEach(item => { %>
-        <article class="result-card card-clickable" aria-label="<%= item.pavadinimas || 'Viešasis pirkimas' %>">
-          <a href="/viesiejiPirkimai/<%= item.pirkimoId %>" class="card-overlay-link"><%= item.pavadinimas %></a>
-
+        <article class="result-card card-clickable">
           <div class="result-card-body">
-
             <dl class="result-card-meta">
               <% if (item.statusas) { %>
                 <div>
@@ -39,7 +36,7 @@
                 <div>
                   <dt class="sr-only">Paskelbimo data</dt>
                   <dd>
-                    <abbr aria-hidden="true" title="Paskelbimo data">Paskelb.</abbr>
+                    <abbr aria-hidden="true" title="Paskelbimo data" class="relative z-1">Paskelb.</abbr>
                     <time datetime="<%= String(item.paskelbimoData).slice(0, 10) %>"><%= String(item.paskelbimoData).slice(0, 10) %></time>
                   </dd>
                 </div>
@@ -48,7 +45,11 @@
 
             <div class="flex align-baseline gap-3">
               <h3 class="result-card-title">
-                <% if (!item.pavadinimas || item.pavadinimas.length < 1) { %><em>Nenurodyta</em><% } else { %><%= item.pavadinimas %><% } %>
+                <% if (!item.pavadinimas || item.pavadinimas.length < 1) { %>
+                  <em>Nenurodyta</em>
+                <% } else { %>
+                  <a href="/viesiejiPirkimai/<%= item.pirkimoId %>"><%= item.pavadinimas %></a>
+                <% } %>
               </h3>
             </div>
 
@@ -59,6 +60,7 @@
                   <%= item.pirkimoVykdytojas.slice(0, 80) %><%= item.pirkimoVykdytojas.length > 80 ? '…' : '' %>
                 </span>
               <% } %>
+
               <% if (item.pasiulymuPateikimoTerminas) { %>
                 <span>
                   <strong>Pasiūlymų terminas:</strong>
@@ -67,6 +69,7 @@
                   </time>
                 </span>
               <% } %>
+
               <% if (item.numatomaBendraPirkimoVerte) { %>
                 <span>
                   <strong>Numatoma vertė:</strong>
@@ -75,11 +78,11 @@
                   </span>
                 </span>
               <% } %>
+
               <% if (item.informacija && item.informacija !== item.pavadinimas) { %>
                 <%= item.informacija %>
               <% } %>
             </div>
-
           </div>
         </article>
       <% }) %>

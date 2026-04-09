@@ -39,23 +39,9 @@
        Consistent stacking order:
        - Overlay link covers the whole card (click target) and sits behind content.
        - Real interactive/content elements sit above the overlay (remain clickable). */
-    .card-clickable { position: relative; }
+    /* .card-clickable { position: relative; } */
     .card-clickable:hover { box-shadow: none; }
 
-    .card-overlay-link {
-        position: absolute;
-        inset: 0;
-        z-index: 0;
-        text-indent: -9999px;
-    }
-
-    /* Put regular content above the overlay link */
-    .card-clickable a:not(.card-overlay-link),
-    .card-clickable button,
-    .card-clickable span {
-        position: relative;
-        z-index: 1;
-    }
 
     /* Result card (search result style) */
     .result-card {
@@ -90,20 +76,12 @@
     }
 
     .result-card-title {
-        font-size: var(--text-xl);
-        font-weight: 700;
-        display: flex;
-        align-items: baseline;
-        gap: var(--space-2);
-
-        @apply mt-2;
+        @apply mt-2 text-xl font-bold;
+        
+        a {
+            @apply no-underline text-black after:absolute after:inset-0 flex items-baseline gap-2;
+        }
     }
-
-    .result-card-title a {
-        color: var(--black);
-        text-decoration: none;
-    }
-    .result-card-title a:hover { text-decoration: underline; }
 
     .result-card-excerpt { color: var(--gray); font-size: var(--text-sm); }
 

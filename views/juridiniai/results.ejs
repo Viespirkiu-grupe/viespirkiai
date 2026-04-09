@@ -19,30 +19,28 @@
 
         <div class="result-list">
         <% data.forEach(item => { %>
-            <article class="result-card card-clickable" aria-label="<%= item.formosPavadinimas %>">
-            <a href="/asmuo/<%= item.jarKodas %>" class="card-overlay-link"><%= item.pavadinimas %></a>
+            <article class="result-card card-clickable">
+                <div class="result-card-body">
+                    <dl class="result-card-meta">
+                        <div>
+                            <dt class="sr-only">Tipas</dt>
+                            <dd><%= item.formosPavadinimas %></dd>
+                        </div>
+                    </dl>
 
-            <div class="result-card-body">
-                <dl class="result-card-meta">
-                <div>
-                    <dt class="sr-only">Tipas</dt>
-                    <dd><%= item.formosPavadinimas %></dd>
+                    <h3 class="result-card-title">
+                        <% if (!item.pavadinimas || item.pavadinimas.length === 0) { %>
+                            <em>Nenurodyta</em>
+                        <% } else { %>
+                            <a href="/asmuo/<%= item.jarKodas %>"><%= item.pavadinimas %></a>
+                        <% } %>
+                    </h3>
+
+                    <div class="result-card-footer">
+                        <span><strong>Adresas:</strong> <%- item.adresas %></span>
+                        <span><strong>Registruota:</strong> <%= new Date(item.registravimoData).toLtDate() %></span>
+                    </div>
                 </div>
-                </dl>
-
-                <h3 class="result-card-title">
-                <% if (!item.pavadinimas || item.pavadinimas.length === 0) { %>
-                    <em>Nenurodyta</em>
-                <% } else { %>
-                    <%= item.pavadinimas %>
-                <% } %>
-                </h3>
-
-                <div class="result-card-footer">
-                <span><strong>Adresas:</strong> <%- item.adresas %></span>
-                <span><strong>Registruota:</strong> <%= new Date(item.registravimoData).toLtDate() %></span>
-                </div>
-            </div>
             </article>
         <% }); %>
         </div>

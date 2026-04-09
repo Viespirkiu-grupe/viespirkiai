@@ -17,24 +17,23 @@
 
     <div class="result-list">
       <% data.forEach(item => { %>
-        <article class="result-card card-clickable" aria-label="<%= item.tipoPavadinimas %>">
-          <a href="/sutartis/<%= item.sutartiesUnikalusId %>" class="card-overlay-link"><%= item.pavadinimas %></a>
-
+        <article class="result-card card-clickable">
           <div class="result-card-body">
-
             <dl class="result-card-meta">
               <div>
                 <dt class="sr-only">Tipas</dt>
                 <dd><%= item.tipas %></dd>
               </div>
+
               <div>
                 <dt class="sr-only">Kategorija</dt>
                 <dd><%= item.kategorija %></dd>
               </div>
+
               <div>
                 <dt class="sr-only">Sutarties galiojimas</dt>
                 <dd>
-                  <abbr aria-hidden="true" title="Sutarties galiojimas">Sut.</abbr>
+                  <abbr aria-hidden="true" title="Sutarties galiojimas" class="relative z-1">Sut.</abbr>
                   <% if (item.sudarymoData && item.galiojimoData) { %>
                     <% const d1 = String(item.sudarymoData).slice(0, 10); %>
                     <% const d2 = String(item.galiojimoData).slice(0, 10); %>
@@ -42,43 +41,49 @@
                   <% } else { %>—<% } %>
                 </dd>
               </div>
+
               <% if (item.dokumentuKiekis > 0) { %>
                 <div>
                   <dt class="sr-only">Dokumentai</dt>
-                  <dd><%= item.dokumentuKiekis %> <abbr aria-hidden="true" title="Dokumentai">dok.</abbr></dd>
+                  <dd><%= item.dokumentuKiekis %> <abbr aria-hidden="true" title="Dokumentai" class="relative z-1">dok.</abbr></dd>
                 </div>
               <% } %>
             </dl>
 
             <div class="flex align-baseline gap-3">
               <h3 class="result-card-title">
-              <span class="amount<%= Number(item.faktineIvykdimoVerte || item.verte) > 10000 ? ' fw-bold' : '' %>">
-                <%= Number(item.faktineIvykdimoVerte || item.verte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>&nbsp;€
-              </span>
-                <% if (item.pavadinimas.length < 1) { %><em>Nenurodyta</em><% } else { %><%= item.pavadinimas %><% } %>
+                <a href="/sutartis/<%= item.sutartiesUnikalusId %>">
+                  <span class="amount<%= Number(item.faktineIvykdimoVerte || item.verte) > 10000 ? ' fw-bold' : '' %>">
+                    <%= Number(item.faktineIvykdimoVerte || item.verte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>&nbsp;€
+                  </span>
+                    <% if (item.pavadinimas.length < 1) { %><em>Nenurodyta</em><% } else { %><%= item.pavadinimas %><% } %>
+                </a>
               </h3>
             </div>
 
             <div class="result-card-footer">
               <span>
                 <strong>Pirkėjas:</strong>
-                <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>">
+                <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>" class="relative z-1">
                   <%= item.perkanciojiOrganizacija?.slice(0, 80) %><%= item.perkanciojiOrganizacija?.length > 80 ? '…' : '' %>
                 </a>
               </span>
+
               <% if (item.tiekejai.length === 1) { %>
                 <span>
                   <strong>Tiekėjas:</strong>
-                  <a href="/asmuo/<%= item.tiekejaiKodai[0] %>">
+                  <a href="/asmuo/<%= item.tiekejaiKodai[0] %>" class="relative z-1">
                     <%= (item.tiekejai[0] || 'Nenurodytas').slice(0, 80) %><%= (item.tiekejai[0] || '').length > 80 ? '…' : '' %>
                   </a>
                 </span>
+
               <% } else { %>
+
                 <span class="flex align-start gap-2">
                   <strong>Tiekėjai:</strong>
                   <span class="flex flex-col gap-1">
                     <% for (let i = 0; i < item.tiekejai.length; i++) { %>
-                      <a href="/asmuo/<%= item.tiekejaiKodai[i] %>">
+                      <a href="/asmuo/<%= item.tiekejaiKodai[i] %>" class="relative z-1">
                         <%= (item.tiekejai[i] || 'Nenurodytas').slice(0, 80) %><%= (item.tiekejai[i] || '').length > 80 ? '…' : '' %>
                       </a>
                     <% } %>
@@ -92,7 +97,6 @@
                 <time datetime="<%= item.paskutinioRedagavimoData %>"><%= item.paskutinioRedagavimoData %></time>
               <% } else { %>—<% } %>
             </div>
-
           </div>
         </article>
       <% }) %>
