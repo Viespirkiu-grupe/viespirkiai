@@ -1,10 +1,15 @@
 <div>
   <div class="flex justify-between items-center mb-4">
-    <span class="text-muted text-sm"><em class="numberOfResults"><%- numberOfResults %></em></span>
+    <span class="text-muted text-sm numberOfResults"><%- numberOfResults %></span>
+
     <% if (galimaEksportuoti) { %>
       <div class="flex gap-3">
-        <a href="/?<%- queryParams %>&jsonl=true&limit=max" class="btn btn-outline btn-sm">↗ JSONL</a>
-        <a href="/?<%- queryParams %>&csv=true&limit=max" class="btn btn-outline btn-sm">↗ CSV</a>
+        <a href="/?<%- queryParams %>&jsonl=true&limit=max" class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
+          <span aria-hidden="true">↗</span> JSONL
+        </a>
+        <a href="/?<%- queryParams %>&csv=true&limit=max" class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
+          <span aria-hidden="true">↗</span> CSV
+        </a>
       </div>
     <% } %>
   </div>

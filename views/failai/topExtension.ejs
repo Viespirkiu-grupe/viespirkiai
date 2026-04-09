@@ -13,7 +13,10 @@
   <main>
       <div class="page-header">
         <h1 class="mb-0">Dažniausi failų plėtiniai</h1>
-        <span class="text-muted text-sm mb-0 numberOfResults"><%- numberOfResults %></span>
+
+        <div class="flex justify-between items-center mb-4">
+          <span class="text-muted text-sm numberOfResults"><%- numberOfResults %></span>
+        </div>
       </div>
 
     <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3);">

@@ -118,10 +118,8 @@
     }
 
     /* Viešlaiškiai */
-    .numberOfResults pre {
-        all: unset;
-        font-family: inherit;
-        font-size: inherit;
+    .numberOfResults {
+        @apply italic;
     }
 
     .rezultatai-nezinomas-total{

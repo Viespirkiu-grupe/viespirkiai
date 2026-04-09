@@ -22,7 +22,9 @@
       formaliai registruoti įmonę, neskelbiant tikros veiklos vietos.
     </p>
 
-    <div class="text-muted text-sm mb-3"><em class="numberOfResults"><%- numberOfResults %></em></div>
+    <div class="flex justify-between items-center mb-4">
+      <span class="text-muted text-sm numberOfResults"><%- numberOfResults %></span>
+    </div>
 
     <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3);">
       <% adresai.forEach(item => { %>

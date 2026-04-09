@@ -138,7 +138,7 @@ function parseLimit(query, defaultLimit = DEFAULT_LIMIT, maxLimit = MAX_LIMIT) {
  */
 function buildNumberOfResults({ rows, total, elapsed, engine = "PostgreSQL" }) {
     const trukme = (elapsed / 1000).toFixed(2);
-    const source = `<pre class="inline" data-duration="${trukme}">(${trukme}s, ${engine})</pre>`;
+    const source = `<span class="inline" data-duration="${trukme}">(${trukme}s, ${engine})</span>`;
     if (rows.length < total)
         return `Rodomi ${rows.length} iš ${Number(total).linksniuotiK(["rezultato", "rezultatų"])} ${source}`;
     return `${Number(total).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} ${source}`;

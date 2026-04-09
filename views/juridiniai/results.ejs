@@ -1,52 +1,61 @@
 <div class="mt-6 max-w-lg center mx-auto">
     <div>
-    <div class="flex justify-between items-center mb-4">
-        <span class="text-muted text-sm"><em class="numberOfResults"><%- numberOfResults %></em></span>
-        <% if (galimaEksportuoti) { %>
-        <div class="flex gap-3">
-            <a href="/juridiniai?<%- queryParams %>&json=true&limit=max" class="btn btn-ghost btn-sm">↗ JSON</a>
-            <a href="/juridiniai?<%- queryParams %>&jsonl=true&limit=max" class="btn btn-ghost btn-sm">↗ JSONL</a>
-            <a href="/juridiniai?<%- queryParams %>&csv=true&limit=max" class="btn btn-ghost btn-sm">↗ CSV</a>
-        </div>
-        <% } %>
-    </div>
+          <div class="flex justify-between items-center mb-4">
+            <span class="text-muted text-sm numberOfResults"><%- numberOfResults %></span>
 
-    <% if (data.length === 0) { %>
-        <div class="empty-state">
-            <p class="text-muted">Rezultatų nerasta.</p>
-        </div>
-    <% } else { %>
+            <% if (galimaEksportuoti) { %>
+            <div class="flex gap-3">
+                <a href="/juridiniai/?<%- queryParams %>&json=true&limit=max" class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSON">
+                    <span aria-hidden="true">↗</span> JSON
+                </a>
 
-        <div class="result-list">
-        <% data.forEach(item => { %>
-            <article class="result-card card-clickable">
-                <div class="result-card-body">
-                    <dl class="result-card-meta">
-                        <div>
-                            <dt class="sr-only">Tipas</dt>
-                            <dd><%= item.formosPavadinimas %></dd>
+                <a href="/juridiniai/?<%- queryParams %>&jsonl=true&limit=max" class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
+                    <span aria-hidden="true">↗</span> JSONL
+                </a>
+
+                <a href="/juridiniai/?<%- queryParams %>&csv=true&limit=max" class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
+                    <span aria-hidden="true">↗</span> CSV
+                </a>
+            </div>
+            <% } %>
+        </div>
+
+        <% if (data.length === 0) { %>
+            <div class="empty-state">
+                <p class="text-muted">Rezultatų nerasta.</p>
+            </div>
+        <% } else { %>
+
+            <div class="result-list">
+            <% data.forEach(item => { %>
+                <article class="result-card card-clickable">
+                    <div class="result-card-body">
+                        <dl class="result-card-meta">
+                            <div>
+                                <dt class="sr-only">Tipas</dt>
+                                <dd><%= item.formosPavadinimas %></dd>
+                            </div>
+                        </dl>
+
+                        <h3 class="result-card-title">
+                            <% if (!item.pavadinimas || item.pavadinimas.length === 0) { %>
+                                <em>Nenurodyta</em>
+                            <% } else { %>
+                                <a href="/asmuo/<%= item.jarKodas %>"><%= item.pavadinimas %></a>
+                            <% } %>
+                        </h3>
+
+                        <div class="result-card-footer">
+                            <span><strong>Adresas:</strong> <%- item.adresas %></span>
+                            <span><strong>Registruota:</strong> <%= new Date(item.registravimoData).toLtDate() %></span>
                         </div>
-                    </dl>
-
-                    <h3 class="result-card-title">
-                        <% if (!item.pavadinimas || item.pavadinimas.length === 0) { %>
-                            <em>Nenurodyta</em>
-                        <% } else { %>
-                            <a href="/asmuo/<%= item.jarKodas %>"><%= item.pavadinimas %></a>
-                        <% } %>
-                    </h3>
-
-                    <div class="result-card-footer">
-                        <span><strong>Adresas:</strong> <%- item.adresas %></span>
-                        <span><strong>Registruota:</strong> <%= new Date(item.registravimoData).toLtDate() %></span>
                     </div>
-                </div>
-            </article>
-        <% }); %>
-        </div>
+                </article>
+            <% }); %>
+            </div>
 
-        <%- include('../pagination.ejs', { currentPage, pageCount, queryParams }) %>
+            <%- include('../pagination.ejs', { currentPage, pageCount, queryParams }) %>
 
-    <% } %>
+        <% } %>
     </div>
 </div>
