@@ -76,13 +76,10 @@
     }
 
     sub, sup { font-size: var(--text-xs); }
+
     sup {
         font-style: italic;
-        font-weight: 400;
-        color: var(--dark-gray);
-        transform: translateY(-0.5em);
-        display: inline-block;
-        line-height: 1;
+        top: -0.25em;
     }
 
     pre, code, kbd {
