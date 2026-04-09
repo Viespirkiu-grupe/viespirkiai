@@ -138,7 +138,7 @@ function parseLimit(query, defaultLimit = DEFAULT_LIMIT, maxLimit = MAX_LIMIT) {
  */
 function buildNumberOfResults({ rows, total, elapsed, engine = "PostgreSQL", approximate = false }) {
     const trukme = (elapsed / 1000).toFixed(2);
-    const source = `<pre class="inline" data-duration="${trukme}">(${trukme}s, ${engine})</pre>`;
+    const source = `<span class="inline" data-duration="${trukme}">(${trukme}s, ${engine})</pre>`;
     if (approximate) {
         const rounded = Math.round(total / 100) * 100 || total;
         return `Apie ${Number(rounded).linksniuotiK(["rezultato", "rezultatų"])} ${source}`;
