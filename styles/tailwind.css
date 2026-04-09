@@ -5,6 +5,8 @@
     --color-black: var(--black);
     --color-muted: var(--gray);
     --color-gray: var(--gray);
+    --color-light-gray: var(--light-gray);
+    --color-lighter-gray: var(--lighter-gray);
     --color-border: var(--light-gray);
     --color-dark: var(--black);
     --color-focus: var(--black);

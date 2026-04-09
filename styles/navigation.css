@@ -11,13 +11,13 @@
         top: 0;
         z-index: var(--z-sticky);
     }
-    
+
     .navbar-nav {
         list-style: none;
         margin: 0;
         padding: 0;
     }
-    
+
     .navbar-brand {
         font-weight: 700;
           font-size: var(--text-lg);
@@ -25,7 +25,7 @@
           text-decoration: none;
           justify-self: start;
     }
-    
+
     .navbar-nav {
         display: flex;
         flex-direction: row;
@@ -35,7 +35,7 @@
         margin: 0;
         padding: 0;
     }
-    
+
     .navbar-nav a {
         color: var(--gray);
         text-decoration: none;
@@ -44,19 +44,19 @@
         border-radius: var(--radius-md);
         transition: color var(--transition), background-color var(--transition);
     }
-    
+
     .navbar-nav a:hover,
     .navbar-nav a.active {
         color: var(--black);
         background: var(--lighter-gray);
     }
-    
+
     .navbar-actions {
         display: flex;
         align-items: center;
         justify-self: end;
     }
-    
+
     /* Tabs */
     .tabs-container {
         width: 100%;
@@ -66,14 +66,14 @@
         margin-block: var(--space-6);
     }
     .tabs-container::-webkit-scrollbar { display: none; }
-    
+
     .tabs {
         display: flex;
         gap: var(--space-7);
         min-width: max-content;
         border-bottom: var(--border);
     }
-    
+
     .tabs a {
         flex-shrink: 0;
         text-decoration: none;
@@ -84,9 +84,9 @@
         font-weight: 500;
         transition: color var(--transition);
     }
-    
+
     .tabs a:hover, .tabs a.active { color: var(--black); }
-    
+
     .tabs a.active::after {
         content: "";
         position: absolute;
@@ -97,7 +97,7 @@
         background: var(--black);
         border-radius: 2px 2px 0 0;
     }
-    
+
     /* Pill tabs */
     .tabs-pills {
         display: flex;
@@ -105,7 +105,7 @@
         gap: var(--space-2);
         margin-block: var(--space-4);
     }
-    
+
     .tabs-pills a {
         padding: var(--space-1) var(--space-3);
         border-radius: var(--radius-pill);
@@ -116,10 +116,10 @@
         background: var(--lighter-gray);
         transition: background-color var(--transition), color var(--transition);
     }
-    
+
     .tabs-pills a:hover { background: var(--light-gray); color: var(--black); }
     .tabs-pills a.active { background: var(--black); color: var(--white); }
-    
+
     /* Breadcrumb */
     .breadcrumb {
         display: flex;
@@ -132,46 +132,37 @@
         font-size: var(--text-sm);
         color: var(--gray);
     }
-    
+
     .breadcrumb li + li::before {
         content: "/";
         color: var(--light-gray);
         margin-right: var(--space-1);
     }
-    
+
     .breadcrumb a { color: var(--gray); }
     .breadcrumb li:last-child { color: var(--black); font-weight: 500; }
-    
+
     /* Pagination */
-    .pagination {
-        display: flex;
-        align-items: center;
-        gap: var(--space-1);
-        list-style: none;
-        padding: 0;
-        margin: var(--space-5) 0;
+    ul.pagination {
+      @apply flex items-center gap-1 list-none p-0 m-0;
+
+      li {
+        &.disabled {
+          @apply opacity-50 pointer-events-none;
+        }
+
+        & > a,
+        & > span {
+          @apply inline-flex items-center justify-center min-w-8 h-8 px-2 border border-light-gray rounded-md text-sm text-black bg-white transition-colors duration-300 hover:bg-lighter-gray no-underline;
+        }
+
+        &.active a {
+          @apply bg-black text-white border-black;
+        }
+      }
     }
-    
-    .pagination a, .pagination span {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 34px;
-        height: 34px;
-        padding-inline: var(--space-2);
-        border: var(--border);
-        border-radius: var(--radius-md);
-        font-size: var(--text-sm);
-        text-decoration: none;
-        color: var(--black);
-        background: var(--white);
-        transition: background-color var(--transition);
-    }
-    
-    .pagination a:hover   { background: var(--lighter-gray); }
-    .pagination .active a { background: var(--black); color: var(--white); border-color: var(--black); }
-    .pagination .disabled span { color: var(--gray); pointer-events: none; }
-    
+
+    /* Mobile nav */
     .navbar-hamburger {
       display: none;
       flex-direction: column;
@@ -199,7 +190,7 @@
     .navbar-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
     .navbar-hamburger.open span:nth-child(2) { opacity: 0; }
     .navbar-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-    
+
     .navbar-mobile {
       display: none;
       background: var(--white);
@@ -246,7 +237,7 @@
       background: var(--light-gray);
       margin: var(--space-2) 0;
     }
-    
+
     @media (max-width: 1200px) {
       .navbar-main      { display: none; }
       .navbar-hamburger { display: flex; margin-left: auto; }
@@ -258,7 +249,7 @@
         z-index: var(--z-sticky);
       }
     }
-    
+
     body > header {
       position: fixed;
       top: 0;
@@ -271,11 +262,11 @@
         backface-visibility: hidden;
         -webkit-backface-visibility: hidden;
     }
-    
+
     body:has(.navbar) {
       padding-top: 80px; /* navbar height */
     }
-    
+
     @media (max-width: 1200px) {
       body > header {
         transition: transform var(--transition-slow);
@@ -284,7 +275,7 @@
         transform: translateY(-100%);
       }
     }
-    
+
     .navbar {
         display: grid;
         grid-template-columns: 1fr auto 1fr;
@@ -293,17 +284,17 @@
         border-bottom: var(--border);
         background: var(--white);
     }
-    
+
     .navbar-brand { justify-self: start; }
     .navbar-main  { justify-self: center; }
     .navbar-actions { justify-self: end; }
-    
+
     @media (max-width: 1200px) {
       .navbar {
         grid-template-columns: 1fr auto;
       }
     }
-    
+
     .navbar-scheme-toggle {
       display: flex;
       align-items: center;
@@ -320,19 +311,19 @@
       transition: background var(--transition);
     }
     .navbar-scheme-toggle:hover { background: var(--lighter-gray); }
-    
+
     @media (max-width: 1200px) {
       .navbar-scheme-toggle {
         margin-left: 0;
         margin-right: var(--space-2);
       }
     }
-    
+
     .navbar-mobile {
       margin-top: -1px;
       padding-top: 1px;
     }
-    
+
     .navbar-mobile::before {
       content: "";
       position: absolute;
