@@ -31,7 +31,7 @@
           <% } %>
         </h1>
       </div>
-      <div class="flex gap-3 align-center">
+      <div class="flex gap-3 items-center">
         <% if (pirkimas.type === 'Pmc') { %>
           <a href="https://viesiejipirkimai.lt/epps/pmc/viewPmc.do?resourceId=<%= pirkimas.pirkimoId %>" class="btn btn-outline btn-sm" target="_blank">↗ CVP IS</a>
         <% } else if (pirkimas.type === 'CfTWS') { %>

@@ -20,7 +20,7 @@
         <div>
           <h1 class="mb-0"><%= asmuo.jar.pavadinimas %></h1>
         </div>
-        <div class="flex flex-wrap gap-2 align-center">
+        <div class="flex flex-wrap gap-2 items-center">
           <a href="/asmuo/<%= asmuo.jar.jarKodas %>.json" class="btn btn-outline btn-sm">↗ JSON</a>
           <% if (asmuo.sodra?.kodas) { %>
             <a href="https://atvira.sodra.lt/imones/detaliai/index.html?code=<%= asmuo.sodra.kodas %>" class="btn btn-outline btn-sm">↗ SODRA</a>

@@ -38,7 +38,7 @@
     <div class="flex flex-col gap-1">
       <% __visibleItems.forEach(item => { %>
         <% if (!item || !item.value) return; %>
-        <div class="flex gap-2 align-center contact-item">
+        <div class="flex gap-2 items-center contact-item">
           <% if (isMono) { %>
             <span class="cell-mono"><%= item.value %></span>
           <% } else if (isExternal) { %>
@@ -60,7 +60,7 @@
         <div class="contact-list-expanded flex flex-col gap-1" style="margin-top:var(--space-2);">
           <% __list.slice(__maxItems).forEach(item => { %>
             <% if (!item || !item.value) return; %>
-            <div class="flex gap-2 align-center contact-item">
+            <div class="flex gap-2 items-center contact-item">
               <% if (isMono) { %>
                 <span class="cell-mono"><%= item.value %></span>
               <% } else if (isExternal) { %>

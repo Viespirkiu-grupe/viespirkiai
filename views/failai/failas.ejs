@@ -90,7 +90,7 @@
           <h1 class="mb-0"><%= failas.pavadinimas %></h1>
         <% } %>
       </div>
-      <div class="flex flex-wrap gap-2 align-center">
+      <div class="flex flex-wrap gap-2 items-center">
         <a href="/failas/<%= failas.id %>.json" class="btn btn-outline btn-sm">↗ JSON</a>
         <a href="https://failai.viespirkiai.org/<%= failas.id %>" class="btn btn-outline btn-sm">↗ Failas</a>
         <% if (failas.extension === "pdf" || libreFormats.includes(failas.extension)) { %>

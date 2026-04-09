@@ -31,7 +31,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
         </h1>
       </div>
 
-      <div class="flex gap-3 align-center">
+      <div class="flex gap-3 items-center">
         <a href="/sutartis/<%= sutartis.sutartiesUnikalusID %>.json" class="btn btn-outline btn-sm">↗ JSON</a>
         <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= sutartis.sutartiesUnikalusID %>" class="btn btn-outline btn-sm">↗ CVP IS</a>
         <a href="mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20<%= sutartis.sutartiesUnikalusID %>&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/<%= sutartis.sutartiesUnikalusID %>" class="btn btn-outline btn-sm">↗ Pranešti</a>
@@ -111,7 +111,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
 
       <section>
         <h2>Pranešimas</h2>
-        <div class="flex align-center gap-2 mb-4">
+        <div class="flex items-center gap-2 mb-4">
           <span class="text-muted"><%= sutartis.sutartiesUnikalusID %></span>
           <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= sutartis.sutartiesUnikalusID %>" class="text-sm">↗ CVP IS</a>
         </div>
@@ -143,7 +143,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
             <section>
                 <br>
                 <h2>Viešasis pirkimas</h2>
-                <div class="flex align-center gap-2 mb-4">
+                <div class="flex items-center gap-2 mb-4">
                 <a href="/viesiejiPirkimai/<%= sutartis.cvpisPirkimas.pirkimoId %>">
                     <span><%= sutartis.cvpisPirkimas.pavadinimas %></span>
                 </a>
