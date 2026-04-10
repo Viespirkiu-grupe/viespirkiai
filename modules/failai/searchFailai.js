@@ -139,12 +139,11 @@ function buildQuickwitQuery(query) {
         const s = query.search.trim();
         const isPhrase = /^".*"$/.test(s);
         if (isPhrase) {
-            // Quoted → phrase query: words must appear adjacent and in order.
             const inner = foldLithuanian(s.slice(1, -1)).replace(/"/g, '\\"');
-            parts.push(`"${inner}"`);
+            parts.push(`(tekstas:"${inner}" OR pavadinimas:"${inner}")`);
         } else {
-            // Unquoted → implicit AND: both words must exist anywhere in the document.
-            parts.push(foldLithuanian(s));
+            const folded = foldLithuanian(s);
+            parts.push(`(tekstas:${folded} OR pavadinimas:${folded})`);
         }
     }
 
@@ -309,7 +308,7 @@ export async function searchFailai(
         t.start("qwSearch");
         const { hits, numHitsEstimate, requests, elapsedTimeMicros } = await search(
             "failai",
-            { query: qwQuery },
+            { query: qwQuery, search_field: "tekstas,pavadinimas" },
             { minHits: needed },
         );
         t.end("qwSearch");
