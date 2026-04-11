@@ -1,6 +1,6 @@
 <div>
-  <div class="flex justify-between align-center mb-4">
-    <span class="text-muted text-sm"><em class="numberOfResults"><%- numberOfResults %></em></span>
+  <div class="flex justify-between items-center mb-4">
+    <span class="text-muted text-sm numberOfResults"><%- numberOfResults %></span>
   </div>
 
   <% if (data.length === 0) { %>
@@ -11,9 +11,7 @@
 
     <div class="result-list">
       <% data.forEach(item => { %>
-        <article class="result-card card-clickable" aria-label="<%= item.extension %>">
-          <a href="/failas/<%= item.id %>?search=<%= encodeURIComponent(search) %>" class="card-overlay-link"><%= item.pavadinimas %></a>
-
+        <article class="result-card card-clickable">
           <div class="result-card-body">
             <dl class="result-card-meta">
               <div>
@@ -37,24 +35,26 @@
             </dl>
 
             <h3 class="result-card-title">
-              <% if (item.metaduomenys) { %>
-                <%= item.metaduomenys.Title || item.pavadinimas %>
-              <% } else { %>
-                <%= item.pavadinimas %>
-              <% } %>
+              <a href="/failas/<%= item.id %>?search=<%= encodeURIComponent(search) %>">
+                <% if (item.metaduomenys) { %>
+                  <%= item.metaduomenys.Title || item.pavadinimas %>
+                <% } else { %>
+                  <%= item.pavadinimas %>
+                <% } %>
+              </a>
             </h3>
 
             <% if (item.excerpt) { %>
-              <div class="text-sm text-muted mt-2" style="text-align: justify;">
+              <div class="text-sm text-muted mt-2 text-justify">
                 <%- item.excerpt %>
               </div>
             <% } %>
 
-            <div class="result-card-footer">
-              <% if (item.dokId) { %>
-                <span><a href="/sutartis/<%= item.dokId %>" style="position:relative;z-index:1;">↗ Sutartis</a></span>
-              <% } %>
-            </div>
+            <% if (item.dokId) { %>
+              <div class="result-card-footer">
+                  <span><a href="/sutartis/<%= item.dokId %>" class="relative z-1">↗ Sutartis</a></span>
+              </div>
+            <% } %>
           </div>
         </article>
       <% }); %>

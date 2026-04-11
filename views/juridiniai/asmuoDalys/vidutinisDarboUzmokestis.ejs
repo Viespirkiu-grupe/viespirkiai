@@ -1,9 +1,9 @@
-<div class="page-section" id="uzmokestis">
+<div class="page-section mb-6" id="uzmokestis">
   <h2><a href="#uzmokestis" class="no-style">Vidutinis darbo užmokestis</a></h2>
   <p class="text-muted text-sm mb-5">Neatskaičius mokesčių, €/mėn.</p>
 
   <div class="grid-2">
-    <div style="display:flex; flex-direction:column; min-height:350px;">
+    <div class="flex flex-col min-h-[350px]">
       <h3 class="text-sm fw-bold mb-3">Darbo sutartys, valstybės tarnautojai</h3>
       <% if (asmuo.sodra?.duomenys?.length > 0 && asmuo.sodra.turejoAtlyginimu) { %>
         <div class="chart-frame">
@@ -23,7 +23,7 @@
       <% } %>
     </div>
 
-    <div style="display:flex; flex-direction:column; min-height:350px;">
+    <div class="flex flex-col min-h-[350px]">
       <h3 class="text-sm fw-bold mb-3">Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
       <% if (asmuo.sodra?.duomenys?.length > 0 && asmuo.sodra.turejoAtlyginimu2) { %>
         <div class="chart-frame">

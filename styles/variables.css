@@ -50,11 +50,11 @@
         --text-xs: 11px;
         --text-sm: 13px;
         --text-base: 15px;
-        --text-md: 17px;
-        --text-lg: 20px;
-        --text-xl: 18px;
+        --text-md: 15px;
+        --text-lg: 18px;
+        --text-xl: 20px;
         --text-2xl: 24px;
-        --text-3xl: 31px;
+        --text-3xl: 30px;
         --line-height: 1.55;
 
         /* --- Border & radius --- */
