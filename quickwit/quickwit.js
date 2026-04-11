@@ -79,14 +79,22 @@ async function ensureQuickwitIndex(indeksas, indexConfig) {
 
 /**
  * Returns the indeksas of the current active shard, creating one if needed.
+ * "Current" means the shard's schema matches the latest indexConfig.
+ * A new shard is created when no current shard has room
+ * (gyvosEilutes + mirusiosEilutes >= shardSize).
  * Must be called within an open transaction with the advisory lock held.
+ *
+ * @param {string} lentele
+ * @param {import('pg').PoolClient} client
+ * @returns {Promise<string>} indeksas
  */
 async function getOrCreateActiveShard(lentele, client) {
   const { rows } = await client.query(
     `SELECT "indeksas"
      FROM "quickwitIndeksai"
      WHERE "lentele" = $1
-       AND "gyvosEilutes" < "shardSize"
+       AND ("gyvosEilutes" + "mirusiosEilutes") < "shardSize"
+       AND "current" = true
      ORDER BY "seq" DESC
      LIMIT 1`,
     [lentele]
@@ -95,13 +103,13 @@ async function getOrCreateActiveShard(lentele, client) {
   if (rows.length) return rows[0].indeksas;
 
   const { rows: cfg } = await client.query(
-    `SELECT "defaultShardSize", "indexConfig"
+    `SELECT "defaultShardSize", "indexConfig", "indexConfigHash"
      FROM "quickwitLenteles"
      WHERE "lentele" = $1`,
     [lentele]
   );
   if (!cfg.length) throw new Error(`Unknown lentele: ${lentele}`);
-  const { defaultShardSize, indexConfig } = cfg[0];
+  const { defaultShardSize, indexConfig, indexConfigHash } = cfg[0];
 
   const { rows: seqRows } = await client.query(
     `SELECT COALESCE(MAX("seq"), 0) + 1 AS "nextSeq"
@@ -113,9 +121,9 @@ async function getOrCreateActiveShard(lentele, client) {
   const indeksas = `${lentele}_${nextSeq}`;
 
   await client.query(
-    `INSERT INTO "quickwitIndeksai"("lentele", "seq", "shardSize", "indexConfig")
-     VALUES ($1, $2, $3, $4)`,
-    [lentele, nextSeq, defaultShardSize, indexConfig]
+    `INSERT INTO "quickwitIndeksai"("lentele", "seq", "shardSize", "indexConfig", "indexConfigHash")
+     VALUES ($1, $2, $3, $4, $5)`,
+    [lentele, nextSeq, defaultShardSize, indexConfig, indexConfigHash]
   );
 
   // Outside transaction — Quickwit is not transactional
@@ -169,25 +177,48 @@ export async function indexDocs(lentele, items) {
     const toInsert = eilutesIds.filter((id) => !existingMap.has(id));
     const toUpdate = eilutesIds.filter((id) => existingMap.has(id));
 
-    // ── Assign a UUID to every item ──────────────────────────────────────────
-    // Map<eilutesId, { quickwitId, indeksas, doc }>
+    // ── Resolve target shard for updates ────────────────────────────────────
+    // Rows on non-current shards are migrated to the current shard.
+    // Map<eilutesId, { quickwitId, oldIndeksas, indeksas, doc }>
     const assigned = new Map();
+    let currentShard = null;
 
-    for (const eilutesId of toUpdate) {
-      assigned.set(eilutesId, {
-        quickwitId: crypto.randomUUID(),
-        indeksas: existingMap.get(eilutesId),
-        doc: byEilutesId.get(eilutesId),
-      });
+    if (toUpdate.length) {
+      const oldIndeksai = [...new Set(toUpdate.map((id) => existingMap.get(id)))];
+      const { rows: shardRows } = await client.query(
+        `SELECT "indeksas", "current"
+         FROM "quickwitIndeksai"
+         WHERE "indeksas" = ANY($1)`,
+        [oldIndeksai]
+      );
+      const shardCurrentMap = new Map(shardRows.map((r) => [r.indeksas, r.current]));
+
+      for (const eilutesId of toUpdate) {
+        const oldIndeksas = existingMap.get(eilutesId);
+        let targetIndeksas;
+        if (shardCurrentMap.get(oldIndeksas)) {
+          targetIndeksas = oldIndeksas;
+        } else {
+          if (!currentShard) currentShard = await getOrCreateActiveShard(lentele, client);
+          targetIndeksas = currentShard;
+        }
+        assigned.set(eilutesId, {
+          quickwitId: crypto.randomUUID(),
+          oldIndeksas,
+          indeksas: targetIndeksas,
+          doc: byEilutesId.get(eilutesId),
+        });
+      }
     }
 
-    // One shard for the entire insert batch — going slightly over shardSize is fine
+    // ── Resolve target shard for inserts ─────────────────────────────────────
     if (toInsert.length) {
-      const indeksas = await getOrCreateActiveShard(lentele, client);
+      if (!currentShard) currentShard = await getOrCreateActiveShard(lentele, client);
       for (const eilutesId of toInsert) {
         assigned.set(eilutesId, {
           quickwitId: crypto.randomUUID(),
-          indeksas,
+          oldIndeksas: null,
+          indeksas: currentShard,
           doc: byEilutesId.get(eilutesId),
         });
       }
@@ -195,48 +226,79 @@ export async function indexDocs(lentele, items) {
 
     // ── Batch UPDATE quickwitEilutes for re-indexed rows ─────────────────────
     if (toUpdate.length) {
-      // UPDATE ... FROM (VALUES ...) — single query regardless of batch size
-      const vals = toUpdate
-        .map((id, i) => `($${i * 2 + 1}::text, $${i * 2 + 2}::uuid)`)
-        .join(", ");
-      const params = toUpdate.flatMap((id) => [id, assigned.get(id).quickwitId]);
+      const stayed = toUpdate.filter((id) => assigned.get(id).indeksas === assigned.get(id).oldIndeksas);
+      const moved  = toUpdate.filter((id) => assigned.get(id).indeksas !== assigned.get(id).oldIndeksas);
 
-      await client.query(
-        `UPDATE "quickwitEilutes" AS qe
-         SET "quickwitId" = v."quickwitId"
-         FROM (VALUES ${vals}) AS v("eilutesId", "quickwitId")
-         WHERE qe."lentele" = $${params.length + 1}
-           AND qe."eilutesId" = v."eilutesId"`,
-        [...params, lentele]
-      );
-
-      // Batch increment mirusiosEilutes per shard
-      // Group updates by indeksas
-      const deadByShard = new Map();
-      for (const eilutesId of toUpdate) {
-        const indeksas = existingMap.get(eilutesId);
-        deadByShard.set(indeksas, (deadByShard.get(indeksas) ?? 0) + 1);
+      if (stayed.length) {
+        const vals = stayed.map((_, i) => `($${i * 2 + 1}::text, $${i * 2 + 2}::uuid)`).join(", ");
+        const params = stayed.flatMap((id) => [id, assigned.get(id).quickwitId]);
+        await client.query(
+          `UPDATE "quickwitEilutes" AS qe
+           SET "quickwitId" = v."quickwitId"
+           FROM (VALUES ${vals}) AS v("eilutesId", "quickwitId")
+           WHERE qe."lentele" = $${params.length + 1}
+             AND qe."eilutesId" = v."eilutesId"`,
+          [...params, lentele]
+        );
       }
 
-      await Promise.all(
-        [...deadByShard.entries()].map(([indeksas, count]) =>
+      if (moved.length) {
+        const vals = moved.map((_, i) => `($${i * 3 + 1}::text, $${i * 3 + 2}::uuid, $${i * 3 + 3}::text)`).join(", ");
+        const params = moved.flatMap((id) => {
+          const { quickwitId, indeksas } = assigned.get(id);
+          return [id, quickwitId, indeksas];
+        });
+        await client.query(
+          `UPDATE "quickwitEilutes" AS qe
+           SET "quickwitId" = v."quickwitId",
+               "indeksas"   = v."indeksas"
+           FROM (VALUES ${vals}) AS v("eilutesId", "quickwitId", "indeksas")
+           WHERE qe."lentele" = $${params.length + 1}
+             AND qe."eilutesId" = v."eilutesId"`,
+          [...params, lentele]
+        );
+      }
+
+      // ── Shard counters for updates ─────────────────────────────────────────
+      // Old shard always: -1 gyva, +1 mirusi
+      // New shard (moves only): +1 gyva
+      const deadByShard = new Map();
+      const newByShard  = new Map();
+
+      for (const eilutesId of toUpdate) {
+        const { oldIndeksas, indeksas } = assigned.get(eilutesId);
+        deadByShard.set(oldIndeksas, (deadByShard.get(oldIndeksas) ?? 0) + 1);
+        if (indeksas !== oldIndeksas) {
+          newByShard.set(indeksas, (newByShard.get(indeksas) ?? 0) + 1);
+        }
+      }
+
+      await Promise.all([
+        ...[...deadByShard.entries()].map(([indeksas, count]) =>
           client.query(
             `UPDATE "quickwitIndeksai"
-             SET "mirusiosEilutes" = "mirusiosEilutes" + $2
+             SET "mirusiosEilutes" = "mirusiosEilutes" + $2,
+                 "gyvosEilutes"    = "gyvosEilutes"    - $2
              WHERE "indeksas" = $1`,
             [indeksas, count]
           )
-        )
-      );
+        ),
+        ...[...newByShard.entries()].map(([indeksas, count]) =>
+          client.query(
+            `UPDATE "quickwitIndeksai"
+             SET "gyvosEilutes" = "gyvosEilutes" + $2
+             WHERE "indeksas" = $1`,
+            [indeksas, count]
+          )
+        ),
+      ]);
     }
 
     // ── Batch INSERT quickwitEilutes for new rows ────────────────────────────
     if (toInsert.length) {
       const indeksas = assigned.get(toInsert[0]).indeksas;
 
-      const vals = toInsert
-        .map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}::uuid)`)
-        .join(", ");
+      const vals = toInsert.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}::uuid)`).join(", ");
       const params = toInsert.flatMap((id) => [id, assigned.get(id).quickwitId]);
 
       await client.query(
@@ -313,48 +375,48 @@ export async function filterLive(hits) {
  * }>}
  */
 export async function search(lentele, params, { minHits = Infinity } = {}) {
-    const deadRatio = await getDeadRatio(lentele);
-    const fetchSize = Number.isFinite(minHits)
-        ? Math.ceil(minHits / (1 - deadRatio || 1)) + 10
-        : 100; // page size when fetching all
+  const deadRatio = await getDeadRatio(lentele);
+  const fetchSize = Number.isFinite(minHits)
+    ? Math.ceil(minHits / (1 - deadRatio || 1)) + 10
+    : 100; // page size when fetching all
 
-    let liveHits = [];
-    let searchAfter = null;
-    let numHitsMax = null;
+  let liveHits = [];
+  let searchAfter = null;
+  let numHitsMax = null;
 
-    let requests = 0;
-    let totalElapsed = 0;
-    while (liveHits.length < minHits) {
-        requests++;
-        const reqParams = {
-            ...params,
-            max_hits: fetchSize,
-            ...(searchAfter ? { search_after: searchAfter } : {}),
-        };
-
-        const data = await qwSearch(`${lentele}_*`, reqParams);
-        totalElapsed += data.elapsed_time_micros ?? 0;
-        const hits = data.hits ?? [];
-
-        if (numHitsMax === null) numHitsMax = data.num_hits ?? 0;
-
-        const live = await filterLive(hits);
-        liveHits.push(...live);
-
-        if (hits.length < fetchSize) break;
-
-        searchAfter = hits[hits.length - 1].sort ?? null;
-        if (!searchAfter) break;
-    }
-
-    return {
-        hits: liveHits,
-        numHitsMax,
-        numHitsEstimate: numHitsMax * (1 - deadRatio),
-        deadRatio,
-        elapsedTimeMicros: totalElapsed,
-        requests
+  let requests = 0;
+  let totalElapsed = 0;
+  while (liveHits.length < minHits) {
+    requests++;
+    const reqParams = {
+      ...params,
+      max_hits: fetchSize,
+      ...(searchAfter ? { search_after: searchAfter } : {}),
     };
+
+    const data = await qwSearch(`${lentele}_*`, reqParams);
+    totalElapsed += data.elapsed_time_micros ?? 0;
+    const hits = data.hits ?? [];
+
+    if (numHitsMax === null) numHitsMax = data.num_hits ?? 0;
+
+    const live = await filterLive(hits);
+    liveHits.push(...live);
+
+    if (hits.length < fetchSize) break;
+
+    searchAfter = hits[hits.length - 1].sort ?? null;
+    if (!searchAfter) break;
+  }
+
+  return {
+    hits: liveHits,
+    numHitsMax,
+    numHitsEstimate: numHitsMax * (1 - deadRatio),
+    deadRatio,
+    elapsedTimeMicros: totalElapsed,
+    requests
+  };
 }
 
 // ── Shard stats ───────────────────────────────────────────────────────────────

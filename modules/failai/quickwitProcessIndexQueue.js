@@ -74,7 +74,8 @@ export async function processFailaiIndexQueue() {
             ft.tekstas,
             f."zodziuSkaicius",
             f."puslapiuSkaicius",
-            f."simboliuSkaicius"
+            f."simboliuSkaicius",
+            f."autorius"
         FROM failai f
         LEFT JOIN "failaiTekstas" ft ON ft.id = f.id
         WHERE f.id = ANY($1)`,
