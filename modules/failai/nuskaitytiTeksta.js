@@ -166,16 +166,11 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     ),
     second AS (
         SELECT q.id FROM public."failaiNuskaitymoQueue" q
-        WHERE q."lockedBy" IS NULL
-        AND q.versija < 0
-        AND (
-            (q.bandymai < 6   AND q."paskutinisBandymas" <= NOW() - interval '3 hours')
-            OR (q.bandymai < 30  AND q."paskutinisBandymas" <= NOW() - interval '12 hours')
-            OR q."paskutinisBandymas" <= NOW() - interval '1 day'
-        ) 
-        ORDER BY q.bandymai ASC, q.id DESC
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED
+WHERE q."lockedBy" IS NULL
+AND q.versija < 0
+ORDER BY q."paskutinisBandymas" ASC NULLS FIRST
+LIMIT 1
+FOR UPDATE SKIP LOCKED
     ),
     cte AS (
         SELECT id FROM first
@@ -224,19 +219,23 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             dokumentas.dydis == 0
         ) {
             kodas = -4; // empty pdf
+        } else if (
+            e.message.includes("Not Found")
+        ) {
+            kodas = -404; // not found
         }
 
         if (dokumentas && dokumentas.id) {
             try {
                await postgres.query(
                     `UPDATE public."failaiNuskaitymoQueue"
-                    SET versija          = $2,
-                        bandymai         = bandymai + 1,
+                    SET versija          = $1,
+                        bandymai = COALESCE(bandymai, 0) + 1,
                         "paskutinisBandymas" = NOW(),
                         "lockedBy"       = NULL,
                         "lockedAt"       = NULL
-                    WHERE id = $1`,
-                    [dokumentas.id, kodas],
+                    WHERE id = $2`,
+                    [kodas, dokumentas.id],
                 );
                 // still update failai for the error code
                 await postgres.query(
@@ -503,6 +502,8 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         location = `POINT(${lon} ${lat})`; // WKT format
     }
 
+    let autorius = metadata?.Author || metadata?.author || undefined;
+
     // Update the row
     await postgres.query(
         `UPDATE failai
@@ -513,8 +514,9 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             "simboliuSkaicius" = $5,
             "ocrState" = $6,
             location = ST_GeomFromText($7, 4326),
-            "nuskaitymasTimestamp" = NOW()
-        WHERE id = $8;`,
+            "nuskaitymasTimestamp" = NOW(),
+            "autorius" = $8
+        WHERE id = $9;`,
         [
             nuskaitymoVersija,
             metadata,
@@ -523,13 +525,14 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             metadata?.characterCount || 0,
             reikalingasOcr,
             location,
+            autorius,
             dokumentas.id,
         ],
     );
 
     await postgres.query(
-        `INSERT INTO "failaiTekstas" (id, tekstas, pavadinimas, extension, saltinis, "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius")
-        SELECT $1, $2, pavadinimas, extension, saltinis, $3, $4, $5
+        `INSERT INTO "failaiTekstas" (id, tekstas, pavadinimas, extension, saltinis, "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", autorius)
+        SELECT $1, $2, pavadinimas, extension, saltinis, $3, $4, $5, $6
         FROM failai
         WHERE id = $1
         ON CONFLICT (id) DO UPDATE SET
@@ -539,13 +542,16 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             saltinis           = EXCLUDED.saltinis,
             "zodziuSkaicius"   = EXCLUDED."zodziuSkaicius",
             "puslapiuSkaicius" = EXCLUDED."puslapiuSkaicius",
-            "simboliuSkaicius" = EXCLUDED."simboliuSkaicius";`,
+            "simboliuSkaicius" = EXCLUDED."simboliuSkaicius",
+            autorius           = EXCLUDED.autorius
+        `,
         [
             dokumentas.id,
             truncateTo1MB(tekstas),
             metadata?.wordCount,
             metadata?.pageCount,
             metadata?.characterCount || 0,
+            autorius,
         ],
     );
 
