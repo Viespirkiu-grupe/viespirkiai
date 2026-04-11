@@ -4,18 +4,28 @@ export async function findFailas({ id, dokId, fileId }) {
     if (id) {
         if (/^[a-f0-9]{32}$/.test(id))
             return postgres.query(
-                `SELECT * FROM failai WHERE "md5" = $1 LIMIT 1`,
+                `SELECT f.*, ft.tekstas
+                 FROM failai f
+                 LEFT JOIN "failaiTekstas" ft ON ft.id = f.id
+                 WHERE f."md5" = $1 LIMIT 1`,
                 [id],
             );
         if (isNaN(id)) return null;
-        return postgres.query(`SELECT * FROM failai WHERE "id" = $1 LIMIT 1`, [
-            id,
-        ]);
+        return postgres.query(
+            `SELECT f.*, ft.tekstas
+             FROM failai f
+             LEFT JOIN "failaiTekstas" ft ON ft.id = f.id
+             WHERE f."id" = $1 LIMIT 1`,
+            [id],
+        );
     }
     if (dokId && fileId) {
         if (isNaN(dokId) || isNaN(fileId)) return null;
         return postgres.query(
-            `SELECT * FROM failai WHERE "dokId" = $1 AND "fileId" = $2 LIMIT 1`,
+            `SELECT f.*, ft.tekstas
+             FROM failai f
+             LEFT JOIN "failaiTekstas" ft ON ft.id = f.id
+             WHERE f."dokId" = $1 AND f."fileId" = $2 LIMIT 1`,
             [dokId, fileId],
         );
     }
@@ -25,7 +35,7 @@ export async function findFailas({ id, dokId, fileId }) {
 export async function getDezeForMd5(md5) {
     const result = await postgres.query(
         `
-        SELECT f.md5, f.deze, f.dydis, d.url, d.speed, a."apiKey"
+        SELECT f.md5, f.deze, f.dydis, d.url, d.speed, d.pavadinimas, a."apiKey"
         FROM "failaiDezes" f
         JOIN dezes d ON f.deze = d.pavadinimas
         JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
