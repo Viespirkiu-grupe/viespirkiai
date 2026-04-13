@@ -66,7 +66,7 @@
         span.classList.add('spin');
         const url = new URL(window.location.href);
         url.searchParams.set('rezultatuSkaiciausPatikslinimas', 'true');
-        const trukme = document.querySelector('.numberOfResults pre')?.getAttribute('data-duration');
+        const trukme = document.querySelector('.numberOfResults span')?.getAttribute('data-duration');
         if (trukme) url.searchParams.set('trukme', trukme);
         fetch(url)
           .then(res => res.json())
