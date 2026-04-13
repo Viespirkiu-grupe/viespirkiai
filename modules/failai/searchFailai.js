@@ -140,10 +140,10 @@ function buildQuickwitQuery(query) {
         const isPhrase = /^".*"$/.test(s);
         if (isPhrase) {
             const inner = foldLithuanian(s.slice(1, -1)).replace(/"/g, '\\"');
-            parts.push(`(tekstas:"${inner}" OR pavadinimas:"${inner}")`);
+            parts.push(`(tekstas:"${inner}" OR pavadinimas:"${inner}" OR autorius:"${inner}")`);
         } else {
             const folded = foldLithuanian(s);
-            parts.push(`(tekstas:${folded} OR pavadinimas:${folded})`);
+            parts.push(`(tekstas:${folded} OR pavadinimas:${folded} OR autorius:${folded})`);
         }
     }
 
@@ -308,7 +308,7 @@ export async function searchFailai(
         t.start("qwSearch");
         const { hits, numHitsEstimate, requests, elapsedTimeMicros } = await search(
             "failai",
-            { query: qwQuery, search_field: "tekstas,pavadinimas" },
+            { query: qwQuery, search_field: "tekstas,pavadinimas,autorius" },
             { minHits: needed },
         );
         t.end("qwSearch");
