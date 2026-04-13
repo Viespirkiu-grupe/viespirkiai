@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+  <%- include('../../head.ejs', {
+    pageTitle: "WebOCR",
+    pageDescription: ``,
+    pageImage: `https://viespirkiai.org/failai.png`,
+    customHead
+  }) %>
+  <style>
+    /* ── Main button area ───────────────────────────────── */
+    #main-action { text-align: center; margin: 1.5rem 0 0.6rem; }
+
+    #btn-main {
+      display: block;
+      width: 440px;
+      margin: 0 auto;
+      cursor: pointer;
+      font-size: 1.25rem;
+      font-weight: bold;
+      padding: 0.9rem 1rem 0.7rem;
+      border: none;
+      border-radius: 4px 4px 0 0;
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+      transition: background-color 0.35s ease;
+    }
+    #btn-main:disabled { cursor: default; }
+
+    /* Phase colors */
+    #btn-main[data-phase="idle"]        { background-color: #2a7d4f; }
+    #btn-main[data-phase="init"]        { background-color: #3a6db5; }
+    #btn-main[data-phase="fetching"]    { background-color: #3a6db5; }
+    #btn-main[data-phase="downloading"] { background-color: #b86a00; }
+    #btn-main[data-phase="rendering"]   { background-color: #6b4a9a; }
+    #btn-main[data-phase="ocr"]         { background-color: #1a7a6e; }
+    #btn-main[data-phase="posting"]     { background-color: #0a6878; }
+    #btn-main[data-phase="stopping"]    { background-color: #888; }
+    #btn-main[data-phase="terminated"]  { background-color: #b03030; }
+
+    /* Diagonal stripe overlay */
+    #btn-main::before {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      left: -28px; right: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        -45deg,
+        transparent,         transparent 10px,
+        rgba(255,255,255,0.08) 10px, rgba(255,255,255,0.08) 20px
+      );
+    }
+    @keyframes stripe-slide {
+      from { transform: translateX(0); }
+      to   { transform: translateX(28px); }
+    }
+    #btn-main:not([data-phase="idle"]):not([data-phase="terminated"])::before {
+      animation: stripe-slide 1.3s linear infinite;
+    }
+
+    #btn-label { line-height: 1.3; }
+    #btn-sub {
+      font-size: 0.62rem;
+      font-weight: normal;
+      opacity: 0.85;
+      min-height: 1.1em;
+      margin-top: 0.15rem;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Progress bar ───────────────────────────────────── */
+    #btn-progress-bar {
+      width: 440px;
+      margin: 0 auto;
+      height: 6px;
+      background: rgba(0,0,0,0.18);
+      border-radius: 0 0 4px 4px;
+      overflow: hidden;
+    }
+    #btn-progress-fill {
+      height: 100%;
+      background: rgba(255,255,255,0.55);
+      width: 0%;
+      transition: width 0.35s ease;
+    }
+
+    /* ── Dialog centering ───────────────────────────────── */
+    dialog {
+      padding: 0; border: none;
+      position: fixed;
+      top: 50%; left: 50%;
+      translate: -50% -50%;
+      margin: 0;
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.4); }
+
+    /* ── Queue animation ────────────────────────────────── */
+    @keyframes card-in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .card--new { animation: card-in 0.3s ease; }
+
+    /* ── Log panel ──────────────────────────────────────── */
+    #log-section { margin: 1rem var(--space-4); }
+    #log-panel {
+      height: 280px; overflow-y: auto;
+      background: #0f0f0f; color: #d4d4d4;
+      font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+      padding: var(--space-4);
+      border-radius: var(--radius-lg); border: var(--border);
+      margin: 0; white-space: pre; box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+
+    <%- include('../../header.ejs', {hideSubtext: false}) %>
+    <h1 class="text-center">WebOCR</h1>
+
+
+<!-- ── Pagrindinis mygtukas ───────────────────────────── -->
+<div id="main-action">
+  <button id="btn-main" data-phase="idle">
+    <div id="btn-label">Pradėti</div>
+    <div id="btn-sub">Norėdami pristabdyti — spauskite dar kartą</div>
+  </button>
+  <div id="btn-progress-bar">
+    <div id="btn-progress-fill"></div>
+  </div>
+  <div id="main-links" class="text-sm mt-2" style="display:none">
+    <a id="lnk-force-stop" href="#" style="color:#c33;text-decoration:none">Avarinis stabdas</a>
+    &nbsp;·&nbsp;
+    <a id="lnk-log" href="#" style="color:#44a;text-decoration:none">Logs'ai</a>
+  </div>
+</div>
+
+<!-- ── Gijų kiekio dialogo langas ─────────────────────── -->
+<dialog id="dlg-start" class="card shadow-lg" style="min-width:380px">
+  <div class="card-header">
+    <h4>OCR darbuotojų konfigūracija</h4>
+  </div>
+  <div class="card-body">
+    <div class="form-group">
+      <label class="form-label" for="dlg-apikey">API raktas</label>
+      <input type="password" id="dlg-apikey" class="form-control" placeholder="įveskite API raktą">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="dlg-workers">Gijų skaičius</label>
+      <input type="number" id="dlg-workers" class="form-control" min="1" step="1">
+      <span id="dlg-ram" class="form-hint"></span>
+    </div>
+    <p id="dlg-core-line" class="text-muted text-sm m-0">Jūsų sistema turi <strong id="dlg-cores">?</strong> loginių branduolių.<br>Kiekvienas darbuotojas naudoja ~300 MB RAM ir vieną CPU giją.</p>
+    <p id="dlg-warn" class="form-error m-0" style="min-height:1.2em"></p>
+  </div>
+  <div class="card-footer">
+    <button id="dlg-cancel" class="btn btn-secondary btn-sm">Atšaukti</button>
+    <button id="dlg-confirm" class="btn btn-primary btn-sm">Pradėti OCR</button>
+  </div>
+</dialog>
+
+<!-- ── Sesijos statistika ─────────────────────────────── -->
+<div id="session-stats" class="text-center text-sm text-muted mt-3 mb-3" style="display:none">
+  <span id="stat-docs">0 dok.</span> &nbsp;·&nbsp;
+  <span id="stat-pages">0 psl.</span> &nbsp;·&nbsp;
+  <span id="stat-size">0 MB</span>  &nbsp;·&nbsp;
+  <span id="stat-time">0s</span>
+</div>
+
+<!-- ── Žurnalas (paslėptas pagal nutylėjimą) ──────────── -->
+<section id="log-section" style="display:none">
+  <pre id="log-panel"></pre>
+</section>
+
+<!-- ── Dokumentų eilė ─────────────────────────────────── -->
+<section id="queue-section" style="min-height:50vh">
+  <div id="queue-tbody" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3); padding: var(--space-1) var(--space-4);"></div>
+</section>
+
+<!-- Tesseract.js v5 UMD — suteikia globalų `Tesseract` -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<script type="module">
+// ═══════════════════════════════════════════════════════════
+// SECTION: PDF.js
+// ═══════════════════════════════════════════════════════════
+import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.min.mjs';
+{
+  const url  = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.worker.min.mjs';
+  const blob = new Blob([`import '${url}';`], { type: 'application/javascript' });
+  pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: CONFIG
+// ═══════════════════════════════════════════════════════════
+const HW_CONCURRENCY  = navigator.hardwareConcurrency || 4;
+const DEFAULT_WORKERS = Math.max(1, HW_CONCURRENCY - 2);
+
+const DEFAULTS = {
+  lang:            'lit+eng',
+  pdfScale:        300 / 72,   // 4.167 — atitinka Ghostscript -r300
+  oem:             1,
+  psm:             3,
+  pollEmpty:       5_000,
+  pollError:       10_000,
+  retries:         5,
+  retryDelay:      10_000,
+  downloadTimeout: 120_000,
+};
+
+function buildUrlConfig(apiKey) {
+  const base = location.origin;
+  const key  = encodeURIComponent(apiKey);
+  return {
+    getTaskUrl:    `${base}/failas/ocr/checkout?apiKey=${key}`,
+    baseFileUrl:   `https://failai.viespirkiai.org/`,
+    postResultUrl: `${base}/failas/ocr/submit?apiKey=${key}`,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: STATE
+// ═══════════════════════════════════════════════════════════
+const STATE = {
+  phase:            'idle',
+  scheduler:        null,
+  abort:            null,
+  queue:            new Map(),
+  totalQueued:      0,
+  prefetch:         null,
+  prefetchInFlight: null,
+};
+
+// ── Sesijos skaitikliai ───────────────────────────────────
+const SESSION = {
+  docs: 0, bytes: 0, pages: 0, elapsedMs: 0, startedAt: null, _timer: null,
+
+  start()  {
+    this.startedAt = Date.now();
+    document.getElementById('session-stats').style.display = '';
+    if (!this._timer) this._timer = setInterval(renderStats, 1000);
+    renderStats();
+  },
+  stop()   {
+    if (this.startedAt) { this.elapsedMs += Date.now() - this.startedAt; this.startedAt = null; }
+    clearInterval(this._timer); this._timer = null;
+  },
+  addDoc(bytes, pages) { this.docs++; this.bytes += bytes; this.pages += pages; renderStats(); },
+};
+
+function renderStats() {
+  const ms  = SESSION.elapsedMs + (SESSION.startedAt ? Date.now() - SESSION.startedAt : 0);
+  const s   = Math.floor(ms / 1000);
+  const str = s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`;
+  const mb  = (SESSION.bytes / 1_048_576).toFixed(2);
+  document.getElementById('stat-docs').textContent  = `${SESSION.docs} dok.`;
+  document.getElementById('stat-size').textContent  = `${mb} MB`;
+  document.getElementById('stat-pages').textContent = `${SESSION.pages} psl.`;
+  document.getElementById('stat-time').textContent  = str;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: LOG
+// ═══════════════════════════════════════════════════════════
+const LOG = (() => {
+  const MAX = 200, lines = [];
+  const panel = () => document.getElementById('log-panel');
+  function flush() { const el = panel(); el.textContent = lines.join('\n'); el.scrollTop = el.scrollHeight; }
+  function append(lvl, msg) {
+    lines.push(`[${new Date().toISOString().slice(11,23)}] [${lvl}] ${msg}`);
+    if (lines.length > MAX) lines.splice(0, lines.length - MAX);
+    flush();
+  }
+  return {
+    info:  m => append('INFO ', m),
+    warn:  m => append('WARN ', m),
+    error: m => append('ERROR', m),
+    clear: () => { lines.length = 0; flush(); },
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: QUEUE_UI
+// ═══════════════════════════════════════════════════════════
+const MAX_QUEUE_STORE = 200;
+const MAX_QUEUE_SHOW  = 100;
+const SEEN_IDS = new Set();
+
+// Lithuanian status labels for queue table
+const STATUS_LT = {
+  pending:           'Laukiama',
+  prefetching:       'Gaunama',
+  prefetched:        'Paruošta',
+  downloading:       'Atsiunčiama',
+  rendering:         'Analizuojama',
+  ocr:               'Atpažįstama',
+  posting:           'Siunčiama',
+  done:              'Atlikta',
+  error:             'Klaida',
+  timeout:           'Pertrauka',
+  terminated:        'Sustabdyta',
+};
+
+const STATUS_BADGE = {
+  done:              'badge-success',
+  error:             'badge-danger',
+  timeout:           'badge-warning',
+  terminated:        'badge-warning',
+  pending:           'badge-muted',
+  prefetching:       'badge-muted',
+  prefetched:        'badge-muted',
+  downloading:       'badge-info',
+  rendering:         'badge-info',
+  ocr:               'badge-info',
+  posting:           'badge-info',
+};
+
+function upsertQueue(id, patch) {
+  const prev = STATE.queue.get(id) ?? {
+    id, uri: '', status: 'pending', pages: 0,
+    pagesOCRd: 0, duration: null, startedAt: Date.now(), error: null, bytes: 0,
+  };
+  STATE.queue.set(id, { ...prev, ...patch });
+  if (STATE.queue.size > MAX_QUEUE_STORE) {
+    STATE.queue.delete(STATE.queue.keys().next().value);
+  }
+  renderQueue();
+}
+
+function renderQueue() {
+  const entries = [...STATE.queue.values()].reverse();
+  const showing = entries.slice(0, MAX_QUEUE_SHOW);
+  const total   = STATE.totalQueued;
+
+  // header is static "Dokumentų eilė" — no need to update it
+
+  document.getElementById('queue-tbody').innerHTML = showing.map(e => {
+    const progress = e.pages > 0
+      ? `${e.pagesOCRd} / ${e.pages}`
+      : (['downloading','rendering','prefetching'].includes(e.status) ? '…' : '');
+    const statusLt   = STATUS_LT[e.status] ?? e.status;
+    const badgeClass = STATUS_BADGE[e.status] ?? 'badge-muted';
+    const dur  = e.duration != null ? (e.duration / 1000).toFixed(1) + 's' : '';
+    const size = e.bytes > 0 ? e.bytes < 1_048_576
+      ? (e.bytes / 1024).toFixed(0) + ' KB'
+      : (e.bytes / 1_048_576).toFixed(1) + ' MB' : '';
+    const isNew = !SEEN_IDS.has(e.id);
+    if (isNew) SEEN_IDS.add(e.id);
+    return `<div class="card${isNew ? ' card--new' : ''}">
+      <div class="card-body">
+        <div class="section-title mb-2">
+          <a href="/failas/${e.id}" target="_blank">${e.id}</a>
+        </div>
+        <dl class="kv-list">
+          <dt>Būsena</dt>
+          <dd><span class="badge ${badgeClass}">${statusLt}</span></dd>
+          ${progress ? `<dt>Puslapiai</dt><dd><span class="cell-mono">${progress}</span></dd>` : ''}
+          ${size     ? `<dt>Dydis</dt><dd><span class="cell-mono">${size}</span></dd>`       : ''}
+          ${dur      ? `<dt>Trukmė</dt><dd><span class="cell-mono">${dur}</span></dd>`      : ''}
+        </dl>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function markAllActiveTerminated() {
+  const terminal = new Set(['done', 'error', 'timeout', 'terminated']);
+  for (const [id, e] of STATE.queue) {
+    if (!terminal.has(e.status)) {
+      STATE.queue.set(id, { ...e, status: 'terminated', error: 'Priverstinai sustabdyta' });
+    }
+  }
+  renderQueue();
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: PHASE  (mygtukas + eigos juosta)
+// ═══════════════════════════════════════════════════════════
+const PHASE_LABELS = {
+  idle:        'Pradėti',
+  init:        'Inicializuojama',
+  fetching:    'Gaunama užduotis',
+  downloading: 'Atsiunčiamas failas',
+  rendering:   'Analizuojamas PDF',
+  ocr:         'Atpažįstamas tekstas',
+  posting:     'Siunčiamas rezultatas',
+  stopping:    'Stabdoma',
+  terminated:  'Priverstinai sustabdyta',
+};
+
+function setPhase(phase, detail = '') {
+  STATE.phase = phase;
+  const btn   = document.getElementById('btn-main');
+  btn.dataset.phase = phase;
+
+  const lbl = PHASE_LABELS[phase];
+  document.getElementById('btn-label').textContent =
+    typeof lbl === 'function' ? lbl(detail) : (lbl ?? phase);
+
+  const sub = document.getElementById('btn-sub');
+  if (phase === 'idle') {
+    sub.textContent = 'Norėdami pristabdyti — spauskite dar kartą';
+    setProgress(0);
+  } else if (phase === 'terminated') {
+    sub.textContent = 'Norėdami tęsti — perkraukite puslapį';
+  } else if (phase === 'init') {
+    sub.textContent = detail;  // e.g. "2 / 4 paruošta"
+  } else if (phase === 'stopping') {
+    sub.textContent = 'Pabaigiamas paskutinis dokumentas';
+    // progress bar stays — OCR continues updating it
+  } else if (phase !== 'ocr') {
+    sub.textContent = '';
+    setProgress(0);
+  }
+
+  btn.disabled = ['init', 'stopping', 'terminated'].includes(phase);
+
+  document.getElementById('main-links').style.display =
+    ['idle', 'terminated'].includes(phase) ? 'none' : '';
+}
+
+function setProgress(pct) {
+  document.getElementById('btn-progress-fill').style.width = `${Math.min(100, Math.max(0, pct))}%`;
+}
+
+function setBtnSub(text) {
+  document.getElementById('btn-sub').textContent = text;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: API
+// ═══════════════════════════════════════════════════════════
+async function fetchTask(cfg, signal) {
+  LOG.info(`POST ${cfg.getTaskUrl}`);
+  const res = await fetch(cfg.getTaskUrl, { method: 'POST', signal });
+  if (!res.ok) {
+    throw Object.assign(new Error(`GET_TASK grąžino ${res.status}`), { httpStatus: res.status });
+  }
+  return res.json();
+}
+
+async function downloadPDF(cfg, uri, signal) {
+  const url = cfg.baseFileUrl.replace(/\/$/, '') + (uri.startsWith('/') ? uri : '/' + uri);
+  LOG.info(`GET ${url}`);
+
+  const timeoutSig = AbortSignal.timeout(cfg.downloadTimeout);
+  const combined   = typeof AbortSignal.any === 'function'
+    ? AbortSignal.any([signal, timeoutSig]) : signal;
+
+  let res;
+  try {
+    res = await fetch(url, { signal: combined });
+  } catch (err) {
+    if (err.name === 'TimeoutError') {
+      throw Object.assign(
+        new Error(`Atsisiuntimas nutrūko po ${cfg.downloadTimeout / 1000}s`),
+        { isTimeout: true }
+      );
+    }
+    throw err;
+  }
+  if (!res.ok) throw new Error(`Atsisiuntimas grąžino ${res.status}`);
+  return res.arrayBuffer();
+}
+
+async function postResult(cfg, result, attempt = 1) {
+  LOG.info(`POST rezultatas id=${result.id} bandymas=${attempt}`);
+  try {
+    const res = await fetch(cfg.postResultUrl, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        id:       result.id,
+        tekstas:  result.texts,
+        duration: result.duration,
+        source:   'browser-worker',
+      }),
+    });
+    if (!res.ok) throw new Error(`POST rezultatas grąžino ${res.status}`);
+    LOG.info(`Rezultatas išsiųstas  id=${result.id}  trukmė=${result.duration}ms`);
+  } catch (err) {
+    LOG.error(`POST rezultatas id=${result.id} bandymas=${attempt} – ${err.message}`);
+    if (attempt < cfg.retries) {
+      await sleep(cfg.retryDelay);
+      return postResult(cfg, result, attempt + 1);
+    }
+    throw err;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: PDF_RENDER
+// ═══════════════════════════════════════════════════════════
+async function renderPageToCanvas(pdfDoc, pageNum, scale) {
+  const page     = await pdfDoc.getPage(pageNum);
+  const viewport = page.getViewport({ scale });
+  const canvas   = document.createElement('canvas');
+  canvas.width   = viewport.width;
+  canvas.height  = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  page.cleanup();
+  return canvas;
+}
+
+// Semaphore — riboja lygiagrečių konvertavimų skaičių
+// (A4 @ 300 DPI ≈ 2480×3510 px ≈ 34 MB canvas atminties)
+function createSemaphore(n) {
+  let active = 0;
+  const q = [];
+  return {
+    acquire: () => new Promise(res => { active < n ? (active++, res()) : q.push(res); }),
+    release() { active--; q.length && (active++, q.shift()()) ; },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: SCHEDULER
+// ═══════════════════════════════════════════════════════════
+async function initScheduler(cfg) {
+  LOG.info(`Init scheduler — darbuotojų=${cfg.workerCount} kalba=${cfg.lang}`);
+  setPhase('init', `0 / ${cfg.workerCount} paruošta`);
+
+  const scheduler = Tesseract.createScheduler();
+  let ready = 0;
+
+  await Promise.all(Array.from({ length: cfg.workerCount }, async () => {
+    const w = await Tesseract.createWorker(cfg.lang, cfg.oem);
+    await w.setParameters({ tessedit_pageseg_mode: cfg.psm });
+    scheduler.addWorker(w);
+    setPhase('init', `${++ready} / ${cfg.workerCount} paruošta`);
+    LOG.info(`Darbuotojas ${ready}/${cfg.workerCount} paruoštas`);
+  }));
+
+  LOG.info(`Scheduler paruoštas — ${cfg.workerCount} darbuotojai`);
+  return scheduler;
+}
+
+async function terminateScheduler(scheduler) {
+  if (!scheduler) return;
+  LOG.info('Stabdomas scheduler');
+  try { await scheduler.terminate(); } catch (_) {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: PROCESSOR
+// ═══════════════════════════════════════════════════════════
+async function processDocument(cfg, task, arrayBuffer, signal) {
+  const startMs  = Date.now();
+  // SVARBU: išsaugoti dydį PRIEŠ perdavimą PDF.js worker'iui —
+  // ArrayBuffer perduodamas kaip transfer, po to .byteLength = 0
+  const byteSize = arrayBuffer.byteLength;
+
+  setPhase('rendering');
+  setBtnSub(`#${task.id}`);
+  upsertQueue(task.id, { status: 'rendering' });
+  const pdfDoc    = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pageCount = pdfDoc.numPages;
+  LOG.info(`PDF puslapių=${pageCount}  id=${task.id}`);
+  upsertQueue(task.id, { pages: pageCount, status: 'ocr' });
+  setPhase('ocr');
+
+  const sem     = createSemaphore(cfg.workerCount);
+  const texts   = new Array(pageCount).fill('');
+  let pagesOCRd = 0;
+  setBtnSub(`Puslapis 0 / ${pageCount}`);
+
+  await Promise.all(Array.from({ length: pageCount }, async (_, i) => {
+    const pageNum = i + 1;
+    await sem.acquire();
+    try {
+      const canvas = await renderPageToCanvas(pdfDoc, pageNum, cfg.pdfScale);
+      const { data: { text } } = await STATE.scheduler.addJob('recognize', canvas);
+      canvas.width = 0;
+      texts[i] = text;
+      pagesOCRd++;
+      upsertQueue(task.id, { pagesOCRd });
+      setProgress(pagesOCRd / pageCount * 100);
+      setBtnSub(`Puslapis ${pagesOCRd} / ${pageCount}`);
+      LOG.info(`Puslapis ${pageNum}/${pageCount} atliktas  id=${task.id}`);
+    } finally {
+      sem.release();
+    }
+  }));
+
+  await pdfDoc.destroy();
+
+  const duration = Date.now() - startMs;
+  LOG.info(`Dokumentas atliktas  id=${task.id}  psl=${pageCount}  trukmė=${duration}ms`);
+  SESSION.addDoc(byteSize, pageCount);
+  upsertQueue(task.id, { status: 'posting', duration });
+
+  return { id: task.id, texts, duration };
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: PREFETCH
+// ═══════════════════════════════════════════════════════════
+async function prefetchNext(cfg, signal) {
+  if (STATE.prefetch) return;
+  try {
+    const task = await fetchTask(cfg, signal);
+    if (signal.aborted) return;
+    LOG.info(`Prefetch užduotis id=${task.id}  uri=${task.uri}`);
+    STATE.totalQueued++;
+    upsertQueue(task.id, { id: task.id, uri: task.uri, status: 'prefetching' });
+
+    const bufferPromise = downloadPDF(cfg, task.uri, signal)
+      .then(buf => {
+        if (!signal.aborted) {
+          LOG.info(`Prefetch paruošta: ${(buf.byteLength / 1024).toFixed(0)} KB  id=${task.id}`);
+          upsertQueue(task.id, { status: 'prefetched', bytes: buf.byteLength });
+        }
+        return buf;
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          const status = err.isTimeout ? 'timeout' : 'error';
+          LOG.warn(`Prefetch klaida id=${task.id}: ${err.message}`);
+          upsertQueue(task.id, { status, error: err.message });
+        }
+        return null;
+      });
+
+    STATE.prefetch = { task, bufferPromise, fetchedAt: Date.now() };
+  } catch (err) {
+    if (err.name !== 'AbortError') LOG.warn(`Prefetch: nėra užduoties (${err.message})`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: POLL_LOOP
+// ═══════════════════════════════════════════════════════════
+async function pollLoop(cfg, signal) {
+  LOG.info('Apklausa pradėta');
+  // STATE.prefetch išsaugomas — jei liko iš anksto paruoštas dokumentas, jis bus panaudotas pirmas,
+  // bet tik jei nėra pasenęs (>15 min)
+  const PREFETCH_TTL = 15 * 60 * 1000;
+  if (STATE.prefetch && Date.now() - STATE.prefetch.fetchedAt > PREFETCH_TTL) {
+    LOG.warn(`Paruoštas dokumentas id=${STATE.prefetch.task.id} pasenęs — atmetamas`);
+    upsertQueue(STATE.prefetch.task.id, { status: 'error', error: 'Pasenęs (>15 min)' });
+    STATE.prefetch = null;
+  }
+  STATE.prefetchInFlight = null;
+
+  while (!signal.aborted) {
+    try {
+      if (STATE.prefetchInFlight) {
+        await STATE.prefetchInFlight;
+        STATE.prefetchInFlight = null;
+      }
+
+      let task, arrayBuffer;
+
+      if (STATE.prefetch) {
+        ({ task } = STATE.prefetch);
+        LOG.info(`Naudojama prefetch užduotis id=${task.id}`);
+        arrayBuffer = await STATE.prefetch.bufferPromise;
+        STATE.prefetch = null;
+
+        if (!arrayBuffer) {
+          LOG.warn(`Pakartotinai atsiunčiama id=${task.id}`);
+          setPhase('downloading');
+          setBtnSub(`#${task.id}`);
+          upsertQueue(task.id, { status: 'downloading' });
+          try {
+            arrayBuffer = await downloadPDF(cfg, task.uri, signal);
+          } catch (err) {
+            if (err.isTimeout) upsertQueue(task.id, { status: 'timeout', error: err.message });
+            throw err;
+          }
+        }
+        LOG.info(`Buferis paruoštas: ${(arrayBuffer.byteLength / 1024).toFixed(0)} KB  id=${task.id}`);
+
+      } else {
+        setPhase('fetching');
+        task = await fetchTask(cfg, signal);
+        LOG.info(`Užduotis id=${task.id}  uri=${task.uri}`);
+        STATE.totalQueued++;
+        upsertQueue(task.id, { id: task.id, uri: task.uri, status: 'downloading' });
+        setPhase('downloading');
+        setBtnSub(`#${task.id}`);
+        try {
+          arrayBuffer = await downloadPDF(cfg, task.uri, signal);
+        } catch (err) {
+          if (err.isTimeout) upsertQueue(task.id, { status: 'timeout', error: err.message });
+          throw err;
+        }
+        LOG.info(`Atsisiųsta ${(arrayBuffer.byteLength / 1024).toFixed(0)} KB  id=${task.id}`);
+      }
+
+      upsertQueue(task.id, { bytes: arrayBuffer.byteLength });
+      STATE.prefetchInFlight = prefetchNext(cfg, signal);
+
+      const result = await processDocument(cfg, task, arrayBuffer, signal);
+
+      if (signal.aborted) {
+        setBtnSub('Siunčiamas rezultatas');
+      } else {
+        setPhase('posting');
+        setBtnSub(`#${task.id}`);
+      }
+      await postResult(cfg, result);
+      upsertQueue(task.id, { status: 'done' });
+
+    } catch (err) {
+      if (signal.aborted || err.name === 'AbortError') break;
+
+      STATE.prefetch         = null;
+      STATE.prefetchInFlight = null;
+      LOG.error(err.message);
+
+      const delay = err.httpStatus && err.httpStatus < 500 ? cfg.pollEmpty : cfg.pollError;
+      LOG.warn(`Laukiama ${delay}ms prieš bandant iš naujo`);
+      await sleep(delay, signal).catch(() => {});
+    }
+  }
+
+  LOG.info('Apklausa sustabdyta');
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: UTILITIES
+// ═══════════════════════════════════════════════════════════
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => {
+      clearTimeout(t);
+      reject(Object.assign(new DOMException('Aborted', 'AbortError'), {}));
+    }, { once: true });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: DIALOG
+// ═══════════════════════════════════════════════════════════
+const dlg        = document.getElementById('dlg-start');
+const dlgApiKey  = document.getElementById('dlg-apikey');
+const dlgWorkers = document.getElementById('dlg-workers');
+
+document.getElementById('dlg-cores').textContent = HW_CONCURRENCY;
+dlgWorkers.value = DEFAULT_WORKERS;
+dlgWorkers.max   = HW_CONCURRENCY * 2;
+
+// Enter navigation: API key → workers → confirm
+dlgApiKey.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); dlgWorkers.focus(); dlgWorkers.select(); }
+});
+dlgWorkers.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('dlg-confirm').click(); }
+});
+
+function updateDlgCalc() {
+  const n  = Math.max(1, parseInt(dlgWorkers.value, 10) || DEFAULT_WORKERS);
+  const mb = n * 300;
+  const gijosForm = n % 10 === 1 && n !== 11 ? 'gija' : (n % 10 >= 2 && n % 10 <= 9 && (n < 10 || n > 20)) ? 'gijos' : 'gijų';
+  document.getElementById('dlg-ram').textContent =
+    `${n} ${gijosForm} × 300 MB ≈ ${mb} MB (${(mb / 1024).toFixed(1)} GB) RAM`;
+  document.getElementById('dlg-warn').textContent = n > HW_CONCURRENCY
+    ? `⚠ Viršija branduolių skaičių — darbuotojai konkuruos dėl CPU` : '';
+}
+dlgWorkers.addEventListener('input', updateDlgCalc);
+updateDlgCalc();
+
+// ═══════════════════════════════════════════════════════════
+// SECTION: UI_BINDING
+// ═══════════════════════════════════════════════════════════
+
+document.getElementById('btn-main').addEventListener('click', () => {
+  if (STATE.phase === 'idle') {
+    dlg.showModal();
+  } else if (!['init', 'stopping', 'terminated'].includes(STATE.phase)) {
+    LOG.info('Stabdoma švelniai — baigiamas dabartinis dokumentas');
+    setPhase('stopping');
+    STATE.abort?.abort();
+  }
+});
+
+document.getElementById('dlg-confirm').addEventListener('click', async () => {
+  const apiKey = dlgApiKey.value.trim();
+  if (!apiKey) {
+    dlgApiKey.focus();
+    dlgApiKey.style.outline = '2px solid #c33';
+    return;
+  }
+  dlgApiKey.style.outline = '';
+  const cfg = {
+    ...buildUrlConfig(apiKey),
+    ...DEFAULTS,
+    workerCount: Math.max(1, parseInt(dlgWorkers.value, 10) || DEFAULT_WORKERS),
+  };
+  dlg.close();
+
+  STATE.totalQueued = 0;
+  SESSION.start();
+  STATE.abort = new AbortController();
+
+  try {
+    STATE.scheduler = await initScheduler(cfg);
+    setPhase('fetching');
+    await pollLoop(cfg, STATE.abort.signal);
+  } catch (err) {
+    if (err.name !== 'AbortError') LOG.error(`Kritinė klaida: ${err.message}`);
+  } finally {
+    SESSION.stop();
+    await terminateScheduler(STATE.scheduler);
+    STATE.scheduler = null;
+    if (STATE.phase !== 'terminated') setPhase('idle');
+  }
+});
+
+document.getElementById('dlg-cancel').addEventListener('click', () => dlg.close());
+
+document.getElementById('lnk-force-stop').addEventListener('click', e => {
+  e.preventDefault();
+  LOG.warn('Priverstinis stabdymas — scheduler nutraukiamas iš karto');
+  markAllActiveTerminated();
+  STATE.abort?.abort();
+  if (STATE.scheduler) {
+    try { STATE.scheduler.terminate(); } catch (_) {}
+    STATE.scheduler = null;
+  }
+  SESSION.stop();
+  setPhase('terminated');
+});
+
+window.addEventListener('beforeunload', e => {
+  if (!['idle', 'terminated'].includes(STATE.phase)) {
+    e.preventDefault();
+  }
+});
+
+let logVisible = false;
+document.getElementById('lnk-log').addEventListener('click', e => {
+  e.preventDefault();
+  logVisible = !logVisible;
+  document.getElementById('log-section').style.display = logVisible ? '' : 'none';
+  e.target.textContent = logVisible ? 'Slėpti logs\'us' : 'Logs\'ai';
+});
+
+</script>
+
+<%- include('../../footer.ejs') %>
+</body>
+</html>

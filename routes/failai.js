@@ -748,6 +748,13 @@ failaiSearchRouter.get("/failai/ocr", async (req, res) => {
     });
 });
 
+failaiSearchRouter.get("/failai/ocr/web", async (req, res) => {
+    res.render("failai/webOcr/webOcr", {
+        customHead: config.customHead,
+        req,
+    });
+});
+
 failaiSearchRouter.get("/failai/ocr/:id", async (req, res, next) => {
     const nodeId = parseInt(req.params.id, 10);
     if (isNaN(nodeId)) return next();
