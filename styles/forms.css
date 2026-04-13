@@ -3,7 +3,7 @@
         @apply mb-4;
     }
 
-    fieldset > .form-group {
+    fieldset.filter-group > .form-group {
         @apply mb-0;
     }
 
