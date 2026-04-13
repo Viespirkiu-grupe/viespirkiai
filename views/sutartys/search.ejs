@@ -16,7 +16,8 @@
       enterkeyhint="search"
     />
 
-    <label for="searchNustatymaiToggle" class="btn btn-ghost btn-icon" title="Filtrai" aria-label="Rodyti filtrus">
+    <label class="btn btn-ghost btn-icon" title="Filtrai" aria-label="<%= usedHiddenFields ? 'Slėpti filtrus' : 'Rodyti filtrus' %>" aria-expanded="<%= usedHiddenFields ? 'true' : 'false' %>" aria-controls="searchNustatymai">
+      <input type="checkbox" id="searchNustatymaiToggle" class="sr-only" <% if (usedHiddenFields) { %>checked<% } %>>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path fill-rule="evenodd" clip-rule="evenodd" d="M11.9999 3C11.4476 3 10.9999 3.44772 10.9999 4V6.17072C9.83476 6.58259 9 7.6938 9 8.99998C9 10.3062 9.83476 11.4174 10.9999 11.8292L10.9999 20C10.9999 20.5523 11.4476 21 11.9999 21C12.5522 21 12.9999 20.5523 12.9999 20V11.8293C14.1651 11.4175 15 10.3062 15 8.99998C15 7.69373 14.1651 6.58246 12.9999 6.17066V4C12.9999 3.44772 12.5522 3 11.9999 3ZM12 7.99998C11.4477 7.99998 11 8.4477 11 8.99998C11 9.55227 11.4477 9.99998 12 9.99998C12.5523 9.99998 13 9.55227 13 8.99998C13 8.4477 12.5523 7.99998 12 7.99998Z" fill="currentColor"/>
         <path fill-rule="evenodd" clip-rule="evenodd" d="M17.9999 20C17.9999 20.5523 18.4476 21 18.9999 21C19.5522 21 19.9999 20.5523 19.9999 20V17.8293C21.1651 17.4175 22 16.3062 22 15C22 13.6937 21.1651 12.5825 19.9999 12.1707V4C19.9999 3.44772 19.5522 3 18.9999 3C18.4476 3 17.9999 3.44772 17.9999 4V12.1707C16.8348 12.5826 16 13.6938 16 15C16 16.3062 16.8348 17.4174 17.9999 17.8292V20ZM19 14C18.4477 14 18 14.4477 18 15C18 15.5523 18.4477 16 19 16C19.5523 16 20 15.5523 20 15C20 14.4477 19.5523 14 19 14Z" fill="currentColor"/>
@@ -27,32 +28,30 @@
     <button type="submit" class="btn btn-primary">Ieškoti</button>
   </div>
 
-  <input type="checkbox" id="searchNustatymaiToggle" hidden <% if (usedHiddenFields) { %>checked<% } %>>
-
-  <div id="searchNustatymai" class="search-filters">
+  <div id="searchNustatymai" class="search-filters" aria-hidden="<% if (!usedHiddenFields) { %>true<% } else { %>false<% } %>" <% if (!usedHiddenFields) { %>inert<% } %>>
       <div class="search-filters-inner">
         <div class="search-filters-grid">
 
-          <div class="filter-group">
-            <div class="filter-group-label">Dalyviai</div>
+          <fieldset class="filter-group">
+            <legend class="filter-group-label">Dalyviai</legend>
             <%- include('../inputs/text', { label: 'Pirkėjo kodas', name: 'perkanciosiosOrganizacijosKodas', placeholder: 'Nenurodyta', values }) %>
             <%- include('../inputs/text', { label: 'Tiekėjo kodas', name: 'tiekejoKodas', placeholder: 'Nenurodyta', values }) %>
-          </div>
+          </fieldset>
 
-          <div class="filter-group">
-            <div class="filter-group-label">Laikotarpis</div>
+          <fieldset class="filter-group">
+            <legend class="filter-group-label">Laikotarpis</legend>
             <%- include('../inputs/date', { label: 'Sudaryta nuo', name: 'sudarymoDataNuo', values }) %>
             <%- include('../inputs/date', { label: 'Sudaryta iki', name: 'sudarymoDataIki', values }) %>
-          </div>
+          </fieldset>
 
-          <div class="filter-group">
-            <div class="filter-group-label">Vertė</div>
+          <fieldset class="filter-group">
+            <legend class="filter-group-label">Vertė</legend>
             <%- include('../inputs/number', { label: 'Vertė nuo', name: 'verteNuo', placeholder: '0 €', values }) %>
             <%- include('../inputs/number', { label: 'Vertė iki', name: 'verteIki', placeholder: '∞ €', values }) %>
-          </div>
+          </fieldset>
 
-          <div class="filter-group">
-            <div class="filter-group-label">Klasifikacija</div>
+          <fieldset class="filter-group">
+            <legend class="filter-group-label">Klasifikacija</legend>
             <div class="form-group">
               <label class="form-label flex justify-between" for="bvpzPrefiksas">
                 <span>BVPŽ prefiksas <sup>1</sup></span>
@@ -70,17 +69,17 @@
             <div class="form-group">
               <input type="text" class="form-control" name="bvpzPrefiksasKitas" id="bvpzPrefiksasKitas" value="<%= values["bvpzPrefiksasKitas"] || "" %>" placeholder="Nenurodyta"/>
             </div>
-          </div>
+          </fieldset>
 
-          <div class="filter-group">
-            <div class="filter-group-label">Identifikatoriai</div>
+          <fieldset class="filter-group">
+            <legend class="filter-group-label">Identifikatoriai</legend>
             <%- include('../inputs/number', { label: 'Unikalus ID', name: 'sutartiesUnikalusID', placeholder: 'Nenurodyta', values }) %>
             <%- include('../inputs/text', { label: 'Sut. numeris', name: 'sutartiesNumeris', placeholder: 'Nenurodyta', values }) %>
             <%- include('../inputs/text', { label: 'Pirkimo numeris', name: 'pirkimoNumeris', placeholder: 'Nenurodyta', values }) %>
-          </div>
+          </fieldset>
 
-          <div class="filter-group" style="justify-content: start;">
-            <div class="filter-group-label">Rikiavimas</div>
+          <fieldset class="filter-group justify-start">
+            <legend class="filter-group-label">Rikiavimas</legend>
             <div class="form-group">
               <label class="form-label" for="sort">Rikiuoti pagal</label>
               <div class="input-group">
@@ -99,13 +98,13 @@
                 <%- include('../inputs/sort', { label: '', name: 'sortDir', values }) %>
               </div>
             </div>
-          </div>
+          </fieldset>
 
-          <div class="filter-group" style="justify-content: start;">
-            <div class="filter-group-label">Filtrai</div>
+          <fieldset class="filter-group justify-start">
+            <legend class="filter-group-label">Filtrai</legend>
             <%- include('../inputs/checkbox', { name: 'tikSuDokumentais', label: "Tik su dokumentais", values }) %>
             <%- include('../inputs/checkbox', { name: 'ignoruotiSp', label: "Nerodyti pakeitimų (SP)", values }) %>
-          </div>
+          </fieldset>
 
         </div>
         <p class="text-muted text-xs mt-5"><sup>1</sup> Veikia tik ne tekstinėse paieškose</p>
@@ -113,6 +112,26 @@
   </div>
 
   <script>
+    // Update aria-expanded and inert when checkbox changes
+    const searchToggle = document.querySelector('label[aria-controls="searchNustatymai"]');
+    const filterBox = document.getElementById('searchNustatymai');
+    const checkbox = document.getElementById('searchNustatymaiToggle');
+
+    checkbox.addEventListener('change', function() {
+      const isChecked = this.checked;
+      searchToggle.setAttribute('aria-expanded', isChecked);
+      searchToggle.setAttribute('aria-label', isChecked ? 'Slėpti filtrus' : 'Rodyti filtrus');
+      if (isChecked) {
+        filterBox.removeAttribute('inert');
+        filterBox.setAttribute('aria-hidden', 'false');
+        const firstInput = filterBox.querySelector('input, select');
+        if (firstInput) firstInput.focus();
+      } else {
+        filterBox.setAttribute('inert', '');
+        filterBox.setAttribute('aria-hidden', 'true');
+      }
+    });
+
     document.getElementById('search').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') {
         e.preventDefault();

@@ -385,7 +385,7 @@ failaiSearchRouter.get(
         } catch {
             total = 10_000;
             const trukme = ((performance.now() - startas) / 1000).toFixed(2);
-            numberOfResults = `Rodomi ${results.length} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <pre data-duration="${trukme}" class="inline"> (${trukme}s, ${engine})</pre>`;
+            numberOfResults = `Rodomi ${results.length} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <span data-duration="${trukme}" class="inline"> (${trukme}s, ${engine})</span>`;
         }
 
         if (req.query.json)
