@@ -3,21 +3,22 @@ import config from "../utils/config.js";
 
 const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
 
-// Dead ratio is stable between index compactions — cache it for 60 s.
+// ── Dead-ratio cache ─────────────────────────────────────────────────────────
+// The ratio mirusios/(gyvos+mirusios) is only used to decide how many hits to
+// over-fetch from Quickwit so we can skip tombstones. It's stable between
+// compactions, so we cache it briefly to avoid a Postgres roundtrip on every
+// search. 60s is a pragmatic tradeoff: long enough to amortize well, short
+// enough that fresh ingest activity is reflected quickly.
 const _deadRatioCache = new Map(); // lentele → { value, expiresAt }
 
-/**
- * Get dead ratio for a table across all shards.
- * Result is cached for 60 s to avoid a Postgres roundtrip on every search.
- */
 async function getDeadRatio(lentele) {
   const cached = _deadRatioCache.get(lentele);
   if (cached && Date.now() < cached.expiresAt) return cached.value;
 
   const { rows } = await postgres.query(
     `SELECT
-       SUM("gyvosEilutes") AS gyva,
-       SUM("mirusiosEilutes") AS mirusi
+       SUM("gyvosEilutes")     AS gyva,
+       SUM("mirusiosEilutes")  AS mirusi
      FROM "quickwitIndeksai"
      WHERE "lentele" = $1`,
     [lentele]
@@ -29,7 +30,7 @@ async function getDeadRatio(lentele) {
   return value;
 }
 
-// ── HTTP helpers ─────────────────────────────────────────────────────────────
+// ── Quickwit HTTP helpers ────────────────────────────────────────────────────
 
 async function qwGet(path) {
   const res = await fetch(`${QW_URL}${path}`);
@@ -61,14 +62,27 @@ async function qwIngestNdjson(indeksas, docs) {
 }
 
 async function qwSearch(indeksas, params) {
+  const start = Date.now();
   const res = await fetch(`${QW_URL}/api/v1/${indeksas}/search`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
-  if (!res.ok)
-    throw new Error(`Quickwit search ${indeksas} → ${res.status}: ${await res.text()}`);
-  return res.json();
+  const fetchEnd = Date.now();
+  const text = await res.text();
+  const textEnd = Date.now();
+  const parsed = JSON.parse(text);
+  const parseEnd = Date.now();
+
+  console.log(
+    `qwSearch ${indeksas}: ${res.status}` +
+    ` fetch=${fetchEnd - start}ms` +
+    ` body=${textEnd - fetchEnd}ms (${(Buffer.byteLength(text) / 1024).toFixed(1)} KB)` +
+    ` parse=${parseEnd - textEnd}ms`
+  );
+
+  if (!res.ok) throw new Error(`Quickwit search ${indeksas} → ${res.status}: ${text}`);
+  return parsed;
 }
 
 // ── Index creation ───────────────────────────────────────────────────────────
@@ -77,6 +91,8 @@ async function ensureQuickwitIndex(indeksas, indexConfig) {
   try {
     await qwGet(`/api/v1/indexes/${indeksas}`);
   } catch {
+    // Rewrite the index_id in the YAML so every shard gets its own Quickwit
+    // index while sharing the same schema blob in quickwitLenteles.
     const yaml = indexConfig.replace(/^index_id:.*$/m, `index_id: ${indeksas}`);
     await qwCreateIndex(yaml);
   }
@@ -85,22 +101,27 @@ async function ensureQuickwitIndex(indeksas, indexConfig) {
 // ── Shard management ─────────────────────────────────────────────────────────
 
 /**
- * Returns the indeksas of the current active shard, creating one if needed.
- * "Current" means the shard's schema matches the latest indexConfig.
- * A new shard is created when no current shard has room
- * (gyvosEilutes + mirusiosEilutes >= shardSize).
- * Must be called within an open transaction with the advisory lock held.
+ * Return the indeksas of a shard that can accept new inserts, creating one if
+ * none has room. "current = true" marks shards whose schema matches the latest
+ * indexConfig — older non-current shards keep accepting re-indexes for rows
+ * they already hold, but new rows only land on current shards.
+ *
+ * Must be called inside a transaction that already holds the per-lentele
+ * advisory lock, so concurrent writers can't race on shard creation.
  *
  * @param {string} lentele
  * @param {import('pg').PoolClient} client
  * @returns {Promise<string>} indeksas
  */
 async function getOrCreateActiveShard(lentele, client) {
+  // iterptosEilutes is monotonic (every Quickwit ingest event bumps it), so
+  // it's the right "has this shard been filled?" signal. gyvos + mirusios
+  // would also work but requires reading the generated column.
   const { rows } = await client.query(
     `SELECT "indeksas"
      FROM "quickwitIndeksai"
      WHERE "lentele" = $1
-       AND ("gyvosEilutes" + "mirusiosEilutes") < "shardSize"
+       AND "iterptosEilutes" < "shardSize"
        AND "current" = true
      ORDER BY "seq" DESC
      LIMIT 1`,
@@ -109,6 +130,7 @@ async function getOrCreateActiveShard(lentele, client) {
 
   if (rows.length) return rows[0].indeksas;
 
+  // No current shard has room — create a fresh one.
   const { rows: cfg } = await client.query(
     `SELECT "defaultShardSize", "indexConfig", "indexConfigHash"
      FROM "quickwitLenteles"
@@ -128,12 +150,15 @@ async function getOrCreateActiveShard(lentele, client) {
   const indeksas = `${lentele}_${nextSeq}`;
 
   await client.query(
-    `INSERT INTO "quickwitIndeksai"("lentele", "seq", "shardSize", "indexConfig", "indexConfigHash")
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO "quickwitIndeksai"
+       ("lentele", "seq", "shardSize", "indexConfig", "indexConfigHash", "current")
+     VALUES ($1, $2, $3, $4, $5, true)`,
     [lentele, nextSeq, defaultShardSize, indexConfig, indexConfigHash]
   );
 
-  // Outside transaction — Quickwit is not transactional
+  // Quickwit is not transactional with Postgres; create the index after the
+  // insert. If this fails, a later retry will see the row already exists and
+  // just try the index create again. Idempotent by design.
   await ensureQuickwitIndex(indeksas, indexConfig);
 
   return indeksas;
@@ -142,18 +167,32 @@ async function getOrCreateActiveShard(lentele, client) {
 // ── Indexing ─────────────────────────────────────────────────────────────────
 
 /**
- * Index a single document.
- *
- * @param {string} lentele
- * @param {string} eilutesId  - source row ID as string
- * @param {object} doc        - fields to push; quickwitId injected automatically
+ * Index a single document. Thin wrapper around indexDocs.
  */
 export async function indexDoc(lentele, eilutesId, doc) {
   return indexDocs(lentele, [{ eilutesId, doc }]);
 }
 
 /**
- * Batch index multiple documents from the same table.
+ * Batch-index multiple documents from the same table.
+ *
+ * Per-row behaviour:
+ *   - NEW eilutesId: INSERT into quickwitEilutes on the current shard.
+ *   - EXISTING on a current shard: UPDATE quickwitEilutes (rotate quickwitId
+ *     in place). The old quickwitId becomes a tombstone once the new doc
+ *     lands in Quickwit.
+ *   - EXISTING on a non-current shard: migrate — UPDATE quickwitEilutes to
+ *     point at the active current shard with a fresh quickwitId.
+ *
+ * Counter ownership split:
+ *   - gyvosEilutes (live row count per shard) is maintained by statement-
+ *     level triggers on quickwitEilutes. The triggers watch INSERT/UPDATE/
+ *     DELETE and aggregate deltas per shard.
+ *   - iterptosEilutes (cumulative Quickwit ingest events per shard) is bumped
+ *     by THIS code, right after a successful Quickwit ingest. iterptos means
+ *     literally "how many docs we've ingested into this shard's Quickwit
+ *     index", which is a count this layer owns.
+ *   - mirusiosEilutes is a generated column (iterptos - gyvos).
  *
  * @param {string} lentele
  * @param {{ eilutesId: string, doc: object }[]} items
@@ -161,66 +200,66 @@ export async function indexDoc(lentele, eilutesId, doc) {
 export async function indexDocs(lentele, items) {
   if (!items.length) return;
 
+  const t0 = Date.now();
+  const timings = {};
+  const mark = (phase, since) => { timings[phase] = Date.now() - since; };
+
   const byEilutesId = new Map(items.map((i) => [i.eilutesId, i.doc]));
   const eilutesIds = [...byEilutesId.keys()];
 
   const client = await postgres.connect();
+  mark("connect", t0);
+
   try {
+    const tTx = Date.now();
     await client.query("BEGIN");
     await client.query(
       `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`,
       [lentele]
     );
+    mark("beginAndLock", tTx);
 
-    // ── Fetch existing rows ──────────────────────────────────────────────────
+    // ── Figure out which ids are new vs. existing ───────────────────────────
+    const tExisting = Date.now();
     const { rows: existing } = await client.query(
       `SELECT "eilutesId", "indeksas"
        FROM "quickwitEilutes"
        WHERE "lentele" = $1 AND "eilutesId" = ANY($2)`,
       [lentele, eilutesIds]
     );
+    mark("selectExisting", tExisting);
 
     const existingMap = new Map(existing.map((r) => [r.eilutesId, r.indeksas]));
     const toInsert = eilutesIds.filter((id) => !existingMap.has(id));
     const toUpdate = eilutesIds.filter((id) => existingMap.has(id));
 
-    // ── Resolve target shard for updates ────────────────────────────────────
-    // Rows on non-current shards are migrated to the current shard.
-    // Map<eilutesId, { quickwitId, oldIndeksas, indeksas, doc }>
+    // assigned: eilutesId → { quickwitId, oldIndeksas, indeksas, doc }
     const assigned = new Map();
     let currentShard = null;
 
+    // ── Resolve target shard for updates ────────────────────────────────────
+    // Every re-index goes to the newest active shard. Old shards retain rows
+    // only until those rows are touched again; once touched, they migrate
+    // forward. This keeps hot data concentrated on recent shards and lets
+    // older ones drain naturally over time.
+    const tAssignUpdates = Date.now();
     if (toUpdate.length) {
-      const oldIndeksai = [...new Set(toUpdate.map((id) => existingMap.get(id)))];
-      const { rows: shardRows } = await client.query(
-        `SELECT "indeksas", "current"
-         FROM "quickwitIndeksai"
-         WHERE "indeksas" = ANY($1)`,
-        [oldIndeksai]
-      );
-      const shardCurrentMap = new Map(shardRows.map((r) => [r.indeksas, r.current]));
-
+      currentShard ??= await getOrCreateActiveShard(lentele, client);
       for (const eilutesId of toUpdate) {
-        const oldIndeksas = existingMap.get(eilutesId);
-        let targetIndeksas;
-        if (shardCurrentMap.get(oldIndeksas)) {
-          targetIndeksas = oldIndeksas;
-        } else {
-          if (!currentShard) currentShard = await getOrCreateActiveShard(lentele, client);
-          targetIndeksas = currentShard;
-        }
         assigned.set(eilutesId, {
           quickwitId: crypto.randomUUID(),
-          oldIndeksas,
-          indeksas: targetIndeksas,
+          oldIndeksas: existingMap.get(eilutesId),
+          indeksas: currentShard,
           doc: byEilutesId.get(eilutesId),
         });
       }
     }
+    mark("assignUpdates", tAssignUpdates);
 
-    // ── Resolve target shard for inserts ─────────────────────────────────────
+    // ── Resolve target shard for inserts ────────────────────────────────────
+    const tAssignInserts = Date.now();
     if (toInsert.length) {
-      if (!currentShard) currentShard = await getOrCreateActiveShard(lentele, client);
+      currentShard ??= await getOrCreateActiveShard(lentele, client);
       for (const eilutesId of toInsert) {
         assigned.set(eilutesId, {
           quickwitId: crypto.randomUUID(),
@@ -230,14 +269,32 @@ export async function indexDocs(lentele, items) {
         });
       }
     }
+    mark("assignInserts", tAssignInserts);
 
-    // ── Batch UPDATE quickwitEilutes for re-indexed rows ─────────────────────
+    // ── Batch UPDATE quickwitEilutes for existing rows ──────────────────────
+    // Split into stayed (same shard, rotate quickwitId) and moved (migration
+    // across shards). Two statements so the stayed path only rewrites the
+    // quickwitId column. The trigger on quickwitEilutes handles gyvos.
+    let stayedCount = 0;
+    let movedCount = 0;
+    const tUpdate = Date.now();
     if (toUpdate.length) {
-      const stayed = toUpdate.filter((id) => assigned.get(id).indeksas === assigned.get(id).oldIndeksas);
-      const moved  = toUpdate.filter((id) => assigned.get(id).indeksas !== assigned.get(id).oldIndeksas);
+      const stayed = toUpdate.filter((id) => {
+        const a = assigned.get(id);
+        return a.indeksas === a.oldIndeksas;
+      });
+      const moved = toUpdate.filter((id) => {
+        const a = assigned.get(id);
+        return a.indeksas !== a.oldIndeksas;
+      });
+      stayedCount = stayed.length;
+      movedCount = moved.length;
 
       if (stayed.length) {
-        const vals = stayed.map((_, i) => `($${i * 2 + 1}::text, $${i * 2 + 2}::uuid)`).join(", ");
+        const tStayed = Date.now();
+        const vals = stayed
+          .map((_, i) => `($${i * 2 + 1}::text, $${i * 2 + 2}::uuid)`)
+          .join(", ");
         const params = stayed.flatMap((id) => [id, assigned.get(id).quickwitId]);
         await client.query(
           `UPDATE "quickwitEilutes" AS qe
@@ -247,10 +304,14 @@ export async function indexDocs(lentele, items) {
              AND qe."eilutesId" = v."eilutesId"`,
           [...params, lentele]
         );
+        mark("updateStayed", tStayed);
       }
 
       if (moved.length) {
-        const vals = moved.map((_, i) => `($${i * 3 + 1}::text, $${i * 3 + 2}::uuid, $${i * 3 + 3}::text)`).join(", ");
+        const tMoved = Date.now();
+        const vals = moved
+          .map((_, i) => `($${i * 3 + 1}::text, $${i * 3 + 2}::uuid, $${i * 3 + 3}::text)`)
+          .join(", ");
         const params = moved.flatMap((id) => {
           const { quickwitId, indeksas } = assigned.get(id);
           return [id, quickwitId, indeksas];
@@ -264,48 +325,18 @@ export async function indexDocs(lentele, items) {
              AND qe."eilutesId" = v."eilutesId"`,
           [...params, lentele]
         );
+        mark("updateMoved", tMoved);
       }
-
-      // ── Shard counters for updates ─────────────────────────────────────────
-      // Old shard always: -1 gyva, +1 mirusi
-      // New shard (moves only): +1 gyva
-      const deadByShard = new Map();
-      const newByShard  = new Map();
-
-      for (const eilutesId of toUpdate) {
-        const { oldIndeksas, indeksas } = assigned.get(eilutesId);
-        deadByShard.set(oldIndeksas, (deadByShard.get(oldIndeksas) ?? 0) + 1);
-        if (indeksas !== oldIndeksas) {
-          newByShard.set(indeksas, (newByShard.get(indeksas) ?? 0) + 1);
-        }
-      }
-
-      await Promise.all([
-        ...[...deadByShard.entries()].map(([indeksas, count]) =>
-          client.query(
-            `UPDATE "quickwitIndeksai"
-             SET "mirusiosEilutes" = "mirusiosEilutes" + $2,
-                 "gyvosEilutes"    = "gyvosEilutes"    - $2
-             WHERE "indeksas" = $1`,
-            [indeksas, count]
-          )
-        ),
-        ...[...newByShard.entries()].map(([indeksas, count]) =>
-          client.query(
-            `UPDATE "quickwitIndeksai"
-             SET "gyvosEilutes" = "gyvosEilutes" + $2
-             WHERE "indeksas" = $1`,
-            [indeksas, count]
-          )
-        ),
-      ]);
     }
+    mark("updateTotal", tUpdate);
 
-    // ── Batch INSERT quickwitEilutes for new rows ────────────────────────────
+    // ── Batch INSERT quickwitEilutes for new rows ───────────────────────────
+    const tInsert = Date.now();
     if (toInsert.length) {
-      const indeksas = assigned.get(toInsert[0]).indeksas;
-
-      const vals = toInsert.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}::uuid)`).join(", ");
+      const indeksas = currentShard;
+      const vals = toInsert
+        .map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}::uuid)`)
+        .join(", ");
       const params = toInsert.flatMap((id) => [id, assigned.get(id).quickwitId]);
 
       await client.query(
@@ -314,18 +345,19 @@ export async function indexDocs(lentele, items) {
          FROM (VALUES ${vals}) AS v("eilutesId", "quickwitId")`,
         [...params, lentele, indeksas]
       );
-
-      await client.query(
-        `UPDATE "quickwitIndeksai"
-         SET "gyvosEilutes" = "gyvosEilutes" + $2
-         WHERE "indeksas" = $1`,
-        [indeksas, toInsert.length]
-      );
     }
+    mark("insert", tInsert);
 
+    const tCommit = Date.now();
     await client.query("COMMIT");
+    mark("commit", tCommit);
 
-    // ── Ingest into Quickwit — group by shard ────────────────────────────────
+    // ── Ingest into Quickwit, grouped by shard ──────────────────────────────
+    // Postgres is committed at this point. Any ingest failure here leaves
+    // rows "live" in Postgres but missing from Quickwit — search won't find
+    // them, filterLive still thinks they exist. If that becomes a real
+    // problem, wire up retries or a deadletter queue here.
+    const tIngest = Date.now();
     const shardDocs = new Map();
     for (const { quickwitId, indeksas, doc } of assigned.values()) {
       if (!shardDocs.has(indeksas)) shardDocs.set(indeksas, []);
@@ -337,8 +369,41 @@ export async function indexDocs(lentele, items) {
         qwIngestNdjson(indeksas, docs)
       )
     );
+    mark("ingest", tIngest);
+
+    // ── Bump iterptosEilutes per shard ──────────────────────────────────────
+    // One row per affected shard, so this is cheap regardless of batch size.
+    // Done AFTER ingest so a failed ingest doesn't falsely advance iterptos
+    // (which drives shard-fullness decisions in getOrCreateActiveShard).
+    const tIterptos = Date.now();
+    const shardCounts = [...shardDocs.entries()];
+    if (shardCounts.length) {
+      const vals = shardCounts
+        .map((_, i) => `($${i * 2 + 1}::text, $${i * 2 + 2}::int)`)
+        .join(", ");
+      const params = shardCounts.flatMap(([indeksas, docs]) => [indeksas, docs.length]);
+      await postgres.query(
+        `UPDATE "quickwitIndeksai" i
+         SET "iterptosEilutes" = i."iterptosEilutes" + v.cnt
+         FROM (VALUES ${vals}) AS v("indeksas", "cnt")
+         WHERE i."indeksas" = v."indeksas"`,
+        params
+      );
+    }
+    mark("iterptos", tIterptos);
+
+    const total = Date.now() - t0;
+    const phases = Object.entries(timings)
+      .map(([k, v]) => `${k}=${v}ms`)
+      .join(" ");
+    console.log(
+      `indexDocs ${lentele}: ${items.length} items ` +
+      `(${toInsert.length} new, ${toUpdate.length} updated: ` +
+      `${stayedCount} stayed, ${movedCount} moved) ` +
+      `→ ${shardDocs.size} shard(s) in ${total}ms [${phases}]`
+    );
   } catch (err) {
-    await client.query("ROLLBACK");
+    await client.query("ROLLBACK").catch(() => {});
     throw err;
   } finally {
     client.release();
@@ -348,56 +413,72 @@ export async function indexDocs(lentele, items) {
 // ── Staleness filter ─────────────────────────────────────────────────────────
 
 /**
- * Given Quickwit search hits, return only those whose quickwitId is still live.
+ * Given Quickwit search hits, return only those whose quickwitId is still
+ * live in Postgres. Scoped by lentele so it plays well with a (lentele,
+ * quickwitId) index and to sidestep the vanishingly-unlikely UUID collision
+ * across tables.
  *
+ * @param {string} lentele
  * @param {{ quickwitId: string, [key: string]: any }[]} hits
  */
-export async function filterLive(hits) {
+export async function filterLive(lentele, hits) {
   if (!hits.length) return [];
 
+  const start = Date.now();
   const ids = hits.map((h) => h.quickwitId);
   const { rows } = await postgres.query(
-    `SELECT "quickwitId" FROM "quickwitEilutes" WHERE "quickwitId" = ANY($1)`,
-    [ids]
+    `SELECT "quickwitId"
+     FROM "quickwitEilutes"
+     WHERE "lentele" = $1 AND "quickwitId" = ANY($2)`,
+    [lentele, ids]
   );
+  const end = Date.now();
+  console.log(
+    `filterLive: ${hits.length} hits → ${rows.length} live in ${(end - start) / 1000}s`
+  );
+
   const live = new Set(rows.map((r) => r.quickwitId));
   return hits.filter((h) => live.has(h.quickwitId));
 }
 
-// ── Search ────────────────────────────────────────────────────────────────────
+// ── Search ───────────────────────────────────────────────────────────────────
 
 /**
- * Search across all shards of a table, filtering dead hits, fetching more if needed.
+ * Search all shards of a table, filter out tombstones, and keep paging until
+ * we've collected `minHits` live hits (or exhausted results).
+ *
+ * Over-fetch math: if deadRatio is e.g. 0.2, fetching N hits yields ~0.8N
+ * live ones on average, so size the first fetch as ceil(minHits / (1-dead))
+ * plus a small buffer. If that underestimates, the loop keeps paging.
  *
  * @param {string} lentele
  * @param {object} params                - Quickwit search body
  * @param {object} [opts]
- * @param {number} [opts.minHits]        - minimum live hits to return; fetches additional
- *                                         pages if needed. Defaults to Infinity (all results)
- * @returns {Promise<{
- *   hits: object[],
- *   numHitsMax: number,                 - raw Quickwit total (includes dead)
- *   numHitsEstimate: number,            - estimated live total based on dead ratio
- *   deadRatio: number,                  - ratio of dead rows
- * }>}
+ * @param {number} [opts.minHits]        - minimum live hits; Infinity = exhaust
  */
 export async function search(lentele, params, { minHits = Infinity } = {}) {
+  const start = Date.now();
   const deadRatio = await getDeadRatio(lentele);
-  const fetchSize = Number.isFinite(minHits)
-    ? Math.ceil(minHits / (1 - deadRatio || 1)) + 10
-    : 100; // page size when fetching all
 
-  let liveHits = [];
+  // Guard against deadRatio being 1 (everything dead — div-by-zero) or >1
+  // (shouldn't happen but cheap to defend against).
+  const liveRatio = Math.max(0.01, 1 - deadRatio);
+  const fetchSize = Number.isFinite(minHits)
+    ? Math.ceil(minHits / liveRatio) + 10
+    : 100;
+
+  const liveHits = [];
   let searchAfter = null;
   let numHitsMax = null;
-
   let requests = 0;
   let totalElapsed = 0;
+
   while (liveHits.length < minHits) {
     requests++;
     const reqParams = {
       ...params,
       max_hits: fetchSize,
+      format: "json",
       ...(searchAfter ? { search_after: searchAfter } : {}),
     };
 
@@ -407,56 +488,64 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
 
     if (numHitsMax === null) numHitsMax = data.num_hits ?? 0;
 
-        // Skip the filterLive Postgres roundtrip when nothing is dead.
-        const live = deadRatio === 0 ? hits : await filterLive(hits);
-        liveHits.push(...live);
+    // Skip the Postgres roundtrip only when the table has zero dead rows.
+    // deadRatio is cached for 60s so this can occasionally lie; the impact
+    // is that a handful of tombstones slip through right after the first
+    // ingest on a previously-clean table. Acceptable tradeoff.
+    const live = deadRatio === 0 ? hits : await filterLive(lentele, hits);
+    liveHits.push(...live);
 
+    // No more results to page through.
     if (hits.length < fetchSize) break;
-
     searchAfter = hits[hits.length - 1].sort ?? null;
     if (!searchAfter) break;
   }
 
+  const end = Date.now();
+  console.log(
+    `search: ${liveHits.length} live hits out of ${numHitsMax} max in ` +
+    `${(end - start) / 1000}s (${requests} requests, ` +
+    `total Quickwit time ${totalElapsed / 1_000_000}s)`
+  );
+
   return {
     hits: liveHits,
     numHitsMax,
-    numHitsEstimate: numHitsMax * (1 - deadRatio),
+    numHitsEstimate: Math.round(numHitsMax * liveRatio),
     deadRatio,
     elapsedTimeMicros: totalElapsed,
-    requests
+    requests,
   };
 }
 
-// ── Count ─────────────────────────────────────────────────────────────────────
+// ── Count ────────────────────────────────────────────────────────────────────
 
 /**
- * Returns an estimated live document count for a table matching `params.query`.
- * Uses max_hits:0 so Quickwit returns only the total without fetching documents.
- *
- * @param {string} lentele
- * @param {object} params - Quickwit search body (must include `query`)
- * @returns {Promise<number>}
+ * Estimated live document count for rows matching `params.query`. Uses
+ * max_hits=0 so Quickwit skips document fetching and only returns the total.
  */
 export async function countDocs(lentele, params) {
-    const deadRatio = await getDeadRatio(lentele);
-    const data = await qwSearch(`${lentele}_*`, { ...params, max_hits: 0 });
-    const numHits = data.num_hits ?? 0;
-    return Math.round(numHits * (1 - deadRatio));
+  const deadRatio = await getDeadRatio(lentele);
+  const data = await qwSearch(`${lentele}_*`, { ...params, max_hits: 0 });
+  const numHits = data.num_hits ?? 0;
+  return Math.round(numHits * (1 - deadRatio));
 }
 
-// ── Shard stats ───────────────────────────────────────────────────────────────
+// ── Shard stats ──────────────────────────────────────────────────────────────
 
 export async function shardStats(lentele) {
   const { rows } = await postgres.query(
     `SELECT
        "indeksas",
        "seq",
+       "current",
        "shardSize",
+       "iterptosEilutes",
        "gyvosEilutes",
        "mirusiosEilutes",
        ROUND(
          "mirusiosEilutes"::numeric
-         / NULLIF("gyvosEilutes" + "mirusiosEilutes", 0)
+         / NULLIF("iterptosEilutes", 0)
          * 100,
          1
        ) AS "mirusiuProc"
@@ -466,4 +555,62 @@ export async function shardStats(lentele) {
     [lentele]
   );
   return rows;
+}
+
+// ── Reconciliation ───────────────────────────────────────────────────────────
+
+/**
+ * One-shot repair: recompute gyvosEilutes per shard from the ground truth in
+ * quickwitEilutes, and bump iterptosEilutes up to gyvos wherever it's lower
+ * (shouldn't happen under the current code but may on legacy data from
+ * earlier buggy counter logic). Run after schema changes to counter tracking
+ * or whenever drift is suspected.
+ *
+ * Note: iterptosEilutes is monotonically increasing and represents cumulative
+ * ingest events — we can only ever *increase* it during reconciliation; we
+ * never have ground truth for how many Quickwit ingests have happened, only
+ * a lower bound (gyvos, since every live row has been ingested at least once).
+ *
+ * mirusiosEilutes is a generated column (iterptos - gyvos) and doesn't need
+ * to be touched directly.
+ */
+export async function reconcileCounters(lentele) {
+  await postgres.query("BEGIN");
+  try {
+    // Recompute gyvos from quickwitEilutes. Shards with no rows get 0.
+    await postgres.query(
+      `UPDATE "quickwitIndeksai" i
+       SET "gyvosEilutes" = COALESCE(a.cnt, 0)
+       FROM (
+         SELECT "indeksas", COUNT(*)::int AS cnt
+         FROM "quickwitEilutes"
+         WHERE "lentele" = $1
+         GROUP BY "indeksas"
+       ) a
+       WHERE i."lentele" = $1 AND i."indeksas" = a."indeksas"`,
+      [lentele]
+    );
+    await postgres.query(
+      `UPDATE "quickwitIndeksai" i
+       SET "gyvosEilutes" = 0
+       WHERE i."lentele" = $1
+         AND NOT EXISTS (
+           SELECT 1 FROM "quickwitEilutes" e
+           WHERE e."lentele" = $1 AND e."indeksas" = i."indeksas"
+         )`,
+      [lentele]
+    );
+    // Keep the generated mirusios >= 0.
+    await postgres.query(
+      `UPDATE "quickwitIndeksai"
+       SET "iterptosEilutes" = "gyvosEilutes"
+       WHERE "lentele" = $1 AND "iterptosEilutes" < "gyvosEilutes"`,
+      [lentele]
+    );
+    await postgres.query("COMMIT");
+  } catch (err) {
+    await postgres.query("ROLLBACK").catch(() => {});
+    throw err;
+  }
+  _deadRatioCache.delete(lentele);
 }
