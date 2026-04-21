@@ -10,7 +10,7 @@ import { OCR_STATES } from "../modules/failai/ocr.js";
 
 const failaiSearchRouter = express.Router();
 
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 250;
 const COUNT_TIMEOUT_MS = 250;
 
