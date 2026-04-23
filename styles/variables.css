@@ -1,16 +1,6 @@
 @layer base {
     /* Spacing, sizes */
     :root {
-        /* --- Spacing scale --- */
-        --space-1: 4px;
-        --space-2: 8px;
-        --space-3: 12px;
-        --space-4: 16px;
-        --space-5: 28px;
-        --space-6: 40px;
-        --space-7: 56px;
-        --space-8: 80px;
-
         /* --- Typography --- */
         --font-sans: "Ubuntu", system-ui, sans-serif;
         --font-mono: monospace;
@@ -54,7 +44,7 @@
         --z-tooltip: 500;
         --z-sticky: 2000;
 
-        --col-gap: var(--space-6);
+        --col-gap: 40px;
 
         interpolate-size: allow-keywords;
     }

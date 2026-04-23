@@ -1,7 +1,7 @@
 @layer components {
     .code-block {
         margin: 0;
-        padding: var(--space-4);
+        padding: 16px;
         background: #111111;
         color: #d4d4d4;
         font-family: var(--font-mono);

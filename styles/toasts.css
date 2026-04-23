@@ -2,18 +2,18 @@
     .alert {
         display: flex;
         align-items: flex-start;
-        gap: var(--space-3);
-        padding: var(--space-3) var(--space-4);
+        gap: 12px;
+        padding: 12px 16px;
         border-radius: var(--radius-lg);
         border: 1px solid transparent;
         font-size: var(--text-sm);
-        margin-bottom: var(--space-4);
+        margin-bottom: 16px;
     }
 
     .alert-icon { flex-shrink: 0; margin-top: 1px; }
 
     .alert-body { flex: 1; }
-    .alert-title { font-weight: 600; margin-bottom: var(--space-1); }
+    .alert-title { font-weight: 600; margin-bottom: 4px; }
 
     .alert-success {
         @apply bg-success-bg text-success border-success;
@@ -34,20 +34,20 @@
     /* Toast */
     .toast-container {
         position: fixed;
-        bottom: var(--space-5);
-        right: var(--space-5);
+        bottom: 28px;
+        right: 28px;
         z-index: var(--z-toast);
         display: flex;
         flex-direction: column;
-        gap: var(--space-2);
+        gap: 8px;
         max-width: 360px;
     }
 
     .toast {
         display: flex;
         align-items: flex-start;
-        gap: var(--space-3);
-        padding: var(--space-3) var(--space-4);
+        gap: 12px;
+        padding: 12px 16px;
         background: var(--white);
         border: var(--border);
         border-radius: var(--radius-lg);

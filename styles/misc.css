@@ -5,7 +5,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: var(--space-4);
+        padding: 16px;
         min-height: 20vh;
         color: var(--gray);
         text-align: center;
@@ -24,10 +24,10 @@
     .divider {
         display: flex;
         align-items: center;
-        gap: var(--space-3);
+        gap: 12px;
         color: var(--gray);
         font-size: var(--text-sm);
-        margin-block: var(--space-4);
+        margin-block: 16px;
     }
     .divider::before, .divider::after {
         content: "";
@@ -112,7 +112,7 @@
 
     .rezultatai-nezinomas-total{
         display: inline-block;
-        padding-inline: var(--space-2);
+        padding-inline: 8px;
     }
 
     .rezultatai-nezinomas-total.spin {

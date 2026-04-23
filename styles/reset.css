@@ -24,7 +24,7 @@
     }
 
     ul, ol {
-        padding-left: var(--space-5);
+        padding-left: 28px;
     }
 
     dd {
@@ -39,7 +39,7 @@
     hr {
         border: none;
         border-top: var(--border);
-        margin: var(--space-5) 0;
+        margin: 28px 0;
     }
 
     :focus-visible {
