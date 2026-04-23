@@ -155,7 +155,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     let start = new Date();
 
     const result = await postgres.query(
-            `WITH first AS (
+        `WITH first AS (
         SELECT q.id FROM public."failaiNuskaitymoQueue" q
         WHERE q."lockedBy" IS NULL
         AND q.versija >= 0
@@ -166,11 +166,12 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     ),
     second AS (
         SELECT q.id FROM public."failaiNuskaitymoQueue" q
-WHERE q."lockedBy" IS NULL
-AND q.versija < 0
-ORDER BY q."paskutinisBandymas" ASC NULLS FIRST
-LIMIT 1
-FOR UPDATE SKIP LOCKED
+        WHERE q."lockedBy" IS NULL
+        AND q.versija < 0
+        AND q.bandymai < 5
+        ORDER BY q."paskutinisBandymas" ASC NULLS FIRST
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
     ),
     cte AS (
         SELECT id FROM first
@@ -188,7 +189,6 @@ FOR UPDATE SKIP LOCKED
     WHERE f.id = (SELECT id FROM locked)`,
         [nodeName, nuskaitymoVersija],
     );
-
 
     if (!result.rows.length) return false;
     const dokumentas = result.rows[0];
@@ -227,7 +227,7 @@ FOR UPDATE SKIP LOCKED
 
         if (dokumentas && dokumentas.id) {
             try {
-               await postgres.query(
+                await postgres.query(
                     `UPDATE public."failaiNuskaitymoQueue"
                     SET versija          = $1,
                         bandymai = COALESCE(bandymai, 0) + 1,
@@ -319,31 +319,31 @@ FOR UPDATE SKIP LOCKED
         for (const child of children) {
             // Check if file already exists
             const existsRes = await postgres.query(
-            `SELECT id FROM failai WHERE "saltinioId" = $1 AND parent = $2 AND saltinis = 'archive'`,
-            [child.saltinioId, child.parent],
+                `SELECT id FROM failai WHERE "saltinioId" = $1 AND parent = $2 AND saltinis = 'archive'`,
+                [child.saltinioId, child.parent],
             );
 
             // Only insert if it doesn't exist
             if (existsRes.rows.length === 0) {
-            await postgres.query(
-                `INSERT INTO failai (
+                await postgres.query(
+                    `INSERT INTO failai (
                 pavadinimas, extension, dydis, md5,
                 "saltinioId", parent, parsiustas, saltinis
                 ) VALUES (
                    $1, $2, $3, $4, $5, $6, $7, $8
                 )
                 ON CONFLICT ("saltinioId", parent) WHERE saltinis = 'archive' DO NOTHING;`,
-                [
-                child.pavadinimas,
-                child.extension,
-                child.dydis,
-                child.md5,
-                child.saltinioId,
-                child.parent,
-                child.parsiustas,
-                child.saltinis,
-                ],
-            );
+                    [
+                        child.pavadinimas,
+                        child.extension,
+                        child.dydis,
+                        child.md5,
+                        child.saltinioId,
+                        child.parent,
+                        child.parsiustas,
+                        child.saltinis,
+                    ],
+                );
             }
         }
     }
