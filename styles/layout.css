@@ -424,7 +424,7 @@
             @apply flex justify-center text-sm items-center flex-wrap gap-4 max-[1200px]:gap-3 max-[480px]:gap-2 max-[480px]:flex-col text-gray;
 
             a, button {
-                @apply cursor-pointer text-inherit no-underline hover:underline;
+                @apply cursor-pointer text-inherit underline decoration-transparent hover:decoration-inherit transition-colors;
             }
         }
     }

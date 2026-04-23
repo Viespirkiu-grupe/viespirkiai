@@ -9,18 +9,28 @@
         font-size: var(--text-sm);
         margin-bottom: var(--space-4);
     }
-    
+
     .alert-icon { flex-shrink: 0; margin-top: 1px; }
-    
+
     .alert-body { flex: 1; }
     .alert-title { font-weight: 600; margin-bottom: var(--space-1); }
-    
-    .alert-success { background: var(--color-success-bg); color: var(--color-success); border-color: var(--color-success); }
-    .alert-warning { background: var(--color-warning-bg); color: var(--color-warning); border-color: var(--color-warning); }
-    .alert-danger  { background: var(--color-danger-bg);  color: var(--color-danger);  border-color: var(--color-danger); }
-    .alert-info    { background: var(--color-info-bg);    color: var(--color-info);    border-color: var(--color-info); }
-    .alert-muted   { background: var(--color-muted-bg);   color: var(--color-muted);   border-color: var(--light-gray); }
-    
+
+    .alert-success {
+        @apply bg-success-bg text-success border-success;
+    }
+    .alert-warning {
+        @apply bg-warning-bg text-warning border-warning;
+    }
+    .alert-danger {
+        @apply bg-danger-bg text-danger border-danger;
+    }
+    .alert-info {
+        @apply bg-info-bg text-info border-info;
+    }
+    .alert-muted {
+        @apply bg-lighter-gray text-dark-gray border-light-gray;
+    }
+
     /* Toast */
     .toast-container {
         position: fixed;
@@ -32,7 +42,7 @@
         gap: var(--space-2);
         max-width: 360px;
     }
-    
+
     .toast {
         display: flex;
         align-items: flex-start;
@@ -45,12 +55,12 @@
         font-size: var(--text-sm);
         animation: toast-in var(--transition-slow) ease forwards;
     }
-    
+
     @keyframes toast-in {
         from { opacity: 0; transform: translateY(12px); }
         to   { opacity: 1; transform: translateY(0); }
     }
-    
+
     .toast-close {
         margin-left: auto;
         background: none;

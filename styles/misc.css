@@ -17,12 +17,8 @@
 
     /* File list */
     ul.file-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
+        @apply list-none p-0 m-0 space-y-2;
     }
-    ul.file-list li { margin-bottom: var(--space-2); }
-    ul.file-list li a:hover { text-decoration: underline; }
 
     /* Divider with label */
     .divider {

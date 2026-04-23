@@ -28,19 +28,18 @@
     }
 
     p  {
-        line-height: var(--line-height);
-
         @apply last:mb-0 mb-4;
     }
 
     a {
         color: var(--link);
-        text-decoration: underline;
-        text-underline-offset: 2px;
-        transition: opacity var(--transition);
+
+        @apply underline hover:decoration-transparent underline-offset-2 transition-colors;
+
+        &.no-style {
+            @apply no-underline text-inherit;
+        }
     }
-    a:hover { opacity: 0.75; }
-    a.no-style { text-decoration: none; color: inherit; }
 
     small, .text-sm  { font-size: var(--text-sm); }
     .text-xs         { font-size: var(--text-xs); }

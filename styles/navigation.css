@@ -37,18 +37,11 @@
     }
 
     .navbar-nav a {
-        color: var(--gray);
-        text-decoration: none;
-        font-size: var(--text-sm);
-        padding: var(--space-1) var(--space-2);
-        border-radius: var(--radius-md);
-        transition: color var(--transition), background-color var(--transition);
-    }
+        @apply text-dark-gray no-underline text-sm px-2 py-1 rounded-md transition-colors duration-300 hover:bg-lighter-gray hover:text-black;
 
-    .navbar-nav a:hover,
-    .navbar-nav a.active {
-        color: var(--black);
-        background: var(--lighter-gray);
+        &.active {
+            @apply text-black bg-lighter-gray;
+        }
     }
 
     .navbar-actions {

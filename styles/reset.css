@@ -13,9 +13,10 @@
         min-height: 100vh;
         font-family: var(--font-sans);
         font-size: var(--text-base);
-        line-height: var(--line-height);
         color: var(--black);
         background-color: var(--white);
+
+        @apply leading-[1.55];
     }
 
     main {
