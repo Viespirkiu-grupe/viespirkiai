@@ -1,18 +1,16 @@
-@layer base {
-    @view-transition {
-        navigation: auto;
-    }
+@view-transition {
+    navigation: auto;
+}
 
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 150ms;
+    animation-fill-mode: both;
+}
+
+@media (prefers-reduced-motion: reduce) {
     ::view-transition-old(root),
     ::view-transition-new(root) {
-        animation-duration: 150ms;
-        animation-timing-function: ease;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        ::view-transition-old(root),
-        ::view-transition-new(root) {
-            animation-duration: 0.01ms;
-        }
+        animation-duration: 0.01ms;
     }
 }
