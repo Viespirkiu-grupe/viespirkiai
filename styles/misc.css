@@ -106,15 +106,7 @@
 
     /* Signal QR */
     .signal-qr {
-        display: block;
-        float: right;
-        margin: var(--space-4);
-        width: 200px;
-        height: auto;
-    }
-
-    @media (prefers-color-scheme: dark) {
-        .signal-qr { filter: invert(1); }
+        @apply block float-right m-4 w-48 h-auto dark:invert;
     }
 
     /* Viešlaiškiai */
