@@ -26,11 +26,11 @@
       <% }) %>
     </div>
     <% if (__hasHidden) { %>
-      <details class="domain-list-details" style="margin-top:var(--space-2);">
+      <details class="domain-list-details mt-2">
         <summary class="domain-list-summary">
           <span class="text-muted text-xs fw-bold">+ <%= __hiddenCount %> daugiau</span>
         </summary>
-        <div class="domain-list-expanded flex flex-col gap-1" style="margin-top:var(--space-2);">
+        <div class="domain-list-expanded flex flex-col gap-1 mt-2">
           <% __list.slice(__maxItems).forEach(domain => { %>
             <% if (!domain) return; %>
             <a href="https://<%= domain %>" target="_blank" class="cell-truncate"><%= domain %></a>

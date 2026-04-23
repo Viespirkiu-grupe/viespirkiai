@@ -45,15 +45,15 @@
             </h3>
 
             <% if (item.irasymoPagrindas && item.irasymoPagrindas.length > 3) { %>
-              <p class="text-sm mt-2" style="text-align:justify;"><%= item.irasymoPagrindas %></p>
+              <p class="text-sm mt-2 text-justify"><%= item.irasymoPagrindas %></p>
             <% } else if (item.itraukimoPriezastis && item.itraukimoPriezastis.length > 3) { %>
-              <p class="text-sm mt-2" style="text-align:justify;"><%= item.itraukimoPriezastis.charAt(0).toUpperCase() + item.itraukimoPriezastis.slice(1) %></p>
+              <p class="text-sm mt-2 text-justify"><%= item.itraukimoPriezastis.charAt(0).toUpperCase() + item.itraukimoPriezastis.slice(1) %></p>
             <% } %>
 
             <% if (item.pagrindimas?.tiekejoPaaiskinimas?.length > 3) { %>
               <blockquote class="mt-3"><%= item.pagrindimas.tiekejoPaaiskinimas %></blockquote>
               <% if (item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda?.length > 3) { %>
-                <a href="<%= item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda %>" target="_blank" rel="noopener noreferrer" class="text-sm" style="position:relative;z-index:1;">↗ Peržiūrėti dokumentą (<%= item.pagrindimas.paaiskinimoPateikimoData || "Data nenurodyta" %>)</a>
+                <a href="<%= item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda %>" target="_blank" rel="noopener noreferrer" class="text-sm relative z-1">↗ Peržiūrėti dokumentą (<%= item.pagrindimas.paaiskinimoPateikimoData || "Data nenurodyta" %>)</a>
               <% } %>
             <% } %>
 
@@ -61,7 +61,7 @@
               <span><strong>Pirkėjas:</strong> <%= item.pirkimoVykdytojoPavadinimas || "nenurodytas" %></span>
               <span><strong>Pirkimo nr.:</strong> <%= item.pirkimoNumeris || "nenurodytas" %></span>
               <% if (item.teismoSprendimoLink?.length > 5) { %>
-                <span><a href="<%= item.teismoSprendimoLink %>" target="_blank" rel="noopener noreferrer" style="position:relative;z-index:1;">↗ Teismo sprendimas</a></span>
+                <span><a href="<%= item.teismoSprendimoLink %>" target="_blank" rel="noopener noreferrer" class="relative z-1">↗ Teismo sprendimas</a></span>
               <% } %>
             </div>
           </div>

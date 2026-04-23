@@ -48,8 +48,8 @@ const __attachments = Array.isArray(__meta.attachments) ? __meta.attachments : [
 const __failasId = (typeof failasId !== 'undefined' && failasId !== null) ? String(failasId) : '';
 %>
 
-<div class="email-message <%= __containerClass %>" style="background:var(--lightest-gray); border:var(--border); border-radius:var(--radius-md); padding:var(--space-4);">
-  <h2 class="mb-2" style="margin-top:0;"><%= __subject %></h2>
+<div class="email-message bg-lighter-gray border-border rounded-md p-4 <%= __containerClass %>">
+  <h2 class="mb-2 mt-0"><%= __subject %></h2>
 
   <dl class="kv-list mb-4">
     <dt>Nuo</dt>
@@ -79,10 +79,11 @@ const __failasId = (typeof failasId !== 'undefined' && failasId !== null) ? Stri
   <% if (__html) { %>
     <iframe
       srcdoc="<%= String(__html).replace(/"/g, '&quot;') %>"
-      style="width:100%; height:<%= __iframeHeight %>px; border:var(--border); border-radius:var(--radius-sm);"
+      style="height:<%= __iframeHeight %>px;"
+      class="w-full border-border rounded-sm"
     ></iframe>
   <% } else { %>
-    <pre style="white-space:pre-wrap; word-wrap:break-word; font-family:var(--font-mono); font-size:var(--text-sm); border-top:var(--border); padding-top:var(--space-3);"><%- String(__text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\r?\n/g,"<br>") %></pre>
+    <pre class="whitespace-pre-wrap wrap-break-word font-mono text-sm border-t pt-3"><%- String(__text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\r?\n/g,"<br>") %></pre>
   <% } %>
 
   <% if (__attachments.length > 0) { %>

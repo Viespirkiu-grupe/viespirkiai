@@ -32,15 +32,15 @@
           <div class="flex flex-col gap-1">
             <div class="flex gap-2 items-center email-item">
               <a class="email-link" href="mailto:info@example.com">info@example.com</a>
-              <sup class="text-muted text-xs email-pages" style="flex-shrink:0;">p. 1, 3</sup>
+              <sup class="text-muted text-xs email-pages shrink-0">p. 1, 3</sup>
             </div>
             <div class="flex gap-2 items-center email-item">
               <a class="email-link" href="mailto:procurement@example.com">procurement@example.com</a>
-              <sup class="text-muted text-xs email-pages" style="flex-shrink:0;">p. 2</sup>
+              <sup class="text-muted text-xs email-pages shrink-0">p. 2</sup>
             </div>
             <div class="flex gap-2 items-center email-item">
               <a class="email-link" href="mailto:legal.team@example.com">legal.team@example.com</a>
-              <sup class="text-muted text-xs email-pages" style="flex-shrink:0;">p. 7, 8, 9</sup>
+              <sup class="text-muted text-xs email-pages shrink-0">p. 7, 8, 9</sup>
             </div>
           </div>
         </dd>
@@ -54,7 +54,7 @@
     <div class="flex flex-col gap-1">
       <div class="flex gap-2 items-center email-item">
         <a class="email-link" href="mailto:info@example.com">info@example.com</a>
-        <sup class="text-muted text-xs email-pages" style="flex-shrink:0;">p. 1, 3</sup>
+        <sup class="text-muted text-xs email-pages shrink-0">p. 1, 3</sup>
       </div>
     </div>
   </dd>
@@ -69,8 +69,8 @@
     </p>
 
     <div class="preview preview-col">
-      <div class="email-message" style="background:var(--lightest-gray); border:var(--border); border-radius:var(--radius-md); padding:var(--space-4);">
-        <h2 class="mb-2" style="margin-top:0;">Question about procurement documents</h2>
+      <div class="email-message bg-lighter-gray border rounded-md p-4">
+        <h2 class="mt-0 mb-2">Question about procurement documents</h2>
         <dl class="kv-list mb-4">
           <dt>From</dt>
           <dd>Jonas Jonaitis &lt;<a href="mailto:jonas@example.com">jonas@example.com</a>&gt;</dd>
@@ -85,7 +85,7 @@
 
         <iframe
           srcdoc="<p>Hello,</p><p>please clarify the proposal submission deadline.</p><p>Regards,<br>Jonas</p>"
-          style="width:100%; height:320px; border:var(--border); border-radius:var(--radius-sm);"
+          class="w-full h-[320px] border rounded-sm"
         ></iframe>
 
         <h3 class="mt-4 mb-2">Attachments</h3>
@@ -108,10 +108,10 @@
     </p>
 
     <div class="preview preview-col">
-      <div class="chart-frame" style="padding:0;">
+      <div class="chart-frame p-0">
         <iframe
           src="/dist/pdfjs/web/viewer.html?file=%2Ffailas%2F123%2Fpreview#search=contract"
-          style="border:none; width:100%; height:420px; display:block; border-radius:var(--radius-md);"
+          class="border-none w-full h-[420px] block rounded-md"
         ></iframe>
       </div>
     </div>

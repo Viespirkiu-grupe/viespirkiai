@@ -8,7 +8,7 @@
       <h3 class="text-sm fw-bold mb-3">Pardavimo pajamos</h3>
       <% if (asmuo.finansai.lentele?.metai?.length > 0 && asmuo.finansai.lentele.duomenys["Pardavimo pajamos"]) { %>
         <div class="chart-frame">
-          <div id="pardavimoPajamosChart" class="chart" style="height:300px;"></div>
+          <div id="pardavimoPajamosChart" class="chart h-75"></div>
         </div>
         <script defer>
           if (typeof pardavimaiKasMetusLabels === 'undefined') var pardavimaiKasMetusLabels = [];
@@ -39,7 +39,7 @@
       <h3 class="text-sm fw-bold mb-3">Grynasis pelnas (nuostoliai)</h3>
       <% if (asmuo.finansai.lentele?.metai?.length > 0) { %>
         <div class="chart-frame">
-          <div id="grynasisPelnas" class="chart" style="height:300px;"></div>
+          <div id="grynasisPelnas" class="chart h-75"></div>
         </div>
         <script defer>
           const grynasisPelnasLabels = [<% asmuo.finansai.lentele.metai.forEach((item, i) => { %>'<%= item %>'<%= i < asmuo.finansai.lentele.metai.length - 1 ? ',' : '' %><% }) %>];

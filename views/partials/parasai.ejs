@@ -38,11 +38,11 @@
       <% }) %>
     </div>
     <% if (__hasHidden) { %>
-      <details class="signature-list-details" style="margin-top:var(--space-2);">
+      <details class="signature-list-details mt-2">
         <summary class="signature-list-summary">
           <span class="text-muted text-xs fw-bold">+ <%= __hiddenCount %> daugiau</span>
         </summary>
-        <div class="signature-list-expanded flex flex-col gap-1" style="margin-top:var(--space-2);">
+        <div class="signature-list-expanded flex flex-col gap-1 mt-2">
           <% __list.slice(__maxItems).forEach(sig => { %>
             <% if (!sig) return; %>
             <div>
