@@ -1,5 +1,5 @@
 <meta charset="UTF-8" />
-<meta name="color-scheme" data-scheme="<%= colorScheme %>">
+<meta name="color-scheme" content="dark light">
 <meta data-font="<%= font %>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>
@@ -41,7 +41,6 @@
 <% if(typeof pageAuthor !== 'undefined'){ %>
     <meta property="article:author" content="<%= pageAuthor %>" />
 <% } %>
-
 
 <script defer>
 if (!navigator.connection?.saveData) {
