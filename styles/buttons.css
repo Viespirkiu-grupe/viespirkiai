@@ -3,8 +3,8 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: var(--space-2);
-        padding: 8px var(--space-4);
+        gap: 8px;
+        padding: 8px 16px;
         font-family: var(--font-sans);
         font-size: var(--text-base);
         font-weight: 500;
@@ -19,12 +19,12 @@
                     border-color var(--transition), box-shadow var(--transition),
                     opacity var(--transition);
     }
-    
+
     .btn:disabled, .btn.disabled {
         opacity: 0.45;
         pointer-events: none;
     }
-    
+
     /* Variants */
     .btn-primary {
         background: var(--black);
@@ -35,7 +35,7 @@
         background: var(--dark-gray);
         border-color: var(--dark-gray);
     }
-    
+
     .btn-secondary {
         background: var(--lighter-gray);
         color: var(--black);
@@ -44,7 +44,7 @@
     .btn-secondary:hover {
         background: var(--light-gray);
     }
-    
+
     .btn-outline {
         background: transparent;
         color: var(--black);
@@ -54,11 +54,11 @@
         background: var(--black);
         color: var(--white);
     }
-    
+
     .btn-form{
         border: var(--border);
     }
-    
+
     .btn-ghost {
         background: transparent;
         color: var(--black);
@@ -67,28 +67,28 @@
     .btn-ghost:hover {
         background: var(--lighter-gray);
     }
-    
+
     .btn-success {
         background: var(--color-success);
         color: #fff;
         border-color: var(--color-success);
     }
     .btn-success:hover { opacity: 0.85; }
-    
+
     .btn-danger {
         background: var(--color-danger);
         color: #fff;
         border-color: var(--color-danger);
     }
     .btn-danger:hover { opacity: 0.85; }
-    
+
     .btn-warning {
         background: var(--color-warning);
         color: #fff;
         border-color: var(--color-warning);
     }
     .btn-warning:hover { opacity: 0.85; }
-    
+
     .btn-link {
         background: transparent;
         color: var(--link);
@@ -97,7 +97,7 @@
         text-decoration: underline;
     }
     .btn-link:hover { opacity: 0.7; }
-    
+
     /* Sizes */
     .btn-sm {
         padding: 5px 10px;
@@ -105,19 +105,19 @@
         border-radius: var(--radius-sm);
     }
     .btn-lg {
-        padding: 12px var(--space-5);
+        padding: 12px 28px;
         font-size: var(--text-md);
         border-radius: var(--radius-lg);
     }
     .btn-xs {
-        padding: 3px var(--space-2);
+        padding: 3px 8px;
         font-size: var(--text-xs);
         border-radius: var(--radius-sm);
     }
     .btn-block { width: 100%; }
     .btn-icon  { padding: 8px; aspect-ratio: 1; border-radius: var(--radius-md); }
     .btn-icon.btn-sm { padding: 5px; }
-    
+
     /* Button group */
     .btn-group {
         display: inline-flex;

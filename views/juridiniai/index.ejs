@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="lt">
+<html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 	<head>
 	<%- include('../head.ejs', {
         pageTitle: "Juridinių asmenų paieška",
@@ -24,7 +24,7 @@
                       });
                     </script>
                     <br>
-                    <div id="map" style="height: 60vh; border-radius: 8px;"></div>
+                    <div id="map" class="h-[60vh] rounded-lg"></div>
 
                     <script>
                     window.addEventListener('DOMContentLoaded', () => {

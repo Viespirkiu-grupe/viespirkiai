@@ -9,7 +9,7 @@
     <a href="/" class="navbar-brand no-style flex">
       <span class="sr-only">Viešpirkiai</span>
       <% if (CONFIG.dev == true) { %>
-        <div style="transform: rotate(180deg);"><%- include('viespirkiaiLogoLaisvasZodis.svg') %></div>
+        <div class="rotate-180"><%- include('viespirkiaiLogoLaisvasZodis.svg') %></div>
       <% } else { %>
         <%- include('viespirkiaiLogoLaisvasZodis.svg') %>
       <% } %>
@@ -33,11 +33,9 @@
       </ul>
 
       <button class="navbar-scheme-toggle" id="schemeToggle" aria-label="Perjungti temą" onclick="
-        const meta = document.querySelector('meta[data-scheme]');
-        const isDark = meta.dataset.scheme === 'dark' ||
-          (meta.dataset.scheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        const isDark = document.documentElement.classList.contains('dark');
         const next = isDark ? 'light' : 'dark';
-        meta.dataset.scheme = next;
+        document.documentElement.classList.toggle('dark', next === 'dark');
         document.cookie = 'colorScheme=' + next + ';path=/;max-age=31536000';
         updateSchemeIcon(next);
       ">
@@ -45,9 +43,6 @@
           <% if (colorScheme === 'dark') { %>
             <!-- sun -->
             <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
-          <% } else if (colorScheme === 'light') { %>
-            <!-- half circle / auto -->
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
           <% } else { %>
             <!-- moon -->
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
@@ -65,12 +60,10 @@
 
         function syncScheme() {
           const cookie = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('colorScheme='));
-          const cookieScheme = cookie ? cookie.split('=')[1] : 'auto';
-          const meta = document.querySelector('meta[data-scheme]');
-          if (meta && meta.dataset.scheme !== cookieScheme) {
-            meta.dataset.scheme = cookieScheme;
-            updateSchemeIcon(cookieScheme);
-          }
+          const scheme = cookie ? cookie.split('=')[1] : 'auto';
+          const isDark = scheme === 'dark' || (scheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', isDark);
+          updateSchemeIcon(isDark ? 'dark' : 'light');
         }
 
         syncScheme();

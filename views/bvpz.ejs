@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="lt">
+<html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 <head>
   <%- include('head.ejs', {
     pageTitle: "BVPŽ kodų paieška",
@@ -20,7 +20,7 @@
       Sąraše galite ieškoti naudodamiesi naršyklės paieškos funkcija (<kbd>Ctrl</kbd>+<kbd>F</kbd>).
     </p>
 
-      <div class="text-muted text-sm mb-2" style="align-self:center;">Greiti pasirinkimai:</div>
+      <div class="text-muted text-sm mb-2 self-center">Greiti pasirinkimai:</div>
     <div class="flex flex-wrap gap-2 mb-4">
       <button class="btn btn-outline btn-sm" onclick="bvpzApplyPreset('48 72')">Informacinės technologijos</button>
       <button class="btn btn-outline btn-sm" onclick="bvpzApplyPreset('3360 3361 3362 3363 3364 3365 3366 3367 33690 33691')">Vaistai</button>

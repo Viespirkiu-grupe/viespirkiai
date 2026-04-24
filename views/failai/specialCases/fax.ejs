@@ -1,9 +1,9 @@
-<p style="text-align: justify;"><i>Šis failas – nepavykosio dokumento siuntimo faksu garso įrašas. Norint jį iškoduoti mūsų iniciatyva bandė viską: begalę fakso programų, hex editor ir netgi Windows XP. <br>Veikė tik vienas metodas:</i></p>
+<p class="text-justify"><i>Šis failas – nepavykosio dokumento siuntimo faksu garso įrašas. Norint jį iškoduoti mūsų iniciatyva bandė viską: begalę fakso programų, hex editor ir netgi Windows XP. <br>Veikė tik vienas metodas:</i></p>
 
-<pre class="code-block" style="margin-bottom: var(--space-4);">sox -t raw -r 8000 -e a-law -b 8 -c 1 debug.fax output.wav
+<pre class="code-block mb-4">sox -t raw -r 8000 -e a-law -b 8 -c 1 debug.fax output.wav
 docker run --rm -v $(pwd):/data -w /data ghcr.io/sieteunoseis/spandsp:main fax_decode output.wav</pre>
 
-<pre class="code-block" style="max-height: 40vh;">V.21 rx status is Carrier up (-2)
+<pre class="code-block max-h-[40vh]">V.21 rx status is Carrier up (-2)
 V.17 rx status is Carrier up (-2)
 V.29 rx status is Carrier up (-2)
 V.27ter rx status is Carrier up (-2)

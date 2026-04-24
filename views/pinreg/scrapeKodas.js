@@ -8,11 +8,11 @@
     /* ---------- UI ---------- */
     const box = document.createElement("div");
     box.innerHTML = `
-    <div style="font-weight:bold; margin-bottom:4px;"><span style="color:red">●</span> PINREG UUID intercept</div>
+    <div class="font-bold mb-1"><span class="text-red-500">●</span> PINREG UUID intercept</div>
     <div>Rastos deklaracijos: <span id="pr-unique">0</span></div>
     <button id="pr-copy">Kopijuoti UUID sąrašą</button>
-    <div style="margin-top:6px; font-size:10px;">
-      <i><a href="https://viespirkiai.org/pinreg/scrape" target="_blank" style="color:#fff; text-decoration:none;">Pilietinė iniciatyva Viešpirkiai</a></i>
+    <div class="mt-2 text-[10px]">
+      <i><a href="https://viespirkiai.org/pinreg/scrape" target="_blank" class="text-white no-underline">Pilietinė iniciatyva Viešpirkiai</a></i>
     </div>
   `;
     Object.assign(box.style, {

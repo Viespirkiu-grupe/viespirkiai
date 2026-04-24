@@ -7,9 +7,23 @@
     --color-gray: var(--gray);
     --color-light-gray: var(--light-gray);
     --color-lighter-gray: var(--lighter-gray);
+    --color-dark-gray: var(--dark-gray);
+    --color-link: var(--link);
     --color-border: var(--light-gray);
     --color-dark: var(--black);
     --color-focus: var(--black);
+    --color-primary: var(--color-primary);
+    --color-primary-hover: var(--color-primary-hover);
+    --color-secondary: var(--color-secondary);
+    --color-secondary-hover: var(--color-secondary-hover);
+    --color-success: var(--color-success);
+    --color-success-bg: var(--color-success-bg);
+    --color-warning: var(--color-warning);
+    --color-warning-bg: var(--color-warning-bg);
+    --color-danger: var(--color-danger);
+    --color-danger-bg: var(--color-danger-bg);
+    --color-info: var(--color-info);
+    --color-info-bg: var(--color-info-bg);
 }
 
 @utility border-focus {

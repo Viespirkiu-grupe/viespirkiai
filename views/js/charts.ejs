@@ -34,35 +34,73 @@
   }
 
   function getIsDark() {
-    const scheme = document.querySelector('meta[data-scheme]')?.dataset.scheme || 'auto';
-    if (scheme === 'dark') return true;
-    if (scheme === 'light') return false;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return document.documentElement.classList.contains('dark');
   }
 
   function getThemeTokens(isDark) {
     return {
-      foreground:  isDark ? '#f2f2f2' : '#0f0f0f',
-      labelColor:  isDark ? '#aaaaaa' : '#777777',
-      gridColor:   isDark ? '#2e2e2e' : '#e0e0e0',
-      tooltipBg:   isDark ? '#1e1e1e' : '#ffffff',
-      tooltipText: isDark ? '#f2f2f2' : '#0f0f0f',
-      tooltipBorder: isDark ? '#2e2e2e' : '#d4d4d4',
+      foreground:    isDark ? '#f5f4f4' : '#0c0a09', // stone-50  / stone-950
+      labelColor:    isDark ? '#a8a29e' : '#292524', // stone-400 / stone-800
+      gridColor:     isDark ? '#292524' : '#e7e5e4', // stone-800 / stone-200
+      tooltipBg:     isDark ? '#1c1917' : '#fafaf9', // stone-900 / stone-50
+      tooltipText:   isDark ? '#f5f4f4' : '#0c0a09', // stone-50  / stone-950
+      tooltipBorder: isDark ? '#292524' : '#d6d3d1', // stone-800 / stone-300
     };
   }
 
-  // Categorical palette — works on both light and dark backgrounds
-  const CATEGORICAL_COLORS = [
-    '#4e79a7','#f28e2b','#e15759','#76b7b2',
-    '#59a14f','#edc948','#b07aa1','#ff9da7',
-    '#9c755f','#bab0ac',
-  ];
+  // Example color pallete, colorful
+  // const CATEGORICAL_COLORS = {
+  //     light: [
+  //         '#2563eb', // blue-600
+  //         '#d97706', // amber-600
+  //         '#dc2626', // red-600
+  //         '#0d9488', // teal-600
+  //         '#16a34a', // green-600
+  //         '#ca8a04', // yellow-600
+  //         '#9333ea', // purple-600
+  //     ],
+  //     dark: [
+  //         '#93c5fd', // blue-300
+  //         '#fcd34d', // amber-300
+  //         '#fca5a5', // red-300
+  //         '#5eead4', // teal-300
+  //         '#86efac', // green-300
+  //         '#fde68a', // yellow-200
+  //         '#d8b4fe', // purple-300
+  //     ],
+  // };
 
-  // Grays that are always visible: avoid extremes that match background
+  // Grayscale pallete
+  // Adjust the number of shades as needed
+  const CATEGORICAL_COLORS = {
+    light: [
+        '#0c0a09', // stone-950
+        // '#292524', // stone-800
+        // '#57534e', // stone-600
+        '#79716b', // stone-500
+        // '#a8a29e', // stone-400
+        // '#d6d3d1', // stone-300
+        '#e7e5e4', // stone-200
+    ],
+    dark: [
+        '#f5f4f4', // stone-50
+        // '#d6d3d1', // stone-300
+        // '#a8a29e', // stone-400
+        '#79716b', // stone-500
+        // '#57534e', // stone-600
+        // '#44403c', // stone-700
+        '#292524', // stone-800
+    ],
+  };
+
+  function getCategoricalColors(isDark) {
+      return isDark ? CATEGORICAL_COLORS.dark : CATEGORICAL_COLORS.light;
+  }
+
   function getShadesOfGray(isDark) {
     return isDark
-      ? ['#ffffff', '#e0e0e0', '#c0c0c0', '#a0a0a0', '#808080', '#606060', '#484848']
-      : ['#222222', '#404040', '#585858', '#707070', '#888888', '#a0a0a0', '#b8b8b8'];
+      ? ['#f5f4f4', '#d6d3d1', '#a8a29e', '#79716b', '#57534e', '#44403c', '#292524']
+      : ['#0c0a09', '#1c1917', '#292524', '#44403c', '#57534e', '#79716b', '#a8a29e'];
   }
 
   const eurFormatter = v => typeof v === 'number'
@@ -89,7 +127,7 @@
       yaxis: { labels: { style: { colors: t.labelColor } } },
       stroke: { curve: 'smooth', width: 2 },
       markers: { size: 4 },
-      colors: [t.foreground],
+      colors: getCategoricalColors(isDark),
       grid: { borderColor: t.gridColor },
       theme: { mode: isDark ? 'dark' : 'light' },
       legend: { labels: { colors: t.labelColor } },
@@ -113,19 +151,19 @@
   };
 
   const chartFlagDefaults = {
-    'yEUR':           { yaxis: { labels: { formatter: eurFormatter } } },
-    'yEURMen':        { yaxis: { labels: { formatter: v => typeof v === 'number' ? eurFormatter(v) + ' / mėn.' : 'Nėra duomenų' } } },
-    'yMin0':          { yaxis: { min: 0 } },
-    'yMinAuto':       { yaxis: { min: undefined } },
-    'xYear':          { xaxis: { labels: { format: 'yyyy' } }, tooltip: { x: { format: 'yyyy' } } },
-    'xAxisYearMonth': { xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'yyyy-MM' } }, tooltip: { x: { format: 'yyyy-MM' } } },
-    'xAxisDay':       { xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'yyyy-MM-dd' } }, tooltip: { x: { format: 'yyyy-MM-dd' } } },
-    'xAxisHourMinute':{ xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'HH:mm' } }, tooltip: { x: { format: 'HH:mm' } } },
-    'yAxisLog':       { yaxis: { logarithmic: true } },
-    'yAxisNoLabel':   { yaxis: { labels: { show: false } } },
-    'noLine':         { stroke: { width: 0 } },
-    'colors':         { colors: CATEGORICAL_COLORS },
-    'numbersWithSpaces': { yaxis: { labels: { formatter: v => typeof v === 'number' ? v.toLocaleString('lt-LT') : 'Nėra duomenų' } } }
+    'yEUR':              { yaxis: { labels: { formatter: eurFormatter } } },
+    'yEURMen':           { yaxis: { labels: { formatter: v => typeof v === 'number' ? eurFormatter(v) + ' / mėn.' : 'Nėra duomenų' } } },
+    'yMin0':             { yaxis: { min: 0 } },
+    'yMinAuto':          { yaxis: { min: undefined } },
+    'xYear':             { xaxis: { labels: { format: 'yyyy' } }, tooltip: { x: { format: 'yyyy' } } },
+    'xAxisYearMonth':    { xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'yyyy-MM' } }, tooltip: { x: { format: 'yyyy-MM' } } },
+    'xAxisDay':          { xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'yyyy-MM-dd' } }, tooltip: { x: { format: 'yyyy-MM-dd' } } },
+    'xAxisHourMinute':   { xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'HH:mm' } }, tooltip: { x: { format: 'HH:mm' } } },
+    'yAxisLog':          { yaxis: { logarithmic: true } },
+    'yAxisNoLabel':      { yaxis: { labels: { show: false } } },
+    'noLine':            { stroke: { width: 0 } },
+    'colors':            { colors: CATEGORICAL_COLORS },
+    'numbersWithSpaces': { yaxis: { labels: { formatter: v => typeof v === 'number' ? v.toLocaleString('lt-LT') : 'Nėra duomenų' } } },
   };
 
   function buildOptions(data, isDark) {
@@ -179,14 +217,9 @@
     const t = getThemeTokens(isDark);
     for (const { chart, data } of renderedCharts) {
       const flags = data.flags || [];
-      let colors;
-      if (flags.includes('colors') || data.type === 'pie') {
-        colors = CATEGORICAL_COLORS;
-      } else if (flags.includes('50shadesOfGray')) {
-        colors = getShadesOfGray(isDark);
-      } else {
-        colors = [t.foreground];
-      }
+      const colors = flags.includes('50shadesOfGray')
+        ? getShadesOfGray(isDark)
+        : getCategoricalColors(isDark);
       chart.updateOptions({
         chart: { foreColor: t.labelColor },
         tooltip: { theme: isDark ? 'dark' : 'light' },
@@ -200,32 +233,20 @@
     }
   }
 
-  const schemeMeta = document.querySelector('meta[data-scheme]');
-  if (schemeMeta) {
-    new MutationObserver(updateAllCharts)
-      .observe(schemeMeta, { attributes: true, attributeFilter: ['data-scheme'] });
-  }
+  new MutationObserver(updateAllCharts)
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    const scheme = document.querySelector('meta[data-scheme]')?.dataset.scheme;
-    if (!scheme || scheme === 'auto') updateAllCharts();
+    if (!document.documentElement.classList.contains('dark')) updateAllCharts();
   });
 </script>
 <style>
   .chart { background-color: transparent; }
 
-  :root:has(meta[data-scheme="dark"]) .apexcharts-tooltip,
-  :root:has(meta[data-scheme="dark"]) .apexcharts-tooltip-title {
-    background: #1e1e1e !important;
-    color: #f2f2f2 !important;
-    border-color: #2e2e2e !important;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not(:has(meta[data-scheme="light"])) .apexcharts-tooltip,
-    :root:not(:has(meta[data-scheme="light"])) .apexcharts-tooltip-title {
-      background: #1e1e1e !important;
-      color: #f2f2f2 !important;
-      border-color: #2e2e2e !important;
-    }
+  .dark .apexcharts-tooltip,
+  .dark .apexcharts-tooltip-title {
+    background: #1c1917 !important; /* stone-900 */
+    color: #f5f4f4 !important;      /* stone-50  */
+    border-color: #292524 !important; /* stone-800 */
   }
 </style>

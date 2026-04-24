@@ -2,10 +2,10 @@
     .word-cloud {
         display: flex;
         flex-wrap: wrap;
-        gap: var(--space-5) var(--space-6);
+        gap: 28px 40px;
         justify-content: center;
         align-items: center;
-        padding: var(--space-5) 0;
+        padding: 28px 0;
     }
 
     .word-cloud span {

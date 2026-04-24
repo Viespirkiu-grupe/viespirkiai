@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="lt">
+<html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 <head>
   <%- include('../head.ejs', {
     pageTitle: "Top adresai pagal įmonių skaičių",
@@ -26,11 +26,11 @@
       <span class="text-muted text-sm numberOfResults"><%- numberOfResults %></span>
     </div>
 
-    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3);">
+    <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
       <% adresai.forEach(item => { %>
         <article class="card card-clickable">
           <div class="card-body">
-            <h3 class="text-sm fw-bold mb-2 mt-1">
+            <h3 class="text-sm mb-2">
               <a href="/juridiniai?adresas=<%= item.adresas %>">
                 <%= item.adresas %>
               </a>

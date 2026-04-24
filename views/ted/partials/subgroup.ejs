@@ -18,9 +18,9 @@ function fArr(id) { return sg.fields.find(x => x.fieldId === id)?.values || [] }
   }).filter(Boolean)
   const meta = [...threshItems, stage2 && stage2 !== 'false' ? '2-as etapas' : null].filter(Boolean).join(' · ')
   %>
-  <% if (type) { %><p class="fw-medium text-sm" style="margin-bottom:var(--space-1)"><%= type %></p><% } %>
-  <% if (desc) { %><p class="text-sm text-muted" style="margin-bottom:var(--space-1)"><%= desc %></p><% } %>
-  <% if (meta) { %><p class="text-xs text-muted" style="margin-bottom:0"><%= meta %></p><% } %>
+  <% if (type) { %><p class="fw-medium text-sm mb-1"><%= type %></p><% } %>
+  <% if (desc) { %><p class="text-sm text-muted mb-1"><%= desc %></p><% } %>
+  <% if (meta) { %><p class="text-xs text-muted mb-0"><%= meta %></p><% } %>
 
 <% } else if (sg.nodeId === 'ND-LotAwardCriterion' || sg.nodeId === 'ND-LotsGroupAwardCriterion') { %>
   <%
@@ -29,9 +29,9 @@ function fArr(id) { return sg.fields.find(x => x.fieldId === id)?.values || [] }
   const weight  = f('BT-541-Lot-WeightNumber') || f('BT-541-LotsGroup-WeightNumber')
   const desc    = f('BT-540-Lot') || f('BT-540-LotsGroup')
   %>
-  <% if (weight || type) { %><p class="fw-medium text-sm" style="margin-bottom:var(--space-1)"><% if (weight) { %><span class="amount amount-sm"><%= weight %>%</span> &ndash; <% } %><%= type || '' %></p><% } %>
-  <% if (name) { %><p class="text-sm" style="margin-bottom:var(--space-1)"><%= name %></p><% } %>
-  <% if (desc) { %><p class="text-sm text-muted" style="margin-bottom:0"><%= desc %></p><% } %>
+  <% if (weight || type) { %><p class="fw-medium text-sm mb-1"><% if (weight) { %><span class="amount amount-sm"><%= weight %>%</span> &ndash; <% } %><%= type || '' %></p><% } %>
+  <% if (name) { %><p class="text-sm mb-1"><%= name %></p><% } %>
+  <% if (desc) { %><p class="text-sm text-muted mb-0"><%= desc %></p><% } %>
 
 <% } else if (sg.nodeId === 'ND-LotProcurementDocument' || sg.nodeId === 'ND-PartProcurementDocument') { %>
   <%
@@ -42,11 +42,11 @@ function fArr(id) { return sg.fields.find(x => x.fieldId === id)?.values || [] }
   const langs   = fArr('BT-708-Lot').concat(fArr('BT-708-Part'))
   const uLangs  = fArr('BT-737-Lot').concat(fArr('BT-737-Part'))
   %>
-  <% if (docId) { %><p class="fw-medium text-sm" style="margin-bottom:var(--space-1)"><%= docId %></p><% } %>
-  <% if (url) { url.values.forEach(v => { %><p class="text-sm" style="margin-bottom:var(--space-1)"><a href="<%- v %>" target="_blank" rel="noopener"><%= shortUrl(v) %></a></p><% }) } %>
-  <% if (access) { %><p class="text-sm text-muted" style="margin-bottom:var(--space-1)"><%= access %></p><% } %>
+  <% if (docId) { %><p class="fw-medium text-sm mb-1"><%= docId %></p><% } %>
+  <% if (url) { url.values.forEach(v => { %><p class="text-sm mb-1"><a href="<%- v %>" target="_blank" rel="noopener"><%= shortUrl(v) %></a></p><% }) } %>
+  <% if (access) { %><p class="text-sm text-muted mb-1"><%= access %></p><% } %>
   <% const allLangs = [...langs, ...uLangs.filter(l => !langs.includes(l)).map(l => `${l} (neofic.)`)] %>
-  <% if (allLangs.length) { %><p class="text-xs text-muted" style="margin-bottom:0"><%= allLangs.join(', ') %></p><% } %>
+  <% if (allLangs.length) { %><p class="text-xs text-muted mb-0"><%= allLangs.join(', ') %></p><% } %>
 
 <% } else if (sg.nodeId === 'ND-EEDProcurementDetailsLot' || sg.nodeId === 'ND-EEDProcurementDetailsLotResult') { %>
   <%

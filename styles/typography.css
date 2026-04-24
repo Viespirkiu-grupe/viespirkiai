@@ -28,19 +28,18 @@
     }
 
     p  {
-        line-height: var(--line-height);
-
         @apply last:mb-0 mb-4;
     }
 
     a {
         color: var(--link);
-        text-decoration: underline;
-        text-underline-offset: 2px;
-        transition: opacity var(--transition);
+
+        @apply underline hover:decoration-transparent underline-offset-2 transition-colors;
+
+        &.no-style {
+            @apply no-underline text-inherit;
+        }
     }
-    a:hover { opacity: 0.75; }
-    a.no-style { text-decoration: none; color: inherit; }
 
     small, .text-sm  { font-size: var(--text-sm); }
     .text-xs         { font-size: var(--text-xs); }
@@ -96,14 +95,14 @@
         background: var(--lighter-gray);
         border: var(--border);
         border-radius: var(--radius-md);
-        padding: var(--space-4);
+        padding: 16px;
         overflow-x: auto;
     }
     pre code { background: none; border: none; padding: 0; }
 
     kbd {
         display: inline-block;
-        padding: 2px var(--space-1);
+        padding: 2px 4px;
         font-size: 0.8em;
         line-height: 1.2;
         color: var(--black);
@@ -113,8 +112,8 @@
     }
 
     blockquote {
-        margin: 0 0 var(--space-4) 0;
-        padding-left: var(--space-4);
+        margin: 0 0 16px 0;
+        padding-left: 16px;
         border-left: 3px solid var(--light-gray);
         color: var(--dark-gray);
         font-style: italic;
@@ -145,7 +144,7 @@
         font-weight: 700;
         letter-spacing: 0.08em;
         color: var(--gray);
-        margin-bottom: var(--space-3);
+        margin-bottom: 12px;
     }
 
     summary { cursor: pointer; }

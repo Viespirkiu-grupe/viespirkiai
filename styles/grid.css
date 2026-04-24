@@ -56,7 +56,7 @@
     /* Gap modifiers */
     .gap-0 { gap: 0; }
     .gap-4 { gap: var(--col-gap); }
-    .gap-5 { gap: var(--space-5); }
+    .gap-5 { gap: 28px; }
 
     /* Span */
     .span-2 { grid-column: span 2; }

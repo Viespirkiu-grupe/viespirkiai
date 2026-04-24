@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="lt">
+<html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
   <head>
     <%- include('../head.ejs', {
       pageTitle: "Failų paieška",
@@ -12,8 +12,8 @@
       .failai-statistika {
         display: flex;
         flex-direction: column;
-        gap: var(--space-6);
-        margin-block: var(--space-5);
+        gap: 40px;
+        margin-block: 28px;
         align-items: center;
         width: 100%;
       }

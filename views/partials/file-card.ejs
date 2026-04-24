@@ -138,10 +138,9 @@ const __innerZIndexClass = 'file-card-z';
       <% if (__ariaLabel) { %>aria-label="<%= __escape(__ariaLabel) %>"<% } %>
     ><%= __title %></a>
 
-    <svg class="file-card-icon <%= __innerZIndexClass %>" viewBox="0 0 96 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" overflow="hidden"
+    <svg class="file-card-icon antialiased rounded-2xl block <%= __innerZIndexClass %>" viewBox="0 0 96 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" overflow="hidden"
       shape-rendering="geometricPrecision"
-      text-rendering="geometricPrecision"
-      style="-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; border-radius:16px;display:block">
+      text-rendering="geometricPrecision">
       <defs>
         <clipPath id="<%= __clipOuter %>">
           <path d="M-28,-36 L14,-36 L28,-22 L28,44 L-28,44 Z"/>
@@ -150,7 +149,7 @@ const __innerZIndexClass = 'file-card-z';
           <clipPath id="<%= __clipInner %>"><rect x="-28" y="-36" width="56" height="80" rx="9"/></clipPath>
         <% } %>
       </defs>
-      <g transform="translate(44,52) rotate(-10)" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision;">
+      <g transform="translate(44,52) rotate(-10)" class="[shape-rendering:geometricPrecision] [text-rendering:geometricPrecision]">
         <g clip-path="url(#<%= __clipOuter %>)">
           <rect x="-28" y="-36" width="56" height="80" rx="9" fill="<%= __theme.base %>"/>
         </g>

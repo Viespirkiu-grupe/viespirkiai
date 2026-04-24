@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="lt">
+<html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 <head>
   <%- include('../head.ejs', {
     pageTitle: "OCR būsena",
@@ -17,54 +17,54 @@
       <h1 class="mb-0">OCR būsena</h1>
     </div>
 
-    <!-- Nuskaitytojai + pie -->
     <div class="page-section">
         <% if (ocrPerMinute) { %>
         <div class="page-section">
           <h2 class="mb-3">
             <a href="#perMinute" id="perMinute" class="no-style">Sparta (<%= ocrPerMinute.date %>)</a>
           </h2>
-          <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3);">
+          <div class="grid auto-fill-180 gap-3">
             <div class="card">
               <div class="card-body">
                 <div class="section-title mb-2">Dokumentai</div>
-                <div style="display:flex; align-items:baseline; gap:0.3rem;">
-                  <span class="cell-mono" style="font-size:1.6rem; font-weight:600;"><%= Number(ocrPerMinute.results).toLocaleString('lt-LT') %></span>
-                  <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">/min.</span>
+                <div class="flex items-baseline gap-1">
+                  <span class="cell-mono text-[1.6rem] font-semibold"><%= Number(ocrPerMinute.results).toLocaleString('lt-LT') %></span>
+                  <span class="text-xs text-muted font-medium">/min.</span>
                 </div>
               </div>
             </div>
             <div class="card">
               <div class="card-body">
                 <div class="section-title mb-2">Puslapiai</div>
-                <div style="display:flex; align-items:baseline; gap:0.3rem;">
-                  <span class="cell-mono" style="font-size:1.6rem; font-weight:600;"><%= Number(ocrPerMinute.pages).toLocaleString('lt-LT') %></span>
-                  <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">/min.</span>
+                <div class="flex items-baseline gap-1">
+                  <span class="cell-mono text-[1.6rem] font-semibold"><%= Number(ocrPerMinute.pages).toLocaleString('lt-LT') %></span>
+                  <span class="text-xs text-muted font-medium">/min.</span>
                 </div>
               </div>
             </div>
             <div class="card">
               <div class="card-body">
                 <div class="section-title mb-2">Žodžiai</div>
-                <div style="display:flex; align-items:baseline; gap:0.3rem;">
-                  <span class="cell-mono" style="font-size:1.6rem; font-weight:600;"><%= Number(ocrPerMinute.words).toLocaleString('lt-LT') %></span>
-                  <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">/min.</span>
+                <div class="flex items-baseline gap-1">
+                  <span class="cell-mono text-[1.6rem] font-semibold"><%= Number(ocrPerMinute.words).toLocaleString('lt-LT') %></span>
+                  <span class="text-xs text-muted font-medium">/min.</span>
                 </div>
               </div>
             </div>
           </div>
         <% } %>
-      <div class="grid-2" style="align-items:start;">
+
+      <div class="grid-2 items-start">
 
         <div>
           <h2 class="mb-4"><a href="#nuskaitytojai" id="nuskaitytojai" class="no-style">OCR nuskaitytojai</a></h2>
-          <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3); padding-top: var(--space-1);">
+          <div class="grid auto-fill-180 gap-3 pt-1">
             <% ocrNuskaitytojai.forEach(nuskaitytojas => { %>
               <div class="card">
                 <div class="card-body">
-                    <div class="section-title mb-2">
-                      <a href="/failai/ocr/<%= nuskaitytojas.id %>"><%= nuskaitytojas.viesasPavadinimas %></a>
-                    </div>
+                  <div class="section-title mb-2">
+                    <a href="/failai/ocr/<%= nuskaitytojas.id %>"><%= nuskaitytojas.viesasPavadinimas %></a>
+                  </div>
                   <dl class="kv-list">
                     <dt>Dokumentai</dt>
                     <dd><span class="cell-mono"><%= Number(nuskaitytojas.results).toLocaleString('lt-LT') %></span></dd>
@@ -83,9 +83,9 @@
 
         <div>
           <h2 class="mb-3"><a href="#busena" id="busena" class="no-style">Failai pagal būseną</a></h2>
-          <div class="flex flex-col min-h-[350px]">
+          <div class="flex flex-col min-h-87.5">
             <div class="chart-frame">
-              <div id="ocrStatsDiagrama" class="chart h-[350px]"></div>
+              <div id="ocrStatsDiagrama" class="chart h-87.5"></div>
             </div>
           </div>
           <script defer>
@@ -122,12 +122,11 @@
       </div>
     </div>
 
-    <!-- Failų dalis pagal nuskaitytoją -->
     <div class="page-section">
       <h2 class="mb-3"><a href="#pagalNuskaitytoją" id="pagalNuskaitytoją" class="no-style">Failų dalis pagal nuskaitytoją</a></h2>
-      <div class="flex flex-col min-h-[350px]">
+      <div class="flex flex-col min-h-87.5">
         <div class="chart-frame">
-          <div id="ocrNuskaitytojaiDiagrama" class="chart h-[350px]"></div>
+          <div id="ocrNuskaitytojaiDiagrama" class="chart h-87.5"></div>
         </div>
       </div>
       <script defer>
@@ -143,21 +142,20 @@
       </script>
     </div>
 
-    <!-- Dienos statistika -->
     <script>
-      const ocrStatsDay    = <%- JSON.stringify(ocrStatsDay) %>;
-      const ocrLabels      = ocrStatsDay.map(item => item.date);
-      const ocrResults     = ocrStatsDay.map(item => item.results);
+      const ocrStatsDay     = <%- JSON.stringify(ocrStatsDay) %>;
+      const ocrLabels       = ocrStatsDay.map(item => item.date);
+      const ocrResults      = ocrStatsDay.map(item => item.results);
       const ocrResultsPages = ocrStatsDay.map(item => item.pages);
       const ocrResultsWords = ocrStatsDay.map(item => item.words);
     </script>
 
     <div class="grid-2">
 
-      <div class="page-section" style="display:flex; flex-direction:column; min-height:350px;">
+      <div class="page-section flex flex-col min-h-87.5">
         <h2 class="mb-3"><a href="#rezultatai" id="rezultatai" class="no-style">Rezultatų skaičius</a></h2>
         <div class="chart-frame">
-          <div id="ocrStatsDayDiagrama" class="chart h-[350px]"></div>
+          <div id="ocrStatsDayDiagrama" class="chart h-87.5"></div>
         </div>
         <script defer>
           displayChart({
@@ -170,10 +168,10 @@
         </script>
       </div>
 
-      <div class="page-section" style="display:flex; flex-direction:column; min-height:350px;">
+      <div class="page-section flex flex-col min-h-87.5">
         <h2 class="mb-3"><a href="#puslapiai" id="puslapiai" class="no-style">Puslapių skaičius</a></h2>
         <div class="chart-frame">
-          <div id="ocrStatsDayPagesDiagrama" class="chart h-[350px]"></div>
+          <div id="ocrStatsDayPagesDiagrama" class="chart h-87.5"></div>
         </div>
         <script defer>
           displayChart({
@@ -186,10 +184,10 @@
         </script>
       </div>
 
-      <div class="page-section" style="display:flex; flex-direction:column; min-height:350px;">
+      <div class="page-section flex flex-col min-h-87.5">
         <h2 class="mb-3"><a href="#zodziai" id="zodziai" class="no-style">Žodžių skaičius</a></h2>
         <div class="chart-frame">
-          <div id="ocrStatsDayWordsDiagrama" class="chart h-[350px]"></div>
+          <div id="ocrStatsDayWordsDiagrama" class="chart h-87.5"></div>
         </div>
         <script defer>
           displayChart({

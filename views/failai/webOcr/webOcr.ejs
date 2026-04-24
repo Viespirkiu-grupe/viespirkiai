@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="lt">
+<html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 <head>
   <%- include('../../head.ejs', {
     pageTitle: "WebOCR",
@@ -104,12 +104,12 @@
     .card--new { animation: card-in 0.3s ease; }
 
     /* ── Log panel ──────────────────────────────────────── */
-    #log-section { margin: 1rem var(--space-4); }
+    #log-section { margin: 1rem 16px; }
     #log-panel {
       height: 280px; overflow-y: auto;
-      background: #0f0f0f; color: #d4d4d4;
+      background: #111111; color: #d4d4d4;
       font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
-      padding: var(--space-4);
+      padding: 16px;
       border-radius: var(--radius-lg); border: var(--border);
       margin: 0; white-space: pre; box-sizing: border-box;
     }
@@ -130,15 +130,15 @@
   <div id="btn-progress-bar">
     <div id="btn-progress-fill"></div>
   </div>
-  <div id="main-links" class="text-sm mt-2" style="display:none">
-    <a id="lnk-force-stop" href="#" style="color:#c33;text-decoration:none">Avarinis stabdas</a>
-    &nbsp;·&nbsp;
-    <a id="lnk-log" href="#" style="color:#44a;text-decoration:none">Logs'ai</a>
+  <div id="main-links" class="text-sm mt-2 hidden">
+    <a id="lnk-force-stop" href="#" class="text-red-700 no-underline">Avarinis stabdas</a>
+    <span class="mx-1">·</span>
+    <a id="lnk-log" href="#" class="text-indigo-700 no-underline">Logs'ai</a>
   </div>
 </div>
 
 <!-- ── Gijų kiekio dialogo langas ─────────────────────── -->
-<dialog id="dlg-start" class="card shadow-lg" style="min-width:380px">
+<dialog id="dlg-start" class="card shadow-lg min-w-[380px]">
   <div class="card-header">
     <h4>OCR darbuotojų konfigūracija</h4>
   </div>
@@ -153,7 +153,7 @@
       <span id="dlg-ram" class="form-hint"></span>
     </div>
     <p id="dlg-core-line" class="text-muted text-sm m-0">Jūsų sistema turi <strong id="dlg-cores">?</strong> loginių branduolių.<br>Kiekvienas darbuotojas naudoja ~300 MB RAM ir vieną CPU giją.</p>
-    <p id="dlg-warn" class="form-error m-0" style="min-height:1.2em"></p>
+    <p id="dlg-warn" class="form-error m-0 min-h-[1.2em]"></p>
   </div>
   <div class="card-footer">
     <button id="dlg-cancel" class="btn btn-secondary btn-sm">Atšaukti</button>
@@ -162,7 +162,7 @@
 </dialog>
 
 <!-- ── Sesijos statistika ─────────────────────────────── -->
-<div id="session-stats" class="text-center text-sm text-muted mt-3 mb-3" style="display:none">
+<div id="session-stats" class="text-center text-sm text-muted mt-3 mb-3 hidden">
   <span id="stat-docs">0 dok.</span> &nbsp;·&nbsp;
   <span id="stat-pages">0 psl.</span> &nbsp;·&nbsp;
   <span id="stat-size">0 MB</span>  &nbsp;·&nbsp;
@@ -170,13 +170,13 @@
 </div>
 
 <!-- ── Žurnalas (paslėptas pagal nutylėjimą) ──────────── -->
-<section id="log-section" style="display:none">
+<section id="log-section" class="hidden">
   <pre id="log-panel"></pre>
 </section>
 
 <!-- ── Dokumentų eilė ─────────────────────────────────── -->
-<section id="queue-section" style="min-height:50vh">
-  <div id="queue-tbody" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3); padding: var(--space-1) var(--space-4);"></div>
+<section id="queue-section" class="min-h-[50vh]">
+  <div id="queue-tbody" class="grid gap-3 px-4 py-1 grid-cols-[repeat(auto-fill,minmax(180px,1fr))]"></div>
 </section>
 
 <!-- Tesseract.js v5 UMD — suteikia globalų `Tesseract` -->

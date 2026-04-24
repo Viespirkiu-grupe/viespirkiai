@@ -116,7 +116,7 @@ const noGrid = new Set([
   'ND-SelectionCriteria',
   'ND-EEDProcurementDetailsLot', 'ND-EEDProcurementDetailsLotResult',
 ])
-const sep = 'margin-top:var(--space-4);padding-top:var(--space-4);border-top:var(--border)'
+const sep = 'margin-top:16px;padding-top:16px;border-top:var(--border)'
 %>
 <div class="card">
   <div class="card-header">
@@ -128,17 +128,17 @@ const sep = 'margin-top:var(--space-4);padding-top:var(--space-4);border-top:var
     <%# Zone 1 – What (left) + Where/When (right) %>
     <% if (hasRightCol) { %><div class="grid-2"><% } %>
       <div>
-        <% if (contractType || otherObjects) { %><p class="text-xs text-muted" style="margin-bottom:var(--space-2)"><%= [contractType, otherObjects].filter(Boolean).join(' · ') %></p><% } %>
-        <% if (description) { %><p class="text-sm" style="margin-bottom:var(--space-3)"><%= description %></p><% } %>
-        <% if (cpv || quantity) { %><dl class="kv-list" style="margin-bottom:0"><% if (quantity) { %><dt>Kiekis</dt><dd><%= quantity %></dd><% } %><% if (cpv) { %><dt>BVPŽ</dt><dd class="fw-medium"><%= cpvLabel || cpvCode %><% if (cpvLabel) { %> <span class="text-muted fw-normal text-xs"><%= cpvCode %></span><% } %></dd><% } %></dl><% } %>
+        <% if (contractType || otherObjects) { %><p class="text-xs text-muted mb-2"><%= [contractType, otherObjects].filter(Boolean).join(' · ') %></p><% } %>
+        <% if (description) { %><p class="text-sm mb-3"><%= description %></p><% } %>
+        <% if (cpv || quantity) { %><dl class="kv-list mb-0"><% if (quantity) { %><dt>Kiekis</dt><dd><%= quantity %></dd><% } %><% if (cpv) { %><dt>BVPŽ</dt><dd class="fw-medium"><%= cpvLabel || cpvCode %><% if (cpvLabel) { %> <span class="text-muted fw-normal text-xs"><%= cpvCode %></span><% } %></dd><% } %></dl><% } %>
       </div>
       <% if (hasRightCol) { %>
-      <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+      <div class="flex flex-col gap-3">
         <% if (hasPlacePerf) { %>
         <div>
           <p class="section-title">Vykdymo vieta</p>
           <% placePerf.forEach((sg, i) => { %>
-            <% if (i > 0) { %><hr style="border:none;border-top:1px solid var(--light-gray);margin:var(--space-2) 0"><% } %>
+            <% if (i > 0) { %><hr class="my-2 border-0 border-t border-light-gray"><% } %>
             <%- include('subgroup', { sg }) %>
           <% }) %>
         </div>
@@ -208,7 +208,7 @@ const sep = 'margin-top:var(--space-4);padding-top:var(--space-4);border-top:var
           <% const useDivider = ['ND-SelectionCriteria','ND-LotAwardCriterion','ND-LotsGroupAwardCriterion'].includes(sgType.nodeId) %>
           <% if (useGrid) { %><div class="grid-<%= Math.min(sgType.instances.length, 3) %>"><% } %>
           <% sgType.instances.forEach((sg, i) => { %>
-            <% if (useDivider && i > 0) { %><hr style="border:none;border-top:1px solid var(--light-gray);margin:var(--space-2) 0"><% } %>
+            <% if (useDivider && i > 0) { %><hr class="my-2 border-0 border-t border-light-gray"><% } %>
             <%- include('subgroup', { sg }) %>
           <% }) %>
           <% if (useGrid) { %></div><% } %>
@@ -239,7 +239,7 @@ const sep = 'margin-top:var(--space-4);padding-top:var(--space-4);border-top:var
         <div>
           <p class="section-title">Pirkimo dokumentas</p>
           <% docSgs.forEach((sg, i) => { %>
-            <% if (i > 0) { %><hr style="border:none;border-top:1px solid var(--light-gray);margin:var(--space-2) 0"><% } %>
+            <% if (i > 0) { %><hr class="my-2 border-0 border-t border-light-gray"><% } %>
             <%- include('subgroup', { sg }) %>
           <% }) %>
         </div>

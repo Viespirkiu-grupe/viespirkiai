@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 <head>
   <%- include('../head.ejs', {
       pageTitle: Number(sutartis.faktineIvykdimoVerte || sutartis.verte)
@@ -231,7 +231,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
                 %>
               <% } %>
 
-              <div style="min-width:0;">
+              <div class="min-w-0">
                 <%- include('../partials/file-card.ejs', { title, href, meta, ext, iconLabel: true, actions }) %>
               </div>
             <% }); %>
@@ -242,7 +242,6 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
       </section>
 
     </div>
-
 
     <!-- ES projektai / SABIS / Panašios sutartys -->
     <div class="grid-2">
@@ -382,8 +381,8 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
                   </h3>
 
                   <div class="flex gap-3 mt-2 text-sm">
-                    <span><strong>Pirkėjas:</strong> <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>" style="position:relative;z-index:1;"><%= item.perkanciojiOrganizacija %></a></span>
-                    <span><strong>Tiekėjas:</strong> <a href="/asmuo/<%= item.tiekejoKodas %>" style="position:relative;z-index:1;"><%= item.tiekejas || "Nenurodytas" %></a></span>
+                    <span><strong>Pirkėjas:</strong> <a href="/asmuo/<%= item.perkanciosiosOrganizacijosKodas %>" class="relative z-1"><%= item.perkanciojiOrganizacija %></a></span>
+                    <span><strong>Tiekėjas:</strong> <a href="/asmuo/<%= item.tiekejoKodas %>" class="relative z-1"><%= item.tiekejas || "Nenurodytas" %></a></span>
                   </div>
                 </div>
               </article>

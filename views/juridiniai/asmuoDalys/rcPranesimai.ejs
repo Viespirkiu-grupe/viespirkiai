@@ -20,14 +20,14 @@
             </div>
             <div>
               <dt class="sr-only">Leidinys</dt>
-              <dd><a href="<%= pranesimas.leidinioLink %>" style="position:relative;z-index:1;"><%= pranesimas.leidinioNumeris %></a></dd>
+              <dd><a href="<%= pranesimas.leidinioLink %>" class="relative z-1"><%= pranesimas.leidinioNumeris %></a></dd>
             </div>
           </dl>
 
           <h3 class="result-card-title"><%= pranesimas.subtitle || pranesimas.title %></h3>
 
           <% if (pranesimas.text) { %>
-            <p class="text-sm text-muted mt-2" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;">
+            <p class="text-sm text-muted mt-2 line-clamp-4">
               <%= pranesimas.text
                     .replace(/&/g, "&amp;")
                     .replace(/</g, "&lt;")

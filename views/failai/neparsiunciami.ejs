@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="lt">
+<html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 <head>
   <%- include('../head.ejs', {
     pageTitle: "Neparsiunciami failai",
@@ -20,7 +20,7 @@
     <form method="get" action="/failai/neparsiunciami" class="filter-bar mb-4">
       <div class="form-group">
         <label for="saltinis" class="form-label">Šaltinis</label>
-        <select id="saltinis" name="saltinis" class="form-control" style="width: 40ch;">
+        <select id="saltinis" name="saltinis" class="form-control w-[40ch]">
           <option value=""                      <%= (!saltinis)                          ? 'selected' : '' %>>Visi</option>
           <option value="sutartys"              <%= (saltinis === 'sutartys')             ? 'selected' : '' %>>Sutartys</option>
           <option value="neskelbiamosDerybos"   <%= (saltinis === 'neskelbiamosDerybos')  ? 'selected' : '' %>>Neskelbiamos derybos</option>

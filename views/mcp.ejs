@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="lt">
+<html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 <head>
   <%- include('head.ejs', {
       pageTitle: "MCP serveris",
@@ -20,10 +20,10 @@
       background: var(--shade-2);
       border: var(--border);
       border-radius: var(--radius-lg);
-      padding: var(--space-4);
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: var(--space-3);
+      gap: 12px;
     }
 
     .mcp-msg {
@@ -37,11 +37,11 @@
 
     .mcp-msg-ai {
       align-items: flex-start;
-      gap: var(--space-2);
+      gap: 8px;
     }
 
     .mcp-bubble {
-      padding: var(--space-3) var(--space-4);
+      padding: 12px 16px;
       border-radius: var(--radius-lg);
       font-size: var(--text-sm);
       line-height: 1.6;
@@ -64,7 +64,7 @@
     .mcp-tool {
       display: inline-flex;
       align-items: center;
-      gap: var(--space-2);
+      gap: 8px;
       font-size: var(--text-xs);
       color: var(--gray);
       font-family: var(--font-mono);
@@ -78,8 +78,8 @@
 
     .mcp-cats-list li {
       display: flex;
-      gap: var(--space-4);
-      padding: var(--space-4) 0;
+      gap: 16px;
+      padding: 16px 0;
       border-bottom: var(--border);
     }
 
@@ -106,7 +106,7 @@
       }
 
       .mcp-mobile-px {
-        padding-inline: var(--space-4);
+        padding-inline: 16px;
       }
     }
   </style>
@@ -212,7 +212,7 @@
 
             <div class="mcp-msg mcp-msg-ai">
               <div class="mcp-bubble mcp-bubble-ai">
-                <p class="text-xs text-muted mb-3" style="font-family: var(--font-mono);">PIRKĖJAS: NEMUNO AUŠRA (JAR 306660048)</p>
+                <p class="text-xs text-muted mb-3 font-mono">PIRKĖJAS: NEMUNO AUŠRA (JAR 306660048)</p>
 
                 <div class="table-wrapper mb-3">
                   <table>
@@ -222,30 +222,30 @@
                         <td><strong>31 501,70 €</strong></td>
                       </tr>
                       <tr>
-                        <td class="text-muted" style="font-size: var(--text-xs);">Interesų konfliktas</td>
-                        <td class="text-muted" style="font-size: var(--text-xs);">Tiekėjas</td>
-                        <td class="text-muted" style="font-size: var(--text-xs);">Laikotarpis</td>
+                        <td class="text-muted text-xs">Interesų konfliktas</td>
+                        <td class="text-muted text-xs">Tiekėjas</td>
+                        <td class="text-muted text-xs">Laikotarpis</td>
                       </tr>
                       <tr>
                         <td></td>
-                        <td style="font-size: var(--text-xs);">Remigijus Žemaitaitis (fizinis asmuo)</td>
-                        <td style="font-size: var(--text-xs);">2024-01-17–2024-11-13</td>
+                        <td class="text-xs">Remigijus Žemaitaitis (fizinis asmuo)</td>
+                        <td class="text-xs">2024-01-17–2024-11-13</td>
                       </tr>
                       <tr>
-                        <td class="text-muted" style="font-size: var(--text-xs);">Mėnesinis mokestis</td>
-                        <td class="text-muted" style="font-size: var(--text-xs);">Tipas</td>
+                        <td class="text-muted text-xs">Mėnesinis mokestis</td>
+                        <td class="text-muted text-xs">Tipas</td>
                         <td></td>
                       </tr>
                       <tr>
-                        <td style="font-size: var(--text-xs);">3 176,47 €/mėn.</td>
-                        <td style="font-size: var(--text-xs);">Mažos vertės pirkimas (MVP)</td>
+                        <td class="text-xs">3 176,47 €/mėn.</td>
+                        <td class="text-xs">Mažos vertės pirkimas (MVP)</td>
                         <td></td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
 
-                <p class="mb-3" style="font-size: var(--text-xs);">⚠ Partijos pirmininkas Remigijus Žemaitaitis sudarė sutartį su savo paties vadovaujama partija — jis yra vienu metu ir pirkėjo vadovas, ir paslaugos tiekėjas. El. paštas sutartyje: r*********@hotmail.com.</p>
+                <p class="mb-3 text-xs">⚠ Partijos pirmininkas Remigijus Žemaitaitis sudarė sutartį su savo paties vadovaujama partija — jis yra vienu metu ir pirkėjo vadovas, ir paslaugos tiekėjas. El. paštas sutartyje: r*********@hotmail.com.</p>
 
                 <div class="table-wrapper mb-0">
                   <table>
@@ -255,14 +255,14 @@
                         <td><strong>18 057,78 €</strong></td>
                       </tr>
                       <tr>
-                        <td class="text-muted" style="font-size: var(--text-xs);">Susijusi sutartis</td>
-                        <td class="text-muted" style="font-size: var(--text-xs);">Tiekėjas</td>
-                        <td class="text-muted" style="font-size: var(--text-xs);">Laikotarpis</td>
+                        <td class="text-muted text-xs">Susijusi sutartis</td>
+                        <td class="text-muted text-xs">Tiekėjas</td>
+                        <td class="text-muted text-xs">Laikotarpis</td>
                       </tr>
                       <tr>
                         <td></td>
-                        <td style="font-size: var(--text-xs);">Daiva Petkevičienė (fizinis asmuo)</td>
-                        <td style="font-size: var(--text-xs);">2024-03-12–2024-11-13</td>
+                        <td class="text-xs">Daiva Petkevičienė (fizinis asmuo)</td>
+                        <td class="text-xs">2024-03-12–2024-11-13</td>
                       </tr>
                     </tbody>
                   </table>
@@ -277,7 +277,7 @@
     </div>
 
     <!-- Setup -->
-    <div class="px-7 py-6 flex flex-wrap align-start gap-5 mcp-mobile-px" style="align-items: stretch;">
+    <div class="px-7 py-6 flex flex-wrap align-start gap-5 mcp-mobile-px items-stretch">
       <div class="max-w-full">
         <p>Pridėkite šį MCP serverį:</p>
 
@@ -289,12 +289,12 @@
         <p>arba konfigūraciją:</p>
 
         <div >
-          <div class="border rounded-lg overflow-hidden" style="min-width: 280px;">
-            <div class="bg-light px-4 py-2 border-bottom flex tems-center ijustify-between">
-              <span class="text-xs text-muted" style="font-family: var(--font-mono);">.mcp.json</span>
+          <div class="border rounded-lg overflow-hidden min-w-70">
+            <div class="bg-light px-4 py-2 border-bottom flex items-center justify-between">
+              <span class="text-xs text-muted font-mono">.mcp.json</span>
               <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(this.closest('div').nextElementSibling.textContent.trim()).then(() => { this.textContent = '✓'; setTimeout(() => this.textContent = 'Kopijuoti', 1500); })">Kopijuoti</button>
             </div>
-            <pre class="m-0 border-0 rounded-0" style="font-size: var(--text-sm);"><code>{
+            <pre class="m-0 border-0 rounded-0 text-sm"><code>{
     "servers": {
       "viespirkiai": {
         "url": "https://viespirkiai.org/mcp"
@@ -306,7 +306,7 @@
       </div>
 
       <div>
-        <div style="display: flex; justify-content: space-between; flex-direction: column; height: 100%;">
+        <div class="flex flex-col justify-between h-full">
           <div>
             <h3 class="inline-block">Claude</h3> <i class="text-muted text-sm">(išskyrus free)</i>
             <p class="mb-5">Settings → Connectors → Add custom connector</p>

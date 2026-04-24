@@ -13,7 +13,7 @@
     }
 
     table th, table td {
-        padding: var(--space-2) var(--space-3);
+        padding: 8px 12px;
         border: var(--border);
         vertical-align: middle;
         text-align: left;
@@ -35,9 +35,9 @@
 
     .table-bordered th, .table-bordered td { border: var(--border); }
 
-    .table-sm th, .table-sm td { padding: var(--space-1) var(--space-2); }
+    .table-sm th, .table-sm td { padding: 4px 8px; }
 
-    .table-lg th, .table-lg td { padding: var(--space-3) var(--space-4); }
+    .table-lg th, .table-lg td { padding: 12px 16px; }
 
     .table-fixed { table-layout: fixed; }
 

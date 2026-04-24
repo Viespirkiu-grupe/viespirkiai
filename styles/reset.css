@@ -13,9 +13,10 @@
         min-height: 100vh;
         font-family: var(--font-sans);
         font-size: var(--text-base);
-        line-height: var(--line-height);
         color: var(--black);
         background-color: var(--white);
+
+        @apply leading-[1.55];
     }
 
     main {
@@ -23,7 +24,7 @@
     }
 
     ul, ol {
-        padding-left: var(--space-5);
+        padding-left: 28px;
     }
 
     dd {
@@ -38,7 +39,7 @@
     hr {
         border: none;
         border-top: var(--border);
-        margin: var(--space-5) 0;
+        margin: 28px 0;
     }
 
     :focus-visible {

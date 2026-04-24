@@ -17,8 +17,8 @@ const nuts     = fa(addrFields, '5071')
 const restrict = fa(addrFields, '727')
 const addInfo  = fa(addrFields, '728')
 %>
-<% if (street1 || street2) { %><p style="margin-bottom:var(--space-1)"><%= [street1, street2].filter(Boolean).join(', ') %></p><% } %>
-<% if (zip || city || country) { %><p style="margin-bottom:var(--space-1)"><%= [[zip, city].filter(Boolean).join(' '), country].filter(Boolean).join(' · ') %></p><% } %>
-<% if (nuts) { %><p class="text-sm text-muted" style="margin-bottom:var(--space-1)">NUTS: <%= nuts %></p><% } %>
-<% if (restrict) { %><p class="text-sm" style="margin-bottom:var(--space-1)"><%= escapeHtml(restrict) %></p><% } %>
-<% if (addInfo) { %><p class="text-sm text-muted" style="margin-bottom:0"><%= escapeHtml(addInfo) %></p><% } %>
+<% if (street1 || street2) { %><p class="mb-1"><%= [street1, street2].filter(Boolean).join(', ') %></p><% } %>
+<% if (zip || city || country) { %><p class="mb-1"><%= [[zip, city].filter(Boolean).join(' '), country].filter(Boolean).join(' · ') %></p><% } %>
+<% if (nuts) { %><p class="text-sm text-muted mb-1">NUTS: <%= nuts %></p><% } %>
+<% if (restrict) { %><p class="text-sm mb-1"><%= escapeHtml(restrict) %></p><% } %>
+<% if (addInfo) { %><p class="text-sm text-muted mb-0"><%= escapeHtml(addInfo) %></p><% } %>
