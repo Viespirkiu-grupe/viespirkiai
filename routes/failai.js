@@ -718,25 +718,35 @@ failaiSearchRouter.get("/failai/ocr", async (req, res) => {
     const ocrStatsDay = ocrStatsDayRes.rows;
     const latestDay = ocrStatsDay[0]; // jau ORDER BY date DESC
     const ocrPerMinute = latestDay
-        ? (() => {
-              const nowLT = new Date(
-                  new Date().toLocaleString("en-US", {
-                      timeZone: "Europe/Vilnius",
-                  }),
-              );
-              const todayLT = nowLT.toISOString().slice(0, 10);
-              const isToday = latestDay.date === todayLT;
-              const minutes = isToday
-                  ? nowLT.getHours() * 60 + nowLT.getMinutes() || 1
-                  : 1440;
-              return {
-                  date: latestDay.date,
-                  results: (latestDay.results / minutes).toFixed(2),
-                  pages: (latestDay.pages / minutes).toFixed(2),
-                  words: (latestDay.words / minutes).toFixed(2),
-              };
-          })()
-        : null;
+    ? (() => {
+        const parts = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Europe/Vilnius",
+            year: "numeric", month: "2-digit", day: "2-digit",
+            hour: "2-digit", minute: "2-digit", hour12: false,
+        }).formatToParts(new Date());
+        const get = (t) => parts.find((p) => p.type === t).value;
+        const todayLT = `${get("year")}-${get("month")}-${get("day")}`;
+
+        // latestDay.date may be a Date object from pg — normalize both sides
+        const latestDateStr =
+            latestDay.date instanceof Date
+                ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vilnius" })
+                      .format(latestDay.date)
+                : latestDay.date;
+
+        const isToday = latestDateStr === todayLT;
+        const minutes = isToday
+            ? Math.max(1, Number(get("hour")) * 60 + Number(get("minute")))
+            : 1440;
+
+        return {
+            date: latestDateStr,
+            results: (latestDay.results / minutes).toFixed(2),
+            pages: (latestDay.pages / minutes).toFixed(2),
+            words: (latestDay.words / minutes).toFixed(2),
+        };
+    })()
+    : null;
 
     res.render("failai/ocr", {
         customHead: config.customHead,
