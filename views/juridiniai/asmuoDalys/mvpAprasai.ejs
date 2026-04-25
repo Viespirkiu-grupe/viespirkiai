@@ -1,5 +1,5 @@
 <% if (asmuo.mvpAprasai?.rows?.length > 0) { %>
-<div class="page-section mt-6" id="mvp-aprasai">
+<div class="page-section mt-10" id="mvp-aprasai">
   <h2><a href="#mvp-aprasai" class="no-style">MVP tvarkos aprašai</a></h2>
 
   <% if (queryParams.mvpAprasaiLimit == "max") { queryParams.mvpAprasaiLimit = 10000000; } %>
@@ -17,7 +17,7 @@
       <div class="card mb-3">
         <div class="card-body">
 
-          <div class="fw-bold mb-1"><%= aprasas.aprasymas %></div>
+          <div class="font-bold mb-1"><%= aprasas.aprasymas %></div>
 
           <div class="text-muted text-sm mb-3">
             <% if (aprasas.paskelbimoData) { %>Paskelbta: <strong><%= aprasas.paskelbimoData %></strong><% } %>

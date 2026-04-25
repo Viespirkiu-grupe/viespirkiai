@@ -26,8 +26,6 @@
     .card-header h3, .card-header h4 { margin: 0; }
 
     .card-body { padding: 16px; }
-    .card-body-sm { padding: 12px; }
-    .card-body-lg { padding: 28px; }
 
     .card-footer {
         padding: 12px 16px;

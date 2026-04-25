@@ -31,12 +31,4 @@
         gap: 8px;
         align-items: center;
     }
-
-    /* Sticky table header helper */
-    .sticky-top {
-        position: sticky;
-        top: 0;
-        z-index: var(--z-sticky);
-        background: var(--white);
-    }
 }

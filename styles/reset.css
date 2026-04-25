@@ -4,7 +4,7 @@
     }
 
     html, body {
-        overflow-x: hidden;
+        @apply overflow-x-hidden;
     }
 
     body {
@@ -24,7 +24,7 @@
     }
 
     ul, ol {
-        padding-left: 28px;
+        @apply pl-7;
     }
 
     dd {
@@ -37,9 +37,7 @@
     }
 
     hr {
-        border: none;
-        border-top: var(--border);
-        margin: 28px 0;
+        @apply my-7;
     }
 
     :focus-visible {

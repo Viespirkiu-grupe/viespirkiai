@@ -1,9 +1,9 @@
-<div class="page-section mb-6" id="darbuotojai">
+<div class="page-section mb-10" id="darbuotojai">
   <h2><a href="#darbuotojai" class="no-style">Darbuotojų skaičius</a></h2>
   <div class="grid-2">
 
     <div class="flex flex-col min-h-[350px]">
-      <h3 class="text-sm fw-bold mb-3">Darbo sutartys, valstybės tarnautojai</h3>
+      <h3 class="text-sm font-bold mb-3">Darbo sutartys, valstybės tarnautojai</h3>
       <% if (asmuo.sodra?.duomenys?.length > 0 && asmuo.sodra.turejoDraustuju) { %>
         <div class="chart-frame">
           <div id="darbuotojuSkaiciausDiagrama" class="chart h-[350px]"></div>
@@ -23,7 +23,7 @@
     </div>
 
     <div class="flex flex-col min-h-[350px]">
-      <h3 class="text-sm fw-bold mb-3">Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
+      <h3 class="text-sm font-bold mb-3">Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
       <% if (asmuo.sodra?.duomenys?.length > 0 && asmuo.sodra.turejoDraustuju2) { %>
         <div class="chart-frame">
           <div id="darbuotojuSkaiciausIIDiagrama" class="chart h-[350px]"></div>

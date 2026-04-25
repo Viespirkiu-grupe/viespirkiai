@@ -57,7 +57,7 @@
       </div>
     </div>
 
-    <div class="grid-3 mb-5 items-start">
+    <div class="grid-3 mb-7 items-start">
       <div>
         <div class="text-muted text-xs mb-4">Duomenys gali būti pasenę</div>
 
@@ -138,7 +138,7 @@
       <% } %>
     </div>
 
-    <div class="grid-3 mb-6">
+    <div class="grid-3 mb-10">
       <div class="card">
         <div class="card-body">
           <div class="section-title mb-3">Darbuotojai</div>
@@ -151,7 +151,7 @@
             <dd><span class="cell-mono"><%= asmuo.sodra.draustieji2 || 0 %></span></dd>
 
             <dt>Viso</dt>
-            <dd><span class="cell-mono fw-bold"><%= asmuo.sodra.draustieji + (asmuo.sodra.draustieji2 || 0) %></span></dd>
+            <dd><span class="cell-mono font-bold"><%= asmuo.sodra.draustieji + (asmuo.sodra.draustieji2 || 0) %></span></dd>
           </dl>
           <% } else { %>
           <em class="text-muted">Nėra duomenų</em>
@@ -177,7 +177,7 @@
               <% } %>
             </dd>
             <dt>Bendrai</dt>
-            <dd><span class="cell-mono fw-bold"><%= asmuo.sodra.bendrasVidutinisAtlyginimas.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>
+            <dd><span class="cell-mono font-bold"><%= asmuo.sodra.bendrasVidutinisAtlyginimas.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>
                 €/mėn.</span></dd>
           </dl>
           <% } else { %>
@@ -243,14 +243,14 @@
     <%- include("asmuoDalys/sutartys.ejs") %>
     <%- include("asmuoDalys/mvpAprasai.ejs") %>
 
-    <div class="grid-2 mb-6">
+    <div class="grid-2 mb-10">
       <%- include("asmuoDalys/melagiai.ejs") %>
       <%- include("asmuoDalys/nepatikimi.ejs") %>
     </div>
 
     <%- include("asmuoDalys/finansinesAtaskaitos.ejs") %>
 
-    <div class="grid-2 mb-6">
+    <div class="grid-2 mb-10">
       <%- include("asmuoDalys/darboSkelbimai.ejs") %>
       <%- include("asmuoDalys/rcPranesimai.ejs") %>
       <%- include("asmuoDalys/domenai.ejs") %>

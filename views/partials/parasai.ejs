@@ -27,9 +27,9 @@
         <% if (!sig) return; %>
         <div>
           <% if (sig.signerCertificateCommonName) { %>
-            <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
+            <span class="font-bold"><%= sig.signerCertificateCommonName %></span>
           <% } else { %>
-            <span class="fw-bold text-muted">Nežinomas pasirašytojas</span>
+            <span class="font-bold text-muted">Nežinomas pasirašytojas</span>
           <% } %>
           <% if (sig.signingTime) { %>
             <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>
@@ -40,16 +40,16 @@
     <% if (__hasHidden) { %>
       <details class="signature-list-details mt-2">
         <summary class="signature-list-summary">
-          <span class="text-muted text-xs fw-bold">+ <%= __hiddenCount %> daugiau</span>
+          <span class="text-muted text-xs font-bold">+ <%= __hiddenCount %> daugiau</span>
         </summary>
         <div class="signature-list-expanded flex flex-col gap-1 mt-2">
           <% __list.slice(__maxItems).forEach(sig => { %>
             <% if (!sig) return; %>
             <div>
               <% if (sig.signerCertificateCommonName) { %>
-                <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
+                <span class="font-bold"><%= sig.signerCertificateCommonName %></span>
               <% } else { %>
-                <span class="fw-bold text-muted">Nežinomas pasirašytojas</span>
+                <span class="font-bold text-muted">Nežinomas pasirašytojas</span>
               <% } %>
               <% if (sig.signingTime) { %>
                 <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>

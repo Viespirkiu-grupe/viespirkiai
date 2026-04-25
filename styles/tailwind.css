@@ -24,6 +24,9 @@
     --color-danger-bg: var(--color-danger-bg);
     --color-info: var(--color-info);
     --color-info-bg: var(--color-info-bg);
+
+    /* Custom 'xs' size for small screens, instead of usual 'sm' (640px) */
+    --breakpoint-xs: 480px;
 }
 
 @utility border-focus {

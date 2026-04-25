@@ -130,7 +130,7 @@ const sep = 'margin-top:16px;padding-top:16px;border-top:var(--border)'
       <div>
         <% if (contractType || otherObjects) { %><p class="text-xs text-muted mb-2"><%= [contractType, otherObjects].filter(Boolean).join(' · ') %></p><% } %>
         <% if (description) { %><p class="text-sm mb-3"><%= description %></p><% } %>
-        <% if (cpv || quantity) { %><dl class="kv-list mb-0"><% if (quantity) { %><dt>Kiekis</dt><dd><%= quantity %></dd><% } %><% if (cpv) { %><dt>BVPŽ</dt><dd class="fw-medium"><%= cpvLabel || cpvCode %><% if (cpvLabel) { %> <span class="text-muted fw-normal text-xs"><%= cpvCode %></span><% } %></dd><% } %></dl><% } %>
+        <% if (cpv || quantity) { %><dl class="kv-list mb-0"><% if (quantity) { %><dt>Kiekis</dt><dd><%= quantity %></dd><% } %><% if (cpv) { %><dt>BVPŽ</dt><dd class="font-medium"><%= cpvLabel || cpvCode %><% if (cpvLabel) { %> <span class="text-muted font-normal text-xs"><%= cpvCode %></span><% } %></dd><% } %></dl><% } %>
       </div>
       <% if (hasRightCol) { %>
       <div class="flex flex-col gap-3">
@@ -160,7 +160,7 @@ const sep = 'margin-top:16px;padding-top:16px;border-top:var(--border)'
             <li class="timeline-item<%= nextPast ? ' line-active' : '' %>">
               <span class="timeline-dot<%= past ? ' active' : '' %>"></span>
               <div class="timeline-body">
-                <div class="timeline-date"><%= item.text || formatDate(item.date) %><% if (item.time) { %> <span class="fw-normal text-xs text-muted"><%= item.time.replace(/\+.*$/,'') %></span><% } %></div>
+                <div class="timeline-date"><%= item.text || formatDate(item.date) %><% if (item.time) { %> <span class="font-normal text-xs text-muted"><%= item.time.replace(/\+.*$/,'') %></span><% } %></div>
                 <span><%= item.label %></span>
               </div>
             </li>

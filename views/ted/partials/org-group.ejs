@@ -45,7 +45,7 @@ const hasContact = phone || email || street1 || zip || city || contactName || co
 
     <% if (hasContact) { %>
     <div class="flex flex-col gap-1">
-      <% if (contactName) { %><p class="text-sm fw-medium m-0"><%= contactName %></p><% } %>
+      <% if (contactName) { %><p class="text-sm font-medium m-0"><%= contactName %></p><% } %>
       <% if (phone) { %><p class="text-sm m-0"><a href="tel:<%= phone %>"><%= phone %></a></p><% } %>
       <% if (contactPhone && contactPhone !== phone) { %><p class="text-sm m-0"><a href="tel:<%= contactPhone %>"><%= contactPhone %></a></p><% } %>
       <% if (email) { email.values.forEach(v => { %><p class="text-sm m-0"><a href="mailto:<%= v %>"><%= v %></a></p><% }) } %>

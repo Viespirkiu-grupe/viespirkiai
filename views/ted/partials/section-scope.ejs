@@ -31,11 +31,11 @@ const addCpvParts = addCpv
     <h3 class="mb-2">BVPŽ</h3>
     <div class="flex flex-col gap-2">
       <div>
-        <div class="fw-medium"><%= mainCpvParts.label || mainCpvParts.code %><% if (mainCpvParts.code) { %> <span class="text-muted fw-normal text-xs"><%= mainCpvParts.code %></span><% } %></div>
+        <div class="font-medium"><%= mainCpvParts.label || mainCpvParts.code %><% if (mainCpvParts.code) { %> <span class="text-muted font-normal text-xs"><%= mainCpvParts.code %></span><% } %></div>
       </div>
       <% addCpvParts.forEach((cpvItem) => { %>
         <div>
-          <div class="fw-medium"><%= cpvItem.label || cpvItem.code %><% if (cpvItem.code) { %> <span class="text-muted fw-normal text-xs"><%= cpvItem.code %></span><% } %></div>
+          <div class="font-medium"><%= cpvItem.label || cpvItem.code %><% if (cpvItem.code) { %> <span class="text-muted font-normal text-xs"><%= cpvItem.code %></span><% } %></div>
         </div>
       <% }) %>
     </div>
