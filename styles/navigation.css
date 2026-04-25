@@ -1,4 +1,86 @@
 @layer components {
+  .navbar-info-banner {
+    display: block;
+    min-height: 36px;
+    width: 100%;
+    border-bottom: var(--border);
+    background: var(--color-warning-bg);
+    color: var(--black);
+    overflow: hidden;
+  }
+
+  .navbar-info-banner-content {
+    width: 100%;
+    padding: 8px 16px;
+    font-size: var(--text-sm);
+    line-height: 1.4;
+  }
+
+  .navbar-info-banner-marquee {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    padding: 8px 0;
+    mask-image: linear-gradient(to right, transparent 0, black 16px, black calc(100% - 16px), transparent 100%);
+  }
+
+  .navbar-info-banner-track {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--banner-gap, 128px);
+    white-space: nowrap;
+    padding: 0 16px;
+    width: max-content;
+    transform: translateX(0);
+    will-change: transform;
+  }
+
+  .navbar-info-banner-text {
+    display: inline-block;
+    font-size: var(--text-sm);
+    line-height: 1.4;
+  }
+
+  .navbar-info-banner-marquee[data-marquee='running'] .navbar-info-banner-track {
+    animation: info-banner-marquee var(--banner-duration, 24s) linear infinite;
+    animation-delay: 2s;
+    animation-fill-mode: both;
+  }
+
+  .navbar-info-banner-marquee[data-marquee='idle'] .navbar-info-banner-text[aria-hidden='true'] {
+    display: none;
+  }
+
+  .navbar-info-banner-marquee[data-marquee='idle'] .navbar-info-banner-track {
+    gap: 0;
+  }
+
+  .navbar-info-banner-important {
+    background: var(--black);
+    color: var(--white);
+
+    @variant dark {
+      background: var(--white);
+      color: var(--black);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .navbar-info-banner-marquee[data-marquee='running'] .navbar-info-banner-track {
+      animation: none;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes info-banner-marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(calc(-1 * var(--banner-step, 320px)));
+    }
+  }
+
     /* Top nav */
     .navbar {
         display: flex;
@@ -257,7 +339,7 @@
     }
 
     body:has(.navbar) {
-      padding-top: 80px; /* navbar height */
+      padding-top: var(--site-header-offset, 80px);
     }
 
     @media (max-width: 1200px) {

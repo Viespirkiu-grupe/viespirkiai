@@ -18,6 +18,22 @@ export default {
     parallelRouteLoading: true,
     workerCount: 2,
     dev: false,
+    // Informacinis baneris viršuje (nebūtina)
+    // Variantai:
+    // 1) String (automatinis judantis tekstas / marquee):
+    // infoBanner: "Dalis funkcijų gali laikinai neveikti dėl atnaujinimo.",
+    // 2) Objektas:
+    // infoBanner: {
+    //     type: "text", // "text" arba "html"
+    //     content: "Dalis funkcijų gali laikinai neveikti dėl atnaujinimo.",
+    //     important: true, // jei true: light mode juodas fonas, dark mode baltas
+    // },
+    // infoBanner: {
+    //     type: "html",
+    //     content: "<strong>Svarbu:</strong> dalis funkcijų gali laikinai neveikti.",
+    //     important: true,
+    // },
+    infoBanner: undefined,
     
     // PostgreSQL
     pgHost: "localhost",

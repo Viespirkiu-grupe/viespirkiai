@@ -85,6 +85,7 @@ app.use((req, res, next) => {
 const faviconSVG = fs.readFileSync("./public/icons/icon.svg", "utf8");
 app.locals.faviconSVG = faviconSVG;
 app.locals.faviconSVGURLEncoded = encodeURIComponent(faviconSVG);
+app.locals.CONFIG = config;
 
 // CSS cache buster
 const tailwindCssPath = path.join(__dirname, "public/dist/tailwind.css");

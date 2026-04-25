@@ -3,8 +3,53 @@
     if (typeof req === 'undefined') return '';
     return req.path === path || (path !== '/' && req.path.startsWith(path)) ? 'active' : '';
   }
+
+  const rawInfoBanner = CONFIG?.infoBanner;
+  let infoBanner = null;
+
+  if (typeof rawInfoBanner === 'string' && rawInfoBanner.trim()) {
+    infoBanner = {
+      type: 'text',
+      content: rawInfoBanner.trim(),
+      important: false,
+    };
+  } else if (rawInfoBanner && typeof rawInfoBanner === 'object') {
+    const type = rawInfoBanner.type === 'html' ? 'html' : 'text';
+    const content =
+      typeof rawInfoBanner.content === 'string'
+        ? rawInfoBanner.content.trim()
+        : '';
+
+    if (content) {
+      infoBanner = {
+        type,
+        content,
+        important: rawInfoBanner.important === true,
+      };
+    }
+  }
 %>
 <header>
+  <% if (infoBanner) { %>
+    <section
+      class="navbar-info-banner <%= infoBanner.important ? 'navbar-info-banner-important' : '' %>"
+      role="status"
+      aria-live="polite"
+      data-important="<%= infoBanner.important ? 'true' : 'false' %>"
+    >
+      <% if (infoBanner.type === 'html') { %>
+        <div class="navbar-info-banner-content"><%- infoBanner.content %></div>
+      <% } else { %>
+        <div class="navbar-info-banner-marquee" data-marquee="idle">
+          <div class="navbar-info-banner-track">
+            <span class="navbar-info-banner-text" data-copy="primary"><%= infoBanner.content %></span>
+            <span class="navbar-info-banner-text" aria-hidden="true"><%= infoBanner.content %></span>
+          </div>
+        </div>
+      <% } %>
+    </section>
+  <% } %>
+
   <nav class="navbar">
     <a href="/" class="navbar-brand no-style flex">
       <span class="sr-only">Viešpirkiai</span>
@@ -98,6 +143,71 @@
 <script>
   const hamburger = document.getElementById('navHamburger');
   const mobileNav = document.getElementById('navMobile');
+  const header = document.querySelector('header');
+  const navbar = document.querySelector('.navbar');
+  const infoBanner = document.querySelector('.navbar-info-banner');
+  const infoBannerMarquee = document.querySelector('.navbar-info-banner-marquee');
+  const infoBannerTrack = document.querySelector('.navbar-info-banner-track');
+  const infoBannerTextPrimary = document.querySelector('.navbar-info-banner-text[data-copy="primary"]');
+
+  function syncInfoBannerMarquee() {
+    if (!infoBannerMarquee || !infoBannerTrack || !infoBannerTextPrimary) return;
+
+    infoBannerMarquee.dataset.marquee = 'idle';
+    infoBannerTrack.style.removeProperty('--banner-step');
+    infoBannerTrack.style.removeProperty('--banner-gap');
+    infoBannerTrack.style.removeProperty('--banner-duration');
+
+    const containerWidth = infoBannerMarquee.clientWidth;
+    const textWidth = infoBannerTextPrimary.scrollWidth;
+
+    if (!containerWidth || !textWidth) return;
+
+    const horizontalPadding = 32;
+    const availableWidth = Math.max(containerWidth - horizontalPadding, 0);
+
+    if (textWidth <= availableWidth) {
+      infoBannerMarquee.dataset.marquee = 'idle';
+      return;
+    }
+
+    const minGap = 128;
+    const offscreenBuffer = 24;
+    const gap = Math.max(minGap, containerWidth - textWidth + offscreenBuffer);
+    const step = textWidth + gap;
+    const pxPerSecond = 52;
+    const duration = Math.max(10, step / pxPerSecond);
+
+    infoBannerTrack.style.setProperty('--banner-gap', `${gap}px`);
+    infoBannerTrack.style.setProperty('--banner-step', `${step}px`);
+    infoBannerTrack.style.setProperty('--banner-duration', `${duration.toFixed(2)}s`);
+    infoBannerMarquee.dataset.marquee = 'running';
+  }
+
+  function syncHeaderOffset() {
+    if (!navbar) return;
+
+    const bannerHeight = infoBanner ? infoBanner.offsetHeight : 0;
+    const navHeight = navbar.offsetHeight;
+    const total = bannerHeight + navHeight;
+
+    document.documentElement.style.setProperty('--site-header-offset', `${total}px`);
+  }
+
+  syncHeaderOffset();
+  syncInfoBannerMarquee();
+  window.addEventListener('resize', syncHeaderOffset, { passive: true });
+  window.addEventListener('resize', syncInfoBannerMarquee, { passive: true });
+
+  if (document.fonts?.ready) {
+    document.fonts.ready
+      .then(() => {
+        syncHeaderOffset();
+        syncInfoBannerMarquee();
+      })
+      .catch(() => {});
+  }
+
   hamburger.addEventListener('click', () => {
     const open = mobileNav.classList.toggle('open');
     hamburger.classList.toggle('open', open);
@@ -107,11 +217,17 @@
   });
 
   let lastY = 0;
-  const header = document.querySelector('header');
   window.addEventListener('scroll', () => {
     const y = window.scrollY;
     if (y > lastY && y > 60) header.classList.add('nav-hidden');
     else header.classList.remove('nav-hidden');
     lastY = y;
   }, { passive: true });
+
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) {
+      syncHeaderOffset();
+      syncInfoBannerMarquee();
+    }
+  });
 </script>
