@@ -30,8 +30,18 @@ function parseJsonSuffix(raw) {
     return { value: raw, requestsJson: false };
 }
 
+function extractApiKey(req) {
+    return (
+        req.query.apiKey ??
+        (req.headers.authorization?.startsWith("Bearer ")
+            ? req.headers.authorization.slice(7).trim()
+            : null)
+    );
+}
+
 failasRouter.post("/failas/ocr/checkout", async (req, res) => {
-    const { apiKey, version = 1 } = req.query;
+    const { version = 1 } = req.query;
+    const apiKey = extractApiKey(req);
 
     const { user, error, message } = await validateOcrApiKey(apiKey);
     if (error) return res.status(error).send(message);
@@ -47,11 +57,7 @@ failasRouter.post("/failas/ocr/checkout", async (req, res) => {
     });
 });
 failasRouter.post("/failas/ocr/submit", async (req, res) => {
-    const apiKey =
-        req.query.apiKey ??
-        (req.headers.authorization?.startsWith("Bearer ")
-            ? req.headers.authorization.slice(7).trim()
-            : null);
+    const apiKey = extractApiKey(req);
     const { user, error, message } = await validateOcrApiKey(apiKey);
     if (error) return res.status(error).send(message);
     const { id, tekstas, duration } = req.body;

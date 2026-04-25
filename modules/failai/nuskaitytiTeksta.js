@@ -3,9 +3,10 @@ import { Buffer } from "buffer";
 import { log } from "../../utils/log.js";
 import { postgres, parsePgArray } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
+import Timings from "../../utils/timings.js";
 
 const nodeName = process.env.NODE_NAME || "default";
-const nuskaitymoVersija = 9;
+const nuskaitymoVersija = 12;
 
 /**
  * Cleans metadata object by removing null characters and trimming strings.
@@ -42,9 +43,11 @@ async function nuskaitytiDokNuskaitytojuje(
     nuskaitytojoId = null,
     extension = "pdf",
     dokumentas,
+    timings,
 ) {
     let nuskaitytojas;
 
+    timings.start("nuskaitytojas");
     if (nuskaitytojoId) {
         const res = await postgres.query(
             `
@@ -52,12 +55,13 @@ async function nuskaitytiDokNuskaitytojuje(
             FROM public."dokNuskaitytojai" d
             JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
             WHERE d.id = $1
+            AND d.enabled = true
             `,
             [nuskaitytojoId],
         );
 
         if (res.rows.length === 0) {
-            throw new Error("Nėra nuskaitytojo su tokiu ID.");
+            throw new Error("Nėra įjungto nuskaitytojo su tokiu ID.");
         }
 
         nuskaitytojas = res.rows[0];
@@ -67,6 +71,7 @@ async function nuskaitytiDokNuskaitytojuje(
             SELECT d.*, a."apiKey"
             FROM public."dokNuskaitytojai" d
             JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
+            WHERE d.enabled = true
             ORDER BY RANDOM()
             LIMIT 1
             `,
@@ -78,6 +83,7 @@ async function nuskaitytiDokNuskaitytojuje(
 
         nuskaitytojas = res.rows[0];
     }
+    timings.end("nuskaitytojas");
 
     const fetchUrl = `${nuskaitytojas.url}/extract`;
 
@@ -85,10 +91,10 @@ async function nuskaitytiDokNuskaitytojuje(
 
     const body = {
         url,
-        apiKey: nuskaitytojas.apiKey,
         extension,
     };
 
+    timings.start("ocrRezultatai");
     try {
         const res = await postgres.query(
             `SELECT *
@@ -108,12 +114,15 @@ async function nuskaitytiDokNuskaitytojuje(
     } catch (e) {
         console.error(e);
     }
+    timings.end("ocrRezultatai");
 
+    timings.start("fetch");
     let response = await fetch(fetchUrl, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
+            Authorization: `Bearer ${nuskaitytojas.apiKey}`,
         },
         body: JSON.stringify(body),
         timeout: 5 * 60 * 1000, // 5 minutes
@@ -129,11 +138,13 @@ async function nuskaitytiDokNuskaitytojuje(
     }
 
     let data = await response.json();
+    timings.end("fetch");
 
     if (!data.result) {
         throw new Error("Nuskaitytojo klaida: nėra rezultato.");
     }
 
+    timings.start("nuskaitytojaUpdate");
     await postgres.query(
         `
       UPDATE public."dokNuskaitytojai"
@@ -142,6 +153,7 @@ async function nuskaitytiDokNuskaitytojuje(
     `,
         [nuskaitytojas.id],
     );
+    timings.end("nuskaitytojaUpdate");
 
     return data.result;
 }
@@ -149,13 +161,31 @@ async function nuskaitytiDokNuskaitytojuje(
 /**
  * Main function to read and process a single document from the bucket.
  * @param {number|null} nuskaitytojoId - Optional ID of a specific document reader to use.
+ * @param {number|null} failasId - Optional file ID to process directly from queue.
  * @returns {Promise<boolean>} - Returns true if a document was processed, false otherwise.
  */
-export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
-    let start = new Date();
+export async function nuskaitytiVienoDokumentoDuomenis(
+    nuskaitytojoId = null,
+    failasId = null,
+) {
+    const timings = new Timings();
 
-    const result = await postgres.query(
-        `WITH first AS (
+    timings.start("queue");
+    const result = failasId
+        ? await postgres.query(
+            `WITH locked AS (
+                UPDATE public."failaiNuskaitymoQueue" q
+                SET "lockedBy" = $1, "lockedAt" = NOW()
+                WHERE q.id = $2
+                  AND q."lockedBy" IS NULL
+                RETURNING q.id
+            )
+            SELECT f.* FROM public.failai f
+            WHERE f.id = (SELECT id FROM locked)`,
+            [nodeName, failasId],
+        )
+        : await postgres.query(
+            `WITH first AS (
         SELECT q.id FROM public."failaiNuskaitymoQueue" q
         WHERE q."lockedBy" IS NULL
         AND q.versija >= 0
@@ -187,9 +217,10 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     )
     SELECT f.* FROM public.failai f
     WHERE f.id = (SELECT id FROM locked)`,
-        [nodeName, nuskaitymoVersija],
-    );
+            [nodeName, nuskaitymoVersija],
+        );
 
+    timings.end("queue");
     if (!result.rows.length) return false;
     const dokumentas = result.rows[0];
 
@@ -198,18 +229,26 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
 
     log(viesasUrl);
 
+    let results;
+    let tekstas, metadata, wordCount, characterCount, pageCount;
+    timings.start("nuskaitymas");
     try {
-        let results = await nuskaitytiDokNuskaitytojuje(
+        results = await nuskaitytiDokNuskaitytojuje(
             url,
             nuskaitytojoId,
             dokumentas.extension,
             dokumentas,
+            timings,
         );
 
-        var tekstas = results.pages;
-        var metadata = results.metadata;
+        tekstas = results.pages;
+        metadata = results.metadata;
+        wordCount = results.wordCount ?? 0;
+        characterCount = results.characterCount ?? 0;
+        pageCount = results.pageCount;
 
         metadata = cleanMetadata(metadata);
+        timings.end("nuskaitymas");
     } catch (e) {
         let kodas = -1;
         if (e.message.includes("No password given")) {
@@ -257,21 +296,9 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         }
     }
 
-    // Tekstas is a json array of pages, join to single string
-    let sujungtasTekstas = (tekstas || []).join("");
-    if (!metadata.wordCount) {
-        metadata.wordCount = sujungtasTekstas
-            .split(/\s+/)
-            .filter(Boolean).length;
-    }
-
-    if (!metadata.characterCount) {
-        metadata.characterCount = sujungtasTekstas.length;
-    }
-
     let reikalingasOcr = dokumentas.ocrState; // Nereikalingas / nebūtinas
     if (
-        metadata?.wordCount == 0 &&
+        wordCount == 0 &&
         dokumentas.extension == "pdf" &&
         dokumentas.ocrState === null
     ) {
@@ -279,6 +306,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     }
     log(`${dokumentas.id} - ${dokumentas.ocrState} o ocr ${reikalingasOcr}`);
 
+    timings.start("archyvas");
     if (
         ["zip", "7z", "rar", "adoc"].includes(dokumentas.extension) &&
         dokumentas.parent === null
@@ -348,6 +376,9 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         }
     }
 
+    timings.end("archyvas");
+
+    timings.start("susijusiaiDuomenys");
     let client;
     try {
         client = await postgres.connect();
@@ -389,14 +420,14 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         }
 
         // IBAN
-        if (metadata?.ibanNumeriai?.length) {
-            for (let i = 0; i < metadata.ibanNumeriai.length; i += 100) {
+        if (results.ibans?.length) {
+            for (let i = 0; i < results.ibans.length; i += 100) {
                 await bulkInsert({
                     table: "failaiIban",
                     columns: ["id", "iban", "puslapiai"],
-                    rows: metadata.ibanNumeriai.slice(i, i + 100).map((x) => ({
+                    rows: results.ibans.slice(i, i + 100).map((x) => ({
                         id: docId,
-                        iban: x.numeris,
+                        iban: x.iban,
                         puslapiai: x.pages,
                     })),
                     client,
@@ -405,12 +436,12 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         }
 
         // JAR kodai
-        if (metadata?.jarKodai?.length) {
-            for (let i = 0; i < metadata.jarKodai.length; i += 100) {
+        if (results.companyIds?.length) {
+            for (let i = 0; i < results.companyIds.length; i += 100) {
                 await bulkInsert({
                     table: "failaiJarKodai",
                     columns: ["id", "jarKodas", "puslapiai"],
-                    rows: metadata.jarKodai.slice(i, i + 100).map((x) => ({
+                    rows: results.companyIds.slice(i, i + 100).map((x) => ({
                         id: docId,
                         jarKodas: x.code,
                         puslapiai: x.pages,
@@ -421,12 +452,12 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         }
 
         // Links
-        if (metadata?.links?.length) {
-            for (let i = 0; i < metadata.links.length; i += 100) {
+        if (results.links?.length) {
+            for (let i = 0; i < results.links.length; i += 100) {
                 await bulkInsert({
                     table: "failaiLinks",
                     columns: ["id", "link", "puslapiai"],
-                    rows: metadata.links.slice(i, i + 100).map((x) => ({
+                    rows: results.links.slice(i, i + 100).map((x) => ({
                         id: docId,
                         link: x.uri?.slice(0, 1024),
                         puslapiai: x.pages,
@@ -437,12 +468,12 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         }
 
         // Emails
-        if (metadata?.emails?.length) {
-            for (let i = 0; i < metadata.emails.length; i += 100) {
+        if (results.emails?.length) {
+            for (let i = 0; i < results.emails.length; i += 100) {
                 await bulkInsert({
                     table: "failaiEmails",
                     columns: ["id", "email", "puslapiai"],
-                    rows: metadata.emails.slice(i, i + 100).map((x) => ({
+                    rows: results.emails.slice(i, i + 100).map((x) => ({
                         id: docId,
                         email: x.email,
                         puslapiai: x.pages,
@@ -453,12 +484,12 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         }
 
         // Domains
-        if (metadata?.domains?.length) {
-            for (let i = 0; i < metadata.domains.length; i += 100) {
+        if (results.domains?.length) {
+            for (let i = 0; i < results.domains.length; i += 100) {
                 await bulkInsert({
                     table: "failaiDomains",
                     columns: ["id", "domain"],
-                    rows: metadata.domains.slice(i, i + 100).map((domain) => ({
+                    rows: results.domains.slice(i, i + 100).map((domain) => ({
                         id: docId,
                         domain,
                     })),
@@ -468,14 +499,14 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         }
 
         // Telefonai
-        if (metadata?.telefonai?.length) {
-            for (let i = 0; i < metadata.telefonai.length; i += 100) {
+        if (results.phones?.length) {
+            for (let i = 0; i < results.phones.length; i += 100) {
                 await bulkInsert({
                     table: "failaiTelefonai",
                     columns: ["id", "telefonas", "puslapiai"],
-                    rows: metadata.telefonai.slice(i, i + 100).map((x) => ({
+                    rows: results.phones.slice(i, i + 100).map((x) => ({
                         id: docId,
-                        telefonas: x.numeris,
+                        telefonas: x.phone,
                         puslapiai: x.pages,
                     })),
                     client,
@@ -484,6 +515,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         }
 
         await client.query("COMMIT");
+        timings.end("susijusiaiDuomenys");
     } catch (e) {
         if (client) await client.query("ROLLBACK");
         throw e;
@@ -494,17 +526,17 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
     let location = null;
 
     if (
-        metadata?.exif?.GPSLatitude?.description != null &&
-        metadata?.exif?.GPSLongitude?.description != null
+        metadata?.location?.latitude != null &&
+        metadata?.location?.longitude != null
     ) {
-        const lat = parseFloat(metadata.exif.GPSLatitude.description);
-        const lon = parseFloat(metadata.exif.GPSLongitude.description);
+        const lat = metadata.location.latitude;
+        const lon = metadata.location.longitude;
         location = `POINT(${lon} ${lat})`; // WKT format
     }
 
-    let autorius = metadata?.Author || metadata?.author || undefined;
+    let autorius = metadata?.author || undefined;
 
-    // Update the row
+    timings.start("failaiUpdate");
     await postgres.query(
         `UPDATE failai
         SET nuskaitytas = $1,
@@ -520,16 +552,18 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         [
             nuskaitymoVersija,
             metadata,
-            metadata?.wordCount,
-            metadata?.pageCount,
-            metadata?.characterCount || 0,
+            wordCount,
+            pageCount,
+            characterCount,
             reikalingasOcr,
             location,
             autorius,
             dokumentas.id,
         ],
     );
+    timings.end("failaiUpdate");
 
+    timings.start("failaiTekstas");
     await postgres.query(
         `INSERT INTO "failaiTekstas" (id, tekstas, pavadinimas, extension, saltinis, "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", autorius)
         SELECT $1, $2, pavadinimas, extension, saltinis, $3, $4, $5, $6
@@ -548,13 +582,15 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         [
             dokumentas.id,
             truncateTo1MB(tekstas),
-            metadata?.wordCount,
-            metadata?.pageCount,
-            metadata?.characterCount || 0,
+            wordCount,
+            pageCount,
+            characterCount,
             autorius,
         ],
     );
+    timings.end("failaiTekstas");
 
+    timings.start("failaiNuskaitymai");
     await postgres.query(
         `INSERT INTO "failaiNuskaitymai"
             (failas, versija, metaduomenys, "timestamp", "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", location)
@@ -571,13 +607,15 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
             dokumentas.id, // failas
             nuskaitymoVersija, // versija
             metadata, // metaduomenys
-            metadata?.wordCount, // zodziuSkaicius
-            metadata?.pageCount, // puslapiuSkaicius
-            metadata?.characterCount || 0, // simboliuSkaicius
+            wordCount, // zodziuSkaicius
+            pageCount, // puslapiuSkaicius
+            characterCount, // simboliuSkaicius
             location, // location
         ],
     );
+    timings.end("failaiNuskaitymai");
 
+    timings.start("queueUpdate");
     await postgres.query(
         `UPDATE public."failaiNuskaitymoQueue"
         SET versija    = $2,
@@ -588,10 +626,15 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
         WHERE id = $1`,
         [dokumentas.id, nuskaitymoVersija],
     );
+    timings.end("queueUpdate");
 
-
+    const timingParts = [
+        "queue", "nuskaitytojas", "ocrRezultatai", "fetch", "nuskaitytojaUpdate",
+        "nuskaitymas", "archyvas", "susijusiaiDuomenys",
+        "failaiUpdate", "failaiTekstas", "failaiNuskaitymai", "queueUpdate", "all",
+    ].map((k) => `${k}=${timings.humanDuration(k)}`).join(" ");
     log(
-        `Nuskaitytas dokumentas ${dokumentas.id} / ${dokumentas.pavadinimas} per ${((new Date() - start) / 1000).toFixed(3)}s, ${metadata.wordCount} žodž.`,
+        `Nuskaitytas dokumentas ${dokumentas.id} / ${dokumentas.pavadinimas}, ${wordCount} žodž. | ${timingParts}`,
     );
 
     return true;
@@ -599,7 +642,17 @@ export async function nuskaitytiVienoDokumentoDuomenis(nuskaitytojoId = null) {
 
 // CLI
 if (import.meta.url === `file://${process.argv[1]}`) {
-    await nuskaitytiVienoDokumentoDuomenis();
+    const args = process.argv.slice(2);
+
+    if (args.length === 1) {
+        const failasId = Number(args[0]);
+        if (!Number.isInteger(failasId) || failasId <= 0) {
+            throw new Error("CLI argument must be a positive integer file ID.");
+        }
+        await nuskaitytiVienoDokumentoDuomenis(null, failasId);
+    } else {
+        await nuskaitytiVienoDokumentoDuomenis();
+    }
 }
 
 /**
