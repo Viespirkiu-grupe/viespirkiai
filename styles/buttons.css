@@ -90,13 +90,8 @@
     .btn-warning:hover { opacity: 0.85; }
 
     .btn-link {
-        background: transparent;
-        color: var(--link);
-        border-color: transparent;
-        padding-inline: 0;
-        text-decoration: underline;
+        @apply bg-transparent text-link border-transparent px-0 underline hover:decoration-transparent transition-colors;
     }
-    .btn-link:hover { opacity: 0.7; }
 
     /* Sizes */
     .btn-sm {
@@ -114,7 +109,6 @@
         font-size: var(--text-xs);
         border-radius: var(--radius-sm);
     }
-    .btn-block { width: 100%; }
     .btn-icon  { padding: 8px; aspect-ratio: 1; border-radius: var(--radius-md); }
     .btn-icon.btn-sm { padding: 5px; }
 

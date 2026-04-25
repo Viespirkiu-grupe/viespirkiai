@@ -32,7 +32,7 @@
 
     <div class="action-bar">
       <div class="action-bar-left">
-        <span id="bvpzCount" class="text-sm fw-bold text-muted">Nepasirinkta</span>
+        <span id="bvpzCount" class="text-sm font-bold text-muted">Nepasirinkta</span>
         <span id="pasirinkti-kodai" class="action-bar-codes"></span>
       </div>
       <div class="action-bar-right">
@@ -195,7 +195,7 @@
         const count = selected.length;
         document.getElementById("pasirinkti-kodai").textContent = selected.join(" ");
         document.getElementById("bvpzCount").textContent = count > 0 ? `${count} pasirinkti` : "Nepasirinkta";
-        document.getElementById("bvpzCount").className = `text-sm fw-bold${count > 0 ? "" : " text-muted"}`;
+        document.getElementById("bvpzCount").className = `text-sm font-bold${count > 0 ? "" : " text-muted"}`;
       }
 
       /**

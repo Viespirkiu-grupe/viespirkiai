@@ -1,12 +1,12 @@
 <div class="replacableContent">
   <% const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-LT', { hour12: false }); %>
 
-  <div class="flex justify-between items-center mb-5">
+  <div class="flex justify-between items-center mb-7">
     <p class="text-muted text-sm mb-0">Atnaujinta: <span class="cell-mono" data-stat="atnaujinta"><%= atnaujintaFormatted %></span></p>
     <p class="text-muted text-xs mb-0">* Pažymėtos numatomos arba apytikslės vertės</p>
   </div>
 
-  <div class="grid-2 mb-6">
+  <div class="grid-2 mb-10">
     <div>
       <h2 class="mb-4">Failai</h2>
       <%- include('failuNuskaitymas.ejs') %>

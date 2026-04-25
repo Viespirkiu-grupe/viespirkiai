@@ -18,8 +18,4 @@
         overflow-x: auto;
         display: block;
     }
-
-    .code-block-integrated-top {
-        border-radius: 0 0 var(--radius-lg);
-    }
 }

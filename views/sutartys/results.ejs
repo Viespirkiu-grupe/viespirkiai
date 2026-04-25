@@ -58,7 +58,7 @@
             <div class="flex align-baseline gap-3">
               <h3 class="result-card-title">
                 <a href="/sutartis/<%= item.sutartiesUnikalusId %>">
-                  <span class="amount<%= Number(item.faktineIvykdimoVerte || item.verte) > 10000 ? ' fw-bold' : '' %>">
+                  <span class="amount<%= Number(item.faktineIvykdimoVerte || item.verte) > 10000 ? ' font-bold' : '' %>">
                     <%= Number(item.faktineIvykdimoVerte || item.verte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>&nbsp;€
                   </span>
                     <% if (item.pavadinimas.length < 1) { %><em>Nenurodyta</em><% } else { %><%= item.pavadinimas %><% } %>

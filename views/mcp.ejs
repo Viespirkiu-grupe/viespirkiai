@@ -80,11 +80,11 @@
       display: flex;
       gap: 16px;
       padding: 16px 0;
-      border-bottom: var(--border);
+      border-b: var(--border);
     }
 
     .mcp-cats-list li:last-child {
-      border-bottom: none;
+      border-b: none;
     }
 
     .mcp-cat-num {
@@ -117,10 +117,10 @@
   <main>
 
     <!-- Hero -->
-    <div class="px-7 py-6 border-bottom mcp-mobile-px">
+    <div class="py-7 border-b mcp-mobile-px">
       <p class="section-title mb-3">Model Context Protocol</p>
       <h1 class="mb-3">Viešpirkiai Jūsų DI programoje</h1>
-      <p class="lead mb-5">Leiskite savo DI asistentui pačiam rasti atsakymus viešųjų pirkimų duomenyse</p>
+      <p class="lead mb-7">Leiskite savo DI asistentui pačiam rasti atsakymus viešųjų pirkimų duomenyse</p>
       <div class="inline-flex border rounded-lg bg-light max-w-full">
         <code class="px-4 py-3 border-none bg-transparent overflow-auto">https://viespirkiai.org/mcp</code>
         <button class="btn btn-primary rounded-0 border-0 border-l-border rounded-r-lg" onclick="navigator.clipboard.writeText('https://viespirkiai.org/mcp').then(() => { this.textContent = '✓ Nukopijuota'; setTimeout(() => this.textContent = 'Kopijuoti URL', 1500); })">Kopijuoti URL</button>
@@ -128,7 +128,7 @@
     </div>
 
     <!-- Content: categories left, chat right -->
-    <div class="grid-2 align-start px-7 py-6 border-bottom mcp-mobile-px">
+    <div class="grid-2 align-start py-10 border-b mcp-mobile-px">
 
       <!-- Categories -->
       <div>
@@ -277,7 +277,7 @@
     </div>
 
     <!-- Setup -->
-    <div class="px-7 py-6 flex flex-wrap align-start gap-5 mcp-mobile-px items-stretch">
+    <div class="py-10 flex flex-wrap align-start gap-5 mcp-mobile-px items-stretch">
       <div class="max-w-full">
         <p>Pridėkite šį MCP serverį:</p>
 
@@ -290,7 +290,7 @@
 
         <div >
           <div class="border rounded-lg overflow-hidden min-w-70">
-            <div class="bg-light px-4 py-2 border-bottom flex items-center justify-between">
+            <div class="bg-light px-4 py-2 border-b flex items-center justify-between">
               <span class="text-xs text-muted font-mono">.mcp.json</span>
               <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(this.closest('div').nextElementSibling.textContent.trim()).then(() => { this.textContent = '✓'; setTimeout(() => this.textContent = 'Kopijuoti', 1500); })">Kopijuoti</button>
             </div>
@@ -309,7 +309,7 @@
         <div class="flex flex-col justify-between h-full">
           <div>
             <h3 class="inline-block">Claude</h3> <i class="text-muted text-sm">(išskyrus free)</i>
-            <p class="mb-5">Settings → Connectors → Add custom connector</p>
+            <p class="mb-7">Settings → Connectors → Add custom connector</p>
           </div>
 
           <div>
