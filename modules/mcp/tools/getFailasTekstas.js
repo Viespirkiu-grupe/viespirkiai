@@ -1,11 +1,50 @@
 import { z } from "zod";
 import { findFailas, checkFailasAccessible } from "../../failai/queries.js";
+import { parsePgArray } from "../../../postgres/postgres.js";
 
-const PAGE_SIZE = 3;
+const DEFAULT_PAGE_BATCH = 3;
+const MAX_PAGE_BATCH = 25;
+
+function parseTekstasPages(rawTekstas) {
+    if (!rawTekstas) return [];
+
+    if (Array.isArray(rawTekstas)) {
+        return rawTekstas.map((page) => String(page ?? ""));
+    }
+
+    if (typeof rawTekstas !== "string") {
+        return [String(rawTekstas)];
+    }
+
+    const trimmed = rawTekstas.trim();
+    if (!trimmed) return [];
+
+    try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+            return parsed.map((page) => String(page ?? ""));
+        }
+        if (typeof parsed === "string") {
+            return [parsed];
+        }
+    } catch {
+        // Not JSON, continue with other fallbacks.
+    }
+
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+        try {
+            return parsePgArray(trimmed).map((page) => String(page ?? ""));
+        } catch {
+            // Not a parseable Postgres array.
+        }
+    }
+
+    return [rawTekstas];
+}
 
 export const name = "get_failas_tekstas";
 export const description =
-    "Grąžina dokumento teksto puslapius. Naudoti po get_failas kai reikia daugiau teksto.";
+    "Grąžina dokumento teksto puslapius pagal faktinius dokumento puslapių numerius. Naudoti po get_failas, kai reikia daugiau teksto. Vienu kartu galima gauti iki 15 puslapių.";
 
 export const schema = {
     id: z.number().int().positive().describe("Failo numerinis ID"),
@@ -14,10 +53,21 @@ export const schema = {
         .int()
         .min(1)
         .default(1)
-        .describe("Teksto puslapis (po 3 dokumento puslapius)"),
+        .describe("Nuo kurio faktinio dokumento puslapio pradėti (1..N)"),
+    kiekis: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_PAGE_BATCH)
+        .default(DEFAULT_PAGE_BATCH)
+        .describe("Kiek faktinių dokumento puslapių grąžinti vienu kartu (1-25)"),
 };
 
-export async function handler({ id, puslapis = 1 }) {
+export async function handler({
+    id,
+    puslapis = 1,
+    kiekis = DEFAULT_PAGE_BATCH,
+}) {
     const result = await findFailas({ id: String(id) });
     if (!result?.rows?.length) {
         return {
@@ -39,24 +89,35 @@ export async function handler({ id, puslapis = 1 }) {
         };
     }
 
-    const pages = Array.isArray(failas.tekstas)
-        ? failas.tekstas
-        : JSON.parse(failas.tekstas);
+    const pages = parseTekstasPages(failas.tekstas);
+    if (!pages.length) {
+        return {
+            content: [{ type: "text", text: "Šis failas neturi teksto." }],
+        };
+    }
 
-    const start = (puslapis - 1) * PAGE_SIZE;
-    const slice = pages.slice(start, start + PAGE_SIZE);
-    const totalOcrPages = Math.ceil(pages.length / PAGE_SIZE);
+    const startIndex = puslapis - 1;
+    const endIndex = startIndex + kiekis;
+    const puslapiai = pages
+        .slice(startIndex, endIndex)
+        .map((tekstas, index) => ({
+            puslapis: startIndex + index + 1,
+            tekstas,
+        }));
 
-    if (!slice.length) {
+    if (!puslapiai.length) {
         return {
             content: [
                 {
                     type: "text",
-                    text: `Puslapis ${puslapis} neegzistuoja. Iš viso puslapių: ${totalOcrPages}.`,
+                    text: `Puslapis ${puslapis} neegzistuoja. Dokumente yra ${pages.length} puslapiai.`,
                 },
             ],
         };
     }
+
+    const nuoPuslapio = puslapiai[0].puslapis;
+    const ikiPuslapio = puslapiai[puslapiai.length - 1].puslapis;
 
     return {
         content: [
@@ -64,13 +125,17 @@ export async function handler({ id, puslapis = 1 }) {
                 type: "text",
                 text: JSON.stringify(
                     {
-                        tekstas: slice,
+                        puslapiai,
                         meta: {
                             docPuslapiuIsviso: pages.length,
-                            rodomiPuslapiai: `${start + 1}–${Math.min(start + PAGE_SIZE, pages.length)}`,
-                            puslapis,
-                            puslapiuIsviso: totalOcrPages,
-                            yraDaugiau: start + PAGE_SIZE < pages.length,
+                            rodomiPuslapiai: `${nuoPuslapio}-${ikiPuslapio}`,
+                            prasytasPuslapis: puslapis,
+                            prasytasKiekis: kiekis,
+                            grazintaPuslapiu: puslapiai.length,
+                            yraDaugiau: endIndex < pages.length,
+                            sekantisPuslapis:
+                                endIndex < pages.length ? endIndex + 1 : null,
+                            maxPuslapiuVienuKartu: MAX_PAGE_BATCH,
                         },
                     },
                     null,

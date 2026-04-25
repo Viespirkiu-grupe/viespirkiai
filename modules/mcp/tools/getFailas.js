@@ -1,12 +1,61 @@
 import { z } from "zod";
 import { findFailas, checkFailasAccessible } from "../../failai/queries.js";
 import { fetchFailasMetadata } from "../../failai/aptarnavimas.js";
+import { parsePgArray } from "../../../postgres/postgres.js";
 
 const PREVIEW_PAGES = 3;
+const MAX_PAGE_BATCH = 25;
+
+function parseTekstasPages(rawTekstas) {
+    if (!rawTekstas) return [];
+
+    if (Array.isArray(rawTekstas)) {
+        return rawTekstas.map((page) => String(page ?? ""));
+    }
+
+    if (typeof rawTekstas !== "string") {
+        return [String(rawTekstas)];
+    }
+
+    const trimmed = rawTekstas.trim();
+    if (!trimmed) return [];
+
+    try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+            return parsed.map((page) => String(page ?? ""));
+        }
+        if (typeof parsed === "string") {
+            return [parsed];
+        }
+    } catch {
+        // Not JSON, continue with other fallbacks.
+    }
+
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+        try {
+            return parsePgArray(trimmed).map((page) => String(page ?? ""));
+        } catch {
+            // Not a parseable Postgres array.
+        }
+    }
+
+    return [rawTekstas];
+}
+
+function formatPageSlice(pages, startPage, count) {
+    const startIndex = Math.max(startPage - 1, 0);
+    return pages
+        .slice(startIndex, startIndex + count)
+        .map((tekstas, index) => ({
+            puslapis: startIndex + index + 1,
+            tekstas,
+        }));
+}
 
 export const name = "get_failas";
 export const description =
-    "Grąžina išsamią informaciją apie viešojo pirkimo sutarties dokumentą pagal jo ID arba md5. Apima metaduomenis, IBAN numerius, JAR kodus, el. pašto adresus, nuorodas ir parašus. Tekstas grąžinamas po 3 puslapius — naudokite get_failas_tekstas norėdami gauti daugiau.";
+    "Grąžina išsamią informaciją apie viešojo pirkimo sutarties dokumentą pagal jo ID arba md5. Apima metaduomenis, IBAN numerius, JAR kodus, el. pašto adresus, nuorodas ir parašus. Tekstas pateikiamas pagal faktinius dokumento puslapius (preview: pirmi 3) - naudokite get_failas_tekstas norėdami gauti daugiau (iki 15 vienu metu).";
 
 export const schema = {
     id: z
@@ -45,16 +94,17 @@ export async function handler({ id }) {
     const rawTekstas = failas.tekstas;
     delete failas.tekstas;
 
-    if (rawTekstas) {
-        const pages = Array.isArray(rawTekstas)
-            ? rawTekstas
-            : JSON.parse(rawTekstas);
-
-        failas.tekstas = pages.slice(0, PREVIEW_PAGES);
+    const pages = parseTekstasPages(rawTekstas);
+    if (pages.length) {
+        failas.tekstas = formatPageSlice(pages, 1, PREVIEW_PAGES);
         failas.tekstasMeta = {
-            puslapiuIsviso: pages.length,
-            rodomiPuslapiai: `1–${Math.min(PREVIEW_PAGES, pages.length)}`,
+            docPuslapiuIsviso: pages.length,
+            rodomiPuslapiai: `1-${Math.min(PREVIEW_PAGES, pages.length)}`,
+            grazintaPuslapiu: failas.tekstas.length,
             yraDaugiau: pages.length > PREVIEW_PAGES,
+            maxPuslapiuVienuKartu: MAX_PAGE_BATCH,
+            pastaba:
+                "Daugiau puslapiu gaukite su get_failas_tekstas naudodami puslapis ir kiekis (1-25).",
         };
     }
 
