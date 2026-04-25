@@ -1,36 +1,30 @@
 @layer components {
     .word-cloud {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 28px 40px;
-        justify-content: center;
-        align-items: center;
-        padding: 28px 0;
-    }
+        @apply flex flex-wrap gap-7 justify-center items-center py-7;
 
-    .word-cloud span {
-        font-size: calc(var(--size) * 1rem);
-        color: var(--dark-gray);
-        cursor: default;
-        transform:
-            translate(
-                calc(sin(var(--r) * 6.28) * 20px),
-                calc(cos(var(--r) * 6.28) * 10px)
-            )
-            rotate(calc((var(--r) - 0.5) * 30deg));
-        transition: transform var(--transition), color var(--transition);
+        span {
+            @apply text-dark-gray cursor-default;
 
-        &:hover {
-            transform: scale(1.2);
-            color: var(--black);
-        }
+            font-size: calc(var(--size) * 1rem);
+            transform:
+                translate(
+                    calc(sin(var(--r) * 6.28) * 20px),
+                    calc(cos(var(--r) * 6.28) * 10px)
+                )
+                rotate(calc((var(--r) - 0.5) * 30deg));
+            transition: transform var(--transition), color var(--transition);
 
-        @media (max-width: 768px) {
-            font-size: calc(var(--size) * 0.8rem);
-        }
+            @media (max-width: 768px) {
+                font-size: calc(var(--size) * 0.8rem);
+            }
 
-        @media (max-width: 480px) {
-            font-size: calc(var(--size) * 0.6rem);
+            @media (max-width: 480px) {
+                font-size: calc(var(--size) * 0.6rem);
+            }
+
+            &:hover {
+                @apply text-black transform-[scale(1.2)];
+            }
         }
     }
 }
