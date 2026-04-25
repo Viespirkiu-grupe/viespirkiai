@@ -1,13 +1,4 @@
 @layer utilities {
-    .mt-6 { margin-top: 40px; }
-
-    .mb-5 { margin-bottom: 28px; }
-    .mb-6 { margin-bottom: 40px; }
-
-    .my-5 { margin-block: 28px; }
-    .px-7 { padding-inline: 56px; }
-    .py-6 { padding-block: 40px; }
-
     .spacing-scale {
         display: flex;
         flex-direction: column;
@@ -43,15 +34,6 @@
         border: var(--border-dark);
         flex-shrink: 0;
     }
-
-    .space-box-1 { width: 4px; }
-    .space-box-2 { width: 8px; }
-    .space-box-3 { width: 12px; }
-    .space-box-4 { width: 16px; }
-    .space-box-5 { width: 28px; }
-    .space-box-6 { width: 40px; }
-    .space-box-7 { width: 56px; }
-    .space-box-8 { width: 80px; }
 
     /* ── Width utilities ──────────────────────────── */
     .max-w-content { max-width: var(--content-width); }
