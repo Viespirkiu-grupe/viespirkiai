@@ -114,7 +114,6 @@
         font-size: var(--text-xs);
         border-radius: var(--radius-sm);
     }
-    .btn-block { width: 100%; }
     .btn-icon  { padding: 8px; aspect-ratio: 1; border-radius: var(--radius-md); }
     .btn-icon.btn-sm { padding: 5px; }
 

@@ -20,27 +20,10 @@
         @apply list-none p-0 m-0 space-y-2;
     }
 
-    /* Divider with label */
-    .divider {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        color: var(--gray);
-        font-size: var(--text-sm);
-        margin-block: 16px;
-    }
-    .divider::before, .divider::after {
-        content: "";
-        flex: 1;
-        height: 1px;
-        background: var(--light-gray);
-    }
-
     /* Border utilities */
     .border       { border: var(--border); }
     .border-top   { border-top: var(--border); }
     .border-bottom{ border-bottom: var(--border); }
-    .border-0     { border: none !important; }
 
     /* Border radius */
     .rounded    { border-radius: var(--radius-md); }
@@ -72,19 +55,6 @@
     .position-relative { position: relative; }
     .position-absolute { position: absolute; }
     .position-fixed    { position: fixed; }
-
-    /* Width / height */
-    .w-100    { width: 100%; }
-    .w-auto   { width: auto; }
-    .h-100    { height: 100%; }
-    .min-w-0  { min-width: 0; }
-
-    /* Cursor */
-    .cursor-pointer { cursor: pointer; }
-    .cursor-default { cursor: default; }
-
-    /* User select */
-    .user-select-none { user-select: none; }
 
     /* Email list component (failai/parts/emails.ejs) */
     .email-list .email-item {
@@ -123,9 +93,5 @@
     @keyframes spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
-    }
-
-    :target {
-        scroll-margin-top: 80px; /* match your header height */
     }
 }

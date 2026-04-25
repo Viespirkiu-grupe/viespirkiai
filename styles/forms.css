@@ -7,20 +7,6 @@
         @apply mb-0;
     }
 
-
-    .form-row   { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-
-    @media (max-width: 600px) {
-        .form-row { grid-template-columns: 1fr; }
-    }
-
-    .form-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 16px;
-        align-items: start;
-    }
-
     .form-label {
         display: block;
         font-size: var(--text-sm);

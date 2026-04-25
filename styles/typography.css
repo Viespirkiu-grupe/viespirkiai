@@ -42,36 +42,16 @@
     }
 
     small, .text-sm  { font-size: var(--text-sm); }
-    .text-xs         { font-size: var(--text-xs); }
-    .text-lg         { font-size: var(--text-lg); }
-    .text-xl         { font-size: var(--text-xl); }
 
     strong, .fw-bold { font-weight: 700; }
     .fw-medium       { font-weight: 500; }
     .fw-normal       { font-weight: 400; }
 
-    .text-dark       { color: var(--dark-gray); }
-    .text-success    { color: var(--color-success); }
-    .text-warning    { color: var(--color-warning); }
-    .text-danger     { color: var(--color-danger); }
-    .text-info       { color: var(--color-info); }
-
-    .text-center  { text-align: center; }
-    .text-right   { text-align: right; }
-    .text-left    { text-align: left; }
-    .text-justify { text-align: justify; }
     .text-nowrap  { white-space: nowrap; }
     .text-ellipsis{
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
-    }
-    .text-truncate-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
     }
 
     sub, sup { font-size: var(--text-xs); }

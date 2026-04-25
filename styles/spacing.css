@@ -8,16 +8,8 @@
     .mb-6 { margin-bottom: 40px; }
 
     .my-5 { margin-block: 28px; }
-
-    .p-5  { padding: 28px; }
-
-    .px-5 { padding-inline: 28px; }
-    .px-6 { padding-inline: 40px; }
     .px-7 { padding-inline: 56px; }
-
-    .py-5 { padding-block: 28px; }
     .py-6 { padding-block: 40px; }
-    .py-7 { padding-block: 56px; }
 
     .spacing-scale {
         display: flex;
