@@ -17,45 +17,45 @@
       <h1 class="mb-0">OCR būsena</h1>
     </div>
 
-    <div class="page-section">
-        <% if (ocrPerMinute) { %>
-        <div class="page-section">
-          <h2 class="mb-3">
-            <a href="#perMinute" id="perMinute" class="no-style">Sparta (<%= ocrPerMinute.date %>)</a>
-          </h2>
-          <div class="grid auto-fill-180 gap-3">
-            <div class="card">
-              <div class="card-body">
-                <div class="section-title mb-2">Dokumentai</div>
-                <div class="flex items-baseline gap-1">
-                  <span class="cell-mono text-[1.6rem] font-semibold"><%= Number(ocrPerMinute.results).toLocaleString('lt-LT') %></span>
-                  <span class="text-xs text-muted font-medium">/min.</span>
-                </div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-body">
-                <div class="section-title mb-2">Puslapiai</div>
-                <div class="flex items-baseline gap-1">
-                  <span class="cell-mono text-[1.6rem] font-semibold"><%= Number(ocrPerMinute.pages).toLocaleString('lt-LT') %></span>
-                  <span class="text-xs text-muted font-medium">/min.</span>
-                </div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-body">
-                <div class="section-title mb-2">Žodžiai</div>
-                <div class="flex items-baseline gap-1">
-                  <span class="cell-mono text-[1.6rem] font-semibold"><%= Number(ocrPerMinute.words).toLocaleString('lt-LT') %></span>
-                  <span class="text-xs text-muted font-medium">/min.</span>
-                </div>
-              </div>
+    <% if (ocrPerMinute) { %>
+    <section class="mb-16">
+      <h2 class="mb-3">
+        <a href="#perMinute" id="perMinute" class="no-style">Sparta (<%= ocrPerMinute.date %>)</a>
+      </h2>
+      <div class="grid auto-fill-180 gap-3">
+        <div class="card">
+          <div class="card-body">
+            <div class="section-title mb-2">Dokumentai</div>
+            <div class="flex items-baseline gap-1">
+              <span class="cell-mono text-[1.6rem] font-semibold"><%= Number(ocrPerMinute.results).toLocaleString('lt-LT') %></span>
+              <span class="text-xs text-muted font-medium">/min.</span>
             </div>
           </div>
-        <% } %>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div class="section-title mb-2">Puslapiai</div>
+            <div class="flex items-baseline gap-1">
+              <span class="cell-mono text-[1.6rem] font-semibold"><%= Number(ocrPerMinute.pages).toLocaleString('lt-LT') %></span>
+              <span class="text-xs text-muted font-medium">/min.</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div class="section-title mb-2">Žodžiai</div>
+            <div class="flex items-baseline gap-1">
+              <span class="cell-mono text-[1.6rem] font-semibold"><%= Number(ocrPerMinute.words).toLocaleString('lt-LT') %></span>
+              <span class="text-xs text-muted font-medium">/min.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <% } %>
 
+    <section class="mb-16">
       <div class="grid-2 items-start">
-
         <div>
           <h2 class="mb-4"><a href="#nuskaitytojai" id="nuskaitytojai" class="no-style">OCR nuskaitytojai</a></h2>
           <div class="grid auto-fill-180 gap-3 pt-1">
@@ -118,11 +118,10 @@
             </table>
           </div>
         </div>
-
       </div>
-    </div>
+    </section>
 
-    <div class="page-section">
+    <section class="mb-16">
       <h2 class="mb-3"><a href="#pagalNuskaitytoją" id="pagalNuskaitytoją" class="no-style">Failų dalis pagal nuskaitytoją</a></h2>
       <div class="flex flex-col min-h-87.5">
         <div class="chart-frame">
@@ -140,7 +139,7 @@
           flags: ["colors"]
         });
       </script>
-    </div>
+    </section>
 
     <script>
       const ocrStatsDay     = <%- JSON.stringify(ocrStatsDay) %>;
@@ -150,8 +149,7 @@
       const ocrResultsWords = ocrStatsDay.map(item => item.words);
     </script>
 
-    <div class="grid-2">
-
+    <section class="grid-2">
       <div class="page-section flex flex-col min-h-87.5">
         <h2 class="mb-3"><a href="#rezultatai" id="rezultatai" class="no-style">Rezultatų skaičius</a></h2>
         <div class="chart-frame">
@@ -199,8 +197,7 @@
           });
         </script>
       </div>
-
-    </div>
+    </section>
 
   </main>
   <%- include('../footer.ejs') %>
