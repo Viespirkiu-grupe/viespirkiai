@@ -96,7 +96,7 @@
       const lentelesBody = document.getElementById("lentelesBody");
       if (lentelesBody && payload.lenteles) {
         lentelesBody.innerHTML = renderRows(payload.lenteles, lentele => `
-          <tr class="${lentele.isTotal ? "fw-bold" : ""}">
+          <tr class="${lentele.isTotal ? "font-bold" : ""}">
             <td>${escapeHtml(lentele.tableName)}</td>
             <td class="cell-mono cell-right cell-nowrap">${escapeHtml(lentele.dataSize)}</td>
             <td class="cell-mono cell-right cell-nowrap">${escapeHtml(lentele.indexSize)}</td>

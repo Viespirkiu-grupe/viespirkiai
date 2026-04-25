@@ -5,7 +5,7 @@
   <div class="grid-2 mb-6">
 
     <div>
-      <h3 class="text-sm fw-bold mb-3">Pardavimo pajamos</h3>
+      <h3 class="text-sm font-bold mb-3">Pardavimo pajamos</h3>
       <% if (asmuo.finansai.lentele?.metai?.length > 0 && asmuo.finansai.lentele.duomenys["Pardavimo pajamos"]) { %>
         <div class="chart-frame">
           <div id="pardavimoPajamosChart" class="chart h-75"></div>
@@ -36,7 +36,7 @@
     </div>
 
     <div>
-      <h3 class="text-sm fw-bold mb-3">Grynasis pelnas (nuostoliai)</h3>
+      <h3 class="text-sm font-bold mb-3">Grynasis pelnas (nuostoliai)</h3>
       <% if (asmuo.finansai.lentele?.metai?.length > 0) { %>
         <div class="chart-frame">
           <div id="grynasisPelnas" class="chart h-75"></div>
@@ -110,7 +110,7 @@
     <div class="subsection">
       <h3>
         <%= laikotarpis.templateName %>
-        <span class="text-muted text-xs fw-normal">(<%= laikotarpis.templateId %>, <%= laikotarpis.duomenuData %>)</span>
+        <span class="text-muted text-xs font-normal">(<%= laikotarpis.templateId %>, <%= laikotarpis.duomenuData %>)</span>
       </h3>
       <p class="text-muted text-sm mb-4"><%= laikotarpis.laikotarpisNuo %> – <%= laikotarpis.laikotarpisIki %></p>
 
@@ -118,7 +118,7 @@
         <% laikotarpis.standards.forEach(standard => { %>
           <div class="card">
             <div class="card-body">
-              <div class="section-title mb-3"><%= standard.standardName %> <span class="text-muted fw-normal">(<%= standard.standardId %>)</span></div>
+              <div class="section-title mb-3"><%= standard.standardName %> <span class="text-muted font-normal">(<%= standard.standardId %>)</span></div>
               <dl class="kv-list">
                 <% standard.lines.forEach(line => { %>
                   <dt><%= line.lineName %> <span class="text-muted text-xs">(<%= line.lineTypeId %>)</span></dt>

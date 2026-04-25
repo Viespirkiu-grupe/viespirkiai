@@ -176,13 +176,13 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
 
         <h3 class="mb-2">BVPŽ</h3>
         <div class="mb-2">
-          <div class="fw-medium"><%= sutartis.bvpzPavadinimas %></div>
+          <div class="font-medium"><%= sutartis.bvpzPavadinimas %></div>
           <span class="text-muted"><%= sutartis.bvpzKodas %></span>
         </div>
         <% if (sutartis.papildomiBvpzKodai && sutartis.papildomiBvpzKodai.length > 0) { %>
           <% for (let i = 0; i < sutartis.papildomiBvpzKodai.length; i++) { %>
             <div class="mb-2">
-              <div class="fw-medium"><%= sutartis.papildomiBvpzPavadinimai[i] %></div>
+              <div class="font-medium"><%= sutartis.papildomiBvpzPavadinimai[i] %></div>
               <span class="text-muted"><%= sutartis.papildomiBvpzKodai[i] %></span>
             </div>
           <% } %>
@@ -312,7 +312,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
                   </div>
                   <h3 class="result-card-title">
                     <% const sabisVerte = item.suma; %>
-                    <span class="amount-sm <%= Number(sabisVerte) > 10000 ? 'fw-bold' : '' %>">
+                    <span class="amount-sm <%= Number(sabisVerte) > 10000 ? 'font-bold' : '' %>">
                       <%= Number(sabisVerte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
                     </span>
                     &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>
@@ -373,7 +373,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
                   <h3 class="result-card-title">
                     <a href="/sutartis/<%= item.sutartiesUnikalusId %>">
                       <% const verte = item.faktineIvykdimoVerte || item.verte; %>
-                      <span class="cell-mono <%= Number(verte) > 10000 ? 'fw-bold' : '' %>">
+                      <span class="cell-mono <%= Number(verte) > 10000 ? 'font-bold' : '' %>">
                         <%= Number(verte).toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %> €
                       </span>
                       &nbsp;<%= item.pavadinimas.length < 1 ? '<em>Nenurodyta</em>' : item.pavadinimas %>

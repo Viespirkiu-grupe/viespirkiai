@@ -1,10 +1,6 @@
 @layer base {
     h1, h2, h3, h4, h5, h6 {
-        font-family: var(--font-sans);
-        font-weight: 700;
-        line-height: 1.25;
-        color: var(--black);
-        margin-top: 0;
+        @apply font-sans font-bold leading-tight text-black mt-0;
     }
 
     h1 {
@@ -12,15 +8,15 @@
     }
 
     h2 {
-        @apply first:mt-0 last:mb-0 my-4 text-2xl
+        @apply first:mt-0 last:mb-0 my-4 text-2xl;
     }
 
     h3 {
-        @apply first:mt-0 last:mb-0 my-3 text-xl
+        @apply first:mt-0 last:mb-0 my-3 text-xl;
     }
 
     h4 {
-        @apply first:mt-0 last:mb-0 my-3 text-lg
+        @apply first:mt-0 last:mb-0 my-3 text-lg;
     }
 
     h5, h6 {
@@ -32,27 +28,16 @@
     }
 
     a {
-        color: var(--link);
-
-        @apply underline hover:decoration-transparent underline-offset-2 transition-colors;
+        @apply underline hover:decoration-transparent underline-offset-2 transition-colors text-link;
 
         &.no-style {
             @apply no-underline text-inherit;
         }
     }
 
-    small, .text-sm  { font-size: var(--text-sm); }
+    small { font-size: var(--text-sm); }
 
-    strong, .fw-bold { font-weight: 700; }
-    .fw-medium       { font-weight: 500; }
-    .fw-normal       { font-weight: 400; }
-
-    .text-nowrap  { white-space: nowrap; }
-    .text-ellipsis{
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-    }
+    strong { font-weight: 700; }
 
     sub, sup { font-size: var(--text-xs); }
 
@@ -77,8 +62,9 @@
         border-radius: var(--radius-md);
         padding: 16px;
         overflow-x: auto;
+
+        code { background: none; border: none; padding: 0; }
     }
-    pre code { background: none; border: none; padding: 0; }
 
     kbd {
         display: inline-block;

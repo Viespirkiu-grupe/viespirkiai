@@ -1,7 +1,4 @@
 @layer utilities {
-    .m-5  { margin: 28px; }
-
-    .mt-5 { margin-top: 28px; }
     .mt-6 { margin-top: 40px; }
 
     .mb-5 { margin-bottom: 28px; }

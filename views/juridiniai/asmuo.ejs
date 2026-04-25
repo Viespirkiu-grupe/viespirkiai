@@ -151,7 +151,7 @@
             <dd><span class="cell-mono"><%= asmuo.sodra.draustieji2 || 0 %></span></dd>
 
             <dt>Viso</dt>
-            <dd><span class="cell-mono fw-bold"><%= asmuo.sodra.draustieji + (asmuo.sodra.draustieji2 || 0) %></span></dd>
+            <dd><span class="cell-mono font-bold"><%= asmuo.sodra.draustieji + (asmuo.sodra.draustieji2 || 0) %></span></dd>
           </dl>
           <% } else { %>
           <em class="text-muted">Nėra duomenų</em>
@@ -177,7 +177,7 @@
               <% } %>
             </dd>
             <dt>Bendrai</dt>
-            <dd><span class="cell-mono fw-bold"><%= asmuo.sodra.bendrasVidutinisAtlyginimas.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>
+            <dd><span class="cell-mono font-bold"><%= asmuo.sodra.bendrasVidutinisAtlyginimas.toLocaleString('lt-LT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %>
                 €/mėn.</span></dd>
           </dl>
           <% } else { %>

@@ -5,7 +5,7 @@
   <div class="grid-2 mb-5 items-start">
 
     <div>
-      <h3 class="text-sm fw-bold mb-3">Apkrova</h3>
+      <h3 class="text-sm font-bold mb-3">Apkrova</h3>
       <dl class="kv-list">
         <dt>Atliktos užklausos</dt>
         <dd><span class="cell-mono" data-stat="database.xact_commit"><%= Number(statistika.database.xact_commit).toLocaleString('lt-LT') %></span></dd>
@@ -22,7 +22,7 @@
 
   </div>
 
-  <h3 class="text-sm fw-bold mb-3">Lentelės</h3>
+  <h3 class="text-sm font-bold mb-3">Lentelės</h3>
   <div class="table-wrapper">
     <table class="table">
       <thead>
@@ -36,7 +36,7 @@
       </thead>
       <tbody id="lentelesBody">
         <% statistika.lenteles.forEach(lentele => { %>
-          <tr class="<%= lentele.tableName === 'Iš viso' ? 'fw-bold' : '' %>">
+          <tr class="<%= lentele.tableName === 'Iš viso' ? 'font-bold' : '' %>">
             <td><%= lentele.tableName %></td>
             <td class="cell-mono cell-right cell-nowrap"><%= Number(lentele.dataSize).convertUnit("B") %></td>
             <td class="cell-mono cell-right cell-nowrap"><%= Number(lentele.indexSize).convertUnit("B") %></td>

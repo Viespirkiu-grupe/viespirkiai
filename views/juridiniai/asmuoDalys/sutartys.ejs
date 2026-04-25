@@ -3,7 +3,7 @@
     <div class="grid-2 mb-6">
 
       <div class="flex flex-col min-h-[350px]">
-        <h3 class="text-sm fw-bold mb-3">Numatytos pirkimų vertės pagal metus</h3>
+        <h3 class="text-sm font-bold mb-3">Numatytos pirkimų vertės pagal metus</h3>
         <% if (asmuo.sutartys?.pirkimaiKasMetus?.length > 0) { %>
           <div class="chart-frame">
             <div id="pirkimaiPerMetus" class="chart h-[350px]"></div>
@@ -23,7 +23,7 @@
       </div>
 
       <div class="flex flex-col min-h-[350px]">
-        <h3 class="text-sm fw-bold mb-3">Numatytos pardavimų vertės pagal metus</h3>
+        <h3 class="text-sm font-bold mb-3">Numatytos pardavimų vertės pagal metus</h3>
         <% if (asmuo.sutartys?.tiekimaiKasMetus?.length > 0) { %>
           <div class="chart-frame">
             <div id="pardavimaiPerMetus" class="chart h-[350px]"></div>
@@ -49,7 +49,7 @@
 
       <div class="flex flex-col">
         <div class="flex justify-between items-center mb-3">
-          <h3 class="text-sm fw-bold mb-0">TOP 10 tiekėjų</h3>
+          <h3 class="text-sm font-bold mb-0">TOP 10 tiekėjų</h3>
           <div class="flex gap-2">
             <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topTiekejai.csv" class="btn btn-outline btn-sm" aria-label="Atsisiųsti TOP 10 tiekėjų CSV">↗ CSV</a>
             <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topTiekejai.jsonl" class="btn btn-outline btn-sm" aria-label="Atsisiųsti TOP 10 tiekėjų JSONL">↗ JSONL</a>
@@ -87,7 +87,7 @@
 
       <div class="flex flex-col">
         <div class="flex justify-between items-center mb-3">
-          <h3 class="text-sm fw-bold mb-0">TOP 10 pirkėjų</h3>
+          <h3 class="text-sm font-bold mb-0">TOP 10 pirkėjų</h3>
           <div class="flex gap-2">
             <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topPirkejai.csv" class="btn btn-outline btn-sm" aria-label="Atsisiųsti TOP 10 pirkėjų CSV">↗ CSV</a>
             <a href="/asmuo/<%= asmuo.jar.jarKodas %>/sutartys/topPirkejai.jsonl" class="btn btn-outline btn-sm" aria-label="Atsisiųsti TOP 10 pirkėjų JSONL">↗ JSONL</a>

@@ -1,6 +1,6 @@
 @layer components {
     .word-cloud {
-        @apply flex flex-wrap gap-7 justify-center items-center py-7;
+        @apply flex flex-wrap gap-x-10 gap-y-8 justify-center items-center py-7;
 
         span {
             @apply text-dark-gray cursor-default;

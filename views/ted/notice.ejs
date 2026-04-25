@@ -26,7 +26,7 @@
         </div>
       </div>
 
-      <div class="<%= hasLocation ? 'grid-4' : 'grid-3' %> mt-5">
+      <div class="<%= hasLocation ? 'grid-4' : 'grid-3' %> mt-7">
 
         <section>
           <h2>Perkančioji organizacija</h2>
@@ -48,12 +48,12 @@
           <h3 class="mb-2">BVPŽ</h3>
           <div class="flex flex-col gap-2">
           <div>
-            <div class="fw-medium"><%= procScope.bvpzPavadinimas %><% if (procScope.bvpzKodas) { %> <span class="text-muted fw-normal text-xs"><%= procScope.bvpzKodas %></span><% } %></div>
+            <div class="font-medium"><%= procScope.bvpzPavadinimas %><% if (procScope.bvpzKodas) { %> <span class="text-muted font-normal text-xs"><%= procScope.bvpzKodas %></span><% } %></div>
           </div>
           <% if (procScope.papildomiBvpzKodai && procScope.papildomiBvpzKodai.length > 0) { %>
           <% for (let i = 0; i < procScope.papildomiBvpzKodai.length; i++) { %>
           <div>
-            <div class="fw-medium"><%= procScope.papildomiBvpzPavadinimai[i] %><% if (procScope.papildomiBvpzKodai[i]) { %> <span class="text-muted fw-normal text-xs"><%= procScope.papildomiBvpzKodai[i] %></span><% } %></div>
+            <div class="font-medium"><%= procScope.papildomiBvpzPavadinimai[i] %><% if (procScope.papildomiBvpzKodai[i]) { %> <span class="text-muted font-normal text-xs"><%= procScope.papildomiBvpzKodai[i] %></span><% } %></div>
           </div>
           <% } %>
           <% } %>
