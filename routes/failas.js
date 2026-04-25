@@ -3,6 +3,7 @@ import mime from "mime";
 import config from "../utils/config.js";
 import { postgres } from "../postgres/postgres.js";
 import { serveOpenGraphImage } from "../utils/openGraphImage.js";
+import { parsePgArray } from "../postgres/postgres.js";
 
 import {
     validateOcrApiKey,

@@ -1,5 +1,5 @@
 <%- include('./contact-list.ejs', {
-  items: (telefonai || []).map(t => ({ value: t.numeris, pages: t.pages })),
+  items: (telefonai || []).map(t => ({ value: t.telefonas, pages: t.puslapiai })),
   title: typeof title !== 'undefined' ? title : 'Telefonai',
   type: 'phone',
   emptyText: typeof emptyText !== 'undefined' ? emptyText : 'Nerasta'

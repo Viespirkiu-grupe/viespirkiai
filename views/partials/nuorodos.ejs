@@ -1,7 +1,7 @@
 <%- include('./contact-list.ejs', {
   items: (links || []).map(l => ({ 
-    value: l.uri.length > 50 ? l.uri.slice(0, 50) + '…' : l.uri,
-    fullValue: l.uri,
+    value: l.link.length > 50 ? l.link.slice(0, 50) + '…' : l.link,
+    fullValue: l.link,
     pages: l.pages
   })),
   title: typeof title !== 'undefined' ? title : 'Nuorodos',

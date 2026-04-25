@@ -103,20 +103,19 @@ function defaultResultsQuery() {
         SELECT * FROM (
             SELECT ${NEPATIKIMAS_COLS}, NULL::text AS "irasymoPagrindas", 'Nepatikimas' AS "saltinis"
             FROM public."nepatikimiTiekejai" nd
-            INNER JOIN public."nepatikimiTiekejaiPagrindimai" p
+            LEFT JOIN public."nepatikimiTiekejaiPagrindimai" p
                 ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
 
             UNION ALL
 
             SELECT ${MELAGINGAS_COLS}, nd."irasymoPagrindas", 'Melagingas' AS "saltinis"
             FROM public."melagingiTiekejai" nd
-            INNER JOIN public."melagingiTiekejaiPagrindimai" p
+            LEFT JOIN public."melagingiTiekejaiPagrindimai" p
                 ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
         ) t
         ORDER BY "duomenuIvedimoData" DESC NULLS LAST
         LIMIT $1 OFFSET $2`;
 }
-
 /**
  * @param {{ cleanSearch: string, tsQueryFunc: string, limit: number, skip: number }} params
  * @returns {Promise<{ rows: object[], total: number }>}
@@ -130,13 +129,13 @@ async function queryNepatikimi({ cleanSearch, tsQueryFunc, limit, skip }) {
                 skip,
             ]),
             postgres.query(
-                `SELECT COUNT(*) FROM (
-                    SELECT 1 FROM public."nepatikimiTiekejai" WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)
-                    UNION ALL
-                    SELECT 1 FROM public."melagingiTiekejai" WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)
-                ) t`,
-                [cleanSearch],
-            ),
+    `SELECT COUNT(*) FROM (
+        SELECT 1 FROM public."nepatikimiTiekejai" WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)
+        UNION ALL
+        SELECT 1 FROM public."melagingiTiekejai" WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)
+    ) t`,
+    [cleanSearch],
+),
         ]);
         return {
             rows: resultsRes.rows,
@@ -147,8 +146,15 @@ async function queryNepatikimi({ cleanSearch, tsQueryFunc, limit, skip }) {
     const [resultsRes, totalRes] = await Promise.all([
         postgres.query(defaultResultsQuery(), [limit, skip]),
         postgres.query(`
-            SELECT (SELECT COUNT(*) FROM public."nepatikimiTiekejai") +
-                   (SELECT COUNT(*) FROM public."melagingiTiekejai") AS count`),
+    SELECT (
+        SELECT COUNT(*) FROM public."nepatikimiTiekejai" nd
+        INNER JOIN public."nepatikimiTiekejaiPagrindimai" p
+            ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
+    ) + (
+        SELECT COUNT(*) FROM public."melagingiTiekejai" nd
+        INNER JOIN public."melagingiTiekejaiPagrindimai" p
+            ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
+    ) AS count`), ,
     ]);
     return {
         rows: resultsRes.rows,
@@ -199,6 +205,8 @@ nepatikimiIrMelagiaiRouter.get(
                 data: rows,
                 currentPage: page,
                 pageCount: Math.ceil(total / limit),
+                total,
+                limit
             });
 
         res.render("nepatikimiIrMelagiai/index", {

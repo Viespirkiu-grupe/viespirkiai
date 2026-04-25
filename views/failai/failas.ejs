@@ -50,6 +50,53 @@
       const libreFormats = ["doc","docx","odt","rtf","xls","xlsx","xlsb","ods","ppt","pptx","ppsx","odp","odg","pub","pages","xlt","dot","docm","dotx"];
       const imageFormats = ["jpg","jpeg","png","bmp","gif","tif","tiff","jfif","heic","webp"];
       const archiveFormats = ["zip","7z","rar","adoc"];
+      const ocrStateTextMap = {
+        "1": "Baigta",
+        "0": "Rekomenduojama",
+        "-1": "Nepavyko",
+        "-3": "Rezervuota",
+        "-6": "Viršijo bandymus"
+      };
+      const ocrStateKey = failas.ocrState === null || typeof failas.ocrState === "undefined"
+        ? null
+        : String(failas.ocrState);
+      const ocrStateText = ocrStateKey && ocrStateTextMap[ocrStateKey]
+        ? ocrStateTextMap[ocrStateKey]
+        : "Nežinoma";
+      const ocrLatest = failas.ocrLatestResult || null;
+      const hasOcrSection = ocrStateKey !== null || !!ocrLatest;
+      const formatDateTime = (value) => {
+        if (!value) return "—";
+        const dt = new Date(value);
+        return Number.isNaN(dt.getTime()) ? "—" : dt.toLocaleString("lt-LT", { hour12: false });
+      };
+      const formatDuration = (value) => {
+        if (value === null || typeof value === "undefined") return "—";
+        const ms = Math.round(Number(value));
+        if (!Number.isFinite(ms) || ms < 0) return "—";
+
+        if (ms < 1000) return `${ms} ms`;
+
+        const totalSecondsFloat = ms / 1000;
+        if (totalSecondsFloat < 10) {
+          return `${totalSecondsFloat.toLocaleString("lt-LT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`;
+        }
+
+        const totalSeconds = Math.round(totalSecondsFloat);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+          return `${hours} val ${String(minutes).padStart(2, "0")} min ${String(seconds).padStart(2, "0")} s`;
+        }
+
+        if (minutes > 0) {
+          return `${minutes} min ${String(seconds).padStart(2, "0")} s`;
+        }
+
+        return `${totalSeconds} s`;
+      };
       let originalusLinkas = null;
       let originalusLinkasPavadinimas = null;
       if (failas.saltinis == "sutartys" || !failas.saltinis) {
@@ -183,11 +230,11 @@
             <h2 class="mb-3 no-style">Dokumentas</h2>
             <dl class="kv-list">
               <dt>Puslapių skaičius</dt>
-              <dd><span class="cell-mono"><%= failas.metaduomenys.pageCount || "—" %></span></dd>
+              <dd><span class="cell-mono"><%= failas.metaduomenys.pageCount || failas.puslapiuSkaicius || "—" %></span></dd>
               <dt>Žodžių skaičius</dt>
-              <dd><span class="cell-mono"><%= failas.metaduomenys.wordCount || "—" %></span></dd>
+              <dd><span class="cell-mono"><%= failas.metaduomenys.wordCount || failas.zodziuSkaicius || "—" %></span></dd>
               <dt>Programa</dt>
-              <dd><%= failas.metaduomenys.Producer || "—" %></dd>
+              <dd><%= failas.metaduomenys.Producer || failas.metaduomenys.producer || "—" %></dd>
               <dt>Autorius</dt>
               <dd><%= failas.metaduomenys.Author || "—" %></dd>
             </dl>
@@ -197,17 +244,15 @@
             <h2 class="mb-3 no-style">Turinys</h2>
             <dl class="kv-list">
 
-              <%- include('../partials/domenai.ejs', { domains: failas.metaduomenys.domains }) %>
+              <%- include('../partials/domenai.ejs', { domains: failas.domains }) %>
 
-              <%- include('../partials/nuorodos.ejs', { links: (failas.metaduomenys.links || []).filter(l => !l.uri.startsWith('mailto:')) }) %>
+              <%- include('../partials/nuorodos.ejs', { links: (failas.links || []).filter(l => !l.link.startsWith('mailto:')) }) %>
 
-              <%- include('../partials/emails.ejs', { emails: failas.metaduomenys.emails }) %>
+              <%- include('../partials/emails.ejs', { emails: failas.emails }) %>
 
-              <%- include('../partials/telefonai.ejs', { telefonai: failas.metaduomenys.telefonai }) %>
+              <%- include('../partials/telefonai.ejs', { telefonai: failas.telefonai }) %>
 
-              <% if (failas.metaduomenys.ibanNumeriai?.length > 0 && failas.metaduomenys.ibanNumeriai[0].pages) { %>
-                <%- include('../partials/ibanNumeriai.ejs', { ibanNumeriai: failas.metaduomenys.ibanNumeriai }) %>
-              <% } %>
+              <%- include('../partials/ibanNumeriai.ejs', { ibanNumeriai: failas.metaduomenys.ibanNumeriai }) %>
 
               <%- include('../partials/parasai.ejs', { signatures: failas.metaduomenys.signatures }) %>
 
@@ -217,6 +262,55 @@
           <p class="text-muted text-sm text-center mb-10">
             <em>Dokumento metaduomenų nėra</em>
           </p>
+        <% } %>
+
+        <% if (hasOcrSection) { %>
+          <div>
+            <h2 class="mb-1 no-style">OCR</h2>
+
+            <% if (ocrLatest?.submitTimestamp) { %>
+              <p class="text-muted text-xs mb-2"><%= formatDateTime(ocrLatest.submitTimestamp) %></p>
+            <% } else if (failas.ocrLockTimestamp) { %>
+              <p class="text-muted text-xs mb-2"><%= formatDateTime(failas.ocrLockTimestamp) %></p>
+            <% } %>
+
+            <dl class="kv-list mb-0">
+              <% if (ocrStateKey && ocrStateKey !== "1") { %>
+                <dt>Būsena</dt>
+                <dd><%= ocrStateText %></dd>
+              <% } %>
+
+              <% if (ocrLatest && (ocrLatest.duration || ocrLatest.duration === 0)) { %>
+                <dt>Trukmė</dt>
+                <dd><span class="cell-mono"><%= formatDuration(ocrLatest.duration) %></span></dd>
+              <% } %>
+
+              <% if (ocrLatest && (ocrLatest.puslapiuSkaicius || ocrLatest.puslapiuSkaicius === 0)) { %>
+                <dt>Puslapiai</dt>
+                <dd><span class="cell-mono"><%= Number(ocrLatest.puslapiuSkaicius).toLocaleString('lt-LT') %></span></dd>
+              <% } %>
+
+              <% if (ocrLatest && (ocrLatest.zodziuSkaicius || ocrLatest.zodziuSkaicius === 0)) { %>
+                <dt>Žodžiai</dt>
+                <dd><span class="cell-mono"><%= Number(ocrLatest.zodziuSkaicius).toLocaleString('lt-LT') %></span></dd>
+              <% } %>
+
+              <% if (typeof failas.ocrBandymai === 'number' && failas.ocrBandymai > 0) { %>
+                <dt>Bandymų sk.</dt>
+                <dd><span class="cell-mono"><%= failas.ocrBandymai %></span></dd>
+              <% } %>
+
+              <% if (typeof failas.ocrRezultatuSkaicius === 'number' && failas.ocrRezultatuSkaicius > 1) { %>
+                <dt>Rezultatų įrašai</dt>
+                <dd><span class="cell-mono"><%= failas.ocrRezultatuSkaicius %></span></dd>
+              <% } %>
+
+              <% if (failas.ocrNode) { %>
+                <dt>Nuskaitytojas</dt>
+                <dd><span class="cell-mono"><%= failas.ocrNode %></span></dd>
+              <% } %>
+            </dl>
+          </div>
         <% } %>
 
       </div>

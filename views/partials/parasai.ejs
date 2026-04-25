@@ -1,65 +1,156 @@
 <%
-  // Reusable signature list partial with collapsible overflow.
-  // Expected locals:
-  // - signatures: Array<{ signerCertificateCommonName: string, signingTime: string }>
-  // - title?: string (optional; default: "Parašai")
-  // - disclaimerText?: string (optional; default warning about signature validation)
-  // - maxItems?: number (optional; default: 3)
-  // - emptyText?: string (optional; default: "Nerasta")
+  // Signature list partial (enhanced for legacy + XAdES structure)
+  // Supports:
+  // - old: { signerCertificateCommonName, signingTime }
+  // - new: { signer: { name, unit, position }, signerCN, signingTime, level, signingPurpose, isValid }
 
-  const __title = typeof title !== 'undefined' ? title : 'Parašai';
-  const __emptyText = typeof emptyText !== 'undefined' ? emptyText : 'Nerasta';
-  const __disclaimerText = typeof disclaimerText !== 'undefined' ? disclaimerText : 'Viešpirkiai netikrina skaitmeninių parašų galiojimo.';
-  const __list = Array.isArray(signatures) ? signatures : [];
-  const __maxItems = typeof maxItems !== 'undefined' ? maxItems : 3;
+  const titleValue = typeof title !== 'undefined' ? title : 'Parašai';
+  const emptyTextValue = typeof emptyText !== 'undefined' ? emptyText : 'Nerasta';
+  const disclaimerValue =
+    typeof disclaimerText !== 'undefined'
+      ? disclaimerText
+      : 'Viešpirkiai netikrina skaitmeninių parašų galiojimo.';
+  const max = typeof maxItems !== 'undefined' ? maxItems : 3;
 
-  const __visibleItems = __list.slice(0, __maxItems);
-  const __hiddenCount = Math.max(0, __list.length - __maxItems);
-  const __hasHidden = __hiddenCount > 0;
+  const list = Array.isArray(signatures) ? signatures : [];
+
+  const formatName = (sig) => {
+    return (
+      sig?.signer?.name ||
+      sig?.signerCertificateCommonName ||
+      sig?.signerCN ||
+      'Nežinomas pasirašytojas'
+    );
+  };
+
+  const formatUnit = (sig) => sig?.signer?.unit || null;
+  const formatPosition = (sig) => sig?.signer?.position || null;
+
+  const formatTime = (t) => {
+    if (!t) return null;
+    try {
+      return new Date(t).toLocaleString('lt-LT', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return t;
+    }
+  };
+
+  const visible = list.slice(0, max);
+  const hiddenCount = Math.max(0, list.length - max);
 %>
 
-<dt><%= __title %></dt>
+<dt><%= titleValue %></dt>
 <dd class="signature-list">
-  <% if (__list.length > 0) { %>
-    <p class="text-muted text-xs mb-2"><em><%= __disclaimerText %></em></p>
-    <div class="flex flex-col gap-1">
-      <% __visibleItems.forEach(sig => { %>
-        <% if (!sig) return; %>
-        <div>
-          <% if (sig.signerCertificateCommonName) { %>
-            <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
-          <% } else { %>
-            <span class="fw-bold text-muted">Nežinomas pasirašytojas</span>
-          <% } %>
-          <% if (sig.signingTime) { %>
-            <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>
-          <% } %>
-        </div>
-      <% }) %>
-    </div>
-    <% if (__hasHidden) { %>
-      <details class="signature-list-details mt-2">
-        <summary class="signature-list-summary">
-          <span class="text-muted text-xs fw-bold">+ <%= __hiddenCount %> daugiau</span>
-        </summary>
-        <div class="signature-list-expanded flex flex-col gap-1 mt-2">
-          <% __list.slice(__maxItems).forEach(sig => { %>
-            <% if (!sig) return; %>
-            <div>
-              <% if (sig.signerCertificateCommonName) { %>
-                <span class="fw-bold"><%= sig.signerCertificateCommonName %></span>
-              <% } else { %>
-                <span class="fw-bold text-muted">Nežinomas pasirašytojas</span>
-              <% } %>
-              <% if (sig.signingTime) { %>
-                <span class="text-muted text-xs ml-2"><%= sig.signingTime %></span>
-              <% } %>
+
+<% if (list.length) { %>
+
+  <p class="text-muted text-xs mb-2"><em><%= disclaimerValue %></em></p>
+
+  <div class="flex flex-col gap-2">
+
+    <% visible.forEach(sig => { %>
+      <% if (!sig) return; %>
+
+      <div class="signature-item">
+        <div class="flex flex-col">
+
+          <div class="flex flex-wrap gap-2 items-baseline">
+            <span class="fw-bold"><%= formatName(sig) %></span>
+
+            <% const time = formatTime(sig.signingTime); %>
+            <% if (time) { %>
+              <span class="text-muted text-xs"><%= time %></span>
+            <% } %>
+          </div>
+
+          <% const unit = formatUnit(sig); %>
+          <% const position = formatPosition(sig); %>
+
+          <% if (unit || position) { %>
+            <div class="text-muted text-xs">
+              <% if (position) { %><%= position %><% } %>
+              <% if (position && unit) { %> · <% } %>
+              <% if (unit) { %><%= unit %><% } %>
             </div>
-          <% }) %>
+          <% } %>
+
+          <% if (sig.level || sig.signingPurpose || sig.isValid !== undefined) { %>
+            <div class="text-muted text-xs">
+              <% if (sig.level) { %>Level: <%= sig.level %><% } %>
+              <% if (sig.signingPurpose) { %> · <%= sig.signingPurpose %><% } %>
+              <% if (sig.isValid === true) { %> · validus<% } %>
+              <% if (sig.isValid === false) { %> · negalioja<% } %>
+            </div>
+          <% } %>
+
         </div>
-      </details>
-    <% } %>
-  <% } else { %>
-    <em class="text-muted"><%= __emptyText %></em>
+      </div>
+
+    <% }) %>
+
+  </div>
+
+  <% if (hiddenCount > 0) { %>
+    <details class="signature-list-details mt-2">
+      <summary class="signature-list-summary">
+        <span class="text-muted text-xs fw-bold">+ <%= hiddenCount %> daugiau</span>
+      </summary>
+
+      <div class="flex flex-col gap-2 mt-2">
+        <% list.slice(max).forEach(sig => { %>
+          <% if (!sig) return; %>
+
+          <div class="signature-item">
+
+            <div class="flex flex-col">
+              <div class="flex flex-wrap gap-2 items-baseline">
+                <span class="fw-bold"><%= formatName(sig) %></span>
+
+                <% const time = formatTime(sig.signingTime); %>
+                <% if (time) { %>
+                  <span class="text-muted text-xs"><%= time %></span>
+                <% } %>
+              </div>
+
+              <% const unit = formatUnit(sig); %>
+              <% const position = formatPosition(sig); %>
+
+              <% if (unit || position) { %>
+                <div class="text-muted text-xs">
+                  <% if (position) { %><%= position %><% } %>
+                  <% if (position && unit) { %> · <% } %>
+                  <% if (unit) { %><%= unit %><% } %>
+                </div>
+              <% } %>
+
+              <% if (sig.level || sig.signingPurpose || sig.isValid !== undefined) { %>
+                <div class="text-muted text-xs">
+                  <% if (sig.level) { %>Level: <%= sig.level %><% } %>
+                  <% if (sig.signingPurpose) { %> · <%= sig.signingPurpose %><% } %>
+                  <% if (sig.isValid === true) { %> · validus<% } %>
+                  <% if (sig.isValid === false) { %> · negalioja<% } %>
+                </div>
+              <% } %>
+
+            </div>
+
+          </div>
+
+        <% }) %>
+      </div>
+    </details>
   <% } %>
+
+<% } else { %>
+
+  <em class="text-muted"><%= emptyTextValue %></em>
+
+<% } %>
+
 </dd>

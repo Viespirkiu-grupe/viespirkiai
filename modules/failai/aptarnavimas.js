@@ -66,7 +66,7 @@ async function resolveRelatedFiles(failas) {
  * @returns {Promise<Object>} An object containing the fetched metadata categorized by type.
  */
 export async function fetchFailasMetadata(id) {
-    const [iban, jarKodai, links, emails, domains, telefonai, metaduomenys] =
+    const [iban, jarKodai, links, emails, domains, telefonai, metaduomenys, tekstas, ocrResults] =
         await Promise.all([
             postgres.query(
                 `SELECT iban, puslapiai FROM "failaiIban"
@@ -103,7 +103,39 @@ export async function fetchFailasMetadata(id) {
                  WHERE failas = $1 ORDER BY id DESC LIMIT 1`,
                 [id],
             ),
+            postgres.query(
+                `SELECT tekstas FROM "failaiTekstas" WHERE id = $1 LIMIT 1`, // Should only be one row, but just in case, we take the first one
+                [id],
+            ),
+            postgres.query(
+                `SELECT id, tekstas, node, "lockTimestamp", "submitTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius"
+                 FROM "failaiOcrRezultatai"
+                 WHERE failas = $1
+                 ORDER BY id DESC`,
+                [id],
+            ),
         ]);
+
+    const latestOcrResult = ocrResults.rows.length
+        ? {
+              id: ocrResults.rows[0].id,
+              node: ocrResults.rows[0].node,
+              lockTimestamp: ocrResults.rows[0].lockTimestamp,
+              submitTimestamp: ocrResults.rows[0].submitTimestamp,
+              duration: ocrResults.rows[0].duration,
+              puslapiuSkaicius: ocrResults.rows[0].puslapiuSkaicius,
+              zodziuSkaicius: ocrResults.rows[0].zodziuSkaicius,
+          }
+        : null;
+
+    const ocr =
+        ocrResults.rows.length && ocrResults.rows[0].tekstas
+            ? parsePgArray(ocrResults.rows[0].tekstas)
+            : [];
+
+    if (tekstas.rows.length) {
+        tekstas.rows[0].tekstas = parsePgArray(tekstas.rows[0].tekstas);
+    }
 
     return {
         ibanNumeriai: iban.rows,
@@ -115,6 +147,10 @@ export async function fetchFailasMetadata(id) {
         metaduomenys: metaduomenys.rows.length
             ? metaduomenys.rows[0].metaduomenys
             : null,
+        tekstas: tekstas.rows.length ? tekstas.rows[0].tekstas : null,
+        ocrLatestResult: latestOcrResult,
+        ocrRezultatuSkaicius: ocrResults.rows.length,
+        ocr,
     };
 }
 
@@ -145,8 +181,6 @@ export async function aptarnautiFailą(
     failas.metaduomenys?.attachments?.forEach((attachment) => {
         attachment.name = decodeQPAttachmentName(attachment.name);
     });
-
-    if (failas.ocrText) failas.ocrText = parsePgArray(failas.ocrText);
 
     if (failas.location) {
         failas.location = parseWKBPoint(failas.location);
