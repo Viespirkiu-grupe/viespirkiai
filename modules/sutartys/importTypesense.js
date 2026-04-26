@@ -20,7 +20,7 @@ function toUnixTimestamp(date) {
 }
 
 // Užtikrina, kad Typesense kolekcija "sutartys" egzistuoja
-await ensureSearchCollection();
+await ensureSearchCollection({ ignoreTypesenseUp: true });
 
 // Po kiek įterpti ant karto
 const BATCH_SIZE = 10_000;
@@ -77,6 +77,12 @@ async function importToTypesense() {
                 tiekejas: doc.tiekejas || "",
                 tiekejoKodas: doc.tiekejoKodas || "",
                 verte: typeof doc.verte === "number" ? doc.verte : 0,
+                // Either faktineIvykdimoVerte or verte, depending on which is available. This allows faceting on "suma" even if faktineIvykdimoVerte is missing.
+                suma: typeof doc.faktineIvykdimoVerte === "number"
+                    ? doc.faktineIvykdimoVerte
+                    : typeof doc.verte === "number"
+                    ? doc.verte
+                    : 0,
                 faktineIvykdimoVerte:
                     typeof doc.faktineIvykdimoVerte === "number"
                         ? doc.faktineIvykdimoVerte

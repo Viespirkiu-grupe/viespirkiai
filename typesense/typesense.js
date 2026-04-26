@@ -11,7 +11,7 @@ export const client = new Typesense.Client({
 export const typesense = client;
 
 const COLLECTION = "sutartys";
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 const schema = {
     name: COLLECTION,
@@ -25,6 +25,7 @@ const schema = {
         { name: "tiekejas", type: "string" },
         { name: "tiekejoKodas", type: "string" },
         { name: "verte", type: "float", facet: true },
+        { name: "suma", type: "float", facet: true },
         { name: "faktineIvykdimoVerte", type: "float", facet: true },
         { name: "faktineIvykdimoData", type: "int64" },
         { name: "dokumentuKiekis", type: "int32", facet: true },
@@ -55,10 +56,12 @@ let collectionInitialized = false;
 /**
  * Užtikrina, kad Typesense kolekcija būtų sukurta ir atnaujinta.
  * Jei kolekcija jau egzistuoja, bet schema nesutampa, ji bus perrašyta.
+ * @param {{ ignoreTypesenseUp?: boolean }} options - Papildomos opcijos
  * @returns {Promise<void>}
  */
-export async function ensureSearchCollection() {
-    if (!config.typesenseUp) return;
+export async function ensureSearchCollection(options = {}) {
+    const { ignoreTypesenseUp = false } = options;
+    if (!config.typesenseUp && !ignoreTypesenseUp) return;
     if (collectionInitialized) return;
 
     try {
