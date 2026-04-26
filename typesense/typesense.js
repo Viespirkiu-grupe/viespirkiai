@@ -184,6 +184,14 @@ export async function addDocumentsToSearch(docs) {
                 ? doc.faktineIvykdimoVerte
                 : 0,
 
+        // Suma is faktineIvykdimoVerte or verte, depending on which one is available
+        suma:
+            typeof doc.faktineIvykdimoVerte === "number" && doc.faktineIvykdimoVerte > 0
+                ? doc.faktineIvykdimoVerte
+                : typeof doc.verte === "number"
+                ? doc.verte
+                : 0,
+
         sudarymoData: toUnixTimestamp(doc.sudarymoData),
         galiojimoData: toUnixTimestamp(doc.galiojimoData),
         paskelbimoData: toUnixTimestamp(doc.paskelbimoData),
