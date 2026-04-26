@@ -25,19 +25,48 @@ document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("searchForm");
   const input = document.getElementById("search");
   const results = document.getElementById("juridiniaiRezultatai");
-  let controller;
   let debounceTimer;
+  let issuedRequestId = 0;
+  let latestRenderedRequestId = 0;
+  const inFlightControllers = new Map();
+
+  const renderResponseIfNewest = (requestId, html) => {
+    if (requestId > latestRenderedRequestId) {
+      results.innerHTML = html;
+      latestRenderedRequestId = requestId;
+      return true;
+    }
+
+    return false;
+  };
+
+  const abortOlderInFlight = (requestId) => {
+    for (const [olderRequestId, controller] of inFlightControllers.entries()) {
+      if (olderRequestId < requestId) {
+        controller.abort();
+        inFlightControllers.delete(olderRequestId);
+      }
+    }
+  };
+
   input.addEventListener("input", () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
+      const requestId = ++issuedRequestId;
       const query = input.value.trim();
+
       if (!query) {
-        results.innerHTML = "";
-        history.replaceState(null, "", window.location.pathname);
+        const rendered = renderResponseIfNewest(requestId, "");
+        if (rendered) {
+          abortOlderInFlight(requestId);
+          history.replaceState(null, "", window.location.pathname);
+        }
         return;
       }
-      if (controller) controller.abort();
-      controller = new AbortController();
+
+      const controller = new AbortController();
+      inFlightControllers.set(requestId, controller);
+
       try {
         const base = form.getAttribute("action") || window.location.pathname;
         const url = new URL(base, window.location.origin);
@@ -45,13 +74,26 @@ document.addEventListener("DOMContentLoaded", () => {
         url.searchParams.set("tikRezultatai", "true");
         const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) throw new Error("Network error");
-        results.innerHTML = await res.text();
+
+        const html = await res.text();
+        const rendered = renderResponseIfNewest(requestId, html);
+
         url.searchParams.delete("tikRezultatai");
-        history.replaceState(null, "", url);
-      } catch (err) {
-        if (err.name !== "AbortError") {
-          results.innerHTML = "<p>Klaida gaunant duomenis.</p>";
+        if (rendered) {
+          abortOlderInFlight(requestId);
+          history.replaceState(null, "", url);
         }
+      } catch (err) {
+        if (err.name === "AbortError") {
+          return;
+        }
+
+        const rendered = renderResponseIfNewest(requestId, "<p>Klaida gaunant duomenis.</p>");
+        if (rendered) {
+          abortOlderInFlight(requestId);
+        }
+      } finally {
+        inFlightControllers.delete(requestId);
       }
     }, 100);
   });
