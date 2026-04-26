@@ -14,43 +14,52 @@ export async function gautiPinregDeklaracijasPagalJarKoda(
         sutuoktiniuQuery,
         sutuoktiniuCountsQuery,
     ] = await Promise.all([
-        // 1. pinregDarbovietes data
+        // 1. Deklaruojancio darbovietes data
         postgres.query(
-            `SELECT * FROM public."pinregDarbovietes"
+            `SELECT * FROM public."pinregJuridiniaiRysiai"
            WHERE "jarKodas" = $1
+           AND "irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE'
            ORDER BY "pateikimoData" DESC
            ${limit ? "LIMIT $2" : ""}`,
             limit ? [jarKodas, limit] : [jarKodas],
         ),
-        // 2. pinregDarbovietesCount
+        // 2. Deklaruojancio darbovietes count
         postgres.query(
-            `SELECT "count" FROM public."pinregDarbovietesCount" WHERE "jarKodas" = $1`,
+            `SELECT COUNT(*)::int AS "count" FROM public."pinregJuridiniaiRysiai"
+           WHERE "jarKodas" = $1
+           AND "irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE'`,
             [jarKodas],
         ),
-        // 3. pinregRysiaiSuJa data
+        // 3. Kiti rysiai su JA data
         postgres.query(
-            `SELECT * FROM public."pinregRysiaiSuJa"
+            `SELECT * FROM public."pinregJuridiniaiRysiai"
            WHERE "jarKodas" = $1
+           AND "irasoTipas" = 'KITI_RYSIAI_SU_JA'
            ORDER BY "pateikimoData" DESC
            ${limit ? "LIMIT $2" : ""}`,
             limit ? [jarKodas, limit] : [jarKodas],
         ),
-        // 4. pinregRysiaiSuJaCount
+        // 4. Kiti rysiai su JA count
         postgres.query(
-            `SELECT "count" FROM public."pinregRysiaiSuJaCount" WHERE "jarKodas" = $1`,
+            `SELECT COUNT(*)::int AS "count" FROM public."pinregJuridiniaiRysiai"
+           WHERE "jarKodas" = $1
+           AND "irasoTipas" = 'KITI_RYSIAI_SU_JA'`,
             [jarKodas],
         ),
-        // 5. pinregSutuoktiniuDarbovietes data
+        // 5. Sutuoktinio darbovietes data
         postgres.query(
-            `SELECT * FROM public."pinregSutuoktiniuDarbovietes"
+            `SELECT * FROM public."pinregJuridiniaiRysiai"
            WHERE "jarKodas" = $1
+           AND "irasoTipas" = 'SUTUOKTINIO_DARBOVIETE'
            ORDER BY "pateikimoData" DESC
            ${limit ? "LIMIT $2" : ""}`,
             limit ? [jarKodas, limit] : [jarKodas],
         ),
-        // 6. pinregSutuoktiniuDarbovietesCount
+        // 6. Sutuoktinio darbovietes count
         postgres.query(
-            `SELECT "count" FROM public."pinregSutuoktiniuDarbovietesCount" WHERE "jarKodas" = $1`,
+            `SELECT COUNT(*)::int AS "count" FROM public."pinregJuridiniaiRysiai"
+           WHERE "jarKodas" = $1
+           AND "irasoTipas" = 'SUTUOKTINIO_DARBOVIETE'`,
             [jarKodas],
         ),
     ]);
@@ -119,11 +128,19 @@ export async function gautiPinregDeklaracijasPagalJarKoda(
 
     // Process pinregSutuoktiniuDarbovietes data
     sutuoktiniuRows.forEach((row) => {
+        const deklaruojancioVardas =
+            row.deklaruojancioVardas || row.susijusioAsmensVardas || "";
+        const deklaruojancioPavarde =
+            row.deklaruojancioPavarde || row.susijusioAsmensPavarde || "";
+        const sutuoktinioVardas = row.sutuoktinioVardas || row.vardas || "";
+        const sutuoktinioPavarde =
+            row.sutuoktinioPavarde || row.pavarde || "";
+
         const deklaruojancio = formatName(
-            `${row.deklaruojancioVardas || ""} ${row.deklaruojancioPavarde || ""}`.trim(),
+            `${deklaruojancioVardas} ${deklaruojancioPavarde}`.trim(),
         );
         const sutuoktinio = formatName(
-            `${row.sutuoktinioVardas || ""} ${row.sutuoktinioPavarde || ""}`.trim(),
+            `${sutuoktinioVardas} ${sutuoktinioPavarde}`.trim(),
         );
 
         sutuoktinioDarbovietes.push({
