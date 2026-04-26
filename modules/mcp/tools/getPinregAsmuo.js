@@ -25,8 +25,9 @@ export const schema = {
 export async function handler({ vardas, limit = DEFAULT_LIMIT }) {
     const result = await gautiPinregDeklaracijasPagalVardaPavarde(vardas, {
         limit,
+        flat: true,
     });
     return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(result.rows, null, 2) }],
     };
 }
