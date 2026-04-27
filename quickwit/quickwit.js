@@ -62,24 +62,13 @@ async function qwIngestNdjson(indeksas, docs) {
 }
 
 async function qwSearch(indeksas, params) {
-  const start = Date.now();
   const res = await fetch(`${QW_URL}/api/v1/${indeksas}/search`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
-  const fetchEnd = Date.now();
   const text = await res.text();
-  const textEnd = Date.now();
   const parsed = JSON.parse(text);
-  const parseEnd = Date.now();
-
-  console.log(
-    `qwSearch ${indeksas}: ${res.status}` +
-    ` fetch=${fetchEnd - start}ms` +
-    ` body=${textEnd - fetchEnd}ms (${(Buffer.byteLength(text) / 1024).toFixed(1)} KB)` +
-    ` parse=${parseEnd - textEnd}ms`
-  );
 
   if (!res.ok) throw new Error(`Quickwit search ${indeksas} → ${res.status}: ${text}`);
   return parsed;
@@ -424,7 +413,6 @@ export async function indexDocs(lentele, items) {
 export async function filterLive(lentele, hits) {
   if (!hits.length) return [];
 
-  const start = Date.now();
   const ids = hits.map((h) => h.quickwitId);
   const { rows } = await postgres.query(
     `SELECT "quickwitId"
@@ -432,11 +420,6 @@ export async function filterLive(lentele, hits) {
      WHERE "lentele" = $1 AND "quickwitId" = ANY($2)`,
     [lentele, ids]
   );
-  const end = Date.now();
-  console.log(
-    `filterLive: ${hits.length} hits → ${rows.length} live in ${(end - start) / 1000}s`
-  );
-
   const live = new Set(rows.map((r) => r.quickwitId));
   return hits.filter((h) => live.has(h.quickwitId));
 }
@@ -457,7 +440,6 @@ export async function filterLive(lentele, hits) {
  * @param {number} [opts.minHits]        - minimum live hits; Infinity = exhaust
  */
 export async function search(lentele, params, { minHits = Infinity } = {}) {
-  const start = Date.now();
   const deadRatio = await getDeadRatio(lentele);
 
   // Guard against deadRatio being 1 (everything dead — div-by-zero) or >1
@@ -472,6 +454,9 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
   let numHitsMax = null;
   let requests = 0;
   let totalElapsed = 0;
+  let qwMs = 0;
+  let filterMs = 0;
+  let rawExhausted = false;
 
   while (liveHits.length < minHits) {
     requests++;
@@ -482,7 +467,9 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
       ...(searchAfter ? { search_after: searchAfter } : {}),
     };
 
+    const qwStart = Date.now();
     const data = await qwSearch(`${lentele}_*`, reqParams);
+    qwMs += Date.now() - qwStart;
     totalElapsed += data.elapsed_time_micros ?? 0;
     const hits = data.hits ?? [];
 
@@ -492,29 +479,31 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
     // deadRatio is cached for 60s so this can occasionally lie; the impact
     // is that a handful of tombstones slip through right after the first
     // ingest on a previously-clean table. Acceptable tradeoff.
+    const filterStart = Date.now();
     const live = deadRatio === 0 ? hits : await filterLive(lentele, hits);
+    filterMs += Date.now() - filterStart;
     liveHits.push(...live);
 
-    // No more results to page through.
-    if (hits.length < fetchSize) break;
+    // Quickwit returned fewer docs than requested → index truly exhausted.
+    if (hits.length < fetchSize) {
+      rawExhausted = true;
+      break;
+    }
+    // No sort key → can't paginate further, but the index is NOT exhausted.
     searchAfter = hits[hits.length - 1].sort ?? null;
     if (!searchAfter) break;
   }
-
-  const end = Date.now();
-  console.log(
-    `search: ${liveHits.length} live hits out of ${numHitsMax} max in ` +
-    `${(end - start) / 1000}s (${requests} requests, ` +
-    `total Quickwit time ${totalElapsed / 1_000_000}s)`
-  );
 
   return {
     hits: liveHits,
     numHitsMax,
     numHitsEstimate: Math.round(numHitsMax * liveRatio),
+    rawExhausted,
     deadRatio,
     elapsedTimeMicros: totalElapsed,
     requests,
+    qwMs,
+    filterMs,
   };
 }
 

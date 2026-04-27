@@ -312,6 +312,20 @@ failaiSearchRouter.get(
             return res.status(400).send(parsedLimit.error);
         const { limit } = parsedLimit;
         const page = parseInt(req.query.page) || 1;
+        if (page > 100)
+            return res.status(400).render("failai/index", {
+                customHead: config.customHead,
+                values: req.query,
+                data: [],
+                klaida: "Failų paieška palaiko daugiausiai 100 puslapių. Patikslinkite paieškos užklausą, kad sumažintumėte rezultatų skaičių.",
+                currentPage: page,
+                pageCount: 100,
+                queryParams: "",
+                galimaEksportuoti: false,
+                search: req.query.search || "",
+                req,
+                usedHiddenFields: false,
+            });
         timings.end("limits");
 
         const searchTerm = req.query.search || "";
@@ -366,7 +380,7 @@ failaiSearchRouter.get(
                     "pagination",
                     {
                         currentPage: page,
-                        pageCount: Math.ceil(total / limit),
+                        pageCount: Math.min(100, Math.ceil(total / limit)),
                         numberOfResults,
                         total,
                         queryParams,
@@ -392,7 +406,7 @@ failaiSearchRouter.get(
             return res.json({
                 data: results,
                 currentPage: page,
-                pageCount: Math.ceil(total / limit),
+                pageCount: Math.min(100, Math.ceil(total / limit)),
             });
 
         res.render("failai/index", {
@@ -404,7 +418,7 @@ failaiSearchRouter.get(
             search: cleanSearch,
             numberOfResults,
             currentPage: page,
-            pageCount: Math.ceil(total / limit),
+            pageCount: Math.min(100, Math.ceil(total / limit)),
             galimaEksportuoti: false,
             req,
             usedHiddenFields,
