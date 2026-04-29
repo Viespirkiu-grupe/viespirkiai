@@ -419,7 +419,7 @@ This allows testing:
 
 **Phase 6 — Expand animations and loading overlay**
 
-- [ ] **Export `animateNodes` from the Sigma bundle** (`src/voratinklis-bundle.js`):
+- [x] **Export `animateNodes` from the Sigma bundle** (`src/voratinklis-bundle.js`):
 
     ```js
     import { animateNodes } from 'sigma/utils/animate';
@@ -429,7 +429,7 @@ This allows testing:
 
   Rebuild with `npm run build` after the change.
 
-- [ ] **Animated node rearrangement after expand** (`src/voratinklis-app.js`):
+- [x] **Animated node rearrangement after expand** (`src/voratinklis-app.js`):
 
   When `mergeGraphElements(data)` adds new nodes, animate them from the clicked node's position to
   their ForceAtlas2-computed positions. Exact steps inside `loadOrg` / `loadPerson`:
@@ -445,7 +445,7 @@ This allows testing:
 
   The result: new nodes visually emerge from the clicked node and fly to their settled positions.
 
-- [ ] **Loading overlay** (`views/voratinklis/index.ejs` + `src/voratinklis-app.js`):
+- [x] **Loading overlay** (`views/voratinklis/index.ejs` + `src/voratinklis-app.js`):
 
   Add a `<div id="voratinklis-loading">` element inside the Sigma container:
 
@@ -496,7 +496,7 @@ unit-tested.
 
 #### Part A — Module split
 
-- [ ] **Create `src/voratinklis/` directory** and extract focused modules from `src/voratinklis-app.js`:
+- [x] **Create `src/voratinklis/` directory** and extract focused modules from `src/voratinklis-app.js`:
 
   | New file | Extracted content |
     |---|---|
@@ -511,7 +511,7 @@ unit-tested.
   creates `graph` + `renderer`, wires `clickNode` and `DOMContentLoaded`. Build scripts are
   unchanged — esbuild bundles the whole tree from the same entry point.
 
-- [ ] **Change `mergeGraphElements` to use injected dependencies** (`src/voratinklis/graph-utils.js`):
+- [x] **Change `mergeGraphElements` to use injected dependencies** (`src/voratinklis/graph-utils.js`):
 
   New signature:
   ```js
@@ -526,7 +526,7 @@ unit-tested.
   mergeGraphElements(graph, (id) => renderer.getNodeDisplayData(id), data, fromNodeId, hiddenEdgeTypes);
   ```
 
-- [ ] **Add `test/voratinklis/graph-utils.test.js`** unit tests covering:
+- [x] **Add `test/voratinklis/graph-utils.test.js`** unit tests covering:
 
     - Nodes are added with correct `color`, `size`, `label`, `image` attributes.
     - Duplicate nodes are skipped (idempotency).
@@ -547,13 +547,13 @@ unit-tested.
 
 #### Part B — Legend checkboxes
 
-- [ ] **Remove `pointer-events: none` from `#voratinklis-legend`** (`views/voratinklis/index.ejs`):
+- [x] **Remove `pointer-events: none` from `#voratinklis-legend`** (`views/voratinklis/index.ejs`):
 
   The legend currently has `pointer-events: none` to float over the canvas without eating clicks.
   Remove that rule — checkboxes require pointer events. The opaque legend background already prevents
   clicks from reaching the canvas beneath it.
 
-- [ ] **Wrap each legend row in a `<label>` with a checkbox** (`views/voratinklis/index.ejs`):
+- [x] **Wrap each legend row in a `<label>` with a checkbox** (`views/voratinklis/index.ejs`):
 
   ```html
   <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
@@ -576,7 +576,7 @@ unit-tested.
   stored on graphology edges: `Director`, `Shareholder`, `Official`, `Employment`, `Spouse`,
   `Order`, `Delivery`.
 
-- [ ] **Apply `hidden` attribute when edges are added** (`src/voratinklis/graph-utils.js`):
+- [x] **Apply `hidden` attribute when edges are added** (`src/voratinklis/graph-utils.js`):
 
   In `mergeGraphElements`, after setting `attrs.color`, add:
   ```js
@@ -585,7 +585,7 @@ unit-tested.
   This ensures newly fetched edges (arriving after a checkbox was toggled) are immediately
   hidden/shown correctly without requiring an additional refresh pass.
 
-- [ ] **Implement `bindLegendCheckboxes`** (`src/voratinklis/legend.js`):
+- [x] **Implement `bindLegendCheckboxes`** (`src/voratinklis/legend.js`):
 
   ```js
   export function bindLegendCheckboxes(graph, renderer, hiddenEdgeTypes) {

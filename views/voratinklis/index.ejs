@@ -21,7 +21,30 @@
     #voratinklis-canvas {
       flex: 1;
       width: 100%;
+      position: relative;
     }
+    #voratinklis-loading {
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      pointer-events: all;
+    }
+    .dark #voratinklis-loading {
+      background: rgba(15,23,42,0.5);
+    }
+    .vl-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #e5e7eb;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: vl-spin 0.8s linear infinite;
+    }
+    @keyframes vl-spin { to { transform: rotate(360deg); } }
     #voratinklis-status {
       position: absolute;
       bottom: 12px;
@@ -40,8 +63,8 @@
       padding: 8px 12px;
       font-size: 0.75rem;
       color: #374151;
-      pointer-events: none;
       line-height: 1.6;
+      user-select: none;
     }
     .dark #voratinklis-legend {
       background: rgba(30,41,59,0.92);
@@ -56,21 +79,35 @@
       vertical-align: middle;
       margin-right: 4px;
     }
+    #voratinklis-legend label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+    #voratinklis-legend input[type=checkbox] {
+      cursor: pointer;
+      margin: 0;
+    }
   </style>
 </head>
 <body>
   <%- include('../header.ejs', { hideSubtext: false }) %>
 
   <div id="voratinklis-wrapper">
-    <div id="voratinklis-canvas"></div>
+    <div id="voratinklis-canvas">
+      <div id="voratinklis-loading" hidden>
+        <div class="vl-spinner"></div>
+      </div>
+    </div>
     <div id="voratinklis-status"></div>
     <div id="voratinklis-legend">
-      <div><span class="vl-swatch" style="background:#1d4ed8"></span>Direktorius / vadovas</div>
-      <div><span class="vl-swatch" style="background:#7c3aed"></span>Akcininkas</div>
-      <div><span class="vl-swatch" style="background:#0891b2"></span>Pareigūnas / oficialus</div>
-      <div><span class="vl-swatch" style="background:#6b7280"></span>Darbuotojas</div>
-      <div><span class="vl-swatch" style="background:#f59e0b"></span>Sutuoktinis</div>
-      <div><span class="vl-swatch" style="background:#10b981"></span>Sutartis</div>
+      <label><input type="checkbox" data-edge-types="Director" checked> <span class="vl-swatch" style="background:#1d4ed8"></span>Direktorius / vadovas</label>
+      <label><input type="checkbox" data-edge-types="Shareholder" checked> <span class="vl-swatch" style="background:#7c3aed"></span>Akcininkas</label>
+      <label><input type="checkbox" data-edge-types="Official"> <span class="vl-swatch" style="background:#0891b2"></span>Pareigūnas / oficialus</label>
+      <label><input type="checkbox" data-edge-types="Employment"> <span class="vl-swatch" style="background:#6b7280"></span>Darbuotojas</label>
+      <label><input type="checkbox" data-edge-types="Spouse" checked> <span class="vl-swatch" style="background:#f59e0b"></span>Sutuoktinis</label>
+      <label><input type="checkbox" data-edge-types="Order,Delivery" checked> <span class="vl-swatch" style="background:#10b981"></span>Sutartis</label>
     </div>
   </div>
 
