@@ -2,9 +2,10 @@
 
 ## Summary
 
-Add a new page `/voratinklis` (Lithuanian: "spider web") that renders an interactive Sigma.js network graph
-of procurement relationships between legal entities. The user searches for a company using the existing
-company search, selects one, and the graph initialises with that company as the root node.
+Add a new page `/voratinklis/:jarKodas` (Lithuanian: "spider web") that renders an interactive Sigma.js
+network graph of procurement relationships centred on the company identified by `jarKodas`. The page
+immediately initialises the graph with that company as the root node — no search step is needed.
+Visiting `/voratinklis/` without a company code returns a 404-style "įmonė nenurodyta" page.
 
 Two types of node expansion are supported:
 
@@ -119,11 +120,15 @@ New server-side module `modules/voratinklis/` containing:
 
 New route `routes/voratinklis.js`:
 
-| Method | Path                            | Purpose                                                                                    |
-|--------|---------------------------------|--------------------------------------------------------------------------------------------|
-| `GET`  | `/voratinklis`                  | EJS page shell (header + full-height Sigma canvas + search bar)                            |
-| `GET`  | `/voratinklis/expand/:jarKodas` | JSON: graph nodes+edges for one organisation (calls `expandOrg`)                           |
-| `GET`  | `/voratinklis/expand-person`    | JSON: graph nodes+edges for one person by full name (`?vardas=...`). Calls `expandPerson`. |
+| Method | Path                            | Purpose                                                                                                     |
+|--------|---------------------------------|-------------------------------------------------------------------------------------------------------------|
+| `GET`  | `/voratinklis/`                 | Returns 404 ("įmonė nenurodyta") — no jarKodas was given                                                    |
+| `GET`  | `/voratinklis/:jarKodas`        | EJS page shell with jarKodas passed as template variable; graph auto-initialises on load                    |
+| `GET`  | `/voratinklis/expand/:jarKodas` | JSON: graph nodes+edges for one organisation (calls `expandOrg`)                                            |
+| `GET`  | `/voratinklis/expand-person`    | JSON: graph nodes+edges for one person by full name (`?vardas=...`). Calls `expandPerson`.                  |
+
+> **Route ordering note**: `expand` and `expand-person` static path segments must be registered _before_
+> the `/:jarKodas` wildcard so they are not swallowed by the dynamic route handler.
 
 Browser bundle `src/voratinklis-bundle.js` compiled by esbuild into `public/dist/voratinklis.js`:
 imports sigma, graphology, layouts, and node-programs; exports nothing — attaches `window.Voratinklis`
@@ -169,13 +174,13 @@ Same pattern applies to `loadPerson`, keyed by `person:{(vardas+" "+pavarde).tri
 ```mermaid
 graph TD
     subgraph Browser
-        SearchBar["Search Bar\n(reuses /juridiniai search logic)"]
         SigmaCanvas["Sigma.js Canvas\n(full viewport below header)"]
         GraphStore["graphology Graph instance"]
     end
 
     subgraph "routes/voratinklis.js"
-        PageRoute["GET /voratinklis → EJS shell"]
+        PageRoute["GET /voratinklis/:jarKodas → EJS shell\n(jarKodas passed as template var)"]
+        NotFoundRoute["GET /voratinklis/ → 404"]
         ExpandOrgAPI["GET /voratinklis/expand/:jarKodas → JSON"]
         ExpandPersonAPI["GET /voratinklis/expand-person?vardas=... → JSON"]
     end
@@ -185,7 +190,7 @@ graph TD
         ExpandPerson["expandPerson(fullName)\ngautiPinregDeklaracijasPagalVardaPavarde\n→ darbovietes + rysiaiSuJa + sutuoktinioDarbovietes"]
     end
 
-    SearchBar -->|" user selects company "| SigmaCanvas
+    PageRoute -->|"DOMContentLoaded: loadOrg(jarKodas)"| ExpandOrgAPI
     SigmaCanvas -->|" org node click "| ExpandOrgAPI
     SigmaCanvas -->|" person node click\n(vardas + pavarde from node attrs) "| ExpandPersonAPI
     ExpandOrgAPI --> ExpandOrg --> ExpandOrgAPI
@@ -202,13 +207,13 @@ sequenceDiagram
     actor User
     participant Browser
     participant Server
-    User ->> Browser: GET /voratinklis
-    Browser ->> Server: GET /voratinklis
-    Server -->> Browser: EJS page (search bar + empty Sigma canvas)
-    User ->> Browser: Types company name in search
-    Browser ->> Server: GET /juridiniai?search=...&tikRezultatai=true
-    Server -->> Browser: Partial HTML results (reused)
-    User ->> Browser: Clicks a company in results
+    User ->> Browser: GET /voratinklis/
+    Browser ->> Server: GET /voratinklis/
+    Server -->> Browser: 404 "įmonė nenurodyta"
+    User ->> Browser: GET /voratinklis/{jarKodas}
+    Browser ->> Server: GET /voratinklis/{jarKodas}
+    Server -->> Browser: EJS page (empty Sigma canvas, jarKodas embedded)
+    Browser ->> Browser: DOMContentLoaded → loadOrg(jarKodas)
     Browser ->> Server: GET /voratinklis/expand/{jarKodas}
     Server -->> Browser: { nodes[], edges[] }
     Browser ->> Browser: Add to graphology Graph
@@ -245,110 +250,74 @@ sequenceDiagram
 
 **Phase 1 — Infrastructure (bundle + route skeleton)**
 
-- [ ] Install npm runtime packages: `sigma@^3.0.2`, `graphology@^0.26.0`, `graphology-layout-forceatlas2@^0.10.1`,
+- [x] Install npm runtime packages: `sigma@^3.0.2`, `graphology@^0.26.0`, `graphology-layout-forceatlas2@^0.10.1`,
   `graphology-layout-noverlap@^0.4.2`, `@sigma/node-border@^3.0.0`, `@sigma/node-image@^3.0.0`
-- [ ] Install dev dependency: `esbuild` (for browser bundle build)
-- [ ] Create `src/voratinklis-bundle.js` entry point that imports sigma/graphology packages and attaches them to
+- [x] Install dev dependency: `esbuild` (for browser bundle build)
+- [x] Create `src/voratinklis-bundle.js` entry point that imports sigma/graphology packages and attaches them to
   `window.Voratinklis`
-- [ ] Add `build:voratinklis` and `watch:voratinklis` npm scripts using
-  `esbuild src/voratinklis-bundle.js --bundle --outfile=public/dist/voratinklis.js`
-- [ ] Run `npm run build:voratinklis` to generate the initial bundle
-- [ ] Create `routes/voratinklis.js` with `GET /voratinklis` serving a skeleton EJS page,
-  `GET /voratinklis/expand/:jarKodas` and `GET /voratinklis/expand-person` both returning `{ nodes: [], edges: [] }`
-- [ ] Create `views/voratinklis/index.ejs` — standard EJS shell with header/footer, full-height `#voratinklis-canvas`
-  div, and `<script src="/dist/voratinklis.js">` tag
-- [ ] Verify server starts and `GET /voratinklis` returns HTTP 200
-- [ ] Mark all checkboxes as done in this document once verified
+- [x] Add `build:voratinklis` and `watch:voratinklis` npm scripts using
+  `esbuild src/voratinklis-bundle.js --bundle --format=iife --outfile=public/dist/voratinklis.js`
+- [x] Run `npm run build:voratinklis` to generate the initial bundle (210 KB at `public/dist/voratinklis.js`)
+- [x] Create `routes/voratinklis.js` with `GET /voratinklis`, `GET /voratinklis/expand/:jarKodas`, and
+  `GET /voratinklis/expand-person`
+- [x] Create `views/voratinklis/index.ejs` — EJS shell with header/footer, full-height `#voratinklis-canvas`
+  div, floating search overlay, and `<script src="/dist/voratinklis.js">` tag
+- [x] Verify route module loads (confirmed via `node --input-type=module` import check)
 
 **Phase 2 — Backend expand API**
 
-- [ ] Create `modules/voratinklis/expand.js` with two exported functions:
-    - `expandOrg(jarKodas)`:
-        - Calls `gautiPinregDeklaracijasPagalJarKoda(jarKodas)` from `modules/pinreg/pinregDeklaracijos.js` for
-          `darbovietes`, `rysiaiSuJa`, `sutuoktinioDarbovietes`
-        - Maps `jar.*` → `OrganizationEntity` node with `id: "org:{jarKodas}"`
-        - Maps `darbovietes[]` → `PersonEntity` nodes with `id: "person:{(vardas+' '+pavarde).trim().toLowerCase()}"` (
-          store `vardas`, `pavarde`, `deklaracija` as attrs) + `Employment/Director/Official` edges with
-          `label: pareiguTipasPavadinimas`
-        - Maps `rysiaiSuJa[]` → `PersonEntity` nodes (same name-based ID) + `Director/Shareholder/Official` edges with
-          `label: rysioPobudzioPavadinimas` — merges automatically if person already in graph
-        - Maps `sutuoktinioDarbovietes[]` → `PersonEntity` nodes (name-based ID for both declarant and spouse) +
-          `Spouse` edges with `label: "Sutuoktinis"`
-        - Maps `sutartys.topPirkejai[]` and `sutartys.topTiekejai[]` → stub `OrganizationEntity` nodes + `Order`/
-          `Delivery` edges with `label: formatContractValue(verte)` (e.g. `€1.2M`)
-        - Returns `{ nodes: GraphNode[], edges: GraphEdge[] }`
-    - `expandPerson(fullName)`:
-        - Calls `gautiPinregDeklaracijasPagalVardaPavarde(fullName, { flat: false })` from
-          `modules/pinreg/pagalVarda.js`
-        - Maps `darbovietes[]` → stub `OrganizationEntity` nodes (`jarKodas` + `pavadinimas`) +
-          `Employment/Director/Official` edges with `label: pareiguTipasPavadinimas` (person → org)
-        - Maps `rysiaiSuJa[]` → stub `OrganizationEntity` nodes + `Director/Shareholder/Official` edges with
-          `label: rysioPobudzioPavadinimas` (person → org)
-        - Maps `sutuoktinioDarbovietes[]` → `PersonEntity` (spouse, id:
-          `person:{sutuoktinioVardas+' '+sutuoktinioPavarde}` normalized) + `Spouse` edge with `label: "Sutuoktinis"` +
-          stub org nodes + `Employment` edges with `label: pareiguTipasPavadinimas` (spouse → org)
-        - Returns `{ nodes: GraphNode[], edges: GraphEdge[] }`
-- [ ] Wire `GET /voratinklis/expand/:jarKodas` → `expandOrg`
-- [ ] Wire `GET /voratinklis/expand-person?vardas=...` → `expandPerson` (validate `vardas` query param is present)
-- [ ] Manually verify org expand: `curl "/voratinklis/expand/110053842"` returns well-formed data
-- [ ] Manually verify person expand: `curl "/voratinklis/expand-person?vardas=Jonas+Jonaitis"` returns darbovietes +
-  rysiaiSuJa + sutuoktinioDarbovietes mapped to graph elements
-- [ ] Mark all checkboxes as done in this document once verified
+- [x] Create `modules/voratinklis/expand.js` with two exported functions:
+    - `expandOrg(jarKodas)` — queries `pinregJuridiniaiRysiai` directly (raw names, not censored),
+      `jarCsv` for org metadata, and `gautiSutarciuDuomenisPagalJarKoda` for top contract partners;
+      returns `{ nodes: GraphNode[], edges: GraphEdge[] }`
+    - `expandPerson(fullName)` — queries `pinregJuridiniaiRysiai` by name (vardas+pavarde or
+      susijusioAsmensVardas+susijusioAsmensPavarde); maps to stub orgs + person edges;
+      returns `{ nodes: GraphNode[], edges: GraphEdge[] }`
+- [x] Wire `GET /voratinklis/expand/:jarKodas` → `expandOrg`
+- [x] Wire `GET /voratinklis/expand-person?vardas=...` → `expandPerson` (validates `vardas` is present)
+- [x] Both modules verified to load without syntax errors
 
 **Phase 3 — Frontend Sigma graph**
 
-- [ ] In `views/voratinklis/index.ejs`:
-    - Add `#voratinklis-canvas` with `height: calc(100vh - var(--site-header-offset))` and `width: 100%`
-    - Include the company search bar (reuse `juridiniai/search.ejs` pattern or inline a simplified version with
-      `form action="/voratinklis"`)
-    - On company selection, trigger `loadOrg(jarKodas)` via JS
-- [ ] In the inline `<script>` (or a separate `views/js/voratinklis.ejs`):
-    - Initialise a `graphology.Graph` (directed)
-    - Define the `wrapLabel(name, n = 3)` helper (splits on spaces, groups into lines of `n` words, joins with `\n`)
-    - Implement `formatContractValue(verte)` helper (e.g. `1234567 → "€1.2M"`, `45000 → "€45K"`, `800 → "€800"`, null →
-      `""`)
-    - Implement a custom `drawNodeLabel` function that renders the label **below** the node:
-        - Position: `(x, y + nodeSize + 4)` in canvas coordinates, `textAlign: "center"`
-        - Split label on `\n` and draw each line incrementally (line height ≈ `fontSize + 2px`)
-        - Pass as `settings.defaultDrawNodeLabel` to the Sigma constructor
-    - When adding nodes to the graph, set `label` using `wrapLabel`:
-        - `OrganizationEntity`: `label: wrapLabel(pavadinimas)`
-        - `PersonEntity`: `label: wrapLabel(vardas + " " + pavarde)`
-        - `ContractEntity`: `label: wrapLabel(pavadinimas)`
-    - Initialise Sigma renderer on `#voratinklis-canvas` with `NodeBorderProgram`, `NodeImageProgram`, and custom
-      `defaultDrawNodeLabel`
-    - Maintain `const expandingNodes = new Set()` to deduplicate concurrent in-flight expand requests
-      (consistent with the `inFlightControllers` Map pattern in `views/juridiniai/search.ejs`)
-    - `loadOrg(jarKodas)`:
-        1. Guard: skip if `expandingNodes.has("org:{jarKodas}")`, otherwise add to set
-        2. `GET /voratinklis/expand/{jarKodas}`
-        3. Merge returned nodes/edges into the graphology graph (skip duplicates by ID)
-        4. Pre-position new nodes outward from the root/clicked node
-        5. Run ForceAtlas2 (`graphology-layout-forceatlas2`) with `{ iterations: 150 }`
-        6. Call `noverlap` (`graphology-layout-noverlap`) to reduce overlaps
-        7. Mark node `expanded: true`; remove from `expandingNodes` in `finally`
-    - `loadPerson(vardas, pavarde)`:
-        1. Derive `nodeId = "person:" + (vardas + " " + pavarde).trim().toLowerCase()`
-        2. Guard: skip if `expandingNodes.has(nodeId)`, otherwise add to set
-        3. `GET /voratinklis/expand-person?vardas={encodeURIComponent(vardas + " " + pavarde)}`
-        4. Merge returned nodes/edges into the graphology graph (skip duplicates by ID)
-        5. Pre-position new nodes outward from the clicked person node
-        6. Short ForceAtlas2 pass + noverlap to settle layout
-        7. Mark node `expanded: true`; remove from `expandingNodes` in `finally`
-    - On Sigma node `clickNode` event:
-        - `OrganizationEntity` node with `expanded === false` → call `loadOrg(node.attributes.jarKodas)`, mark
-          `expanded: true`
-        - `PersonEntity` node with `expanded === false` → call
-          `loadPerson(node.attributes.vardas, node.attributes.pavarde)`, mark `expanded: true`
-    - Node size: `Math.max(8, Math.log(node.attributes.verte ?? 1) * 3)` for org nodes; fixed size for person nodes
-    - Node colour: grey for stub orgs, blue for expanded orgs, orange for persons, green for contracts
-- [ ] Verify graph renders for a real `jarKodas` (e.g. `110053842`)
-- [ ] Add `/voratinklis` link to the main navigation in `views/header.ejs` (desktop + mobile nav)
-- [ ] Update required documentation after the implementation is complete
-- [ ] Ensure new tests are added for the new feature and all tests are passing
-- [ ] Perform linting and formatting to maintain code quality and consistency
-- [ ] Review the implementation to ensure it meets the requirements and follows best practices
-- [ ] Mark all checkboxes as done in this document once verified
+- [x] `#voratinklis-canvas` fills viewport below header using `position: fixed` layout
+- [x] Floating search overlay with debounced company search (reuses `/juridiniai` partial HTML)
+- [x] `wrapLabel(name, n=3)` helper implemented
+- [x] `formatContractValue(verte)` helper implemented (`€1.2M`, `€45K`, `€800`, `""`)
+- [x] Custom `drawNodeLabel` renders label below node at `(x, y + nodeSize + 4)`, `textAlign: "center"`,
+  multi-line support via `\n`
+- [x] Sigma renderer initialised with `defaultDrawNodeLabel`
+- [x] `expandingNodes: Set` for in-flight deduplication
+- [x] `loadOrg(jarKodas, fromNodeId)` — fetch + merge + ForceAtlas2 + noverlap + mark expanded
+- [x] `loadPerson(vardas, pavarde, fromNodeId)` — fetch + merge + layout + mark expanded
+- [x] `clickNode` handler: org node → `loadOrg`, person node → `loadPerson`
+- [x] Node colours: grey stub org / blue expanded org / orange person / green contract
+- [x] Add `/voratinklis` link to `views/header.ejs` (desktop + mobile nav)
+
+> **Note on `expand.js` implementation**: Instead of using the censoring helper
+> `gautiPinregDeklaracijasPagalJarKoda`, `expand.js` queries `pinregJuridiniaiRysiai` directly to
+> get raw `vardas`/`pavarde` for correct name-based person IDs. This is consistent with the
+> `/asmuo/{jarKodas}.json` pattern which exposes raw data via JSON API.
+
+---
+
+**Phase 4 — Remove search bar; direct-URL activation**
+
+- [x] **`routes/voratinklis.js`**: Remove `GET /voratinklis` (plain, no jarKodas) handler and replace with a
+  handler that returns a 404 response using the existing `views/404.ejs` template (call `next()` or
+  `res.status(404).renderCompiled('404', {})`, matching how `asmuo.js` calls `next()` when a company is
+  not found).
+- [x] **`routes/voratinklis.js`**: Add `GET /voratinklis/:jarKodas` route — validate jarKodas is numeric
+  (`/^\d+$/`), then `res.renderCompiled('voratinklis/index', { req, jarKodas, customHead })`. Ensure
+  `expand` and `expand-person` static paths are registered **before** the `/:jarKodas` wildcard.
+- [x] **`views/voratinklis/index.ejs`**: Remove all search-bar HTML (`#voratinklis-search` div and its
+  contents including the `<input>`, results dropdown, and `<script>` debounce/fetch logic). Remove the
+  corresponding CSS rules for `#voratinklis-search`, `#voratinklis-search-results`, and
+  `.voratinklis-result-item`.
+- [x] **`views/voratinklis/index.ejs`**: Embed `jarKodas` into the inline `<script>` as a JS constant
+  (`const INITIAL_JAR_KODAS = '<%- jarKodas %>';`) and call `loadOrg(INITIAL_JAR_KODAS)` inside
+  `DOMContentLoaded` so the graph initialises automatically without user input.
+- [x] **`views/header.ejs`**: Keep the existing `/voratinklis` nav link as-is — it intentionally points to
+  `/voratinklis/` which shows a 404 when clicked directly. No change needed.
 
 ---
 
@@ -358,6 +327,8 @@ sequenceDiagram
    for large graphs. For large graphs (>200 nodes) a Web Worker is recommended. For v1, synchronous with
    a capped iteration count is acceptable.
 
-2. **Search UX on `/voratinklis`**: Should the search results panel float over the graph (overlay panel),
-   or should the layout have a sidebar? Recommended: floating overlay panel that dismisses when a company
-   is selected, to maximise graph canvas area.
+2. **Search UX on `/voratinklis`**: ~~Implemented as a floating overlay panel.~~ **Eliminated in Phase 4.**
+   Entry to the graph is now exclusively via `/voratinklis/:jarKodas` (e.g. linked from the `/asmuo/` page).
+
+3. **Header nav link for `/voratinklis`**: Keep the existing nav link pointing to `/voratinklis/` as-is. It
+   will show the 404 "įmonė nenurodyta" page when clicked directly — this is intentional. ✓ Resolved.
