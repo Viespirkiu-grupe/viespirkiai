@@ -24,12 +24,17 @@ export const postgres = new Pool({
 });
 
 export function parsePgArray(str) {
+    if (str == null) return [];
+    if (Array.isArray(str)) return str;
+    if (typeof str !== "string") return [];
+
     const result = [];
     let current = "";
     let inQuotes = false;
 
     // Strip outer braces
     const s = str.slice(1, -1);
+    if (!s.length) return [];
 
     for (let i = 0; i < s.length; i++) {
         const char = s[i];

@@ -364,16 +364,26 @@
 
         <% } else if (failas.extension === "txt") { %>
           <%
-            if (failas.tekstas) {
-              failas.tekstas = failas.tekstas.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            let tekstasPerziurai = "";
+
+            if (Array.isArray(failas.tekstas)) {
+              tekstasPerziurai = failas.tekstas.map((page) => String(page ?? "")).join("");
+            } else if (typeof failas.tekstas === "string") {
+              tekstasPerziurai = failas.tekstas;
               try {
-                let pages = JSON.parse(failas.tekstas);
-                if (Array.isArray(pages)) failas.tekstas = pages.join('');
+                let pages = JSON.parse(tekstasPerziurai);
+                if (Array.isArray(pages)) {
+                  tekstasPerziurai = pages.map((page) => String(page ?? "")).join("");
+                }
               } catch(e) {}
+            } else if (failas.tekstas != null) {
+              tekstasPerziurai = String(failas.tekstas);
             }
+
+            tekstasPerziurai = tekstasPerziurai.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
           %>
         <div class="bg-lighter-gray border rounded-md p-4 overflow-x-auto">
-            <pre class="whitespace-pre-wrap break-words font-mono text-sm m-0"><%= failas.tekstas || "" %></pre>
+            <pre class="whitespace-pre-wrap break-words font-mono text-sm m-0"><%= tekstasPerziurai %></pre>
         </div>
 
         <% } else if (failas.extension === "fax" && failas.md5 === 'e083b15bc91cd24583955d3493347f7a') { %>

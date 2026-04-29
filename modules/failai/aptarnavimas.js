@@ -134,7 +134,9 @@ export async function fetchFailasMetadata(id) {
             : [];
 
     if (tekstas.rows.length) {
-        tekstas.rows[0].tekstas = parsePgArray(tekstas.rows[0].tekstas);
+        tekstas.rows[0].tekstas = tekstas.rows[0].tekstas
+            ? parsePgArray(tekstas.rows[0].tekstas)
+            : null;
     }
 
     return {
