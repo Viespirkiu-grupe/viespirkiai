@@ -1,5 +1,6 @@
 import express from "express";
 import config from "../utils/config.js";
+import { requestContext } from "../modules/mcp/mcpLogger.js";
 
 const mcpRouter = express.Router();
 
@@ -22,7 +23,8 @@ mcpRouter.post("/mcp", async (req, res) => {
         sessionIdGenerator: undefined,
     });
     await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    const ctx = { userAgent: req.headers["user-agent"] ?? null };
+    await requestContext.run(ctx, () => transport.handleRequest(req, res, req.body));
 });
 
 export default mcpRouter;
