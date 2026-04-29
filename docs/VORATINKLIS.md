@@ -248,76 +248,78 @@ sequenceDiagram
 
 ## Tasks
 
-**Phase 1 — Infrastructure (bundle + route skeleton)**
-
-- [x] Install npm runtime packages: `sigma@^3.0.2`, `graphology@^0.26.0`, `graphology-layout-forceatlas2@^0.10.1`,
-  `graphology-layout-noverlap@^0.4.2`, `@sigma/node-border@^3.0.0`, `@sigma/node-image@^3.0.0`
-- [x] Install dev dependency: `esbuild` (for browser bundle build)
-- [x] Create `src/voratinklis-bundle.js` entry point that imports sigma/graphology packages and attaches them to
-  `window.Voratinklis`
-- [x] Add `build:voratinklis` and `watch:voratinklis` npm scripts using
-  `esbuild src/voratinklis-bundle.js --bundle --format=iife --outfile=public/dist/voratinklis.js`
-- [x] Run `npm run build:voratinklis` to generate the initial bundle (210 KB at `public/dist/voratinklis.js`)
-- [x] Create `routes/voratinklis.js` with `GET /voratinklis`, `GET /voratinklis/expand/:jarKodas`, and
-  `GET /voratinklis/expand-person`
-- [x] Create `views/voratinklis/index.ejs` — EJS shell with header/footer, full-height `#voratinklis-canvas`
-  div, floating search overlay, and `<script src="/dist/voratinklis.js">` tag
-- [x] Verify route module loads (confirmed via `node --input-type=module` import check)
-
-**Phase 2 — Backend expand API**
-
-- [x] Create `modules/voratinklis/expand.js` with two exported functions:
-    - `expandOrg(jarKodas)` — queries `pinregJuridiniaiRysiai` directly (raw names, not censored),
-      `jarCsv` for org metadata, and `gautiSutarciuDuomenisPagalJarKoda` for top contract partners;
-      returns `{ nodes: GraphNode[], edges: GraphEdge[] }`
-    - `expandPerson(fullName)` — queries `pinregJuridiniaiRysiai` by name (vardas+pavarde or
-      susijusioAsmensVardas+susijusioAsmensPavarde); maps to stub orgs + person edges;
-      returns `{ nodes: GraphNode[], edges: GraphEdge[] }`
-- [x] Wire `GET /voratinklis/expand/:jarKodas` → `expandOrg`
-- [x] Wire `GET /voratinklis/expand-person?vardas=...` → `expandPerson` (validates `vardas` is present)
-- [x] Both modules verified to load without syntax errors
-
-**Phase 3 — Frontend Sigma graph**
-
-- [x] `#voratinklis-canvas` fills viewport below header using `position: fixed` layout
-- [x] Floating search overlay with debounced company search (reuses `/juridiniai` partial HTML)
-- [x] `wrapLabel(name, n=3)` helper implemented
-- [x] `formatContractValue(verte)` helper implemented (`€1.2M`, `€45K`, `€800`, `""`)
-- [x] Custom `drawNodeLabel` renders label below node at `(x, y + nodeSize + 4)`, `textAlign: "center"`,
-  multi-line support via `\n`
-- [x] Sigma renderer initialised with `defaultDrawNodeLabel`
-- [x] `expandingNodes: Set` for in-flight deduplication
-- [x] `loadOrg(jarKodas, fromNodeId)` — fetch + merge + ForceAtlas2 + noverlap + mark expanded
-- [x] `loadPerson(vardas, pavarde, fromNodeId)` — fetch + merge + layout + mark expanded
-- [x] `clickNode` handler: org node → `loadOrg`, person node → `loadPerson`
-- [x] Node colours: grey stub org / blue expanded org / orange person / green contract
-- [x] Add `/voratinklis` link to `views/header.ejs` (desktop + mobile nav)
-
-> **Note on `expand.js` implementation**: Instead of using the censoring helper
-> `gautiPinregDeklaracijasPagalJarKoda`, `expand.js` queries `pinregJuridiniaiRysiai` directly to
-> get raw `vardas`/`pavarde` for correct name-based person IDs. This is consistent with the
-> `/asmuo/{jarKodas}.json` pattern which exposes raw data via JSON API.
+> Phases 1–4 are complete. All infrastructure, backend API, frontend graph, and direct-URL activation work
+> has been shipped. The server-side `expand.js` queries `pinregJuridiniaiRysiai` directly (not the censoring
+> helper) to get raw `vardas`/`pavarde` for correct person IDs — consistent with the `/asmuo/{jarKodas}.json`
+> JSON API pattern.
 
 ---
 
-**Phase 4 — Remove search bar; direct-URL activation**
+**Phase 5 — Visual polish, node icons, and ContractEntity graph structure**
 
-- [x] **`routes/voratinklis.js`**: Remove `GET /voratinklis` (plain, no jarKodas) handler and replace with a
-  handler that returns a 404 response using the existing `views/404.ejs` template (call `next()` or
-  `res.status(404).renderCompiled('404', {})`, matching how `asmuo.js` calls `next()` when a company is
-  not found).
-- [x] **`routes/voratinklis.js`**: Add `GET /voratinklis/:jarKodas` route — validate jarKodas is numeric
-  (`/^\d+$/`), then `res.renderCompiled('voratinklis/index', { req, jarKodas, customHead })`. Ensure
-  `expand` and `expand-person` static paths are registered **before** the `/:jarKodas` wildcard.
-- [x] **`views/voratinklis/index.ejs`**: Remove all search-bar HTML (`#voratinklis-search` div and its
-  contents including the `<input>`, results dropdown, and `<script>` debounce/fetch logic). Remove the
-  corresponding CSS rules for `#voratinklis-search`, `#voratinklis-search-results`, and
-  `.voratinklis-result-item`.
-- [x] **`views/voratinklis/index.ejs`**: Embed `jarKodas` into the inline `<script>` as a JS constant
-  (`const INITIAL_JAR_KODAS = '<%- jarKodas %>';`) and call `loadOrg(INITIAL_JAR_KODAS)` inside
-  `DOMContentLoaded` so the graph initialises automatically without user input.
-- [x] **`views/header.ejs`**: Keep the existing `/voratinklis` nav link as-is — it intentionally points to
-  `/voratinklis/` which shows a 404 when clicked directly. No change needed.
+- [ ] **`views/voratinklis/index.ejs`**: Remove `<%- include('../footer.ejs') %>`. The page uses
+  `position: fixed` full-viewport canvas with `body { overflow: hidden }`, making a footer meaningless
+  and the HTML-flow footer element bleeds through and renders visibly. No other page layout change is needed.
+
+- [ ] **Extract inline JS to `src/voratinklis-app.js`**: The large inline `<script>` in
+  `views/voratinklis/index.ejs` must be extracted into a separate source file `src/voratinklis-app.js`,
+  built by a new esbuild target `build:voratinklis-app` into `public/dist/voratinklis-app.js` (add
+  corresponding `watch:voratinklis-app` script too). The EJS template retains only a minimal inline
+  `<script>` that sets `window.VORATINKLIS_CONFIG = { jarKodas: '<%- jarKodas %>' }` **before** the two
+  `<script src="...">` tags. The app script reads `window.VORATINKLIS_CONFIG.jarKodas` at runtime instead
+  of EJS interpolation. `src/voratinklis-app.js` must import `NodeImageProgram` from
+  `@sigma/node-image` directly (it is already in the bundle but the app script can import it too; esbuild
+  deduplicates). The app script file replaces the EJS inline script entirely.
+
+- [ ] **Node icons via `NodeImageProgram`**: Implement `makeIconDataUri(nodeType)` (plain JS, no TypeScript)
+  in `src/voratinklis-app.js` using the `MUI_ICON_PATHS` constant from the `## Nodes` section below.
+  Configure the Sigma renderer to use `NodeImageProgram` for all nodes:
+
+  ```js
+  const renderer = new Sigma(graph, container, {
+    nodeProgramClasses: { image: NodeImageProgram },
+    defaultNodeType: 'image',
+    // ... other options unchanged
+  });
+  ```
+
+  When adding each node in `mergeGraphElements`, compute the icon key from node attributes and set the
+  `image` attribute:
+
+  | `entityType`         | `orgType`        | Icon key used in `makeIconDataUri` |
+  |----------------------|------------------|------------------------------------|
+  | `OrganizationEntity` | `PrivateCompany` | `'PrivateCompany'`                 |
+  | `OrganizationEntity` | `PublicCompany`  | `'PublicCompany'`                  |
+  | `OrganizationEntity` | `Institution`    | `'Institution'`                    |
+  | `PersonEntity`       | —                | `'Person'`                         |
+  | `ContractEntity`     | —                | `'Contract'`                       |
+
+  If `makeIconDataUri` returns `''` (unknown type), omit the `image` attribute so Sigma falls back to the
+  default filled-circle renderer.
+
+- [ ] **Equal node sizes**: All nodes must render at the same fixed size. Remove the logarithmic
+  `Math.log(opts.verte + 1) * 3` scaling from `orgNode()` in `modules/voratinklis/expand.js`.
+  Change the `size` field to always be `8` regardless of `opts.verte`.
+
+- [ ] **ContractEntity nodes between organisations**: Update `expandOrg` in
+  `modules/voratinklis/expand.js` to insert intermediate `ContractEntity` nodes between buyer and supplier
+  organisations instead of the current direct org-to-org edges. Replace the existing `topTiekejai` and
+  `topPirkejai` loops with this new pattern:
+
+  For **`topTiekejai`** (root org is the **buyer**, partner is the supplier):
+  - Create `ContractEntity` node: `id = contract:buyer${jk}:seller${partnerJarKodas}`,
+    `attributes: { entityType: 'ContractEntity', label: formatContractValue(total), verte: total, expanded: true }`
+  - Add edge `rootOrg.id --Order--> contractNode.id` (label = formatted total)
+  - Add edge `contractNode.id --Delivery--> supplierOrg.id` (label = `''`)
+
+  For **`topPirkejai`** (root org is the **supplier**, partner is the buyer):
+  - Create `ContractEntity` node: `id = contract:buyer${partnerJarKodas}:seller${jk}`,
+    same attributes as above
+  - Add edge `buyerOrg.id --Order--> contractNode.id` (label = formatted total)
+  - Add edge `contractNode.id --Delivery--> rootOrg.id` (label = `''`)
+
+  ContractEntity ID is deterministic (buyer+seller pair) so the same contract node is naturally merged
+  if the graph is expanded from both ends.
 
 ---
 
@@ -327,8 +329,42 @@ sequenceDiagram
    for large graphs. For large graphs (>200 nodes) a Web Worker is recommended. For v1, synchronous with
    a capped iteration count is acceptable.
 
-2. **Search UX on `/voratinklis`**: ~~Implemented as a floating overlay panel.~~ **Eliminated in Phase 4.**
-   Entry to the graph is now exclusively via `/voratinklis/:jarKodas` (e.g. linked from the `/asmuo/` page).
+2. **Search UX on `/voratinklis`**: Eliminated. Entry to the graph is exclusively via
+   `/voratinklis/:jarKodas` (e.g. linked from the `/asmuo/` page). ✓ Resolved.
 
 3. **Header nav link for `/voratinklis`**: Keep the existing nav link pointing to `/voratinklis/` as-is. It
    will show the 404 "įmonė nenurodyta" page when clicked directly — this is intentional. ✓ Resolved.
+
+
+## Nodes:
+
+```typescript
+// MUI icon SVG path data (viewBox 0 0 24 24) keyed by graph node type.
+// To add a new icon: copy the `d` attribute from the MUI icon component source.
+export const MUI_ICON_PATHS: Record<string, string> = {
+    // Business icon — PrivateCompany
+    PrivateCompany:
+        'M12 7V3H2v18h20V7zM6 19H4v-2h2zm0-4H4v-2h2zm0-4H4V9h2zm0-4H4V5h2zm4 12H8v-2h2zm0-4H8v-2h2zm0-4H8V9h2zm0-4H8V5h2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8zm-2-8h-2v2h2zm0 4h-2v2h2z',
+    // DomainAdd icon — PublicCompany
+    PublicCompany:
+        'M12 7V3H2v18h14v-2h-4v-2h2v-2h-2v-2h2v-2h-2V9h8v6h2V7zM6 19H4v-2h2zm0-4H4v-2h2zm0-4H4V9h2zm0-4H4V5h2zm4 12H8v-2h2zm0-4H8v-2h2zm0-4H8V9h2zm0-4H8V5h2zm14 12v2h-2v2h-2v-2h-2v-2h2v-2h2v2zm-6-8h-2v2h2zm0 4h-2v2h2z',
+    // AccountBalance icon — Institution
+    Institution: 'M4 10h3v7H4zm6.5 0h3v7h-3zM2 19h20v3H2zm15-9h3v7h-3zm-5-9L2 6v2h20V6z',
+    // Person icon — Person
+    Person: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4m0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4',
+    // Assignment icon — Tender
+    Tender: 'M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1m2 14H7v-2h7zm3-4H7v-2h10zm0-4H7V7h10z',
+    // HistoryEdu icon — Contract
+    Contract:
+        'M9 4v1.38c-.83-.33-1.72-.5-2.61-.5-1.79 0-3.58.68-4.95 2.05l3.33 3.33h1.11v1.11c.86.86 1.98 1.31 3.11 1.36V15H6v3c0 1.1.9 2 2 2h10c1.66 0 3-1.34 3-3V4zm-1.11 6.41V8.26H5.61L4.57 7.22a5.07 5.07 0 0 1 1.82-.34c1.34 0 2.59.52 3.54 1.46l1.41 1.41-.2.2c-.51.51-1.19.8-1.92.8-.47 0-.93-.12-1.33-.34M19 17c0 .55-.45 1-1 1s-1-.45-1-1v-2h-6v-2.59c.57-.23 1.1-.57 1.56-1.03l.2-.2L15.59 14H17v-1.41l-6-5.97V6h8z',
+};
+
+// Returns a base64-encoded SVG data URI for the given node type, or '' if unknown.
+// The icon is rendered dark (#1e293b) at 64×64 px for crisp display on the light-mode canvas.
+export function makeIconDataUri(nodeType: string): string {
+    const path = MUI_ICON_PATHS[nodeType];
+    if (!path) return '';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64"><path fill="#1e293b" d="${path}"/></svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+```
