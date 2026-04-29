@@ -29,12 +29,19 @@ bundle must be compiled with `esbuild` and served as `public/dist/voratinklis.js
 
 The graph uses the entity and edge model defined in the repository data structures:
 
-| Node type            | Expand trigger    | Source function / data                                         | Key fields                                                    |
-|----------------------|-------------------|----------------------------------------------------------------|---------------------------------------------------------------|
-| `OrganizationEntity` | Org node click    | `gautiPinregDeklaracijasPagalJarKoda(jarKodas)` + `asmuo.json` | `jarKodas`, `pavadinimas`, `registravimoData`, `formosKodas`  |
-| `PersonEntity`       | Org node click    | `pinreg.darbovietes[]` / `pinreg.rysiaiSuJa[]`                 | `vardas + pavarde` (name is the identity key), `rysioPradzia` |
-| `PersonEntity`       | Person node click | `gautiPinregDeklaracijasPagalVardaPavarde(fullName)`           | Same; all declarations for that name are merged into one node |
-| `ContractEntity`     | Org node click    | `sutartys.topPirkejai/topTiekejai`                             | `sutartiesUnikalusID`, `verte`, dates                         |
+| Node type            | Expand trigger    | Source function / data                                                                                                                        | Key fields                                                    |
+|----------------------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------|
+| `OrganizationEntity` | Org node click    | `jarCsv` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN jarCsv` (partner org names)                            | `jarKodas`, `pavadinimas`, `formosKodas`                      |
+| `PersonEntity`       | Org node click    | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows         | `vardas + pavarde` (name is the identity key), `rysioPradzia` |
+| `PersonEntity`       | Person node click | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person | Same; all declarations for that name are merged into one node |
+| `ContractEntity`     | Org node click    | `sutartysSaliuSumos JOIN jarCsv` (aggregated per buyer↔seller pair, partner `pavadinimas` from `jarCsv` JOIN)                                 | buyer/seller `jarKodas` pair (node ID key), `verte`, `count`  |
+
+> **Why `/asmuo/:jarKodas` is not used for org expansion**: that route aggregates ~18 data sources
+> (sodra, vmi, regitra, finansai, etc.) and is too heavy for graph node expansion. Instead `expandOrg`
+> queries only what the graph needs: `jarCsv` for org metadata and `sutartysSaliuSumos JOIN jarCsv`
+> for aggregated contract partner data with human-readable partner names. Individual contract numbers
+> (`sutartiesUnikalusID`) are not used — the graph represents the aggregated buyer↔seller relationship
+> (sum + count) rather than individual contracts.
 
 **Entity ID convention:**
 
@@ -53,7 +60,11 @@ The graph uses the entity and edge model defined in the repository data structur
 
 #### Person node expansion — `expandPerson` and `expandOrg` DB mapping
 
-Both functions query `pinregJuridiniaiRysiai` directly. Each row has an `irasoTipas` classifier that
+Both functions query `pinregJuridiniaiRysiai` directly — this table stores all pinreg declared
+relationships as structured rows, with one row per person↔org link. When a **person node is clicked**,
+`expandPerson` filters this table by `vardas + pavarde` (or `susijusioAsmensVardas + susijusioAsmensPavarde`
+for spouse relationships), returning all darbovietes, governance roles, and spouse links declared
+across every employer that person has ever listed. Each row has an `irasoTipas` classifier that
 determines which graph elements to produce:
 
 | `irasoTipas`                | Produces                                                                       | Edge type(s)                                                           |
@@ -81,15 +92,15 @@ determines which graph elements to produce:
 flowchart LR
     subgraph DB["PostgreSQL Tables"]
         JC[("jarCsv\npavadinimas · formosKodas")]
-        PR[("pinregJuridiniaiRysiai\nirasoTipas · vardas · pavarde\npareigos · rysioPobudzioPavadinimas\njarKodas · darbovietesTipas")]
+        PR[("pinregJuridiniaiRysiai\nirasoTipas · vardas · pavarde\npareigos · rysioPobudzioPavadinimas\njarKodas · pavadinimas\ndarbovietesTipas")]
         SS[("sutartysSaliuSumos\npirkejoKodas · tiekejoKodas\nsuma · kiekis")]
     end
 
     subgraph GN["Graph Nodes"]
         OE_root["OrganizationEntity\n— root —\nexpanded=true"]
-        OE_stub["OrganizationEntity\n— stub —\nexpanded=false"]
-        PE["PersonEntity"]
-        CE["ContractEntity\nlabel: N sut."]
+        OE_stub["OrganizationEntity\n— stub —\nexpanded=false\n(partner name from jarCsv JOIN)"]
+        PE["PersonEntity\n(all darbovietes + rysiaiSuJa\n+ sutuoktinioDarbovietes)"]
+        CE["ContractEntity\nlabel: N sut.\npavadinimas = partner name"]
     end
 
     subgraph GE["Graph Edges"]
@@ -100,16 +111,16 @@ flowchart LR
         E5["Delivery\n(no label)"]
     end
 
-    JC -->|" pavadinimas, formosKodas "| OE_root
+    JC -->|" pavadinimas, formosKodas\n(root org only) "| OE_root
     PR -->|" DEKLARUOJANCIO_DARBOVIETE\nvardas + pavarde "| PE
     PR -->|" SUTUOKTINIO_DARBOVIETE\nvardas/pavarde = spouse\nsusijusioAsmens* = declarant "| PE
     PR -->|" KITI_RYSIAI_SU_JA\nvardas + pavarde "| PE
-    PR -->|" all irasoTipas\njarKodas + pavadinimas "| OE_stub
+    PR -->|" all irasoTipas\njarKodas + pavadinimas\n(from pinreg row) "| OE_stub
     PR -->|" DEKLARUOJANCIO / SUTUOKTINIO\ndirection: person → org\npareigos "| E1
     PR -->|" KITI_RYSIAI_SU_JA\ndirection: person → org\nrysioPobudzioPavadinimas "| E2
     PR -->|" SUTUOKTINIO_DARBOVIETE\ndirection: declarant → spouse "| E3
-    SS -->|" suma=verte · kiekis=count "| CE
-    SS -->|" tiekejoKodas / pirkejoKodas\npavadinimas via JOIN jarCsv "| OE_stub
+    SS & JC -->|" suma=verte · kiekis=count\npartner pavadinimas via JOIN jarCsv "| CE
+    SS & JC -->|" tiekejoKodas / pirkejoKodas\npavadinimas via JOIN jarCsv "| OE_stub
     SS -->|" direction: org → contract\nsuma as label "| E4
     SS -->|" direction: contract → org "| E5
 ```
@@ -158,11 +169,14 @@ to position the label **below** the node (draw at `y + nodeSize + labelPadding`,
 New server-side module `modules/voratinklis/` containing:
 
 - `expand.js` — two exported functions:
-    - `expandOrg(jarKodas)` — queries `jarCsv`, `pinregJuridiniaiRysiai`, and `sutartysSaliuSumos` (via
-      `gautiSutarciuDuomenisPagalJarKoda`) directly; maps raw rows to `GraphNode[]` and `GraphEdge[]`.
-    - `expandPerson(fullName)` — queries `pinregJuridiniaiRysiai` directly, matching on `vardas`/`pavarde`
-      or `susijusioAsmensVardas`/`susijusioAsmensPavarde`; returns stub `OrganizationEntity` nodes and all
-      person↔org / spouse edges.
+    - `expandOrg(jarKodas)` — queries `jarCsv` (root org metadata), `pinregJuridiniaiRysiai` (person
+      relationships), and `sutartysSaliuSumos JOIN jarCsv` (via `gautiSutarciuDuomenisPagalJarKoda`)
+      for aggregated contract partner data with human-readable partner names; maps raw rows to
+      `GraphNode[]` and `GraphEdge[]`.
+    - `expandPerson(fullName)` — queries `pinregJuridiniaiRysiai` directly, matching on
+      `vardas + pavarde` or `susijusioAsmensVardas + susijusioAsmensPavarde`; returns **all
+      darbovietes, governance roles, and spouse relationships** declared by that person across all
+      employers, as stub `OrganizationEntity` nodes + person↔org / spouse edges.
     - Both return `{ nodes: GraphNode[], edges: GraphEdge[] }`.
 
 New route `routes/voratinklis.js`:
@@ -233,8 +247,8 @@ graph TD
     end
 
     subgraph "modules/voratinklis/expand.js"
-        ExpandOrg["expandOrg(jarKodas)\ngautiPinregDeklaracijasPagalJarKoda\n+ asmuo queries"]
-        ExpandPerson["expandPerson(fullName)\ngautiPinregDeklaracijasPagalVardaPavarde\n→ darbovietes + rysiaiSuJa + sutuoktinioDarbovietes"]
+        ExpandOrg["expandOrg(jarKodas)\njarCsv (root org metadata)\n+ pinregJuridiniaiRysiai (by jarKodas)\n+ sutartysSaliuSumos JOIN jarCsv (contract partners)"]
+        ExpandPerson["expandPerson(fullName)\npinregJuridiniaiRysiai (by vardas+pavarde)\n→ all darbovietes + rysiaiSuJa + sutuoktinioDarbovietes"]
     end
 
     PageRoute -->|" DOMContentLoaded: loadOrg(jarKodas) "| ExpandOrgAPI
@@ -272,17 +286,17 @@ sequenceDiagram
     Server -->> Browser: { nodes[], edges[] } (merged, idempotent)
     Browser ->> Browser: Merge nodes pre-position new nodes at clicked node pos
     Browser ->> Browser: Run ForceAtlas2 → compute final positions
-Browser ->> Browser: animateNodes (600ms, quadraticInOut) clicked pos → final pos
-Browser ->> Browser: Hide loading overlay
-User ->> Browser: Clicks unexpanded person node
-Note over Browser: person node attrs contain vardas + pavarde
-Browser ->> Browser: Show loading overlay
-Browser ->> Server: GET /voratinklis/expand-person?vardas=Jonas+Jonaitis
-Server -->> Browser: { nodes[], edges[] }
-Browser ->> Browser: Merge nodes pre-position new nodes at person node pos
-Browser ->> Browser: Run ForceAtlas2 + noverlap → compute final positions
-Browser ->> Browser: animateNodes (600ms, quadraticInOut) → final pos
-Browser ->> Browser: Hide loading overlay
+    Browser ->> Browser: animateNodes (600ms, quadraticInOut) clicked pos → final pos
+    Browser ->> Browser: Hide loading overlay
+    User ->> Browser: Clicks unexpanded person node
+    Note over Browser: person node attrs contain vardas + pavarde
+    Browser ->> Browser: Show loading overlay
+    Browser ->> Server: GET /voratinklis/expand-person?vardas=Jonas+Jonaitis
+    Server -->> Browser: { nodes[], edges[] }
+    Browser ->> Browser: Merge nodes pre-position new nodes at person node pos
+    Browser ->> Browser: Run ForceAtlas2 + noverlap → compute final positions
+    Browser ->> Browser: animateNodes (600ms, quadraticInOut) → final pos
+    Browser ->> Browser: Hide loading overlay
 ```
 
 ---
@@ -336,19 +350,19 @@ graph TD
 
 ### Module responsibilities
 
-| File                             | Layer  | Purpose                                                                         | DOM required              |
-|----------------------------------|--------|---------------------------------------------------------------------------------|---------------------------|
-| `src/voratinklis-bundle.js`      | Client | Bundles third-party npm packages; exposes `window.Voratinklis`                  | No                        |
-| `src/voratinklis-app.js`         | Client | esbuild entry; creates `dataGraph` + `viewGraph`; Sigma uses `viewGraph`; wires events | Yes                |
-| `src/voratinklis/icons.js`       | Client | MUI SVG path map; `makeIconDataUri`; `getIconKey`                               | No                        |
-| `src/voratinklis/colors.js`      | Client | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` Set                  | No                        |
-| `src/voratinklis/renderers.js`   | Client | `drawNodeLabel`, `drawNodeHover` — Sigma canvas callbacks                       | No (canvas ctx passed in) |
-| `src/voratinklis/graph-utils.js` | Client | `mergeGraphElements(dataGraph,...)`, `rebuildViewGraph`, `syncPositionsToData`, `runLayout` — **pure, injected deps** | No ★ |
-| `src/voratinklis/legend.js`      | Client | `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)`            | Yes (queries DOM)         |
-| `src/voratinklis/expand-ui.js`   | Client | `createExpandUI({dataGraph,viewGraph,...})` — async fetch + rebuild; returns `rebuildAndRefresh` | Yes |
-| `modules/voratinklis/expand.js`  | Server | `expandOrg`, `expandPerson`, all pure builder helpers                           | No                        |
-| `routes/voratinklis.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`; renders EJS                  | No                        |
-| `views/voratinklis/index.ejs`    | View   | HTML shell, inline CSS, legend overlay with checkboxes                          | —                         |
+| File                             | Layer  | Purpose                                                                                                               | DOM required              |
+|----------------------------------|--------|-----------------------------------------------------------------------------------------------------------------------|---------------------------|
+| `src/voratinklis-bundle.js`      | Client | Bundles third-party npm packages; exposes `window.Voratinklis`                                                        | No                        |
+| `src/voratinklis-app.js`         | Client | esbuild entry; creates `dataGraph` + `viewGraph`; Sigma uses `viewGraph`; wires events                                | Yes                       |
+| `src/voratinklis/icons.js`       | Client | MUI SVG path map; `makeIconDataUri`; `getIconKey`                                                                     | No                        |
+| `src/voratinklis/colors.js`      | Client | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` Set                                                        | No                        |
+| `src/voratinklis/renderers.js`   | Client | `drawNodeLabel`, `drawNodeHover` — Sigma canvas callbacks                                                             | No (canvas ctx passed in) |
+| `src/voratinklis/graph-utils.js` | Client | `mergeGraphElements(dataGraph,...)`, `rebuildViewGraph`, `syncPositionsToData`, `runLayout` — **pure, injected deps** | No ★                      |
+| `src/voratinklis/legend.js`      | Client | `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)`                                                  | Yes (queries DOM)         |
+| `src/voratinklis/expand-ui.js`   | Client | `createExpandUI({dataGraph,viewGraph,...})` — async fetch + rebuild; returns `rebuildAndRefresh`                      | Yes                       |
+| `modules/voratinklis/expand.js`  | Server | `expandOrg`, `expandPerson`, all pure builder helpers                                                                 | No                        |
+| `routes/voratinklis.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`; renders EJS                                                         | No                        |
+| `views/voratinklis/index.ejs`    | View   | HTML shell, inline CSS, legend overlay with checkboxes                                                                | —                         |
 
 ### Testability design
 
@@ -358,10 +372,16 @@ them as parameters:
 
 ```js
 // graph-utils.js (Phase 9 signature — hiddenEdgeTypes removed; dataGraph is a pure store)
-export function mergeGraphElements(dataGraph, getNodePos, data, fromNodeId) { ... }
-export function rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes) { ... } // returns newNodeIds[]
-export function syncPositionsToData(dataGraph, viewGraph) { ... }
-export function runLayout(graph, forceAtlas2, noverlap) { ... }
+export function mergeGraphElements(dataGraph, getNodePos, data, fromNodeId) { ...
+}
+
+export function rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes) { ...
+} // returns newNodeIds[]
+export function syncPositionsToData(dataGraph, viewGraph) { ...
+}
+
+export function runLayout(graph, forceAtlas2, noverlap) { ...
+}
 ```
 
 In production (`expand-ui.js`):
@@ -376,10 +396,10 @@ In unit tests — no DOM or Sigma needed:
 
 ```js
 import Graph from 'graphology';
-import { mergeGraphElements, rebuildViewGraph, syncPositionsToData } from '../../src/voratinklis/graph-utils.js';
+import {mergeGraphElements, rebuildViewGraph, syncPositionsToData} from '../../src/voratinklis/graph-utils.js';
 
-const dataGraph = new Graph({ type: 'directed', multi: true });
-const viewGraph = new Graph({ type: 'directed', multi: true });
+const dataGraph = new Graph({type: 'directed', multi: true});
+const viewGraph = new Graph({type: 'directed', multi: true});
 const getNodePos = () => null;
 
 mergeGraphElements(dataGraph, getNodePos, data, null);
@@ -498,14 +518,14 @@ types receive `hidden: true`; checking/unchecking immediately updates edge visib
 
 - [x] **Create `src/voratinklis/` directory** and extract focused modules from `src/voratinklis-app.js`:
 
-  | New file | Extracted content |
-    |---|---|
-  | `src/voratinklis/icons.js` | `MUI_ICON_PATHS`, `makeIconDataUri`, `getIconKey` |
-  | `src/voratinklis/colors.js` | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` |
-  | `src/voratinklis/renderers.js` | `drawNodeLabel`, `drawNodeHover` |
-  | `src/voratinklis/graph-utils.js` | `mergeGraphElements`, `runLayout` — injected deps, no globals |
-  | `src/voratinklis/legend.js` | `bindLegendCheckboxes`, `toggleEdgeTypeVisibility` |
-  | `src/voratinklis/expand-ui.js` | `loadOrg`, `loadPerson`, `setStatus` |
+  | New file                          | Extracted content                                               |
+    |-----------------------------------|-----------------------------------------------------------------|
+  | `src/voratinklis/icons.js`        | `MUI_ICON_PATHS`, `makeIconDataUri`, `getIconKey`               |
+  | `src/voratinklis/colors.js`       | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes`      |
+  | `src/voratinklis/renderers.js`    | `drawNodeLabel`, `drawNodeHover`                                |
+  | `src/voratinklis/graph-utils.js`  | `mergeGraphElements`, `runLayout` — injected deps, no globals   |
+  | `src/voratinklis/legend.js`       | `bindLegendCheckboxes`, `toggleEdgeTypeVisibility`              |
+  | `src/voratinklis/expand-ui.js`    | `loadOrg`, `loadPerson`, `setStatus`                            |
 
   `src/voratinklis-app.js` becomes the thin esbuild entry: imports from the sub-modules above,
   creates `graph` + `renderer`, wires `clickNode` and `DOMContentLoaded`. Build scripts are
@@ -637,9 +657,9 @@ must disappear when all their `Order`/`Delivery` edges are hidden.
 
 1. Capture `prevNodes = new Set(viewGraph.nodes())` **before** any mutations.
 2. Compute the `visible` set of node IDs:
-   - Start with all anchor nodes from `dataGraph`.
-   - For every edge in `dataGraph` whose `edgeType` is **not** in `hiddenEdgeTypes`, include
-     both the source and target node IDs.
+    - Start with all anchor nodes from `dataGraph`.
+    - For every edge in `dataGraph` whose `edgeType` is **not** in `hiddenEdgeTypes`, include
+      both the source and target node IDs.
 3. Drop from `viewGraph` any node not in `visible` (graphology auto-drops incident edges).
 4. Add to `viewGraph` any node in `visible` not already present, copying all attributes from
    `dataGraph` — including `x`/`y` from the last known position (so re-appearing nodes restore
@@ -671,10 +691,12 @@ In the two-graph design `dataGraph` stores **all** edges unconditionally — fil
 
 ```js
 // Before (Phase 8):
-export function mergeGraphElements(graph, getNodePos, data, fromNodeId, hiddenEdgeTypes) { ... }
+export function mergeGraphElements(graph, getNodePos, data, fromNodeId, hiddenEdgeTypes) { ...
+}
 
 // After (Phase 9):
-export function mergeGraphElements(dataGraph, getNodePos, data, fromNodeId) { ... }
+export function mergeGraphElements(dataGraph, getNodePos, data, fromNodeId) { ...
+}
 ```
 
 #### Animation cancel token
@@ -687,12 +709,15 @@ from `viewGraph`, causing a graphology invariant error:
 let cancelAnimation = null;
 
 function rebuildAndRefresh() {
-    if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
+    if (cancelAnimation) {
+        cancelAnimation();
+        cancelAnimation = null;
+    }
     const newNodes = rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes);
     runLayout(viewGraph, forceAtlas2, noverlap);
     syncPositionsToData(dataGraph, viewGraph);
     if (newNodes.length) {
-        cancelAnimation = animateNodes(viewGraph, /* from clicked pos */, { duration: 600 });
+        cancelAnimation = animateNodes(viewGraph, /* from clicked pos */, {duration: 600});
     } else {
         renderer.refresh();
     }
@@ -701,14 +726,14 @@ function rebuildAndRefresh() {
 
 #### Updated module signatures
 
-| Module                          | Changed signature / addition                                                                          |
-|---------------------------------|-------------------------------------------------------------------------------------------------------|
-| `src/voratinklis/graph-utils.js` | `mergeGraphElements(dataGraph, getNodePos, data, fromNodeId)` — drop `hiddenEdgeTypes`               |
-| `src/voratinklis/graph-utils.js` | + `rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes): string[]`                                |
-| `src/voratinklis/graph-utils.js` | + `syncPositionsToData(dataGraph, viewGraph): void`                                                  |
-| `src/voratinklis/expand-ui.js`   | `createExpandUI({ dataGraph, viewGraph, renderer, ... })` — exposes `rebuildAndRefresh` callback    |
+| Module                           | Changed signature / addition                                                                                                                  |
+|----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| `src/voratinklis/graph-utils.js` | `mergeGraphElements(dataGraph, getNodePos, data, fromNodeId)` — drop `hiddenEdgeTypes`                                                        |
+| `src/voratinklis/graph-utils.js` | + `rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes): string[]`                                                                         |
+| `src/voratinklis/graph-utils.js` | + `syncPositionsToData(dataGraph, viewGraph): void`                                                                                           |
+| `src/voratinklis/expand-ui.js`   | `createExpandUI({ dataGraph, viewGraph, renderer, ... })` — exposes `rebuildAndRefresh` callback                                              |
 | `src/voratinklis/legend.js`      | `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)` — remove `toggleEdgeTypeVisibility`; legend triggers `rebuildAndRefresh` |
-| `src/voratinklis-app.js`         | Creates `dataGraph = new Graph(...)` + `viewGraph = new Graph(...)`; passes `viewGraph` to Sigma   |
+| `src/voratinklis-app.js`         | Creates `dataGraph = new Graph(...)` + `viewGraph = new Graph(...)`; passes `viewGraph` to Sigma                                              |
 
 #### Tasks
 
