@@ -34,14 +34,14 @@ The graph uses the entity and edge model defined in the repository data structur
 | `OrganizationEntity` | Org node click    | `jarCsv` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN jarCsv` (partner org names)                            | `jarKodas`, `pavadinimas`, `formosKodas`                      |
 | `PersonEntity`       | Org node click    | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows         | `vardas + pavarde` (name is the identity key), `rysioPradzia` |
 | `PersonEntity`       | Person node click | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person | Same; all declarations for that name are merged into one node |
-| `ContractEntity`     | Org node click    | `sutartysSaliuSumos JOIN jarCsv` (aggregated per buyer↔seller pair, partner `pavadinimas` from `jarCsv` JOIN)                                 | buyer/seller `jarKodas` pair (node ID key), `verte`, `count`  |
+| `ContractEntity`     | Org node click    | `sutartys JOIN jarCsv` (top 30 contracts by value; buyer/seller names from `jarCsv` JOIN)         | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte`  |
 
 > **Why `/asmuo/:jarKodas` is not used for org expansion**: that route aggregates ~18 data sources
 > (sodra, vmi, regitra, finansai, etc.) and is too heavy for graph node expansion. Instead `expandOrg`
-> queries only what the graph needs: `jarCsv` for org metadata and `sutartysSaliuSumos JOIN jarCsv`
-> for aggregated contract partner data with human-readable partner names. Individual contract numbers
-> (`sutartiesUnikalusID`) are not used — the graph represents the aggregated buyer↔seller relationship
-> (sum + count) rather than individual contracts.
+> queries only what the graph needs: `jarCsv` for org metadata and `sutartys JOIN jarCsv` for the top
+> 30 contracts by value with human-readable contract titles (`pavadinimas`) and partner org names.
+> The `sutartysSaliuSumos` aggregate table is not used — individual contract rows give the contract
+> title needed for the `ContractEntity` node label.
 
 **Entity ID convention:**
 
@@ -93,14 +93,14 @@ flowchart LR
     subgraph DB["PostgreSQL Tables"]
         JC[("jarCsv\npavadinimas · formosKodas")]
         PR[("pinregJuridiniaiRysiai\nirasoTipas · vardas · pavarde\npareigos · rysioPobudzioPavadinimas\njarKodas · pavadinimas\ndarbovietesTipas")]
-        SS[("sutartysSaliuSumos\npirkejoKodas · tiekejoKodas\nsuma · kiekis")]
+        ST[("sutartys\nsutartiesUnikalusId · pavadinimas · verte\nperkanciosiosOrganizacijosKodas · tiekejoKodas")]
     end
 
     subgraph GN["Graph Nodes"]
         OE_root["OrganizationEntity\n— root —\nexpanded=true"]
         OE_stub["OrganizationEntity\n— stub —\nexpanded=false\n(partner name from jarCsv JOIN)"]
         PE["PersonEntity\n(all darbovietes + rysiaiSuJa\n+ sutuoktinioDarbovietes)"]
-        CE["ContractEntity\nlabel: N sut.\npavadinimas = partner name"]
+        CE["ContractEntity\nlabel: contract pavadinimas\n(first 9 words)"]
     end
 
     subgraph GE["Graph Edges"]
@@ -119,10 +119,10 @@ flowchart LR
     PR -->|" DEKLARUOJANCIO / SUTUOKTINIO\ndirection: person → org\npareigos "| E1
     PR -->|" KITI_RYSIAI_SU_JA\ndirection: person → org\nrysioPobudzioPavadinimas "| E2
     PR -->|" SUTUOKTINIO_DARBOVIETE\ndirection: declarant → spouse "| E3
-    SS & JC -->|" suma=verte · kiekis=count\npartner pavadinimas via JOIN jarCsv "| CE
-    SS & JC -->|" tiekejoKodas / pirkejoKodas\npavadinimas via JOIN jarCsv "| OE_stub
-    SS -->|" direction: org → contract\nsuma as label "| E4
-    SS -->|" direction: contract → org "| E5
+    ST & JC -->|" sutartiesUnikalusId\npavadinimas (contract title)\nverte · partner names via JOIN jarCsv "| CE
+    ST & JC -->|" perkanciosiosOrganizacijosKodas / tiekejoKodas\npavadinimas via JOIN jarCsv "| OE_stub
+    ST -->|" direction: org → contract\nverte as label "| E4
+    ST -->|" direction: contract → org "| E5
 ```
 
 #### Edge labels
@@ -765,7 +765,88 @@ function rebuildAndRefresh() {
 
 ---
 
-## Open Questions
+**Phase 10 — Individual contract nodes with human-readable contract titles**
+
+Currently `expandOrg` queries `sutartysSaliuSumos` which aggregates all contracts between two companies
+into a single row (sum + count), so the `ContractEntity` node label is `"N sut."` — not meaningful.
+Replace with direct queries on the `sutartys` table to produce one `ContractEntity` node per contract,
+with the actual contract `pavadinimas` as its label.
+
+#### Data model change
+
+| | Before (Phase 1–9) | After (Phase 10) |
+|---|---|---|
+| **Source table** | `sutartysSaliuSumos` (aggregate) | `sutartys JOIN jarCsv` (individual rows) |
+| **ContractEntity ID** | `contract:buyer{buyerJk}:seller{sellerJk}` | `contract:{sutartiesUnikalusId}` |
+| **ContractEntity label** | `"N sut."` (count) | `wrapLabel(pavadinimas.split(' ').slice(0,9).join(' '))` |
+| **Limit** | top 20 buyer + top 20 seller partner pairs | top 30 contracts by `verte DESC` (buyer or seller) |
+
+#### New query in `expandOrg`
+
+Replace the `gautiSutarciuDuomenisPagalJarKoda` call with a direct query:
+
+```sql
+SELECT s."sutartiesUnikalusId",
+       s."pavadinimas",
+       s."verte",
+       s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
+       s."tiekejoKodas",
+       buyer."pavadinimas"   AS "pirkejoPavadinimas",
+       buyer."formosKodas"   AS "pirkejoFormosKodas",
+       seller."pavadinimas"  AS "tiekejoPavadinimas",
+       seller."formosKodas"  AS "tiekejoFormosKodas"
+FROM   public."sutartys" s
+LEFT JOIN public."jarCsv" buyer  ON buyer."jarKodas"::text  = s."perkanciosiosOrganizacijosKodas"
+LEFT JOIN public."jarCsv" seller ON seller."jarKodas"::text = s."tiekejoKodas"
+WHERE  (s."perkanciosiosOrganizacijosKodas" = $1 OR s."tiekejoKodas" = $1)
+  AND  s."tipas" <> 'SP'
+  AND  s."verte" IS NOT NULL
+ORDER BY s."verte" DESC NULLS LAST
+LIMIT 30
+```
+
+#### Updated `contractNode` builder
+
+```js
+// Old: contractNode(id, pavadinimas, verte, count)
+// New: contractNode(sutartiesUnikalusId, pavadinimas, verte)
+export function contractNode(sutartiesUnikalusId, pavadinimas, verte) {
+    const id = `contract:${sutartiesUnikalusId}`;
+    const shortName = (pavadinimas || '').split(' ').slice(0, 9).join(' ');
+    return {
+        id,
+        attributes: {
+            entityType: 'ContractEntity',
+            pavadinimas: pavadinimas || '',
+            label: wrapLabel(shortName),
+            verte: verte || 0,
+            expanded: true,
+            size: 8,
+        },
+    };
+}
+```
+
+#### Tasks
+
+- [ ] **`modules/voratinklis/expand.js`** — `expandOrg`:
+  - Remove the `gautiSutarciuDuomenisPagalJarKoda` import and call.
+  - Add the new `sutartys JOIN jarCsv` query (top 30 by `verte DESC`).
+  - Update the contract loop: for each row, create `contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte)`.
+  - Determine buyer/seller roles from `row.pirkejoKodas === jk`:
+    - If `pirkejoKodas === jk`: root org is buyer → `rootOrg →[Order]→ cNode →[Delivery]→ sellerOrg`.
+    - If `tiekejoKodas === jk`: root org is seller → `buyerOrg →[Order]→ cNode →[Delivery]→ rootOrg`.
+  - Org stubs for the counter-party are built with `orgNode(code, pavadinimas, formosKodas)` from the joined columns.
+
+- [ ] **`modules/voratinklis/expand.js`** — update `contractNode` signature: drop `count` param; ID is now `contract:{sutartiesUnikalusId}`; label is `wrapLabel` of first 9 words of `pavadinimas`.
+
+- [ ] **`test/voratinklis/expand.test.js`** — update contract-related test fixtures and assertions:
+  - Replace `contract:buyer…:seller…` ID format with `contract:{sutartiesUnikalusId}`.
+  - Replace `"N sut."` label assertions with truncated `pavadinimas` label assertions.
+  - Remove any assertions referencing `count` attribute on `ContractEntity`.
+  - Add a test for the buyer-role branch (root org is buyer) and seller-role branch (root org is seller).
+
+
 
 1. **ForceAtlas2 in browser**: `graphology-layout-forceatlas2` runs synchronously and blocks the main thread
    for large graphs. For large graphs (>200 nodes) a Web Worker is recommended. For v1, synchronous with
