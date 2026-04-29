@@ -270,7 +270,7 @@ sequenceDiagram
     Browser ->> Browser: Show loading overlay (blocks further clicks)
     Browser ->> Server: GET /voratinklis/expand/{jarKodas}
     Server -->> Browser: { nodes[], edges[] } (merged, idempotent)
-    Browser ->> Browser: Merge nodes; pre-position new nodes at clicked node pos
+    Browser ->> Browser: Merge nodes pre-position new nodes at clicked node pos
     Browser ->> Browser: Run ForceAtlas2 → compute final positions
 Browser ->> Browser: animateNodes (600ms, quadraticInOut) clicked pos → final pos
 Browser ->> Browser: Hide loading overlay
@@ -279,11 +279,114 @@ Note over Browser: person node attrs contain vardas + pavarde
 Browser ->> Browser: Show loading overlay
 Browser ->> Server: GET /voratinklis/expand-person?vardas=Jonas+Jonaitis
 Server -->> Browser: { nodes[], edges[] }
-Browser ->> Browser: Merge nodes ; pre-position new nodes at person node pos
+Browser ->> Browser: Merge nodes pre-position new nodes at person node pos
 Browser ->> Browser: Run ForceAtlas2 + noverlap → compute final positions
 Browser ->> Browser: animateNodes (600ms, quadraticInOut) → final pos
 Browser ->> Browser: Hide loading overlay
 ```
+
+---
+
+## Components
+
+### Component Map
+
+```mermaid
+graph TD
+    subgraph Browser["Browser — two IIFE bundles"]
+        BUNDLE["public/dist/voratinklis.js\n(esbuild bundle of voratinklis-bundle.js)\nSigma · graphology · forceAtlas2\nnoverlap · NodeImageProgram\n→ window.Voratinklis"]
+
+        subgraph APP["public/dist/voratinklis-app.js\n(esbuild bundle of src/voratinklis-app.js)"]
+            ICONS["src/voratinklis/icons.js\nMUI_ICON_PATHS\nmakeIconDataUri · getIconKey"]
+            COLORS["src/voratinklis/colors.js\nNODE_COLOR · EDGE_COLOR\nnodeColor · hiddenEdgeTypes"]
+            RENDERERS["src/voratinklis/renderers.js\ndrawNodeLabel · drawNodeHover"]
+            GRAPHUTILS["src/voratinklis/graph-utils.js\nmergeGraphElements(graph,getNodePos,data,...)\nrunLayout(graph)\n★ testable without DOM"]
+            LEGEND["src/voratinklis/legend.js\nbindLegendCheckboxes(graph,renderer,hiddenEdgeTypes)\ntoggleEdgeTypeVisibility"]
+            EXPANDUI["src/voratinklis/expand-ui.js\nloadOrg · loadPerson · setStatus"]
+            ENTRY["src/voratinklis-app.js ← esbuild entry\ncreates graph + renderer\nwires clickNode + DOMContentLoaded"]
+        end
+
+        ENTRY --> ICONS
+        ENTRY --> COLORS
+        ENTRY --> RENDERERS
+        ENTRY --> GRAPHUTILS
+        ENTRY --> LEGEND
+        ENTRY --> EXPANDUI
+        BUNDLE -->|" window.Voratinklis "| ENTRY
+    end
+
+    subgraph Server["Server"]
+        ROUTE["routes/voratinklis.js\nExpress router\nGET /voratinklis/:jarKodas\nGET /voratinklis/expand/:jarKodas\nGET /voratinklis/expand-person"]
+        EXPAND["modules/voratinklis/expand.js\nexpandOrg · expandPerson\npure helpers: orgNode · personNode\ncontractNode · edge · mapPareigos\nmapRysioPobudis · mapFormosKodas"]
+        VIEW["views/voratinklis/index.ejs\npage shell · legend HTML\ncheckboxes · Sigma container"]
+    end
+
+    subgraph Tests["Tests — node --test"]
+        T_EXPAND["test/voratinklis/expand.test.js\nserver-side pure helpers\n(61 tests)"]
+        T_GRAPHUTILS["test/voratinklis/graph-utils.test.js\nclient-side mergeGraphElements\nhiddenEdgeTypes visibility logic"]
+    end
+
+    ENTRY -->|" fetch /expand/:jk "| ROUTE
+    ENTRY -->|" fetch /expand-person "| ROUTE
+    ROUTE --> EXPAND
+    ROUTE --> VIEW
+    T_EXPAND -.->|" import "| EXPAND
+    T_GRAPHUTILS -.->|" import "| GRAPHUTILS
+```
+
+### Module responsibilities
+
+| File                             | Layer  | Purpose                                                            | DOM required              |
+|----------------------------------|--------|--------------------------------------------------------------------|---------------------------|
+| `src/voratinklis-bundle.js`      | Client | Bundles third-party npm packages; exposes `window.Voratinklis`     | No                        |
+| `src/voratinklis-app.js`         | Client | esbuild entry point; creates `graph`, `renderer`; wires events     | Yes                       |
+| `src/voratinklis/icons.js`       | Client | MUI SVG path map; `makeIconDataUri`; `getIconKey`                  | No                        |
+| `src/voratinklis/colors.js`      | Client | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` Set     | No                        |
+| `src/voratinklis/renderers.js`   | Client | `drawNodeLabel`, `drawNodeHover` — Sigma canvas callbacks          | No (canvas ctx passed in) |
+| `src/voratinklis/graph-utils.js` | Client | `mergeGraphElements`, `runLayout` — **pure, injected deps**        | No ★                      |
+| `src/voratinklis/legend.js`      | Client | `bindLegendCheckboxes`, `toggleEdgeTypeVisibility`                 | Yes (queries DOM)         |
+| `src/voratinklis/expand-ui.js`   | Client | `loadOrg`, `loadPerson`, `setStatus` — async fetch + graph updates | Yes                       |
+| `modules/voratinklis/expand.js`  | Server | `expandOrg`, `expandPerson`, all pure builder helpers              | No                        |
+| `routes/voratinklis.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`; renders EJS      | No                        |
+| `views/voratinklis/index.ejs`    | View   | HTML shell, inline CSS, legend overlay with checkboxes             | —                         |
+
+### Testability design
+
+The single most impactful change for testability is the **dependency-injection signature** of
+`mergeGraphElements`. Instead of closing over the module-level `graph` and `renderer`, it receives
+them as parameters:
+
+```js
+// graph-utils.js
+export function mergeGraphElements(graph, getNodePos, data, fromNodeId, hiddenEdgeTypes) { ...
+}
+
+// getNodePos: (id: string) => { x, y } | null
+```
+
+In production (`expand-ui.js`):
+
+```js
+mergeGraphElements(graph, (id) => renderer.getNodeDisplayData(id), data, fromNodeId, hiddenEdgeTypes);
+```
+
+In unit tests — no DOM or Sigma needed:
+
+```js
+import Graph from 'graphology';
+import {mergeGraphElements} from '../../src/voratinklis/graph-utils.js';
+
+const graph = new Graph({type: 'directed', multi: true});
+const getNodePos = () => null;   // new nodes fall back to random position — fine for tests
+mergeGraphElements(graph, getNodePos, data, null, new Set(['Official']));
+```
+
+This allows testing:
+
+- That edges with `edgeType` in `hiddenEdgeTypes` receive `hidden: true`
+- That `type` is renamed to `edgeType` in stored attributes
+- That `EDGE_COLOR` is applied correctly
+- That duplicate nodes/edges are skipped (idempotency)
 
 ---
 
@@ -298,14 +401,19 @@ Browser ->> Browser: Hide loading overlay
 
 ## Tasks
 
-> **Phases 1–5 complete.** All infrastructure delivered: Express routes (`/voratinklis/`, `/:jarKodas`,
-> `/expand/:jarKodas`, `/expand-person`), server-side `modules/voratinklis/expand.js` (direct DB queries,
-> deduplication, `ContractEntity` intermediate nodes), Sigma.js canvas (full viewport, no footer), node
-> icons via `NodeImageProgram`, equal node sizes (`size: 8`), `ContractEntity` label as `"N sut."`,
-> `Order`/`Delivery` edge value labels with `forceLabel: true`, hover label pinned below node, JS extracted
-> to `src/voratinklis-app.js`, unit tests in `test/voratinklis/expand.test.js` (51 passing, `npm test`).
-> Edge label bug fixed: `DEKLARUOJANCIO_DARBOVIETE` and `SUTUOKTINIO_DARBOVIETE` person→org edges now use
-> `pareigos` (human-readable job title) instead of `darbovietesTipas` (`STANDARTINE`/`EKSPERTO`/`SUTUOKTINIO`).
+> **Phases 1–7 complete.**
+>
+> *Phases 1–5*: Express routes (`/voratinklis/`, `/:jarKodas`, `/expand/:jarKodas`, `/expand-person`),
+> server-side `modules/voratinklis/expand.js` (direct DB queries, deduplication, `ContractEntity`
+> intermediate nodes), Sigma.js canvas (full viewport, no footer), node icons via `NodeImageProgram`,
+> equal node sizes (`size: 8`), `ContractEntity` label as `"N sut."`, `Order`/`Delivery` edge value
+> labels with `forceLabel: true`, hover label pinned below node, JS extracted to `src/voratinklis-app.js`,
+> 61 unit tests passing in `test/voratinklis/expand.test.js`.
+>
+> *Phase 7*: `mapDarbovietesTipas` renamed to `mapPareigos` and fixed to use `row.pareigos` (human-readable
+> job title) instead of `row.darbovietesTipas` (`STANDARTINE`/`EKSPERTO`/`SUTUOKTINIO`). `EDGE_COLOR` map
+> added to `src/voratinklis-app.js`. Legend overlay added to `views/voratinklis/index.ejs`. All 61 tests
+> passing.
 
 ---
 
@@ -360,73 +468,148 @@ Browser ->> Browser: Hide loading overlay
 
 ---
 
-**Phase 7 — Proper Person→Org edge types from actual job title**
+**Phase 7 — Proper Person→Org edge types from actual job title** ✅ Complete
 
-#### Background
+`mapDarbovietesTipas` renamed to `mapPareigos`; all 4 call sites updated to pass `row.pareigos`.
+`EDGE_COLOR` map added. Legend overlay added to `views/voratinklis/index.ejs`. 61 tests passing.
 
-`mapDarbovietesTipas(tipas)` checks for keywords like `"vadovas"` and `"ekspertas"` inside `tipas`,
-but it is currently called with `row.darbovietesTipas` whose only values are `STANDARTINE`, `EKSPERTO`,
-and `SUTUOKTINIO`. None of these match the keyword checks, so the function always falls through to
-`'Employment'` — meaning every person→org edge for `DEKLARUOJANCIO_DARBOVIETE` rows is typed as
-`Employment` regardless of whether the person is a CEO, Board Chair, or a Shareholder.
+---
 
-The actual role lives in `row.pareigos` ("Direktorius", "Vadovas", "Generalinis direktorius",
-"Pirkimo iniciatorius", etc.). `mapDarbovietesTipas` must be updated to accept `pareigos` content,
-and all call sites must pass `row.pareigos` instead of `row.darbovietesTipas`.
+**Phase 8 — Module split + legend checkboxes for edge-type visibility**
 
-#### Tasks
+Phase 8 has two parts: (A) split the monolithic `src/voratinklis-app.js` into focused, testable
+modules; (B) implement legend checkboxes that control edge-type visibility. Part A is a prerequisite
+for Part B because `hiddenEdgeTypes` and `mergeGraphElements` must be in importable modules to be
+unit-tested.
 
-- [ ] **Rename + fix `mapDarbovietesTipas` to operate on `pareigos`**
-  (`modules/voratinklis/expand.js`):
+#### Behaviour (Part B)
 
-  Rename the function to `mapPareigos(pareigos)` and expand the Lithuanian keyword list:
+- All 6 legend rows get an `<input type="checkbox">` on the left.
+- **`Official` and `Employment` start unchecked** — their edges are hidden on initial graph load and
+  after every expand.
+- All other types (`Director`, `Shareholder`, `Spouse`, `Order`/`Delivery`) start **checked** and
+  visible by default.
+- Checking/unchecking a box immediately shows/hides all graph edges of that type. No page reload,
+  no re-fetch — data in graphology is toggled via the `hidden` edge attribute.
+- Hiding an edge type does **not** remove it from the graph. Data is preserved; only rendering is
+  suppressed.
 
-  | `pareigos` contains (case-insensitive) | Edge type    |
-  |----------------------------------------|--------------|
-  | `direktorius`, `direktorė`, `vadovas`, `prezidentas`, `pirmininkas`, `generalinis` | `'Director'` |
-  | `pirkimo iniciatorius`, `ekspertas`, `prokuristas`, `kontrolierius` | `'Official'` |
-  | anything else (or null/empty)          | `'Employment'` |
+#### Part A — Module split
 
-  Update all call sites in `expandOrg` and `expandPerson` to pass `row.pareigos`:
-  - `expandOrg` → `DEKLARUOJANCIO_DARBOVIETE` branch (line ~214): `mapPareigos(row.pareigos)`
-  - `expandOrg` → `SUTUOKTINIO_DARBOVIETE` branch (line ~240): `mapPareigos(row.pareigos)` (spouse's job title)
-  - `expandPerson` → `DEKLARUOJANCIO_DARBOVIETE` branch (line ~324): `mapPareigos(row.pareigos)`
-  - `expandPerson` → `SUTUOKTINIO_DARBOVIETE` branch (line ~354): `mapPareigos(row.pareigos)`
+- [ ] **Create `src/voratinklis/` directory** and extract focused modules from `src/voratinklis-app.js`:
 
-  For `KITI_RYSIAI_SU_JA` rows `mapRysioPobudis(row.rysioPobudzioPavadinimas)` is already correct — no change needed.
+  | New file | Extracted content |
+    |---|---|
+  | `src/voratinklis/icons.js` | `MUI_ICON_PATHS`, `makeIconDataUri`, `getIconKey` |
+  | `src/voratinklis/colors.js` | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` |
+  | `src/voratinklis/renderers.js` | `drawNodeLabel`, `drawNodeHover` |
+  | `src/voratinklis/graph-utils.js` | `mergeGraphElements`, `runLayout` — injected deps, no globals |
+  | `src/voratinklis/legend.js` | `bindLegendCheckboxes`, `toggleEdgeTypeVisibility` |
+  | `src/voratinklis/expand-ui.js` | `loadOrg`, `loadPerson`, `setStatus` |
 
-- [ ] **Update unit tests for `mapPareigos`** (`test/voratinklis/expand.test.js`):
+  `src/voratinklis-app.js` becomes the thin esbuild entry: imports from the sub-modules above,
+  creates `graph` + `renderer`, wires `clickNode` and `DOMContentLoaded`. Build scripts are
+  unchanged — esbuild bundles the whole tree from the same entry point.
 
-  Replace all `mapDarbovietesTipas` test cases with `mapPareigos` test cases covering:
-  - `"Direktorius"` → `'Director'`
-  - `"Generalinis direktorius"` → `'Director'`
-  - `"Vadovas"` → `'Director'`
-  - `"Direktorė"` → `'Director'`
-  - `"Pirmininkas"` → `'Director'`
-  - `"Pirkimo iniciatorius"` → `'Official'`
-  - `"Prokuristas"` → `'Official'`
-  - `"Buhalterė"` → `'Employment'`
-  - `""` / `null` → `'Employment'`
+- [ ] **Change `mergeGraphElements` to use injected dependencies** (`src/voratinklis/graph-utils.js`):
 
-- [ ] **Edge colour differentiation by edge type** (`src/voratinklis-app.js`):
+  New signature:
+  ```js
+  export function mergeGraphElements(graph, getNodePos, data, fromNodeId, hiddenEdgeTypes) { ... }
+  // getNodePos: (id: string) => { x: number, y: number } | null
+  ```
+  `getNodePos` replaces the direct call to `renderer.getNodeDisplayData`. Falls back to random
+  scatter when `getNodePos` returns `null` (same behaviour as before for new/unknown nodes).
 
-  Add an `EDGE_COLOR` map and apply it when merging edges so that Directors, Shareholders, and
-  regular employees are visually distinct:
+  Call site in `expand-ui.js`:
+  ```js
+  mergeGraphElements(graph, (id) => renderer.getNodeDisplayData(id), data, fromNodeId, hiddenEdgeTypes);
+  ```
 
-  | Edge type (stored as `edgeType` attribute) | Colour   |
-  |--------------------------------------------|----------|
-  | `Director`                                 | `#1d4ed8` (dark blue) |
-  | `Shareholder`                              | `#7c3aed` (purple) |
-  | `Official`                                 | `#0891b2` (teal) |
-  | `Employment`                               | `#6b7280` (gray) |
-  | `Spouse`                                   | `#f59e0b` (amber) |
-  | `Order` / `Delivery`                       | `#10b981` (green — unchanged) |
+- [ ] **Add `test/voratinklis/graph-utils.test.js`** unit tests covering:
 
-  In `mergeGraphElements`, after building `attrs`, set `attrs.color = EDGE_COLOR[attrs.edgeType] || '#d1d5db'`
-  before calling `graph.addEdgeWithKey`.
+    - Nodes are added with correct `color`, `size`, `label`, `image` attributes.
+    - Duplicate nodes are skipped (idempotency).
+    - Edge `type` attribute is renamed to `edgeType`; `EDGE_COLOR` is applied.
+    - Edges whose `edgeType` is in `hiddenEdgeTypes` receive `hidden: true`.
+    - Edges whose `edgeType` is **not** in `hiddenEdgeTypes` receive `hidden: false`.
+    - Duplicate edges are skipped.
+    - `runLayout` does not crash on a single-node graph.
 
-  Also add a legend `<div>` below the Sigma container (or as an absolutely positioned overlay) listing
-  the edge type → colour mapping so users can interpret the graph without prior knowledge.
+  Tests use `graphology` directly — no DOM, no Sigma, no fetch required:
+  ```js
+  import Graph from 'graphology';
+  import { mergeGraphElements } from '../../src/voratinklis/graph-utils.js';
+
+  const graph = new Graph({ type: 'directed', multi: true });
+  mergeGraphElements(graph, () => null, data, null, new Set(['Official']));
+  ```
+
+#### Part B — Legend checkboxes
+
+- [ ] **Remove `pointer-events: none` from `#voratinklis-legend`** (`views/voratinklis/index.ejs`):
+
+  The legend currently has `pointer-events: none` to float over the canvas without eating clicks.
+  Remove that rule — checkboxes require pointer events. The opaque legend background already prevents
+  clicks from reaching the canvas beneath it.
+
+- [ ] **Wrap each legend row in a `<label>` with a checkbox** (`views/voratinklis/index.ejs`):
+
+  ```html
+  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
+    <input type="checkbox" data-edge-type="Director" checked>
+    <span class="vl-swatch" style="background:#1d4ed8"></span>Direktorius / vadovas
+  </label>
+  ```
+  Omit `checked` for `Official` and `Employment` rows. The `<label>` wrapper makes the swatch and
+  text also toggle the checkbox.
+
+  `Order` and `Delivery` share one row and one checkbox — use `data-edge-types="Order,Delivery"`:
+  ```html
+  <label ...>
+    <input type="checkbox" data-edge-types="Order,Delivery" checked>
+    <span class="vl-swatch" style="background:#10b981"></span>Sutartis
+  </label>
+  ```
+
+  All `data-edge-type` / `data-edge-types` values must exactly match the `edgeType` attribute
+  stored on graphology edges: `Director`, `Shareholder`, `Official`, `Employment`, `Spouse`,
+  `Order`, `Delivery`.
+
+- [ ] **Apply `hidden` attribute when edges are added** (`src/voratinklis/graph-utils.js`):
+
+  In `mergeGraphElements`, after setting `attrs.color`, add:
+  ```js
+  attrs.hidden = hiddenEdgeTypes.has(attrs.edgeType);
+  ```
+  This ensures newly fetched edges (arriving after a checkbox was toggled) are immediately
+  hidden/shown correctly without requiring an additional refresh pass.
+
+- [ ] **Implement `bindLegendCheckboxes`** (`src/voratinklis/legend.js`):
+
+  ```js
+  export function bindLegendCheckboxes(graph, renderer, hiddenEdgeTypes) {
+      document.querySelectorAll('#voratinklis-legend input[type="checkbox"]').forEach(function (cb) {
+          cb.addEventListener('change', function () {
+              toggleEdgeTypeVisibility(graph, renderer, hiddenEdgeTypes,
+                  (cb.dataset.edgeTypes || cb.dataset.edgeType || '').split(',').map(s => s.trim()),
+                  cb.checked);
+          });
+      });
+  }
+
+  export function toggleEdgeTypeVisibility(graph, renderer, hiddenEdgeTypes, types, visible) {
+      types.forEach(t => visible ? hiddenEdgeTypes.delete(t) : hiddenEdgeTypes.add(t));
+      graph.forEachEdge(function (edgeId, attrs) {
+          var hidden = hiddenEdgeTypes.has(attrs.edgeType);
+          if (attrs.hidden !== hidden) graph.setEdgeAttribute(edgeId, 'hidden', hidden);
+      });
+      renderer.refresh();
+  }
+  ```
+
+  Call `bindLegendCheckboxes(graph, renderer, hiddenEdgeTypes)` in `src/voratinklis-app.js` after
+  the renderer is created.
 
 ## Open Questions
 
