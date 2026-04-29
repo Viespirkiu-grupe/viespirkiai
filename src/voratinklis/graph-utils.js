@@ -67,11 +67,15 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
  * Rebuilds viewGraph (Sigma's graph) from dataGraph using an edge-visibility predicate.
  * Nodes with no visible edges (and not anchors) are removed; newly visible nodes are added.
  *
- * Anchor = expanded node whose entityType is NOT ContractEntity.
- * ContractEntity nodes are never anchors — they vanish when Order/Delivery edges are hidden.
+ * Anchor = expanded org/person node (entityType !== ContractEntity).
+ * ContractEntity nodes are never anchors — they normally vanish when their edges are hidden.
  *
- * Visibility rule is entirely delegated to the isEdgeHidden predicate supplied by the caller
- * (typically LegendState.isEdgeHidden bound to the current state).
+ * Bridge rule (overrides isEdgeHidden):
+ *   A node that has edges to 2+ distinct expanded anchors is a "bridge node". Its bridge
+ *   edges (the edges connecting it to those anchors) are always visible regardless of legend
+ *   settings. This ensures intermediate nodes between two expanded nodes (e.g. a contract
+ *   shared by two expanded orgs) are never hidden by filtering.
+ *   Note: only direct (one-hop) bridges are handled; deep multi-hop chains are not.
  *
  * @param {Graph}    dataGraph     - permanent store of all fetched nodes+edges
  * @param {Graph}    viewGraph     - Sigma's graph (mutated in-place)
@@ -81,11 +85,40 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
 export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
     var prevNodes = new Set(viewGraph.nodes());
 
+    // Expanded anchor nodes — always visible regardless of edge visibility
+    var expandedAnchors = new Set();
+    dataGraph.forEachNode(function (id, attrs) {
+        if (attrs.expanded && attrs.entityType !== 'ContractEntity') expandedAnchors.add(id);
+    });
+
+    // Bridge nodes: ContractEntity nodes connected to 2+ distinct expanded anchors → always visible.
+    // Bridge edges: edges from a bridge contract to its expanded anchor neighbors → always visible.
+    // Only ContractEntity nodes are bridges — person/org nodes connecting two expanded anchors
+    // are "shared relationship nodes" and remain under legend/filter control.
+    var bridgeNodes = new Set();
+    var bridgeEdges = new Set();
+    dataGraph.forEachNode(function (nodeId, nodeAttrs) {
+        if (expandedAnchors.has(nodeId)) return;
+        if (nodeAttrs.entityType !== 'ContractEntity') return;
+        var anchorNeighbors = new Set();
+        var edgesToAnchors = [];
+        dataGraph.forEachEdge(nodeId, function (edgeId, edgeAttrs, src, tgt) {
+            var neighbor = src === nodeId ? tgt : src;
+            if (expandedAnchors.has(neighbor)) {
+                anchorNeighbors.add(neighbor);
+                edgesToAnchors.push(edgeId);
+            }
+        });
+        if (anchorNeighbors.size >= 2) {
+            bridgeNodes.add(nodeId);
+            edgesToAnchors.forEach(function (id) { bridgeEdges.add(id); });
+        }
+    });
+
     // Compute the set of nodes that should be visible
     var visible = new Set();
-    dataGraph.forEachNode(function (id, attrs) {
-        if (attrs.expanded && attrs.entityType !== 'ContractEntity') visible.add(id);
-    });
+    expandedAnchors.forEach(function (id) { visible.add(id); });
+    bridgeNodes.forEach(function (id) { visible.add(id); });
     dataGraph.forEachEdge(function (edgeId, attrs, source, target) {
         if (!isEdgeHidden(source, target, attrs.edgeType)) {
             visible.add(source);
@@ -105,16 +138,16 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
         }
     });
 
-    // Remove any surviving hidden-type edges from viewGraph
+    // Remove hidden-type edges from viewGraph (bridge edges are exempt)
     var edgesToRemove = [];
     viewGraph.forEachEdge(function (edgeId, attrs, source, target) {
-        if (isEdgeHidden(source, target, attrs.edgeType)) edgesToRemove.push(edgeId);
+        if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType)) edgesToRemove.push(edgeId);
     });
     edgesToRemove.forEach(function (id) { viewGraph.dropEdge(id); });
 
-    // Add visible edges from dataGraph that are not yet in viewGraph
+    // Add visible edges from dataGraph that are not yet in viewGraph (bridge edges always pass)
     dataGraph.forEachEdge(function (edgeId, attrs, source, target) {
-        if (isEdgeHidden(source, target, attrs.edgeType)) return;
+        if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType)) return;
         if (!viewGraph.hasNode(source) || !viewGraph.hasNode(target)) return;
         if (viewGraph.hasEdge(edgeId)) return;
         viewGraph.addEdgeWithKey(edgeId, source, target, Object.assign({}, attrs));

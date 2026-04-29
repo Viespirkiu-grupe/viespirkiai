@@ -378,6 +378,85 @@ describe('rebuildViewGraph', () => {
         assert.ok(viewGraph.hasEdge('e:person:x:org:B:Employment'), 'Employment edge to OrgB is visible');
     });
 
+    // ── Bridge node visibility ─────────────────────────────────────────────────
+    // A node adjacent to 2+ distinct expanded anchors is a "bridge". Its bridge
+    // edges (to those anchors) are always visible regardless of isEdgeHidden.
+
+    it('BRIDGE: contract between two expanded orgs is always visible even when all edge types hidden', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addOrg(dataGraph, 'org:B', true);
+        addContract(dataGraph, 'contract:x');
+        addEdge(dataGraph, 'org:A', 'contract:x', 'Order');
+        addEdge(dataGraph, 'contract:x', 'org:B', 'Delivery');
+
+        rebuildViewGraph(dataGraph, viewGraph, mkHidden(['Order', 'Delivery']));
+
+        assert.ok(viewGraph.hasNode('contract:x'), 'bridge contract must be visible');
+        assert.ok(viewGraph.hasEdge('e:org:A:contract:x:Order'), 'bridge edge Order must be visible');
+        assert.ok(viewGraph.hasEdge('e:contract:x:org:B:Delivery'), 'bridge edge Delivery must be visible');
+    });
+
+    it('BRIDGE: bridge remains visible even when LegendState hides all types for both expanded nodes', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addOrg(dataGraph, 'org:B', true);
+        addContract(dataGraph, 'contract:x');
+        addEdge(dataGraph, 'org:A', 'contract:x', 'Order');
+        addEdge(dataGraph, 'contract:x', 'org:B', 'Delivery');
+
+        const ls = new LegendState();
+        ls.initNode('org:A');
+        ls.setTypeVisible('org:A', 'Order', false);
+        ls.setTypeVisible('org:A', 'Delivery', false);
+        ls.initNode('org:B');
+        ls.setTypeVisible('org:B', 'Order', false);
+        ls.setTypeVisible('org:B', 'Delivery', false);
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => ls.isEdgeHidden(s, t, type));
+
+        assert.ok(viewGraph.hasNode('contract:x'), 'bridge contract visible despite legend hiding all types');
+        assert.ok(viewGraph.hasEdge('e:org:A:contract:x:Order'), 'bridge edge Order visible');
+        assert.ok(viewGraph.hasEdge('e:contract:x:org:B:Delivery'), 'bridge edge Delivery visible');
+    });
+
+    it('BRIDGE: person bridging two expanded orgs is NOT a bridge — legend still controls it', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addOrg(dataGraph, 'org:B', true);
+        addPerson(dataGraph, 'person:x');
+        addEdge(dataGraph, 'person:x', 'org:A', 'Director');
+        addEdge(dataGraph, 'person:x', 'org:B', 'Director');
+
+        // Only ContractEntity nodes are bridges; person nodes respect legend filtering
+        rebuildViewGraph(dataGraph, viewGraph, mkHidden(['Director']));
+
+        assert.ok(!viewGraph.hasNode('person:x'), 'person connecting two expanded orgs is NOT a bridge — hidden by legend');
+        assert.ok(!viewGraph.hasEdge('e:person:x:org:A:Director'), 'Director edge to OrgA hidden');
+        assert.ok(!viewGraph.hasEdge('e:person:x:org:B:Director'), 'Director edge to OrgB hidden');
+    });
+
+    it('BRIDGE: contract with only ONE expanded anchor is NOT a bridge (can be hidden)', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addOrg(dataGraph, 'org:B', false); // NOT expanded
+        addContract(dataGraph, 'contract:x');
+        addEdge(dataGraph, 'org:A', 'contract:x', 'Order');
+        addEdge(dataGraph, 'contract:x', 'org:B', 'Delivery');
+
+        rebuildViewGraph(dataGraph, viewGraph, mkHidden(['Order', 'Delivery']));
+
+        assert.ok(!viewGraph.hasNode('contract:x'), 'non-bridge contract hidden when edges hidden');
+    });
+
+    it('BRIDGE: multi-edge to same anchor does not make it a bridge', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addContract(dataGraph, 'contract:x');
+        // Two edges to the same expanded anchor
+        addEdge(dataGraph, 'org:A', 'contract:x', 'Order');
+        addEdge(dataGraph, 'contract:x', 'org:A', 'Delivery');
+
+        rebuildViewGraph(dataGraph, viewGraph, mkHidden(['Order', 'Delivery']));
+
+        assert.ok(!viewGraph.hasNode('contract:x'), 'single-anchor multi-edge contract is not a bridge');
+    });
+
     it('CRITICAL: after switching selection from A to B, OrgA settings remain unchanged', () => {
         addOrg(dataGraph, 'org:A', true);
         addOrg(dataGraph, 'org:B', true);
