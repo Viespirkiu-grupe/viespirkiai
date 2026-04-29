@@ -4,7 +4,7 @@ import { FilterBuilder } from "../../utils/filter.js";
 import QueryStream from "pg-query-stream";
 import config from "../../utils/config.js";
 import { search, countDocs } from "../../quickwit/quickwit.js";
-import Timings, { formatTime } from "../../utils/timings.js";
+import { log } from "../../utils/log.js";
 
 const failaiFilter = new FilterBuilder({
     fields: [
@@ -85,7 +85,7 @@ const failaiFilter = new FilterBuilder({
             hidden: true,
             pgOverride: (addParam, val) => {
                 const quoteMatch = val.match(/^"(.*)"$/);
-                const clean = quoteMatch ? quoteMatch[1] : val;
+                const clean = quoteMatch ? quoteMatch[1] : val.replace(/"/g, "");
                 const query = quoteMatch
                     ? `'${clean}'`
                     : clean.trim().split(/\s+/).join(' & ');
@@ -142,7 +142,7 @@ function buildQuickwitQuery(query) {
             const inner = foldLithuanian(s.slice(1, -1)).replace(/"/g, '\\"');
             parts.push(`(tekstas:"${inner}" OR pavadinimas:"${inner}" OR autorius:"${inner}")`);
         } else {
-            const folded = foldLithuanian(s);
+            const folded = foldLithuanian(s.replace(/"/g, ""));
             parts.push(`(tekstas:${folded} OR pavadinimas:${folded} OR autorius:${folded})`);
         }
     }
@@ -243,6 +243,9 @@ function buildPgOnlyFilters(query) {
     return { conditions, params };
 }
 
+
+const QW_MIN_HITS = 50;
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -277,7 +280,7 @@ export async function searchFailai(
     query,
     { limit, page = 1, stream = false } = {},
 ) {
-    const { sql, params, values, queryParams, usedHiddenFields } =
+    const { sql, params, sqlCount, paramsCount, values, queryParams, usedHiddenFields } =
         failaiFilter.build(query, {
             table: "failai f",
             limit,
@@ -299,24 +302,20 @@ export async function searchFailai(
     }
 
     if (config.quickwitUp && hasQuickwitFilters(query)) {
-        const t = new Timings();
         const qwQuery = buildQuickwitQuery(query);
 
-        // Always fetch at least 100 live hits. If we exhaust the index before
-        // reaching 100 we have an exact count; otherwise use the dead-ratio estimate.
-        const needed = Math.max(page * limit, 100);
-        t.start("qwSearch");
-        const { hits, numHitsEstimate, requests, elapsedTimeMicros } = await search(
+        const needed = Math.max(page * limit, QW_MIN_HITS);
+        const { hits, numHitsEstimate, rawExhausted, qwMs, filterMs } = await search(
             "failai",
             { query: qwQuery, search_field: "tekstas,pavadinimas,autorius" },
             { minHits: needed },
         );
-        t.end("qwSearch");
 
         const pageHits = hits.slice((page - 1) * limit, page * limit);
         const ids = pageHits.map((h) => h.id);
 
         let rows = [];
+        let pgMs = 0;
         if (ids.length > 0) {
             const { conditions, params: pgParams } = buildPgOnlyFilters(query);
 
@@ -325,7 +324,7 @@ export async function searchFailai(
                 ? ` AND ${conditions.join(" AND ")}`
                 : "";
 
-            t.start("pgFetch");
+            const pgStart = Date.now();
             // Locate the search term inside the full text in Postgres and return
             // a window around it. For multi-word non-phrase queries the full
             // string may not appear contiguously, so fall back to the first word.
@@ -357,36 +356,28 @@ export async function searchFailai(
                 ),
                 tekstasQuery,
             ]);
-            t.end("pgFetch");
             // Merge tekstas into rows, then restore Quickwit ranking order
             const tekstasById = new Map(tekstasRows.map((r) => [r.id, r.tekstas]));
             const byId = new Map(pgRows.map((r) => [r.id, { ...r, tekstas: tekstasById.get(r.id) ?? r.tekstas }]));
             rows = ids.map((id) => byId.get(id)).filter(Boolean);
+            pgMs = Date.now() - pgStart;
         }
 
-        t.end("all");
-        console.log(
-            `[searchFailai] qw=${formatTime(t.timings.qwSearch.end - t.timings.qwSearch.start)}` +
-            ` (${requests} req, ${formatTime(elapsedTimeMicros / 1000)})` +
-            ` pg=${ids.length > 0 ? formatTime(t.timings.pgFetch.end - t.timings.pgFetch.start) : "—"}` +
-            ` total=${formatTime(t.timings.all.end - t.timings.all.start)}` +
-            ` hits=${hits.length}/${needed} estimate=${Math.round(numHitsEstimate)}` +
-            ` query=${JSON.stringify(qwQuery)}`
-        );
+        if (config.dev) log(`qw=${qwMs}ms filter=${filterMs}ms pg=${pgMs}ms hits=${hits.length}/${needed}`);
 
-        // If Quickwit returned fewer than 100 live hits it's exhausted — exact count.
-        const exhausted = hits.length < 100;
-        const total = exhausted ? hits.length : Math.round(numHitsEstimate);
+        // When Quickwit exhausts its results, its tokenization may differ from
+        // Postgres (e.g. "a" matches 39 in QW vs 7000+ via Postgres ###). Return
+        // null so the route falls back to countFailai for an accurate Postgres count.
+        // When not exhausted, QW has plenty of hits and the estimate is meaningful.
+        const total = rawExhausted ? null : Math.round(numHitsEstimate);
 
-        // In the Quickwit path, search/extension/saltinis/etc. are handled by
-        // Quickwit — only flag usedHiddenFields for PG-only filters.
-        const qwUsedHiddenFields = ['telefonas', 'email', 'domain', 'iban', 'jarKodas', 'location', 'md5']
+        const qwUsedHiddenFields = ['extension', 'saltinis', 'puslapiaiMin', 'puslapiaiMax', 'telefonas', 'email', 'domain', 'iban', 'jarKodas', 'location', 'md5']
             .some((f) => !!query[f]);
 
         return {
             results: arrayToLithuanianTime(rows).map(aptvarkytiFailoRezultata),
             total,
-            approximate: !exhausted,
+            approximate: !rawExhausted,
             values,
             queryParams,
             usedHiddenFields: qwUsedHiddenFields,
@@ -396,10 +387,13 @@ export async function searchFailai(
         };
     }
 
-    const { rows } = await postgres.query(sql, params);
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+        postgres.query(sql, params),
+        postgres.query(sqlCount, paramsCount),
+    ]);
     return {
         results: arrayToLithuanianTime(rows).map(aptvarkytiFailoRezultata),
-        total: null,
+        total: parseInt(countRows[0].count, 10),
         values,
         queryParams,
         usedHiddenFields,

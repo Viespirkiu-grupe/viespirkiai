@@ -1,4 +1,9 @@
 <div>
+  <% if (typeof klaida !== "undefined" && klaida) { %>
+    <div class="empty-state">
+      <p class="text-muted"><%= klaida %></p>
+    </div>
+  <% } else { %>
   <div class="flex justify-between items-center mb-4">
     <span class="text-muted text-sm numberOfResults"><%- numberOfResults %></span>
   </div>
@@ -85,5 +90,6 @@
 
     <%- include('../pagination.ejs', { currentPage, pageCount, queryParams }) %>
 
+  <% } %>
   <% } %>
 </div>

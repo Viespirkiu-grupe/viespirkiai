@@ -28,7 +28,10 @@ function enrichFilesWithIds(metaduomenys, relatedFiles) {
     metaduomenys.files = metaduomenys.files.map((file) => {
         if (file.path) {
             const match = relatedFiles.find((f) => f.saltinioId === file.path);
-            if (match) file.id = match.id;
+            if (match) {
+                file.id = match.id;
+                if (match.extension) file.extension = match.extension;
+            }
         }
         return file;
     });
@@ -36,7 +39,10 @@ function enrichFilesWithIds(metaduomenys, relatedFiles) {
     function enrichNode(node) {
         if (node.path) {
             const match = metaduomenys.files.find((f) => f.path === node.path);
-            if (match) node.id = match.id;
+            if (match) {
+                node.id = match.id;
+                if (match.extension) node.extension = match.extension;
+            }
         }
         node.children?.forEach(enrichNode);
     }
