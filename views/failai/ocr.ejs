@@ -22,7 +22,7 @@
       <h2 class="mb-3">
         <a href="#perMinute" id="perMinute" class="no-style">Sparta (<%= ocrPerMinute.date %>)</a>
       </h2>
-      <div class="grid auto-fill-180 gap-3">
+      <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
         <div class="card">
           <div class="card-body">
             <div class="section-title mb-2">Dokumentai</div>
@@ -58,7 +58,7 @@
       <div class="grid-2 items-start">
         <div>
           <h2 class="mb-4"><a href="#nuskaitytojai" id="nuskaitytojai" class="no-style">OCR nuskaitytojai</a></h2>
-          <div class="grid auto-fill-180 gap-3 pt-1">
+          <div class="grid gap-3 pt-1 grid-cols-[repeat(auto-fill,minmax(190px,1fr))]">
             <% ocrNuskaitytojai.forEach(nuskaitytojas => { %>
               <div class="card">
                 <div class="card-body">
@@ -150,7 +150,7 @@
     </script>
 
     <section class="grid-2">
-      <div class="page-section flex flex-col min-h-87.5">
+      <div class="min-w-0 flex flex-col min-h-87.5">
         <h2 class="mb-3"><a href="#rezultatai" id="rezultatai" class="no-style">Rezultatų skaičius</a></h2>
         <div class="chart-frame">
           <div id="ocrStatsDayDiagrama" class="chart h-87.5"></div>
@@ -166,7 +166,7 @@
         </script>
       </div>
 
-      <div class="page-section flex flex-col min-h-87.5">
+      <div class="min-w-0 flex flex-col min-h-87.5">
         <h2 class="mb-3"><a href="#puslapiai" id="puslapiai" class="no-style">Puslapių skaičius</a></h2>
         <div class="chart-frame">
           <div id="ocrStatsDayPagesDiagrama" class="chart h-87.5"></div>
@@ -182,7 +182,7 @@
         </script>
       </div>
 
-      <div class="page-section flex flex-col min-h-87.5">
+      <div class="min-w-0 flex flex-col min-h-87.5">
         <h2 class="mb-3"><a href="#zodziai" id="zodziai" class="no-style">Žodžių skaičius</a></h2>
         <div class="chart-frame">
           <div id="ocrStatsDayWordsDiagrama" class="chart h-87.5"></div>
