@@ -6,7 +6,7 @@
           ? Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " € "
           : "") + pirkimas.pavadinimas,
       pageDescription: `${pirkimas.pirkimoBudas || ""}\nPaskelbta: ${String(pirkimas.paskelbimoData).slice(0,10)}\nVykdytojas: ${pirkimas.pirkimoVykdytojas}`,
-      pageImage: `https://viespirkiai.org/index.png`,
+      pageImage: `https://viespirkiai.org/viesiejiPirkimai/${pirkimas.pirkimoId}.png`,
       pageAuthor: pirkimas.pirkimoVykdytojas,
       customHead
   }) %>

@@ -195,4 +195,14 @@ neskelbiamosDerybosRouter.get("/failai.png", async (req, res) => {
     );
 });
 
+neskelbiamosDerybosRouter.get("/neskelbiamos.png", async (req, res) => {
+    return await serveOpenGraphImage(
+        res,
+        "Neskelbiamų derybų paieška",
+        "Viešpirkiai",
+        "",
+        "viespirkiai.org/neskelbiamos",
+    );
+});
+
 export default neskelbiamosDerybosRouter;

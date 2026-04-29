@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 <head>
+  <%
+    const _ogTitle = failas.metaduomenys?.Title || failas.pavadinimas || "Failas";
+    const _ogParts = [failas.extension?.toUpperCase(), failas.dydis ? `${(failas.dydis / 1024 / 1024).toFixed(1)} MB` : null].filter(Boolean);
+  %>
   <%- include('../head.ejs', {
-    pageTitle: "Failas",
-    pageDescription: ``,
-    pageImage: `https://viespirkiai.org/failai.png`,
+    pageTitle: _ogTitle,
+    pageDescription: _ogParts.join(' · '),
+    pageImage: `https://viespirkiai.org/failas/${failas.id}.png`,
     customHead
   }) %>
   <style>
