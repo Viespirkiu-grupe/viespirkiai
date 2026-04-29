@@ -25,6 +25,10 @@ await ensureSearchCollection({ ignoreTypesenseUp: true });
 // Po kiek įterpti ant karto
 const BATCH_SIZE = 10_000;
 
+const fromIdArg = process.argv.find((a) => a.startsWith("--from-id="));
+const FROM_ID = fromIdArg ? Number(fromIdArg.split("=")[1]) : null;
+if (FROM_ID !== null) log(`Starting from sutartiesUnikalusId >= ${FROM_ID}`);
+
 /**
  * Užkrauna sutartis iš PostgreSQL duomenų bazės po dalis (batches).
  * @param {number} batchSize - Dalies dydis
@@ -37,10 +41,15 @@ async function fetchSutartysBatches(batchSize, onBatch) {
         let batchNumber = 1;
 
         while (true) {
-            const res = await client.query(
-                `SELECT * FROM sutartys ORDER BY "sutartiesUnikalusId" ASC LIMIT $1 OFFSET $2`,
-                [batchSize, offset],
-            );
+            const res = FROM_ID !== null
+                ? await client.query(
+                    `SELECT * FROM sutartys WHERE "sutartiesUnikalusId" >= $3 ORDER BY "sutartiesUnikalusId" ASC LIMIT $1 OFFSET $2`,
+                    [batchSize, offset, FROM_ID],
+                )
+                : await client.query(
+                    `SELECT * FROM sutartys ORDER BY "sutartiesUnikalusId" ASC LIMIT $1 OFFSET $2`,
+                    [batchSize, offset],
+                );
             if (res.rows.length === 0) break;
 
             // log progress for this batch
