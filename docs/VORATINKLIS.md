@@ -257,69 +257,22 @@ sequenceDiagram
 
 **Phase 5 — Visual polish, node icons, and ContractEntity graph structure**
 
-- [ ] **`views/voratinklis/index.ejs`**: Remove `<%- include('../footer.ejs') %>`. The page uses
-  `position: fixed` full-viewport canvas with `body { overflow: hidden }`, making a footer meaningless
-  and the HTML-flow footer element bleeds through and renders visibly. No other page layout change is needed.
+- [x] **`views/voratinklis/index.ejs`**: Remove `<%- include('../footer.ejs') %>`.
 
-- [ ] **Extract inline JS to `src/voratinklis-app.js`**: The large inline `<script>` in
-  `views/voratinklis/index.ejs` must be extracted into a separate source file `src/voratinklis-app.js`,
-  built by a new esbuild target `build:voratinklis-app` into `public/dist/voratinklis-app.js` (add
-  corresponding `watch:voratinklis-app` script too). The EJS template retains only a minimal inline
-  `<script>` that sets `window.VORATINKLIS_CONFIG = { jarKodas: '<%- jarKodas %>' }` **before** the two
-  `<script src="...">` tags. The app script reads `window.VORATINKLIS_CONFIG.jarKodas` at runtime instead
-  of EJS interpolation. `src/voratinklis-app.js` must import `NodeImageProgram` from
-  `@sigma/node-image` directly (it is already in the bundle but the app script can import it too; esbuild
-  deduplicates). The app script file replaces the EJS inline script entirely.
+- [x] **Extract inline JS to `src/voratinklis-app.js`**: Extracted to `src/voratinklis-app.js`, built by
+  `build:voratinklis-app` into `public/dist/voratinklis-app.js`. EJS retains only
+  `window.VORATINKLIS_CONFIG = { jarKodas: '<%- jarKodas %>' }` inline. Uses `window.Voratinklis.*` for all
+  Sigma deps (no separate imports).
 
-- [ ] **Node icons via `NodeImageProgram`**: Implement `makeIconDataUri(nodeType)` (plain JS, no TypeScript)
-  in `src/voratinklis-app.js` using the `MUI_ICON_PATHS` constant from the `## Nodes` section below.
-  Configure the Sigma renderer to use `NodeImageProgram` for all nodes:
+- [x] **Node icons via `NodeImageProgram`**: `makeIconDataUri(nodeType)` and `getIconKey(attrs)` implemented
+  in `src/voratinklis-app.js`. Sigma configured with `nodeProgramClasses: { image: NodeImageProgram }`,
+  `defaultNodeType: 'image'`. Icon set in `mergeGraphElements` via the `image` attribute.
 
-  ```js
-  const renderer = new Sigma(graph, container, {
-    nodeProgramClasses: { image: NodeImageProgram },
-    defaultNodeType: 'image',
-    // ... other options unchanged
-  });
-  ```
+- [x] **Equal node sizes**: All nodes fixed at `size: 8` in `modules/voratinklis/expand.js`.
 
-  When adding each node in `mergeGraphElements`, compute the icon key from node attributes and set the
-  `image` attribute:
-
-  | `entityType`         | `orgType`        | Icon key used in `makeIconDataUri` |
-  |----------------------|------------------|------------------------------------|
-  | `OrganizationEntity` | `PrivateCompany` | `'PrivateCompany'`                 |
-  | `OrganizationEntity` | `PublicCompany`  | `'PublicCompany'`                  |
-  | `OrganizationEntity` | `Institution`    | `'Institution'`                    |
-  | `PersonEntity`       | —                | `'Person'`                         |
-  | `ContractEntity`     | —                | `'Contract'`                       |
-
-  If `makeIconDataUri` returns `''` (unknown type), omit the `image` attribute so Sigma falls back to the
-  default filled-circle renderer.
-
-- [ ] **Equal node sizes**: All nodes must render at the same fixed size. Remove the logarithmic
-  `Math.log(opts.verte + 1) * 3` scaling from `orgNode()` in `modules/voratinklis/expand.js`.
-  Change the `size` field to always be `8` regardless of `opts.verte`.
-
-- [ ] **ContractEntity nodes between organisations**: Update `expandOrg` in
-  `modules/voratinklis/expand.js` to insert intermediate `ContractEntity` nodes between buyer and supplier
-  organisations instead of the current direct org-to-org edges. Replace the existing `topTiekejai` and
-  `topPirkejai` loops with this new pattern:
-
-  For **`topTiekejai`** (root org is the **buyer**, partner is the supplier):
-  - Create `ContractEntity` node: `id = contract:buyer${jk}:seller${partnerJarKodas}`,
-    `attributes: { entityType: 'ContractEntity', label: formatContractValue(total), verte: total, expanded: true }`
-  - Add edge `rootOrg.id --Order--> contractNode.id` (label = formatted total)
-  - Add edge `contractNode.id --Delivery--> supplierOrg.id` (label = `''`)
-
-  For **`topPirkejai`** (root org is the **supplier**, partner is the buyer):
-  - Create `ContractEntity` node: `id = contract:buyer${partnerJarKodas}:seller${jk}`,
-    same attributes as above
-  - Add edge `buyerOrg.id --Order--> contractNode.id` (label = formatted total)
-  - Add edge `contractNode.id --Delivery--> rootOrg.id` (label = `''`)
-
-  ContractEntity ID is deterministic (buyer+seller pair) so the same contract node is naturally merged
-  if the graph is expanded from both ends.
+- [x] **ContractEntity nodes between organisations**: `expandOrg` now inserts intermediate `ContractEntity`
+  nodes. `topTiekejai`: `rootOrg --Order--> contractNode --Delivery--> supplierOrg`. `topPirkejai`:
+  `buyerOrg --Order--> contractNode --Delivery--> rootOrg`. IDs are deterministic (`contract:buyer{jk}:seller{jk}`).
 
 ---
 

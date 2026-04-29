@@ -3,14 +3,20 @@
     "version": "1.0.0",
     "main": "index.js",
     "scripts": {
-        "build:tailwind": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --minify",
-        "watch:tailwind": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --watch"
+        "dev": "node index.js",
+        "start": "node server.js",
+        "build": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --minify && esbuild src/voratinklis-bundle.js --bundle --format=iife --outfile=public/dist/voratinklis.js --minify && esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --minify",
+        "watch": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --watch & esbuild src/voratinklis-bundle.js --bundle --format=iife --outfile=public/dist/voratinklis.js --watch & esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --watch",
+        "build:voratinklis-app": "esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --minify",
+        "watch:voratinklis-app": "esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --watch"
     },
     "keywords": [],
     "author": "",
     "description": "",
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.27.1",
+        "@sigma/node-border": "^3.0.0",
+        "@sigma/node-image": "^3.0.0",
         "@xmldom/xmldom": "^0.9.8",
         "adm-zip": "^0.5.16",
         "canvas": "^3.2.1",
@@ -20,6 +26,9 @@
         "exceljs": "^4.4.0",
         "express": "^5.1.0",
         "express-rate-limit": "^8.2.1",
+        "graphology": "^0.26.0",
+        "graphology-layout-forceatlas2": "^0.10.1",
+        "graphology-layout-noverlap": "^0.4.2",
         "helmet": "^8.1.0",
         "highlight.js": "^11.11.1",
         "html-minifier-terser": "^7.2.0",
@@ -38,6 +47,7 @@
         "pg-query-stream": "^4.10.3",
         "proj4": "^2.20.4",
         "puppeteer": "^24.16.1",
+        "sigma": "^3.0.2",
         "socks-proxy-agent": "^8.0.5",
         "stream-chain": "^3.4.1",
         "stream-json": "^1.9.1",
@@ -52,6 +62,7 @@
     "devDependencies": {
         "@tailwindcss/cli": "4.2.2",
         "@tailwindcss/postcss": "4.2.2",
+        "esbuild": "^0.28.0",
         "postcss": "^8.5.8",
         "tailwindcss": "4.2.2"
     }
