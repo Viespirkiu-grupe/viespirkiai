@@ -2,6 +2,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { toLithuanianTime } from "../../utils/time.js";
 import { typesense } from "../../typesense/typesense.js";
 import { levenshtein, toAscii } from "../../utils/text.js";
+import config from "../../utils/config.js";
 
 /**
  * Searches for juridinis records using Typesense or PostgreSQL.
@@ -27,41 +28,66 @@ export async function searchJar(query = {}, options = {}) {
     if (search) {
         const baseQuery = toBaseCompanyName(search);
 
-        // Perform Typesense search
-        const resultsRaw = await typesense
-            .collections("viespirkiaiJAR")
-            .documents()
-            .search({
-                q: baseQuery,
-                query_by: "pavadinimasBase,pavadinimas,adresas",
-                per_page: limit,
-                page: page,
-            });
+        if (config.typesenseUp) {
+            // Perform Typesense search
+            const resultsRaw = await typesense
+                .collections("viespirkiaiJAR")
+                .documents()
+                .search({
+                    q: baseQuery,
+                    query_by: "pavadinimasBase,pavadinimas,adresas",
+                    per_page: limit,
+                    page: page,
+                });
 
-        // Extract documents
-        let documents = resultsRaw.hits.map((hit) => hit.document);
+            // Extract documents
+            let documents = resultsRaw.hits.map((hit) => hit.document);
 
-        // Only rank by Levenshtein if all results fit on one page
-        if (resultsRaw.found <= limit) {
-            documents.sort((a, b) => {
-                const nameA = a.pavadinimasBase || a.pavadinimas;
-                const nameB = b.pavadinimasBase || b.pavadinimas;
-                return (
-                    levenshtein(baseQuery, nameA) -
-                    levenshtein(baseQuery, nameB)
-                );
+            // Only rank by Levenshtein if all results fit on one page
+            if (resultsRaw.found <= limit) {
+                documents.sort((a, b) => {
+                    const nameA = a.pavadinimasBase || a.pavadinimas;
+                    const nameB = b.pavadinimasBase || b.pavadinimas;
+                    return (
+                        levenshtein(baseQuery, nameA) -
+                        levenshtein(baseQuery, nameB)
+                    );
+                });
+            }
+
+            // Format registravimoData
+            results = documents.map((item) => ({
+                ...item,
+                registravimoData: toLithuanianTime(item.registravimoData).split(
+                    " ",
+                )[0],
+            }));
+
+            total = resultsRaw.found;
+        } else {
+            // PostgreSQL ILIKE fallback
+            searchEngine = "PostgreSQL";
+            const offset = (page - 1) * limit;
+            const { rows } = await postgres.query(
+                `SELECT *, COUNT(*) OVER() AS total_count
+                 FROM public."jarCsv"
+                 WHERE "pavadinimas" ILIKE $1
+                 ORDER BY "pavadinimas"
+                 LIMIT $2 OFFSET $3`,
+                [`%${search}%`, limit, offset],
+            );
+            results = rows.map((row) => {
+                const { total_count, ...item } = row;
+                total = parseInt(total_count) || 0;
+                return {
+                    ...item,
+                    registravimoData: item.registravimoData
+                        ? String(item.registravimoData).split("T")[0]
+                        : "",
+                };
             });
+            if (results.length === 0) total = 0;
         }
-
-        // Format registravimoData
-        results = documents.map((item) => ({
-            ...item,
-            registravimoData: toLithuanianTime(item.registravimoData).split(
-                " ",
-            )[0],
-        }));
-
-        total = resultsRaw.found;
     } else if (location && locationRadius) {
         searchEngine = "PostgreSQL";
         const [lat, lon] = location.split(",").map(Number);
@@ -117,6 +143,24 @@ export async function searchJar(query = {}, options = {}) {
 export async function findSingleJuridinis(queryStr, options = {}) {
     const { similarityThreshold = 1 } = options;
     if (!queryStr) return null;
+
+    if (!config.typesenseUp) {
+        // PostgreSQL ILIKE fallback
+        const { rows } = await postgres.query(
+            `SELECT * FROM public."jarCsv"
+             WHERE "pavadinimas" ILIKE $1
+             ORDER BY "pavadinimas"
+             LIMIT 10`,
+            [`%${queryStr}%`],
+        );
+        if (rows.length === 0) return null;
+        return {
+            ...rows[0],
+            registravimoData: rows[0].registravimoData
+                ? String(rows[0].registravimoData).split("T")[0]
+                : "",
+        };
+    }
 
     const baseQuery = toBaseCompanyName(queryStr).replace(
         /([:"<>=&|!()\[\]{}~*?\\/])/g,

@@ -82,6 +82,19 @@ function drawNodeLabel(context, data, settings) {
     }
 }
 
+// Draws hover highlight ring + label below (same position as drawNodeLabel)
+function drawNodeHover(context, data, settings) {
+    var nodeSize = data.size || 8;
+    context.beginPath();
+    context.arc(data.x, data.y, nodeSize + 4, 0, Math.PI * 2);
+    context.fillStyle = 'rgba(255,255,255,0.6)';
+    context.fill();
+    context.strokeStyle = data.color || '#9ca3af';
+    context.lineWidth = 2;
+    context.stroke();
+    drawNodeLabel(context, data, settings);
+}
+
 // ── Graph setup ───────────────────────────────────────────────────────────────
 
 var graph = new Graph({ type: 'directed', multi: true });
@@ -92,7 +105,7 @@ var renderer = new Sigma(graph, container, {
     nodeProgramClasses: { image: NodeImageProgram },
     defaultNodeType: 'image',
     defaultDrawNodeLabel: drawNodeLabel,
-    defaultDrawEdgeLabel: null,
+    defaultDrawNodeHover: drawNodeHover,
     renderEdgeLabels: true,
     labelFont: 'Arial',
     labelSize: 11,

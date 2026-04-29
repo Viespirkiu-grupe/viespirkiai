@@ -119,13 +119,17 @@ function personNode(vardas, pavarde, deklaracija, fromDate) {
 
 /**
  * Builds a ContractEntity node object.
+ * @param {string} id
+ * @param {string} pavadinimas  Partner company name (used as node label)
+ * @param {number} verte
  */
-function contractNode(id, label, verte) {
+function contractNode(id, pavadinimas, verte) {
     return {
         id,
         attributes: {
             entityType: 'ContractEntity',
-            label: label || '',
+            pavadinimas: pavadinimas || '',
+            label: wrapLabel(pavadinimas || ''),
             verte: verte || 0,
             expanded: true,
             size: 8,
@@ -250,7 +254,7 @@ export async function expandOrg(jarKodas) {
         const supplierOrg = orgNode(row.jarKodas, row.pavadinimas, null);
         addNode(nodes, nodeMap, supplierOrg);
         const valueLabel = formatContractValue(row.total);
-        const cNode = contractNode(`contract:buyer${jk}:seller${row.jarKodas}`, valueLabel, row.total);
+        const cNode = contractNode(`contract:buyer${jk}:seller${row.jarKodas}`, row.pavadinimas, row.total);
         addNode(nodes, nodeMap, cNode);
         addEdge(edges, edgeMap, edge(rootOrg.id, cNode.id, 'Order', valueLabel, null));
         addEdge(edges, edgeMap, edge(cNode.id, supplierOrg.id, 'Delivery', '', null));
@@ -262,7 +266,7 @@ export async function expandOrg(jarKodas) {
         const buyerOrg = orgNode(row.jarKodas, row.pavadinimas, null);
         addNode(nodes, nodeMap, buyerOrg);
         const valueLabel = formatContractValue(row.total);
-        const cNode = contractNode(`contract:buyer${row.jarKodas}:seller${jk}`, valueLabel, row.total);
+        const cNode = contractNode(`contract:buyer${row.jarKodas}:seller${jk}`, row.pavadinimas, row.total);
         addNode(nodes, nodeMap, cNode);
         addEdge(edges, edgeMap, edge(buyerOrg.id, cNode.id, 'Order', valueLabel, null));
         addEdge(edges, edgeMap, edge(cNode.id, rootOrg.id, 'Delivery', '', null));
