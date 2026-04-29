@@ -7,6 +7,7 @@ of procurement relationships between legal entities. The user searches for a com
 company search, selects one, and the graph initialises with that company as the root node.
 
 Two types of node expansion are supported:
+
 - **Organisation node click** — expands employees, board members, shareholders, spouses, and linked contract
   partners via `/voratinklis/expand/:jarKodas`.
 - **Person node click** — expands all workplaces, governance roles, and spouse relationships declared by
@@ -27,20 +28,20 @@ bundle must be compiled with `esbuild` and served as `public/dist/voratinklis.js
 
 The graph uses the entity and edge model defined in the repository data structures:
 
-| Node type            | Expand trigger        | Source function / data                                         | Key fields                                                   |
-|----------------------|-----------------------|----------------------------------------------------------------|--------------------------------------------------------------|
-| `OrganizationEntity` | Org node click        | `gautiPinregDeklaracijasPagalJarKoda(jarKodas)` + `asmuo.json` | `jarKodas`, `pavadinimas`, `registravimoData`, `formosKodas` |
-| `PersonEntity`       | Org node click        | `pinreg.darbovietes[]` / `pinreg.rysiaiSuJa[]`                | `vardas + pavarde` (name is the identity key), `rysioPradzia` |
-| `PersonEntity`       | Person node click     | `gautiPinregDeklaracijasPagalVardaPavarde(fullName)`           | Same; all declarations for that name are merged into one node |
-| `ContractEntity`     | Org node click        | `sutartys.topPirkejai/topTiekejai`                             | `sutartiesUnikalusID`, `verte`, dates                        |
+| Node type            | Expand trigger    | Source function / data                                         | Key fields                                                    |
+|----------------------|-------------------|----------------------------------------------------------------|---------------------------------------------------------------|
+| `OrganizationEntity` | Org node click    | `gautiPinregDeklaracijasPagalJarKoda(jarKodas)` + `asmuo.json` | `jarKodas`, `pavadinimas`, `registravimoData`, `formosKodas`  |
+| `PersonEntity`       | Org node click    | `pinreg.darbovietes[]` / `pinreg.rysiaiSuJa[]`                 | `vardas + pavarde` (name is the identity key), `rysioPradzia` |
+| `PersonEntity`       | Person node click | `gautiPinregDeklaracijasPagalVardaPavarde(fullName)`           | Same; all declarations for that name are merged into one node |
+| `ContractEntity`     | Org node click    | `sutartys.topPirkejai/topTiekejai`                             | `sutartiesUnikalusID`, `verte`, dates                         |
 
 **Entity ID convention:**
 
-| Entity | ID format | Example |
-|---|---|---|
-| Organisation | `org:{jarKodas}` | `org:110053842` |
-| Person | `person:{vardas.trim().toLowerCase()} {pavarde.trim().toLowerCase()}` | `person:jonas jonaitis` |
-| Contract | `contract:{sutartiesUnikalusID}` | `contract:2008059225` |
+| Entity       | ID format                                                             | Example                 |
+|--------------|-----------------------------------------------------------------------|-------------------------|
+| Organisation | `org:{jarKodas}`                                                      | `org:110053842`         |
+| Person       | `person:{vardas.trim().toLowerCase()} {pavarde.trim().toLowerCase()}` | `person:jonas jonaitis` |
+| Contract     | `contract:{sutartiesUnikalusID}`                                      | `contract:2008059225`   |
 
 > **Person identity is name-only.** The same physical person appearing in declarations for different
 > organisations will have the same node ID and will be merged into a single graph node automatically
@@ -51,39 +52,78 @@ The graph uses the entity and edge model defined in the repository data structur
 
 #### Person node expansion — what `gautiPinregDeklaracijasPagalVardaPavarde` returns
 
-| Section | Produces | Edge type |
-|---|---|---|
-| `darbovietes[]` | `OrganizationEntity` stub nodes + edges | `Employment` / `Director` / `Official` (person → org) |
-| `rysiaiSuJa[]` | `OrganizationEntity` stub nodes + edges | `Director` / `Shareholder` / `Official` (person → org) |
+| Section                    | Produces                                             | Edge type                                                |
+|----------------------------|------------------------------------------------------|----------------------------------------------------------|
+| `darbovietes[]`            | `OrganizationEntity` stub nodes + edges              | `Employment` / `Director` / `Official` (person → org)    |
+| `rysiaiSuJa[]`             | `OrganizationEntity` stub nodes + edges              | `Director` / `Shareholder` / `Official` (person → org)   |
 | `sutuoktinioDarbovietes[]` | `PersonEntity` (spouse) + `OrganizationEntity` stubs | `Spouse` (person → spouse) + `Employment` (spouse → org) |
 
-| Edge type                              | Direction       | Source                                                  |
-|----------------------------------------|-----------------|---------------------------------------------------------|
-| `Employment` / `Director` / `Official` | Person → Org    | `pinreg.darbovietes[].pareiguTipasPavadinimas`          |
-| `Shareholder`                          | Person → Org    | `pinreg.rysiaiSuJa[].rysioPobudzioPavadinimas`          |
-| `Spouse`                               | Person → Person | `pinreg.sutuoktinioDarbovietes[]`                       |
-| `Order`                                | Org → Contract  | `sutartys.topPirkejai` → buyer side                     |
-| `Delivery`                             | Org → Contract  | `sutartys.topTiekejai` → supplier side                  |
+| Edge type                              | Direction       | Source                                         |
+|----------------------------------------|-----------------|------------------------------------------------|
+| `Employment` / `Director` / `Official` | Person → Org    | `pinreg.darbovietes[].pareiguTipasPavadinimas` |
+| `Shareholder`                          | Person → Org    | `pinreg.rysiaiSuJa[].rysioPobudzioPavadinimas` |
+| `Spouse`                               | Person → Person | `pinreg.sutuoktinioDarbovietes[]`              |
+| `Order`                                | Org → Contract  | `sutartys.topPirkejai` → buyer side            |
+| `Delivery`                             | Org → Contract  | `sutartys.topTiekejai` → supplier side         |
+
+#### Edge labels
+
+Every edge must carry a visible `label` attribute set at build time in `modules/voratinklis/expand.js`:
+
+| Edge type                                                   | `label` value                                                           |
+|-------------------------------------------------------------|-------------------------------------------------------------------------|
+| `Order` / `Delivery`                                        | Formatted `verte`: `€1.2M`, `€450K`, `€12K`, etc. — see formatting note |
+| `Employment` / `Director` / `Official`                      | Raw `pareiguTipasPavadinimas` string from the declaration (Lithuanian)  |
+| `Director` / `Shareholder` / `Official` (from `rysiaiSuJa`) | Raw `rysioPobudzioPavadinimas` string (Lithuanian)                      |
+| `Spouse`                                                    | `"Sutuoktinis"`                                                         |
+
+> **Contract value formatting**: use `Math.round(verte)` and express as `€XM` (millions, 1 dp), `€XK`
+> (thousands, 0 dp), or `€X` (under 1000) — e.g. `1234567 → €1.2M`, `45000 → €45K`, `800 → €800`.
+> `null`/`0` values display an empty string (no label).
+
+#### Node labels
+
+Node labels are rendered **below** the node. Long names are word-wrapped at **3 words per line**
+using a simple space-split utility:
+
+```js
+function wrapLabel(name, n = 3) {
+    const words = (name ?? '').split(' ');
+    const lines = [];
+    for (let i = 0; i < words.length; i += n) lines.push(words.slice(i, i + n).join(' '));
+    return lines.join('\n');
+}
+```
+
+| Entity type          | Label source             | Applied as                          |
+|----------------------|--------------------------|-------------------------------------|
+| `OrganizationEntity` | `pavadinimas`            | `wrapLabel(pavadinimas)`            |
+| `PersonEntity`       | `vardas + " " + pavarde` | `wrapLabel(vardas + " " + pavarde)` |
+| `ContractEntity`     | `pavadinimas`            | `wrapLabel(pavadinimas)`            |
+
+Sigma's default label renderer draws labels to the **right** of the node centre. A custom
+`defaultDrawNodeLabel` function must be provided to `new Sigma(graph, container, { defaultDrawNodeLabel })`
+to position the label **below** the node (draw at `y + nodeSize + labelPadding`, horizontally centred on `x`).
 
 ### Architecture
 
 New server-side module `modules/voratinklis/` containing:
 
 - `expand.js` — two exported functions:
-  - `expandOrg(jarKodas)` — calls `gautiPinregDeklaracijasPagalJarKoda` (from `modules/pinreg/pinregDeklaracijos.js`)
-    + the existing `asmuo` route queries; maps raw fields to `GraphNode[]` and `GraphEdge[]`.
-  - `expandPerson(fullName)` — calls `gautiPinregDeklaracijasPagalVardaPavarde` (from `modules/pinreg/pagalVarda.js`)
-    with `{ flat: false }`; maps `darbovietes`, `rysiaiSuJa`, and `sutuoktinioDarbovietes` to graph elements.
-    Returns stub `OrganizationEntity` nodes (only `jarKodas` + `pavadinimas` known) for each workplace.
-  - Both return `{ nodes: GraphNode[], edges: GraphEdge[] }`.
+    - `expandOrg(jarKodas)` — calls `gautiPinregDeklaracijasPagalJarKoda` (from `modules/pinreg/pinregDeklaracijos.js`)
+        + the existing `asmuo` route queries; maps raw fields to `GraphNode[]` and `GraphEdge[]`.
+    - `expandPerson(fullName)` — calls `gautiPinregDeklaracijasPagalVardaPavarde` (from `modules/pinreg/pagalVarda.js`)
+      with `{ flat: false }`; maps `darbovietes`, `rysiaiSuJa`, and `sutuoktinioDarbovietes` to graph elements.
+      Returns stub `OrganizationEntity` nodes (only `jarKodas` + `pavadinimas` known) for each workplace.
+    - Both return `{ nodes: GraphNode[], edges: GraphEdge[] }`.
 
 New route `routes/voratinklis.js`:
 
-| Method | Path                                    | Purpose                                                              |
-|--------|-----------------------------------------|----------------------------------------------------------------------|
-| `GET`  | `/voratinklis`                          | EJS page shell (header + full-height Sigma canvas + search bar)      |
-| `GET`  | `/voratinklis/expand/:jarKodas`         | JSON: graph nodes+edges for one organisation (calls `expandOrg`)     |
-| `GET`  | `/voratinklis/expand-person`            | JSON: graph nodes+edges for one person by full name (`?vardas=...`). Calls `expandPerson`. |
+| Method | Path                            | Purpose                                                                                    |
+|--------|---------------------------------|--------------------------------------------------------------------------------------------|
+| `GET`  | `/voratinklis`                  | EJS page shell (header + full-height Sigma canvas + search bar)                            |
+| `GET`  | `/voratinklis/expand/:jarKodas` | JSON: graph nodes+edges for one organisation (calls `expandOrg`)                           |
+| `GET`  | `/voratinklis/expand-person`    | JSON: graph nodes+edges for one person by full name (`?vardas=...`). Calls `expandPerson`. |
 
 Browser bundle `src/voratinklis-bundle.js` compiled by esbuild into `public/dist/voratinklis.js`:
 imports sigma, graphology, layouts, and node-programs; exports nothing — attaches `window.Voratinklis`
@@ -104,22 +144,24 @@ for the canonical pattern). `@tanstack/query-core` was considered but is **not u
   zero-framework vanilla JS convention throughout all views.
 
 **In-flight deduplication pattern** (to implement in the inline script):
+
 ```js
 const expandingNodes = new Set(); // IDs currently being fetched
 
 async function loadOrg(jarKodas) {
-  const id = `org:${jarKodas}`;
-  if (expandingNodes.has(id)) return;
-  expandingNodes.add(id);
-  try {
-    const data = await fetch(`/voratinklis/expand/${jarKodas}`).then(r => r.json());
-    mergeGraphElements(data);
-    graph.setNodeAttribute(id, 'expanded', true);
-  } finally {
-    expandingNodes.delete(id);
-  }
+    const id = `org:${jarKodas}`;
+    if (expandingNodes.has(id)) return;
+    expandingNodes.add(id);
+    try {
+        const data = await fetch(`/voratinklis/expand/${jarKodas}`).then(r => r.json());
+        mergeGraphElements(data);
+        graph.setNodeAttribute(id, 'expanded', true);
+    } finally {
+        expandingNodes.delete(id);
+    }
 }
 ```
+
 Same pattern applies to `loadPerson`, keyed by `person:{(vardas+" "+pavarde).trim().toLowerCase()}`.
 
 ### Structural Diagram
@@ -160,37 +202,32 @@ sequenceDiagram
     actor User
     participant Browser
     participant Server
-
-    User->>Browser: GET /voratinklis
-    Browser->>Server: GET /voratinklis
-    Server-->>Browser: EJS page (search bar + empty Sigma canvas)
-
-    User->>Browser: Types company name in search
-    Browser->>Server: GET /juridiniai?search=...&tikRezultatai=true
-    Server-->>Browser: Partial HTML results (reused)
-
-    User->>Browser: Clicks a company in results
-    Browser->>Server: GET /voratinklis/expand/{jarKodas}
-    Server-->>Browser: { nodes[], edges[] }
-    Browser->>Browser: Add to graphology Graph
-    Browser->>Browser: Run ForceAtlas2 layout
-    Browser->>Browser: Render with Sigma
-
-    User->>Browser: Clicks unexpanded org node
-    Browser->>Server: GET /voratinklis/expand/{jarKodas}
-    Server-->>Browser: { nodes[], edges[] } (merged, idempotent)
-    Browser->>Browser: Pre-position new nodes outward from clicked node
-    Browser->>Browser: Short ForceAtlas2 pass to settle
-    Browser->>Browser: Re-render Sigma
-
-    User->>Browser: Clicks unexpanded person node
+    User ->> Browser: GET /voratinklis
+    Browser ->> Server: GET /voratinklis
+    Server -->> Browser: EJS page (search bar + empty Sigma canvas)
+    User ->> Browser: Types company name in search
+    Browser ->> Server: GET /juridiniai?search=...&tikRezultatai=true
+    Server -->> Browser: Partial HTML results (reused)
+    User ->> Browser: Clicks a company in results
+    Browser ->> Server: GET /voratinklis/expand/{jarKodas}
+    Server -->> Browser: { nodes[], edges[] }
+    Browser ->> Browser: Add to graphology Graph
+    Browser ->> Browser: Run ForceAtlas2 layout
+    Browser ->> Browser: Render with Sigma
+    User ->> Browser: Clicks unexpanded org node
+    Browser ->> Server: GET /voratinklis/expand/{jarKodas}
+    Server -->> Browser: { nodes[], edges[] } (merged, idempotent)
+    Browser ->> Browser: Pre-position new nodes outward from clicked node
+    Browser ->> Browser: Short ForceAtlas2 pass to settle
+    Browser ->> Browser: Re-render Sigma
+    User ->> Browser: Clicks unexpanded person node
     Note over Browser: person node attrs contain vardas + pavarde
-    Browser->>Server: GET /voratinklis/expand-person?vardas=Jonas+Jonaitis
-    Server-->>Browser: { nodes[], edges[] }\n(darbovietes + rysiaiSuJa + sutuoktinioDarbovietes)
-    Browser->>Browser: Merge nodes/edges (stub orgs, spouse person, edges)
-    Browser->>Browser: Pre-position new nodes outward from person node
-    Browser->>Browser: Short ForceAtlas2 pass + noverlap
-    Browser->>Browser: Re-render Sigma
+    Browser ->> Server: GET /voratinklis/expand-person?vardas=Jonas+Jonaitis
+    Server -->> Browser: { nodes[], edges[] }\n(darbovietes + rysiaiSuJa + sutuoktinioDarbovietes)
+    Browser ->> Browser: Merge nodes/edges (stub orgs, spouse person, edges)
+    Browser ->> Browser: Pre-position new nodes outward from person node
+    Browser ->> Browser: Short ForceAtlas2 pass + noverlap
+    Browser ->> Browser: Re-render Sigma
 ```
 
 ---
@@ -226,25 +263,36 @@ sequenceDiagram
 **Phase 2 — Backend expand API**
 
 - [ ] Create `modules/voratinklis/expand.js` with two exported functions:
-  - `expandOrg(jarKodas)`:
-    - Calls `gautiPinregDeklaracijasPagalJarKoda(jarKodas)` from `modules/pinreg/pinregDeklaracijos.js` for
-      `darbovietes`, `rysiaiSuJa`, `sutuoktinioDarbovietes`
-    - Maps `jar.*` → `OrganizationEntity` node with `id: "org:{jarKodas}"`
-    - Maps `darbovietes[]` → `PersonEntity` nodes with `id: "person:{(vardas+' '+pavarde).trim().toLowerCase()}"` (store `vardas`, `pavarde`, `deklaracija` as attrs) + `Employment/Director/Official` edges
-    - Maps `rysiaiSuJa[]` → `PersonEntity` nodes (same name-based ID) + `Director/Shareholder/Official` edges — merges automatically if person already in graph
-    - Maps `sutuoktinioDarbovietes[]` → `PersonEntity` nodes (name-based ID for both declarant and spouse) + `Spouse` edges
-    - Maps `sutartys.topPirkejai[]` and `sutartys.topTiekejai[]` → stub `OrganizationEntity` nodes + `Order`/`Delivery` edges
-    - Returns `{ nodes: GraphNode[], edges: GraphEdge[] }`
-  - `expandPerson(fullName)`:
-    - Calls `gautiPinregDeklaracijasPagalVardaPavarde(fullName, { flat: false })` from `modules/pinreg/pagalVarda.js`
-    - Maps `darbovietes[]` → stub `OrganizationEntity` nodes (`jarKodas` + `pavadinimas`) + `Employment/Director/Official` edges (person → org)
-    - Maps `rysiaiSuJa[]` → stub `OrganizationEntity` nodes + `Director/Shareholder/Official` edges (person → org)
-    - Maps `sutuoktinioDarbovietes[]` → `PersonEntity` (spouse, id: `person:{sutuoktinioVardas+' '+sutuoktinioPavarde}` normalized) + `Spouse` edge + stub org nodes + `Employment` edges (spouse → org)
-    - Returns `{ nodes: GraphNode[], edges: GraphEdge[] }`
+    - `expandOrg(jarKodas)`:
+        - Calls `gautiPinregDeklaracijasPagalJarKoda(jarKodas)` from `modules/pinreg/pinregDeklaracijos.js` for
+          `darbovietes`, `rysiaiSuJa`, `sutuoktinioDarbovietes`
+        - Maps `jar.*` → `OrganizationEntity` node with `id: "org:{jarKodas}"`
+        - Maps `darbovietes[]` → `PersonEntity` nodes with `id: "person:{(vardas+' '+pavarde).trim().toLowerCase()}"` (
+          store `vardas`, `pavarde`, `deklaracija` as attrs) + `Employment/Director/Official` edges with
+          `label: pareiguTipasPavadinimas`
+        - Maps `rysiaiSuJa[]` → `PersonEntity` nodes (same name-based ID) + `Director/Shareholder/Official` edges with
+          `label: rysioPobudzioPavadinimas` — merges automatically if person already in graph
+        - Maps `sutuoktinioDarbovietes[]` → `PersonEntity` nodes (name-based ID for both declarant and spouse) +
+          `Spouse` edges with `label: "Sutuoktinis"`
+        - Maps `sutartys.topPirkejai[]` and `sutartys.topTiekejai[]` → stub `OrganizationEntity` nodes + `Order`/
+          `Delivery` edges with `label: formatContractValue(verte)` (e.g. `€1.2M`)
+        - Returns `{ nodes: GraphNode[], edges: GraphEdge[] }`
+    - `expandPerson(fullName)`:
+        - Calls `gautiPinregDeklaracijasPagalVardaPavarde(fullName, { flat: false })` from
+          `modules/pinreg/pagalVarda.js`
+        - Maps `darbovietes[]` → stub `OrganizationEntity` nodes (`jarKodas` + `pavadinimas`) +
+          `Employment/Director/Official` edges with `label: pareiguTipasPavadinimas` (person → org)
+        - Maps `rysiaiSuJa[]` → stub `OrganizationEntity` nodes + `Director/Shareholder/Official` edges with
+          `label: rysioPobudzioPavadinimas` (person → org)
+        - Maps `sutuoktinioDarbovietes[]` → `PersonEntity` (spouse, id:
+          `person:{sutuoktinioVardas+' '+sutuoktinioPavarde}` normalized) + `Spouse` edge with `label: "Sutuoktinis"` +
+          stub org nodes + `Employment` edges with `label: pareiguTipasPavadinimas` (spouse → org)
+        - Returns `{ nodes: GraphNode[], edges: GraphEdge[] }`
 - [ ] Wire `GET /voratinklis/expand/:jarKodas` → `expandOrg`
 - [ ] Wire `GET /voratinklis/expand-person?vardas=...` → `expandPerson` (validate `vardas` query param is present)
 - [ ] Manually verify org expand: `curl "/voratinklis/expand/110053842"` returns well-formed data
-- [ ] Manually verify person expand: `curl "/voratinklis/expand-person?vardas=Jonas+Jonaitis"` returns darbovietes + rysiaiSuJa + sutuoktinioDarbovietes mapped to graph elements
+- [ ] Manually verify person expand: `curl "/voratinklis/expand-person?vardas=Jonas+Jonaitis"` returns darbovietes +
+  rysiaiSuJa + sutuoktinioDarbovietes mapped to graph elements
 - [ ] Mark all checkboxes as done in this document once verified
 
 **Phase 3 — Frontend Sigma graph**
@@ -256,7 +304,19 @@ sequenceDiagram
     - On company selection, trigger `loadOrg(jarKodas)` via JS
 - [ ] In the inline `<script>` (or a separate `views/js/voratinklis.ejs`):
     - Initialise a `graphology.Graph` (directed)
-    - Initialise Sigma renderer on `#voratinklis-canvas` with `NodeBorderProgram` and `NodeImageProgram`
+    - Define the `wrapLabel(name, n = 3)` helper (splits on spaces, groups into lines of `n` words, joins with `\n`)
+    - Implement `formatContractValue(verte)` helper (e.g. `1234567 → "€1.2M"`, `45000 → "€45K"`, `800 → "€800"`, null →
+      `""`)
+    - Implement a custom `drawNodeLabel` function that renders the label **below** the node:
+        - Position: `(x, y + nodeSize + 4)` in canvas coordinates, `textAlign: "center"`
+        - Split label on `\n` and draw each line incrementally (line height ≈ `fontSize + 2px`)
+        - Pass as `settings.defaultDrawNodeLabel` to the Sigma constructor
+    - When adding nodes to the graph, set `label` using `wrapLabel`:
+        - `OrganizationEntity`: `label: wrapLabel(pavadinimas)`
+        - `PersonEntity`: `label: wrapLabel(vardas + " " + pavarde)`
+        - `ContractEntity`: `label: wrapLabel(pavadinimas)`
+    - Initialise Sigma renderer on `#voratinklis-canvas` with `NodeBorderProgram`, `NodeImageProgram`, and custom
+      `defaultDrawNodeLabel`
     - Maintain `const expandingNodes = new Set()` to deduplicate concurrent in-flight expand requests
       (consistent with the `inFlightControllers` Map pattern in `views/juridiniai/search.ejs`)
     - `loadOrg(jarKodas)`:
@@ -276,8 +336,10 @@ sequenceDiagram
         6. Short ForceAtlas2 pass + noverlap to settle layout
         7. Mark node `expanded: true`; remove from `expandingNodes` in `finally`
     - On Sigma node `clickNode` event:
-      - `OrganizationEntity` node with `expanded === false` → call `loadOrg(node.attributes.jarKodas)`, mark `expanded: true`
-      - `PersonEntity` node with `expanded === false` → call `loadPerson(node.attributes.vardas, node.attributes.pavarde)`, mark `expanded: true`
+        - `OrganizationEntity` node with `expanded === false` → call `loadOrg(node.attributes.jarKodas)`, mark
+          `expanded: true`
+        - `PersonEntity` node with `expanded === false` → call
+          `loadPerson(node.attributes.vardas, node.attributes.pavarde)`, mark `expanded: true`
     - Node size: `Math.max(8, Math.log(node.attributes.verte ?? 1) * 3)` for org nodes; fixed size for person nodes
     - Node colour: grey for stub orgs, blue for expanded orgs, orange for persons, green for contracts
 - [ ] Verify graph renders for a real `jarKodas` (e.g. `110053842`)
