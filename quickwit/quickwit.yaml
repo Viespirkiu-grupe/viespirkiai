@@ -13,5 +13,10 @@ indexer:
   max_concurrent_split_uploads: 8
 
 searcher:
-  fast_field_cache_capacity: 1G
-  split_footer_cache_capacity: 500M
+  fast_field_cache_capacity: 4G
+  split_footer_cache_capacity: 2G
+  partial_request_cache_capacity: 512M
+  aggregation_memory_limit: 1G
+  aggregation_bucket_limit: 100000
+  max_num_concurrent_split_searches: 200
+  max_num_concurrent_split_streams: 200
