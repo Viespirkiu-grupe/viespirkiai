@@ -11,7 +11,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 5048M
+                    memory: 6048M
 
     postgres:
         build:
