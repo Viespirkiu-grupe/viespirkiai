@@ -343,6 +343,11 @@
                 <source src="https://failai.viespirkiai.org/<%= failas.id %>" type="video/mp4">
             </video>
 
+        <% } else if (failas.extension === "mp3") { %>
+            <audio controls class="w-full">
+                <source src="https://failai.viespirkiai.org/<%= failas.id %>" type="audio/mpeg">
+            </audio>
+
         <% } else if (imageFormats.includes(failas.extension)) { %>
             <%
                 let convertString = "";
