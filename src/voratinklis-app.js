@@ -128,6 +128,16 @@ var NODE_COLOR = {
     contract: '#10b981',
 };
 
+var EDGE_COLOR = {
+    Director:    '#1d4ed8',
+    Shareholder: '#7c3aed',
+    Official:    '#0891b2',
+    Employment:  '#6b7280',
+    Spouse:      '#f59e0b',
+    Order:       '#10b981',
+    Delivery:    '#10b981',
+};
+
 function nodeColor(attrs) {
     if (attrs.entityType === 'ContractEntity') return NODE_COLOR.contract;
     if (attrs.entityType === 'PersonEntity') return NODE_COLOR.person;
@@ -176,6 +186,7 @@ function mergeGraphElements(data, fromNodeId) {
                 var attrs = Object.assign({}, e.attributes || {});
                 // Rename semantic 'type' to 'edgeType' so Sigma doesn't try to find a renderer program for it.
                 if (attrs.type) { attrs.edgeType = attrs.type; delete attrs.type; }
+                attrs.color = EDGE_COLOR[attrs.edgeType] || '#d1d5db';
                 graph.addEdgeWithKey(e.id, e.source, e.target, attrs);
             }
         }

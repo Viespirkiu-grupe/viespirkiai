@@ -30,6 +30,32 @@
       color: var(--color-muted, #6b7280);
       pointer-events: none;
     }
+    #voratinklis-legend {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      color: #374151;
+      pointer-events: none;
+      line-height: 1.6;
+    }
+    .dark #voratinklis-legend {
+      background: rgba(30,41,59,0.92);
+      border-color: #374151;
+      color: #d1d5db;
+    }
+    .vl-swatch {
+      display: inline-block;
+      width: 22px;
+      height: 3px;
+      border-radius: 2px;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
   </style>
 </head>
 <body>
@@ -38,6 +64,14 @@
   <div id="voratinklis-wrapper">
     <div id="voratinklis-canvas"></div>
     <div id="voratinklis-status"></div>
+    <div id="voratinklis-legend">
+      <div><span class="vl-swatch" style="background:#1d4ed8"></span>Direktorius / vadovas</div>
+      <div><span class="vl-swatch" style="background:#7c3aed"></span>Akcininkas</div>
+      <div><span class="vl-swatch" style="background:#0891b2"></span>Pareigūnas / oficialus</div>
+      <div><span class="vl-swatch" style="background:#6b7280"></span>Darbuotojas</div>
+      <div><span class="vl-swatch" style="background:#f59e0b"></span>Sutuoktinis</div>
+      <div><span class="vl-swatch" style="background:#10b981"></span>Sutartis</div>
+    </div>
   </div>
 
   <script src="/dist/voratinklis.js"></script>

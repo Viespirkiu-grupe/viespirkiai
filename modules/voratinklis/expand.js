@@ -38,15 +38,26 @@ export function personId(vardas, pavarde) {
 }
 
 /**
- * Maps darbovietesTipas to an edge relationship type.
- * @param {string|null} tipas
+ * Maps a free-text pareigos (job title) to an edge relationship type.
+ * @param {string|null} pareigos  e.g. "Direktorius", "Generalinis direktorius", "Buhalterė"
  * @returns {'Director'|'Employment'|'Official'}
  */
-export function mapDarbovietesTipas(tipas) {
-    if (!tipas) return 'Employment';
-    const t = tipas.toLowerCase();
-    if (t.includes('vadovas')) return 'Director';
-    if (t.includes('pirkimo iniciatorius') || t.includes('ekspertas')) return 'Official';
+export function mapPareigos(pareigos) {
+    if (!pareigos) return 'Employment';
+    const p = pareigos.toLowerCase();
+    if (
+        p.includes('direktorius') || p.includes('direktorė') ||
+        p.includes('vadovas') || p.includes('vadovė') ||
+        p.includes('prezidentas') || p.includes('prezidentė') ||
+        p.includes('pirmininkas') || p.includes('pirmininkė') ||
+        p.includes('generalinis')
+    ) return 'Director';
+    if (
+        p.includes('pirkimo iniciatorius') ||
+        p.includes('ekspertas') || p.includes('ekspertė') ||
+        p.includes('prokuristas') ||
+        p.includes('kontrolierius') || p.includes('kontrolierė')
+    ) return 'Official';
     return 'Employment';
 }
 
@@ -211,7 +222,7 @@ export async function expandOrg(jarKodas) {
             const pNode = personNode(row.vardas, row.pavarde, row.deklaracija, row.rysioPradzia);
             addNode(nodes, nodeMap, pNode);
 
-            const relType = mapDarbovietesTipas(row.darbovietesTipas);
+            const relType = mapPareigos(row.pareigos);
             const label = row.pareigos || '';
             addEdge(edges, edgeMap, edge(pNode.id, rootOrg.id, relType, label, row.rysioPradzia));
 
@@ -237,7 +248,7 @@ export async function expandOrg(jarKodas) {
             addNode(nodes, nodeMap, spouseNode);
 
             // Spouse works at this org
-            const relType = mapDarbovietesTipas(row.darbovietesTipas);
+            const relType = mapPareigos(row.pareigos);
             const label = row.pareigos || '';
             addEdge(edges, edgeMap, edge(spouseNode.id, rootOrg.id, relType, label, row.rysioPradzia));
 
@@ -321,7 +332,7 @@ export async function expandPerson(fullName) {
             const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
             addNode(nodes, nodeMap, stub);
 
-            const relType = mapDarbovietesTipas(row.darbovietesTipas);
+            const relType = mapPareigos(row.pareigos);
             const label = row.pareigos || '';
             addEdge(edges, edgeMap, edge(personNodeId, stub.id, relType, label, row.rysioPradzia));
 
@@ -351,7 +362,7 @@ export async function expandPerson(fullName) {
             if (row.jarKodas && row.pavadinimas) {
                 const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
                 addNode(nodes, nodeMap, stub);
-                const relType = mapDarbovietesTipas(row.darbovietesTipas);
+                const relType = mapPareigos(row.pareigos);
                 const label = row.pareigos || '';
                 addEdge(edges, edgeMap, edge(spouseN.id, stub.id, relType, label, null));
             }

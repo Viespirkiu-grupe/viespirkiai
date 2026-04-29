@@ -5,7 +5,7 @@ import {
     formatContractValue,
     wrapLabel,
     personId,
-    mapDarbovietesTipas,
+    mapPareigos,
     mapRysioPobudis,
     mapFormosKodas,
     orgNode,
@@ -38,12 +38,22 @@ describe('personId', () => {
     it('handles empty strings', () => assert.equal(personId('', ''), 'person:'));
 });
 
-describe('mapDarbovietesTipas', () => {
-    it('returns Employment for null', () => assert.equal(mapDarbovietesTipas(null), 'Employment'));
-    it('returns Director for vadovas role', () => assert.equal(mapDarbovietesTipas('Vadovas'), 'Director'));
-    it('returns Official for pirkimo iniciatorius', () => assert.equal(mapDarbovietesTipas('Pirkimo iniciatorius'), 'Official'));
-    it('returns Official for ekspertas', () => assert.equal(mapDarbovietesTipas('Ekspertas'), 'Official'));
-    it('returns Employment for unrecognised role', () => assert.equal(mapDarbovietesTipas('Buhalteris'), 'Employment'));
+describe('mapPareigos', () => {
+    it('returns Employment for null', () => assert.equal(mapPareigos(null), 'Employment'));
+    it('returns Employment for empty string', () => assert.equal(mapPareigos(''), 'Employment'));
+    it('returns Director for Direktorius', () => assert.equal(mapPareigos('Direktorius'), 'Director'));
+    it('returns Director for Direktorė', () => assert.equal(mapPareigos('Direktorė'), 'Director'));
+    it('returns Director for Generalinis direktorius', () => assert.equal(mapPareigos('Generalinis direktorius'), 'Director'));
+    it('returns Director for Vadovas', () => assert.equal(mapPareigos('Vadovas'), 'Director'));
+    it('returns Director for Pirmininkas', () => assert.equal(mapPareigos('Pirmininkas'), 'Director'));
+    it('returns Director for Prezidentas', () => assert.equal(mapPareigos('Prezidentas'), 'Director'));
+    it('returns Official for Pirkimo iniciatorius', () => assert.equal(mapPareigos('Pirkimo iniciatorius'), 'Official'));
+    it('returns Official for Ekspertas', () => assert.equal(mapPareigos('Ekspertas'), 'Official'));
+    it('returns Official for Prokuristas', () => assert.equal(mapPareigos('Prokuristas'), 'Official'));
+    it('returns Official for Kontrolierius', () => assert.equal(mapPareigos('Kontrolierius'), 'Official'));
+    it('returns Employment for Buhalterė', () => assert.equal(mapPareigos('Buhalterė'), 'Employment'));
+    it('returns Employment for unrecognised role', () => assert.equal(mapPareigos('Gydytojas'), 'Employment'));
+    it('is case-insensitive', () => assert.equal(mapPareigos('DIREKTORIUS'), 'Director'));
 });
 
 describe('mapRysioPobudis', () => {

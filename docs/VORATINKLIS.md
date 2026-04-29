@@ -358,6 +358,76 @@ Browser ->> Browser: Hide loading overlay
     - While the overlay is visible it covers the canvas, so no further node clicks can fire. No extra
       click-guard logic is needed — the DOM overlay handles it.
 
+---
+
+**Phase 7 — Proper Person→Org edge types from actual job title**
+
+#### Background
+
+`mapDarbovietesTipas(tipas)` checks for keywords like `"vadovas"` and `"ekspertas"` inside `tipas`,
+but it is currently called with `row.darbovietesTipas` whose only values are `STANDARTINE`, `EKSPERTO`,
+and `SUTUOKTINIO`. None of these match the keyword checks, so the function always falls through to
+`'Employment'` — meaning every person→org edge for `DEKLARUOJANCIO_DARBOVIETE` rows is typed as
+`Employment` regardless of whether the person is a CEO, Board Chair, or a Shareholder.
+
+The actual role lives in `row.pareigos` ("Direktorius", "Vadovas", "Generalinis direktorius",
+"Pirkimo iniciatorius", etc.). `mapDarbovietesTipas` must be updated to accept `pareigos` content,
+and all call sites must pass `row.pareigos` instead of `row.darbovietesTipas`.
+
+#### Tasks
+
+- [ ] **Rename + fix `mapDarbovietesTipas` to operate on `pareigos`**
+  (`modules/voratinklis/expand.js`):
+
+  Rename the function to `mapPareigos(pareigos)` and expand the Lithuanian keyword list:
+
+  | `pareigos` contains (case-insensitive) | Edge type    |
+  |----------------------------------------|--------------|
+  | `direktorius`, `direktorė`, `vadovas`, `prezidentas`, `pirmininkas`, `generalinis` | `'Director'` |
+  | `pirkimo iniciatorius`, `ekspertas`, `prokuristas`, `kontrolierius` | `'Official'` |
+  | anything else (or null/empty)          | `'Employment'` |
+
+  Update all call sites in `expandOrg` and `expandPerson` to pass `row.pareigos`:
+  - `expandOrg` → `DEKLARUOJANCIO_DARBOVIETE` branch (line ~214): `mapPareigos(row.pareigos)`
+  - `expandOrg` → `SUTUOKTINIO_DARBOVIETE` branch (line ~240): `mapPareigos(row.pareigos)` (spouse's job title)
+  - `expandPerson` → `DEKLARUOJANCIO_DARBOVIETE` branch (line ~324): `mapPareigos(row.pareigos)`
+  - `expandPerson` → `SUTUOKTINIO_DARBOVIETE` branch (line ~354): `mapPareigos(row.pareigos)`
+
+  For `KITI_RYSIAI_SU_JA` rows `mapRysioPobudis(row.rysioPobudzioPavadinimas)` is already correct — no change needed.
+
+- [ ] **Update unit tests for `mapPareigos`** (`test/voratinklis/expand.test.js`):
+
+  Replace all `mapDarbovietesTipas` test cases with `mapPareigos` test cases covering:
+  - `"Direktorius"` → `'Director'`
+  - `"Generalinis direktorius"` → `'Director'`
+  - `"Vadovas"` → `'Director'`
+  - `"Direktorė"` → `'Director'`
+  - `"Pirmininkas"` → `'Director'`
+  - `"Pirkimo iniciatorius"` → `'Official'`
+  - `"Prokuristas"` → `'Official'`
+  - `"Buhalterė"` → `'Employment'`
+  - `""` / `null` → `'Employment'`
+
+- [ ] **Edge colour differentiation by edge type** (`src/voratinklis-app.js`):
+
+  Add an `EDGE_COLOR` map and apply it when merging edges so that Directors, Shareholders, and
+  regular employees are visually distinct:
+
+  | Edge type (stored as `edgeType` attribute) | Colour   |
+  |--------------------------------------------|----------|
+  | `Director`                                 | `#1d4ed8` (dark blue) |
+  | `Shareholder`                              | `#7c3aed` (purple) |
+  | `Official`                                 | `#0891b2` (teal) |
+  | `Employment`                               | `#6b7280` (gray) |
+  | `Spouse`                                   | `#f59e0b` (amber) |
+  | `Order` / `Delivery`                       | `#10b981` (green — unchanged) |
+
+  In `mergeGraphElements`, after building `attrs`, set `attrs.color = EDGE_COLOR[attrs.edgeType] || '#d1d5db'`
+  before calling `graph.addEdgeWithKey`.
+
+  Also add a legend `<div>` below the Sigma container (or as an absolutely positioned overlay) listing
+  the edge type → colour mapping so users can interpret the graph without prior knowledge.
+
 ## Open Questions
 
 1. **ForceAtlas2 in browser**: `graphology-layout-forceatlas2` runs synchronously and blocks the main thread
