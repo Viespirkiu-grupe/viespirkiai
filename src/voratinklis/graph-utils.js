@@ -146,9 +146,13 @@ export function syncPositionsToData(dataGraph, viewGraph) {
  */
 export function runLayout(graph, forceAtlas2, noverlap) {
     if (graph.order < 2) return;
+    var inferred = forceAtlas2.inferSettings(graph);
     var positions = forceAtlas2(graph, {
-        iterations: 150,
-        settings: forceAtlas2.inferSettings(graph),
+        iterations: 200,
+        settings: Object.assign({}, inferred, {
+            scalingRatio: Math.max(inferred.scalingRatio || 1, 10),
+            gravity: 0.5,
+        }),
     });
     graph.forEachNode(function (id) {
         if (positions[id]) {
@@ -156,5 +160,5 @@ export function runLayout(graph, forceAtlas2, noverlap) {
             graph.setNodeAttribute(id, 'y', positions[id].y);
         }
     });
-    noverlap(graph, { maxIterations: 50 });
+    noverlap(graph, { maxIterations: 100, settings: { ratio: 1.2 } });
 }

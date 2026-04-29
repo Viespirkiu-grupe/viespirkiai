@@ -59,13 +59,9 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             var newNodeIds = rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes);
 
             if (startPos && newNodeIds.length > 0) {
-                // Pre-position new nodes at clicked node for animation start
-                newNodeIds.forEach(function (nid) {
-                    if (viewGraph.hasNode(nid)) {
-                        viewGraph.setNodeAttribute(nid, 'x', startPos.x);
-                        viewGraph.setNodeAttribute(nid, 'y', startPos.y);
-                    }
-                });
+                // Run layout with natural scattered positions from mergeGraphElements —
+                // NOT from startPos. Starting many nodes at the same coordinate causes
+                // ForceAtlas2 to produce a degenerate layout (forces cancel out).
                 runLayout(viewGraph, forceAtlas2, noverlap);
                 syncPositionsToData(dataGraph, viewGraph);
                 // Capture final layout positions
@@ -78,7 +74,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                         };
                     }
                 });
-                // Reset to start so animateNodes reads correct start coords
+                // Reset to startPos so animateNodes animates from the clicked node outward
                 newNodeIds.forEach(function (nid) {
                     if (viewGraph.hasNode(nid)) {
                         viewGraph.setNodeAttribute(nid, 'x', startPos.x);
