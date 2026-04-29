@@ -45,6 +45,7 @@ var ui = createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, f
 bindLegendCheckboxes(function () { return ui.getSelectedNodeId(); }, legendState, ui.rebuildAndRefresh);
 
 var INITIAL_JAR_KODAS = window.VORATINKLIS_CONFIG.jarKodas;
-document.addEventListener('DOMContentLoaded', function () {
-    ui.loadOrg(INITIAL_JAR_KODAS, null);
+document.addEventListener('DOMContentLoaded', async function () {
+    await ui.loadOrg(INITIAL_JAR_KODAS, null);
+    ui.selectNode('org:' + INITIAL_JAR_KODAS);
 });

@@ -6,8 +6,16 @@
  * @param {LegendState}   legendState - the LegendState instance
  */
 export function updateLegendForNode(nodeId, label, legendState) {
+    var legendEl = document.getElementById('voratinklis-legend');
     var titleEl = document.getElementById('voratinklis-legend-title');
-    if (titleEl) titleEl.textContent = label != null ? label : 'Filtrai';
+
+    if (nodeId == null) {
+        if (legendEl) legendEl.hidden = true;
+        return;
+    }
+
+    if (legendEl) legendEl.hidden = false;
+    if (titleEl) titleEl.textContent = label != null ? label : nodeId;
 
     document.querySelectorAll('#voratinklis-legend input[type=checkbox][data-edge-types]').forEach(function (cb) {
         var types = cb.dataset.edgeTypes.split(',');

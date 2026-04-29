@@ -197,5 +197,5 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     renderer.on('clickStage', deselectAll);
 
-    return { loadOrg, loadPerson, rebuildAndRefresh, getSelectedNodeId: function () { return selectedNodeId; } };
+    return { loadOrg, loadPerson, rebuildAndRefresh, getSelectedNodeId: function () { return selectedNodeId; }, selectNode };
 }
