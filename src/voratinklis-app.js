@@ -8,7 +8,7 @@ var Sigma = _v.Sigma;
 var Graph = _v.Graph;
 var forceAtlas2 = _v.forceAtlas2;
 var noverlap = _v.noverlap;
-var NodeImageProgram = _v.NodeImageProgram;
+var NodeImageProgram = _v.createNodeImageProgram({ padding: 0.2 });
 var animateNodes = _v.animateNodes;
 
 // dataGraph: permanent store of all fetched nodes+edges (never given to Sigma)
