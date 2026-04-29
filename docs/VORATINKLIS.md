@@ -38,11 +38,11 @@ The graph uses the entity and edge model defined in the repository data structur
 
 **Entity ID convention:**
 
-| Entity       | ID format                                                             | Example                                      |
-|--------------|-----------------------------------------------------------------------|----------------------------------------------|
-| Organisation | `org:{jarKodas}`                                                      | `org:110053842`                              |
-| Person       | `person:{vardas.trim().toLowerCase()} {pavarde.trim().toLowerCase()}` | `person:jonas jonaitis`                      |
-| Contract     | `contract:buyer{buyerJk}:seller{sellerJk}`                           | `contract:buyer110078991:seller110394345`    |
+| Entity       | ID format                                                             | Example                                   |
+|--------------|-----------------------------------------------------------------------|-------------------------------------------|
+| Organisation | `org:{jarKodas}`                                                      | `org:110053842`                           |
+| Person       | `person:{vardas.trim().toLowerCase()} {pavarde.trim().toLowerCase()}` | `person:jonas jonaitis`                   |
+| Contract     | `contract:buyer{buyerJk}:seller{sellerJk}`                            | `contract:buyer110078991:seller110394345` |
 
 > **Person identity is name-only.** The same physical person appearing in declarations for different
 > organisations will have the same node ID and will be merged into a single graph node automatically
@@ -56,20 +56,20 @@ The graph uses the entity and edge model defined in the repository data structur
 Both functions query `pinregJuridiniaiRysiai` directly. Each row has an `irasoTipas` classifier that
 determines which graph elements to produce:
 
-| `irasoTipas`                  | Produces                                                     | Edge type(s)                                              |
-|-------------------------------|--------------------------------------------------------------|-----------------------------------------------------------|
-| `DEKLARUOJANCIO_DARBOVIETE`   | `PersonEntity` (declarant) + `OrganizationEntity` stub       | `Employment`/`Director`/`Official` — person → org         |
-| `KITI_RYSIAI_SU_JA`           | `PersonEntity` + `OrganizationEntity` stub                   | `Director`/`Shareholder`/`Official` — person → org        |
-| `SUTUOKTINIO_DARBOVIETE`      | `PersonEntity` (spouse) + `OrganizationEntity` stub + declarant `PersonEntity` | `Employment`/`Director` (spouse → org) + `Spouse` (declarant → spouse) |
+| `irasoTipas`                | Produces                                                                       | Edge type(s)                                                           |
+|-----------------------------|--------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| `DEKLARUOJANCIO_DARBOVIETE` | `PersonEntity` (declarant) + `OrganizationEntity` stub                         | `Employment`/`Director`/`Official` — person → org                      |
+| `KITI_RYSIAI_SU_JA`         | `PersonEntity` + `OrganizationEntity` stub                                     | `Director`/`Shareholder`/`Official` — person → org                     |
+| `SUTUOKTINIO_DARBOVIETE`    | `PersonEntity` (spouse) + `OrganizationEntity` stub + declarant `PersonEntity` | `Employment`/`Director` (spouse → org) + `Spouse` (declarant → spouse) |
 
-| Edge type                              | Direction       | Source                                                                  |
-|----------------------------------------|-----------------|-------------------------------------------------------------------------|
-| `Employment` / `Director` / `Official` | Person → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = DEKLARUOJANCIO_DARBOVIETE` |
-| `Employment` / `Director`              | Spouse → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE` |
-| `Shareholder` / `Director` / `Official`| Person → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = KITI_RYSIAI_SU_JA`    |
-| `Spouse`                               | Person → Person | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE` (declarant → spouse) |
-| `Order`                                | Org → Contract  | `sutartys.topPirkejai` → buyer side                                     |
-| `Delivery`                             | Org → Contract  | `sutartys.topTiekejai` → supplier side                                  |
+| Edge type                               | Direction       | Source                                                                                        |
+|-----------------------------------------|-----------------|-----------------------------------------------------------------------------------------------|
+| `Employment` / `Director` / `Official`  | Person → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = DEKLARUOJANCIO_DARBOVIETE`                   |
+| `Employment` / `Director`               | Spouse → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE`                      |
+| `Shareholder` / `Director` / `Official` | Person → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = KITI_RYSIAI_SU_JA`                           |
+| `Spouse`                                | Person → Person | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE` (declarant → spouse) |
+| `Order`                                 | Org → Contract  | `sutartys.topPirkejai` → buyer side                                                           |
+| `Delivery`                              | Org → Contract  | `sutartys.topTiekejai` → supplier side                                                        |
 
 > **`irasoTipas` is a record classifier, not a role label.** The three distinct values in the DB are
 > `DEKLARUOJANCIO_DARBOVIETE`, `SUTUOKTINIO_DARBOVIETE`, and `KITI_RYSIAI_SU_JA`. They must **never**
@@ -100,33 +100,30 @@ flowchart LR
         E5["Delivery\n(no label)"]
     end
 
-    JC -->|"pavadinimas, formosKodas"| OE_root
-
-    PR -->|"DEKLARUOJANCIO_DARBOVIETE\nvardas + pavarde"| PE
-    PR -->|"SUTUOKTINIO_DARBOVIETE\nvardas/pavarde = spouse\nsusijusioAsmens* = declarant"| PE
-    PR -->|"KITI_RYSIAI_SU_JA\nvardas + pavarde"| PE
-    PR -->|"all irasoTipas\njarKodas + pavadinimas"| OE_stub
-
-    PR -->|"DEKLARUOJANCIO / SUTUOKTINIO\ndirection: person → org\npareigos"| E1
-    PR -->|"KITI_RYSIAI_SU_JA\ndirection: person → org\nrysioPobudzioPavadinimas"| E2
-    PR -->|"SUTUOKTINIO_DARBOVIETE\ndirection: declarant → spouse"| E3
-
-    SS -->|"suma=verte · kiekis=count"| CE
-    SS -->|"tiekejoKodas / pirkejoKodas\npavadinimas via JOIN jarCsv"| OE_stub
-    SS -->|"direction: org → contract\nsuma as label"| E4
-    SS -->|"direction: contract → org"| E5
+    JC -->|" pavadinimas, formosKodas "| OE_root
+    PR -->|" DEKLARUOJANCIO_DARBOVIETE\nvardas + pavarde "| PE
+    PR -->|" SUTUOKTINIO_DARBOVIETE\nvardas/pavarde = spouse\nsusijusioAsmens* = declarant "| PE
+    PR -->|" KITI_RYSIAI_SU_JA\nvardas + pavarde "| PE
+    PR -->|" all irasoTipas\njarKodas + pavadinimas "| OE_stub
+    PR -->|" DEKLARUOJANCIO / SUTUOKTINIO\ndirection: person → org\npareigos "| E1
+    PR -->|" KITI_RYSIAI_SU_JA\ndirection: person → org\nrysioPobudzioPavadinimas "| E2
+    PR -->|" SUTUOKTINIO_DARBOVIETE\ndirection: declarant → spouse "| E3
+    SS -->|" suma=verte · kiekis=count "| CE
+    SS -->|" tiekejoKodas / pirkejoKodas\npavadinimas via JOIN jarCsv "| OE_stub
+    SS -->|" direction: org → contract\nsuma as label "| E4
+    SS -->|" direction: contract → org "| E5
 ```
 
 #### Edge labels
 
 Every edge must carry a visible `label` attribute set at build time in `modules/voratinklis/expand.js`:
 
-| Edge type                                                        | `label` value                                                           |
-|------------------------------------------------------------------|-------------------------------------------------------------------------|
-| `Order` / `Delivery`                                             | Formatted `verte`: `€1.2M`, `€450K`, `€12K`, etc. — see formatting note |
-| `Employment` / `Director` / `Official` (person or spouse → org) | `pareigos` field (free-text job title, e.g. "Direktorius", "Gydytojas"). Never `darbovietesTipas` — that field holds `STANDARTINE`, `EKSPERTO`, or `SUTUOKTINIO` and is not human-readable |
-| `Director` / `Shareholder` / `Official` (from `KITI_RYSIAI_SU_JA`) | `rysioPobudzioPavadinimas` field (controlled vocabulary, e.g. "Valdybos narys", "Akcininkas") |
-| `Spouse`                                                         | `"Sutuoktinis"`                                                         |
+| Edge type                                                          | `label` value                                                                                                                                                                              |
+|--------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Order` / `Delivery`                                               | Formatted `verte`: `€1.2M`, `€450K`, `€12K`, etc. — see formatting note                                                                                                                    |
+| `Employment` / `Director` / `Official` (person or spouse → org)    | `pareigos` field (free-text job title, e.g. "Direktorius", "Gydytojas"). Never `darbovietesTipas` — that field holds `STANDARTINE`, `EKSPERTO`, or `SUTUOKTINIO` and is not human-readable |
+| `Director` / `Shareholder` / `Official` (from `KITI_RYSIAI_SU_JA`) | `rysioPobudzioPavadinimas` field (controlled vocabulary, e.g. "Valdybos narys", "Akcininkas")                                                                                              |
+| `Spouse`                                                           | `"Sutuoktinis"`                                                                                                                                                                            |
 
 > **Contract value formatting**: use `Math.round(verte)` and express as `€XM` (millions, 1 dp), `€XK`
 > (thousands, 0 dp), or `€X` (under 1000) — e.g. `1234567 → €1.2M`, `45000 → €45K`, `800 → €800`.
@@ -150,7 +147,7 @@ function wrapLabel(name, n = 3) {
 |----------------------|--------------------------|-------------------------------------|
 | `OrganizationEntity` | `pavadinimas`            | `wrapLabel(pavadinimas)`            |
 | `PersonEntity`       | `vardas + " " + pavarde` | `wrapLabel(vardas + " " + pavarde)` |
-| `ContractEntity`     | contract count           | `"N sut."` (e.g. `"17 sut."`)      |
+| `ContractEntity`     | contract count           | `"N sut."` (e.g. `"17 sut."`)       |
 
 Sigma's default label renderer draws labels to the **right** of the node centre. A custom
 `defaultDrawNodeLabel` function must be provided to `new Sigma(graph, container, { defaultDrawNodeLabel })`
@@ -170,12 +167,12 @@ New server-side module `modules/voratinklis/` containing:
 
 New route `routes/voratinklis.js`:
 
-| Method | Path                            | Purpose                                                                                                     |
-|--------|---------------------------------|-------------------------------------------------------------------------------------------------------------|
-| `GET`  | `/voratinklis/`                 | Returns 404 ("įmonė nenurodyta") — no jarKodas was given                                                    |
-| `GET`  | `/voratinklis/:jarKodas`        | EJS page shell with jarKodas passed as template variable; graph auto-initialises on load                    |
-| `GET`  | `/voratinklis/expand/:jarKodas` | JSON: graph nodes+edges for one organisation (calls `expandOrg`)                                            |
-| `GET`  | `/voratinklis/expand-person`    | JSON: graph nodes+edges for one person by full name (`?vardas=...`). Calls `expandPerson`.                  |
+| Method | Path                            | Purpose                                                                                    |
+|--------|---------------------------------|--------------------------------------------------------------------------------------------|
+| `GET`  | `/voratinklis/`                 | Returns 404 ("įmonė nenurodyta") — no jarKodas was given                                   |
+| `GET`  | `/voratinklis/:jarKodas`        | EJS page shell with jarKodas passed as template variable; graph auto-initialises on load   |
+| `GET`  | `/voratinklis/expand/:jarKodas` | JSON: graph nodes+edges for one organisation (calls `expandOrg`)                           |
+| `GET`  | `/voratinklis/expand-person`    | JSON: graph nodes+edges for one person by full name (`?vardas=...`). Calls `expandPerson`. |
 
 > **Route ordering note**: `expand` and `expand-person` static path segments must be registered _before_
 > the `/:jarKodas` wildcard so they are not swallowed by the dynamic route handler.
@@ -240,7 +237,7 @@ graph TD
         ExpandPerson["expandPerson(fullName)\ngautiPinregDeklaracijasPagalVardaPavarde\n→ darbovietes + rysiaiSuJa + sutuoktinioDarbovietes"]
     end
 
-    PageRoute -->|"DOMContentLoaded: loadOrg(jarKodas)"| ExpandOrgAPI
+    PageRoute -->|" DOMContentLoaded: loadOrg(jarKodas) "| ExpandOrgAPI
     SigmaCanvas -->|" org node click "| ExpandOrgAPI
     SigmaCanvas -->|" person node click\n(vardas + pavarde from node attrs) "| ExpandPersonAPI
     ExpandOrgAPI --> ExpandOrg --> ExpandOrgAPI
@@ -270,19 +267,22 @@ sequenceDiagram
     Browser ->> Browser: Run ForceAtlas2 layout
     Browser ->> Browser: Render with Sigma
     User ->> Browser: Clicks unexpanded org node
+    Browser ->> Browser: Show loading overlay (blocks further clicks)
     Browser ->> Server: GET /voratinklis/expand/{jarKodas}
     Server -->> Browser: { nodes[], edges[] } (merged, idempotent)
-    Browser ->> Browser: Pre-position new nodes outward from clicked node
-    Browser ->> Browser: Short ForceAtlas2 pass to settle
-    Browser ->> Browser: Re-render Sigma
-    User ->> Browser: Clicks unexpanded person node
-    Note over Browser: person node attrs contain vardas + pavarde
-    Browser ->> Server: GET /voratinklis/expand-person?vardas=Jonas+Jonaitis
-    Server -->> Browser: { nodes[], edges[] }\n(darbovietes + rysiaiSuJa + sutuoktinioDarbovietes)
-    Browser ->> Browser: Merge nodes/edges (stub orgs, spouse person, edges)
-    Browser ->> Browser: Pre-position new nodes outward from person node
-    Browser ->> Browser: Short ForceAtlas2 pass + noverlap
-    Browser ->> Browser: Re-render Sigma
+    Browser ->> Browser: Merge nodes; pre-position new nodes at clicked node pos
+    Browser ->> Browser: Run ForceAtlas2 → compute final positions
+Browser ->> Browser: animateNodes (600ms, quadraticInOut) clicked pos → final pos
+Browser ->> Browser: Hide loading overlay
+User ->> Browser: Clicks unexpanded person node
+Note over Browser: person node attrs contain vardas + pavarde
+Browser ->> Browser: Show loading overlay
+Browser ->> Server: GET /voratinklis/expand-person?vardas=Jonas+Jonaitis
+Server -->> Browser: { nodes[], edges[] }
+Browser ->> Browser: Merge nodes ; pre-position new nodes at person node pos
+Browser ->> Browser: Run ForceAtlas2 + noverlap → compute final positions
+Browser ->> Browser: animateNodes (600ms, quadraticInOut) → final pos
+Browser ->> Browser: Hide loading overlay
 ```
 
 ---
@@ -309,6 +309,55 @@ sequenceDiagram
 
 ---
 
+**Phase 6 — Expand animations and loading overlay**
+
+- [ ] **Export `animateNodes` from the Sigma bundle** (`src/voratinklis-bundle.js`):
+
+    ```js
+    import { animateNodes } from 'sigma/utils/animate';
+    window.Voratinklis = { Sigma, Graph, forceAtlas2, noverlap,
+                           NodeBorderProgram, NodeImageProgram, animateNodes };
+    ```
+
+  Rebuild with `npm run build` after the change.
+
+- [ ] **Animated node rearrangement after expand** (`src/voratinklis-app.js`):
+
+  When `mergeGraphElements(data)` adds new nodes, animate them from the clicked node's position to
+  their ForceAtlas2-computed positions. Exact steps inside `loadOrg` / `loadPerson`:
+
+    1. Before merging, snapshot the clicked node's `{ x, y }`.
+    2. Call `mergeGraphElements(data)` — new nodes land at default position `(0, 0)`.
+    3. Collect the IDs of all **newly added** nodes (those not in the graph before step 2).
+    4. Pre-position new nodes at the clicked node's `{ x, y }`.
+    5. Run ForceAtlas2 (computes final positions for the full graph in-place).
+    6. Read final `{ x, y }` for each new node from the graph — build a `targets` map.
+    7. Reset each new node back to the clicked node's `{ x, y }`.
+    8. Call `animateNodes(graph, targets, { duration: 600, easing: 'quadraticInOut' })`.
+
+  The result: new nodes visually emerge from the clicked node and fly to their settled positions.
+
+- [ ] **Loading overlay** (`views/voratinklis/index.ejs` + `src/voratinklis-app.js`):
+
+  Add a `<div id="voratinklis-loading">` element inside the Sigma container:
+
+    ```html
+    <div id="voratinklis-loading" style="display:none;position:absolute;inset:0;
+         background:rgba(0,0,0,0.5);z-index:10;
+         align-items:center;justify-content:center;">
+      <div class="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent"></div>
+    </div>
+    ```
+
+  The Sigma container must have `position: relative` (it already fills the viewport — add the style).
+
+  In `voratinklis-app.js`:
+    - `showLoading()` — sets `display: flex` on the overlay. Called immediately when a node is clicked
+      and added to `expandingNodes` (before the `fetch`).
+    - `hideLoading()` — sets `display: none`. Called in the `finally` block of every expand function.
+    - While the overlay is visible it covers the canvas, so no further node clicks can fire. No extra
+      click-guard logic is needed — the DOM overlay handles it.
+
 ## Open Questions
 
 1. **ForceAtlas2 in browser**: `graphology-layout-forceatlas2` runs synchronously and blocks the main thread
@@ -321,36 +370,3 @@ sequenceDiagram
 3. **Header nav link for `/voratinklis`**: Keep the existing nav link pointing to `/voratinklis/` as-is. It
    will show the 404 "įmonė nenurodyta" page when clicked directly — this is intentional. ✓ Resolved.
 
-
-## Nodes:
-
-```typescript
-// MUI icon SVG path data (viewBox 0 0 24 24) keyed by graph node type.
-// To add a new icon: copy the `d` attribute from the MUI icon component source.
-export const MUI_ICON_PATHS: Record<string, string> = {
-    // Business icon — PrivateCompany
-    PrivateCompany:
-        'M12 7V3H2v18h20V7zM6 19H4v-2h2zm0-4H4v-2h2zm0-4H4V9h2zm0-4H4V5h2zm4 12H8v-2h2zm0-4H8v-2h2zm0-4H8V9h2zm0-4H8V5h2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8zm-2-8h-2v2h2zm0 4h-2v2h2z',
-    // DomainAdd icon — PublicCompany
-    PublicCompany:
-        'M12 7V3H2v18h14v-2h-4v-2h2v-2h-2v-2h2v-2h-2V9h8v6h2V7zM6 19H4v-2h2zm0-4H4v-2h2zm0-4H4V9h2zm0-4H4V5h2zm4 12H8v-2h2zm0-4H8v-2h2zm0-4H8V9h2zm0-4H8V5h2zm14 12v2h-2v2h-2v-2h-2v-2h2v-2h2v2zm-6-8h-2v2h2zm0 4h-2v2h2z',
-    // AccountBalance icon — Institution
-    Institution: 'M4 10h3v7H4zm6.5 0h3v7h-3zM2 19h20v3H2zm15-9h3v7h-3zm-5-9L2 6v2h20V6z',
-    // Person icon — Person
-    Person: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4m0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4',
-    // Assignment icon — Tender
-    Tender: 'M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1m2 14H7v-2h7zm3-4H7v-2h10zm0-4H7V7h10z',
-    // HistoryEdu icon — Contract
-    Contract:
-        'M9 4v1.38c-.83-.33-1.72-.5-2.61-.5-1.79 0-3.58.68-4.95 2.05l3.33 3.33h1.11v1.11c.86.86 1.98 1.31 3.11 1.36V15H6v3c0 1.1.9 2 2 2h10c1.66 0 3-1.34 3-3V4zm-1.11 6.41V8.26H5.61L4.57 7.22a5.07 5.07 0 0 1 1.82-.34c1.34 0 2.59.52 3.54 1.46l1.41 1.41-.2.2c-.51.51-1.19.8-1.92.8-.47 0-.93-.12-1.33-.34M19 17c0 .55-.45 1-1 1s-1-.45-1-1v-2h-6v-2.59c.57-.23 1.1-.57 1.56-1.03l.2-.2L15.59 14H17v-1.41l-6-5.97V6h8z',
-};
-
-// Returns a base64-encoded SVG data URI for the given node type, or '' if unknown.
-// The icon is rendered dark (#1e293b) at 64×64 px for crisp display on the light-mode canvas.
-export function makeIconDataUri(nodeType: string): string {
-    const path = MUI_ICON_PATHS[nodeType];
-    if (!path) return '';
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64"><path fill="#1e293b" d="${path}"/></svg>`;
-    return `data:image/svg+xml;base64,${btoa(svg)}`;
-}
-```
