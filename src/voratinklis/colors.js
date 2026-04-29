@@ -19,7 +19,7 @@ export var EDGE_COLOR = {
 
 // Edge types hidden on initial render (legend checkboxes start unchecked).
 // LegendState seeds its global and per-node Sets from this constant.
-export var HIDDEN_BY_DEFAULT = new Set(['Official', 'Employment']);
+export var HIDDEN_BY_DEFAULT = new Set(['Official', 'Employment', 'Spouse']);
 
 export function nodeColor(attrs) {
     if (attrs.entityType === 'ContractEntity') return NODE_COLOR.contract;
