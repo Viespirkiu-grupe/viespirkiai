@@ -24,6 +24,7 @@ export const postgres = new Pool({
 });
 
 export function parsePgArray(str) {
+    if (str === null || str === undefined) return [];
     const result = [];
     let current = "";
     let inQuotes = false;

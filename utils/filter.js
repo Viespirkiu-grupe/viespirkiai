@@ -348,6 +348,7 @@ export class FilterBuilder {
         const qStr = queryParams.length ? "&" + queryParams.join("&") : "";
 
         let sql = "";
+        const paramsCount = [...params];
         let sqlCount = `SELECT COUNT(*) FROM ${table} ${where};`;
 
         if (table) {
@@ -365,6 +366,7 @@ export class FilterBuilder {
             sql,
             sqlCount,
             params,
+            paramsCount,
             filterBy: tsFilters.join(" && "),
             sortBy,
             orderBy,
