@@ -1,7 +1,7 @@
 import { drawNodeLabel, drawNodeHover } from './voratinklis/renderers.js';
 import { createExpandUI } from './voratinklis/expand-ui.js';
 import { bindLegendCheckboxes } from './voratinklis/legend.js';
-import { hiddenEdgeTypes } from './voratinklis/colors.js';
+import { LegendState } from './voratinklis/legend-state.js';
 
 var _v = window.Voratinklis;
 var Sigma = _v.Sigma;
@@ -18,6 +18,9 @@ var viewGraph = new Graph({ type: 'directed', multi: true });
 var container = document.getElementById('voratinklis-canvas');
 var statusEl = document.getElementById('voratinklis-status');
 var loadingEl = document.getElementById('voratinklis-loading');
+
+// Per-node and global edge-type visibility state
+var legendState = new LegendState();
 
 var renderer = new Sigma(viewGraph, container, {
     nodeProgramClasses: { image: NodeImageProgram },
@@ -37,9 +40,9 @@ var renderer = new Sigma(viewGraph, container, {
     maxCameraRatio: 5,
 });
 
-var ui = createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes });
+var ui = createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState });
 
-bindLegendCheckboxes(hiddenEdgeTypes, ui.rebuildAndRefresh);
+bindLegendCheckboxes(function () { return ui.getSelectedNodeId(); }, legendState, ui.rebuildAndRefresh);
 
 var INITIAL_JAR_KODAS = window.VORATINKLIS_CONFIG.jarKodas;
 document.addEventListener('DOMContentLoaded', function () {

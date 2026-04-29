@@ -1,25 +1,28 @@
 import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout } from './graph-utils.js';
-import { hiddenEdgeTypes, NODE_COLOR } from './colors.js';
+import { NODE_COLOR } from './colors.js';
+import { updateLegendForNode } from './legend.js';
 
 /**
  * Creates the expand UI controller.
  * Uses a two-graph design: dataGraph holds all fetched data; viewGraph is Sigma's filtered view.
  *
  * @param {{
- *   dataGraph: Graph,
- *   viewGraph: Graph,
- *   renderer: Sigma,
- *   statusEl: HTMLElement|null,
- *   loadingEl: HTMLElement|null,
- *   forceAtlas2: Function,
- *   noverlap: Function,
+ *   dataGraph:    Graph,
+ *   viewGraph:    Graph,
+ *   renderer:     Sigma,
+ *   statusEl:     HTMLElement|null,
+ *   loadingEl:    HTMLElement|null,
+ *   forceAtlas2:  Function,
+ *   noverlap:     Function,
  *   animateNodes: Function,
+ *   legendState:  LegendState,
  * }} deps
- * @returns {{ loadOrg: Function, loadPerson: Function, rebuildAndRefresh: Function }}
+ * @returns {{ loadOrg, loadPerson, rebuildAndRefresh, getSelectedNodeId }}
  */
-export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes }) {
+export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState }) {
     var expandingNodes = new Set();
     var cancelAnimation = null;
+    var selectedNodeId = null;
 
     function showLoading() { if (loadingEl) loadingEl.hidden = false; }
     function hideLoading() { if (loadingEl) loadingEl.hidden = true; }
@@ -29,15 +32,66 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         return viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : null;
     }
 
+    function _isConfigurableNode(attrs) {
+        return attrs.entityType === 'OrganizationEntity' || attrs.entityType === 'PersonEntity';
+    }
+
+    function _clearSelectionAttrs(id) {
+        if (dataGraph.hasNode(id)) {
+            dataGraph.setNodeAttribute(id, 'highlighted', false);
+            dataGraph.setNodeAttribute(id, 'selected', false);
+        }
+        if (viewGraph.hasNode(id)) {
+            viewGraph.setNodeAttribute(id, 'highlighted', false);
+            viewGraph.setNodeAttribute(id, 'selected', false);
+        }
+    }
+
+    function _setSelectionAttrs(id) {
+        if (dataGraph.hasNode(id)) {
+            dataGraph.setNodeAttribute(id, 'highlighted', true);
+            dataGraph.setNodeAttribute(id, 'selected', true);
+        }
+        if (viewGraph.hasNode(id)) {
+            viewGraph.setNodeAttribute(id, 'highlighted', true);
+            viewGraph.setNodeAttribute(id, 'selected', true);
+        }
+    }
+
+    function selectNode(id) {
+        if (selectedNodeId && selectedNodeId !== id) {
+            _clearSelectionAttrs(selectedNodeId);
+        }
+        selectedNodeId = id;
+        _setSelectionAttrs(id);
+
+        var attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
+        if (_isConfigurableNode(attrs)) {
+            legendState.initNode(id);
+            updateLegendForNode(id, attrs.label || id, legendState);
+        }
+        renderer.refresh();
+    }
+
+    function deselectAll() {
+        if (selectedNodeId) {
+            _clearSelectionAttrs(selectedNodeId);
+            selectedNodeId = null;
+        }
+        updateLegendForNode(null, null, legendState);
+        renderer.refresh();
+    }
+
     /**
-     * Rebuilds viewGraph from dataGraph, runs layout, syncs positions, refreshes.
+     * Rebuilds viewGraph from dataGraph, runs layout, syncs positions, refreshes Sigma.
      * Called by legend checkboxes and after every expand.
      */
     function rebuildAndRefresh() {
         if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
-        rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes);
+        rebuildViewGraph(dataGraph, viewGraph, function (s, t, type) { return legendState.isEdgeHidden(s, t, type); });
         runLayout(viewGraph, forceAtlas2, noverlap);
         syncPositionsToData(dataGraph, viewGraph);
+        if (selectedNodeId) _setSelectionAttrs(selectedNodeId);
         renderer.refresh();
     }
 
@@ -56,15 +110,16 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             mergeGraphElements(dataGraph, getNodePos, data, fromNodeId);
             afterMerge(id);
 
-            var newNodeIds = rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes);
+            var newNodeIds = rebuildViewGraph(dataGraph, viewGraph, function (s, t, type) { return legendState.isEdgeHidden(s, t, type); });
+
+            // Re-apply selection attrs after rebuild (node may have been re-added)
+            if (selectedNodeId && viewGraph.hasNode(selectedNodeId)) {
+                _setSelectionAttrs(selectedNodeId);
+            }
 
             if (startPos && newNodeIds.length > 0) {
-                // Run layout with natural scattered positions from mergeGraphElements —
-                // NOT from startPos. Starting many nodes at the same coordinate causes
-                // ForceAtlas2 to produce a degenerate layout (forces cancel out).
                 runLayout(viewGraph, forceAtlas2, noverlap);
                 syncPositionsToData(dataGraph, viewGraph);
-                // Capture final layout positions
                 var targets = {};
                 newNodeIds.forEach(function (nid) {
                     if (viewGraph.hasNode(nid)) {
@@ -74,7 +129,6 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                         };
                     }
                 });
-                // Reset to startPos so animateNodes animates from the clicked node outward
                 newNodeIds.forEach(function (nid) {
                     if (viewGraph.hasNode(nid)) {
                         viewGraph.setNodeAttribute(nid, 'x', startPos.x);
@@ -119,19 +173,29 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     renderer.on('clickNode', function (event) {
         var nodeId = event.node;
-        var attrs = viewGraph.getNodeAttributes(nodeId);
-        if (attrs.expanded) return;
 
-        if (attrs.entityType === 'OrganizationEntity' && attrs.jarKodas) {
-            viewGraph.setNodeAttribute(nodeId, 'expanded', true);
-            dataGraph.setNodeAttribute(nodeId, 'expanded', true);
-            loadOrg(attrs.jarKodas, nodeId);
-        } else if (attrs.entityType === 'PersonEntity' && attrs.vardas && attrs.pavarde) {
-            viewGraph.setNodeAttribute(nodeId, 'expanded', true);
-            dataGraph.setNodeAttribute(nodeId, 'expanded', true);
-            loadPerson(attrs.vardas, attrs.pavarde);
+        if (selectedNodeId === nodeId) {
+            deselectAll();
+            return;
+        }
+
+        selectNode(nodeId);
+
+        var attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
+        if (!attrs.expanded) {
+            if (attrs.entityType === 'OrganizationEntity' && attrs.jarKodas) {
+                viewGraph.setNodeAttribute(nodeId, 'expanded', true);
+                dataGraph.setNodeAttribute(nodeId, 'expanded', true);
+                loadOrg(attrs.jarKodas, nodeId);
+            } else if (attrs.entityType === 'PersonEntity' && attrs.vardas && attrs.pavarde) {
+                viewGraph.setNodeAttribute(nodeId, 'expanded', true);
+                dataGraph.setNodeAttribute(nodeId, 'expanded', true);
+                loadPerson(attrs.vardas, attrs.pavarde);
+            }
         }
     });
 
-    return { loadOrg, loadPerson, rebuildAndRefresh };
+    renderer.on('clickStage', deselectAll);
+
+    return { loadOrg, loadPerson, rebuildAndRefresh, getSelectedNodeId: function () { return selectedNodeId; } };
 }

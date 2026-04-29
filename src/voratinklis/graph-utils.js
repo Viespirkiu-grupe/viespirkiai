@@ -64,18 +64,21 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
 }
 
 /**
- * Rebuilds viewGraph (Sigma's graph) from dataGraph applying hiddenEdgeTypes filter.
+ * Rebuilds viewGraph (Sigma's graph) from dataGraph using an edge-visibility predicate.
  * Nodes with no visible edges (and not anchors) are removed; newly visible nodes are added.
  *
  * Anchor = expanded node whose entityType is NOT ContractEntity.
  * ContractEntity nodes are never anchors — they vanish when Order/Delivery edges are hidden.
  *
- * @param {Graph}    dataGraph       - permanent store of all fetched nodes+edges
- * @param {Graph}    viewGraph       - Sigma's graph (mutated in-place)
- * @param {Set}      hiddenEdgeTypes - edge types currently hidden
+ * Visibility rule is entirely delegated to the isEdgeHidden predicate supplied by the caller
+ * (typically LegendState.isEdgeHidden bound to the current state).
+ *
+ * @param {Graph}    dataGraph     - permanent store of all fetched nodes+edges
+ * @param {Graph}    viewGraph     - Sigma's graph (mutated in-place)
+ * @param {Function} isEdgeHidden  - (source: string, target: string, edgeType: string) => boolean
  * @returns {string[]} IDs of nodes newly added to viewGraph (for animation)
  */
-export function rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes) {
+export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
     var prevNodes = new Set(viewGraph.nodes());
 
     // Compute the set of nodes that should be visible
@@ -84,7 +87,7 @@ export function rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes) {
         if (attrs.expanded && attrs.entityType !== 'ContractEntity') visible.add(id);
     });
     dataGraph.forEachEdge(function (edgeId, attrs, source, target) {
-        if (!hiddenEdgeTypes.has(attrs.edgeType)) {
+        if (!isEdgeHidden(source, target, attrs.edgeType)) {
             visible.add(source);
             visible.add(target);
         }
@@ -104,14 +107,14 @@ export function rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes) {
 
     // Remove any surviving hidden-type edges from viewGraph
     var edgesToRemove = [];
-    viewGraph.forEachEdge(function (edgeId, attrs) {
-        if (hiddenEdgeTypes.has(attrs.edgeType)) edgesToRemove.push(edgeId);
+    viewGraph.forEachEdge(function (edgeId, attrs, source, target) {
+        if (isEdgeHidden(source, target, attrs.edgeType)) edgesToRemove.push(edgeId);
     });
     edgesToRemove.forEach(function (id) { viewGraph.dropEdge(id); });
 
     // Add visible edges from dataGraph that are not yet in viewGraph
     dataGraph.forEachEdge(function (edgeId, attrs, source, target) {
-        if (hiddenEdgeTypes.has(attrs.edgeType)) return;
+        if (isEdgeHidden(source, target, attrs.edgeType)) return;
         if (!viewGraph.hasNode(source) || !viewGraph.hasNode(target)) return;
         if (viewGraph.hasEdge(edgeId)) return;
         viewGraph.addEdgeWithKey(edgeId, source, target, Object.assign({}, attrs));

@@ -865,20 +865,20 @@ Keeps the Map manipulation testable without DOM or Sigma.
 
 #### Tasks
 
-- [ ] **`src/voratinklis/selection.js`** — create new module with
+- [x] **`src/voratinklis/selection.js`** — create new module with
   `getOrInitNodeHidden(nodeId, nodeHiddenMap, defaults)`.
 
-- [ ] **`src/voratinklis/renderers.js`** — update `drawNodeHover`:
+- [x] **`src/voratinklis/renderers.js`** — update `drawNodeHover`:
     - If `data.selected` is true: draw bold ring (`nodeSize + 6`, `lineWidth: 5`, `rgba(255,255,255,0.15)` fill,
       `data.color` stroke). Do not also draw soft hover ring.
     - Otherwise (hover only): draw existing soft ring (`nodeSize + 4`, `lineWidth: 2`, `rgba(255,255,255,0.6)` fill).
     - In both cases: call `drawNodeLabel(context, data, settings)` at the end.
 
-- [ ] **`views/voratinklis/index.ejs`** — add
+- [x] **`views/voratinklis/index.ejs`** — add
   `<div id="voratinklis-legend-title" style="font-weight:600;text-align:center;margin-bottom:6px;">Filtrai</div>` at the
   top of `#voratinklis-legend`.
 
-- [ ] **`src/voratinklis/legend.js`** — add `updateLegendForNode(label, hiddenSet)`:
+- [x] **`src/voratinklis/legend.js`** — add `updateLegendForNode(label, hiddenSet)`:
     - Sets `document.getElementById('voratinklis-legend-title').textContent` to `label ?? 'Filtrai'`.
     - For each `input[type=checkbox][data-edge-types]`: set `checked = true` if none of its `data-edge-types` values are
       in `hiddenSet`.
@@ -887,33 +887,30 @@ Keeps the Map manipulation testable without DOM or Sigma.
   `bindLegendCheckboxes(getHiddenSet, rebuildAndRefresh)`:
     - On each `change` event: call `getHiddenSet()` to get the live Set, mutate it, then call `rebuildAndRefresh()`.
 
-- [ ] **`src/voratinklis/expand-ui.js`** — add selection state management:
+- [x] **`src/voratinklis/expand-ui.js`** — add selection state management:
     - Declare `var selectedNodeId = null;` and accept `nodeHiddenEdgeTypes` as an injected dep.
     - `selectNode(id)`: deselect previous (clear `highlighted`/`selected` attrs in viewGraph+dataGraph); set
       `highlighted: true; selected: true` on new node in both graphs; call `updateLegendForNode` with node label and its
       hidden Set.
     - `deselectAll()`: clear attrs on `selectedNodeId` if set; set `selectedNodeId = null`; call
       `updateLegendForNode(null, hiddenEdgeTypes)`.
-    - Update `clickNode` handler: call `selectNode(nodeId)` before expanding.
+    - Update `clickNode` handler: call `selectNode(nodeId)` before expanding; toggle-deselect when same node clicked.
     - Add `renderer.on('clickStage', deselectAll)`.
     - Update `rebuildAndRefresh` to pass `currentHiddenSet()` to `rebuildViewGraph`.
-    - Expose `selectNode` and `deselectAll` in the returned object for testing.
+    - Expose `selectNode`, `deselectAll`, and `currentHiddenSet` in the returned object.
 
-- [ ] **`src/voratinklis-app.js`**:
-    - Declare `var selectedNodeId = null; var nodeHiddenEdgeTypes = new Map();`.
-    - Import `getOrInitNodeHidden` from `./voratinklis/selection.js`.
+- [x] **`src/voratinklis-app.js`**:
+    - Declare `var nodeHiddenEdgeTypes = new Map();`.
     - Pass `nodeHiddenEdgeTypes` into `createExpandUI`.
-    - Change `bindLegendCheckboxes` call: pass
-      `() => selectedNodeId ? getOrInitNodeHidden(selectedNodeId, nodeHiddenEdgeTypes, hiddenEdgeTypes) : hiddenEdgeTypes`
-      as the `getHiddenSet` getter.
+    - Change `bindLegendCheckboxes` call: pass `() => ui.currentHiddenSet()` as the `getHiddenSet` getter.
 
-- [ ] **`test/voratinklis/selection.test.js`** — unit tests for `getOrInitNodeHidden`:
+- [x] **`test/voratinklis/selection.test.js`** — unit tests for `getOrInitNodeHidden`:
     - Returns existing Set if nodeId is already in Map.
     - Creates a new Set (a copy of `defaults`) if nodeId is absent.
     - Modifying the returned Set does not affect the original defaults Set.
     - Multiple nodes get independent Sets.
 
-- [ ] **Build** with `npm run build` and verify no compilation errors.
+- [x] **Build** with `npm run build` — clean, `voratinklis-app.js` 8.8 kb, all 98 tests passing.
 
 - [ ] **Browser smoke-test** `http://localhost:9019/voratinklis/{jarKodas}`:
     - Click a node: bold ring appears; legend header shows node label; checkboxes reflect that node's defaults.
@@ -921,6 +918,7 @@ Keeps the Map manipulation testable without DOM or Sigma.
     - Click another node: previous ring gone; new ring appears; legend updates to new node's settings.
     - Clicking same node again: ring disappears; legend reverts to `'Filtrai'`.
     - Previous node's checkbox state is restored when re-selecting it.
+
 
 
 1. **ForceAtlas2 in browser**: `graphology-layout-forceatlas2` runs synchronously and blocks the main thread

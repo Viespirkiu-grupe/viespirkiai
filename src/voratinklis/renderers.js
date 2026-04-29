@@ -26,15 +26,26 @@ export function drawNodeLabel(context, data, settings) {
     }
 }
 
-// Draws hover highlight ring + label below (same position as drawNodeLabel)
+// Draws hover/selection highlight ring + label below.
+// Selected node: bold ring (nodeSize+6, lineWidth 5).
+// Hover only: soft ring (nodeSize+4, lineWidth 2).
 export function drawNodeHover(context, data, settings) {
     var nodeSize = data.size || 8;
     context.beginPath();
-    context.arc(data.x, data.y, nodeSize + 4, 0, Math.PI * 2);
-    context.fillStyle = 'rgba(255,255,255,0.6)';
-    context.fill();
-    context.strokeStyle = data.color || '#9ca3af';
-    context.lineWidth = 2;
-    context.stroke();
+    if (data.selected) {
+        context.arc(data.x, data.y, nodeSize + 6, 0, Math.PI * 2);
+        context.fillStyle = 'rgba(255,255,255,0.15)';
+        context.fill();
+        context.strokeStyle = data.color || '#9ca3af';
+        context.lineWidth = 5;
+        context.stroke();
+    } else {
+        context.arc(data.x, data.y, nodeSize + 4, 0, Math.PI * 2);
+        context.fillStyle = 'rgba(255,255,255,0.6)';
+        context.fill();
+        context.strokeStyle = data.color || '#9ca3af';
+        context.lineWidth = 2;
+        context.stroke();
+    }
     drawNodeLabel(context, data, settings);
 }

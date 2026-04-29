@@ -17,12 +17,9 @@ export var EDGE_COLOR = {
     Delivery:    '#10b981',
 };
 
-// Edge types hidden on initial render (legend checkboxes start unchecked)
+// Edge types hidden on initial render (legend checkboxes start unchecked).
+// LegendState seeds its global and per-node Sets from this constant.
 export var HIDDEN_BY_DEFAULT = new Set(['Official', 'Employment']);
-
-// Mutable shared Set; legend.js mutates this on checkbox change;
-// mergeGraphElements reads it at add time.
-export var hiddenEdgeTypes = new Set(HIDDEN_BY_DEFAULT);
 
 export function nodeColor(attrs) {
     if (attrs.entityType === 'ContractEntity') return NODE_COLOR.contract;

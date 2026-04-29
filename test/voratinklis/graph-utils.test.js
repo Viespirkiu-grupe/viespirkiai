@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import Graph from 'graphology';
 
 import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout } from '../../src/voratinklis/graph-utils.js';
+import { LegendState } from '../../src/voratinklis/legend-state.js';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import noverlap from 'graphology-layout-noverlap';
 
@@ -209,7 +210,10 @@ describe('runLayout', () => {
 
 describe('rebuildViewGraph', () => {
     let dataGraph, viewGraph;
-    const noHidden = new Set();
+
+    // isEdgeHidden predicate that hides a fixed set of types (global, no per-node config)
+    const mkHidden = (types) => { const s = new Set(types); return (src, tgt, type) => s.has(type); };
+    const noneHidden = () => false;
 
     function addOrg(g, id, expanded = false) {
         g.addNode(id, { entityType: 'OrganizationEntity', expanded, x: 1, y: 2, size: 8, color: '#000', label: id });
@@ -231,7 +235,7 @@ describe('rebuildViewGraph', () => {
 
     it('adds expanded non-contract anchor to viewGraph', () => {
         addOrg(dataGraph, 'org:A', true);
-        rebuildViewGraph(dataGraph, viewGraph, noHidden);
+        rebuildViewGraph(dataGraph, viewGraph, noneHidden);
         assert.ok(viewGraph.hasNode('org:A'));
     });
 
@@ -242,7 +246,7 @@ describe('rebuildViewGraph', () => {
         viewGraph.addNode('person:b', { x: 0, y: 0, size: 8, entityType: 'PersonEntity' });
         viewGraph.addNode('org:A', { x: 0, y: 0, size: 8, entityType: 'OrganizationEntity', expanded: true });
 
-        rebuildViewGraph(dataGraph, viewGraph, new Set(['Employment']));
+        rebuildViewGraph(dataGraph, viewGraph, mkHidden(['Employment']));
         assert.ok(!viewGraph.hasNode('person:b'), 'orphan person removed');
         assert.ok(viewGraph.hasNode('org:A'), 'anchor stays');
     });
@@ -252,7 +256,7 @@ describe('rebuildViewGraph', () => {
         addPerson(dataGraph, 'person:b');
         addEdge(dataGraph, 'person:b', 'org:A', 'Employment');
 
-        rebuildViewGraph(dataGraph, viewGraph, new Set(['Employment']));
+        rebuildViewGraph(dataGraph, viewGraph, mkHidden(['Employment']));
         assert.ok(viewGraph.hasNode('org:A'), 'anchor survives with all edges hidden');
         assert.ok(!viewGraph.hasNode('person:b'), 'orphan person absent');
     });
@@ -262,7 +266,7 @@ describe('rebuildViewGraph', () => {
         addContract(dataGraph, 'contract:x');
         addEdge(dataGraph, 'org:A', 'contract:x', 'Order');
 
-        rebuildViewGraph(dataGraph, viewGraph, new Set(['Order', 'Delivery']));
+        rebuildViewGraph(dataGraph, viewGraph, mkHidden(['Order', 'Delivery']));
         assert.ok(!viewGraph.hasNode('contract:x'), 'contract removed when Order/Delivery hidden');
     });
 
@@ -271,7 +275,7 @@ describe('rebuildViewGraph', () => {
         addOrg(dataGraph, 'org:B');
         addEdge(dataGraph, 'org:A', 'org:B', 'Director');
 
-        rebuildViewGraph(dataGraph, viewGraph, noHidden);
+        rebuildViewGraph(dataGraph, viewGraph, noneHidden);
         assert.ok(viewGraph.hasNode('org:B'), 'node with visible edge included');
     });
 
@@ -281,7 +285,7 @@ describe('rebuildViewGraph', () => {
         addEdge(dataGraph, 'org:A', 'org:B', 'Director');
         viewGraph.addNode('org:A', { x: 0, y: 0, size: 8, entityType: 'OrganizationEntity', expanded: true });
 
-        const newNodes = rebuildViewGraph(dataGraph, viewGraph, noHidden);
+        const newNodes = rebuildViewGraph(dataGraph, viewGraph, noneHidden);
         assert.ok(newNodes.includes('org:B'), 'org:B is a new node');
         assert.ok(!newNodes.includes('org:A'), 'org:A was pre-existing');
     });
@@ -293,7 +297,7 @@ describe('rebuildViewGraph', () => {
         dataGraph.setNodeAttribute('person:b', 'x', 42);
         dataGraph.setNodeAttribute('person:b', 'y', 99);
 
-        rebuildViewGraph(dataGraph, viewGraph, noHidden);
+        rebuildViewGraph(dataGraph, viewGraph, noneHidden);
         assert.equal(viewGraph.getNodeAttribute('person:b', 'x'), 42);
         assert.equal(viewGraph.getNodeAttribute('person:b', 'y'), 99);
     });
@@ -303,7 +307,7 @@ describe('rebuildViewGraph', () => {
         addOrg(dataGraph, 'org:B');
         addEdge(dataGraph, 'org:A', 'org:B', 'Director');
 
-        rebuildViewGraph(dataGraph, viewGraph, noHidden);
+        rebuildViewGraph(dataGraph, viewGraph, noneHidden);
         assert.ok(viewGraph.hasEdge('e:org:A:org:B:Director'));
     });
 
@@ -313,9 +317,88 @@ describe('rebuildViewGraph', () => {
         addEdge(dataGraph, 'person:b', 'org:A', 'Employment');
         addEdge(dataGraph, 'person:b', 'org:A', 'Director'); // person has a visible edge too
 
-        rebuildViewGraph(dataGraph, viewGraph, new Set(['Employment']));
+        rebuildViewGraph(dataGraph, viewGraph, mkHidden(['Employment']));
         assert.ok(!viewGraph.hasEdge('e:person:b:org:A:Employment'), 'hidden edge absent');
         assert.ok(viewGraph.hasEdge('e:person:b:org:A:Director'), 'visible edge present');
+    });
+
+    // ── Per-node filtering via LegendState ────────────────────────────────────
+    // These tests use a real LegendState to verify the integration between
+    // LegendState.isEdgeHidden and rebuildViewGraph.
+
+    it('LegendState: configured node hides type → its edges are hidden, unconfigured node edges use global', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addPerson(dataGraph, 'person:b');
+        addEdge(dataGraph, 'person:b', 'org:A', 'Director');
+
+        const ls = new LegendState();
+        ls.initNode('org:A');
+        ls.setTypeVisible('org:A', 'Director', false); // OrgA hides Director
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => ls.isEdgeHidden(s, t, type));
+        assert.ok(!viewGraph.hasEdge('e:person:b:org:A:Director'), 'Director edge to OrgA hidden');
+        assert.ok(!viewGraph.hasNode('person:b'), 'orphan person removed');
+        assert.ok(viewGraph.hasNode('org:A'), 'anchor stays');
+    });
+
+    it('LegendState: configured node shows type → its edges are visible even if global hides', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addPerson(dataGraph, 'person:b');
+        addEdge(dataGraph, 'person:b', 'org:A', 'Employment'); // Employment hidden globally
+
+        const ls = new LegendState();
+        ls.initNode('org:A');
+        ls.setTypeVisible('org:A', 'Employment', true); // OrgA explicitly shows Employment
+
+        // person:b unconfigured (transparent) → org:A configured and shows → edge visible
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => ls.isEdgeHidden(s, t, type));
+        assert.ok(viewGraph.hasEdge('e:person:b:org:A:Employment'), 'Employment edge visible when OrgA shows it');
+        assert.ok(viewGraph.hasNode('person:b'), 'person:b visible because edge is visible');
+    });
+
+    it('CRITICAL: OrgA hides Employment, OrgB shows it — edges to each behave independently', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addOrg(dataGraph, 'org:B', true);
+        addPerson(dataGraph, 'person:x');
+        addEdge(dataGraph, 'person:x', 'org:A', 'Employment');
+        addEdge(dataGraph, 'person:x', 'org:B', 'Employment');
+
+        const ls = new LegendState();
+        ls.initNode('org:A');
+        ls.setTypeVisible('org:A', 'Employment', false); // OrgA: hide Employment
+
+        ls.initNode('org:B');
+        ls.setTypeVisible('org:B', 'Employment', true);  // OrgB: show Employment
+
+        // person:x is NOT initialised → transparent
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => ls.isEdgeHidden(s, t, type));
+
+        assert.ok(!viewGraph.hasEdge('e:person:x:org:A:Employment'), 'Employment edge to OrgA is hidden');
+        assert.ok(viewGraph.hasEdge('e:person:x:org:B:Employment'), 'Employment edge to OrgB is visible');
+    });
+
+    it('CRITICAL: after switching selection from A to B, OrgA settings remain unchanged', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addOrg(dataGraph, 'org:B', true);
+        addPerson(dataGraph, 'person:x');
+        addEdge(dataGraph, 'person:x', 'org:A', 'Director');
+        addEdge(dataGraph, 'person:x', 'org:B', 'Director');
+
+        const ls = new LegendState();
+
+        // User selects OrgA and hides Director
+        ls.initNode('org:A');
+        ls.setTypeVisible('org:A', 'Director', false);
+
+        // User selects OrgB and shows Director (initNode copies global — Director was visible globally)
+        ls.initNode('org:B');
+        // Director is visible by default in OrgB (not in global hidden, so initNode copies it as visible)
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => ls.isEdgeHidden(s, t, type));
+
+        assert.ok(!viewGraph.hasEdge('e:person:x:org:A:Director'), 'Director edge to OrgA must stay hidden');
+        assert.ok(viewGraph.hasEdge('e:person:x:org:B:Director'), 'Director edge to OrgB must be visible');
     });
 });
 
