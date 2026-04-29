@@ -38,11 +38,11 @@ The graph uses the entity and edge model defined in the repository data structur
 
 **Entity ID convention:**
 
-| Entity       | ID format                                                             | Example                 |
-|--------------|-----------------------------------------------------------------------|-------------------------|
-| Organisation | `org:{jarKodas}`                                                      | `org:110053842`         |
-| Person       | `person:{vardas.trim().toLowerCase()} {pavarde.trim().toLowerCase()}` | `person:jonas jonaitis` |
-| Contract     | `contract:{sutartiesUnikalusID}`                                      | `contract:2008059225`   |
+| Entity       | ID format                                                             | Example                                      |
+|--------------|-----------------------------------------------------------------------|----------------------------------------------|
+| Organisation | `org:{jarKodas}`                                                      | `org:110053842`                              |
+| Person       | `person:{vardas.trim().toLowerCase()} {pavarde.trim().toLowerCase()}` | `person:jonas jonaitis`                      |
+| Contract     | `contract:buyer{buyerJk}:seller{sellerJk}`                           | `contract:buyer110078991:seller110394345`    |
 
 > **Person identity is name-only.** The same physical person appearing in declarations for different
 > organisations will have the same node ID and will be merged into a single graph node automatically
@@ -51,13 +51,16 @@ The graph uses the entity and edge model defined in the repository data structur
 > Person nodes must store `vardas` and `pavarde` as separate attributes so the frontend can derive
 > the node ID and pass the full name to `expand-person`.
 
-#### Person node expansion — what `gautiPinregDeklaracijasPagalVardaPavarde` returns
+#### Person node expansion — `expandPerson` and `expandOrg` DB mapping
 
-| Section                    | Produces                                             | Edge type                                                |
-|----------------------------|------------------------------------------------------|----------------------------------------------------------|
-| `darbovietes[]`            | `OrganizationEntity` stub nodes + edges              | `Employment` / `Director` / `Official` (person → org)    |
-| `rysiaiSuJa[]`             | `OrganizationEntity` stub nodes + edges              | `Director` / `Shareholder` / `Official` (person → org)   |
-| `sutuoktinioDarbovietes[]` | `PersonEntity` (spouse) + `OrganizationEntity` stubs | `Spouse` (person → spouse) + `Employment` (spouse → org) |
+Both functions query `pinregJuridiniaiRysiai` directly. Each row has an `irasoTipas` classifier that
+determines which graph elements to produce:
+
+| `irasoTipas`                  | Produces                                                     | Edge type(s)                                              |
+|-------------------------------|--------------------------------------------------------------|-----------------------------------------------------------|
+| `DEKLARUOJANCIO_DARBOVIETE`   | `PersonEntity` (declarant) + `OrganizationEntity` stub       | `Employment`/`Director`/`Official` — person → org         |
+| `KITI_RYSIAI_SU_JA`           | `PersonEntity` + `OrganizationEntity` stub                   | `Director`/`Shareholder`/`Official` — person → org        |
+| `SUTUOKTINIO_DARBOVIETE`      | `PersonEntity` (spouse) + `OrganizationEntity` stub + declarant `PersonEntity` | `Employment`/`Director` (spouse → org) + `Spouse` (declarant → spouse) |
 
 | Edge type                              | Direction       | Source                                                                  |
 |----------------------------------------|-----------------|-------------------------------------------------------------------------|
@@ -71,6 +74,48 @@ The graph uses the entity and edge model defined in the repository data structur
 > **`irasoTipas` is a record classifier, not a role label.** The three distinct values in the DB are
 > `DEKLARUOJANCIO_DARBOVIETE`, `SUTUOKTINIO_DARBOVIETE`, and `KITI_RYSIAI_SU_JA`. They must **never**
 > be used as edge labels — they are only used to decide which mapping branch to enter.
+
+#### Data Source → Graph Element Mapping
+
+```mermaid
+flowchart LR
+    subgraph DB["PostgreSQL Tables"]
+        JC[("jarCsv\npavadinimas · formosKodas")]
+        PR[("pinregJuridiniaiRysiai\nirasoTipas · vardas · pavarde\npareigos · rysioPobudzioPavadinimas\njarKodas · darbovietesTipas")]
+        SS[("sutartysSaliuSumos\npirkejoKodas · tiekejoKodas\nsuma · kiekis")]
+    end
+
+    subgraph GN["Graph Nodes"]
+        OE_root["OrganizationEntity\n— root —\nexpanded=true"]
+        OE_stub["OrganizationEntity\n— stub —\nexpanded=false"]
+        PE["PersonEntity"]
+        CE["ContractEntity\nlabel: N sut."]
+    end
+
+    subgraph GE["Graph Edges"]
+        E1["Employment / Director / Official\nlabel: pareigos"]
+        E2["Shareholder / Director / Official\nlabel: rysioPobudzioPavadinimas"]
+        E3["Spouse\nlabel: Sutuoktinis"]
+        E4["Order\nlabel: €X / €XK / €XM"]
+        E5["Delivery\n(no label)"]
+    end
+
+    JC -->|"pavadinimas, formosKodas"| OE_root
+
+    PR -->|"DEKLARUOJANCIO_DARBOVIETE\nvardas + pavarde"| PE
+    PR -->|"SUTUOKTINIO_DARBOVIETE\nvardas/pavarde = spouse\nsusijusioAsmens* = declarant"| PE
+    PR -->|"KITI_RYSIAI_SU_JA\nvardas + pavarde"| PE
+    PR -->|"all irasoTipas\njarKodas + pavadinimas"| OE_stub
+
+    PR -->|"DEKLARUOJANCIO / SUTUOKTINIO\ndirection: person → org\npareigos"| E1
+    PR -->|"KITI_RYSIAI_SU_JA\ndirection: person → org\nrysioPobudzioPavadinimas"| E2
+    PR -->|"SUTUOKTINIO_DARBOVIETE\ndirection: declarant → spouse"| E3
+
+    SS -->|"suma=verte · kiekis=count"| CE
+    SS -->|"tiekejoKodas / pirkejoKodas\npavadinimas via JOIN jarCsv"| OE_stub
+    SS -->|"direction: org → contract\nsuma as label"| E4
+    SS -->|"direction: contract → org"| E5
+```
 
 #### Edge labels
 
@@ -116,11 +161,11 @@ to position the label **below** the node (draw at `y + nodeSize + labelPadding`,
 New server-side module `modules/voratinklis/` containing:
 
 - `expand.js` — two exported functions:
-    - `expandOrg(jarKodas)` — calls `gautiPinregDeklaracijasPagalJarKoda` (from `modules/pinreg/pinregDeklaracijos.js`)
-        + the existing `asmuo` route queries; maps raw fields to `GraphNode[]` and `GraphEdge[]`.
-    - `expandPerson(fullName)` — calls `gautiPinregDeklaracijasPagalVardaPavarde` (from `modules/pinreg/pagalVarda.js`)
-      with `{ flat: false }`; maps `darbovietes`, `rysiaiSuJa`, and `sutuoktinioDarbovietes` to graph elements.
-      Returns stub `OrganizationEntity` nodes (only `jarKodas` + `pavadinimas` known) for each workplace.
+    - `expandOrg(jarKodas)` — queries `jarCsv`, `pinregJuridiniaiRysiai`, and `sutartysSaliuSumos` (via
+      `gautiSutarciuDuomenisPagalJarKoda`) directly; maps raw rows to `GraphNode[]` and `GraphEdge[]`.
+    - `expandPerson(fullName)` — queries `pinregJuridiniaiRysiai` directly, matching on `vardas`/`pavarde`
+      or `susijusioAsmensVardas`/`susijusioAsmensPavarde`; returns stub `OrganizationEntity` nodes and all
+      person↔org / spouse edges.
     - Both return `{ nodes: GraphNode[], edges: GraphEdge[] }`.
 
 New route `routes/voratinklis.js`:
@@ -253,31 +298,14 @@ sequenceDiagram
 
 ## Tasks
 
-> Phases 1–4 are complete. All infrastructure, backend API, frontend graph, and direct-URL activation work
-> has been shipped. The server-side `expand.js` queries `pinregJuridiniaiRysiai` directly (not the censoring
-> helper) to get raw `vardas`/`pavarde` for correct person IDs — consistent with the `/asmuo/{jarKodas}.json`
-> JSON API pattern.
-
----
-
-**Phase 5 — Visual polish, node icons, and ContractEntity graph structure**
-
-- [x] **`views/voratinklis/index.ejs`**: Remove `<%- include('../footer.ejs') %>`.
-
-- [x] **Extract inline JS to `src/voratinklis-app.js`**: Extracted to `src/voratinklis-app.js`, built by
-  `build:voratinklis-app` into `public/dist/voratinklis-app.js`. EJS retains only
-  `window.VORATINKLIS_CONFIG = { jarKodas: '<%- jarKodas %>' }` inline. Uses `window.Voratinklis.*` for all
-  Sigma deps (no separate imports).
-
-- [x] **Node icons via `NodeImageProgram`**: `makeIconDataUri(nodeType)` and `getIconKey(attrs)` implemented
-  in `src/voratinklis-app.js`. Sigma configured with `nodeProgramClasses: { image: NodeImageProgram }`,
-  `defaultNodeType: 'image'`. Icon set in `mergeGraphElements` via the `image` attribute.
-
-- [x] **Equal node sizes**: All nodes fixed at `size: 8` in `modules/voratinklis/expand.js`.
-
-- [x] **ContractEntity nodes between organisations**: `expandOrg` now inserts intermediate `ContractEntity`
-  nodes. `topTiekejai`: `rootOrg --Order--> contractNode --Delivery--> supplierOrg`. `topPirkejai`:
-  `buyerOrg --Order--> contractNode --Delivery--> rootOrg`. IDs are deterministic (`contract:buyer{jk}:seller{jk}`).
+> **Phases 1–5 complete.** All infrastructure delivered: Express routes (`/voratinklis/`, `/:jarKodas`,
+> `/expand/:jarKodas`, `/expand-person`), server-side `modules/voratinklis/expand.js` (direct DB queries,
+> deduplication, `ContractEntity` intermediate nodes), Sigma.js canvas (full viewport, no footer), node
+> icons via `NodeImageProgram`, equal node sizes (`size: 8`), `ContractEntity` label as `"N sut."`,
+> `Order`/`Delivery` edge value labels with `forceLabel: true`, hover label pinned below node, JS extracted
+> to `src/voratinklis-app.js`, unit tests in `test/voratinklis/expand.test.js` (51 passing, `npm test`).
+> Edge label bug fixed: `DEKLARUOJANCIO_DARBOVIETE` and `SUTUOKTINIO_DARBOVIETE` person→org edges now use
+> `pareigos` (human-readable job title) instead of `darbovietesTipas` (`STANDARTINE`/`EKSPERTO`/`SUTUOKTINIO`).
 
 ---
 

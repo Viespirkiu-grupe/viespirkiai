@@ -8,7 +8,8 @@
         "build": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --minify && esbuild src/voratinklis-bundle.js --bundle --format=iife --outfile=public/dist/voratinklis.js --minify && esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --minify",
         "watch": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --watch & esbuild src/voratinklis-bundle.js --bundle --format=iife --outfile=public/dist/voratinklis.js --watch & esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --watch",
         "build:voratinklis-app": "esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --minify",
-        "watch:voratinklis-app": "esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --watch"
+        "watch:voratinklis-app": "esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --watch",
+        "test": "node --test"
     },
     "keywords": [],
     "author": "",

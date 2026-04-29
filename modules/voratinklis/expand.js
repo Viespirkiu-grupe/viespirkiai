@@ -6,7 +6,7 @@ import { gautiSutarciuDuomenisPagalJarKoda } from '../sutartys/pagalJarKoda.js';
  * @param {number|null} verte
  * @returns {string}
  */
-function formatContractValue(verte) {
+export function formatContractValue(verte) {
     if (verte == null || verte === 0) return '';
     const v = Math.round(verte);
     if (v >= 1000000) return `€${(v / 1000000).toFixed(1)}M`;
@@ -20,7 +20,7 @@ function formatContractValue(verte) {
  * @param {number} n
  * @returns {string}
  */
-function wrapLabel(name, n = 3) {
+export function wrapLabel(name, n = 3) {
     const words = (name ?? '').split(' ');
     const lines = [];
     for (let i = 0; i < words.length; i += n) lines.push(words.slice(i, i + n).join(' '));
@@ -33,7 +33,7 @@ function wrapLabel(name, n = 3) {
  * @param {string} pavarde
  * @returns {string}
  */
-function personId(vardas, pavarde) {
+export function personId(vardas, pavarde) {
     return `person:${(vardas || '').trim().toLowerCase()} ${(pavarde || '').trim().toLowerCase()}`.trimEnd();
 }
 
@@ -42,7 +42,7 @@ function personId(vardas, pavarde) {
  * @param {string|null} tipas
  * @returns {'Director'|'Employment'|'Official'}
  */
-function mapDarbovietesTipas(tipas) {
+export function mapDarbovietesTipas(tipas) {
     if (!tipas) return 'Employment';
     const t = tipas.toLowerCase();
     if (t.includes('vadovas')) return 'Director';
@@ -55,7 +55,7 @@ function mapDarbovietesTipas(tipas) {
  * @param {string|null} pobud
  * @returns {'Director'|'Shareholder'|'Official'}
  */
-function mapRysioPobudis(pobud) {
+export function mapRysioPobudis(pobud) {
     if (!pobud) return 'Official';
     const p = pobud.toLowerCase();
     if (p.includes('valdybos narys') || p.includes('stebėtojų tarybos narys')) return 'Director';
@@ -68,7 +68,7 @@ function mapRysioPobudis(pobud) {
  * @param {string|null} formosKodas
  * @returns {'PrivateCompany'|'PublicCompany'|'Institution'}
  */
-function mapFormosKodas(formosKodas) {
+export function mapFormosKodas(formosKodas) {
     if (!formosKodas) return 'PrivateCompany';
     const k = String(formosKodas);
     if (k.startsWith('4') || k.startsWith('5') || k.startsWith('6') || k.startsWith('7') || k.startsWith('8') || k.startsWith('9')) return 'Institution';
@@ -79,7 +79,7 @@ function mapFormosKodas(formosKodas) {
 /**
  * Builds an OrganizationEntity node object.
  */
-function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
+export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
     const jk = String(jarKodas);
     const id = `org:${jk}`;
     const size = 8;
@@ -100,7 +100,7 @@ function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
 /**
  * Builds a PersonEntity node object.
  */
-function personNode(vardas, pavarde, deklaracija, fromDate) {
+export function personNode(vardas, pavarde, deklaracija, fromDate) {
     const id = personId(vardas, pavarde);
     return {
         id,
@@ -120,16 +120,18 @@ function personNode(vardas, pavarde, deklaracija, fromDate) {
 /**
  * Builds a ContractEntity node object.
  * @param {string} id
- * @param {string} pavadinimas  Partner company name (used as node label)
- * @param {number} verte
+ * @param {string} pavadinimas  Partner company name (for reference, not used as label)
+ * @param {number} verte        Aggregated contract value
+ * @param {number} count        Number of contracts between the two companies
  */
-function contractNode(id, pavadinimas, verte) {
+export function contractNode(id, pavadinimas, verte, count) {
+    const countLabel = count > 0 ? `${count} sut.` : 'Sutartis';
     return {
         id,
         attributes: {
             entityType: 'ContractEntity',
             pavadinimas: pavadinimas || '',
-            label: wrapLabel(pavadinimas || ''),
+            label: countLabel,
             verte: verte || 0,
             expanded: true,
             size: 8,
@@ -140,25 +142,25 @@ function contractNode(id, pavadinimas, verte) {
 /**
  * Builds an edge object.
  */
-function edge(source, target, type, label, fromDate) {
+export function edge(source, target, type, label, fromDate, forceLabel = false) {
     const id = `edge:${source}:${target}:${type}`;
     return {
         id,
         source,
         target,
-        attributes: { type, label: label || '', fromDate: fromDate || null },
+        attributes: { type, label: label || '', fromDate: fromDate || null, forceLabel },
     };
 }
 
 // ── Deduplication helpers ─────────────────────────────────────────────────────
 
-function addNode(nodes, nodeMap, node) {
+export function addNode(nodes, nodeMap, node) {
     if (nodeMap.has(node.id)) return;
     nodeMap.set(node.id, true);
     nodes.push(node);
 }
 
-function addEdge(edges, edgeMap, e) {
+export function addEdge(edges, edgeMap, e) {
     if (edgeMap.has(e.id)) return;
     edgeMap.set(e.id, true);
     edges.push(e);
@@ -210,7 +212,7 @@ export async function expandOrg(jarKodas) {
             addNode(nodes, nodeMap, pNode);
 
             const relType = mapDarbovietesTipas(row.darbovietesTipas);
-            const label = row.darbovietesTipas || row.pareigos || '';
+            const label = row.pareigos || '';
             addEdge(edges, edgeMap, edge(pNode.id, rootOrg.id, relType, label, row.rysioPradzia));
 
         } else if (tipas === 'KITI_RYSIAI_SU_JA') {
@@ -236,7 +238,7 @@ export async function expandOrg(jarKodas) {
 
             // Spouse works at this org
             const relType = mapDarbovietesTipas(row.darbovietesTipas);
-            const label = row.darbovietesTipas || row.pareigos || '';
+            const label = row.pareigos || '';
             addEdge(edges, edgeMap, edge(spouseNode.id, rootOrg.id, relType, label, row.rysioPradzia));
 
             // Declarant → spouse (Spouse edge)
@@ -254,9 +256,9 @@ export async function expandOrg(jarKodas) {
         const supplierOrg = orgNode(row.jarKodas, row.pavadinimas, null);
         addNode(nodes, nodeMap, supplierOrg);
         const valueLabel = formatContractValue(row.total);
-        const cNode = contractNode(`contract:buyer${jk}:seller${row.jarKodas}`, row.pavadinimas, row.total);
+        const cNode = contractNode(`contract:buyer${jk}:seller${row.jarKodas}`, row.pavadinimas, row.total, row.count);
         addNode(nodes, nodeMap, cNode);
-        addEdge(edges, edgeMap, edge(rootOrg.id, cNode.id, 'Order', valueLabel, null));
+        addEdge(edges, edgeMap, edge(rootOrg.id, cNode.id, 'Order', valueLabel, null, true));
         addEdge(edges, edgeMap, edge(cNode.id, supplierOrg.id, 'Delivery', '', null));
     }
 
@@ -266,9 +268,9 @@ export async function expandOrg(jarKodas) {
         const buyerOrg = orgNode(row.jarKodas, row.pavadinimas, null);
         addNode(nodes, nodeMap, buyerOrg);
         const valueLabel = formatContractValue(row.total);
-        const cNode = contractNode(`contract:buyer${row.jarKodas}:seller${jk}`, row.pavadinimas, row.total);
+        const cNode = contractNode(`contract:buyer${row.jarKodas}:seller${jk}`, row.pavadinimas, row.total, row.count);
         addNode(nodes, nodeMap, cNode);
-        addEdge(edges, edgeMap, edge(buyerOrg.id, cNode.id, 'Order', valueLabel, null));
+        addEdge(edges, edgeMap, edge(buyerOrg.id, cNode.id, 'Order', valueLabel, null, true));
         addEdge(edges, edgeMap, edge(cNode.id, rootOrg.id, 'Delivery', '', null));
     }
 
@@ -320,7 +322,7 @@ export async function expandPerson(fullName) {
             addNode(nodes, nodeMap, stub);
 
             const relType = mapDarbovietesTipas(row.darbovietesTipas);
-            const label = row.darbovietesTipas || row.pareigos || '';
+            const label = row.pareigos || '';
             addEdge(edges, edgeMap, edge(personNodeId, stub.id, relType, label, row.rysioPradzia));
 
         } else if (tipas === 'KITI_RYSIAI_SU_JA') {
@@ -350,7 +352,7 @@ export async function expandPerson(fullName) {
                 const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
                 addNode(nodes, nodeMap, stub);
                 const relType = mapDarbovietesTipas(row.darbovietesTipas);
-                const label = row.darbovietesTipas || row.pareigos || '';
+                const label = row.pareigos || '';
                 addEdge(edges, edgeMap, edge(spouseN.id, stub.id, relType, label, null));
             }
         }
