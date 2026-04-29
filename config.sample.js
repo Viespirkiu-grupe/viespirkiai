@@ -41,7 +41,7 @@ export default {
     pgPassword: "CHANGE_ME",
     pgDatabase: "viespirkiai",
     pgPort: 9118,
-    pgMaxConnections: 16,
+    pgMaxConnections: 5,
 
     // Quickwit
     quickwitUp: true,

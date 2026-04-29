@@ -2,16 +2,16 @@ import { makeIconDataUri, getIconKey } from './icons.js';
 import { EDGE_COLOR, nodeColor } from './colors.js';
 
 /**
- * Merges API graph data into a graphology graph instance.
+ * Merges API graph data into the permanent data graph (unconditionally — no filtering).
+ * hiddenEdgeTypes filtering is applied later by rebuildViewGraph.
  *
- * @param {Graph}    graph          - graphology Graph instance
+ * @param {Graph}    graph          - graphology Graph instance (the data graph)
  * @param {Function} getNodePos     - (id: string) => {x, y} | null — returns graph-space coords
  * @param {{ nodes: Array, edges: Array }} data
  * @param {string|null} fromNodeId  - ID of the node that triggered the expansion (scatter origin)
- * @param {Set<string>} hiddenEdgeTypes - edge types to hide on add
  * @returns {string[]} IDs of newly added nodes
  */
-export function mergeGraphElements(graph, getNodePos, data, fromNodeId, hiddenEdgeTypes) {
+export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
     var newNodeIds = [];
 
     (data.nodes || []).forEach(function (n) {
@@ -57,11 +57,84 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId, hiddenEd
         // Rename semantic 'type' → 'edgeType' so Sigma doesn't treat it as a renderer program key.
         if (attrs.type) { attrs.edgeType = attrs.type; delete attrs.type; }
         attrs.color = EDGE_COLOR[attrs.edgeType] || '#d1d5db';
-        attrs.hidden = hiddenEdgeTypes.has(attrs.edgeType);
         graph.addEdgeWithKey(e.id, e.source, e.target, attrs);
     });
 
     return newNodeIds;
+}
+
+/**
+ * Rebuilds viewGraph (Sigma's graph) from dataGraph applying hiddenEdgeTypes filter.
+ * Nodes with no visible edges (and not anchors) are removed; newly visible nodes are added.
+ *
+ * Anchor = expanded node whose entityType is NOT ContractEntity.
+ * ContractEntity nodes are never anchors — they vanish when Order/Delivery edges are hidden.
+ *
+ * @param {Graph}    dataGraph       - permanent store of all fetched nodes+edges
+ * @param {Graph}    viewGraph       - Sigma's graph (mutated in-place)
+ * @param {Set}      hiddenEdgeTypes - edge types currently hidden
+ * @returns {string[]} IDs of nodes newly added to viewGraph (for animation)
+ */
+export function rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes) {
+    var prevNodes = new Set(viewGraph.nodes());
+
+    // Compute the set of nodes that should be visible
+    var visible = new Set();
+    dataGraph.forEachNode(function (id, attrs) {
+        if (attrs.expanded && attrs.entityType !== 'ContractEntity') visible.add(id);
+    });
+    dataGraph.forEachEdge(function (edgeId, attrs, source, target) {
+        if (!hiddenEdgeTypes.has(attrs.edgeType)) {
+            visible.add(source);
+            visible.add(target);
+        }
+    });
+
+    // Drop invisible nodes (graphology auto-drops their incident edges)
+    var toRemove = [];
+    viewGraph.forEachNode(function (id) { if (!visible.has(id)) toRemove.push(id); });
+    toRemove.forEach(function (id) { viewGraph.dropNode(id); });
+
+    // Add newly visible nodes, restoring last-known x/y from dataGraph
+    visible.forEach(function (id) {
+        if (!viewGraph.hasNode(id) && dataGraph.hasNode(id)) {
+            viewGraph.addNode(id, Object.assign({}, dataGraph.getNodeAttributes(id)));
+        }
+    });
+
+    // Remove any surviving hidden-type edges from viewGraph
+    var edgesToRemove = [];
+    viewGraph.forEachEdge(function (edgeId, attrs) {
+        if (hiddenEdgeTypes.has(attrs.edgeType)) edgesToRemove.push(edgeId);
+    });
+    edgesToRemove.forEach(function (id) { viewGraph.dropEdge(id); });
+
+    // Add visible edges from dataGraph that are not yet in viewGraph
+    dataGraph.forEachEdge(function (edgeId, attrs, source, target) {
+        if (hiddenEdgeTypes.has(attrs.edgeType)) return;
+        if (!viewGraph.hasNode(source) || !viewGraph.hasNode(target)) return;
+        if (viewGraph.hasEdge(edgeId)) return;
+        viewGraph.addEdgeWithKey(edgeId, source, target, Object.assign({}, attrs));
+    });
+
+    return viewGraph.nodes().filter(function (id) { return !prevNodes.has(id); });
+}
+
+/**
+ * Copies layout positions (x, y) from viewGraph back to dataGraph so that
+ * re-appearing nodes restore to their last known position after a rebuild.
+ * Must be called after every layout pass.
+ *
+ * @param {Graph} dataGraph
+ * @param {Graph} viewGraph
+ */
+export function syncPositionsToData(dataGraph, viewGraph) {
+    viewGraph.forEachNode(function (id, attrs) {
+        if (dataGraph.hasNode(id)) {
+            dataGraph.setNodeAttribute(id, 'x', attrs.x);
+            dataGraph.setNodeAttribute(id, 'y', attrs.y);
+        }
+    });
 }
 
 /**

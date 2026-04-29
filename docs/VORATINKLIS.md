@@ -300,10 +300,10 @@ graph TD
             ICONS["src/voratinklis/icons.js\nMUI_ICON_PATHS\nmakeIconDataUri · getIconKey"]
             COLORS["src/voratinklis/colors.js\nNODE_COLOR · EDGE_COLOR\nnodeColor · hiddenEdgeTypes"]
             RENDERERS["src/voratinklis/renderers.js\ndrawNodeLabel · drawNodeHover"]
-            GRAPHUTILS["src/voratinklis/graph-utils.js\nmergeGraphElements(graph,getNodePos,data,...)\nrunLayout(graph)\n★ testable without DOM"]
-            LEGEND["src/voratinklis/legend.js\nbindLegendCheckboxes(graph,renderer,hiddenEdgeTypes)\ntoggleEdgeTypeVisibility"]
-            EXPANDUI["src/voratinklis/expand-ui.js\nloadOrg · loadPerson · setStatus"]
-            ENTRY["src/voratinklis-app.js ← esbuild entry\ncreates graph + renderer\nwires clickNode + DOMContentLoaded"]
+            GRAPHUTILS["src/voratinklis/graph-utils.js\nmergeGraphElements(dataGraph,getNodePos,data,fromNodeId)\nrebuildViewGraph(dataGraph,viewGraph,hiddenEdgeTypes)\nsyncPositionsToData(dataGraph,viewGraph)\nrunLayout(graph)\n★ testable without DOM"]
+            LEGEND["src/voratinklis/legend.js\nbindLegendCheckboxes(renderer,hiddenEdgeTypes,rebuildAndRefresh)"]
+            EXPANDUI["src/voratinklis/expand-ui.js\ncreateExpandUI({dataGraph,viewGraph,...})\n→ rebuildAndRefresh callback"]
+            ENTRY["src/voratinklis-app.js ← esbuild entry\ncreates dataGraph + viewGraph\nSigma uses viewGraph\nwires clickNode + DOMContentLoaded"]
         end
 
         ENTRY --> ICONS
@@ -323,7 +323,7 @@ graph TD
 
     subgraph Tests["Tests — node --test"]
         T_EXPAND["test/voratinklis/expand.test.js\nserver-side pure helpers\n(61 tests)"]
-        T_GRAPHUTILS["test/voratinklis/graph-utils.test.js\nclient-side mergeGraphElements\nhiddenEdgeTypes visibility logic"]
+        T_GRAPHUTILS["test/voratinklis/graph-utils.test.js\nclient-side mergeGraphElements\nrebuildViewGraph: orphan removal · anchor logic\nposition restore · syncPositionsToData"]
     end
 
     ENTRY -->|" fetch /expand/:jk "| ROUTE
@@ -336,19 +336,19 @@ graph TD
 
 ### Module responsibilities
 
-| File                             | Layer  | Purpose                                                            | DOM required              |
-|----------------------------------|--------|--------------------------------------------------------------------|---------------------------|
-| `src/voratinklis-bundle.js`      | Client | Bundles third-party npm packages; exposes `window.Voratinklis`     | No                        |
-| `src/voratinklis-app.js`         | Client | esbuild entry point; creates `graph`, `renderer`; wires events     | Yes                       |
-| `src/voratinklis/icons.js`       | Client | MUI SVG path map; `makeIconDataUri`; `getIconKey`                  | No                        |
-| `src/voratinklis/colors.js`      | Client | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` Set     | No                        |
-| `src/voratinklis/renderers.js`   | Client | `drawNodeLabel`, `drawNodeHover` — Sigma canvas callbacks          | No (canvas ctx passed in) |
-| `src/voratinklis/graph-utils.js` | Client | `mergeGraphElements`, `runLayout` — **pure, injected deps**        | No ★                      |
-| `src/voratinklis/legend.js`      | Client | `bindLegendCheckboxes`, `toggleEdgeTypeVisibility`                 | Yes (queries DOM)         |
-| `src/voratinklis/expand-ui.js`   | Client | `loadOrg`, `loadPerson`, `setStatus` — async fetch + graph updates | Yes                       |
-| `modules/voratinklis/expand.js`  | Server | `expandOrg`, `expandPerson`, all pure builder helpers              | No                        |
-| `routes/voratinklis.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`; renders EJS      | No                        |
-| `views/voratinklis/index.ejs`    | View   | HTML shell, inline CSS, legend overlay with checkboxes             | —                         |
+| File                             | Layer  | Purpose                                                                         | DOM required              |
+|----------------------------------|--------|---------------------------------------------------------------------------------|---------------------------|
+| `src/voratinklis-bundle.js`      | Client | Bundles third-party npm packages; exposes `window.Voratinklis`                  | No                        |
+| `src/voratinklis-app.js`         | Client | esbuild entry; creates `dataGraph` + `viewGraph`; Sigma uses `viewGraph`; wires events | Yes                |
+| `src/voratinklis/icons.js`       | Client | MUI SVG path map; `makeIconDataUri`; `getIconKey`                               | No                        |
+| `src/voratinklis/colors.js`      | Client | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` Set                  | No                        |
+| `src/voratinklis/renderers.js`   | Client | `drawNodeLabel`, `drawNodeHover` — Sigma canvas callbacks                       | No (canvas ctx passed in) |
+| `src/voratinklis/graph-utils.js` | Client | `mergeGraphElements(dataGraph,...)`, `rebuildViewGraph`, `syncPositionsToData`, `runLayout` — **pure, injected deps** | No ★ |
+| `src/voratinklis/legend.js`      | Client | `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)`            | Yes (queries DOM)         |
+| `src/voratinklis/expand-ui.js`   | Client | `createExpandUI({dataGraph,viewGraph,...})` — async fetch + rebuild; returns `rebuildAndRefresh` | Yes |
+| `modules/voratinklis/expand.js`  | Server | `expandOrg`, `expandPerson`, all pure builder helpers                           | No                        |
+| `routes/voratinklis.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`; renders EJS                  | No                        |
+| `views/voratinklis/index.ejs`    | View   | HTML shell, inline CSS, legend overlay with checkboxes                          | —                         |
 
 ### Testability design
 
@@ -357,36 +357,44 @@ The single most impactful change for testability is the **dependency-injection s
 them as parameters:
 
 ```js
-// graph-utils.js
-export function mergeGraphElements(graph, getNodePos, data, fromNodeId, hiddenEdgeTypes) { ...
-}
-
-// getNodePos: (id: string) => { x, y } | null
+// graph-utils.js (Phase 9 signature — hiddenEdgeTypes removed; dataGraph is a pure store)
+export function mergeGraphElements(dataGraph, getNodePos, data, fromNodeId) { ... }
+export function rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes) { ... } // returns newNodeIds[]
+export function syncPositionsToData(dataGraph, viewGraph) { ... }
+export function runLayout(graph, forceAtlas2, noverlap) { ... }
 ```
 
 In production (`expand-ui.js`):
 
 ```js
-mergeGraphElements(graph, (id) => renderer.getNodeDisplayData(id), data, fromNodeId, hiddenEdgeTypes);
+mergeGraphElements(dataGraph, (id) => renderer.getNodeDisplayData(id), data, fromNodeId);
+const newNodes = rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes);
+syncPositionsToData(dataGraph, viewGraph);
 ```
 
 In unit tests — no DOM or Sigma needed:
 
 ```js
 import Graph from 'graphology';
-import {mergeGraphElements} from '../../src/voratinklis/graph-utils.js';
+import { mergeGraphElements, rebuildViewGraph, syncPositionsToData } from '../../src/voratinklis/graph-utils.js';
 
-const graph = new Graph({type: 'directed', multi: true});
-const getNodePos = () => null;   // new nodes fall back to random position — fine for tests
-mergeGraphElements(graph, getNodePos, data, null, new Set(['Official']));
+const dataGraph = new Graph({ type: 'directed', multi: true });
+const viewGraph = new Graph({ type: 'directed', multi: true });
+const getNodePos = () => null;
+
+mergeGraphElements(dataGraph, getNodePos, data, null);
+const newNodes = rebuildViewGraph(dataGraph, viewGraph, new Set(['Official']));
 ```
 
 This allows testing:
 
-- That edges with `edgeType` in `hiddenEdgeTypes` receive `hidden: true`
-- That `type` is renamed to `edgeType` in stored attributes
-- That `EDGE_COLOR` is applied correctly
-- That duplicate nodes/edges are skipped (idempotency)
+- That `dataGraph` receives all edges unconditionally (no hidden filtering at merge time)
+- That `rebuildViewGraph` removes orphan nodes (no visible edges) from `viewGraph`
+- That anchor nodes (expanded, non-ContractEntity) survive even when all their edges are hidden
+- That `ContractEntity` nodes disappear when `Order`/`Delivery` are in `hiddenEdgeTypes`
+- That re-appearing nodes restore their `x`/`y` position from `dataGraph`
+- That `syncPositionsToData` correctly copies layout coordinates back to `dataGraph`
+- That newly added node IDs are returned by `rebuildViewGraph` (for `animateNodes` call site)
 
 ---
 
@@ -475,24 +483,16 @@ This allows testing:
 
 ---
 
-**Phase 8 — Module split + legend checkboxes for edge-type visibility**
+**Phase 8 — Module split + legend checkboxes (edge visibility)** ✅ Complete
 
-Phase 8 has two parts: (A) split the monolithic `src/voratinklis-app.js` into focused, testable
-modules; (B) implement legend checkboxes that control edge-type visibility. Part A is a prerequisite
-for Part B because `hiddenEdgeTypes` and `mergeGraphElements` must be in importable modules to be
-unit-tested.
+Modules extracted to `src/voratinklis/` (`icons.js`, `colors.js`, `renderers.js`, `graph-utils.js`,
+`legend.js`, `expand-ui.js`). `src/voratinklis-app.js` rewritten as thin entry. `animateNodes` added
+to bundle. Legend checkboxes added — `Official` and `Employment` unchecked by default. Edges of hidden
+types receive `hidden: true`; checking/unchecking immediately updates edge visibility and calls
+`renderer.refresh()`. `test/voratinklis/graph-utils.test.js` added (17 new tests; 78 total passing).
 
-#### Behaviour (Part B)
-
-- All 6 legend rows get an `<input type="checkbox">` on the left.
-- **`Official` and `Employment` start unchecked** — their edges are hidden on initial graph load and
-  after every expand.
-- All other types (`Director`, `Shareholder`, `Spouse`, `Order`/`Delivery`) start **checked** and
-  visible by default.
-- Checking/unchecking a box immediately shows/hides all graph edges of that type. No page reload,
-  no re-fetch — data in graphology is toggled via the `hidden` edge attribute.
-- Hiding an edge type does **not** remove it from the graph. Data is preserved; only rendering is
-  suppressed.
+> **Limitation of this phase**: nodes whose only edges are hidden remain visible. This is addressed
+> in Phase 9.
 
 #### Part A — Module split
 
@@ -513,17 +513,10 @@ unit-tested.
 
 - [x] **Change `mergeGraphElements` to use injected dependencies** (`src/voratinklis/graph-utils.js`):
 
-  New signature:
+  Phase 8 signature (superseded in Phase 9 — `hiddenEdgeTypes` param will be removed):
   ```js
   export function mergeGraphElements(graph, getNodePos, data, fromNodeId, hiddenEdgeTypes) { ... }
   // getNodePos: (id: string) => { x: number, y: number } | null
-  ```
-  `getNodePos` replaces the direct call to `renderer.getNodeDisplayData`. Falls back to random
-  scatter when `getNodePos` returns `null` (same behaviour as before for new/unknown nodes).
-
-  Call site in `expand-ui.js`:
-  ```js
-  mergeGraphElements(graph, (id) => renderer.getNodeDisplayData(id), data, fromNodeId, hiddenEdgeTypes);
   ```
 
 - [x] **Add `test/voratinklis/graph-utils.test.js`** unit tests covering:
@@ -610,6 +603,142 @@ unit-tested.
 
   Call `bindLegendCheckboxes(graph, renderer, hiddenEdgeTypes)` in `src/voratinklis-app.js` after
   the renderer is created.
+
+---
+
+**Phase 9 — Two-graph architecture: node hiding and graph rearrangement**
+
+When all edges of a given type are hidden via legend checkboxes, nodes that have **no remaining
+visible edges** must also disappear from the graph. The graph must then rearrange (ForceAtlas2 +
+noverlap) so the visible nodes spread to fill the space.
+
+To achieve this without data loss a **two-graph** design is used:
+
+- `dataGraph` — permanent graphology store that holds **all** fetched nodes and edges unconditionally.
+  Never passed to Sigma. Updated only on network fetches (expand org / expand person).
+- `viewGraph` — the graphology instance given to `new Sigma(viewGraph, ...)`. Derived from `dataGraph`
+  by `rebuildViewGraph`. Contains only nodes and edges that should currently be visible.
+
+`hiddenEdgeTypes` Set (from `colors.js`) is the shared mutable state that bridges `dataGraph` and
+`viewGraph`.
+
+#### Anchor rule
+
+An **anchor node** is a node that is always kept in `viewGraph` regardless of edge visibility:
+
+```
+attrs.expanded === true && attrs.entityType !== 'ContractEntity'
+```
+
+`ContractEntity` nodes are never anchors — they exist only to represent contract relationships and
+must disappear when all their `Order`/`Delivery` edges are hidden.
+
+#### `rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes)` algorithm
+
+1. Capture `prevNodes = new Set(viewGraph.nodes())` **before** any mutations.
+2. Compute the `visible` set of node IDs:
+   - Start with all anchor nodes from `dataGraph`.
+   - For every edge in `dataGraph` whose `edgeType` is **not** in `hiddenEdgeTypes`, include
+     both the source and target node IDs.
+3. Drop from `viewGraph` any node not in `visible` (graphology auto-drops incident edges).
+4. Add to `viewGraph` any node in `visible` not already present, copying all attributes from
+   `dataGraph` — including `x`/`y` from the last known position (so re-appearing nodes restore
+   where they were, not at random coords).
+5. For every edge in `dataGraph` whose `edgeType` is **not** in `hiddenEdgeTypes` and whose
+   source+target are both in `viewGraph`: add it if not already present.
+6. Remove from `viewGraph` any edge whose `edgeType` is now in `hiddenEdgeTypes`.
+7. Return `viewGraph.nodes().filter(id => !prevNodes.has(id))` — the newly added node IDs (used
+   for `animateNodes` after layout).
+
+#### `syncPositionsToData(dataGraph, viewGraph)`
+
+After **every** layout pass (both after expand and after legend toggle), copy `x`/`y` from
+`viewGraph` back to `dataGraph` so that positions are preserved for the next rebuild:
+
+```js
+viewGraph.forEachNode((id, attrs) => {
+    if (dataGraph.hasNode(id)) {
+        dataGraph.setNodeAttribute(id, 'x', attrs.x);
+        dataGraph.setNodeAttribute(id, 'y', attrs.y);
+    }
+});
+```
+
+#### `mergeGraphElements` signature change
+
+In the two-graph design `dataGraph` stores **all** edges unconditionally — filtering is done in
+`rebuildViewGraph`. The `hiddenEdgeTypes` parameter must be **removed** from `mergeGraphElements`:
+
+```js
+// Before (Phase 8):
+export function mergeGraphElements(graph, getNodePos, data, fromNodeId, hiddenEdgeTypes) { ... }
+
+// After (Phase 9):
+export function mergeGraphElements(dataGraph, getNodePos, data, fromNodeId) { ... }
+```
+
+#### Animation cancel token
+
+`animateNodes` returns a cancel function. Store it and call it before any `rebuildViewGraph` during
+a legend toggle — otherwise the animation loop may write attributes to nodes that were just dropped
+from `viewGraph`, causing a graphology invariant error:
+
+```js
+let cancelAnimation = null;
+
+function rebuildAndRefresh() {
+    if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
+    const newNodes = rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes);
+    runLayout(viewGraph, forceAtlas2, noverlap);
+    syncPositionsToData(dataGraph, viewGraph);
+    if (newNodes.length) {
+        cancelAnimation = animateNodes(viewGraph, /* from clicked pos */, { duration: 600 });
+    } else {
+        renderer.refresh();
+    }
+}
+```
+
+#### Updated module signatures
+
+| Module                          | Changed signature / addition                                                                          |
+|---------------------------------|-------------------------------------------------------------------------------------------------------|
+| `src/voratinklis/graph-utils.js` | `mergeGraphElements(dataGraph, getNodePos, data, fromNodeId)` — drop `hiddenEdgeTypes`               |
+| `src/voratinklis/graph-utils.js` | + `rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes): string[]`                                |
+| `src/voratinklis/graph-utils.js` | + `syncPositionsToData(dataGraph, viewGraph): void`                                                  |
+| `src/voratinklis/expand-ui.js`   | `createExpandUI({ dataGraph, viewGraph, renderer, ... })` — exposes `rebuildAndRefresh` callback    |
+| `src/voratinklis/legend.js`      | `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)` — remove `toggleEdgeTypeVisibility`; legend triggers `rebuildAndRefresh` |
+| `src/voratinklis-app.js`         | Creates `dataGraph = new Graph(...)` + `viewGraph = new Graph(...)`; passes `viewGraph` to Sigma   |
+
+#### Tasks
+
+- [ ] **`graph-utils.js`**: remove `hiddenEdgeTypes` from `mergeGraphElements`; add `rebuildViewGraph`
+  and `syncPositionsToData` as exported functions.
+
+- [ ] **`expand-ui.js`**: accept `{ dataGraph, viewGraph }` separately; call
+  `mergeGraphElements(dataGraph, ...)` then `rebuildViewGraph` + `syncPositionsToData` after every
+  expand; store and return `rebuildAndRefresh` callback; store `cancelAnimation` token and cancel
+  before each rebuild.
+
+- [ ] **`legend.js`**: replace `toggleEdgeTypeVisibility` with a simple `rebuildAndRefresh` callback
+  approach. New signature: `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)`.
+  Checkbox `change` handler: update `hiddenEdgeTypes` Set then call `rebuildAndRefresh()`.
+
+- [ ] **`voratinklis-app.js`**: create `dataGraph` + `viewGraph` (both `new Graph({ type: 'directed', multi: true })`);
+  pass `viewGraph` to `new Sigma(...)`; wire `rebuildAndRefresh` from the `expand-ui` factory into
+  `bindLegendCheckboxes`.
+
+- [ ] **`test/voratinklis/graph-utils.test.js`**: update existing `mergeGraphElements` test calls to
+  drop `hiddenEdgeTypes` arg; remove 2 hidden-related tests that no longer apply; add
+  `rebuildViewGraph` tests:
+    - Orphan node is removed when its only edge type is hidden.
+    - Anchor node (expanded non-contract) is never removed even when all its edges are hidden.
+    - `ContractEntity` node is **not** an anchor and is removed when `Order`/`Delivery` hidden.
+    - Newly visible node is included in the returned `newNodes` array.
+    - Re-appearing node restores `x`/`y` from `dataGraph`.
+    - `syncPositionsToData` copies `x`/`y` from viewGraph → dataGraph for all shared nodes.
+
+---
 
 ## Open Questions
 

@@ -1,6 +1,7 @@
 import { drawNodeLabel, drawNodeHover } from './voratinklis/renderers.js';
 import { createExpandUI } from './voratinklis/expand-ui.js';
 import { bindLegendCheckboxes } from './voratinklis/legend.js';
+import { hiddenEdgeTypes } from './voratinklis/colors.js';
 
 var _v = window.Voratinklis;
 var Sigma = _v.Sigma;
@@ -10,12 +11,15 @@ var noverlap = _v.noverlap;
 var NodeImageProgram = _v.NodeImageProgram;
 var animateNodes = _v.animateNodes;
 
-var graph = new Graph({ type: 'directed', multi: true });
+// dataGraph: permanent store of all fetched nodes+edges (never given to Sigma)
+// viewGraph: Sigma's filtered view, rebuilt by rebuildViewGraph on each expand/legend toggle
+var dataGraph = new Graph({ type: 'directed', multi: true });
+var viewGraph = new Graph({ type: 'directed', multi: true });
 var container = document.getElementById('voratinklis-canvas');
 var statusEl = document.getElementById('voratinklis-status');
 var loadingEl = document.getElementById('voratinklis-loading');
 
-var renderer = new Sigma(graph, container, {
+var renderer = new Sigma(viewGraph, container, {
     nodeProgramClasses: { image: NodeImageProgram },
     defaultNodeType: 'image',
     defaultDrawNodeLabel: drawNodeLabel,
@@ -33,9 +37,9 @@ var renderer = new Sigma(graph, container, {
     maxCameraRatio: 5,
 });
 
-var ui = createExpandUI({ graph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes });
+var ui = createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes });
 
-bindLegendCheckboxes(graph, renderer);
+bindLegendCheckboxes(hiddenEdgeTypes, ui.rebuildAndRefresh);
 
 var INITIAL_JAR_KODAS = window.VORATINKLIS_CONFIG.jarKodas;
 document.addEventListener('DOMContentLoaded', function () {

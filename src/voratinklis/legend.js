@@ -1,29 +1,12 @@
-import { hiddenEdgeTypes } from './colors.js';
-
 /**
- * Toggles visibility of all edges of a given type in the graph.
+ * Wires legend checkboxes to control node/edge visibility via rebuildAndRefresh.
+ * On toggle: updates hiddenEdgeTypes Set, then calls rebuildAndRefresh() which
+ * removes orphan nodes (no visible edges) and rearranges the graph.
  *
- * @param {Graph}   graph
- * @param {string}  edgeType
- * @param {boolean} visible
+ * @param {Set<string>} hiddenEdgeTypes  - shared mutable Set from colors.js
+ * @param {Function}    rebuildAndRefresh - callback from createExpandUI
  */
-export function toggleEdgeTypeVisibility(graph, edgeType, visible) {
-    graph.forEachEdge(function (id, attrs) {
-        if (attrs.edgeType === edgeType) {
-            graph.setEdgeAttribute(id, 'hidden', !visible);
-        }
-    });
-}
-
-/**
- * Wires legend checkboxes to show/hide edge types.
- * Expects checkboxes with attribute data-edge-types="Type1,Type2" (comma-separated).
- * Mutates the shared hiddenEdgeTypes Set so that new edges added later respect the state.
- *
- * @param {Graph}    graph
- * @param {Renderer} renderer  - Sigma renderer instance
- */
-export function bindLegendCheckboxes(graph, renderer) {
+export function bindLegendCheckboxes(hiddenEdgeTypes, rebuildAndRefresh) {
     document.querySelectorAll('#voratinklis-legend input[type=checkbox][data-edge-types]').forEach(function (cb) {
         cb.addEventListener('change', function () {
             var types = cb.dataset.edgeTypes.split(',');
@@ -34,9 +17,8 @@ export function bindLegendCheckboxes(graph, renderer) {
                 } else {
                     hiddenEdgeTypes.add(type);
                 }
-                toggleEdgeTypeVisibility(graph, type, cb.checked);
             });
-            renderer.refresh();
+            rebuildAndRefresh();
         });
     });
 }

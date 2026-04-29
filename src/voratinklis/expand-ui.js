@@ -1,11 +1,13 @@
-import { mergeGraphElements, runLayout } from './graph-utils.js';
+import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout } from './graph-utils.js';
 import { hiddenEdgeTypes, NODE_COLOR } from './colors.js';
 
 /**
- * Creates the expand UI controller: wires click handler and exposes loadOrg/loadPerson.
+ * Creates the expand UI controller.
+ * Uses a two-graph design: dataGraph holds all fetched data; viewGraph is Sigma's filtered view.
  *
  * @param {{
- *   graph: Graph,
+ *   dataGraph: Graph,
+ *   viewGraph: Graph,
  *   renderer: Sigma,
  *   statusEl: HTMLElement|null,
  *   loadingEl: HTMLElement|null,
@@ -13,17 +15,30 @@ import { hiddenEdgeTypes, NODE_COLOR } from './colors.js';
  *   noverlap: Function,
  *   animateNodes: Function,
  * }} deps
- * @returns {{ loadOrg: Function, loadPerson: Function }}
+ * @returns {{ loadOrg: Function, loadPerson: Function, rebuildAndRefresh: Function }}
  */
-export function createExpandUI({ graph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes }) {
+export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes }) {
     var expandingNodes = new Set();
+    var cancelAnimation = null;
 
     function showLoading() { if (loadingEl) loadingEl.hidden = false; }
     function hideLoading() { if (loadingEl) loadingEl.hidden = true; }
     function setStatus(msg) { if (statusEl) statusEl.textContent = msg || ''; }
 
     function getNodePos(id) {
-        return graph.hasNode(id) ? graph.getNodeAttributes(id) : null;
+        return viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : null;
+    }
+
+    /**
+     * Rebuilds viewGraph from dataGraph, runs layout, syncs positions, refreshes.
+     * Called by legend checkboxes and after every expand.
+     */
+    function rebuildAndRefresh() {
+        if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
+        rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes);
+        runLayout(viewGraph, forceAtlas2, noverlap);
+        syncPositionsToData(dataGraph, viewGraph);
+        renderer.refresh();
     }
 
     async function _expand(id, fetchUrl, afterMerge) {
@@ -33,37 +48,47 @@ export function createExpandUI({ graph, renderer, statusEl, loadingEl, forceAtla
         setStatus('Kraunama...');
         try {
             var data = await fetch(fetchUrl).then(function (r) { return r.json(); });
-            var fromNodeId = graph.hasNode(id) ? id : null;
+            var fromNodeId = viewGraph.hasNode(id) ? id : null;
             var startPos = fromNodeId ? getNodePos(fromNodeId) : null;
 
-            var newNodeIds = mergeGraphElements(graph, getNodePos, data, fromNodeId, hiddenEdgeTypes);
-            afterMerge(id, data);
+            if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
+
+            mergeGraphElements(dataGraph, getNodePos, data, fromNodeId);
+            afterMerge(id);
+
+            var newNodeIds = rebuildViewGraph(dataGraph, viewGraph, hiddenEdgeTypes);
 
             if (startPos && newNodeIds.length > 0) {
-                // Pre-position new nodes at start point for animation
+                // Pre-position new nodes at clicked node for animation start
                 newNodeIds.forEach(function (nid) {
-                    graph.setNodeAttribute(nid, 'x', startPos.x);
-                    graph.setNodeAttribute(nid, 'y', startPos.y);
+                    if (viewGraph.hasNode(nid)) {
+                        viewGraph.setNodeAttribute(nid, 'x', startPos.x);
+                        viewGraph.setNodeAttribute(nid, 'y', startPos.y);
+                    }
                 });
-                runLayout(graph, forceAtlas2, noverlap);
-                // Capture final positions before resetting for animation
+                runLayout(viewGraph, forceAtlas2, noverlap);
+                syncPositionsToData(dataGraph, viewGraph);
+                // Capture final layout positions
                 var targets = {};
                 newNodeIds.forEach(function (nid) {
-                    if (graph.hasNode(nid)) {
+                    if (viewGraph.hasNode(nid)) {
                         targets[nid] = {
-                            x: graph.getNodeAttribute(nid, 'x'),
-                            y: graph.getNodeAttribute(nid, 'y'),
+                            x: viewGraph.getNodeAttribute(nid, 'x'),
+                            y: viewGraph.getNodeAttribute(nid, 'y'),
                         };
                     }
                 });
-                // Reset to start so animateNodes reads the correct start coords
+                // Reset to start so animateNodes reads correct start coords
                 newNodeIds.forEach(function (nid) {
-                    graph.setNodeAttribute(nid, 'x', startPos.x);
-                    graph.setNodeAttribute(nid, 'y', startPos.y);
+                    if (viewGraph.hasNode(nid)) {
+                        viewGraph.setNodeAttribute(nid, 'x', startPos.x);
+                        viewGraph.setNodeAttribute(nid, 'y', startPos.y);
+                    }
                 });
-                animateNodes(graph, targets, { duration: 600, easing: 'quadraticInOut' });
+                cancelAnimation = animateNodes(viewGraph, targets, { duration: 600, easing: 'quadraticInOut' });
             } else {
-                runLayout(graph, forceAtlas2, noverlap);
+                runLayout(viewGraph, forceAtlas2, noverlap);
+                syncPositionsToData(dataGraph, viewGraph);
                 renderer.refresh();
             }
         } catch (err) {
@@ -78,36 +103,39 @@ export function createExpandUI({ graph, renderer, statusEl, loadingEl, forceAtla
 
     function loadOrg(jarKodas, fromNodeId) {
         var id = 'org:' + jarKodas;
-        // If the expansion was triggered by clicking a different node, pre-mark origin
-        if (fromNodeId && graph.hasNode(fromNodeId)) {
-            graph.setNodeAttribute(fromNodeId, 'color', NODE_COLOR.org);
+        if (fromNodeId && viewGraph.hasNode(fromNodeId)) {
+            viewGraph.setNodeAttribute(fromNodeId, 'color', NODE_COLOR.org);
         }
         return _expand(id, '/voratinklis/expand/' + encodeURIComponent(jarKodas), function (nodeId) {
-            if (graph.hasNode(nodeId)) graph.setNodeAttribute(nodeId, 'expanded', true);
+            if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
+            if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
         });
     }
 
-    function loadPerson(vardas, pavarde, fromNodeId) {
+    function loadPerson(vardas, pavarde) {
         var fullName = (vardas + ' ' + pavarde).trim();
         var id = 'person:' + fullName.toLowerCase();
         return _expand(id, '/voratinklis/expand-person?vardas=' + encodeURIComponent(fullName), function (nodeId) {
-            if (graph.hasNode(nodeId)) graph.setNodeAttribute(nodeId, 'expanded', true);
+            if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
+            if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
         });
     }
 
     renderer.on('clickNode', function (event) {
         var nodeId = event.node;
-        var attrs = graph.getNodeAttributes(nodeId);
+        var attrs = viewGraph.getNodeAttributes(nodeId);
         if (attrs.expanded) return;
 
         if (attrs.entityType === 'OrganizationEntity' && attrs.jarKodas) {
-            graph.setNodeAttribute(nodeId, 'expanded', true);
+            viewGraph.setNodeAttribute(nodeId, 'expanded', true);
+            dataGraph.setNodeAttribute(nodeId, 'expanded', true);
             loadOrg(attrs.jarKodas, nodeId);
         } else if (attrs.entityType === 'PersonEntity' && attrs.vardas && attrs.pavarde) {
-            graph.setNodeAttribute(nodeId, 'expanded', true);
-            loadPerson(attrs.vardas, attrs.pavarde, nodeId);
+            viewGraph.setNodeAttribute(nodeId, 'expanded', true);
+            dataGraph.setNodeAttribute(nodeId, 'expanded', true);
+            loadPerson(attrs.vardas, attrs.pavarde);
         }
     });
 
-    return { loadOrg, loadPerson };
+    return { loadOrg, loadPerson, rebuildAndRefresh };
 }
