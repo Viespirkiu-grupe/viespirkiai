@@ -59,24 +59,29 @@ The graph uses the entity and edge model defined in the repository data structur
 | `rysiaiSuJa[]`             | `OrganizationEntity` stub nodes + edges              | `Director` / `Shareholder` / `Official` (person → org)   |
 | `sutuoktinioDarbovietes[]` | `PersonEntity` (spouse) + `OrganizationEntity` stubs | `Spouse` (person → spouse) + `Employment` (spouse → org) |
 
-| Edge type                              | Direction       | Source                                         |
-|----------------------------------------|-----------------|------------------------------------------------|
-| `Employment` / `Director` / `Official` | Person → Org    | `pinreg.darbovietes[].pareiguTipasPavadinimas` |
-| `Shareholder`                          | Person → Org    | `pinreg.rysiaiSuJa[].rysioPobudzioPavadinimas` |
-| `Spouse`                               | Person → Person | `pinreg.sutuoktinioDarbovietes[]`              |
-| `Order`                                | Org → Contract  | `sutartys.topPirkejai` → buyer side            |
-| `Delivery`                             | Org → Contract  | `sutartys.topTiekejai` → supplier side         |
+| Edge type                              | Direction       | Source                                                                  |
+|----------------------------------------|-----------------|-------------------------------------------------------------------------|
+| `Employment` / `Director` / `Official` | Person → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = DEKLARUOJANCIO_DARBOVIETE` |
+| `Employment` / `Director`              | Spouse → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE` |
+| `Shareholder` / `Director` / `Official`| Person → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = KITI_RYSIAI_SU_JA`    |
+| `Spouse`                               | Person → Person | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE` (declarant → spouse) |
+| `Order`                                | Org → Contract  | `sutartys.topPirkejai` → buyer side                                     |
+| `Delivery`                             | Org → Contract  | `sutartys.topTiekejai` → supplier side                                  |
+
+> **`irasoTipas` is a record classifier, not a role label.** The three distinct values in the DB are
+> `DEKLARUOJANCIO_DARBOVIETE`, `SUTUOKTINIO_DARBOVIETE`, and `KITI_RYSIAI_SU_JA`. They must **never**
+> be used as edge labels — they are only used to decide which mapping branch to enter.
 
 #### Edge labels
 
 Every edge must carry a visible `label` attribute set at build time in `modules/voratinklis/expand.js`:
 
-| Edge type                                                   | `label` value                                                           |
-|-------------------------------------------------------------|-------------------------------------------------------------------------|
-| `Order` / `Delivery`                                        | Formatted `verte`: `€1.2M`, `€450K`, `€12K`, etc. — see formatting note |
-| `Employment` / `Director` / `Official`                      | Raw `pareiguTipasPavadinimas` string from the declaration (Lithuanian)  |
-| `Director` / `Shareholder` / `Official` (from `rysiaiSuJa`) | Raw `rysioPobudzioPavadinimas` string (Lithuanian)                      |
-| `Spouse`                                                    | `"Sutuoktinis"`                                                         |
+| Edge type                                                        | `label` value                                                           |
+|------------------------------------------------------------------|-------------------------------------------------------------------------|
+| `Order` / `Delivery`                                             | Formatted `verte`: `€1.2M`, `€450K`, `€12K`, etc. — see formatting note |
+| `Employment` / `Director` / `Official` (person or spouse → org) | `pareigos` field (free-text job title, e.g. "Direktorius", "Gydytojas"). Never `darbovietesTipas` — that field holds `STANDARTINE`, `EKSPERTO`, or `SUTUOKTINIO` and is not human-readable |
+| `Director` / `Shareholder` / `Official` (from `KITI_RYSIAI_SU_JA`) | `rysioPobudzioPavadinimas` field (controlled vocabulary, e.g. "Valdybos narys", "Akcininkas") |
+| `Spouse`                                                         | `"Sutuoktinis"`                                                         |
 
 > **Contract value formatting**: use `Math.round(verte)` and express as `€XM` (millions, 1 dp), `€XK`
 > (thousands, 0 dp), or `€X` (under 1000) — e.g. `1234567 → €1.2M`, `45000 → €45K`, `800 → €800`.
@@ -100,7 +105,7 @@ function wrapLabel(name, n = 3) {
 |----------------------|--------------------------|-------------------------------------|
 | `OrganizationEntity` | `pavadinimas`            | `wrapLabel(pavadinimas)`            |
 | `PersonEntity`       | `vardas + " " + pavarde` | `wrapLabel(vardas + " " + pavarde)` |
-| `ContractEntity`     | `pavadinimas`            | `wrapLabel(pavadinimas)`            |
+| `ContractEntity`     | contract count           | `"N sut."` (e.g. `"17 sut."`)      |
 
 Sigma's default label renderer draws labels to the **right** of the node centre. A custom
 `defaultDrawNodeLabel` function must be provided to `new Sigma(graph, container, { defaultDrawNodeLabel })`
