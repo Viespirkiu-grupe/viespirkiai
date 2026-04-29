@@ -29,12 +29,12 @@ bundle must be compiled with `esbuild` and served as `public/dist/voratinklis.js
 
 The graph uses the entity and edge model defined in the repository data structures:
 
-| Node type            | Expand trigger    | Source function / data                                                                                                                        | Key fields                                                    |
-|----------------------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------|
-| `OrganizationEntity` | Org node click    | `jarCsv` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN jarCsv` (partner org names)                            | `jarKodas`, `pavadinimas`, `formosKodas`                      |
-| `PersonEntity`       | Org node click    | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows         | `vardas + pavarde` (name is the identity key), `rysioPradzia` |
-| `PersonEntity`       | Person node click | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person | Same; all declarations for that name are merged into one node |
-| `ContractEntity`     | Org node click    | `sutartys JOIN jarCsv` (top 30 contracts by value; buyer/seller names from `jarCsv` JOIN)         | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte`  |
+| Node type            | Expand trigger    | Source function / data                                                                                                                        | Key fields                                                                   |
+|----------------------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| `OrganizationEntity` | Org node click    | `jarCsv` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN jarCsv` (partner org names)                            | `jarKodas`, `pavadinimas`, `formosKodas`                                     |
+| `PersonEntity`       | Org node click    | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows         | `vardas + pavarde` (name is the identity key), `rysioPradzia`                |
+| `PersonEntity`       | Person node click | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person | Same; all declarations for that name are merged into one node                |
+| `ContractEntity`     | Org node click    | `sutartys JOIN jarCsv` (top 30 contracts by value; buyer/seller names from `jarCsv` JOIN)                                                     | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte` |
 
 > **Why `/asmuo/:jarKodas` is not used for org expansion**: that route aggregates ~18 data sources
 > (sodra, vmi, regitra, finansai, etc.) and is too heavy for graph node expansion. Instead `expandOrg`
@@ -519,7 +519,7 @@ types receive `hidden: true`; checking/unchecking immediately updates edge visib
 - [x] **Create `src/voratinklis/` directory** and extract focused modules from `src/voratinklis-app.js`:
 
   | New file                          | Extracted content                                               |
-    |-----------------------------------|-----------------------------------------------------------------|
+      |-----------------------------------|-----------------------------------------------------------------|
   | `src/voratinklis/icons.js`        | `MUI_ICON_PATHS`, `makeIconDataUri`, `getIconKey`               |
   | `src/voratinklis/colors.js`       | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes`      |
   | `src/voratinklis/renderers.js`    | `drawNodeLabel`, `drawNodeHover`                                |
@@ -765,87 +765,162 @@ function rebuildAndRefresh() {
 
 ---
 
-**Phase 10 — Individual contract nodes with human-readable contract titles**
+**Phase 10 — Individual contract nodes with human-readable titles** ✅ Complete
 
-Currently `expandOrg` queries `sutartysSaliuSumos` which aggregates all contracts between two companies
-into a single row (sum + count), so the `ContractEntity` node label is `"N sut."` — not meaningful.
-Replace with direct queries on the `sutartys` table to produce one `ContractEntity` node per contract,
-with the actual contract `pavadinimas` as its label.
+`expandOrg` query replaced from `gautiSutarciuDuomenisPagalJarKoda` to direct `sutartys JOIN jarCsv`
+(top 30 by `verte DESC`). `ContractEntity` ID is now `contract:{sutartiesUnikalusId}`; label is
+`wrapLabel` of first 9 words of `pavadinimas` (fallback `'Sutartis'`). `contractNode` builder updated.
+All tests passing.
 
-#### Data model change
+---
 
-| | Before (Phase 1–9) | After (Phase 10) |
-|---|---|---|
-| **Source table** | `sutartysSaliuSumos` (aggregate) | `sutartys JOIN jarCsv` (individual rows) |
-| **ContractEntity ID** | `contract:buyer{buyerJk}:seller{sellerJk}` | `contract:{sutartiesUnikalusId}` |
-| **ContractEntity label** | `"N sut."` (count) | `wrapLabel(pavadinimas.split(' ').slice(0,9).join(' '))` |
-| **Limit** | top 20 buyer + top 20 seller partner pairs | top 30 contracts by `verte DESC` (buyer or seller) |
+**Phase 11 — Node selection + per-node legend**
 
-#### New query in `expandOrg`
+#### Behaviour
 
-Replace the `gautiSutarciuDuomenisPagalJarKoda` call with a direct query:
+- **Single-node selection**: clicking a node selects it. The legend header immediately shows that node's
+  label. Clicking the same node again deselects it. Clicking a different node deselects the previous
+  and selects the new one. Clicking the canvas (`clickStage`) deselects the current node.
+- **Selection + expansion**: if the clicked node is not yet expanded, it is selected first (ring appears
+  immediately), data is fetched, and the node remains selected after the expand completes.
+- **Per-node legend state**: every node has its own `Set<string>` of hidden edge types, stored in
+  `nodeHiddenEdgeTypes: Map<nodeId, Set<string>>` in `voratinklis-app.js`. When a node is first
+  selected, its Set is initialised as a copy of `HIDDEN_BY_DEFAULT`. Changing checkboxes updates only
+  the selected node's Set. Switching to another node restores that node's previously saved settings.
+- **When no node is selected**: legend header shows `'Filtrai'`; checkboxes reflect the global
+  `hiddenEdgeTypes` default Set. Checking/unchecking updates the global Set so future first-time
+  selections inherit the new defaults.
 
-```sql
-SELECT s."sutartiesUnikalusId",
-       s."pavadinimas",
-       s."verte",
-       s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
-       s."tiekejoKodas",
-       buyer."pavadinimas"   AS "pirkejoPavadinimas",
-       buyer."formosKodas"   AS "pirkejoFormosKodas",
-       seller."pavadinimas"  AS "tiekejoPavadinimas",
-       seller."formosKodas"  AS "tiekejoFormosKodas"
-FROM   public."sutartys" s
-LEFT JOIN public."jarCsv" buyer  ON buyer."jarKodas"::text  = s."perkanciosiosOrganizacijosKodas"
-LEFT JOIN public."jarCsv" seller ON seller."jarKodas"::text = s."tiekejoKodas"
-WHERE  (s."perkanciosiosOrganizacijosKodas" = $1 OR s."tiekejoKodas" = $1)
-  AND  s."tipas" <> 'SP'
-  AND  s."verte" IS NOT NULL
-ORDER BY s."verte" DESC NULLS LAST
-LIMIT 30
-```
+#### Selection visual
 
-#### Updated `contractNode` builder
+Set `highlighted: true` and `selected: true` on the selected node in both `viewGraph` and `dataGraph`.
+Sigma calls `drawNodeHover` for every node with `highlighted: true`, so the selection ring renders
+persistently — no node-program change is needed.
+
+Update `drawNodeHover` to distinguish between hover and selection states via `data.selected`:
+
+| State                            | Ring radius    | Fill                     | Stroke width | Stroke colour |
+|----------------------------------|----------------|--------------------------|--------------|---------------|
+| Hover only                       | `nodeSize + 4` | `rgba(255,255,255,0.6)`  | `2`          | `data.color`  |
+| Selected (with or without hover) | `nodeSize + 6` | `rgba(255,255,255,0.15)` | `5`          | `data.color`  |
+
+When the node is both hovered and selected, draw the bold selection ring only (not both).
+
+On deselect: `setNodeAttribute(id, 'highlighted', false); setNodeAttribute(id, 'selected', false)`.
+
+#### Legend UI changes
+
+Add `<div id="voratinklis-legend-title">` at the very top of the `#voratinklis-legend` overlay.
+
+New `legend.js` export `updateLegendForNode(label, hiddenSet)`:
+
+- Sets `legendTitle.textContent` to `label` (selected node's display label) or `'Filtrai'` when null.
+- Syncs every `input[type=checkbox][data-edge-types]` to checked/unchecked based on `hiddenSet`:
+  a checkbox is checked when **none** of its `data-edge-types` values are in `hiddenSet`.
+
+`bindLegendCheckboxes` signature change: replace the single `hiddenEdgeTypes` Set parameter with a
+getter `getHiddenSet: () => Set<string>`. On each checkbox `change` event the handler calls
+`getHiddenSet()` to get the current node's Set (or the global fallback), mutates it, then calls
+`rebuildAndRefresh()`.
+
+#### `rebuildAndRefresh` change
+
+`rebuildAndRefresh` is a closure in `expand-ui.js` that now calls
+`rebuildViewGraph(dataGraph, viewGraph, currentHiddenSet())` where:
 
 ```js
-// Old: contractNode(id, pavadinimas, verte, count)
-// New: contractNode(sutartiesUnikalusId, pavadinimas, verte)
-export function contractNode(sutartiesUnikalusId, pavadinimas, verte) {
-    const id = `contract:${sutartiesUnikalusId}`;
-    const shortName = (pavadinimas || '').split(' ').slice(0, 9).join(' ');
-    return {
-        id,
-        attributes: {
-            entityType: 'ContractEntity',
-            pavadinimas: pavadinimas || '',
-            label: wrapLabel(shortName),
-            verte: verte || 0,
-            expanded: true,
-            size: 8,
-        },
-    };
+function currentHiddenSet() {
+    return selectedNodeId && nodeHiddenEdgeTypes.has(selectedNodeId)
+        ? nodeHiddenEdgeTypes.get(selectedNodeId)
+        : hiddenEdgeTypes;              // global fallback from colors.js
 }
 ```
 
+`rebuildViewGraph` signature is **unchanged** — it still receives a plain `Set<string>`.
+
+#### New `selection.js` module — pure helpers
+
+```js
+// src/voratinklis/selection.js
+export function getOrInitNodeHidden(nodeId, nodeHiddenMap, defaults) {
+    if (!nodeHiddenMap.has(nodeId)) {
+        nodeHiddenMap.set(nodeId, new Set(defaults));
+    }
+    return nodeHiddenMap.get(nodeId);
+}
+```
+
+Keeps the Map manipulation testable without DOM or Sigma.
+
+#### Module responsibilities update
+
+| Module                         | Change                                                                                                                                                 |
+|--------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `src/voratinklis/selection.js` | **New** — `getOrInitNodeHidden` pure helper                                                                                                            |
+| `src/voratinklis/renderers.js` | `drawNodeHover` — check `data.selected` for bold ring                                                                                                  |
+| `src/voratinklis/legend.js`    | `updateLegendForNode(label, hiddenSet)` added; `bindLegendCheckboxes` takes `getHiddenSet` getter                                                      |
+| `src/voratinklis/expand-ui.js` | Manages `selectedNodeId` + `nodeHiddenEdgeTypes`; `clickNode` handles selection; `clickStage` deselects; `rebuildAndRefresh` uses `currentHiddenSet()` |
+| `src/voratinklis-app.js`       | Declares `selectedNodeId`, `nodeHiddenEdgeTypes`; passes `getHiddenSet` to `bindLegendCheckboxes`                                                      |
+| `views/voratinklis/index.ejs`  | Add `<div id="voratinklis-legend-title">` in legend overlay                                                                                            |
+
 #### Tasks
 
-- [x] **`modules/voratinklis/expand.js`** — `expandOrg`:
-  - Remove the `gautiSutarciuDuomenisPagalJarKoda` import and call.
-  - Add two separate `sutartys JOIN jarCsv` queries (top 20 as buyer + top 20 as seller, ordered by `verte DESC`).
-  - Update the contract loop: for each row, create `contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte)`.
-  - Buyer query loop: root org is buyer → `rootOrg →[Order]→ cNode →[Delivery]→ sellerOrg`.
-  - Seller query loop: root org is seller → `buyerOrg →[Order]→ cNode →[Delivery]→ rootOrg`.
-  - Guard: skip rows where `sutartiesUnikalusId` or counterparty code is null.
-  - Org stubs for the counter-party are built with `orgNode(code, pavadinimas, formosKodas)` from the joined columns.
+- [ ] **`src/voratinklis/selection.js`** — create new module with
+  `getOrInitNodeHidden(nodeId, nodeHiddenMap, defaults)`.
 
-- [x] **`modules/voratinklis/expand.js`** — update `contractNode` signature: drop `count` param; ID is now `contract:{sutartiesUnikalusId}`; label is `wrapLabel` of first 9 words of `pavadinimas` (fallback `'Sutartis'` for null/empty).
+- [ ] **`src/voratinklis/renderers.js`** — update `drawNodeHover`:
+    - If `data.selected` is true: draw bold ring (`nodeSize + 6`, `lineWidth: 5`, `rgba(255,255,255,0.15)` fill,
+      `data.color` stroke). Do not also draw soft hover ring.
+    - Otherwise (hover only): draw existing soft ring (`nodeSize + 4`, `lineWidth: 2`, `rgba(255,255,255,0.6)` fill).
+    - In both cases: call `drawNodeLabel(context, data, settings)` at the end.
 
-- [x] **`test/voratinklis/expand.test.js`** — update contract-related test fixtures and assertions:
-  - Replace `contract:buyer…:seller…` ID format with `contract:{sutartiesUnikalusId}`.
-  - Replace `"N sut."` label assertions with truncated `pavadinimas` label assertions.
-  - Remove any assertions referencing `count` attribute on `ContractEntity`.
-  - Add tests for null/empty fallback, 9-word truncation, and `expanded: true`.
+- [ ] **`views/voratinklis/index.ejs`** — add
+  `<div id="voratinklis-legend-title" style="font-weight:600;text-align:center;margin-bottom:6px;">Filtrai</div>` at the
+  top of `#voratinklis-legend`.
 
+- [ ] **`src/voratinklis/legend.js`** — add `updateLegendForNode(label, hiddenSet)`:
+    - Sets `document.getElementById('voratinklis-legend-title').textContent` to `label ?? 'Filtrai'`.
+    - For each `input[type=checkbox][data-edge-types]`: set `checked = true` if none of its `data-edge-types` values are
+      in `hiddenSet`.
+
+  Change `bindLegendCheckboxes(hiddenEdgeTypes, rebuildAndRefresh)` to
+  `bindLegendCheckboxes(getHiddenSet, rebuildAndRefresh)`:
+    - On each `change` event: call `getHiddenSet()` to get the live Set, mutate it, then call `rebuildAndRefresh()`.
+
+- [ ] **`src/voratinklis/expand-ui.js`** — add selection state management:
+    - Declare `var selectedNodeId = null;` and accept `nodeHiddenEdgeTypes` as an injected dep.
+    - `selectNode(id)`: deselect previous (clear `highlighted`/`selected` attrs in viewGraph+dataGraph); set
+      `highlighted: true; selected: true` on new node in both graphs; call `updateLegendForNode` with node label and its
+      hidden Set.
+    - `deselectAll()`: clear attrs on `selectedNodeId` if set; set `selectedNodeId = null`; call
+      `updateLegendForNode(null, hiddenEdgeTypes)`.
+    - Update `clickNode` handler: call `selectNode(nodeId)` before expanding.
+    - Add `renderer.on('clickStage', deselectAll)`.
+    - Update `rebuildAndRefresh` to pass `currentHiddenSet()` to `rebuildViewGraph`.
+    - Expose `selectNode` and `deselectAll` in the returned object for testing.
+
+- [ ] **`src/voratinklis-app.js`**:
+    - Declare `var selectedNodeId = null; var nodeHiddenEdgeTypes = new Map();`.
+    - Import `getOrInitNodeHidden` from `./voratinklis/selection.js`.
+    - Pass `nodeHiddenEdgeTypes` into `createExpandUI`.
+    - Change `bindLegendCheckboxes` call: pass
+      `() => selectedNodeId ? getOrInitNodeHidden(selectedNodeId, nodeHiddenEdgeTypes, hiddenEdgeTypes) : hiddenEdgeTypes`
+      as the `getHiddenSet` getter.
+
+- [ ] **`test/voratinklis/selection.test.js`** — unit tests for `getOrInitNodeHidden`:
+    - Returns existing Set if nodeId is already in Map.
+    - Creates a new Set (a copy of `defaults`) if nodeId is absent.
+    - Modifying the returned Set does not affect the original defaults Set.
+    - Multiple nodes get independent Sets.
+
+- [ ] **Build** with `npm run build` and verify no compilation errors.
+
+- [ ] **Browser smoke-test** `http://localhost:9019/voratinklis/{jarKodas}`:
+    - Click a node: bold ring appears; legend header shows node label; checkboxes reflect that node's defaults.
+    - Toggle a checkbox: graph rebuilds for that node's settings.
+    - Click another node: previous ring gone; new ring appears; legend updates to new node's settings.
+    - Clicking same node again: ring disappears; legend reverts to `'Filtrai'`.
+    - Previous node's checkbox state is restored when re-selecting it.
 
 
 1. **ForceAtlas2 in browser**: `graphology-layout-forceatlas2` runs synchronously and blocks the main thread
