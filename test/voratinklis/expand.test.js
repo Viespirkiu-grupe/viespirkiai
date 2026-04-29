@@ -116,21 +116,33 @@ describe('personNode', () => {
 
 describe('contractNode', () => {
     it('sets entityType to ContractEntity', () => {
-        assert.equal(contractNode('c:1', 'Partner', 1000, 5).attributes.entityType, 'ContractEntity');
+        assert.equal(contractNode('abc123', 'Sutarties pavadinimas', 1000).attributes.entityType, 'ContractEntity');
     });
-    it('label is "N sut." when count > 0', () => {
-        assert.equal(contractNode('c:1', 'Partner', 1000, 17).attributes.label, '17 sut.');
+    it('id is contract:<sutartiesUnikalusId>', () => {
+        assert.equal(contractNode('abc123', 'Pavadinimas', 5000).id, 'contract:abc123');
     });
-    it('label is "Sutartis" when count is 0', () => {
-        assert.equal(contractNode('c:1', 'Partner', 0, 0).attributes.label, 'Sutartis');
+    it('label is wrapped first 9 words of pavadinimas', () => {
+        const title = 'Vienas Du Trys Keturi Penki Šeši Septyni Aštuoni Devyni Dešimt';
+        const n = contractNode('x1', title, 1000);
+        const expected = wrapLabel('Vienas Du Trys Keturi Penki Šeši Septyni Aštuoni Devyni');
+        assert.equal(n.attributes.label, expected);
     });
-    it('stores pavadinimas as reference attribute (not label)', () => {
-        const n = contractNode('c:1', 'UAB Partneris', 1000, 5);
-        assert.equal(n.attributes.pavadinimas, 'UAB Partneris');
-        assert.notEqual(n.attributes.label, 'UAB Partneris');
+    it('label falls back to "Sutartis" when pavadinimas is null', () => {
+        assert.equal(contractNode('x1', null, 0).attributes.label, 'Sutartis');
     });
-    it('preserves the given id', () => {
-        assert.equal(contractNode('contract:buyer1:seller2', 'X', 0, 1).id, 'contract:buyer1:seller2');
+    it('label falls back to "Sutartis" when pavadinimas is empty string', () => {
+        assert.equal(contractNode('x1', '', 0).attributes.label, 'Sutartis');
+    });
+    it('stores full pavadinimas in attributes (not just 9 words)', () => {
+        const long = 'A B C D E F G H I J K L';
+        const n = contractNode('x2', long, 500);
+        assert.equal(n.attributes.pavadinimas, long);
+    });
+    it('stores verte in attributes', () => {
+        assert.equal(contractNode('x3', 'Test', 99000).attributes.verte, 99000);
+    });
+    it('expanded is always true', () => {
+        assert.equal(contractNode('x4', 'Test', 0).attributes.expanded, true);
     });
 });
 

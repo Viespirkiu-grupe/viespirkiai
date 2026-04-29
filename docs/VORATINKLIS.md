@@ -737,23 +737,23 @@ function rebuildAndRefresh() {
 
 #### Tasks
 
-- [ ] **`graph-utils.js`**: remove `hiddenEdgeTypes` from `mergeGraphElements`; add `rebuildViewGraph`
+- [x] **`graph-utils.js`**: remove `hiddenEdgeTypes` from `mergeGraphElements`; add `rebuildViewGraph`
   and `syncPositionsToData` as exported functions.
 
-- [ ] **`expand-ui.js`**: accept `{ dataGraph, viewGraph }` separately; call
+- [x] **`expand-ui.js`**: accept `{ dataGraph, viewGraph }` separately; call
   `mergeGraphElements(dataGraph, ...)` then `rebuildViewGraph` + `syncPositionsToData` after every
   expand; store and return `rebuildAndRefresh` callback; store `cancelAnimation` token and cancel
   before each rebuild.
 
-- [ ] **`legend.js`**: replace `toggleEdgeTypeVisibility` with a simple `rebuildAndRefresh` callback
+- [x] **`legend.js`**: replace `toggleEdgeTypeVisibility` with a simple `rebuildAndRefresh` callback
   approach. New signature: `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)`.
   Checkbox `change` handler: update `hiddenEdgeTypes` Set then call `rebuildAndRefresh()`.
 
-- [ ] **`voratinklis-app.js`**: create `dataGraph` + `viewGraph` (both `new Graph({ type: 'directed', multi: true })`);
+- [x] **`voratinklis-app.js`**: create `dataGraph` + `viewGraph` (both `new Graph({ type: 'directed', multi: true })`);
   pass `viewGraph` to `new Sigma(...)`; wire `rebuildAndRefresh` from the `expand-ui` factory into
   `bindLegendCheckboxes`.
 
-- [ ] **`test/voratinklis/graph-utils.test.js`**: update existing `mergeGraphElements` test calls to
+- [x] **`test/voratinklis/graph-utils.test.js`**: update existing `mergeGraphElements` test calls to
   drop `hiddenEdgeTypes` arg; remove 2 hidden-related tests that no longer apply; add
   `rebuildViewGraph` tests:
     - Orphan node is removed when its only edge type is hidden.
@@ -829,22 +829,22 @@ export function contractNode(sutartiesUnikalusId, pavadinimas, verte) {
 
 #### Tasks
 
-- [ ] **`modules/voratinklis/expand.js`** — `expandOrg`:
+- [x] **`modules/voratinklis/expand.js`** — `expandOrg`:
   - Remove the `gautiSutarciuDuomenisPagalJarKoda` import and call.
-  - Add the new `sutartys JOIN jarCsv` query (top 30 by `verte DESC`).
+  - Add two separate `sutartys JOIN jarCsv` queries (top 20 as buyer + top 20 as seller, ordered by `verte DESC`).
   - Update the contract loop: for each row, create `contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte)`.
-  - Determine buyer/seller roles from `row.pirkejoKodas === jk`:
-    - If `pirkejoKodas === jk`: root org is buyer → `rootOrg →[Order]→ cNode →[Delivery]→ sellerOrg`.
-    - If `tiekejoKodas === jk`: root org is seller → `buyerOrg →[Order]→ cNode →[Delivery]→ rootOrg`.
+  - Buyer query loop: root org is buyer → `rootOrg →[Order]→ cNode →[Delivery]→ sellerOrg`.
+  - Seller query loop: root org is seller → `buyerOrg →[Order]→ cNode →[Delivery]→ rootOrg`.
+  - Guard: skip rows where `sutartiesUnikalusId` or counterparty code is null.
   - Org stubs for the counter-party are built with `orgNode(code, pavadinimas, formosKodas)` from the joined columns.
 
-- [ ] **`modules/voratinklis/expand.js`** — update `contractNode` signature: drop `count` param; ID is now `contract:{sutartiesUnikalusId}`; label is `wrapLabel` of first 9 words of `pavadinimas`.
+- [x] **`modules/voratinklis/expand.js`** — update `contractNode` signature: drop `count` param; ID is now `contract:{sutartiesUnikalusId}`; label is `wrapLabel` of first 9 words of `pavadinimas` (fallback `'Sutartis'` for null/empty).
 
-- [ ] **`test/voratinklis/expand.test.js`** — update contract-related test fixtures and assertions:
+- [x] **`test/voratinklis/expand.test.js`** — update contract-related test fixtures and assertions:
   - Replace `contract:buyer…:seller…` ID format with `contract:{sutartiesUnikalusId}`.
   - Replace `"N sut."` label assertions with truncated `pavadinimas` label assertions.
   - Remove any assertions referencing `count` attribute on `ContractEntity`.
-  - Add a test for the buyer-role branch (root org is buyer) and seller-role branch (root org is seller).
+  - Add tests for null/empty fallback, 9-word truncation, and `expanded: true`.
 
 
 

@@ -1,5 +1,4 @@
 import { postgres } from '../../postgres/postgres.js';
-import { gautiSutarciuDuomenisPagalJarKoda } from '../sutartys/pagalJarKoda.js';
 
 /**
  * Formats a contract value as €XM / €XK / €X.
@@ -130,19 +129,20 @@ export function personNode(vardas, pavarde, deklaracija, fromDate) {
 
 /**
  * Builds a ContractEntity node object.
- * @param {string} id
- * @param {string} pavadinimas  Partner company name (for reference, not used as label)
- * @param {number} verte        Aggregated contract value
- * @param {number} count        Number of contracts between the two companies
+ * @param {string} sutartiesUnikalusId  Unique contract identifier (used as node ID)
+ * @param {string|null} pavadinimas     Contract title
+ * @param {number|null} verte           Contract value
  */
-export function contractNode(id, pavadinimas, verte, count) {
-    const countLabel = count > 0 ? `${count} sut.` : 'Sutartis';
+export function contractNode(sutartiesUnikalusId, pavadinimas, verte) {
+    const id = `contract:${sutartiesUnikalusId}`;
+    const title = pavadinimas || 'Sutartis';
+    const shortName = title.split(' ').slice(0, 9).join(' ');
     return {
         id,
         attributes: {
             entityType: 'ContractEntity',
             pavadinimas: pavadinimas || '',
-            label: countLabel,
+            label: wrapLabel(shortName),
             verte: verte || 0,
             expanded: true,
             size: 8,
@@ -189,7 +189,7 @@ export function addEdge(edges, edgeMap, e) {
 export async function expandOrg(jarKodas) {
     const jk = String(jarKodas);
 
-    const [jarRes, pinregRes, sutartysRes] = await Promise.all([
+    const [jarRes, pinregRes, asBuyerRes, asSellerRes] = await Promise.all([
         // Org metadata from jarCsv
         postgres.query(
             `SELECT "pavadinimas", "formosKodas" FROM public."jarCsv" WHERE "jarKodas" = $1 LIMIT 1`,
@@ -200,8 +200,40 @@ export async function expandOrg(jarKodas) {
             `SELECT * FROM public."pinregJuridiniaiRysiai" WHERE "jarKodas" = $1 ORDER BY "pateikimoData" DESC LIMIT 500`,
             [jk],
         ),
-        // Top contract partners
-        gautiSutarciuDuomenisPagalJarKoda(jk, { limit: 20 }),
+        // Top contracts where this org is the buyer
+        postgres.query(
+            `SELECT s."sutartiesUnikalusId",
+                    s."pavadinimas",
+                    s."verte",
+                    s."tiekejoKodas",
+                    seller."pavadinimas"  AS "tiekejoPavadinimas",
+                    seller."formosKodas" AS "tiekejoFormosKodas"
+             FROM   public."sutartys" s
+             LEFT JOIN public."jarCsv" seller ON seller."jarKodas"::text = s."tiekejoKodas"
+             WHERE  s."perkanciosiosOrganizacijosKodas" = $1
+               AND  s."tipas" <> 'SP'
+               AND  s."verte" IS NOT NULL
+             ORDER BY s."verte" DESC NULLS LAST
+             LIMIT 20`,
+            [jk],
+        ),
+        // Top contracts where this org is the seller
+        postgres.query(
+            `SELECT s."sutartiesUnikalusId",
+                    s."pavadinimas",
+                    s."verte",
+                    s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
+                    buyer."pavadinimas"  AS "pirkejoPavadinimas",
+                    buyer."formosKodas" AS "pirkejoFormosKodas"
+             FROM   public."sutartys" s
+             LEFT JOIN public."jarCsv" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+             WHERE  s."tiekejoKodas" = $1
+               AND  s."tipas" <> 'SP'
+               AND  s."verte" IS NOT NULL
+             ORDER BY s."verte" DESC NULLS LAST
+             LIMIT 20`,
+            [jk],
+        ),
     ]);
 
     const nodes = [];
@@ -261,26 +293,26 @@ export async function expandOrg(jarKodas) {
         }
     }
 
-    // Top suppliers (root org is buyer → ContractEntity → supplier)
-    for (const row of sutartysRes.topTiekejai) {
-        if (!row.jarKodas) continue;
-        const supplierOrg = orgNode(row.jarKodas, row.pavadinimas, null);
-        addNode(nodes, nodeMap, supplierOrg);
-        const valueLabel = formatContractValue(row.total);
-        const cNode = contractNode(`contract:buyer${jk}:seller${row.jarKodas}`, row.pavadinimas, row.total, row.count);
+    // Top contracts where root org is buyer → ContractEntity → supplier
+    for (const row of asBuyerRes.rows) {
+        if (!row.sutartiesUnikalusId || !row.tiekejoKodas) continue;
+        const cNode = contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte);
         addNode(nodes, nodeMap, cNode);
+        const supplierOrg = orgNode(row.tiekejoKodas, row.tiekejoPavadinimas, row.tiekejoFormosKodas);
+        addNode(nodes, nodeMap, supplierOrg);
+        const valueLabel = formatContractValue(row.verte);
         addEdge(edges, edgeMap, edge(rootOrg.id, cNode.id, 'Order', valueLabel, null, true));
         addEdge(edges, edgeMap, edge(cNode.id, supplierOrg.id, 'Delivery', '', null));
     }
 
-    // Top buyers (buyer → ContractEntity → root org)
-    for (const row of sutartysRes.topPirkejai) {
-        if (!row.jarKodas) continue;
-        const buyerOrg = orgNode(row.jarKodas, row.pavadinimas, null);
-        addNode(nodes, nodeMap, buyerOrg);
-        const valueLabel = formatContractValue(row.total);
-        const cNode = contractNode(`contract:buyer${row.jarKodas}:seller${jk}`, row.pavadinimas, row.total, row.count);
+    // Top contracts where root org is seller: buyer → ContractEntity → root org
+    for (const row of asSellerRes.rows) {
+        if (!row.sutartiesUnikalusId || !row.pirkejoKodas) continue;
+        const cNode = contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte);
         addNode(nodes, nodeMap, cNode);
+        const buyerOrg = orgNode(row.pirkejoKodas, row.pirkejoPavadinimas, row.pirkejoFormosKodas);
+        addNode(nodes, nodeMap, buyerOrg);
+        const valueLabel = formatContractValue(row.verte);
         addEdge(edges, edgeMap, edge(buyerOrg.id, cNode.id, 'Order', valueLabel, null, true));
         addEdge(edges, edgeMap, edge(cNode.id, rootOrg.id, 'Delivery', '', null));
     }
