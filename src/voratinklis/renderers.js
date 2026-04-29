@@ -1,7 +1,21 @@
 // ── Custom Sigma node renderers ───────────────────────────────────────────────
 
-// Draws node label centred below the node
+// Draws a dotted ring for expanded (non-contract) nodes, then the node label.
+// Called by Sigma for every visible labelled node, and also by drawNodeHover.
 export function drawNodeLabel(context, data, settings) {
+    var nodeSize = data.size || 8;
+
+    // Persistent expanded indicator: dotted ring outside the selection ring
+    if (data.expanded && data.entityType !== 'ContractEntity') {
+        context.beginPath();
+        context.arc(data.x, data.y, nodeSize + 9, 0, Math.PI * 2);
+        context.strokeStyle = data.color || '#9ca3af';
+        context.lineWidth = 2.5;
+        context.setLineDash([5, 4]);
+        context.stroke();
+        context.setLineDash([]);
+    }
+
     var label = data.label;
     if (!label) return;
 
@@ -18,7 +32,6 @@ export function drawNodeLabel(context, data, settings) {
 
     var lines = label.split('\n');
     var lineHeight = size + 3;
-    var nodeSize = data.size || 8;
     var startY = data.y + nodeSize + 4;
 
     for (var i = 0; i < lines.length; i++) {
@@ -27,8 +40,9 @@ export function drawNodeLabel(context, data, settings) {
 }
 
 // Draws hover/selection highlight ring + label below.
-// Selected node: bold ring (nodeSize+6, lineWidth 5).
-// Hover only: soft ring (nodeSize+4, lineWidth 2).
+// Selected node: bold solid ring (nodeSize+6, lineWidth 5).
+// Hover only:    soft ring (nodeSize+4, lineWidth 2).
+// Expanded ring is drawn by drawNodeLabel (called at end) — always outermost.
 export function drawNodeHover(context, data, settings) {
     var nodeSize = data.size || 8;
     context.beginPath();
@@ -49,3 +63,4 @@ export function drawNodeHover(context, data, settings) {
     }
     drawNodeLabel(context, data, settings);
 }
+
