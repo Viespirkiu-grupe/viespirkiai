@@ -7,6 +7,29 @@ const ENTITY_TYPE = {
 };
 
 /**
+ * Returns the visual node size for a contract based on its value (EUR).
+ * @param {number} verte
+ * @returns {8|13|19}
+ */
+export function contractSize(verte) {
+    if (verte >= 1_000_000) return 19;
+    if (verte >= 100_000)   return 13;
+    return 8;
+}
+
+/**
+ * Returns the visual edge stroke width for a contract edge based on its value (EUR).
+ * Minimum is 1 (never 0).
+ * @param {number} verte
+ * @returns {1|3|6}
+ */
+export function edgeWeight(verte) {
+    if (verte >= 1_000_000) return 6;
+    if (verte >= 100_000)   return 3;
+    return 1;
+}
+
+/**
  * Formats a contract value as €XM / €XK / €X.
  * @param {number|null} verte
  * @returns {string}
@@ -98,7 +121,6 @@ export function mapFormosKodas(formosKodas) {
 export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
     const jk = String(jarKodas);
     const id = `org:${jk}`;
-    const size = 8;
     return {
         id,
         attributes: {
@@ -108,7 +130,9 @@ export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
             pavadinimas: pavadinimas || jk,
             label: wrapLabel(pavadinimas || jk),
             expanded: opts.expanded ?? false,
-            size,
+            draustieji: opts.draustieji ?? undefined,
+            draustieji2: opts.draustieji2 ?? undefined,
+            size: 8,
         },
     };
 }
@@ -143,15 +167,16 @@ export function contractNode(sutartiesUnikalusId, pavadinimas, verte) {
     const id = `contract:${sutartiesUnikalusId}`;
     const title = pavadinimas || 'Sutartis';
     const shortName = title.split(' ').slice(0, 9).join(' ');
+    const v = verte || 0;
     return {
         id,
         attributes: {
             entityType: ENTITY_TYPE.Contract,
             pavadinimas: pavadinimas || '',
             label: wrapLabel(shortName),
-            verte: verte || 0,
+            verte: v,
             expanded: true,
-            size: 8,
+            size: contractSize(v),
         },
     };
 }
@@ -159,14 +184,11 @@ export function contractNode(sutartiesUnikalusId, pavadinimas, verte) {
 /**
  * Builds an edge object.
  */
-export function edge(source, target, type, label, fromDate, forceLabel = false) {
+export function edge(source, target, type, label, fromDate, forceLabel = false, opts = {}) {
     const id = `edge:${source}:${target}:${type}`;
-    return {
-        id,
-        source,
-        target,
-        attributes: { type, label: label || '', fromDate: fromDate || null, forceLabel },
-    };
+    const attrs = { type, label: label || '', fromDate: fromDate || null, forceLabel };
+    if (opts.size != null) attrs.size = opts.size;
+    return { id, source, target, attributes: attrs };
 }
 
 // ── Deduplication helpers ─────────────────────────────────────────────────────
@@ -247,9 +269,28 @@ export async function expandOrg(jarKodas) {
     const nodeMap = new Map();
     const edgeMap = new Map();
 
+    // Collect all org jarKodas appearing in contracts for a single sodra query
+    const contractOrgCodes = new Set([jk]);
+    for (const row of asBuyerRes.rows)  { if (row.tiekejoKodas)  contractOrgCodes.add(row.tiekejoKodas); }
+    for (const row of asSellerRes.rows) { if (row.pirkejoKodas)  contractOrgCodes.add(row.pirkejoKodas); }
+
+    const sodraRes = await postgres.query(
+        `SELECT DISTINCT ON ("jarKodas") "jarKodas", "draustieji", "draustieji2"
+         FROM sodra
+         WHERE "jarKodas" = ANY($1)
+         ORDER BY "jarKodas", "data" DESC NULLS LAST`,
+        [Array.from(contractOrgCodes)],
+    );
+    const sodraMap = new Map(sodraRes.rows.map(r => [r.jarKodas, r]));
+
     // Root org node
     const jarRow = jarRes.rows[0];
-    const rootOrg = orgNode(jk, jarRow?.pavadinimas, jarRow?.formosKodas, { expanded: true });
+    const sodraSelf = sodraMap.get(jk) || {};
+    const rootOrg = orgNode(jk, jarRow?.pavadinimas, jarRow?.formosKodas, {
+        expanded: true,
+        draustieji: sodraSelf.draustieji,
+        draustieji2: sodraSelf.draustieji2,
+    });
     addNode(nodes, nodeMap, rootOrg);
 
     for (const row of pinregRes.rows) {
@@ -304,11 +345,16 @@ export async function expandOrg(jarKodas) {
         if (!row.sutartiesUnikalusId || !row.tiekejoKodas) continue;
         const cNode = contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte);
         addNode(nodes, nodeMap, cNode);
-        const supplierOrg = orgNode(row.tiekejoKodas, row.tiekejoPavadinimas, row.tiekejoFormosKodas);
+        const sodraSupplier = sodraMap.get(row.tiekejoKodas) || {};
+        const supplierOrg = orgNode(row.tiekejoKodas, row.tiekejoPavadinimas, row.tiekejoFormosKodas, {
+            draustieji: sodraSupplier.draustieji,
+            draustieji2: sodraSupplier.draustieji2,
+        });
         addNode(nodes, nodeMap, supplierOrg);
         const valueLabel = formatContractValue(row.verte);
-        addEdge(edges, edgeMap, edge(rootOrg.id, cNode.id, 'Order', valueLabel, null, true));
-        addEdge(edges, edgeMap, edge(cNode.id, supplierOrg.id, 'Delivery', '', null));
+        const w = edgeWeight(row.verte || 0);
+        addEdge(edges, edgeMap, edge(rootOrg.id, cNode.id, 'Order', valueLabel, null, true, { size: w }));
+        addEdge(edges, edgeMap, edge(cNode.id, supplierOrg.id, 'Delivery', '', null, false, { size: w }));
     }
 
     // Top contracts where root org is seller: buyer → ContractEntity → root org
@@ -316,11 +362,16 @@ export async function expandOrg(jarKodas) {
         if (!row.sutartiesUnikalusId || !row.pirkejoKodas) continue;
         const cNode = contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte);
         addNode(nodes, nodeMap, cNode);
-        const buyerOrg = orgNode(row.pirkejoKodas, row.pirkejoPavadinimas, row.pirkejoFormosKodas);
+        const sodraBuyer = sodraMap.get(row.pirkejoKodas) || {};
+        const buyerOrg = orgNode(row.pirkejoKodas, row.pirkejoPavadinimas, row.pirkejoFormosKodas, {
+            draustieji: sodraBuyer.draustieji,
+            draustieji2: sodraBuyer.draustieji2,
+        });
         addNode(nodes, nodeMap, buyerOrg);
         const valueLabel = formatContractValue(row.verte);
-        addEdge(edges, edgeMap, edge(buyerOrg.id, cNode.id, 'Order', valueLabel, null, true));
-        addEdge(edges, edgeMap, edge(cNode.id, rootOrg.id, 'Delivery', '', null));
+        const w = edgeWeight(row.verte || 0);
+        addEdge(edges, edgeMap, edge(buyerOrg.id, cNode.id, 'Order', valueLabel, null, true, { size: w }));
+        addEdge(edges, edgeMap, edge(cNode.id, rootOrg.id, 'Delivery', '', null, false, { size: w }));
     }
 
     return { nodes, edges };

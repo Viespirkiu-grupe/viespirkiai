@@ -931,12 +931,20 @@ square swatches to SVG arrows whose stroke width matches the corresponding edge 
 
 **Org node size** — `personelSize(count)` pure function in `src/voratinklis/colors.js`:
 
-| Personnel (`max(draustieji + draustieji2, 1)`) | Node size (`size`)  |
-|------------------------------------------------|---------------------|
-| < 10                                           | 8 (current default) |
-| 10 – 50                                        | 13                  |
-| 50 – 200                                       | 19                  |
-| > 200                                          | 28                  |
+Personnel count is computed **client-side** from raw sodra fields sent in the org node attributes:
+
+```js
+Math.max(attrs.bendrasDraustujuSkaicius || 0, attrs.draustieji || 0, attrs.draustieji2 || 0, 1)
+```
+
+where `bendrasDraustujuSkaicius = draustieji + draustieji2` (as computed by `gautiSodrosDuomenis`).
+
+| Personnel (`max(bendrasDraustujuSkaicius, draustieji, draustieji2, 1)`) | Node size (`size`)  |
+|------------------------------------------------------------------------|---------------------|
+| < 10                                                                   | 8 (current default) |
+| 10 – 50                                                                | 13                  |
+| 50 – 200                                                               | 19                  |
+| > 200                                                                  | 28                  |
 
 **Contract node size** — `contractSize(verte)` pure function in `src/voratinklis/colors.js`:
 
@@ -961,23 +969,24 @@ without DOM or Sigma.
 
 #### Server-side changes — `modules/voratinklis/expand.js`
 
-1. **`orgNode` factory** — add optional `personelCount` parameter (defaults to `0`):
+1. **`orgNode` factory** — add optional sodra fields (`draustiejai`, `draustieji2`,
+   `bendrasDraustujuSkaicius`) to node attributes. The `size` is **not** computed on the server
+   for org nodes — the client computes it from these raw fields:
 
    ```js
    export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
        // …existing…
        attributes: {
            // …existing…
-           personelCount: opts.personelCount ?? 0,
-           size: personelSize(opts.personelCount ?? 0),   // replaces hardcoded 8
+           draustieji:               opts.draustieji               ?? 0,
+           draustieji2:              opts.draustieji2              ?? 0,
+           bendrasDraustujuSkaicius: opts.bendrasDraustujuSkaicius ?? 0,
+           size: 8,   // placeholder — overwritten by mergeGraphElements client-side
        }
    }
    ```
 
-   `personelSize` is imported from a shared helper (or computed inline — keep it consistent with
-   the client). Since `expand.js` is server-side, duplicate the lookup table as a local
-   `personelSize` helper in `expand.js` — do **not** import from `src/voratinklis/colors.js` (that
-   is a client-side module).
+   `personelSize` runs entirely in the browser — `expand.js` does not need a copy.
 
 2. **`contractNode` factory** — compute `size` from `verte` using a local `contractSize` helper:
 
@@ -992,33 +1001,34 @@ without DOM or Sigma.
    }
    ```
 
-3. **`expandOrg` — sodra lookup for personnel count**: after all existing queries have run and the
-   full list of org `jarKodas` values is known, fetch sodra data for every org in a **single
-   flat query**:
+3. **`expandOrg` — sodra lookup for raw insured fields**: after all existing queries have run and
+   the full list of org `jarKodas` values is known, fetch the most-recent sodra row per company
+   in a **single flat query**:
 
    ```sql
-   SELECT "jarKodas",
-          COALESCE("draustieji", 0) + COALESCE("draustieji2", 0) AS "personelCount",
-          "data"
+   SELECT DISTINCT ON ("jarKodas")
+          "jarKodas", "draustieji", "draustieji2"
    FROM sodra
    WHERE "jarKodas" = ANY($1)
    ORDER BY "jarKodas", "data" DESC
    ```
 
-   Collect all unique `jarKodas` values that will become org nodes (root + all partners found in
-   the contract rows), pass them as a single array parameter, and build a `Map<jarKodas, number>`
-   keeping only the first (most-recent) row per company:
+   Build a Map keyed by `jarKodas`:
 
    ```js
    const sodraMap = new Map();
    for (const row of sodraRows) {
-       if (!sodraMap.has(row.jarKodas)) sodraMap.set(row.jarKodas, row.personelCount);
+       sodraMap.set(row.jarKodas, {
+           draustieji:               row.draustieji               ?? 0,
+           draustieji2:              row.draustieji2              ?? 0,
+           bendrasDraustujuSkaicius: (row.draustieji ?? 0) + (row.draustieji2 ?? 0),
+       });
    }
    ```
 
-   Pass `personelCount: sodraMap.get(jk) ?? 0` when calling `orgNode(…, { personelCount })` for
-   every org (root and partners). No JOINs, no subqueries — one extra flat SELECT per
-   `expandOrg` call.
+   Pass raw fields into `orgNode(…, { ...sodraMap.get(jk) })` for every org. The client computes
+   `personelCount` and `size` from these raw attributes. No JOINs, no subqueries — one extra
+   flat SELECT per `expandOrg` call.
 
 4. **Edge `size` in `expandOrg`** — when building Order/Delivery edges, compute and store the edge
    `size` attribute:
@@ -1037,7 +1047,8 @@ without DOM or Sigma.
 
 #### Client-side changes
 
-1. **`src/voratinklis/colors.js`** — add three exported pure functions:
+1. **`src/voratinklis/colors.js`** — add three exported pure functions. `personelSize` takes a
+   pre-computed count (use the correct formula in the call site — see below):
 
    ```js
    export function personelSize(count) {
@@ -1060,22 +1071,40 @@ without DOM or Sigma.
    }
    ```
 
-2. **`src/voratinklis/graph-utils.js` `mergeGraphElements`** — replace the hardcoded fallback:
+2. **`src/voratinklis/graph-utils.js` `mergeGraphElements`** — compute `size` client-side instead
+   of trusting the server value:
+
+   ```js
+   import { personelSize, contractSize, nodeColor } from './colors.js';
+   import { isOrgNode, isContractNode } from './entity-types.js';
+
+   function computeNodeSize(attrs) {
+       if (isOrgNode(attrs)) {
+           const count = Math.max(
+               attrs.bendrasDraustujuSkaicius || 0,
+               attrs.draustieji  || 0,
+               attrs.draustieji2 || 0,
+               1,
+           );
+           return personelSize(count);
+       }
+       if (isContractNode(attrs)) return contractSize(attrs.verte || 0);
+       return 8;   // PersonEntity fixed size
+   }
+   ```
+
+   Replace the hardcoded fallback when adding nodes:
 
    ```js
    // Before:
    size: n.attributes.size || 8,
 
    // After:
-   size: n.attributes.size,   // size is now always set by the server-side factory
+   size: computeNodeSize(n.attributes),
    ```
 
-   The `size` attribute is computed in `orgNode` / `contractNode` / `personNode` on the server and
-   arrives in `n.attributes.size` — do not override it client-side. Person nodes remain hardcoded
-   at `size: 8` in the `personNode` factory.
-
 3. **`src/voratinklis/graph-utils.js` `mergeGraphElements`** — when adding edges, preserve the
-   server-computed `size`:
+   server-computed `size` for Order/Delivery edges:
 
    ```js
    // Edge attrs already contain `size` from the server — don't clobber it.
@@ -1138,28 +1167,37 @@ for non-contract edges).
     - `contractSize`: boundary checks for 0, 99_999, 100_000, 999_999, 1_000_000, 5_000_000.
     - `edgeWeight`: boundary checks for 0, 99_999, 100_000, 999_999, 1_000_000, 5_000_000.
 
-- **`test/voratinklis/expand.test.js`** — add cases for `orgNode` and `contractNode` that verify
-  `size` and `personelCount` are set correctly for various inputs.
+- **`test/voratinklis/graph-utils.test.js`** — add tests verifying `computeNodeSize` inside
+  `mergeGraphElements` applies the correct formula for org nodes (with raw sodra fields) and
+  contract nodes (from `verte`).
+
+- **`test/voratinklis/expand.test.js`** — add cases for `orgNode` that verify raw sodra fields
+  (`draustieji`, `draustieji2`, `bendrasDraustujuSkaicius`) are stored in attributes; and for
+  `contractNode` that `verte` is stored correctly.
 
 #### Tasks
 
 - [ ] **`modules/voratinklis/expand.js`**:
-    - Add local `personelSize(count)` and `contractSize(verte)` and `edgeWeight(verte)` helper
-      functions (mirror of `colors.js` exports — same thresholds, same values).
-    - Update `orgNode` factory: add `opts.personelCount` → store as `personelCount` attribute,
-      compute `size` via `personelSize`.
-    - Update `contractNode` factory: compute `size` via `contractSize(verte)`.
-    - Update `expandOrg`: collect all unique org `jarKodas` values from the query results; run
-      **one flat `SELECT … WHERE "jarKodas" = ANY($1)` query** against `sodra`; build a
-      `Map<jarKodas, personelCount>`; pass `personelCount` from the map when calling `orgNode`
-      for every org (root and all partners). No JOINs, no subqueries.
-    - Update `edge` builder (or its call sites) to accept and store `size` attribute on
-      Order/Delivery edges via `edgeWeight(row.verte)`.
+    - Add local `contractSize(verte)` and `edgeWeight(verte)` helper functions (mirror of
+      `colors.js` exports — same thresholds, same values). No `personelSize` needed server-side.
+    - Update `orgNode` factory: accept `opts.draustieji`, `opts.draustieji2`,
+      `opts.bendrasDraustujuSkaicius`; store them as node attributes; remove hardcoded `size: 8`
+      (client will compute it).
+    - Update `contractNode` factory: compute `size` via local `contractSize(verte)`.
+    - Update `expandOrg`: collect all unique org `jarKodas` values; run one flat
+      `SELECT DISTINCT ON ("jarKodas") "jarKodas", "draustieji", "draustieji2" FROM sodra WHERE
+      "jarKodas" = ANY($1) ORDER BY "jarKodas", "data" DESC`; build a
+      `Map<jarKodas, {draustieji, draustieji2, bendrasDraustujuSkaicius}>`; pass those fields into
+      `orgNode(…, { draustieji, draustieji2, bendrasDraustujuSkaicius })` for each org.
+    - Update `edge` builder (or its call sites) to accept and store `size` on Order/Delivery edges
+      via local `edgeWeight(row.verte)`.
 
 - [ ] **`src/voratinklis/colors.js`**: export `personelSize`, `contractSize`, `edgeWeight`.
 
-- [ ] **`src/voratinklis/graph-utils.js`**: remove the `|| 8` size fallback in
-  `mergeGraphElements`; ensure edge `size` attribute from server payload is not clobbered.
+- [ ] **`src/voratinklis/graph-utils.js`**: add `computeNodeSize(attrs)` private helper that
+  applies `max(bendrasDraustujuSkaicius, draustieji, draustieji2, 1)` for org nodes and
+  `contractSize(verte)` for contract nodes; replace `n.attributes.size || 8` with
+  `computeNodeSize(n.attributes)`; preserve edge `size` from server payload.
 
 - [ ] **`views/voratinklis/index.ejs`**: replace all `<span class="vl-swatch">` with inline SVG
   arrows; split the Sutartis row into three sub-rows (thin / medium / thick) sharing the same
@@ -1167,8 +1205,6 @@ for non-contract edges).
 
 - [ ] **`test/voratinklis/colors.test.js`**: new file — unit tests for all three size/weight
   pure functions.
-
-- [ ] **`test/voratinklis/expand.test.js`**: add `orgNode` size and `contractNode` size tests.
 
 - [ ] **Build** with `npm run build` — clean; all tests passing.
 

@@ -513,3 +513,150 @@ describe('syncPositionsToData', () => {
         assert.equal(dg.getNodeAttribute('org:A', 'y'), 88);
     });
 });
+
+// ── computeNodeSize ───────────────────────────────────────────────────────────
+
+import { computeNodeSize } from '../../src/voratinklis/graph-utils.js';
+
+describe('computeNodeSize', function () {
+    it('returns 8 for a person node regardless of other attrs', function () {
+        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Person }), 8);
+    });
+
+    it('returns 8 for org with no sodra data (draustieji + draustieji2 = 0 → count = 1)', function () {
+        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Org }), 8);
+    });
+
+    it('returns 8 for org with fewer than 10 employees', function () {
+        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Org, draustieji: 5, draustieji2: 3 }), 8);
+    });
+
+    it('returns 13 for org at the 10-employee boundary', function () {
+        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Org, draustieji: 7, draustieji2: 3 }), 13);
+    });
+
+    it('returns 19 for org at the 50-employee boundary', function () {
+        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Org, draustieji: 30, draustieji2: 20 }), 19);
+    });
+
+    it('returns 28 for org at the 200-employee boundary', function () {
+        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Org, draustieji: 120, draustieji2: 80 }), 28);
+    });
+
+    it('returns 8 for a small contract (< 100k)', function () {
+        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Contract, verte: 50_000 }), 8);
+    });
+
+    it('returns 13 for a medium contract (100k–1M)', function () {
+        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Contract, verte: 500_000 }), 13);
+    });
+
+    it('returns 19 for a large contract (>= 1M)', function () {
+        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Contract, verte: 2_000_000 }), 19);
+    });
+});
+
+// ── mergeGraphElements — org node enrichment ──────────────────────────────────
+
+describe('mergeGraphElements — org node sodra enrichment', function () {
+    it('enriches an existing stub org node with sodra data when first available', function () {
+        const dg = new Graph({ type: 'directed', multi: true });
+        // Stub org already in the graph (came from an earlier expansion) — no sodra fields
+        dg.addNode('org:100', { entityType: ENTITY_TYPE.Org, size: 8, draustieji: undefined, draustieji2: undefined });
+
+        // New data includes sodra fields for the same org
+        const data = {
+            nodes: [{
+                id: 'org:100',
+                attributes: {
+                    entityType: ENTITY_TYPE.Org,
+                    draustieji: 60,
+                    draustieji2: 0,
+                    size: 8,
+                    label: 'UAB Test',
+                    pavadinimas: 'UAB Test',
+                },
+            }],
+            edges: [],
+        };
+
+        mergeGraphElements(dg, () => null, data, null);
+
+        // After enrichment, size should reflect personelSize(60) = 19
+        assert.equal(dg.getNodeAttribute('org:100', 'draustieji'), 60);
+        assert.equal(dg.getNodeAttribute('org:100', 'draustieji2'), 0);
+        assert.equal(dg.getNodeAttribute('org:100', 'size'), 19);
+    });
+
+    it('does NOT overwrite an org node that already has sodra data', function () {
+        const dg = new Graph({ type: 'directed', multi: true });
+        dg.addNode('org:200', {
+            entityType: ENTITY_TYPE.Org,
+            draustieji: 100,
+            draustieji2: 10,
+            size: 19,
+        });
+
+        const data = {
+            nodes: [{
+                id: 'org:200',
+                attributes: {
+                    entityType: ENTITY_TYPE.Org,
+                    draustieji: 5,
+                    draustieji2: 0,
+                    size: 8,
+                },
+            }],
+            edges: [],
+        };
+
+        mergeGraphElements(dg, () => null, data, null);
+
+        // Original sodra data preserved
+        assert.equal(dg.getNodeAttribute('org:200', 'draustieji'), 100);
+        assert.equal(dg.getNodeAttribute('org:200', 'size'), 19);
+    });
+
+    it('does not enrich a stub org that has no sodra data in the incoming payload', function () {
+        const dg = new Graph({ type: 'directed', multi: true });
+        dg.addNode('org:300', { entityType: ENTITY_TYPE.Org, size: 8 });
+
+        const data = {
+            nodes: [{
+                id: 'org:300',
+                attributes: { entityType: ENTITY_TYPE.Org, size: 8 },
+            }],
+            edges: [],
+        };
+
+        mergeGraphElements(dg, () => null, data, null);
+
+        assert.equal(dg.getNodeAttribute('org:300', 'size'), 8);
+    });
+});
+
+// ── rebuildViewGraph — size sync ──────────────────────────────────────────────
+
+describe('rebuildViewGraph — size sync for already-visible nodes', function () {
+    it('updates size in viewGraph when dataGraph size was enriched', function () {
+        const dg = new Graph({ type: 'directed', multi: true });
+        const vg = new Graph({ type: 'directed', multi: true });
+
+        // Both graphs have the same org node, but dataGraph has been enriched
+        const attrs = {
+            entityType: ENTITY_TYPE.Org,
+            expanded: true,
+            size: 19,
+            x: 0, y: 0,
+            color: '#3b82f6',
+            label: 'UAB',
+        };
+        dg.addNode('org:A', attrs);
+        vg.addNode('org:A', Object.assign({}, attrs, { size: 8 })); // stale size
+
+        // No edges — never-hide predicate
+        rebuildViewGraph(dg, vg, () => false);
+
+        assert.equal(vg.getNodeAttribute('org:A', 'size'), 19);
+    });
+});

@@ -1,6 +1,26 @@
 import { makeIconDataUri, getIconKey } from './icons.js';
-import { EDGE_COLOR, nodeColor } from './colors.js';
-import { isAnchorNode, isBridgeCandidate } from './entity-types.js';
+import { EDGE_COLOR, nodeColor, personelSize, contractSize } from './colors.js';
+import { isAnchorNode, isBridgeCandidate, isOrgNode, isContractNode } from './entity-types.js';
+
+/**
+ * Computes the visual node size from a node's attributes.
+ *   - Org nodes: employee count derived from sodra fields → personelSize
+ *   - Contract nodes: contract value → contractSize
+ *   - Person nodes: fixed 8
+ *
+ * @param {object} attrs  node attributes (must include entityType)
+ * @returns {number}
+ */
+export function computeNodeSize(attrs) {
+    if (isOrgNode(attrs)) {
+        var count = Math.max((attrs.draustieji || 0) + (attrs.draustieji2 || 0), 1);
+        return personelSize(count);
+    }
+    if (isContractNode(attrs)) {
+        return contractSize(attrs.verte || 0);
+    }
+    return 8;
+}
 
 /**
  * Merges API graph data into the permanent data graph (unconditionally — no filtering).
@@ -16,7 +36,18 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
     var newNodeIds = [];
 
     (data.nodes || []).forEach(function (n) {
-        if (graph.hasNode(n.id)) return;
+        if (graph.hasNode(n.id)) {
+            // Enrich existing org node with sodra fields when we have them for the first time
+            if (isOrgNode(n.attributes) && n.attributes.draustieji !== undefined) {
+                var existing = graph.getNodeAttributes(n.id);
+                if (existing.draustieji === undefined) {
+                    graph.setNodeAttribute(n.id, 'draustieji', n.attributes.draustieji);
+                    graph.setNodeAttribute(n.id, 'draustieji2', n.attributes.draustieji2);
+                    graph.setNodeAttribute(n.id, 'size', computeNodeSize(Object.assign({}, existing, n.attributes)));
+                }
+            }
+            return;
+        }
 
         var x = 0, y = 0;
         if (fromNodeId) {
@@ -40,7 +71,7 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
         var nodeAttrs = Object.assign({}, n.attributes, {
             x: x,
             y: y,
-            size: n.attributes.size || 8,
+            size: computeNodeSize(n.attributes),
             color: nodeColor(n.attributes),
             label: n.attributes.label || n.id,
         });
@@ -136,6 +167,16 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
     visible.forEach(function (id) {
         if (!viewGraph.hasNode(id) && dataGraph.hasNode(id)) {
             viewGraph.addNode(id, Object.assign({}, dataGraph.getNodeAttributes(id)));
+        }
+    });
+
+    // Sync size from dataGraph to viewGraph (handles enrichment of already-visible nodes)
+    viewGraph.forEachNode(function (id) {
+        if (dataGraph.hasNode(id)) {
+            var newSize = dataGraph.getNodeAttribute(id, 'size');
+            if (newSize != null && viewGraph.getNodeAttribute(id, 'size') !== newSize) {
+                viewGraph.setNodeAttribute(id, 'size', newSize);
+            }
         }
     });
 
