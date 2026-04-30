@@ -1,3 +1,5 @@
+import { isOrgNode, isPersonNode, isContractNode } from './entity-types.js';
+
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
 const MUI_ICON_PATHS = {
@@ -24,8 +26,8 @@ export function makeIconDataUri(nodeType) {
 }
 
 export function getIconKey(attrs) {
-    if (attrs.entityType === 'OrganizationEntity') return attrs.orgType || 'PrivateCompany';
-    if (attrs.entityType === 'PersonEntity') return 'Person';
-    if (attrs.entityType === 'ContractEntity') return 'Contract';
+    if (isOrgNode(attrs)) return attrs.orgType || 'PrivateCompany';
+    if (isPersonNode(attrs)) return 'Person';
+    if (isContractNode(attrs)) return 'Contract';
     return '';
 }

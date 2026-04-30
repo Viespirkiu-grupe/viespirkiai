@@ -1,6 +1,7 @@
 import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout } from './graph-utils.js';
 import { NODE_COLOR } from './colors.js';
 import { updateLegendForNode } from './legend.js';
+import { isConfigurableNode, isOrgNode, isPersonNode } from './entity-types.js';
 
 /**
  * Creates the expand UI controller.
@@ -30,10 +31,6 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     function getNodePos(id) {
         return viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : null;
-    }
-
-    function _isConfigurableNode(attrs) {
-        return attrs.entityType === 'OrganizationEntity' || attrs.entityType === 'PersonEntity';
     }
 
     function _clearSelectionAttrs(id) {
@@ -66,7 +63,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         _setSelectionAttrs(id);
 
         var attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
-        if (_isConfigurableNode(attrs)) {
+        if (isConfigurableNode(attrs)) {
             legendState.initNode(id);
             updateLegendForNode(id, attrs.label || id, legendState);
         }
@@ -183,11 +180,11 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
         var attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
         if (!attrs.expanded) {
-            if (attrs.entityType === 'OrganizationEntity' && attrs.jarKodas) {
+            if (isOrgNode(attrs) && attrs.jarKodas) {
                 viewGraph.setNodeAttribute(nodeId, 'expanded', true);
                 dataGraph.setNodeAttribute(nodeId, 'expanded', true);
                 loadOrg(attrs.jarKodas, nodeId);
-            } else if (attrs.entityType === 'PersonEntity' && attrs.vardas && attrs.pavarde) {
+            } else if (isPersonNode(attrs) && attrs.vardas && attrs.pavarde) {
                 viewGraph.setNodeAttribute(nodeId, 'expanded', true);
                 dataGraph.setNodeAttribute(nodeId, 'expanded', true);
                 loadPerson(attrs.vardas, attrs.pavarde);

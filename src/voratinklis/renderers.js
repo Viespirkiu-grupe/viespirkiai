@@ -1,3 +1,5 @@
+import { isContractNode } from './entity-types.js';
+
 // ── Custom Sigma node renderers ───────────────────────────────────────────────
 
 // Draws a dotted ring for expanded (non-contract) nodes, then the node label.
@@ -6,7 +8,7 @@ export function drawNodeLabel(context, data, settings) {
     var nodeSize = data.size || 8;
 
     // Persistent expanded indicator: dotted ring outside the selection ring
-    if (data.expanded && data.entityType !== 'ContractEntity') {
+    if (data.expanded && !isContractNode(data)) {
         context.beginPath();
         context.arc(data.x, data.y, nodeSize + 9, 0, Math.PI * 2);
         context.strokeStyle = data.color || '#9ca3af';

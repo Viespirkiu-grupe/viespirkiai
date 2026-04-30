@@ -1,5 +1,11 @@
 import { postgres } from '../../postgres/postgres.js';
 
+const ENTITY_TYPE = {
+    Org:      'OrganizationEntity',
+    Person:   'PersonEntity',
+    Contract: 'ContractEntity',
+};
+
 /**
  * Formats a contract value as €XM / €XK / €X.
  * @param {number|null} verte
@@ -96,7 +102,7 @@ export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
     return {
         id,
         attributes: {
-            entityType: 'OrganizationEntity',
+            entityType: ENTITY_TYPE.Org,
             orgType: mapFormosKodas(formosKodas),
             jarKodas: jk,
             pavadinimas: pavadinimas || jk,
@@ -115,7 +121,7 @@ export function personNode(vardas, pavarde, deklaracija, fromDate) {
     return {
         id,
         attributes: {
-            entityType: 'PersonEntity',
+            entityType: ENTITY_TYPE.Person,
             vardas: (vardas || '').trim(),
             pavarde: (pavarde || '').trim(),
             label: wrapLabel(`${vardas || ''} ${pavarde || ''}`.trim()),
@@ -140,7 +146,7 @@ export function contractNode(sutartiesUnikalusId, pavadinimas, verte) {
     return {
         id,
         attributes: {
-            entityType: 'ContractEntity',
+            entityType: ENTITY_TYPE.Contract,
             pavadinimas: pavadinimas || '',
             label: wrapLabel(shortName),
             verte: verte || 0,

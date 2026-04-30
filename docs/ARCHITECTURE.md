@@ -253,3 +253,17 @@ In production the web server connects via PgBouncer (`:9120`); direct Postgres i
 └── .github/
     └── copilot-instructions.md
 ```
+
+# New Requirements
+
+- Each arrow from contract and to contract has a value. Make an arrow weight dependent on the contract (edge) value:
+  - Contracts with value < 100k EUR: thin edge
+  - Contracts with value 100k-1M EUR: medium edge
+  - Contracts with value > 1M EUR: thick edge
+  - Also, increase size for contract node as well. < 100k EUR is a current contract size.
+- Make company nodes sized based on the company personel count that is acquired from:
+  - `max(bendrasDraustujuSkaicius, draustieji, draustieji2, 1)` from `sodra` part
+  - Personel < 10: small node (as is right now!)
+  - Personel 10-50: medium node
+  - Personel 200-50: large node
+  - Personel > 200: extra large node

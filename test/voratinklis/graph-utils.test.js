@@ -4,6 +4,7 @@ import Graph from 'graphology';
 
 import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout } from '../../src/voratinklis/graph-utils.js';
 import { LegendState } from '../../src/voratinklis/legend-state.js';
+import { ENTITY_TYPE } from '../../src/voratinklis/entity-types.js';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import noverlap from 'graphology-layout-noverlap';
 
@@ -13,7 +14,7 @@ function orgNodeData(id, label) {
     return {
         id,
         attributes: {
-            entityType: 'OrganizationEntity',
+            entityType: ENTITY_TYPE.Org,
             orgType: 'PrivateCompany',
             jarKodas: id.replace('org:', ''),
             pavadinimas: label,
@@ -28,7 +29,7 @@ function personNodeData(id, label) {
     return {
         id,
         attributes: {
-            entityType: 'PersonEntity',
+            entityType: ENTITY_TYPE.Person,
             vardas: 'Jonas',
             pavarde: 'Jonaitis',
             label,
@@ -42,7 +43,7 @@ function contractNodeData(id, label) {
     return {
         id,
         attributes: {
-            entityType: 'ContractEntity',
+            entityType: ENTITY_TYPE.Contract,
             label,
             pavadinimas: 'Partner',
             verte: 50000,
@@ -216,13 +217,13 @@ describe('rebuildViewGraph', () => {
     const noneHidden = () => false;
 
     function addOrg(g, id, expanded = false) {
-        g.addNode(id, { entityType: 'OrganizationEntity', expanded, x: 1, y: 2, size: 8, color: '#000', label: id });
+        g.addNode(id, { entityType: ENTITY_TYPE.Org, expanded, x: 1, y: 2, size: 8, color: '#000', label: id });
     }
     function addPerson(g, id, expanded = false) {
-        g.addNode(id, { entityType: 'PersonEntity', expanded, x: 1, y: 2, size: 8, color: '#000', label: id });
+        g.addNode(id, { entityType: ENTITY_TYPE.Person, expanded, x: 1, y: 2, size: 8, color: '#000', label: id });
     }
     function addContract(g, id) {
-        g.addNode(id, { entityType: 'ContractEntity', expanded: true, x: 1, y: 2, size: 8, color: '#000', label: id });
+        g.addNode(id, { entityType: ENTITY_TYPE.Contract, expanded: true, x: 1, y: 2, size: 8, color: '#000', label: id });
     }
     function addEdge(g, src, tgt, type) {
         g.addEdgeWithKey(`e:${src}:${tgt}:${type}`, src, tgt, { edgeType: type, color: '#ccc' });
@@ -243,8 +244,8 @@ describe('rebuildViewGraph', () => {
         addOrg(dataGraph, 'org:A', true);
         addPerson(dataGraph, 'person:b');
         addEdge(dataGraph, 'person:b', 'org:A', 'Employment');
-        viewGraph.addNode('person:b', { x: 0, y: 0, size: 8, entityType: 'PersonEntity' });
-        viewGraph.addNode('org:A', { x: 0, y: 0, size: 8, entityType: 'OrganizationEntity', expanded: true });
+        viewGraph.addNode('person:b', { x: 0, y: 0, size: 8, entityType: ENTITY_TYPE.Person });
+        viewGraph.addNode('org:A', { x: 0, y: 0, size: 8, entityType: ENTITY_TYPE.Org, expanded: true });
 
         rebuildViewGraph(dataGraph, viewGraph, mkHidden(['Employment']));
         assert.ok(!viewGraph.hasNode('person:b'), 'orphan person removed');
@@ -283,7 +284,7 @@ describe('rebuildViewGraph', () => {
         addOrg(dataGraph, 'org:A', true);
         addOrg(dataGraph, 'org:B');
         addEdge(dataGraph, 'org:A', 'org:B', 'Director');
-        viewGraph.addNode('org:A', { x: 0, y: 0, size: 8, entityType: 'OrganizationEntity', expanded: true });
+        viewGraph.addNode('org:A', { x: 0, y: 0, size: 8, entityType: ENTITY_TYPE.Org, expanded: true });
 
         const newNodes = rebuildViewGraph(dataGraph, viewGraph, noneHidden);
         assert.ok(newNodes.includes('org:B'), 'org:B is a new node');

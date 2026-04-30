@@ -519,7 +519,7 @@ types receive `hidden: true`; checking/unchecking immediately updates edge visib
 - [x] **Create `src/voratinklis/` directory** and extract focused modules from `src/voratinklis-app.js`:
 
   | New file                          | Extracted content                                               |
-      |-----------------------------------|-----------------------------------------------------------------|
+        |-----------------------------------|-----------------------------------------------------------------|
   | `src/voratinklis/icons.js`        | `MUI_ICON_PATHS`, `makeIconDataUri`, `getIconKey`               |
   | `src/voratinklis/colors.js`       | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes`      |
   | `src/voratinklis/renderers.js`    | `drawNodeLabel`, `drawNodeHover`                                |
@@ -919,7 +919,263 @@ Keeps the Map manipulation testable without DOM or Sigma.
     - Clicking same node again: ring disappears; legend reverts to `'Filtrai'`.
     - Previous node's checkbox state is restored when re-selecting it.
 
+---
 
+**Phase 12 — Dynamic node sizes and edge weights**
+
+Encode data significance visually: contract value drives both edge stroke width and contract node
+size; company employee count drives organisation node size. Legend rows are changed from coloured
+square swatches to SVG arrows whose stroke width matches the corresponding edge in the graph.
+
+#### Size and weight lookup tables
+
+**Org node size** — `personelSize(count)` pure function in `src/voratinklis/colors.js`:
+
+| Personnel (`max(draustieji + draustieji2, 1)`) | Node size (`size`)  |
+|------------------------------------------------|---------------------|
+| < 10                                           | 8 (current default) |
+| 10 – 50                                        | 13                  |
+| 50 – 200                                       | 19                  |
+| > 200                                          | 28                  |
+
+**Contract node size** — `contractSize(verte)` pure function in `src/voratinklis/colors.js`:
+
+| Contract value (`verte`) | Node size |
+|--------------------------|-----------|
+| < 100 000 EUR            | 8         |
+| 100 000 – 1 000 000 EUR  | 13        |
+| > 1 000 000 EUR          | 19        |
+
+**Order / Delivery edge stroke width** — `edgeWeight(verte)` pure function in `src/voratinklis/colors.js`:
+
+| Contract value (`verte`) | Edge `size` |
+|--------------------------|-------------|
+| < 100 000 EUR            | 1           |
+| 100 000 – 1 000 000 EUR  | 3           |
+| > 1 000 000 EUR          | 6           |
+
+Person nodes keep a fixed `size: 8`.
+
+All three functions must be **pure** (no side-effects, no imports) so they can be unit-tested
+without DOM or Sigma.
+
+#### Server-side changes — `modules/voratinklis/expand.js`
+
+1. **`orgNode` factory** — add optional `personelCount` parameter (defaults to `0`):
+
+   ```js
+   export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
+       // …existing…
+       attributes: {
+           // …existing…
+           personelCount: opts.personelCount ?? 0,
+           size: personelSize(opts.personelCount ?? 0),   // replaces hardcoded 8
+       }
+   }
+   ```
+
+   `personelSize` is imported from a shared helper (or computed inline — keep it consistent with
+   the client). Since `expand.js` is server-side, duplicate the lookup table as a local
+   `personelSize` helper in `expand.js` — do **not** import from `src/voratinklis/colors.js` (that
+   is a client-side module).
+
+2. **`contractNode` factory** — compute `size` from `verte` using a local `contractSize` helper:
+
+   ```js
+   export function contractNode(sutartiesUnikalusId, pavadinimas, verte) {
+       // …existing…
+       attributes: {
+           // …existing…
+           verte: verte || 0,
+           size: contractSize(verte || 0),   // replaces hardcoded 8
+       }
+   }
+   ```
+
+3. **`expandOrg` — sodra lookup for personnel count**: after all existing queries have run and the
+   full list of org `jarKodas` values is known, fetch sodra data for every org in a **single
+   flat query**:
+
+   ```sql
+   SELECT "jarKodas",
+          COALESCE("draustieji", 0) + COALESCE("draustieji2", 0) AS "personelCount",
+          "data"
+   FROM sodra
+   WHERE "jarKodas" = ANY($1)
+   ORDER BY "jarKodas", "data" DESC
+   ```
+
+   Collect all unique `jarKodas` values that will become org nodes (root + all partners found in
+   the contract rows), pass them as a single array parameter, and build a `Map<jarKodas, number>`
+   keeping only the first (most-recent) row per company:
+
+   ```js
+   const sodraMap = new Map();
+   for (const row of sodraRows) {
+       if (!sodraMap.has(row.jarKodas)) sodraMap.set(row.jarKodas, row.personelCount);
+   }
+   ```
+
+   Pass `personelCount: sodraMap.get(jk) ?? 0` when calling `orgNode(…, { personelCount })` for
+   every org (root and partners). No JOINs, no subqueries — one extra flat SELECT per
+   `expandOrg` call.
+
+4. **Edge `size` in `expandOrg`** — when building Order/Delivery edges, compute and store the edge
+   `size` attribute:
+
+   ```js
+   const eSize = edgeWeight(row.verte);
+   edges.push(edge(orgId, cNode.id, 'Order', valueLabel, { size: eSize }));
+   edges.push(edge(cNode.id, sellerOrgId, 'Delivery', valueLabel, { size: eSize }));
+   ```
+
+   The `edge` builder function accepts an optional `opts` parameter for extra attributes (add if not
+   already present).
+
+   `edgeWeight` must also be defined as a local helper in `expand.js` (mirror of the client-side
+   function — same thresholds, same values).
+
+#### Client-side changes
+
+1. **`src/voratinklis/colors.js`** — add three exported pure functions:
+
+   ```js
+   export function personelSize(count) {
+       if (count >= 200) return 28;
+       if (count >= 50)  return 19;
+       if (count >= 10)  return 13;
+       return 8;
+   }
+
+   export function contractSize(verte) {
+       if (verte >= 1_000_000) return 19;
+       if (verte >= 100_000)   return 13;
+       return 8;
+   }
+
+   export function edgeWeight(verte) {
+       if (verte >= 1_000_000) return 6;
+       if (verte >= 100_000)   return 3;
+       return 1;
+   }
+   ```
+
+2. **`src/voratinklis/graph-utils.js` `mergeGraphElements`** — replace the hardcoded fallback:
+
+   ```js
+   // Before:
+   size: n.attributes.size || 8,
+
+   // After:
+   size: n.attributes.size,   // size is now always set by the server-side factory
+   ```
+
+   The `size` attribute is computed in `orgNode` / `contractNode` / `personNode` on the server and
+   arrives in `n.attributes.size` — do not override it client-side. Person nodes remain hardcoded
+   at `size: 8` in the `personNode` factory.
+
+3. **`src/voratinklis/graph-utils.js` `mergeGraphElements`** — when adding edges, preserve the
+   server-computed `size`:
+
+   ```js
+   // Edge attrs already contain `size` from the server — don't clobber it.
+   // EDGE_COLOR and edgeType are still applied; only avoid setting a default size.
+   attrs.color = EDGE_COLOR[attrs.edgeType] || '#d1d5db';
+   // attrs.size is preserved from server payload
+   ```
+
+#### Legend — SVG arrows
+
+Replace every `<span class="vl-swatch">` coloured square in `views/voratinklis/index.ejs` with an
+inline SVG arrow. The SVG arrow must visually match the corresponding Sigma edge style (same colour,
+same stroke width).
+
+Recommended inline SVG (width 28px, arrow pointing right):
+
+```html
+
+<svg width="28" height="12" viewBox="0 0 28 12" style="flex-shrink:0">
+    <line x1="0" y1="6" x2="22" y2="6"
+          stroke="<COLOR>" stroke-width="<WEIGHT>" stroke-linecap="round"/>
+    <polyline points="17,1 23,6 17,11"
+              fill="none" stroke="<COLOR>" stroke-width="<WEIGHT>" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+```
+
+For the **Sutartis** legend row, replace the single row with **three separate rows** — one for each
+weight tier. All three share the same `data-edge-types="Order,Delivery"` checkbox so toggling one
+toggles all:
+
+```html
+<label …>
+    <input type="checkbox" data-edge-types="Order,Delivery" checked>
+    <!-- thin: < 100k -->
+    <svg …>
+        <line … stroke-width="1"/>
+        <polyline … stroke-width="1"/>
+    </svg>
+    <!-- medium: 100k–1M -->
+    <svg …>
+        <line … stroke-width="3"/>
+        <polyline … stroke-width="3"/>
+    </svg>
+    <!-- thick: > 1M -->
+    <svg …>
+        <line … stroke-width="6"/>
+        <polyline … stroke-width="6"/>
+    </svg>
+    Sutartis
+</label>
+```
+
+All other legend rows show a single SVG arrow sized at stroke-width `2` (the default visual weight
+for non-contract edges).
+
+#### Tests
+
+- **`test/voratinklis/colors.test.js`** (new) — unit tests for the three new pure functions:
+    - `personelSize`: boundary checks for 0, 9, 10, 49, 50, 199, 200, 500.
+    - `contractSize`: boundary checks for 0, 99_999, 100_000, 999_999, 1_000_000, 5_000_000.
+    - `edgeWeight`: boundary checks for 0, 99_999, 100_000, 999_999, 1_000_000, 5_000_000.
+
+- **`test/voratinklis/expand.test.js`** — add cases for `orgNode` and `contractNode` that verify
+  `size` and `personelCount` are set correctly for various inputs.
+
+#### Tasks
+
+- [ ] **`modules/voratinklis/expand.js`**:
+    - Add local `personelSize(count)` and `contractSize(verte)` and `edgeWeight(verte)` helper
+      functions (mirror of `colors.js` exports — same thresholds, same values).
+    - Update `orgNode` factory: add `opts.personelCount` → store as `personelCount` attribute,
+      compute `size` via `personelSize`.
+    - Update `contractNode` factory: compute `size` via `contractSize(verte)`.
+    - Update `expandOrg`: collect all unique org `jarKodas` values from the query results; run
+      **one flat `SELECT … WHERE "jarKodas" = ANY($1)` query** against `sodra`; build a
+      `Map<jarKodas, personelCount>`; pass `personelCount` from the map when calling `orgNode`
+      for every org (root and all partners). No JOINs, no subqueries.
+    - Update `edge` builder (or its call sites) to accept and store `size` attribute on
+      Order/Delivery edges via `edgeWeight(row.verte)`.
+
+- [ ] **`src/voratinklis/colors.js`**: export `personelSize`, `contractSize`, `edgeWeight`.
+
+- [ ] **`src/voratinklis/graph-utils.js`**: remove the `|| 8` size fallback in
+  `mergeGraphElements`; ensure edge `size` attribute from server payload is not clobbered.
+
+- [ ] **`views/voratinklis/index.ejs`**: replace all `<span class="vl-swatch">` with inline SVG
+  arrows; split the Sutartis row into three sub-rows (thin / medium / thick) sharing the same
+  `data-edge-types="Order,Delivery"` checkbox.
+
+- [ ] **`test/voratinklis/colors.test.js`**: new file — unit tests for all three size/weight
+  pure functions.
+
+- [ ] **`test/voratinklis/expand.test.js`**: add `orgNode` size and `contractNode` size tests.
+
+- [ ] **Build** with `npm run build` — clean; all tests passing.
+
+- [ ] **Browser smoke-test**: contract nodes and org nodes should vary visibly in size; thick
+  edges from high-value contracts should be immediately visible; legend shows arrow icons.
+
+---
 
 1. **ForceAtlas2 in browser**: `graphology-layout-forceatlas2` runs synchronously and blocks the main thread
    for large graphs. For large graphs (>200 nodes) a Web Worker is recommended. For v1, synchronous with

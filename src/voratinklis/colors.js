@@ -1,3 +1,5 @@
+import { isContractNode, isPersonNode } from './entity-types.js';
+
 // ── Node and edge colours ────────────────────────────────────────────────────
 
 export var NODE_COLOR = {
@@ -22,8 +24,8 @@ export var EDGE_COLOR = {
 export var HIDDEN_BY_DEFAULT = new Set(['Official', 'Employment', 'Spouse']);
 
 export function nodeColor(attrs) {
-    if (attrs.entityType === 'ContractEntity') return NODE_COLOR.contract;
-    if (attrs.entityType === 'PersonEntity') return NODE_COLOR.person;
+    if (isContractNode(attrs)) return NODE_COLOR.contract;
+    if (isPersonNode(attrs)) return NODE_COLOR.person;
     if (attrs.expanded) return NODE_COLOR.org;
     return NODE_COLOR.orgStub;
 }

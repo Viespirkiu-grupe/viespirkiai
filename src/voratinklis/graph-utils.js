@@ -1,5 +1,6 @@
 import { makeIconDataUri, getIconKey } from './icons.js';
 import { EDGE_COLOR, nodeColor } from './colors.js';
+import { isAnchorNode, isBridgeCandidate } from './entity-types.js';
 
 /**
  * Merges API graph data into the permanent data graph (unconditionally — no filtering).
@@ -88,7 +89,7 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
     // Expanded anchor nodes — always visible regardless of edge visibility
     var expandedAnchors = new Set();
     dataGraph.forEachNode(function (id, attrs) {
-        if (attrs.expanded && attrs.entityType !== 'ContractEntity') expandedAnchors.add(id);
+        if (isAnchorNode(attrs)) expandedAnchors.add(id);
     });
 
     // Bridge nodes: ContractEntity nodes connected to 2+ distinct expanded anchors → always visible.
@@ -99,7 +100,7 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
     var bridgeEdges = new Set();
     dataGraph.forEachNode(function (nodeId, nodeAttrs) {
         if (expandedAnchors.has(nodeId)) return;
-        if (nodeAttrs.entityType !== 'ContractEntity') return;
+        if (!isBridgeCandidate(nodeAttrs)) return;
         var anchorNeighbors = new Set();
         var edgesToAnchors = [];
         dataGraph.forEachEdge(nodeId, function (edgeId, edgeAttrs, src, tgt) {
