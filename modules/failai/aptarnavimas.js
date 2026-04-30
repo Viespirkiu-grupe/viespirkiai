@@ -2,6 +2,109 @@ import { Buffer } from "buffer";
 import { postgres, parsePgArray } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import { parseWKBPoint } from "../geografija/utils.js";
+import { formatDateTime, formatDuration } from "../../utils/time.js";
+
+const libreFormats = new Set(["doc","docx","odt","rtf","xls","xlsx","xlsb","ods","ppt","pptx","ppsx","odp","odg","pub","pages","xlt","dot","docm","dotx"]);
+const imageFormats = new Set(["jpg","jpeg","png","bmp","gif","tif","tiff","jfif","heic","webp"]);
+const archiveFormats = new Set(["zip","7z","rar","adoc"]);
+
+const ocrStateTextMap = {
+    "1": "Baigta",
+    "0": "Rekomenduojama",
+    "-1": "Nepavyko",
+    "-3": "Rezervuota",
+    "-6": "Viršijo bandymus",
+};
+
+function computeOriginalusLinkas(failas) {
+    if (failas.saltinis === "sutartys" || !failas.saltinis) {
+        return {
+            linkas: `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dokId}&file_id=${failas.fileId}`,
+            pavadinimas: "CVP IS",
+        };
+    }
+    if (failas.saltinis === "neskelbiamosDerybos") {
+        return { linkas: `https://eviesiejipirkimai.lt/${failas.saltinioId}`, pavadinimas: "CVP IS" };
+    }
+    if (failas.saltinis === "archive") {
+        return { linkas: `/failas/${failas.parent}`, pavadinimas: "Archyvas" };
+    }
+    if (failas.saltinis === "mvpAprasai") {
+        return {
+            linkas: `https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp?&Itemid=112`,
+            pavadinimas: "VPM IS",
+        };
+    }
+    if (failas.saltinis === "cvpIs") {
+        const parts = failas.saltinioId.split("/");
+        return {
+            linkas: `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${parts[2]}&documentId=${parts[1]}`,
+            pavadinimas: "CVP IS",
+        };
+    }
+    if (failas.saltinis === "cvpp") {
+        const parts = String(failas.saltinioId || "").split("/").filter(Boolean);
+        const pid = parts.length >= 3 ? parts[0] : null;
+        return {
+            linkas: pid
+                ? `https://pirkimai.eviesiejipirkimai.lt/app/rfq/rwlentrance_s.asp?PID=${encodeURIComponent(pid)}&B=PPO`
+                : `https://cvpp.eviesiejipirkimai.lt`,
+            pavadinimas: "CVPP",
+        };
+    }
+    return { linkas: null, pavadinimas: null };
+}
+
+function computeSaltinioLinkas(failas) {
+    if (failas.saltinis === "sutartys" || !failas.saltinis) return `/sutartis/${failas.dokId}`;
+    if (failas.saltinis === "neskelbiamosDerybos") return `/neskelbiamos`;
+    if (failas.saltinis === "archive") return `/failas/${failas.parent}`;
+    if (failas.saltinis === "mvpAprasai") return `https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp?&Itemid=112`;
+    if (failas.saltinis === "cvpIs") return `/viesiejiPirkimai/${failas.saltinioId?.split("/")[0]}`;
+    if (failas.saltinis === "cvpp") return failas.originalusLinkas;
+    return null;
+}
+
+function computeSaltinioLinkoPavadinimas(failas) {
+    if (failas.saltinis === "sutartys" || !failas.saltinis) return `Sutartis ${failas.dokId}`;
+    if (failas.saltinis === "neskelbiamosDerybos") return `Neskelbiamos derybos`;
+    if (failas.saltinis === "archive") return `Archyvas ${failas.parent}`;
+    if (failas.saltinis === "mvpAprasai") return `MVP tvarkos aprašai`;
+    if (failas.saltinis === "cvpIs") return `Viešasis pirkimas ${failas.saltinioId?.split("/")[0]}`;
+    if (failas.saltinis === "cvpp") return `CVPP viešasis pirkimas`;
+    return null;
+}
+
+function computePreviewType(failas) {
+    const ext = failas.extension;
+    if (ext === "pdf" || ext === "prn" || libreFormats.has(ext)) return "pdf";
+    if (archiveFormats.has(ext) && failas.metaduomenys?.filesTree) return "archive";
+    if (ext === "mp4") return "mp4";
+    if (ext === "mp3") return "mp3";
+    if (imageFormats.has(ext)) return "image";
+    if (ext === "url") return "url";
+    if (ext === "txt") return "txt";
+    if (ext === "fax" && failas.md5 === "e083b15bc91cd24583955d3493347f7a") return "fax-special";
+    if (["html", "htm", "svg"].includes(ext)) return "html";
+    if ((ext === "eml" || ext === "msg") && failas.metaduomenys) return "email";
+    return "none";
+}
+
+function normalizeTekstasPerziurai(tekstas) {
+    let result = "";
+    if (Array.isArray(tekstas)) {
+        result = tekstas.map((p) => String(p ?? "")).join("");
+    } else if (typeof tekstas === "string") {
+        result = tekstas;
+        try {
+            const pages = JSON.parse(result);
+            if (Array.isArray(pages)) result = pages.map((p) => String(p ?? "")).join("");
+        } catch (_) {}
+    } else if (tekstas != null) {
+        result = String(tekstas);
+    }
+    return result.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
 
 /**
  * Decodes a quoted-printable encoded attachment name.
@@ -198,9 +301,36 @@ export async function aptarnautiFailą(
 
     if (requestsJson) return res.json(failas);
 
+    failas.extension = (failas.extension || "").toLowerCase();
+
+    const { linkas, pavadinimas } = computeOriginalusLinkas(failas);
+    failas.originalusLinkas = linkas;
+    failas.originalusLinkasPavadinimas = pavadinimas;
+
+    failas.saltinioLinkas = computeSaltinioLinkas(failas);
+    failas.saltinioLinkoPavadinimas = computeSaltinioLinkoPavadinimas(failas);
+
+    const ocrStateKey = failas.ocrState === null || failas.ocrState === undefined
+        ? null
+        : String(failas.ocrState);
+    failas.ocrStateKey = ocrStateKey;
+    failas.ocrStateText = ocrStateKey && ocrStateTextMap[ocrStateKey]
+        ? ocrStateTextMap[ocrStateKey]
+        : "Nežinoma";
+    failas.hasOcrSection = ocrStateKey !== null || !!failas.ocrLatestResult;
+
+    failas.previewType = computePreviewType(failas);
+    failas.isLibreFormat = libreFormats.has(failas.extension);
+
+    if (failas.previewType === "txt") {
+        failas.tekstasPerziurai = normalizeTekstasPerziurai(failas.tekstas);
+    }
+
     res.render("failai/failas", {
         customHead: config.customHead,
         failas,
         query: req.query,
+        formatDateTime,
+        formatDuration,
     });
 }
