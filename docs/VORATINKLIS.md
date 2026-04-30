@@ -29,14 +29,25 @@ bundle must be compiled with `esbuild` and served as `public/dist/voratinklis.js
 
 The graph uses the entity and edge model defined in the repository data structures:
 
-| Node type            | Expand trigger    | Source function / data                                                                                                                        | Key fields                                                                   |
-|----------------------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| `OrganizationEntity` | Org node click    | `jarCsv` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN jarCsv` (partner org names)                            | `jarKodas`, `pavadinimas`, `formosKodas`                                     |
-| `PersonEntity`       | Org node click    | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows         | `vardas + pavarde` (name is the identity key), `rysioPradzia`                |
-| `PersonEntity`       | Person node click | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person | Same; all declarations for that name are merged into one node                |
-| `ContractEntity`     | Org node click    | `sutartys JOIN jarCsv` (top 30 contracts by value; buyer/seller names from `jarCsv` JOIN)                                                     | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte` |
+| Node type              | Expand trigger          | Source function / data                                                                                                                        | Key fields                                                                                                   | Details panel link                                                                                |
+|------------------------|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| `OrganizationEntity`   | Org node click          | `jarCsv` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN jarCsv` (partner org names)                            | `jarKodas`, `pavadinimas`, `formosKodas`                                                                     | `/asmuo/{jarKodas}`                                                                               |
+| `PersonEntity`         | Org node click          | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows         | `vardas + pavarde` (name is the identity key), `rysioPradzia`                                                | *(no dedicated page)*                                                                             |
+| `PersonEntity`         | Person node click       | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person | Same; all declarations for that name are merged into one node                                                | *(no dedicated page)*                                                                             |
+| `ContractEntity`       | Org node click          | `sutartys JOIN jarCsv` (top 30 contracts by value; buyer/seller names from `jarCsv` JOIN)                                                     | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte`, `pirkimoNumeris` (may be null) | `/sutartis/{sutartiesUnikalusId}` (primary); `/viesiejiPirkimai/{pirkimoNumeris}` (if present)    |
+| `ProcurementEntity`    | Org node click (buyer) / Procurement node click | Created when buyer org is expanded: `viesiejiPirkimai WHERE jarKodas = $jarKodas ORDER BY numatomaVerteEUR DESC LIMIT 20`. When the procurement node itself is clicked, it expands by fetching `sutartys WHERE pirkimoNumeris = $pirkimoId GROUP BY tiekejoKodas` → winner org stubs | `pirkimoId` (node ID key), `pavadinimas`, `numatomaVerteEUR`, `statusas`, `pirkimoBudas` | `/viesiejiPirkimai/{pirkimoId}` |
 
-> **Why `/asmuo/:jarKodas` is not used for org expansion**: that route aggregates ~18 data sources
+> **`ProcurementEntity` is a hub node.** One procurement notice can result in contracts with multiple
+> different winners (32,605 of 37,796 procurements have >1 distinct winner — see `docs/DB_ER.md`).
+> The procurement node sits between the buyer org and its award recipients: `BuyerOrg → Procurement →
+> [WinnerOrg1, WinnerOrg2, …]`. This is fundamentally different from a `ContractEntity` which is
+> always a one-to-one buyer↔seller financial document.
+>
+> **`ContractEntity.pirkimoNumeris`** links a signed contract back to the originating procurement
+> notice. The details panel renders a secondary link `/viesiejiPirkimai/{pirkimoNumeris}` only when
+> the value is non-null. This is separate from the `ProcurementEntity` graph node — both views are
+> useful but serve different purposes.
+
 > (sodra, vmi, regitra, finansai, etc.) and is too heavy for graph node expansion. Instead `expandOrg`
 > queries only what the graph needs: `jarCsv` for org metadata and `sutartys JOIN jarCsv` for the top
 > 30 contracts by value with human-readable contract titles (`pavadinimas`) and partner org names.
@@ -49,7 +60,8 @@ The graph uses the entity and edge model defined in the repository data structur
 |--------------|-----------------------------------------------------------------------|-------------------------------------------|
 | Organisation | `org:{jarKodas}`                                                      | `org:110053842`                           |
 | Person       | `person:{vardas.trim().toLowerCase()} {pavarde.trim().toLowerCase()}` | `person:jonas jonaitis`                   |
-| Contract     | `contract:buyer{buyerJk}:seller{sellerJk}`                            | `contract:buyer110078991:seller110394345` |
+| Contract     | `contract:{sutartiesUnikalusId}`                                      | `contract:2008083561`                     |
+| Procurement  | `procurement:{pirkimoId}`                                             | `procurement:474742`                      |
 
 > **Person identity is name-only.** The same physical person appearing in declarations for different
 > organisations will have the same node ID and will be merged into a single graph node automatically
@@ -73,14 +85,16 @@ determines which graph elements to produce:
 | `KITI_RYSIAI_SU_JA`         | `PersonEntity` + `OrganizationEntity` stub                                     | `Director`/`Shareholder`/`Official` — person → org                     |
 | `SUTUOKTINIO_DARBOVIETE`    | `PersonEntity` (spouse) + `OrganizationEntity` stub + declarant `PersonEntity` | `Employment`/`Director` (spouse → org) + `Spouse` (declarant → spouse) |
 
-| Edge type                               | Direction       | Source                                                                                        |
-|-----------------------------------------|-----------------|-----------------------------------------------------------------------------------------------|
-| `Employment` / `Director` / `Official`  | Person → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = DEKLARUOJANCIO_DARBOVIETE`                   |
-| `Employment` / `Director`               | Spouse → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE`                      |
-| `Shareholder` / `Director` / `Official` | Person → Org    | `pinregJuridiniaiRysiai` rows with `irasoTipas = KITI_RYSIAI_SU_JA`                           |
-| `Spouse`                                | Person → Person | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE` (declarant → spouse) |
-| `Order`                                 | Org → Contract  | `sutartys.topPirkejai` → buyer side                                                           |
-| `Delivery`                              | Org → Contract  | `sutartys.topTiekejai` → supplier side                                                        |
+| Edge type                               | Direction              | Source                                                                                        |
+|-----------------------------------------|------------------------|-----------------------------------------------------------------------------------------------|
+| `Employment` / `Director` / `Official`  | Person → Org           | `pinregJuridiniaiRysiai` rows with `irasoTipas = DEKLARUOJANCIO_DARBOVIETE`                   |
+| `Employment` / `Director`               | Spouse → Org           | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE`                      |
+| `Shareholder` / `Director` / `Official` | Person → Org           | `pinregJuridiniaiRysiai` rows with `irasoTipas = KITI_RYSIAI_SU_JA`                           |
+| `Spouse`                                | Person → Person        | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE` (declarant → spouse) |
+| `Order`                                 | Org → Contract         | `sutartys.topPirkejai` → buyer side                                                           |
+| `Delivery`                              | Contract → Org         | `sutartys.topTiekejai` → supplier side                                                        |
+| `Procurement`                           | Org → Procurement      | `viesiejiPirkimai WHERE jarKodas = $jarKodas` — buyer org issued the tender                   |
+| `Award`                                 | Procurement → Org      | `sutartys WHERE pirkimoNumeris = $pirkimoId GROUP BY tiekejoKodas` — winning seller orgs       |
 
 > **`irasoTipas` is a record classifier, not a role label.** The three distinct values in the DB are
 > `DEKLARUOJANCIO_DARBOVIETE`, `SUTUOKTINIO_DARBOVIETE`, and `KITI_RYSIAI_SU_JA`. They must **never**
@@ -93,7 +107,8 @@ flowchart LR
     subgraph DB["PostgreSQL Tables"]
         JC[("jarCsv\npavadinimas · formosKodas")]
         PR[("pinregJuridiniaiRysiai\nirasoTipas · vardas · pavarde\npareigos · rysioPobudzioPavadinimas\njarKodas · pavadinimas\ndarbovietesTipas")]
-        ST[("sutartys\nsutartiesUnikalusId · pavadinimas · verte\nperkanciosiosOrganizacijosKodas · tiekejoKodas")]
+        ST[("sutartys\nsutartiesUnikalusId · pavadinimas · verte\nperkanciosiosOrganizacijosKodas · tiekejoKodas\npirkimoNumeris")]
+        VP[("viesiejiPirkimai\npirkimoId · pavadinimas\njarKodas · numatomaVerteEUR\nstatusas · pirkimoBudas")]
     end
 
     subgraph GN["Graph Nodes"]
@@ -101,6 +116,7 @@ flowchart LR
         OE_stub["OrganizationEntity\n— stub —\nexpanded=false\n(partner name from jarCsv JOIN)"]
         PE["PersonEntity\n(all darbovietes + rysiaiSuJa\n+ sutuoktinioDarbovietes)"]
         CE["ContractEntity\nlabel: contract pavadinimas\n(first 9 words)"]
+        VPE["ProcurementEntity\nlabel: pavadinimas (first 6 words)\nnumatomaVerteEUR"]
     end
 
     subgraph GE["Graph Edges"]
@@ -109,6 +125,8 @@ flowchart LR
         E3["Spouse\nlabel: Sutuoktinis"]
         E4["Order\nlabel: €X / €XK / €XM"]
         E5["Delivery\n(no label)"]
+        E6["Procurement\nlabel: pirkimoBudas"]
+        E7["Award\nlabel: €X / €XK / €XM"]
     end
 
     JC -->|" pavadinimas, formosKodas\n(root org only) "| OE_root
@@ -123,6 +141,9 @@ flowchart LR
     ST & JC -->|" perkanciosiosOrganizacijosKodas / tiekejoKodas\npavadinimas via JOIN jarCsv "| OE_stub
     ST -->|" direction: org → contract\nverte as label "| E4
     ST -->|" direction: contract → org "| E5
+    VP & JC -->|" pirkimoId · pavadinimas\nnumatomaVerteEUR · statusas · pirkimoBudas "| VPE
+    VP -->|" direction: buyer org → procurement\npirkimoBudas as label "| E6
+    ST & VP -->|" pirkimoNumeris = pirkimoId\ndistinct tiekejoKodas → OE_stub\ndirection: procurement → seller org "| E7
 ```
 
 #### Edge labels
@@ -132,6 +153,8 @@ Every edge must carry a visible `label` attribute set at build time in `modules/
 | Edge type                                                          | `label` value                                                                                                                                                                              |
 |--------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Order` / `Delivery`                                               | Formatted `verte`: `€1.2M`, `€450K`, `€12K`, etc. — see formatting note                                                                                                                    |
+| `Procurement`                                                      | `pirkimoBudas` field (e.g. "Atviras konkursas", "Skelbiama apklausa")                                                                                                                      |
+| `Award`                                                            | Formatted `verte` sum (total contract value from that seller for this procurement)                                                                                                         |
 | `Employment` / `Director` / `Official` (person or spouse → org)    | `pareigos` field (free-text job title, e.g. "Direktorius", "Gydytojas"). Never `darbovietesTipas` — that field holds `STANDARTINE`, `EKSPERTO`, or `SUTUOKTINIO` and is not human-readable |
 | `Director` / `Shareholder` / `Official` (from `KITI_RYSIAI_SU_JA`) | `rysioPobudzioPavadinimas` field (controlled vocabulary, e.g. "Valdybos narys", "Akcininkas")                                                                                              |
 | `Spouse`                                                           | `"Sutuoktinis"`                                                                                                                                                                            |
@@ -154,11 +177,12 @@ function wrapLabel(name, n = 3) {
 }
 ```
 
-| Entity type          | Label source             | Applied as                          |
-|----------------------|--------------------------|-------------------------------------|
-| `OrganizationEntity` | `pavadinimas`            | `wrapLabel(pavadinimas)`            |
-| `PersonEntity`       | `vardas + " " + pavarde` | `wrapLabel(vardas + " " + pavarde)` |
-| `ContractEntity`     | contract count           | `"N sut."` (e.g. `"17 sut."`)       |
+| Entity type           | Label source              | Applied as                           |
+|-----------------------|---------------------------|--------------------------------------|
+| `OrganizationEntity`  | `pavadinimas`             | `wrapLabel(pavadinimas)`             |
+| `PersonEntity`        | `vardas + " " + pavarde`  | `wrapLabel(vardas + " " + pavarde)`  |
+| `ContractEntity`      | contract count            | `"N sut."` (e.g. `"17 sut."`)        |
+| `ProcurementEntity`   | `pavadinimas` (6 words)   | `wrapLabel(pavadinimas, 6)`          |
 
 Sigma's default label renderer draws labels to the **right** of the node centre. A custom
 `defaultDrawNodeLabel` function must be provided to `new Sigma(graph, container, { defaultDrawNodeLabel })`
@@ -168,25 +192,29 @@ to position the label **below** the node (draw at `y + nodeSize + labelPadding`,
 
 New server-side module `modules/voratinklis/` containing:
 
-- `expand.js` — two exported functions:
+- `expand.js` — exported functions:
     - `expandOrg(jarKodas)` — queries `jarCsv` (root org metadata), `pinregJuridiniaiRysiai` (person
-      relationships), and `sutartysSaliuSumos JOIN jarCsv` (via `gautiSutarciuDuomenisPagalJarKoda`)
-      for aggregated contract partner data with human-readable partner names; maps raw rows to
-      `GraphNode[]` and `GraphEdge[]`.
+      relationships), `sutartys JOIN jarCsv` (top 30 contracts by value), and `viesiejiPirkimai`
+      (top 20 procurement notices by `numatomaVerteEUR`) for this org as **buyer**; maps raw rows to
+      `GraphNode[]` and `GraphEdge[]`. Returns `{ nodes, edges }`.
     - `expandPerson(fullName)` — queries `pinregJuridiniaiRysiai` directly, matching on
       `vardas + pavarde` or `susijusioAsmensVardas + susijusioAsmensPavarde`; returns **all
       darbovietes, governance roles, and spouse relationships** declared by that person across all
       employers, as stub `OrganizationEntity` nodes + person↔org / spouse edges.
-    - Both return `{ nodes: GraphNode[], edges: GraphEdge[] }`.
+    - `expandProcurement(pirkimoId)` — queries `sutartys WHERE pirkimoNumeris = $pirkimoId GROUP BY
+      tiekejoKodas` to find distinct winning seller orgs + `jarCsv JOIN` for their names; returns
+      seller `OrganizationEntity` stub nodes + `Award` edges from the procurement node.
+    - All functions return `{ nodes: GraphNode[], edges: GraphEdge[] }`.
 
 New route `routes/voratinklis.js`:
 
-| Method | Path                            | Purpose                                                                                    |
-|--------|---------------------------------|--------------------------------------------------------------------------------------------|
-| `GET`  | `/voratinklis/`                 | Returns 404 ("įmonė nenurodyta") — no jarKodas was given                                   |
-| `GET`  | `/voratinklis/:jarKodas`        | EJS page shell with jarKodas passed as template variable; graph auto-initialises on load   |
-| `GET`  | `/voratinklis/expand/:jarKodas` | JSON: graph nodes+edges for one organisation (calls `expandOrg`)                           |
-| `GET`  | `/voratinklis/expand-person`    | JSON: graph nodes+edges for one person by full name (`?vardas=...`). Calls `expandPerson`. |
+| Method | Path                                    | Purpose                                                                                    |
+|--------|-----------------------------------------|--------------------------------------------------------------------------------------------|
+| `GET`  | `/voratinklis/`                         | Returns 404 ("įmonė nenurodyta") — no jarKodas was given                                   |
+| `GET`  | `/voratinklis/:jarKodas`                | EJS page shell with jarKodas passed as template variable; graph auto-initialises on load   |
+| `GET`  | `/voratinklis/expand/:jarKodas`         | JSON: graph nodes+edges for one organisation (calls `expandOrg`)                           |
+| `GET`  | `/voratinklis/expand-person`            | JSON: graph nodes+edges for one person by full name (`?vardas=...`). Calls `expandPerson`. |
+| `GET`  | `/voratinklis/expand-procurement/:id`   | JSON: graph nodes+edges for one procurement — its winning seller orgs. Calls `expandProcurement`. |
 
 > **Route ordering note**: `expand` and `expand-person` static path segments must be registered _before_
 > the `/:jarKodas` wildcard so they are not swallowed by the dynamic route handler.
@@ -360,11 +388,33 @@ graph TD
 | `src/voratinklis/graph-utils.js` | Client | `mergeGraphElements(dataGraph,...)`, `rebuildViewGraph`, `syncPositionsToData`, `runLayout` — **pure, injected deps** | No ★                      |
 | `src/voratinklis/legend.js`      | Client | `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)`                                                  | Yes (queries DOM)         |
 | `src/voratinklis/expand-ui.js`   | Client | `createExpandUI({dataGraph,viewGraph,...})` — async fetch + rebuild; returns `rebuildAndRefresh`                      | Yes                       |
-| `modules/voratinklis/expand.js`  | Server | `expandOrg`, `expandPerson`, all pure builder helpers                                                                 | No                        |
-| `routes/voratinklis.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`; renders EJS                                                         | No                        |
+| `modules/voratinklis/expand.js`  | Server | `expandOrg`, `expandPerson`, `expandProcurement`, all pure builder helpers                                            | No                        |
+| `routes/voratinklis.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`/`expandProcurement`; renders EJS                                     | No                        |
 | `views/voratinklis/index.ejs`    | View   | HTML shell, inline CSS, legend overlay with checkboxes                                                                | —                         |
 
-### Testability design
+**Visual identity — node colours and icons:**
+
+| Entity type           | `NODE_COLOR` key  | Hex        | Icon (MUI)                                   | Icon key           |
+|-----------------------|-------------------|------------|----------------------------------------------|--------------------|
+| `OrganizationEntity`  | `org`             | `#3b82f6`  | Business / DomainAdd / AccountBalance         | `PrivateCompany` / `PublicCompany` / `Institution` |
+| `OrganizationEntity`  | `orgStub`         | `#9ca3af`  | Business                                     | same               |
+| `PersonEntity`        | `person`          | `#f97316`  | Person                                       | `Person`           |
+| `ContractEntity`      | `contract`        | `#10b981`  | HistoryEdu                                   | `Contract`         |
+| `ProcurementEntity`   | `procurement`     | `#8b5cf6`  | Gavel                                        | `Procurement`      |
+
+`ProcurementEntity` uses **purple** (`#8b5cf6`) — distinct from all current node colours. The MUI
+`Gavel` icon path must be added to `MUI_ICON_PATHS` in `src/voratinklis/icons.js`, and `getIconKey`
+must return `'Procurement'` for procurement nodes. `EDGE_COLOR` must add entries for `Procurement`
+(`#8b5cf6`) and `Award` (`#8b5cf6`) edges.
+
+**`ProcurementEntity` node sizing** — same tiers as `ContractEntity`, driven by `numatomaVerteEUR`:
+
+| Estimated value | Node size |
+|-----------------|-----------|
+| < €100 K        | 8         |
+| €100 K – €1 M   | 13        |
+| ≥ €1 M          | 19        |
+
 
 The single most impactful change for testability is the **dependency-injection signature** of
 `mergeGraphElements`. Instead of closing over the module-level `graph` and `renderer`, it receives
@@ -519,7 +569,7 @@ types receive `hidden: true`; checking/unchecking immediately updates edge visib
 - [x] **Create `src/voratinklis/` directory** and extract focused modules from `src/voratinklis-app.js`:
 
   | New file                          | Extracted content                                               |
-        |-----------------------------------|-----------------------------------------------------------------|
+  |-----------------------------------|-----------------------------------------------------------------|
   | `src/voratinklis/icons.js`        | `MUI_ICON_PATHS`, `makeIconDataUri`, `getIconKey`               |
   | `src/voratinklis/colors.js`       | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes`      |
   | `src/voratinklis/renderers.js`    | `drawNodeLabel`, `drawNodeHover`                                |
@@ -940,11 +990,11 @@ Math.max(attrs.bendrasDraustujuSkaicius || 0, attrs.draustieji || 0, attrs.draus
 where `bendrasDraustujuSkaicius = draustieji + draustieji2` (as computed by `gautiSodrosDuomenis`).
 
 | Personnel (`max(bendrasDraustujuSkaicius, draustieji, draustieji2, 1)`) | Node size (`size`)  |
-|------------------------------------------------------------------------|---------------------|
-| < 10                                                                   | 8 (current default) |
-| 10 – 50                                                                | 13                  |
-| 50 – 200                                                               | 19                  |
-| > 200                                                                  | 28                  |
+|-------------------------------------------------------------------------|---------------------|
+| < 10                                                                    | 8 (current default) |
+| 10 – 50                                                                 | 13                  |
+| 50 – 200                                                                | 19                  |
+| > 200                                                                   | 28                  |
 
 **Contract node size** — `contractSize(verte)` pure function in `src/voratinklis/colors.js`:
 
@@ -1177,39 +1227,198 @@ for non-contract edges).
 
 #### Tasks
 
-- [ ] **`modules/voratinklis/expand.js`**:
-    - Add local `contractSize(verte)` and `edgeWeight(verte)` helper functions (mirror of
-      `colors.js` exports — same thresholds, same values). No `personelSize` needed server-side.
-    - Update `orgNode` factory: accept `opts.draustieji`, `opts.draustieji2`,
-      `opts.bendrasDraustujuSkaicius`; store them as node attributes; remove hardcoded `size: 8`
-      (client will compute it).
-    - Update `contractNode` factory: compute `size` via local `contractSize(verte)`.
-    - Update `expandOrg`: collect all unique org `jarKodas` values; run one flat
-      `SELECT DISTINCT ON ("jarKodas") "jarKodas", "draustieji", "draustieji2" FROM sodra WHERE
-      "jarKodas" = ANY($1) ORDER BY "jarKodas", "data" DESC`; build a
-      `Map<jarKodas, {draustieji, draustieji2, bendrasDraustujuSkaicius}>`; pass those fields into
-      `orgNode(…, { draustieji, draustieji2, bendrasDraustujuSkaicius })` for each org.
-    - Update `edge` builder (or its call sites) to accept and store `size` on Order/Delivery edges
-      via local `edgeWeight(row.verte)`.
+- [x] **`modules/voratinklis/expand.js`**: local `contractSize`/`edgeWeight` helpers; `orgNode` with sodra fields;
+  `contractNode` with computed size; `expandOrg` sodra flat query; edge `size` via `edgeWeight`.
+- [x] **`src/voratinklis/colors.js`**: export `personelSize`, `contractSize`, `edgeWeight`.
+- [x] **`src/voratinklis/graph-utils.js`**: `computeNodeSize`; enrichment of existing org nodes; size sync in
+  `rebuildViewGraph`.
+- [x] **`views/voratinklis/index.ejs`**: SVG arrow legend; Sutartis split into three rows.
+- [x] **`test/voratinklis/colors.test.js`**: unit tests for all three size/weight pure functions.
+- [x] **Build** — clean; 169 tests passing.
 
-- [ ] **`src/voratinklis/colors.js`**: export `personelSize`, `contractSize`, `edgeWeight`.
+---
 
-- [ ] **`src/voratinklis/graph-utils.js`**: add `computeNodeSize(attrs)` private helper that
-  applies `max(bendrasDraustujuSkaicius, draustieji, draustieji2, 1)` for org nodes and
-  `contractSize(verte)` for contract nodes; replace `n.attributes.size || 8` with
-  `computeNodeSize(n.attributes)`; preserve edge `size` from server payload.
+**Phase 13 — Details panel**
 
-- [ ] **`views/voratinklis/index.ejs`**: replace all `<span class="vl-swatch">` with inline SVG
-  arrows; split the Sutartis row into three sub-rows (thin / medium / thick) sharing the same
-  `data-edge-types="Order,Delivery"` checkbox.
+When a node is selected a compact details card appears in the **top-right** corner of the graph
+canvas. It shows the 2–3 most useful attributes for the selected entity type and — where a
+dedicated page exists — a prominent "open" link that navigates to that entity's full page.
 
-- [ ] **`test/voratinklis/colors.test.js`**: new file — unit tests for all three size/weight
-  pure functions.
+#### Detail page routes (existing)
+
+| Entity type          | Detail page URL pattern              | Example                                  |
+|----------------------|--------------------------------------|------------------------------------------|
+| `OrganizationEntity` | `/asmuo/{jarKodas}`                  | `/asmuo/171658927`                       |
+| `ContractEntity`     | `/sutartis/{sutartiesUnikalusId}`    | `/sutartis/2008083561`                   |
+|                      | `/viesiejiPirkimai/{pirkimoNumeris}` | `/viesiejiPirkimai/7676505` (if present) |
+| `PersonEntity`       | *(no dedicated page)*                | — show attributes only, no link          |
+
+> The `ContractEntity` node ID has the form `contract:{sutartiesUnikalusId}`. Strip the
+> `contract:` prefix to get the URL segment for `/sutartis/…`.
+
+#### Panel content per entity type
+
+**OrganizationEntity:**
+
+- Title: `pavadinimas`
+- Sub-line: company code `jarKodas`
+- Sub-line: employee count (only if sodra data is present: `draustieji + draustieji2`), e.g. `Darbuotojų: 47`
+- Link (opens new tab): `/asmuo/{jarKodas}` — label `Peržiūrėti įmonę ↗`
+
+**ContractEntity:**
+
+- Title: `pavadinimas` (full contract title — let it wrap; it is already word-wrapped in the node
+  label but the panel should show the full `pavadinimas` attribute)
+- Sub-line: contract value formatted as `€1.2M`, `€450K`, etc. (use `formatContractValue`)
+- Link (opens new tab): `/sutartis/{sutartiesUnikalusId}` — label `Peržiūrėti sutartį ↗`
+- Link (opens new tab, **only when `pirkimoNumeris` is not null**): `/viesiejiPirkimai/{pirkimoNumeris}` — label
+  `Peržiūrėti pirkimą ↗`
+
+**ProcurementEntity:**
+
+- Title: `pavadinimas` (let it wrap)
+- Sub-line: estimated value formatted as `€1.2M`, `€450K`, etc. (use `formatContractValue`)
+- Sub-line: `statusas` (e.g. "Nustatytas laimėtojas", "Baigtas")
+- Link (opens new tab): `/viesiejiPirkimai/{pirkimoId}` — label `Peržiūrėti pirkimą ↗`
+
+**PersonEntity:**
+
+- Title: `vardas + " " + pavarde`
+- No detail page link (no dedicated person page exists in viespirkiai)
+
+#### UI/UX requirements
+
+- Panel is **hidden** by default (HTML `hidden` attribute).
+- Panel appears when a node is **selected** (same click that sets `selected: true`).
+- Panel is **cleared and hidden** when selection is dismissed (`deselectAll`).
+- Panel is positioned **top-right** of the graph canvas using `position: absolute; top: 12px; right: 12px`.
+- Styled as a white card with subtle shadow and `max-width: 240px`.
+- The "open" link opens in a **new tab** (`target="_blank" rel="noopener"`).
+- Panel must not overlap the legend (legend is on the left side).
+
+#### Architecture
+
+New client-side module **`src/voratinklis/details-panel.js`** with two exported functions:
+
+```js
+export function showNodeDetails(nodeId, attrs) { …
+}
+
+export function hideDetails() { …
+}
+```
+
+`showNodeDetails` builds the inner HTML conditionally on `attrs.entityType` and sets the panel
+`hidden = false`. `hideDetails` sets `hidden = true`.
+
+Both functions are imported in `src/voratinklis/expand-ui.js` and called from:
+
+- `selectNode(id)` — calls `showNodeDetails(id, attrs)`
+- `deselectAll()` — calls `hideDetails()`
+
+`formatContractValue` is already exported from `modules/voratinklis/expand.js` on the server
+but is **not** available to browser bundles. Duplicate the same pure function in
+`src/voratinklis/details-panel.js` (no import needed — pure formatter, < 5 lines).
+
+#### Tasks
+
+- [ ] **`modules/voratinklis/expand.js`**: add `s."pirkimoNumeris"` to both `asBuyerRes` and
+  `asSellerRes` SQL queries; pass `pirkimoNumeris: row.pirkimoNumeris || null` into `contractNode`;
+  update `contractNode` factory to store `pirkimoNumeris` in attributes.
+
+- [ ] **`views/voratinklis/index.ejs`**: add `<div id="voratinklis-details" hidden></div>` inside
+  `#voratinklis-wrapper` (after `#voratinklis-legend`); add CSS for `#voratinklis-details`:
+  absolute top-right card, white background, shadow, `max-width: 240px`, padding 10px,
+  `font-size: 0.85rem`, border-radius, `z-index: 20`.
+
+- [ ] **`src/voratinklis/details-panel.js`** (new): implement `showNodeDetails(nodeId, attrs)` and
+  `hideDetails()`; include local `formatContractValue(verte)` helper; build entity-specific
+  HTML per `attrs.entityType` with all links; `pirkimoNumeris` link rendered only when non-null.
+
+- [ ] **`src/voratinklis/expand-ui.js`**: import `showNodeDetails`, `hideDetails` from
+  `./details-panel.js`; call `showNodeDetails(id, viewGraph.getNodeAttributes(id))` inside
+  `selectNode` after `_setSelectionAttrs`; call `hideDetails()` inside `deselectAll`.
 
 - [ ] **Build** with `npm run build` — clean; all tests passing.
 
-- [ ] **Browser smoke-test**: contract nodes and org nodes should vary visibly in size; thick
-  edges from high-value contracts should be immediately visible; legend shows arrow icons.
+- [ ] **Browser smoke-test**:
+    - Select an org node → panel shows name, jarKodas, optional employee count, link to `/asmuo/…`
+    - Select a contract node → panel shows title, formatted value, link to `/sutartis/…`; when `pirkimoNumeris` is
+      present a second link to `/viesiejiPirkimai/…` appears
+    - Select a person node → panel shows full name, no link
+    - Select a procurement node → panel shows title, estimated value, statusas, link to `/viesiejiPirkimai/…`
+    - Deselect (click canvas) → panel disappears
+
+---
+
+## Phase 14 — ProcurementEntity graph nodes
+
+Add `ProcurementEntity` as a first-class node type in the graph. When an organisation is expanded as a
+**buyer**, up to 20 of its highest-value procurement notices (`viesiejiPirkimai WHERE jarKodas = $jk`)
+appear as purple hub nodes connected by `Procurement` edges. Clicking a procurement node expands it to
+show its winning seller organisations (`Award` edges).
+
+### Data model
+
+**Node**: `ProcurementEntity`
+
+| Attribute         | Source                          | Notes                                                      |
+|-------------------|---------------------------------|------------------------------------------------------------|
+| `id`              | `procurement:{pirkimoId}`       | Stable; same pirkimoId across all page loads               |
+| `entityType`      | `'ProcurementEntity'`           |                                                            |
+| `pirkimoId`       | `viesiejiPirkimai.pirkimoId`    | Used for expansion and detail page link                    |
+| `pavadinimas`     | `viesiejiPirkimai.pavadinimas`  | Procurement title                                          |
+| `numatomaVerteEUR`| `viesiejiPirkimai.numatomaVerteEUR` | Estimated total value                                  |
+| `statusas`        | `viesiejiPirkimai.statusas`     | e.g. "Nustatytas laimėtojas"                               |
+| `pirkimoBudas`    | `viesiejiPirkimai.pirkimoBudas` | e.g. "Atviras konkursas"                                   |
+| `size`            | `contractSize(numatomaVerteEUR)` | Same tiers as ContractEntity (8 / 13 / 19)                |
+| `expanded`        | `false` initially               | Set to `true` after `expandProcurement` is called          |
+
+**Edges from `expandOrg` (buyer side)**:
+- `Procurement` edge: `org:{buyerJk}` → `procurement:{pirkimoId}`, label = `pirkimoBudas`
+
+**Edges from `expandProcurement` (winner orgs)**:
+- `Award` edge: `procurement:{pirkimoId}` → `org:{tiekejoKodas}`, label = formatted total verte sum for that seller
+
+### Client-side trigger
+
+`ProcurementEntity` nodes are expandable (like `OrganizationEntity`). When a procurement node is
+clicked, `expand-ui.js` fetches `/voratinklis/expand-procurement/{pirkimoId}` and merges the result.
+
+### Legend
+
+Add `Procurement` and `Award` rows to the legend checkbox list (both visible by default, not in
+`HIDDEN_BY_DEFAULT`).
+
+### Tasks
+
+- [ ] **`modules/voratinklis/expand.js`**:
+    - Add `procurementNode(row)` factory: `{ id, entityType, pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas, size, expanded: false }`.
+    - In `expandOrg`: add query `SELECT pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas FROM viesiejiPirkimai WHERE jarKodas = $jk ORDER BY numatomaVerteEUR DESC NULLS LAST LIMIT 20`; emit `procurementNode` + `Procurement` edge for each result.
+    - Add `expandProcurement(pirkimoId)`: query `SELECT DISTINCT s.tiekejoKodas, j.pavadinimas, SUM(s.verte) as totalVerte FROM sutartys s LEFT JOIN jarCsv j ON j.jarKodas::text = s.tiekejoKodas WHERE s.pirkimoNumeris = $1 GROUP BY s.tiekejoKodas, j.pavadinimas`; emit org stub nodes + `Award` edges.
+
+- [ ] **`src/voratinklis/entity-types.js`**: add `isProcurementNode(attrs)` predicate and export `Procurement` entity type constant.
+
+- [ ] **`src/voratinklis/colors.js`**: add `procurement: '#8b5cf6'` to `NODE_COLOR`; add `Procurement: '#8b5cf6'` and `Award: '#8b5cf6'` to `EDGE_COLOR`; update `nodeColor()` to handle procurement nodes.
+
+- [ ] **`src/voratinklis/icons.js`**: add MUI `Gavel` icon path to `MUI_ICON_PATHS`; update `getIconKey` to return `'Procurement'` for procurement nodes.
+
+- [ ] **`routes/voratinklis.js`**: add `GET /voratinklis/expand-procurement/:id` route (before `/:jarKodas`); calls `expandProcurement(req.params.id)`; returns JSON.
+
+- [ ] **`src/voratinklis/expand-ui.js`**: handle procurement node click — fetch `/voratinklis/expand-procurement/{pirkimoId}`, merge, mark `expanded: true`; same in-flight deduplication pattern as org/person.
+
+- [ ] **`views/voratinklis/index.ejs`**: add `Procurement` and `Award` legend rows with purple arrow SVGs.
+
+- [ ] **`src/voratinklis/details-panel.js`**: add `ProcurementEntity` branch to `showNodeDetails`.
+
+- [ ] **Tests** (`test/voratinklis/expand.test.js`): add tests for `procurementNode`, `expandProcurement`, `Procurement` edge structure.
+
+- [ ] **Build** with `npm run build` — clean; all tests passing.
+
+- [ ] **Browser smoke-test**:
+    - Expand an org that is a buyer → purple procurement nodes appear
+    - Click a procurement node → winner seller org stubs appear via `Award` edges
+    - Select a procurement node → details panel shows title, estimated value, statusas, link
 
 ---
 
