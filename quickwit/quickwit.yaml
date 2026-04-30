@@ -7,6 +7,7 @@ ingest_api:
   max_queue_memory_usage: 1GiB
   max_queue_disk_usage: 4GiB
   content_length_limit: 500MiB
+  shard_burst_limit: 1500MiB
 
 indexer:
   split_store_max_num_bytes: 5G
@@ -15,8 +16,4 @@ indexer:
 searcher:
   fast_field_cache_capacity: 4G
   split_footer_cache_capacity: 2G
-  partial_request_cache_capacity: 512M
-  aggregation_memory_limit: 1G
-  aggregation_bucket_limit: 100000
-  max_num_concurrent_split_searches: 200
-  max_num_concurrent_split_streams: 200
+
