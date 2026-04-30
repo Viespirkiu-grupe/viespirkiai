@@ -535,12 +535,12 @@ describe('computeNodeSize', function () {
         assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Org, draustieji: 7, draustieji2: 3 }), 13);
     });
 
-    it('returns 19 for org at the 50-employee boundary', function () {
-        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Org, draustieji: 30, draustieji2: 20 }), 19);
+    it('returns 15 for org at the 50-employee boundary', function () {
+        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Org, draustieji: 30, draustieji2: 20 }), 15);
     });
 
-    it('returns 28 for org at the 200-employee boundary', function () {
-        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Org, draustieji: 120, draustieji2: 80 }), 28);
+    it('returns 20 for org at the 200-employee boundary', function () {
+        assert.equal(computeNodeSize({ entityType: ENTITY_TYPE.Org, draustieji: 120, draustieji2: 80 }), 20);
     });
 
     it('returns 8 for a small contract (< 100k)', function () {
@@ -582,10 +582,10 @@ describe('mergeGraphElements — org node sodra enrichment', function () {
 
         mergeGraphElements(dg, () => null, data, null);
 
-        // After enrichment, size should reflect personelSize(60) = 19
+        // After enrichment, size should reflect personelSize(60) = 15
         assert.equal(dg.getNodeAttribute('org:100', 'draustieji'), 60);
         assert.equal(dg.getNodeAttribute('org:100', 'draustieji2'), 0);
-        assert.equal(dg.getNodeAttribute('org:100', 'size'), 19);
+        assert.equal(dg.getNodeAttribute('org:100', 'size'), 15);
     });
 
     it('does NOT overwrite an org node that already has sodra data', function () {

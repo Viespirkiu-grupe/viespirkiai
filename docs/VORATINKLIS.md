@@ -623,23 +623,23 @@ function locally in `details-panel.js` (< 5 lines, no import needed).
 
 #### Tasks
 
-- [ ] **`modules/voratinklis/expand.js`**: add `s."pirkimoNumeris"` to both `asBuyerRes` and
+- [x] **`modules/voratinklis/expand.js`**: add `s."pirkimoNumeris"` to both `asBuyerRes` and
   `asSellerRes` SQL queries; pass `pirkimoNumeris: row.pirkimoNumeris || null` into `contractNode`;
   update `contractNode` factory to store `pirkimoNumeris` in attributes.
 
-- [ ] **`views/voratinklis/index.ejs`**: add `<div id="voratinklis-details" hidden></div>` inside
+- [x] **`views/voratinklis/index.ejs`**: add `<div id="voratinklis-details" hidden></div>` inside
   `#voratinklis-wrapper` (after `#voratinklis-legend`); add CSS: absolute top-right card, white
   background, shadow, `max-width: 240px`, padding 10px, `font-size: 0.85rem`, border-radius, `z-index: 20`.
 
-- [ ] **`src/voratinklis/details-panel.js`** (new): implement `showNodeDetails(nodeId, attrs)` and
+- [x] **`src/voratinklis/details-panel.js`** (new): implement `showNodeDetails(nodeId, attrs)` and
   `hideDetails()`; local `formatContractValue(verte)` helper; entity-specific HTML per
   `attrs.entityType`; `pirkimoNumeris` link only when non-null.
 
-- [ ] **`src/voratinklis/expand-ui.js`**: import `showNodeDetails`, `hideDetails`; call
+- [x] **`src/voratinklis/expand-ui.js`**: import `showNodeDetails`, `hideDetails`; call
   `showNodeDetails(id, viewGraph.getNodeAttributes(id))` in `selectNode`; call `hideDetails()` in
   `deselectAll`.
 
-- [ ] **Build** with `npm run build` — clean; all tests passing.
+- [x] **Build** with `npm run build` — clean; all tests passing.
 
 - [ ] **Browser smoke-test**:
     - Select an org node → panel shows name, jarKodas, optional employee count, link to `/asmuo/…`

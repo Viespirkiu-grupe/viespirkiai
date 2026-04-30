@@ -22,20 +22,20 @@ describe('personelSize', function () {
         assert.equal(personelSize(49), 13);
     });
 
-    it('returns 19 for count = 50 (lower boundary of large)', function () {
-        assert.equal(personelSize(50), 19);
+    it('returns 15 for count = 50 (lower boundary of large)', function () {
+        assert.equal(personelSize(50), 15);
     });
 
-    it('returns 19 for count = 199', function () {
-        assert.equal(personelSize(199), 19);
+    it('returns 15 for count = 199', function () {
+        assert.equal(personelSize(199), 15);
     });
 
-    it('returns 28 for count = 200 (lower boundary of extra-large)', function () {
-        assert.equal(personelSize(200), 28);
+    it('returns 20 for count = 200 (lower boundary of extra-large)', function () {
+        assert.equal(personelSize(200), 20);
     });
 
-    it('returns 28 for count = 1000', function () {
-        assert.equal(personelSize(1000), 28);
+    it('returns 20 for count = 1000', function () {
+        assert.equal(personelSize(1000), 20);
     });
 });
 

@@ -2,6 +2,7 @@ import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout } 
 import { NODE_COLOR } from './colors.js';
 import { updateLegendForNode } from './legend.js';
 import { isConfigurableNode, isOrgNode, isPersonNode } from './entity-types.js';
+import { showNodeDetails, hideDetails } from './details-panel.js';
 
 /**
  * Creates the expand UI controller.
@@ -67,6 +68,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             legendState.initNode(id);
             updateLegendForNode(id, attrs.label || id, legendState);
         }
+        showNodeDetails(id, attrs);
         renderer.refresh();
     }
 
@@ -76,6 +78,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             selectedNodeId = null;
         }
         updateLegendForNode(null, null, legendState);
+        hideDetails();
         renderer.refresh();
     }
 

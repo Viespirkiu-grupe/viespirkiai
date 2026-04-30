@@ -162,8 +162,9 @@ export function personNode(vardas, pavarde, deklaracija, fromDate) {
  * @param {string} sutartiesUnikalusId  Unique contract identifier (used as node ID)
  * @param {string|null} pavadinimas     Contract title
  * @param {number|null} verte           Contract value
+ * @param {string|null} pirkimoNumeris  Procurement notice ID (may be null)
  */
-export function contractNode(sutartiesUnikalusId, pavadinimas, verte) {
+export function contractNode(sutartiesUnikalusId, pavadinimas, verte, pirkimoNumeris = null) {
     const id = `contract:${sutartiesUnikalusId}`;
     const title = pavadinimas || 'Sutartis';
     const shortName = title.split(' ').slice(0, 9).join(' ');
@@ -172,9 +173,11 @@ export function contractNode(sutartiesUnikalusId, pavadinimas, verte) {
         id,
         attributes: {
             entityType: ENTITY_TYPE.Contract,
+            sutartiesUnikalusId,
             pavadinimas: pavadinimas || '',
             label: wrapLabel(shortName),
             verte: v,
+            pirkimoNumeris: pirkimoNumeris || null,
             expanded: true,
             size: contractSize(v),
         },
@@ -233,6 +236,7 @@ export async function expandOrg(jarKodas) {
             `SELECT s."sutartiesUnikalusId",
                     s."pavadinimas",
                     s."verte",
+                    s."pirkimoNumeris",
                     s."tiekejoKodas",
                     seller."pavadinimas"  AS "tiekejoPavadinimas",
                     seller."formosKodas" AS "tiekejoFormosKodas"
@@ -250,6 +254,7 @@ export async function expandOrg(jarKodas) {
             `SELECT s."sutartiesUnikalusId",
                     s."pavadinimas",
                     s."verte",
+                    s."pirkimoNumeris",
                     s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
                     buyer."pavadinimas"  AS "pirkejoPavadinimas",
                     buyer."formosKodas" AS "pirkejoFormosKodas"
@@ -343,7 +348,7 @@ export async function expandOrg(jarKodas) {
     // Top contracts where root org is buyer → ContractEntity → supplier
     for (const row of asBuyerRes.rows) {
         if (!row.sutartiesUnikalusId || !row.tiekejoKodas) continue;
-        const cNode = contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte);
+        const cNode = contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte, row.pirkimoNumeris || null);
         addNode(nodes, nodeMap, cNode);
         const sodraSupplier = sodraMap.get(row.tiekejoKodas) || {};
         const supplierOrg = orgNode(row.tiekejoKodas, row.tiekejoPavadinimas, row.tiekejoFormosKodas, {
@@ -360,7 +365,7 @@ export async function expandOrg(jarKodas) {
     // Top contracts where root org is seller: buyer → ContractEntity → root org
     for (const row of asSellerRes.rows) {
         if (!row.sutartiesUnikalusId || !row.pirkejoKodas) continue;
-        const cNode = contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte);
+        const cNode = contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte, row.pirkimoNumeris || null);
         addNode(nodes, nodeMap, cNode);
         const sodraBuyer = sodraMap.get(row.pirkejoKodas) || {};
         const buyerOrg = orgNode(row.pirkejoKodas, row.pirkejoPavadinimas, row.pirkejoFormosKodas, {

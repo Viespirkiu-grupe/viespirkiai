@@ -3,9 +3,10 @@
 // Consumers should use predicates instead of comparing strings directly.
 
 export const ENTITY_TYPE = {
-    Org:      'OrganizationEntity',
-    Person:   'PersonEntity',
-    Contract: 'ContractEntity',
+    Org:         'OrganizationEntity',
+    Person:      'PersonEntity',
+    Contract:    'ContractEntity',
+    Procurement: 'ProcurementEntity',
 };
 
 export const isOrgNode      = (a) => a.entityType === ENTITY_TYPE.Org;
