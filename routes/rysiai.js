@@ -1,6 +1,6 @@
 import express from 'express';
 import { log } from '../utils/log.js';
-import { expandOrg, expandPerson } from '../modules/rysiai/expand.js';
+import { expandOrg, expandPerson, expandProcurement, expandContract } from '../modules/rysiai/expand.js';
 import config from '../utils/config.js';
 
 const rysiaiRouter = express.Router();
@@ -29,6 +29,34 @@ rysiaiRouter.get('/rysiai/expand-person', async (req, res) => {
         res.json(data);
     } catch (err) {
         log(`expandPerson klaida (${vardas}): ${err.message}`);
+        res.status(500).json({ error: 'Vidinė klaida' });
+    }
+});
+
+rysiaiRouter.get('/rysiai/expand-procurement/:id', async (req, res) => {
+    const { id } = req.params;
+    if (!id || !/^\d+$/.test(id)) {
+        return res.status(400).json({ error: 'Neteisingas pirkimoId' });
+    }
+    try {
+        const data = await expandProcurement(id);
+        res.json(data);
+    } catch (err) {
+        log(`expandProcurement klaida (${id}): ${err.message}`);
+        res.status(500).json({ error: 'Vidinė klaida' });
+    }
+});
+
+rysiaiRouter.get('/rysiai/expand-contract/:pirkimoNumeris', async (req, res) => {
+    const { pirkimoNumeris } = req.params;
+    if (!pirkimoNumeris || !/^\d+$/.test(pirkimoNumeris)) {
+        return res.status(400).json({ error: 'Neteisingas pirkimoNumeris' });
+    }
+    try {
+        const data = await expandContract(pirkimoNumeris);
+        res.json(data);
+    } catch (err) {
+        log(`expandContract klaida (${pirkimoNumeris}): ${err.message}`);
         res.status(500).json({ error: 'Vidinė klaida' });
     }
 });

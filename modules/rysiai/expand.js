@@ -1,9 +1,10 @@
 import { postgres } from '../../postgres/postgres.js';
 
 const ENTITY_TYPE = {
-    Org:      'OrganizationEntity',
-    Person:   'PersonEntity',
-    Contract: 'ContractEntity',
+    Org:         'OrganizationEntity',
+    Person:      'PersonEntity',
+    Contract:    'ContractEntity',
+    Procurement: 'ProcurementEntity',
 };
 
 /**
@@ -178,7 +179,30 @@ export function contractNode(sutartiesUnikalusId, pavadinimas, verte, pirkimoNum
             label: wrapLabel(shortName),
             verte: v,
             pirkimoNumeris: pirkimoNumeris || null,
-            expanded: true,
+            expanded: false,
+            size: contractSize(v),
+        },
+    };
+}
+
+/**
+ * Builds a ProcurementEntity node object.
+ */
+export function procurementNode(pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas) {
+    const id = `procurement:${pirkimoId}`;
+    const title = pavadinimas || 'Pirkimas';
+    const v = numatomaVerteEUR || 0;
+    return {
+        id,
+        attributes: {
+            entityType: ENTITY_TYPE.Procurement,
+            pirkimoId: String(pirkimoId),
+            pavadinimas: pavadinimas || '',
+            label: wrapLabel(title.split(' ').slice(0, 6).join(' ')),
+            numatomaVerteEUR: v,
+            statusas: statusas || '',
+            pirkimoBudas: pirkimoBudas || '',
+            expanded: false,
             size: contractSize(v),
         },
     };
@@ -220,7 +244,7 @@ export function addEdge(edges, edgeMap, e) {
 export async function expandOrg(jarKodas) {
     const jk = String(jarKodas);
 
-    const [jarRes, pinregRes, asBuyerRes, asSellerRes] = await Promise.all([
+    const [jarRes, pinregRes, asBuyerRes, asSellerRes, vpRes] = await Promise.all([
         // Org metadata from jarCsv
         postgres.query(
             `SELECT "pavadinimas", "formosKodas" FROM public."jarCsv" WHERE "jarKodas" = $1 LIMIT 1`,
@@ -264,6 +288,15 @@ export async function expandOrg(jarKodas) {
                AND  s."tipas" <> 'SP'
                AND  s."verte" IS NOT NULL
              ORDER BY s."verte" DESC NULLS LAST
+             LIMIT 20`,
+            [jk],
+        ),
+        // Top 20 procurement notices where this org is the buyer
+        postgres.query(
+            `SELECT "pirkimoId", "pavadinimas", "numatomaVerteEUR", "statusas", "pirkimoBudas"
+             FROM   public."viesiejiPirkimai"
+             WHERE  "jarKodas" = $1
+             ORDER BY "numatomaVerteEUR" DESC NULLS LAST
              LIMIT 20`,
             [jk],
         ),
@@ -377,6 +410,137 @@ export async function expandOrg(jarKodas) {
         const w = edgeWeight(row.verte || 0);
         addEdge(edges, edgeMap, edge(buyerOrg.id, cNode.id, 'Order', valueLabel, null, true, { size: w }));
         addEdge(edges, edgeMap, edge(cNode.id, rootOrg.id, 'Delivery', '', null, false, { size: w }));
+    }
+
+    // Procurement notices where root org is the buyer
+    for (const row of vpRes.rows) {
+        if (!row.pirkimoId) continue;
+        const pNode = procurementNode(row.pirkimoId, row.pavadinimas, row.numatomaVerteEUR, row.statusas, row.pirkimoBudas);
+        addNode(nodes, nodeMap, pNode);
+        addEdge(edges, edgeMap, edge(rootOrg.id, pNode.id, 'Procurement', '', null, false, { size: 1 }));
+    }
+
+    return { nodes, edges };
+}
+
+// ── expandProcurement ─────────────────────────────────────────────────────────
+
+/**
+ * Expands a procurement node: returns winner org stubs connected via Award edges.
+ *
+ * @param {string|number} pirkimoId
+ * @returns {Promise<{ nodes: object[], edges: object[] }>}
+ */
+export async function expandProcurement(pirkimoId) {
+    const id = String(pirkimoId);
+    const procId = `procurement:${id}`;
+
+    const winnersRes = await postgres.query(
+        `SELECT DISTINCT s."tiekejoKodas",
+                j."pavadinimas",
+                j."formosKodas",
+                SUM(s."verte") AS "totalVerte"
+         FROM   public."sutartys" s
+         LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
+         WHERE  s."pirkimoNumeris" = $1
+         GROUP  BY s."tiekejoKodas", j."pavadinimas", j."formosKodas"`,
+        [id],
+    );
+
+    const nodes = [];
+    const edges = [];
+    const nodeMap = new Map();
+    const edgeMap = new Map();
+
+    for (const row of winnersRes.rows) {
+        if (!row.tiekejoKodas) continue;
+        const stub = orgNode(row.tiekejoKodas, row.pavadinimas, row.formosKodas);
+        addNode(nodes, nodeMap, stub);
+        const valueLabel = formatContractValue(Number(row.totalVerte) || 0);
+        addEdge(edges, edgeMap, edge(procId, stub.id, 'Award', valueLabel, null, false, { size: 1 }));
+    }
+
+    return { nodes, edges };
+}
+
+// ── expandContract ────────────────────────────────────────────────────────────
+
+/**
+ * Expands a contract node via its pirkimoNumeris: fetches the procurement notice,
+ * all winners (Award edges), and best-effort losers (Bid edges, Lithuanian only).
+ * The ContractLink edge (contract → procurement) is created client-side.
+ *
+ * @param {string|number} pirkimoNumeris
+ * @returns {Promise<{ nodes: object[], edges: object[] }>}
+ */
+export async function expandContract(pirkimoNumeris) {
+    const pirkNr = String(pirkimoNumeris);
+
+    const [vpRes, winnersRes, losersRes] = await Promise.all([
+        // Procurement node data from viesiejiPirkimai
+        postgres.query(
+            `SELECT "pirkimoId", "pavadinimas", "numatomaVerteEUR", "statusas", "pirkimoBudas"
+             FROM   public."viesiejiPirkimai"
+             WHERE  "pirkimoId" = $1
+             LIMIT 1`,
+            [pirkNr],
+        ),
+        // Winners via sutartys
+        postgres.query(
+            `SELECT DISTINCT s."tiekejoKodas",
+                    j."pavadinimas",
+                    j."formosKodas",
+                    SUM(s."verte") AS "totalVerte"
+             FROM   public."sutartys" s
+             LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
+             WHERE  s."pirkimoNumeris" = $1
+             GROUP  BY s."tiekejoKodas", j."pavadinimas", j."formosKodas"`,
+            [pirkNr],
+        ),
+        // Best-effort losers from ATN1 (Lithuanian bidders only)
+        postgres.query(
+            `SELECT DISTINCT d."kodas",
+                    j."pavadinimas",
+                    j."formosKodas"
+             FROM   public."atn1dalyviai" d
+             JOIN   public."atn1ataskaitos" a ON a."id" = d."ataskaitos_id"
+             LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = d."kodas"
+             WHERE  a."pirkimoNumeris" = $1
+               AND  d."salis" = 'LT'`,
+            [pirkNr],
+        ),
+    ]);
+
+    const nodes = [];
+    const edges = [];
+    const nodeMap = new Map();
+    const edgeMap = new Map();
+
+    // Procurement node (auto-expanded since we return all data)
+    const vpRow = vpRes.rows[0];
+    const pNode = vpRow
+        ? procurementNode(vpRow.pirkimoId, vpRow.pavadinimas, vpRow.numatomaVerteEUR, vpRow.statusas, vpRow.pirkimoBudas)
+        : procurementNode(pirkNr, null, null, null, null);
+    pNode.attributes.expanded = true;
+    addNode(nodes, nodeMap, pNode);
+
+    // Winners → Award edges
+    const winnerCodes = new Set();
+    for (const row of winnersRes.rows) {
+        if (!row.tiekejoKodas) continue;
+        winnerCodes.add(row.tiekejoKodas);
+        const stub = orgNode(row.tiekejoKodas, row.pavadinimas, row.formosKodas);
+        addNode(nodes, nodeMap, stub);
+        const valueLabel = formatContractValue(Number(row.totalVerte) || 0);
+        addEdge(edges, edgeMap, edge(pNode.id, stub.id, 'Award', valueLabel, null, false, { size: 1 }));
+    }
+
+    // Best-effort losers (exclude winners) → Bid edges
+    for (const row of losersRes.rows) {
+        if (!row.kodas || winnerCodes.has(row.kodas)) continue;
+        const stub = orgNode(row.kodas, row.pavadinimas, row.formosKodas);
+        addNode(nodes, nodeMap, stub);
+        addEdge(edges, edgeMap, edge(pNode.id, stub.id, 'Bid', '', null, false, { size: 1 }));
     }
 
     return { nodes, edges };

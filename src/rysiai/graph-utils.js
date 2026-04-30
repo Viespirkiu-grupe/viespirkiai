@@ -1,6 +1,6 @@
 import { makeIconDataUri, getIconKey } from './icons.js';
 import { EDGE_COLOR, nodeColor, personelSize, contractSize } from './colors.js';
-import { isAnchorNode, isBridgeCandidate, isOrgNode, isContractNode } from './entity-types.js';
+import { isAnchorNode, isBridgeCandidate, isOrgNode, isContractNode, isProcurementNode } from './entity-types.js';
 
 /**
  * Computes the visual node size from a node's attributes.
@@ -18,6 +18,9 @@ export function computeNodeSize(attrs) {
     }
     if (isContractNode(attrs)) {
         return contractSize(attrs.verte || 0);
+    }
+    if (isProcurementNode(attrs)) {
+        return contractSize(attrs.numatomaVerteEUR || 0);
     }
     return 8;
 }

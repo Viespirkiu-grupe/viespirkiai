@@ -1,4 +1,4 @@
-import { isContractNode, isPersonNode } from './entity-types.js';
+import { isContractNode, isPersonNode, isProcurementNode } from './entity-types.js';
 
 // ── Node and edge colours ────────────────────────────────────────────────────
 
@@ -7,16 +7,21 @@ export var NODE_COLOR = {
     orgStub: '#9ca3af',
     person: '#f97316',
     contract: '#10b981',
+    procurement: '#8b5cf6',
 };
 
 export var EDGE_COLOR = {
-    Director:    '#1d4ed8',
-    Shareholder: '#7c3aed',
-    Official:    '#0891b2',
-    Employment:  '#6b7280',
-    Spouse:      '#f59e0b',
-    Order:       '#10b981',
-    Delivery:    '#10b981',
+    Director:     '#1d4ed8',
+    Shareholder:  '#7c3aed',
+    Official:     '#0891b2',
+    Employment:   '#6b7280',
+    Spouse:       '#f59e0b',
+    Order:        '#10b981',
+    Delivery:     '#10b981',
+    Procurement:  '#8b5cf6',
+    Award:        '#22c55e',
+    Bid:          '#ef4444',
+    ContractLink: '#94a3b8',
 };
 
 // Edge types hidden on initial render (legend checkboxes start unchecked).
@@ -24,9 +29,10 @@ export var EDGE_COLOR = {
 export var HIDDEN_BY_DEFAULT = new Set(['Official', 'Employment', 'Spouse']);
 
 export function nodeColor(attrs) {
-    if (isContractNode(attrs)) return NODE_COLOR.contract;
-    if (isPersonNode(attrs)) return NODE_COLOR.person;
-    if (attrs.expanded) return NODE_COLOR.org;
+    if (isContractNode(attrs))    return NODE_COLOR.contract;
+    if (isProcurementNode(attrs)) return NODE_COLOR.procurement;
+    if (isPersonNode(attrs))      return NODE_COLOR.person;
+    if (attrs.expanded)           return NODE_COLOR.org;
     return NODE_COLOR.orgStub;
 }
 

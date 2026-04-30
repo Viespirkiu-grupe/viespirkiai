@@ -11,6 +11,7 @@ import {
     orgNode,
     personNode,
     contractNode,
+    procurementNode,
     edge,
     addNode,
     addEdge,
@@ -141,8 +142,8 @@ describe('contractNode', () => {
     it('stores verte in attributes', () => {
         assert.equal(contractNode('x3', 'Test', 99000).attributes.verte, 99000);
     });
-    it('expanded is always true', () => {
-        assert.equal(contractNode('x4', 'Test', 0).attributes.expanded, true);
+    it('expanded is false by default', () => {
+        assert.equal(contractNode('x4', 'Test', 0).attributes.expanded, false);
     });
 });
 
@@ -190,5 +191,37 @@ describe('addNode / addEdge deduplication', () => {
         addNode(nodes, map, { id: 'org:1', attributes: {} });
         addNode(nodes, map, { id: 'org:2', attributes: {} });
         assert.equal(nodes.length, 2);
+    });
+});
+
+describe('procurementNode', () => {
+    it('produces id in procurement:<pirkimoId> format', () => {
+        assert.equal(procurementNode('7676505', 'Pirkimas', 500000, 'SKELBTAS', 'Atviras').id, 'procurement:7676505');
+    });
+    it('sets entityType to ProcurementEntity', () => {
+        assert.equal(procurementNode('1', null, null, null, null).attributes.entityType, 'ProcurementEntity');
+    });
+    it('stores pirkimoId as string', () => {
+        assert.equal(procurementNode(12345, null, null, null, null).attributes.pirkimoId, '12345');
+    });
+    it('defaults expanded to false', () => {
+        assert.equal(procurementNode('1', null, null, null, null).attributes.expanded, false);
+    });
+    it('stores statusas and pirkimoBudas in attributes', () => {
+        const n = procurementNode('1', 'P', 100, 'SKELBTAS', 'Atviras');
+        assert.equal(n.attributes.statusas, 'SKELBTAS');
+        assert.equal(n.attributes.pirkimoBudas, 'Atviras');
+    });
+    it('uses contractSize for node size based on numatomaVerteEUR', () => {
+        assert.equal(procurementNode('1', null, 2000000, null, null).attributes.size, 19);
+        assert.equal(procurementNode('2', null, 200000, null, null).attributes.size, 13);
+        assert.equal(procurementNode('3', null, 0, null, null).attributes.size, 8);
+    });
+    it('label is wrapped first 6 words of pavadinimas', () => {
+        const n = procurementNode('1', 'A B C D E F G H', 0, null, null);
+        assert.equal(n.attributes.label, wrapLabel('A B C D E F'));
+    });
+    it('falls back to "Pirkimas" label when pavadinimas is null', () => {
+        assert.equal(procurementNode('1', null, 0, null, null).attributes.label, 'Pirkimas');
     });
 });

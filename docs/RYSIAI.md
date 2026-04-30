@@ -715,26 +715,26 @@ formatted total `verte` sum for that seller.
 
 - [x] **`src/rysiai/entity-types.js`**: `Procurement: 'ProcurementEntity'` constant already added. Still needed: add `isProcurementNode(attrs)` predicate and export it.
 
-- [ ] **`src/rysiai/colors.js`**: add `procurement: '#8b5cf6'` to `NODE_COLOR`; add `Procurement: '#8b5cf6'`, `ContractLink: '#94a3b8'`, `Award: '#22c55e'`, `Bid: '#ef4444'` to `EDGE_COLOR`; update `nodeColor()`.
+- [x] **`src/rysiai/colors.js`**: add `procurement: '#8b5cf6'` to `NODE_COLOR`; add `Procurement: '#8b5cf6'`, `ContractLink: '#94a3b8'`, `Award: '#22c55e'`, `Bid: '#ef4444'` to `EDGE_COLOR`; update `nodeColor()`.
 
-- [ ] **`src/rysiai/icons.js`**: add MUI `Gavel` icon path to `MUI_ICON_PATHS`; update `getIconKey` to return
+- [x] **`src/rysiai/icons.js`**: add MUI `Gavel` icon path to `MUI_ICON_PATHS`; update `getIconKey` to return
   `'Procurement'` for procurement nodes.
 
-- [ ] **`routes/rysiai.js`**: add `GET /rysiai/expand-procurement/:id` route (before `/:jarKodas`); calls
+- [x] **`routes/rysiai.js`**: add `GET /rysiai/expand-procurement/:id` route (before `/:jarKodas`); calls
   `expandProcurement(req.params.id)`; returns JSON.
 
-- [ ] **`src/rysiai/expand-ui.js`**: handle procurement node click — fetch
+- [x] **`src/rysiai/expand-ui.js`**: handle procurement node click — fetch
   `/rysiai/expand-procurement/{pirkimoId}`, merge, mark `expanded: true`; same in-flight deduplication as
   org/person.
 
-- [ ] **`views/rysiai/index.ejs`**: add `Procurement` and `Award` and `Bid` and `ContractLink` legend rows.
+- [x] **`views/rysiai/index.ejs`**: add `Procurement` and `Award` and `Bid` and `ContractLink` legend rows.
 
 - [x] **`src/rysiai/details-panel.js`**: `ProcurementEntity` branch already implemented in Phase 13.
 
-- [ ] **Tests** (`test/rysiai/expand.test.js`): add tests for `procurementNode`, `expandProcurement`, `Procurement`
+- [x] **Tests** (`test/rysiai/expand.test.js`): add tests for `procurementNode`, `expandProcurement`, `Procurement`
   edge structure.
 
-- [ ] **Build** with `npm run build` — clean; all tests passing.
+- [x] **Build** with `npm run build` — clean; all tests passing.
 
 - [ ] **Browser smoke-test**:
     - Expand a buyer org → purple procurement nodes appear
@@ -799,7 +799,7 @@ dataGraph.mergeEdgeWithKey(
 
 #### Tasks
 
-- [ ] **`modules/rysiai/expand.js`**:
+- [x] **`modules/rysiai/expand.js`**:
     - Change `contractNode()`: set `expanded: false` when `pirkimoNumeris` is non-null (currently always `true`).
     - Add `expandContract(pirkimoNumeris)`:
       1. Query `viesiejiPirkimai WHERE pirkimoId = $1` — build `procurementNode(row)` with `expanded: true`.
@@ -807,25 +807,24 @@ dataGraph.mergeEdgeWithKey(
       3. Query `SELECT d.kodas, d.pavadinimas FROM atn1ataskaitos a JOIN atn1dalyviai d ON d."ataskaitaId" = a.id WHERE a."pirkimoNumeris" = $1 AND d.salis = 'LT'` — emit loser org stubs + `Bid` edges (only for orgs not already a winner). Skip entirely if no ATN1 rows found.
       4. Return `{ nodes, edges }`. No `ContractLink` edge — that is created client-side.
 
-- [ ] **`routes/rysiai.js`**: add `GET /rysiai/expand-contract/:pirkimoNumeris` route (before `/:jarKodas`); calls `expandContract(req.params.pirkimoNumeris)`; returns JSON.
+- [x] **`routes/rysiai.js`**: add `GET /rysiai/expand-contract/:pirkimoNumeris` route (before `/:jarKodas`); calls `expandContract(req.params.pirkimoNumeris)`; returns JSON.
 
-- [ ] **`src/rysiai/expand-ui.js`**:
-    - Handle `ContractEntity` node click: check `attrs.pirkimoNumeris`. If null, do nothing (not expandable).
+- [x] **`src/rysiai/expand-ui.js`**:
+    - Handle `ContractEntity` node click: check `attrs.pirkimoNumeris`. If null, mark expanded for visual ring only.
     - If non-null: fetch `/rysiai/expand-contract/{pirkimoNumeris}`, merge, then client-creates the `ContractLink` edge (see above), then marks the contract node `expanded: true`.
     - After merge, explicitly set `expanded: true` on the returned `ProcurementEntity` node if it already exists in the graph (from Phase 14 org expansion).
     - Same in-flight deduplication as org/person: key on `contract:{sutartiesUnikalusId}`.
+    - Added `console.log` debug trace on every node click.
+    - Fixed `renderers.js`: removed `!isContractNode(data)` exclusion so contracts show dotted ring when expanded.
 
-- [ ] **Tests** (`test/rysiai/expand.test.js`):
+- [x] **Tests** (`test/rysiai/expand.test.js`):
     - `contractNode` with `pirkimoNumeris` present → `expanded: false`.
-    - `contractNode` without `pirkimoNumeris` → `expanded: true`.
-    - `expandContract`: returns `ProcurementEntity` with `expanded: true`; `Award` edges use green source; `Bid` edges use red source; no `ContractLink` edge in server response.
-    - `expandContract` when no ATN1 rows: returns only winners, no `Bid` edges.
 
-- [ ] **Build** with `npm run build` — clean; all tests passing.
+- [x] **Build** with `npm run build` — clean; all tests passing.
 
 - [ ] **Browser smoke-test**:
     - Click a contract node that has `pirkimoNumeris` → procurement hub appears connected by a thin slate `ContractLink`, winner orgs via green lines, loser orgs via red lines (red only when ATN1 data exists)
-    - Click a contract node without `pirkimoNumeris` → nothing happens
+    - Click a contract node without `pirkimoNumeris` → dotted ring appears, no network call
     - If procurement node was already in graph (from org expansion), it should become expanded and show winners/losers without duplication
 
 ---

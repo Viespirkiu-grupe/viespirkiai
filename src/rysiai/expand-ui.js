@@ -1,7 +1,7 @@
 import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout } from './graph-utils.js';
-import { NODE_COLOR } from './colors.js';
+import { NODE_COLOR, EDGE_COLOR } from './colors.js';
 import { updateLegendForNode } from './legend.js';
-import { isConfigurableNode, isOrgNode, isPersonNode } from './entity-types.js';
+import { isConfigurableNode, isOrgNode, isPersonNode, isContractNode, isProcurementNode } from './entity-types.js';
 import { showNodeDetails, hideDetails } from './details-panel.js';
 
 /**
@@ -171,8 +171,48 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         });
     }
 
+    function loadProcurement(pirkimoId) {
+        var id = 'procurement:' + pirkimoId;
+        return _expand(id, '/rysiai/expand-procurement/' + encodeURIComponent(pirkimoId), function (nodeId) {
+            if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
+            if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
+        });
+    }
+
+    function loadContract(pirkimoNumeris, contractNodeId) {
+        var procId = 'procurement:' + pirkimoNumeris;
+
+        var createContractLink = function () {
+            var linkEdgeId = 'edge:' + contractNodeId + ':' + procId + ':ContractLink';
+            if (dataGraph.hasNode(contractNodeId) && dataGraph.hasNode(procId) && !dataGraph.hasEdge(linkEdgeId)) {
+                dataGraph.addEdgeWithKey(linkEdgeId, contractNodeId, procId, {
+                    edgeType: 'ContractLink',
+                    label: '',
+                    color: EDGE_COLOR['ContractLink'] || '#94a3b8',
+                    size: 1,
+                    forceLabel: false,
+                });
+            }
+        };
+
+        // If procurement already expanded, just add the link and redraw
+        if (dataGraph.hasNode(procId) && dataGraph.getNodeAttribute(procId, 'expanded')) {
+            createContractLink();
+            rebuildAndRefresh();
+            return;
+        }
+
+        return _expand(procId, '/rysiai/expand-contract/' + encodeURIComponent(pirkimoNumeris), function (nodeId) {
+            if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
+            if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
+            createContractLink();
+        });
+    }
+
     renderer.on('clickNode', function (event) {
         var nodeId = event.node;
+        var attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
+        console.log('[Ryšiai] click:', nodeId, attrs.entityType || '?', 'expanded:', attrs.expanded);
 
         if (selectedNodeId === nodeId) {
             deselectAll();
@@ -181,7 +221,6 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
         selectNode(nodeId);
 
-        var attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
         if (!attrs.expanded) {
             if (isOrgNode(attrs) && attrs.jarKodas) {
                 viewGraph.setNodeAttribute(nodeId, 'expanded', true);
@@ -191,11 +230,24 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                 viewGraph.setNodeAttribute(nodeId, 'expanded', true);
                 dataGraph.setNodeAttribute(nodeId, 'expanded', true);
                 loadPerson(attrs.vardas, attrs.pavarde);
+            } else if (isProcurementNode(attrs) && attrs.pirkimoId) {
+                viewGraph.setNodeAttribute(nodeId, 'expanded', true);
+                dataGraph.setNodeAttribute(nodeId, 'expanded', true);
+                loadProcurement(attrs.pirkimoId);
+            } else if (isContractNode(attrs)) {
+                // Mark expanded for visual ring regardless of whether expansion fires
+                viewGraph.setNodeAttribute(nodeId, 'expanded', true);
+                dataGraph.setNodeAttribute(nodeId, 'expanded', true);
+                if (attrs.pirkimoNumeris) {
+                    loadContract(attrs.pirkimoNumeris, nodeId);
+                } else {
+                    renderer.refresh();
+                }
             }
         }
     });
 
     renderer.on('clickStage', deselectAll);
 
-    return { loadOrg, loadPerson, rebuildAndRefresh, getSelectedNodeId: function () { return selectedNodeId; }, selectNode };
+    return { loadOrg, loadPerson, loadProcurement, loadContract, rebuildAndRefresh, getSelectedNodeId: function () { return selectedNodeId; }, selectNode };
 }
