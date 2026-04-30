@@ -11,10 +11,8 @@ const MUI_ICON_PATHS = {
     Institution: 'M4 10h3v7H4zm6.5 0h3v7h-3zM2 19h20v3H2zm15-9h3v7h-3zm-5-9L2 6v2h20V6z',
     // Person icon — Person
     Person: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4m0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4',
-    // HistoryEdu icon — Contract
+    // HistoryEdu icon — Contract and Procurement (shared)
     Contract: 'M9 4v1.38c-.83-.33-1.72-.5-2.61-.5-1.79 0-3.58.68-4.95 2.05l3.33 3.33h1.11v1.11c.86.86 1.98 1.31 3.11 1.36V15H6v3c0 1.1.9 2 2 2h10c1.66 0 3-1.34 3-3V4zm-1.11 6.41V8.26H5.61L4.57 7.22a5.07 5.07 0 0 1 1.82-.34c1.34 0 2.59.52 3.54 1.46l1.41 1.41-.2.2c-.51.51-1.19.8-1.92.8-.47 0-.93-.12-1.33-.34M19 17c0 .55-.45 1-1 1s-1-.45-1-1v-2h-6v-2.59c.57-.23 1.1-.57 1.56-1.03l.2-.2L15.59 14H17v-1.41l-6-5.97V6h8z',
-    // Gavel icon — Procurement
-    Procurement: 'M9.9 14.1L7.07 11.3c-.39-.39-1.02-.39-1.41 0L1.4 15.55c-.39.39-.39 1.02 0 1.41L4.22 19.8c.39.39 1.02.39 1.41 0l4.27-4.28-1-1zm.71-.71l2.12-2.12 1.41 1.41-2.12 2.12-1.41-1.41zm6.36-6.36l.71-.71c.78-.78.78-2.05 0-2.83l-1.41-1.41c-.78-.78-2.05-.78-2.83 0l-.71.71 4.24 4.24zm0 0l-3.53-3.53-6.18 6.18 3.53 3.54z',
 };
 
 // btoa polyfill for Node.js test environment
@@ -30,7 +28,6 @@ export function makeIconDataUri(nodeType) {
 export function getIconKey(attrs) {
     if (isOrgNode(attrs)) return attrs.orgType || 'PrivateCompany';
     if (isPersonNode(attrs)) return 'Person';
-    if (isContractNode(attrs)) return 'Contract';
-    if (isProcurementNode(attrs)) return 'Procurement';
+    if (isContractNode(attrs) || isProcurementNode(attrs)) return 'Contract';
     return '';
 }
