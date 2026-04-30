@@ -38,8 +38,8 @@ export function nodeColor(attrs) {
  * @returns {8|13|19|28}
  */
 export function personelSize(count) {
-    if (count >= 200) return 28;
-    if (count >= 50)  return 19;
+    if (count >= 200) return 20;
+    if (count >= 50)  return 15;
     if (count >= 10)  return 13;
     return 8;
 }
