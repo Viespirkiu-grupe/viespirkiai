@@ -156,7 +156,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         if (fromNodeId && viewGraph.hasNode(fromNodeId)) {
             viewGraph.setNodeAttribute(fromNodeId, 'color', NODE_COLOR.org);
         }
-        return _expand(id, '/voratinklis/expand/' + encodeURIComponent(jarKodas), function (nodeId) {
+        return _expand(id, '/rysiai/expand/' + encodeURIComponent(jarKodas), function (nodeId) {
             if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
             if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
         });
@@ -165,7 +165,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
     function loadPerson(vardas, pavarde) {
         var fullName = (vardas + ' ' + pavarde).trim();
         var id = 'person:' + fullName.toLowerCase();
-        return _expand(id, '/voratinklis/expand-person?vardas=' + encodeURIComponent(fullName), function (nodeId) {
+        return _expand(id, '/rysiai/expand-person?vardas=' + encodeURIComponent(fullName), function (nodeId) {
             if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
             if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
         });

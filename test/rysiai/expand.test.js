@@ -14,7 +14,7 @@ import {
     edge,
     addNode,
     addEdge,
-} from '../../modules/voratinklis/expand.js';
+} from '../../modules/rysiai/expand.js';
 
 describe('formatContractValue', () => {
     it('returns empty string for null', () => assert.equal(formatContractValue(null), ''));

@@ -6,4 +6,4 @@ import { NodeBorderProgram } from '@sigma/node-border';
 import { NodeImageProgram, createNodeImageProgram } from '@sigma/node-image';
 import { animateNodes } from 'sigma/utils';
 
-window.Voratinklis = { Sigma, Graph, forceAtlas2, noverlap, NodeBorderProgram, NodeImageProgram, createNodeImageProgram, animateNodes };
+window.Rysiai = { Sigma, Graph, forceAtlas2, noverlap, NodeBorderProgram, NodeImageProgram, createNodeImageProgram, animateNodes };

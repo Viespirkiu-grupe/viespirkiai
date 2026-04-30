@@ -2,14 +2,14 @@
 <html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 <head>
   <%- include('../head.ejs', {
-    pageTitle: 'Voratinklis — Ryšių grafikas',
+    pageTitle: 'Ryšiai — Ryšių grafikas',
     pageDescription: 'Interaktyvus viešųjų pirkimų ryšių tinklo grafikas',
     pageImage: '',
     customHead: customHead || ''
   }) %>
   <style>
     body { overflow: hidden; }
-    #voratinklis-wrapper {
+    #rysiai-wrapper {
       position: fixed;
       top: var(--site-header-offset, 56px);
       left: 0;
@@ -18,12 +18,12 @@
       display: flex;
       flex-direction: column;
     }
-    #voratinklis-canvas {
+    #rysiai-canvas {
       flex: 1;
       width: 100%;
       position: relative;
     }
-    #voratinklis-loading {
+    #rysiai-loading {
       position: absolute;
       inset: 0;
       background: rgba(255,255,255,0.5);
@@ -33,7 +33,7 @@
       z-index: 10;
       pointer-events: all;
     }
-    .dark #voratinklis-loading {
+    .dark #rysiai-loading {
       background: rgba(15,23,42,0.5);
     }
     .vl-spinner {
@@ -45,7 +45,7 @@
       animation: vl-spin 0.8s linear infinite;
     }
     @keyframes vl-spin { to { transform: rotate(360deg); } }
-    #voratinklis-status {
+    #rysiai-status {
       position: absolute;
       bottom: 12px;
       left: 12px;
@@ -53,7 +53,7 @@
       color: var(--color-muted, #6b7280);
       pointer-events: none;
     }
-    #voratinklis-legend {
+    #rysiai-legend {
       position: absolute;
       bottom: 12px;
       right: 12px;
@@ -66,12 +66,12 @@
       line-height: 1.6;
       user-select: none;
     }
-    .dark #voratinklis-legend {
+    .dark #rysiai-legend {
       background: rgba(30,41,59,0.92);
       border-color: #374151;
       color: #d1d5db;
     }
-    #voratinklis-details {
+    #rysiai-details {
       position: absolute;
       top: 12px;
       right: 12px;
@@ -87,31 +87,31 @@
       line-height: 1.5;
       overflow-wrap: break-word;
     }
-    .dark #voratinklis-details {
+    .dark #rysiai-details {
       background: #1e293b;
       border-color: #374151;
       color: #d1d5db;
     }
-    #voratinklis-details .vd-title {
+    #rysiai-details .vd-title {
       font-weight: 600;
       margin-bottom: 4px;
     }
-    #voratinklis-details .vd-sub {
+    #rysiai-details .vd-sub {
       color: #6b7280;
       font-size: 0.8rem;
       margin-bottom: 2px;
     }
-    .dark #voratinklis-details .vd-sub {
+    .dark #rysiai-details .vd-sub {
       color: #9ca3af;
     }
-    #voratinklis-details .vd-link {
+    #rysiai-details .vd-link {
       display: block;
       margin-top: 6px;
       color: #3b82f6;
       text-decoration: none;
       font-size: 0.8rem;
     }
-    #voratinklis-details .vd-link:hover {
+    #rysiai-details .vd-link:hover {
       text-decoration: underline;
     }
     .vl-swatch {
@@ -122,13 +122,13 @@
       vertical-align: middle;
       margin-right: 4px;
     }
-    #voratinklis-legend label {
+    #rysiai-legend label {
       display: flex;
       align-items: center;
       gap: 4px;
       cursor: pointer;
     }
-    #voratinklis-legend input[type=checkbox] {
+    #rysiai-legend input[type=checkbox] {
       cursor: pointer;
       margin: 0;
     }
@@ -137,16 +137,16 @@
 <body>
   <%- include('../header.ejs', { hideSubtext: false }) %>
 
-  <div id="voratinklis-wrapper">
-    <div id="voratinklis-canvas">
-      <div id="voratinklis-loading" hidden>
+  <div id="rysiai-wrapper">
+    <div id="rysiai-canvas">
+      <div id="rysiai-loading" hidden>
         <div class="vl-spinner"></div>
       </div>
-      <div id="voratinklis-details" hidden></div>
+      <div id="rysiai-details" hidden></div>
     </div>
-    <div id="voratinklis-status"></div>
-      <div id="voratinklis-legend" hidden>
-      <div id="voratinklis-legend-title" style="font-weight:600;text-align:center;margin-bottom:6px;">Filtrai</div>
+    <div id="rysiai-status"></div>
+      <div id="rysiai-legend" hidden>
+      <div id="rysiai-legend-title" style="font-weight:600;text-align:center;margin-bottom:6px;">Filtrai</div>
       <label><input type="checkbox" data-edge-types="Director" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#1d4ed8" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#1d4ed8"/></svg>Direktorius / vadovas</label>
       <label><input type="checkbox" data-edge-types="Shareholder" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#7c3aed" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#7c3aed"/></svg>Akcininkas</label>
       <label><input type="checkbox" data-edge-types="Official"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#0891b2" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#0891b2"/></svg>Pareigūnas / oficialus</label>
@@ -158,9 +158,9 @@
     </div>
   </div>
 
-  <script src="/dist/voratinklis.js"></script>
-  <script>window.VORATINKLIS_CONFIG = { jarKodas: '<%- jarKodas %>' };</script>
-  <script src="/dist/voratinklis-app.js"></script>
+  <script src="/dist/rysiai.js"></script>
+  <script>window.RYSIAI_CONFIG = { jarKodas: '<%- jarKodas %>' };</script>
+  <script src="/dist/rysiai-app.js"></script>
 
 </body>
 </html>

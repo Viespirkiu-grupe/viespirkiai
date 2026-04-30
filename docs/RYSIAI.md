@@ -1,25 +1,25 @@
-# Voratinklis — Interactive Procurement Network Graph
+# Ryšiai — Interactive Procurement Network Graph
 
 ## Summary
 
-Add a new page `/voratinklis/:jarKodas` (Lithuanian: "spider web") that renders an interactive Sigma.js
+Add a new page `/rysiai/:jarKodas` (Lithuanian: "spider web") that renders an interactive Sigma.js
 network graph of procurement relationships centred on the company identified by `jarKodas`. The page
 immediately initialises the graph with that company as the root node — no search step is needed.
-Visiting `/voratinklis/` without a company code returns a 404-style "įmonė nenurodyta" page.
+Visiting `/rysiai/` without a company code returns a 404-style "įmonė nenurodyta" page.
 
 Two types of node expansion are supported:
 
 - **Organisation node click** — expands employees, board members, shareholders, spouses, and linked contract
-  partners via `/voratinklis/expand/:jarKodas`.
+  partners via `/rysiai/expand/:jarKodas`.
 - **Person node click** — expands all workplaces, governance roles, and spouse relationships declared by
-  that person via `/voratinklis/expand-person?vardas=...`. Data comes from PINREG declarations queried
+  that person via `/rysiai/expand-person?vardas=...`. Data comes from PINREG declarations queried
   directly from the DB using `gautiPinregDeklaracijasPagalVardaPavarde` (the same function that backs the
   MCP `get_pinreg_asmuo` tool). MCP is not used for this — direct DB calls are faster and avoid HTTP/SSE
   overhead; MCP is designed for external AI clients only.
 
 Stack additions: `sigma@3`, `graphology@0.26`, `graphology-layout-forceatlas2`, `graphology-layout-noverlap`,
 `@sigma/node-border`, `@sigma/node-image`. Because these are ESM npm packages targeted at Node, a browser
-bundle must be compiled with `esbuild` and served as `public/dist/voratinklis.js`.
+bundle must be compiled with `esbuild` and served as `public/dist/rysiai.js`.
 
 ---
 
@@ -142,7 +142,7 @@ flowchart LR
 
 #### Edge labels
 
-Every edge must carry a visible `label` attribute set at build time in `modules/voratinklis/expand.js`:
+Every edge must carry a visible `label` attribute set at build time in `modules/rysiai/expand.js`:
 
 | Edge type                                                          | `label` value                                                                                                                                                                              |
 |--------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -184,7 +184,7 @@ to position the label **below** the node (draw at `y + nodeSize + labelPadding`,
 
 ### Architecture
 
-New server-side module `modules/voratinklis/` containing:
+New server-side module `modules/rysiai/` containing:
 
 - `expand.js` — exported functions:
     - `expandOrg(jarKodas)` — queries `jarCsv` (root org metadata), `pinregJuridiniaiRysiai` (person
@@ -200,21 +200,21 @@ New server-side module `modules/voratinklis/` containing:
       seller `OrganizationEntity` stub nodes + `Award` edges from the procurement node.
     - All functions return `{ nodes: GraphNode[], edges: GraphEdge[] }`.
 
-New route `routes/voratinklis.js`:
+New route `routes/rysiai.js`:
 
 | Method | Path                                  | Purpose                                                                                           |
 |--------|---------------------------------------|---------------------------------------------------------------------------------------------------|
-| `GET`  | `/voratinklis/`                       | Returns 404 ("įmonė nenurodyta") — no jarKodas was given                                          |
-| `GET`  | `/voratinklis/:jarKodas`              | EJS page shell with jarKodas passed as template variable; graph auto-initialises on load          |
-| `GET`  | `/voratinklis/expand/:jarKodas`       | JSON: graph nodes+edges for one organisation (calls `expandOrg`)                                  |
-| `GET`  | `/voratinklis/expand-person`          | JSON: graph nodes+edges for one person by full name (`?vardas=...`). Calls `expandPerson`.        |
-| `GET`  | `/voratinklis/expand-procurement/:id` | JSON: graph nodes+edges for one procurement — its winning seller orgs. Calls `expandProcurement`. |
+| `GET`  | `/rysiai/`                       | Returns 404 ("įmonė nenurodyta") — no jarKodas was given                                          |
+| `GET`  | `/rysiai/:jarKodas`              | EJS page shell with jarKodas passed as template variable; graph auto-initialises on load          |
+| `GET`  | `/rysiai/expand/:jarKodas`       | JSON: graph nodes+edges for one organisation (calls `expandOrg`)                                  |
+| `GET`  | `/rysiai/expand-person`          | JSON: graph nodes+edges for one person by full name (`?vardas=...`). Calls `expandPerson`.        |
+| `GET`  | `/rysiai/expand-procurement/:id` | JSON: graph nodes+edges for one procurement — its winning seller orgs. Calls `expandProcurement`. |
 
 > **Route ordering note**: `expand` and `expand-person` static path segments must be registered _before_
 > the `/:jarKodas` wildcard so they are not swallowed by the dynamic route handler.
 
-Browser bundle `src/voratinklis-bundle.js` compiled by esbuild into `public/dist/voratinklis.js`:
-imports sigma, graphology, layouts, and node-programs; exports nothing — attaches `window.Voratinklis`
+Browser bundle `src/rysiai-bundle.js` compiled by esbuild into `public/dist/rysiai.js`:
+imports sigma, graphology, layouts, and node-programs; exports nothing — attaches `window.Rysiai`
 with `{ Sigma, Graph, forceAtlas2, noverlap, NodeBorderProgram, NodeImageProgram }` so the inline EJS
 script can initialise the graph.
 
@@ -241,7 +241,7 @@ async function loadOrg(jarKodas) {
     if (expandingNodes.has(id)) return;
     expandingNodes.add(id);
     try {
-        const data = await fetch(`/voratinklis/expand/${jarKodas}`).then(r => r.json());
+        const data = await fetch(`/rysiai/expand/${jarKodas}`).then(r => r.json());
         mergeGraphElements(data);
         graph.setNodeAttribute(id, 'expanded', true);
     } finally {
@@ -261,14 +261,14 @@ graph TD
         GraphStore["graphology Graph instance"]
     end
 
-    subgraph "routes/voratinklis.js"
-        PageRoute["GET /voratinklis/:jarKodas → EJS shell\n(jarKodas passed as template var)"]
-        NotFoundRoute["GET /voratinklis/ → 404"]
-        ExpandOrgAPI["GET /voratinklis/expand/:jarKodas → JSON"]
-        ExpandPersonAPI["GET /voratinklis/expand-person?vardas=... → JSON"]
+    subgraph "routes/rysiai.js"
+        PageRoute["GET /rysiai/:jarKodas → EJS shell\n(jarKodas passed as template var)"]
+        NotFoundRoute["GET /rysiai/ → 404"]
+        ExpandOrgAPI["GET /rysiai/expand/:jarKodas → JSON"]
+        ExpandPersonAPI["GET /rysiai/expand-person?vardas=... → JSON"]
     end
 
-    subgraph "modules/voratinklis/expand.js"
+    subgraph "modules/rysiai/expand.js"
         ExpandOrg["expandOrg(jarKodas)\njarCsv (root org metadata)\n+ pinregJuridiniaiRysiai (by jarKodas)\n+ sutartysSaliuSumos JOIN jarCsv (contract partners)"]
         ExpandPerson["expandPerson(fullName)\npinregJuridiniaiRysiai (by vardas+pavarde)\n→ all darbovietes + rysiaiSuJa + sutuoktinioDarbovietes"]
     end
@@ -290,21 +290,21 @@ sequenceDiagram
     actor User
     participant Browser
     participant Server
-    User ->> Browser: GET /voratinklis/
-    Browser ->> Server: GET /voratinklis/
+    User ->> Browser: GET /rysiai/
+    Browser ->> Server: GET /rysiai/
     Server -->> Browser: 404 "įmonė nenurodyta"
-    User ->> Browser: GET /voratinklis/{jarKodas}
-    Browser ->> Server: GET /voratinklis/{jarKodas}
+    User ->> Browser: GET /rysiai/{jarKodas}
+    Browser ->> Server: GET /rysiai/{jarKodas}
     Server -->> Browser: EJS page (empty Sigma canvas, jarKodas embedded)
     Browser ->> Browser: DOMContentLoaded → loadOrg(jarKodas)
-    Browser ->> Server: GET /voratinklis/expand/{jarKodas}
+    Browser ->> Server: GET /rysiai/expand/{jarKodas}
     Server -->> Browser: { nodes[], edges[] }
     Browser ->> Browser: Add to graphology Graph
     Browser ->> Browser: Run ForceAtlas2 layout
     Browser ->> Browser: Render with Sigma
     User ->> Browser: Clicks unexpanded org node
     Browser ->> Browser: Show loading overlay (blocks further clicks)
-    Browser ->> Server: GET /voratinklis/expand/{jarKodas}
+    Browser ->> Server: GET /rysiai/expand/{jarKodas}
     Server -->> Browser: { nodes[], edges[] } (merged, idempotent)
     Browser ->> Browser: Merge nodes pre-position new nodes at clicked node pos
     Browser ->> Browser: Run ForceAtlas2 → compute final positions
@@ -313,7 +313,7 @@ sequenceDiagram
     User ->> Browser: Clicks unexpanded person node
     Note over Browser: person node attrs contain vardas + pavarde
     Browser ->> Browser: Show loading overlay
-    Browser ->> Server: GET /voratinklis/expand-person?vardas=Jonas+Jonaitis
+    Browser ->> Server: GET /rysiai/expand-person?vardas=Jonas+Jonaitis
     Server -->> Browser: { nodes[], edges[] }
     Browser ->> Browser: Merge nodes pre-position new nodes at person node pos
     Browser ->> Browser: Run ForceAtlas2 + noverlap → compute final positions
@@ -330,16 +330,16 @@ sequenceDiagram
 ```mermaid
 graph TD
     subgraph Browser["Browser — two IIFE bundles"]
-        BUNDLE["public/dist/voratinklis.js\n(esbuild bundle of voratinklis-bundle.js)\nSigma · graphology · forceAtlas2\nnoverlap · NodeImageProgram\n→ window.Voratinklis"]
+        BUNDLE["public/dist/rysiai.js\n(esbuild bundle of rysiai-bundle.js)\nSigma · graphology · forceAtlas2\nnoverlap · NodeImageProgram\n→ window.Rysiai"]
 
-        subgraph APP["public/dist/voratinklis-app.js\n(esbuild bundle of src/voratinklis-app.js)"]
-            ICONS["src/voratinklis/icons.js\nMUI_ICON_PATHS\nmakeIconDataUri · getIconKey"]
-            COLORS["src/voratinklis/colors.js\nNODE_COLOR · EDGE_COLOR\nnodeColor · hiddenEdgeTypes"]
-            RENDERERS["src/voratinklis/renderers.js\ndrawNodeLabel · drawNodeHover"]
-            GRAPHUTILS["src/voratinklis/graph-utils.js\nmergeGraphElements(dataGraph,getNodePos,data,fromNodeId)\nrebuildViewGraph(dataGraph,viewGraph,hiddenEdgeTypes)\nsyncPositionsToData(dataGraph,viewGraph)\nrunLayout(graph)\n★ testable without DOM"]
-            LEGEND["src/voratinklis/legend.js\nbindLegendCheckboxes(renderer,hiddenEdgeTypes,rebuildAndRefresh)"]
-            EXPANDUI["src/voratinklis/expand-ui.js\ncreateExpandUI({dataGraph,viewGraph,...})\n→ rebuildAndRefresh callback"]
-            ENTRY["src/voratinklis-app.js ← esbuild entry\ncreates dataGraph + viewGraph\nSigma uses viewGraph\nwires clickNode + DOMContentLoaded"]
+        subgraph APP["public/dist/rysiai-app.js\n(esbuild bundle of src/rysiai-app.js)"]
+            ICONS["src/rysiai/icons.js\nMUI_ICON_PATHS\nmakeIconDataUri · getIconKey"]
+            COLORS["src/rysiai/colors.js\nNODE_COLOR · EDGE_COLOR\nnodeColor · hiddenEdgeTypes"]
+            RENDERERS["src/rysiai/renderers.js\ndrawNodeLabel · drawNodeHover"]
+            GRAPHUTILS["src/rysiai/graph-utils.js\nmergeGraphElements(dataGraph,getNodePos,data,fromNodeId)\nrebuildViewGraph(dataGraph,viewGraph,hiddenEdgeTypes)\nsyncPositionsToData(dataGraph,viewGraph)\nrunLayout(graph)\n★ testable without DOM"]
+            LEGEND["src/rysiai/legend.js\nbindLegendCheckboxes(renderer,hiddenEdgeTypes,rebuildAndRefresh)"]
+            EXPANDUI["src/rysiai/expand-ui.js\ncreateExpandUI({dataGraph,viewGraph,...})\n→ rebuildAndRefresh callback"]
+            ENTRY["src/rysiai-app.js ← esbuild entry\ncreates dataGraph + viewGraph\nSigma uses viewGraph\nwires clickNode + DOMContentLoaded"]
         end
 
         ENTRY --> ICONS
@@ -348,18 +348,18 @@ graph TD
         ENTRY --> GRAPHUTILS
         ENTRY --> LEGEND
         ENTRY --> EXPANDUI
-        BUNDLE -->|" window.Voratinklis "| ENTRY
+        BUNDLE -->|" window.Rysiai "| ENTRY
     end
 
     subgraph Server["Server"]
-        ROUTE["routes/voratinklis.js\nExpress router\nGET /voratinklis/:jarKodas\nGET /voratinklis/expand/:jarKodas\nGET /voratinklis/expand-person"]
-        EXPAND["modules/voratinklis/expand.js\nexpandOrg · expandPerson\npure helpers: orgNode · personNode\ncontractNode · edge · mapPareigos\nmapRysioPobudis · mapFormosKodas"]
-        VIEW["views/voratinklis/index.ejs\npage shell · legend HTML\ncheckboxes · Sigma container"]
+        ROUTE["routes/rysiai.js\nExpress router\nGET /rysiai/:jarKodas\nGET /rysiai/expand/:jarKodas\nGET /rysiai/expand-person"]
+        EXPAND["modules/rysiai/expand.js\nexpandOrg · expandPerson\npure helpers: orgNode · personNode\ncontractNode · edge · mapPareigos\nmapRysioPobudis · mapFormosKodas"]
+        VIEW["views/rysiai/index.ejs\npage shell · legend HTML\ncheckboxes · Sigma container"]
     end
 
     subgraph Tests["Tests — node --test"]
-        T_EXPAND["test/voratinklis/expand.test.js\nserver-side pure helpers\n(61 tests)"]
-        T_GRAPHUTILS["test/voratinklis/graph-utils.test.js\nclient-side mergeGraphElements\nrebuildViewGraph: orphan removal · anchor logic\nposition restore · syncPositionsToData"]
+        T_EXPAND["test/rysiai/expand.test.js\nserver-side pure helpers\n(61 tests)"]
+        T_GRAPHUTILS["test/rysiai/graph-utils.test.js\nclient-side mergeGraphElements\nrebuildViewGraph: orphan removal · anchor logic\nposition restore · syncPositionsToData"]
     end
 
     ENTRY -->|" fetch /expand/:jk "| ROUTE
@@ -374,17 +374,17 @@ graph TD
 
 | File                             | Layer  | Purpose                                                                                                               | DOM required              |
 |----------------------------------|--------|-----------------------------------------------------------------------------------------------------------------------|---------------------------|
-| `src/voratinklis-bundle.js`      | Client | Bundles third-party npm packages; exposes `window.Voratinklis`                                                        | No                        |
-| `src/voratinklis-app.js`         | Client | esbuild entry; creates `dataGraph` + `viewGraph`; Sigma uses `viewGraph`; wires events                                | Yes                       |
-| `src/voratinklis/icons.js`       | Client | MUI SVG path map; `makeIconDataUri`; `getIconKey`                                                                     | No                        |
-| `src/voratinklis/colors.js`      | Client | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` Set                                                        | No                        |
-| `src/voratinklis/renderers.js`   | Client | `drawNodeLabel`, `drawNodeHover` — Sigma canvas callbacks                                                             | No (canvas ctx passed in) |
-| `src/voratinklis/graph-utils.js` | Client | `mergeGraphElements(dataGraph,...)`, `rebuildViewGraph`, `syncPositionsToData`, `runLayout` — **pure, injected deps** | No ★                      |
-| `src/voratinklis/legend.js`      | Client | `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)`                                                  | Yes (queries DOM)         |
-| `src/voratinklis/expand-ui.js`   | Client | `createExpandUI({dataGraph,viewGraph,...})` — async fetch + rebuild; returns `rebuildAndRefresh`                      | Yes                       |
-| `modules/voratinklis/expand.js`  | Server | `expandOrg`, `expandPerson`, `expandProcurement`, all pure builder helpers                                            | No                        |
-| `routes/voratinklis.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`/`expandProcurement`; renders EJS                                     | No                        |
-| `views/voratinklis/index.ejs`    | View   | HTML shell, inline CSS, legend overlay with checkboxes                                                                | —                         |
+| `src/rysiai-bundle.js`      | Client | Bundles third-party npm packages; exposes `window.Rysiai`                                                        | No                        |
+| `src/rysiai-app.js`         | Client | esbuild entry; creates `dataGraph` + `viewGraph`; Sigma uses `viewGraph`; wires events                                | Yes                       |
+| `src/rysiai/icons.js`       | Client | MUI SVG path map; `makeIconDataUri`; `getIconKey`                                                                     | No                        |
+| `src/rysiai/colors.js`      | Client | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` Set                                                        | No                        |
+| `src/rysiai/renderers.js`   | Client | `drawNodeLabel`, `drawNodeHover` — Sigma canvas callbacks                                                             | No (canvas ctx passed in) |
+| `src/rysiai/graph-utils.js` | Client | `mergeGraphElements(dataGraph,...)`, `rebuildViewGraph`, `syncPositionsToData`, `runLayout` — **pure, injected deps** | No ★                      |
+| `src/rysiai/legend.js`      | Client | `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)`                                                  | Yes (queries DOM)         |
+| `src/rysiai/expand-ui.js`   | Client | `createExpandUI({dataGraph,viewGraph,...})` — async fetch + rebuild; returns `rebuildAndRefresh`                      | Yes                       |
+| `modules/rysiai/expand.js`  | Server | `expandOrg`, `expandPerson`, `expandProcurement`, all pure builder helpers                                            | No                        |
+| `routes/rysiai.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`/`expandProcurement`; renders EJS                                     | No                        |
+| `views/rysiai/index.ejs`    | View   | HTML shell, inline CSS, legend overlay with checkboxes                                                                | —                         |
 
 **Visual identity — node colours and icons:**
 
@@ -397,7 +397,7 @@ graph TD
 | `ProcurementEntity`  | `procurement`    | `#8b5cf6` | Gavel                                 | `Procurement`                                      |
 
 `ProcurementEntity` uses **purple** (`#8b5cf6`) — distinct from all current node colours. The MUI
-`Gavel` icon path must be added to `MUI_ICON_PATHS` in `src/voratinklis/icons.js`, and `getIconKey`
+`Gavel` icon path must be added to `MUI_ICON_PATHS` in `src/rysiai/icons.js`, and `getIconKey`
 must return `'Procurement'` for procurement nodes. `EDGE_COLOR` must add entries for `Procurement`
 (`#8b5cf6`) and `Award` (`#8b5cf6`) edges.
 
@@ -439,7 +439,7 @@ In unit tests — no DOM or Sigma needed:
 
 ```js
 import Graph from 'graphology';
-import {mergeGraphElements, rebuildViewGraph, syncPositionsToData} from '../../src/voratinklis/graph-utils.js';
+import {mergeGraphElements, rebuildViewGraph, syncPositionsToData} from '../../src/rysiai/graph-utils.js';
 
 const dataGraph = new Graph({type: 'directed', multi: true});
 const viewGraph = new Graph({type: 'directed', multi: true});
@@ -522,7 +522,7 @@ thresholds:
 | €100 K – €1 M | 13        | 3           |
 | > €1 M        | 19        | 6           |
 
-Person nodes keep a fixed `size: 8`. `edgeWeight` is mirrored as a local helper in `modules/voratinklis/expand.js` so
+Person nodes keep a fixed `size: 8`. `edgeWeight` is mirrored as a local helper in `modules/rysiai/expand.js` so
 `Order`/`Delivery` edges carry their `size` from the server payload.
 
 ---
@@ -604,7 +604,7 @@ dedicated page exists — a prominent "open" link that navigates to that entity'
 
 #### Architecture
 
-New client-side module **`src/voratinklis/details-panel.js`** with two exported functions:
+New client-side module **`src/rysiai/details-panel.js`** with two exported functions:
 
 ```js
 export function showNodeDetails(nodeId, attrs) { …
@@ -618,24 +618,24 @@ export function hideDetails() { …
 `hideDetails` sets `hidden = true`. Both are imported in `expand-ui.js` and called from `selectNode`
 and `deselectAll`.
 
-`formatContractValue` is server-side only (`modules/voratinklis/expand.js`). Duplicate the same pure
+`formatContractValue` is server-side only (`modules/rysiai/expand.js`). Duplicate the same pure
 function locally in `details-panel.js` (< 5 lines, no import needed).
 
 #### Tasks
 
-- [x] **`modules/voratinklis/expand.js`**: add `s."pirkimoNumeris"` to both `asBuyerRes` and
+- [x] **`modules/rysiai/expand.js`**: add `s."pirkimoNumeris"` to both `asBuyerRes` and
   `asSellerRes` SQL queries; pass `pirkimoNumeris: row.pirkimoNumeris || null` into `contractNode`;
   update `contractNode` factory to store `pirkimoNumeris` in attributes.
 
-- [x] **`views/voratinklis/index.ejs`**: add `<div id="voratinklis-details" hidden></div>` inside
-  `#voratinklis-wrapper` (after `#voratinklis-legend`); add CSS: absolute top-right card, white
+- [x] **`views/rysiai/index.ejs`**: add `<div id="rysiai-details" hidden></div>` inside
+  `#rysiai-wrapper` (after `#rysiai-legend`); add CSS: absolute top-right card, white
   background, shadow, `max-width: 240px`, padding 10px, `font-size: 0.85rem`, border-radius, `z-index: 20`.
 
-- [x] **`src/voratinklis/details-panel.js`** (new): implement `showNodeDetails(nodeId, attrs)` and
+- [x] **`src/rysiai/details-panel.js`** (new): implement `showNodeDetails(nodeId, attrs)` and
   `hideDetails()`; local `formatContractValue(verte)` helper; entity-specific HTML per
   `attrs.entityType`; `pirkimoNumeris` link only when non-null.
 
-- [x] **`src/voratinklis/expand-ui.js`**: import `showNodeDetails`, `hideDetails`; call
+- [x] **`src/rysiai/expand-ui.js`**: import `showNodeDetails`, `hideDetails`; call
   `showNodeDetails(id, viewGraph.getNodeAttributes(id))` in `selectNode`; call `hideDetails()` in
   `deselectAll`.
 
@@ -679,7 +679,7 @@ formatted total `verte` sum for that seller.
 
 #### Tasks
 
-- [ ] **`modules/voratinklis/expand.js`**:
+- [ ] **`modules/rysiai/expand.js`**:
     - Add `procurementNode(row)` factory:
       `{ id, entityType, pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas, size, expanded: false }`.
     - In `expandOrg`: query
@@ -689,28 +689,28 @@ formatted total `verte` sum for that seller.
       `SELECT DISTINCT s.tiekejoKodas, j.pavadinimas, SUM(s.verte) as totalVerte FROM sutartys s LEFT JOIN jarCsv j ON j.jarKodas::text = s.tiekejoKodas WHERE s.pirkimoNumeris = $1 GROUP BY s.tiekejoKodas, j.pavadinimas`;
       return org stub nodes + `Award` edges.
 
-- [ ] **`src/voratinklis/entity-types.js`**: add `isProcurementNode(attrs)` predicate and export `Procurement` entity
+- [ ] **`src/rysiai/entity-types.js`**: add `isProcurementNode(attrs)` predicate and export `Procurement` entity
   type constant.
 
-- [ ] **`src/voratinklis/colors.js`**: add `procurement: '#8b5cf6'` to `NODE_COLOR`; add `Procurement: '#8b5cf6'` and
+- [ ] **`src/rysiai/colors.js`**: add `procurement: '#8b5cf6'` to `NODE_COLOR`; add `Procurement: '#8b5cf6'` and
   `Award: '#8b5cf6'` to `EDGE_COLOR`; update `nodeColor()`.
 
-- [ ] **`src/voratinklis/icons.js`**: add MUI `Gavel` icon path to `MUI_ICON_PATHS`; update `getIconKey` to return
+- [ ] **`src/rysiai/icons.js`**: add MUI `Gavel` icon path to `MUI_ICON_PATHS`; update `getIconKey` to return
   `'Procurement'` for procurement nodes.
 
-- [ ] **`routes/voratinklis.js`**: add `GET /voratinklis/expand-procurement/:id` route (before `/:jarKodas`); calls
+- [ ] **`routes/rysiai.js`**: add `GET /rysiai/expand-procurement/:id` route (before `/:jarKodas`); calls
   `expandProcurement(req.params.id)`; returns JSON.
 
-- [ ] **`src/voratinklis/expand-ui.js`**: handle procurement node click — fetch
-  `/voratinklis/expand-procurement/{pirkimoId}`, merge, mark `expanded: true`; same in-flight deduplication as
+- [ ] **`src/rysiai/expand-ui.js`**: handle procurement node click — fetch
+  `/rysiai/expand-procurement/{pirkimoId}`, merge, mark `expanded: true`; same in-flight deduplication as
   org/person.
 
-- [ ] **`views/voratinklis/index.ejs`**: add `Procurement` and `Award` legend rows with purple arrow SVGs.
+- [ ] **`views/rysiai/index.ejs`**: add `Procurement` and `Award` legend rows with purple arrow SVGs.
 
-- [ ] **`src/voratinklis/details-panel.js`**: add `ProcurementEntity` branch to `showNodeDetails` (can be done together
+- [ ] **`src/rysiai/details-panel.js`**: add `ProcurementEntity` branch to `showNodeDetails` (can be done together
   with Phase 13).
 
-- [ ] **Tests** (`test/voratinklis/expand.test.js`): add tests for `procurementNode`, `expandProcurement`, `Procurement`
+- [ ] **Tests** (`test/rysiai/expand.test.js`): add tests for `procurementNode`, `expandProcurement`, `Procurement`
   edge structure.
 
 - [ ] **Build** with `npm run build` — clean; all tests passing.
@@ -726,8 +726,8 @@ formatted total `verte` sum for that seller.
    thread for large graphs. For large graphs (>200 nodes) a Web Worker is recommended. For v1,
    synchronous with a capped iteration count is acceptable.
 
-2. **Search UX on `/voratinklis`**: Eliminated. Entry is exclusively via `/voratinklis/:jarKodas`
+2. **Search UX on `/rysiai`**: Eliminated. Entry is exclusively via `/rysiai/:jarKodas`
    (linked from `/asmuo/`). ✓ Resolved.
 
-3. **Header nav link for `/voratinklis`**: Keep pointing to `/voratinklis/` — shows 404 "įmonė nenurodyta"
+3. **Header nav link for `/rysiai`**: Keep pointing to `/rysiai/` — shows 404 "įmonė nenurodyta"
    when clicked directly. This is intentional. ✓ Resolved.

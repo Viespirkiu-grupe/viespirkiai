@@ -6,8 +6,8 @@
  * @param {LegendState}   legendState - the LegendState instance
  */
 export function updateLegendForNode(nodeId, label, legendState) {
-    var legendEl = document.getElementById('voratinklis-legend');
-    var titleEl = document.getElementById('voratinklis-legend-title');
+    var legendEl = document.getElementById('rysiai-legend');
+    var titleEl = document.getElementById('rysiai-legend-title');
 
     if (nodeId == null) {
         if (legendEl) legendEl.hidden = true;
@@ -17,7 +17,7 @@ export function updateLegendForNode(nodeId, label, legendState) {
     if (legendEl) legendEl.hidden = false;
     if (titleEl) titleEl.textContent = label != null ? label : nodeId;
 
-    document.querySelectorAll('#voratinklis-legend input[type=checkbox][data-edge-types]').forEach(function (cb) {
+    document.querySelectorAll('#rysiai-legend input[type=checkbox][data-edge-types]').forEach(function (cb) {
         var types = cb.dataset.edgeTypes.split(',');
         if (nodeId != null) {
             cb.checked = types.every(function (t) { return legendState.isTypeVisible(nodeId, t.trim()); });
@@ -39,7 +39,7 @@ export function updateLegendForNode(nodeId, label, legendState) {
  * @param {Function}           rebuildAndRefresh  - callback from createExpandUI
  */
 export function bindLegendCheckboxes(getSelectedNodeId, legendState, rebuildAndRefresh) {
-    document.querySelectorAll('#voratinklis-legend input[type=checkbox][data-edge-types]').forEach(function (cb) {
+    document.querySelectorAll('#rysiai-legend input[type=checkbox][data-edge-types]').forEach(function (cb) {
         cb.addEventListener('change', function () {
             var nodeId = getSelectedNodeId();
             var types = cb.dataset.edgeTypes.split(',');

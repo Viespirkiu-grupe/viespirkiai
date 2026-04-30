@@ -1,11 +1,11 @@
 import express from 'express';
 import { log } from '../utils/log.js';
-import { expandOrg, expandPerson } from '../modules/voratinklis/expand.js';
+import { expandOrg, expandPerson } from '../modules/rysiai/expand.js';
 import config from '../utils/config.js';
 
-const voratinklisRouter = express.Router();
+const rysiaiRouter = express.Router();
 
-voratinklisRouter.get('/voratinklis/expand/:jarKodas', async (req, res) => {
+rysiaiRouter.get('/rysiai/expand/:jarKodas', async (req, res) => {
     const { jarKodas } = req.params;
     if (!jarKodas || !/^\d+$/.test(jarKodas)) {
         return res.status(400).json({ error: 'Neteisingas jarKodas' });
@@ -19,7 +19,7 @@ voratinklisRouter.get('/voratinklis/expand/:jarKodas', async (req, res) => {
     }
 });
 
-voratinklisRouter.get('/voratinklis/expand-person', async (req, res) => {
+rysiaiRouter.get('/rysiai/expand-person', async (req, res) => {
     const { vardas } = req.query;
     if (!vardas || !vardas.trim()) {
         return res.status(400).json({ error: 'Trūksta parametro: vardas' });
@@ -33,14 +33,14 @@ voratinklisRouter.get('/voratinklis/expand-person', async (req, res) => {
     }
 });
 
-voratinklisRouter.get('/voratinklis/:jarKodas', async (req, res, next) => {
+rysiaiRouter.get('/rysiai/:jarKodas', async (req, res, next) => {
     const { jarKodas } = req.params;
     if (!jarKodas || !/^\d+$/.test(jarKodas)) return next();
-    res.renderCompiled('voratinklis/index', {
+    res.renderCompiled('rysiai/index', {
         req,
         jarKodas,
         customHead: config.customHead || '',
     });
 });
 
-export default voratinklisRouter;
+export default rysiaiRouter;

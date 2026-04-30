@@ -5,7 +5,7 @@ import { isOrgNode, isPersonNode, isContractNode, ENTITY_TYPE } from './entity-t
 var panelEl = null;
 
 function getPanel() {
-    if (!panelEl) panelEl = document.getElementById('voratinklis-details');
+    if (!panelEl) panelEl = document.getElementById('rysiai-details');
     return panelEl;
 }
 

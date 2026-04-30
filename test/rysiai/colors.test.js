@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { personelSize, contractSize, edgeWeight } from '../../src/voratinklis/colors.js';
+import { personelSize, contractSize, edgeWeight } from '../../src/rysiai/colors.js';
 
 // ── personelSize ──────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getOrInitNodeHidden } from '../../src/voratinklis/selection.js';
+import { getOrInitNodeHidden } from '../../src/rysiai/selection.js';
 
 describe('getOrInitNodeHidden', () => {
     it('returns the existing Set when nodeId is already in the Map', () => {

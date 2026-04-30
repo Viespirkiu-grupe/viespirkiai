@@ -5,10 +5,10 @@
     "scripts": {
         "dev": "node index.js",
         "start": "node server.js",
-        "build": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --minify && esbuild src/voratinklis-bundle.js --bundle --format=iife --outfile=public/dist/voratinklis.js --minify && esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --minify",
-        "watch": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --watch & esbuild src/voratinklis-bundle.js --bundle --format=iife --outfile=public/dist/voratinklis.js --watch & esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --watch",
-        "build:voratinklis-app": "esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --minify",
-        "watch:voratinklis-app": "esbuild src/voratinklis-app.js --bundle --format=iife --outfile=public/dist/voratinklis-app.js --watch",
+        "build": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --minify && esbuild src/rysiai-bundle.js --bundle --format=iife --outfile=public/dist/rysiai.js --minify && esbuild src/rysiai-app.js --bundle --format=iife --outfile=public/dist/rysiai-app.js --minify",
+        "watch": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --watch & esbuild src/rysiai-bundle.js --bundle --format=iife --outfile=public/dist/rysiai.js --watch & esbuild src/rysiai-app.js --bundle --format=iife --outfile=public/dist/rysiai-app.js --watch",
+        "build:rysiai-app": "esbuild src/rysiai-app.js --bundle --format=iife --outfile=public/dist/rysiai-app.js --minify",
+        "watch:rysiai-app": "esbuild src/rysiai-app.js --bundle --format=iife --outfile=public/dist/rysiai-app.js --watch",
         "test": "node --test"
     },
     "keywords": [],

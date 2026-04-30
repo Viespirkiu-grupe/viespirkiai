@@ -1,9 +1,9 @@
-import { drawNodeLabel, drawNodeHover } from './voratinklis/renderers.js';
-import { createExpandUI } from './voratinklis/expand-ui.js';
-import { bindLegendCheckboxes } from './voratinklis/legend.js';
-import { LegendState } from './voratinklis/legend-state.js';
+import { drawNodeLabel, drawNodeHover } from './rysiai/renderers.js';
+import { createExpandUI } from './rysiai/expand-ui.js';
+import { bindLegendCheckboxes } from './rysiai/legend.js';
+import { LegendState } from './rysiai/legend-state.js';
 
-var _v = window.Voratinklis;
+var _v = window.Rysiai;
 var Sigma = _v.Sigma;
 var Graph = _v.Graph;
 var forceAtlas2 = _v.forceAtlas2;
@@ -15,9 +15,9 @@ var animateNodes = _v.animateNodes;
 // viewGraph: Sigma's filtered view, rebuilt by rebuildViewGraph on each expand/legend toggle
 var dataGraph = new Graph({ type: 'directed', multi: true });
 var viewGraph = new Graph({ type: 'directed', multi: true });
-var container = document.getElementById('voratinklis-canvas');
-var statusEl = document.getElementById('voratinklis-status');
-var loadingEl = document.getElementById('voratinklis-loading');
+var container = document.getElementById('rysiai-canvas');
+var statusEl = document.getElementById('rysiai-status');
+var loadingEl = document.getElementById('rysiai-loading');
 
 // Per-node and global edge-type visibility state
 var legendState = new LegendState();
@@ -44,7 +44,7 @@ var ui = createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, f
 
 bindLegendCheckboxes(function () { return ui.getSelectedNodeId(); }, legendState, ui.rebuildAndRefresh);
 
-var INITIAL_JAR_KODAS = window.VORATINKLIS_CONFIG.jarKodas;
+var INITIAL_JAR_KODAS = window.RYSIAI_CONFIG.jarKodas;
 document.addEventListener('DOMContentLoaded', async function () {
     await ui.loadOrg(INITIAL_JAR_KODAS, null);
     ui.selectNode('org:' + INITIAL_JAR_KODAS);

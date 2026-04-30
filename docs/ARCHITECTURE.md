@@ -171,8 +171,8 @@ In production the web server connects via PgBouncer (`:9120`); direct Postgres i
 | `GET /viesieji-pirkimai` | `routes/viesiejiPirkimai.js` | Procurement notice search |
 | `GET /failas/:md5` | `routes/failas.js` | Document file viewer + proxy + OCR API |
 | `GET /failai` | `routes/failai.js` | File search |
-| `GET /voratinklis` | `routes/voratinklis.js` | Sigma network graph browser (company search + interactive graph) |
-| `GET /voratinklis/expand/:jarKodas` | `routes/voratinklis.js` | JSON: graph nodes+edges for one org |
+| `GET /rysiai` | `routes/rysiai.js` | Sigma network graph browser (company search + interactive graph) |
+| `GET /rysiai/expand/:jarKodas` | `routes/rysiai.js` | JSON: graph nodes+edges for one org |
 | `GET /juridiniai` | `routes/juridiniai.js` | Company registry search |
 | `GET /kodas/:kodas` | `routes/kodas.js` | Entity lookup by company code |
 | `GET /ted/:id` | `routes/ted.js` | EU TED notice detail |
@@ -245,7 +245,7 @@ In production the web server connects via PgBouncer (`:9120`); direct Postgres i
 │   └── ...
 ├── styles/                   # Source CSS — built into public/dist/tailwind.css
 ├── src/                      # Browser bundle entry points (built by esbuild)
-│   └── voratinklis-bundle.js # Sigma + graphology bundle → public/dist/voratinklis.js
+│   └── rysiai-bundle.js # Sigma + graphology bundle → public/dist/rysiai.js
 ├── public/                   # Static assets served directly
 │   └── dist/tailwind.css     # Built Tailwind output (must exist before starting)
 ├── pgbouncer/                # PgBouncer Dockerfile + config
