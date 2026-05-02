@@ -1,7 +1,23 @@
 // ── Custom Sigma node renderers ───────────────────────────────────────────────
 
+/**
+ * @typedef {object} NodeDisplayData
+ * @property {number}  x         - graph-space X coordinate
+ * @property {number}  y         - graph-space Y coordinate
+ * @property {number}  [size]    - visual radius in px (default 8)
+ * @property {string}  [color]   - fill colour (hex)
+ * @property {string}  [label]   - display label, may contain \n for line breaks
+ * @property {boolean} [expanded]  - true once the node's neighbours have been fetched
+ * @property {boolean} [selected]  - true while the node is the active selection
+ */
+
 // Draws a dotted ring for expanded nodes (orgs, persons, contracts, procurement), then the label.
 // Called by Sigma for every visible labelled node, and also by drawNodeHover.
+/**
+ * @param {CanvasRenderingContext2D} context
+ * @param {NodeDisplayData} data
+ * @param {object} settings  Sigma renderer settings
+ */
 export function drawNodeLabel(context, data, settings) {
     const nodeSize = data.size || 8;
 
@@ -43,6 +59,11 @@ export function drawNodeLabel(context, data, settings) {
 // Selected node: bold solid ring (nodeSize+6, lineWidth 5).
 // Hover only:    soft ring (nodeSize+4, lineWidth 2).
 // Expanded ring is drawn by drawNodeLabel (called at end) — always outermost.
+/**
+ * @param {CanvasRenderingContext2D} context
+ * @param {NodeDisplayData} data
+ * @param {object} settings  Sigma renderer settings
+ */
 export function drawNodeHover(context, data, settings) {
     const nodeSize = data.size || 8;
     context.beginPath();

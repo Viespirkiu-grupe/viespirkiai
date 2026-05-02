@@ -7,15 +7,21 @@ network graph of procurement relationships centred on the company identified by 
 immediately initialises the graph with that company as the root node — no search step is needed.
 Visiting `/rysiai/` without a company code returns a 404-style "įmonė nenurodyta" page.
 
-Two types of node expansion are supported:
+Interaction model:
 
-- **Organisation node click** — expands employees, board members, shareholders, spouses, and linked contract
-  partners via `/rysiai/expand/:jarKodas`.
-- **Person node click** — expands all workplaces, governance roles, and spouse relationships declared by
-  that person via `/rysiai/expand-person?vardas=...`. Data comes from PINREG declarations queried
-  directly from the DB using `gautiPinregDeklaracijasPagalVardaPavarde` (the same function that backs the
-  MCP `get_pinreg_asmuo` tool). MCP is not used for this — direct DB calls are faster and avoid HTTP/SSE
-  overhead; MCP is designed for external AI clients only.
+- **Single click** — selects the node and shows its details panel. Clicking the canvas background deselects.
+- **Double-click** — expands the node, fetching and merging its connected data into the graph.
+
+The **details panel** (top-right overlay) shows a type-specific summary of the selected node. At the bottom of the
+panel, an **expand/collapse button** provides an alternative to double-clicking. The node stays selected after either
+button action:
+
+- **"Išskleisti"** (Hub icon) — shown when the node has not yet been expanded; triggers expansion.
+- **"Suskleisti"** (Adjust icon) — shown when the node is already expanded; collapses: removes the edges and orphaned
+  nodes brought in by this expansion, resets `expanded: false`, rebuilds the graph.
+
+MCP is not used for DB queries — direct DB calls are faster and avoid HTTP/SSE overhead; MCP is designed for external AI
+clients only.
 
 Stack additions: `sigma@3`, `graphology@0.26`, `graphology-layout-forceatlas2`, `graphology-layout-noverlap`,
 `@sigma/node-border`, `@sigma/node-image`. Because these are ESM npm packages targeted at Node, a browser
@@ -29,14 +35,14 @@ bundle must be compiled with `esbuild` and served as `public/dist/rysiai.js`.
 
 The graph uses the entity and edge model defined in the repository data structures:
 
-| Node type            | Expand trigger                                                    | Source function / data                                                                                                                                                                                                                                                                                                                                       | Key fields                                                                                                   | Details panel link                                                                             |
-|----------------------|-------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `OrganizationEntity` | Org node click                                                    | `jarCsv` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN jarCsv` (partner org names)                                                                                                                                                                                                                                           | `jarKodas`, `pavadinimas`, `formosKodas`                                                                     | `/asmuo/{jarKodas}`                                                                            |
-| `PersonEntity`       | Org node click                                                    | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows                                                                                                                                                                                                                        | `vardas + pavarde` (name is the identity key), `rysioPradzia`                                                | *(no dedicated page)*                                                                          |
-| `PersonEntity`       | Person node click                                                 | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person                                                                                                                                                                                                                | Same; all declarations for that name are merged into one node                                                | *(no dedicated page)*                                                                          |
-| `ContractEntity`     | Org node click (creates node)                                     | `sutartys JOIN jarCsv` (top 30 contracts by value; buyer/seller names from `jarCsv` JOIN)                                                                                                                                                                                                                                                                    | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte`, `pirkimoNumeris` (may be null) | `/sutartis/{sutartiesUnikalusId}` (primary); `/viesiejiPirkimai/{pirkimoNumeris}` (if present) |
-| `ContractEntity`     | Contract node click (when `pirkimoNumeris` is present)            | `expandContract(pirkimoNumeris)` — fetches full `ProcurementEntity` node (`viesiejiPirkimai WHERE pirkimoId = $1`) + all winner org stubs (`sutartys GROUP BY tiekejoKodas`) + best-effort loser org stubs (`atn1ataskaitos JOIN atn1dalyviai WHERE salis='LT'`, only ~425 procurements covered). Client creates the `ContractLink` edge locally after merge. | Same as above (contract node already in graph)                                                               | *(same, already shown)*                                                                        |
-| `ProcurementEntity`  | Org node click (buyer) / Contract node click (auto-expanded)      | Created when buyer org is expanded: `viesiejiPirkimai WHERE jarKodas = $jarKodas ORDER BY numatomaVerteEUR DESC LIMIT 20`. When reached via contract expansion, already fully populated and auto-expanded by `expandContract`.                                                                                                                                | `pirkimoId` (node ID key), `pavadinimas`, `numatomaVerteEUR`, `statusas`, `pirkimoBudas`                     | `/viesiejiPirkimai/{pirkimoId}`                                                                |
+| Node type            | Expand trigger                                               | Source function / data                                                                                                                                                                                                                                                                                                                                        | Key fields                                                                                                   | Details panel link                                                                             |
+|----------------------|--------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `OrganizationEntity` | Org node click                                               | `jarCsv` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN jarCsv` (partner org names)                                                                                                                                                                                                                                            | `jarKodas`, `pavadinimas`, `formosKodas`                                                                     | `/asmuo/{jarKodas}`                                                                            |
+| `PersonEntity`       | Org node click                                               | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows                                                                                                                                                                                                                         | `vardas + pavarde` (name is the identity key), `rysioPradzia`                                                | *(no dedicated page)*                                                                          |
+| `PersonEntity`       | Person node click                                            | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person                                                                                                                                                                                                                 | Same; all declarations for that name are merged into one node                                                | *(no dedicated page)*                                                                          |
+| `ContractEntity`     | Org node click (creates node)                                | `sutartys JOIN jarCsv` (top 30 contracts by value; buyer/seller names from `jarCsv` JOIN)                                                                                                                                                                                                                                                                     | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte`, `pirkimoNumeris` (may be null) | `/sutartis/{sutartiesUnikalusId}` (primary); `/viesiejiPirkimai/{pirkimoNumeris}` (if present) |
+| `ContractEntity`     | Contract node click (when `pirkimoNumeris` is present)       | `expandContract(pirkimoNumeris)` — fetches full `ProcurementEntity` node (`viesiejiPirkimai WHERE pirkimoId = $1`) + all winner org stubs (`sutartys GROUP BY tiekejoKodas`) + best-effort loser org stubs (`atn1ataskaitos JOIN atn1dalyviai WHERE salis='LT'`, only ~425 procurements covered). Client creates the `ContractLink` edge locally after merge. | Same as above (contract node already in graph)                                                               | *(same, already shown)*                                                                        |
+| `ProcurementEntity`  | Org node click (buyer) / Contract node click (auto-expanded) | Created when buyer org is expanded: `viesiejiPirkimai WHERE jarKodas = $jarKodas ORDER BY numatomaVerteEUR DESC LIMIT 20`. When reached via contract expansion, already fully populated and auto-expanded by `expandContract`.                                                                                                                                | `pirkimoId` (node ID key), `pavadinimas`, `numatomaVerteEUR`, `statusas`, `pirkimoBudas`                     | `/viesiejiPirkimai/{pirkimoId}`                                                                |
 
 > **`ProcurementEntity` is a hub node.** One procurement notice can result in contracts with multiple
 > different winners (32,605 of 37,796 procurements have >1 distinct winner — see `docs/DB_ER.md`).
@@ -87,18 +93,18 @@ determines which graph elements to produce:
 | `KITI_RYSIAI_SU_JA`         | `PersonEntity` + `OrganizationEntity` stub                                     | `Director`/`Shareholder`/`Official` — person → org                     |
 | `SUTUOKTINIO_DARBOVIETE`    | `PersonEntity` (spouse) + `OrganizationEntity` stub + declarant `PersonEntity` | `Employment`/`Director` (spouse → org) + `Spouse` (declarant → spouse) |
 
-| Edge type                               | Direction            | Style             | Source                                                                                                                                                       |
-|-----------------------------------------|----------------------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Employment` / `Director` / `Official`  | Person → Org         | solid             | `pinregJuridiniaiRysiai` rows with `irasoTipas = DEKLARUOJANCIO_DARBOVIETE`                                                                                  |
-| `Employment` / `Director`               | Spouse → Org         | solid             | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE`                                                                                     |
-| `Shareholder` / `Director` / `Official` | Person → Org         | solid             | `pinregJuridiniaiRysiai` rows with `irasoTipas = KITI_RYSIAI_SU_JA`                                                                                          |
-| `Spouse`                                | Person → Person      | solid             | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE` (declarant → spouse)                                                                |
-| `Order`                                 | Org → Contract       | solid, sized      | `sutartys.topPirkejai` → buyer side                                                                                                                          |
-| `Delivery`                              | Contract → Org       | solid, sized      | `sutartys.topTiekejai` → supplier side                                                                                                                       |
-| `Procurement`                           | Org → Procurement    | solid             | `viesiejiPirkimai WHERE jarKodas = $jarKodas` — buyer org issued the tender                                                                                  |
-| `ContractLink`                          | Contract → Procurement | thin, muted     | Created client-side when a contract node is expanded — links the clicked contract to its procurement hub. Color `#94a3b8` (slate). Size 1.                   |
-| `Award`                                 | Procurement → Org    | thin, **green**   | `sutartys WHERE pirkimoNumeris = $pirkimoId GROUP BY tiekejoKodas` — winning seller orgs. Color `#22c55e`. Size 1.                                           |
-| `Bid`                                   | Procurement → Org    | thin, **red**     | `atn1ataskaitos JOIN atn1dalyviai WHERE pirkimoNumeris = $pirkimoId AND salis='LT'` — procurement participants who did not win. Color `#ef4444`. Size 1. Best-effort: only ~425 procurements have ATN1 data. |
+| Edge type                               | Direction              | Style           | Source                                                                                                                                                                                                       |
+|-----------------------------------------|------------------------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Employment` / `Director` / `Official`  | Person → Org           | solid           | `pinregJuridiniaiRysiai` rows with `irasoTipas = DEKLARUOJANCIO_DARBOVIETE`                                                                                                                                  |
+| `Employment` / `Director`               | Spouse → Org           | solid           | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE`                                                                                                                                     |
+| `Shareholder` / `Director` / `Official` | Person → Org           | solid           | `pinregJuridiniaiRysiai` rows with `irasoTipas = KITI_RYSIAI_SU_JA`                                                                                                                                          |
+| `Spouse`                                | Person → Person        | solid           | `pinregJuridiniaiRysiai` rows with `irasoTipas = SUTUOKTINIO_DARBOVIETE` (declarant → spouse)                                                                                                                |
+| `Order`                                 | Org → Contract         | solid, sized    | `sutartys.topPirkejai` → buyer side                                                                                                                                                                          |
+| `Delivery`                              | Contract → Org         | solid, sized    | `sutartys.topTiekejai` → supplier side                                                                                                                                                                       |
+| `Procurement`                           | Org → Procurement      | solid           | `viesiejiPirkimai WHERE jarKodas = $jarKodas` — buyer org issued the tender                                                                                                                                  |
+| `ContractLink`                          | Contract → Procurement | thin, muted     | Created client-side when a contract node is expanded — links the clicked contract to its procurement hub. Color `#94a3b8` (slate). Size 1.                                                                   |
+| `Award`                                 | Procurement → Org      | thin, **green** | `sutartys WHERE pirkimoNumeris = $pirkimoId GROUP BY tiekejoKodas` — winning seller orgs. Color `#22c55e`. Size 1.                                                                                           |
+| `Bid`                                   | Procurement → Org      | thin, **red**   | `atn1ataskaitos JOIN atn1dalyviai WHERE pirkimoNumeris = $pirkimoId AND salis='LT'` — procurement participants who did not win. Color `#ef4444`. Size 1. Best-effort: only ~425 procurements have ATN1 data. |
 
 > **Visual style note — thin edges.** Sigma.js does not natively render dashed or dotted lines.
 > `ContractLink`, `Award`, and `Bid` are visually distinguished from solid `Order`/`Delivery` edges
@@ -220,8 +226,8 @@ New server-side module `modules/rysiai/` containing:
 
 New route `routes/rysiai.js`:
 
-| Method | Path                                  | Purpose                                                                                           |
-|--------|---------------------------------------|---------------------------------------------------------------------------------------------------|
+| Method | Path                             | Purpose                                                                                           |
+|--------|----------------------------------|---------------------------------------------------------------------------------------------------|
 | `GET`  | `/rysiai/`                       | Returns 404 ("įmonė nenurodyta") — no jarKodas was given                                          |
 | `GET`  | `/rysiai/:jarKodas`              | EJS page shell with jarKodas passed as template variable; graph auto-initialises on load          |
 | `GET`  | `/rysiai/expand/:jarKodas`       | JSON: graph nodes+edges for one organisation (calls `expandOrg`)                                  |
@@ -320,23 +326,28 @@ sequenceDiagram
     Browser ->> Browser: Add to graphology Graph
     Browser ->> Browser: Run ForceAtlas2 layout
     Browser ->> Browser: Render with Sigma
-    User ->> Browser: Clicks unexpanded org node
+    User ->> Browser: Clicks any node
+    Browser ->> Browser: Select node → show details panel (Išskleisti/Suskleisti button)
+    User ->> Browser: Double-clicks unexpanded org node
     Browser ->> Browser: Show loading overlay (blocks further clicks)
     Browser ->> Server: GET /rysiai/expand/{jarKodas}
     Server -->> Browser: { nodes[], edges[] } (merged, idempotent)
-    Browser ->> Browser: Merge nodes pre-position new nodes at clicked node pos
+    Browser ->> Browser: Merge nodes, pre-position new nodes at clicked node pos
     Browser ->> Browser: Run ForceAtlas2 → compute final positions
     Browser ->> Browser: animateNodes (600ms, quadraticInOut) clicked pos → final pos
-    Browser ->> Browser: Hide loading overlay
-    User ->> Browser: Clicks unexpanded person node
-    Note over Browser: person node attrs contain vardas + pavarde
-    Browser ->> Browser: Show loading overlay
-    Browser ->> Server: GET /rysiai/expand-person?vardas=Jonas+Jonaitis
-    Server -->> Browser: { nodes[], edges[] }
-    Browser ->> Browser: Merge nodes pre-position new nodes at person node pos
-    Browser ->> Browser: Run ForceAtlas2 + noverlap → compute final positions
-    Browser ->> Browser: animateNodes (600ms, quadraticInOut) → final pos
-    Browser ->> Browser: Hide loading overlay
+    Browser ->> Browser: Hide loading overlay; details panel switches to Suskleisti button
+    User ->> Browser: Double-clicks unexpanded person node
+Note over Browser: person node attrs contain vardas + pavarde
+Browser ->> Browser: Show loading overlay
+Browser ->> Server: GET /rysiai/expand-person?vardas=Jonas+Jonaitis
+Server -->> Browser: { nodes[], edges[] }
+Browser ->> Browser: Merge nodes, pre-position at person node pos
+Browser ->> Browser: Run ForceAtlas2 + noverlap → compute final positions
+Browser ->> Browser: animateNodes (600ms, quadraticInOut) → final pos
+Browser ->> Browser: Hide loading overlay
+User ->> Browser: Clicks "Suskleisti" in details panel
+Browser ->> Browser: Remove expansion edges+orphan nodes from dataGraph
+Browser ->> Browser: Set expanded=false, rebuild viewGraph, refresh
 ```
 
 ---
@@ -390,9 +401,9 @@ graph TD
 
 ### Module responsibilities
 
-| File                             | Layer  | Purpose                                                                                                               | DOM required              |
-|----------------------------------|--------|-----------------------------------------------------------------------------------------------------------------------|---------------------------|
-| `src/rysiai-bundle.js`      | Client | Bundles third-party npm packages; exposes `window.Rysiai`                                                        | No                        |
+| File                        | Layer  | Purpose                                                                                                               | DOM required              |
+|-----------------------------|--------|-----------------------------------------------------------------------------------------------------------------------|---------------------------|
+| `src/rysiai-bundle.js`      | Client | Bundles third-party npm packages; exposes `window.Rysiai`                                                             | No                        |
 | `src/rysiai-app.js`         | Client | esbuild entry; creates `dataGraph` + `viewGraph`; Sigma uses `viewGraph`; wires events                                | Yes                       |
 | `src/rysiai/icons.js`       | Client | MUI SVG path map; `makeIconDataUri`; `getIconKey`                                                                     | No                        |
 | `src/rysiai/colors.js`      | Client | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` Set                                                        | No                        |
@@ -418,9 +429,9 @@ graph TD
 `Gavel` icon path must be added to `MUI_ICON_PATHS` in `src/rysiai/icons.js`, and `getIconKey`
 must return `'Procurement'` for procurement nodes. `EDGE_COLOR` must add entries for:
 
-| Edge type      | Color     | Meaning            |
-|----------------|-----------|--------------------|
-| `Procurement`  | `#8b5cf6` | Org → Procurement  |
+| Edge type      | Color     | Meaning                                    |
+|----------------|-----------|--------------------------------------------|
+| `Procurement`  | `#8b5cf6` | Org → Procurement                          |
 | `ContractLink` | `#94a3b8` | Contract → Procurement (thin, muted slate) |
 | `Award`        | `#22c55e` | Procurement → winner org (green)           |
 | `Bid`          | `#ef4444` | Procurement → loser/participant org (red)  |
@@ -556,7 +567,8 @@ Person nodes keep a fixed `size: 8`. `edgeWeight` is mirrored as a local helper 
 - Risk score colouring of nodes/edges
 - Saving / sharing graph state via URL
 - Toolbar "Balance" button triggering a full ForceAtlas2 pass — v2
-- Dashed/dotted edge rendering (Sigma.js has no built-in dash program; thin colored solid lines are used instead — a custom renderer can be added in a future phase)
+- Dashed/dotted edge rendering (Sigma.js has no built-in dash program; thin colored solid lines are used instead — a
+  custom renderer can be added in a future phase)
 
 ---
 
@@ -569,117 +581,10 @@ Person nodes keep a fixed `size: 8`. `edgeWeight` is mirrored as a local helper 
 
 ---
 
-**Phase 13 — Details panel**
+**Phase 14 — ProcurementEntity graph nodes (server-side)**
 
-When a node is selected a compact details card appears in the **top-right** corner of the graph
-canvas. It shows the 2–3 most useful attributes for the selected entity type and — where a
-dedicated page exists — a prominent "open" link that navigates to that entity's full page.
-
-#### Detail page routes (existing)
-
-| Entity type          | Detail page URL pattern              | Example                                  |
-|----------------------|--------------------------------------|------------------------------------------|
-| `OrganizationEntity` | `/asmuo/{jarKodas}`                  | `/asmuo/171658927`                       |
-| `ContractEntity`     | `/sutartis/{sutartiesUnikalusId}`    | `/sutartis/2008083561`                   |
-|                      | `/viesiejiPirkimai/{pirkimoNumeris}` | `/viesiejiPirkimai/7676505` (if present) |
-| `PersonEntity`       | *(no dedicated page)*                | — show attributes only, no link          |
-
-> The `ContractEntity` node ID has the form `contract:{sutartiesUnikalusId}`. Strip the
-> `contract:` prefix to get the URL segment for `/sutartis/…`.
-
-#### Panel content per entity type
-
-**OrganizationEntity:**
-
-- Title: `pavadinimas`
-- Sub-line: company code `jarKodas`
-- Sub-line: employee count (only if sodra data is present: `draustieji + draustieji2`), e.g. `Darbuotojų: 47`
-- Link (opens new tab): `/asmuo/{jarKodas}` — label `Peržiūrėti įmonę ↗`
-
-**ContractEntity:**
-
-- Title: `pavadinimas` (full contract title — let it wrap)
-- Sub-line: contract value formatted as `€1.2M`, `€450K`, etc. (use `formatContractValue`)
-- Link (opens new tab): `/sutartis/{sutartiesUnikalusId}` — label `Peržiūrėti sutartį ↗`
-- Link (opens new tab, **only when `pirkimoNumeris` is not null**): `/viesiejiPirkimai/{pirkimoNumeris}` — label
-  `Peržiūrėti pirkimą ↗`
-
-**ProcurementEntity:**
-
-- Title: `pavadinimas` (let it wrap)
-- Sub-line: estimated value formatted as `€1.2M`, `€450K`, etc. (use `formatContractValue`)
-- Sub-line: `statusas` (e.g. "Nustatytas laimėtojas", "Baigtas")
-- Link (opens new tab): `/viesiejiPirkimai/{pirkimoId}` — label `Peržiūrėti pirkimą ↗`
-
-**PersonEntity:**
-
-- Title: `vardas + " " + pavarde`
-- No detail page link (no dedicated person page exists in viespirkiai)
-
-#### UI/UX requirements
-
-- Panel is **hidden** by default (HTML `hidden` attribute).
-- Panel appears when a node is **selected** (same click that sets `selected: true`).
-- Panel is **cleared and hidden** when selection is dismissed (`deselectAll`).
-- Panel is positioned **top-right** of the graph canvas using `position: absolute; top: 12px; right: 12px`.
-- Styled as a white card with subtle shadow and `max-width: 240px`.
-- The "open" link opens in a **new tab** (`target="_blank" rel="noopener"`).
-- Panel must not overlap the legend (legend is on the left side).
-
-#### Architecture
-
-New client-side module **`src/rysiai/details-panel.js`** with two exported functions:
-
-```js
-export function showNodeDetails(nodeId, attrs) { …
-}
-
-export function hideDetails() { …
-}
-```
-
-`showNodeDetails` builds inner HTML conditionally on `attrs.entityType` and sets `hidden = false`.
-`hideDetails` sets `hidden = true`. Both are imported in `expand-ui.js` and called from `selectNode`
-and `deselectAll`.
-
-`formatContractValue` is server-side only (`modules/rysiai/expand.js`). Duplicate the same pure
-function locally in `details-panel.js` (< 5 lines, no import needed).
-
-#### Tasks
-
-- [x] **`modules/rysiai/expand.js`**: add `s."pirkimoNumeris"` to both `asBuyerRes` and
-  `asSellerRes` SQL queries; pass `pirkimoNumeris: row.pirkimoNumeris || null` into `contractNode`;
-  update `contractNode` factory to store `pirkimoNumeris` in attributes.
-
-- [x] **`views/rysiai/index.ejs`**: add `<div id="rysiai-details" hidden></div>` inside
-  `#rysiai-wrapper` (after `#rysiai-legend`); add CSS: absolute top-right card, white
-  background, shadow, `max-width: 240px`, padding 10px, `font-size: 0.85rem`, border-radius, `z-index: 20`.
-
-- [x] **`src/rysiai/details-panel.js`** (new): implement `showNodeDetails(nodeId, attrs)` and
-  `hideDetails()`; local `formatContractValue(verte)` helper; entity-specific HTML per
-  `attrs.entityType`; `pirkimoNumeris` link only when non-null.
-
-- [x] **`src/rysiai/expand-ui.js`**: import `showNodeDetails`, `hideDetails`; call
-  `showNodeDetails(id, viewGraph.getNodeAttributes(id))` in `selectNode`; call `hideDetails()` in
-  `deselectAll`.
-
-- [x] **Build** with `npm run build` — clean; all tests passing.
-
-- [ ] **Browser smoke-test**:
-    - Select an org node → panel shows name, jarKodas, optional employee count, link to `/asmuo/…`
-    - Select a contract node → panel shows title, value, link to `/sutartis/…`; second link when `pirkimoNumeris`
-      present
-    - Select a person node → panel shows full name, no link
-    - Select a procurement node → panel shows title, estimated value, statusas, link to `/viesiejiPirkimai/…`
-    - Deselect (click canvas) → panel disappears
-
----
-
-**Phase 14 — ProcurementEntity graph nodes**
-
-Add `ProcurementEntity` as a first-class node type. When an org is expanded as a **buyer**, up to 20
-of its highest-value procurement notices appear as purple hub nodes connected by `Procurement` edges.
-Clicking a procurement node expands it to reveal winning seller orgs via `Award` edges.
+Add `ProcurementEntity` as a first-class node type on the server. The client-side infrastructure
+(colors, icons, entity-types, expand-ui, legend rows, details panel) is already implemented.
 
 #### Data model
 
@@ -713,119 +618,138 @@ formatted total `verte` sum for that seller.
       `SELECT DISTINCT s.tiekejoKodas, j.pavadinimas, SUM(s.verte) as totalVerte FROM sutartys s LEFT JOIN jarCsv j ON j.jarKodas::text = s.tiekejoKodas WHERE s.pirkimoNumeris = $1 GROUP BY s.tiekejoKodas, j.pavadinimas`;
       return org stub nodes + `Award` edges.
 
-- [x] **`src/rysiai/entity-types.js`**: `Procurement: 'ProcurementEntity'` constant already added. Still needed: add `isProcurementNode(attrs)` predicate and export it.
-
-- [x] **`src/rysiai/colors.js`**: add `procurement: '#8b5cf6'` to `NODE_COLOR`; add `Procurement: '#8b5cf6'`, `ContractLink: '#94a3b8'`, `Award: '#22c55e'`, `Bid: '#ef4444'` to `EDGE_COLOR`; update `nodeColor()`.
-
-- [x] **`src/rysiai/icons.js`**: add MUI `Gavel` icon path to `MUI_ICON_PATHS`; update `getIconKey` to return
-  `'Procurement'` for procurement nodes.
-
-- [x] **`routes/rysiai.js`**: add `GET /rysiai/expand-procurement/:id` route (before `/:jarKodas`); calls
-  `expandProcurement(req.params.id)`; returns JSON.
-
-- [x] **`src/rysiai/expand-ui.js`**: handle procurement node click — fetch
-  `/rysiai/expand-procurement/{pirkimoId}`, merge, mark `expanded: true`; same in-flight deduplication as
-  org/person.
-
-- [x] **`views/rysiai/index.ejs`**: add `Procurement` and `Award` and `Bid` and `ContractLink` legend rows.
-
-- [x] **`src/rysiai/details-panel.js`**: `ProcurementEntity` branch already implemented in Phase 13.
-
-- [x] **Tests** (`test/rysiai/expand.test.js`): add tests for `procurementNode`, `expandProcurement`, `Procurement`
-  edge structure.
-
-- [x] **Build** with `npm run build` — clean; all tests passing.
-
 - [ ] **Browser smoke-test**:
-    - Expand a buyer org → purple procurement nodes appear
-    - Click a procurement node → winner seller org stubs appear via green `Award` edges
-    - Select a procurement node → details panel shows title, estimated value, statusas, link
+    - Double-click a buyer org → purple procurement nodes appear
+    - Double-click a procurement node → winner seller org stubs appear via green `Award` edges
+    - Select a procurement node → details panel shows title, estimated value, statusas, link, and Išskleisti/Suskleisti
+      button
 
 ---
 
-**Phase 15 — Contract node expansion → procurement hub with winners and losers**
+**Phase 16 — Double-click to expand / details panel expand-collapse button**
 
-Clicking a `ContractEntity` node that has a `pirkimoNumeris` triggers a single fetch that returns the
-full procurement hub node, all winner org stubs (via `sutartys`), and best-effort loser org stubs
-(via `atn1dalyviai`, ~425 procurements). The procurement node is immediately rendered as already
-expanded. A thin `ContractLink` edge is created client-side connecting the clicked contract to its
-procurement hub. Winner orgs connect via green `Award` edges; loser orgs via red `Bid` edges.
+Replaces single-click expansion with double-click. Adds an expand/collapse button to the details
+panel as a secondary interaction path.
 
-Requires Phase 14 to be complete (ProcurementEntity infrastructure, edge colors, legend rows).
+#### Interaction model
 
-#### Data flow
+| Event            | Source                        | Behaviour                                                                                |
+|------------------|-------------------------------|------------------------------------------------------------------------------------------|
+| `clickNode`      | Sigma — canvas node click     | Select the node (show details panel). If already selected, **no-op** — do not deselect. |
+| `doubleClickNode`| Sigma — canvas node dblclick  | Expand the node.                                                                         |
+| `clickExpand`    | Details panel "Išskleisti" btn| Expand the currently selected node. Node remains selected.                               |
+| `clickCollapse`  | Details panel "Suskleisti" btn| Collapse the currently selected node. Node remains selected; panel updates.              |
+| `clickStage`     | Sigma — canvas background click | Deselect (unchanged).                                                                  |
 
-```
-ContractEntity (pirkimoNumeris = "123456")
-   │  [user clicks]
-   ▼
-GET /rysiai/expand-contract/123456
-   ▼
-Server: expandContract("123456")
-   ├── viesiejiPirkimai WHERE pirkimoId = '123456'   → ProcurementEntity node (expanded: true)
-   ├── sutartys GROUP BY tiekejoKodas                → winner OrgEntity stubs + Award edges
-   └── atn1ataskaitos JOIN atn1dalyviai WHERE salis='LT'  → loser OrgEntity stubs + Bid edges (best-effort)
-   ▼
-Client merges response into dataGraph
-Client creates ContractLink edge: contract:{sutartiesUnikalusId} → procurement:{pirkimoId}
-Client marks contract node expanded: true
-```
+> **Why no-op on re-click**: Sigma fires `clickNode` twice before `doubleClickNode`. If the second
+> `clickNode` deselected the node, the user would see a flicker (select → deselect → expand). Making
+> re-click a no-op avoids this: both clicks select/keep the node selected, then `doubleClickNode`
+> expands it.
 
-#### ContractLink edge (client-created)
+#### Details panel expand/collapse button
 
-The server cannot create the `ContractLink` edge because multiple contracts may share the same
-`pirkimoNumeris`. The click handler knows which `contract:{sutartiesUnikalusId}` was clicked and
-creates the edge locally:
+At the bottom of the `#rysiai-details` panel, a single button is rendered based on node state:
+
+| Node state                                                              | Button label     | Button icon                               | Action             |
+|-------------------------------------------------------------------------|------------------|-------------------------------------------|--------------------|
+| expandable, not yet expanded                                            | **"Išskleisti"** | Hub (MUI `@mui/icons-material/Hub`)       | triggers expansion |
+| already expanded                                                        | **"Suskleisti"** | Adjust (MUI `@mui/icons-material/Adjust`) | triggers collapse  |
+| not expandable (e.g. `PersonEntity`, contract without `pirkimoNumeris`) | *(no button)*    | —                                         | —                  |
+
+A node is expandable when any of the following is true:
+
+- `isOrgNode(attrs) && attrs.jarKodas`
+- `isPersonNode(attrs) && attrs.vardas && attrs.pavarde`
+- `isProcurementNode(attrs) && attrs.pirkimoId`
+- `isContractNode(attrs) && attrs.pirkimoNumeris`
+
+Icons are rendered as **inline SVG** using the MUI path data already stored in `MUI_ICON_PATHS` in
+`src/rysiai/icons.js`. Add `Hub` and `Adjust` path keys there; render them via a small `svgIcon(key)`
+helper in `details-panel.js` that wraps the path in a `<svg viewBox="0 0 24 24" width="16" height="16">` element.
+
+#### `showNodeDetails` signature change
 
 ```js
-const pirkimoId = attrs.pirkimoNumeris;
-// after merge:
-dataGraph.mergeEdgeWithKey(
-  `edge:contract:${sutartiesUnikalusId}:procurement:${pirkimoId}:ContractLink`,
-  `contract:${sutartiesUnikalusId}`,
-  `procurement:${pirkimoId}`,
-  { type: 'ContractLink', label: '', size: 1 }
-);
+// was: showNodeDetails(nodeId, attrs)
+// now:
+export function showNodeDetails(nodeId, attrs, handlers = {}) { …
+}
+
+// handlers: { onExpand?: () => void, onCollapse?: () => void }
 ```
 
-#### Contract `expanded` flag behaviour
+`buildHtml` appends the button only when a handler is provided. After setting `innerHTML`, attach
+a one-time click listener on the panel element via `addEventListener` with `{ once: true }`.
 
-| `pirkimoNumeris` | Initial `expanded` | Clickable |
-|------------------|--------------------|-----------|
-| non-null         | `false`            | Yes — triggers `expandContract` |
-| null             | `true`             | No — anchor state, no expansion |
+In `expand-ui.js`, `selectNode` computes the handlers and passes them:
 
-`contractNode()` in `expand.js` must set `expanded: false` when `pirkimoNumeris` is present.
+```js
+function selectNode(id) {
+…
+    const attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
+    const handlers = {};
+    if (attrs.expanded) {
+        handlers.onCollapse = () => collapseNode(id);
+    } else if (isExpandableNode(attrs)) {
+        handlers.onExpand = () => _triggerExpand(id, attrs);
+    }
+    showNodeDetails(id, attrs, handlers);
+}
+```
+
+#### Collapse algorithm (`collapseNode`)
+
+1. Collect all edge IDs in `dataGraph` where `source === nodeId || target === nodeId`.
+2. Remove those edges from `dataGraph` (drops all edges created during this node's expansion).
+3. Collect all nodes in `dataGraph` that now have `degree === 0` **and** are not themselves
+   expanded (`attrs.expanded !== true`) **and** are not `nodeId` itself.
+4. Drop those zero-degree nodes from `dataGraph`.
+5. Set `expanded: false` on `nodeId` in both graphs.
+6. Run `rebuildAndRefresh()` — orphaned nodes are pruned from `viewGraph` since `nodeId` is no
+   longer an anchor.
+7. Update the details panel: re-call `showNodeDetails` for the now-collapsed node with an
+   `onExpand` handler (so the button switches from Suskleisti to Išskleisti).
+
+> **Caution**: step 2 removes edges that connect `nodeId` to nodes that were in the graph *before*
+> this expansion (e.g. if nodeId was also reached via another path). Those nodes keep their own edges
+> and remain visible. Only truly orphaned nodes (degree 0 after edge removal) are pruned.
 
 #### Tasks
 
-- [x] **`modules/rysiai/expand.js`**:
-    - Change `contractNode()`: set `expanded: false` when `pirkimoNumeris` is non-null (currently always `true`).
-    - Add `expandContract(pirkimoNumeris)`:
-      1. Query `viesiejiPirkimai WHERE pirkimoId = $1` — build `procurementNode(row)` with `expanded: true`.
-      2. Query `SELECT DISTINCT s."tiekejoKodas", j.pavadinimas, j."formosKodas", SUM(s.verte) AS "totalVerte" FROM sutartys s LEFT JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas" WHERE s."pirkimoNumeris" = $1 GROUP BY s."tiekejoKodas", j.pavadinimas, j."formosKodas"` — emit winner org stubs + `Award` edges.
-      3. Query `SELECT d.kodas, d.pavadinimas FROM atn1ataskaitos a JOIN atn1dalyviai d ON d."ataskaitaId" = a.id WHERE a."pirkimoNumeris" = $1 AND d.salis = 'LT'` — emit loser org stubs + `Bid` edges (only for orgs not already a winner). Skip entirely if no ATN1 rows found.
-      4. Return `{ nodes, edges }`. No `ContractLink` edge — that is created client-side.
+- [ ] **`src/rysiai/icons.js`**: add `Hub` and `Adjust` MUI SVG path strings to `MUI_ICON_PATHS`.
 
-- [x] **`routes/rysiai.js`**: add `GET /rysiai/expand-contract/:pirkimoNumeris` route (before `/:jarKodas`); calls `expandContract(req.params.pirkimoNumeris)`; returns JSON.
+- [ ] **`src/rysiai/details-panel.js`**:
+    - Add `svgIcon(key)` helper — returns inline SVG HTML using path from `MUI_ICON_PATHS`.
+    - Change `showNodeDetails(nodeId, attrs, handlers = {})` — accept optional `handlers`.
+    - In `buildHtml(attrs, handlers)`: append at the bottom an Išskleisti or Suskleisti button
+      based on `handlers.onExpand` / `handlers.onCollapse`. Style: `class="vd-btn"`, flex row,
+      gap, icon + label.
+    - After `el.innerHTML = html`, attach `{ once: true }` click listener: if clicked element
+      matches `[data-action=expand]`, call `handlers.onExpand()`; if `[data-action=collapse]`,
+      call `handlers.onCollapse()`.
+    - Add button CSS to `views/rysiai/index.ejs`: `.vd-btn` — full-width, small padding,
+      border, rounded, cursor pointer, flex, align-items center, gap 6px; hover state.
 
-- [x] **`src/rysiai/expand-ui.js`**:
-    - Handle `ContractEntity` node click: check `attrs.pirkimoNumeris`. If null, mark expanded for visual ring only.
-    - If non-null: fetch `/rysiai/expand-contract/{pirkimoNumeris}`, merge, then client-creates the `ContractLink` edge (see above), then marks the contract node `expanded: true`.
-    - After merge, explicitly set `expanded: true` on the returned `ProcurementEntity` node if it already exists in the graph (from Phase 14 org expansion).
-    - Same in-flight deduplication as org/person: key on `contract:{sutartiesUnikalusId}`.
-    - Added `console.log` debug trace on every node click.
-    - Fixed `renderers.js`: removed `!isContractNode(data)` exclusion so contracts show dotted ring when expanded.
-
-- [x] **Tests** (`test/rysiai/expand.test.js`):
-    - `contractNode` with `pirkimoNumeris` present → `expanded: false`.
-
-- [x] **Build** with `npm run build` — clean; all tests passing.
+- [ ] **`src/rysiai/expand-ui.js`**:
+    - Move all expansion logic from `clickNode` handler to a new `doubleClickNode` handler
+      (`renderer.on('doubleClickNode', ...)`). The `doubleClickNode` handler is the same as the
+      current `clickNode` expansion block (EXPAND_KINDS lookup + contract special case).
+    - Change `clickNode` handler: call `selectNode(nodeId)` only; remove the deselect-on-re-click
+      branch (re-clicking an already-selected node is a no-op — `clickStage` is the only deselect).
+    - Add `isExpandableNode(attrs)` predicate (local helper, not exported).
+    - Add `_triggerExpand(nodeId, attrs)` — the expansion dispatch used by both `doubleClickNode`
+      and the panel button; contains the current EXPAND_KINDS + contract dispatch logic.
+    - Add `collapseNode(nodeId)` — implements the collapse algorithm above.
+    - Update `selectNode` to pass `handlers` to `showNodeDetails` (see signature above).
+    - After `collapseNode`, re-call `showNodeDetails` for the collapsed node with updated handlers.
 
 - [ ] **Browser smoke-test**:
-    - Click a contract node that has `pirkimoNumeris` → procurement hub appears connected by a thin slate `ContractLink`, winner orgs via green lines, loser orgs via red lines (red only when ATN1 data exists)
-    - Click a contract node without `pirkimoNumeris` → dotted ring appears, no network call
-    - If procurement node was already in graph (from org expansion), it should become expanded and show winners/losers without duplication
+    - Single-click a node → selects, shows details panel; double-clicking re-click does not deselect
+    - Double-click an unexpanded org → expands, details panel switches to Suskleisti button
+    - Click Išskleisti in panel → same expansion as double-click
+    - Click Suskleisti in panel → expansion nodes disappear, button reverts to Išskleisti
+    - Single-click canvas → deselects, panel hides
+    - Single-click already-selected node → no-op (panel stays open)
 
 ---
 
