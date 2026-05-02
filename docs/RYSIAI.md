@@ -785,3 +785,22 @@ function selectNode(id) {
 
 3. **Header nav link for `/rysiai`**: Keep pointing to `/rysiai/` — shows 404 "įmonė nenurodyta"
    when clicked directly. This is intentional. ✓ Resolved.
+
+# Node Details Panel
+
+When node is selected, right side panel is displayed. Currently, we have two panels: `rysiai-details` and
+`rysiai-legend` - we need to have one unified panel: `node-details` that will be used for both purposes. You can still
+keep `rysiai-details` and `rysiai-legend` as a subcomponents inside `node-details`.
+
+`node-details` properties:
+
+- [ ] Min width is 200 px, and max width is 240 px.
+
+`node-details` features:
+
+- [ ] When panel is open, at the top right show as it is right now in `rysiai-details`
+- [ ] After `rysiai-details` part, show a button "Išskleisti" when not expanded, and "Suskleisti" when expanded.
+- [ ] When node is not expanded, do not show `rysiai-legend`, because for not expanded node, legend is not relevant.
+  Collapse legend, when node is set to "Suskleisti".
+- [ ] As before, right panel `node-details` is shown for each selected node.
+- [ ] When user double-clicks the node, `node-details` is shown as a fully expanded with legend.

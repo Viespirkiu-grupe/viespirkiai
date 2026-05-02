@@ -40,6 +40,12 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
 
     (data.nodes || []).forEach((n) => {
         if (graph.hasNode(n.id)) {
+            // Track new owner on an already-existing node (diamond dependency support)
+            if (fromNodeId) {
+                const owners = graph.getNodeAttribute(n.id, 'expandedBy') || new Set();
+                owners.add(fromNodeId);
+                graph.setNodeAttribute(n.id, 'expandedBy', owners);
+            }
             // Enrich existing org node with sodra fields when we have them for the first time
             if (isOrgNode(n.attributes) && n.attributes.draustieji !== undefined) {
                 const existing = graph.getNodeAttributes(n.id);
@@ -77,6 +83,8 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
             size: computeNodeSize(n.attributes),
             color: nodeColor(n.attributes),
             label: n.attributes.label || n.id,
+            expandedBy: fromNodeId ? new Set([fromNodeId]) : new Set(),
+            isRoot: !fromNodeId,
         });
         if (imgUri) nodeAttrs.image = imgUri;
 
@@ -85,13 +93,22 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
     });
 
     (data.edges || []).forEach((e) => {
-        if (graph.hasEdge(e.id)) return;
+        if (graph.hasEdge(e.id)) {
+            // Track new owner on an already-existing edge
+            if (fromNodeId) {
+                const owners = graph.getEdgeAttribute(e.id, 'expandedBy') || new Set();
+                owners.add(fromNodeId);
+                graph.setEdgeAttribute(e.id, 'expandedBy', owners);
+            }
+            return;
+        }
         if (!graph.hasNode(e.source) || !graph.hasNode(e.target)) return;
 
         const attrs = Object.assign({}, e.attributes || {});
         // Rename semantic 'type' → 'edgeType' so Sigma doesn't treat it as a renderer program key.
         if (attrs.type) { attrs.edgeType = attrs.type; delete attrs.type; }
         attrs.color = EDGE_COLOR[attrs.edgeType] || '#d1d5db';
+        attrs.expandedBy = fromNodeId ? new Set([fromNodeId]) : new Set();
         graph.addEdgeWithKey(e.id, e.source, e.target, attrs);
     });
 
@@ -182,6 +199,11 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
             }
         }
     });
+
+    // Remove edges from viewGraph that were pruned from dataGraph (e.g. after a collapse)
+    const staleEdges = [];
+    viewGraph.forEachEdge((edgeId) => { if (!dataGraph.hasEdge(edgeId)) staleEdges.push(edgeId); });
+    staleEdges.forEach((id) => { viewGraph.dropEdge(id); });
 
     // Remove hidden-type edges from viewGraph (bridge edges are exempt)
     const edgesToRemove = [];
