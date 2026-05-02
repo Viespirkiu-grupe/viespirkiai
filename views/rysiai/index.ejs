@@ -53,26 +53,7 @@
       color: var(--color-muted, #6b7280);
       pointer-events: none;
     }
-    #rysiai-legend {
-      position: absolute;
-      bottom: 12px;
-      right: 12px;
-      background: rgba(255,255,255,0.92);
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-size: 0.75rem;
-      color: #374151;
-      line-height: 1.6;
-      user-select: none;
-      min-width: 200px;
-    }
-    .dark #rysiai-legend {
-      background: rgba(30,41,59,0.92);
-      border-color: #374151;
-      color: #d1d5db;
-    }
-    #rysiai-details {
+    #node-details {
       position: absolute;
       top: 12px;
       right: 12px;
@@ -80,18 +61,32 @@
       border: 1px solid #e5e7eb;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-      padding: 10px 14px;
-      max-width: 240px;
       min-width: 200px;
+      max-width: 240px;
       font-size: 0.85rem;
       color: #374151;
       z-index: 20;
-      line-height: 1.5;
       overflow-wrap: break-word;
     }
-    .dark #rysiai-details {
+    .dark #node-details {
       background: #1e293b;
       border-color: #374151;
+      color: #d1d5db;
+    }
+    #rysiai-details {
+      padding: 10px 14px;
+      line-height: 1.5;
+    }
+    #rysiai-legend {
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      line-height: 1.6;
+      user-select: none;
+      border-top: 1px solid #e5e7eb;
+      margin-top: 8px;
+    }
+    .dark #rysiai-legend {
+      border-top-color: #374151;
       color: #d1d5db;
     }
     #rysiai-details .vd-title {
@@ -171,10 +166,9 @@
       <div id="rysiai-loading" hidden>
         <div class="vl-spinner"></div>
       </div>
-      <div id="rysiai-details" hidden></div>
-    </div>
-    <div id="rysiai-status"></div>
-      <div id="rysiai-legend" hidden>
+      <div id="node-details" hidden>
+        <div id="rysiai-details"></div>
+        <div id="rysiai-legend" hidden>
       <div id="rysiai-legend-title" style="font-weight:600;text-align:center;margin-bottom:6px;">Filtrai</div>
       <label><input type="checkbox" data-edge-types="Director" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#1d4ed8" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#1d4ed8"/></svg>Direktorius / vadovas</label>
       <label><input type="checkbox" data-edge-types="Shareholder" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#7c3aed" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#7c3aed"/></svg>Akcininkas</label>
@@ -188,7 +182,10 @@
       <label><input type="checkbox" data-edge-types="Award" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#22c55e" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#22c55e"/></svg>Pirkimo laimėtojas</label>
       <label><input type="checkbox" data-edge-types="Bid" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#ef4444" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#ef4444"/></svg>Pirkimo dalyvis</label>
       <label><input type="checkbox" data-edge-types="ContractLink" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#94a3b8"/></svg>Sutartis → pirkimas</label>
+        </div>
+      </div>
     </div>
+    <div id="rysiai-status"></div>
   </div>
 
   <script src="/dist/rysiai.js"></script>

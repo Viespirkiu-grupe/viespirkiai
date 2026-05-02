@@ -1,15 +1,17 @@
 /**
- * Updates the legend title and syncs checkbox state for the selected node (or global state).
+ * Updates the legend visibility and checkbox state for the selected node.
+ * Legend is only shown when nodeId is non-null AND expanded is true.
  *
- * @param {string|null}   nodeId      - selected node's ID, or null to show global state
- * @param {string|null}   label       - selected node's display label, or null for 'Filtrai'
+ * @param {string|null}   nodeId      - selected node's ID, or null to hide legend
+ * @param {string|null}   label       - selected node's display label
  * @param {LegendState}   legendState - the LegendState instance
+ * @param {boolean}       [expanded]  - whether the selected node is expanded; legend hidden when false
  */
-export function updateLegendForNode(nodeId, label, legendState) {
+export function updateLegendForNode(nodeId, label, legendState, expanded) {
     const legendEl = document.getElementById('rysiai-legend');
     const titleEl = document.getElementById('rysiai-legend-title');
 
-    if (nodeId == null) {
+    if (nodeId == null || !expanded) {
         if (legendEl) legendEl.hidden = true;
         return;
     }
@@ -19,11 +21,7 @@ export function updateLegendForNode(nodeId, label, legendState) {
 
     document.querySelectorAll('#rysiai-legend input[type=checkbox][data-edge-types]').forEach((cb) => {
         const types = cb.dataset.edgeTypes.split(',');
-        if (nodeId != null) {
-            cb.checked = types.every((t) => legendState.isTypeVisible(nodeId, t.trim()));
-        } else {
-            cb.checked = types.every((t) => legendState.isGlobalTypeVisible(t.trim()));
-        }
+        cb.checked = types.every((t) => legendState.isTypeVisible(nodeId, t.trim()));
     });
 }
 

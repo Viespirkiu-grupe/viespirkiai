@@ -749,7 +749,7 @@ After `collapseNode`, the legend is hidden. Double-clicking an unexpanded node f
 
 #### Tasks
 
-- [ ] **`views/rysiai/index.ejs`**:
+- [x] **`views/rysiai/index.ejs`**:
     - Add `#node-details` wrapper div: `position: absolute; top: 12px; right: 12px; min-width: 200px; max-width: 240px`
       with same background, border, border-radius, box-shadow, font-size, color, z-index, and overflow-wrap as the
       current `#rysiai-details`. Start `hidden`.
@@ -761,18 +761,18 @@ After `collapseNode`, the legend is hidden. Double-clicking an unexpanded node f
     - Dark mode border separator: `.dark #rysiai-legend { border-top-color: #374151; }`.
     - Keep all existing child styles: `.vd-title`, `.vd-sub`, `.vd-link`, `.vd-btn`, `.vl-swatch`, legend label/checkbox.
 
-- [ ] **`src/rysiai/details-panel.js`**:
+- [x] **`src/rysiai/details-panel.js`**:
     - Add `getNodeDetailsWrapper()` helper: `document.getElementById('node-details')`.
     - In `showNodeDetails`: after resolving `html`, show the wrapper (`wrapper.hidden = false`) and set `el.hidden = false`.
     - In `hideDetails`: hide the wrapper (`wrapper.hidden = true`) instead of (or in addition to) `el.hidden = true`.
 
-- [ ] **`src/rysiai/legend.js`**:
+- [x] **`src/rysiai/legend.js`**:
     - Update `updateLegendForNode(nodeId, label, legendState, expanded)` — add 4th parameter `expanded`.
     - When `nodeId != null && expanded === true`: show `#rysiai-legend`, sync checkboxes (existing logic unchanged).
     - When `nodeId != null && !expanded`: hide `#rysiai-legend` only (do not affect `#node-details` wrapper — it stays visible via `showNodeDetails`).
     - When `nodeId == null`: hide `#rysiai-legend` (redundant since wrapper hides, but explicit).
 
-- [ ] **`src/rysiai/expand-ui.js`**:
+- [x] **`src/rysiai/expand-ui.js`**:
     - In `selectNode`: pass `attrs.expanded` as 4th arg to `updateLegendForNode(id, label, legendState, attrs.expanded)`.
     - In `refreshSelectedNodePanel` (called after `_expand` completes): after `showNodeDetails`, also call
       `updateLegendForNode(selectedNodeId, label, legendState, true)` — node is now expanded, legend should show.
@@ -780,7 +780,7 @@ After `collapseNode`, the legend is hidden. Double-clicking an unexpanded node f
       `updateLegendForNode(nodeId, label, legendState, false)` to hide legend; existing `showNodeDetails` call is sufficient for panel content.
     - `deselectAll` and the disappeared-node branch in `collapseNode` already call `updateLegendForNode(null, null, legendState)` — pass `false` or omit 4th arg (null nodeId hides legend unconditionally).
 
-- [ ] **Browser smoke-test**:
+- [ ] **Browser smoke-test** (manual verification required):
     - Single-click unexpanded node → `#node-details` shows with details only; `#rysiai-legend` hidden
     - Click "Išskleisti" → node expands; `#rysiai-legend` appears inside `#node-details`
     - Click "Suskleisti" → legend disappears; button reverts to "Išskleisti"

@@ -4,10 +4,16 @@ import { svgIcon } from './icons.js';
 // ── Details panel ─────────────────────────────────────────────────────────────
 
 let panelEl = null;
+let wrapperEl = null;
 
 function getPanel() {
     if (!panelEl) panelEl = document.getElementById('rysiai-details');
     return panelEl;
+}
+
+function getWrapper() {
+    if (!wrapperEl) wrapperEl = document.getElementById('node-details');
+    return wrapperEl;
 }
 
 /**
@@ -85,12 +91,13 @@ function buildHtml(attrs, handlers = {}) {
  */
 export function showNodeDetails(nodeId, attrs, handlers = {}) {
     const el = getPanel();
+    const wrapper = getWrapper();
     if (!el) return;
     const html = buildHtml(attrs, handlers);
-    if (!html) { el.hidden = true; return; }
+    if (!html) { if (wrapper) wrapper.hidden = true; return; }
     el.innerHTML = html;
-    el.hidden = false;
-    
+    if (wrapper) wrapper.hidden = false;
+
     // Bind button event listener
     const btn = el.querySelector('[data-action]');
     if (btn) {
@@ -102,9 +109,9 @@ export function showNodeDetails(nodeId, attrs, handlers = {}) {
 }
 
 /**
- * Hides the details panel.
+ * Hides the details panel wrapper (collapses the entire node-details panel including legend).
  */
 export function hideDetails() {
-    const el = getPanel();
-    if (el) el.hidden = true;
+    const wrapper = getWrapper();
+    if (wrapper) wrapper.hidden = true;
 }
