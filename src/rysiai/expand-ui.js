@@ -19,7 +19,7 @@ import { showNodeDetails, hideDetails } from './details-panel.js';
  *   animateNodes: Function,
  *   legendState:  LegendState,
  * }} deps
- * @returns {{ loadOrg, loadPerson, rebuildAndRefresh, getSelectedNodeId }}
+ * @returns {{ loadOrg, rebuildAndRefresh, getSelectedNodeId, selectNode }}
  */
 export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState }) {
     const expandingNodes = new Set();
@@ -34,34 +34,26 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         return viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : null;
     }
 
-    function _clearSelectionAttrs(id) {
+    function setSelection(id, on) {
         if (dataGraph.hasNode(id)) {
-            dataGraph.setNodeAttribute(id, 'highlighted', false);
-            dataGraph.setNodeAttribute(id, 'selected', false);
+            dataGraph.setNodeAttribute(id, 'highlighted', on);
+            dataGraph.setNodeAttribute(id, 'selected', on);
         }
         if (viewGraph.hasNode(id)) {
-            viewGraph.setNodeAttribute(id, 'highlighted', false);
-            viewGraph.setNodeAttribute(id, 'selected', false);
+            viewGraph.setNodeAttribute(id, 'highlighted', on);
+            viewGraph.setNodeAttribute(id, 'selected', on);
         }
     }
 
-    function _setSelectionAttrs(id) {
-        if (dataGraph.hasNode(id)) {
-            dataGraph.setNodeAttribute(id, 'highlighted', true);
-            dataGraph.setNodeAttribute(id, 'selected', true);
-        }
-        if (viewGraph.hasNode(id)) {
-            viewGraph.setNodeAttribute(id, 'highlighted', true);
-            viewGraph.setNodeAttribute(id, 'selected', true);
-        }
+    function markExpanded(id) {
+        if (dataGraph.hasNode(id)) dataGraph.setNodeAttribute(id, 'expanded', true);
+        if (viewGraph.hasNode(id)) viewGraph.setNodeAttribute(id, 'expanded', true);
     }
 
     function selectNode(id) {
-        if (selectedNodeId && selectedNodeId !== id) {
-            _clearSelectionAttrs(selectedNodeId);
-        }
+        if (selectedNodeId && selectedNodeId !== id) setSelection(selectedNodeId, false);
         selectedNodeId = id;
-        _setSelectionAttrs(id);
+        setSelection(id, true);
 
         const attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
         if (isConfigurableNode(attrs)) {
@@ -74,7 +66,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     function deselectAll() {
         if (selectedNodeId) {
-            _clearSelectionAttrs(selectedNodeId);
+            setSelection(selectedNodeId, false);
             selectedNodeId = null;
         }
         updateLegendForNode(null, null, legendState);
@@ -91,7 +83,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
         runLayout(viewGraph, forceAtlas2, noverlap);
         syncPositionsToData(dataGraph, viewGraph);
-        if (selectedNodeId) _setSelectionAttrs(selectedNodeId);
+        if (selectedNodeId) setSelection(selectedNodeId, true);
         renderer.refresh();
     }
 
@@ -114,7 +106,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
             // Re-apply selection attrs after rebuild (node may have been re-added)
             if (selectedNodeId && viewGraph.hasNode(selectedNodeId)) {
-                _setSelectionAttrs(selectedNodeId);
+                setSelection(selectedNodeId, true);
             }
 
             if (startPos && newNodeIds.length > 0) {
@@ -151,32 +143,36 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         }
     }
 
+    // Config-driven expand kinds for org / person / procurement.
+    // Each entry: test(attrs) → should this kind handle the node?
+    //             id(attrs)   → the expand-target node ID
+    //             url(attrs)  → the fetch URL
+    // Adding a new expandable entity type = one new entry here.
+    const EXPAND_KINDS = [
+        {
+            test: (a) => isOrgNode(a) && a.jarKodas,
+            id:   (a) => 'org:' + a.jarKodas,
+            url:  (a) => '/rysiai/expand/' + encodeURIComponent(a.jarKodas),
+        },
+        {
+            test: (a) => isPersonNode(a) && a.vardas && a.pavarde,
+            id:   (a) => { const full = (a.vardas + ' ' + a.pavarde).trim(); return 'person:' + full.toLowerCase(); },
+            url:  (a) => '/rysiai/expand-person?vardas=' + encodeURIComponent((a.vardas + ' ' + a.pavarde).trim()),
+        },
+        {
+            test: (a) => isProcurementNode(a) && a.pirkimoId,
+            id:   (a) => 'procurement:' + a.pirkimoId,
+            url:  (a) => '/rysiai/expand-procurement/' + encodeURIComponent(a.pirkimoId),
+        },
+    ];
+
+    // loadOrg is part of the public API (called by rysiai-app.js on initial load).
     function loadOrg(jarKodas, fromNodeId) {
         const id = 'org:' + jarKodas;
         if (fromNodeId && viewGraph.hasNode(fromNodeId)) {
             viewGraph.setNodeAttribute(fromNodeId, 'color', NODE_COLOR.org);
         }
-        return _expand(id, '/rysiai/expand/' + encodeURIComponent(jarKodas), (nodeId) => {
-            if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
-            if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
-        });
-    }
-
-    function loadPerson(vardas, pavarde) {
-        const fullName = (vardas + ' ' + pavarde).trim();
-        const id = 'person:' + fullName.toLowerCase();
-        return _expand(id, '/rysiai/expand-person?vardas=' + encodeURIComponent(fullName), (nodeId) => {
-            if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
-            if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
-        });
-    }
-
-    function loadProcurement(pirkimoId) {
-        const id = 'procurement:' + pirkimoId;
-        return _expand(id, '/rysiai/expand-procurement/' + encodeURIComponent(pirkimoId), (nodeId) => {
-            if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
-            if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
-        });
+        return _expand(id, '/rysiai/expand/' + encodeURIComponent(jarKodas), markExpanded);
     }
 
     function loadContract(pirkimoNumeris, contractNodeId) {
@@ -203,8 +199,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         }
 
         return _expand(procId, '/rysiai/expand-contract/' + encodeURIComponent(pirkimoNumeris), (nodeId) => {
-            if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
-            if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
+            markExpanded(nodeId);
             createContractLink();
         });
     }
@@ -221,33 +216,24 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
         selectNode(nodeId);
 
-        if (!attrs.expanded) {
-            if (isOrgNode(attrs) && attrs.jarKodas) {
-                viewGraph.setNodeAttribute(nodeId, 'expanded', true);
-                dataGraph.setNodeAttribute(nodeId, 'expanded', true);
-                loadOrg(attrs.jarKodas, nodeId);
-            } else if (isPersonNode(attrs) && attrs.vardas && attrs.pavarde) {
-                viewGraph.setNodeAttribute(nodeId, 'expanded', true);
-                dataGraph.setNodeAttribute(nodeId, 'expanded', true);
-                loadPerson(attrs.vardas, attrs.pavarde);
-            } else if (isProcurementNode(attrs) && attrs.pirkimoId) {
-                viewGraph.setNodeAttribute(nodeId, 'expanded', true);
-                dataGraph.setNodeAttribute(nodeId, 'expanded', true);
-                loadProcurement(attrs.pirkimoId);
-            } else if (isContractNode(attrs)) {
-                // Mark expanded for visual ring regardless of whether expansion fires
-                viewGraph.setNodeAttribute(nodeId, 'expanded', true);
-                dataGraph.setNodeAttribute(nodeId, 'expanded', true);
-                if (attrs.pirkimoNumeris) {
-                    loadContract(attrs.pirkimoNumeris, nodeId);
-                } else {
-                    renderer.refresh();
-                }
+        if (attrs.expanded) return;
+
+        const kind = EXPAND_KINDS.find((k) => k.test(attrs));
+        if (kind) {
+            if (isOrgNode(attrs)) viewGraph.setNodeAttribute(nodeId, 'color', NODE_COLOR.org);
+            markExpanded(nodeId);
+            _expand(kind.id(attrs), kind.url(attrs), markExpanded);
+        } else if (isContractNode(attrs)) {
+            markExpanded(nodeId);
+            if (attrs.pirkimoNumeris) {
+                loadContract(attrs.pirkimoNumeris, nodeId);
+            } else {
+                renderer.refresh();
             }
         }
     });
 
     renderer.on('clickStage', deselectAll);
 
-    return { loadOrg, loadPerson, loadProcurement, loadContract, rebuildAndRefresh, getSelectedNodeId: () => selectedNodeId, selectNode };
+    return { loadOrg, loadContract, rebuildAndRefresh, getSelectedNodeId: () => selectedNodeId, selectNode };
 }
