@@ -35,14 +35,14 @@ bundle must be compiled with `esbuild` and served as `public/dist/rysiai.js`.
 
 The graph uses the entity and edge model defined in the repository data structures:
 
-| Node type            | Expand trigger                                               | Source function / data                                                                                                                                                                                                                                                                                                                                        | Key fields                                                                                                   | Details panel link                                                                             |
-|----------------------|--------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `OrganizationEntity` | Org node click                                               | `jarCsv` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN jarCsv` (partner org names)                                                                                                                                                                                                                                            | `jarKodas`, `pavadinimas`, `formosKodas`                                                                     | `/asmuo/{jarKodas}`                                                                            |
-| `PersonEntity`       | Org node click                                               | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows                                                                                                                                                                                                                         | `vardas + pavarde` (name is the identity key), `rysioPradzia`                                                | *(no dedicated page)*                                                                          |
-| `PersonEntity`       | Person node click                                            | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person                                                                                                                                                                                                                 | Same; all declarations for that name are merged into one node                                                | *(no dedicated page)*                                                                          |
-| `ContractEntity`     | Org node click (creates node)                                | `sutartys JOIN jarCsv` (top 30 contracts by value; buyer/seller names from `jarCsv` JOIN)                                                                                                                                                                                                                                                                     | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte`, `pirkimoNumeris` (may be null) | `/sutartis/{sutartiesUnikalusId}` (primary); `/viesiejiPirkimai/{pirkimoNumeris}` (if present) |
-| `ContractEntity`     | Contract node click (when `pirkimoNumeris` is present)       | `expandContract(pirkimoNumeris)` — fetches full `ProcurementEntity` node (`viesiejiPirkimai WHERE pirkimoId = $1`) + all winner org stubs (`sutartys GROUP BY tiekejoKodas`) + best-effort loser org stubs (`atn1ataskaitos JOIN atn1dalyviai WHERE salis='LT'`, only ~425 procurements covered). Client creates the `ContractLink` edge locally after merge. | Same as above (contract node already in graph)                                                               | *(same, already shown)*                                                                        |
-| `ProcurementEntity`  | Org node click (buyer) / Contract node click (auto-expanded) | Created when buyer org is expanded: `viesiejiPirkimai WHERE jarKodas = $jarKodas ORDER BY numatomaVerteEUR DESC LIMIT 20`. When reached via contract expansion, already fully populated and auto-expanded by `expandContract`.                                                                                                                                | `pirkimoId` (node ID key), `pavadinimas`, `numatomaVerteEUR`, `statusas`, `pirkimoBudas`                     | `/viesiejiPirkimai/{pirkimoId}`                                                                |
+| Node type            | Expand trigger                                                             | Source function / data                                                                                                                                                                                                                                                                                                                                        | Key fields                                                                                                   | Details panel link                                                                             |
+|----------------------|----------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `OrganizationEntity` | Org node double-click                                                      | `jarCsv` (root org metadata — `pavadinimas`, `formosKodas`) + `sutartysSaliuSumos JOIN jarCsv` (partner org names)                                                                                                                                                                                                                                            | `jarKodas`, `pavadinimas`, `formosKodas`                                                                     | `/asmuo/{jarKodas}`                                                                            |
+| `PersonEntity`       | Org node double-click                                                      | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows                                                                                                                                                                                                                         | `vardas + pavarde` (name is the identity key), `rysioPradzia`                                                | *(no dedicated page)*                                                                          |
+| `PersonEntity`       | Person node double-click                                                   | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person                                                                                                                                                                                                                 | Same; all declarations for that name are merged into one node                                                | *(no dedicated page)*                                                                          |
+| `ContractEntity`     | Org node double-click (creates node)                                       | `sutartys JOIN jarCsv` (top 30 contracts by value; buyer/seller names from `jarCsv` JOIN)                                                                                                                                                                                                                                                                     | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte`, `pirkimoNumeris` (may be null) | `/sutartis/{sutartiesUnikalusId}` (primary); `/viesiejiPirkimai/{pirkimoNumeris}` (if present) |
+| `ContractEntity`     | Contract node double-click (when `pirkimoNumeris` is present)              | `expandContract(pirkimoNumeris)` — fetches full `ProcurementEntity` node (`viesiejiPirkimai WHERE pirkimoId = $1`) + all winner org stubs (`sutartys GROUP BY tiekejoKodas`) + best-effort loser org stubs (`atn1ataskaitos JOIN atn1dalyviai WHERE salis='LT'`, only ~425 procurements covered). Client creates the `ContractLink` edge locally after merge. | Same as above (contract node already in graph)                                                               | *(same, already shown)*                                                                        |
+| `ProcurementEntity`  | Org node double-click (buyer) / Contract node double-click (auto-expanded) | Created when buyer org is expanded: `viesiejiPirkimai WHERE jarKodas = $jarKodas ORDER BY numatomaVerteEUR DESC LIMIT 20`. When reached via contract expansion, already fully populated and auto-expanded by `expandContract`.                                                                                                                                | `pirkimoId` (node ID key), `pavadinimas`, `numatomaVerteEUR`, `statusas`, `pirkimoBudas`                     | `/viesiejiPirkimai/{pirkimoId}`                                                                |
 
 > **`ProcurementEntity` is a hub node.** One procurement notice can result in contracts with multiple
 > different winners (32,605 of 37,796 procurements have >1 distinct winner — see `docs/DB_ER.md`).
@@ -633,13 +633,13 @@ panel as a secondary interaction path.
 
 #### Interaction model
 
-| Event            | Source                        | Behaviour                                                                                |
-|------------------|-------------------------------|------------------------------------------------------------------------------------------|
-| `clickNode`      | Sigma — canvas node click     | Select the node (show details panel). If already selected, **no-op** — do not deselect. |
-| `doubleClickNode`| Sigma — canvas node dblclick  | Expand the node.                                                                         |
-| `clickExpand`    | Details panel "Išskleisti" btn| Expand the currently selected node. Node remains selected.                               |
-| `clickCollapse`  | Details panel "Suskleisti" btn| Collapse the currently selected node. Node remains selected; panel updates.              |
-| `clickStage`     | Sigma — canvas background click | Deselect (unchanged).                                                                  |
+| Event             | Source                          | Behaviour                                                                               |
+|-------------------|---------------------------------|-----------------------------------------------------------------------------------------|
+| `clickNode`       | Sigma — canvas node click       | Select the node (show details panel). If already selected, **no-op** — do not deselect. |
+| `doubleClickNode` | Sigma — canvas node dblclick    | Expand the node.                                                                        |
+| `clickExpand`     | Details panel "Išskleisti" btn  | Expand the currently selected node. Node remains selected.                              |
+| `clickCollapse`   | Details panel "Suskleisti" btn  | Collapse the currently selected node. Node remains selected; panel updates.             |
+| `clickStage`      | Sigma — canvas background click | Deselect (unchanged).                                                                   |
 
 > **Why no-op on re-click**: Sigma fires `clickNode` twice before `doubleClickNode`. If the second
 > `clickNode` deselected the node, the user would see a flicker (select → deselect → expand). Making
@@ -663,9 +663,14 @@ A node is expandable when any of the following is true:
 - `isProcurementNode(attrs) && attrs.pirkimoId`
 - `isContractNode(attrs) && attrs.pirkimoNumeris`
 
-Icons are rendered as **inline SVG** using the MUI path data already stored in `MUI_ICON_PATHS` in
-`src/rysiai/icons.js`. Add `Hub` and `Adjust` path keys there; render them via a small `svgIcon(key)`
-helper in `details-panel.js` that wraps the path in a `<svg viewBox="0 0 24 24" width="16" height="16">` element.
+Icons are rendered as **inline SVG**. Add `Hub` and `Adjust` path strings to `MUI_ICON_PATHS` in
+`src/rysiai/icons.js` and export a `svgIcon(key)` helper from that module (it already owns the path
+map). `details-panel.js` imports `svgIcon` from `icons.js` and calls it to build the button markup.
+`svgIcon` wraps the path in `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">`.
+
+> **Why `svgIcon` belongs in `icons.js`, not `details-panel.js`**: `MUI_ICON_PATHS` is currently a
+> private `const` in `icons.js`. Exporting the helper (not the raw map) keeps the path data
+> encapsulated and avoids a cross-module data dependency.
 
 #### `showNodeDetails` signature change
 
@@ -679,7 +684,22 @@ export function showNodeDetails(nodeId, attrs, handlers = {}) { …
 ```
 
 `buildHtml` appends the button only when a handler is provided. After setting `innerHTML`, attach
-a one-time click listener on the panel element via `addEventListener` with `{ once: true }`.
+the handler directly to the rendered button element (not via `{ once: true }` on the panel — a
+`{ once: true }` listener on the panel is consumed by the first click anywhere, including the
+existing "Peržiūrėti…" links, leaving subsequent button clicks dead):
+
+```js
+const btn = el.querySelector('[data-action]');
+if (btn) {
+    btn.addEventListener('click', () => {
+        if (btn.dataset.action === 'expand') handlers.onExpand?.();
+        else handlers.onCollapse?.();
+    });
+}
+```
+
+Each call to `showNodeDetails` replaces `innerHTML`, so the old button and its listener are
+discarded automatically.
 
 In `expand-ui.js`, `selectNode` computes the handlers and passes them:
 
@@ -699,49 +719,52 @@ function selectNode(id) {
 
 #### Collapse algorithm (`collapseNode`)
 
-1. Collect all edge IDs in `dataGraph` where `source === nodeId || target === nodeId`.
-2. Remove those edges from `dataGraph` (drops all edges created during this node's expansion).
-3. Collect all nodes in `dataGraph` that now have `degree === 0` **and** are not themselves
-   expanded (`attrs.expanded !== true`) **and** are not `nodeId` itself.
-4. Drop those zero-degree nodes from `dataGraph`.
-5. Set `expanded: false` on `nodeId` in both graphs.
-6. Run `rebuildAndRefresh()` — orphaned nodes are pruned from `viewGraph` since `nodeId` is no
-   longer an anchor.
-7. Update the details panel: re-call `showNodeDetails` for the now-collapsed node with an
-   `onExpand` handler (so the button switches from Suskleisti to Išskleisti).
+1. Set `expanded: false` on `nodeId` in both graphs.
+2. Run `rebuildAndRefresh()` — `nodeId` is no longer an anchor, so nodes whose only anchor
+   connection was through `nodeId` are pruned from `viewGraph` by the existing anchor/visibility
+   logic. `dataGraph` is **not modified** — the data is retained as a silent cache so re-expansion
+   is instant without a network call.
+3. After the rebuild, check whether `nodeId` is still in `viewGraph`:
+    - **Still visible** (has edges from other expansions): re-call `showNodeDetails` with an
+      `onExpand` handler so the button switches from Suskleisti to Išskleisti.
+    - **No longer visible** (all its edges were expansion-exclusive): call `deselectAll()` — the
+      node is gone from the canvas, selection is meaningless.
 
-> **Caution**: step 2 removes edges that connect `nodeId` to nodes that were in the graph *before*
-> this expansion (e.g. if nodeId was also reached via another path). Those nodes keep their own edges
-> and remain visible. Only truly orphaned nodes (degree 0 after edge removal) are pruned.
+> **Why not delete from `dataGraph`**: removing edges from `dataGraph` risks deleting edges added
+> by *other* nodes' expansions (e.g. a `Delivery` edge `contract→nodeId` added when expanding a
+> different org). Provenance tracking would be required to do this safely and is deferred to a
+> future phase.
 
 #### Tasks
 
-- [ ] **`src/rysiai/icons.js`**: add `Hub` and `Adjust` MUI SVG path strings to `MUI_ICON_PATHS`.
+- [ ] **`src/rysiai/icons.js`**: add `Hub` and `Adjust` MUI SVG path strings to `MUI_ICON_PATHS`;
+  export a new `svgIcon(key)` function that returns the inline SVG HTML string for a given key
+  (returns empty string for unknown keys).
 
 - [ ] **`src/rysiai/details-panel.js`**:
-    - Add `svgIcon(key)` helper — returns inline SVG HTML using path from `MUI_ICON_PATHS`.
-    - Change `showNodeDetails(nodeId, attrs, handlers = {})` — accept optional `handlers`.
+    - Import `svgIcon` from `icons.js`.
+    - Change signature to `showNodeDetails(nodeId, attrs, handlers = {})`.
     - In `buildHtml(attrs, handlers)`: append at the bottom an Išskleisti or Suskleisti button
-      based on `handlers.onExpand` / `handlers.onCollapse`. Style: `class="vd-btn"`, flex row,
-      gap, icon + label.
-    - After `el.innerHTML = html`, attach `{ once: true }` click listener: if clicked element
-      matches `[data-action=expand]`, call `handlers.onExpand()`; if `[data-action=collapse]`,
-      call `handlers.onCollapse()`.
+      based on `handlers.onExpand` / `handlers.onCollapse`. Button HTML: `class="vd-btn"`,
+      `data-action="expand"` or `data-action="collapse"`, flex row with `svgIcon(...)` + label text.
+    - After `el.innerHTML = html`, bind the handler directly to the button element (see wiring
+      pattern in the section above — do **not** use `{ once: true }` on the panel).
     - Add button CSS to `views/rysiai/index.ejs`: `.vd-btn` — full-width, small padding,
       border, rounded, cursor pointer, flex, align-items center, gap 6px; hover state.
 
 - [ ] **`src/rysiai/expand-ui.js`**:
-    - Move all expansion logic from `clickNode` handler to a new `doubleClickNode` handler
-      (`renderer.on('doubleClickNode', ...)`). The `doubleClickNode` handler is the same as the
-      current `clickNode` expansion block (EXPAND_KINDS lookup + contract special case).
-    - Change `clickNode` handler: call `selectNode(nodeId)` only; remove the deselect-on-re-click
-      branch (re-clicking an already-selected node is a no-op — `clickStage` is the only deselect).
     - Add `isExpandableNode(attrs)` predicate (local helper, not exported).
-    - Add `_triggerExpand(nodeId, attrs)` — the expansion dispatch used by both `doubleClickNode`
-      and the panel button; contains the current EXPAND_KINDS + contract dispatch logic.
-    - Add `collapseNode(nodeId)` — implements the collapse algorithm above.
-    - Update `selectNode` to pass `handlers` to `showNodeDetails` (see signature above).
-    - After `collapseNode`, re-call `showNodeDetails` for the collapsed node with updated handlers.
+    - Add `_triggerExpand(nodeId, attrs)` — guards `if (attrs.expanded) return;` first, then
+      dispatches via EXPAND_KINDS lookup or contract special case (extracted from current
+      `clickNode` expansion block).
+    - Replace `clickNode` expansion block with `selectNode(nodeId)` only; remove the
+      deselect-on-re-click branch (`if (selectedNodeId === nodeId) deselectAll()` → delete).
+    - Add `renderer.on('doubleClickNode', (event) => { ... })` handler that calls
+      `_triggerExpand(event.node, attrs)`.
+    - Add `collapseNode(nodeId)` — implements the simplified collapse algorithm above.
+    - Update `selectNode` to compute and pass `handlers` to `showNodeDetails`.
+    - In `collapseNode`, after `rebuildAndRefresh()`: if nodeId still in `viewGraph`, re-call
+      `showNodeDetails` with `onExpand` handler; else call `deselectAll()`.
 
 - [ ] **Browser smoke-test**:
     - Single-click a node → selects, shows details panel; double-clicking re-click does not deselect
