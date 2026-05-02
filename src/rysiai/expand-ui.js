@@ -1,8 +1,8 @@
-import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout } from './graph-utils.js';
-import { NODE_COLOR, EDGE_COLOR } from './colors.js';
-import { updateLegendForNode } from './legend.js';
-import { isConfigurableNode, isOrgNode, isPersonNode, isContractNode, isProcurementNode } from './entity-types.js';
-import { showNodeDetails, hideDetails } from './details-panel.js';
+import {mergeGraphElements, rebuildViewGraph, runLayout, syncPositionsToData} from './graph-utils.js';
+import {EDGE_COLOR, NODE_COLOR} from './colors.js';
+import {updateLegendForNode} from './legend.js';
+import {isConfigurableNode, isContractNode, isOrgNode, isPersonNode, isProcurementNode} from './entity-types.js';
+import {hideDetails, showNodeDetails} from './details-panel.js';
 
 /**
  * Creates the expand UI controller.
@@ -21,14 +21,32 @@ import { showNodeDetails, hideDetails } from './details-panel.js';
  * }} deps
  * @returns {{ loadOrg, rebuildAndRefresh, getSelectedNodeId, selectNode }}
  */
-export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState }) {
+export function createExpandUI({
+                                   dataGraph,
+                                   viewGraph,
+                                   renderer,
+                                   statusEl,
+                                   loadingEl,
+                                   forceAtlas2,
+                                   noverlap,
+                                   animateNodes,
+                                   legendState
+                               }) {
     const expandingNodes = new Set();
     let cancelAnimation = null;
     let selectedNodeId = null;
 
-    function showLoading() { if (loadingEl) loadingEl.hidden = false; }
-    function hideLoading() { if (loadingEl) loadingEl.hidden = true; }
-    function setStatus(msg) { if (statusEl) statusEl.textContent = msg || ''; }
+    function showLoading() {
+        if (loadingEl) loadingEl.hidden = false;
+    }
+
+    function hideLoading() {
+        if (loadingEl) loadingEl.hidden = true;
+    }
+
+    function setStatus(msg) {
+        if (statusEl) statusEl.textContent = msg || '';
+    }
 
     function getNodePos(id) {
         return viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : null;
@@ -50,18 +68,77 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         if (viewGraph.hasNode(id)) viewGraph.setNodeAttribute(id, 'expanded', true);
     }
 
-    function selectNode(id) {
-        if (selectedNodeId && selectedNodeId !== id) setSelection(selectedNodeId, false);
-        selectedNodeId = id;
-        setSelection(id, true);
+    /**
+     * Checks if a node is expandable.
+     * @param {object} attrs
+     * @returns {boolean}
+     */
+    function isExpandableNode(attrs) {
+        return (
+            (isOrgNode(attrs) && attrs.jarKodas) ||
+            (isPersonNode(attrs) && attrs.vardas && attrs.pavarde) ||
+            (isProcurementNode(attrs) && attrs.pirkimoId) ||
+            (isContractNode(attrs) && attrs.pirkimoNumeris)
+        );
+    }
 
-        const attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
-        if (isConfigurableNode(attrs)) {
-            legendState.initNode(id);
-            updateLegendForNode(id, attrs.label || id, legendState);
+    /**
+     * Triggers expansion of a node. Guarded by !attrs.expanded check.
+     * @param {string} nodeId
+     * @param {object} attrs
+     */
+    function _triggerExpand(nodeId, attrs) {
+        if (attrs.expanded) return;
+
+        const kind = EXPAND_KINDS.find((k) => k.test(attrs));
+        if (kind) {
+            if (isOrgNode(attrs)) viewGraph.setNodeAttribute(nodeId, 'color', NODE_COLOR.org);
+            markExpanded(nodeId);
+            _expand(kind.id(attrs), kind.url(attrs), markExpanded);
+        } else if (isContractNode(attrs)) {
+            markExpanded(nodeId);
+            if (attrs.pirkimoNumeris) {
+                loadContract(attrs.pirkimoNumeris, nodeId);
+            } else {
+                renderer.refresh();
+            }
         }
-        showNodeDetails(id, attrs);
+    }
+
+    /**
+     * Collapses a node: sets expanded to false, rebuilds view, and updates panel.
+     * @param {string} nodeId
+     */
+    function collapseNode(nodeId) {
+        // Set expanded to false in both graphs
+        if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', false);
+        if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', false);
+
+        // Rebuild without maintaining selection state first
+        if (cancelAnimation) {
+            cancelAnimation();
+            cancelAnimation = null;
+        }
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+        runLayout(viewGraph, forceAtlas2, noverlap);
+        syncPositionsToData(dataGraph, viewGraph);
         renderer.refresh();
+
+        // Check if node still visible after rebuild
+        if (viewGraph.hasNode(nodeId)) {
+            // Node is still visible, re-select it and update panel
+            setSelection(nodeId, true);
+            const attrs = viewGraph.getNodeAttributes(nodeId);
+            const handlers = {onExpand: () => _triggerExpand(nodeId, attrs)};
+            showNodeDetails(nodeId, attrs, handlers);
+            renderer.refresh();
+        } else {
+            // Node is no longer visible, deselect everything
+            selectedNodeId = null;
+            updateLegendForNode(null, null, legendState);
+            hideDetails();
+            renderer.refresh();
+        }
     }
 
     function deselectAll() {
@@ -79,7 +156,10 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
      * Called by legend checkboxes and after every expand.
      */
     function rebuildAndRefresh() {
-        if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
+        if (cancelAnimation) {
+            cancelAnimation();
+            cancelAnimation = null;
+        }
         rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
         runLayout(viewGraph, forceAtlas2, noverlap);
         syncPositionsToData(dataGraph, viewGraph);
@@ -97,7 +177,10 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             const fromNodeId = viewGraph.hasNode(id) ? id : null;
             const startPos = fromNodeId ? getNodePos(fromNodeId) : null;
 
-            if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
+            if (cancelAnimation) {
+                cancelAnimation();
+                cancelAnimation = null;
+            }
 
             mergeGraphElements(dataGraph, getNodePos, data, fromNodeId);
             afterMerge(id);
@@ -127,7 +210,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                         viewGraph.setNodeAttribute(nid, 'y', startPos.y);
                     }
                 });
-                cancelAnimation = animateNodes(viewGraph, targets, { duration: 600, easing: 'quadraticInOut' });
+                cancelAnimation = animateNodes(viewGraph, targets, {duration: 600, easing: 'quadraticInOut'});
             } else {
                 runLayout(viewGraph, forceAtlas2, noverlap);
                 syncPositionsToData(dataGraph, viewGraph);
@@ -143,6 +226,29 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         }
     }
 
+    function selectNode(id) {
+        if (selectedNodeId && selectedNodeId !== id) setSelection(selectedNodeId, false);
+        selectedNodeId = id;
+        setSelection(id, true);
+
+        const attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
+        if (isConfigurableNode(attrs)) {
+            legendState.initNode(id);
+            updateLegendForNode(id, attrs.label || id, legendState);
+        }
+
+        // Compute handlers for the button
+        const handlers = {};
+        if (attrs.expanded) {
+            handlers.onCollapse = () => collapseNode(id);
+        } else if (isExpandableNode(attrs)) {
+            handlers.onExpand = () => _triggerExpand(id, attrs);
+        }
+
+        showNodeDetails(id, attrs, handlers);
+        renderer.refresh();
+    }
+
     // Config-driven expand kinds for org / person / procurement.
     // Each entry: test(attrs) → should this kind handle the node?
     //             id(attrs)   → the expand-target node ID
@@ -151,18 +257,21 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
     const EXPAND_KINDS = [
         {
             test: (a) => isOrgNode(a) && a.jarKodas,
-            id:   (a) => 'org:' + a.jarKodas,
-            url:  (a) => '/rysiai/expand/' + encodeURIComponent(a.jarKodas),
+            id: (a) => 'org:' + a.jarKodas,
+            url: (a) => '/rysiai/expand/' + encodeURIComponent(a.jarKodas),
         },
         {
             test: (a) => isPersonNode(a) && a.vardas && a.pavarde,
-            id:   (a) => { const full = (a.vardas + ' ' + a.pavarde).trim(); return 'person:' + full.toLowerCase(); },
-            url:  (a) => '/rysiai/expand-person?vardas=' + encodeURIComponent((a.vardas + ' ' + a.pavarde).trim()),
+            id: (a) => {
+                const full = (a.vardas + ' ' + a.pavarde).trim();
+                return 'person:' + full.toLowerCase();
+            },
+            url: (a) => '/rysiai/expand-person?vardas=' + encodeURIComponent((a.vardas + ' ' + a.pavarde).trim()),
         },
         {
             test: (a) => isProcurementNode(a) && a.pirkimoId,
-            id:   (a) => 'procurement:' + a.pirkimoId,
-            url:  (a) => '/rysiai/expand-procurement/' + encodeURIComponent(a.pirkimoId),
+            id: (a) => 'procurement:' + a.pirkimoId,
+            url: (a) => '/rysiai/expand-procurement/' + encodeURIComponent(a.pirkimoId),
         },
     ];
 
@@ -209,31 +318,23 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         const attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
         console.log('[Ryšiai] click:', nodeId, attrs.entityType || '?', 'expanded:', attrs.expanded);
 
-        if (selectedNodeId === nodeId) {
-            deselectAll();
-            return;
-        }
+        // If already selected, no-op (do not deselect)
+        if (selectedNodeId === nodeId) return;
 
+        // Select the node
         selectNode(nodeId);
+    });
 
-        if (attrs.expanded) return;
+    renderer.on('doubleClickNode', (event) => {
+        const nodeId = event.node;
+        const attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
+        console.log('[Ryšiai] doubleClick:', nodeId, attrs.entityType || '?');
 
-        const kind = EXPAND_KINDS.find((k) => k.test(attrs));
-        if (kind) {
-            if (isOrgNode(attrs)) viewGraph.setNodeAttribute(nodeId, 'color', NODE_COLOR.org);
-            markExpanded(nodeId);
-            _expand(kind.id(attrs), kind.url(attrs), markExpanded);
-        } else if (isContractNode(attrs)) {
-            markExpanded(nodeId);
-            if (attrs.pirkimoNumeris) {
-                loadContract(attrs.pirkimoNumeris, nodeId);
-            } else {
-                renderer.refresh();
-            }
-        }
+        // Trigger expansion
+        _triggerExpand(nodeId, attrs);
     });
 
     renderer.on('clickStage', deselectAll);
 
-    return { loadOrg, loadContract, rebuildAndRefresh, getSelectedNodeId: () => selectedNodeId, selectNode };
+    return {loadOrg, loadContract, rebuildAndRefresh, getSelectedNodeId: () => selectedNodeId, selectNode};
 }

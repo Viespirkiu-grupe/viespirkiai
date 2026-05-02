@@ -608,7 +608,7 @@ formatted total `verte` sum for that seller.
 
 #### Tasks
 
-- [ ] **`modules/rysiai/expand.js`**:
+- [x] **`modules/rysiai/expand.js`**:
     - Add `procurementNode(row)` factory:
       `{ id, entityType, pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas, size, expanded: false }`.
     - In `expandOrg`: query
@@ -618,7 +618,7 @@ formatted total `verte` sum for that seller.
       `SELECT DISTINCT s.tiekejoKodas, j.pavadinimas, SUM(s.verte) as totalVerte FROM sutartys s LEFT JOIN jarCsv j ON j.jarKodas::text = s.tiekejoKodas WHERE s.pirkimoNumeris = $1 GROUP BY s.tiekejoKodas, j.pavadinimas`;
       return org stub nodes + `Award` edges.
 
-- [ ] **Browser smoke-test**:
+- [x] **Browser smoke-test**:
     - Double-click a buyer org → purple procurement nodes appear
     - Double-click a procurement node → winner seller org stubs appear via green `Award` edges
     - Select a procurement node → details panel shows title, estimated value, statusas, link, and Išskleisti/Suskleisti
@@ -737,11 +737,11 @@ function selectNode(id) {
 
 #### Tasks
 
-- [ ] **`src/rysiai/icons.js`**: add `Hub` and `Adjust` MUI SVG path strings to `MUI_ICON_PATHS`;
+- [x] **`src/rysiai/icons.js`**: add `Hub` and `Adjust` MUI SVG path strings to `MUI_ICON_PATHS`;
   export a new `svgIcon(key)` function that returns the inline SVG HTML string for a given key
   (returns empty string for unknown keys).
 
-- [ ] **`src/rysiai/details-panel.js`**:
+- [x] **`src/rysiai/details-panel.js`**:
     - Import `svgIcon` from `icons.js`.
     - Change signature to `showNodeDetails(nodeId, attrs, handlers = {})`.
     - In `buildHtml(attrs, handlers)`: append at the bottom an Išskleisti or Suskleisti button
@@ -752,7 +752,7 @@ function selectNode(id) {
     - Add button CSS to `views/rysiai/index.ejs`: `.vd-btn` — full-width, small padding,
       border, rounded, cursor pointer, flex, align-items center, gap 6px; hover state.
 
-- [ ] **`src/rysiai/expand-ui.js`**:
+- [x] **`src/rysiai/expand-ui.js`**:
     - Add `isExpandableNode(attrs)` predicate (local helper, not exported).
     - Add `_triggerExpand(nodeId, attrs)` — guards `if (attrs.expanded) return;` first, then
       dispatches via EXPAND_KINDS lookup or contract special case (extracted from current
@@ -766,7 +766,7 @@ function selectNode(id) {
     - In `collapseNode`, after `rebuildAndRefresh()`: if nodeId still in `viewGraph`, re-call
       `showNodeDetails` with `onExpand` handler; else call `deselectAll()`.
 
-- [ ] **Browser smoke-test**:
+- [x] **Browser smoke-test**:
     - Single-click a node → selects, shows details panel; double-clicking re-click does not deselect
     - Double-click an unexpanded org → expands, details panel switches to Suskleisti button
     - Click Išskleisti in panel → same expansion as double-click
