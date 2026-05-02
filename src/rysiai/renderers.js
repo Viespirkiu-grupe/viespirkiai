@@ -3,7 +3,7 @@
 // Draws a dotted ring for expanded nodes (orgs, persons, contracts, procurement), then the label.
 // Called by Sigma for every visible labelled node, and also by drawNodeHover.
 export function drawNodeLabel(context, data, settings) {
-    var nodeSize = data.size || 8;
+    const nodeSize = data.size || 8;
 
     // Persistent expanded indicator: dotted ring outside the selection ring
     if (data.expanded) {
@@ -16,12 +16,12 @@ export function drawNodeLabel(context, data, settings) {
         context.setLineDash([]);
     }
 
-    var label = data.label;
+    const label = data.label;
     if (!label) return;
 
-    var size = settings.labelSize || 12;
-    var font = settings.labelFont || 'Arial';
-    var color = settings.labelColor && settings.labelColor.attribute
+    const size = settings.labelSize || 12;
+    const font = settings.labelFont || 'Arial';
+    const color = settings.labelColor && settings.labelColor.attribute
         ? (data[settings.labelColor.attribute] || settings.labelColor.color || '#000')
         : (settings.labelColor && settings.labelColor.color || '#000');
 
@@ -30,11 +30,11 @@ export function drawNodeLabel(context, data, settings) {
     context.textAlign = 'center';
     context.textBaseline = 'top';
 
-    var lines = label.split('\n');
-    var lineHeight = size + 3;
-    var startY = data.y + nodeSize + 4;
+    const lines = label.split('\n');
+    const lineHeight = size + 3;
+    const startY = data.y + nodeSize + 4;
 
-    for (var i = 0; i < lines.length; i++) {
+    for (let i = 0; i < lines.length; i++) {
         context.fillText(lines[i], data.x, startY + i * lineHeight);
     }
 }
@@ -44,7 +44,7 @@ export function drawNodeLabel(context, data, settings) {
 // Hover only:    soft ring (nodeSize+4, lineWidth 2).
 // Expanded ring is drawn by drawNodeLabel (called at end) — always outermost.
 export function drawNodeHover(context, data, settings) {
-    var nodeSize = data.size || 8;
+    const nodeSize = data.size || 8;
     context.beginPath();
     if (data.selected) {
         context.arc(data.x, data.y, nodeSize + 6, 0, Math.PI * 2);

@@ -13,7 +13,7 @@ import { isAnchorNode, isBridgeCandidate, isOrgNode, isContractNode, isProcureme
  */
 export function computeNodeSize(attrs) {
     if (isOrgNode(attrs)) {
-        var count = Math.max((attrs.draustieji || 0) + (attrs.draustieji2 || 0), 1);
+        const count = Math.max((attrs.draustieji || 0) + (attrs.draustieji2 || 0), 1);
         return personelSize(count);
     }
     if (isContractNode(attrs)) {
@@ -36,13 +36,13 @@ export function computeNodeSize(attrs) {
  * @returns {string[]} IDs of newly added nodes
  */
 export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
-    var newNodeIds = [];
+    const newNodeIds = [];
 
-    (data.nodes || []).forEach(function (n) {
+    (data.nodes || []).forEach((n) => {
         if (graph.hasNode(n.id)) {
             // Enrich existing org node with sodra fields when we have them for the first time
             if (isOrgNode(n.attributes) && n.attributes.draustieji !== undefined) {
-                var existing = graph.getNodeAttributes(n.id);
+                const existing = graph.getNodeAttributes(n.id);
                 if (existing.draustieji === undefined) {
                     graph.setNodeAttribute(n.id, 'draustieji', n.attributes.draustieji);
                     graph.setNodeAttribute(n.id, 'draustieji2', n.attributes.draustieji2);
@@ -52,12 +52,12 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
             return;
         }
 
-        var x = 0, y = 0;
+        let x = 0, y = 0;
         if (fromNodeId) {
-            var pos = getNodePos(fromNodeId);
+            const pos = getNodePos(fromNodeId);
             if (pos) {
-                var angle = Math.random() * Math.PI * 2;
-                var dist = 150 + Math.random() * 100;
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 150 + Math.random() * 100;
                 x = pos.x + Math.cos(angle) * dist;
                 y = pos.y + Math.sin(angle) * dist;
             } else {
@@ -69,9 +69,9 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
             y = (Math.random() - 0.5) * 400;
         }
 
-        var iconKey = getIconKey(n.attributes);
-        var imgUri = iconKey ? makeIconDataUri(iconKey) : '';
-        var nodeAttrs = Object.assign({}, n.attributes, {
+        const iconKey = getIconKey(n.attributes);
+        const imgUri = iconKey ? makeIconDataUri(iconKey) : '';
+        const nodeAttrs = Object.assign({}, n.attributes, {
             x: x,
             y: y,
             size: computeNodeSize(n.attributes),
@@ -84,11 +84,11 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
         newNodeIds.push(n.id);
     });
 
-    (data.edges || []).forEach(function (e) {
+    (data.edges || []).forEach((e) => {
         if (graph.hasEdge(e.id)) return;
         if (!graph.hasNode(e.source) || !graph.hasNode(e.target)) return;
 
-        var attrs = Object.assign({}, e.attributes || {});
+        const attrs = Object.assign({}, e.attributes || {});
         // Rename semantic 'type' → 'edgeType' so Sigma doesn't treat it as a renderer program key.
         if (attrs.type) { attrs.edgeType = attrs.type; delete attrs.type; }
         attrs.color = EDGE_COLOR[attrs.edgeType] || '#d1d5db';
@@ -118,11 +118,11 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
  * @returns {string[]} IDs of nodes newly added to viewGraph (for animation)
  */
 export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
-    var prevNodes = new Set(viewGraph.nodes());
+    const prevNodes = new Set(viewGraph.nodes());
 
     // Expanded anchor nodes — always visible regardless of edge visibility
-    var expandedAnchors = new Set();
-    dataGraph.forEachNode(function (id, attrs) {
+    const expandedAnchors = new Set();
+    dataGraph.forEachNode((id, attrs) => {
         if (isAnchorNode(attrs)) expandedAnchors.add(id);
     });
 
@@ -130,15 +130,15 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
     // Bridge edges: edges from a bridge contract to its expanded anchor neighbors → always visible.
     // Only ContractEntity nodes are bridges — person/org nodes connecting two expanded anchors
     // are "shared relationship nodes" and remain under legend/filter control.
-    var bridgeNodes = new Set();
-    var bridgeEdges = new Set();
-    dataGraph.forEachNode(function (nodeId, nodeAttrs) {
+    const bridgeNodes = new Set();
+    const bridgeEdges = new Set();
+    dataGraph.forEachNode((nodeId, nodeAttrs) => {
         if (expandedAnchors.has(nodeId)) return;
         if (!isBridgeCandidate(nodeAttrs)) return;
-        var anchorNeighbors = new Set();
-        var edgesToAnchors = [];
-        dataGraph.forEachEdge(nodeId, function (edgeId, edgeAttrs, src, tgt) {
-            var neighbor = src === nodeId ? tgt : src;
+        const anchorNeighbors = new Set();
+        const edgesToAnchors = [];
+        dataGraph.forEachEdge(nodeId, (edgeId, edgeAttrs, src, tgt) => {
+            const neighbor = src === nodeId ? tgt : src;
             if (expandedAnchors.has(neighbor)) {
                 anchorNeighbors.add(neighbor);
                 edgesToAnchors.push(edgeId);
@@ -146,15 +146,15 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
         });
         if (anchorNeighbors.size >= 2) {
             bridgeNodes.add(nodeId);
-            edgesToAnchors.forEach(function (id) { bridgeEdges.add(id); });
+            edgesToAnchors.forEach((id) => { bridgeEdges.add(id); });
         }
     });
 
     // Compute the set of nodes that should be visible
-    var visible = new Set();
-    expandedAnchors.forEach(function (id) { visible.add(id); });
-    bridgeNodes.forEach(function (id) { visible.add(id); });
-    dataGraph.forEachEdge(function (edgeId, attrs, source, target) {
+    const visible = new Set();
+    expandedAnchors.forEach((id) => { visible.add(id); });
+    bridgeNodes.forEach((id) => { visible.add(id); });
+    dataGraph.forEachEdge((edgeId, attrs, source, target) => {
         if (!isEdgeHidden(source, target, attrs.edgeType)) {
             visible.add(source);
             visible.add(target);
@@ -162,21 +162,21 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
     });
 
     // Drop invisible nodes (graphology auto-drops their incident edges)
-    var toRemove = [];
-    viewGraph.forEachNode(function (id) { if (!visible.has(id)) toRemove.push(id); });
-    toRemove.forEach(function (id) { viewGraph.dropNode(id); });
+    const toRemove = [];
+    viewGraph.forEachNode((id) => { if (!visible.has(id)) toRemove.push(id); });
+    toRemove.forEach((id) => { viewGraph.dropNode(id); });
 
     // Add newly visible nodes, restoring last-known x/y from dataGraph
-    visible.forEach(function (id) {
+    visible.forEach((id) => {
         if (!viewGraph.hasNode(id) && dataGraph.hasNode(id)) {
             viewGraph.addNode(id, Object.assign({}, dataGraph.getNodeAttributes(id)));
         }
     });
 
     // Sync size from dataGraph to viewGraph (handles enrichment of already-visible nodes)
-    viewGraph.forEachNode(function (id) {
+    viewGraph.forEachNode((id) => {
         if (dataGraph.hasNode(id)) {
-            var newSize = dataGraph.getNodeAttribute(id, 'size');
+            const newSize = dataGraph.getNodeAttribute(id, 'size');
             if (newSize != null && viewGraph.getNodeAttribute(id, 'size') !== newSize) {
                 viewGraph.setNodeAttribute(id, 'size', newSize);
             }
@@ -184,21 +184,21 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
     });
 
     // Remove hidden-type edges from viewGraph (bridge edges are exempt)
-    var edgesToRemove = [];
-    viewGraph.forEachEdge(function (edgeId, attrs, source, target) {
+    const edgesToRemove = [];
+    viewGraph.forEachEdge((edgeId, attrs, source, target) => {
         if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType)) edgesToRemove.push(edgeId);
     });
-    edgesToRemove.forEach(function (id) { viewGraph.dropEdge(id); });
+    edgesToRemove.forEach((id) => { viewGraph.dropEdge(id); });
 
     // Add visible edges from dataGraph that are not yet in viewGraph (bridge edges always pass)
-    dataGraph.forEachEdge(function (edgeId, attrs, source, target) {
+    dataGraph.forEachEdge((edgeId, attrs, source, target) => {
         if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType)) return;
         if (!viewGraph.hasNode(source) || !viewGraph.hasNode(target)) return;
         if (viewGraph.hasEdge(edgeId)) return;
         viewGraph.addEdgeWithKey(edgeId, source, target, Object.assign({}, attrs));
     });
 
-    return viewGraph.nodes().filter(function (id) { return !prevNodes.has(id); });
+    return viewGraph.nodes().filter((id) => !prevNodes.has(id));
 }
 
 /**
@@ -210,7 +210,7 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
  * @param {Graph} viewGraph
  */
 export function syncPositionsToData(dataGraph, viewGraph) {
-    viewGraph.forEachNode(function (id, attrs) {
+    viewGraph.forEachNode((id, attrs) => {
         if (dataGraph.hasNode(id)) {
             dataGraph.setNodeAttribute(id, 'x', attrs.x);
             dataGraph.setNodeAttribute(id, 'y', attrs.y);
@@ -227,15 +227,15 @@ export function syncPositionsToData(dataGraph, viewGraph) {
  */
 export function runLayout(graph, forceAtlas2, noverlap) {
     if (graph.order < 2) return;
-    var inferred = forceAtlas2.inferSettings(graph);
-    var positions = forceAtlas2(graph, {
+    const inferred = forceAtlas2.inferSettings(graph);
+    const positions = forceAtlas2(graph, {
         iterations: 200,
         settings: Object.assign({}, inferred, {
             scalingRatio: Math.max(inferred.scalingRatio || 1, 10),
             gravity: 0.5,
         }),
     });
-    graph.forEachNode(function (id) {
+    graph.forEachNode((id) => {
         if (positions[id]) {
             graph.setNodeAttribute(id, 'x', positions[id].x);
             graph.setNodeAttribute(id, 'y', positions[id].y);

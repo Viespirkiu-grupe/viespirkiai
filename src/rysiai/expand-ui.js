@@ -22,9 +22,9 @@ import { showNodeDetails, hideDetails } from './details-panel.js';
  * @returns {{ loadOrg, loadPerson, rebuildAndRefresh, getSelectedNodeId }}
  */
 export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState }) {
-    var expandingNodes = new Set();
-    var cancelAnimation = null;
-    var selectedNodeId = null;
+    const expandingNodes = new Set();
+    let cancelAnimation = null;
+    let selectedNodeId = null;
 
     function showLoading() { if (loadingEl) loadingEl.hidden = false; }
     function hideLoading() { if (loadingEl) loadingEl.hidden = true; }
@@ -63,7 +63,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         selectedNodeId = id;
         _setSelectionAttrs(id);
 
-        var attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
+        const attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
         if (isConfigurableNode(attrs)) {
             legendState.initNode(id);
             updateLegendForNode(id, attrs.label || id, legendState);
@@ -88,7 +88,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
      */
     function rebuildAndRefresh() {
         if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
-        rebuildViewGraph(dataGraph, viewGraph, function (s, t, type) { return legendState.isEdgeHidden(s, t, type); });
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
         runLayout(viewGraph, forceAtlas2, noverlap);
         syncPositionsToData(dataGraph, viewGraph);
         if (selectedNodeId) _setSelectionAttrs(selectedNodeId);
@@ -101,16 +101,16 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         if (expandingNodes.size === 1) showLoading();
         setStatus('Kraunama...');
         try {
-            var data = await fetch(fetchUrl).then(function (r) { return r.json(); });
-            var fromNodeId = viewGraph.hasNode(id) ? id : null;
-            var startPos = fromNodeId ? getNodePos(fromNodeId) : null;
+            const data = await fetch(fetchUrl).then((r) => r.json());
+            const fromNodeId = viewGraph.hasNode(id) ? id : null;
+            const startPos = fromNodeId ? getNodePos(fromNodeId) : null;
 
             if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
 
             mergeGraphElements(dataGraph, getNodePos, data, fromNodeId);
             afterMerge(id);
 
-            var newNodeIds = rebuildViewGraph(dataGraph, viewGraph, function (s, t, type) { return legendState.isEdgeHidden(s, t, type); });
+            const newNodeIds = rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
 
             // Re-apply selection attrs after rebuild (node may have been re-added)
             if (selectedNodeId && viewGraph.hasNode(selectedNodeId)) {
@@ -120,8 +120,8 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             if (startPos && newNodeIds.length > 0) {
                 runLayout(viewGraph, forceAtlas2, noverlap);
                 syncPositionsToData(dataGraph, viewGraph);
-                var targets = {};
-                newNodeIds.forEach(function (nid) {
+                const targets = {};
+                newNodeIds.forEach((nid) => {
                     if (viewGraph.hasNode(nid)) {
                         targets[nid] = {
                             x: viewGraph.getNodeAttribute(nid, 'x'),
@@ -129,7 +129,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                         };
                     }
                 });
-                newNodeIds.forEach(function (nid) {
+                newNodeIds.forEach((nid) => {
                     if (viewGraph.hasNode(nid)) {
                         viewGraph.setNodeAttribute(nid, 'x', startPos.x);
                         viewGraph.setNodeAttribute(nid, 'y', startPos.y);
@@ -152,38 +152,38 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
     }
 
     function loadOrg(jarKodas, fromNodeId) {
-        var id = 'org:' + jarKodas;
+        const id = 'org:' + jarKodas;
         if (fromNodeId && viewGraph.hasNode(fromNodeId)) {
             viewGraph.setNodeAttribute(fromNodeId, 'color', NODE_COLOR.org);
         }
-        return _expand(id, '/rysiai/expand/' + encodeURIComponent(jarKodas), function (nodeId) {
+        return _expand(id, '/rysiai/expand/' + encodeURIComponent(jarKodas), (nodeId) => {
             if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
             if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
         });
     }
 
     function loadPerson(vardas, pavarde) {
-        var fullName = (vardas + ' ' + pavarde).trim();
-        var id = 'person:' + fullName.toLowerCase();
-        return _expand(id, '/rysiai/expand-person?vardas=' + encodeURIComponent(fullName), function (nodeId) {
+        const fullName = (vardas + ' ' + pavarde).trim();
+        const id = 'person:' + fullName.toLowerCase();
+        return _expand(id, '/rysiai/expand-person?vardas=' + encodeURIComponent(fullName), (nodeId) => {
             if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
             if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
         });
     }
 
     function loadProcurement(pirkimoId) {
-        var id = 'procurement:' + pirkimoId;
-        return _expand(id, '/rysiai/expand-procurement/' + encodeURIComponent(pirkimoId), function (nodeId) {
+        const id = 'procurement:' + pirkimoId;
+        return _expand(id, '/rysiai/expand-procurement/' + encodeURIComponent(pirkimoId), (nodeId) => {
             if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
             if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
         });
     }
 
     function loadContract(pirkimoNumeris, contractNodeId) {
-        var procId = 'procurement:' + pirkimoNumeris;
+        const procId = 'procurement:' + pirkimoNumeris;
 
-        var createContractLink = function () {
-            var linkEdgeId = 'edge:' + contractNodeId + ':' + procId + ':ContractLink';
+        const createContractLink = () => {
+            const linkEdgeId = 'edge:' + contractNodeId + ':' + procId + ':ContractLink';
             if (dataGraph.hasNode(contractNodeId) && dataGraph.hasNode(procId) && !dataGraph.hasEdge(linkEdgeId)) {
                 dataGraph.addEdgeWithKey(linkEdgeId, contractNodeId, procId, {
                     edgeType: 'ContractLink',
@@ -202,16 +202,16 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             return;
         }
 
-        return _expand(procId, '/rysiai/expand-contract/' + encodeURIComponent(pirkimoNumeris), function (nodeId) {
+        return _expand(procId, '/rysiai/expand-contract/' + encodeURIComponent(pirkimoNumeris), (nodeId) => {
             if (dataGraph.hasNode(nodeId)) dataGraph.setNodeAttribute(nodeId, 'expanded', true);
             if (viewGraph.hasNode(nodeId)) viewGraph.setNodeAttribute(nodeId, 'expanded', true);
             createContractLink();
         });
     }
 
-    renderer.on('clickNode', function (event) {
-        var nodeId = event.node;
-        var attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
+    renderer.on('clickNode', (event) => {
+        const nodeId = event.node;
+        const attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
         console.log('[Ryšiai] click:', nodeId, attrs.entityType || '?', 'expanded:', attrs.expanded);
 
         if (selectedNodeId === nodeId) {
@@ -249,5 +249,5 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     renderer.on('clickStage', deselectAll);
 
-    return { loadOrg, loadPerson, loadProcurement, loadContract, rebuildAndRefresh, getSelectedNodeId: function () { return selectedNodeId; }, selectNode };
+    return { loadOrg, loadPerson, loadProcurement, loadContract, rebuildAndRefresh, getSelectedNodeId: () => selectedNodeId, selectNode };
 }

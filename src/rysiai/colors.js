@@ -2,7 +2,7 @@ import { isContractNode, isPersonNode, isProcurementNode } from './entity-types.
 
 // ── Node and edge colours ────────────────────────────────────────────────────
 
-export var NODE_COLOR = {
+export const NODE_COLOR = {
     org: '#3b82f6',
     orgStub: '#9ca3af',
     person: '#f97316',
@@ -10,7 +10,7 @@ export var NODE_COLOR = {
     procurement: '#8b5cf6',
 };
 
-export var EDGE_COLOR = {
+export const EDGE_COLOR = {
     Director:     '#1d4ed8',
     Shareholder:  '#7c3aed',
     Official:     '#0891b2',
@@ -26,7 +26,7 @@ export var EDGE_COLOR = {
 
 // Edge types hidden on initial render (legend checkboxes start unchecked).
 // LegendState seeds its global and per-node Sets from this constant.
-export var HIDDEN_BY_DEFAULT = new Set(['Official', 'Employment', 'Spouse']);
+export const HIDDEN_BY_DEFAULT = new Set(['Official', 'Employment', 'Spouse']);
 
 export function nodeColor(attrs) {
     if (isContractNode(attrs))    return NODE_COLOR.contract;

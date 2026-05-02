@@ -2,7 +2,7 @@ import { isOrgNode, isPersonNode, isContractNode, ENTITY_TYPE } from './entity-t
 
 // ── Details panel ─────────────────────────────────────────────────────────────
 
-var panelEl = null;
+let panelEl = null;
 
 function getPanel() {
     if (!panelEl) panelEl = document.getElementById('rysiai-details');
@@ -16,7 +16,7 @@ function getPanel() {
  */
 function formatContractValue(verte) {
     if (verte == null || verte === 0) return '';
-    var v = Math.round(verte);
+    const v = Math.round(verte);
     if (v >= 1000000) return '€' + (v / 1000000).toFixed(1) + 'M';
     if (v >= 1000) return '€' + Math.round(v / 1000) + 'K';
     return '€' + v;
@@ -32,10 +32,10 @@ function esc(s) {
 
 function buildHtml(attrs) {
     if (isOrgNode(attrs)) {
-        var employees = '';
-        var d1 = attrs.draustieji || 0;
-        var d2 = attrs.draustieji2 || 0;
-        var count = d1 + d2;
+        let employees = '';
+        const d1 = attrs.draustieji || 0;
+        const d2 = attrs.draustieji2 || 0;
+        const count = d1 + d2;
         if (count > 0) employees = '<div class="vd-sub">Darbuotojų: ' + count + '</div>';
         return '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>'
             + '<div class="vd-sub">' + esc(attrs.jarKodas) + '</div>'
@@ -44,9 +44,9 @@ function buildHtml(attrs) {
     }
 
     if (isContractNode(attrs)) {
-        var valueStr = formatContractValue(attrs.verte);
-        var sutId = attrs.sutartiesUnikalusId || attrs.id.replace('contract:', '');
-        var html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
+        const valueStr = formatContractValue(attrs.verte);
+        const sutId = attrs.sutartiesUnikalusId || attrs.id.replace('contract:', '');
+        let html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
         if (valueStr) html += '<div class="vd-sub">' + valueStr + '</div>';
         html += link('/sutartis/' + encodeURIComponent(sutId), 'Peržiūrėti sutartį');
         if (attrs.pirkimoNumeris) {
@@ -56,8 +56,8 @@ function buildHtml(attrs) {
     }
 
     if (attrs.entityType === ENTITY_TYPE.Procurement) {
-        var procValue = formatContractValue(attrs.numatomaVerteEUR);
-        var html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
+        const procValue = formatContractValue(attrs.numatomaVerteEUR);
+        let html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
         if (procValue) html += '<div class="vd-sub">' + procValue + '</div>';
         if (attrs.statusas) html += '<div class="vd-sub">' + esc(attrs.statusas) + '</div>';
         html += link('/viesiejiPirkimai/' + encodeURIComponent(attrs.pirkimoId), 'Peržiūrėti pirkimą');
@@ -65,7 +65,7 @@ function buildHtml(attrs) {
     }
 
     if (isPersonNode(attrs)) {
-        var name = ((attrs.vardas || '') + ' ' + (attrs.pavarde || '')).trim();
+        const name = ((attrs.vardas || '') + ' ' + (attrs.pavarde || '')).trim();
         return '<div class="vd-title">' + esc(name) + '</div>';
     }
 
@@ -78,9 +78,9 @@ function buildHtml(attrs) {
  * @param {object} attrs  Node attributes from viewGraph
  */
 export function showNodeDetails(nodeId, attrs) {
-    var el = getPanel();
+    const el = getPanel();
     if (!el) return;
-    var html = buildHtml(attrs);
+    const html = buildHtml(attrs);
     if (!html) { el.hidden = true; return; }
     el.innerHTML = html;
     el.hidden = false;
@@ -90,6 +90,6 @@ export function showNodeDetails(nodeId, attrs) {
  * Hides the details panel.
  */
 export function hideDetails() {
-    var el = getPanel();
+    const el = getPanel();
     if (el) el.hidden = true;
 }

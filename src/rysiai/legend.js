@@ -6,8 +6,8 @@
  * @param {LegendState}   legendState - the LegendState instance
  */
 export function updateLegendForNode(nodeId, label, legendState) {
-    var legendEl = document.getElementById('rysiai-legend');
-    var titleEl = document.getElementById('rysiai-legend-title');
+    const legendEl = document.getElementById('rysiai-legend');
+    const titleEl = document.getElementById('rysiai-legend-title');
 
     if (nodeId == null) {
         if (legendEl) legendEl.hidden = true;
@@ -17,12 +17,12 @@ export function updateLegendForNode(nodeId, label, legendState) {
     if (legendEl) legendEl.hidden = false;
     if (titleEl) titleEl.textContent = label != null ? label : nodeId;
 
-    document.querySelectorAll('#rysiai-legend input[type=checkbox][data-edge-types]').forEach(function (cb) {
-        var types = cb.dataset.edgeTypes.split(',');
+    document.querySelectorAll('#rysiai-legend input[type=checkbox][data-edge-types]').forEach((cb) => {
+        const types = cb.dataset.edgeTypes.split(',');
         if (nodeId != null) {
-            cb.checked = types.every(function (t) { return legendState.isTypeVisible(nodeId, t.trim()); });
+            cb.checked = types.every((t) => legendState.isTypeVisible(nodeId, t.trim()));
         } else {
-            cb.checked = types.every(function (t) { return legendState.isGlobalTypeVisible(t.trim()); });
+            cb.checked = types.every((t) => legendState.isGlobalTypeVisible(t.trim()));
         }
     });
 }
@@ -39,12 +39,12 @@ export function updateLegendForNode(nodeId, label, legendState) {
  * @param {Function}           rebuildAndRefresh  - callback from createExpandUI
  */
 export function bindLegendCheckboxes(getSelectedNodeId, legendState, rebuildAndRefresh) {
-    document.querySelectorAll('#rysiai-legend input[type=checkbox][data-edge-types]').forEach(function (cb) {
-        cb.addEventListener('change', function () {
-            var nodeId = getSelectedNodeId();
-            var types = cb.dataset.edgeTypes.split(',');
-            types.forEach(function (t) {
-                var type = t.trim();
+    document.querySelectorAll('#rysiai-legend input[type=checkbox][data-edge-types]').forEach((cb) => {
+        cb.addEventListener('change', () => {
+            const nodeId = getSelectedNodeId();
+            const types = cb.dataset.edgeTypes.split(',');
+            types.forEach((t) => {
+                const type = t.trim();
                 if (nodeId != null) {
                     legendState.setTypeVisible(nodeId, type, cb.checked);
                 } else {

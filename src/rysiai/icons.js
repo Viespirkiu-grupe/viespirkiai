@@ -16,12 +16,12 @@ const MUI_ICON_PATHS = {
 };
 
 // btoa polyfill for Node.js test environment
-var _btoa = typeof btoa === 'function' ? btoa : function (s) { return Buffer.from(s).toString('base64'); };
+const _btoa = typeof btoa === 'function' ? btoa : (s) => Buffer.from(s).toString('base64');
 
 export function makeIconDataUri(nodeType) {
-    var path = MUI_ICON_PATHS[nodeType];
+    const path = MUI_ICON_PATHS[nodeType];
     if (!path) return '';
-    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="48" height="48"><path fill="white" d="' + path + '"/></svg>';
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="48" height="48"><path fill="white" d="' + path + '"/></svg>';
     return 'data:image/svg+xml;base64,' + _btoa(svg);
 }
 
