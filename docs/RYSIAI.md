@@ -12,13 +12,17 @@ Interaction model:
 - **Single click** — selects the node and shows its details panel. Clicking the canvas background deselects.
 - **Double-click** — expands the node, fetching and merging its connected data into the graph.
 
-The **details panel** (top-right overlay) shows a type-specific summary of the selected node. At the bottom of the
-panel, an **expand/collapse button** provides an alternative to double-clicking. The node stays selected after either
-button action:
+The **`#node-details` panel** (top-right overlay, min 200 px / max 240 px) unifies the node details and the edge-type
+legend into a single panel. It contains two sub-components:
 
-- **"Išskleisti"** (Hub icon) — shown when the node has not yet been expanded; triggers expansion.
-- **"Suskleisti"** (Adjust icon) — shown when the node is already expanded; collapses: removes the edges and orphaned
-  nodes brought in by this expansion, resets `expanded: false`, rebuilds the graph.
+- **`#rysiai-details`** — type-specific summary of the selected node. At the bottom, an **expand/collapse button**
+  provides an alternative to double-clicking. The node stays selected after either button action:
+  - **"Išskleisti"** (Hub icon) — shown when the node has not yet been expanded; triggers expansion.
+  - **"Suskleisti"** (Adjust icon) — shown when the node is already expanded; collapses: removes the edges and orphaned
+    nodes brought in by this expansion, resets `expanded: false`, rebuilds the graph.
+- **`#rysiai-legend`** — edge-type filter checkboxes; shown **only when the selected node is expanded** (`expanded === true`).
+  Hidden automatically when "Suskleisti" is clicked (node collapses) or when a different node is selected and it is not yet
+  expanded.
 
 MCP is not used for DB queries — direct DB calls are faster and avoid HTTP/SSE overhead; MCP is designed for external AI
 clients only.
@@ -409,11 +413,11 @@ graph TD
 | `src/rysiai/colors.js`      | Client | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` Set                                                        | No                        |
 | `src/rysiai/renderers.js`   | Client | `drawNodeLabel`, `drawNodeHover` — Sigma canvas callbacks                                                             | No (canvas ctx passed in) |
 | `src/rysiai/graph-utils.js` | Client | `mergeGraphElements(dataGraph,...)`, `rebuildViewGraph`, `syncPositionsToData`, `runLayout` — **pure, injected deps** | No ★                      |
-| `src/rysiai/legend.js`      | Client | `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)`                                                  | Yes (queries DOM)         |
+| `src/rysiai/legend.js`      | Client | `updateLegendForNode(nodeId, label, legendState, expanded)` — shows/hides `#rysiai-legend` based on expansion state  | Yes (queries DOM)         |
 | `src/rysiai/expand-ui.js`   | Client | `createExpandUI({dataGraph,viewGraph,...})` — async fetch + rebuild; returns `rebuildAndRefresh`                      | Yes                       |
 | `modules/rysiai/expand.js`  | Server | `expandOrg`, `expandPerson`, `expandProcurement`, all pure builder helpers                                            | No                        |
 | `routes/rysiai.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`/`expandProcurement`; renders EJS                                     | No                        |
-| `views/rysiai/index.ejs`    | View   | HTML shell, inline CSS, legend overlay with checkboxes                                                                | —                         |
+| `views/rysiai/index.ejs`    | View   | HTML shell; `#node-details` wrapper (top-right); `#rysiai-details` + `#rysiai-legend` sub-components inside wrapper  | —                         |
 
 **Visual identity — node colours and icons:**
 
@@ -574,9 +578,10 @@ Person nodes keep a fixed `size: 8`. `edgeWeight` is mirrored as a local helper 
 
 ## Tasks
 
-> **Phases 1–12 complete.** Core infrastructure (routes, expand.js, Sigma canvas, icons), expand
+> **Phases 1–16 complete.** Core infrastructure (routes, expand.js, Sigma canvas, icons), expand
 > animations, loading overlay, edge/node type labels, legend checkboxes, two-graph architecture,
-> per-node selection state, dynamic node/edge sizing, entity-types module, and SVG legend arrows are
+> per-node selection state, dynamic node/edge sizing, entity-types module, SVG legend arrows,
+> ProcurementEntity nodes, double-click expand, and expand/collapse button in details panel are
 > all implemented. See architecture sections above for current implementation state.
 
 ---
@@ -605,24 +610,6 @@ Add `ProcurementEntity` as a first-class node type on the server. The client-sid
 
 **Edges from `expandProcurement` (winner orgs)**: `Award` edge `procurement:{pirkimoId}` → `org:{tiekejoKodas}`, label =
 formatted total `verte` sum for that seller.
-
-#### Tasks
-
-- [x] **`modules/rysiai/expand.js`**:
-    - Add `procurementNode(row)` factory:
-      `{ id, entityType, pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas, size, expanded: false }`.
-    - In `expandOrg`: query
-      `SELECT pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas FROM viesiejiPirkimai WHERE jarKodas = $jk ORDER BY numatomaVerteEUR DESC NULLS LAST LIMIT 20`;
-      emit `procurementNode` + `Procurement` edge per result.
-    - Add `expandProcurement(pirkimoId)`: query
-      `SELECT DISTINCT s.tiekejoKodas, j.pavadinimas, SUM(s.verte) as totalVerte FROM sutartys s LEFT JOIN jarCsv j ON j.jarKodas::text = s.tiekejoKodas WHERE s.pirkimoNumeris = $1 GROUP BY s.tiekejoKodas, j.pavadinimas`;
-      return org stub nodes + `Award` edges.
-
-- [x] **Browser smoke-test**:
-    - Double-click a buyer org → purple procurement nodes appear
-    - Double-click a procurement node → winner seller org stubs appear via green `Award` edges
-    - Select a procurement node → details panel shows title, estimated value, statusas, link, and Išskleisti/Suskleisti
-      button
 
 ---
 
@@ -735,44 +722,71 @@ function selectNode(id) {
 > different org). Provenance tracking would be required to do this safely and is deferred to a
 > future phase.
 
+---
+
+**Phase 17 — Unified `#node-details` panel**
+
+Merge the separately positioned `#rysiai-details` (top-right) and `#rysiai-legend` (bottom-right) into a single
+`#node-details` wrapper panel anchored top-right. The legend becomes a sub-component inside the wrapper and is shown
+only when the selected node is expanded.
+
+#### Layout
+
+```
+#node-details (wrapper: position absolute, top 12px, right 12px, min 200px, max 240px)
+├── #rysiai-details  (node info: title, sub, links + Išskleisti/Suskleisti button)
+└── #rysiai-legend   (edge-type checkboxes — border-top separator, hidden when node not expanded)
+```
+
+`#node-details` is hidden when no node is selected. When a node is selected:
+
+- `#rysiai-details` is always shown.
+- `#rysiai-legend` is shown only when `attrs.expanded === true`; hidden otherwise.
+
+After `_expand` completes, the legend becomes visible because the node's `expanded` flag is set to `true`.
+After `collapseNode`, the legend is hidden. Double-clicking an unexpanded node first selects (no legend), then expands
+(legend appears automatically).
+
 #### Tasks
 
-- [x] **`src/rysiai/icons.js`**: add `Hub` and `Adjust` MUI SVG path strings to `MUI_ICON_PATHS`;
-  export a new `svgIcon(key)` function that returns the inline SVG HTML string for a given key
-  (returns empty string for unknown keys).
+- [ ] **`views/rysiai/index.ejs`**:
+    - Add `#node-details` wrapper div: `position: absolute; top: 12px; right: 12px; min-width: 200px; max-width: 240px`
+      with same background, border, border-radius, box-shadow, font-size, color, z-index, and overflow-wrap as the
+      current `#rysiai-details`. Start `hidden`.
+    - Move `#rysiai-details` inside `#node-details`; strip its individual `position`, `top`, `right`, `max-width`,
+      `min-width`, `background`, `border`, `box-shadow`, `z-index` CSS — it inherits the wrapper's container styles.
+      Keep `padding: 10px 14px; line-height: 1.5`.
+    - Move `#rysiai-legend` inside `#node-details` after `#rysiai-details`; strip its `position: absolute; bottom; right`
+      CSS. Add `border-top: 1px solid #e5e7eb; margin-top: 8px; padding-top: 8px` separator. Start `hidden`.
+    - Dark mode border separator: `.dark #rysiai-legend { border-top-color: #374151; }`.
+    - Keep all existing child styles: `.vd-title`, `.vd-sub`, `.vd-link`, `.vd-btn`, `.vl-swatch`, legend label/checkbox.
 
-- [x] **`src/rysiai/details-panel.js`**:
-    - Import `svgIcon` from `icons.js`.
-    - Change signature to `showNodeDetails(nodeId, attrs, handlers = {})`.
-    - In `buildHtml(attrs, handlers)`: append at the bottom an Išskleisti or Suskleisti button
-      based on `handlers.onExpand` / `handlers.onCollapse`. Button HTML: `class="vd-btn"`,
-      `data-action="expand"` or `data-action="collapse"`, flex row with `svgIcon(...)` + label text.
-    - After `el.innerHTML = html`, bind the handler directly to the button element (see wiring
-      pattern in the section above — do **not** use `{ once: true }` on the panel).
-    - Add button CSS to `views/rysiai/index.ejs`: `.vd-btn` — full-width, small padding,
-      border, rounded, cursor pointer, flex, align-items center, gap 6px; hover state.
+- [ ] **`src/rysiai/details-panel.js`**:
+    - Add `getNodeDetailsWrapper()` helper: `document.getElementById('node-details')`.
+    - In `showNodeDetails`: after resolving `html`, show the wrapper (`wrapper.hidden = false`) and set `el.hidden = false`.
+    - In `hideDetails`: hide the wrapper (`wrapper.hidden = true`) instead of (or in addition to) `el.hidden = true`.
 
-- [x] **`src/rysiai/expand-ui.js`**:
-    - Add `isExpandableNode(attrs)` predicate (local helper, not exported).
-    - Add `_triggerExpand(nodeId, attrs)` — guards `if (attrs.expanded) return;` first, then
-      dispatches via EXPAND_KINDS lookup or contract special case (extracted from current
-      `clickNode` expansion block).
-    - Replace `clickNode` expansion block with `selectNode(nodeId)` only; remove the
-      deselect-on-re-click branch (`if (selectedNodeId === nodeId) deselectAll()` → delete).
-    - Add `renderer.on('doubleClickNode', (event) => { ... })` handler that calls
-      `_triggerExpand(event.node, attrs)`.
-    - Add `collapseNode(nodeId)` — implements the simplified collapse algorithm above.
-    - Update `selectNode` to compute and pass `handlers` to `showNodeDetails`.
-    - In `collapseNode`, after `rebuildAndRefresh()`: if nodeId still in `viewGraph`, re-call
-      `showNodeDetails` with `onExpand` handler; else call `deselectAll()`.
+- [ ] **`src/rysiai/legend.js`**:
+    - Update `updateLegendForNode(nodeId, label, legendState, expanded)` — add 4th parameter `expanded`.
+    - When `nodeId != null && expanded === true`: show `#rysiai-legend`, sync checkboxes (existing logic unchanged).
+    - When `nodeId != null && !expanded`: hide `#rysiai-legend` only (do not affect `#node-details` wrapper — it stays visible via `showNodeDetails`).
+    - When `nodeId == null`: hide `#rysiai-legend` (redundant since wrapper hides, but explicit).
 
-- [x] **Browser smoke-test**:
-    - Single-click a node → selects, shows details panel; double-clicking re-click does not deselect
-    - Double-click an unexpanded org → expands, details panel switches to Suskleisti button
-    - Click Išskleisti in panel → same expansion as double-click
-    - Click Suskleisti in panel → expansion nodes disappear, button reverts to Išskleisti
-    - Single-click canvas → deselects, panel hides
-    - Single-click already-selected node → no-op (panel stays open)
+- [ ] **`src/rysiai/expand-ui.js`**:
+    - In `selectNode`: pass `attrs.expanded` as 4th arg to `updateLegendForNode(id, label, legendState, attrs.expanded)`.
+    - In `refreshSelectedNodePanel` (called after `_expand` completes): after `showNodeDetails`, also call
+      `updateLegendForNode(selectedNodeId, label, legendState, true)` — node is now expanded, legend should show.
+    - In `collapseNode` after rebuild: if node still in `viewGraph`, call
+      `updateLegendForNode(nodeId, label, legendState, false)` to hide legend; existing `showNodeDetails` call is sufficient for panel content.
+    - `deselectAll` and the disappeared-node branch in `collapseNode` already call `updateLegendForNode(null, null, legendState)` — pass `false` or omit 4th arg (null nodeId hides legend unconditionally).
+
+- [ ] **Browser smoke-test**:
+    - Single-click unexpanded node → `#node-details` shows with details only; `#rysiai-legend` hidden
+    - Click "Išskleisti" → node expands; `#rysiai-legend` appears inside `#node-details`
+    - Click "Suskleisti" → legend disappears; button reverts to "Išskleisti"
+    - Double-click unexpanded node → node selected (no legend) → expands → legend appears
+    - Click canvas background → `#node-details` hides entirely
+    - `#rysiai-legend` no longer floats independently at bottom-right
 
 ---
 
@@ -785,22 +799,3 @@ function selectNode(id) {
 
 3. **Header nav link for `/rysiai`**: Keep pointing to `/rysiai/` — shows 404 "įmonė nenurodyta"
    when clicked directly. This is intentional. ✓ Resolved.
-
-# Node Details Panel
-
-When node is selected, right side panel is displayed. Currently, we have two panels: `rysiai-details` and
-`rysiai-legend` - we need to have one unified panel: `node-details` that will be used for both purposes. You can still
-keep `rysiai-details` and `rysiai-legend` as a subcomponents inside `node-details`.
-
-`node-details` properties:
-
-- [ ] Min width is 200 px, and max width is 240 px.
-
-`node-details` features:
-
-- [ ] When panel is open, at the top right show as it is right now in `rysiai-details`
-- [ ] After `rysiai-details` part, show a button "Išskleisti" when not expanded, and "Suskleisti" when expanded.
-- [ ] When node is not expanded, do not show `rysiai-legend`, because for not expanded node, legend is not relevant.
-  Collapse legend, when node is set to "Suskleisti".
-- [ ] As before, right panel `node-details` is shown for each selected node.
-- [ ] When user double-clicks the node, `node-details` is shown as a fully expanded with legend.
