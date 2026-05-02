@@ -33,9 +33,11 @@ export function computeNodeSize(attrs) {
  * @param {Function} getNodePos     - (id: string) => {x, y} | null — returns graph-space coords
  * @param {{ nodes: Array, edges: Array }} data
  * @param {string|null} fromNodeId  - ID of the node that triggered the expansion (scatter origin)
+ * @param {string|null} rootNodeId  - ID of the node that is the permanent root (gets isRoot=true,
+ *                                    expandedBy stays empty even though fromNodeId == rootNodeId)
  * @returns {string[]} IDs of newly added nodes
  */
-export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
+export function mergeGraphElements(graph, getNodePos, data, fromNodeId, rootNodeId = null) {
     const newNodeIds = [];
 
     (data.nodes || []).forEach((n) => {
@@ -77,14 +79,15 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
 
         const iconKey = getIconKey(n.attributes);
         const imgUri = iconKey ? makeIconDataUri(iconKey) : '';
+        const isThisRoot = rootNodeId ? n.id === rootNodeId : !fromNodeId;
         const nodeAttrs = Object.assign({}, n.attributes, {
             x: x,
             y: y,
             size: computeNodeSize(n.attributes),
             color: nodeColor(n.attributes),
             label: n.attributes.label || n.id,
-            expandedBy: fromNodeId ? new Set([fromNodeId]) : new Set(),
-            isRoot: !fromNodeId,
+            expandedBy: isThisRoot ? new Set() : (fromNodeId ? new Set([fromNodeId]) : new Set()),
+            isRoot: isThisRoot,
         });
         if (imgUri) nodeAttrs.image = imgUri;
 
@@ -238,6 +241,42 @@ export function syncPositionsToData(dataGraph, viewGraph) {
             dataGraph.setNodeAttribute(id, 'y', attrs.y);
         }
     });
+}
+
+/**
+ * Pure collapse: sets expanded=false on nodeId, then removes all nodes and edges
+ * that were exclusively owned by this node's expansion (expandedBy tracking).
+ * Does NOT touch viewGraph or trigger any UI updates — call rebuildViewGraph after.
+ *
+ * @param {Graph}  dataGraph
+ * @param {string} nodeId
+ */
+export function collapseGraphData(dataGraph, nodeId) {
+    if (!dataGraph.hasNode(nodeId)) return;
+
+    dataGraph.setNodeAttribute(nodeId, 'expanded', false);
+
+    const nodesToRemove = [];
+    dataGraph.forEachNode((id, attrs) => {
+        if (id === nodeId) return;
+        const owners = attrs.expandedBy;
+        if (owners && owners.has(nodeId)) {
+            owners.delete(nodeId);
+            if (owners.size === 0 && !attrs.isRoot) nodesToRemove.push(id);
+        }
+    });
+
+    const edgesToRemove = [];
+    dataGraph.forEachEdge((edgeId, attrs) => {
+        const owners = attrs.expandedBy;
+        if (owners && owners.has(nodeId)) {
+            owners.delete(nodeId);
+            if (owners.size === 0) edgesToRemove.push(edgeId);
+        }
+    });
+
+    edgesToRemove.forEach((eid) => { if (dataGraph.hasEdge(eid)) dataGraph.dropEdge(eid); });
+    nodesToRemove.forEach((nid) => { if (dataGraph.hasNode(nid)) dataGraph.dropNode(nid); });
 }
 
 /**

@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import Graph from 'graphology';
 
-import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout } from '../../src/rysiai/graph-utils.js';
+import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData } from '../../src/rysiai/graph-utils.js';
 import { LegendState } from '../../src/rysiai/legend-state.js';
 import { ENTITY_TYPE } from '../../src/rysiai/entity-types.js';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
@@ -658,5 +658,180 @@ describe('rebuildViewGraph — size sync for already-visible nodes', function ()
         rebuildViewGraph(dg, vg, () => false);
 
         assert.equal(vg.getNodeAttribute('org:A', 'size'), 19);
+    });
+});
+
+// ── mergeGraphElements — rootNodeId parameter ─────────────────────────────────
+
+describe('mergeGraphElements — rootNodeId', () => {
+    let graph;
+    const noPos = () => null;
+
+    beforeEach(() => {
+        graph = new Graph({ type: 'directed', multi: true });
+    });
+
+    it('root node gets isRoot=true and empty expandedBy when rootNodeId provided', () => {
+        mergeGraphElements(graph, noPos, { nodes: [orgNodeData('org:root', 'Root')] }, 'org:root', 'org:root');
+        assert.equal(graph.getNodeAttribute('org:root', 'isRoot'), true);
+        assert.deepEqual([...graph.getNodeAttribute('org:root', 'expandedBy')], []);
+    });
+
+    it('non-root nodes get isRoot=false and expandedBy=[fromNodeId] when rootNodeId provided', () => {
+        mergeGraphElements(graph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:partner', 'Partner')],
+            edges: [],
+        }, 'org:root', 'org:root');
+        assert.equal(graph.getNodeAttribute('org:partner', 'isRoot'), false);
+        assert.deepEqual([...graph.getNodeAttribute('org:partner', 'expandedBy')], ['org:root']);
+    });
+
+    it('edges get expandedBy=[fromNodeId] when rootNodeId provided', () => {
+        mergeGraphElements(graph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:partner', 'Partner')],
+            edges: [edgeData('org:root', 'org:partner', 'Order', '')],
+        }, 'org:root', 'org:root');
+        const edgeId = 'edge:org:root:org:partner:Order';
+        assert.deepEqual([...graph.getEdgeAttribute(edgeId, 'expandedBy')], ['org:root']);
+    });
+
+    it('without rootNodeId, fromNodeId=null makes all nodes isRoot=true (backward compat)', () => {
+        mergeGraphElements(graph, noPos, { nodes: [orgNodeData('org:A', 'A')] }, null);
+        assert.equal(graph.getNodeAttribute('org:A', 'isRoot'), true);
+    });
+});
+
+// ── collapseGraphData ─────────────────────────────────────────────────────────
+
+describe('collapseGraphData', () => {
+    let dataGraph;
+    const noPos = () => null;
+
+    beforeEach(() => {
+        dataGraph = new Graph({ type: 'directed', multi: true });
+    });
+
+    it('sets expanded=false on the collapsed node', () => {
+        mergeGraphElements(dataGraph, noPos, { nodes: [orgNodeData('org:root', 'Root')] }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+        collapseGraphData(dataGraph, 'org:root');
+        assert.equal(dataGraph.getNodeAttribute('org:root', 'expanded'), false);
+    });
+
+    it('removes nodes exclusively owned by the collapsed node', () => {
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:p', 'Partner')],
+            edges: [edgeData('org:root', 'org:p', 'Order', '')],
+        }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+
+        collapseGraphData(dataGraph, 'org:root');
+
+        assert.ok(!dataGraph.hasNode('org:p'), 'exclusively owned partner should be removed');
+        assert.ok(dataGraph.hasNode('org:root'), 'collapsed node itself stays in dataGraph');
+        assert.equal(dataGraph.edges().length, 0, 'owned edge should be removed');
+    });
+
+    it('preserves nodes shared with another expansion (diamond dependency)', () => {
+        // Root expansion: root + shared partner
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:shared', 'Shared')],
+            edges: [edgeData('org:root', 'org:shared', 'Order', '')],
+        }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+
+        // Expanding org:other also claims org:shared (server returns both in its response)
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:other', 'Other'), orgNodeData('org:shared', 'Shared')],
+            edges: [edgeData('org:other', 'org:shared', 'Order', '')],
+        }, 'org:other');
+        dataGraph.setNodeAttribute('org:other', 'expanded', true);
+
+        collapseGraphData(dataGraph, 'org:root');
+
+        assert.ok(dataGraph.hasNode('org:shared'), 'shared node must survive (also owned by org:other)');
+        assert.ok(dataGraph.hasNode('org:other'), 'other expanded node must survive');
+    });
+
+    it('does nothing when nodeId is not in dataGraph', () => {
+        collapseGraphData(dataGraph, 'org:nonexistent'); // must not throw
+    });
+});
+
+// ── collapse + rebuildViewGraph integration ───────────────────────────────────
+
+describe('collapse + rebuildViewGraph integration', () => {
+    let dataGraph, viewGraph;
+    const noPos = () => null;
+    const neverHide = () => false;
+
+    beforeEach(() => {
+        dataGraph = new Graph({ type: 'directed', multi: true });
+        viewGraph = new Graph({ type: 'directed', multi: true });
+    });
+
+    it('collapsing the root node when it is the only expanded node empties viewGraph', () => {
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:p1', 'Partner')],
+            edges: [edgeData('org:root', 'org:p1', 'Order', '')],
+        }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+
+        rebuildViewGraph(dataGraph, viewGraph, neverHide);
+        assert.equal(viewGraph.order, 2, 'both nodes visible before collapse');
+
+        collapseGraphData(dataGraph, 'org:root');
+        rebuildViewGraph(dataGraph, viewGraph, neverHide);
+
+        assert.equal(viewGraph.order, 0, 'graph must be empty after root collapse');
+    });
+
+    it('collapsing root leaves another independently expanded node visible', () => {
+        // Root expansion: root + partner (server returns root itself + all connected nodes)
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:p1', 'Partner')],
+            edges: [edgeData('org:root', 'org:p1', 'Order', '')],
+        }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+
+        // Partner expansion: server returns org:p1 itself (already in graph → gets expandedBy updated)
+        // plus any new nodes. This is the real server behaviour: expandOrg includes the target org.
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:p1', 'Partner'), orgNodeData('org:p2', 'Sub-partner')],
+            edges: [edgeData('org:p1', 'org:p2', 'Order', '')],
+        }, 'org:p1');
+        dataGraph.setNodeAttribute('org:p1', 'expanded', true);
+
+        rebuildViewGraph(dataGraph, viewGraph, neverHide);
+        assert.equal(viewGraph.order, 3, 'all three nodes visible before collapse');
+
+        collapseGraphData(dataGraph, 'org:root');
+        rebuildViewGraph(dataGraph, viewGraph, neverHide);
+
+        assert.ok(!viewGraph.hasNode('org:root'), 'root should disappear');
+        assert.ok(viewGraph.hasNode('org:p1'), 'partner stays (still expanded anchor)');
+        assert.ok(viewGraph.hasNode('org:p2'), 'sub-partner stays (has edge to anchor)');
+    });
+
+    it('root node is isRoot=true and survives another node collapsing it', () => {
+        // Root expansion (root itself + partner)
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:p1', 'Partner')],
+            edges: [edgeData('org:root', 'org:p1', 'Order', '')],
+        }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+
+        // Partner expansion: partner claims root as one of its connections;
+        // root already exists → gets org:p1 added to expandedBy (but isRoot stays true)
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:p1', 'Partner'), orgNodeData('org:root', 'Root')],
+            edges: [edgeData('org:p1', 'org:root', 'Order', '')],
+        }, 'org:p1');
+        dataGraph.setNodeAttribute('org:p1', 'expanded', true);
+
+        // Collapse partner — root must survive because isRoot=true
+        collapseGraphData(dataGraph, 'org:p1');
+
+        assert.ok(dataGraph.hasNode('org:root'), 'root must not be removed when partner collapses');
     });
 });
