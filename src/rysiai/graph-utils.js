@@ -112,6 +112,10 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId, rootNode
         if (attrs.type) { attrs.edgeType = attrs.type; delete attrs.type; }
         attrs.color = EDGE_COLOR[attrs.edgeType] || '#d1d5db';
         attrs.expandedBy = fromNodeId ? new Set([fromNodeId]) : new Set();
+        // Assign size category for contract edges so legend can filter by size.
+        if ((attrs.edgeType === 'Order' || attrs.edgeType === 'Delivery') && attrs.size != null) {
+            attrs.contractSizeCategory = attrs.size >= 6 ? 'large' : attrs.size >= 3 ? 'medium' : 'small';
+        }
         graph.addEdgeWithKey(e.id, e.source, e.target, attrs);
     });
 
@@ -175,7 +179,7 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
     expandedAnchors.forEach((id) => { visible.add(id); });
     bridgeNodes.forEach((id) => { visible.add(id); });
     dataGraph.forEachEdge((edgeId, attrs, source, target) => {
-        if (!isEdgeHidden(source, target, attrs.edgeType)) {
+        if (!isEdgeHidden(source, target, attrs.edgeType, attrs.contractSizeCategory ?? null)) {
             visible.add(source);
             visible.add(target);
         }
@@ -211,13 +215,13 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
     // Remove hidden-type edges from viewGraph (bridge edges are exempt)
     const edgesToRemove = [];
     viewGraph.forEachEdge((edgeId, attrs, source, target) => {
-        if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType)) edgesToRemove.push(edgeId);
+        if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType, attrs.contractSizeCategory ?? null)) edgesToRemove.push(edgeId);
     });
     edgesToRemove.forEach((id) => { viewGraph.dropEdge(id); });
 
     // Add visible edges from dataGraph that are not yet in viewGraph (bridge edges always pass)
     dataGraph.forEachEdge((edgeId, attrs, source, target) => {
-        if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType)) return;
+        if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType, attrs.contractSizeCategory ?? null)) return;
         if (!viewGraph.hasNode(source) || !viewGraph.hasNode(target)) return;
         if (viewGraph.hasEdge(edgeId)) return;
         viewGraph.addEdgeWithKey(edgeId, source, target, Object.assign({}, attrs));

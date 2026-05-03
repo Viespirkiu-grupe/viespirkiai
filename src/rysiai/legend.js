@@ -23,6 +23,9 @@ export function updateLegendForNode(nodeId, label, legendState, expanded) {
         const types = cb.dataset.edgeTypes.split(',');
         cb.checked = types.every((t) => legendState.isTypeVisible(nodeId, t.trim()));
     });
+    document.querySelectorAll('#rysiai-legend input[type=checkbox][data-contract-size]').forEach((cb) => {
+        cb.checked = legendState.isSizeCategoryVisible(nodeId, cb.dataset.contractSize);
+    });
 }
 
 /**
@@ -49,6 +52,18 @@ export function bindLegendCheckboxes(getSelectedNodeId, legendState, rebuildAndR
                     legendState.setGlobalTypeVisible(type, cb.checked);
                 }
             });
+            rebuildAndRefresh();
+        });
+    });
+    document.querySelectorAll('#rysiai-legend input[type=checkbox][data-contract-size]').forEach((cb) => {
+        cb.addEventListener('change', () => {
+            const nodeId = getSelectedNodeId();
+            const category = cb.dataset.contractSize;
+            if (nodeId != null) {
+                legendState.setSizeCategoryVisible(nodeId, category, cb.checked);
+            } else {
+                legendState.setGlobalSizeCategoryVisible(category, cb.checked);
+            }
             rebuildAndRefresh();
         });
     });

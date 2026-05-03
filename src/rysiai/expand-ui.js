@@ -113,7 +113,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
      */
     function rebuildAndRefresh() {
         if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
-        rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => legendState.isEdgeHidden(s, t, type, sz));
         runLayout(viewGraph, forceAtlas2, noverlap);
         syncPositionsToData(dataGraph, viewGraph);
         if (selectedNodeId) setSelection(selectedNodeId, true);
@@ -139,7 +139,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             mergeGraphElements(dataGraph, getNodePos, data, fromNodeId, rootNodeId);
             afterMerge(id);
 
-            const newNodeIds = rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+            const newNodeIds = rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => legendState.isEdgeHidden(s, t, type, sz));
 
             // Re-apply selection attrs after rebuild (node may have been re-added)
             if (selectedNodeId && viewGraph.hasNode(selectedNodeId)) {
@@ -262,7 +262,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             // nodeColor reads expanded, so we update the stored color attribute explicitly.
             dataGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId)));
 
-            rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+            rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => legendState.isEdgeHidden(s, t, type, sz));
             runLayout(viewGraph, forceAtlas2, noverlap);
             syncPositionsToData(dataGraph, viewGraph);
 

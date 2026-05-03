@@ -556,6 +556,137 @@ describe('computeNodeSize', function () {
     });
 });
 
+// ── mergeGraphElements — contractSizeCategory ────────────────────────────────
+
+describe('mergeGraphElements — contractSizeCategory', () => {
+    let graph;
+    const noPos = () => null;
+
+    beforeEach(() => {
+        graph = new Graph({ type: 'directed', multi: true });
+        graph.addNode('org:A', { x: 0, y: 0, size: 8, color: '#000', label: 'A' });
+        graph.addNode('contract:x', { x: 10, y: 0, size: 8, color: '#000', label: 'x' });
+    });
+
+    function contractEdge(type, size) {
+        return { id: `edge:org:A:contract:x:${type}`, source: 'org:A', target: 'contract:x', attributes: { type, label: '', size } };
+    }
+
+    it('Order edge with size 1 gets contractSizeCategory small', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [contractEdge('Order', 1)] }, null);
+        assert.equal(graph.getEdgeAttribute('edge:org:A:contract:x:Order', 'contractSizeCategory'), 'small');
+    });
+
+    it('Order edge with size 3 gets contractSizeCategory medium', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [contractEdge('Order', 3)] }, null);
+        assert.equal(graph.getEdgeAttribute('edge:org:A:contract:x:Order', 'contractSizeCategory'), 'medium');
+    });
+
+    it('Order edge with size 6 gets contractSizeCategory large', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [contractEdge('Order', 6)] }, null);
+        assert.equal(graph.getEdgeAttribute('edge:org:A:contract:x:Order', 'contractSizeCategory'), 'large');
+    });
+
+    it('Delivery edge with size 3 gets contractSizeCategory medium', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [contractEdge('Delivery', 3)] }, null);
+        assert.equal(graph.getEdgeAttribute('edge:org:A:contract:x:Delivery', 'contractSizeCategory'), 'medium');
+    });
+
+    it('Director edge does NOT get contractSizeCategory', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [edgeData('org:A', 'contract:x', 'Director', '')] }, null);
+        const attrs = graph.getEdgeAttributes('edge:org:A:contract:x:Director');
+        assert.ok(!('contractSizeCategory' in attrs), 'Director edge must not have contractSizeCategory');
+    });
+
+    it('Order edge with no size does NOT get contractSizeCategory', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [edgeData('org:A', 'contract:x', 'Order', '')] }, null);
+        const attrs = graph.getEdgeAttributes('edge:org:A:contract:x:Order');
+        assert.ok(!('contractSizeCategory' in attrs), 'size-less Order edge must not have contractSizeCategory');
+    });
+});
+
+// ── rebuildViewGraph — size category filtering ────────────────────────────────
+
+describe('rebuildViewGraph — contractSizeCategory filtering', () => {
+    let dataGraph, viewGraph;
+
+    beforeEach(() => {
+        dataGraph = new Graph({ type: 'directed', multi: true });
+        viewGraph = new Graph({ type: 'directed', multi: true });
+    });
+
+    function addOrg(g, id, expanded = false) {
+        g.addNode(id, { entityType: ENTITY_TYPE.Org, expanded, x: 1, y: 2, size: 8, color: '#000', label: id });
+    }
+    function addContract(g, id) {
+        g.addNode(id, { entityType: ENTITY_TYPE.Contract, expanded: true, x: 1, y: 2, size: 8, color: '#000', label: id });
+    }
+    function addContractEdge(g, src, tgt, type, sizeCategory) {
+        g.addEdgeWithKey(`e:${src}:${tgt}:${type}`, src, tgt, { edgeType: type, contractSizeCategory: sizeCategory, color: '#ccc' });
+    }
+
+    it('hiding medium size hides medium contract edges', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addContract(dataGraph, 'contract:x');
+        addContractEdge(dataGraph, 'org:A', 'contract:x', 'Order', 'medium');
+
+        const ls = new LegendState();
+        ls.setGlobalSizeCategoryVisible('medium', false);
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => ls.isEdgeHidden(s, t, type, sz));
+        assert.ok(!viewGraph.hasEdge('e:org:A:contract:x:Order'), 'medium edge hidden when medium category hidden');
+        assert.ok(!viewGraph.hasNode('contract:x'), 'contract removed when its only edge is hidden');
+    });
+
+    it('hiding medium does not affect large or small contract edges', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addContract(dataGraph, 'contract:small');
+        addContract(dataGraph, 'contract:large');
+        addContractEdge(dataGraph, 'org:A', 'contract:small', 'Order', 'small');
+        addContractEdge(dataGraph, 'org:A', 'contract:large', 'Order', 'large');
+
+        const ls = new LegendState();
+        ls.setGlobalSizeCategoryVisible('medium', false);
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => ls.isEdgeHidden(s, t, type, sz));
+        assert.ok(viewGraph.hasNode('contract:small'), 'small contract unaffected');
+        assert.ok(viewGraph.hasNode('contract:large'), 'large contract unaffected');
+    });
+
+    it('per-node size filter: hiding large for OrgA does not affect OrgB', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addOrg(dataGraph, 'org:B', true);
+        addContract(dataGraph, 'contract:x');
+        addContract(dataGraph, 'contract:y');
+        addContractEdge(dataGraph, 'org:A', 'contract:x', 'Order', 'large');
+        addContractEdge(dataGraph, 'org:B', 'contract:y', 'Order', 'large');
+
+        const ls = new LegendState();
+        ls.initNode('org:A');
+        ls.setSizeCategoryVisible('org:A', 'large', false);
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => ls.isEdgeHidden(s, t, type, sz));
+        assert.ok(!viewGraph.hasNode('contract:x'), 'OrgA large contract hidden');
+        assert.ok(viewGraph.hasNode('contract:y'), 'OrgB large contract visible');
+    });
+
+    it('bridge contract remains visible even when its size category is hidden globally', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addOrg(dataGraph, 'org:B', true);
+        addContract(dataGraph, 'contract:x');
+        addContractEdge(dataGraph, 'org:A', 'contract:x', 'Order', 'large');
+        addContractEdge(dataGraph, 'contract:x', 'org:B', 'Delivery', 'large');
+
+        const ls = new LegendState();
+        ls.setGlobalSizeCategoryVisible('large', false);
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => ls.isEdgeHidden(s, t, type, sz));
+        assert.ok(viewGraph.hasNode('contract:x'), 'bridge contract visible despite size hidden');
+        assert.ok(viewGraph.hasEdge('e:org:A:contract:x:Order'), 'bridge edge visible');
+        assert.ok(viewGraph.hasEdge('e:contract:x:org:B:Delivery'), 'bridge edge visible');
+    });
+});
+
 // ── mergeGraphElements — org node enrichment ──────────────────────────────────
 
 describe('mergeGraphElements — org node sodra enrichment', function () {
