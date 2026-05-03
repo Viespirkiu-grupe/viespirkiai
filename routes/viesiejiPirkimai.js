@@ -248,8 +248,10 @@ viesiejiPirkimaiRouter.get(
 );
 
 viesiejiPirkimaiRouter.get("/viesiejiPirkimai/:id", async (req, res, next) => {
-    const id = req.params.id.replace(/\.json$/, "");
-    const isJson = req.params.id.endsWith(".json");
+    const raw = req.params.id;
+    const isPng = raw.endsWith(".png");
+    const isJson = raw.endsWith(".json");
+    const id = raw.replace(/\.(png|json)$/, "");
     const { rows } = await postgres.query(
         `
         SELECT p.*, v.pavadinimas AS "vykdytojoPavadinimas", v."jarKodas"
@@ -413,6 +415,19 @@ viesiejiPirkimaiRouter.get("/viesiejiPirkimai/:id", async (req, res, next) => {
     });
 
     pirkimas.sutartys = sutartysRes.results;
+
+    if (isPng) {
+        const verte = pirkimas.numatomaBendraPirkimoVerte
+            ? `${Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString("lt-LT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+            : "";
+        return await serveOpenGraphImage(
+            res,
+            pirkimas.pirkimoBudas || "Viešasis pirkimas",
+            [verte, pirkimas.pavadinimas].filter(Boolean).join(" "),
+            `Pirkėjas: ${pirkimas.pirkimoVykdytojas || ""}`,
+            `viespirkiai.org/viesiejiPirkimai/${pirkimas.pirkimoId}`,
+        );
+    }
 
     if (isJson) return res.json(pirkimas);
 

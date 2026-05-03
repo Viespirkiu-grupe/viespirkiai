@@ -127,6 +127,12 @@ export async function addDocumentToSearch(doc) {
             typeof doc.faktineIvykdimoVerte === "number"
                 ? doc.faktineIvykdimoVerte
                 : 0,
+        suma:
+            typeof doc.faktineIvykdimoVerte === "number" && doc.faktineIvykdimoVerte > 0
+                ? doc.faktineIvykdimoVerte
+                : typeof doc.verte === "number"
+                ? doc.verte
+                : 0,
 
         sudarymoData: toUnixTimestamp(doc.sudarymoData),
         galiojimoData: toUnixTimestamp(doc.galiojimoData),

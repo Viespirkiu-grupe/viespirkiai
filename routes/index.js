@@ -301,4 +301,14 @@ indexRouter.get("/index.png", async (req, res) => {
     );
 });
 
+indexRouter.get("/sutartys.png", async (req, res) => {
+    return await serveOpenGraphImage(
+        res,
+        "Sutarčių paieška",
+        "Viešpirkiai",
+        "Viešųjų pirkimų sutartys ir jų informacija",
+        "viespirkiai.org/sutartys",
+    );
+});
+
 export default indexRouter;

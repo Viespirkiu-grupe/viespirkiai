@@ -1,0 +1,47 @@
+<div>
+  <h2 class="mb-1 no-style">OCR</h2>
+
+  <% const ocrLatest = failas.ocrLatestResult; %>
+  <% if (ocrLatest?.submitTimestamp) { %>
+    <p class="text-muted text-xs mb-2"><%= formatDateTime(ocrLatest.submitTimestamp) %></p>
+  <% } else if (failas.ocrLockTimestamp) { %>
+    <p class="text-muted text-xs mb-2"><%= formatDateTime(failas.ocrLockTimestamp) %></p>
+  <% } %>
+
+  <dl class="kv-list mb-0">
+    <% if (failas.ocrStateKey && failas.ocrStateKey !== "1") { %>
+      <dt>Būsena</dt>
+      <dd><%= failas.ocrStateText %></dd>
+    <% } %>
+
+    <% if (ocrLatest && (ocrLatest.duration || ocrLatest.duration === 0)) { %>
+      <dt>Trukmė</dt>
+      <dd><span class="cell-mono"><%= formatDuration(ocrLatest.duration) %></span></dd>
+    <% } %>
+
+    <% if (ocrLatest && (ocrLatest.puslapiuSkaicius || ocrLatest.puslapiuSkaicius === 0)) { %>
+      <dt>Puslapiai</dt>
+      <dd><span class="cell-mono"><%= Number(ocrLatest.puslapiuSkaicius).toLocaleString('lt-LT') %></span></dd>
+    <% } %>
+
+    <% if (ocrLatest && (ocrLatest.zodziuSkaicius || ocrLatest.zodziuSkaicius === 0)) { %>
+      <dt>Žodžiai</dt>
+      <dd><span class="cell-mono"><%= Number(ocrLatest.zodziuSkaicius).toLocaleString('lt-LT') %></span></dd>
+    <% } %>
+
+    <% if (typeof failas.ocrBandymai === 'number' && failas.ocrBandymai > 0) { %>
+      <dt>Bandymų sk.</dt>
+      <dd><span class="cell-mono"><%= failas.ocrBandymai %></span></dd>
+    <% } %>
+
+    <% if (typeof failas.ocrRezultatuSkaicius === 'number' && failas.ocrRezultatuSkaicius > 1) { %>
+      <dt>Rezultatų įrašai</dt>
+      <dd><span class="cell-mono"><%= failas.ocrRezultatuSkaicius %></span></dd>
+    <% } %>
+
+    <% if (failas.ocrNode) { %>
+      <dt>Nuskaitytojas</dt>
+      <dd><span class="cell-mono"><%= failas.ocrNode %></span></dd>
+    <% } %>
+  </dl>
+</div>

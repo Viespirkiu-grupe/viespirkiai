@@ -280,7 +280,7 @@ export async function searchFailai(
     query,
     { limit, page = 1, stream = false } = {},
 ) {
-    const { sql, params, sqlCount, values, queryParams, usedHiddenFields } =
+    const { sql, params, sqlCount, paramsCount, values, queryParams, usedHiddenFields } =
         failaiFilter.build(query, {
             table: "failai f",
             limit,
@@ -371,9 +371,7 @@ export async function searchFailai(
         // When not exhausted, QW has plenty of hits and the estimate is meaningful.
         const total = rawExhausted ? null : Math.round(numHitsEstimate);
 
-        // In the Quickwit path, search/extension/saltinis/etc. are handled by
-        // Quickwit — only flag usedHiddenFields for PG-only filters.
-        const qwUsedHiddenFields = ['telefonas', 'email', 'domain', 'iban', 'jarKodas', 'location', 'md5']
+        const qwUsedHiddenFields = ['extension', 'saltinis', 'puslapiaiMin', 'puslapiaiMax', 'telefonas', 'email', 'domain', 'iban', 'jarKodas', 'location', 'md5']
             .some((f) => !!query[f]);
 
         return {
@@ -391,7 +389,7 @@ export async function searchFailai(
 
     const [{ rows }, { rows: countRows }] = await Promise.all([
         postgres.query(sql, params),
-        postgres.query(sqlCount, params),
+        postgres.query(sqlCount, paramsCount),
     ]);
     return {
         results: arrayToLithuanianTime(rows).map(aptvarkytiFailoRezultata),

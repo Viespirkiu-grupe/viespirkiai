@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 <head>
+  <%
+    const _ogTitle = failas.metaduomenys?.Title || failas.pavadinimas || "Failas";
+    const _ogParts = [failas.extension?.toUpperCase(), failas.dydis ? `${(failas.dydis / 1024 / 1024).toFixed(1)} MB` : null].filter(Boolean);
+  %>
   <%- include('../head.ejs', {
-    pageTitle: "Failas",
-    pageDescription: ``,
-    pageImage: `https://viespirkiai.org/failai.png`,
+    pageTitle: _ogTitle,
+    pageDescription: _ogParts.join(' · '),
+    pageImage: `https://viespirkiai.org/failas/${failas.id}.png`,
     customHead
   }) %>
   <style>
@@ -14,18 +18,6 @@
       gap: 28px;
       align-items: start;
     }
-    @media (max-width: 900px) {
-      .failas-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 900px) {
-      .failas-grid iframe {
-        height: 50vh;
-      }
-    }
-
     @media (max-width: 900px) {
       .failas-grid {
         grid-template-columns: 1fr;
@@ -45,87 +37,6 @@
 <body>
   <%- include('../header.ejs', {hideSubtext: false}) %>
   <main>
-    <%
-      failas.extension = (failas.extension || "").toLowerCase();
-      const libreFormats = ["doc","docx","odt","rtf","xls","xlsx","xlsb","ods","ppt","pptx","ppsx","odp","odg","pub","pages","xlt","dot","docm","dotx"];
-      const imageFormats = ["jpg","jpeg","png","bmp","gif","tif","tiff","jfif","heic","webp"];
-      const archiveFormats = ["zip","7z","rar","adoc"];
-      const ocrStateTextMap = {
-        "1": "Baigta",
-        "0": "Rekomenduojama",
-        "-1": "Nepavyko",
-        "-3": "Rezervuota",
-        "-6": "Viršijo bandymus"
-      };
-      const ocrStateKey = failas.ocrState === null || typeof failas.ocrState === "undefined"
-        ? null
-        : String(failas.ocrState);
-      const ocrStateText = ocrStateKey && ocrStateTextMap[ocrStateKey]
-        ? ocrStateTextMap[ocrStateKey]
-        : "Nežinoma";
-      const ocrLatest = failas.ocrLatestResult || null;
-      const hasOcrSection = ocrStateKey !== null || !!ocrLatest;
-      const formatDateTime = (value) => {
-        if (!value) return "—";
-        const dt = new Date(value);
-        return Number.isNaN(dt.getTime()) ? "—" : dt.toLocaleString("lt-LT", { hour12: false });
-      };
-      const formatDuration = (value) => {
-        if (value === null || typeof value === "undefined") return "—";
-        const ms = Math.round(Number(value));
-        if (!Number.isFinite(ms) || ms < 0) return "—";
-
-        if (ms < 1000) return `${ms} ms`;
-
-        const totalSecondsFloat = ms / 1000;
-        if (totalSecondsFloat < 10) {
-          return `${totalSecondsFloat.toLocaleString("lt-LT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`;
-        }
-
-        const totalSeconds = Math.round(totalSecondsFloat);
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
-
-        if (hours > 0) {
-          return `${hours} val ${String(minutes).padStart(2, "0")} min ${String(seconds).padStart(2, "0")} s`;
-        }
-
-        if (minutes > 0) {
-          return `${minutes} min ${String(seconds).padStart(2, "0")} s`;
-        }
-
-        return `${totalSeconds} s`;
-      };
-      let originalusLinkas = null;
-      let originalusLinkasPavadinimas = null;
-      if (failas.saltinis == "sutartys" || !failas.saltinis) {
-        originalusLinkas = `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dokId}&file_id=${failas.fileId}`;
-        originalusLinkasPavadinimas = "CVP IS";
-      } else if (failas.saltinis == "neskelbiamosDerybos") {
-        originalusLinkas = `https://eviesiejipirkimai.lt/${failas.saltinioId}`;
-        originalusLinkasPavadinimas = "CVP IS";
-      } else if (failas.saltinis == "archive") {
-        originalusLinkas = `/failas/${failas.parent}`;
-        originalusLinkasPavadinimas = "Archyvas";
-      } else if (failas.saltinis == "mvpAprasai") {
-        originalusLinkas = `https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp?&Itemid=112`;
-        originalusLinkasPavadinimas = "VPM IS";
-      } else if (failas.saltinis == "cvpIs") {
-        let pirkimoId = failas.saltinioId.split('/')[0];
-        let documentId = failas.saltinioId.split('/')[1];
-        let versionId = failas.saltinioId.split('/')[2];
-        originalusLinkas = `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${versionId}&documentId=${documentId}`;
-        originalusLinkasPavadinimas = "CVP IS";
-      } else if (failas.saltinis == "cvpp"){
-        const parts = String(failas.saltinioId || "").split('/').filter(Boolean);
-        const pid = parts.length >= 3 ? parts[0] : null;
-        originalusLinkas = pid
-          ? `https://pirkimai.eviesiejipirkimai.lt/app/rfq/rwlentrance_s.asp?PID=${encodeURIComponent(pid)}&B=PPO`
-          : `https://cvpp.eviesiejipirkimai.lt`;
-        originalusLinkasPavadinimas = "CVPP";
-      }
-    %>
 
     <!-- Page header -->
     <div class="page-header">
@@ -151,7 +62,7 @@
           <span aria-hidden="true">↗</span> Failas
         </a>
 
-        <% if (failas.extension === "pdf" || libreFormats.includes(failas.extension)) { %>
+        <% if (failas.previewType === "pdf") { %>
           <a href="/dist/pdfjs/web/viewer.html?file=<%= encodeURIComponent(`/failas/${failas.id}/preview`) %>#search=<%= encodeURIComponent(query.search || '') %>"
             class="btn btn-outline btn-sm"
             aria-label="Atidaryti PDF peržiūrą">
@@ -159,11 +70,11 @@
           </a>
         <% } %>
 
-        <% if (originalusLinkas && originalusLinkasPavadinimas) { %>
-          <a href="<%= originalusLinkas %>"
+        <% if (failas.originalusLinkas) { %>
+          <a href="<%= failas.originalusLinkas %>"
             class="btn btn-outline btn-sm"
-            aria-label="Atidaryti <%= originalusLinkasPavadinimas %>">
-            <span aria-hidden="true">↗</span> <%= originalusLinkasPavadinimas %>
+            aria-label="Atidaryti <%= failas.originalusLinkasPavadinimas %>">
+            <span aria-hidden="true">↗</span> <%= failas.originalusLinkasPavadinimas %>
           </a>
         <% } %>
       </div>
@@ -187,22 +98,7 @@
             <dt>MD5</dt>
             <dd><span class="cell-mono wrap-anywhere"><%= failas.md5 || "—" %></span></dd>
             <dt>Šaltinis</dt>
-            <dd>
-              <% if (failas.saltinis == "sutartys" || !failas.saltinis) { %>
-                <a href="/sutartis/<%= failas.dokId %>">Sutartis <%= failas.dokId %></a>
-              <% } else if (failas.saltinis == "neskelbiamosDerybos") { %>
-                <a href="/neskelbiamos">Neskelbiamos derybos</a>
-              <% } else if (failas.saltinis == "archive") { %>
-                <a href="/failas/<%= failas.parent %>">Archyvas <%= failas.parent %></a>
-              <% } else if (failas.saltinis == "mvpAprasai") { %>
-                <a href="https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp?&Itemid=112">MVP tvarkos aprašai</a>
-              <% } else if (failas.saltinis == "cvpIs") { %>
-                <% let pirkimoId = failas.saltinioId.split('/')[0]; %>
-                <a href="/viesiejiPirkimai/<%= pirkimoId %>">Viešasis pirkimas <%= pirkimoId %></a>
-              <% } else if (failas.saltinis == "cvpp") { %>
-                <a href="<%= originalusLinkas %>">CVPP viešasis pirkimas</a>
-              <% } %>
-            </dd>
+            <dd><a href="<%= failas.saltinioLinkas %>"><%= failas.saltinioLinkoPavadinimas %></a></dd>
           </dl>
         </div>
 
@@ -243,19 +139,12 @@
           <div>
             <h2 class="mb-3 no-style">Turinys</h2>
             <dl class="kv-list">
-
               <%- include('../partials/domenai.ejs', { domains: failas.domains }) %>
-
               <%- include('../partials/nuorodos.ejs', { links: (failas.links || []).filter(l => !l.link.startsWith('mailto:')) }) %>
-
               <%- include('../partials/emails.ejs', { emails: failas.emails }) %>
-
               <%- include('../partials/telefonai.ejs', { telefonai: failas.telefonai }) %>
-
               <%- include('../partials/ibanNumeriai.ejs', { ibanNumeriai: failas.metaduomenys.ibanNumeriai }) %>
-
               <%- include('../partials/parasai.ejs', { signatures: failas.metaduomenys.signatures }) %>
-
             </dl>
           </div>
         <% } else { %>
@@ -264,132 +153,15 @@
           </p>
         <% } %>
 
-        <% if (hasOcrSection) { %>
-          <div>
-            <h2 class="mb-1 no-style">OCR</h2>
-
-            <% if (ocrLatest?.submitTimestamp) { %>
-              <p class="text-muted text-xs mb-2"><%= formatDateTime(ocrLatest.submitTimestamp) %></p>
-            <% } else if (failas.ocrLockTimestamp) { %>
-              <p class="text-muted text-xs mb-2"><%= formatDateTime(failas.ocrLockTimestamp) %></p>
-            <% } %>
-
-            <dl class="kv-list mb-0">
-              <% if (ocrStateKey && ocrStateKey !== "1") { %>
-                <dt>Būsena</dt>
-                <dd><%= ocrStateText %></dd>
-              <% } %>
-
-              <% if (ocrLatest && (ocrLatest.duration || ocrLatest.duration === 0)) { %>
-                <dt>Trukmė</dt>
-                <dd><span class="cell-mono"><%= formatDuration(ocrLatest.duration) %></span></dd>
-              <% } %>
-
-              <% if (ocrLatest && (ocrLatest.puslapiuSkaicius || ocrLatest.puslapiuSkaicius === 0)) { %>
-                <dt>Puslapiai</dt>
-                <dd><span class="cell-mono"><%= Number(ocrLatest.puslapiuSkaicius).toLocaleString('lt-LT') %></span></dd>
-              <% } %>
-
-              <% if (ocrLatest && (ocrLatest.zodziuSkaicius || ocrLatest.zodziuSkaicius === 0)) { %>
-                <dt>Žodžiai</dt>
-                <dd><span class="cell-mono"><%= Number(ocrLatest.zodziuSkaicius).toLocaleString('lt-LT') %></span></dd>
-              <% } %>
-
-              <% if (typeof failas.ocrBandymai === 'number' && failas.ocrBandymai > 0) { %>
-                <dt>Bandymų sk.</dt>
-                <dd><span class="cell-mono"><%= failas.ocrBandymai %></span></dd>
-              <% } %>
-
-              <% if (typeof failas.ocrRezultatuSkaicius === 'number' && failas.ocrRezultatuSkaicius > 1) { %>
-                <dt>Rezultatų įrašai</dt>
-                <dd><span class="cell-mono"><%= failas.ocrRezultatuSkaicius %></span></dd>
-              <% } %>
-
-              <% if (failas.ocrNode) { %>
-                <dt>Nuskaitytojas</dt>
-                <dd><span class="cell-mono"><%= failas.ocrNode %></span></dd>
-              <% } %>
-            </dl>
-          </div>
+        <% if (failas.hasOcrSection) { %>
+          <%- include('../partials/failas-ocr.ejs') %>
         <% } %>
 
       </div>
 
       <!-- Right: preview -->
       <div>
-        <% if (failas.extension === "pdf" || failas.extension === "prn" || libreFormats.includes(failas.extension)) { %>
-          <% if (libreFormats.includes(failas.extension)) { %>
-            <p class="text-muted text-xs mb-3"><em>Dokumentas konvertuotas į PDF naudojant LibreOffice, gali būti atvaizduojamas iškraipytas.</em></p>
-          <% } %>
-          <%- include('../partials/pdf-preview.ejs', {
-            failasId: failas.id,
-            search: (query && query.search) ? query.search : '',
-            height: '70vh',
-            border: 'none',
-            rounded: true
-          }) %>
-
-        <% } else if (failas.nuskaitytas > 0 && archiveFormats.includes(failas.extension)) { %>
-          <p class="text-muted text-sm mb-3"><em>Archyvo peržiūra</em></p>
-
-          <%- include('../partials/archive-tree.ejs', {
-            filesTree: failas.metaduomenys?.filesTree,
-            failasId: failas.id,
-            openByDefault: true
-          }) %>
-
-        <% } else if (failas.extension === "mp4") { %>
-            <video controls class="w-full max-h-[70vh] rounded-md block">
-                <source src="https://failai.viespirkiai.org/<%= failas.id %>" type="video/mp4">
-            </video>
-
-        <% } else if (imageFormats.includes(failas.extension)) { %>
-            <%
-                let convertString = "";
-                if (failas.extension === "heic") convertString = "?convertTo=jpeg";
-            %>
-            <img src="https://failai.viespirkiai.org/<%= failas.id %><%= convertString %>" alt="" class="max-w-full rounded-md">
-
-        <% } else if (failas.extension === "url") { %>
-          <dl class="kv-list">
-            <dt>Nuoroda</dt>
-            <dd>
-              <% if (failas.metaduomenys?.links?.[0]?.uri) { %>
-                <a href="<%= encodeURI(failas.metaduomenys.links[0].uri) %>"><%= failas.metaduomenys.links[0].uri %></a>
-              <% } else { %>
-                <em class="text-muted">Nenurodyta</em>
-              <% } %>
-            </dd>
-          </dl>
-
-        <% } else if (failas.extension === "txt") { %>
-          <%
-            if (failas.tekstas) {
-              failas.tekstas = failas.tekstas.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-              try {
-                let pages = JSON.parse(failas.tekstas);
-                if (Array.isArray(pages)) failas.tekstas = pages.join('');
-              } catch(e) {}
-            }
-          %>
-        <div class="bg-lighter-gray border rounded-md p-4 overflow-x-auto">
-            <pre class="whitespace-pre-wrap break-words font-mono text-sm m-0"><%= failas.tekstas || "" %></pre>
-        </div>
-
-        <% } else if (failas.extension === "fax" && failas.md5 === 'e083b15bc91cd24583955d3493347f7a') { %>
-            <%- include('./specialCases/fax.ejs') %>
-        <% } else if (["html","htm","svg"].includes(failas.extension)) { %>
-          <iframe
-            src="https://failai.viespirkiai.org/<%= failas.id %>"
-            class="w-full h-[600px] border border-border rounded-md"
-          ></iframe>
-
-        <% } else if ((failas.extension === "eml" || failas.extension === "msg") && failas.metaduomenys) { %>
-          <%- include('../partials/email-message.ejs', { metaduomenys: failas.metaduomenys, failasId: failas.id }) %>
-
-        <% } else { %>
-          <p class="text-muted text-sm"><em>Peržiūra nepalaikoma šio formato failams. Spustelėkite „Failas", jei norite jį atsisiųsti.</em></p>
-        <% } %>
+        <%- include('../partials/failas-preview.ejs') %>
       </div>
 
     </div>

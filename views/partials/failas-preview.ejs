@@ -1,0 +1,65 @@
+<% if (failas.previewType === "pdf") { %>
+  <% if (failas.isLibreFormat) { %>
+    <p class="text-muted text-xs mb-3"><em>Dokumentas konvertuotas į PDF naudojant LibreOffice, gali būti atvaizduojamas iškraipytas.</em></p>
+  <% } %>
+  <%- include('./pdf-preview.ejs', {
+    failasId: failas.id,
+    search: (query && query.search) ? query.search : '',
+    height: '70vh',
+    border: 'none',
+    rounded: true
+  }) %>
+
+<% } else if (failas.previewType === "archive") { %>
+  <p class="text-muted text-sm mb-3"><em>Archyvo peržiūra</em></p>
+  <%- include('./archive-tree.ejs', {
+    filesTree: failas.metaduomenys?.filesTree,
+    failasId: failas.id,
+    openByDefault: true
+  }) %>
+
+<% } else if (failas.previewType === "mp4") { %>
+  <video controls class="w-full max-h-[70vh] rounded-md block">
+    <source src="https://failai.viespirkiai.org/<%= failas.id %>" type="video/mp4">
+  </video>
+
+<% } else if (failas.previewType === "mp3") { %>
+  <audio controls class="w-full">
+    <source src="https://failai.viespirkiai.org/<%= failas.id %>" type="audio/mpeg">
+  </audio>
+
+<% } else if (failas.previewType === "image") { %>
+  <img src="https://failai.viespirkiai.org/<%= failas.id %><%= failas.extension === 'heic' ? '?convertTo=jpeg' : '' %>" alt="" class="max-w-full rounded-md">
+
+<% } else if (failas.previewType === "url") { %>
+  <dl class="kv-list">
+    <dt>Nuoroda</dt>
+    <dd>
+      <% if (failas.metaduomenys?.links?.[0]?.uri) { %>
+        <a href="<%= encodeURI(failas.metaduomenys.links[0].uri) %>"><%= failas.metaduomenys.links[0].uri %></a>
+      <% } else { %>
+        <em class="text-muted">Nenurodyta</em>
+      <% } %>
+    </dd>
+  </dl>
+
+<% } else if (failas.previewType === "txt") { %>
+  <div class="bg-lighter-gray border rounded-md p-4 overflow-x-auto">
+    <pre class="whitespace-pre-wrap break-words font-mono text-sm m-0"><%= failas.tekstasPerziurai %></pre>
+  </div>
+
+<% } else if (failas.previewType === "fax-special") { %>
+  <%- include('../failai/specialCases/fax.ejs') %>
+
+<% } else if (failas.previewType === "html") { %>
+  <iframe
+    src="https://failai.viespirkiai.org/<%= failas.id %>"
+    class="w-full h-[600px] border border-border rounded-md"
+  ></iframe>
+
+<% } else if (failas.previewType === "email") { %>
+  <%- include('./email-message.ejs', { metaduomenys: failas.metaduomenys, failasId: failas.id }) %>
+
+<% } else { %>
+  <p class="text-muted text-sm"><em>Peržiūra nepalaikoma šio formato failams. Spustelėkite „Failas", jei norite jį atsisiųsti.</em></p>
+<% } %>

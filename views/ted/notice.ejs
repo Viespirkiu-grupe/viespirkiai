@@ -2,10 +2,11 @@
 <html lang="lt" class="<%= colorScheme === 'dark' ? 'dark' : '' %>">
 
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= pageTitle %><% if (noticeId) { %> – <%= noticeId %><% } %></title>
-  <%- include('partials/notice-styles') %>
+  <%- include('../head.ejs', {
+    pageTitle: pageTitle + (noticeId ? ` – ${noticeId}` : ''),
+    pageDescription: documentTypeLabel + (issueDateText ? ` · ${issueDateText}` : ''),
+    customHead
+  }) %>
 </head>
 
 <body>

@@ -11,7 +11,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 5048M
+                    memory: 6048M
 
     postgres:
         build:
@@ -68,7 +68,7 @@ services:
                     memory: 256M
 
     quickwit:
-        image: quickwit/quickwit
+        image: quickwit/quickwit:v0.9.0-rc
         container_name: quickwit
         ports:
             - "7280:7280"
@@ -80,6 +80,10 @@ services:
             - QW_DATA_DIR=/quickwit/qwdata
             - QW_CONFIG=/quickwit/config/quickwit.yaml
         restart: unless-stopped
+        ulimits:
+            nofile:
+                soft: 1048576
+                hard: 1048576
         deploy:
             resources:
                 limits:

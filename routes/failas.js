@@ -30,6 +30,12 @@ function parseJsonSuffix(raw) {
     return { value: raw, requestsJson: false };
 }
 
+function parseSuffix(raw) {
+    if (raw.endsWith(".json")) return { value: raw.slice(0, -5), format: "json" };
+    if (raw.endsWith(".png")) return { value: raw.slice(0, -4), format: "png" };
+    return { value: raw, format: "html" };
+}
+
 function extractApiKey(req) {
     return (
         req.query.apiKey ??
@@ -241,7 +247,7 @@ failasRouter.get("/failas/:dokId/:fileId", async (req, res, next) => {
 });
 
 failasRouter.get("/failas/:id", async (req, res, next) => {
-    const { value: id, requestsJson } = parseJsonSuffix(req.params.id);
+    const { value: id, format } = parseSuffix(req.params.id);
 
     if (isNaN(id)) return next();
 
@@ -252,12 +258,26 @@ failasRouter.get("/failas/:id", async (req, res, next) => {
     if (!result.rows.length) return next();
     const failas = result.rows[0];
 
+    if (format === "png") {
+        const ext = (failas.extension || "").toUpperCase();
+        const sizeMB = failas.dydis
+            ? `${(failas.dydis / 1024 / 1024).toFixed(1)} MB`
+            : null;
+        return await serveOpenGraphImage(
+            res,
+            ext || "Failas",
+            failas.pavadinimas || "Failas",
+            sizeMB || "",
+            `viespirkiai.org/failas/${failas.id}`,
+        );
+    }
+
     if (await checkDokFileRemoved(failas.dokId, failas.fileId))
         return res.status(451).render("failai/failasPasalintas", {
             customHead: config.customHead,
         });
 
-    return aptarnautiFailą(req, res, next, failas, requestsJson);
+    return aptarnautiFailą(req, res, next, failas, format === "json");
 });
 
 failasRouter.get("/cvpp/fileProxy/:lid/:dvid", async (req, res) => {

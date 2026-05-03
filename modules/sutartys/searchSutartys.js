@@ -84,9 +84,7 @@ const sutartysFilter = new FilterBuilder({
             "paskelbimoData",
             "suma",
         ],
-        pgAliases: { suma: "verte" },
-        tsAliases: { suma: "verte" },
-    },
+        },
 });
 
 const FIXED_WHERE = [`NOT COALESCE("istrinta", false)`];

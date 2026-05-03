@@ -1,10 +1,22 @@
 import express from "express";
 import config from "../utils/config.js";
+import { requestContext } from "../modules/mcp/mcpLogger.js";
+import { serveOpenGraphImage } from "../utils/openGraphImage.js";
 
 const mcpRouter = express.Router();
 
 mcpRouter.get("/mcp", (req, res) => {
     res.render("mcp", { customHead: config.customHead });
+});
+
+mcpRouter.get("/mcp.png", async (req, res) => {
+    return await serveOpenGraphImage(
+        res,
+        "MCP serveris",
+        "Viešpirkiai",
+        "Prijunkite savo DI asistentą prie viešųjų pirkimų duomenų",
+        "viespirkiai.org/mcp",
+    );
 });
 
 let mcpImports = null;
@@ -22,7 +34,8 @@ mcpRouter.post("/mcp", async (req, res) => {
         sessionIdGenerator: undefined,
     });
     await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    const ctx = { userAgent: req.headers["user-agent"] ?? null };
+    await requestContext.run(ctx, () => transport.handleRequest(req, res, req.body));
 });
 
 export default mcpRouter;
