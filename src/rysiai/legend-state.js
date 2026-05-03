@@ -1,22 +1,19 @@
-import { HIDDEN_BY_DEFAULT } from './colors.js';
+import { HIDDEN_BY_DEFAULT } from './graph-theme.js';
 
 /**
- * Manages per-node and global edge-type visibility for the Voratinklis graph.
+ * Manages per-node and global edge-type and contract-size-category visibility.
  *
  * Visibility model
  * ─────────────────
  *  • Nodes initialised via initNode() own an explicit hidden-type Set (configured nodes).
  *  • Nodes never initialised are "transparent" — they do not contribute to edge filtering.
- *  • isEdgeHidden(src, tgt, type):
+ *  • isEdgeHidden(src, tgt, type, sizeCategory):
  *      – If neither endpoint is configured → use global hidden set (pre-selection behaviour).
- *      – Otherwise → hidden if ANY configured endpoint hides the type.
+ *      – Otherwise → hidden if ANY configured endpoint hides the type or size category.
  *        A transparent endpoint is treated as "don't care".
  *
- * This ensures:
- *  • Global-only state (no node selected) behaves identically to the old single-Set approach.
- *  • Configuring OrgA to hide Employment only affects edges touching OrgA.
- *  • Configuring OrgB to show Employment does NOT un-hide OrgA's edges.
- *  • Unconfigured person nodes never override a configured org node's settings.
+ * Size categories ('small', 'medium', 'large') apply only to Order/Delivery contract edges.
+ * All size categories are visible by default.
  */
 export class LegendState {
     constructor() {
@@ -24,18 +21,22 @@ export class LegendState {
         this._nodeHidden = new Map();
         /** @type {Set<string>} global fallback when neither edge endpoint is configured */
         this._globalHidden = new Set(HIDDEN_BY_DEFAULT);
+        /** @type {Map<string, Set<string>>} per-node hidden contract-size-category Sets */
+        this._nodeHiddenSizes = new Map();
+        /** @type {Set<string>} global fallback for size categories */
+        this._globalHiddenSizes = new Set();
     }
 
     /**
-     * Initialises a node's hidden-type Set, copying the current global defaults.
+     * Initialises a node's hidden-type and hidden-size-category Sets from current global defaults.
      * No-op when the node has already been configured.
-     * Call this only for nodes that should be legend-configurable (org / person nodes).
      *
      * @param {string} nodeId
      */
     initNode(nodeId) {
         if (!this._nodeHidden.has(nodeId)) {
             this._nodeHidden.set(nodeId, new Set(this._globalHidden));
+            this._nodeHiddenSizes.set(nodeId, new Set(this._globalHiddenSizes));
         }
     }
 
@@ -101,26 +102,89 @@ export class LegendState {
     }
 
     /**
+     * Sets the visibility of a contract size category for a specific node.
+     * Auto-initialises the node if not yet configured.
+     *
+     * @param {string}  nodeId
+     * @param {string}  category  'small' | 'medium' | 'large'
+     * @param {boolean} visible
+     */
+    setSizeCategoryVisible(nodeId, category, visible) {
+        this.initNode(nodeId);
+        if (visible) this._nodeHiddenSizes.get(nodeId).delete(category);
+        else this._nodeHiddenSizes.get(nodeId).add(category);
+    }
+
+    /**
+     * Returns true when the size category is currently visible for the given node.
+     * Falls back to the global hidden-sizes set for unconfigured nodes.
+     *
+     * @param {string} nodeId
+     * @param {string} category
+     * @returns {boolean}
+     */
+    isSizeCategoryVisible(nodeId, category) {
+        const hidden = this._nodeHiddenSizes.get(nodeId) ?? this._globalHiddenSizes;
+        return !hidden.has(category);
+    }
+
+    /**
+     * Sets a contract size category's global visibility (used when no node is selected).
+     *
+     * @param {string}  category
+     * @param {boolean} visible
+     */
+    setGlobalSizeCategoryVisible(category, visible) {
+        if (visible) this._globalHiddenSizes.delete(category);
+        else this._globalHiddenSizes.add(category);
+    }
+
+    /**
+     * Returns true when the size category is visible in the global (no-selection) state.
+     *
+     * @param {string} category
+     * @returns {boolean}
+     */
+    isGlobalSizeCategoryVisible(category) {
+        return !this._globalHiddenSizes.has(category);
+    }
+
+    /**
      * The main visibility predicate consumed by rebuildViewGraph.
      *
      * Edge hidden when:
      *   (a) Neither endpoint is configured → falls back to global hidden set, OR
-     *   (b) At least one configured endpoint has the type in its hidden set.
+     *   (b) At least one configured endpoint has the type (or size category) in its hidden set.
      *
-     * @param {string} source
-     * @param {string} target
-     * @param {string} type
+     * @param {string}      source
+     * @param {string}      target
+     * @param {string}      type
+     * @param {string|null} [sizeCategory]  contract size category — only checked when non-null
      * @returns {boolean}
      */
-    isEdgeHidden(source, target, type) {
+    isEdgeHidden(source, target, type, sizeCategory = null) {
         const sourceHidden = this._nodeHidden.get(source);
         const targetHidden = this._nodeHidden.get(target);
 
         if (sourceHidden === undefined && targetHidden === undefined) {
-            return this._globalHidden.has(type);
+            if (this._globalHidden.has(type)) return true;
+        } else {
+            if (sourceHidden !== undefined && sourceHidden.has(type)) return true;
+            if (targetHidden !== undefined && targetHidden.has(type)) return true;
         }
-        if (sourceHidden !== undefined && sourceHidden.has(type)) return true;
-        if (targetHidden !== undefined && targetHidden.has(type)) return true;
+
+        if (sizeCategory !== null) {
+            const sourceSizes = this._nodeHiddenSizes.get(source);
+            const targetSizes = this._nodeHiddenSizes.get(target);
+
+            if (sourceSizes === undefined && targetSizes === undefined) {
+                if (this._globalHiddenSizes.has(sizeCategory)) return true;
+            } else {
+                if (sourceSizes !== undefined && sourceSizes.has(sizeCategory)) return true;
+                if (targetSizes !== undefined && targetSizes.has(sizeCategory)) return true;
+            }
+        }
+
         return false;
     }
 }

@@ -1,8 +1,6 @@
-import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout } from './graph-utils.js';
-import { NODE_COLOR, EDGE_COLOR } from './colors.js';
-import { updateLegendForNode } from './legend.js';
+import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from './graph-utils.js';
+import { NODE_COLOR, EDGE_COLOR, nodeColor } from './graph-theme.js';
 import { isConfigurableNode, isOrgNode, isPersonNode, isContractNode, isProcurementNode } from './entity-types.js';
-import { showNodeDetails, hideDetails } from './details-panel.js';
 
 /**
  * Creates the expand UI controller.
@@ -18,10 +16,11 @@ import { showNodeDetails, hideDetails } from './details-panel.js';
  *   noverlap:     Function,
  *   animateNodes: Function,
  *   legendState:  LegendState,
+ *   nodeDetails:  NodeDetails,
  * }} deps
- * @returns {{ loadOrg, rebuildAndRefresh, getSelectedNodeId, selectNode }}
+ * @returns {{ loadOrg, loadContract, rebuildAndRefresh, getSelectedNodeId, selectNode }}
  */
-export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState }) {
+export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState, nodeDetails }) {
     const expandingNodes = new Set();
     let cancelAnimation = null;
     let selectedNodeId = null;
@@ -46,8 +45,42 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
     }
 
     function markExpanded(id) {
-        if (dataGraph.hasNode(id)) dataGraph.setNodeAttribute(id, 'expanded', true);
-        if (viewGraph.hasNode(id)) viewGraph.setNodeAttribute(id, 'expanded', true);
+        if (dataGraph.hasNode(id)) {
+            dataGraph.setNodeAttribute(id, 'expanded', true);
+            if (isOrgNode(dataGraph.getNodeAttributes(id))) {
+                dataGraph.setNodeAttribute(id, 'color', NODE_COLOR.org);
+            }
+        }
+        if (viewGraph.hasNode(id)) {
+            viewGraph.setNodeAttribute(id, 'expanded', true);
+            if (isOrgNode(viewGraph.getNodeAttributes(id))) {
+                viewGraph.setNodeAttribute(id, 'color', NODE_COLOR.org);
+            }
+        }
+    }
+
+    function isExpandableNode(attrs) {
+        return EXPAND_KINDS.some((k) => k.test(attrs)) || (isContractNode(attrs) && attrs.pirkimoNumeris);
+    }
+
+    function buildHandlers(id, attrs) {
+        if (attrs.expanded) return { onCollapse: () => collapseNode(id) };
+        if (isExpandableNode(attrs)) return { onExpand: () => _triggerExpand(id, attrs) };
+        return {};
+    }
+
+    function _showNodePanel(id, attrs, handlers) {
+        const counts = isConfigurableNode(attrs) ? computeEdgeCounts(viewGraph, id) : null;
+        nodeDetails.showForNode(id, attrs, handlers, counts);
+    }
+
+    // Re-renders the details panel for the currently selected node with fresh handlers.
+    // Called after expand/collapse to switch Rodyti ↔ Slėpti ryšius and update legend.
+    function refreshSelectedNodePanel() {
+        if (!selectedNodeId || !viewGraph.hasNode(selectedNodeId)) return;
+        const id = selectedNodeId;
+        const attrs = viewGraph.getNodeAttributes(id);
+        _showNodePanel(id, attrs, buildHandlers(id, attrs));
     }
 
     function selectNode(id) {
@@ -56,11 +89,9 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         setSelection(id, true);
 
         const attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
-        if (isConfigurableNode(attrs)) {
-            legendState.initNode(id);
-            updateLegendForNode(id, attrs.label || id, legendState);
-        }
-        showNodeDetails(id, attrs);
+        const handlers = buildHandlers(id, attrs);
+        if (isConfigurableNode(attrs)) legendState.initNode(id);
+        _showNodePanel(id, attrs, handlers);
         renderer.refresh();
     }
 
@@ -69,8 +100,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             setSelection(selectedNodeId, false);
             selectedNodeId = null;
         }
-        updateLegendForNode(null, null, legendState);
-        hideDetails();
+        nodeDetails.hide();
         renderer.refresh();
     }
 
@@ -80,29 +110,33 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
      */
     function rebuildAndRefresh() {
         if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
-        rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => legendState.isEdgeHidden(s, t, type, sz));
         runLayout(viewGraph, forceAtlas2, noverlap);
         syncPositionsToData(dataGraph, viewGraph);
         if (selectedNodeId) setSelection(selectedNodeId, true);
         renderer.refresh();
     }
 
-    async function _expand(id, fetchUrl, afterMerge) {
+    // ownerId overrides the derived fromNodeId for ownership tracking — used when the expand
+    // target doesn't yet exist in viewGraph (e.g. loadContract expanding a new procurement node).
+    // rootNodeId marks which single node in the response is the permanent root (isRoot=true,
+    // expandedBy stays empty); used by loadOrg for the initial graph load.
+    async function _expand(id, fetchUrl, afterMerge, ownerId = null, rootNodeId = null) {
         if (expandingNodes.has(id)) return;
         expandingNodes.add(id);
         if (expandingNodes.size === 1) showLoading();
         setStatus('Kraunama...');
         try {
             const data = await fetch(fetchUrl).then((r) => r.json());
-            const fromNodeId = viewGraph.hasNode(id) ? id : null;
+            const fromNodeId = ownerId || (viewGraph.hasNode(id) ? id : null);
             const startPos = fromNodeId ? getNodePos(fromNodeId) : null;
 
             if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
 
-            mergeGraphElements(dataGraph, getNodePos, data, fromNodeId);
+            mergeGraphElements(dataGraph, getNodePos, data, fromNodeId, rootNodeId);
             afterMerge(id);
 
-            const newNodeIds = rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+            const newNodeIds = rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => legendState.isEdgeHidden(s, t, type, sz));
 
             // Re-apply selection attrs after rebuild (node may have been re-added)
             if (selectedNodeId && viewGraph.hasNode(selectedNodeId)) {
@@ -133,6 +167,9 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                 syncPositionsToData(dataGraph, viewGraph);
                 renderer.refresh();
             }
+
+            // Refresh panel so button switches from Rodyti → Slėpti ryšius
+            refreshSelectedNodePanel();
         } catch (err) {
             setStatus('Klaida kraunant duomenis.');
             console.error(err);
@@ -166,13 +203,100 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         },
     ];
 
+    function _triggerExpand(nodeId, attrs) {
+        if (attrs.expanded) return;
+        const kind = EXPAND_KINDS.find((k) => k.test(attrs));
+        if (kind) {
+            markExpanded(nodeId);
+            _expand(kind.id(attrs), kind.url(attrs), markExpanded);
+        } else if (isContractNode(attrs)) {
+            markExpanded(nodeId);
+            if (attrs.pirkimoNumeris) {
+                loadContract(attrs.pirkimoNumeris, nodeId);
+            } else {
+                renderer.refresh();
+            }
+        }
+    }
+
+    /**
+     * Collapses a node: prunes exclusively-owned nodes+edges from dataGraph using expandedBy
+     * reference tracking, resets the node's color, then rebuilds the view.
+     *
+     * Nodes shared with other expansions (diamond dependencies) are preserved — only
+     * this node's ownership claim is removed from their expandedBy sets.
+     */
+    function collapseNode(nodeId) {
+        if (!dataGraph.hasNode(nodeId)) return;
+
+        if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
+
+        // Find nodes currently in viewGraph that will be exclusively removed by this collapse
+        const collapsePos = getNodePos(nodeId);
+        const animationTargets = {};
+        if (collapsePos) {
+            dataGraph.forEachNode((id, attrs) => {
+                if (id === nodeId) return;
+                const owners = attrs.expandedBy;
+                if (owners && owners.has(nodeId) && owners.size === 1 && !attrs.isRoot && viewGraph.hasNode(id)) {
+                    animationTargets[id] = { x: collapsePos.x, y: collapsePos.y };
+                }
+            });
+        }
+
+        const doCollapse = () => {
+            cancelAnimation = null;
+
+            // Pure data cleanup (sets expanded=false, removes exclusively-owned nodes+edges)
+            collapseGraphData(dataGraph, nodeId);
+
+            // Sync expanded=false and reset color to non-expanded state in viewGraph
+            if (viewGraph.hasNode(nodeId)) {
+                viewGraph.setNodeAttribute(nodeId, 'expanded', false);
+                viewGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId)));
+            }
+            // dataGraph color was already updated by collapseGraphData setting expanded=false;
+            // nodeColor reads expanded, so we update the stored color attribute explicitly.
+            dataGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId)));
+
+            rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => legendState.isEdgeHidden(s, t, type, sz));
+            runLayout(viewGraph, forceAtlas2, noverlap);
+            syncPositionsToData(dataGraph, viewGraph);
+
+            if (viewGraph.hasNode(nodeId)) {
+                // Node still visible (has edges from other expansions) — update panel to Rodyti ryšius
+                setSelection(nodeId, true);
+                const updatedAttrs = viewGraph.getNodeAttributes(nodeId);
+                _showNodePanel(nodeId, updatedAttrs, { onExpand: () => _triggerExpand(nodeId, updatedAttrs) });
+            } else {
+                // Node disappeared — clear selection
+                if (dataGraph.hasNode(nodeId)) {
+                    dataGraph.setNodeAttribute(nodeId, 'selected', false);
+                    dataGraph.setNodeAttribute(nodeId, 'highlighted', false);
+                }
+                selectedNodeId = null;
+                nodeDetails.hide();
+            }
+            renderer.refresh();
+        };
+
+        if (Object.keys(animationTargets).length > 0) {
+            cancelAnimation = animateNodes(viewGraph, animationTargets, { duration: 400, easing: 'quadraticIn' }, doCollapse);
+        } else {
+            doCollapse();
+        }
+    }
+
     // loadOrg is part of the public API (called by rysiai-app.js on initial load).
+    // The root org's own ID is passed as both ownerId and rootNodeId so that:
+    //   - All expansion nodes get expandedBy = Set([id]) (enabling collapse cleanup)
+    //   - The root org node itself gets isRoot=true and expandedBy=Set() (permanent root)
     function loadOrg(jarKodas, fromNodeId) {
         const id = 'org:' + jarKodas;
         if (fromNodeId && viewGraph.hasNode(fromNodeId)) {
             viewGraph.setNodeAttribute(fromNodeId, 'color', NODE_COLOR.org);
         }
-        return _expand(id, '/rysiai/expand/' + encodeURIComponent(jarKodas), markExpanded);
+        return _expand(id, '/rysiai/expand/' + encodeURIComponent(jarKodas), markExpanded, id, id);
     }
 
     function loadContract(pirkimoNumeris, contractNodeId) {
@@ -187,6 +311,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                     color: EDGE_COLOR['ContractLink'] || '#94a3b8',
                     size: 1,
                     forceLabel: false,
+                    expandedBy: new Set([contractNodeId]),
                 });
             }
         };
@@ -198,39 +323,26 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             return;
         }
 
+        // Pass contractNodeId as ownerId so all procurement data is owned by the contract,
+        // enabling full cleanup when the contract is collapsed.
         return _expand(procId, '/rysiai/expand-contract/' + encodeURIComponent(pirkimoNumeris), (nodeId) => {
             markExpanded(nodeId);
             createContractLink();
-        });
+        }, contractNodeId);
     }
 
     renderer.on('clickNode', (event) => {
         const nodeId = event.node;
-        const attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
-        console.log('[Ryšiai] click:', nodeId, attrs.entityType || '?', 'expanded:', attrs.expanded);
-
-        if (selectedNodeId === nodeId) {
-            deselectAll();
-            return;
-        }
-
+        // No-op on re-click: Sigma fires clickNode twice before doubleClickNode.
+        // Deselecting on re-click would cause a visible flicker (select → deselect → expand).
+        if (selectedNodeId === nodeId) return;
         selectNode(nodeId);
+    });
 
-        if (attrs.expanded) return;
-
-        const kind = EXPAND_KINDS.find((k) => k.test(attrs));
-        if (kind) {
-            if (isOrgNode(attrs)) viewGraph.setNodeAttribute(nodeId, 'color', NODE_COLOR.org);
-            markExpanded(nodeId);
-            _expand(kind.id(attrs), kind.url(attrs), markExpanded);
-        } else if (isContractNode(attrs)) {
-            markExpanded(nodeId);
-            if (attrs.pirkimoNumeris) {
-                loadContract(attrs.pirkimoNumeris, nodeId);
-            } else {
-                renderer.refresh();
-            }
-        }
+    renderer.on('doubleClickNode', (event) => {
+        const nodeId = event.node;
+        const attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
+        _triggerExpand(nodeId, attrs);
     });
 
     renderer.on('clickStage', deselectAll);

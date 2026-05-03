@@ -1,5 +1,7 @@
-import { makeIconDataUri, getIconKey } from './icons.js';
-import { EDGE_COLOR, nodeColor, personelSize, contractSize } from './colors.js';
+// Graph data operations — merges API data, filters, lays out, and collapses graphology Graph instances.
+// No DOM, no canvas, no Sigma API. Consumed by expand-ui.js.
+
+import { makeIconDataUri, getIconKey, EDGE_COLOR, nodeColor, personelSize, contractSize } from './graph-theme.js';
 import { isAnchorNode, isBridgeCandidate, isOrgNode, isContractNode, isProcurementNode } from './entity-types.js';
 
 /**
@@ -33,13 +35,21 @@ export function computeNodeSize(attrs) {
  * @param {Function} getNodePos     - (id: string) => {x, y} | null — returns graph-space coords
  * @param {{ nodes: Array, edges: Array }} data
  * @param {string|null} fromNodeId  - ID of the node that triggered the expansion (scatter origin)
+ * @param {string|null} rootNodeId  - ID of the node that is the permanent root (gets isRoot=true,
+ *                                    expandedBy stays empty even though fromNodeId == rootNodeId)
  * @returns {string[]} IDs of newly added nodes
  */
-export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
+export function mergeGraphElements(graph, getNodePos, data, fromNodeId, rootNodeId = null) {
     const newNodeIds = [];
 
     (data.nodes || []).forEach((n) => {
         if (graph.hasNode(n.id)) {
+            // Track new owner on an already-existing node (diamond dependency support)
+            if (fromNodeId) {
+                const owners = graph.getNodeAttribute(n.id, 'expandedBy') || new Set();
+                owners.add(fromNodeId);
+                graph.setNodeAttribute(n.id, 'expandedBy', owners);
+            }
             // Enrich existing org node with sodra fields when we have them for the first time
             if (isOrgNode(n.attributes) && n.attributes.draustieji !== undefined) {
                 const existing = graph.getNodeAttributes(n.id);
@@ -71,12 +81,15 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
 
         const iconKey = getIconKey(n.attributes);
         const imgUri = iconKey ? makeIconDataUri(iconKey) : '';
+        const isThisRoot = rootNodeId ? n.id === rootNodeId : !fromNodeId;
         const nodeAttrs = Object.assign({}, n.attributes, {
             x: x,
             y: y,
             size: computeNodeSize(n.attributes),
             color: nodeColor(n.attributes),
             label: n.attributes.label || n.id,
+            expandedBy: isThisRoot ? new Set() : (fromNodeId ? new Set([fromNodeId]) : new Set()),
+            isRoot: isThisRoot,
         });
         if (imgUri) nodeAttrs.image = imgUri;
 
@@ -85,13 +98,26 @@ export function mergeGraphElements(graph, getNodePos, data, fromNodeId) {
     });
 
     (data.edges || []).forEach((e) => {
-        if (graph.hasEdge(e.id)) return;
+        if (graph.hasEdge(e.id)) {
+            // Track new owner on an already-existing edge
+            if (fromNodeId) {
+                const owners = graph.getEdgeAttribute(e.id, 'expandedBy') || new Set();
+                owners.add(fromNodeId);
+                graph.setEdgeAttribute(e.id, 'expandedBy', owners);
+            }
+            return;
+        }
         if (!graph.hasNode(e.source) || !graph.hasNode(e.target)) return;
 
         const attrs = Object.assign({}, e.attributes || {});
         // Rename semantic 'type' → 'edgeType' so Sigma doesn't treat it as a renderer program key.
         if (attrs.type) { attrs.edgeType = attrs.type; delete attrs.type; }
         attrs.color = EDGE_COLOR[attrs.edgeType] || '#d1d5db';
+        attrs.expandedBy = fromNodeId ? new Set([fromNodeId]) : new Set();
+        // Assign size category for contract edges so legend can filter by size.
+        if ((attrs.edgeType === 'Order' || attrs.edgeType === 'Delivery') && attrs.size != null) {
+            attrs.contractSizeCategory = attrs.size >= 6 ? 'large' : attrs.size >= 3 ? 'medium' : 'small';
+        }
         graph.addEdgeWithKey(e.id, e.source, e.target, attrs);
     });
 
@@ -155,7 +181,7 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
     expandedAnchors.forEach((id) => { visible.add(id); });
     bridgeNodes.forEach((id) => { visible.add(id); });
     dataGraph.forEachEdge((edgeId, attrs, source, target) => {
-        if (!isEdgeHidden(source, target, attrs.edgeType)) {
+        if (!isEdgeHidden(source, target, attrs.edgeType, attrs.contractSizeCategory ?? null)) {
             visible.add(source);
             visible.add(target);
         }
@@ -183,16 +209,21 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
         }
     });
 
+    // Remove edges from viewGraph that were pruned from dataGraph (e.g. after a collapse)
+    const staleEdges = [];
+    viewGraph.forEachEdge((edgeId) => { if (!dataGraph.hasEdge(edgeId)) staleEdges.push(edgeId); });
+    staleEdges.forEach((id) => { viewGraph.dropEdge(id); });
+
     // Remove hidden-type edges from viewGraph (bridge edges are exempt)
     const edgesToRemove = [];
     viewGraph.forEachEdge((edgeId, attrs, source, target) => {
-        if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType)) edgesToRemove.push(edgeId);
+        if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType, attrs.contractSizeCategory ?? null)) edgesToRemove.push(edgeId);
     });
     edgesToRemove.forEach((id) => { viewGraph.dropEdge(id); });
 
     // Add visible edges from dataGraph that are not yet in viewGraph (bridge edges always pass)
     dataGraph.forEachEdge((edgeId, attrs, source, target) => {
-        if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType)) return;
+        if (!bridgeEdges.has(edgeId) && isEdgeHidden(source, target, attrs.edgeType, attrs.contractSizeCategory ?? null)) return;
         if (!viewGraph.hasNode(source) || !viewGraph.hasNode(target)) return;
         if (viewGraph.hasEdge(edgeId)) return;
         viewGraph.addEdgeWithKey(edgeId, source, target, Object.assign({}, attrs));
@@ -216,6 +247,61 @@ export function syncPositionsToData(dataGraph, viewGraph) {
             dataGraph.setNodeAttribute(id, 'y', attrs.y);
         }
     });
+}
+
+/**
+ * Pure collapse: sets expanded=false on nodeId, then removes all nodes and edges
+ * that were exclusively owned by this node's expansion (expandedBy tracking).
+ * Does NOT touch viewGraph or trigger any UI updates — call rebuildViewGraph after.
+ *
+ * @param {Graph}  dataGraph
+ * @param {string} nodeId
+ */
+export function collapseGraphData(dataGraph, nodeId) {
+    if (!dataGraph.hasNode(nodeId)) return;
+
+    dataGraph.setNodeAttribute(nodeId, 'expanded', false);
+
+    const nodesToRemove = [];
+    dataGraph.forEachNode((id, attrs) => {
+        if (id === nodeId) return;
+        const owners = attrs.expandedBy;
+        if (owners && owners.has(nodeId)) {
+            owners.delete(nodeId);
+            if (owners.size === 0 && !attrs.isRoot) nodesToRemove.push(id);
+        }
+    });
+
+    const edgesToRemove = [];
+    dataGraph.forEachEdge((edgeId, attrs) => {
+        const owners = attrs.expandedBy;
+        if (owners && owners.has(nodeId)) {
+            owners.delete(nodeId);
+            if (owners.size === 0) edgesToRemove.push(edgeId);
+        }
+    });
+
+    edgesToRemove.forEach((eid) => { if (dataGraph.hasEdge(eid)) dataGraph.dropEdge(eid); });
+    nodesToRemove.forEach((nid) => { if (dataGraph.hasNode(nid)) dataGraph.dropNode(nid); });
+}
+
+/**
+ * Counts edges incident to nodeId grouped by edgeType and by contractSizeCategory.
+ * Used by the legend to show relationship counts and hide zero-count rows.
+ *
+ * @param {Graph}  graph
+ * @param {string} nodeId
+ * @returns {{ byType: Map<string, number>, bySize: Map<string, number> }}
+ */
+export function computeEdgeCounts(graph, nodeId) {
+    const byType = new Map();
+    const bySize = new Map();
+    if (!graph.hasNode(nodeId)) return { byType, bySize };
+    graph.forEachEdge(nodeId, (_edgeId, attrs) => {
+        if (attrs.edgeType) byType.set(attrs.edgeType, (byType.get(attrs.edgeType) || 0) + 1);
+        if (attrs.contractSizeCategory) bySize.set(attrs.contractSizeCategory, (bySize.get(attrs.contractSizeCategory) || 0) + 1);
+    });
+    return { byType, bySize };
 }
 
 /**

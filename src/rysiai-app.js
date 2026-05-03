@@ -1,6 +1,7 @@
 import { drawNodeLabel, drawNodeHover } from './rysiai/renderers.js';
 import { createExpandUI } from './rysiai/expand-ui.js';
-import { bindLegendCheckboxes } from './rysiai/legend.js';
+import { NodeLegend } from './rysiai/legend.js';
+import { NodeDetails } from './rysiai/details-panel.js';
 import { LegendState } from './rysiai/legend-state.js';
 
 var _v = window.Rysiai;
@@ -21,6 +22,8 @@ var loadingEl = document.getElementById('rysiai-loading');
 
 // Per-node and global edge-type visibility state
 var legendState = new LegendState();
+var legend = new NodeLegend({ legendState });
+var nodeDetails = new NodeDetails({ legend });
 
 var renderer = new Sigma(viewGraph, container, {
     nodeProgramClasses: { image: NodeImageProgram },
@@ -40,7 +43,7 @@ var renderer = new Sigma(viewGraph, container, {
     maxCameraRatio: 5,
 });
 
-var ui = createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState });
+var ui = createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState, nodeDetails });
 
 // Canvas overlay for dashed edges (ContractLink, Award, Bid)
 var dashedOverlay = document.createElement('canvas');
@@ -84,7 +87,7 @@ renderer.on('afterRender', function () {
     });
 });
 
-bindLegendCheckboxes(function () { return ui.getSelectedNodeId(); }, legendState, ui.rebuildAndRefresh);
+legend.bindCheckboxes(function () { return ui.getSelectedNodeId(); }, ui.rebuildAndRefresh);
 
 var INITIAL_JAR_KODAS = window.RYSIAI_CONFIG.jarKodas;
 document.addEventListener('DOMContentLoaded', async function () {

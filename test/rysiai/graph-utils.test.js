@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import Graph from 'graphology';
 
-import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout } from '../../src/rysiai/graph-utils.js';
+import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from '../../src/rysiai/graph-utils.js';
 import { LegendState } from '../../src/rysiai/legend-state.js';
 import { ENTITY_TYPE } from '../../src/rysiai/entity-types.js';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
@@ -556,6 +556,137 @@ describe('computeNodeSize', function () {
     });
 });
 
+// ── mergeGraphElements — contractSizeCategory ────────────────────────────────
+
+describe('mergeGraphElements — contractSizeCategory', () => {
+    let graph;
+    const noPos = () => null;
+
+    beforeEach(() => {
+        graph = new Graph({ type: 'directed', multi: true });
+        graph.addNode('org:A', { x: 0, y: 0, size: 8, color: '#000', label: 'A' });
+        graph.addNode('contract:x', { x: 10, y: 0, size: 8, color: '#000', label: 'x' });
+    });
+
+    function contractEdge(type, size) {
+        return { id: `edge:org:A:contract:x:${type}`, source: 'org:A', target: 'contract:x', attributes: { type, label: '', size } };
+    }
+
+    it('Order edge with size 1 gets contractSizeCategory small', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [contractEdge('Order', 1)] }, null);
+        assert.equal(graph.getEdgeAttribute('edge:org:A:contract:x:Order', 'contractSizeCategory'), 'small');
+    });
+
+    it('Order edge with size 3 gets contractSizeCategory medium', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [contractEdge('Order', 3)] }, null);
+        assert.equal(graph.getEdgeAttribute('edge:org:A:contract:x:Order', 'contractSizeCategory'), 'medium');
+    });
+
+    it('Order edge with size 6 gets contractSizeCategory large', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [contractEdge('Order', 6)] }, null);
+        assert.equal(graph.getEdgeAttribute('edge:org:A:contract:x:Order', 'contractSizeCategory'), 'large');
+    });
+
+    it('Delivery edge with size 3 gets contractSizeCategory medium', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [contractEdge('Delivery', 3)] }, null);
+        assert.equal(graph.getEdgeAttribute('edge:org:A:contract:x:Delivery', 'contractSizeCategory'), 'medium');
+    });
+
+    it('Director edge does NOT get contractSizeCategory', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [edgeData('org:A', 'contract:x', 'Director', '')] }, null);
+        const attrs = graph.getEdgeAttributes('edge:org:A:contract:x:Director');
+        assert.ok(!('contractSizeCategory' in attrs), 'Director edge must not have contractSizeCategory');
+    });
+
+    it('Order edge with no size does NOT get contractSizeCategory', () => {
+        mergeGraphElements(graph, noPos, { nodes: [], edges: [edgeData('org:A', 'contract:x', 'Order', '')] }, null);
+        const attrs = graph.getEdgeAttributes('edge:org:A:contract:x:Order');
+        assert.ok(!('contractSizeCategory' in attrs), 'size-less Order edge must not have contractSizeCategory');
+    });
+});
+
+// ── rebuildViewGraph — size category filtering ────────────────────────────────
+
+describe('rebuildViewGraph — contractSizeCategory filtering', () => {
+    let dataGraph, viewGraph;
+
+    beforeEach(() => {
+        dataGraph = new Graph({ type: 'directed', multi: true });
+        viewGraph = new Graph({ type: 'directed', multi: true });
+    });
+
+    function addOrg(g, id, expanded = false) {
+        g.addNode(id, { entityType: ENTITY_TYPE.Org, expanded, x: 1, y: 2, size: 8, color: '#000', label: id });
+    }
+    function addContract(g, id) {
+        g.addNode(id, { entityType: ENTITY_TYPE.Contract, expanded: true, x: 1, y: 2, size: 8, color: '#000', label: id });
+    }
+    function addContractEdge(g, src, tgt, type, sizeCategory) {
+        g.addEdgeWithKey(`e:${src}:${tgt}:${type}`, src, tgt, { edgeType: type, contractSizeCategory: sizeCategory, color: '#ccc' });
+    }
+
+    it('hiding medium size hides medium contract edges', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addContract(dataGraph, 'contract:x');
+        addContractEdge(dataGraph, 'org:A', 'contract:x', 'Order', 'medium');
+
+        const ls = new LegendState();
+        ls.setGlobalSizeCategoryVisible('medium', false);
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => ls.isEdgeHidden(s, t, type, sz));
+        assert.ok(!viewGraph.hasEdge('e:org:A:contract:x:Order'), 'medium edge hidden when medium category hidden');
+        assert.ok(!viewGraph.hasNode('contract:x'), 'contract removed when its only edge is hidden');
+    });
+
+    it('hiding medium does not affect large or small contract edges', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addContract(dataGraph, 'contract:small');
+        addContract(dataGraph, 'contract:large');
+        addContractEdge(dataGraph, 'org:A', 'contract:small', 'Order', 'small');
+        addContractEdge(dataGraph, 'org:A', 'contract:large', 'Order', 'large');
+
+        const ls = new LegendState();
+        ls.setGlobalSizeCategoryVisible('medium', false);
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => ls.isEdgeHidden(s, t, type, sz));
+        assert.ok(viewGraph.hasNode('contract:small'), 'small contract unaffected');
+        assert.ok(viewGraph.hasNode('contract:large'), 'large contract unaffected');
+    });
+
+    it('per-node size filter: hiding large for OrgA does not affect OrgB', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addOrg(dataGraph, 'org:B', true);
+        addContract(dataGraph, 'contract:x');
+        addContract(dataGraph, 'contract:y');
+        addContractEdge(dataGraph, 'org:A', 'contract:x', 'Order', 'large');
+        addContractEdge(dataGraph, 'org:B', 'contract:y', 'Order', 'large');
+
+        const ls = new LegendState();
+        ls.initNode('org:A');
+        ls.setSizeCategoryVisible('org:A', 'large', false);
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => ls.isEdgeHidden(s, t, type, sz));
+        assert.ok(!viewGraph.hasNode('contract:x'), 'OrgA large contract hidden');
+        assert.ok(viewGraph.hasNode('contract:y'), 'OrgB large contract visible');
+    });
+
+    it('bridge contract remains visible even when its size category is hidden globally', () => {
+        addOrg(dataGraph, 'org:A', true);
+        addOrg(dataGraph, 'org:B', true);
+        addContract(dataGraph, 'contract:x');
+        addContractEdge(dataGraph, 'org:A', 'contract:x', 'Order', 'large');
+        addContractEdge(dataGraph, 'contract:x', 'org:B', 'Delivery', 'large');
+
+        const ls = new LegendState();
+        ls.setGlobalSizeCategoryVisible('large', false);
+
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => ls.isEdgeHidden(s, t, type, sz));
+        assert.ok(viewGraph.hasNode('contract:x'), 'bridge contract visible despite size hidden');
+        assert.ok(viewGraph.hasEdge('e:org:A:contract:x:Order'), 'bridge edge visible');
+        assert.ok(viewGraph.hasEdge('e:contract:x:org:B:Delivery'), 'bridge edge visible');
+    });
+});
+
 // ── mergeGraphElements — org node enrichment ──────────────────────────────────
 
 describe('mergeGraphElements — org node sodra enrichment', function () {
@@ -658,5 +789,255 @@ describe('rebuildViewGraph — size sync for already-visible nodes', function ()
         rebuildViewGraph(dg, vg, () => false);
 
         assert.equal(vg.getNodeAttribute('org:A', 'size'), 19);
+    });
+});
+
+// ── mergeGraphElements — rootNodeId parameter ─────────────────────────────────
+
+describe('mergeGraphElements — rootNodeId', () => {
+    let graph;
+    const noPos = () => null;
+
+    beforeEach(() => {
+        graph = new Graph({ type: 'directed', multi: true });
+    });
+
+    it('root node gets isRoot=true and empty expandedBy when rootNodeId provided', () => {
+        mergeGraphElements(graph, noPos, { nodes: [orgNodeData('org:root', 'Root')] }, 'org:root', 'org:root');
+        assert.equal(graph.getNodeAttribute('org:root', 'isRoot'), true);
+        assert.deepEqual([...graph.getNodeAttribute('org:root', 'expandedBy')], []);
+    });
+
+    it('non-root nodes get isRoot=false and expandedBy=[fromNodeId] when rootNodeId provided', () => {
+        mergeGraphElements(graph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:partner', 'Partner')],
+            edges: [],
+        }, 'org:root', 'org:root');
+        assert.equal(graph.getNodeAttribute('org:partner', 'isRoot'), false);
+        assert.deepEqual([...graph.getNodeAttribute('org:partner', 'expandedBy')], ['org:root']);
+    });
+
+    it('edges get expandedBy=[fromNodeId] when rootNodeId provided', () => {
+        mergeGraphElements(graph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:partner', 'Partner')],
+            edges: [edgeData('org:root', 'org:partner', 'Order', '')],
+        }, 'org:root', 'org:root');
+        const edgeId = 'edge:org:root:org:partner:Order';
+        assert.deepEqual([...graph.getEdgeAttribute(edgeId, 'expandedBy')], ['org:root']);
+    });
+
+    it('without rootNodeId, fromNodeId=null makes all nodes isRoot=true (backward compat)', () => {
+        mergeGraphElements(graph, noPos, { nodes: [orgNodeData('org:A', 'A')] }, null);
+        assert.equal(graph.getNodeAttribute('org:A', 'isRoot'), true);
+    });
+});
+
+// ── collapseGraphData ─────────────────────────────────────────────────────────
+
+describe('collapseGraphData', () => {
+    let dataGraph;
+    const noPos = () => null;
+
+    beforeEach(() => {
+        dataGraph = new Graph({ type: 'directed', multi: true });
+    });
+
+    it('sets expanded=false on the collapsed node', () => {
+        mergeGraphElements(dataGraph, noPos, { nodes: [orgNodeData('org:root', 'Root')] }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+        collapseGraphData(dataGraph, 'org:root');
+        assert.equal(dataGraph.getNodeAttribute('org:root', 'expanded'), false);
+    });
+
+    it('removes nodes exclusively owned by the collapsed node', () => {
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:p', 'Partner')],
+            edges: [edgeData('org:root', 'org:p', 'Order', '')],
+        }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+
+        collapseGraphData(dataGraph, 'org:root');
+
+        assert.ok(!dataGraph.hasNode('org:p'), 'exclusively owned partner should be removed');
+        assert.ok(dataGraph.hasNode('org:root'), 'collapsed node itself stays in dataGraph');
+        assert.equal(dataGraph.edges().length, 0, 'owned edge should be removed');
+    });
+
+    it('preserves nodes shared with another expansion (diamond dependency)', () => {
+        // Root expansion: root + shared partner
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:shared', 'Shared')],
+            edges: [edgeData('org:root', 'org:shared', 'Order', '')],
+        }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+
+        // Expanding org:other also claims org:shared (server returns both in its response)
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:other', 'Other'), orgNodeData('org:shared', 'Shared')],
+            edges: [edgeData('org:other', 'org:shared', 'Order', '')],
+        }, 'org:other');
+        dataGraph.setNodeAttribute('org:other', 'expanded', true);
+
+        collapseGraphData(dataGraph, 'org:root');
+
+        assert.ok(dataGraph.hasNode('org:shared'), 'shared node must survive (also owned by org:other)');
+        assert.ok(dataGraph.hasNode('org:other'), 'other expanded node must survive');
+    });
+
+    it('does nothing when nodeId is not in dataGraph', () => {
+        collapseGraphData(dataGraph, 'org:nonexistent'); // must not throw
+    });
+});
+
+// ── collapse + rebuildViewGraph integration ───────────────────────────────────
+
+describe('collapse + rebuildViewGraph integration', () => {
+    let dataGraph, viewGraph;
+    const noPos = () => null;
+    const neverHide = () => false;
+
+    beforeEach(() => {
+        dataGraph = new Graph({ type: 'directed', multi: true });
+        viewGraph = new Graph({ type: 'directed', multi: true });
+    });
+
+    it('collapsing the root node when it is the only expanded node empties viewGraph', () => {
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:p1', 'Partner')],
+            edges: [edgeData('org:root', 'org:p1', 'Order', '')],
+        }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+
+        rebuildViewGraph(dataGraph, viewGraph, neverHide);
+        assert.equal(viewGraph.order, 2, 'both nodes visible before collapse');
+
+        collapseGraphData(dataGraph, 'org:root');
+        rebuildViewGraph(dataGraph, viewGraph, neverHide);
+
+        assert.equal(viewGraph.order, 0, 'graph must be empty after root collapse');
+    });
+
+    it('collapsing root leaves another independently expanded node visible', () => {
+        // Root expansion: root + partner (server returns root itself + all connected nodes)
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:p1', 'Partner')],
+            edges: [edgeData('org:root', 'org:p1', 'Order', '')],
+        }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+
+        // Partner expansion: server returns org:p1 itself (already in graph → gets expandedBy updated)
+        // plus any new nodes. This is the real server behaviour: expandOrg includes the target org.
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:p1', 'Partner'), orgNodeData('org:p2', 'Sub-partner')],
+            edges: [edgeData('org:p1', 'org:p2', 'Order', '')],
+        }, 'org:p1');
+        dataGraph.setNodeAttribute('org:p1', 'expanded', true);
+
+        rebuildViewGraph(dataGraph, viewGraph, neverHide);
+        assert.equal(viewGraph.order, 3, 'all three nodes visible before collapse');
+
+        collapseGraphData(dataGraph, 'org:root');
+        rebuildViewGraph(dataGraph, viewGraph, neverHide);
+
+        assert.ok(!viewGraph.hasNode('org:root'), 'root should disappear');
+        assert.ok(viewGraph.hasNode('org:p1'), 'partner stays (still expanded anchor)');
+        assert.ok(viewGraph.hasNode('org:p2'), 'sub-partner stays (has edge to anchor)');
+    });
+
+    it('root node is isRoot=true and survives another node collapsing it', () => {
+        // Root expansion (root itself + partner)
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:root', 'Root'), orgNodeData('org:p1', 'Partner')],
+            edges: [edgeData('org:root', 'org:p1', 'Order', '')],
+        }, 'org:root', 'org:root');
+        dataGraph.setNodeAttribute('org:root', 'expanded', true);
+
+        // Partner expansion: partner claims root as one of its connections;
+        // root already exists → gets org:p1 added to expandedBy (but isRoot stays true)
+        mergeGraphElements(dataGraph, noPos, {
+            nodes: [orgNodeData('org:p1', 'Partner'), orgNodeData('org:root', 'Root')],
+            edges: [edgeData('org:p1', 'org:root', 'Order', '')],
+        }, 'org:p1');
+        dataGraph.setNodeAttribute('org:p1', 'expanded', true);
+
+        // Collapse partner — root must survive because isRoot=true
+        collapseGraphData(dataGraph, 'org:p1');
+
+        assert.ok(dataGraph.hasNode('org:root'), 'root must not be removed when partner collapses');
+    });
+});
+
+// ── computeEdgeCounts ─────────────────────────────────────────────────────────
+
+describe('computeEdgeCounts', () => {
+    let g;
+    beforeEach(() => { g = new Graph({ type: 'directed', multi: true }); });
+
+    it('returns empty maps for a missing node', () => {
+        const { byType, bySize } = computeEdgeCounts(g, 'org:x');
+        assert.equal(byType.size, 0);
+        assert.equal(bySize.size, 0);
+    });
+
+    it('returns empty maps for a node with no edges', () => {
+        g.addNode('org:x', {});
+        const { byType, bySize } = computeEdgeCounts(g, 'org:x');
+        assert.equal(byType.size, 0);
+        assert.equal(bySize.size, 0);
+    });
+
+    it('counts Director edges correctly', () => {
+        g.addNode('org:a', {}); g.addNode('person:1', {}); g.addNode('person:2', {});
+        g.addEdgeWithKey('e1', 'person:1', 'org:a', { edgeType: 'Director' });
+        g.addEdgeWithKey('e2', 'person:2', 'org:a', { edgeType: 'Director' });
+        const { byType } = computeEdgeCounts(g, 'org:a');
+        assert.equal(byType.get('Director'), 2);
+        assert.equal(byType.get('Shareholder'), undefined);
+    });
+
+    it('counts multiple edge types independently', () => {
+        g.addNode('org:a', {}); g.addNode('person:1', {}); g.addNode('person:2', {});
+        g.addEdgeWithKey('e1', 'person:1', 'org:a', { edgeType: 'Director' });
+        g.addEdgeWithKey('e2', 'person:2', 'org:a', { edgeType: 'Shareholder' });
+        const { byType } = computeEdgeCounts(g, 'org:a');
+        assert.equal(byType.get('Director'), 1);
+        assert.equal(byType.get('Shareholder'), 1);
+    });
+
+    it('counts Order edges by size category independently', () => {
+        g.addNode('org:a', {}); g.addNode('contract:1', {}); g.addNode('contract:2', {}); g.addNode('contract:3', {});
+        g.addEdgeWithKey('e1', 'org:a', 'contract:1', { edgeType: 'Order', contractSizeCategory: 'small' });
+        g.addEdgeWithKey('e2', 'org:a', 'contract:2', { edgeType: 'Order', contractSizeCategory: 'medium' });
+        g.addEdgeWithKey('e3', 'org:a', 'contract:3', { edgeType: 'Order', contractSizeCategory: 'large' });
+        const { bySize } = computeEdgeCounts(g, 'org:a');
+        assert.equal(bySize.get('small'), 1);
+        assert.equal(bySize.get('medium'), 1);
+        assert.equal(bySize.get('large'), 1);
+    });
+
+    it('medium count does not affect small or large counts', () => {
+        g.addNode('org:a', {}); g.addNode('contract:1', {}); g.addNode('contract:2', {});
+        g.addEdgeWithKey('e1', 'org:a', 'contract:1', { edgeType: 'Order', contractSizeCategory: 'medium' });
+        g.addEdgeWithKey('e2', 'org:a', 'contract:2', { edgeType: 'Order', contractSizeCategory: 'medium' });
+        const { bySize } = computeEdgeCounts(g, 'org:a');
+        assert.equal(bySize.get('medium'), 2);
+        assert.equal(bySize.get('small'), undefined);
+        assert.equal(bySize.get('large'), undefined);
+    });
+
+    it('does not count edges not incident to the queried node', () => {
+        g.addNode('org:a', {}); g.addNode('org:b', {}); g.addNode('org:c', {});
+        g.addEdgeWithKey('e1', 'org:b', 'org:c', { edgeType: 'Director' });
+        const { byType } = computeEdgeCounts(g, 'org:a');
+        assert.equal(byType.size, 0);
+    });
+
+    it('counts both outgoing and incoming edges', () => {
+        g.addNode('org:a', {}); g.addNode('org:b', {}); g.addNode('org:c', {});
+        g.addEdgeWithKey('e1', 'org:a', 'org:b', { edgeType: 'Order' });
+        g.addEdgeWithKey('e2', 'org:c', 'org:a', { edgeType: 'Delivery' });
+        const { byType } = computeEdgeCounts(g, 'org:a');
+        assert.equal(byType.get('Order'), 1);
+        assert.equal(byType.get('Delivery'), 1);
     });
 });

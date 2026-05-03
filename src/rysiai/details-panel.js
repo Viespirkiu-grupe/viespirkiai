@@ -1,19 +1,18 @@
-import { isOrgNode, isPersonNode, isContractNode, ENTITY_TYPE } from './entity-types.js';
+import { isOrgNode, isPersonNode, isContractNode, isProcurementNode, isConfigurableNode } from './entity-types.js';
 
-// ── Details panel ─────────────────────────────────────────────────────────────
+// ── Shared expand/collapse button ─────────────────────────────────────────────
 
-let panelEl = null;
-
-function getPanel() {
-    if (!panelEl) panelEl = document.getElementById('rysiai-details');
-    return panelEl;
+export function buildExpandButtonHtml(handlers) {
+    if (!handlers.onExpand && !handlers.onCollapse) return '';
+    const isExpanded = !!handlers.onCollapse;
+    const icon = isExpanded ? '▲' : '▼';
+    const label = isExpanded ? 'Slėpti ryšius' : 'Rodyti ryšius';
+    const action = isExpanded ? 'collapse' : 'expand';
+    return '<button class="btn btn-ghost btn-sm vd-btn" data-action="' + action + '">' + icon + ' <span>' + label + '</span></button>';
 }
 
-/**
- * Formats a contract/procurement value as €XM / €XK / €X.
- * @param {number|null} verte
- * @returns {string}
- */
+// ── Private helpers ───────────────────────────────────────────────────────────
+
 function formatContractValue(verte) {
     if (verte == null || verte === 0) return '';
     const v = Math.round(verte);
@@ -30,66 +29,114 @@ function esc(s) {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function buildHtml(attrs) {
+function buildHtml(attrs, handlers = {}) {
+    let html = '';
+
     if (isOrgNode(attrs)) {
         let employees = '';
         const d1 = attrs.draustieji || 0;
         const d2 = attrs.draustieji2 || 0;
         const count = d1 + d2;
         if (count > 0) employees = '<div class="vd-sub">Darbuotojų: ' + count + '</div>';
-        return '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>'
+        html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>'
             + '<div class="vd-sub">' + esc(attrs.jarKodas) + '</div>'
             + employees
             + link('/asmuo/' + encodeURIComponent(attrs.jarKodas), 'Peržiūrėti įmonę');
-    }
-
-    if (isContractNode(attrs)) {
+    } else if (isContractNode(attrs)) {
         const valueStr = formatContractValue(attrs.verte);
         const sutId = attrs.sutartiesUnikalusId || attrs.id.replace('contract:', '');
-        let html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
+        html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
         if (valueStr) html += '<div class="vd-sub">' + valueStr + '</div>';
         html += link('/sutartis/' + encodeURIComponent(sutId), 'Peržiūrėti sutartį');
         if (attrs.pirkimoNumeris) {
             html += link('/viesiejiPirkimai/' + encodeURIComponent(attrs.pirkimoNumeris), 'Peržiūrėti pirkimą');
         }
-        return html;
-    }
-
-    if (attrs.entityType === ENTITY_TYPE.Procurement) {
+    } else if (isProcurementNode(attrs)) {
         const procValue = formatContractValue(attrs.numatomaVerteEUR);
-        let html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
+        html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
         if (procValue) html += '<div class="vd-sub">' + procValue + '</div>';
         if (attrs.statusas) html += '<div class="vd-sub">' + esc(attrs.statusas) + '</div>';
         html += link('/viesiejiPirkimai/' + encodeURIComponent(attrs.pirkimoId), 'Peržiūrėti pirkimą');
-        return html;
-    }
-
-    if (isPersonNode(attrs)) {
+    } else if (isPersonNode(attrs)) {
         const name = ((attrs.vardas || '') + ' ' + (attrs.pavarde || '')).trim();
-        return '<div class="vd-title">' + esc(name) + '</div>';
+        html = '<div class="vd-title">' + esc(name) + '</div>';
     }
 
-    return '';
+    // Configurable nodes (org/person) get their expand/collapse button in the legend panel.
+    const showButton = handlers.onExpand || (handlers.onCollapse && !isConfigurableNode(attrs));
+    if (html && showButton) {
+        html += buildExpandButtonHtml(handlers);
+    }
+
+    return html;
 }
 
-/**
- * Shows the details panel for the selected node.
- * @param {string} nodeId
- * @param {object} attrs  Node attributes from viewGraph
- */
-export function showNodeDetails(nodeId, attrs) {
-    const el = getPanel();
-    if (!el) return;
-    const html = buildHtml(attrs);
-    if (!html) { el.hidden = true; return; }
-    el.innerHTML = html;
-    el.hidden = false;
-}
+// ── NodeDetails component ─────────────────────────────────────────────────────
 
 /**
- * Hides the details panel.
+ * Manages the node details panel and delegates legend updates to the composed NodeLegend.
+ * Call showForNode() on selection; call hide() on deselect or collapse.
  */
-export function hideDetails() {
-    const el = getPanel();
-    if (el) el.hidden = true;
+export class NodeDetails {
+    constructor({ legend = null } = {}) {
+        this.legend = legend;
+        this._panel = null;
+        this._wrapper = null;
+    }
+
+    _getPanel() {
+        if (!this._panel) this._panel = document.getElementById('rysiai-details');
+        return this._panel;
+    }
+
+    _getWrapper() {
+        if (!this._wrapper) this._wrapper = document.getElementById('node-details');
+        return this._wrapper;
+    }
+
+    /**
+     * Renders the details panel for the selected node and updates the legend.
+     * @param {string} nodeId
+     * @param {object} attrs  Node attributes from viewGraph
+     * @param {object} handlers  { onExpand?: () => void, onCollapse?: () => void }
+     * @param {{ byType: Map<string,number>, bySize: Map<string,number> }|null} counts
+     */
+    showForNode(nodeId, attrs, handlers = {}, counts = null) {
+        const el = this._getPanel();
+        const wrapper = this._getWrapper();
+        if (!el) return;
+
+        const html = buildHtml(attrs, handlers);
+        if (!html) {
+            if (wrapper) wrapper.hidden = true;
+            this.legend?.hide();
+            return;
+        }
+
+        el.innerHTML = html;
+        if (wrapper) wrapper.hidden = false;
+
+        const btn = el.querySelector('[data-action]');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                if (btn.dataset.action === 'expand') handlers.onExpand?.();
+                else handlers.onCollapse?.();
+            });
+        }
+
+        if (isConfigurableNode(attrs)) {
+            this.legend?.updateForNode(nodeId, attrs.expanded, handlers, counts);
+        } else {
+            this.legend?.hide();
+        }
+    }
+
+    /**
+     * Hides the details panel wrapper and the legend.
+     */
+    hide() {
+        const wrapper = this._getWrapper();
+        if (wrapper) wrapper.hidden = true;
+        this.legend?.hide();
+    }
 }

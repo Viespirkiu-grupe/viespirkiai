@@ -1,5 +1,7 @@
 // ── Custom Sigma node renderers ───────────────────────────────────────────────
-
+// Pure canvas drawing functions — converts NodeDisplayData to pixels.
+// No graph state, no DOM queries, no business logic.
+// graph-utils.js handles graph data operations; this file handles how nodes look on screen.
 /**
  * @typedef {object} NodeDisplayData
  * @property {number}  x         - graph-space X coordinate

@@ -12,13 +12,23 @@ Interaction model:
 - **Single click** — selects the node and shows its details panel. Clicking the canvas background deselects.
 - **Double-click** — expands the node, fetching and merging its connected data into the graph.
 
-The **details panel** (top-right overlay) shows a type-specific summary of the selected node. At the bottom of the
-panel, an **expand/collapse button** provides an alternative to double-clicking. The node stays selected after either
-button action:
+The **`#node-details` panel** (top-right overlay, min 200 px / max 240 px) unifies the node details and the edge-type
+legend into a single panel. It contains two sub-components:
 
-- **"Išskleisti"** (Hub icon) — shown when the node has not yet been expanded; triggers expansion.
-- **"Suskleisti"** (Adjust icon) — shown when the node is already expanded; collapses: removes the edges and orphaned
-  nodes brought in by this expansion, resets `expanded: false`, rebuilds the graph.
+- **`#rysiai-details`** — type-specific summary of the selected node (title, sub-info, external links).
+  For non-configurable expandable nodes (e.g. contract with `pirkimoNumeris`) an **"Išskleisti"** / **"Suskleisti"**
+  button is rendered here.
+- **`#rysiai-legend`** — shown **only when an org/person node is expanded** (`expanded === true`). Contains:
+  - **`#rysiai-legend-checkboxes`** — edge-type and contract-size filter checkboxes. Each row shows the **count of
+    that relationship type incident to the selected node** (e.g. "Direktorius / vadovas (5)"). Rows where the count
+    is **zero are hidden entirely** — no checkbox is shown for a relationship type that does not exist on the node.
+    Contract edges are split into three independently-toggleable size rows:
+    "Sutartis (maža)" / "(vidutinė)" / "(didelė)" corresponding to `contractSizeCategory` small / medium / large.
+  - **`#rysiai-legend-btn`** — the **"Suskleisti"** (Adjust icon) button for org/person nodes, separated by a
+    border-top. Clicking collapses the node: removes expansion-owned edges and orphaned nodes, resets
+    `expanded: false`, hides the legend.
+  The **"Išskleisti"** (Hub icon) button for not-yet-expanded org/person nodes is rendered in `#rysiai-details`
+  (legend is hidden when node is not expanded). Hidden automatically on collapse or when a non-expanded node is selected.
 
 MCP is not used for DB queries — direct DB calls are faster and avoid HTTP/SSE overhead; MCP is designed for external AI
 clients only.
@@ -409,11 +419,11 @@ graph TD
 | `src/rysiai/colors.js`      | Client | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` Set                                                        | No                        |
 | `src/rysiai/renderers.js`   | Client | `drawNodeLabel`, `drawNodeHover` — Sigma canvas callbacks                                                             | No (canvas ctx passed in) |
 | `src/rysiai/graph-utils.js` | Client | `mergeGraphElements(dataGraph,...)`, `rebuildViewGraph`, `syncPositionsToData`, `runLayout` — **pure, injected deps** | No ★                      |
-| `src/rysiai/legend.js`      | Client | `bindLegendCheckboxes(renderer, hiddenEdgeTypes, rebuildAndRefresh)`                                                  | Yes (queries DOM)         |
+| `src/rysiai/legend.js`      | Client | `updateLegendForNode(nodeId, legendState, expanded, handlers, counts)` — shows/hides `#rysiai-legend`; renders counts per edge type; hides zero-count rows; renders Suskleisti button at bottom | Yes (queries DOM) |
 | `src/rysiai/expand-ui.js`   | Client | `createExpandUI({dataGraph,viewGraph,...})` — async fetch + rebuild; returns `rebuildAndRefresh`                      | Yes                       |
 | `modules/rysiai/expand.js`  | Server | `expandOrg`, `expandPerson`, `expandProcurement`, all pure builder helpers                                            | No                        |
 | `routes/rysiai.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`/`expandProcurement`; renders EJS                                     | No                        |
-| `views/rysiai/index.ejs`    | View   | HTML shell, inline CSS, legend overlay with checkboxes                                                                | —                         |
+| `views/rysiai/index.ejs`    | View   | HTML shell; `#node-details` wrapper (top-right); `#rysiai-details` + `#rysiai-legend` sub-components inside wrapper  | —                         |
 
 **Visual identity — node colours and icons:**
 
@@ -574,214 +584,26 @@ Person nodes keep a fixed `size: 8`. `edgeWeight` is mirrored as a local helper 
 
 ## Tasks
 
-> **Phases 1–12 complete.** Core infrastructure (routes, expand.js, Sigma canvas, icons), expand
-> animations, loading overlay, edge/node type labels, legend checkboxes, two-graph architecture,
-> per-node selection state, dynamic node/edge sizing, entity-types module, and SVG legend arrows are
-> all implemented. See architecture sections above for current implementation state.
+> **Phases 1–18 complete.** Core infrastructure (routes, expand.js, Sigma canvas, icons), expand
+> animations, loading overlay, edge/node type labels, per-node legend checkboxes with `LegendState`,
+> two-graph architecture, per-node selection state, dynamic node/edge sizing, entity-types module,
+> SVG legend arrows, ProcurementEntity nodes, double-click expand, expand/collapse button,
+> unified `#node-details` panel, button moved to bottom of legend, legend title removed,
+> size-based contract filtering (small / medium / large), legend row counts with zero-count hiding
+> (`computeEdgeCounts`, `vl-count` spans, `▼`/`▲` expand/collapse buttons). See architecture
+> sections above for current implementation state.
 
 ---
 
-**Phase 14 — ProcurementEntity graph nodes (server-side)**
-
-Add `ProcurementEntity` as a first-class node type on the server. The client-side infrastructure
-(colors, icons, entity-types, expand-ui, legend rows, details panel) is already implemented.
-
-#### Data model
-
-| Attribute          | Source                              | Notes                                             |
-|--------------------|-------------------------------------|---------------------------------------------------|
-| `id`               | `procurement:{pirkimoId}`           | Stable across page loads                          |
-| `entityType`       | `'ProcurementEntity'`               |                                                   |
-| `pirkimoId`        | `viesiejiPirkimai.pirkimoId`        | Used for expansion and detail page link           |
-| `pavadinimas`      | `viesiejiPirkimai.pavadinimas`      | Procurement title                                 |
-| `numatomaVerteEUR` | `viesiejiPirkimai.numatomaVerteEUR` | Estimated total value                             |
-| `statusas`         | `viesiejiPirkimai.statusas`         | e.g. "Nustatytas laimėtojas"                      |
-| `pirkimoBudas`     | `viesiejiPirkimai.pirkimoBudas`     | e.g. "Atviras konkursas"                          |
-| `size`             | `contractSize(numatomaVerteEUR)`    | Same tiers as ContractEntity (8 / 13 / 19)        |
-| `expanded`         | `false` initially                   | Set to `true` after `expandProcurement` is called |
-
-**Edges from `expandOrg` (buyer side)**: `Procurement` edge `org:{buyerJk}` → `procurement:{pirkimoId}`, label =
-`pirkimoBudas`.
-
-**Edges from `expandProcurement` (winner orgs)**: `Award` edge `procurement:{pirkimoId}` → `org:{tiekejoKodas}`, label =
-formatted total `verte` sum for that seller.
-
-#### Tasks
-
-- [ ] **`modules/rysiai/expand.js`**:
-    - Add `procurementNode(row)` factory:
-      `{ id, entityType, pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas, size, expanded: false }`.
-    - In `expandOrg`: query
-      `SELECT pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas FROM viesiejiPirkimai WHERE jarKodas = $jk ORDER BY numatomaVerteEUR DESC NULLS LAST LIMIT 20`;
-      emit `procurementNode` + `Procurement` edge per result.
-    - Add `expandProcurement(pirkimoId)`: query
-      `SELECT DISTINCT s.tiekejoKodas, j.pavadinimas, SUM(s.verte) as totalVerte FROM sutartys s LEFT JOIN jarCsv j ON j.jarKodas::text = s.tiekejoKodas WHERE s.pirkimoNumeris = $1 GROUP BY s.tiekejoKodas, j.pavadinimas`;
-      return org stub nodes + `Award` edges.
-
-- [ ] **Browser smoke-test**:
-    - Double-click a buyer org → purple procurement nodes appear
-    - Double-click a procurement node → winner seller org stubs appear via green `Award` edges
-    - Select a procurement node → details panel shows title, estimated value, statusas, link, and Išskleisti/Suskleisti
-      button
-
----
-
-**Phase 16 — Double-click to expand / details panel expand-collapse button**
-
-Replaces single-click expansion with double-click. Adds an expand/collapse button to the details
-panel as a secondary interaction path.
-
-#### Interaction model
-
-| Event             | Source                          | Behaviour                                                                               |
-|-------------------|---------------------------------|-----------------------------------------------------------------------------------------|
-| `clickNode`       | Sigma — canvas node click       | Select the node (show details panel). If already selected, **no-op** — do not deselect. |
-| `doubleClickNode` | Sigma — canvas node dblclick    | Expand the node.                                                                        |
-| `clickExpand`     | Details panel "Išskleisti" btn  | Expand the currently selected node. Node remains selected.                              |
-| `clickCollapse`   | Details panel "Suskleisti" btn  | Collapse the currently selected node. Node remains selected; panel updates.             |
-| `clickStage`      | Sigma — canvas background click | Deselect (unchanged).                                                                   |
-
-> **Why no-op on re-click**: Sigma fires `clickNode` twice before `doubleClickNode`. If the second
-> `clickNode` deselected the node, the user would see a flicker (select → deselect → expand). Making
-> re-click a no-op avoids this: both clicks select/keep the node selected, then `doubleClickNode`
-> expands it.
-
-#### Details panel expand/collapse button
-
-At the bottom of the `#rysiai-details` panel, a single button is rendered based on node state:
-
-| Node state                                                              | Button label     | Button icon                               | Action             |
-|-------------------------------------------------------------------------|------------------|-------------------------------------------|--------------------|
-| expandable, not yet expanded                                            | **"Išskleisti"** | Hub (MUI `@mui/icons-material/Hub`)       | triggers expansion |
-| already expanded                                                        | **"Suskleisti"** | Adjust (MUI `@mui/icons-material/Adjust`) | triggers collapse  |
-| not expandable (e.g. `PersonEntity`, contract without `pirkimoNumeris`) | *(no button)*    | —                                         | —                  |
-
-A node is expandable when any of the following is true:
-
-- `isOrgNode(attrs) && attrs.jarKodas`
-- `isPersonNode(attrs) && attrs.vardas && attrs.pavarde`
-- `isProcurementNode(attrs) && attrs.pirkimoId`
-- `isContractNode(attrs) && attrs.pirkimoNumeris`
-
-Icons are rendered as **inline SVG**. Add `Hub` and `Adjust` path strings to `MUI_ICON_PATHS` in
-`src/rysiai/icons.js` and export a `svgIcon(key)` helper from that module (it already owns the path
-map). `details-panel.js` imports `svgIcon` from `icons.js` and calls it to build the button markup.
-`svgIcon` wraps the path in `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">`.
-
-> **Why `svgIcon` belongs in `icons.js`, not `details-panel.js`**: `MUI_ICON_PATHS` is currently a
-> private `const` in `icons.js`. Exporting the helper (not the raw map) keeps the path data
-> encapsulated and avoids a cross-module data dependency.
-
-#### `showNodeDetails` signature change
-
-```js
-// was: showNodeDetails(nodeId, attrs)
-// now:
-export function showNodeDetails(nodeId, attrs, handlers = {}) { …
-}
-
-// handlers: { onExpand?: () => void, onCollapse?: () => void }
-```
-
-`buildHtml` appends the button only when a handler is provided. After setting `innerHTML`, attach
-the handler directly to the rendered button element (not via `{ once: true }` on the panel — a
-`{ once: true }` listener on the panel is consumed by the first click anywhere, including the
-existing "Peržiūrėti…" links, leaving subsequent button clicks dead):
-
-```js
-const btn = el.querySelector('[data-action]');
-if (btn) {
-    btn.addEventListener('click', () => {
-        if (btn.dataset.action === 'expand') handlers.onExpand?.();
-        else handlers.onCollapse?.();
-    });
-}
-```
-
-Each call to `showNodeDetails` replaces `innerHTML`, so the old button and its listener are
-discarded automatically.
-
-In `expand-ui.js`, `selectNode` computes the handlers and passes them:
-
-```js
-function selectNode(id) {
-…
-    const attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
-    const handlers = {};
-    if (attrs.expanded) {
-        handlers.onCollapse = () => collapseNode(id);
-    } else if (isExpandableNode(attrs)) {
-        handlers.onExpand = () => _triggerExpand(id, attrs);
-    }
-    showNodeDetails(id, attrs, handlers);
-}
-```
-
-#### Collapse algorithm (`collapseNode`)
-
-1. Set `expanded: false` on `nodeId` in both graphs.
-2. Run `rebuildAndRefresh()` — `nodeId` is no longer an anchor, so nodes whose only anchor
-   connection was through `nodeId` are pruned from `viewGraph` by the existing anchor/visibility
-   logic. `dataGraph` is **not modified** — the data is retained as a silent cache so re-expansion
-   is instant without a network call.
-3. After the rebuild, check whether `nodeId` is still in `viewGraph`:
-    - **Still visible** (has edges from other expansions): re-call `showNodeDetails` with an
-      `onExpand` handler so the button switches from Suskleisti to Išskleisti.
-    - **No longer visible** (all its edges were expansion-exclusive): call `deselectAll()` — the
-      node is gone from the canvas, selection is meaningless.
-
-> **Why not delete from `dataGraph`**: removing edges from `dataGraph` risks deleting edges added
-> by *other* nodes' expansions (e.g. a `Delivery` edge `contract→nodeId` added when expanding a
-> different org). Provenance tracking would be required to do this safely and is deferred to a
-> future phase.
-
-#### Tasks
-
-- [ ] **`src/rysiai/icons.js`**: add `Hub` and `Adjust` MUI SVG path strings to `MUI_ICON_PATHS`;
-  export a new `svgIcon(key)` function that returns the inline SVG HTML string for a given key
-  (returns empty string for unknown keys).
-
-- [ ] **`src/rysiai/details-panel.js`**:
-    - Import `svgIcon` from `icons.js`.
-    - Change signature to `showNodeDetails(nodeId, attrs, handlers = {})`.
-    - In `buildHtml(attrs, handlers)`: append at the bottom an Išskleisti or Suskleisti button
-      based on `handlers.onExpand` / `handlers.onCollapse`. Button HTML: `class="vd-btn"`,
-      `data-action="expand"` or `data-action="collapse"`, flex row with `svgIcon(...)` + label text.
-    - After `el.innerHTML = html`, bind the handler directly to the button element (see wiring
-      pattern in the section above — do **not** use `{ once: true }` on the panel).
-    - Add button CSS to `views/rysiai/index.ejs`: `.vd-btn` — full-width, small padding,
-      border, rounded, cursor pointer, flex, align-items center, gap 6px; hover state.
-
-- [ ] **`src/rysiai/expand-ui.js`**:
-    - Add `isExpandableNode(attrs)` predicate (local helper, not exported).
-    - Add `_triggerExpand(nodeId, attrs)` — guards `if (attrs.expanded) return;` first, then
-      dispatches via EXPAND_KINDS lookup or contract special case (extracted from current
-      `clickNode` expansion block).
-    - Replace `clickNode` expansion block with `selectNode(nodeId)` only; remove the
-      deselect-on-re-click branch (`if (selectedNodeId === nodeId) deselectAll()` → delete).
-    - Add `renderer.on('doubleClickNode', (event) => { ... })` handler that calls
-      `_triggerExpand(event.node, attrs)`.
-    - Add `collapseNode(nodeId)` — implements the simplified collapse algorithm above.
-    - Update `selectNode` to compute and pass `handlers` to `showNodeDetails`.
-    - In `collapseNode`, after `rebuildAndRefresh()`: if nodeId still in `viewGraph`, re-call
-      `showNodeDetails` with `onExpand` handler; else call `deselectAll()`.
-
-- [ ] **Browser smoke-test**:
-    - Single-click a node → selects, shows details panel; double-clicking re-click does not deselect
-    - Double-click an unexpanded org → expands, details panel switches to Suskleisti button
-    - Click Išskleisti in panel → same expansion as double-click
-    - Click Suskleisti in panel → expansion nodes disappear, button reverts to Išskleisti
-    - Single-click canvas → deselects, panel hides
-    - Single-click already-selected node → no-op (panel stays open)
+- [ ] **Browser smoke-test** (manual verification):
+    - Expand an org node — legend shows only rows with count > 0; each visible row has `(N)`.
+    - Node with no Employment edges: "Darbuotojas" row absent from legend.
+    - Node with only large contracts: only "Sutartis (didelė)" size row shown.
+    - After expanding a second node that adds new edge types to the first's neighbourhood: legend
+      updates correctly on re-selection.
 
 ---
 
 1. **ForceAtlas2 in browser**: `graphology-layout-forceatlas2` runs synchronously and blocks the main
    thread for large graphs. For large graphs (>200 nodes) a Web Worker is recommended. For v1,
    synchronous with a capped iteration count is acceptable.
-
-2. **Search UX on `/rysiai`**: Eliminated. Entry is exclusively via `/rysiai/:jarKodas`
-   (linked from `/asmuo/`). ✓ Resolved.
-
-3. **Header nav link for `/rysiai`**: Keep pointing to `/rysiai/` — shows 404 "įmonė nenurodyta"
-   when clicked directly. This is intentional. ✓ Resolved.

@@ -36,85 +36,73 @@
     .dark #rysiai-loading {
       background: rgba(15,23,42,0.5);
     }
-    .vl-spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid #e5e7eb;
-      border-top-color: #3b82f6;
-      border-radius: 50%;
-      animation: vl-spin 0.8s linear infinite;
-    }
-    @keyframes vl-spin { to { transform: rotate(360deg); } }
     #rysiai-status {
       position: absolute;
       bottom: 12px;
       left: 12px;
       font-size: 0.8rem;
-      color: var(--color-muted, #6b7280);
+      color: var(--gray);
       pointer-events: none;
     }
-    #rysiai-legend {
-      position: absolute;
-      bottom: 12px;
-      right: 12px;
-      background: rgba(255,255,255,0.92);
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-size: 0.75rem;
-      color: #374151;
-      line-height: 1.6;
-      user-select: none;
-      min-width: 200px;
-    }
-    .dark #rysiai-legend {
-      background: rgba(30,41,59,0.92);
-      border-color: #374151;
-      color: #d1d5db;
-    }
-    #rysiai-details {
+    #node-details {
       position: absolute;
       top: 12px;
       right: 12px;
-      background: #fff;
-      border: 1px solid #e5e7eb;
+      background: var(--white);
+      border: var(--border);
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-      padding: 10px 14px;
-      max-width: 240px;
       min-width: 200px;
+      max-width: 240px;
       font-size: 0.85rem;
-      color: #374151;
+      color: var(--black);
       z-index: 20;
-      line-height: 1.5;
       overflow-wrap: break-word;
     }
-    .dark #rysiai-details {
-      background: #1e293b;
-      border-color: #374151;
-      color: #d1d5db;
+    #rysiai-details {
+      padding: 10px 14px;
+      line-height: 1.5;
+    }
+    #rysiai-legend {
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      line-height: 1.6;
+      user-select: none;
+      border-top: var(--border);
+      margin-top: 8px;
     }
     #rysiai-details .vd-title {
       font-weight: 600;
       margin-bottom: 4px;
     }
     #rysiai-details .vd-sub {
-      color: #6b7280;
+      color: var(--gray);
       font-size: 0.8rem;
       margin-bottom: 2px;
-    }
-    .dark #rysiai-details .vd-sub {
-      color: #9ca3af;
     }
     #rysiai-details .vd-link {
       display: block;
       margin-top: 6px;
-      color: #3b82f6;
+      color: var(--link);
       text-decoration: none;
       font-size: 0.8rem;
     }
     #rysiai-details .vd-link:hover {
       text-decoration: underline;
+    }
+    #rysiai-details .vd-btn {
+      width: 100%;
+      margin-top: 12px;
+      border: var(--border);
+    }
+    #rysiai-legend .vd-btn {
+      width: 100%;
+      border: var(--border);
+    }
+    #rysiai-legend-btn:not(:empty) {
+      border-top: var(--border);
+      padding-top: 8px;
+      margin-top: 8px;
     }
     .vl-swatch {
       display: inline-block;
@@ -134,6 +122,7 @@
       cursor: pointer;
       margin: 0;
     }
+    .vl-count { color: var(--gray); font-size: 0.7rem; margin-left: 2px; }
   </style>
 </head>
 <body>
@@ -142,26 +131,30 @@
   <div id="rysiai-wrapper">
     <div id="rysiai-canvas">
       <div id="rysiai-loading" hidden>
-        <div class="vl-spinner"></div>
+        <span class="spinner spinner-lg"></span>
       </div>
-      <div id="rysiai-details" hidden></div>
+      <div id="node-details" hidden>
+        <div id="rysiai-details"></div>
+        <div id="rysiai-legend" hidden>
+          <div id="rysiai-legend-checkboxes">
+            <label><input type="checkbox" data-edge-types="Director" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#1d4ed8" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#1d4ed8"/></svg>Direktorius / vadovas<span class="vl-count"></span></label>
+            <label><input type="checkbox" data-edge-types="Shareholder" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#7c3aed" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#7c3aed"/></svg>Akcininkas<span class="vl-count"></span></label>
+            <label><input type="checkbox" data-edge-types="Official"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#0891b2" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#0891b2"/></svg>Pareigūnas / oficialus<span class="vl-count"></span></label>
+            <label><input type="checkbox" data-edge-types="Employment"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#6b7280" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#6b7280"/></svg>Darbuotojas<span class="vl-count"></span></label>
+            <label><input type="checkbox" data-edge-types="Spouse"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#f59e0b" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#f59e0b"/></svg>Sutuoktinis<span class="vl-count"></span></label>
+            <label><input type="checkbox" data-contract-size="small" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="1"/><polygon points="20,3 26,6 20,9" fill="#10b981"/></svg>Sutartis (maža)<span class="vl-count"></span></label>
+            <label><input type="checkbox" data-contract-size="medium" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="3"/><polygon points="20,3 26,6 20,9" fill="#10b981"/></svg>Sutartis (vidutinė)<span class="vl-count"></span></label>
+            <label><input type="checkbox" data-contract-size="large" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="6"/><polygon points="19,2 26,6 19,10" fill="#10b981"/></svg>Sutartis (didelė)<span class="vl-count"></span></label>
+            <label><input type="checkbox" data-edge-types="Procurement" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#8b5cf6" stroke-width="1"/><polygon points="20,3 26,6 20,9" fill="#8b5cf6"/></svg>Pirkimo skelbimas<span class="vl-count"></span></label>
+            <label><input type="checkbox" data-edge-types="Award" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#22c55e" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#22c55e"/></svg>Pirkimo laimėtojas<span class="vl-count"></span></label>
+            <label><input type="checkbox" data-edge-types="Bid" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#ef4444" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#ef4444"/></svg>Pirkimo dalyvis<span class="vl-count"></span></label>
+            <label><input type="checkbox" data-edge-types="ContractLink" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#94a3b8"/></svg>Sutartis → pirkimas<span class="vl-count"></span></label>
+          </div>
+          <div id="rysiai-legend-btn"></div>
+        </div>
+      </div>
     </div>
     <div id="rysiai-status"></div>
-      <div id="rysiai-legend" hidden>
-      <div id="rysiai-legend-title" style="font-weight:600;text-align:center;margin-bottom:6px;">Filtrai</div>
-      <label><input type="checkbox" data-edge-types="Director" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#1d4ed8" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#1d4ed8"/></svg>Direktorius / vadovas</label>
-      <label><input type="checkbox" data-edge-types="Shareholder" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#7c3aed" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#7c3aed"/></svg>Akcininkas</label>
-      <label><input type="checkbox" data-edge-types="Official"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#0891b2" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#0891b2"/></svg>Pareigūnas / oficialus</label>
-      <label><input type="checkbox" data-edge-types="Employment"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#6b7280" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#6b7280"/></svg>Darbuotojas</label>
-      <label><input type="checkbox" data-edge-types="Spouse"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#f59e0b" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#f59e0b"/></svg>Sutuoktinis</label>
-      <label><input type="checkbox" data-edge-types="Order,Delivery" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="1"/><polygon points="20,3 26,6 20,9" fill="#10b981"/></svg>Sutartis (maža)</label>
-      <label style="padding-left:20px"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="3"/><polygon points="20,3 26,6 20,9" fill="#10b981"/></svg>Sutartis (vidutinė)</label>
-      <label style="padding-left:20px"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="6"/><polygon points="19,2 26,6 19,10" fill="#10b981"/></svg>Sutartis (didelė)</label>
-      <label><input type="checkbox" data-edge-types="Procurement" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#8b5cf6" stroke-width="1"/><polygon points="20,3 26,6 20,9" fill="#8b5cf6"/></svg>Pirkimo skelbimas</label>
-      <label><input type="checkbox" data-edge-types="Award" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#22c55e" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#22c55e"/></svg>Pirkimo laimėtojas</label>
-      <label><input type="checkbox" data-edge-types="Bid" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#ef4444" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#ef4444"/></svg>Pirkimo dalyvis</label>
-      <label><input type="checkbox" data-edge-types="ContractLink" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#94a3b8"/></svg>Sutartis → pirkimas</label>
-    </div>
   </div>
 
   <script src="/dist/rysiai.js"></script>

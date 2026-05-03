@@ -237,3 +237,143 @@ describe('LegendState — isEdgeHidden', () => {
         assert.equal(ls.isEdgeHidden('person:x', 'org:A', 'Order'), true);
     });
 });
+
+// ── Size category filtering ───────────────────────────────────────────────────
+
+describe('LegendState — size category global state', () => {
+    let ls;
+    beforeEach(() => { ls = new LegendState(); });
+
+    it('all size categories visible by default (globally)', () => {
+        assert.equal(ls.isGlobalSizeCategoryVisible('small'), true);
+        assert.equal(ls.isGlobalSizeCategoryVisible('medium'), true);
+        assert.equal(ls.isGlobalSizeCategoryVisible('large'), true);
+    });
+
+    it('setGlobalSizeCategoryVisible(false) hides the category', () => {
+        ls.setGlobalSizeCategoryVisible('large', false);
+        assert.equal(ls.isGlobalSizeCategoryVisible('large'), false);
+    });
+
+    it('setGlobalSizeCategoryVisible(true) shows the category', () => {
+        ls.setGlobalSizeCategoryVisible('medium', false);
+        ls.setGlobalSizeCategoryVisible('medium', true);
+        assert.equal(ls.isGlobalSizeCategoryVisible('medium'), true);
+    });
+});
+
+describe('LegendState — size category per-node state', () => {
+    let ls;
+    beforeEach(() => { ls = new LegendState(); });
+
+    it('all size categories visible after initNode (global default is all visible)', () => {
+        ls.initNode('org:A');
+        assert.equal(ls.isSizeCategoryVisible('org:A', 'small'), true);
+        assert.equal(ls.isSizeCategoryVisible('org:A', 'medium'), true);
+        assert.equal(ls.isSizeCategoryVisible('org:A', 'large'), true);
+    });
+
+    it('setSizeCategoryVisible(false) hides for node', () => {
+        ls.initNode('org:A');
+        ls.setSizeCategoryVisible('org:A', 'large', false);
+        assert.equal(ls.isSizeCategoryVisible('org:A', 'large'), false);
+    });
+
+    it('setSizeCategoryVisible(true) shows for node', () => {
+        ls.initNode('org:A');
+        ls.setSizeCategoryVisible('org:A', 'large', false);
+        ls.setSizeCategoryVisible('org:A', 'large', true);
+        assert.equal(ls.isSizeCategoryVisible('org:A', 'large'), true);
+    });
+
+    it('isSizeCategoryVisible falls back to global for unconfigured node', () => {
+        ls.setGlobalSizeCategoryVisible('large', false);
+        assert.equal(ls.isSizeCategoryVisible('org:unconfigured', 'large'), false);
+        assert.equal(ls.isSizeCategoryVisible('org:unconfigured', 'small'), true);
+    });
+
+    it('setSizeCategoryVisible auto-initialises unconfigured node', () => {
+        ls.setSizeCategoryVisible('org:NEW', 'large', false);
+        assert.equal(ls.hasNodeConfig('org:NEW'), true);
+        assert.equal(ls.isSizeCategoryVisible('org:NEW', 'large'), false);
+    });
+
+    it('initNode copies global hidden size categories at call time', () => {
+        ls.setGlobalSizeCategoryVisible('large', false);
+        ls.initNode('org:A');
+        assert.equal(ls.isSizeCategoryVisible('org:A', 'large'), false);
+    });
+
+    it('initNode snapshot is independent of later global size changes', () => {
+        ls.initNode('org:A');
+        ls.setGlobalSizeCategoryVisible('large', false); // change after init
+        assert.equal(ls.isSizeCategoryVisible('org:A', 'large'), true, 'node was initialised before global change');
+    });
+
+    it('per-node and global size states are independent', () => {
+        ls.initNode('org:A');
+        ls.setSizeCategoryVisible('org:A', 'large', false);
+        assert.equal(ls.isGlobalSizeCategoryVisible('large'), true, 'global unaffected');
+    });
+});
+
+describe('LegendState — isEdgeHidden with sizeCategory', () => {
+    let ls;
+    beforeEach(() => { ls = new LegendState(); });
+
+    it('no sizeCategory arg → size check is skipped (edge visible)', () => {
+        assert.equal(ls.isEdgeHidden('org:A', 'contract:x', 'Order'), false);
+    });
+
+    it('null sizeCategory → size check is skipped', () => {
+        ls.setGlobalSizeCategoryVisible('large', false);
+        assert.equal(ls.isEdgeHidden('org:A', 'contract:x', 'Order', null), false,
+            'null sizeCategory skips size check even if globally hidden');
+    });
+
+    it('both endpoints unconfigured, size hidden globally → edge hidden', () => {
+        ls.setGlobalSizeCategoryVisible('large', false);
+        assert.equal(ls.isEdgeHidden('org:A', 'contract:x', 'Order', 'large'), true);
+    });
+
+    it('both endpoints unconfigured, size visible globally → edge not hidden by size', () => {
+        assert.equal(ls.isEdgeHidden('org:A', 'contract:x', 'Order', 'large'), false);
+    });
+
+    it('source configured and hides size → edge hidden', () => {
+        ls.initNode('org:A');
+        ls.setSizeCategoryVisible('org:A', 'medium', false);
+        assert.equal(ls.isEdgeHidden('org:A', 'contract:x', 'Order', 'medium'), true);
+    });
+
+    it('target configured and hides size → edge hidden (source transparent)', () => {
+        ls.initNode('contract:x');
+        ls.setSizeCategoryVisible('contract:x', 'medium', false);
+        assert.equal(ls.isEdgeHidden('org:A', 'contract:x', 'Order', 'medium'), true);
+    });
+
+    it('source configured and shows size, target transparent → edge not hidden by size', () => {
+        ls.initNode('org:A');
+        // org:A has large visible by default — no explicit action needed
+        assert.equal(ls.isEdgeHidden('org:A', 'contract:x', 'Order', 'large'), false);
+    });
+
+    it('type hidden → edge hidden regardless of size', () => {
+        // Order type is visible globally but let's set per-node
+        ls.initNode('org:A');
+        ls.setTypeVisible('org:A', 'Order', false);
+        // Size visible — but type is hidden, so edge is hidden
+        assert.equal(ls.isEdgeHidden('org:A', 'contract:x', 'Order', 'small'), true);
+    });
+
+    it('CRITICAL: OrgA hides large, OrgB shows large — edges behave independently', () => {
+        ls.initNode('org:A');
+        ls.setSizeCategoryVisible('org:A', 'large', false);
+
+        ls.initNode('org:B');
+        // org:B has large visible (default)
+
+        assert.equal(ls.isEdgeHidden('org:A', 'contract:x', 'Order', 'large'), true, 'OrgA large hidden');
+        assert.equal(ls.isEdgeHidden('org:B', 'contract:y', 'Order', 'large'), false, 'OrgB large visible');
+    });
+});
