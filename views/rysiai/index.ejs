@@ -95,6 +95,15 @@
       margin-top: 12px;
       border: var(--border);
     }
+    #rysiai-legend .vd-btn {
+      width: 100%;
+      border: var(--border);
+    }
+    #rysiai-legend-btn:not(:empty) {
+      border-top: var(--border);
+      padding-top: 8px;
+      margin-top: 8px;
+    }
     .vl-swatch {
       display: inline-block;
       width: 22px;
@@ -126,19 +135,21 @@
       <div id="node-details" hidden>
         <div id="rysiai-details"></div>
         <div id="rysiai-legend" hidden>
-      <div id="rysiai-legend-title" style="font-weight:600;text-align:center;margin-bottom:6px;">Filtrai</div>
-      <label><input type="checkbox" data-edge-types="Director" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#1d4ed8" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#1d4ed8"/></svg>Direktorius / vadovas</label>
-      <label><input type="checkbox" data-edge-types="Shareholder" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#7c3aed" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#7c3aed"/></svg>Akcininkas</label>
-      <label><input type="checkbox" data-edge-types="Official"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#0891b2" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#0891b2"/></svg>Pareigūnas / oficialus</label>
-      <label><input type="checkbox" data-edge-types="Employment"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#6b7280" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#6b7280"/></svg>Darbuotojas</label>
-      <label><input type="checkbox" data-edge-types="Spouse"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#f59e0b" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#f59e0b"/></svg>Sutuoktinis</label>
-      <label><input type="checkbox" data-contract-size="small" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="1"/><polygon points="20,3 26,6 20,9" fill="#10b981"/></svg>Sutartis (maža)</label>
-      <label><input type="checkbox" data-contract-size="medium" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="3"/><polygon points="20,3 26,6 20,9" fill="#10b981"/></svg>Sutartis (vidutinė)</label>
-      <label><input type="checkbox" data-contract-size="large" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="6"/><polygon points="19,2 26,6 19,10" fill="#10b981"/></svg>Sutartis (didelė)</label>
-      <label><input type="checkbox" data-edge-types="Procurement" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#8b5cf6" stroke-width="1"/><polygon points="20,3 26,6 20,9" fill="#8b5cf6"/></svg>Pirkimo skelbimas</label>
-      <label><input type="checkbox" data-edge-types="Award" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#22c55e" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#22c55e"/></svg>Pirkimo laimėtojas</label>
-      <label><input type="checkbox" data-edge-types="Bid" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#ef4444" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#ef4444"/></svg>Pirkimo dalyvis</label>
-      <label><input type="checkbox" data-edge-types="ContractLink" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#94a3b8"/></svg>Sutartis → pirkimas</label>
+          <div id="rysiai-legend-checkboxes">
+            <label><input type="checkbox" data-edge-types="Director" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#1d4ed8" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#1d4ed8"/></svg>Direktorius / vadovas</label>
+            <label><input type="checkbox" data-edge-types="Shareholder" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#7c3aed" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#7c3aed"/></svg>Akcininkas</label>
+            <label><input type="checkbox" data-edge-types="Official"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#0891b2" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#0891b2"/></svg>Pareigūnas / oficialus</label>
+            <label><input type="checkbox" data-edge-types="Employment"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#6b7280" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#6b7280"/></svg>Darbuotojas</label>
+            <label><input type="checkbox" data-edge-types="Spouse"> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#f59e0b" stroke-width="2"/><polygon points="20,3 26,6 20,9" fill="#f59e0b"/></svg>Sutuoktinis</label>
+            <label><input type="checkbox" data-contract-size="small" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="1"/><polygon points="20,3 26,6 20,9" fill="#10b981"/></svg>Sutartis (maža)</label>
+            <label><input type="checkbox" data-contract-size="medium" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="3"/><polygon points="20,3 26,6 20,9" fill="#10b981"/></svg>Sutartis (vidutinė)</label>
+            <label><input type="checkbox" data-contract-size="large" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#10b981" stroke-width="6"/><polygon points="19,2 26,6 19,10" fill="#10b981"/></svg>Sutartis (didelė)</label>
+            <label><input type="checkbox" data-edge-types="Procurement" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#8b5cf6" stroke-width="1"/><polygon points="20,3 26,6 20,9" fill="#8b5cf6"/></svg>Pirkimo skelbimas</label>
+            <label><input type="checkbox" data-edge-types="Award" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#22c55e" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#22c55e"/></svg>Pirkimo laimėtojas</label>
+            <label><input type="checkbox" data-edge-types="Bid" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#ef4444" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#ef4444"/></svg>Pirkimo dalyvis</label>
+            <label><input type="checkbox" data-edge-types="ContractLink" checked> <svg width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5,4"/><polygon points="20,3 26,6 20,9" fill="#94a3b8"/></svg>Sutartis → pirkimas</label>
+          </div>
+          <div id="rysiai-legend-btn"></div>
         </div>
       </div>
     </div>

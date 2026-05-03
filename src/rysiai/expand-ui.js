@@ -76,9 +76,10 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         if (!selectedNodeId || !viewGraph.hasNode(selectedNodeId)) return;
         const id = selectedNodeId;
         const attrs = viewGraph.getNodeAttributes(id);
-        showNodeDetails(id, attrs, buildHandlers(id, attrs));
+        const handlers = buildHandlers(id, attrs);
+        showNodeDetails(id, attrs, handlers);
         if (isConfigurableNode(attrs)) {
-            updateLegendForNode(id, attrs.label || id, legendState, attrs.expanded);
+            updateLegendForNode(id, legendState, attrs.expanded, handlers);
         }
     }
 
@@ -88,12 +89,13 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         setSelection(id, true);
 
         const attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
+        const handlers = buildHandlers(id, attrs);
         if (isConfigurableNode(attrs)) {
             legendState.initNode(id);
-            updateLegendForNode(id, attrs.label || id, legendState, attrs.expanded);
+            updateLegendForNode(id, legendState, attrs.expanded, handlers);
         }
 
-        showNodeDetails(id, attrs, buildHandlers(id, attrs));
+        showNodeDetails(id, attrs, handlers);
         renderer.refresh();
     }
 
@@ -102,7 +104,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             setSelection(selectedNodeId, false);
             selectedNodeId = null;
         }
-        updateLegendForNode(null, null, legendState, false);
+        updateLegendForNode(null, legendState, false);
         hideDetails();
         renderer.refresh();
     }
@@ -270,10 +272,11 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                 // Node still visible (has edges from other expansions) — update panel to Išskleisti
                 setSelection(nodeId, true);
                 const updatedAttrs = viewGraph.getNodeAttributes(nodeId);
-                showNodeDetails(nodeId, updatedAttrs, { onExpand: () => _triggerExpand(nodeId, updatedAttrs) });
+                const expandHandlers = { onExpand: () => _triggerExpand(nodeId, updatedAttrs) };
+                showNodeDetails(nodeId, updatedAttrs, expandHandlers);
                 // Node is no longer expanded — hide legend
                 if (isConfigurableNode(updatedAttrs)) {
-                    updateLegendForNode(nodeId, updatedAttrs.label || nodeId, legendState, false);
+                    updateLegendForNode(nodeId, legendState, false, expandHandlers);
                 }
             } else {
                 // Node disappeared — clear selection
@@ -282,7 +285,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                     dataGraph.setNodeAttribute(nodeId, 'highlighted', false);
                 }
                 selectedNodeId = null;
-                updateLegendForNode(null, null, legendState, false);
+                updateLegendForNode(null, legendState, false);
                 hideDetails();
             }
             renderer.refresh();

@@ -1,4 +1,4 @@
-import { isOrgNode, isPersonNode, isContractNode, isProcurementNode, ENTITY_TYPE } from './entity-types.js';
+import { isOrgNode, isPersonNode, isContractNode, isProcurementNode, isConfigurableNode } from './entity-types.js';
 import { svgIcon } from './icons.js';
 
 // ── Details panel ─────────────────────────────────────────────────────────────
@@ -70,9 +70,11 @@ function buildHtml(attrs, handlers = {}) {
         html = '<div class="vd-title">' + esc(name) + '</div>';
     }
 
-    // Add expand/collapse button if handlers provided
-    if (html && (handlers.onExpand || handlers.onCollapse)) {
-        const isExpanded = attrs.expanded;
+    // Add expand/collapse button — but the collapse button for configurable (org/person) nodes
+    // lives at the bottom of the legend panel instead of here.
+    const showButton = handlers.onExpand || (handlers.onCollapse && !isConfigurableNode(attrs));
+    if (html && showButton) {
+        const isExpanded = !!handlers.onCollapse;
         const iconKey = isExpanded ? 'Adjust' : 'Hub';
         const label = isExpanded ? 'Suskleisti' : 'Išskleisti';
         const action = isExpanded ? 'collapse' : 'expand';

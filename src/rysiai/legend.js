@@ -1,15 +1,18 @@
+import { svgIcon } from './icons.js';
+
 /**
- * Updates the legend visibility and checkbox state for the selected node.
- * Legend is only shown when nodeId is non-null AND expanded is true.
+ * Updates the legend visibility, checkbox state, and action button for the selected node.
+ * Legend is shown when nodeId is non-null AND expanded is true.
+ * The collapse button for configurable nodes is rendered at the bottom of the legend.
  *
  * @param {string|null}   nodeId      - selected node's ID, or null to hide legend
- * @param {string|null}   label       - selected node's display label
  * @param {LegendState}   legendState - the LegendState instance
- * @param {boolean}       [expanded]  - whether the selected node is expanded; legend hidden when false
+ * @param {boolean}       expanded    - whether the selected node is expanded
+ * @param {object}        [handlers]  - { onExpand?, onCollapse? }
  */
-export function updateLegendForNode(nodeId, label, legendState, expanded) {
+export function updateLegendForNode(nodeId, legendState, expanded, handlers = {}) {
     const legendEl = document.getElementById('rysiai-legend');
-    const titleEl = document.getElementById('rysiai-legend-title');
+    const btnEl = document.getElementById('rysiai-legend-btn');
 
     if (nodeId == null || !expanded) {
         if (legendEl) legendEl.hidden = true;
@@ -17,7 +20,6 @@ export function updateLegendForNode(nodeId, label, legendState, expanded) {
     }
 
     if (legendEl) legendEl.hidden = false;
-    if (titleEl) titleEl.textContent = label != null ? label : nodeId;
 
     document.querySelectorAll('#rysiai-legend input[type=checkbox][data-edge-types]').forEach((cb) => {
         const types = cb.dataset.edgeTypes.split(',');
@@ -26,6 +28,25 @@ export function updateLegendForNode(nodeId, label, legendState, expanded) {
     document.querySelectorAll('#rysiai-legend input[type=checkbox][data-contract-size]').forEach((cb) => {
         cb.checked = legendState.isSizeCategoryVisible(nodeId, cb.dataset.contractSize);
     });
+
+    if (btnEl) {
+        if (handlers.onExpand || handlers.onCollapse) {
+            const isExpanded = !!handlers.onCollapse;
+            const iconKey = isExpanded ? 'Adjust' : 'Hub';
+            const btnLabel = isExpanded ? 'Suskleisti' : 'Išskleisti';
+            const action = isExpanded ? 'collapse' : 'expand';
+            btnEl.innerHTML = '<button class="btn btn-ghost btn-sm vd-btn" data-action="' + action + '">' + svgIcon(iconKey) + '<span>' + btnLabel + '</span></button>';
+            const btn = btnEl.querySelector('[data-action]');
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (btn.dataset.action === 'expand') handlers.onExpand?.();
+                    else handlers.onCollapse?.();
+                });
+            }
+        } else {
+            btnEl.innerHTML = '';
+        }
+    }
 }
 
 /**
