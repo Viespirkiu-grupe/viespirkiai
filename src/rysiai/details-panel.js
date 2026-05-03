@@ -77,7 +77,7 @@ function buildHtml(attrs, handlers = {}) {
         const label = isExpanded ? 'Suskleisti' : 'Išskleisti';
         const action = isExpanded ? 'collapse' : 'expand';
         const icon = svgIcon(iconKey);
-        html += '<button class="vd-btn" data-action="' + action + '">' + icon + '<span>' + label + '</span></button>';
+        html += '<button class="btn btn-ghost btn-sm vd-btn" data-action="' + action + '">' + icon + '<span>' + label + '</span></button>';
     }
     
     return html;
