@@ -260,7 +260,7 @@ viesiejiPirkimaiRouter.get("/viesiejiPirkimai/:id", async (req, res, next) => {
         [id],
     );
     const pirkimas = rows[0];
-    if (!pirkimas) return res.status(404).render("404");
+    if (!pirkimas) return res.status(404).render("404", { customHead: config.customHead });
 
     const failai = pirkimas.turinys?.failai ?? [];
     const saltinioIds = failai.flatMap((failas) =>
