@@ -1,8 +1,6 @@
 import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from './graph-utils.js';
-import { NODE_COLOR, EDGE_COLOR, nodeColor } from './colors.js';
-import { updateLegendForNode } from './legend.js';
+import { NODE_COLOR, EDGE_COLOR, nodeColor } from './graph-theme.js';
 import { isConfigurableNode, isOrgNode, isPersonNode, isContractNode, isProcurementNode } from './entity-types.js';
-import { showNodeDetails, hideDetails } from './details-panel.js';
 
 /**
  * Creates the expand UI controller.
@@ -18,10 +16,11 @@ import { showNodeDetails, hideDetails } from './details-panel.js';
  *   noverlap:     Function,
  *   animateNodes: Function,
  *   legendState:  LegendState,
+ *   nodeDetails:  NodeDetails,
  * }} deps
- * @returns {{ loadOrg, rebuildAndRefresh, getSelectedNodeId, selectNode }}
+ * @returns {{ loadOrg, loadContract, rebuildAndRefresh, getSelectedNodeId, selectNode }}
  */
-export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState }) {
+export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState, nodeDetails }) {
     const expandingNodes = new Set();
     let cancelAnimation = null;
     let selectedNodeId = null;
@@ -70,18 +69,18 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         return {};
     }
 
+    function _showNodePanel(id, attrs, handlers) {
+        const counts = isConfigurableNode(attrs) ? computeEdgeCounts(viewGraph, id) : null;
+        nodeDetails.showForNode(id, attrs, handlers, counts);
+    }
+
     // Re-renders the details panel for the currently selected node with fresh handlers.
-    // Called after expand/collapse to switch Išskleisti ↔ Suskleisti button and update legend.
+    // Called after expand/collapse to switch Rodyti ↔ Slėpti ryšius and update legend.
     function refreshSelectedNodePanel() {
         if (!selectedNodeId || !viewGraph.hasNode(selectedNodeId)) return;
         const id = selectedNodeId;
         const attrs = viewGraph.getNodeAttributes(id);
-        const handlers = buildHandlers(id, attrs);
-        showNodeDetails(id, attrs, handlers);
-        if (isConfigurableNode(attrs)) {
-            const counts = computeEdgeCounts(viewGraph, id);
-            updateLegendForNode(id, legendState, attrs.expanded, handlers, counts);
-        }
+        _showNodePanel(id, attrs, buildHandlers(id, attrs));
     }
 
     function selectNode(id) {
@@ -91,13 +90,8 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
         const attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
         const handlers = buildHandlers(id, attrs);
-        if (isConfigurableNode(attrs)) {
-            legendState.initNode(id);
-            const counts = computeEdgeCounts(viewGraph, id);
-            updateLegendForNode(id, legendState, attrs.expanded, handlers, counts);
-        }
-
-        showNodeDetails(id, attrs, handlers);
+        if (isConfigurableNode(attrs)) legendState.initNode(id);
+        _showNodePanel(id, attrs, handlers);
         renderer.refresh();
     }
 
@@ -106,8 +100,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             setSelection(selectedNodeId, false);
             selectedNodeId = null;
         }
-        updateLegendForNode(null, legendState, false);
-        hideDetails();
+        nodeDetails.hide();
         renderer.refresh();
     }
 
@@ -175,7 +168,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                 renderer.refresh();
             }
 
-            // Refresh panel so button switches from Išskleisti → Suskleisti
+            // Refresh panel so button switches from Rodyti → Slėpti ryšius
             refreshSelectedNodePanel();
         } catch (err) {
             setStatus('Klaida kraunant duomenis.');
@@ -271,15 +264,10 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             syncPositionsToData(dataGraph, viewGraph);
 
             if (viewGraph.hasNode(nodeId)) {
-                // Node still visible (has edges from other expansions) — update panel to Išskleisti
+                // Node still visible (has edges from other expansions) — update panel to Rodyti ryšius
                 setSelection(nodeId, true);
                 const updatedAttrs = viewGraph.getNodeAttributes(nodeId);
-                const expandHandlers = { onExpand: () => _triggerExpand(nodeId, updatedAttrs) };
-                showNodeDetails(nodeId, updatedAttrs, expandHandlers);
-                // Node is no longer expanded — hide legend
-                if (isConfigurableNode(updatedAttrs)) {
-                    updateLegendForNode(nodeId, legendState, false, expandHandlers);
-                }
+                _showNodePanel(nodeId, updatedAttrs, { onExpand: () => _triggerExpand(nodeId, updatedAttrs) });
             } else {
                 // Node disappeared — clear selection
                 if (dataGraph.hasNode(nodeId)) {
@@ -287,8 +275,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                     dataGraph.setNodeAttribute(nodeId, 'highlighted', false);
                 }
                 selectedNodeId = null;
-                updateLegendForNode(null, legendState, false);
-                hideDetails();
+                nodeDetails.hide();
             }
             renderer.refresh();
         };
@@ -346,7 +333,6 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     renderer.on('clickNode', (event) => {
         const nodeId = event.node;
-        const attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
         // No-op on re-click: Sigma fires clickNode twice before doubleClickNode.
         // Deselecting on re-click would cause a visible flicker (select → deselect → expand).
         if (selectedNodeId === nodeId) return;

@@ -1,4 +1,4 @@
-import { HIDDEN_BY_DEFAULT } from './colors.js';
+import { HIDDEN_BY_DEFAULT } from './graph-theme.js';
 
 /**
  * Manages per-node and global edge-type and contract-size-category visibility.

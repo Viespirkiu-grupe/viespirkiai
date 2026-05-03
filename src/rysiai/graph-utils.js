@@ -1,5 +1,7 @@
-import { makeIconDataUri, getIconKey } from './icons.js';
-import { EDGE_COLOR, nodeColor, personelSize, contractSize } from './colors.js';
+// Graph data operations — merges API data, filters, lays out, and collapses graphology Graph instances.
+// No DOM, no canvas, no Sigma API. Consumed by expand-ui.js.
+
+import { makeIconDataUri, getIconKey, EDGE_COLOR, nodeColor, personelSize, contractSize } from './graph-theme.js';
 import { isAnchorNode, isBridgeCandidate, isOrgNode, isContractNode, isProcurementNode } from './entity-types.js';
 
 /**

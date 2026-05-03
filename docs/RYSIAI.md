@@ -584,87 +584,16 @@ Person nodes keep a fixed `size: 8`. `edgeWeight` is mirrored as a local helper 
 
 ## Tasks
 
-> **Phases 1–17 complete.** Core infrastructure (routes, expand.js, Sigma canvas, icons), expand
+> **Phases 1–18 complete.** Core infrastructure (routes, expand.js, Sigma canvas, icons), expand
 > animations, loading overlay, edge/node type labels, per-node legend checkboxes with `LegendState`,
 > two-graph architecture, per-node selection state, dynamic node/edge sizing, entity-types module,
 > SVG legend arrows, ProcurementEntity nodes, double-click expand, expand/collapse button,
 > unified `#node-details` panel, button moved to bottom of legend, legend title removed,
-> size-based contract filtering (small / medium / large). See architecture sections above for
-> current implementation state.
+> size-based contract filtering (small / medium / large), legend row counts with zero-count hiding
+> (`computeEdgeCounts`, `vl-count` spans, `▼`/`▲` expand/collapse buttons). See architecture
+> sections above for current implementation state.
 
 ---
-
-**Phase 18 — Legend row counts and zero-count hiding**
-
-When the legend is shown for an expanded configurable (org/person) node, each row displays the
-count of that relationship type in the **current `viewGraph`** incident to the selected node.
-Rows with zero count are hidden entirely — no checkbox is shown for a relationship that does
-not exist on the node.
-
-#### Counting rules
-
-- Count is based on **`viewGraph` edges incident to the selected node** at the time
-  `updateLegendForNode` is called (after every expand or rebuild).
-- Edge-type rows count edges whose `edgeType` matches. Multi-type rows (currently none) would
-  sum all matching types.
-- Contract-size rows count `Order` + `Delivery` edges with the matching `contractSizeCategory`
-  attribute (`'small'` / `'medium'` / `'large'`).
-- If all contract-size counts are zero, all three size rows are hidden. If only "large" has
-  count > 0, only the "large" row is shown.
-
-#### Display format
-
-Label text: `"Direktorius / vadovas (5)"` — original label + space + count in parentheses.
-The count span must be a separate `<span class="vl-count">` element inside the `<label>` so
-it can be updated without rebuilding the full checkbox HTML.
-
-If the count changes (e.g. after another expand that adds edges to the same node), the label
-updates automatically because `updateLegendForNode` is called again.
-
-#### Implementation tasks
-
-- [ ] **`src/rysiai/graph-utils.js`** — add pure helper `computeEdgeCounts(graph, nodeId)`:
-    ```js
-    // Returns { byType: Map<string, number>, bySize: Map<string, number> }
-    // byType: edgeType → count of incident edges with that type
-    // bySize: contractSizeCategory → count of Order/Delivery edges with that size
-    export function computeEdgeCounts(graph, nodeId) { … }
-    ```
-    Iterates `graph.forEachEdge(nodeId, …)` — counts by `attrs.edgeType` into `byType` and
-    by `attrs.contractSizeCategory` into `bySize`. Returns empty Maps if node is absent.
-
-- [ ] **`test/rysiai/graph-utils.test.js`** — add `computeEdgeCounts` tests:
-    - Returns empty maps for a node with no edges.
-    - Counts Director edges correctly.
-    - Counts Order edges by size category independently (medium count does not affect small/large).
-    - Does not count edges not incident to the queried node.
-
-- [ ] **`views/rysiai/index.ejs`** — add `<span class="vl-count"></span>` inside each `<label>`
-    in `#rysiai-legend-checkboxes`, after the label text. Add CSS:
-    ```css
-    .vl-count { color: var(--gray); font-size: 0.7rem; margin-left: 2px; }
-    ```
-
-- [ ] **`src/rysiai/expand-ui.js`** — compute counts before each `updateLegendForNode` call:
-    ```js
-    // in refreshSelectedNodePanel and selectNode (only for configurable nodes):
-    const counts = computeEdgeCounts(viewGraph, id);
-    updateLegendForNode(id, legendState, attrs.expanded, handlers, counts);
-    ```
-    Import `computeEdgeCounts` from `./graph-utils.js`.
-
-- [ ] **`src/rysiai/legend.js`** — update `updateLegendForNode` signature to accept
-    `counts = { byType: Map<string, number>, bySize: Map<string, number> }` as 5th parameter.
-    When rendering the legend:
-    - For each `<label>` containing `input[data-edge-types]`:
-        - Compute `count = sum of byType.get(t) for each type in data-edge-types`.
-        - If `count === 0`: hide the `<label>` (set `.hidden = true` or `display: none`).
-        - Otherwise: show the `<label>`, update its `.vl-count` span to `(${count})`.
-    - For each `<label>` containing `input[data-contract-size]`:
-        - Compute `count = bySize.get(category) ?? 0`.
-        - Same hide/show logic.
-    - When `counts` is `null` (e.g. no counts provided): skip count updates — show all rows and
-      leave count spans empty (safe fallback).
 
 - [ ] **Browser smoke-test** (manual verification):
     - Expand an org node — legend shows only rows with count > 0; each visible row has `(N)`.

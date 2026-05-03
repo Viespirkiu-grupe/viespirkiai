@@ -1,25 +1,18 @@
 import { isOrgNode, isPersonNode, isContractNode, isProcurementNode, isConfigurableNode } from './entity-types.js';
 
-// ── Details panel ─────────────────────────────────────────────────────────────
+// ── Shared expand/collapse button ─────────────────────────────────────────────
 
-let panelEl = null;
-let wrapperEl = null;
-
-function getPanel() {
-    if (!panelEl) panelEl = document.getElementById('rysiai-details');
-    return panelEl;
+export function buildExpandButtonHtml(handlers) {
+    if (!handlers.onExpand && !handlers.onCollapse) return '';
+    const isExpanded = !!handlers.onCollapse;
+    const icon = isExpanded ? '▲' : '▼';
+    const label = isExpanded ? 'Slėpti ryšius' : 'Rodyti ryšius';
+    const action = isExpanded ? 'collapse' : 'expand';
+    return '<button class="btn btn-ghost btn-sm vd-btn" data-action="' + action + '">' + icon + ' <span>' + label + '</span></button>';
 }
 
-function getWrapper() {
-    if (!wrapperEl) wrapperEl = document.getElementById('node-details');
-    return wrapperEl;
-}
+// ── Private helpers ───────────────────────────────────────────────────────────
 
-/**
- * Formats a contract/procurement value as €XM / €XK / €X.
- * @param {number|null} verte
- * @returns {string}
- */
 function formatContractValue(verte) {
     if (verte == null || verte === 0) return '';
     const v = Math.round(verte);
@@ -38,7 +31,7 @@ function esc(s) {
 
 function buildHtml(attrs, handlers = {}) {
     let html = '';
-    
+
     if (isOrgNode(attrs)) {
         let employees = '';
         const d1 = attrs.draustieji || 0;
@@ -69,49 +62,81 @@ function buildHtml(attrs, handlers = {}) {
         html = '<div class="vd-title">' + esc(name) + '</div>';
     }
 
-    // Add expand/collapse button — but the collapse button for configurable (org/person) nodes
-    // lives at the bottom of the legend panel instead of here.
+    // Configurable nodes (org/person) get their expand/collapse button in the legend panel.
     const showButton = handlers.onExpand || (handlers.onCollapse && !isConfigurableNode(attrs));
     if (html && showButton) {
-        const isExpanded = !!handlers.onCollapse;
-        const icon = isExpanded ? '▲' : '▼';
-        const label = isExpanded ? 'Slėpti ryšius' : 'Rodyti ryšius';
-        const action = isExpanded ? 'collapse' : 'expand';
-        html += '<button class="btn btn-ghost btn-sm vd-btn" data-action="' + action + '">' + icon + ' <span>' + label + '</span></button>';
+        html += buildExpandButtonHtml(handlers);
     }
-    
+
     return html;
 }
 
-/**
- * Shows the details panel for the selected node.
- * @param {string} nodeId
- * @param {object} attrs  Node attributes from viewGraph
- * @param {object} handlers  { onExpand?: () => void, onCollapse?: () => void }
- */
-export function showNodeDetails(nodeId, attrs, handlers = {}) {
-    const el = getPanel();
-    const wrapper = getWrapper();
-    if (!el) return;
-    const html = buildHtml(attrs, handlers);
-    if (!html) { if (wrapper) wrapper.hidden = true; return; }
-    el.innerHTML = html;
-    if (wrapper) wrapper.hidden = false;
+// ── NodeDetails component ─────────────────────────────────────────────────────
 
-    // Bind button event listener
-    const btn = el.querySelector('[data-action]');
-    if (btn) {
-        btn.addEventListener('click', () => {
-            if (btn.dataset.action === 'expand') handlers.onExpand?.();
-            else handlers.onCollapse?.();
-        });
+/**
+ * Manages the node details panel and delegates legend updates to the composed NodeLegend.
+ * Call showForNode() on selection; call hide() on deselect or collapse.
+ */
+export class NodeDetails {
+    constructor({ legend = null } = {}) {
+        this.legend = legend;
+        this._panel = null;
+        this._wrapper = null;
     }
-}
 
-/**
- * Hides the details panel wrapper (collapses the entire node-details panel including legend).
- */
-export function hideDetails() {
-    const wrapper = getWrapper();
-    if (wrapper) wrapper.hidden = true;
+    _getPanel() {
+        if (!this._panel) this._panel = document.getElementById('rysiai-details');
+        return this._panel;
+    }
+
+    _getWrapper() {
+        if (!this._wrapper) this._wrapper = document.getElementById('node-details');
+        return this._wrapper;
+    }
+
+    /**
+     * Renders the details panel for the selected node and updates the legend.
+     * @param {string} nodeId
+     * @param {object} attrs  Node attributes from viewGraph
+     * @param {object} handlers  { onExpand?: () => void, onCollapse?: () => void }
+     * @param {{ byType: Map<string,number>, bySize: Map<string,number> }|null} counts
+     */
+    showForNode(nodeId, attrs, handlers = {}, counts = null) {
+        const el = this._getPanel();
+        const wrapper = this._getWrapper();
+        if (!el) return;
+
+        const html = buildHtml(attrs, handlers);
+        if (!html) {
+            if (wrapper) wrapper.hidden = true;
+            this.legend?.hide();
+            return;
+        }
+
+        el.innerHTML = html;
+        if (wrapper) wrapper.hidden = false;
+
+        const btn = el.querySelector('[data-action]');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                if (btn.dataset.action === 'expand') handlers.onExpand?.();
+                else handlers.onCollapse?.();
+            });
+        }
+
+        if (isConfigurableNode(attrs)) {
+            this.legend?.updateForNode(nodeId, attrs.expanded, handlers, counts);
+        } else {
+            this.legend?.hide();
+        }
+    }
+
+    /**
+     * Hides the details panel wrapper and the legend.
+     */
+    hide() {
+        const wrapper = this._getWrapper();
+        if (wrapper) wrapper.hidden = true;
+        this.legend?.hide();
+    }
 }
