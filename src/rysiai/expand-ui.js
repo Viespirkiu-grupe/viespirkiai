@@ -1,4 +1,4 @@
-import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData } from './graph-utils.js';
+import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from './graph-utils.js';
 import { NODE_COLOR, EDGE_COLOR, nodeColor } from './colors.js';
 import { updateLegendForNode } from './legend.js';
 import { isConfigurableNode, isOrgNode, isPersonNode, isContractNode, isProcurementNode } from './entity-types.js';
@@ -79,7 +79,8 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         const handlers = buildHandlers(id, attrs);
         showNodeDetails(id, attrs, handlers);
         if (isConfigurableNode(attrs)) {
-            updateLegendForNode(id, legendState, attrs.expanded, handlers);
+            const counts = computeEdgeCounts(viewGraph, id);
+            updateLegendForNode(id, legendState, attrs.expanded, handlers, counts);
         }
     }
 
@@ -92,7 +93,8 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         const handlers = buildHandlers(id, attrs);
         if (isConfigurableNode(attrs)) {
             legendState.initNode(id);
-            updateLegendForNode(id, legendState, attrs.expanded, handlers);
+            const counts = computeEdgeCounts(viewGraph, id);
+            updateLegendForNode(id, legendState, attrs.expanded, handlers, counts);
         }
 
         showNodeDetails(id, attrs, handlers);

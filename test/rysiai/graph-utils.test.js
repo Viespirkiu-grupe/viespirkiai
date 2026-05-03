@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import Graph from 'graphology';
 
-import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData } from '../../src/rysiai/graph-utils.js';
+import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from '../../src/rysiai/graph-utils.js';
 import { LegendState } from '../../src/rysiai/legend-state.js';
 import { ENTITY_TYPE } from '../../src/rysiai/entity-types.js';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
@@ -964,5 +964,80 @@ describe('collapse + rebuildViewGraph integration', () => {
         collapseGraphData(dataGraph, 'org:p1');
 
         assert.ok(dataGraph.hasNode('org:root'), 'root must not be removed when partner collapses');
+    });
+});
+
+// ── computeEdgeCounts ─────────────────────────────────────────────────────────
+
+describe('computeEdgeCounts', () => {
+    let g;
+    beforeEach(() => { g = new Graph({ type: 'directed', multi: true }); });
+
+    it('returns empty maps for a missing node', () => {
+        const { byType, bySize } = computeEdgeCounts(g, 'org:x');
+        assert.equal(byType.size, 0);
+        assert.equal(bySize.size, 0);
+    });
+
+    it('returns empty maps for a node with no edges', () => {
+        g.addNode('org:x', {});
+        const { byType, bySize } = computeEdgeCounts(g, 'org:x');
+        assert.equal(byType.size, 0);
+        assert.equal(bySize.size, 0);
+    });
+
+    it('counts Director edges correctly', () => {
+        g.addNode('org:a', {}); g.addNode('person:1', {}); g.addNode('person:2', {});
+        g.addEdgeWithKey('e1', 'person:1', 'org:a', { edgeType: 'Director' });
+        g.addEdgeWithKey('e2', 'person:2', 'org:a', { edgeType: 'Director' });
+        const { byType } = computeEdgeCounts(g, 'org:a');
+        assert.equal(byType.get('Director'), 2);
+        assert.equal(byType.get('Shareholder'), undefined);
+    });
+
+    it('counts multiple edge types independently', () => {
+        g.addNode('org:a', {}); g.addNode('person:1', {}); g.addNode('person:2', {});
+        g.addEdgeWithKey('e1', 'person:1', 'org:a', { edgeType: 'Director' });
+        g.addEdgeWithKey('e2', 'person:2', 'org:a', { edgeType: 'Shareholder' });
+        const { byType } = computeEdgeCounts(g, 'org:a');
+        assert.equal(byType.get('Director'), 1);
+        assert.equal(byType.get('Shareholder'), 1);
+    });
+
+    it('counts Order edges by size category independently', () => {
+        g.addNode('org:a', {}); g.addNode('contract:1', {}); g.addNode('contract:2', {}); g.addNode('contract:3', {});
+        g.addEdgeWithKey('e1', 'org:a', 'contract:1', { edgeType: 'Order', contractSizeCategory: 'small' });
+        g.addEdgeWithKey('e2', 'org:a', 'contract:2', { edgeType: 'Order', contractSizeCategory: 'medium' });
+        g.addEdgeWithKey('e3', 'org:a', 'contract:3', { edgeType: 'Order', contractSizeCategory: 'large' });
+        const { bySize } = computeEdgeCounts(g, 'org:a');
+        assert.equal(bySize.get('small'), 1);
+        assert.equal(bySize.get('medium'), 1);
+        assert.equal(bySize.get('large'), 1);
+    });
+
+    it('medium count does not affect small or large counts', () => {
+        g.addNode('org:a', {}); g.addNode('contract:1', {}); g.addNode('contract:2', {});
+        g.addEdgeWithKey('e1', 'org:a', 'contract:1', { edgeType: 'Order', contractSizeCategory: 'medium' });
+        g.addEdgeWithKey('e2', 'org:a', 'contract:2', { edgeType: 'Order', contractSizeCategory: 'medium' });
+        const { bySize } = computeEdgeCounts(g, 'org:a');
+        assert.equal(bySize.get('medium'), 2);
+        assert.equal(bySize.get('small'), undefined);
+        assert.equal(bySize.get('large'), undefined);
+    });
+
+    it('does not count edges not incident to the queried node', () => {
+        g.addNode('org:a', {}); g.addNode('org:b', {}); g.addNode('org:c', {});
+        g.addEdgeWithKey('e1', 'org:b', 'org:c', { edgeType: 'Director' });
+        const { byType } = computeEdgeCounts(g, 'org:a');
+        assert.equal(byType.size, 0);
+    });
+
+    it('counts both outgoing and incoming edges', () => {
+        g.addNode('org:a', {}); g.addNode('org:b', {}); g.addNode('org:c', {});
+        g.addEdgeWithKey('e1', 'org:a', 'org:b', { edgeType: 'Order' });
+        g.addEdgeWithKey('e2', 'org:c', 'org:a', { edgeType: 'Delivery' });
+        const { byType } = computeEdgeCounts(g, 'org:a');
+        assert.equal(byType.get('Order'), 1);
+        assert.equal(byType.get('Delivery'), 1);
     });
 });

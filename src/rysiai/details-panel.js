@@ -1,5 +1,4 @@
 import { isOrgNode, isPersonNode, isContractNode, isProcurementNode, isConfigurableNode } from './entity-types.js';
-import { svgIcon } from './icons.js';
 
 // ── Details panel ─────────────────────────────────────────────────────────────
 
@@ -75,11 +74,10 @@ function buildHtml(attrs, handlers = {}) {
     const showButton = handlers.onExpand || (handlers.onCollapse && !isConfigurableNode(attrs));
     if (html && showButton) {
         const isExpanded = !!handlers.onCollapse;
-        const iconKey = isExpanded ? 'Adjust' : 'Hub';
-        const label = isExpanded ? 'Suskleisti' : 'Išskleisti';
+        const icon = isExpanded ? '▲' : '▼';
+        const label = isExpanded ? 'Slėpti ryšius' : 'Rodyti ryšius';
         const action = isExpanded ? 'collapse' : 'expand';
-        const icon = svgIcon(iconKey);
-        html += '<button class="btn btn-ghost btn-sm vd-btn" data-action="' + action + '">' + icon + '<span>' + label + '</span></button>';
+        html += '<button class="btn btn-ghost btn-sm vd-btn" data-action="' + action + '">' + icon + ' <span>' + label + '</span></button>';
     }
     
     return html;

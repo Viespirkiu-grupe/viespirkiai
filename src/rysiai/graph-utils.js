@@ -284,6 +284,25 @@ export function collapseGraphData(dataGraph, nodeId) {
 }
 
 /**
+ * Counts edges incident to nodeId grouped by edgeType and by contractSizeCategory.
+ * Used by the legend to show relationship counts and hide zero-count rows.
+ *
+ * @param {Graph}  graph
+ * @param {string} nodeId
+ * @returns {{ byType: Map<string, number>, bySize: Map<string, number> }}
+ */
+export function computeEdgeCounts(graph, nodeId) {
+    const byType = new Map();
+    const bySize = new Map();
+    if (!graph.hasNode(nodeId)) return { byType, bySize };
+    graph.forEachEdge(nodeId, (_edgeId, attrs) => {
+        if (attrs.edgeType) byType.set(attrs.edgeType, (byType.get(attrs.edgeType) || 0) + 1);
+        if (attrs.contractSizeCategory) bySize.set(attrs.contractSizeCategory, (bySize.get(attrs.contractSizeCategory) || 0) + 1);
+    });
+    return { byType, bySize };
+}
+
+/**
  * Runs force-directed layout on the graph (mutates node x/y attributes).
  *
  * @param {Graph}    graph
