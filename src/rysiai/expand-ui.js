@@ -241,43 +241,67 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
     function collapseNode(nodeId) {
         if (!dataGraph.hasNode(nodeId)) return;
 
-        // Pure data cleanup (sets expanded=false, removes exclusively-owned nodes+edges)
-        collapseGraphData(dataGraph, nodeId);
-
-        // Sync expanded=false and reset color to non-expanded state in viewGraph
-        if (viewGraph.hasNode(nodeId)) {
-            viewGraph.setNodeAttribute(nodeId, 'expanded', false);
-            viewGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId)));
-        }
-        // dataGraph color was already updated by collapseGraphData setting expanded=false;
-        // nodeColor reads expanded, so we update the stored color attribute explicitly.
-        dataGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId)));
-
         if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
-        rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
-        runLayout(viewGraph, forceAtlas2, noverlap);
-        syncPositionsToData(dataGraph, viewGraph);
 
-        if (viewGraph.hasNode(nodeId)) {
-            // Node still visible (has edges from other expansions) — update panel to Išskleisti
-            setSelection(nodeId, true);
-            const updatedAttrs = viewGraph.getNodeAttributes(nodeId);
-            showNodeDetails(nodeId, updatedAttrs, { onExpand: () => _triggerExpand(nodeId, updatedAttrs) });
-            // Node is no longer expanded — hide legend
-            if (isConfigurableNode(updatedAttrs)) {
-                updateLegendForNode(nodeId, updatedAttrs.label || nodeId, legendState, false);
-            }
-        } else {
-            // Node disappeared — clear selection
-            if (dataGraph.hasNode(nodeId)) {
-                dataGraph.setNodeAttribute(nodeId, 'selected', false);
-                dataGraph.setNodeAttribute(nodeId, 'highlighted', false);
-            }
-            selectedNodeId = null;
-            updateLegendForNode(null, null, legendState, false);
-            hideDetails();
+        // Find nodes currently in viewGraph that will be exclusively removed by this collapse
+        const collapsePos = getNodePos(nodeId);
+        const animationTargets = {};
+        if (collapsePos) {
+            dataGraph.forEachNode((id, attrs) => {
+                if (id === nodeId) return;
+                const owners = attrs.expandedBy;
+                if (owners && owners.has(nodeId) && owners.size === 1 && !attrs.isRoot && viewGraph.hasNode(id)) {
+                    animationTargets[id] = { x: collapsePos.x, y: collapsePos.y };
+                }
+            });
         }
-        renderer.refresh();
+
+        const doCollapse = () => {
+            cancelAnimation = null;
+
+            // Pure data cleanup (sets expanded=false, removes exclusively-owned nodes+edges)
+            collapseGraphData(dataGraph, nodeId);
+
+            // Sync expanded=false and reset color to non-expanded state in viewGraph
+            if (viewGraph.hasNode(nodeId)) {
+                viewGraph.setNodeAttribute(nodeId, 'expanded', false);
+                viewGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId)));
+            }
+            // dataGraph color was already updated by collapseGraphData setting expanded=false;
+            // nodeColor reads expanded, so we update the stored color attribute explicitly.
+            dataGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId)));
+
+            rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+            runLayout(viewGraph, forceAtlas2, noverlap);
+            syncPositionsToData(dataGraph, viewGraph);
+
+            if (viewGraph.hasNode(nodeId)) {
+                // Node still visible (has edges from other expansions) — update panel to Išskleisti
+                setSelection(nodeId, true);
+                const updatedAttrs = viewGraph.getNodeAttributes(nodeId);
+                showNodeDetails(nodeId, updatedAttrs, { onExpand: () => _triggerExpand(nodeId, updatedAttrs) });
+                // Node is no longer expanded — hide legend
+                if (isConfigurableNode(updatedAttrs)) {
+                    updateLegendForNode(nodeId, updatedAttrs.label || nodeId, legendState, false);
+                }
+            } else {
+                // Node disappeared — clear selection
+                if (dataGraph.hasNode(nodeId)) {
+                    dataGraph.setNodeAttribute(nodeId, 'selected', false);
+                    dataGraph.setNodeAttribute(nodeId, 'highlighted', false);
+                }
+                selectedNodeId = null;
+                updateLegendForNode(null, null, legendState, false);
+                hideDetails();
+            }
+            renderer.refresh();
+        };
+
+        if (Object.keys(animationTargets).length > 0) {
+            cancelAnimation = animateNodes(viewGraph, animationTargets, { duration: 400, easing: 'quadraticIn' }, doCollapse);
+        } else {
+            doCollapse();
+        }
     }
 
     // loadOrg is part of the public API (called by rysiai-app.js on initial load).
