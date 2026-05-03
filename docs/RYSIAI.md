@@ -15,14 +15,20 @@ Interaction model:
 The **`#node-details` panel** (top-right overlay, min 200 px / max 240 px) unifies the node details and the edge-type
 legend into a single panel. It contains two sub-components:
 
-- **`#rysiai-details`** — type-specific summary of the selected node. At the bottom, an **expand/collapse button**
-  provides an alternative to double-clicking. The node stays selected after either button action:
-  - **"Išskleisti"** (Hub icon) — shown when the node has not yet been expanded; triggers expansion.
-  - **"Suskleisti"** (Adjust icon) — shown when the node is already expanded; collapses: removes the edges and orphaned
-    nodes brought in by this expansion, resets `expanded: false`, rebuilds the graph.
-- **`#rysiai-legend`** — edge-type filter checkboxes; shown **only when the selected node is expanded** (`expanded === true`).
-  Hidden automatically when "Suskleisti" is clicked (node collapses) or when a different node is selected and it is not yet
-  expanded.
+- **`#rysiai-details`** — type-specific summary of the selected node (title, sub-info, external links).
+  For non-configurable expandable nodes (e.g. contract with `pirkimoNumeris`) an **"Išskleisti"** / **"Suskleisti"**
+  button is rendered here.
+- **`#rysiai-legend`** — shown **only when an org/person node is expanded** (`expanded === true`). Contains:
+  - **`#rysiai-legend-checkboxes`** — edge-type and contract-size filter checkboxes. Each row shows the **count of
+    that relationship type incident to the selected node** (e.g. "Direktorius / vadovas (5)"). Rows where the count
+    is **zero are hidden entirely** — no checkbox is shown for a relationship type that does not exist on the node.
+    Contract edges are split into three independently-toggleable size rows:
+    "Sutartis (maža)" / "(vidutinė)" / "(didelė)" corresponding to `contractSizeCategory` small / medium / large.
+  - **`#rysiai-legend-btn`** — the **"Suskleisti"** (Adjust icon) button for org/person nodes, separated by a
+    border-top. Clicking collapses the node: removes expansion-owned edges and orphaned nodes, resets
+    `expanded: false`, hides the legend.
+  The **"Išskleisti"** (Hub icon) button for not-yet-expanded org/person nodes is rendered in `#rysiai-details`
+  (legend is hidden when node is not expanded). Hidden automatically on collapse or when a non-expanded node is selected.
 
 MCP is not used for DB queries — direct DB calls are faster and avoid HTTP/SSE overhead; MCP is designed for external AI
 clients only.
@@ -413,7 +419,7 @@ graph TD
 | `src/rysiai/colors.js`      | Client | `NODE_COLOR`, `EDGE_COLOR`, `nodeColor`, `hiddenEdgeTypes` Set                                                        | No                        |
 | `src/rysiai/renderers.js`   | Client | `drawNodeLabel`, `drawNodeHover` — Sigma canvas callbacks                                                             | No (canvas ctx passed in) |
 | `src/rysiai/graph-utils.js` | Client | `mergeGraphElements(dataGraph,...)`, `rebuildViewGraph`, `syncPositionsToData`, `runLayout` — **pure, injected deps** | No ★                      |
-| `src/rysiai/legend.js`      | Client | `updateLegendForNode(nodeId, label, legendState, expanded)` — shows/hides `#rysiai-legend` based on expansion state  | Yes (queries DOM)         |
+| `src/rysiai/legend.js`      | Client | `updateLegendForNode(nodeId, legendState, expanded, handlers, counts)` — shows/hides `#rysiai-legend`; renders counts per edge type; hides zero-count rows; renders Suskleisti button at bottom | Yes (queries DOM) |
 | `src/rysiai/expand-ui.js`   | Client | `createExpandUI({dataGraph,viewGraph,...})` — async fetch + rebuild; returns `rebuildAndRefresh`                      | Yes                       |
 | `modules/rysiai/expand.js`  | Server | `expandOrg`, `expandPerson`, `expandProcurement`, all pure builder helpers                                            | No                        |
 | `routes/rysiai.js`          | Server | Express routes; calls `expandOrg`/`expandPerson`/`expandProcurement`; renders EJS                                     | No                        |
@@ -578,224 +584,97 @@ Person nodes keep a fixed `size: 8`. `edgeWeight` is mirrored as a local helper 
 
 ## Tasks
 
-> **Phases 1–16 complete.** Core infrastructure (routes, expand.js, Sigma canvas, icons), expand
-> animations, loading overlay, edge/node type labels, legend checkboxes, two-graph architecture,
-> per-node selection state, dynamic node/edge sizing, entity-types module, SVG legend arrows,
-> ProcurementEntity nodes, double-click expand, and expand/collapse button in details panel are
-> all implemented. See architecture sections above for current implementation state.
+> **Phases 1–17 complete.** Core infrastructure (routes, expand.js, Sigma canvas, icons), expand
+> animations, loading overlay, edge/node type labels, per-node legend checkboxes with `LegendState`,
+> two-graph architecture, per-node selection state, dynamic node/edge sizing, entity-types module,
+> SVG legend arrows, ProcurementEntity nodes, double-click expand, expand/collapse button,
+> unified `#node-details` panel, button moved to bottom of legend, legend title removed,
+> size-based contract filtering (small / medium / large). See architecture sections above for
+> current implementation state.
 
 ---
 
-**Phase 14 — ProcurementEntity graph nodes (server-side)**
+**Phase 18 — Legend row counts and zero-count hiding**
 
-Add `ProcurementEntity` as a first-class node type on the server. The client-side infrastructure
-(colors, icons, entity-types, expand-ui, legend rows, details panel) is already implemented.
+When the legend is shown for an expanded configurable (org/person) node, each row displays the
+count of that relationship type in the **current `viewGraph`** incident to the selected node.
+Rows with zero count are hidden entirely — no checkbox is shown for a relationship that does
+not exist on the node.
 
-#### Data model
+#### Counting rules
 
-| Attribute          | Source                              | Notes                                             |
-|--------------------|-------------------------------------|---------------------------------------------------|
-| `id`               | `procurement:{pirkimoId}`           | Stable across page loads                          |
-| `entityType`       | `'ProcurementEntity'`               |                                                   |
-| `pirkimoId`        | `viesiejiPirkimai.pirkimoId`        | Used for expansion and detail page link           |
-| `pavadinimas`      | `viesiejiPirkimai.pavadinimas`      | Procurement title                                 |
-| `numatomaVerteEUR` | `viesiejiPirkimai.numatomaVerteEUR` | Estimated total value                             |
-| `statusas`         | `viesiejiPirkimai.statusas`         | e.g. "Nustatytas laimėtojas"                      |
-| `pirkimoBudas`     | `viesiejiPirkimai.pirkimoBudas`     | e.g. "Atviras konkursas"                          |
-| `size`             | `contractSize(numatomaVerteEUR)`    | Same tiers as ContractEntity (8 / 13 / 19)        |
-| `expanded`         | `false` initially                   | Set to `true` after `expandProcurement` is called |
+- Count is based on **`viewGraph` edges incident to the selected node** at the time
+  `updateLegendForNode` is called (after every expand or rebuild).
+- Edge-type rows count edges whose `edgeType` matches. Multi-type rows (currently none) would
+  sum all matching types.
+- Contract-size rows count `Order` + `Delivery` edges with the matching `contractSizeCategory`
+  attribute (`'small'` / `'medium'` / `'large'`).
+- If all contract-size counts are zero, all three size rows are hidden. If only "large" has
+  count > 0, only the "large" row is shown.
 
-**Edges from `expandOrg` (buyer side)**: `Procurement` edge `org:{buyerJk}` → `procurement:{pirkimoId}`, label =
-`pirkimoBudas`.
+#### Display format
 
-**Edges from `expandProcurement` (winner orgs)**: `Award` edge `procurement:{pirkimoId}` → `org:{tiekejoKodas}`, label =
-formatted total `verte` sum for that seller.
+Label text: `"Direktorius / vadovas (5)"` — original label + space + count in parentheses.
+The count span must be a separate `<span class="vl-count">` element inside the `<label>` so
+it can be updated without rebuilding the full checkbox HTML.
 
----
+If the count changes (e.g. after another expand that adds edges to the same node), the label
+updates automatically because `updateLegendForNode` is called again.
 
-**Phase 16 — Double-click to expand / details panel expand-collapse button**
+#### Implementation tasks
 
-Replaces single-click expansion with double-click. Adds an expand/collapse button to the details
-panel as a secondary interaction path.
+- [ ] **`src/rysiai/graph-utils.js`** — add pure helper `computeEdgeCounts(graph, nodeId)`:
+    ```js
+    // Returns { byType: Map<string, number>, bySize: Map<string, number> }
+    // byType: edgeType → count of incident edges with that type
+    // bySize: contractSizeCategory → count of Order/Delivery edges with that size
+    export function computeEdgeCounts(graph, nodeId) { … }
+    ```
+    Iterates `graph.forEachEdge(nodeId, …)` — counts by `attrs.edgeType` into `byType` and
+    by `attrs.contractSizeCategory` into `bySize`. Returns empty Maps if node is absent.
 
-#### Interaction model
+- [ ] **`test/rysiai/graph-utils.test.js`** — add `computeEdgeCounts` tests:
+    - Returns empty maps for a node with no edges.
+    - Counts Director edges correctly.
+    - Counts Order edges by size category independently (medium count does not affect small/large).
+    - Does not count edges not incident to the queried node.
 
-| Event             | Source                          | Behaviour                                                                               |
-|-------------------|---------------------------------|-----------------------------------------------------------------------------------------|
-| `clickNode`       | Sigma — canvas node click       | Select the node (show details panel). If already selected, **no-op** — do not deselect. |
-| `doubleClickNode` | Sigma — canvas node dblclick    | Expand the node.                                                                        |
-| `clickExpand`     | Details panel "Išskleisti" btn  | Expand the currently selected node. Node remains selected.                              |
-| `clickCollapse`   | Details panel "Suskleisti" btn  | Collapse the currently selected node. Node remains selected; panel updates.             |
-| `clickStage`      | Sigma — canvas background click | Deselect (unchanged).                                                                   |
+- [ ] **`views/rysiai/index.ejs`** — add `<span class="vl-count"></span>` inside each `<label>`
+    in `#rysiai-legend-checkboxes`, after the label text. Add CSS:
+    ```css
+    .vl-count { color: var(--gray); font-size: 0.7rem; margin-left: 2px; }
+    ```
 
-> **Why no-op on re-click**: Sigma fires `clickNode` twice before `doubleClickNode`. If the second
-> `clickNode` deselected the node, the user would see a flicker (select → deselect → expand). Making
-> re-click a no-op avoids this: both clicks select/keep the node selected, then `doubleClickNode`
-> expands it.
+- [ ] **`src/rysiai/expand-ui.js`** — compute counts before each `updateLegendForNode` call:
+    ```js
+    // in refreshSelectedNodePanel and selectNode (only for configurable nodes):
+    const counts = computeEdgeCounts(viewGraph, id);
+    updateLegendForNode(id, legendState, attrs.expanded, handlers, counts);
+    ```
+    Import `computeEdgeCounts` from `./graph-utils.js`.
 
-#### Details panel expand/collapse button
+- [ ] **`src/rysiai/legend.js`** — update `updateLegendForNode` signature to accept
+    `counts = { byType: Map<string, number>, bySize: Map<string, number> }` as 5th parameter.
+    When rendering the legend:
+    - For each `<label>` containing `input[data-edge-types]`:
+        - Compute `count = sum of byType.get(t) for each type in data-edge-types`.
+        - If `count === 0`: hide the `<label>` (set `.hidden = true` or `display: none`).
+        - Otherwise: show the `<label>`, update its `.vl-count` span to `(${count})`.
+    - For each `<label>` containing `input[data-contract-size]`:
+        - Compute `count = bySize.get(category) ?? 0`.
+        - Same hide/show logic.
+    - When `counts` is `null` (e.g. no counts provided): skip count updates — show all rows and
+      leave count spans empty (safe fallback).
 
-At the bottom of the `#rysiai-details` panel, a single button is rendered based on node state:
-
-| Node state                                                              | Button label     | Button icon                               | Action             |
-|-------------------------------------------------------------------------|------------------|-------------------------------------------|--------------------|
-| expandable, not yet expanded                                            | **"Išskleisti"** | Hub (MUI `@mui/icons-material/Hub`)       | triggers expansion |
-| already expanded                                                        | **"Suskleisti"** | Adjust (MUI `@mui/icons-material/Adjust`) | triggers collapse  |
-| not expandable (e.g. `PersonEntity`, contract without `pirkimoNumeris`) | *(no button)*    | —                                         | —                  |
-
-A node is expandable when any of the following is true:
-
-- `isOrgNode(attrs) && attrs.jarKodas`
-- `isPersonNode(attrs) && attrs.vardas && attrs.pavarde`
-- `isProcurementNode(attrs) && attrs.pirkimoId`
-- `isContractNode(attrs) && attrs.pirkimoNumeris`
-
-Icons are rendered as **inline SVG**. Add `Hub` and `Adjust` path strings to `MUI_ICON_PATHS` in
-`src/rysiai/icons.js` and export a `svgIcon(key)` helper from that module (it already owns the path
-map). `details-panel.js` imports `svgIcon` from `icons.js` and calls it to build the button markup.
-`svgIcon` wraps the path in `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">`.
-
-> **Why `svgIcon` belongs in `icons.js`, not `details-panel.js`**: `MUI_ICON_PATHS` is currently a
-> private `const` in `icons.js`. Exporting the helper (not the raw map) keeps the path data
-> encapsulated and avoids a cross-module data dependency.
-
-#### `showNodeDetails` signature change
-
-```js
-// was: showNodeDetails(nodeId, attrs)
-// now:
-export function showNodeDetails(nodeId, attrs, handlers = {}) { …
-}
-
-// handlers: { onExpand?: () => void, onCollapse?: () => void }
-```
-
-`buildHtml` appends the button only when a handler is provided. After setting `innerHTML`, attach
-the handler directly to the rendered button element (not via `{ once: true }` on the panel — a
-`{ once: true }` listener on the panel is consumed by the first click anywhere, including the
-existing "Peržiūrėti…" links, leaving subsequent button clicks dead):
-
-```js
-const btn = el.querySelector('[data-action]');
-if (btn) {
-    btn.addEventListener('click', () => {
-        if (btn.dataset.action === 'expand') handlers.onExpand?.();
-        else handlers.onCollapse?.();
-    });
-}
-```
-
-Each call to `showNodeDetails` replaces `innerHTML`, so the old button and its listener are
-discarded automatically.
-
-In `expand-ui.js`, `selectNode` computes the handlers and passes them:
-
-```js
-function selectNode(id) {
-…
-    const attrs = viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : {};
-    const handlers = {};
-    if (attrs.expanded) {
-        handlers.onCollapse = () => collapseNode(id);
-    } else if (isExpandableNode(attrs)) {
-        handlers.onExpand = () => _triggerExpand(id, attrs);
-    }
-    showNodeDetails(id, attrs, handlers);
-}
-```
-
-#### Collapse algorithm (`collapseNode`)
-
-1. Set `expanded: false` on `nodeId` in both graphs.
-2. Run `rebuildAndRefresh()` — `nodeId` is no longer an anchor, so nodes whose only anchor
-   connection was through `nodeId` are pruned from `viewGraph` by the existing anchor/visibility
-   logic. `dataGraph` is **not modified** — the data is retained as a silent cache so re-expansion
-   is instant without a network call.
-3. After the rebuild, check whether `nodeId` is still in `viewGraph`:
-    - **Still visible** (has edges from other expansions): re-call `showNodeDetails` with an
-      `onExpand` handler so the button switches from Suskleisti to Išskleisti.
-    - **No longer visible** (all its edges were expansion-exclusive): call `deselectAll()` — the
-      node is gone from the canvas, selection is meaningless.
-
-> **Why not delete from `dataGraph`**: removing edges from `dataGraph` risks deleting edges added
-> by *other* nodes' expansions (e.g. a `Delivery` edge `contract→nodeId` added when expanding a
-> different org). Provenance tracking would be required to do this safely and is deferred to a
-> future phase.
-
----
-
-**Phase 17 — Unified `#node-details` panel**
-
-Merge the separately positioned `#rysiai-details` (top-right) and `#rysiai-legend` (bottom-right) into a single
-`#node-details` wrapper panel anchored top-right. The legend becomes a sub-component inside the wrapper and is shown
-only when the selected node is expanded.
-
-#### Layout
-
-```
-#node-details (wrapper: position absolute, top 12px, right 12px, min 200px, max 240px)
-├── #rysiai-details  (node info: title, sub, links + Išskleisti/Suskleisti button)
-└── #rysiai-legend   (edge-type checkboxes — border-top separator, hidden when node not expanded)
-```
-
-`#node-details` is hidden when no node is selected. When a node is selected:
-
-- `#rysiai-details` is always shown.
-- `#rysiai-legend` is shown only when `attrs.expanded === true`; hidden otherwise.
-
-After `_expand` completes, the legend becomes visible because the node's `expanded` flag is set to `true`.
-After `collapseNode`, the legend is hidden. Double-clicking an unexpanded node first selects (no legend), then expands
-(legend appears automatically).
-
-#### Tasks
-
-- [x] **`views/rysiai/index.ejs`**:
-    - Add `#node-details` wrapper div: `position: absolute; top: 12px; right: 12px; min-width: 200px; max-width: 240px`
-      with same background, border, border-radius, box-shadow, font-size, color, z-index, and overflow-wrap as the
-      current `#rysiai-details`. Start `hidden`.
-    - Move `#rysiai-details` inside `#node-details`; strip its individual `position`, `top`, `right`, `max-width`,
-      `min-width`, `background`, `border`, `box-shadow`, `z-index` CSS — it inherits the wrapper's container styles.
-      Keep `padding: 10px 14px; line-height: 1.5`.
-    - Move `#rysiai-legend` inside `#node-details` after `#rysiai-details`; strip its `position: absolute; bottom; right`
-      CSS. Add `border-top: 1px solid #e5e7eb; margin-top: 8px; padding-top: 8px` separator. Start `hidden`.
-    - Dark mode border separator: `.dark #rysiai-legend { border-top-color: #374151; }`.
-    - Keep all existing child styles: `.vd-title`, `.vd-sub`, `.vd-link`, `.vd-btn`, `.vl-swatch`, legend label/checkbox.
-
-- [x] **`src/rysiai/details-panel.js`**:
-    - Add `getNodeDetailsWrapper()` helper: `document.getElementById('node-details')`.
-    - In `showNodeDetails`: after resolving `html`, show the wrapper (`wrapper.hidden = false`) and set `el.hidden = false`.
-    - In `hideDetails`: hide the wrapper (`wrapper.hidden = true`) instead of (or in addition to) `el.hidden = true`.
-
-- [x] **`src/rysiai/legend.js`**:
-    - Update `updateLegendForNode(nodeId, label, legendState, expanded)` — add 4th parameter `expanded`.
-    - When `nodeId != null && expanded === true`: show `#rysiai-legend`, sync checkboxes (existing logic unchanged).
-    - When `nodeId != null && !expanded`: hide `#rysiai-legend` only (do not affect `#node-details` wrapper — it stays visible via `showNodeDetails`).
-    - When `nodeId == null`: hide `#rysiai-legend` (redundant since wrapper hides, but explicit).
-
-- [x] **`src/rysiai/expand-ui.js`**:
-    - In `selectNode`: pass `attrs.expanded` as 4th arg to `updateLegendForNode(id, label, legendState, attrs.expanded)`.
-    - In `refreshSelectedNodePanel` (called after `_expand` completes): after `showNodeDetails`, also call
-      `updateLegendForNode(selectedNodeId, label, legendState, true)` — node is now expanded, legend should show.
-    - In `collapseNode` after rebuild: if node still in `viewGraph`, call
-      `updateLegendForNode(nodeId, label, legendState, false)` to hide legend; existing `showNodeDetails` call is sufficient for panel content.
-    - `deselectAll` and the disappeared-node branch in `collapseNode` already call `updateLegendForNode(null, null, legendState)` — pass `false` or omit 4th arg (null nodeId hides legend unconditionally).
-
-- [ ] **Browser smoke-test** (manual verification required):
-    - Single-click unexpanded node → `#node-details` shows with details only; `#rysiai-legend` hidden
-    - Click "Išskleisti" → node expands; `#rysiai-legend` appears inside `#node-details`
-    - Click "Suskleisti" → legend disappears; button reverts to "Išskleisti"
-    - Double-click unexpanded node → node selected (no legend) → expands → legend appears
-    - Click canvas background → `#node-details` hides entirely
-    - `#rysiai-legend` no longer floats independently at bottom-right
+- [ ] **Browser smoke-test** (manual verification):
+    - Expand an org node — legend shows only rows with count > 0; each visible row has `(N)`.
+    - Node with no Employment edges: "Darbuotojas" row absent from legend.
+    - Node with only large contracts: only "Sutartis (didelė)" size row shown.
+    - After expanding a second node that adds new edge types to the first's neighbourhood: legend
+      updates correctly on re-selection.
 
 ---
 
 1. **ForceAtlas2 in browser**: `graphology-layout-forceatlas2` runs synchronously and blocks the main
    thread for large graphs. For large graphs (>200 nodes) a Web Worker is recommended. For v1,
    synchronous with a capped iteration count is acceptable.
-
-2. **Search UX on `/rysiai`**: Eliminated. Entry is exclusively via `/rysiai/:jarKodas`
-   (linked from `/asmuo/`). ✓ Resolved.
-
-3. **Header nav link for `/rysiai`**: Keep pointing to `/rysiai/` — shows 404 "įmonė nenurodyta"
-   when clicked directly. This is intentional. ✓ Resolved.
