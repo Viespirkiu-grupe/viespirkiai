@@ -61,10 +61,13 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
     }
 
     function isExpandableNode(attrs) {
-        return (isOrgNode(attrs) && attrs.jarKodas) ||
-               (isPersonNode(attrs) && attrs.vardas && attrs.pavarde) ||
-               (isProcurementNode(attrs) && attrs.pirkimoId) ||
-               (isContractNode(attrs) && attrs.pirkimoNumeris);
+        return EXPAND_KINDS.some((k) => k.test(attrs)) || (isContractNode(attrs) && attrs.pirkimoNumeris);
+    }
+
+    function buildHandlers(id, attrs) {
+        if (attrs.expanded) return { onCollapse: () => collapseNode(id) };
+        if (isExpandableNode(attrs)) return { onExpand: () => _triggerExpand(id, attrs) };
+        return {};
     }
 
     // Re-renders the details panel for the currently selected node with fresh handlers.
@@ -73,13 +76,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         if (!selectedNodeId || !viewGraph.hasNode(selectedNodeId)) return;
         const id = selectedNodeId;
         const attrs = viewGraph.getNodeAttributes(id);
-        const handlers = {};
-        if (attrs.expanded) {
-            handlers.onCollapse = () => collapseNode(id);
-        } else if (isExpandableNode(attrs)) {
-            handlers.onExpand = () => _triggerExpand(id, attrs);
-        }
-        showNodeDetails(id, attrs, handlers);
+        showNodeDetails(id, attrs, buildHandlers(id, attrs));
         if (isConfigurableNode(attrs)) {
             updateLegendForNode(id, attrs.label || id, legendState, attrs.expanded);
         }
@@ -96,13 +93,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             updateLegendForNode(id, attrs.label || id, legendState, attrs.expanded);
         }
 
-        const handlers = {};
-        if (attrs.expanded) {
-            handlers.onCollapse = () => collapseNode(id);
-        } else if (isExpandableNode(attrs)) {
-            handlers.onExpand = () => _triggerExpand(id, attrs);
-        }
-        showNodeDetails(id, attrs, handlers);
+        showNodeDetails(id, attrs, buildHandlers(id, attrs));
         renderer.refresh();
     }
 
@@ -351,7 +342,6 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
     renderer.on('clickNode', (event) => {
         const nodeId = event.node;
         const attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
-        console.log('[Ryšiai] click:', nodeId, attrs.entityType || '?', 'expanded:', attrs.expanded);
         // No-op on re-click: Sigma fires clickNode twice before doubleClickNode.
         // Deselecting on re-click would cause a visible flicker (select → deselect → expand).
         if (selectedNodeId === nodeId) return;
