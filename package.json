@@ -3,14 +3,25 @@
     "version": "1.0.0",
     "main": "index.js",
     "scripts": {
-        "build:tailwind": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --minify",
-        "watch:tailwind": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --watch"
+        "dev": "node index.js",
+        "start": "node server.js",
+        "build": "npm run build:css && npm run build:graph-bundle && npm run build:rysiai",
+        "watch": "npm run watch:css & npm run watch:graph-bundle & npm run watch:rysiai",
+        "build:css": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --minify",
+        "watch:css": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --watch",
+        "build:graph-bundle": "esbuild src/graph-bundle.js --bundle --format=iife --outfile=public/dist/graph-bundle.js --minify",
+        "watch:graph-bundle": "esbuild src/graph-bundle.js --bundle --format=iife --outfile=public/dist/graph-bundle.js --watch",
+        "build:rysiai": "esbuild src/rysiai-app.js --bundle --format=iife --outfile=public/dist/rysiai.js --minify",
+        "watch:rysiai": "esbuild src/rysiai-app.js --bundle --format=iife --outfile=public/dist/rysiai.js --watch",
+        "test": "node --test"
     },
     "keywords": [],
     "author": "",
     "description": "",
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.27.1",
+        "@sigma/node-border": "^3.0.0",
+        "@sigma/node-image": "^3.0.0",
         "@xmldom/xmldom": "^0.9.8",
         "adm-zip": "^0.5.16",
         "canvas": "^3.2.1",
@@ -20,6 +31,9 @@
         "exceljs": "^4.4.0",
         "express": "^5.1.0",
         "express-rate-limit": "^8.2.1",
+        "graphology": "^0.26.0",
+        "graphology-layout-forceatlas2": "^0.10.1",
+        "graphology-layout-noverlap": "^0.4.2",
         "helmet": "^8.1.0",
         "highlight.js": "^11.11.1",
         "html-minifier-terser": "^7.2.0",
@@ -38,6 +52,7 @@
         "pg-query-stream": "^4.10.3",
         "proj4": "^2.20.4",
         "puppeteer": "^24.16.1",
+        "sigma": "^3.0.2",
         "socks-proxy-agent": "^8.0.5",
         "stream-chain": "^3.4.1",
         "stream-json": "^1.9.1",
@@ -52,6 +67,7 @@
     "devDependencies": {
         "@tailwindcss/cli": "4.2.2",
         "@tailwindcss/postcss": "4.2.2",
+        "esbuild": "^0.28.0",
         "postcss": "^8.5.8",
         "tailwindcss": "4.2.2"
     }
