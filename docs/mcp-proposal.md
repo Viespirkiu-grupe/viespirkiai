@@ -216,6 +216,132 @@ ROLE mcp_analyst SET work_mem = '32MB';
 
 ---
 
+## Subject-matter temporary views
+
+Four `CREATE TEMP VIEW` statements executed at connection open time (session-scoped, no DDL privileges needed).
+They solve the three recurring pain points across all investigation queries:
+
+- `jarCsv.jarKodas` is `integer`; all FK columns are `text` — every join needs `::text` cast
+- Latest Sodra snapshot requires `ORDER BY data DESC NULLS LAST LIMIT 1` per company
+- Common multi-table joins are re-derived from scratch each investigation
+
+The LLM uses views for simple lookups and profile queries; it writes directly against the raw tables for window
+functions, CTEs, and recursive graph traversal where full expressiveness is needed.
+
+### `v_company` — company profile with latest headcount and compliance status
+
+```sql
+CREATE TEMP VIEW v_company AS
+SELECT j.jarKodas::text,
+       j.pavadinimas,
+       j.adresas,
+       j.registravimoData,
+       j.statusoPavadinimas,
+       j.statusasNuo,
+       s.data                                                         AS sodraData, -- YYYYMM integer
+       (COALESCE(s.draustieji, 0) + COALESCE(s.draustieji2, 0))      AS darbuotojai,
+       s.vidutinisAtlyginimas,
+       s.imokuSuma,
+       EXISTS(SELECT 1
+              FROM melagingiTiekejai m
+              WHERE m.tiekejoJarKodas = j.jarKodas::text
+                AND (m.itrauktasIki IS NULL OR m.itrauktasIki >= CURRENT_DATE)) AS melagingisTiekejas,
+       EXISTS(SELECT 1
+              FROM nepatikimiTiekejai n
+              WHERE n.tiekejoJarKodas = j.jarKodas::text
+                AND (n.itrauktaIki IS NULL OR n.itrauktaIki >= CURRENT_DATE))   AS nepatikimasTiekejas,
+       (SELECT COUNT(*)
+        FROM vdiPazeidimai v
+        WHERE v.jarKodas = j.jarKodas::text)                          AS vdiPazeidimuSkaicius
+FROM jarCsv j
+         LEFT JOIN LATERAL (
+    SELECT draustieji, draustieji2, vidutinisAtlyginimas, imokuSuma, data
+    FROM sodra
+    WHERE jarKodas = j.jarKodas::text
+    ORDER BY data DESC NULLS LAST
+    LIMIT 1
+    ) s ON true;
+```
+
+### `v_sutartys` — contracts with buyer and seller names resolved
+
+```sql
+CREATE TEMP VIEW v_sutartys AS
+SELECT s.sutartiesUnikalusId,
+       s.pirkimoNumeris,                          -- nullable ~30-40% (direct procurement)
+       s.sudarymoData,
+       s.galiojimoData,
+       s.verte,
+       s.faktineIvykdimoVerte,
+       s.pavadinimas,
+       s.bvpzKodas,
+       s.tipas,
+       s.istrinta,
+       s.perkanciosiosOrganizacijosKodas          AS pirkejoKodas,
+       pb.pavadinimas                             AS pirkejas,
+       s.tiekejoKodas,
+       tb.pavadinimas                             AS tiekejas,
+       s.papildomiTiekejaiKodai
+FROM sutartys s
+         LEFT JOIN jarCsv pb ON pb.jarKodas::text = s.perkanciosiosOrganizacijosKodas
+         LEFT JOIN jarCsv tb ON tb.jarKodas::text = s.tiekejoKodas;
+```
+
+### `v_pirkimas` — procurement notices with organizer details
+
+```sql
+CREATE TEMP VIEW v_pirkimas AS
+SELECT p.pirkimoId,
+       p.pavadinimas,
+       p.jarKodas,
+       o.pavadinimas                              AS organizatorius,
+       o.trumpinys,
+       o.miestas,
+       p.pirkimoBudas,
+       p.statusas,
+       p.zingsnis,
+       p.pirkimoObjektoTipas,
+       p.numatomaVerteEUR,
+       p.paskelbimoData,
+       p.pasiulymuPateikimoTerminas,
+       p.esFinansavimas,
+       p.bvpzKodai
+FROM viesiejiPirkimai p
+         LEFT JOIN viesiejiPirkimaiVykdytojai o ON o.id = p.pirkimoVykdytojasId;
+```
+
+### `v_person_links` — declared person-to-company relationships with company name
+
+```sql
+CREATE TEMP VIEW v_person_links AS
+SELECT r.id,
+       r.deklaracija,
+       r.vardas,
+       r.pavarde,
+       r.susijusioAsmensVardas,
+       r.susijusioAsmensPavarde,
+       r.jarKodas,
+       j.pavadinimas                              AS imonesVardas,
+       r.pareigos,
+       r.irasoTipas,            -- DEKLARUOJANCIO_DARBOVIETE | SUTUOKTINIO_DARBOVIETE | KITI_RYSIAI_SU_JA
+       r.darbovietesTipas,
+       r.rysioPobudzioPavadinimas,
+       r.rysioPradzia,
+       r.rysioPabaiga,
+       r.yraJuridinisAsmuo,
+       r.registruotaLietuvoje
+FROM pinregJuridiniaiRysiai r
+         LEFT JOIN jarCsv j ON j.jarKodas::text = r.jarKodas;
+```
+
+### Connection lifecycle
+
+The MCP server runs all four `CREATE TEMP VIEW` statements immediately after acquiring a connection from the pool,
+before executing any user query. Because TEMP views are session-scoped they disappear automatically when the
+connection closes — no cleanup needed.
+
+---
+
 ## Investigation session example
 
 A human says: *"UAB Greitas Statyba keeps winning road contracts in Kaunas. They seem tiny. Something feels off."*
