@@ -54,4 +54,7 @@ export default {
     // Failai
     internalFileBase: "https://failai.viespirkiai.org",
     ocrBandymai: 5,
+
+    // Features
+    enableGraph: false,
 };

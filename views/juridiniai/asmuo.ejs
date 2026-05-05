@@ -29,6 +29,12 @@
           <span aria-hidden="true">↗</span> JSON
         </a>
 
+        <% if (CONFIG.enableGraph) { %><a href="/rysiai/asmuo/<%= asmuo.jar.jarKodas %>"
+          class="btn btn-outline btn-sm"
+          aria-label="Peržiūrėti įmonės ryšių grafą">
+          <span aria-hidden="true">↗</span> Ryšiai
+        </a><% } %>
+
         <% if (asmuo.sodra?.kodas) { %>
         <a href="https://atvira.sodra.lt/imones/detaliai/index.html?code=<%= asmuo.sodra.kodas %>"
           class="btn btn-outline btn-sm"
