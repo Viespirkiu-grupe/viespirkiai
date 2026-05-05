@@ -191,17 +191,16 @@ ON
     "eiluciuSkaiciai",
     "bvpzKodai",
     "sodra",
-    "vmiDuomenys",
-    "regitraDuomenys",
-    "teismoNuosprendziai",
+    regitra,
     "nepatikimiTiekejai",
     "melagingiTiekejai",
-    "jadisDuomenys",
-    "rcPranesimai",
+    jadis,
+    "rcInformaciniaiLeidiniaiPranesimai",
     "domenai",
-    "kotisIrasai",
-    "finansai",
-    "darboSkelbimai",
+    kotis,
+    "balansoAtaskaitos",
+    "pelnoNuostoliuAtaskaitos",
+    "darboVieta",
     "istatinisKapitalas",
     -- required for bid rigging / carousel analysis (Themes 2, 3)
     "atn1ataskaitos",
@@ -446,107 +445,114 @@ jarKodas: "304567890"
 
 ### Step 3 — How many contracts and for how much?
 
+**Tool**: `execute_investigation_query`  
+**Purpose**: "Total contract volume for this supplier vs employee count"
+
+```sql
+SELECT COUNT(*)          AS contract_count,
+       SUM(verte)        AS total_value,
+       MIN(sudarymoData) AS first_contract,
+       MAX(sudarymoData) AS last_contract
+FROM sutartys
+WHERE tiekejoKodas = '304567890';
 ```
-Tool: execute_investigation_query
-purpose: "Total contract volume for this supplier vs employee count"
-query:
-  SELECT COUNT(*) as contract_count,
-         SUM(verte) as total_value,
-         MIN("sudarymoData") as first_contract,
-         MAX("sudarymoData") as last_contract
-  FROM sutartys
-  WHERE "tiekejoKodas" = '304567890'
-→ 47 contracts, €12.3M total, 2020–2025
-```
+
+*→ 47 contracts, €12.3M total, 2020–2025*
 
 *LLM notes: 3 employees, €12.3M in contracts. Red flag: revenue/contract ratio anomaly.*
 
 ### Step 4 — Win rate analysis
 
+**Tool**: `execute_investigation_query`  
+**Purpose**: "How often does this company win as lowest bidder vs other participants"
+
+```sql
+WITH target AS (
+    SELECT pirkimoNumeris
+    FROM v_dalyviai
+    WHERE tiekejoKodas = '304567890'
+),
+all_bids AS (
+    SELECT d.pirkimoNumeris,
+           d.tiekejoKodas,
+           d.pasiulymoKaina,
+           RANK() OVER (PARTITION BY d.pirkimoNumeris ORDER BY d.pasiulymoKaina)  AS rank,
+           COUNT(*) OVER (PARTITION BY d.pirkimoNumeris)                           AS bidders
+    FROM v_dalyviai d
+    WHERE d.pirkimoNumeris IN (SELECT pirkimoNumeris FROM target)
+)
+SELECT COUNT(DISTINCT pirkimoNumeris)                                               AS procurements,
+       COUNT(*) FILTER (WHERE tiekejoKodas = '304567890' AND rank = 1)             AS cheapest_wins,
+       ROUND(AVG(bidders), 1)                                                       AS avg_competitors,
+       ROUND(AVG(CASE WHEN tiekejoKodas = '304567890' THEN pasiulymoKaina END) /
+             NULLIF(AVG(pasiulymoKaina), 0), 3)                                    AS price_ratio
+FROM all_bids;
 ```
-Tool: execute_investigation_query
-purpose: "How often does this company win as lowest bidder vs other participants"
-query:
-  WITH this_company AS (
-    SELECT "pirkimoNumeris", verte
-    FROM sutartys
-    WHERE "tiekejoKodas" = '304567890'
-  ),
-  all_bids AS (
-    SELECT s."pirkimoNumeris",
-           s."tiekejoKodas",
-           s.verte,
-           RANK() OVER (PARTITION BY s."pirkimoNumeris" ORDER BY s.verte) as rank,
-           COUNT(*) OVER (PARTITION BY s."pirkimoNumeris") as bidders
-    FROM sutartys s
-    WHERE s."pirkimoNumeris" IN (SELECT "pirkimoNumeris" FROM this_company)
-  )
-  SELECT
-    COUNT(DISTINCT "pirkimoNumeris") as procurements,
-    COUNT(*) FILTER (WHERE "tiekejoKodas" = '304567890' AND rank = 1) as cheapest_wins,
-    ROUND(AVG(bidders), 1) as avg_competitors,
-    ROUND(AVG(CASE WHEN "tiekejoKodas" = '304567890' THEN verte END) /
-          NULLIF(AVG(verte), 0), 3) as price_ratio
-  FROM all_bids
-→ 47 procurements, 41 cheapest wins (87%), avg 2.3 competitors, price ratio 0.72
-```
+
+*→ 47 procurements, 41 cheapest wins (87%), avg 2.3 competitors, price ratio 0.72*
 
 *LLM notes: Wins 87% of the time as lowest bidder with few competitors. Consistent underbidding at 72% of average price.
 Matches bid-rigging suppression pattern.*
 
 ### Step 5 — Who else bids alongside them?
 
+**Tool**: `execute_investigation_query`  
+**Purpose**: "Identify companies that frequently co-bid with target — carousel pattern check"
+
+```sql
+WITH target_procurements AS (
+    SELECT DISTINCT pirkimoNumeris
+    FROM v_dalyviai
+    WHERE tiekejoKodas = '304567890'
+),
+winner_kaina AS (
+    SELECT pirkimoNumeris, pasiulymoKaina
+    FROM v_dalyviai
+    WHERE tiekejoKodas = '304567890'
+)
+SELECT d.tiekejoKodas,
+       d.tiekejas,
+       COUNT(*)                                                                   AS co_bids,
+       COUNT(*) FILTER (WHERE d.pasiulymoKaina > w.pasiulymoKaina)               AS times_bid_higher
+FROM v_dalyviai d
+JOIN winner_kaina w USING (pirkimoNumeris)
+WHERE d.pirkimoNumeris IN (SELECT pirkimoNumeris FROM target_procurements)
+  AND d.tiekejoKodas != '304567890'
+GROUP BY d.tiekejoKodas, d.tiekejas
+ORDER BY co_bids DESC
+LIMIT 10;
 ```
-Tool: execute_investigation_query
-purpose: "Identify companies that frequently co-bid with target — carousel pattern check"
-query:
-  WITH target_procurements AS (
-    SELECT "pirkimoNumeris" FROM sutartys WHERE "tiekejoKodas" = '304567890'
-  )
-  SELECT s."tiekejoKodas",
-         j.pavadinimas,
-         COUNT(*) as co_bids,
-         COUNT(*) FILTER (WHERE s.verte > (
-           SELECT verte FROM sutartys
-           WHERE "tiekejoKodas" = '304567890'
-             AND "pirkimoNumeris" = s."pirkimoNumeris"
-         )) as times_bid_higher
-  FROM sutartys s
-  JOIN "jarCsv" j ON j."jarKodas" = s."tiekejoKodas"
-  WHERE s."pirkimoNumeris" IN (SELECT "pirkimoNumeris" FROM target_procurements)
-    AND s."tiekejoKodas" != '304567890'
-  GROUP BY s."tiekejoKodas", j.pavadinimas
-  ORDER BY co_bids DESC
-  LIMIT 10
-→ UAB Kelių Draugai: 38 co-bids, 38 times higher
-  UAB Asfaltas Pro:  29 co-bids, 27 times higher
-```
+
+*→ UAB Kelių Draugai: 38 co-bids, 38 times higher*  
+*→ UAB Asfaltas Pro:  29 co-bids, 27 times higher*
 
 *LLM notes: Same two companies appear repeatedly and always bid higher. Classic bid rotation / cover bidding pattern.*
 
 ### Step 6 — Are these companies connected via people?
 
-```
-Tool: execute_investigation_query
-purpose: "Graph traversal: shared persons between the three co-bidding companies"
-query:
-  WITH target_companies AS (
-    SELECT unnest(ARRAY['304567890','301234567','309876543']) AS jar
-  )
-  SELECT p1."jarKodas" AS company_a,
-         p2."jarKodas" AS company_b,
-         p1.vardas, p1.pavarde,
-         p1."irasoTipas" AS role_a,
-         p2."irasoTipas" AS role_b
-  FROM "pinregJuridiniaiRysiai" p1
-  JOIN "pinregJuridiniaiRysiai" p2
+**Tool**: `execute_investigation_query`  
+**Purpose**: "Graph traversal: shared persons between the three co-bidding companies"
+
+```sql
+WITH target_companies AS (
+    SELECT unnest(ARRAY['304567890', '301234567', '309876543']) AS jar
+)
+SELECT p1.jarKodas AS company_a,
+       p2.jarKodas AS company_b,
+       p1.vardas,
+       p1.pavarde,
+       p1.irasoTipas AS role_a,
+       p2.irasoTipas AS role_b
+FROM v_person_links p1
+JOIN v_person_links p2
     ON p1.vardas = p2.vardas AND p1.pavarde = p2.pavarde
-  WHERE p1."jarKodas" IN (SELECT jar FROM target_companies)
-    AND p2."jarKodas" IN (SELECT jar FROM target_companies)
-    AND p1."jarKodas" < p2."jarKodas"
-→ Jonas Jonaitis: director of 304567890, shareholder of 301234567
-  Petras Petraitis: director of 301234567, spouse declares for 309876543
+WHERE p1.jarKodas IN (SELECT jar FROM target_companies)
+  AND p2.jarKodas IN (SELECT jar FROM target_companies)
+  AND p1.jarKodas < p2.jarKodas;
 ```
+
+*→ Jonas Jonaitis: director of 304567890, shareholder of 301234567*  
+*→ Petras Petraitis: director of 301234567, spouse declares for 309876543*
 
 *The LLM now has a complete picture: three companies, two people, shared ownership, consistent bid suppression, classic
 carousel.*
