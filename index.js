@@ -148,7 +148,7 @@ app.use(
 
 app.use(express.static(path.join(__dirname, "public"), {
     setHeaders: (res, filePath) => {
-        if (filePath.endsWith("/dist/tailwind.css")) {
+        if (filePath.endsWith("/dist/tailwind.css") || filePath.endsWith("/dist/graph-bundle.js")) {
             res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
         } else {
             res.setHeader("Cache-Control", "no-store");
