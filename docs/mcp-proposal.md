@@ -202,7 +202,20 @@ ON
     "kotisIrasai",
     "finansai",
     "darboSkelbimai",
-    "istatinisKapitalas"
+    "istatinisKapitalas",
+    -- required for bid rigging / carousel analysis (Themes 2, 3)
+    "atn1ataskaitos",
+    "atn1dalyviai",
+    "atn1pasiulymuEile",
+    -- required for procedure manipulation analysis (Theme 7)
+    "neskelbiamosDerybos",
+    -- required for compliance / VDI violations (Theme 9) — was used in v_company but not granted
+    "vdiPazeidimai",
+    -- required for court case analysis (Theme 9)
+    "bylos",
+    "bylosDalyviai",
+    -- required for tax payment analysis (Theme 1)
+    "mokesciai"
     TO mcp_analyst;
 
 -- No INSERT, UPDATE, DELETE, CREATE, DROP — implicit by omission
@@ -218,7 +231,7 @@ ROLE mcp_analyst SET work_mem = '32MB';
 
 ## Subject-matter temporary views
 
-Four `CREATE TEMP VIEW` statements executed at connection open time (session-scoped, no DDL privileges needed).
+Six `CREATE TEMP VIEW` statements executed at connection open time (session-scoped, no DDL privileges needed).
 They solve the three recurring pain points across all investigation queries:
 
 - `jarCsv.jarKodas` is `integer`; all FK columns are `text` — every join needs `::text` cast
@@ -227,6 +240,17 @@ They solve the three recurring pain points across all investigation queries:
 
 The LLM uses views for simple lookups and profile queries; it writes directly against the raw tables for window
 functions, CTEs, and recursive graph traversal where full expressiveness is needed.
+
+**Coverage map against the 10 investigator themes:**
+
+| View             | Themes covered    | Critical facts provided                                                    |
+|------------------|-------------------|----------------------------------------------------------------------------|
+| `v_company`      | 1, 5, 6, 7, 9, 10 | headcount, registration, compliance flags, domain/court/negotiation counts |
+| `v_sutartys`     | 1, 2, 3, 5, 8     | contract value, overrun ratio, CPV, buyer/seller names                     |
+| `v_pirkimas`     | 5, 6, 7           | procedure type, buyer municipality, estimated value                        |
+| `v_person_links` | 4, 10             | person ↔ company edges, spouse links, role type                            |
+| `v_dalyviai`     | **2, 3**          | full bidder list, bid amounts, rank — essential for bid rigging            |
+| `v_bylos`        | **9**             | court cases per company — blind spot without this view                     |
 
 ### `v_company` — company profile with latest headcount and compliance status
 
@@ -237,10 +261,12 @@ SELECT j.jarKodas::text, j.pavadinimas,
        j.registravimoData,
        j.statusoPavadinimas,
        j.statusasNuo,
+       -- headcount: Theme 1 (capacity mismatch)
        s.data                                                              AS sodraData, -- YYYYMM integer
        (COALESCE(s.draustieji, 0) + COALESCE(s.draustieji2, 0))            AS darbuotojai,
        s.vidutinisAtlyginimas,
-       s.imokuSuma,
+       s.imokuSuma,                                                                      -- total social tax paid
+       -- compliance flags: Theme 9
        EXISTS(SELECT 1
               FROM melagingiTiekejai m
               WHERE m.tiekejoJarKodas = j.jarKodas::text
@@ -251,7 +277,19 @@ SELECT j.jarKodas::text, j.pavadinimas,
            AND (n.itrauktaIki IS NULL OR n.itrauktaIki >= CURRENT_DATE))   AS nepatikimasTiekejas,
        (SELECT COUNT(*)
         FROM vdiPazeidimai v
-        WHERE v.jarKodas = j.jarKodas::text)                               AS vdiPazeidimuSkaicius
+        WHERE v.jarKodas = j.jarKodas::text)                               AS vdiPazeidimuSkaicius,
+       -- court exposure: Theme 9
+       (SELECT COUNT(*)
+        FROM bylosDalyviai bd
+        WHERE bd.kodas = j.jarKodas::text)                                 AS bylosSkaicius,
+       -- web footprint: Theme 10 (shared domain / network signals)
+       (SELECT COUNT(*)
+        FROM domenai d
+        WHERE d.savininkoKodas = j.jarKodas::text)                         AS domenaiSkaicius,
+       -- procedure abuse signal: Theme 7
+       (SELECT COUNT(*)
+        FROM neskelbiamosDerybos nd
+        WHERE nd.jarKodas = j.jarKodas::text)                              AS neskelbiamosDerybosSkaicius
 FROM jarCsv j
          LEFT JOIN LATERAL(
     SELECT draustieji, draustieji2, vidutinisAtlyginimas, imokuSuma, data FROM sodra
@@ -332,9 +370,53 @@ FROM pinregJuridiniaiRysiai r
          LEFT JOIN jarCsv j ON j.jarKodas::text = r.jarKodas;
 ```
 
+### `v_dalyviai` — full bidder list per procurement with ranked bid amounts
+
+The only source of **all participants** in a tender, not just the winner. Without this view, Themes 2 and 3
+(cover bidding, bid rotation) are impossible — `sutartys` records winners only.
+
+```sql
+CREATE TEMP VIEW v_dalyviai AS
+SELECT a.pirkimoNumeris,
+       a.perkanciosiosOrganizacijosKodas AS pirkejoKodas,
+       a.pirkimoBudas,
+       a.sukurtaAt                       AS ataskaitosData,
+       d.kodas                           AS tiekejoKodas,
+       j.pavadinimas                     AS tiekejas,
+       d.fizinisAsmuo,
+       d.salis,
+       e.eileNumeris,                                                                         -- bid rank: 1 = lowest / winner
+       e.kaina::numeric                  AS pasiulymoKaina, ap.statusas AS atmetimoPriezastis -- non-null if proposal was rejected
+FROM atn1ataskaitos a
+         JOIN atn1dalyviai d ON d.ataskaitaId = a.id
+         LEFT JOIN atn1pasiulymuEile e
+                   ON e.ataskaitaId = a.id AND e.dalyvioKodas = d.kodas
+         LEFT JOIN atn1atmestiPasiulymai ap
+                   ON ap.ataskaitaId = a.id AND ap.dalyvioKodas = d.kodas
+         LEFT JOIN jarCsv j ON j.jarKodas::text = d.kodas;
+```
+
+### `v_bylos` — court cases with company and person participants
+
+```sql
+CREATE TEMP VIEW v_bylos AS
+SELECT b.id           AS bylosId,
+       b.bylosNumeris,
+       b.bylosRusis,
+       b.data         AS bylosData,
+       b.teismas,
+       bd.kodas       AS jarKodas,
+       j.pavadinimas  AS dalyvioPavadinimas,
+       bd.pavadinimas AS dalyvioVardasIrPavarde, -- persons have no jarKodas, only pavadinimas
+       bd.bylojeKaip                             -- role: plaintiff, defendant, third party, etc.
+FROM bylosDalyviai bd
+         JOIN bylos b ON b.id = bd.bylosId
+         LEFT JOIN jarCsv j ON j.jarKodas::text = bd.kodas;
+```
+
 ### Connection lifecycle
 
-The MCP server runs all four `CREATE TEMP VIEW` statements immediately after acquiring a connection from the pool,
+The MCP server runs all six `CREATE TEMP VIEW` statements immediately after acquiring a connection from the pool,
 before executing any user query. Because TEMP views are session-scoped they disappear automatically when the
 connection closes — no cleanup needed.
 
