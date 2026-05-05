@@ -255,94 +255,96 @@ functions, CTEs, and recursive graph traversal where full expressiveness is need
 
 ```sql
 CREATE TEMP VIEW v_company AS
-SELECT j.jarKodas::text, j.pavadinimas,
+SELECT j."jarKodas"::text,
+       j.pavadinimas,
        j.adresas,
-       j.registravimoData,
-       j.statusoPavadinimas,
-       j.statusasNuo,
+       j."registravimoData",
+       j."statusoPavadinimas",
+       j."statusasNuo",
        -- headcount: Theme 1 (capacity mismatch)
-       s.data                                                              AS sodraData, -- YYYYMM integer
-       (COALESCE(s.draustieji, 0) + COALESCE(s.draustieji2, 0))            AS darbuotojai,
-       s.vidutinisAtlyginimas,
-       s.imokuSuma,                                                                      -- total social tax paid
+       s.data                                                              AS "sodraData", -- YYYYMM integer
+       (COALESCE(s.draustieji, 0) + COALESCE(s.draustieji2, 0))           AS darbuotojai,
+       s."vidutinisAtlyginimas",
+       s."imokuSuma",                                                                     -- total social tax paid
        -- compliance flags: Theme 9
        EXISTS(SELECT 1
-              FROM melagingiTiekejai m
-              WHERE m.tiekejoJarKodas = j.jarKodas::text
-           AND (m.itrauktasIki IS NULL OR m.itrauktasIki >= CURRENT_DATE)) AS melagingisTiekejas,
+              FROM "melagingiTiekejai" m
+              WHERE m."tiekejoJarKodas" = j."jarKodas"::text
+                AND (m."itrauktasIki" IS NULL OR m."itrauktasIki" >= CURRENT_DATE)) AS "melagingisTiekejas",
        EXISTS(SELECT 1
-              FROM nepatikimiTiekejai n
-              WHERE n.tiekejoJarKodas = j.jarKodas::text
-           AND (n.itrauktaIki IS NULL OR n.itrauktaIki >= CURRENT_DATE))   AS nepatikimasTiekejas,
+              FROM "nepatikimiTiekejai" n
+              WHERE n."tiekejoJarKodas" = j."jarKodas"::text
+                AND (n."itrauktaIki" IS NULL OR n."itrauktaIki" >= CURRENT_DATE))   AS "nepatikimasTiekejas",
        (SELECT COUNT(*)
-        FROM vdiPazeidimai v
-        WHERE v.jarKodas = j.jarKodas::text)                               AS vdiPazeidimuSkaicius,
+        FROM "vdiPazeidimai" v
+        WHERE v."jarKodas" = j."jarKodas"::text)                          AS "vdiPazeidimuSkaicius",
        -- court exposure: Theme 9
        (SELECT COUNT(*)
-        FROM bylosDalyviai bd
-        WHERE bd.kodas = j.jarKodas::text)                                 AS bylosSkaicius,
+        FROM "bylosDalyviai" bd
+        WHERE bd.kodas = j."jarKodas"::text)                              AS "bylosSkaicius",
        -- web footprint: Theme 10 (shared domain / network signals)
        (SELECT COUNT(*)
         FROM domenai d
-        WHERE d.savininkoKodas = j.jarKodas::text)                         AS domenaiSkaicius,
+        WHERE d."savininkoKodas" = j."jarKodas"::text)                    AS "domenaiSkaicius",
        -- procedure abuse signal: Theme 7
        (SELECT COUNT(*)
-        FROM neskelbiamosDerybos nd
-        WHERE nd.jarKodas = j.jarKodas::text)                              AS neskelbiamosDerybosSkaicius
-FROM jarCsv j
-         LEFT JOIN LATERAL(
-    SELECT draustieji, draustieji2, vidutinisAtlyginimas, imokuSuma, data FROM sodra
-    WHERE jarKodas = j.jarKodas::text
+        FROM "neskelbiamosDerybos" nd
+        WHERE nd."jarKodas" = j."jarKodas"::text)                         AS "neskelbiamosDerybosSkaicius"
+FROM "jarCsv" j
+LEFT JOIN LATERAL (
+    SELECT draustieji, draustieji2, "vidutinisAtlyginimas", "imokuSuma", data
+    FROM sodra
+    WHERE "jarKodas" = j."jarKodas"::text
     ORDER BY data DESC NULLS LAST
     LIMIT 1
-                   ) s ON true;
+) s ON true;
 ```
 
 ### `v_sutartys` — contracts with buyer and seller names resolved
 
 ```sql
 CREATE TEMP VIEW v_sutartys AS
-SELECT s.sutartiesUnikalusId,
-       s.pirkimoNumeris, -- nullable ~30-40% (direct procurement)
-       s.sudarymoData,
-       s.galiojimoData,
+SELECT s."sutartiesUnikalusId",
+       s."pirkimoNumeris",           -- nullable ~30-40% (direct procurement)
+       s."sudarymoData",
+       s."galiojimoData",
        s.verte,
-       s.faktineIvykdimoVerte,
+       s."faktineIvykdimoVerte",
        s.pavadinimas,
-       s.bvpzKodas,
+       s."bvpzKodas",
        s.tipas,
        s.istrinta,
-       s.perkanciosiosOrganizacijosKodas AS pirkejoKodas,
-       pb.pavadinimas                    AS pirkejas,
-       s.tiekejoKodas,
-       tb.pavadinimas                    AS tiekejas,
-       s.papildomiTiekejaiKodai
+       s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
+       pb.pavadinimas                      AS pirkejas,
+       s."tiekejoKodas",
+       tb.pavadinimas                      AS tiekejas,
+       s."papildomiTiekejaiKodai"
 FROM sutartys s
-         LEFT JOIN jarCsv pb ON pb.jarKodas::text = s.perkanciosiosOrganizacijosKodas
-         LEFT JOIN jarCsv tb ON tb.jarKodas::text = s.tiekejoKodas;
+LEFT JOIN "jarCsv" pb ON pb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+LEFT JOIN "jarCsv" tb ON tb."jarKodas"::text = s."tiekejoKodas";
 ```
 
 ### `v_pirkimas` — procurement notices with organizer details
 
 ```sql
 CREATE TEMP VIEW v_pirkimas AS
-SELECT p.pirkimoId,
+SELECT p."pirkimoId",
        p.pavadinimas,
-       p.jarKodas,
-       o.pavadinimas AS organizatorius,
+       p."jarKodas",
+       o.pavadinimas              AS organizatorius,
        o.trumpinys,
        o.miestas,
-       p.pirkimoBudas,
+       p."pirkimoBudas",
        p.statusas,
        p.zingsnis,
-       p.pirkimoObjektoTipas,
-       p.numatomaVerteEUR,
-       p.paskelbimoData,
-       p.pasiulymuPateikimoTerminas,
-       p.esFinansavimas,
-       p.bvpzKodai
-FROM viesiejiPirkimai p
-         LEFT JOIN viesiejiPirkimaiVykdytojai o ON o.id = p.pirkimoVykdytojasId;
+       p."pirkimoObjektoTipas",
+       p."numatomaVerteEUR",
+       p."paskelbimoData",
+       p."pasiulymuPateikimoTerminas",
+       p."esFinansavimas",
+       p."bvpzKodai"
+FROM "viesiejiPirkimai" p
+LEFT JOIN "viesiejiPirkimaiVykdytojai" o ON o.id = p."pirkimoVykdytojasId";
 ```
 
 ### `v_person_links` — declared person-to-company relationships with company name
@@ -353,20 +355,20 @@ SELECT r.id,
        r.deklaracija,
        r.vardas,
        r.pavarde,
-       r.susijusioAsmensVardas,
-       r.susijusioAsmensPavarde,
-       r.jarKodas,
-       j.pavadinimas AS imonesVardas,
+       r."susijusioAsmensVardas",
+       r."susijusioAsmensPavarde",
+       r."jarKodas",
+       j.pavadinimas              AS "imonesVardas",
        r.pareigos,
-       r.irasoTipas, -- DEKLARUOJANCIO_DARBOVIETE | SUTUOKTINIO_DARBOVIETE | KITI_RYSIAI_SU_JA
-       r.darbovietesTipas,
-       r.rysioPobudzioPavadinimas,
-       r.rysioPradzia,
-       r.rysioPabaiga,
-       r.yraJuridinisAsmuo,
-       r.registruotaLietuvoje
-FROM pinregJuridiniaiRysiai r
-         LEFT JOIN jarCsv j ON j.jarKodas::text = r.jarKodas;
+       r."irasoTipas",            -- DEKLARUOJANCIO_DARBOVIETE | SUTUOKTINIO_DARBOVIETE | KITI_RYSIAI_SU_JA
+       r."darbovietesTipas",
+       r."rysioPobudzioPavadinimas",
+       r."rysioPradzia",
+       r."rysioPabaiga",
+       r."yraJuridinisAsmuo",
+       r."registruotaLietuvoje"
+FROM "pinregJuridiniaiRysiai" r
+LEFT JOIN "jarCsv" j ON j."jarKodas"::text = r."jarKodas";
 ```
 
 ### `v_dalyviai` — full bidder list per procurement with ranked bid amounts
@@ -376,41 +378,42 @@ The only source of **all participants** in a tender, not just the winner. Withou
 
 ```sql
 CREATE TEMP VIEW v_dalyviai AS
-SELECT a.pirkimoNumeris,
-       a.perkanciosiosOrganizacijosKodas AS pirkejoKodas,
-       a.pirkimoBudas,
-       a.sukurtaAt                       AS ataskaitosData,
-       d.kodas                           AS tiekejoKodas,
-       j.pavadinimas                     AS tiekejas,
-       d.fizinisAsmuo,
+SELECT a."pirkimoNumeris",
+       a."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
+       a."pirkimoBudas",
+       a."sukurtaAt"                       AS "ataskaitosData",
+       d.kodas                             AS "tiekejoKodas",
+       j.pavadinimas                       AS tiekejas,
+       d."fizinisAsmuo",
        d.salis,
-       e.eileNumeris,                                                                         -- bid rank: 1 = lowest / winner
-       e.kaina::numeric                  AS pasiulymoKaina, ap.statusas AS atmetimoPriezastis -- non-null if proposal was rejected
+       e."eileNumeris",                    -- bid rank: 1 = lowest / winner
+       e.kaina::numeric                    AS "pasiulymoKaina",
+       ap.statusas                         AS "atmetimoPriezastis" -- non-null if proposal was rejected
 FROM atn1ataskaitos a
-         JOIN atn1dalyviai d ON d.ataskaitaId = a.id
-         LEFT JOIN atn1pasiulymuEile e
-                   ON e.ataskaitaId = a.id AND e.dalyvioKodas = d.kodas
-         LEFT JOIN atn1atmestiPasiulymai ap
-                   ON ap.ataskaitaId = a.id AND ap.dalyvioKodas = d.kodas
-         LEFT JOIN jarCsv j ON j.jarKodas::text = d.kodas;
+JOIN atn1dalyviai d ON d."ataskaitaId" = a.id
+LEFT JOIN "atn1pasiulymuEile" e
+    ON e."ataskaitaId" = a.id AND e."dalyvioKodas" = d.kodas
+LEFT JOIN "atn1atmestiPasiulymai" ap
+    ON ap."ataskaitaId" = a.id AND ap."dalyvioKodas" = d.kodas
+LEFT JOIN "jarCsv" j ON j."jarKodas"::text = d.kodas;
 ```
 
 ### `v_bylos` — court cases with company and person participants
 
 ```sql
 CREATE TEMP VIEW v_bylos AS
-SELECT b.id           AS bylosId,
-       b.bylosNumeris,
-       b.bylosRusis,
-       b.data         AS bylosData,
+SELECT b.id            AS "bylosId",
+       b."bylosNumeris",
+       b."bylosRusis",
+       b.data          AS "bylosData",
        b.teismas,
-       bd.kodas       AS jarKodas,
-       j.pavadinimas  AS dalyvioPavadinimas,
-       bd.pavadinimas AS dalyvioVardasIrPavarde, -- persons have no jarKodas, only pavadinimas
-       bd.bylojeKaip                             -- role: plaintiff, defendant, third party, etc.
-FROM bylosDalyviai bd
-         JOIN bylos b ON b.id = bd.bylosId
-         LEFT JOIN jarCsv j ON j.jarKodas::text = bd.kodas;
+       bd.kodas        AS "jarKodas",
+       j.pavadinimas   AS "dalyvioPavadinimas",
+       bd.pavadinimas  AS "dalyvioVardasIrPavarde", -- persons have no jarKodas, only pavadinimas
+       bd."bylojeKaip"                              -- role: plaintiff, defendant, third party, etc.
+FROM "bylosDalyviai" bd
+JOIN bylos b ON b.id = bd."bylosId"
+LEFT JOIN "jarCsv" j ON j."jarKodas"::text = bd.kodas;
 ```
 
 ### Connection lifecycle
@@ -432,139 +435,213 @@ The LLM agent receives this and begins an investigation loop:
 ```
 Tool: search_juridiniai
 search: "Greitas Statyba"
-→ jarKodas: 304567890, registered Kaunas, UAB, 2019
+→ jarKodas: 304567890, pavadinimas: UAB Greitas Statyba, registered: 2019-03-11, Kaunas
 ```
 
-### Step 2 — Get company profile
-
-```
-Tool: get_juridinis
-jarKodas: "304567890"
-→ sodra: 3 employees, revenue: €180K (2024)
-```
-
-### Step 3 — How many contracts and for how much?
+### Step 2 — Full risk profile in one shot (`v_company`)
 
 **Tool**: `execute_investigation_query`  
-**Purpose**: "Total contract volume for this supplier vs employee count"
+**Purpose**: "Capacity, compliance flags, court exposure, and domain footprint for the target company"
 
 ```sql
-SELECT COUNT(*)          AS contract_count,
-       SUM(verte)        AS total_value,
-       MIN(sudarymoData) AS first_contract,
-       MAX(sudarymoData) AS last_contract
-FROM sutartys
-WHERE tiekejoKodas = '304567890';
+SELECT "jarKodas",
+       pavadinimas,
+       "registravimoData",
+       "statusoPavadinimas",
+       "sodraData",
+       darbuotojai,
+       "vidutinisAtlyginimas",
+       "imokuSuma",
+       "melagingisTiekejas",
+       "nepatikimasTiekejas",
+       "vdiPazeidimuSkaicius",
+       "bylosSkaicius",
+       "domenaiSkaicius",
+       "neskelbiamosDerybosSkaicius"
+FROM v_company
+WHERE "jarKodas" = '304567890';
 ```
 
-*→ 47 contracts, €12.3M total, 2020–2025*
+*→ 3 employees (Sodra 202412), avg salary €1,850, compliance: clean, court cases: 2, domains: 0, negotiated-without-publication appearances: 0*
 
-*LLM notes: 3 employees, €12.3M in contracts. Red flag: revenue/contract ratio anomaly.*
+*LLM notes: Company is 5 years old, 3 employees, no blacklist flags. Two court cases worth investigating. Capacity to deliver road construction at this scale is implausible.*
 
-### Step 4 — Win rate analysis
+### Step 3 — Contract history by year with cost overrun ratio (`v_sutartys`)
 
 **Tool**: `execute_investigation_query`  
-**Purpose**: "How often does this company win as lowest bidder vs other participants"
+**Purpose**: "Contract volume trend and execution overruns — is the company growing or was it born ready?"
+
+```sql
+SELECT DATE_TRUNC('year', "sudarymoData")::date                                    AS metai,
+       COUNT(*)                                                                     AS sutarciu_sk,
+       ROUND(SUM(verte) / 1000)                                                    AS verte_tukst,
+       ROUND(SUM("faktineIvykdimoVerte") / 1000)                                   AS faktine_tukst,
+       ROUND(SUM("faktineIvykdimoVerte") / NULLIF(SUM(verte), 0), 2)               AS virsijimo_koef,
+       pirkejas
+FROM v_sutartys
+WHERE "tiekejoKodas" = '304567890'
+  AND istrinta IS NOT TRUE
+GROUP BY metai, pirkejas
+ORDER BY metai;
+```
+
+*→ 2020: 5 contracts €890K (×1.02, buyer: Kauno miesto savivaldybė)*  
+*→ 2021: 11 contracts €2.1M (×1.28)*  
+*→ 2022: 14 contracts €3.8M (×1.41)*  
+*→ 2023: 17 contracts €5.5M (×1.52)*
+
+*LLM notes: Contract volume grows 6× in four years; overrun ratio worsening each year — classic low-ball-then-escalate. Same buyer every time.*
+
+### Step 4 — Does the buyer favour non-competitive procedures? (`v_pirkimas`)
+
+**Tool**: `execute_investigation_query`  
+**Purpose**: "Procedure type breakdown for the contracting authority — how often do they bypass open tender?"
+
+```sql
+SELECT "pirkimoBudas",
+       COUNT(*)                          AS pirkimu_sk,
+       ROUND(SUM("numatomaVerteEUR"))    AS bendra_verte_eur
+FROM v_pirkimas
+WHERE "jarKodas" = (
+    SELECT "pirkejoKodas" FROM v_sutartys
+    WHERE "tiekejoKodas" = '304567890' LIMIT 1
+)
+GROUP BY "pirkimoBudas"
+ORDER BY pirkimu_sk DESC;
+```
+
+*→ NESKELBIAMOS_DERYBOS: 31 procurements €4.9M (68%)*  
+*→ ATVIRAS: 11 procurements €1.1M (24%)*  
+*→ SUPAPRASTINTAS_ATVIRAS: 4 procurements €0.3M (9%)*
+
+*LLM notes: Buyer runs 68% of procurements as negotiated-without-publication. That is the mechanism that eliminates competition before the bid even opens. Focus of Theme 7 confirmed.*
+
+### Step 5 — Win rate and price suppression (`v_dalyviai`)
+
+**Tool**: `execute_investigation_query`  
+**Purpose**: "How often does this company win as lowest bidder vs all other participants in the same tenders"
 
 ```sql
 WITH target AS (
-    SELECT pirkimoNumeris
+    SELECT DISTINCT "pirkimoNumeris"
     FROM v_dalyviai
-    WHERE tiekejoKodas = '304567890'
+    WHERE "tiekejoKodas" = '304567890'
 ),
 all_bids AS (
-    SELECT d.pirkimoNumeris,
-           d.tiekejoKodas,
-           d.pasiulymoKaina,
-           RANK() OVER (PARTITION BY d.pirkimoNumeris ORDER BY d.pasiulymoKaina)  AS rank,
-           COUNT(*) OVER (PARTITION BY d.pirkimoNumeris)                           AS bidders
+    SELECT d."pirkimoNumeris",
+           d."tiekejoKodas",
+           d."pasiulymoKaina",
+           RANK() OVER (PARTITION BY d."pirkimoNumeris" ORDER BY d."pasiulymoKaina") AS rank,
+           COUNT(*) OVER (PARTITION BY d."pirkimoNumeris")                            AS bidders
     FROM v_dalyviai d
-    WHERE d.pirkimoNumeris IN (SELECT pirkimoNumeris FROM target)
+    WHERE d."pirkimoNumeris" IN (SELECT "pirkimoNumeris" FROM target)
 )
-SELECT COUNT(DISTINCT pirkimoNumeris)                                               AS procurements,
-       COUNT(*) FILTER (WHERE tiekejoKodas = '304567890' AND rank = 1)             AS cheapest_wins,
-       ROUND(AVG(bidders), 1)                                                       AS avg_competitors,
-       ROUND(AVG(CASE WHEN tiekejoKodas = '304567890' THEN pasiulymoKaina END) /
-             NULLIF(AVG(pasiulymoKaina), 0), 3)                                    AS price_ratio
+SELECT COUNT(DISTINCT "pirkimoNumeris")                                               AS procurements,
+       COUNT(*) FILTER (WHERE "tiekejoKodas" = '304567890' AND rank = 1)             AS cheapest_wins,
+       ROUND(AVG(bidders), 1)                                                         AS avg_competitors,
+       ROUND(AVG(CASE WHEN "tiekejoKodas" = '304567890' THEN "pasiulymoKaina" END) /
+             NULLIF(AVG("pasiulymoKaina"), 0), 3)                                    AS price_ratio
 FROM all_bids;
 ```
 
 *→ 47 procurements, 41 cheapest wins (87%), avg 2.3 competitors, price ratio 0.72*
 
-*LLM notes: Wins 87% of the time as lowest bidder with few competitors. Consistent underbidding at 72% of average price.
-Matches bid-rigging suppression pattern.*
+*LLM notes: Wins 87% of the time as lowest bidder. Consistent underbidding at 72% of field average — statistically improbable without prior knowledge of competitors' prices.*
 
-### Step 5 — Who else bids alongside them?
+### Step 6 — Who co-bids and always loses? (`v_dalyviai`)
 
 **Tool**: `execute_investigation_query`  
-**Purpose**: "Identify companies that frequently co-bid with target — carousel pattern check"
+**Purpose**: "Identify companies that repeatedly appear as cover bidders — always present, always higher"
 
 ```sql
 WITH target_procurements AS (
-    SELECT DISTINCT pirkimoNumeris
-    FROM v_dalyviai
-    WHERE tiekejoKodas = '304567890'
+    SELECT DISTINCT "pirkimoNumeris" FROM v_dalyviai WHERE "tiekejoKodas" = '304567890'
 ),
 winner_kaina AS (
-    SELECT pirkimoNumeris, pasiulymoKaina
-    FROM v_dalyviai
-    WHERE tiekejoKodas = '304567890'
+    SELECT "pirkimoNumeris", "pasiulymoKaina" FROM v_dalyviai WHERE "tiekejoKodas" = '304567890'
 )
-SELECT d.tiekejoKodas,
+SELECT d."tiekejoKodas",
        d.tiekejas,
-       COUNT(*)                                                                   AS co_bids,
-       COUNT(*) FILTER (WHERE d.pasiulymoKaina > w.pasiulymoKaina)               AS times_bid_higher
+       COUNT(*)                                                              AS co_bids,
+       COUNT(*) FILTER (WHERE d."pasiulymoKaina" > w."pasiulymoKaina")      AS times_bid_higher
 FROM v_dalyviai d
-JOIN winner_kaina w USING (pirkimoNumeris)
-WHERE d.pirkimoNumeris IN (SELECT pirkimoNumeris FROM target_procurements)
-  AND d.tiekejoKodas != '304567890'
-GROUP BY d.tiekejoKodas, d.tiekejas
+JOIN winner_kaina w USING ("pirkimoNumeris")
+WHERE d."pirkimoNumeris" IN (SELECT "pirkimoNumeris" FROM target_procurements)
+  AND d."tiekejoKodas" != '304567890'
+GROUP BY d."tiekejoKodas", d.tiekejas
 ORDER BY co_bids DESC
 LIMIT 10;
 ```
 
-*→ UAB Kelių Draugai: 38 co-bids, 38 times higher*  
-*→ UAB Asfaltas Pro:  29 co-bids, 27 times higher*
+*→ UAB Kelių Draugai (301234567): 38 co-bids, 38 times higher*  
+*→ UAB Asfaltas Pro (309876543): 29 co-bids, 27 times higher*
 
-*LLM notes: Same two companies appear repeatedly and always bid higher. Classic bid rotation / cover bidding pattern.*
+*LLM notes: Same two companies appear in nearly every tender and always bid above the winner. Cover bidding pattern confirmed.*
 
-### Step 6 — Are these companies connected via people?
+### Step 7 — Are the three companies linked through people? (`v_person_links`)
 
 **Tool**: `execute_investigation_query`  
-**Purpose**: "Graph traversal: shared persons between the three co-bidding companies"
+**Purpose**: "Graph traversal: shared directors, shareholders, or spouses across the three co-bidding companies"
 
 ```sql
 WITH target_companies AS (
     SELECT unnest(ARRAY['304567890', '301234567', '309876543']) AS jar
 )
-SELECT p1.jarKodas AS company_a,
-       p2.jarKodas AS company_b,
+SELECT p1."jarKodas"     AS company_a,
+       p1."imonesVardas" AS company_a_name,
+       p2."jarKodas"     AS company_b,
+       p2."imonesVardas" AS company_b_name,
        p1.vardas,
        p1.pavarde,
-       p1.irasoTipas AS role_a,
-       p2.irasoTipas AS role_b
+       p1."irasoTipas"   AS role_a,
+       p2."irasoTipas"   AS role_b
 FROM v_person_links p1
 JOIN v_person_links p2
     ON p1.vardas = p2.vardas AND p1.pavarde = p2.pavarde
-WHERE p1.jarKodas IN (SELECT jar FROM target_companies)
-  AND p2.jarKodas IN (SELECT jar FROM target_companies)
-  AND p1.jarKodas < p2.jarKodas;
+WHERE p1."jarKodas" IN (SELECT jar FROM target_companies)
+  AND p2."jarKodas" IN (SELECT jar FROM target_companies)
+  AND p1."jarKodas" < p2."jarKodas";
 ```
 
-*→ Jonas Jonaitis: director of 304567890, shareholder of 301234567*  
-*→ Petras Petraitis: director of 301234567, spouse declares for 309876543*
+*→ Jonas Jonaitis: DEKLARUOJANCIO_DARBOVIETE at 304567890 (Greitas Statyba) + KITI_RYSIAI_SU_JA at 301234567 (Kelių Draugai)*  
+*→ Petras Petraitis: DEKLARUOJANCIO_DARBOVIETE at 301234567 + SUTUOKTINIO_DARBOVIETE links to 309876543 (Asfaltas Pro)*
 
-*The LLM now has a complete picture: three companies, two people, shared ownership, consistent bid suppression, classic
-carousel.*
+*LLM notes: Two people bridge all three companies. Shared ownership confirmed via PINREG declarations.*
 
-### Step 7 — LLM summarizes findings to the human
+### Step 8 — Court exposure of the cluster (`v_bylos`)
 
-> Your intuition was right. UAB Greitas Statyba (3 employees, €12.3M in contracts) has won 87% of its road procurement
-> contracts as the cheapest bidder. The same two companies — UAB Keliu Draugai and UAB Asfaltas Pro — appear as
-> competitors in most of these procurements and consistently bid higher. These three companies share people: Jonas
-> Jonaitis is director of Greitas Statyba and shareholder of Keliu Draugai; Petras Petraitis directs Keliu Draugai while
-> his spouse is linked to Asfaltas Pro. This pattern is consistent with coordinated bid rigging (cover bidding / bid
-> rotation).
+**Tool**: `execute_investigation_query`  
+**Purpose**: "Check whether any of the three companies appear as defendants in court cases"
+
+```sql
+SELECT "jarKodas",
+       "dalyvioPavadinimas",
+       "bylosRusis",
+       "bylosData",
+       teismas,
+       "bylojeKaip"
+FROM v_bylos
+WHERE "jarKodas" IN ('304567890', '301234567', '309876543')
+ORDER BY "bylosData" DESC
+LIMIT 20;
+```
+
+*→ 304567890 — defendant in 2 labour-law cases (2022, 2024)*  
+*→ 301234567 — defendant in 1 contract-dispute case (2023)*  
+*→ 309876543 — no court cases*
+
+*LLM notes: Two of three companies have been defendants. Labour-law cases at the winning company are consistent with undeclared subcontracting — another capacity-mismatch indicator.*
+
+### Step 9 — LLM summarizes findings to the human
+
+> Your intuition was right. UAB Greitas Statyba (3 employees, €12.3M in contracts since 2020) wins 87% of road tenders
+> as the cheapest bidder, with costs overrunning by up to 52%. The same two companies — UAB Kelių Draugai and UAB
+> Asfaltas Pro — appear as competitors in nearly every tender and consistently bid above the winner. The contracting
+> authority runs 68% of its procurements as negotiated-without-publication, eliminating open competition before bids
+> are submitted. These three companies share people: Jonas Jonaitis is linked to both Greitas Statyba and Kelių Draugai;
+> Petras Petraitis directs Kelių Draugai while his spouse is linked to Asfaltas Pro. Two of the three companies have
+> been defendants in court cases. The overall pattern is consistent with a coordinated bid-rigging ring (cover bidding +
+> procedure manipulation) operating under a single contracting authority.
 
 ---
 
