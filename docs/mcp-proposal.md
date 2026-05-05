@@ -232,35 +232,33 @@ functions, CTEs, and recursive graph traversal where full expressiveness is need
 
 ```sql
 CREATE TEMP VIEW v_company AS
-SELECT j.jarKodas::text,
-       j.pavadinimas,
+SELECT j.jarKodas::text, j.pavadinimas,
        j.adresas,
        j.registravimoData,
        j.statusoPavadinimas,
        j.statusasNuo,
-       s.data                                                         AS sodraData, -- YYYYMM integer
-       (COALESCE(s.draustieji, 0) + COALESCE(s.draustieji2, 0))      AS darbuotojai,
+       s.data                                                              AS sodraData, -- YYYYMM integer
+       (COALESCE(s.draustieji, 0) + COALESCE(s.draustieji2, 0))            AS darbuotojai,
        s.vidutinisAtlyginimas,
        s.imokuSuma,
        EXISTS(SELECT 1
               FROM melagingiTiekejai m
               WHERE m.tiekejoJarKodas = j.jarKodas::text
-                AND (m.itrauktasIki IS NULL OR m.itrauktasIki >= CURRENT_DATE)) AS melagingisTiekejas,
+           AND (m.itrauktasIki IS NULL OR m.itrauktasIki >= CURRENT_DATE)) AS melagingisTiekejas,
        EXISTS(SELECT 1
               FROM nepatikimiTiekejai n
               WHERE n.tiekejoJarKodas = j.jarKodas::text
-                AND (n.itrauktaIki IS NULL OR n.itrauktaIki >= CURRENT_DATE))   AS nepatikimasTiekejas,
+           AND (n.itrauktaIki IS NULL OR n.itrauktaIki >= CURRENT_DATE))   AS nepatikimasTiekejas,
        (SELECT COUNT(*)
         FROM vdiPazeidimai v
-        WHERE v.jarKodas = j.jarKodas::text)                          AS vdiPazeidimuSkaicius
+        WHERE v.jarKodas = j.jarKodas::text)                               AS vdiPazeidimuSkaicius
 FROM jarCsv j
-         LEFT JOIN LATERAL (
-    SELECT draustieji, draustieji2, vidutinisAtlyginimas, imokuSuma, data
-    FROM sodra
+         LEFT JOIN LATERAL(
+    SELECT draustieji, draustieji2, vidutinisAtlyginimas, imokuSuma, data FROM sodra
     WHERE jarKodas = j.jarKodas::text
     ORDER BY data DESC NULLS LAST
     LIMIT 1
-    ) s ON true;
+                   ) s ON true;
 ```
 
 ### `v_sutartys` — contracts with buyer and seller names resolved
@@ -268,7 +266,7 @@ FROM jarCsv j
 ```sql
 CREATE TEMP VIEW v_sutartys AS
 SELECT s.sutartiesUnikalusId,
-       s.pirkimoNumeris,                          -- nullable ~30-40% (direct procurement)
+       s.pirkimoNumeris, -- nullable ~30-40% (direct procurement)
        s.sudarymoData,
        s.galiojimoData,
        s.verte,
@@ -277,10 +275,10 @@ SELECT s.sutartiesUnikalusId,
        s.bvpzKodas,
        s.tipas,
        s.istrinta,
-       s.perkanciosiosOrganizacijosKodas          AS pirkejoKodas,
-       pb.pavadinimas                             AS pirkejas,
+       s.perkanciosiosOrganizacijosKodas AS pirkejoKodas,
+       pb.pavadinimas                    AS pirkejas,
        s.tiekejoKodas,
-       tb.pavadinimas                             AS tiekejas,
+       tb.pavadinimas                    AS tiekejas,
        s.papildomiTiekejaiKodai
 FROM sutartys s
          LEFT JOIN jarCsv pb ON pb.jarKodas::text = s.perkanciosiosOrganizacijosKodas
@@ -294,7 +292,7 @@ CREATE TEMP VIEW v_pirkimas AS
 SELECT p.pirkimoId,
        p.pavadinimas,
        p.jarKodas,
-       o.pavadinimas                              AS organizatorius,
+       o.pavadinimas AS organizatorius,
        o.trumpinys,
        o.miestas,
        p.pirkimoBudas,
@@ -321,9 +319,9 @@ SELECT r.id,
        r.susijusioAsmensVardas,
        r.susijusioAsmensPavarde,
        r.jarKodas,
-       j.pavadinimas                              AS imonesVardas,
+       j.pavadinimas AS imonesVardas,
        r.pareigos,
-       r.irasoTipas,            -- DEKLARUOJANCIO_DARBOVIETE | SUTUOKTINIO_DARBOVIETE | KITI_RYSIAI_SU_JA
+       r.irasoTipas, -- DEKLARUOJANCIO_DARBOVIETE | SUTUOKTINIO_DARBOVIETE | KITI_RYSIAI_SU_JA
        r.darbovietesTipas,
        r.rysioPobudzioPavadinimas,
        r.rysioPradzia,
@@ -534,3 +532,133 @@ carousel.*
   can deviate from — guidance, not constraints.
 - **Cross-investigation memory**: Let the LLM reference findings from previous investigations to detect patterns across
   multiple tips.
+
+---
+
+## Classic investigator questions for MCP debugging
+
+Organised by interrogation theme. Each question is phrased as a real investigator tip — the kind of sentence typed
+into the chat. Use these to verify that the MCP agentic loop produces correct, useful, non-hallucinated answers
+against the live database.
+
+---
+
+### 1. Shell company / capacity mismatch
+
+> *"This company keeps winning large road contracts but they only have a handful of employees."*
+
+- How many employees does this supplier have, and how does that compare to their total contract value this year?
+- When was the company registered? Did it start winning contracts within months of registration?
+- What is the ratio of declared Sodra wages to total contract revenue? Could they actually deliver this work?
+- Does the company's registered address appear on many other companies?
+- Has the company ever declared any fixed assets or significant revenue in financial reports?
+
+---
+
+### 2. Bid rigging — cover bidding and bid suppression
+
+> *"I have a feeling the same companies keep showing up as losers in every tender this supplier wins."*
+
+- What is this company's win rate across all procurements they participated in?
+- Who are the most frequent co-bidders, and how often do they bid higher than the winner?
+- Do the losing bids cluster just above the winning bid, or are they spread randomly?
+- Are there procurements where only one or two companies ever participate?
+- Is the average number of bidders in this company's procurements lower than the national average for the same CPV
+  category?
+
+---
+
+### 3. Bid rotation / carousel
+
+> *"I think these three companies take turns winning — each one wins for a while, then steps back."*
+
+- Over the past five years, how is the total contract value split between these companies within the same CPV
+  category?
+- Is there a pattern where company A wins in one period and company B wins in another, with minimal overlap?
+- Do these companies ever bid against each other, or do they consistently appear in separate tenders?
+- When company A is the winner, do companies B and C appear as cover bidders, and vice versa?
+
+---
+
+### 4. Conflict of interest — shared people between buyer and seller
+
+> *"The procurement officer and the winning supplier's director might know each other."*
+
+- Are any people declared in PINREG as working for the buying organisation also linked to the winning supplier?
+- Do any directors or shareholders of the winning supplier have a spouse or family member employed by the buyer?
+- Has the same individual appeared in interest declarations for both the contracting authority and a supplier that
+  won contracts from that authority?
+- Are there common persons in the ownership chains of companies that both bid and buy from each other?
+
+---
+
+### 5. Contract splitting to avoid thresholds
+
+> *"This buyer keeps awarding lots of small contracts to the same supplier — I think they're avoiding the open
+> tender threshold."*
+
+- How many contracts has this buyer awarded to this supplier in the past 12 months, and what are their individual
+  values?
+- Are there clusters of contracts just below the simplified procurement threshold (€30K) or the open procedure
+  threshold?
+- What is the time gap between consecutive contracts to the same supplier? Are they awarded days apart?
+- Does the same contract description (or CPV code) recur across many small awards?
+
+---
+
+### 6. Geographic monopoly / local capture
+
+> *"Every road repair contract in this municipality goes to the same company, year after year."*
+
+- What share of total procurement value in this municipality was awarded to this single supplier over the past
+  three years?
+- Are there other suppliers in the same region and CPV category who never win, or who stopped bidding?
+- Is the contracting authority exclusively issuing contracts to locally registered companies?
+- Do procurement officers at this authority have declared connections to local suppliers?
+
+---
+
+### 7. Procedure manipulation — unjustified direct award
+
+> *"This authority almost never uses open tenders — everything goes through negotiated procedure without
+> publication."*
+
+- What fraction of this buyer's contracts by value were awarded via direct negotiation vs open competition?
+- Has this buyer's use of negotiated-without-publication procedure increased over time?
+- Are the stated justifications for non-competitive procedures consistent, or do they recycle boilerplate reasons?
+- Which suppliers benefit most from this buyer's non-competitive awards?
+
+---
+
+### 8. Price anomalies — over-invoicing and scope creep
+
+> *"The contract was signed for €200K but the final execution value was €900K."*
+
+- For this supplier, what is the average ratio of `faktineIvykdimoVerte` to `verte` across all contracts?
+- Are there contracts where the final value exceeded the original by more than 50%?
+- Do price overruns correlate with specific buyers, CPV categories, or procurement methods?
+- Is there a pattern of low initial bids followed by large amendments — a classic low-ball-then-escalate pattern?
+
+---
+
+### 9. Compliance and blacklist cross-check
+
+> *"I want to know if this company or its related parties have ever been flagged."*
+
+- Is this company currently on the unreliable suppliers list or the false-declaration debarment list?
+- Has this company ever been debarred, even if that debarment has since expired?
+- Are any of this company's directors or shareholders linked to other companies that are blacklisted?
+- Does this company have outstanding VDI (Labour Inspectorate) violations?
+- Are there court cases where this company appears as a party?
+
+---
+
+### 10. Network — second-degree connections and corporate webs
+
+> *"I want to understand who really controls this company and what else they're involved in."*
+
+- Who are the current directors and shareholders of this company according to PINREG declarations?
+- What other companies are those people connected to — as directors, shareholders, or via a spouse?
+- Do any of those second-degree companies also hold government contracts?
+- Is there a cluster of companies sharing the same address, phone, or domain that all bid in the same tenders?
+- Has the ownership structure changed significantly in the period just before or after a large contract award?
