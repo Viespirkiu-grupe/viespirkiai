@@ -710,3 +710,343 @@ See **[mcp-investigator-questions.md](mcp-investigator-questions.md)** for the f
 - **Supported** (themes 1–17): fully answerable with current data; all SQL validated against the live database
 - **Not yet fully supported** (themes 18–22): partial data or missing data source; gaps documented per theme
 
+---
+
+## Implementation specification
+
+### How existing MCP tools work
+
+The codebase uses `@modelcontextprotocol/sdk` with a stateless StreamableHTTP transport. Each HTTP POST to `/mcp`
+creates a fresh `McpServer`, connects it via `StreamableHTTPServerTransport`, handles the request, and discards the
+server — there is no persistent server object between requests.
+
+Each tool is a JS ESM module in `modules/mcp/tools/` with three exports:
+
+```
+name        string           Tool identifier registered with the MCP SDK
+description string           Shown to the LLM in the tool list
+schema      Zod object       Input validation — SDK converts this to JSON Schema
+handler     async function   Receives validated params, returns MCP content object
+```
+
+`modules/mcp/server.js` auto-loads all files in `tools/`, wraps each handler with timing and `logToolCall` (writes
+to `mcpToolCalls` table via the main PG pool), then registers them. No manual registration needed — drop a file in
+`tools/` and it appears.
+
+The main PG pool (`postgres/postgres.js`) uses `pg.Pool` with `statement_cache_size: 0` (PgBouncer compatibility).
+`DATE`/`TIMESTAMP` columns return as strings; `NUMERIC` returns as float (type parsers set globally).
+
+---
+
+### New file structure
+
+```
+modules/mcp/
+├── tools/
+│   ├── getSchema.js                     ← Tool 1 (new)
+│   └── executeInvestigationQuery.js     ← Tool 2 (new)
+└── analyst/
+    ├── pool.js           ← Dedicated pg.Pool for mcp_analyst role
+    ├── tempViews.js      ← Six CREATE TEMP VIEW statements as a string constant
+    ├── validateSql.js    ← Multi-layer SQL validation (AST + whitelists + limits)
+    └── auditLog.js       ← Writes to investigation_query_log table
+```
+
+The `analyst/` directory is internal infrastructure consumed only by the two new tools. It must not be imported from
+routes or other modules.
+
+---
+
+### New config entries (`config.sample.js`)
+
+```js
+// Read-only analyst role for MCP investigation queries
+// Must point at direct PostgreSQL (not PgBouncer) — TEMP views are session-scoped
+pgAnalystUser: "mcp_analyst",
+pgAnalystPassword: "CHANGE_ME",
+pgAnalystPort: 9118,          // same host as pgHost, direct PG port
+pgAnalystMaxConnections: 3,   // investigation queries serialize naturally; keep small
+```
+
+**Why not PgBouncer?** `CREATE TEMP VIEW` is session-scoped. PgBouncer in transaction-pooling mode may route the next
+query to a different backend connection, making the views invisible. The analyst pool must connect directly to
+PostgreSQL on the direct port (`9118` in dev).
+
+---
+
+### New npm package
+
+```
+node-sql-parser   ^5.x   PostgreSQL dialect; AST-based parse + table/function extraction
+```
+
+---
+
+### New database objects (one-time DDL)
+
+**Read-only role** — see the `CREATE ROLE` block in the Guardrail stack section above. Run once by an admin.
+
+**Audit log table:**
+
+```sql
+CREATE TABLE investigation_query_log
+(
+    id         BIGSERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    purpose    TEXT        NOT NULL,
+    sql        TEXT        NOT NULL,
+    duration_ms INTEGER,
+    row_count  INTEGER,
+    error_msg  TEXT,
+    user_agent TEXT
+);
+```
+
+---
+
+### Module: `analyst/pool.js`
+
+Creates and exports a single `pg.Pool` connected as `mcp_analyst`. Mirrors the main pool in `postgres/postgres.js`
+but with analyst credentials and direct-PG port. Applies the same global type parsers (strings for dates, floats
+for numerics) so results are consistent with the rest of the app.
+
+```
+export const analystPool = new Pool({ host, user: pgAnalystUser, password, port: pgAnalystPort, ... })
+```
+
+---
+
+### Module: `analyst/tempViews.js`
+
+Exports a single string constant `TEMP_VIEWS_SQL` — all six `CREATE TEMP VIEW` statements joined by semicolons,
+taken verbatim from the "Subject-matter temporary views" section above. The executor runs this string once per
+acquired client before executing the user query.
+
+```
+export const TEMP_VIEWS_SQL = `
+  CREATE TEMP VIEW v_company AS ...;
+  CREATE TEMP VIEW v_sutartys AS ...;
+  ...
+`;
+```
+
+---
+
+### Module: `analyst/validateSql.js`
+
+Four-layer synchronous validation. Returns `{ ok: true }` or `{ ok: false, layer, message }`.
+
+**Layer 1 — AST parse**
+
+Use `node-sql-parser` with `{ database: "PostgreSQL" }`. If the parse throws, return error immediately. After parse:
+- Reject if the AST is not a single `SELECT` statement.
+- Reject if the statement count ≠ 1 (blocks semicolon-chained statements).
+
+**Layer 2 — Table whitelist**
+
+Walk the AST collecting every `TableRef` node. Every table name must appear in `TABLE_WHITELIST` (the same set
+granted to `mcp_analyst`). Also accept the six temp view names (`v_company`, `v_sutartys`, `v_pirkimas`,
+`v_person_links`, `v_dalyviai`, `v_bylos`). Reject anything else — including `pg_catalog`, `information_schema`,
+and any `pg_*` system table.
+
+**Layer 3 — Function whitelist**
+
+Walk the AST collecting every `Function` node. Block known dangerous functions:
+`pg_read_file`, `pg_read_binary_file`, `dblink`, `lo_import`, `lo_export`, `pg_sleep`, `set_config`,
+`current_setting`, `pg_terminate_backend`, `pg_cancel_backend`, any `pg_*` not in the allow list.
+
+Allow list is the set enumerated in the Guardrail stack section above. Unknown functions not on either list are
+allowed by default — the read-only role is the enforcement backstop, not the function whitelist.
+
+**Layer 4 — Complexity limits**
+
+Count via AST walk:
+- JOIN nodes: reject if > 6
+- Subquery depth: reject if > 3 (recursive count of nested `SELECT` nodes)
+- CTE count: reject if > 8
+- `WITH RECURSIVE` present: allowed, but flag for audit log
+
+---
+
+### Module: `analyst/auditLog.js`
+
+Async function `logInvestigationQuery({ purpose, sql, durationMs, rowCount, errorMsg, userAgent })`. Inserts into
+`investigation_query_log`. Errors are swallowed silently (same pattern as `mcpLogger.js`) — audit failure must
+never block query execution.
+
+---
+
+### Tool 1: `getSchema`
+
+**File**: `modules/mcp/tools/getSchema.js`
+
+**Inputs** (Zod schema):
+
+```
+table   z.enum([...TABLE_WHITELIST, ...VIEW_NAMES]).optional()
+          If omitted → return the full table list with row counts only.
+          If provided → return column details + 3 sample rows for that table/view.
+```
+
+**Implementation**:
+
+- For the table list: query `information_schema.tables` filtered to `TABLE_WHITELIST`, plus a hardcoded list of the
+  six temp view names. Row counts come from `pg_stat_user_tables.n_live_tup` (fast estimate, not `COUNT(*)`).
+- For a specific table: query `information_schema.columns` for column name, data type, and nullable. Then run
+  `SELECT * FROM <table> LIMIT 3` via the **main pool** (the analyst pool has no views initialized). Emit result
+  as JSON.
+- For a specific view: query the same column metadata from `information_schema.views` and include the view SQL
+  source. Do not run sample rows for views (they join multiple tables; sample rows add noise).
+
+Uses the **main pool**, not the analyst pool. Schema introspection is read-only and needs no sandbox.
+
+---
+
+### Tool 2: `executeInvestigationQuery`
+
+**File**: `modules/mcp/tools/executeInvestigationQuery.js`
+
+**Inputs** (Zod schema):
+
+```
+query    z.string().min(10).max(8000)   The SQL SELECT to execute
+purpose  z.string().min(5).max(500)     Human-readable reason — audit log only
+```
+
+**Implementation**: see sequence diagram below.
+
+Wraps the user query as `SELECT * FROM (<user_sql>) AS q LIMIT 200` before execution. This is applied after
+validation passes — the user query is validated as-is, but executed wrapped.
+
+Returns:
+
+```json
+{
+  "rows": [...],
+  "rowCount": 42,
+  "truncated": false,
+  "durationMs": 381
+}
+```
+
+If `rowCount === 200`, set `truncated: true` to signal the LLM that results were capped.
+
+On validation error, return `isError: true` with the layer name and message so the LLM can self-correct its SQL.
+
+On execution error (timeout, syntax error the parser missed, etc.), return `isError: true` with the PG error
+message — the LLM uses this to retry.
+
+---
+
+### Architecture diagram
+
+```mermaid
+graph TD
+    subgraph routes
+        R[POST /mcp]
+    end
+
+    subgraph "MCP Server — server.js"
+        R --> S[createMcpServer]
+        S --> W[wrapHandler + logToolCall]
+    end
+
+    subgraph "Tool 1: get_schema — getSchema.js"
+        W --> GS[getSchema handler]
+        GS --> IS[information_schema queries]
+        IS --> MP[(main pool\npostgres.js)]
+    end
+
+    subgraph "Tool 2: execute_investigation_query — executeInvestigationQuery.js"
+        W --> EQ[executeInvestigationQuery handler]
+        EQ --> VS[validateSql.js\nLayers 1–4]
+        VS -->|invalid| ER[return isError + layer + message]
+        VS -->|valid| AP[(analyst pool\nanalyst/pool.js)]
+        AP --> TV[CREATE TEMP VIEWs\ntempViews.js]
+        TV --> EX[SELECT * FROM\n  user_sql\nAS q LIMIT 200]
+        EX --> AL[auditLog.js\ninvestigation_query_log]
+        AL --> RET[return rows + metadata]
+    end
+```
+
+---
+
+### Single-query execution flow
+
+```mermaid
+sequenceDiagram
+    participant LLM
+    participant H as executeInvestigationQuery handler
+    participant V as validateSql.js
+    participant P as analyst/pool.js
+    participant DB as PostgreSQL (mcp_analyst role)
+    participant A as auditLog.js
+
+    LLM->>H: { query, purpose }
+
+    H->>V: validate(query)
+    V->>V: L1: node-sql-parser — parse AST,\nassert single SELECT
+    V->>V: L2: walk TableRef nodes —\nall in TABLE_WHITELIST or VIEW_NAMES?
+    V->>V: L3: walk Function nodes —\nno blocked pg_* functions?
+    V->>V: L4: count JOINs ≤ 6,\nsubquery depth ≤ 3, CTEs ≤ 8
+
+    alt validation fails
+        V-->>H: { ok: false, layer, message }
+        H-->>LLM: isError: true\n"Layer 2 rejected: table 'pg_catalog.pg_class'\nnot in whitelist"
+    else validation passes
+        V-->>H: { ok: true }
+        H->>P: pool.connect()
+        P-->>H: client (mcp_analyst)
+        H->>DB: TEMP_VIEWS_SQL\n(6× CREATE TEMP VIEW)
+        Note over DB: v_company, v_sutartys, v_pirkimas,\nv_person_links, v_dalyviai, v_bylos
+        H->>DB: SELECT * FROM (<user_query>) AS q LIMIT 200
+        Note over DB: statement_timeout = 10s\nwork_mem = 32MB\n(set at role level)
+
+        alt query succeeds
+            DB-->>H: rows[]
+            H->>P: client.release()
+            H->>A: log(purpose, sql, durationMs, rowCount)
+            H-->>LLM: { rows, rowCount, truncated, durationMs }
+        else query times out / syntax error
+            DB-->>H: PG error
+            H->>P: client.release()
+            H->>A: log(purpose, sql, durationMs, errorMsg)
+            H-->>LLM: isError: true\nerror message from PostgreSQL
+        end
+    end
+```
+
+---
+
+### Validation layer decision table
+
+| Input condition                              | Layer | Action                                   |
+|----------------------------------------------|-------|------------------------------------------|
+| SQL parse fails (syntax error)               | 1     | Return parse error from `node-sql-parser` |
+| Multiple statements (`SELECT 1; DROP TABLE`) | 1     | Reject: "only a single SELECT is allowed" |
+| Statement type is not SELECT                 | 1     | Reject: "only SELECT statements allowed"  |
+| Table not in whitelist (`pg_class`)          | 2     | Reject: name the blocked table            |
+| Blocked function (`pg_sleep`)               | 3     | Reject: name the blocked function         |
+| JOIN count > 6                              | 4     | Reject: "too many JOINs (max 6)"          |
+| Subquery depth > 3                          | 4     | Reject: "subquery nesting too deep (max 3)" |
+| CTE count > 8                               | 4     | Reject: "too many CTEs (max 8)"           |
+| All layers pass                             | —     | Execute wrapped query                     |
+
+---
+
+### Error response contract
+
+All errors returned by both tools use this shape so the LLM can reason about them:
+
+```json
+{
+  "content": [{ "type": "text", "text": "<message>" }],
+  "isError": true
+}
+```
+
+The message always includes:
+- For validation errors: the layer name and the specific identifier that was rejected.
+- For execution errors: the raw PostgreSQL error message (the LLM uses `position` and `message` to fix its SQL).
+- For schema errors (table not found): a suggestion to call `get_schema` first to discover available tables.
+
