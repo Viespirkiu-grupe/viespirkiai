@@ -1111,12 +1111,78 @@ describe('computeEdgeCounts', () => {
         assert.equal(byType.size, 0);
     });
 
-    it('counts both outgoing and incoming edges', () => {
+    it('counts both outgoing and incoming edges to different neighbors', () => {
         g.addNode('org:a', {}); g.addNode('org:b', {}); g.addNode('org:c', {});
         g.addEdgeWithKey('e1', 'org:a', 'org:b', { edgeType: 'ContractSmall' });
         g.addEdgeWithKey('e2', 'org:c', 'org:a', { edgeType: 'ContractLarge' });
         const byType = computeEdgeCounts(g, 'org:a');
         assert.equal(byType.get('ContractSmall'), 1);
         assert.equal(byType.get('ContractLarge'), 1);
+    });
+
+    it('SPOUSE REGRESSION: bidirectional Spouse edges between same pair count as 1', () => {
+        // Real-world scenario: both persons expanded from hash routing.
+        // Alenas's expansion adds alenas→toma:Spouse.
+        // Toma's expansion adds toma→alenas:Spouse.
+        // Both are in the graph; legend for Alenas should show Spouse (1), not (2).
+        g.addNode('person:alenas bulauskis', {});
+        g.addNode('person:toma bulauskienė', {});
+        g.addEdgeWithKey(
+            'edge:person:alenas bulauskis:person:toma bulauskienė:Spouse',
+            'person:alenas bulauskis', 'person:toma bulauskienė',
+            { edgeType: 'Spouse' }
+        );
+        g.addEdgeWithKey(
+            'edge:person:toma bulauskienė:person:alenas bulauskis:Spouse',
+            'person:toma bulauskienė', 'person:alenas bulauskis',
+            { edgeType: 'Spouse' }
+        );
+        const byType = computeEdgeCounts(g, 'person:alenas bulauskis');
+        assert.equal(byType.get('Spouse'), 1, 'bidirectional Spouse pair must count as 1');
+    });
+
+    it('SPOUSE REGRESSION: legend for toma also shows 1, not 2', () => {
+        g.addNode('person:alenas bulauskis', {});
+        g.addNode('person:toma bulauskienė', {});
+        g.addEdgeWithKey(
+            'edge:person:alenas bulauskis:person:toma bulauskienė:Spouse',
+            'person:alenas bulauskis', 'person:toma bulauskienė',
+            { edgeType: 'Spouse' }
+        );
+        g.addEdgeWithKey(
+            'edge:person:toma bulauskienė:person:alenas bulauskis:Spouse',
+            'person:toma bulauskienė', 'person:alenas bulauskis',
+            { edgeType: 'Spouse' }
+        );
+        const byType = computeEdgeCounts(g, 'person:toma bulauskienė');
+        assert.equal(byType.get('Spouse'), 1, 'bidirectional Spouse pair must count as 1 from toma side too');
+    });
+
+    it('Director edges from different persons to same org still count separately', () => {
+        // Dedup must not merge edges between DIFFERENT pairs even for the same type
+        g.addNode('org:a', {}); g.addNode('person:1', {}); g.addNode('person:2', {}); g.addNode('person:3', {});
+        g.addEdgeWithKey('e1', 'person:1', 'org:a', { edgeType: 'Director' });
+        g.addEdgeWithKey('e2', 'person:2', 'org:a', { edgeType: 'Director' });
+        g.addEdgeWithKey('e3', 'person:3', 'org:a', { edgeType: 'Director' });
+        const byType = computeEdgeCounts(g, 'org:a');
+        assert.equal(byType.get('Director'), 3, 'three different persons → three Director edges');
+    });
+
+    it('same person with Director and Employment edges to same org counts each type once', () => {
+        g.addNode('person:a', {}); g.addNode('org:b', {});
+        g.addEdgeWithKey('e1', 'person:a', 'org:b', { edgeType: 'Director' });
+        g.addEdgeWithKey('e2', 'person:a', 'org:b', { edgeType: 'Employment' });
+        const byType = computeEdgeCounts(g, 'person:a');
+        assert.equal(byType.get('Director'), 1);
+        assert.equal(byType.get('Employment'), 1);
+    });
+
+    it('same-type edges to different neighbors are not collapsed', () => {
+        // person has Spouse edges to two different people (unusual but must count correctly)
+        g.addNode('person:a', {}); g.addNode('person:b', {}); g.addNode('person:c', {});
+        g.addEdgeWithKey('e1', 'person:a', 'person:b', { edgeType: 'Spouse' });
+        g.addEdgeWithKey('e2', 'person:a', 'person:c', { edgeType: 'Spouse' });
+        const byType = computeEdgeCounts(g, 'person:a');
+        assert.equal(byType.get('Spouse'), 2, 'edges to different neighbors must both count');
     });
 });

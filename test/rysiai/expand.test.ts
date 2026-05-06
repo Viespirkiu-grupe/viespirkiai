@@ -15,6 +15,7 @@ import {
     edge,
     addNode,
     addEdge,
+    addSpouseEdge,
     buildPersonGraphFromRows,
 } from '../../modules/rysiai/expand.js';
 
@@ -230,6 +231,47 @@ describe('procurementNode', () => {
     });
 });
 
+// ── addSpouseEdge ─────────────────────────────────────────────────────────────
+
+describe('addSpouseEdge', () => {
+    it('adds a Spouse edge when neither direction exists', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b');
+        assert.equal(edges.length, 1);
+        assert.equal(edges[0].id, 'edge:person:a:person:b:Spouse');
+        assert.equal(edges[0].attributes.type, 'Spouse');
+    });
+
+    it('skips the edge when the forward direction is already present', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b');
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b'); // duplicate
+        assert.equal(edges.length, 1);
+    });
+
+    it('skips the edge when the reverse direction already exists (dedup across directions)', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b'); // forward added first
+        addSpouseEdge(edges, edgeMap, 'person:b', 'person:a'); // reverse must be dropped
+        assert.equal(edges.length, 1, 'reverse direction must be deduplicated');
+        assert.equal(edges[0].source, 'person:a');
+        assert.equal(edges[0].target, 'person:b');
+    });
+
+    it('reverse-first: forward direction is dropped when reverse already present', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:b', 'person:a'); // reverse first
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b'); // forward must be dropped
+        assert.equal(edges.length, 1, 'forward direction must be deduplicated');
+        assert.equal(edges[0].source, 'person:b');
+        assert.equal(edges[0].target, 'person:a');
+    });
+});
+
 // ── buildPersonGraphFromRows ──────────────────────────────────────────────────
 
 // Helpers to build minimal pinregJuridiniaiRysiai row fixtures.
@@ -306,8 +348,9 @@ describe('buildPersonGraphFromRows', () => {
         assert.ok(spouseEdge, 'expected Toma→Alenas Spouse edge');
     });
 
-    it('SUTUOKTINIO_DARBOVIETE — both rows present (real-world bidirectional): two distinct spouse edges, no self-loop', () => {
+    it('SUTUOKTINIO_DARBOVIETE — both rows present (real-world bidirectional): exactly one deduplicated Spouse edge', () => {
         // This is the exact scenario from the real DB: both Alenas and Toma are declarants.
+        // The normal case adds alenas→toma:Spouse; the reverse case must be dropped (not toma→alenas too).
         const rows = [
             spouseRow('TOMA', 'BULAUSKIENĖ', 'ALENAS', 'BULAUSKIS', '188784898', 'Aplinkos apsaugos agentūra', 'Vedėjas'),
             spouseRow('ALENAS', 'BULAUSKIS', 'TOMA', 'BULAUSKIENĖ', '188752740', 'Žuvininkystės tarnyba', 'Departamento direktorius'),
@@ -318,12 +361,29 @@ describe('buildPersonGraphFromRows', () => {
         assert.equal(selfLoop, undefined, 'must not create any self-loop');
 
         const spouseEdges = edges.filter(e => e.attributes.type === 'Spouse');
-        assert.equal(spouseEdges.length, 2, 'expect exactly two Spouse edges (one each direction)');
+        assert.equal(spouseEdges.length, 1, 'expect exactly ONE Spouse edge between the pair');
 
-        const fwd = spouseEdges.find(e => e.source === ALENAS_ID && e.target === TOMA_ID);
-        const rev = spouseEdges.find(e => e.source === TOMA_ID   && e.target === ALENAS_ID);
-        assert.ok(fwd, 'expected Alenas→Toma Spouse edge');
-        assert.ok(rev, 'expected Toma→Alenas Spouse edge');
+        const between = spouseEdges.find(e =>
+            (e.source === ALENAS_ID && e.target === TOMA_ID) ||
+            (e.source === TOMA_ID   && e.target === ALENAS_ID)
+        );
+        assert.ok(between, 'the single Spouse edge must connect Alenas and Toma');
+
+        // Both person nodes must still be present despite the dedup
+        assert.ok(nodes.some(n => n.id === ALENAS_ID), 'Alenas node present');
+        assert.ok(nodes.some(n => n.id === TOMA_ID),   'Toma node present');
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — reverse-first bidirectional: dedup works regardless of row order', () => {
+        // Same pair, but the reverse row comes first — only one Spouse edge must be emitted
+        const rows = [
+            spouseRow('ALENAS', 'BULAUSKIS', 'TOMA', 'BULAUSKIENĖ', '188752740', 'Žuvininkystės tarnyba', 'Departamento direktorius'),
+            spouseRow('TOMA', 'BULAUSKIENĖ', 'ALENAS', 'BULAUSKIS', '188784898', 'Aplinkos apsaugos agentūra', 'Vedėjas'),
+        ];
+        const { edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+
+        const spouseEdges = edges.filter(e => e.attributes.type === 'Spouse');
+        assert.equal(spouseEdges.length, 1, 'expect exactly ONE Spouse edge regardless of row order');
     });
 
     it('SUTUOKTINIO_DARBOVIETE — skips row when spouse name is missing', () => {

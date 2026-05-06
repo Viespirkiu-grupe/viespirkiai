@@ -232,6 +232,16 @@ export function addEdge(edges, edgeMap, e) {
     edges.push(e);
 }
 
+// Adds a Spouse edge sourceId→targetId unless the reverse (targetId→sourceId:Spouse)
+// already exists. Prevents duplicate bidirectional edges when both spouses have filed
+// their own declarations.
+export function addSpouseEdge(edges, edgeMap, sourceId, targetId) {
+    const reverseId = `edge:${targetId}:${sourceId}:Spouse`;
+    if (!edgeMap.has(reverseId)) {
+        addEdge(edges, edgeMap, edge(sourceId, targetId, 'Spouse', 'Sutuoktinis', null));
+    }
+}
+
 // ── expandOrg ─────────────────────────────────────────────────────────────────
 
 /**
@@ -373,7 +383,7 @@ export async function expandOrg(jarKodas) {
             if (declVardas && declPavarde) {
                 const declNode = personNode(declVardas, declPavarde, null, null);
                 addNode(nodes, nodeMap, declNode);
-                addEdge(edges, edgeMap, edge(declNode.id, spouseNode.id, 'Spouse', 'Sutuoktinis', null));
+                addSpouseEdge(edges, edgeMap, declNode.id, spouseNode.id);
             }
         }
     }
@@ -722,14 +732,14 @@ export function buildPersonGraphFromRows(rows, rootPersonId, vardas, pavarde) {
                 if (declVardas && declPavarde) {
                     const declNode = personNode(declVardas, declPavarde, null, null);
                     addNode(nodes, nodeMap, declNode);
-                    addEdge(edges, edgeMap, edge(declNode.id, rootPersonId, 'Spouse', 'Sutuoktinis', null));
+                    addSpouseEdge(edges, edgeMap, declNode.id, rootPersonId);
                 }
                 // The org in this row is the searched person's own workplace — already covered
                 // by their own DEKLARUOJANCIO_DARBOVIETE rows; skip to avoid duplication.
             } else {
                 // Searched person IS the declarant; spouseN is their actual spouse.
                 addNode(nodes, nodeMap, spouseN);
-                addEdge(edges, edgeMap, edge(rootPersonId, spouseN.id, 'Spouse', 'Sutuoktinis', null));
+                addSpouseEdge(edges, edgeMap, rootPersonId, spouseN.id);
                 if (row.jarKodas && row.pavadinimas) {
                     const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
                     addNode(nodes, nodeMap, stub);

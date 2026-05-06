@@ -282,8 +282,18 @@ export function collapseGraphData(dataGraph: Graph, nodeId: string): void {
 export function computeEdgeCounts(graph: Graph, nodeId: string): Map<string, number> {
     const byType = new Map<string, number>();
     if (!graph.hasNode(nodeId)) return byType;
-    graph.forEachEdge(nodeId, (_edgeId, attrs) => {
-        if (attrs.edgeType) byType.set(attrs.edgeType as string, (byType.get(attrs.edgeType as string) || 0) + 1);
+    // Deduplicate by canonical (unordered) node pair + edgeType so that bidirectional
+    // edges between the same two nodes (e.g. A→B:Spouse and B→A:Spouse when both
+    // persons have filed declarations) count as one logical relationship, not two.
+    const seen = new Set<string>();
+    graph.forEachEdge(nodeId, (_edgeId, attrs, source, target) => {
+        if (!attrs.edgeType) return;
+        const edgeType = attrs.edgeType as string;
+        const [a, b] = source <= target ? [source, target] : [target, source];
+        const key = `${edgeType}\0${a}\0${b}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        byType.set(edgeType, (byType.get(edgeType) || 0) + 1);
     });
     return byType;
 }
