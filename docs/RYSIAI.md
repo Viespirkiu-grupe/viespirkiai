@@ -529,28 +529,38 @@ Each edge type is represented by a single ASCII character in the hash string:
 | `Bidder`                  | Pirkimo dalyvis        | `B`         |
 | `ContractProcurementLink` | Sutartis → pirkimas    | `C`         |
 
-`filter=DSO` means Director + Shareholder + Official are **visible**; all other edge types are
-**hidden** for that node. A missing `filter` key means the node's visibility state is left at its
+`f=DSO` means Director + Shareholder + Official are **visible**; all other edge types are
+**hidden** for that node. A missing filter's `f` key means the node's visibility state is left at its
 default (from `HIDDEN_BY_DEFAULT`).
+
+### Entity ↔ Mapping
+
+| Entity Type          | Entity Type Key | URL ID              | Entity Reference         |
+|----------------------|-----------------|---------------------|--------------------------|
+| `OrganizationEntity` | `o`             | `/asmuo`            | `jarKodas`               |
+| `ContractEntity`     | `c`             | `/sutartis`         | `sutartiesUnikalusId`    |
+| `ProcurementEntity`  | `r`             | `/viesiejiPirkimai` | `pirkimoId`              |
+| `PersonEntity`       | `p`             | *(not supported)*   | base64(vardas + pavarde) |
 
 ### Hash format
 
 ```
-#filter=<chars>[&<entityType>_<N>=<entityId>&filter_<N>=<chars>...]
+#f=<chars>[&<Entity Type Key>_<N>=<Entity Reference>&f_<N>=<chars>...]
 ```
 
-- `filter` — comma-free string of filter chars for the **primary** (initial) node.
-- Additional expanded nodes use `<entityType>_<N>=<entityId>` keys where:
-    - `<entityType>` ∈ `{ asmuo, sutartis, viesiejiPirkimai }`
-    - `<N>` is a positive integer that also keys `filter_<N>` for that node's filter state
-    - `<entityId>` is the entity's database ID
+- `f` (filter) — comma-free string of filter chars for the **primary** (initial) node.
+- Additional expanded nodes use `<Entity Type Key>_<N>=<Entity Reference>` keys where:
+    - `<Entity Type Key>` ∈ `{ OrganizationEntity, ContractEntity, ProcurementEntity, PersonEntity }` → `{ o, c, r, p }`
+    - `<N>` is a positive integer that also keys `f_<N>` for that node's filter state
+    - `<Entity Reference>` is the entity's database ID, except for `PersonEntity` where it is a base64-encoded
+      `vardas + pavarde` string (to avoid ambiguity and URL encoding issues with names)
 
 Examples:
 
 ```
-/rysiai/asmuo/110078991#filter=DSO
-/rysiai/asmuo/110078991#filter=DSO&asmuo_2=110078992&filter_2=LMG
-/rysiai/asmuo/110078991#filter=DSOELM&sutartis_2=2008083561&filter_2=LG&asmuo_3=110055123&filter_3=DS
+/rysiai/asmuo/110078991#f=DSO
+/rysiai/asmuo/110078991#f=DSO&o_2=110078992&f_2=LMG
+/rysiai/asmuo/110078991#f=DSOELM&c_2=2008083561&f_2=LG&o_3=110055123&f_3=DS
 ```
 
 ### `src/rysiai/hash-state.js`
