@@ -906,35 +906,133 @@ Uses the **main pool**, not the analyst pool. Schema introspection is read-only 
 
 **File**: `modules/mcp/tools/executeInvestigationQuery.js`
 
-**Inputs** (Zod schema):
+#### Input schema
 
+| Field      | Zod type                                   | Default | Description                                        |
+|------------|--------------------------------------------|---------|----------------------------------------------------|
+| `query`    | `z.string().min(10).max(8000)`             | —       | SQL SELECT to execute (required)                   |
+| `purpose`  | `z.string().min(5).max(500)`               | —       | Human-readable reason — audit log only (required)  |
+| `page`     | `z.number().int().min(1).default(1)`       | `1`     | Page number (1-based)                              |
+| `pageSize` | `z.number().int().min(1).max(50).default(50)` | `50` | Rows per page — capped at 50 regardless of input   |
+
+#### Pagination design
+
+The LLM cannot scroll or paginate passively — it must decide to call the tool again. Two principles drive the design:
+
+1. **Never flood the LLM with rows it didn't ask for.** 50 rows per page keeps the context cost predictable. The
+   LLM can always request additional pages, but it can never accidentally receive thousands of rows from a single call.
+
+2. **Avoid `COUNT(*)` on user queries.** Running `SELECT COUNT(*) FROM (<user_sql>)` for every request doubles
+   execution cost and doubles timeout risk. Instead, use the **N+1 trick**: fetch `pageSize + 1` rows — if the
+   extra row comes back, there are more pages; if not, this is the last page.
+
+Execution wrapping:
+
+```sql
+SELECT * FROM (<user_sql>) AS q
+LIMIT <pageSize + 1>
+OFFSET <(page - 1) * pageSize>
 ```
-query    z.string().min(10).max(8000)   The SQL SELECT to execute
-purpose  z.string().min(5).max(500)     Human-readable reason — audit log only
-```
 
-**Implementation**: see sequence diagram below.
+After execution: if `rawRows.length > pageSize`, set `hasMore = true` and trim the last row before returning.
 
-Wraps the user query as `SELECT * FROM (<user_sql>) AS q LIMIT 200` before execution. This is applied after
-validation passes — the user query is validated as-is, but executed wrapped.
-
-Returns:
+#### Success response
 
 ```json
 {
   "rows": [...],
-  "rowCount": 42,
-  "truncated": false,
+  "page": 1,
+  "pageSize": 50,
+  "rowCount": 50,
+  "hasMore": true,
   "durationMs": 381
 }
 ```
 
-If `rowCount === 200`, set `truncated: true` to signal the LLM that results were capped.
+| Field        | Type      | Description                                                            |
+|--------------|-----------|------------------------------------------------------------------------|
+| `rows`       | array     | Result rows for this page (at most `pageSize` items)                   |
+| `page`       | number    | Page number that was returned (echoed from input)                      |
+| `pageSize`   | number    | Page size that was used (echoed from input, capped at 50)              |
+| `rowCount`   | number    | Number of rows in this response (`rows.length`, ≤ `pageSize`)          |
+| `hasMore`    | boolean   | `true` if there are more rows on the next page                         |
+| `durationMs` | number    | Query execution wall time in milliseconds                              |
 
-On validation error, return `isError: true` with the layer name and message so the LLM can self-correct its SQL.
+The LLM reads `hasMore: true` and calls the tool again with `page: 2` if it needs more data. Because the LLM
+controls pagination explicitly, it can also decide to stop early once it has enough evidence.
 
-On execution error (timeout, syntax error the parser missed, etc.), return `isError: true` with the PG error
-message — the LLM uses this to retry.
+#### Error response (validation or execution failure)
+
+```json
+{
+  "content": [{ "type": "text", "text": "<message>" }],
+  "isError": true
+}
+```
+
+Validation errors include the layer name and the specific identifier that was rejected (e.g. `"Layer 2: table
+'pg_class' is not in the allowed table list"`). Execution errors include the raw PostgreSQL error message so the
+LLM can self-correct its SQL. If neither `query` nor `purpose` is provided, the Zod schema rejects the call
+before the handler runs — the SDK returns a validation error automatically.
+
+#### Minimal example
+
+**Input:**
+
+```json
+{
+  "query": "SELECT \"tiekejoKodas\", COUNT(*) AS sutarciu_sk, ROUND(SUM(verte)) AS bendra_verte FROM sutartys WHERE istrinta IS NOT TRUE GROUP BY \"tiekejoKodas\" ORDER BY bendra_verte DESC",
+  "purpose": "Top suppliers by total contract value — initial scan",
+  "page": 1,
+  "pageSize": 10
+}
+```
+
+**Execution wrapper applied:**
+
+```sql
+SELECT * FROM (
+  SELECT "tiekejoKodas", COUNT(*) AS sutarciu_sk, ROUND(SUM(verte)) AS bendra_verte
+  FROM sutartys
+  WHERE istrinta IS NOT TRUE
+  GROUP BY "tiekejoKodas"
+  ORDER BY bendra_verte DESC
+) AS q
+LIMIT 11 OFFSET 0
+```
+
+**Output:**
+
+```json
+{
+  "rows": [
+    { "tiekejoKodas": "304567890", "sutarciu_sk": 47, "bendra_verte": 12300000 },
+    { "tiekejoKodas": "301234567", "sutarciu_sk": 31, "bendra_verte": 8750000 },
+    "..."
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "rowCount": 10,
+  "hasMore": true,
+  "durationMs": 214
+}
+```
+
+The LLM sees `hasMore: true` and can call `page: 2` if the investigation requires more suppliers, or proceed
+with the top 10 if that is sufficient.
+
+#### Multi-page investigation pattern
+
+```
+Call 1:  page=1  → rows 1–50,  hasMore=true   → LLM decides: enough? or call page=2
+Call 2:  page=2  → rows 51–100, hasMore=false  → LLM knows this is the complete result set
+```
+
+The LLM should state its pagination decision in the `purpose` field:
+- `"Top suppliers scan — page 1 of initial results"`
+- `"Continuing supplier scan — checking if more risky companies appear on page 2"`
+
+This keeps the audit log readable as a narrative of the investigation.
 
 ---
 
@@ -963,9 +1061,13 @@ graph TD
         VS -->|invalid| ER[return isError + layer + message]
         VS -->|valid| AP[(analyst pool\nanalyst/pool.js)]
         AP --> TV[CREATE TEMP VIEWs\ntempViews.js]
-        TV --> EX[SELECT * FROM\n  user_sql\nAS q LIMIT 200]
-        EX --> AL[auditLog.js\ninvestigation_query_log]
-        AL --> RET[return rows + metadata]
+        TV --> EX["SELECT * FROM (user_sql) AS q\nLIMIT pageSize+1 OFFSET (page-1)*pageSize"]
+        EX --> PN{rows.length\n> pageSize?}
+        PN -->|yes| HM[trim last row\nhasMore=true]
+        PN -->|no| NM[hasMore=false]
+        HM --> AL[auditLog.js\ninvestigation_query_log]
+        NM --> AL
+        AL --> RET["return { rows, page, pageSize,\nrowCount, hasMore, durationMs }"]
     end
 ```
 
@@ -982,7 +1084,8 @@ sequenceDiagram
     participant DB as PostgreSQL (mcp_analyst role)
     participant A as auditLog.js
 
-    LLM->>H: { query, purpose }
+    LLM->>H: { query, purpose, page, pageSize }
+    Note over H: page defaults to 1, pageSize defaults to 50 (max 50)
 
     H->>V: validate(query)
     V->>V: L1: node-sql-parser — parse AST,\nassert single SELECT
@@ -992,26 +1095,27 @@ sequenceDiagram
 
     alt validation fails
         V-->>H: { ok: false, layer, message }
-        H-->>LLM: isError: true\n"Layer 2 rejected: table 'pg_catalog.pg_class'\nnot in whitelist"
+        H-->>LLM: isError: true\n"Layer 2: table 'pg_class' not in allowed list"
     else validation passes
         V-->>H: { ok: true }
         H->>P: pool.connect()
         P-->>H: client (mcp_analyst)
-        H->>DB: TEMP_VIEWS_SQL\n(6× CREATE TEMP VIEW)
+        H->>DB: TEMP_VIEWS_SQL (6× CREATE TEMP VIEW)
         Note over DB: v_company, v_sutartys, v_pirkimas,\nv_person_links, v_dalyviai, v_bylos
-        H->>DB: SELECT * FROM (<user_query>) AS q LIMIT 200
-        Note over DB: statement_timeout = 10s\nwork_mem = 32MB\n(set at role level)
+        H->>DB: SELECT * FROM (user_query) AS q\nLIMIT pageSize+1 OFFSET (page-1)*pageSize
+        Note over DB: statement_timeout=10s, work_mem=32MB\nenforced at role level
 
         alt query succeeds
-            DB-->>H: rows[]
+            DB-->>H: rawRows (up to pageSize+1)
             H->>P: client.release()
+            Note over H: if rawRows.length > pageSize:\n  hasMore=true, trim last row\nelse hasMore=false
             H->>A: log(purpose, sql, durationMs, rowCount)
-            H-->>LLM: { rows, rowCount, truncated, durationMs }
+            H-->>LLM: { rows, page, pageSize, rowCount, hasMore, durationMs }
         else query times out / syntax error
             DB-->>H: PG error
             H->>P: client.release()
             H->>A: log(purpose, sql, durationMs, errorMsg)
-            H-->>LLM: isError: true\nerror message from PostgreSQL
+            H-->>LLM: isError: true + PostgreSQL error message
         end
     end
 ```
@@ -1046,7 +1150,18 @@ All errors returned by both tools use this shape so the LLM can reason about the
 ```
 
 The message always includes:
-- For validation errors: the layer name and the specific identifier that was rejected.
-- For execution errors: the raw PostgreSQL error message (the LLM uses `position` and `message` to fix its SQL).
-- For schema errors (table not found): a suggestion to call `get_schema` first to discover available tables.
+- For validation errors: the layer name and the specific identifier that was rejected (e.g. `"Layer 2: table 'pg_class' is not in the allowed table list — call get_schema to see available tables"`).
+- For execution errors: the raw PostgreSQL error message so the LLM can self-correct (PG includes `position` for syntax errors).
+- For `get_schema` unknown table: a suggestion to call `get_schema` without arguments first to discover the full table list.
+
+### Pagination summary
+
+| Scenario                          | `hasMore` | LLM action                                          |
+|-----------------------------------|-----------|-----------------------------------------------------|
+| `rowCount < pageSize`             | `false`   | This is the complete result — no more calls needed  |
+| `rowCount === pageSize`           | `true`    | More rows exist — call again with `page: N+1`       |
+| First call returned enough signal | either    | LLM may stop early regardless of `hasMore`          |
+
+The `hasMore` flag is computed without a `COUNT(*)` query: the handler fetches `pageSize + 1` rows from the
+database and checks if the extra row came back. Zero additional database cost.
 
