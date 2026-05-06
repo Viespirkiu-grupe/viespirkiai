@@ -164,6 +164,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                 });
             }
 
+            console.warn('Fetched data for', id, data);
             mergeGraphElements(dataGraph, getNodePos, data, fromNodeId, rootNodeId);
             afterMerge(id);
 
@@ -342,6 +343,11 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         }, contractNodeId);
     }
 
+    function loadPerson(fullName: string) {
+        const id = 'person:' + fullName.toLowerCase().trim();
+        return _expand(id, '/rysiai/expand-person?vardas=' + encodeURIComponent(fullName.trim()), markExpanded, id, id);
+    }
+
     function loadSutartis(sutartiesUnikalusId: string) {
         const id = 'contract:' + sutartiesUnikalusId;
         return _expand(id, '/rysiai/expand-sutartis/' + encodeURIComponent(sutartiesUnikalusId), markExpanded, id, id);
@@ -366,5 +372,5 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     renderer.on('clickStage', deselectAll as unknown as (event: { node: string }) => void);
 
-    return { loadOrg, loadSutartis, loadPirkimas, loadContract, rebuildAndRefresh, getSelectedNodeId: () => selectedNodeId, selectNode };
+    return { loadOrg, loadPerson, loadSutartis, loadPirkimas, loadContract, rebuildAndRefresh, getSelectedNodeId: () => selectedNodeId, selectNode };
 }

@@ -122,10 +122,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     for (var i = 0; i < additionalEntities.length; i++) {
         var extra = additionalEntities[i];
         var extraNodeId;
-        if (extra.entityType === 'asmuo') {
+        if (extra.entityType === 'o') {
             await ui.loadOrg(extra.entityId, null);
             extraNodeId = 'org:' + extra.entityId;
-        } else if (extra.entityType === 'sutartis') {
+        } else if (extra.entityType === 'c') {
             await ui.loadSutartis(extra.entityId);
             extraNodeId = 'contract:' + extra.entityId;
             // Mirror _triggerExpand: also load procurement if the contract has one
@@ -133,9 +133,12 @@ document.addEventListener('DOMContentLoaded', async function () {
                 var pirkimoNumeris = dataGraph.getNodeAttribute(extraNodeId, 'pirkimoNumeris');
                 if (pirkimoNumeris) await ui.loadContract(pirkimoNumeris, extraNodeId);
             }
-        } else if (extra.entityType === 'viesiejiPirkimai') {
+        } else if (extra.entityType === 'r') {
             await ui.loadPirkimas(extra.entityId);
             extraNodeId = 'procurement:' + extra.entityId;
+        } else if (extra.entityType === 'p') {
+            await ui.loadPerson(extra.entityId);
+            extraNodeId = 'person:' + extra.entityId.toLowerCase().trim();
         }
         if (extraNodeId) {
             applyFilterChars(legendState, extraNodeId, extra.filterChars);

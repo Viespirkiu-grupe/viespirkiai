@@ -1,5 +1,9 @@
 // Pure hash-state module: no DOM reads; only writes window.location.hash.
 // Encodes / decodes the active edge-type filter and expanded node set into the URL hash.
+//
+// Hash format: #f=<chars>[&<typeKey>_<N>=<entityId>&f_<N>=<chars>...]
+// Entity type keys: o=OrganizationEntity, c=ContractEntity, r=ProcurementEntity, p=PersonEntity
+// PersonEntity entityId is base64(encodeURIComponent(vardas + ' ' + pavarde)).
 
 import type { LegendState } from './legend-state.ts';
 
@@ -13,15 +17,37 @@ export const FILTER_ID_MAP: Record<string, string> = Object.fromEntries(
     Object.entries(FILTER_CHAR_MAP).map(([k, v]) => [v, k])
 );
 
-const ENTITY_URL_MAP: Record<string, { urlKey: string; idAttr: string }> = {
-    OrganizationEntity: { urlKey: 'asmuo',           idAttr: 'jarKodas' },
-    ContractEntity:     { urlKey: 'sutartis',         idAttr: 'sutartiesUnikalusId' },
-    ProcurementEntity:  { urlKey: 'viesiejiPirkimai', idAttr: 'pirkimoId' },
+// Maps full entity type name → { key (single char), idAttr (node attribute for numeric ID) }
+// PersonEntity has no idAttr — its ID is base64(encodeURIComponent(vardas + ' ' + pavarde)).
+const ENTITY_TYPE_KEY_MAP: Record<string, { key: string; idAttr?: string }> = {
+    OrganizationEntity: { key: 'o', idAttr: 'jarKodas' },
+    ContractEntity:     { key: 'c', idAttr: 'sutartiesUnikalusId' },
+    ProcurementEntity:  { key: 'r', idAttr: 'pirkimoId' },
+    PersonEntity:       { key: 'p' },
 };
 
+// Reverse: single-char hash key → full entity type name
+const KEY_TO_ENTITY_TYPE: Record<string, string> = Object.fromEntries(
+    Object.entries(ENTITY_TYPE_KEY_MAP).map(([type, { key }]) => [key, type])
+);
+
+const _btoa: (s: string) => string =
+    typeof btoa === 'function' ? btoa : (s) => Buffer.from(s, 'binary').toString('base64');
+const _atob: (s: string) => string =
+    typeof atob === 'function' ? atob : (s) => Buffer.from(s, 'base64').toString('binary');
+
+// Encodes a person's full name to a URL-safe base64 string that survives Lithuanian characters.
+function encodePersonId(fullName: string): string {
+    return _btoa(encodeURIComponent(fullName));
+}
+
+function decodePersonId(encoded: string): string {
+    try { return decodeURIComponent(_atob(encoded)); } catch { return ''; }
+}
+
 export interface AdditionalEntity {
-    entityType: string;
-    entityId: string;
+    entityType: string;   // short hash key: 'o' | 'c' | 'r' | 'p'
+    entityId: string;     // numeric string for o/c/r; decoded full name for p
     filterChars: string;
     entityNumber: number;
 }
@@ -51,25 +77,35 @@ export function applyFilterFromHash(
         params.set(part.slice(0, eq), decodeURIComponent(part.slice(eq + 1)));
     }
 
-    const primaryChars = params.get('filter');
+    const primaryChars = params.get('f');
     if (primaryChars !== undefined) {
         applyFilterChars(legendState, primaryNodeId, primaryChars);
     }
 
     const additionalEntities: AdditionalEntity[] = [];
     for (const [key, value] of params) {
-        if (key === 'filter' || key.startsWith('filter_')) continue;
+        if (key === 'f' || key.startsWith('f_')) continue;
         const underscore = key.lastIndexOf('_');
         if (underscore === -1) continue;
-        const entityType = key.slice(0, underscore);
+        const entityKey = key.slice(0, underscore);
         const N = key.slice(underscore + 1);
-        if (!/^[a-zA-Z]+$/.test(entityType)) continue;
+        if (!(entityKey in KEY_TO_ENTITY_TYPE)) continue;
         if (!/^[1-9]\d*$/.test(N)) continue;
-        if (!/^\d+$/.test(value)) continue;
+
+        let entityId: string;
+        if (entityKey === 'p') {
+            if (!/^[A-Za-z0-9+\/=]+$/.test(value)) continue;
+            entityId = decodePersonId(value);
+            if (!entityId) continue;
+        } else {
+            if (!/^\d+$/.test(value)) continue;
+            entityId = value;
+        }
+
         additionalEntities.push({
-            entityType,
-            entityId: value,
-            filterChars: params.get('filter_' + N) || '',
+            entityType: entityKey,
+            entityId,
+            filterChars: params.get('f_' + N) || '',
             entityNumber: Number(N),
         });
     }
@@ -77,9 +113,12 @@ export function applyFilterFromHash(
     return { additionalEntities };
 }
 
-export function buildHashString(legendState: LegendState, dataGraph: { forEachNode: (cb: (id: string, attrs: Record<string, unknown>) => void) => void }): string {
+export function buildHashString(
+    legendState: LegendState,
+    dataGraph: { forEachNode: (cb: (id: string, attrs: Record<string, unknown>) => void) => void }
+): string {
     const parts: string[] = [];
-    const extras: Array<{ id: string; mapping: { urlKey: string; idAttr: string }; entityId: string }> = [];
+    const extras: Array<{ id: string; typeKey: string; entityId: string }> = [];
     let primaryId: string | null = null;
 
     dataGraph.forEachNode((id, attrs) => {
@@ -91,32 +130,47 @@ export function buildHashString(legendState: LegendState, dataGraph: { forEachNo
             .filter(([, type]) => legendState.isTypeVisible(primaryId!, type))
             .map(([char]) => char)
             .join('');
-        parts.push('filter=' + chars);
+        parts.push('f=' + chars);
     }
 
     dataGraph.forEachNode((id, attrs) => {
         if (id === primaryId || !legendState.hasNodeConfig(id)) return;
-        const mapping = ENTITY_URL_MAP[attrs.entityType as string];
+        const entityTypeName = attrs.entityType as string;
+        const mapping = ENTITY_TYPE_KEY_MAP[entityTypeName];
         if (!mapping) return;
-        const entityId = attrs[mapping.idAttr];
-        if (!entityId) return;
-        extras.push({ id, mapping, entityId: String(entityId) });
+
+        let entityId: string;
+        if (entityTypeName === 'PersonEntity') {
+            const vardas = attrs.vardas as string | undefined;
+            const pavarde = attrs.pavarde as string | undefined;
+            if (!vardas || !pavarde) return;
+            entityId = encodePersonId((vardas + ' ' + pavarde).trim());
+        } else {
+            if (!mapping.idAttr) return;
+            const rawId = attrs[mapping.idAttr];
+            if (!rawId) return;
+            entityId = String(rawId);
+        }
+        extras.push({ id, typeKey: mapping.key, entityId });
     });
 
-    extras.forEach(({ id, mapping, entityId }, i) => {
+    extras.forEach(({ id, typeKey, entityId }, i) => {
         const N = i + 2;
         const chars = Object.entries(FILTER_CHAR_MAP)
             .filter(([, type]) => legendState.isTypeVisible(id, type))
             .map(([char]) => char)
             .join('');
-        parts.push(mapping.urlKey + '_' + N + '=' + entityId);
-        parts.push('filter_' + N + '=' + chars);
+        parts.push(typeKey + '_' + N + '=' + entityId);
+        parts.push('f_' + N + '=' + chars);
     });
 
     return parts.length ? '#' + parts.join('&') : '';
 }
 
-export function updateHashFromFilter(legendState: LegendState, dataGraph: { forEachNode: (cb: (id: string, attrs: Record<string, unknown>) => void) => void }): string {
+export function updateHashFromFilter(
+    legendState: LegendState,
+    dataGraph: { forEachNode: (cb: (id: string, attrs: Record<string, unknown>) => void) => void }
+): string {
     const h = buildHashString(legendState, dataGraph);
     if (typeof window !== 'undefined') {
         if (h) {
