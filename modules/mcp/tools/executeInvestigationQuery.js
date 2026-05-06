@@ -48,7 +48,8 @@ export async function handler({ query, purpose, page }) {
     }
 
     const offset = (page - 1) * PAGE_SIZE;
-    const wrappedSql = `SELECT q.*, COUNT(*) OVER () AS __total__\nFROM (\n${query}\n) AS q\nLIMIT ${PAGE_SIZE} OFFSET ${offset}`;
+    // Fetch one extra row to detect whether more pages exist — avoids a full-scan COUNT(*) OVER ()
+    const wrappedSql = `SELECT q.*\nFROM (\n${query}\n) AS q\nLIMIT ${PAGE_SIZE + 1} OFFSET ${offset}`;
 
     const start = Date.now();
     const client = await analystPool.connect();
@@ -58,31 +59,15 @@ export async function handler({ query, purpose, page }) {
         const result = await client.query(wrappedSql);
 
         const durationMs = Date.now() - start;
-        let totalRows;
-
-        if (result.rows.length > 0) {
-            totalRows = Number(result.rows[0].__total__);
-        } else {
-            // Empty result — run a separate COUNT to report totalRows correctly
-            const countResult = await client.query(
-                `SELECT COUNT(*) AS n FROM (\n${query}\n) AS q`
-            );
-            totalRows = Number(countResult.rows[0].n);
-        }
-
-        // Strip __total__ from every row
-        const rows = result.rows.map(({ __total__, ...rest }) => rest);
-
-        const totalPages = totalRows === 0 ? 0 : Math.ceil(totalRows / PAGE_SIZE);
+        const hasMore = result.rows.length > PAGE_SIZE;
+        const rows = hasMore ? result.rows.slice(0, PAGE_SIZE) : result.rows;
 
         const payload = {
             rows,
             page,
             pageSize: PAGE_SIZE,
             rowCount: rows.length,
-            totalRows,
-            totalPages,
-            hasMore: page < totalPages,
+            hasMore,
             durationMs,
         };
 
