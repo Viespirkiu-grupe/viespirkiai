@@ -25,6 +25,7 @@ interface ExpandUIDeps {
     legendState: LegendState;
     nodeDetails: NodeDetails;
     onStateChange?: (() => void) | null;
+    postRebuild?: (() => void) | null;
 }
 
 interface NodeAttrsLocal {
@@ -45,7 +46,7 @@ interface ExpandKind {
     url: (a: NodeAttrsLocal) => string;
 }
 
-export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState, nodeDetails, onStateChange = null }: ExpandUIDeps) {
+export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState, nodeDetails, onStateChange = null, postRebuild = null }: ExpandUIDeps) {
     const expandingNodes = new Set<string>();
     let cancelAnimation: (() => void) | null = null;
     let selectedNodeId: string | null = null;
@@ -131,6 +132,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
     function rebuildAndRefresh() {
         if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
         rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+        postRebuild?.();
         viewGraph.forEachNode((id) => {
             if (dataGraph.hasNode(id)) {
                 viewGraph.setNodeAttribute(id, 'x', dataGraph.getNodeAttribute(id, 'x'));
@@ -169,6 +171,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             afterMerge(id);
 
             const newNodeIds = rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+            postRebuild?.();
 
             if (selectedNodeId && viewGraph.hasNode(selectedNodeId)) {
                 setSelection(selectedNodeId, true);
@@ -280,6 +283,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             dataGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId) as NodeAttrsLocal));
 
             rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+            postRebuild?.();
             runLayout(viewGraph, forceAtlas2, noverlap);
             syncPositionsToData(dataGraph, viewGraph);
 
