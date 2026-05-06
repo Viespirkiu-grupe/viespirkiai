@@ -240,16 +240,25 @@ They solve the three recurring pain points across all investigation queries:
 The LLM uses views for simple lookups and profile queries; it writes directly against the raw tables for window
 functions, CTEs, and recursive graph traversal where full expressiveness is needed.
 
-**Coverage map against the 11 investigator themes:**
+**Coverage map against the 22 investigator themes:**
 
-| View             | Themes covered        | Critical facts provided                                                    |
-|------------------|-----------------------|----------------------------------------------------------------------------|
-| `v_company`      | 1, 5, 6, 7, 9, 10, 11 | headcount, registration, compliance flags, domain/court/negotiation counts |
-| `v_sutartys`     | 1, 2, 3, 5, 8         | contract value, overrun ratio, CPV, buyer/seller names                     |
-| `v_pirkimas`     | 5, 6, 7               | procedure type, buyer municipality, estimated value                        |
-| `v_person_links` | 4, 10, 11             | person ↔ company edges, spouse links, role type, foreign-entity flag       |
-| `v_dalyviai`     | **2, 3**              | full bidder list, bid amounts, rank — essential for bid rigging            |
-| `v_bylos`        | **9**                 | court cases per company — blind spot without this view                     |
+| View             | Themes covered              | Critical facts provided                                                    |
+|------------------|-----------------------------|----------------------------------------------------------------------------|
+| `v_company`      | 1, 5, 6, 7, 9, 10, 11, 12  | headcount, registration, compliance flags, domain/court/negotiation counts |
+| `v_sutartys`     | 1, 2, 3, 5, 8, 15, 18      | contract value, overrun ratio, CPV, buyer/seller names, tipas              |
+| `v_pirkimas`     | 5, 6, 7, 20                 | procedure type, buyer municipality, estimated value                        |
+| `v_person_links` | 4, 10, 11, 13, 19           | person ↔ company edges, spouse links, role type, foreign-entity flag       |
+| `v_dalyviai`     | **2, 3, 14, 17**            | full bidder list, bid amounts, rank — essential for bid rigging/spec rigging/cartel |
+| `v_bylos`        | **9**                       | court cases per company — blind spot without this view                     |
+
+Raw tables used directly (no view wrapper needed):
+
+| Table                  | Themes | Why no view |
+|------------------------|--------|-------------|
+| `cpvaProjektuSutartys` | 12     | CPVA subcontractor data — join shape varies per query |
+| `pinregJuridiniaiRysiai` | 13, 19 | Revolving door needs self-join on date ranges — view would fix too many columns |
+| `domenai`              | 16     | Domain pair queries need flexible self-join |
+| `neskelbiamosDerybos`  | 20     | Audit findings — single-table lookup, no join needed |
 
 ### `v_company` — company profile with latest headcount and compliance status
 
@@ -917,3 +926,423 @@ WHERE "jarKodas" IN ('304567890', '301234567', '309876543')
   AND ("registruotaLietuvoje" = false OR "yraJuridinisAsmuo" = true)
 ORDER BY "jarKodas", pavarde;
 ```
+
+---
+
+### 12. EU Structural Funds abuse — fictitious subcontractors and inflated costs
+
+> *"This company won a CPVA-funded project worth €2M but they have 4 employees and the subcontractor they declared has zero Sodra payments."*
+
+- Which CPVA-funded contracts name a subcontractor, and how many employees does that subcontractor actually have according to Sodra?
+- Is the main contractor's Sodra headcount consistent with the contract scope, or are they clearly a pass-through?
+- Does the subcontractor appear in other CPVA contracts with the same main contractor — suggesting a recurring related-party arrangement?
+- Are both the winner and subcontractor linked via shared directors or shareholders in PINREG?
+
+```sql
+-- Subcontractor headcount cross-check on CPVA contracts
+SELECT cs."projektoNr",
+       cs."projektoPavadinimas",
+       cs."tiekejoKodas",
+       cs."tiekejoPavadinimasVardasIrPavardeGimimoData" AS tiekejas,
+       cs."pirkimoSutartiesSumaSusijusiSuProjektu"     AS suma,
+       cs."subtiekejoKodas",
+       cs."subtiekejoPavadinimasVardasIrPavardeGimimoData" AS subtiekejasVardas,
+       s_main.draustieji   AS "tiekejoDarbuotojai",
+       s_sub.draustieji    AS "subtiekejoDarbuotojai"
+FROM "cpvaProjektuSutartys" cs
+LEFT JOIN LATERAL (
+    SELECT draustieji FROM sodra
+    WHERE "jarKodas" = cs."tiekejoKodas"
+    ORDER BY data DESC NULLS LAST LIMIT 1
+) s_main ON true
+LEFT JOIN LATERAL (
+    SELECT draustieji FROM sodra
+    WHERE "jarKodas" = cs."subtiekejoKodas"
+    ORDER BY data DESC NULLS LAST LIMIT 1
+) s_sub ON true
+WHERE cs."subtiekejoKodas" IS NOT NULL
+  AND cs."subtiekejoKodas" != ''
+ORDER BY cs."pirkimoSutartiesSumaSusijusiSuProjektu" DESC
+LIMIT 200;
+```
+
+```sql
+-- Recurring main contractor + subcontractor pairs across multiple CPVA projects
+SELECT cs."tiekejoKodas", cs."tiekejoPavadinimasVardasIrPavardeGimimoData" AS tiekejas,
+       cs."subtiekejoKodas", cs."subtiekejoPavadinimasVardasIrPavardeGimimoData" AS subtiekejasVardas,
+       COUNT(DISTINCT cs."projektoNr") AS projektu_sk,
+       ROUND(SUM(cs."pirkimoSutartiesSumaSusijusiSuProjektu")) AS bendra_suma
+FROM "cpvaProjektuSutartys" cs
+WHERE cs."subtiekejoKodas" IS NOT NULL AND cs."subtiekejoKodas" != ''
+GROUP BY cs."tiekejoKodas", cs."tiekejoPavadinimasVardasIrPavardeGimimoData",
+         cs."subtiekejoKodas", cs."subtiekejoPavadinimasVardasIrPavardeGimimoData"
+HAVING COUNT(DISTINCT cs."projektoNr") >= 2
+ORDER BY projektu_sk DESC
+LIMIT 200;
+```
+
+---
+
+### 13. Revolving door — procurement officer joins winning supplier
+
+> *"The head of procurement at this municipality left last year. I want to know if she now works for any company that won contracts there while she was in charge."*
+
+- Which people held roles at a buying organisation and subsequently appear in PINREG at a supplier that won contracts from that same buyer?
+- How quickly did they move — days, months?
+- Did that supplier's win rate or contract value at the buyer change after the person joined?
+
+```sql
+-- People who left a buyer org and joined a supplier within 2 years
+WITH buyer_staff AS (
+    SELECT r.vardas, r.pavarde,
+           r."jarKodas"  AS "pirkejoKodas",
+           r."rysioPabaiga" AS "isejoData"
+    FROM "pinregJuridiniaiRysiai" r
+    WHERE r."darbovietesTipas" = 'STANDARTINE'
+      AND r."irasoTipas"       = 'DEKLARUOJANCIO_DARBOVIETE'
+      AND r."rysioPabaiga"     IS NOT NULL
+      AND r."jarKodas" IN (SELECT DISTINCT "perkanciosiosOrganizacijosKodas" FROM sutartys)
+),
+supplier_staff AS (
+    SELECT r.vardas, r.pavarde,
+           r."jarKodas"   AS "tiekejoKodas",
+           r."rysioPradzia" AS "atejoData"
+    FROM "pinregJuridiniaiRysiai" r
+    WHERE r."darbovietesTipas" = 'STANDARTINE'
+      AND r."irasoTipas"       = 'DEKLARUOJANCIO_DARBOVIETE'
+      AND r."rysioPradzia"     IS NOT NULL
+)
+SELECT b.vardas, b.pavarde,
+       b."pirkejoKodas", b."isejoData",
+       s."tiekejoKodas", s."atejoData",
+       (s."atejoData" - b."isejoData") AS "dienuSkaicius",
+       (SELECT COUNT(*) FROM sutartys
+        WHERE "perkanciosiosOrganizacijosKodas" = b."pirkejoKodas"
+          AND "tiekejoKodas" = s."tiekejoKodas"
+          AND "sudarymoData" >= b."isejoData") AS "sutartysPoPerejimo"
+FROM buyer_staff b
+JOIN supplier_staff s
+  ON s.vardas   = b.vardas
+ AND s.pavarde  = b.pavarde
+ AND s."atejoData" > b."isejoData"
+ AND (s."atejoData" - b."isejoData") < 730
+ AND b."pirkejoKodas" != s."tiekejoKodas"
+ORDER BY "dienuSkaicius"
+LIMIT 200;
+```
+
+---
+
+### 14. Spec rigging — technical specifications written for one supplier
+
+> *"Every tender this department publishes in this category ends up with only one bidder. I think the specs are written to exclude everyone else."*
+
+- What fraction of a buyer's tenders in a given CPV category receive only one bid, compared to the national average for that same CPV?
+- Which suppliers consistently win those single-bidder tenders?
+- Is the single-bidder rate significantly higher than peers buying in the same category?
+
+```sql
+-- Buyers whose single-bidder rate per CPV is more than 2× the national average (min 5 tenders)
+WITH cpv_national AS (
+    SELECT a."pagrindinisKodasBvpz" AS cpv,
+           COUNT(DISTINCT a."pirkimoNumeris") AS total_pirkimai,
+           COUNT(DISTINCT a."pirkimoNumeris") FILTER (
+               WHERE (SELECT COUNT(*) FROM atn1dalyviai WHERE "ataskaitaId" = a.id) = 1
+           ) AS single_bidder_cnt
+    FROM atn1ataskaitos a
+    WHERE a."pagrindinisKodasBvpz" IS NOT NULL
+    GROUP BY a."pagrindinisKodasBvpz"
+),
+buyer_cpv AS (
+    SELECT a."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
+           a."pagrindinisKodasBvpz"            AS cpv,
+           COUNT(DISTINCT a."pirkimoNumeris")  AS pirkimai,
+           COUNT(DISTINCT a."pirkimoNumeris") FILTER (
+               WHERE (SELECT COUNT(*) FROM atn1dalyviai WHERE "ataskaitaId" = a.id) = 1
+           ) AS single_bidder
+    FROM atn1ataskaitos a
+    WHERE a."pagrindinisKodasBvpz" IS NOT NULL
+    GROUP BY a."perkanciosiosOrganizacijosKodas", a."pagrindinisKodasBvpz"
+)
+SELECT bc."pirkejoKodas", bc.cpv,
+       bc.pirkimai, bc.single_bidder,
+       ROUND(bc.single_bidder::numeric / NULLIF(bc.pirkimai, 0), 2)            AS "pirkejoVienbidiskumas",
+       ROUND(cn.single_bidder_cnt::numeric / NULLIF(cn.total_pirkimai, 0), 2)  AS "cpvSaliesVidurkis"
+FROM buyer_cpv bc
+JOIN cpv_national cn ON cn.cpv = bc.cpv
+WHERE bc.pirkimai >= 5
+  AND (bc.single_bidder::numeric / NULLIF(bc.pirkimai, 0))
+      > (cn.single_bidder_cnt::numeric / NULLIF(cn.total_pirkimai, 0)) * 2
+ORDER BY "pirkejoVienbidiskumas" DESC
+LIMIT 200;
+```
+
+---
+
+### 15. Framework agreement abuse — single-supplier call-offs
+
+> *"This buyer set up a framework agreement three years ago and has been calling off contracts from it ever since, but always to the same one company."*
+
+- How many distinct suppliers appear across all call-off contracts (`tipas = 'PPS'`) linked to a given framework procurement number?
+- What is the total value channelled through the framework, and over how many years?
+- Did the buyer run a competitive open tender to establish the framework in the first place, or was it a direct award?
+
+```sql
+-- Frameworks where 100% of call-offs went to a single supplier, ranked by total value
+SELECT s."pirkimoNumeris",
+       COUNT(*)                          AS uzsakymuSkaicius,
+       COUNT(DISTINCT s."tiekejoKodas") AS tiekejuSkaicius,
+       ROUND(SUM(s.verte))              AS bendra_verte,
+       MIN(s."sudarymoData")            AS pirmas_uzsakymas,
+       MAX(s."sudarymoData")            AS paskutinis_uzsakymas,
+       MAX(j.pavadinimas)              AS tiekejas,
+       MAX(s."perkanciosiosOrganizacijosKodas") AS "pirkejoKodas"
+FROM sutartys s
+LEFT JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
+WHERE s.tipas = 'PPS'
+  AND s."pirkimoNumeris" IS NOT NULL
+GROUP BY s."pirkimoNumeris"
+HAVING COUNT(DISTINCT s."tiekejoKodas") = 1
+   AND COUNT(*) >= 5
+ORDER BY bendra_verte DESC
+LIMIT 200;
+```
+
+---
+
+### 16. Shared back-office — competing companies with the same address or domain
+
+> *"I keep seeing the same two companies bidding against each other, but they're registered at exactly the same street address."*
+
+- Do any of the co-bidders in a cluster share a registered legal address in the company registry?
+- Do any of them share a domain registrant in the WHOIS/`domenai` table?
+- How many government contracts has each of those companies won, and do their contract timelines overlap in a way that suggests coordination?
+
+```sql
+-- Active companies sharing a registered address that have both won government contracts
+WITH candidate_pairs AS (
+    SELECT a."jarKodas"::text AS jar_a,
+           b."jarKodas"::text AS jar_b,
+           a.adresas
+    FROM "jarCsv" a
+    JOIN "jarCsv" b ON b.adresas = a.adresas AND b."jarKodas" > a."jarKodas"
+    WHERE a.adresas IS NOT NULL
+      AND LENGTH(a.adresas) > 10
+      AND a."statusoKodas" = 1
+      AND b."statusoKodas" = 1
+)
+SELECT cp.adresas,
+       cp.jar_a, ja.pavadinimas AS pav_a,
+       cp.jar_b, jb.pavadinimas AS pav_b,
+       (SELECT COUNT(*) FROM sutartys WHERE "tiekejoKodas" = cp.jar_a) AS sutartys_a,
+       (SELECT COUNT(*) FROM sutartys WHERE "tiekejoKodas" = cp.jar_b) AS sutartys_b
+FROM candidate_pairs cp
+JOIN "jarCsv" ja ON ja."jarKodas"::text = cp.jar_a
+JOIN "jarCsv" jb ON jb."jarKodas"::text = cp.jar_b
+WHERE EXISTS (SELECT 1 FROM sutartys WHERE "tiekejoKodas" = cp.jar_a)
+  AND EXISTS (SELECT 1 FROM sutartys WHERE "tiekejoKodas" = cp.jar_b)
+LIMIT 200;
+```
+
+```sql
+-- Competing companies sharing a domain registrant
+SELECT d1."savininkoKodas"  AS jar_a,
+       j1.pavadinimas       AS pav_a,
+       d2."savininkoKodas"  AS jar_b,
+       j2.pavadinimas       AS pav_b,
+       d1.domenas
+FROM domenai d1
+JOIN domenai d2
+  ON d1.domenas = d2.domenas
+ AND d1."savininkoKodas" < d2."savininkoKodas"
+JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1."savininkoKodas"
+JOIN "jarCsv" j2 ON j2."jarKodas"::text = d2."savininkoKodas"
+WHERE EXISTS (SELECT 1 FROM sutartys WHERE "tiekejoKodas" = d1."savininkoKodas")
+  AND EXISTS (SELECT 1 FROM sutartys WHERE "tiekejoKodas" = d2."savininkoKodas")
+LIMIT 200;
+```
+
+---
+
+### 17. Price cartel — suspiciously uniform bid prices across a CPV category
+
+> *"All the bids in this sector feel like they came from the same spreadsheet — the prices are almost identical across completely unrelated tenders."*
+
+- In a given CPV category, is the coefficient of variation of submitted bid prices abnormally low, suggesting coordination?
+- Which suppliers appear repeatedly in low-variation CPV categories?
+- Do the same companies cluster together across multiple such categories?
+
+```sql
+-- CPV categories with suspiciously low price variation (coefficient of variation < 5%)
+WITH cpv_bids AS (SELECT a."pagrindinisKodasBvpz" AS cpv,
+                         e.kaina::numeric         AS kaina, a."pirkimoNumeris",
+                         d.kodas                  AS "tiekejoKodas"
+                  FROM atn1ataskaitos a
+                           JOIN atn1dalyviai d ON d."ataskaitaId" = a.id
+                           JOIN "atn1pasiulymuEile" e ON e."ataskaitaId" = a.id AND e."dalyvioKodas" = d.kodas
+                  WHERE a."pagrindinisKodasBvpz" IS NOT NULL
+                    AND e.kaina ~ '^\d+(\.\d+)?$')
+SELECT cpv,
+       COUNT(*)                                              AS pasiulymu_sk,
+       ROUND(AVG(kaina))                                     AS vidurkis,
+       ROUND(STDDEV(kaina))                                  AS std,
+       ROUND(STDDEV(kaina) / NULLIF(AVG(kaina), 0) * 100, 1) AS cv_proc
+FROM cpv_bids
+GROUP BY cpv
+HAVING COUNT(*) >= 10
+   AND STDDEV(kaina) / NULLIF(AVG(kaina), 0) < 0.05
+ORDER BY cv_proc ASC
+LIMIT 200;
+```
+
+---
+
+### 18. Contract amendment escalation — low bid, then value inflated through amendments
+
+> *"They won with a suspiciously low bid and then the contract value tripled through amendments. I want to see which contracts had the biggest gap between the signed price and the final invoiced amount."*
+
+- What is the ratio of `faktineIvykdimoVerte` (actual final value) to `verte` (originally signed value) across a supplier's contracts?
+- Which buyers tolerate the highest amendment overruns?
+- Are there patterns where a supplier consistently under-bids relative to what they ultimately collect?
+
+```sql
+-- Suppliers with highest median amendment overrun ratio (min 5 contracts, overrun > 50%)
+SELECT s."tiekejoKodas",
+       MAX(j.pavadinimas)                                        AS tiekejas,
+       COUNT(*)                                                  AS sutarciu_sk,
+       ROUND(AVG(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0)), 2)    AS vid_koef,
+       ROUND(MAX(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0)), 2)    AS max_koef,
+       ROUND(SUM(s."faktineIvykdimoVerte" - s.verte))            AS bendra_pervirsis
+FROM sutartys s
+JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
+WHERE s."faktineIvykdimoVerte" IS NOT NULL
+  AND s.verte > 0
+  AND s.istrinta IS NOT TRUE
+GROUP BY s."tiekejoKodas"
+HAVING COUNT(*) >= 5
+   AND AVG(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0)) > 1.5
+ORDER BY vid_koef DESC
+LIMIT 200;
+```
+
+**What is currently missing:**
+
+The system captures the **end result** (final invoiced vs. originally signed value via `faktineIvykdimoVerte` / `verte`) but not the amendment trail itself. The `dokumentai` JSONB column contains attached document names but is not structured amendment history. To fully answer this question the schema would need:
+
+- A separate amendments table with: amendment date, amendment reason, value delta, approval authority
+- Or structured parsing of the `dokumentai` JSONB to extract amendment documents and their dates
+
+This is a data sourcing gap — the amendment sequence is published on the CVP IS portal but is not currently ingested.
+
+---
+
+### 19. Municipal company favoritism — buyer awards contracts to its own subsidiary
+
+> *"This municipality keeps awarding contracts to a company that is effectively owned by the municipality itself, bypassing competition."*
+
+- What fraction of a municipality's contracts by value go to companies where the municipality is a declared shareholder or founder?
+- Does that company win through competitive procedures, or mostly direct awards and framework call-offs?
+
+```sql
+-- Contracts where buyer and supplier share declared persons (proxy for municipal subsidiary link)
+WITH buyer_persons AS (
+    SELECT "jarKodas", vardas, pavarde
+    FROM "pinregJuridiniaiRysiai"
+    WHERE "darbovietesTipas" = 'STANDARTINE'
+      AND "irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE'
+),
+supplier_persons AS (
+    SELECT "jarKodas", vardas, pavarde
+    FROM "pinregJuridiniaiRysiai"
+    WHERE "darbovietesTipas" = 'STANDARTINE'
+      AND "irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE'
+)
+SELECT s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
+       s."tiekejoKodas",
+       MAX(j.pavadinimas) AS tiekejas,
+       COUNT(DISTINCT s."sutartiesUnikalusId") AS sutarciu_sk,
+       ROUND(SUM(s.verte)) AS bendra_verte,
+       STRING_AGG(DISTINCT bp.vardas || ' ' || bp.pavarde, ', ' ORDER BY bp.vardas || ' ' || bp.pavarde) AS bendri_asmenys
+FROM sutartys s
+JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
+JOIN buyer_persons bp  ON bp."jarKodas" = s."perkanciosiosOrganizacijosKodas"
+JOIN supplier_persons sp ON sp."jarKodas" = s."tiekejoKodas"
+                         AND sp.vardas = bp.vardas AND sp.pavarde = bp.pavarde
+WHERE s.istrinta IS NOT TRUE
+GROUP BY s."perkanciosiosOrganizacijosKodas", s."tiekejoKodas"
+HAVING COUNT(DISTINCT s."sutartiesUnikalusId") >= 3
+ORDER BY bendra_verte DESC
+LIMIT 200;
+```
+
+**What is currently missing:**
+
+The query above detects shared *declared people* as a proxy — it catches cases where a municipal official sits on both the buyer board and the supplier board. However, it does **not** detect formal ownership: a municipality holding a 51% stake in a company does not appear in PINREG at all unless an individual official made a personal declaration. True detection requires:
+
+- A company-owns-company ownership table sourced from JAR registry (ownership share, owner type `SAVIVALDYBĖ`)
+- Or a dedicated feed of municipal-owned enterprise registrations
+
+---
+
+### 20. Restricted procedure manipulation — buyer hand-picks the same invitees
+
+> *"This buyer uses restricted tenders where they get to choose who receives an invitation, and I'm pretty sure the same companies get invited every single time."*
+
+- How often does this buyer use restricted or negotiated procedures (`pirkimoBudas` = `Ribotas konkursas`, `Skelbiamos derybos`) vs. open competition?
+- What is the direct-award audit history from `neskelbiamosDerybos`?
+
+```sql
+-- Buyer's procedure mix: how much goes through restricted/negotiated vs. open
+SELECT s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
+       MAX(j.pavadinimas) AS pirkejas,
+       s.tipas,
+       COUNT(*)           AS sutarciu_sk,
+       ROUND(SUM(s.verte)) AS bendra_verte
+FROM sutartys s
+JOIN "jarCsv" j ON j."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+WHERE s.istrinta IS NOT TRUE
+GROUP BY s."perkanciosiosOrganizacijosKodas", s.tipas
+ORDER BY "pirkejoKodas", bendra_verte DESC
+LIMIT 200;
+```
+
+```sql
+-- Direct-award audit findings for a buyer (neskelbiamosDerybos)
+SELECT nd."jarKodas", nd."jarPavadinimas",
+       nd.data, nd.isvada, nd.aprasymas
+FROM "neskelbiamosDerybos" nd
+WHERE nd."jarKodas" = '123456789'
+ORDER BY nd.data DESC
+LIMIT 200;
+```
+
+**What is currently missing:**
+
+`neskelbiamosDerybos` records audit findings about unjustified direct awards — useful signal. However, for restricted procedures the system **cannot** identify which companies were invited but chose not to bid: the `atn1dalyviai` table only records companies that submitted a bid, not the full invitation list. Detecting systematic exclusion of qualified suppliers from invite lists would require the invitation list data from CVP IS, which is not currently ingested.
+
+---
+
+### 21. Political connection favoritism — companies linked to party donors or politicians
+
+> *"I have a hunch that this company's owners are close to the ruling party and that's why they keep winning."*
+
+**Not currently feasible.** The schema contains no political donation registry, no party membership data, and no politician–company link table. Detection would require:
+
+- Cross-referencing with the Central Electoral Commission (VRK) donor database
+- Matching donor names to company directors/shareholders in PINREG by name + approximate date
+
+This is a data sourcing gap. The VRK publishes donor data publicly; if ingested and name-matched against `pinregJuridiniaiRysiai`, this theme becomes tractable.
+
+---
+
+### 22. Fictitious deliverables — contract marked complete but work never done
+
+> *"The contract says it was executed in full, but the road they were paid to repair is in the same condition as before. Is there any signal in the data?"*
+
+**Not currently feasible from structured data alone.** The `faktineIvykdimoVerte` field confirms payment was recorded, not that delivery occurred. Detection would require:
+
+- Field inspection records or satellite imagery analysis (e.g., road condition scoring)
+- Invoice-level data from SABIS cross-referenced against delivery acceptance documents
+- Complaint or audit trail data from STT or NKT
+
+The closest available signal is a VDI labor violation (`vdiPazeidimai`) on the contractor during the contract execution period — suggesting the workforce was unavailable — but this is weak and indirect.
