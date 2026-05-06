@@ -1,6 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
 
-export async function validateOcrApiKey(apiKey) {
+export async function validateOcrApiKey(apiKey, options = {}) {
     if (!apiKey || typeof apiKey !== "string")
         return { error: 400, message: "API raktas privalomas." };
 
@@ -20,7 +20,7 @@ export async function validateOcrApiKey(apiKey) {
 
     const user = result.rows[0];
 
-    if (user.rezervacijos > 500)
+    if (user.rezervacijos > 5_000 && !options.skipRezervacijosCheck)
         return { error: 429, message: "Per daug rezervacijų." };
 
     return { user };

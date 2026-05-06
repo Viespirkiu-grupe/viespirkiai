@@ -64,7 +64,7 @@ failasRouter.post("/failas/ocr/checkout", async (req, res) => {
 });
 failasRouter.post("/failas/ocr/submit", async (req, res) => {
     const apiKey = extractApiKey(req);
-    const { user, error, message } = await validateOcrApiKey(apiKey);
+    const { user, error, message } = await validateOcrApiKey(apiKey, { skipRezervacijosCheck: true });
     if (error) return res.status(error).send(message);
     const { id, tekstas, duration } = req.body;
     if (
