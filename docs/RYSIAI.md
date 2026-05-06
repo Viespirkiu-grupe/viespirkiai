@@ -582,26 +582,30 @@ export const FILTER_ID_MAP = Object.fromEntries(Object.entries(FILTER_CHAR_MAP).
 #### `applyFilterFromHash(legendState, primaryNodeId)`
 
 1. Parse `window.location.hash` — strip leading `#`, split on `&`, build a `Map<key, value>`.
-2. **Input validation**: entity type keys (`asmuo`, `sutartis`, `viesiejiPirkimai`) must contain only
-   alphabetic characters; entity ID values must be numeric strings. Keys or values that fail
-   validation are silently ignored.
-3. If `filter` key is present: for `primaryNodeId`, call `legendState.initNode(primaryNodeId)` then
-   set each edge type visible/hidden according to whether its char appears in the `filter` value.
+2. **Input validation**: entity type keys must be a known single-char key (`o`, `c`, `r`, `p`);
+   entity ID values must be numeric strings for `o`/`c`/`r`, or valid base64 (`[A-Za-z0-9+/=]+`)
+   for `p`. Keys or values that fail validation are silently ignored.
+3. If `f` key is present: for `primaryNodeId`, call `legendState.initNode(primaryNodeId)` then
+   set each edge type visible/hidden according to whether its char appears in the `f` value.
    All chars listed → **visible**; all chars not listed → **hidden**.
-4. For each `<entityType>_<N>` key that passes validation: note the entity for deferred expansion.
-5. For each `filter_<N>` key paired with a loaded node: apply the same char-based visibility to that
-   node's `legendState` entry once the node exists in `dataGraph`.
+4. For each `<typeKey>_<N>` key that passes validation: decode the entityId (for `p`: base64-decode
+   and URI-decode to get the original `vardas + pavarde` string) and note the entity for deferred
+   expansion.
+5. For each `f_<N>` key: its value is the filter chars for entity `<N>`, returned alongside the
+   entity in `additionalEntities` so the caller can apply it after loading.
 6. Returns `{ additionalEntities: Array<{ entityType, entityId, filterChars, entityNumber }> }` so
-   `rysiai-app.js` can load them sequentially after the primary entity.
+   `rysiai-app.js` can load them sequentially after the primary entity. `entityType` is the short
+   key (`'o'` | `'c'` | `'r'` | `'p'`); `entityId` is the decoded numeric ID or full person name.
 
 #### `updateHashFromFilter(legendState, dataGraph)`
 
 1. Collect all node IDs in `dataGraph` that have an explicit `legendState` entry (`hasNodeConfig`).
 2. For each configured node, derive its filter string: join the chars of all visible edge types.
-3. For the primary node (the one marked `isRoot: true` in `dataGraph`), emit `filter=<chars>`.
-4. For each additional expanded node, determine its `entityType` from `attrs.entityType` and its
-   `entityId` from the relevant attribute (`jarKodas`, `sutartiesUnikalusId`, or `pirkimoId`). Assign
-   ascending `N` values starting from `2`. Emit `<entityType>_<N>=<entityId>&filter_<N>=<chars>`.
+3. For the primary node (the one marked `isRoot: true` in `dataGraph`), emit `f=<chars>`.
+4. For each additional expanded node, look up its entity type key from `ENTITY_TYPE_KEY_MAP` and
+   its entityId from `attrs.jarKodas` / `attrs.sutartiesUnikalusId` / `attrs.pirkimoId`, or for
+   `PersonEntity` encode `btoa(encodeURIComponent(vardas + ' ' + pavarde))`. Assign ascending `N`
+   values starting from `2`. Emit `<typeKey>_<N>=<entityId>&f_<N>=<chars>`.
 5. Set `window.location.hash = '#' + assembled` (no page navigation; replaces fragment only).
    If all nodes are at default (nothing configured), set hash to empty string.
 
@@ -613,7 +617,8 @@ DOMContentLoaded
   → selectNode(primaryNodeId)
   → legendState.initNode(primaryNodeId)
   → applyFilterFromHash(legendState, primaryNodeId)
-      → if additionalEntities: load each sequentially, then apply their filter_N
+      → if additionalEntities: load each sequentially (o→loadOrg, c→loadSutartis,
+        r→loadPirkimas, p→loadPerson), then apply their f_N
   → rebuildAndRefresh()
 
 On legend checkbox change:
