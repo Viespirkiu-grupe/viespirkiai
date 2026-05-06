@@ -4,6 +4,10 @@
 import { makeIconDataUri, getIconKey, EDGE_COLOR, nodeColor, personelSize, contractSize } from './graph-theme.ts';
 import { isAnchorNode, isBridgeCandidate, isOrgNode, isContractNode, isProcurementNode } from './entity-types.ts';
 import type Graph from 'graphology';
+import type forceAtlas2 from 'graphology-layout-forceatlas2';
+import type noverlap from 'graphology-layout-noverlap';
+type IForceAtlas2Layout = typeof forceAtlas2;
+type INoverlapLayout = typeof noverlap;
 
 type NodePos = { x: number; y: number } | null;
 type GetNodePos = (id: string) => NodePos;
@@ -40,83 +44,114 @@ export function computeNodeSize(attrs: Record<string, unknown>): number {
     return 8;
 }
 
+// ── mergeGraphElements helpers ────────────────────────────────────────────────
+
+// Returns a random position scattered around the origin node, or a random
+// position within a fixed 400×400 field when no reference point is available.
+function computeSpawnPosition(getNodePos: GetNodePos, fromNodeId: string | null): { x: number; y: number } {
+    if (fromNodeId) {
+        const pos = getNodePos(fromNodeId);
+        if (pos) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 150 + Math.random() * 100;
+            return { x: pos.x + Math.cos(angle) * dist, y: pos.y + Math.sin(angle) * dist };
+        }
+    }
+    return { x: (Math.random() - 0.5) * 400, y: (Math.random() - 0.5) * 400 };
+}
+
+// Maps Order/Delivery + numeric size to a bucketed contract edge type.
+// Other edge types pass through unchanged.
+function resolveEdgeType(rawType: string, size: number | null | undefined): string {
+    if ((rawType === 'Order' || rawType === 'Delivery') && size != null) {
+        if (size >= 6) return 'ContractLarge';
+        if (size >= 3) return 'ContractMedium';
+        return 'ContractSmall';
+    }
+    return rawType;
+}
+
+function buildNewNodeAttrs(
+    n: ApiNode,
+    pos: { x: number; y: number },
+    fromNodeId: string | null,
+    rootNodeId: string | null,
+): Record<string, unknown> {
+    const isThisRoot = rootNodeId ? n.id === rootNodeId : !fromNodeId;
+    const iconKey = getIconKey(n.attributes);
+    const attrs: Record<string, unknown> = {
+        ...n.attributes,
+        x: pos.x,
+        y: pos.y,
+        size: computeNodeSize(n.attributes),
+        color: nodeColor(n.attributes),
+        label: n.attributes.label || n.id,
+        expandedBy: isThisRoot ? new Set() : (fromNodeId ? new Set([fromNodeId]) : new Set()),
+        isRoot: isThisRoot,
+    };
+    if (iconKey) attrs.image = makeIconDataUri(iconKey);
+    return attrs;
+}
+
+function updateExistingNode(graph: Graph, n: ApiNode, fromNodeId: string | null): void {
+    if (fromNodeId) {
+        const owners = (graph.getNodeAttribute(n.id, 'expandedBy') as Set<string>) || new Set<string>();
+        owners.add(fromNodeId);
+        graph.setNodeAttribute(n.id, 'expandedBy', owners);
+    }
+    // Enrich existing org node with sodra fields when we have them for the first time.
+    if (isOrgNode(n.attributes) && n.attributes.draustieji !== undefined) {
+        const existing = graph.getNodeAttributes(n.id) as Record<string, unknown>;
+        if (existing.draustieji === undefined) {
+            graph.setNodeAttribute(n.id, 'draustieji', n.attributes.draustieji);
+            graph.setNodeAttribute(n.id, 'draustieji2', n.attributes.draustieji2);
+            graph.setNodeAttribute(n.id, 'size', computeNodeSize({ ...existing, ...n.attributes }));
+        }
+    }
+}
+
+function mergeEdge(graph: Graph, e: ApiEdge, fromNodeId: string | null): void {
+    if (graph.hasEdge(e.id)) {
+        if (fromNodeId) {
+            const owners = (graph.getEdgeAttribute(e.id, 'expandedBy') as Set<string>) || new Set<string>();
+            owners.add(fromNodeId);
+            graph.setEdgeAttribute(e.id, 'expandedBy', owners);
+        }
+        return;
+    }
+    if (!graph.hasNode(e.source) || !graph.hasNode(e.target)) return;
+
+    const raw = { ...e.attributes };
+    // Rename semantic 'type' → 'edgeType' so Sigma doesn't treat it as a renderer program key.
+    const rawType = (raw.type as string) || '';
+    delete raw.type;
+    const edgeType = resolveEdgeType(rawType, raw.size as number | null);
+    graph.addEdgeWithKey(e.id, e.source, e.target, {
+        ...raw,
+        edgeType,
+        color: EDGE_COLOR[edgeType] || '#d1d5db',
+        expandedBy: fromNodeId ? new Set([fromNodeId]) : new Set(),
+    });
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
 export function mergeGraphElements(graph: Graph, getNodePos: GetNodePos, data: ApiData, fromNodeId: string | null, rootNodeId: string | null = null): string[] {
     const newNodeIds: string[] = [];
 
-    (data.nodes || []).forEach((n) => {
+    for (const n of (data.nodes ?? [])) {
         if (graph.hasNode(n.id)) {
-            if (fromNodeId) {
-                const owners = (graph.getNodeAttribute(n.id, 'expandedBy') as Set<string>) || new Set<string>();
-                owners.add(fromNodeId);
-                graph.setNodeAttribute(n.id, 'expandedBy', owners);
-            }
-            if (isOrgNode(n.attributes) && n.attributes.draustieji !== undefined) {
-                const existing = graph.getNodeAttributes(n.id) as Record<string, unknown>;
-                if (existing.draustieji === undefined) {
-                    graph.setNodeAttribute(n.id, 'draustieji', n.attributes.draustieji);
-                    graph.setNodeAttribute(n.id, 'draustieji2', n.attributes.draustieji2);
-                    graph.setNodeAttribute(n.id, 'size', computeNodeSize(Object.assign({}, existing, n.attributes)));
-                }
-            }
-            return;
-        }
-
-        let x = 0, y = 0;
-        if (fromNodeId) {
-            const pos = getNodePos(fromNodeId);
-            if (pos) {
-                const angle = Math.random() * Math.PI * 2;
-                const dist = 150 + Math.random() * 100;
-                x = pos.x + Math.cos(angle) * dist;
-                y = pos.y + Math.sin(angle) * dist;
-            } else {
-                x = (Math.random() - 0.5) * 400;
-                y = (Math.random() - 0.5) * 400;
-            }
+            updateExistingNode(graph, n, fromNodeId);
         } else {
-            x = (Math.random() - 0.5) * 400;
-            y = (Math.random() - 0.5) * 400;
+            const pos = computeSpawnPosition(getNodePos, fromNodeId);
+            graph.addNode(n.id, buildNewNodeAttrs(n, pos, fromNodeId, rootNodeId));
+            newNodeIds.push(n.id);
         }
+    }
 
-        const iconKey = getIconKey(n.attributes);
-        const imgUri = iconKey ? makeIconDataUri(iconKey) : '';
-        const isThisRoot = rootNodeId ? n.id === rootNodeId : !fromNodeId;
-        const nodeAttrs: Record<string, unknown> = Object.assign({}, n.attributes, {
-            x: x,
-            y: y,
-            size: computeNodeSize(n.attributes),
-            color: nodeColor(n.attributes),
-            label: n.attributes.label || n.id,
-            expandedBy: isThisRoot ? new Set() : (fromNodeId ? new Set([fromNodeId]) : new Set()),
-            isRoot: isThisRoot,
-        });
-        if (imgUri) nodeAttrs.image = imgUri;
-
-        graph.addNode(n.id, nodeAttrs);
-        newNodeIds.push(n.id);
-    });
-
-    (data.edges || []).forEach((e) => {
-        if (graph.hasEdge(e.id)) {
-            if (fromNodeId) {
-                const owners = (graph.getEdgeAttribute(e.id, 'expandedBy') as Set<string>) || new Set<string>();
-                owners.add(fromNodeId);
-                graph.setEdgeAttribute(e.id, 'expandedBy', owners);
-            }
-            return;
-        }
-        if (!graph.hasNode(e.source) || !graph.hasNode(e.target)) return;
-
-        const attrs: Record<string, unknown> = Object.assign({}, e.attributes || {});
-        // Rename semantic 'type' → 'edgeType' so Sigma doesn't treat it as a renderer program key.
-        if (attrs.type) { attrs.edgeType = attrs.type; delete attrs.type; }
-        if ((attrs.edgeType === 'Order' || attrs.edgeType === 'Delivery') && attrs.size != null) {
-            attrs.edgeType = (attrs.size as number) >= 6 ? 'ContractLarge' : (attrs.size as number) >= 3 ? 'ContractMedium' : 'ContractSmall';
-        }
-        attrs.color = EDGE_COLOR[attrs.edgeType as string] || '#d1d5db';
-        attrs.expandedBy = fromNodeId ? new Set([fromNodeId]) : new Set();
-        graph.addEdgeWithKey(e.id, e.source, e.target, attrs);
-    });
+    for (const e of (data.edges ?? [])) {
+        mergeEdge(graph, e, fromNodeId);
+    }
 
     return newNodeIds;
 }
@@ -253,7 +288,7 @@ export function computeEdgeCounts(graph: Graph, nodeId: string): Map<string, num
     return byType;
 }
 
-export function runLayout(graph: Graph, forceAtlas2: Function, noverlap: Function): void {
+export function runLayout(graph: Graph, forceAtlas2: IForceAtlas2Layout, noverlap: INoverlapLayout): void {
     if (graph.order < 2) return;
     const inferred = forceAtlas2.inferSettings(graph);
     const fa2Iterations = Math.min(600, Math.max(200, graph.order * 8));

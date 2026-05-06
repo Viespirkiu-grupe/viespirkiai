@@ -4,6 +4,10 @@ import { isConfigurableNode, isOrgNode, isPersonNode, isContractNode, isProcurem
 import type { LegendState } from './legend-state.ts';
 import type { NodeDetails } from './details-panel.ts';
 import type Graph from 'graphology';
+import type forceAtlas2 from 'graphology-layout-forceatlas2';
+import type noverlap from 'graphology-layout-noverlap';
+type IForceAtlas2Layout = typeof forceAtlas2;
+type INoverlapLayout = typeof noverlap;
 
 interface ExpandUIDeps {
     dataGraph: Graph;
@@ -15,9 +19,9 @@ interface ExpandUIDeps {
     };
     statusEl: HTMLElement | null;
     loadingEl: HTMLElement | null;
-    forceAtlas2: Function;
-    noverlap: Function;
-    animateNodes: Function;
+    forceAtlas2: IForceAtlas2Layout;
+    noverlap: INoverlapLayout;
+    animateNodes: (graph: Graph, targets: Record<string, { x: number; y: number }>, opts: { duration: number; easing: string }, callback?: () => void) => () => void;
     legendState: LegendState;
     nodeDetails: NodeDetails;
     onStateChange?: (() => void) | null;
