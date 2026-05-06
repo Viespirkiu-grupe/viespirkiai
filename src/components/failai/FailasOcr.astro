@@ -1,0 +1,40 @@
+---
+import { formatDateTime, formatDuration } from '@/utils/time.js';
+interface Props { failas: any; }
+const { failas } = Astro.props;
+const ocrLatest = failas.ocrLatestResult;
+---
+<div>
+  <h2 class="mb-1 no-style">OCR</h2>
+
+  {ocrLatest?.submitTimestamp
+    ? <p class="text-muted text-xs mb-2">{formatDateTime(ocrLatest.submitTimestamp)}</p>
+    : failas.ocrLockTimestamp
+      ? <p class="text-muted text-xs mb-2">{formatDateTime(failas.ocrLockTimestamp)}</p>
+      : null
+  }
+
+  <dl class="kv-list mb-0">
+    {failas.ocrStateKey && failas.ocrStateKey !== '1' && (
+      <><dt>Būsena</dt><dd>{failas.ocrStateText}</dd></>
+    )}
+    {ocrLatest && (ocrLatest.duration || ocrLatest.duration === 0) && (
+      <><dt>Trukmė</dt><dd><span class="cell-mono">{formatDuration(ocrLatest.duration)}</span></dd></>
+    )}
+    {ocrLatest && (ocrLatest.puslapiuSkaicius || ocrLatest.puslapiuSkaicius === 0) && (
+      <><dt>Puslapiai</dt><dd><span class="cell-mono">{Number(ocrLatest.puslapiuSkaicius).toLocaleString('lt-LT')}</span></dd></>
+    )}
+    {ocrLatest && (ocrLatest.zodziuSkaicius || ocrLatest.zodziuSkaicius === 0) && (
+      <><dt>Žodžiai</dt><dd><span class="cell-mono">{Number(ocrLatest.zodziuSkaicius).toLocaleString('lt-LT')}</span></dd></>
+    )}
+    {typeof failas.ocrBandymai === 'number' && failas.ocrBandymai > 0 && (
+      <><dt>Bandymų sk.</dt><dd><span class="cell-mono">{failas.ocrBandymai}</span></dd></>
+    )}
+    {typeof failas.ocrRezultatuSkaicius === 'number' && failas.ocrRezultatuSkaicius > 1 && (
+      <><dt>Rezultatų įrašai</dt><dd><span class="cell-mono">{failas.ocrRezultatuSkaicius}</span></dd></>
+    )}
+    {failas.ocrNode && (
+      <><dt>Nuskaitytojas</dt><dd><span class="cell-mono">{failas.ocrNode}</span></dd></>
+    )}
+  </dl>
+</div>

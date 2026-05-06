@@ -1,0 +1,145 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Pagination from '../../components/Pagination.astro';
+import { postgres, parseLimit, enrichFailasRow, getColorScheme, getFont, cleanQuery, buildSaltinioLink } from '../../lib/failai.js';
+import '@/utils/linksniai.js';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+const cleaned = cleanQuery(Astro.url);
+if ('redirectTo' in cleaned) return Astro.redirect(cleaned.redirectTo);
+const query = cleaned.query;
+const parsedLimit = parseLimit(query, 250, 1000000);
+if ('error' in parsedLimit) return new Response(parsedLimit.error, { status: 400 });
+const limit = parsedLimit.limit;
+const page = Math.max(1, parseInt(query.page) || 1);
+const offset = (page - 1) * limit;
+const saltinis = query.saltinis || null;
+const where = saltinis ? (saltinis === 'sutartys' ? 'WHERE (f.saltinis = $1 OR f.saltinis IS NULL)' : 'WHERE f.saltinis = $1') : '';
+const params = saltinis ? [saltinis] : [];
+const countRes = await postgres.query(`SELECT COUNT(*) AS total FROM public."failaiParsiuntimoQueue" q JOIN public.failai f ON f.id = q.id ${where}`, params);
+const total = parseInt(countRes.rows[0].total, 10) || 0;
+
+if (typeof query.csv !== 'undefined') {
+  const csvLimit = Math.min(100000, Math.max(1, parseInt(query.csvLimit) || 10000));
+  const rowsRes = await postgres.query(
+    `SELECT f.id, f.pavadinimas, f.extension, f."saltinioId", f.saltinis,
+            q.bandymai AS "parsiuntimoBandymai",
+            q."paskutinisBandymas" AS "paskutinisParsiuntimoBandymas",
+            q.state, f."dokId", f."fileId"
+     FROM public."failaiParsiuntimoQueue" q
+     JOIN public.failai f ON f.id = q.id
+     ${where}
+     ORDER BY q."paskutinisBandymas" ASC NULLS FIRST
+     LIMIT $${params.length + 1}`,
+    [...params, csvLimit]
+  );
+
+  const escapeCsv = (value: unknown) => {
+    if (value == null) return '';
+    const stringValue = String(value);
+    return /[",\n\r]/.test(stringValue) ? `"${stringValue.replace(/"/g, '""')}"` : stringValue;
+  };
+
+  const header = [
+    'id',
+    'pavadinimas',
+    'plėtinys',
+    'saltinis',
+    'saltinioNuoroda',
+    'parsiuntimoBandymai',
+    'paskutinisParsiuntimoBandymas',
+  ];
+
+  const lines = [header.join(',')];
+  for (const row of rowsRes.rows) {
+    lines.push([
+      escapeCsv(row.id),
+      escapeCsv(row.pavadinimas),
+      escapeCsv(row.extension),
+      escapeCsv(row.saltinis || 'sutartys'),
+      escapeCsv(buildSaltinioLink(row)),
+      escapeCsv(row.parsiuntimoBandymai),
+      escapeCsv(row.paskutinisParsiuntimoBandymas),
+    ].join(','));
+  }
+
+  return new Response('\uFEFF' + lines.join('\r\n'), {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="neparsiunciami_${new Date().toISOString().slice(0, 10)}.csv"`,
+    },
+  });
+}
+
+const result = await postgres.query(`SELECT f.id, f.pavadinimas, f.extension, f."saltinioId", f.saltinis, q.bandymai AS "parsiuntimoBandymai", q."paskutinisBandymas" AS "paskutinisParsiuntimoBandymas", q.state, f."dokId", f."fileId" FROM public."failaiParsiuntimoQueue" q JOIN public.failai f ON f.id = q.id ${where} ORDER BY q."paskutinisBandymas" ASC NULLS FIRST LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, limit, offset]);
+const files = result.rows.map(enrichFailasRow) as any[];
+const pageCount = Math.max(1, Math.ceil(total / limit));
+const queryParamsRaw = [saltinis && `saltinis=${encodeURIComponent(saltinis)}`, query.limit && `limit=${encodeURIComponent(query.limit)}`].filter(Boolean).join('&');
+const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
+---
+<Layout pageTitle="Neparsiunčiami failai" pageDescription="Sąrašas failų, kurių parsisiuntimas nepavyko" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font}>
+  <main>
+    <div class="page-header">
+      <h1 class="mb-0">Neparsiunčiami failai</h1>
+      <a href={`/failai/neparsiunciami?csv=true${queryParams}&limit=max`} class="btn btn-outline btn-sm">↗ CSV</a>
+    </div>
+
+    <form method="get" action="/failai/neparsiunciami" class="filter-bar mb-4">
+      <div class="form-group">
+        <label for="saltinis" class="form-label">Šaltinis</label>
+        <select id="saltinis" name="saltinis" class="form-control w-[40ch]">
+          <option value="" selected={!saltinis}>Visi</option>
+          <option value="sutartys" selected={saltinis === 'sutartys'}>Sutartys</option>
+          <option value="neskelbiamosDerybos" selected={saltinis === 'neskelbiamosDerybos'}>Neskelbiamos derybos</option>
+          <option value="cvpIs" selected={saltinis === 'cvpIs'}>Viešieji pirkimai</option>
+          <option value="cvpp" selected={saltinis === 'cvpp'}>CVPP viešieji pirkimai</option>
+          <option value="mvpAprasai" selected={saltinis === 'mvpAprasai'}>MVP tvarkos aprašai</option>
+          <option value="archive" selected={saltinis === 'archive'}>Failas archyvo viduje</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Ieškoti</button>
+    </form>
+
+    <p class="text-muted text-sm mb-3">
+      {files.length
+        ? <>Rodoma <strong>{files.length}</strong> iš <strong>{total}</strong> įrašų</>
+        : 'Įrašų nėra'}
+    </p>
+
+    <div class="table-wrapper">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Id</th>
+            <th>Pavadinimas</th>
+            <th>Plėtinys</th>
+            <th>Šaltinis</th>
+            <th>Šaltinio nuoroda</th>
+            <th class="cell-right">Bandymai</th>
+            <th>Paskutinis bandymas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {files.length === 0 ? (
+            <tr>
+              <td colspan="7" class="empty-state-cell">Nėra neparsiunčiamų failų.</td>
+            </tr>
+          ) : files.map((file: any) => (
+            <tr>
+              <td class="cell-mono">{file.id ? <a href={`/failas/${file.id}`}>{file.id}</a> : '—'}</td>
+              <td class="cell-truncate">{file.pavadinimas || '—'}</td>
+              <td class="cell-mono">{file.extension || ''}</td>
+              <td>{file.saltinis || 'sutartys'}</td>
+              <td class="cell-truncate">{file.saltinioLink ? <a href={file.saltinioLink}>{file.saltinioLink}</a> : ''}</td>
+              <td class="cell-mono cell-right">{file.parsiuntimoBandymai ?? 0}</td>
+              <td class="cell-nowrap">{file.paskutinisParsiuntimoBandymas ? String(new Date(file.paskutinisParsiuntimoBandymas).toLocaleString('lt-LT')) : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
+  </main>
+</Layout>

@@ -1,0 +1,101 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../lib/failai.js';
+import SignalQr from '../components/SignalQr.astro';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+---
+<Layout
+  pageTitle="Kontaktai"
+  pageDescription=""
+  pageImage="https://viespirkiai.org/kontaktai.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <div class="page-header">
+      <h1>Kontaktai</h1>
+    </div>
+
+    <div class="grid-2 mb-7">
+      <section>
+        <h2>Elektroninis paštas</h2>
+        <p><a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a></p>
+
+        <h3>Šifravimas</h3>
+        <p>Elektroninius laiškus galite šifruoti, tam reikalingą informaciją rasite žemiau.</p>
+
+        <dl class="kv-list mb-7">
+          <dt>PGP fingerprint</dt>
+          <dd><code>7772 F2FD A950 2E09 AFA0 1A35 AD87 6037 7869 0B5A</code></dd>
+          <dt>PGP public key</dt>
+          <dd>Įkeltas į <a href="https://keys.openpgp.org/search?q=viespirkiai%40viespirkiai.org">keys.openpgp.org</a> - daugelis pašto programų jį atras automatiškai.</dd>
+        </dl>
+
+        <details>
+          <summary class="text-sm">Rodyti PGP viešąjį raktą</summary>
+          <pre class="code-block code-block-standalone mt-3 overflow-x-auto">-----BEGIN PGP PUBLIC KEY BLOCK-----
+xjMEaU7oEhYJKwYBBAHaRw8BAQdA2d5wFWUwGDqlxKpTrBK9643NIMUG9VXvnNb/
+54ZKwrjNKlZpZcWhcGlya2lhaSA8dmllc3BpcmtpYWlAdmllc3BpcmtpYWkub3Jn
+PsKJBBMWCAAxFiEEd3Ly/alQLgmvoBo1rYdgN3hpC1oFAmlO6BICGwMECwkIBwUV
+CAkKCwUWAgMBAAAKCRCth2A3eGkLWg5ZAQDr0ElNXyB7/fLkRSWWG1KHBGr97m8A
+Xa8gcJPnFaa9OQEAmhipZ6K4y3yjbf44bDdNeGaenh55qks9vDEnCTf7IADOOARp
+TugSEgorBgEEAZdVAQUBAQdAQMxgJ0nXHPxH8S1EmjemTGSMUqolPfFih2Cu71JY
+NxYDAQgHwngEGBYIACAWIQR3cvL9qVAuCa+gGjWth2A3eGkLWgUCaU7oEgIbDAAK
+CRCth2A3eGkLWo57AQCDIVtp+WWKvuJQR12oeLBB8n5TnsISZrYiwn7NwCmgSwEA
+hkEtHhWmsNS3eDj4F/NL1rkkdNt+ChsBfaZxkOn11gA=
+=dPWq
+-----END PGP PUBLIC KEY BLOCK-----</pre>
+        </details>
+      </section>
+
+      <section>
+        <SignalQr />
+
+        <h2>Signal</h2>
+        <p class="text-muted text-sm">Privatumą gerbianti pokalbių programėlė.</p>
+        <p><a href="https://signal.me/#eu/owm5rTu2SjNCZifQAxmJO9yW95ImS1c7jxI5b07r-ZWtW7waKAhBZohZKhTmTZts">@viespirkiai.52</a></p>
+
+        <h2 class="mt-7">Mastodon</h2>
+        <p class="text-muted text-sm">Decentralizuotas ir vartotojų valdomas socialinis tinklas.</p>
+        <p><a href="https://river.group.lt/@viespirkiai">@viespirkiai@river.group.lt</a></p>
+
+        <h2 class="mt-7">Matrix</h2>
+        <p class="text-muted text-sm">Decentralizuota ir šifruota pokalbių platforma.</p>
+        <p><code>@viespirkiai:group.lt</code></p>
+      </section>
+    </div>
+
+    <div class="page-header">
+      <h2>Pagal užklausos pobūdį</h2>
+    </div>
+
+    <section id="informacijosTikslumas">
+      <h3>Informacijos tikslumas / pašalinimai</h3>
+      <p>Primename, kad informaciją renkame iš viešųjų šaltinių, tačiau pasitaiko atvejų kai duomenys atsilieka, būna klaidingi arba neturėjo būti paviešinti, tada jums reikia:</p>
+
+      <ol class="mt-4">
+        <li class="mb-4">
+          <h4>Patikrinti originalų informacijos šaltinį</h4>
+          <p>Jį rasite <a href="/duomenys#duomenu-saltiniai">duomenų puslapyje</a>. Jeigu tai yra sutarties duomenys ar failai - žr. <a href="https://eviesiejipirkimai.lt">CVP IS</a>.</p>
+        </li>
+        <li class="mb-4">
+          <h4>Susisiekti su atsakingu už originalų informacijos šaltinį</h4>
+          <p>Jeigu informacija yra neteisinga duomenų šaltinyje, ji privalo būti ištaisyta ten. Viešųjų pirkimų sutarčių atveju jums pagelbės perkančioji organizacija arba Viešųjų pirkimų tarnyba - <a href="mailto:pagalba@vpt.lt">pagalba@vpt.lt</a>.</p>
+        </li>
+        <li class="mb-4">
+          <h4>Susisiekti su Viešpirkių iniciatyva</h4>
+          <p>Susisiekite su mūsų iniciatyva bendruoju elektroninio pašto adresu - <a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a>.</p>
+          <p>Esant tvirtam pagrindui pakeitimus atliksime iš karto, tačiau jeigu duomenų tiekėjas veiksmų nesiims pasiliekame teisę informaciją sugąžinti į tokią situaciją kokioje ji jau buvo.</p>
+          <p class="text-muted text-sm"><em>Aiškiai klaidingi, melagingi, neaiškūs, nekonkretūs, nepagrįsti, nesuprantamai parašyti (pvz. ne lietuvių ar anglų kalba) bei visi jiems panašūs pranešimai nėra nagrinėjami.</em></p>
+        </li>
+        <li class="mb-4">
+          <h4>Pranešti paieškos sistemoms apie pakeitimus</h4>
+          <p>Paieškos sistemos svetainių turinį indeksuoja savarankiškai, o automatiniai atnaujinimai dažnai užtrunka itin ilgai. Jeigu matote, kad neteisinga informacija atvaizduojama ir paieškos sistemos rezultatuose, nors puslapis buvo atnaujintas arba panaikintas, praneškite joms.</p>
+          <p>Jei tai yra Google - pasinaudokite įrankiu <a href="https://search.google.com/search-console/remove-outdated-content">Remove outdated content</a>.</p>
+        </li>
+      </ol>
+    </section>
+  </main>
+</Layout>

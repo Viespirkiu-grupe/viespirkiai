@@ -162,7 +162,7 @@ export function rebuildViewGraph(dataGraph, viewGraph, isEdgeHidden) {
         if (!isBridgeCandidate(nodeAttrs)) return;
         const anchorNeighbors = new Set();
         const edgesToAnchors = [];
-        dataGraph.forEachEdge(nodeId, (edgeId, edgeAttrs, src, tgt) => {
+        dataGraph.forEachEdge(nodeId, (edgeId, _edgeAttrs, src, tgt) => {
             const neighbor = src === nodeId ? tgt : src;
             if (expandedAnchors.has(neighbor)) {
                 anchorNeighbors.add(neighbor);

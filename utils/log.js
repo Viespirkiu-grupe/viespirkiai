@@ -1,5 +1,13 @@
 import path from "path";
 import crypto from "crypto";
+import { fileURLToPath } from "url";
+
+const currentFile = fileURLToPath(import.meta.url);
+
+function normalizeFileName(fileName) {
+    if (typeof fileName !== "string") return null;
+    return fileName.startsWith("file://") ? fileURLToPath(fileName) : fileName;
+}
 
 /**
  * Generate a pastel color based on a seed string.
@@ -63,8 +71,12 @@ function getCallerFile() {
     Error.prepareStackTrace = origPrepareStackTrace;
 
     // stack[0] = this function, stack[1] = log(), stack[2] = caller
-    const caller = stack[2];
-    return path.basename(caller.getFileName());
+    const caller = stack.find((frame) => {
+        const fileName = normalizeFileName(frame.getFileName());
+        return typeof fileName === "string" && fileName !== currentFile;
+    });
+    const fileName = normalizeFileName(caller?.getFileName());
+    return typeof fileName === "string" ? path.basename(fileName) : "unknown";
 }
 
 /**
@@ -80,9 +92,13 @@ function getCallerFileFolder() {
 
     Error.prepareStackTrace = origPrepareStackTrace;
 
-    // stack[0] = this function, stack[1] = wrapper/log, stack[2] = caller
-    const caller = stack[2];
-    const filePath = caller.getFileName();
+    const caller = stack.find((frame) => {
+        const fileName = normalizeFileName(frame.getFileName());
+        return typeof fileName === "string" && fileName !== currentFile;
+    });
+    const filePath = normalizeFileName(caller?.getFileName());
+
+    if (typeof filePath !== "string") return "unknown";
 
     const dir = path.basename(path.dirname(filePath));
     const file = path.basename(filePath);

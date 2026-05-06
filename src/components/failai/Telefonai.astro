@@ -1,0 +1,6 @@
+---
+import ContactList from './ContactList.astro';
+interface Props { telefonai: { telefonas: string; puslapiai?: number[] }[]; title?: string; emptyText?: string; }
+const { telefonai = [], title = 'Telefonai', emptyText = 'Nerasta' } = Astro.props;
+---
+<ContactList items={telefonai.map(t => ({ value: t.telefonas, pages: t.puslapiai }))} title={title} type="phone" emptyText={emptyText} />

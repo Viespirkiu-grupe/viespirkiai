@@ -72,7 +72,7 @@ renderer.on('afterRender', function () {
 
     var dashedEdgeTypes = { 'ContractProcurementLink': true, 'Award': true, 'Bidder': true };
 
-    viewGraph.forEachEdge(function (edgeId, attrs, source, target, sourceAttrs, targetAttrs) {
+    viewGraph.forEachEdge(function (_edgeId, attrs, _source, _target, sourceAttrs, targetAttrs) {
         if (!dashedEdgeTypes[attrs.edgeType]) return;
 
         var p1 = renderer.graphToViewport({ x: sourceAttrs.x, y: sourceAttrs.y });

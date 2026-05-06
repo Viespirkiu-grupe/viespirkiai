@@ -1,0 +1,290 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../../lib/failai.js';
+import { postgres } from '@/postgres/postgres.js';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const { pavadinimas: rawPavadinimas } = Astro.params;
+let pavadinimas = rawPavadinimas || '';
+const isJson = pavadinimas.endsWith('.json');
+if (isJson) pavadinimas = pavadinimas.slice(0, -5);
+
+if (pavadinimas !== 'eviesiejipirkimai.lt') {
+  return Astro.redirect('/');
+}
+
+function toIsoDay(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const [apjungtiRes, intervalaiRes, allTimestampsResult, paskutinisGedimasRes] = await Promise.all([
+  postgres.query(`
+    WITH ordered AS (
+      SELECT id, "timestamp", tipas,
+        "timestamp" - LAG("timestamp") OVER (PARTITION BY tipas ORDER BY "timestamp") AS delta
+      FROM public."eviesiejipirkimaiGedimai"
+    ),
+    groups AS (
+      SELECT *,
+        SUM(CASE WHEN delta IS NULL OR delta > INTERVAL '5 minutes' THEN 1 ELSE 0 END)
+          OVER (PARTITION BY tipas ORDER BY "timestamp") AS grp
+      FROM ordered
+    ),
+    intervals AS (
+      SELECT tipas, MIN("timestamp") AS start_time, MAX("timestamp") AS end_time,
+        MAX("timestamp") - MIN("timestamp") AS duration,
+        COUNT(*) AS unmerged_count
+      FROM groups
+      GROUP BY tipas, grp
+    )
+    SELECT
+      start_time::date AS day,
+      SUM(duration) AS total_duration,
+      COUNT(*) AS merged_incidents,
+      SUM(unmerged_count) AS unmerged_events
+    FROM intervals
+    GROUP BY day
+    ORDER BY day DESC`),
+  postgres.query(`
+    WITH ordered AS (
+      SELECT id, "timestamp", tipas,
+        "timestamp" - LAG("timestamp") OVER (PARTITION BY tipas ORDER BY "timestamp") AS delta
+      FROM public."eviesiejipirkimaiGedimai"
+    ),
+    groups AS (
+      SELECT *,
+        SUM(CASE WHEN delta IS NULL OR delta > INTERVAL '5 minutes' THEN 1 ELSE 0 END)
+          OVER (PARTITION BY tipas ORDER BY "timestamp") AS grp
+      FROM ordered
+    ),
+    intervals AS (
+      SELECT tipas, MIN("timestamp") AS start_time, MAX("timestamp") AS end_time
+      FROM groups
+      GROUP BY tipas, grp
+    )
+    SELECT tipas, start_time, end_time FROM intervals ORDER BY start_time`),
+  postgres.query(
+    `SELECT "timestamp"::date AS day, MAX("timestamp") AS "timestamp"
+     FROM public."eviesiejipirkimaiGedimai"
+     GROUP BY "timestamp"::date
+     ORDER BY day DESC`,
+  ),
+  postgres.query(
+    `SELECT "timestamp" FROM public."eviesiejipirkimaiGedimai" ORDER BY "timestamp" DESC LIMIT 1`
+  ),
+]);
+
+const paskutinisGedimas = paskutinisGedimasRes.rows[0] ?? null;
+if (paskutinisGedimas) {
+  paskutinisGedimas.per5min = Date.now() - new Date(paskutinisGedimas.timestamp).getTime() <= 5 * 60 * 1000;
+}
+
+const allTimestamps: string[] = allTimestampsResult.rows.map((r: any) => r.timestamp);
+const intervalai: any[] = intervalaiRes.rows;
+const apjungti: any[] = apjungtiRes.rows;
+
+const byDay = new Map<string, string[]>();
+for (const ts of allTimestamps) {
+  const day = toIsoDay(new Date(ts));
+  if (!byDay.has(day)) byDay.set(day, []);
+  byDay.get(day)!.push(ts);
+}
+
+const intervalsByDay = new Map<string, any[]>();
+for (const i of intervalai) {
+  const day = toIsoDay(new Date(i.start_time));
+  if (!intervalsByDay.has(day)) intervalsByDay.set(day, []);
+  intervalsByDay.get(day)!.push(i);
+}
+
+for (const item of apjungti) {
+  const day = toIsoDay(new Date(item.day));
+  item.timestamps = byDay.get(day) ?? [];
+  item.intervals = intervalsByDay.get(day) ?? [];
+}
+
+if (isJson) {
+  return new Response(JSON.stringify({ apjungti }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Pre-build all chart configs server-side for client use
+const chartConfigs = apjungti.map((diena: any) => {
+  const dayStr: string = toIsoDay(new Date(diena.day));
+  const [year, month, dayNum] = dayStr.split('-').map(Number);
+  return {
+    id: `Gedimai${dayStr.replaceAll('-', '')}Diagrama`,
+    day: dayStr,
+    year, month: month - 1, dayNum,
+    timestamps: (diena.timestamps as string[]).map((t: string) => new Date(t + 'Z').getTime()),
+    intervals: (diena.intervals as any[]).map((i: any) => ({
+      start: new Date(i.start_time).getTime(),
+      end: new Date(i.end_time).getTime(),
+    })),
+  };
+});
+
+const chartsHead = `<script defer>
+  let apexPromise;
+  const renderedCharts = [];
+  function loadApexCharts() {
+    if (window.ApexCharts) return Promise.resolve(window.ApexCharts);
+    if (apexPromise) return apexPromise;
+    apexPromise = new Promise((resolve, reject) => {
+      function startLoading() {
+        const s = document.createElement('script'); s.src = '/dist/apexcharts.js'; s.defer = true;
+        s.onload = () => resolve(window.ApexCharts); s.onerror = reject;
+        document.body.appendChild(s);
+      }
+      document.readyState === 'loading' ? window.addEventListener('DOMContentLoaded', startLoading) : startLoading();
+    });
+    return apexPromise;
+  }
+  function deepMerge(t,s){for(const k in s){if(s[k]&&typeof s[k]==='object'&&!Array.isArray(s[k])){if(!t[k])t[k]={};deepMerge(t[k],s[k]);}else{t[k]=s[k];}}return t;}
+  function getIsDark(){return document.documentElement.classList.contains('dark');}
+  function getThemeTokens(d){return{foreground:d?'#f5f4f4':'#0c0a09',labelColor:d?'#a8a29e':'#292524',gridColor:d?'#292524':'#e7e5e4',tooltipBg:d?'#1c1917':'#fafaf9',tooltipText:d?'#f5f4f4':'#0c0a09',tooltipBorder:d?'#292524':'#d6d3d1'};}
+  const CATEGORICAL_COLORS={light:['#0c0a09','#79716b','#e7e5e4'],dark:['#f5f4f4','#79716b','#292524']};
+  function getCategoricalColors(d){return d?CATEGORICAL_COLORS.dark:CATEGORICAL_COLORS.light;}
+  const eurFormatter=v=>typeof v==='number'?v.toLocaleString('lt-LT',{style:'currency',currency:'EUR'}):'Nėra duomenų';
+  function buildGlobalDefaults(d){const t=getThemeTokens(d);return{chart:{toolbar:{show:false},zoom:{enabled:false},fontFamily:'Ubuntu, system-ui, sans-serif',background:'transparent',height:350,foreColor:t.labelColor},tooltip:{enabled:true,theme:d?'dark':'light',style:{fontFamily:'Ubuntu, system-ui, sans-serif'}},xaxis:{labels:{style:{colors:t.labelColor}}},yaxis:{labels:{style:{colors:t.labelColor}}},stroke:{curve:'smooth',width:2},markers:{size:4},colors:getCategoricalColors(d),grid:{borderColor:t.gridColor},theme:{mode:d?'dark':'light'},legend:{labels:{colors:t.labelColor}}};}
+  const typeChartDefaults={'line-datetime':{chart:{type:'line'},xaxis:{type:'datetime',tickAmount:6,labels:{format:'yyyy-MM'}},tooltip:{x:{format:'yyyy-MM'}}},'pie':{chart:{type:'pie'},legend:{position:'bottom'},dataLabels:{enabled:true}},'scatter':{chart:{type:'scatter'}},'treemap':{chart:{type:'treemap'}}};
+  const chartFlagDefaults={'yEUR':{yaxis:{labels:{formatter:eurFormatter}}},'yEURMen':{yaxis:{labels:{formatter:v=>typeof v==='number'?eurFormatter(v)+' / mėn.':'Nėra duomenų'}}},'yMin0':{yaxis:{min:0}},'yMinAuto':{yaxis:{min:undefined}},'xYear':{xaxis:{labels:{format:'yyyy'}},tooltip:{x:{format:'yyyy'}}},'xAxisYearMonth':{xaxis:{type:'datetime',tickAmount:6,labels:{format:'yyyy-MM'}},tooltip:{x:{format:'yyyy-MM'}}},'xAxisDay':{xaxis:{type:'datetime',tickAmount:6,labels:{format:'yyyy-MM-dd'}},tooltip:{x:{format:'yyyy-MM-dd'}}},'xAxisHourMinute':{xaxis:{type:'datetime',labels:{format:'HH:mm'}},tooltip:{x:{format:'HH:mm'}}},'numbersWithSpaces':{yaxis:{labels:{formatter:v=>typeof v==='number'?v.toLocaleString('lt-LT'):'Nėra duomenų'}}},'yAxisNoLabel':{yaxis:{labels:{show:false}}},'noLine':{stroke:{width:0},markers:{size:6}}};
+  function buildOptions(data,isDark){let o=structuredClone(buildGlobalDefaults(isDark));if(data.type&&typeChartDefaults[data.type])o=deepMerge(o,structuredClone(typeChartDefaults[data.type]));for(const f of(data.flags||[])){if(f in chartFlagDefaults)o=deepMerge(o,chartFlagDefaults[f]);}if(data.type!=='pie'){o.xaxis=o.xaxis||{};o.xaxis.categories=data.labels;if(Array.isArray(data.series)&&(data.series.length===0||!data.series[0]?.data)){o.series=[{name:data.customOptions?.seriesName||'',data:data.series}];}else{o.series=data.series;}}else{o.labels=data.labels;o.series=data.series;}if(data.customOptions)o=deepMerge(o,data.customOptions);return o;}
+  async function displayChart(data){if(!data?.element||!data?.labels||!data?.series){return;}await loadApexCharts();const chart=new ApexCharts(data.element,buildOptions(data,getIsDark()));chart.render();renderedCharts.push({chart,data});}
+  function updateAllCharts(){const d=getIsDark();const t=getThemeTokens(d);for(const{chart}of renderedCharts){chart.updateOptions({chart:{foreColor:t.labelColor},tooltip:{theme:d?'dark':'light'},xaxis:{labels:{style:{colors:t.labelColor}}},yaxis:{labels:{style:{colors:t.labelColor}}},grid:{borderColor:t.gridColor},theme:{mode:d?'dark':'light'},legend:{labels:{colors:t.labelColor}},colors:getCategoricalColors(d)},false,true);}}
+  new MutationObserver(updateAllCharts).observe(document.documentElement,{attributes:true,attributeFilter:['class']});
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(!document.documentElement.classList.contains('dark'))updateAllCharts();});
+<\/script>
+<style>.chart{background-color:transparent;}.dark .apexcharts-tooltip,.dark .apexcharts-tooltip-title{background:#1c1917!important;color:#f5f4f4!important;border-color:#292524!important;}<\/style>`;
+
+function formatDuration(d: any): string {
+  if (!d) return '0s';
+  const parts = [];
+  if (d.hours) parts.push(`${d.hours}h`);
+  if (d.minutes) parts.push(`${d.minutes}min`);
+  if (d.seconds) parts.push(`${d.seconds}s`);
+  return parts.length ? parts.join(' ') : '0s';
+}
+---
+
+<Layout
+  pageTitle="Ar veikia eviesiejipirkimai.lt?"
+  pageDescription="Išorinių sistemų prieinamumo stebėjimas"
+  pageImage="https://viespirkiai.org/status/eviesiejipirkimai.lt.png"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={chartsHead}
+>
+  <main>
+
+    <div class="page-header justify-center mb-7">
+      <div class="text-center">
+        <h1 class="mb-3">Ar veikia eviesiejipirkimai.lt?</h1>
+        {paskutinisGedimas?.per5min ? (
+          <>
+            <h2 class="text-danger text-3xl mb-2">Tikriausiai NE</h2>
+            <p class="text-muted"><em>Per paskutines 5min fiksavome sutrikimų</em></p>
+          </>
+        ) : (
+          <>
+            <h2 class="text-success text-3xl mb-2">Tikriausiai TAIP</h2>
+            <p class="text-muted"><em>Per paskutines 5min sutrikimų nefiksavome</em></p>
+          </>
+        )}
+      </div>
+    </div>
+
+    <section class="page-section">
+      <h2>Istoriniai duomenys</h2>
+      <h3 class="mt-4 mb-2">Skaičiavimo metodologija</h3>
+      <p class="text-muted text-sm">
+        Sistemos veikimas yra tikrinamas bent kas 2 minutes.
+        Jeigu pateikiama klaida (šiuo atveju užrašas „Vyksta sistemos atnaujinimo darbai"), tada tai yra fiksuojama duomenų bazėje.
+        Kai tarp fiksavimų yra mažiau nei 5 minutės, jie yra apjungiami ir skaičiuojama trukmė (gali būti apjungti ir keli jeigu kartojasi).
+        Laikoma, kad gedimas prasidėjo gavus pirmąjį klaidos pranešimą ir pasibaigė iškart po paskutinio (sistemos naudai).
+      </p>
+    </section>
+
+    {apjungti.length > 0 && (
+      <div class="grid-2">
+        {apjungti.map((diena: any) => (
+          <article class="result-card">
+            <div class="result-card-body">
+
+              <div class="result-card-meta">
+                <span>{toIsoDay(new Date(diena.day))}</span>
+                <span>{Number(diena.merged_incidents)} {Number(diena.merged_incidents) === 1 ? 'gedimas' : 'gedimai'}</span>
+                <span>{Number(diena.unmerged_events)} {Number(diena.unmerged_events) === 1 ? 'fiksavimas' : 'fiksavimai'}</span>
+              </div>
+
+              <h3 class="result-card-title">
+                Neveikė bent {formatDuration(diena.total_duration)}
+              </h3>
+
+              <div id={`Gedimai${toIsoDay(new Date(diena.day)).replaceAll('-', '')}Diagrama`} class="chart mt-3 w-full h-[200px]"></div>
+
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
+
+    <script defer is:inline define:vars={{ chartConfigs }}>
+      function todayLT() {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Europe/Vilnius',
+          year: 'numeric', month: '2-digit', day: '2-digit'
+        }).formatToParts(new Date());
+        let year, month, day;
+        for (const part of parts) {
+          if (part.type === 'year') year = part.value;
+          if (part.type === 'month') month = part.value;
+          if (part.type === 'day') day = part.value;
+        }
+        return `${year}-${month}-${day}`;
+      }
+
+      const today = todayLT();
+
+      for (const cfg of chartConfigs) {
+        const annotations = cfg.intervals.map(i => ({
+          x: i.start,
+          x2: i.end,
+          fillColor: '#FF4560',
+          borderColor: '#777',
+        }));
+
+        if (today === cfg.day) {
+          annotations.push({
+            x: Date.now(),
+            label: { text: 'Dabar', style: { color: '#000' } },
+            borderColor: '#777',
+          });
+        }
+
+        displayChart({
+          element: document.querySelector(`#${cfg.id}`),
+          type: 'line-datetime',
+          labels: cfg.timestamps,
+          series: cfg.timestamps.map(() => 1),
+          flags: ['xAxisHourMinute', 'yAxisNoLabel', 'noLine'],
+          customOptions: {
+            tooltip: { y: { title: { formatter: () => 'Fiksuotas sutrikimas' } } },
+            chart: { height: 200 },
+            annotations: { xaxis: annotations },
+            colors: ['#FF4560'],
+            yaxis: { min: 0, max: 2, tickAmount: 1, labels: { formatter: () => '' } },
+            xaxis: {
+              min: Date.UTC(cfg.year, cfg.month, cfg.dayNum, 0, 0, 0),
+              max: Date.UTC(cfg.year, cfg.month, cfg.dayNum, 23, 59, 59),
+            },
+          },
+        });
+      }
+    </script>
+
+  </main>
+</Layout>

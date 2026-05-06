@@ -1,0 +1,14 @@
+---
+import Layout from '../layouts/Layout.astro';
+const colorScheme = Astro.cookies.get('colorScheme')?.value || 'auto';
+const font = Astro.cookies.get('font')?.value || 'ubuntu';
+---
+<Layout pageTitle="Puslapis nerastas" pageDescription="" pageImage="" colorScheme={colorScheme} font={font}>
+  <main>
+    <div class="empty-state">
+      <div class="empty-state-icon">404</div>
+      <h2>Puslapis nerastas</h2>
+      <p class="text-muted">Puslapis kurio ieškote nerastas.</p>
+    </div>
+  </main>
+</Layout>

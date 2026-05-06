@@ -1,0 +1,71 @@
+---
+import PdfPreview from './PdfPreview.astro';
+import ArchiveTree from './ArchiveTree.astro';
+import EmailMessage from './EmailMessage.astro';
+import FaxSpecial from './FaxSpecial.astro';
+interface Props { failas: any; search?: string; }
+const { failas, search = '' } = Astro.props;
+---
+{failas.previewType === 'pdf' && (
+  <>
+    {failas.isLibreFormat && (
+      <p class="text-muted text-xs mb-3"><em>Dokumentas konvertuotas į PDF naudojant LibreOffice, gali būti atvaizduojamas iškraipytas.</em></p>
+    )}
+    <PdfPreview failasId={failas.id} search={search} height="70vh" rounded={true} border="none" />
+  </>
+)}
+
+{failas.previewType === 'archive' && (
+  <>
+    <p class="text-muted text-sm mb-3"><em>Archyvo peržiūra</em></p>
+    <ArchiveTree filesTree={failas.metaduomenys?.filesTree} failasId={failas.id} openByDefault={true} />
+  </>
+)}
+
+{failas.previewType === 'mp4' && (
+  <video controls class="w-full max-h-[70vh] rounded-md block">
+    <source src={`https://failai.viespirkiai.org/${failas.id}`} type="video/mp4" />
+  </video>
+)}
+
+{failas.previewType === 'mp3' && (
+  <audio controls class="w-full">
+    <source src={`https://failai.viespirkiai.org/${failas.id}`} type="audio/mpeg" />
+  </audio>
+)}
+
+{failas.previewType === 'image' && (
+  <img src={`https://failai.viespirkiai.org/${failas.id}${failas.extension === 'heic' ? '?convertTo=jpeg' : ''}`} alt="" class="max-w-full rounded-md" />
+)}
+
+{failas.previewType === 'url' && (
+  <dl class="kv-list">
+    <dt>Nuoroda</dt>
+    <dd>
+      {failas.metaduomenys?.links?.[0]?.uri
+        ? <a href={encodeURI(failas.metaduomenys.links[0].uri)}>{failas.metaduomenys.links[0].uri}</a>
+        : <em class="text-muted">Nenurodyta</em>
+      }
+    </dd>
+  </dl>
+)}
+
+{failas.previewType === 'txt' && (
+  <div class="bg-lighter-gray border rounded-md p-4 overflow-x-auto">
+    <pre class="whitespace-pre-wrap break-words font-mono text-sm m-0">{failas.tekstasPerziurai}</pre>
+  </div>
+)}
+
+{failas.previewType === 'fax-special' && <FaxSpecial />}
+
+{failas.previewType === 'html' && (
+  <iframe src={`https://failai.viespirkiai.org/${failas.id}`} class="w-full h-[600px] border border-border rounded-md"></iframe>
+)}
+
+{failas.previewType === 'email' && (
+  <EmailMessage metaduomenys={failas.metaduomenys} failasId={failas.id} />
+)}
+
+{failas.previewType === 'none' && (
+  <p class="text-muted text-sm"><em>Peržiūra nepalaikoma šio formato failams. Spustelėkite „Failas", jei norite jį atsisiųsti.</em></p>
+)}

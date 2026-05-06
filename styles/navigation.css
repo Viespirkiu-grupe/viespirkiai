@@ -339,7 +339,7 @@
     }
 
     body:has(.navbar) {
-      padding-top: var(--site-header-offset, 80px);
+      padding-top: var(--site-header-offset, 49px);
     }
 
     @media (max-width: 1200px) {

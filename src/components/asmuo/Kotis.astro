@@ -1,0 +1,33 @@
+---
+const { asmuo } = Astro.props;
+if (!(asmuo.kotis?.count > 0)) return;
+const { count, limit, rows } = asmuo.kotis;
+---
+
+<div class="page-section mb-10" id="kotis">
+  <h2><a href="#kotis" class="no-style">Valstybės pagalba (KOTIS)</a></h2>
+  {count > rows.length && (
+    <p class="text-muted text-sm mb-4">
+      Rodomi tik {limit} įrašai.
+      <a href="?kotisLimit=max#kotis">Rodyti visus ({count})</a>
+    </p>
+  )}
+  <div class="result-list">
+    {rows.map((item: any) => (
+      <article class="result-card card-clickable">
+        <div class="result-card-body">
+          <dl class="result-card-meta">
+            <div><dt class="sr-only">Teikėjas</dt><dd>{item.teikejas}</dd></div>
+            <div><dt class="sr-only">Data</dt><dd>{String(item.suteikimoData).split(' ')[0]}</dd></div>
+          </dl>
+          <h3 class="result-card-title">
+            <a href={`https://kotis.kt.gov.lt/paraiskos/view_item/id.${item.id}`}>
+              <span class="cell-mono">{new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(item.suma)}</span>
+            </a>
+          </h3>
+          <div class="result-card-footer"><span>{item.pagalbosForma}</span></div>
+        </div>
+      </article>
+    ))}
+  </div>
+</div>

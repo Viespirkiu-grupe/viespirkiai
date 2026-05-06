@@ -1,0 +1,146 @@
+---
+// @ts-nocheck
+import Layout from '../../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../../lib/failai.js';
+import { postgres } from '../../postgres/postgres.js';
+import { buildTedNoticeViewModel } from '../../modules/ted/viewer.js';
+import { readFileSync, readdirSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const { id } = Astro.params;
+let tedData: any = null;
+let pageTitle = 'TED Iš';
+let pageDescription = 'EU viešoji pirkimų iš TED duomenų bazės';
+
+const isSample = id && !id.match(/^\d+-\d{4}$/);
+
+if (isSample) {
+  // Load sample notice from XML
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const tedSamplesDir = join(__dirname, '../../modules/ted/samples');
+  const fileName = `${id}.xml`;
+  const samplePath = join(tedSamplesDir, fileName);
+
+  try {
+    const sampleXml = readFileSync(samplePath, 'utf-8');
+    tedData = buildTedNoticeViewModel(sampleXml);
+    pageTitle = `TED ${id}`;
+  } catch (err) {
+    return Astro.redirect('/');
+  }
+} else if (id && /^\d+-\d{4}$/.test(id)) {
+  // Load from database
+  const result = await postgres.query(
+    `SELECT * FROM "tedNotices" WHERE "tedNoticeNumber" = $1;`,
+    [id]
+  );
+
+  if (result.rowCount === 0 || !result.rows[0].turinys || result.rows[0].scrapeStatus < 1) {
+    return Astro.redirect('/');
+  }
+
+  tedData = buildTedNoticeViewModel(result.rows[0].turinys);
+  pageTitle = `TED ${id}`;
+} else {
+  return Astro.redirect('/');
+}
+---
+
+<Layout
+  pageTitle={pageTitle}
+  pageDescription={pageDescription}
+  pageImage="https://viespirkiai.org/ted.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <style>
+    .ted-notice {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .ted-header {
+      padding: 2rem 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 2rem;
+    }
+
+    .ted-header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 1rem 0;
+    }
+
+    .ted-section {
+      margin-bottom: 2rem;
+      padding: 1.5rem;
+      background: var(--shade-2);
+      border: var(--border);
+      border-radius: var(--radius-md);
+    }
+
+    .ted-section h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0 0 1rem 0;
+    }
+
+    .ted-notice-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      font-size: 0.875rem;
+    }
+
+    .ted-notice-meta dt {
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .ted-notice-meta dd {
+      margin: 0;
+    }
+  </style>
+
+  <div class="ted-notice">
+    <div class="ted-header">
+      <h1>TED Iš – {id}</h1>
+      <p class="text-muted">Šis puslapis yra šablono versija. Pilna TED vediklio versija su visomis sekcijomis neseniai portavimo dar nėra baigta.</p>
+    </div>
+
+    {tedData && (
+      <div class="ted-section">
+        <h2>Pagrindinė informacija</h2>
+        <dl class="ted-notice-meta">
+          {tedData.title && (
+            <>
+              <dt>Pavadinimas</dt>
+              <dd>{tedData.title}</dd>
+            </>
+          )}
+          {tedData.noticeNumber && (
+            <>
+              <dt>Pranešimo numeris</dt>
+              <dd>{tedData.noticeNumber}</dd>
+            </>
+          )}
+        </dl>
+      </div>
+    )}
+
+    <div class="ted-section">
+      <h2>Pastaba</h2>
+      <p>Pilnas TED vediklis su visomis 16 partinų šablonų (organizacijos, sritys, terminai ir kt.) turėtų būti papildytas.</p>
+      <p>Šiuo metu rodomas tik pagrindinės informacijos šablonas. Planuojamas darbas:</p>
+      <ul>
+        <li>Konvertuoti <code>views/ted/partials/*.ejs</code> failus į Astro komponentus</li>
+        <li>Įgyvendinti visų TED sekcijų renderavimą</li>
+        <li>Patikrinti šablono suderinamumą su TED duomenų struktura</li>
+      </ul>
+    </div>
+  </div>
+</Layout>

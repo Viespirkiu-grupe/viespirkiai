@@ -1,0 +1,158 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../../lib/failai.js';
+import { highlightCode } from '@/utils/highlightCode.js';
+import { postgres } from '@/postgres/postgres.js';
+import { spawn } from 'child_process';
+import { log } from '@/utils/log.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { join, dirname } from 'path';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UPSERT_BATCH_SIZE = 1000;
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const scrapeKodas = readFileSync(join(__dirname, '../../../views/pinreg/scrapeKodas.js'), 'utf-8');
+const highlightedCode = highlightCode(scrapeKodas);
+
+function fetchUUID(uuid: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const url = `https://pinreg.vtek.lt/external/deklaracijos/${uuid}/view/viesa`;
+    const curl = spawn('curl', ['-s', '-w', '%{http_code}', '-o', '-', url]);
+    let output = '';
+    curl.stdout.on('data', (chunk: Buffer) => { output += chunk.toString(); });
+    curl.on('error', reject);
+    curl.on('close', () => {
+      const status = output.slice(-3);
+      if (status !== '200') return reject(new Error(`Status ${status}`));
+      try { JSON.parse(output.slice(0, -3)); resolve(); } catch (err) { reject(err); }
+    });
+  });
+}
+
+async function patikrintiUUID(uuids: string[]): Promise<boolean> {
+  if (!uuids.length) return false;
+  const sample = [...uuids].sort(() => Math.random() - 0.5).slice(0, 5);
+  let failCount = 0;
+  for (const uuid of sample) {
+    try { await fetchUUID(uuid); }
+    catch (err) { log(`UUID ${uuid} nepavyko nuskaityti: ${(err as Error).message}`); failCount++; }
+  }
+  if (sample.length < 5) return failCount === 0;
+  return failCount < 2;
+}
+
+async function upsertUUIDs(uuids: string[]): Promise<void> {
+  if (!uuids.length) return;
+  for (let i = 0; i < uuids.length; i += UPSERT_BATCH_SIZE) {
+    const batch = uuids.slice(i, i + UPSERT_BATCH_SIZE);
+    const placeholders = batch.map((_, idx) => `($${idx + 1})`).join(', ');
+    await postgres.query(`INSERT INTO pinreg (uuid) VALUES ${placeholders} ON CONFLICT (uuid) DO NOTHING`, batch);
+  }
+}
+
+function parseUUIDs(raw: string): string[] {
+  return raw.split('\n').map(u => u.trim()).filter(u => UUID_REGEX.test(u));
+}
+
+let uuidSubmitMessage: string | undefined;
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const raw = formData.get('uuids') as string | null;
+  if (!raw) {
+    uuidSubmitMessage = 'UUIDs yra būtini';
+  } else {
+    const uuids = parseUUIDs(raw);
+    if (!uuids.length) {
+      uuidSubmitMessage = 'Galiojančių UUID nepateikta.';
+    } else if (!(await patikrintiUUID(uuids))) {
+      uuidSubmitMessage = 'Duoti UUID negalioja.';
+    } else {
+      await upsertUUIDs(uuids);
+      uuidSubmitMessage = `Gauti ${uuids.length} UUID, ačiū!`;
+    }
+  }
+}
+---
+
+<Layout
+  pageTitle="PINREG duomenų atnaujinimas"
+  pageDescription="Puslapis skirtas atnaujinti Privačių interesų registro duomenis."
+  pageImage="https://viespirkiai.org/pinreg/scrape.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+
+    <div class="page-header">
+      <h1>Privačių interesų registro duomenų atnaujinimas</h1>
+    </div>
+
+    <div class="grid-2">
+
+      <section>
+        <h2 id="scrape">Duomenų gavimas</h2>
+        <ol class="mt-3 mb-7">
+          <li>Nukopijuokite žemiau esantį kodą</li>
+          <li>Atidarykite <a href="https://pinreg.vtek.lt/app/deklaraciju-paieska" target="_blank">Privačių interesų registro</a> svetainę</li>
+          <li>Paspauskite klaviatūroje <kbd>F12</kbd>, kad atidarytumėte naršyklės kūrėjo įrankius</li>
+          <li>Pasirinkite <kbd>Console</kbd> skiltį</li>
+          <li>Įklijuokite nukopijuotą kodą į konsolę ir paspauskite <kbd>Enter</kbd></li>
+          <li>Pereikite per paskutinius kelis puslapius deklaracijų<br><em class="text-muted text-sm">Pačių deklaracijų atsidaryti būtina nėra, neeikite toliau už 10.000 įrašų.</em></li>
+          <li>Paspauskite mygtuką <kbd>Kopijuoti UUID sąrašą</kbd> ir sekite instrukcijas skiltyje duomenų pateikimas</li>
+        </ol>
+
+        <h3 class="mb-3">Kodas</h3>
+        <div class="code-container relative">
+          <pre class="code-block"><code class="hljs language-javascript" set:html={highlightedCode}></code></pre>
+          <a href="#" id="copy-link" class="btn btn-ghost btn-sm absolute top-2 right-2">Kopijuoti</a>
+        </div>
+        <script>
+          const copyLink = document.getElementById('copy-link');
+          const codeEl = copyLink?.previousElementSibling?.querySelector('code');
+          copyLink?.addEventListener('click', (e) => {
+            e.preventDefault();
+            navigator.clipboard.writeText(codeEl?.textContent ?? '')
+              .then(() => {
+                const original = copyLink.textContent;
+                copyLink.textContent = 'Kopijuota!';
+                setTimeout(() => { copyLink.textContent = original; }, 1500);
+              })
+              .catch(err => console.error('Copy failed', err));
+          });
+        </script>
+      </section>
+
+      <section>
+        <h2 id="submit">Duomenų pateikimas</h2>
+
+        {uuidSubmitMessage && (
+          <div class="alert alert-info mb-4">
+            <div class="alert-body">{uuidSubmitMessage}</div>
+          </div>
+        )}
+
+        <form method="post" action="">
+          <div class="form-group">
+            <label class="form-label" for="uuid-input">Įklijuokite deklaracijų UUID žemiau:</label>
+            <textarea
+              id="uuid-input"
+              name="uuids"
+              class="form-control"
+              rows="10"
+              placeholder="Įklijuokite UUID čia..."
+            ></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary mt-3">Pateikti</button>
+        </form>
+      </section>
+
+    </div>
+
+  </main>
+</Layout>

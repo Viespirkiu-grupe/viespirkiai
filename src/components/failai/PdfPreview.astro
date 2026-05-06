@@ -1,0 +1,8 @@
+---
+interface Props { failasId: string | number; search?: string; height?: string; rounded?: boolean; border?: string; class?: string; }
+const { failasId, search = '', height = '70vh', rounded = true, border = 'none', class: className = '' } = Astro.props;
+const fileUrl = `/failas/${failasId}/preview`;
+const viewerSrc = `/dist/pdfjs/web/viewer.html?file=${encodeURIComponent(fileUrl)}#search=${encodeURIComponent(search)}`;
+const style = `border:${border}; width:100%; height:${height}; display:block;${rounded ? ' border-radius:var(--radius-md);' : ''}`;
+---
+<iframe class={className} src={viewerSrc} style={style}></iframe>

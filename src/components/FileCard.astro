@@ -1,0 +1,118 @@
+---
+interface Action { href: string; text: string; target?: string; rel?: string; }
+interface Props {
+  title: string;
+  href: string;
+  meta?: string;
+  ext?: string;
+  actions?: Action[];
+  titleTwoLines?: boolean;
+  hideMeta?: boolean;
+}
+const { title, href, meta = '', ext: rawExt, actions = [], titleTwoLines = false, hideMeta = false } = Astro.props;
+
+function getExtFromTitle(t: string) {
+  const idx = t.lastIndexOf('.');
+  if (idx === -1 || idx === t.length - 1) return '';
+  return t.slice(idx + 1).toLowerCase();
+}
+
+const ext = (rawExt ?? getExtFromTitle(title)).toLowerCase();
+
+function iconTheme(e: string) {
+  if (e === 'pdf') return { type: 'pdf', base: 'var(--shade-5)', fold2: 'var(--shade-6)' };
+  if (['doc','docx','odt','rtf','dot','dotx','docm'].includes(e)) return { type: 'doc', base: '#1a2a4a', fold2: '#2e5fa3' };
+  if (['xls','xlsx','xlsb','ods','xlt'].includes(e)) return { type: 'xls', base: '#1a3020', fold2: '#2e7a3e' };
+  if (['ppt','pptx','ppsx','odp'].includes(e)) return { type: 'ppt', base: '#3a2414', fold2: '#d35400' };
+  if (['jpg','jpeg','png','bmp','gif','tif','tiff','webp','svg','heic'].includes(e)) return { type: 'img', base: 'var(--shade-5)', fold2: 'var(--shade-6)' };
+  if (['zip','7z','rar'].includes(e)) return { type: 'zip', base: '#2e2010', fold2: '#8a6020' };
+  if (e === 'tedeu') return { type: 'tedeu', base: '#1a3a8c', fold2: '#0d2260' };
+  if (e === 'tedlt') return { type: 'tedlt', base: '#f5cb35', fold2: '#c9a820' };
+  return { type: 'generic', base: 'var(--shade-5)', fold2: 'var(--shade-6)' };
+}
+
+const theme = iconTheme(ext);
+const uid = Math.random().toString(36).slice(2, 10);
+const clipOuter = `fc-clip-${uid}`;
+const clipInner = `fc-iclip-${uid}`;
+
+const outerClasses = ['file-card','card-clickable', titleTwoLines ? 'file-card-title-2l' : '', hideMeta ? 'file-card-hide-meta' : ''].filter(Boolean).join(' ');
+---
+
+{title && href ? (
+  <article class={outerClasses} aria-label={title}>
+    <a href={href} class="card-overlay-link">{title}</a>
+
+    <svg class="file-card-icon antialiased rounded-2xl block file-card-z" viewBox="0 0 96 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" overflow="hidden" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+      <defs>
+        <clipPath id={clipOuter}><path d="M-28,-36 L14,-36 L28,-22 L28,44 L-28,44 Z"/></clipPath>
+        {theme.type === 'img' && <clipPath id={clipInner}><rect x="-28" y="-36" width="56" height="80" rx="9"/></clipPath>}
+      </defs>
+      <g transform="translate(44,52) rotate(-10)">
+        <g clip-path={`url(#${clipOuter})`}>
+          <rect x="-28" y="-36" width="56" height="80" rx="9" fill={theme.base}/>
+        </g>
+        <polygon points="14,-36 28,-22 14,-22" fill={theme.fold2}/>
+        {theme.type === 'pdf' && <>
+          <rect x="-28" y="-8" width="56" height="14" fill="#c0392b"/>
+          <text x="0" y="1.5" font-family="system-ui,sans-serif" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">PDF</text>
+        </>}
+        {theme.type === 'doc' && <>
+          <rect x="-16" y="-10" width="30" height="3.5" rx="1.5" fill="#2e5fa3" opacity="0.9"/>
+          <rect x="-16" y="0" width="22" height="3.5" rx="1.5" fill="#2e5fa3" opacity="0.6"/>
+          <rect x="-16" y="10" width="26" height="3.5" rx="1.5" fill="#2e5fa3" opacity="0.6"/>
+        </>}
+        {theme.type === 'xls' && <>
+          <rect x="-14" y="-18" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+          <rect x="2" y="-18" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+          <rect x="-14" y="-7" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+          <rect x="2" y="-7" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+          <rect x="-14" y="4" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+          <rect x="2" y="4" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9"/>
+        </>}
+        {theme.type === 'zip' && <>
+          <rect x="-6" y="-23" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+          <rect x="2" y="-16" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+          <rect x="-6" y="-9" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+          <rect x="2" y="-2" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+          <rect x="-6" y="5" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+          <rect x="-6" y="15" width="16" height="8" rx="2.5" fill="none" stroke="#c8902a" stroke-width="1.2"/>
+        </>}
+        {theme.type === 'tedeu' && (() => {
+          const starId = `star_${clipOuter}`;
+          const angles = [0,30,60,90,120,150,180,210,240,270,300,330];
+          return <>
+            <defs><path id={starId} d="M0,-3.2 L0.76,-1.05 L3.04,-1.05 L1.22,0.40 L1.88,2.59 L0,1.13 L-1.88,2.59 L-1.22,0.40 L-3.04,-1.05 L-0.76,-1.05 Z"/></defs>
+            <g transform="translate(0,4)">
+              {angles.map(a => <use href={`#${starId}`} transform={`rotate(${a}) translate(0,-18) rotate(-${a})`} fill="#FFD700"/>)}
+            </g>
+          </>;
+        })()}
+        {theme.type === 'tedlt' && <>
+          <clipPath id={`${clipOuter}_inner`}><rect x="-28" y="-36" width="56" height="80" rx="9"/></clipPath>
+          <g clip-path={`url(#${clipOuter}_inner)`}>
+            <rect x="-28" y="-12" width="56" height="26" fill="#006a44"/>
+            <rect x="-28" y="14" width="56" height="30" fill="#c1272d"/>
+          </g>
+        </>}
+      </g>
+    </svg>
+
+    <div class="file-card-body file-card-z">
+      <div class="file-card-title">{title}</div>
+      {!hideMeta && (meta || ext) && <div class="file-card-meta">{meta || ext.toUpperCase()}</div>}
+    </div>
+
+    {actions.length > 0 && (
+      <div class="file-card-actions-col file-card-z" aria-label="Veiksmai">
+        {actions.map(a => (
+          <a class="file-card-action" href={a.href} target={a.target} rel={a.rel}>{a.text}</a>
+        ))}
+      </div>
+    )}
+  </article>
+) : title ? (
+  <div class="text-muted text-sm"><em>Trūksta failo nuorodos.</em></div>
+) : (
+  <div class="text-muted text-sm"><em>Trūksta failo pavadinimo.</em></div>
+)}

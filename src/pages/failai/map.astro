@@ -1,0 +1,67 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { postgres, getColorScheme, getFont } from '../../lib/failai.js';
+import config from '@/config.js';
+import '@/utils/linksniai.js';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+const { rows } = await postgres.query('SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon FROM public.failai WHERE location IS NOT NULL');
+const locations = (rows as any[]).map((r) => [r.lat, r.lon]);
+
+const leafletHead = `<script defer>
+(function(){
+  window.__vpLeaflet=window.__vpLeaflet||{loading:null,loaded:false};
+  const state=window.__vpLeaflet;
+  function ensureCssOnce(){if(document.querySelector('link[data-vp-leaflet-css="1"]'))return;const link=document.createElement('link');link.rel='stylesheet';link.href='/dist/leaflet.css';link.dataset.vpLeafletCss='1';document.head.appendChild(link);}
+  function waitForLeafletGlobal(resolve){const check=()=>{if(window.L&&window.L.map){state.loaded=true;resolve();}else{setTimeout(check,25);}};check();}
+  function appendScriptWhenBodyReady(script){const mount=()=>{const target=document.body||document.head||document.documentElement;if(!target)return false;target.appendChild(script);return true;};if(mount())return;if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',()=>{mount();},{once:true});}else{setTimeout(()=>{mount();},0);}}
+  function ensureJsOnce(){if(state.loaded){state.loading=state.loading||Promise.resolve();return state.loading;}if(state.loading)return state.loading;state.loading=new Promise((resolve,reject)=>{if(document.querySelector('script[data-vp-leaflet-js="1"]'))return waitForLeafletGlobal(resolve);const script=document.createElement('script');script.src='/dist/leaflet.js';script.defer=true;script.dataset.vpLeafletJs='1';script.onload=()=>{state.loaded=true;resolve();};script.onerror=reject;appendScriptWhenBodyReady(script);});return state.loading;}
+  window.__vpLeafletLoad=window.__vpLeafletLoad||function(){ensureCssOnce();return ensureJsOnce();};
+  try{window.__vpLeafletLoad();}catch(e){}
+})();
+</script>`;
+---
+<Layout pageTitle="Failų žemėlapis" pageDescription="Viešųjų pirkimų dokumentų geografinis pasiskirstymas žemėlapyje" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font} customHead={((config as any).customHead || '') + leafletHead}>
+  <main>
+    <div class="page-header"><h1 class="mb-0">Failų žemėlapis</h1></div>
+    <p class="text-muted text-sm mb-4">
+      Dalis paviešintų failų turi geografinę informaciją apie jų sukūrimo vietą.
+      Norėdami peržiūrėti failus tam tikroje vietovėje, spustelėkite žemėlapyje esančius taškus.
+    </p>
+    <div id="map" class="map-container map-lg"></div>
+    <script defer is:inline define:vars={{ locationsArray: locations }}>
+      window.addEventListener('DOMContentLoaded', () => {
+        const start = () => {
+          if (!window.L || !window.L.map) return;
+
+          const map = L.map('map').setView([55.1694, 23.8813], 7);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+          }).addTo(map);
+
+          const layerGroup = L.layerGroup();
+          locationsArray.forEach(([lat, lon]) => {
+            L.circleMarker([lat, lon], {
+              radius: 2,
+              color: 'black',
+              fillColor: 'black',
+              fillOpacity: 0.5
+            })
+              .on('click', () => { window.location.href = `/failai?location=${lat},${lon}&locationRadius=100`; })
+              .addTo(layerGroup);
+          });
+          layerGroup.addTo(map);
+        };
+
+        if (typeof window.__vpLeafletLoad === 'function') {
+          window.__vpLeafletLoad().then(start).catch(() => {});
+        } else if (window.__vpLeaflet && (window.__vpLeaflet.loading || window.__vpLeaflet.loaded)) {
+          (window.__vpLeaflet.loading || Promise.resolve()).then(start).catch(() => {});
+        } else {
+          start();
+        }
+      });
+    </script>
+  </main>
+</Layout>

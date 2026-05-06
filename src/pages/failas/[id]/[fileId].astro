@@ -1,0 +1,30 @@
+---
+import { postgres } from '@/postgres/postgres.js';
+import { checkDokFileRemoved } from '@/modules/failai/queries.js';
+
+function stripJsonSuffix(raw: string): { value: string; requestsJson: boolean } {
+  if (raw.endsWith('.json')) return { value: raw.slice(0, -5), requestsJson: true };
+  return { value: raw, requestsJson: false };
+}
+
+const { id: rawDokId, fileId: rawFileId } = Astro.params;
+const { value: dokId } = stripJsonSuffix(rawDokId ?? '');
+const { value: fileId } = stripJsonSuffix(rawFileId ?? '');
+
+if (isNaN(Number(dokId)) || isNaN(Number(fileId))) return new Response(null, { status: 404 });
+
+if (await checkDokFileRemoved(dokId, fileId)) {
+  return new Response(
+    await (await import('../../../components/failai/FailasPasalintas.astro')).default.toString(),
+    { status: 451 },
+  );
+}
+
+const result = await postgres.query(
+  `SELECT id FROM failai WHERE "dokId" = $1 AND "fileId" = $2 LIMIT 1`,
+  [dokId, fileId],
+);
+if (!result.rows.length) return new Response(null, { status: 404 });
+
+return Astro.redirect(`/failas/${result.rows[0].id}`, 301);
+---

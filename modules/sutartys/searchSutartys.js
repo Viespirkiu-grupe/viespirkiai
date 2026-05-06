@@ -95,11 +95,12 @@ const FIXED_WHERE = [`NOT COALESCE("istrinta", false)`];
 
 /**
  * @typedef {object} SearchOptions
- * @property {number} limit - Rows per page.
+ * @property {number | null} [limit] - Rows per page.
  * @property {number} [page=1] - Current page number.
  * @property {Engine} [engine="postgres"] - Search engine to use.
  * @property {boolean} [stream=false] - Return a raw stream instead of rows.
  *   When true, caller must release the returned `client`.
+ * @property {boolean} [sort=true] - Whether to apply default sorting.
  */
 
 /**
@@ -108,7 +109,7 @@ const FIXED_WHERE = [`NOT COALESCE("istrinta", false)`];
  * @property {number | null} total - Total matching rows. Null if count timed out.
  * @property {object} values - Resolved filter values for form repopulation.
  * @property {string} queryParams - URL query string fragment for pagination links.
- * @property {import("pg-query-stream") | null} stream - Raw stream, or null.
+ * @property {import("node:stream").Readable | null} stream - Raw stream, or null.
  * @property {import("pg").PoolClient | null} client - Live pg client when streaming, else null.
  */
 

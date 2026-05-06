@@ -1,0 +1,83 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { postgres, getColorScheme, getFont } from '../../lib/failai.js';
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+const { rows } = await postgres.query(`SELECT * FROM failai WHERE "ocrState" = 1 AND ("zodziuSkaicius" IS NULL OR "zodziuSkaicius" <= 10) AND lower(extension) = ANY(ARRAY['jpg','jpeg','png','bmp','gif','webp','heic']) ORDER BY random() LIMIT 50`);
+const seen = new Set();
+const images = (rows as any[]).filter((r) => !seen.has(r.id) && seen.add(r.id));
+---
+<Layout pageTitle="Failų galerija" pageDescription="Atsitiktinė viešųjų pirkimų dokumentų nuotraukų galerija" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font}>
+  <style>
+    .gallery-grid {
+      columns: 4 200px;
+      gap: 12px;
+    }
+
+    .gallery-item {
+      break-inside: avoid;
+      margin-bottom: 12px;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: var(--shade-4);
+    }
+
+    .gallery-item a {
+      display: block;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(110deg, var(--shade-4) 30%, var(--shade-2) 50%, var(--shade-4) 70%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+    }
+
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+      display: block;
+      transition: opacity var(--transition);
+    }
+
+    .gallery-item:hover img {
+      opacity: 0.85;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+  </style>
+  <main>
+    <div class="page-header flex align-items-center justify-content-between">
+      <h1 class="mb-0">Failų galerija</h1>
+      <a href="/failai/galerija" class="btn btn-sm btn-outline-secondary">Atnaujinti</a>
+    </div>
+
+    <p class="text-muted text-sm mb-4">
+      50 atsitiktinai parinktų nuskaitytų nuotraukų iš viešųjų pirkimų dokumentų.
+    </p>
+
+    <div class="gallery-grid">
+      {images.map((img: any) => {
+        const w = img.metaduomenys?.width || img.metaduomenys?.exif?.['Image Width']?.value;
+        const h = img.metaduomenys?.height || img.metaduomenys?.exif?.['Image Height']?.value;
+        const valid = w && h && w > 10 && h > 10 && w < 20000 && h < 20000 && (h / w) < 2 && (w / h) < 10;
+        const ratio = valid ? `${w}/${h}` : '4/3';
+
+        return (
+          <div class="gallery-item">
+            <a href={`/failas/${img.id}`} target="_blank" style={`aspect-ratio: ${ratio}`}>
+              <img
+                src={`https://failai.viespirkiai.org/${img.id}`}
+                loading="lazy"
+                onerror="this.closest('.gallery-item').style.display='none'"
+              />
+            </a>
+          </div>
+        );
+      })}
+    </div>
+  </main>
+</Layout>

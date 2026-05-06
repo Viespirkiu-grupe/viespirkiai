@@ -1,0 +1,71 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../lib/failai.js';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+---
+<Layout
+  pageTitle="Privatumo politika"
+  pageDescription="Viešpirkiai puslapio privatumo politika"
+  pageImage="https://viespirkiai.org/privatumas.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <div class="page-header">
+      <h1>Privatumo politika</h1>
+    </div>
+
+    <div class="faq">
+      <div class="faq-item">
+        <h2 class="faq-question">Kokiu tikslu renkami ir rodomi duomenys?</h2>
+        <div class="faq-answer">
+          <p>Viešuoju interesu – siekiant užtikrinti skaidrumą ir prieigą prie viešųjų pirkimų dokumentų, informacijos apie viešuosius pirkimus, juridinius asmenis.</p>
+          <p>Primename Bendrąjo duomenų apsaugos reglamento 86 straipsnį:</p>
+          <blockquote>
+            Valdžios institucijos arba viešosios įstaigos ar privačios įstaigos turimuose oficialiuose dokumentuose,
+            reikalinguose užduočiai, vykdomai dėl viešojo intereso, atlikti, esantys asmens duomenys šios institucijos arba
+            įstaigos gali būti atskleisti laikantis Sąjungos ar valstybės narės teisės, kuri taikoma tai valdžios institucijai
+            arba įstaigai, siekiant visuomenės teisę susipažinti su oficialiais dokumentais suderinti su teise į asmens duomenų
+            apsaugą pagal šį reglamentą.
+          </blockquote>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <h2 class="faq-question">Ar Viešpirkiai renka asmeninius puslapio vartotojų duomenis?</h2>
+        <div class="faq-answer">
+          <p class="text-3xl font-bold">Ne.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <h2 class="faq-question">Atvaizduojama nenuasmeninta informacija, ką daryti?</h2>
+        <div class="faq-answer">
+          <p>Duomenys automatiškai renkami <strong>tik iš viešų šaltinių</strong>, todėl tikėtina, kad nuasmeninimo klaida buvo atlikta institucijai juos viešinant.</p>
+          <p>Prašome susisiekti su atitinkama institucija ir Viešpirkiais. Daugiau apie tai – <a href="/kontaktai#informacijosTikslumas">kontaktų puslapio skiltyje informacijos tikslumas / pašalinimai</a>.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <h2 class="faq-question">Kokie slapukai naudojami?</h2>
+        <div class="faq-answer">
+          <p>Naudojami tik būtiniausi slapukai, reikalingi puslapio veikimui.</p>
+          <p>Svetainės apsaugai ir paslaugų užtikrinimui naudojamas „Cloudflare", kuris kartais nustato būtinuosius saugumo slapukus (pvz., <code>cf_clearance</code>) siekiant atskirti žmones nuo automatizuoto srauto. Plausible Analitika slapukų nenaudoja.</p>
+          <p>Naudojami funkciniai slapukai:</p>
+          <ul>
+            <li><code>naujaPaieska</code> – jei <code>false</code> – informuoja, kad paieškos rezultatus reikia atvaizduoti lentele. Jei <code>true</code> – slapukas ištrinamas.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <h2 class="faq-question">Kiti klausimai</h2>
+        <div class="faq-answer">
+          <p>Susisiekite – <a href="/kontaktai">kontaktų puslapis</a>.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</Layout>

@@ -1,0 +1,124 @@
+---
+const { asmuo, finansaiLimit } = Astro.props;
+const ataskaitos = asmuo.finansai?.ataskaitos ?? [];
+if (ataskaitos.length === 0) return;
+const lentele = asmuo.finansai?.lentele;
+const metai = lentele?.metai ?? [];
+const duomenys = lentele?.duomenys ?? {};
+const pardavimoPajamosSeries = JSON.stringify(metai.map((m: string) => duomenys['Pardavimo pajamos']?.[metai.indexOf(m)] ?? null));
+const metaiLabels = JSON.stringify(metai.map(String));
+const pelnoDuomenys = JSON.stringify(duomenys['Grynasis pelnas (nuostoliai)'] ?? duomenys['Ataskaitinių metų pelnas (nuostoliai)'] ?? []);
+---
+
+<div class="page-section mb-10" id="finansai">
+  <h2><a href="#finansai" class="no-style">Finansinės ataskaitos</a></h2>
+
+  <div class="grid-2 mb-10">
+    <div>
+      <h3 class="text-sm font-bold mb-3">Pardavimo pajamos</h3>
+      {metai.length > 0 && duomenys['Pardavimo pajamos'] ? (
+        <div class="chart-frame">
+          <div id="pardavimoPajamosChart" class="chart h-75"></div>
+          <script defer is:inline define:vars={{ fa_ml: JSON.parse(metaiLabels), fa_ps: JSON.parse(pardavimoPajamosSeries) }}>
+            if (typeof window.pardavimaiKasMetusLabels === 'undefined') window.pardavimaiKasMetusLabels = [];
+            if (typeof window.pardavimaiKasMetus === 'undefined') window.pardavimaiKasMetus = [];
+            const fa_map = {};
+            fa_ml.forEach((m, i) => { fa_map[m] = fa_ps[i]; });
+            const fa_merged = Array.from(new Set([...Object.keys(fa_map), ...window.pardavimaiKasMetusLabels])).map(Number).sort((a,b)=>a-b).map(String);
+            displayChart({
+              element: document.querySelector('#pardavimoPajamosChart'),
+              labels: fa_merged,
+              series: [
+                { name: 'Pardavimo pajamos', data: fa_merged.map(l => fa_map[l] ?? null) },
+                { name: 'Viešųjų pirkimų pardavimai', data: fa_merged.map(l => { const i = window.pardavimaiKasMetusLabels.indexOf(l); return i !== -1 ? window.pardavimaiKasMetus[i] : null; }) }
+              ],
+              flags: ['yEUR', 'yMin0'],
+            });
+          </script>
+        </div>
+      ) : <div class="chart-empty">Nėra duomenų</div>}
+    </div>
+
+    <div>
+      <h3 class="text-sm font-bold mb-3">Grynasis pelnas (nuostoliai)</h3>
+      {metai.length > 0 ? (
+        <div class="chart-frame">
+          <div id="grynasisPelnas" class="chart h-75"></div>
+          <script defer is:inline define:vars={{ gp_l: JSON.parse(metaiLabels), gp_d: JSON.parse(pelnoDuomenys) }}>
+            const gp_v = gp_d.map((v) => v ?? null);
+            const gp_neg = gp_v.some((v) => v !== null && v < 0);
+            displayChart({
+              element: document.querySelector('#grynasisPelnas'),
+              labels: gp_l, series: gp_v, flags: ['yEUR', 'yMinAuto'],
+              customOptions: { annotations: gp_neg ? { yaxis: [{ y: 0, y2: -100000000, borderColor: 'red', borderWidth: 2, label: { borderColor: 'red', style: { color: '#fff', background: 'red' }, text: 'Nuostoliai' } }] } : {} }
+            });
+          </script>
+        </div>
+      ) : <div class="chart-empty">Nėra duomenų</div>}
+    </div>
+  </div>
+
+  {metai.length > 0 && (
+    <div class="table-wrapper mb-7">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Eilutė</th>
+            {metai.map((y: string) => <th class="cell-right">{y}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {Object.entries(duomenys).map(([lineName, values]: [string, any]) => (
+            <tr>
+              <td>{lineName}</td>
+              {(values as any[]).map((value: any) => (
+                <td class="cell-mono cell-right">
+                  {value == null
+                    ? <span class="text-muted">—</span>
+                    : lineName === 'Pelningumas'
+                      ? `${value.toFixed(2)}%`
+                      : value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' })
+                  }
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+
+  {ataskaitos.length > finansaiLimit && (
+    <p class="text-muted text-sm mb-4">
+      Rodoma tik paskutinė finansinė ataskaita.
+      <a href="?finansaiLimit=max#finansai">Rodyti visas ({ataskaitos.length})</a>
+    </p>
+  )}
+
+  {ataskaitos.slice(0, finansaiLimit).map((laikotarpis: any) => (
+    <div class="subsection">
+      <h3>
+        {laikotarpis.templateName}
+        <span class="text-muted text-xs font-normal">({laikotarpis.templateId}, {laikotarpis.duomenuData})</span>
+      </h3>
+      <p class="text-muted text-sm mb-4">{laikotarpis.laikotarpisNuo} – {laikotarpis.laikotarpisIki}</p>
+      <div class="grid-auto items-start">
+        {laikotarpis.standards.map((std: any) => (
+          <div class="card">
+            <div class="card-body">
+              <div class="section-title mb-3">{std.standardName} <span class="text-muted font-normal">({std.standardId})</span></div>
+              <dl class="kv-list">
+                {std.lines.map((line: any) => (
+                  <>
+                    <dt>{line.lineName} <span class="text-muted text-xs">({line.lineTypeId})</span></dt>
+                    <dd><span class="cell-mono">{new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(line.reiksme)}</span></dd>
+                  </>
+                ))}
+              </dl>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ))}
+</div>

@@ -1,0 +1,97 @@
+---
+const { asmuo } = Astro.props;
+const pirkimai = asmuo.sutartys?.pirkimaiKasMetus ?? [];
+const tiekimai = asmuo.sutartys?.tiekimaiKasMetus ?? [];
+const topTiekejai = asmuo.sutartys?.topTiekejai ?? [];
+const topPirkejai = asmuo.sutartys?.topPirkejai ?? [];
+const pirkimaiLabels = JSON.stringify(pirkimai.map((d: any) => String(d.year)));
+const pirkimaiSeries = JSON.stringify(pirkimai.map((d: any) => d.total || null));
+const tiekimaiLabels = JSON.stringify(tiekimai.map((d: any) => String(d.year)));
+const tiekimaiSeries = JSON.stringify(tiekimai.map((d: any) => d.total || null));
+---
+
+<div class="page-section mb-10" id="sutartys">
+  <h2><a href="#sutartys" class="no-style">Viešųjų pirkimų sutartys</a></h2>
+  <div class="grid-2 mb-10">
+    <div class="flex flex-col min-h-[350px]">
+      <h3 class="text-sm font-bold mb-3">Numatytos pirkimų vertės pagal metus</h3>
+      {pirkimai.length > 0 ? (
+        <div class="chart-frame">
+          <div id="pirkimaiPerMetus" class="chart h-[350px]"></div>
+          <script defer is:inline define:vars={{ pp_l: JSON.parse(pirkimaiLabels), pp_s: JSON.parse(pirkimaiSeries) }}>
+            displayChart({ element: document.querySelector('#pirkimaiPerMetus'), type: 'line-datetime', labels: pp_l, series: pp_s, flags: ['yEUR', 'yMin0', 'xYear'] });
+          </script>
+        </div>
+      ) : <div class="chart-empty">Nėra duomenų</div>}
+    </div>
+    <div class="flex flex-col min-h-[350px]">
+      <h3 class="text-sm font-bold mb-3">Numatytos pardavimų vertės pagal metus</h3>
+      {tiekimai.length > 0 ? (
+        <div class="chart-frame">
+          <div id="pardavimaiPerMetus" class="chart h-[350px]"></div>
+          <script defer is:inline define:vars={{ tp_l: JSON.parse(tiekimaiLabels), tp_s: JSON.parse(tiekimaiSeries) }}>
+            window.pardavimaiKasMetusLabels = tp_l;
+            window.pardavimaiKasMetus = tp_s;
+            displayChart({ element: document.querySelector('#pardavimaiPerMetus'), type: 'line-datetime', labels: tp_l, series: tp_s, flags: ['yEUR', 'yMin0', 'xYear'] });
+          </script>
+        </div>
+      ) : <div class="chart-empty">Nėra duomenų</div>}
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="flex flex-col">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-sm font-bold mb-0">TOP 10 tiekėjų</h3>
+        <div class="flex gap-2">
+          <a href={`/asmuo/${asmuo.jar.jarKodas}/sutartys/topTiekejai.csv`} class="btn btn-outline btn-sm">↗ CSV</a>
+          <a href={`/asmuo/${asmuo.jar.jarKodas}/sutartys/topTiekejai.jsonl`} class="btn btn-outline btn-sm">↗ JSONL</a>
+        </div>
+      </div>
+      {topTiekejai.length > 0 ? (
+        <div class="table-wrapper flex-1">
+          <table class="table">
+            <thead><tr><th>#</th><th>Tiekėjas</th><th class="cell-right">Suma</th><th class="cell-right">Sut.</th></tr></thead>
+            <tbody>
+              {topTiekejai.map((t: any, i: number) => (
+                <tr>
+                  <td class="cell-mono text-muted">{i + 1}</td>
+                  <td class="cell-truncate"><a href={`/?perkanciosiosOrganizacijosKodas=${asmuo.jar.jarKodas}&tiekejoKodas=${t.jarKodas}`}>{t.pavadinimas}</a></td>
+                  <td class="cell-mono cell-right">{t.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' })}</td>
+                  <td class="cell-mono cell-right">{t.count.toLocaleString('lt-LT')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div class="chart-empty flex-1">Nėra duomenų</div>}
+    </div>
+
+    <div class="flex flex-col">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-sm font-bold mb-0">TOP 10 pirkėjų</h3>
+        <div class="flex gap-2">
+          <a href={`/asmuo/${asmuo.jar.jarKodas}/sutartys/topPirkejai.csv`} class="btn btn-outline btn-sm">↗ CSV</a>
+          <a href={`/asmuo/${asmuo.jar.jarKodas}/sutartys/topPirkejai.jsonl`} class="btn btn-outline btn-sm">↗ JSONL</a>
+        </div>
+      </div>
+      {topPirkejai.length > 0 ? (
+        <div class="table-wrapper flex-1">
+          <table class="table">
+            <thead><tr><th>#</th><th>Pirkėjas</th><th class="cell-right">Suma</th><th class="cell-right">Sut.</th></tr></thead>
+            <tbody>
+              {topPirkejai.map((p: any, i: number) => (
+                <tr>
+                  <td class="cell-mono text-muted">{i + 1}</td>
+                  <td class="cell-truncate"><a href={`/?perkanciosiosOrganizacijosKodas=${p.jarKodas}&tiekejoKodas=${asmuo.jar.jarKodas}`}>{p.pavadinimas}</a></td>
+                  <td class="cell-mono cell-right">{p.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' })}</td>
+                  <td class="cell-mono cell-right">{p.count.toLocaleString('lt-LT')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div class="chart-empty flex-1">Nėra duomenų</div>}
+    </div>
+  </div>
+</div>

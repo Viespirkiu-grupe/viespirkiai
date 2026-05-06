@@ -1,0 +1,32 @@
+---
+interface Props { domains: string[]; title?: string; maxItems?: number; emptyText?: string; }
+const { domains = [], title = 'Interneto puslapiai', maxItems = 3, emptyText = 'Nerasta' } = Astro.props;
+const visible = domains.slice(0, maxItems);
+const hidden = domains.slice(maxItems);
+---
+<dt>{title}</dt>
+<dd class="domain-list">
+  {domains.length > 0 ? (
+    <>
+      <div class="flex flex-col gap-1">
+        {visible.filter(Boolean).map(d => (
+          <a href={`https://${d}`} target="_blank" class="cell-truncate">{d}</a>
+        ))}
+      </div>
+      {hidden.length > 0 && (
+        <details class="domain-list-details mt-2">
+          <summary class="domain-list-summary">
+            <span class="text-muted text-xs font-bold">+ {hidden.length} daugiau</span>
+          </summary>
+          <div class="domain-list-expanded flex flex-col gap-1 mt-2">
+            {hidden.filter(Boolean).map(d => (
+              <a href={`https://${d}`} target="_blank" class="cell-truncate">{d}</a>
+            ))}
+          </div>
+        </details>
+      )}
+    </>
+  ) : (
+    <em class="text-muted">{emptyText}</em>
+  )}
+</dd>

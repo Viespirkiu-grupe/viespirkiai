@@ -1,0 +1,40 @@
+---
+const { asmuo } = Astro.props;
+if (!(asmuo.esInvesticijos?.count > 0)) return;
+const { count, limit, rows } = asmuo.esInvesticijos;
+---
+
+<div class="page-section mb-10" id="esInvesticijos">
+  <h2><a href="#esInvesticijos" class="no-style">ES investicijos (2014 programa)</a></h2>
+  {count > rows.length && (
+    <p class="text-muted text-sm mb-4">
+      Rodomos tik {limit} paraiškos.
+      <a href="?esInvesticijosLimit=max#esInvesticijos">Rodyti visus ({count})</a>
+    </p>
+  )}
+  <div class="result-list">
+    {rows.map((item: any) => {
+      const suma = typeof item.galutineSuma === 'number' && Number.isFinite(item.galutineSuma)
+        ? new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(item.galutineSuma)
+        : null;
+      const pabaiga = item.pabaigosData ? new Date(item.pabaigosData).toISOString().slice(0, 10) : 'nenurodyta';
+      return (
+        <article class="result-card card-clickable">
+          <div class="result-card-body">
+            <dl class="result-card-meta">
+              <div><dt class="sr-only">Pareiškėjas</dt><dd>{item.pareiskejas}</dd></div>
+              <div><dt class="sr-only">Kodas</dt><dd><span class="cell-mono">{item.kodas}</span></dd></div>
+              <div><dt class="sr-only">Pabaiga</dt><dd>Iki {pabaiga}</dd></div>
+            </dl>
+            <h3 class="result-card-title">
+              <a href={`https://2014.esinvesticijos.lt/lt/finansavimas/paraiskos_ir_projektai/${item.slug}`}>
+                {suma && <span class="cell-mono">{suma}</span>}{suma && ' – '}{item.pavadinimas}
+              </a>
+            </h3>
+            <div class="result-card-footer"><span>{item.busena}</span></div>
+          </div>
+        </article>
+      );
+    })}
+  </div>
+</div>

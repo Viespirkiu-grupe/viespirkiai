@@ -1,0 +1,8 @@
+---
+interface Props { label: string; name: string; placeholder?: string; values: Record<string, any>; }
+const { label, name, placeholder = '', values } = Astro.props;
+---
+<div class="form-group">
+  <label class="form-label" for={name}>{label}</label>
+  <input type="text" class="form-control" name={name} id={name} value={values[name] || ''} placeholder={placeholder}>
+</div>

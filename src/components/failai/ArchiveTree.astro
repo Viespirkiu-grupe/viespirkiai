@@ -1,0 +1,59 @@
+---
+interface TreeNode { name?: string; path?: string; id?: string | number; extension?: string; size?: number; isDirectory?: boolean; children?: TreeNode[]; }
+interface Props { filesTree: TreeNode[]; failasId: string | number; openByDefault?: boolean; rootClass?: string; }
+const { filesTree = [], failasId, openByDefault = true, rootClass = '' } = Astro.props;
+
+function formatSize(bytes: number) {
+  const b = Number(bytes);
+  if (!Number.isFinite(b) || b < 0) return '';
+  if (b < 1024) return `${b} B`;
+  const kb = b / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  return `${(mb / 1024).toFixed(1)} GB`;
+}
+
+function renderNodes(nodes: TreeNode[]): string {
+  if (!nodes?.length) return '';
+  let html = '';
+  for (const node of nodes) {
+    if (!node) continue;
+    const isDir = !!node.isDirectory || Array.isArray(node.children);
+    const name = node.name || '—';
+    const safeName = name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const children = node.children || [];
+    if (isDir) {
+      const openAttr = openByDefault ? ' open' : '';
+      const noChildren = children.length ? '' : ' class="no-children"';
+      const count = children.length ? `(${children.length})` : '';
+      html += `<details${openAttr}${noChildren}><summary>`;
+      if (children.length) html += `<span class="archive-toggle">▶</span>`;
+      html += `<span class="archive-name">${safeName}</span>`;
+      if (count) html += `<span class="archive-meta">${count}</span>`;
+      html += `</summary>`;
+      if (children.length) html += `<div class="archive-children">${renderNodes(children)}</div>`;
+      html += `</details>`;
+    } else {
+      const ext = node.extension || (name.includes('.') ? name.split('.').pop() : '');
+      const size = formatSize(node.size!);
+      const meta = [ext, size].filter(Boolean).join(' · ');
+      const href = node.id
+        ? `/failas/${node.id}`
+        : (failasId && node.path ? `https://failai.viespirkiai.org/${failasId}/${node.path}` : '#');
+      html += `<details class="no-children"><summary><span class="archive-name"><a href="${href}" class="cell-truncate">${safeName}</a></span>`;
+      if (meta) html += `<span class="archive-meta">${meta.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span>`;
+      html += `</summary></details>`;
+    }
+  }
+  return html;
+}
+
+const treeHtml = renderNodes(filesTree);
+---
+<div class={`archive-tree ${rootClass}`}>
+  {filesTree.length > 0
+    ? <div class="archive-root" set:html={treeHtml} />
+    : <em class="text-muted">Nerasta</em>
+  }
+</div>

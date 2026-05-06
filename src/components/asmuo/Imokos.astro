@@ -1,0 +1,39 @@
+---
+const { asmuo } = Astro.props;
+const sodra = asmuo.sodra?.duomenys ?? [];
+const vmi = asmuo.vmi?.duomenys ?? [];
+const sodraLabels = JSON.stringify(sodra.map((d: any) => d.data + '-01'));
+const sodraSeries = JSON.stringify(sodra.map((d: any) => d.imokuSuma || null));
+const vmiLabels = JSON.stringify(vmi.map((d: any) => d.data + '-01'));
+const vmiSeries = JSON.stringify(vmi.map((d: any) => d.suma || null));
+const lastVmiDate = vmi.length > 0 ? vmi[vmi.length - 1].data + '-01' : null;
+---
+
+<div class="page-section mb-10" id="imokos">
+  <div class="grid-2">
+    <div class="flex flex-col min-h-[350px]">
+      <h2 class="mb-4"><a href="#sodraImokos" id="sodraImokos" class="no-style">SODRA įmokos</a></h2>
+      {sodra.length > 0 ? (
+        <div class="chart-frame">
+          <div id="sodraImokosDiagrama" class="chart h-[350px]"></div>
+          <script defer is:inline define:vars={{ si_l: JSON.parse(sodraLabels), si_s: JSON.parse(sodraSeries) }}>
+            displayChart({ element: document.querySelector('#sodraImokosDiagrama'), type: 'line-datetime', labels: si_l, series: si_s, flags: ['yEUR', 'yMin0'] });
+          </script>
+        </div>
+      ) : <div class="chart-empty">Nėra duomenų</div>}
+    </div>
+    <div class="flex flex-col min-h-[350px]">
+      <h2 class="mb-4"><a href="#vmiImokos" id="vmiImokos" class="no-style">VMI įmokos</a></h2>
+      {vmi.length > 0 ? (
+        <div class="chart-frame">
+          <div id="vmiMokesciuDiagrama" class="chart h-[350px]"></div>
+          <script defer is:inline define:vars={{ vi_l: JSON.parse(vmiLabels), vi_s: JSON.parse(vmiSeries), vi_last: lastVmiDate }}>
+            const _lastDate = new Date(vi_last);
+            const _annotations = _lastDate.getMonth() + 1 !== 12 ? { xaxis: [{ x: new Date(_lastDate.getFullYear(), 0, 1).getTime(), borderColor: '#777', label: { style: { color: '#000' }, position: 'bottom', text: 'Nebaigti duomenys:' } }] } : {};
+            displayChart({ element: document.querySelector('#vmiMokesciuDiagrama'), type: 'line-datetime', labels: vi_l, series: vi_s, flags: ['yEUR', 'yMin0'], customOptions: { annotations: _annotations } });
+          </script>
+        </div>
+      ) : <div class="chart-empty">Nėra duomenų</div>}
+    </div>
+  </div>
+</div>

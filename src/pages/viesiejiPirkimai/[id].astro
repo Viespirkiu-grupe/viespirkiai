@@ -1,0 +1,469 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import FileCard from '../../components/FileCard.astro';
+import { postgres } from '@/postgres/postgres.js';
+import { buildTedNoticeViewModel } from '@/modules/ted/viewer.js';
+import { searchSutartys } from '@/modules/sutartys/searchSutartys.js';
+
+const raw = Astro.params.id!;
+const isPng = raw.endsWith('.png');
+const isJson = raw.endsWith('.json');
+const id = raw.replace(/\.(png|json)$/, '');
+
+const { rows } = await postgres.query(
+  `SELECT p.*, v.pavadinimas AS "vykdytojoPavadinimas", v."jarKodas"
+   FROM public."viesiejiPirkimai" p
+   LEFT JOIN public."viesiejiPirkimaiVykdytojai" v ON v.id = p."pirkimoVykdytojasId"
+   WHERE p."pirkimoId" = $1`,
+  [id],
+);
+const pirkimas = rows[0];
+if (!pirkimas) return new Response(null, { status: 404 });
+
+const failai = pirkimas.turinys?.failai ?? [];
+const saltinioIds = failai.flatMap((failas: any) =>
+  (failas.versijos ?? []).map((v: any) => `${id}/${failas.dokumentasId}/${v.versionId}`),
+);
+
+if (saltinioIds.length) {
+  const { rows: failaiRows } = await postgres.query(
+    `SELECT * FROM public."failai" WHERE saltinis = 'cvpIs' AND "saltinioId" = ANY($1)`,
+    [saltinioIds],
+  );
+  const lokalusFailai = Object.fromEntries(failaiRows.map((f: any) => [f.saltinioId, f]));
+  for (const failas of failai) {
+    for (const versija of failas.versijos ?? []) {
+      const saltinioId = `${id}/${failas.dokumentasId}/${versija.versionId}`;
+      const lokalus = (lokalusFailai as any)[saltinioId];
+      if (lokalus) {
+        const { id: lId, filename, extension, parsiustas, nuskaitytas, zodziuSkaicius, puslapiuSkaicius, dydis, md5 } = lokalus;
+        Object.assign(versija, { id: lId, filename, extension, parsiustas, nuskaitytas, zodziuSkaicius, puslapiuSkaicius, dydis, md5 });
+      }
+    }
+  }
+}
+
+if (pirkimas?.turinys?.skelbimai && Array.isArray(pirkimas.turinys.skelbimai)) {
+  pirkimas.turinys.skelbimai = pirkimas.turinys.skelbimai.map((s: any) => {
+    if (!s || typeof s !== 'object') return s;
+    const href = (s.downloadHref || '').trim();
+    if (!href || /^https?:\/\//i.test(href)) return s;
+    const path = href.startsWith('/') ? href : `/${href}`;
+    return { ...s, downloadHref: `https://viesiejipirkimai.lt${path}` };
+  });
+}
+
+if (Array.isArray(pirkimas?.turinys?.tedNuorodosIPaskelbtusPranesimus)) {
+  const tedUrls = pirkimas.turinys.tedNuorodosIPaskelbtusPranesimus.filter(
+    (u: any) => typeof u === 'string' && u.trim().length > 0,
+  );
+  pirkimas.turinys.tedSkelbimai = [];
+  pirkimas.turinys.tedNuorodosIsorines = [];
+
+  const parseTedNoticeNumber = (url: string) => {
+    const trimmed = String(url).trim();
+    const noticeMatch = trimmed.match(/NOTICE:(\d+-\d{4})/i);
+    if (noticeMatch?.[1]) return noticeMatch[1];
+    const fallbackMatch = trimmed.match(/(\d{4,}-\d{4})/);
+    return fallbackMatch?.[1] || null;
+  };
+
+  const tedNoticeNumbers = [...new Set(tedUrls.map((url: string) => parseTedNoticeNumber(url)).filter(Boolean))];
+
+  if (tedNoticeNumbers.length > 0) {
+    const { rows: tedRows } = await postgres.query(
+      `SELECT "tedNoticeNumber", turinys FROM public."tedNotices" WHERE "tedNoticeNumber" = ANY($1) AND turinys IS NOT NULL`,
+      [tedNoticeNumbers],
+    );
+    const availableNotices = new Map(tedRows.map((r: any) => [r.tedNoticeNumber, r.turinys]));
+
+    tedUrls.forEach((url: string) => {
+      const tedNoticeNumber = parseTedNoticeNumber(url);
+      if (!tedNoticeNumber || !availableNotices.has(tedNoticeNumber)) {
+        pirkimas.turinys.tedNuorodosIsorines.push(url);
+        return;
+      }
+      let pavadinimas = 'TED skelbimas';
+      const tedTurinys = availableNotices.get(tedNoticeNumber);
+      if (tedTurinys) {
+        try {
+          const tedView = buildTedNoticeViewModel(tedTurinys);
+          pavadinimas = tedView?.documentTypeLabel || tedView?.subTypeDescription || pavadinimas;
+        } catch {}
+      }
+      pirkimas.turinys.tedSkelbimai.push({ pavadinimas, numeris: tedNoticeNumber, downloadHref: `/ted/${tedNoticeNumber}`, originalHref: url });
+    });
+  } else {
+    pirkimas.turinys.tedSkelbimai = [];
+    pirkimas.turinys.tedNuorodosIsorines = tedUrls;
+  }
+}
+
+const sutartysRes = await searchSutartys({ pirkimoNumeris: pirkimas.pirkimoId });
+pirkimas.sutartys = sutartysRes.results;
+
+if (isPng) {
+  return new Response(new Uint8Array(await (await import('@/utils/openGraphImage.js')).getOpenGraphImage(
+    pirkimas.pirkimoBudas || 'Viešasis pirkimas',
+    [pirkimas.numatomaBendraPirkimoVerte ? `${Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '', pirkimas.pavadinimas].filter(Boolean).join(' '),
+    `Pirkėjas: ${pirkimas.pirkimoVykdytojas || ''}`,
+    `viespirkiai.org/viesiejiPirkimai/${pirkimas.pirkimoId}`,
+  )), { headers: { 'Content-Type': 'image/png' } });
+}
+
+if (isJson) {
+  return new Response(JSON.stringify(pirkimas), { headers: { 'Content-Type': 'application/json' } });
+}
+
+const t = pirkimas.turinys || {};
+
+const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Vilnius' }));
+const isPast = (dateStr: any) => {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  return !isNaN(d.getTime()) && d < now;
+};
+
+const timelineItems = [
+  pirkimas.paskelbimoData && { date: pirkimas.paskelbimoData, label: 'Paskelbta' },
+  t.paskelbimoIrArbaKvietimoData && { date: t.paskelbimoIrArbaKvietimoData, label: 'Kvietimo data' },
+  t.paaiskinimuTerminoPabaiga && { date: t.paaiskinimuTerminoPabaiga, label: 'Paaiškinimų terminas' },
+  pirkimas.pasiulymuPateikimoTerminas && { date: pirkimas.pasiulymuPateikimoTerminas, label: 'Pasiūlymų teikimo terminas' },
+  t.susipazinimoSuPasiulymaisData && { date: t.susipazinimoSuPasiulymaisData, label: 'Susipažinimo data' },
+  t.laimetojoNustatymoData && { date: t.laimetojoNustatymoData, label: 'Laimėtojas nustatytas' },
+  t.dpsGaliojimoDataIrLaikas && { date: t.dpsGaliojimoDataIrLaikas, label: 'DPS galiojimas' },
+  t.kvsGaliojimoDataIrLaikas && { date: t.kvsGaliojimoDataIrLaikas, label: 'KVS galiojimas' },
+].filter(Boolean) as { date: any; label: string }[];
+
+const fmtVerte = (v: any) => {
+  const n = Number(v);
+  return v != null && v !== '' && !isNaN(n) && n > 0 ? n.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' : null;
+};
+const hasVerte = fmtVerte(pirkimas.numatomaBendraPirkimoVerte) || fmtVerte(t.numatomaVerteEUR) || fmtVerte(t.bendraSutarciuVerte) || fmtVerte(t.suteiktaVertemaksimaliDPSVerte);
+const hasKita = t.eAukcionuSukurimas || t.pirkimasSkaidomasIDaliuDPSIKategorijas || t.leidziamaPateiktisAlternatyviusPasiulymus || t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais || t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus || t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims;
+
+const tedSkelbimai: any[] = Array.isArray(t.tedSkelbimai) ? t.tedSkelbimai : [];
+const tedIsorinesNuorodos: any[] = Array.isArray(t.tedNuorodosIsorines) ? t.tedNuorodosIsorines : [];
+
+const tedKorteles = [
+  ...tedSkelbimai,
+  ...tedIsorinesNuorodos.map((url: string) => {
+    const m = String(url).match(/NOTICE:(\d+-\d{4})/i) || String(url).match(/(\d{4,}-\d{4})/);
+    const noticeId = m && m[1] ? m[1] : null;
+    return { pavadinimas: 'TED skelbimas', numeris: noticeId, downloadHref: url, originalHref: url };
+  }),
+];
+
+const verteStr = pirkimas.numatomaBendraPirkimoVerte
+  ? Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' € '
+  : '';
+const pageTitle = verteStr + pirkimas.pavadinimas;
+const pageDescription = `${pirkimas.pirkimoBudas || ''}\nPaskelbta: ${String(pirkimas.paskelbimoData).slice(0, 10)}\nVykdytojas: ${pirkimas.pirkimoVykdytojas}`;
+
+const colorScheme = Astro.cookies.get('colorScheme')?.value || 'auto';
+const font = Astro.cookies.get('font')?.value || 'ubuntu';
+---
+
+<Layout
+  pageTitle={pageTitle}
+  pageDescription={pageDescription}
+  pageImage={`https://viespirkiai.org/viesiejiPirkimai/${pirkimas.pirkimoId}.png`}
+  pageAuthor={pirkimas.pirkimoVykdytojas}
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <div class="page-header">
+      <div>
+        <p class="subtext">{pirkimas.pirkimoBudas}{pirkimas.statusas && <> · <span class="text-muted">{pirkimas.statusas}</span></>}</p>
+        <h1 class="mb-0">
+          {(!pirkimas.pavadinimas || pirkimas.pavadinimas.length < 1) ? <em>Nenurodyta</em> : pirkimas.pavadinimas}
+          {pirkimas.numatomaBendraPirkimoVerte && (
+            <> už <span class="amount">{Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;€</span></>
+          )}
+        </h1>
+      </div>
+      <div class="flex gap-3 items-center">
+        {pirkimas.type === 'Pmc' && (
+          <a href={`https://viesiejipirkimai.lt/epps/pmc/viewPmc.do?resourceId=${pirkimas.pirkimoId}`} class="btn btn-outline btn-sm" target="_blank" aria-label="Peržiūrėti CVP IS puslapį">↗ CVP IS</a>
+        )}
+        {pirkimas.type === 'CfTWS' && (
+          <a href={`https://viesiejipirkimai.lt/epps/cft/prepareViewCfTWS.do?resourceId=${pirkimas.pirkimoId}`} class="btn btn-outline btn-sm" target="_blank" aria-label="Peržiūrėti CVP IS puslapį">↗ CVP IS</a>
+        )}
+        {pirkimas.type === 'CfTDPSWS' && (
+          <a href={`https://viesiejipirkimai.lt/epps/cft/prepareViewCfTDPSWS.do?resourceId=${pirkimas.pirkimoId}`} class="btn btn-outline btn-sm" target="_blank" aria-label="Peržiūrėti CVP IS puslapį">↗ CVP IS</a>
+        )}
+        <a href={`/viesiejiPirkimai/${pirkimas.pirkimoId}.json`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti pirkimo JSON duomenis">↗ JSON</a>
+      </div>
+    </div>
+
+    <div class="mb-10">
+      <div class="text-muted mb-4 text-sm">
+        <i>BETA versija, galimos problemos bei netikslumai, apie kuriuos maloniai prašome pranešti <a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a><br />
+          Duomenys atnaujinti {String(pirkimas.turinioNuskaitymoData).slice(0, 16).replace('T', ' ')}</i>
+      </div>
+      {pirkimas.informacija && pirkimas.informacija !== pirkimas.pavadinimas && (
+        <div class="text-justify">{pirkimas.informacija}</div>
+      )}
+    </div>
+
+    <div class="grid-3 mb-10">
+
+      <section>
+        <h2>Pirkimo vykdytojas</h2>
+        <h3>
+          {pirkimas.jarKodas
+            ? <a href={`/asmuo/${pirkimas.jarKodas}`}>{pirkimas.vykdytojoPavadinimas || pirkimas.pirkimoVykdytojas}</a>
+            : (pirkimas.vykdytojoPavadinimas || pirkimas.pirkimoVykdytojas)}
+        </h3>
+        {pirkimas.jarKodas && <span class="text-muted">{pirkimas.jarKodas}</span>}
+        {t.kontaktinisAsmuo && <p class="text-muted text-sm mt-2">{t.kontaktinisAsmuo}</p>}
+        {t.pirkimuSuvestinesNuoroda && (
+          <p class="text-sm mt-2">
+            <a href={`https://viesiejipirkimai.lt/epps/app/viewPublication.do?selectedId=${t.pirkimuSuvestinesNuoroda}`} target="_blank">↗ Pirkimų suvestinė</a>
+          </p>
+        )}
+      </section>
+
+      <section>
+        <h2>Terminai</h2>
+        <ul class="timeline">
+          {timelineItems.map((item, i) => {
+            const past = isPast(item.date);
+            const nextPast = i + 1 < timelineItems.length && isPast(timelineItems[i + 1].date);
+            return (
+              <li class={`timeline-item${nextPast ? ' line-active' : ''}`}>
+                <span class={`timeline-dot${past ? ' active' : ''}`}></span>
+                <div class="timeline-body">
+                  <div class="timeline-date">{String(item.date).slice(0, 16).replace('T', ' ')}</div>
+                  <strong>{item.label}</strong>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      <section>
+        <h2>Klasifikacija</h2>
+        <dl class="kv-list mb-4">
+          {pirkimas.statusas && <><dt>Statusas</dt><dd>{pirkimas.statusas}</dd></>}
+          {pirkimas.pirkimoObjektoTipas && <><dt>Objekto tipas</dt><dd>{pirkimas.pirkimoObjektoTipas}</dd></>}
+          {t.direktyva && <><dt>Direktyva</dt><dd>{t.direktyva}</dd></>}
+          {t.nutsKodai && <><dt>NUTS kodas</dt><dd>{t.nutsKodai}</dd></>}
+          {pirkimas.esFinansavimas != null && <><dt>ES finansavimas</dt><dd>{pirkimas.esFinansavimas ? 'Taip' : 'Ne'}</dd></>}
+          {t.pasiulymuVertinimoKriterijai && <><dt>Vertinimo kriterijai</dt><dd>{t.pasiulymuVertinimoKriterijai}</dd></>}
+          {t.virsArbaZemiauTarptautinioPirkimoVertesRibos && <><dt>Tarpt. vertės riba</dt><dd>{t.virsArbaZemiauTarptautinioPirkimoVertesRibos}</dd></>}
+        </dl>
+        {pirkimas.bvpzKodai && pirkimas.bvpzKodai.length > 0 && (
+          <>
+            <h3 class="mb-2">BVPŽ kodai</h3>
+            {pirkimas.bvpzKodai.map((kodas: string, i: number) => (
+              <div class="mb-2">
+                {t.bvpzKodaiPavadinimai?.[i] && <div class="font-medium">{t.bvpzKodaiPavadinimai[i]}</div>}
+                <span class="text-muted">{kodas}</span>
+              </div>
+            ))}
+            <a href="/bvpz" class="text-sm">↗ BVPŽ kodai</a>
+          </>
+        )}
+      </section>
+
+      {hasVerte && (
+        <section>
+          <h2>Vertė</h2>
+          <dl class="kv-list">
+            {(fmtVerte(pirkimas.numatomaBendraPirkimoVerte) || fmtVerte(t.numatomaVerteEUR)) && (
+              <><dt>Numatoma</dt><dd class="cell-mono">{fmtVerte(pirkimas.numatomaBendraPirkimoVerte) || fmtVerte(t.numatomaVerteEUR)}</dd></>
+            )}
+            {fmtVerte(t.bendraSutarciuVerte) && <><dt>Bendra sutarčių</dt><dd class="cell-mono">{fmtVerte(t.bendraSutarciuVerte)}</dd></>}
+            {fmtVerte(t.suteiktaVertemaksimaliDPSVerte) && <><dt>Maksimali DPS</dt><dd class="cell-mono">{fmtVerte(t.suteiktaVertemaksimaliDPSVerte)}</dd></>}
+          </dl>
+        </section>
+      )}
+
+      {hasKita && (
+        <section>
+          <h2>Sąlygos</h2>
+          <dl class="kv-list">
+            {t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims && <><dt>Sutarties tipas</dt><dd>{t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims}</dd></>}
+            {t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus && <><dt>Sutarties trukmė</dt><dd>{t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus}</dd></>}
+            {t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais && <><dt>Pasiūlymo galiojimas</dt><dd>{t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais}</dd></>}
+            {t.eAukcionuSukurimas && <><dt>El. aukcionas</dt><dd>{t.eAukcionuSukurimas}</dd></>}
+            {t.leidziamaPateiktisAlternatyviusPasiulymus && <><dt>Alternatyvūs pasiūlymai</dt><dd>{t.leidziamaPateiktisAlternatyviusPasiulymus}</dd></>}
+            {t.pirkimasSkaidomasIDaliuDPSIKategorijas && <><dt>Skaidoma į dalis</dt><dd>{t.pirkimasSkaidomasIDaliuDPSIKategorijas}</dd></>}
+          </dl>
+        </section>
+      )}
+
+    </div>
+
+    <section class="grid-2">
+
+      {failai.length > 0 && (
+        <section class="mb-7">
+          <h2>Dokumentai</h2>
+          <div class="flex flex-col gap-2 mt-4">
+            {failai.map((failas: any) => {
+              const versija = failas.versijos?.[failas.versijos.length - 1];
+              const title = failas.dokumentasPavadinimas || failas.pavadinimas || '—';
+              const ext = (versija?.formatas || (title.includes('.') ? title.split('.').pop() : '') || '').toLowerCase();
+              const cvpisUrl = `https://viesiejipirkimai.lt/epps/cft/viewDocumentVersions.do?resourceId=${failas.dokumentasId}`;
+
+              return (
+                <div class="min-w-0">
+                  {versija?.parsiustas && versija?.nuskaitytas ? (
+                    <FileCard
+                      title={title}
+                      href={`/failas/${versija.id}`}
+                      meta={ext ? `${ext.toUpperCase()}${versija?.ikelimoData ? ' · ' + versija.ikelimoData : ''}${versija?.statusas ? ' · ' + versija.statusas : ''}` : `${versija?.ikelimoData || ''}${versija?.statusas ? ' · ' + versija.statusas : ''}`.trim()}
+                      ext={ext}
+                      actions={[
+                        { href: `https://failai.viespirkiai.org/${versija.id}`, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+                        { href: cvpisUrl, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
+                      ]}
+                    />
+                  ) : (
+                    <FileCard
+                      title={title}
+                      href={cvpisUrl}
+                      meta={ext ? ext.toUpperCase() : ''}
+                      ext={ext}
+                      actions={[{ href: cvpisUrl, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' }]}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {t.skelbimai && t.skelbimai.length > 0 && (
+        <section class="mb-7">
+          <h2>Skelbimai</h2>
+          <div class="flex flex-col gap-2 mt-4">
+            {t.skelbimai.map((skelbimas: any) => {
+              const pavadinimas = (skelbimas.tipas || 'Skelbimas').trim();
+              const isNacionalinis = pavadinimas.toLowerCase().startsWith('nacionalinis');
+              const ext = isNacionalinis ? 'tedLt' : 'tedEu';
+              return (
+                <div class="min-w-0">
+                  <FileCard
+                    title={pavadinimas}
+                    href={skelbimas.downloadHref || '#'}
+                    meta={ext}
+                    ext={ext}
+                    actions={[]}
+                    titleTwoLines={true}
+                    hideMeta={true}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {(tedKorteles.length > 0) && (
+        <section class="mb-7">
+          <h2>TED nuorodos</h2>
+          <div class="flex flex-col gap-2 mt-4">
+            {tedKorteles.map((skelbimas: any) => {
+              const href = skelbimas.downloadHref || '#';
+              const hrefMatch = String(href).match(/\/ted\/(\d+-\d{4})/i) || String(href).match(/NOTICE:(\d+-\d{4})/i) || String(href).match(/(\d{4,}-\d{4})/);
+              const numeris = skelbimas.numeris || (hrefMatch?.[1] ?? null);
+              const pavadinimas = (skelbimas.pavadinimas || 'TED skelbimas').trim();
+              const actions = skelbimas.originalHref
+                ? [{ href: skelbimas.originalHref, text: '↗ TED', target: '_blank', rel: 'noopener noreferrer' }]
+                : [];
+              return (
+                <div class="min-w-0">
+                  <FileCard
+                    title={pavadinimas}
+                    href={href}
+                    meta={numeris || ''}
+                    ext="tedeu"
+                    actions={actions}
+                    titleTwoLines={true}
+                    hideMeta={false}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {pirkimas.sutartys && pirkimas.sutartys.length > 0 && (
+        <section class="mb-7">
+          <h2>Sutartys</h2>
+          <div class="result-list mt-4">
+            {pirkimas.sutartys.map((item: any) => {
+              const verte = item.faktineIvykdimoVerte || item.verte;
+              return (
+                <article class="result-card card-clickable">
+                  <div class="result-card-body">
+                    <dl class="result-card-meta">
+                      <div><dt class="sr-only">Tipas</dt><dd>{item.tipas}</dd></div>
+                      <div><dt class="sr-only">Kategorija</dt><dd>{item.kategorija}</dd></div>
+                      <div>
+                        <dt class="sr-only">Sutarties galiojimas</dt>
+                        <dd>
+                          <abbr aria-hidden="true" title="Sutarties galiojimas">Sut.</abbr>
+                          {item.sudarymoData && item.galiojimoData ? (
+                            <>
+                              <time datetime={String(item.sudarymoData).slice(0, 10)}>{String(item.sudarymoData).slice(0, 10)}</time>
+                              {String(item.sudarymoData).slice(0, 10) !== String(item.galiojimoData).slice(0, 10) && (
+                                <> – <time datetime={String(item.galiojimoData).slice(0, 10)}>{String(item.galiojimoData).slice(0, 10)}</time></>
+                              )}
+                            </>
+                          ) : '—'}
+                        </dd>
+                      </div>
+                      {item.dokumentuKiekis > 0 && (
+                        <div><dt class="sr-only">Dokumentai</dt><dd>{item.dokumentuKiekis} <abbr aria-hidden="true" title="Dokumentai">dok.</abbr></dd></div>
+                      )}
+                    </dl>
+
+                    <h3 class="result-card-title">
+                      <a href={`/sutartis/${item.sutartiesUnikalusId}`}>
+                        <span class={`cell-mono ${Number(verte) > 10000 ? 'font-bold' : ''}`}>
+                          {Number(verte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;€
+                        </span>
+                        &nbsp;{item.pavadinimas.length < 1 ? <em>Nenurodyta</em> : item.pavadinimas}
+                      </a>
+                    </h3>
+
+                    <div class="flex gap-3 mt-2 text-sm">
+                      {item.tiekejai.length === 1 ? (
+                        <span>
+                          <strong>Tiekėjas:</strong>
+                          <a href={`/asmuo/${item.tiekejaiKodai[0]}`}>
+                            {(item.tiekejai[0] || 'Nenurodytas').slice(0, 80)}{(item.tiekejai[0] || '').length > 80 ? '…' : ''}
+                          </a>
+                        </span>
+                      ) : (
+                        <span class="flex align-start gap-2">
+                          <strong>Tiekėjai:</strong>
+                          <span class="flex flex-col gap-1">
+                            {item.tiekejai.map((t: string, i: number) => (
+                              <a href={`/asmuo/${item.tiekejaiKodai[i]}`}>
+                                {(t || 'Nenurodytas').slice(0, 80)}{(t || '').length > 80 ? '…' : ''}
+                              </a>
+                            ))}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+    </section>
+  </main>
+</Layout>

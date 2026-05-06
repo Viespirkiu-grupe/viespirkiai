@@ -1,0 +1,38 @@
+---
+const { asmuo } = Astro.props;
+if (!(asmuo.teismoNuosprendziai?.rows > 0)) return;
+const { rows, limit, nuosprendziai } = asmuo.teismoNuosprendziai;
+---
+
+<div class="page-section mb-10" id="teismai">
+  <h2><a href="#teismai" class="no-style">Teismo nuosprendžiai</a></h2>
+  {rows > limit && (
+    <p class="text-muted text-sm mb-4">
+      Rodomi tik {limit} naujausi nuosprendžiai.
+      <a href="?teismoNuosprendziaiLimit=max#teismai">Rodyti visus ({rows})</a>
+    </p>
+  )}
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Bylos numeris</th><th>Rūšis</th><th class="cell-center">Data</th>
+          <th>Rolė</th><th>Teismas</th>
+        </tr>
+      </thead>
+      <tbody>
+        {nuosprendziai.map((n: any) => (
+          <tr>
+            <td class="cell-nowrap">
+              <a href={`https://liteko.teismai.lt/viesasprendimupaieska/${n.fileHref}`} target="_blank">{n.bylosNumeris}</a>
+            </td>
+            <td class="cell-truncate max-w-[30ch]">{n.bylosRusis}</td>
+            <td class="cell-center cell-mono cell-nowrap">{new Date(n.data).toLocaleDateString('lt-LT')}</td>
+            <td class={`cell-truncate max-w-[30ch]${n.bylojeKaip === 'Atsakovas' ? ' font-bold' : ''}`}>{n.bylojeKaip}</td>
+            <td class="cell-truncate max-w-[40ch]">{n.teismas}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
