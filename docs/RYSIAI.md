@@ -716,3 +716,8 @@ On node collapse (non-primary node only):
 1. **ForceAtlas2 in browser**: `graphology-layout-forceatlas2` runs synchronously and blocks the main
    thread for large graphs. For large graphs (>200 nodes) a Web Worker is recommended. For v1,
    synchronous with a capped iteration count is acceptable.
+
+# Smoky Test Cases:
+
+http://localhost:9019/rysiai/asmuo/188752740#f=DSELMGPABC&p_2=RUdMJUM0JTk2JTIwUE9WSUxJJUM1JUFBTiVDNCU5Ng==&f_2=DSEULMGPABC
+http://localhost:9019/rysiai/asmuo/300015158#f=DSLMGPABC&p_2=SlVTVEFTJTIwVFJVTkMlQzQlOTY=&f_2=DSOEULMGPABC&p_3=QUdOJUM0JTk2JTIwVFJVTkNJRU4lQzQlOTY=&f_3=DSOEULMGPABC&p_4=QVVSSU1BUyUyMFRSVU5DJUM0JTk2&f_4=DSOEULMGPABC&p_5=U09MVkVJR0ElMjBUUlVOQ0lFTiVDNCU5Ng==&f_5=DSOEULMGPABC&o_6=301550690&f_6=DSLMGPABC
