@@ -43,6 +43,12 @@ export default {
     pgPort: 9118,
     pgMaxConnections: 16,
 
+    // MCP analyst — existing read-only PostgreSQL role (direct PG port, not PgBouncer)
+    pgAnalystUser: "analyst",
+    pgAnalystPassword: "CHANGE_ME",
+    pgAnalystPort: 9118,
+    pgAnalystMaxConnections: 16,
+
     // Quickwit
     quickwitUp: true,
     quickwitUrl: "http://localhost:7280",
