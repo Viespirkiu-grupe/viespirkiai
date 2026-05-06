@@ -8,9 +8,10 @@ import { HIDDEN_BY_DEFAULT } from './graph-theme.ts';
  *  • Nodes initialised via initNode() own an explicit hidden-type Set (configured nodes).
  *  • Nodes never initialised are "transparent" — they do not contribute to edge filtering.
  *  • isEdgeHidden(src, tgt, type):
- *      – If neither endpoint is configured → use global hidden set (pre-selection behaviour).
- *      – Otherwise → hidden if ANY configured endpoint hides the type.
- *        A transparent endpoint is treated as "don't care".
+ *      – Neither configured → use global hidden set (pre-selection behaviour).
+ *      – One configured, one transparent → follow the configured endpoint.
+ *      – Both configured → hidden only if BOTH hide the type (any-visible-wins).
+ *        If either shows the type, the edge is drawn.
  */
 export class LegendState {
     private _nodeHidden: Map<string, Set<string>>;
@@ -64,8 +65,12 @@ export class LegendState {
         if (sourceHidden === undefined && targetHidden === undefined) {
             return this._globalHidden.has(type);
         }
-        if (sourceHidden !== undefined && sourceHidden.has(type)) return true;
-        if (targetHidden !== undefined && targetHidden.has(type)) return true;
-        return false;
+        // Both configured: hide only if BOTH hide (any-visible-wins)
+        if (sourceHidden !== undefined && targetHidden !== undefined) {
+            return sourceHidden.has(type) && targetHidden.has(type);
+        }
+        // One configured, one transparent: follow the configured endpoint
+        if (sourceHidden !== undefined) return sourceHidden.has(type);
+        return targetHidden!.has(type);
     }
 }

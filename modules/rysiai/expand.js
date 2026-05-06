@@ -663,6 +663,87 @@ export async function expandPirkimas(pirkimoId) {
 // ── expandPerson ──────────────────────────────────────────────────────────────
 
 /**
+ * Pure row processor for expandPerson. Exported for testing.
+ *
+ * The SQL query matches rows where the searched person appears as either the
+ * declarant (vardas/pavarde) OR the related person (susijusioAsmens*). The
+ * SUTUOKTINIO_DARBOVIETE handler must detect which role the person plays to
+ * avoid emitting a self-loop Spouse edge.
+ *
+ * @param {object[]} rows  Rows from pinregJuridiniaiRysiai
+ * @param {string} rootPersonId  Stable node id of the searched person, e.g. "person:jonas jonaitis"
+ * @param {string} vardas  First name (trimmed, original case)
+ * @param {string} pavarde Last name (trimmed, original case)
+ * @returns {{ nodes: object[], edges: object[] }}
+ */
+export function buildPersonGraphFromRows(rows, rootPersonId, vardas, pavarde) {
+    const nodes = [];
+    const edges = [];
+    const nodeMap = new Map();
+    const edgeMap = new Map();
+
+    const rootPerson = personNode(vardas, pavarde, null, null);
+    rootPerson.attributes.expanded = true;
+    addNode(nodes, nodeMap, rootPerson);
+
+    for (const row of rows) {
+        const tipas = row.irasoTipas;
+
+        if (tipas === 'DEKLARUOJANCIO_DARBOVIETE') {
+            if (!row.jarKodas || !row.pavadinimas) continue;
+            const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
+            addNode(nodes, nodeMap, stub);
+            const relType = mapPareigos(row.pareigos);
+            addEdge(edges, edgeMap, edge(rootPersonId, stub.id, relType, row.pareigos || '', row.rysioPradzia));
+
+        } else if (tipas === 'KITI_RYSIAI_SU_JA') {
+            if (!row.jarKodas || !row.pavadinimas) continue;
+            const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
+            addNode(nodes, nodeMap, stub);
+            const relType = mapRysioPobudis(row.rysioPobudzioPavadinimas);
+            addEdge(edges, edgeMap, edge(rootPersonId, stub.id, relType, row.rysioPobudzioPavadinimas || '', row.rysioPradzia));
+
+        } else if (tipas === 'SUTUOKTINIO_DARBOVIETE') {
+            // DB query matches rows where the person is the declarant (vardas/pavarde = them)
+            // AND rows where they are the spouse (susijusioAsmens* = them). We must detect
+            // which case applies to avoid emitting a self-loop.
+            const spouseVardas = row.vardas || '';
+            const spousePavarde = row.pavarde || '';
+            if (!spouseVardas || !spousePavarde) continue;
+
+            const spouseN = personNode(spouseVardas, spousePavarde, row.deklaracija, null);
+
+            if (spouseN.id === rootPersonId) {
+                // Searched person IS the spouse in this row; declarant is susijusioAsmens*.
+                // Creating edge(rootPersonId, rootPersonId, ...) would be a self-loop — instead
+                // emit the reverse: declarant → root.
+                const declVardas = row.susijusioAsmensVardas || '';
+                const declPavarde = row.susijusioAsmensPavarde || '';
+                if (declVardas && declPavarde) {
+                    const declNode = personNode(declVardas, declPavarde, null, null);
+                    addNode(nodes, nodeMap, declNode);
+                    addEdge(edges, edgeMap, edge(declNode.id, rootPersonId, 'Spouse', 'Sutuoktinis', null));
+                }
+                // The org in this row is the searched person's own workplace — already covered
+                // by their own DEKLARUOJANCIO_DARBOVIETE rows; skip to avoid duplication.
+            } else {
+                // Searched person IS the declarant; spouseN is their actual spouse.
+                addNode(nodes, nodeMap, spouseN);
+                addEdge(edges, edgeMap, edge(rootPersonId, spouseN.id, 'Spouse', 'Sutuoktinis', null));
+                if (row.jarKodas && row.pavadinimas) {
+                    const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
+                    addNode(nodes, nodeMap, stub);
+                    const relType = mapPareigos(row.pareigos);
+                    addEdge(edges, edgeMap, edge(spouseN.id, stub.id, relType, row.pareigos || '', null));
+                }
+            }
+        }
+    }
+
+    return { nodes, edges };
+}
+
+/**
  * Expands a person node: returns all workplaces, governance roles,
  * and spouse relationships for the given full name.
  *
@@ -675,7 +756,7 @@ export async function expandPerson(fullName) {
     const vardas = parts[0] || '';
     const pavarde = parts.slice(1).join(' ') || '';
 
-    const personNodeId = personId(vardas, pavarde);
+    const rootPersonId = personId(vardas, pavarde);
 
     const pinregRes = await postgres.query(
         `SELECT * FROM public."pinregJuridiniaiRysiai"
@@ -685,61 +766,5 @@ export async function expandPerson(fullName) {
         [name.toLowerCase()],
     );
 
-    const nodes = [];
-    const edges = [];
-    const nodeMap = new Map();
-    const edgeMap = new Map();
-
-    // Root person node (may or may not already exist in client graph)
-    const rootPerson = personNode(vardas, pavarde, null, null);
-    rootPerson.attributes.expanded = true;
-    addNode(nodes, nodeMap, rootPerson);
-
-    for (const row of pinregRes.rows) {
-        const tipas = row.irasoTipas;
-
-        if (tipas === 'DEKLARUOJANCIO_DARBOVIETE') {
-            // Person works at jarKodas org
-            if (!row.jarKodas || !row.pavadinimas) continue;
-            const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
-            addNode(nodes, nodeMap, stub);
-
-            const relType = mapPareigos(row.pareigos);
-            const label = row.pareigos || '';
-            addEdge(edges, edgeMap, edge(personNodeId, stub.id, relType, label, row.rysioPradzia));
-
-        } else if (tipas === 'KITI_RYSIAI_SU_JA') {
-            // Person has governance role at jarKodas org
-            if (!row.jarKodas || !row.pavadinimas) continue;
-            const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
-            addNode(nodes, nodeMap, stub);
-
-            const relType = mapRysioPobudis(row.rysioPobudzioPavadinimas);
-            const label = row.rysioPobudzioPavadinimas || '';
-            addEdge(edges, edgeMap, edge(personNodeId, stub.id, relType, label, row.rysioPradzia));
-
-        } else if (tipas === 'SUTUOKTINIO_DARBOVIETE') {
-            // The searched person is the declarant; the spouse (vardas/pavarde) works at this org
-            const spouseVardas = row.vardas || '';
-            const spousePavarde = row.pavarde || '';
-            if (!spouseVardas || !spousePavarde) continue;
-
-            const spouseN = personNode(spouseVardas, spousePavarde, row.deklaracija, null);
-            addNode(nodes, nodeMap, spouseN);
-
-            // Declarant → spouse
-            addEdge(edges, edgeMap, edge(personNodeId, spouseN.id, 'Spouse', 'Sutuoktinis', null));
-
-            // Spouse works at org
-            if (row.jarKodas && row.pavadinimas) {
-                const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
-                addNode(nodes, nodeMap, stub);
-                const relType = mapPareigos(row.pareigos);
-                const label = row.pareigos || '';
-                addEdge(edges, edgeMap, edge(spouseN.id, stub.id, relType, label, null));
-            }
-        }
-    }
-
-    return { nodes, edges };
+    return buildPersonGraphFromRows(pinregRes.rows, rootPersonId, vardas, pavarde);
 }

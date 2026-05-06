@@ -437,6 +437,33 @@ test/rysiai/
 | €100 K – €1 M   | 13        |
 | ≥ €1 M          | 19        |
 
+### Edge Visibility Rules
+
+`isEdgeHidden(source, target, type)` in `src/rysiai/legend-state.ts` decides whether an edge appears in `viewGraph`. The
+rule is **any-visible-wins**: if either endpoint is configured to show the type, the edge is drawn.
+
+| Source configured? | Target configured? | Source shows type? | Target shows type? | Edge visible?  |
+|--------------------|--------------------|--------------------|--------------------|----------------|
+| No                 | No                 | —                  | —                  | Global default |
+| Yes                | No (transparent)   | Yes                | —                  | **Yes**        |
+| Yes                | No (transparent)   | No                 | —                  | No             |
+| No (transparent)   | Yes                | —                  | Yes                | **Yes**        |
+| No (transparent)   | Yes                | —                  | No                 | No             |
+| Yes                | Yes                | Yes                | Yes                | **Yes**        |
+| Yes                | Yes                | Yes                | No                 | **Yes**        |
+| Yes                | Yes                | No                 | Yes                | **Yes**        |
+| Yes                | Yes                | No                 | No                 | No             |
+
+Key invariants:
+
+- **Both configured, either shows → visible.** A Spouse edge between Alenas (Spouse visible) and Toma (Spouse hidden) is
+  always drawn.
+- **Both configured, both hide → hidden.** Only unanimous agreement to hide suppresses the edge.
+- **One transparent endpoint is a "don't care"** — it never contributes to hiding.
+- **Neither configured** → falls back to the global `HIDDEN_BY_DEFAULT` set (pre-selection state).
+
+---
+
 ### Two-graph design
 
 A `dataGraph` (permanent store) and a `viewGraph` (Sigma's rendered graph) are maintained separately:
