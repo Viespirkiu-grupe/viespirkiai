@@ -206,6 +206,7 @@ ON
     "atn1ataskaitos",
     "atn1dalyviai",
     "atn1pasiulymuEile",
+    "atn1atmestiPasiulymai", -- joined in v_dalyviai for rejection reasons
     -- required for procedure manipulation analysis (Theme 7)
     "neskelbiamosDerybos",
     -- required for compliance / VDI violations (Theme 9) — was used in v_company but not granted
@@ -667,7 +668,7 @@ undeclared subcontracting — another capacity-mismatch indicator.*
 | `execute_investigation_query` MCP tool    | Medium | SQL parser + guardrail stack + execution                       |
 | Read-only PG role (`mcp_analyst`)         | Small  | One-time DDL                                                   |
 | SQL AST validation module                 | Medium | `node-sql-parser`, table/function whitelist, complexity checks |
-| Audit logging                             | Small  | Insert to a `query_audit_log` table                            |
+| Audit logging                             | Small  | Insert to the `investigation_query_log` table                  |
 | MCP tool description / prompt engineering | Small  | Tell the LLM what tables exist and how they relate             |
 
 ### Recommended npm packages
@@ -1134,6 +1135,7 @@ sequenceDiagram
 | JOIN count > 6                              | 4     | Reject: "too many JOINs (max 6)"          |
 | Subquery depth > 3                          | 4     | Reject: "subquery nesting too deep (max 3)" |
 | CTE count > 8                               | 4     | Reject: "too many CTEs (max 8)"           |
+| `WITH RECURSIVE` present                    | 4     | Allow; flag in audit log                  |
 | All layers pass                             | —     | Execute wrapped query                     |
 
 ---
