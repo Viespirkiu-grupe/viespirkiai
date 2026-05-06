@@ -2,25 +2,27 @@
 // Pure canvas drawing functions — converts NodeDisplayData to pixels.
 // No graph state, no DOM queries, no business logic.
 // graph-utils.js handles graph data operations; this file handles how nodes look on screen.
-/**
- * @typedef {object} NodeDisplayData
- * @property {number}  x         - graph-space X coordinate
- * @property {number}  y         - graph-space Y coordinate
- * @property {number}  [size]    - visual radius in px (default 8)
- * @property {string}  [color]   - fill colour (hex)
- * @property {string}  [label]   - display label, may contain \n for line breaks
- * @property {boolean} [expanded]  - true once the node's neighbours have been fetched
- * @property {boolean} [selected]  - true while the node is the active selection
- */
+
+interface NodeDisplayData {
+    x: number;
+    y: number;
+    size?: number;
+    color?: string;
+    label?: string;
+    expanded?: boolean;
+    selected?: boolean;
+}
+
+interface SigmaSettings {
+    labelSize?: number;
+    labelFont?: string;
+    labelColor?: { attribute?: string; color?: string } | null;
+    [key: string]: unknown;
+}
 
 // Draws a dotted ring for expanded nodes (orgs, persons, contracts, procurement), then the label.
 // Called by Sigma for every visible labelled node, and also by drawNodeHover.
-/**
- * @param {CanvasRenderingContext2D} context
- * @param {NodeDisplayData} data
- * @param {object} settings  Sigma renderer settings
- */
-export function drawNodeLabel(context, data, settings) {
+export function drawNodeLabel(context: CanvasRenderingContext2D, data: NodeDisplayData, settings: SigmaSettings): void {
     const nodeSize = data.size || 8;
 
     // Persistent expanded indicator: dotted ring outside the selection ring
@@ -40,7 +42,7 @@ export function drawNodeLabel(context, data, settings) {
     const size = settings.labelSize || 12;
     const font = settings.labelFont || 'Arial';
     const color = settings.labelColor && settings.labelColor.attribute
-        ? (data[settings.labelColor.attribute] || settings.labelColor.color || '#000')
+        ? ((data as unknown as Record<string, unknown>)[settings.labelColor.attribute] as string || settings.labelColor.color || '#000')
         : (settings.labelColor && settings.labelColor.color || '#000');
 
     context.font = size + 'px ' + font;
@@ -61,12 +63,7 @@ export function drawNodeLabel(context, data, settings) {
 // Selected node: bold solid ring (nodeSize+6, lineWidth 5).
 // Hover only:    soft ring (nodeSize+4, lineWidth 2).
 // Expanded ring is drawn by drawNodeLabel (called at end) — always outermost.
-/**
- * @param {CanvasRenderingContext2D} context
- * @param {NodeDisplayData} data
- * @param {object} settings  Sigma renderer settings
- */
-export function drawNodeHover(context, data, settings) {
+export function drawNodeHover(context: CanvasRenderingContext2D, data: NodeDisplayData, settings: SigmaSettings): void {
     const nodeSize = data.size || 8;
     context.beginPath();
     if (data.selected) {
@@ -86,4 +83,3 @@ export function drawNodeHover(context, data, settings) {
     }
     drawNodeLabel(context, data, settings);
 }
-

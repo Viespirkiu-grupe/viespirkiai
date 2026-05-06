@@ -1,11 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import Graph from 'graphology';
-import { LegendState } from '../../src/rysiai/legend-state.js';
+import { LegendState } from '../../src/rysiai/legend-state.ts';
 import {
     FILTER_CHAR_MAP, FILTER_ID_MAP,
     applyFilterChars, applyFilterFromHash, buildHashString,
-} from '../../src/rysiai/hash-state.js';
+} from '../../src/rysiai/hash-state.ts';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

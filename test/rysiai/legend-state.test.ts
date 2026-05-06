@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { LegendState } from '../../src/rysiai/legend-state.js';
+import { LegendState } from '../../src/rysiai/legend-state.ts';
 
 // ── LegendState ───────────────────────────────────────────────────────────────
 

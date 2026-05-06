@@ -2,9 +2,9 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import Graph from 'graphology';
 
-import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from '../../src/rysiai/graph-utils.js';
-import { LegendState } from '../../src/rysiai/legend-state.js';
-import { ENTITY_TYPE } from '../../src/rysiai/entity-types.js';
+import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from '../../src/rysiai/graph-utils.ts';
+import { LegendState } from '../../src/rysiai/legend-state.ts';
+import { ENTITY_TYPE } from '../../src/rysiai/entity-types.ts';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import noverlap from 'graphology-layout-noverlap';
 
@@ -599,7 +599,7 @@ describe('syncPositionsToData', () => {
 
 // ── computeNodeSize ───────────────────────────────────────────────────────────
 
-import { computeNodeSize } from '../../src/rysiai/graph-utils.js';
+import { computeNodeSize } from '../../src/rysiai/graph-utils.ts';
 
 describe('computeNodeSize', function () {
     it('returns 8 for a person node regardless of other attrs', function () {

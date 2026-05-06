@@ -1,59 +1,50 @@
 // Pure hash-state module: no DOM reads; only writes window.location.hash.
 // Encodes / decodes the active edge-type filter and expanded node set into the URL hash.
 
-export const FILTER_CHAR_MAP = {
+import type { LegendState } from './legend-state.ts';
+
+export const FILTER_CHAR_MAP: Record<string, string> = {
     D: 'Director', S: 'Shareholder', O: 'Official', E: 'Employment',
     U: 'Spouse', L: 'ContractSmall', M: 'ContractMedium', G: 'ContractLarge',
     P: 'Procurement', A: 'Award', B: 'Bidder', C: 'ContractProcurementLink',
 };
 
-export const FILTER_ID_MAP = Object.fromEntries(
+export const FILTER_ID_MAP: Record<string, string> = Object.fromEntries(
     Object.entries(FILTER_CHAR_MAP).map(([k, v]) => [v, k])
 );
 
-const ENTITY_URL_MAP = {
+const ENTITY_URL_MAP: Record<string, { urlKey: string; idAttr: string }> = {
     OrganizationEntity: { urlKey: 'asmuo',           idAttr: 'jarKodas' },
     ContractEntity:     { urlKey: 'sutartis',         idAttr: 'sutartiesUnikalusId' },
     ProcurementEntity:  { urlKey: 'viesiejiPirkimai', idAttr: 'pirkimoId' },
 };
 
-/**
- * Applies a filter char string to a single node in legendState.
- * Each char in FILTER_CHAR_MAP that appears in `chars` → visible; absent chars → hidden.
- * Initialises the node if not yet configured.
- *
- * @param {LegendState} legendState
- * @param {string}      nodeId
- * @param {string}      chars  e.g. "DSO"
- */
-export function applyFilterChars(legendState, nodeId, chars) {
+export interface AdditionalEntity {
+    entityType: string;
+    entityId: string;
+    filterChars: string;
+    entityNumber: number;
+}
+
+export function applyFilterChars(legendState: LegendState, nodeId: string, chars: string): void {
     legendState.initNode(nodeId);
     for (const [char, type] of Object.entries(FILTER_CHAR_MAP)) {
         legendState.setTypeVisible(nodeId, type, chars.includes(char));
     }
 }
 
-/**
- * Parses a URL hash string and applies its `filter=` segment to the primary node.
- * Returns additional entities (asmuo/sutartis/viesiejiPirkimai) encoded in the hash
- * for the caller to load sequentially.
- *
- * Entity type keys must be alphabetic; entity ID values must be numeric strings —
- * invalid keys/values are silently ignored.
- *
- * @param {LegendState} legendState
- * @param {string}      primaryNodeId
- * @param {string}      [hash]  defaults to window.location.hash in browser environments
- * @returns {{ additionalEntities: Array<{ entityType, entityId, filterChars, entityNumber }> }}
- */
-export function applyFilterFromHash(legendState, primaryNodeId, hash) {
+export function applyFilterFromHash(
+    legendState: LegendState,
+    primaryNodeId: string,
+    hash?: string
+): { additionalEntities: AdditionalEntity[] } {
     const raw = hash !== undefined
         ? hash
         : (typeof window !== 'undefined' ? window.location.hash : '');
     if (!raw || raw === '#') return { additionalEntities: [] };
 
     const fragment = raw.startsWith('#') ? raw.slice(1) : raw;
-    const params = new Map();
+    const params = new Map<string, string>();
     for (const part of fragment.split('&')) {
         const eq = part.indexOf('=');
         if (eq === -1) continue;
@@ -65,7 +56,7 @@ export function applyFilterFromHash(legendState, primaryNodeId, hash) {
         applyFilterChars(legendState, primaryNodeId, primaryChars);
     }
 
-    const additionalEntities = [];
+    const additionalEntities: AdditionalEntity[] = [];
     for (const [key, value] of params) {
         if (key === 'filter' || key.startsWith('filter_')) continue;
         const underscore = key.lastIndexOf('_');
@@ -86,18 +77,10 @@ export function applyFilterFromHash(legendState, primaryNodeId, hash) {
     return { additionalEntities };
 }
 
-/**
- * Builds the URL hash string representing the current filter state.
- * Pure function — does not write to window.
- *
- * @param {LegendState} legendState
- * @param {object}      dataGraph  graphology Graph instance
- * @returns {string}  e.g. "#filter=DSO&asmuo_2=110078992&filter_2=LMG"
- */
-export function buildHashString(legendState, dataGraph) {
-    const parts = [];
-    const extras = [];
-    let primaryId = null;
+export function buildHashString(legendState: LegendState, dataGraph: { forEachNode: (cb: (id: string, attrs: Record<string, unknown>) => void) => void }): string {
+    const parts: string[] = [];
+    const extras: Array<{ id: string; mapping: { urlKey: string; idAttr: string }; entityId: string }> = [];
+    let primaryId: string | null = null;
 
     dataGraph.forEachNode((id, attrs) => {
         if (attrs.isRoot && primaryId === null) primaryId = id;
@@ -105,7 +88,7 @@ export function buildHashString(legendState, dataGraph) {
 
     if (primaryId && legendState.hasNodeConfig(primaryId)) {
         const chars = Object.entries(FILTER_CHAR_MAP)
-            .filter(([, type]) => legendState.isTypeVisible(primaryId, type))
+            .filter(([, type]) => legendState.isTypeVisible(primaryId!, type))
             .map(([char]) => char)
             .join('');
         parts.push('filter=' + chars);
@@ -113,11 +96,11 @@ export function buildHashString(legendState, dataGraph) {
 
     dataGraph.forEachNode((id, attrs) => {
         if (id === primaryId || !legendState.hasNodeConfig(id)) return;
-        const mapping = ENTITY_URL_MAP[attrs.entityType];
+        const mapping = ENTITY_URL_MAP[attrs.entityType as string];
         if (!mapping) return;
         const entityId = attrs[mapping.idAttr];
         if (!entityId) return;
-        extras.push({ id, mapping, entityId });
+        extras.push({ id, mapping, entityId: String(entityId) });
     });
 
     extras.forEach(({ id, mapping, entityId }, i) => {
@@ -133,15 +116,7 @@ export function buildHashString(legendState, dataGraph) {
     return parts.length ? '#' + parts.join('&') : '';
 }
 
-/**
- * Writes the current filter state to window.location.hash.
- * Returns the assembled hash string (useful for testing).
- *
- * @param {LegendState} legendState
- * @param {object}      dataGraph
- * @returns {string}
- */
-export function updateHashFromFilter(legendState, dataGraph) {
+export function updateHashFromFilter(legendState: LegendState, dataGraph: { forEachNode: (cb: (id: string, attrs: Record<string, unknown>) => void) => void }): string {
     const h = buildHashString(legendState, dataGraph);
     if (typeof window !== 'undefined') {
         if (h) {

@@ -1,8 +1,14 @@
-import { isOrgNode, isPersonNode, isContractNode, isProcurementNode, isConfigurableNode } from './entity-types.js';
+import { isOrgNode, isPersonNode, isContractNode, isProcurementNode, isConfigurableNode } from './entity-types.ts';
+import type { NodeLegend } from './legend.ts';
+
+export interface NodeHandlers {
+    onExpand?: () => void;
+    onCollapse?: () => void;
+}
 
 // ── Shared expand/collapse button ─────────────────────────────────────────────
 
-export function buildExpandButtonHtml(handlers) {
+export function buildExpandButtonHtml(handlers: NodeHandlers): string {
     if (!handlers.onExpand && !handlers.onCollapse) return '';
     const isExpanded = !!handlers.onCollapse;
     const icon = isExpanded ? '▲' : '▼';
@@ -13,7 +19,7 @@ export function buildExpandButtonHtml(handlers) {
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-function formatContractValue(verte) {
+function formatContractValue(verte: number | null | undefined): string {
     if (verte == null || verte === 0) return '';
     const v = Math.round(verte);
     if (v >= 1000000) return '€' + (v / 1000000).toFixed(1) + 'M';
@@ -21,44 +27,44 @@ function formatContractValue(verte) {
     return '€' + v;
 }
 
-function link(href, label) {
+function link(href: string, label: string): string {
     return '<a href="' + href + '" target="_blank" rel="noopener" class="vd-link">' + label + ' ↗</a>';
 }
 
-function esc(s) {
+function esc(s: unknown): string {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function buildHtml(attrs, handlers = {}) {
+function buildHtml(attrs: Record<string, unknown>, handlers: NodeHandlers = {}): string {
     let html = '';
 
     if (isOrgNode(attrs)) {
         let employees = '';
-        const d1 = attrs.draustieji || 0;
-        const d2 = attrs.draustieji2 || 0;
+        const d1 = (attrs.draustieji as number) || 0;
+        const d2 = (attrs.draustieji2 as number) || 0;
         const count = d1 + d2;
         if (count > 0) employees = '<div class="vd-sub">Darbuotojų: ' + count + '</div>';
         html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>'
             + '<div class="vd-sub">' + esc(attrs.jarKodas) + '</div>'
             + employees
-            + link('/asmuo/' + encodeURIComponent(attrs.jarKodas), 'Peržiūrėti įmonę');
+            + link('/asmuo/' + encodeURIComponent(attrs.jarKodas as string), 'Peržiūrėti įmonę');
     } else if (isContractNode(attrs)) {
-        const valueStr = formatContractValue(attrs.verte);
-        const sutId = attrs.sutartiesUnikalusId || attrs.id.replace('contract:', '');
+        const valueStr = formatContractValue(attrs.verte as number);
+        const sutId = attrs.sutartiesUnikalusId || (attrs.id as string).replace('contract:', '');
         html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
         if (valueStr) html += '<div class="vd-sub">' + valueStr + '</div>';
-        html += link('/sutartis/' + encodeURIComponent(sutId), 'Peržiūrėti sutartį');
+        html += link('/sutartis/' + encodeURIComponent(sutId as string), 'Peržiūrėti sutartį');
         if (attrs.pirkimoNumeris) {
-            html += link('/viesiejiPirkimai/' + encodeURIComponent(attrs.pirkimoNumeris), 'Peržiūrėti pirkimą');
+            html += link('/viesiejiPirkimai/' + encodeURIComponent(attrs.pirkimoNumeris as string), 'Peržiūrėti pirkimą');
         }
     } else if (isProcurementNode(attrs)) {
-        const procValue = formatContractValue(attrs.numatomaVerteEUR);
+        const procValue = formatContractValue(attrs.numatomaVerteEUR as number);
         html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
         if (procValue) html += '<div class="vd-sub">' + procValue + '</div>';
         if (attrs.statusas) html += '<div class="vd-sub">' + esc(attrs.statusas) + '</div>';
-        html += link('/viesiejiPirkimai/' + encodeURIComponent(attrs.pirkimoId), 'Peržiūrėti pirkimą');
+        html += link('/viesiejiPirkimai/' + encodeURIComponent(attrs.pirkimoId as string), 'Peržiūrėti pirkimą');
     } else if (isPersonNode(attrs)) {
-        const name = ((attrs.vardas || '') + ' ' + (attrs.pavarde || '')).trim();
+        const name = (((attrs.vardas as string) || '') + ' ' + ((attrs.pavarde as string) || '')).trim();
         html = '<div class="vd-title">' + esc(name) + '</div>';
     }
 
@@ -73,35 +79,28 @@ function buildHtml(attrs, handlers = {}) {
 
 // ── NodeDetails component ─────────────────────────────────────────────────────
 
-/**
- * Manages the node details panel and delegates legend updates to the composed NodeLegend.
- * Call showForNode() on selection; call hide() on deselect or collapse.
- */
 export class NodeDetails {
-    constructor({ legend = null } = {}) {
+    legend: NodeLegend | null;
+    private _panel: HTMLElement | null;
+    private _wrapper: HTMLElement | null;
+
+    constructor({ legend = null }: { legend?: NodeLegend | null } = {}) {
         this.legend = legend;
         this._panel = null;
         this._wrapper = null;
     }
 
-    _getPanel() {
+    private _getPanel(): HTMLElement | null {
         if (!this._panel) this._panel = document.getElementById('rysiai-details');
         return this._panel;
     }
 
-    _getWrapper() {
+    private _getWrapper(): HTMLElement | null {
         if (!this._wrapper) this._wrapper = document.getElementById('node-details');
         return this._wrapper;
     }
 
-    /**
-     * Renders the details panel for the selected node and updates the legend.
-     * @param {string} nodeId
-     * @param {object} attrs  Node attributes from dataGraph
-     * @param {object} handlers  { onExpand?: () => void, onCollapse?: () => void }
-     * @param {Map<string,number>|null} counts  edge counts from dataGraph, or null for non-configurable nodes
-     */
-    showForNode(nodeId, attrs, handlers = {}, counts = null) {
+    showForNode(nodeId: string, attrs: Record<string, unknown>, handlers: NodeHandlers = {}, counts: Map<string, number> | null = null): void {
         const el = this._getPanel();
         const wrapper = this._getWrapper();
         if (!el) return;
@@ -116,7 +115,7 @@ export class NodeDetails {
         el.innerHTML = html;
         if (wrapper) wrapper.hidden = false;
 
-        const btn = el.querySelector('[data-action]');
+        const btn = el.querySelector<HTMLElement>('[data-action]');
         if (btn) {
             btn.addEventListener('click', () => {
                 if (btn.dataset.action === 'expand') handlers.onExpand?.();
@@ -125,16 +124,13 @@ export class NodeDetails {
         }
 
         if (isConfigurableNode(attrs)) {
-            this.legend?.updateForNode(nodeId, attrs.expanded, handlers, counts);
+            this.legend?.updateForNode(nodeId, !!attrs.expanded, handlers, counts);
         } else {
             this.legend?.hide();
         }
     }
 
-    /**
-     * Hides the details panel wrapper and the legend.
-     */
-    hide() {
+    hide(): void {
         const wrapper = this._getWrapper();
         if (wrapper) wrapper.hidden = true;
         this.legend?.hide();
