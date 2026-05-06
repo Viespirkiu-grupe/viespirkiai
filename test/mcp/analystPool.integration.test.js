@@ -167,32 +167,33 @@ describe("v_bylos", () => {
 // ---------------------------------------------------------------------------
 
 describe("pagination wrapper", () => {
-    it("COUNT(*) OVER () returns __total__ and strips cleanly", async () => {
+    it("LIMIT n+1 trick: 51 rows fetched means hasMore is true", async () => {
         const client = await getClient();
-        const sql = `SELECT q.*, COUNT(*) OVER () AS __total__
-FROM (
-  SELECT "sutartiesUnikalusId" FROM sutartys ORDER BY "sutartiesUnikalusId"
-) AS q
-LIMIT 50 OFFSET 0`;
-        const { rows } = await client.query(sql);
-        assert.ok(rows.length > 0, "expected rows");
-        assert.ok("__total__" in rows[0], "__total__ should be present before stripping");
-        const totalRows = Number(rows[0].__total__);
-        assert.ok(totalRows > 50, "expected more than 50 total rows");
-        // Strip __total__ — same logic as the handler
-        const clean = rows.map(({ __total__, ...rest }) => rest);
-        assert.ok(!("__total__" in clean[0]), "__total__ should be stripped");
+        // Fetch 51 rows (PAGE_SIZE + 1); sutartys has far more than 50 rows
+        const { rows } = await client.query(`
+            SELECT q.* FROM (
+                SELECT "sutartiesUnikalusId" FROM sutartys ORDER BY "sutartiesUnikalusId"
+            ) AS q LIMIT 51 OFFSET 0
+        `);
+        assert.equal(rows.length, 51, "expected exactly 51 rows when table has >50 rows");
+        // hasMore logic: strip the 51st
+        const hasMore = rows.length > 50;
+        assert.ok(hasMore, "hasMore should be true");
+        const page1Rows = rows.slice(0, 50);
+        assert.equal(page1Rows.length, 50);
     });
 
     it("page 2 returns the next 50 rows", async () => {
         const client = await getClient();
         const base = `SELECT "sutartiesUnikalusId" FROM sutartys ORDER BY "sutartiesUnikalusId"`;
-        const page1 = await client.query(`SELECT q.*, COUNT(*) OVER () AS __total__ FROM (${base}) AS q LIMIT 50 OFFSET 0`);
-        const page2 = await client.query(`SELECT q.*, COUNT(*) OVER () AS __total__ FROM (${base}) AS q LIMIT 50 OFFSET 50`);
-        assert.ok(page2.rows.length > 0, "page 2 should have rows");
+        const [r1, r2] = await Promise.all([
+            client.query(`SELECT q.* FROM (${base}) AS q LIMIT 51 OFFSET 0`),
+            client.query(`SELECT q.* FROM (${base}) AS q LIMIT 51 OFFSET 50`),
+        ]);
+        assert.ok(r2.rows.length > 0, "page 2 should have rows");
         assert.notEqual(
-            page1.rows[0].sutartiesUnikalusId,
-            page2.rows[0].sutartiesUnikalusId,
+            r1.rows[0].sutartiesUnikalusId,
+            r2.rows[0].sutartiesUnikalusId,
             "page 1 and page 2 should start with different rows"
         );
     });
@@ -200,14 +201,12 @@ LIMIT 50 OFFSET 0`;
     it("v_sutartys is accessible inside the pagination wrapper", async () => {
         const client = await getClient();
         const { rows } = await client.query(`
-            SELECT q.*, COUNT(*) OVER () AS __total__
-            FROM (
-                SELECT pirkejas, tiekejas FROM v_sutartys
-            ) AS q
-            LIMIT 5 OFFSET 0
+            SELECT q.* FROM (
+                SELECT pirkejas, tiekejas FROM v_sutartys LIMIT 100
+            ) AS q LIMIT 51 OFFSET 0
         `);
         assert.ok(rows.length > 0, "expected rows from v_sutartys via pagination wrapper");
         assert.ok("pirkejas" in rows[0], "missing pirkejas");
-        assert.ok("__total__" in rows[0], "__total__ column must be present");
+        assert.ok(!("__total__" in rows[0]), "__total__ column must not be present");
     });
 });
