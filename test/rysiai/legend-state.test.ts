@@ -5,7 +5,7 @@ import { LegendState } from '../../src/rysiai/legend-state.js';
 // ── LegendState ───────────────────────────────────────────────────────────────
 
 describe('LegendState — global state', () => {
-    let ls;
+    let ls: LegendState;
     beforeEach(() => { ls = new LegendState(); });
 
     it('Official is hidden by default', () => {
@@ -34,7 +34,7 @@ describe('LegendState — global state', () => {
 // ── initNode ──────────────────────────────────────────────────────────────────
 
 describe('LegendState — initNode', () => {
-    let ls;
+    let ls: LegendState;
     beforeEach(() => { ls = new LegendState(); });
 
     it('node has no config before initNode', () => {
@@ -79,7 +79,7 @@ describe('LegendState — initNode', () => {
 // ── setTypeVisible / isTypeVisible ────────────────────────────────────────────
 
 describe('LegendState — setTypeVisible / isTypeVisible', () => {
-    let ls;
+    let ls: LegendState;
     beforeEach(() => { ls = new LegendState(); });
 
     it('setTypeVisible(false) hides type for node', () => {
@@ -117,7 +117,7 @@ describe('LegendState — setTypeVisible / isTypeVisible', () => {
 // ── isEdgeHidden ──────────────────────────────────────────────────────────────
 
 describe('LegendState — isEdgeHidden', () => {
-    let ls;
+    let ls: LegendState;
     beforeEach(() => { ls = new LegendState(); });
 
     it('both unconfigured → uses global (Official hidden)', () => {
@@ -229,7 +229,7 @@ describe('LegendState — isEdgeHidden', () => {
     it('unchecking all checkboxes for OrgA hides all its edges', () => {
         ls.initNode('org:A');
         // Uncheck everything (hide all types)
-        ['Director', 'Shareholder', 'Official', 'Employment', 'ContractSmall', 'ContractMedium', 'ContractLarge', 'Spouse'].forEach(function (t) {
+        ['Director', 'Shareholder', 'Official', 'Employment', 'ContractSmall', 'ContractMedium', 'ContractLarge', 'Spouse'].forEach(function (t: string) {
             ls.setTypeVisible('org:A', t, false);
         });
         assert.equal(ls.isEdgeHidden('person:x', 'org:A', 'Director'), true);
@@ -237,4 +237,3 @@ describe('LegendState — isEdgeHidden', () => {
         assert.equal(ls.isEdgeHidden('person:x', 'org:A', 'ContractSmall'), true);
     });
 });
-

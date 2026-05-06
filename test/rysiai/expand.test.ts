@@ -17,6 +17,9 @@ import {
     addEdge,
 } from '../../modules/rysiai/expand.js';
 
+type NodeLike = { id: string; attributes: Record<string, unknown> };
+type EdgeLike = { id: string; source: string; target: string; attributes: Record<string, unknown> };
+
 describe('formatContractValue', () => {
     it('returns empty string for null', () => assert.equal(formatContractValue(null), ''));
     it('returns empty string for 0', () => assert.equal(formatContractValue(0), ''));
@@ -168,26 +171,26 @@ describe('edge', () => {
 
 describe('addNode / addEdge deduplication', () => {
     it('addNode ignores duplicate ids', () => {
-        const nodes = [];
-        const map = new Map();
-        const n = { id: 'org:1', attributes: {} };
+        const nodes: NodeLike[] = [];
+        const map: Map<string, boolean> = new Map();
+        const n: NodeLike = { id: 'org:1', attributes: {} };
         addNode(nodes, map, n);
         addNode(nodes, map, n);
         assert.equal(nodes.length, 1);
     });
 
     it('addEdge ignores duplicate ids', () => {
-        const edges = [];
-        const map = new Map();
-        const e = { id: 'edge:a:b:T', source: 'a', target: 'b', attributes: {} };
+        const edges: EdgeLike[] = [];
+        const map: Map<string, boolean> = new Map();
+        const e: EdgeLike = { id: 'edge:a:b:T', source: 'a', target: 'b', attributes: {} };
         addEdge(edges, map, e);
         addEdge(edges, map, e);
         assert.equal(edges.length, 1);
     });
 
     it('addNode accepts nodes with different ids', () => {
-        const nodes = [];
-        const map = new Map();
+        const nodes: NodeLike[] = [];
+        const map: Map<string, boolean> = new Map();
         addNode(nodes, map, { id: 'org:1', attributes: {} });
         addNode(nodes, map, { id: 'org:2', attributes: {} });
         assert.equal(nodes.length, 2);

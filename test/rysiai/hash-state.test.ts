@@ -9,29 +9,29 @@ import {
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-function makeGraph(...nodes) {
+function makeGraph(...nodes: [string, Record<string, unknown>][]): Graph {
     const g = new Graph({ type: 'directed', multi: true });
     for (const [id, attrs] of nodes) g.addNode(id, attrs);
     return g;
 }
 
-function rootOrgAttrs(jarKodas) {
+function rootOrgAttrs(jarKodas: string): Record<string, unknown> {
     return { entityType: 'OrganizationEntity', jarKodas, isRoot: true, expanded: true };
 }
 
-function extraOrgAttrs(jarKodas) {
+function extraOrgAttrs(jarKodas: string): Record<string, unknown> {
     return { entityType: 'OrganizationEntity', jarKodas, isRoot: false, expanded: true };
 }
 
-function rootContractAttrs(sutartiesUnikalusId) {
+function rootContractAttrs(sutartiesUnikalusId: string): Record<string, unknown> {
     return { entityType: 'ContractEntity', sutartiesUnikalusId, isRoot: true, expanded: true };
 }
 
-function rootProcurementAttrs(pirkimoId) {
+function rootProcurementAttrs(pirkimoId: string): Record<string, unknown> {
     return { entityType: 'ProcurementEntity', pirkimoId, isRoot: true, expanded: true };
 }
 
-function extraContractAttrs(sutartiesUnikalusId) {
+function extraContractAttrs(sutartiesUnikalusId: string): Record<string, unknown> {
     return { entityType: 'ContractEntity', sutartiesUnikalusId, isRoot: false, expanded: true };
 }
 
