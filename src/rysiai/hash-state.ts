@@ -134,7 +134,7 @@ export function buildHashString(
     }
 
     dataGraph.forEachNode((id, attrs) => {
-        if (id === primaryId || !legendState.hasNodeConfig(id)) return;
+        if (id === primaryId || !legendState.hasNodeConfig(id) || !attrs.expanded) return;
         const entityTypeName = attrs.entityType as string;
         const mapping = ENTITY_TYPE_KEY_MAP[entityTypeName];
         if (!mapping) return;

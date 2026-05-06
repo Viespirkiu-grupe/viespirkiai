@@ -449,6 +449,32 @@ describe('buildHashString', () => {
         assert.ok(h.includes('c_2=') || h.includes('c_3='), `contract must appear in hash: ${h}`);
         assert.ok(!h.includes('o_2=190011232'), `primary org must not appear as secondary: ${h}`);
     });
+
+    it('collapsed node (expanded:false) is excluded from hash even if legendState has config', () => {
+        // Simulates: person expanded from hash → user clicks collapse → expanded becomes false
+        const state = new LegendState();
+        const graph = makeGraph(
+            ['org:100', { entityType: 'OrganizationEntity', jarKodas: '100', isRoot: true, expanded: true }],
+            ['person:alenas bulauskis', { entityType: 'PersonEntity', vardas: 'Alenas', pavarde: 'Bulauskis', isRoot: false, expanded: false }],
+        );
+        applyFilterChars(state, 'org:100', 'DS');
+        applyFilterChars(state, 'person:alenas bulauskis', 'DSEULMGPABC'); // was expanded, has config
+        const h = buildHashString(state, graph);
+        assert.ok(!h.includes('p_'), `collapsed person must not appear in hash: ${h}`);
+        assert.equal(h, '#f=DS', `hash must only contain primary filter: ${h}`);
+    });
+
+    it('collapsed org node (expanded:false) is excluded from hash', () => {
+        const state = new LegendState();
+        const graph = makeGraph(
+            ['org:100', { entityType: 'OrganizationEntity', jarKodas: '100', isRoot: true, expanded: true }],
+            ['org:200', { entityType: 'OrganizationEntity', jarKodas: '200', isRoot: false, expanded: false }],
+        );
+        applyFilterChars(state, 'org:100', 'DS');
+        applyFilterChars(state, 'org:200', 'LMG');
+        const h = buildHashString(state, graph);
+        assert.equal(h, '#f=DS', `collapsed org must not appear in hash: ${h}`);
+    });
 });
 
 // ── applyFilterFromHash + buildHashString round-trip ─────────────────────────
