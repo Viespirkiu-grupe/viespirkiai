@@ -1,5 +1,11 @@
 # MCP Risk Intelligence Tool — Proposal
 
+> **Beta release scope.** During beta we have **only a pre-existing read-only PostgreSQL user** (no DDL, no role
+> creation, no new tables, no permanent views). Helper views are session-scoped TEMP VIEWs created on every
+> connection acquire. Audit logging reuses the existing `mcpToolCalls` table written by `logToolCall`. After beta,
+> the helper views will be promoted to permanent views in the database and DDL-dependent items (custom role,
+> dedicated audit table, `ALTER ROLE … SET …`) become available.
+
 ## The insight
 
 A human says: *"This company feels off — they keep winning government contracts in my town and they only have 2
@@ -105,134 +111,105 @@ Six layers of defense. Each layer is independent — even if one fails, the othe
 |       schema from direct access       |
 |     - block sensitive columns if any  |
 +---------------------------------------+
-|  3. Function whitelist                |
-|     Allow:                            |
-|       COUNT, SUM, AVG, MAX, MIN,      |
-|       RANK, ROW_NUMBER, DENSE_RANK,   |
-|       NTILE, PERCENTILE_CONT,         |
-|       LAG, LEAD, FIRST_VALUE,         |
-|       COALESCE, NULLIF, GREATEST,     |
-|       LEAST, CASE,                    |
-|       DATE_TRUNC, EXTRACT, AGE,       |
-|       NOW, CURRENT_DATE,              |
-|       ROUND, ABS, CEIL, FLOOR, LN,   |
-|       UPPER, LOWER, LENGTH, TRIM,     |
-|       SUBSTRING, LEFT, RIGHT,         |
-|       CONCAT, STRING_AGG,             |
-|       ARRAY_AGG, JSONB_BUILD_OBJECT,  |
-|       REGEXP_MATCH, REGEXP_REPLACE,   |
-|       TO_CHAR, TO_DATE,               |
-|       BOOL_AND, BOOL_OR,              |
-|       GENERATE_SERIES                 |
-|     Block:                            |
-|       pg_read_file, pg_read_binary_   |
-|       file, dblink, lo_import,        |
-|       lo_export, pg_sleep,            |
-|       set_config, current_setting,    |
-|       pg_terminate_backend,           |
-|       pg_cancel_backend, COPY,        |
-|       any pg_* admin functions        |
+|  3. Function whitelist (strict)       |
+|     Reject any function NOT in the    |
+|     allow list below.                 |
+|     See "Allowed functions" table.    |
 +---------------------------------------+
 |  4. Complexity limits                 |
 |     - max JOIN count: 6               |
 |     - max subquery depth: 3           |
-|     - max CTE count: 8               |
-|     - LIMIT enforced (cap at 200)     |
-|     - WITH RECURSIVE: max depth 5     |
+|     - max CTE count: 8                |
+|     - WITH RECURSIVE allowed; flagged |
+|       in audit log                    |
 +---------------------------------------+
 |  5. Execution sandbox                 |
-|     - dedicated read-only PG role     |
-|     - statement_timeout = 10s         |
-|     - work_mem cap per query          |
+|     - existing read-only PG role      |
+|       (max 5 connections)             |
+|     - SET LOCAL statement_timeout =   |
+|       '20s' at session start          |
+|       (capped by role default if      |
+|        admin set lower)               |
 |     - row limit enforced via wrapper: |
-|       SELECT * FROM (...user SQL...)  |
-|       AS q LIMIT 200                  |
+|       SELECT *, COUNT(*) OVER ()      |
+|       AS __total__                    |
+|       FROM (...user SQL...) AS q      |
+|       LIMIT 50 OFFSET (page-1)*50     |
 +---------------------------------------+
 |  6. Audit log                         |
-|     - every query logged:             |
-|       timestamp, purpose, SQL,        |
-|       duration, row count, caller     |
-|     - enables post-hoc review         |
+|     - every query logged via existing |
+|       logToolCall → mcpToolCalls      |
+|       (input.purpose + input.query    |
+|        already captured)              |
 +---------------------------------------+
 ```
 
-### Dedicated read-only PostgreSQL role
+### Read-only PostgreSQL role (existing)
 
-The database-level last line of defense. Even if every application-layer guard fails, this role **cannot** modify data
-or access system internals.
+A read-only role with `SELECT` on the analytical tables already exists in the database — **no DDL is required for
+beta**. The MCP tool simply connects as this user. The application maintains the in-code `TABLE_WHITELIST` (used by
+Layer 2) in lockstep with the role's actual grants:
 
-```sql
-CREATE
-ROLE mcp_analyst LOGIN PASSWORD '...';
-GRANT CONNECT ON DATABASE viespirkiai TO mcp_analyst;
-GRANT USAGE ON SCHEMA public TO mcp_analyst;
-
--- SELECT only on analytical tables
-GRANT
-SELECT
-ON
-    sutartys,
-    "sutartysAtviriDuomenys",
-    "sutartysAtviriDuomenysImp",
-    "jarCsv",
-    jar,
-    "viesiejiPirkimai",
-    "viesiejiPirkimaiVykdytojai",
-    "pinregJuridiniaiRysiai",
-    pinreg,
-    failai,
-    "sabisSutartys",
-    "sabisSutarciuSalys",
-    "sabisSaskaitos",
-    "sabisSaskaituSalys",
-    "cpvaProjektuSutartys",
-    "cpvaProjektuSarasas",
-    "cvppViesiejiPirkimai",
-    "eiluciuSkaiciai",
-    "bvpzKodai",
-    "sodra",
-    regitra,
-    "nepatikimiTiekejai",
-    "melagingiTiekejai",
-    jadis,
-    "rcInformaciniaiLeidiniaiPranesimai",
-    "domenai",
-    kotis,
-    "balansoAtaskaitos",
-    "pelnoNuostoliuAtaskaitos",
-    "darboVieta",
-    "istatinisKapitalas",
-    -- required for bid rigging / carousel analysis (Themes 2, 3)
-    "atn1ataskaitos",
-    "atn1dalyviai",
-    "atn1pasiulymuEile",
-    "atn1atmestiPasiulymai", -- joined in v_dalyviai for rejection reasons
-    -- required for procedure manipulation analysis (Theme 7)
-    "neskelbiamosDerybos",
-    -- required for compliance / VDI violations (Theme 9) — was used in v_company but not granted
-    "vdiPazeidimai",
-    -- required for court case analysis (Theme 9)
-    "bylos",
-    "bylosDalyviai",
-    -- required for tax payment analysis (Theme 1)
-    "mokesciai"
-    TO mcp_analyst;
-
--- No INSERT, UPDATE, DELETE, CREATE, DROP — implicit by omission
-
--- Role-level resource limits
-ALTER
-ROLE mcp_analyst SET statement_timeout = '10s';
-ALTER
-ROLE mcp_analyst SET work_mem = '32MB';
 ```
+sutartys, sutartysAtviriDuomenys, sutartysAtviriDuomenysImp,
+jarCsv, jar,
+viesiejiPirkimai, viesiejiPirkimaiVykdytojai,
+pinregJuridiniaiRysiai, pinreg,
+failai,
+sabisSutartys, sabisSutarciuSalys, sabisSaskaitos, sabisSaskaituSalys,
+cpvaProjektuSutartys, cpvaProjektuSarasas,
+cvppViesiejiPirkimai,
+eiluciuSkaiciai, bvpzKodai,
+sodra, regitra,
+nepatikimiTiekejai, melagingiTiekejai,
+jadis, rcInformaciniaiLeidiniaiPranesimai,
+domenai, kotis,
+balansoAtaskaitos, pelnoNuostoliuAtaskaitos,
+darboVieta, istatinisKapitalas,
+atn1ataskaitos, atn1dalyviai, atn1pasiulymuEile, atn1atmestiPasiulymai,
+neskelbiamosDerybos,
+vdiPazeidimai,
+bylos, bylosDalyviai,
+mokesciai
+```
+
+Plus the six TEMP view names (Layer 2 also accepts these): `v_company`, `v_sutartys`, `v_pirkimas`,
+`v_person_links`, `v_dalyviai`, `v_bylos`.
+
+Resource limits (`statement_timeout`, `work_mem`) inherit whatever the existing role has. The handler additionally
+runs `SET LOCAL statement_timeout = '20s'` per query — PostgreSQL silently caps this if the role default is lower.
+
+### Allowed functions (Layer 3 — strict whitelist)
+
+Every function reference in the parsed AST must be in this set. Anything else is rejected. The set is sized to
+cover all SQL examples in this proposal and `mcp-investigator-questions.md`; extend it reactively as the LLM hits
+walls during beta.
+
+| Category               | Allowed                                                                                                                                                                                                                                                                                                                           |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Aggregates             | `count`, `sum`, `avg`, `min`, `max`, `stddev`, `stddev_pop`, `stddev_samp`, `variance`, `var_pop`, `var_samp`, `bool_and`, `bool_or`, `every`, `string_agg`, `array_agg`, `jsonb_agg`, `json_agg`, `percentile_cont`, `percentile_disc`, `mode`                                                                                   |
+| Window                 | `row_number`, `rank`, `dense_rank`, `percent_rank`, `cume_dist`, `ntile`, `lag`, `lead`, `first_value`, `last_value`, `nth_value`                                                                                                                                                                                                 |
+| Conditional            | `coalesce`, `nullif`, `greatest`, `least`                                                                                                                                                                                                                                                                                         |
+| Math                   | `round`, `abs`, `ceil`, `ceiling`, `floor`, `trunc`, `sign`, `mod`, `power`, `sqrt`, `exp`, `ln`, `log`, `div`                                                                                                                                                                                                                    |
+| Date / time            | `now`, `current_date`, `current_timestamp`, `date_trunc`, `date_part`, `extract`, `age`, `to_char`, `to_date`, `to_timestamp`, `make_date`, `make_interval`, `justify_interval`                                                                                                                                                   |
+| String                 | `upper`, `lower`, `length`, `char_length`, `trim`, `ltrim`, `rtrim`, `btrim`, `substring`, `substr`, `left`, `right`, `concat`, `concat_ws`, `replace`, `split_part`, `position`, `strpos`, `lpad`, `rpad`, `regexp_match`, `regexp_matches`, `regexp_replace`, `regexp_split_to_array`, `regexp_split_to_table`, `format`, `md5` |
+| Array                  | `unnest`, `array_length`, `array_position`, `array_remove`, `array_replace`, `cardinality`, `string_to_array`, `array_to_string`                                                                                                                                                                                                  |
+| JSON                   | `jsonb_build_object`, `json_build_object`, `jsonb_build_array`, `jsonb_object_keys`, `jsonb_array_elements`, `jsonb_array_elements_text`, `jsonb_extract_path`, `jsonb_extract_path_text`                                                                                                                                         |
+| Set returning          | `generate_series`                                                                                                                                                                                                                                                                                                                 |
+| Type / casting helpers | `cast` (AST node, not a function call), implicit `::type` casts (allowed by parser, not on this list)                                                                                                                                                                                                                             |
+
+Explicitly **never** allowed (would otherwise sneak in via lookup): `pg_read_file`, `pg_read_binary_file`,
+`pg_ls_dir`, `dblink`, `dblink_*`, `lo_import`, `lo_export`, `lo_*`, `pg_sleep`, `pg_sleep_for`, `set_config`,
+`current_setting`, `pg_terminate_backend`, `pg_cancel_backend`, `pg_advisory_*`, `copy`, any `pg_*` admin
+function. The whitelist is the gate; this list is documentation of intent only.
 
 ---
 
 ## Subject-matter temporary views
 
 Six `CREATE TEMP VIEW` statements executed at connection open time (session-scoped, no DDL privileges needed).
-They solve the three recurring pain points across all investigation queries:
+**Beta only** — after beta these will be promoted to permanent views in the database and the temp-view machinery
+removed. They solve the three recurring pain points across all investigation queries:
 
 - `jarCsv.jarKodas` is `integer`; all FK columns are `text` — every join needs `::text` cast
 - Latest Sodra snapshot requires `ORDER BY data DESC NULLS LAST LIMIT 1` per company
@@ -243,23 +220,23 @@ functions, CTEs, and recursive graph traversal where full expressiveness is need
 
 **Coverage map against the 22 investigator themes:**
 
-| View             | Themes covered              | Critical facts provided                                                    |
-|------------------|-----------------------------|----------------------------------------------------------------------------|
-| `v_company`      | 1, 5, 6, 7, 9, 10, 11, 12  | headcount, registration, compliance flags, domain/court/negotiation counts |
-| `v_sutartys`     | 1, 2, 3, 5, 8, 15, 18      | contract value, overrun ratio, CPV, buyer/seller names, tipas              |
-| `v_pirkimas`     | 5, 6, 7, 20                 | procedure type, buyer municipality, estimated value                        |
-| `v_person_links` | 4, 10, 11, 13, 19           | person ↔ company edges, spouse links, role type, foreign-entity flag       |
-| `v_dalyviai`     | **2, 3, 14, 17**            | full bidder list, bid amounts, rank — essential for bid rigging/spec rigging/cartel |
-| `v_bylos`        | **9**                       | court cases per company — blind spot without this view                     |
+| View             | Themes covered            | Critical facts provided                                                             |
+|------------------|---------------------------|-------------------------------------------------------------------------------------|
+| `v_company`      | 1, 5, 6, 7, 9, 10, 11, 12 | headcount, registration, compliance flags, domain/court/negotiation counts          |
+| `v_sutartys`     | 1, 2, 3, 5, 8, 15, 18     | contract value, overrun ratio, CPV, buyer/seller names, tipas                       |
+| `v_pirkimas`     | 5, 6, 7, 20               | procedure type, buyer municipality, estimated value                                 |
+| `v_person_links` | 4, 10, 11, 13, 19         | person ↔ company edges, spouse links, role type, foreign-entity flag                |
+| `v_dalyviai`     | **2, 3, 14, 17**          | full bidder list, bid amounts, rank — essential for bid rigging/spec rigging/cartel |
+| `v_bylos`        | **9**                     | court cases per company — blind spot without this view                              |
 
 Raw tables used directly (no view wrapper needed):
 
-| Table                  | Themes | Why no view |
-|------------------------|--------|-------------|
-| `cpvaProjektuSutartys` | 12     | CPVA subcontractor data — join shape varies per query |
+| Table                    | Themes | Why no view                                                                     |
+|--------------------------|--------|---------------------------------------------------------------------------------|
+| `cpvaProjektuSutartys`   | 12     | CPVA subcontractor data — join shape varies per query                           |
 | `pinregJuridiniaiRysiai` | 13, 19 | Revolving door needs self-join on date ranges — view would fix too many columns |
-| `domenai`              | 16     | Domain pair queries need flexible self-join |
-| `neskelbiamosDerybos`  | 20     | Audit findings — single-table lookup, no join needed |
+| `domenai`                | 16     | Domain pair queries need flexible self-join                                     |
+| `neskelbiamosDerybos`    | 20     | Audit findings — single-table lookup, no join needed                            |
 
 ### `v_company` — company profile with latest headcount and compliance status
 
@@ -425,9 +402,13 @@ FROM "bylosDalyviai" bd
 
 ### Connection lifecycle
 
-The MCP server runs all six `CREATE TEMP VIEW` statements immediately after acquiring a connection from the pool,
-before executing any user query. Because TEMP views are session-scoped they disappear automatically when the
-connection closes — no cleanup needed.
+The analyst pool registers a `pool.on('connect', client => client.query(TEMP_VIEWS_SQL))` hook so the six TEMP
+views are created **once per physical backend connection**. Because TEMP views are session-scoped they disappear
+automatically when the backend connection closes — no cleanup needed, and the views aren't recreated on every
+query (which would fail with "relation already exists" on connection reuse).
+
+If `pool.on('connect')` proves fragile in beta, a safe fallback is to wrap each statement as
+`CREATE OR REPLACE TEMP VIEW …` (PostgreSQL 14+) and execute the block before each user query.
 
 ---
 
@@ -662,14 +643,14 @@ undeclared subcontracting — another capacity-mismatch indicator.*
 
 ## What to build
 
-| Component                                 | Effort | Notes                                                          |
-|-------------------------------------------|--------|----------------------------------------------------------------|
-| `get_schema` MCP tool                     | Small  | Query `information_schema`, filter to whitelist                |
-| `execute_investigation_query` MCP tool    | Medium | SQL parser + guardrail stack + execution                       |
-| Read-only PG role (`mcp_analyst`)         | Small  | One-time DDL                                                   |
-| SQL AST validation module                 | Medium | `node-sql-parser`, table/function whitelist, complexity checks |
-| Audit logging                             | Small  | Insert to the `investigation_query_log` table                  |
-| MCP tool description / prompt engineering | Small  | Tell the LLM what tables exist and how they relate             |
+| Component                                 | Effort | Notes                                                                                |
+|-------------------------------------------|--------|--------------------------------------------------------------------------------------|
+| `get_schema` MCP tool                     | Small  | Query `information_schema`, filter to whitelist                                      |
+| `execute_investigation_query` MCP tool    | Medium | SQL parser + guardrail stack + execution + pagination wrapper                        |
+| Analyst pool with `on('connect')` hook    | Small  | Reuses existing read-only PG role; runs `TEMP_VIEWS_SQL` once                        |
+| SQL AST validation module                 | Medium | `node-sql-parser`, table whitelist, **strict** function whitelist, complexity checks |
+| Audit logging                             | None   | Reuses existing `logToolCall` → `mcpToolCalls`                                       |
+| MCP tool description / prompt engineering | Small  | Tell the LLM what tables exist and how they relate                                   |
 
 ### Recommended npm packages
 
@@ -747,11 +728,14 @@ modules/mcp/
 │   ├── getSchema.js                     ← Tool 1 (new)
 │   └── executeInvestigationQuery.js     ← Tool 2 (new)
 └── analyst/
-    ├── pool.js           ← Dedicated pg.Pool for mcp_analyst role
+    ├── pool.js           ← Dedicated pg.Pool for the existing read-only role,
+    │                        with on('connect') hook running TEMP_VIEWS_SQL
     ├── tempViews.js      ← Six CREATE TEMP VIEW statements as a string constant
-    ├── validateSql.js    ← Multi-layer SQL validation (AST + whitelists + limits)
-    └── auditLog.js       ← Writes to investigation_query_log table
+    └── validateSql.js    ← Multi-layer SQL validation (AST + whitelists + limits)
 ```
+
+Auditing reuses the existing `logToolCall` → `mcpToolCalls` path (input params already capture both `query` and
+`purpose`), so no new audit module is needed.
 
 The `analyst/` directory is internal infrastructure consumed only by the two new tools. It must not be imported from
 routes or other modules.
@@ -761,12 +745,18 @@ routes or other modules.
 ### New config entries (`config.sample.js`)
 
 ```js
-// Read-only analyst role for MCP investigation queries
-// Must point at direct PostgreSQL (not PgBouncer) — TEMP views are session-scoped
-pgAnalystUser: "mcp_analyst",
-pgAnalystPassword: "CHANGE_ME",
-pgAnalystPort: 9118,          // same host as pgHost, direct PG port
-pgAnalystMaxConnections: 3,   // investigation queries serialize naturally; keep small
+// Existing read-only PostgreSQL user used by MCP investigation queries.
+// Must point at direct PostgreSQL (not PgBouncer) — TEMP views are session-scoped.
+pgAnalystUser: "...",        // existing read-only role name
+    pgAnalystPassword
+:
+"...",
+    pgAnalystPort
+:
+9118,         // same host as pgHost, direct PG port
+    pgAnalystMaxConnections
+:
+5,  // hard ceiling — the role itself is capped at 5 connections
 ```
 
 **Why not PgBouncer?** `CREATE TEMP VIEW` is session-scoped. PgBouncer in transaction-pooling mode may route the next
@@ -783,36 +773,24 @@ node-sql-parser   ^5.x   PostgreSQL dialect; AST-based parse + table/function ex
 
 ---
 
-### New database objects (one-time DDL)
+### Database objects
 
-**Read-only role** — see the `CREATE ROLE` block in the Guardrail stack section above. Run once by an admin.
-
-**Audit log table:**
-
-```sql
-CREATE TABLE investigation_query_log
-(
-    id         BIGSERIAL PRIMARY KEY,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    purpose    TEXT        NOT NULL,
-    sql        TEXT        NOT NULL,
-    duration_ms INTEGER,
-    row_count  INTEGER,
-    error_msg  TEXT,
-    user_agent TEXT
-);
-```
+**No DDL during beta.** The read-only role already exists and the audit log reuses `mcpToolCalls`.
 
 ---
 
 ### Module: `analyst/pool.js`
 
-Creates and exports a single `pg.Pool` connected as `mcp_analyst`. Mirrors the main pool in `postgres/postgres.js`
-but with analyst credentials and direct-PG port. Applies the same global type parsers (strings for dates, floats
-for numerics) so results are consistent with the rest of the app.
+Creates and exports a single `pg.Pool` connected as the existing read-only role. Mirrors the main pool in
+`postgres/postgres.js` but with analyst credentials and the direct-PG port. Applies the same global type parsers
+(strings for dates, floats for numerics) so results are consistent with the rest of the app.
+
+A `pool.on('connect', client => client.query(TEMP_VIEWS_SQL))` hook initialises the six TEMP views once per
+physical backend connection.
 
 ```
-export const analystPool = new Pool({ host, user: pgAnalystUser, password, port: pgAnalystPort, ... })
+export const analystPool = new Pool({ host, user: pgAnalystUser, password, port: pgAnalystPort, max: 5, ... });
+analystPool.on('connect', client => client.query(TEMP_VIEWS_SQL));
 ```
 
 ---
@@ -840,6 +818,7 @@ Four-layer synchronous validation. Returns `{ ok: true }` or `{ ok: false, layer
 **Layer 1 — AST parse**
 
 Use `node-sql-parser` with `{ database: "PostgreSQL" }`. If the parse throws, return error immediately. After parse:
+
 - Reject if the AST is not a single `SELECT` statement.
 - Reject if the statement count ≠ 1 (blocks semicolon-chained statements).
 
@@ -850,30 +829,32 @@ granted to `mcp_analyst`). Also accept the six temp view names (`v_company`, `v_
 `v_person_links`, `v_dalyviai`, `v_bylos`). Reject anything else — including `pg_catalog`, `information_schema`,
 and any `pg_*` system table.
 
-**Layer 3 — Function whitelist**
+**Layer 3 — Function whitelist (strict)**
 
-Walk the AST collecting every `Function` node. Block known dangerous functions:
-`pg_read_file`, `pg_read_binary_file`, `dblink`, `lo_import`, `lo_export`, `pg_sleep`, `set_config`,
-`current_setting`, `pg_terminate_backend`, `pg_cancel_backend`, any `pg_*` not in the allow list.
+Walk the AST collecting every `Function` node and every aggregate / window-function name. Reject the query if any
+identifier is **not** in `FUNCTION_WHITELIST` (the table in the Guardrail stack section above). Comparison is
+case-insensitive. The error message names the rejected function so the LLM can rewrite.
 
-Allow list is the set enumerated in the Guardrail stack section above. Unknown functions not on either list are
-allowed by default — the read-only role is the enforcement backstop, not the function whitelist.
+If beta surfaces a legitimate function the LLM needs (e.g. `corr`, `regr_slope`), add it to the whitelist with a
+short rationale comment in the code rather than weakening the gate.
 
 **Layer 4 — Complexity limits**
 
 Count via AST walk:
+
 - JOIN nodes: reject if > 6
 - Subquery depth: reject if > 3 (recursive count of nested `SELECT` nodes)
 - CTE count: reject if > 8
-- `WITH RECURSIVE` present: allowed, but flag for audit log
+- `WITH RECURSIVE` present: allowed, but the boolean is returned to the caller so the existing `logToolCall`
+  entry can record it.
 
 ---
 
-### Module: `analyst/auditLog.js`
+### Auditing
 
-Async function `logInvestigationQuery({ purpose, sql, durationMs, rowCount, errorMsg, userAgent })`. Inserts into
-`investigation_query_log`. Errors are swallowed silently (same pattern as `mcpLogger.js`) — audit failure must
-never block query execution.
+Reuses the existing `logToolCall` → `mcpToolCalls` write path. The tool's input object (`{ query, purpose, page }`)
+is already serialised into `mcpToolCalls` by the existing wrapper, and the handler additionally logs `durationMs`
+/ `rowCount` / `errorMsg` into the same row via the response payload. No new module.
 
 ---
 
@@ -909,72 +890,102 @@ Uses the **main pool**, not the analyst pool. Schema introspection is read-only 
 
 #### Input schema
 
-| Field      | Zod type                                   | Default | Description                                        |
-|------------|--------------------------------------------|---------|----------------------------------------------------|
-| `query`    | `z.string().min(10).max(8000)`             | —       | SQL SELECT to execute (required)                   |
-| `purpose`  | `z.string().min(5).max(500)`               | —       | Human-readable reason — audit log only (required)  |
-| `page`     | `z.number().int().min(1).default(1)`       | `1`     | Page number (1-based)                              |
-| `pageSize` | `z.number().int().min(1).max(50).default(50)` | `50` | Rows per page — capped at 50 regardless of input   |
+| Field     | Zod type                             | Default | Description                                       |
+|-----------|--------------------------------------|---------|---------------------------------------------------|
+| `query`   | `z.string().min(10).max(8000)`       | —       | SQL SELECT to execute (required)                  |
+| `purpose` | `z.string().min(5).max(500)`         | —       | Human-readable reason — audit log only (required) |
+| `page`    | `z.number().int().min(1).default(1)` | `1`     | Page number (1-based). Page size is fixed at 50.  |
+
+`pageSize` is **not** an input — it is fixed at **50 rows** to bound both PostgreSQL load on the small read-only
+connection pool and LLM context cost.
 
 #### Pagination design
 
-The LLM cannot scroll or paginate passively — it must decide to call the tool again. Two principles drive the design:
+Two principles:
 
-1. **Never flood the LLM with rows it didn't ask for.** 50 rows per page keeps the context cost predictable. The
-   LLM can always request additional pages, but it can never accidentally receive thousands of rows from a single call.
-
-2. **Avoid `COUNT(*)` on user queries.** Running `SELECT COUNT(*) FROM (<user_sql>)` for every request doubles
-   execution cost and doubles timeout risk. Instead, use the **N+1 trick**: fetch `pageSize + 1` rows — if the
-   extra row comes back, there are more pages; if not, this is the last page.
+1. **Fixed 50-row pages.** A single call returns at most 50 rows; further rows require explicit follow-up calls
+   from the LLM with `page: 2`, `page: 3`, etc.
+2. **Total row count is reported on every page** so the LLM can decide whether to keep paging. The total is
+   computed by adding `COUNT(*) OVER ()` to the wrapper, which evaluates the inner query once and returns the
+   total alongside each row — cheaper and simpler than a separate `COUNT(*)` query.
 
 Execution wrapping:
 
 ```sql
-SELECT * FROM (<user_sql>) AS q
-LIMIT <pageSize + 1>
-OFFSET <(page - 1) * pageSize>
+SELECT q.*, COUNT(*) OVER () AS __total__
+FROM (<user_sql>) AS q
+LIMIT 50 OFFSET (<page> - 1) * 50
 ```
 
-After execution: if `rawRows.length > pageSize`, set `hasMore = true` and trim the last row before returning.
+The handler reads `__total__` from any returned row (all rows carry the same value), strips it from the rows
+returned to the LLM, and computes `totalPages = ceil(totalRows / 50)`. If the result set is empty the handler
+runs a fallback `SELECT COUNT(*) FROM (<user_sql>) AS q` so `totalRows` is still reported correctly.
 
 #### Success response
 
+The MCP envelope is:
+
 ```json
 {
-  "rows": [...],
+  "content": [
+    {
+      "type": "text",
+      "text": "<JSON.stringify(payload)>"
+    }
+  ]
+}
+```
+
+Where `payload` is:
+
+```json
+{
+  "rows": [
+    ...
+  ],
   "page": 1,
   "pageSize": 50,
   "rowCount": 50,
+  "totalRows": 232,
+  "totalPages": 5,
   "hasMore": true,
   "durationMs": 381
 }
 ```
 
-| Field        | Type      | Description                                                            |
-|--------------|-----------|------------------------------------------------------------------------|
-| `rows`       | array     | Result rows for this page (at most `pageSize` items)                   |
-| `page`       | number    | Page number that was returned (echoed from input)                      |
-| `pageSize`   | number    | Page size that was used (echoed from input, capped at 50)              |
-| `rowCount`   | number    | Number of rows in this response (`rows.length`, ≤ `pageSize`)          |
-| `hasMore`    | boolean   | `true` if there are more rows on the next page                         |
-| `durationMs` | number    | Query execution wall time in milliseconds                              |
+| Field        | Type    | Description                                                       |
+|--------------|---------|-------------------------------------------------------------------|
+| `rows`       | array   | Result rows for this page (at most 50 items, `__total__` removed) |
+| `page`       | number  | Page number that was returned (echoed from input)                 |
+| `pageSize`   | number  | Always `50`                                                       |
+| `rowCount`   | number  | Number of rows in this response (`rows.length`)                   |
+| `totalRows`  | number  | Total rows in the full result set (from `COUNT(*) OVER ()`)       |
+| `totalPages` | number  | `Math.ceil(totalRows / 50)`                                       |
+| `hasMore`    | boolean | `page < totalPages`                                               |
+| `durationMs` | number  | Query execution wall time in milliseconds                         |
 
-The LLM reads `hasMore: true` and calls the tool again with `page: 2` if it needs more data. Because the LLM
-controls pagination explicitly, it can also decide to stop early once it has enough evidence.
+The LLM phrases its progress to the user as e.g. *"showing 1 of 5 pages"* or *"50 of 232 records"*. Because the
+LLM controls pagination explicitly, it can stop early once it has enough evidence regardless of `hasMore`.
 
 #### Error response (validation or execution failure)
 
 ```json
 {
-  "content": [{ "type": "text", "text": "<message>" }],
+  "content": [
+    {
+      "type": "text",
+      "text": "<message>"
+    }
+  ],
   "isError": true
 }
 ```
 
 Validation errors include the layer name and the specific identifier that was rejected (e.g. `"Layer 2: table
-'pg_class' is not in the allowed table list"`). Execution errors include the raw PostgreSQL error message so the
-LLM can self-correct its SQL. If neither `query` nor `purpose` is provided, the Zod schema rejects the call
-before the handler runs — the SDK returns a validation error automatically.
+'pg_class' is not in the allowed table list"` or `"Layer 3: function 'pg_sleep' is not on the allow list"`).
+Execution errors include the raw PostgreSQL error message so the LLM can self-correct its SQL. If neither `query`
+nor `purpose` is provided, the Zod schema rejects the call before the handler runs — the SDK returns a validation
+error automatically.
 
 #### Minimal example
 
@@ -984,54 +995,64 @@ before the handler runs — the SDK returns a validation error automatically.
 {
   "query": "SELECT \"tiekejoKodas\", COUNT(*) AS sutarciu_sk, ROUND(SUM(verte)) AS bendra_verte FROM sutartys WHERE istrinta IS NOT TRUE GROUP BY \"tiekejoKodas\" ORDER BY bendra_verte DESC",
   "purpose": "Top suppliers by total contract value — initial scan",
-  "page": 1,
-  "pageSize": 10
+  "page": 1
 }
 ```
 
 **Execution wrapper applied:**
 
 ```sql
-SELECT * FROM (
-  SELECT "tiekejoKodas", COUNT(*) AS sutarciu_sk, ROUND(SUM(verte)) AS bendra_verte
-  FROM sutartys
-  WHERE istrinta IS NOT TRUE
-  GROUP BY "tiekejoKodas"
-  ORDER BY bendra_verte DESC
-) AS q
-LIMIT 11 OFFSET 0
+SELECT q.*, COUNT(*) OVER () AS __total__
+FROM (SELECT "tiekejoKodas", COUNT(*) AS sutarciu_sk, ROUND(SUM(verte)) AS bendra_verte
+      FROM sutartys
+      WHERE istrinta IS NOT TRUE
+      GROUP BY "tiekejoKodas"
+      ORDER BY bendra_verte DESC) AS q
+LIMIT 50 OFFSET 0
 ```
 
-**Output:**
+**Output payload (wrapped in MCP `content`):**
 
 ```json
 {
   "rows": [
-    { "tiekejoKodas": "304567890", "sutarciu_sk": 47, "bendra_verte": 12300000 },
-    { "tiekejoKodas": "301234567", "sutarciu_sk": 31, "bendra_verte": 8750000 },
+    {
+      "tiekejoKodas": "304567890",
+      "sutarciu_sk": 47,
+      "bendra_verte": 12300000
+    },
+    {
+      "tiekejoKodas": "301234567",
+      "sutarciu_sk": 31,
+      "bendra_verte": 8750000
+    },
     "..."
   ],
   "page": 1,
-  "pageSize": 10,
-  "rowCount": 10,
+  "pageSize": 50,
+  "rowCount": 50,
+  "totalRows": 232,
+  "totalPages": 5,
   "hasMore": true,
   "durationMs": 214
 }
 ```
 
-The LLM sees `hasMore: true` and can call `page: 2` if the investigation requires more suppliers, or proceed
-with the top 10 if that is sufficient.
+The LLM reports *"showing page 1 of 5 (50 of 232 records)"* and decides whether to call `page: 2` or stop here.
 
 #### Multi-page investigation pattern
 
 ```
-Call 1:  page=1  → rows 1–50,  hasMore=true   → LLM decides: enough? or call page=2
-Call 2:  page=2  → rows 51–100, hasMore=false  → LLM knows this is the complete result set
+Call 1:  page=1  → rows 1–50,    totalRows=232, hasMore=true   → "page 1 of 5"
+Call 2:  page=2  → rows 51–100,  totalRows=232, hasMore=true   → "page 2 of 5"
+...
+Call 5:  page=5  → rows 201–232, totalRows=232, hasMore=false  → complete
 ```
 
 The LLM should state its pagination decision in the `purpose` field:
+
 - `"Top suppliers scan — page 1 of initial results"`
-- `"Continuing supplier scan — checking if more risky companies appear on page 2"`
+- `"Continuing supplier scan — page 2, checking if more risky companies appear"`
 
 This keeps the audit log readable as a narrative of the investigation.
 
@@ -1056,20 +1077,15 @@ graph TD
         IS --> MP[(main pool\npostgres.js)]
     end
 
-    subgraph "Tool 2: execute_investigation_query — executeInvestigationQuery.js"
-        W --> EQ[executeInvestigationQuery handler]
-        EQ --> VS[validateSql.js\nLayers 1–4]
-        VS -->|invalid| ER[return isError + layer + message]
-        VS -->|valid| AP[(analyst pool\nanalyst/pool.js)]
-        AP --> TV[CREATE TEMP VIEWs\ntempViews.js]
-        TV --> EX["SELECT * FROM (user_sql) AS q\nLIMIT pageSize+1 OFFSET (page-1)*pageSize"]
-        EX --> PN{rows.length\n> pageSize?}
-        PN -->|yes| HM[trim last row\nhasMore=true]
-        PN -->|no| NM[hasMore=false]
-        HM --> AL[auditLog.js\ninvestigation_query_log]
-        NM --> AL
-        AL --> RET["return { rows, page, pageSize,\nrowCount, hasMore, durationMs }"]
-    end
+subgraph "Tool 2: execute_investigation_query — executeInvestigationQuery.js"
+W --> EQ[executeInvestigationQuery handler]
+EQ --> VS[validateSql.js\nLayers 1–4]
+VS -->|invalid|ER[return isError + layer + message]
+VS -->|valid|AP[(analyst pool\nanalyst/pool.js\nTEMP_VIEWS_SQL on connect)]
+AP --> EX["SELECT q.*, COUNT(*) OVER () AS __total__\nFROM (user_sql) AS q\nLIMIT 50 OFFSET (page-1)*50"]
+EX --> EXTRACT["read __total__,\nstrip from rows,\ntotalPages = ceil(total/50)"]
+EXTRACT --> RET["MCP content envelope:\n{ rows, page, pageSize=50,\nrowCount, totalRows,\ntotalPages, hasMore, durationMs }"]
+end
 ```
 
 ---
@@ -1082,61 +1098,56 @@ sequenceDiagram
     participant H as executeInvestigationQuery handler
     participant V as validateSql.js
     participant P as analyst/pool.js
-    participant DB as PostgreSQL (mcp_analyst role)
-    participant A as auditLog.js
+    participant DB as PostgreSQL (read-only role)
+    LLM ->> H: { query, purpose, page }
+    Note over H: page defaults to 1, pageSize is fixed at 50
 
-    LLM->>H: { query, purpose, page, pageSize }
-    Note over H: page defaults to 1, pageSize defaults to 50 (max 50)
+H->>V: validate(query)
+V->>V: L1: node-sql-parser — parse AST,\nassert single SELECT
+V->>V: L2: walk TableRef nodes —\nall in TABLE_WHITELIST or VIEW_NAMES?
+V->>V: L3: walk Function nodes —\nstrict whitelist (reject if missing)
+V->>V: L4: JOINs ≤ 6, subquery depth ≤ 3, CTEs ≤ 8
 
-    H->>V: validate(query)
-    V->>V: L1: node-sql-parser — parse AST,\nassert single SELECT
-    V->>V: L2: walk TableRef nodes —\nall in TABLE_WHITELIST or VIEW_NAMES?
-    V->>V: L3: walk Function nodes —\nno blocked pg_* functions?
-    V->>V: L4: count JOINs ≤ 6,\nsubquery depth ≤ 3, CTEs ≤ 8
+alt validation fails
+V-->>H: { ok: false, layer, message }
+H-->>LLM: isError: true\n"Layer N: <identifier> rejected"
+else validation passes
+V-->>H: { ok: true, hasRecursive }
+H->>P: pool.connect()
+Note over P: pool.on('connect') has already run\nTEMP_VIEWS_SQL on this backend
+P-->>H: client
+H->>DB: SET LOCAL statement_timeout = '20s'
+H->>DB: SELECT q.*, COUNT(*) OVER () AS __total__\nFROM (user_sql) AS q\nLIMIT 50 OFFSET (page-1)*50
 
-    alt validation fails
-        V-->>H: { ok: false, layer, message }
-        H-->>LLM: isError: true\n"Layer 2: table 'pg_class' not in allowed list"
-    else validation passes
-        V-->>H: { ok: true }
-        H->>P: pool.connect()
-        P-->>H: client (mcp_analyst)
-        H->>DB: TEMP_VIEWS_SQL (6× CREATE TEMP VIEW)
-        Note over DB: v_company, v_sutartys, v_pirkimas,\nv_person_links, v_dalyviai, v_bylos
-        H->>DB: SELECT * FROM (user_query) AS q\nLIMIT pageSize+1 OFFSET (page-1)*pageSize
-        Note over DB: statement_timeout=10s, work_mem=32MB\nenforced at role level
-
-        alt query succeeds
-            DB-->>H: rawRows (up to pageSize+1)
-            H->>P: client.release()
-            Note over H: if rawRows.length > pageSize:\n  hasMore=true, trim last row\nelse hasMore=false
-            H->>A: log(purpose, sql, durationMs, rowCount)
-            H-->>LLM: { rows, page, pageSize, rowCount, hasMore, durationMs }
-        else query times out / syntax error
-            DB-->>H: PG error
-            H->>P: client.release()
-            H->>A: log(purpose, sql, durationMs, errorMsg)
-            H-->>LLM: isError: true + PostgreSQL error message
-        end
-    end
+alt query succeeds
+DB-->>H: rows (up to 50, each with __total__)
+H->>P: client.release()
+Note over H: read totalRows from __total__,\nstrip column from rows,\ncompute totalPages, hasMore
+H-->>LLM: content envelope with payload\n(logToolCall records purpose + duration)
+else query times out / syntax error
+DB-->>H: PG error
+H->>P: client.release()
+H-->>LLM: isError: true + PostgreSQL error message
+end
+end
 ```
 
 ---
 
 ### Validation layer decision table
 
-| Input condition                              | Layer | Action                                   |
-|----------------------------------------------|-------|------------------------------------------|
-| SQL parse fails (syntax error)               | 1     | Return parse error from `node-sql-parser` |
-| Multiple statements (`SELECT 1; DROP TABLE`) | 1     | Reject: "only a single SELECT is allowed" |
-| Statement type is not SELECT                 | 1     | Reject: "only SELECT statements allowed"  |
-| Table not in whitelist (`pg_class`)          | 2     | Reject: name the blocked table            |
-| Blocked function (`pg_sleep`)               | 3     | Reject: name the blocked function         |
-| JOIN count > 6                              | 4     | Reject: "too many JOINs (max 6)"          |
-| Subquery depth > 3                          | 4     | Reject: "subquery nesting too deep (max 3)" |
-| CTE count > 8                               | 4     | Reject: "too many CTEs (max 8)"           |
-| `WITH RECURSIVE` present                    | 4     | Allow; flag in audit log                  |
-| All layers pass                             | —     | Execute wrapped query                     |
+| Input condition                              | Layer | Action                                      |
+|----------------------------------------------|-------|---------------------------------------------|
+| SQL parse fails (syntax error)               | 1     | Return parse error from `node-sql-parser`   |
+| Multiple statements (`SELECT 1; DROP TABLE`) | 1     | Reject: "only a single SELECT is allowed"   |
+| Statement type is not SELECT                 | 1     | Reject: "only SELECT statements allowed"    |
+| Table not in whitelist (`pg_class`)          | 2     | Reject: name the blocked table              |
+| Function not on whitelist (`pg_sleep`)       | 3     | Reject: name the rejected function          |
+| JOIN count > 6                               | 4     | Reject: "too many JOINs (max 6)"            |
+| Subquery depth > 3                           | 4     | Reject: "subquery nesting too deep (max 3)" |
+| CTE count > 8                                | 4     | Reject: "too many CTEs (max 8)"             |
+| `WITH RECURSIVE` present                     | 4     | Allow; flag in audit log                    |
+| All layers pass                              | —     | Execute wrapped query                       |
 
 ---
 
@@ -1146,24 +1157,34 @@ All errors returned by both tools use this shape so the LLM can reason about the
 
 ```json
 {
-  "content": [{ "type": "text", "text": "<message>" }],
+  "content": [
+    {
+      "type": "text",
+      "text": "<message>"
+    }
+  ],
   "isError": true
 }
 ```
 
 The message always includes:
-- For validation errors: the layer name and the specific identifier that was rejected (e.g. `"Layer 2: table 'pg_class' is not in the allowed table list — call get_schema to see available tables"`).
-- For execution errors: the raw PostgreSQL error message so the LLM can self-correct (PG includes `position` for syntax errors).
-- For `get_schema` unknown table: a suggestion to call `get_schema` without arguments first to discover the full table list.
+
+- For validation errors: the layer name and the specific identifier that was rejected (e.g.
+  `"Layer 2: table 'pg_class' is not in the allowed table list — call get_schema to see available tables"`).
+- For execution errors: the raw PostgreSQL error message so the LLM can self-correct (PG includes `position` for syntax
+  errors).
+- For `get_schema` unknown table: a suggestion to call `get_schema` without arguments first to discover the full table
+  list.
 
 ### Pagination summary
 
-| Scenario                          | `hasMore` | LLM action                                          |
-|-----------------------------------|-----------|-----------------------------------------------------|
-| `rowCount < pageSize`             | `false`   | This is the complete result — no more calls needed  |
-| `rowCount === pageSize`           | `true`    | More rows exist — call again with `page: N+1`       |
-| First call returned enough signal | either    | LLM may stop early regardless of `hasMore`          |
+| Scenario                          | `hasMore` | LLM action                                      |
+|-----------------------------------|-----------|-------------------------------------------------|
+| `page >= totalPages`              | `false`   | Complete result returned — no more calls needed |
+| `page < totalPages`               | `true`    | More rows exist — call again with `page: N+1`   |
+| First call returned enough signal | either    | LLM may stop early regardless of `hasMore`      |
 
-The `hasMore` flag is computed without a `COUNT(*)` query: the handler fetches `pageSize + 1` rows from the
-database and checks if the extra row came back. Zero additional database cost.
+`totalRows` and `totalPages` come from a `COUNT(*) OVER ()` window function added to the wrapper, so the inner
+query is evaluated only once per call — no separate `COUNT(*)` round-trip. Page size is fixed at 50 and not
+configurable, both to bound LLM context and to protect the 5-connection read-only pool.
 
