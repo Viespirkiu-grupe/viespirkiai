@@ -1,4 +1,10 @@
 import { postgres } from '../../postgres/postgres.js';
+import { specialJarCodes } from '../juridiniai/specialJarCodes.js';
+
+// Jar codes that represent CVP IS placeholder entities (not real companies).
+// Nodes with these codes get cannotExpand=true so the graph never tries to load their relations.
+export const DISABLE_EXPAND_JARS = [801, 802, 803, 807, 809];
+const DISABLE_EXPAND_SET = new Set(DISABLE_EXPAND_JARS.map(String));
 
 const ENTITY_TYPE = {
     Org:         'OrganizationEntity',
@@ -122,20 +128,20 @@ export function mapFormosKodas(formosKodas) {
 export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
     const jk = String(jarKodas);
     const id = `org:${jk}`;
-    return {
-        id,
-        attributes: {
-            entityType: ENTITY_TYPE.Org,
-            orgType: mapFormosKodas(formosKodas),
-            jarKodas: jk,
-            pavadinimas: pavadinimas || jk,
-            label: wrapLabel(pavadinimas || jk),
-            expanded: opts.expanded ?? false,
-            draustieji: opts.draustieji ?? undefined,
-            draustieji2: opts.draustieji2 ?? undefined,
-            size: 8,
-        },
+    const resolvedName = pavadinimas || specialJarCodes[jk]?.pavadinimas || jk;
+    const attrs = {
+        entityType: ENTITY_TYPE.Org,
+        orgType: mapFormosKodas(formosKodas),
+        jarKodas: jk,
+        pavadinimas: resolvedName,
+        label: wrapLabel(resolvedName),
+        expanded: opts.expanded ?? false,
+        draustieji: opts.draustieji ?? undefined,
+        draustieji2: opts.draustieji2 ?? undefined,
+        size: 8,
     };
+    if (DISABLE_EXPAND_SET.has(jk)) attrs.cannotExpand = true;
+    return { id, attributes: attrs };
 }
 
 /**

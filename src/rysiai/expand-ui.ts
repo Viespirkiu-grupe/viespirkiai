@@ -215,7 +215,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     const EXPAND_KINDS: ExpandKind[] = [
         {
-            test: (a) => isOrgNode(a) && !!a.jarKodas,
+            test: (a) => isOrgNode(a) && !!a.jarKodas && !a.cannotExpand,
             id:   (a) => 'org:' + a.jarKodas,
             url:  (a) => '/rysiai/expand/' + encodeURIComponent(a.jarKodas!),
         },
