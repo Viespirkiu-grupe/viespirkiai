@@ -45,6 +45,7 @@
         "mime": "^4.0.7",
         "node-cron": "^4.2.1",
         "node-fetch": "^3.3.2",
+        "node-sql-parser": "^5.4.0",
         "p-limit": "^6.2.0",
         "p-queue": "^8.1.0",
         "pdfjs-dist": "^5.4.530",

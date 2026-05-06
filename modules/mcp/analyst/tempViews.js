@@ -1,0 +1,136 @@
+export const VIEW_DEFINITIONS = {
+    v_company: `CREATE TEMP VIEW v_company AS
+SELECT j."jarKodas"::text,
+       j.pavadinimas,
+       j.adresas,
+       j."registravimoData",
+       j."statusoPavadinimas",
+       j."statusasNuo",
+       s.data                                                                   AS "sodraData",
+       (COALESCE(s.draustieji, 0) + COALESCE(s.draustieji2, 0))                AS darbuotojai,
+       s."vidutinisAtlyginimas",
+       s."imokuSuma",
+       EXISTS(SELECT 1
+              FROM "melagingiTiekejai" m
+              WHERE m."tiekejoJarKodas" = j."jarKodas"::text
+                AND (m."itrauktasIki" IS NULL OR m."itrauktasIki" >= CURRENT_DATE)) AS "melagingisTiekejas",
+       EXISTS(SELECT 1
+              FROM "nepatikimiTiekejai" n
+              WHERE n."tiekejoJarKodas" = j."jarKodas"::text
+                AND (n."itrauktaIki" IS NULL OR n."itrauktaIki" >= CURRENT_DATE))   AS "nepatikimasTiekejas",
+       (SELECT COUNT(*)
+        FROM "vdiPazeidimai" v
+        WHERE v."jarKodas" = j."jarKodas"::text)                                AS "vdiPazeidimuSkaicius",
+       (SELECT COUNT(*)
+        FROM "bylosDalyviai" bd
+        WHERE bd.kodas = j."jarKodas"::text)                                    AS "bylosSkaicius",
+       (SELECT COUNT(*)
+        FROM domenai d
+        WHERE d."savininkoKodas" = j."jarKodas"::text)                          AS "domenaiSkaicius",
+       (SELECT COUNT(*)
+        FROM "neskelbiamosDerybos" nd
+        WHERE nd."jarKodas" = j."jarKodas"::text)                               AS "neskelbiamosDerybosSkaicius"
+FROM "jarCsv" j
+         LEFT JOIN LATERAL (
+    SELECT draustieji, draustieji2, "vidutinisAtlyginimas", "imokuSuma", data
+    FROM sodra
+    WHERE "jarKodas" = j."jarKodas"::text
+    ORDER BY data DESC NULLS LAST
+    LIMIT 1
+    ) s ON true`,
+
+    v_sutartys: `CREATE TEMP VIEW v_sutartys AS
+SELECT s."sutartiesUnikalusId",
+       s."pirkimoNumeris",
+       s."sudarymoData",
+       s."galiojimoData",
+       s.verte,
+       s."faktineIvykdimoVerte",
+       s.pavadinimas,
+       s."bvpzKodas",
+       s.tipas,
+       s.istrinta,
+       s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
+       pb.pavadinimas                      AS pirkejas,
+       s."tiekejoKodas",
+       tb.pavadinimas                      AS tiekejas,
+       s."papildomiTiekejaiKodai"
+FROM sutartys s
+         LEFT JOIN "jarCsv" pb ON pb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+         LEFT JOIN "jarCsv" tb ON tb."jarKodas"::text = s."tiekejoKodas"`,
+
+    v_pirkimas: `CREATE TEMP VIEW v_pirkimas AS
+SELECT p."pirkimoId",
+       p.pavadinimas,
+       p."jarKodas",
+       o.pavadinimas AS organizatorius,
+       o.trumpinys,
+       o.miestas,
+       p."pirkimoBudas",
+       p.statusas,
+       p.zingsnis,
+       p."pirkimoObjektoTipas",
+       p."numatomaVerteEUR",
+       p."paskelbimoData",
+       p."pasiulymuPateikimoTerminas",
+       p."esFinansavimas",
+       p."bvpzKodai"
+FROM "viesiejiPirkimai" p
+         LEFT JOIN "viesiejiPirkimaiVykdytojai" o ON o.id = p."pirkimoVykdytojasId"`,
+
+    v_person_links: `CREATE TEMP VIEW v_person_links AS
+SELECT r.id,
+       r.deklaracija,
+       r.vardas,
+       r.pavarde,
+       r."susijusioAsmensVardas",
+       r."susijusioAsmensPavarde",
+       r."jarKodas",
+       j.pavadinimas AS "imonesVardas",
+       r.pareigos,
+       r."irasoTipas",
+       r."darbovietesTipas",
+       r."rysioPobudzioPavadinimas",
+       r."rysioPradzia",
+       r."rysioPabaiga",
+       r."yraJuridinisAsmuo",
+       r."registruotaLietuvoje"
+FROM "pinregJuridiniaiRysiai" r
+         LEFT JOIN "jarCsv" j ON j."jarKodas"::text = r."jarKodas"`,
+
+    v_dalyviai: `CREATE TEMP VIEW v_dalyviai AS
+SELECT a."pirkimoNumeris",
+       a."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
+       a."pirkimoBudas",
+       a."sukurtaAt"                       AS "ataskaitosData",
+       d.kodas                             AS "tiekejoKodas",
+       j.pavadinimas                       AS tiekejas,
+       d."fizinisAsmuo",
+       d.salis,
+       e."eileNumeris",
+       e.kaina::numeric                    AS "pasiulymoKaina",
+       ap.statusas                         AS "atmetimoPriezastis"
+FROM atn1ataskaitos a
+         JOIN atn1dalyviai d ON d."ataskaitaId" = a.id
+         LEFT JOIN "atn1pasiulymuEile" e
+                   ON e."ataskaitaId" = a.id AND e."dalyvioKodas" = d.kodas
+         LEFT JOIN "atn1atmestiPasiulymai" ap
+                   ON ap."ataskaitaId" = a.id AND ap."dalyvioKodas" = d.kodas
+         LEFT JOIN "jarCsv" j ON j."jarKodas"::text = d.kodas`,
+
+    v_bylos: `CREATE TEMP VIEW v_bylos AS
+SELECT b.id           AS "bylosId",
+       b."bylosNumeris",
+       b."bylosRusis",
+       b.data         AS "bylosData",
+       b.teismas,
+       bd.kodas       AS "jarKodas",
+       j.pavadinimas  AS "dalyvioPavadinimas",
+       bd.pavadinimas AS "dalyvioVardasIrPavarde",
+       bd."bylojeKaip"
+FROM "bylosDalyviai" bd
+         JOIN bylos b ON b.id = bd."bylosId"
+         LEFT JOIN "jarCsv" j ON j."jarKodas"::text = bd.kodas`,
+};
+
+export const TEMP_VIEWS_SQL = Object.values(VIEW_DEFINITIONS).join(';\n\n') + ';';
