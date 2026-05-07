@@ -7,6 +7,9 @@
 
 import type { LegendState } from './legend-state.ts';
 
+export const MAX_HASH_ENTITIES = 50;
+export const MAX_HASH_LENGTH = 32000;
+
 export const FILTER_CHAR_MAP: Record<string, string> = {
     D: 'Director', S: 'Shareholder', O: 'Official', E: 'Employment',
     U: 'Spouse', L: 'ContractSmall', M: 'ContractMedium', G: 'ContractLarge',
@@ -64,10 +67,15 @@ export function applyFilterFromHash(
     primaryNodeId: string,
     hash?: string
 ): { additionalEntities: AdditionalEntity[] } {
-    const raw = hash !== undefined
+    let raw = hash !== undefined
         ? hash
         : (typeof window !== 'undefined' ? window.location.hash : '');
     if (!raw || raw === '#') return { additionalEntities: [] };
+
+    if (raw.length > MAX_HASH_LENGTH) {
+        console.error(`hash-state: hash length ${raw.length} exceeds ${MAX_HASH_LENGTH}; truncating`);
+        raw = raw.slice(0, MAX_HASH_LENGTH);
+    }
 
     const fragment = raw.startsWith('#') ? raw.slice(1) : raw;
     const params = new Map<string, string>();
@@ -110,6 +118,10 @@ export function applyFilterFromHash(
         });
     }
     additionalEntities.sort((a, b) => a.entityNumber - b.entityNumber);
+    if (additionalEntities.length > MAX_HASH_ENTITIES) {
+        console.error(`hash-state: hash contains ${additionalEntities.length} additional entities; only the first ${MAX_HASH_ENTITIES} will be loaded`);
+        additionalEntities.splice(MAX_HASH_ENTITIES);
+    }
     return { additionalEntities };
 }
 
@@ -153,6 +165,11 @@ export function buildHashString(
         }
         extras.push({ id, typeKey: mapping.key, entityId });
     });
+
+    if (extras.length > MAX_HASH_ENTITIES) {
+        console.error(`hash-state: graph contains ${extras.length} additional expanded entities; only the first ${MAX_HASH_ENTITIES} will be added to the hash`);
+        extras.splice(MAX_HASH_ENTITIES);
+    }
 
     extras.forEach(({ id, typeKey, entityId }, i) => {
         const N = i + 2;

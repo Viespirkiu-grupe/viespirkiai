@@ -17,7 +17,7 @@ import {
     addEdge,
     addSpouseEdge,
     buildPersonGraphFromRows,
-} from '../../modules/rysiai/expand.js';
+} from '@/modules/rysiai/expand';
 
 type NodeLike = { id: string; attributes: Record<string, unknown> };
 type EdgeLike = { id: string; source: string; target: string; attributes: Record<string, unknown> };

@@ -2,9 +2,9 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import Graph from 'graphology';
 
-import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from '../../src/rysiai/graph-utils.ts';
-import { LegendState } from '../../src/rysiai/legend-state.ts';
-import { ENTITY_TYPE } from '../../src/rysiai/entity-types.ts';
+import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from '@/src/rysiai/graph-utils.ts';
+import { LegendState } from '@/src/rysiai/legend-state.ts';
+import { ENTITY_TYPE } from '@/src/rysiai/entity-types.ts';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import noverlap from 'graphology-layout-noverlap';
 

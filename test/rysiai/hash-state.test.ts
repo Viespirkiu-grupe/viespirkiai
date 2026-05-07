@@ -1,11 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import Graph from 'graphology';
-import { LegendState } from '../../src/rysiai/legend-state.ts';
+import { LegendState } from '@/src/rysiai/legend-state.ts';
 import {
     FILTER_CHAR_MAP, FILTER_ID_MAP,
     applyFilterChars, applyFilterFromHash, buildHashString,
-} from '../../src/rysiai/hash-state.ts';
+    MAX_HASH_ENTITIES, MAX_HASH_LENGTH,
+} from '@/src/rysiai/hash-state.ts';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -659,5 +660,153 @@ describe('applyFilterFromHash — malformed / adversarial inputs', () => {
         );
         assert.equal(additionalEntities.length, 1);
         assert.equal(additionalEntities[0].entityId, '110');
+    });
+});
+
+// ── 50-entry limits ───────────────────────────────────────────────────────────
+
+describe('50-entry limit: applyFilterFromHash', () => {
+    function buildHashWith(count: number): string {
+        const parts = ['f=D'];
+        for (let i = 2; i <= count + 1; i++) {
+            parts.push(`o_${i}=${1000000 + i}`);
+            parts.push(`f_${i}=D`);
+        }
+        return '#' + parts.join('&');
+    }
+
+    it('loads exactly MAX_HASH_ENTITIES additional entities when hash has exactly that many', () => {
+        const state = new LegendState();
+        const { additionalEntities } = applyFilterFromHash(state, 'org:1', buildHashWith(MAX_HASH_ENTITIES));
+        assert.equal(additionalEntities.length, MAX_HASH_ENTITIES);
+    });
+
+    it('caps at MAX_HASH_ENTITIES and logs console.error when hash has one more', () => {
+        const state = new LegendState();
+        const errors: string[] = [];
+        const orig = console.error;
+        console.error = (...args: unknown[]) => errors.push(String(args[0]));
+        try {
+            const { additionalEntities } = applyFilterFromHash(state, 'org:1', buildHashWith(MAX_HASH_ENTITIES + 1));
+            assert.equal(additionalEntities.length, MAX_HASH_ENTITIES);
+            assert.equal(errors.length, 1);
+            assert.ok(errors[0].includes(String(MAX_HASH_ENTITIES + 1)), `error should mention count: ${errors[0]}`);
+        } finally {
+            console.error = orig;
+        }
+    });
+
+    it('caps at MAX_HASH_ENTITIES when hash has double that many entities', () => {
+        const state = new LegendState();
+        const errors: string[] = [];
+        const orig = console.error;
+        console.error = (...args: unknown[]) => errors.push(String(args[0]));
+        try {
+            const { additionalEntities } = applyFilterFromHash(state, 'org:1', buildHashWith(MAX_HASH_ENTITIES * 2));
+            assert.equal(additionalEntities.length, MAX_HASH_ENTITIES);
+            assert.equal(errors.length, 1);
+        } finally {
+            console.error = orig;
+        }
+    });
+});
+
+describe('MAX_HASH_LENGTH: applyFilterFromHash', () => {
+    it('processes hash at exactly MAX_HASH_LENGTH without truncation', () => {
+        const state = new LegendState();
+        const base = '#f=D';
+        const padding = '&' + 'x'.repeat(MAX_HASH_LENGTH - base.length - 1);
+        const hash = base + padding;
+        assert.equal(hash.length, MAX_HASH_LENGTH);
+        const errors: string[] = [];
+        const orig = console.error;
+        console.error = (...args: unknown[]) => errors.push(String(args[0]));
+        try {
+            applyFilterFromHash(state, 'org:1', hash);
+            assert.equal(errors.length, 0);
+            assert.equal(state.isTypeVisible('org:1', 'Director'), true);
+        } finally {
+            console.error = orig;
+        }
+    });
+
+    it('truncates and logs console.error when hash exceeds MAX_HASH_LENGTH', () => {
+        const state = new LegendState();
+        const hash = '#f=D' + 'x'.repeat(MAX_HASH_LENGTH);
+        assert.ok(hash.length > MAX_HASH_LENGTH);
+        const errors: string[] = [];
+        const orig = console.error;
+        console.error = (...args: unknown[]) => errors.push(String(args[0]));
+        try {
+            applyFilterFromHash(state, 'org:1', hash);
+            assert.equal(errors.length, 1);
+            assert.ok(errors[0].includes(String(MAX_HASH_LENGTH)), `error should mention limit: ${errors[0]}`);
+            assert.equal(state.isTypeVisible('org:1', 'Director'), true);
+        } finally {
+            console.error = orig;
+        }
+    });
+
+    it('does not parse entities that appear after MAX_HASH_LENGTH cutoff', () => {
+        const state = new LegendState();
+        // Place a valid entity just past the cutoff
+        const prefix = '#f=D' + '&'.padEnd(MAX_HASH_LENGTH - 5, 'x');
+        const suffix = '&o_2=999999&f_2=S';
+        const hash = prefix + suffix;
+        assert.ok(hash.length > MAX_HASH_LENGTH);
+        const errors: string[] = [];
+        const orig = console.error;
+        console.error = (...args: unknown[]) => errors.push(String(args[0]));
+        try {
+            const { additionalEntities } = applyFilterFromHash(state, 'org:1', hash);
+            assert.equal(additionalEntities.length, 0, 'entity past cutoff must not be parsed');
+        } finally {
+            console.error = orig;
+        }
+    });
+});
+
+describe('50-entry limit: buildHashString', () => {
+    function makeGraphWithExtras(count: number): Graph {
+        const nodes: [string, Record<string, unknown>][] = [
+            ['org:root', rootOrgAttrs('1')],
+        ];
+        for (let i = 2; i <= count + 1; i++) {
+            nodes.push([`org:${i}`, extraOrgAttrs(String(i))]);
+        }
+        return makeGraph(...nodes);
+    }
+
+    it('encodes exactly MAX_HASH_ENTITIES extras when graph has exactly that many expanded non-root nodes', () => {
+        const state = new LegendState();
+        const graph = makeGraphWithExtras(MAX_HASH_ENTITIES);
+        applyFilterChars(state, 'org:root', 'D');
+        graph.forEachNode((id, attrs) => {
+            if (!attrs.isRoot) applyFilterChars(state, id, 'S');
+        });
+        const h = buildHashString(state, graph);
+        const matches = h.match(/o_\d+=/g) ?? [];
+        assert.equal(matches.length, MAX_HASH_ENTITIES);
+    });
+
+    it('caps at MAX_HASH_ENTITIES and logs console.error when graph has one more expanded non-root node', () => {
+        const state = new LegendState();
+        const graph = makeGraphWithExtras(MAX_HASH_ENTITIES + 1);
+        applyFilterChars(state, 'org:root', 'D');
+        graph.forEachNode((id, attrs) => {
+            if (!attrs.isRoot) applyFilterChars(state, id, 'S');
+        });
+        const errors: string[] = [];
+        const orig = console.error;
+        console.error = (...args: unknown[]) => errors.push(String(args[0]));
+        try {
+            const h = buildHashString(state, graph);
+            const matches = h.match(/o_\d+=/g) ?? [];
+            assert.equal(matches.length, MAX_HASH_ENTITIES);
+            assert.equal(errors.length, 1);
+            assert.ok(errors[0].includes(String(MAX_HASH_ENTITIES + 1)), `error should mention count: ${errors[0]}`);
+        } finally {
+            console.error = orig;
+        }
     });
 });
