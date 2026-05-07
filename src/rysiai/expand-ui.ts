@@ -166,7 +166,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                 });
             }
 
-            console.warn('Fetched data for', id, data);
+            //console.warn('Fetched data for', id, data);
             mergeGraphElements(dataGraph, getNodePos, data, fromNodeId, rootNodeId);
             afterMerge(id);
 
