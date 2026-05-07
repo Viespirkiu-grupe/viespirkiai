@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 import Graph from 'graphology';
 
@@ -84,7 +84,7 @@ describe('mergeGraphElements', () => {
 
     it('scatters new nodes around fromNodeId position', () => {
         graph.addNode('org:000', { x: 100, y: 200, size: 8, color: '#000', label: 'Root' });
-        const getPos = (id: string) => graph.hasNode(id) ? graph.getNodeAttributes(id) : null;
+        const getPos = (id: string) => graph.hasNode(id) ? graph.getNodeAttributes(id) as { x: number; y: number } : null;
         mergeGraphElements(graph, getPos, { nodes: [orgNodeData('org:111', 'Child')] }, 'org:000');
         const child = graph.getNodeAttributes('org:111');
         const dist = Math.hypot(child.x - 100, child.y - 200);
