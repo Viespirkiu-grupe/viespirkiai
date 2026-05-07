@@ -1,6 +1,11 @@
 import { postgres } from '../../postgres/postgres.js';
 import { specialJarCodes } from '../juridiniai/specialJarCodes.js';
 
+/**
+ * @typedef {{ id: string; attributes: Record<string, unknown> }} NodeLike
+ * @typedef {{ id: string; source: string; target: string; attributes: Record<string, unknown> }} EdgeLike
+ */
+
 // Jar codes that represent CVP IS placeholder entities (not real companies).
 // Nodes with these codes get cannotExpand=true so the graph never tries to load their relations.
 export const DISABLE_EXPAND_JARS = [801, 802, 803, 807, 809];
@@ -51,7 +56,7 @@ export function formatContractValue(verte) {
 
 /**
  * Wraps a name to at most n words per line.
- * @param {string} name
+ * @param {string|null} name
  * @param {number} n
  * @returns {string}
  */
@@ -124,6 +129,11 @@ export function mapFormosKodas(formosKodas) {
 
 /**
  * Builds an OrganizationEntity node object.
+ * @param {string|number} jarKodas
+ * @param {string|null} pavadinimas
+ * @param {string|null} formosKodas
+ * @param {Record<string, unknown>} [opts]
+ * @returns {NodeLike}
  */
 export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
     const jk = String(jarKodas);
@@ -146,6 +156,11 @@ export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
 
 /**
  * Builds a PersonEntity node object.
+ * @param {string} vardas
+ * @param {string} pavarde
+ * @param {string|null} deklaracija
+ * @param {string|null} fromDate
+ * @returns {NodeLike}
  */
 export function personNode(vardas, pavarde, deklaracija, fromDate) {
     const id = personId(vardas, pavarde);
@@ -193,6 +208,12 @@ export function contractNode(sutartiesUnikalusId, pavadinimas, verte, pirkimoNum
 
 /**
  * Builds a ProcurementEntity node object.
+ * @param {string|number} pirkimoId
+ * @param {string|null} pavadinimas
+ * @param {number|null} numatomaVerteEUR
+ * @param {string|null} statusas
+ * @param {string|null} pirkimoBudas
+ * @returns {NodeLike}
  */
 export function procurementNode(pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas) {
     const id = `procurement:${pirkimoId}`;
@@ -216,6 +237,14 @@ export function procurementNode(pirkimoId, pavadinimas, numatomaVerteEUR, status
 
 /**
  * Builds an edge object.
+ * @param {string} source
+ * @param {string} target
+ * @param {string} type
+ * @param {string|null} label
+ * @param {string|null} fromDate
+ * @param {boolean} [forceLabel]
+ * @param {Record<string, unknown>} [opts]
+ * @returns {EdgeLike}
  */
 export function edge(source, target, type, label, fromDate, forceLabel = false, opts = {}) {
     const id = `edge:${source}:${target}:${type}`;
@@ -551,12 +580,12 @@ export async function expandContract(pirkimoNumeris) {
         addEdge(edges, edgeMap, edge(pNode.id, stub.id, 'Award', valueLabel, null, false, { size: 1 }));
     }
 
-    // Best-effort losers (exclude winners) → Bid edges
+    // Best-effort losers (exclude winners) → Bidder edges
     for (const row of losersRes.rows) {
         if (!row.kodas || winnerCodes.has(row.kodas)) continue;
         const stub = orgNode(row.kodas, row.pavadinimas, row.formosKodas);
         addNode(nodes, nodeMap, stub);
-        addEdge(edges, edgeMap, edge(pNode.id, stub.id, 'Bid', '', null, false, { size: 1 }));
+        addEdge(edges, edgeMap, edge(pNode.id, stub.id, 'Bidder', '', null, false, { size: 1 }));
     }
 
     return { nodes, edges };
@@ -690,7 +719,7 @@ export async function expandPirkimas(pirkimoId) {
  * @param {string} rootPersonId  Stable node id of the searched person, e.g. "person:jonas jonaitis"
  * @param {string} vardas  First name (trimmed, original case)
  * @param {string} pavarde Last name (trimmed, original case)
- * @returns {{ nodes: object[], edges: object[] }}
+ * @returns {{ nodes: NodeLike[], edges: EdgeLike[] }}
  */
 export function buildPersonGraphFromRows(rows, rootPersonId, vardas, pavarde) {
     const nodes = [];
