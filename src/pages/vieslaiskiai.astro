@@ -2,12 +2,20 @@
 import Layout from '../layouts/Layout.astro';
 import { getColorScheme, getFont } from '../lib/failai.js';
 import { postgres } from '@/postgres/postgres.js';
+import ImageTileGrid from '../components/content/ImageTileGrid.astro';
+import NewsCardList from '../components/content/NewsCardList.astro';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
 const vieslaiskiaiRes = await postgres.query('SELECT * FROM vieslaiskiai ORDER BY id DESC;');
 const vieslaiskiai = vieslaiskiaiRes.rows;
+
+const vieslaiskiuTiles = vieslaiskiai.map((vieslaiskis: any) => ({
+  href: vieslaiskis.nuoroda,
+  src: vieslaiskis.nuotrauka,
+  alt: `${vieslaiskis.pavadinimas} (PDF)`,
+}));
 
 const ziniasklaidojeRes = await postgres.query('SELECT * FROM "vieslaiskiaiZiniasklaidoje" ORDER BY date DESC, id DESC;');
 const vieslaiskiaiZiniasklaidoje = ziniasklaidojeRes.rows;
@@ -26,41 +34,18 @@ const vieslaiskiaiZiniasklaidoje = ziniasklaidojeRes.rows;
 
     <p class="text-muted mb-10">Mūsų iniciatyvos subjektyvios vertinančiosios nuomonės apie kai kuriuos viešuosius pirkimus arba su jais susijusias problemas.</p>
 
-    <section class="flex flex-wrap justify-center gap-4 mb-16">
-      {vieslaiskiai.map((vieslaiskis: any) => (
-        <article class="flex-[1_1_300px] aspect-[1.414/1] max-w-175 min-w-75 shadow-md rounded-lg transition-all duration-300 hover:-translate-y-1.25 hover:shadow-lg">
-          <a href={vieslaiskis.nuoroda} class="bg-muted size-full block text-black rounded-lg overflow-hidden">
-            <img class="size-full object-contain block" src={vieslaiskis.nuotrauka} alt={`${vieslaiskis.pavadinimas} (PDF)`} />
-          </a>
-        </article>
-      ))}
-    </section>
+    <ImageTileGrid items={vieslaiskiuTiles} />
 
-    <section>
-      <h2>Žiniasklaidoje</h2>
-
-      <div class="result-list">
-        {vieslaiskiaiZiniasklaidoje.map((rezultatas: any) => (
-          <article class="result-card card-clickable">
-            <div class="result-card-body">
-              <div class="result-card-meta">
-                <span>{rezultatas.saltinis}</span>
-                <span>{rezultatas.date}</span>
-                <span>
-                  <a href={rezultatas.vieslaiskisLink} class="relative z-1">
-                    {rezultatas.vieslaiskis}
-                    <span class="sr-only">(PDF)</span>
-                  </a>
-                </span>
-              </div>
-
-              <h3 class="result-card-title">
-                <a href={rezultatas.link}>{rezultatas.pavadinimas}</a>
-              </h3>
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
+    <NewsCardList
+      title="Žiniasklaidoje"
+      items={vieslaiskiaiZiniasklaidoje.map((rezultatas: any) => ({
+        href: rezultatas.link,
+        title: rezultatas.pavadinimas,
+        source: rezultatas.saltinis,
+        date: rezultatas.date,
+        relatedHref: rezultatas.vieslaiskisLink,
+        relatedLabel: rezultatas.vieslaiskis,
+      }))}
+    />
   </main>
 </Layout>

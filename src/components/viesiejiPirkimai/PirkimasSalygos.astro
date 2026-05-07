@@ -1,0 +1,23 @@
+---
+interface Props {
+  pirkimas: any;
+}
+const { pirkimas } = Astro.props;
+const t = pirkimas.turinys || {};
+
+const has = t.eAukcionuSukurimas || t.pirkimasSkaidomasIDaliuDPSIKategorijas || t.leidziamaPateiktisAlternatyviusPasiulymus || t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais || t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus || t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims;
+---
+
+{has && (
+  <section>
+    <h2>Sąlygos</h2>
+    <dl class="kv-list">
+      {t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims && <><dt>Sutarties tipas</dt><dd>{t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims}</dd></>}
+      {t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus && <><dt>Sutarties trukmė</dt><dd>{t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus}</dd></>}
+      {t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais && <><dt>Pasiūlymo galiojimas</dt><dd>{t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais}</dd></>}
+      {t.eAukcionuSukurimas && <><dt>El. aukcionas</dt><dd>{t.eAukcionuSukurimas}</dd></>}
+      {t.leidziamaPateiktisAlternatyviusPasiulymus && <><dt>Alternatyvūs pasiūlymai</dt><dd>{t.leidziamaPateiktisAlternatyviusPasiulymus}</dd></>}
+      {t.pirkimasSkaidomasIDaliuDPSIKategorijas && <><dt>Skaidoma į dalis</dt><dd>{t.pirkimasSkaidomasIDaliuDPSIKategorijas}</dd></>}
+    </dl>
+  </section>
+)}

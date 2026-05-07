@@ -1,0 +1,30 @@
+---
+interface FaqItem {
+  question: string;
+  answerHtml: string;
+}
+
+interface Props {
+  items: FaqItem[];
+  title?: string;
+  headingLevel?: 'h2' | 'h3';
+  questionTag?: 'h2' | 'h3';
+}
+
+const { items, title, headingLevel = 'h2', questionTag = 'h3' } = Astro.props;
+const HeadingTag = headingLevel;
+const QuestionTag = questionTag;
+---
+
+<section>
+  {title && <HeadingTag>{title}</HeadingTag>}
+
+  <div class="faq">
+    {items.map((item) => (
+      <div class="faq-item">
+        <QuestionTag class="faq-question" set:html={item.question} />
+        <div class="faq-answer" set:html={item.answerHtml} />
+      </div>
+    ))}
+  </div>
+</section>

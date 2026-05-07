@@ -53,7 +53,7 @@ function buildNumberOfResults({ shown, total, elapsed, engine }) {
     const source = `<span class="inline">(${trukme}, ${engine})</span>`;
     if (total == null) {
         return {
-            numberOfResults: `Rodomi ${shown} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <span class="inline"> (${trukme}, ${engine})</span>`,
+            numberOfResults: `${Number(shown).linksniuoti(["rezultatas", "rezultatai", "rezultatų"])} ${source}`,
             total: 10_000,
         };
     }

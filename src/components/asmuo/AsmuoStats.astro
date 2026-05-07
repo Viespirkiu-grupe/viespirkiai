@@ -1,0 +1,64 @@
+---
+import StatCard from '../StatCard.astro';
+
+interface Props {
+  asmuo: any;
+}
+
+const { asmuo } = Astro.props;
+const fmtEur = (v: number) => v.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const sodra = asmuo.sodra ?? {};
+const mokesciai = asmuo.mokesciai;
+---
+
+<div class="grid-3 mb-10">
+  <StatCard title="Darbuotojai">
+    {sodra.draustieji != null ? (
+      <dl class="kv-list">
+        <dt>Darbo sutartys</dt><dd><span class="cell-mono">{sodra.draustieji}</span></dd>
+        <dt>Autorinės ir kitos</dt><dd><span class="cell-mono">{sodra.draustieji2 || 0}</span></dd>
+        <dt>Viso</dt><dd><span class="cell-mono font-bold">{sodra.draustieji + (sodra.draustieji2 || 0)}</span></dd>
+      </dl>
+    ) : <em class="text-muted">Nėra duomenų</em>}
+  </StatCard>
+
+  <StatCard title="Vid. atlyginimai">
+    {sodra.vidutinisAtlyginimas ? (
+      <dl class="kv-list">
+        <dt>Darbo sutartys</dt>
+        <dd><span class="cell-mono">{fmtEur(sodra.vidutinisAtlyginimas)} €/mėn.</span></dd>
+        <dt>Autorinės ir kitos</dt>
+        <dd>
+          {sodra.vidutinisAtlyginimas2
+            ? <span class="cell-mono">{fmtEur(sodra.vidutinisAtlyginimas2)} €/mėn.</span>
+            : <em class="text-muted">Nėra duomenų</em>}
+        </dd>
+        <dt>Bendrai</dt>
+        <dd><span class="cell-mono font-bold">{fmtEur(sodra.bendrasVidutinisAtlyginimas)} €/mėn.</span></dd>
+      </dl>
+    ) : <em class="text-muted">Nėra duomenų</em>}
+  </StatCard>
+
+  <StatCard title="Mokėjimai">
+    <dl class="kv-list">
+      <dt>Mokesčiai (VMI)</dt>
+      <dd>
+        {mokesciai?.suma
+          ? <><span class="cell-mono">{fmtEur(mokesciai.suma)} €</span> <span class="text-muted text-xs">({mokesciai.data})</span></>
+          : <em class="text-muted">Nėra duomenų</em>}
+      </dd>
+      <dt>Atlyginimai</dt>
+      <dd>
+        {sodra.atlyginimuIslaidos
+          ? <span class="cell-mono">{fmtEur(sodra.atlyginimuIslaidos)} €/mėn.</span>
+          : <em class="text-muted">Nėra duomenų</em>}
+      </dd>
+      <dt>SODRA įmokos</dt>
+      <dd>
+        {sodra.imokuSuma
+          ? <span class="cell-mono">{fmtEur(sodra.imokuSuma)} €</span>
+          : <em class="text-muted">Nėra duomenų</em>}
+      </dd>
+    </dl>
+  </StatCard>
+</div>

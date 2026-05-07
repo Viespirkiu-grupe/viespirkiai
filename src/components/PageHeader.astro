@@ -1,0 +1,16 @@
+---
+const hasSubtext = Astro.slots.has('subtext');
+const hasActions = Astro.slots.has('actions');
+---
+
+<div class="page-header">
+  <div>
+    {hasSubtext && <p class="subtext"><slot name="subtext" /></p>}
+    <h1><slot /></h1>
+  </div>
+  {hasActions && (
+    <div class="flex flex-wrap gap-3 items-center">
+      <slot name="actions" />
+    </div>
+  )}
+</div>

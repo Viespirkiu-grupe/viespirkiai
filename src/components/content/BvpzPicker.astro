@@ -1,0 +1,298 @@
+---
+interface Preset {
+  label: string;
+  codes: string;
+}
+
+interface SearchTarget {
+  label: string;
+  value: string;
+}
+
+interface Props {
+  presets: Preset[];
+  searchTargets: SearchTarget[];
+  treeUrl?: string;
+}
+
+const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
+---
+
+<div>
+  <div class="text-muted text-sm mb-2 self-center">Greiti pasirinkimai:</div>
+  <div class="flex flex-wrap gap-2 mb-4">
+    {presets.map((preset) => (
+      <button class="btn btn-outline btn-sm" type="button" onclick={`bvpzApplyPreset(${JSON.stringify(preset.codes)})`}>
+        {preset.label}
+      </button>
+    ))}
+  </div>
+
+  <div id="tree" class="cpv-tree loading mb-4">
+    <span class="spinner spinner-xl"></span>
+  </div>
+
+  <div class="action-bar">
+    <div class="action-bar-left">
+      <span id="bvpzCount" class="text-sm font-bold text-muted">Nepasirinkta</span>
+      <span id="pasirinkti-kodai" class="action-bar-codes"></span>
+    </div>
+    <div class="action-bar-right">
+      <button class="btn btn-ghost btn-sm" type="button" onclick="bvpzClear()">Išvalyti</button>
+      <button class="btn btn-outline btn-sm" type="button" id="bvpzCopyBtn">Kopijuoti</button>
+      <div class="action-bar-popup-wrap">
+        <button class="btn btn-primary btn-sm" type="button" id="bvpzSearchBtn">Ieškoti ↑</button>
+        <div class="action-bar-popup" id="bvpzSearchDropdown">
+          {searchTargets.map((target) => (
+            <button type="button" class="action-bar-popup-item" onclick={`bvpzSearch(${JSON.stringify(target.value)})`}>
+              {target.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline define:vars={{ treeUrl }}>
+    // @ts-nocheck
+    function bvpzFormatCode(mask) {
+      const span = document.createElement("span");
+      span.className = "cpv-code";
+      let splitAt = 2;
+      for (let i = mask.length - 1; i >= 2; i--) {
+        if (mask[i] !== "0") { splitAt = i + 1; break; }
+      }
+      span.appendChild(document.createTextNode(mask.slice(0, splitAt)));
+      if (splitAt < mask.length) {
+        const dim = document.createElement("span");
+        dim.className = "cpv-code-dim";
+        dim.textContent = mask.slice(splitAt);
+        span.appendChild(dim);
+      }
+      return span;
+    }
+
+    function bvpzDecodeEntities(str) {
+      const el = document.createElement("textarea");
+      el.innerHTML = str;
+      return el.value;
+    }
+
+    function bvpzBuildTree(nodes, container) {
+      nodes.forEach((node) => {
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        const hasChildren = node.children?.length > 0;
+
+        if (hasChildren) {
+          const toggle = document.createElement("span");
+          toggle.className = "cpv-toggle";
+          toggle.textContent = "▶";
+          summary.appendChild(toggle);
+        } else {
+          details.className = "no-children";
+        }
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "form-check-input";
+        checkbox.dataset.cpv = node.attributes.cpv_mask;
+        checkbox.addEventListener("change", () => {
+          details.querySelectorAll("details input[type=checkbox]")
+            .forEach((cb) => { cb.checked = checkbox.checked; });
+          bvpzUpdateOutput();
+        });
+
+        const rawLabel = bvpzDecodeEntities(node.label);
+        const codeMatch = rawLabel.match(/^(\d{8}):\s*(.*)/);
+        const fullCode = codeMatch ? codeMatch[1] : node.attributes.cpv_mask;
+        const labelText = codeMatch ? codeMatch[2] : rawLabel;
+
+        const label = document.createElement("label");
+        label.appendChild(checkbox);
+        label.appendChild(bvpzFormatCode(fullCode));
+        label.appendChild(document.createTextNode(" " + labelText));
+        summary.appendChild(label);
+        details.appendChild(summary);
+
+        if (hasChildren) bvpzBuildTree(node.children, details);
+        container.appendChild(details);
+      });
+    }
+
+    function bvpzOpenSelected(node) {
+      if (!node.matches("details")) return { anyChecked: false, allChecked: false };
+
+      const checkbox = node.querySelector(":scope > summary label input[type=checkbox]");
+      const children = Array.from(node.querySelectorAll(":scope > details"));
+
+      if (children.length === 0) {
+        const checked = checkbox?.checked ?? false;
+        return { anyChecked: checked, allChecked: checked };
+      }
+
+      let anyChecked = false;
+      let allChecked = true;
+
+      for (const child of children) {
+        const { anyChecked: ca, allChecked: cc } = bvpzOpenSelected(child);
+        if (ca) anyChecked = true;
+        if (!cc) allChecked = false;
+      }
+
+      if (checkbox?.checked) anyChecked = true;
+      else allChecked = false;
+
+      if (anyChecked && !allChecked) node.open = true;
+
+      return { anyChecked, allChecked };
+    }
+
+    async function bvpzLoadData() {
+      const data = await fetch(treeUrl).then(r => r.json());
+      const container = document.getElementById("tree");
+      if (!container) return;
+      container.classList.remove("loading");
+      container.innerHTML = "";
+      bvpzBuildTree(data, container);
+      bvpzApplyFromUrl();
+    }
+
+    function bvpzUpdateOutput() {
+      const tree = document.getElementById("tree");
+      if (!tree) return;
+      const selected = bvpzCollectSelected(tree);
+      const count = selected.length;
+      const codesEl = document.getElementById("pasirinkti-kodai");
+      const countEl = document.getElementById("bvpzCount");
+      if (!codesEl || !countEl) return;
+      codesEl.textContent = selected.join(" ");
+      countEl.textContent = count > 0 ? `${count} pasirinkti` : "Nepasirinkta";
+      countEl.className = `text-sm font-bold${count > 0 ? "" : " text-muted"}`;
+    }
+
+    function bvpzCollectSelected(root) {
+      return Array.from(root.children).flatMap((child) => bvpzCollectMinimal(child).prefixes);
+    }
+
+    function bvpzCollectMinimal(node) {
+      const checkbox = node.querySelector(":scope > summary label input[type=checkbox]");
+      if (!checkbox) return { selected: false, prefixes: [] };
+
+      const children = Array.from(node.querySelectorAll(":scope > details"));
+      let allChildrenSelected = true;
+      const collected = [];
+
+      for (const child of children) {
+        const { selected, prefixes } = bvpzCollectMinimal(child);
+        if (!selected) allChildrenSelected = false;
+        collected.push(...prefixes);
+      }
+
+      if (checkbox.checked) {
+        if (children.length === 0 || allChildrenSelected) {
+          return { selected: true, prefixes: [checkbox.dataset.cpv] };
+        }
+        return { selected: false, prefixes: [checkbox.dataset.cpv + "0", ...collected] };
+      }
+      return { selected: false, prefixes: collected };
+    }
+
+    function bvpzApplySelection(treeEl, prefixes) {
+      if (!treeEl) return;
+      treeEl.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+        const mask = cb.dataset.cpv;
+        if (!mask) return;
+        cb.checked = prefixes.some((sel) =>
+          sel.endsWith("0") ? sel.slice(0, -1) === mask : mask.startsWith(sel)
+        );
+      });
+      treeEl.querySelectorAll("details").forEach((d) => { d.open = false; });
+      Array.from(treeEl.querySelectorAll(":scope > details")).forEach((detail) => bvpzOpenSelected(detail));
+      bvpzUpdateOutput();
+    }
+
+    function bvpzApplyPreset(codes) {
+      bvpzApplySelection(document.getElementById("tree"), codes.trim().split(/\s+/));
+    }
+
+    function bvpzApplyFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      if (code) bvpzApplySelection(document.getElementById("tree"), code.trim().split(/\s+/));
+    }
+
+    function bvpzClear() {
+      bvpzApplySelection(document.getElementById("tree"), []);
+    }
+
+    function bvpzSearch(target) {
+      const codesEl = document.getElementById("pasirinkti-kodai");
+      const codes = codesEl?.textContent?.trim() ?? "";
+      if (!codes) return;
+      if (target === "sutartys") {
+        window.location.href = `/?bvpzPrefiksasKitas=${encodeURIComponent(codes)}`;
+      } else if (target === "viesiejiPirkimai") {
+        window.location.href = `/viesiejiPirkimai?bvpzPrefiksai=${encodeURIComponent(codes)}`;
+      } else if (target === "viesiejiPirkimaiTeikimas") {
+        window.location.href = `/viesiejiPirkimai?statusas=teikimas&bvpzPrefiksai=${encodeURIComponent(codes)}`;
+      }
+    }
+
+    window.bvpzApplyPreset = bvpzApplyPreset;
+    window.bvpzClear = bvpzClear;
+    window.bvpzSearch = bvpzSearch;
+
+    const searchBtn = document.getElementById("bvpzSearchBtn");
+    const searchDropdown = document.getElementById("bvpzSearchDropdown");
+    const copyBtn = document.getElementById("bvpzCopyBtn");
+    const copiedText = "Nukopijuota ✓";
+    const copyLabel = "Kopijuoti";
+    if (copyBtn) {
+      copyBtn.addEventListener("click", async function () {
+        const codes = document.getElementById("pasirinkti-kodai")?.textContent ?? "";
+        if (!codes) return;
+        await navigator.clipboard.writeText(codes);
+        copyBtn.textContent = copiedText;
+        copyBtn.classList.add("btn-success");
+        copyBtn.classList.remove("btn-outline");
+        setTimeout(() => {
+          copyBtn.textContent = copyLabel;
+          copyBtn.classList.remove("btn-success");
+          copyBtn.classList.add("btn-outline");
+        }, 2000);
+      });
+    }
+    if (searchBtn && searchDropdown) {
+      searchBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        searchDropdown.classList.toggle("open");
+      });
+      document.addEventListener("click", () => {
+        searchDropdown.classList.remove("open");
+      });
+    }
+
+    bvpzLoadData();
+  </script>
+
+  <style>
+    .action-bar-popup-item {
+      display: block;
+      width: 100%;
+      padding: 8px 12px;
+      font-size: var(--text-sm);
+      color: var(--black);
+      text-decoration: none;
+      text-align: left;
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      outline-offset: 0;
+    }
+
+    .action-bar-popup-item:hover {
+      background: var(--lightest-gray);
+    }
+  </style>
+</div>

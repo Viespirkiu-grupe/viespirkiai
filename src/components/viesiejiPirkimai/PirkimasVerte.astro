@@ -1,0 +1,25 @@
+---
+import { fmtEur } from '../../lib/viesiejiPirkimai.js';
+
+interface Props {
+  pirkimas: any;
+}
+const { pirkimas } = Astro.props;
+const t = pirkimas.turinys || {};
+
+const numatoma = fmtEur(pirkimas.numatomaBendraPirkimoVerte) || fmtEur(t.numatomaVerteEUR);
+const bendra = fmtEur(t.bendraSutarciuVerte);
+const dpsMax = fmtEur(t.suteiktaVertemaksimaliDPSVerte);
+const hasAny = numatoma || bendra || dpsMax;
+---
+
+{hasAny && (
+  <section>
+    <h2>Vertė</h2>
+    <dl class="kv-list">
+      {numatoma && <><dt>Numatoma</dt><dd class="cell-mono">{numatoma}</dd></>}
+      {bendra && <><dt>Bendra sutarčių</dt><dd class="cell-mono">{bendra}</dd></>}
+      {dpsMax && <><dt>Maksimali DPS</dt><dd class="cell-mono">{dpsMax}</dd></>}
+    </dl>
+  </section>
+)}

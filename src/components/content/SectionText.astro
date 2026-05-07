@@ -1,0 +1,18 @@
+---
+interface Props {
+  title: string;
+  paragraphs: string[];
+  titleTag?: 'h2' | 'h3';
+}
+
+const { title, paragraphs, titleTag = 'h2' } = Astro.props;
+const TitleTag = titleTag;
+---
+
+<section>
+  <TitleTag>{title}</TitleTag>
+
+  {paragraphs.map((paragraph) => <p set:html={paragraph} />)}
+
+  <slot />
+</section>

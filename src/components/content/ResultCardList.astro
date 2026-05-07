@@ -1,0 +1,38 @@
+---
+interface ResultCardItem {
+  title: string;
+  href: string;
+  meta?: string[];
+}
+
+interface Props {
+  title?: string;
+  items: ResultCardItem[];
+  titleTag?: 'h2' | 'h3';
+}
+
+const { title, items, titleTag = 'h2' } = Astro.props;
+const TitleTag = titleTag;
+---
+
+<section>
+  {title && <TitleTag>{title}</TitleTag>}
+
+  <div class="result-list">
+    {items.map((item) => (
+      <article class="result-card card-clickable">
+        <div class="result-card-body">
+          {item.meta && item.meta.length > 0 && (
+            <div class="result-card-meta">
+              {item.meta.map((value) => <span>{value}</span>)}
+            </div>
+          )}
+
+          <h3 class="result-card-title">
+            <a href={item.href}>{item.title}</a>
+          </h3>
+        </div>
+      </article>
+    ))}
+  </div>
+</section>

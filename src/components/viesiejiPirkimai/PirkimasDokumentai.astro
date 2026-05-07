@@ -1,0 +1,44 @@
+---
+import FileCard from '../FileCard.astro';
+
+interface Props {
+  failai: any[];
+}
+const { failai } = Astro.props;
+---
+
+{failai.length > 0 && (
+  <section class="mb-7">
+    <h2>Dokumentai</h2>
+    <div class="flex flex-col gap-2 mt-4">
+      {failai.map((failas: any) => {
+        const versija = failas.versijos?.[failas.versijos.length - 1];
+        const title = failas.dokumentasPavadinimas || failas.pavadinimas || '—';
+        const ext = (versija?.formatas || (title.includes('.') ? title.split('.').pop() : '') || '').toLowerCase();
+        const cvpisUrl = `https://viesiejipirkimai.lt/epps/cft/viewDocumentVersions.do?resourceId=${failas.dokumentasId}`;
+        const isLocal = versija?.parsiustas && versija?.nuskaitytas;
+        const meta = isLocal
+          ? (ext ? `${ext.toUpperCase()}${versija?.ikelimoData ? ' · ' + versija.ikelimoData : ''}${versija?.statusas ? ' · ' + versija.statusas : ''}` : `${versija?.ikelimoData || ''}${versija?.statusas ? ' · ' + versija.statusas : ''}`.trim())
+          : (ext ? ext.toUpperCase() : '');
+        const actions = isLocal
+          ? [
+              { href: `https://failai.viespirkiai.org/${versija.id}`, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+              { href: cvpisUrl, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
+            ]
+          : [{ href: cvpisUrl, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' }];
+
+        return (
+          <div class="min-w-0">
+            <FileCard
+              title={title}
+              href={isLocal ? `/failas/${versija.id}` : cvpisUrl}
+              meta={meta}
+              ext={ext}
+              actions={actions}
+            />
+          </div>
+        );
+      })}
+    </div>
+  </section>
+)}

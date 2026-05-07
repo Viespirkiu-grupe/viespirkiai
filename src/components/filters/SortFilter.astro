@@ -1,0 +1,48 @@
+---
+import FilterGroup from './FilterGroup.astro';
+import SortToggle from '../inputs/SortToggle.astro';
+
+interface SortOption {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  options: SortOption[];
+  values: Record<string, any>;
+  defaultValue?: string;
+  legend?: string;
+  label?: string;
+  name?: string;
+  dirName?: string;
+  includeBlank?: boolean;
+}
+
+const {
+  options,
+  values,
+  defaultValue,
+  legend = 'Rikiavimas',
+  label = 'Rikiuoti pagal',
+  name = 'sort',
+  dirName = 'sortDir',
+  includeBlank = true,
+} = Astro.props;
+
+const current = values[name] ?? defaultValue ?? '';
+---
+
+<FilterGroup legend={legend} class="justify-start">
+  <div class="form-group">
+    <label class="form-label" for={name}>{label}</label>
+    <div class="input-group">
+      <select name={name} id={name} class="form-control">
+        {includeBlank && <option value="" selected={!current}>—</option>}
+        {options.map(opt => (
+          <option value={opt.value} selected={current === opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      <SortToggle fieldName={dirName} values={values} />
+    </div>
+  </div>
+</FilterGroup>

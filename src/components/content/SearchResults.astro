@@ -1,0 +1,85 @@
+---
+import Pagination from '../Pagination.astro';
+import SutartisCard from './SutartisCard.astro';
+
+type SearchResultItem = {
+  tipas: string;
+  kategorija: string;
+  sudarymoData?: string | null;
+  galiojimoData?: string | null;
+  dokumentuKiekis?: number | null;
+  sutartiesUnikalusId: string | number;
+  faktineIvykdimoVerte?: number | string | null;
+  verte?: number | string | null;
+  pavadinimas: string;
+  perkanciosiosOrganizacijosKodas: string;
+  perkanciojiOrganizacija?: string | null;
+  tiekejai: string[];
+  tiekejaiKodai: string[];
+  paskutinioRedagavimoData?: string | null;
+};
+
+interface Props {
+  numberOfResults: string;
+  results: SearchResultItem[];
+  page: number;
+  pageCount: number;
+  queryParams: string;
+  galimaEksportuoti: boolean;
+}
+
+const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti } = Astro.props;
+---
+
+<div class="mt-10 max-w-lg center mx-auto">
+  <div>
+    <div class="flex justify-between items-center mb-4">
+      <span class="text-muted text-sm numberOfResults" set:html={numberOfResults} />
+      {galimaEksportuoti && (
+        <div class="flex gap-3">
+          <a href={`/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
+            <span aria-hidden="true">↗</span> JSONL
+          </a>
+          <a href={`/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
+            <span aria-hidden="true">↗</span> CSV
+          </a>
+        </div>
+      )}
+    </div>
+
+    {results.length === 0
+      ? <div class="empty-state"><p class="text-muted">Rezultatų nerasta.</p></div>
+      : <>
+          <div class="result-list">
+            {results.map(item => (
+              <SutartisCard item={item} />
+            ))}
+          </div>
+          <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
+        </>
+    }
+  </div>
+</div>
+
+<script>
+  const span = document.querySelector('.rezultatai-nezinomas-total');
+  if (span && !span.classList.contains('spin')) {
+    span.classList.add('spin');
+    const url = new URL(window.location.href);
+    url.searchParams.set('rezultatuSkaiciausPatikslinimas', 'true');
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        if (data.total !== undefined) {
+          span.className = '';
+          const numberOfResultsElement = document.querySelector('.numberOfResults');
+          if (numberOfResultsElement) numberOfResultsElement.innerHTML = data.numberOfResults;
+          const paginationElement = document.querySelector('ul.pagination');
+          if (paginationElement && data.pagination) paginationElement.innerHTML = data.pagination;
+        } else {
+          span.classList.remove('spin');
+        }
+      })
+      .catch(() => span.classList.remove('spin'));
+  }
+</script>

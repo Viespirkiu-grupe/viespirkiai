@@ -1,0 +1,58 @@
+---
+interface Props {
+  asmuo: any;
+}
+
+const { asmuo } = Astro.props;
+const jadis = asmuo.jadis ?? {};
+const hasJadis = Object.values(jadis).some((v: any) => Number(v) > 0);
+const istatinis = asmuo.istatinisKapitalas;
+---
+
+<dl class="kv-list">
+  <dt>JAR kodas</dt>
+  <dd><span class="cell-mono">{asmuo.jar.jarKodas}</span> · {asmuo.jar.formosPavadinimas}</dd>
+
+  {asmuo.sodra?.kodas && <>
+    <dt>SODRA kodas</dt>
+    <dd><span class="cell-mono">{asmuo.sodra.kodas}</span></dd>
+  </>}
+
+  {asmuo.sodra?.ekonominesVeiklosPavadinimas && <>
+    <dt>Veikla</dt>
+    <dd>{asmuo.sodra.ekonominesVeiklosPavadinimas} (<span class="cell-mono">{asmuo.sodra.ekonominesVeiklosKodas}</span>)</dd>
+  </>}
+
+  <dt>Įregistruota</dt>
+  <dd>{asmuo.jar.registravimoData}</dd>
+
+  <dt>Adresas</dt>
+  <dd>
+    {asmuo.jar.location
+      ? <a href={`https://www.openstreetmap.org/?mlat=${asmuo.jar.location[0]}&mlon=${asmuo.jar.location[1]}&zoom=16`} target="_blank">{asmuo.jar.adresas}</a>
+      : asmuo.jar.adresas
+        ? asmuo.jar.adresas
+        : <em class="text-muted">Nenurodytas</em>
+    }
+  </dd>
+
+  {istatinis?.reiksme && <>
+    <dt>Įstatinis kapitalas</dt>
+    <dd>
+      <span class="cell-mono">{istatinis.reiksme.toLocaleString('lt-LT', { style: 'currency', currency: istatinis.valiuta })}</span>
+      <span class="text-muted text-xs">({istatinis.data})</span>
+    </dd>
+  </>}
+
+  {hasJadis && <>
+    <dt>Dalyviai</dt>
+    <dd>
+      <div class="flex flex-col gap-1">
+        {jadis.lrFiziniai > 0 && <span>{jadis.lrFiziniai} asmuo(-enys) — fiziniai (LT)</span>}
+        {jadis.lrJuridiniai > 0 && <span>{jadis.lrJuridiniai} asmuo(-enys) — juridiniai (LT)</span>}
+        {jadis.uzsienioFiziniai > 0 && <span>{jadis.uzsienioFiziniai} asmuo(-enys) — fiziniai (užsienis)</span>}
+        {jadis.uzsienioJuridiniai > 0 && <span>{jadis.uzsienioJuridiniai} asmuo(-enys) — juridiniai (užsienis)</span>}
+      </div>
+    </dd>
+  </>}
+</dl>

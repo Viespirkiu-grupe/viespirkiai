@@ -14,7 +14,7 @@
         "build:rysiai": "esbuild src/rysiai-app.js --bundle --format=iife --outfile=public/dist/rysiai.js --minify",
         "watch:rysiai": "esbuild src/rysiai-app.js --bundle --format=iife --outfile=public/dist/rysiai.js --watch",
         "test": "vitest run",
-        "dev:astro": "astro dev",
+        "dev:astro": "npm run watch:tailwind & astro dev",
         "build:astro": "astro build",
         "start:astro": "node start.mjs"
     },

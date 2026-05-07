@@ -1,0 +1,24 @@
+---
+interface ImageTileItem {
+  href: string;
+  src: string;
+  alt: string;
+}
+
+interface Props {
+  items: ImageTileItem[];
+  className?: string;
+}
+
+const { items, className = '' } = Astro.props;
+---
+
+<section class:list={[ 'flex flex-wrap justify-center gap-4 mb-16', className ].filter(Boolean)}>
+  {items.map((item) => (
+    <article class="flex-[1_1_300px] aspect-[1.414/1] max-w-175 min-w-75 shadow-md rounded-lg transition-all duration-300 hover:-translate-y-1.25 hover:shadow-lg">
+      <a href={item.href} class="bg-muted size-full block text-black rounded-lg overflow-hidden">
+        <img class="size-full object-contain block" src={item.src} alt={item.alt} />
+      </a>
+    </article>
+  ))}
+</section>

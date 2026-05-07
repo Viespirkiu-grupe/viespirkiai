@@ -1,0 +1,28 @@
+---
+interface Props {
+  id: string;
+  title: string;
+  anchor: string;
+  labels: any[];
+  series: any[];
+  flags?: string[];
+}
+const { id, title, anchor, labels, series, flags = ['yMin0', 'xAxisDay', 'numbersWithSpaces'] } = Astro.props;
+const chartData = { labels, series, flags };
+---
+
+<div class="min-w-0 flex flex-col min-h-87.5">
+  <h2 class="mb-3"><a href={`#${anchor}`} id={anchor} class="no-style">{title}</a></h2>
+  <div class="chart-frame">
+    <div id={id} class="chart h-87.5"></div>
+  </div>
+  <script defer is:inline define:vars={{ id, chartData }}>
+    displayChart({
+      element: document.querySelector('#' + id),
+      type: 'line-datetime',
+      labels: chartData.labels,
+      series: chartData.series,
+      flags: chartData.flags,
+    });
+  </script>
+</div>

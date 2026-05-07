@@ -1,0 +1,27 @@
+---
+import PageHeader from '../PageHeader.astro';
+import config from '@/config.js';
+
+interface Props {
+  asmuo: any;
+}
+
+const { asmuo } = Astro.props;
+const jarKodas = asmuo.jar.jarKodas;
+---
+
+<PageHeader>
+  {asmuo.jar.pavadinimas}
+  <Fragment slot="actions">
+    <a href={`/asmuo/${jarKodas}.json`} class="btn btn-outline btn-sm">↗ JSON</a>
+    {(config as any).enableGraph && (
+      <a href={`/rysiai/asmuo/${jarKodas}`} class="btn btn-outline btn-sm">↗ Ryšiai</a>
+    )}
+    {asmuo.sodra?.kodas && (
+      <a href={`https://atvira.sodra.lt/imones/detaliai/index.html?code=${asmuo.sodra.kodas}`} class="btn btn-outline btn-sm">↗ SODRA</a>
+    )}
+    <a href={`https://liteko.teismai.lt/viesasprendimupaieska/paieska.aspx?txt=${jarKodas}`} class="btn btn-outline btn-sm">↗ Bylos</a>
+    <a href={`/pirkejas/${jarKodas}`} class="btn btn-outline btn-sm">↗ Pirkimai</a>
+    <a href={`/tiekejas/${jarKodas}`} class="btn btn-outline btn-sm">↗ Pardavimai</a>
+  </Fragment>
+</PageHeader>

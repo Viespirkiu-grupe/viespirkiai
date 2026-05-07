@@ -1,0 +1,100 @@
+---
+interface Props {
+  location: [number, number] | null | undefined;
+}
+
+const { location } = Astro.props;
+---
+
+{location && (
+  <>
+    <div
+      id="asmuo-map"
+      class="map-container h-full min-h-70 col-[span_2]"
+      data-x={location[1]}
+      data-y={location[0]}
+    />
+
+    <script is:inline>
+      (function () {
+        window.__vpLeaflet = window.__vpLeaflet || { loading: null, loaded: false };
+        const state = window.__vpLeaflet;
+        function ensureCssOnce() {
+          if (document.querySelector('link[data-vp-leaflet-css="1"]')) return;
+          const l = document.createElement('link');
+          l.rel = 'stylesheet';
+          l.href = '/dist/leaflet.css';
+          l.dataset.vpLeafletCss = '1';
+          document.head.appendChild(l);
+        }
+        function waitForLeafletGlobal(r) {
+          const c = () => { if (window.L && window.L.map) { state.loaded = true; r(); } else setTimeout(c, 25); };
+          c();
+        }
+        function appendScriptWhenBodyReady(s) {
+          const m = () => {
+            const t = document.body || document.head || document.documentElement;
+            if (!t) return false;
+            t.appendChild(s);
+            return true;
+          };
+          if (m()) return;
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => { m(); }, { once: true });
+          } else {
+            setTimeout(() => { m(); }, 0);
+          }
+        }
+        function ensureJsOnce() {
+          if (state.loaded) { state.loading = state.loading || Promise.resolve(); return state.loading; }
+          if (state.loading) return state.loading;
+          state.loading = new Promise((r, j) => {
+            if (document.querySelector('script[data-vp-leaflet-js="1"]')) return waitForLeafletGlobal(r);
+            const s = document.createElement('script');
+            s.src = '/dist/leaflet.js';
+            s.defer = true;
+            s.dataset.vpLeafletJs = '1';
+            s.onload = () => { state.loaded = true; r(); };
+            s.onerror = j;
+            appendScriptWhenBodyReady(s);
+          });
+          return state.loading;
+        }
+        window.__vpLeafletLoad = window.__vpLeafletLoad || function () {
+          ensureCssOnce();
+          return ensureJsOnce();
+        };
+        try { window.__vpLeafletLoad(); } catch (e) {}
+      })();
+    </script>
+
+    <script is:inline>
+      (function () {
+        function init() {
+          const el = document.getElementById('asmuo-map');
+          if (!el || el.dataset.leafletInited === '1') return;
+          el.dataset.leafletInited = '1';
+          const lat = Number(el.dataset.y), lon = Number(el.dataset.x);
+          if (!isFinite(lat) || !isFinite(lon)) return;
+          const map = L.map('asmuo-map', { zoomAnimation: true, markerZoomAnimation: true }).setView([lat, lon], 16);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          }).addTo(map);
+          L.marker([lat, lon]).addTo(map);
+        }
+        function start() {
+          if (typeof window.__vpLeafletLoad === 'function') {
+            window.__vpLeafletLoad().then(() => { if (window.L && window.L.map) init(); }).catch(() => {});
+          } else if (window.L && window.L.map) {
+            init();
+          }
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', start, { once: true });
+        } else {
+          start();
+        }
+      })();
+    </script>
+  </>
+)}

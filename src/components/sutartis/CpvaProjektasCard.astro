@@ -1,0 +1,36 @@
+---
+interface Props {
+  item: any;
+}
+
+const { item } = Astro.props;
+const proj = item.projektas;
+---
+
+<article class="result-card card-clickable">
+  <div class="result-card-body">
+    <div class="result-card-meta">
+      <span>{item.projektoNr || ''}</span>
+      {proj && <span>{proj.projektoVeikluPradziosData || ''} — {proj.projektoVeikluPabaigosData || ''}</span>}
+    </div>
+    <h3 class="result-card-title">
+      <a href={`https://2021.esinvesticijos.lt/projektu-sritis/projektu-sarasas?query=${item.projektoNr}`}>
+        {proj?.projektoPavadinimas || item.pirkimoObjektas || ''}
+      </a>
+    </h3>
+  </div>
+  {proj && (
+    <div class="result-card-sidebar">
+      {proj.projektoVykdytojas && (
+        <span class="text-sm">
+          <a href={`/asmuo/${proj.projektoVykdytojoKodas}`}>{proj.projektoVykdytojas}</a>
+        </span>
+      )}
+      {proj.isViso && (
+        <span class="amount amount-sm">
+          {Number(proj.isViso).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+        </span>
+      )}
+    </div>
+  )}
+</article>

@@ -1,8 +1,15 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { postgres } from '@/postgres/postgres.js';
-import { fixHtmlEntities } from '@/utils/fixHtmlEntities.js';
-import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
+import PageHeader from '../../components/PageHeader.astro';
+import SutartisSalys from '../../components/sutartis/SutartisSalys.astro';
+import SutartisDetails from '../../components/sutartis/SutartisDetails.astro';
+import SutartisPranesimas from '../../components/sutartis/SutartisPranesimas.astro';
+import SutartisKlasifikacija from '../../components/sutartis/SutartisKlasifikacija.astro';
+import SutartisDokumentai from '../../components/sutartis/SutartisDokumentai.astro';
+import SutartisEsProjektai from '../../components/sutartis/SutartisEsProjektai.astro';
+import SutartisSabis from '../../components/sutartis/SutartisSabis.astro';
+import SutartisPanasios from '../../components/sutartis/SutartisPanasios.astro';
+import { loadSutartis } from '../../lib/sutartis.js';
 import config from '@/config.js';
 
 const colorScheme = Astro.cookies.get('colorScheme')?.value || 'auto';
@@ -11,115 +18,22 @@ const font = Astro.cookies.get('font')?.value || 'ubuntu';
 const { id } = Astro.params;
 if (!id || isNaN(parseInt(id))) return Astro.redirect('/404');
 
-let sutartis = await postgres
-  .query('SELECT * FROM sutartys WHERE "sutartiesUnikalusId" = $1 LIMIT 1', [parseInt(id)])
-  .then((r: any) => r.rows[0]);
-
+const sutartis = await loadSutartis(parseInt(id));
 if (!sutartis) return Astro.redirect('/404');
 
-// Tiekėjo subjekto patikslinimas
-const [atviriDuomenys, atviriDuomenysImp] = await Promise.all([
-  postgres.query(`SELECT * FROM "sutartysAtviriDuomenys" WHERE "dokId" = $1 LIMIT 1`, [sutartis.sutartiesUnikalusId]),
-  postgres.query(`SELECT * FROM "sutartysAtviriDuomenysImp" WHERE "dokId" = $1 LIMIT 1`, [sutartis.sutartiesUnikalusId]),
-]);
-
-if (atviriDuomenys.rowCount > 0) {
-  if (atviriDuomenys.rows[0].tiekPavPatikslinimas) sutartis.tiekejasPatikslinimas = atviriDuomenys.rows[0].tiekPavPatikslinimas;
-  if (atviriDuomenys.rows[0].tiekSalis) sutartis.tiekejasSalis = atviriDuomenys.rows[0].tiekSalis;
-}
-if (atviriDuomenysImp.rowCount > 0) {
-  if (atviriDuomenysImp.rows[0].tiekSbjPatikslinimas) sutartis.tiekejasPatikslinimas = atviriDuomenysImp.rows[0].tiekSbjPatikslinimas;
-  if (atviriDuomenysImp.rows[0].tiekSalis) sutartis.tiekejasSalis = atviriDuomenysImp.rows[0].tiekSalis;
-}
-
-// Panašios sutartys
-const similarContracts = await postgres.query(
-  `SELECT * FROM sutartys WHERE "sutartiesUnikalusId" != $1 AND "perkanciosiosOrganizacijosKodas" = $2 AND "tiekejoKodas" = $3 AND verte = $4 ORDER BY "paskutinioRedagavimoData" DESC`,
-  [sutartis.sutartiesUnikalusId, sutartis.perkanciosiosOrganizacijosKodas, sutartis.tiekejoKodas, sutartis.verte],
-).then((r: any) => r.rows);
-if (similarContracts.length > 0) sutartis.panasiosSutartys = similarContracts;
-
-// SABIS
-let sabisSutartys = await postgres.query(`SELECT * FROM "sabisSutartys" WHERE "vpId" = $1`, [sutartis.sutartiesUnikalusId]).then((r: any) => r.rows);
-await Promise.all(sabisSutartys.map(async (s: any) => {
-  s.salys = await postgres.query(`SELECT * FROM "sabisSutarciuSalys" WHERE "sutartiesId" = $1`, [s.sutartiesId]).then((r: any) => r.rows);
-  const saskaitos = await postgres.query(`SELECT * FROM "sabisSaskaitos" WHERE "sutartiesUid" = $1`, [s.sutartiesUid]).then((r: any) => r.rows);
-  await Promise.all(saskaitos.map(async (sk: any) => {
-    sk.salys = await postgres.query(`SELECT * FROM "sabisSaskaituSalys" WHERE "sfId" = $1`, [sk.sfId]).then((r: any) => r.rows);
-  }));
-  s.saskaitos = saskaitos;
-}));
-sutartis.sabisSutartys = sabisSutartys;
-
-// Failų būsena
-await Promise.all(sutartis.dokumentai.map(async (failas: any) => {
-  const dokIdMatch = failas.url.match(/dok_id=(\d+)/);
-  const fileIdMatch = failas.url.match(/file_id=(\d+)/);
-  failas.dok_id = dokIdMatch ? dokIdMatch[1] : '';
-  failas.file_id = fileIdMatch ? fileIdMatch[1] : '';
-  failas.proxyUrl = failas.dok_id && failas.file_id
-    ? `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dok_id}&file_id=${failas.file_id}`
-    : '';
-  const busena = failas.dok_id && failas.file_id ? await postgres.query(
-    `SELECT "dokId", "fileId", ("parsiustas" > 0) AS parsiustas, ("nuskaitytas" IS NOT NULL AND "nuskaitytas" > 0) AS nuskaitytas, id FROM failai WHERE "dokId" = $1 AND "fileId" = $2`,
-    [failas.dok_id, failas.file_id],
-  ).then((r: any) => r.rows[0]) : undefined;
-  failas.parsiustas = busena?.parsiustas || false;
-  failas.nuskaitytas = busena?.nuskaitytas || false;
-  if (busena?.parsiustas) { failas.id = busena.id; failas.proxyUrl = `https://failai.viespirkiai.org/${failas.id}`; }
-}));
-
-// CPVA
-sutartis.cpvaProjektuSutartys = [];
-if (sutartis.pirkimoNumeris) {
-  sutartis.cpvaProjektuSutartys = await postgres.query(`SELECT * FROM "cpvaProjektuSutartys" WHERE "pirkimoNrCvpis" = $1`, [sutartis.pirkimoNumeris]).then((r: any) => r.rows);
-}
-for (const ps of sutartis.cpvaProjektuSutartys) {
-  const proj = await postgres.query(`SELECT * FROM "cpvaProjektuSarasas" WHERE "projektoNr" = $1`, [ps.projektoNr]).then((r: any) => r.rows[0]);
-  if (proj) ps.projektas = proj;
-}
-
-// Pirkimai
-const [cvppPirkimas, cvpisPirkimas] = await Promise.all([
-  postgres.query(`SELECT * FROM "cvppViesiejiPirkimai" WHERE "pirkimoNumeris" = $1`, [sutartis.pirkimoNumeris]).then((r: any) => r.rows[0]),
-  postgres.query(`SELECT * FROM "viesiejiPirkimai" WHERE "pirkimoId" = $1`, [sutartis.pirkimoNumeris]).then((r: any) => r.rows[0]),
-]);
-if (cvppPirkimas) sutartis.cvppPirkimas = cvppPirkimas;
-if (cvpisPirkimas) sutartis.cvpisPirkimas = cvpisPirkimas;
-
-// HTML entities
-sutartis.pavadinimas = fixHtmlEntities(sutartis.pavadinimas);
-sutartis.perkanciojiOrganizacija = fixHtmlEntities(sutartis.perkanciojiOrganizacija);
-sutartis.tiekejas = fixHtmlEntities(sutartis.tiekejas);
-
-const tipo = (sutartis.tipas || '').trim().toUpperCase();
-sutartis.tipoPavadinimas = (CONTRACT_TYPES as any)[tipo] || tipo;
-
-const sutartiesUnikalusID = sutartis.sutartiesUnikalusId;
-
-const pageTitle = `${Number(sutartis.faktineIvykdimoVerte || sutartis.verte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € ${sutartis.pavadinimas}`;
-const pageDescription = `Sutartis nr. ${sutartis.sutartiesNumeris}\nSudaryta: ${String(sutartis.sudarymoData).slice(0, 10)}\nGalioja iki: ${String(sutartis.galiojimoData).slice(0, 10)}`;
-
-const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
-
-function getFileCardTheme(ext: string) {
-  const value = String(ext || '').toLowerCase();
-  if (value === 'pdf') return { type: 'pdf', base: 'var(--shade-5)', fold2: 'var(--shade-6)' };
-  if (['doc', 'docx', 'odt', 'rtf', 'dot', 'dotx', 'docm'].includes(value)) return { type: 'doc', base: '#1a2a4a', fold2: '#2e5fa3' };
-  if (['xls', 'xlsx', 'xlsb', 'ods', 'xlt'].includes(value)) return { type: 'xls', base: '#1a3020', fold2: '#2e7a3e' };
-  if (['ppt', 'pptx', 'ppsx', 'odp'].includes(value)) return { type: 'ppt', base: '#3a2414', fold2: '#d35400' };
-  if (['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tif', 'tiff', 'webp', 'svg', 'heic', 'jfif'].includes(value)) return { type: 'img', base: 'var(--shade-5)', fold2: 'var(--shade-6)' };
-  if (['zip', '7z', 'rar'].includes(value)) return { type: 'zip', base: '#2e2010', fold2: '#8a6020' };
-  if (['txt', 'csv', 'log', 'json', 'xml', 'md'].includes(value)) return { type: 'txt', base: 'var(--shade-5)', fold2: 'var(--shade-6)' };
-  if (value === 'tedeu') return { type: 'tedeu', base: '#1a3a8c', fold2: '#0d2260' };
-  if (value === 'tedlt') return { type: 'tedlt', base: '#f5cb35', fold2: '#c9a820' };
-  return { type: 'generic', base: 'var(--shade-5)', fold2: 'var(--shade-6)' };
-}
-
-// If requested as JSON (path ending with .json or Accept header asks for JSON), return JSON
 if (Astro.url.pathname.endsWith('.json') || (Astro.request?.headers.get('accept') || '').includes('application/json')) {
   return new Response(JSON.stringify(sutartis, null, 2), { headers: { 'Content-Type': 'application/json' } });
 }
+
+const sutartiesUnikalusID = sutartis.sutartiesUnikalusId;
+const fmtEur = (v: any) => Number(v).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const verte = sutartis.faktineIvykdimoVerte || sutartis.verte;
+const cvpisUrl = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=${sutartiesUnikalusID}`;
+
+const pageTitle = `${fmtEur(verte)} € ${sutartis.pavadinimas}`;
+const pageDescription = `Sutartis nr. ${sutartis.sutartiesNumeris}\nSudaryta: ${String(sutartis.sudarymoData).slice(0, 10)}\nGalioja iki: ${String(sutartis.galiojimoData).slice(0, 10)}`;
+
+const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
 ---
 
 <Layout
@@ -133,389 +47,33 @@ if (Astro.url.pathname.endsWith('.json') || (Astro.request?.headers.get('accept'
 >
   <main>
 
-    <div class="page-header">
-      <div>
-        <p class="subtext">{sutartis.tipoPavadinimas}</p>
-        <h1>
-          {sutartis.pavadinimas.length < 1 ? <em>Nenurodyta</em> : sutartis.pavadinimas}
-          {' '}už <span class="amount">{Number(sutartis.faktineIvykdimoVerte || sutartis.verte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;€</span>
-        </h1>
-      </div>
-      <div class="flex gap-3 items-center">
+    <PageHeader>
+      <Fragment slot="subtext">{sutartis.tipoPavadinimas}</Fragment>
+      {sutartis.pavadinimas.length < 1 ? <em>Nenurodyta</em> : sutartis.pavadinimas}
+      {' '}už <span class="amount">{fmtEur(verte)}&nbsp;€</span>
+      <Fragment slot="actions">
         <a href={`/sutartis/${sutartiesUnikalusID}.json`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties JSON duomenis">↗ JSON</a>
-        <a href={`https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=${sutartiesUnikalusID}`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties CVP IS duomenis">↗ CVP IS</a>
-        <a href={`mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20${sutartiesUnikalusID}&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/${sutartiesUnikalusID}`} class="btn btn-outline btn-sm" aria-label="Pranešti apie sutartį">↗ Pranešti</a>
+        <a href={cvpisUrl} class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties CVP IS duomenis">↗ CVP IS</a>
         {(config as any).enableGraph && (
-          <a href={`/rysiai/asmuo/${sutartis.perkanciosiosOrganizacijosKodas}#filter=&asmuo_2=${sutartis.tiekejoKodas}&filter_2=&sutartis_3=${sutartiesUnikalusID}&filter_3=DSLMGPABC`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti ryšių grafą">↗ Ryšiai</a>
+          <a href={`/rysiai/asmuo/${sutartis.perkanciosiosOrganizacijosKodas}#o_2=${sutartis.tiekejoKodas}&f_2=DSLMGPABC&c_3=${sutartiesUnikalusID}&f_3=DSLMGPABC`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti ryšių grafą">↗ Ryšiai</a>
         )}
-      </div>
-    </div>
+        <a href={`mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20${sutartiesUnikalusID}&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/${sutartiesUnikalusID}`} class="btn btn-outline btn-sm" aria-label="Pranešti apie sutartį">↗ Pranešti</a>
+      </Fragment>
+    </PageHeader>
 
-    <div class="mb-10">
-      <div class="grid-3">
-        <section>
-          <h2>Pirkėjas</h2>
-          <h3><a href={`/asmuo/${sutartis.perkanciosiosOrganizacijosKodas}`}>{sutartis.perkanciojiOrganizacija}</a></h3>
-          <span class="text-muted">{sutartis.perkanciosiosOrganizacijosKodas}</span>
-        </section>
-
-        <section>
-          {(!sutartis.papildomiTiekejai || sutartis.papildomiTiekejai.length === 0)
-            ? <>
-                <h2>Tiekėjas</h2>
-                {sutartis.tiekejasPatikslinimas && sutartis.tiekejasPatikslinimas !== sutartis.tiekejas &&
-                  <p class="text-muted text-sm mb-1">{sutartis.tiekejasPatikslinimas}</p>
-                }
-                <h3><a href={`/asmuo/${sutartis.tiekejoKodas}`}>{sutartis.tiekejas}</a></h3>
-                {sutartis.tiekejasSalis && <p class="text-muted text-sm">{sutartis.tiekejasSalis}</p>}
-                <span class="text-muted">{sutartis.tiekejoKodas}</span>
-              </>
-            : <>
-                <h2>Tiekėjai</h2>
-                <div class="mb-3">
-                  <h3><a href={`/asmuo/${sutartis.tiekejoKodas}`}>{sutartis.tiekejas}</a></h3>
-                  <span class="text-muted">{sutartis.tiekejoKodas}</span>
-                </div>
-                {sutartis.papildomiTiekejai.map((t: string, i: number) => (
-                  <div class="mt-3">
-                    <h3><a href={`/asmuo/${sutartis.papildomiTiekejaiKodai[i]}`}>{t}</a></h3>
-                    <span class="text-muted">{sutartis.papildomiTiekejaiKodai[i]}</span>
-                  </div>
-                ))}
-              </>
-          }
-        </section>
-      </div>
-
-      <div class="mt-4">
-        <a href={`/?tiekejoKodas=${sutartis.tiekejoKodas}&perkanciosiosOrganizacijosKodas=${sutartis.perkanciosiosOrganizacijosKodas}`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti tarpusavio sutartis">↗ Tarpusavio sutartys</a>
-      </div>
-    </div>
+    <SutartisSalys sutartis={sutartis} />
 
     <div class="grid-3 mb-7">
-
-      <section>
-        <h2>Sutartis</h2>
-        <span class="text-muted mb-4 block">{sutartis.sutartiesNumeris}</span>
-
-        <h3 class="mb-2">Vertė</h3>
-        <dl class="kv-list mb-4">
-          <dt>Numatyta</dt>
-          <dd class="cell-mono">{sutartis.verte.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</dd>
-          <dt>Faktinė</dt>
-          <dd class="cell-mono">{sutartis.faktineIvykdimoVerte ? sutartis.faktineIvykdimoVerte.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' : 'Nenurodyta'}</dd>
-        </dl>
-
-        <h3 class="mb-2">Terminai</h3>
-        <dl class="kv-list">
-          <dt>Sudaryta</dt><dd>{String(sutartis.sudarymoData).slice(0, 10)}</dd>
-          <dt>Galioja iki</dt><dd>{String(sutartis.galiojimoData).slice(0, 10)}</dd>
-          <dt>Faktinė įvykdymo data</dt><dd>{sutartis.faktineIvykdimoData || 'Nenurodyta'}</dd>
-        </dl>
-      </section>
-
-      <section>
-        <h2>Pranešimas</h2>
-        <div class="flex items-center gap-2 mb-4">
-          <span class="text-muted">{sutartiesUnikalusID}</span>
-          <a href={`https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=${sutartiesUnikalusID}`} class="text-sm">↗ CVP IS</a>
-        </div>
-
-        <dl class="kv-list mb-4">
-          <dt>Paskelbta</dt><dd>{sutartis.paskelbimoData}</dd>
-          <dt>Redaguota</dt><dd>{sutartis.paskutinioRedagavimoData}</dd>
-          <dt>Pirkimo numeris</dt>
-          <dd>
-            {sutartis.cvpisPirkimas
-              ? <a href={`/viesiejiPirkimai/${sutartis.cvpisPirkimas.pirkimoId}`}>{sutartis.pirkimoNumeris}</a>
-              : sutartis.cvppPirkimas
-                ? <a href={sutartis.cvppPirkimas.link}>{sutartis.pirkimoNumeris}</a>
-                : sutartis.pirkimoNumeris || 'Nenurodytas'
-            }
-          </dd>
-        </dl>
-
-        {sutartis.cvpisPirkimas && (
-          <section>
-            <br />
-            <h2>Viešasis pirkimas</h2>
-            <div class="flex items-center gap-2 mb-4">
-              <a href={`/viesiejiPirkimai/${sutartis.cvpisPirkimas.pirkimoId}`}>
-                <span>{sutartis.cvpisPirkimas.pavadinimas}</span>
-              </a>
-            </div>
-            <dl class="kv-list">
-              {sutartis.cvpisPirkimas.pasiulymuPateikimoTerminas && <>
-                <dt>Pasiūlymų pateikimo terminas</dt>
-                <dd>{String(sutartis.cvpisPirkimas.pasiulymuPateikimoTerminas).slice(0, 10)}</dd>
-              </>}
-              {sutartis.cvpisPirkimas.numatomaVerteEUR && Number(sutartis.cvpisPirkimas.numatomaVerteEUR) > 0 && <>
-                <dt>Numatoma vertė</dt>
-                <dd class="cell-mono">{Number(sutartis.cvpisPirkimas.numatomaVerteEUR).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</dd>
-              </>}
-            </dl>
-            {sutartis.cvpisPirkimas.informacija && <p class="text-muted text-sm">{sutartis.cvpisPirkimas.informacija}</p>}
-          </section>
-        )}
-      </section>
-
-      <section>
-        <h2>Klasifikacija</h2>
-        <dl class="kv-list mb-4">
-          <dt>Kategorija</dt><dd>{sutartis.kategorija}</dd>
-          <dt>Tipas</dt><dd>{sutartis.tipas} <span class="text-muted">(<em>{sutartis.tipoPavadinimas}</em>)</span></dd>
-        </dl>
-
-        <h3 class="mb-2">BVPŽ</h3>
-        <div class="mb-2">
-          <div class="font-medium">{sutartis.bvpzPavadinimas}</div>
-          <span class="text-muted">{sutartis.bvpzKodas}</span>
-        </div>
-        {sutartis.papildomiBvpzKodai?.length > 0 && sutartis.papildomiBvpzKodai.map((kodas: string, i: number) => (
-          <div class="mb-2">
-            <div class="font-medium">{sutartis.papildomiBvpzPavadinimai[i]}</div>
-            <span class="text-muted">{kodas}</span>
-          </div>
-        ))}
-        <a href="/bvpz" class="text-sm">↗ BVPŽ kodai</a>
-      </section>
-
-      <section class="span-full">
-        <h2>Dokumentai</h2>
-        {sutartis.dokumentai?.length > 0
-          ? <div class="flex flex-col gap-2">
-              {sutartis.dokumentai.map((doc: any) => {
-                const title = doc.pavadinimas || '—';
-                const ext = (doc.extension || (title.includes('.') ? title.split('.').pop() : '') || '').toLowerCase();
-                const theme = getFileCardTheme(ext);
-                let href = '';
-                let actions: { href: string; text: string; target: string; rel: string }[] = [];
-
-                if (doc.id && doc.parsiustas && doc.nuskaitytas) {
-                  href = `/failas/${doc.id}`;
-                  actions = [
-                    { href: `https://failai.viespirkiai.org/${doc.id}`, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
-                    { href: doc.url, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
-                  ];
-                } else if (doc.parsiustas && doc.nuskaitytas) {
-                  href = `/failas/${doc.dok_id}/${doc.file_id}`;
-                  actions = [
-                    { href: `https://failai.viespirkiai.org/${doc.dok_id}/${doc.file_id}`, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
-                    { href: doc.url, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
-                  ];
-                } else {
-                  href = doc.proxyUrl;
-                  actions = [
-                    { href: doc.proxyUrl, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
-                    { href: doc.url, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
-                  ];
-                }
-
-                return (
-                  <div class="min-w-0">
-                    <article class="file-card card-clickable" aria-label={title}>
-                      <a href={href} class="card-overlay-link">{title}</a>
-                      <svg class="file-card-icon antialiased rounded-2xl block file-card-z" viewBox="0 0 96 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" overflow="hidden" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
-                        <defs>
-                          <clipPath id={`fc-clip-${doc.id || doc.dok_id || doc.file_id || ext}-${ext}`}>
-                            <path d="M-28,-36 L14,-36 L28,-22 L28,44 L-28,44 Z" />
-                          </clipPath>
-                        </defs>
-                        <g transform="translate(44,52) rotate(-10)" class="[shape-rendering:geometricPrecision] [text-rendering:geometricPrecision]">
-                          <g clip-path={`url(#fc-clip-${doc.id || doc.dok_id || doc.file_id || ext}-${ext})`}>
-                            <rect x="-28" y="-36" width="56" height="80" rx="9" fill={theme.base} />
-                          </g>
-                          <polygon points="14,-36 28,-22 14,-22" fill={theme.fold2} />
-                          {theme.type === 'pdf' && (
-                            <>
-                              <rect x="-28" y="-8" width="56" height="14" fill="#c0392b" />
-                              <text x="0" y="1.5" font-family="system-ui,sans-serif" font-size="7" font-weight="700" fill="#fff" text-anchor="middle">PDF</text>
-                            </>
-                          )}
-                          {theme.type === 'doc' && (
-                            <>
-                              <rect x="-16" y="-10" width="30" height="3.5" rx="1.5" fill="#2e5fa3" opacity="0.9" />
-                              <rect x="-16" y="0" width="22" height="3.5" rx="1.5" fill="#2e5fa3" opacity="0.6" />
-                              <rect x="-16" y="10" width="26" height="3.5" rx="1.5" fill="#2e5fa3" opacity="0.6" />
-                            </>
-                          )}
-                          {theme.type === 'xls' && (
-                            <>
-                              <rect x="-14" y="-18" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9" />
-                              <rect x="2" y="-18" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9" />
-                              <rect x="-14" y="-7" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9" />
-                              <rect x="2" y="-7" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9" />
-                              <rect x="-14" y="4" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9" />
-                              <rect x="2" y="4" width="12" height="9" rx="1" fill="none" stroke="#2e7a3e" stroke-width="1" opacity="0.9" />
-                            </>
-                          )}
-                          {theme.type === 'zip' && (
-                            <>
-                              <rect x="-6" y="-23" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2" />
-                              <rect x="2" y="-16" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2" />
-                              <rect x="-6" y="-9" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2" />
-                              <rect x="2" y="-2" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2" />
-                              <rect x="-6" y="5" width="8" height="7" rx="1.5" fill="none" stroke="#c8902a" stroke-width="1.2" />
-                              <rect x="-6" y="15" width="16" height="8" rx="2.5" fill="none" stroke="#c8902a" stroke-width="1.2" />
-                            </>
-                          )}
-                          {theme.type === 'img' && (
-                            <>
-                              <circle cx="14" cy="-20" r="5" fill="none" stroke="var(--dark-gray)" stroke-width="1.3" />
-                              <polygon points="-28,44 -4,-4 18,44" fill="none" stroke="var(--dark-gray)" stroke-width="1.3" stroke-linejoin="round" />
-                              <polygon points="-16,44 8,6 32,44" fill={theme.base} stroke="var(--dark-gray)" stroke-width="1.3" stroke-linejoin="round" />
-                            </>
-                          )}
-                        </g>
-                      </svg>
-                      <div class="file-card-body file-card-z">
-                        <div class="file-card-title">{title}</div>
-                        {ext && <div class="file-card-meta">{ext.toUpperCase()}</div>}
-                      </div>
-                      <div class="file-card-actions-col file-card-z" aria-label="Veiksmai">
-                        {actions.map(a => (
-                          <a class="file-card-action" href={a.href} target={a.target} rel={a.rel}>{a.text}</a>
-                        ))}
-                      </div>
-                    </article>
-                  </div>
-                );
-              })}
-            </div>
-          : <p class="text-muted">Pateiktų dokumentų nėra.</p>
-        }
-      </section>
-
+      <SutartisDetails sutartis={sutartis} />
+      <SutartisPranesimas sutartis={sutartis} />
+      <SutartisKlasifikacija sutartis={sutartis} />
+      <SutartisDokumentai dokumentai={sutartis.dokumentai} />
     </div>
 
     <div class="grid-2">
-
-      {sutartis.cpvaProjektuSutartys?.length > 0 && (
-        <section>
-          <h2>Europos sąjungos projektai</h2>
-          {sutartis.cpvaProjektuSutartys.length > 3 && !showCpvaAll
-            ? <>
-                <p class="text-muted mt-4">Yra daug (<strong>{sutartis.cpvaProjektuSutartys.length}</strong>) CPVA projektų su šiuo pirkimo numeriu — tikėtina, kad ryšys netiesioginis (DPS / CPO katalogas).</p>
-                <div class="mt-2"><a href="?cpvaAll=true" class="btn btn-sm btn-secondary">Rodyti</a></div>
-              </>
-            : <div class="result-list mt-4">
-                {sutartis.cpvaProjektuSutartys.map((ps: any) => (
-                  <article class="result-card card-clickable">
-                    <div class="result-card-body">
-                      <div class="result-card-meta">
-                        <span>{ps.projektoNr || ''}</span>
-                        {ps.projektas && <span>{ps.projektas.projektoVeikluPradziosData || ''} — {ps.projektas.projektoVeikluPabaigosData || ''}</span>}
-                      </div>
-                      <h3 class="result-card-title">
-                        <a href={`https://2021.esinvesticijos.lt/projektu-sritis/projektu-sarasas?query=${ps.projektoNr}`}>
-                          {ps.projektas?.projektoPavadinimas || ps.pirkimoObjektas || ''}
-                        </a>
-                      </h3>
-                    </div>
-                    {ps.projektas && (
-                      <div class="result-card-sidebar">
-                        {ps.projektas.projektoVykdytojas && <span class="text-sm"><a href={`/asmuo/${ps.projektas.projektoVykdytojoKodas}`}>{ps.projektas.projektoVykdytojas}</a></span>}
-                        {ps.projektas.isViso && <span class="amount amount-sm">{Number(ps.projektas.isViso).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>}
-                      </div>
-                    )}
-                  </article>
-                ))}
-              </div>
-          }
-        </section>
-      )}
-
-      <section>
-        <h2>SABIS sutartys <sup>BETA</sup></h2>
-        {sutartis.sabisSutartys?.length > 0
-          ? <div class="result-list mt-4">
-              {sutartis.sabisSutartys.map((item: any) => {
-                const d1 = item.sutartiesPasirasymoData ? String(item.sutartiesPasirasymoData).slice(0, 10) : '';
-                const d2 = item.sutartiesGaliojimoData ? String(item.sutartiesGaliojimoData).slice(0, 10) : '';
-                return (
-                  <article class="result-card">
-                    <div class="result-card-body">
-                      <div class="result-card-meta">
-                        <span>{item.tipas}</span>
-                        <span>{item.sutartiesNumeris}</span>
-                        <span>{d1 ? `Sut. ${d1}${d1 !== d2 ? ' — ' + d2 : ''}` : '—'}</span>
-                      </div>
-                      <h3 class="result-card-title">
-                        <span class={`amount-sm${Number(item.suma) > 10000 ? ' font-bold' : ''}`}>
-                          {Number(item.suma).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
-                        </span>
-                        &nbsp;{item.pavadinimas.length < 1 ? <em>Nenurodyta</em> : item.pavadinimas}
-                      </h3>
-                      <div class="flex flex-wrap gap-2 mt-2">
-                        {item.salys.map((s: any) => (
-                          <span class="text-sm"><strong>{s.tipas}</strong> {s.validusJarKodas || s.validusAsmensKodas || s.kitasKodas || s.pavadinimas}</span>
-                        ))}
-                      </div>
-                      {item.saskaitos?.length > 0 && (
-                        <div class="mt-3">
-                          <p class="section-title mb-2">Sąskaitos</p>
-                          {item.saskaitos.map((sk: any) => {
-                            const valiuta = sk.valiuta === 'Euras' || sk.valiuta === 'EUR' ? '€' : sk.valiuta;
-                            return (
-                              <div class="kv-list mb-2">
-                                <dt>{sk.sfTipas} Nr. {sk.sfNumeris}</dt>
-                                <dd>
-                                  <span class="cell-mono">{Number(sk.bendraSfSuma).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {valiuta}</span>
-                                  <span class="text-muted text-sm"> (su {sk.pvm} PVM)</span><br />
-                                  <span class="subtext">{sk.sfBusena} ({sk.sfBusenoData})</span>
-                                </dd>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          : <p class="text-muted mt-4"><em>Panašių sutarčių nerasta.</em></p>
-        }
-      </section>
-
-      <section>
-        <h2>Panašios sutartys</h2>
-        {sutartis.panasiosSutartys?.length > 0
-          ? <div class="result-list mt-4">
-              {sutartis.panasiosSutartys.map((item: any) => {
-                const d1 = item.sudarymoData ? String(item.sudarymoData).slice(0, 10) : '';
-                const d2 = item.galiojimoData ? String(item.galiojimoData).slice(0, 10) : '';
-                const verte = item.faktineIvykdimoVerte || item.verte;
-                return (
-                  <article class="result-card card-clickable">
-                    <div class="result-card-body">
-                      <div class="result-card-meta">
-                        <span>{item.tipas}</span>
-                        <span>{item.kategorija}</span>
-                        <span>{d1 ? `Sut. ${d1}${d1 !== d2 ? ' — ' + d2 : ''}` : '—'}</span>
-                        {item.dokumentuKiekis > 0 && <span>{item.dokumentuKiekis} dok.</span>}
-                      </div>
-                      <h3 class="result-card-title">
-                        <a href={`/sutartis/${item.sutartiesUnikalusId}`}>
-                          <span class={`cell-mono${Number(verte) > 10000 ? ' font-bold' : ''}`}>
-                            {Number(verte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
-                          </span>
-                          &nbsp;{item.pavadinimas.length < 1 ? <em>Nenurodyta</em> : item.pavadinimas}
-                        </a>
-                      </h3>
-                      <div class="flex gap-3 mt-2 text-sm">
-                        <span><strong>Pirkėjas:</strong> <a href={`/asmuo/${item.perkanciosiosOrganizacijosKodas}`} class="relative z-1">{item.perkanciojiOrganizacija}</a></span>
-                        <span><strong>Tiekėjas:</strong> <a href={`/asmuo/${item.tiekejoKodas}`} class="relative z-1">{item.tiekejas || 'Nenurodytas'}</a></span>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          : <p class="text-muted mt-4"><em>Panašių sutarčių nerasta.</em></p>
-        }
-      </section>
-
+      <SutartisEsProjektai sutartys={sutartis.cpvaProjektuSutartys} showAll={showCpvaAll} />
+      <SutartisSabis sutartys={sutartis.sabisSutartys} />
+      <SutartisPanasios sutartys={sutartis.panasiosSutartys} />
     </div>
 
   </main>

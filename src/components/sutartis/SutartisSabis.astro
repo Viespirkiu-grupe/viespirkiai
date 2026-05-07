@@ -1,0 +1,33 @@
+---
+import SabisSutartisCard from './SabisSutartisCard.astro';
+
+interface Props {
+  sutartys: any[] | null | undefined;
+  maxVisible?: number;
+}
+
+const { sutartys, maxVisible = 3 } = Astro.props;
+const list = sutartys ?? [];
+const visible = list.slice(0, maxVisible);
+const hidden = list.slice(maxVisible);
+---
+
+<section>
+  <h2>SABIS sutartys</h2>
+  {list.length === 0
+    ? <p class="text-muted mt-4"><em>SABIS sutarčių nerasta.</em></p>
+    : <div class="result-list mt-4">
+        {visible.map((item: any) => <SabisSutartisCard item={item} />)}
+        {hidden.length > 0 && (
+          <details>
+            <summary class="text-sm text-muted px-2 py-2 cursor-pointer select-none hover:text-current">
+              Rodyti dar {hidden.length}
+            </summary>
+            <div class="result-list mt-4">
+              {hidden.map((item: any) => <SabisSutartisCard item={item} />)}
+            </div>
+          </details>
+        )}
+      </div>
+  }
+</section>

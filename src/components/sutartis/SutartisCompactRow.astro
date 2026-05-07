@@ -1,0 +1,19 @@
+---
+interface Props {
+  item: any;
+}
+
+const { item } = Astro.props;
+const sudaryta = item.sudarymoData ? String(item.sudarymoData).slice(0, 10) : '';
+const verte = Number(item.faktineIvykdimoVerte || item.verte || 0);
+const fmtEur = (v: number) => v.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+---
+
+<a href={`/sutartis/${item.sutartiesUnikalusId}`} class="flex items-baseline gap-3 px-2 py-1 rounded-md text-sm hover:bg-shade-2 no-underline">
+  {item.tipas && <span class="text-muted shrink-0 tabular-nums">{item.tipas}</span>}
+  <span class="flex-1 truncate min-w-0">
+    {(!item.pavadinimas || item.pavadinimas.length < 1) ? <em>Nenurodyta</em> : item.pavadinimas}
+  </span>
+  <span class="tabular-nums whitespace-nowrap shrink-0">{fmtEur(verte)}&nbsp;€</span>
+  <time class="text-muted tabular-nums whitespace-nowrap shrink-0" datetime={sudaryta}>{sudaryta || '—'}</time>
+</a>

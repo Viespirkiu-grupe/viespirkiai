@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { getColorScheme, getFont } from '../lib/failai.js';
+import CopyField from '../components/content/CopyField.astro';
 
 if (Astro.request.method === 'POST') {
   const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
@@ -21,6 +22,77 @@ if (Astro.request.method === 'POST') {
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
+const mcpUrl = 'https://viespirkiai.org/mcp';
+const mcpConfig = `{
+  "servers": {
+    "viespirkiai": {
+      "url": "https://viespirkiai.org/mcp"
+    }
+  }
+}`;
+
+const categories = [
+  {
+    number: '01',
+    title: 'Sutartys',
+    description: 'Pirkėjai, pirkėjai, tiekėjai, sumos ir visi pridėti dokumentai',
+  },
+  {
+    number: '02',
+    title: 'Viešieji pirkimai',
+    description: 'Naujos CVP IS skelbimai bei jų paieška',
+  },
+  {
+    number: '03',
+    title: 'Dokumentai',
+    description: 'Pilna tekstinė paieška sutarčių dokumentuose, bei jų skaitymas, naršymas archyvuose. OCR rezultatai kur atlikta',
+  },
+  {
+    number: '04',
+    title: 'Juridiniai asmenys',
+    description: 'Įmonių profilis - bendra informacija, Sodra, VMI, finansinės ataskaitos, teismo nuosprendžiai, darbo skelbimai ir t.t.',
+  },
+  {
+    number: '05',
+    title: 'Privatūs interesai',
+    description: 'PINREG deklaracijos - ryšiai su verslu, darbovietės, sutuoktinių ryšiai. Pagal vardą arba juridinį asmenį',
+  },
+];
+
+const conversation = [
+  {
+    type: 'user',
+    content: 'Kokias sutartis yra sudaręs Remigijus Žemaitaitis? Ar ten yra kažkas įtartino?',
+  },
+  {
+    type: 'ai-tool',
+    tool: 'Searched available tools',
+    content: 'Pirmiausia ieškosiu sutarčių dokumentuose pagal Remigijaus Žemaitaičio vardą ir pavardę.',
+  },
+  {
+    type: 'ai-tool',
+    tool: 'Search failai',
+    content: 'Pastebiu, kad daugelis dokumentų susiję su JAR kodu 306660048 ir el. paštu r*********@hotmail.com. Pažiūrėkime kas slepiasi po šiuo kodu ir detaliau patikrinkime kelis svarbiausius dokumentus.',
+  },
+  {
+    type: 'ai-tool',
+    tool: 'Get juridinis',
+    content: 'Dabar pažvelkime į konkrečius dokumentus, ypač tuos, kuriuose figūruoja el. paštas r*********@hotmail.com - tai sutartys 2561 ir 2562. Taip pat patikrinsime didžiausią išlaidų dalį - nežinomus tiekėjus.',
+  },
+  {
+    type: 'ai-tool',
+    tool: 'Used Viešpirkiai integration',
+    content: 'Turiu pakankamai duomenų, kad galėčiau pateikti išsamią ataskaitą. Patikrinsiu dar vieną sutartį su el. paštu r*********@hotmail.com.',
+  },
+  {
+    type: 'ai-tool',
+    tool: 'Get sutartis',
+    content: 'Dabar turiu išsamų vaizdą. Pateikiu analizę.',
+  },
+  {
+    type: 'ai-report',
+  },
+];
 ---
 <Layout
   pageTitle="MCP serveris"
@@ -140,10 +212,7 @@ const font = getFont(Astro.cookies);
       <p class="section-title mb-3">Model Context Protocol</p>
       <h1 class="mb-3">Viešpirkiai Jūsų DI programoje</h1>
       <p class="lead mb-7">Leiskite savo DI asistentui pačiam rasti atsakymus viešųjų pirkimų duomenyse</p>
-      <div class="inline-flex border rounded-lg bg-light max-w-full">
-        <code class="px-4 py-3 border-none bg-transparent overflow-auto">https://viespirkiai.org/mcp</code>
-        <button id="mcpCopyUrlBtn" class="btn btn-primary rounded-0 border-0 border-l-border rounded-r-lg" type="button">Kopijuoti URL</button>
-      </div>
+      <CopyField value={mcpUrl} buttonId="mcpCopyUrlBtnHero" buttonLabel="Kopijuoti URL" />
     </div>
 
     <!-- Content: categories left, chat right -->
@@ -153,41 +222,15 @@ const font = getFont(Astro.cookies);
       <div>
         <h2 class="mb-4">Kas prieinama</h2>
         <ol class="mcp-cats-list">
-          <li>
-            <span class="mcp-cat-num">01</span>
-            <div>
-              <strong>Sutartys</strong>
-              <p class="text-muted text-sm mb-0">Pirkėjai, pirkėjai, tiekėjai, sumos ir visi pridėti dokumentai</p>
-            </div>
-          </li>
-          <li>
-            <span class="mcp-cat-num">02</span>
-            <div>
-              <strong>Viešieji pirkimai</strong>
-              <p class="text-muted text-sm mb-0">Naujos CVP IS skelbimai bei jų paieška</p>
-            </div>
-          </li>
-          <li>
-            <span class="mcp-cat-num">03</span>
-            <div>
-              <strong>Dokumentai</strong>
-              <p class="text-muted text-sm mb-0">Pilna tekstinė paieška sutarčių dokumentuose, bei jų skaitymas, naršymas archyvuose. OCR rezultatai kur atlikta</p>
-            </div>
-          </li>
-          <li>
-            <span class="mcp-cat-num">04</span>
-            <div>
-              <strong>Juridiniai asmenys</strong>
-              <p class="text-muted text-sm mb-0">Įmonių profilis — bendra informacija, Sodra, VMI, finansinės ataskaitos, teismo nuosprendžiai, darbo skelbimai ir t.t.</p>
-            </div>
-          </li>
-          <li>
-            <span class="mcp-cat-num">05</span>
-            <div>
-              <strong>Privatūs interesai</strong>
-              <p class="text-muted text-sm mb-0">PINREG deklaracijos — ryšiai su verslu, darbovietės, sutuoktinių ryšiai. Pagal vardą arba juridinį asmenį</p>
-            </div>
-          </li>
+          {categories.map((item) => (
+            <li>
+              <span class="mcp-cat-num">{item.number}</span>
+              <div>
+                <strong>{item.title}</strong>
+                <p class="text-muted text-sm mb-0">{item.description}</p>
+              </div>
+            </li>
+          ))}
         </ol>
 
         <p class="mt-4">Turite idėjų? <a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a></p>
@@ -197,98 +240,80 @@ const font = getFont(Astro.cookies);
       <div>
         <div class="mcp-chat-outer">
           <div class="mcp-chat">
-
-            <div class="mcp-msg mcp-msg-user">
-              <div class="mcp-bubble mcp-bubble-user">
-                Kokias sutartis yra sudaręs Remigijus Žemaitaitis? Ar ten yra kažkas įtartino?
-              </div>
-            </div>
-
-            <div class="mcp-msg mcp-msg-ai">
-              <div class="mcp-tool"><span>↗↙</span> Searched available tools</div>
-              <p class="text-sm text-muted mb-0 px-1">Pirmiausia ieškosiu sutarčių dokumentuose pagal Remigijaus Žemaitaičio vardą ir pavardę.</p>
-            </div>
-
-            <div class="mcp-msg mcp-msg-ai">
-              <div class="mcp-tool"><span>↗↙</span> Search failai</div>
-              <p class="text-sm text-muted mb-0 px-1">Pastebiu, kad daugelis dokumentų susiję su JAR kodu 306660048 ir el. paštu r*********@hotmail.com. Pažiūrėkime kas slepiasi po šiuo kodu ir detaliau patikrinkime kelis svarbiausius dokumentus.</p>
-            </div>
-
-            <div class="mcp-msg mcp-msg-ai">
-              <div class="mcp-tool"><span>↗↙</span> Get juridinis</div>
-              <p class="text-sm text-muted mb-0 px-1">Dabar pažvelkime į konkrečius dokumentus, ypač tuos, kuriuose figūruoja el. paštas r*********@hotmail.com — tai sutartys 2561 ir 2562. Taip pat patikrinsime didžiausią išlaidų dalį — nežinomus tiekėjus.</p>
-            </div>
-
-            <div class="mcp-msg mcp-msg-ai">
-              <div class="mcp-tool"><span>↗↙</span> Used Viešpirkiai integration</div>
-              <p class="text-sm text-muted mb-0 px-1">Turiu pakankamai duomenų, kad galėčiau pateikti išsamią ataskaitą. Patikrinsiu dar vieną sutartį su el. paštu r*********@hotmail.com.</p>
-            </div>
-
-            <div class="mcp-msg mcp-msg-ai">
-              <div class="mcp-tool"><span>↗↙</span> Get sutartis</div>
-              <p class="text-sm text-muted mb-0 px-1">Dabar turiu išsamų vaizdą. Pateikiu analizę.</p>
-            </div>
-
-            <div class="mcp-msg mcp-msg-ai">
-              <div class="mcp-bubble mcp-bubble-ai">
-                <p class="text-xs text-muted mb-3 font-mono">PIRKĖJAS: NEMUNO AUŠRA (JAR 306660048)</p>
-
-                <div class="table-wrapper mb-3">
-                  <table>
-                    <tbody>
-                      <tr>
-                        <td colspan="2"><strong>Automobilio nuomos sutartis Nr. 2024/01</strong></td>
-                        <td><strong>31 501,70 €</strong></td>
-                      </tr>
-                      <tr>
-                        <td class="text-muted text-xs">Interesų konfliktas</td>
-                        <td class="text-muted text-xs">Tiekėjas</td>
-                        <td class="text-muted text-xs">Laikotarpis</td>
-                      </tr>
-                      <tr>
-                        <td></td>
-                        <td class="text-xs">Remigijus Žemaitaitis (fizinis asmuo)</td>
-                        <td class="text-xs">2024-01-17–2024-11-13</td>
-                      </tr>
-                      <tr>
-                        <td class="text-muted text-xs">Mėnesinis mokestis</td>
-                        <td class="text-muted text-xs">Tipas</td>
-                        <td></td>
-                      </tr>
-                      <tr>
-                        <td class="text-xs">3 176,47 €/mėn.</td>
-                        <td class="text-xs">Mažos vertės pirkimas (MVP)</td>
-                        <td></td>
-                      </tr>
-                    </tbody>
-                  </table>
+            {conversation.map((item) => (
+              item.type === 'user' ? (
+                <div class="mcp-msg mcp-msg-user">
+                  <div class="mcp-bubble mcp-bubble-user">
+                    {item.content}
+                  </div>
                 </div>
-
-                <p class="mb-3 text-xs">⚠ Partijos pirmininkas Remigijus Žemaitaitis sudarė sutartį su savo paties vadovaujama partija — jis yra vienu metu ir pirkėjo vadovas, ir paslaugos tiekėjas. El. paštas sutartyje: r*********@hotmail.com.</p>
-
-                <div class="table-wrapper mb-0">
-                  <table>
-                    <tbody>
-                      <tr>
-                        <td colspan="2"><strong>Automobilio nuomos sutartis Nr. 2024/02</strong></td>
-                        <td><strong>18 057,78 €</strong></td>
-                      </tr>
-                      <tr>
-                        <td class="text-muted text-xs">Susijusi sutartis</td>
-                        <td class="text-muted text-xs">Tiekėjas</td>
-                        <td class="text-muted text-xs">Laikotarpis</td>
-                      </tr>
-                      <tr>
-                        <td></td>
-                        <td class="text-xs">Daiva Petkevičienė (fizinis asmuo)</td>
-                        <td class="text-xs">2024-03-12–2024-11-13</td>
-                      </tr>
-                    </tbody>
-                  </table>
+              ) : item.type === 'ai-tool' ? (
+                <div class="mcp-msg mcp-msg-ai">
+                  <div class="mcp-tool"><span>↗↙</span> {item.tool}</div>
+                  <p class="text-sm text-muted mb-0 px-1">{item.content}</p>
                 </div>
-              </div>
-            </div>
+              ) : (
+                <div class="mcp-msg mcp-msg-ai">
+                  <div class="mcp-bubble mcp-bubble-ai">
+                    <p class="text-xs text-muted mb-3 font-mono">PIRKĖJAS: NEMUNO AUŠRA (JAR 306660048)</p>
 
+                    <div class="table-wrapper mb-3">
+                      <table>
+                        <tbody>
+                          <tr>
+                            <td colspan="2"><strong>Automobilio nuomos sutartis Nr. 2024/01</strong></td>
+                            <td><strong>31 501,70 €</strong></td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted text-xs">Interesų konfliktas</td>
+                            <td class="text-muted text-xs">Tiekėjas</td>
+                            <td class="text-muted text-xs">Laikotarpis</td>
+                          </tr>
+                          <tr>
+                            <td></td>
+                            <td class="text-xs">Remigijus Žemaitaitis (fizinis asmuo)</td>
+                            <td class="text-xs">2024-01-17–2024-11-13</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted text-xs">Mėnesinis mokestis</td>
+                            <td class="text-muted text-xs">Tipas</td>
+                            <td></td>
+                          </tr>
+                          <tr>
+                            <td class="text-xs">3 176,47 €/mėn.</td>
+                            <td class="text-xs">Mažos vertės pirkimas (MVP)</td>
+                            <td></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <p class="mb-3 text-xs">⚠ Partijos pirmininkas Remigijus Žemaitaitis sudarė sutartį su savo paties vadovaujama partija - jis yra vienu metu ir pirkėjo vadovas, ir paslaugos tiekėjas. El. paštas sutartyje: r*********@hotmail.com.</p>
+
+                    <div class="table-wrapper mb-0">
+                      <table>
+                        <tbody>
+                          <tr>
+                            <td colspan="2"><strong>Automobilio nuomos sutartis Nr. 2024/02</strong></td>
+                            <td><strong>18 057,78 €</strong></td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted text-xs">Susijusi sutartis</td>
+                            <td class="text-muted text-xs">Tiekėjas</td>
+                            <td class="text-muted text-xs">Laikotarpis</td>
+                          </tr>
+                          <tr>
+                            <td></td>
+                            <td class="text-xs">Daiva Petkevičienė (fizinis asmuo)</td>
+                            <td class="text-xs">2024-03-12–2024-11-13</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )
+            ))}
           </div>
         </div>
       </div>
@@ -300,26 +325,19 @@ const font = getFont(Astro.cookies);
       <div class="max-w-full">
         <p>Pridėkite šį MCP serverį:</p>
 
-        <div class="inline-flex border rounded-lg bg-light max-w-full mb-4">
-          <code class="px-4 py-3 border-none bg-transparent overflow-auto">https://viespirkiai.org/mcp</code>
-          <button id="mcpCopyUrlBtn" class="btn btn-primary rounded-0 border-0 border-l-border rounded-r-lg" type="button">Kopijuoti URL</button>
+        <div class="mb-4">
+          <CopyField value={mcpUrl} buttonId="mcpCopyUrlBtnSetup" buttonLabel="Kopijuoti URL" />
         </div>
 
         <p>arba konfigūraciją:</p>
 
         <div>
-          <div class="border rounded-lg overflow-hidden min-w-70">
-            <div class="bg-light px-4 py-2 border-b flex items-center justify-between">
-              <span class="text-xs text-muted font-mono">.mcp.json</span>
-              <button id="mcpCopyConfigBtn" class="btn btn-secondary btn-sm" type="button">Kopijuoti</button>
-            </div>
-            <pre class="m-0 border-0 rounded-0 text-sm"><code>{`{
-  "servers": {
-    "viespirkiai": {
-      "url": "https://viespirkiai.org/mcp"
-    }
-  }
-}`}</code></pre>
+            <div class="border rounded-lg overflow-hidden min-w-70">
+              <div class="bg-light px-4 py-2 border-b flex items-center justify-between">
+                <span class="text-xs text-muted font-mono">.mcp.json</span>
+                <button id="mcpCopyConfigBtn" class="btn btn-secondary btn-sm" type="button">Kopijuoti</button>
+              </div>
+            <pre class="m-0 border-0 rounded-0 text-sm"><code>{mcpConfig}</code></pre>
           </div>
         </div>
       </div>
@@ -351,15 +369,15 @@ const font = getFont(Astro.cookies);
 
     <script is:inline>
       (function () {
-        const copyUrlBtn = document.getElementById('mcpCopyUrlBtn');
+        const copyUrlBtns = Array.from(document.querySelectorAll('[id^="mcpCopyUrlBtn"]'));
         const copyConfigBtn = document.getElementById('mcpCopyConfigBtn');
-        if (copyUrlBtn) {
-          copyUrlBtn.addEventListener('click', async function () {
+        copyUrlBtns.forEach((button) => {
+          button.addEventListener('click', async function () {
             await navigator.clipboard.writeText('https://viespirkiai.org/mcp');
-            copyUrlBtn.textContent = '✓ Nukopijuota';
-            setTimeout(() => { copyUrlBtn.textContent = 'Kopijuoti URL'; }, 1500);
+            button.textContent = '✓ Nukopijuota';
+            setTimeout(() => { button.textContent = 'Kopijuoti URL'; }, 1500);
           });
-        }
+        });
         if (copyConfigBtn) {
           copyConfigBtn.addEventListener('click', async function () {
             const configText = this.closest('div').nextElementSibling.textContent.trim();

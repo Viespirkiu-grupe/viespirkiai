@@ -2,9 +2,55 @@
 import Layout from '../layouts/Layout.astro';
 import { getColorScheme, getFont } from '../lib/failai.js';
 import SignalQr from '../components/SignalQr.astro';
+import ContactMethodList from '../components/content/ContactMethodList.astro';
+import StepList from '../components/content/StepList.astro';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
+
+const socialContacts = [
+  {
+    title: 'Signal',
+    description: 'Privatumą gerbianti pokalbių programėlė.',
+    valueHtml: '<a href="https://signal.me/#eu/owm5rTu2SjNCZifQAxmJO9yW95ImS1c7jxI5b07r-ZWtW7waKAhBZohZKhTmTZts">@viespirkiai.52</a>',
+  },
+  {
+    title: 'Mastodon',
+    description: 'Decentralizuotas ir vartotojų valdomas socialinis tinklas.',
+    valueHtml: '<a href="https://river.group.lt/@viespirkiai">@viespirkiai@river.group.lt</a>',
+  },
+  {
+    title: 'Matrix',
+    description: 'Decentralizuota ir šifruota pokalbių platforma.',
+    valueHtml: '<code>@viespirkiai:group.lt</code>',
+  },
+];
+
+const informationAccuracySteps = [
+  {
+    title: 'Patikrinti originalų informacijos šaltinį',
+    body: ['Jį rasite <a href="/duomenys#duomenu-saltiniai">duomenų puslapyje</a>. Jeigu tai yra sutarties duomenys ar failai - žr. <a href="https://eviesiejipirkimai.lt">CVP IS</a>.'],
+  },
+  {
+    title: 'Susisiekti su atsakingu už originalų informacijos šaltinį',
+    body: ['Jeigu informacija yra neteisinga duomenų šaltinyje, ji privalo būti ištaisyta ten. Viešųjų pirkimų sutarčių atveju jums pagelbės perkančioji organizacija arba Viešųjų pirkimų tarnyba - <a href="mailto:pagalba@vpt.lt">pagalba@vpt.lt</a>.'],
+  },
+  {
+    title: 'Susisiekti su Viešpirkių iniciatyva',
+    body: [
+      'Susisiekite su mūsų iniciatyva bendruoju elektroninio pašto adresu - <a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a>.',
+      'Esant tvirtam pagrindui pakeitimus atliksime iš karto, tačiau jeigu duomenų tiekėjas veiksmų nesiims pasiliekame teisę informaciją sugąžinti į tokią situaciją kokioje ji jau buvo.',
+    ],
+    mutedHtml: 'Aiškiai klaidingi, melagingi, neaiškūs, nekonkretūs, nepagrįsti, nesuprantamai parašyti (pvz. ne lietuvių ar anglų kalba) bei visi jiems panašūs pranešimai nėra nagrinėjami.',
+  },
+  {
+    title: 'Pranešti paieškos sistemoms apie pakeitimus',
+    body: [
+      'Paieškos sistemos svetainių turinį indeksuoja savarankiškai, o automatiniai atnaujinimai dažnai užtrunka itin ilgai. Jeigu matote, kad neteisinga informacija atvaizduojama ir paieškos sistemos rezultatuose, nors puslapis buvo atnaujintas arba panaikintas, praneškite joms.',
+      'Jei tai yra Google - pasinaudokite įrankiu <a href="https://search.google.com/search-console/remove-outdated-content">Remove outdated content</a>.',
+    ],
+  },
+];
 ---
 <Layout
   pageTitle="Kontaktai"
@@ -52,18 +98,7 @@ hkEtHhWmsNS3eDj4F/NL1rkkdNt+ChsBfaZxkOn11gA=
 
       <section>
         <SignalQr />
-
-        <h2>Signal</h2>
-        <p class="text-muted text-sm">Privatumą gerbianti pokalbių programėlė.</p>
-        <p><a href="https://signal.me/#eu/owm5rTu2SjNCZifQAxmJO9yW95ImS1c7jxI5b07r-ZWtW7waKAhBZohZKhTmTZts">@viespirkiai.52</a></p>
-
-        <h2 class="mt-7">Mastodon</h2>
-        <p class="text-muted text-sm">Decentralizuotas ir vartotojų valdomas socialinis tinklas.</p>
-        <p><a href="https://river.group.lt/@viespirkiai">@viespirkiai@river.group.lt</a></p>
-
-        <h2 class="mt-7">Matrix</h2>
-        <p class="text-muted text-sm">Decentralizuota ir šifruota pokalbių platforma.</p>
-        <p><code>@viespirkiai:group.lt</code></p>
+        <ContactMethodList items={socialContacts} />
       </section>
     </div>
 
@@ -74,28 +109,7 @@ hkEtHhWmsNS3eDj4F/NL1rkkdNt+ChsBfaZxkOn11gA=
     <section id="informacijosTikslumas">
       <h3>Informacijos tikslumas / pašalinimai</h3>
       <p>Primename, kad informaciją renkame iš viešųjų šaltinių, tačiau pasitaiko atvejų kai duomenys atsilieka, būna klaidingi arba neturėjo būti paviešinti, tada jums reikia:</p>
-
-      <ol class="mt-4">
-        <li class="mb-4">
-          <h4>Patikrinti originalų informacijos šaltinį</h4>
-          <p>Jį rasite <a href="/duomenys#duomenu-saltiniai">duomenų puslapyje</a>. Jeigu tai yra sutarties duomenys ar failai - žr. <a href="https://eviesiejipirkimai.lt">CVP IS</a>.</p>
-        </li>
-        <li class="mb-4">
-          <h4>Susisiekti su atsakingu už originalų informacijos šaltinį</h4>
-          <p>Jeigu informacija yra neteisinga duomenų šaltinyje, ji privalo būti ištaisyta ten. Viešųjų pirkimų sutarčių atveju jums pagelbės perkančioji organizacija arba Viešųjų pirkimų tarnyba - <a href="mailto:pagalba@vpt.lt">pagalba@vpt.lt</a>.</p>
-        </li>
-        <li class="mb-4">
-          <h4>Susisiekti su Viešpirkių iniciatyva</h4>
-          <p>Susisiekite su mūsų iniciatyva bendruoju elektroninio pašto adresu - <a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a>.</p>
-          <p>Esant tvirtam pagrindui pakeitimus atliksime iš karto, tačiau jeigu duomenų tiekėjas veiksmų nesiims pasiliekame teisę informaciją sugąžinti į tokią situaciją kokioje ji jau buvo.</p>
-          <p class="text-muted text-sm"><em>Aiškiai klaidingi, melagingi, neaiškūs, nekonkretūs, nepagrįsti, nesuprantamai parašyti (pvz. ne lietuvių ar anglų kalba) bei visi jiems panašūs pranešimai nėra nagrinėjami.</em></p>
-        </li>
-        <li class="mb-4">
-          <h4>Pranešti paieškos sistemoms apie pakeitimus</h4>
-          <p>Paieškos sistemos svetainių turinį indeksuoja savarankiškai, o automatiniai atnaujinimai dažnai užtrunka itin ilgai. Jeigu matote, kad neteisinga informacija atvaizduojama ir paieškos sistemos rezultatuose, nors puslapis buvo atnaujintas arba panaikintas, praneškite joms.</p>
-          <p>Jei tai yra Google - pasinaudokite įrankiu <a href="https://search.google.com/search-console/remove-outdated-content">Remove outdated content</a>.</p>
-        </li>
-      </ol>
+      <StepList items={informationAccuracySteps} />
     </section>
   </main>
 </Layout>

@@ -1,0 +1,41 @@
+---
+interface SourceLink {
+  href: string;
+  label: string;
+  badge?: string;
+  suffixHtml?: string;
+}
+
+interface SourceItem {
+  title: string;
+  links: SourceLink[];
+}
+
+interface Props {
+  title: string;
+  items: SourceItem[];
+  titleTag?: 'h2' | 'h3';
+}
+
+const { title, items, titleTag = 'h3' } = Astro.props;
+const TitleTag = titleTag;
+---
+
+<section class="space-y-4">
+  <TitleTag>{title}</TitleTag>
+
+  {items.map((item) => (
+    <div class="subsection">
+      <h4>{item.title}</h4>
+
+      {item.links.map((link, index) => (
+        <>
+          {index > 0 && <br />}
+          <a href={link.href}>{link.label}</a>
+          {link.badge && <span class="badge badge-muted ml-2">{link.badge}</span>}
+          {link.suffixHtml && <Fragment set:html={` ${link.suffixHtml}`} />}
+        </>
+      ))}
+    </div>
+  ))}
+</section>

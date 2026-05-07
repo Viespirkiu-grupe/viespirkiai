@@ -1,0 +1,89 @@
+---
+import FilterGroup from '../filters/FilterGroup.astro';
+import DateRangeFilter from '../filters/DateRangeFilter.astro';
+import NumberRangeFilter from '../filters/NumberRangeFilter.astro';
+import SortFilter from '../filters/SortFilter.astro';
+import TextInput from '../inputs/TextInput.astro';
+import NumberInput from '../inputs/NumberInput.astro';
+import CheckboxInput from '../inputs/CheckboxInput.astro';
+
+interface SortOption {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  values: Record<string, string | number | undefined>;
+  sortOptions: SortOption[];
+}
+
+const { values, sortOptions } = Astro.props;
+
+const bvpzOptions = [
+  { value: '48 72', label: 'Informacinės technologijos' },
+  { value: '3360 3361 3362 3363 3364 3365 3366 3367 33690 33691', label: 'Vaistai' },
+];
+const bvpzCurrent = values['bvpzPrefiksas'];
+---
+
+<div class="search-filters-grid">
+  <FilterGroup legend="Dalyviai">
+    <TextInput label="Pirkėjo kodas" name="perkanciosiosOrganizacijosKodas" placeholder="Nenurodyta" values={values} />
+    <TextInput label="Tiekėjo kodas" name="tiekejoKodas" placeholder="Nenurodyta" values={values} />
+  </FilterGroup>
+
+  <DateRangeFilter
+    legend="Laikotarpis"
+    nameFrom="sudarymoDataNuo"
+    nameTo="sudarymoDataIki"
+    labelFrom="Sudaryta nuo"
+    labelTo="Sudaryta iki"
+    values={values}
+  />
+
+  <NumberRangeFilter
+    legend="Vertė"
+    nameFrom="verteNuo"
+    nameTo="verteIki"
+    labelFrom="Vertė nuo"
+    labelTo="Vertė iki"
+    placeholderFrom="0 €"
+    placeholderTo="∞ €"
+    values={values}
+  />
+
+  <FilterGroup legend="Klasifikacija">
+    <div class="form-group">
+      <label class="form-label flex justify-between" for="bvpzPrefiksas">
+        <span>BVPŽ prefiksas <sup>1</sup></span>
+        <a href="/bvpz" class="text-sm">Žr. BVPŽ</a>
+      </label>
+      <select name="bvpzPrefiksas" id="bvpzPrefiksas" class="form-control">
+        <option value="" selected={!bvpzCurrent || bvpzCurrent === 'kitas'}>Visi / nurodytas žemiau</option>
+        {bvpzOptions.map(opt => (
+          <option value={opt.value} selected={bvpzCurrent === opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-muted text-xs"><em>arba</em></span>
+    </div>
+    <div class="form-group">
+      <input type="text" class="form-control" name="bvpzPrefiksasKitas" id="bvpzPrefiksasKitas" value={values['bvpzPrefiksasKitas'] || ''} placeholder="Nenurodyta" />
+    </div>
+  </FilterGroup>
+
+  <FilterGroup legend="Identifikatoriai">
+    <NumberInput label="Unikalus ID" name="sutartiesUnikalusID" placeholder="Nenurodyta" values={values} />
+    <TextInput label="Sut. numeris" name="sutartiesNumeris" placeholder="Nenurodyta" values={values} />
+    <TextInput label="Pirkimo numeris" name="pirkimoNumeris" placeholder="Nenurodyta" values={values} />
+  </FilterGroup>
+
+  <SortFilter options={sortOptions} values={values} />
+
+  <FilterGroup legend="Filtrai" class="justify-start">
+    <CheckboxInput name="tikSuDokumentais" label="Tik su dokumentais" values={values} />
+    <CheckboxInput name="ignoruotiSp" label="Nerodyti pakeitimų (SP)" values={values} />
+  </FilterGroup>
+</div>
+<p class="text-muted text-xs mt-7"><sup>1</sup> Veikia tik ne tekstinėse paieškose</p>

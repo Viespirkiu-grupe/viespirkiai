@@ -26,6 +26,7 @@ const tailwindCssBuster = createHash('md5').update(new Uint8Array(readFileSync('
 <html lang="lt" class={colorScheme === 'dark' ? 'dark' : ''}>
 <head>
   <meta charset="UTF-8" />
+  <link rel="stylesheet" href={`/dist/tailwind.css?v=${tailwindCssBuster}`}>
   <meta name="color-scheme" content="dark light">
   <meta data-font={font}>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -80,7 +81,6 @@ const tailwindCssBuster = createHash('md5').update(new Uint8Array(readFileSync('
   </script>
 
   {customHead && <Fragment set:html={customHead} />}
-  <link rel="stylesheet" href={`/dist/tailwind.css?v=${tailwindCssBuster}`}>
 </head>
 <body>
   <Header pathname={Astro.url.pathname} colorScheme={colorScheme} />

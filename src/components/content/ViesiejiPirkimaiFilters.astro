@@ -1,0 +1,91 @@
+---
+import FilterGroup from '../filters/FilterGroup.astro';
+import DateRangeFilter from '../filters/DateRangeFilter.astro';
+import NumberRangeFilter from '../filters/NumberRangeFilter.astro';
+import SortFilter from '../filters/SortFilter.astro';
+import TextInput from '../inputs/TextInput.astro';
+import { STATUSAS, PIRKIMO_BUDAS } from '@/modules/viesiejiPirkimai/viesiejiPirkimaiEnums.js';
+
+interface Props {
+  values: Record<string, string | number | undefined>;
+}
+
+const { values } = Astro.props;
+
+const sortOptions = [
+  { value: 'paskelbimoData', label: 'Paskelbimo data' },
+  { value: 'pasiulymuPateikimoTerminas', label: 'Pasiūlymų terminas' },
+  { value: 'numatomaBendraPirkimoVerte', label: 'Vertė' },
+];
+---
+
+<div class="search-filters-grid">
+  <FilterGroup legend="Pirkimas">
+    <TextInput label="Vykdytojo kodas" name="pvJarKodas" placeholder="Nenurodyta" values={values} />
+    <TextInput label="Pirkimo ID" name="pirkimoId" placeholder="Nenurodyta" values={values} />
+  </FilterGroup>
+
+  <DateRangeFilter
+    legend="Paskelbimo data"
+    nameFrom="paskelbimoDataNuo"
+    nameTo="paskelbimoDataIki"
+    labelFrom="Paskelbta nuo"
+    labelTo="Paskelbta iki"
+    values={values}
+  />
+
+  <DateRangeFilter
+    legend="Pasiūlymų terminas"
+    nameFrom="pasiulymuTerminasNuo"
+    nameTo="pasiulymuTerminasIki"
+    labelFrom="Terminas nuo"
+    labelTo="Terminas iki"
+    values={values}
+  />
+
+  <NumberRangeFilter
+    legend="Numatoma vertė"
+    nameFrom="verteNuo"
+    nameTo="verteIki"
+    labelFrom="Numatoma vertė nuo"
+    labelTo="Numatoma vertė iki"
+    placeholderFrom="0 €"
+    placeholderTo="∞ €"
+    values={values}
+  />
+
+  <FilterGroup legend="Klasifikacija">
+    <div class="form-group">
+      <label class="form-label" for="pirkimoBudas">Pirkimo būdas</label>
+      <select name="pirkimoBudas" id="pirkimoBudas" class="form-control">
+        <option value="" selected={!values['pirkimoBudas']}>Visi</option>
+        {Object.entries(PIRKIMO_BUDAS).map(([key, label]) => (
+          <option value={key} selected={values['pirkimoBudas'] === key}>{label as string}</option>
+        ))}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="statusas">Statusas</label>
+      <select name="statusas" id="statusas" class="form-control">
+        <option value="" selected={!values['statusas']}>Visi</option>
+        {Object.entries(STATUSAS).map(([key, label]) => (
+          <option value={key} selected={values['statusas'] === key}>{label as string}</option>
+        ))}
+      </select>
+    </div>
+  </FilterGroup>
+
+  <SortFilter
+    options={sortOptions}
+    values={values}
+    defaultValue="paskelbimoData"
+    includeBlank={false}
+  />
+
+  <FilterGroup legend="Kodai" class="justify-start">
+    <div>
+      <TextInput label="BVPŽ prefiksai" name="bvpzPrefiksai" placeholder="Visi" values={values} />
+      <a href="/bvpz" class="text-sm">Žr. BVPŽ</a>
+    </div>
+  </FilterGroup>
+</div>
