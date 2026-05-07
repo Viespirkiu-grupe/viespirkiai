@@ -1,16 +1,19 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 import Graph from 'graphology';
 
-import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from '../../src/rysiai/graph-utils.js';
-import { LegendState } from '../../src/rysiai/legend-state.js';
-import { ENTITY_TYPE } from '../../src/rysiai/entity-types.js';
+import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from '@/src/rysiai/graph-utils.ts';
+import { LegendState } from '@/src/rysiai/legend-state.ts';
+import { ENTITY_TYPE } from '@/src/rysiai/entity-types.ts';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import noverlap from 'graphology-layout-noverlap';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-function orgNodeData(id, label) {
+type NodeData = { id: string; attributes: Record<string, unknown> };
+type EdgeData = { id: string; source: string; target: string; attributes: Record<string, unknown> };
+
+function orgNodeData(id: string, label: string): NodeData {
     return {
         id,
         attributes: {
@@ -25,7 +28,7 @@ function orgNodeData(id, label) {
     };
 }
 
-function personNodeData(id, label) {
+function personNodeData(id: string, label: string): NodeData {
     return {
         id,
         attributes: {
@@ -39,7 +42,7 @@ function personNodeData(id, label) {
     };
 }
 
-function contractNodeData(id, label) {
+function contractNodeData(id: string, label: string): NodeData {
     return {
         id,
         attributes: {
@@ -53,14 +56,14 @@ function contractNodeData(id, label) {
     };
 }
 
-function edgeData(source, target, type, label) {
+function edgeData(source: string, target: string, type: string, label: string): EdgeData {
     return { id: `edge:${source}:${target}:${type}`, source, target, attributes: { type, label: label || '' } };
 }
 
 // ── mergeGraphElements ────────────────────────────────────────────────────────
 
 describe('mergeGraphElements', () => {
-    let graph;
+    let graph: Graph;
     const noPos = () => null;
 
     beforeEach(() => {
@@ -81,7 +84,7 @@ describe('mergeGraphElements', () => {
 
     it('scatters new nodes around fromNodeId position', () => {
         graph.addNode('org:000', { x: 100, y: 200, size: 8, color: '#000', label: 'Root' });
-        const getPos = (id) => graph.hasNode(id) ? graph.getNodeAttributes(id) : null;
+        const getPos = (id: string) => graph.hasNode(id) ? graph.getNodeAttributes(id) as { x: number; y: number } : null;
         mergeGraphElements(graph, getPos, { nodes: [orgNodeData('org:111', 'Child')] }, 'org:000');
         const child = graph.getNodeAttributes('org:111');
         const dist = Math.hypot(child.x - 100, child.y - 200);
@@ -210,22 +213,22 @@ describe('runLayout', () => {
 // ── rebuildViewGraph ──────────────────────────────────────────────────────────
 
 describe('rebuildViewGraph', () => {
-    let dataGraph, viewGraph;
+    let dataGraph: Graph, viewGraph: Graph;
 
     // isEdgeHidden predicate that hides a fixed set of types (global, no per-node config)
-    const mkHidden = (types) => { const s = new Set(types); return (src, tgt, type) => s.has(type); };
+    const mkHidden = (types: string[]) => { const s = new Set(types); return (src: string, tgt: string, type: string) => s.has(type); };
     const noneHidden = () => false;
 
-    function addOrg(g, id, expanded = false) {
+    function addOrg(g: Graph, id: string, expanded = false) {
         g.addNode(id, { entityType: ENTITY_TYPE.Org, expanded, x: 1, y: 2, size: 8, color: '#000', label: id });
     }
-    function addPerson(g, id, expanded = false) {
+    function addPerson(g: Graph, id: string, expanded = false) {
         g.addNode(id, { entityType: ENTITY_TYPE.Person, expanded, x: 1, y: 2, size: 8, color: '#000', label: id });
     }
-    function addContract(g, id) {
+    function addContract(g: Graph, id: string) {
         g.addNode(id, { entityType: ENTITY_TYPE.Contract, expanded: true, x: 1, y: 2, size: 8, color: '#000', label: id });
     }
-    function addEdge(g, src, tgt, type) {
+    function addEdge(g: Graph, src: string, tgt: string, type: string) {
         g.addEdgeWithKey(`e:${src}:${tgt}:${type}`, src, tgt, { edgeType: type, color: '#ccc' });
     }
 
@@ -596,7 +599,7 @@ describe('syncPositionsToData', () => {
 
 // ── computeNodeSize ───────────────────────────────────────────────────────────
 
-import { computeNodeSize } from '../../src/rysiai/graph-utils.js';
+import { computeNodeSize } from '../../src/rysiai/graph-utils.ts';
 
 describe('computeNodeSize', function () {
     it('returns 8 for a person node regardless of other attrs', function () {
@@ -639,7 +642,7 @@ describe('computeNodeSize', function () {
 // ── mergeGraphElements — contract edge type remapping ────────────────────────
 
 describe('mergeGraphElements — contract edge type remapping', () => {
-    let graph;
+    let graph: Graph;
     const noPos = () => null;
 
     beforeEach(() => {
@@ -648,7 +651,7 @@ describe('mergeGraphElements — contract edge type remapping', () => {
         graph.addNode('contract:x', { x: 10, y: 0, size: 8, color: '#000', label: 'x' });
     });
 
-    function contractEdge(type, size) {
+    function contractEdge(type: string, size: number): EdgeData {
         return { id: `edge:org:A:contract:x:${type}`, source: 'org:A', target: 'contract:x', attributes: { type, label: '', size } };
     }
 
@@ -686,20 +689,20 @@ describe('mergeGraphElements — contract edge type remapping', () => {
 // ── rebuildViewGraph — contract size edge type filtering ──────────────────────
 
 describe('rebuildViewGraph — contract size edge type filtering', () => {
-    let dataGraph, viewGraph;
+    let dataGraph: Graph, viewGraph: Graph;
 
     beforeEach(() => {
         dataGraph = new Graph({ type: 'directed', multi: true });
         viewGraph = new Graph({ type: 'directed', multi: true });
     });
 
-    function addOrg(g, id, expanded = false) {
+    function addOrg(g: Graph, id: string, expanded = false) {
         g.addNode(id, { entityType: ENTITY_TYPE.Org, expanded, x: 1, y: 2, size: 8, color: '#000', label: id });
     }
-    function addContract(g, id) {
+    function addContract(g: Graph, id: string) {
         g.addNode(id, { entityType: ENTITY_TYPE.Contract, expanded: true, x: 1, y: 2, size: 8, color: '#000', label: id });
     }
-    function addContractEdge(g, src, tgt, edgeType) {
+    function addContractEdge(g: Graph, src: string, tgt: string, edgeType: string) {
         g.addEdgeWithKey(`e:${src}:${tgt}:${edgeType}`, src, tgt, { edgeType, color: '#ccc' });
     }
 
@@ -873,7 +876,7 @@ describe('rebuildViewGraph — size sync for already-visible nodes', function ()
 // ── mergeGraphElements — rootNodeId parameter ─────────────────────────────────
 
 describe('mergeGraphElements — rootNodeId', () => {
-    let graph;
+    let graph: Graph;
     const noPos = () => null;
 
     beforeEach(() => {
@@ -913,7 +916,7 @@ describe('mergeGraphElements — rootNodeId', () => {
 // ── collapseGraphData ─────────────────────────────────────────────────────────
 
 describe('collapseGraphData', () => {
-    let dataGraph;
+    let dataGraph: Graph;
     const noPos = () => null;
 
     beforeEach(() => {
@@ -970,7 +973,7 @@ describe('collapseGraphData', () => {
 // ── collapse + rebuildViewGraph integration ───────────────────────────────────
 
 describe('collapse + rebuildViewGraph integration', () => {
-    let dataGraph, viewGraph;
+    let dataGraph: Graph, viewGraph: Graph;
     const noPos = () => null;
     const neverHide = () => false;
 
@@ -1048,17 +1051,17 @@ describe('collapse + rebuildViewGraph integration', () => {
 // ── computeEdgeCounts ─────────────────────────────────────────────────────────
 
 describe('computeEdgeCounts', () => {
-    let g;
+    let g: Graph;
     beforeEach(() => { g = new Graph({ type: 'directed', multi: true }); });
 
     it('returns empty map for a missing node', () => {
-        const { byType } = computeEdgeCounts(g, 'org:x');
+        const byType = computeEdgeCounts(g, 'org:x');
         assert.equal(byType.size, 0);
     });
 
     it('returns empty map for a node with no edges', () => {
         g.addNode('org:x', {});
-        const { byType } = computeEdgeCounts(g, 'org:x');
+        const byType = computeEdgeCounts(g, 'org:x');
         assert.equal(byType.size, 0);
     });
 
@@ -1066,7 +1069,7 @@ describe('computeEdgeCounts', () => {
         g.addNode('org:a', {}); g.addNode('person:1', {}); g.addNode('person:2', {});
         g.addEdgeWithKey('e1', 'person:1', 'org:a', { edgeType: 'Director' });
         g.addEdgeWithKey('e2', 'person:2', 'org:a', { edgeType: 'Director' });
-        const { byType } = computeEdgeCounts(g, 'org:a');
+        const byType = computeEdgeCounts(g, 'org:a');
         assert.equal(byType.get('Director'), 2);
         assert.equal(byType.get('Shareholder'), undefined);
     });
@@ -1075,7 +1078,7 @@ describe('computeEdgeCounts', () => {
         g.addNode('org:a', {}); g.addNode('person:1', {}); g.addNode('person:2', {});
         g.addEdgeWithKey('e1', 'person:1', 'org:a', { edgeType: 'Director' });
         g.addEdgeWithKey('e2', 'person:2', 'org:a', { edgeType: 'Shareholder' });
-        const { byType } = computeEdgeCounts(g, 'org:a');
+        const byType = computeEdgeCounts(g, 'org:a');
         assert.equal(byType.get('Director'), 1);
         assert.equal(byType.get('Shareholder'), 1);
     });
@@ -1085,7 +1088,7 @@ describe('computeEdgeCounts', () => {
         g.addEdgeWithKey('e1', 'org:a', 'contract:1', { edgeType: 'ContractSmall' });
         g.addEdgeWithKey('e2', 'org:a', 'contract:2', { edgeType: 'ContractMedium' });
         g.addEdgeWithKey('e3', 'org:a', 'contract:3', { edgeType: 'ContractLarge' });
-        const { byType } = computeEdgeCounts(g, 'org:a');
+        const byType = computeEdgeCounts(g, 'org:a');
         assert.equal(byType.get('ContractSmall'), 1);
         assert.equal(byType.get('ContractMedium'), 1);
         assert.equal(byType.get('ContractLarge'), 1);
@@ -1095,7 +1098,7 @@ describe('computeEdgeCounts', () => {
         g.addNode('org:a', {}); g.addNode('contract:1', {}); g.addNode('contract:2', {});
         g.addEdgeWithKey('e1', 'org:a', 'contract:1', { edgeType: 'ContractMedium' });
         g.addEdgeWithKey('e2', 'org:a', 'contract:2', { edgeType: 'ContractMedium' });
-        const { byType } = computeEdgeCounts(g, 'org:a');
+        const byType = computeEdgeCounts(g, 'org:a');
         assert.equal(byType.get('ContractMedium'), 2);
         assert.equal(byType.get('ContractSmall'), undefined);
         assert.equal(byType.get('ContractLarge'), undefined);
@@ -1104,16 +1107,82 @@ describe('computeEdgeCounts', () => {
     it('does not count edges not incident to the queried node', () => {
         g.addNode('org:a', {}); g.addNode('org:b', {}); g.addNode('org:c', {});
         g.addEdgeWithKey('e1', 'org:b', 'org:c', { edgeType: 'Director' });
-        const { byType } = computeEdgeCounts(g, 'org:a');
+        const byType = computeEdgeCounts(g, 'org:a');
         assert.equal(byType.size, 0);
     });
 
-    it('counts both outgoing and incoming edges', () => {
+    it('counts both outgoing and incoming edges to different neighbors', () => {
         g.addNode('org:a', {}); g.addNode('org:b', {}); g.addNode('org:c', {});
         g.addEdgeWithKey('e1', 'org:a', 'org:b', { edgeType: 'ContractSmall' });
         g.addEdgeWithKey('e2', 'org:c', 'org:a', { edgeType: 'ContractLarge' });
-        const { byType } = computeEdgeCounts(g, 'org:a');
+        const byType = computeEdgeCounts(g, 'org:a');
         assert.equal(byType.get('ContractSmall'), 1);
         assert.equal(byType.get('ContractLarge'), 1);
+    });
+
+    it('SPOUSE REGRESSION: bidirectional Spouse edges between same pair count as 1', () => {
+        // Real-world scenario: both persons expanded from hash routing.
+        // Alenas's expansion adds alenas→toma:Spouse.
+        // Toma's expansion adds toma→alenas:Spouse.
+        // Both are in the graph; legend for Alenas should show Spouse (1), not (2).
+        g.addNode('person:alenas bulauskis', {});
+        g.addNode('person:toma bulauskienė', {});
+        g.addEdgeWithKey(
+            'edge:person:alenas bulauskis:person:toma bulauskienė:Spouse',
+            'person:alenas bulauskis', 'person:toma bulauskienė',
+            { edgeType: 'Spouse' }
+        );
+        g.addEdgeWithKey(
+            'edge:person:toma bulauskienė:person:alenas bulauskis:Spouse',
+            'person:toma bulauskienė', 'person:alenas bulauskis',
+            { edgeType: 'Spouse' }
+        );
+        const byType = computeEdgeCounts(g, 'person:alenas bulauskis');
+        assert.equal(byType.get('Spouse'), 1, 'bidirectional Spouse pair must count as 1');
+    });
+
+    it('SPOUSE REGRESSION: legend for toma also shows 1, not 2', () => {
+        g.addNode('person:alenas bulauskis', {});
+        g.addNode('person:toma bulauskienė', {});
+        g.addEdgeWithKey(
+            'edge:person:alenas bulauskis:person:toma bulauskienė:Spouse',
+            'person:alenas bulauskis', 'person:toma bulauskienė',
+            { edgeType: 'Spouse' }
+        );
+        g.addEdgeWithKey(
+            'edge:person:toma bulauskienė:person:alenas bulauskis:Spouse',
+            'person:toma bulauskienė', 'person:alenas bulauskis',
+            { edgeType: 'Spouse' }
+        );
+        const byType = computeEdgeCounts(g, 'person:toma bulauskienė');
+        assert.equal(byType.get('Spouse'), 1, 'bidirectional Spouse pair must count as 1 from toma side too');
+    });
+
+    it('Director edges from different persons to same org still count separately', () => {
+        // Dedup must not merge edges between DIFFERENT pairs even for the same type
+        g.addNode('org:a', {}); g.addNode('person:1', {}); g.addNode('person:2', {}); g.addNode('person:3', {});
+        g.addEdgeWithKey('e1', 'person:1', 'org:a', { edgeType: 'Director' });
+        g.addEdgeWithKey('e2', 'person:2', 'org:a', { edgeType: 'Director' });
+        g.addEdgeWithKey('e3', 'person:3', 'org:a', { edgeType: 'Director' });
+        const byType = computeEdgeCounts(g, 'org:a');
+        assert.equal(byType.get('Director'), 3, 'three different persons → three Director edges');
+    });
+
+    it('same person with Director and Employment edges to same org counts each type once', () => {
+        g.addNode('person:a', {}); g.addNode('org:b', {});
+        g.addEdgeWithKey('e1', 'person:a', 'org:b', { edgeType: 'Director' });
+        g.addEdgeWithKey('e2', 'person:a', 'org:b', { edgeType: 'Employment' });
+        const byType = computeEdgeCounts(g, 'person:a');
+        assert.equal(byType.get('Director'), 1);
+        assert.equal(byType.get('Employment'), 1);
+    });
+
+    it('same-type edges to different neighbors are not collapsed', () => {
+        // person has Spouse edges to two different people (unusual but must count correctly)
+        g.addNode('person:a', {}); g.addNode('person:b', {}); g.addNode('person:c', {});
+        g.addEdgeWithKey('e1', 'person:a', 'person:b', { edgeType: 'Spouse' });
+        g.addEdgeWithKey('e2', 'person:a', 'person:c', { edgeType: 'Spouse' });
+        const byType = computeEdgeCounts(g, 'person:a');
+        assert.equal(byType.get('Spouse'), 2, 'edges to different neighbors must both count');
     });
 });

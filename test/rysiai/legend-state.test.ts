@@ -1,11 +1,11 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
-import { LegendState } from '../../src/rysiai/legend-state.js';
+import { LegendState } from '@/src/rysiai/legend-state.ts';
 
 // ── LegendState ───────────────────────────────────────────────────────────────
 
 describe('LegendState — global state', () => {
-    let ls;
+    let ls: LegendState;
     beforeEach(() => { ls = new LegendState(); });
 
     it('Official is hidden by default', () => {
@@ -34,7 +34,7 @@ describe('LegendState — global state', () => {
 // ── initNode ──────────────────────────────────────────────────────────────────
 
 describe('LegendState — initNode', () => {
-    let ls;
+    let ls: LegendState;
     beforeEach(() => { ls = new LegendState(); });
 
     it('node has no config before initNode', () => {
@@ -79,7 +79,7 @@ describe('LegendState — initNode', () => {
 // ── setTypeVisible / isTypeVisible ────────────────────────────────────────────
 
 describe('LegendState — setTypeVisible / isTypeVisible', () => {
-    let ls;
+    let ls: LegendState;
     beforeEach(() => { ls = new LegendState(); });
 
     it('setTypeVisible(false) hides type for node', () => {
@@ -117,7 +117,7 @@ describe('LegendState — setTypeVisible / isTypeVisible', () => {
 // ── isEdgeHidden ──────────────────────────────────────────────────────────────
 
 describe('LegendState — isEdgeHidden', () => {
-    let ls;
+    let ls: LegendState;
     beforeEach(() => { ls = new LegendState(); });
 
     it('both unconfigured → uses global (Official hidden)', () => {
@@ -163,21 +163,30 @@ describe('LegendState — isEdgeHidden', () => {
         assert.equal(ls.isEdgeHidden('org:A', 'person:b', 'Director'), true);
     });
 
-    it('both configured: source hides, target shows → edge hidden (hide takes priority)', () => {
+    it('both configured: source hides, target shows → edge visible (any-visible-wins)', () => {
         ls.initNode('org:A');
         ls.setTypeVisible('org:A', 'Director', false); // org:A hides Director
         ls.initNode('person:b');
         // person:b has Director visible (default after initNode)
         assert.equal(ls.isTypeVisible('person:b', 'Director'), true);
-        assert.equal(ls.isEdgeHidden('org:A', 'person:b', 'Director'), true);
+        assert.equal(ls.isEdgeHidden('org:A', 'person:b', 'Director'), false);
     });
 
-    it('both configured: source shows, target hides → edge hidden', () => {
+    it('both configured: source shows, target hides → edge visible (any-visible-wins)', () => {
         ls.initNode('org:A');
         // org:A has Director visible (default)
         ls.initNode('person:b');
         ls.setTypeVisible('person:b', 'Director', false); // person:b hides Director
-        assert.equal(ls.isEdgeHidden('org:A', 'person:b', 'Director'), true);
+        assert.equal(ls.isEdgeHidden('org:A', 'person:b', 'Director'), false);
+    });
+
+    it('SPOUSE REGRESSION: Alenas shows Spouse, Toma hides Spouse → edge must be visible', () => {
+        // Exact real-world scenario: both persons expanded; Toma's legend has Spouse unchecked
+        ls.initNode('person:alenas bulauskis');
+        ls.setTypeVisible('person:alenas bulauskis', 'Spouse', true);
+        ls.initNode('person:toma bulauskiene');
+        ls.setTypeVisible('person:toma bulauskiene', 'Spouse', false);
+        assert.equal(ls.isEdgeHidden('person:alenas bulauskis', 'person:toma bulauskiene', 'Spouse'), false);
     });
 
     // ── Critical scenario: the original per-node bug ──────────────────────────
@@ -229,7 +238,7 @@ describe('LegendState — isEdgeHidden', () => {
     it('unchecking all checkboxes for OrgA hides all its edges', () => {
         ls.initNode('org:A');
         // Uncheck everything (hide all types)
-        ['Director', 'Shareholder', 'Official', 'Employment', 'ContractSmall', 'ContractMedium', 'ContractLarge', 'Spouse'].forEach(function (t) {
+        ['Director', 'Shareholder', 'Official', 'Employment', 'ContractSmall', 'ContractMedium', 'ContractLarge', 'Spouse'].forEach(function (t: string) {
             ls.setTypeVisible('org:A', t, false);
         });
         assert.equal(ls.isEdgeHidden('person:x', 'org:A', 'Director'), true);
@@ -237,4 +246,3 @@ describe('LegendState — isEdgeHidden', () => {
         assert.equal(ls.isEdgeHidden('person:x', 'org:A', 'ContractSmall'), true);
     });
 });
-

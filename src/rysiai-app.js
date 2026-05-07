@@ -12,6 +12,9 @@ var forceAtlas2 = _v.forceAtlas2;
 var noverlap = _v.noverlap;
 var NodeImageProgram = _v.createNodeImageProgram({ padding: 0.2 });
 var animateNodes = _v.animateNodes;
+var createSigma = _v.createSigma;
+var DEFAULT_EDGE_CURVATURE = _v.DEFAULT_EDGE_CURVATURE;
+var indexParallelEdgesIndex = _v.indexParallelEdgesIndex;
 
 // dataGraph: permanent store of all fetched nodes+edges (never given to Sigma)
 // viewGraph: Sigma's filtered view, rebuilt by rebuildViewGraph on each expand/legend toggle
@@ -26,7 +29,7 @@ var legendState = new LegendState();
 var legend = new NodeLegend({ legendState });
 var nodeDetails = new NodeDetails({ legend });
 
-var renderer = new Sigma(viewGraph, container, {
+var renderer = createSigma(viewGraph, container, {
     nodeProgramClasses: { image: NodeImageProgram },
     defaultNodeType: 'image',
     defaultDrawNodeLabel: drawNodeLabel,
@@ -40,13 +43,44 @@ var renderer = new Sigma(viewGraph, container, {
     edgeLabelColor: { color: '#6b7280' },
     defaultNodeColor: '#9ca3af',
     defaultEdgeColor: '#d1d5db',
+    defaultEdgeType: 'line',
     minCameraRatio: 0.05,
     maxCameraRatio: 5,
 });
 
 function syncHash() { updateHashFromFilter(legendState, dataGraph); }
 
-var ui = createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState, nodeDetails, onStateChange: syncHash });
+function getCurvature(index, maxIndex) {
+    if (maxIndex <= 0) throw new Error('Invalid maxIndex');
+    if (index < 0) return -getCurvature(-index, maxIndex);
+    var amplitude = 3.5;
+    var maxCurvature = amplitude * (1 - Math.exp(-maxIndex / amplitude)) * DEFAULT_EDGE_CURVATURE;
+    return (maxCurvature * index) / maxIndex;
+}
+
+function applyParallelEdgeTypes(graph) {
+    indexParallelEdgesIndex(graph);
+    graph.forEachEdge(function (edge, attrs) {
+        var parallelIndex = attrs.parallelIndex;
+        var parallelMinIndex = attrs.parallelMinIndex;
+        var parallelMaxIndex = attrs.parallelMaxIndex;
+        if (typeof parallelMinIndex === 'number') {
+            graph.mergeEdgeAttributes(edge, {
+                type: parallelIndex ? 'curved' : 'line',
+                curvature: getCurvature(parallelIndex, parallelMaxIndex),
+            });
+        } else if (typeof parallelIndex === 'number') {
+            graph.mergeEdgeAttributes(edge, {
+                type: 'curved',
+                curvature: getCurvature(parallelIndex, parallelMaxIndex),
+            });
+        } else {
+            graph.setEdgeAttribute(edge, 'type', 'line');
+        }
+    });
+}
+
+var ui = createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState, nodeDetails, onStateChange: syncHash, postRebuild: function () { applyParallelEdgeTypes(viewGraph); } });
 
 // Canvas overlay for dashed edges (ContractProcurementLink, Award, Bidder)
 var dashedOverlay = document.createElement('canvas');
@@ -83,7 +117,22 @@ renderer.on('afterRender', function () {
         dashedCtx.setLineDash([5, 4]);
         dashedCtx.beginPath();
         dashedCtx.moveTo(p1.x, p1.y);
-        dashedCtx.lineTo(p2.x, p2.y);
+
+        var curvature = attrs.curvature;
+        if (curvature) {
+            var mx = (p1.x + p2.x) / 2;
+            var my = (p1.y + p2.y) / 2;
+            var dx = p2.x - p1.x;
+            var dy = p2.y - p1.y;
+            var len = Math.sqrt(dx * dx + dy * dy);
+            // Control point: midpoint offset perpendicularly (quadratic bezier arc height = 0.5 * perpendicular offset)
+            var cx = mx - dy / len * curvature * len;
+            var cy = my + dx / len * curvature * len;
+            dashedCtx.quadraticCurveTo(cx, cy, p2.x, p2.y);
+        } else {
+            dashedCtx.lineTo(p2.x, p2.y);
+        }
+
         dashedCtx.stroke();
         dashedCtx.setLineDash([]);
     });
@@ -122,10 +171,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     for (var i = 0; i < additionalEntities.length; i++) {
         var extra = additionalEntities[i];
         var extraNodeId;
-        if (extra.entityType === 'asmuo') {
+        if (extra.entityType === 'o') {
             await ui.loadOrg(extra.entityId, null);
             extraNodeId = 'org:' + extra.entityId;
-        } else if (extra.entityType === 'sutartis') {
+        } else if (extra.entityType === 'c') {
             await ui.loadSutartis(extra.entityId);
             extraNodeId = 'contract:' + extra.entityId;
             // Mirror _triggerExpand: also load procurement if the contract has one
@@ -133,9 +182,12 @@ document.addEventListener('DOMContentLoaded', async function () {
                 var pirkimoNumeris = dataGraph.getNodeAttribute(extraNodeId, 'pirkimoNumeris');
                 if (pirkimoNumeris) await ui.loadContract(pirkimoNumeris, extraNodeId);
             }
-        } else if (extra.entityType === 'viesiejiPirkimai') {
+        } else if (extra.entityType === 'r') {
             await ui.loadPirkimas(extra.entityId);
             extraNodeId = 'procurement:' + extra.entityId;
+        } else if (extra.entityType === 'p') {
+            await ui.loadPerson(extra.entityId);
+            extraNodeId = 'person:' + extra.entityId.toLowerCase().trim();
         }
         if (extraNodeId) {
             applyFilterChars(legendState, extraNodeId, extra.filterChars);

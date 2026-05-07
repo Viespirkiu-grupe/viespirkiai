@@ -2,7 +2,7 @@
 // All visual decisions for entity types live here.
 // graph-utils.js uses these values to label graph data; renderers.js uses them to paint pixels.
 
-import { isOrgNode, isPersonNode, isContractNode, isProcurementNode } from './entity-types.js';
+import { isOrgNode, isPersonNode, isContractNode, isProcurementNode, type NodeAttrs } from './entity-types.ts';
 
 // ── Node and edge colours ────────────────────────────────────────────────────
 
@@ -12,9 +12,9 @@ export const NODE_COLOR = {
     person: '#f97316',
     contract: '#10b981',
     procurement: '#8b5cf6',
-};
+} as const;
 
-export const EDGE_COLOR = {
+export const EDGE_COLOR: Record<string, string> = {
     Director:                '#1d4ed8',
     Shareholder:             '#7c3aed',
     Official:                '#0891b2',
@@ -33,7 +33,7 @@ export const EDGE_COLOR = {
 // LegendState seeds its global and per-node Sets from this constant.
 export const HIDDEN_BY_DEFAULT = new Set(['Official', 'Employment', 'Spouse']);
 
-export function nodeColor(attrs) {
+export function nodeColor(attrs: NodeAttrs): string {
     if (isContractNode(attrs))    return NODE_COLOR.contract;
     if (isProcurementNode(attrs)) return NODE_COLOR.procurement;
     if (isPersonNode(attrs))      return NODE_COLOR.person;
@@ -43,36 +43,20 @@ export function nodeColor(attrs) {
 
 // ── Size and weight helpers ──────────────────────────────────────────────────
 
-/**
- * Returns the visual node size for an org based on its employee count.
- * @param {number} count  employee count (>= 1)
- * @returns {8|13|15|20}
- */
-export function personelSize(count) {
+export function personelSize(count: number): 8 | 13 | 15 | 20 {
     if (count >= 200) return 20;
     if (count >= 50)  return 15;
     if (count >= 10)  return 13;
     return 8;
 }
 
-/**
- * Returns the visual node size for a contract based on its value (EUR).
- * @param {number} verte
- * @returns {8|13|19}
- */
-export function contractSize(verte) {
+export function contractSize(verte: number): 8 | 13 | 19 {
     if (verte >= 1_000_000) return 19;
     if (verte >= 100_000)   return 13;
     return 8;
 }
 
-/**
- * Returns the visual edge stroke width for a contract edge.
- * Minimum is always 1.
- * @param {number} verte
- * @returns {1|3|6}
- */
-export function edgeWeight(verte) {
+export function edgeWeight(verte: number): 1 | 3 | 6 {
     if (verte >= 1_000_000) return 6;
     if (verte >= 100_000)   return 3;
     return 1;
@@ -80,7 +64,7 @@ export function edgeWeight(verte) {
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
-const MUI_ICON_PATHS = {
+const MUI_ICON_PATHS: Record<string, string> = {
     // Business icon — PrivateCompany
     PrivateCompany: 'M12 7V3H2v18h20V7zM6 19H4v-2h2zm0-4H4v-2h2zm0-4H4V9h2zm0-4H4V5h2zm4 12H8v-2h2zm0-4H8v-2h2zm0-4H8V9h2zm0-4H8V5h2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8zm-2-8h-2v2h2zm0 4h-2v2h2z',
     // DomainAdd icon — PublicCompany
@@ -98,29 +82,23 @@ const MUI_ICON_PATHS = {
 };
 
 // btoa polyfill for Node.js test environment
-const _btoa = typeof btoa === 'function' ? btoa : (s) => Buffer.from(s).toString('base64');
+const _btoa = typeof btoa === 'function' ? btoa : (s: string) => Buffer.from(s).toString('base64');
 
-export function makeIconDataUri(nodeType) {
+export function makeIconDataUri(nodeType: string): string {
     const path = MUI_ICON_PATHS[nodeType];
     if (!path) return '';
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="48" height="48"><path fill="white" d="' + path + '"/></svg>';
     return 'data:image/svg+xml;base64,' + _btoa(svg);
 }
 
-/**
- * Returns the inline SVG HTML string for a given icon key.
- * Used for small inline icons (e.g., expand/collapse buttons).
- * @param {string} key
- * @returns {string}
- */
-export function svgIcon(key) {
+export function svgIcon(key: string): string {
     const path = MUI_ICON_PATHS[key];
     if (!path) return '';
     return '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="' + path + '"/></svg>';
 }
 
-export function getIconKey(attrs) {
-    if (isOrgNode(attrs)) return attrs.orgType || 'PrivateCompany';
+export function getIconKey(attrs: NodeAttrs): string {
+    if (isOrgNode(attrs)) return (attrs.orgType as string) || 'PrivateCompany';
     if (isPersonNode(attrs)) return 'Person';
     if (isContractNode(attrs) || isProcurementNode(attrs)) return 'Contract';
     return '';

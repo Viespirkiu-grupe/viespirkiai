@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 
 import {
@@ -15,7 +15,12 @@ import {
     edge,
     addNode,
     addEdge,
-} from '../../modules/rysiai/expand.js';
+    addSpouseEdge,
+    buildPersonGraphFromRows,
+} from '@/modules/rysiai/expand';
+
+type NodeLike = { id: string; attributes: Record<string, unknown> };
+type EdgeLike = { id: string; source: string; target: string; attributes: Record<string, unknown> };
 
 describe('formatContractValue', () => {
     it('returns empty string for null', () => assert.equal(formatContractValue(null), ''));
@@ -168,26 +173,26 @@ describe('edge', () => {
 
 describe('addNode / addEdge deduplication', () => {
     it('addNode ignores duplicate ids', () => {
-        const nodes = [];
-        const map = new Map();
-        const n = { id: 'org:1', attributes: {} };
+        const nodes: NodeLike[] = [];
+        const map: Map<string, boolean> = new Map();
+        const n: NodeLike = { id: 'org:1', attributes: {} };
         addNode(nodes, map, n);
         addNode(nodes, map, n);
         assert.equal(nodes.length, 1);
     });
 
     it('addEdge ignores duplicate ids', () => {
-        const edges = [];
-        const map = new Map();
-        const e = { id: 'edge:a:b:T', source: 'a', target: 'b', attributes: {} };
+        const edges: EdgeLike[] = [];
+        const map: Map<string, boolean> = new Map();
+        const e: EdgeLike = { id: 'edge:a:b:T', source: 'a', target: 'b', attributes: {} };
         addEdge(edges, map, e);
         addEdge(edges, map, e);
         assert.equal(edges.length, 1);
     });
 
     it('addNode accepts nodes with different ids', () => {
-        const nodes = [];
-        const map = new Map();
+        const nodes: NodeLike[] = [];
+        const map: Map<string, boolean> = new Map();
         addNode(nodes, map, { id: 'org:1', attributes: {} });
         addNode(nodes, map, { id: 'org:2', attributes: {} });
         assert.equal(nodes.length, 2);
@@ -223,5 +228,173 @@ describe('procurementNode', () => {
     });
     it('falls back to "Pirkimas" label when pavadinimas is null', () => {
         assert.equal(procurementNode('1', null, 0, null, null).attributes.label, 'Pirkimas');
+    });
+});
+
+// ── addSpouseEdge ─────────────────────────────────────────────────────────────
+
+describe('addSpouseEdge', () => {
+    it('adds a Spouse edge when neither direction exists', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b');
+        assert.equal(edges.length, 1);
+        assert.equal(edges[0].id, 'edge:person:a:person:b:Spouse');
+        assert.equal(edges[0].attributes.type, 'Spouse');
+    });
+
+    it('skips the edge when the forward direction is already present', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b');
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b'); // duplicate
+        assert.equal(edges.length, 1);
+    });
+
+    it('skips the edge when the reverse direction already exists (dedup across directions)', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b'); // forward added first
+        addSpouseEdge(edges, edgeMap, 'person:b', 'person:a'); // reverse must be dropped
+        assert.equal(edges.length, 1, 'reverse direction must be deduplicated');
+        assert.equal(edges[0].source, 'person:a');
+        assert.equal(edges[0].target, 'person:b');
+    });
+
+    it('reverse-first: forward direction is dropped when reverse already present', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:b', 'person:a'); // reverse first
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b'); // forward must be dropped
+        assert.equal(edges.length, 1, 'forward direction must be deduplicated');
+        assert.equal(edges[0].source, 'person:b');
+        assert.equal(edges[0].target, 'person:a');
+    });
+});
+
+// ── buildPersonGraphFromRows ──────────────────────────────────────────────────
+
+// Helpers to build minimal pinregJuridiniaiRysiai row fixtures.
+function darbovieteRow(vardas: string, pavarde: string, jarKodas: string, pavadinimas: string, pareigos: string | null = null) {
+    return { irasoTipas: 'DEKLARUOJANCIO_DARBOVIETE', vardas, pavarde, jarKodas, pavadinimas, jaTeisinesFormosKodas: null, pareigos, rysioPradzia: null, susijusioAsmensVardas: null, susijusioAsmensPavarde: null, rysioPobudzioPavadinimas: null, deklaracija: null };
+}
+
+function spouseRow(
+    spouseVardas: string, spousePavarde: string,
+    declVardas: string, declPavarde: string,
+    jarKodas: string, pavadinimas: string, pareigos: string | null = null,
+) {
+    return { irasoTipas: 'SUTUOKTINIO_DARBOVIETE', vardas: spouseVardas, pavarde: spousePavarde, susijusioAsmensVardas: declVardas, susijusioAsmensPavarde: declPavarde, jarKodas, pavadinimas, jaTeisinesFormosKodas: null, pareigos, rysioPradzia: null, rysioPobudzioPavadinimas: null, deklaracija: null };
+}
+
+describe('buildPersonGraphFromRows', () => {
+    const ALENAS_ID  = 'person:alenas bulauskis';
+    const TOMA_ID    = 'person:toma bulauskienė';
+    const ORG_A_ID   = 'org:188784898';
+    const ORG_B_ID   = 'org:188752740';
+
+    it('includes the root person node marked expanded', () => {
+        const { nodes } = buildPersonGraphFromRows([], ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+        assert.equal(nodes.length, 1);
+        assert.equal(nodes[0].id, ALENAS_ID);
+        assert.equal(nodes[0].attributes.expanded, true);
+    });
+
+    it('DEKLARUOJANCIO_DARBOVIETE: adds org and edge from root to org', () => {
+        const rows = [darbovieteRow('ALENAS', 'BULAUSKIS', '188752740', 'Žuvininkystės tarnyba', 'Departamento direktorius')];
+        const { nodes, edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+        assert.ok(nodes.some(n => n.id === ORG_B_ID));
+        const e = edges.find(e => e.source === ALENAS_ID && e.target === ORG_B_ID);
+        assert.ok(e, 'expected edge from root to org');
+        assert.equal(e!.attributes.type, 'Director');
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — normal case (searched person is declarant): no self-loop', () => {
+        // Alenas declares spouse Toma works at org A
+        const rows = [spouseRow('TOMA', 'BULAUSKIENĖ', 'ALENAS', 'BULAUSKIS', '188784898', 'Aplinkos apsaugos agentūra', 'Vedėjas')];
+        const { nodes, edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+
+        // No self-loop
+        const selfLoop = edges.find(e => e.source === ALENAS_ID && e.target === ALENAS_ID);
+        assert.equal(selfLoop, undefined, 'must not create a self-loop Spouse edge');
+
+        // Spouse node exists
+        assert.ok(nodes.some(n => n.id === TOMA_ID), 'spouse node must be added');
+
+        // Alenas → Toma Spouse edge
+        const spouseEdge = edges.find(e => e.source === ALENAS_ID && e.target === TOMA_ID && e.attributes.type === 'Spouse');
+        assert.ok(spouseEdge, 'expected Alenas→Toma Spouse edge');
+
+        // Toma's org edge
+        assert.ok(nodes.some(n => n.id === ORG_A_ID), 'spouse org node must be added');
+        const orgEdge = edges.find(e => e.source === TOMA_ID && e.target === ORG_A_ID);
+        assert.ok(orgEdge, 'expected Toma→org Employment/Director edge');
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — reverse case (searched person IS the spouse): no self-loop', () => {
+        // Toma declares spouse Alenas works at org B — Alenas appears as vardas/pavarde (not declarant)
+        const rows = [spouseRow('ALENAS', 'BULAUSKIS', 'TOMA', 'BULAUSKIENĖ', '188752740', 'Žuvininkystės tarnyba', 'Departamento direktorius')];
+        const { nodes, edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+
+        // No self-loop
+        const selfLoop = edges.find(e => e.source === ALENAS_ID && e.target === ALENAS_ID);
+        assert.equal(selfLoop, undefined, 'must not create a self-loop Spouse edge');
+
+        // Declarant (Toma) node must be added
+        assert.ok(nodes.some(n => n.id === TOMA_ID), 'declarant node must be added');
+
+        // Toma → Alenas Spouse edge (reversed)
+        const spouseEdge = edges.find(e => e.source === TOMA_ID && e.target === ALENAS_ID && e.attributes.type === 'Spouse');
+        assert.ok(spouseEdge, 'expected Toma→Alenas Spouse edge');
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — both rows present (real-world bidirectional): exactly one deduplicated Spouse edge', () => {
+        // This is the exact scenario from the real DB: both Alenas and Toma are declarants.
+        // The normal case adds alenas→toma:Spouse; the reverse case must be dropped (not toma→alenas too).
+        const rows = [
+            spouseRow('TOMA', 'BULAUSKIENĖ', 'ALENAS', 'BULAUSKIS', '188784898', 'Aplinkos apsaugos agentūra', 'Vedėjas'),
+            spouseRow('ALENAS', 'BULAUSKIS', 'TOMA', 'BULAUSKIENĖ', '188752740', 'Žuvininkystės tarnyba', 'Departamento direktorius'),
+        ];
+        const { nodes, edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+
+        const selfLoop = edges.find(e => e.source === e.target);
+        assert.equal(selfLoop, undefined, 'must not create any self-loop');
+
+        const spouseEdges = edges.filter(e => e.attributes.type === 'Spouse');
+        assert.equal(spouseEdges.length, 1, 'expect exactly ONE Spouse edge between the pair');
+
+        const between = spouseEdges.find(e =>
+            (e.source === ALENAS_ID && e.target === TOMA_ID) ||
+            (e.source === TOMA_ID   && e.target === ALENAS_ID)
+        );
+        assert.ok(between, 'the single Spouse edge must connect Alenas and Toma');
+
+        // Both person nodes must still be present despite the dedup
+        assert.ok(nodes.some(n => n.id === ALENAS_ID), 'Alenas node present');
+        assert.ok(nodes.some(n => n.id === TOMA_ID),   'Toma node present');
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — reverse-first bidirectional: dedup works regardless of row order', () => {
+        // Same pair, but the reverse row comes first — only one Spouse edge must be emitted
+        const rows = [
+            spouseRow('ALENAS', 'BULAUSKIS', 'TOMA', 'BULAUSKIENĖ', '188752740', 'Žuvininkystės tarnyba', 'Departamento direktorius'),
+            spouseRow('TOMA', 'BULAUSKIENĖ', 'ALENAS', 'BULAUSKIS', '188784898', 'Aplinkos apsaugos agentūra', 'Vedėjas'),
+        ];
+        const { edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+
+        const spouseEdges = edges.filter(e => e.attributes.type === 'Spouse');
+        assert.equal(spouseEdges.length, 1, 'expect exactly ONE Spouse edge regardless of row order');
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — skips row when spouse name is missing', () => {
+        const rows = [spouseRow('', '', 'ALENAS', 'BULAUSKIS', '188784898', 'Org')];
+        const { edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+        assert.equal(edges.length, 0);
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — reverse case skips Spouse edge when declarant name is missing', () => {
+        const rows = [spouseRow('ALENAS', 'BULAUSKIS', '', '', '188752740', 'Org')];
+        const { edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+        assert.equal(edges.filter(e => e.attributes.type === 'Spouse').length, 0);
     });
 });

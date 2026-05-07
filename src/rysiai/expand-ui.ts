@@ -1,39 +1,65 @@
-import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from './graph-utils.js';
-import { NODE_COLOR, EDGE_COLOR, nodeColor } from './graph-theme.js';
-import { isConfigurableNode, isOrgNode, isPersonNode, isContractNode, isProcurementNode } from './entity-types.js';
+import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, collapseGraphData, computeEdgeCounts } from './graph-utils.ts';
+import { NODE_COLOR, EDGE_COLOR, nodeColor } from './graph-theme.ts';
+import { isConfigurableNode, isOrgNode, isPersonNode, isContractNode, isProcurementNode } from './entity-types.ts';
+import type { LegendState } from './legend-state.ts';
+import type { NodeDetails } from './details-panel.ts';
+import type Graph from 'graphology';
+import type forceAtlas2 from 'graphology-layout-forceatlas2';
+import type noverlap from 'graphology-layout-noverlap';
+type IForceAtlas2Layout = typeof forceAtlas2;
+type INoverlapLayout = typeof noverlap;
 
-/**
- * Creates the expand UI controller.
- * Uses a two-graph design: dataGraph holds all fetched data; viewGraph is Sigma's filtered view.
- *
- * @param {{
- *   dataGraph:    Graph,
- *   viewGraph:    Graph,
- *   renderer:     Sigma,
- *   statusEl:     HTMLElement|null,
- *   loadingEl:    HTMLElement|null,
- *   forceAtlas2:  Function,
- *   noverlap:     Function,
- *   animateNodes: Function,
- *   legendState:  LegendState,
- *   nodeDetails:  NodeDetails,
- * }} deps
- * @returns {{ loadOrg, loadSutartis, loadPirkimas, loadContract, rebuildAndRefresh, getSelectedNodeId, selectNode }}
- */
-export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState, nodeDetails, onStateChange = null }) {
-    const expandingNodes = new Set();
-    let cancelAnimation = null;
-    let selectedNodeId = null;
+interface ExpandUIDeps {
+    dataGraph: Graph;
+    viewGraph: Graph;
+    renderer: {
+        on: (event: string, handler: (event: { node: string }) => void) => void;
+        refresh: () => void;
+        graphToViewport: (pos: { x: number; y: number }) => { x: number; y: number };
+    };
+    statusEl: HTMLElement | null;
+    loadingEl: HTMLElement | null;
+    forceAtlas2: IForceAtlas2Layout;
+    noverlap: INoverlapLayout;
+    animateNodes: (graph: Graph, targets: Record<string, { x: number; y: number }>, opts: { duration: number; easing: string }, callback?: () => void) => () => void;
+    legendState: LegendState;
+    nodeDetails: NodeDetails;
+    onStateChange?: (() => void) | null;
+    postRebuild?: (() => void) | null;
+}
+
+interface NodeAttrsLocal {
+    expanded?: boolean;
+    isRoot?: boolean;
+    jarKodas?: string;
+    vardas?: string;
+    pavarde?: string;
+    pirkimoId?: string;
+    pirkimoNumeris?: string;
+    entityType?: string;
+    [key: string]: unknown;
+}
+
+interface ExpandKind {
+    test: (a: NodeAttrsLocal) => boolean;
+    id: (a: NodeAttrsLocal) => string;
+    url: (a: NodeAttrsLocal) => string;
+}
+
+export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadingEl, forceAtlas2, noverlap, animateNodes, legendState, nodeDetails, onStateChange = null, postRebuild = null }: ExpandUIDeps) {
+    const expandingNodes = new Set<string>();
+    let cancelAnimation: (() => void) | null = null;
+    let selectedNodeId: string | null = null;
 
     function showLoading() { if (loadingEl) loadingEl.hidden = false; }
     function hideLoading() { if (loadingEl) loadingEl.hidden = true; }
-    function setStatus(msg) { if (statusEl) statusEl.textContent = msg || ''; }
+    function setStatus(msg: string) { if (statusEl) statusEl.textContent = msg || ''; }
 
-    function getNodePos(id) {
-        return viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) : null;
+    function getNodePos(id: string): { x: number; y: number } | null {
+        return viewGraph.hasNode(id) ? viewGraph.getNodeAttributes(id) as { x: number; y: number } : null;
     }
 
-    function setSelection(id, on) {
+    function setSelection(id: string, on: boolean) {
         if (dataGraph.hasNode(id)) {
             dataGraph.setNodeAttribute(id, 'highlighted', on);
             dataGraph.setNodeAttribute(id, 'selected', on);
@@ -44,52 +70,50 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         }
     }
 
-    function markExpanded(id) {
+    function markExpanded(id: string) {
         if (dataGraph.hasNode(id)) {
             dataGraph.setNodeAttribute(id, 'expanded', true);
-            if (isOrgNode(dataGraph.getNodeAttributes(id))) {
+            if (isOrgNode(dataGraph.getNodeAttributes(id) as NodeAttrsLocal)) {
                 dataGraph.setNodeAttribute(id, 'color', NODE_COLOR.org);
             }
         }
         if (viewGraph.hasNode(id)) {
             viewGraph.setNodeAttribute(id, 'expanded', true);
-            if (isOrgNode(viewGraph.getNodeAttributes(id))) {
+            if (isOrgNode(viewGraph.getNodeAttributes(id) as NodeAttrsLocal)) {
                 viewGraph.setNodeAttribute(id, 'color', NODE_COLOR.org);
             }
         }
     }
 
-    function isExpandableNode(attrs) {
-        return EXPAND_KINDS.some((k) => k.test(attrs)) || (isContractNode(attrs) && attrs.pirkimoNumeris);
+    function isExpandableNode(attrs: NodeAttrsLocal): boolean {
+        return EXPAND_KINDS.some((k) => k.test(attrs)) || (isContractNode(attrs) && !!attrs.pirkimoNumeris);
     }
 
-    function buildHandlers(id, attrs) {
+    function buildHandlers(id: string, attrs: NodeAttrsLocal) {
         if (attrs.isRoot) return {};
         if (attrs.expanded) return { onCollapse: () => collapseNode(id) };
         if (isExpandableNode(attrs)) return { onExpand: () => _triggerExpand(id, attrs) };
         return {};
     }
 
-    function _showNodePanel(id, attrs, handlers) {
+    function _showNodePanel(id: string, attrs: NodeAttrsLocal, handlers: ReturnType<typeof buildHandlers>) {
         const counts = isConfigurableNode(attrs) ? computeEdgeCounts(dataGraph, id) : null;
-        nodeDetails.showForNode(id, attrs, handlers, counts);
+        nodeDetails.showForNode(id, attrs as Record<string, unknown>, handlers, counts);
     }
 
-    // Re-renders the details panel for the currently selected node with fresh handlers.
-    // Called after expand/collapse to switch Rodyti ↔ Slėpti ryšius and update legend.
     function refreshSelectedNodePanel() {
         if (!selectedNodeId || !viewGraph.hasNode(selectedNodeId)) return;
         const id = selectedNodeId;
-        const attrs = dataGraph.getNodeAttributes(id);
+        const attrs = dataGraph.getNodeAttributes(id) as NodeAttrsLocal;
         _showNodePanel(id, attrs, buildHandlers(id, attrs));
     }
 
-    function selectNode(id) {
+    function selectNode(id: string) {
         if (selectedNodeId && selectedNodeId !== id) setSelection(selectedNodeId, false);
         selectedNodeId = id;
         setSelection(id, true);
 
-        const attrs = dataGraph.hasNode(id) ? dataGraph.getNodeAttributes(id) : {};
+        const attrs = dataGraph.hasNode(id) ? dataGraph.getNodeAttributes(id) as NodeAttrsLocal : {};
         const handlers = buildHandlers(id, attrs);
         if (isConfigurableNode(attrs)) legendState.initNode(id);
         _showNodePanel(id, attrs, handlers);
@@ -105,16 +129,10 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         renderer.refresh();
     }
 
-    /**
-     * Rebuilds viewGraph from dataGraph, runs layout, syncs positions, refreshes Sigma.
-     * Called by legend checkboxes and after every expand.
-     */
     function rebuildAndRefresh() {
         if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
-        rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => legendState.isEdgeHidden(s, t, type, sz));
-        // After a cancelled animation, viewGraph positions may be stale — nodes stacked at the
-        // animation origin. Restore last-known positions from dataGraph (saved after each layout
-        // pass) so runLayout starts from the correct resting state, not mid-animation positions.
+        rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+        postRebuild?.();
         viewGraph.forEachNode((id) => {
             if (dataGraph.hasNode(id)) {
                 viewGraph.setNodeAttribute(id, 'x', dataGraph.getNodeAttribute(id, 'x'));
@@ -127,11 +145,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         renderer.refresh();
     }
 
-    // ownerId overrides the derived fromNodeId for ownership tracking — used when the expand
-    // target doesn't yet exist in viewGraph (e.g. loadContract expanding a new procurement node).
-    // rootNodeId marks which single node in the response is the permanent root (isRoot=true,
-    // expandedBy stays empty); used by loadOrg for the initial graph load.
-    async function _expand(id, fetchUrl, afterMerge, ownerId = null, rootNodeId = null) {
+    async function _expand(id: string, fetchUrl: string, afterMerge: (id: string) => void, ownerId: string | null = null, rootNodeId: string | null = null) {
         if (expandingNodes.has(id)) return;
         expandingNodes.add(id);
         if (expandingNodes.size === 1) showLoading();
@@ -144,8 +158,6 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             if (cancelAnimation) {
                 cancelAnimation();
                 cancelAnimation = null;
-                // Restore last-known positions from dataGraph so subsequent layout doesn't start
-                // from mid-animation / stacked positions left by the cancelled animation.
                 viewGraph.forEachNode((nodeId) => {
                     if (dataGraph.hasNode(nodeId)) {
                         viewGraph.setNodeAttribute(nodeId, 'x', dataGraph.getNodeAttribute(nodeId, 'x'));
@@ -154,12 +166,13 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
                 });
             }
 
+            //console.warn('Fetched data for', id, data);
             mergeGraphElements(dataGraph, getNodePos, data, fromNodeId, rootNodeId);
             afterMerge(id);
 
-            const newNodeIds = rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => legendState.isEdgeHidden(s, t, type, sz));
+            const newNodeIds = rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+            postRebuild?.();
 
-            // Re-apply selection attrs after rebuild (node may have been re-added)
             if (selectedNodeId && viewGraph.hasNode(selectedNodeId)) {
                 setSelection(selectedNodeId, true);
             }
@@ -167,12 +180,12 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             if (startPos && newNodeIds.length > 0) {
                 runLayout(viewGraph, forceAtlas2, noverlap);
                 syncPositionsToData(dataGraph, viewGraph);
-                const targets = {};
+                const targets: Record<string, { x: number; y: number }> = {};
                 newNodeIds.forEach((nid) => {
                     if (viewGraph.hasNode(nid)) {
                         targets[nid] = {
-                            x: viewGraph.getNodeAttribute(nid, 'x'),
-                            y: viewGraph.getNodeAttribute(nid, 'y'),
+                            x: viewGraph.getNodeAttribute(nid, 'x') as number,
+                            y: viewGraph.getNodeAttribute(nid, 'y') as number,
                         };
                     }
                 });
@@ -190,7 +203,6 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             }
 
             onStateChange?.();
-            // Refresh panel so button switches from Rodyti → Slėpti ryšius
             refreshSelectedNodePanel();
         } catch (err) {
             setStatus('Klaida kraunant duomenis.');
@@ -204,30 +216,25 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         }
     }
 
-    // Config-driven expand kinds for org / person / procurement.
-    // Each entry: test(attrs) → should this kind handle the node?
-    //             id(attrs)   → the expand-target node ID
-    //             url(attrs)  → the fetch URL
-    // Adding a new expandable entity type = one new entry here.
-    const EXPAND_KINDS = [
+    const EXPAND_KINDS: ExpandKind[] = [
         {
-            test: (a) => isOrgNode(a) && a.jarKodas,
+            test: (a) => isOrgNode(a) && !!a.jarKodas && !a.cannotExpand,
             id:   (a) => 'org:' + a.jarKodas,
-            url:  (a) => '/rysiai/expand/' + encodeURIComponent(a.jarKodas),
+            url:  (a) => '/rysiai/expand/' + encodeURIComponent(a.jarKodas!),
         },
         {
-            test: (a) => isPersonNode(a) && a.vardas && a.pavarde,
+            test: (a) => isPersonNode(a) && !!a.vardas && !!a.pavarde,
             id:   (a) => { const full = (a.vardas + ' ' + a.pavarde).trim(); return 'person:' + full.toLowerCase(); },
             url:  (a) => '/rysiai/expand-person?vardas=' + encodeURIComponent((a.vardas + ' ' + a.pavarde).trim()),
         },
         {
-            test: (a) => isProcurementNode(a) && a.pirkimoId,
+            test: (a) => isProcurementNode(a) && !!a.pirkimoId,
             id:   (a) => 'procurement:' + a.pirkimoId,
-            url:  (a) => '/rysiai/expand-procurement/' + encodeURIComponent(a.pirkimoId),
+            url:  (a) => '/rysiai/expand-procurement/' + encodeURIComponent(a.pirkimoId!),
         },
     ];
 
-    function _triggerExpand(nodeId, attrs) {
+    function _triggerExpand(nodeId: string, attrs: NodeAttrsLocal) {
         if (attrs.expanded) return;
         const kind = EXPAND_KINDS.find((k) => k.test(attrs));
         if (kind) {
@@ -246,26 +253,19 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         }
     }
 
-    /**
-     * Collapses a node: prunes exclusively-owned nodes+edges from dataGraph using expandedBy
-     * reference tracking, resets the node's color, then rebuilds the view.
-     *
-     * Nodes shared with other expansions (diamond dependencies) are preserved — only
-     * this node's ownership claim is removed from their expandedBy sets.
-     */
-    function collapseNode(nodeId) {
+    function collapseNode(nodeId: string) {
         if (!dataGraph.hasNode(nodeId)) return;
 
         if (cancelAnimation) { cancelAnimation(); cancelAnimation = null; }
 
-        // Find nodes currently in viewGraph that will be exclusively removed by this collapse
         const collapsePos = getNodePos(nodeId);
-        const animationTargets = {};
+        const animationTargets: Record<string, { x: number; y: number }> = {};
         if (collapsePos) {
             dataGraph.forEachNode((id, attrs) => {
+                const a = attrs as NodeAttrsLocal & { expandedBy?: Set<string>; isRoot?: boolean };
                 if (id === nodeId) return;
-                const owners = attrs.expandedBy;
-                if (owners && owners.has(nodeId) && owners.size === 1 && !attrs.isRoot && viewGraph.hasNode(id)) {
+                const owners = a.expandedBy;
+                if (owners && owners.has(nodeId) && owners.size === 1 && !a.isRoot && viewGraph.hasNode(id)) {
                     animationTargets[id] = { x: collapsePos.x, y: collapsePos.y };
                 }
             });
@@ -274,29 +274,24 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         const doCollapse = () => {
             cancelAnimation = null;
 
-            // Pure data cleanup (sets expanded=false, removes exclusively-owned nodes+edges)
             collapseGraphData(dataGraph, nodeId);
 
-            // Sync expanded=false and reset color to non-expanded state in viewGraph
             if (viewGraph.hasNode(nodeId)) {
                 viewGraph.setNodeAttribute(nodeId, 'expanded', false);
-                viewGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId)));
+                viewGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId) as NodeAttrsLocal));
             }
-            // dataGraph color was already updated by collapseGraphData setting expanded=false;
-            // nodeColor reads expanded, so we update the stored color attribute explicitly.
-            dataGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId)));
+            dataGraph.setNodeAttribute(nodeId, 'color', nodeColor(dataGraph.getNodeAttributes(nodeId) as NodeAttrsLocal));
 
-            rebuildViewGraph(dataGraph, viewGraph, (s, t, type, sz) => legendState.isEdgeHidden(s, t, type, sz));
+            rebuildViewGraph(dataGraph, viewGraph, (s, t, type) => legendState.isEdgeHidden(s, t, type));
+            postRebuild?.();
             runLayout(viewGraph, forceAtlas2, noverlap);
             syncPositionsToData(dataGraph, viewGraph);
 
             if (viewGraph.hasNode(nodeId)) {
-                // Node still visible (has edges from other expansions) — update panel to Rodyti ryšius
                 setSelection(nodeId, true);
-                const updatedAttrs = dataGraph.getNodeAttributes(nodeId);
+                const updatedAttrs = dataGraph.getNodeAttributes(nodeId) as NodeAttrsLocal;
                 _showNodePanel(nodeId, updatedAttrs, { onExpand: () => _triggerExpand(nodeId, updatedAttrs) });
             } else {
-                // Node disappeared — clear selection
                 if (dataGraph.hasNode(nodeId)) {
                     dataGraph.setNodeAttribute(nodeId, 'selected', false);
                     dataGraph.setNodeAttribute(nodeId, 'highlighted', false);
@@ -315,11 +310,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         }
     }
 
-    // loadOrg is part of the public API (called by rysiai-app.js on initial load).
-    // The root org's own ID is passed as both ownerId and rootNodeId so that:
-    //   - All expansion nodes get expandedBy = Set([id]) (enabling collapse cleanup)
-    //   - The root org node itself gets isRoot=true and expandedBy=Set() (permanent root)
-    function loadOrg(jarKodas, fromNodeId) {
+    function loadOrg(jarKodas: string, fromNodeId: string | null) {
         const id = 'org:' + jarKodas;
         if (fromNodeId && viewGraph.hasNode(fromNodeId)) {
             viewGraph.setNodeAttribute(fromNodeId, 'color', NODE_COLOR.org);
@@ -327,7 +318,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         return _expand(id, '/rysiai/expand/' + encodeURIComponent(jarKodas), markExpanded, id, id);
     }
 
-    function loadContract(pirkimoNumeris, contractNodeId) {
+    function loadContract(pirkimoNumeris: string, contractNodeId: string) {
         const procId = 'procurement:' + pirkimoNumeris;
 
         const createContractProcurementLink = () => {
@@ -344,46 +335,46 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
             }
         };
 
-        // If procurement already expanded, just add the link and redraw
         if (dataGraph.hasNode(procId) && dataGraph.getNodeAttribute(procId, 'expanded')) {
             createContractProcurementLink();
             rebuildAndRefresh();
             return;
         }
 
-        // Pass contractNodeId as ownerId so all procurement data is owned by the contract,
-        // enabling full cleanup when the contract is collapsed.
         return _expand(procId, '/rysiai/expand-contract/' + encodeURIComponent(pirkimoNumeris), (nodeId) => {
             markExpanded(nodeId);
             createContractProcurementLink();
         }, contractNodeId);
     }
 
-    function loadSutartis(sutartiesUnikalusId) {
+    function loadPerson(fullName: string) {
+        const id = 'person:' + fullName.toLowerCase().trim();
+        return _expand(id, '/rysiai/expand-person?vardas=' + encodeURIComponent(fullName.trim()), markExpanded, id, id);
+    }
+
+    function loadSutartis(sutartiesUnikalusId: string) {
         const id = 'contract:' + sutartiesUnikalusId;
         return _expand(id, '/rysiai/expand-sutartis/' + encodeURIComponent(sutartiesUnikalusId), markExpanded, id, id);
     }
 
-    function loadPirkimas(pirkimoId) {
+    function loadPirkimas(pirkimoId: string) {
         const id = 'procurement:' + pirkimoId;
         return _expand(id, '/rysiai/expand-pirkimas/' + encodeURIComponent(pirkimoId), markExpanded, id, id);
     }
 
     renderer.on('clickNode', (event) => {
         const nodeId = event.node;
-        // No-op on re-click: Sigma fires clickNode twice before doubleClickNode.
-        // Deselecting on re-click would cause a visible flicker (select → deselect → expand).
         if (selectedNodeId === nodeId) return;
         selectNode(nodeId);
     });
 
     renderer.on('doubleClickNode', (event) => {
         const nodeId = event.node;
-        const attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) : {};
+        const attrs = viewGraph.hasNode(nodeId) ? viewGraph.getNodeAttributes(nodeId) as NodeAttrsLocal : {};
         _triggerExpand(nodeId, attrs);
     });
 
-    renderer.on('clickStage', deselectAll);
+    renderer.on('clickStage', deselectAll as unknown as (event: { node: string }) => void);
 
-    return { loadOrg, loadSutartis, loadPirkimas, loadContract, rebuildAndRefresh, getSelectedNodeId: () => selectedNodeId, selectNode };
+    return { loadOrg, loadPerson, loadSutartis, loadPirkimas, loadContract, rebuildAndRefresh, getSelectedNodeId: () => selectedNodeId, selectNode };
 }

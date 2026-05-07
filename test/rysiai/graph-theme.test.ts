@@ -1,7 +1,7 @@
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 
-import { personelSize, contractSize, edgeWeight } from '../../src/rysiai/graph-theme.js';
+import { personelSize, contractSize, edgeWeight } from '@/src/rysiai/graph-theme.ts';
 
 // ── personelSize ──────────────────────────────────────────────────────────────
 
