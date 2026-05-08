@@ -6,6 +6,17 @@ import { specialJarCodes } from '../juridiniai/specialJarCodes.js';
  * @typedef {{ id: string; source: string; target: string; attributes: Record<string, unknown> }} EdgeLike
  */
 
+/**
+ * Returns true when jarKodas is a CVP IS placeholder code (not a real organisation).
+ * These nodes must never be expanded — they aggregate all contracts of a given legal-form
+ * class (e.g. 809 = any physical person), so expanding them would produce misleading results.
+ * @param {string|number} jarKodas
+ * @returns {boolean}
+ */
+export function isBlockedOrg(jarKodas) {
+    return !!specialJarCodes[String(jarKodas)];
+}
+
 const ENTITY_TYPE = {
     Org:         'OrganizationEntity',
     Person:      'PersonEntity',
@@ -283,6 +294,7 @@ export function addSpouseEdge(edges, edgeMap, sourceId, targetId) {
  */
 export async function expandOrg(jarKodas) {
     const jk = String(jarKodas);
+    if (isBlockedOrg(jk)) return { nodes: [], edges: [] };
 
     const [jarRes, pinregRes, asBuyerRes, asSellerRes, vpRes] = await Promise.all([
         // Org metadata from jarCsv

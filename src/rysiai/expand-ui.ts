@@ -237,6 +237,14 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     function _triggerExpand(nodeId: string, attrs: NodeAttrsLocal) {
         if (attrs.expanded) return;
+        if (attrs.cannotExpand) {
+            markExpanded(nodeId);
+            legendState.initNode(nodeId);
+            rebuildAndRefresh();
+            onStateChange?.();
+            refreshSelectedNodePanel();
+            return;
+        }
         const kind = EXPAND_KINDS.find((k) => k.test(attrs));
         if (kind) {
             markExpanded(nodeId);
@@ -313,6 +321,14 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     function loadOrg(jarKodas: string, fromNodeId: string | null) {
         const id = 'org:' + jarKodas;
+        if (dataGraph.hasNode(id) && dataGraph.getNodeAttribute(id, 'cannotExpand')) {
+            markExpanded(id);
+            legendState.initNode(id);
+            rebuildAndRefresh();
+            onStateChange?.();
+            refreshSelectedNodePanel();
+            return Promise.resolve();
+        }
         if (fromNodeId && viewGraph.hasNode(fromNodeId)) {
             viewGraph.setNodeAttribute(fromNodeId, 'color', NODE_COLOR.org);
         }

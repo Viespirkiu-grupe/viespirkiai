@@ -17,7 +17,9 @@ import {
     addEdge,
     addSpouseEdge,
     buildPersonGraphFromRows,
+    isBlockedOrg,
 } from '@/modules/rysiai/expand';
+import { specialJarCodes } from '@/modules/juridiniai/specialJarCodes';
 
 type NodeLike = { id: string; attributes: Record<string, unknown> };
 type EdgeLike = { id: string; source: string; target: string; attributes: Record<string, unknown> };
@@ -396,5 +398,58 @@ describe('buildPersonGraphFromRows', () => {
         const rows = [spouseRow('ALENAS', 'BULAUSKIS', '', '', '188752740', 'Org')];
         const { edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
         assert.equal(edges.filter(e => e.attributes.type === 'Spouse').length, 0);
+    });
+});
+
+// ── specialJarCodes / isBlockedOrg ────────────────────────────────────────────
+//
+// These codes are CVP IS placeholders (e.g. 809 = "any physical person").
+// Expanding them would aggregate ALL contracts for that legal-form class,
+// producing meaningless results — so they must be permanently blocked.
+
+describe('isBlockedOrg', () => {
+    it('returns true for every code in specialJarCodes', () => {
+        for (const code of Object.keys(specialJarCodes)) {
+            assert.equal(isBlockedOrg(code), true, `expected isBlockedOrg('${code}') to be true`);
+            assert.equal(isBlockedOrg(Number(code)), true, `expected isBlockedOrg(${code}) to be true`);
+        }
+    });
+
+    it('returns false for a normal jarKodas not in specialJarCodes', () => {
+        assert.equal(isBlockedOrg('110078991'), false);
+        assert.equal(isBlockedOrg('188784898'), false);
+    });
+
+    it('returns false for an unknown numeric string', () => {
+        assert.equal(isBlockedOrg('0'), false);
+        assert.equal(isBlockedOrg('999'), false);
+    });
+});
+
+describe('orgNode — specialJarCodes block expansion', () => {
+    it('sets cannotExpand on every specialJarCode', () => {
+        for (const code of Object.keys(specialJarCodes)) {
+            const n = orgNode(code, null, null);
+            assert.equal(n.attributes.cannotExpand, true,
+                `expected orgNode('${code}') to have cannotExpand=true`);
+        }
+    });
+
+    it('does not set cannotExpand for a normal jarKodas', () => {
+        const n = orgNode('110078991', 'Regitra', null);
+        assert.equal(n.attributes.cannotExpand, undefined);
+    });
+
+    it('resolves pavadinimas from specialJarCodes when argument is null', () => {
+        const n = orgNode('809', null, null);
+        assert.equal(n.attributes.pavadinimas, specialJarCodes[809].pavadinimas);
+    });
+
+    it('resolves pavadinimas from specialJarCodes when argument is null for each code', () => {
+        for (const [code, entry] of Object.entries(specialJarCodes)) {
+            const n = orgNode(code, null, null);
+            assert.equal(n.attributes.pavadinimas, entry.pavadinimas,
+                `expected pavadinimas for code ${code} to come from specialJarCodes`);
+        }
     });
 });
