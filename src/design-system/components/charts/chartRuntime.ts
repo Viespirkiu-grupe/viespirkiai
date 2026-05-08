@@ -102,6 +102,17 @@ const chartFlagDefaults: Record<string, any> = {
   },
 };
 
+function resolveChartColors(data: any, isDark: boolean) {
+  if (Array.isArray(data?.customOptions?.colors) && data.customOptions.colors.length > 0) {
+    return data.customOptions.colors;
+  }
+
+  const flags = data?.flags || [];
+  if (flags.includes('50shadesOfGray')) return getShadesOfGray(isDark);
+
+  return getCategoricalColors(isDark);
+}
+
 function buildOptions(data: any, isDark: boolean) {
   let options = structuredClone(buildGlobalDefaults(isDark));
   if (data.type && typeChartDefaults[data.type]) options = deepMerge(options, structuredClone(typeChartDefaults[data.type]));
@@ -170,8 +181,6 @@ export function ensureChartRuntime() {
       const isDark = getIsDark();
       const themeTokens = getThemeTokens(isDark);
       for (const { chart, data } of renderedCharts) {
-        const flags = data.flags || [];
-        const colors = flags.includes('50shadesOfGray') ? getShadesOfGray(isDark) : getCategoricalColors(isDark);
         chart.updateOptions({
           chart: { foreColor: themeTokens.labelColor },
           tooltip: { theme: isDark ? 'dark' : 'light' },
@@ -180,7 +189,7 @@ export function ensureChartRuntime() {
           grid: { borderColor: themeTokens.gridColor },
           theme: { mode: isDark ? 'dark' : 'light' },
           legend: { labels: { colors: themeTokens.labelColor } },
-          colors,
+          colors: resolveChartColors(data, isDark),
         }, false, true);
       }
     };

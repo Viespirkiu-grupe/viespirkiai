@@ -10,6 +10,16 @@ import { postgres, OCR_STATES, getColorScheme, getFont } from '../../lib/failai.
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
+const OCR_STATE_COLORS: Record<string, string> = {
+  baigta: '#22c55e',
+  rekomenduojama: '#f59e0b',
+  nepavyko: '#ef4444',
+  rezervuota: '#3b82f6',
+  virsijoBandymus: '#f97316',
+  galima: '#06b6d4',
+  nepalaikoma: '#a855f7',
+};
+
 const [ocrStatsRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrStatsHourExistsRes] = await Promise.all([
   postgres.query(`SELECT * FROM "failaiOcrStats" ORDER BY count DESC`),
   postgres.query(`SELECT * FROM "failaiOcrRezultataiStatsDay" ORDER BY date DESC`),
@@ -129,7 +139,10 @@ const ocrPerMinute = latestDay
 const ocrStatsChartData = {
   labels: ocrStats.map((item: any) => item.text),
   series: ocrStats.map((item: any) => item.count),
+  colors: ocrStats.map((item: any) => OCR_STATE_COLORS[item.camel] || '#78716c'),
 };
+
+const ocrNuskaitytojaiTreemapColors = ['#0ea5e9', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4', '#f97316'];
 
 const ocrNuskaitytojaiChartData = {
   labels: ocrNuskaitytojai.map((item: any) => item.viesasPavadinimas),
@@ -221,6 +234,13 @@ const ocrStatsDayChartData = {
             type="pie"
             labels={ocrStatsChartData.labels}
             series={ocrStatsChartData.series}
+            customOptions={{
+              colors: ocrStatsChartData.colors,
+              stroke: {
+                width: 4,
+                colors: ['var(--white)'],
+              },
+            }}
           />
           <TableWrapper className="mt-4">
             <Table>
@@ -253,6 +273,27 @@ const ocrStatsDayChartData = {
         type="treemap"
         labels={ocrNuskaitytojaiChartData.labels}
         series={ocrNuskaitytojaiChartData.series}
+        customOptions={{
+          colors: ocrNuskaitytojaiTreemapColors,
+          legend: {
+            show: false,
+          },
+          stroke: {
+            width: 1.25,
+            colors: ['var(--gray)'],
+          },
+          dataLabels: {
+            enabled: true,
+            style: {
+              colors: ['var(--black)'],
+              fontSize: '13px',
+              fontWeight: 600,
+            },
+            dropShadow: {
+              enabled: false,
+            },
+          },
+        }}
       />
     </section>
 
