@@ -163,13 +163,24 @@ describe('edge', () => {
         assert.equal(edge('a', 'b', 'T', '', null).attributes.forceLabel, false);
     });
     it('passes forceLabel through when set to true', () => {
-        assert.equal(edge('a', 'b', 'T', '', null, true).attributes.forceLabel, true);
+        assert.equal(edge('a', 'b', 'T', '', null, null, true).attributes.forceLabel, true);
     });
     it('stores label in attributes', () => {
         assert.equal(edge('a', 'b', 'Order', '€1M', null).attributes.label, '€1M');
     });
     it('normalises null label to empty string', () => {
         assert.equal(edge('a', 'b', 'T', null, null).attributes.label, '');
+    });
+    it('stores fromDate in attributes', () => {
+        assert.equal(edge('a', 'b', 'T', '', '2020-01-15').attributes.fromDate, '2020-01-15');
+    });
+    it('stores toDate in attributes', () => {
+        assert.equal(edge('a', 'b', 'T', '', null, '2024-12-31').attributes.toDate, '2024-12-31');
+    });
+    it('defaults fromDate and toDate to null', () => {
+        const e = edge('a', 'b', 'T', '');
+        assert.equal(e.attributes.fromDate, null);
+        assert.equal(e.attributes.toDate, null);
     });
 });
 

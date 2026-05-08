@@ -611,7 +611,8 @@ primary node (marked `isRoot: true`) emits `f=<chars>`; additional nodes emit
 ### Node Time Fields
 
 Lifespan logic: **earliest start field → latest end field** = actual duration of the entity's lifespan on the graph
-timeline.
+timeline. Each entity will have `startDate` and `endDate` attributes computed from the following fields. If no end date
+is found, the entity is treated as still active (open-ended).
 
 | Node type            | DB table                 | Start fields                                                                          | Possible end fields, If not found, the treat as not ended                        | Notes                                                                                                                                                                                                 |
 |----------------------|--------------------------|---------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -619,6 +620,22 @@ timeline.
 | `PersonEntity`       | `pinregJuridiniaiRysiai` | `rysioPradzia` (100% filled) — one row per relationship; take **min** across all rows | `rysioPabaiga` (~0.6% filled, very sparse) — take **max** across all rows        | Time lives on relationship rows, not the person node. min(`rysioPradzia`) → max(`rysioPabaiga` or `rysioPradzia`) = known active period. Most persons appear open-ended due to sparse `rysioPabaiga`. |
 | `ContractEntity`     | `sutartys`               | `sudarymoData` (~100% filled), `paskelbimoData` (~100% filled) — take **min**         | `galiojimoData` (~100% filled), `faktineIvykdimoData` (7% filled) — take **max** | min(`sudarymoData`, `paskelbimoData`) → max(`galiojimoData`, `faktineIvykdimoData`) = contract lifespan. `faktineIvykdimoData` extends the window only when present.                                  |
 | `ProcurementEntity`  | `viesiejiPirkimai`       | `paskelbimoData` (100% filled)                                                        | `pasiulymuPateikimoTerminas` (98% filled)                                        | `paskelbimoData` → `pasiulymuPateikimoTerminas` = procurement active period. End marks bid submission deadline, not contract award.                                                                   |
+
+### Edge Time Fields
+
+Edges carry `fromDate` and `toDate` (`YYYY-MM-DD`, no time component, `null` when unavailable). For relationship edges
+the dates come from the individual pinreg row — not aggregated across all rows for that person.
+
+| Edge type                                              | DB table                 | `fromDate`                                                | `toDate`                                              | Notes                                                                                           |
+|--------------------------------------------------------|--------------------------|-----------------------------------------------------------|-------------------------------------------------------|-------------------------------------------------------------------------------------------------|
+| `Employment` / `Director` / `Official` / `Shareholder` | `pinregJuridiniaiRysiai` | `rysioPradzia` of the row (100% filled)                   | `rysioPabaiga` of the row (~0.6% filled)              | Per-row, not aggregated. Each edge represents one declared relationship with its own start/end. |
+| `Spouse`                                               | `pinregJuridiniaiRysiai` | `rysioPradzia` of the declaration row                     | `rysioPabaiga` of the declaration row                 | Currently stored as `null`; same row carries the dates — can be populated.                      |
+| `Order`                                                | `sutartys`               | mirrors `ContractEntity` `fromDate` (min of start fields) | mirrors `ContractEntity` `toDate` (max of end fields) | Edge lifespan equals the contract lifespan.                                                     |
+| `Delivery`                                             | `sutartys`               | mirrors `ContractEntity` `fromDate`                       | mirrors `ContractEntity` `toDate`                     | Same contract row as `Order`.                                                                   |
+| `Procurement`                                          | `viesiejiPirkimai`       | `paskelbimoData`                                          | `pasiulymuPateikimoTerminas`                          | Mirrors the `ProcurementEntity` node dates.                                                     |
+| `Award`                                                | `sutartys`               | mirrors winning `ContractEntity` `fromDate`               | mirrors winning `ContractEntity` `toDate`             | Each award edge spans the winning contract's lifespan.                                          |
+| `Bidder`                                               | `atn1dalyviai`           | `null`                                                    | `null`                                                | No date columns in `atn1dalyviai`; always open-ended.                                           |
+| `ContractProcurementLink`                              | *(client-side)*          | mirrors `ContractEntity` `fromDate`                       | mirrors `ContractEntity` `toDate`                     | Client-created link; inherits from the contract node already in the graph.                      |
 
 ---
 
