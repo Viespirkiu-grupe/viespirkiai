@@ -18,7 +18,7 @@ interface Props {
 const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
 ---
 
-<div>
+<div class="bvpz-picker">
   <div class="text-muted text-sm mb-2 self-center">Greiti pasirinkimai:</div>
   <div class="flex flex-wrap gap-2 mb-4">
     {presets.map((preset) => (
@@ -276,20 +276,20 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
     bvpzLoadData();
   </script>
 
-  <style>
-    .cpv-tree {
+  <style is:global>
+    .bvpz-picker .cpv-tree {
       font-size: var(--text-sm);
     }
 
-    .cpv-tree details {
+    .bvpz-picker .cpv-tree details {
       margin-left: 28px;
     }
 
-    .cpv-tree > details {
+    .bvpz-picker .cpv-tree > details {
       margin-left: 0;
     }
 
-    .cpv-tree summary {
+    .bvpz-picker .cpv-tree summary {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -300,15 +300,15 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
       cursor: pointer;
     }
 
-    .cpv-tree summary::-webkit-details-marker {
+    .bvpz-picker .cpv-tree summary::-webkit-details-marker {
       display: none;
     }
 
-    .cpv-tree summary:hover {
+    .bvpz-picker .cpv-tree summary:hover {
       background: var(--lightest-gray);
     }
 
-    .cpv-tree summary label {
+    .bvpz-picker .cpv-tree summary label {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -316,11 +316,11 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
       flex: 1;
     }
 
-    .cpv-tree details.no-children > summary {
+    .bvpz-picker .cpv-tree details.no-children > summary {
       padding-left: calc(18px + 8px);
     }
 
-    .cpv-toggle {
+    .bvpz-picker .cpv-toggle {
       font-size: 10px;
       color: var(--gray);
       width: 18px;
@@ -329,29 +329,29 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
       transition: transform var(--transition);
     }
 
-    .cpv-tree details[open] > summary .cpv-toggle {
+    .bvpz-picker .cpv-tree details[open] > summary .cpv-toggle {
       transform: rotate(90deg);
     }
 
-    .cpv-code {
+    .bvpz-picker .cpv-code {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--dark-gray);
       flex-shrink: 0;
     }
 
-    .cpv-code-dim {
+    .bvpz-picker .cpv-code-dim {
       opacity: 0.3;
     }
 
-    .cpv-tree.loading {
+    .bvpz-picker .cpv-tree.loading {
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 200px;
     }
 
-    .action-bar {
+    .bvpz-picker .action-bar {
       position: fixed;
       bottom: 0;
       left: 0;
@@ -366,14 +366,14 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
       z-index: var(--z-sticky);
     }
 
-    .action-bar-left {
+    .bvpz-picker .action-bar-left {
       display: flex;
       flex-direction: column;
       gap: 2px;
       min-width: 0;
     }
 
-    .action-bar-codes {
+    .bvpz-picker .action-bar-codes {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--gray);
@@ -383,18 +383,18 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
       max-width: 60vw;
     }
 
-    .action-bar-right {
+    .bvpz-picker .action-bar-right {
       display: flex;
       gap: 8px;
       align-items: center;
       flex-shrink: 0;
     }
 
-    .action-bar-popup-wrap {
+    .bvpz-picker .action-bar-popup-wrap {
       position: relative;
     }
 
-    .action-bar-popup {
+    .bvpz-picker .action-bar-popup {
       position: absolute;
       bottom: calc(100% + 4px);
       right: 0;
@@ -406,11 +406,11 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
       display: none;
     }
 
-    .action-bar-popup.open {
+    .bvpz-picker .action-bar-popup.open {
       display: block;
     }
 
-    .action-bar-popup-item {
+    .bvpz-picker .action-bar-popup-item {
       display: block;
       width: 100%;
       padding: 8px 12px;
@@ -424,7 +424,7 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
       outline-offset: 0;
     }
 
-    .action-bar-popup-item:hover {
+    .bvpz-picker .action-bar-popup-item:hover {
       background: var(--lightest-gray);
     }
   </style>
