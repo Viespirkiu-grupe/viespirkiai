@@ -1,14 +1,13 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import Map from '@design-system/components/maps/Map.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
 import KeyValueList from '@design-system/components/KeyValueList.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
-import { LEAFLET_HEAD } from '@design-system/lib/leaflet.ts';
 import { loadFailasById, enrichFailas, parseSuffix } from '../../lib/failas.js';
 import { checkDokFileRemoved } from '@/modules/failai/queries.js';
 import FailasPreview from '../../components/failai/FailasPreview.astro';
 import FailasOcr from '../../components/failai/FailasOcr.astro';
-import MapPoint from '../../components/failai/MapPoint.astro';
 import Domenai from '../../components/failai/Domenai.astro';
 import Nuorodos from '../../components/failai/Nuorodos.astro';
 import Emails from '../../components/failai/Emails.astro';
@@ -62,7 +61,6 @@ const search = Astro.url.searchParams.get('search') || '';
   pageImage={`https://viespirkiai.org/failas/${failas.id}.png`}
   colorScheme={colorScheme}
   font={font}
-  customHead={failas.location && !isPasalintas ? LEAFLET_HEAD : ''}
 >
   <style>
     .failas-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 28px; align-items: start; }
@@ -131,7 +129,16 @@ const search = Astro.url.searchParams.get('search') || '';
         {failas.location && (
           <div>
             <h2 class="mb-3 no-style">Vieta</h2>
-            <MapPoint id="failas-map" lat={failas.location.lat} lon={failas.location.lon} zoom={14} height="220px" class="map-container" style="border-radius:var(--radius-md);" showLink={true} linkText="auto" />
+            <Map
+              id="failas-map"
+              lat={failas.location.lat}
+              lon={failas.location.lon}
+              zoom={14}
+              height="220px"
+              style="border-radius:var(--radius-md);"
+              showLink={true}
+              linkText="auto"
+            />
           </div>
         )}
 

@@ -1,8 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import Map from '@design-system/components/maps/Map.astro';
 import AsmuoHeader from '../../components/asmuo/AsmuoHeader.astro';
 import AsmuoBasics from '../../components/asmuo/AsmuoBasics.astro';
-import AsmuoMap from '../../components/asmuo/AsmuoMap.astro';
 import AsmuoStats from '../../components/asmuo/AsmuoStats.astro';
 import AsmuoSpecial from '../../components/asmuo/AsmuoSpecial.astro';
 import VidutinisDarboUzmokestis from '../../components/asmuo/VidutinisDarboUzmokestis.astro';
@@ -116,7 +116,16 @@ const mvpAprasaiLimit = query.mvpAprasaiLimit === 'max' ? 9999999 : Number(query
           <div class="text-muted text-xs mb-4">Duomenys gali būti pasenę</div>
           <AsmuoBasics asmuo={asmuo} />
         </div>
-        <AsmuoMap location={asmuo.jar.location} />
+        {asmuo.jar.location && (
+          <Map
+            id="asmuo-map"
+            lat={asmuo.jar.location[0]}
+            lon={asmuo.jar.location[1]}
+            zoom={16}
+            height="100%"
+            class="h-full min-h-70 col-[span_2]"
+          />
+        )}
       </div>
 
       <AsmuoStats asmuo={asmuo} />

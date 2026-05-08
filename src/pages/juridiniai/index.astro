@@ -1,11 +1,11 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import Map from '@design-system/components/maps/Map.astro';
 import SearchForm from '@design-system/components/content/SearchForm.astro';
 import JuridiniaiResults from '../../components/juridiniai/JuridiniaiResults.astro';
 import { searchJar } from '@/modules/juridiniai/search.js';
 import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
 import { getColorScheme, getFont, cleanQuery } from '../../lib/failai.js';
-import { LEAFLET_HEAD } from '@design-system/lib/leaflet.ts';
 import config from '../../lib/config.ts';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
 import { objectsToCsvStream } from '@/utils/csv.js';
@@ -90,6 +90,26 @@ if (hasSearch) {
 }
 
 const tikRezultatai = !!query.tikRezultatai;
+const juridiniaiMapConfig = {
+  mode: 'juridiniai',
+  center: [55.1694, 23.8813],
+  zoom: 7,
+  overlayTileUrl: '/juridiniai/map/tiles/{z}/{x}/{y}.png',
+  overlayOpacity: 0.6,
+  maxNativeZoom: 16,
+  maxZoom: 16,
+  overlayBlurPx: 5,
+  detailZoomThreshold: 17,
+  viewportUrlTemplate: '/juridiniai/map/viewport?minLat={minLat}&minLon={minLon}&maxLat={maxLat}&maxLon={maxLon}',
+  detailPointStyle: {
+    radius: 6,
+    color: 'black',
+    fillColor: 'black',
+    fillOpacity: 1,
+    weight: 1,
+  },
+  detailClickUrlTemplate: '/juridiniai?location={lat},{lon}&locationRadius=10',
+};
 ---
 
 {tikRezultatai ? (
@@ -107,7 +127,7 @@ const tikRezultatai = !!query.tikRezultatai;
     pageImage="https://viespirkiai.org/juridiniai.png"
     colorScheme={colorScheme}
     font={font}
-    customHead={((config.customHead) || '') + LEAFLET_HEAD}
+    customHead={config.customHead}
   >
     <main>
       <SearchForm title="Juridinių asmenų paieška" searchValue={query.search} />
@@ -131,53 +151,7 @@ const tikRezultatai = !!query.tikRezultatai;
               });
             </script>
             <br />
-            <div id="map" class="h-[60vh] rounded-lg"></div>
-            <script>
-            window.addEventListener('DOMContentLoaded', () => {
-              const leafletWindow = window as Window & {
-                L?: any;
-                juridiniaiLayer?: any;
-                __vpLeafletLoad?: () => Promise<void>;
-              };
-              const start = () => {
-                if (!leafletWindow.L || !leafletWindow.L.map) return;
-                const map = leafletWindow.L.map('map', { zoomAnimation: true, markerZoomAnimation: true }).setView([55.1694, 23.8813], 7);
-                leafletWindow.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                  attribution: '&copy; OpenStreetMap contributors',
-                }).addTo(map);
-                const juridiniaiTiles = leafletWindow.L.tileLayer('/juridiniai/map/tiles/{z}/{x}/{y}.png', {
-                  tileSize: 256, opacity: 0.6, maxNativeZoom: 16, maxZoom: 16,
-                }).addTo(map);
-                juridiniaiTiles.getContainer().style.filter = 'blur(5px)';
-                map.on('moveend zoomend', async () => {
-                  const zoom = map.getZoom();
-                  if (zoom < 17) {
-                    if (leafletWindow.juridiniaiLayer) map.removeLayer(leafletWindow.juridiniaiLayer);
-                    return;
-                  }
-                  const bounds = map.getBounds();
-                  const url = `/juridiniai/map/viewport?minLat=${bounds.getSouth()}&minLon=${bounds.getWest()}&maxLat=${bounds.getNorth()}&maxLon=${bounds.getEast()}`;
-                  const res = await fetch(url);
-                  const data = await res.json();
-                  if (leafletWindow.juridiniaiLayer) map.removeLayer(leafletWindow.juridiniaiLayer);
-                  const layerGroup = leafletWindow.L.layerGroup();
-                  data.locations.forEach(([lat, lon]: [number, number]) => {
-                    const circle = leafletWindow.L.circleMarker([lat, lon], {
-                      radius: 6, color: 'black', fillColor: 'black', fillOpacity: 1, weight: 1, interactive: true,
-                    }).addTo(layerGroup);
-                    circle.on('click', () => { leafletWindow.location.href = `/juridiniai?location=${lat},${lon}&locationRadius=10`; });
-                  });
-                  leafletWindow.juridiniaiLayer = layerGroup;
-                  map.addLayer(layerGroup);
-                });
-              };
-              if (typeof leafletWindow.__vpLeafletLoad === 'function') {
-                leafletWindow.__vpLeafletLoad().then(start).catch(() => {});
-              } else {
-                start();
-              }
-            });
-            </script>
+            <Map id="map" class="h-[60vh] rounded-lg" height="60vh" config={juridiniaiMapConfig} />
           </>
         )}
         <br />
