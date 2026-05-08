@@ -1,10 +1,10 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { getColorScheme, getFont } from '../lib/failai.js';
-import SectionText from '../components/content/SectionText.astro';
-import WordCloud from '../components/content/WordCloud.astro';
-import FaqList from '../components/content/FaqList.astro';
-import ResultCardList from '../components/content/ResultCardList.astro';
+import SectionText from '@design-system/components/content/SectionText.astro';
+import WordCloud from '@design-system/components/content/WordCloud.astro';
+import FaqList from '@design-system/components/content/FaqList.astro';
+import ResultCardList from '@design-system/components/content/ResultCardList.astro';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);

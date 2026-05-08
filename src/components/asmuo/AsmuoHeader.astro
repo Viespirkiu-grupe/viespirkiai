@@ -1,6 +1,7 @@
 ---
-import PageHeader from '../PageHeader.astro';
-import config from '@/config.js';
+import Button from '@design-system/components/Button.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import config from '../../lib/config.ts';
 
 interface Props {
   asmuo: any;
@@ -13,15 +14,15 @@ const jarKodas = asmuo.jar.jarKodas;
 <PageHeader>
   {asmuo.jar.pavadinimas}
   <Fragment slot="actions">
-    <a href={`/asmuo/${jarKodas}.json`} class="btn btn-outline btn-sm">↗ JSON</a>
-    {(config as any).enableGraph && (
-      <a href={`/rysiai/asmuo/${jarKodas}`} class="btn btn-outline btn-sm">↗ Ryšiai</a>
+    <Button href={`/asmuo/${jarKodas}.json`} variant="outline" size="sm">↗ JSON</Button>
+    {config.enableGraph && (
+      <Button href={`/rysiai/asmuo/${jarKodas}`} variant="outline" size="sm">↗ Ryšiai</Button>
     )}
     {asmuo.sodra?.kodas && (
-      <a href={`https://atvira.sodra.lt/imones/detaliai/index.html?code=${asmuo.sodra.kodas}`} class="btn btn-outline btn-sm">↗ SODRA</a>
+      <Button href={`https://atvira.sodra.lt/imones/detaliai/index.html?code=${asmuo.sodra.kodas}`} variant="outline" size="sm">↗ SODRA</Button>
     )}
-    <a href={`https://liteko.teismai.lt/viesasprendimupaieska/paieska.aspx?txt=${jarKodas}`} class="btn btn-outline btn-sm">↗ Bylos</a>
-    <a href={`/pirkejas/${jarKodas}`} class="btn btn-outline btn-sm">↗ Pirkimai</a>
-    <a href={`/tiekejas/${jarKodas}`} class="btn btn-outline btn-sm">↗ Pardavimai</a>
+    <Button href={`https://liteko.teismai.lt/viesasprendimupaieska/paieska.aspx?txt=${jarKodas}`} variant="outline" size="sm">↗ Bylos</Button>
+    <Button href={`/pirkejas/${jarKodas}`} variant="outline" size="sm">↗ Pirkimai</Button>
+    <Button href={`/tiekejas/${jarKodas}`} variant="outline" size="sm">↗ Pardavimai</Button>
   </Fragment>
 </PageHeader>

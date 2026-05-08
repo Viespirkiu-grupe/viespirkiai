@@ -1,5 +1,5 @@
 ---
-import ContactList from './ContactList.astro';
+import ContactList from '@design-system/components/content/ContactList.astro';
 interface Props { links: { link: string; pages?: number[] }[]; title?: string; emptyText?: string; }
 const { links = [], title = 'Nuorodos', emptyText = 'Nerasta' } = Astro.props;
 ---

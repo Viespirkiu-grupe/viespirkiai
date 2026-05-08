@@ -1,0 +1,59 @@
+<footer class="site-footer-shell">
+  <div class="footer-inner">
+    <slot />
+  </div>
+
+  <slot name="disclaimer" />
+</footer>
+
+<style>
+  .site-footer-shell {
+    width: 100%;
+    min-height: 4rem;
+    margin-block: 40px;
+    padding: 28px 16px;
+    border-top: var(--border);
+  }
+
+  .footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    color: var(--gray);
+    font-size: var(--text-sm);
+  }
+
+  .footer-inner :global(a),
+  .footer-inner :global(button) {
+    cursor: pointer;
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    transition: color var(--transition), text-decoration-color var(--transition);
+  }
+
+  .footer-inner :global(a:hover),
+  .footer-inner :global(button:hover) {
+    text-decoration-color: currentColor;
+  }
+
+  @media (max-width: 1200px) {
+    .site-footer-shell {
+      margin-block: 28px;
+      padding-top: 16px;
+    }
+
+    .footer-inner {
+      gap: 12px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .footer-inner {
+      flex-direction: column;
+      gap: 8px;
+    }
+  }
+</style>

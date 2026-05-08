@@ -1,5 +1,5 @@
 ---
-import ContactList from './ContactList.astro';
+import ContactList from '@design-system/components/content/ContactList.astro';
 interface Props { telefonai: { telefonas: string; puslapiai?: number[] }[]; title?: string; emptyText?: string; }
 const { telefonai = [], title = 'Telefonai', emptyText = 'Nerasta' } = Astro.props;
 ---

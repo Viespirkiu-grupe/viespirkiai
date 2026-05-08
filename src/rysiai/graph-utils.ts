@@ -156,6 +156,23 @@ export function mergeGraphElements(graph: Graph, getNodePos: GetNodePos, data: A
     return newNodeIds;
 }
 
+/**
+ * Recompute the visible view graph from the full data graph.
+ *
+ * `dataGraph` holds every node we have ever fetched.  `viewGraph` is the
+ * trimmed copy actually rendered.  This function:
+ *
+ *   1. Collects all "anchor" nodes (nodes the user has explicitly expanded).
+ *   2. Detects "bridge nodes" — non-anchor nodes that connect two or more
+ *      anchors.  Bridge nodes are kept visible even when their edge type is
+ *      otherwise filtered out, because hiding them would silently break the
+ *      visual relationship between the anchors the user expanded.
+ *   3. BFS-walks outward from the anchor + bridge set, honouring the user's
+ *      edge-type filter, to compute the final visible-node set.
+ *   4. Synchronises `viewGraph` with that set (adds new nodes, removes nodes
+ *      and edges that fell out of view) and returns the list of newly added
+ *      node IDs so the caller can run layout only on those.
+ */
 export function rebuildViewGraph(dataGraph: Graph, viewGraph: Graph, isEdgeHidden: IsEdgeHidden): string[] {
     const prevNodes = new Set(viewGraph.nodes());
 
@@ -164,6 +181,10 @@ export function rebuildViewGraph(dataGraph: Graph, viewGraph: Graph, isEdgeHidde
         if (isAnchorNode(attrs)) expandedAnchors.add(id);
     });
 
+    // Bridge detection: a node is a bridge if it directly connects two or
+    // more anchor nodes.  We capture both the bridge nodes themselves AND
+    // the edge IDs leading to anchors, so the BFS step below can keep those
+    // edges visible even if they would otherwise be filtered out.
     const bridgeNodes = new Set<string>();
     const bridgeEdges = new Set<string>();
     dataGraph.forEachNode((nodeId, nodeAttrs) => {

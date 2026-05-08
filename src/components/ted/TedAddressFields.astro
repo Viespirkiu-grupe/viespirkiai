@@ -1,0 +1,22 @@
+---
+function fa(fields: any[], btNum: string) {
+  const field = fields.find((x) => x.fieldId.startsWith(`BT-${btNum}-`) || x.fieldId.startsWith(`BT-${btNum}(`));
+  return (field?.values || []).join(', ');
+}
+
+const { addrFields = [] } = Astro.props;
+const street1 = fa(addrFields, '5101(a)');
+const street2 = fa(addrFields, '5101(b)');
+const zip = fa(addrFields, '5121');
+const city = fa(addrFields, '5131');
+const country = fa(addrFields, '5141');
+const nuts = fa(addrFields, '5071');
+const restrict = fa(addrFields, '727');
+const addInfo = fa(addrFields, '728');
+---
+
+{(street1 || street2) && <p class="mb-1">{[street1, street2].filter(Boolean).join(', ')}</p>}
+{(zip || city || country) && <p class="mb-1">{[[zip, city].filter(Boolean).join(' '), country].filter(Boolean).join(' · ')}</p>}
+{nuts && <p class="text-sm text-muted mb-1">NUTS: {nuts}</p>}
+{restrict && <p class="text-sm mb-1">{restrict}</p>}
+{addInfo && <p class="text-sm text-muted mb-0">{addInfo}</p>}

@@ -1,34 +1,13 @@
 ---
+import LeafletLoader from '@design-system/components/LeafletLoader.astro';
+
 interface Props { id: string; lat: number; lon: number; zoom?: number; height?: string; class?: string; style?: string; showLink?: boolean; linkText?: string; linkZoom?: number; }
 const { id, lat, lon, zoom = 14, height = '220px', class: className = 'map-container', style: styleExtra = '', showLink = true, linkText = 'auto', linkZoom } = Astro.props;
 const resolvedLinkZoom = linkZoom ?? zoom;
 const computedLinkText = linkText === 'auto' ? `${lat.toFixed(5)}, ${lon.toFixed(5)}` : linkText;
 const containerStyle = `height:${height};${styleExtra ? ` ${styleExtra}` : ''}`;
 ---
-<script is:inline>
-(function () {
-  window.__vpLeaflet = window.__vpLeaflet || { loading: null, loaded: false };
-  const state = window.__vpLeaflet;
-  function ensureCssOnce() {
-    if (document.querySelector('link[data-vp-leaflet-css="1"]')) return;
-    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = '/dist/leaflet.css'; link.dataset.vpLeafletCss = '1'; document.head.appendChild(link);
-  }
-  /** @param {() => void} resolve */
-  function waitForLeafletGlobal(resolve) { const check = () => { if (window.L && window.L.map) { state.loaded = true; resolve(); } else setTimeout(check, 25); }; check(); }
-  function ensureJsOnce() {
-    if (state.loaded) return state.loading || Promise.resolve();
-    if (state.loading) return state.loading;
-    state.loading = new Promise((resolve, reject) => {
-      if (document.querySelector('script[data-vp-leaflet-js="1"]')) return waitForLeafletGlobal(resolve);
-      const s = document.createElement('script'); s.src = '/dist/leaflet.js'; s.defer = true; s.dataset.vpLeafletJs = '1'; s.onload = () => { state.loaded = true; resolve(); }; s.onerror = () => reject(new Error('Leaflet failed to load'));
-      (document.body || document.head || document.documentElement).appendChild(s);
-    });
-    return state.loading;
-  }
-  window.__vpLeafletLoad = window.__vpLeafletLoad || function () { ensureCssOnce(); return ensureJsOnce(); };
-  try { window.__vpLeafletLoad(); } catch(e) {}
-})();
-</script>
+<LeafletLoader />
 
 <div id={id} class={className} style={containerStyle} data-lat={lat} data-lon={lon} data-zoom={zoom}></div>
 

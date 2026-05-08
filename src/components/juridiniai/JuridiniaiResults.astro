@@ -1,5 +1,8 @@
 ---
-import Pagination from '../Pagination.astro';
+import EmptyState from '@design-system/components/EmptyState.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import ResultsSummary from '@design-system/components/ResultsSummary.astro';
 
 interface Props {
   results: any[];
@@ -16,7 +19,7 @@ const { results, numberOfResults, galimaEksportuoti, queryParams, page, pageCoun
 <div class="mt-10 max-w-lg center mx-auto">
   <div>
     <div class="flex justify-between items-center mb-4">
-      <span class="text-muted text-sm numberOfResults" set:html={numberOfResults} />
+      <ResultsSummary html={numberOfResults} />
       {galimaEksportuoti && (
         <div class="flex gap-3">
           <a href={`/juridiniai/?${queryParams}&json=true&limit=max`} class="btn btn-outline btn-sm">↗ JSON</a>
@@ -26,27 +29,25 @@ const { results, numberOfResults, galimaEksportuoti, queryParams, page, pageCoun
       )}
     </div>
     {results.length === 0
-      ? <div class="empty-state"><p class="text-muted">Rezultatų nerasta.</p></div>
+      ? <EmptyState message="Rezultatų nerasta." />
       : <>
           <div class="result-list">
             {results.map((item: any) => (
-              <article class="result-card card-clickable">
-                <div class="result-card-body">
-                  <dl class="result-card-meta">
-                    <div><dt class="sr-only">Tipas</dt><dd>{item.formosPavadinimas}</dd></div>
-                  </dl>
-                  <h3 class="result-card-title">
-                    {!item.pavadinimas || item.pavadinimas.length === 0
-                      ? <em>Nenurodyta</em>
-                      : <a href={`/asmuo/${item.jarKodas}`}>{item.pavadinimas}</a>
-                    }
-                  </h3>
-                  <div class="result-card-footer">
-                    <span><strong>Adresas:</strong> {item.adresas}</span>
-                    <span><strong>Registruota:</strong> {item.registravimoData}</span>
-                  </div>
+              <ResultCardShell clickable={true}>
+                <dl slot="meta" class="result-card-meta">
+                  <div><dt class="sr-only">Tipas</dt><dd>{item.formosPavadinimas}</dd></div>
+                </dl>
+                <h3 slot="title" class="result-card-title">
+                  {!item.pavadinimas || item.pavadinimas.length === 0
+                    ? <em>Nenurodyta</em>
+                    : <a href={`/asmuo/${item.jarKodas}`}>{item.pavadinimas}</a>
+                  }
+                </h3>
+                <div slot="footer" class="result-card-footer">
+                  <span><strong>Adresas:</strong> {item.adresas}</span>
+                  <span><strong>Registruota:</strong> {item.registravimoData}</span>
                 </div>
-              </article>
+              </ResultCardShell>
             ))}
           </div>
           <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />

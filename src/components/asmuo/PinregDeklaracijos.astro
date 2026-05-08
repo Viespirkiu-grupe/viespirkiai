@@ -1,4 +1,6 @@
 ---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+
 const { asmuo } = Astro.props;
 const pinreg = asmuo.pinreg;
 if (!pinreg) return;
@@ -22,19 +24,17 @@ const anyTruncated =
       {pinreg.rysiaiSuJa.length > 0 ? (
         <div class="result-list">
           {pinreg.rysiaiSuJa.map((r: any) => (
-            <article class="result-card card-clickable">
-              <div class="result-card-body">
-                <dl class="result-card-meta">
-                  <div><dt class="sr-only">Nuo</dt><dd>Nuo {r.rysioPradzia}</dd></div>
-                  <div><dt class="sr-only">Kas</dt><dd>{r.kienoRysys && r.kienoRysys[0].toUpperCase() + r.kienoRysys.slice(1).toLowerCase()}</dd></div>
-                  <div><dt class="sr-only">Pateikta</dt><dd>{new Date(r.pateikimoData).toLocaleString('lt-LT')}</dd></div>
-                </dl>
-                <h3 class="result-card-title">
-                  <a href={`https://pinreg.vtek.lt/app/pid-perziura/${r.uuid}`}>{r.asmuo}</a>
-                </h3>
-                <div class="result-card-footer"><span>{r.rysioPobudzioPavadinimas}</span></div>
-              </div>
-            </article>
+            <ResultCardShell clickable={true}>
+              <dl slot="meta" class="result-card-meta">
+                <div><dt class="sr-only">Nuo</dt><dd>Nuo {r.rysioPradzia}</dd></div>
+                <div><dt class="sr-only">Kas</dt><dd>{r.kienoRysys && r.kienoRysys[0].toUpperCase() + r.kienoRysys.slice(1).toLowerCase()}</dd></div>
+                <div><dt class="sr-only">Pateikta</dt><dd>{new Date(r.pateikimoData).toLocaleString('lt-LT')}</dd></div>
+              </dl>
+              <h3 slot="title" class="result-card-title">
+                <a href={`https://pinreg.vtek.lt/app/pid-perziura/${r.uuid}`}>{r.asmuo}</a>
+              </h3>
+              <div slot="footer" class="result-card-footer"><span>{r.rysioPobudzioPavadinimas}</span></div>
+            </ResultCardShell>
           ))}
         </div>
       ) : <p class="text-muted text-sm">Nėra duomenų</p>}
@@ -45,18 +45,16 @@ const anyTruncated =
       {pinreg.darbovietes.length > 0 ? (
         <div class="result-list">
           {pinreg.darbovietes.map((d: any) => (
-            <article class="result-card card-clickable">
-              <div class="result-card-body">
-                <dl class="result-card-meta">
-                  <div><dt class="sr-only">Nuo</dt><dd>Nuo {d.rysioPradzia}</dd></div>
-                  <div><dt class="sr-only">Pateikta</dt><dd>{new Date(d.pateikimoData).toLocaleString('lt-LT')}</dd></div>
-                </dl>
-                <h3 class="result-card-title">
-                  <a href={`https://pinreg.vtek.lt/app/pid-perziura/${d.uuid}`}>{d.asmuo}</a>
-                </h3>
-                <div class="result-card-footer"><span>{d.pareigos}</span></div>
-              </div>
-            </article>
+            <ResultCardShell clickable={true}>
+              <dl slot="meta" class="result-card-meta">
+                <div><dt class="sr-only">Nuo</dt><dd>Nuo {d.rysioPradzia}</dd></div>
+                <div><dt class="sr-only">Pateikta</dt><dd>{new Date(d.pateikimoData).toLocaleString('lt-LT')}</dd></div>
+              </dl>
+              <h3 slot="title" class="result-card-title">
+                <a href={`https://pinreg.vtek.lt/app/pid-perziura/${d.uuid}`}>{d.asmuo}</a>
+              </h3>
+              <div slot="footer" class="result-card-footer"><span>{d.pareigos}</span></div>
+            </ResultCardShell>
           ))}
         </div>
       ) : <p class="text-muted text-sm">Nėra duomenų</p>}
@@ -67,18 +65,16 @@ const anyTruncated =
       {pinreg.sutuoktinioDarbovietes.length > 0 ? (
         <div class="result-list">
           {pinreg.sutuoktinioDarbovietes.map((d: any) => (
-            <article class="result-card card-clickable">
-              <div class="result-card-body">
-                <dl class="result-card-meta">
-                  <div><dt class="sr-only">Nuo</dt><dd>Nuo {d.rysioPradzia}</dd></div>
-                  <div><dt class="sr-only">Pateikta</dt><dd>{new Date(d.pateikimoData).toLocaleString('lt-LT')}</dd></div>
-                </dl>
-                <h3 class="result-card-title">
-                  <a href={`https://pinreg.vtek.lt/app/pid-perziura/${d.uuid}`}>{d.asmuo} – {d.sutuoktinis}</a>
-                </h3>
-                <div class="result-card-footer"><span>{d.pareigos}</span></div>
-              </div>
-            </article>
+            <ResultCardShell clickable={true}>
+              <dl slot="meta" class="result-card-meta">
+                <div><dt class="sr-only">Nuo</dt><dd>Nuo {d.rysioPradzia}</dd></div>
+                <div><dt class="sr-only">Pateikta</dt><dd>{new Date(d.pateikimoData).toLocaleString('lt-LT')}</dd></div>
+              </dl>
+              <h3 slot="title" class="result-card-title">
+                <a href={`https://pinreg.vtek.lt/app/pid-perziura/${d.uuid}`}>{d.asmuo} – {d.sutuoktinis}</a>
+              </h3>
+              <div slot="footer" class="result-card-footer"><span>{d.pareigos}</span></div>
+            </ResultCardShell>
           ))}
         </div>
       ) : <p class="text-muted text-sm">Nėra duomenų</p>}

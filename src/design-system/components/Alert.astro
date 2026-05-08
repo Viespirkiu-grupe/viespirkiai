@@ -1,0 +1,82 @@
+---
+interface Props {
+  variant?: 'success' | 'warning' | 'danger' | 'info' | 'muted';
+  icon?: string;
+  title?: string;
+  className?: string;
+}
+
+const {
+  variant = 'info',
+  icon,
+  title,
+  className = '',
+} = Astro.props;
+
+const classes = ['ds-alert', `ds-alert--${variant}`, className].filter(Boolean).join(' ');
+---
+
+<div class={classes}>
+  {icon && <span class="ds-alert__icon">{icon}</span>}
+  <div class="ds-alert__body">
+    {title && <div class="ds-alert__title">{title}</div>}
+    <slot />
+  </div>
+</div>
+
+<style>
+  .ds-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-lg);
+    font-size: var(--text-sm);
+  }
+
+  .ds-alert__icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .ds-alert__body {
+    flex: 1;
+  }
+
+  .ds-alert__title {
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .ds-alert--success {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    border-color: var(--color-success);
+  }
+
+  .ds-alert--warning {
+    background: var(--color-warning-bg);
+    color: var(--color-warning);
+    border-color: var(--color-warning);
+  }
+
+  .ds-alert--danger {
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+  }
+
+  .ds-alert--info {
+    background: var(--color-info-bg);
+    color: var(--color-info);
+    border-color: var(--color-info);
+  }
+
+  .ds-alert--muted {
+    background: var(--lighter-gray);
+    color: var(--dark-gray);
+    border-color: var(--light-gray);
+  }
+</style>

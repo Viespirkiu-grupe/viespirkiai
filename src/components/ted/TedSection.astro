@@ -1,0 +1,290 @@
+---
+import TedAddressFields from './TedAddressFields.astro';
+import TedGroup from './TedGroup.astro';
+import TedKvList from './TedKvList.astro';
+import TedLotGroup from './TedLotGroup.astro';
+import TedLotsGroupGroup from './TedLotsGroupGroup.astro';
+import TedOrgGroup from './TedOrgGroup.astro';
+
+const {
+  section,
+  shortUrl,
+  buyerOrgId,
+  reviewBodyOrgIds,
+  mediationBodyOrgIds,
+  eSenderOrgIds,
+  parentNodeTitles,
+  parentNodeAliases,
+  subgroupTitles,
+} = Astro.props;
+
+const sectionId = section.nodeId.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
+
+function f(id: string) {
+  return (section.fields.find((x: any) => x.fieldId === id)?.values || []).join(', ');
+}
+
+function byParent(fields: any[]) {
+  const result: any[] = [];
+  const seen = new Map();
+  for (const field of fields) {
+    const canonical = parentNodeAliases[field.parentNodeId] || field.parentNodeId || '__root__';
+    if (!seen.has(canonical)) {
+      const item = { label: parentNodeTitles[canonical] || null, pid: canonical, fields: [] };
+      seen.set(canonical, item);
+      result.push(item);
+    }
+    seen.get(canonical).fields.push(field);
+  }
+  return result;
+}
+
+function splitMax5(groups: any[]) {
+  const out: any[] = [];
+  for (const fg of groups) {
+    if (fg.fields.length <= 5) {
+      out.push(fg);
+      continue;
+    }
+    for (let i = 0; i < fg.fields.length; i += 5) {
+      out.push({ label: i === 0 ? fg.label : null, pid: fg.pid, fields: fg.fields.slice(i, i + 5) });
+    }
+  }
+  return out;
+}
+
+function getOrgId(group: any) {
+  return group.fields.find((field: any) => field.fieldId === 'OPT-200-Organization-Company')?.values?.[0] ?? null;
+}
+
+const SECTION_ROLE: Record<string, string> = {
+  'ND-ContractingParty': 'Pirkėjas',
+  'ND-ReviewBody': 'Peržiūros institucija',
+  'ND-MediationBody': 'Tarpininkas',
+  'ND-ReviewOrganization': 'Peržiūros organizacija',
+};
+
+function getRole(group: any) {
+  const sectionRoleLabel = SECTION_ROLE[section.nodeId] || null;
+  if (sectionRoleLabel) return sectionRoleLabel;
+
+  const orgId = getOrgId(group);
+  if (orgId && buyerOrgId && orgId === buyerOrgId) return 'Pirkėjas';
+  if (orgId && reviewBodyOrgIds?.has?.(orgId)) return 'Peržiūros institucija';
+  if (orgId && mediationBodyOrgIds?.has?.(orgId)) return 'Tarpininkavimo institucija';
+  if (orgId && eSenderOrgIds?.has?.(orgId)) return 'TED siuntėjas';
+
+  const hasCpFields = group.fields.some((field: any) =>
+    field.fieldId.startsWith('BT-10-') || field.fieldId.startsWith('BT-11-') || field.fieldId === 'BT-508-Procedure-Buyer',
+  );
+  if (hasCpFields) return 'Pirkėjas';
+
+  return null;
+}
+
+function sortOrder(group: any) {
+  const role = getRole(group);
+  if (role === 'Pirkėjas') return 0;
+  if (role === 'TED siuntėjas') return 2;
+  return 1;
+}
+
+const ORG_FIELD_PREFIXES = ['BT-500', 'BT-501', 'BT-502', 'BT-503', 'BT-505', 'BT-506', 'BT-507', 'BT-508', 'BT-510', 'BT-512', 'BT-513', 'BT-514', 'BT-610', 'BT-10-', 'BT-11-', 'BT-740'];
+const orgGroups = section.groups
+  .filter((group: any) => group.fields.some((field: any) => ORG_FIELD_PREFIXES.some((prefix) => field.fieldId.startsWith(prefix))))
+  .sort((a: any, b: any) => sortOrder(a) - sortOrder(b));
+
+const isScopeSection = section.nodeId === 'ND-ProcedureProcurementScope' || section.nodeId === 'ND-ProcurementProject';
+const isProcedureSection = section.nodeId === 'ND-ProcedureTenderingProcess' || section.nodeId === 'ND-TenderingProcess';
+const isTermsSection = section.nodeId === 'ND-ProcedureTerms' || section.nodeId === 'ND-TenderingTerms';
+const isOrgSection = ['ND-RootExtension', 'ND-ContractingParty', 'ND-Organization', 'ND-ReviewBody', 'ND-MediationBody', 'ND-ReviewOrganization'].includes(section.nodeId);
+const isMetaSection = section.nodeId === 'ND-Root' || section.nodeId === 'ND-GazetteReference';
+const fieldCols = splitMax5(byParent(section.fields));
+---
+
+{isScopeSection ? (
+  <>
+    {(() => {
+      const internalId = f('BT-22-Procedure');
+      const contractType = f('BT-23-Procedure');
+      const description = f('BT-24-Procedure');
+      const mainCpv = f('BT-262-Procedure');
+      const addInfo = f('BT-300-Procedure');
+      const otherObjects = f('BT-531-Procedure');
+      const addrFields = section.fields.filter((field: any) => field.parentNodeId === 'ND-ProcedurePlacePerformance' || field.parentNodeId === 'ND-ProcedurePlacePerformanceAdditionalInformation');
+      const splitCpv = (value: string) => {
+        const text = String(value || '').trim();
+        if (!text) return { code: '', label: '' };
+        const parts = text.split(' – ');
+        return parts.length > 1 ? { code: parts[0].trim(), label: parts.slice(1).join(' – ').trim() } : { code: text, label: '' };
+      };
+      const mainCpvParts = splitCpv(mainCpv);
+      const addCpvParts = f('BT-263-Procedure')
+        ? f('BT-263-Procedure').split(',').map((item) => item.trim()).filter(Boolean).map(splitCpv)
+        : [];
+      return (
+        <section id="pirkimo-objektas">
+          <h2 class="mb-7">Pirkimo objektas</h2>
+          {description && <p>{description}</p>}
+          {(internalId || contractType) && <p class="text-sm text-muted">{[internalId, contractType].filter(Boolean).join(' · ')}</p>}
+          {addInfo && <p class="text-sm text-muted">{addInfo}</p>}
+          {mainCpvParts.code && (
+            <>
+              <h3 class="mb-2">BVPŽ</h3>
+              <div class="flex flex-col gap-2">
+                <div>
+                  <div class="font-medium">{mainCpvParts.label || mainCpvParts.code}{mainCpvParts.code && <span class="text-muted font-normal text-xs"> {mainCpvParts.code}</span>}</div>
+                </div>
+                {addCpvParts.map((cpvItem) => (
+                  <div>
+                    <div class="font-medium">{cpvItem.label || cpvItem.code}{cpvItem.code && <span class="text-muted font-normal text-xs"> {cpvItem.code}</span>}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {otherObjects && <p class="text-sm text-muted">Taip pat: {otherObjects}</p>}
+          {addrFields.length > 0 && (
+            <>
+              <p class="section-title text-sm">Vykdymo vieta</p>
+              <TedAddressFields addrFields={addrFields} />
+            </>
+          )}
+        </section>
+      );
+    })()}
+  </>
+) : isProcedureSection ? (
+  <>
+    {(() => {
+      const procType = f('BT-105-Procedure');
+      const accelerated = f('BT-106-Procedure');
+      const accelDesc = f('BT-1351-Procedure');
+      const lotsConstr = f('BT-763-Procedure');
+      const features = f('BT-88-Procedure');
+      const cols = [
+        features && { label: 'Procedūros ypatumai', text: features },
+        accelerated === 'Taip' && { label: 'Pagreitinta procedūra', text: accelDesc || 'Taip' },
+        lotsConstr && { label: 'Dalių apribojimai', text: lotsConstr },
+      ].filter(Boolean);
+      return (
+        <section id="procedura">
+          <h2 class="mb-7">Procedūra</h2>
+          {procType && <h3>{procType}</h3>}
+          {cols.length > 0 && (
+            <div class="grid-3">
+              {cols.map((col) => (
+                <div>
+                  <p class="section-title">{col.label}</p>
+                  <p class="text-sm">{col.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      );
+    })()}
+  </>
+) : isTermsSection ? (
+  <>
+    {(() => {
+      const exclusion = f('BT-67(a)-Procedure');
+      const exclusionDesc = f('BT-67(b)-Procedure');
+      const exclusionSrc = f('BT-806-Procedure');
+      const maxSubmit = f('BT-31-Procedure');
+      const maxAwarded = f('BT-33-Procedure');
+      const crossBorder = f('BT-09(a)-Procedure');
+      const crossBorderDesc = f('BT-09(b)-Procedure');
+      const hasContent = exclusion || exclusionDesc || maxSubmit || maxAwarded || crossBorder || crossBorderDesc;
+      return hasContent ? (
+        <section id="dalyvavimo-salygos">
+          <h2 class="mb-7">Dalyvavimo sąlygos</h2>
+          <div class="grid-3">
+            {(exclusion || exclusionDesc) && (
+              <div>
+                <p class="section-title">Pašalinimo pagrindai</p>
+                {exclusion && <p>{exclusion}</p>}
+                {exclusionDesc && <p class="text-sm text-muted">{exclusionDesc}</p>}
+                {exclusionSrc && <p class="text-sm text-muted">Šaltinis: {exclusionSrc}</p>}
+              </div>
+            )}
+            {(maxSubmit || maxAwarded) && (
+              <div>
+                <p class="section-title">Dalių paskirstymas</p>
+                {maxSubmit && <><p class="section-title text-sm">Maks. pasiūlymų dalių</p><p><strong>{maxSubmit}</strong></p></>}
+                {maxAwarded && <><p class="section-title text-sm">Maks. skiriamų dalių</p><p><strong>{maxAwarded}</strong></p></>}
+              </div>
+            )}
+            {(crossBorder || crossBorderDesc) && (
+              <div>
+                <p class="section-title">Tarpvalstybinė teisė</p>
+                <p>{crossBorderDesc || crossBorder}</p>
+              </div>
+            )}
+          </div>
+        </section>
+      ) : null;
+    })()}
+  </>
+) : isOrgSection ? (
+  orgGroups.length > 0 && (
+    <section id={sectionId}>
+      <h2 class="mb-7">{section.title}</h2>
+      <div class="grid-3">
+        {orgGroups.map((group) => <TedOrgGroup group={group} roleLabel={getRole(group)} />)}
+      </div>
+    </section>
+  )
+) : isMetaSection ? (
+  <>
+    {(() => {
+      const legalBasis = f('BT-01-notice');
+      const noticeType = f('BT-02-notice');
+      const sentDate = f('BT-05(a)-notice');
+      const noticeId = f('BT-701-notice');
+      const langs = f('BT-702(a)-notice');
+      const version = f('BT-757-notice');
+      const items = [
+        sentDate && { label: 'Išsiųsta', value: sentDate },
+        noticeType && { label: 'Rūšis', value: noticeType },
+        legalBasis && { label: 'Pagrindas', value: legalBasis },
+        langs && { label: 'Kalbos', value: langs },
+        version && { label: 'Versija', value: version },
+        noticeId && { label: 'ID', value: noticeId },
+      ].filter(Boolean);
+      return (
+        <section id="skelbimo-informacija">
+          <h2 class="mb-7">Skelbimo informacija</h2>
+          <dl class="kv-list">
+            {items.map((item) => <><dt>{item.label}</dt><dd>{item.value}</dd></>)}
+          </dl>
+        </section>
+      );
+    })()}
+  </>
+) : (
+  <section id={sectionId}>
+    <h2 class="mb-7">{section.title}</h2>
+    {section.fields.length > 0 && (
+      <div class="grid-auto">
+        {fieldCols.map((fg) => (
+          <div>
+            {fg.label && <h3>{fg.label}</h3>}
+            {(fg.pid === 'ND-ProcedurePlacePerformance' || fg.pid === 'ND-LotPlacePerformance' || fg.pid === 'ND-PartPlacePerformance')
+              ? <TedAddressFields addrFields={fg.fields} />
+              : <TedKvList fields={fg.fields} shortUrl={shortUrl} />}
+          </div>
+        ))}
+      </div>
+    )}
+    <div class="flex flex-col gap-4">
+      {section.groups.map((group, idx) => (
+        (section.nodeId === 'ND-Lot' || section.nodeId === 'ND-Part')
+          ? <TedLotGroup group={group} idx={idx} totalGroups={section.groups.length} shortUrl={shortUrl} subgroupTitles={subgroupTitles} formatDate={Astro.props.formatDate} />
+          : section.nodeId === 'ND-LotsGroup'
+            ? <TedLotsGroupGroup group={group} idx={idx} totalGroups={section.groups.length} shortUrl={shortUrl} subgroupTitles={subgroupTitles} />
+            : <TedGroup group={group} idx={idx} shortUrl={shortUrl} parentNodeTitles={parentNodeTitles} parentNodeAliases={parentNodeAliases} subgroupTitles={subgroupTitles} />
+      ))}
+    </div>
+  </section>
+)}

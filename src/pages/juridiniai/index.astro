@@ -1,12 +1,12 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import SearchForm from '../../components/content/SearchForm.astro';
+import SearchForm from '@design-system/components/content/SearchForm.astro';
 import JuridiniaiResults from '../../components/juridiniai/JuridiniaiResults.astro';
 import { searchJar } from '@/modules/juridiniai/search.js';
 import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
 import { getColorScheme, getFont, cleanQuery } from '../../lib/failai.js';
-import { LEAFLET_HEAD } from '../../lib/leaflet.js';
-import config from '@/config.js';
+import { LEAFLET_HEAD } from '@design-system/lib/leaflet.ts';
+import config from '../../lib/config.ts';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
 import { objectsToCsvStream } from '@/utils/csv.js';
 import { Readable as NodeReadable, PassThrough } from 'node:stream';
@@ -107,7 +107,7 @@ const tikRezultatai = !!query.tikRezultatai;
     pageImage="https://viespirkiai.org/juridiniai.png"
     colorScheme={colorScheme}
     font={font}
-    customHead={((config as any).customHead || '') + LEAFLET_HEAD}
+    customHead={((config.customHead) || '') + LEAFLET_HEAD}
   >
     <main>
       <SearchForm title="Juridinių asmenų paieška" searchValue={query.search} />

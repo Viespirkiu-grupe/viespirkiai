@@ -1,4 +1,6 @@
 ---
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
 const { asmuo, finansaiLimit } = Astro.props;
 const ataskaitos = asmuo.finansai?.ataskaitos ?? [];
 if (ataskaitos.length === 0) return;
@@ -59,8 +61,8 @@ const pelnoDuomenys = JSON.stringify(duomenys['Grynasis pelnas (nuostoliai)'] ??
   </div>
 
   {metai.length > 0 && (
-    <div class="table-wrapper mb-7">
-      <table class="table">
+    <TableWrapper className="mb-7">
+      <Table>
         <thead>
           <tr>
             <th>Eilutė</th>
@@ -84,8 +86,8 @@ const pelnoDuomenys = JSON.stringify(duomenys['Grynasis pelnas (nuostoliai)'] ??
             </tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </Table>
+    </TableWrapper>
   )}
 
   {ataskaitos.length > finansaiLimit && (

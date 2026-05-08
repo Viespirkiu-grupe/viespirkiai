@@ -1,0 +1,59 @@
+---
+interface Props { label: string; name: string; values: Record<string, any>; }
+const { label, name, values } = Astro.props;
+---
+<div class="ds-checkbox">
+  <input type="checkbox" class="ds-checkbox__input" name={name} id={name} value="true" checked={!!values[name]}>
+  <label class="ds-checkbox__label" for={name}>{label}</label>
+</div>
+
+<style>
+  .ds-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-block: 4px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .ds-checkbox__label {
+    cursor: pointer;
+    font-size: var(--text-base);
+  }
+
+  .ds-checkbox__input {
+    position: relative;
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    appearance: none;
+    border: 2px solid var(--light-gray);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    cursor: pointer;
+    transition: background-color var(--transition), border-color var(--transition);
+  }
+
+  .ds-checkbox__input:hover {
+    border-color: var(--black);
+  }
+
+  .ds-checkbox__input:checked {
+    border-color: var(--black);
+    background: var(--black);
+  }
+
+  .ds-checkbox__input:checked::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 5px;
+    width: 4px;
+    height: 8px;
+    border: solid var(--white);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+</style>

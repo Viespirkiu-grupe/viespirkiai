@@ -1,4 +1,6 @@
 ---
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+
 interface Props {
   sutartis: any;
 }
@@ -10,10 +12,10 @@ const papildomiPav = sutartis.papildomiBvpzPavadinimai ?? [];
 
 <section>
   <h2>Klasifikacija</h2>
-  <dl class="kv-list mb-4">
+  <KeyValueList className="mb-4">
     <dt>Kategorija</dt><dd>{sutartis.kategorija}</dd>
     <dt>Tipas</dt><dd>{sutartis.tipas} <span class="text-muted">(<em>{sutartis.tipoPavadinimas}</em>)</span></dd>
-  </dl>
+  </KeyValueList>
 
   <h3 class="mb-2">BVPŽ</h3>
   <div class="mb-2">

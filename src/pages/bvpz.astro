@@ -1,9 +1,11 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import BvpzPicker from '../components/content/BvpzPicker.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import { getColorScheme, getFont } from '../lib/failai.ts';
 
-const colorScheme = Astro.cookies.get('colorScheme')?.value || 'auto';
-const font = Astro.cookies.get('font')?.value || 'ubuntu';
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
 
 const presets = [
   { label: 'Informacinės technologijos', codes: '48 72' },
@@ -25,10 +27,7 @@ const searchTargets = [
   font={font}
 >
   <main>
-
-    <div class="page-header">
-      <h1 class="mb-0">BVPŽ kodai</h1>
-    </div>
+    <PageHeader>BVPŽ kodai</PageHeader>
 
     <p class="text-muted text-sm mb-4">
       Sąraše galite ieškoti naudodamiesi naršyklės paieškos funkcija (<kbd>Ctrl</kbd>+<kbd>F</kbd>).

@@ -98,6 +98,17 @@ function normalizeTekstasPerziurai(failas: Failas) {
   failas.tekstasPerziurai = (t || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
 
+/**
+ * Decorate the entries of an archive (zip/tar/...) with their DB-resident
+ * file IDs so the UI can render them as clickable links.
+ *
+ * When an archive file is OCR'd we store each member individually in `failai`
+ * with `parent = <archive id>` and `saltinioId = <member path>`.  The
+ * extractor metadata in `metaduomenys.files` knows the paths but not the
+ * IDs, so we look them up here and inject `{ id, extension }` onto each
+ * matching entry — both the flat `files` array and the recursive
+ * `filesTree` structure.
+ */
 async function resolveArchiveFiles(failas: Failas) {
   if (!failas?.metaduomenys?.files) return;
   const paths = failas.metaduomenys.files.map((f: any) => f.path).filter(Boolean);
@@ -135,6 +146,20 @@ export async function loadFailasById(id: string): Promise<Failas | null> {
   return result.rows[0] || null;
 }
 
+/**
+ * Run the full enrichment pipeline on a `failas` row.
+ *
+ * Steps (in order):
+ *   1. Merge in metadata from the file-storage service (`fetchFailasMetadata`).
+ *   2. Strip long digit runs from signature DNs (PII redaction).
+ *   3. Decode the QP-encoded `attachmentName` if present (`fixHtmlEntities`).
+ *   4. Parse the WKB `location` blob into `[lat, lon]` coordinates.
+ *   5. Resolve archive children and decorate them with DB IDs.
+ *   6. Compute the preview type, OCR-state label, source link, and original
+ *      external URL fields used by the UI.
+ *
+ * Mutates and returns the same object for convenience.
+ */
 export async function enrichFailas(failas: Failas): Promise<Failas> {
   const { fetchFailasMetadata } = await import('@/modules/failai/aptarnavimas.js');
   failas = { ...failas, ...(await fetchFailasMetadata(failas.id)) };

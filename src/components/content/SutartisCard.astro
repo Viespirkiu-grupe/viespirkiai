@@ -1,4 +1,6 @@
 ---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+
 interface SutartisCardItem {
   tipas: string;
   kategorija: string;
@@ -42,78 +44,76 @@ const sudaryta = item.sudarymoData ? String(item.sudarymoData).slice(0, 10) : ''
 const galioja = item.galiojimoData ? String(item.galiojimoData).slice(0, 10) : '';
 ---
 
-<article class="result-card card-clickable">
-  <div class="result-card-body">
-    <dl class="result-card-meta">
-      <div><dt class="sr-only">Tipas</dt><dd>{item.tipas}</dd></div>
-      <div><dt class="sr-only">Kategorija</dt><dd>{item.kategorija}</dd></div>
-      <div>
-        <dt class="sr-only">Sutarties galiojimas</dt>
-        <dd>
-          <abbr aria-hidden="true" title="Sutarties galiojimas" class="relative z-1">Sut.</abbr>
-          {sudaryta && galioja
-            ? <><time datetime={sudaryta}>{sudaryta}</time>{sudaryta !== galioja && <> – <time datetime={galioja}>{galioja}</time></>}</>
-            : '—'
-          }
-        </dd>
-      </div>
-      {(item.dokumentuKiekis ?? 0) > 0 && (
-        <div>
-          <dt class="sr-only">Dokumentai</dt>
-          <dd>{item.dokumentuKiekis} <abbr aria-hidden="true" title="Dokumentai" class="relative z-1">dok.</abbr></dd>
-        </div>
-      )}
-    </dl>
-
-    <div class="flex align-baseline gap-3">
-      <h3 class="result-card-title">
-        <a href={`/sutartis/${item.sutartiesUnikalusId}`}>
-          <span class={`amount${verte > 10000 ? ' font-bold' : ''}`}>
-            {verte.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;€
-          </span>
-          {item.pavadinimas.length < 1 ? <em>Nenurodyta</em> : item.pavadinimas}
-        </a>
-      </h3>
-    </div>
-
-    <div class="result-card-footer">
-      {item.perkanciosiosOrganizacijosKodas && (
-        <span>
-          <strong>Pirkėjas:</strong>
-          <a href={`/asmuo/${item.perkanciosiosOrganizacijosKodas}`} class="relative z-1">
-            {truncate(item.perkanciojiOrganizacija)}
-          </a>
-        </span>
-      )}
-      {tiekejai.length === 1
-        ? <span>
-            <strong>Tiekėjas:</strong>
-            <a href={`/asmuo/${tiekejaiKodai[0]}`} class="relative z-1">
-              {truncate(tiekejai[0] || 'Nenurodytas')}
-            </a>
-          </span>
-        : tiekejai.length > 1 && (
-            <span class="flex align-start gap-2">
-              <strong>Tiekėjai:</strong>
-              <span class="flex flex-col gap-1">
-                {tiekejai.map((t, i) => (
-                  <a href={`/asmuo/${tiekejaiKodai[i]}`} class="relative z-1">
-                    {truncate(t || 'Nenurodytas')}
-                  </a>
-                ))}
-              </span>
-            </span>
-          )
-      }
-    </div>
-
-    {showRedagavimoData && (
-      <div class="text-muted text-sm mt-4">
-        {item.paskutinioRedagavimoData
-          ? <time datetime={item.paskutinioRedagavimoData}>{item.paskutinioRedagavimoData}</time>
+<ResultCardShell clickable={true}>
+  <dl slot="meta" class="result-card-meta">
+    <div><dt class="sr-only">Tipas</dt><dd>{item.tipas}</dd></div>
+    <div><dt class="sr-only">Kategorija</dt><dd>{item.kategorija}</dd></div>
+    <div>
+      <dt class="sr-only">Sutarties galiojimas</dt>
+      <dd>
+        <abbr aria-hidden="true" title="Sutarties galiojimas" class="relative z-1">Sut.</abbr>
+        {sudaryta && galioja
+          ? <><time datetime={sudaryta}>{sudaryta}</time>{sudaryta !== galioja && <> – <time datetime={galioja}>{galioja}</time></>}</>
           : '—'
         }
+      </dd>
+    </div>
+    {(item.dokumentuKiekis ?? 0) > 0 && (
+      <div>
+        <dt class="sr-only">Dokumentai</dt>
+        <dd>{item.dokumentuKiekis} <abbr aria-hidden="true" title="Dokumentai" class="relative z-1">dok.</abbr></dd>
       </div>
     )}
+  </dl>
+
+  <div slot="title" class="flex align-baseline gap-3">
+    <h3 class="result-card-title">
+      <a href={`/sutartis/${item.sutartiesUnikalusId}`}>
+        <span class={`amount${verte > 10000 ? ' font-bold' : ''}`}>
+          {verte.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;€
+        </span>
+        {item.pavadinimas.length < 1 ? <em>Nenurodyta</em> : item.pavadinimas}
+      </a>
+    </h3>
   </div>
-</article>
+
+  <div slot="footer" class="result-card-footer">
+    {item.perkanciosiosOrganizacijosKodas && (
+      <span>
+        <strong>Pirkėjas:</strong>
+        <a href={`/asmuo/${item.perkanciosiosOrganizacijosKodas}`} class="relative z-1">
+          {truncate(item.perkanciojiOrganizacija)}
+        </a>
+      </span>
+    )}
+    {tiekejai.length === 1
+      ? <span>
+          <strong>Tiekėjas:</strong>
+          <a href={`/asmuo/${tiekejaiKodai[0]}`} class="relative z-1">
+            {truncate(tiekejai[0] || 'Nenurodytas')}
+          </a>
+        </span>
+      : tiekejai.length > 1 && (
+          <span class="flex align-start gap-2">
+            <strong>Tiekėjai:</strong>
+            <span class="flex flex-col gap-1">
+              {tiekejai.map((t, i) => (
+                <a href={`/asmuo/${tiekejaiKodai[i]}`} class="relative z-1">
+                  {truncate(t || 'Nenurodytas')}
+                </a>
+              ))}
+            </span>
+          </span>
+        )
+    }
+  </div>
+
+  {showRedagavimoData && (
+    <div slot="after-footer" class="text-muted text-sm mt-4">
+      {item.paskutinioRedagavimoData
+        ? <time datetime={item.paskutinioRedagavimoData}>{item.paskutinioRedagavimoData}</time>
+        : '—'
+      }
+    </div>
+  )}
+</ResultCardShell>

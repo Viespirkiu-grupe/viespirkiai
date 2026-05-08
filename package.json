@@ -3,20 +3,14 @@
     "version": "1.0.0",
     "main": "index.js",
     "scripts": {
-        "dev": "node index.js",
-        "start": "node server.js",
-        "build": "npm run build:tailwind && npm run build:graph-bundle && npm run build:rysiai",
-        "watch": "npm run watch:tailwind & npm run watch:graph-bundle & npm run watch:rysiai",
-        "build:tailwind": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --minify",
-        "watch:tailwind": "tailwindcss -i ./styles/tailwind.css -o ./public/dist/tailwind.css --watch",
-        "build:graph-bundle": "esbuild src/graph-bundle.js --bundle --format=iife --outfile=public/dist/graph-bundle.js --minify",
-        "watch:graph-bundle": "esbuild src/graph-bundle.js --bundle --format=iife --outfile=public/dist/graph-bundle.js --watch",
-        "build:rysiai": "esbuild src/rysiai-app.js --bundle --format=iife --outfile=public/dist/rysiai.js --minify",
-        "watch:rysiai": "esbuild src/rysiai-app.js --bundle --format=iife --outfile=public/dist/rysiai.js --watch",
+        "dev": "astro dev",
+        "start": "node start.mjs",
+        "build": "astro build",
         "test": "vitest run",
-        "dev:astro": "npm run watch:tailwind & astro dev",
-        "build:astro": "astro build",
-        "start:astro": "node start.mjs"
+        "check": "astro check"
+    },
+    "overrides": {
+        "vite": "^7"
     },
     "keywords": [],
     "author": "",
@@ -73,11 +67,9 @@
     },
     "type": "module",
     "devDependencies": {
-        "@tailwindcss/cli": "4.2.2",
-        "@tailwindcss/postcss": "4.2.2",
+        "@tailwindcss/vite": "^4.2.4",
         "@types/node": "^25.6.0",
         "esbuild": "^0.28.0",
-        "postcss": "^8.5.8",
         "tailwindcss": "4.2.2",
         "vitest": "^4.1.5"
     }

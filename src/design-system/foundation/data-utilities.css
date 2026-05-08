@@ -1,0 +1,21 @@
+@layer components {
+  .cell-center {
+    text-align: center;
+  }
+
+  .cell-right {
+    text-align: right;
+  }
+
+  .cell-nowrap {
+    white-space: nowrap;
+  }
+
+  .cell-truncate {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+}

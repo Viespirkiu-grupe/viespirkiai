@@ -1,0 +1,51 @@
+---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import ResultList from '@design-system/components/ResultList.astro';
+
+interface NewsCardItem {
+  href: string;
+  title: string;
+  source: string;
+  date: string;
+  relatedHref?: string;
+  relatedLabel?: string;
+}
+
+interface Props {
+  title?: string;
+  items: NewsCardItem[];
+  titleTag?: 'h2' | 'h3';
+}
+
+const { title, items, titleTag = 'h2' } = Astro.props;
+const TitleTag = titleTag;
+---
+
+<section>
+  {title && <TitleTag>{title}</TitleTag>}
+
+  <ResultList>
+    {items.map((item) => (
+      <ResultCardShell clickable={true}>
+        <div slot="meta" class="result-card-meta">
+          <span>{item.source}</span>
+          <span>{item.date}</span>
+          {item.relatedHref ? (
+            <span>
+              <a href={item.relatedHref} class="relative z-1">
+                {item.relatedLabel || 'Susijęs'}
+                <span class="sr-only">(PDF)</span>
+              </a>
+            </span>
+          ) : (
+            <span>{item.relatedLabel || ''}</span>
+          )}
+        </div>
+
+        <h3 slot="title" class="result-card-title">
+          <a href={item.href}>{item.title}</a>
+        </h3>
+      </ResultCardShell>
+    ))}
+  </ResultList>
+</section>

@@ -1,0 +1,75 @@
+---
+interface FaqItem {
+  question: string;
+  answerHtml: string;
+}
+
+interface Props {
+  items: FaqItem[];
+  title?: string;
+  headingLevel?: 'h2' | 'h3';
+  questionTag?: 'h2' | 'h3';
+}
+
+const { items, title, headingLevel = 'h2', questionTag = 'h3' } = Astro.props;
+const HeadingTag = headingLevel;
+const QuestionTag = questionTag;
+---
+
+<section>
+  {title && <HeadingTag>{title}</HeadingTag>}
+
+  <div class="faq">
+    {items.map((item) => (
+      <div class="faq-item">
+        <QuestionTag class="faq-question" set:html={item.question} />
+        <div class="faq-answer" set:html={item.answerHtml} />
+      </div>
+    ))}
+  </div>
+</section>
+
+<style>
+  .faq {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .faq-item {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color, var(--light-gray));
+  }
+
+  .faq-item:first-child {
+    padding-top: 0;
+  }
+
+  .faq-item:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .faq-question {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--black);
+  }
+
+  .faq-answer {
+    font-size: 0.875rem;
+    line-height: 1.625;
+    color: var(--dark-gray);
+  }
+
+  .faq-answer :global(p),
+  .faq-answer :global(ul) {
+    margin: 0 0 0.5rem;
+  }
+
+  .faq-answer :global(p:last-child),
+  .faq-answer :global(ul:last-child) {
+    margin-bottom: 0;
+  }
+</style>

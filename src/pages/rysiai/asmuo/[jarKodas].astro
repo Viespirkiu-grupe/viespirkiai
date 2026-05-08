@@ -1,8 +1,12 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
-const colorScheme = Astro.cookies.get('colorScheme')?.value || 'auto';
-const font = Astro.cookies.get('font')?.value || 'ubuntu';
+import { getColorScheme, getFont } from '../../../lib/failai.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
 const { jarKodas } = Astro.params;
+import rysiaiAppUrl from '../../../rysiai-app.js?url';
+
 if (!/^\d+$/.test(jarKodas!)) return Astro.redirect('/404');
 ---
 <Layout pageTitle="Ryšiai — Ryšių grafikas" pageDescription="Interaktyvus viešųjų pirkimų ryšių tinklo grafikas" pageImage="" colorScheme={colorScheme} font={font} hideFooter={true}>
@@ -82,9 +86,8 @@ if (!/^\d+$/.test(jarKodas!)) return Astro.redirect('/404');
     <div id="rysiai-status"></div>
   </div>
 
-  <script src="/dist/graph-bundle.js" is:inline></script>
   <script is:inline define:vars={{ entityType: 'asmuo', entityId: jarKodas }}>
     window.RYSIAI_CONFIG = { entityType, entityId };
   </script>
-  <script src="/dist/rysiai.js" is:inline></script>
+  <script type="module" src={rysiaiAppUrl}></script>
 </Layout>

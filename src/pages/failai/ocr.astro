@@ -1,8 +1,10 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import ChartsSetup from '../../components/charts/ChartsSetup.astro';
+import Chart from '@design-system/components/charts/Chart.astro';
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
 import OcrSpartaCards from '../../components/failai/OcrSpartaCards.astro';
-import LineDatetimeChart from '../../components/charts/LineDatetimeChart.astro';
+import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
 import { postgres, OCR_STATES, getColorScheme, getFont } from '../../lib/failai.js';
 
 const colorScheme = getColorScheme(Astro.cookies);
@@ -155,7 +157,6 @@ const ocrStatsDayChartData = {
   colorScheme={colorScheme}
   font={font}
 >
-  <ChartsSetup />
   <main>
     <div class="page-header">
       <h1 class="mb-0">OCR būsena</h1>
@@ -215,22 +216,14 @@ const ocrStatsDayChartData = {
 
         <div>
           <h2 class="mb-3"><a href="#busena" id="busena" class="no-style">Failai pagal būseną</a></h2>
-          <div class="flex flex-col min-h-87.5">
-            <div class="chart-frame">
-              <div id="ocrStatsDiagrama" class="chart h-87.5"></div>
-            </div>
-          </div>
-          <script defer is:inline define:vars={{ ocrStatsChartData }}>
-            displayChart({
-              element: document.querySelector('#ocrStatsDiagrama'),
-              type: 'pie',
-              labels: ocrStatsChartData.labels,
-              series: ocrStatsChartData.series,
-              flags: ['colors'],
-            });
-          </script>
-          <div class="table-wrapper mt-4">
-            <table class="table">
+          <Chart
+            id="ocrStatsDiagrama"
+            type="pie"
+            labels={ocrStatsChartData.labels}
+            series={ocrStatsChartData.series}
+          />
+          <TableWrapper className="mt-4">
+            <Table>
               <thead>
                 <tr>
                   <th class="cell-center">ID</th>
@@ -247,28 +240,20 @@ const ocrStatsDayChartData = {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </TableWrapper>
         </div>
       </div>
     </section>
 
     <section class="mb-16">
       <h2 class="mb-3"><a href="#pagalNuskaitytoją" id="pagalNuskaitytoją" class="no-style">Failų dalis pagal nuskaitytoją</a></h2>
-      <div class="flex flex-col min-h-87.5">
-        <div class="chart-frame">
-          <div id="ocrNuskaitytojaiDiagrama" class="chart h-87.5"></div>
-        </div>
-      </div>
-      <script defer is:inline define:vars={{ ocrNuskaitytojaiChartData }}>
-        displayChart({
-          element: document.querySelector('#ocrNuskaitytojaiDiagrama'),
-          type: 'treemap',
-          labels: ocrNuskaitytojaiChartData.labels,
-          series: ocrNuskaitytojaiChartData.series,
-          flags: ['colors'],
-        });
-      </script>
+      <Chart
+        id="ocrNuskaitytojaiDiagrama"
+        type="treemap"
+        labels={ocrNuskaitytojaiChartData.labels}
+        series={ocrNuskaitytojaiChartData.series}
+      />
     </section>
 
     <section class="grid-2">

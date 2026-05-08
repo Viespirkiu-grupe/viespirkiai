@@ -108,13 +108,6 @@ export async function loadPirkimas(pirkimoId: string): Promise<Pirkimas | null> 
   return pirkimas;
 }
 
-export const fmtEur = (v: any) => {
-  const n = Number(v);
-  return v != null && v !== '' && !isNaN(n) && n > 0
-    ? n.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-    : null;
-};
-
 export function buildTimelineItems(pirkimas: Pirkimas) {
   const t = pirkimas.turinys || {};
   return [

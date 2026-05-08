@@ -1,8 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
 import { postgres, getColorScheme, getFont } from '../../lib/failai.js';
-import { LEAFLET_HEAD } from '../../lib/leaflet.js';
-import config from '@/config.js';
+import { LEAFLET_HEAD } from '@design-system/lib/leaflet.ts';
+import config from '../../lib/config.ts';
 import '@/utils/linksniai.js';
 
 const colorScheme = getColorScheme(Astro.cookies);
@@ -10,9 +11,9 @@ const font = getFont(Astro.cookies);
 const { rows } = await postgres.query('SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon FROM public.failai WHERE location IS NOT NULL');
 const locations = (rows as any[]).map((r) => [r.lat, r.lon]);
 ---
-<Layout pageTitle="Failų žemėlapis" pageDescription="Viešųjų pirkimų dokumentų geografinis pasiskirstymas žemėlapyje" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font} customHead={((config as any).customHead || '') + LEAFLET_HEAD}>
+<Layout pageTitle="Failų žemėlapis" pageDescription="Viešųjų pirkimų dokumentų geografinis pasiskirstymas žemėlapyje" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font} customHead={((config.customHead) || '') + LEAFLET_HEAD}>
   <main>
-    <div class="page-header"><h1 class="mb-0">Failų žemėlapis</h1></div>
+    <PageHeader>Failų žemėlapis</PageHeader>
     <p class="text-muted text-sm mb-4">
       Dalis paviešintų failų turi geografinę informaciją apie jų sukūrimo vietą.
       Norėdami peržiūrėti failus tam tikroje vietovėje, spustelėkite žemėlapyje esančius taškus.

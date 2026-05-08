@@ -1,10 +1,12 @@
 ---
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import { fmtEur } from '../../lib/formatters.ts';
+
 interface Props {
   sutartis: any;
 }
 
 const { sutartis } = Astro.props;
-const fmtEur = (v: any) => Number(v).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 ---
 
 <section>
@@ -12,17 +14,17 @@ const fmtEur = (v: any) => Number(v).toLocaleString('lt-LT', { minimumFractionDi
   <span class="text-muted mb-4 block">{sutartis.sutartiesNumeris}</span>
 
   <h3 class="mb-2">Vertė</h3>
-  <dl class="kv-list mb-4">
+  <KeyValueList className="mb-4">
     <dt>Numatyta</dt>
     <dd class="cell-mono">{fmtEur(sutartis.verte)} €</dd>
     <dt>Faktinė</dt>
     <dd class="cell-mono">{sutartis.faktineIvykdimoVerte ? fmtEur(sutartis.faktineIvykdimoVerte) + ' €' : 'Nenurodyta'}</dd>
-  </dl>
+  </KeyValueList>
 
   <h3 class="mb-2">Terminai</h3>
-  <dl class="kv-list">
+  <KeyValueList>
     <dt>Sudaryta</dt><dd>{String(sutartis.sudarymoData).slice(0, 10)}</dd>
     <dt>Galioja iki</dt><dd>{String(sutartis.galiojimoData).slice(0, 10)}</dd>
     <dt>Faktinė įvykdymo data</dt><dd>{sutartis.faktineIvykdimoData || 'Nenurodyta'}</dd>
-  </dl>
+  </KeyValueList>
 </section>

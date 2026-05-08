@@ -1,0 +1,32 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import config from '../../lib/config.ts';
+
+interface Props {
+  jarKodas: string;
+  pavadinimas: string;
+  aprasymas: string;
+  colorScheme?: string;
+  font?: string;
+}
+
+const { jarKodas, pavadinimas, aprasymas, colorScheme = 'auto', font = 'ubuntu' } = Astro.props;
+---
+
+<Layout
+  pageTitle="CVP IS netikras asmuo"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <div class="page-header">
+      <h1 class="mb-0">{pavadinimas} <code>{jarKodas}</code></h1>
+    </div>
+    <div class="flex gap-2 mb-4">
+      <a href={`/pirkejas/${jarKodas}`} class="btn btn-outline btn-sm">↗ Pirkimai</a>
+      <a href={`/tiekejas/${jarKodas}`} class="btn btn-outline btn-sm">↗ Pardavimai</a>
+    </div>
+    <p class="text-muted">{aprasymas}</p>
+  </main>
+</Layout>

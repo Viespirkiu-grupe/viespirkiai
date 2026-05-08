@@ -1,4 +1,6 @@
 ---
+import FileCard from '@design-system/components/FileCard.astro';
+
 const { asmuo, mvpAprasaiLimit } = Astro.props;
 const rows = asmuo.mvpAprasai?.rows ?? [];
 if (rows.length === 0) return;
@@ -24,14 +26,16 @@ const count = asmuo.mvpAprasai?.count ?? 0;
             {aprasas.galiojaIki && <> &middot; Galioja iki: {aprasas.galiojaIki}</>}
           </div>
           {aprasas.rinkmenos?.length > 0 && (
-            <ul class="file-list">
+            <ul class="list-none p-0 m-0 space-y-2">
               {aprasas.rinkmenos.map((r: any) => (
-                <li class="file-item">
-                  <a href={r.url || r.originalUrl} class="file-link" target={r.url ? undefined : '_blank'} rel={r.url ? undefined : 'noopener'}>
-                    <span class="file-ext">{r.extension || '?'}</span>
-                    <span class="file-name">{r.pavadinimas}</span>
-                    {!r.url && <span class="text-muted text-xs">↗</span>}
-                  </a>
+                <li class="mvp-file-item">
+                  <FileCard
+                    title={r.pavadinimas || 'Nežinoma rinkmena'}
+                    href={r.url || r.originalUrl}
+                    ext={r.extension || undefined}
+                    target={r.url ? undefined : '_blank'}
+                    rel={r.url ? undefined : 'noopener'}
+                  />
                 </li>
               ))}
             </ul>
@@ -41,3 +45,9 @@ const count = asmuo.mvpAprasai?.count ?? 0;
     ))}
   </div>
 </div>
+
+<style>
+  .mvp-file-item :global(.file-card) {
+    max-width: 420px;
+  }
+</style>

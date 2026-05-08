@@ -14,7 +14,7 @@ const app = express();
 
 app.use(express.static(clientDist, {
   setHeaders(res, filePath) {
-    if (filePath.endsWith('tailwind.css') || filePath.includes('/fontai/')) {
+    if (filePath.includes('/assets/') || filePath.includes('/fontai/')) {
       res.setHeader('Cache-Control', IMMUTABLE);
     }
   },

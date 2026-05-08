@@ -4,17 +4,18 @@ import { NodeLegend } from './rysiai/legend.js';
 import { NodeDetails } from './rysiai/details-panel.js';
 import { LegendState } from './rysiai/legend-state.js';
 import { applyFilterChars, applyFilterFromHash, updateHashFromFilter } from './rysiai/hash-state.js';
+import {
+    Graph,
+    forceAtlas2,
+    noverlap,
+    createNodeImageProgram,
+    animateNodes,
+    createSigma,
+    DEFAULT_EDGE_CURVATURE,
+    indexParallelEdgesIndex,
+} from './graph-bundle.js';
 
-var _v = window.Rysiai;
-var Sigma = _v.Sigma;
-var Graph = _v.Graph;
-var forceAtlas2 = _v.forceAtlas2;
-var noverlap = _v.noverlap;
-var NodeImageProgram = _v.createNodeImageProgram({ padding: 0.2 });
-var animateNodes = _v.animateNodes;
-var createSigma = _v.createSigma;
-var DEFAULT_EDGE_CURVATURE = _v.DEFAULT_EDGE_CURVATURE;
-var indexParallelEdgesIndex = _v.indexParallelEdgesIndex;
+var NodeImageProgram = createNodeImageProgram({ padding: 0.2 });
 
 // dataGraph: permanent store of all fetched nodes+edges (never given to Sigma)
 // viewGraph: Sigma's filtered view, rebuilt by rebuildViewGraph on each expand/legend toggle

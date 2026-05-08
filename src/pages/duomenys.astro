@@ -1,8 +1,9 @@
 ---
+import Alert from '@design-system/components/Alert.astro';
 import Layout from '../layouts/Layout.astro';
 import { getColorScheme, getFont } from '../lib/failai.js';
-import LinkListSection from '../components/content/LinkListSection.astro';
-import SourceGroup from '../components/content/SourceGroup.astro';
+import LinkListSection from '@design-system/components/content/LinkListSection.astro';
+import SourceGroup from '@design-system/components/content/SourceGroup.astro';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
@@ -103,7 +104,7 @@ const sourceLists = [
     items: [
       { href: 'https://nominatim.org/', label: 'Nominatim', suffixHtml: '(© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>)' },
       { href: 'https://openstreetmap.org/', label: 'OpenStreetMap', suffixHtml: '(© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>)' },
-      { href: 'https://data.gov.lt/datasets/1287/', label: 'Registrų centras / data.gov.lt', suffixHtml: '- vietovių linksniavimas <span class="badge badge-muted ml-2">CC BY 4.0</span>' },
+      { href: 'https://data.gov.lt/datasets/1287/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0', suffixHtml: '- vietovių linksniavimas' },
     ],
   },
   {
@@ -112,7 +113,7 @@ const sourceLists = [
   },
   {
     title: 'SABIS sąskaitos',
-    items: [{ href: 'https://data.gov.lt/datasets/3924/', label: 'Nacionalinis bendrųjų funkcijų centras / data.gov.lt', suffixHtml: '<span class="badge badge-muted ml-2">CC BY 4.0</span>' }],
+    items: [{ href: 'https://data.gov.lt/datasets/3924/', label: 'Nacionalinis bendrųjų funkcijų centras / data.gov.lt', badge: 'CC BY 4.0' }],
   },
   {
     title: 'Valstybės suteikta pagalba',
@@ -170,10 +171,9 @@ const softwareSections = [
       <h1>Duomenys</h1>
     </div>
 
-    <div class="alert alert-muted mb-7">
-      <span class="alert-icon">—</span>
-      <div class="alert-body">Jokiems šioje svetainėje pateiktiems duomenims nėra taikomas jokios rūšies garantijos. Jie yra bendrinami siekiant padidinti viešųjų pirkimų skaidrumą ir padidinti valstybinių duomenų prieinamumą.</div>
-    </div>
+    <Alert variant="muted" icon="—" className="mb-7">
+      Jokiems šioje svetainėje pateiktiems duomenims nėra taikomas jokios rūšies garantijos. Jie yra bendrinami siekiant padidinti viešųjų pirkimų skaidrumą ir padidinti valstybinių duomenų prieinamumą.
+    </Alert>
 
     <section class="page-section" id="api">
       <h2>API</h2>

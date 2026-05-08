@@ -1,4 +1,6 @@
 ---
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
 const { asmuo } = Astro.props;
 const pirkimai = asmuo.sutartys?.pirkimaiKasMetus ?? [];
 const tiekimai = asmuo.sutartys?.tiekimaiKasMetus ?? [];
@@ -49,21 +51,25 @@ const tiekimaiSeries = JSON.stringify(tiekimai.map((d: any) => d.total || null))
         </div>
       </div>
       {topTiekejai.length > 0 ? (
-        <div class="table-wrapper flex-1">
-          <table class="table">
+        <TableWrapper className="flex-1">
+          <Table>
             <thead><tr><th>#</th><th>Tiekėjas</th><th class="cell-right">Suma</th><th class="cell-right">Sut.</th></tr></thead>
             <tbody>
               {topTiekejai.map((t: any, i: number) => (
                 <tr>
                   <td class="cell-mono text-muted">{i + 1}</td>
-                  <td class="cell-truncate"><a href={`/?perkanciosiosOrganizacijosKodas=${asmuo.jar.jarKodas}&tiekejoKodas=${t.jarKodas}`}>{t.pavadinimas}</a></td>
+                  <td class="sutartys-col-party">
+                    <a href={`/?perkanciosiosOrganizacijosKodas=${asmuo.jar.jarKodas}&tiekejoKodas=${t.jarKodas}`} class="cell-truncate">
+                      {t.pavadinimas}
+                    </a>
+                  </td>
                   <td class="cell-mono cell-right">{t.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' })}</td>
                   <td class="cell-mono cell-right">{t.count.toLocaleString('lt-LT')}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </TableWrapper>
       ) : <div class="chart-empty flex-1">Nėra duomenų</div>}
     </div>
 
@@ -76,22 +82,32 @@ const tiekimaiSeries = JSON.stringify(tiekimai.map((d: any) => d.total || null))
         </div>
       </div>
       {topPirkejai.length > 0 ? (
-        <div class="table-wrapper flex-1">
-          <table class="table">
+        <TableWrapper className="flex-1">
+          <Table>
             <thead><tr><th>#</th><th>Pirkėjas</th><th class="cell-right">Suma</th><th class="cell-right">Sut.</th></tr></thead>
             <tbody>
               {topPirkejai.map((p: any, i: number) => (
                 <tr>
                   <td class="cell-mono text-muted">{i + 1}</td>
-                  <td class="cell-truncate"><a href={`/?perkanciosiosOrganizacijosKodas=${p.jarKodas}&tiekejoKodas=${asmuo.jar.jarKodas}`}>{p.pavadinimas}</a></td>
+                  <td class="sutartys-col-party">
+                    <a href={`/?perkanciosiosOrganizacijosKodas=${p.jarKodas}&tiekejoKodas=${asmuo.jar.jarKodas}`} class="cell-truncate">
+                      {p.pavadinimas}
+                    </a>
+                  </td>
                   <td class="cell-mono cell-right">{p.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' })}</td>
                   <td class="cell-mono cell-right">{p.count.toLocaleString('lt-LT')}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </TableWrapper>
       ) : <div class="chart-empty flex-1">Nėra duomenų</div>}
     </div>
   </div>
 </div>
+
+<style>
+  .sutartys-col-party {
+    max-width: 34ch;
+  }
+</style>

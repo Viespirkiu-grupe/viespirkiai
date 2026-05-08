@@ -1,7 +1,9 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { getColorScheme, getFont } from '../lib/failai.js';
-import CopyField from '../components/content/CopyField.astro';
+import CopyField from '@design-system/components/content/CopyField.astro';
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
 
 if (Astro.request.method === 'POST') {
   const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
@@ -257,8 +259,8 @@ const conversation = [
                   <div class="mcp-bubble mcp-bubble-ai">
                     <p class="text-xs text-muted mb-3 font-mono">PIRKĖJAS: NEMUNO AUŠRA (JAR 306660048)</p>
 
-                    <div class="table-wrapper mb-3">
-                      <table>
+                    <TableWrapper className="mb-3">
+                      <Table>
                         <tbody>
                           <tr>
                             <td colspan="2"><strong>Automobilio nuomos sutartis Nr. 2024/01</strong></td>
@@ -285,13 +287,13 @@ const conversation = [
                             <td></td>
                           </tr>
                         </tbody>
-                      </table>
-                    </div>
+                      </Table>
+                    </TableWrapper>
 
                     <p class="mb-3 text-xs">⚠ Partijos pirmininkas Remigijus Žemaitaitis sudarė sutartį su savo paties vadovaujama partija - jis yra vienu metu ir pirkėjo vadovas, ir paslaugos tiekėjas. El. paštas sutartyje: r*********@hotmail.com.</p>
 
-                    <div class="table-wrapper mb-0">
-                      <table>
+                    <TableWrapper className="mb-0">
+                      <Table>
                         <tbody>
                           <tr>
                             <td colspan="2"><strong>Automobilio nuomos sutartis Nr. 2024/02</strong></td>
@@ -308,8 +310,8 @@ const conversation = [
                             <td class="text-xs">2024-03-12–2024-11-13</td>
                           </tr>
                         </tbody>
-                      </table>
-                    </div>
+                      </Table>
+                    </TableWrapper>
                   </div>
                 </div>
               )
@@ -333,7 +335,7 @@ const conversation = [
 
         <div>
             <div class="border rounded-lg overflow-hidden min-w-70">
-              <div class="bg-light px-4 py-2 border-b flex items-center justify-between">
+              <div class="bg-lighter-gray px-4 py-2 border-b flex items-center justify-between">
                 <span class="text-xs text-muted font-mono">.mcp.json</span>
                 <button id="mcpCopyConfigBtn" class="btn btn-secondary btn-sm" type="button">Kopijuoti</button>
               </div>
@@ -368,16 +370,11 @@ const conversation = [
     </p>
 
     <script is:inline>
+      // Note: copy buttons rendered by <CopyField> are wired up by the
+      // component itself.  Only the JSON-config copy button (which reads the
+      // adjacent <pre> contents at click time) needs page-level handling.
       (function () {
-        const copyUrlBtns = Array.from(document.querySelectorAll('[id^="mcpCopyUrlBtn"]'));
         const copyConfigBtn = document.getElementById('mcpCopyConfigBtn');
-        copyUrlBtns.forEach((button) => {
-          button.addEventListener('click', async function () {
-            await navigator.clipboard.writeText('https://viespirkiai.org/mcp');
-            button.textContent = '✓ Nukopijuota';
-            setTimeout(() => { button.textContent = 'Kopijuoti URL'; }, 1500);
-          });
-        });
         if (copyConfigBtn) {
           copyConfigBtn.addEventListener('click', async function () {
             const configText = this.closest('div').nextElementSibling.textContent.trim();

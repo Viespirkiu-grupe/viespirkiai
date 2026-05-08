@@ -1,4 +1,5 @@
 ---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
 const { asmuo } = Astro.props;
 const list = asmuo.melagingi ?? [];
 if (list.length === 0) return;
@@ -8,33 +9,31 @@ if (list.length === 0) return;
   <h2><a href="#melagiai" class="no-style">Melagingą informaciją pateikusių tiekėjų sąrašas</a></h2>
   <div class="result-list">
     {list.map((m: any) => (
-      <article class="result-card">
-        <div class="result-card-body">
-          <dl class="result-card-meta">
-            <div><dt class="sr-only">Įvesta</dt><dd>Įvesta {m.duomenuIvedimoData}</dd></div>
-            <div><dt class="sr-only">Galioja</dt><dd>{m.dataNuoKuriosSkaiciuojamasTerminas || 'nežinoma'} – {m.itrauktasIki || 'nežinoma'}</dd></div>
-            <div><dt class="sr-only">Paskutinį kartą matyta</dt><dd>Matyta {m.paskutiniKartaMatytaSarase}</dd></div>
-          </dl>
-          <h3 class="result-card-title">
-            {m.pagrindimas?.irasymoPagrindas
-              ? m.pagrindimas.irasymoPagrindas
-              : <em class="text-muted">Įtraukimo pagrindas nenurodytas</em>}
-          </h3>
-          <div class="result-card-footer">
-            <span><strong>Pirkėjas:</strong> {m.pirkimoVykdytojoPavadinimas || 'nenurodytas'}</span>
-            <span><strong>Pirkimo nr.:</strong> {m.pirkimoNumeris || 'nenurodytas'}</span>
-            {m.pagrindimas?.tiekejoPaaiskinimoDokumentoNuoroda?.length > 3 && (
-              <span><a href={m.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda} target="_blank" rel="noopener noreferrer">↗ Tiekėjo paaiškinimo dokumentas ({m.pagrindimas.paaiskinimoPateikimoData || 'data nenurodyta'})</a></span>
-            )}
-          </div>
-          {m.pagrindimas?.tiekejoPaaiskinimas?.length > 3 && (
-            <>
-              <blockquote class="mt-3">{m.pagrindimas.tiekejoPaaiskinimas}</blockquote>
-              {m.pagrindimas.paaiskinimoPateikimoData && <p class="text-muted text-xs mt-1 text-right">Pateiktas: {m.pagrindimas.paaiskinimoPateikimoData}</p>}
-            </>
+      <ResultCardShell>
+        <dl slot="meta" class="result-card-meta">
+          <div><dt class="sr-only">Įvesta</dt><dd>Įvesta {m.duomenuIvedimoData}</dd></div>
+          <div><dt class="sr-only">Galioja</dt><dd>{m.dataNuoKuriosSkaiciuojamasTerminas || 'nežinoma'} – {m.itrauktasIki || 'nežinoma'}</dd></div>
+          <div><dt class="sr-only">Paskutinį kartą matyta</dt><dd>Matyta {m.paskutiniKartaMatytaSarase}</dd></div>
+        </dl>
+        <h3 slot="title" class="result-card-title">
+          {m.pagrindimas?.irasymoPagrindas
+            ? m.pagrindimas.irasymoPagrindas
+            : <em class="text-muted">Įtraukimo pagrindas nenurodytas</em>}
+        </h3>
+        <div slot="footer" class="result-card-footer">
+          <span><strong>Pirkėjas:</strong> {m.pirkimoVykdytojoPavadinimas || 'nenurodytas'}</span>
+          <span><strong>Pirkimo nr.:</strong> {m.pirkimoNumeris || 'nenurodytas'}</span>
+          {m.pagrindimas?.tiekejoPaaiskinimoDokumentoNuoroda?.length > 3 && (
+            <span><a href={m.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda} target="_blank" rel="noopener noreferrer">↗ Tiekėjo paaiškinimo dokumentas ({m.pagrindimas.paaiskinimoPateikimoData || 'data nenurodyta'})</a></span>
           )}
         </div>
-      </article>
+        {m.pagrindimas?.tiekejoPaaiskinimas?.length > 3 && (
+          <>
+            <blockquote class="mt-3">{m.pagrindimas.tiekejoPaaiskinimas}</blockquote>
+            {m.pagrindimas.paaiskinimoPateikimoData && <p class="text-muted text-xs mt-1 text-right">Pateiktas: {m.pagrindimas.paaiskinimoPateikimoData}</p>}
+          </>
+        )}
+      </ResultCardShell>
     ))}
   </div>
 </div>

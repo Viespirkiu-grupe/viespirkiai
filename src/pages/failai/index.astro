@@ -1,8 +1,11 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import SearchForm from '../../components/content/SearchForm.astro';
+import EmptyState from '@design-system/components/EmptyState.astro';
+import ResultsSummary from '@design-system/components/ResultsSummary.astro';
+import SearchForm from '@design-system/components/content/SearchForm.astro';
 import FailaiFilters from '../../components/content/FailaiFilters.astro';
 import { getColorScheme, getFont, buildNumberOfResults, processSearchResults, cleanQuery } from '../../lib/failai.js';
+import { buildStatistika } from '../../lib/failaiStatistika.ts';
 import { postgres } from '../../../postgres/postgres.js';
 import { countFailai, searchFailai } from '../../../modules/failai/searchFailai.js';
 import FailasResultCard from '../../components/failai/FailasResultCard.astro';
@@ -21,37 +24,6 @@ let currentPage = 1;
 let pageCount = 1;
 let search = '';
 let statistika: any = null;
-
-const formatPluralOnly = (number: number, forms: [string, string, string, string]) => {
-  const n = Math.abs(Number(number));
-  const stringValue = number.toString();
-  const hasFraction = stringValue.includes('.') || stringValue.includes(',');
-
-  if (hasFraction && n !== 0) return forms[3];
-  if (n % 10 === 1 && !(n % 100 >= 11 && n % 100 <= 19)) return forms[0];
-  if (n % 10 >= 2 && n % 10 <= 9 && !(n % 100 >= 11 && n % 100 <= 19)) return forms[1];
-  return forms[2];
-};
-
-const formatLtDateTime = (value: unknown) => {
-  if (!value) return '';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return '';
-
-  const datePart = date.toLocaleDateString('lt-LT', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const timePart = date.toLocaleTimeString('lt-LT', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-
-  return `${datePart} ${timePart}`;
-};
 
 if (!showStatistics) {
   const startedAt = Date.now();
@@ -100,25 +72,6 @@ if (!showStatistics) {
     },
   };
 }
-const buildStatistika = (stat: any) => {
-  if (!stat) return null;
-  const totalWords = Number(stat.nuskaitymas.zodziai.total);
-  const failaiSuZodziais = Number(stat.nuskaitymas.zodziai.failaiSuZodziais);
-  const visiFailai = Number(stat.failai.kiekiai.visi);
-  const visiDydziai = Number(stat.failai.dydziai.visi);
-  const duomenuBaitai = visiDydziai * (visiFailai > 0 ? failaiSuZodziais / visiFailai : 0);
-  const atnaujinta = formatLtDateTime(stat.atnaujinta);
-
-  return {
-    atnaujinta,
-    totalWordsNumber: totalWords.toLocaleString('lt-LT'),
-    totalWordsLabel: `${formatPluralOnly(totalWords, ['žodis', 'žodžiai', 'žodžių', 'žodžio'])} teksto`,
-    dataSize: `${(duomenuBaitai / 1024 / 1024 / 1024).toFixed(2)} GB`,
-    filesWithWordsNumber: failaiSuZodziais.toLocaleString('lt-LT'),
-    filesWithWordsLabel: formatPluralOnly(failaiSuZodziais, ['failas', 'failai', 'failų', 'failo']),
-  };
-};
-
 const statistikaPayload = buildStatistika(statistika);
 ---
 <Layout pageTitle="Failų paieška" pageDescription="Parsisiųstų viešųjų pirkimų dokumentų paieška pagal pavadinimą, plėtinį ir turinį" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font}>
@@ -189,44 +142,46 @@ const statistikaPayload = buildStatistika(statistika);
             <a href="/failai/neparsiunciami" class="btn btn-outline btn-sm">↗ Neparsiunčiami failai</a>
             <a href="/failai/galerija" class="btn btn-outline btn-sm">↗ Nuotraukų galerija</a>
           </div>
-          <script is:inline set:html={`window.addEventListener('DOMContentLoaded', () => {
-  const search = document.getElementById('search');
-  if (search) search.focus();
-});
+          <script is:inline>
+            window.addEventListener('DOMContentLoaded', () => {
+              const search = document.getElementById('search');
+              if (search) search.focus();
+            });
 
-let evtSource;
-const setText = (key, value) => {
-  const el = document.querySelector('[data-stat="' + key + '"]');
-  if (el && value !== undefined) el.textContent = value;
-};
+            const setText = (key, value) => {
+              const el = document.querySelector('[data-stat="' + key + '"]');
+              if (el && value !== undefined) el.textContent = value;
+            };
 
-const updateStatistika = (payload) => {
-  setText('atnaujinta', payload.atnaujinta);
-  setText('totalWordsNumber', payload.totalWordsNumber);
-  setText('totalWordsLabel', payload.totalWordsLabel);
-  setText('dataSize', payload.dataSize);
-  setText('filesWithWordsNumber', payload.filesWithWordsNumber);
-  setText('filesWithWordsLabel', payload.filesWithWordsLabel);
-};
+            const updateStatistika = (payload) => {
+              setText('atnaujinta', payload.atnaujinta);
+              setText('totalWordsNumber', payload.totalWordsNumber);
+              setText('totalWordsLabel', payload.totalWordsLabel);
+              setText('dataSize', payload.dataSize);
+              setText('filesWithWordsNumber', payload.filesWithWordsNumber);
+              setText('filesWithWordsLabel', payload.filesWithWordsLabel);
+            };
 
-const connect = () => {
-  evtSource = new EventSource('/failai/statistika/sse');
-  evtSource.onmessage = (e) => updateStatistika(JSON.parse(e.data));
-  evtSource.onerror = () => {
-    evtSource.close();
-    setTimeout(connect, 1000);
-  };
-};
+            let evtSource;
+            const connect = () => {
+              evtSource = new EventSource('/failai/statistika/sse');
+              evtSource.onmessage = (e) => updateStatistika(JSON.parse(e.data));
+              evtSource.onerror = () => {
+                evtSource.close();
+                setTimeout(connect, 1000);
+              };
+            };
 
-connect();`} />
+            connect();
+          </script>
         </div>
       ) : (
         <div class="mt-10 max-w-lg center mx-auto">
           <div class="flex justify-between items-center mb-4">
-            <span class="text-muted text-sm numberOfResults" set:html={numberOfResults}></span>
+            <ResultsSummary html={numberOfResults} />
           </div>
           {results.length === 0 ? (
-            <div class="empty-state"><p class="text-muted">Rezultatų nerasta.</p></div>
+            <EmptyState message="Rezultatų nerasta." />
           ) : (
             <div class="result-list">
               {results.map((item: any) => <FailasResultCard item={item} search={search} />)}

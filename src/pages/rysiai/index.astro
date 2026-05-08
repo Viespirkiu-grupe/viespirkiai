@@ -1,16 +1,17 @@
 ---
+import Button from '@design-system/components/Button.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
 import Layout from '../../layouts/Layout.astro';
-const colorScheme = Astro.cookies.get('colorScheme')?.value || 'auto';
-const font = Astro.cookies.get('font')?.value || 'ubuntu';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
 ---
 <Layout pageTitle="Ryšiai" pageDescription="Išekokite ryšių tarp juridinių ir sutarčių duomenų" pageImage="" colorScheme={colorScheme} font={font}>
   <main>
-    <div class="page-header" style="justify-content: center; text-align: center;">
-      <h1>Išekokite ryšių tarp juridinių ir sutarčių duomenų</h1>
-    </div>
+    <PageHeader className="justify-center text-center">Išekokite ryšių tarp juridinių ir sutarčių duomenų</PageHeader>
     <div class="flex gap-6 justify-center mt-8">
-      <a href="/" class="btn btn-outline">↗ Sutartys</a>
-      <a href="/juridiniai" class="btn btn-outline">↗ Juridiniai</a>
+      <Button href="/" variant="outline">↗ Sutartys</Button>
+      <Button href="/juridiniai" variant="outline">↗ Juridiniai</Button>
     </div>
   </main>
 </Layout>

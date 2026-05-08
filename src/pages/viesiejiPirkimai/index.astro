@@ -1,8 +1,12 @@
 ---
-// @ts-nocheck
+// @ts-nocheck — page mixes streamed exports, dynamic search-param maps, and
+// nullable totals; gradual typing can be done once the search modules expose
+// proper type definitions.
 import Layout from '../../layouts/Layout.astro';
-import Pagination from '../../components/Pagination.astro';
-import SearchForm from '../../components/content/SearchForm.astro';
+import EmptyState from '@design-system/components/EmptyState.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import ResultsSummary from '@design-system/components/ResultsSummary.astro';
+import SearchForm from '@design-system/components/content/SearchForm.astro';
 import ViesiejiPirkimaiFilters from '../../components/content/ViesiejiPirkimaiFilters.astro';
 import ViesiejiPirkimaiCard from '../../components/viesiejiPirkimai/ViesiejiPirkimaiCard.astro';
 import { searchViesiejiPirkimai, countViesiejiPirkimai } from '@/modules/viesiejiPirkimai/searchViesiejiPirkimai.js';
@@ -155,7 +159,7 @@ const font = getFont(Astro.cookies);
     <div class="mt-10 max-w-lg center mx-auto">
       <div>
         <div class="flex justify-between items-center mb-4">
-          <span class="text-muted text-sm numberOfResults" set:html={numberOfResults} />
+          <ResultsSummary html={numberOfResults} />
           {galimaEksportuoti && (
             <div class="flex gap-3">
               <a href={`/viesiejiPirkimai/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
@@ -169,9 +173,7 @@ const font = getFont(Astro.cookies);
         </div>
 
         {results.length === 0 ? (
-          <div class="empty-state">
-            <p class="text-muted">Rezultatų nerasta.</p>
-          </div>
+          <EmptyState message="Rezultatų nerasta." />
         ) : (
           <>
             <div class="result-list">

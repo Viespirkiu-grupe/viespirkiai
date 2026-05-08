@@ -1,8 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import PageHeader from '../../components/PageHeader.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
-import { LEAFLET_HEAD } from '../../lib/leaflet.js';
+import { LEAFLET_HEAD } from '@design-system/lib/leaflet.ts';
 import { loadFailasById, enrichFailas, parseSuffix } from '../../lib/failas.js';
 import { checkDokFileRemoved } from '@/modules/failai/queries.js';
 import FailasPreview from '../../components/failai/FailasPreview.astro';
@@ -13,7 +14,8 @@ import Nuorodos from '../../components/failai/Nuorodos.astro';
 import Emails from '../../components/failai/Emails.astro';
 import Telefonai from '../../components/failai/Telefonai.astro';
 import IbanNumeriai from '../../components/failai/IbanNumeriai.astro';
-import Parasai from '../../components/failai/Parasai.astro';
+import Parasai from '@design-system/components/content/SignatureList.astro';
+import FailasPasalintas from '../../components/failai/FailasPasalintas.astro';
 import { convertUnit } from '@/utils/units.js';
 
 const { id: rawId } = Astro.params;
@@ -30,8 +32,12 @@ if (format === 'png') {
   });
 }
 
-if (await checkDokFileRemoved(failas.dokId, failas.fileId)) {
-  return new Response(await (await import('../../components/failai/FailasPasalintas.astro')).default.toString(), { status: 451 });
+const isPasalintas = await checkDokFileRemoved(failas.dokId, failas.fileId);
+if (isPasalintas) {
+  // 451 Unavailable For Legal Reasons — render the dedicated page component
+  // through the regular Astro template (the previous `.toString()` trick on
+  // the compiled component module did not actually produce HTML).
+  Astro.response.status = 451;
 }
 
 if (format === 'json') {
@@ -40,11 +46,13 @@ if (format === 'json') {
   });
 }
 
-failas = await enrichFailas(failas);
+if (!isPasalintas) {
+  failas = await enrichFailas(failas);
+}
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
-const ogTitle = failas.metaduomenys?.Title || failas.pavadinimas || 'Failas';
+const ogTitle = isPasalintas ? 'Failas pašalintas' : (failas.metaduomenys?.Title || failas.pavadinimas || 'Failas');
 const ogParts = [failas.extension?.toUpperCase(), failas.dydis ? convertUnit(failas.dydis, 'B') : null].filter(Boolean);
 const search = Astro.url.searchParams.get('search') || '';
 ---
@@ -54,7 +62,7 @@ const search = Astro.url.searchParams.get('search') || '';
   pageImage={`https://viespirkiai.org/failas/${failas.id}.png`}
   colorScheme={colorScheme}
   font={font}
-  customHead={failas.location ? LEAFLET_HEAD : ''}
+  customHead={failas.location && !isPasalintas ? LEAFLET_HEAD : ''}
 >
   <style>
     .failas-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 28px; align-items: start; }
@@ -65,6 +73,9 @@ const search = Astro.url.searchParams.get('search') || '';
     }
   </style>
 
+  {isPasalintas ? (
+    <FailasPasalintas />
+  ) : (
   <main>
     <PageHeader>
       {failas.metaduomenys?.Title ? (
@@ -100,7 +111,7 @@ const search = Astro.url.searchParams.get('search') || '';
 
         <div>
           <h2 class="mb-3 no-style">Failas</h2>
-          <dl class="kv-list">
+          <KeyValueList>
             <dt>Formatas</dt>
             <dd><span class="cell-mono">{failas.extension || '—'}</span></dd>
             <dt>Dydis</dt>
@@ -114,7 +125,7 @@ const search = Astro.url.searchParams.get('search') || '';
             <dd><span class="cell-mono wrap-anywhere">{failas.md5 || '—'}</span></dd>
             <dt>Šaltinis</dt>
             <dd><a href={failas.saltinioLinkas}>{failas.saltinioLinkoPavadinimas}</a></dd>
-          </dl>
+          </KeyValueList>
         </div>
 
         {failas.location && (
@@ -128,7 +139,7 @@ const search = Astro.url.searchParams.get('search') || '';
           <>
             <div>
               <h2 class="mb-3 no-style">Dokumentas</h2>
-              <dl class="kv-list">
+              <KeyValueList>
                 <dt>Puslapių skaičius</dt>
                 <dd><span class="cell-mono">{failas.metaduomenys.pageCount || failas.puslapiuSkaicius || '—'}</span></dd>
                 <dt>Žodžių skaičius</dt>
@@ -137,19 +148,19 @@ const search = Astro.url.searchParams.get('search') || '';
                 <dd>{failas.metaduomenys.Producer || failas.metaduomenys.producer || '—'}</dd>
                 <dt>Autorius</dt>
                 <dd>{failas.autorius || failas.metaduomenys.Author || '—'}</dd>
-              </dl>
+              </KeyValueList>
             </div>
 
             <div>
               <h2 class="mb-3 no-style">Turinys</h2>
-              <dl class="kv-list">
+              <KeyValueList>
                 <Domenai domains={failas.domains} />
                 <Nuorodos links={(failas.links || []).filter((l: any) => !l.link.startsWith('mailto:'))} />
                 <Emails emails={failas.emails} />
                 <Telefonai telefonai={failas.telefonai} />
                 <IbanNumeriai ibanNumeriai={failas.metaduomenys.ibanNumeriai} />
                 <Parasai signatures={failas.metaduomenys.signatures} />
-              </dl>
+              </KeyValueList>
             </div>
           </>
         ) : (
@@ -164,4 +175,5 @@ const search = Astro.url.searchParams.get('search') || '';
       </div>
     </div>
   </main>
+  )}
 </Layout>

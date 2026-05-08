@@ -1,15 +1,15 @@
 ---
-// @ts-nocheck
 import Layout from '../layouts/Layout.astro';
-import SearchForm from '../components/content/SearchForm.astro';
+import SearchForm from '@design-system/components/content/SearchForm.astro';
 import SutartysFilters from '../components/content/SutartysFilters.astro';
 import SearchResults from '../components/content/SearchResults.astro';
 import { searchSutartys, countSutartys } from '@/modules/sutartys/searchSutartys.js';
 import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
-import config from '@/config.js';
+import config from '../lib/config.ts';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
 import { objectsToCsvStream } from '@/utils/csv.js';
 import { Readable as NodeReadable, PassThrough } from 'node:stream';
+import { cleanQuery, getColorScheme, getFont } from '../lib/failai.ts';
 
 type SearchValues = Record<string, string | number | undefined>;
 
@@ -35,28 +35,16 @@ type SortOption = {
   label: string;
 };
 
-const colorScheme = Astro.cookies.get('colorScheme')?.value || 'auto';
-const font = Astro.cookies.get('font')?.value || 'ubuntu';
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
 
-// Clean empty query params redirect
-const url = Astro.url;
-const rawQuery = Object.fromEntries(url.searchParams);
-const cleaned: Record<string, string> = {};
-let hasEmpty = false;
-for (const [key, value] of Object.entries(rawQuery)) {
-  if (value !== '') cleaned[key] = value;
-  else hasEmpty = true;
-}
-if (hasEmpty) {
-  const qs = new URLSearchParams(cleaned).toString();
-  return Astro.redirect(url.pathname + (qs ? `?${qs}` : ''));
-}
-
-const query: Record<string, string> = cleaned;
+const cleaned = cleanQuery(Astro.url);
+if (cleaned.redirectTo) return Astro.redirect(cleaned.redirectTo);
+const query: Record<string, string> = cleaned.query;
 const DEFAULT_LIMIT = 50;
 const limit = parseInt(query.limit) || DEFAULT_LIMIT;
 const page = parseInt(query.page) || 1;
-const engine = query.search && (config as any).typesenseUp ? 'typesense' : 'postgres';
+const engine = query.search && config.typesenseUp ? 'typesense' : 'postgres';
 
 function buildNumberOfResults({ shown, total, elapsed, engine, page = 1 }: { shown: number; total: number | null; elapsed: number; engine: string; page?: number }) {
   const durationMs = Math.round(elapsed);
@@ -181,7 +169,7 @@ const sortOptions = [
   pageImage="https://viespirkiai.org/sutartys.png"
   colorScheme={colorScheme}
   font={font}
-  customHead={(config as any).customHead}
+  customHead={config.customHead}
 >
   <main>
     <SearchForm

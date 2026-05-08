@@ -1,0 +1,67 @@
+@layer components {
+    .container {
+        width: 100%;
+        max-width: var(--max-width);
+        margin-inline: auto;
+        padding-inline: 16px;
+    }
+    .container-fluid { max-width: 100%; }
+
+    body > header  { margin-bottom: 28px; }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 28px;
+        border-bottom: var(--border);
+
+        @apply pt-7 pb-4;
+    }
+
+    .section { margin-block: 56px; }
+
+    .sidebar {
+        width: 240px;
+        flex-shrink: 0;
+        height: 100vh;
+        overflow-y: auto;
+        background: var(--white);
+        border-right: var(--border);
+        padding: 28px 16px;
+    }
+
+    .sidebar nav a {
+        display: block;
+        padding: 4px 8px;
+        font-size: var(--text-sm);
+        color: var(--gray);
+        text-decoration: none;
+        border-radius: var(--radius-sm);
+        transition: color var(--transition), background-color var(--transition);
+    }
+
+    .sidebar nav a:hover,
+    .sidebar nav a.active {
+        color: var(--black);
+        background: var(--lighter-gray);
+    }
+
+    main:not(.sidebar-main):not([class*="px-"]) { padding-inline: 56px; }
+
+    @media (max-width: 1200px){
+        main:not(.sidebar-main):not([class*="px-"]) {
+            padding-inline: 28px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .sidebar { display: none; }
+    }
+
+    .grid { display: grid; }
+    .items-start { align-items: start; }
+    .min-w-0 { min-width: 0; }
+}

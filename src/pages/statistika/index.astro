@@ -1,12 +1,16 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
 import { gautiStatistika, humanizeStatistika } from '@/modules/statistika/statistika.js';
 import { convertUnit } from '@/utils/units.js';
 import '@/utils/linksniai.js';
-import config from '@/config.js';
+import config from '../../lib/config.ts';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
 
-const colorScheme = Astro.cookies.get('colorScheme')?.value || 'auto';
-const font = Astro.cookies.get('font')?.value || 'ubuntu';
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
 
 const statistika = humanizeStatistika(await gautiStatistika());
 const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-LT', { hour12: false });
@@ -17,13 +21,13 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
   pageImage="https://viespirkiai.org/statistika.png"
   colorScheme={colorScheme}
   font={font}
-  customHead={(config as any).customHead}
+  customHead={config.customHead}
 >
   <main>
-    <div class="page-header">
-      <h1 class="mb-0">Statistika</h1>
-      <button id="liveUpdate" class="btn btn-outline btn-sm">▶ Tiesioginis atnaujinimas</button>
-    </div>
+    <PageHeader>
+      Statistika
+      <button slot="actions" id="liveUpdate" class="btn btn-outline btn-sm">▶ Tiesioginis atnaujinimas</button>
+    </PageHeader>
 
     <div class="replacableContent">
       <div class="flex justify-between items-center mb-7">
@@ -42,8 +46,8 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
             <div class="grid-2">
               <div>
                 <p class="text-sm font-bold mb-3">Pagal būseną</p>
-                <div class="table-wrapper">
-                  <table class="table">
+                <TableWrapper>
+                  <Table>
                     <thead><tr><th>Nuskaitymas</th><th class="cell-right">Failai</th><th class="cell-right">Dalis</th></tr></thead>
                     <tbody id="pagalVersijaBody">
                       {statistika.nuskaitymas.pagalVersija.map((v: any) => (
@@ -54,13 +58,13 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                  </Table>
+                </TableWrapper>
               </div>
               <div>
                 <p class="text-sm font-bold mb-3">Pagal nuskaitytoją</p>
-                <div class="table-wrapper">
-                  <table class="table">
+                <TableWrapper>
+                  <Table>
                     <thead><tr><th>Nuskaitytojas</th><th class="cell-right">Failų skaičius</th></tr></thead>
                     <tbody id="topNuskaitytojaiBody">
                       {statistika.topDokNuskaitytojai.map((n: any) => (
@@ -70,8 +74,8 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                  </Table>
+                </TableWrapper>
               </div>
             </div>
           </div>
@@ -157,8 +161,8 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
           </div>
         </div>
         <h3 class="text-sm font-bold mb-3">Lentelės</h3>
-        <div class="table-wrapper">
-          <table class="table">
+        <TableWrapper>
+          <Table>
             <thead><tr>
               <th>Pavadinimas</th>
               <th class="cell-right">Duomenų dydis</th>
@@ -177,8 +181,8 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </TableWrapper>
       </div>
     </div>
   </main>

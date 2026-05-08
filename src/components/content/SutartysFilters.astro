@@ -1,11 +1,12 @@
 ---
-import FilterGroup from '../filters/FilterGroup.astro';
-import DateRangeFilter from '../filters/DateRangeFilter.astro';
-import NumberRangeFilter from '../filters/NumberRangeFilter.astro';
-import SortFilter from '../filters/SortFilter.astro';
-import TextInput from '../inputs/TextInput.astro';
-import NumberInput from '../inputs/NumberInput.astro';
-import CheckboxInput from '../inputs/CheckboxInput.astro';
+import FilterGroup from '@design-system/components/filters/FilterGroup.astro';
+import DateRangeFilter from '@design-system/components/filters/DateRangeFilter.astro';
+import NumberRangeFilter from '@design-system/components/filters/NumberRangeFilter.astro';
+import SortFilter from '@design-system/components/filters/SortFilter.astro';
+import SelectInput from '@design-system/components/inputs/SelectInput.astro';
+import TextInput from '@design-system/components/inputs/TextInput.astro';
+import NumberInput from '@design-system/components/inputs/NumberInput.astro';
+import CheckboxInput from '@design-system/components/inputs/CheckboxInput.astro';
 
 interface SortOption {
   value: string;
@@ -53,24 +54,24 @@ const bvpzCurrent = values['bvpzPrefiksas'];
   />
 
   <FilterGroup legend="Klasifikacija">
-    <div class="form-group">
+    <div class="ds-bvpz-label-row">
       <label class="form-label flex justify-between" for="bvpzPrefiksas">
         <span>BVPŽ prefiksas <sup>1</sup></span>
         <a href="/bvpz" class="text-sm">Žr. BVPŽ</a>
       </label>
-      <select name="bvpzPrefiksas" id="bvpzPrefiksas" class="form-control">
-        <option value="" selected={!bvpzCurrent || bvpzCurrent === 'kitas'}>Visi / nurodytas žemiau</option>
-        {bvpzOptions.map(opt => (
-          <option value={opt.value} selected={bvpzCurrent === opt.value}>{opt.label}</option>
-        ))}
-      </select>
+      <SelectInput
+        label=""
+        name="bvpzPrefiksas"
+        options={bvpzOptions}
+        values={{ bvpzPrefiksas: !bvpzCurrent || bvpzCurrent === 'kitas' ? '' : bvpzCurrent }}
+        placeholder="Visi / nurodytas žemiau"
+        className="mb-0"
+      />
     </div>
     <div class="flex items-center gap-2">
       <span class="text-muted text-xs"><em>arba</em></span>
     </div>
-    <div class="form-group">
-      <input type="text" class="form-control" name="bvpzPrefiksasKitas" id="bvpzPrefiksasKitas" value={values['bvpzPrefiksasKitas'] || ''} placeholder="Nenurodyta" />
-    </div>
+    <TextInput label="" name="bvpzPrefiksasKitas" placeholder="Nenurodyta" values={values} />
   </FilterGroup>
 
   <FilterGroup legend="Identifikatoriai">
@@ -87,3 +88,13 @@ const bvpzCurrent = values['bvpzPrefiksas'];
   </FilterGroup>
 </div>
 <p class="text-muted text-xs mt-7"><sup>1</sup> Veikia tik ne tekstinėse paieškose</p>
+
+<style>
+  .ds-bvpz-label-row :global(.form-label) {
+    margin-bottom: 4px;
+  }
+
+  .ds-bvpz-label-row :global(.ds-field__label) {
+    display: none;
+  }
+</style>

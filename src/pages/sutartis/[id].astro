@@ -1,6 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import PageHeader from '../../components/PageHeader.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
 import SutartisSalys from '../../components/sutartis/SutartisSalys.astro';
 import SutartisDetails from '../../components/sutartis/SutartisDetails.astro';
 import SutartisPranesimas from '../../components/sutartis/SutartisPranesimas.astro';
@@ -10,10 +10,12 @@ import SutartisEsProjektai from '../../components/sutartis/SutartisEsProjektai.a
 import SutartisSabis from '../../components/sutartis/SutartisSabis.astro';
 import SutartisPanasios from '../../components/sutartis/SutartisPanasios.astro';
 import { loadSutartis } from '../../lib/sutartis.js';
-import config from '@/config.js';
+import { fmtEur } from '../../lib/formatters.ts';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
+import config from '../../lib/config.ts';
 
-const colorScheme = Astro.cookies.get('colorScheme')?.value || 'auto';
-const font = Astro.cookies.get('font')?.value || 'ubuntu';
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
 
 const { id } = Astro.params;
 if (!id || isNaN(parseInt(id))) return Astro.redirect('/404');
@@ -26,7 +28,6 @@ if (Astro.url.pathname.endsWith('.json') || (Astro.request?.headers.get('accept'
 }
 
 const sutartiesUnikalusID = sutartis.sutartiesUnikalusId;
-const fmtEur = (v: any) => Number(v).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const verte = sutartis.faktineIvykdimoVerte || sutartis.verte;
 const cvpisUrl = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=${sutartiesUnikalusID}`;
 
@@ -43,7 +44,7 @@ const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
   pageAuthor={sutartis.perkanciojiOrganizacija}
   colorScheme={colorScheme}
   font={font}
-  customHead={(config as any).customHead}
+  customHead={config.customHead}
 >
   <main>
 
@@ -54,7 +55,7 @@ const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
       <Fragment slot="actions">
         <a href={`/sutartis/${sutartiesUnikalusID}.json`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties JSON duomenis">↗ JSON</a>
         <a href={cvpisUrl} class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties CVP IS duomenis">↗ CVP IS</a>
-        {(config as any).enableGraph && (
+        {config.enableGraph && (
           <a href={`/rysiai/asmuo/${sutartis.perkanciosiosOrganizacijosKodas}#o_2=${sutartis.tiekejoKodas}&f_2=DSLMGPABC&c_3=${sutartiesUnikalusID}&f_3=DSLMGPABC`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti ryšių grafą">↗ Ryšiai</a>
         )}
         <a href={`mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20${sutartiesUnikalusID}&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/${sutartiesUnikalusID}`} class="btn btn-outline btn-sm" aria-label="Pranešti apie sutartį">↗ Pranešti</a>

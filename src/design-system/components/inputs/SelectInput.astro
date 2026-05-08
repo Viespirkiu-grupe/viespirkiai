@@ -1,0 +1,88 @@
+---
+interface Option {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  label: string;
+  name: string;
+  options: Option[];
+  values: Record<string, any>;
+  placeholder?: string;
+  className?: string;
+}
+
+const {
+  label,
+  name,
+  options,
+  values,
+  placeholder = '—',
+  className = '',
+} = Astro.props;
+
+const current = values[name] ?? '';
+---
+
+<div class:list={['ds-field', className]}>
+  <label class="ds-field__label" for={name}>{label}</label>
+  <select name={name} id={name} class="ds-field__control ds-field__control--select">
+    <option value="" selected={!current}>{placeholder}</option>
+    {options.map((option) => (
+      <option value={option.value} selected={current === option.value}>{option.label}</option>
+    ))}
+  </select>
+</div>
+
+<style>
+  .ds-field {
+    margin-bottom: 16px;
+  }
+
+  .ds-field__label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .ds-field__control {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    color: var(--black);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    appearance: none;
+  }
+
+  .ds-field__control:focus {
+    outline: none;
+    border-color: var(--black);
+    box-shadow: 0 0 0 3px rgba(15, 15, 15, 0.08);
+  }
+
+  .ds-field__control:disabled {
+    background: var(--lighter-gray);
+    color: var(--gray);
+    cursor: not-allowed;
+  }
+
+  .ds-field__control--select {
+    color-scheme: inherit;
+    cursor: pointer;
+  }
+
+  .ds-field__control--select option,
+  .ds-field__control--select optgroup {
+    background: var(--white);
+    color: var(--black);
+  }
+</style>

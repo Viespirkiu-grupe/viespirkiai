@@ -1,59 +1,154 @@
 ---
+import ArchiveTreeNode from './ArchiveTreeNode.astro';
+
 interface TreeNode { name?: string; path?: string; id?: string | number; extension?: string; size?: number; isDirectory?: boolean; children?: TreeNode[]; }
 interface Props { filesTree: TreeNode[]; failasId: string | number; openByDefault?: boolean; rootClass?: string; }
 const { filesTree = [], failasId, openByDefault = true, rootClass = '' } = Astro.props;
 
-function formatSize(bytes: number) {
-  const b = Number(bytes);
-  if (!Number.isFinite(b) || b < 0) return '';
-  if (b < 1024) return `${b} B`;
-  const kb = b / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  const mb = kb / 1024;
-  if (mb < 1024) return `${mb.toFixed(1)} MB`;
-  return `${(mb / 1024).toFixed(1)} GB`;
+function compareNodes(a: TreeNode, b: TreeNode) {
+  const aIsDir = !!a?.isDirectory || (Array.isArray(a?.children) && a.children.length > 0);
+  const bIsDir = !!b?.isDirectory || (Array.isArray(b?.children) && b.children.length > 0);
+  if (aIsDir !== bIsDir) return aIsDir ? -1 : 1;
+  return (a?.name || '').localeCompare(b?.name || '', 'lt', { numeric: true, sensitivity: 'base' });
 }
 
-function renderNodes(nodes: TreeNode[]): string {
-  if (!nodes?.length) return '';
-  let html = '';
-  for (const node of nodes) {
-    if (!node) continue;
-    const isDir = !!node.isDirectory || Array.isArray(node.children);
-    const name = node.name || '—';
-    const safeName = name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    const children = node.children || [];
-    if (isDir) {
-      const openAttr = openByDefault ? ' open' : '';
-      const noChildren = children.length ? '' : ' class="no-children"';
-      const count = children.length ? `(${children.length})` : '';
-      html += `<details${openAttr}${noChildren}><summary>`;
-      if (children.length) html += `<span class="archive-toggle">▶</span>`;
-      html += `<span class="archive-name">${safeName}</span>`;
-      if (count) html += `<span class="archive-meta">${count}</span>`;
-      html += `</summary>`;
-      if (children.length) html += `<div class="archive-children">${renderNodes(children)}</div>`;
-      html += `</details>`;
-    } else {
-      const ext = node.extension || (name.includes('.') ? name.split('.').pop() : '');
-      const size = formatSize(node.size!);
-      const meta = [ext, size].filter(Boolean).join(' · ');
-      const href = node.id
-        ? `/failas/${node.id}`
-        : (failasId && node.path ? `https://failai.viespirkiai.org/${failasId}/${node.path}` : '#');
-      html += `<details class="no-children"><summary><span class="archive-name"><a href="${href}" class="cell-truncate">${safeName}</a></span>`;
-      if (meta) html += `<span class="archive-meta">${meta.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span>`;
-      html += `</summary></details>`;
-    }
-  }
-  return html;
-}
-
-const treeHtml = renderNodes(filesTree);
+const sortedTree = [...filesTree].sort(compareNodes);
 ---
 <div class={`archive-tree ${rootClass}`}>
   {filesTree.length > 0
-    ? <div class="archive-root" set:html={treeHtml} />
+    ? (
+      <div class="archive-root">
+        <ul class="archive-branch archive-branch-root">
+          {sortedTree.map((node) => (
+            <ArchiveTreeNode node={node} failasId={failasId} openByDefault={openByDefault} />
+          ))}
+        </ul>
+      </div>
+    )
     : <em class="text-muted">Nerasta</em>
   }
 </div>
+
+<style>
+  .archive-tree {
+    font-size: var(--text-sm);
+    overflow: auto;
+  }
+
+  .archive-root {
+    min-width: 0;
+  }
+
+  .archive-branch {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .archive-branch:not(.archive-branch-root) {
+    margin-left: 18px;
+    padding-left: 14px;
+  }
+
+  :global(.archive-node) {
+    margin: 0;
+  }
+
+  :global(.archive-row) {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 10px 0;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  :global(.archive-tree summary) {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  :global(.archive-tree summary::-webkit-details-marker) {
+    display: none;
+  }
+
+  :global(.archive-caret) {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+  }
+
+  :global(.archive-caret)::before {
+    content: "";
+    position: absolute;
+    left: 2px;
+    top: 1px;
+    width: 7px;
+    height: 7px;
+    border-right: 1.5px solid var(--gray);
+    border-bottom: 1.5px solid var(--gray);
+    transform: rotate(-45deg);
+    transition: transform var(--transition);
+  }
+
+  :global(.archive-tree details[open] > summary .archive-caret)::before {
+    transform: rotate(45deg);
+    top: 0;
+  }
+
+  :global(.archive-label) {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+  }
+
+  :global(.archive-meta) {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--gray);
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+  }
+
+  :global(.archive-link) {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  :global(.archive-row:hover) {
+    background: transparent;
+  }
+
+  :global(.archive-link:hover .archive-label) {
+    text-decoration: underline;
+  }
+
+  .archive-tree.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+  }
+
+  .archive-tree.compact :global(summary.archive-row) {
+    padding: 6px 0;
+    gap: 12px;
+  }
+
+  @media (max-width: 640px) {
+    :global(.archive-row) {
+      padding: 8px 0;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    :global(.archive-meta) {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,41 @@
+---
+interface ImageTileItem {
+  href: string;
+  src: string;
+  alt: string;
+}
+
+interface Props {
+  items: ImageTileItem[];
+  className?: string;
+}
+
+const { items, className = '' } = Astro.props;
+---
+
+<section class:list={[ 'flex flex-wrap justify-center gap-4 mb-16', className ].filter(Boolean)}>
+  {items.map((item) => (
+    <article class="image-tile">
+      <a href={item.href} class="bg-muted size-full block text-black rounded-lg overflow-hidden">
+        <img class="size-full object-contain block" src={item.src} alt={item.alt} />
+      </a>
+    </article>
+  ))}
+</section>
+
+<style>
+  .image-tile {
+    flex: 1 1 300px;
+    aspect-ratio: 1.414 / 1;
+    min-width: 18.75rem;
+    max-width: 43.75rem;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    transition: transform 300ms, box-shadow 300ms;
+  }
+
+  .image-tile:hover {
+    transform: translateY(-0.3125rem);
+    box-shadow: var(--shadow-lg);
+  }
+</style>

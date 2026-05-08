@@ -1,0 +1,53 @@
+---
+import Button from '@design-system/components/Button.astro';
+
+/**
+ * Read-only value field with a "Copy" button next to it.
+ *
+ * Self-contained: the inline script wires up the click handler using the
+ * `value` and `buttonId` props, so consumers don't need to add their own
+ * clipboard logic.  The button's label flips to "✓ Nukopijuota" for ~1.5s
+ * after a successful copy.
+ */
+interface Props {
+  value: string;
+  buttonId: string;
+  buttonLabel?: string;
+}
+
+const { value, buttonId, buttonLabel = 'Kopijuoti' } = Astro.props;
+---
+
+<div class="inline-flex border rounded-lg bg-lighter-gray max-w-full">
+  <code class="px-4 py-3 border-none bg-transparent overflow-auto">{value}</code>
+  <Button
+    id={buttonId}
+    type="button"
+    className="copy-field-button"
+  >
+    {buttonLabel}
+  </Button>
+</div>
+
+<script is:inline define:vars={{ value, buttonId, buttonLabel }}>
+  (function () {
+    const btn = document.getElementById(buttonId);
+    if (!btn || btn.dataset.copyBound === '1') return;
+    btn.dataset.copyBound = '1';
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(value);
+        btn.textContent = '✓ Nukopijuota';
+        setTimeout(() => { btn.textContent = buttonLabel; }, 1500);
+      } catch {}
+    });
+  })();
+</script>
+
+<style>
+  .copy-field-button {
+    border: 0;
+    border-left: var(--border);
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  }
+</style>

@@ -1,0 +1,74 @@
+---
+import Badge from '@design-system/components/Badge.astro';
+
+const { group, roleLabel } = Astro.props;
+
+function f(id: string) {
+  return (group.fields.find((x: any) => x.fieldId === id)?.values || []).join(', ');
+}
+
+function fUrl(id: string) {
+  return group.fields.find((x: any) => x.fieldId === id);
+}
+
+const name = group.label || f('BT-500-Organization-Company');
+const regNum = f('BT-501-Organization-Company');
+const street1 = f('BT-510(a)-Organization-Company');
+const street2 = f('BT-510(b)-Organization-Company');
+const zip = f('BT-512-Organization-Company');
+const city = f('BT-513-Organization-Company');
+const country = f('BT-514-Organization-Company');
+const nuts = f('BT-507-Organization-Company');
+const email = fUrl('BT-506-Organization-Company');
+const phone = f('BT-503-Organization-Company');
+const website = fUrl('BT-505-Organization-Company');
+const profile = fUrl('BT-508-Procedure-Buyer');
+const contactName = f('BT-502-Organization-TouchPoint') || f('BT-500-Organization-TouchPoint');
+const contactEmail = fUrl('BT-506-Organization-TouchPoint');
+const contactPhone = f('BT-503-Organization-TouchPoint');
+const buyerActivity = f('BT-10-Procedure-Buyer');
+const buyerLegalType = f('BT-11-Procedure-Buyer');
+const utilityActivity = f('BT-610-Procedure-Buyer');
+const hasKv = buyerLegalType || buyerActivity || utilityActivity;
+const hasContact = phone || email || street1 || zip || city || contactName || contactEmail;
+---
+
+<div class="card h-full flex flex-col">
+  {(name || roleLabel) && (
+    <div class="card-header">
+      {name && <h3>{regNum ? <a href={`/asmuo/${regNum}`} class="no-style">{name}</a> : name}</h3>}
+      {roleLabel && <Badge>{roleLabel}</Badge>}
+    </div>
+  )}
+  <div class="card-body flex-1 flex flex-col gap-2 pt-5">
+    <div class="flex flex-col gap-1">
+      {regNum && <p class="text-sm text-muted m-0">{regNum}</p>}
+      {hasKv && (
+        <dl class="kv-list m-0">
+          {buyerLegalType && <><dt>Teisinė forma</dt><dd>{buyerLegalType}</dd></>}
+          {buyerActivity && <><dt>Veiklos sritis</dt><dd>{buyerActivity}</dd></>}
+          {utilityActivity && <><dt>Sektoriaus veikla</dt><dd>{utilityActivity}</dd></>}
+        </dl>
+      )}
+    </div>
+
+    {hasContact && (
+      <div class="flex flex-col gap-1">
+        {contactName && <p class="text-sm font-medium m-0">{contactName}</p>}
+        {phone && <p class="text-sm m-0"><a href={`tel:${phone}`}>{phone}</a></p>}
+        {contactPhone && contactPhone !== phone && <p class="text-sm m-0"><a href={`tel:${contactPhone}`}>{contactPhone}</a></p>}
+        {email?.values?.map((v: string) => <p class="text-sm m-0"><a href={`mailto:${v}`}>{v}</a></p>)}
+        {contactEmail?.values?.map((v: string) => <p class="text-sm m-0"><a href={`mailto:${v}`}>{v}</a></p>)}
+        {(street1 || street2) && <p class="text-sm text-muted m-0">{[street1, street2].filter(Boolean).join(', ')}</p>}
+        {(zip || city || country) && <p class="text-sm text-muted m-0">{[[zip, city].filter(Boolean).join(' '), country].filter(Boolean).join(' · ')}</p>}
+        {nuts && <p class="text-xs text-muted m-0">NUTS: {nuts}</p>}
+        {website?.values?.map((v: string) => <p class="text-sm m-0"><a href={v} target="_blank" rel="noopener">{v}</a></p>)}
+      </div>
+    )}
+  </div>
+  {profile && (
+    <div class="card-footer">
+      {profile.values.map((v: string) => <a href={v} class="text-sm" target="_blank" rel="noopener">Pirkėjo profilis →</a>)}
+    </div>
+  )}
+</div>

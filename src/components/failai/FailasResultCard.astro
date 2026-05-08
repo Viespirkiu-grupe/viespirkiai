@@ -1,4 +1,6 @@
 ---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+
 interface Props {
   item: any;
   search: string;
@@ -15,23 +17,25 @@ const formatBytes = (value: unknown) => {
 };
 ---
 
-<article class="result-card card-clickable">
-  <div class="result-card-body">
-    <dl class="result-card-meta">
-      <div><dt class="sr-only">Formatas</dt><dd>{String(item.extension || '').toUpperCase()}</dd></div>
-      <div><dt class="sr-only">Dydis</dt><dd>{formatBytes(item.dydis)}</dd></div>
-      {item.metaduomenys && item.metaduomenys.pageCount && <div><dt class="sr-only">Puslapiai</dt><dd>{Number(item.metaduomenys.pageCount).toLocaleString('lt-LT')} p.</dd></div>}
-      <div><dt class="sr-only">Žodžiai</dt><dd>{Number(item.zodziuSkaicius).toLocaleString('lt-LT') || '—'} ž.</dd></div>
-    </dl>
+<ResultCardShell clickable={true}>
+  <dl slot="meta" class="result-card-meta">
+    <div><dt class="sr-only">Formatas</dt><dd>{String(item.extension || '').toUpperCase()}</dd></div>
+    <div><dt class="sr-only">Dydis</dt><dd>{formatBytes(item.dydis)}</dd></div>
+    {item.metaduomenys && item.metaduomenys.pageCount && <div><dt class="sr-only">Puslapiai</dt><dd>{Number(item.metaduomenys.pageCount).toLocaleString('lt-LT')} p.</dd></div>}
+    <div><dt class="sr-only">Žodžiai</dt><dd>{Number(item.zodziuSkaicius).toLocaleString('lt-LT') || '—'} ž.</dd></div>
+  </dl>
 
-    <h3 class="result-card-title">
-      <a href={`/failas/${item.id}?search=${encodeURIComponent(search)}`}>
-        {item.metaduomenys ? item.metaduomenys.Title || item.pavadinimas : item.pavadinimas}
-      </a>
-    </h3>
+  <h3 slot="title" class="result-card-title">
+    <a href={`/failas/${item.id}?search=${encodeURIComponent(search)}`}>
+      {item.metaduomenys ? item.metaduomenys.Title || item.pavadinimas : item.pavadinimas}
+    </a>
+  </h3>
 
-    {item.excerpt && <div class="text-sm text-muted mt-2 text-justify" set:html={item.excerpt} />}
+  {item.excerpt && <div class="text-sm text-muted mt-2 text-justify" set:html={item.excerpt} />}
 
-    {item.dokId && <div class="result-card-footer"><span><a href={`/sutartis/${item.dokId}`} class="relative z-1">↗ Sutartis</a></span></div>}
-  </div>
-</article>
+  {item.dokId && (
+    <div slot="footer" class="result-card-footer">
+      <span><a href={`/sutartis/${item.dokId}`} class="relative z-1">↗ Sutartis</a></span>
+    </div>
+  )}
+</ResultCardShell>

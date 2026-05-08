@@ -1,0 +1,73 @@
+---
+interface Props {
+  id: string;
+  type: string;
+  labels: any[];
+  series: any[];
+  flags?: string[];
+  customOptions?: Record<string, any>;
+  title?: string;
+  anchor?: string;
+  wrapperClass?: string;
+  titleClass?: string;
+  frameClass?: string;
+  chartClass?: string;
+  heightClass?: string;
+  framed?: boolean;
+  titleTag?: 'h2' | 'h3';
+}
+
+const {
+  id,
+  type,
+  labels,
+  series,
+  flags = [],
+  customOptions,
+  title,
+  anchor,
+  wrapperClass = 'min-w-0 flex flex-col min-h-87.5',
+  titleClass = 'mb-3',
+  frameClass = '',
+  chartClass = '',
+  heightClass = 'h-87.5',
+  framed = true,
+  titleTag = 'h2',
+} = Astro.props;
+
+const TitleTag = titleTag;
+const chartData = { labels, series, flags, customOptions };
+---
+
+<div class={wrapperClass}>
+  <script>
+    import './chartRuntime';
+  </script>
+
+  {title && (
+    <TitleTag class={titleClass}>
+      {anchor ? <a href={`#${anchor}`} id={anchor} class="no-style">{title}</a> : title}
+    </TitleTag>
+  )}
+
+  {framed ? (
+    <div class:list={['chart-frame', frameClass]}>
+      <div id={id} class:list={['chart', heightClass, chartClass]}></div>
+    </div>
+  ) : (
+    <div id={id} class:list={['chart', heightClass, chartClass]}></div>
+  )}
+
+  <script defer is:inline define:vars={{ id, type, chartData }}>
+    window.ensureChartRuntime?.().then(() => {
+      window.displayChart?.({
+        element: document.querySelector('#' + id),
+        type,
+        labels: chartData.labels,
+        series: chartData.series,
+        flags: chartData.flags,
+        customOptions: chartData.customOptions,
+      });
+    });
+  </script>
+</div>
