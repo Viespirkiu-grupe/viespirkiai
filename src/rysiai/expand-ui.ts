@@ -2,7 +2,7 @@ import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, c
 import { NODE_COLOR, EDGE_COLOR, nodeColor } from './graph-theme.ts';
 import { isConfigurableNode, isOrgNode, isPersonNode, isContractNode, isProcurementNode } from './entity-types.ts';
 import type { LegendState } from './legend-state.ts';
-import type { NodeDetails } from './details-panel.ts';
+import type { NodePanel } from './details-panel.ts';
 import type Graph from 'graphology';
 import type forceAtlas2 from 'graphology-layout-forceatlas2';
 import type noverlap from 'graphology-layout-noverlap';
@@ -23,7 +23,7 @@ interface ExpandUIDeps {
     noverlap: INoverlapLayout;
     animateNodes: (graph: Graph, targets: Record<string, { x: number; y: number }>, opts: { duration: number; easing: string }, callback?: () => void) => () => void;
     legendState: LegendState;
-    nodeDetails: NodeDetails;
+    nodeDetails: NodePanel;
     onStateChange?: (() => void) | null;
     postRebuild?: (() => void) | null;
 }

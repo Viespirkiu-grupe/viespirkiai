@@ -4,6 +4,7 @@ export {};
 
 declare global {
   interface Window {
+    RYSIAI_CONFIG: { entityType: string; entityId: string };
     L?: {
       map: unknown;
       tileLayer: (...args: unknown[]) => unknown;
