@@ -1,4 +1,5 @@
 ---
+import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
 import Table from '@design-system/components/Table.astro';
 import TableWrapper from '@design-system/components/TableWrapper.astro';
 const { asmuo } = Astro.props;
@@ -6,10 +7,10 @@ const pirkimai = asmuo.sutartys?.pirkimaiKasMetus ?? [];
 const tiekimai = asmuo.sutartys?.tiekimaiKasMetus ?? [];
 const topTiekejai = asmuo.sutartys?.topTiekejai ?? [];
 const topPirkejai = asmuo.sutartys?.topPirkejai ?? [];
-const pirkimaiLabels = JSON.stringify(pirkimai.map((d: any) => String(d.year)));
-const pirkimaiSeries = JSON.stringify(pirkimai.map((d: any) => d.total || null));
-const tiekimaiLabels = JSON.stringify(tiekimai.map((d: any) => String(d.year)));
-const tiekimaiSeries = JSON.stringify(tiekimai.map((d: any) => d.total || null));
+const pirkimaiLabels = pirkimai.map((d: any) => String(d.year));
+const pirkimaiSeries = pirkimai.map((d: any) => d.total || null);
+const tiekimaiLabels = tiekimai.map((d: any) => String(d.year));
+const tiekimaiSeries = tiekimai.map((d: any) => d.total || null);
 ---
 
 <div class="page-section mb-10" id="sutartys">
@@ -18,25 +19,33 @@ const tiekimaiSeries = JSON.stringify(tiekimai.map((d: any) => d.total || null))
     <div class="flex flex-col min-h-[350px]">
       <h3 class="text-sm font-bold mb-3">Numatytos pirkimų vertės pagal metus</h3>
       {pirkimai.length > 0 ? (
-        <div class="chart-frame">
-          <div id="pirkimaiPerMetus" class="chart h-[350px]"></div>
-          <script defer is:inline define:vars={{ pp_l: JSON.parse(pirkimaiLabels), pp_s: JSON.parse(pirkimaiSeries) }}>
-            displayChart({ element: document.querySelector('#pirkimaiPerMetus'), type: 'line-datetime', labels: pp_l, series: pp_s, flags: ['yEUR', 'yMin0', 'xYear'] });
-          </script>
-        </div>
+        <LineDatetimeChart
+          id="pirkimaiPerMetus"
+          title="Numatytos pirkimų vertės pagal metus"
+          anchor="pirkimaiPerMetusAnchor"
+          labels={pirkimaiLabels}
+          series={pirkimaiSeries}
+          flags={['yEUR', 'yMin0', 'xYear']}
+          wrapperClass=""
+          titleClass="sr-only"
+          heightClass="h-[350px]"
+        />
       ) : <div class="chart-empty">Nėra duomenų</div>}
     </div>
     <div class="flex flex-col min-h-[350px]">
       <h3 class="text-sm font-bold mb-3">Numatytos pardavimų vertės pagal metus</h3>
       {tiekimai.length > 0 ? (
-        <div class="chart-frame">
-          <div id="pardavimaiPerMetus" class="chart h-[350px]"></div>
-          <script defer is:inline define:vars={{ tp_l: JSON.parse(tiekimaiLabels), tp_s: JSON.parse(tiekimaiSeries) }}>
-            window.pardavimaiKasMetusLabels = tp_l;
-            window.pardavimaiKasMetus = tp_s;
-            displayChart({ element: document.querySelector('#pardavimaiPerMetus'), type: 'line-datetime', labels: tp_l, series: tp_s, flags: ['yEUR', 'yMin0', 'xYear'] });
-          </script>
-        </div>
+        <LineDatetimeChart
+          id="pardavimaiPerMetus"
+          title="Numatytos pardavimų vertės pagal metus"
+          anchor="pardavimaiPerMetusAnchor"
+          labels={tiekimaiLabels}
+          series={tiekimaiSeries}
+          flags={['yEUR', 'yMin0', 'xYear']}
+          wrapperClass=""
+          titleClass="sr-only"
+          heightClass="h-[350px]"
+        />
       ) : <div class="chart-empty">Nėra duomenų</div>}
     </div>
   </div>

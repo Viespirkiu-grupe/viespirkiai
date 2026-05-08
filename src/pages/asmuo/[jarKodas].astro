@@ -1,6 +1,5 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import ChartsSetup from '@design-system/components/charts/ChartsSetup.astro';
 import AsmuoHeader from '../../components/asmuo/AsmuoHeader.astro';
 import AsmuoBasics from '../../components/asmuo/AsmuoBasics.astro';
 import AsmuoMap from '../../components/asmuo/AsmuoMap.astro';
@@ -110,8 +109,6 @@ const mvpAprasaiLimit = query.mvpAprasaiLimit === 'max' ? 9999999 : Number(query
     customHead={config.customHead}
   >
     <main>
-      <ChartsSetup />
-
       <AsmuoHeader asmuo={asmuo} />
 
       <div class="grid-3 mb-7 items-start">

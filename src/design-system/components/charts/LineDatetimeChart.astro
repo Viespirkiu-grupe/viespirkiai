@@ -8,6 +8,7 @@ interface Props {
   labels: any[];
   series: any[];
   flags?: string[];
+  customOptions?: Record<string, any>;
   wrapperClass?: string;
   titleClass?: string;
   frameClass?: string;
@@ -22,6 +23,7 @@ const {
   labels,
   series,
   flags = ['yMin0', 'xAxisDay', 'numbersWithSpaces'],
+  customOptions,
   wrapperClass,
   titleClass,
   frameClass,
@@ -38,6 +40,7 @@ const {
   labels={labels}
   series={series}
   flags={flags}
+  customOptions={customOptions}
   wrapperClass={wrapperClass}
   titleClass={titleClass}
   frameClass={frameClass}

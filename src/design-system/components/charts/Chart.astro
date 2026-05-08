@@ -36,14 +36,10 @@ const {
 } = Astro.props;
 
 const TitleTag = titleTag;
-const chartData = { labels, series, flags, customOptions };
+const chartConfig = JSON.stringify({ type, labels, series, flags, customOptions });
 ---
 
 <div class={wrapperClass}>
-  <script>
-    import './chartRuntime';
-  </script>
-
   {title && (
     <TitleTag class={titleClass}>
       {anchor ? <a href={`#${anchor}`} id={anchor} class="no-style">{title}</a> : title}
@@ -52,22 +48,24 @@ const chartData = { labels, series, flags, customOptions };
 
   {framed ? (
     <div class:list={['chart-frame', frameClass]}>
-      <div id={id} class:list={['chart', heightClass, chartClass]}></div>
+      <div id={id} class:list={['chart', heightClass, chartClass]} data-chart-config={chartConfig}></div>
     </div>
   ) : (
-    <div id={id} class:list={['chart', heightClass, chartClass]}></div>
+    <div id={id} class:list={['chart', heightClass, chartClass]} data-chart-config={chartConfig}></div>
   )}
 
-  <script defer is:inline define:vars={{ id, type, chartData }}>
-    window.ensureChartRuntime?.().then(() => {
+  <script>
+    import { ensureChartRuntime } from './chartRuntime';
+
+    await ensureChartRuntime();
+    for (const element of document.querySelectorAll('.chart[data-chart-config]:not([data-chart-initialized])')) {
+      const rawConfig = element.getAttribute('data-chart-config');
+      if (!rawConfig) continue;
+      element.setAttribute('data-chart-initialized', 'true');
       window.displayChart?.({
-        element: document.querySelector('#' + id),
-        type,
-        labels: chartData.labels,
-        series: chartData.series,
-        flags: chartData.flags,
-        customOptions: chartData.customOptions,
+        element,
+        ...JSON.parse(rawConfig),
       });
-    });
+    }
   </script>
 </div>
