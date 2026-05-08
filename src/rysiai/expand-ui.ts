@@ -13,9 +13,10 @@ interface ExpandUIDeps {
     dataGraph: Graph;
     viewGraph: Graph;
     renderer: {
-        on: (event: string, handler: (event: { node: string }) => void) => void;
-        refresh: () => void;
-        graphToViewport: (pos: { x: number; y: number }) => { x: number; y: number };
+        on(event: 'clickNode' | 'doubleClickNode', handler: (event: { node: string }) => void): void;
+        on(event: 'clickStage', handler: () => void): void;
+        refresh(): void;
+        graphToViewport(pos: { x: number; y: number }): { x: number; y: number };
     };
     statusEl: HTMLElement | null;
     loadingEl: HTMLElement | null;
@@ -374,7 +375,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         _triggerExpand(nodeId, attrs);
     });
 
-    renderer.on('clickStage', deselectAll as unknown as (event: { node: string }) => void);
+    renderer.on('clickStage', deselectAll);
 
     return { loadOrg, loadPerson, loadSutartis, loadPirkimas, loadContract, rebuildAndRefresh, getSelectedNodeId: () => selectedNodeId, selectNode };
 }
