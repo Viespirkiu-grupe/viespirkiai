@@ -6,11 +6,6 @@ import { specialJarCodes } from '../juridiniai/specialJarCodes.js';
  * @typedef {{ id: string; source: string; target: string; attributes: Record<string, unknown> }} EdgeLike
  */
 
-// Jar codes that represent CVP IS placeholder entities (not real companies).
-// Nodes with these codes get cannotExpand=true so the graph never tries to load their relations.
-export const DISABLE_EXPAND_JARS = [801, 802, 803, 807, 809];
-const DISABLE_EXPAND_SET = new Set(DISABLE_EXPAND_JARS.map(String));
-
 const ENTITY_TYPE = {
     Org:         'OrganizationEntity',
     Person:      'PersonEntity',
@@ -150,7 +145,7 @@ export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
         draustieji2: opts.draustieji2 ?? undefined,
         size: 8,
     };
-    if (DISABLE_EXPAND_SET.has(jk)) attrs.cannotExpand = true;
+    if (specialJarCodes[jk]) attrs.cannotExpand = true;
     return { id, attributes: attrs };
 }
 
