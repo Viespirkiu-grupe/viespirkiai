@@ -59,7 +59,7 @@ export async function syncAdpChanges(CONFIG) {
 
         const values = [];
         const placeholders = filteredRows
-            .map((row, rowIndex) => {
+            .map((row) => {
                 const ph = dbCols.map((col) => {
                     values.push(row[col] ?? null);
                     return `$${values.length}`;

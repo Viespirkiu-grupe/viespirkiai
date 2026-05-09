@@ -51,7 +51,14 @@ const tools = [
 export function createMcpServer() {
     const server = new McpServer({ name: "viespirkiai", version: "1.0.0" });
     for (const tool of tools) {
-        server.tool(tool.name, tool.description, tool.schema, wrapHandler(tool.name, tool.handler));
+        server.registerTool(
+            tool.name,
+            {
+                description: tool.description,
+                inputSchema: tool.schema,
+            },
+            wrapHandler(tool.name, tool.handler),
+        );
     }
     return server;
 }

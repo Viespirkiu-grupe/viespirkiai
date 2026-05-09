@@ -113,8 +113,8 @@ function resolveChartColors(data: any, isDark: boolean) {
   return getCategoricalColors(isDark);
 }
 
-function buildOptions(data: any, isDark: boolean) {
-  let options = structuredClone(buildGlobalDefaults(isDark));
+function buildOptions(data: any, isDark: boolean): any {
+  let options: any = structuredClone(buildGlobalDefaults(isDark));
   if (data.type && typeChartDefaults[data.type]) options = deepMerge(options, structuredClone(typeChartDefaults[data.type]));
   for (const flag of (data.flags || [])) {
     if (flag === '50shadesOfGray') options = deepMerge(options, { colors: getShadesOfGray(isDark) });
@@ -132,7 +132,7 @@ function buildOptions(data: any, isDark: boolean) {
     options.labels = data.labels;
     options.series = data.series;
   }
-  if (data.customOptions) options = deepMerge(options, data.customOptions);
+  if (data.customOptions) options = deepMerge(options, data.customOptions as any);
   return options;
 }
 

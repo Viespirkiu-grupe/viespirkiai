@@ -216,7 +216,7 @@ describe('rebuildViewGraph', () => {
     let dataGraph: Graph, viewGraph: Graph;
 
     // isEdgeHidden predicate that hides a fixed set of types (global, no per-node config)
-    const mkHidden = (types: string[]) => { const s = new Set(types); return (src: string, tgt: string, type: string) => s.has(type); };
+    const mkHidden = (types: string[]) => { const s = new Set(types); return (_src: string, _tgt: string, type: string) => s.has(type); };
     const noneHidden = () => false;
 
     function addOrg(g: Graph, id: string, expanded = false) {

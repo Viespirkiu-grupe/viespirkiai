@@ -71,7 +71,7 @@ export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
     const values = [];
     const placeholders = [];
 
-    aprasai.forEach((a, i) => {
+    aprasai.forEach((a) => {
         // compute hash
         const hash = crypto
             .createHash("md5")

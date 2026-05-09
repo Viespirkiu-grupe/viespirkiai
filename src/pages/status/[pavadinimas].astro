@@ -128,7 +128,7 @@ const today = todayLT();
 const chartConfigs = apjungti.map((diena: any) => {
   const dayStr: string = toIsoDay(new Date(diena.day));
   const [year, month, dayNum] = dayStr.split('-').map(Number);
-  const annotations = (diena.intervals as any[]).map((i: any) => ({
+  const annotations: any[] = (diena.intervals as any[]).map((i: any) => ({
     x: new Date(i.start_time).getTime(),
     x2: new Date(i.end_time).getTime(),
     fillColor: '#FF4560',

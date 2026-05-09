@@ -1,7 +1,6 @@
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
-import PQueue from "p-queue";
 import RPSCounter from "../../utils/rpsCounter.js";
 
 const rps = new RPSCounter();

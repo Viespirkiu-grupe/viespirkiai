@@ -39,7 +39,7 @@ export const GET: APIRoute = async ({ params }) => {
 
   const buffer = await renderTile(rows, { TILE_SIZE, scale, minTileX, minTileY });
 
-  return new Response(buffer, {
+  return new Response(buffer as any, {
     headers: { 'Content-Type': 'image/png' },
   });
 };

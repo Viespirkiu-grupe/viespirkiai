@@ -71,8 +71,6 @@ async function nuskaitytiDiena(data) {
 
         for (let i = 1; i <= rezultatuSkaicius / 50; i++) {
             // pad with a 0
-            let pageNumber = i.toString().padStart(2, "0");
-
             let postBody = new URLSearchParams();
 
             postBody.append(
@@ -222,7 +220,6 @@ var eilute = 0;
 async function insertBatch(rows) {
     if (rows.length === 0) return;
 
-    const rowPlaceholders = `($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`;
     const sql = `
          INSERT INTO bylos (
              "bylosNumeris", "bylosRusis", data, teisejai, salys,

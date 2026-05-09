@@ -198,8 +198,12 @@ export async function cvpIsScrapePageContent(url, options = {}) {
                 .querySelectorAll("td")[8]
                 .innerHTML.replace("&#160;", ""),
             tipas: mainRow.querySelectorAll("td")[9].innerHTML,
+            bvpzKodas: "",
+            bvpzPavadinimas: "",
             dokumentai: [],
             dokumentuKiekis: 0,
+            papildomiBvpzKodai: [],
+            papildomiBvpzPavadinimai: [],
         };
 
         sutartis.papildomiTiekejai = [];
@@ -463,7 +467,6 @@ export async function cvpIsScrapePagesSequential(
     let yraIrasu = true;
 
     while (yraIrasu) {
-        let batchResults;
         while (true) {
             try {
                 const batchPromises = [];
@@ -474,15 +477,13 @@ export async function cvpIsScrapePagesSequential(
                     batchPromises.push(cvpIsScrapePageContent(url));
                 }
 
-                batchResults = await Promise.all(batchPromises);
+                var batchData = await Promise.all(batchPromises);
                 break; // success, exit loop
             } catch (err) {
                 log(`Batch failed, retrying in 60s: ${err}`);
                 await new Promise((res) => setTimeout(res, 60000));
             }
         }
-
-        const sutartys = batchData.flatMap((item) => item.sutartys ?? []);
 
         if (batchData.length === 0) {
             yraIrasu = false;

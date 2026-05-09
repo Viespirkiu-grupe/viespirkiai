@@ -1,5 +1,6 @@
 import { postgres } from '@/postgres/postgres.js';
 import { Buffer } from 'buffer';
+// @ts-expect-error luxon does not have type declarations
 import { DateTime } from 'luxon';
 
 export type Failas = Record<string, any>;

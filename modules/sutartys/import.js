@@ -94,7 +94,6 @@ export async function cvpIsImportArray(data, options = {}) {
     if (items.length > 0) {
         // Įterpiame į Typesense
         timings.start("importTypesenseUpsert");
-        let startTypesenseTime = Date.now();
         await addDocumentsToSearch(items);
         timings.end("importTypesenseUpsert");
 

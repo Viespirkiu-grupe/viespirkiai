@@ -120,7 +120,7 @@ const fieldCols = splitMax5(byParent(section.fields));
       };
       const mainCpvParts = splitCpv(mainCpv);
       const addCpvParts = f('BT-263-Procedure')
-        ? f('BT-263-Procedure').split(',').map((item) => item.trim()).filter(Boolean).map(splitCpv)
+        ? f('BT-263-Procedure').split(',').map((item: string) => item.trim()).filter(Boolean).map(splitCpv)
         : [];
       return (
         <section id="pirkimo-objektas">
@@ -135,7 +135,7 @@ const fieldCols = splitMax5(byParent(section.fields));
                 <div>
                   <div class="font-medium">{mainCpvParts.label || mainCpvParts.code}{mainCpvParts.code && <span class="text-muted font-normal text-xs"> {mainCpvParts.code}</span>}</div>
                 </div>
-                {addCpvParts.map((cpvItem) => (
+                {addCpvParts.map((cpvItem: any) => (
                   <div>
                     <div class="font-medium">{cpvItem.label || cpvItem.code}{cpvItem.code && <span class="text-muted font-normal text-xs"> {cpvItem.code}</span>}</div>
                   </div>
@@ -231,7 +231,7 @@ const fieldCols = splitMax5(byParent(section.fields));
     <section id={sectionId}>
       <h2 class="mb-7">{section.title}</h2>
       <div class="grid-3">
-        {orgGroups.map((group) => <TedOrgGroup group={group} roleLabel={getRole(group)} />)}
+        {orgGroups.map((group: any) => <TedOrgGroup group={group} roleLabel={getRole(group)} />)}
       </div>
     </section>
   )
@@ -278,7 +278,7 @@ const fieldCols = splitMax5(byParent(section.fields));
       </div>
     )}
     <div class="flex flex-col gap-4">
-      {section.groups.map((group, idx) => (
+      {section.groups.map((group: any, idx: number) => (
         (section.nodeId === 'ND-Lot' || section.nodeId === 'ND-Part')
           ? <TedLotGroup group={group} idx={idx} totalGroups={section.groups.length} shortUrl={shortUrl} subgroupTitles={subgroupTitles} formatDate={Astro.props.formatDate} />
           : section.nodeId === 'ND-LotsGroup'

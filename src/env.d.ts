@@ -5,11 +5,7 @@ export {};
 declare global {
   interface Window {
     RYSIAI_CONFIG: { entityType: string; entityId: string };
-    L?: {
-      map: unknown;
-      tileLayer: (...args: unknown[]) => unknown;
-      marker: (...args: unknown[]) => unknown;
-    };
+    L?: any;
     __vpLeaflet?: {
       loading: Promise<void> | null;
       loaded: boolean;

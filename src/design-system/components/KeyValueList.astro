@@ -1,10 +1,5 @@
 ---
-interface Props {
-  as?: 'dl' | 'div';
-  className?: string;
-}
-
-const { as = 'dl', className = '' } = Astro.props;
+const { as = 'dl', className = '' }: { as?: 'dl' | 'div'; className?: string } = Astro.props;
 const Tag = as;
 const classes = ['kv-list-shell', className].filter(Boolean).join(' ');
 ---

@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @source "../**/*.{astro,html,js,jsx,ts,tsx,md,mdx}";
-@source "../../views/**/*.ejs";
 @source "../../routes/**/*.js";
 @source "../../public/**/*.js";
 

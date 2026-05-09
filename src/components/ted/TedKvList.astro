@@ -1,28 +1,34 @@
 ---
 import KeyValueList from '@design-system/components/KeyValueList.astro';
 
+interface FieldValue {
+  name: string;
+  type: string;
+  values: string[];
+}
+
 const { fields = [], shortUrl } = Astro.props;
 ---
 
 <KeyValueList>
-  {fields.map((fv) => (
+  {(fields as FieldValue[]).map((fv: FieldValue) => (
     <>
       <dt>{fv.name}</dt>
       <dd>
         {fv.type === 'url' ? (
-          fv.values.map((v) => (
+          fv.values.map((v: string) => (
             <>
               <a href={v} target="_blank" rel="noopener">{shortUrl(v)}</a>{' '}
             </>
           ))
         ) : fv.type === 'email' ? (
-          fv.values.map((v) => (
+          fv.values.map((v: string) => (
             <>
               <a href={`mailto:${v}`}>{v}</a>{' '}
             </>
           ))
         ) : (
-          fv.values.map((v, i) => (
+          fv.values.map((v: string, i: number) => (
             <>
               {i > 0 && <br />}
               {v}

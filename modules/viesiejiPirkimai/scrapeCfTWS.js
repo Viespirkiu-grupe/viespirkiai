@@ -55,12 +55,6 @@ function cleanup(now) {
     }
 }
 
-function formatLastScrapeTime(value) {
-    if (!value) return "nenustatyta";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? String(value) : date.toISOString();
-}
-
 const QUEUE_SIZE = 1000;
 const cftQueue = [];
 let refillPromise = null;

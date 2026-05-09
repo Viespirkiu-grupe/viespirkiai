@@ -152,7 +152,7 @@ export async function searchSutartys(
         };
     }
 
-    const { sql, sqlCount, params, values, queryParams } = sutartysFilter.build(
+    const { sql, params, values, queryParams } = sutartysFilter.build(
         query,
         {
             table: "sutartys",

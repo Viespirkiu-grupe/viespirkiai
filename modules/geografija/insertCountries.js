@@ -59,7 +59,7 @@ async function updateCountries() {
             throw new Error(`Overpass API error: ${res.status}\n${text}`);
         }
         const data = await res.json();
-        const { nodeMap, wayMap } = buildNodeWayMaps(data.elements);
+        const { wayMap } = buildNodeWayMaps(data.elements);
         for (const el of data.elements) {
             if (el.type !== "relation" || !el.tags?.name) continue;
             const tipas = "salis";

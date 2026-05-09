@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { validateOcrApiKey } from '@/modules/failai/auth.js';
 import { postgres } from '@/postgres/postgres.js';
 
-export const GET: APIRoute = async ({ request }) => {
+export const GET: APIRoute = async () => {
   return new Response('Method not allowed', { status: 405 });
 };
 

@@ -92,7 +92,7 @@ const acType = sgByType.find((s: any) => s.nodeId === 'ND-LotsGroupAwardCriterio
       {acType && (
         <div>
           <p class="section-title">Skyrimo kriterijai</p>
-          {acType.instances.map((sg) => <TedSubgroup sg={sg} shortUrl={shortUrl} />)}
+          {acType.instances.map((sg: any) => <TedSubgroup sg={sg} shortUrl={shortUrl} />)}
         </div>
       )}
     </div>
@@ -101,7 +101,7 @@ const acType = sgByType.find((s: any) => s.nodeId === 'ND-LotsGroupAwardCriterio
       <>
         <h4>{subgroupTitles[sgType.nodeId] || sgType.nodeId}</h4>
         <div class={`grid-${Math.min(sgType.instances.length, 3)}`}>
-          {sgType.instances.map((sg) => <TedSubgroup sg={sg} shortUrl={shortUrl} />)}
+          {sgType.instances.map((sg: any) => <TedSubgroup sg={sg} shortUrl={shortUrl} />)}
         </div>
       </>
     ))}

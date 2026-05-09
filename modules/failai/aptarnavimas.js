@@ -276,7 +276,6 @@ export async function fetchFailasMetadata(id) {
 export async function aptarnautiFailą(
     req,
     res,
-    next,
     failas,
     requestsJson = false,
 ) {

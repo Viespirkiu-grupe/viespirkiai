@@ -14,19 +14,6 @@ function phone(v) {
     return `+${digits}`;
 }
 
-function req(label, ...args) {
-    for (const [key, val] of Object.entries(args[0])) {
-        if (val === null || val === undefined)
-            throw new Error(
-                `PPA parse error: expected non-null field "${key}" in ${label}`,
-            );
-    }
-}
-
-function row(sheet, idx) {
-    return sheet[idx] ?? null;
-}
-
 function cell(r, idx) {
     if (!r) return null;
     const v = r[idx];
@@ -349,7 +336,6 @@ export async function doOneAtn1() {
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
-    const fileId = process.argv[2];
     // if (!fileId) {
     //     console.error("Usage: node parse-ppa.mjs <fileId>");
     //     process.exit(1);

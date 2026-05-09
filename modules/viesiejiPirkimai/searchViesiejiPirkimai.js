@@ -1,7 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { FilterBuilder } from "../../utils/filter.js";
 import { fixHtmlEntities } from "../../utils/fixHtmlEntities.js";
-import { Readable, Transform } from "node:stream";
+import { Transform } from "node:stream";
 import QueryStream from "pg-query-stream";
 import { STATUSAS, PIRKIMO_BUDAS } from "./viesiejiPirkimaiEnums.js";
 
@@ -141,7 +141,7 @@ export async function searchViesiejiPirkimai(
     query,
     { limit, page = 1, stream = false, sort = true } = {},
 ) {
-    const { sql, sqlCount, params, values, queryParams } =
+    const { sql, params, values, queryParams } =
         viesiejiPirkimaiFilter.build(query, {
             table: `"viesiejiPirkimai"`,
             fixedWhere: FIXED_WHERE,
