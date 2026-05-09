@@ -272,7 +272,7 @@ export function procurementNode(pirkimoId, pavadinimas, numatomaVerteEUR, status
  * @param {Record<string, unknown>} [opts]
  * @returns {EdgeLike}
  */
-export function edge(source, target, type, label, fromDate, toDate = null, forceLabel = false, opts = {}) {
+export function edge(source, target, type, label, fromDate = null, toDate = null, forceLabel = false, opts = {}) {
     const id = `edge:${source}:${target}:${type}`;
     const attrs = { type, label: label || '', fromDate: fromDate || null, toDate: toDate || null, forceLabel };
     if (opts.size != null) attrs.size = opts.size;
