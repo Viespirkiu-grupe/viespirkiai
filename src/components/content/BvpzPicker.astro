@@ -11,50 +11,150 @@ interface SearchTarget {
 
 interface Props {
   presets: Preset[];
-  searchTargets: SearchTarget[];
+  searchTargets?: SearchTarget[];
   treeUrl?: string;
+  instanceId?: string;
+  initialCodes?: string;
+  syncInputId?: string;
+  clearInputId?: string;
+  syncButtonLabel?: string;
+  actionBarMode?: 'fixed' | 'sticky' | 'attached';
+  showPresets?: boolean;
+  showManualInput?: boolean;
 }
 
-const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
+const {
+  presets,
+  searchTargets = [],
+  treeUrl = '/dist/cpv.json',
+  instanceId = 'bvpz-picker',
+  initialCodes = '',
+  syncInputId,
+  clearInputId,
+  syncButtonLabel = 'Naudoti',
+  actionBarMode = 'fixed',
+  showPresets = true,
+  showManualInput = true,
+} = Astro.props;
+
+const rootId = `${instanceId}-root`;
+const treeId = `${instanceId}-tree`;
+const countId = `${instanceId}-count`;
+const selectedCodesId = `${instanceId}-selected-codes`;
+const searchBtnId = `${instanceId}-search-btn`;
+const searchDropdownId = `${instanceId}-search-dropdown`;
+const copyBtnId = `${instanceId}-copy-btn`;
+const manualInputId = `${instanceId}-manual-input`;
+const applyManualBtnId = `${instanceId}-apply-manual`;
+const syncBtnId = `${instanceId}-sync-btn`;
 ---
 
-<div class="bvpz-picker">
-  <div class="text-muted text-sm mb-2 self-center">Greiti pasirinkimai:</div>
-  <div class="flex flex-wrap gap-2 mb-4">
-    {presets.map((preset) => (
-      <button class="btn btn-outline btn-sm" type="button" onclick={`bvpzApplyPreset(${JSON.stringify(preset.codes)})`}>
-        {preset.label}
-      </button>
-    ))}
-  </div>
+<div
+  class:list={['bvpz-picker', actionBarMode === 'attached' && 'bvpz-picker-attached']}
+  id={rootId}
+  data-sync-input-id={syncInputId ?? ''}
+  data-clear-input-id={clearInputId ?? ''}
+>
+  {showPresets && presets.length > 0 && (
+    <>
+      <div class="text-muted text-sm mb-2 self-center">Greiti pasirinkimai:</div>
+      <div class="flex flex-wrap gap-2 mb-4">
+        {presets.map((preset) => (
+          <button class="btn btn-outline btn-sm" type="button" data-bvpz-preset={preset.codes}>
+            {preset.label}
+          </button>
+        ))}
+      </div>
+    </>
+  )}
 
-  <div id="tree" class="cpv-tree loading mb-4">
+  {showManualInput && <div class="bvpz-manual mb-4">
+    <label class="form-label" for={manualInputId}>BVPŽ prefiksai</label>
+    <div class="bvpz-manual-row">
+      <input
+        id={manualInputId}
+        class="form-control"
+        type="text"
+        inputmode="numeric"
+        placeholder="Pvz. 48 72 3360"
+        value={initialCodes}
+      />
+      <button class="btn btn-outline" id={applyManualBtnId} type="button">Pritaikyti</button>
+    </div>
+  </div>}
+
+  <div id={treeId} class="cpv-tree loading mb-4">
     <span class="spinner spinner-xl"></span>
   </div>
 
-  <div class="action-bar">
+  <div class:list={['action-bar', actionBarMode === 'sticky' && 'action-bar-sticky', actionBarMode === 'attached' && 'action-bar-attached']}>
     <div class="action-bar-left">
-      <span id="bvpzCount" class="text-sm font-bold text-muted">Nepasirinkta</span>
-      <span id="pasirinkti-kodai" class="action-bar-codes"></span>
+      <span id={countId} class="text-sm font-bold text-muted">Nepasirinkta</span>
+      <span id={selectedCodesId} class="action-bar-codes"></span>
     </div>
     <div class="action-bar-right">
-      <button class="btn btn-ghost btn-sm" type="button" onclick="bvpzClear()">Išvalyti</button>
-      <button class="btn btn-outline btn-sm" type="button" id="bvpzCopyBtn">Kopijuoti</button>
-      <div class="action-bar-popup-wrap">
-        <button class="btn btn-primary btn-sm" type="button" id="bvpzSearchBtn">Ieškoti ↑</button>
-        <div class="action-bar-popup" id="bvpzSearchDropdown">
-          {searchTargets.map((target) => (
-            <button type="button" class="action-bar-popup-item" onclick={`bvpzSearch(${JSON.stringify(target.value)})`}>
-              {target.label}
-            </button>
-          ))}
+      <button class="btn btn-ghost btn-sm" type="button" data-bvpz-clear>Išvalyti</button>
+      <button class="btn btn-outline btn-sm" type="button" id={copyBtnId}>Kopijuoti</button>
+      {syncInputId && <button class="btn btn-outline btn-sm" type="button" id={syncBtnId}>{syncButtonLabel}</button>}
+      {searchTargets.length > 0 && (
+        <div class="action-bar-popup-wrap">
+          <button class="btn btn-primary btn-sm" type="button" id={searchBtnId}>Ieškoti ↑</button>
+          <div class="action-bar-popup" id={searchDropdownId}>
+            {searchTargets.map((target) => (
+              <button type="button" class="action-bar-popup-item" data-bvpz-search-target={target.value}>
+                {target.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   </div>
 
-  <script is:inline define:vars={{ treeUrl }}>
+  <script is:inline define:vars={{ treeUrl, rootId, treeId, countId, selectedCodesId, searchBtnId, searchDropdownId, copyBtnId, manualInputId, applyManualBtnId, syncBtnId, initialCodes }}>
     // @ts-nocheck
+    const root = document.getElementById(rootId);
+    const treeEl = document.getElementById(treeId);
+    const countEl = document.getElementById(countId);
+    const codesEl = document.getElementById(selectedCodesId);
+    const manualInput = document.getElementById(manualInputId);
+    const applyManualBtn = document.getElementById(applyManualBtnId);
+    const syncBtn = document.getElementById(syncBtnId);
+    const searchBtn = document.getElementById(searchBtnId);
+    const searchDropdown = document.getElementById(searchDropdownId);
+    const copyBtn = document.getElementById(copyBtnId);
+    const syncInputIdValue = root?.dataset.syncInputId ?? "";
+    const clearInputIdValue = root?.dataset.clearInputId ?? "";
+    const copiedText = "Nukopijuota ✓";
+    const copyLabel = "Kopijuoti";
+
+    function bvpzNormalizeCodes(value) {
+      const matches = String(value || "").match(/\d{2,9}/g) || [];
+      return Array.from(new Set(matches));
+    }
+
+    function bvpzCodesToText(codes) {
+      return bvpzNormalizeCodes(Array.isArray(codes) ? codes.join(" ") : codes).join(" ");
+    }
+
+    function bvpzSetCodes(codes, { syncTree = false } = {}) {
+      const normalized = bvpzNormalizeCodes(Array.isArray(codes) ? codes.join(" ") : codes);
+      const text = normalized.join(" ");
+      if (manualInput) manualInput.value = text;
+      if (codesEl) codesEl.textContent = text;
+      if (countEl) {
+        countEl.textContent = normalized.length > 0 ? `${normalized.length} pasirinkti` : "Nepasirinkta";
+        countEl.className = `text-sm font-bold${normalized.length > 0 ? "" : " text-muted"}`;
+      }
+      if (syncTree && treeEl) bvpzApplySelection(treeEl, normalized);
+      return normalized;
+    }
+
+    function bvpzGetCodes() {
+      const syncInput = syncInputIdValue ? document.getElementById(syncInputIdValue) : null;
+      return bvpzNormalizeCodes(manualInput?.value ?? codesEl?.textContent ?? syncInput?.value ?? "");
+    }
+
     function bvpzFormatCode(mask) {
       const span = document.createElement("span");
       span.className = "cpv-code";
@@ -98,8 +198,9 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
         checkbox.className = "form-check-input";
         checkbox.dataset.cpv = node.attributes.cpv_mask;
         checkbox.addEventListener("change", () => {
-          details.querySelectorAll("details input[type=checkbox]")
-            .forEach((cb) => { cb.checked = checkbox.checked; });
+          details.querySelectorAll("details input[type=checkbox]").forEach((cb) => {
+            cb.checked = checkbox.checked;
+          });
           bvpzUpdateOutput();
         });
 
@@ -111,7 +212,7 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
         const label = document.createElement("label");
         label.appendChild(checkbox);
         label.appendChild(bvpzFormatCode(fullCode));
-        label.appendChild(document.createTextNode(" " + labelText));
+        label.appendChild(document.createTextNode(" " + labelText));
         summary.appendChild(label);
         details.appendChild(summary);
 
@@ -149,30 +250,21 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
     }
 
     async function bvpzLoadData() {
-      const data = await fetch(treeUrl).then(r => r.json());
-      const container = document.getElementById("tree");
-      if (!container) return;
-      container.classList.remove("loading");
-      container.innerHTML = "";
-      bvpzBuildTree(data, container);
-      bvpzApplyFromUrl();
+      const data = await fetch(treeUrl).then((r) => r.json());
+      if (!treeEl) return;
+      treeEl.classList.remove("loading");
+      treeEl.innerHTML = "";
+      bvpzBuildTree(data, treeEl);
+      bvpzApplyInitial();
     }
 
     function bvpzUpdateOutput() {
-      const tree = document.getElementById("tree");
-      if (!tree) return;
-      const selected = bvpzCollectSelected(tree);
-      const count = selected.length;
-      const codesEl = document.getElementById("pasirinkti-kodai");
-      const countEl = document.getElementById("bvpzCount");
-      if (!codesEl || !countEl) return;
-      codesEl.textContent = selected.join(" ");
-      countEl.textContent = count > 0 ? `${count} pasirinkti` : "Nepasirinkta";
-      countEl.className = `text-sm font-bold${count > 0 ? "" : " text-muted"}`;
+      if (!treeEl) return;
+      bvpzSetCodes(bvpzCollectSelected(treeEl));
     }
 
-    function bvpzCollectSelected(root) {
-      return Array.from(root.children).flatMap((child) => bvpzCollectMinimal(child).prefixes);
+    function bvpzCollectSelected(rootNode) {
+      return Array.from(rootNode.children).flatMap((child) => bvpzCollectMinimal(child).prefixes);
     }
 
     function bvpzCollectMinimal(node) {
@@ -198,37 +290,40 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
       return { selected: false, prefixes: collected };
     }
 
-    function bvpzApplySelection(treeEl, prefixes) {
-      if (!treeEl) return;
-      treeEl.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    function bvpzApplySelection(treeNode, prefixes) {
+      if (!treeNode) return;
+      const selectedPrefixes = bvpzNormalizeCodes(prefixes.join(" "));
+      treeNode.querySelectorAll("input[type=checkbox]").forEach((cb) => {
         const mask = cb.dataset.cpv;
         if (!mask) return;
-        cb.checked = prefixes.some((sel) =>
+        cb.checked = selectedPrefixes.some((sel) =>
           sel.endsWith("0") ? sel.slice(0, -1) === mask : mask.startsWith(sel)
         );
       });
-      treeEl.querySelectorAll("details").forEach((d) => { d.open = false; });
-      Array.from(treeEl.querySelectorAll(":scope > details")).forEach((detail) => bvpzOpenSelected(detail));
-      bvpzUpdateOutput();
+      treeNode.querySelectorAll("details").forEach((d) => {
+        d.open = false;
+      });
+      Array.from(treeNode.querySelectorAll(":scope > details")).forEach((detail) => bvpzOpenSelected(detail));
+      const selected = bvpzCollectSelected(treeNode);
+      bvpzSetCodes(selected.length > 0 ? selected : selectedPrefixes);
     }
 
     function bvpzApplyPreset(codes) {
-      bvpzApplySelection(document.getElementById("tree"), codes.trim().split(/\s+/));
+      bvpzSetCodes(codes, { syncTree: true });
     }
 
-    function bvpzApplyFromUrl() {
+    function bvpzApplyInitial() {
       const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-      if (code) bvpzApplySelection(document.getElementById("tree"), code.trim().split(/\s+/));
+      const code = initialCodes || params.get("code") || "";
+      bvpzSetCodes(code, { syncTree: true });
     }
 
     function bvpzClear() {
-      bvpzApplySelection(document.getElementById("tree"), []);
+      bvpzSetCodes([], { syncTree: true });
     }
 
     function bvpzSearch(target) {
-      const codesEl = document.getElementById("pasirinkti-kodai");
-      const codes = codesEl?.textContent?.trim() ?? "";
+      const codes = bvpzCodesToText(bvpzGetCodes());
       if (!codes) return;
       if (target === "sutartys") {
         window.location.href = `/?bvpzPrefiksasKitas=${encodeURIComponent(codes)}`;
@@ -239,18 +334,9 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
       }
     }
 
-    window.bvpzApplyPreset = bvpzApplyPreset;
-    window.bvpzClear = bvpzClear;
-    window.bvpzSearch = bvpzSearch;
-
-    const searchBtn = document.getElementById("bvpzSearchBtn");
-    const searchDropdown = document.getElementById("bvpzSearchDropdown");
-    const copyBtn = document.getElementById("bvpzCopyBtn");
-    const copiedText = "Nukopijuota ✓";
-    const copyLabel = "Kopijuoti";
     if (copyBtn) {
       copyBtn.addEventListener("click", async function () {
-        const codes = document.getElementById("pasirinkti-kodai")?.textContent ?? "";
+        const codes = bvpzCodesToText(bvpzGetCodes());
         if (!codes) return;
         await navigator.clipboard.writeText(codes);
         copyBtn.textContent = copiedText;
@@ -263,6 +349,59 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
         }, 2000);
       });
     }
+
+    if (applyManualBtn) {
+      applyManualBtn.addEventListener("click", () => {
+        bvpzSetCodes(bvpzGetCodes(), { syncTree: true });
+      });
+    }
+
+    if (manualInput) {
+      manualInput.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        bvpzSetCodes(bvpzGetCodes(), { syncTree: true });
+      });
+    }
+
+    root?.querySelectorAll("[data-bvpz-preset]").forEach((button) => {
+      button.addEventListener("click", () => {
+        bvpzApplyPreset(button.getAttribute("data-bvpz-preset") || "");
+      });
+    });
+
+    root?.querySelector("[data-bvpz-clear]")?.addEventListener("click", bvpzClear);
+
+    root?.querySelectorAll("[data-bvpz-search-target]").forEach((button) => {
+      button.addEventListener("click", () => {
+        bvpzSearch(button.getAttribute("data-bvpz-search-target") || "");
+      });
+    });
+
+    if (syncBtn) {
+      syncBtn.addEventListener("click", () => {
+        const codes = bvpzCodesToText(bvpzGetCodes());
+        const syncInput = syncInputIdValue ? document.getElementById(syncInputIdValue) : null;
+        const clearInput = clearInputIdValue ? document.getElementById(clearInputIdValue) : null;
+        if (syncInput) {
+          syncInput.value = codes;
+          syncInput.dispatchEvent(new Event("input", { bubbles: true }));
+          syncInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        if (clearInput) {
+          clearInput.value = "";
+          clearInput.dispatchEvent(new Event("input", { bubbles: true }));
+          clearInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        root?.dispatchEvent(new CustomEvent("bvpz:sync", { bubbles: true, detail: { codes } }));
+      });
+    }
+
+    root?.addEventListener("bvpz:setCodes", (event) => {
+      const codes = event?.detail?.codes ?? "";
+      bvpzSetCodes(codes, { syncTree: true });
+    });
+
     if (searchBtn && searchDropdown) {
       searchBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -277,6 +416,17 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
   </script>
 
   <style is:global>
+    .bvpz-picker .bvpz-manual-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .bvpz-picker .bvpz-manual-row .form-control {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
     .bvpz-picker .cpv-tree {
       font-size: var(--text-sm);
     }
@@ -366,6 +516,32 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
       z-index: var(--z-sticky);
     }
 
+    .bvpz-picker .action-bar.action-bar-sticky {
+      position: sticky;
+      left: auto;
+      right: auto;
+      z-index: 1;
+      margin-inline: -4px;
+      border: var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .bvpz-picker .action-bar.action-bar-attached {
+      position: static;
+      left: auto;
+      right: auto;
+      z-index: auto;
+      margin-top: 0;
+      border-top: var(--border);
+      border-left: 0;
+      border-right: 0;
+      border-bottom: 0;
+      border-radius: 0;
+      box-shadow: none;
+      padding: 12px 28px 20px;
+    }
+
     .bvpz-picker .action-bar-left {
       display: flex;
       flex-direction: column;
@@ -388,6 +564,8 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
       gap: 8px;
       align-items: center;
       flex-shrink: 0;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .bvpz-picker .action-bar-popup-wrap {
@@ -426,6 +604,28 @@ const { presets, searchTargets, treeUrl = '/dist/cpv.json' } = Astro.props;
 
     .bvpz-picker .action-bar-popup-item:hover {
       background: var(--lightest-gray);
+    }
+
+    .bvpz-picker.bvpz-picker-attached .cpv-tree {
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      margin-bottom: 0;
+    }
+
+    @media (max-width: 768px) {
+      .bvpz-picker .bvpz-manual-row {
+        flex-direction: column;
+      }
+
+      .bvpz-picker .action-bar {
+        padding: 12px 16px;
+      }
+
+      .bvpz-picker .action-bar-codes {
+        max-width: 100%;
+        white-space: normal;
+      }
     }
   </style>
 </div>

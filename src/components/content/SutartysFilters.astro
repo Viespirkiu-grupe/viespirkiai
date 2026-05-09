@@ -3,10 +3,10 @@ import FilterGroup from '@design-system/components/filters/FilterGroup.astro';
 import DateRangeFilter from '@design-system/components/filters/DateRangeFilter.astro';
 import NumberRangeFilter from '@design-system/components/filters/NumberRangeFilter.astro';
 import SortFilter from '@design-system/components/filters/SortFilter.astro';
-import SelectInput from '@design-system/components/inputs/SelectInput.astro';
 import TextInput from '@design-system/components/inputs/TextInput.astro';
 import NumberInput from '@design-system/components/inputs/NumberInput.astro';
 import CheckboxInput from '@design-system/components/inputs/CheckboxInput.astro';
+import BvpzPicker from './BvpzPicker.astro';
 
 interface SortOption {
   value: string;
@@ -20,11 +20,11 @@ interface Props {
 
 const { values, sortOptions } = Astro.props;
 
-const bvpzOptions = [
-  { value: '48 72', label: 'Informacinės technologijos' },
-  { value: '3360 3361 3362 3363 3364 3365 3366 3367 33690 33691', label: 'Vaistai' },
+const bvpzPresets = [
+  { label: 'Informacinės technologijos', codes: '48 72' },
+  { label: 'Vaistai', codes: '3360 3361 3362 3363 3364 3365 3366 3367 33690 33691' },
 ];
-const bvpzCurrent = values['bvpzPrefiksas'];
+const bvpzCurrent = String(values['bvpzPrefiksasKitas'] || values['bvpzPrefiksas'] || '');
 ---
 
 <div class="search-filters-grid">
@@ -54,24 +54,47 @@ const bvpzCurrent = values['bvpzPrefiksas'];
   />
 
   <FilterGroup legend="Klasifikacija">
-    <div class="ds-bvpz-label-row">
-      <label class="form-label flex justify-between" for="bvpzPrefiksas">
-        <span>BVPŽ prefiksas <sup>1</sup></span>
-        <a href="/bvpz" class="text-sm">Žr. BVPŽ</a>
-      </label>
-      <SelectInput
-        label=""
-        name="bvpzPrefiksas"
-        options={bvpzOptions}
-        values={{ bvpzPrefiksas: !bvpzCurrent || bvpzCurrent === 'kitas' ? '' : bvpzCurrent }}
-        placeholder="Visi / nurodytas žemiau"
-        className="mb-0"
-      />
+    <div class="ds-field ds-bvpz-field">
+      <label class="ds-field__label" for="bvpzPrefiksasKitas">BVPŽ prefiksas</label>
+      <input type="hidden" name="bvpzPrefiksas" id="bvpzPrefiksas" value="" />
+      <div class="ds-bvpz-group">
+        <input
+          class="ds-bvpz-input"
+          type="text"
+          name="bvpzPrefiksasKitas"
+          id="bvpzPrefiksasKitas"
+          value={bvpzCurrent}
+          placeholder="Pvz. 48 72 3360"
+        />
+        <button class="ds-bvpz-trigger" type="button" id="openBvpzDialog" aria-label="Pasirinkti BVPŽ prefiksus" title="Pasirinkti BVPŽ prefiksus">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16M4 12h10M4 17h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"></path>
+            <path d="M17 14l3 3 4-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+          </svg>
+        </button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <span class="text-muted text-xs"><em>arba</em></span>
+
+    <div class="modal-backdrop" id="bvpzDialogBackdrop" hidden>
+      <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="bvpzDialogTitle">
+        <div class="modal-header">
+          <h3 id="bvpzDialogTitle">BVPŽ pasirinkimas</h3>
+          <button class="modal-close" type="button" id="closeBvpzDialog" aria-label="Uždaryti">×</button>
+        </div>
+        <BvpzPicker
+          presets={bvpzPresets}
+          searchTargets={[]}
+          instanceId="sutartys-bvpz"
+          initialCodes={bvpzCurrent}
+          syncInputId="bvpzPrefiksasKitas"
+          clearInputId="bvpzPrefiksas"
+          syncButtonLabel="Naudoti paieškoje"
+          actionBarMode="attached"
+          showPresets={true}
+          showManualInput={false}
+        />
+      </div>
     </div>
-    <TextInput label="" name="bvpzPrefiksasKitas" placeholder="Nenurodyta" values={values} />
   </FilterGroup>
 
   <FilterGroup legend="Identifikatoriai">
@@ -87,14 +110,168 @@ const bvpzCurrent = values['bvpzPrefiksas'];
     <CheckboxInput name="ignoruotiSp" label="Nerodyti pakeitimų (SP)" values={values} />
   </FilterGroup>
 </div>
-<p class="text-muted text-xs mt-7"><sup>1</sup> Veikia tik ne tekstinėse paieškose</p>
+<p class="text-muted text-xs mt-7">Veikia tik ne tekstinėse paieškose</p>
 
 <style>
-  .ds-bvpz-label-row :global(.form-label) {
-    margin-bottom: 4px;
+  .ds-bvpz-field {
+    margin-bottom: 0;
   }
 
-  .ds-bvpz-label-row :global(.ds-field__label) {
+  .ds-bvpz-field .ds-field__label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .ds-bvpz-group {
+    display: flex;
+    align-items: stretch;
+    min-height: 41px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--white);
+    transition: border-color var(--transition), box-shadow var(--transition);
+  }
+
+  .ds-bvpz-group:focus-within {
+    border-color: var(--black);
+    box-shadow: 0 0 0 3px rgba(15, 15, 15, 0.08);
+  }
+
+  .ds-bvpz-input {
+    display: block;
+    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 8px 12px;
+    border: 0;
+    border-right: var(--border);
+    border-radius: 0;
+    background: var(--white);
+    color: var(--black);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    appearance: none;
+  }
+
+  .ds-bvpz-input::placeholder {
+    color: var(--gray);
+  }
+
+  .ds-bvpz-input:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .ds-bvpz-trigger {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 41px;
+    min-width: 41px;
+    border: 0;
+    border-radius: 0;
+    background: var(--black);
+    color: var(--white);
+    cursor: pointer;
+    transition: background-color var(--transition), color var(--transition);
+  }
+
+  .ds-bvpz-trigger:hover {
+    background: var(--dark-gray);
+    color: var(--white);
+  }
+
+  .ds-bvpz-trigger:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .ds-bvpz-trigger svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  #bvpzDialogBackdrop[hidden] {
     display: none;
   }
+
+  #bvpzDialogBackdrop {
+    z-index: calc(var(--z-sticky) + 50);
+  }
+
+  #bvpzDialogBackdrop .modal {
+    max-width: 980px;
+    overflow: hidden;
+  }
+
+  #bvpzDialogBackdrop :global(.bvpz-picker) {
+    padding: 0;
+  }
+
+  #bvpzDialogBackdrop :global(.bvpz-picker > .text-muted),
+  #bvpzDialogBackdrop :global(.bvpz-picker > .flex.flex-wrap) {
+    padding-inline: 28px;
+  }
+
+  #bvpzDialogBackdrop :global(.bvpz-picker > .text-muted) {
+    padding-top: 20px;
+  }
+
+  #bvpzDialogBackdrop :global(.bvpz-picker .cpv-tree) {
+    max-height: 55vh;
+    overflow: auto;
+    padding: 0 28px 0 28px;
+  }
+
 </style>
+
+<script is:inline>
+  const bvpzInput = document.getElementById('bvpzPrefiksasKitas');
+  const bvpzLegacyInput = document.getElementById('bvpzPrefiksas');
+  const dialogBackdrop = document.getElementById('bvpzDialogBackdrop');
+  const openDialogBtn = document.getElementById('openBvpzDialog');
+  const closeDialogBtn = document.getElementById('closeBvpzDialog');
+
+  function normalizeBvpzCodes(value) {
+    const matches = String(value || '').match(/\d{2,9}/g) || [];
+    return Array.from(new Set(matches)).join(' ');
+  }
+
+  function closeBvpzDialog() {
+    if (!dialogBackdrop) return;
+    dialogBackdrop.hidden = true;
+    document.body.style.removeProperty('overflow');
+  }
+
+  function openBvpzDialog() {
+    if (!dialogBackdrop) return;
+    document.getElementById('sutartys-bvpz-root')?.dispatchEvent(new CustomEvent('bvpz:setCodes', {
+      bubbles: true,
+      detail: { codes: normalizeBvpzCodes(bvpzInput?.value || '') },
+    }));
+    dialogBackdrop.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  openDialogBtn?.addEventListener('click', openBvpzDialog);
+  closeDialogBtn?.addEventListener('click', closeBvpzDialog);
+  dialogBackdrop?.addEventListener('click', (event) => {
+    if (event.target === dialogBackdrop) closeBvpzDialog();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && dialogBackdrop && !dialogBackdrop.hidden) closeBvpzDialog();
+  });
+
+  bvpzInput?.addEventListener('change', () => {
+    bvpzInput.value = normalizeBvpzCodes(bvpzInput.value);
+    if (bvpzLegacyInput && bvpzInput.value) bvpzLegacyInput.value = '';
+  });
+  document.getElementById('sutartys-bvpz-root')?.addEventListener('bvpz:sync', closeBvpzDialog);
+</script>

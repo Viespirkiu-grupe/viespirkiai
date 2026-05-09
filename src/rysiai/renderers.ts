@@ -3,26 +3,14 @@
 // No graph state, no DOM queries, no business logic.
 // graph-utils.js handles graph data operations; this file handles how nodes look on screen.
 
-interface NodeDisplayData {
-    x: number;
-    y: number;
-    size?: number;
-    color?: string;
-    label?: string;
-    expanded?: boolean;
-    selected?: boolean;
-}
+import type { NodeDisplayData, PartialButFor } from 'sigma/types';
+import type { Settings } from 'sigma/settings';
 
-interface SigmaSettings {
-    labelSize?: number;
-    labelFont?: string;
-    labelColor?: { attribute?: string; color?: string } | null;
-    [key: string]: unknown;
-}
+type NodeData = PartialButFor<NodeDisplayData, 'x' | 'y' | 'size' | 'label' | 'color'>;
 
 // Draws a dotted ring for expanded nodes (orgs, persons, contracts, procurement), then the label.
 // Called by Sigma for every visible labelled node, and also by drawNodeHover.
-export function drawNodeLabel(context: CanvasRenderingContext2D, data: NodeDisplayData, settings: SigmaSettings): void {
+export function drawNodeLabel(context: CanvasRenderingContext2D, data: NodeData, settings: Settings): void {
     const nodeSize = data.size || 8;
 
     // Persistent expanded indicator: dotted ring outside the selection ring
@@ -63,7 +51,7 @@ export function drawNodeLabel(context: CanvasRenderingContext2D, data: NodeDispl
 // Selected node: bold solid ring (nodeSize+6, lineWidth 5).
 // Hover only:    soft ring (nodeSize+4, lineWidth 2).
 // Expanded ring is drawn by drawNodeLabel (called at end) — always outermost.
-export function drawNodeHover(context: CanvasRenderingContext2D, data: NodeDisplayData, settings: SigmaSettings): void {
+export function drawNodeHover(context: CanvasRenderingContext2D, data: NodeData, settings: Settings): void {
     const nodeSize = data.size || 8;
     context.beginPath();
     if (data.selected) {

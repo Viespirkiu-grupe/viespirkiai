@@ -7,7 +7,7 @@
         "start": "node start.mjs",
         "build": "astro build",
         "test": "vitest run",
-        "test:integration": "node --test test/mcp/getSchema.integration.test.js",
+        "test:integration": "vitest run --config vitest.integration.config.ts",
         "check": "astro check"
     },
     "overrides": {

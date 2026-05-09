@@ -5,21 +5,27 @@ import CopyField from '@design-system/components/content/CopyField.astro';
 import Table from '@design-system/components/Table.astro';
 import TableWrapper from '@design-system/components/TableWrapper.astro';
 
-if (Astro.request.method === 'POST') {
-  const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
+const acceptHeader = Astro.request.headers.get('accept') ?? '';
+const isMcpTransportRequest =
+  Astro.request.method === 'POST' ||
+  Astro.request.method === 'DELETE' ||
+  (Astro.request.method === 'GET' && acceptHeader.includes('text/event-stream'));
+
+if (isMcpTransportRequest) {
+  const { WebStandardStreamableHTTPServerTransport } = await import(
+    '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
+  );
   const { createMcpServer } = await import('@/modules/mcp/server.js');
   const { requestContext } = await import('@/modules/mcp/mcpLogger.js');
 
   const server = createMcpServer();
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);
 
-  const ctx = { userAgent: Astro.request.headers.get('user-agent') ?? null };
-  const nodeReq = (Astro.locals as any).req;
-  const nodeRes = (Astro.locals as any).res;
-
-  await requestContext.run(ctx, () => transport.handleRequest(nodeReq, nodeRes, nodeReq.body));
-  return new Response(null, { status: 200 });
+  return await requestContext.run(
+    { userAgent: Astro.request.headers.get('user-agent') ?? null },
+    async () => transport.handleRequest(Astro.request),
+  );
 }
 
 const colorScheme = getColorScheme(Astro.cookies);
