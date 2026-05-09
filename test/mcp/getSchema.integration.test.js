@@ -17,6 +17,13 @@ function assertWhereExample(sql, label) {
     assert.doesNotMatch(sql, /\bSELECT\s+\*/i, `${label} must not use SELECT *`);
 }
 
+function assertColumnStringArray(columns, label) {
+    assert.ok(Array.isArray(columns), `${label} must be an array`);
+    for (const col of columns) {
+        assert.match(col, /^[a-zA-Z_][a-zA-Z0-9_]*:\s\w+/, `${label} column '${col}' must be "name: type" format`);
+    }
+}
+
 describe("MCP get_schema integration", () => {
     it("prints no-arg/get-view/get-table payloads and validates structuredContent contract", async () => {
         const noArgResult = await handler();
@@ -30,8 +37,10 @@ describe("MCP get_schema integration", () => {
         printResult("handler({ table: \"v_sutartys\" })", viewResult);
         assert.equal(viewResult?.structuredContent?.identifier, "v_sutartys");
         assert.ok(!("type" in viewResult.structuredContent), "Type should not be included");
-        assert.ok(Array.isArray(viewResult?.structuredContent?.columns), "Expected view columns");
+        assertColumnStringArray(viewResult?.structuredContent?.columns, "View columns");
+        assert.ok(Array.isArray(viewResult?.structuredContent?.primaryKeys), "Expected view primaryKeys array");
         assert.ok(Array.isArray(viewResult?.structuredContent?.relationships), "Expected view relationships");
+        assert.doesNotMatch(JSON.stringify(viewResult.structuredContent), /nullable/, "nullable field must not appear");
         assert.ok(typeof viewResult?.structuredContent?.example === "string", "Expected view example SQL");
         assertWhereExample(viewResult.structuredContent.example, "View example");
         assert.ok(!("sourceSQL" in viewResult.structuredContent), "View metadata must not expose DDL/sourceSQL");
@@ -41,8 +50,10 @@ describe("MCP get_schema integration", () => {
         printResult("handler({ table: \"sutartys\" })", tableResult);
         assert.equal(tableResult?.structuredContent?.identifier, "sutartys");
         assert.ok(!("type" in tableResult.structuredContent), "Type should not be included");
-        assert.ok(Array.isArray(tableResult?.structuredContent?.columns), "Expected table columns");
+        assertColumnStringArray(tableResult?.structuredContent?.columns, "Table columns");
+        assert.ok(Array.isArray(tableResult?.structuredContent?.primaryKeys), "Expected table primaryKeys array");
         assert.ok(Array.isArray(tableResult?.structuredContent?.relationships), "Expected table relationships");
+        assert.doesNotMatch(JSON.stringify(tableResult.structuredContent), /nullable/, "nullable field must not appear");
         assert.ok(typeof tableResult?.structuredContent?.example === "string", "Expected table example SQL");
         assertWhereExample(tableResult.structuredContent.example, "Table example");
         assert.ok(!("sampleRows" in tableResult.structuredContent), "Table metadata must stay normalized");
@@ -55,7 +66,7 @@ describe("MCP get_schema integration", () => {
             await client.query(TEMP_VIEWS_SQL);
             for (const viewName of VIEW_NAMES) {
                 const toolResult = await handler({ table: viewName });
-                const declared = toolResult.structuredContent.columns.map((c) => c.name);
+                const declared = toolResult.structuredContent.columns.map((c) => c.split(": ")[0]);
                 const { rows } = await client.query(
                     `
                         SELECT column_name

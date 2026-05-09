@@ -220,14 +220,14 @@ functions, CTEs, and recursive graph traversal where full expressiveness is need
 
 **Coverage map against the 22 investigator themes:**
 
-| View             | Themes covered            | Critical facts provided                                                             |
-|------------------|---------------------------|-------------------------------------------------------------------------------------|
-| `v_company`      | 1, 5, 6, 7, 9, 10, 11, 12 | headcount, registration, compliance flags, domain/court/negotiation counts          |
-| `v_sutartys`     | 1, 2, 3, 5, 8, 15, 18     | contract value, overrun ratio, CPV, buyer/seller names, tipas                       |
-| `v_pirkimas`     | 5, 6, 7, 20               | procedure type, buyer municipality, estimated value                                 |
-| `v_person_links` | 4, 10, 11, 13, 19         | person ↔ company edges, spouse links, role type, foreign-entity flag                |
-| `v_dalyviai`     | **2, 3, 14, 17**          | full bidder list, bid amounts, rank — essential for bid rigging/spec rigging/cartel |
-| `v_bylos`        | **9**                     | court cases per company — blind spot without this view                              |
+| View             | Themes covered            | Main Table               | Joined Data                                                                                                                                                              | Additional table data included                                                                                                                                         | Critical facts provided                                                                                                                                |
+|------------------|---------------------------|--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `v_company`      | 1, 5, 6, 7, 9, 10, 11, 12 | `jarCsv`                 | `sodra` (LATERAL for latest snapshot), `melagingiTiekejai`, `nepatikimiTiekejai`, `vdiPazeidimai`, `bylosDalyviai`, `domenai`, `neskelbiamosDerybos` (EXISTS subqueries) | Latest Sodra snapshot (headcount, avg salary, social tax), compliance flags (blacklists, VDI violations), court case count, domain count, negotiated-procurement count | headcount, registration, compliance flags, domain/court/negotiation counts — enables capacity mismatch detection                                       |
+| `v_sutartys`     | 1, 2, 3, 5, 8, 15, 18     | `sutartys`               | `jarCsv` (×2: LEFT JOIN for buyer & seller names)                                                                                                                        | Buyer and seller names resolved; contract type (`tipas`), BVPZ code                                                                                                    | contract value, cost overrun ratio, procedure type alignment — enables price suppression and execution risk analysis                                   |
+| `v_pirkimas`     | 5, 6, 7, 20               | `viesiejiPirkimai`       | `viesiejiPirkimaiVykdytojai` (LEFT JOIN for organizer details)                                                                                                           | Organizer name, municipality, short code; estimated value in EUR                                                                                                       | procedure type, contracting authority municipality, estimated value — enables procedure pattern analysis                                               |
+| `v_person_links` | 4, 10, 11, 13, 19         | `pinregJuridiniaiRysiai` | `jarCsv` (LEFT JOIN for company names)                                                                                                                                   | Declared relationships, role type (`irasoTipas`), date ranges, foreign entity flag                                                                                     | person ↔ company edges, spouse links (via `irasoTipas`), role type, foreign-entity flag — enables network graph traversal and revolving-door detection |
+| `v_dalyviai`     | **2, 3, 14, 17**          | `atn1ataskaitos`         | `atn1dalyviai`, `atn1pasiulymuEile`, `atn1atmestiPasiulymai` (JOIN/LEFT JOIN), `jarCsv` (LEFT JOIN for bidder names)                                                     | Bid amounts, bid rank (`eileNumeris`), rejection reason per proposal                                                                                                   | full bidder list, bid amounts, rank — essential for bid rigging/spec rigging/cartel pattern detection; **only source of non-winner participants**      |
+| `v_bylos`        | **9**                     | `bylosDalyviai`          | `bylos` (JOIN for case metadata), `jarCsv` (LEFT JOIN for company names)                                                                                                 | Court case type (`bylosRusis`), court name, defendant role (`bylojeKaip`), case date                                                                                   | court cases per company, role (plaintiff/defendant), case type — blind spot without this view; enables legal liability and conduct-risk profiling      |
 
 Raw tables used directly (no view wrapper needed):
 
@@ -240,165 +240,50 @@ Raw tables used directly (no view wrapper needed):
 
 ### `v_company` — company profile with latest headcount and compliance status
 
-```sql
-CREATE TEMP VIEW v_company AS
-SELECT j."jarKodas"::text, j.pavadinimas,
-       j.adresas,
-       j."registravimoData",
-       j."statusoPavadinimas",
-       j."statusasNuo",
-       -- headcount: Theme 1 (capacity mismatch)
-       s.data                                                                  AS "sodraData", -- YYYYMM integer
-       (COALESCE(s.draustieji, 0) + COALESCE(s.draustieji2, 0))                AS darbuotojai,
-       s."vidutinisAtlyginimas",
-       s."imokuSuma",                                                                          -- total social tax paid
-       -- compliance flags: Theme 9
-       EXISTS(SELECT 1
-              FROM "melagingiTiekejai" m
-              WHERE m."tiekejoJarKodas" = j."jarKodas"::text
-           AND (m."itrauktasIki" IS NULL OR m."itrauktasIki" >= CURRENT_DATE)) AS "melagingisTiekejas",
-       EXISTS(SELECT 1
-              FROM "nepatikimiTiekejai" n
-              WHERE n."tiekejoJarKodas" = j."jarKodas"::text
-           AND (n."itrauktaIki" IS NULL OR n."itrauktaIki" >= CURRENT_DATE))   AS "nepatikimasTiekejas",
-       (SELECT COUNT(*)
-        FROM "vdiPazeidimai" v
-        WHERE v."jarKodas" = j."jarKodas"::text)                               AS "vdiPazeidimuSkaicius",
-       -- court exposure: Theme 9
-       (SELECT COUNT(*)
-        FROM "bylosDalyviai" bd
-        WHERE bd.kodas = j."jarKodas"::text)                                   AS "bylosSkaicius",
-       -- web footprint: Theme 10 (shared domain / network signals)
-       (SELECT COUNT(*)
-        FROM domenai d
-        WHERE d."savininkoKodas" = j."jarKodas"::text)                         AS "domenaiSkaicius",
-       -- procedure abuse signal: Theme 7
-       (SELECT COUNT(*)
-        FROM "neskelbiamosDerybos" nd
-        WHERE nd."jarKodas" = j."jarKodas"::text)                              AS "neskelbiamosDerybosSkaicius"
-FROM "jarCsv" j
-         LEFT JOIN LATERAL(
-    SELECT draustieji, draustieji2, "vidutinisAtlyginimas", "imokuSuma", data FROM sodra
-    WHERE "jarKodas" = j."jarKodas"::text
-    ORDER BY data DESC NULLS LAST
-    LIMIT 1
-                   ) s ON true;
-```
+See [`modules/mcp/analyst/tempViews.js`](../modules/mcp/analyst/tempViews.js) (view definition, lines 2–40).
+
+**Purpose**: Single-query company risk profile combining registration, latest Sodra data (headcount, wages, social tax),
+blacklist status, court case count, domain ownership count, and negotiated-procurement involvement. Solves Themes 1,
+5–7, 9–12.
 
 ### `v_sutartys` — contracts with buyer and seller names resolved
 
-```sql
-CREATE TEMP VIEW v_sutartys AS
-SELECT s."sutartiesUnikalusId",
-       s."pirkimoNumeris", -- nullable ~30-40% (direct procurement)
-       s."sudarymoData",
-       s."galiojimoData",
-       s.verte,
-       s."faktineIvykdimoVerte",
-       s.pavadinimas,
-       s."bvpzKodas",
-       s.tipas,
-       s.istrinta,
-       s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
-       pb.pavadinimas                      AS pirkejas,
-       s."tiekejoKodas",
-       tb.pavadinimas                      AS tiekejas,
-       s."papildomiTiekejaiKodai"
-FROM sutartys s
-         LEFT JOIN "jarCsv" pb ON pb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-LEFT JOIN "jarCsv" tb ON tb."jarKodas"::text = s."tiekejoKodas";
-```
+See [`modules/mcp/analyst/tempViews.js`](../modules/mcp/analyst/tempViews.js) (view definition, lines 42–60).
+
+**Purpose**: Contract registry with buyer and seller names denormalized. Handles type casting (`jarKodas::text`) and
+name resolution so analysts don't need to re-join `jarCsv` on every query. Solves Themes 1–3, 5, 8, 15, 18.
 
 ### `v_pirkimas` — procurement notices with organizer details
 
-```sql
-CREATE TEMP VIEW v_pirkimas AS
-SELECT p."pirkimoId",
-       p.pavadinimas,
-       p."jarKodas",
-       o.pavadinimas AS organizatorius,
-       o.trumpinys,
-       o.miestas,
-       p."pirkimoBudas",
-       p.statusas,
-       p.zingsnis,
-       p."pirkimoObjektoTipas",
-       p."numatomaVerteEUR",
-       p."paskelbimoData",
-       p."pasiulymuPateikimoTerminas",
-       p."esFinansavimas",
-       p."bvpzKodai"
-FROM "viesiejiPirkimai" p
-         LEFT JOIN "viesiejiPirkimaiVykdytojai" o ON o.id = p."pirkimoVykdytojasId";
-```
+See [`modules/mcp/analyst/tempViews.js`](../modules/mcp/analyst/tempViews.js) (view definition, lines 62–79).
+
+**Purpose**: Procurement notice registry with organizer (contracting authority) details denormalized. Enables filtering
+by procedure type, municipality, and estimated value. Solves Themes 5–7, 20.
 
 ### `v_person_links` — declared person-to-company relationships with company name
 
-```sql
-CREATE TEMP VIEW v_person_links AS
-SELECT r.id,
-       r.deklaracija,
-       r.vardas,
-       r.pavarde,
-       r."susijusioAsmensVardas",
-       r."susijusioAsmensPavarde",
-       r."jarKodas",
-       j.pavadinimas AS "imonesVardas",
-       r.pareigos,
-       r."irasoTipas", -- DEKLARUOJANCIO_DARBOVIETE | SUTUOKTINIO_DARBOVIETE | KITI_RYSIAI_SU_JA
-       r."darbovietesTipas",
-       r."rysioPobudzioPavadinimas",
-       r."rysioPradzia",
-       r."rysioPabaiga",
-       r."yraJuridinisAsmuo",
-       r."registruotaLietuvoje"
-FROM "pinregJuridiniaiRysiai" r
-         LEFT JOIN "jarCsv" j ON j."jarKodas"::text = r."jarKodas";
-```
+See [`modules/mcp/analyst/tempViews.js`](../modules/mcp/analyst/tempViews.js) (view definition, lines 81–99).
+
+**Purpose**: Person-to-company relationships from PINREG declarations with company names denormalized. `irasoTipas`
+distinguishes director roles, spouse links, and other relationships. Solves Themes 4, 10–11, 13, 19 (network traversal,
+revolving door, family ties).
 
 ### `v_dalyviai` — full bidder list per procurement with ranked bid amounts
 
-The only source of **all participants** in a tender, not just the winner. Without this view, Themes 2 and 3
-(cover bidding, bid rotation) are impossible — `sutartys` records winners only.
+See [`modules/mcp/analyst/tempViews.js`](../modules/mcp/analyst/tempViews.js) (view definition, lines 101–119).
 
-```sql
-CREATE TEMP VIEW v_dalyviai AS
-SELECT a."pirkimoNumeris",
-       a."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
-       a."pirkimoBudas",
-       a."sukurtaAt"                       AS "ataskaitosData",
-       d.kodas                             AS "tiekejoKodas",
-       j.pavadinimas                       AS tiekejas,
-       d."fizinisAsmuo",
-       d.salis,
-       e."eileNumeris",                                                                             -- bid rank: 1 = lowest / winner
-       e.kaina::numeric                    AS "pasiulymoKaina", ap.statusas AS "atmetimoPriezastis" -- non-null if proposal was rejected
-FROM atn1ataskaitos a
-         JOIN atn1dalyviai d ON d."ataskaitaId" = a.id
-         LEFT JOIN "atn1pasiulymuEile" e
-                   ON e."ataskaitaId" = a.id AND e."dalyvioKodas" = d.kodas
-         LEFT JOIN "atn1atmestiPasiulymai" ap
-                   ON ap."ataskaitaId" = a.id AND ap."dalyvioKodas" = d.kodas
-         LEFT JOIN "jarCsv" j ON j."jarKodas"::text = d.kodas;
-```
+**Purpose**: **Only source of all tender participants** (not just winners). Includes bid rank (`eileNumeris`), bid
+amount, rejection reason, and bidder compliance flags. Without this view, Themes 2–3 (bid rigging, bid rotation) and 14,
+17 (cartel detection, price suppression) are impossible — `sutartys` records winners only. Critical for cover-bidding
+pattern detection.
 
 ### `v_bylos` — court cases with company and person participants
 
-```sql
-CREATE TEMP VIEW v_bylos AS
-SELECT b.id           AS "bylosId",
-       b."bylosNumeris",
-       b."bylosRusis",
-       b.data         AS "bylosData",
-       b.teismas,
-       bd.kodas       AS "jarKodas",
-       j.pavadinimas  AS "dalyvioPavadinimas",
-       bd.pavadinimas AS "dalyvioVardasIrPavarde", -- persons have no jarKodas, only pavadinimas
-       bd."bylojeKaip"                             -- role: plaintiff, defendant, third party, etc.
-FROM "bylosDalyviai" bd
-         JOIN bylos b ON b.id = bd."bylosId"
-         LEFT JOIN "jarCsv" j ON j."jarKodas"::text = bd.kodas;
-```
+See [`modules/mcp/analyst/tempViews.js`](../modules/mcp/analyst/tempViews.js) (view definition, lines 121–133).
+
+**Purpose**: Court case registry linking companies and individuals as plaintiffs, defendants, or third parties. Combines
+case metadata (`bylosRusis`, `teismas`, `data`) with company names denormalized from `jarCsv`. Solves Theme 9 (legal
+liability) — a critical blind spot without this view.
 
 ### Connection lifecycle
 
@@ -1101,35 +986,34 @@ sequenceDiagram
     participant DB as PostgreSQL (read-only role)
     LLM ->> H: { query, purpose, page }
     Note over H: page defaults to 1, pageSize is fixed at 50
+    H ->> V: validate(query)
+    V ->> V: L1: node-sql-parser — parse AST,\nassert single SELECT
+    V ->> V: L2: walk TableRef nodes —\nall in TABLE_WHITELIST or VIEW_NAMES?
+    V ->> V: L3: walk Function nodes —\nstrict whitelist (reject if missing)
+    V ->> V: L4: JOINs ≤ 6, subquery depth ≤ 3, CTEs ≤ 8
 
-H->>V: validate(query)
-V->>V: L1: node-sql-parser — parse AST,\nassert single SELECT
-V->>V: L2: walk TableRef nodes —\nall in TABLE_WHITELIST or VIEW_NAMES?
-V->>V: L3: walk Function nodes —\nstrict whitelist (reject if missing)
-V->>V: L4: JOINs ≤ 6, subquery depth ≤ 3, CTEs ≤ 8
+    alt validation fails
+        V -->> H: { ok: false, layer, message }
+        H -->> LLM: isError: true\n"Layer N: <identifier> rejected"
+    else validation passes
+        V -->> H: { ok: true, hasRecursive }
+        H ->> P: pool.connect()
+        Note over P: pool.on('connect') has already run\nTEMP_VIEWS_SQL on this backend
+        P -->> H: client
+        H ->> DB: SET LOCAL statement_timeout = '20s'
+        H ->> DB: SELECT q.*, COUNT(*) OVER () AS __total__\nFROM (user_sql) AS q\nLIMIT 50 OFFSET (page-1)*50
 
-alt validation fails
-V-->>H: { ok: false, layer, message }
-H-->>LLM: isError: true\n"Layer N: <identifier> rejected"
-else validation passes
-V-->>H: { ok: true, hasRecursive }
-H->>P: pool.connect()
-Note over P: pool.on('connect') has already run\nTEMP_VIEWS_SQL on this backend
-P-->>H: client
-H->>DB: SET LOCAL statement_timeout = '20s'
-H->>DB: SELECT q.*, COUNT(*) OVER () AS __total__\nFROM (user_sql) AS q\nLIMIT 50 OFFSET (page-1)*50
-
-alt query succeeds
-DB-->>H: rows (up to 50, each with __total__)
-H->>P: client.release()
-Note over H: read totalRows from __total__,\nstrip column from rows,\ncompute totalPages, hasMore
-H-->>LLM: content envelope with payload\n(logToolCall records purpose + duration)
-else query times out / syntax error
-DB-->>H: PG error
-H->>P: client.release()
-H-->>LLM: isError: true + PostgreSQL error message
-end
-end
+        alt query succeeds
+            DB -->> H: rows (up to 50, each with __total__)
+            H ->> P: client.release()
+            Note over H: read totalRows from __total__,\nstrip column from rows,\ncompute totalPages, hasMore
+            H -->> LLM: content envelope with payload\n(logToolCall records purpose + duration)
+        else query times out / syntax error
+            DB -->> H: PG error
+            H ->> P: client.release()
+            H -->> LLM: isError: true + PostgreSQL error message
+        end
+    end
 ```
 
 ---
@@ -1203,7 +1087,8 @@ acceptance check passes.
 2. Add the four `pgAnalyst*` keys to `config.sample.js` and `config.js` (existing read-only role credentials,
    direct PG port `9118`, `pgAnalystMaxConnections: 5`).
 3. Create `modules/mcp/analyst/pool.js` exporting `analystPool` — a `pg.Pool` with the same `statement_cache_size: 0`
-   and global type parsers as `postgres/postgres.js`, plus a `pool.on('connect', client => client.query(TEMP_VIEWS_SQL))`
+   and global type parsers as `postgres/postgres.js`, plus a
+   `pool.on('connect', client => client.query(TEMP_VIEWS_SQL))`
    hook.
 4. Create `modules/mcp/analyst/tempViews.js` exporting `TEMP_VIEWS_SQL` — the six `CREATE TEMP VIEW` statements
    verbatim from the "Subject-matter temporary views" section.
@@ -1260,12 +1145,14 @@ Three test layers, each with a different failure mode in mind.
 Use the Node built-in test runner (matches the existing `test/rysiai/*.test.js` convention). Run with `npm test`.
 
 **Layer 1 (parser):**
+
 - ✅ valid `SELECT 1` parses
 - ❌ `INSERT …`, `UPDATE …`, `DELETE …`, `DROP …`, `ALTER …`, `CREATE …`, `COPY …` → rejected
 - ❌ `SELECT 1; SELECT 2` (multi-statement) → rejected
 - ❌ malformed SQL → parse error surfaced
 
 **Layer 2 (table whitelist):**
+
 - ✅ `SELECT * FROM sutartys` → ok
 - ✅ `SELECT * FROM v_company` (TEMP view name) → ok
 - ❌ `SELECT * FROM pg_class` → rejected, message names `pg_class`
@@ -1273,6 +1160,7 @@ Use the Node built-in test runner (matches the existing `test/rysiai/*.test.js` 
 - ❌ `SELECT * FROM users` (table not in whitelist) → rejected
 
 **Layer 3 (function whitelist):**
+
 - ✅ `SELECT COUNT(*), SUM(verte), DATE_TRUNC('year', sudarymoData) FROM sutartys` → ok
 - ✅ all functions used in the document's eight investigation-step examples → ok
 - ❌ `SELECT pg_sleep(5)` → rejected, message names `pg_sleep`
@@ -1281,6 +1169,7 @@ Use the Node built-in test runner (matches the existing `test/rysiai/*.test.js` 
 - ❌ unknown function `SELECT my_udf()` → rejected (whitelist is strict)
 
 **Layer 4 (complexity):**
+
 - ✅ 6 JOINs, depth-3 subqueries, 8 CTEs → ok
 - ❌ 7 JOINs → rejected
 - ❌ depth-4 subquery → rejected
@@ -1293,6 +1182,7 @@ Hit a real local PostgreSQL with the read-only role. Skip via `process.env.SKIP_
 without a DB.
 
 **Cases:**
+
 - Happy path: simple aggregation returns rows + `totalRows` + correct `totalPages` + `hasMore` flag.
 - Pagination: same query at `page=1` and `page=2` returns disjoint rows whose union matches the unpaginated query.
 - Empty result: query returning 0 rows reports `totalRows: 0`, `totalPages: 0`, `hasMore: false` (verifies the
@@ -1391,7 +1281,8 @@ curl -s -X POST http://localhost:9019/mcp \
   }' | jq -r '.result.content[0].text' | jq .
 ```
 
-Expected payload shape: `{ rows: [...], page: 1, pageSize: 50, totalRows: N, totalPages: ceil(N/50), hasMore: ..., durationMs: ... }`.
+Expected payload shape:
+`{ rows: [...], page: 1, pageSize: 50, totalRows: N, totalPages: ceil(N/50), hasMore: ..., durationMs: ... }`.
 
 **Negative tests (should each return `isError: true`):**
 
@@ -1430,6 +1321,7 @@ purpose before calling the tool and quote the totals you got back.
 ```
 
 What to watch:
+
 - **Tool selection.** Claude should call `get_schema` early and reach for `execute_investigation_query` for every
   hypothesis test.
 - **Pagination narration.** When `totalPages > 1`, Claude should phrase progress as *"page 1 of 5"* or *"50 of 232"*
@@ -1443,13 +1335,13 @@ What to watch:
 
 Ask Claude these directly to verify the safety story:
 
-| Prompt to Claude                                                                  | Expected behaviour                                          |
-|-----------------------------------------------------------------------------------|-------------------------------------------------------------|
-| *"Use the MCP to delete the row where jarKodas = 1"*                              | Claude attempts a DELETE; Layer 1 rejects; Claude explains. |
-| *"Read /etc/passwd via the MCP"*                                                  | Claude tries `pg_read_file` (or similar); Layer 3 rejects.  |
-| *"Run a query that joins sutartys to itself five times"*                          | Either succeeds (≤6 JOINs) or hits Layer 4 cleanly.         |
-| *"List all the columns of pg_class through the MCP"*                              | Layer 2 rejects; Claude falls back to `get_schema`.         |
-| *"Run a query that takes 30 seconds"*                                             | Statement timeout fires after ~20s; PG error surfaced.      |
+| Prompt to Claude                                         | Expected behaviour                                          |
+|----------------------------------------------------------|-------------------------------------------------------------|
+| *"Use the MCP to delete the row where jarKodas = 1"*     | Claude attempts a DELETE; Layer 1 rejects; Claude explains. |
+| *"Read /etc/passwd via the MCP"*                         | Claude tries `pg_read_file` (or similar); Layer 3 rejects.  |
+| *"Run a query that joins sutartys to itself five times"* | Either succeeds (≤6 JOINs) or hits Layer 4 cleanly.         |
+| *"List all the columns of pg_class through the MCP"*     | Layer 2 rejects; Claude falls back to `get_schema`.         |
+| *"Run a query that takes 30 seconds"*                    | Statement timeout fires after ~20s; PG error surfaced.      |
 
 ### 5. Cleanup
 

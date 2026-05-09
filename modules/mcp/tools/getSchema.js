@@ -37,23 +37,24 @@ const VIEW_METADATA = {
         description:
             "Company profile with workforce, payroll, risk flags, and activity counters.",
         columns: [
-            { name: "jarKodas", type: "text", primaryKey: true },
-            { name: "pavadinimas", type: "text", description: "Company name." },
-            { name: "adresas", type: "text", description: "Registered address." },
-            { name: "registravimoData", type: "timestamp without time zone" },
-            { name: "statusoPavadinimas", type: "text" },
-            { name: "statusasNuo", type: "timestamp without time zone" },
-            { name: "sodraData", type: "date", description: "Latest sodra snapshot date." },
-            { name: "darbuotojai", type: "integer", description: "Current employee count estimate." },
-            { name: "vidutinisAtlyginimas", type: "numeric" },
-            { name: "imokuSuma", type: "numeric" },
-            { name: "melagingisTiekejas", type: "boolean" },
-            { name: "nepatikimasTiekejas", type: "boolean" },
-            { name: "vdiPazeidimuSkaicius", type: "bigint" },
-            { name: "bylosSkaicius", type: "bigint" },
-            { name: "domenaiSkaicius", type: "bigint" },
-            { name: "neskelbiamosDerybosSkaicius", type: "bigint" },
+            "jarKodas: text",
+            "pavadinimas: text",
+            "adresas: text",
+            "registravimoData: timestamp without time zone",
+            "statusoPavadinimas: text",
+            "statusasNuo: timestamp without time zone",
+            "sodraData: date",
+            "darbuotojai: integer",
+            "vidutinisAtlyginimas: numeric",
+            "imokuSuma: numeric",
+            "melagingisTiekejas: boolean",
+            "nepatikimasTiekejas: boolean",
+            "vdiPazeidimuSkaicius: bigint",
+            "bylosSkaicius: bigint",
+            "domenaiSkaicius: bigint",
+            "neskelbiamosDerybosSkaicius: bigint",
         ],
+        primaryKeys: ["jarKodas"],
         relationships: [
             {
                 column: "jarKodas",
@@ -68,22 +69,23 @@ const VIEW_METADATA = {
         description:
             "Contract-centric view with buyer/supplier names and key contract values.",
         columns: [
-            { name: "sutartiesUnikalusId", type: "bigint", primaryKey: true },
-            { name: "pirkimoNumeris", type: "text" },
-            { name: "sudarymoData", type: "timestamp without time zone" },
-            { name: "galiojimoData", type: "timestamp without time zone" },
-            { name: "verte", type: "numeric" },
-            { name: "faktineIvykdimoVerte", type: "numeric" },
-            { name: "pavadinimas", type: "text" },
-            { name: "bvpzKodas", type: "text" },
-            { name: "tipas", type: "text" },
-            { name: "istrinta", type: "boolean" },
-            { name: "pirkejoKodas", type: "text" },
-            { name: "pirkejas", type: "text", description: "Buyer name from jarCsv." },
-            { name: "tiekejoKodas", type: "text" },
-            { name: "tiekejas", type: "text", description: "Supplier name from jarCsv." },
-            { name: "papildomiTiekejaiKodai", type: "text[]" },
+            "sutartiesUnikalusId: bigint",
+            "pirkimoNumeris: text",
+            "sudarymoData: timestamp without time zone",
+            "galiojimoData: timestamp without time zone",
+            "verte: numeric",
+            "faktineIvykdimoVerte: numeric",
+            "pavadinimas: text",
+            "bvpzKodas: text",
+            "tipas: text",
+            "istrinta: boolean",
+            "pirkejoKodas: text",
+            "pirkejas: text",
+            "tiekejoKodas: text",
+            "tiekejas: text",
+            "papildomiTiekejaiKodai: text[]",
         ],
+        primaryKeys: ["sutartiesUnikalusId"],
         relationships: [
             {
                 column: "pirkejoKodas",
@@ -103,22 +105,23 @@ const VIEW_METADATA = {
         description:
             "Procurement notice view with organizer details, lifecycle status, and value.",
         columns: [
-            { name: "pirkimoId", type: "bigint", primaryKey: true },
-            { name: "pavadinimas", type: "text" },
-            { name: "jarKodas", type: "text" },
-            { name: "organizatorius", type: "text" },
-            { name: "trumpinys", type: "text" },
-            { name: "miestas", type: "text" },
-            { name: "pirkimoBudas", type: "text" },
-            { name: "statusas", type: "text" },
-            { name: "zingsnis", type: "text" },
-            { name: "pirkimoObjektoTipas", type: "text" },
-            { name: "numatomaVerteEUR", type: "numeric" },
-            { name: "paskelbimoData", type: "timestamp without time zone" },
-            { name: "pasiulymuPateikimoTerminas", type: "timestamp without time zone" },
-            { name: "esFinansavimas", type: "boolean" },
-            { name: "bvpzKodai", type: "text[]" },
+            "pirkimoId: bigint",
+            "pavadinimas: text",
+            "jarKodas: text",
+            "organizatorius: text",
+            "trumpinys: text",
+            "miestas: text",
+            "pirkimoBudas: text",
+            "statusas: text",
+            "zingsnis: text",
+            "pirkimoObjektoTipas: text",
+            "numatomaVerteEUR: numeric",
+            "paskelbimoData: timestamp without time zone",
+            "pasiulymuPateikimoTerminas: timestamp without time zone",
+            "esFinansavimas: boolean",
+            "bvpzKodai: text[]",
         ],
+        primaryKeys: ["pirkimoId"],
         relationships: [
             {
                 column: "jarKodas",
@@ -133,23 +136,24 @@ const VIEW_METADATA = {
         description:
             "Person-to-organization relationship view from PINREG declarations.",
         columns: [
-            { name: "id", type: "bigint", primaryKey: true },
-            { name: "deklaracija", type: "text" },
-            { name: "vardas", type: "text" },
-            { name: "pavarde", type: "text" },
-            { name: "susijusioAsmensVardas", type: "text" },
-            { name: "susijusioAsmensPavarde", type: "text" },
-            { name: "jarKodas", type: "text" },
-            { name: "imonesVardas", type: "text" },
-            { name: "pareigos", type: "text" },
-            { name: "irasoTipas", type: "text" },
-            { name: "darbovietesTipas", type: "text" },
-            { name: "rysioPobudzioPavadinimas", type: "text" },
-            { name: "rysioPradzia", type: "date" },
-            { name: "rysioPabaiga", type: "date" },
-            { name: "yraJuridinisAsmuo", type: "boolean" },
-            { name: "registruotaLietuvoje", type: "boolean" },
+            "id: bigint",
+            "deklaracija: text",
+            "vardas: text",
+            "pavarde: text",
+            "susijusioAsmensVardas: text",
+            "susijusioAsmensPavarde: text",
+            "jarKodas: text",
+            "imonesVardas: text",
+            "pareigos: text",
+            "irasoTipas: text",
+            "darbovietesTipas: text",
+            "rysioPobudzioPavadinimas: text",
+            "rysioPradzia: date",
+            "rysioPabaiga: date",
+            "yraJuridinisAsmuo: boolean",
+            "registruotaLietuvoje: boolean",
         ],
+        primaryKeys: ["id"],
         relationships: [
             {
                 column: "jarKodas",
@@ -164,18 +168,19 @@ const VIEW_METADATA = {
         description:
             "Bidder-level ATN-1 procurement participation, ranking, and rejection data.",
         columns: [
-            { name: "pirkimoNumeris", type: "text" },
-            { name: "pirkejoKodas", type: "text" },
-            { name: "pirkimoBudas", type: "text" },
-            { name: "ataskaitosData", type: "timestamp without time zone" },
-            { name: "tiekejoKodas", type: "text" },
-            { name: "tiekejas", type: "text" },
-            { name: "fizinisAsmuo", type: "boolean" },
-            { name: "salis", type: "text" },
-            { name: "eileNumeris", type: "integer" },
-            { name: "pasiulymoKaina", type: "numeric" },
-            { name: "atmetimoPriezastis", type: "text" },
+            "pirkimoNumeris: text",
+            "pirkejoKodas: text",
+            "pirkimoBudas: text",
+            "ataskaitosData: timestamp without time zone",
+            "tiekejoKodas: text",
+            "tiekejas: text",
+            "fizinisAsmuo: boolean",
+            "salis: text",
+            "eileNumeris: integer",
+            "pasiulymoKaina: numeric",
+            "atmetimoPriezastis: text",
         ],
+        primaryKeys: [],
         relationships: [
             {
                 column: "pirkejoKodas",
@@ -195,16 +200,17 @@ const VIEW_METADATA = {
         description:
             "Court case view linking case attributes with participant organizations.",
         columns: [
-            { name: "bylosId", type: "bigint", primaryKey: true },
-            { name: "bylosNumeris", type: "text" },
-            { name: "bylosRusis", type: "text" },
-            { name: "bylosData", type: "date" },
-            { name: "teismas", type: "text" },
-            { name: "jarKodas", type: "text" },
-            { name: "dalyvioPavadinimas", type: "text" },
-            { name: "dalyvioVardasIrPavarde", type: "text" },
-            { name: "bylojeKaip", type: "text" },
+            "bylosId: bigint",
+            "bylosNumeris: text",
+            "bylosRusis: text",
+            "bylosData: date",
+            "teismas: text",
+            "jarKodas: text",
+            "dalyvioPavadinimas: text",
+            "dalyvioVardasIrPavarde: text",
+            "bylojeKaip: text",
         ],
+        primaryKeys: ["bylosId"],
         relationships: [
             {
                 column: "jarKodas",
@@ -276,21 +282,16 @@ async function listAll() {
         if (!columnMap.has(row.table_name)) {
             columnMap.set(row.table_name, []);
         }
-        columnMap.get(row.table_name).push({
-            name: row.column_name,
-            type: row.data_type,
-            nullable: row.is_nullable === "YES",
-            primaryKey: false,
-        });
+        columnMap.get(row.table_name).push(row);
     }
 
     const tables = TABLE_LIST.map((identifier) => {
-        const columns = columnMap.get(identifier) ?? [];
+        const rows = columnMap.get(identifier) ?? [];
         return {
             identifier,
-            description: buildTableDescription(identifier, columns),
+            description: buildTableDescription(identifier, rows),
             rowCountEstimate: rowCountMap[identifier] ?? null,
-            example: buildTableExample(identifier, columns),
+            example: buildTableExample(identifier, rows),
         };
     });
 
@@ -375,12 +376,8 @@ async function describeTable(tableName) {
     }
 
     const primaryKeys = new Set(primaryKeyResult.rows.map((row) => row.column_name));
-    const columns = colResult.rows.map((r) => ({
-        name: r.column_name,
-        type: r.data_type,
-        nullable: r.is_nullable === "YES",
-        primaryKey: primaryKeys.has(r.column_name),
-    }));
+    const columns = colResult.rows.map((r) => `${r.column_name}: ${r.data_type}`);
+    const primaryKeyList = Array.from(primaryKeys);
 
     const relationships = foreignKeyResult.rows.map((row) => ({
         column: row.column_name,
@@ -390,10 +387,11 @@ async function describeTable(tableName) {
 
     const result = {
         identifier: tableName,
-        description: buildTableDescription(tableName, columns),
+        description: buildTableDescription(tableName, colResult.rows),
         columns,
+        primaryKeys: primaryKeyList,
         relationships,
-        example: buildTableExample(tableName, columns),
+        example: buildTableExample(tableName, colResult.rows),
     };
 
     return {
@@ -416,10 +414,12 @@ async function describeView(viewName) {
         };
     }
 
+
     const result = {
         identifier: viewName,
         description: metadata.description,
         columns: metadata.columns,
+        primaryKeys: metadata.primaryKeys,
         relationships: metadata.relationships,
         example: metadata.example,
     };
@@ -435,41 +435,38 @@ async function describeView(viewName) {
     };
 }
 
-function buildTableExample(tableName, columns) {
-    if (columns.length === 0) {
+function buildTableExample(tableName, rows) {
+    if (rows.length === 0) {
         return `SELECT 1 FROM "${tableName}" WHERE 1 = 1`;
     }
 
-    const selectColumns = columns.map((c) => `"${c.name}"`);
-    const whereColumn = pickRecommendedWhereColumn(columns);
+    const selectColumns = rows.map((r) => `"${r.column_name}"`);
+    const whereColumn = pickRecommendedWhereColumn(rows);
     const wherePredicate = buildWherePredicate(whereColumn);
     return `SELECT ${selectColumns.join(", ")} FROM "${tableName}" WHERE ${wherePredicate}`;
 }
 
-function pickRecommendedWhereColumn(columns) {
-    const primary = columns.find((c) => c.primaryKey);
-    if (primary) return primary;
-
+function pickRecommendedWhereColumn(rows) {
     for (const candidate of IDENTIFIER_CANDIDATES) {
-        const found = columns.find((c) => c.name === candidate);
+        const found = rows.find((r) => r.column_name === candidate);
         if (found) return found;
     }
 
-    const temporal = columns.find((c) =>
-        c.type.includes("timestamp") || c.type === "date"
+    const temporal = rows.find((r) =>
+        r.data_type.includes("timestamp") || r.data_type === "date"
     );
     if (temporal) return temporal;
 
-    const textColumn = columns.find((c) => c.type === "text");
+    const textColumn = rows.find((r) => r.data_type === "text");
     if (textColumn) return textColumn;
 
-    return columns[0];
+    return rows[0];
 }
 
-function buildWherePredicate(column) {
-    const quotedName = `"${column.name}"`;
-    const lowerName = column.name.toLowerCase();
-    const lowerType = column.type.toLowerCase();
+function buildWherePredicate(row) {
+    const quotedName = `"${row.column_name}"`;
+    const lowerName = row.column_name.toLowerCase();
+    const lowerType = row.data_type.toLowerCase();
 
     if (lowerName.includes("kodas")) {
         return `${quotedName} = '302556251'`;
@@ -500,19 +497,19 @@ function buildWherePredicate(column) {
     return `${quotedName} IS NOT NULL`;
 }
 
-function buildTableDescription(tableName, columns) {
+function buildTableDescription(tableName, rows) {
     if (TABLE_DESCRIPTIONS[tableName]) {
         return TABLE_DESCRIPTIONS[tableName];
     }
-    return inferDescriptionFromColumns(tableName, columns);
+    return inferDescriptionFromColumns(tableName, rows);
 }
 
-function inferDescriptionFromColumns(tableName, columns) {
-    if (columns.length === 0) {
+function inferDescriptionFromColumns(tableName, rows) {
+    if (rows.length === 0) {
         return `Public dataset table '${tableName}'.`;
     }
 
-    const names = columns.map((c) => c.name.toLowerCase());
+    const names = rows.map((r) => r.column_name.toLowerCase());
     const has = (token) => names.some((n) => n.includes(token));
 
     if (has("jar") || has("imones") || has("imone")) {
@@ -531,9 +528,9 @@ function inferDescriptionFromColumns(tableName, columns) {
         return `Financial-value dataset for '${tableName}' with monetary indicators and related dimensions.`;
     }
 
-    const sampleColumns = columns
+    const sampleColumns = rows
         .slice(0, 3)
-        .map((c) => `"${c.name}"`)
+        .map((r) => `"${r.column_name}"`)
         .join(", ");
     return `Public dataset table '${tableName}' with columns such as ${sampleColumns}.`;
 }
@@ -545,6 +542,14 @@ function assertViewMetadataCompleteness() {
         }
         if (!Array.isArray(VIEW_METADATA[viewName].columns) || VIEW_METADATA[viewName].columns.length === 0) {
             throw new Error(`VIEW_METADATA['${viewName}'] must define at least one column.`);
+        }
+        for (const col of VIEW_METADATA[viewName].columns) {
+            if (typeof col !== "string" || !col.includes(": ")) {
+                throw new Error(`VIEW_METADATA['${viewName}'] column '${col}' must be "name: type" string format.`);
+            }
+        }
+        if (!Array.isArray(VIEW_METADATA[viewName].primaryKeys)) {
+            throw new Error(`VIEW_METADATA['${viewName}'] must define primaryKeys array.`);
         }
         if (typeof VIEW_METADATA[viewName].example !== "string" || VIEW_METADATA[viewName].example.length === 0) {
             throw new Error(`VIEW_METADATA['${viewName}'] must define an example SQL query.`);
