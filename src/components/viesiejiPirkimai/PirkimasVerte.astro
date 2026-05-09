@@ -1,0 +1,25 @@
+---
+import { fmtEurOrNull } from '../../lib/formatters.ts';
+
+interface Props {
+  pirkimas: any;
+}
+const { pirkimas } = Astro.props;
+const t = pirkimas.turinys || {};
+
+const numatoma = fmtEurOrNull(pirkimas.numatomaBendraPirkimoVerte) || fmtEurOrNull(t.numatomaVerteEUR);
+const bendra = fmtEurOrNull(t.bendraSutarciuVerte);
+const dpsMax = fmtEurOrNull(t.suteiktaVertemaksimaliDPSVerte);
+const hasAny = numatoma || bendra || dpsMax;
+---
+
+{hasAny && (
+  <section>
+    <h2>Vertė</h2>
+    <dl class="kv-list">
+      {numatoma && <><dt>Numatoma</dt><dd class="cell-mono">{numatoma}</dd></>}
+      {bendra && <><dt>Bendra sutarčių</dt><dd class="cell-mono">{bendra}</dd></>}
+      {dpsMax && <><dt>Maksimali DPS</dt><dd class="cell-mono">{dpsMax}</dd></>}
+    </dl>
+  </section>
+)}

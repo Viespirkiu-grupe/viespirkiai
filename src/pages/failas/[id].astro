@@ -1,0 +1,186 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Map from '@design-system/components/maps/Map.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import { getColorScheme, getFont } from '../../lib/failai.js';
+import { loadFailasById, enrichFailas, parseSuffix } from '../../lib/failas.js';
+import { checkDokFileRemoved } from '@/modules/failai/queries.js';
+import FailasPreview from '../../components/failai/FailasPreview.astro';
+import FailasOcr from '../../components/failai/FailasOcr.astro';
+import Domenai from '../../components/failai/Domenai.astro';
+import Nuorodos from '../../components/failai/Nuorodos.astro';
+import Emails from '../../components/failai/Emails.astro';
+import Telefonai from '../../components/failai/Telefonai.astro';
+import IbanNumeriai from '../../components/failai/IbanNumeriai.astro';
+import Parasai from '@design-system/components/content/SignatureList.astro';
+import FailasPasalintas from '../../components/failai/FailasPasalintas.astro';
+import { convertUnit } from '@/utils/units.js';
+
+const { id: rawId } = Astro.params;
+const { value: id, format } = parseSuffix(rawId!);
+
+if (isNaN(Number(id))) return Astro.redirect('/404');
+
+let failas = await loadFailasById(id);
+if (!failas) return Astro.redirect('/404');
+
+if (format === 'png') {
+  return new Response(new Uint8Array(await (await import('@/utils/openGraphImage.js')).getOpenGraphImage((failas.extension || '').toUpperCase() || 'Failas', failas.pavadinimas || 'Failas', failas.dydis ? convertUnit(failas.dydis, 'B') : '', `viespirkiai.org/failas/${failas.id}`)), {
+    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=7200, s-maxage=7200' },
+  });
+}
+
+const isPasalintas = await checkDokFileRemoved(failas.dokId, failas.fileId);
+if (isPasalintas) {
+  // 451 Unavailable For Legal Reasons — render the dedicated page component
+  // through the regular Astro template (the previous `.toString()` trick on
+  // the compiled component module did not actually produce HTML).
+  Astro.response.status = 451;
+}
+
+if (format === 'json') {
+  return new Response(JSON.stringify({ ...failas, ...(await (await import('@/modules/failai/aptarnavimas.js')).fetchFailasMetadata(failas.id)) }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (!isPasalintas) {
+  failas = await enrichFailas(failas);
+}
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+const ogTitle = isPasalintas ? 'Failas pašalintas' : (failas.metaduomenys?.Title || failas.pavadinimas || 'Failas');
+const ogParts = [failas.extension?.toUpperCase(), failas.dydis ? convertUnit(failas.dydis, 'B') : null].filter(Boolean);
+const search = Astro.url.searchParams.get('search') || '';
+---
+<Layout
+  pageTitle={ogTitle}
+  pageDescription={ogParts.join(' · ')}
+  pageImage={`https://viespirkiai.org/failas/${failas.id}.png`}
+  colorScheme={colorScheme}
+  font={font}
+>
+  <style>
+    .failas-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 28px; align-items: start; }
+    @media (max-width: 900px) {
+      .failas-grid { grid-template-columns: 1fr; }
+      .failas-grid > div:last-child { order: -1; }
+      .failas-grid iframe { height: 50vh; }
+    }
+  </style>
+
+  {isPasalintas ? (
+    <FailasPasalintas />
+  ) : (
+  <main>
+    <PageHeader>
+      {failas.metaduomenys?.Title ? (
+        <>
+          <Fragment slot="subtext">{failas.pavadinimas}</Fragment>
+          {failas.metaduomenys.Title}
+        </>
+      ) : (
+        failas.pavadinimas
+      )}
+      <Fragment slot="actions">
+        <a href={`/failas/${failas.id}.json`} class="btn btn-outline btn-sm" aria-label="Atsisiųsti failo metaduomenis JSON formatu">
+          <span aria-hidden="true">↗</span> JSON
+        </a>
+        <a href={`https://failai.viespirkiai.org/${failas.id}`} class="btn btn-outline btn-sm" aria-label="Atsisiųsti failą">
+          <span aria-hidden="true">↗</span> Failas
+        </a>
+        {failas.previewType === 'pdf' && (
+          <a href={`/dist/pdfjs/web/viewer.html?file=${encodeURIComponent(`/failas/${failas.id}/preview`)}#search=${encodeURIComponent(search)}`} class="btn btn-outline btn-sm" aria-label="Atidaryti PDF peržiūrą">
+            <span aria-hidden="true">↗</span> Padidinti
+          </a>
+        )}
+        {failas.originalusLinkas && (
+          <a href={failas.originalusLinkas} class="btn btn-outline btn-sm" aria-label={`Atidaryti ${failas.originalusLinkasPavadinimas}`}>
+            <span aria-hidden="true">↗</span> {failas.originalusLinkasPavadinimas}
+          </a>
+        )}
+      </Fragment>
+    </PageHeader>
+
+    <div class="failas-grid mb-10">
+      <div class="flex flex-col gap-4">
+
+        <div>
+          <h2 class="mb-3 no-style">Failas</h2>
+          <KeyValueList>
+            <dt>Formatas</dt>
+            <dd><span class="cell-mono">{failas.extension || '—'}</span></dd>
+            <dt>Dydis</dt>
+            <dd>
+              {(failas.dydis || failas.dydis === 0)
+                ? <span class="cell-mono">{convertUnit(failas.dydis, 'B')}</span>
+                : '—'
+              }
+            </dd>
+            <dt>MD5</dt>
+            <dd><span class="cell-mono wrap-anywhere">{failas.md5 || '—'}</span></dd>
+            <dt>Šaltinis</dt>
+            <dd><a href={failas.saltinioLinkas}>{failas.saltinioLinkoPavadinimas}</a></dd>
+          </KeyValueList>
+        </div>
+
+        {failas.location && (
+          <div>
+            <h2 class="mb-3 no-style">Vieta</h2>
+            <Map
+              id="failas-map"
+              lat={failas.location.lat}
+              lon={failas.location.lon}
+              zoom={14}
+              height="220px"
+              style="border-radius:var(--radius-md);"
+              showLink={true}
+              linkText="auto"
+            />
+          </div>
+        )}
+
+        {failas.metaduomenys ? (
+          <>
+            <div>
+              <h2 class="mb-3 no-style">Dokumentas</h2>
+              <KeyValueList>
+                <dt>Puslapių skaičius</dt>
+                <dd><span class="cell-mono">{failas.metaduomenys.pageCount || failas.puslapiuSkaicius || '—'}</span></dd>
+                <dt>Žodžių skaičius</dt>
+                <dd><span class="cell-mono">{failas.metaduomenys.wordCount || failas.zodziuSkaicius || '—'}</span></dd>
+                <dt>Programa</dt>
+                <dd>{failas.metaduomenys.Producer || failas.metaduomenys.producer || '—'}</dd>
+                <dt>Autorius</dt>
+                <dd>{failas.autorius || failas.metaduomenys.Author || '—'}</dd>
+              </KeyValueList>
+            </div>
+
+            <div>
+              <h2 class="mb-3 no-style">Turinys</h2>
+              <KeyValueList>
+                <Domenai domains={failas.domains} />
+                <Nuorodos links={(failas.links || []).filter((l: any) => !l.link.startsWith('mailto:'))} />
+                <Emails emails={failas.emails} />
+                <Telefonai telefonai={failas.telefonai} />
+                <IbanNumeriai ibanNumeriai={failas.metaduomenys.ibanNumeriai} />
+                <Parasai signatures={failas.metaduomenys.signatures} />
+              </KeyValueList>
+            </div>
+          </>
+        ) : (
+          <p class="text-muted text-sm text-center mb-10"><em>Dokumento metaduomenų nėra</em></p>
+        )}
+
+        {failas.hasOcrSection && <FailasOcr failas={failas} />}
+      </div>
+
+      <div>
+        <FailasPreview failas={failas} search={search} />
+      </div>
+    </div>
+  </main>
+  )}
+</Layout>

@@ -1,0 +1,32 @@
+---
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+
+interface Props {
+  sutartis: any;
+}
+
+const { sutartis } = Astro.props;
+const papildomi = sutartis.papildomiBvpzKodai ?? [];
+const papildomiPav = sutartis.papildomiBvpzPavadinimai ?? [];
+---
+
+<section>
+  <h2>Klasifikacija</h2>
+  <KeyValueList className="mb-4">
+    <dt>Kategorija</dt><dd>{sutartis.kategorija}</dd>
+    <dt>Tipas</dt><dd>{sutartis.tipas} <span class="text-muted">(<em>{sutartis.tipoPavadinimas}</em>)</span></dd>
+  </KeyValueList>
+
+  <h3 class="mb-2">BVPŽ</h3>
+  <div class="mb-2">
+    <div class="font-medium">{sutartis.bvpzPavadinimas}</div>
+    <span class="text-muted">{sutartis.bvpzKodas}</span>
+  </div>
+  {papildomi.map((kodas: string, i: number) => (
+    <div class="mb-2">
+      <div class="font-medium">{papildomiPav[i]}</div>
+      <span class="text-muted">{kodas}</span>
+    </div>
+  ))}
+  <a href="/bvpz" class="text-sm">↗ BVPŽ kodai</a>
+</section>

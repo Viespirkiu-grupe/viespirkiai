@@ -1,0 +1,75 @@
+---
+import TedKvList from './TedKvList.astro';
+import TedSubgroup from './TedSubgroup.astro';
+
+const { group, idx = 0, shortUrl, parentNodeTitles, parentNodeAliases, subgroupTitles } = Astro.props;
+const groupLabel = group.label || String(idx + 1);
+const isLabeled = Boolean(group.label);
+
+function byParent(fields: any[]) {
+  const result: any[] = [];
+  const seen = new Map();
+  for (const f of fields) {
+    const canonical = parentNodeAliases[f.parentNodeId] || f.parentNodeId || '__root__';
+    if (!seen.has(canonical)) {
+      const g = { label: parentNodeTitles[canonical] || null, pid: canonical, fields: [] };
+      seen.set(canonical, g);
+      result.push(g);
+    }
+    seen.get(canonical).fields.push(f);
+  }
+  return result;
+}
+
+function splitMax5(groups: any[]) {
+  const out: any[] = [];
+  for (const fg of groups) {
+    if (fg.fields.length <= 5) {
+      out.push(fg);
+      continue;
+    }
+    for (let i = 0; i < fg.fields.length; i += 5) {
+      out.push({ label: i === 0 ? fg.label : null, pid: fg.pid, fields: fg.fields.slice(i, i + 5) });
+    }
+  }
+  return out;
+}
+
+const fieldCols = splitMax5(byParent(group.fields));
+const sgByType: any[] = [];
+const sgTypeMap = new Map();
+for (const sg of (group.subGroups || [])) {
+  if (!sgTypeMap.has(sg.nodeId)) {
+    const item = { nodeId: sg.nodeId, instances: [] };
+    sgTypeMap.set(sg.nodeId, item);
+    sgByType.push(item);
+  }
+  sgTypeMap.get(sg.nodeId).instances.push(sg);
+}
+---
+
+<div>
+  {isLabeled ? <h3>{groupLabel}</h3> : <p class="section-title">{groupLabel}</p>}
+
+  {group.fields.length > 0 && (
+    <div class="grid-auto">
+      {fieldCols.map((fg) => (
+        <div>
+          {fg.label && <h4>{fg.label}</h4>}
+          <TedKvList fields={fg.fields} shortUrl={shortUrl} />
+        </div>
+      ))}
+    </div>
+  )}
+
+  {sgByType.map((sgType) => (
+    <>
+      <h4>{subgroupTitles[sgType.nodeId] || sgType.nodeId}</h4>
+      <div class={`grid-${Math.min(sgType.instances.length, 3)}`}>
+        {sgType.instances.map((sg) => (
+          <TedSubgroup sg={sg} shortUrl={shortUrl} />
+        ))}
+      </div>
+    </>
+  ))}
+</div>

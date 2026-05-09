@@ -1,0 +1,20 @@
+---
+import LinkAmountDateRow from '@design-system/components/content/LinkAmountDateRow.astro';
+import { fmtEur } from '../../lib/formatters.ts';
+
+interface Props {
+  item: any;
+}
+
+const { item } = Astro.props;
+const sudaryta = item.sudarymoData ? String(item.sudarymoData).slice(0, 10) : '';
+const verte = Number(item.faktineIvykdimoVerte || item.verte || 0);
+---
+
+<LinkAmountDateRow
+  href={`/sutartis/${item.sutartiesUnikalusId}`}
+  leadingText={item.tipas || ''}
+  title={item.pavadinimas || ''}
+  amount={`${fmtEur(verte)}\u00A0€`}
+  date={sudaryta}
+/>

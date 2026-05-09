@@ -1,0 +1,294 @@
+---
+import Timeline from '@design-system/components/Timeline.astro';
+import TimelineItem from '@design-system/components/TimelineItem.astro';
+import TedSubgroup from './TedSubgroup.astro';
+
+const { group, totalGroups = 1, shortUrl, subgroupTitles, formatDate } = Astro.props;
+
+function f(id: string) {
+  return (group.fields.find((x: any) => x.fieldId === id)?.values || []).join(', ');
+}
+
+function fArr(id: string) {
+  return group.fields.find((x: any) => x.fieldId === id)?.values || [];
+}
+
+function fType(type: string) {
+  return group.fields.find((x: any) => x.type === type);
+}
+
+function fUrl(id: string) {
+  return group.fields.find((x: any) => x.fieldId === id);
+}
+
+function isNullValue(v: string) {
+  if (!v) return true;
+  const l = v.toLowerCase();
+  return l === 'ne' || l.includes('nėra') || l.includes('nerezervuotas');
+}
+
+const title = group.label || f('BT-21-Lot');
+const internalId = f('BT-22-Lot');
+const contractType = f('BT-23-Lot');
+const description = f('BT-24-Lot');
+const quantity = f('BT-25-Lot');
+const cpv = f('BT-262-Lot');
+const otherObjects = f('BT-531-Lot');
+const value = fType('amount');
+const durationStart = f('BT-536-Lot');
+const durationEnd = f('BT-537-Lot');
+const infoDeadlineD = f('BT-13(d)-Lot');
+const infoDeadlineT = f('BT-13(t)-Lot');
+const subDeadlineD = f('BT-1311(d)-Lot');
+const subDeadlineT = f('BT-1311(t)-Lot');
+const submissionType = f('BT-17-Lot');
+const submitUrl = fUrl('BT-18-Lot');
+const langs = fArr('BT-97-Lot');
+const gpa = f('BT-115-Lot');
+const sme = f('BT-726-Lot');
+const framework = f('BT-765-Lot');
+const dps = f('BT-766-Lot');
+const eAuction = f('BT-767-Lot');
+const eCatalog = f('BT-764-Lot');
+const reservedPartic = f('BT-71-Lot');
+const reservedExec = f('BT-736-Lot');
+const legalForm = f('BT-76-Lot');
+const guaranteeReq = f('BT-751-Lot');
+const guaranteeDesc = f('BT-75-Lot');
+const nda = f('BT-801-Lot');
+
+const cpvDash = cpv ? cpv.indexOf(' – ') : -1;
+const cpvCode = cpv ? (cpvDash >= 0 ? cpv.slice(0, cpvDash) : cpv) : null;
+const cpvLabel = cpv ? (cpvDash >= 0 ? cpv.slice(cpvDash + 3) : null) : null;
+
+const procedureFields = [
+  framework && !isNullValue(framework) && ['Preliminarioji sutartis', framework],
+  dps && !isNullValue(dps) && ['Dinaminė pirkimo sistema', dps],
+  eAuction && !isNullValue(eAuction) && ['El. aukcionas', eAuction],
+  eCatalog && !isNullValue(eCatalog) && ['El. katalogas', eCatalog],
+].filter(Boolean);
+
+const participationFields = [
+  reservedPartic && !isNullValue(reservedPartic) && ['Rezervuotas dalyvavimas', reservedPartic],
+  reservedExec && !isNullValue(reservedExec) && ['Rezervuotas vykdymas', reservedExec],
+  legalForm && !isNullValue(legalForm) && ['Teisinė forma', legalForm],
+  guaranteeReq && !isNullValue(guaranteeReq) && ['Garantija', guaranteeDesc || guaranteeReq],
+  nda && !isNullValue(nda) && ['Konfidencialumas', f('BT-802-Lot') || 'Taip'],
+].filter(Boolean);
+
+const allSubs = group.subGroups || [];
+const placePerf = allSubs.filter((sg: any) => sg.nodeId === 'ND-LotPlacePerformance' || sg.nodeId === 'ND-PartPlacePerformance');
+const restList = allSubs.filter((sg: any) =>
+  sg.nodeId !== 'ND-LotPlacePerformance' && sg.nodeId !== 'ND-PartPlacePerformance'
+  && sg.nodeId !== 'ND-LotProcurementDocument' && sg.nodeId !== 'ND-PartProcurementDocument',
+);
+
+const SG_ORDER = [
+  'ND-LotAwardCriterion', 'ND-LotsGroupAwardCriterion',
+  'ND-SelectionCriteria',
+  'ND-SubcontractingObligation',
+  'ND-StrategicProcurementType', 'ND-StrategicProcurementInformationLotResult',
+  'ND-Funding', 'ND-ContractEUFunds',
+  'ND-LotPreviousPlanning', 'ND-PartPreviousPlanning',
+  'ND-QualityTarget', 'ND-Prize', 'ND-Asset',
+  'ND-OtherContractExecutionConditions', 'ND-IPIAppliedMeasure',
+  'ND-ReceivedSubmissions', 'ND-ReviewRequestsStatistics',
+  'ND-EEDProcurementDetailsLot', 'ND-EEDProcurementDetailsLotResult',
+];
+
+const cellMerge = [
+  ['ND-StrategicProcurementType', 'ND-StrategicProcurementInformationLotResult', 'ND-LotPreviousPlanning', 'ND-PartPreviousPlanning'],
+];
+const nodeToCell = new Map();
+cellMerge.forEach((g) => g.forEach((id) => nodeToCell.set(id, g[0])));
+
+const restByTypeMap = new Map();
+const restByType: any[] = [];
+for (const sg of restList) {
+  if (!restByTypeMap.has(sg.nodeId)) {
+    const item = { nodeId: sg.nodeId, instances: [] };
+    restByTypeMap.set(sg.nodeId, item);
+    restByType.push(item);
+  }
+  restByTypeMap.get(sg.nodeId).instances.push(sg);
+}
+
+const cellMap = new Map();
+const cellOrder: string[] = [];
+restByType.forEach((sgType: any) => {
+  const key = nodeToCell.get(sgType.nodeId) || sgType.nodeId;
+  if (!cellMap.has(key)) {
+    cellMap.set(key, []);
+    cellOrder.push(key);
+  }
+  cellMap.get(key).push(sgType);
+});
+
+cellOrder.sort((a, b) => {
+  const ai = SG_ORDER.indexOf(a);
+  const bi = SG_ORDER.indexOf(b);
+  return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+});
+
+const hasTimeline = Boolean(subDeadlineD || infoDeadlineD || durationStart || durationEnd);
+const hasPlacePerf = placePerf.length > 0;
+const hasSubmission = Boolean(submissionType || submitUrl || langs.length || (gpa && !isNullValue(gpa)) || (sme && !isNullValue(sme)));
+const hasRightCol = hasPlacePerf || hasTimeline || hasSubmission;
+
+const noGrid = new Set([
+  'ND-LotAwardCriterion', 'ND-LotsGroupAwardCriterion',
+  'ND-SelectionCriteria',
+  'ND-EEDProcurementDetailsLot', 'ND-EEDProcurementDetailsLotResult',
+]);
+
+const lotTlItems = [
+  infoDeadlineD && { label: 'Informacijos pateikimo terminas', date: infoDeadlineD, time: infoDeadlineT },
+  subDeadlineD && { label: 'Pasiūlymų terminas', date: subDeadlineD, time: subDeadlineT },
+  (durationStart || durationEnd) && { label: 'Trukmė', date: durationEnd || durationStart, text: [formatDate(durationStart), formatDate(durationEnd)].filter(Boolean).join(' – ') },
+].filter(Boolean);
+
+function isPast(d?: string) {
+  return Boolean(d && new Date(`${d}T00:00:00`).getTime() < Date.now());
+}
+---
+
+<div class="card">
+  <div class="card-header">
+    <h3>{title}{internalId && totalGroups > 1 && <span class="text-muted text-sm"> ({internalId})</span>}</h3>
+    {value && <span class="amount">{value.values[0]}</span>}
+  </div>
+  <div class="card-body">
+    {hasRightCol ? (
+      <div class="grid-2">
+        <div>
+          {(contractType || otherObjects) && <p class="text-xs text-muted mb-2">{[contractType, otherObjects].filter(Boolean).join(' · ')}</p>}
+          {description && <p class="text-sm mb-3">{description}</p>}
+          {(cpv || quantity) && (
+            <dl class="kv-list mb-0">
+              {quantity && <><dt>Kiekis</dt><dd>{quantity}</dd></>}
+              {cpv && <><dt>BVPŽ</dt><dd class="font-medium">{cpvLabel || cpvCode}{cpvLabel && <span class="text-muted font-normal text-xs"> {cpvCode}</span>}</dd></>}
+            </dl>
+          )}
+        </div>
+        <div class="flex flex-col gap-3">
+          {hasPlacePerf && (
+            <div>
+              <p class="section-title">Vykdymo vieta</p>
+              {placePerf.map((sg, i) => (
+                <>
+                  {i > 0 && <hr class="my-2 border-0 border-t border-light-gray" />}
+                  <TedSubgroup sg={sg} shortUrl={shortUrl} />
+                </>
+              ))}
+            </div>
+          )}
+          {hasTimeline && (
+            <div>
+              <p class="section-title">Terminai ir trukmė</p>
+              <Timeline>
+                {lotTlItems.map((item, i) => {
+                  const past = isPast(item.date);
+                  const nextPast = lotTlItems[i + 1] && isPast((lotTlItems[i + 1] as any).date);
+                  return (
+                    <TimelineItem active={past} lineActive={Boolean(nextPast)}>
+                      <div class="text-xs text-muted">
+                        {item.text || formatDate(item.date)}
+                        {item.time && <span class="font-normal text-xs text-muted"> {item.time.replace(/\+.*$/, '')}</span>}
+                      </div>
+                      <span>{item.label}</span>
+                    </TimelineItem>
+                  );
+                })}
+              </Timeline>
+            </div>
+          )}
+          {hasSubmission && (
+            <div>
+              <p class="section-title">Pasiūlymai</p>
+              <dl class="kv-list mb-0">
+                {submissionType && <><dt>Pateikimo būdas</dt><dd>{submissionType}</dd></>}
+                {submitUrl && <><dt>Pateikimo nuoroda</dt><dd>{submitUrl.values.map((v) => <a href={v} target="_blank" rel="noopener">{shortUrl(v)}</a>)}</dd></>}
+                {langs.length > 0 && <><dt>Kalbos</dt><dd>{langs.join(', ')}</dd></>}
+                {gpa && !isNullValue(gpa) && <><dt>GPA</dt><dd>{gpa}</dd></>}
+                {sme && !isNullValue(sme) && <><dt>MVĮ</dt><dd>{sme}</dd></>}
+              </dl>
+            </div>
+          )}
+        </div>
+      </div>
+    ) : (
+      <div>
+        {(contractType || otherObjects) && <p class="text-xs text-muted mb-2">{[contractType, otherObjects].filter(Boolean).join(' · ')}</p>}
+        {description && <p class="text-sm mb-3">{description}</p>}
+        {(cpv || quantity) && (
+          <dl class="kv-list mb-0">
+            {quantity && <><dt>Kiekis</dt><dd>{quantity}</dd></>}
+            {cpv && <><dt>BVPŽ</dt><dd class="font-medium">{cpvLabel || cpvCode}{cpvLabel && <span class="text-muted font-normal text-xs"> {cpvCode}</span>}</dd></>}
+          </dl>
+        )}
+      </div>
+    )}
+
+    {(procedureFields.length > 0 || participationFields.length > 0) && (
+      <div style="margin-top:16px;padding-top:16px;border-top:var(--border)">
+        <div class={(procedureFields.length && participationFields.length) ? 'grid-2' : ''}>
+          {procedureFields.length > 0 && (
+            <div>
+              <p class="section-title">Procedūra</p>
+              <dl class="kv-list">
+                {procedureFields.map((entry) => <><dt>{entry[0]}</dt><dd>{entry[1]}</dd></>)}
+              </dl>
+            </div>
+          )}
+          {participationFields.length > 0 && (
+            <div>
+              <p class="section-title">Dalyvavimo sąlygos</p>
+              <dl class="kv-list">
+                {participationFields.map((entry) => <><dt>{entry[0]}</dt><dd>{entry[1]}</dd></>)}
+              </dl>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+
+    {cellOrder.length > 0 && (
+      <div style="margin-top:16px;padding-top:16px;border-top:var(--border)">
+        <div class={cellOrder.length > 1 ? `grid-${Math.min(cellOrder.length, 3)}` : ''}>
+          {cellOrder.map((cellKey) => (
+            <div>
+              {cellMap.get(cellKey).map((sgType) => {
+                const useGrid = !noGrid.has(sgType.nodeId) && sgType.instances.length > 1;
+                const useDivider = ['ND-SelectionCriteria', 'ND-LotAwardCriterion', 'ND-LotsGroupAwardCriterion'].includes(sgType.nodeId);
+                return (
+                  <>
+                    <p class="section-title">{subgroupTitles[sgType.nodeId] || sgType.nodeId}</p>
+                    {useGrid ? (
+                      <div class={`grid-${Math.min(sgType.instances.length, 3)}`}>
+                        {sgType.instances.map((sg, i) => (
+                          <>
+                            {useDivider && i > 0 && <hr class="my-2 border-0 border-t border-light-gray" />}
+                            <TedSubgroup sg={sg} shortUrl={shortUrl} />
+                          </>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        {sgType.instances.map((sg, i) => (
+                          <>
+                            {useDivider && i > 0 && <hr class="my-2 border-0 border-t border-light-gray" />}
+                            <TedSubgroup sg={sg} shortUrl={shortUrl} />
+                          </>
+                        ))}
+                      </>
+                    )}
+                  </>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+</div>

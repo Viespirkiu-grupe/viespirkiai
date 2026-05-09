@@ -1,0 +1,12 @@
+---
+import EmptyState from '@design-system/components/EmptyState.astro';
+/**
+ * 451 Unavailable For Legal Reasons body fragment.
+ *
+ * Rendered inside the parent page's `<Layout>` — does not embed its own.
+ * The page is responsible for setting `Astro.response.status = 451`.
+ */
+---
+<main>
+  <EmptyState title="Failas pašalintas" titleTag="h1" message="451 Unavailable For Legal Reasons — kol kas neturime daugiau informacijos." messageClass="text-muted text-sm" />
+</main>

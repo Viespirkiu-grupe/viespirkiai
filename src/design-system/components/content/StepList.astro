@@ -1,0 +1,23 @@
+---
+interface StepItem {
+  title: string;
+  body: string[];
+  mutedHtml?: string;
+}
+
+interface Props {
+  items: StepItem[];
+}
+
+const { items } = Astro.props;
+---
+
+<ol class="mt-4">
+  {items.map((item) => (
+    <li class="mb-4">
+      <h4>{item.title}</h4>
+      {item.body.map((paragraph) => <p set:html={paragraph} />)}
+      {item.mutedHtml && <p class="text-muted text-sm"><em set:html={item.mutedHtml} /></p>}
+    </li>
+  ))}
+</ol>

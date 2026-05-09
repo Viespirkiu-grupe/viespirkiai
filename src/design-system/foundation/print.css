@@ -1,0 +1,11 @@
+@layer base {
+  @media print {
+    .action-bar {
+      display: none !important;
+    }
+
+    .modal-backdrop {
+      display: none !important;
+    }
+  }
+}

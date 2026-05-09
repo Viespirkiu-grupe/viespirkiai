@@ -1,0 +1,30 @@
+---
+import SutartisCompactRow from './SutartisCompactRow.astro';
+import CollapsibleListSection from '@design-system/components/CollapsibleListSection.astro';
+
+interface Props {
+  sutartys: any[] | null | undefined;
+  maxVisible?: number;
+}
+
+const { sutartys, maxVisible = 5 } = Astro.props;
+const list = sutartys ?? [];
+const visible = list.slice(0, maxVisible);
+const hidden = list.slice(maxVisible);
+---
+
+<CollapsibleListSection
+  title="Panašios sutartys"
+  emptyText="Panašių sutarčių nerasta."
+  totalCount={list.length}
+  hiddenCount={hidden.length}
+  showTotalBadge={true}
+  listClass="flex flex-col mt-4"
+  hiddenListClass="flex flex-col"
+  bordered={false}
+>
+  {visible.map((item: any) => <SutartisCompactRow item={item} />)}
+  <Fragment slot="hidden">
+    {hidden.map((item: any) => <SutartisCompactRow item={item} />)}
+  </Fragment>
+</CollapsibleListSection>

@@ -1,0 +1,12 @@
+---
+import EmptyState from '@design-system/components/EmptyState.astro';
+import Layout from '../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../lib/failai.ts';
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+---
+<Layout pageTitle="Puslapis nerastas" pageDescription="" pageImage="" colorScheme={colorScheme} font={font}>
+  <main>
+    <EmptyState icon="404" title="Puslapis nerastas" message="Puslapis kurio ieškote nerastas." />
+  </main>
+</Layout>

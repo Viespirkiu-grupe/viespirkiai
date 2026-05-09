@@ -1,0 +1,23 @@
+---
+interface Props {
+  pirkimas: any;
+}
+const { pirkimas } = Astro.props;
+const t = pirkimas.turinys || {};
+---
+
+<section>
+  <h2>Pirkimo vykdytojas</h2>
+  <h3>
+    {pirkimas.jarKodas
+      ? <a href={`/asmuo/${pirkimas.jarKodas}`}>{pirkimas.vykdytojoPavadinimas || pirkimas.pirkimoVykdytojas}</a>
+      : (pirkimas.vykdytojoPavadinimas || pirkimas.pirkimoVykdytojas)}
+  </h3>
+  {pirkimas.jarKodas && <span class="text-muted">{pirkimas.jarKodas}</span>}
+  {t.kontaktinisAsmuo && <p class="text-muted text-sm mt-2">{t.kontaktinisAsmuo}</p>}
+  {t.pirkimuSuvestinesNuoroda && (
+    <p class="text-sm mt-2">
+      <a href={`https://viesiejipirkimai.lt/epps/app/viewPublication.do?selectedId=${t.pirkimuSuvestinesNuoroda}`} target="_blank">↗ Pirkimų suvestinė</a>
+    </p>
+  )}
+</section>

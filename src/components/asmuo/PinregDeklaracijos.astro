@@ -1,0 +1,83 @@
+---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+
+const { asmuo } = Astro.props;
+const pinreg = asmuo.pinreg;
+if (!pinreg) return;
+const anyTruncated =
+  pinreg.counts.rysiaiSuJa > pinreg.rysiaiSuJa.length ||
+  pinreg.counts.darbovietes > pinreg.darbovietes.length ||
+  pinreg.counts.sutuoktiniuDarbovietes > pinreg.sutuoktinioDarbovietes.length;
+---
+
+<div class="page-section mb-10" id="pinreg">
+  <h2><a href="#pinreg" class="no-style">Privačių interesų deklaracijos</a></h2>
+  {anyTruncated && (
+    <p class="text-muted text-sm mb-4">
+      Rodomos tik po {pinreg.limit} deklaracijos.
+      <a href="?pinregLimit=max#pinreg">Rodyti visas ({pinreg.total})</a>
+    </p>
+  )}
+  <div class="grid-3">
+    <div>
+      <h3 class="text-sm font-bold mb-3">Ryšiai su juridiniais asmenimis</h3>
+      {pinreg.rysiaiSuJa.length > 0 ? (
+        <div class="result-list">
+          {pinreg.rysiaiSuJa.map((r: any) => (
+            <ResultCardShell clickable={true}>
+              <dl slot="meta" class="result-card-meta">
+                <div><dt class="sr-only">Nuo</dt><dd>Nuo {r.rysioPradzia}</dd></div>
+                <div><dt class="sr-only">Kas</dt><dd>{r.kienoRysys && r.kienoRysys[0].toUpperCase() + r.kienoRysys.slice(1).toLowerCase()}</dd></div>
+                <div><dt class="sr-only">Pateikta</dt><dd>{new Date(r.pateikimoData).toLocaleString('lt-LT')}</dd></div>
+              </dl>
+              <h3 slot="title" class="result-card-title">
+                <a href={`https://pinreg.vtek.lt/app/pid-perziura/${r.uuid}`}>{r.asmuo}</a>
+              </h3>
+              <div slot="footer" class="result-card-footer"><span>{r.rysioPobudzioPavadinimas}</span></div>
+            </ResultCardShell>
+          ))}
+        </div>
+      ) : <p class="text-muted text-sm">Nėra duomenų</p>}
+    </div>
+
+    <div>
+      <h3 class="text-sm font-bold mb-3">Darbovietės</h3>
+      {pinreg.darbovietes.length > 0 ? (
+        <div class="result-list">
+          {pinreg.darbovietes.map((d: any) => (
+            <ResultCardShell clickable={true}>
+              <dl slot="meta" class="result-card-meta">
+                <div><dt class="sr-only">Nuo</dt><dd>Nuo {d.rysioPradzia}</dd></div>
+                <div><dt class="sr-only">Pateikta</dt><dd>{new Date(d.pateikimoData).toLocaleString('lt-LT')}</dd></div>
+              </dl>
+              <h3 slot="title" class="result-card-title">
+                <a href={`https://pinreg.vtek.lt/app/pid-perziura/${d.uuid}`}>{d.asmuo}</a>
+              </h3>
+              <div slot="footer" class="result-card-footer"><span>{d.pareigos}</span></div>
+            </ResultCardShell>
+          ))}
+        </div>
+      ) : <p class="text-muted text-sm">Nėra duomenų</p>}
+    </div>
+
+    <div>
+      <h3 class="text-sm font-bold mb-3">Sutuoktinių darbovietės</h3>
+      {pinreg.sutuoktinioDarbovietes.length > 0 ? (
+        <div class="result-list">
+          {pinreg.sutuoktinioDarbovietes.map((d: any) => (
+            <ResultCardShell clickable={true}>
+              <dl slot="meta" class="result-card-meta">
+                <div><dt class="sr-only">Nuo</dt><dd>Nuo {d.rysioPradzia}</dd></div>
+                <div><dt class="sr-only">Pateikta</dt><dd>{new Date(d.pateikimoData).toLocaleString('lt-LT')}</dd></div>
+              </dl>
+              <h3 slot="title" class="result-card-title">
+                <a href={`https://pinreg.vtek.lt/app/pid-perziura/${d.uuid}`}>{d.asmuo} – {d.sutuoktinis}</a>
+              </h3>
+              <div slot="footer" class="result-card-footer"><span>{d.pareigos}</span></div>
+            </ResultCardShell>
+          ))}
+        </div>
+      ) : <p class="text-muted text-sm">Nėra duomenų</p>}
+    </div>
+  </div>
+</div>

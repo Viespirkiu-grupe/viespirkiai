@@ -1,0 +1,39 @@
+---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import ResultList from '@design-system/components/ResultList.astro';
+
+interface ResultCardItem {
+  title: string;
+  href: string;
+  meta?: string[];
+}
+
+interface Props {
+  title?: string;
+  items: ResultCardItem[];
+  titleTag?: 'h2' | 'h3';
+}
+
+const { title, items, titleTag = 'h2' } = Astro.props;
+const TitleTag = titleTag;
+---
+
+<section>
+  {title && <TitleTag>{title}</TitleTag>}
+
+  <ResultList>
+    {items.map((item) => (
+      <ResultCardShell clickable={true}>
+        {item.meta && item.meta.length > 0 && (
+          <div slot="meta" class="result-card-meta">
+            {item.meta.map((value) => <span>{value}</span>)}
+          </div>
+        )}
+
+        <h3 slot="title" class="result-card-title">
+          <a href={item.href}>{item.title}</a>
+        </h3>
+      </ResultCardShell>
+    ))}
+  </ResultList>
+</section>

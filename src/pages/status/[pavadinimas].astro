@@ -1,0 +1,245 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Chart from '@design-system/components/charts/Chart.astro';
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import { getColorScheme, getFont } from '../../lib/failai.js';
+import { postgres } from '@/postgres/postgres.js';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const { pavadinimas: rawPavadinimas } = Astro.params;
+let pavadinimas = rawPavadinimas || '';
+const isJson = pavadinimas.endsWith('.json');
+if (isJson) pavadinimas = pavadinimas.slice(0, -5);
+
+if (pavadinimas !== 'eviesiejipirkimai.lt') {
+  return Astro.redirect('/');
+}
+
+function toIsoDay(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const [apjungtiRes, intervalaiRes, allTimestampsResult, paskutinisGedimasRes] = await Promise.all([
+  postgres.query(`
+    WITH ordered AS (
+      SELECT id, "timestamp", tipas,
+        "timestamp" - LAG("timestamp") OVER (PARTITION BY tipas ORDER BY "timestamp") AS delta
+      FROM public."eviesiejipirkimaiGedimai"
+    ),
+    groups AS (
+      SELECT *,
+        SUM(CASE WHEN delta IS NULL OR delta > INTERVAL '5 minutes' THEN 1 ELSE 0 END)
+          OVER (PARTITION BY tipas ORDER BY "timestamp") AS grp
+      FROM ordered
+    ),
+    intervals AS (
+      SELECT tipas, MIN("timestamp") AS start_time, MAX("timestamp") AS end_time,
+        MAX("timestamp") - MIN("timestamp") AS duration,
+        COUNT(*) AS unmerged_count
+      FROM groups
+      GROUP BY tipas, grp
+    )
+    SELECT
+      start_time::date AS day,
+      SUM(duration) AS total_duration,
+      COUNT(*) AS merged_incidents,
+      SUM(unmerged_count) AS unmerged_events
+    FROM intervals
+    GROUP BY day
+    ORDER BY day DESC`),
+  postgres.query(`
+    WITH ordered AS (
+      SELECT id, "timestamp", tipas,
+        "timestamp" - LAG("timestamp") OVER (PARTITION BY tipas ORDER BY "timestamp") AS delta
+      FROM public."eviesiejipirkimaiGedimai"
+    ),
+    groups AS (
+      SELECT *,
+        SUM(CASE WHEN delta IS NULL OR delta > INTERVAL '5 minutes' THEN 1 ELSE 0 END)
+          OVER (PARTITION BY tipas ORDER BY "timestamp") AS grp
+      FROM ordered
+    ),
+    intervals AS (
+      SELECT tipas, MIN("timestamp") AS start_time, MAX("timestamp") AS end_time
+      FROM groups
+      GROUP BY tipas, grp
+    )
+    SELECT tipas, start_time, end_time FROM intervals ORDER BY start_time`),
+  postgres.query(
+    `SELECT "timestamp"::date AS day, MAX("timestamp") AS "timestamp"
+     FROM public."eviesiejipirkimaiGedimai"
+     GROUP BY "timestamp"::date
+     ORDER BY day DESC`,
+  ),
+  postgres.query(
+    `SELECT "timestamp" FROM public."eviesiejipirkimaiGedimai" ORDER BY "timestamp" DESC LIMIT 1`
+  ),
+]);
+
+const paskutinisGedimas = paskutinisGedimasRes.rows[0] ?? null;
+if (paskutinisGedimas) {
+  paskutinisGedimas.per5min = Date.now() - new Date(paskutinisGedimas.timestamp).getTime() <= 5 * 60 * 1000;
+}
+
+const allTimestamps: string[] = allTimestampsResult.rows.map((r: any) => r.timestamp);
+const intervalai: any[] = intervalaiRes.rows;
+const apjungti: any[] = apjungtiRes.rows;
+
+const byDay = new Map<string, string[]>();
+for (const ts of allTimestamps) {
+  const day = toIsoDay(new Date(ts));
+  if (!byDay.has(day)) byDay.set(day, []);
+  byDay.get(day)!.push(ts);
+}
+
+const intervalsByDay = new Map<string, any[]>();
+for (const i of intervalai) {
+  const day = toIsoDay(new Date(i.start_time));
+  if (!intervalsByDay.has(day)) intervalsByDay.set(day, []);
+  intervalsByDay.get(day)!.push(i);
+}
+
+for (const item of apjungti) {
+  const day = toIsoDay(new Date(item.day));
+  item.timestamps = byDay.get(day) ?? [];
+  item.intervals = intervalsByDay.get(day) ?? [];
+}
+
+function todayLT(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Vilnius',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+if (isJson) {
+  return new Response(JSON.stringify({ apjungti }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Pre-build all chart configs server-side for client use
+const nowTimestamp = Date.now();
+const today = todayLT();
+const chartConfigs = apjungti.map((diena: any) => {
+  const dayStr: string = toIsoDay(new Date(diena.day));
+  const [year, month, dayNum] = dayStr.split('-').map(Number);
+  const annotations = (diena.intervals as any[]).map((i: any) => ({
+    x: new Date(i.start_time).getTime(),
+    x2: new Date(i.end_time).getTime(),
+    fillColor: '#FF4560',
+    borderColor: '#777',
+  }));
+
+  if (today === dayStr) {
+    annotations.push({
+      x: nowTimestamp,
+      label: { text: 'Dabar', style: { color: '#000' } },
+      borderColor: '#777',
+    });
+  }
+
+  return {
+    id: `Gedimai${dayStr.replaceAll('-', '')}Diagrama`,
+    labels: (diena.timestamps as string[]).map((t: string) => new Date(t + 'Z').getTime()),
+    series: (diena.timestamps as string[]).map(() => 1),
+    flags: ['xAxisHourMinute', 'yAxisNoLabel', 'noLine', 'statusTimeline'],
+    customOptions: {
+      chart: { height: 200 },
+      annotations: { xaxis: annotations },
+      xaxis: {
+        min: Date.UTC(year, month - 1, dayNum, 0, 0, 0),
+        max: Date.UTC(year, month - 1, dayNum, 23, 59, 59),
+      },
+    },
+  };
+});
+
+const chartEntries = apjungti.map((diena: any, index: number) => ({
+  diena,
+  chartConfig: chartConfigs[index],
+}));
+
+function formatDuration(d: any): string {
+  if (!d) return '0s';
+  const parts = [];
+  if (d.hours) parts.push(`${d.hours}h`);
+  if (d.minutes) parts.push(`${d.minutes}min`);
+  if (d.seconds) parts.push(`${d.seconds}s`);
+  return parts.length ? parts.join(' ') : '0s';
+}
+---
+
+<Layout
+  pageTitle="Ar veikia eviesiejipirkimai.lt?"
+  pageDescription="Išorinių sistemų prieinamumo stebėjimas"
+  pageImage="https://viespirkiai.org/status/eviesiejipirkimai.lt.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <div class="page-header justify-center mb-7">
+      <div class="text-center">
+        <h1 class="mb-3">Ar veikia eviesiejipirkimai.lt?</h1>
+        {paskutinisGedimas?.per5min ? (
+          <>
+            <h2 class="text-danger text-3xl mb-2">Tikriausiai NE</h2>
+            <p class="text-muted"><em>Per paskutines 5min fiksavome sutrikimų</em></p>
+          </>
+        ) : (
+          <>
+            <h2 class="text-success text-3xl mb-2">Tikriausiai TAIP</h2>
+            <p class="text-muted"><em>Per paskutines 5min sutrikimų nefiksavome</em></p>
+          </>
+        )}
+      </div>
+    </div>
+
+    <section class="page-section">
+      <h2>Istoriniai duomenys</h2>
+      <h3 class="mt-4 mb-2">Skaičiavimo metodologija</h3>
+      <p class="text-muted text-sm">
+        Sistemos veikimas yra tikrinamas bent kas 2 minutes.
+        Jeigu pateikiama klaida (šiuo atveju užrašas „Vyksta sistemos atnaujinimo darbai"), tada tai yra fiksuojama duomenų bazėje.
+        Kai tarp fiksavimų yra mažiau nei 5 minutės, jie yra apjungiami ir skaičiuojama trukmė (gali būti apjungti ir keli jeigu kartojasi).
+        Laikoma, kad gedimas prasidėjo gavus pirmąjį klaidos pranešimą ir pasibaigė iškart po paskutinio (sistemos naudai).
+      </p>
+    </section>
+
+    {chartEntries.length > 0 && (
+      <div class="grid-2">
+        {chartEntries.map(({ diena, chartConfig }: any) => (
+          <ResultCardShell>
+            <div slot="meta" class="result-card-meta">
+              <span>{toIsoDay(new Date(diena.day))}</span>
+              <span>{Number(diena.merged_incidents)} {Number(diena.merged_incidents) === 1 ? 'gedimas' : 'gedimai'}</span>
+              <span>{Number(diena.unmerged_events)} {Number(diena.unmerged_events) === 1 ? 'fiksavimas' : 'fiksavimai'}</span>
+            </div>
+
+            <h3 slot="title" class="result-card-title">
+              Neveikė bent {formatDuration(diena.total_duration)}
+            </h3>
+
+            <Chart
+              id={chartConfig.id}
+              type="line-datetime"
+              labels={chartConfig.labels}
+              series={chartConfig.series}
+              flags={chartConfig.flags}
+              customOptions={chartConfig.customOptions}
+              framed={false}
+              wrapperClass=""
+              chartClass="mt-3 w-full"
+              heightClass="h-[200px]"
+            />
+          </ResultCardShell>
+        ))}
+      </div>
+    )}
+
+  </main>
+</Layout>

@@ -1,0 +1,32 @@
+---
+import Timeline from '@design-system/components/Timeline.astro';
+import TimelineItem from '@design-system/components/TimelineItem.astro';
+
+interface Props {
+  items: { date: any; label: string }[];
+}
+const { items } = Astro.props;
+
+const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Vilnius' }));
+const isPast = (dateStr: any) => {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  return !isNaN(d.getTime()) && d < now;
+};
+---
+
+<section>
+  <h2>Terminai</h2>
+  <Timeline>
+    {items.map((item, i) => {
+      const past = isPast(item.date);
+      const nextPast = i + 1 < items.length && isPast(items[i + 1].date);
+      return (
+        <TimelineItem active={past} lineActive={nextPast}>
+          <div class="text-xs text-muted">{String(item.date).slice(0, 16).replace('T', ' ')}</div>
+          <strong>{item.label}</strong>
+        </TimelineItem>
+      );
+    })}
+  </Timeline>
+</section>

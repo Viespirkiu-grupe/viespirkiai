@@ -8,8 +8,8 @@ Daugiau informacijos el. paštu viespirkiai@viespirkiai.org
 
 ## Tailwind CSS
 
-Tailwind v4 is set up as an additional stylesheet and is generated into `public/dist/tailwind.css`.
-The existing legacy CSS is still active and loaded after Tailwind.
+Astro port (`src/`) now uses Tailwind v4 directly through Astro/Vite.
+The main stylesheet entrypoint is `src/styles/global.css`, which imports Tailwind and the design-system foundation CSS.
 
 ### Documentation
 
@@ -17,20 +17,19 @@ The existing legacy CSS is still active and loaded after Tailwind.
 
 ### Commands
 
-- Build once:
+- Astro development:
 
 ```bash
-npm run build:tailwind
+npm run dev:astro
 ```
 
-- Watch during development:
+- Astro production build:
 
 ```bash
-npm run watch:tailwind
+npm run build:astro
 ```
 
 ### Project setup files
 
-- PostCSS config: `postcss.config.cjs`
-- Tailwind entry file: `styles/tailwind.css` — imports, `@theme`, and `@source` directives
-- Custom component .css files stay at `styles` folder
+- Astro Tailwind entry file: `src/styles/global.css`
+- Astro/Vite config: `astro.config.mjs`

@@ -1,0 +1,136 @@
+---
+import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import Layout from '../../../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../../../lib/failai.js';
+import { postgres } from '@/postgres/postgres.js';
+
+interface OcrNode {
+  id: number;
+  nuskaitytiDokumentai: number;
+  viesasPavadinimas: string;
+  pavadinimas: string;
+  rezervacijos: number;
+  results: number;
+  pages: number;
+  words: number;
+}
+
+interface OcrStatDay {
+  date: string;
+  results: number;
+  pages: number;
+  words: number;
+}
+
+const { id } = Astro.params;
+const nodeId = parseInt(id || '0', 10);
+
+if (isNaN(nodeId)) {
+  return Astro.redirect('/failai/ocr');
+}
+
+const [nuskaitytojasRes, ocrStatsDayRes] = await Promise.all([
+  postgres.query(
+    `SELECT n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos",
+      COALESCE(SUM(s.results), 0) AS "results", COALESCE(SUM(s.pages), 0) AS "pages", COALESCE(SUM(s.words), 0) AS "words"
+     FROM "ocrNuskaitytojai" n
+     LEFT JOIN "failaiOcrRezultataiStatsDayNode" s ON s.node = n.pavadinimas
+     WHERE n.id = $1
+     GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos"`,
+    [nodeId],
+  ),
+  postgres.query(
+    `SELECT s.* FROM "failaiOcrRezultataiStatsDayNode" s
+     JOIN "ocrNuskaitytojai" n ON n.pavadinimas = s.node
+     WHERE n.id = $1
+     ORDER BY s.date DESC`,
+    [nodeId],
+  ),
+]);
+
+if (!nuskaitytojasRes.rows.length) {
+  return Astro.redirect('/failai/ocr');
+}
+
+const nuskaitytojas = nuskaitytojasRes.rows[0] as OcrNode;
+const ocrStatsDay = ocrStatsDayRes.rows as OcrStatDay[];
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const ocrLabels = ocrStatsDay.map(item => item.date);
+const ocrResults = ocrStatsDay.map(item => item.results);
+const ocrResultsPages = ocrStatsDay.map(item => item.pages);
+const ocrResultsWords = ocrStatsDay.map(item => item.words);
+---
+
+<Layout
+  pageTitle={`OCR nuskaitytojas – ${nuskaitytojas.viesasPavadinimas}`}
+  pageDescription="OCR nuskaitytuvo statistika"
+  pageImage="https://viespirkiai.org/failai.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+
+    <PageHeader>
+      <Fragment>
+        <a href="/failai/ocr" class="breadcrumb-link">OCR būsena</a>
+        <span class="breadcrumb-sep">›</span>
+        {nuskaitytojas.viesasPavadinimas}
+      </Fragment>
+    </PageHeader>
+
+    <div class="page-section">
+      <h2 class="mb-3">Nuskaitytojas</h2>
+      <div class="card max-w-[360px]">
+        <div class="card-body">
+          <KeyValueList>
+            <dt>Dokumentai</dt>
+            <dd><span class="cell-mono">{Number(nuskaitytojas.nuskaitytiDokumentai).toLocaleString('lt-LT')}</span></dd>
+            <dt>Puslapiai</dt>
+            <dd><span class="cell-mono">{Number(nuskaitytojas.pages).toLocaleString('lt-LT')}</span></dd>
+            <dt>Žodžiai</dt>
+            <dd><span class="cell-mono">{Number(nuskaitytojas.words).toLocaleString('lt-LT')}</span></dd>
+            <dt>Rezervacijos</dt>
+            <dd><span class="cell-mono">{Number(nuskaitytojas.rezervacijos).toLocaleString('lt-LT')}</span></dd>
+          </KeyValueList>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <LineDatetimeChart
+        id="ocrStatsDayDiagrama"
+        title="Rezultatų skaičius"
+        anchor="rezultatai"
+        labels={ocrLabels}
+        series={ocrResults}
+        wrapperClass="page-section flex flex-col min-h-[350px]"
+        heightClass="h-[350px]"
+      />
+
+      <LineDatetimeChart
+        id="ocrStatsDayPagesDiagrama"
+        title="Puslapių skaičius"
+        anchor="puslapiai"
+        labels={ocrLabels}
+        series={ocrResultsPages}
+        wrapperClass="page-section flex flex-col min-h-[350px]"
+        heightClass="h-[350px]"
+      />
+
+      <LineDatetimeChart
+        id="ocrStatsDayWordsDiagrama"
+        title="Žodžių skaičius"
+        anchor="zodziai"
+        labels={ocrLabels}
+        series={ocrResultsWords}
+        wrapperClass="page-section flex flex-col min-h-[350px]"
+        heightClass="h-[350px]"
+      />
+    </div>
+  </main>
+</Layout>

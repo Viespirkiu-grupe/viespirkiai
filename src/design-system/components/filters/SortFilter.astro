@@ -1,0 +1,126 @@
+---
+import FilterGroup from './FilterGroup.astro';
+import SortToggle from '../inputs/SortToggle.astro';
+
+interface SortOption {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  options: SortOption[];
+  values: Record<string, any>;
+  defaultValue?: string;
+  legend?: string;
+  label?: string;
+  name?: string;
+  dirName?: string;
+  includeBlank?: boolean;
+}
+
+const {
+  options,
+  values,
+  defaultValue,
+  legend = 'Rikiavimas',
+  label = 'Rikiuoti pagal',
+  name = 'sort',
+  dirName = 'sortDir',
+  includeBlank = true,
+} = Astro.props;
+
+const current = values[name] ?? defaultValue ?? '';
+---
+
+<FilterGroup legend={legend} class="justify-start">
+  <div class="sort-filter-field">
+    <label class="sort-filter-label" for={name}>{label}</label>
+    <div class="sort-filter-group">
+      <select name={name} id={name} class="sort-filter-select">
+        <option value="" selected={!current}>{includeBlank ? '—' : options[0]?.label ?? '—'}</option>
+        {options.map((option) => (
+          <option value={option.value} selected={current === option.value}>{option.label}</option>
+        ))}
+      </select>
+      <div class="sort-filter-toggle">
+        <SortToggle fieldName={dirName} values={values} />
+      </div>
+    </div>
+    {!includeBlank && options.length > 0 && current === '' && (
+      <input type="hidden" name={name} value={options[0].value} />
+    )}
+  </div>
+</FilterGroup>
+
+<style>
+  .sort-filter-field {
+    margin-bottom: 0;
+  }
+
+  .sort-filter-label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .sort-filter-group {
+    display: flex;
+    align-items: stretch;
+    min-height: 42px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--white);
+  }
+
+  .sort-filter-select {
+    color-scheme: inherit;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 8px 40px 8px 12px;
+    border: 0;
+    border-right: var(--border);
+    border-radius: 0;
+    background-color: transparent;
+    background-image:
+      linear-gradient(45deg, transparent 50%, currentColor 50%),
+      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position:
+      calc(100% - 18px) calc(50% - 2px),
+      calc(100% - 13px) calc(50% - 2px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    color: var(--black);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    appearance: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+  }
+
+  .sort-filter-select option,
+  .sort-filter-select optgroup {
+    background: var(--white);
+    color: var(--black);
+  }
+
+  .sort-filter-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(15, 15, 15, 0.08);
+    position: relative;
+    z-index: 1;
+  }
+
+  .sort-filter-toggle {
+    flex-shrink: 0;
+    display: flex;
+  }
+
+  .sort-filter-toggle :global(.sort-toggle-btn) {
+    margin-left: 0;
+    border: 0;
+    border-radius: 0;
+  }
+</style>

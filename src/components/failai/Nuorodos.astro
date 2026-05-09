@@ -1,0 +1,15 @@
+---
+import ContactList from '@design-system/components/content/ContactList.astro';
+interface Props { links: { link: string; pages?: number[] }[]; title?: string; emptyText?: string; }
+const { links = [], title = 'Nuorodos', emptyText = 'Nerasta' } = Astro.props;
+---
+<ContactList
+  items={links.map(l => ({
+    value: l.link.length > 50 ? l.link.slice(0, 50) + '…' : l.link,
+    fullValue: l.link,
+    pages: l.pages,
+  }))}
+  title={title}
+  type="link"
+  emptyText={emptyText}
+/>

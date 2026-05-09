@@ -1,0 +1,31 @@
+---
+import FilterGroup from './FilterGroup.astro';
+import NumberInput from '../inputs/NumberInput.astro';
+
+interface Props {
+  legend: string;
+  nameFrom: string;
+  nameTo: string;
+  labelFrom?: string;
+  labelTo?: string;
+  placeholderFrom?: string;
+  placeholderTo?: string;
+  values: Record<string, any>;
+}
+
+const {
+  legend,
+  nameFrom,
+  nameTo,
+  labelFrom = 'Nuo',
+  labelTo = 'Iki',
+  placeholderFrom = '0',
+  placeholderTo = '∞',
+  values,
+} = Astro.props;
+---
+
+<FilterGroup legend={legend}>
+  <NumberInput label={labelFrom} name={nameFrom} placeholder={placeholderFrom} values={values} />
+  <NumberInput label={labelTo} name={nameTo} placeholder={placeholderTo} values={values} />
+</FilterGroup>

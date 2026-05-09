@@ -1,0 +1,49 @@
+---
+interface Props {
+  sutartis: any;
+}
+
+const { sutartis } = Astro.props;
+const hasMultipleTiekejai = sutartis.papildomiTiekejai && sutartis.papildomiTiekejai.length > 0;
+const showPatikslinimas = sutartis.tiekejasPatikslinimas && sutartis.tiekejasPatikslinimas !== sutartis.tiekejas;
+---
+
+<div class="mb-10">
+  <div class="grid-3">
+    <section>
+      <h2>Pirkėjas</h2>
+      <h3><a href={`/asmuo/${sutartis.perkanciosiosOrganizacijosKodas}`}>{sutartis.perkanciojiOrganizacija}</a></h3>
+      <span class="text-muted">{sutartis.perkanciosiosOrganizacijosKodas}</span>
+    </section>
+
+    <section>
+      {hasMultipleTiekejai ? (
+        <>
+          <h2>Tiekėjai</h2>
+          <div class="mb-3">
+            <h3><a href={`/asmuo/${sutartis.tiekejoKodas}`}>{sutartis.tiekejas}</a></h3>
+            <span class="text-muted">{sutartis.tiekejoKodas}</span>
+          </div>
+          {sutartis.papildomiTiekejai.map((t: string, i: number) => (
+            <div class="mt-3">
+              <h3><a href={`/asmuo/${sutartis.papildomiTiekejaiKodai[i]}`}>{t}</a></h3>
+              <span class="text-muted">{sutartis.papildomiTiekejaiKodai[i]}</span>
+            </div>
+          ))}
+        </>
+      ) : (
+        <>
+          <h2>Tiekėjas</h2>
+          {showPatikslinimas && <p class="text-muted text-sm mb-1">{sutartis.tiekejasPatikslinimas}</p>}
+          <h3><a href={`/asmuo/${sutartis.tiekejoKodas}`}>{sutartis.tiekejas}</a></h3>
+          {sutartis.tiekejasSalis && <p class="text-muted text-sm">{sutartis.tiekejasSalis}</p>}
+          <span class="text-muted">{sutartis.tiekejoKodas}</span>
+        </>
+      )}
+    </section>
+  </div>
+
+  <div class="mt-4">
+    <a href={`/?tiekejoKodas=${sutartis.tiekejoKodas}&perkanciosiosOrganizacijosKodas=${sutartis.perkanciosiosOrganizacijosKodas}`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti tarpusavio sutartis">↗ Tarpusavio sutartys</a>
+  </div>
+</div>

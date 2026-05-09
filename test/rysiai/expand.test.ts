@@ -1,0 +1,400 @@
+import { describe, it } from 'vitest';
+import assert from 'node:assert/strict';
+
+import {
+    formatContractValue,
+    wrapLabel,
+    personId,
+    mapPareigos,
+    mapRysioPobudis,
+    mapFormosKodas,
+    orgNode,
+    personNode,
+    contractNode,
+    procurementNode,
+    edge,
+    addNode,
+    addEdge,
+    addSpouseEdge,
+    buildPersonGraphFromRows,
+} from '@/modules/rysiai/expand';
+
+type NodeLike = { id: string; attributes: Record<string, unknown> };
+type EdgeLike = { id: string; source: string; target: string; attributes: Record<string, unknown> };
+
+describe('formatContractValue', () => {
+    it('returns empty string for null', () => assert.equal(formatContractValue(null), ''));
+    it('returns empty string for 0', () => assert.equal(formatContractValue(0), ''));
+    it('formats values below 1 000 as plain euros', () => assert.equal(formatContractValue(500), '€500'));
+    it('formats values in thousands as K', () => assert.equal(formatContractValue(2500), '€3K'));
+    it('formats values in millions as M with one decimal', () => assert.equal(formatContractValue(2500000), '€2.5M'));
+    it('rounds to nearest K', () => assert.equal(formatContractValue(1499), '€1K'));
+});
+
+describe('wrapLabel', () => {
+    it('returns empty string for null input', () => assert.equal(wrapLabel(null), ''));
+    it('leaves short names on one line', () => assert.equal(wrapLabel('UAB Regitra'), 'UAB Regitra'));
+    it('wraps every 3 words by default', () => assert.equal(wrapLabel('A B C D E F'), 'A B C\nD E F'));
+    it('respects custom word-per-line count', () => assert.equal(wrapLabel('A B C D', 2), 'A B\nC D'));
+});
+
+describe('personId', () => {
+    it('lowercases both parts', () => assert.equal(personId('Jonas', 'Jonaitis'), 'person:jonas jonaitis'));
+    it('trims surrounding whitespace', () => assert.equal(personId(' Jonas ', ' Jonaitis '), 'person:jonas jonaitis'));
+    it('handles empty strings', () => assert.equal(personId('', ''), 'person:'));
+});
+
+describe('mapPareigos', () => {
+    it('returns Employment for null', () => assert.equal(mapPareigos(null), 'Employment'));
+    it('returns Employment for empty string', () => assert.equal(mapPareigos(''), 'Employment'));
+    it('returns Director for Direktorius', () => assert.equal(mapPareigos('Direktorius'), 'Director'));
+    it('returns Director for Direktorė', () => assert.equal(mapPareigos('Direktorė'), 'Director'));
+    it('returns Director for Generalinis direktorius', () => assert.equal(mapPareigos('Generalinis direktorius'), 'Director'));
+    it('returns Director for Vadovas', () => assert.equal(mapPareigos('Vadovas'), 'Director'));
+    it('returns Director for Pirmininkas', () => assert.equal(mapPareigos('Pirmininkas'), 'Director'));
+    it('returns Director for Prezidentas', () => assert.equal(mapPareigos('Prezidentas'), 'Director'));
+    it('returns Official for Pirkimo iniciatorius', () => assert.equal(mapPareigos('Pirkimo iniciatorius'), 'Official'));
+    it('returns Official for Ekspertas', () => assert.equal(mapPareigos('Ekspertas'), 'Official'));
+    it('returns Official for Prokuristas', () => assert.equal(mapPareigos('Prokuristas'), 'Official'));
+    it('returns Official for Kontrolierius', () => assert.equal(mapPareigos('Kontrolierius'), 'Official'));
+    it('returns Employment for Buhalterė', () => assert.equal(mapPareigos('Buhalterė'), 'Employment'));
+    it('returns Employment for unrecognised role', () => assert.equal(mapPareigos('Gydytojas'), 'Employment'));
+    it('is case-insensitive', () => assert.equal(mapPareigos('DIREKTORIUS'), 'Director'));
+});
+
+describe('mapRysioPobudis', () => {
+    it('returns Official for null', () => assert.equal(mapRysioPobudis(null), 'Official'));
+    it('returns Director for valdybos narys', () => assert.equal(mapRysioPobudis('Valdybos narys'), 'Director'));
+    it('returns Director for stebėtojų tarybos narys', () => assert.equal(mapRysioPobudis('Stebėtojų tarybos narys'), 'Director'));
+    it('returns Shareholder for akcininkas', () => assert.equal(mapRysioPobudis('Akcininkas'), 'Shareholder'));
+    it('returns Official for unrecognised relationship', () => assert.equal(mapRysioPobudis('Kita'), 'Official'));
+});
+
+describe('mapFormosKodas', () => {
+    it('returns PrivateCompany for null', () => assert.equal(mapFormosKodas(null), 'PrivateCompany'));
+    it('returns Institution for codes starting with 4–9', () => {
+        for (const k of ['4', '5', '6', '7', '8', '9']) assert.equal(mapFormosKodas(`${k}00`), 'Institution');
+    });
+    it('returns PublicCompany for codes starting with 2 or 3', () => {
+        assert.equal(mapFormosKodas('200'), 'PublicCompany');
+        assert.equal(mapFormosKodas('300'), 'PublicCompany');
+    });
+    it('returns PrivateCompany for codes starting with 1', () => assert.equal(mapFormosKodas('100'), 'PrivateCompany'));
+});
+
+describe('orgNode', () => {
+    it('produces id in org:<jarKodas> format', () => {
+        const n = orgNode('110078991', 'Regitra', null);
+        assert.equal(n.id, 'org:110078991');
+    });
+    it('sets entityType to OrganizationEntity', () => {
+        assert.equal(orgNode('1', 'X', null).attributes.entityType, 'OrganizationEntity');
+    });
+    it('falls back to jarKodas when pavadinimas is missing', () => {
+        const n = orgNode('123', null, null);
+        assert.equal(n.attributes.pavadinimas, '123');
+    });
+    it('defaults expanded to false', () => assert.equal(orgNode('1', 'X', null).attributes.expanded, false));
+    it('sets expanded when opts.expanded is true', () => assert.equal(orgNode('1', 'X', null, { expanded: true }).attributes.expanded, true));
+    it('maps formosKodas to orgType', () => assert.equal(orgNode('1', 'X', '400').attributes.orgType, 'Institution'));
+});
+
+describe('personNode', () => {
+    it('produces stable id via personId()', () => {
+        const n = personNode('Jonas', 'Jonaitis', null, null);
+        assert.equal(n.id, 'person:jonas jonaitis');
+    });
+    it('sets entityType to PersonEntity', () => {
+        assert.equal(personNode('J', 'P', null, null).attributes.entityType, 'PersonEntity');
+    });
+    it('trims vardas and pavarde', () => {
+        const n = personNode(' Jonas ', ' Jonaitis ', null, null);
+        assert.equal(n.attributes.vardas, 'Jonas');
+        assert.equal(n.attributes.pavarde, 'Jonaitis');
+    });
+    it('stores deklaracija in an array', () => {
+        assert.deepEqual(personNode('J', 'P', 'D1', null).attributes.deklaracijos, ['D1']);
+    });
+    it('stores empty deklaracijos array when null', () => {
+        assert.deepEqual(personNode('J', 'P', null, null).attributes.deklaracijos, []);
+    });
+});
+
+describe('contractNode', () => {
+    it('sets entityType to ContractEntity', () => {
+        assert.equal(contractNode('abc123', 'Sutarties pavadinimas', 1000).attributes.entityType, 'ContractEntity');
+    });
+    it('id is contract:<sutartiesUnikalusId>', () => {
+        assert.equal(contractNode('abc123', 'Pavadinimas', 5000).id, 'contract:abc123');
+    });
+    it('label is wrapped first 9 words of pavadinimas', () => {
+        const title = 'Vienas Du Trys Keturi Penki Šeši Septyni Aštuoni Devyni Dešimt';
+        const n = contractNode('x1', title, 1000);
+        const expected = wrapLabel('Vienas Du Trys Keturi Penki Šeši Septyni Aštuoni Devyni');
+        assert.equal(n.attributes.label, expected);
+    });
+    it('label falls back to "Sutartis" when pavadinimas is null', () => {
+        assert.equal(contractNode('x1', null, 0).attributes.label, 'Sutartis');
+    });
+    it('label falls back to "Sutartis" when pavadinimas is empty string', () => {
+        assert.equal(contractNode('x1', '', 0).attributes.label, 'Sutartis');
+    });
+    it('stores full pavadinimas in attributes (not just 9 words)', () => {
+        const long = 'A B C D E F G H I J K L';
+        const n = contractNode('x2', long, 500);
+        assert.equal(n.attributes.pavadinimas, long);
+    });
+    it('stores verte in attributes', () => {
+        assert.equal(contractNode('x3', 'Test', 99000).attributes.verte, 99000);
+    });
+    it('expanded is false by default', () => {
+        assert.equal(contractNode('x4', 'Test', 0).attributes.expanded, false);
+    });
+});
+
+describe('edge', () => {
+    it('produces id in edge:<source>:<target>:<type> format', () => {
+        const e = edge('org:1', 'org:2', 'Order', '€5K', null);
+        assert.equal(e.id, 'edge:org:1:org:2:Order');
+    });
+    it('defaults forceLabel to false', () => {
+        assert.equal(edge('a', 'b', 'T', '', null).attributes.forceLabel, false);
+    });
+    it('passes forceLabel through when set to true', () => {
+        assert.equal(edge('a', 'b', 'T', '', null, true).attributes.forceLabel, true);
+    });
+    it('stores label in attributes', () => {
+        assert.equal(edge('a', 'b', 'Order', '€1M', null).attributes.label, '€1M');
+    });
+    it('normalises null label to empty string', () => {
+        assert.equal(edge('a', 'b', 'T', null, null).attributes.label, '');
+    });
+});
+
+describe('addNode / addEdge deduplication', () => {
+    it('addNode ignores duplicate ids', () => {
+        const nodes: NodeLike[] = [];
+        const map: Map<string, boolean> = new Map();
+        const n: NodeLike = { id: 'org:1', attributes: {} };
+        addNode(nodes, map, n);
+        addNode(nodes, map, n);
+        assert.equal(nodes.length, 1);
+    });
+
+    it('addEdge ignores duplicate ids', () => {
+        const edges: EdgeLike[] = [];
+        const map: Map<string, boolean> = new Map();
+        const e: EdgeLike = { id: 'edge:a:b:T', source: 'a', target: 'b', attributes: {} };
+        addEdge(edges, map, e);
+        addEdge(edges, map, e);
+        assert.equal(edges.length, 1);
+    });
+
+    it('addNode accepts nodes with different ids', () => {
+        const nodes: NodeLike[] = [];
+        const map: Map<string, boolean> = new Map();
+        addNode(nodes, map, { id: 'org:1', attributes: {} });
+        addNode(nodes, map, { id: 'org:2', attributes: {} });
+        assert.equal(nodes.length, 2);
+    });
+});
+
+describe('procurementNode', () => {
+    it('produces id in procurement:<pirkimoId> format', () => {
+        assert.equal(procurementNode('7676505', 'Pirkimas', 500000, 'SKELBTAS', 'Atviras').id, 'procurement:7676505');
+    });
+    it('sets entityType to ProcurementEntity', () => {
+        assert.equal(procurementNode('1', null, null, null, null).attributes.entityType, 'ProcurementEntity');
+    });
+    it('stores pirkimoId as string', () => {
+        assert.equal(procurementNode(12345, null, null, null, null).attributes.pirkimoId, '12345');
+    });
+    it('defaults expanded to false', () => {
+        assert.equal(procurementNode('1', null, null, null, null).attributes.expanded, false);
+    });
+    it('stores statusas and pirkimoBudas in attributes', () => {
+        const n = procurementNode('1', 'P', 100, 'SKELBTAS', 'Atviras');
+        assert.equal(n.attributes.statusas, 'SKELBTAS');
+        assert.equal(n.attributes.pirkimoBudas, 'Atviras');
+    });
+    it('uses contractSize for node size based on numatomaVerteEUR', () => {
+        assert.equal(procurementNode('1', null, 2000000, null, null).attributes.size, 19);
+        assert.equal(procurementNode('2', null, 200000, null, null).attributes.size, 13);
+        assert.equal(procurementNode('3', null, 0, null, null).attributes.size, 8);
+    });
+    it('label is wrapped first 6 words of pavadinimas', () => {
+        const n = procurementNode('1', 'A B C D E F G H', 0, null, null);
+        assert.equal(n.attributes.label, wrapLabel('A B C D E F'));
+    });
+    it('falls back to "Pirkimas" label when pavadinimas is null', () => {
+        assert.equal(procurementNode('1', null, 0, null, null).attributes.label, 'Pirkimas');
+    });
+});
+
+// ── addSpouseEdge ─────────────────────────────────────────────────────────────
+
+describe('addSpouseEdge', () => {
+    it('adds a Spouse edge when neither direction exists', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b');
+        assert.equal(edges.length, 1);
+        assert.equal(edges[0].id, 'edge:person:a:person:b:Spouse');
+        assert.equal(edges[0].attributes.type, 'Spouse');
+    });
+
+    it('skips the edge when the forward direction is already present', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b');
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b'); // duplicate
+        assert.equal(edges.length, 1);
+    });
+
+    it('skips the edge when the reverse direction already exists (dedup across directions)', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b'); // forward added first
+        addSpouseEdge(edges, edgeMap, 'person:b', 'person:a'); // reverse must be dropped
+        assert.equal(edges.length, 1, 'reverse direction must be deduplicated');
+        assert.equal(edges[0].source, 'person:a');
+        assert.equal(edges[0].target, 'person:b');
+    });
+
+    it('reverse-first: forward direction is dropped when reverse already present', () => {
+        const edges: EdgeLike[] = [];
+        const edgeMap: Map<string, boolean> = new Map();
+        addSpouseEdge(edges, edgeMap, 'person:b', 'person:a'); // reverse first
+        addSpouseEdge(edges, edgeMap, 'person:a', 'person:b'); // forward must be dropped
+        assert.equal(edges.length, 1, 'forward direction must be deduplicated');
+        assert.equal(edges[0].source, 'person:b');
+        assert.equal(edges[0].target, 'person:a');
+    });
+});
+
+// ── buildPersonGraphFromRows ──────────────────────────────────────────────────
+
+// Helpers to build minimal pinregJuridiniaiRysiai row fixtures.
+function darbovieteRow(vardas: string, pavarde: string, jarKodas: string, pavadinimas: string, pareigos: string | null = null) {
+    return { irasoTipas: 'DEKLARUOJANCIO_DARBOVIETE', vardas, pavarde, jarKodas, pavadinimas, jaTeisinesFormosKodas: null, pareigos, rysioPradzia: null, susijusioAsmensVardas: null, susijusioAsmensPavarde: null, rysioPobudzioPavadinimas: null, deklaracija: null };
+}
+
+function spouseRow(
+    spouseVardas: string, spousePavarde: string,
+    declVardas: string, declPavarde: string,
+    jarKodas: string, pavadinimas: string, pareigos: string | null = null,
+) {
+    return { irasoTipas: 'SUTUOKTINIO_DARBOVIETE', vardas: spouseVardas, pavarde: spousePavarde, susijusioAsmensVardas: declVardas, susijusioAsmensPavarde: declPavarde, jarKodas, pavadinimas, jaTeisinesFormosKodas: null, pareigos, rysioPradzia: null, rysioPobudzioPavadinimas: null, deklaracija: null };
+}
+
+describe('buildPersonGraphFromRows', () => {
+    const ALENAS_ID  = 'person:alenas bulauskis';
+    const TOMA_ID    = 'person:toma bulauskienė';
+    const ORG_A_ID   = 'org:188784898';
+    const ORG_B_ID   = 'org:188752740';
+
+    it('includes the root person node marked expanded', () => {
+        const { nodes } = buildPersonGraphFromRows([], ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+        assert.equal(nodes.length, 1);
+        assert.equal(nodes[0].id, ALENAS_ID);
+        assert.equal(nodes[0].attributes.expanded, true);
+    });
+
+    it('DEKLARUOJANCIO_DARBOVIETE: adds org and edge from root to org', () => {
+        const rows = [darbovieteRow('ALENAS', 'BULAUSKIS', '188752740', 'Žuvininkystės tarnyba', 'Departamento direktorius')];
+        const { nodes, edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+        assert.ok(nodes.some(n => n.id === ORG_B_ID));
+        const e = edges.find(e => e.source === ALENAS_ID && e.target === ORG_B_ID);
+        assert.ok(e, 'expected edge from root to org');
+        assert.equal(e!.attributes.type, 'Director');
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — normal case (searched person is declarant): no self-loop', () => {
+        // Alenas declares spouse Toma works at org A
+        const rows = [spouseRow('TOMA', 'BULAUSKIENĖ', 'ALENAS', 'BULAUSKIS', '188784898', 'Aplinkos apsaugos agentūra', 'Vedėjas')];
+        const { nodes, edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+
+        // No self-loop
+        const selfLoop = edges.find(e => e.source === ALENAS_ID && e.target === ALENAS_ID);
+        assert.equal(selfLoop, undefined, 'must not create a self-loop Spouse edge');
+
+        // Spouse node exists
+        assert.ok(nodes.some(n => n.id === TOMA_ID), 'spouse node must be added');
+
+        // Alenas → Toma Spouse edge
+        const spouseEdge = edges.find(e => e.source === ALENAS_ID && e.target === TOMA_ID && e.attributes.type === 'Spouse');
+        assert.ok(spouseEdge, 'expected Alenas→Toma Spouse edge');
+
+        // Toma's org edge
+        assert.ok(nodes.some(n => n.id === ORG_A_ID), 'spouse org node must be added');
+        const orgEdge = edges.find(e => e.source === TOMA_ID && e.target === ORG_A_ID);
+        assert.ok(orgEdge, 'expected Toma→org Employment/Director edge');
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — reverse case (searched person IS the spouse): no self-loop', () => {
+        // Toma declares spouse Alenas works at org B — Alenas appears as vardas/pavarde (not declarant)
+        const rows = [spouseRow('ALENAS', 'BULAUSKIS', 'TOMA', 'BULAUSKIENĖ', '188752740', 'Žuvininkystės tarnyba', 'Departamento direktorius')];
+        const { nodes, edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+
+        // No self-loop
+        const selfLoop = edges.find(e => e.source === ALENAS_ID && e.target === ALENAS_ID);
+        assert.equal(selfLoop, undefined, 'must not create a self-loop Spouse edge');
+
+        // Declarant (Toma) node must be added
+        assert.ok(nodes.some(n => n.id === TOMA_ID), 'declarant node must be added');
+
+        // Toma → Alenas Spouse edge (reversed)
+        const spouseEdge = edges.find(e => e.source === TOMA_ID && e.target === ALENAS_ID && e.attributes.type === 'Spouse');
+        assert.ok(spouseEdge, 'expected Toma→Alenas Spouse edge');
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — both rows present (real-world bidirectional): exactly one deduplicated Spouse edge', () => {
+        // This is the exact scenario from the real DB: both Alenas and Toma are declarants.
+        // The normal case adds alenas→toma:Spouse; the reverse case must be dropped (not toma→alenas too).
+        const rows = [
+            spouseRow('TOMA', 'BULAUSKIENĖ', 'ALENAS', 'BULAUSKIS', '188784898', 'Aplinkos apsaugos agentūra', 'Vedėjas'),
+            spouseRow('ALENAS', 'BULAUSKIS', 'TOMA', 'BULAUSKIENĖ', '188752740', 'Žuvininkystės tarnyba', 'Departamento direktorius'),
+        ];
+        const { nodes, edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+
+        const selfLoop = edges.find(e => e.source === e.target);
+        assert.equal(selfLoop, undefined, 'must not create any self-loop');
+
+        const spouseEdges = edges.filter(e => e.attributes.type === 'Spouse');
+        assert.equal(spouseEdges.length, 1, 'expect exactly ONE Spouse edge between the pair');
+
+        const between = spouseEdges.find(e =>
+            (e.source === ALENAS_ID && e.target === TOMA_ID) ||
+            (e.source === TOMA_ID   && e.target === ALENAS_ID)
+        );
+        assert.ok(between, 'the single Spouse edge must connect Alenas and Toma');
+
+        // Both person nodes must still be present despite the dedup
+        assert.ok(nodes.some(n => n.id === ALENAS_ID), 'Alenas node present');
+        assert.ok(nodes.some(n => n.id === TOMA_ID),   'Toma node present');
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — reverse-first bidirectional: dedup works regardless of row order', () => {
+        // Same pair, but the reverse row comes first — only one Spouse edge must be emitted
+        const rows = [
+            spouseRow('ALENAS', 'BULAUSKIS', 'TOMA', 'BULAUSKIENĖ', '188752740', 'Žuvininkystės tarnyba', 'Departamento direktorius'),
+            spouseRow('TOMA', 'BULAUSKIENĖ', 'ALENAS', 'BULAUSKIS', '188784898', 'Aplinkos apsaugos agentūra', 'Vedėjas'),
+        ];
+        const { edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+
+        const spouseEdges = edges.filter(e => e.attributes.type === 'Spouse');
+        assert.equal(spouseEdges.length, 1, 'expect exactly ONE Spouse edge regardless of row order');
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — skips row when spouse name is missing', () => {
+        const rows = [spouseRow('', '', 'ALENAS', 'BULAUSKIS', '188784898', 'Org')];
+        const { edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+        assert.equal(edges.length, 0);
+    });
+
+    it('SUTUOKTINIO_DARBOVIETE — reverse case skips Spouse edge when declarant name is missing', () => {
+        const rows = [spouseRow('ALENAS', 'BULAUSKIS', '', '', '188752740', 'Org')];
+        const { edges } = buildPersonGraphFromRows(rows, ALENAS_ID, 'ALENAS', 'BULAUSKIS');
+        assert.equal(edges.filter(e => e.attributes.type === 'Spouse').length, 0);
+    });
+});

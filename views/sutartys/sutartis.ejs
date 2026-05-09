@@ -34,7 +34,7 @@ Galioja iki: ${new String(sutartis.galiojimoData).slice(0,10)}`,
       <div class="flex gap-3 items-center">
         <a href="/sutartis/<%= sutartis.sutartiesUnikalusID %>.json" class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties JSON duomenis">↗ JSON</a>
         <a href="https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=<%= sutartis.sutartiesUnikalusID %>" class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties CVP IS duomenis">↗ CVP IS</a>
-        <% if (CONFIG.enableGraph) { %><a href="/rysiai/asmuo/<%= sutartis.perkanciosiosOrganizacijosKodas %>#filter=&asmuo_2=<%= sutartis.tiekejoKodas %>&filter_2=&sutartis_3=<%= sutartis.sutartiesUnikalusID %>&filter_3=DSLMGPABC" class="btn btn-outline btn-sm" aria-label="Peržiūrėti ryšių grafą"><span aria-hidden="true">↗</span> Ryšiai</a><% } %>
+        <% if (CONFIG.enableGraph) { %><a href="/rysiai/asmuo/<%= sutartis.perkanciosiosOrganizacijosKodas %>#o_2=<%= sutartis.tiekejoKodas %>&f_2=DSLMGPABC&c_3=<%= sutartis.sutartiesUnikalusID %>&f_3=DSLMGPABC" class="btn btn-outline btn-sm" aria-label="Peržiūrėti ryšių grafą"><span aria-hidden="true">↗</span> Ryšiai</a><% } %>
         <a href="mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20<%= sutartis.sutartiesUnikalusID %>&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/<%= sutartis.sutartiesUnikalusID %>" class="btn btn-outline btn-sm" aria-label="Pranešti apie sutartį">↗ Pranešti</a>
       </div>
     </div>

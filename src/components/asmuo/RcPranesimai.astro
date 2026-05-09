@@ -1,0 +1,25 @@
+---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import TruncationNotice from '@design-system/components/TruncationNotice.astro';
+
+const { asmuo } = Astro.props;
+if (!(asmuo.rcPranesimai?.rows > 0)) return;
+const { rows, pranesimai } = asmuo.rcPranesimai;
+---
+
+<div class="page-section mb-10" id="rcPranesimai">
+  <h2><a href="#rcPranesimai" class="no-style">Registrų centro pranešimai</a></h2>
+  <TruncationNotice count={rows} shown={pranesimai.length} anchor="rcPranesimai" paramName="rcPranesimaiLimit" label="naujausi pranešimai" />
+  <div class="result-list">
+    {pranesimai.map((p: any) => (
+      <ResultCardShell>
+        <dl slot="meta" class="result-card-meta">
+          <div><dt class="sr-only">Paskelbta</dt><dd>Paskelbta {p.leidinioData}</dd></div>
+          <div><dt class="sr-only">Leidinys</dt><dd><a href={p.leidinioLink} class="relative z-1">{p.leidinioNumeris}</a></dd></div>
+        </dl>
+        <h3 slot="title" class="result-card-title">{p.subtitle || p.title}</h3>
+        {p.text && <p class="text-sm text-muted mt-2 line-clamp-4">{p.text}</p>}
+      </ResultCardShell>
+    ))}
+  </div>
+</div>

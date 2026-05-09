@@ -1,0 +1,38 @@
+---
+import FilterGroup from '@design-system/components/filters/FilterGroup.astro';
+import NumberRangeFilter from '@design-system/components/filters/NumberRangeFilter.astro';
+import SelectInput from '@design-system/components/inputs/SelectInput.astro';
+import TextInput from '@design-system/components/inputs/TextInput.astro';
+import { SALTINIS_OPTIONS } from '../../lib/failaiEnums.ts';
+
+interface Props {
+  values: Record<string, string | undefined>;
+}
+
+const { values } = Astro.props;
+---
+
+<div class="search-filters-grid">
+  <FilterGroup legend="Failas">
+    <TextInput label="Extension" name="extension" placeholder="Visi" values={values} />
+    <TextInput label="MD5" name="md5" placeholder="d41d8cd98..." values={values} />
+    <SelectInput label="Šaltinis" name="saltinis" options={SALTINIS_OPTIONS} values={values} placeholder="Visi" />
+  </FilterGroup>
+
+  <NumberRangeFilter
+    legend="Puslapių skaičius"
+    nameFrom="puslapiaiMin"
+    nameTo="puslapiaiMax"
+    values={values}
+  />
+
+  <FilterGroup legend="Turinys" class="col-span-2 max-sm:col-span-1 items-start justify-start">
+    <div class="search-filters-grid grid-cols-3 w-fit gap-3 [&_.form-group]:mb-0 max-sm:grid-cols-2">
+      <TextInput label="Tel. numeris" name="telefonas" placeholder="+37060000000" values={values} />
+      <TextInput label="El. paštas" name="email" placeholder="viespirkiai@viespirkiai.org" values={values} />
+      <TextInput label="Domenas" name="domain" placeholder="viespirkiai.org" values={values} />
+      <TextInput label="IBAN numeris" name="iban" placeholder="LT0000000000..." values={values} />
+      <TextInput label="JAR kodas" name="jarKodas" placeholder="000000000" values={values} />
+    </div>
+  </FilterGroup>
+</div>

@@ -1,0 +1,80 @@
+---
+interface Item {
+  value: string;
+  pages?: number[];
+  fullValue?: string;
+}
+
+interface Props {
+  items: Item[];
+  title: string;
+  type: 'email' | 'phone' | 'link' | 'iban';
+  maxItems?: number;
+  emptyText?: string;
+}
+
+const { items = [], title, type, maxItems = 3, emptyText = 'Nerasta' } = Astro.props;
+
+const visible = items.slice(0, maxItems);
+const hidden = items.slice(maxItems);
+const isMono = type === 'iban';
+const isExternal = type === 'link';
+
+function getHref(item: Item) {
+  if (type === 'email') return `mailto:${item.value}`;
+  if (type === 'phone') return `tel:${item.value}`;
+  if (type === 'link') return item.fullValue || item.value;
+  return '#';
+}
+---
+
+<dt>{title}</dt>
+<dd class={`contact-list contact-list--${type}`}>
+  {items.length > 0 ? (
+    <>
+      <div class="flex flex-col gap-1">
+        {visible.map((item) => item?.value && (
+          <div class="flex gap-1 items-center contact-item">
+            {isMono
+              ? <span class="cell-mono">{item.value}</span>
+              : isExternal
+                ? <a href={getHref(item)} target="_blank" class="cell-truncate">{item.value}</a>
+                : <a href={getHref(item)}>{item.value}</a>
+            }
+            {Array.isArray(item.pages) && item.pages.length > 0 && (
+              <sup class="text-muted text-xs contact-pages shrink-0">
+                {item.pages.slice(0, 3).join(', ')}{item.pages.length > 3 ? '...' : ''} psl.
+              </sup>
+            )}
+          </div>
+        ))}
+      </div>
+      {hidden.length > 0 && (
+        <details class="contact-list-details mt-2">
+          <summary class="contact-list-summary">
+            <span class="text-muted text-xs font-bold">+ {hidden.length} daugiau</span>
+          </summary>
+          <div class="contact-list-expanded flex flex-col gap-1 mt-2">
+            {hidden.map((item) => item?.value && (
+              <div class="flex gap-1 items-center contact-item">
+                {isMono
+                  ? <span class="cell-mono">{item.value}</span>
+                  : isExternal
+                    ? <a href={getHref(item)} target="_blank" class="cell-truncate">{item.value}</a>
+                    : <a href={getHref(item)}>{item.value}</a>
+                }
+                {Array.isArray(item.pages) && item.pages.length > 0 && (
+                  <sup class="text-muted text-xs contact-pages shrink-0">
+                    {item.pages.slice(0, 3).join(', ')}{item.pages.length > 3 ? '...' : ''} psl.
+                  </sup>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </>
+  ) : (
+    <em class="text-muted">{emptyText}</em>
+  )}
+</dd>

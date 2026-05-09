@@ -1,0 +1,27 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+const id = Astro.url.searchParams.get('id') || '';
+const pavadinimas = Astro.url.searchParams.get('pavadinimas') || 'CVP IS netikras asmuo';
+const aprasymas = Astro.url.searchParams.get('aprasymas') || '';
+---
+<Layout
+  pageTitle="CVP IS netikras asmuo"
+  pageDescription="Juridinis asmuo kurio ieškote neegzistuoja, kadangi tai yra tiesiog CVP IS sistemoje naudojamas kodas."
+  pageImage="https://viespirkiai.org/failai.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <div class="page-header">
+      <h1 class="mb-0">{pavadinimas} <code>{id}</code></h1>
+    </div>
+    <div class="flex gap-2 mb-4">
+      <a href={`/pirkejas/${id}`} class="btn btn-outline btn-sm">↗ Pirkimai</a>
+      <a href={`/tiekejas/${id}`} class="btn btn-outline btn-sm">↗ Pardavimai</a>
+    </div>
+    <p class="text-muted">{aprasymas}</p>
+  </main>
+</Layout>

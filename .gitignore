@@ -54,3 +54,6 @@ public/dist/tailwind.css
 public/dist/tailwind.css.map
 # Quickwit
 quickwit/qwdata
+
+# Dist
+dist

@@ -1,0 +1,209 @@
+---
+// @ts-nocheck — page mixes streamed exports, dynamic search-param maps, and
+// nullable totals; gradual typing can be done once the search modules expose
+// proper type definitions.
+import Layout from '../../layouts/Layout.astro';
+import EmptyState from '@design-system/components/EmptyState.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import ResultsSummary from '@design-system/components/ResultsSummary.astro';
+import SearchForm from '@design-system/components/content/SearchForm.astro';
+import ViesiejiPirkimaiFilters from '../../components/content/ViesiejiPirkimaiFilters.astro';
+import ViesiejiPirkimaiCard from '../../components/viesiejiPirkimai/ViesiejiPirkimaiCard.astro';
+import { searchViesiejiPirkimai, countViesiejiPirkimai } from '@/modules/viesiejiPirkimai/searchViesiejiPirkimai.js';
+import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
+import { objectsToCsvStream } from '@/utils/csv.js';
+import { objectsToJsonlStream } from '@/utils/jsonl.js';
+import { Transform } from 'node:stream';
+import { Readable } from 'node:stream';
+import { cleanQuery, getColorScheme, getFont } from '../../lib/failai.js';
+
+const DEFAULT_LIMIT = 50;
+const MAX_POSTGRES_LIMIT = 1_000_000;
+
+const cleaned = cleanQuery(Astro.url);
+if (cleaned.redirectTo) return Astro.redirect(cleaned.redirectTo);
+const query = cleaned.query;
+
+function parseLimit(q: Record<string, string>) {
+  if (q.limit === 'max') return { limit: MAX_POSTGRES_LIMIT };
+  const n = parseInt(q.limit);
+  if (n > MAX_POSTGRES_LIMIT) return { error: `Limitas per didelis. Maksimalus limitas yra ${MAX_POSTGRES_LIMIT} rezultatų puslapyje.` };
+  if (n > 0) return { limit: n };
+  return { limit: DEFAULT_LIMIT };
+}
+
+const parsedLimit = parseLimit(query);
+if ('error' in parsedLimit) {
+  return new Response(parsedLimit.error, { status: 400 });
+}
+const { limit } = parsedLimit;
+const page = parseInt(query.page) || 1;
+
+function buildNumberOfResults({ shown, total, elapsed }: { shown: number; total: number | null; elapsed: number }) {
+  const trukme = (elapsed / 1000).toFixed(2) + 's';
+  const source = `<span class="inline">(${trukme}, postgres)</span>`;
+  if (total == null) {
+    return {
+      numberOfResults: `Rodomi ${shown} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <span class="inline"> (${trukme}, postgres)</span>`,
+      total: 10_000,
+    };
+  }
+  if (shown < total)
+    return {
+      numberOfResults: `Rodomi ${shown} iš ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`,
+      total,
+    };
+  return {
+    numberOfResults: `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų'])} ${source}`,
+    total,
+  };
+}
+
+const CSV_HEADERS = ['Pirkimo ID','Pavadinimas','Vykdytojas','Paskelbimo data','Pasiūlymų terminas','Pirkimo būdas','Statusas','Žingsnis','Numatoma vertė','Tipas'];
+
+function resultToCsvObject(r: any) {
+  const fmt = (v: any) => (v ? String(v).slice(0, 10) : '');
+  return {
+    'Pirkimo ID': r.pirkimoId,
+    'Pavadinimas': r.pavadinimas,
+    'Vykdytojas': r.pirkimoVykdytojas,
+    'Paskelbimo data': fmt(r.paskelbimoData),
+    'Pasiūlymų terminas': r.pasiulymuPateikimoTerminas ? String(r.pasiulymuPateikimoTerminas).slice(0, 16).replace('T', ' ') : '',
+    'Pirkimo būdas': r.pirkimoBudas,
+    'Statusas': r.statusas,
+    'Žingsnis': r.zingsnis,
+    'Numatoma vertė': r.numatomaBendraPirkimoVerte ?? '',
+    'Tipas': r.type,
+  };
+}
+
+if (query.csv || query.jsonl) {
+  const { stream, client } = await searchViesiejiPirkimai(query, { limit: null, page, stream: true, sort: false });
+
+  if (query.jsonl) {
+    const web = Readable.toWeb(stream.pipe(objectsToJsonlStream())) as unknown as BodyInit;
+    client?.release();
+    return new Response(web, {
+      headers: {
+        'Content-Type': 'application/x-ndjson',
+        'Content-Disposition': `attachment; filename=viesieji-pirkimai-${new Date().toISOString()}.jsonl`,
+      },
+    });
+  }
+
+  if (query.csv) {
+    const csvStream = stream
+      .pipe(new Transform({ objectMode: true, transform(row, _enc, cb) { cb(null, resultToCsvObject(row)); } }))
+      .pipe(objectsToCsvStream());
+    const web = Readable.toWeb(csvStream) as unknown as BodyInit;
+    client?.release();
+    return new Response(web, {
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename=viesieji-pirkimai-${new Date().toISOString()}.csv`,
+      },
+    });
+  }
+}
+
+if (query.rezultatuSkaiciausPatikslinimas) {
+  const startas = performance.now();
+  const [total, { values, queryParams }] = await Promise.all([
+    countViesiejiPirkimai(query),
+    searchViesiejiPirkimai(query, { limit: 1, page }),
+  ]);
+  const elapsed = performance.now() - startas + Number(query.trukme || 0);
+  const { numberOfResults } = buildNumberOfResults({ shown: limit, total, elapsed });
+  return new Response(JSON.stringify({ total, numberOfResults }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (query.json) {
+  const { results } = await searchViesiejiPirkimai(query, { limit, page });
+  return new Response(JSON.stringify({ results }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const startas = performance.now();
+const { results, total, values, queryParams } = await searchViesiejiPirkimai(query, { limit, page });
+const elapsed = performance.now() - startas + Number(query.trukme || 0);
+const { numberOfResults } = buildNumberOfResults({ shown: results.length, total, elapsed });
+
+const galimaEksportuoti = Object.keys(values).length > 0 && (total ?? 0) <= MAX_POSTGRES_LIMIT;
+const usedHiddenFields = Object.keys(values).some(k => k !== 'search' && values[k] !== '' && values[k] !== undefined);
+const pageCount = Math.ceil((total || 100_000) / limit);
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+---
+
+<Layout
+  pageTitle="Viešųjų pirkimų paieška"
+  pageDescription="Pilietinė viešųjų pirkimų analizės iniciatyva. Prieinamai patiekiami viešieji pirkimai bei kita susijusi informacija."
+  pageImage="https://viespirkiai.org/viesiejiPirkimai.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <SearchForm
+      title="Viešųjų pirkimų paieška"
+      searchValue={values.search}
+      usedHiddenFields={usedHiddenFields}
+    >
+      <Fragment slot="title-suffix"> <sup class="top-[-0.75em]">BETA</sup></Fragment>
+      <ViesiejiPirkimaiFilters slot="filters" values={values} />
+    </SearchForm>
+
+    <div class="mt-10 max-w-lg center mx-auto">
+      <div>
+        <div class="flex justify-between items-center mb-4">
+          <ResultsSummary html={numberOfResults} />
+          {galimaEksportuoti && (
+            <div class="flex gap-3">
+              <a href={`/viesiejiPirkimai/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
+                <span aria-hidden="true">↗</span> JSONL
+              </a>
+              <a href={`/viesiejiPirkimai/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
+                <span aria-hidden="true">↗</span> CSV
+              </a>
+            </div>
+          )}
+        </div>
+
+        {results.length === 0 ? (
+          <EmptyState message="Rezultatų nerasta." />
+        ) : (
+          <>
+            <div class="result-list">
+              {results.map((item: any) => <ViesiejiPirkimaiCard item={item} />)}
+            </div>
+
+            <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
+          </>
+        )}
+      </div>
+    </div>
+
+    <script>
+      const span = document.querySelector('.rezultatai-nezinomas-total');
+      if (span && !span.classList.contains('spin')) {
+        span.classList.add('spin');
+        const url = new URL(window.location.href);
+        url.searchParams.set('rezultatuSkaiciausPatikslinimas', 'true');
+        fetch(url.toString())
+          .then(res => res.json())
+          .then(data => {
+            if (data.total) {
+              span.className = '';
+              document.querySelector('.numberOfResults')!.innerHTML = data.numberOfResults;
+            } else {
+              span.classList.remove('spin');
+            }
+          })
+          .catch(() => span.classList.remove('spin'));
+      }
+    </script>
+  </main>
+</Layout>

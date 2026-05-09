@@ -1,0 +1,112 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../lib/failai.js';
+import SectionText from '@design-system/components/content/SectionText.astro';
+import WordCloud from '@design-system/components/content/WordCloud.astro';
+import FaqList from '@design-system/components/content/FaqList.astro';
+import ResultCardList from '@design-system/components/content/ResultCardList.astro';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const aboutParagraphs = [
+  'Trumpai - esame pilietinė iniciatyva užsiimanti viešųjų pirkimų ir kitos viešosios informacijos skaidrinimu.',
+  'Šis projektas gimė dėl paprasčiausio nepasitenkinimo Viešųjų pirkimų tarnybos sutarčių viešinimo sistema (ji yra lėta, nepatogi, neaiški, reguliariai stringanti). Kartu su bendraminčiais nusprendėme padaryti šią ir kitą demokratinės valstybės klestėjimui svarbią informaciją daug lengviau prieinamą.',
+  'Taip pat, matydami įvarias problemas bei sritis, kur galima tobulėti, skelbiame iniciatyvos narių nuomones vadinamas <a href="/vieslaiskiai">„viešlaiškiais"</a>. Kviečiame paskaityti.',
+];
+
+const wordCloudItems = [
+  { label: 'skaidrumas', size: 2, rotation: 0.72 },
+  { label: 'atviri duomenys', size: 2, rotation: 0.33 },
+  { label: 'atsakomybė', size: 2, rotation: 0.57 },
+  { label: 'lėšų taupymas', size: 1.8, rotation: 0.91 },
+  { label: 'atviras kodas', size: 1.8, rotation: 0.12 },
+  { label: 'efektyvumas', size: 2, rotation: 0.44 },
+  { label: 'prieinamumas', size: 1.7, rotation: 0.66 },
+  { label: 'sąžiningumas', size: 2, rotation: 0.29 },
+  { label: 'patikimumas', size: 1.8, rotation: 0.81 },
+  { label: 'kokybė', size: 2, rotation: 0.53 },
+  { label: 'viešumas', size: 1.7, rotation: 0.14 },
+  { label: 'rizikų mažinimas', size: 1.6, rotation: 0.97 },
+  { label: 'atsakinga kontrolė', size: 1.8, rotation: 0.38 },
+];
+
+const activityReports = [
+  {
+    href: '/veiklosAtaskaitos/0.5.pdf',
+    title: 'Pusės metų veiklos ataskaita',
+    meta: ['2025-12-03'],
+  },
+];
+
+const faqItems = [
+  {
+    question: 'Kodėl dirbate anonimiškai?',
+    answerHtml: 'Viešųjų pirkimų sritis dažnai yra susijusi su dideliais pinigais bei interesais. Dėl šios priežasties norime apsaugoti iniciatyvos narių tapatybes nuo galimų neigiamų pasekmių.',
+  },
+  {
+    question: 'Kaip galėčiau prisidėti?',
+    answerHtml: `
+      <ul>
+        <li><a href="https://github.com/viespirkiu-grupe">Programavimas</a> (pagrinde <em>JavaScript</em> ir <em>Go</em>)</li>
+        <li><a href="https://github.com/Viespirkiu-grupe/goviesdeze">Duomenų saugojimas</a> (jeigu turite bent 1000 GB vietos su neribotu internetu; viešas IP nereikalingas)</li>
+        <li><a href="https://github.com/viespirkiu-grupe/ocr">Dokumentų OCR</a> (ypač jei turite pigios elektros)</li>
+        <li>Duomenų analizė(s)</li>
+      </ul>
+      <p>Jeigu turite kitokių idėjų, <a href="/kontaktai">susisiekite</a>.</p>
+    `,
+  },
+  {
+    question: 'Kas jus išlaiko?',
+    answerHtml: 'Išsilaikome patys iš to ką mūsų iniciatyvos nariai atsineša, padaro ar prijungia.',
+  },
+  {
+    question: 'Kaip galėčiau paaukoti?',
+    answerHtml: 'Pinigų neimame. Galite prisidėti prie iniciatyvos saugodami duomenis arba atlikdami dokumentų OCR.',
+  },
+  {
+    question: 'Įtariu neskaidrius veiksmus, ar galiu susisiekti?',
+    answerHtml: 'Žinoma: <a href="/kontaktai">kontaktų puslapis</a>.',
+  },
+  {
+    question: 'Ar gerbiate susisiekiančių asmenų anonimiškumą?',
+    answerHtml: 'Taip.',
+  },
+  {
+    question: 'Turiu pasiūlymą / skundą / idėją...',
+    answerHtml: '<a href="/kontaktai">Laukiame.</a>',
+  },
+  {
+    question: 'Neradau atsakymo / turiu <em>„durną"</em> klausimą',
+    answerHtml: '<a href="/kontaktai">Susisiekite, tikrai atsakysime.</a>',
+  },
+];
+---
+
+<Layout
+  pageTitle="Apie mus"
+  pageDescription="Esame pilietinė iniciatyva užsiimanti viešųjų pirkimų ir kitos viešosios informacijos skaidrinimu."
+  pageImage="https://viespirkiai.org/apie.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <div class="page-header">
+      <h1>Apie mus</h1>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <SectionText title="Kas mes?" paragraphs={aboutParagraphs}>
+          <WordCloud items={wordCloudItems} />
+        </SectionText>
+
+        <div class="mt-10">
+          <ResultCardList title="Veiklos ataskaitos" items={activityReports} />
+        </div>
+      </div>
+
+      <FaqList title="Dažniausiai užduodami klausimai" items={faqItems} />
+    </div>
+  </main>
+</Layout>

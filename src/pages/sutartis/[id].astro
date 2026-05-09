@@ -1,0 +1,81 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import SutartisSalys from '../../components/sutartis/SutartisSalys.astro';
+import SutartisDetails from '../../components/sutartis/SutartisDetails.astro';
+import SutartisPranesimas from '../../components/sutartis/SutartisPranesimas.astro';
+import SutartisKlasifikacija from '../../components/sutartis/SutartisKlasifikacija.astro';
+import SutartisDokumentai from '../../components/sutartis/SutartisDokumentai.astro';
+import SutartisEsProjektai from '../../components/sutartis/SutartisEsProjektai.astro';
+import SutartisSabis from '../../components/sutartis/SutartisSabis.astro';
+import SutartisPanasios from '../../components/sutartis/SutartisPanasios.astro';
+import { loadSutartis } from '../../lib/sutartis.js';
+import { fmtEur } from '../../lib/formatters.ts';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
+import config from '../../lib/config.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const { id } = Astro.params;
+if (!id || isNaN(parseInt(id))) return Astro.redirect('/404');
+
+const sutartis = await loadSutartis(parseInt(id));
+if (!sutartis) return Astro.redirect('/404');
+
+if (Astro.url.pathname.endsWith('.json') || (Astro.request?.headers.get('accept') || '').includes('application/json')) {
+  return new Response(JSON.stringify(sutartis, null, 2), { headers: { 'Content-Type': 'application/json' } });
+}
+
+const sutartiesUnikalusID = sutartis.sutartiesUnikalusId;
+const verte = sutartis.faktineIvykdimoVerte || sutartis.verte;
+const cvpisUrl = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=${sutartiesUnikalusID}`;
+
+const pageTitle = `${fmtEur(verte)} € ${sutartis.pavadinimas}`;
+const pageDescription = `Sutartis nr. ${sutartis.sutartiesNumeris}\nSudaryta: ${String(sutartis.sudarymoData).slice(0, 10)}\nGalioja iki: ${String(sutartis.galiojimoData).slice(0, 10)}`;
+
+const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
+---
+
+<Layout
+  pageTitle={pageTitle}
+  pageDescription={pageDescription}
+  pageImage={`https://viespirkiai.org/sutartis/${sutartiesUnikalusID}.png`}
+  pageAuthor={sutartis.perkanciojiOrganizacija}
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+
+    <PageHeader>
+      <Fragment slot="subtext">{sutartis.tipoPavadinimas}</Fragment>
+      {sutartis.pavadinimas.length < 1 ? <em>Nenurodyta</em> : sutartis.pavadinimas}
+      {' '}už <span class="amount">{fmtEur(verte)}&nbsp;€</span>
+      <Fragment slot="actions">
+        <a href={`/sutartis/${sutartiesUnikalusID}.json`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties JSON duomenis">↗ JSON</a>
+        <a href={cvpisUrl} class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties CVP IS duomenis">↗ CVP IS</a>
+        {config.enableGraph && (
+          <a href={`/rysiai/asmuo/${sutartis.perkanciosiosOrganizacijosKodas}#o_2=${sutartis.tiekejoKodas}&f_2=DSLMGPABC&c_3=${sutartiesUnikalusID}&f_3=DSLMGPABC`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti ryšių grafą">↗ Ryšiai</a>
+        )}
+        <a href={`mailto:pranesti@viespirkiai.org?subject=Dėl sutarties%20nr.%20${sutartiesUnikalusID}&body=Čia paaiškinkite, kodėl norėjote informuoti apie sutartį%0D%0A%0D%0Ahttps://viespirkiai.org/pirkimas/${sutartiesUnikalusID}`} class="btn btn-outline btn-sm" aria-label="Pranešti apie sutartį">↗ Pranešti</a>
+      </Fragment>
+    </PageHeader>
+
+    <SutartisSalys sutartis={sutartis} />
+
+    <div class="grid-3 mb-7">
+      <SutartisDetails sutartis={sutartis} />
+      <SutartisPranesimas sutartis={sutartis} />
+      <SutartisKlasifikacija sutartis={sutartis} />
+      <SutartisDokumentai dokumentai={sutartis.dokumentai} />
+    </div>
+
+    <div class="grid-2">
+      <SutartisEsProjektai sutartys={sutartis.cpvaProjektuSutartys} showAll={showCpvaAll} />
+      <SutartisSabis sutartys={sutartis.sabisSutartys} />
+      <SutartisPanasios sutartys={sutartis.panasiosSutartys} />
+    </div>
+
+  </main>
+</Layout>

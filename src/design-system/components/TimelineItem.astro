@@ -1,0 +1,70 @@
+---
+interface Props {
+  active?: boolean;
+  lineActive?: boolean;
+  className?: string;
+}
+
+const {
+  active = false,
+  lineActive = false,
+  className = '',
+} = Astro.props;
+
+const classes = ['ds-timeline-item', lineActive ? 'ds-timeline-item--line-active' : '', className].filter(Boolean).join(' ');
+---
+
+<li class={classes}>
+  <span class:list={['ds-timeline-dot', active && 'ds-timeline-dot--active']}></span>
+  <div class="ds-timeline-body">
+    <slot />
+  </div>
+</li>
+
+<style>
+  .ds-timeline-item {
+    position: relative;
+    display: flex;
+    gap: 12px;
+    padding-bottom: 16px;
+  }
+
+  .ds-timeline-item::before {
+    content: "";
+    position: absolute;
+    top: 20px;
+    bottom: 0;
+    left: 7px;
+    width: 1px;
+    background: var(--light-gray);
+  }
+
+  .ds-timeline-item--line-active::before {
+    background: var(--black);
+  }
+
+  .ds-timeline-item:last-child::before {
+    display: none;
+  }
+
+  .ds-timeline-dot {
+    z-index: 1;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin-top: 3px;
+    border: 2px solid var(--light-gray);
+    border-radius: 50%;
+    background: var(--white);
+  }
+
+  .ds-timeline-dot--active {
+    border-color: var(--black);
+    background: var(--black);
+  }
+
+  .ds-timeline-body {
+    flex: 1;
+    min-width: 0;
+  }
+</style>

@@ -1,0 +1,20 @@
+---
+/**
+ * Single sąskaita (invoice) row inside the SABIS contract card.
+ * Shared by both the visible and the hidden `<details>` overflow lists.
+ */
+import { fmtEur } from '../../lib/formatters.ts';
+
+interface Props { sk: any; }
+const { sk } = Astro.props;
+const valiuta = sk.valiuta === 'Euras' || sk.valiuta === 'EUR' ? '€' : sk.valiuta;
+---
+
+<div class="kv-list mb-2">
+  <dt>{sk.sfTipas} Nr. {sk.sfNumeris}</dt>
+  <dd>
+    <span class="cell-mono">{fmtEur(sk.bendraSfSuma)} {valiuta}</span>
+    {sk.pvm && <span class="text-muted text-sm"> (su {sk.pvm} PVM)</span>}<br />
+    <span class="subtext">{sk.sfBusena} ({sk.sfBusenoData})</span>
+  </dd>
+</div>

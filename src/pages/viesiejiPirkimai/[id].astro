@@ -1,0 +1,110 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import SutartisCard from '../../components/content/SutartisCard.astro';
+import PirkimasVykdytojas from '../../components/viesiejiPirkimai/PirkimasVykdytojas.astro';
+import PirkimasTerminai from '../../components/viesiejiPirkimai/PirkimasTerminai.astro';
+import PirkimasKlasifikacija from '../../components/viesiejiPirkimai/PirkimasKlasifikacija.astro';
+import PirkimasVerte from '../../components/viesiejiPirkimai/PirkimasVerte.astro';
+import PirkimasSalygos from '../../components/viesiejiPirkimai/PirkimasSalygos.astro';
+import PirkimasDokumentai from '../../components/viesiejiPirkimai/PirkimasDokumentai.astro';
+import PirkimasSkelbimai from '../../components/viesiejiPirkimai/PirkimasSkelbimai.astro';
+import PirkimasTedNuorodos from '../../components/viesiejiPirkimai/PirkimasTedNuorodos.astro';
+import { getColorScheme, getFont } from '../../lib/failai.js';
+import { loadPirkimas, buildTimelineItems, buildTedKorteles, getCvpisUrl } from '../../lib/viesiejiPirkimai.js';
+
+const raw = Astro.params.id!;
+const isPng = raw.endsWith('.png');
+const isJson = raw.endsWith('.json');
+const id = raw.replace(/\.(png|json)$/, '');
+
+const pirkimas = await loadPirkimas(id);
+if (!pirkimas) return new Response(null, { status: 404 });
+
+if (isPng) {
+  return new Response(new Uint8Array(await (await import('@/utils/openGraphImage.js')).getOpenGraphImage(
+    pirkimas.pirkimoBudas || 'Viešasis pirkimas',
+    [pirkimas.numatomaBendraPirkimoVerte ? `${Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €` : '', pirkimas.pavadinimas].filter(Boolean).join(' '),
+    `Pirkėjas: ${pirkimas.pirkimoVykdytojas || ''}`,
+    `viespirkiai.org/viesiejiPirkimai/${pirkimas.pirkimoId}`,
+  )), { headers: { 'Content-Type': 'image/png' } });
+}
+
+if (isJson) {
+  return new Response(JSON.stringify(pirkimas), { headers: { 'Content-Type': 'application/json' } });
+}
+
+const t = pirkimas.turinys || {};
+const timelineItems = buildTimelineItems(pirkimas);
+const tedKorteles = buildTedKorteles(t);
+const cvpisUrl = getCvpisUrl(pirkimas);
+
+const verteStr = pirkimas.numatomaBendraPirkimoVerte
+  ? Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' € '
+  : '';
+const pageTitle = verteStr + pirkimas.pavadinimas;
+const pageDescription = `${pirkimas.pirkimoBudas || ''}\nPaskelbta: ${String(pirkimas.paskelbimoData).slice(0, 10)}\nVykdytojas: ${pirkimas.pirkimoVykdytojas}`;
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+---
+
+<Layout
+  pageTitle={pageTitle}
+  pageDescription={pageDescription}
+  pageImage={`https://viespirkiai.org/viesiejiPirkimai/${pirkimas.pirkimoId}.png`}
+  pageAuthor={pirkimas.pirkimoVykdytojas}
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <PageHeader>
+      <Fragment slot="subtext">{pirkimas.pirkimoBudas}{pirkimas.statusas && <> · <span class="text-muted">{pirkimas.statusas}</span></>}</Fragment>
+      {(!pirkimas.pavadinimas || pirkimas.pavadinimas.length < 1) ? <em>Nenurodyta</em> : pirkimas.pavadinimas}
+      {pirkimas.numatomaBendraPirkimoVerte && (
+        <> už <span class="amount">{Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;€</span></>
+      )}
+      <Fragment slot="actions">
+        {cvpisUrl && (
+          <a href={cvpisUrl} class="btn btn-outline btn-sm" target="_blank" aria-label="Peržiūrėti CVP IS puslapį">↗ CVP IS</a>
+        )}
+        <a href={`/viesiejiPirkimai/${pirkimas.pirkimoId}.json`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti pirkimo JSON duomenis">↗ JSON</a>
+      </Fragment>
+    </PageHeader>
+
+    <div class="mb-10">
+      <div class="text-muted mb-4 text-sm">
+        <i>BETA versija, galimos problemos bei netikslumai, apie kuriuos maloniai prašome pranešti <a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a><br />
+          Duomenys atnaujinti {String(pirkimas.turinioNuskaitymoData).slice(0, 16).replace('T', ' ')}</i>
+      </div>
+      {pirkimas.informacija && pirkimas.informacija !== pirkimas.pavadinimas && (
+        <div class="text-justify">{pirkimas.informacija}</div>
+      )}
+    </div>
+
+    <div class="grid-3 mb-10">
+      <PirkimasVykdytojas pirkimas={pirkimas} />
+      <PirkimasTerminai items={timelineItems} />
+      <PirkimasKlasifikacija pirkimas={pirkimas} />
+      <PirkimasVerte pirkimas={pirkimas} />
+      <PirkimasSalygos pirkimas={pirkimas} />
+    </div>
+
+    <section class="grid-2">
+      <PirkimasDokumentai failai={t.failai ?? []} />
+      <PirkimasSkelbimai skelbimai={t.skelbimai} />
+      <PirkimasTedNuorodos korteles={tedKorteles} />
+
+      {pirkimas.sutartys && pirkimas.sutartys.length > 0 && (
+        <section class="mb-7">
+          <h2>Sutartys</h2>
+          <div class="result-list mt-4">
+            {pirkimas.sutartys.map((item: any) => (
+              <SutartisCard item={item} showRedagavimoData={false} />
+            ))}
+          </div>
+        </section>
+      )}
+    </section>
+  </main>
+</Layout>

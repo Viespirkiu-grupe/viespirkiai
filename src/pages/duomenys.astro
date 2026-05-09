@@ -1,0 +1,231 @@
+---
+import Alert from '@design-system/components/Alert.astro';
+import Layout from '../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../lib/failai.js';
+import LinkListSection from '@design-system/components/content/LinkListSection.astro';
+import SourceGroup from '@design-system/components/content/SourceGroup.astro';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const apiSections = [
+  {
+    title: 'Sutartys',
+    description: 'Pavienių sutarčių duomenys pasiekiami <code>.json</code> formatu pagal sutarties unikalų ID:',
+    href: 'https://viespirkiai.org/sutartis/2007700250.json',
+    hrefHtml: 'https://viespirkiai.org/sutartis/<strong>2007700250</strong>.json',
+  },
+  {
+    title: 'Juridiniai asmenys',
+    description: 'Juridinių asmenų duomenys pasiekiami <code>.json</code> formatu pagal juridinio asmens JAR kodą:',
+    href: 'https://viespirkiai.org/asmuo/110053842.json',
+    hrefHtml: 'https://viespirkiai.org/asmuo/<strong>110053842</strong>.json',
+  },
+];
+
+const legalEntitySources = [
+  {
+    title: 'Įregistruoti asmenys',
+    links: [{ href: 'https://data.gov.lt/datasets/1484/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0' }],
+  },
+  {
+    title: 'Socialinis draudimas, atlyginimai, darbuotojai',
+    links: [{ href: 'https://atvira.sodra.lt/imones/rinkiniai/index.html', label: 'Atvira SODRA' }],
+  },
+  {
+    title: 'Mokesčiai',
+    links: [{ href: 'https://data.gov.lt/datasets/673/', label: 'VMI / data.gov.lt', badge: 'CC BY 4.0' }],
+  },
+  {
+    title: 'Finansai, pelnas, nuostoliai',
+    links: [
+      { href: 'https://data.gov.lt/datasets/1806/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0' },
+      { href: 'https://data.gov.lt/datasets/1666/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0' },
+    ],
+  },
+  {
+    title: 'Įstatinis kapitalas',
+    links: [{ href: 'https://data.gov.lt/datasets/1570/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0' }],
+  },
+  {
+    title: 'Dalyviai',
+    links: [{ href: 'https://data.gov.lt/datasets/1732/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0' }],
+  },
+  {
+    title: 'Transporto priemonės',
+    links: [{ href: 'https://www.regitra.lt/imone/atviri-duomenys/', label: 'Regitra' }],
+  },
+  {
+    title: 'Teismo nuosprendžiai',
+    links: [{ href: 'https://liteko.teismai.lt/viesasprendimupaieska/detalipaieska.aspx?detali=2', label: 'LITEKO' }],
+  },
+  {
+    title: 'Privačių interesų deklaracijos',
+    links: [{ href: 'https://pinreg.vtek.lt/app/deklaraciju-paieska', label: 'Privačių interesų registras / VTEK' }],
+  },
+  {
+    title: 'Darbo skelbimai',
+    links: [{ href: 'https://data.gov.lt/datasets/2894/', label: 'Užimtumo tarnyba / data.gov.lt', badge: 'CC BY 4.0' }],
+  },
+  {
+    title: 'Darbo teisės pažeidimai',
+    links: [{ href: 'https://vdi.lrv.lt/lt/informacija-apie-darbdaviu-padarytus-teises-pazeidimus/', label: 'Valstybinė darbo inspekcija' }],
+  },
+  {
+    title: 'Pranešimai apie steigimą, reorganizavimą, likvidavimą',
+    links: [{ href: 'https://www.registrucentras.lt/jar/infleid/', label: 'Registrų centras' }],
+  },
+];
+
+const sourceLists = [
+  {
+    title: 'Viešųjų pirkimų duomenys',
+    items: [
+      { href: 'https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109', label: 'CVP IS (sena) / Viešųjų pirkimų tarnyba' },
+      { href: 'https://viesiejipirkimai.lt', label: 'CVP IS (nauja) / Viešųjų pirkimų tarnyba' },
+      { href: 'https://vpt.lrv.lt/lt/statistika-ir-analize/pirkimu-ir-sutarciu-duomenys-1/sutarciu-duomenys/', label: 'Sutarčių duomenys / Viešųjų pirkimų tarnyba' },
+      { href: 'https://eviesiejipirkimai.lt/index.php?option=com_profile&Itemid=86&task=sutikimai&Itemid=98', label: 'Neskelbiamos derybos / Viešųjų pirkimų tarnyba' },
+      { href: 'https://vpt.lrv.lt/lt/nuorodos/kiti-duomenys/powerbi/melaginga-informacija-pateikusiu-tiekeju-sarasas-3/', label: 'Melagingą informaciją pateikusių tiekėjų sąrašas / VPT' },
+      { href: 'https://vpt.lrv.lt/lt/nuorodos/kiti-duomenys/powerbi/nepatikimi-tiekejai-1/', label: 'Nepatikimų tiekėjų sąrašas / VPT' },
+      { href: 'https://cvpp.eviesiejipirkimai.lt/', label: 'Centrinė viešųjų pirkimų platforma (CVPP) / VPT' },
+      { href: 'https://ted.europa.eu/', label: 'Tenders Electronic Daily (TED) / Europos Sąjunga' },
+      { href: 'https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp', label: 'Mažos vertės pirkimų tvarkos aprašai / VPT' },
+    ],
+  },
+  {
+    title: 'ES investicijų projektai',
+    items: [
+      { href: 'https://2021.esinvesticijos.lt/dokumentai/cpva-adminstruojami-projektai-ir-tiekejai', label: 'CPVA administruojami projektai ir tiekėjai / esinvesticijos.lt' },
+      { href: 'https://2014.esinvesticijos.lt/lt/finansavimas/paraiskos_ir_projektai', label: '2014-2020 m. ES investicijų projektai / esinvesticijos.lt' },
+    ],
+  },
+  {
+    title: 'Adresų koordinatės',
+    items: [
+      { href: 'https://nominatim.org/', label: 'Nominatim', suffixHtml: '(© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>)' },
+      { href: 'https://openstreetmap.org/', label: 'OpenStreetMap', suffixHtml: '(© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>)' },
+      { href: 'https://data.gov.lt/datasets/1287/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0', suffixHtml: '- vietovių linksniavimas' },
+    ],
+  },
+  {
+    title: 'Domenų savininkai',
+    items: [{ href: 'https://www.domreg.lt/', label: 'KTU Interneto paslaugų centras / DOMREG' }],
+  },
+  {
+    title: 'SABIS sąskaitos',
+    items: [{ href: 'https://data.gov.lt/datasets/3924/', label: 'Nacionalinis bendrųjų funkcijų centras / data.gov.lt', badge: 'CC BY 4.0' }],
+  },
+  {
+    title: 'Valstybės suteikta pagalba',
+    items: [{ href: 'https://kotis.kt.gov.lt/', label: 'Konkurencijos taryba / KOTIS' }],
+  },
+];
+
+const softwareSections = [
+  {
+    title: 'Operacinė sistema',
+    items: [{ href: 'https://ubuntu.com/download/server', label: 'Ubuntu Server 24.04 LTS' }],
+  },
+  {
+    title: 'Duomenų bazės',
+    items: [
+      { href: 'https://www.postgresql.org/', label: 'PostgreSQL' },
+      { href: 'https://typesense.org/', label: 'Typesense' },
+    ],
+  },
+  {
+    title: 'Programavimo kalbos',
+    items: [{ href: 'https://nodejs.org/en', label: 'JavaScript / NodeJS' }],
+  },
+  {
+    title: 'Failų sistema',
+    items: [{ href: 'https://en.wikipedia.org/wiki/ZFS', label: 'ZFS' }],
+  },
+  {
+    title: 'Komunikavimo priemonės',
+    items: [
+      { href: 'https://www.postfix.org/', label: 'Postfix' },
+      { href: 'https://signal.org/', label: 'Signal' },
+      { href: 'https://matrix.org/', label: 'Matrix' },
+      { href: 'https://joinmastodon.org', label: 'Mastodon' },
+    ],
+  },
+  {
+    title: 'Komandoje naudojami įrankiai',
+    items: [
+      { href: 'https://nextcloud.com/', label: 'Nextcloud' },
+      { href: 'https://libreoffice.org/', label: 'Libreoffice' },
+    ],
+  },
+];
+---
+<Layout
+  pageTitle="Duomenys"
+  pageDescription="Viešai prieinami pirkimų, juridinių asmenų duomenys bei jų šaltiniai"
+  pageImage="https://viespirkiai.org/duomenys.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <div class="page-header">
+      <h1>Duomenys</h1>
+    </div>
+
+    <Alert variant="muted" icon="—" className="mb-7">
+      Jokiems šioje svetainėje pateiktiems duomenims nėra taikomas jokios rūšies garantijos. Jie yra bendrinami siekiant padidinti viešųjų pirkimų skaidrumą ir padidinti valstybinių duomenų prieinamumą.
+    </Alert>
+
+    <section class="page-section" id="api">
+      <h2>API</h2>
+
+      <div class="grid-2">
+        {apiSections.map((item) => (
+          <section>
+            <h3>{item.title}</h3>
+            <p set:html={item.description} />
+            <a href={item.href} set:html={item.hrefHtml} />
+          </section>
+        ))}
+      </div>
+    </section>
+
+    <hr class="my-7" />
+
+    <section class="page-section" id="duomenu-eksportas">
+      <h2>Duomenų eksportai</h2>
+      <p><a href="/kontaktai">Susisiekite</a></p>
+    </section>
+
+    <hr class="my-7" />
+
+    <section class="page-section" id="duomenu-saltiniai">
+      <h2>Duomenų šaltiniai</h2>
+      <p class="text-muted text-sm mb-7">Šioje svetainėje pateikiami duomenys yra surenkami iš viešai prieinamų šaltinių. Informaciją mes vizualizuojame ir pateikiame patogesne forma.</p>
+
+      <div class="grid-2">
+        <SourceGroup title="Juridinių asmenų informacija" items={legalEntitySources} />
+
+        <div class="flex flex-col gap-5">
+          {sourceLists.map((section) => (
+            <LinkListSection title={section.title} items={section.items} />
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <hr class="my-7" />
+
+    <section class="page-section" id="programineIranga">
+      <h2>Naudojama programinė įranga</h2>
+      <p class="text-muted text-sm mb-7">Visas mūsų projektas pastatytas naudojant atviro kodo programinę įrangą.</p>
+
+      <div class="grid-3">
+        {softwareSections.map((section) => (
+          <LinkListSection title={section.title} items={section.items} />
+        ))}
+      </div>
+
+      <p class="text-muted text-sm mt-7">Dėkojame visiems, kurie prisideda duomenimis, resursais, patobulinimais ar kitais būdais.</p>
+    </section>
+  </main>
+</Layout>

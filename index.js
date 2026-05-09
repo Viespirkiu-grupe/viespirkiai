@@ -87,18 +87,21 @@ app.locals.faviconSVG = faviconSVG;
 app.locals.faviconSVGURLEncoded = encodeURIComponent(faviconSVG);
 app.locals.CONFIG = config;
 
-// CSS cache buster
+// CSS/JS cache busters
 const tailwindCssPath = path.join(__dirname, "public/dist/tailwind.css");
-const computeCssMd5 = () =>
-    crypto.createHash("md5").update(fs.readFileSync(tailwindCssPath)).digest("hex");
+const graphBundlePath = path.join(__dirname, "public/dist/graph-bundle.js");
+const computeMd5 = (filePath) =>
+    crypto.createHash("md5").update(fs.readFileSync(filePath)).digest("hex");
 
 if (config.dev) {
     app.use((_req, res, next) => {
-        res.locals.tailwindCssBuster = computeCssMd5();
+        res.locals.tailwindCssBuster = computeMd5(tailwindCssPath);
+        res.locals.graphBundleBuster = computeMd5(graphBundlePath);
         next();
     });
 } else {
-    app.locals.tailwindCssBuster = computeCssMd5();
+    app.locals.tailwindCssBuster = computeMd5(tailwindCssPath);
+    app.locals.graphBundleBuster = computeMd5(graphBundlePath);
 }
 
 // EJS

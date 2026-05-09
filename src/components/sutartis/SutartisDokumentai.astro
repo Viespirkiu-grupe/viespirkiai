@@ -1,0 +1,49 @@
+---
+import FileCard from '@design-system/components/FileCard.astro';
+
+interface Props {
+  dokumentai: any[] | null | undefined;
+}
+
+const { dokumentai } = Astro.props;
+
+function buildDocLinks(doc: any): { href: string; fileHref: string } {
+  if (doc.id && doc.parsiustas && doc.nuskaitytas) {
+    return { href: `/failas/${doc.id}`, fileHref: `https://failai.viespirkiai.org/${doc.id}` };
+  }
+  if (doc.parsiustas && doc.nuskaitytas) {
+    return {
+      href: `/failas/${doc.dok_id}/${doc.file_id}`,
+      fileHref: `https://failai.viespirkiai.org/${doc.dok_id}/${doc.file_id}`,
+    };
+  }
+  return { href: doc.proxyUrl, fileHref: doc.proxyUrl };
+}
+---
+
+<section class="span-full">
+  <h2>Dokumentai</h2>
+  {dokumentai && dokumentai.length > 0
+    ? <div class="flex flex-col gap-2">
+        {dokumentai.map((doc: any) => {
+          const title = doc.pavadinimas || '—';
+          const ext = (doc.extension || (title.includes('.') ? title.split('.').pop() : '') || '').toLowerCase();
+          const { href, fileHref } = buildDocLinks(doc);
+          return (
+            <div class="min-w-0">
+              <FileCard
+                title={title}
+                href={href}
+                ext={ext}
+                actions={[
+                  { href: fileHref, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+                  { href: doc.url, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
+                ]}
+              />
+            </div>
+          );
+        })}
+      </div>
+    : <p class="text-muted">Pateiktų dokumentų nėra.</p>
+  }
+</section>

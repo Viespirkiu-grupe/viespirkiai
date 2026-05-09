@@ -1,0 +1,42 @@
+---
+/**
+ * "Showing only N of M …" notice with a "Show all" link.
+ *
+ * Used by every section on the asmuo (entity) detail page that supports
+ * a per-section row limit.  Clicking the link sets the `<paramName>=max`
+ * query param and jumps to the section anchor, expanding the section to
+ * its full row count.
+ *
+ * Lithuanian has gendered plural forms; the `gender` prop selects between
+ * masculine ("Rodomi tik" / "Rodyti visus") and feminine ("Rodomos tik" /
+ * "Rodyti visas") so the surrounding noun agrees correctly.
+ */
+interface Props {
+  /** Total row count available. */
+  count: number;
+  /** Number of rows currently shown — notice hides itself when count <= shown. */
+  shown: number;
+  /** Section anchor id (without `#`). */
+  anchor: string;
+  /**
+   * Query-parameter name controlling this section's limit.
+   * Convention: `<sectionLimit>` (e.g. `kotisLimit`, `domenaiLimit`).
+   */
+  paramName: string;
+  /** Plural noun describing the rows (e.g. "domenai", "naujausi pranešimai"). */
+  label: string;
+  /** Grammatical gender of the noun in `label` — defaults to masculine. */
+  gender?: 'm' | 'f';
+}
+
+const { count, shown, anchor, paramName, label, gender = 'm' } = Astro.props;
+const showingPrefix = gender === 'f' ? 'Rodomos tik' : 'Rodomi tik';
+const showAllVerb = gender === 'f' ? 'Rodyti visas' : 'Rodyti visus';
+---
+
+{count > shown && (
+  <p class="text-muted text-sm mb-4">
+    {showingPrefix}{' '}{shown}{' '}{label}.{` `}
+    <a href={`?${paramName}=max#${anchor}`}>{showAllVerb} ({count})</a>
+  </p>
+)}

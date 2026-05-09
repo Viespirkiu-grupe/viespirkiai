@@ -1,0 +1,168 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Map from '@design-system/components/maps/Map.astro';
+import AsmuoHeader from '../../components/asmuo/AsmuoHeader.astro';
+import AsmuoBasics from '../../components/asmuo/AsmuoBasics.astro';
+import AsmuoStats from '../../components/asmuo/AsmuoStats.astro';
+import AsmuoSpecial from '../../components/asmuo/AsmuoSpecial.astro';
+import VidutinisDarboUzmokestis from '../../components/asmuo/VidutinisDarboUzmokestis.astro';
+import DarbuotojuSkaicius from '../../components/asmuo/DarbuotojuSkaicius.astro';
+import Imokos from '../../components/asmuo/Imokos.astro';
+import Sutartys from '../../components/asmuo/Sutartys.astro';
+import MvpAprasai from '../../components/asmuo/MvpAprasai.astro';
+import Melagiai from '../../components/asmuo/Melagiai.astro';
+import Nepatikimi from '../../components/asmuo/Nepatikimi.astro';
+import FinansinesAtaskaitos from '../../components/asmuo/FinansinesAtaskaitos.astro';
+import DarboSkelbimai from '../../components/asmuo/DarboSkelbimai.astro';
+import RcPranesimai from '../../components/asmuo/RcPranesimai.astro';
+import Domenai from '../../components/asmuo/Domenai.astro';
+import Kotis from '../../components/asmuo/Kotis.astro';
+import EsInvesticijos from '../../components/asmuo/EsInvesticijos.astro';
+import VdiPazeidimai from '../../components/asmuo/VdiPazeidimai.astro';
+import Regitra from '../../components/asmuo/Regitra.astro';
+import TeismoNuosprendziai from '../../components/asmuo/TeismoNuosprendziai.astro';
+import PinregDeklaracijos from '../../components/asmuo/PinregDeklaracijos.astro';
+import { getJuridinisInfo } from '@/modules/juridiniai/getJuridinisInfo.js';
+import config from '../../lib/config.ts';
+import '@/utils/time.js';
+import '@/utils/linksniai.js';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const raw = Astro.params.jarKodas!;
+if (!/^\d{1,9}(\.json|\.png)?$/.test(raw)) return Astro.redirect('/404');
+
+const format = raw.endsWith('.json') ? 'json' : raw.endsWith('.png') ? 'png' : 'html';
+const jarKodas = raw.replace(/\.(json|png)$/, '');
+
+const query = Object.fromEntries(Astro.url.searchParams);
+
+function parseLimitai(q: Record<string, string>) {
+  if (q.limitai === 'false') return {};
+  const defaults: Record<string, number> = {
+    regitra: 5, teismoNuosprendziai: 10, sutartys: 10, darboSkelbimai: 5,
+    rcPranesimai: 3, domenai: 3, pinreg: 3, kotis: 3, esInvesticijos: 5,
+    mvpAprasai: 1, vdiPazeidimai: 3,
+  };
+  const map: Record<string, string> = {
+    transportoPriemonesLimit: 'regitra', teismoNuosprendziaiLimit: 'teismoNuosprendziai',
+    sutartysLimit: 'sutartys', darboSkelbimaiLimit: 'darboSkelbimai',
+    rcPranesimaiLimit: 'rcPranesimai', domenaiLimit: 'domenai',
+    pinregLimit: 'pinreg', kotisLimit: 'kotis',
+    esInvesticijosLimit: 'esInvesticijos', mvpAprasaiLimit: 'mvpAprasai',
+    vdiPazeidimaiLimit: 'vdiPazeidimai',
+  };
+  return Object.fromEntries(
+    Object.entries(map).map(([qk, k]) => {
+      const val = q[qk];
+      if (val === 'max') return [k, { limit: null }];
+      if (val !== undefined) return [k, { limit: isNaN(Number(val)) ? defaults[k] : Number(val) }];
+      return [k, { limit: defaults[k] }];
+    })
+  );
+}
+
+const juridinioInfo = await getJuridinisInfo(jarKodas, parseLimitai(query));
+
+if (juridinioInfo.error === 404) return Astro.redirect('/404');
+
+if (juridinioInfo.special) {
+  return Astro.rewrite(`/asmuo/special?${new URLSearchParams({
+    id: jarKodas,
+    pavadinimas: juridinioInfo.pavadinimas,
+    aprasymas: juridinioInfo.aprasymas,
+  })}`);
+}
+
+const asmuo: any = 'asmuo' in juridinioInfo ? juridinioInfo.asmuo : undefined;
+
+if (format === 'json' && asmuo) {
+  return new Response(JSON.stringify(asmuo, null, 2), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+if (format === 'png' && asmuo) {
+  return new Response(new Uint8Array(await (await import('@/utils/openGraphImage.js')).getOpenGraphImage(
+    asmuo.jar.formosPavadinimas || 'Juridinis asmuo',
+    asmuo.jar.pavadinimas.replace(asmuo.jar.formosPavadinimas || '', '').replaceAll('"', ''),
+    `Registruotas: ${asmuo.jar.registravimoData}\nAdresas: ${asmuo.jar.adresas}\nVid. atlyginimas ${asmuo.sodra?.vidutinisAtlyginimas || 'nežinomas'} (€/mėn)\nDirba ${asmuo.sodra?.draustieji || 'nežinomas skaičius'} darb.`,
+    `viespirkiai.org/asmuo/${asmuo.jar.jarKodas}`,
+  )), {
+    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=7200, s-maxage=7200' },
+  });
+}
+
+const finansaiLimit = query.finansaiLimit === 'max' ? 9999999 : Number(query.finansaiLimit) || 1;
+const mvpAprasaiLimit = query.mvpAprasaiLimit === 'max' ? 9999999 : Number(query.mvpAprasaiLimit) || 1;
+---
+
+{asmuo ? (
+  <Layout
+    pageTitle={asmuo.jar.pavadinimas}
+    pageDescription="Juridinio asmens informacija"
+    pageImage={`https://viespirkiai.org/asmuo/${asmuo.jar.jarKodas}.png`}
+    colorScheme={colorScheme}
+    font={font}
+    customHead={config.customHead}
+  >
+    <main>
+      <AsmuoHeader asmuo={asmuo} />
+
+      <div class="grid-3 mb-7 items-start">
+        <div>
+          <div class="text-muted text-xs mb-4">Duomenys gali būti pasenę</div>
+          <AsmuoBasics asmuo={asmuo} />
+        </div>
+        {asmuo.jar.location && (
+          <Map
+            id="asmuo-map"
+            lat={asmuo.jar.location[0]}
+            lon={asmuo.jar.location[1]}
+            zoom={16}
+            height="100%"
+            class="h-full min-h-70 col-[span_2]"
+          />
+        )}
+      </div>
+
+      <AsmuoStats asmuo={asmuo} />
+
+      <VidutinisDarboUzmokestis asmuo={asmuo} />
+      <DarbuotojuSkaicius asmuo={asmuo} />
+      <Imokos asmuo={asmuo} />
+      <Sutartys asmuo={asmuo} />
+      <MvpAprasai asmuo={asmuo} mvpAprasaiLimit={mvpAprasaiLimit} />
+
+      <div class="grid-2 mb-10">
+        <Melagiai asmuo={asmuo} />
+        <Nepatikimi asmuo={asmuo} />
+      </div>
+
+      <FinansinesAtaskaitos asmuo={asmuo} finansaiLimit={finansaiLimit} />
+
+      <div class="grid-2 mb-10">
+        <DarboSkelbimai asmuo={asmuo} />
+        <RcPranesimai asmuo={asmuo} />
+        <Domenai asmuo={asmuo} />
+        <Kotis asmuo={asmuo} />
+        <EsInvesticijos asmuo={asmuo} />
+        <VdiPazeidimai asmuo={asmuo} />
+      </div>
+
+      <Regitra asmuo={asmuo} />
+      <TeismoNuosprendziai asmuo={asmuo} />
+      <PinregDeklaracijos asmuo={asmuo} />
+    </main>
+  </Layout>
+) : (
+  <AsmuoSpecial
+    jarKodas={jarKodas}
+    pavadinimas={juridinioInfo.pavadinimas}
+    aprasymas={juridinioInfo.aprasymas}
+    colorScheme={colorScheme}
+    font={font}
+  />
+)}

@@ -1,0 +1,389 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../lib/failai.js';
+import CopyField from '@design-system/components/content/CopyField.astro';
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
+
+if (Astro.request.method === 'POST') {
+  const { StreamableHTTPServerTransport } = await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
+  const { createMcpServer } = await import('@/modules/mcp/server.js');
+  const { requestContext } = await import('@/modules/mcp/mcpLogger.js');
+
+  const server = createMcpServer();
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  await server.connect(transport);
+
+  const ctx = { userAgent: Astro.request.headers.get('user-agent') ?? null };
+  const nodeReq = (Astro.locals as any).req;
+  const nodeRes = (Astro.locals as any).res;
+
+  await requestContext.run(ctx, () => transport.handleRequest(nodeReq, nodeRes, nodeReq.body));
+  return new Response(null, { status: 200 });
+}
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+const mcpUrl = 'https://viespirkiai.org/mcp';
+const mcpConfig = `{
+  "servers": {
+    "viespirkiai": {
+      "url": "https://viespirkiai.org/mcp"
+    }
+  }
+}`;
+
+const categories = [
+  {
+    number: '01',
+    title: 'Sutartys',
+    description: 'Pirkėjai, pirkėjai, tiekėjai, sumos ir visi pridėti dokumentai',
+  },
+  {
+    number: '02',
+    title: 'Viešieji pirkimai',
+    description: 'Naujos CVP IS skelbimai bei jų paieška',
+  },
+  {
+    number: '03',
+    title: 'Dokumentai',
+    description: 'Pilna tekstinė paieška sutarčių dokumentuose, bei jų skaitymas, naršymas archyvuose. OCR rezultatai kur atlikta',
+  },
+  {
+    number: '04',
+    title: 'Juridiniai asmenys',
+    description: 'Įmonių profilis - bendra informacija, Sodra, VMI, finansinės ataskaitos, teismo nuosprendžiai, darbo skelbimai ir t.t.',
+  },
+  {
+    number: '05',
+    title: 'Privatūs interesai',
+    description: 'PINREG deklaracijos - ryšiai su verslu, darbovietės, sutuoktinių ryšiai. Pagal vardą arba juridinį asmenį',
+  },
+];
+
+const conversation = [
+  {
+    type: 'user',
+    content: 'Kokias sutartis yra sudaręs Remigijus Žemaitaitis? Ar ten yra kažkas įtartino?',
+  },
+  {
+    type: 'ai-tool',
+    tool: 'Searched available tools',
+    content: 'Pirmiausia ieškosiu sutarčių dokumentuose pagal Remigijaus Žemaitaičio vardą ir pavardę.',
+  },
+  {
+    type: 'ai-tool',
+    tool: 'Search failai',
+    content: 'Pastebiu, kad daugelis dokumentų susiję su JAR kodu 306660048 ir el. paštu r*********@hotmail.com. Pažiūrėkime kas slepiasi po šiuo kodu ir detaliau patikrinkime kelis svarbiausius dokumentus.',
+  },
+  {
+    type: 'ai-tool',
+    tool: 'Get juridinis',
+    content: 'Dabar pažvelkime į konkrečius dokumentus, ypač tuos, kuriuose figūruoja el. paštas r*********@hotmail.com - tai sutartys 2561 ir 2562. Taip pat patikrinsime didžiausią išlaidų dalį - nežinomus tiekėjus.',
+  },
+  {
+    type: 'ai-tool',
+    tool: 'Used Viešpirkiai integration',
+    content: 'Turiu pakankamai duomenų, kad galėčiau pateikti išsamią ataskaitą. Patikrinsiu dar vieną sutartį su el. paštu r*********@hotmail.com.',
+  },
+  {
+    type: 'ai-tool',
+    tool: 'Get sutartis',
+    content: 'Dabar turiu išsamų vaizdą. Pateikiu analizę.',
+  },
+  {
+    type: 'ai-report',
+  },
+];
+---
+<Layout
+  pageTitle="MCP serveris"
+  pageDescription="Prijunkite savo DI asistentą prie Viešpirkių — sutartys, viešieji pirkimai, dokumentai ir juridiniai asmenys vienoje vietoje."
+  pageImage="https://viespirkiai.org/mcp.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <style>
+    .mcp-chat-outer {
+      position: relative;
+      max-height: 620px;
+      overflow: hidden;
+      -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+      mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    }
+
+    .mcp-chat {
+      background: var(--shade-2);
+      border: var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .mcp-msg {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mcp-msg-user {
+      align-items: flex-end;
+    }
+
+    .mcp-msg-ai {
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .mcp-bubble {
+      padding: 12px 16px;
+      border-radius: var(--radius-lg);
+      font-size: var(--text-sm);
+      line-height: 1.6;
+    }
+
+    .mcp-bubble-user {
+      background: var(--black);
+      color: var(--white);
+      border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+      max-width: 85%;
+    }
+
+    .mcp-bubble-ai {
+      background: var(--white);
+      border: var(--border);
+      border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg) var(--radius-lg);
+      width: 100%;
+    }
+
+    .mcp-tool {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: var(--text-xs);
+      color: var(--gray);
+      font-family: var(--font-mono);
+    }
+
+    .mcp-cats-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .mcp-cats-list li {
+      display: flex;
+      gap: 16px;
+      padding: 16px 0;
+      border-b: var(--border);
+    }
+
+    .mcp-cats-list li:last-child {
+      border-b: none;
+    }
+
+    .mcp-cat-num {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--gray);
+      flex-shrink: 0;
+      width: 20px;
+      padding-top: 3px;
+    }
+
+    @media (max-width: 768px) {
+      .mcp-bubble-user {
+        max-width: 92%;
+      }
+
+      .mcp-chat-outer {
+        max-height: 700px;
+      }
+
+      .mcp-mobile-px {
+        padding-inline: 16px;
+      }
+    }
+  </style>
+
+  <main>
+
+    <!-- Hero -->
+    <div class="py-7 border-b mcp-mobile-px">
+      <p class="section-title mb-3">Model Context Protocol</p>
+      <h1 class="mb-3">Viešpirkiai Jūsų DI programoje</h1>
+      <p class="lead mb-7">Leiskite savo DI asistentui pačiam rasti atsakymus viešųjų pirkimų duomenyse</p>
+      <CopyField value={mcpUrl} buttonId="mcpCopyUrlBtnHero" buttonLabel="Kopijuoti URL" />
+    </div>
+
+    <!-- Content: categories left, chat right -->
+    <div class="grid-2 align-start py-10 border-b mcp-mobile-px">
+
+      <!-- Categories -->
+      <div>
+        <h2 class="mb-4">Kas prieinama</h2>
+        <ol class="mcp-cats-list">
+          {categories.map((item) => (
+            <li>
+              <span class="mcp-cat-num">{item.number}</span>
+              <div>
+                <strong>{item.title}</strong>
+                <p class="text-muted text-sm mb-0">{item.description}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        <p class="mt-4">Turite idėjų? <a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a></p>
+      </div>
+
+      <!-- Chat -->
+      <div>
+        <div class="mcp-chat-outer">
+          <div class="mcp-chat">
+            {conversation.map((item) => (
+              item.type === 'user' ? (
+                <div class="mcp-msg mcp-msg-user">
+                  <div class="mcp-bubble mcp-bubble-user">
+                    {item.content}
+                  </div>
+                </div>
+              ) : item.type === 'ai-tool' ? (
+                <div class="mcp-msg mcp-msg-ai">
+                  <div class="mcp-tool"><span>↗↙</span> {item.tool}</div>
+                  <p class="text-sm text-muted mb-0 px-1">{item.content}</p>
+                </div>
+              ) : (
+                <div class="mcp-msg mcp-msg-ai">
+                  <div class="mcp-bubble mcp-bubble-ai">
+                    <p class="text-xs text-muted mb-3 font-mono">PIRKĖJAS: NEMUNO AUŠRA (JAR 306660048)</p>
+
+                    <TableWrapper className="mb-3">
+                      <Table>
+                        <tbody>
+                          <tr>
+                            <td colspan="2"><strong>Automobilio nuomos sutartis Nr. 2024/01</strong></td>
+                            <td><strong>31 501,70 €</strong></td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted text-xs">Interesų konfliktas</td>
+                            <td class="text-muted text-xs">Tiekėjas</td>
+                            <td class="text-muted text-xs">Laikotarpis</td>
+                          </tr>
+                          <tr>
+                            <td></td>
+                            <td class="text-xs">Remigijus Žemaitaitis (fizinis asmuo)</td>
+                            <td class="text-xs">2024-01-17–2024-11-13</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted text-xs">Mėnesinis mokestis</td>
+                            <td class="text-muted text-xs">Tipas</td>
+                            <td></td>
+                          </tr>
+                          <tr>
+                            <td class="text-xs">3 176,47 €/mėn.</td>
+                            <td class="text-xs">Mažos vertės pirkimas (MVP)</td>
+                            <td></td>
+                          </tr>
+                        </tbody>
+                      </Table>
+                    </TableWrapper>
+
+                    <p class="mb-3 text-xs">⚠ Partijos pirmininkas Remigijus Žemaitaitis sudarė sutartį su savo paties vadovaujama partija - jis yra vienu metu ir pirkėjo vadovas, ir paslaugos tiekėjas. El. paštas sutartyje: r*********@hotmail.com.</p>
+
+                    <TableWrapper className="mb-0">
+                      <Table>
+                        <tbody>
+                          <tr>
+                            <td colspan="2"><strong>Automobilio nuomos sutartis Nr. 2024/02</strong></td>
+                            <td><strong>18 057,78 €</strong></td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted text-xs">Susijusi sutartis</td>
+                            <td class="text-muted text-xs">Tiekėjas</td>
+                            <td class="text-muted text-xs">Laikotarpis</td>
+                          </tr>
+                          <tr>
+                            <td></td>
+                            <td class="text-xs">Daiva Petkevičienė (fizinis asmuo)</td>
+                            <td class="text-xs">2024-03-12–2024-11-13</td>
+                          </tr>
+                        </tbody>
+                      </Table>
+                    </TableWrapper>
+                  </div>
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Setup -->
+    <div class="py-10 flex flex-wrap align-start gap-5 mcp-mobile-px items-stretch">
+      <div class="max-w-full">
+        <p>Pridėkite šį MCP serverį:</p>
+
+        <div class="mb-4">
+          <CopyField value={mcpUrl} buttonId="mcpCopyUrlBtnSetup" buttonLabel="Kopijuoti URL" />
+        </div>
+
+        <p>arba konfigūraciją:</p>
+
+        <div>
+            <div class="border rounded-lg overflow-hidden min-w-70">
+              <div class="bg-lighter-gray px-4 py-2 border-b flex items-center justify-between">
+                <span class="text-xs text-muted font-mono">.mcp.json</span>
+                <button id="mcpCopyConfigBtn" class="btn btn-secondary btn-sm" type="button">Kopijuoti</button>
+              </div>
+            <pre class="m-0 border-0 rounded-0 text-sm"><code>{mcpConfig}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex flex-col justify-between h-full">
+          <div>
+            <h3 class="inline-block">Claude</h3> <i class="text-muted text-sm">(išskyrus free)</i>
+            <p class="mb-7">Settings → Connectors → Add custom connector</p>
+          </div>
+
+          <div>
+            <p>
+              <i>Naudojate Viešpirkių MCP kitur?</i><br />
+              <i>Kažkas neveikia?</i><br />
+              <i>Turite pasiūlymų?</i><br />
+              <i>Tiesiog norite paklausti?</i>
+            </p>
+
+            <p>Parašykite <a href="mailto:viespirkiai@viespirkiai.org">viespirkiai@viespirkiai.org</a>!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="text-muted text-sm">
+      <em>Primename, kad dirbtinis intelektas yra dirbtinis intelektas ir atsakymai gali būti klaidingi.</em>
+    </p>
+
+    <script is:inline>
+      // Note: copy buttons rendered by <CopyField> are wired up by the
+      // component itself.  Only the JSON-config copy button (which reads the
+      // adjacent <pre> contents at click time) needs page-level handling.
+      (function () {
+        const copyConfigBtn = document.getElementById('mcpCopyConfigBtn');
+        if (copyConfigBtn) {
+          copyConfigBtn.addEventListener('click', async function () {
+            const configText = this.closest('div').nextElementSibling.textContent.trim();
+            await navigator.clipboard.writeText(configText);
+            copyConfigBtn.textContent = '✓';
+            setTimeout(() => { copyConfigBtn.textContent = 'Kopijuoti'; }, 1500);
+          });
+        }
+      })();
+    </script>
+  </main>
+</Layout>

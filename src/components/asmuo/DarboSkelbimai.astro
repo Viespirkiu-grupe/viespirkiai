@@ -1,0 +1,25 @@
+---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import TruncationNotice from '@design-system/components/TruncationNotice.astro';
+
+const { asmuo } = Astro.props;
+if (!(asmuo.darboSkelbimai?.rows > 0)) return;
+const { rows, skelbimai } = asmuo.darboSkelbimai;
+---
+
+<div class="page-section mb-10" id="darboSkelbimai">
+  <h2><a href="#darboSkelbimai" class="no-style">Darbo skelbimai</a></h2>
+  <TruncationNotice count={rows} shown={skelbimai.length} anchor="darboSkelbimai" paramName="darboSkelbimaiLimit" label="naujausi skelbimai" />
+  <div class="result-list">
+    {skelbimai.map((s: any) => (
+      <ResultCardShell>
+        <dl slot="meta" class="result-card-meta">
+          <div><dt class="sr-only">Paskelbta</dt><dd>Paskelbta {s.ikelimo_data}</dd></div>
+          <div><dt class="sr-only">Galioja</dt><dd>{s.galioja_nuo || 'nežinoma'} – {s.galioja_iki || 'nežinoma'}</dd></div>
+        </dl>
+        <h3 slot="title" class="result-card-title">{s.profesijos_pareigybes_pav || 'Profesijos pareigybės pavadinimas nenurodytas'}</h3>
+        <p class="text-sm text-muted mt-2 line-clamp-4">{s.darbo_aprasymas_lt || 'Darbo aprašymas nenurodytas'}</p>
+      </ResultCardShell>
+    ))}
+  </div>
+</div>

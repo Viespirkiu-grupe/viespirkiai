@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@source "../**/*.{astro,html,js,jsx,ts,tsx,md,mdx}";
+@source "../../views/**/*.ejs";
+@source "../../routes/**/*.js";
+@source "../../public/**/*.js";
+
+@import "../design-system/foundation/theme.css";
+@import "../design-system/foundation/variables.css";
+@import "../design-system/foundation/reset.css";
+@import "../design-system/foundation/typography.css";
+@import "../design-system/foundation/layout-primitives.css";
+@import "../design-system/foundation/spacing.css";
+@import "../design-system/foundation/grid.css";
+@import "../design-system/foundation/data-utilities.css";
+@import "../design-system/foundation/docs.css";
+@import "../design-system/foundation/buttons.css";
+@import "../design-system/foundation/forms.css";
+@import "../design-system/foundation/cards.css";
+@import "../design-system/foundation/navigation.css";
+@import "../design-system/foundation/toasts.css";
+@import "../design-system/foundation/modals.css";
+@import "../design-system/foundation/data.css";
+@import "../design-system/foundation/spinners.css";
+@import "../design-system/foundation/code.css";
+@import "../design-system/foundation/swatches.css";
+@import "../design-system/foundation/view-transitions.css";
+@import "../design-system/foundation/map.css";
+@import "../design-system/foundation/charts.css";
+@import "../design-system/foundation/print.css";

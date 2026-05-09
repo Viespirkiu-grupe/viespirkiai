@@ -1,0 +1,68 @@
+---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+
+interface Props {
+  item: any;
+}
+const { item } = Astro.props;
+---
+
+<ResultCardShell clickable={true}>
+  <dl slot="meta" class="result-card-meta">
+    {item.statusas && (
+      <div>
+        <dt class="sr-only">Statusas</dt>
+        <dd class={item.statusas === 'Vykdomas' ? 'badge-active' : ''}>{item.statusas}</dd>
+      </div>
+    )}
+    {item.pirkimoBudas && (
+      <div>
+        <dt class="sr-only">Pirkimo būdas</dt>
+        <dd>{item.pirkimoBudas}</dd>
+      </div>
+    )}
+    {item.paskelbimoData && (
+      <div>
+        <dt class="sr-only">Paskelbimo data</dt>
+        <dd>
+          <abbr aria-hidden="true" title="Paskelbimo data" class="relative z-1">Paskelb.</abbr>
+          <time datetime={String(item.paskelbimoData).slice(0, 10)}>{String(item.paskelbimoData).slice(0, 10)}</time>
+        </dd>
+      </div>
+    )}
+  </dl>
+
+  <div slot="title" class="flex align-baseline gap-3">
+    <h3 class="result-card-title">
+      {(!item.pavadinimas || item.pavadinimas.length < 1) ? (
+        <em>Nenurodyta</em>
+      ) : (
+        <a href={`/viesiejiPirkimai/${item.pirkimoId}`}>{item.pavadinimas}</a>
+      )}
+    </h3>
+  </div>
+
+  <div slot="footer" class="result-card-footer">
+    {item.pirkimoVykdytojas && (
+      <span>
+        <strong>Vykdytojas:</strong>
+        {item.pirkimoVykdytojas.slice(0, 80)}{item.pirkimoVykdytojas.length > 80 ? '…' : ''}
+      </span>
+    )}
+    {item.pasiulymuPateikimoTerminas && (
+      <span>
+        <strong>Pasiūlymų terminas:</strong>
+        <time datetime={String(item.pasiulymuPateikimoTerminas).slice(0, 10)}>
+          {String(item.pasiulymuPateikimoTerminas).slice(0, 16).replace('T', ' ')}
+        </time>
+      </span>
+    )}
+    {item.numatomaBendraPirkimoVerte && (
+      <span>
+        <strong>Numatoma vertė:</strong>
+        <span>{Number(item.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;€</span>
+      </span>
+    )}
+    {item.informacija && item.informacija !== item.pavadinimas && item.informacija}
+  </div>
+</ResultCardShell>

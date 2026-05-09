@@ -1,0 +1,24 @@
+---
+interface ContactMethodItem {
+  title: string;
+  description?: string;
+  valueHtml: string;
+}
+
+interface Props {
+  items: ContactMethodItem[];
+  titleTag?: 'h2' | 'h3' | 'h4';
+  spaced?: boolean;
+}
+
+const { items, titleTag = 'h2', spaced = true } = Astro.props;
+const TitleTag = titleTag;
+---
+
+{items.map((item, index) => (
+  <section class={spaced && index > 0 ? 'mt-7' : undefined}>
+    <TitleTag>{item.title}</TitleTag>
+    {item.description && <p class="text-muted text-sm">{item.description}</p>}
+    <p set:html={item.valueHtml} />
+  </section>
+))}

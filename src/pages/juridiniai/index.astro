@@ -1,0 +1,235 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Map from '@design-system/components/maps/Map.astro';
+import SearchForm from '@design-system/components/content/SearchForm.astro';
+import JuridiniaiResults from '../../components/juridiniai/JuridiniaiResults.astro';
+import { searchJar } from '@/modules/juridiniai/search.js';
+import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
+import { getColorScheme, getFont, cleanQuery } from '../../lib/failai.js';
+import config from '../../lib/config.ts';
+import { objectsToJsonlStream } from '@/utils/jsonl.js';
+import { objectsToCsvStream } from '@/utils/csv.js';
+import { Readable as NodeReadable, PassThrough } from 'node:stream';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const cleaned = cleanQuery(Astro.url);
+if (cleaned.redirectTo) return Astro.redirect(cleaned.redirectTo);
+
+const query = cleaned.query;
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 250;
+const limit = query.limit === 'max' ? MAX_LIMIT : (parseInt(query.limit) || DEFAULT_LIMIT);
+const page = parseInt(query.page) || 1;
+
+const hasSearch = query.search || (query.location && query.locationRadius) || query.adresas;
+
+function buildQueryParams(q: Record<string, string>) {
+  if (q.search) return `&search=${encodeURIComponent(q.search)}`;
+  if (q.location && q.locationRadius) return `&location=${q.location}&locationRadius=${q.locationRadius}`;
+  if (q.adresas) return `&adresas=${encodeURIComponent(q.adresas)}`;
+  return '&';
+}
+
+function buildNumberOfResults({ results, total, elapsed, searchEngine }: { results: unknown[]; total: number; elapsed: number; searchEngine: string }) {
+  const trukme = (elapsed / 1000).toFixed(2) + 's';
+  const source = `<span class="inline">(${trukme}, ${searchEngine})</span>`;
+  if (results.length < total) return `Rodomi ${results.length} iš ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`;
+  return `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų'])} ${source}`;
+}
+
+let results: any[] = [];
+let total = 0;
+let searchEngine = '';
+let numberOfResults = '';
+let queryParams = '&';
+let galimaEksportuoti = false;
+let pageCount = 1;
+
+if (hasSearch) {
+  if (query.jsonl || query.json || query.csv) {
+    const { results: allResults } = await searchJar(query, { page, limit: MAX_LIMIT });
+
+    if (query.json) {
+      return new Response(JSON.stringify(allResults), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const pass = new PassThrough();
+    const readable = NodeReadable.from(allResults);
+
+    if (query.jsonl) {
+      readable.pipe(objectsToJsonlStream()).pipe(pass);
+      return new Response(NodeReadable.toWeb(pass) as unknown as BodyInit, {
+        headers: {
+          'Content-Type': 'application/x-ndjson',
+          'Content-Disposition': `attachment; filename=viespirkiai-${new Date().toISOString()}.jsonl`,
+        },
+      });
+    }
+
+    if (query.csv) {
+      readable.pipe(objectsToCsvStream()).pipe(pass);
+      return new Response(NodeReadable.toWeb(pass) as unknown as BodyInit, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename=viespirkiai-${new Date().toISOString()}.csv`,
+        },
+      });
+    }
+  }
+
+  const startas = performance.now();
+  ({ results, total, searchEngine } = await searchJar(query, { page, limit }));
+  const elapsed = performance.now() - startas;
+
+  numberOfResults = buildNumberOfResults({ results, total, elapsed, searchEngine });
+  queryParams = buildQueryParams(query);
+  galimaEksportuoti = total > 0 && total <= MAX_LIMIT;
+  pageCount = Math.ceil(total / limit);
+}
+
+const tikRezultatai = !!query.tikRezultatai;
+const juridiniaiMapConfig = {
+  mode: 'juridiniai',
+  center: [55.1694, 23.8813],
+  zoom: 7,
+  overlayTileUrl: '/juridiniai/map/tiles/{z}/{x}/{y}.png',
+  overlayOpacity: 0.6,
+  maxNativeZoom: 16,
+  maxZoom: 16,
+  overlayBlurPx: 5,
+  detailZoomThreshold: 17,
+  viewportUrlTemplate: '/juridiniai/map/viewport?minLat={minLat}&minLon={minLon}&maxLat={maxLat}&maxLon={maxLon}',
+  detailPointStyle: {
+    radius: 6,
+    color: 'black',
+    fillColor: 'black',
+    fillOpacity: 1,
+    weight: 1,
+  },
+  detailClickUrlTemplate: '/juridiniai?location={lat},{lon}&locationRadius=10',
+};
+---
+
+{tikRezultatai ? (
+  <JuridiniaiResults
+    results={results}
+    numberOfResults={numberOfResults}
+    galimaEksportuoti={galimaEksportuoti}
+    queryParams={queryParams}
+    page={page}
+    pageCount={pageCount}
+  />
+) : (
+  <Layout
+    pageTitle="Juridinių asmenų paieška"
+    pageImage="https://viespirkiai.org/juridiniai.png"
+    colorScheme={colorScheme}
+    font={font}
+    customHead={config.customHead}
+  >
+    <main>
+      <SearchForm title="Juridinių asmenų paieška" searchValue={query.search} />
+
+      <section class="results" id="juridiniaiRezultatai">
+        {hasSearch ? (
+          <JuridiniaiResults
+            results={results}
+            numberOfResults={numberOfResults}
+            galimaEksportuoti={galimaEksportuoti}
+            queryParams={queryParams}
+            page={page}
+            pageCount={pageCount}
+          />
+        ) : (
+          <>
+            <script>
+              window.addEventListener('DOMContentLoaded', () => {
+                const search = document.getElementById('search');
+                if (search) search.focus();
+              });
+            </script>
+            <br />
+            <Map id="map" class="h-[60vh] rounded-lg" height="60vh" config={juridiniaiMapConfig} />
+          </>
+        )}
+        <br />
+        <div class="flex gap-2 justify-center mb-2">
+          <a href="/juridiniai/topAdresai" class="btn btn-outline btn-sm">↗ Top adresai</a>
+        </div>
+      </section>
+
+      <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('searchForm');
+        const inputElement = document.getElementById('search');
+        const results = document.getElementById('juridiniaiRezultatai');
+        if (!form || !inputElement || !results || !(inputElement instanceof HTMLInputElement)) return;
+        const input = inputElement;
+        let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+        let issuedRequestId = 0;
+        let latestRenderedRequestId = 0;
+        const inFlightControllers = new Map<number, AbortController>();
+
+        const renderResponseIfNewest = (requestId: number, html: string) => {
+          if (requestId > latestRenderedRequestId) {
+            results.innerHTML = html;
+            latestRenderedRequestId = requestId;
+            return true;
+          }
+          return false;
+        };
+
+        const abortOlderInFlight = (requestId: number) => {
+          for (const [olderRequestId, controller] of inFlightControllers.entries()) {
+            if (olderRequestId < requestId) {
+              controller.abort();
+              inFlightControllers.delete(olderRequestId);
+            }
+          }
+        };
+
+        input.addEventListener('input', () => {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(async () => {
+            const requestId = ++issuedRequestId;
+            const query = input.value.trim();
+            if (!query) {
+              const rendered = renderResponseIfNewest(requestId, '');
+              if (rendered) {
+                abortOlderInFlight(requestId);
+                history.replaceState(null, '', window.location.pathname);
+              }
+              return;
+            }
+            const controller = new AbortController();
+            inFlightControllers.set(requestId, controller);
+            try {
+              const base = form.getAttribute('action') || window.location.pathname;
+              const url = new URL(base, window.location.origin);
+              url.searchParams.set('search', query);
+              url.searchParams.set('tikRezultatai', 'true');
+              const res = await fetch(url, { signal: controller.signal });
+              if (!res.ok) throw new Error('Network error');
+              const html = await res.text();
+              const rendered = renderResponseIfNewest(requestId, html);
+              url.searchParams.delete('tikRezultatai');
+              if (rendered) {
+                abortOlderInFlight(requestId);
+                history.replaceState(null, '', url);
+              }
+            } catch (err: unknown) {
+              if (err instanceof DOMException && err.name === 'AbortError') return;
+              const rendered = renderResponseIfNewest(requestId, '<p>Klaida gaunant duomenis.</p>');
+              if (rendered) abortOlderInFlight(requestId);
+            } finally {
+              inFlightControllers.delete(requestId);
+            }
+          }, 100);
+        });
+      });
+      </script>
+    </main>
+  </Layout>
+)}

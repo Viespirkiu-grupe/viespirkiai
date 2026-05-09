@@ -1,0 +1,191 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SearchForm from '@design-system/components/content/SearchForm.astro';
+import SutartysFilters from '../components/content/SutartysFilters.astro';
+import SearchResults from '../components/content/SearchResults.astro';
+import { searchSutartys, countSutartys } from '@/modules/sutartys/searchSutartys.js';
+import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
+import config from '../lib/config.ts';
+import { objectsToJsonlStream } from '@/utils/jsonl.js';
+import { objectsToCsvStream } from '@/utils/csv.js';
+import { Readable as NodeReadable, PassThrough } from 'node:stream';
+import { cleanQuery, getColorScheme, getFont } from '../lib/failai.ts';
+
+type SearchValues = Record<string, string | number | undefined>;
+
+type SearchResultItem = {
+  tipas: string;
+  kategorija: string;
+  sudarymoData?: string | null;
+  galiojimoData?: string | null;
+  dokumentuKiekis?: number | null;
+  sutartiesUnikalusId: string | number;
+  faktineIvykdimoVerte?: number | string | null;
+  verte?: number | string | null;
+  pavadinimas: string;
+  perkanciosiosOrganizacijosKodas: string;
+  perkanciojiOrganizacija?: string | null;
+  tiekejai: string[];
+  tiekejaiKodai: string[];
+  paskutinioRedagavimoData?: string | null;
+};
+
+type SortOption = {
+  value: string;
+  label: string;
+};
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const cleaned = cleanQuery(Astro.url);
+if (cleaned.redirectTo) return Astro.redirect(cleaned.redirectTo);
+const query: Record<string, string> = cleaned.query;
+const DEFAULT_LIMIT = 50;
+const limit = parseInt(query.limit) || DEFAULT_LIMIT;
+const page = parseInt(query.page) || 1;
+const engine = query.search && config.typesenseUp ? 'typesense' : 'postgres';
+
+function buildNumberOfResults({ shown, total, elapsed, engine, page = 1 }: { shown: number; total: number | null; elapsed: number; engine: string; page?: number }) {
+  const durationMs = Math.round(elapsed);
+  const trukme = (elapsed / 1000).toFixed(2);
+  const source = `<span class="inline" data-duration="${durationMs}">(${trukme}s, ${engine})</span>`;
+  if (total == null) {
+    return `Rodomi ${shown} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų ${source}`;
+  }
+  if (shown < total) {
+    return `Rodomi ${shown} iš ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`;
+  }
+  return `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų'])} ${source}`;
+}
+
+function buildPaginationHtml({ currentPage, pageCount, queryParams }: { currentPage: number; pageCount: number; queryParams: string }) {
+  const totalPages = Number(pageCount);
+  const current = Number(currentPage);
+  const maxVisible = 6;
+  const half = Math.floor(maxVisible / 2);
+  let start = Math.max(1, current - half);
+  let end = Math.min(totalPages, current + half);
+
+  if (current <= half) {
+    end = Math.min(totalPages, maxVisible);
+  }
+  if (current + half > totalPages) {
+    start = Math.max(1, totalPages - maxVisible + 1);
+  }
+
+  const pageLink = (page: number) => `?page=${page}`;
+  const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+
+  return `<nav aria-label="Puslapiavimas" class="mt-8"><ul class="pagination">${current > 1 ? `<li><a href="${pageLink(current - 1) + queryParams}" aria-label="Ankstesnis puslapis"><span aria-hidden="true">←</span></a></li>` : '<li class="disabled"><span aria-hidden="true">←</span></li>'}${pages.map(i => `<li${i === current ? ' class="active"' : ''}><a href="${pageLink(i) + queryParams}" aria-label="Puslapis ${i}"${i === current ? ' aria-current="page"' : ''}>${i}</a></li>`).join('')}${current < totalPages ? `<li><a href="${pageLink(current + 1) + queryParams}" aria-label="Kitas puslapis"><span aria-hidden="true">→</span></a></li>` : '<li class="disabled"><span aria-hidden="true">→</span></li>'}</ul></nav>`;
+}
+
+// Stream exports (JSONL / CSV) short-circuit
+if (query.jsonl || query.csv) {
+  const { stream, client } = await searchSutartys(query, { limit: null, page, stream: true, sort: false, engine }) as {
+    stream: import('node:stream').Readable | null;
+    client: { release(): void } | null;
+  };
+
+  if (!stream) {
+    return new Response(null, { status: 500 });
+  }
+
+  const pass = new PassThrough();
+  // Ensure client is released when stream ends/errors
+  if (client) {
+    stream.on('end', () => client.release());
+    stream.on('error', () => client.release());
+  }
+
+  if (query.jsonl) {
+    stream.pipe(objectsToJsonlStream()).pipe(pass);
+    const web = NodeReadable.toWeb(pass) as unknown as BodyInit;
+    return new Response(web, {
+      headers: {
+        'Content-Type': 'application/x-ndjson',
+        'Content-Disposition': `attachment; filename=viespirkiai-${new Date().toISOString()}.jsonl`,
+      },
+    });
+  }
+
+  if (query.csv) {
+    // Basic CSV fallback: map raw rows to CSV using generic object keys
+    stream.pipe(objectsToCsvStream()).pipe(pass);
+    const web = NodeReadable.toWeb(pass) as unknown as BodyInit;
+    return new Response(web, {
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename=viespirkiai-${new Date().toISOString()}.csv`,
+      },
+    });
+  }
+}
+
+// Result count update (AJAX)
+if (query.rezultatuSkaiciausPatikslinimas) {
+  const startas = performance.now();
+  const [total, { values, queryParams }] = await Promise.all([
+    countSutartys(query),
+    searchSutartys(query, { limit: 1, page, engine }),
+  ]) as [number, { values: SearchValues; queryParams: string }];
+  const pageCount = Math.ceil(total / limit);
+  const elapsed = performance.now() - startas + Number(query.trukme || 0);
+  const numberOfResults = buildNumberOfResults({ shown: limit, total, elapsed, engine, page });
+  const pagination = buildPaginationHtml({ currentPage: page, pageCount, queryParams });
+  return new Response(JSON.stringify({ total, pageCount, queryParams, numberOfResults, pagination, zinomasRezultatuSkaicius: true }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const startas = performance.now();
+const { results, total: searchedTotal, values, queryParams } = await searchSutartys(query, { limit, page, engine }) as {
+  results: SearchResultItem[];
+  total: number | null;
+  values: SearchValues;
+  queryParams: string;
+};
+const elapsed = performance.now() - startas;
+const total = searchedTotal;
+const numberOfResults = buildNumberOfResults({ shown: results.length, total, elapsed, engine, page });
+
+const pageCount = Math.ceil((total || 100_000) / limit);
+const usedHiddenFields = Object.keys(values).some(k => k !== 'search' && k !== 'limit' && values[k] !== '' && values[k] !== undefined);
+
+let galimaEksportuoti = Object.keys(values).length > 0;
+values.limit = limit;
+
+const sortOptions = [
+  { value: 'paskutinioRedagavimoData', label: 'Red. data' },
+  { value: 'sudarymoData', label: 'Sut. data' },
+  { value: 'suma', label: 'Suma' },
+  { value: 'paskelbimoData', label: 'Paskelb. data' },
+ ] satisfies SortOption[];
+---
+
+<Layout
+  pageTitle="Sutarčių paieška"
+  pageDescription="Pilietinė viešųjų pirkimų analizės iniciatyva. Prieinamai patiekiamos viešųjų pirkimų sutartys bei kita susijusi informacija."
+  pageImage="https://viespirkiai.org/sutartys.png"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <SearchForm
+      title="Sutarčių paieška"
+      searchValue={values.search as string | undefined}
+      usedHiddenFields={usedHiddenFields}
+    >
+      <SutartysFilters slot="filters" values={values} sortOptions={sortOptions} />
+    </SearchForm>
+    <SearchResults
+      numberOfResults={numberOfResults}
+      results={results}
+      page={page}
+      pageCount={pageCount}
+      queryParams={queryParams}
+      galimaEksportuoti={galimaEksportuoti}
+    />
+  </main>
+</Layout>

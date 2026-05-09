@@ -1,0 +1,41 @@
+---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+
+interface Props {
+  item: any;
+  search: string;
+}
+const { item, search } = Astro.props;
+
+const formatBytes = (value: unknown) => {
+  const bytes = Number(value || 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const amount = bytes / 1024 ** index;
+  return `${amount.toLocaleString('lt-LT', { maximumFractionDigits: index === 0 ? 0 : 1 })} ${units[index]}`;
+};
+---
+
+<ResultCardShell clickable={true}>
+  <dl slot="meta" class="result-card-meta">
+    <div><dt class="sr-only">Formatas</dt><dd>{String(item.extension || '').toUpperCase()}</dd></div>
+    <div><dt class="sr-only">Dydis</dt><dd>{formatBytes(item.dydis)}</dd></div>
+    {item.metaduomenys && item.metaduomenys.pageCount && <div><dt class="sr-only">Puslapiai</dt><dd>{Number(item.metaduomenys.pageCount).toLocaleString('lt-LT')} p.</dd></div>}
+    <div><dt class="sr-only">Žodžiai</dt><dd>{Number(item.zodziuSkaicius).toLocaleString('lt-LT') || '—'} ž.</dd></div>
+  </dl>
+
+  <h3 slot="title" class="result-card-title">
+    <a href={`/failas/${item.id}?search=${encodeURIComponent(search)}`}>
+      {item.metaduomenys ? item.metaduomenys.Title || item.pavadinimas : item.pavadinimas}
+    </a>
+  </h3>
+
+  {item.excerpt && <div class="text-sm text-muted mt-2 text-justify" set:html={item.excerpt} />}
+
+  {item.dokId && (
+    <div slot="footer" class="result-card-footer">
+      <span><a href={`/sutartis/${item.dokId}`} class="relative z-1">↗ Sutartis</a></span>
+    </div>
+  )}
+</ResultCardShell>

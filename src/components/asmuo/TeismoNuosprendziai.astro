@@ -1,0 +1,54 @@
+---
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
+import TruncationNotice from '@design-system/components/TruncationNotice.astro';
+
+const { asmuo } = Astro.props;
+if (!(asmuo.teismoNuosprendziai?.rows > 0)) return;
+const { rows, nuosprendziai } = asmuo.teismoNuosprendziai;
+---
+
+<div class="page-section mb-10" id="teismai">
+  <h2><a href="#teismai" class="no-style">Teismo nuosprendžiai</a></h2>
+  <TruncationNotice count={rows} shown={nuosprendziai.length} anchor="teismai" paramName="teismoNuosprendziaiLimit" label="naujausi nuosprendžiai" />
+  <TableWrapper>
+    <Table>
+      <thead>
+        <tr>
+          <th>Bylos numeris</th><th>Rūšis</th><th class="cell-center">Data</th>
+          <th>Rolė</th><th>Teismas</th>
+        </tr>
+      </thead>
+      <tbody>
+        {nuosprendziai.map((n: any) => (
+          <tr>
+            <td class="cell-nowrap">
+              <a href={`https://liteko.teismai.lt/viesasprendimupaieska/${n.fileHref}`} target="_blank" rel="noopener noreferrer">{n.bylosNumeris}</a>
+            </td>
+            <td class="teismai-col-rusis">
+              <span class="cell-truncate">{n.bylosRusis}</span>
+            </td>
+            <td class="cell-center cell-mono cell-nowrap">{new Date(n.data).toLocaleDateString('lt-LT')}</td>
+            <td class:list={['teismai-col-role', n.bylojeKaip === 'Atsakovas' && 'font-bold']}>
+              <span class="cell-truncate">{n.bylojeKaip}</span>
+            </td>
+            <td class="teismai-col-court">
+              <span class="cell-truncate">{n.teismas}</span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  </TableWrapper>
+</div>
+
+<style>
+  .teismai-col-rusis,
+  .teismai-col-role {
+    max-width: 30ch;
+  }
+
+  .teismai-col-court {
+    max-width: 40ch;
+  }
+</style>

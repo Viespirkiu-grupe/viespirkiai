@@ -1,0 +1,50 @@
+---
+import Button from '@design-system/components/Button.astro';
+import ResultList from '@design-system/components/ResultList.astro';
+
+interface Props {
+  title: string;
+  isEmpty: boolean;
+  emptyText?: string;
+  titleSuffix?: string;
+  moreLabel?: string;
+}
+
+const { title, isEmpty, emptyText = 'Nėra duomenų.', titleSuffix, moreLabel } = Astro.props;
+const hasTitleSuffix = Astro.slots.has('title-suffix') || titleSuffix;
+const hasMore = Astro.slots.has('more');
+---
+
+<section>
+  <h2>
+    {title}{titleSuffix && <> <sup>{titleSuffix}</sup></>}{!titleSuffix && hasTitleSuffix && <slot name="title-suffix" />}
+  </h2>
+  {isEmpty
+    ? <p class="text-muted mt-4"><em>{emptyText}</em></p>
+    : <>
+        <ResultList className="mt-4"><slot /></ResultList>
+        {hasMore && (
+          <details class="card-list-more mt-4">
+            <summary class="card-list-summary">
+              <Button variant="secondary" size="sm">{moreLabel ?? 'Rodyti daugiau'}</Button>
+            </summary>
+            <ResultList className="mt-4"><slot name="more" /></ResultList>
+          </details>
+        )}
+      </>
+  }
+</section>
+
+<style>
+  .card-list-more > summary {
+    list-style: none;
+    cursor: pointer;
+    display: inline-block;
+  }
+  .card-list-summary :global(.ds-button) {
+    pointer-events: none;
+  }
+  .card-list-more > summary::-webkit-details-marker {
+    display: none;
+  }
+</style>

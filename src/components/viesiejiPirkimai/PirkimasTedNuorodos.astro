@@ -1,0 +1,38 @@
+---
+import FileCard from '@design-system/components/FileCard.astro';
+
+interface Props {
+  korteles: any[];
+}
+const { korteles } = Astro.props;
+---
+
+{korteles.length > 0 && (
+  <section class="mb-7">
+    <h2>TED nuorodos</h2>
+    <div class="flex flex-col gap-2 mt-4">
+      {korteles.map((skelbimas: any) => {
+        const href = skelbimas.downloadHref || '#';
+        const hrefMatch = String(href).match(/\/ted\/(\d+-\d{4})/i) || String(href).match(/NOTICE:(\d+-\d{4})/i) || String(href).match(/(\d{4,}-\d{4})/);
+        const numeris = skelbimas.numeris || (hrefMatch?.[1] ?? null);
+        const pavadinimas = (skelbimas.pavadinimas || 'TED skelbimas').trim();
+        const actions = skelbimas.originalHref
+          ? [{ href: skelbimas.originalHref, text: '↗ TED', target: '_blank', rel: 'noopener noreferrer' }]
+          : [];
+        return (
+          <div class="min-w-0">
+            <FileCard
+              title={pavadinimas}
+              href={href}
+              meta={numeris || ''}
+              ext="tedeu"
+              actions={actions}
+              titleTwoLines={true}
+              hideMeta={false}
+            />
+          </div>
+        );
+      })}
+    </div>
+  </section>
+)}

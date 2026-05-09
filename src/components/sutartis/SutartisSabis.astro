@@ -1,0 +1,26 @@
+---
+import SabisSutartisCard from './SabisSutartisCard.astro';
+import CollapsibleListSection from '@design-system/components/CollapsibleListSection.astro';
+
+interface Props {
+  sutartys: any[] | null | undefined;
+  maxVisible?: number;
+}
+
+const { sutartys, maxVisible = 3 } = Astro.props;
+const list = sutartys ?? [];
+const visible = list.slice(0, maxVisible);
+const hidden = list.slice(maxVisible);
+---
+
+<CollapsibleListSection
+  title="SABIS sutartys"
+  emptyText="SABIS sutarčių nerasta."
+  totalCount={list.length}
+  hiddenCount={hidden.length}
+>
+  {visible.map((item: any) => <SabisSutartisCard item={item} />)}
+  <Fragment slot="hidden">
+    {hidden.map((item: any) => <SabisSutartisCard item={item} />)}
+  </Fragment>
+</CollapsibleListSection>

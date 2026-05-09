@@ -1,0 +1,13 @@
+---
+interface Props {
+  legend: string;
+  class?: string;
+}
+
+const { legend, class: extraClass = '' } = Astro.props;
+---
+
+<fieldset class:list={['filter-group', extraClass]}>
+  <legend class="filter-group-label">{legend}</legend>
+  <slot />
+</fieldset>

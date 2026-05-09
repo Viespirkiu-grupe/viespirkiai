@@ -1,0 +1,77 @@
+---
+import SearchResultsShell from '@design-system/components/content/SearchResultsShell.astro';
+import SutartisCard from './SutartisCard.astro';
+
+type SearchResultItem = {
+  tipas: string;
+  kategorija: string;
+  sudarymoData?: string | null;
+  galiojimoData?: string | null;
+  dokumentuKiekis?: number | null;
+  sutartiesUnikalusId: string | number;
+  faktineIvykdimoVerte?: number | string | null;
+  verte?: number | string | null;
+  pavadinimas: string;
+  perkanciosiosOrganizacijosKodas: string;
+  perkanciojiOrganizacija?: string | null;
+  tiekejai: string[];
+  tiekejaiKodai: string[];
+  paskutinioRedagavimoData?: string | null;
+};
+
+interface Props {
+  numberOfResults: string;
+  results: SearchResultItem[];
+  page: number;
+  pageCount: number;
+  queryParams: string;
+  galimaEksportuoti: boolean;
+}
+
+const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti } = Astro.props;
+---
+
+<SearchResultsShell
+  numberOfResults={numberOfResults}
+  resultCount={results.length}
+  page={page}
+  pageCount={pageCount}
+  queryParams={queryParams}
+>
+  {galimaEksportuoti && (
+    <Fragment slot="actions">
+      <a href={`/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
+        <span aria-hidden="true">↗</span> JSONL
+      </a>
+      <a href={`/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
+        <span aria-hidden="true">↗</span> CSV
+      </a>
+    </Fragment>
+  )}
+  {results.map(item => (
+    <SutartisCard item={item} />
+  ))}
+</SearchResultsShell>
+
+<script>
+  const span = document.querySelector('.rezultatai-nezinomas-total');
+  if (span && !span.classList.contains('spin')) {
+    span.classList.add('spin');
+    const url = new URL(window.location.href);
+    url.searchParams.set('rezultatuSkaiciausPatikslinimas', 'true');
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        if (data.total !== undefined) {
+          span.className = '';
+          const numberOfResultsElement = document.querySelector('.numberOfResults');
+          if (numberOfResultsElement) numberOfResultsElement.innerHTML = data.numberOfResults;
+          const paginationElement = document.querySelector('ul.pagination');
+          if (paginationElement && data.pagination) paginationElement.innerHTML = data.pagination;
+        } else {
+          span.classList.remove('spin');
+        }
+      })
+      .catch(() => span.classList.remove('spin'));
+  }
+</script>

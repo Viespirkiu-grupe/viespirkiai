@@ -1,0 +1,12 @@
+{
+  "extends": "astro/tsconfigs/base",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@/*": ["./*"],
+      "@design-system/*": ["./src/design-system/*"]
+    }
+  },
+  "include": ["src/**/*", "test/**/*", "modules/**/*"]
+}

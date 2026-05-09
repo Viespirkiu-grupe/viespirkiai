@@ -1,0 +1,18 @@
+---
+import EmptyState from '@design-system/components/EmptyState.astro';
+import Layout from '../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../lib/failai.ts';
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+---
+<Layout pageTitle="Vidinė serverio klaida" pageDescription="" pageImage="" colorScheme={colorScheme} font={font}>
+  <main>
+    <EmptyState icon="500" title="Vidinė serverio klaida">
+      <p class="text-muted">
+        Jeigu bandėte atlikti paiešką, ji tikriausiai užtruko per ilgai.
+        <br />
+        Bandykite naudoti tikslesnius paieškos kriterijus.
+      </p>
+    </EmptyState>
+  </main>
+</Layout>

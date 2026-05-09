@@ -1,0 +1,60 @@
+---
+import SiteHeaderShell from '@design-system/components/SiteHeaderShell.astro';
+import { readFileSync } from 'fs';
+import config from '../lib/config.ts';
+
+interface Props {
+  pathname: string;
+  colorScheme: string;
+}
+
+const { pathname, colorScheme } = Astro.props;
+
+interface NavLink {
+  href: string;
+  /** Label shown in the desktop navbar. */
+  label: string;
+  /** Optional longer label used in the mobile menu (defaults to `label`). */
+  mobileLabel?: string;
+}
+
+const primaryLinks: NavLink[] = [
+  { href: '/',                 label: 'Sutartys' },
+  { href: '/viesiejiPirkimai', label: 'Viešieji pirkimai' },
+  { href: '/failai',           label: 'Failai' },
+  { href: '/juridiniai',       label: 'Juridiniai',   mobileLabel: 'Juridiniai asmenys' },
+  { href: '/neskelbiamos',     label: 'Neskelbiamos', mobileLabel: 'Neskelbiamos derybos' },
+  { href: '/nepatikimi',       label: 'Nepatikimi ir melagiai' },
+];
+
+const secondaryLinks: NavLink[] = [
+  { href: '/apie',         label: 'Apie' },
+  { href: '/kontaktai',    label: 'Kontaktai' },
+  { href: '/duomenys',     label: 'Duomenys' },
+  { href: '/vieslaiskiai', label: 'Viešlaiškiai' },
+];
+
+const rawInfoBanner = config.infoBanner;
+let infoBanner: { type: string; content: string; important: boolean } | null = null;
+if (typeof rawInfoBanner === 'string' && rawInfoBanner.trim()) {
+  infoBanner = { type: 'text', content: rawInfoBanner.trim(), important: false };
+} else if (rawInfoBanner && typeof rawInfoBanner === 'object') {
+  const type = rawInfoBanner.type === 'html' ? 'html' : 'text';
+  const content = typeof rawInfoBanner.content === 'string' ? rawInfoBanner.content.trim() : '';
+  if (content) infoBanner = { type, content, important: rawInfoBanner.important === true };
+}
+
+const logoSvg = readFileSync('./views/viespirkiaiLogoLaisvasZodis.svg', 'utf8');
+---
+
+<SiteHeaderShell
+  pathname={pathname}
+  colorScheme={colorScheme}
+  brandHref="/"
+  brandLabel="Viešpirkiai"
+  logoHtml={logoSvg}
+  primaryLinks={primaryLinks}
+  secondaryLinks={secondaryLinks}
+  infoBanner={infoBanner}
+  mirrorLogo={config.dev}
+/>

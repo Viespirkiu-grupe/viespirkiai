@@ -1,0 +1,77 @@
+---
+interface TreeNode {
+  name?: string;
+  path?: string;
+  id?: string | number;
+  extension?: string;
+  size?: number;
+  isDirectory?: boolean;
+  children?: TreeNode[];
+}
+
+interface Props {
+  node: TreeNode;
+  failasId: string | number;
+  openByDefault?: boolean;
+}
+
+const { node, failasId, openByDefault = true } = Astro.props;
+
+const children = Array.isArray(node?.children) ? node.children : [];
+const isDirectory = !!node?.isDirectory || children.length > 0;
+const name = node?.name || '\u2014';
+
+function formatSize(bytes?: number) {
+  const b = Number(bytes);
+  if (!Number.isFinite(b) || b < 0) return '';
+  if (b < 1024) return `${b} B`;
+  const kb = b / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  return `${(mb / 1024).toFixed(1)} GB`;
+}
+
+function compareNodes(a: TreeNode, b: TreeNode) {
+  const aIsDir = !!a?.isDirectory || (Array.isArray(a?.children) && a.children.length > 0);
+  const bIsDir = !!b?.isDirectory || (Array.isArray(b?.children) && b.children.length > 0);
+  if (aIsDir !== bIsDir) return aIsDir ? -1 : 1;
+  return (a?.name || '').localeCompare(b?.name || '', 'lt', { numeric: true, sensitivity: 'base' });
+}
+
+function getHref(item: TreeNode) {
+  if (item.id) return `/failas/${encodeURIComponent(String(item.id))}`;
+  if (!failasId || !item.path) return '#';
+  const encodedPath = item.path.split('/').map((part) => encodeURIComponent(part)).join('/');
+  return `https://failai.viespirkiai.org/${encodeURIComponent(String(failasId))}/${encodedPath}`;
+}
+
+const sortedChildren = [...children].sort(compareNodes);
+const extension = node?.extension || (name.includes('.') ? name.split('.').pop() : '');
+const meta = [extension, formatSize(node?.size)].filter(Boolean).join(' · ');
+---
+
+{isDirectory ? (
+  <li class="archive-node archive-node-directory">
+    <details open={openByDefault}>
+      <summary class="archive-row">
+        <span class="archive-caret" aria-hidden="true"></span>
+        <span class="archive-label" title={name}>{name}</span>
+      </summary>
+      {sortedChildren.length > 0 && (
+        <ul class="archive-branch">
+          {sortedChildren.map((child) => (
+            <Astro.self node={child} failasId={failasId} openByDefault={openByDefault} />
+          ))}
+        </ul>
+      )}
+    </details>
+  </li>
+) : (
+  <li class="archive-node archive-node-file">
+    <a href={getHref(node)} class="archive-row archive-link">
+      <span class="archive-label" title={name}>{name}</span>
+      {meta && <span class="archive-meta">{meta}</span>}
+    </a>
+  </li>
+)}

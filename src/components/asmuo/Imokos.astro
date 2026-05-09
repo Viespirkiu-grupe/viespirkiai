@@ -1,0 +1,64 @@
+---
+import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
+
+const { asmuo } = Astro.props;
+const sodra = asmuo.sodra?.duomenys ?? [];
+const vmi = asmuo.vmi?.duomenys ?? [];
+const sodraLabels = sodra.map((d: any) => d.data + '-01');
+const sodraSeries = sodra.map((d: any) => d.imokuSuma || null);
+const vmiLabels = vmi.map((d: any) => d.data + '-01');
+const vmiSeries = vmi.map((d: any) => d.suma || null);
+const lastVmiDate = vmi.length > 0 ? vmi[vmi.length - 1].data + '-01' : null;
+const lastVmi = lastVmiDate ? new Date(lastVmiDate) : null;
+const vmiAnnotations = lastVmi && lastVmi.getMonth() + 1 !== 12
+  ? {
+      xaxis: [{
+        x: new Date(lastVmi.getFullYear(), 0, 1).getTime(),
+        borderColor: '#777',
+        label: {
+          style: { color: '#000' },
+          position: 'bottom',
+          text: 'Nebaigti duomenys:',
+        },
+      }],
+    }
+  : {};
+---
+
+<div class="page-section mb-10" id="imokos">
+  <div class="grid-2">
+    <div class="flex flex-col min-h-[350px]">
+      <h2 class="mb-4"><a href="#sodraImokos" id="sodraImokos" class="no-style">SODRA įmokos</a></h2>
+      {sodra.length > 0 ? (
+        <LineDatetimeChart
+          id="sodraImokosDiagrama"
+          title="SODRA įmokos"
+          anchor="sodraImokos"
+          labels={sodraLabels}
+          series={sodraSeries}
+          flags={['yEUR', 'yMin0']}
+          wrapperClass=""
+          titleClass="sr-only"
+          heightClass="h-[350px]"
+        />
+      ) : <div class="chart-empty">Nėra duomenų</div>}
+    </div>
+    <div class="flex flex-col min-h-[350px]">
+      <h2 class="mb-4"><a href="#vmiImokos" id="vmiImokos" class="no-style">VMI įmokos</a></h2>
+      {vmi.length > 0 ? (
+        <LineDatetimeChart
+          id="vmiMokesciuDiagrama"
+          title="VMI įmokos"
+          anchor="vmiImokos"
+          labels={vmiLabels}
+          series={vmiSeries}
+          flags={['yEUR', 'yMin0']}
+          customOptions={{ annotations: vmiAnnotations }}
+          wrapperClass=""
+          titleClass="sr-only"
+          heightClass="h-[350px]"
+        />
+      ) : <div class="chart-empty">Nėra duomenų</div>}
+    </div>
+  </div>
+</div>

@@ -1,0 +1,109 @@
+---
+import TedSubgroup from './TedSubgroup.astro';
+
+const { group, shortUrl, subgroupTitles } = Astro.props;
+
+function f(id: string) {
+  return (group.fields.find((x: any) => x.fieldId === id)?.values || []).join(', ');
+}
+
+function fType(type: string) {
+  return group.fields.find((x: any) => x.type === type);
+}
+
+const title = group.label || f('BT-21-LotsGroup');
+const internalId = f('BT-22-LotsGroup');
+const lotRef = f('BT-137-LotsGroup');
+const maxFaValue = f('BT-157-LotsGroup');
+const faMaxPrec = f('BT-271-LotsGroup');
+const description = f('BT-24-LotsGroup');
+const addInfo = f('BT-300-LotsGroup');
+const sme = f('BT-726-LotsGroup');
+const value = fType('amount') || (f('BT-27-LotsGroup') ? { values: [f('BT-27-LotsGroup')] } : null);
+
+const sgByType: any[] = [];
+const sgTypeMap = new Map();
+for (const sg of (group.subGroups || [])) {
+  if (!sgTypeMap.has(sg.nodeId)) {
+    const item = { nodeId: sg.nodeId, instances: [] };
+    sgTypeMap.set(sg.nodeId, item);
+    sgByType.push(item);
+  }
+  sgTypeMap.get(sg.nodeId).instances.push(sg);
+}
+
+const acType = sgByType.find((s: any) => s.nodeId === 'ND-LotsGroupAwardCriterion');
+---
+
+<div class="card">
+  <div class="card-header">
+    <h3>{title}{internalId && <span class="text-muted text-sm"> ({internalId})</span>}</h3>
+  </div>
+  <div class="card-body">
+    <div class="grid-3">
+      <div>
+        {lotRef && (
+          <>
+            <p class="section-title">Pirkimo dalis</p>
+            <p>{lotRef}</p>
+          </>
+        )}
+        {maxFaValue && (
+          <>
+            <p class="section-title">Didžiausia vertė (PS)</p>
+            <p><span class="amount amount-sm">{maxFaValue}</span></p>
+          </>
+        )}
+        {faMaxPrec && (
+          <>
+            <p class="section-title">PS didžiausioji vertė</p>
+            <p><span class="amount amount-sm">{faMaxPrec}</span></p>
+          </>
+        )}
+        {value && !maxFaValue && (
+          <>
+            <p class="section-title">Numatoma vertė</p>
+            <p><span class="amount amount-sm">{value.values[0]}</span></p>
+          </>
+        )}
+      </div>
+
+      <div>
+        {description && (
+          <>
+            <p class="section-title">Aprašymas</p>
+            <p class="text-sm">{description}</p>
+          </>
+        )}
+        {addInfo && (
+          <>
+            <p class="section-title">Papildoma informacija</p>
+            <p class="text-sm text-muted">{addInfo}</p>
+          </>
+        )}
+        {sme && sme !== 'Ne' && (
+          <>
+            <p class="section-title">MVĮ</p>
+            <p class="text-sm">{sme}</p>
+          </>
+        )}
+      </div>
+
+      {acType && (
+        <div>
+          <p class="section-title">Skyrimo kriterijai</p>
+          {acType.instances.map((sg) => <TedSubgroup sg={sg} shortUrl={shortUrl} />)}
+        </div>
+      )}
+    </div>
+
+    {sgByType.filter((s: any) => s.nodeId !== 'ND-LotsGroupAwardCriterion').map((sgType) => (
+      <>
+        <h4>{subgroupTitles[sgType.nodeId] || sgType.nodeId}</h4>
+        <div class={`grid-${Math.min(sgType.instances.length, 3)}`}>
+          {sgType.instances.map((sg) => <TedSubgroup sg={sg} shortUrl={shortUrl} />)}
+        </div>
+      </>
+    ))}
+  </div>
+</div>

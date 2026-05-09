@@ -1,0 +1,44 @@
+---
+interface Props {
+  as?: 'dl' | 'div';
+  className?: string;
+}
+
+const { as = 'dl', className = '' } = Astro.props;
+const Tag = as;
+const classes = ['kv-list-shell', className].filter(Boolean).join(' ');
+---
+
+<Tag class={classes}>
+  <slot />
+</Tag>
+
+<style>
+  .kv-list-shell {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px 16px;
+    font-size: var(--text-sm);
+  }
+
+  .kv-list-shell :global(dt) {
+    color: var(--gray);
+    font-weight: 400;
+  }
+
+  .kv-list-shell :global(dd) {
+    color: var(--black);
+    font-weight: 500;
+  }
+
+  @media (max-width: 600px) {
+    .kv-list-shell {
+      grid-template-columns: 1fr;
+    }
+
+    .kv-list-shell :global(dd) {
+      text-align: left;
+      margin-bottom: 8px;
+    }
+  }
+</style>

@@ -1,0 +1,274 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
+import { gautiStatistika, humanizeStatistika } from '@/modules/statistika/statistika.js';
+import { convertUnit } from '@/utils/units.js';
+import '@/utils/linksniai.js';
+import config from '../../lib/config.ts';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const statistika = humanizeStatistika(await gautiStatistika());
+const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-LT', { hour12: false });
+---
+<Layout
+  pageTitle="Statistika"
+  pageDescription="Viešpirkių sistemos veikimo statistika"
+  pageImage="https://viespirkiai.org/statistika.png"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      Statistika
+      <button slot="actions" id="liveUpdate" class="btn btn-outline btn-sm">▶ Tiesioginis atnaujinimas</button>
+    </PageHeader>
+
+    <div class="replacableContent">
+      <div class="flex justify-between items-center mb-7">
+        <p class="text-muted text-sm mb-0">Atnaujinta: <span class="cell-mono" data-stat="atnaujinta">{atnaujintaFormatted}</span></p>
+        <p class="text-muted text-xs mb-0">* Pažymėtos numatomos arba apytikslės vertės</p>
+      </div>
+
+      <div class="grid-2 mb-10">
+        <div>
+          <h2 class="mb-4">Failai</h2>
+
+          <!-- Turinio nuskaitymas -->
+          <div class="page-section">
+            <h3 class="mb-1"><a href="#turinio-nuskaitymas" id="turinio-nuskaitymas" class="no-style">Turinio nuskaitymas</a></h3>
+            <p class="text-muted text-sm mb-4">Failų teksto, metaduomenų nuskaitymas</p>
+            <div class="grid-2">
+              <div>
+                <p class="text-sm font-bold mb-3">Pagal būseną</p>
+                <TableWrapper>
+                  <Table>
+                    <thead><tr><th>Nuskaitymas</th><th class="cell-right">Failai</th><th class="cell-right">Dalis</th></tr></thead>
+                    <tbody id="pagalVersijaBody">
+                      {statistika.nuskaitymas.pagalVersija.map((v: any) => (
+                        <tr>
+                          <td>{v.status}</td>
+                          <td class="cell-mono cell-right cell-nowrap">{Number(v.kiekis).toLocaleString('lt-LT')}</td>
+                          <td class="cell-mono cell-right cell-nowrap">{Number(v.procentai).toLocaleString('lt-LT')} %</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </TableWrapper>
+              </div>
+              <div>
+                <p class="text-sm font-bold mb-3">Pagal nuskaitytoją</p>
+                <TableWrapper>
+                  <Table>
+                    <thead><tr><th>Nuskaitytojas</th><th class="cell-right">Failų skaičius</th></tr></thead>
+                    <tbody id="topNuskaitytojaiBody">
+                      {statistika.topDokNuskaitytojai.map((n: any) => (
+                        <tr>
+                          <td>{n.viesasPavadinimas}</td>
+                          <td class="cell-mono cell-right cell-nowrap">{Number(n.nuskaitytidokumentai).toLocaleString('lt-LT')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </TableWrapper>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <!-- Indeksavimas -->
+          <div class="page-section">
+            <h3 class="mb-1"><a href="#indeksavimas" id="indeksavimas" class="no-style">Indeksavimas</a></h3>
+            <p class="text-muted text-sm mb-4">Surašymas duomenų bazėje, kad būtų galima greičiau ieškoti.</p>
+            <p class="text-sm font-bold mb-3">Žodžiai</p>
+            <div class="grid-2">
+              <div class="card"><div class="card-body">
+                <div class="section-title mb-2">Iš viso</div>
+                <span class="cell-mono" data-stat="nuskaitymas.zodziai.total">{(Number(statistika.nuskaitymas.zodziai.total) as any).linksniuoti(['žodis', 'žodžiai', 'žodžių', 'žodžio'])}</span>
+              </div></div>
+              <div class="card"><div class="card-body">
+                <div class="section-title mb-2">Vidurkis</div>
+                <span class="cell-mono" data-stat="nuskaitymas.zodziai.vidurkis">{(Number(statistika.nuskaitymas.zodziai.vidurkis) as any).linksniuoti(['žodis', 'žodžiai', 'žodžių', 'žodžio'])}</span>
+              </div></div>
+              <div class="card"><div class="card-body">
+                <div class="section-title mb-2">Vidurkis (be 0)</div>
+                <span class="cell-mono" data-stat="nuskaitymas.zodziai.vidurkisNeNulis">{(Number(statistika.nuskaitymas.zodziai.vidurkisNeNulis) as any).linksniuoti(['žodis', 'žodžiai', 'žodžių', 'žodžio'])}</span>
+              </div></div>
+              <div class="card"><div class="card-body">
+                <div class="section-title mb-2">Failų su žodžiais dalis</div>
+                <span class="cell-mono" data-stat="nuskaitymas.zodziai.failuSuZodziaisDalis">{Number(statistika.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2)} %</span>
+              </div></div>
+            </div>
+          </div>
+
+          <!-- Parsiuntimas -->
+          <div class="page-section">
+            <h3 class="text-sm font-bold mb-3">Parsiuntimas</h3>
+            <div class="grid-2">
+              <div class="card"><div class="card-body">
+                <div class="section-title mb-3">Visi failai</div>
+                <dl class="kv-list">
+                  <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.visi">{statistika.failai.kiekiai.visi}</span></dd>
+                  <dt>Dydis *</dt><dd><span class="cell-mono" data-stat="failai.dydziai.visi">{statistika.failai.dydziai.visi}</span></dd>
+                </dl>
+              </div></div>
+              <div class="card"><div class="card-body">
+                <div class="section-title mb-3">Parsiųsti failai</div>
+                <dl class="kv-list">
+                  <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.parsiusti">{statistika.failai.kiekiai.parsiusti}</span></dd>
+                  <dt>Dydis</dt><dd><span class="cell-mono" data-stat="failai.dydziai.parsiusti">{statistika.failai.dydziai.parsiusti}</span></dd>
+                </dl>
+              </div></div>
+              <div class="card"><div class="card-body">
+                <div class="section-title mb-3">Neparsiųsti (klaida)</div>
+                <dl class="kv-list">
+                  <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.klaida">{statistika.failai.kiekiai.klaida}</span></dd>
+                  <dt>Dydis *</dt><dd><span class="cell-mono" data-stat="failai.dydziai.klaida">{statistika.failai.dydziai.klaida}</span></dd>
+                </dl>
+              </div></div>
+              <div class="card"><div class="card-body">
+                <div class="section-title mb-3">Neparsiųsti</div>
+                <dl class="kv-list">
+                  <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.neparsiusti">{statistika.failai.kiekiai.neparsiusti}</span></dd>
+                  <dt>Dydis *</dt><dd><span class="cell-mono" data-stat="failai.dydziai.neparsiusti">{statistika.failai.dydziai.neparsiusti}</span></dd>
+                </dl>
+              </div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Duomenų bazė -->
+      <div class="page-section">
+        <h2 class="mb-1"><a href="#duomenuBaze" id="duomenuBaze" class="no-style">Duomenų bazė</a></h2>
+        <p class="text-muted text-sm mb-4">Nuo paskutinio įjungimo (<span data-stat="database.uptime">{convertUnit(Number(statistika.database.uptime_seconds), 's')}</span>)</p>
+        <div class="grid-2 mb-7 items-start">
+          <div>
+            <h3 class="text-sm font-bold mb-3">Apkrova</h3>
+            <dl class="kv-list">
+              <dt>Atliktos užklausos</dt><dd><span class="cell-mono" data-stat="database.xact_commit">{Number(statistika.database.xact_commit).toLocaleString('lt-LT')}</span></dd>
+              <dt>Įterptos eilutės</dt><dd><span class="cell-mono" data-stat="database.tup_inserted">{Number(statistika.database.tup_inserted).toLocaleString('lt-LT')}</span></dd>
+              <dt>Atnaujintos eilutės</dt><dd><span class="cell-mono" data-stat="database.tup_updated">{Number(statistika.database.tup_updated).toLocaleString('lt-LT')}</span></dd>
+              <dt>Ištrintos eilutės</dt><dd><span class="cell-mono" data-stat="database.tup_deleted">{Number(statistika.database.tup_deleted).toLocaleString('lt-LT')}</span></dd>
+              <dt>Skaitytos eilutės</dt><dd><span class="cell-mono" data-stat="database.tup_fetched">{Number(statistika.database.tup_fetched).toLocaleString('lt-LT')}</span></dd>
+            </dl>
+          </div>
+        </div>
+        <h3 class="text-sm font-bold mb-3">Lentelės</h3>
+        <TableWrapper>
+          <Table>
+            <thead><tr>
+              <th>Pavadinimas</th>
+              <th class="cell-right">Duomenų dydis</th>
+              <th class="cell-right">Indekso dydis</th>
+              <th class="cell-right">Visas dydis</th>
+              <th class="cell-right">Eilutės *</th>
+            </tr></thead>
+            <tbody id="lentelesBody">
+              {statistika.lenteles.map((l: any) => (
+                <tr class={l.tableName === 'Iš viso' ? 'font-bold' : ''}>
+                  <td>{l.tableName}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.dataSize), 'B')}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.indexSize), 'B')}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.totalSize), 'B')}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{Number(l.approxRowCount).toLocaleString('lt-LT')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </TableWrapper>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let evtSource: EventSource | null = null;
+    const button = document.getElementById('liveUpdate')!;
+
+    const setText = (key: string, value: string) => {
+      const el = document.querySelector(`[data-stat="${key}"]`);
+      if (el) el.textContent = value;
+    };
+
+    const escapeHtml = (v: string) =>
+      String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
+
+    const updatePage = (payload: any) => {
+      if (payload.atnaujinta !== undefined) setText('atnaujinta', payload.atnaujinta);
+
+      const fk = payload.failai?.kiekiai;
+      if (fk?.visi !== undefined) setText('failai.kiekiai.visi', fk.visi);
+      if (fk?.parsiusti !== undefined) setText('failai.kiekiai.parsiusti', fk.parsiusti);
+      if (fk?.klaida !== undefined) setText('failai.kiekiai.klaida', fk.klaida);
+      if (fk?.neparsiusti !== undefined) setText('failai.kiekiai.neparsiusti', fk.neparsiusti);
+
+      const fd = payload.failai?.dydziai;
+      if (fd?.visi !== undefined) setText('failai.dydziai.visi', fd.visi);
+      if (fd?.parsiusti !== undefined) setText('failai.dydziai.parsiusti', fd.parsiusti);
+      if (fd?.klaida !== undefined) setText('failai.dydziai.klaida', fd.klaida);
+      if (fd?.neparsiusti !== undefined) setText('failai.dydziai.neparsiusti', fd.neparsiusti);
+
+      const z = payload.nuskaitymas?.zodziai;
+      if (z?.total !== undefined) setText('nuskaitymas.zodziai.total', z.total);
+      if (z?.vidurkis !== undefined) setText('nuskaitymas.zodziai.vidurkis', z.vidurkis);
+      if (z?.vidurkisNeNulis !== undefined) setText('nuskaitymas.zodziai.vidurkisNeNulis', z.vidurkisNeNulis);
+      if (z?.failuSuZodziaisDalis !== undefined) setText('nuskaitymas.zodziai.failuSuZodziaisDalis', z.failuSuZodziaisDalis);
+
+      const db = payload.database;
+      if (db?.uptime !== undefined) setText('database.uptime', db.uptime);
+      if (db?.xact_commit !== undefined) setText('database.xact_commit', db.xact_commit);
+      if (db?.tup_inserted !== undefined) setText('database.tup_inserted', db.tup_inserted);
+      if (db?.tup_updated !== undefined) setText('database.tup_updated', db.tup_updated);
+      if (db?.tup_deleted !== undefined) setText('database.tup_deleted', db.tup_deleted);
+      if (db?.tup_fetched !== undefined) setText('database.tup_fetched', db.tup_fetched);
+
+      const pvBody = document.getElementById('pagalVersijaBody');
+      if (pvBody && payload.nuskaitymas?.pagalVersija) {
+        pvBody.innerHTML = payload.nuskaitymas.pagalVersija.map((v: any) =>
+          `<tr><td>${escapeHtml(v.status)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(v.kiekis)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(v.procentai)}</td></tr>`
+        ).join('');
+      }
+
+      const tnBody = document.getElementById('topNuskaitytojaiBody');
+      if (tnBody && payload.topDokNuskaitytojai) {
+        tnBody.innerHTML = payload.topDokNuskaitytojai.map((n: any) =>
+          `<tr><td>${escapeHtml(n.viesasPavadinimas)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(n.nuskaitytidokumentai)}</td></tr>`
+        ).join('');
+      }
+
+      const lBody = document.getElementById('lentelesBody');
+      if (lBody && payload.lenteles) {
+        lBody.innerHTML = payload.lenteles.map((l: any) =>
+          `<tr class="${l.isTotal ? 'font-bold' : ''}"><td>${escapeHtml(l.tableName)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.dataSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.indexSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.totalSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.approxRowCount)}</td></tr>`
+        ).join('');
+      }
+    };
+
+    const stopSSE = () => {
+      if (!evtSource) return;
+      evtSource.close(); evtSource = null;
+      button.textContent = '▶ Tiesioginis atnaujinimas';
+      button.classList.replace('btn-primary', 'btn-outline');
+    };
+
+    const startSSE = () => {
+      evtSource?.close();
+      evtSource = new EventSource('/statistika/sse');
+      button.textContent = '⏸ Tiesioginis atnaujinimas';
+      button.classList.replace('btn-outline', 'btn-primary');
+      evtSource.onmessage = e => updatePage(JSON.parse(e.data));
+      evtSource.onerror = () => {
+        evtSource?.close(); evtSource = null;
+        setTimeout(() => { if (button.classList.contains('btn-primary')) startSSE(); }, 500);
+      };
+    };
+
+    button.addEventListener('click', () => evtSource ? stopSSE() : startSSE());
+  </script>
+</Layout>

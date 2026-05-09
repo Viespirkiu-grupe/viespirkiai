@@ -1,9 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
-import { fileURLToPath } from "url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const configPath = path.join(__dirname, "..", "config.js");
+const configPath = path.join(process.cwd(), "config.js");
 
 let config = {};
 

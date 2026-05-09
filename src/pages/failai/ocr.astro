@@ -1,0 +1,306 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Chart from '@design-system/components/charts/Chart.astro';
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
+import OcrSpartaCards from '../../components/failai/OcrSpartaCards.astro';
+import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
+import { postgres, OCR_STATES, getColorScheme, getFont } from '../../lib/failai.js';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const OCR_STATE_COLORS: Record<string, string> = {
+  baigta: '#22c55e',
+  rekomenduojama: '#f59e0b',
+  nepavyko: '#ef4444',
+  rezervuota: '#3b82f6',
+  virsijoBandymus: '#f97316',
+  galima: '#06b6d4',
+  nepalaikoma: '#a855f7',
+};
+
+const [ocrStatsRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrStatsHourExistsRes] = await Promise.all([
+  postgres.query(`SELECT * FROM "failaiOcrStats" ORDER BY count DESC`),
+  postgres.query(`SELECT * FROM "failaiOcrRezultataiStatsDay" ORDER BY date DESC`),
+  postgres.query(`
+    SELECT n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos",
+      COALESCE(SUM(s.results), 0) AS "results",
+      COALESCE(SUM(s.pages), 0) AS "pages",
+      COALESCE(SUM(s.words), 0) AS "words"
+    FROM "ocrNuskaitytojai" n
+    LEFT JOIN "failaiOcrRezultataiStatsDayNode" s ON s.node = n.pavadinimas
+    GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos"
+    ORDER BY n."nuskaitytiDokumentai" DESC
+    LIMIT 100
+  `),
+  postgres.query(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = 'failaiOcrRezultataiStatsHour'
+    ) AS exists
+  `),
+]);
+
+const ocrStatsHourRes = ocrStatsHourExistsRes.rows[0]?.exists
+  ? await postgres.query(`SELECT * FROM "failaiOcrRezultataiStatsHour" ORDER BY date DESC`)
+  : { rows: [] };
+
+const formatLtDate = (value: unknown) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Vilnius',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(String(value)));
+
+const formatNowLtParts = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Vilnius',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || '00';
+
+  return {
+    today: `${get('year')}-${get('month')}-${get('day')}`,
+    hour: Number(get('hour')),
+    minute: Number(get('minute')),
+  };
+};
+
+const ocrStats = ocrStatsRes.rows.map((stat: any) => {
+  const state = OCR_STATES.find((s: any) => s.camel === stat.tipas || s.text === stat.tipas);
+  return {
+    ...stat,
+    ...state,
+    count: Number(stat.count || 0),
+    id: stat.id ?? '-',
+    text: state?.text || stat.tipas || 'Nežinoma',
+  };
+});
+
+const ocrStatsDay = ocrStatsDayRes.rows.map((row: any) => ({
+  ...row,
+  date: formatLtDate(row.date),
+  results: Number(row.results || 0),
+  pages: Number(row.pages || 0),
+  words: Number(row.words || 0),
+}));
+
+const ocrStatsHour = ocrStatsHourRes.rows.map((row: any) => ({
+  ...row,
+  date: formatLtDate(row.date),
+  results: Number(row.results || 0),
+  pages: Number(row.pages || 0),
+  words: Number(row.words || 0),
+}));
+
+const ocrNuskaitytojai = ocrNuskaitytojaiRes.rows.map((row: any) => ({
+  ...row,
+  nuskaitytiDokumentai: Number(row.nuskaitytiDokumentai || 0),
+  rezervacijos: Number(row.rezervacijos || 0),
+  results: Number(row.results || 0),
+  pages: Number(row.pages || 0),
+  words: Number(row.words || 0),
+}));
+
+const latestDay = ocrStatsDay[0];
+const nowLt = formatNowLtParts();
+const ocrPerMinute = latestDay
+  ? (() => {
+      const isToday = latestDay.date === nowLt.today;
+      const minutes = isToday ? Math.max(1, nowLt.hour * 60 + nowLt.minute) : 1440;
+
+      return {
+        date: latestDay.date,
+        results: Number((latestDay.results / minutes).toFixed(2)),
+        pages: Number((latestDay.pages / minutes).toFixed(2)),
+        words: Number((latestDay.words / minutes).toFixed(2)),
+      };
+    })()
+  : null;
+
+  const ocrLastHour = ocrStatsHour.length
+    ? {
+        results: Number((ocrStatsHour[0].results / 60).toFixed(2)),
+        pages: Number((ocrStatsHour[0].pages / 60).toFixed(2)),
+        words: Number((ocrStatsHour[0].words / 60).toFixed(2)),
+      }
+    : null;
+
+const ocrStatsChartData = {
+  labels: ocrStats.map((item: any) => item.text),
+  series: ocrStats.map((item: any) => item.count),
+  colors: ocrStats.map((item: any) => OCR_STATE_COLORS[item.camel] || '#78716c'),
+};
+
+const ocrNuskaitytojaiTreemapColors = ['#0ea5e9', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4', '#f97316'];
+
+const ocrNuskaitytojaiChartData = {
+  labels: ocrNuskaitytojai.map((item: any) => item.viesasPavadinimas),
+  series: [
+    {
+      data: ocrNuskaitytojai.map((item: any) => ({
+        x: item.viesasPavadinimas,
+        y: item.nuskaitytiDokumentai,
+      })),
+    },
+  ],
+};
+
+const ocrStatsDayChartData = {
+  labels: ocrStatsDay.map((item: any) => item.date),
+  results: ocrStatsDay.map((item: any) => item.results),
+  pages: ocrStatsDay.map((item: any) => item.pages),
+  words: ocrStatsDay.map((item: any) => item.words),
+};
+---
+<Layout
+  pageTitle="OCR būsena"
+  pageDescription="OCR statistika ir dokumentų teksto atpažinimo būsena"
+  pageImage="https://viespirkiai.org/failai.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <div class="page-header">
+      <h1 class="mb-0">OCR būsena</h1>
+    </div>
+
+    {(ocrPerMinute || ocrLastHour) && (
+      <section class="mb-16">
+        <div class="flex flex-col gap-6 xl:flex-row">
+          {ocrPerMinute && (
+            <OcrSpartaCards
+              title={`Sparta (${ocrPerMinute.date})`}
+              anchor="perMinute"
+              results={ocrPerMinute.results}
+              pages={ocrPerMinute.pages}
+              words={ocrPerMinute.words}
+            />
+          )}
+          {ocrLastHour && (
+            <OcrSpartaCards
+              title="Paskutinė 1h"
+              anchor="lastHour"
+              results={ocrLastHour.results}
+              pages={ocrLastHour.pages}
+              words={ocrLastHour.words}
+            />
+          )}
+        </div>
+      </section>
+    )}
+
+    <section class="mb-16">
+      <div class="grid-2 items-start">
+        <div>
+          <h2 class="mb-4"><a href="#nuskaitytojai" id="nuskaitytojai" class="no-style">OCR nuskaitytojai</a></h2>
+          <div class="grid gap-3 pt-1 grid-cols-[repeat(auto-fill,minmax(190px,1fr))]">
+            {ocrNuskaitytojai.map((nuskaitytojas: any) => (
+              <div class="card">
+                <div class="card-body">
+                  <div class="section-title mb-2">
+                    <a href={`/failai/ocr/${nuskaitytojas.id}`}>{nuskaitytojas.viesasPavadinimas}</a>
+                  </div>
+                  <dl class="kv-list">
+                    <dt>Dokumentai</dt>
+                    <dd><span class="cell-mono">{nuskaitytojas.results.toLocaleString('lt-LT')}</span></dd>
+                    <dt>Puslapiai</dt>
+                    <dd><span class="cell-mono">{nuskaitytojas.pages.toLocaleString('lt-LT')}</span></dd>
+                    <dt>Žodžiai</dt>
+                    <dd><span class="cell-mono">{nuskaitytojas.words.toLocaleString('lt-LT')}</span></dd>
+                    <dt>Rezervacijos</dt>
+                    <dd><span class="cell-mono">{nuskaitytojas.rezervacijos.toLocaleString('lt-LT')}</span></dd>
+                  </dl>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h2 class="mb-3"><a href="#busena" id="busena" class="no-style">Failai pagal būseną</a></h2>
+          <Chart
+            id="ocrStatsDiagrama"
+            type="pie"
+            labels={ocrStatsChartData.labels}
+            series={ocrStatsChartData.series}
+            customOptions={{
+              colors: ocrStatsChartData.colors,
+              stroke: {
+                width: 4,
+                colors: ['var(--white)'],
+              },
+            }}
+          />
+          <TableWrapper className="mt-4">
+            <Table>
+              <thead>
+                <tr>
+                  <th class="cell-center">ID</th>
+                  <th>OCR būsena</th>
+                  <th class="cell-right">Failų skaičius</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ocrStats.map((status: any) => (
+                  <tr>
+                    <td class="cell-mono cell-center">{status.id}</td>
+                    <td>{status.text}</td>
+                    <td class="cell-mono cell-right">{status.count.toLocaleString('lt-LT')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </TableWrapper>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-16">
+      <h2 class="mb-3"><a href="#pagalNuskaitytoją" id="pagalNuskaitytoją" class="no-style">Failų dalis pagal nuskaitytoją</a></h2>
+      <Chart
+        id="ocrNuskaitytojaiDiagrama"
+        type="treemap"
+        labels={ocrNuskaitytojaiChartData.labels}
+        series={ocrNuskaitytojaiChartData.series}
+        customOptions={{
+          colors: ocrNuskaitytojaiTreemapColors,
+          legend: {
+            show: false,
+          },
+          stroke: {
+            width: 1.25,
+            colors: ['var(--gray)'],
+          },
+          dataLabels: {
+            enabled: true,
+            style: {
+              colors: ['var(--black)'],
+              fontSize: '13px',
+              fontWeight: 600,
+            },
+            dropShadow: {
+              enabled: false,
+            },
+          },
+        }}
+      />
+    </section>
+
+    <section class="grid-2">
+      <LineDatetimeChart id="ocrStatsDayDiagrama" title="Rezultatų skaičius" anchor="rezultatai" labels={ocrStatsDayChartData.labels} series={ocrStatsDayChartData.results} />
+      <LineDatetimeChart id="ocrStatsDayPagesDiagrama" title="Puslapių skaičius" anchor="puslapiai" labels={ocrStatsDayChartData.labels} series={ocrStatsDayChartData.pages} />
+      <LineDatetimeChart id="ocrStatsDayWordsDiagrama" title="Žodžių skaičius" anchor="zodziai" labels={ocrStatsDayChartData.labels} series={ocrStatsDayChartData.words} />
+    </section>
+  </main>
+</Layout>

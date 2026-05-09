@@ -70,7 +70,7 @@ The graph uses the entity and edge model defined in the repository data structur
 | `PersonEntity`       | Org node double-click                                                      | `pinregJuridiniaiRysiai` filtered by `jarKodas` — all `DEKLARUOJANCIO_DARBOVIETE`, `KITI_RYSIAI_SU_JA`, `SUTUOKTINIO_DARBOVIETE` rows                                                                                                                                                                                                                         | `vardas + pavarde` (name is the identity key), `rysioPradzia`                                                | *(no dedicated page)*                                                                          |
 | `PersonEntity`       | Person node double-click                                                   | `pinregJuridiniaiRysiai` filtered by `vardas + pavarde` — returns all darbovietes, governance roles, and spouse relationships for that person                                                                                                                                                                                                                 | Same; all declarations for that name are merged into one node                                                | *(no dedicated page)*                                                                          |
 | `ContractEntity`     | Org node double-click (creates node)                                       | `sutartys JOIN jarCsv` (top 30 contracts by value; buyer/seller names from `jarCsv` JOIN)                                                                                                                                                                                                                                                                     | `sutartiesUnikalusId` (node ID key), `pavadinimas` (contract title), `verte`, `pirkimoNumeris` (may be null) | `/sutartis/{sutartiesUnikalusId}` (primary); `/viesiejiPirkimai/{pirkimoNumeris}` (if present) |
-| `ContractEntity`     | Contract node double-click (when `pirkimoNumeris` is present)              | `expandContract(pirkimoNumeris)` — fetches full `ProcurementEntity` node (`viesiejiPirkimai WHERE pirkimoId = $1`) + all winner org stubs (`sutartys GROUP BY tiekejoKodas`) + best-effort loser org stubs (`atn1ataskaitos JOIN atn1dalyviai WHERE salis='LT'`, only ~425 procurements covered). Client creates the `ContractLink` edge locally after merge. | Same as above (contract node already in graph)                                                               | *(same, already shown)*                                                                        |
+| `ContractEntity`     | Contract node double-click (when `pirkimoNumeris` is present)              | `expandContract(pirkimoNumeris)` — fetches full `ProcurementEntity` node (`viesiejiPirkimai WHERE pirkimoId = $1`) + all winner org stubs (`sutartys GROUP BY tiekejoKodas`) + best-effort loser org stubs (`atn1ataskaitos JOIN atn1dalyviai WHERE salis='LT'`, only ~425 procurements covered). Client creates the `ContractProcurementLink` edge locally after merge. | Same as above (contract node already in graph)                                                               | *(same, already shown)*                                                                        |
 | `ProcurementEntity`  | Org node double-click (buyer) / Contract node double-click (auto-expanded) | Created when buyer org is expanded: `viesiejiPirkimai WHERE jarKodas = $jarKodas ORDER BY numatomaVerteEUR DESC LIMIT 20`. When reached via contract expansion, already fully populated and auto-expanded by `expandContract`.                                                                                                                                | `pirkimoId` (node ID key), `pavadinimas`, `numatomaVerteEUR`, `statusas`, `pirkimoBudas`                     | `/viesiejiPirkimai/{pirkimoId}`                                                                |
 
 > **`ProcurementEntity` is a hub node.** One procurement notice can result in contracts with multiple
@@ -131,15 +131,9 @@ determines which graph elements to produce:
 | `Order`                                 | Org → Contract         | solid, sized    | `sutartys.topPirkejai` → buyer side                                                                                                                                                                          |
 | `Delivery`                              | Contract → Org         | solid, sized    | `sutartys.topTiekejai` → supplier side                                                                                                                                                                       |
 | `Procurement`                           | Org → Procurement      | solid           | `viesiejiPirkimai WHERE jarKodas = $jarKodas` — buyer org issued the tender                                                                                                                                  |
-| `ContractLink`                          | Contract → Procurement | thin, muted     | Created client-side when a contract node is expanded — links the clicked contract to its procurement hub. Color `#94a3b8` (slate). Size 1.                                                                   |
+| `ContractProcurementLink`               | Contract → Procurement | thin, muted     | Created client-side when a contract node is expanded — links the clicked contract to its procurement hub. Color `#94a3b8`. Size 1.                                                                           |
 | `Award`                                 | Procurement → Org      | thin, **green** | `sutartys WHERE pirkimoNumeris = $pirkimoId GROUP BY tiekejoKodas` — winning seller orgs. Color `#22c55e`. Size 1.                                                                                           |
-| `Bid`                                   | Procurement → Org      | thin, **red**   | `atn1ataskaitos JOIN atn1dalyviai WHERE pirkimoNumeris = $pirkimoId AND salis='LT'` — procurement participants who did not win. Color `#ef4444`. Size 1. Best-effort: only ~425 procurements have ATN1 data. |
-
-> **Visual style note — thin edges.** Sigma.js does not natively render dashed or dotted lines.
-> `ContractLink`, `Award`, and `Bid` are visually distinguished from solid `Order`/`Delivery` edges
-> by being **very thin (size 1)** and carrying distinct colors (slate / green / red). If a
-> `@sigma/edge-dashed` custom program is added in a future phase, these three edge types are already
-> separated and ready to be switched.
+| `Bidder`                                | Procurement → Org      | thin, **red**   | `atn1ataskaitos JOIN atn1dalyviai WHERE pirkimoNumeris = $pirkimoId AND salis='LT'` — procurement participants who did not win. Color `#ef4444`. Size 1. Best-effort: only ~425 procurements have ATN1 data. |
 
 > **`irasoTipas` is a record classifier, not a role label.** The three distinct values in the DB are
 > `DEKLARUOJANCIO_DARBOVIETE`, `SUTUOKTINIO_DARBOVIETE`, and `KITI_RYSIAI_SU_JA`. They must **never**
@@ -200,8 +194,8 @@ Every edge must carry a visible `label` attribute set at build time in `modules/
 | `Order` / `Delivery`                                               | Formatted `verte`: `€1.2M`, `€450K`, `€12K`, etc.                                                                                                                                          |
 | `Procurement`                                                      | `pirkimoBudas` field (e.g. "Atviras konkursas", "Skelbiama apklausa")                                                                                                                      |
 | `Award`                                                            | Formatted `verte` sum (total contract value from that seller for this procurement)                                                                                                         |
-| `Bid`                                                              | *(empty — no label)*                                                                                                                                                                       |
-| `ContractLink`                                                     | *(empty — no label)*                                                                                                                                                                       |
+| `Bidder`                                                           | *(empty — no label)*                                                                                                                                                                       |
+| `ContractProcurementLink`                                          | *(empty — no label)*                                                                                                                                                                       |
 | `Employment` / `Director` / `Official` (person or spouse → org)    | `pareigos` field (free-text job title, e.g. "Direktorius", "Gydytojas"). Never `darbovietesTipas` — that field holds `STANDARTINE`, `EKSPERTO`, or `SUTUOKTINIO` and is not human-readable |
 | `Director` / `Shareholder` / `Official` (from `KITI_RYSIAI_SU_JA`) | `rysioPobudzioPavadinimas` field (controlled vocabulary, e.g. "Valdybos narys", "Akcininkas")                                                                                              |
 | `Spouse`                                                           | `"Sutuoktinis"`                                                                                                                                                                            |
@@ -387,17 +381,20 @@ src/
 ├── rysiai-app.js          Client — esbuild entry; creates dataGraph + viewGraph; wires
 │                                   DOMContentLoaded dispatch + hash apply/update
 └── rysiai/
-    ├── graph-theme.js     Client — NODE_COLOR · EDGE_COLOR · nodeColor · hiddenEdgeTypes
-    │                               icon paths · sizing helpers  (no DOM)
-    ├── renderers.js       Client — drawNodeLabel · drawNodeHover  (canvas ctx injected)
-    ├── graph-utils.js     Client — mergeGraphElements · rebuildViewGraph · syncPositionsToData
-    │                               runLayout  (pure, injected deps, no DOM ★ testable)
-    ├── legend.js          Client — NodeLegend.updateForNode; renders counts; hides zero-count rows;
+    ├── entity-types.ts    Client — ENTITY_TYPE constants; NodeAttrs interface; isOrgNode / isPersonNode
+    │                               / isContractNode / isProcurementNode predicates
+    ├── graph-theme.ts     Client — NODE_COLOR · EDGE_COLOR · HIDDEN_BY_DEFAULT · nodeColor
+    │                               · personelSize · contractSize · edgeWeight · icon paths  (no DOM)
+    ├── renderers.ts       Client — drawNodeLabel · drawNodeHover  (canvas ctx injected)
+    ├── graph-utils.ts     Client — mergeGraphElements · rebuildViewGraph · syncPositionsToData
+    │                               · runLayout  (pure, injected deps, no DOM ★ testable)
+    ├── legend.ts          Client — NodeLegend.updateForNode; renders counts; hides zero-count rows;
     │                               shows "Ryšių nerasta" when expansion returned no edges  (DOM)
-    ├── legend-state.js    Client — LegendState; initNode · setTypeVisible · isEdgeHidden  (no DOM)
-    ├── hash-state.js      Client — FILTER_ID_MAP · FILTER_CHAR_MAP;
+    ├── legend-state.ts    Client — LegendState; initNode · setTypeVisible · isEdgeHidden  (no DOM)
+    ├── hash-state.ts      Client — FILTER_ID_MAP · FILTER_CHAR_MAP;
     │                               applyFilterFromHash · updateHashFromFilter  (pure, writes hash)
-    └── expand-ui.js       Client — createExpandUI({...}); loadOrg · loadSutartis · loadPirkimas;
+    ├── details-panel.ts   Client — NodeDetails; renders #rysiai-details content per entity type  (DOM)
+    └── expand-ui.ts       Client — createExpandUI({...}); loadOrg · loadSutartis · loadPirkimas;
                                     returns rebuildAndRefresh callback  (DOM)
 
 public/dist/
@@ -405,9 +402,11 @@ public/dist/
 └── rysiai-app.js          Built  — esbuild output of src/rysiai-app.js
 
 test/rysiai/
-├── expand.test.js         Test   — server-side pure helpers
-├── graph-utils.test.js    Test   — mergeGraphElements · rebuildViewGraph · syncPositionsToData
-└── hash-state.test.js     Test   — applyFilterFromHash · updateHashFromFilter · roundtrip
+├── expand.test.ts         Test   — server-side pure helpers
+├── graph-utils.test.ts    Test   — mergeGraphElements · rebuildViewGraph · syncPositionsToData
+├── graph-theme.test.ts    Test   — personelSize · contractSize · edgeWeight
+├── legend-state.test.ts   Test   — LegendState; initNode · setTypeVisible · isEdgeHidden
+└── hash-state.test.ts     Test   — applyFilterFromHash · updateHashFromFilter · roundtrip
 ```
 
 **Visual identity — node colours and icons:**
@@ -422,20 +421,41 @@ test/rysiai/
 
 `ProcurementEntity` uses **purple** (`#8b5cf6`) — distinct from all current node colours. `EDGE_COLOR` entries:
 
-| Edge type      | Color     | Meaning                                    |
-|----------------|-----------|--------------------------------------------|
-| `Procurement`  | `#8b5cf6` | Org → Procurement                          |
-| `ContractLink` | `#94a3b8` | Contract → Procurement (thin, muted slate) |
-| `Award`        | `#22c55e` | Procurement → winner org (green)           |
-| `Bid`          | `#ef4444` | Procurement → loser/participant org (red)  |
+| Edge type                 | Color     | Meaning                                             |
+|---------------------------|-----------|-----------------------------------------------------|
+| `Procurement`             | `#8b5cf6` | Org → Procurement                                   |
+| `ContractProcurementLink` | `#94a3b8` | Contract → Procurement (thin, muted slate)          |
+| `Award`                   | `#22c55e` | Procurement → winner org (green)                    |
+| `Bidder`                  | `#ef4444` | Procurement → loser/participant org (red)           |
 
-**`ProcurementEntity` node sizing** — same tiers as `ContractEntity`, driven by `numatomaVerteEUR`:
+### Edge Visibility Rules
 
-| Estimated value | Node size |
-|-----------------|-----------|
-| < €100 K        | 8         |
-| €100 K – €1 M   | 13        |
-| ≥ €1 M          | 19        |
+`isEdgeHidden(source, target, type)` in `src/rysiai/legend-state.ts` decides whether an edge appears in `viewGraph`. The
+rule is **any-visible-wins**: if either endpoint is configured to show the type, the edge is drawn.
+
+| Source configured? | Target configured? | Source shows type? | Target shows type? | Edge visible?  |
+|--------------------|--------------------|--------------------|--------------------|----------------|
+| No                 | No                 | —                  | —                  | Global default |
+| Yes                | No (transparent)   | Yes                | —                  | **Yes**        |
+| Yes                | No (transparent)   | No                 | —                  | No             |
+| No (transparent)   | Yes                | —                  | Yes                | **Yes**        |
+| No (transparent)   | Yes                | —                  | No                 | No             |
+| Yes                | Yes                | Yes                | Yes                | **Yes**        |
+| Yes                | Yes                | Yes                | No                 | **Yes**        |
+| Yes                | Yes                | No                 | Yes                | **Yes**        |
+| Yes                | Yes                | No                 | No                 | No             |
+
+Key invariants:
+
+- **Both configured, either shows → visible.** A Spouse edge between Alenas (Spouse visible) and Toma (Spouse hidden) is
+  always drawn.
+- **Both configured, both hide → hidden.** Only unanimous agreement to hide suppresses the edge.
+- **One transparent endpoint is a "don't care"** — it never contributes to hiding.
+- **Neither configured** → falls back to the global `HIDDEN_BY_DEFAULT` set (pre-selection state).
+
+`HIDDEN_BY_DEFAULT` (in `src/rysiai/graph-theme.ts`): `Official`, `Employment`, `Spouse` are hidden on initial render.
+
+---
 
 ### Two-graph design
 
@@ -460,17 +480,7 @@ the next rebuild.
 **Animation cancel token**: `animateNodes` returns a cancel function stored in `cancelAnimation`. It is called before
 each `rebuildViewGraph` to prevent writing attributes to nodes that were just dropped from `viewGraph`.
 
-### Selection state
-
-Single-node selection. Clicking a node sets `highlighted: true; selected: true` on both graphs (Sigma draws the
-persistent ring via `drawNodeHover`). `nodeHiddenEdgeTypes: Map<nodeId, Set<string>>` stores per-node edge-filter
-state — on first selection a new Set is initialised as a copy of `HIDDEN_BY_DEFAULT`. `currentHiddenSet()` returns the
-selected node's Set or the global fallback; `rebuildAndRefresh` always uses `currentHiddenSet()`.
-
-| Visual state       | Ring radius    | Fill                     | Stroke width | Stroke colour |
-|--------------------|----------------|--------------------------|--------------|---------------|
-| Hover only         | `nodeSize + 4` | `rgba(255,255,255,0.6)`  | `2`          | `data.color`  |
-| Selected (± hover) | `nodeSize + 6` | `rgba(255,255,255,0.15)` | `5`          | `data.color`  |
+---
 
 ### Node and edge sizing
 
@@ -481,9 +491,9 @@ selected node's Set or the global fallback; `rebuildAndRefresh` always uses `cur
 | Personnel | Node size |
 |-----------|-----------|
 | < 10      | 8         |
-| 10 – 50   | 13        |
-| 50 – 200  | 19        |
-| > 200     | 28        |
+| 10–49     | 13        |
+| 50–199    | 15        |
+| ≥ 200     | 20        |
 
 **Contract / Procurement node size** (`contractSize`) and **Order / Delivery edge weight** (`edgeWeight`):
 
@@ -491,7 +501,7 @@ selected node's Set or the global fallback; `rebuildAndRefresh` always uses `cur
 |---------------|-----------|-------------|
 | < €100 K      | 8         | 1           |
 | €100 K – €1 M | 13        | 3           |
-| > €1 M        | 19        | 6           |
+| ≥ €1 M        | 19        | 6           |
 
 Person nodes keep a fixed `size: 8`.
 
@@ -529,37 +539,47 @@ Each edge type is represented by a single ASCII character in the hash string:
 | `Bidder`                  | Pirkimo dalyvis        | `B`         |
 | `ContractProcurementLink` | Sutartis → pirkimas    | `C`         |
 
-`filter=DSO` means Director + Shareholder + Official are **visible**; all other edge types are
-**hidden** for that node. A missing `filter` key means the node's visibility state is left at its
+`f=DSO` means Director + Shareholder + Official are **visible**; all other edge types are
+**hidden** for that node. A missing filter's `f` key means the node's visibility state is left at its
 default (from `HIDDEN_BY_DEFAULT`).
+
+### Entity ↔ Mapping
+
+| Entity Type          | Entity Type Key | URL ID              | Entity Reference         |
+|----------------------|-----------------|---------------------|--------------------------|
+| `OrganizationEntity` | `o`             | `/asmuo`            | `jarKodas`               |
+| `ContractEntity`     | `c`             | `/sutartis`         | `sutartiesUnikalusId`    |
+| `ProcurementEntity`  | `r`             | `/viesiejiPirkimai` | `pirkimoId`              |
+| `PersonEntity`       | `p`             | *(not supported)*   | base64(vardas + pavarde) |
 
 ### Hash format
 
 ```
-#filter=<chars>[&<entityType>_<N>=<entityId>&filter_<N>=<chars>...]
+#f=<chars>[&<Entity Type Key>_<N>=<Entity Reference>&f_<N>=<chars>...]
 ```
 
-- `filter` — comma-free string of filter chars for the **primary** (initial) node.
-- Additional expanded nodes use `<entityType>_<N>=<entityId>` keys where:
-    - `<entityType>` ∈ `{ asmuo, sutartis, viesiejiPirkimai }`
-    - `<N>` is a positive integer that also keys `filter_<N>` for that node's filter state
-    - `<entityId>` is the entity's database ID
+- `f` (filter) — comma-free string of filter chars for the **primary** (initial) node.
+- Additional expanded nodes use `<Entity Type Key>_<N>=<Entity Reference>` keys where:
+    - `<Entity Type Key>` ∈ `{ o, c, r, p }`
+    - `<N>` is a positive integer that also keys `f_<N>` for that node's filter state
+    - `<Entity Reference>` is the entity's database ID, except for `PersonEntity` where it is a base64-encoded
+      `vardas + pavarde` string (to avoid ambiguity and URL encoding issues with names)
 
 Examples:
 
 ```
-/rysiai/asmuo/110078991#filter=DSO
-/rysiai/asmuo/110078991#filter=DSO&asmuo_2=110078992&filter_2=LMG
-/rysiai/asmuo/110078991#filter=DSOELM&sutartis_2=2008083561&filter_2=LG&asmuo_3=110055123&filter_3=DS
+/rysiai/asmuo/110078991#f=DSO
+/rysiai/asmuo/110078991#f=DSO&o_2=110078992&f_2=LMG
+/rysiai/asmuo/110078991#f=DSOELM&c_2=2008083561&f_2=LG&o_3=110055123&f_3=DS
 ```
 
-### `src/rysiai/hash-state.js`
+### `src/rysiai/hash-state.ts`
 
 Pure module — no DOM reads; only writes `window.location.hash`.
 
-```js
+```ts
 // Maps filter char → edge type name
-export const FILTER_CHAR_MAP = {
+export const FILTER_CHAR_MAP: Record<string, string> = {
     D: 'Director', S: 'Shareholder', O: 'Official', E: 'Employment',
     U: 'Spouse', L: 'ContractSmall', M: 'ContractMedium', G: 'ContractLarge',
     P: 'Procurement', A: 'Award', B: 'Bidder', C: 'ContractProcurementLink'
@@ -571,197 +591,24 @@ export const FILTER_ID_MAP = Object.fromEntries(Object.entries(FILTER_CHAR_MAP).
 
 #### `applyFilterFromHash(legendState, primaryNodeId)`
 
-1. Parse `window.location.hash` — strip leading `#`, split on `&`, build a `Map<key, value>`.
-2. **Input validation**: entity type keys (`asmuo`, `sutartis`, `viesiejiPirkimai`) must contain only
-   alphabetic characters; entity ID values must be numeric strings. Keys or values that fail
-   validation are silently ignored.
-3. If `filter` key is present: for `primaryNodeId`, call `legendState.initNode(primaryNodeId)` then
-   set each edge type visible/hidden according to whether its char appears in the `filter` value.
-   All chars listed → **visible**; all chars not listed → **hidden**.
-4. For each `<entityType>_<N>` key that passes validation: note the entity for deferred expansion.
-5. For each `filter_<N>` key paired with a loaded node: apply the same char-based visibility to that
-   node's `legendState` entry once the node exists in `dataGraph`.
-6. Returns `{ additionalEntities: Array<{ entityType, entityId, filterChars, entityNumber }> }` so
-   `rysiai-app.js` can load them sequentially after the primary entity.
+Parses `window.location.hash`, validates keys/values (entity type keys must be `o`/`c`/`r`/`p`; IDs
+must be numeric for orgs/contracts/procurements or valid base64 for persons), applies visible/hidden
+state for the primary node, and returns
+`{ additionalEntities: Array<{ entityType, entityId, filterChars, entityNumber }> }` so `rysiai-app.js`
+can load them sequentially after the primary entity.
 
 #### `updateHashFromFilter(legendState, dataGraph)`
 
-1. Collect all node IDs in `dataGraph` that have an explicit `legendState` entry (`hasNodeConfig`).
-2. For each configured node, derive its filter string: join the chars of all visible edge types.
-3. For the primary node (the one marked `isRoot: true` in `dataGraph`), emit `filter=<chars>`.
-4. For each additional expanded node, determine its `entityType` from `attrs.entityType` and its
-   `entityId` from the relevant attribute (`jarKodas`, `sutartiesUnikalusId`, or `pirkimoId`). Assign
-   ascending `N` values starting from `2`. Emit `<entityType>_<N>=<entityId>&filter_<N>=<chars>`.
-5. Set `window.location.hash = '#' + assembled` (no page navigation; replaces fragment only).
-   If all nodes are at default (nothing configured), set hash to empty string.
+Collects all nodes in `dataGraph` with an explicit `legendState` entry, derives each node's filter
+string from its visible edge types, and writes the assembled hash to `window.location.hash`. The
+primary node (marked `isRoot: true`) emits `f=<chars>`; additional nodes emit
+`<typeKey>_<N>=<entityId>&f_<N>=<chars>`. Sets hash to empty string if no nodes are configured.
 
-### Integration in `rysiai-app.js`
+---
+
+## Smoke Test URLs
 
 ```
-DOMContentLoaded
-  → loadOrg/loadSutartis/loadPirkimas (initial entity)
-  → selectNode(primaryNodeId)
-  → legendState.initNode(primaryNodeId)
-  → applyFilterFromHash(legendState, primaryNodeId)
-      → if additionalEntities: load each sequentially, then apply their filter_N
-  → rebuildAndRefresh()
-
-On legend checkbox change:
-  → legendState mutated
-  → rebuildAndRefresh()
-  → updateHashFromFilter(legendState, dataGraph)
-
-On node expand (double-click):
-  → _expand(...)
-  → rebuildAndRefresh()
-  → updateHashFromFilter(legendState, dataGraph)
-
-On node collapse (non-primary node only):
-  → collapseGraphData(...)
-  → rebuildAndRefresh()
-  → updateHashFromFilter(legendState, dataGraph)
+http://localhost:9019/rysiai/asmuo/188752740#f=DSELMGPABC&p_2=RUdMJUM0JTk2JTIwUE9WSUxJJUM1JUFBTiVDNCU5Ng==&f_2=DSEULMGPABC
+http://localhost:9019/rysiai/asmuo/300015158#f=DSLMGPABC&p_2=SlVTVEFTJTIwVFJVTkMlQzQlOTY=&f_2=DSOEULMGPABC&p_3=QUdOJUM0JTk2JTIwVFJVTkNJRU4lQzQlOTY=&f_3=DSOEULMGPABC&p_4=QVVSSU1BUyUyMFRSVU5DJUM0JTk2&f_4=DSOEULMGPABC&p_5=U09MVkVJR0ElMjBUUlVOQ0lFTiVDNCU5Ng==&f_5=DSOEULMGPABC&o_6=301550690&f_6=DSLMGPABC
 ```
-
----
-
-## Out of Scope
-
-- Risk score colouring of nodes/edges
-- Toolbar "Balance" button triggering a full ForceAtlas2 pass — v2
-- Dashed/dotted edge rendering (Sigma.js has no built-in dash program; thin colored solid lines are used instead — a
-  custom renderer can be added in a future phase)
-
----
-
-## Tasks
-
-> **Phases 1–18 complete.** Core infrastructure (routes, expand.js, Sigma canvas, icons), expand
-> animations, loading overlay, edge/node type labels, per-node legend checkboxes with `LegendState`,
-> two-graph architecture, per-node selection state, dynamic node/edge sizing, entity-types module,
-> SVG legend arrows, ProcurementEntity nodes, double-click expand, expand/collapse button,
-> unified `#node-details` panel, button moved to bottom of legend, legend title removed,
-> size-based contract filtering (small / medium / large), legend row counts with zero-count hiding
-> (`computeEdgeCounts`, `vl-count` spans, `▼`/`▲` expand/collapse buttons). See architecture
-> sections above for current implementation state.
->
-> **Phase 19 complete.** Typed URL routes (`/rysiai/asmuo/:jarKodas`, `/rysiai/sutartis/:id`,
-> `/rysiai/viesiejiPirkimai/:id`), `expandSutartis` and `expandPirkimas` server functions,
-> `RYSIAI_CONFIG` updated to `{ entityType, entityId }`, client dispatch for all three entity types,
-> `loadSutartis` / `loadPirkimas` on `createExpandUI` return value.
->
-> **Phase 20 (20.1–20.3, 20.5–20.6) complete.** `hash-state.js` (pure module: `FILTER_CHAR_MAP`,
-> `FILTER_ID_MAP`, `applyFilterChars`, `applyFilterFromHash`, `buildHashString`,
-> `updateHashFromFilter`); `rysiai-app.js` reads hash on load, applies filter to primary node,
-> sequentially loads and filters additional entities from hash; `updateHashFromFilter` called after
-> every checkbox change, node expand, and node collapse via `onStateChange` callback; primary node
-> guard (`attrs.isRoot`) prevents expand/collapse button on root node. 48 tests in
-> `test/rysiai/hash-state.test.js` covering happy path, round-trips, and adversarial inputs.
-
----
-
-- [ ] **Browser smoke-test** (manual verification):
-    - Expand an org node — legend shows only rows with count > 0; each visible row has `(N)`.
-    - Node with no Employment edges: "Darbuotojas" row absent from legend.
-    - Node with only large contracts: only "Sutartis (didelė)" size row shown.
-    - After expanding a second node that adds new edge types to the first's neighbourhood: legend
-      updates correctly on re-selection.
-    - Expand a node that returns no relationships — "Ryšių nerasta" message shown; node stays `expanded: true`.
-    - Primary node has no expand/collapse button in the details panel.
-    - Collapse a non-primary node — hash updates; collapse button hidden after.
-
----
-
-1. **ForceAtlas2 in browser**: `graphology-layout-forceatlas2` runs synchronously and blocks the main
-   thread for large graphs. For large graphs (>200 nodes) a Web Worker is recommended. For v1,
-   synchronous with a capped iteration count is acceptable.
-
----
-
-### Phase 19 — Typed URL routes
-
-- [x] **19.1 — Server: 3 new page routes** in `routes/rysiai.js`:
-    - `GET /rysiai/asmuo/:jarKodas` — validates numeric jarKodas; renders EJS with
-      `{ entityType: 'asmuo', entityId: jarKodas }`
-    - `GET /rysiai/sutartis/:sutartiesUnikalusId` — validates numeric id; renders EJS with
-      `{ entityType: 'sutartis', entityId }`
-    - `GET /rysiai/viesiejiPirkimai/:pirkimoId` — validates numeric id; renders EJS with
-      `{ entityType: 'viesiejiPirkimai', entityId }`
-    - All 3 registered **before** any wildcard segments.
-
-- [x] **19.2 — Server: `expandSutartis(sutartiesUnikalusId)`** in `modules/rysiai/expand.js`:
-    - Query `sutartys JOIN jarCsv` for the single row by `sutartiesUnikalusId`.
-    - Return `ContractEntity` node (`isRoot: true`, `expanded: true`) + buyer `OrganizationEntity`
-      stub + seller `OrganizationEntity` stub + `Order` + `Delivery` edges.
-    - Expose as `GET /rysiai/expand-sutartis/:sutartiesUnikalusId`.
-
-- [x] **19.3 — Server: `expandPirkimas(pirkimoId)`** in `modules/rysiai/expand.js`:
-    - Query `viesiejiPirkimai JOIN jarCsv` for the procurement row + buyer org name.
-    - Reuse `expandProcurement(pirkimoId)` for winner/bidder stubs.
-    - Return `ProcurementEntity` node (`isRoot: true`, `expanded: true`) + buyer
-      `OrganizationEntity` stub + `Procurement` edge + all winner/bidder stubs from
-      `expandProcurement`.
-    - Expose as `GET /rysiai/expand-pirkimas/:pirkimoId`.
-
-- [x] **19.4 — View: `RYSIAI_CONFIG` change** in `views/rysiai/index.ejs`:
-    - Replace `{ jarKodas }` with `{ entityType, entityId }`.
-    - Template variables passed from all 3 page routes.
-
-- [x] **19.5 — Client: entity-type dispatch** in `src/rysiai-app.js`:
-    - Read `window.RYSIAI_CONFIG.entityType` + `entityId`.
-    - Route to `ui.loadOrg`, `ui.loadSutartis`, or `ui.loadPirkimas` accordingly.
-    - Select the correct initial node ID after load.
-
-- [x] **19.6 — Client: `loadSutartis` and `loadPirkimas`** in `src/rysiai/expand-ui.js`:
-    - `loadSutartis(sutartiesUnikalusId)` — fetches `/rysiai/expand-sutartis/:id`, merges,
-      marks root as selected.
-    - `loadPirkimas(pirkimoId)` — fetches `/rysiai/expand-pirkimas/:id`, merges, marks root
-      as selected.
-    - Both exposed on the return value of `createExpandUI`.
-
----
-
-### Phase 20 — URL hash filter state
-
-- [x] **20.1 — `src/rysiai/hash-state.js`** — new pure module:
-    - Export `FILTER_CHAR_MAP` and `FILTER_ID_MAP` constants (all 12 edge types).
-    - `applyFilterChars(legendState, nodeId, chars)` — apply a char string to one node.
-    - `applyFilterFromHash(legendState, primaryNodeId, hash?)` — parse hash with validation
-      (alpha entity type names, numeric entity IDs); apply per-node visibility; return
-      `additionalEntities` array. Hash parameter defaults to `window.location.hash`.
-    - `buildHashString(legendState, dataGraph)` — pure helper; builds the hash string without
-      writing to window (testable).
-    - `updateHashFromFilter(legendState, dataGraph)` — calls `buildHashString`, writes
-      `window.location.hash` (clears via `history.replaceState` when empty).
-
-- [x] **20.2 — `rysiai-app.js` integration**:
-    - Saves `window.location.hash` before any async operations.
-    - After initial load + `selectNode` + `legendState.initNode`, calls `applyFilterFromHash`
-      for the primary node.
-    - For each `additionalEntities` item returned, calls the appropriate `ui.load*` then applies
-      `filterChars` via `applyFilterChars` and calls `rebuildAndRefresh`.
-    - Calls `syncHash` (= `updateHashFromFilter`) at the end of the full setup.
-
-- [x] **20.3 — Hash wiring**: `onStateChange` callback passed to `createExpandUI`; called at
-  the end of every `_expand` try-block and at the end of `doCollapse` in `collapseNode`.
-  Legend checkbox handler in `rysiai-app.js` also calls `syncHash` after `rebuildAndRefresh`.
-
-- [ ] **20.4 — "Ryšių nerasta" UX**: in `legend.js`, after `updateForNode` detects that the
-  expanded node has zero incident edges in `dataGraph`, render the message inside
-  `#rysiai-legend-msg` and hide `#rysiai-legend-checkboxes`. The collapse button in
-  `#rysiai-legend-btn` is still rendered for non-primary nodes.
-
-- [x] **20.5 — Primary node guard**: `buildHandlers` in `expand-ui.js` returns `{}` immediately
-  when `attrs.isRoot === true` — no expand or collapse button is ever rendered for the root node.
-
-- [x] **20.6 — Tests `test/rysiai/hash-state.test.js`** — 48 tests across 5 suites:
-    - `FILTER_CHAR_MAP / FILTER_ID_MAP` constants verified (12 entries, round-trip inverse).
-    - `applyFilterChars`: DSO visible/hidden split, all-hidden, all-visible, per-node isolation.
-    - `applyFilterFromHash`: empty/bare-hash, no-filter key, DSO application, all-hidden,
-      single and multi-entity parsing, viesiejiPirkimai entity type, missing filter_N, invalid
-      entity type (non-alpha), invalid entity ID (non-numeric), N=0, negative N.
-    - `buildHashString`: empty state, all-hidden, DSO round-trip, char insertion order, contract
-      and procurement root types, multi-entity, secondary N=2 numbering, missing idAttr skip.
-    - Adversarial inputs: no `=` sign, unknown single-segment keys, numeric chars in type,
-      empty type, N=0, negative N, non-numeric ID, empty ID, still applies primary filter on
-      invalid extras, unknown filter chars treated as absent, filter_ only keys, duplicate keys,
-      out-of-order entityNumbers, URL-encoded numeric IDs.

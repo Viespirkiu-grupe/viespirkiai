@@ -1,0 +1,92 @@
+---
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import '../styles/global.css';
+import { readFileSync } from 'fs';
+
+interface Props {
+  pageTitle?: string;
+  pageDescription?: string;
+  pageImage?: string;
+  pageAuthor?: string;
+  colorScheme?: string;
+  font?: string;
+  customHead?: string;
+  hideFooter?: boolean;
+}
+
+const { pageTitle, pageDescription, pageImage, pageAuthor, colorScheme = 'auto', font = 'ubuntu', customHead = '', hideFooter = false } = Astro.props;
+
+const faviconSVG = readFileSync('./public/icons/icon.svg', 'utf8');
+const faviconSVGURLEncoded = encodeURIComponent(faviconSVG);
+---
+
+<!DOCTYPE html>
+<html lang="lt" class={colorScheme === 'dark' ? 'dark' : ''}>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="color-scheme" content={colorScheme === 'dark' ? 'dark' : colorScheme === 'light' ? 'light' : 'light dark'}>
+  <meta data-font={font}>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{pageTitle ? `${pageTitle} – Viešpirkiai` : 'Viešpirkiai'}</title>
+
+  <link rel="icon" type="image/png" href="/icons/maskable_icon_x128.png" sizes="any">
+  <link rel="icon" href={`data:image/svg+xml,${faviconSVGURLEncoded}`}>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+  <meta name="referrer" content="origin">
+
+  <meta property="og:site_name" content="Viešpirkiai" />
+  <meta property="og:locale" content="lt_LT" />
+  {pageTitle && <meta property="og:title" content={pageTitle} />}
+  {pageTitle && <meta name="twitter:title" content={pageTitle} />}
+  {pageDescription && <meta property="og:description" content={pageDescription} />}
+  {pageDescription && <meta name="description" content={pageDescription} />}
+  {pageDescription && <meta name="twitter:description" content={pageDescription} />}
+  {pageImage && <>
+    <meta property="og:image" content={pageImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:image" content={pageImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </>}
+  {pageAuthor && <meta property="article:author" content={pageAuthor} />}
+
+  <script is:inline>
+    (function() {
+      var cookie = document.cookie.split(';').map(function(c){ return c.trim(); }).find(function(c){ return c.startsWith('colorScheme='); });
+      var scheme = cookie ? cookie.split('=')[1] : 'auto';
+      var isDark = scheme === 'dark' || (scheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.classList.toggle('dark', isDark);
+      var colorSchemeMeta = document.querySelector('meta[name="color-scheme"]');
+      if (colorSchemeMeta) {
+        colorSchemeMeta.setAttribute('content', isDark ? 'dark' : 'light');
+      }
+    })();
+  </script>
+
+  <script is:inline defer>
+    if (!navigator.connection?.saveData) {
+      const prefetched = new Set();
+      document.addEventListener('mouseover', (e) => {
+        const link = e.target.closest('a[href]');
+        if (link && link.href.startsWith(location.origin) && !prefetched.has(link.href)) {
+          fetch(link.href).catch(() => {});
+          prefetched.add(link.href);
+        }
+      });
+    }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+  </script>
+
+  {customHead && <Fragment set:html={customHead} />}
+</head>
+<body>
+  <Header pathname={Astro.url.pathname} colorScheme={colorScheme} />
+  <slot />
+  {!hideFooter && <Footer />}
+</body>
+</html>

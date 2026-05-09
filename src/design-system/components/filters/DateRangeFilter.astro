@@ -1,0 +1,27 @@
+---
+import FilterGroup from './FilterGroup.astro';
+import DateInput from '../inputs/DateInput.astro';
+
+interface Props {
+  legend: string;
+  nameFrom: string;
+  nameTo: string;
+  labelFrom?: string;
+  labelTo?: string;
+  values: Record<string, any>;
+}
+
+const {
+  legend,
+  nameFrom,
+  nameTo,
+  labelFrom = 'Nuo',
+  labelTo = 'Iki',
+  values,
+} = Astro.props;
+---
+
+<FilterGroup legend={legend}>
+  <DateInput label={labelFrom} name={nameFrom} values={values} />
+  <DateInput label={labelTo} name={nameTo} values={values} />
+</FilterGroup>

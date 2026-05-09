@@ -1,0 +1,214 @@
+<p class="text-justify"><i>Šis failas – nepavykosio dokumento siuntimo faksu garso įrašas. Norint jį iškoduoti mūsų iniciatyva bandė viską: begalę fakso programų, hex editor ir netgi Windows XP. <br>Veikė tik vienas metodas:</i></p>
+
+<pre class="code-block mb-4">sox -t raw -r 8000 -e a-law -b 8 -c 1 debug.fax output.wav
+docker run --rm -v $(pwd):/data -w /data ghcr.io/sieteunoseis/spandsp:main fax_decode output.wav</pre>
+
+<pre class="code-block max-h-[40vh]">V.21 rx status is Carrier up (-2)
+V.17 rx status is Carrier up (-2)
+V.29 rx status is Carrier up (-2)
+V.27ter rx status is Carrier up (-2)
+V.27ter rx status is Carrier up (-2)
+V.21 rx status is Carrier down (-1)
+00:00:00.020 FLOW V.17 Restarting V.17, 14400bps, long training
+00:00:00.020 FLOW V.17 Gains 0.000000 0.002952
+00:00:00.020 FLOW V.17 Phase rates 1800.000000 1800.000000
+V.17 rx status is Carrier down (-1)
+00:00:00.020 FLOW V.29 Locking AGC at 0.001113
+00:00:00.020 FLOW V.29 Coarse carrier frequency 1784.83
+00:00:00.020 FLOW V.29 Training failed (sequence failed)
+V.29 rx status is Training failed (-5)
+V.29 rx status is Carrier down (-1)
+00:00:00.020 FLOW V.27ter-4800 Coarse carrier frequency 1978.00 (17)
+00:00:00.020 FLOW V.27ter-4800 Training failed (sequence failed)
+V.27ter rx status is Training failed (-5)
+00:00:00.020 FLOW V.27ter-4800 Restarting V.27ter
+V.27ter rx status is Carrier down (-1)
+00:00:00.020 FLOW V.27ter-2400 Restarting V.27ter
+V.27ter rx status is Carrier down (-1)
+V.21 rx status is Carrier up (-2)
+V.17 rx status is Carrier up (-2)
+V.29 rx status is Carrier up (-2)
+V.27ter rx status is Carrier up (-2)
+V.27ter rx status is Carrier up (-2)
+HDLC status is Abort (-8)
+00:00:00.100 FLOW V.29 Locking AGC at 0.000103
+00:00:00.100 FLOW V.29 Coarse carrier frequency 1490.71
+00:00:00.100 FLOW V.29 Training failed (sequence failed)
+V.29 rx status is Training failed (-5)
+00:00:00.100 FLOW V.27ter-4800 Coarse carrier frequency 1539.21 (13)
+00:00:00.100 FLOW V.27ter-4800 Training failed (sequence failed)
+V.27ter rx status is Training failed (-5)
+00:00:00.100 FLOW V.27ter-2400 Coarse carrier frequency 1530.34 (13)
+00:00:00.100 FLOW V.27ter-2400 Training failed (sequence failed)
+V.27ter rx status is Training failed (-5)
+00:00:00.120 FLOW V.17 We seem to have a reversal at symbol 14
+00:00:00.120 FLOW V.17 Angles 87038980, eb84d400, dist 6
+00:00:00.120 FLOW V.17 Coarse carrier frequency 1791.93 (14)
+00:00:00.120 FLOW V.17 Spin (long) by 5.45879 rads
+V.17 rx status is Training in progress (-3)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+00:00:01.360 FLOW V.17 Long training error 1136.261597
+00:00:01.360 FLOW V.17 Training failed (convergence failed)
+V.17 rx status is Training failed (-5)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+V.21 rx status is Carrier down (-1)
+00:00:12.880 FLOW V.17 Restarting V.17, 14400bps, long training
+00:00:12.880 FLOW V.17 Gains 0.000000 0.002952
+00:00:12.880 FLOW V.17 Phase rates 1800.000000 1800.000000
+V.17 rx status is Carrier down (-1)
+V.29 rx status is Carrier down (-1)
+00:00:12.880 FLOW V.27ter-4800 Restarting V.27ter
+V.27ter rx status is Carrier down (-1)
+00:00:12.880 FLOW V.27ter-2400 Restarting V.27ter
+V.27ter rx status is Carrier down (-1)
+V.21 rx status is Carrier up (-2)
+V.17 rx status is Carrier up (-2)
+V.29 rx status is Carrier up (-2)
+V.27ter rx status is Carrier up (-2)
+V.27ter rx status is Carrier up (-2)
+00:00:12.960 FLOW V.29 Locking AGC at 0.000095
+00:00:12.960 FLOW V.29 Coarse carrier frequency 1964.03
+00:00:12.960 FLOW V.29 Training failed (sequence failed)
+V.29 rx status is Training failed (-5)
+00:00:12.960 FLOW V.27ter-4800 Coarse carrier frequency 1769.97 (13)
+00:00:12.960 FLOW V.27ter-4800 Training failed (sequence failed)
+V.27ter rx status is Training failed (-5)
+00:00:12.960 FLOW V.27ter-2400 Coarse carrier frequency 1831.99 (13)
+00:00:12.960 FLOW V.27ter-2400 Training failed (sequence failed)
+V.27ter rx status is Training failed (-5)
+00:00:12.980 FLOW V.17 We seem to have a reversal at symbol 13
+00:00:12.980 FLOW V.17 Angles 1d6bce20, 5954f100, dist 4
+00:00:12.980 FLOW V.17 Coarse carrier frequency 1824.12 (13)
+00:00:12.980 FLOW V.17 Training failed (sequence failed)
+V.17 rx status is Training failed (-5)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+V.21 rx status is Carrier down (-1)
+00:00:22.740 FLOW V.17 Restarting V.17, 14400bps, long training
+00:00:22.740 FLOW V.17 Gains 0.000000 0.002952
+00:00:22.740 FLOW V.17 Phase rates 1800.000000 1800.000000
+V.17 rx status is Carrier down (-1)
+V.29 rx status is Carrier down (-1)
+00:00:22.740 FLOW V.27ter-4800 Restarting V.27ter
+V.27ter rx status is Carrier down (-1)
+00:00:22.740 FLOW V.27ter-2400 Restarting V.27ter
+V.27ter rx status is Carrier down (-1)
+V.21 rx status is Carrier up (-2)
+V.17 rx status is Carrier up (-2)
+V.29 rx status is Carrier up (-2)
+V.27ter rx status is Carrier up (-2)
+V.27ter rx status is Carrier up (-2)
+00:00:22.800 FLOW V.29 Locking AGC at 0.000108
+00:00:22.820 FLOW V.29 Coarse carrier frequency 1581.75
+00:00:22.820 FLOW V.29 Training failed (sequence failed)
+V.29 rx status is Training failed (-5)
+00:00:22.820 FLOW V.27ter-4800 Coarse carrier frequency 1642.69 (13)
+00:00:22.820 FLOW V.27ter-4800 Training failed (sequence failed)
+V.27ter rx status is Training failed (-5)
+00:00:22.820 FLOW V.27ter-2400 Coarse carrier frequency 1602.56 (13)
+00:00:22.820 FLOW V.27ter-2400 Training failed (sequence failed)
+V.27ter rx status is Training failed (-5)
+HDLC status is Abort (-8)
+00:00:22.840 FLOW V.17 We seem to have a reversal at symbol 13
+00:00:22.840 FLOW V.17 Angles ec769440, f23aeda0, dist 4
+00:00:22.840 FLOW V.17 Coarse carrier frequency 2167.85 (13)
+00:00:22.840 FLOW V.17 Training failed (sequence failed)
+V.17 rx status is Training failed (-5)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+00:00:33.800 FLOW V.17 Restarting V.17, 14400bps, long training
+00:00:33.800 FLOW V.17 Gains 0.000000 0.002952
+00:00:33.800 FLOW V.17 Phase rates 1800.000000 1800.000000
+V.17 rx status is Carrier down (-1)
+V.29 rx status is Carrier down (-1)
+00:00:33.800 FLOW V.27ter-4800 Restarting V.27ter
+V.27ter rx status is Carrier down (-1)
+00:00:33.800 FLOW V.27ter-2400 Restarting V.27ter
+V.27ter rx status is Carrier down (-1)
+V.21 rx status is Carrier down (-1)
+V.21 rx status is Carrier up (-2)
+V.17 rx status is Carrier up (-2)
+V.29 rx status is Carrier up (-2)
+V.27ter rx status is Carrier up (-2)
+V.27ter rx status is Carrier up (-2)
+00:00:33.880 FLOW V.29 Locking AGC at 0.000085
+00:00:33.880 FLOW V.29 Coarse carrier frequency 1610.22
+00:00:33.880 FLOW V.29 Training failed (sequence failed)
+V.29 rx status is Training failed (-5)
+00:00:33.880 FLOW V.27ter-4800 Coarse carrier frequency 1451.53 (13)
+00:00:33.880 FLOW V.27ter-4800 Training failed (sequence failed)
+V.27ter rx status is Training failed (-5)
+00:00:33.880 FLOW V.27ter-2400 Coarse carrier frequency 1711.67 (13)
+00:00:33.880 FLOW V.27ter-2400 Training failed (sequence failed)
+V.27ter rx status is Training failed (-5)
+00:00:33.900 FLOW V.17 We seem to have a reversal at symbol 16
+00:00:33.900 FLOW V.17 Angles dc6a8f00, e6410b20, dist 8
+00:00:33.900 FLOW V.17 Coarse carrier frequency 1700.08 (16)
+00:00:33.900 FLOW V.17 Training failed (sequence failed)
+V.17 rx status is Training failed (-5)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)
+HDLC status is Abort (-8)</pre>

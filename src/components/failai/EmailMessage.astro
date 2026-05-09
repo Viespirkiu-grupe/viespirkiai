@@ -1,0 +1,43 @@
+---
+interface Props { metaduomenys: any; failasId: string | number; containerClass?: string; iframeHeight?: number; }
+const { metaduomenys: m = {}, failasId, containerClass = '', iframeHeight = 400 } = Astro.props;
+
+const subject = m.subject || '—';
+const fromName = m?.from?.name || '—';
+const fromEmail = m?.from?.email || '—';
+const toList: any[] = Array.isArray(m.to) ? m.to : (m.to ? [m.to] : []);
+const dateRaw = m.date || m.messageDeliveryTime;
+let dateText = '—';
+try { if (dateRaw) dateText = new Date(dateRaw).toLocaleString('lt-LT') || '—'; } catch {}
+const attachments: any[] = Array.isArray(m.attachments) ? m.attachments : [];
+---
+<div class={`email-message bg-lighter-gray border-border rounded-md p-4 ${containerClass}`}>
+  <h2 class="mb-2 mt-0">{subject}</h2>
+  <dl class="kv-list mb-4">
+    <dt>Nuo</dt>
+    <dd>{fromName} &lt;<a href={`mailto:${fromEmail}`}>{fromEmail}</a>&gt;</dd>
+    <dt>Kam</dt>
+    <dd>
+      {toList.length > 0
+        ? toList.map(to => <div>{to?.name || '—'} &lt;<a href={`mailto:${to?.email || ''}`}>{to?.email || '—'}</a>&gt;</div>)
+        : '—'
+      }
+    </dd>
+    <dt>Data</dt>
+    <dd>{dateText}</dd>
+  </dl>
+  {m.html
+    ? <iframe srcdoc={m.html} style={`height:${iframeHeight}px;`} class="w-full border-border rounded-sm"></iframe>
+    : <pre class="whitespace-pre-wrap wrap-break-word font-mono text-sm border-t pt-3" set:html={String(m.text || m.body || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\r?\n/g,'<br>')} />
+  }
+  {attachments.length > 0 && (
+    <>
+      <h3 class="mt-4 mb-2">Priedai</h3>
+      <div class="flex flex-col gap-1">
+        {attachments.filter(a => a?.name).map(a => (
+          <a href={`https://failai.viespirkiai.org/${failasId}/${a.name}`} target="_blank">{a.name}</a>
+        ))}
+      </div>
+    </>
+  )}
+</div>

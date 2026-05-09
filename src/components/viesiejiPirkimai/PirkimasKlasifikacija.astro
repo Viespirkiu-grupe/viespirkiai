@@ -1,0 +1,32 @@
+---
+interface Props {
+  pirkimas: any;
+}
+const { pirkimas } = Astro.props;
+const t = pirkimas.turinys || {};
+---
+
+<section>
+  <h2>Klasifikacija</h2>
+  <dl class="kv-list mb-4">
+    {pirkimas.statusas && <><dt>Statusas</dt><dd>{pirkimas.statusas}</dd></>}
+    {pirkimas.pirkimoObjektoTipas && <><dt>Objekto tipas</dt><dd>{pirkimas.pirkimoObjektoTipas}</dd></>}
+    {t.direktyva && <><dt>Direktyva</dt><dd>{t.direktyva}</dd></>}
+    {t.nutsKodai && <><dt>NUTS kodas</dt><dd>{t.nutsKodai}</dd></>}
+    {pirkimas.esFinansavimas != null && <><dt>ES finansavimas</dt><dd>{pirkimas.esFinansavimas ? 'Taip' : 'Ne'}</dd></>}
+    {t.pasiulymuVertinimoKriterijai && <><dt>Vertinimo kriterijai</dt><dd>{t.pasiulymuVertinimoKriterijai}</dd></>}
+    {t.virsArbaZemiauTarptautinioPirkimoVertesRibos && <><dt>Tarpt. vertės riba</dt><dd>{t.virsArbaZemiauTarptautinioPirkimoVertesRibos}</dd></>}
+  </dl>
+  {pirkimas.bvpzKodai && pirkimas.bvpzKodai.length > 0 && (
+    <>
+      <h3 class="mb-2">BVPŽ kodai</h3>
+      {pirkimas.bvpzKodai.map((kodas: string, i: number) => (
+        <div class="mb-2">
+          {t.bvpzKodaiPavadinimai?.[i] && <div class="font-medium">{t.bvpzKodaiPavadinimai[i]}</div>}
+          <span class="text-muted">{kodas}</span>
+        </div>
+      ))}
+      <a href="/bvpz" class="text-sm">↗ BVPŽ kodai</a>
+    </>
+  )}
+</section>

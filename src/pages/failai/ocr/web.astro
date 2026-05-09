@@ -1,0 +1,13 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import { getColorScheme, getFont } from '../../../lib/failai.js';
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+---
+<Layout pageTitle="WebOCR" pageDescription="Naršyklėje veikiantis OCR" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font}>
+  <main>
+    <PageHeader>WebOCR</PageHeader>
+    <p class="text-muted">Šis Astro puslapis dar neperkelia visos senos WebOCR darbo eigos.</p>
+  </main>
+</Layout>

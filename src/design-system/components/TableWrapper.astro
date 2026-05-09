@@ -1,0 +1,21 @@
+---
+interface Props {
+  className?: string;
+}
+
+const { className = '' } = Astro.props;
+const classes = ['ds-table-wrapper', className].filter(Boolean).join(' ');
+---
+
+<div class={classes}>
+  <slot />
+</div>
+
+<style>
+  .ds-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+  }
+</style>

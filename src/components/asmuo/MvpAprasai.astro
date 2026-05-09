@@ -1,0 +1,53 @@
+---
+import FileCard from '@design-system/components/FileCard.astro';
+
+const { asmuo, mvpAprasaiLimit } = Astro.props;
+const rows = asmuo.mvpAprasai?.rows ?? [];
+if (rows.length === 0) return;
+const count = asmuo.mvpAprasai?.count ?? 0;
+---
+
+<div class="page-section mt-10" id="mvp-aprasai">
+  <h2><a href="#mvp-aprasai" class="no-style">MVP tvarkos aprašai</a></h2>
+  {count > mvpAprasaiLimit && (
+    <p class="text-muted text-sm mb-4">
+      Rodomas tik paskutinis aprašas.
+      <a href={`?mvpAprasaiLimit=max#mvp-aprasai`}>Rodyti visus ({count})</a>
+    </p>
+  )}
+  <div class="subsection">
+    {rows.slice(0, mvpAprasaiLimit).map((aprasas: any) => (
+      <div class="card mb-3">
+        <div class="card-body">
+          <div class="font-bold mb-1">{aprasas.aprasymas}</div>
+          <div class="text-muted text-sm mb-3">
+            {aprasas.paskelbimoData && <>Paskelbta: <strong>{aprasas.paskelbimoData}</strong></>}
+            {aprasas.vptGavimoData && <> &middot; VPT gavimo data: {aprasas.vptGavimoData}</>}
+            {aprasas.galiojaIki && <> &middot; Galioja iki: {aprasas.galiojaIki}</>}
+          </div>
+          {aprasas.rinkmenos?.length > 0 && (
+            <ul class="list-none p-0 m-0 space-y-2">
+              {aprasas.rinkmenos.map((r: any) => (
+                <li class="mvp-file-item">
+                  <FileCard
+                    title={r.pavadinimas || 'Nežinoma rinkmena'}
+                    href={r.url || r.originalUrl}
+                    ext={r.extension || undefined}
+                    target={r.url ? undefined : '_blank'}
+                    rel={r.url ? undefined : 'noopener'}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+  .mvp-file-item :global(.file-card) {
+    max-width: 420px;
+  }
+</style>

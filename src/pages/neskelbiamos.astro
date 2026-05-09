@@ -1,0 +1,169 @@
+---
+import Layout from '../layouts/Layout.astro';
+import EmptyState from '@design-system/components/EmptyState.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import ResultsSummary from '@design-system/components/ResultsSummary.astro';
+import SearchForm from '@design-system/components/content/SearchForm.astro';
+import { postgres, getColorScheme, getFont, cleanQuery, parseLimit, buildNumberOfResults } from '../lib/failai.js';
+import '@/utils/linksniai.js';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const cleaned = cleanQuery(Astro.url);
+if ('redirectTo' in cleaned) return Astro.redirect(cleaned.redirectTo);
+const query = cleaned.query;
+
+const parsedLimit = parseLimit(query, 50, 250);
+if ('error' in parsedLimit) return new Response(parsedLimit.error, { status: 400 });
+const limit = parsedLimit.limit;
+
+const currentPage = Math.max(1, parseInt(query.page) || 1);
+const skip = (currentPage - 1) * limit;
+const rawSearch = query.search || '';
+
+const parseSearch = (searchTerm: string) => {
+  const quoteMatch = searchTerm.match(/^"(.*)"$/);
+  return {
+    tsQueryFunc: quoteMatch ? 'phraseto_tsquery' : 'plainto_tsquery',
+    cleanSearch: quoteMatch ? quoteMatch[1] : searchTerm,
+  };
+};
+
+const queryNeskelbiamos = async ({ cleanSearch, tsQueryFunc, limit, skip }: { cleanSearch: string; tsQueryFunc: string; limit: number; skip: number; }) => {
+  const fileJoin = `
+    LEFT JOIN public."failai" f
+      ON replace(nd.link, 'https://eviesiejipirkimai.lt/', '') = f."saltinioId"
+      AND f."parsiustas" = 1`;
+
+  if (cleanSearch) {
+    const [resultsRes, totalRes] = await Promise.all([
+      postgres.query(
+        `SELECT nd.*, f.id AS "failoId"
+         FROM public."neskelbiamosDerybos" nd ${fileJoin}
+         WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
+         LIMIT $2 OFFSET $3`,
+        [cleanSearch, limit, skip]
+      ),
+      postgres.query(
+        `SELECT COUNT(*) FROM public."neskelbiamosDerybos"
+         WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)`,
+        [cleanSearch]
+      ),
+    ]);
+
+    return {
+      rows: resultsRes.rows,
+      total: parseInt(totalRes.rows[0].count, 10),
+    };
+  }
+
+  const [resultsRes, totalRes] = await Promise.all([
+    postgres.query(
+      `SELECT nd.*, f.id AS "failoId"
+       FROM public."neskelbiamosDerybos" nd ${fileJoin}
+       ORDER BY nd.data DESC NULLS LAST
+       LIMIT $1 OFFSET $2`,
+      [limit, skip]
+    ),
+    postgres.query(`SELECT COUNT(*) FROM public."neskelbiamosDerybos"`),
+  ]);
+
+  return {
+    rows: resultsRes.rows,
+    total: parseInt(totalRes.rows[0].count, 10),
+  };
+};
+
+const startedAt = Date.now();
+const { tsQueryFunc, cleanSearch } = rawSearch ? parseSearch(rawSearch) : { tsQueryFunc: '', cleanSearch: '' };
+const { rows, total } = await queryNeskelbiamos({ cleanSearch, tsQueryFunc, limit, skip });
+const pageCount = Math.ceil(total / limit);
+
+if (typeof query.json !== 'undefined') {
+  return new Response(JSON.stringify({
+    data: rows,
+    currentPage,
+    pageCount,
+  }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const numberOfResults = buildNumberOfResults({
+  rows,
+  total,
+  elapsed: Date.now() - startedAt,
+  engine: 'PostgreSQL',
+});
+
+const queryParams = rawSearch ? `&search=${encodeURIComponent(rawSearch)}` : '';
+---
+<Layout
+  pageTitle="Neskelbiamų derybų paieška"
+  pageDescription="Pirkimai, kurių informacija nebuvo skelbiama viešai"
+  pageImage="https://viespirkiai.org/neskelbiamos.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <SearchForm title="Neskelbiamų derybų paieška" searchValue={rawSearch} />
+
+    <div class="mt-10 max-w-lg center mx-auto">
+      <div class="flex justify-between items-center mb-4">
+        <ResultsSummary html={numberOfResults} />
+      </div>
+
+      {rows.length === 0 ? (
+        <EmptyState message="Rezultatų nerasta." />
+      ) : (
+        <>
+          <div class="result-list">
+            {rows.map((item: any) => {
+              const href = item.failoId ? `/failas/${item.failoId}` : `https://eviesiejipirkimai.lt/${item.link}`;
+              return (
+                <ResultCardShell clickable={true}>
+                  <dl slot="meta" class="result-card-meta">
+                    <div>
+                      <dt class="sr-only">Data</dt>
+                      <dd>
+                        {item.data ? <time datetime={item.data}>{item.data}</time> : '—'}
+                      </dd>
+                    </div>
+
+                    <div>
+                      <dt class="sr-only">Išvada</dt>
+                      <dd>{item.isvada || '—'}</dd>
+                    </div>
+                  </dl>
+
+                  <h3 slot="title" class="result-card-title">
+                    {item.aprasymas && item.aprasymas.length > 0 ? (
+                      <a href={href}>{item.aprasymas}</a>
+                    ) : (
+                      <em>Nenurodyta</em>
+                    )}
+                  </h3>
+
+                  <div slot="footer" class="result-card-footer">
+                    <span>
+                      <strong>Perkančioji organizacija:</strong>{' '}
+                      {item.jarKodas && item.jarPavadinimas ? (
+                        <a href={`/asmuo/${item.jarKodas}`} class="relative z-1">{item.jarPavadinimas}</a>
+                      ) : (
+                        <em>Nenurodyta</em>
+                      )}
+                    </span>
+                  </div>
+                </ResultCardShell>
+              );
+            })}
+          </div>
+
+          <Pagination currentPage={currentPage} pageCount={pageCount} queryParams={queryParams} />
+        </>
+      )}
+    </div>
+  </main>
+</Layout>

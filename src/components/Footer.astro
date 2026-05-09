@@ -1,0 +1,27 @@
+---
+import SiteFooterShell from '@design-system/components/SiteFooterShell.astro';
+---
+<SiteFooterShell>
+  <a href="https://www.facebook.com/profile.php?id=100003117510876" rel="me">↗ Facebook</a>
+  <a href="https://river.group.lt/@viespirkiai" rel="me">↗ Mastodon</a>
+  <a href="/duomenys#duomenu-saltiniai">↗ Duomenų šaltiniai</a>
+  <a href="/mcp">↗ MCP</a>
+  <a href="/kontaktai">↗ Kontaktai</a>
+  <a href="/analitika">↗ Analitika</a>
+  <a href="/kodas">↗ Kodas</a>
+  <a href="/privatumas">↗ Privatumo politika</a>
+  <button onclick="
+    const meta = document.querySelector('meta[data-font]');
+    const next = meta.dataset.font === 'comic' ? 'ubuntu' : 'comic';
+    meta.dataset.font = next;
+    document.cookie = 'font=' + next + ';path=/;max-age=31536000';
+  ">↗ Pakeisti šriftą</button>
+
+  <p slot="disclaimer" class="text-center text-sm text-muted mt-4 mb-0">
+    <em>
+      Rekomenduojame tikrinti pateiktą informaciją. Ji buvo automatiškai surinkta remiantis tik viešais šaltiniais, gali būti pasenusi, klaidinga.
+      <br>Jeigu yra priežastis, kodėl tokia ji turėtų būti neskelbiama, šalinama ar pataisyta – prašome susisiekti.
+      Daugiau informacijos rasite <a href="/kontaktai#informacijosTikslumas" class="text-inherit">kontaktų puslapyje</a>.
+    </em>
+  </p>
+</SiteFooterShell>

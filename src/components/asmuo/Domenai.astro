@@ -1,0 +1,28 @@
+---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import TruncationNotice from '@design-system/components/TruncationNotice.astro';
+
+const { asmuo } = Astro.props;
+if (!(asmuo.domenai?.count > 0)) return;
+const { count, rows } = asmuo.domenai;
+---
+
+<div class="page-section mb-10" id="domenai">
+  <h2><a href="#domenai" class="no-style">.lt domenai</a></h2>
+  <p class="text-muted text-sm mb-4">Pagal savininko pavadinimo panašumą.</p>
+  <TruncationNotice count={count} shown={rows.length} anchor="domenai" paramName="domenaiLimit" label="domenai" />
+  <div class="result-list">
+    {rows.map((d: any) => (
+      <ResultCardShell clickable={true}>
+        <dl slot="meta" class="result-card-meta">
+          <div><dt class="sr-only">Registruota</dt><dd>{String(d.created).split(' ')[0]} – {String(d.expired).split(' ')[0]}</dd></div>
+          <div><dt class="sr-only">Duomenų data</dt><dd>Duomenys {String(d.domregData).split(' ')[0]}</dd></div>
+        </dl>
+        <h3 slot="title" class="result-card-title">
+          <a href={`https://www.domreg.lt/paslaugos/whois/?search=${d.domain}`}>{d.domain}</a>
+        </h3>
+        <div slot="footer" class="result-card-footer"><span><strong>Savininkas:</strong> {d.savininkas}</span></div>
+      </ResultCardShell>
+    ))}
+  </div>
+</div>

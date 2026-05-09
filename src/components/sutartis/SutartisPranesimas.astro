@@ -1,0 +1,56 @@
+---
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import { fmtEur } from '../../lib/formatters.ts';
+
+interface Props {
+  sutartis: any;
+}
+
+const { sutartis } = Astro.props;
+const cvpisUrl = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=${sutartis.sutartiesUnikalusId}`;
+const cvpis = sutartis.cvpisPirkimas;
+const cvpp = sutartis.cvppPirkimas;
+---
+
+<section>
+  <h2>Pranešimas</h2>
+  <div class="flex items-center gap-2 mb-4">
+    <span class="text-muted">{sutartis.sutartiesUnikalusId}</span>
+    <a href={cvpisUrl} class="text-sm">↗ CVP IS</a>
+  </div>
+
+  <KeyValueList className="mb-4">
+    <dt>Paskelbta</dt><dd>{sutartis.paskelbimoData}</dd>
+    <dt>Redaguota</dt><dd>{sutartis.paskutinioRedagavimoData}</dd>
+    <dt>Pirkimo numeris</dt>
+    <dd>
+      {cvpis
+        ? <a href={`/viesiejiPirkimai/${cvpis.pirkimoId}`}>{sutartis.pirkimoNumeris}</a>
+        : cvpp
+          ? <a href={cvpp.link}>{sutartis.pirkimoNumeris}</a>
+          : sutartis.pirkimoNumeris || 'Nenurodytas'
+      }
+    </dd>
+  </KeyValueList>
+
+  {cvpis && (
+    <section>
+      <br />
+      <h2>Viešasis pirkimas</h2>
+      <div class="flex items-center gap-2 mb-4">
+        <a href={`/viesiejiPirkimai/${cvpis.pirkimoId}`}><span>{cvpis.pavadinimas}</span></a>
+      </div>
+      <KeyValueList>
+        {cvpis.pasiulymuPateikimoTerminas && <>
+          <dt>Pasiūlymų pateikimo terminas</dt>
+          <dd>{String(cvpis.pasiulymuPateikimoTerminas).slice(0, 10)}</dd>
+        </>}
+        {cvpis.numatomaVerteEUR && Number(cvpis.numatomaVerteEUR) > 0 && <>
+          <dt>Numatoma vertė</dt>
+          <dd class="cell-mono">{fmtEur(cvpis.numatomaVerteEUR)} €</dd>
+        </>}
+      </KeyValueList>
+      {cvpis.informacija && <p class="text-muted text-sm">{cvpis.informacija}</p>}
+    </section>
+  )}
+</section>
