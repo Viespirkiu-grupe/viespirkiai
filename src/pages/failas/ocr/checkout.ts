@@ -11,7 +11,7 @@ function extractApiKey(request: Request): string | null {
   return null;
 }
 
-export const POST: APIRoute = async ({ request }) => {
+export const GET: APIRoute = async ({ request }) => {
   const apiKey = extractApiKey(request);
 
   const { user, error, message } = await validateOcrApiKey(apiKey);
