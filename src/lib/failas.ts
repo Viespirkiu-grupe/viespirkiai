@@ -1,7 +1,28 @@
 import { postgres } from '@/postgres/postgres.js';
 import { Buffer } from 'buffer';
+import { DateTime } from 'luxon';
 
 export type Failas = Record<string, any>;
+
+function formatOcrTimestampForVilnius(value: unknown): string | null {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return DateTime.fromJSDate(value, { zone: 'utc' }).setZone('Europe/Vilnius').toFormat('yyyy-MM-dd HH:mm:ss');
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const asUtc = DateTime.fromSQL(raw, { zone: 'utc' });
+  if (asUtc.isValid) return asUtc.setZone('Europe/Vilnius').toFormat('yyyy-MM-dd HH:mm:ss');
+
+  const asIsoUtc = DateTime.fromISO(raw.replace(' ', 'T'), { zone: 'utc' });
+  if (asIsoUtc.isValid) return asIsoUtc.setZone('Europe/Vilnius').toFormat('yyyy-MM-dd HH:mm:ss');
+
+  return null;
+}
 
 export function parseSuffix(raw: string) {
   if (raw.endsWith('.json')) return { value: raw.slice(0, -5), format: 'json' as const };
@@ -163,6 +184,12 @@ export async function loadFailasById(id: string): Promise<Failas | null> {
 export async function enrichFailas(failas: Failas): Promise<Failas> {
   const { fetchFailasMetadata } = await import('@/modules/failai/aptarnavimas.js');
   failas = { ...failas, ...(await fetchFailasMetadata(failas.id)) };
+
+  if (failas.ocrLatestResult) {
+    failas.ocrLatestResult.submitTimestampDisplay = formatOcrTimestampForVilnius(failas.ocrLatestResult.submitTimestamp);
+    failas.ocrLatestResult.lockTimestampDisplay = formatOcrTimestampForVilnius(failas.ocrLatestResult.lockTimestamp);
+  }
+  failas.ocrLockTimestampDisplay = formatOcrTimestampForVilnius(failas.ocrLockTimestamp);
 
   failas.metaduomenys?.signatures?.forEach((sig: any) => {
     if (sig.signerFullDistinguishedName) {
