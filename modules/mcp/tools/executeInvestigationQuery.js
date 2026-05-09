@@ -10,8 +10,8 @@ export const description =
     "The query is validated through a multi-layer guardrail stack (AST parse, table whitelist, " +
     "function whitelist, complexity limits) before execution. " +
     "Results are paginated — 50 rows per page. Include a 'purpose' describing your investigation hypothesis. " +
-    "Session-scoped views v_company, v_sutartys, v_pirkimas, v_person_links, v_dalyviai, v_bylos are available. " +
-    "Call get_schema first to understand the available tables and their columns.";
+    "Primary views that you should consider using first: v_company, v_sutartys, v_pirkimas, v_person_links, v_dalyviai, v_bylos. " +
+    "Call get_schema first to understand the available views and additional tables, and their columns.";
 
 export const schema = {
     query: z

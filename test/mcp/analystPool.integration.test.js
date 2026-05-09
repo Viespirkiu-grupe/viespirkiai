@@ -11,8 +11,8 @@ import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
 import pkg from "pg";
 import config from "../../utils/config.js";
-import { TEMP_VIEWS_SQL } from "../../modules/mcp/analyst/tempViews.js";
-import { VIEW_NAMES } from "../../modules/mcp/analyst/validateSql.js";
+import { TEMP_VIEWS_SQL } from "@/modules/mcp/analyst/tempViews.js";
+import { VIEW_NAMES } from "@/modules/mcp/analyst/validateSql.js";
 
 const { Pool } = pkg;
 
