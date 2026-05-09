@@ -71,6 +71,7 @@
     "devDependencies": {
         "@tailwindcss/vite": "^4.2.4",
         "@types/node": "^25.6.0",
+        "@types/pg": "^8.20.0",
         "esbuild": "^0.28.0",
         "tailwindcss": "4.2.2",
         "vitest": "^4.1.5"

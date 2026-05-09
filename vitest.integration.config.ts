@@ -9,7 +9,7 @@ export default defineConfig({
         alias: { '@': root },
     },
     test: {
-        include: ['test/it/**/*.it.ts'],
+        include: ['test/**/*.it.ts'],
         hookTimeout: 120_000,
         testTimeout: 120_000,
     },
