@@ -1,8 +1,8 @@
 import { defineConfig } from 'astro/config';
 import node from '@astrojs/node';
+import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { build as esbuild } from 'esbuild';
 import config from './config.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -17,27 +17,22 @@ export default defineConfig({
   },
   vite: {
     resolve: {
-      alias: { '@': root },
+      alias: {
+        '@': root,
+        '@design-system': path.join(root, 'src/design-system'),
+      },
     },
     server: {
       allowedHosts: ['localhost', 'viespirkiai.org', '.viespirkiai.org'],
     },
     plugins: [
-      {
-        name: 'esbuild-bundles',
-        async buildStart() {
-          await Promise.all([
-            esbuild({ entryPoints: ['src/graph-bundle.js'], bundle: true, format: 'iife', outfile: 'public/dist/graph-bundle.js', minify: true }),
-            esbuild({ entryPoints: ['src/rysiai-app.js'], bundle: true, format: 'iife', outfile: 'public/dist/rysiai.js', minify: true }),
-          ]);
-        },
-      },
+      tailwindcss(),
       {
         name: 'immutable-cache',
         configureServer(server) {
           server.middlewares.use((req, res, next) => {
             const url = req.url?.split('?')[0];
-            if (url === '/dist/tailwind.css' || url?.startsWith('/fontai/')) {
+            if (url?.startsWith('/fontai/')) {
               const orig = res.setHeader.bind(res);
               res.setHeader = (name, value) => {
                 if (name.toLowerCase() === 'cache-control') return res;

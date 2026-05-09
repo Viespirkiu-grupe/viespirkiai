@@ -1,0 +1,47 @@
+---
+import EmptyState from '@design-system/components/EmptyState.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import ResultList from '@design-system/components/ResultList.astro';
+import ResultsSummary from '@design-system/components/ResultsSummary.astro';
+
+interface Props {
+  numberOfResults: string;
+  resultCount: number;
+  page: number;
+  pageCount: number;
+  queryParams: string;
+  emptyText?: string;
+  containerClass?: string;
+}
+
+const {
+  numberOfResults,
+  resultCount,
+  page,
+  pageCount,
+  queryParams,
+  emptyText = 'Rezultatų nerasta.',
+  containerClass = 'mt-10 max-w-lg center mx-auto',
+} = Astro.props;
+
+const hasActions = Astro.slots.has('actions');
+---
+
+<div class={containerClass}>
+  <div>
+    <div class="flex justify-between items-center mb-4">
+      <ResultsSummary html={numberOfResults} />
+      {hasActions && <div class="flex gap-3"><slot name="actions" /></div>}
+    </div>
+
+    {resultCount === 0
+      ? <EmptyState message={emptyText} />
+      : <>
+          <ResultList>
+            <slot />
+          </ResultList>
+          <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
+        </>
+    }
+  </div>
+</div>

@@ -1,7 +1,10 @@
 ---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import TruncationNotice from '@design-system/components/TruncationNotice.astro';
+
 const { asmuo } = Astro.props;
 if (!(asmuo.vdiPazeidimai?.count > 0)) return;
-const { count, limit, rows } = asmuo.vdiPazeidimai;
+const { count, rows } = asmuo.vdiPazeidimai;
 
 const aggregated = Object.values(
   rows.reduce((acc: any, p: any) => {
@@ -15,27 +18,20 @@ const aggregated = Object.values(
 
 <div class="page-section mb-10" id="vdiPazeidimai">
   <h2><a href="#vdiPazeidimai" class="no-style">Darbo teisės pažeidimai</a></h2>
-  {count > rows.length && (
-    <p class="text-muted text-sm mb-4">
-      Rodomi tik {limit} pažeidimai.
-      <a href="?vdiPazeidimaiLimit=max#vdiPazeidimai">Rodyti visus ({count})</a>
-    </p>
-  )}
+  <TruncationNotice count={count} shown={rows.length} anchor="vdiPazeidimai" paramName="vdiPazeidimaiLimit" label="pažeidimai" />
   <div class="result-list">
     {aggregated.map((p: any) => (
-      <article class="result-card">
-        <div class="result-card-body">
-          <dl class="result-card-meta">
-            <div><dt class="sr-only">Teisės aktas</dt><dd>{p.teisesAktas}</dd></div>
-            <div><dt class="sr-only">Straipsnis</dt><dd>{p.straipsnis} str.{p.dalis && ` ${p.dalis} d.`}</dd></div>
-            {p.pirmaKarta && <div><dd>Pirmą kartą</dd></div>}
-          </dl>
-          <h3 class="result-card-title">
-            {p.kiekis > 1 && <span class="font-bold mr-1">{p.kiekis}&times;</span>}
-            {p.pavadinimas}
-          </h3>
-        </div>
-      </article>
+      <ResultCardShell>
+        <dl slot="meta" class="result-card-meta">
+          <div><dt class="sr-only">Teisės aktas</dt><dd>{p.teisesAktas}</dd></div>
+          <div><dt class="sr-only">Straipsnis</dt><dd>{p.straipsnis} str.{p.dalis && ` ${p.dalis} d.`}</dd></div>
+          {p.pirmaKarta && <div><dd>Pirmą kartą</dd></div>}
+        </dl>
+        <h3 slot="title" class="result-card-title">
+          {p.kiekis > 1 && <span class="font-bold mr-1">{p.kiekis}&times;</span>}
+          {p.pavadinimas}
+        </h3>
+      </ResultCardShell>
     ))}
   </div>
 </div>

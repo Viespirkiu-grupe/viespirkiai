@@ -1,0 +1,46 @@
+@layer components {
+  .card {
+    @apply bg-white border border-border rounded-lg overflow-hidden transition-colors;
+  }
+
+  .card.card-clickable {
+    @apply hover:ring relative;
+  }
+
+  .card.card-clickable h3 a {
+    @apply no-underline text-black after:absolute after:inset-0 flex items-baseline gap-2;
+  }
+
+  .card-header {
+    padding: 12px 16px;
+    border-bottom: var(--border);
+    background: var(--shade-2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .card-header h3,
+  .card-header h4 {
+    margin: 0;
+  }
+
+  .card-body {
+    padding: 16px;
+  }
+
+  .card-footer {
+    padding: 12px 16px;
+    border-top: var(--border);
+    background: var(--shade-2);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .result-list {
+    @apply border border-border rounded-lg max-[600px]:border-0 max-[600px]:rounded-none;
+  }
+}

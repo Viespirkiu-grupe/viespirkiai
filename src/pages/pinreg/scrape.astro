@@ -1,4 +1,7 @@
 ---
+import Alert from '@design-system/components/Alert.astro';
+import Button from '@design-system/components/Button.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
 import Layout from '../../layouts/Layout.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
 import { highlightCode } from '@/utils/highlightCode.js';
@@ -89,9 +92,7 @@ if (Astro.request.method === 'POST') {
 >
   <main>
 
-    <div class="page-header">
-      <h1>Privačių interesų registro duomenų atnaujinimas</h1>
-    </div>
+    <PageHeader>Privačių interesų registro duomenų atnaujinimas</PageHeader>
 
     <div class="grid-2">
 
@@ -110,7 +111,7 @@ if (Astro.request.method === 'POST') {
         <h3 class="mb-3">Kodas</h3>
         <div class="code-container relative">
           <pre class="code-block"><code class="hljs language-javascript" set:html={highlightedCode}></code></pre>
-          <a href="#" id="copy-link" class="btn btn-ghost btn-sm absolute top-2 right-2">Kopijuoti</a>
+          <Button href="#" id="copy-link" variant="ghost" size="sm" className="absolute top-2 right-2">Kopijuoti</Button>
         </div>
         <script>
           const copyLink = document.getElementById('copy-link');
@@ -132,9 +133,7 @@ if (Astro.request.method === 'POST') {
         <h2 id="submit">Duomenų pateikimas</h2>
 
         {uuidSubmitMessage && (
-          <div class="alert alert-info mb-4">
-            <div class="alert-body">{uuidSubmitMessage}</div>
-          </div>
+          <Alert variant="info" className="mb-4">{uuidSubmitMessage}</Alert>
         )}
 
         <form method="post" action="">
@@ -148,7 +147,7 @@ if (Astro.request.method === 'POST') {
               placeholder="Įklijuokite UUID čia..."
             ></textarea>
           </div>
-          <button type="submit" class="btn btn-primary mt-3">Pateikti</button>
+          <Button type="submit" className="mt-3">Pateikti</Button>
         </form>
       </section>
 
@@ -156,3 +155,107 @@ if (Astro.request.method === 'POST') {
 
   </main>
 </Layout>
+
+<style>
+  pre code.hljs {
+    display: block;
+    overflow-x: auto;
+    padding: 1em;
+  }
+
+  code.hljs {
+    padding: 5px;
+  }
+
+  .hljs {
+    color: #c9d1d9;
+    background: transparent;
+  }
+
+  .hljs-doctag,
+  .hljs-keyword,
+  .hljs-meta .hljs-keyword,
+  .hljs-template-tag,
+  .hljs-template-variable,
+  .hljs-type,
+  .hljs-variable.language_ {
+    color: #ff7b72;
+  }
+
+  .hljs-title,
+  .hljs-title.class_,
+  .hljs-title.class_.inherited__,
+  .hljs-title.function_ {
+    color: #d2a8ff;
+  }
+
+  .hljs-attr,
+  .hljs-attribute,
+  .hljs-literal,
+  .hljs-meta,
+  .hljs-number,
+  .hljs-operator,
+  .hljs-selector-attr,
+  .hljs-selector-class,
+  .hljs-selector-id,
+  .hljs-variable {
+    color: #79c0ff;
+  }
+
+  .hljs-meta .hljs-string,
+  .hljs-regexp,
+  .hljs-string {
+    color: #a5d6ff;
+  }
+
+  .hljs-built_in,
+  .hljs-symbol {
+    color: #ffa657;
+  }
+
+  .hljs-code,
+  .hljs-comment,
+  .hljs-formula {
+    color: #8b949e;
+  }
+
+  .hljs-name,
+  .hljs-quote,
+  .hljs-selector-pseudo,
+  .hljs-selector-tag {
+    color: #7ee787;
+  }
+
+  .hljs-subst {
+    color: #c9d1d9;
+  }
+
+  .hljs-section {
+    color: #1f6feb;
+    font-weight: 700;
+  }
+
+  .hljs-bullet {
+    color: #f2cc60;
+  }
+
+  .hljs-emphasis {
+    color: #c9d1d9;
+    font-style: italic;
+  }
+
+  .hljs-strong {
+    color: #c9d1d9;
+    font-weight: 700;
+  }
+
+  .hljs-addition {
+    color: #aff5b4;
+    background-color: #033a16;
+  }
+
+  .hljs-deletion {
+    color: #ffdcd7;
+    background-color: #67060c;
+  }
+</style>

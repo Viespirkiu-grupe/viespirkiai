@@ -1,53 +1,25 @@
 ---
-// @ts-nocheck
 import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import Timeline from '@design-system/components/Timeline.astro';
+import TimelineItem from '@design-system/components/TimelineItem.astro';
+import TedAddressFields from '../../components/ted/TedAddressFields.astro';
+import TedSection from '../../components/ted/TedSection.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
-import { postgres } from '../../postgres/postgres.js';
-import { buildTedNoticeViewModel } from '../../modules/ted/viewer.js';
-import { readFileSync, readdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { loadTedNoticePageData } from '../../lib/ted.ts';
 
+const { id } = Astro.params;
+if (!id) return new Response(null, { status: 404 });
+
+const noticeData = await loadTedNoticePageData(id);
+if (!noticeData) return new Response(null, { status: 404 });
+
+const { noticeId, view } = noticeData;
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
-const { id } = Astro.params;
-let tedData: any = null;
-let pageTitle = 'TED Iš';
-let pageDescription = 'EU viešoji pirkimų iš TED duomenų bazės';
-
-const isSample = id && !id.match(/^\d+-\d{4}$/);
-
-if (isSample) {
-  // Load sample notice from XML
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  const tedSamplesDir = join(__dirname, '../../modules/ted/samples');
-  const fileName = `${id}.xml`;
-  const samplePath = join(tedSamplesDir, fileName);
-
-  try {
-    const sampleXml = readFileSync(samplePath, 'utf-8');
-    tedData = buildTedNoticeViewModel(sampleXml);
-    pageTitle = `TED ${id}`;
-  } catch (err) {
-    return Astro.redirect('/');
-  }
-} else if (id && /^\d+-\d{4}$/.test(id)) {
-  // Load from database
-  const result = await postgres.query(
-    `SELECT * FROM "tedNotices" WHERE "tedNoticeNumber" = $1;`,
-    [id]
-  );
-
-  if (result.rowCount === 0 || !result.rows[0].turinys || result.rows[0].scrapeStatus < 1) {
-    return Astro.redirect('/');
-  }
-
-  tedData = buildTedNoticeViewModel(result.rows[0].turinys);
-  pageTitle = `TED ${id}`;
-} else {
-  return Astro.redirect('/');
-}
+const pageTitle = view.pageTitle + (noticeId ? ` – ${noticeId}` : '');
+const pageDescription = view.documentTypeLabel + (view.issueDateText ? ` · ${view.issueDateText}` : '');
 ---
 
 <Layout
@@ -58,89 +30,130 @@ if (isSample) {
   font={font}
 >
   <style>
-    .ted-notice {
-      max-width: 900px;
-      margin: 0 auto;
+    .ted-page {
+      max-width: 1760px;
+      padding-inline: 24px;
     }
 
-    .ted-header {
-      padding: 2rem 0;
-      border-bottom: 2px solid var(--border);
-      margin-bottom: 2rem;
+    .ted-preline {
+      white-space: pre-line;
     }
 
-    .ted-header h1 {
-      font-size: 2rem;
-      font-weight: 700;
-      margin: 0 0 1rem 0;
+    .ted-page .page-header,
+    .ted-page .grid-3,
+    .ted-page .grid-4 {
+      align-items: start;
     }
 
-    .ted-section {
-      margin-bottom: 2rem;
-      padding: 1.5rem;
-      background: var(--shade-2);
-      border: var(--border);
-      border-radius: var(--radius-md);
-    }
-
-    .ted-section h2 {
-      font-size: 1.25rem;
-      font-weight: 600;
-      margin: 0 0 1rem 0;
-    }
-
-    .ted-notice-meta {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      font-size: 0.875rem;
-    }
-
-    .ted-notice-meta dt {
-      font-weight: 600;
-      color: var(--text-secondary);
-    }
-
-    .ted-notice-meta dd {
-      margin: 0;
+    @media (max-width: 768px) {
+      .ted-page {
+        padding-inline: 16px;
+      }
     }
   </style>
 
-  <div class="ted-notice">
-    <div class="ted-header">
-      <h1>TED Iš – {id}</h1>
-      <p class="text-muted">Šis puslapis yra šablono versija. Pilna TED vediklio versija su visomis sekcijomis neseniai portavimo dar nėra baigta.</p>
-    </div>
+  <main>
+    <div class="container container-fluid ted-page">
+      <PageHeader>
+        <Fragment slot="subtext">
+          {view.documentTypeLabel}{view.subTypeDescription && <> · {view.subTypeDescription}</>}
+        </Fragment>
+        {view.pageTitle}
+        {view.procScope?.value && <> <span class="amount">{view.procScope.value.values[0]}</span></>}
+        <Fragment slot="actions">
+          <div class="text-muted text-sm text-right">
+            {noticeId && <>ID: {noticeId}<br /></>}
+            {view.issueDateText && <>Išleista: {view.issueDateText}</>}
+          </div>
+          <a href={`/ted/${noticeId}.xml`} class="btn btn-outline btn-sm">↗ XML</a>
+        </Fragment>
+      </PageHeader>
 
-    {tedData && (
-      <div class="ted-section">
-        <h2>Pagrindinė informacija</h2>
-        <dl class="ted-notice-meta">
-          {tedData.title && (
+      <div class={view.hasLocation ? 'grid-4 mt-7' : 'grid-3 mt-7'}>
+        <section>
+          <h2>Perkančioji organizacija</h2>
+          {view.primaryOrg && (
             <>
-              <dt>Pavadinimas</dt>
-              <dd>{tedData.title}</dd>
+              <h3 class="mb-1">{view.primaryOrg.reg ? <a href={`/asmuo/${view.primaryOrg.reg}`}>{view.primaryOrg.label}</a> : view.primaryOrg.label}</h3>
+              {view.primaryOrg.reg && <p class="text-muted text-sm mb-1">{view.primaryOrg.reg}</p>}
+              {view.primaryOrg.city && <p class="text-sm text-muted mb-0">{view.primaryOrg.city}</p>}
+              {view.primaryOrg.email && <p class="text-sm mb-1"><a href={`mailto:${view.primaryOrg.email}`}>{view.primaryOrg.email}</a></p>}
+              {view.primaryOrg.url && <p class="text-sm mb-0"><a href={view.primaryOrg.url} target="_blank" rel="noopener">{view.primaryOrg.url}</a></p>}
             </>
           )}
-          {tedData.noticeNumber && (
+        </section>
+
+        <section>
+          <h2>Pirkimo objektas</h2>
+          {view.procScope.description && <p class="text-sm ted-preline">{view.procScope.description}</p>}
+          {(view.procScope.internalId || view.procScope.contractType || view.procScope.otherObj) && <p class="text-sm text-muted">{[view.procScope.internalId, view.procScope.contractType, view.procScope.otherObj].filter(Boolean).join(' · ')}</p>}
+          {view.procScope.addInfo && <p class="text-sm text-muted ted-preline">{view.procScope.addInfo}</p>}
+          {view.procScope.bvpzKodas && (
             <>
-              <dt>Pranešimo numeris</dt>
-              <dd>{tedData.noticeNumber}</dd>
+              <h3 class="mb-2">BVPŽ</h3>
+              <div class="flex flex-col gap-2">
+                <div>
+                  <div class="font-medium">{view.procScope.bvpzPavadinimas}{view.procScope.bvpzKodas && <span class="text-muted font-normal text-xs"> {view.procScope.bvpzKodas}</span>}</div>
+                </div>
+                {view.procScope.papildomiBvpzKodai?.map((code, i) => (
+                  <div>
+                    <div class="font-medium">{view.procScope.papildomiBvpzPavadinimai[i]}{code && <span class="text-muted font-normal text-xs"> {code}</span>}</div>
+                  </div>
+                ))}
+              </div>
             </>
           )}
-        </dl>
+        </section>
+
+        {view.hasLocation && (
+          <section>
+            <h2>Vykdymo vieta</h2>
+            <TedAddressFields addrFields={view.procScope.addrFields} />
+          </section>
+        )}
+
+        <section>
+          <h2>Terminai</h2>
+          <Timeline>
+            {view.timelineItems.map((item, i) => {
+              const past = item.date && new Date(`${item.date}T00:00:00`).getTime() < Date.now();
+              const nextItem = view.timelineItems[i + 1];
+              const nextPast = nextItem?.date && new Date(`${nextItem.date}T00:00:00`).getTime() < Date.now();
+              return (
+                <TimelineItem active={Boolean(past)} lineActive={Boolean(nextPast)}>
+                  <div class="text-xs text-muted">{item.text}</div>
+                  <strong>{item.label}</strong>
+                </TimelineItem>
+              );
+            })}
+          </Timeline>
+        </section>
       </div>
-    )}
 
-    <div class="ted-section">
-      <h2>Pastaba</h2>
-      <p>Pilnas TED vediklis su visomis 16 partinų šablonų (organizacijos, sritys, terminai ir kt.) turėtų būti papildytas.</p>
-      <p>Šiuo metu rodomas tik pagrindinės informacijos šablonas. Planuojamas darbas:</p>
-      <ul>
-        <li>Konvertuoti <code>views/ted/partials/*.ejs</code> failus į Astro komponentus</li>
-        <li>Įgyvendinti visų TED sekcijų renderavimą</li>
-        <li>Patikrinti šablono suderinamumą su TED duomenų struktura</li>
-      </ul>
+      <div>
+        {view.visibleSections.map((section, i) => (
+          <div class={
+            ['ND-Lot', 'ND-Part', 'ND-LotsGroup'].includes(section.nodeId)
+              ? 'mt-10 pt-2'
+              : i === 0
+                ? ''
+                : 'mt-8'
+          }>
+            <TedSection
+              section={section}
+              shortUrl={view.shortUrl}
+              formatDate={view.formatDate}
+              buyerOrgId={view.buyerOrgId}
+              reviewBodyOrgIds={view.reviewBodyOrgIds}
+              mediationBodyOrgIds={view.mediationBodyOrgIds}
+              eSenderOrgIds={view.eSenderOrgIds}
+              parentNodeTitles={view.PARENT_NODE_TITLES}
+              parentNodeAliases={view.PARENT_NODE_ALIASES}
+              subgroupTitles={view.SUBGROUP_TITLES}
+            />
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
+  </main>
 </Layout>

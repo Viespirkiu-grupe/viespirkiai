@@ -1,4 +1,6 @@
 ---
+import { fmtNumber } from '../../lib/formatters.ts';
+
 interface Props {
   title: string;
   anchor: string;
@@ -7,8 +9,6 @@ interface Props {
   words: number;
 }
 const { title, anchor, results, pages, words } = Astro.props;
-
-const fmt = (n: number) => n.toLocaleString('lt-LT');
 ---
 
 <div class="min-w-0 flex-1">
@@ -25,7 +25,7 @@ const fmt = (n: number) => n.toLocaleString('lt-LT');
         <div class="card-body">
           <div class="section-title mb-2">{label}</div>
           <div class="flex items-baseline gap-1">
-            <span class="cell-mono text-[1.6rem] font-semibold">{fmt(value)}</span>
+            <span class="cell-mono text-[1.6rem] font-semibold">{fmtNumber(value)}</span>
             <span class="text-xs text-muted font-medium">/min.</span>
           </div>
         </div>

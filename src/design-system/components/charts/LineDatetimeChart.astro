@@ -1,0 +1,49 @@
+---
+import Chart from './Chart.astro';
+
+interface Props {
+  id: string;
+  title: string;
+  anchor: string;
+  labels: any[];
+  series: any[];
+  flags?: string[];
+  customOptions?: Record<string, any>;
+  wrapperClass?: string;
+  titleClass?: string;
+  frameClass?: string;
+  chartClass?: string;
+  heightClass?: string;
+}
+
+const {
+  id,
+  title,
+  anchor,
+  labels,
+  series,
+  flags = ['yMin0', 'xAxisDay', 'numbersWithSpaces'],
+  customOptions,
+  wrapperClass,
+  titleClass,
+  frameClass,
+  chartClass,
+  heightClass,
+} = Astro.props;
+---
+
+<Chart
+  id={id}
+  type="line-datetime"
+  title={title}
+  anchor={anchor}
+  labels={labels}
+  series={series}
+  flags={flags}
+  customOptions={customOptions}
+  wrapperClass={wrapperClass}
+  titleClass={titleClass}
+  frameClass={frameClass}
+  chartClass={chartClass}
+  heightClass={heightClass}
+/>

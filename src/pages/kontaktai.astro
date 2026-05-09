@@ -1,9 +1,11 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
 import { getColorScheme, getFont } from '../lib/failai.js';
-import SignalQr from '../components/SignalQr.astro';
-import ContactMethodList from '../components/content/ContactMethodList.astro';
-import StepList from '../components/content/StepList.astro';
+import SignalQr from '@design-system/components/SignalQr.astro';
+import ContactMethodList from '@design-system/components/content/ContactMethodList.astro';
+import StepList from '@design-system/components/content/StepList.astro';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
@@ -60,9 +62,7 @@ const informationAccuracySteps = [
   font={font}
 >
   <main>
-    <div class="page-header">
-      <h1>Kontaktai</h1>
-    </div>
+    <PageHeader>Kontaktai</PageHeader>
 
     <div class="grid-2 mb-7">
       <section>
@@ -72,12 +72,12 @@ const informationAccuracySteps = [
         <h3>Šifravimas</h3>
         <p>Elektroninius laiškus galite šifruoti, tam reikalingą informaciją rasite žemiau.</p>
 
-        <dl class="kv-list mb-7">
+        <KeyValueList className="mb-7">
           <dt>PGP fingerprint</dt>
           <dd><code>7772 F2FD A950 2E09 AFA0 1A35 AD87 6037 7869 0B5A</code></dd>
           <dt>PGP public key</dt>
           <dd>Įkeltas į <a href="https://keys.openpgp.org/search?q=viespirkiai%40viespirkiai.org">keys.openpgp.org</a> - daugelis pašto programų jį atras automatiškai.</dd>
-        </dl>
+        </KeyValueList>
 
         <details>
           <summary class="text-sm">Rodyti PGP viešąjį raktą</summary>
@@ -102,9 +102,7 @@ hkEtHhWmsNS3eDj4F/NL1rkkdNt+ChsBfaZxkOn11gA=
       </section>
     </div>
 
-    <div class="page-header">
-      <h2>Pagal užklausos pobūdį</h2>
-    </div>
+    <PageHeader>Pagal užklausos pobūdį</PageHeader>
 
     <section id="informacijosTikslumas">
       <h3>Informacijos tikslumas / pašalinimai</h3>

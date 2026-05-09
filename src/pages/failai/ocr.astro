@@ -1,12 +1,24 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import ChartsSetup from '../../components/charts/ChartsSetup.astro';
+import Chart from '@design-system/components/charts/Chart.astro';
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
 import OcrSpartaCards from '../../components/failai/OcrSpartaCards.astro';
-import LineDatetimeChart from '../../components/charts/LineDatetimeChart.astro';
+import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
 import { postgres, OCR_STATES, getColorScheme, getFont } from '../../lib/failai.js';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
+
+const OCR_STATE_COLORS: Record<string, string> = {
+  baigta: '#22c55e',
+  rekomenduojama: '#f59e0b',
+  nepavyko: '#ef4444',
+  rezervuota: '#3b82f6',
+  virsijoBandymus: '#f97316',
+  galima: '#06b6d4',
+  nepalaikoma: '#a855f7',
+};
 
 const [ocrStatsRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrStatsHourExistsRes] = await Promise.all([
   postgres.query(`SELECT * FROM "failaiOcrStats" ORDER BY count DESC`),
@@ -127,7 +139,10 @@ const ocrPerMinute = latestDay
 const ocrStatsChartData = {
   labels: ocrStats.map((item: any) => item.text),
   series: ocrStats.map((item: any) => item.count),
+  colors: ocrStats.map((item: any) => OCR_STATE_COLORS[item.camel] || '#78716c'),
 };
+
+const ocrNuskaitytojaiTreemapColors = ['#0ea5e9', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4', '#f97316'];
 
 const ocrNuskaitytojaiChartData = {
   labels: ocrNuskaitytojai.map((item: any) => item.viesasPavadinimas),
@@ -155,7 +170,6 @@ const ocrStatsDayChartData = {
   colorScheme={colorScheme}
   font={font}
 >
-  <ChartsSetup />
   <main>
     <div class="page-header">
       <h1 class="mb-0">OCR būsena</h1>
@@ -215,22 +229,21 @@ const ocrStatsDayChartData = {
 
         <div>
           <h2 class="mb-3"><a href="#busena" id="busena" class="no-style">Failai pagal būseną</a></h2>
-          <div class="flex flex-col min-h-87.5">
-            <div class="chart-frame">
-              <div id="ocrStatsDiagrama" class="chart h-87.5"></div>
-            </div>
-          </div>
-          <script defer is:inline define:vars={{ ocrStatsChartData }}>
-            displayChart({
-              element: document.querySelector('#ocrStatsDiagrama'),
-              type: 'pie',
-              labels: ocrStatsChartData.labels,
-              series: ocrStatsChartData.series,
-              flags: ['colors'],
-            });
-          </script>
-          <div class="table-wrapper mt-4">
-            <table class="table">
+          <Chart
+            id="ocrStatsDiagrama"
+            type="pie"
+            labels={ocrStatsChartData.labels}
+            series={ocrStatsChartData.series}
+            customOptions={{
+              colors: ocrStatsChartData.colors,
+              stroke: {
+                width: 4,
+                colors: ['var(--white)'],
+              },
+            }}
+          />
+          <TableWrapper className="mt-4">
+            <Table>
               <thead>
                 <tr>
                   <th class="cell-center">ID</th>
@@ -247,28 +260,41 @@ const ocrStatsDayChartData = {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </TableWrapper>
         </div>
       </div>
     </section>
 
     <section class="mb-16">
       <h2 class="mb-3"><a href="#pagalNuskaitytoją" id="pagalNuskaitytoją" class="no-style">Failų dalis pagal nuskaitytoją</a></h2>
-      <div class="flex flex-col min-h-87.5">
-        <div class="chart-frame">
-          <div id="ocrNuskaitytojaiDiagrama" class="chart h-87.5"></div>
-        </div>
-      </div>
-      <script defer is:inline define:vars={{ ocrNuskaitytojaiChartData }}>
-        displayChart({
-          element: document.querySelector('#ocrNuskaitytojaiDiagrama'),
-          type: 'treemap',
-          labels: ocrNuskaitytojaiChartData.labels,
-          series: ocrNuskaitytojaiChartData.series,
-          flags: ['colors'],
-        });
-      </script>
+      <Chart
+        id="ocrNuskaitytojaiDiagrama"
+        type="treemap"
+        labels={ocrNuskaitytojaiChartData.labels}
+        series={ocrNuskaitytojaiChartData.series}
+        customOptions={{
+          colors: ocrNuskaitytojaiTreemapColors,
+          legend: {
+            show: false,
+          },
+          stroke: {
+            width: 1.25,
+            colors: ['var(--gray)'],
+          },
+          dataLabels: {
+            enabled: true,
+            style: {
+              colors: ['var(--black)'],
+              fontSize: '13px',
+              fontWeight: 600,
+            },
+            dropShadow: {
+              enabled: false,
+            },
+          },
+        }}
+      />
     </section>
 
     <section class="grid-2">

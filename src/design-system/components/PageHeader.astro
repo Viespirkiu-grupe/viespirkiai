@@ -1,0 +1,41 @@
+---
+interface Props {
+  className?: string;
+}
+
+const hasSubtext = Astro.slots.has('subtext');
+const hasActions = Astro.slots.has('actions');
+const { className = '' } = Astro.props;
+const classes = ['page-header-shell', className].filter(Boolean).join(' ');
+---
+
+<div class={classes}>
+  <div>
+    {hasSubtext && <p class="subtext"><slot name="subtext" /></p>}
+    <h1><slot /></h1>
+  </div>
+  {hasActions && (
+    <div class="flex flex-wrap gap-3 items-center">
+      <slot name="actions" />
+    </div>
+  )}
+</div>
+
+<style>
+  .page-header-shell {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 28px;
+    border-bottom: var(--border);
+    padding-top: 28px;
+    padding-bottom: 16px;
+  }
+
+  .page-header-shell :global(h1),
+  .page-header-shell :global(h2) {
+    margin-bottom: 0;
+  }
+</style>

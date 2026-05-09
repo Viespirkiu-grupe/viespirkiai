@@ -1,0 +1,68 @@
+---
+import ResultList from '@design-system/components/ResultList.astro';
+
+/**
+ * Section wrapper for "list of cards with N visible by default" patterns.
+ *
+ * Renders:
+ *   - a `<section>` with an `<h2>` heading (and optional total count badge);
+ *   - an italic empty-state when the list is empty;
+ *   - the `default` slot wrapped in a list container for the visible items;
+ *   - a `<details>` overflow group with a "Rodyti dar N" summary, populated
+ *     by the `hidden` slot, when the list overflows the visible cap.
+ *
+ * Consumers slice their array themselves and pass the visible items into the
+ * default slot and the hidden ones into the named `hidden` slot.  The
+ * component is unaware of the card type — it just lays out the slots.
+ */
+interface Props {
+  title: string;
+  emptyText: string;
+  /** Number of items hidden in the overflow `<details>` (controls the summary count and visibility). */
+  hiddenCount: number;
+  /** Total list length — empty state shows when 0; total count badge shows when > 0. */
+  totalCount: number;
+  /** Whether to show the total count badge next to the heading. */
+  showTotalBadge?: boolean;
+  /** CSS class applied to the visible-items container (defaults to `mt-4`). */
+  listClass?: string;
+  /** CSS class applied to the hidden-items container — usually mirrors `listClass`. */
+  hiddenListClass?: string;
+  /** Whether the list shell should render with the default bordered frame. */
+  bordered?: boolean;
+}
+
+const {
+  title,
+  emptyText,
+  hiddenCount,
+  totalCount,
+  showTotalBadge = false,
+  listClass = 'mt-4',
+  hiddenListClass = 'mt-4',
+  bordered = true,
+} = Astro.props;
+---
+
+<section>
+  <h2>
+    {title}
+    {showTotalBadge && totalCount > 0 && <span class="text-muted text-base font-normal">({totalCount})</span>}
+  </h2>
+  {totalCount === 0
+    ? <p class="text-muted mt-4"><em>{emptyText}</em></p>
+    : <ResultList className={listClass} bordered={bordered}>
+        <slot />
+        {hiddenCount > 0 && (
+          <details>
+            <summary class="text-sm text-muted px-2 py-2 cursor-pointer select-none hover:text-current">
+              Rodyti dar {hiddenCount}
+            </summary>
+            <ResultList className={hiddenListClass} bordered={bordered}>
+              <slot name="hidden" />
+            </ResultList>
+          </details>
+        )}
+      </ResultList>
+  }
+</section>

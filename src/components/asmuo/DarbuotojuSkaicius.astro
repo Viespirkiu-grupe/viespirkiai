@@ -1,9 +1,11 @@
 ---
+import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
+
 const { asmuo } = Astro.props;
 const duomenys = asmuo.sodra?.duomenys ?? [];
-const labels = JSON.stringify(duomenys.map((d: any) => d.data + '-01'));
-const series1 = JSON.stringify(duomenys.map((d: any) => d.draustieji || null));
-const series2 = JSON.stringify(duomenys.map((d: any) => d.draustieji2 || null));
+const labels = duomenys.map((d: any) => d.data + '-01');
+const series1 = duomenys.map((d: any) => d.draustieji || null);
+const series2 = duomenys.map((d: any) => d.draustieji2 || null);
 ---
 
 <div class="page-section mb-10" id="darbuotojai">
@@ -12,23 +14,33 @@ const series2 = JSON.stringify(duomenys.map((d: any) => d.draustieji2 || null));
     <div class="flex flex-col min-h-[350px]">
       <h3 class="text-sm font-bold mb-3">Darbo sutartys, valstybės tarnautojai</h3>
       {duomenys.length > 0 && asmuo.sodra?.turejoDraustuju ? (
-        <div class="chart-frame">
-          <div id="darbuotojuSkaiciausDiagrama" class="chart h-[350px]"></div>
-          <script defer is:inline define:vars={{ dl1: JSON.parse(labels), ds1: JSON.parse(series1) }}>
-            displayChart({ element: document.querySelector('#darbuotojuSkaiciausDiagrama'), type: 'line-datetime', labels: dl1, series: ds1, flags: ['yMin0'] });
-          </script>
-        </div>
+        <LineDatetimeChart
+          id="darbuotojuSkaiciausDiagrama"
+          title="Darbo sutartys, valstybės tarnautojai"
+          anchor="darbuotojai-darbo-sutartys"
+          labels={labels}
+          series={series1}
+          flags={['yMin0']}
+          wrapperClass=""
+          titleClass="sr-only"
+          heightClass="h-[350px]"
+        />
       ) : <div class="chart-empty">Nėra duomenų</div>}
     </div>
     <div class="flex flex-col min-h-[350px]">
       <h3 class="text-sm font-bold mb-3">Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
       {duomenys.length > 0 && asmuo.sodra?.turejoDraustuju2 ? (
-        <div class="chart-frame">
-          <div id="darbuotojuSkaiciausIIDiagrama" class="chart h-[350px]"></div>
-          <script defer is:inline define:vars={{ dl2: JSON.parse(labels), ds2: JSON.parse(series2) }}>
-            displayChart({ element: document.querySelector('#darbuotojuSkaiciausIIDiagrama'), type: 'line-datetime', labels: dl2, series: ds2, flags: ['yMin0'] });
-          </script>
-        </div>
+        <LineDatetimeChart
+          id="darbuotojuSkaiciausIIDiagrama"
+          title="Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos"
+          anchor="darbuotojai-autorines"
+          labels={labels}
+          series={series2}
+          flags={['yMin0']}
+          wrapperClass=""
+          titleClass="sr-only"
+          heightClass="h-[350px]"
+        />
       ) : <div class="chart-empty">Nėra duomenų</div>}
     </div>
   </div>

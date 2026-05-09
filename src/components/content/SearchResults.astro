@@ -1,5 +1,5 @@
 ---
-import Pagination from '../Pagination.astro';
+import SearchResultsShell from '@design-system/components/content/SearchResultsShell.astro';
 import SutartisCard from './SutartisCard.astro';
 
 type SearchResultItem = {
@@ -31,35 +31,27 @@ interface Props {
 const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti } = Astro.props;
 ---
 
-<div class="mt-10 max-w-lg center mx-auto">
-  <div>
-    <div class="flex justify-between items-center mb-4">
-      <span class="text-muted text-sm numberOfResults" set:html={numberOfResults} />
-      {galimaEksportuoti && (
-        <div class="flex gap-3">
-          <a href={`/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
-            <span aria-hidden="true">↗</span> JSONL
-          </a>
-          <a href={`/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
-            <span aria-hidden="true">↗</span> CSV
-          </a>
-        </div>
-      )}
-    </div>
-
-    {results.length === 0
-      ? <div class="empty-state"><p class="text-muted">Rezultatų nerasta.</p></div>
-      : <>
-          <div class="result-list">
-            {results.map(item => (
-              <SutartisCard item={item} />
-            ))}
-          </div>
-          <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
-        </>
-    }
-  </div>
-</div>
+<SearchResultsShell
+  numberOfResults={numberOfResults}
+  resultCount={results.length}
+  page={page}
+  pageCount={pageCount}
+  queryParams={queryParams}
+>
+  {galimaEksportuoti && (
+    <Fragment slot="actions">
+      <a href={`/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
+        <span aria-hidden="true">↗</span> JSONL
+      </a>
+      <a href={`/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
+        <span aria-hidden="true">↗</span> CSV
+      </a>
+    </Fragment>
+  )}
+  {results.map(item => (
+    <SutartisCard item={item} />
+  ))}
+</SearchResultsShell>
 
 <script>
   const span = document.querySelector('.rezultatai-nezinomas-total');

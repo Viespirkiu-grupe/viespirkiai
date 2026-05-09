@@ -1,0 +1,28 @@
+---
+interface Props {
+  className?: string;
+  bordered?: boolean;
+}
+
+const { className = '', bordered = true } = Astro.props;
+const classes = ['result-list-shell', bordered ? 'result-list-shell-bordered' : '', className].filter(Boolean).join(' ');
+---
+
+<div class={classes}>
+  <slot />
+</div>
+
+<style>
+  .result-list-shell-bordered {
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  @media (max-width: 600px) {
+    .result-list-shell-bordered {
+      border: 0;
+      border-radius: 0;
+    }
+  }
+</style>

@@ -1,11 +1,11 @@
 ---
-// @ts-nocheck
-import { createHash } from 'crypto';
+import '../styles/global.css';
 import { readFileSync } from 'fs';
 
 const { tipas, pavadinimas, aprasymas, id } = Object.fromEntries(Astro.url.searchParams);
 
 const { default: createDOMPurify } = await import('dompurify');
+// @ts-ignore — jsdom ships no .d.ts in this project setup
 const { JSDOM } = await import('jsdom');
 const DOMPurify = createDOMPurify(new JSDOM('').window);
 
@@ -13,9 +13,6 @@ const safePavadinimas = DOMPurify.sanitize(pavadinimas || '');
 const safeAprasymas = DOMPurify.sanitize(aprasymas || '', {
   ALLOWED_TAGS: ['b', 'i', 'u', 'br'],
 });
-
-const tailwindCssBuster = createHash('md5').update(new Uint8Array(readFileSync('./public/dist/tailwind.css').buffer)).digest('hex');
-
 const logoSvg = readFileSync('./views/viespirkiaiLogoLaisvasZodis.svg', 'utf-8');
 ---
 
@@ -24,7 +21,6 @@ const logoSvg = readFileSync('./views/viespirkiaiLogoLaisvasZodis.svg', 'utf-8')
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href={`/dist/tailwind.css?v=${tailwindCssBuster}`}>
   <style>
     body {
       display: flex;

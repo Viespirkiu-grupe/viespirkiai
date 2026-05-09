@@ -1,12 +1,13 @@
 ---
-import StatCard from '../StatCard.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import StatCard from '@design-system/components/StatCard.astro';
+import { fmtEur } from '../../lib/formatters.ts';
 
 interface Props {
   asmuo: any;
 }
 
 const { asmuo } = Astro.props;
-const fmtEur = (v: number) => v.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const sodra = asmuo.sodra ?? {};
 const mokesciai = asmuo.mokesciai;
 ---
@@ -14,17 +15,17 @@ const mokesciai = asmuo.mokesciai;
 <div class="grid-3 mb-10">
   <StatCard title="Darbuotojai">
     {sodra.draustieji != null ? (
-      <dl class="kv-list">
+      <KeyValueList>
         <dt>Darbo sutartys</dt><dd><span class="cell-mono">{sodra.draustieji}</span></dd>
         <dt>Autorinės ir kitos</dt><dd><span class="cell-mono">{sodra.draustieji2 || 0}</span></dd>
         <dt>Viso</dt><dd><span class="cell-mono font-bold">{sodra.draustieji + (sodra.draustieji2 || 0)}</span></dd>
-      </dl>
+      </KeyValueList>
     ) : <em class="text-muted">Nėra duomenų</em>}
   </StatCard>
 
   <StatCard title="Vid. atlyginimai">
     {sodra.vidutinisAtlyginimas ? (
-      <dl class="kv-list">
+      <KeyValueList>
         <dt>Darbo sutartys</dt>
         <dd><span class="cell-mono">{fmtEur(sodra.vidutinisAtlyginimas)} €/mėn.</span></dd>
         <dt>Autorinės ir kitos</dt>
@@ -35,12 +36,12 @@ const mokesciai = asmuo.mokesciai;
         </dd>
         <dt>Bendrai</dt>
         <dd><span class="cell-mono font-bold">{fmtEur(sodra.bendrasVidutinisAtlyginimas)} €/mėn.</span></dd>
-      </dl>
+      </KeyValueList>
     ) : <em class="text-muted">Nėra duomenų</em>}
   </StatCard>
 
   <StatCard title="Mokėjimai">
-    <dl class="kv-list">
+    <KeyValueList>
       <dt>Mokesčiai (VMI)</dt>
       <dd>
         {mokesciai?.suma
@@ -59,6 +60,6 @@ const mokesciai = asmuo.mokesciai;
           ? <span class="cell-mono">{fmtEur(sodra.imokuSuma)} €</span>
           : <em class="text-muted">Nėra duomenų</em>}
       </dd>
-    </dl>
+    </KeyValueList>
   </StatCard>
 </div>

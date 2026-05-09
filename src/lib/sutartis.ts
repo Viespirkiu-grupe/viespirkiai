@@ -4,6 +4,22 @@ import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
 
 export type Sutartis = Record<string, any>;
 
+/**
+ * Apply the supplier-name "patikslinimas" (clarification) to a contract.
+ *
+ * The portal records contracts as scraped from CVP IS, which stores the
+ * supplier name in a free-form field that often contains typos, missing
+ * legal-form suffixes, or wrong country codes.  Two parallel "open data"
+ * tables ship corrected values:
+ *
+ *   - `sutartysAtviriDuomenys`     — original open-data dump.
+ *   - `sutartysAtviriDuomenysImp`  — imported / supplemental dump that may
+ *                                    refine the original.
+ *
+ * Both are consulted; the second wins if it has a value, since it is
+ * considered the more recent correction.  Country codes from either table
+ * are likewise applied (second-table value wins).
+ */
 async function applyTiekejasPatikslinimas(sutartis: Sutartis) {
   const [atviri, atviriImp] = await Promise.all([
     postgres.query(`SELECT * FROM "sutartysAtviriDuomenys" WHERE "dokId" = $1 LIMIT 1`, [sutartis.sutartiesUnikalusId]),

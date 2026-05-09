@@ -1,0 +1,56 @@
+---
+import Button from '@design-system/components/Button.astro';
+
+interface Props { fieldName: string; values: Record<string, any>; }
+const { fieldName, values } = Astro.props;
+const sortDirLabel = values['sortDir'] === 'asc' ? 'Rikiavimo kryptis: nuo mažiausio' : 'Rikiavimo kryptis: nuo didžiausio';
+---
+<Button type="button" id={`${fieldName}_btn`} variant="primary" className="sort-toggle-btn" ariaLabel={sortDirLabel} title={sortDirLabel}>
+  <svg class="sort-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M3 18h6v-2H3v2zm0-5h12v-2H3v2zm0-5h18V6H3v2z" fill="currentColor"/>
+  </svg>
+</Button>
+<input type="hidden" name={fieldName} id={`${fieldName}_hidden`} value={values['sortDir'] || ''}>
+<script is:inline define:vars={{ fieldName }}>
+(function() {
+  const sortName = String(fieldName);
+  const btn = document.getElementById(sortName + '_btn');
+  const input = document.getElementById(sortName + '_hidden');
+  if (!btn || !input) return;
+  const icon = btn.querySelector('.sort-icon');
+  if (!icon) return;
+  let dir = input.value || '';
+  function update() {
+    icon.style.transform = dir === 'asc' ? 'scaleY(-1)' : 'scaleY(1)';
+    const label = dir === 'asc' ? 'Rikiavimo kryptis: nuo mažiausio' : 'Rikiavimo kryptis: nuo didžiausio';
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('title', label);
+  }
+  update();
+  btn.addEventListener('click', () => { dir = dir === 'asc' ? 'desc' : 'asc'; input.value = dir; update(); });
+})();
+</script>
+
+<style>
+  .sort-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 100%;
+    margin-left: -1px;
+    padding-inline: 12px;
+    border: var(--border);
+    border-left: 0;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    box-shadow: none;
+  }
+
+  .sort-toggle-btn:hover {
+    border-color: var(--dark-gray);
+  }
+
+  .sort-toggle-btn :global(.sort-icon) {
+    transition: transform var(--transition);
+  }
+</style>

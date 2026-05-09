@@ -1,7 +1,10 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import Pagination from '../components/Pagination.astro';
-import SearchForm from '../components/content/SearchForm.astro';
+import EmptyState from '@design-system/components/EmptyState.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import ResultsSummary from '@design-system/components/ResultsSummary.astro';
+import SearchForm from '@design-system/components/content/SearchForm.astro';
 import { postgres, getColorScheme, getFont, cleanQuery, parseLimit, buildNumberOfResults } from '../lib/failai.js';
 import '@/utils/linksniai.js';
 
@@ -175,13 +178,11 @@ const queryParams = rawSearch ? `&search=${encodeURIComponent(rawSearch)}` : '';
 
     <div class="mt-10 max-w-lg center mx-auto">
       <div class="flex justify-between items-center mb-4">
-        <span class="text-muted text-sm numberOfResults" set:html={numberOfResults}></span>
+        <ResultsSummary html={numberOfResults} />
       </div>
 
       {rows.length === 0 ? (
-        <div class="empty-state">
-          <p class="text-muted">Rezultatų nerasta.</p>
-        </div>
+        <EmptyState message="Rezultatų nerasta." />
       ) : (
         <>
           <div class="result-list">
@@ -191,69 +192,67 @@ const queryParams = rawSearch ? `&search=${encodeURIComponent(rawSearch)}` : '';
               else if (item.saltinis === 'Melagingas') asmuoLink += '#melagiai';
 
               return (
-                <article class="result-card card-clickable">
-                  <div class="result-card-body">
-                    <dl class="result-card-meta">
-                      <div>
-                        <dt class="sr-only">Šaltinis</dt>
-                        <dd>{item.saltinis}</dd>
-                      </div>
-
-                      <div>
-                        <dt class="sr-only">Galiojimas</dt>
-                        <dd>{item.dataNuoKuriosSkaiciuojama || 'nežinoma'} – {item.itrauktasIki || 'nežinoma'}</dd>
-                      </div>
-
-                      <div>
-                        <dt class="sr-only">Pirmą kartą įvesta</dt>
-                        <dd>Įvesta: {item.duomenuIvedimoData || 'nežinoma'}</dd>
-                      </div>
-
-                      <div>
-                        <dt class="sr-only">Paskutinį kartą matyta</dt>
-                        <dd>Matyta: {item.paskutiniKartaMatytaSarase}</dd>
-                      </div>
-                    </dl>
-
-                    <h3 class="result-card-title">
-                      <a href={asmuoLink}>{item.tiekejoPavadinimas}</a>
-                    </h3>
-
-                    {item.irasymoPagrindas && item.irasymoPagrindas.length > 3 ? (
-                      <p class="text-sm mt-2 text-justify">{item.irasymoPagrindas}</p>
-                    ) : item.itraukimoPriezastis && item.itraukimoPriezastis.length > 3 ? (
-                      <p class="text-sm mt-2 text-justify">
-                        {item.itraukimoPriezastis.charAt(0).toUpperCase() + item.itraukimoPriezastis.slice(1)}
-                      </p>
-                    ) : null}
-
-                    {item.pagrindimas?.tiekejoPaaiskinimas?.length > 3 && (
-                      <>
-                        <blockquote class="mt-3">{item.pagrindimas.tiekejoPaaiskinimas}</blockquote>
-                        {item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda?.length > 3 && (
-                          <a
-                            href={item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="text-sm relative z-1"
-                          >
-                            ↗ Peržiūrėti dokumentą ({item.pagrindimas.paaiskinimoPateikimoData || 'Data nenurodyta'})
-                          </a>
-                        )}
-                      </>
-                    )}
-
-                    <div class="result-card-footer">
-                      <span><strong>Pirkėjas:</strong> {item.pirkimoVykdytojoPavadinimas || 'nenurodytas'}</span>
-                      <span><strong>Pirkimo nr.:</strong> {item.pirkimoNumeris || 'nenurodytas'}</span>
-                      {item.teismoSprendimoLink?.length > 5 && (
-                        <span>
-                          <a href={item.teismoSprendimoLink} target="_blank" rel="noopener noreferrer" class="relative z-1">↗ Teismo sprendimas</a>
-                        </span>
-                      )}
+                <ResultCardShell clickable={true}>
+                  <dl slot="meta" class="result-card-meta">
+                    <div>
+                      <dt class="sr-only">Šaltinis</dt>
+                      <dd>{item.saltinis}</dd>
                     </div>
+
+                    <div>
+                      <dt class="sr-only">Galiojimas</dt>
+                      <dd>{item.dataNuoKuriosSkaiciuojama || 'nežinoma'} – {item.itrauktasIki || 'nežinoma'}</dd>
+                    </div>
+
+                    <div>
+                      <dt class="sr-only">Pirmą kartą įvesta</dt>
+                      <dd>Įvesta: {item.duomenuIvedimoData || 'nežinoma'}</dd>
+                    </div>
+
+                    <div>
+                      <dt class="sr-only">Paskutinį kartą matyta</dt>
+                      <dd>Matyta: {item.paskutiniKartaMatytaSarase}</dd>
+                    </div>
+                  </dl>
+
+                  <h3 slot="title" class="result-card-title">
+                    <a href={asmuoLink}>{item.tiekejoPavadinimas}</a>
+                  </h3>
+
+                  {item.irasymoPagrindas && item.irasymoPagrindas.length > 3 ? (
+                    <p class="text-sm mt-2 text-justify">{item.irasymoPagrindas}</p>
+                  ) : item.itraukimoPriezastis && item.itraukimoPriezastis.length > 3 ? (
+                    <p class="text-sm mt-2 text-justify">
+                      {item.itraukimoPriezastis.charAt(0).toUpperCase() + item.itraukimoPriezastis.slice(1)}
+                    </p>
+                  ) : null}
+
+                  {item.pagrindimas?.tiekejoPaaiskinimas?.length > 3 && (
+                    <>
+                      <blockquote class="mt-3">{item.pagrindimas.tiekejoPaaiskinimas}</blockquote>
+                      {item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda?.length > 3 && (
+                        <a
+                          href={item.pagrindimas.tiekejoPaaiskinimoDokumentoNuoroda}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="text-sm relative z-1"
+                        >
+                          ↗ Peržiūrėti dokumentą ({item.pagrindimas.paaiskinimoPateikimoData || 'Data nenurodyta'})
+                        </a>
+                      )}
+                    </>
+                  )}
+
+                  <div slot="footer" class="result-card-footer">
+                    <span><strong>Pirkėjas:</strong> {item.pirkimoVykdytojoPavadinimas || 'nenurodytas'}</span>
+                    <span><strong>Pirkimo nr.:</strong> {item.pirkimoNumeris || 'nenurodytas'}</span>
+                    {item.teismoSprendimoLink?.length > 5 && (
+                      <span>
+                        <a href={item.teismoSprendimoLink} target="_blank" rel="noopener noreferrer" class="relative z-1">↗ Teismo sprendimas</a>
+                      </span>
+                    )}
                   </div>
-                </article>
+                </ResultCardShell>
               );
             })}
           </div>

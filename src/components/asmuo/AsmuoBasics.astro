@@ -1,4 +1,6 @@
 ---
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+
 interface Props {
   asmuo: any;
 }
@@ -9,7 +11,7 @@ const hasJadis = Object.values(jadis).some((v: any) => Number(v) > 0);
 const istatinis = asmuo.istatinisKapitalas;
 ---
 
-<dl class="kv-list">
+<KeyValueList>
   <dt>JAR kodas</dt>
   <dd><span class="cell-mono">{asmuo.jar.jarKodas}</span> · {asmuo.jar.formosPavadinimas}</dd>
 
@@ -55,4 +57,4 @@ const istatinis = asmuo.istatinisKapitalas;
       </div>
     </dd>
   </>}
-</dl>
+</KeyValueList>

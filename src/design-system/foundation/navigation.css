@@ -1,0 +1,119 @@
+@layer components {
+  .tabs-container {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-inline: 16px;
+    margin-block: 40px;
+  }
+
+  .tabs-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 56px;
+    min-width: max-content;
+    border-bottom: var(--border);
+  }
+
+  .tabs a {
+    flex-shrink: 0;
+    text-decoration: none;
+    padding-bottom: 16px;
+    color: var(--gray);
+    position: relative;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    transition: color var(--transition);
+  }
+
+  .tabs a:hover,
+  .tabs a.active {
+    color: var(--black);
+  }
+
+  .tabs a.active::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--black);
+    border-radius: 2px 2px 0 0;
+  }
+
+  .tabs-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-block: 16px;
+  }
+
+  .tabs-pills a {
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--gray);
+    text-decoration: none;
+    background: var(--lighter-gray);
+    transition: background-color var(--transition), color var(--transition);
+  }
+
+  .tabs-pills a:hover {
+    background: var(--light-gray);
+    color: var(--black);
+  }
+
+  .tabs-pills a.active {
+    background: var(--black);
+    color: var(--white);
+  }
+
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px 0;
+    font-size: var(--text-sm);
+    color: var(--gray);
+  }
+
+  .breadcrumb li + li::before {
+    content: "/";
+    color: var(--light-gray);
+    margin-right: 4px;
+  }
+
+  .breadcrumb a {
+    color: var(--gray);
+  }
+
+  .breadcrumb li:last-child {
+    color: var(--black);
+    font-weight: 500;
+  }
+
+  ul.pagination {
+    @apply flex items-center gap-1 list-none p-0 m-0;
+  }
+
+  ul.pagination li.disabled {
+    @apply opacity-50 pointer-events-none;
+  }
+
+  ul.pagination li > a,
+  ul.pagination li > span {
+    @apply inline-flex items-center justify-center min-w-8 h-8 px-2 border border-light-gray rounded-md text-sm text-black bg-white transition-colors duration-300 hover:bg-lighter-gray no-underline;
+  }
+
+  ul.pagination li.active a {
+    @apply bg-black text-white border-black;
+  }
+}

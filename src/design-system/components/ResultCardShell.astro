@@ -1,0 +1,114 @@
+---
+interface Props {
+  clickable?: boolean;
+  className?: string;
+  bodyClass?: string;
+}
+
+const {
+  clickable = false,
+  className = '',
+  bodyClass = '',
+} = Astro.props;
+
+const articleClasses = ['result-card', clickable ? 'card-clickable' : '', className].filter(Boolean).join(' ');
+const bodyClasses = ['result-card-body', bodyClass].filter(Boolean).join(' ');
+---
+
+<article class={articleClasses}>
+  <div class={bodyClasses}>
+    {Astro.slots.has('meta') && <slot name="meta" />}
+    {Astro.slots.has('title') && <slot name="title" />}
+    <slot />
+    {Astro.slots.has('footer') && <slot name="footer" />}
+    {Astro.slots.has('after-footer') && <slot name="after-footer" />}
+  </div>
+  {Astro.slots.has('sidebar') && <slot name="sidebar" />}
+</article>
+
+<style>
+  .result-card {
+    padding: 28px;
+    display: flex;
+    align-items: flex-start;
+    position: relative;
+    border-bottom: var(--border);
+    transition: box-shadow var(--transition);
+  }
+
+  .result-card.card-clickable:hover {
+    box-shadow: var(--shadow-sm);
+  }
+
+  .result-card-body {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .result-card :global(.result-card-sidebar) {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    margin-left: 16px;
+    padding-left: 12px;
+    padding-block: 8px;
+    border-left: var(--border);
+    min-width: 120px;
+  }
+
+  .result-card :global(.result-card-meta) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: var(--text-sm);
+    color: var(--gray);
+  }
+
+  .result-card :global(.result-card-title) {
+    margin-top: 8px;
+    font-size: var(--text-xl);
+    font-weight: 700;
+  }
+
+  .result-card :global(.result-card-title a) {
+    color: var(--black);
+    text-decoration: none;
+  }
+
+  .result-card.card-clickable :global(.result-card-title a)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .result-card.card-clickable :global(.result-card-title a) {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .result-card :global(.result-card-footer) {
+    display: flex;
+    flex-direction: column;
+    gap: 8px 28px;
+    margin-top: 12px;
+    font-size: var(--text-sm);
+    color: var(--dark-gray);
+  }
+
+  .result-card:last-child {
+    border-bottom: 0;
+  }
+
+  @media (max-width: 600px) {
+    .result-card {
+      padding-inline: 0;
+    }
+
+    .result-card.card-clickable:hover {
+      box-shadow: none;
+    }
+  }
+</style>

@@ -1,9 +1,10 @@
 ---
-import FilterGroup from '../filters/FilterGroup.astro';
-import DateRangeFilter from '../filters/DateRangeFilter.astro';
-import NumberRangeFilter from '../filters/NumberRangeFilter.astro';
-import SortFilter from '../filters/SortFilter.astro';
-import TextInput from '../inputs/TextInput.astro';
+import FilterGroup from '@design-system/components/filters/FilterGroup.astro';
+import DateRangeFilter from '@design-system/components/filters/DateRangeFilter.astro';
+import NumberRangeFilter from '@design-system/components/filters/NumberRangeFilter.astro';
+import SortFilter from '@design-system/components/filters/SortFilter.astro';
+import SelectInput from '@design-system/components/inputs/SelectInput.astro';
+import TextInput from '@design-system/components/inputs/TextInput.astro';
 import { STATUSAS, PIRKIMO_BUDAS } from '@/modules/viesiejiPirkimai/viesiejiPirkimaiEnums.js';
 
 interface Props {
@@ -55,24 +56,20 @@ const sortOptions = [
   />
 
   <FilterGroup legend="Klasifikacija">
-    <div class="form-group">
-      <label class="form-label" for="pirkimoBudas">Pirkimo būdas</label>
-      <select name="pirkimoBudas" id="pirkimoBudas" class="form-control">
-        <option value="" selected={!values['pirkimoBudas']}>Visi</option>
-        {Object.entries(PIRKIMO_BUDAS).map(([key, label]) => (
-          <option value={key} selected={values['pirkimoBudas'] === key}>{label as string}</option>
-        ))}
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="statusas">Statusas</label>
-      <select name="statusas" id="statusas" class="form-control">
-        <option value="" selected={!values['statusas']}>Visi</option>
-        {Object.entries(STATUSAS).map(([key, label]) => (
-          <option value={key} selected={values['statusas'] === key}>{label as string}</option>
-        ))}
-      </select>
-    </div>
+    <SelectInput
+      label="Pirkimo būdas"
+      name="pirkimoBudas"
+      options={Object.entries(PIRKIMO_BUDAS).map(([value, label]) => ({ value, label: label as string }))}
+      values={values}
+      placeholder="Visi"
+    />
+    <SelectInput
+      label="Statusas"
+      name="statusas"
+      options={Object.entries(STATUSAS).map(([value, label]) => ({ value, label: label as string }))}
+      values={values}
+      placeholder="Visi"
+    />
   </FilterGroup>
 
   <SortFilter

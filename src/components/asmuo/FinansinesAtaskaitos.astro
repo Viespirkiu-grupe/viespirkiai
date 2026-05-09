@@ -1,13 +1,43 @@
 ---
+import Chart from '@design-system/components/charts/Chart.astro';
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
 const { asmuo, finansaiLimit } = Astro.props;
 const ataskaitos = asmuo.finansai?.ataskaitos ?? [];
 if (ataskaitos.length === 0) return;
 const lentele = asmuo.finansai?.lentele;
 const metai = lentele?.metai ?? [];
 const duomenys = lentele?.duomenys ?? {};
-const pardavimoPajamosSeries = JSON.stringify(metai.map((m: string) => duomenys['Pardavimo pajamos']?.[metai.indexOf(m)] ?? null));
-const metaiLabels = JSON.stringify(metai.map(String));
-const pelnoDuomenys = JSON.stringify(duomenys['Grynasis pelnas (nuostoliai)'] ?? duomenys['Ataskaitinių metų pelnas (nuostoliai)'] ?? []);
+const pardavimaiKasMetus = asmuo.sutartys?.tiekimaiKasMetus ?? [];
+const financeRevenueByYear = Object.fromEntries(metai.map((year: string, index: number) => [year, duomenys['Pardavimo pajamos']?.[index] ?? null]));
+const procurementRevenueByYear = Object.fromEntries(pardavimaiKasMetus.map((item: any) => [String(item.year), item.total || null]));
+const mergedRevenueLabels = Array.from(new Set([...Object.keys(financeRevenueByYear), ...Object.keys(procurementRevenueByYear)]))
+  .map(Number)
+  .sort((a, b) => a - b)
+  .map(String);
+const mergedRevenueSeries = [
+  { name: 'Pardavimo pajamos', data: mergedRevenueLabels.map((label) => financeRevenueByYear[label] ?? null) },
+  { name: 'Viešųjų pirkimų pardavimai', data: mergedRevenueLabels.map((label) => procurementRevenueByYear[label] ?? null) },
+];
+const pelnoSeries = (duomenys['Grynasis pelnas (nuostoliai)'] ?? duomenys['Ataskaitinių metų pelnas (nuostoliai)'] ?? []).map((value: any) => value ?? null);
+const hasNegativeProfit = pelnoSeries.some((value: any) => value !== null && value < 0);
+const profitChartOptions = {
+  annotations: hasNegativeProfit
+    ? {
+        yaxis: [{
+          y: 0,
+          y2: -100000000,
+          borderColor: 'red',
+          borderWidth: 2,
+          label: {
+            borderColor: 'red',
+            style: { color: '#fff', background: 'red' },
+            text: 'Nuostoliai',
+          },
+        }],
+      }
+    : {},
+};
 ---
 
 <div class="page-section mb-10" id="finansai">
@@ -17,50 +47,38 @@ const pelnoDuomenys = JSON.stringify(duomenys['Grynasis pelnas (nuostoliai)'] ??
     <div>
       <h3 class="text-sm font-bold mb-3">Pardavimo pajamos</h3>
       {metai.length > 0 && duomenys['Pardavimo pajamos'] ? (
-        <div class="chart-frame">
-          <div id="pardavimoPajamosChart" class="chart h-75"></div>
-          <script defer is:inline define:vars={{ fa_ml: JSON.parse(metaiLabels), fa_ps: JSON.parse(pardavimoPajamosSeries) }}>
-            if (typeof window.pardavimaiKasMetusLabels === 'undefined') window.pardavimaiKasMetusLabels = [];
-            if (typeof window.pardavimaiKasMetus === 'undefined') window.pardavimaiKasMetus = [];
-            const fa_map = {};
-            fa_ml.forEach((m, i) => { fa_map[m] = fa_ps[i]; });
-            const fa_merged = Array.from(new Set([...Object.keys(fa_map), ...window.pardavimaiKasMetusLabels])).map(Number).sort((a,b)=>a-b).map(String);
-            displayChart({
-              element: document.querySelector('#pardavimoPajamosChart'),
-              labels: fa_merged,
-              series: [
-                { name: 'Pardavimo pajamos', data: fa_merged.map(l => fa_map[l] ?? null) },
-                { name: 'Viešųjų pirkimų pardavimai', data: fa_merged.map(l => { const i = window.pardavimaiKasMetusLabels.indexOf(l); return i !== -1 ? window.pardavimaiKasMetus[i] : null; }) }
-              ],
-              flags: ['yEUR', 'yMin0'],
-            });
-          </script>
-        </div>
+        <Chart
+          id="pardavimoPajamosChart"
+          type="line-datetime"
+          labels={mergedRevenueLabels}
+          series={mergedRevenueSeries}
+          flags={['yEUR', 'yMin0']}
+          wrapperClass=""
+          heightClass="h-75"
+        />
       ) : <div class="chart-empty">Nėra duomenų</div>}
     </div>
 
     <div>
       <h3 class="text-sm font-bold mb-3">Grynasis pelnas (nuostoliai)</h3>
       {metai.length > 0 ? (
-        <div class="chart-frame">
-          <div id="grynasisPelnas" class="chart h-75"></div>
-          <script defer is:inline define:vars={{ gp_l: JSON.parse(metaiLabels), gp_d: JSON.parse(pelnoDuomenys) }}>
-            const gp_v = gp_d.map((v) => v ?? null);
-            const gp_neg = gp_v.some((v) => v !== null && v < 0);
-            displayChart({
-              element: document.querySelector('#grynasisPelnas'),
-              labels: gp_l, series: gp_v, flags: ['yEUR', 'yMinAuto'],
-              customOptions: { annotations: gp_neg ? { yaxis: [{ y: 0, y2: -100000000, borderColor: 'red', borderWidth: 2, label: { borderColor: 'red', style: { color: '#fff', background: 'red' }, text: 'Nuostoliai' } }] } : {} }
-            });
-          </script>
-        </div>
+        <Chart
+          id="grynasisPelnas"
+          type="line-datetime"
+          labels={metai.map(String)}
+          series={pelnoSeries}
+          flags={['yEUR', 'yMinAuto']}
+          customOptions={profitChartOptions}
+          wrapperClass=""
+          heightClass="h-75"
+        />
       ) : <div class="chart-empty">Nėra duomenų</div>}
     </div>
   </div>
 
   {metai.length > 0 && (
-    <div class="table-wrapper mb-7">
-      <table class="table">
+    <TableWrapper className="mb-7">
+      <Table>
         <thead>
           <tr>
             <th>Eilutė</th>
@@ -84,8 +102,8 @@ const pelnoDuomenys = JSON.stringify(duomenys['Grynasis pelnas (nuostoliai)'] ??
             </tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </Table>
+    </TableWrapper>
   )}
 
   {ataskaitos.length > finansaiLimit && (

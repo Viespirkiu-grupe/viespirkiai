@@ -1,40 +1,10 @@
 ---
+import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
 import Layout from '../../../layouts/Layout.astro';
 import { getColorScheme, getFont } from '../../../lib/failai.js';
 import { postgres } from '@/postgres/postgres.js';
-
-const chartsHead = `<script defer>
-  let apexPromise;
-  const renderedCharts = [];
-  function loadApexCharts() {
-    if (window.ApexCharts) return Promise.resolve(window.ApexCharts);
-    if (apexPromise) return apexPromise;
-    apexPromise = new Promise((resolve, reject) => {
-      function startLoading() {
-        const s = document.createElement('script'); s.src = '/dist/apexcharts.js'; s.defer = true;
-        s.onload = () => resolve(window.ApexCharts); s.onerror = reject;
-        document.body.appendChild(s);
-      }
-      document.readyState === 'loading' ? window.addEventListener('DOMContentLoaded', startLoading) : startLoading();
-    });
-    return apexPromise;
-  }
-  function deepMerge(t,s){for(const k in s){if(s[k]&&typeof s[k]==='object'&&!Array.isArray(s[k])){if(!t[k])t[k]={};deepMerge(t[k],s[k]);}else{t[k]=s[k];}}return t;}
-  function getIsDark(){return document.documentElement.classList.contains('dark');}
-  function getThemeTokens(d){return{foreground:d?'#f5f4f4':'#0c0a09',labelColor:d?'#a8a29e':'#292524',gridColor:d?'#292524':'#e7e5e4',tooltipBg:d?'#1c1917':'#fafaf9',tooltipText:d?'#f5f4f4':'#0c0a09',tooltipBorder:d?'#292524':'#d6d3d1'};}
-  const CATEGORICAL_COLORS={light:['#0c0a09','#79716b','#e7e5e4'],dark:['#f5f4f4','#79716b','#292524']};
-  function getCategoricalColors(d){return d?CATEGORICAL_COLORS.dark:CATEGORICAL_COLORS.light;}
-  const eurFormatter=v=>typeof v==='number'?v.toLocaleString('lt-LT',{style:'currency',currency:'EUR'}):'Nėra duomenų';
-  function buildGlobalDefaults(d){const t=getThemeTokens(d);return{chart:{toolbar:{show:false},zoom:{enabled:false},fontFamily:'Ubuntu, system-ui, sans-serif',background:'transparent',height:350,foreColor:t.labelColor},tooltip:{enabled:true,theme:d?'dark':'light',style:{fontFamily:'Ubuntu, system-ui, sans-serif'}},xaxis:{labels:{style:{colors:t.labelColor}}},yaxis:{labels:{style:{colors:t.labelColor}}},stroke:{curve:'smooth',width:2},markers:{size:4},colors:getCategoricalColors(d),grid:{borderColor:t.gridColor},theme:{mode:d?'dark':'light'},legend:{labels:{colors:t.labelColor}}};}
-  const typeChartDefaults={'line-datetime':{chart:{type:'line'},xaxis:{type:'datetime',tickAmount:6,labels:{format:'yyyy-MM'}},tooltip:{x:{format:'yyyy-MM'}}},'pie':{chart:{type:'pie'},legend:{position:'bottom'},dataLabels:{enabled:true}},'scatter':{chart:{type:'scatter'}},'treemap':{chart:{type:'treemap'}}};
-  const chartFlagDefaults={'yEUR':{yaxis:{labels:{formatter:eurFormatter}}},'yEURMen':{yaxis:{labels:{formatter:v=>typeof v==='number'?eurFormatter(v)+' / mėn.':'Nėra duomenų'}}},'yMin0':{yaxis:{min:0}},'yMinAuto':{yaxis:{min:undefined}},'xYear':{xaxis:{labels:{format:'yyyy'}},tooltip:{x:{format:'yyyy'}}},'xAxisYearMonth':{xaxis:{type:'datetime',tickAmount:6,labels:{format:'yyyy-MM'}},tooltip:{x:{format:'yyyy-MM'}}},'xAxisDay':{xaxis:{type:'datetime',tickAmount:6,labels:{format:'yyyy-MM-dd'}},tooltip:{x:{format:'yyyy-MM-dd'}}},'numbersWithSpaces':{yaxis:{labels:{formatter:v=>typeof v==='number'?v.toLocaleString('lt-LT'):'Nėra duomenų'}}}};
-  function buildOptions(data,isDark){let o=structuredClone(buildGlobalDefaults(isDark));if(data.type&&typeChartDefaults[data.type])o=deepMerge(o,structuredClone(typeChartDefaults[data.type]));for(const f of(data.flags||[])){if(f in chartFlagDefaults)o=deepMerge(o,chartFlagDefaults[f]);}if(data.type!=='pie'){o.xaxis=o.xaxis||{};o.xaxis.categories=data.labels;if(Array.isArray(data.series)&&(data.series.length===0||!data.series[0]?.data)){o.series=[{name:data.customOptions?.seriesName||'',data:data.series}];}else{o.series=data.series;}}else{o.labels=data.labels;o.series=data.series;}if(data.customOptions)o=deepMerge(o,data.customOptions);return o;}
-  async function displayChart(data){if(!data?.element||!data?.labels||!data?.series){return;}await loadApexCharts();const chart=new ApexCharts(data.element,buildOptions(data,getIsDark()));chart.render();renderedCharts.push({chart,data});}
-  function updateAllCharts(){const d=getIsDark();const t=getThemeTokens(d);for(const{chart}of renderedCharts){chart.updateOptions({chart:{foreColor:t.labelColor},tooltip:{theme:d?'dark':'light'},xaxis:{labels:{style:{colors:t.labelColor}}},yaxis:{labels:{style:{colors:t.labelColor}}},grid:{borderColor:t.gridColor},theme:{mode:d?'dark':'light'},legend:{labels:{colors:t.labelColor}},colors:getCategoricalColors(d)},false,true);}}
-  new MutationObserver(updateAllCharts).observe(document.documentElement,{attributes:true,attributeFilter:['class']});
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(!document.documentElement.classList.contains('dark'))updateAllCharts();});
-<\/script>
-<style>.chart{background-color:transparent;}.dark .apexcharts-tooltip,.dark .apexcharts-tooltip-title{background:#1c1917!important;color:#f5f4f4!important;border-color:#292524!important;}<\/style>`;
 
 interface OcrNode {
   id: number;
@@ -102,23 +72,22 @@ const ocrResultsWords = ocrStatsDay.map(item => item.words);
   pageImage="https://viespirkiai.org/failai.png"
   colorScheme={colorScheme}
   font={font}
-  customHead={chartsHead}
 >
   <main>
 
-    <div class="page-header">
-      <h1 class="mb-0">
+    <PageHeader>
+      <Fragment>
         <a href="/failai/ocr" class="breadcrumb-link">OCR būsena</a>
         <span class="breadcrumb-sep">›</span>
         {nuskaitytojas.viesasPavadinimas}
-      </h1>
-    </div>
+      </Fragment>
+    </PageHeader>
 
     <div class="page-section">
       <h2 class="mb-3">Nuskaitytojas</h2>
       <div class="card max-w-[360px]">
         <div class="card-body">
-          <dl class="kv-list">
+          <KeyValueList>
             <dt>Dokumentai</dt>
             <dd><span class="cell-mono">{Number(nuskaitytojas.nuskaitytiDokumentai).toLocaleString('lt-LT')}</span></dd>
             <dt>Puslapiai</dt>
@@ -127,58 +96,41 @@ const ocrResultsWords = ocrStatsDay.map(item => item.words);
             <dd><span class="cell-mono">{Number(nuskaitytojas.words).toLocaleString('lt-LT')}</span></dd>
             <dt>Rezervacijos</dt>
             <dd><span class="cell-mono">{Number(nuskaitytojas.rezervacijos).toLocaleString('lt-LT')}</span></dd>
-          </dl>
+          </KeyValueList>
         </div>
       </div>
     </div>
 
     <div class="grid-2">
+      <LineDatetimeChart
+        id="ocrStatsDayDiagrama"
+        title="Rezultatų skaičius"
+        anchor="rezultatai"
+        labels={ocrLabels}
+        series={ocrResults}
+        wrapperClass="page-section flex flex-col min-h-[350px]"
+        heightClass="h-[350px]"
+      />
 
-      <div class="page-section flex flex-col min-h-[350px]">
-        <h2 class="mb-3"><a href="#rezultatai" id="rezultatai" class="no-style">Rezultatų skaičius</a></h2>
-        <div class="chart-frame">
-          <div id="ocrStatsDayDiagrama" class="chart h-[350px]"></div>
-        </div>
-      </div>
+      <LineDatetimeChart
+        id="ocrStatsDayPagesDiagrama"
+        title="Puslapių skaičius"
+        anchor="puslapiai"
+        labels={ocrLabels}
+        series={ocrResultsPages}
+        wrapperClass="page-section flex flex-col min-h-[350px]"
+        heightClass="h-[350px]"
+      />
 
-      <div class="page-section flex flex-col min-h-[350px]">
-        <h2 class="mb-3"><a href="#puslapiai" id="puslapiai" class="no-style">Puslapių skaičius</a></h2>
-        <div class="chart-frame">
-          <div id="ocrStatsDayPagesDiagrama" class="chart h-[350px]"></div>
-        </div>
-      </div>
-
-      <div class="page-section flex flex-col min-h-[350px]">
-        <h2 class="mb-3"><a href="#zodziai" id="zodziai" class="no-style">Žodžių skaičius</a></h2>
-        <div class="chart-frame">
-          <div id="ocrStatsDayWordsDiagrama" class="chart h-[350px]"></div>
-        </div>
-      </div>
-
+      <LineDatetimeChart
+        id="ocrStatsDayWordsDiagrama"
+        title="Žodžių skaičius"
+        anchor="zodziai"
+        labels={ocrLabels}
+        series={ocrResultsWords}
+        wrapperClass="page-section flex flex-col min-h-[350px]"
+        heightClass="h-[350px]"
+      />
     </div>
   </main>
-
-  <script defer is:inline define:vars={{ ocrLabels, ocrResults, ocrResultsPages, ocrResultsWords }}>
-    displayChart({
-      element: document.querySelector('#ocrStatsDayDiagrama'),
-      type: 'line-datetime',
-      labels: ocrLabels,
-      series: ocrResults,
-      flags: ['yMin0', 'xAxisDay', 'numbersWithSpaces'],
-    });
-    displayChart({
-      element: document.querySelector('#ocrStatsDayPagesDiagrama'),
-      type: 'line-datetime',
-      labels: ocrLabels,
-      series: ocrResultsPages,
-      flags: ['yMin0', 'xAxisDay', 'numbersWithSpaces'],
-    });
-    displayChart({
-      element: document.querySelector('#ocrStatsDayWordsDiagrama'),
-      type: 'line-datetime',
-      labels: ocrLabels,
-      series: ocrResultsWords,
-      flags: ['yMin0', 'xAxisDay', 'numbersWithSpaces'],
-    });
-  </script>
 </Layout>

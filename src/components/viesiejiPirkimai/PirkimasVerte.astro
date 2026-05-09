@@ -1,5 +1,5 @@
 ---
-import { fmtEur } from '../../lib/viesiejiPirkimai.js';
+import { fmtEurOrNull } from '../../lib/formatters.ts';
 
 interface Props {
   pirkimas: any;
@@ -7,9 +7,9 @@ interface Props {
 const { pirkimas } = Astro.props;
 const t = pirkimas.turinys || {};
 
-const numatoma = fmtEur(pirkimas.numatomaBendraPirkimoVerte) || fmtEur(t.numatomaVerteEUR);
-const bendra = fmtEur(t.bendraSutarciuVerte);
-const dpsMax = fmtEur(t.suteiktaVertemaksimaliDPSVerte);
+const numatoma = fmtEurOrNull(pirkimas.numatomaBendraPirkimoVerte) || fmtEurOrNull(t.numatomaVerteEUR);
+const bendra = fmtEurOrNull(t.bendraSutarciuVerte);
+const dpsMax = fmtEurOrNull(t.suteiktaVertemaksimaliDPSVerte);
 const hasAny = numatoma || bendra || dpsMax;
 ---
 

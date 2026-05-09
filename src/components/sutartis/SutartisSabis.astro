@@ -1,5 +1,6 @@
 ---
 import SabisSutartisCard from './SabisSutartisCard.astro';
+import CollapsibleListSection from '@design-system/components/CollapsibleListSection.astro';
 
 interface Props {
   sutartys: any[] | null | undefined;
@@ -12,22 +13,14 @@ const visible = list.slice(0, maxVisible);
 const hidden = list.slice(maxVisible);
 ---
 
-<section>
-  <h2>SABIS sutartys</h2>
-  {list.length === 0
-    ? <p class="text-muted mt-4"><em>SABIS sutarčių nerasta.</em></p>
-    : <div class="result-list mt-4">
-        {visible.map((item: any) => <SabisSutartisCard item={item} />)}
-        {hidden.length > 0 && (
-          <details>
-            <summary class="text-sm text-muted px-2 py-2 cursor-pointer select-none hover:text-current">
-              Rodyti dar {hidden.length}
-            </summary>
-            <div class="result-list mt-4">
-              {hidden.map((item: any) => <SabisSutartisCard item={item} />)}
-            </div>
-          </details>
-        )}
-      </div>
-  }
-</section>
+<CollapsibleListSection
+  title="SABIS sutartys"
+  emptyText="SABIS sutarčių nerasta."
+  totalCount={list.length}
+  hiddenCount={hidden.length}
+>
+  {visible.map((item: any) => <SabisSutartisCard item={item} />)}
+  <Fragment slot="hidden">
+    {hidden.map((item: any) => <SabisSutartisCard item={item} />)}
+  </Fragment>
+</CollapsibleListSection>

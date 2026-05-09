@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import mime from 'mime';
-import config from '@/config.js';
+import config from '../../../lib/config.ts';
 import { postgres } from '@/postgres/postgres.js';
 import { checkFailasAccessible } from '@/modules/failai/queries.js';
 
@@ -16,7 +16,7 @@ export const GET: APIRoute = async ({ params }) => {
   if (error) return new Response(message, { status: error });
 
   const needsConversion = !['pdf', 'prn'].includes(String(failas.extension).toLowerCase());
-  const url = `${(config as any).internalFileBase}/${failas.md5}${needsConversion ? '?convertTo=pdf' : ''}`;
+  const url = `${config.internalFileBase}/${failas.md5}${needsConversion ? '?convertTo=pdf' : ''}`;
 
   const upstream = await fetch(url);
   if (!upstream.ok) return new Response('Nepavyko gauti failo.', { status: 500 });

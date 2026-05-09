@@ -1,10 +1,12 @@
 ---
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import { fmtEur } from '../../lib/formatters.ts';
+
 interface Props {
   sutartis: any;
 }
 
 const { sutartis } = Astro.props;
-const fmtEur = (v: any) => Number(v).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const cvpisUrl = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=${sutartis.sutartiesUnikalusId}`;
 const cvpis = sutartis.cvpisPirkimas;
 const cvpp = sutartis.cvppPirkimas;
@@ -17,7 +19,7 @@ const cvpp = sutartis.cvppPirkimas;
     <a href={cvpisUrl} class="text-sm">↗ CVP IS</a>
   </div>
 
-  <dl class="kv-list mb-4">
+  <KeyValueList className="mb-4">
     <dt>Paskelbta</dt><dd>{sutartis.paskelbimoData}</dd>
     <dt>Redaguota</dt><dd>{sutartis.paskutinioRedagavimoData}</dd>
     <dt>Pirkimo numeris</dt>
@@ -29,7 +31,7 @@ const cvpp = sutartis.cvppPirkimas;
           : sutartis.pirkimoNumeris || 'Nenurodytas'
       }
     </dd>
-  </dl>
+  </KeyValueList>
 
   {cvpis && (
     <section>
@@ -38,7 +40,7 @@ const cvpp = sutartis.cvppPirkimas;
       <div class="flex items-center gap-2 mb-4">
         <a href={`/viesiejiPirkimai/${cvpis.pirkimoId}`}><span>{cvpis.pavadinimas}</span></a>
       </div>
-      <dl class="kv-list">
+      <KeyValueList>
         {cvpis.pasiulymuPateikimoTerminas && <>
           <dt>Pasiūlymų pateikimo terminas</dt>
           <dd>{String(cvpis.pasiulymuPateikimoTerminas).slice(0, 10)}</dd>
@@ -47,7 +49,7 @@ const cvpp = sutartis.cvppPirkimas;
           <dt>Numatoma vertė</dt>
           <dd class="cell-mono">{fmtEur(cvpis.numatomaVerteEUR)} €</dd>
         </>}
-      </dl>
+      </KeyValueList>
       {cvpis.informacija && <p class="text-muted text-sm">{cvpis.informacija}</p>}
     </section>
   )}

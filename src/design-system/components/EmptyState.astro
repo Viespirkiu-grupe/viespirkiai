@@ -1,0 +1,51 @@
+---
+interface Props {
+  icon?: string;
+  title?: string;
+  titleTag?: 'h1' | 'h2' | 'h3';
+  message?: string;
+  className?: string;
+  messageClass?: string;
+}
+
+const {
+  icon,
+  title,
+  titleTag = 'h2',
+  message,
+  className = '',
+  messageClass = 'text-muted',
+} = Astro.props;
+
+const TitleTag = titleTag;
+const hasContent = Astro.slots.has('default');
+---
+
+<div class:list={['empty-state', className].filter(Boolean)}>
+  {icon && <div class="empty-state-icon">{icon}</div>}
+  {title && <TitleTag>{title}</TitleTag>}
+  {hasContent
+    ? <slot />
+    : message && <p class={messageClass}>{message}</p>
+  }
+</div>
+
+<style>
+  .empty-state {
+    min-height: 20vh;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--gray);
+  }
+
+  .empty-state-icon {
+    margin: 0;
+    font-size: 3.75rem;
+    line-height: 1;
+    opacity: 0.4;
+  }
+</style>

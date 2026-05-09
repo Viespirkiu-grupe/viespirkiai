@@ -1,37 +1,22 @@
 ---
-import FilterGroup from '../filters/FilterGroup.astro';
-import NumberRangeFilter from '../filters/NumberRangeFilter.astro';
-import TextInput from '../inputs/TextInput.astro';
+import FilterGroup from '@design-system/components/filters/FilterGroup.astro';
+import NumberRangeFilter from '@design-system/components/filters/NumberRangeFilter.astro';
+import SelectInput from '@design-system/components/inputs/SelectInput.astro';
+import TextInput from '@design-system/components/inputs/TextInput.astro';
+import { SALTINIS_OPTIONS } from '../../lib/failaiEnums.ts';
 
 interface Props {
   values: Record<string, string | undefined>;
 }
 
 const { values } = Astro.props;
-
-const saltinisOptions = [
-  { value: 'sutartys', label: 'Sutartys' },
-  { value: 'neskelbiamosDerybos', label: 'Neskelbiamos derybos' },
-  { value: 'cvpIs', label: 'Viešieji pirkimai' },
-  { value: 'cvpp', label: 'CVPP viešieji pirkimai' },
-  { value: 'mvpAprasai', label: 'MVP tvarkos aprašai' },
-  { value: 'archive', label: 'Failas archyvo viduje' },
-];
 ---
 
 <div class="search-filters-grid">
   <FilterGroup legend="Failas">
     <TextInput label="Extension" name="extension" placeholder="Visi" values={values} />
     <TextInput label="MD5" name="md5" placeholder="d41d8cd98..." values={values} />
-    <div class="form-group">
-      <label class="form-label" for="saltinis">Šaltinis</label>
-      <select name="saltinis" id="saltinis" class="form-control">
-        <option value="" selected={!values.saltinis}>Visi</option>
-        {saltinisOptions.map(opt => (
-          <option value={opt.value} selected={values.saltinis === opt.value}>{opt.label}</option>
-        ))}
-      </select>
-    </div>
+    <SelectInput label="Šaltinis" name="saltinis" options={SALTINIS_OPTIONS} values={values} placeholder="Visi" />
   </FilterGroup>
 
   <NumberRangeFilter

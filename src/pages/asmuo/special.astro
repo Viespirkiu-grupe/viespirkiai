@@ -1,7 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-const colorScheme = Astro.cookies.get('colorScheme')?.value || 'auto';
-const font = Astro.cookies.get('font')?.value || 'ubuntu';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
 const id = Astro.url.searchParams.get('id') || '';
 const pavadinimas = Astro.url.searchParams.get('pavadinimas') || 'CVP IS netikras asmuo';
 const aprasymas = Astro.url.searchParams.get('aprasymas') || '';

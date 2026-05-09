@@ -1,0 +1,43 @@
+---
+interface Props { label: string; name: string; values: Record<string, any>; }
+const { label, name, values } = Astro.props;
+---
+<div class="ds-field">
+  <label class="ds-field__label" for={name}>{label}</label>
+  <input type="date" class="ds-field__control" name={name} id={name} value={values[name] || ''}>
+</div>
+
+<style>
+  .ds-field {
+    margin-bottom: 16px;
+  }
+
+  .ds-field__label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .ds-field__control {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    color: var(--black);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    appearance: none;
+  }
+
+  .ds-field__control:focus {
+    outline: none;
+    border-color: var(--black);
+    box-shadow: 0 0 0 3px rgba(15, 15, 15, 0.08);
+  }
+</style>

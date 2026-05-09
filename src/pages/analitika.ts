@@ -1,5 +1,5 @@
-import config from '@/config.js';
+import config from '../lib/config.ts';
 
 export async function GET() {
-  return Response.redirect((config as any).analitikaUrl, 302);
+  return Response.redirect(config.analitikaUrl ?? '/', 302);
 }

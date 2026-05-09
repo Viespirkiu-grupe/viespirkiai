@@ -1,9 +1,11 @@
 ---
+import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
+
 const { asmuo } = Astro.props;
 const duomenys = asmuo.sodra?.duomenys ?? [];
-const labels = JSON.stringify(duomenys.map((d: any) => d.data + '-01'));
-const series1 = JSON.stringify(duomenys.map((d: any) => d.vidutinisAtlyginimas || null));
-const series2 = JSON.stringify(duomenys.map((d: any) => d.vidutinisAtlyginimas2 || null));
+const labels = duomenys.map((d: any) => d.data + '-01');
+const series1 = duomenys.map((d: any) => d.vidutinisAtlyginimas || null);
+const series2 = duomenys.map((d: any) => d.vidutinisAtlyginimas2 || null);
 ---
 
 <div class="page-section mb-10" id="uzmokestis">
@@ -13,23 +15,33 @@ const series2 = JSON.stringify(duomenys.map((d: any) => d.vidutinisAtlyginimas2 
     <div class="flex flex-col min-h-87.5">
       <h3 class="text-sm font-bold mb-3">Darbo sutartys, valstybės tarnautojai</h3>
       {duomenys.length > 0 && asmuo.sodra?.turejoAtlyginimu ? (
-        <div class="chart-frame">
-          <div id="vidAtlyginimoDiagrama" class="chart h-75"></div>
-          <script defer is:inline define:vars={{ labels1: JSON.parse(labels), s1: JSON.parse(series1) }}>
-            displayChart({ element: document.querySelector('#vidAtlyginimoDiagrama'), type: 'line-datetime', labels: labels1, series: s1, flags: ['yEURMen', 'yMin0'] });
-          </script>
-        </div>
+        <LineDatetimeChart
+          id="vidAtlyginimoDiagrama"
+          title="Darbo sutartys, valstybės tarnautojai"
+          anchor="uzmokestis-darbo-sutartys"
+          labels={labels}
+          series={series1}
+          flags={['yEURMen', 'yMin0']}
+          wrapperClass=""
+          titleClass="sr-only"
+          heightClass="h-75"
+        />
       ) : <div class="chart-empty">Nėra duomenų</div>}
     </div>
     <div class="flex flex-col min-h-87.5">
       <h3 class="text-sm font-bold mb-3">Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
       {duomenys.length > 0 && asmuo.sodra?.turejoAtlyginimu2 ? (
-        <div class="chart-frame">
-          <div id="vidAtlyginimoIIDiagrama" class="chart h-75"></div>
-          <script defer is:inline define:vars={{ labels2: JSON.parse(labels), s2: JSON.parse(series2) }}>
-            displayChart({ element: document.querySelector('#vidAtlyginimoIIDiagrama'), type: 'line-datetime', labels: labels2, series: s2, flags: ['yEURMen', 'yMin0'] });
-          </script>
-        </div>
+        <LineDatetimeChart
+          id="vidAtlyginimoIIDiagrama"
+          title="Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos"
+          anchor="uzmokestis-autorines"
+          labels={labels}
+          series={series2}
+          flags={['yEURMen', 'yMin0']}
+          wrapperClass=""
+          titleClass="sr-only"
+          heightClass="h-75"
+        />
       ) : <div class="chart-empty">Nėra duomenų</div>}
     </div>
   </div>

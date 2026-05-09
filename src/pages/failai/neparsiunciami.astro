@@ -1,6 +1,11 @@
 ---
+import Button from '@design-system/components/Button.astro';
 import Layout from '../../layouts/Layout.astro';
-import Pagination from '../../components/Pagination.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import SelectInput from '@design-system/components/inputs/SelectInput.astro';
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
 import { postgres, parseLimit, enrichFailasRow, getColorScheme, getFont, cleanQuery, buildSaltinioLink } from '../../lib/failai.js';
 import '@/utils/linksniai.js';
 
@@ -80,25 +85,28 @@ const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
 ---
 <Layout pageTitle="Neparsiunčiami failai" pageDescription="Sąrašas failų, kurių parsisiuntimas nepavyko" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font}>
   <main>
-    <div class="page-header">
-      <h1 class="mb-0">Neparsiunčiami failai</h1>
-      <a href={`/failai/neparsiunciami?csv=true${queryParams}&limit=max`} class="btn btn-outline btn-sm">↗ CSV</a>
-    </div>
+    <PageHeader>
+      Neparsiunčiami failai
+      <Button slot="actions" href={`/failai/neparsiunciami?csv=true${queryParams}&limit=max`} variant="outline" size="sm">↗ CSV</Button>
+    </PageHeader>
 
     <form method="get" action="/failai/neparsiunciami" class="filter-bar mb-4">
-      <div class="form-group">
-        <label for="saltinis" class="form-label">Šaltinis</label>
-        <select id="saltinis" name="saltinis" class="form-control w-[40ch]">
-          <option value="" selected={!saltinis}>Visi</option>
-          <option value="sutartys" selected={saltinis === 'sutartys'}>Sutartys</option>
-          <option value="neskelbiamosDerybos" selected={saltinis === 'neskelbiamosDerybos'}>Neskelbiamos derybos</option>
-          <option value="cvpIs" selected={saltinis === 'cvpIs'}>Viešieji pirkimai</option>
-          <option value="cvpp" selected={saltinis === 'cvpp'}>CVPP viešieji pirkimai</option>
-          <option value="mvpAprasai" selected={saltinis === 'mvpAprasai'}>MVP tvarkos aprašai</option>
-          <option value="archive" selected={saltinis === 'archive'}>Failas archyvo viduje</option>
-        </select>
-      </div>
-      <button type="submit" class="btn btn-primary btn-sm">Ieškoti</button>
+      <SelectInput
+        label="Šaltinis"
+        name="saltinis"
+        values={{ saltinis }}
+        placeholder="Visi"
+        className="w-[40ch] mb-0"
+        options={[
+          { value: 'sutartys', label: 'Sutartys' },
+          { value: 'neskelbiamosDerybos', label: 'Neskelbiamos derybos' },
+          { value: 'cvpIs', label: 'Viešieji pirkimai' },
+          { value: 'cvpp', label: 'CVPP viešieji pirkimai' },
+          { value: 'mvpAprasai', label: 'MVP tvarkos aprašai' },
+          { value: 'archive', label: 'Failas archyvo viduje' },
+        ]}
+      />
+      <Button type="submit" size="sm">Ieškoti</Button>
     </form>
 
     <p class="text-muted text-sm mb-3">
@@ -107,8 +115,8 @@ const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
         : 'Įrašų nėra'}
     </p>
 
-    <div class="table-wrapper">
-      <table class="table">
+    <TableWrapper>
+      <Table>
         <thead>
           <tr>
             <th>Id</th>
@@ -128,18 +136,36 @@ const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
           ) : files.map((file: any) => (
             <tr>
               <td class="cell-mono">{file.id ? <a href={`/failas/${file.id}`}>{file.id}</a> : '—'}</td>
-              <td class="cell-truncate">{file.pavadinimas || '—'}</td>
+              <td class="neparsiunciami-col-name">
+                <span class="cell-truncate">{file.pavadinimas || '—'}</span>
+              </td>
               <td class="cell-mono">{file.extension || ''}</td>
               <td>{file.saltinis || 'sutartys'}</td>
-              <td class="cell-truncate">{file.saltinioLink ? <a href={file.saltinioLink}>{file.saltinioLink}</a> : ''}</td>
+              <td class="neparsiunciami-col-source-link">
+                {file.saltinioLink ? (
+                  <a href={file.saltinioLink} class="cell-truncate">
+                    {file.saltinioLink}
+                  </a>
+                ) : ''}
+              </td>
               <td class="cell-mono cell-right">{file.parsiuntimoBandymai ?? 0}</td>
               <td class="cell-nowrap">{file.paskutinisParsiuntimoBandymas ? String(new Date(file.paskutinisParsiuntimoBandymas).toLocaleString('lt-LT')) : '—'}</td>
             </tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </Table>
+    </TableWrapper>
 
     <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
   </main>
 </Layout>
+
+<style>
+  .neparsiunciami-col-name {
+    max-width: 36ch;
+  }
+
+  .neparsiunciami-col-source-link {
+    max-width: 44ch;
+  }
+</style>

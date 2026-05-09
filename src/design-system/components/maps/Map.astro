@@ -1,0 +1,180 @@
+---
+interface Props {
+  id: string;
+  lat?: number;
+  lon?: number;
+  zoom?: number;
+  config?: Record<string, any>;
+  height?: string;
+  class?: string;
+  style?: string;
+  showLink?: boolean;
+  linkText?: string;
+  linkZoom?: number;
+  marker?: boolean;
+}
+
+const {
+  id,
+  lat,
+  lon,
+  zoom = 14,
+  config,
+  height = '220px',
+  class: className = 'map-container',
+  style: styleExtra = '',
+  showLink = false,
+  linkText = 'auto',
+  linkZoom,
+  marker = true,
+} = Astro.props;
+
+const pointLat = lat ?? config?.lat ?? config?.center?.[0];
+const pointLon = lon ?? config?.lon ?? config?.center?.[1];
+const resolvedZoom = config?.zoom ?? zoom;
+const resolvedLinkZoom = linkZoom ?? resolvedZoom;
+const computedLinkText = linkText === 'auto' && pointLat != null && pointLon != null
+  ? `${pointLat.toFixed(5)}, ${pointLon.toFixed(5)}`
+  : linkText;
+const containerStyle = `height:${height};${styleExtra ? ` ${styleExtra}` : ''}`;
+const mapConfig = JSON.stringify(config ?? { mode: 'point', lat: pointLat, lon: pointLon, zoom: resolvedZoom, marker });
+const configElementId = `${id}-map-config`;
+---
+
+<div
+  id={id}
+  class:list={['map-container', className]}
+  style={containerStyle}
+></div>
+
+<script type="application/json" id={configElementId} set:html={mapConfig}></script>
+
+{showLink && pointLat != null && pointLon != null && (
+  <p class="text-muted text-xs mt-2">
+    <a href={`https://www.openstreetmap.org/?mlat=${pointLat}&mlon=${pointLon}&zoom=${resolvedLinkZoom}`} target="_blank">
+      {computedLinkText}
+    </a>
+  </p>
+)}
+
+<script>
+  import { ensureLeafletRuntime } from './mapRuntime';
+
+  await ensureLeafletRuntime();
+
+  const resolveTemplate = (template, values) => template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ''));
+  const toPoint = (value) => {
+    if (!Array.isArray(value) || value.length < 2) return null;
+    const lat = Number(value[0]);
+    const lon = Number(value[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return [lat, lon];
+  };
+
+  for (const element of document.querySelectorAll('.map-container:not([data-map-initialized])')) {
+    const configElement = document.getElementById(`${element.id}-map-config`);
+    const rawConfig = configElement?.textContent;
+    if (!rawConfig) continue;
+    element.setAttribute('data-map-initialized', 'true');
+
+    const config = JSON.parse(rawConfig);
+    const center = config.center ?? [config.lat, config.lon];
+    const map = window.L.map(element.id, { zoomAnimation: true, markerZoomAnimation: true }).setView(center, config.zoom ?? 14);
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    if (config.mode === 'point' || !config.mode) {
+      if (config.marker !== false) window.L.marker([config.lat, config.lon]).addTo(map);
+      continue;
+    }
+
+    if (config.mode === 'points') {
+      const layerGroup = window.L.layerGroup().addTo(map);
+      const rawPoints = config.pointsUrl
+        ? await fetch(config.pointsUrl).then((response) => response.json())
+        : (config.points || []);
+      const pointValues = Array.isArray(rawPoints) ? rawPoints : (rawPoints.points || []);
+      const points = pointValues.map(toPoint).filter(Boolean);
+      if (config.debug) {
+        console.log('[Map points debug] rawPoints:', rawPoints);
+        console.log('[Map points debug] pointValues.length:', pointValues.length);
+        console.log('[Map points debug] normalized points.length:', points.length);
+        console.log('[Map points debug] first points:', points.slice(0, 10));
+      }
+      for (const [lat, lon] of points) {
+        const marker = window.L.circleMarker([lat, lon], {
+          radius: config.pointStyle?.radius ?? 2,
+          color: config.pointStyle?.color ?? 'black',
+          fillColor: config.pointStyle?.fillColor ?? 'black',
+          fillOpacity: config.pointStyle?.fillOpacity ?? 0.5,
+          weight: config.pointStyle?.weight,
+          interactive: config.clickUrlTemplate ? true : (config.pointStyle?.interactive ?? true),
+        });
+        if (config.clickUrlTemplate) {
+          marker.on('click', () => {
+            window.location.href = resolveTemplate(config.clickUrlTemplate, { lat, lon });
+          });
+        }
+        marker.addTo(layerGroup);
+      }
+      continue;
+    }
+
+    if (config.mode === 'juridiniai') {
+      const overlay = window.L.tileLayer(config.overlayTileUrl, {
+        tileSize: 256,
+        opacity: config.overlayOpacity ?? 0.6,
+        maxNativeZoom: config.maxNativeZoom ?? 16,
+        maxZoom: config.maxZoom ?? 16,
+      }).addTo(map);
+
+      if (config.overlayBlurPx) {
+        overlay.getContainer().style.filter = `blur(${config.overlayBlurPx}px)`;
+      }
+
+      let detailLayer = null;
+      map.on('moveend zoomend', async () => {
+        const zoom = map.getZoom();
+        if (zoom < (config.detailZoomThreshold ?? 17)) {
+          if (detailLayer) map.removeLayer(detailLayer);
+          detailLayer = null;
+          return;
+        }
+
+        const bounds = map.getBounds();
+        const url = resolveTemplate(config.viewportUrlTemplate, {
+          minLat: bounds.getSouth(),
+          minLon: bounds.getWest(),
+          maxLat: bounds.getNorth(),
+          maxLon: bounds.getEast(),
+        });
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (detailLayer) map.removeLayer(detailLayer);
+        detailLayer = window.L.layerGroup();
+
+        for (const [lat, lon] of (data.locations || [])) {
+          const circle = window.L.circleMarker([lat, lon], {
+            radius: config.detailPointStyle?.radius ?? 6,
+            color: config.detailPointStyle?.color ?? 'black',
+            fillColor: config.detailPointStyle?.fillColor ?? 'black',
+            fillOpacity: config.detailPointStyle?.fillOpacity ?? 1,
+            weight: config.detailPointStyle?.weight ?? 1,
+            interactive: true,
+          }).addTo(detailLayer);
+
+          if (config.detailClickUrlTemplate) {
+            circle.on('click', () => {
+              window.location.href = resolveTemplate(config.detailClickUrlTemplate, { lat, lon });
+            });
+          }
+        }
+
+        map.addLayer(detailLayer);
+      });
+    }
+  }
+</script>

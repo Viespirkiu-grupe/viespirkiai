@@ -1,55 +1,38 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import Map from '@design-system/components/maps/Map.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
 import { postgres, getColorScheme, getFont } from '../../lib/failai.js';
-import { LEAFLET_HEAD } from '../../lib/leaflet.js';
-import config from '@/config.js';
+import config from '../../lib/config.ts';
 import '@/utils/linksniai.js';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 const { rows } = await postgres.query('SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon FROM public.failai WHERE location IS NOT NULL');
-const locations = (rows as any[]).map((r) => [r.lat, r.lon]);
+const locations = (rows as any[]).map((r) => [Number(r.lat), Number(r.lon)]);
+const mapConfig = {
+  mode: 'points',
+  center: [55.1694, 23.8813],
+  zoom: 7,
+  points: locations,
+  debug: true,
+  pointStyle: {
+    radius: 4,
+    color: '#000000',
+    fillColor: '#000000',
+    fillOpacity: 0.9,
+    weight: 1,
+  },
+  clickUrlTemplate: '/failai?location={lat},{lon}&locationRadius=100',
+};
 ---
-<Layout pageTitle="Failų žemėlapis" pageDescription="Viešųjų pirkimų dokumentų geografinis pasiskirstymas žemėlapyje" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font} customHead={((config as any).customHead || '') + LEAFLET_HEAD}>
+<Layout pageTitle="Failų žemėlapis" pageDescription="Viešųjų pirkimų dokumentų geografinis pasiskirstymas žemėlapyje" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font} customHead={config.customHead}>
   <main>
-    <div class="page-header"><h1 class="mb-0">Failų žemėlapis</h1></div>
+    <PageHeader>Failų žemėlapis</PageHeader>
     <p class="text-muted text-sm mb-4">
       Dalis paviešintų failų turi geografinę informaciją apie jų sukūrimo vietą.
       Norėdami peržiūrėti failus tam tikroje vietovėje, spustelėkite žemėlapyje esančius taškus.
     </p>
-    <div id="map" class="map-container map-lg"></div>
-    <script defer is:inline define:vars={{ locationsArray: locations }}>
-      window.addEventListener('DOMContentLoaded', () => {
-        const start = () => {
-          if (!window.L || !window.L.map) return;
-
-          const map = L.map('map').setView([55.1694, 23.8813], 7);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-          }).addTo(map);
-
-          const layerGroup = L.layerGroup();
-          locationsArray.forEach(([lat, lon]) => {
-            L.circleMarker([lat, lon], {
-              radius: 2,
-              color: 'black',
-              fillColor: 'black',
-              fillOpacity: 0.5
-            })
-              .on('click', () => { window.location.href = `/failai?location=${lat},${lon}&locationRadius=100`; })
-              .addTo(layerGroup);
-          });
-          layerGroup.addTo(map);
-        };
-
-        if (typeof window.__vpLeafletLoad === 'function') {
-          window.__vpLeafletLoad().then(start).catch(() => {});
-        } else if (window.__vpLeaflet && (window.__vpLeaflet.loading || window.__vpLeaflet.loaded)) {
-          (window.__vpLeaflet.loading || Promise.resolve()).then(start).catch(() => {});
-        } else {
-          start();
-        }
-      });
-    </script>
+    <Map id="map" class="map-lg" height="min(70vh, 720px)" config={mapConfig} />
   </main>
 </Layout>

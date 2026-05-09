@@ -1,0 +1,26 @@
+---
+interface Props {
+  href: string;
+  title: string;
+  leadingText?: string;
+  amount: string;
+  date?: string;
+}
+
+const {
+  href,
+  title,
+  leadingText = '',
+  amount,
+  date = '',
+} = Astro.props;
+---
+
+<a href={href} class="flex items-baseline gap-3 px-2 py-1 rounded-md text-sm hover:bg-shade-2 no-underline">
+  {leadingText && <span class="text-muted shrink-0 tabular-nums">{leadingText}</span>}
+  <span class="flex-1 truncate min-w-0">
+    {title ? title : <em>Nenurodyta</em>}
+  </span>
+  <span class="tabular-nums whitespace-nowrap shrink-0 text-black">{amount}</span>
+  <time class="text-muted tabular-nums whitespace-nowrap shrink-0" datetime={date}>{date || '—'}</time>
+</a>

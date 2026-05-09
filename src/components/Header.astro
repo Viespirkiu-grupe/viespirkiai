@@ -1,6 +1,7 @@
 ---
+import SiteHeaderShell from '@design-system/components/SiteHeaderShell.astro';
 import { readFileSync } from 'fs';
-import config from '@/config.js';
+import config from '../lib/config.ts';
 
 interface Props {
   pathname: string;
@@ -9,11 +10,31 @@ interface Props {
 
 const { pathname, colorScheme } = Astro.props;
 
-function isActive(path: string) {
-  return pathname === path || (path !== '/' && pathname.startsWith(path)) ? 'active' : '';
+interface NavLink {
+  href: string;
+  /** Label shown in the desktop navbar. */
+  label: string;
+  /** Optional longer label used in the mobile menu (defaults to `label`). */
+  mobileLabel?: string;
 }
 
-const rawInfoBanner = (config as any).infoBanner;
+const primaryLinks: NavLink[] = [
+  { href: '/',                 label: 'Sutartys' },
+  { href: '/viesiejiPirkimai', label: 'Viešieji pirkimai' },
+  { href: '/failai',           label: 'Failai' },
+  { href: '/juridiniai',       label: 'Juridiniai',   mobileLabel: 'Juridiniai asmenys' },
+  { href: '/neskelbiamos',     label: 'Neskelbiamos', mobileLabel: 'Neskelbiamos derybos' },
+  { href: '/nepatikimi',       label: 'Nepatikimi ir melagiai' },
+];
+
+const secondaryLinks: NavLink[] = [
+  { href: '/apie',         label: 'Apie' },
+  { href: '/kontaktai',    label: 'Kontaktai' },
+  { href: '/duomenys',     label: 'Duomenys' },
+  { href: '/vieslaiskiai', label: 'Viešlaiškiai' },
+];
+
+const rawInfoBanner = config.infoBanner;
 let infoBanner: { type: string; content: string; important: boolean } | null = null;
 if (typeof rawInfoBanner === 'string' && rawInfoBanner.trim()) {
   infoBanner = { type: 'text', content: rawInfoBanner.trim(), important: false };
@@ -26,185 +47,14 @@ if (typeof rawInfoBanner === 'string' && rawInfoBanner.trim()) {
 const logoSvg = readFileSync('./views/viespirkiaiLogoLaisvasZodis.svg', 'utf8');
 ---
 
-<header>
-  {infoBanner && (
-    <section
-      class={`navbar-info-banner${infoBanner.important ? ' navbar-info-banner-important' : ''}`}
-      role="status"
-      aria-live="polite"
-      data-important={infoBanner.important ? 'true' : 'false'}
-    >
-      {infoBanner.type === 'html'
-        ? <div class="navbar-info-banner-content" set:html={infoBanner.content} />
-        : <div class="navbar-info-banner-marquee" data-marquee="idle">
-            <div class="navbar-info-banner-track">
-              <span class="navbar-info-banner-text" data-copy="primary">{infoBanner.content}</span>
-              <span class="navbar-info-banner-text" aria-hidden="true">{infoBanner.content}</span>
-            </div>
-          </div>
-      }
-    </section>
-  )}
-
-  <nav class="navbar">
-    <a href="/" class="navbar-brand no-style flex">
-      <span class="sr-only">Viešpirkiai</span>
-      {(config as any).dev
-        ? <div class="rotate-180"><Fragment set:html={logoSvg} /></div>
-        : <Fragment set:html={logoSvg} />
-      }
-    </a>
-
-    <ul class="navbar-nav navbar-main mr-2">
-      <li><a href="/"                 class={isActive('/')}                 aria-current={isActive('/') === 'active' ? 'page' : undefined}>Sutartys</a></li>
-      <li><a href="/viesiejiPirkimai" class={isActive('/viesiejiPirkimai')} aria-current={isActive('/viesiejiPirkimai') === 'active' ? 'page' : undefined}>Viešieji pirkimai</a></li>
-      <li><a href="/failai"           class={isActive('/failai')}           aria-current={isActive('/failai') === 'active' ? 'page' : undefined}>Failai</a></li>
-      <li><a href="/juridiniai"       class={isActive('/juridiniai')}       aria-current={isActive('/juridiniai') === 'active' ? 'page' : undefined}>Juridiniai</a></li>
-      <li><a href="/neskelbiamos"     class={isActive('/neskelbiamos')}     aria-current={isActive('/neskelbiamos') === 'active' ? 'page' : undefined}>Neskelbiamos</a></li>
-      <li><a href="/nepatikimi"       class={isActive('/nepatikimi')}       aria-current={isActive('/nepatikimi') === 'active' ? 'page' : undefined}>Nepatikimi ir melagiai</a></li>
-    </ul>
-
-    <div class="navbar-actions">
-      <ul class="navbar-nav">
-        <li><a href="/apie"         class={isActive('/apie')}         aria-current={isActive('/apie') === 'active' ? 'page' : undefined}>Apie</a></li>
-        <li><a href="/kontaktai"    class={isActive('/kontaktai')}    aria-current={isActive('/kontaktai') === 'active' ? 'page' : undefined}>Kontaktai</a></li>
-        <li><a href="/duomenys"     class={isActive('/duomenys')}     aria-current={isActive('/duomenys') === 'active' ? 'page' : undefined}>Duomenys</a></li>
-        <li><a href="/vieslaiskiai" class={isActive('/vieslaiskiai')} aria-current={isActive('/vieslaiskiai') === 'active' ? 'page' : undefined}>Viešlaiškiai</a></li>
-      </ul>
-
-      <button class="navbar-scheme-toggle" id="schemeToggle" aria-label="Perjungti temą">
-        <svg id="schemeIcon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          {colorScheme === 'dark'
-            ? <Fragment set:html={`<circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>`} />
-            : <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-          }
-        </svg>
-      </button>
-
-      <script>
-        const schemeWindow = window as Window & { updateSchemeIcon?: (scheme: string) => void };
-        const schemeToggle = document.getElementById('schemeToggle') as HTMLButtonElement | null;
-
-        schemeWindow.updateSchemeIcon = function updateSchemeIcon(scheme: string) {
-          const svg = document.getElementById('schemeIcon') as HTMLElement | null;
-          if (!svg) return;
-          const sun  = `<circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>`;
-          const moon = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
-          svg.innerHTML = scheme === 'dark' ? sun : moon;
-        };
-        function syncScheme() {
-          const cookie = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('colorScheme='));
-          const scheme = cookie ? cookie.split('=')[1] : 'auto';
-          const isDark = scheme === 'dark' || (scheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          document.documentElement.classList.toggle('dark', isDark);
-          schemeWindow.updateSchemeIcon?.(isDark ? 'dark' : 'light');
-        }
-
-        schemeToggle?.addEventListener('click', () => {
-          const isDark = document.documentElement.classList.contains('dark');
-          const next = isDark ? 'light' : 'dark';
-          document.documentElement.classList.toggle('dark', next === 'dark');
-          document.cookie = 'colorScheme=' + next + ';path=/;max-age=31536000';
-          schemeWindow.updateSchemeIcon?.(next);
-        });
-
-        syncScheme();
-        window.addEventListener('pageshow', (e) => { if (e.persisted) syncScheme(); });
-      </script>
-
-      <button class="navbar-hamburger" id="navHamburger" aria-label="Atidaryti meniu" aria-expanded="false">
-        <span></span><span></span><span></span>
-      </button>
-    </div>
-  </nav>
-
-  <div class="navbar-mobile" id="navMobile" aria-hidden="true">
-    <ul class="navbar-mobile-nav">
-      <li><a href="/"                 class={isActive('/')}                 aria-current={isActive('/') === 'active' ? 'page' : undefined}>Sutartys</a></li>
-      <li><a href="/viesiejiPirkimai" class={isActive('/viesiejiPirkimai')} aria-current={isActive('/viesiejiPirkimai') === 'active' ? 'page' : undefined}>Viešieji pirkimai</a></li>
-      <li><a href="/failai"           class={isActive('/failai')}           aria-current={isActive('/failai') === 'active' ? 'page' : undefined}>Failai</a></li>
-      <li><a href="/juridiniai"       class={isActive('/juridiniai')}       aria-current={isActive('/juridiniai') === 'active' ? 'page' : undefined}>Juridiniai asmenys</a></li>
-      <li><a href="/neskelbiamos"     class={isActive('/neskelbiamos')}     aria-current={isActive('/neskelbiamos') === 'active' ? 'page' : undefined}>Neskelbiamos derybos</a></li>
-      <li><a href="/nepatikimi"       class={isActive('/nepatikimi')}       aria-current={isActive('/nepatikimi') === 'active' ? 'page' : undefined}>Nepatikimi ir melagiai</a></li>
-      <li class="navbar-mobile-divider"></li>
-      <li><a href="/apie"             class={isActive('/apie')}             aria-current={isActive('/apie') === 'active' ? 'page' : undefined}>Apie</a></li>
-      <li><a href="/kontaktai"        class={isActive('/kontaktai')}        aria-current={isActive('/kontaktai') === 'active' ? 'page' : undefined}>Kontaktai</a></li>
-      <li><a href="/duomenys"         class={isActive('/duomenys')}         aria-current={isActive('/duomenys') === 'active' ? 'page' : undefined}>Duomenys</a></li>
-      <li><a href="/vieslaiskiai"     class={isActive('/vieslaiskiai')}     aria-current={isActive('/vieslaiskiai') === 'active' ? 'page' : undefined}>Viešlaiškiai</a></li>
-    </ul>
-  </div>
-</header>
-
-<script is:inline>
-  (function() {
-    var navbar = document.querySelector('.navbar');
-    var infoBanner = document.querySelector('.navbar-info-banner');
-    if (!navbar) return;
-    var total = (infoBanner ? infoBanner.offsetHeight : 0) + navbar.offsetHeight;
-    document.documentElement.style.setProperty('--site-header-offset', total + 'px');
-  })();
-</script>
-
-<script>
-  const hamburger = document.getElementById('navHamburger') as HTMLElement;
-  const mobileNav = document.getElementById('navMobile') as HTMLElement;
-  const header = document.querySelector('header') as HTMLElement;
-  const navbar = document.querySelector('.navbar') as HTMLElement;
-  const infoBanner = document.querySelector('.navbar-info-banner') as HTMLElement;
-  const infoBannerMarquee = document.querySelector('.navbar-info-banner-marquee') as HTMLElement;
-  const infoBannerTrack = document.querySelector('.navbar-info-banner-track') as HTMLElement;
-  const infoBannerTextPrimary = document.querySelector('.navbar-info-banner-text[data-copy="primary"]') as HTMLElement;
-
-  function syncInfoBannerMarquee() {
-    if (!infoBannerMarquee || !infoBannerTrack || !infoBannerTextPrimary) return;
-    infoBannerMarquee.dataset.marquee = 'idle';
-    infoBannerTrack.style.removeProperty('--banner-step');
-    infoBannerTrack.style.removeProperty('--banner-gap');
-    infoBannerTrack.style.removeProperty('--banner-duration');
-    const containerWidth = infoBannerMarquee.clientWidth;
-    const textWidth = infoBannerTextPrimary.scrollWidth;
-    if (!containerWidth || !textWidth) return;
-    const availableWidth = Math.max(containerWidth - 32, 0);
-    if (textWidth <= availableWidth) { infoBannerMarquee.dataset.marquee = 'idle'; return; }
-    const gap = Math.max(128, containerWidth - textWidth + 24);
-    const step = textWidth + gap;
-    const duration = Math.max(10, step / 52);
-    infoBannerTrack.style.setProperty('--banner-gap', `${gap}px`);
-    infoBannerTrack.style.setProperty('--banner-step', `${step}px`);
-    infoBannerTrack.style.setProperty('--banner-duration', `${duration.toFixed(2)}s`);
-    infoBannerMarquee.dataset.marquee = 'running';
-  }
-
-  function syncHeaderOffset() {
-    if (!navbar) return;
-    const bannerHeight = infoBanner ? infoBanner.offsetHeight : 0;
-    const total = bannerHeight + navbar.offsetHeight;
-    document.documentElement.style.setProperty('--site-header-offset', `${total}px`);
-  }
-
-  syncHeaderOffset();
-  syncInfoBannerMarquee();
-  window.addEventListener('resize', syncHeaderOffset, { passive: true });
-  window.addEventListener('resize', syncInfoBannerMarquee, { passive: true });
-  if (document.fonts?.ready) document.fonts.ready.then(() => { syncHeaderOffset(); syncInfoBannerMarquee(); }).catch(() => {});
-
-  hamburger.addEventListener('click', () => {
-    const open = mobileNav.classList.toggle('open');
-    hamburger.classList.toggle('open', open);
-    hamburger.setAttribute('aria-expanded', String(open));
-    mobileNav.setAttribute('aria-hidden', String(!open));
-    document.body.classList.toggle('nav-open', open);
-  });
-
-  let lastY = 0;
-  window.addEventListener('scroll', () => {
-    const y = window.scrollY;
-    if (y > lastY && y > 60) header.classList.add('nav-hidden');
-    else header.classList.remove('nav-hidden');
-    lastY = y;
-  }, { passive: true });
-
-  window.addEventListener('pageshow', (e) => {
-    if (e.persisted) { syncHeaderOffset(); syncInfoBannerMarquee(); }
-  });
-</script>
+<SiteHeaderShell
+  pathname={pathname}
+  colorScheme={colorScheme}
+  brandHref="/"
+  brandLabel="Viešpirkiai"
+  logoHtml={logoSvg}
+  primaryLinks={primaryLinks}
+  secondaryLinks={secondaryLinks}
+  infoBanner={infoBanner}
+  mirrorLogo={config.dev}
+/>

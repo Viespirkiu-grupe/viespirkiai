@@ -1,19 +1,18 @@
 ---
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
+import TruncationNotice from '@design-system/components/TruncationNotice.astro';
+
 const { asmuo } = Astro.props;
 if (!(asmuo.regitra?.rows > 0)) return;
-const { rows, limit, transportoPriemones } = asmuo.regitra;
+const { rows, transportoPriemones } = asmuo.regitra;
 ---
 
 <div class="page-section mb-10" id="transportoPriemones">
   <h2><a href="#transportoPriemones" class="no-style">Transporto priemonės</a></h2>
-  {rows > limit && (
-    <p class="text-muted text-sm mb-4">
-      Rodomos tik {limit} transporto priemonės.
-      <a href="?transportoPriemonesLimit=max#transportoPriemones">Rodyti visas ({rows})</a>
-    </p>
-  )}
-  <div class="table-wrapper">
-    <table class="table">
+  <TruncationNotice count={rows} shown={transportoPriemones.length} anchor="transportoPriemones" paramName="transportoPriemonesLimit" label="transporto priemonės" gender="f" />
+  <TableWrapper>
+    <Table>
       <thead>
         <tr>
           <th>Markė</th><th>Pavadinimas</th><th class="cell-center">Kategorija</th>
@@ -41,6 +40,6 @@ const { rows, limit, transportoPriemones } = asmuo.regitra;
           </tr>
         ))}
       </tbody>
-    </table>
-  </div>
+    </Table>
+  </TableWrapper>
 </div>

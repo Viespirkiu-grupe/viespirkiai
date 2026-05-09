@@ -1,5 +1,6 @@
 ---
-import PdfPreview from './PdfPreview.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import PdfPreview from '@design-system/components/PdfPreview.astro';
 import ArchiveTree from './ArchiveTree.astro';
 import EmailMessage from './EmailMessage.astro';
 import FaxSpecial from './FaxSpecial.astro';
@@ -39,7 +40,7 @@ const { failas, search = '' } = Astro.props;
 )}
 
 {failas.previewType === 'url' && (
-  <dl class="kv-list">
+  <KeyValueList>
     <dt>Nuoroda</dt>
     <dd>
       {failas.metaduomenys?.links?.[0]?.uri
@@ -47,7 +48,7 @@ const { failas, search = '' } = Astro.props;
         : <em class="text-muted">Nenurodyta</em>
       }
     </dd>
-  </dl>
+  </KeyValueList>
 )}
 
 {failas.previewType === 'txt' && (

@@ -1,0 +1,66 @@
+---
+interface WordCloudItem {
+  label: string;
+  size: number;
+  rotation: number;
+}
+
+interface Props {
+  items: WordCloudItem[];
+}
+
+const { items } = Astro.props;
+---
+
+<div class="word-cloud">
+  {items.map((item) => (
+    <span style={`--size:${item.size}; --r:${item.rotation}`}>{item.label}</span>
+  ))}
+</div>
+
+<style>
+  .word-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem 2.5rem;
+    padding-block: 1.75rem;
+  }
+
+  .word-cloud span {
+    color: var(--dark-gray);
+    cursor: default;
+    font-size: calc(var(--size) * 1rem);
+    transform:
+      translate(
+        calc(sin(var(--r) * 6.28) * 20px),
+        calc(cos(var(--r) * 6.28) * 10px)
+      )
+      rotate(calc((var(--r) - 0.5) * 30deg));
+    transition: transform var(--transition), color var(--transition);
+  }
+
+  .word-cloud span:hover {
+    color: var(--black);
+    transform:
+      translate(
+        calc(sin(var(--r) * 6.28) * 20px),
+        calc(cos(var(--r) * 6.28) * 10px)
+      )
+      rotate(calc((var(--r) - 0.5) * 30deg))
+      scale(1.2);
+  }
+
+  @media (max-width: 768px) {
+    .word-cloud span {
+      font-size: calc(var(--size) * 0.8rem);
+    }
+  }
+
+  @media (max-width: 480px) {
+    .word-cloud span {
+      font-size: calc(var(--size) * 0.6rem);
+    }
+  }
+</style>

@@ -1,0 +1,112 @@
+---
+import TedAddressFields from './TedAddressFields.astro';
+import TedKvList from './TedKvList.astro';
+
+const { sg, shortUrl } = Astro.props;
+
+function f(id: string) {
+  return (sg.fields.find((x: any) => x.fieldId === id)?.values || []).join(', ');
+}
+
+function fArr(id: string) {
+  return sg.fields.find((x: any) => x.fieldId === id)?.values || [];
+}
+---
+
+{(sg.nodeId === 'ND-LotPlacePerformance' || sg.nodeId === 'ND-PartPlacePerformance') ? (
+  <TedAddressFields addrFields={sg.fields} />
+) : (sg.nodeId === 'ND-SelectionCriteria') ? (
+  <>
+    {(() => {
+      const type = f('BT-809-Lot');
+      const desc = f('BT-750-Lot');
+      const stage2 = f('BT-40-Lot');
+      const threshItems = (sg.items || []).map((item) => {
+        const n = (item.fields.find((x: any) => x.fieldId === 'BT-752-Lot-ThresholdNumber')?.values || []).join('');
+        const t = (item.fields.find((x: any) => x.fieldId === 'BT-7532-Lot')?.values || []).join('');
+        return t && n ? `${t}: ${n}` : (t || n);
+      }).filter(Boolean);
+      const meta = [...threshItems, stage2 && stage2 !== 'false' ? '2-as etapas' : null].filter(Boolean).join(' · ');
+      return (
+        <>
+          {type && <p class="font-medium text-sm mb-1">{type}</p>}
+          {desc && <p class="text-sm text-muted mb-1">{desc}</p>}
+          {meta && <p class="text-xs text-muted mb-0">{meta}</p>}
+        </>
+      );
+    })()}
+  </>
+) : (sg.nodeId === 'ND-LotAwardCriterion' || sg.nodeId === 'ND-LotsGroupAwardCriterion') ? (
+  <>
+    {(() => {
+      const name = f('BT-734-Lot') || f('BT-734-LotsGroup');
+      const type = f('BT-539-Lot') || f('BT-539-LotsGroup');
+      const weight = f('BT-541-Lot-WeightNumber') || f('BT-541-LotsGroup-WeightNumber');
+      const desc = f('BT-540-Lot') || f('BT-540-LotsGroup');
+      return (
+        <>
+          {(weight || type) && <p class="font-medium text-sm mb-1">{weight && <><span class="amount amount-sm">{weight}%</span> – </>}{type || ''}</p>}
+          {name && <p class="text-sm mb-1">{name}</p>}
+          {desc && <p class="text-sm text-muted mb-0">{desc}</p>}
+        </>
+      );
+    })()}
+  </>
+) : (sg.nodeId === 'ND-LotProcurementDocument' || sg.nodeId === 'ND-PartProcurementDocument') ? (
+  <>
+    {(() => {
+      const docId = f('OPT-140-Lot') || f('OPT-140-Part');
+      const access = f('BT-14-Lot') || f('BT-14-Part');
+      const url =
+        sg.fields.find((x: any) => x.fieldId === 'BT-15-Lot')
+        || sg.fields.find((x: any) => x.fieldId === 'BT-15-Part')
+        || sg.fields.find((x: any) => x.fieldId === 'BT-615-Lot')
+        || sg.fields.find((x: any) => x.fieldId === 'BT-615-Part');
+      const langs = fArr('BT-708-Lot').concat(fArr('BT-708-Part'));
+      const uLangs = fArr('BT-737-Lot').concat(fArr('BT-737-Part'));
+      const allLangs = [...langs, ...uLangs.filter((l) => !langs.includes(l)).map((l) => `${l} (neofic.)`)];
+      return (
+        <>
+          {docId && <p class="font-medium text-sm mb-1">{docId}</p>}
+          {url?.values?.map((v) => <p class="text-sm mb-1"><a href={v} target="_blank" rel="noopener">{shortUrl(v)}</a></p>)}
+          {access && <p class="text-sm text-muted mb-1">{access}</p>}
+          {allLangs.length > 0 && <p class="text-xs text-muted mb-0">{allLangs.join(', ')}</p>}
+        </>
+      );
+    })()}
+  </>
+) : (sg.nodeId === 'ND-EEDProcurementDetailsLot' || sg.nodeId === 'ND-EEDProcurementDetailsLotResult') ? (
+  <>
+    {(() => {
+      const listA = fArr('BT-811(a)-Lot');
+      const listB = fArr('BT-811(b)-Lot');
+      const rest = sg.fields.filter((x: any) => x.fieldId !== 'BT-811(a)-Lot' && x.fieldId !== 'BT-811(b)-Lot');
+      return (
+        <dl class="kv-list">
+          {listA.map((v, i) => (
+            <>
+              <dt>{v}</dt>
+              <dd>{listB[i] || ''}</dd>
+            </>
+          ))}
+          {listA.length === 0 && rest.map((fv) => (
+            <>
+              <dt>{fv.name}</dt>
+              <dd>{fv.values.join(', ')}</dd>
+            </>
+          ))}
+        </dl>
+      );
+    })()}
+  </>
+) : (
+  <>
+    <TedKvList fields={sg.fields} shortUrl={shortUrl} />
+    {(sg.items || []).map((item) => (
+      <div>
+        <p class="section-title text-muted">#{item.index}</p>
+        <TedKvList fields={item.fields} shortUrl={shortUrl} />
+      </div>
+    ))}
+  </>
+)}
