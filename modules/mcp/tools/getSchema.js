@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { postgres } from "../../../postgres/postgres.js";
-import { TABLE_WHITELIST, VIEW_NAMES } from "../analyst/validateSql.js";
+import { TABLE_WHITELIST } from "../analyst/validateSql.js";
+import { VIEW_NAMES, COVERED_TABLES_BY_VIEWS } from "../analyst/tempViews.js";
 
-const TABLE_LIST = [...TABLE_WHITELIST];
+const COVERED_TABLES = new Set(Object.keys(COVERED_TABLES_BY_VIEWS));
+const TABLE_LIST = [...TABLE_WHITELIST].filter((t) => !COVERED_TABLES.has(t));
 const VIEW_LIST = [...VIEW_NAMES];
 const IDENTIFIER_CANDIDATES = [
     "id",
@@ -35,14 +37,15 @@ const TABLE_DESCRIPTIONS = {
 const VIEW_METADATA = {
     v_company: {
         description:
-            "Company profile with workforce, payroll, risk flags, and activity counters.",
+            "Company profile with legal form, workforce, payroll, risk flags, and activity counters.",
         columns: [
             "jarKodas: text",
             "pavadinimas: text",
             "adresas: text",
-            "registravimoData: timestamp without time zone",
+            "registravimoData: date",
+            "formosPavadinimas: text",
             "statusoPavadinimas: text",
-            "statusasNuo: timestamp without time zone",
+            "statusasNuo: date",
             "sodraData: date",
             "darbuotojai: integer",
             "vidutinisAtlyginimas: numeric",
@@ -63,20 +66,28 @@ const VIEW_METADATA = {
             },
         ],
         example:
-            'SELECT "jarKodas", pavadinimas, darbuotojai, "vidutinisAtlyginimas" FROM v_company WHERE "jarKodas" = \'302556251\'',
+            'SELECT "jarKodas", pavadinimas, "formosPavadinimas", darbuotojai, "vidutinisAtlyginimas" FROM v_company WHERE "jarKodas" = \'302556251\'',
     },
     v_sutartys: {
         description:
-            "Contract-centric view with buyer/supplier names and key contract values.",
+            "Contract-centric view with buyer/supplier names, CPV category, value, and timing fields.",
         columns: [
             "sutartiesUnikalusId: bigint",
+            "sutartiesNumeris: text",
             "pirkimoNumeris: text",
             "sudarymoData: timestamp without time zone",
+            "paskelbimoData: timestamp without time zone",
             "galiojimoData: timestamp without time zone",
+            "faktineIvykdimoData: timestamp without time zone",
             "verte: numeric",
+            "suma: numeric",
             "faktineIvykdimoVerte: numeric",
             "pavadinimas: text",
             "bvpzKodas: text",
+            "bvpzPavadinimas: text",
+            "papildomiBvpzKodai: text[]",
+            "papildomiBvpzPavadinimai: text[]",
+            "kategorija: text",
             "tipas: text",
             "istrinta: boolean",
             "pirkejoKodas: text",
@@ -99,13 +110,13 @@ const VIEW_METADATA = {
             },
         ],
         example:
-            'SELECT "sutartiesUnikalusId", pirkejas, tiekejas, verte, "sudarymoData" FROM v_sutartys WHERE "sudarymoData" >= CURRENT_DATE - INTERVAL \'1 year\'',
+            'SELECT "sutartiesUnikalusId", pirkejas, tiekejas, verte, "bvpzPavadinimas", "sudarymoData" FROM v_sutartys WHERE "sudarymoData" >= CURRENT_DATE - INTERVAL \'1 year\'',
     },
     v_pirkimas: {
         description:
-            "Procurement notice view with organizer details, lifecycle status, and value.",
+            "Procurement notice view with organizer details, lifecycle status, estimated value, and description.",
         columns: [
-            "pirkimoId: bigint",
+            "pirkimoId: text",
             "pavadinimas: text",
             "jarKodas: text",
             "organizatorius: text",
@@ -120,6 +131,7 @@ const VIEW_METADATA = {
             "pasiulymuPateikimoTerminas: timestamp without time zone",
             "esFinansavimas: boolean",
             "bvpzKodai: text[]",
+            "informacija: text",
         ],
         primaryKeys: ["pirkimoId"],
         relationships: [
@@ -134,10 +146,10 @@ const VIEW_METADATA = {
     },
     v_person_links: {
         description:
-            "Person-to-organization relationship view from PINREG declarations.",
+            "Person-to-organization relationship view from PINREG declarations, including procurement participation flag.",
         columns: [
             "id: bigint",
-            "deklaracija: text",
+            "deklaracija: uuid",
             "vardas: text",
             "pavarde: text",
             "susijusioAsmensVardas: text",
@@ -152,6 +164,11 @@ const VIEW_METADATA = {
             "rysioPabaiga: date",
             "yraJuridinisAsmuo: boolean",
             "registruotaLietuvoje: boolean",
+            "jaTeisinesFormosPavadinimas: text",
+            "kienoRysys: text",
+            "dalyvaujaViesuosePirkimuose: boolean",
+            "dalyvavimoVpInformacija: text",
+            "pateikimoData: timestamp without time zone",
         ],
         primaryKeys: ["id"],
         relationships: [
@@ -162,16 +179,25 @@ const VIEW_METADATA = {
             },
         ],
         example:
-            'SELECT vardas, pavarde, "imonesVardas", pareigos, "rysioPobudzioPavadinimas" FROM v_person_links WHERE "jarKodas" = \'302556251\'',
+            'SELECT vardas, pavarde, "imonesVardas", pareigos, "dalyvaujaViesuosePirkimuose" FROM v_person_links WHERE "jarKodas" = \'302556251\'',
     },
     v_dalyviai: {
         description:
-            "Bidder-level ATN-1 procurement participation, ranking, and rejection data.",
+            "Bidder-level ATN-1 procurement participation with ranking, rejection data, and fraud-signal flags (conflict of interest, competition distortion, complaints).",
         columns: [
             "pirkimoNumeris: text",
             "pirkejoKodas: text",
             "pirkimoBudas: text",
-            "ataskaitosData: timestamp without time zone",
+            "ataskaitosData: timestamp with time zone",
+            "pirkimoObjektoPavadinimas: text",
+            "pagrindinisKodasBvpz: text",
+            "daliuSkaicius: integer",
+            "interesuKonfliktasNustatytas: boolean",
+            "interesuKonfliktoPriemones: text",
+            "konkurencijaIskreipiantisAsmuo: boolean",
+            "konkurencijosPriemones: text",
+            "pretenzijaPateikta: boolean",
+            "ieskinysTeismui: boolean",
             "tiekejoKodas: text",
             "tiekejas: text",
             "fizinisAsmuo: boolean",
@@ -194,7 +220,7 @@ const VIEW_METADATA = {
             },
         ],
         example:
-            'SELECT "pirkimoNumeris", "tiekejoKodas", tiekejas, "eileNumeris", "pasiulymoKaina" FROM v_dalyviai WHERE "pirkimoNumeris" = \'1005158\'',
+            'SELECT "pirkimoNumeris", "tiekejoKodas", tiekejas, "eileNumeris", "pasiulymoKaina", "interesuKonfliktasNustatytas" FROM v_dalyviai WHERE "pirkimoNumeris" = \'1005158\'',
     },
     v_bylos: {
         description:
@@ -318,6 +344,18 @@ async function listAll() {
 }
 
 async function describeTable(tableName) {
+    const coveringView = COVERED_TABLES_BY_VIEWS[tableName];
+    if (coveringView) {
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `Table '${tableName}' is fully covered by view '${coveringView}'. Call get_schema with '${coveringView}' to see columns, relationships, and an example query.`,
+                },
+            ],
+        };
+    }
+
     const [colResult, primaryKeyResult, foreignKeyResult] = await Promise.all([
         postgres.query(
             `

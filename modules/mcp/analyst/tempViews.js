@@ -158,3 +158,16 @@ FROM "bylosDalyviai" bd
 };
 
 export const TEMP_VIEWS_SQL = Object.values(VIEW_DEFINITIONS).join(';\n\n') + ';';
+
+export const VIEW_NAMES = new Set(Object.keys(VIEW_DEFINITIONS));
+
+// Maps each main (FROM-clause) table to the view that fully covers it.
+// getSchema uses this to suppress raw table listings in favour of the view.
+export const COVERED_TABLES_BY_VIEWS = {
+    jarCsv:                  "v_company",
+    sutartys:                "v_sutartys",
+    viesiejiPirkimai:        "v_pirkimas",
+    pinregJuridiniaiRysiai:  "v_person_links",
+    atn1ataskaitos:          "v_dalyviai",
+    bylosDalyviai:           "v_bylos",
+};

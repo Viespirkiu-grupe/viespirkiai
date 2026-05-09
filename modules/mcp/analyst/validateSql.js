@@ -1,4 +1,5 @@
 import pkg from "node-sql-parser";
+import { VIEW_NAMES } from "./tempViews.js";
 const { Parser } = pkg;
 
 const parser = new Parser();
@@ -24,10 +25,6 @@ export const TABLE_WHITELIST = new Set([
     "vdiPazeidimai",
     "bylos", "bylosDalyviai",
     "mokesciai",
-]);
-
-export const VIEW_NAMES = new Set([
-    "v_company", "v_sutartys", "v_pirkimas", "v_person_links", "v_dalyviai", "v_bylos",
 ]);
 
 export const FUNCTION_WHITELIST = new Set([
