@@ -49,6 +49,8 @@ if (!isPasalintas) {
   failas = await enrichFailas(failas);
 }
 
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
+
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 const ogTitle = isPasalintas ? 'Failas pašalintas' : (failas.metaduomenys?.Title || failas.pavadinimas || 'Failas');

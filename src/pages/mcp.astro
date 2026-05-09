@@ -101,6 +101,8 @@ const conversation = [
     type: 'ai-report',
   },
 ];
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
 <Layout
   pageTitle="MCP serveris"

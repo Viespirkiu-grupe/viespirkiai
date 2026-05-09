@@ -34,6 +34,8 @@ if (isJson) {
   return new Response(JSON.stringify(pirkimas), { headers: { 'Content-Type': 'application/json' } });
 }
 
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
+
 const t = pirkimas.turinys || {};
 const timelineItems = buildTimelineItems(pirkimas);
 const tedKorteles = buildTedKorteles(t);

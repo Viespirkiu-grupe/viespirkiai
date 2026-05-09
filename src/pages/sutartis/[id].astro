@@ -27,6 +27,8 @@ if (Astro.url.pathname.endsWith('.json') || (Astro.request?.headers.get('accept'
   return new Response(JSON.stringify(sutartis, null, 2), { headers: { 'Content-Type': 'application/json' } });
 }
 
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
+
 const sutartiesUnikalusID = sutartis.sutartiesUnikalusId;
 const verte = sutartis.faktineIvykdimoVerte || sutartis.verte;
 const cvpisUrl = `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id=${sutartiesUnikalusID}`;
