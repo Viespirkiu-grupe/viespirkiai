@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { handler } from "../../modules/mcp/tools/getSchema.js";
 import { postgres } from "../../postgres/postgres.js";
 import { TEMP_VIEWS_SQL } from "../../modules/mcp/analyst/tempViews.js";
-import { VIEW_NAMES } from "../../modules/mcp/analyst/validateSql.js";
+import { VIEW_NAMES } from "../../modules/mcp/analyst/tempViews.js";
 
 function printResult(label, payload) {
     const text = JSON.stringify(payload, null, 2);
