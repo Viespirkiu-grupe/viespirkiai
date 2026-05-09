@@ -1,22 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { readdir } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { logToolCall } from "./mcpLogger.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-async function loadTools() {
-    const files = await readdir(join(__dirname, "tools"));
-    return Promise.all(
-        files
-            .filter((f) => f.endsWith(".js"))
-            .map(
-                (f) => import(pathToFileURL(join(__dirname, "tools", f)).href),
-            ),
-    );
-}
+import * as getFailas from "./tools/getFailas.js";
+import * as getFailasTekstas from "./tools/getFailasTekstas.js";
+import * as getJuridinis from "./tools/getJuridinis.js";
+import * as getPinregAsmuo from "./tools/getPinregAsmuo.js";
+import * as getPinregJar from "./tools/getPinregJar.js";
+import * as getSutartis from "./tools/getSutartis.js";
+import * as getViesasisPirkimas from "./tools/getViesasisPirkimas.js";
+import * as searchFailai from "./tools/searchFailai.js";
+import * as searchJuridiniai from "./tools/searchJuridiniai.js";
+import * as searchSutartys from "./tools/searchSutartys.js";
+import * as searchViesiejiPirkimai from "./tools/searchViesiejiPirkimai.js";
 
 function wrapHandler(toolName, handler) {
     return async (params) => {
@@ -40,7 +34,19 @@ function wrapHandler(toolName, handler) {
     };
 }
 
-const tools = await loadTools();
+const tools = [
+    getFailas,
+    getFailasTekstas,
+    getJuridinis,
+    getPinregAsmuo,
+    getPinregJar,
+    getSutartis,
+    getViesasisPirkimas,
+    searchFailai,
+    searchJuridiniai,
+    searchSutartys,
+    searchViesiejiPirkimai,
+];
 
 export function createMcpServer() {
     const server = new McpServer({ name: "viespirkiai", version: "1.0.0" });

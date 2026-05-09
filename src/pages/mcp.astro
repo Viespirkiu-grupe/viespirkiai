@@ -4,28 +4,12 @@ import { getColorScheme, getFont } from '../lib/failai.js';
 import CopyField from '@design-system/components/content/CopyField.astro';
 import Table from '@design-system/components/Table.astro';
 import TableWrapper from '@design-system/components/TableWrapper.astro';
+import { handleMcpRequest, isMcpTransportRequest } from '@/src/lib/mcp';
 
-const acceptHeader = Astro.request.headers.get('accept') ?? '';
-const isMcpTransportRequest =
-  Astro.request.method === 'POST' ||
-  Astro.request.method === 'DELETE' ||
-  (Astro.request.method === 'GET' && acceptHeader.includes('text/event-stream'));
+const isTransportRequest = isMcpTransportRequest(Astro.request);
 
-if (isMcpTransportRequest) {
-  const { WebStandardStreamableHTTPServerTransport } = await import(
-    '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
-  );
-  const { createMcpServer } = await import('@/modules/mcp/server.js');
-  const { requestContext } = await import('@/modules/mcp/mcpLogger.js');
-
-  const server = createMcpServer();
-  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  await server.connect(transport);
-
-  return await requestContext.run(
-    { userAgent: Astro.request.headers.get('user-agent') ?? null },
-    async () => transport.handleRequest(Astro.request),
-  );
+if (isTransportRequest) {
+  return await handleMcpRequest(Astro.request);
 }
 
 const colorScheme = getColorScheme(Astro.cookies);
