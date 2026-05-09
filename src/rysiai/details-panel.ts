@@ -1,9 +1,44 @@
-import { isOrgNode, isPersonNode, isContractNode, isProcurementNode, isConfigurableNode } from './entity-types.ts';
-import type { LegendState } from './legend-state.ts';
+import type {NodeAttrs} from './entity-types.ts';
+import {isConfigurableNode, isContractNode, isOrgNode, isPersonNode, isProcurementNode} from './entity-types.ts';
+import type {LegendState} from './legend-state.ts';
 
 export interface NodeHandlers {
     onExpand?: () => void;
     onCollapse?: () => void;
+}
+
+// ── Typed node attribute interfaces ──────────────────────────────────────────
+
+interface DateableAttrs {
+    fromDate?: string | null;
+    toDate?: string | null;
+}
+
+interface OrgNodeAttrs extends NodeAttrs, DateableAttrs {
+    pavadinimas: string;
+    jarKodas: string;
+    draustieji?: number;
+    draustieji2?: number;
+}
+
+interface ContractNodeAttrs extends NodeAttrs, DateableAttrs {
+    pavadinimas: string;
+    id: string;
+    verte?: number | null;
+    sutartiesUnikalusId?: string;
+    pirkimoNumeris?: string;
+}
+
+interface ProcurementNodeAttrs extends NodeAttrs, DateableAttrs {
+    pavadinimas: string;
+    pirkimoId: string;
+    numatomaVerteEUR?: number | null;
+    statusas?: string;
+}
+
+interface PersonNodeAttrs extends NodeAttrs, DateableAttrs {
+    vardas?: string;
+    pavarde?: string;
 }
 
 // ── Shared expand/collapse button ─────────────────────────────────────────────
@@ -14,7 +49,7 @@ export function buildExpandButtonHtml(handlers: NodeHandlers): string {
     const icon = isExpanded ? '▲' : '▼';
     const label = isExpanded ? 'Slėpti ryšius' : 'Rodyti ryšius';
     const action = isExpanded ? 'collapse' : 'expand';
-    return '<button class="btn btn-ghost btn-sm vd-btn" data-action="' + action + '">' + icon + ' <span>' + label + '</span></button>';
+    return `<button class="btn btn-ghost btn-sm vd-btn" data-action="${action}">${icon} <span>${label}</span></button>`;
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
@@ -22,59 +57,102 @@ export function buildExpandButtonHtml(handlers: NodeHandlers): string {
 function formatContractValue(verte: number | null | undefined): string {
     if (verte == null || verte === 0) return '';
     const v = Math.round(verte);
-    if (v >= 1000000) return '€' + (v / 1000000).toFixed(1) + 'M';
-    if (v >= 1000) return '€' + Math.round(v / 1000) + 'K';
-    return '€' + v;
+    if (v >= 1000000) return `€${(v / 1000000).toFixed(1)}M`;
+    if (v >= 1000) return `€${Math.round(v / 1000)}K`;
+    return `€${v}`;
 }
 
 function link(href: string, label: string): string {
-    return '<a href="' + href + '" target="_blank" rel="noopener" class="vd-link">' + label + ' ↗</a>';
+    return `<a href="${href}" target="_blank" rel="noopener" class="vd-link">${label} ↗</a>`;
 }
 
 function esc(s: unknown): string {
-    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function buildHtml(attrs: Record<string, unknown>, handlers: NodeHandlers = {}): string {
-    let html = '';
+function formatDate(d: string | null | undefined): string {
+    if (!d) return '';
+    const parsed = new Date(d);
+    if (isNaN(parsed.getTime())) return esc(d);
+    return parsed.toLocaleDateString('lt-LT');
+}
 
-    if (isOrgNode(attrs)) {
-        let employees = '';
-        const d1 = (attrs.draustieji as number) || 0;
-        const d2 = (attrs.draustieji2 as number) || 0;
-        const count = d1 + d2;
-        if (count > 0) employees = '<div class="vd-sub">Darbuotojų: ' + count + '</div>';
-        html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>'
-            + '<div class="vd-sub">' + esc(attrs.jarKodas) + '</div>'
-            + employees
-            + link('/asmuo/' + encodeURIComponent(attrs.jarKodas as string), 'Peržiūrėti įmonę');
-    } else if (isContractNode(attrs)) {
-        const valueStr = formatContractValue(attrs.verte as number);
-        const sutId = attrs.sutartiesUnikalusId || (attrs.id as string).replace('contract:', '');
-        html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
-        if (valueStr) html += '<div class="vd-sub">' + valueStr + '</div>';
-        html += link('/sutartis/' + encodeURIComponent(sutId as string), 'Peržiūrėti sutartį');
-        if (attrs.pirkimoNumeris) {
-            html += link('/viesiejiPirkimai/' + encodeURIComponent(attrs.pirkimoNumeris as string), 'Peržiūrėti pirkimą');
-        }
-    } else if (isProcurementNode(attrs)) {
-        const procValue = formatContractValue(attrs.numatomaVerteEUR as number);
-        html = '<div class="vd-title">' + esc(attrs.pavadinimas) + '</div>';
-        if (procValue) html += '<div class="vd-sub">' + procValue + '</div>';
-        if (attrs.statusas) html += '<div class="vd-sub">' + esc(attrs.statusas) + '</div>';
-        html += link('/viesiejiPirkimai/' + encodeURIComponent(attrs.pirkimoId as string), 'Peržiūrėti pirkimą');
-    } else if (isPersonNode(attrs)) {
-        const name = (((attrs.vardas as string) || '') + ' ' + ((attrs.pavarde as string) || '')).trim();
-        html = '<div class="vd-title">' + esc(name) + '</div>';
-    }
+function renderDateRange(attrs: DateableAttrs, label: string = "Ryšiai nuo", endLabel = "Iki"): string {
+    const from = formatDate(attrs.fromDate);
+    const to = formatDate(attrs.toDate);
+    if (!from && !to) return '';
+    return [
+        from ? `<div class="vd-sub">${label}: ${from}</div>` : '',
+        to ? `<div class="vd-sub">${endLabel}: ${to}</div>` : '',
+    ].join('');
+}
+
+// ── Per-type renderers ────────────────────────────────────────────────────────
+
+function renderOrgNode(attrs: OrgNodeAttrs): string {
+    const count = (attrs.draustieji ?? 0) + (attrs.draustieji2 ?? 0);
+    const employees = count > 0 ? `<div class="vd-sub">Darbuotojų: ${count}</div>` : '';
+    return [
+        `<div class="vd-title">${esc(attrs.pavadinimas)}</div>`,
+        `<div class="vd-sub">${esc(attrs.jarKodas)}</div>`,
+        employees,
+        renderDateRange(attrs, "Registruota"),
+        link(`/asmuo/${encodeURIComponent(attrs.jarKodas)}`, 'Peržiūrėti įmonę'),
+    ].filter(Boolean).join('');
+}
+
+function renderContractNode(attrs: ContractNodeAttrs): string {
+    const valueStr = formatContractValue(attrs.verte);
+    const sutId = attrs.sutartiesUnikalusId ?? attrs.id.replace('contract:', '');
+    return [
+        `<div class="vd-title">${esc(attrs.pavadinimas)}</div>`,
+        valueStr ? `<div class="vd-sub">${valueStr}</div>` : '',
+        renderDateRange(attrs, "Nuo"),
+        link(`/sutartis/${encodeURIComponent(sutId)}`, 'Peržiūrėti sutartį'),
+        attrs.pirkimoNumeris
+            ? link(`/viesiejiPirkimai/${encodeURIComponent(attrs.pirkimoNumeris)}`, 'Peržiūrėti pirkimą')
+            : '',
+    ].filter(Boolean).join('');
+}
+
+function renderProcurementNode(attrs: ProcurementNodeAttrs): string {
+    const procValue = formatContractValue(attrs.numatomaVerteEUR);
+    return [
+        `<div class="vd-title">${esc(attrs.pavadinimas)}</div>`,
+        procValue ? `<div class="vd-sub">${procValue}</div>` : '',
+        attrs.statusas ? `<div class="vd-sub">${esc(attrs.statusas)}</div>` : '',
+        renderDateRange(attrs, "Paskelbta"),
+        link(`/viesiejiPirkimai/${encodeURIComponent(attrs.pirkimoId)}`, 'Peržiūrėti pirkimą'),
+    ].filter(Boolean).join('');
+}
+
+function renderPersonNode(attrs: PersonNodeAttrs): string {
+    const name = `${attrs.vardas ?? ''} ${attrs.pavarde ?? ''}`.trim();
+    return [
+        `<div class="vd-title">${esc(name)}</div>`,
+        renderDateRange(attrs, "Ryšiai nuo", "Ryšiai iki"),
+    ].filter(Boolean).join('');
+}
+
+// ── Dispatcher ────────────────────────────────────────────────────────────────
+
+function renderNodeContent(attrs: NodeAttrs): string {
+    if (isOrgNode(attrs)) return renderOrgNode(attrs as OrgNodeAttrs);
+    if (isContractNode(attrs)) return renderContractNode(attrs as ContractNodeAttrs);
+    if (isProcurementNode(attrs)) return renderProcurementNode(attrs as ProcurementNodeAttrs);
+    if (isPersonNode(attrs)) return renderPersonNode(attrs as PersonNodeAttrs);
+    return '';
+}
+
+// ── Assembler ─────────────────────────────────────────────────────────────────
+
+function buildHtml(attrs: NodeAttrs, handlers: NodeHandlers = {}): string {
+    const content = renderNodeContent(attrs);
+    if (!content) return '';
 
     // Configurable nodes (org/person) get their expand/collapse button in the legend panel.
     const showButton = handlers.onExpand || (handlers.onCollapse && !isConfigurableNode(attrs));
-    if (html && showButton) {
-        html += buildExpandButtonHtml(handlers);
-    }
-
-    return html;
+    return content + (showButton ? buildExpandButtonHtml(handlers) : '');
 }
 
 // ── NodePanel — unified controller for the #node-details overlay ──────────────
@@ -86,7 +164,7 @@ export class NodePanel {
     private _panel: HTMLElement | null = null;
     private _wrapper: HTMLElement | null = null;
 
-    constructor({ legendState }: { legendState: LegendState }) {
+    constructor({legendState}: { legendState: LegendState }) {
         this._state = legendState;
     }
 
@@ -100,7 +178,7 @@ export class NodePanel {
         return this._wrapper;
     }
 
-    showForNode(nodeId: string, attrs: Record<string, unknown>, handlers: NodeHandlers = {}, counts: Map<string, number> | null = null): void {
+    showForNode(nodeId: string, attrs: NodeAttrs, handlers: NodeHandlers = {}, counts: Map<string, number> | null = null): void {
         const el = this._getPanel();
         const wrapper = this._getWrapper();
         if (!el) return;

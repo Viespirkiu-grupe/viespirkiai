@@ -611,7 +611,7 @@ primary node (marked `isRoot: true`) emits `f=<chars>`; additional nodes emit
 ### Node Time Fields
 
 Lifespan logic: **earliest start field → latest end field** = actual duration of the entity's lifespan on the graph
-timeline. Each entity will have `startDate` and `endDate` attributes computed from the following fields. If no end date
+timeline. Each entity will have `fromDate` and `toDate` attributes computed from the following fields. If no end date
 is found, the entity is treated as still active (open-ended).
 
 | Node type            | DB table                 | Start fields                                                                          | Possible end fields, If not found, the treat as not ended                        | Notes                                                                                                                                                                                                 |
