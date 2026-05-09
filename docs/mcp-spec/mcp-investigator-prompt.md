@@ -23,7 +23,7 @@ Each section below references tools by ID only. Full descriptions:
 
 ### Views available inside `execute_investigation_query`
 
-Prefer views over raw tables. Call `get_schema` to confirm column names.
+Prefer views to raw tables. Call `get_schema` to confirm column names.
 
 - `v_company` [themes 1, 5–7, 9–12]: `jarCsv` + `sodra` (LATERAL) + compliance flags → `draustieji`,
   `vidutinasDarboUzmokestis`, `melagingiTiekejai`, `nepatikimiTiekejai`, `vdiPazeidimaiFlag`, `bylosKiekis`,
@@ -142,7 +142,8 @@ inflate pattern
 GOAL: Check all blacklists, sanctions, and violations for company and linked parties
 
 DETECT: current/expired debarment (melagingiTiekejai, nepatikimiTiekejai) · VDI violations · court cases ·
-linked-company blacklist status
+linked-company blacklist status · supplier-as-claimant against former/current buyers (`bylojeKaip = 'IEŠKOVAS'`) —
+signals litigation leverage to pressure buyers into continued contracting
 
 ---
 
@@ -518,7 +519,7 @@ LIMIT 200;
 
 ## Partially supported themes
 
-Themes 18–20: partial data — queries exist but schema gaps limit completeness. Themes 21–22: no data support.
+Themes 18–20: partial data — queries exist but schema gaps limit completeness. Themes 21–23: no or limited data support.
 
 ---
 
@@ -654,3 +655,78 @@ CVP IS invitation list data.
 STT/NKT audit trail.
 
 **Weak signal:** VDI violation (`vdiPazeidimai`) during contract execution period suggests workforce unavailability.
+
+---
+
+### 23. Vendor lock-in — incumbent supplier structural monopoly
+
+**TOOLS:** `execute_investigation_query`, `search_sutartys`, `get_juridinis`
+
+GOAL: Detect suppliers whose relationship with a single buyer is self-reinforcing — system builder becomes sole
+maintenance provider, all subsequent contracts awarded without competition
+
+DETECT: single-buyer concentration > 70% of supplier's total value · all contracts to that buyer via
+direct/negotiated procedure · escalating contract count over years · no other supplier winning same CPV from same
+buyer · litigation against buyers who attempted to switch (`bylojeKaip = 'IEŠKOVAS'` vs buyer `jarKodas`)
+
+```sql
+-- Suppliers with >70% of total contract value from a single buyer (min €1M total, min 5 contracts)
+WITH supplier_totals AS (SELECT "tiekejoKodas",
+                                SUM(verte) AS total_verte
+                         FROM v_sutartys
+                         WHERE istrinta IS NOT TRUE
+                         GROUP BY "tiekejoKodas"),
+     buyer_concentration AS (SELECT s."tiekejoKodas",
+                                    s."pirkejoKodas",
+                                    MAX(s.tiekejas) AS tiekejas,
+                                    MAX(s.pirkejas) AS pirkejas,
+                                    COUNT(*)        AS sutarciu_sk,
+                                    SUM(s.verte)    AS buyer_verte
+                             FROM v_sutartys s
+                             WHERE s.istrinta IS NOT TRUE
+                             GROUP BY s."tiekejoKodas", s."pirkejoKodas")
+SELECT bc."tiekejoKodas",
+       bc.tiekejas,
+       bc."pirkejoKodas",
+       bc.pirkejas,
+       bc.sutarciu_sk,
+       ROUND(bc.buyer_verte)                                              AS pirkejo_verte,
+       ROUND(bc.buyer_verte * 100.0 / NULLIF(t.total_verte, 0), 1)       AS koncentracija_proc
+FROM buyer_concentration bc
+         JOIN supplier_totals t ON t."tiekejoKodas" = bc."tiekejoKodas"
+WHERE t.total_verte >= 1000000
+  AND bc.sutarciu_sk >= 5
+  AND bc.buyer_verte * 100.0 / NULLIF(t.total_verte, 0) >= 70
+ORDER BY pirkejo_verte DESC
+LIMIT 200;
+```
+
+```sql
+-- Procedure type mix for a specific buyer→supplier pair (replace jarKodas values)
+SELECT tipas,
+       COUNT(*)          AS sutarciu_sk,
+       ROUND(SUM(verte)) AS bendra_verte
+FROM v_sutartys
+WHERE "tiekejoKodas" = '302676496'
+  AND "pirkejoKodas" = '191346299'
+  AND istrinta IS NOT TRUE
+GROUP BY tipas
+ORDER BY bendra_verte DESC;
+```
+
+```sql
+-- Year-over-year contract escalation between buyer and supplier
+SELECT EXTRACT(YEAR FROM "sudarymoData")::int AS metai,
+       COUNT(*)                               AS sutarciu_sk,
+       ROUND(SUM(verte))                      AS bendra_verte
+FROM v_sutartys
+WHERE "tiekejoKodas" = '302676496'
+  AND "pirkejoKodas" = '191346299'
+  AND istrinta IS NOT TRUE
+GROUP BY metai
+ORDER BY metai;
+```
+
+**Gap:** Cannot determine if supplier built the original system — no system name→contract mapping. Lock-in
+mechanism (code/IP ownership) is invisible; only the outcome (structural monopoly) is detectable. Combine with
+theme 14 (spec rigging single-bidder rate) and theme 7 (direct award overuse) for a stronger composite signal.
