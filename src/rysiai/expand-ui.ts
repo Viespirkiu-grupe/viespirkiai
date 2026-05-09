@@ -2,7 +2,7 @@ import { mergeGraphElements, rebuildViewGraph, syncPositionsToData, runLayout, c
 import { NODE_COLOR, EDGE_COLOR, nodeColor } from './graph-theme.ts';
 import { isConfigurableNode, isOrgNode, isPersonNode, isContractNode, isProcurementNode } from './entity-types.ts';
 import type { LegendState } from './legend-state.ts';
-import type { NodeDetails } from './details-panel.ts';
+import type { NodePanel } from './details-panel.ts';
 import type Graph from 'graphology';
 import type forceAtlas2 from 'graphology-layout-forceatlas2';
 import type noverlap from 'graphology-layout-noverlap';
@@ -13,9 +13,10 @@ interface ExpandUIDeps {
     dataGraph: Graph;
     viewGraph: Graph;
     renderer: {
-        on: (event: string, handler: (event: { node: string }) => void) => void;
-        refresh: () => void;
-        graphToViewport: (pos: { x: number; y: number }) => { x: number; y: number };
+        on(event: 'clickNode' | 'doubleClickNode', handler: (event: { node: string }) => void): void;
+        on(event: 'clickStage', handler: () => void): void;
+        refresh(): void;
+        graphToViewport(pos: { x: number; y: number }): { x: number; y: number };
     };
     statusEl: HTMLElement | null;
     loadingEl: HTMLElement | null;
@@ -23,7 +24,7 @@ interface ExpandUIDeps {
     noverlap: INoverlapLayout;
     animateNodes: (graph: Graph, targets: Record<string, { x: number; y: number }>, opts: { duration: number; easing: string }, callback?: () => void) => () => void;
     legendState: LegendState;
-    nodeDetails: NodeDetails;
+    nodeDetails: NodePanel;
     onStateChange?: (() => void) | null;
     postRebuild?: (() => void) | null;
 }
@@ -236,6 +237,14 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     function _triggerExpand(nodeId: string, attrs: NodeAttrsLocal) {
         if (attrs.expanded) return;
+        if (attrs.cannotExpand) {
+            markExpanded(nodeId);
+            legendState.initNode(nodeId);
+            rebuildAndRefresh();
+            onStateChange?.();
+            refreshSelectedNodePanel();
+            return;
+        }
         const kind = EXPAND_KINDS.find((k) => k.test(attrs));
         if (kind) {
             markExpanded(nodeId);
@@ -312,6 +321,14 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
 
     function loadOrg(jarKodas: string, fromNodeId: string | null) {
         const id = 'org:' + jarKodas;
+        if (dataGraph.hasNode(id) && dataGraph.getNodeAttribute(id, 'cannotExpand')) {
+            markExpanded(id);
+            legendState.initNode(id);
+            rebuildAndRefresh();
+            onStateChange?.();
+            refreshSelectedNodePanel();
+            return Promise.resolve();
+        }
         if (fromNodeId && viewGraph.hasNode(fromNodeId)) {
             viewGraph.setNodeAttribute(fromNodeId, 'color', NODE_COLOR.org);
         }
@@ -374,7 +391,7 @@ export function createExpandUI({ dataGraph, viewGraph, renderer, statusEl, loadi
         _triggerExpand(nodeId, attrs);
     });
 
-    renderer.on('clickStage', deselectAll as unknown as (event: { node: string }) => void);
+    renderer.on('clickStage', deselectAll);
 
     return { loadOrg, loadPerson, loadSutartis, loadPirkimas, loadContract, rebuildAndRefresh, getSelectedNodeId: () => selectedNodeId, selectNode };
 }

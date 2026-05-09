@@ -6,10 +6,28 @@ import { specialJarCodes } from '../juridiniai/specialJarCodes.js';
  * @typedef {{ id: string; source: string; target: string; attributes: Record<string, unknown> }} EdgeLike
  */
 
-// Jar codes that represent CVP IS placeholder entities (not real companies).
-// Nodes with these codes get cannotExpand=true so the graph never tries to load their relations.
-export const DISABLE_EXPAND_JARS = [801, 802, 803, 807, 809];
-const DISABLE_EXPAND_SET = new Set(DISABLE_EXPAND_JARS.map(String));
+/**
+ * Returns true when jarKodas is a CVP IS placeholder code (not a real organisation).
+ * These nodes must never be expanded — they aggregate all contracts of a given legal-form
+ * class (e.g. 809 = any physical person), so expanding them would produce misleading results.
+ * @param {string|number} jarKodas
+ * @returns {boolean}
+ */
+export function isBlockedOrg(jarKodas) {
+    return !!specialJarCodes[String(jarKodas)];
+}
+
+function minDate(...vals) {
+    const ds = vals.filter(Boolean).map(v => String(v).slice(0, 10));
+    return ds.length ? ds.sort()[0] : null;
+}
+function maxDate(...vals) {
+    const ds = vals.filter(Boolean).map(v => String(v).slice(0, 10));
+    return ds.length ? ds.sort().at(-1) : null;
+}
+function orgToDate(statusoKodas, statusasNuo) {
+    return statusoKodas && Number(statusoKodas) !== 0 ? (String(statusasNuo).slice(0, 10) || null) : null;
+}
 
 const ENTITY_TYPE = {
     Org:         'OrganizationEntity',
@@ -148,9 +166,11 @@ export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
         expanded: opts.expanded ?? false,
         draustieji: opts.draustieji ?? undefined,
         draustieji2: opts.draustieji2 ?? undefined,
+        fromDate: opts.fromDate ?? null,
+        toDate:   opts.toDate   ?? null,
         size: 8,
     };
-    if (DISABLE_EXPAND_SET.has(jk)) attrs.cannotExpand = true;
+    if (specialJarCodes[jk]) attrs.cannotExpand = true;
     return { id, attributes: attrs };
 }
 
@@ -162,7 +182,7 @@ export function orgNode(jarKodas, pavadinimas, formosKodas, opts = {}) {
  * @param {string|null} fromDate
  * @returns {NodeLike}
  */
-export function personNode(vardas, pavarde, deklaracija, fromDate) {
+export function personNode(vardas, pavarde, deklaracija, fromDate, toDate = null) {
     const id = personId(vardas, pavarde);
     return {
         id,
@@ -174,6 +194,7 @@ export function personNode(vardas, pavarde, deklaracija, fromDate) {
             expanded: false,
             deklaracijos: deklaracija ? [deklaracija] : [],
             fromDate: fromDate || null,
+            toDate:   toDate   || null,
             size: 8,
         },
     };
@@ -186,7 +207,7 @@ export function personNode(vardas, pavarde, deklaracija, fromDate) {
  * @param {number|null} verte           Contract value
  * @param {string|null} pirkimoNumeris  Procurement notice ID (may be null)
  */
-export function contractNode(sutartiesUnikalusId, pavadinimas, verte, pirkimoNumeris = null) {
+export function contractNode(sutartiesUnikalusId, pavadinimas, verte, pirkimoNumeris = null, fromDate = null, toDate = null) {
     const id = `contract:${sutartiesUnikalusId}`;
     const title = pavadinimas || 'Sutartis';
     const shortName = title.split(' ').slice(0, 9).join(' ');
@@ -200,6 +221,8 @@ export function contractNode(sutartiesUnikalusId, pavadinimas, verte, pirkimoNum
             label: wrapLabel(shortName),
             verte: v,
             pirkimoNumeris: pirkimoNumeris || null,
+            fromDate: fromDate || null,
+            toDate:   toDate   || null,
             expanded: false,
             size: contractSize(v),
         },
@@ -215,7 +238,7 @@ export function contractNode(sutartiesUnikalusId, pavadinimas, verte, pirkimoNum
  * @param {string|null} pirkimoBudas
  * @returns {NodeLike}
  */
-export function procurementNode(pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas) {
+export function procurementNode(pirkimoId, pavadinimas, numatomaVerteEUR, statusas, pirkimoBudas, fromDate = null, toDate = null) {
     const id = `procurement:${pirkimoId}`;
     const title = pavadinimas || 'Pirkimas';
     const v = numatomaVerteEUR || 0;
@@ -229,6 +252,8 @@ export function procurementNode(pirkimoId, pavadinimas, numatomaVerteEUR, status
             numatomaVerteEUR: v,
             statusas: statusas || '',
             pirkimoBudas: pirkimoBudas || '',
+            fromDate: fromDate || null,
+            toDate:   toDate   || null,
             expanded: false,
             size: contractSize(v),
         },
@@ -242,13 +267,14 @@ export function procurementNode(pirkimoId, pavadinimas, numatomaVerteEUR, status
  * @param {string} type
  * @param {string|null} label
  * @param {string|null} fromDate
+ * @param {string|null} toDate
  * @param {boolean} [forceLabel]
  * @param {Record<string, unknown>} [opts]
  * @returns {EdgeLike}
  */
-export function edge(source, target, type, label, fromDate, forceLabel = false, opts = {}) {
+export function edge(source, target, type, label, fromDate = null, toDate = null, forceLabel = false, opts = {}) {
     const id = `edge:${source}:${target}:${type}`;
-    const attrs = { type, label: label || '', fromDate: fromDate || null, forceLabel };
+    const attrs = { type, label: label || '', fromDate: fromDate || null, toDate: toDate || null, forceLabel };
     if (opts.size != null) attrs.size = opts.size;
     return { id, source, target, attributes: attrs };
 }
@@ -270,10 +296,10 @@ export function addEdge(edges, edgeMap, e) {
 // Adds a Spouse edge sourceId→targetId unless the reverse (targetId→sourceId:Spouse)
 // already exists. Prevents duplicate bidirectional edges when both spouses have filed
 // their own declarations.
-export function addSpouseEdge(edges, edgeMap, sourceId, targetId) {
+export function addSpouseEdge(edges, edgeMap, sourceId, targetId, fromDate = null, toDate = null) {
     const reverseId = `edge:${targetId}:${sourceId}:Spouse`;
     if (!edgeMap.has(reverseId)) {
-        addEdge(edges, edgeMap, edge(sourceId, targetId, 'Spouse', 'Sutuoktinis', null));
+        addEdge(edges, edgeMap, edge(sourceId, targetId, 'Spouse', 'Sutuoktinis', fromDate, toDate));
     }
 }
 
@@ -288,11 +314,12 @@ export function addSpouseEdge(edges, edgeMap, sourceId, targetId) {
  */
 export async function expandOrg(jarKodas) {
     const jk = String(jarKodas);
+    if (isBlockedOrg(jk)) return { nodes: [], edges: [] };
 
     const [jarRes, pinregRes, asBuyerRes, asSellerRes, vpRes] = await Promise.all([
         // Org metadata from jarCsv
         postgres.query(
-            `SELECT "pavadinimas", "formosKodas" FROM public."jarCsv" WHERE "jarKodas" = $1 LIMIT 1`,
+            `SELECT "pavadinimas", "formosKodas", "registravimoData", "statusasNuo", "statusoKodas" FROM public."jarCsv" WHERE "jarKodas" = $1 LIMIT 1`,
             [jk],
         ),
         // All pinreg declarations for this org
@@ -307,8 +334,15 @@ export async function expandOrg(jarKodas) {
                     s."verte",
                     s."pirkimoNumeris",
                     s."tiekejoKodas",
-                    seller."pavadinimas"  AS "tiekejoPavadinimas",
-                    seller."formosKodas" AS "tiekejoFormosKodas"
+                    s."sudarymoData"::date        AS "sudarymoData",
+                    s."galiojimoData"::date       AS "galiojimoData",
+                    s."paskelbimoData"::date      AS "paskelbimoData",
+                    s."faktineIvykdimoData"::date AS "faktineIvykdimoData",
+                    seller."pavadinimas"          AS "tiekejoPavadinimas",
+                    seller."formosKodas"          AS "tiekejoFormosKodas",
+                    seller."registravimoData"     AS "tiekejoRegistravimoData",
+                    seller."statusasNuo"          AS "tiekejoStatusasNuo",
+                    seller."statusoKodas"         AS "tiekejoStatusoKodas"
              FROM   public."sutartys" s
              LEFT JOIN public."jarCsv" seller ON seller."jarKodas"::text = s."tiekejoKodas"
              WHERE  s."perkanciosiosOrganizacijosKodas" = $1
@@ -325,8 +359,15 @@ export async function expandOrg(jarKodas) {
                     s."verte",
                     s."pirkimoNumeris",
                     s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
-                    buyer."pavadinimas"  AS "pirkejoPavadinimas",
-                    buyer."formosKodas" AS "pirkejoFormosKodas"
+                    s."sudarymoData"::date              AS "sudarymoData",
+                    s."galiojimoData"::date             AS "galiojimoData",
+                    s."paskelbimoData"::date            AS "paskelbimoData",
+                    s."faktineIvykdimoData"::date       AS "faktineIvykdimoData",
+                    buyer."pavadinimas"                 AS "pirkejoPavadinimas",
+                    buyer."formosKodas"                 AS "pirkejoFormosKodas",
+                    buyer."registravimoData"            AS "pirkejoRegistravimoData",
+                    buyer."statusasNuo"                 AS "pirkejoStatusasNuo",
+                    buyer."statusoKodas"                AS "pirkejoStatusoKodas"
              FROM   public."sutartys" s
              LEFT JOIN public."jarCsv" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
              WHERE  s."tiekejoKodas" = $1
@@ -338,7 +379,9 @@ export async function expandOrg(jarKodas) {
         ),
         // Top 20 procurement notices where this org is the buyer
         postgres.query(
-            `SELECT "pirkimoId", "pavadinimas", "numatomaVerteEUR", "statusas", "pirkimoBudas"
+            `SELECT "pirkimoId", "pavadinimas", "numatomaVerteEUR", "statusas", "pirkimoBudas",
+                    "paskelbimoData"::date              AS "paskelbimoData",
+                    "pasiulymuPateikimoTerminas"::date  AS "pasiulymuPateikimoTerminas"
              FROM   public."viesiejiPirkimai"
              WHERE  "jarKodas" = $1
              ORDER BY "numatomaVerteEUR" DESC NULLS LAST
@@ -373,29 +416,49 @@ export async function expandOrg(jarKodas) {
         expanded: true,
         draustieji: sodraSelf.draustieji,
         draustieji2: sodraSelf.draustieji2,
+        fromDate: minDate(jarRow?.registravimoData),
+        toDate:   orgToDate(jarRow?.statusoKodas, jarRow?.statusasNuo),
     });
     addNode(nodes, nodeMap, rootOrg);
+
+    // Pre-aggregate person time ranges across all pinreg rows
+    const personTimeMap = new Map();
+    for (const row of pinregRes.rows) {
+        if (!row.vardas || !row.pavarde) continue;
+        const pid = personId(row.vardas, row.pavarde);
+        const cur = personTimeMap.get(pid) ?? { fromDate: null, maxPabaiga: null, maxPradzia: null };
+        cur.fromDate   = minDate(cur.fromDate, row.rysioPradzia);
+        cur.maxPabaiga = maxDate(cur.maxPabaiga, row.rysioPabaiga);
+        cur.maxPradzia = maxDate(cur.maxPradzia, row.rysioPradzia);
+        personTimeMap.set(pid, cur);
+    }
+    const getPersonTime = pid => {
+        const t = personTimeMap.get(pid);
+        return { fromDate: t?.fromDate ?? null, toDate: t?.maxPabaiga ?? t?.maxPradzia ?? null };
+    };
 
     for (const row of pinregRes.rows) {
         const tipas = row.irasoTipas;
 
         if (tipas === 'DEKLARUOJANCIO_DARBOVIETE') {
             if (!row.vardas || !row.pavarde) continue;
-            const pNode = personNode(row.vardas, row.pavarde, row.deklaracija, row.rysioPradzia);
+            const { fromDate: pFrom, toDate: pTo } = getPersonTime(personId(row.vardas, row.pavarde));
+            const pNode = personNode(row.vardas, row.pavarde, row.deklaracija, pFrom, pTo);
             addNode(nodes, nodeMap, pNode);
 
             const relType = mapPareigos(row.pareigos);
             const label = row.pareigos || '';
-            addEdge(edges, edgeMap, edge(pNode.id, rootOrg.id, relType, label, row.rysioPradzia));
+            addEdge(edges, edgeMap, edge(pNode.id, rootOrg.id, relType, label, row.rysioPradzia, row.rysioPabaiga ?? null));
 
         } else if (tipas === 'KITI_RYSIAI_SU_JA') {
             if (!row.vardas || !row.pavarde) continue;
-            const pNode = personNode(row.vardas, row.pavarde, row.deklaracija, row.rysioPradzia);
+            const { fromDate: pFrom, toDate: pTo } = getPersonTime(personId(row.vardas, row.pavarde));
+            const pNode = personNode(row.vardas, row.pavarde, row.deklaracija, pFrom, pTo);
             addNode(nodes, nodeMap, pNode);
 
             const relType = mapRysioPobudis(row.rysioPobudzioPavadinimas);
             const label = row.rysioPobudzioPavadinimas || '';
-            addEdge(edges, edgeMap, edge(pNode.id, rootOrg.id, relType, label, row.rysioPradzia));
+            addEdge(edges, edgeMap, edge(pNode.id, rootOrg.id, relType, label, row.rysioPradzia, row.rysioPabaiga ?? null));
 
         } else if (tipas === 'SUTUOKTINIO_DARBOVIETE') {
             // vardas/pavarde = spouse; susijusioAsmensVardas/Pavarde = declarant
@@ -406,19 +469,20 @@ export async function expandOrg(jarKodas) {
 
             if (!spouseVardas || !spousePavarde) continue;
 
-            const spouseNode = personNode(spouseVardas, spousePavarde, row.deklaracija, row.rysioPradzia);
+            const { fromDate: spFrom, toDate: spTo } = getPersonTime(personId(spouseVardas, spousePavarde));
+            const spouseNode = personNode(spouseVardas, spousePavarde, row.deklaracija, spFrom, spTo);
             addNode(nodes, nodeMap, spouseNode);
 
             // Spouse works at this org
             const relType = mapPareigos(row.pareigos);
             const label = row.pareigos || '';
-            addEdge(edges, edgeMap, edge(spouseNode.id, rootOrg.id, relType, label, row.rysioPradzia));
+            addEdge(edges, edgeMap, edge(spouseNode.id, rootOrg.id, relType, label, row.rysioPradzia, row.rysioPabaiga ?? null));
 
             // Declarant → spouse (Spouse edge)
             if (declVardas && declPavarde) {
-                const declNode = personNode(declVardas, declPavarde, null, null);
+                const declNode = personNode(declVardas, declPavarde, null, null, null);
                 addNode(nodes, nodeMap, declNode);
-                addSpouseEdge(edges, edgeMap, declNode.id, spouseNode.id);
+                addSpouseEdge(edges, edgeMap, declNode.id, spouseNode.id, row.rysioPradzia, row.rysioPabaiga ?? null);
             }
         }
     }
@@ -426,43 +490,62 @@ export async function expandOrg(jarKodas) {
     // Top contracts where root org is buyer → ContractEntity → supplier
     for (const row of asBuyerRes.rows) {
         if (!row.sutartiesUnikalusId || !row.tiekejoKodas) continue;
-        const cNode = contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte, row.pirkimoNumeris || null);
+        const cFrom = minDate(row.sudarymoData, row.paskelbimoData);
+        const cTo   = maxDate(row.galiojimoData, row.faktineIvykdimoData);
+        const cNode = contractNode(
+            row.sutartiesUnikalusId, row.pavadinimas, row.verte, row.pirkimoNumeris || null,
+            cFrom, cTo,
+        );
         addNode(nodes, nodeMap, cNode);
         const sodraSupplier = sodraMap.get(row.tiekejoKodas) || {};
         const supplierOrg = orgNode(row.tiekejoKodas, row.tiekejoPavadinimas, row.tiekejoFormosKodas, {
             draustieji: sodraSupplier.draustieji,
             draustieji2: sodraSupplier.draustieji2,
+            fromDate: minDate(row.tiekejoRegistravimoData),
+            toDate:   orgToDate(row.tiekejoStatusoKodas, row.tiekejoStatusasNuo),
         });
         addNode(nodes, nodeMap, supplierOrg);
         const valueLabel = formatContractValue(row.verte);
         const w = edgeWeight(row.verte || 0);
-        addEdge(edges, edgeMap, edge(rootOrg.id, cNode.id, 'Order', valueLabel, null, true, { size: w }));
-        addEdge(edges, edgeMap, edge(cNode.id, supplierOrg.id, 'Delivery', '', null, false, { size: w }));
+        addEdge(edges, edgeMap, edge(rootOrg.id, cNode.id, 'Order', valueLabel, cFrom, cTo, true, { size: w }));
+        addEdge(edges, edgeMap, edge(cNode.id, supplierOrg.id, 'Delivery', '', cFrom, cTo, false, { size: w }));
     }
 
     // Top contracts where root org is seller: buyer → ContractEntity → root org
     for (const row of asSellerRes.rows) {
         if (!row.sutartiesUnikalusId || !row.pirkejoKodas) continue;
-        const cNode = contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte, row.pirkimoNumeris || null);
+        const cFrom = minDate(row.sudarymoData, row.paskelbimoData);
+        const cTo   = maxDate(row.galiojimoData, row.faktineIvykdimoData);
+        const cNode = contractNode(
+            row.sutartiesUnikalusId, row.pavadinimas, row.verte, row.pirkimoNumeris || null,
+            cFrom, cTo,
+        );
         addNode(nodes, nodeMap, cNode);
         const sodraBuyer = sodraMap.get(row.pirkejoKodas) || {};
         const buyerOrg = orgNode(row.pirkejoKodas, row.pirkejoPavadinimas, row.pirkejoFormosKodas, {
             draustieji: sodraBuyer.draustieji,
             draustieji2: sodraBuyer.draustieji2,
+            fromDate: minDate(row.pirkejoRegistravimoData),
+            toDate:   orgToDate(row.pirkejoStatusoKodas, row.pirkejoStatusasNuo),
         });
         addNode(nodes, nodeMap, buyerOrg);
         const valueLabel = formatContractValue(row.verte);
         const w = edgeWeight(row.verte || 0);
-        addEdge(edges, edgeMap, edge(buyerOrg.id, cNode.id, 'Order', valueLabel, null, true, { size: w }));
-        addEdge(edges, edgeMap, edge(cNode.id, rootOrg.id, 'Delivery', '', null, false, { size: w }));
+        addEdge(edges, edgeMap, edge(buyerOrg.id, cNode.id, 'Order', valueLabel, cFrom, cTo, true, { size: w }));
+        addEdge(edges, edgeMap, edge(cNode.id, rootOrg.id, 'Delivery', '', cFrom, cTo, false, { size: w }));
     }
 
     // Procurement notices where root org is the buyer
     for (const row of vpRes.rows) {
         if (!row.pirkimoId) continue;
-        const pNode = procurementNode(row.pirkimoId, row.pavadinimas, row.numatomaVerteEUR, row.statusas, row.pirkimoBudas);
+        const pFrom = minDate(row.paskelbimoData);
+        const pTo   = maxDate(row.pasiulymuPateikimoTerminas);
+        const pNode = procurementNode(
+            row.pirkimoId, row.pavadinimas, row.numatomaVerteEUR, row.statusas, row.pirkimoBudas,
+            pFrom, pTo,
+        );
         addNode(nodes, nodeMap, pNode);
-        addEdge(edges, edgeMap, edge(rootOrg.id, pNode.id, 'Procurement', '', null, false, { size: 1 }));
+        addEdge(edges, edgeMap, edge(rootOrg.id, pNode.id, 'Procurement', '', pFrom, pTo, false, { size: 1 }));
     }
 
     return { nodes, edges };
@@ -481,14 +564,21 @@ export async function expandProcurement(pirkimoId) {
     const procId = `procurement:${id}`;
 
     const winnersRes = await postgres.query(
-        `SELECT DISTINCT s."tiekejoKodas",
+        `SELECT s."tiekejoKodas",
                 j."pavadinimas",
                 j."formosKodas",
-                SUM(s."verte") AS "totalVerte"
+                j."registravimoData",
+                j."statusasNuo",
+                j."statusoKodas",
+                SUM(s."verte") AS "totalVerte",
+                MIN(LEAST(COALESCE(s."sudarymoData"::date, s."paskelbimoData"::date),
+                          COALESCE(s."paskelbimoData"::date, s."sudarymoData"::date)))::text AS "awardFromDate",
+                MAX(GREATEST(COALESCE(s."galiojimoData"::date, s."faktineIvykdimoData"::date),
+                             COALESCE(s."faktineIvykdimoData"::date, s."galiojimoData"::date)))::text AS "awardToDate"
          FROM   public."sutartys" s
          LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
          WHERE  s."pirkimoNumeris" = $1
-         GROUP  BY s."tiekejoKodas", j."pavadinimas", j."formosKodas"`,
+         GROUP  BY s."tiekejoKodas", j."pavadinimas", j."formosKodas", j."registravimoData", j."statusasNuo", j."statusoKodas"`,
         [id],
     );
 
@@ -499,10 +589,13 @@ export async function expandProcurement(pirkimoId) {
 
     for (const row of winnersRes.rows) {
         if (!row.tiekejoKodas) continue;
-        const stub = orgNode(row.tiekejoKodas, row.pavadinimas, row.formosKodas);
+        const stub = orgNode(row.tiekejoKodas, row.pavadinimas, row.formosKodas, {
+            fromDate: minDate(row.registravimoData),
+            toDate:   orgToDate(row.statusoKodas, row.statusasNuo),
+        });
         addNode(nodes, nodeMap, stub);
         const valueLabel = formatContractValue(Number(row.totalVerte) || 0);
-        addEdge(edges, edgeMap, edge(procId, stub.id, 'Award', valueLabel, null, false, { size: 1 }));
+        addEdge(edges, edgeMap, edge(procId, stub.id, 'Award', valueLabel, row.awardFromDate || null, row.awardToDate || null, false, { size: 1 }));
     }
 
     return { nodes, edges };
@@ -524,7 +617,9 @@ export async function expandContract(pirkimoNumeris) {
     const [vpRes, winnersRes, losersRes] = await Promise.all([
         // Procurement node data from viesiejiPirkimai
         postgres.query(
-            `SELECT "pirkimoId", "pavadinimas", "numatomaVerteEUR", "statusas", "pirkimoBudas"
+            `SELECT "pirkimoId", "pavadinimas", "numatomaVerteEUR", "statusas", "pirkimoBudas",
+                    "paskelbimoData"::date              AS "paskelbimoData",
+                    "pasiulymuPateikimoTerminas"::date  AS "pasiulymuPateikimoTerminas"
              FROM   public."viesiejiPirkimai"
              WHERE  "pirkimoId" = $1
              LIMIT 1`,
@@ -532,21 +627,31 @@ export async function expandContract(pirkimoNumeris) {
         ),
         // Winners via sutartys
         postgres.query(
-            `SELECT DISTINCT s."tiekejoKodas",
+            `SELECT s."tiekejoKodas",
                     j."pavadinimas",
                     j."formosKodas",
-                    SUM(s."verte") AS "totalVerte"
+                    j."registravimoData",
+                    j."statusasNuo",
+                    j."statusoKodas",
+                    SUM(s."verte") AS "totalVerte",
+                    MIN(LEAST(COALESCE(s."sudarymoData"::date, s."paskelbimoData"::date),
+                              COALESCE(s."paskelbimoData"::date, s."sudarymoData"::date)))::text AS "awardFromDate",
+                    MAX(GREATEST(COALESCE(s."galiojimoData"::date, s."faktineIvykdimoData"::date),
+                                 COALESCE(s."faktineIvykdimoData"::date, s."galiojimoData"::date)))::text AS "awardToDate"
              FROM   public."sutartys" s
              LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
              WHERE  s."pirkimoNumeris" = $1
-             GROUP  BY s."tiekejoKodas", j."pavadinimas", j."formosKodas"`,
+             GROUP  BY s."tiekejoKodas", j."pavadinimas", j."formosKodas", j."registravimoData", j."statusasNuo", j."statusoKodas"`,
             [pirkNr],
         ),
         // Best-effort losers from ATN1 (Lithuanian bidders only)
         postgres.query(
             `SELECT DISTINCT d."kodas",
                     j."pavadinimas",
-                    j."formosKodas"
+                    j."formosKodas",
+                    j."registravimoData",
+                    j."statusasNuo",
+                    j."statusoKodas"
              FROM   public."atn1dalyviai" d
              JOIN   public."atn1ataskaitos" a ON a."id" = d."ataskaitaId"
              LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = d."kodas"
@@ -564,8 +669,9 @@ export async function expandContract(pirkimoNumeris) {
     // Procurement node (auto-expanded since we return all data)
     const vpRow = vpRes.rows[0];
     const pNode = vpRow
-        ? procurementNode(vpRow.pirkimoId, vpRow.pavadinimas, vpRow.numatomaVerteEUR, vpRow.statusas, vpRow.pirkimoBudas)
-        : procurementNode(pirkNr, null, null, null, null);
+        ? procurementNode(vpRow.pirkimoId, vpRow.pavadinimas, vpRow.numatomaVerteEUR, vpRow.statusas, vpRow.pirkimoBudas,
+            minDate(vpRow.paskelbimoData), maxDate(vpRow.pasiulymuPateikimoTerminas))
+        : procurementNode(pirkNr, null, null, null, null, null, null);
     pNode.attributes.expanded = true;
     addNode(nodes, nodeMap, pNode);
 
@@ -574,18 +680,24 @@ export async function expandContract(pirkimoNumeris) {
     for (const row of winnersRes.rows) {
         if (!row.tiekejoKodas) continue;
         winnerCodes.add(row.tiekejoKodas);
-        const stub = orgNode(row.tiekejoKodas, row.pavadinimas, row.formosKodas);
+        const stub = orgNode(row.tiekejoKodas, row.pavadinimas, row.formosKodas, {
+            fromDate: minDate(row.registravimoData),
+            toDate:   orgToDate(row.statusoKodas, row.statusasNuo),
+        });
         addNode(nodes, nodeMap, stub);
         const valueLabel = formatContractValue(Number(row.totalVerte) || 0);
-        addEdge(edges, edgeMap, edge(pNode.id, stub.id, 'Award', valueLabel, null, false, { size: 1 }));
+        addEdge(edges, edgeMap, edge(pNode.id, stub.id, 'Award', valueLabel, row.awardFromDate || null, row.awardToDate || null, false, { size: 1 }));
     }
 
     // Best-effort losers (exclude winners) → Bidder edges
     for (const row of losersRes.rows) {
         if (!row.kodas || winnerCodes.has(row.kodas)) continue;
-        const stub = orgNode(row.kodas, row.pavadinimas, row.formosKodas);
+        const stub = orgNode(row.kodas, row.pavadinimas, row.formosKodas, {
+            fromDate: minDate(row.registravimoData),
+            toDate:   orgToDate(row.statusoKodas, row.statusasNuo),
+        });
         addNode(nodes, nodeMap, stub);
-        addEdge(edges, edgeMap, edge(pNode.id, stub.id, 'Bidder', '', null, false, { size: 1 }));
+        addEdge(edges, edgeMap, edge(pNode.id, stub.id, 'Bidder', '', null, null, false, { size: 1 }));
     }
 
     return { nodes, edges };
@@ -606,8 +718,20 @@ export async function expandSutartis(sutartiesUnikalusId) {
     const sutartisRes = await postgres.query(
         `SELECT s."sutartiesUnikalusId", s."pavadinimas", s."verte", s."pirkimoNumeris",
                 s."perkanciosiosOrganizacijosKodas", s."tiekejoKodas",
-                buyer."pavadinimas"  AS "pirkejoName",  buyer."formosKodas"  AS "pirkejoFormosKodas",
-                seller."pavadinimas" AS "tiekejoName",  seller."formosKodas" AS "tiekejoFormosKodas"
+                s."sudarymoData"::date         AS "sudarymoData",
+                s."galiojimoData"::date        AS "galiojimoData",
+                s."paskelbimoData"::date       AS "paskelbimoData",
+                s."faktineIvykdimoData"::date  AS "faktineIvykdimoData",
+                buyer."pavadinimas"            AS "pirkejoName",
+                buyer."formosKodas"            AS "pirkejoFormosKodas",
+                buyer."registravimoData"       AS "pirkejoRegistravimoData",
+                buyer."statusasNuo"            AS "pirkejoStatusasNuo",
+                buyer."statusoKodas"           AS "pirkejoStatusoKodas",
+                seller."pavadinimas"           AS "tiekejoName",
+                seller."formosKodas"           AS "tiekejoFormosKodas",
+                seller."registravimoData"      AS "tiekejoRegistravimoData",
+                seller."statusasNuo"           AS "tiekejoStatusasNuo",
+                seller."statusoKodas"          AS "tiekejoStatusoKodas"
          FROM   public."sutartys" s
          LEFT JOIN public."jarCsv" buyer  ON buyer."jarKodas"::text  = s."perkanciosiosOrganizacijosKodas"
          LEFT JOIN public."jarCsv" seller ON seller."jarKodas"::text = s."tiekejoKodas"
@@ -629,7 +753,12 @@ export async function expandSutartis(sutartiesUnikalusId) {
         return { nodes, edges };
     }
 
-    const cNode = contractNode(row.sutartiesUnikalusId, row.pavadinimas, row.verte, row.pirkimoNumeris || null);
+    const cFrom = minDate(row.sudarymoData, row.paskelbimoData);
+    const cTo   = maxDate(row.galiojimoData, row.faktineIvykdimoData);
+    const cNode = contractNode(
+        row.sutartiesUnikalusId, row.pavadinimas, row.verte, row.pirkimoNumeris || null,
+        cFrom, cTo,
+    );
     cNode.attributes.isRoot = true;
     cNode.attributes.expanded = true;
     addNode(nodes, nodeMap, cNode);
@@ -638,15 +767,21 @@ export async function expandSutartis(sutartiesUnikalusId) {
     const w = edgeWeight(row.verte || 0);
 
     if (row.perkanciosiosOrganizacijosKodas) {
-        const buyerOrg = orgNode(row.perkanciosiosOrganizacijosKodas, row.pirkejoName, row.pirkejoFormosKodas);
+        const buyerOrg = orgNode(row.perkanciosiosOrganizacijosKodas, row.pirkejoName, row.pirkejoFormosKodas, {
+            fromDate: minDate(row.pirkejoRegistravimoData),
+            toDate:   orgToDate(row.pirkejoStatusoKodas, row.pirkejoStatusasNuo),
+        });
         addNode(nodes, nodeMap, buyerOrg);
-        addEdge(edges, edgeMap, edge(buyerOrg.id, cNode.id, 'Order', valueLabel, null, true, { size: w }));
+        addEdge(edges, edgeMap, edge(buyerOrg.id, cNode.id, 'Order', valueLabel, cFrom, cTo, true, { size: w }));
     }
 
     if (row.tiekejoKodas) {
-        const sellerOrg = orgNode(row.tiekejoKodas, row.tiekejoName, row.tiekejoFormosKodas);
+        const sellerOrg = orgNode(row.tiekejoKodas, row.tiekejoName, row.tiekejoFormosKodas, {
+            fromDate: minDate(row.tiekejoRegistravimoData),
+            toDate:   orgToDate(row.tiekejoStatusoKodas, row.tiekejoStatusasNuo),
+        });
         addNode(nodes, nodeMap, sellerOrg);
-        addEdge(edges, edgeMap, edge(cNode.id, sellerOrg.id, 'Delivery', '', null, false, { size: w }));
+        addEdge(edges, edgeMap, edge(cNode.id, sellerOrg.id, 'Delivery', '', cFrom, cTo, false, { size: w }));
     }
 
     return { nodes, edges };
@@ -669,8 +804,13 @@ export async function expandPirkimas(pirkimoId) {
         postgres.query(
             `SELECT vp."pirkimoId", vp."pavadinimas", vp."numatomaVerteEUR", vp."statusas", vp."pirkimoBudas",
                     vp."jarKodas",
-                    j."pavadinimas"  AS "buyerPavadinimas",
-                    j."formosKodas" AS "buyerFormosKodas"
+                    vp."paskelbimoData"::date              AS "paskelbimoData",
+                    vp."pasiulymuPateikimoTerminas"::date  AS "pasiulymuPateikimoTerminas",
+                    j."pavadinimas"                        AS "buyerPavadinimas",
+                    j."formosKodas"                        AS "buyerFormosKodas",
+                    j."registravimoData"                   AS "buyerRegistravimoData",
+                    j."statusasNuo"                        AS "buyerStatusasNuo",
+                    j."statusoKodas"                       AS "buyerStatusoKodas"
              FROM   public."viesiejiPirkimai" vp
              LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = vp."jarKodas"
              WHERE  vp."pirkimoId" = $1
@@ -687,16 +827,22 @@ export async function expandPirkimas(pirkimoId) {
 
     const row = vpRes.rows[0];
     const pNode = row
-        ? procurementNode(row.pirkimoId, row.pavadinimas, row.numatomaVerteEUR, row.statusas, row.pirkimoBudas)
-        : procurementNode(id, null, null, null, null);
+        ? procurementNode(row.pirkimoId, row.pavadinimas, row.numatomaVerteEUR, row.statusas, row.pirkimoBudas,
+            minDate(row.paskelbimoData), maxDate(row.pasiulymuPateikimoTerminas))
+        : procurementNode(id, null, null, null, null, null, null);
     pNode.attributes.isRoot = true;
     pNode.attributes.expanded = true;
     addNode(nodes, nodeMap, pNode);
 
     if (row?.jarKodas) {
-        const buyerOrg = orgNode(row.jarKodas, row.buyerPavadinimas, row.buyerFormosKodas);
+        const pFrom = minDate(row.paskelbimoData);
+        const pTo   = maxDate(row.pasiulymuPateikimoTerminas);
+        const buyerOrg = orgNode(row.jarKodas, row.buyerPavadinimas, row.buyerFormosKodas, {
+            fromDate: minDate(row.buyerRegistravimoData),
+            toDate:   orgToDate(row.buyerStatusoKodas, row.buyerStatusasNuo),
+        });
         addNode(nodes, nodeMap, buyerOrg);
-        addEdge(edges, edgeMap, edge(buyerOrg.id, pNode.id, 'Procurement', row.pirkimoBudas || '', null, false, { size: 1 }));
+        addEdge(edges, edgeMap, edge(buyerOrg.id, pNode.id, 'Procurement', row.pirkimoBudas || '', pFrom, pTo, false, { size: 1 }));
     }
 
     for (const n of winnerNodes) addNode(nodes, nodeMap, n);
@@ -727,7 +873,29 @@ export function buildPersonGraphFromRows(rows, rootPersonId, vardas, pavarde) {
     const nodeMap = new Map();
     const edgeMap = new Map();
 
-    const rootPerson = personNode(vardas, pavarde, null, null);
+    // Pre-aggregate time ranges per person across all rows
+    const personTimeMap = new Map();
+    for (const row of rows) {
+        const names = [];
+        if (row.vardas && row.pavarde) names.push({ v: row.vardas, p: row.pavarde });
+        if (row.susijusioAsmensVardas && row.susijusioAsmensPavarde)
+            names.push({ v: row.susijusioAsmensVardas, p: row.susijusioAsmensPavarde });
+        for (const { v, p } of names) {
+            const pid = personId(v, p);
+            const cur = personTimeMap.get(pid) ?? { fromDate: null, maxPabaiga: null, maxPradzia: null };
+            cur.fromDate   = minDate(cur.fromDate, row.rysioPradzia);
+            cur.maxPabaiga = maxDate(cur.maxPabaiga, row.rysioPabaiga);
+            cur.maxPradzia = maxDate(cur.maxPradzia, row.rysioPradzia);
+            personTimeMap.set(pid, cur);
+        }
+    }
+    const getPersonTime = pid => {
+        const t = personTimeMap.get(pid);
+        return { fromDate: t?.fromDate ?? null, toDate: t?.maxPabaiga ?? t?.maxPradzia ?? null };
+    };
+
+    const rootTime = getPersonTime(rootPersonId);
+    const rootPerson = personNode(vardas, pavarde, null, rootTime.fromDate, rootTime.toDate);
     rootPerson.attributes.expanded = true;
     addNode(nodes, nodeMap, rootPerson);
 
@@ -739,14 +907,14 @@ export function buildPersonGraphFromRows(rows, rootPersonId, vardas, pavarde) {
             const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
             addNode(nodes, nodeMap, stub);
             const relType = mapPareigos(row.pareigos);
-            addEdge(edges, edgeMap, edge(rootPersonId, stub.id, relType, row.pareigos || '', row.rysioPradzia));
+            addEdge(edges, edgeMap, edge(rootPersonId, stub.id, relType, row.pareigos || '', row.rysioPradzia, row.rysioPabaiga ?? null));
 
         } else if (tipas === 'KITI_RYSIAI_SU_JA') {
             if (!row.jarKodas || !row.pavadinimas) continue;
             const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
             addNode(nodes, nodeMap, stub);
             const relType = mapRysioPobudis(row.rysioPobudzioPavadinimas);
-            addEdge(edges, edgeMap, edge(rootPersonId, stub.id, relType, row.rysioPobudzioPavadinimas || '', row.rysioPradzia));
+            addEdge(edges, edgeMap, edge(rootPersonId, stub.id, relType, row.rysioPobudzioPavadinimas || '', row.rysioPradzia, row.rysioPabaiga ?? null));
 
         } else if (tipas === 'SUTUOKTINIO_DARBOVIETE') {
             // DB query matches rows where the person is the declarant (vardas/pavarde = them)
@@ -756,7 +924,9 @@ export function buildPersonGraphFromRows(rows, rootPersonId, vardas, pavarde) {
             const spousePavarde = row.pavarde || '';
             if (!spouseVardas || !spousePavarde) continue;
 
-            const spouseN = personNode(spouseVardas, spousePavarde, row.deklaracija, null);
+            const spousePid = personId(spouseVardas, spousePavarde);
+            const { fromDate: spFrom, toDate: spTo } = getPersonTime(spousePid);
+            const spouseN = personNode(spouseVardas, spousePavarde, row.deklaracija, spFrom, spTo);
 
             if (spouseN.id === rootPersonId) {
                 // Searched person IS the spouse in this row; declarant is susijusioAsmens*.
@@ -765,21 +935,23 @@ export function buildPersonGraphFromRows(rows, rootPersonId, vardas, pavarde) {
                 const declVardas = row.susijusioAsmensVardas || '';
                 const declPavarde = row.susijusioAsmensPavarde || '';
                 if (declVardas && declPavarde) {
-                    const declNode = personNode(declVardas, declPavarde, null, null);
+                    const declPid = personId(declVardas, declPavarde);
+                    const { fromDate: dFrom, toDate: dTo } = getPersonTime(declPid);
+                    const declNode = personNode(declVardas, declPavarde, null, dFrom, dTo);
                     addNode(nodes, nodeMap, declNode);
-                    addSpouseEdge(edges, edgeMap, declNode.id, rootPersonId);
+                    addSpouseEdge(edges, edgeMap, declNode.id, rootPersonId, row.rysioPradzia, row.rysioPabaiga ?? null);
                 }
                 // The org in this row is the searched person's own workplace — already covered
                 // by their own DEKLARUOJANCIO_DARBOVIETE rows; skip to avoid duplication.
             } else {
                 // Searched person IS the declarant; spouseN is their actual spouse.
                 addNode(nodes, nodeMap, spouseN);
-                addSpouseEdge(edges, edgeMap, rootPersonId, spouseN.id);
+                addSpouseEdge(edges, edgeMap, rootPersonId, spouseN.id, row.rysioPradzia, row.rysioPabaiga ?? null);
                 if (row.jarKodas && row.pavadinimas) {
                     const stub = orgNode(row.jarKodas, row.pavadinimas, row.jaTeisinesFormosKodas);
                     addNode(nodes, nodeMap, stub);
                     const relType = mapPareigos(row.pareigos);
-                    addEdge(edges, edgeMap, edge(spouseN.id, stub.id, relType, row.pareigos || '', null));
+                    addEdge(edges, edgeMap, edge(spouseN.id, stub.id, relType, row.pareigos || '', row.rysioPradzia, row.rysioPabaiga ?? null));
                 }
             }
         }

@@ -1,6 +1,6 @@
 import express from 'express';
 import { log } from '../utils/log.js';
-import { expandOrg, expandPerson, expandProcurement, expandContract, expandSutartis, expandPirkimas } from '../modules/rysiai/expand.js';
+import { expandOrg, expandPerson, expandProcurement, expandContract, expandSutartis, expandPirkimas, isBlockedOrg } from '../modules/rysiai/expand.js';
 import config from '../utils/config.js';
 
 const rysiaiRouter = express.Router();
@@ -30,6 +30,9 @@ rysiaiRouter.get('/rysiai/expand/:jarKodas', async (req, res) => {
     const { jarKodas } = req.params;
     if (!jarKodas || !/^\d+$/.test(jarKodas)) {
         return res.status(400).json({ error: 'Neteisingas jarKodas' });
+    }
+    if (isBlockedOrg(jarKodas)) {
+        return res.json({ nodes: [], edges: [] });
     }
     try {
         const data = await expandOrg(jarKodas);
