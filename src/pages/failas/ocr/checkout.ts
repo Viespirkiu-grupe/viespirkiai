@@ -13,7 +13,6 @@ function extractApiKey(request: Request): string | null {
 
 const handleCheckout: APIRoute = async ({ request }) => {
   const apiKey = extractApiKey(request);
-
   const { user, error, message } = await validateOcrApiKey(apiKey);
   if (error) return new Response(message, { status: error });
 

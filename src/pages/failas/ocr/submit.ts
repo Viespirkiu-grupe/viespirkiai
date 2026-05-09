@@ -2,6 +2,10 @@ import type { APIRoute } from 'astro';
 import { validateOcrApiKey } from '@/modules/failai/auth.js';
 import { postgres } from '@/postgres/postgres.js';
 
+export const GET: APIRoute = async ({ request }) => {
+  return new Response('Method not allowed', { status: 405 });
+};
+
 function extractApiKey(request: Request): string | null {
   const url = new URL(request.url);
   const fromQuery = url.searchParams.get('apiKey');
@@ -34,7 +38,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     const queueRes = await client.query(
       `DELETE FROM public."failaiOcrQueue"
-       WHERE id = $1 AND "lockedBy" = $2
+      WHERE id = $1 AND "lockedBy" = $2
        RETURNING "lockedAt"`,
       [id, user.pavadinimas],
     );
