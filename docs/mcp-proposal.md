@@ -878,7 +878,7 @@ error automatically.
 
 ```json
 {
-  "query": "SELECT \"tiekejoKodas\", COUNT(*) AS sutarciu_sk, ROUND(SUM(verte)) AS bendra_verte FROM sutartys WHERE istrinta IS NOT TRUE GROUP BY \"tiekejoKodas\" ORDER BY bendra_verte DESC",
+  "query": "SELECT \"tiekejoKodas\", MAX(tiekejas) AS tiekejas, COUNT(*) AS sutarciu_sk, ROUND(SUM(verte)) AS bendra_verte FROM v_sutartys WHERE istrinta IS NOT TRUE GROUP BY \"tiekejoKodas\" ORDER BY bendra_verte DESC",
   "purpose": "Top suppliers by total contract value — initial scan",
   "page": 1
 }
@@ -888,8 +888,8 @@ error automatically.
 
 ```sql
 SELECT q.*, COUNT(*) OVER () AS __total__
-FROM (SELECT "tiekejoKodas", COUNT(*) AS sutarciu_sk, ROUND(SUM(verte)) AS bendra_verte
-      FROM sutartys
+FROM (SELECT "tiekejoKodas", MAX(tiekejas) AS tiekejas, COUNT(*) AS sutarciu_sk, ROUND(SUM(verte)) AS bendra_verte
+      FROM v_sutartys
       WHERE istrinta IS NOT TRUE
       GROUP BY "tiekejoKodas"
       ORDER BY bendra_verte DESC) AS q
@@ -903,11 +903,13 @@ LIMIT 50 OFFSET 0
   "rows": [
     {
       "tiekejoKodas": "304567890",
+      "tiekejas": "UAB Greitas Statyba",
       "sutarciu_sk": 47,
       "bendra_verte": 12300000
     },
     {
       "tiekejoKodas": "301234567",
+      "tiekejas": "UAB Kelių Draugai",
       "sutarciu_sk": 31,
       "bendra_verte": 8750000
     },

@@ -173,10 +173,10 @@ SELECT d1."savininkoKodas" AS company_a,
        j1.pavadinimas      AS company_a_name,
        d2."savininkoKodas" AS company_b,
        j2.pavadinimas      AS company_b_name,
-       d1.domenas
+       d1.domain
 FROM domenai d1
 JOIN domenai d2
-  ON d1.domenas = d2.domenas
+  ON d1.domain = d2.domain
  AND d1."savininkoKodas" < d2."savininkoKodas"
 JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1."savininkoKodas"
 JOIN "jarCsv" j2 ON j2."jarKodas"::text = d2."savininkoKodas"
@@ -300,7 +300,7 @@ WITH buyer_staff AS (
     WHERE r."darbovietesTipas" = 'STANDARTINE'
       AND r."irasoTipas"       = 'DEKLARUOJANCIO_DARBOVIETE'
       AND r."rysioPabaiga"     IS NOT NULL
-      AND r."jarKodas" IN (SELECT DISTINCT "perkanciosiosOrganizacijosKodas" FROM sutartys)
+      AND r."jarKodas" IN (SELECT DISTINCT "pirkejoKodas" FROM v_sutartys)
 ),
 supplier_staff AS (
     SELECT r.vardas, r.pavarde,
@@ -315,8 +315,8 @@ SELECT b.vardas, b.pavarde,
        b."pirkejoKodas", b."isejoData",
        s."tiekejoKodas", s."atejoData",
        (s."atejoData" - b."isejoData") AS "dienuSkaicius",
-       (SELECT COUNT(*) FROM sutartys
-        WHERE "perkanciosiosOrganizacijosKodas" = b."pirkejoKodas"
+       (SELECT COUNT(*) FROM v_sutartys
+        WHERE "pirkejoKodas" = b."pirkejoKodas"
           AND "tiekejoKodas" = s."tiekejoKodas"
           AND "sudarymoData" >= b."isejoData") AS "sutartysPoPerejimo"
 FROM buyer_staff b
@@ -342,26 +342,29 @@ LIMIT 200;
 
 ```sql
 -- Buyers whose single-bidder rate per CPV is more than 2× the national average (min 5 tenders)
-WITH cpv_national AS (
-    SELECT a."pagrindinisKodasBvpz"              AS cpv,
-           COUNT(DISTINCT a."pirkimoNumeris")    AS total_pirkimai,
-           COUNT(DISTINCT a."pirkimoNumeris") FILTER (
-               WHERE (SELECT COUNT(*) FROM atn1dalyviai WHERE "ataskaitaId" = a.id) = 1
-           )                                     AS single_bidder_cnt
-    FROM atn1ataskaitos a
-    WHERE a."pagrindinisKodasBvpz" IS NOT NULL
-    GROUP BY a."pagrindinisKodasBvpz"
+WITH per_procurement AS (
+    SELECT "pirkimoNumeris",
+           "pagrindinisKodasBvpz"                                         AS cpv,
+           "pirkejoKodas",
+           COUNT(DISTINCT "tiekejoKodas")                                 AS dalyviu_sk
+    FROM v_dalyviai
+    WHERE "pagrindinisKodasBvpz" IS NOT NULL
+    GROUP BY "pirkimoNumeris", "pagrindinisKodasBvpz", "pirkejoKodas"
+),
+cpv_national AS (
+    SELECT cpv,
+           COUNT(DISTINCT "pirkimoNumeris")                               AS total_pirkimai,
+           COUNT(DISTINCT "pirkimoNumeris") FILTER (WHERE dalyviu_sk = 1) AS single_bidder_cnt
+    FROM per_procurement
+    GROUP BY cpv
 ),
 buyer_cpv AS (
-    SELECT a."perkanciosiosOrganizacijosKodas"   AS "pirkejoKodas",
-           a."pagrindinisKodasBvpz"              AS cpv,
-           COUNT(DISTINCT a."pirkimoNumeris")    AS pirkimai,
-           COUNT(DISTINCT a."pirkimoNumeris") FILTER (
-               WHERE (SELECT COUNT(*) FROM atn1dalyviai WHERE "ataskaitaId" = a.id) = 1
-           )                                     AS single_bidder
-    FROM atn1ataskaitos a
-    WHERE a."pagrindinisKodasBvpz" IS NOT NULL
-    GROUP BY a."perkanciosiosOrganizacijosKodas", a."pagrindinisKodasBvpz"
+    SELECT "pirkejoKodas",
+           cpv,
+           COUNT(DISTINCT "pirkimoNumeris")                               AS pirkimai,
+           COUNT(DISTINCT "pirkimoNumeris") FILTER (WHERE dalyviu_sk = 1) AS single_bidder
+    FROM per_procurement
+    GROUP BY "pirkejoKodas", cpv
 )
 SELECT bc."pirkejoKodas", bc.cpv,
        bc.pirkimai, bc.single_bidder,
@@ -388,20 +391,19 @@ LIMIT 200;
 
 ```sql
 -- Frameworks where 100% of call-offs went to a single supplier, ranked by total value
-SELECT s."pirkimoNumeris",
-       COUNT(*)                                      AS uzsakymuSkaicius,
-       COUNT(DISTINCT s."tiekejoKodas")             AS tiekejuSkaicius,
-       ROUND(SUM(s.verte))                          AS bendra_verte,
-       MIN(s."sudarymoData")                        AS pirmas_uzsakymas,
-       MAX(s."sudarymoData")                        AS paskutinis_uzsakymas,
-       MAX(j.pavadinimas)                           AS tiekejas,
-       MAX(s."perkanciosiosOrganizacijosKodas")     AS "pirkejoKodas"
-FROM sutartys s
-LEFT JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
-WHERE s.tipas = 'PPS'
-  AND s."pirkimoNumeris" IS NOT NULL
-GROUP BY s."pirkimoNumeris"
-HAVING COUNT(DISTINCT s."tiekejoKodas") = 1
+SELECT "pirkimoNumeris",
+       COUNT(*)                              AS uzsakymuSkaicius,
+       COUNT(DISTINCT "tiekejoKodas")       AS tiekejuSkaicius,
+       ROUND(SUM(verte))                    AS bendra_verte,
+       MIN("sudarymoData")                  AS pirmas_uzsakymas,
+       MAX("sudarymoData")                  AS paskutinis_uzsakymas,
+       MAX(tiekejas)                        AS tiekejas,
+       MAX("pirkejoKodas")                  AS "pirkejoKodas"
+FROM v_sutartys
+WHERE tipas = 'PPS'
+  AND "pirkimoNumeris" IS NOT NULL
+GROUP BY "pirkimoNumeris"
+HAVING COUNT(DISTINCT "tiekejoKodas") = 1
    AND COUNT(*) >= 5
 ORDER BY bendra_verte DESC
 LIMIT 200;
@@ -436,13 +438,13 @@ WITH candidate_pairs AS (
 SELECT cp.adresas,
        cp.jar_a, ja.pavadinimas AS pav_a,
        cp.jar_b, jb.pavadinimas AS pav_b,
-       (SELECT COUNT(*) FROM sutartys WHERE "tiekejoKodas" = cp.jar_a) AS sutartys_a,
-       (SELECT COUNT(*) FROM sutartys WHERE "tiekejoKodas" = cp.jar_b) AS sutartys_b
+       (SELECT COUNT(*) FROM v_sutartys WHERE "tiekejoKodas" = cp.jar_a) AS sutartys_a,
+       (SELECT COUNT(*) FROM v_sutartys WHERE "tiekejoKodas" = cp.jar_b) AS sutartys_b
 FROM candidate_pairs cp
 JOIN "jarCsv" ja ON ja."jarKodas"::text = cp.jar_a
 JOIN "jarCsv" jb ON jb."jarKodas"::text = cp.jar_b
-WHERE EXISTS (SELECT 1 FROM sutartys WHERE "tiekejoKodas" = cp.jar_a)
-  AND EXISTS (SELECT 1 FROM sutartys WHERE "tiekejoKodas" = cp.jar_b)
+WHERE EXISTS (SELECT 1 FROM v_sutartys WHERE "tiekejoKodas" = cp.jar_a)
+  AND EXISTS (SELECT 1 FROM v_sutartys WHERE "tiekejoKodas" = cp.jar_b)
 LIMIT 200;
 ```
 
@@ -450,15 +452,15 @@ LIMIT 200;
 -- Competing companies sharing a domain registrant
 SELECT d1."savininkoKodas" AS jar_a, j1.pavadinimas AS pav_a,
        d2."savininkoKodas" AS jar_b, j2.pavadinimas AS pav_b,
-       d1.domenas
+       d1.domain
 FROM domenai d1
 JOIN domenai d2
-  ON d1.domenas = d2.domenas
+  ON d1.domain = d2.domain
  AND d1."savininkoKodas" < d2."savininkoKodas"
 JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1."savininkoKodas"
 JOIN "jarCsv" j2 ON j2."jarKodas"::text = d2."savininkoKodas"
-WHERE EXISTS (SELECT 1 FROM sutartys WHERE "tiekejoKodas" = d1."savininkoKodas")
-  AND EXISTS (SELECT 1 FROM sutartys WHERE "tiekejoKodas" = d2."savininkoKodas")
+WHERE EXISTS (SELECT 1 FROM v_sutartys WHERE "tiekejoKodas" = d1."savininkoKodas")
+  AND EXISTS (SELECT 1 FROM v_sutartys WHERE "tiekejoKodas" = d2."savininkoKodas")
 LIMIT 200;
 ```
 
@@ -476,15 +478,13 @@ LIMIT 200;
 ```sql
 -- CPV categories with suspiciously low price variation (coefficient of variation < 5%)
 WITH cpv_bids AS (
-    SELECT a."pagrindinisKodasBvpz" AS cpv,
-           e.kaina::numeric         AS kaina,
-           a."pirkimoNumeris",
-           d.kodas                  AS "tiekejoKodas"
-    FROM atn1ataskaitos a
-    JOIN atn1dalyviai d        ON d."ataskaitaId" = a.id
-    JOIN "atn1pasiulymuEile" e ON e."ataskaitaId" = a.id AND e."dalyvioKodas" = d.kodas
-    WHERE a."pagrindinisKodasBvpz" IS NOT NULL
-      AND e.kaina ~ '^\d+(\.\d+)?$'
+    SELECT "pagrindinisKodasBvpz" AS cpv,
+           "pasiulymoKaina"       AS kaina,
+           "pirkimoNumeris",
+           "tiekejoKodas"
+    FROM v_dalyviai
+    WHERE "pagrindinisKodasBvpz" IS NOT NULL
+      AND "pasiulymoKaina" IS NOT NULL
 )
 SELECT cpv,
        COUNT(*)                                               AS pasiulymu_sk,
@@ -518,20 +518,19 @@ Themes 21–22 have no data support at all.
 
 ```sql
 -- Suppliers with highest median amendment overrun ratio (min 5 contracts, overrun > 50%)
-SELECT s."tiekejoKodas",
-       MAX(j.pavadinimas)                                                  AS tiekejas,
+SELECT "tiekejoKodas",
+       MAX(tiekejas)                                                       AS tiekejas,
        COUNT(*)                                                             AS sutarciu_sk,
-       ROUND(AVG(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0)), 2)        AS vid_koef,
-       ROUND(MAX(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0)), 2)        AS max_koef,
-       ROUND(SUM(s."faktineIvykdimoVerte" - s.verte))                      AS bendra_pervirsis
-FROM sutartys s
-JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
-WHERE s."faktineIvykdimoVerte" IS NOT NULL
-  AND s.verte > 0
-  AND s.istrinta IS NOT TRUE
-GROUP BY s."tiekejoKodas"
+       ROUND(AVG("faktineIvykdimoVerte" / NULLIF(verte, 0)), 2)            AS vid_koef,
+       ROUND(MAX("faktineIvykdimoVerte" / NULLIF(verte, 0)), 2)            AS max_koef,
+       ROUND(SUM("faktineIvykdimoVerte" - verte))                          AS bendra_pervirsis
+FROM v_sutartys
+WHERE "faktineIvykdimoVerte" IS NOT NULL
+  AND verte > 0
+  AND istrinta IS NOT TRUE
+GROUP BY "tiekejoKodas"
 HAVING COUNT(*) >= 5
-   AND AVG(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0)) > 1.5
+   AND AVG("faktineIvykdimoVerte" / NULLIF(verte, 0)) > 1.5
 ORDER BY vid_koef DESC
 LIMIT 200;
 ```
@@ -570,20 +569,19 @@ supplier_persons AS (
     WHERE "darbovietesTipas" = 'STANDARTINE'
       AND "irasoTipas"       = 'DEKLARUOJANCIO_DARBOVIETE'
 )
-SELECT s."perkanciosiosOrganizacijosKodas"                                    AS "pirkejoKodas",
+SELECT s."pirkejoKodas",
        s."tiekejoKodas",
-       MAX(j.pavadinimas)                                                     AS tiekejas,
+       MAX(s.tiekejas)                                                        AS tiekejas,
        COUNT(DISTINCT s."sutartiesUnikalusId")                                AS sutarciu_sk,
        ROUND(SUM(s.verte))                                                    AS bendra_verte,
        STRING_AGG(DISTINCT bp.vardas || ' ' || bp.pavarde, ', '
                   ORDER BY bp.vardas || ' ' || bp.pavarde)                    AS bendri_asmenys
-FROM sutartys s
-JOIN "jarCsv" j         ON j."jarKodas"::text = s."tiekejoKodas"
-JOIN buyer_persons bp   ON bp."jarKodas"       = s."perkanciosiosOrganizacijosKodas"
-JOIN supplier_persons sp ON sp."jarKodas"      = s."tiekejoKodas"
+FROM v_sutartys s
+JOIN buyer_persons bp    ON bp."jarKodas"  = s."pirkejoKodas"
+JOIN supplier_persons sp ON sp."jarKodas" = s."tiekejoKodas"
                          AND sp.vardas = bp.vardas AND sp.pavarde = bp.pavarde
 WHERE s.istrinta IS NOT TRUE
-GROUP BY s."perkanciosiosOrganizacijosKodas", s."tiekejoKodas"
+GROUP BY s."pirkejoKodas", s."tiekejoKodas"
 HAVING COUNT(DISTINCT s."sutartiesUnikalusId") >= 3
 ORDER BY bendra_verte DESC
 LIMIT 200;
@@ -609,15 +607,14 @@ not appear in PINREG unless an individual official made a personal declaration. 
 
 ```sql
 -- Buyer's procedure mix: how much goes through restricted/negotiated vs. open
-SELECT s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
-       MAX(j.pavadinimas)                  AS pirkejas,
-       s.tipas,
-       COUNT(*)                            AS sutarciu_sk,
-       ROUND(SUM(s.verte))                AS bendra_verte
-FROM sutartys s
-JOIN "jarCsv" j ON j."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-WHERE s.istrinta IS NOT TRUE
-GROUP BY s."perkanciosiosOrganizacijosKodas", s.tipas
+SELECT "pirkejoKodas",
+       MAX(pirkejas)       AS pirkejas,
+       tipas,
+       COUNT(*)            AS sutarciu_sk,
+       ROUND(SUM(verte))  AS bendra_verte
+FROM v_sutartys
+WHERE istrinta IS NOT TRUE
+GROUP BY "pirkejoKodas", tipas
 ORDER BY "pirkejoKodas", bendra_verte DESC
 LIMIT 200;
 ```
