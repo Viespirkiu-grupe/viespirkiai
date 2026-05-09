@@ -1,7 +1,5 @@
 # MCP Risk Intelligence Tool — Investigator Questions
 
-For LLM see: [mcp-investigator-prompt.md](mcp-investigator-prompt.md)
-
 Each question is phrased as a real investigator tip — the kind of sentence typed into the chat. Use these to verify
 that the MCP agentic loop produces correct, useful, non-hallucinated answers against the live database.
 
