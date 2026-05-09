@@ -16,34 +16,39 @@ All SQL in this document has been validated via `EXPLAIN` against the live `vies
 
 ### Available tools
 
-| Tool                          | What it returns                                                                                                                          |
-|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
-| `get_schema`                  | Schema of all views and raw tables with column names — call this first when unsure                                                       |
-| `get_juridinis`               | Full company profile: Sodra headcount/wages, recent contracts, PINREG declarations, court cases, VDI violations, domains, ES investments |
-| `search_juridiniai`           | Search companies by name or code                                                                                                         |
-| `search_sutartys`             | Search contracts by buyer code, supplier code, value range, date range, CPV prefix, contract type                                        |
-| `get_sutartis`                | Full single-contract record with documents JSONB and ES project links                                                                    |
-| `search_viesieji_pirkimai`    | Search procurement announcements by buyer, procedure type (`pirkimoBudas`), status, date, value, CPV                                     |
-| `get_viesasis_pirkimas`       | Full single-procurement record with technical specification files                                                                        |
-| `get_pinreg_jar`              | PINREG private-interest declarations for a company (directors, shareholders, spouses)                                                    |
-| `get_pinreg_asmuo`            | PINREG declarations for a named individual across all their employer and company links                                                   |
-| `search_failai`               | Search uploaded procurement documents by filename or procurement ID                                                                      |
-| `get_failas`                  | Fetch file metadata by numeric ID or MD5 hash                                                                                            |
-| `get_failas_tekstas`          | Read OCR-extracted full text of a procurement document                                                                                   |
-| `execute_investigation_query` | Run a validated read-only SQL SELECT against the database — analytical backbone for **all themes**                                       |
+Each section below references tools by ID only. Full descriptions:
+
+- `get_schema`: Schema of all views and raw tables — call first when column names are uncertain
+- `get_juridinis`: Full company profile (Sodra headcount/wages, contracts, PINREG, court cases, VDI, domains, ES
+  investments)
+- `search_juridiniai`: Search companies by name or code
+- `search_sutartys`: Search contracts (buyer/supplier code, value, date range, CPV prefix, contract type)
+- `get_sutartis`: Single-contract record with documents JSONB and ES project links
+- `search_viesieji_pirkimai`: Procurement announcements (buyer, `pirkimoBudas`, status, date, value, CPV)
+- `get_viesasis_pirkimas`: Single-procurement record with technical specification files
+- `get_pinreg_jar`: PINREG declarations for a company (directors, shareholders, spouses)
+- `get_pinreg_asmuo`: PINREG declarations for a named individual across all employer/company links
+- `search_failai`: Search procurement documents by filename or procurement ID
+- `get_failas`: File metadata by numeric ID or MD5 hash
+- `get_failas_tekstas`: OCR-extracted full text of a procurement document
+- `execute_investigation_query`: Read-only SQL SELECT — analytical backbone for **all themes**
 
 ### Views available inside `execute_investigation_query`
 
 Prefer views over raw tables. Call `get_schema` to confirm column names.
 
-| View             | Wraps                                                                                        | Key added columns                                                                                                                                                     | Themes                     |
-|------------------|----------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------|
-| `v_company`      | `jarCsv` + `sodra` (LATERAL) + compliance EXISTS flags                                       | `draustieji`, `vidutinasDarboUzmokestis`, `melagingiTiekejai`, `nepatikimiTiekejai`, `vdiPazeidimaiFlag`, `bylosKiekis`, `domenaiKiekis`, `neskelbiamosDerybosKiekis` | 1, 5–7, 9–12               |
-| `v_sutartys`     | `sutartys` + `jarCsv` ×2                                                                     | `pirkejas`, `tiekejas`, `pirkejoKodas`, `tiekejoKodas` (names resolved)                                                                                               | 1–3, 5–8, 13, 15–16, 18–20 |
-| `v_pirkimas`     | `viesiejiPirkimai` + `viesiejiPirkimaiVykdytojai`                                            | `vykdytojoPavadinimas`, `savivaldybe`, `shortCode`, `verteEur`                                                                                                        | 5–7, 20                    |
-| `v_person_links` | `pinregJuridiniaiRysiai` + `jarCsv`                                                          | `imonesVardas`, `registruotaLietuvoje`, `yraJuridinisAsmuo`                                                                                                           | 4, 10–11, 13, 19           |
-| `v_dalyviai`     | `atn1ataskaitos` + `atn1dalyviai` + `atn1pasiulymuEile` + `atn1atmestiPasiulymai` + `jarCsv` | `pasiulymoKaina` (cast to numeric), `eileNumeris`, `atmetimoPriezastis`, `tiekejas`                                                                                   | 2–3, 14, 17                |
-| `v_bylos`        | `bylosDalyviai` + `bylos` + `jarCsv`                                                         | `bylosRusis`, `teismas`, `bylojeKaip`, `pavadinimas`                                                                                                                  | 9                          |
+- `v_company` [themes 1, 5–7, 9–12]: `jarCsv` + `sodra` (LATERAL) + compliance flags → `draustieji`,
+  `vidutinasDarboUzmokestis`, `melagingiTiekejai`, `nepatikimiTiekejai`, `vdiPazeidimaiFlag`, `bylosKiekis`,
+  `domenaiKiekis`, `neskelbiamosDerybosKiekis`
+- `v_sutartys` [themes 1–3, 5–8, 13, 15–16, 18–20]: `sutartys` + `jarCsv` ×2 → `pirkejas`, `tiekejas`, `pirkejoKodas`,
+  `tiekejoKodas` (names resolved)
+- `v_pirkimas` [themes 5–7, 20]: `viesiejiPirkimai` + `viesiejiPirkimaiVykdytojai` → `vykdytojoPavadinimas`,
+  `savivaldybe`, `shortCode`, `verteEur`
+- `v_person_links` [themes 4, 10–11, 13, 19]: `pinregJuridiniaiRysiai` + `jarCsv` → `imonesVardas`,
+  `registruotaLietuvoje`, `yraJuridinisAsmuo`
+- `v_dalyviai` [themes 2–3, 14, 17]: `atn1ataskaitos` + `atn1dalyviai` + `atn1pasiulymuEile` + `atn1atmestiPasiulymai` +
+  `jarCsv` → `pasiulymoKaina` (numeric), `eileNumeris`, `atmetimoPriezastis`, `tiekejas`
+- `v_bylos` [theme 9]: `bylosDalyviai` + `bylos` + `jarCsv` → `bylosRusis`, `teismas`, `bylojeKaip`, `pavadinimas`
 
 **Raw tables used directly** (no view wrapper exists or view would be counterproductive):
 `pinregJuridiniaiRysiai` — themes 13, 19 (revolving-door date-range CTEs need raw access) ·
@@ -64,13 +69,7 @@ These themes are fully answerable with current data. All queries run without err
 
 > *"This company keeps winning large road contracts but they only have a handful of employees."*
 
-**Recommended MCP calls:**
-
-- `get_juridinis` — single call returns Sodra headcount, average salary, social tax, VDI violations, and recent
-  contracts; increase `sutartysLimit` to see the full award history
-- `execute_investigation_query` — query `v_company` for aggregate capacity metrics (headcount vs. total contract value
-  ratio); query `v_sutartys` to sum contract values by year for the supplier
-- `search_sutartys` — list all contracts for a supplier code filtered by date and value range as a quick first pass
+**TOOLS:** `get_juridinis`, `execute_investigation_query`, `search_sutartys`
 
 - How many employees does this supplier have, and how does that compare to their total contract value this year?
 - When was the company registered? Did it start winning contracts within months of registration?
@@ -84,13 +83,7 @@ These themes are fully answerable with current data. All queries run without err
 
 > *"I have a feeling the same companies keep showing up as losers in every tender this supplier wins."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — primary tool; query `v_dalyviai` to get all bid participations, amounts (
-  `pasiulymoKaina`), and rank (`eileNumeris`) for a company or procurement; calculate win rate, co-bidder frequency, and
-  bid-price clustering
-- `search_sutartys` — find the contracts a supplier won to seed the procurement numbers before writing aggregate
-  `v_dalyviai` queries
+**TOOLS:** `execute_investigation_query`, `search_sutartys`
 
 - What is this company's win rate across all procurements they participated in?
 - Who are the most frequent co-bidders, and how often do they bid higher than the winner?
@@ -105,11 +98,7 @@ These themes are fully answerable with current data. All queries run without err
 
 > *"I think these three companies take turns winning — each one wins for a while, then steps back."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query `v_dalyviai` grouped by `"tiekejoKodas"` and year to detect alternating win
-  windows within a CPV category; query `v_sutartys` to aggregate total contract value per company per period
-- `search_sutartys` — identify the set of contracts and CPV codes to investigate before writing aggregate queries
+**TOOLS:** `execute_investigation_query`, `search_sutartys`
 
 - Over the past five years, how is the total contract value split between these companies within the same CPV
   category?
@@ -123,14 +112,7 @@ These themes are fully answerable with current data. All queries run without err
 
 > *"The procurement officer and the winning supplier's director might know each other."*
 
-**Recommended MCP calls:**
-
-- `get_pinreg_jar` — retrieve PINREG declarations for both the buyer organisation and the winning supplier (declared
-  workplaces, shareholders, spouse workplaces)
-- `get_pinreg_asmuo` — look up a named individual to trace their full employment and company-link history across all
-  declarations
-- `execute_investigation_query` — query `v_person_links` to find shared declared persons between any set of company JAR
-  codes; filter `irasoTipas = 'SUTUOKTINIO_DARBOVIETE'` to surface spouse links
+**TOOLS:** `get_pinreg_jar`, `get_pinreg_asmuo`, `execute_investigation_query`
 
 - Are any people declared in PINREG as working for the buying organisation also linked to the winning supplier?
 - Do any directors or shareholders of the winning supplier have a spouse or family member employed by the buyer?
@@ -145,12 +127,7 @@ These themes are fully answerable with current data. All queries run without err
 > *"This buyer keeps awarding lots of small contracts to the same supplier — I think they're avoiding the open
 > tender threshold."*
 
-**Recommended MCP calls:**
-
-- `search_sutartys` — filter by `perkanciosiosOrganizacijosKodas` + `tiekejoKodas` + date range to list all contracts in
-  a buyer–supplier pair; sort by `sudarymoData` to inspect temporal clustering
-- `execute_investigation_query` — query `v_sutartys` to count and sum contracts by value bracket (< €30K, < €58K, <
-  €145K) to detect threshold-hugging clusters; compute days between consecutive awards for the same supplier
+**TOOLS:** `search_sutartys`, `execute_investigation_query`
 
 - How many contracts has this buyer awarded to this supplier in the past 12 months, and what are their individual
   values?
@@ -165,13 +142,7 @@ These themes are fully answerable with current data. All queries run without err
 
 > *"Every road repair contract in this municipality goes to the same company, year after year."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query `v_sutartys` filtered by `"pirkejoKodas"` to calculate each supplier's share of
-  total municipal procurement value; query `v_pirkimas` for the municipality's procedure distribution by `savivaldybe`
-- `search_sutartys` — list contracts for a buyer municipality to identify dominant suppliers at a glance
-- `get_juridinis` — profile the dominant supplier (headcount, registration date, address) and check whether competing
-  suppliers in the same region are active
+**TOOLS:** `execute_investigation_query`, `search_sutartys`, `get_juridinis`
 
 - What share of total procurement value in this municipality was awarded to this single supplier over the past
   three years?
@@ -186,13 +157,7 @@ These themes are fully answerable with current data. All queries run without err
 > *"This authority almost never uses open tenders — everything goes through negotiated procedure without
 > publication."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query `v_sutartys` grouped by `tipas` per buyer to compute open-vs-direct ratio; query
-  raw `neskelbiamosDerybos` for audit findings on unjustified direct awards for that buyer
-- `search_viesieji_pirkimai` — filter by `pvJarKodas` (buyer code) and `pirkimoBudas` (e.g., `DERYBOS_BE_PASKELBIMO`) to
-  list direct-award announcements
-- `get_viesasis_pirkimas` — open a specific procurement to read its stated justification text
+**TOOLS:** `execute_investigation_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`
 
 - What fraction of this buyer's contracts by value were awarded via direct negotiation vs open competition?
 - Has this buyer's use of negotiated-without-publication procedure increased over time?
@@ -205,13 +170,7 @@ These themes are fully answerable with current data. All queries run without err
 
 > *"The contract was signed for €200K but the final execution value was €900K."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query `v_sutartys` comparing `"faktineIvykdimoVerte"` to `verte`; sort by overrun
-  ratio to find worst cases; group by supplier or buyer to detect systematic patterns
-- `get_sutartis` — fetch the full contract record including `dokumentai` JSONB to see attached amendment document names
-- `search_sutartys` — narrow down contracts before writing aggregate queries (filter by supplier, buyer, CPV prefix,
-  date)
+**TOOLS:** `execute_investigation_query`, `get_sutartis`, `search_sutartys`
 
 - For this supplier, what is the average ratio of `faktineIvykdimoVerte` to `verte` across all contracts?
 - Are there contracts where the final value exceeded the original by more than 50%?
@@ -224,12 +183,7 @@ These themes are fully answerable with current data. All queries run without err
 
 > *"I want to know if this company or its related parties have ever been flagged."*
 
-**Recommended MCP calls:**
-
-- `get_juridinis` — single call returns `melagingiTiekejai` and `nepatikimiTiekejai` blacklist flags, VDI violation
-  count, and court case summaries; increase `teismoNuosprendziaiLimit` to see more cases
-- `execute_investigation_query` — query `v_company` to batch-check compliance flags across multiple company codes; query
-  `v_bylos` for full court case details including `bylosRusis` (case type) and `bylojeKaip` (defendant/plaintiff role)
+**TOOLS:** `get_juridinis`, `execute_investigation_query`
 
 - Is this company currently on the unreliable suppliers list or the false-declaration debarment list?
 - Has this company ever been debarred, even if that debarment has since expired?
@@ -243,15 +197,7 @@ These themes are fully answerable with current data. All queries run without err
 
 > *"I want to understand who really controls this company and what else they're involved in."*
 
-**Recommended MCP calls:**
-
-- `get_pinreg_jar` — retrieve all PINREG-declared persons for a company (directors, shareholders, and their spouses)
-- `get_pinreg_asmuo` — given a person's name, find every company they are linked to; repeat for each discovered person
-  to traverse the network
-- `execute_investigation_query` — query `v_person_links` to map the corporate web programmatically; query `v_company`
-  for contract counts and compliance flags for each discovered node
-- `search_juridiniai` — look up companies by name when you have a name but not a JAR code
-- `get_juridinis` — deep-dive a specific network node (shared address, domain registrations, court cases)
+**TOOLS:** `get_pinreg_jar`, `get_pinreg_asmuo`, `execute_investigation_query`, `search_juridiniai`, `get_juridinis`
 
 - Who are the current directors and shareholders of this company according to PINREG declarations?
 - What other companies are those people connected to — as directors, shareholders, or via a spouse?
@@ -266,14 +212,7 @@ These themes are fully answerable with current data. All queries run without err
 > *"These two companies bid against each other every time, but I suspect the same person controls both through a shell
 holding company."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query `v_person_links` to find shared declared persons across a cluster of `jarKodas`
-  values; filter `registruotaLietuvoje = false` to flag foreign entities that cannot be traced further; query raw
-  `domenai` for shared domain registrants
-- `get_pinreg_jar` — pull full PINREG declarations for each bidder to manually cross-reference directors and
-  shareholders
-- `get_juridinis` — check domain registrations and court case history for each company in the bidder cluster
+**TOOLS:** `execute_investigation_query`, `get_pinreg_jar`, `get_juridinis`
 
 **What the system can answer with current data:**
 
@@ -337,13 +276,11 @@ false negative.
 
 **What would be needed to close this gap:**
 
-| Requirement                                 | Status      | Notes                                                                                           |
-|---------------------------------------------|-------------|-------------------------------------------------------------------------------------------------|
-| Company-owns-company table with ownership % | ❌ Missing   | Would need JAR registry export or a commercial UBO database (OpenCorporates, Orbis)             |
-| `WITH RECURSIVE` CTE traversal              | ✅ Available | Guardrail stack already allows it; max depth 5                                                  |
-| 25% threshold filter (EU AML standard)      | ❌ No data   | Requires ownership share column, not just a link                                                |
-| Foreign holding company resolution          | ❌ No data   | `registruotaLietuvoje = false` flag exists in `v_person_links` but the chain is not traversable |
-| JAR historical ownership snapshots          | ❌ Missing   | Would catch structures created just before a tender and dissolved after award                   |
+- ❌ Company-owns-company table with ownership % — needs JAR registry export or commercial UBO DB (OpenCorporates, Orbis)
+- ✅ `WITH RECURSIVE` CTE traversal — guardrail stack allows it; max depth 5
+- ❌ 25% threshold filter (EU AML standard) — requires ownership share column, not just a link
+- ❌ Foreign holding company resolution — `registruotaLietuvoje = false` flags opacity but chain is not traversable
+- ❌ JAR historical ownership snapshots — needed to catch structures created before a tender, dissolved after award
 
 **Interim mitigation available today:**
 
@@ -373,12 +310,7 @@ ORDER BY "jarKodas", pavarde;
 > *"This company won a CPVA-funded project worth €2M but they have 4 employees and the subcontractor they declared has
 zero Sodra payments."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query raw `cpvaProjektuSutartys` (no view wrapper exists) with LATERAL joins to
-  `sodra` for headcount; group by contractor–subcontractor pair to detect recurring related-party arrangements
-- `get_juridinis` — verify Sodra headcount and wage data for specific main contractors or subcontractors by JAR code
-- `get_pinreg_jar` — check whether the main contractor and subcontractor share declared directors or shareholders
+**TOOLS:** `execute_investigation_query`, `get_juridinis`, `get_pinreg_jar`
 
 - Which CPVA-funded contracts name a subcontractor, and how many employees does that subcontractor actually have
   according to Sodra?
@@ -440,13 +372,7 @@ LIMIT 200;
 > *"The head of procurement at this municipality left last year. I want to know if she now works for any company that
 won contracts there while she was in charge."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query raw `pinregJuridiniaiRysiai` (use raw table, not `v_person_links` — the
-  revolving-door date-range self-join pattern requires raw access) joined to `v_sutartys` to find people who left a
-  buyer org and joined a supplier within 2 years; count post-transition contracts
-- `get_pinreg_asmuo` — look up a specific named individual to trace their employment timeline across all organisations
-- `get_pinreg_jar` — retrieve the full declared staff list for a buyer or supplier to identify transition candidates
+**TOOLS:** `execute_investigation_query`, `get_pinreg_asmuo`, `get_pinreg_jar`
 
 - Which people held roles at a buying organisation and subsequently appear in PINREG at a supplier that won contracts
   from that same buyer?
@@ -502,15 +428,8 @@ LIMIT 200;
 > *"Every tender this department publishes in this category ends up with only one bidder. I think the specs are written
 to exclude everyone else."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — primary tool; query `v_dalyviai` to calculate single-bidder rates per buyer per CPV
-  vs. the national average; identify which suppliers dominate single-bidder awards
-- `search_viesieji_pirkimai` — find specific procurement announcements for the suspect buyer and CPV category
-- `get_viesasis_pirkimas` — open a procurement record to access its technical specification files
-- `search_failai` — find specification documents uploaded to a procurement
-- `get_failas_tekstas` — read OCR-extracted text of specification documents to detect supplier-specific or exclusionary
-  wording
+**TOOLS:** `execute_investigation_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `search_failai`,
+`get_failas_tekstas`
 
 - What fraction of a buyer's tenders in a given CPV category receive only one bid, compared to the national average for
   that same CPV?
@@ -559,13 +478,7 @@ LIMIT 200;
 > *"This buyer set up a framework agreement three years ago and has been calling off contracts from it ever since, but
 always to the same one company."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query `v_sutartys` filtered on `tipas = 'PPS'` grouped by `"pirkimoNumeris"` to count
-  distinct suppliers and total value; a single-supplier framework with many call-offs is the key red flag
-- `search_sutartys` — filter by `tipas = 'PPS'` and `perkanciosiosOrganizacijosKodas` to list call-off contracts for a
-  buyer
-- `get_sutartis` — inspect individual call-off contracts for procedure and document details
+**TOOLS:** `execute_investigation_query`, `search_sutartys`, `get_sutartis`
 
 - How many distinct suppliers appear across all call-off contracts (`tipas = 'PPS'`) linked to a given framework
   procurement number?
@@ -599,13 +512,7 @@ LIMIT 200;
 > *"I keep seeing the same two companies bidding against each other, but they're registered at exactly the same street
 address."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query raw `jarCsv` self-joined on `adresas` (use raw table, not `v_company` — the
-  LATERAL Sodra join in `v_company` makes a self-join prohibitively expensive); cross-reference with `v_sutartys` for
-  contract counts; query raw `domenai` self-joined on `domain` for shared registrants
-- `get_juridinis` — verify registered address and domain registrations for specific companies in the candidate pair
-- `search_juridiniai` — find companies sharing an address fragment or operating in the same area
+**TOOLS:** `execute_investigation_query`, `get_juridinis`, `search_juridiniai`
 
 - Do any of the co-bidders in a cluster share a registered legal address in the company registry?
 - Do any of them share a domain registrant in the WHOIS/`domenai` table?
@@ -665,11 +572,7 @@ LIMIT 200;
 > *"All the bids in this sector feel like they came from the same spreadsheet — the prices are almost identical across
 completely unrelated tenders."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — sole analytical tool for this theme; query `v_dalyviai` to compute the coefficient of
-  variation (STDDEV / AVG) of `pasiulymoKaina` per CPV category; `pasiulymoKaina` is already cast to numeric in the
-  view — no regex needed; follow up by listing the specific suppliers in flagged low-variation categories
+**TOOLS:** `execute_investigation_query`
 
 - In a given CPV category, is the coefficient of variation of submitted bid prices abnormally low, suggesting
   coordination?
@@ -712,15 +615,7 @@ Themes 21–22 have no data support at all.
 > *"They won with a suspiciously low bid and then the contract value tripled through amendments. I want to see which
 contracts had the biggest gap between the signed price and the final invoiced amount."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query `v_sutartys` filtering `"faktineIvykdimoVerte" IS NOT NULL AND verte > 0` sorted
-  by overrun ratio; group by supplier or buyer to detect systematic patterns; the amendment trail itself is a data gap (
-  see below)
-- `get_sutartis` — fetch the full contract record including `dokumentai` JSONB to inspect names of attached amendment
-  documents
-- `search_failai` — find amendment documents attached to a specific contract
-- `get_failas_tekstas` — read amendment document text for narrative context
+**TOOLS:** `execute_investigation_query`, `get_sutartis`, `search_failai`, `get_failas_tekstas`
 
 - What is the ratio of `faktineIvykdimoVerte` (actual final value) to `verte` (originally signed value) across a
   supplier's contracts?
@@ -764,13 +659,7 @@ This is a data sourcing gap — the amendment sequence is published on the CVP I
 > *"This municipality keeps awarding contracts to a company that is effectively owned by the municipality itself,
 bypassing competition."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query raw `pinregJuridiniaiRysiai` joined to `v_sutartys` to find buyer–supplier pairs
-  sharing declared persons; this is the best available proxy for formal municipal ownership (see limitations below)
-- `get_pinreg_jar` — retrieve PINREG declarations for both the municipality (buyer) and the suspected subsidiary (
-  supplier) to compare named individuals
-- `search_sutartys` — confirm contract volume between the buyer and supplier before running aggregate analysis
+**TOOLS:** `execute_investigation_query`, `get_pinreg_jar`, `search_sutartys`
 
 - What fraction of a municipality's contracts by value go to companies where the municipality is a declared shareholder
   or founder?
@@ -820,15 +709,7 @@ not appear in PINREG unless an individual official made a personal declaration. 
 > *"This buyer uses restricted tenders where they get to choose who receives an invitation, and I'm pretty sure the same
 companies get invited every single time."*
 
-**Recommended MCP calls:**
-
-- `execute_investigation_query` — query `v_sutartys` grouped by `tipas` per buyer to compute procedure mix (open vs.
-  restricted vs. direct); query raw `neskelbiamosDerybos` filtered by `"jarKodas"` to retrieve audit findings on
-  unjustified direct awards
-- `search_viesieji_pirkimai` — filter by `pvJarKodas` (buyer code) and `pirkimoBudas` (e.g., `RIBOTAS`,
-  `DERYBOS_BE_PASKELBIMO`) to list restricted and negotiated announcements
-- `get_viesasis_pirkimas` — open a specific procurement to read its stated justification for the non-competitive
-  procedure
+**TOOLS:** `execute_investigation_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`
 
 - How often does this buyer use restricted or negotiated procedures vs. open competition?
 - What is the direct-award audit history from `neskelbiamosDerybos`?
@@ -892,13 +773,7 @@ This is a data sourcing gap. The VRK publishes donor data publicly; if ingested 
 > *"The contract says it was executed in full, but the road they were paid to repair is in the same condition as before.
 Is there any signal in the data?"*
 
-**MCP tool coverage (limited signal only):**
-
-- `get_juridinis` — check for VDI violations (`vdiPazeidimai`) during the contract execution period as an indirect
-  signal of unavailable workforce
-- `get_sutartis` — confirm `faktineIvykdimoVerte` is recorded (payment confirmed, but not proof of delivery); inspect
-  `dokumentai` for acceptance documents
-- `search_failai` + `get_failas_tekstas` — read delivery acceptance documents if attached to the contract
+**TOOLS (limited signal only):** `get_juridinis`, `get_sutartis`, `search_failai`, `get_failas_tekstas`
 
 **Not currently feasible from structured data alone.** The `faktineIvykdimoVerte` field confirms payment was
 recorded, not that delivery occurred. Detection would require:
