@@ -38,6 +38,17 @@ const VIEW_METADATA = {
     v_company: {
         description:
             "Company profile with legal form, workforce, payroll, risk flags, and activity counters.",
+        keyColumns: [
+            "jarKodas (PK)",
+            "pavadinimas",
+            "formosPavadinimas",
+            "darbuotojai",
+            "vidutinisAtlyginimas",
+            "melagingisTiekejas",
+            "nepatikimasTiekejas",
+            "bylosSkaicius",
+        ],
+        linksTo: ["v_sutartys.pirkejoKodas", "v_sutartys.tiekejoKodas", "v_bylos.jarKodas", "v_person_links.jarKodas", "v_dalyviai.tiekejoKodas"],
         columns: [
             "jarKodas: text",
             "pavadinimas: text",
@@ -71,6 +82,18 @@ const VIEW_METADATA = {
     v_sutartys: {
         description:
             "Contract-centric view with buyer/supplier names, CPV category, value, and timing fields.",
+        keyColumns: [
+            "sutartiesUnikalusId (PK)",
+            "pirkimoNumeris (FK→v_pirkimas)",
+            "pirkejoKodas (FK→v_company)",
+            "tiekejoKodas (FK→v_company)",
+            "sudarymoData",
+            "verte",
+            "tipas",
+            "bvpzKodas",
+            "kategorija",
+        ],
+        linksTo: ["v_company.jarKodas", "v_pirkimas.pirkimoId", "v_dalyviai.pirkimoNumeris"],
         columns: [
             "sutartiesUnikalusId: bigint",
             "sutartiesNumeris: text",
@@ -115,6 +138,15 @@ const VIEW_METADATA = {
     v_pirkimas: {
         description:
             "Procurement notice view with organizer details, lifecycle status, estimated value, and description.",
+        keyColumns: [
+            "pirkimoId (PK)",
+            "jarKodas (FK→v_company)",
+            "pirkimoBudas",
+            "statusas",
+            "numatomaVerteEUR",
+            "paskelbimoData",
+        ],
+        linksTo: ["v_company.jarKodas", "v_sutartys.pirkimoNumeris", "v_dalyviai.pirkimoNumeris"],
         columns: [
             "pirkimoId: text",
             "pavadinimas: text",
@@ -147,6 +179,16 @@ const VIEW_METADATA = {
     v_person_links: {
         description:
             "Person-to-organization relationship view from PINREG declarations, including procurement participation flag.",
+        keyColumns: [
+            "id (PK)",
+            "jarKodas (FK→v_company)",
+            "vardas",
+            "pavarde",
+            "pareigos",
+            "dalyvaujaViesuosePirkimuose",
+            "rysioPradzia",
+        ],
+        linksTo: ["v_company.jarKodas"],
         columns: [
             "id: bigint",
             "deklaracija: uuid",
@@ -184,6 +226,17 @@ const VIEW_METADATA = {
     v_dalyviai: {
         description:
             "Bidder-level ATN-1 procurement participation with ranking, rejection data, and fraud-signal flags (conflict of interest, competition distortion, complaints).",
+        keyColumns: [
+            "pirkimoNumeris (FK→v_pirkimas)",
+            "pirkejoKodas (FK→v_company)",
+            "tiekejoKodas (FK→v_company)",
+            "eileNumeris",
+            "pasiulymoKaina",
+            "interesuKonfliktasNustatytas",
+            "konkurencijaIskreipiantisAsmuo",
+            "pretenzijaPateikta",
+        ],
+        linksTo: ["v_company.jarKodas", "v_pirkimas.pirkimoId", "v_sutartys.pirkimoNumeris"],
         columns: [
             "pirkimoNumeris: text",
             "pirkejoKodas: text",
@@ -225,6 +278,15 @@ const VIEW_METADATA = {
     v_bylos: {
         description:
             "Court case view linking case attributes with participant organizations.",
+        keyColumns: [
+            "bylosId (PK)",
+            "jarKodas (FK→v_company)",
+            "bylosNumeris",
+            "bylosRusis",
+            "bylosData",
+            "bylojeKaip",
+        ],
+        linksTo: ["v_company.jarKodas"],
         columns: [
             "bylosId: bigint",
             "bylosNumeris: text",
@@ -326,6 +388,8 @@ async function listAll() {
         return {
             identifier,
             description: metadata.description,
+            keyColumns: metadata.keyColumns,
+            linksTo: metadata.linksTo,
             example: metadata.example,
         };
     });
