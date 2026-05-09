@@ -8,7 +8,7 @@ import { animateNodes } from 'sigma/utils';
 import EdgeCurveProgram, { DEFAULT_EDGE_CURVATURE, indexParallelEdgesIndex } from '@sigma/edge-curve';
 import type { Settings } from 'sigma/settings';
 
-function createSigma(graph: Graph, container: HTMLElement, options?: Partial<Settings>): Sigma {
+export function createSigma(graph: Graph, container: HTMLElement, options?: Partial<Settings>): Sigma {
     const { edgeProgramClasses, ...rest } = options ?? {};
     return new Sigma(graph, container, {
         ...rest,
@@ -19,11 +19,31 @@ function createSigma(graph: Graph, container: HTMLElement, options?: Partial<Set
     });
 }
 
+export {
+    Sigma,
+    Graph,
+    forceAtlas2,
+    noverlap,
+    NodeBorderProgram,
+    NodeImageProgram,
+    createNodeImageProgram,
+    animateNodes,
+    DEFAULT_EDGE_CURVATURE,
+    indexParallelEdgesIndex,
+};
+
 const _rysiai = {
-    Sigma, Graph, forceAtlas2, noverlap,
-    NodeBorderProgram, NodeImageProgram, createNodeImageProgram,
-    animateNodes, createSigma,
-    DEFAULT_EDGE_CURVATURE, indexParallelEdgesIndex,
+    Sigma,
+    Graph,
+    forceAtlas2,
+    noverlap,
+    NodeBorderProgram,
+    NodeImageProgram,
+    createNodeImageProgram,
+    animateNodes,
+    createSigma,
+    DEFAULT_EDGE_CURVATURE,
+    indexParallelEdgesIndex,
 };
 
 declare global {
