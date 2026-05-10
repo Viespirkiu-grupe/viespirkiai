@@ -1,4 +1,8 @@
-# MCP Risk Intelligence Tool — Investigation Themes
+# MCP Risk Intelligence Tool — Enhanced Investigation Themes for Lithuanian Public Procurement
+
+> For human investigator: this document is meant to be pasted as the LLM prompt (with or without the human-only notes).
+> Human-only notes are clearly marked with blockquotes starting with `For human investigator:` and can be removed before
+> giving the prompt to the MCP agent.
 
 ## MCP Tool Quick Reference
 
@@ -6,642 +10,571 @@
 
 Each section below references tools by ID only. Full descriptions:
 
-- `get_schema`: Schema of all views and raw tables — call first when column names are uncertain
+- `get_schema`: Schema of all views and raw tables — call first when column names are uncertain.
 - `get_juridinis`: Full company profile (Sodra headcount/wages, contracts, PINREG, court cases, VDI, domains, ES
-  investments)
-- `search_juridiniai`: Search companies by name or code
-- `search_sutartys`: Search contracts (buyer/supplier code, value, date range, CPV prefix, contract type)
-- `get_sutartis`: Single-contract record with documents JSONB and ES project links
-- `search_viesieji_pirkimai`: Procurement announcements (buyer, `pirkimoBudas`, status, date, value, CPV)
-- `get_viesasis_pirkimas`: Single-procurement record with technical specification files
-- `get_pinreg_jar`: PINREG declarations for a company (directors, shareholders, spouses)
-- `get_pinreg_asmuo`: PINREG declarations for a named individual across all employer/company links
-- `search_failai`: Search procurement documents by filename or procurement ID
-- `get_failas`: File metadata by numeric ID or MD5 hash
-- `get_failas_tekstas`: OCR-extracted full text of a procurement document
-- `execute_query`: Read-only SQL SELECT — analytical backbone for **all themes**
+  investments).
+- `search_juridiniai`: Search companies by name or code.
+- `search_sutartys`: Search contracts (buyer/supplier code, value, date range, CPV prefix, contract type).
+- `get_sutartis`: Single-contract record with documents JSONB and ES project links.
+- `search_viesieji_pirkimai`: Procurement announcements (buyer, `pirkimoBudas`, status, date, value, CPV).
+- `get_viesasis_pirkimas`: Single-procurement record with technical specification files.
+- `get_pinreg_jar`: PINREG declarations for a company (directors, shareholders, spouses).
+- `get_pinreg_asmuo`: PINREG declarations for a named individual across all employer/company links.
+- `search_failai`: Search procurement documents by filename or procurement ID.
+- `get_failas`: File metadata by numeric ID or MD5 hash.
+- `get_failas_tekstas`: OCR-extracted full text of a procurement document.
+- `execute_query`: Read-only SQL SELECT — analytical backbone for **all themes**.
 
 ### Views available inside `execute_query`
 
 Prefer views to raw tables. Call `get_schema` to confirm column names.
 
-- `v_company` [themes 1, 5–7, 9–12]: `jarCsv` + `sodra` (LATERAL) + compliance flags → `draustieji`,
-  `vidutinasDarboUzmokestis`, `melagingiTiekejai`, `nepatikimiTiekejai`, `vdiPazeidimaiFlag`, `bylosKiekis`,
-  `domenaiKiekis`, `neskelbiamosDerybosKiekis`
-- `v_sutartys` [themes 1–3, 5–8, 13, 15–16, 18–20]: `sutartys` + `jarCsv` ×2 → `pirkejas`, `tiekejas`, `pirkejoKodas`,
-  `tiekejoKodas` (names resolved)
-- `v_pirkimas` [themes 5–7, 20]: `viesiejiPirkimai` + `viesiejiPirkimaiVykdytojai` → `vykdytojoPavadinimas`,
-  `savivaldybe`, `shortCode`, `verteEur`
-- `v_person_links` [themes 4, 10–11, 13, 19]: `pinregJuridiniaiRysiai` + `jarCsv` → `imonesVardas`,
-  `registruotaLietuvoje`, `yraJuridinisAsmuo`
+- `v_company` [themes 1, 5–7, 9–12, 19, 22–23]: `jarCsv` + `sodra` (LATERAL) + compliance flags → `draustieji`,
+  `vidutinisAtlyginimas`, `melagingiTiekejai`, `nepatikimiTiekejai`, `vdiPazeidimaiFlag`, `bylosKiekis`,
+  `domenaiKiekis`, `neskelbiamosDerybosKiekis`.
+- `v_sutartys` [themes 1–3, 5–8, 13, 15–16, 18–20, 22–24]: `sutartys` + `jarCsv` ×2 → `pirkejas`, `tiekejas`,
+  `pirkejoKodas`, `tiekejoKodas` (names resolved).
+- `v_pirkimas` [themes 5–7, 14, 20, 24]: `viesiejiPirkimai` + `viesiejiPirkimaiVykdytojai` → `vykdytojoPavadinimas`,
+  `savivaldybe`, `shortCode`, `verteEur`.
+- `v_person_links` [themes 4, 10–11, 13, 19, 21]: `pinregJuridiniaiRysiai` + `jarCsv` → `imonesVardas`,
+  `registruotaLietuvoje`, `yraJuridinisAsmuo`.
 - `v_dalyviai` [themes 2–3, 14, 17]: `atn1ataskaitos` + `atn1dalyviai` + `atn1pasiulymuEile` + `atn1atmestiPasiulymai` +
-  `jarCsv` → `pasiulymoKaina` (numeric), `eileNumeris`, `atmetimoPriezastis`, `tiekejas`
-- `v_bylos` [theme 9]: `bylosDalyviai` + `bylos` + `jarCsv` → `bylosRusis`, `teismas`, `bylojeKaip`, `pavadinimas`
+  `jarCsv` → `pasiulymoKaina` (numeric), `eileNumeris`, `atmetimoPriezastis`, `tiekejas`.
+- `v_bylos` [themes 9, 23–24]: `bylosDalyviai` + `bylos` + `jarCsv` → `bylosRusis`, `teismas`, `bylojeKaip`,
+  `pavadinimas`.
 
 **Raw tables used directly** (no view wrapper exists or view would be counterproductive):
-`pinregJuridiniaiRysiai` — themes 13, 19 (revolving-door date-range CTEs need raw access) ·
-`jarCsv` — theme 16 (address self-join; `v_company` LATERAL sodra join would be extremely expensive here) ·
-`domenai` — themes 11, 16 (domain pair self-join) ·
-`cpvaProjektuSutartys` — theme 12 (CPVA subcontractor data) ·
-`neskelbiamosDerybos` — theme 20 (audit findings, single-table lookup)
 
----
+- `pinregJuridiniaiRysiai` — themes 11, 13, 19, 21 (revolving-door and municipal ownership date-range CTEs need raw
+  access).
+- `jarCsv` — themes 1, 10, 16, 22 (address self-join; `v_company` LATERAL Sodra join would be extremely expensive here).
+- `domenai` — themes 10–11, 16 (domain pair self-join).
+- `cpvaProjektuSutartys` — theme 12 (CPVA subcontractor data).
+- `neskelbiamosDerybos` — theme 20 (audit findings, single-table lookup).
+- other specialized tables (e.g. accounts, invoices) when added — see `get_schema`.
 
-## Supported themes
+> For human investigator: when adding new raw tables (e.g. new JAR ownership exports, VRK donor data, municipal
+> enterprise registries), extend this list and reference themes where the table is actually used. This keeps the LLM
+> focused on relevant sources and avoids spurious joins.
+
+## Theme tagging for Lithuanian institutions and OSINT
+
+For each theme below, the tag list indicates the primary institutional interest and whether OSINT is recommended:
+
+- `[STT]` – Specialiųjų tyrimų tarnyba: corruption, abuse of office, conflict of interest, influence peddling.
+- `[FNTT]` – Finansinių nusikaltimų tyrimo tarnyba: fraud, money laundering, EU funds abuse, tax-related crimes.
+- `[VPT]` – Viešųjų pirkimų tarnyba: procurement law compliance, procedure correctness.
+- `[VK]` – Valstybės kontrolė: systemic weaknesses, EU funds eligibility issues.
+- `[KT]` – Konkurencijos taryba: cartels, bid rigging, anti-competitive agreements.
+- `OSINT: yes/no/conditional` – whether the agent should consider structured web search and open-source intelligence (
+  e.g. public company websites, media, OSINT registers).
+
+These tags are **for the human investigator and LLM routing**, they do not change legal qualification of conduct.
+
+## Supported themes (updated and extended)
 
 ### 1. Shell company / capacity mismatch
 
+`[STT][FNTT][VPT]` – OSINT: **yes** (websites, LinkedIn, media)
+
 TOOLS: `get_juridinis`, `execute_query`, `search_sutartys`
-GOAL: Detect capacity mismatch — supplier headcount/wages insufficient for contract scope
-DETECT: headcount vs. total contract value · Sodra wages vs. revenue ratio · registration date vs. first win date ·
-shared registered address count
+
+GOAL: Detect capacity mismatch — supplier headcount/wages insufficient for contract scope.
+
+DETECT:
+
+- Headcount vs. total contract value over rolling windows (e.g. annual Sodra vs. cumulative contract obligations).
+- Sodra wages vs. revenue proxies (when revenue fields/tax data become available) and vs. sector medians.
+- Registration date vs. first contract win date (sudden large wins soon after incorporation, especially in high-risk CPV
+  areas).
+- Shared registered address count (same address used by many suppliers or linked to buyers).
+- Lack of visible operational footprint: no website, no employees on LinkedIn, no office in OSINT sources while handling
+  large/complex contracts.
+
+> For human investigator: STT typically sees capacity mismatch as part of sham competition, favouritism, or misuse of
+> shell companies; FNTT will be interested when capacity mismatch is combined with suspicious financial flows (e.g.
+> significant advances, cash withdrawals, or cross-border payments). When escalating to FNTT, attach summary tables of
+> headcount vs. obligations and any OSINT on real operations.
 
 ### 2. Bid rigging — cover bidding and bid suppression
 
+`[STT][KT]` – OSINT: **yes** (industry associations, local media)
+
 TOOLS: `execute_query`, `search_sutartys`
-GOAL: Detect cover bidding — recurring losers always bidding just above winner
-DETECT: win rate vs. participation count · top co-bidder frequency · losing bid clustering above winner · participation
-count vs. CPV national average
+
+GOAL: Detect cover bidding — recurring losers always bidding just above winner.
+
+DETECT:
+
+- Win rate vs. participation count per supplier per CPV category.
+- Top co-bidder frequency (same losing bidders repeatedly present when a given winner participates).
+- Losing bid clustering above winning price (small margins, consistent structure).
+- Participation count vs. CPV national average (few bidders where market structure suggests more).
+- Persistent patterns where one supplier often wins, others rarely win except where the main supplier does not bid.
 
 ### 3. Bid rotation / carousel
 
+`[STT][KT]` – OSINT: **conditional** (sector analysis, competitor structure)
+
 TOOLS: `execute_query`, `search_sutartys`
-GOAL: Detect companies alternating wins in same CPV — never competing simultaneously
-DETECT: win value share by period per CPV · mutual bidding absence · cross-appearance as cover bidders
+
+GOAL: Detect companies alternating wins in same CPV — never competing simultaneously.
+
+DETECT:
+
+- Win value share by period per CPV for a small cluster of suppliers.
+- Mutual bidding absence (A wins when B does not participate and vice versa).
+- Cross-appearance as cover bidders for each other in other buyers’ tenders.
+- Rotation schemes aligned with calendar years, budget cycles, or EU funding phases.
+
+> For human investigator: potential KT interest is high — bid rotation is classic cartel behaviour. STT may focus on
+> cases where rotation is driven by public officials’ interference; KT focuses on competition law violations.
 
 ### 4. Conflict of interest — shared people between buyer and seller
 
+`[STT][VPT]` – OSINT: **yes** (media, LinkedIn, board memberships)
+
 TOOLS: `get_pinreg_jar`, `get_pinreg_asmuo`, `execute_query`
-GOAL: Find persons declared in both buyer and winning supplier PINREG records
-DETECT: shared persons buyer↔supplier · spouse/family links · cross-declared interest declarations · ownership chain
-overlap
+
+GOAL: Find persons declared in both buyer and winning supplier PINREG records.
+
+DETECT:
+
+- Shared persons buyer↔supplier (directors, board members, key staff).
+- Spouse/family links (SUTUOKTINIO_DARBOVIETE and similar fields).
+- Cross-declared interest declarations (same person declaring interests in both entities).
+- Ownership chain overlap (person is owner/co-owner in supplier while participating in buyer decisions).
+- Undeclared conflicts: persons visible in OSINT sources (boards, associations) but missing from PINREG.
 
 ### 5. Contract splitting to avoid thresholds
 
+`[STT][VPT][VK]` – OSINT: **conditional** (local press about repetitive small contracts)
+
 TOOLS: `search_sutartys`, `execute_query`
-GOAL: Detect contract splitting below €30K or open-procedure threshold to avoid competition
-DETECT: contract value clusters just below thresholds · same CPV recurring in small awards · short time gaps between
-consecutive awards to same supplier
+
+GOAL: Detect contract splitting below €30K or open-procedure threshold to avoid competition.
+
+DETECT:
+
+- Contract value clusters just below thresholds (e.g. repeated contracts at 29 900 EUR).
+- Same CPV recurring in small awards over short time to same supplier or related suppliers.
+- Short time gaps between consecutive awards to same supplier or same CPV by same buyer.
+- Fragmentation of a clearly homogeneous need (e.g. IT system development) into many small contracts.
 
 ### 6. Geographic monopoly / local capture
 
+`[STT][VK][VPT]` – OSINT: **yes** (local media, municipal council decisions)
+
 TOOLS: `execute_query`, `search_sutartys`, `get_juridinis`
-GOAL: Detect single-supplier dominance in one municipality or CPV category
-DETECT: value share by supplier per municipality · competitors who stopped bidding · local registration bias ·
-officer→supplier PINREG connections
+
+GOAL: Detect single-supplier dominance in one municipality or CPV category.
+
+DETECT:
+
+- Value share by supplier per municipality and CPV over multi-year periods.
+- Competitors who stopped bidding or winning over time after one supplier begins to dominate.
+- Local registration bias (buyer awarding mostly to locally registered companies despite national markets).
+- Officer→supplier PINREG connections for local officials.
 
 ### 7. Procedure manipulation — unjustified direct award
 
+`[STT][VPT][VK]` – OSINT: **yes** (audit reports, media)
+
 TOOLS: `execute_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`
-GOAL: Detect overuse of negotiated-without-publication procedure
-DETECT: direct-negotiation value share vs. open competition · trend over time · top beneficiary suppliers
+
+GOAL: Detect overuse of negotiated-without-publication or restricted procedures, and possible misclassification of
+urgency/exception conditions.
+
+DETECT:
+
+- Direct-negotiation value share vs. open competition by buyer and CPV over time.
+- Trend over time, including spikes in specific years or budget periods.
+- Top beneficiary suppliers, especially newly created entities or those with conflicts of interest.
+- Justification text in procurement notices and documents indicating vague or repetitive reasons.
 
 ### 8. Price anomalies — over-invoicing and scope creep
 
+`[STT][FNTT][VK]` – OSINT: **conditional** (market price benchmarks)
+
 TOOLS: `execute_query`, `get_sutartis`, `search_sutartys`
-GOAL: Detect contracts where faktineIvykdimoVerte significantly exceeds signed verte
-DETECT: avg faktineIvykdimoVerte/verte ratio · overruns >50% · overrun correlation by buyer/CPV/procedure · low-bid then
-inflate pattern
+
+GOAL: Detect contracts where `faktineIvykdimoVerte` significantly exceeds signed `verte` or where unit prices appear
+inflated.
+
+DETECT:
+
+- Average `faktineIvykdimoVerte/verte` ratio by supplier, buyer, CPV, and procedure type.
+- Overruns >50% and clustering of high-overrun cases by supplier or buyer.
+- Low-bid-then-inflate patterns where the same supplier frequently wins as the cheapest, then exhibits large amendments.
+- For homogeneous goods, systematic per-unit price differences vs. national average.
 
 ### 9. Compliance and blacklist cross-check
 
+`[STT][FNTT][VPT]` – OSINT: **conditional** (sanction lists, media on fraud)
+
 TOOLS: `get_juridinis`, `execute_query`
-GOAL: Check all blacklists, sanctions, and violations for company and linked parties
-DETECT: current/expired debarment (melagingiTiekejai, nepatikimiTiekejai) · VDI violations · court cases ·
-linked-company blacklist status · supplier-as-claimant against former/current buyers (`bylojeKaip = 'IEŠKOVAS'`) —
-signals litigation leverage to pressure buyers into continued contracting
+
+GOAL: Check all blacklists, sanctions, and violations for company and linked parties.
+
+DETECT:
+
+- Current/expired debarment (melagingiTiekejai, nepatikimiTiekejai) and repeat non-compliance.
+- VDI violations (vdiPazeidimai) during contract execution periods.
+- Court cases where supplier is claimant against former or current buyers (`bylojeKaip = 'IEŠKOVAS'`).
+- Linked-company blacklist status (group companies, same owners, same address/domain).
 
 ### 10. Network — second-degree connections and corporate webs
 
+`[STT][FNTT]` – OSINT: **yes** (JAR extracts, foreign registers, company websites)
+
 TOOLS: `get_pinreg_jar`, `get_pinreg_asmuo`, `execute_query`, `search_juridiniai`, `get_juridinis`
-GOAL: Map corporate control network beyond direct ownership
-DETECT: directors/shareholders → second-degree companies → govt contracts · shared address/domain cluster · ownership
-changes around contract award dates
+
+GOAL: Map corporate control network beyond direct ownership.
+
+DETECT:
+
+- Directors/shareholders → second-degree companies → public contracts.
+- Shared address/domain clusters; offices shared among multiple bidders.
+- Ownership changes around contract award dates (transfers before large tenders).
+- Foreign beneficial ownership indicators (non-Lithuanian entities with unclear activity).
+
+> For human investigator: networks that cross into high-risk sectors (construction, IT, healthcare, EU-funded projects)
+> are particularly relevant for STT; when capital flows, cross-border payments, or complex chains with offshore entities
+> are visible, FNTT interest increases.
 
 ### 11. UBO risk — beneficial ownership through holding layers
 
+`[STT][FNTT]` – OSINT: **yes** (foreign company registers, OpenCorporates)
+
 TOOLS: `execute_query`, `get_pinreg_jar`, `get_juridinis`
-GOAL: Detect shared control of competing bidders through shared persons or back-office signals
+
+GOAL: Detect shared control of competing bidders or buyer–supplier pairs through holding companies and back-office
+signals.
 
 ANSWERABLE NOW:
 
-- Shared declared persons across bidder set (including spouse links via `SUTUOKTINIO_DARBOVIETE`)
-- Shared domain registrant, address, or court history across co-bidders
+- Shared declared persons across bidder set (including spouse links via `SUTUOKTINIO_DARBOVIETE`).
+- Shared domain registrant, address, or court history across co-bidders.
 
-```sql
--- Shared declared persons across a set of competing bidders
-WITH bidders AS (SELECT unnest(ARRAY['304567890','301234567','309876543']) AS jar)
-SELECT p1."jarKodas"     AS company_a,
-       p1."imonesVardas" AS company_a_name,
-       p2."jarKodas"     AS company_b,
-       p2."imonesVardas" AS company_b_name,
-       p1.vardas,
-       p1.pavarde,
-       p1."irasoTipas"   AS role_a,
-       p2."irasoTipas"   AS role_b,
-       p1."rysioPradzia",
-       p1."rysioPabaiga"
-FROM v_person_links p1
-         JOIN v_person_links p2
-              ON p1.vardas = p2.vardas
-                  AND p1.pavarde = p2.pavarde
-                  AND p1."jarKodas" < p2."jarKodas"
-WHERE p1."jarKodas" IN (SELECT jar FROM bidders)
-  AND p2."jarKodas" IN (SELECT jar FROM bidders);
-```
+GAP (DATA):
 
-```sql
--- Shared domain registrant across the same company set
-SELECT d1."savininkoKodas" AS company_a,
-       j1.pavadinimas      AS company_a_name,
-       d2."savininkoKodas" AS company_b,
-       j2.pavadinimas      AS company_b_name,
-       d1.domain
-FROM domenai d1
-         JOIN domenai d2
-              ON d1.domain = d2.domain
-                  AND d1."savininkoKodas" < d2."savininkoKodas"
-         JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1."savininkoKodas"
-JOIN "jarCsv" j2
-ON j2."jarKodas":: text = d2."savininkoKodas"
-WHERE d1."savininkoKodas" IN ('304567890', '301234567', '309876543');
-```
+- Only one-hop person→company links; no explicit company→company ownership table.
+- Foreign ownership chains often opaque.
 
-GAP — multi-layer ownership:
+MITIGATION:
 
-One-hop only: person → company. Holding company intermediaries are invisible, e.g.:
-
-```
-Jonas Jonaitis (person)
-  └─► UAB HoldCo LT (intermediate, LT registered)
-        ├─► UAB Greitas Statyba   (bidder A)  ← appears to be independent
-        └─► UAB Kelių Draugai     (bidder B)  ← appears to be independent
-```
-
-Returns zero rows — false negative.
-
-- ❌ Company-owns-company table — needs JAR export or OpenCorporates/Orbis
-- ✅ `WITH RECURSIVE` traversal (max depth 5, guardrail allows it)
-- ❌ 25% threshold filter, foreign chain resolution, historical snapshots
-
-MITIGATION: Flag `registruotaLietuvoje = false` — signals unresolvable foreign entity in chain.
-
-```sql
--- Flag any foreign or opaque links in the person-company graph for the bidder cluster
-SELECT "jarKodas",
-       "imonesVardas",
-       vardas,
-       pavarde,
-       "irasoTipas",
-       "registruotaLietuvoje",
-       "yraJuridinisAsmuo"
-FROM v_person_links
-WHERE "jarKodas" IN ('304567890', '301234567', '309876543')
-  AND ("registruotaLietuvoje" = false OR "yraJuridinisAsmuo" = true)
-ORDER BY "jarKodas", pavarde;
-```
+- Flag `registruotaLietuvoje = false` or `yraJuridinisAsmuo = true` in `v_person_links` as high-risk chain elements.
+- Use OSINT to identify foreign holdings and beneficial owners.
 
 ### 12. EU Structural Funds abuse — fictitious subcontractors and inflated costs
 
+`[FNTT][VK][STT]` – OSINT: **yes** (EU project registers, agency reports)
+
 TOOLS: `execute_query`, `get_juridinis`, `get_pinreg_jar`
-GOAL: Detect fictitious subcontractors in CPVA-funded contracts
-DETECT: subcontractor Sodra headcount · main contractor pass-through signal · recurring contractor+subcontractor pairs ·
-shared PINREG persons between contractor and subcontractor
 
-```sql
--- Subcontractor headcount cross-check on CPVA contracts
-SELECT cs."projektoNr",
-       cs."projektoPavadinimas",
-       cs."tiekejoKodas",
-       cs."tiekejoPavadinimasVardasIrPavardeGimimoData"    AS tiekejas,
-       cs."pirkimoSutartiesSumaSusijusiSuProjektu"         AS suma,
-       cs."subtiekejoKodas",
-       cs."subtiekejoPavadinimasVardasIrPavardeGimimoData" AS subtiekejasVardas,
-       s_main.draustieji                                   AS "tiekejoDarbuotojai",
-       s_sub.draustieji                                    AS "subtiekejoDarbuotojai"
-FROM "cpvaProjektuSutartys" cs
-         LEFT JOIN LATERAL(
-    SELECT draustieji FROM sodra
-    WHERE "jarKodas" = cs."tiekejoKodas"
-    ORDER BY data DESC NULLS LAST LIMIT 1
-) s_main ON true
-         LEFT JOIN LATERAL(
-    SELECT draustieji FROM sodra
-    WHERE "jarKodas" = cs."subtiekejoKodas"
-    ORDER BY data DESC NULLS LAST LIMIT 1
-) s_sub ON true
-WHERE cs."subtiekejoKodas" IS NOT NULL
-  AND cs."subtiekejoKodas" != ''
-ORDER BY cs."pirkimoSutartiesSumaSusijusiSuProjektu" DESC
-LIMIT 200;
-```
+GOAL: Detect fictitious subcontractors and pass-through schemes in CPVA-funded contracts.
 
-```sql
--- Recurring main contractor + subcontractor pairs across multiple CPVA projects
-SELECT cs."tiekejoKodas",
-       cs."tiekejoPavadinimasVardasIrPavardeGimimoData"        AS tiekejas,
-       cs."subtiekejoKodas",
-       cs."subtiekejoPavadinimasVardasIrPavardeGimimoData"     AS subtiekejasVardas,
-       COUNT(DISTINCT cs."projektoNr")                         AS projektu_sk,
-       ROUND(SUM(cs."pirkimoSutartiesSumaSusijusiSuProjektu")) AS bendra_suma
-FROM "cpvaProjektuSutartys" cs
-WHERE cs."subtiekejoKodas" IS NOT NULL
-  AND cs."subtiekejoKodas" != ''
-GROUP BY cs."tiekejoKodas", cs."tiekejoPavadinimasVardasIrPavardeGimimoData",
-         cs."subtiekejoKodas", cs."subtiekejoPavadinimasVardasIrPavardeGimimoData"
-HAVING COUNT(DISTINCT cs."projektoNr") >= 2
-ORDER BY projektu_sk DESC
-LIMIT 200;
-```
+DETECT:
+
+- Subcontractor Sodra headcount vs. project obligations.
+- Main contractor pass-through signal (low margins, fees mostly passed to subcontractor, or vice versa).
+- Recurring contractor+subcontractor pairs across projects with similar scope.
+- Shared PINREG persons between contractor and subcontractor.
+- Mismatches between declared procurement procedures and EU rules in audit reports.
 
 ### 13. Revolving door — procurement officer joins winning supplier
 
-TOOLS: `execute_query`, `get_pinreg_asmuo`, `get_pinreg_jar`
-GOAL: Find buyer-side staff who moved to suppliers that won contracts from their former employer
-DETECT: person left buyer org → joined supplier within 2 years · contracts awarded to that supplier after move
+`[STT]` – OSINT: **yes** (LinkedIn, public CVs)
 
-```sql
--- People who left a buyer org and joined a supplier within 2 years
-WITH buyer_staff AS (SELECT r.vardas,
-                            r.pavarde,
-                            r."jarKodas"     AS "pirkejoKodas",
-                            r."rysioPabaiga" AS "isejoData"
-                     FROM "pinregJuridiniaiRysiai" r
-                     WHERE r."darbovietesTipas" = 'STANDARTINE'
-                       AND r."irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE'
-                       AND r."rysioPabaiga" IS NOT NULL
-                       AND r."jarKodas" IN (SELECT DISTINCT "pirkejoKodas" FROM v_sutartys)),
-     supplier_staff AS (SELECT r.vardas,
-                               r.pavarde,
-                               r."jarKodas"     AS "tiekejoKodas",
-                               r."rysioPradzia" AS "atejoData"
-                        FROM "pinregJuridiniaiRysiai" r
-                        WHERE r."darbovietesTipas" = 'STANDARTINE'
-                          AND r."irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE'
-                          AND r."rysioPradzia" IS NOT NULL)
-SELECT b.vardas,
-       b.pavarde,
-       b."pirkejoKodas",
-       b."isejoData",
-       s."tiekejoKodas",
-       s."atejoData",
-       (s."atejoData" - b."isejoData")         AS "dienuSkaicius",
-       (SELECT COUNT(*)
-        FROM v_sutartys
-        WHERE "pirkejoKodas" = b."pirkejoKodas"
-          AND "tiekejoKodas" = s."tiekejoKodas"
-          AND "sudarymoData" >= b."isejoData") AS "sutartysPoPerejimo"
-FROM buyer_staff b
-         JOIN supplier_staff s
-              ON s.vardas = b.vardas
-                  AND s.pavarde = b.pavarde
-                  AND s."atejoData" > b."isejoData"
-                  AND (s."atejoData" - b."isejoData") < 730
-                  AND b."pirkejoKodas" != s."tiekejoKodas"
-ORDER BY "dienuSkaicius"
-LIMIT 200;
-```
+TOOLS: `execute_query`, `get_pinreg_asmuo`, `get_pinreg_jar`
+
+GOAL: Find buyer-side staff who moved to suppliers that won contracts from their former employer.
+
+DETECT:
+
+- Person left buyer organisation and joined supplier within a defined time window (e.g. 2 years).
+- Contracts awarded to that supplier after move date by same buyer.
+- Changes in procedure type and competition intensity before and after move.
 
 ### 14. Spec rigging — technical specifications written for one supplier
 
-TOOLS: `execute_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `search_failai`,
-`get_failas_tekstas`
-GOAL: Detect buyers with abnormally high single-bidder rate in a CPV category
-DETECT: single-bidder rate vs. CPV national average · repeat winner in single-bidder tenders
+`[STT][KT][VPT]` – OSINT: **yes** (technical standards, competing products, prior tenders)
 
-```sql
--- Buyers whose single-bidder rate per CPV is more than 2× the national average (min 5 tenders)
-WITH per_procurement AS (SELECT "pirkimoNumeris",
-                                "pagrindinisKodasBvpz"         AS cpv,
-                                "pirkejoKodas",
-                                COUNT(DISTINCT "tiekejoKodas") AS dalyviu_sk
-                         FROM v_dalyviai
-                         WHERE "pagrindinisKodasBvpz" IS NOT NULL
-                         GROUP BY "pirkimoNumeris", "pagrindinisKodasBvpz", "pirkejoKodas"),
-     cpv_national AS (SELECT cpv,
-                             COUNT(DISTINCT "pirkimoNumeris")                               AS total_pirkimai,
-                             COUNT(DISTINCT "pirkimoNumeris") FILTER (WHERE dalyviu_sk = 1) AS single_bidder_cnt
-                      FROM per_procurement
-                      GROUP BY cpv),
-     buyer_cpv AS (SELECT "pirkejoKodas",
-                          cpv,
-                          COUNT(DISTINCT "pirkimoNumeris")                               AS pirkimai,
-                          COUNT(DISTINCT "pirkimoNumeris") FILTER (WHERE dalyviu_sk = 1) AS single_bidder
-                   FROM per_procurement
-                   GROUP BY "pirkejoKodas", cpv)
-SELECT bc."pirkejoKodas",
-       bc.cpv,
-       bc.pirkimai,
-       bc.single_bidder,
-       ROUND(bc.single_bidder::numeric / NULLIF(bc.pirkimai, 0), 2)            AS "pirkejoVienbidiskumas",
-       ROUND(cn.single_bidder_cnt ::numeric / NULLIF(cn.total_pirkimai, 0), 2) AS "cpvSaliesVidurkis"
-FROM buyer_cpv bc
-         JOIN cpv_national cn ON cn.cpv = bc.cpv
-WHERE bc.pirkimai >= 5
-  AND (bc.single_bidder::numeric / NULLIF(bc.pirkimai, 0))
-    > (cn.single_bidder_cnt::numeric / NULLIF(cn.total_pirkimai, 0)) * 2
-ORDER BY "pirkejoVienbidiskumas" DESC
-LIMIT 200;
-```
+TOOLS: `execute_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `search_failai`, `get_failas_tekstas`
+
+GOAL: Detect buyers with abnormally high single-bidder rate in a CPV category and specification patterns favouring one
+supplier.
+
+DETECT:
+
+- Single-bidder rate vs. CPV national average.
+- Repeat winner in single-bidder tenders.
+- Technical specification language that matches one brand/model; repeated exclusionary requirements (e.g. specific
+  patents, small deviations).
+- Use of overly narrow CPV codes or contract splitting to keep competition away.
 
 ### 15. Framework agreement abuse — single-supplier call-offs
 
-TOOLS: `execute_query`, `search_sutartys`, `get_sutartis`
-GOAL: Detect framework agreements where all call-offs (`tipas = 'PPS'`) go to one supplier
-DETECT: distinct supplier count per framework · total value and duration · framework establishment procedure type
+`[STT][VPT]` – OSINT: **conditional** (framework establishment documentation)
 
-```sql
--- Frameworks where 100% of call-offs went to a single supplier, ranked by total value
-SELECT "pirkimoNumeris",
-       COUNT(*)                       AS uzsakymuSkaicius,
-       COUNT(DISTINCT "tiekejoKodas") AS tiekejuSkaicius,
-       ROUND(SUM(verte))              AS bendra_verte,
-       MIN("sudarymoData")            AS pirmas_uzsakymas,
-       MAX("sudarymoData")            AS paskutinis_uzsakymas,
-       MAX(tiekejas)                  AS tiekejas,
-       MAX("pirkejoKodas")            AS "pirkejoKodas"
-FROM v_sutartys
-WHERE tipas = 'PPS'
-  AND "pirkimoNumeris" IS NOT NULL
-GROUP BY "pirkimoNumeris"
-HAVING COUNT(DISTINCT "tiekejoKodas") = 1
-   AND COUNT(*) >= 5
-ORDER BY bendra_verte DESC
-LIMIT 200;
-```
+TOOLS: `execute_query`, `search_sutartys`, `get_sutartis`
+
+GOAL: Detect framework agreements where all call-offs (`tipas = 'PPS'`) go to one supplier.
+
+DETECT:
+
+- Distinct supplier count per framework vs. expected.
+- Total value and duration of framework vs. call-off distribution.
+- Framework establishment procedure type and competition level.
+- Cross-check with single-bidder signals and direct awards.
 
 ### 16. Shared back-office — competing companies with the same address or domain
 
+`[STT][KT][FNTT]` – OSINT: **yes** (physical site checks, business registries)
+
 TOOLS: `execute_query`, `get_juridinis`, `search_juridiniai`
-GOAL: Detect co-bidders sharing registered address or domain registrant
-DETECT: shared legal address in jarCsv · shared domain in domenai · overlapping contract timelines
 
-```sql
--- Active companies sharing a registered address that have both won government contracts
-WITH candidate_pairs AS (SELECT a."jarKodas"::text AS jar_a, b."jarKodas"::text AS jar_b, a.adresas
-                         FROM "jarCsv" a
-                                  JOIN "jarCsv" b
-                                       ON b.adresas = a.adresas
-                                           AND b."jarKodas" > a."jarKodas"
-                         WHERE a.adresas IS NOT NULL
-                           AND LENGTH(a.adresas) > 10
-                           AND a."statusoKodas" = 1
-                           AND b."statusoKodas" = 1)
-SELECT cp.adresas,
-       cp.jar_a,
-       ja.pavadinimas                                                    AS pav_a,
-       cp.jar_b,
-       jb.pavadinimas                                                    AS pav_b,
-       (SELECT COUNT(*) FROM v_sutartys WHERE "tiekejoKodas" = cp.jar_a) AS sutartys_a,
-       (SELECT COUNT(*) FROM v_sutartys WHERE "tiekejoKodas" = cp.jar_b) AS sutartys_b
-FROM candidate_pairs cp
-         JOIN "jarCsv" ja ON ja."jarKodas"::text = cp.jar_a
-JOIN "jarCsv" jb
-ON jb."jarKodas":: text = cp.jar_b
-WHERE EXISTS (SELECT 1 FROM v_sutartys WHERE "tiekejoKodas" = cp.jar_a)
-  AND EXISTS (SELECT 1 FROM v_sutartys WHERE "tiekejoKodas" = cp.jar_b)
-LIMIT 200;
-```
+GOAL: Detect co-bidders sharing registered address or domain registrant.
 
-```sql
--- Competing companies sharing a domain registrant
-SELECT d1."savininkoKodas" AS jar_a,
-       j1.pavadinimas      AS pav_a,
-       d2."savininkoKodas" AS jar_b,
-       j2.pavadinimas      AS pav_b,
-       d1.domain
-FROM domenai d1
-         JOIN domenai d2
-              ON d1.domain = d2.domain
-                  AND d1."savininkoKodas" < d2."savininkoKodas"
-         JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1."savininkoKodas"
-JOIN "jarCsv" j2
-ON j2."jarKodas":: text = d2."savininkoKodas"
-WHERE EXISTS (SELECT 1 FROM v_sutartys WHERE "tiekejoKodas" = d1."savininkoKodas")
-  AND EXISTS (SELECT 1 FROM v_sutartys WHERE "tiekejoKodas" = d2."savininkoKodas")
-LIMIT 200;
-```
+DETECT:
+
+- Shared legal address in `jarCsv` among active bidders with wins.
+- Shared domain in `domenai` among suppliers.
+- Overlapping contract timelines and CPV categories.
+- Cross-link with PINREG persons to strengthen suspicion.
 
 ### 17. Price cartel — suspiciously uniform bid prices across a CPV category
 
+`[KT][STT]` – OSINT: **conditional** (sector cost structures)
+
 TOOLS: `execute_query`
-GOAL: Detect CPV categories with abnormally low price variance (CV < 5%) across independent tenders
-DETECT: coefficient of variation by CPV · repeat suppliers in low-variation categories · cross-category clustering
 
-```sql
--- CPV categories with suspiciously low price variation (coefficient of variation < 5%)
-WITH cpv_bids AS (SELECT "pagrindinisKodasBvpz" AS cpv,
-                         "pasiulymoKaina"       AS kaina,
-                         "pirkimoNumeris",
-                         "tiekejoKodas"
-                  FROM v_dalyviai
-                  WHERE "pagrindinisKodasBvpz" IS NOT NULL
-                    AND "pasiulymoKaina" IS NOT NULL)
-SELECT cpv,
-       COUNT(*)                                              AS pasiulymu_sk,
-       ROUND(AVG(kaina))                                     AS vidurkis,
-       ROUND(STDDEV(kaina))                                  AS std,
-       ROUND(STDDEV(kaina) / NULLIF(AVG(kaina), 0) * 100, 1) AS cv_proc
-FROM cpv_bids
-GROUP BY cpv
-HAVING COUNT(*) >= 10
-   AND STDDEV(kaina) / NULLIF(AVG(kaina), 0) < 0.05
-ORDER BY cv_proc ASC
-LIMIT 200;
-```
+GOAL: Detect CPV categories with abnormally low price variation (coefficient of variation <5%) across independent
+tenders.
 
----
+DETECT:
 
-## Partially supported themes
+- Coefficient of variation of bid prices by CPV.
+- Repeat suppliers in low-variation categories.
+- Clustering of low-variation cases in certain buyers or regions.
 
-Themes 18–20: partial data — queries exist but schema gaps limit completeness. Themes 21–23: no or limited data support.
+## Partially supported and extended themes
 
 ### 18. Contract amendment escalation — low bid, then value inflated through amendments
 
+`[STT][FNTT][VK]` – OSINT: **yes** (audit reports, media on overruns)
+
 TOOLS: `execute_query`, `get_sutartis`, `search_failai`, `get_failas_tekstas`
-GOAL: Detect suppliers who systematically under-bid then inflate via amendments
-DETECT: faktineIvykdimoVerte/verte ratio > 1.5 · buyers with highest overrun tolerance · consistent under-bid pattern by
-supplier
 
-```sql
--- Suppliers with highest median amendment overrun ratio (min 5 contracts, overrun > 50%)
-SELECT "tiekejoKodas",
-       MAX(tiekejas)                                            AS tiekejas,
-       COUNT(*)                                                 AS sutarciu_sk,
-       ROUND(AVG("faktineIvykdimoVerte" / NULLIF(verte, 0)), 2) AS vid_koef,
-       ROUND(MAX("faktineIvykdimoVerte" / NULLIF(verte, 0)), 2) AS max_koef,
-       ROUND(SUM("faktineIvykdimoVerte" - verte))               AS bendra_pervirsis
-FROM v_sutartys
-WHERE "faktineIvykdimoVerte" IS NOT NULL
-  AND verte > 0
-  AND istrinta IS NOT TRUE
-GROUP BY "tiekejoKodas"
-HAVING COUNT(*) >= 5
-   AND AVG("faktineIvykdimoVerte" / NULLIF(verte, 0)) > 1.5
-ORDER BY vid_koef DESC
-LIMIT 200;
-```
+GOAL: Detect suppliers who systematically under-bid then inflate via amendments.
 
-GAP: End result only (`faktineIvykdimoVerte`/`verte`); no amendment trail. `dokumentai` JSONB is unstructured.
-Needs: amendments table (date, reason, delta) or JSONB parsing. CVP IS publishes amendment sequence but it is not
-ingested.
+DETECT:
+
+- `faktineIvykdimoVerte/verte` ratio >1.5 by supplier and buyer.
+- Buyers with highest tolerance for overruns (systemic behaviour).
+- Consistent under-bid pattern by supplier (often cheapest winner) followed by high amendment ratios.
+
+GAP (DATA):
+
+- No explicit amendment trail (dates, reasons, amounts) in structured tables.
+- `dokumentai` JSONB unstructured; CVP IS amendment sequence not fully ingested.
 
 ### 19. Municipal company favoritism — buyer awards contracts to its own subsidiary
 
+`[STT][VK][VPT]` – OSINT: **yes** (municipal decisions, press)
+
 TOOLS: `execute_query`, `get_pinreg_jar`, `search_sutartys`
-GOAL: Detect municipality awarding contracts to its own subsidiary via shared-person proxy
-DETECT: value share to companies with shared PINREG persons with buyer · procedure type distribution (direct vs.
-competitive)
 
-```sql
--- Contracts where buyer and supplier share declared persons (proxy for municipal subsidiary link)
-WITH buyer_persons AS (SELECT "jarKodas", vardas, pavarde
-                       FROM "pinregJuridiniaiRysiai"
-                       WHERE "darbovietesTipas" = 'STANDARTINE'
-                         AND "irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE'),
-     supplier_persons AS (SELECT "jarKodas", vardas, pavarde
-                          FROM "pinregJuridiniaiRysiai"
-                          WHERE "darbovietesTipas" = 'STANDARTINE'
-                            AND "irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE')
-SELECT s."pirkejoKodas",
-       s."tiekejoKodas",
-       MAX(s.tiekejas)                              AS tiekejas,
-       COUNT(DISTINCT s."sutartiesUnikalusId")      AS sutarciu_sk,
-       ROUND(SUM(s.verte))                          AS bendra_verte,
-       STRING_AGG(DISTINCT bp.vardas || ' ' || bp.pavarde, ', '
-           ORDER BY bp.vardas || ' ' || bp.pavarde) AS bendri_asmenys
-FROM v_sutartys s
-         JOIN buyer_persons bp ON bp."jarKodas" = s."pirkejoKodas"
-         JOIN supplier_persons sp ON sp."jarKodas" = s."tiekejoKodas"
-    AND sp.vardas = bp.vardas AND sp.pavarde = bp.pavarde
-WHERE s.istrinta IS NOT TRUE
-GROUP BY s."pirkejoKodas", s."tiekejoKodas"
-HAVING COUNT(DISTINCT s."sutartiesUnikalusId") >= 3
-ORDER BY bendra_verte DESC
-LIMIT 200;
-```
+GOAL: Detect municipality awarding contracts to its own subsidiary via shared-person or ownership proxies.
 
-GAP: Shared-person proxy only — misses formal municipal ownership (51% stake). Needs: JAR ownership table with
-`SAVIVALDYBĖ` type or municipal enterprise registry feed.
+DETECT:
+
+- Value share to companies with shared PINREG persons with buyer.
+- Procedure type distribution (direct vs. competitive) for such pairs.
+- Structural patterns where one municipal company or group company receives majority of local contracts.
+
+GAP (DATA):
+
+- No direct municipal-ownership table (e.g. JAR "SAVIVALDYBĖ" participation data) — proxy via shared persons and
+  addresses.
 
 ### 20. Restricted procedure manipulation — buyer hand-picks the same invitees
 
+`[STT][KT][VPT]` – OSINT: **yes** (invitation letters, internal rules)
+
 TOOLS: `execute_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`
-GOAL: Detect restricted/negotiated procedure overuse and audit findings for direct awards
-DETECT: procedure mix (restricted/negotiated vs. open) · `neskelbiamosDerybos` audit findings by buyer
 
-```sql
--- Buyer's procedure mix: how much goes through restricted/negotiated vs. open
-SELECT "pirkejoKodas",
-       MAX(pirkejas)     AS pirkejas,
-       tipas,
-       COUNT(*)          AS sutarciu_sk,
-       ROUND(SUM(verte)) AS bendra_verte
-FROM v_sutartys
-WHERE istrinta IS NOT TRUE
-GROUP BY "pirkejoKodas", tipas
-ORDER BY "pirkejoKodas", bendra_verte DESC
-LIMIT 200;
-```
+GOAL: Detect restricted/negotiated procedure overuse and audit findings for direct awards.
 
-```sql
--- Direct-award audit findings for a buyer (neskelbiamosDerybos)
-SELECT nd."jarKodas",
-       nd."jarPavadinimas",
-       nd.data,
-       nd.isvada,
-       nd.aprasymas
-FROM "neskelbiamosDerybos" nd
-WHERE nd."jarKodas" = '123456789'
-ORDER BY nd.data DESC
-LIMIT 200;
-```
+DETECT:
 
-GAP: `atn1dalyviai` records submitted bids only, not invitees — cannot detect excluded qualified suppliers. Needs:
-CVP IS invitation list data.
+- Procedure mix (restricted/negotiated vs. open) by buyer and CPV.
+- `neskelbiamosDerybos` audit findings by buyer.
+- Recurring small circle of invitees (if/when invitation data is available in future).
+
+GAP (DATA):
+
+- `atn1dalyviai` records submitted bids only, not invitees — cannot detect excluded qualified suppliers yet.
 
 ### 21. Political connection favoritism — companies linked to party donors or politicians
 
-TOOLS: none — ❌ No data — no political donation or party membership in schema.
+`[STT][FNTT]` – OSINT: **yes** (VRK donor lists, political office data)
 
-GAP: Needs VRK (Central Electoral Commission) donor database, name-matched against `pinregJuridiniaiRysiai`.
+TOOLS: (future) VRK donors dataset, `execute_query`, `get_pinreg_jar`
+
+GOAL: Detect companies linked to party donors or elected officials receiving disproportionate contract value.
+
+DETECT:
+
+- Overlap between company beneficial owners or directors and political donors/party officials.
+- Contract value share for politically connected companies vs. peers.
+
+GAP (DATA):
+
+- No political donation or party membership data in current schema.
+- Needs VRK donor database and politician office/mandate register.
+
+> For human investigator: when considering escalation to STT on political favouritism, combine MCP signals with OSINT
+> from VRK, Seimas and savivaldybių tarybų registers, and media investigations. FNTT becomes relevant when donations
+> correlate with suspicious financial flows or EU funds cases.
 
 ### 22. Fictitious deliverables — contract marked complete but work never done
 
-TOOLS: `get_juridinis`, `get_sutartis`, `search_failai`, `get_failas_tekstas` (limited signal only)
+`[STT][FNTT][VK]` – OSINT: **yes** (on-site inspections, beneficiary reports, media)
 
-GAP: `faktineIvykdimoVerte` confirms payment, not delivery. Needs: field inspection records, SABIS invoice data,
-STT/NKT audit trail.
+TOOLS: `get_juridinis`, `get_sutartis`, `search_failai`, `get_failas_tekstas`
 
-Weak signal: VDI violation (`vdiPazeidimai`) during contract execution period suggests workforce unavailability.
+GOAL: Detect contracts where payment is confirmed but delivery is doubtful.
+
+DETECT:
+
+- `faktineIvykdimoVerte` paid in full despite weak or missing acceptance documentation.
+- VDI violations (`vdiPazeidimai`) during execution suggesting lack of workforce capacity.
+- For works contracts, repeated complaints or negative findings in oversight reports (OSINT).
+
+GAP (DATA):
+
+- No structured field inspection records, SABIS invoice-level data, or detailed STT/NKT audit trails in schema.
 
 ### 23. Vendor lock-in — incumbent supplier structural monopoly
 
+`[STT][KT][VK]` – OSINT: **conditional** (system ownership, IP clauses)
+
 TOOLS: `execute_query`, `search_sutartys`, `get_juridinis`
+
 GOAL: Detect suppliers whose relationship with a single buyer is self-reinforcing — system builder becomes sole
-maintenance provider, all subsequent contracts awarded without competition
-DETECT: single-buyer concentration > 70% of supplier's total value · all contracts to that buyer via
-direct/negotiated procedure · escalating contract count over years · no other supplier winning same CPV from same
-buyer · litigation against buyers who attempted to switch (`bylojeKaip = 'IEŠKOVAS'` vs buyer `jarKodas`)
+maintenance provider and captures future related contracts.
 
-```sql
--- Suppliers with >70% of total contract value from a single buyer (min €1M total, min 5 contracts)
-WITH supplier_totals AS (SELECT "tiekejoKodas",
-                                SUM(verte) AS total_verte
-                         FROM v_sutartys
-                         WHERE istrinta IS NOT TRUE
-                         GROUP BY "tiekejoKodas"),
-     buyer_concentration AS (SELECT s."tiekejoKodas",
-                                    s."pirkejoKodas",
-                                    MAX(s.tiekejas) AS tiekejas,
-                                    MAX(s.pirkejas) AS pirkejas,
-                                    COUNT(*)        AS sutarciu_sk,
-                                    SUM(s.verte)    AS buyer_verte
-                             FROM v_sutartys s
-                             WHERE s.istrinta IS NOT TRUE
-                             GROUP BY s."tiekejoKodas", s."pirkejoKodas")
-SELECT bc."tiekejoKodas",
-       bc.tiekejas,
-       bc."pirkejoKodas",
-       bc.pirkejas,
-       bc.sutarciu_sk,
-       ROUND(bc.buyer_verte)                                              AS pirkejo_verte,
-       ROUND(bc.buyer_verte * 100.0 / NULLIF(t.total_verte, 0), 1)       AS koncentracija_proc
-FROM buyer_concentration bc
-         JOIN supplier_totals t ON t."tiekejoKodas" = bc."tiekejoKodas"
-WHERE t.total_verte >= 1000000
-  AND bc.sutarciu_sk >= 5
-  AND bc.buyer_verte * 100.0 / NULLIF(t.total_verte, 0) >= 70
-ORDER BY pirkejo_verte DESC
-LIMIT 200;
-```
+DETECT:
 
-```sql
--- Procedure type mix for a specific buyer→supplier pair (replace jarKodas values)
-SELECT tipas,
-       COUNT(*)          AS sutarciu_sk,
-       ROUND(SUM(verte)) AS bendra_verte
-FROM v_sutartys
-WHERE "tiekejoKodas" = '302676496'
-  AND "pirkejoKodas" = '191346299'
-  AND istrinta IS NOT TRUE
-GROUP BY tipas
-ORDER BY bendra_verte DESC;
-```
+- Single-buyer concentration >70% of supplier's total contract value (min total and contract count thresholds).
+- All or most contracts to that buyer via direct/negotiated procedures.
+- Escalating contract count and value over years.
+- No other supplier winning same CPV from same buyer.
+- Litigation (`bylojeKaip = 'IEŠKOVAS'`) against buyers who attempt to switch suppliers.
 
-```sql
--- Year-over-year contract escalation between buyer and supplier
-SELECT EXTRACT(YEAR FROM "sudarymoData")::int AS metai,
-       COUNT(*)                               AS sutarciu_sk,
-       ROUND(SUM(verte))                      AS bendra_verte
-FROM v_sutartys
-WHERE "tiekejoKodas" = '302676496'
-  AND "pirkejoKodas" = '191346299'
-  AND istrinta IS NOT TRUE
-GROUP BY metai
-ORDER BY metai;
-```
+GAP (DATA):
 
-GAP: Cannot determine if supplier built the original system — no system name→contract mapping. Lock-in
-mechanism (code/IP ownership) is invisible; only the outcome (structural monopoly) is detectable. Combine with
-theme 14 (spec rigging single-bidder rate) and theme 7 (direct award overuse) for a stronger composite signal.
+- Cannot determine initial system-building contract content or IP ownership from structured data.
+- Mechanism of lock-in (e.g. proprietary code, restrictive SLA clauses) only visible in contract texts.
+
+## New / clarified themes for Lithuanian context
+
+### 24. EU funds irregularities and cross-border fraud patterns
+
+`[FNTT][VK][STT]` – OSINT: **yes** (EU OLAF/EPPO cases, cross-border company data)
+
+TOOLS: `execute_query`, `get_juridinis`, `search_sutartys`, `get_sutartis`
+
+GOAL: Detect patterns in EU-funded procurements and projects that resemble known EU funds fraud schemes (overpricing,
+fictitious suppliers, self-dealing across borders).
+
+DETECT:
+
+- Concentration of irregularities in specific operational programmes or measures (CPVA-based flags, when available).
+- Clusters of projects where expenditure is later found ineligible in VK audits (once data integrated).
+- Cross-border supplier networks where Lithuanian beneficiary works with the same small set of foreign suppliers.
+- Early termination of contracts, repeated project modifications, or high rate of budget reallocations.
+
+> For human investigator: EPPO and OLAF are key external partners on EU funds fraud; FNTT leads financial crime
+> investigation domestically, VK provides systemic audit findings. When OSINT or VK reports show high irregularity rates
+> in a specific programme, use this theme to prioritise procurement-level analysis.
+
+### 25. Money-laundering indicators around procurement flows
+
+`[FNTT][STT]` – OSINT: **yes** (beneficiary/SAR mentions in FNTT releases)
+
+TOOLS: `execute_query`, future accounting/payment tables, `get_juridinis`
+
+GOAL: Flag procurement cases where contract payment flows show money-laundering typologies (layering, use of high-risk
+sectors, circular flows).
+
+DETECT (requires future integration with financial transaction data):
+
+- Payments quickly transferred to other jurisdictions or high-risk entities.
+- Use of multiple small contracts to channel funds through the same intermediaries.
+- Mismatches between contract scope and supplier’s usual business or risk profile (e.g. sudden expansion into unrelated
+  sectors).
+
+GAP (DATA):
+
+- Current schema focuses on procurement and registries, not bank transaction data.
+- Money-laundering analysis largely requires FNTT data and STR reports.
+
+### 26. Systemic internal control weaknesses in buyers
+
+`[VK][STT][VPT]` – OSINT: **yes** (VK, VPT, internal audit reports)
+
+TOOLS: `execute_query`, `search_sutartys`
+
+GOAL: Identify buyers whose internal control weaknesses make them high-risk for corruption and fraud.
+
+DETECT:
+
+- High share of non-competitive procedures across all CPVs.
+- Frequent corrections or cancellations of procurements.
+- High rate of contracts with significant overruns or repeated amendments.
+- Repeated audit findings about conflict-of-interest management, planning, or contract management weaknesses.
+
+> For human investigator: VK and VPT audits highlight systemic weaknesses in internal control and risk management; use
+> their findings as context for MCP analytical outputs about the same institutions.
+
+### 27. Sector-specific red flags (healthcare, construction, IT)
+
+`[STT][FNTT][VK]` – OSINT: **yes** (sector regulators, professional bodies)
+
+TOOLS: `execute_query`, `search_sutartys`, `search_viesieji_pirkimai`, `get_sutartis`
+
+GOAL: Tailor risk detection to sectors known in Lithuania to be high-risk for corruption and procurement violations (
+e.g. healthcare, construction, IT).
+
+DETECT:
+
+- In healthcare: repeated purchases of branded medicines/devices with limited competition; unusual technical
+  specifications in medical equipment tenders.
+- In construction: repeated cost overruns, change orders, and low initial bids followed by many amendments.
+- In IT: vendor lock-in patterns, proprietary standards, and recurrent single-supplier maintenance contracts.
+
+> For human investigator: sector context matters. Combine MCP outputs with sector-specific supervisory authorities and
+> professional standards bodies when assessing risk severity.
+
+## Human-only guidance notes
+
+> For human investigator:
+>
+> - **STT contact**: when MCP themes show strong patterns in bid rigging, conflict of interest, unjustified direct
+    awards, municipal favouritism, or vendor lock-in, STT is a natural escalation partner. Attach: key MCP queries,
+    summarised metrics (e.g. concentration measures), and any OSINT about involved officials.
+> - **FNTT contact**: when EU funds, inflated prices, shell companies, or money flows suggest fraud or money laundering,
+    FNTT interest increases. Attach: contract lists with values and dates, beneficiary and supplier structures (UBO
+    analysis), and any signs of cross-border flows.
+> - **VPT contact**: when issues are primarily procedural (threshold splitting, wrong procedure type, poor tender
+    design) but not yet clearly criminal, VPT may be the first point of contact.
+> - **VK contact**: when patterns appear systemic in a specific sector or institution (e.g. repeated findings across
+    years), VK’s audit mandate is key for structural remedies.
+> - **KT contact**: when cartels or bid-rigging patterns are strong (bid rotation, cover bidding, price cartels), KT has
+    specialised enforcement tools and sanctions.
+>
+> In written referrals, clearly separate: (1) automated MCP analytical indicators, (2) corroborating evidence from OSINT
+> and audits, and (3) open questions requiring investigative powers (e.g. bank data, internal correspondence). This
+> alignment with institutional mandates will increase acceptance and effective follow-up.
