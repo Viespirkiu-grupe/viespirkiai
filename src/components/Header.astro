@@ -1,7 +1,7 @@
 ---
 import SiteHeaderShell from '@design-system/components/SiteHeaderShell.astro';
-import { readFileSync } from 'fs';
-import config from '../lib/config.ts';
+import config, { normalizeInfoBanner } from '../lib/config.ts';
+import logoSvg from '../assets/branding/viespirkiaiLogoLaisvasZodis.svg?raw';
 
 interface Props {
   pathname: string;
@@ -34,17 +34,7 @@ const secondaryLinks: NavLink[] = [
   { href: '/vieslaiskiai', label: 'Viešlaiškiai' },
 ];
 
-const rawInfoBanner = config.infoBanner;
-let infoBanner: { type: string; content: string; important: boolean } | null = null;
-if (typeof rawInfoBanner === 'string' && rawInfoBanner.trim()) {
-  infoBanner = { type: 'text', content: rawInfoBanner.trim(), important: false };
-} else if (rawInfoBanner && typeof rawInfoBanner === 'object') {
-  const type = rawInfoBanner.type === 'html' ? 'html' : 'text';
-  const content = typeof rawInfoBanner.content === 'string' ? rawInfoBanner.content.trim() : '';
-  if (content) infoBanner = { type, content, important: rawInfoBanner.important === true };
-}
-
-const logoSvg = readFileSync('./views/viespirkiaiLogoLaisvasZodis.svg', 'utf8');
+const infoBanner = normalizeInfoBanner(config.infoBanner);
 ---
 
 <SiteHeaderShell

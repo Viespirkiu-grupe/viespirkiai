@@ -67,16 +67,6 @@ const faviconSVGURLEncoded = encodeURIComponent(faviconSVG);
   </script>
 
   <script is:inline defer>
-    if (!navigator.connection?.saveData) {
-      const prefetched = new Set();
-      document.addEventListener('mouseover', (e) => {
-        const link = e.target.closest('a[href]');
-        if (link && link.href.startsWith(location.origin) && !prefetched.has(link.href)) {
-          fetch(link.href).catch(() => {});
-          prefetched.add(link.href);
-        }
-      });
-    }
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js');
     }

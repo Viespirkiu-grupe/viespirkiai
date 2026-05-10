@@ -90,7 +90,7 @@ export async function upsertAtn1(client, failasId, ppa) {
 
         if (ppa.pirkimoDalys.length) {
             const vals = ppa.pirkimoDalys
-                .map((d, i) => {
+                .map((_, i) => {
                     const b = i * 5;
                     return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5})`;
                 })

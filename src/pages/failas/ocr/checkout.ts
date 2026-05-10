@@ -11,9 +11,8 @@ function extractApiKey(request: Request): string | null {
   return null;
 }
 
-export const POST: APIRoute = async ({ request }) => {
+const handleCheckout: APIRoute = async ({ request }) => {
   const apiKey = extractApiKey(request);
-
   const { user, error, message } = await validateOcrApiKey(apiKey);
   if (error) return new Response(message, { status: error });
 
@@ -27,3 +26,6 @@ export const POST: APIRoute = async ({ request }) => {
     extension: failas.extension,
   });
 };
+
+export const GET = handleCheckout;
+export const POST = handleCheckout;

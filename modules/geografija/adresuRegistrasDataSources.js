@@ -23,9 +23,10 @@ export async function getArDataSources() {
 
     try {
         const page = await browser.newPage();
-        await page.setUserAgent(
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        );
+        await page.setUserAgent({
+            userAgent:
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        });
         await page.goto(
             "https://www.registrucentras.lt/atviri-duomenys-ir-statistika/adresu-registro-pirminiai-duomenys-raw-data",
             { waitUntil: "networkidle2", timeout: 60000 },

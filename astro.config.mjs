@@ -9,7 +9,11 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   output: 'server',
-  adapter: node({ mode: 'middleware' }),
+  adapter: node({ mode: 'standalone' }),
+  prefetch: {
+    prefetchAll: true,
+    defaultStrategy: 'hover',
+  },
   security: { checkOrigin: false },
   server: {
     port: config.port,

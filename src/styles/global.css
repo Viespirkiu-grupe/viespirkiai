@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @source "../**/*.{astro,html,js,jsx,ts,tsx,md,mdx}";
-@source "../../views/**/*.ejs";
 @source "../../routes/**/*.js";
 @source "../../public/**/*.js";
 
@@ -24,7 +23,6 @@
 @import "../design-system/foundation/spinners.css";
 @import "../design-system/foundation/code.css";
 @import "../design-system/foundation/swatches.css";
-@import "../design-system/foundation/view-transitions.css";
 @import "../design-system/foundation/map.css";
 @import "../design-system/foundation/charts.css";
 @import "../design-system/foundation/print.css";

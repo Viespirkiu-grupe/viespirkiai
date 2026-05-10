@@ -97,6 +97,8 @@ if (format === 'png' && asmuo) {
 
 const finansaiLimit = query.finansaiLimit === 'max' ? 9999999 : Number(query.finansaiLimit) || 1;
 const mvpAprasaiLimit = query.mvpAprasaiLimit === 'max' ? 9999999 : Number(query.mvpAprasaiLimit) || 1;
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
 
 {asmuo ? (

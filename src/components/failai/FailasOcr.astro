@@ -8,9 +8,9 @@ const ocrLatest = failas.ocrLatestResult;
   <h2 class="mb-1 no-style">OCR</h2>
 
   {ocrLatest?.submitTimestamp
-    ? <p class="text-muted text-xs mb-2">{formatDateTime(ocrLatest.submitTimestamp)}</p>
+    ? <p class="text-muted text-xs mb-2">{ocrLatest.submitTimestampDisplay || formatDateTime(ocrLatest.submitTimestamp)}</p>
     : failas.ocrLockTimestamp
-      ? <p class="text-muted text-xs mb-2">{formatDateTime(failas.ocrLockTimestamp)}</p>
+      ? <p class="text-muted text-xs mb-2">{failas.ocrLockTimestampDisplay || formatDateTime(failas.ocrLockTimestamp)}</p>
       : null
   }
 

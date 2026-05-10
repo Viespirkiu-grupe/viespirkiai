@@ -174,7 +174,7 @@ function isPast(d?: string) {
           {hasPlacePerf && (
             <div>
               <p class="section-title">Vykdymo vieta</p>
-              {placePerf.map((sg, i) => (
+              {placePerf.map((sg: any, i: number) => (
                 <>
                   {i > 0 && <hr class="my-2 border-0 border-t border-light-gray" />}
                   <TedSubgroup sg={sg} shortUrl={shortUrl} />
@@ -207,7 +207,7 @@ function isPast(d?: string) {
               <p class="section-title">Pasiūlymai</p>
               <dl class="kv-list mb-0">
                 {submissionType && <><dt>Pateikimo būdas</dt><dd>{submissionType}</dd></>}
-                {submitUrl && <><dt>Pateikimo nuoroda</dt><dd>{submitUrl.values.map((v) => <a href={v} target="_blank" rel="noopener">{shortUrl(v)}</a>)}</dd></>}
+                {submitUrl && <><dt>Pateikimo nuoroda</dt><dd>{submitUrl.values.map((v: string) => <a href={v} target="_blank" rel="noopener">{shortUrl(v)}</a>)}</dd></>}
                 {langs.length > 0 && <><dt>Kalbos</dt><dd>{langs.join(', ')}</dd></>}
                 {gpa && !isNullValue(gpa) && <><dt>GPA</dt><dd>{gpa}</dd></>}
                 {sme && !isNullValue(sme) && <><dt>MVĮ</dt><dd>{sme}</dd></>}
@@ -257,7 +257,7 @@ function isPast(d?: string) {
         <div class={cellOrder.length > 1 ? `grid-${Math.min(cellOrder.length, 3)}` : ''}>
           {cellOrder.map((cellKey) => (
             <div>
-              {cellMap.get(cellKey).map((sgType) => {
+              {cellMap.get(cellKey).map((sgType: any) => {
                 const useGrid = !noGrid.has(sgType.nodeId) && sgType.instances.length > 1;
                 const useDivider = ['ND-SelectionCriteria', 'ND-LotAwardCriterion', 'ND-LotsGroupAwardCriterion'].includes(sgType.nodeId);
                 return (
@@ -265,7 +265,7 @@ function isPast(d?: string) {
                     <p class="section-title">{subgroupTitles[sgType.nodeId] || sgType.nodeId}</p>
                     {useGrid ? (
                       <div class={`grid-${Math.min(sgType.instances.length, 3)}`}>
-                        {sgType.instances.map((sg, i) => (
+                        {sgType.instances.map((sg: any, i: number) => (
                           <>
                             {useDivider && i > 0 && <hr class="my-2 border-0 border-t border-light-gray" />}
                             <TedSubgroup sg={sg} shortUrl={shortUrl} />
@@ -274,7 +274,7 @@ function isPast(d?: string) {
                       </div>
                     ) : (
                       <>
-                        {sgType.instances.map((sg, i) => (
+                        {sgType.instances.map((sg: any, i: number) => (
                           <>
                             {useDivider && i > 0 && <hr class="my-2 border-0 border-t border-light-gray" />}
                             <TedSubgroup sg={sg} shortUrl={shortUrl} />

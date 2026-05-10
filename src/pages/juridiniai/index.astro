@@ -110,6 +110,8 @@ const juridiniaiMapConfig = {
   },
   detailClickUrlTemplate: '/juridiniai?location={lat},{lon}&locationRadius=10',
 };
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
 
 {tikRezultatai ? (

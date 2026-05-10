@@ -1,6 +1,0 @@
-<%- include('./contact-list.ejs', {
-  items: (emails || []).map(e => ({ value: e.email, pages: e.pages })),
-  title: typeof title !== 'undefined' ? title : 'El. paštas',
-  type: 'email',
-  emptyText: typeof emptyText !== 'undefined' ? emptyText : 'Nerasta'
-}) %>

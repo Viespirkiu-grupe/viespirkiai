@@ -10,7 +10,6 @@ import { parseHTML } from "linkedom";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { toAscii, toCamelCase } from "../../utils/text.js";
-import { spawn } from "child_process";
 
 function cleanRows(rows) {
     return rows.map((row) => {

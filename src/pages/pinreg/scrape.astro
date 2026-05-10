@@ -8,9 +8,7 @@ import { highlightCode } from '@/utils/highlightCode.js';
 import { postgres } from '@/postgres/postgres.js';
 import { spawn } from 'child_process';
 import { log } from '@/utils/log.js';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { join, dirname } from 'path';
+import scrapeKodas from '../../assets/pinreg/scrapeKodas.js?raw';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
@@ -18,8 +16,6 @@ const font = getFont(Astro.cookies);
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UPSERT_BATCH_SIZE = 1000;
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const scrapeKodas = readFileSync(join(__dirname, '../../../views/pinreg/scrapeKodas.js'), 'utf-8');
 const highlightedCode = highlightCode(scrapeKodas);
 
 function fetchUUID(uuid: string): Promise<void> {

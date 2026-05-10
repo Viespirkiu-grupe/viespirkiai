@@ -95,7 +95,7 @@ const pageDescription = view.documentTypeLabel + (view.issueDateText ? ` · ${vi
                 <div>
                   <div class="font-medium">{view.procScope.bvpzPavadinimas}{view.procScope.bvpzKodas && <span class="text-muted font-normal text-xs"> {view.procScope.bvpzKodas}</span>}</div>
                 </div>
-                {view.procScope.papildomiBvpzKodai?.map((code, i) => (
+                {view.procScope.papildomiBvpzKodai?.map((code: any, i: number) => (
                   <div>
                     <div class="font-medium">{view.procScope.papildomiBvpzPavadinimai[i]}{code && <span class="text-muted font-normal text-xs"> {code}</span>}</div>
                   </div>

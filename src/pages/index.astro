@@ -11,6 +11,8 @@ import { objectsToCsvStream } from '@/utils/csv.js';
 import { Readable as NodeReadable, PassThrough } from 'node:stream';
 import { cleanQuery, getColorScheme, getFont } from '../lib/failai.ts';
 
+void NodeReadable;
+
 type SearchValues = Record<string, string | number | undefined>;
 
 type SearchResultItem = {
@@ -46,7 +48,7 @@ const limit = parseInt(query.limit) || DEFAULT_LIMIT;
 const page = parseInt(query.page) || 1;
 const engine = query.search && config.typesenseUp ? 'typesense' : 'postgres';
 
-function buildNumberOfResults({ shown, total, elapsed, engine, page = 1 }: { shown: number; total: number | null; elapsed: number; engine: string; page?: number }) {
+function buildNumberOfResults({ shown, total, elapsed, engine }: { shown: number; total: number | null; elapsed: number; engine: string }) {
   const durationMs = Math.round(elapsed);
   const trukme = (elapsed / 1000).toFixed(2);
   const source = `<span class="inline" data-duration="${durationMs}">(${trukme}s, ${engine})</span>`;
@@ -80,6 +82,8 @@ function buildPaginationHtml({ currentPage, pageCount, queryParams }: { currentP
   return `<nav aria-label="Puslapiavimas" class="mt-8"><ul class="pagination">${current > 1 ? `<li><a href="${pageLink(current - 1) + queryParams}" aria-label="Ankstesnis puslapis"><span aria-hidden="true">←</span></a></li>` : '<li class="disabled"><span aria-hidden="true">←</span></li>'}${pages.map(i => `<li${i === current ? ' class="active"' : ''}><a href="${pageLink(i) + queryParams}" aria-label="Puslapis ${i}"${i === current ? ' aria-current="page"' : ''}>${i}</a></li>`).join('')}${current < totalPages ? `<li><a href="${pageLink(current + 1) + queryParams}" aria-label="Kitas puslapis"><span aria-hidden="true">→</span></a></li>` : '<li class="disabled"><span aria-hidden="true">→</span></li>'}</ul></nav>`;
 }
 
+void buildPaginationHtml;
+
 // Stream exports (JSONL / CSV) short-circuit
 if (query.jsonl || query.csv) {
   const { stream, client } = await searchSutartys(query, { limit: null, page, stream: true, sort: false, engine }) as {
@@ -100,8 +104,7 @@ if (query.jsonl || query.csv) {
 
   if (query.jsonl) {
     stream.pipe(objectsToJsonlStream()).pipe(pass);
-    const web = NodeReadable.toWeb(pass) as unknown as BodyInit;
-    return new Response(web, {
+    return new Response(NodeReadable.toWeb(pass) as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/x-ndjson',
         'Content-Disposition': `attachment; filename=viespirkiai-${new Date().toISOString()}.jsonl`,
@@ -112,8 +115,7 @@ if (query.jsonl || query.csv) {
   if (query.csv) {
     // Basic CSV fallback: map raw rows to CSV using generic object keys
     stream.pipe(objectsToCsvStream()).pipe(pass);
-    const web = NodeReadable.toWeb(pass) as unknown as BodyInit;
-    return new Response(web, {
+    return new Response(NodeReadable.toWeb(pass) as unknown as BodyInit, {
       headers: {
         'Content-Type': 'text/csv',
         'Content-Disposition': `attachment; filename=viespirkiai-${new Date().toISOString()}.csv`,
@@ -125,15 +127,21 @@ if (query.jsonl || query.csv) {
 // Result count update (AJAX)
 if (query.rezultatuSkaiciausPatikslinimas) {
   const startas = performance.now();
-  const [total, { values, queryParams }] = await Promise.all([
+  const [total, { queryParams }] = await Promise.all([
     countSutartys(query),
     searchSutartys(query, { limit: 1, page, engine }),
   ]) as [number, { values: SearchValues; queryParams: string }];
   const pageCount = Math.ceil(total / limit);
   const elapsed = performance.now() - startas + Number(query.trukme || 0);
-  const numberOfResults = buildNumberOfResults({ shown: limit, total, elapsed, engine, page });
-  const pagination = buildPaginationHtml({ currentPage: page, pageCount, queryParams });
-  return new Response(JSON.stringify({ total, pageCount, queryParams, numberOfResults, pagination, zinomasRezultatuSkaicius: true }), {
+  void [queryParams, pageCount, elapsed];
+  return new Response(JSON.stringify({
+    total,
+    pageCount,
+    queryParams,
+    numberOfResults: buildNumberOfResults({ shown: limit, total, elapsed, engine }),
+    pagination: buildPaginationHtml({ currentPage: page, pageCount, queryParams }),
+    zinomasRezultatuSkaicius: true,
+  }), {
     headers: { 'Content-Type': 'application/json' },
   });
 }
@@ -147,7 +155,7 @@ const { results, total: searchedTotal, values, queryParams } = await searchSutar
 };
 const elapsed = performance.now() - startas;
 const total = searchedTotal;
-const numberOfResults = buildNumberOfResults({ shown: results.length, total, elapsed, engine, page });
+const numberOfResults = buildNumberOfResults({ shown: results.length, total, elapsed, engine });
 
 const pageCount = Math.ceil((total || 100_000) / limit);
 const usedHiddenFields = Object.keys(values).some(k => k !== 'search' && k !== 'limit' && values[k] !== '' && values[k] !== undefined);

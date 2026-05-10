@@ -53,6 +53,8 @@ const informationAccuracySteps = [
     ],
   },
 ];
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
 <Layout
   pageTitle="Kontaktai"

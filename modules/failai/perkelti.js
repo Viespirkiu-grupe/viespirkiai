@@ -55,7 +55,7 @@ export async function perkeltiFailus(from, to, kiekis = 1) {
                 }),
             });
 
-            var { md5, size } = await response.json();
+            var { md5 } = await response.json();
 
             if (!response.ok || !md5) {
                 throw new Error("Nepavyko gauti failo.");

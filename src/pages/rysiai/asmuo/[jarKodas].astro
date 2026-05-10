@@ -89,5 +89,5 @@ if (!/^\d+$/.test(jarKodas!)) return Astro.redirect('/404');
   <script is:inline define:vars={{ entityType: 'asmuo', entityId: jarKodas }}>
     window.RYSIAI_CONFIG = { entityType, entityId };
   </script>
-  <script type="module" src={rysiaiAppUrl}></script>
+  <script is:inline type="module" src={rysiaiAppUrl}></script>
 </Layout>

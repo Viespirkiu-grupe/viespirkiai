@@ -1,8 +1,5 @@
 ---
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
-const svg = readFileSync(fileURLToPath(new URL('../../assets/signal-qr.svg', import.meta.url)), 'utf-8');
+import svg from '../../assets/signal-qr.svg?raw';
 ---
 
 <Fragment set:html={svg} />

@@ -1,4 +1,8 @@
 ---
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 interface Preset {
   label: string;
   codes: string;
@@ -23,10 +27,14 @@ interface Props {
   showManualInput?: boolean;
 }
 
+const cpvJsonPath = fileURLToPath(new URL('../../../public/dist/cpv.json', import.meta.url));
+const cpvJsonVersion = createHash('md5').update(readFileSync(cpvJsonPath)).digest('hex');
+const defaultTreeUrl = `/bvpz/cpv.json?v=${cpvJsonVersion}`;
+
 const {
   presets,
   searchTargets = [],
-  treeUrl = '/dist/cpv.json',
+  treeUrl = defaultTreeUrl,
   instanceId = 'bvpz-picker',
   initialCodes = '',
   syncInputId,

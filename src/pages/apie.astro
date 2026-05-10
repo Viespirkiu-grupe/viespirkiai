@@ -81,6 +81,8 @@ const faqItems = [
     answerHtml: '<a href="/kontaktai">Susisiekite, tikrai atsakysime.</a>',
   },
 ];
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
 
 <Layout

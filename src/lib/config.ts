@@ -18,6 +18,12 @@ export interface InfoBannerObject {
   important?: boolean;
 }
 
+export interface InfoBanner {
+  type: 'text' | 'html';
+  content: string;
+  important: boolean;
+}
+
 export interface SiteConfig {
   /** HTML injected into every page's `<head>` (analytics snippets, custom CSS, etc.). */
   customHead?: string;
@@ -52,5 +58,32 @@ export interface SiteConfig {
 }
 
 const config = rawConfig as SiteConfig;
+
+export function normalizeInfoBanner(rawInfoBanner?: string | InfoBannerObject): InfoBanner | null {
+  if (typeof rawInfoBanner === 'string' && rawInfoBanner.trim()) {
+    return {
+      type: 'text',
+      content: rawInfoBanner.trim(),
+      important: false,
+    };
+  }
+
+  if (!rawInfoBanner || typeof rawInfoBanner !== 'object') {
+    return null;
+  }
+
+  const type = rawInfoBanner.type === 'html' ? 'html' : 'text';
+  const content = typeof rawInfoBanner.content === 'string' ? rawInfoBanner.content.trim() : '';
+
+  if (!content) {
+    return null;
+  }
+
+  return {
+    type,
+    content,
+    important: rawInfoBanner.important === true,
+  };
+}
 
 export default config;

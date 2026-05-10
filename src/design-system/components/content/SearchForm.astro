@@ -89,28 +89,31 @@ const hasTitleSuffix = Astro.slots.has('title-suffix');
     const searchInput = document.querySelector<HTMLInputElement>('#search');
 
     if (searchToggle && filterBox && checkbox) {
-      const initialChecked = checkbox.dataset.initialChecked === 'true';
+      const _searchToggle = searchToggle;
+      const _filterBox = filterBox;
+      const _checkbox = checkbox;
+      const initialChecked = _checkbox.dataset.initialChecked === 'true';
 
       function applyFilterState(isChecked: boolean) {
-        searchToggle.setAttribute('aria-expanded', String(isChecked));
-        searchToggle.setAttribute('aria-label', isChecked ? 'Slėpti filtrus' : 'Rodyti filtrus');
+        _searchToggle.setAttribute('aria-expanded', String(isChecked));
+        _searchToggle.setAttribute('aria-label', isChecked ? 'Slėpti filtrus' : 'Rodyti filtrus');
         if (isChecked) {
-          filterBox.removeAttribute('inert');
-          filterBox.setAttribute('aria-hidden', 'false');
+          _filterBox.removeAttribute('inert');
+          _filterBox.setAttribute('aria-hidden', 'false');
         } else {
-          filterBox.setAttribute('inert', '');
-          filterBox.setAttribute('aria-hidden', 'true');
+          _filterBox.setAttribute('inert', '');
+          _filterBox.setAttribute('aria-hidden', 'true');
         }
       }
 
-      checkbox.checked = initialChecked;
+      _checkbox.checked = initialChecked;
       applyFilterState(initialChecked);
 
-      checkbox.addEventListener('change', () => {
-        const isChecked = checkbox.checked;
+      _checkbox.addEventListener('change', () => {
+        const isChecked = _checkbox.checked;
         applyFilterState(isChecked);
         if (isChecked) {
-          const firstInput = filterBox.querySelector<HTMLElement>('input, select');
+          const firstInput = _filterBox.querySelector<HTMLElement>('input, select');
           if (firstInput) firstInput.focus();
         }
       });

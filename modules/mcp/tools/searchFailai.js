@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { searchFailai, countFailai } from "../../failai/searchFailai.js";
+import { searchFailai } from "../../failai/searchFailai.js";
 
 export const name = "search_failai";
 export const description =

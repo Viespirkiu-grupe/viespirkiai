@@ -21,7 +21,7 @@ function fArr(id: string) {
       const type = f('BT-809-Lot');
       const desc = f('BT-750-Lot');
       const stage2 = f('BT-40-Lot');
-      const threshItems = (sg.items || []).map((item) => {
+      const threshItems = (sg.items || []).map((item: any) => {
         const n = (item.fields.find((x: any) => x.fieldId === 'BT-752-Lot-ThresholdNumber')?.values || []).join('');
         const t = (item.fields.find((x: any) => x.fieldId === 'BT-7532-Lot')?.values || []).join('');
         return t && n ? `${t}: ${n}` : (t || n);
@@ -64,11 +64,11 @@ function fArr(id: string) {
         || sg.fields.find((x: any) => x.fieldId === 'BT-615-Part');
       const langs = fArr('BT-708-Lot').concat(fArr('BT-708-Part'));
       const uLangs = fArr('BT-737-Lot').concat(fArr('BT-737-Part'));
-      const allLangs = [...langs, ...uLangs.filter((l) => !langs.includes(l)).map((l) => `${l} (neofic.)`)];
+      const allLangs = [...langs, ...uLangs.filter((l: string) => !langs.includes(l)).map((l: string) => `${l} (neofic.)`)];
       return (
         <>
           {docId && <p class="font-medium text-sm mb-1">{docId}</p>}
-          {url?.values?.map((v) => <p class="text-sm mb-1"><a href={v} target="_blank" rel="noopener">{shortUrl(v)}</a></p>)}
+          {url?.values?.map((v: string) => <p class="text-sm mb-1"><a href={v} target="_blank" rel="noopener">{shortUrl(v)}</a></p>)}
           {access && <p class="text-sm text-muted mb-1">{access}</p>}
           {allLangs.length > 0 && <p class="text-xs text-muted mb-0">{allLangs.join(', ')}</p>}
         </>
@@ -83,13 +83,13 @@ function fArr(id: string) {
       const rest = sg.fields.filter((x: any) => x.fieldId !== 'BT-811(a)-Lot' && x.fieldId !== 'BT-811(b)-Lot');
       return (
         <dl class="kv-list">
-          {listA.map((v, i) => (
+          {listA.map((v: string, i: number) => (
             <>
               <dt>{v}</dt>
               <dd>{listB[i] || ''}</dd>
             </>
           ))}
-          {listA.length === 0 && rest.map((fv) => (
+          {listA.length === 0 && rest.map((fv: any) => (
             <>
               <dt>{fv.name}</dt>
               <dd>{fv.values.join(', ')}</dd>
@@ -102,7 +102,7 @@ function fArr(id: string) {
 ) : (
   <>
     <TedKvList fields={sg.fields} shortUrl={shortUrl} />
-    {(sg.items || []).map((item) => (
+    {(sg.items || []).map((item: any) => (
       <div>
         <p class="section-title text-muted">#{item.index}</p>
         <TedKvList fields={item.fields} shortUrl={shortUrl} />

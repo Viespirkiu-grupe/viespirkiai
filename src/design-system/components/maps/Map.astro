@@ -47,7 +47,7 @@ const configElementId = `${id}-map-config`;
   style={containerStyle}
 ></div>
 
-<script type="application/json" id={configElementId} set:html={mapConfig}></script>
+<script is:inline type="application/json" id={configElementId} set:html={mapConfig}></script>
 
 {showLink && pointLat != null && pointLon != null && (
   <p class="text-muted text-xs mt-2">
@@ -62,8 +62,8 @@ const configElementId = `${id}-map-config`;
 
   await ensureLeafletRuntime();
 
-  const resolveTemplate = (template, values) => template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ''));
-  const toPoint = (value) => {
+  const resolveTemplate = (template: any, values: any) => template.replace(/\{(\w+)\}/g, (_: any, key: any) => String(values[key] ?? ''));
+  const toPoint = (value: any) => {
     if (!Array.isArray(value) || value.length < 2) return null;
     const lat = Number(value[0]);
     const lon = Number(value[1]);
@@ -79,18 +79,19 @@ const configElementId = `${id}-map-config`;
 
     const config = JSON.parse(rawConfig);
     const center = config.center ?? [config.lat, config.lon];
-    const map = window.L.map(element.id, { zoomAnimation: true, markerZoomAnimation: true }).setView(center, config.zoom ?? 14);
-    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const L = window.L as any;
+    const map = L.map(element.id, { zoomAnimation: true, markerZoomAnimation: true }).setView(center, config.zoom ?? 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
     if (config.mode === 'point' || !config.mode) {
-      if (config.marker !== false) window.L.marker([config.lat, config.lon]).addTo(map);
+      if (config.marker !== false) L.marker([config.lat, config.lon]).addTo(map);
       continue;
     }
 
     if (config.mode === 'points') {
-      const layerGroup = window.L.layerGroup().addTo(map);
+      const layerGroup = L.layerGroup().addTo(map);
       const rawPoints = config.pointsUrl
         ? await fetch(config.pointsUrl).then((response) => response.json())
         : (config.points || []);
@@ -103,7 +104,7 @@ const configElementId = `${id}-map-config`;
         console.log('[Map points debug] first points:', points.slice(0, 10));
       }
       for (const [lat, lon] of points) {
-        const marker = window.L.circleMarker([lat, lon], {
+        const marker = L.circleMarker([lat, lon], {
           radius: config.pointStyle?.radius ?? 2,
           color: config.pointStyle?.color ?? 'black',
           fillColor: config.pointStyle?.fillColor ?? 'black',
@@ -122,7 +123,7 @@ const configElementId = `${id}-map-config`;
     }
 
     if (config.mode === 'juridiniai') {
-      const overlay = window.L.tileLayer(config.overlayTileUrl, {
+      const overlay = L.tileLayer(config.overlayTileUrl, {
         tileSize: 256,
         opacity: config.overlayOpacity ?? 0.6,
         maxNativeZoom: config.maxNativeZoom ?? 16,
@@ -133,7 +134,7 @@ const configElementId = `${id}-map-config`;
         overlay.getContainer().style.filter = `blur(${config.overlayBlurPx}px)`;
       }
 
-      let detailLayer = null;
+      let detailLayer: any = null;
       map.on('moveend zoomend', async () => {
         const zoom = map.getZoom();
         if (zoom < (config.detailZoomThreshold ?? 17)) {
@@ -154,10 +155,10 @@ const configElementId = `${id}-map-config`;
         const data = await response.json();
 
         if (detailLayer) map.removeLayer(detailLayer);
-        detailLayer = window.L.layerGroup();
+        detailLayer = L.layerGroup();
 
         for (const [lat, lon] of (data.locations || [])) {
-          const circle = window.L.circleMarker([lat, lon], {
+          const circle = L.circleMarker([lat, lon], {
             radius: config.detailPointStyle?.radius ?? 6,
             color: config.detailPointStyle?.color ?? 'black',
             fillColor: config.detailPointStyle?.fillColor ?? 'black',

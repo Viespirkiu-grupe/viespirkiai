@@ -18,7 +18,7 @@ function fetchBatch(fromId) {
 
 async function insertBatch(rows) {
     const values = rows
-        .map((r, i) => {
+        .map((_, i) => {
             const base = i * 8;
             return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`;
         })
