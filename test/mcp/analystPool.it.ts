@@ -167,7 +167,7 @@ describe("v_bylos", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Pagination wrapper — the same SQL used by executeInvestigationQuery
+// Pagination wrapper — the same SQL used by executeQuery
 // ---------------------------------------------------------------------------
 
 describe("pagination wrapper", () => {

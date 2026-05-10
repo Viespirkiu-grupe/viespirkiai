@@ -76,13 +76,13 @@ filtered to the whitelist.
 
 The LLM calls this at the start of an investigation to understand what data is available and how tables relate.
 
-### Tool 2: `execute_investigation_query`
+### Tool 2: `execute_query`
 
 The analytical workhorse. Accepts a SQL SELECT, validates it through a multi-layer guardrail stack, executes it on a
 sandboxed read-only connection, and returns results.
 
 ```
-tool: execute_investigation_query
+tool: execute_query
 query: "SELECT ..."
 purpose: "Testing hypothesis: supplier X has abnormally high win rate relative to competitors"
 ```
@@ -313,7 +313,7 @@ search: "Greitas Statyba"
 
 ### Step 2 — Full risk profile in one shot (`v_company`)
 
-**Tool**: `execute_investigation_query`  
+**Tool**: `execute_query`  
 **Purpose**: "Capacity, compliance flags, court exposure, and domain footprint for the target company"
 
 ```sql
@@ -343,7 +343,7 @@ deliver road construction at this scale is implausible.*
 
 ### Step 3 — Contract history by year with cost overrun ratio (`v_sutartys`)
 
-**Tool**: `execute_investigation_query`  
+**Tool**: `execute_query`  
 **Purpose**: "Contract volume trend and execution overruns — is the company growing or was it born ready?"
 
 ```sql
@@ -369,7 +369,7 @@ Same buyer every time.*
 
 ### Step 4 — Does the buyer favour non-competitive procedures? (`v_pirkimas`)
 
-**Tool**: `execute_investigation_query`  
+**Tool**: `execute_query`  
 **Purpose**: "Procedure type breakdown for the contracting authority — how often do they bypass open tender?"
 
 ```sql
@@ -394,7 +394,7 @@ competition before the bid even opens. Focus of Theme 7 confirmed.*
 
 ### Step 5 — Win rate and price suppression (`v_dalyviai`)
 
-**Tool**: `execute_investigation_query`  
+**Tool**: `execute_query`  
 **Purpose**: "How often does this company win as lowest bidder vs all other participants in the same tenders"
 
 ```sql
@@ -423,7 +423,7 @@ improbable without prior knowledge of competitors' prices.*
 
 ### Step 6 — Who co-bids and always loses? (`v_dalyviai`)
 
-**Tool**: `execute_investigation_query`  
+**Tool**: `execute_query`  
 **Purpose**: "Identify companies that repeatedly appear as cover bidders — always present, always higher"
 
 ```sql
@@ -450,7 +450,7 @@ confirmed.*
 
 ### Step 7 — Are the three companies linked through people? (`v_person_links`)
 
-**Tool**: `execute_investigation_query`  
+**Tool**: `execute_query`  
 **Purpose**: "Graph traversal: shared directors, shareholders, or spouses across the three co-bidding companies"
 
 ```sql
@@ -479,7 +479,7 @@ Draugai)*
 
 ### Step 8 — Court exposure of the cluster (`v_bylos`)
 
-**Tool**: `execute_investigation_query`  
+**Tool**: `execute_query`  
 **Purpose**: "Check whether any of the three companies appear as defendants in court cases"
 
 ```sql
@@ -531,7 +531,7 @@ undeclared subcontracting — another capacity-mismatch indicator.*
 | Component                                 | Effort | Notes                                                                                |
 |-------------------------------------------|--------|--------------------------------------------------------------------------------------|
 | `get_schema` MCP tool                     | Small  | Query `information_schema`, filter to whitelist                                      |
-| `execute_investigation_query` MCP tool    | Medium | SQL parser + guardrail stack + execution + pagination wrapper                        |
+| `execute_query` MCP tool    | Medium | SQL parser + guardrail stack + execution + pagination wrapper                        |
 | Analyst pool with `on('connect')` hook    | Small  | Reuses existing read-only PG role; runs `TEMP_VIEWS_SQL` once                        |
 | SQL AST validation module                 | Medium | `node-sql-parser`, table whitelist, **strict** function whitelist, complexity checks |
 | Audit logging                             | None   | Reuses existing `logToolCall` → `mcpToolCalls`                                       |
@@ -611,7 +611,7 @@ The main PG pool (`postgres/postgres.js`) uses `pg.Pool` with `statement_cache_s
 modules/mcp/
 ├── tools/
 │   ├── getSchema.js                     ← Tool 1 (new)
-│   └── executeInvestigationQuery.js     ← Tool 2 (new)
+    │   └── executeQuery.js                  ← Tool 2 (new)
 └── analyst/
     ├── pool.js           ← Dedicated pg.Pool for the existing read-only role,
     │                        with on('connect') hook running TEMP_VIEWS_SQL
@@ -769,15 +769,15 @@ Uses the **main pool**, not the analyst pool. Schema introspection is read-only 
 
 ---
 
-### Tool 2: `executeInvestigationQuery`
+### Tool 2: `executeQuery`
 
-**File**: `modules/mcp/tools/executeInvestigationQuery.js`
+**File**: `modules/mcp/tools/executeQuery.js`
 
 #### Input schema
 
 | Field     | Zod type                             | Default | Description                                       |
 |-----------|--------------------------------------|---------|---------------------------------------------------|
-| `query`   | `z.string().min(10).max(8000)`       | —       | SQL SELECT to execute (required)                  |
+| `query`   | `z.string().min(10).max(3072)`       | —       | SQL SELECT to execute (required)                  |
 | `purpose` | `z.string().min(5).max(500)`         | —       | Human-readable reason — audit log only (required) |
 | `page`    | `z.number().int().min(1).default(1)` | `1`     | Page number (1-based). Page size is fixed at 50.  |
 
@@ -872,6 +872,10 @@ Execution errors include the raw PostgreSQL error message so the LLM can self-co
 nor `purpose` is provided, the Zod schema rejects the call before the handler runs — the SDK returns a validation
 error automatically.
 
+The very first handler check — before any SQL parsing — is a raw character-length guard: if `query.length > 3072`
+the call is rejected immediately with `"Query exceeds the 3072-character limit."` and `isError: true`. No trimming
+or normalisation is applied before this check.
+
 #### Minimal example
 
 **Input:**
@@ -964,8 +968,8 @@ graph TD
         IS --> MP[(main pool\npostgres.js)]
     end
 
-subgraph "Tool 2: execute_investigation_query — executeInvestigationQuery.js"
-W --> EQ[executeInvestigationQuery handler]
+subgraph "Tool 2: execute_query — executeQuery.js"
+W --> EQ[executeQuery handler]
 EQ --> VS[validateSql.js\nLayers 1–4]
 VS -->|invalid|ER[return isError + layer + message]
 VS -->|valid|AP[(analyst pool\nanalyst/pool.js\nTEMP_VIEWS_SQL on connect)]
@@ -982,7 +986,7 @@ end
 ```mermaid
 sequenceDiagram
     participant LLM
-    participant H as executeInvestigationQuery handler
+    participant H as executeQuery handler
     participant V as validateSql.js
     participant P as analyst/pool.js
     participant DB as PostgreSQL (read-only role)
@@ -1118,9 +1122,9 @@ returns `{ rowCount: 1 }` and the connection has the six TEMP views (verify with
 **Acceptance:** the `tools/list` JSON-RPC call (Section "E2E testing" below) returns `get_schema`, and calling
 `tools/call` with `{ table: "sutartys" }` returns its column list.
 
-### Phase 4 — Tool 2: `execute_investigation_query`
+### Phase 4 — Tool 2: `execute_query`
 
-1. Create `modules/mcp/tools/executeInvestigationQuery.js`.
+1. Create `modules/mcp/tools/executeQuery.js`.
 2. Zod input schema as documented (`query`, `purpose`, `page` only).
 3. Pipeline: validate → acquire client from `analystPool` → `SET LOCAL statement_timeout = '20s'` →
    wrap query with `COUNT(*) OVER ()` + `LIMIT 50 OFFSET ((page-1)*50)` → execute → strip `__total__` →
@@ -1178,7 +1182,7 @@ Use the Node built-in test runner (matches the existing `test/rysiai/*.test.js` 
 - ❌ 9 CTEs → rejected
 - ✅ `WITH RECURSIVE` → ok with `hasRecursive: true`
 
-### 2. Integration tests — `test/mcp/executeInvestigationQuery.test.js`
+### 2. Integration tests — `test/mcp/executeQuery.test.js`
 
 Hit a real local PostgreSQL with the read-only role. Skip via `process.env.SKIP_DB_TESTS` for CI environments
 without a DB.
@@ -1243,7 +1247,7 @@ curl -s -X POST http://localhost:9019/mcp \
   }' | jq .
 ```
 
-Expected: a list including `get_schema` and `execute_investigation_query`.
+Expected: a list including `get_schema` and `execute_query`.
 
 **Call `get_schema` with no argument (table list):**
 
@@ -1262,7 +1266,7 @@ curl -s -X POST http://localhost:9019/mcp \
   }' | jq -r '.result.content[0].text' | jq .
 ```
 
-**Call `execute_investigation_query` with a simple aggregation:**
+**Call `execute_query` with a simple aggregation:**
 
 ```bash
 curl -s -X POST http://localhost:9019/mcp \
@@ -1273,7 +1277,7 @@ curl -s -X POST http://localhost:9019/mcp \
     "id": 3,
     "method": "tools/call",
     "params": {
-      "name": "execute_investigation_query",
+      "name": "execute_query",
       "arguments": {
         "query": "SELECT \"tiekejoKodas\", COUNT(*) AS n FROM sutartys WHERE istrinta IS NOT TRUE GROUP BY \"tiekejoKodas\" ORDER BY n DESC",
         "purpose": "Smoke test — top suppliers by contract count",
@@ -1324,7 +1328,7 @@ purpose before calling the tool and quote the totals you got back.
 
 What to watch:
 
-- **Tool selection.** Claude should call `get_schema` early and reach for `execute_investigation_query` for every
+- **Tool selection.** Claude should call `get_schema` early and reach for `execute_query` for every
   hypothesis test.
 - **Pagination narration.** When `totalPages > 1`, Claude should phrase progress as *"page 1 of 5"* or *"50 of 232"*
   — confirms the pagination payload is being read correctly.

@@ -4,7 +4,7 @@ import { validateSql } from "../analyst/validateSql.js";
 
 const PAGE_SIZE = 50;
 
-export const name = "execute_investigation_query";
+export const name = "execute_query";
 export const description =
     "Executes a read-only SQL SELECT against the procurement database. " +
     "The query is validated through a multi-layer guardrail stack (AST parse, table whitelist, " +
@@ -17,7 +17,7 @@ export const schema = {
     query: z
         .string()
         .min(10)
-        .max(8000)
+        .max(3072)
         .describe("SQL SELECT statement to execute"),
     purpose: z
         .string()
@@ -33,6 +33,13 @@ export const schema = {
 };
 
 export async function handler({ query, purpose, page }) {
+    if (query.length > 3072) {
+        return {
+            content: [{ type: "text", text: "Query exceeds the 3072-character limit." }],
+            isError: true,
+        };
+    }
+
     // Layer 1–4 validation
     const validation = validateSql(query);
     if (!validation.ok) {

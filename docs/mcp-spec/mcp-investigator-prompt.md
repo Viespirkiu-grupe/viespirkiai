@@ -19,9 +19,9 @@ Each section below references tools by ID only. Full descriptions:
 - `search_failai`: Search procurement documents by filename or procurement ID
 - `get_failas`: File metadata by numeric ID or MD5 hash
 - `get_failas_tekstas`: OCR-extracted full text of a procurement document
-- `execute_investigation_query`: Read-only SQL SELECT — analytical backbone for **all themes**
+- `execute_query`: Read-only SQL SELECT — analytical backbone for **all themes**
 
-### Views available inside `execute_investigation_query`
+### Views available inside `execute_query`
 
 Prefer views to raw tables. Call `get_schema` to confirm column names.
 
@@ -51,61 +51,61 @@ Prefer views to raw tables. Call `get_schema` to confirm column names.
 
 ### 1. Shell company / capacity mismatch
 
-TOOLS: `get_juridinis`, `execute_investigation_query`, `search_sutartys`
+TOOLS: `get_juridinis`, `execute_query`, `search_sutartys`
 GOAL: Detect capacity mismatch — supplier headcount/wages insufficient for contract scope
 DETECT: headcount vs. total contract value · Sodra wages vs. revenue ratio · registration date vs. first win date ·
 shared registered address count
 
 ### 2. Bid rigging — cover bidding and bid suppression
 
-TOOLS: `execute_investigation_query`, `search_sutartys`
+TOOLS: `execute_query`, `search_sutartys`
 GOAL: Detect cover bidding — recurring losers always bidding just above winner
 DETECT: win rate vs. participation count · top co-bidder frequency · losing bid clustering above winner · participation
 count vs. CPV national average
 
 ### 3. Bid rotation / carousel
 
-TOOLS: `execute_investigation_query`, `search_sutartys`
+TOOLS: `execute_query`, `search_sutartys`
 GOAL: Detect companies alternating wins in same CPV — never competing simultaneously
 DETECT: win value share by period per CPV · mutual bidding absence · cross-appearance as cover bidders
 
 ### 4. Conflict of interest — shared people between buyer and seller
 
-TOOLS: `get_pinreg_jar`, `get_pinreg_asmuo`, `execute_investigation_query`
+TOOLS: `get_pinreg_jar`, `get_pinreg_asmuo`, `execute_query`
 GOAL: Find persons declared in both buyer and winning supplier PINREG records
 DETECT: shared persons buyer↔supplier · spouse/family links · cross-declared interest declarations · ownership chain
 overlap
 
 ### 5. Contract splitting to avoid thresholds
 
-TOOLS: `search_sutartys`, `execute_investigation_query`
+TOOLS: `search_sutartys`, `execute_query`
 GOAL: Detect contract splitting below €30K or open-procedure threshold to avoid competition
 DETECT: contract value clusters just below thresholds · same CPV recurring in small awards · short time gaps between
 consecutive awards to same supplier
 
 ### 6. Geographic monopoly / local capture
 
-TOOLS: `execute_investigation_query`, `search_sutartys`, `get_juridinis`
+TOOLS: `execute_query`, `search_sutartys`, `get_juridinis`
 GOAL: Detect single-supplier dominance in one municipality or CPV category
 DETECT: value share by supplier per municipality · competitors who stopped bidding · local registration bias ·
 officer→supplier PINREG connections
 
 ### 7. Procedure manipulation — unjustified direct award
 
-TOOLS: `execute_investigation_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`
+TOOLS: `execute_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`
 GOAL: Detect overuse of negotiated-without-publication procedure
 DETECT: direct-negotiation value share vs. open competition · trend over time · top beneficiary suppliers
 
 ### 8. Price anomalies — over-invoicing and scope creep
 
-TOOLS: `execute_investigation_query`, `get_sutartis`, `search_sutartys`
+TOOLS: `execute_query`, `get_sutartis`, `search_sutartys`
 GOAL: Detect contracts where faktineIvykdimoVerte significantly exceeds signed verte
 DETECT: avg faktineIvykdimoVerte/verte ratio · overruns >50% · overrun correlation by buyer/CPV/procedure · low-bid then
 inflate pattern
 
 ### 9. Compliance and blacklist cross-check
 
-TOOLS: `get_juridinis`, `execute_investigation_query`
+TOOLS: `get_juridinis`, `execute_query`
 GOAL: Check all blacklists, sanctions, and violations for company and linked parties
 DETECT: current/expired debarment (melagingiTiekejai, nepatikimiTiekejai) · VDI violations · court cases ·
 linked-company blacklist status · supplier-as-claimant against former/current buyers (`bylojeKaip = 'IEŠKOVAS'`) —
@@ -113,14 +113,14 @@ signals litigation leverage to pressure buyers into continued contracting
 
 ### 10. Network — second-degree connections and corporate webs
 
-TOOLS: `get_pinreg_jar`, `get_pinreg_asmuo`, `execute_investigation_query`, `search_juridiniai`, `get_juridinis`
+TOOLS: `get_pinreg_jar`, `get_pinreg_asmuo`, `execute_query`, `search_juridiniai`, `get_juridinis`
 GOAL: Map corporate control network beyond direct ownership
 DETECT: directors/shareholders → second-degree companies → govt contracts · shared address/domain cluster · ownership
 changes around contract award dates
 
 ### 11. UBO risk — beneficial ownership through holding layers
 
-TOOLS: `execute_investigation_query`, `get_pinreg_jar`, `get_juridinis`
+TOOLS: `execute_query`, `get_pinreg_jar`, `get_juridinis`
 GOAL: Detect shared control of competing bidders through shared persons or back-office signals
 
 ANSWERABLE NOW:
@@ -203,7 +203,7 @@ ORDER BY "jarKodas", pavarde;
 
 ### 12. EU Structural Funds abuse — fictitious subcontractors and inflated costs
 
-TOOLS: `execute_investigation_query`, `get_juridinis`, `get_pinreg_jar`
+TOOLS: `execute_query`, `get_juridinis`, `get_pinreg_jar`
 GOAL: Detect fictitious subcontractors in CPVA-funded contracts
 DETECT: subcontractor Sodra headcount · main contractor pass-through signal · recurring contractor+subcontractor pairs ·
 shared PINREG persons between contractor and subcontractor
@@ -256,7 +256,7 @@ LIMIT 200;
 
 ### 13. Revolving door — procurement officer joins winning supplier
 
-TOOLS: `execute_investigation_query`, `get_pinreg_asmuo`, `get_pinreg_jar`
+TOOLS: `execute_query`, `get_pinreg_asmuo`, `get_pinreg_jar`
 GOAL: Find buyer-side staff who moved to suppliers that won contracts from their former employer
 DETECT: person left buyer org → joined supplier within 2 years · contracts awarded to that supplier after move
 
@@ -304,7 +304,7 @@ LIMIT 200;
 
 ### 14. Spec rigging — technical specifications written for one supplier
 
-TOOLS: `execute_investigation_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `search_failai`,
+TOOLS: `execute_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `search_failai`,
 `get_failas_tekstas`
 GOAL: Detect buyers with abnormally high single-bidder rate in a CPV category
 DETECT: single-bidder rate vs. CPV national average · repeat winner in single-bidder tenders
@@ -346,7 +346,7 @@ LIMIT 200;
 
 ### 15. Framework agreement abuse — single-supplier call-offs
 
-TOOLS: `execute_investigation_query`, `search_sutartys`, `get_sutartis`
+TOOLS: `execute_query`, `search_sutartys`, `get_sutartis`
 GOAL: Detect framework agreements where all call-offs (`tipas = 'PPS'`) go to one supplier
 DETECT: distinct supplier count per framework · total value and duration · framework establishment procedure type
 
@@ -372,7 +372,7 @@ LIMIT 200;
 
 ### 16. Shared back-office — competing companies with the same address or domain
 
-TOOLS: `execute_investigation_query`, `get_juridinis`, `search_juridiniai`
+TOOLS: `execute_query`, `get_juridinis`, `search_juridiniai`
 GOAL: Detect co-bidders sharing registered address or domain registrant
 DETECT: shared legal address in jarCsv · shared domain in domenai · overlapping contract timelines
 
@@ -424,7 +424,7 @@ LIMIT 200;
 
 ### 17. Price cartel — suspiciously uniform bid prices across a CPV category
 
-TOOLS: `execute_investigation_query`
+TOOLS: `execute_query`
 GOAL: Detect CPV categories with abnormally low price variance (CV < 5%) across independent tenders
 DETECT: coefficient of variation by CPV · repeat suppliers in low-variation categories · cross-category clustering
 
@@ -458,7 +458,7 @@ Themes 18–20: partial data — queries exist but schema gaps limit completenes
 
 ### 18. Contract amendment escalation — low bid, then value inflated through amendments
 
-TOOLS: `execute_investigation_query`, `get_sutartis`, `search_failai`, `get_failas_tekstas`
+TOOLS: `execute_query`, `get_sutartis`, `search_failai`, `get_failas_tekstas`
 GOAL: Detect suppliers who systematically under-bid then inflate via amendments
 DETECT: faktineIvykdimoVerte/verte ratio > 1.5 · buyers with highest overrun tolerance · consistent under-bid pattern by
 supplier
@@ -488,7 +488,7 @@ ingested.
 
 ### 19. Municipal company favoritism — buyer awards contracts to its own subsidiary
 
-TOOLS: `execute_investigation_query`, `get_pinreg_jar`, `search_sutartys`
+TOOLS: `execute_query`, `get_pinreg_jar`, `search_sutartys`
 GOAL: Detect municipality awarding contracts to its own subsidiary via shared-person proxy
 DETECT: value share to companies with shared PINREG persons with buyer · procedure type distribution (direct vs.
 competitive)
@@ -526,7 +526,7 @@ GAP: Shared-person proxy only — misses formal municipal ownership (51% stake).
 
 ### 20. Restricted procedure manipulation — buyer hand-picks the same invitees
 
-TOOLS: `execute_investigation_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`
+TOOLS: `execute_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`
 GOAL: Detect restricted/negotiated procedure overuse and audit findings for direct awards
 DETECT: procedure mix (restricted/negotiated vs. open) · `neskelbiamosDerybos` audit findings by buyer
 
@@ -577,7 +577,7 @@ Weak signal: VDI violation (`vdiPazeidimai`) during contract execution period su
 
 ### 23. Vendor lock-in — incumbent supplier structural monopoly
 
-TOOLS: `execute_investigation_query`, `search_sutartys`, `get_juridinis`
+TOOLS: `execute_query`, `search_sutartys`, `get_juridinis`
 GOAL: Detect suppliers whose relationship with a single buyer is self-reinforcing — system builder becomes sole
 maintenance provider, all subsequent contracts awarded without competition
 DETECT: single-buyer concentration > 70% of supplier's total value · all contracts to that buyer via
