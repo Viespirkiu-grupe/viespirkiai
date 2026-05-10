@@ -3,6 +3,11 @@
 > For human investigator: this document is meant to be pasted as the LLM prompt (with or without the human-only notes).
 > Human-only notes are clearly marked with blockquotes starting with `For human investigator:` and can be removed before
 > giving the prompt to the MCP agent.
+> Run `mcp-investigator-prompt-split.sh` to regenerate the derived files:
+> `mcp-investigator-prompt-thin.md` (no SQL, no human notes) and `mcp-investigator-prompt-sql.md` (SQL cookbook).
+
+**SQL cookbook**: all SQL examples from this document are collected in `mcp-investigator-prompt-sql.md`, organised by
+section headings. When you need a query pattern, search that file first — it is faster than scanning the full prompt.
 
 ## MCP Tool Quick Reference
 
@@ -10,7 +15,11 @@
 
 Each section below references tools by ID only. Full descriptions:
 
-- `get_schema`: Schema of all views and raw tables — call first when column names are uncertain.
+- `get_schema`: Schema tool. No args → compact inventory (`id`, `kind`, `tags`, `keys` per entity; no examples).
+  With `table`: detail by default (`pk`, `columns` object, `joins` tuples, one `ex`). Explicit modes: `columns`,
+  `joins`, `examples`.
+  `joins` tuple format: `[localCol, foreignRef, joinType]`. `joinType`: `"strict"` = enforced FK; `"semantic"` = logical
+  only; `"sparse"` = FK exists, many nulls.
 - `get_juridinis`: Full company profile (Sodra headcount/wages, contracts, PINREG, court cases, VDI, domains, ES
   investments).
 - `search_juridiniai`: Search companies by name or code.
@@ -1400,17 +1409,17 @@ SQL EXAMPLES:
 
 ```sql
 -- Buyers ranked by systemic weakness indicators: overruns + high non-competitive procedure share
-SELECT s."perkanciosiosOrganizacijosKodas"                                                               AS pirkejoKodas,
-       jb.pavadinimas                                                                                    AS pirkejas,
-       COUNT(*)                                                                                          AS sutarciuKiekis,
-       COUNT(CASE WHEN s."faktineIvykdimoVerte" > s.verte * 1.3 THEN 1 END)                              AS virsijimukiekis,
+SELECT s."perkanciosiosOrganizacijosKodas"                                  AS pirkejoKodas,
+       jb.pavadinimas                                                       AS pirkejas,
+       COUNT(*)                                                             AS sutarciuKiekis,
+       COUNT(CASE WHEN s."faktineIvykdimoVerte" > s.verte * 1.3 THEN 1 END) AS virsijimukiekis,
        ROUND(100.0 * COUNT(CASE WHEN s."faktineIvykdimoVerte" > s.verte * 1.3 THEN 1 END) / COUNT(*),
-             1)                                                                                          AS virsijimoProcent,
+             1)                                                             AS virsijimoProcent,
        COUNT(CASE WHEN vp.statusas IS NOT NULL AND vp."pirkimoBudas" NOT ILIKE '%atvir%' THEN 1
-             END)                                                                                        AS nekonkurenciniai,
+             END)                                                           AS nekonkurenciniai,
        ROUND(100.0 * COUNT(CASE WHEN vp.statusas IS NOT NULL AND vp."pirkimoBudas" NOT ILIKE '%atvir%' THEN 1 END) /
              COUNT(*),
-             1)                                                                                          AS nekonkurProcent
+             1)                                                             AS nekonkurProcent
 FROM sutartys s
          JOIN "jarCsv" jb ON jb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
 LEFT JOIN "viesiejiPirkimai" vp
@@ -1486,23 +1495,23 @@ LIMIT 30;
 
 > For human investigator: sector context matters. Combine MCP outputs with sector-specific supervisory authorities and
 > professional standards bodies when assessing risk severity.
-
-## Human-only guidance notes
-
-> For human investigator:
 >
-> - **STT contact**: when MCP themes show strong patterns in bid rigging, conflict of interest, unjustified direct
-    awards, municipal favouritism, or vendor lock-in, STT is a natural escalation partner. Attach: key MCP queries,
-    summarised metrics (e.g. concentration measures), and any OSINT about involved officials.
-> - **FNTT contact**: when EU funds, inflated prices, shell companies, or money flows suggest fraud or money laundering,
-    FNTT interest increases. Attach: contract lists with values and dates, beneficiary and supplier structures (UBO
-    analysis), and any signs of cross-border flows.
-> - **VPT contact**: when issues are primarily procedural (threshold splitting, wrong procedure type, poor tender
-    design) but not yet clearly criminal, VPT may be the first point of contact.
-> - **VK contact**: when patterns appear systemic in a specific sector or institution (e.g. repeated findings across
-    years), VK’s audit mandate is key for structural remedies.
-> - **KT contact**: when cartels or bid-rigging patterns are strong (bid rotation, cover bidding, price cartels), KT has
-    specialised enforcement tools and sanctions.
+> **STT contact**: when MCP themes show strong patterns in bid rigging, conflict of interest, unjustified direct
+> awards, municipal favouritism, or vendor lock-in, STT is a natural escalation partner. Attach: key MCP queries,
+> summarised metrics (e.g. concentration measures), and any OSINT about involved officials.
+>
+> **FNTT contact**: when EU funds, inflated prices, shell companies, or money flows suggest fraud or money laundering,
+> FNTT interest increases. Attach: contract lists with values and dates, beneficiary and supplier structures (UBO
+> analysis), and any signs of cross-border flows.
+>
+> **VPT contact**: when issues are primarily procedural (threshold splitting, wrong procedure type, poor tender
+> design) but not yet clearly criminal, VPT may be the first point of contact.
+>
+> **VK contact**: when patterns appear systemic in a specific sector or institution (e.g. repeated findings across
+> years), VK’s audit mandate is key for structural remedies.
+>
+> **KT contact**: when cartels or bid-rigging patterns are strong (bid rotation, cover bidding, price cartels), KT has
+> specialised enforcement tools and sanctions.
 >
 > In written referrals, clearly separate: (1) automated MCP analytical indicators, (2) corroborating evidence from OSINT
 > and audits, and (3) open questions requiring investigative powers (e.g. bank data, internal correspondence). This
