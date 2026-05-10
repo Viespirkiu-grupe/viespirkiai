@@ -22,17 +22,29 @@ function assertWhereExample(sql: string, label: string) {
     expect(sql, `${label} must not use SELECT *`).not.toMatch(/\bSELECT\s+\*/i);
 }
 
-function assertColumnStringArray(columns: unknown, label: string) {
-    expect(Array.isArray(columns), `${label} must be an array`).toBe(true);
-    for (const col of columns as string[]) {
-        expect(col).toMatch(/^[a-zA-Z_][a-zA-Z0-9_]*:\s\w+/);
+function assertColumnsObject(columns: unknown, label: string) {
+    expect(columns !== null && typeof columns === "object" && !Array.isArray(columns), `${label} must be a plain object`).toBe(true);
+    for (const [name, type] of Object.entries(columns as Record<string, unknown>)) {
+        expect(typeof name).toBe("string");
+        expect(typeof type, `${label} column '${name}' type must be a string`).toBe("string");
+    }
+}
+
+function assertJoinsTuples(joins: unknown, label: string) {
+    expect(Array.isArray(joins), `${label} must be an array`).toBe(true);
+    for (const join of joins as unknown[]) {
+        expect(Array.isArray(join), `${label} join entry must be an array`).toBe(true);
+        const [local, foreign, joinType] = join as string[];
+        expect(typeof local).toBe("string");
+        expect(typeof foreign).toBe("string");
+        expect(["strict", "semantic", "sparse"]).toContain(joinType);
     }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyResult = Record<string, any>;
 
-describe("MCP get_schema — no-arg summary", () => {
+describe("MCP get_schema — inventory (no-arg)", () => {
     it("returns entities inventory with views and tables", async () => {
         const result = (await handler()) as AnyResult;
         printResult("handler()", result);
@@ -43,34 +55,102 @@ describe("MCP get_schema — no-arg summary", () => {
         expect(typeof result?.content?.[0]?.text).toBe("string");
     });
 
-    it("each view entry includes keyColumns and linksTo", async () => {
+    it("each view entry has id, kind, tags, and keys — no description or linksTo", async () => {
         const result = (await handler()) as AnyResult;
         const sc = result?.structuredContent as AnyResult;
-        const views = sc.entities.filter((e: AnyResult) => e.identifier.startsWith("v_"));
+        const views = sc.entities.filter((e: AnyResult) => e.kind === "view");
         expect(views.length).toBeGreaterThan(0);
         for (const view of views) {
-            expect(Array.isArray(view.keyColumns), `${view.identifier} must have keyColumns array`).toBe(true);
-            expect(view.keyColumns.length, `${view.identifier} keyColumns must not be empty`).toBeGreaterThan(0);
-            expect(Array.isArray(view.linksTo), `${view.identifier} must have linksTo array`).toBe(true);
+            expect(view.id, `${view.id} must have id`).toBeDefined();
+            expect(Array.isArray(view.tags), `${view.id} must have tags array`).toBe(true);
+            expect(view.tags.length, `${view.id} tags must not be empty`).toBeGreaterThan(0);
+            expect(Array.isArray(view.keys), `${view.id} must have keys array`).toBe(true);
+            expect(view.keys.length, `${view.id} keys must not be empty`).toBeGreaterThan(0);
+            // Inventory must NOT contain verbose fields
+            expect("description" in view, `${view.id} must NOT have description in inventory`).toBe(false);
+            expect("linksTo" in view, `${view.id} must NOT have linksTo in inventory`).toBe(false);
+            expect("example" in view, `${view.id} must NOT have example in inventory`).toBe(false);
+            expect("columns" in view, `${view.id} must NOT have columns in inventory`).toBe(false);
+        }
+    });
+
+    it("each table entry has id, kind, and keys", async () => {
+        const result = (await handler()) as AnyResult;
+        const sc = result?.structuredContent as AnyResult;
+        const tables = sc.entities.filter((e: AnyResult) => e.kind === "table");
+        expect(tables.length).toBeGreaterThan(0);
+        for (const table of tables) {
+            expect(table.id).toBeDefined();
+            expect(Array.isArray(table.keys)).toBe(true);
         }
     });
 });
 
-describe("MCP get_schema — view detail", () => {
-    it("returns full column list, primaryKeys and example for v_sutartys", async () => {
+describe("MCP get_schema — view detail (table + mode:'detail')", () => {
+    it("returns compact detail for v_sutartys", async () => {
         const result = (await handler({ table: "v_sutartys" })) as AnyResult;
         printResult('handler({ table: "v_sutartys" })', result);
         const sc = result?.structuredContent as AnyResult;
-        expect(sc?.identifier).toBe("v_sutartys");
-        expect("type" in sc).toBe(false);
-        assertColumnStringArray(sc?.columns, "View columns");
-        expect(Array.isArray(sc?.primaryKeys)).toBe(true);
-        expect(Array.isArray(sc?.relationships)).toBe(true);
-        expect(JSON.stringify(sc)).not.toContain("nullable");
-        expect(typeof sc?.example).toBe("string");
-        assertWhereExample(sc.example, "View example");
-        expect("sourceSQL" in sc).toBe(false);
+        expect(sc?.id).toBe("v_sutartys");
+        expect(Array.isArray(sc?.pk)).toBe(true);
+        assertColumnsObject(sc?.columns, "View columns");
+        assertJoinsTuples(sc?.joins, "View joins");
+        expect(typeof sc?.ex).toBe("string");
+        assertWhereExample(sc.ex, "View example");
+        // Must NOT contain old verbose fields
+        expect("identifier" in sc).toBe(false);
+        expect("description" in sc).toBe(false);
+        expect("relationships" in sc).toBe(false);
+        expect("keyColumns" in sc).toBe(false);
         expect(typeof result?.content?.[0]?.text).toBe("string");
+    });
+
+    it("explicit mode:'detail' returns same shape", async () => {
+        const result = (await handler({ table: "v_sutartys", mode: "detail" })) as AnyResult;
+        const sc = result?.structuredContent as AnyResult;
+        expect(sc?.id).toBe("v_sutartys");
+        assertColumnsObject(sc?.columns, "Explicit detail columns");
+        assertJoinsTuples(sc?.joins, "Explicit detail joins");
+    });
+});
+
+describe("MCP get_schema — mode:'columns'", () => {
+    it("returns only id and columns object for v_sutartys", async () => {
+        const result = (await handler({ table: "v_sutartys", mode: "columns" })) as AnyResult;
+        printResult('handler({ table: "v_sutartys", mode: "columns" })', result);
+        const sc = result?.structuredContent as AnyResult;
+        expect(sc?.id).toBe("v_sutartys");
+        assertColumnsObject(sc?.columns, "Columns mode");
+        expect("joins" in sc).toBe(false);
+        expect("ex" in sc).toBe(false);
+        expect("pk" in sc).toBe(false);
+    });
+});
+
+describe("MCP get_schema — mode:'joins'", () => {
+    it("returns only id, pk and joins for v_sutartys", async () => {
+        const result = (await handler({ table: "v_sutartys", mode: "joins" })) as AnyResult;
+        printResult('handler({ table: "v_sutartys", mode: "joins" })', result);
+        const sc = result?.structuredContent as AnyResult;
+        expect(sc?.id).toBe("v_sutartys");
+        expect(Array.isArray(sc?.pk)).toBe(true);
+        assertJoinsTuples(sc?.joins, "Joins mode");
+        expect("columns" in sc).toBe(false);
+        expect("ex" in sc).toBe(false);
+    });
+});
+
+describe("MCP get_schema — mode:'examples'", () => {
+    it("returns only id and ex array for v_sutartys", async () => {
+        const result = (await handler({ table: "v_sutartys", mode: "examples" })) as AnyResult;
+        printResult('handler({ table: "v_sutartys", mode: "examples" })', result);
+        const sc = result?.structuredContent as AnyResult;
+        expect(sc?.id).toBe("v_sutartys");
+        expect(Array.isArray(sc?.ex)).toBe(true);
+        expect(sc.ex.length).toBeGreaterThan(0);
+        assertWhereExample(sc.ex[0], "Examples mode");
+        expect("columns" in sc).toBe(false);
+        expect("joins" in sc).toBe(false);
     });
 });
 
@@ -81,24 +161,24 @@ describe("MCP get_schema — covered table redirect", () => {
         const text: string = result?.content?.[0]?.text ?? "";
         expect(text).toContain("v_sutartys");
         expect(text.toLowerCase()).toMatch(/covered|view/);
-        // No structuredContent with columns — it is a redirect, not a schema
         expect(result?.structuredContent).toBeUndefined();
     });
 });
 
 describe("MCP get_schema — uncovered table detail", () => {
-    it("returns full schema for mokesciai (not covered by any view)", async () => {
+    it("returns compact detail for mokesciai (not covered by any view)", async () => {
         const result = (await handler({ table: "mokesciai" })) as AnyResult;
         printResult('handler({ table: "mokesciai" })', result);
         const sc = result?.structuredContent as AnyResult;
-        expect(sc?.identifier).toBe("mokesciai");
-        assertColumnStringArray(sc?.columns, "Table columns");
-        expect(Array.isArray(sc?.primaryKeys)).toBe(true);
-        expect(Array.isArray(sc?.relationships)).toBe(true);
-        expect(JSON.stringify(sc)).not.toContain("nullable");
-        expect(typeof sc?.example).toBe("string");
-        assertWhereExample(sc.example, "Table example");
-        expect("sampleRows" in sc).toBe(false);
+        expect(sc?.id).toBe("mokesciai");
+        assertColumnsObject(sc?.columns, "Table columns");
+        expect(Array.isArray(sc?.pk)).toBe(true);
+        assertJoinsTuples(sc?.joins, "Table joins");
+        expect(typeof sc?.ex).toBe("string");
+        assertWhereExample(sc.ex, "Table example");
+        expect("identifier" in sc).toBe(false);
+        expect("description" in sc).toBe(false);
+        expect("relationships" in sc).toBe(false);
         expect(typeof result?.content?.[0]?.text).toBe("string");
     });
 });
@@ -111,7 +191,7 @@ describe("MCP get_schema — curated metadata matches DB columns", () => {
             for (const viewName of VIEW_NAMES) {
                 const toolResult = (await handler({ table: viewName })) as AnyResult;
                 const sc = toolResult?.structuredContent as AnyResult;
-                const declared = (sc.columns as string[]).map((c) => c.split(": ")[0]);
+                const declared = Object.keys(sc.columns as Record<string, string>);
                 const { rows } = await client.query(
                     `
                         SELECT column_name

@@ -16,39 +16,13 @@ const IDENTIFIER_CANDIDATES = [
     "pirkejoKodas",
 ];
 
-const TABLE_DESCRIPTIONS = {
-    sutartys: "Public procurement contracts with buyer, supplier, value, and timing fields.",
-    jarCsv: "Company registry snapshot with legal entity identity and profile attributes.",
-    viesiejiPirkimai: "Procurement notices with status, method, and estimated value fields.",
-    viesiejiPirkimaiVykdytojai: "Lookup table for procurement organizers and location details.",
-    pinregJuridiniaiRysiai: "Declared person-to-company links and relationship metadata.",
-    bylos: "Court case records with case number, type, date, and court.",
-    bylosDalyviai: "Court case participants, their codes, and participation role.",
-    atn1ataskaitos: "ATN-1 procurement report headers and process metadata.",
-    atn1dalyviai: "ATN-1 report participants (suppliers) per procurement report.",
-    atn1pasiulymuEile: "ATN-1 supplier ranking and bid price rows.",
-    atn1atmestiPasiulymai: "ATN-1 rejected bids with rejection reasons.",
-    failai: "Document/file registry with source links and OCR-related attributes.",
-    sodra: "Employer social insurance metrics by period and company code.",
-    domenai: "Domain ownership records linked to legal entities.",
-    mokesciai: "Tax-related indicators by legal entity and period.",
-};
-
 const VIEW_METADATA = {
     v_company: {
-        description:
-            "Company profile with legal form, workforce, payroll, risk flags, and activity counters.",
-        keyColumns: [
-            "jarKodas (PK)",
-            "pavadinimas",
-            "formosPavadinimas",
-            "darbuotojai",
-            "vidutinisAtlyginimas",
-            "melagingisTiekejas",
-            "nepatikimasTiekejas",
-            "bylosSkaicius",
+        tags: ["capacity", "blacklist", "labor", "domains", "court"],
+        keys: ["jarKodas", "pavadinimas", "darbuotojai", "melagingisTiekejas", "bylosSkaicius"],
+        joins: [
+            ["jarKodas", "jarCsv.jarKodas", "strict"],
         ],
-        linksTo: ["v_sutartys.pirkejoKodas", "v_sutartys.tiekejoKodas", "v_bylos.jarKodas", "v_person_links.jarKodas", "v_dalyviai.tiekejoKodas"],
         columns: [
             "jarKodas: text",
             "pavadinimas: text",
@@ -69,31 +43,17 @@ const VIEW_METADATA = {
             "neskelbiamosDerybosSkaicius: bigint",
         ],
         primaryKeys: ["jarKodas"],
-        relationships: [
-            {
-                column: "jarKodas",
-                references: "jarCsv.jarKodas",
-                description: "Join key for company master data.",
-            },
-        ],
         example:
             'SELECT "jarKodas", pavadinimas, "formosPavadinimas", darbuotojai, "vidutinisAtlyginimas" FROM v_company WHERE "jarKodas" = \'302556251\'',
     },
     v_sutartys: {
-        description:
-            "Contract-centric view with buyer/supplier names, CPV category, value, and timing fields.",
-        keyColumns: [
-            "sutartiesUnikalusId (PK)",
-            "pirkimoNumeris (FK→v_pirkimas)",
-            "pirkejoKodas (FK→v_company)",
-            "tiekejoKodas (FK→v_company)",
-            "sudarymoData",
-            "verte",
-            "tipas",
-            "bvpzKodas",
-            "kategorija",
+        tags: ["contracts", "buyer-supplier", "cpv", "value", "timing", "frameworks"],
+        keys: ["sutartiesUnikalusId", "pirkejoKodas", "tiekejoKodas", "verte", "sudarymoData"],
+        joins: [
+            ["pirkejoKodas", "v_company.jarKodas", "strict"],
+            ["tiekejoKodas", "v_company.jarKodas", "strict"],
+            ["pirkimoNumeris", "v_pirkimas.pirkimoId", "semantic"],
         ],
-        linksTo: ["v_company.jarKodas", "v_pirkimas.pirkimoId", "v_dalyviai.pirkimoNumeris"],
         columns: [
             "sutartiesUnikalusId: bigint",
             "sutartiesNumeris: text",
@@ -120,33 +80,17 @@ const VIEW_METADATA = {
             "papildomiTiekejaiKodai: text[]",
         ],
         primaryKeys: ["sutartiesUnikalusId"],
-        relationships: [
-            {
-                column: "pirkejoKodas",
-                references: "jarCsv.jarKodas",
-                description: "Join key for buyer company details.",
-            },
-            {
-                column: "tiekejoKodas",
-                references: "jarCsv.jarKodas",
-                description: "Join key for supplier company details.",
-            },
-        ],
         example:
             'SELECT "sutartiesUnikalusId", pirkejas, tiekejas, verte, "bvpzPavadinimas", "sudarymoData" FROM v_sutartys WHERE "sudarymoData" >= CURRENT_DATE - INTERVAL \'1 year\'',
     },
     v_pirkimas: {
-        description:
-            "Procurement notice view with organizer details, lifecycle status, estimated value, and description.",
-        keyColumns: [
-            "pirkimoId (PK)",
-            "jarKodas (FK→v_company)",
-            "pirkimoBudas",
-            "statusas",
-            "numatomaVerteEUR",
-            "paskelbimoData",
+        tags: ["procedures", "criteria", "lot-count", "single-bidder"],
+        keys: ["pirkimoId", "jarKodas", "pirkimoBudas", "statusas", "numatomaVerteEUR"],
+        joins: [
+            ["jarKodas", "v_company.jarKodas", "strict"],
+            ["pirkimoId", "v_sutartys.pirkimoNumeris", "semantic"],
+            ["pirkimoId", "v_dalyviai.pirkimoNumeris", "semantic"],
         ],
-        linksTo: ["v_company.jarKodas", "v_sutartys.pirkimoNumeris", "v_dalyviai.pirkimoNumeris"],
         columns: [
             "pirkimoId: text",
             "pavadinimas: text",
@@ -166,29 +110,15 @@ const VIEW_METADATA = {
             "informacija: text",
         ],
         primaryKeys: ["pirkimoId"],
-        relationships: [
-            {
-                column: "jarKodas",
-                references: "jarCsv.jarKodas",
-                description: "Join key for procuring organization details.",
-            },
-        ],
         example:
             'SELECT "pirkimoId", pavadinimas, organizatorius, statusas, "numatomaVerteEUR" FROM v_pirkimas WHERE statusas = \'Paskelbtas\'',
     },
     v_person_links: {
-        description:
-            "Person-to-organization relationship view from PINREG declarations, including procurement participation flag.",
-        keyColumns: [
-            "id (PK)",
-            "jarKodas (FK→v_company)",
-            "vardas",
-            "pavarde",
-            "pareigos",
-            "dalyvaujaViesuosePirkimuose",
-            "rysioPradzia",
+        tags: ["conflict-of-interest", "directors", "beneficial-owners"],
+        keys: ["id", "jarKodas", "vardas", "pavarde", "pareigos"],
+        joins: [
+            ["jarKodas", "v_company.jarKodas", "strict"],
         ],
-        linksTo: ["v_company.jarKodas"],
         columns: [
             "id: bigint",
             "deklaracija: uuid",
@@ -213,30 +143,18 @@ const VIEW_METADATA = {
             "pateikimoData: timestamp without time zone",
         ],
         primaryKeys: ["id"],
-        relationships: [
-            {
-                column: "jarKodas",
-                references: "jarCsv.jarKodas",
-                description: "Join key for organization name enrichment.",
-            },
-        ],
         example:
             'SELECT vardas, pavarde, "imonesVardas", pareigos, "dalyvaujaViesuosePirkimuose" FROM v_person_links WHERE "jarKodas" = \'302556251\'',
     },
     v_dalyviai: {
-        description:
-            "Bidder-level ATN-1 procurement participation with ranking, rejection data, and fraud-signal flags (conflict of interest, competition distortion, complaints).",
-        keyColumns: [
-            "pirkimoNumeris (FK→v_pirkimas)",
-            "pirkejoKodas (FK→v_company)",
-            "tiekejoKodas (FK→v_company)",
-            "eileNumeris",
-            "pasiulymoKaina",
-            "interesuKonfliktasNustatytas",
-            "konkurencijaIskreipiantisAsmuo",
-            "pretenzijaPateikta",
+        tags: ["bid-ranking", "rejections", "co-bidding", "single-bidder"],
+        keys: ["pirkimoNumeris", "tiekejoKodas", "eileNumeris", "pasiulymoKaina", "interesuKonfliktasNustatytas"],
+        joins: [
+            ["pirkejoKodas", "v_company.jarKodas", "strict"],
+            ["tiekejoKodas", "v_company.jarKodas", "sparse"],
+            ["pirkimoNumeris", "v_pirkimas.pirkimoId", "semantic"],
+            ["pirkimoNumeris", "v_sutartys.pirkimoNumeris", "semantic"],
         ],
-        linksTo: ["v_company.jarKodas", "v_pirkimas.pirkimoId", "v_sutartys.pirkimoNumeris"],
         columns: [
             "pirkimoNumeris: text",
             "pirkejoKodas: text",
@@ -260,33 +178,15 @@ const VIEW_METADATA = {
             "atmetimoPriezastis: text",
         ],
         primaryKeys: [],
-        relationships: [
-            {
-                column: "pirkejoKodas",
-                references: "jarCsv.jarKodas",
-                description: "Join key for buyer organization details.",
-            },
-            {
-                column: "tiekejoKodas",
-                references: "jarCsv.jarKodas",
-                description: "Join key for supplier organization details.",
-            },
-        ],
         example:
             'SELECT "pirkimoNumeris", "tiekejoKodas", tiekejas, "eileNumeris", "pasiulymoKaina", "interesuKonfliktasNustatytas" FROM v_dalyviai WHERE "pirkimoNumeris" = \'1005158\'',
     },
     v_bylos: {
-        description:
-            "Court case view linking case attributes with participant organizations.",
-        keyColumns: [
-            "bylosId (PK)",
-            "jarKodas (FK→v_company)",
-            "bylosNumeris",
-            "bylosRusis",
-            "bylosData",
-            "bylojeKaip",
+        tags: ["court", "litigation", "enforcement"],
+        keys: ["bylosId", "jarKodas", "bylosNumeris", "bylosRusis", "bylojeKaip"],
+        joins: [
+            ["jarKodas", "v_company.jarKodas", "strict"],
         ],
-        linksTo: ["v_company.jarKodas"],
         columns: [
             "bylosId: bigint",
             "bylosNumeris: text",
@@ -299,13 +199,6 @@ const VIEW_METADATA = {
             "bylojeKaip: text",
         ],
         primaryKeys: ["bylosId"],
-        relationships: [
-            {
-                column: "jarKodas",
-                references: "jarCsv.jarKodas",
-                description: "Join key for legal entity details in case participants.",
-            },
-        ],
         example:
             'SELECT "bylosId", "bylosNumeris", teismas, "dalyvioPavadinimas", "bylojeKaip" FROM v_bylos WHERE "jarKodas" = \'302556251\'',
     },
@@ -315,28 +208,47 @@ assertViewMetadataCompleteness();
 
 export const name = "get_schema";
 export const description =
-    "Returns schema information for the procurement database. " +
-    "Without arguments: lists available query entities with row count estimates for base tables. " +
-    "With a table or view name: returns normalized columns, keys, relationships, and an example SQL query. " +
-    "Call this at the start of an investigation to understand what data is available.";
+    "Returns schema for the procurement database. " +
+    "No args (mode: 'inventory'): compact list — id, kind, tags, keys for all entities. " +
+    "With table + mode 'detail' (default): pk, columns object {name→type}, joins tuples [local,foreign,joinType], one example. " +
+    "mode 'columns': column name→type map only. " +
+    "mode 'joins': pk and joins tuples only. " +
+    "mode 'examples': example SQL only. " +
+    "joinType values: 'strict' (enforced FK, safe for INNER JOIN), 'semantic' (logical only, may miss rows), 'sparse' (FK exists but many nulls). " +
+    "Call with no args at investigation start. Call with table+mode when you need column or join details.";
 
 export const schema = {
     table: z
         .enum([...TABLE_LIST, ...VIEW_LIST])
         .optional()
+        .describe("Table or view name. Omit to list all entities (inventory mode)."),
+    mode: z
+        .enum(["inventory", "detail", "columns", "joins", "examples"])
+        .optional()
         .describe(
-            "Table or view name. Omit to list all available entities with brief descriptions."
+            "Output mode: inventory (default, no table) | detail (default with table) | columns | joins | examples"
         ),
 };
 
-export async function handler({ table } = {}) {
-    if (!table) {
+export async function handler({ table, mode } = {}) {
+    if (!table || mode === "inventory") {
         return listAll();
     }
-    if (VIEW_NAMES.has(table)) {
-        return describeView(table);
+    const effectiveMode = mode ?? "detail";
+    if (effectiveMode === "columns") {
+        return VIEW_NAMES.has(table) ? describeViewColumns(table) : describeTableColumns(table);
     }
-    return describeTable(table);
+    if (effectiveMode === "joins") {
+        return VIEW_NAMES.has(table) ? describeViewJoins(table) : describeTableJoins(table);
+    }
+    if (effectiveMode === "examples") {
+        return VIEW_NAMES.has(table) ? describeViewExamples(table) : describeTableExamples(table);
+    }
+    // detail (default)
+    if (VIEW_NAMES.has(table)) {
+        return describeViewDetail(table);
+    }
+    return describeTableDetail(table);
 }
 
 async function listAll() {
@@ -352,7 +264,7 @@ async function listAll() {
         ),
         postgres.query(
             `
-            SELECT table_name, column_name, data_type, is_nullable
+            SELECT table_name, column_name
             FROM information_schema.columns
             WHERE table_schema = 'public'
               AND table_name = ANY($1::text[])
@@ -370,28 +282,20 @@ async function listAll() {
         if (!columnMap.has(row.table_name)) {
             columnMap.set(row.table_name, []);
         }
-        columnMap.get(row.table_name).push(row);
+        columnMap.get(row.table_name).push(row.column_name);
     }
 
-    const tables = TABLE_LIST.map((identifier) => {
-        const rows = columnMap.get(identifier) ?? [];
-        return {
-            identifier,
-            description: buildTableDescription(identifier, rows),
-            rowCountEstimate: rowCountMap[identifier] ?? null,
-            example: buildTableExample(identifier, rows),
-        };
+    const views = VIEW_LIST.map((id) => {
+        const metadata = VIEW_METADATA[id];
+        return { id, kind: "view", tags: metadata.tags, keys: metadata.keys };
     });
 
-    const views = VIEW_LIST.map((identifier) => {
-        const metadata = VIEW_METADATA[identifier];
-        return {
-            identifier,
-            description: metadata.description,
-            keyColumns: metadata.keyColumns,
-            linksTo: metadata.linksTo,
-            example: metadata.example,
-        };
+    const tables = TABLE_LIST.map((id) => {
+        const cols = columnMap.get(id) ?? [];
+        const entry = { id, kind: "table", keys: cols.slice(0, 3) };
+        const rc = rowCountMap[id];
+        if (rc != null) entry.rowCountEstimate = rc;
+        return entry;
     });
 
     const entities = [...views, ...tables];
@@ -401,20 +305,97 @@ async function listAll() {
         content: [
             {
                 type: "text",
-                text: `Available schema entities: ${entities.length}. Use "table" to request columns, relationships, and a query example.`,
+                text: `${entities.length} entities. Views: ${views.length} (use tags to route). Tables: ${tables.length}. Pass table+mode:'detail' for columns/joins.`,
             },
         ],
     };
 }
 
-async function describeTable(tableName) {
+// --- View detail modes ---
+
+async function describeViewDetail(viewName) {
+    const metadata = VIEW_METADATA[viewName];
+    if (!metadata) {
+        return {
+            content: [{ type: "text", text: `View '${viewName}' metadata was not found.` }],
+            isError: true,
+        };
+    }
+
+    const result = {
+        id: viewName,
+        pk: metadata.primaryKeys,
+        columns: columnsArrayToObject(metadata.columns),
+        joins: metadata.joins,
+        ex: metadata.example,
+    };
+
+    return {
+        structuredContent: result,
+        content: [
+            {
+                type: "text",
+                text: `${viewName}: ${metadata.columns.length} columns, ${metadata.joins.length} joins. Includes example.`,
+            },
+        ],
+    };
+}
+
+async function describeViewColumns(viewName) {
+    const metadata = VIEW_METADATA[viewName];
+    if (!metadata) {
+        return {
+            content: [{ type: "text", text: `View '${viewName}' metadata was not found.` }],
+            isError: true,
+        };
+    }
+    const result = { id: viewName, columns: columnsArrayToObject(metadata.columns) };
+    return {
+        structuredContent: result,
+        content: [{ type: "text", text: `${viewName}: ${metadata.columns.length} columns.` }],
+    };
+}
+
+async function describeViewJoins(viewName) {
+    const metadata = VIEW_METADATA[viewName];
+    if (!metadata) {
+        return {
+            content: [{ type: "text", text: `View '${viewName}' metadata was not found.` }],
+            isError: true,
+        };
+    }
+    const result = { id: viewName, pk: metadata.primaryKeys, joins: metadata.joins };
+    return {
+        structuredContent: result,
+        content: [{ type: "text", text: `${viewName}: ${metadata.joins.length} joins.` }],
+    };
+}
+
+async function describeViewExamples(viewName) {
+    const metadata = VIEW_METADATA[viewName];
+    if (!metadata) {
+        return {
+            content: [{ type: "text", text: `View '${viewName}' metadata was not found.` }],
+            isError: true,
+        };
+    }
+    const result = { id: viewName, ex: [metadata.example] };
+    return {
+        structuredContent: result,
+        content: [{ type: "text", text: `${viewName}: 1 example.` }],
+    };
+}
+
+// --- Table detail modes ---
+
+async function describeTableDetail(tableName) {
     const coveringView = COVERED_TABLES_BY_VIEWS[tableName];
     if (coveringView) {
         return {
             content: [
                 {
                     type: "text",
-                    text: `Table '${tableName}' is fully covered by view '${coveringView}'. Call get_schema with '${coveringView}' to see columns, relationships, and an example query.`,
+                    text: `Table '${tableName}' is fully covered by view '${coveringView}'. Call get_schema with '${coveringView}' to see columns, joins, and an example query.`,
                 },
             ],
         };
@@ -477,23 +458,22 @@ async function describeTable(tableName) {
         };
     }
 
-    const primaryKeys = new Set(primaryKeyResult.rows.map((row) => row.column_name));
-    const columns = colResult.rows.map((r) => `${r.column_name}: ${r.data_type}`);
-    const primaryKeyList = Array.from(primaryKeys);
-
-    const relationships = foreignKeyResult.rows.map((row) => ({
-        column: row.column_name,
-        references: `${row.foreign_table_name}.${row.foreign_column_name}`,
-        description: "Foreign key relationship.",
-    }));
+    const primaryKeys = primaryKeyResult.rows.map((row) => row.column_name);
+    const columns = columnsArrayToObject(
+        colResult.rows.map((r) => `${r.column_name}: ${r.data_type}`)
+    );
+    const joins = foreignKeyResult.rows.map((row) => [
+        row.column_name,
+        `${row.foreign_table_name}.${row.foreign_column_name}`,
+        "strict",
+    ]);
 
     const result = {
-        identifier: tableName,
-        description: buildTableDescription(tableName, colResult.rows),
+        id: tableName,
+        pk: primaryKeys,
         columns,
-        primaryKeys: primaryKeyList,
-        relationships,
-        example: buildTableExample(tableName, colResult.rows),
+        joins,
+        ex: buildTableExample(tableName, colResult.rows),
     };
 
     return {
@@ -501,40 +481,135 @@ async function describeTable(tableName) {
         content: [
             {
                 type: "text",
-                text: `${tableName}: ${columns.length} columns, ${relationships.length} relationships. Includes example SQL query.`,
+                text: `${tableName}: ${Object.keys(columns).length} columns, ${joins.length} joins. Includes example.`,
             },
         ],
     };
 }
 
-async function describeView(viewName) {
-    const metadata = VIEW_METADATA[viewName];
-    if (!metadata) {
+async function describeTableColumns(tableName) {
+    const coveringView = COVERED_TABLES_BY_VIEWS[tableName];
+    if (coveringView) {
         return {
-            content: [{ type: "text", text: `View '${viewName}' metadata was not found.` }],
+            content: [
+                {
+                    type: "text",
+                    text: `Table '${tableName}' is covered by view '${coveringView}'. Use get_schema with '${coveringView}' instead.`,
+                },
+            ],
+        };
+    }
+
+    const colResult = await postgres.query(
+        `SELECT column_name, data_type FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = $1 ORDER BY ordinal_position`,
+        [tableName]
+    );
+
+    if (colResult.rows.length === 0) {
+        return {
+            content: [{ type: "text", text: `Table '${tableName}' not found.` }],
             isError: true,
         };
     }
 
-
-    const result = {
-        identifier: viewName,
-        description: metadata.description,
-        columns: metadata.columns,
-        primaryKeys: metadata.primaryKeys,
-        relationships: metadata.relationships,
-        example: metadata.example,
+    const columns = columnsArrayToObject(colResult.rows.map((r) => `${r.column_name}: ${r.data_type}`));
+    return {
+        structuredContent: { id: tableName, columns },
+        content: [{ type: "text", text: `${tableName}: ${Object.keys(columns).length} columns.` }],
     };
+}
+
+async function describeTableJoins(tableName) {
+    const coveringView = COVERED_TABLES_BY_VIEWS[tableName];
+    if (coveringView) {
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `Table '${tableName}' is covered by view '${coveringView}'. Use get_schema with '${coveringView}' instead.`,
+                },
+            ],
+        };
+    }
+
+    const [primaryKeyResult, foreignKeyResult] = await Promise.all([
+        postgres.query(
+            `SELECT kcu.column_name FROM information_schema.table_constraints tc
+             JOIN information_schema.key_column_usage kcu
+               ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+             WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = 'public' AND tc.table_name = $1`,
+            [tableName]
+        ),
+        postgres.query(
+            `SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name
+             FROM information_schema.table_constraints tc
+             JOIN information_schema.key_column_usage kcu
+               ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+             JOIN information_schema.constraint_column_usage ccu
+               ON ccu.constraint_name = tc.constraint_name AND ccu.constraint_schema = tc.constraint_schema
+             WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public' AND tc.table_name = $1`,
+            [tableName]
+        ),
+    ]);
+
+    const pk = primaryKeyResult.rows.map((r) => r.column_name);
+    const joins = foreignKeyResult.rows.map((row) => [
+        row.column_name,
+        `${row.foreign_table_name}.${row.foreign_column_name}`,
+        "strict",
+    ]);
 
     return {
-        structuredContent: result,
-        content: [
-            {
-                type: "text",
-                text: `${viewName}: ${metadata.columns.length} columns, ${metadata.relationships.length} relationships. Includes example SQL query.`,
-            },
-        ],
+        structuredContent: { id: tableName, pk, joins },
+        content: [{ type: "text", text: `${tableName}: ${joins.length} joins.` }],
     };
+}
+
+async function describeTableExamples(tableName) {
+    const coveringView = COVERED_TABLES_BY_VIEWS[tableName];
+    if (coveringView) {
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `Table '${tableName}' is covered by view '${coveringView}'. Use get_schema with '${coveringView}' instead.`,
+                },
+            ],
+        };
+    }
+
+    const colResult = await postgres.query(
+        `SELECT column_name, data_type FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = $1 ORDER BY ordinal_position`,
+        [tableName]
+    );
+
+    if (colResult.rows.length === 0) {
+        return {
+            content: [{ type: "text", text: `Table '${tableName}' not found.` }],
+            isError: true,
+        };
+    }
+
+    const ex = buildTableExample(tableName, colResult.rows);
+    return {
+        structuredContent: { id: tableName, ex: [ex] },
+        content: [{ type: "text", text: `${tableName}: 1 example.` }],
+    };
+}
+
+// --- Helpers ---
+
+function columnsArrayToObject(colStrings) {
+    const obj = {};
+    for (const col of colStrings) {
+        const colonIdx = col.indexOf(": ");
+        if (colonIdx !== -1) {
+            obj[col.slice(0, colonIdx)] = col.slice(colonIdx + 2);
+        }
+    }
+    return obj;
 }
 
 function buildTableExample(tableName, rows) {
@@ -599,61 +674,38 @@ function buildWherePredicate(row) {
     return `${quotedName} IS NOT NULL`;
 }
 
-function buildTableDescription(tableName, rows) {
-    if (TABLE_DESCRIPTIONS[tableName]) {
-        return TABLE_DESCRIPTIONS[tableName];
-    }
-    return inferDescriptionFromColumns(tableName, rows);
-}
-
-function inferDescriptionFromColumns(tableName, rows) {
-    if (rows.length === 0) {
-        return `Public dataset table '${tableName}'.`;
-    }
-
-    const names = rows.map((r) => r.column_name.toLowerCase());
-    const has = (token) => names.some((n) => n.includes(token));
-
-    if (has("jar") || has("imones") || has("imone")) {
-        return `Entity-focused dataset for '${tableName}' with company identifiers and profile fields.`;
-    }
-    if (has("sutart") || has("pirkimo")) {
-        return `Procurement dataset for '${tableName}' with contract/procurement identifiers, values, and dates.`;
-    }
-    if (has("bylos") || has("teism")) {
-        return `Court-case dataset for '${tableName}' with case attributes and participant linkage fields.`;
-    }
-    if (has("atlygin") || has("imoku") || has("draust")) {
-        return `Employment and payroll-related dataset for '${tableName}' with period-based metrics.`;
-    }
-    if (has("kaina") || has("verte") || has("suma")) {
-        return `Financial-value dataset for '${tableName}' with monetary indicators and related dimensions.`;
-    }
-
-    const sampleColumns = rows
-        .slice(0, 3)
-        .map((r) => `"${r.column_name}"`)
-        .join(", ");
-    return `Public dataset table '${tableName}' with columns such as ${sampleColumns}.`;
-}
-
 function assertViewMetadataCompleteness() {
     for (const viewName of VIEW_LIST) {
         if (!VIEW_METADATA[viewName]) {
             throw new Error(`Missing VIEW_METADATA for '${viewName}'.`);
         }
-        if (!Array.isArray(VIEW_METADATA[viewName].columns) || VIEW_METADATA[viewName].columns.length === 0) {
+        const m = VIEW_METADATA[viewName];
+        if (!Array.isArray(m.tags) || m.tags.length === 0) {
+            throw new Error(`VIEW_METADATA['${viewName}'] must define a non-empty tags array.`);
+        }
+        if (!Array.isArray(m.keys) || m.keys.length === 0) {
+            throw new Error(`VIEW_METADATA['${viewName}'] must define a non-empty keys array.`);
+        }
+        if (!Array.isArray(m.joins)) {
+            throw new Error(`VIEW_METADATA['${viewName}'] must define a joins array.`);
+        }
+        for (const join of m.joins) {
+            if (!Array.isArray(join) || join.length !== 3 || !["strict", "semantic", "sparse"].includes(join[2])) {
+                throw new Error(`VIEW_METADATA['${viewName}'] join ${JSON.stringify(join)} must be [local, foreign, "strict"|"semantic"|"sparse"].`);
+            }
+        }
+        if (!Array.isArray(m.columns) || m.columns.length === 0) {
             throw new Error(`VIEW_METADATA['${viewName}'] must define at least one column.`);
         }
-        for (const col of VIEW_METADATA[viewName].columns) {
+        for (const col of m.columns) {
             if (typeof col !== "string" || !col.includes(": ")) {
                 throw new Error(`VIEW_METADATA['${viewName}'] column '${col}' must be "name: type" string format.`);
             }
         }
-        if (!Array.isArray(VIEW_METADATA[viewName].primaryKeys)) {
+        if (!Array.isArray(m.primaryKeys)) {
             throw new Error(`VIEW_METADATA['${viewName}'] must define primaryKeys array.`);
         }
-        if (typeof VIEW_METADATA[viewName].example !== "string" || VIEW_METADATA[viewName].example.length === 0) {
+        if (typeof m.example !== "string" || m.example.length === 0) {
             throw new Error(`VIEW_METADATA['${viewName}'] must define an example SQL query.`);
         }
     }
