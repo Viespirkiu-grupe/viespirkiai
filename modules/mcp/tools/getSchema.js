@@ -230,11 +230,27 @@ export const schema = {
         ),
 };
 
+// In-process cache: schema/inventory results are stable for the lifetime of the process.
+// Keyed by "<table>:<effectiveMode>" — empty string prefix for inventory.
+const _cache = new Map();
+
 export async function handler({ table, mode } = {}) {
-    if (!table || mode === "inventory") {
+    const effectiveMode = (!table || mode === "inventory") ? "inventory" : (mode ?? "detail");
+    const cacheKey = `${table ?? ""}:${effectiveMode}`;
+
+    if (_cache.has(cacheKey)) {
+        return _cache.get(cacheKey);
+    }
+
+    const result = await _compute(table, effectiveMode);
+    _cache.set(cacheKey, result);
+    return result;
+}
+
+async function _compute(table, effectiveMode) {
+    if (effectiveMode === "inventory") {
         return listAll();
     }
-    const effectiveMode = mode ?? "detail";
     if (effectiveMode === "columns") {
         return VIEW_NAMES.has(table) ? describeViewColumns(table) : describeTableColumns(table);
     }
