@@ -95,37 +95,48 @@ SQL EXAMPLES:
 
 ```sql
 -- Shell company: high recent contract value vs. near-zero headcount (capacity mismatch)
-SELECT j."jarKodas", j.pavadinimas, j."registravimoData",
-    sod.draustieji, sod."vidutinisAtlyginimas",
-    stats.totalVerte, stats.kiekis,
-    ROUND(stats.totalVerte / NULLIF(sod.draustieji, 0)) AS verteVienamdarbVienam
+SELECT j."jarKodas",
+       j.pavadinimas,
+       j."registravimoData",
+       sod.draustieji,
+       sod."vidutinisAtlyginimas",
+       stats.totalVerte,
+       stats.kiekis,
+       ROUND(stats.totalVerte / NULLIF(sod.draustieji, 0)) AS verteVienamdarbVienam
 FROM "jarCsv" j
-JOIN (
-    SELECT "tiekejoKodas", SUM(verte) AS totalVerte, COUNT(*) AS kiekis
-    FROM sutartys
-    WHERE istrinta = false AND "sudarymoData" >= CURRENT_DATE - INTERVAL '3 years'
-    GROUP BY "tiekejoKodas" HAVING SUM(verte) > 300000
-) stats ON stats."tiekejoKodas" = j."jarKodas"::text
+         JOIN (SELECT "tiekejoKodas", SUM(verte) AS totalVerte, COUNT(*) AS kiekis
+               FROM sutartys
+               WHERE istrinta = false
+                 AND "sudarymoData" >= CURRENT_DATE - INTERVAL '3 years'
+               GROUP BY "tiekejoKodas"
+               HAVING SUM(verte) > 300000) stats ON stats."tiekejoKodas" = j."jarKodas"::text
 JOIN LATERAL (
     SELECT draustieji, "vidutinisAtlyginimas"
     FROM sodra WHERE "jarKodas" = j."jarKodas"::text ORDER BY data DESC LIMIT 1
-) sod ON true
+) sod
+ON true
 WHERE sod.draustieji < 5
-ORDER BY stats.totalVerte DESC LIMIT 30;
+ORDER BY stats.totalVerte DESC
+LIMIT 30;
 ```
 
 ```sql
 -- New company winning large contracts shortly after incorporation
-SELECT j."jarKodas", j.pavadinimas, j."registravimoData",
-    MIN(s."sudarymoData") AS pirmasSutartisData,
-    (MIN(s."sudarymoData") - j."registravimoData") AS dienosPoRegistracijos,
-    SUM(s.verte) AS totalVerte
+SELECT j."jarKodas",
+       j.pavadinimas,
+       j."registravimoData",
+       MIN(s."sudarymoData")                          AS pirmasSutartisData,
+       (MIN(s."sudarymoData") - j."registravimoData") AS dienosPoRegistracijos,
+       SUM(s.verte)                                   AS totalVerte
 FROM "jarCsv" j
-JOIN sutartys s ON s."tiekejoKodas" = j."jarKodas"::text AND s.istrinta = false
+         JOIN sutartys s ON s."tiekejoKodas" = j."jarKodas"::text AND s.istrinta = false
 GROUP BY j."jarKodas", j.pavadinimas, j."registravimoData"
-HAVING (MIN(s."sudarymoData") - j."registravimoData") < INTERVAL '365 days'
-   AND SUM(s.verte) > 200000
-ORDER BY dienosPoRegistracijos ASC LIMIT 30;
+HAVING (MIN(s."sudarymoData") - j."registravimoData")
+     < 365
+   AND SUM(s.verte)
+     > 200000
+ORDER BY dienosPoRegistracijos ASC
+LIMIT 30;
 ```
 
 > For human investigator: STT typically sees capacity mismatch as part of sham competition, favouritism, or misuse of
@@ -133,7 +144,7 @@ ORDER BY dienosPoRegistracijos ASC LIMIT 30;
 > significant advances, cash withdrawals, or cross-border payments). When escalating to FNTT, attach summary tables of
 > headcount vs. obligations and any OSINT on real operations.
 
-### 2. Bid rigging — cover bidding and bid suppression
+### 2. Bid rigging — cover bidding
 
 `[STT][KT]` – OSINT: **yes** (industry associations, local media)
 
@@ -141,9 +152,14 @@ TOOLS: `execute_query`, `search_sutartys`
 
 GOAL: Detect cover bidding — recurring losers always bidding just above winner.
 
+> **Note**: **Bid suppression** (potential bidders deliberately abstaining from a tender) cannot be detected from
+> available data. `atn1dalyviai` records only submitted bids, not invited parties. Do not claim bid suppression
+> detection; defer to Theme 20 for partial insight via invitation data gaps.
+
 DETECT:
 
-- Win rate vs. participation count per supplier per CPV category.
+- Win rate vs. participation count per supplier per CPV category (use as initial screening only — low win rate alone
+  does not confirm cover bidding; legitimate SMEs may participate in many tenders without winning).
 - Top co-bidder frequency (same losing bidders repeatedly present when a given winner participates).
 - Losing bid clustering above winning price (small margins, consistent structure).
 - Participation count vs. CPV national average (few bidders where market structure suggests more).
@@ -152,33 +168,40 @@ DETECT:
 SQL EXAMPLES:
 
 ```sql
--- Win rate vs. participation count per supplier — very low win rate = likely cover bidder
-SELECT d.kodas AS "tiekejoKodas", j.pavadinimas AS tiekejas,
-    COUNT(DISTINCT d."ataskaitaId") AS dalyvutaPirkimuose,
-    COUNT(DISTINCT CASE WHEN e."eileNumeris" = 1 THEN d."ataskaitaId" END) AS laimetaPirkimuose,
-    ROUND(100.0 * COUNT(DISTINCT CASE WHEN e."eileNumeris" = 1 THEN d."ataskaitaId" END)
-        / COUNT(DISTINCT d."ataskaitaId"), 1) AS laimedamuProc
+-- Win rate vs. participation count per supplier — preliminary screening; very low win rate with high frequency warrants further co-bidder analysis
+SELECT d.kodas                                                                AS "tiekejoKodas",
+       j.pavadinimas                                                          AS tiekejas,
+       COUNT(DISTINCT d."ataskaitaId")                                        AS dalyvutaPirkimuose,
+       COUNT(DISTINCT CASE WHEN e."eileNumeris" = 1 THEN d."ataskaitaId" END) AS laimetaPirkimuose,
+       ROUND(100.0 * COUNT(DISTINCT CASE WHEN e."eileNumeris" = 1 THEN d."ataskaitaId" END)
+                 / COUNT(DISTINCT d."ataskaitaId"), 1)                        AS laimedamuProc
 FROM "atn1dalyviai" d
-JOIN "jarCsv" j ON j."jarKodas"::text = d.kodas
-LEFT JOIN "atn1pasiulymuEile" e ON e."ataskaitaId" = d."ataskaitaId" AND e."dalyvioKodas" = d.kodas
+         JOIN "jarCsv" j ON j."jarKodas"::text = d.kodas
+LEFT JOIN "atn1pasiulymuEile" e
+ON e."ataskaitaId" = d."ataskaitaId" AND e."dalyvioKodas" = d.kodas
 WHERE d.kodas IS NOT NULL AND d.kodas <> ''
 GROUP BY d.kodas, j.pavadinimas
 HAVING COUNT(DISTINCT d."ataskaitaId") >= 10
-ORDER BY laimedamuProc ASC, dalyvutaPirkimuose DESC LIMIT 50;
+ORDER BY laimedamuProc ASC, dalyvutaPirkimuose DESC
+LIMIT 50;
 ```
 
 ```sql
 -- Most frequent co-bidder pairs (same two companies appearing together repeatedly)
-SELECT d1.kodas AS kodas1, j1.pavadinimas AS pavadinimas1,
-    d2.kodas AS kodas2, j2.pavadinimas AS pavadinimas2,
-    COUNT(DISTINCT d1."ataskaitaId") AS buvoPoroje
+SELECT d1.kodas                         AS kodas1,
+       j1.pavadinimas                   AS pavadinimas1,
+       d2.kodas                         AS kodas2,
+       j2.pavadinimas                   AS pavadinimas2,
+       COUNT(DISTINCT d1."ataskaitaId") AS buvoPoroje
 FROM "atn1dalyviai" d1
-JOIN "atn1dalyviai" d2 ON d2."ataskaitaId" = d1."ataskaitaId" AND d2.kodas > d1.kodas
-JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1.kodas
-JOIN "jarCsv" j2 ON j2."jarKodas"::text = d2.kodas
+         JOIN "atn1dalyviai" d2 ON d2."ataskaitaId" = d1."ataskaitaId" AND d2.kodas > d1.kodas
+         JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1.kodas
+JOIN "jarCsv" j2
+ON j2."jarKodas":: text = d2.kodas
 GROUP BY d1.kodas, j1.pavadinimas, d2.kodas, j2.pavadinimas
 HAVING COUNT(DISTINCT d1."ataskaitaId") >= 15
-ORDER BY buvoPoroje DESC LIMIT 30;
+ORDER BY buvoPoroje DESC
+LIMIT 30;
 ```
 
 ### 3. Bid rotation / carousel
@@ -200,23 +223,27 @@ SQL EXAMPLES:
 
 ```sql
 -- Annual CPV group market share per supplier — detect alternating winner across years
-WITH yearly AS (
-    SELECT DATE_TRUNC('year', "sudarymoData")::date AS metai,
+WITH yearly AS (SELECT DATE_TRUNC('year', "sudarymoData")::date AS metai,
         LEFT("bvpzKodas", 3) AS cpvGrupe, "tiekejoKodas", SUM(verte) AS suma
-    FROM sutartys
-    WHERE istrinta = false AND "bvpzKodas" IS NOT NULL AND "sudarymoData" IS NOT NULL
-    GROUP BY 1, 2, 3
-), grp AS (
-    SELECT metai, cpvGrupe, SUM(suma) AS visoSuma
-    FROM yearly GROUP BY 1, 2 HAVING SUM(suma) > 500000
-)
-SELECT y.metai, y.cpvGrupe, y."tiekejoKodas", j.pavadinimas AS tiekejas,
-    y.suma, g.visoSuma,
-    ROUND(100.0 * y.suma / g.visoSuma, 1) AS rinkosDolisProcProc
+                FROM sutartys
+                WHERE istrinta = false AND "bvpzKodas" IS NOT NULL AND "sudarymoData" IS NOT NULL
+                GROUP BY 1, 2, 3),
+     grp AS (SELECT metai, cpvGrupe, SUM(suma) AS visoSuma
+             FROM yearly
+             GROUP BY 1, 2
+             HAVING SUM(suma) > 500000)
+SELECT y.metai,
+       y.cpvGrupe,
+       y."tiekejoKodas",
+       j.pavadinimas                         AS tiekejas,
+       y.suma,
+       g.visoSuma,
+       ROUND(100.0 * y.suma / g.visoSuma, 1) AS rinkosDalisProc
 FROM yearly y
-JOIN grp g ON g.metai = y.metai AND g.cpvGrupe = y.cpvGrupe
-JOIN "jarCsv" j ON j."jarKodas"::text = y."tiekejoKodas"
-ORDER BY y.cpvGrupe, y.metai, y.suma DESC LIMIT 100;
+         JOIN grp g ON g.metai = y.metai AND g.cpvGrupe = y.cpvGrupe
+         JOIN "jarCsv" j ON j."jarKodas"::text = y."tiekejoKodas"
+ORDER BY y.cpvGrupe, y.metai, y.suma DESC
+LIMIT 100;
 ```
 
 > For human investigator: potential KT interest is high — bid rotation is classic cartel behaviour. STT may focus on
@@ -228,7 +255,12 @@ ORDER BY y.cpvGrupe, y.metai, y.suma DESC LIMIT 100;
 
 TOOLS: `get_pinreg_jar`, `get_pinreg_asmuo`, `execute_query`
 
-GOAL: Find persons declared in both buyer and winning supplier PINREG records.
+GOAL: Find persons declared in both buyer and winning supplier PINREG records **with an active or recent relationship
+** (filter by `rysioPabaiga` to avoid flagging persons who left either entity years ago).
+
+> **Important**: Always filter by relationship date. Without a date filter this query will match expired historical
+> relationships and produce large numbers of false positives. Use `rysioPabaiga IS NULL` (currently active) or
+> `rysioPabaiga >= CURRENT_DATE - INTERVAL '3 years'` (active within last 3 years).
 
 DETECT:
 
@@ -242,24 +274,34 @@ SQL EXAMPLES:
 
 ```sql
 -- Persons appearing in PINREG for both buyer and winning supplier (direct conflict of interest)
-SELECT pr_b.vardas, pr_b.pavarde,
-    pr_b."jarKodas" AS pirkejoKodas, buyer.pavadinimas AS pirkejas,
-    pr_s."jarKodas" AS "tiekejoKodas", supplier.pavadinimas AS tiekejas,
-    COUNT(DISTINCT s."sutartiesUnikalusId") AS sutarciuKiekis,
-    SUM(s.verte) AS totalVerte
+-- Filter to active/recent relationships to avoid false positives from stale historical links
+SELECT pr_b.vardas,
+       pr_b.pavarde,
+       pr_b."jarKodas"                         AS pirkejoKodas,
+       buyer.pavadinimas                       AS pirkejas,
+       pr_s."jarKodas"                         AS "tiekejoKodas",
+       supplier.pavadinimas                    AS tiekejas,
+       COUNT(DISTINCT s."sutartiesUnikalusId") AS sutarciuKiekis,
+       SUM(s.verte)                            AS totalVerte
 FROM "pinregJuridiniaiRysiai" pr_b
-JOIN "pinregJuridiniaiRysiai" pr_s
-    ON pr_s.vardas = pr_b.vardas AND pr_s.pavarde = pr_b.pavarde
-    AND pr_s."jarKodas" <> pr_b."jarKodas"
-JOIN sutartys s
-    ON s."perkanciosiosOrganizacijosKodas" = pr_b."jarKodas"
-    AND s."tiekejoKodas" = pr_s."jarKodas" AND s.istrinta = false
-JOIN "jarCsv" buyer ON buyer."jarKodas"::text = pr_b."jarKodas"
-JOIN "jarCsv" supplier ON supplier."jarKodas"::text = pr_s."jarKodas"
+         JOIN "pinregJuridiniaiRysiai" pr_s
+              ON pr_s.vardas = pr_b.vardas AND pr_s.pavarde = pr_b.pavarde
+                  AND pr_s."jarKodas" <> pr_b."jarKodas"
+         JOIN sutartys s
+              ON s."perkanciosiosOrganizacijosKodas" = pr_b."jarKodas"
+                  AND s."tiekejoKodas" = pr_s."jarKodas" AND s.istrinta = false
+         JOIN "jarCsv" buyer ON buyer."jarKodas"::text = pr_b."jarKodas"
+JOIN "jarCsv" supplier
+ON supplier."jarKodas":: text = pr_s."jarKodas"
+WHERE (pr_b."rysioPabaiga" IS NULL
+   OR pr_b."rysioPabaiga" >= CURRENT_DATE - INTERVAL '3 years')
+  AND (pr_s."rysioPabaiga" IS NULL
+   OR pr_s."rysioPabaiga" >= CURRENT_DATE - INTERVAL '3 years')
 GROUP BY pr_b.vardas, pr_b.pavarde, pr_b."jarKodas", buyer.pavadinimas,
-         pr_s."jarKodas", supplier.pavadinimas
+    pr_s."jarKodas", supplier.pavadinimas
 HAVING SUM(s.verte) > 50000
-ORDER BY totalVerte DESC LIMIT 30;
+ORDER BY totalVerte DESC
+LIMIT 30;
 ```
 
 ### 5. Contract splitting to avoid thresholds
@@ -268,7 +310,13 @@ ORDER BY totalVerte DESC LIMIT 30;
 
 TOOLS: `search_sutartys`, `execute_query`
 
-GOAL: Detect contract splitting below €30K or open-procedure threshold to avoid competition.
+GOAL: Detect contract splitting to avoid competition thresholds. There are two distinct splitting risks:
+
+1. **Below €30 000** (MVT threshold): avoids any competitive procedure for goods/services.
+2. **Below EU open-procedure threshold** (~€140 000 for central-government services; ~€215 000 for sub-central; ~€5.38M
+   for works as of 2024): avoids EU-level publication and full open competition.
+
+Both risks are distinct. The SQL examples cover both; adjust thresholds to reflect current VPT/EU figures.
 
 DETECT:
 
@@ -280,43 +328,69 @@ DETECT:
 SQL EXAMPLES:
 
 ```sql
--- Repeated small contracts just below €30 000 threshold (same buyer-supplier-CPV trio)
-SELECT s."perkanciosiosOrganizacijosKodas" AS pirkejoKodas, buyer.pavadinimas AS pirkejas,
-    s."tiekejoKodas", supplier.pavadinimas AS tiekejas,
-    LEFT(s."bvpzKodas", 3) AS cpvGrupe,
-    COUNT(*) AS sutarciuKiekis, SUM(s.verte) AS totalVerte, MAX(s.verte) AS maxVerte
+-- Repeated small contracts just below €30 000 MVT threshold (same buyer-supplier-CPV trio)
+SELECT s."perkanciosiosOrganizacijosKodas" AS pirkejoKodas,
+       buyer.pavadinimas                   AS pirkejas,
+       s."tiekejoKodas",
+       supplier.pavadinimas                AS tiekejas, LEFT (s."bvpzKodas", 3) AS cpvGrupe, COUNT(*) AS sutarciuKiekis, SUM(s.verte) AS totalVerte, MAX(s.verte) AS maxVerte
 FROM sutartys s
-JOIN "jarCsv" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-JOIN "jarCsv" supplier ON supplier."jarKodas"::text = s."tiekejoKodas"
-WHERE s.verte BETWEEN 20000 AND 29999
+    JOIN "jarCsv" buyer
+ON buyer."jarKodas":: text = s."perkanciosiosOrganizacijosKodas"
+    JOIN "jarCsv" supplier ON supplier."jarKodas":: text = s."tiekejoKodas"
+WHERE s.verte BETWEEN 20000
+  AND 29999
   AND s.istrinta = false
   AND s."sudarymoData" >= CURRENT_DATE - INTERVAL '3 years'
 GROUP BY 1, 2, 3, 4, 5
 HAVING COUNT(*) >= 3
-ORDER BY sutarciuKiekis DESC, totalVerte DESC LIMIT 50;
+ORDER BY sutarciuKiekis DESC, totalVerte DESC
+LIMIT 50;
+```
+
+```sql
+-- Repeated contracts just below EU sub-central threshold (€215 000) — below-EU-threshold splitting signal
+SELECT s."perkanciosiosOrganizacijosKodas" AS pirkejoKodas,
+       buyer.pavadinimas                   AS pirkejas,
+       s."tiekejoKodas",
+       supplier.pavadinimas                AS tiekejas, LEFT (s."bvpzKodas", 3) AS cpvGrupe, COUNT(*) AS sutarciuKiekis, SUM(s.verte) AS totalVerte, MAX(s.verte) AS maxVerte
+FROM sutartys s
+    JOIN "jarCsv" buyer
+ON buyer."jarKodas":: text = s."perkanciosiosOrganizacijosKodas"
+    JOIN "jarCsv" supplier ON supplier."jarKodas":: text = s."tiekejoKodas"
+WHERE s.verte BETWEEN 150000
+  AND 214999
+  AND s.istrinta = false
+  AND s."sudarymoData" >= CURRENT_DATE - INTERVAL '3 years'
+GROUP BY 1, 2, 3, 4, 5
+HAVING COUNT(*) >= 2
+ORDER BY totalVerte DESC
+LIMIT 50;
 ```
 
 ```sql
 -- Consecutive awards to same supplier within 30 days (splitting gap signal)
-SELECT s1."perkanciosiosOrganizacijosKodas" AS pirkejoKodas, j_b.pavadinimas AS pirkejas,
-    s1."tiekejoKodas", j_s.pavadinimas AS tiekejas,
-    LEFT(s1."bvpzKodas", 3) AS cpvGrupe,
-    s1."sudarymoData" AS data1, s2."sudarymoData" AS data2,
-    s1.verte AS verte1, s2.verte AS verte2,
-    (s2."sudarymoData" - s1."sudarymoData") AS tarposDienos
+SELECT s1."perkanciosiosOrganizacijosKodas" AS pirkejoKodas,
+       j_b.pavadinimas                      AS pirkejas,
+       s1."tiekejoKodas",
+       j_s.pavadinimas                      AS tiekejas, LEFT (s1."bvpzKodas", 3) AS cpvGrupe, s1."sudarymoData" AS data1, s2."sudarymoData" AS data2, s1.verte AS verte1, s2.verte AS verte2, (s2."sudarymoData" - s1."sudarymoData") AS tarposDienos
 FROM sutartys s1
-JOIN sutartys s2
-    ON s2."perkanciosiosOrganizacijosKodas" = s1."perkanciosiosOrganizacijosKodas"
+    JOIN sutartys s2
+ON s2."perkanciosiosOrganizacijosKodas" = s1."perkanciosiosOrganizacijosKodas"
     AND s2."tiekejoKodas" = s1."tiekejoKodas"
-    AND LEFT(s2."bvpzKodas", 3) = LEFT(s1."bvpzKodas", 3)
+    AND LEFT (s2."bvpzKodas", 3) = LEFT (s1."bvpzKodas", 3)
     AND s2."sudarymoData" > s1."sudarymoData"
     AND (s2."sudarymoData" - s1."sudarymoData") <= INTERVAL '30 days'
     AND s2."sutartiesUnikalusId" <> s1."sutartiesUnikalusId"
-JOIN "jarCsv" j_b ON j_b."jarKodas"::text = s1."perkanciosiosOrganizacijosKodas"
-JOIN "jarCsv" j_s ON j_s."jarKodas"::text = s1."tiekejoKodas"
-WHERE s1.istrinta = false AND s2.istrinta = false
-  AND s1.verte < 30000 AND s2.verte < 30000
-ORDER BY tarposDienos ASC LIMIT 50;
+    JOIN "jarCsv" j_b ON j_b."jarKodas":: text = s1."perkanciosiosOrganizacijosKodas"
+    JOIN "jarCsv" j_s ON j_s."jarKodas":: text = s1."tiekejoKodas"
+WHERE s1.istrinta = false
+  AND s2.istrinta = false
+  AND s1.verte
+    < 30000
+  AND s2.verte
+    < 30000
+ORDER BY tarposDienos ASC
+LIMIT 50;
 ```
 
 ### 6. Geographic monopoly / local capture
@@ -338,26 +412,36 @@ SQL EXAMPLES:
 
 ```sql
 -- Supplier capturing >70% of a single buyer's total contract value (local dominance signal)
-WITH buyer_totals AS (
-    SELECT "perkanciosiosOrganizacijosKodas", SUM(verte) AS totalVerte
-    FROM sutartys WHERE istrinta = false AND "sudarymoData" >= CURRENT_DATE - INTERVAL '5 years'
-    GROUP BY 1 HAVING SUM(verte) > 500000
-), supplier_share AS (
-    SELECT "perkanciosiosOrganizacijosKodas", "tiekejoKodas",
-        SUM(verte) AS supplierVerte, COUNT(*) AS kiekis
-    FROM sutartys WHERE istrinta = false AND "sudarymoData" >= CURRENT_DATE - INTERVAL '5 years'
-    GROUP BY 1, 2
-)
-SELECT ss."perkanciosiosOrganizacijosKodas" AS pirkejoKodas, buyer.pavadinimas AS pirkejas,
-    ss."tiekejoKodas", supplier.pavadinimas AS tiekejas,
-    bt.totalVerte, ss.supplierVerte, ss.kiekis,
-    ROUND(100.0 * ss.supplierVerte / bt.totalVerte, 1) AS rinkosDolisProcProc
+WITH buyer_totals AS (SELECT "perkanciosiosOrganizacijosKodas", SUM(verte) AS totalVerte
+                      FROM sutartys
+                      WHERE istrinta = false
+                        AND "sudarymoData" >= CURRENT_DATE - INTERVAL '5 years'
+                      GROUP BY 1
+                      HAVING SUM(verte) > 500000),
+     supplier_share AS (SELECT "perkanciosiosOrganizacijosKodas",
+                               "tiekejoKodas",
+                               SUM(verte) AS supplierVerte,
+                               COUNT(*)   AS kiekis
+                        FROM sutartys
+                        WHERE istrinta = false
+                          AND "sudarymoData" >= CURRENT_DATE - INTERVAL '5 years'
+                        GROUP BY 1, 2)
+SELECT ss."perkanciosiosOrganizacijosKodas"               AS pirkejoKodas,
+       buyer.pavadinimas                                  AS pirkejas,
+       ss."tiekejoKodas",
+       supplier.pavadinimas                               AS tiekejas,
+       bt.totalVerte,
+       ss.supplierVerte,
+       ss.kiekis,
+       ROUND(100.0 * ss.supplierVerte / bt.totalVerte, 1) AS rinkosDalisProc
 FROM supplier_share ss
-JOIN buyer_totals bt ON bt."perkanciosiosOrganizacijosKodas" = ss."perkanciosiosOrganizacijosKodas"
-JOIN "jarCsv" buyer ON buyer."jarKodas"::text = ss."perkanciosiosOrganizacijosKodas"
-JOIN "jarCsv" supplier ON supplier."jarKodas"::text = ss."tiekejoKodas"
+         JOIN buyer_totals bt ON bt."perkanciosiosOrganizacijosKodas" = ss."perkanciosiosOrganizacijosKodas"
+         JOIN "jarCsv" buyer ON buyer."jarKodas"::text = ss."perkanciosiosOrganizacijosKodas"
+JOIN "jarCsv" supplier
+ON supplier."jarKodas":: text = ss."tiekejoKodas"
 WHERE ss.supplierVerte / bt.totalVerte > 0.70
-ORDER BY ss.supplierVerte DESC LIMIT 30;
+ORDER BY ss.supplierVerte DESC
+LIMIT 30;
 ```
 
 ### 7. Procedure manipulation — unjustified direct award
@@ -380,17 +464,19 @@ SQL EXAMPLES:
 
 ```sql
 -- Procedure mix by buyer: count and value share of each "pirkimoBudas" type
-SELECT vp."jarKodas" AS pirkejoKodas, j.pavadinimas AS pirkejas,
-    vp."pirkimoBudas",
-    COUNT(*) AS pirkimuKiekis,
-    ROUND(SUM(vp."numatomaVerteEUR")) AS totalVerteEUR,
-    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY vp."jarKodas"), 1) AS procentas
+SELECT vp."jarKodas"                                                                AS pirkejoKodas,
+       j.pavadinimas                                                                AS pirkejas,
+       vp."pirkimoBudas",
+       COUNT(*)                                                                     AS pirkimuKiekis,
+       ROUND(SUM(vp."numatomaVerteEUR"))                                            AS totalVerteEUR,
+       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY vp."jarKodas"), 1) AS procentas
 FROM "viesiejiPirkimai" vp
-JOIN "jarCsv" j ON j."jarKodas"::text = vp."jarKodas"
+         JOIN "jarCsv" j ON j."jarKodas"::text = vp."jarKodas"
 WHERE vp."paskelbimoData" >= CURRENT_DATE - INTERVAL '5 years'
 GROUP BY vp."jarKodas", j.pavadinimas, vp."pirkimoBudas"
 HAVING COUNT(*) >= 3
-ORDER BY vp."jarKodas", totalVerteEUR DESC NULLS LAST LIMIT 100;
+ORDER BY vp."jarKodas", totalVerteEUR DESC NULLS LAST
+LIMIT 100;
 ```
 
 ### 8. Price anomalies — over-invoicing and scope creep
@@ -413,17 +499,28 @@ SQL EXAMPLES:
 
 ```sql
 -- Contracts where actual execution value exceeds signed value by >50% (overrun outliers)
-SELECT s."sutartiesUnikalusId", s.pavadinimas, s."bvpzKodas", s."sudarymoData",
-    s."perkanciosiosOrganizacijosKodas" AS pirkejoKodas, buyer.pavadinimas AS pirkejas,
-    s."tiekejoKodas", supplier.pavadinimas AS tiekejas,
-    s.verte, s."faktineIvykdimoVerte",
-    ROUND(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0), 2) AS vertuSantykis
+SELECT s."sutartiesUnikalusId",
+       s.pavadinimas,
+       s."bvpzKodas",
+       s."sudarymoData",
+       s."perkanciosiosOrganizacijosKodas"                     AS pirkejoKodas,
+       buyer.pavadinimas                                       AS pirkejas,
+       s."tiekejoKodas",
+       supplier.pavadinimas                                    AS tiekejas,
+       s.verte,
+       s."faktineIvykdimoVerte",
+       ROUND(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0), 2) AS vertuSantykis
 FROM sutartys s
-JOIN "jarCsv" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-JOIN "jarCsv" supplier ON supplier."jarKodas"::text = s."tiekejoKodas"
-WHERE s."faktineIvykdimoVerte" > s.verte * 1.5
-  AND s.verte > 50000 AND s.istrinta = false
-ORDER BY vertuSantykis DESC LIMIT 50;
+         JOIN "jarCsv" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+JOIN "jarCsv" supplier
+ON supplier."jarKodas":: text = s."tiekejoKodas"
+WHERE s."faktineIvykdimoVerte"
+    > s.verte * 1.5
+  AND s.verte
+    > 50000
+  AND s.istrinta = false
+ORDER BY vertuSantykis DESC
+LIMIT 50;
 ```
 
 ### 9. Compliance and blacklist cross-check
@@ -445,23 +542,33 @@ SQL EXAMPLES:
 
 ```sql
 -- Contracts awarded to debarred suppliers (active during contract signing)
-SELECT s."sutartiesUnikalusId", s."sudarymoData", s.verte,
-    s."tiekejoKodas", j.pavadinimas AS tiekejas,
-    s."perkanciosiosOrganizacijosKodas" AS pirkejoKodas, buyer.pavadinimas AS pirkejas,
-    CASE WHEN mt."tiekejoJarKodas" IS NOT NULL THEN '"melagingiTiekejai"' END AS melagingasFlag,
-    CASE WHEN nt."tiekejoJarKodas" IS NOT NULL THEN '"nepatikimiTiekejai"' END AS nepatikimasFlag
+SELECT s."sutartiesUnikalusId",
+       s."sudarymoData",
+       s.verte,
+       s."tiekejoKodas",
+       j.pavadinimas                                                              AS tiekejas,
+       s."perkanciosiosOrganizacijosKodas"                                        AS pirkejoKodas,
+       buyer.pavadinimas                                                          AS pirkejas,
+       CASE WHEN mt."tiekejoJarKodas" IS NOT NULL THEN '"melagingiTiekejai"' END  AS melagingasFlag,
+       CASE WHEN nt."tiekejoJarKodas" IS NOT NULL THEN '"nepatikimiTiekejai"' END AS nepatikimasFlag
 FROM sutartys s
-JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
-JOIN "jarCsv" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-LEFT JOIN "melagingiTiekejai" mt
+         JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
+JOIN "jarCsv" buyer
+ON buyer."jarKodas":: text = s."perkanciosiosOrganizacijosKodas"
+    LEFT JOIN "melagingiTiekejai" mt
     ON mt."tiekejoJarKodas" = s."tiekejoKodas"
+    -- Check debarment was active at contract signing (start ≤ signing date ≤ end).
+    -- Verify exact "start date" column name via get_schema ("itrauktasNuo" or similar).
     AND (mt."itrauktasIki" IS NULL OR mt."itrauktasIki" >= s."sudarymoData")
-LEFT JOIN "nepatikimiTiekejai" nt
+    LEFT JOIN "nepatikimiTiekejai" nt
     ON nt."tiekejoJarKodas" = s."tiekejoKodas"
+    -- Same start-date caveat applies; verify column name in nepatikimiTiekejai via get_schema.
     AND (nt."itrauktaIki" IS NULL OR nt."itrauktaIki" >= s."sudarymoData")
-WHERE (mt."tiekejoJarKodas" IS NOT NULL OR nt."tiekejoJarKodas" IS NOT NULL)
+WHERE (mt."tiekejoJarKodas" IS NOT NULL
+   OR nt."tiekejoJarKodas" IS NOT NULL)
   AND s.istrinta = false
-ORDER BY s."sudarymoData" DESC LIMIT 50;
+ORDER BY s."sudarymoData" DESC
+LIMIT 50;
 ```
 
 ### 10. Network — second-degree connections and corporate webs
@@ -483,26 +590,31 @@ SQL EXAMPLES:
 
 ```sql
 -- Persons linking 4+ companies via PINREG (network hub — second-degree connection risk)
-SELECT pr.vardas, pr.pavarde,
-    COUNT(DISTINCT pr."jarKodas") AS susijusiuImoniu,
-    BOOL_OR(NOT pr."registruotaLietuvoje") AS yraUzsienioRysiu,
-    STRING_AGG(DISTINCT j.pavadinimas, '; ') AS imones
+SELECT pr.vardas,
+       pr.pavarde,
+       COUNT(DISTINCT pr."jarKodas")            AS susijusiuImoniu,
+       BOOL_OR(NOT pr."registruotaLietuvoje")   AS yraUzsienioRysiu,
+       STRING_AGG(DISTINCT j.pavadinimas, '; ') AS imones
 FROM "pinregJuridiniaiRysiai" pr
-JOIN "jarCsv" j ON j."jarKodas"::text = pr."jarKodas"
+         JOIN "jarCsv" j ON j."jarKodas"::text = pr."jarKodas"
 GROUP BY pr.vardas, pr.pavarde
 HAVING COUNT(DISTINCT pr."jarKodas") >= 4
-ORDER BY susijusiuImoniu DESC LIMIT 30;
+ORDER BY susijusiuImoniu DESC
+LIMIT 30;
 ```
 
 ```sql
 -- Companies sharing the same registered address (shared back-office cluster)
-SELECT j.adresas, COUNT(DISTINCT j."jarKodas") AS imoniu,
-    STRING_AGG(j.pavadinimas, '; ' ORDER BY j.pavadinimas) AS imones
+SELECT j.adresas,
+       COUNT(DISTINCT j."jarKodas")                           AS imoniu,
+       STRING_AGG(j.pavadinimas, '; ' ORDER BY j.pavadinimas) AS imones
 FROM "jarCsv" j
-WHERE j.adresas IS NOT NULL AND LENGTH(j.adresas) > 10
+WHERE j.adresas IS NOT NULL
+  AND LENGTH(j.adresas) > 10
 GROUP BY j.adresas
 HAVING COUNT(DISTINCT j."jarKodas") >= 5
-ORDER BY imoniu DESC LIMIT 30;
+ORDER BY imoniu DESC
+LIMIT 30;
 ```
 
 > For human investigator: networks that cross into high-risk sectors (construction, IT, healthcare, EU-funded projects)
@@ -518,6 +630,11 @@ TOOLS: `execute_query`, `get_pinreg_jar`, `get_juridinis`
 GOAL: Detect shared control of competing bidders or buyer–supplier pairs through holding companies and back-office
 signals.
 
+> **False-positive risk**: `yraJuridinisAsmuo = true` alone matches all companies that have any corporate shareholder,
+> including entirely normal Lithuanian holding structures. Filter specifically for **foreign-registered** legal entities
+> (`registruotaLietuvoje = false AND yraJuridinisAsmuo = true`) to focus on high-risk offshore chains. Domestic parent
+> companies are not inherently suspicious.
+
 ANSWERABLE NOW:
 
 - Shared declared persons across bidder set (including spouse links via `SUTUOKTINIO_DARBOVIETE`).
@@ -527,32 +644,46 @@ SQL EXAMPLES:
 
 ```sql
 -- Persons declared in PINREG for two companies that bid in the same tender (UBO co-control)
-SELECT d1."ataskaitaId" AS pirkimasId, a."pirkimoNumeris",
-    d1.kodas AS kodas1, j1.pavadinimas AS pavadinimas1,
-    d2.kodas AS kodas2, j2.pavadinimas AS pavadinimas2,
-    pr.vardas, pr.pavarde
+SELECT d1."ataskaitaId" AS pirkimasId,
+       a."pirkimoNumeris",
+       d1.kodas         AS kodas1,
+       j1.pavadinimas   AS pavadinimas1,
+       d2.kodas         AS kodas2,
+       j2.pavadinimas   AS pavadinimas2,
+       pr.vardas,
+       pr.pavarde
 FROM "atn1dalyviai" d1
-JOIN "atn1dalyviai" d2
-    ON d2."ataskaitaId" = d1."ataskaitaId" AND d2.kodas > d1.kodas
-JOIN "atn1ataskaitos" a ON a.id = d1."ataskaitaId"
-JOIN "pinregJuridiniaiRysiai" pr ON pr."jarKodas" = d1.kodas
-JOIN "pinregJuridiniaiRysiai" pr2
-    ON pr2."jarKodas" = d2.kodas AND pr2.vardas = pr.vardas AND pr2.pavarde = pr.pavarde
-JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1.kodas
-JOIN "jarCsv" j2 ON j2."jarKodas"::text = d2.kodas
-ORDER BY a."pirkimoNumeris" LIMIT 50;
+         JOIN "atn1dalyviai" d2
+              ON d2."ataskaitaId" = d1."ataskaitaId" AND d2.kodas > d1.kodas
+         JOIN "atn1ataskaitos" a ON a.id = d1."ataskaitaId"
+         JOIN "pinregJuridiniaiRysiai" pr ON pr."jarKodas" = d1.kodas
+         JOIN "pinregJuridiniaiRysiai" pr2
+              ON pr2."jarKodas" = d2.kodas AND pr2.vardas = pr.vardas AND pr2.pavarde = pr.pavarde
+         JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1.kodas
+JOIN "jarCsv" j2
+ON j2."jarKodas":: text = d2.kodas
+ORDER BY a."pirkimoNumeris"
+LIMIT 50;
 ```
 
 ```sql
 -- PINREG links to foreign-registered or legal-entity holders (high UBO risk indicators)
-SELECT pr.vardas, pr.pavarde, pr.pareigos,
-    pr."jarKodas", j.pavadinimas AS imone,
-    pr."registruotaLietuvoje", pr."yraJuridinisAsmuo",
-    pr."rysioPradzia", pr."rysioPabaiga"
+SELECT pr.vardas,
+       pr.pavarde,
+       pr.pareigos,
+       pr."jarKodas",
+       j.pavadinimas AS imone,
+       pr."registruotaLietuvoje",
+       pr."yraJuridinisAsmuo",
+       pr."rysioPradzia",
+       pr."rysioPabaiga"
 FROM "pinregJuridiniaiRysiai" pr
-JOIN "jarCsv" j ON j."jarKodas"::text = pr."jarKodas"
-WHERE pr."registruotaLietuvoje" = false OR pr."yraJuridinisAsmuo" = true
-ORDER BY j.pavadinimas LIMIT 100;
+         JOIN "jarCsv" j ON j."jarKodas"::text = pr."jarKodas"
+WHERE pr."registruotaLietuvoje" = false
+   OR (pr."yraJuridinisAsmuo" = true
+  AND pr."registruotaLietuvoje" = false)
+ORDER BY j.pavadinimas
+LIMIT 100;
 ```
 
 GAP (DATA):
@@ -585,35 +716,47 @@ SQL EXAMPLES:
 
 ```sql
 -- CPVA-funded contracts with very low supplier headcount (fictitious capacity signal)
-SELECT cs."projektoNr", cs."pirkimoNrCvpis", cs."tiekejoKodas",
-    j.pavadinimas AS tiekejas, j."registravimoData",
-    cs."pirkimoSutartiesSumaSusijusiSuProjektu" AS sutartisSuma,
-    sod.draustieji, sod."vidutinisAtlyginimas"
+SELECT cs."projektoNr",
+       cs."pirkimoNrCvpis",
+       cs."tiekejoKodas",
+       j.pavadinimas                               AS tiekejas,
+       j."registravimoData",
+       cs."pirkimoSutartiesSumaSusijusiSuProjektu" AS sutartisSuma,
+       sod.draustieji,
+       sod."vidutinisAtlyginimas"
 FROM "cpvaProjektuSutartys" cs
-JOIN "jarCsv" j ON j."jarKodas"::text = cs."tiekejoKodas"
+         JOIN "jarCsv" j ON j."jarKodas"::text = cs."tiekejoKodas"
 JOIN LATERAL (
     SELECT draustieji, "vidutinisAtlyginimas"
     FROM sodra WHERE "jarKodas" = cs."tiekejoKodas" ORDER BY data DESC LIMIT 1
-) sod ON true
-WHERE sod.draustieji < 5
-  AND cs."pirkimoSutartiesSumaSusijusiSuProjektu" > 100000
-ORDER BY cs."pirkimoSutartiesSumaSusijusiSuProjektu" DESC LIMIT 30;
+) sod
+ON true
+WHERE sod.draustieji
+    < 5
+  AND cs."pirkimoSutartiesSumaSusijusiSuProjektu"
+    > 100000
+ORDER BY cs."pirkimoSutartiesSumaSusijusiSuProjektu" DESC
+LIMIT 30;
 ```
 
 ```sql
 -- Recurring contractor + subcontractor pairs across multiple EU-funded projects
-SELECT cs1."tiekejoKodas" AS pagrindinisKodas, j1.pavadinimas AS pagrindinisRangovas,
-    cs2."tiekejoKodas" AS papildomasKodas, j2.pavadinimas AS papildomasRangovas,
-    COUNT(DISTINCT cs1."projektoNr") AS projektaiKartu,
-    SUM(cs1."pirkimoSutartiesSumaSusijusiSuProjektu") AS bendraPagrindinoVerte
+SELECT cs1."tiekejoKodas"                                AS pagrindinisKodas,
+       j1.pavadinimas                                    AS pagrindinisRangovas,
+       cs2."tiekejoKodas"                                AS papildomasKodas,
+       j2.pavadinimas                                    AS papildomasRangovas,
+       COUNT(DISTINCT cs1."projektoNr")                  AS projektaiKartu,
+       SUM(cs1."pirkimoSutartiesSumaSusijusiSuProjektu") AS bendraPagrindinoVerte
 FROM "cpvaProjektuSutartys" cs1
-JOIN "cpvaProjektuSutartys" cs2
-    ON cs2."projektoNr" = cs1."projektoNr" AND cs2."tiekejoKodas" <> cs1."tiekejoKodas"
-JOIN "jarCsv" j1 ON j1."jarKodas"::text = cs1."tiekejoKodas"
-JOIN "jarCsv" j2 ON j2."jarKodas"::text = cs2."tiekejoKodas"
+         JOIN "cpvaProjektuSutartys" cs2
+              ON cs2."projektoNr" = cs1."projektoNr" AND cs2."tiekejoKodas" <> cs1."tiekejoKodas"
+         JOIN "jarCsv" j1 ON j1."jarKodas"::text = cs1."tiekejoKodas"
+JOIN "jarCsv" j2
+ON j2."jarKodas":: text = cs2."tiekejoKodas"
 GROUP BY cs1."tiekejoKodas", j1.pavadinimas, cs2."tiekejoKodas", j2.pavadinimas
 HAVING COUNT(DISTINCT cs1."projektoNr") >= 3
-ORDER BY projektaiKartu DESC LIMIT 30;
+ORDER BY projektaiKartu DESC
+LIMIT 30;
 ```
 
 ### 13. Revolving door — procurement officer joins winning supplier
@@ -634,31 +777,39 @@ SQL EXAMPLES:
 
 ```sql
 -- Person left buyer PINREG and joined a supplier within 2 years; supplier then won contracts
-SELECT pr_b.vardas, pr_b.pavarde,
-    pr_b."jarKodas" AS pirkejoKodas, buyer.pavadinimas AS pirkejas,
-    pr_b."rysioPabaiga" AS isejimoPiamo,
-    pr_s."jarKodas" AS "tiekejoKodas", supplier.pavadinimas AS tiekejas,
-    pr_s."rysioPradzia" AS prisijungimoData,
-    (pr_s."rysioPradzia" - pr_b."rysioPabaiga") AS persiskolimoLaikotarpis,
-    COUNT(s."sutartiesUnikalusId") AS sutarciuPoPerejimo,
-    COALESCE(SUM(s.verte), 0) AS vertePoPerejimo
+SELECT pr_b.vardas,
+       pr_b.pavarde,
+       pr_b."jarKodas"                             AS pirkejoKodas,
+       buyer.pavadinimas                           AS pirkejas,
+       pr_b."rysioPabaiga"                         AS isejimoData,
+       pr_s."jarKodas"                             AS "tiekejoKodas",
+       supplier.pavadinimas                        AS tiekejas,
+       pr_s."rysioPradzia"                         AS prisijungimoData,
+       (pr_s."rysioPradzia" - pr_b."rysioPabaiga") AS perejimoDienos,
+       COUNT(s."sutartiesUnikalusId")              AS sutarciuPoPerejimo,
+       COALESCE(SUM(s.verte), 0)                   AS vertePoPerejimo
 FROM "pinregJuridiniaiRysiai" pr_b
-JOIN "pinregJuridiniaiRysiai" pr_s
-    ON pr_s.vardas = pr_b.vardas AND pr_s.pavarde = pr_b.pavarde
-    AND pr_s."jarKodas" <> pr_b."jarKodas"
-    AND pr_b."rysioPabaiga" IS NOT NULL AND pr_s."rysioPradzia" IS NOT NULL
-    AND pr_s."rysioPradzia" > pr_b."rysioPabaiga"
-    AND (pr_s."rysioPradzia" - pr_b."rysioPabaiga") < 730
-LEFT JOIN sutartys s
-    ON s."perkanciosiosOrganizacijosKodas" = pr_b."jarKodas"
-    AND s."tiekejoKodas" = pr_s."jarKodas"
-    AND s."sudarymoData" >= pr_s."rysioPradzia" AND s.istrinta = false
-JOIN "jarCsv" buyer ON buyer."jarKodas"::text = pr_b."jarKodas"
-JOIN "jarCsv" supplier ON supplier."jarKodas"::text = pr_s."jarKodas"
+         JOIN "pinregJuridiniaiRysiai" pr_s
+              ON pr_s.vardas = pr_b.vardas AND pr_s.pavarde = pr_b.pavarde
+                  AND pr_s."jarKodas" <> pr_b."jarKodas"
+                  AND pr_b."rysioPabaiga" IS NOT NULL AND pr_s."rysioPradzia" IS NOT NULL
+                  AND pr_s."rysioPradzia" > pr_b."rysioPabaiga"
+                  -- 730 days is an investigation parameter, not a legal cooling-off period — adjust for seniority.
+                  AND (pr_s."rysioPradzia" - pr_b."rysioPabaiga") < 730
+         LEFT JOIN sutartys s
+                   ON s."perkanciosiosOrganizacijosKodas" = pr_b."jarKodas"
+                       AND s."tiekejoKodas" = pr_s."jarKodas"
+                       AND s."sudarymoData" >= pr_s."rysioPradzia" AND s.istrinta = false
+         JOIN "jarCsv" buyer ON buyer."jarKodas"::text = pr_b."jarKodas"
+JOIN "jarCsv" supplier
+ON supplier."jarKodas":: text = pr_s."jarKodas"
 GROUP BY pr_b.vardas, pr_b.pavarde, pr_b."jarKodas", buyer.pavadinimas, pr_b."rysioPabaiga",
-         pr_s."jarKodas", supplier.pavadinimas, pr_s."rysioPradzia"
+    pr_s."jarKodas", supplier.pavadinimas, pr_s."rysioPradzia"
+-- HAVING removes cases with zero post-move contracts; remove this filter to also surface
+-- pre-positioned relationships (supplier had prior contracts before the person moved).
 HAVING COALESCE(SUM(s.verte), 0) > 0
-ORDER BY vertePoPerejimo DESC LIMIT 30;
+ORDER BY vertePoPerejimo DESC
+LIMIT 30;
 ```
 
 ### 14. Spec rigging — technical specifications written for one supplier
@@ -682,21 +833,20 @@ SQL EXAMPLES:
 
 ```sql
 -- Buyers with highest single-bidder rate per CPV category (spec rigging signal)
-SELECT a."perkanciosiosOrganizacijosKodas" AS pirkejoKodas, j.pavadinimas AS pirkejas,
-    LEFT(vp."bvpzKodai"[1], 3) AS cpvGrupe,
-    COUNT(DISTINCT a.id) AS pirkimuKiekis,
-    COUNT(DISTINCT CASE WHEN dalyviu.cnt = 1 THEN a.id END) AS vienasdalyvys,
-    ROUND(100.0 * COUNT(DISTINCT CASE WHEN dalyviu.cnt = 1 THEN a.id END)
-        / COUNT(DISTINCT a.id), 1) AS vienoDalyvioProcProc
+SELECT a."perkanciosiosOrganizacijosKodas" AS pirkejoKodas,
+       j.pavadinimas                       AS pirkejas, LEFT (vp."bvpzKodai"[1], 3) AS cpvGrupe, COUNT(DISTINCT a.id) AS pirkimuKiekis, COUNT(DISTINCT CASE WHEN dalyviu.cnt = 1 THEN a.id END) AS vienasdalyvys, ROUND(100.0 * COUNT(DISTINCT CASE WHEN dalyviu.cnt = 1 THEN a.id END)
+    / COUNT(DISTINCT a.id), 1) AS vienoDalyvioProcent
 FROM "atn1ataskaitos" a
-JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = a."pirkimoNumeris"
-JOIN "jarCsv" j ON j."jarKodas"::text = a."perkanciosiosOrganizacijosKodas"
-JOIN (
+    JOIN "viesiejiPirkimai" vp
+ON vp."pirkimoId" = a."pirkimoNumeris"
+    JOIN "jarCsv" j ON j."jarKodas":: text = a."perkanciosiosOrganizacijosKodas"
+    JOIN (
     SELECT "ataskaitaId", COUNT(*) AS cnt FROM "atn1dalyviai" GROUP BY "ataskaitaId"
-) dalyviu ON dalyviu."ataskaitaId" = a.id
-GROUP BY a."perkanciosiosOrganizacijosKodas", j.pavadinimas, LEFT(vp."bvpzKodai"[1], 3)
+    ) dalyviu ON dalyviu."ataskaitaId" = a.id
+GROUP BY a."perkanciosiosOrganizacijosKodas", j.pavadinimas, LEFT (vp."bvpzKodai"[1], 3)
 HAVING COUNT(DISTINCT a.id) >= 5
-ORDER BY vienoDalyvioProcProc DESC LIMIT 30;
+ORDER BY vienoDalyvioProcent DESC
+LIMIT 30;
 ```
 
 ### 15. Framework agreement abuse — single-supplier call-offs
@@ -706,6 +856,11 @@ ORDER BY vienoDalyvioProcProc DESC LIMIT 30;
 TOOLS: `execute_query`, `search_sutartys`, `get_sutartis`
 
 GOAL: Detect framework agreements where all call-offs (`tipas = 'PPS'`) go to one supplier.
+
+> **Important caveat**: A single-supplier framework established through an open competitive procedure is legal under
+> Lithuanian and EU procurement law. This query flags all single-supplier frameworks regardless of how they were
+> established. Always verify the procurement procedure used to set up the framework (`pirkimoBudas`) before treating
+> single-supplier call-offs as suspicious.
 
 DETECT:
 
@@ -719,17 +874,21 @@ SQL EXAMPLES:
 ```sql
 -- Framework call-offs (tipas = 'PPS') concentrated to a single supplier per framework
 SELECT s."pirkimoNumeris",
-    s."perkanciosiosOrganizacijosKodas" AS pirkejoKodas, buyer.pavadinimas AS pirkejas,
-    COUNT(DISTINCT s."tiekejoKodas") AS tiekejuKiekis,
-    COUNT(*) AS ppsKiekis, SUM(s.verte) AS ppsVerte,
-    STRING_AGG(DISTINCT supplier.pavadinimas, '; ') AS tiekejaiPav
+       s."perkanciosiosOrganizacijosKodas"             AS pirkejoKodas,
+       buyer.pavadinimas                               AS pirkejas,
+       COUNT(DISTINCT s."tiekejoKodas")                AS tiekejuKiekis,
+       COUNT(*)                                        AS ppsKiekis,
+       SUM(s.verte)                                    AS ppsVerte,
+       STRING_AGG(DISTINCT supplier.pavadinimas, '; ') AS tiekejaiPav
 FROM sutartys s
-JOIN "jarCsv" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-JOIN "jarCsv" supplier ON supplier."jarKodas"::text = s."tiekejoKodas"
+         JOIN "jarCsv" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+JOIN "jarCsv" supplier
+ON supplier."jarKodas":: text = s."tiekejoKodas"
 WHERE s.tipas = 'PPS' AND s.istrinta = false AND s."pirkimoNumeris" IS NOT NULL
 GROUP BY s."pirkimoNumeris", s."perkanciosiosOrganizacijosKodas", buyer.pavadinimas
 HAVING COUNT(DISTINCT s."tiekejoKodas") = 1 AND COUNT(*) >= 3
-ORDER BY ppsVerte DESC LIMIT 30;
+ORDER BY ppsVerte DESC
+LIMIT 30;
 ```
 
 ### 16. Shared back-office — competing companies with the same address or domain
@@ -752,31 +911,49 @@ SQL EXAMPLES:
 ```sql
 -- Supplier pairs sharing the same registered address and appearing as co-bidders
 SELECT j1.adresas,
-    j1."jarKodas" AS kodas1, j1.pavadinimas AS pavadinimas1,
-    j2."jarKodas" AS kodas2, j2.pavadinimas AS pavadinimas2,
-    COUNT(DISTINCT d1."ataskaitaId") AS bendruPirkimuKiekis
+       j1."jarKodas"                    AS kodas1,
+       j1.pavadinimas                   AS pavadinimas1,
+       j2."jarKodas"                    AS kodas2,
+       j2.pavadinimas                   AS pavadinimas2,
+       COUNT(DISTINCT d1."ataskaitaId") AS bendruPirkimuKiekis
 FROM "jarCsv" j1
-JOIN "jarCsv" j2 ON j2.adresas = j1.adresas AND j2."jarKodas" > j1."jarKodas"
-JOIN "atn1dalyviai" d1 ON d1.kodas = j1."jarKodas"::text
-JOIN "atn1dalyviai" d2 ON d2."ataskaitaId" = d1."ataskaitaId" AND d2.kodas = j2."jarKodas"::text
+         JOIN "jarCsv" j2 ON j2.adresas = j1.adresas AND j2."jarKodas" > j1."jarKodas"
+         JOIN "atn1dalyviai" d1 ON d1.kodas = j1."jarKodas"::text
+JOIN "atn1dalyviai" d2
+ON d2."ataskaitaId" = d1."ataskaitaId" AND d2.kodas = j2."jarKodas":: text
 WHERE j1.adresas IS NOT NULL AND LENGTH(j1.adresas) > 10
 GROUP BY j1.adresas, j1."jarKodas", j1.pavadinimas, j2."jarKodas", j2.pavadinimas
 HAVING COUNT(DISTINCT d1."ataskaitaId") >= 2
-ORDER BY bendruPirkimuKiekis DESC LIMIT 30;
+ORDER BY bendruPirkimuKiekis DESC
+LIMIT 30;
 ```
 
 ```sql
 -- Competing suppliers sharing the same internet domain registrant (shared online infrastructure)
-SELECT d1."savininkoKodas" AS registrantoKodas1, d1.savininkas,
-    d1.domain AS domenas,
-    j1."jarKodas" AS kodas1, j1.pavadinimas AS pavadinimas1,
-    j2."jarKodas" AS kodas2, j2.pavadinimas AS pavadinimas2
+-- NOTE: this does NOT verify the companies co-bid; filter further to pairs that appeared as co-bidders.
+SELECT d1."savininkoKodas"                AS registrantoKodas1,
+       d1.savininkas,
+       d1.domain                          AS domenas,
+       j1."jarKodas"                      AS kodas1,
+       j1.pavadinimas                     AS pavadinimas1,
+       j2."jarKodas"                      AS kodas2,
+       j2.pavadinimas                     AS pavadinimas2,
+       COUNT(DISTINCT dal1."ataskaitaId") AS bendruPirkimuKiekis
 FROM domenai d1
-JOIN domenai d2
-    ON d2.domain = d1.domain AND d2."savininkoKodas" <> d1."savininkoKodas"
-    AND d2."savininkoKodas" > d1."savininkoKodas"
-JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1."savininkoKodas"
-JOIN "jarCsv" j2 ON j2."jarKodas"::text = d2."savininkoKodas"
+         JOIN domenai d2
+              ON d2.domain = d1.domain AND d2."savininkoKodas" <> d1."savininkoKodas"
+                  AND d2."savininkoKodas" > d1."savininkoKodas"
+         JOIN "jarCsv" j1 ON j1."jarKodas"::text = d1."savininkoKodas"
+JOIN "jarCsv" j2
+ON j2."jarKodas":: text = d2."savininkoKodas"
+-- Restrict to pairs that actually co-bid to eliminate noise
+    JOIN "atn1dalyviai" dal1 ON dal1.kodas = j1."jarKodas":: text
+    JOIN "atn1dalyviai" dal2
+    ON dal2."ataskaitaId" = dal1."ataskaitaId" AND dal2.kodas = j2."jarKodas":: text
+GROUP BY d1."savininkoKodas", d1.savininkas, d1.domain,
+    j1."jarKodas", j1.pavadinimas, j2."jarKodas", j2.pavadinimas
+HAVING COUNT(DISTINCT dal1."ataskaitaId") >= 2
+ORDER BY bendruPirkimuKiekis DESC
 LIMIT 50;
 ```
 
@@ -786,31 +963,57 @@ LIMIT 50;
 
 TOOLS: `execute_query`
 
-GOAL: Detect CPV categories with abnormally low price variation (coefficient of variation <5%) across independent
-tenders.
+GOAL: Detect tenders with abnormally low price variation among independent bidders — a primary cartel signal. Also
+screen
+CPV categories nationally for uniformity as a secondary filter to identify categories warranting deeper per-tender
+analysis.
+
+> **Methodology note**: The correct unit of analysis for price cartel detection is the **individual tender** (comparing
+> bids submitted by different suppliers within the same procurement). Computing CV across all tenders in a CPV group
+> nationally conflates different buyers, specifications, years, and scales — the resulting CV tells you almost nothing
+> about cartel behaviour. Use the per-tender query (first SQL below) as the primary detection method. The cross-tender
+> national-average query (second SQL) is a coarse screening tool only; low national CV in commodity categories may be
+> entirely normal.
 
 DETECT:
 
-- Coefficient of variation of bid prices by CPV.
-- Repeat suppliers in low-variation categories.
-- Clustering of low-variation cases in certain buyers or regions.
+- Coefficient of variation of bid prices **within individual tenders** (CV < 5% with ≥ 3 bidders is a strong signal).
+- Repeat suppliers in tenders with suspiciously uniform prices.
+- Clustering of low-variation tenders in certain buyers or regions.
 
 SQL EXAMPLES:
 
 ```sql
--- Coefficient of variation of bid prices by CPV group (CV < 5% = suspiciously uniform = cartel signal)
-SELECT LEFT(vp."bvpzKodai"[1], 3) AS cpvGrupe,
-    COUNT(DISTINCT e."ataskaitaId") AS pirkimuKiekis,
-    COUNT(e.id) AS pasiulymuKiekis,
-    ROUND(AVG(e.kaina::numeric), 0) AS vidutineKaina,
-    ROUND(STDDEV(e.kaina::numeric) / NULLIF(AVG(e.kaina::numeric), 0) * 100, 1) AS variacijosKoefProc
+-- PRIMARY: Per-tender CV of bid prices — low within-tender variation among ≥3 bidders is a cartel signal
+SELECT e."ataskaitaId" AS pirkimasId,
+       a."pirkimoNumeris", LEFT (vp."bvpzKodai"[1], 3) AS cpvGrupe, COUNT(e.id) AS pasiulymuKiekis, ROUND(AVG(e.kaina:: numeric), 0) AS vidutineKaina, ROUND(MIN(e.kaina:: numeric), 0) AS minKaina, ROUND(MAX(e.kaina:: numeric), 0) AS maxKaina, ROUND(STDDEV(e.kaina:: numeric) / NULLIF(AVG(e.kaina:: numeric), 0) * 100, 1) AS variacijosKoefProc
 FROM "atn1pasiulymuEile" e
-JOIN "atn1ataskaitos" a ON a.id = e."ataskaitaId"
-JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = a."pirkimoNumeris"
+    JOIN "atn1ataskaitos" a
+ON a.id = e."ataskaitaId"
+    JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = a."pirkimoNumeris"
 WHERE e.kaina ~ '^\d+(\.\d+)?$' AND vp."bvpzKodai" IS NOT NULL
-GROUP BY LEFT(vp."bvpzKodai"[1], 3)
-HAVING COUNT(DISTINCT e."ataskaitaId") >= 10 AND AVG(e.kaina::numeric) > 0
-ORDER BY variacijosKoefProc ASC LIMIT 30;
+GROUP BY e."ataskaitaId", a."pirkimoNumeris", LEFT (vp."bvpzKodai"[1], 3)
+HAVING COUNT(e.id) >= 3
+   AND STDDEV(e.kaina:: numeric) / NULLIF(AVG(e.kaina:: numeric)
+     , 0) * 100
+     < 5
+ORDER BY variacijosKoefProc ASC
+LIMIT 50;
+```
+
+```sql
+-- SECONDARY SCREENING ONLY: Cross-tender CV by CPV group nationally (commodity-like categories
+-- may show naturally low CV — always investigate individual tenders before drawing conclusions)
+SELECT LEFT (vp."bvpzKodai"[1], 3) AS cpvGrupe, COUNT(DISTINCT e."ataskaitaId") AS pirkimuKiekis, COUNT(e.id) AS pasiulymuKiekis, ROUND(AVG(e.kaina:: numeric), 0) AS vidutineKaina, ROUND(STDDEV(e.kaina:: numeric) / NULLIF(AVG(e.kaina:: numeric), 0) * 100, 1) AS variacijosKoefProc
+FROM "atn1pasiulymuEile" e
+    JOIN "atn1ataskaitos" a
+ON a.id = e."ataskaitaId"
+    JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = a."pirkimoNumeris"
+WHERE e.kaina ~ '^\d+(\.\d+)?$' AND vp."bvpzKodai" IS NOT NULL
+GROUP BY LEFT (vp."bvpzKodai"[1], 3)
+HAVING COUNT(DISTINCT e."ataskaitaId") >= 10 AND AVG(e.kaina:: numeric) > 0
+ORDER BY variacijosKoefProc ASC
+LIMIT 30;
 ```
 
 ## Partially supported and extended themes
@@ -833,20 +1036,24 @@ SQL EXAMPLES:
 
 ```sql
 -- Suppliers systematically winning cheap then inflating via amendments (low-bid-then-inflate)
-SELECT s."tiekejoKodas", j.pavadinimas AS tiekejas,
-    COUNT(*) AS sutarciuKiekis, SUM(s.verte) AS totalVerte,
-    ROUND(AVG(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0)), 2) AS vidutinisSantykis,
-    COUNT(CASE WHEN s."faktineIvykdimoVerte" > s.verte * 1.5 THEN 1 END) AS stipriuVirsijimukiekis
+SELECT s."tiekejoKodas",
+       j.pavadinimas                                                        AS tiekejas,
+       COUNT(*)                                                             AS sutarciuKiekis,
+       SUM(s.verte)                                                         AS totalVerte,
+       ROUND(AVG(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0)), 2)         AS vidutinisSantykis,
+       COUNT(CASE WHEN s."faktineIvykdimoVerte" > s.verte * 1.5 THEN 1 END) AS stipriuVirsijimuKiekis
 FROM sutartys s
-JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
+         JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
 WHERE s."faktineIvykdimoVerte" IS NOT NULL AND s.verte > 0 AND s.istrinta = false
 GROUP BY s."tiekejoKodas", j.pavadinimas
 HAVING COUNT(*) >= 5 AND AVG(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0)) > 1.3
-ORDER BY stipriuVirsijimukiekis DESC LIMIT 30;
+ORDER BY stipriuVirsijimuKiekis DESC
+LIMIT 30;
 ```
 
 GAP (DATA):
-- `dokumentai` JSONB unstructured; CVP IS amendment sequence not fully ingested.
+
+- `dokumentai` JSONB unstructured; CVPIS amendment sequence not fully ingested.
 
 ### 19. Municipal company favoritism — buyer awards contracts to its own subsidiary
 
@@ -866,28 +1073,32 @@ SQL EXAMPLES:
 
 ```sql
 -- Buyer awarding disproportionate value to companies sharing PINREG persons with the buyer
-SELECT pr_b."jarKodas" AS pirkejoKodas, buyer.pavadinimas AS pirkejas,
-    pr_s."jarKodas" AS "tiekejoKodas", supplier.pavadinimas AS tiekejas,
-    COUNT(DISTINCT pr_b.vardas || ' ' || pr_b.pavarde) AS bendruAsmenuKiekis,
-    COUNT(DISTINCT s."sutartiesUnikalusId") AS sutarciuKiekis,
-    SUM(s.verte) AS totalVerte,
-    STRING_AGG(DISTINCT s.tipas, ', ') AS procedurosTipai
+SELECT pr_b."jarKodas"                                    AS pirkejoKodas,
+       buyer.pavadinimas                                  AS pirkejas,
+       pr_s."jarKodas"                                    AS "tiekejoKodas",
+       supplier.pavadinimas                               AS tiekejas,
+       COUNT(DISTINCT pr_b.vardas || ' ' || pr_b.pavarde) AS bendruAsmenuKiekis,
+       COUNT(DISTINCT s."sutartiesUnikalusId")            AS sutarciuKiekis,
+       SUM(s.verte)                                       AS totalVerte,
+       STRING_AGG(DISTINCT s.tipas, ', ')                 AS procedurosTipai
 FROM "pinregJuridiniaiRysiai" pr_b
-JOIN "pinregJuridiniaiRysiai" pr_s
-    ON pr_s.vardas = pr_b.vardas AND pr_s.pavarde = pr_b.pavarde
-    AND pr_s."jarKodas" <> pr_b."jarKodas"
-JOIN sutartys s
-    ON s."perkanciosiosOrganizacijosKodas" = pr_b."jarKodas"
-    AND s."tiekejoKodas" = pr_s."jarKodas" AND s.istrinta = false
-JOIN "jarCsv" buyer ON buyer."jarKodas"::text = pr_b."jarKodas"
-JOIN "jarCsv" supplier ON supplier."jarKodas"::text = pr_s."jarKodas"
+         JOIN "pinregJuridiniaiRysiai" pr_s
+              ON pr_s.vardas = pr_b.vardas AND pr_s.pavarde = pr_b.pavarde
+                  AND pr_s."jarKodas" <> pr_b."jarKodas"
+         JOIN sutartys s
+              ON s."perkanciosiosOrganizacijosKodas" = pr_b."jarKodas"
+                  AND s."tiekejoKodas" = pr_s."jarKodas" AND s.istrinta = false
+         JOIN "jarCsv" buyer ON buyer."jarKodas"::text = pr_b."jarKodas"
+JOIN "jarCsv" supplier
+ON supplier."jarKodas":: text = pr_s."jarKodas"
 GROUP BY pr_b."jarKodas", buyer.pavadinimas, pr_s."jarKodas", supplier.pavadinimas
 HAVING SUM(s.verte) > 100000
-ORDER BY totalVerte DESC LIMIT 30;
+ORDER BY totalVerte DESC
+LIMIT 30;
 ```
 
 GAP (DATA): (e.g. JAR "SAVIVALDYBĖ" participation data) — proxy via shared persons and
-  addresses.
+addresses.
 
 ### 20. Restricted procedure manipulation — buyer hand-picks the same invitees
 
@@ -907,13 +1118,16 @@ SQL EXAMPLES:
 
 ```sql
 -- Non-public negotiation audit findings ("neskelbiamosDerybos") grouped by buyer
-SELECT nd."jarKodas" AS pirkejoKodas, nd."jarPavadinimas" AS pirkejas,
-    COUNT(*) AS radiniunKiekis,
-    STRING_AGG(nd.isvada, ' | ' ORDER BY nd.data) AS isvados,
-    MIN(nd.data) AS pirmasis, MAX(nd.data) AS paskutinis
+SELECT nd."jarKodas"                                 AS pirkejoKodas,
+       nd."jarPavadinimas"                           AS pirkejas,
+       COUNT(*)                                      AS radininiuKiekis,
+       STRING_AGG(nd.isvada, ' | ' ORDER BY nd.data) AS isvados,
+       MIN(nd.data)                                  AS pirmasis,
+       MAX(nd.data)                                  AS paskutinis
 FROM "neskelbiamosDerybos" nd
 GROUP BY nd."jarKodas", nd."jarPavadinimas"
-ORDER BY radiniunKiekis DESC LIMIT 30;
+ORDER BY radininiuKiekis DESC
+LIMIT 30;
 ```
 
 GAP (DATA):
@@ -940,20 +1154,23 @@ SQL EXAMPLES:
 
 ```sql
 -- Companies with very high total contract value and persons linked to many organisations (proxy for political exposure)
-SELECT pr.vardas, pr.pavarde,
-    COUNT(DISTINCT pr."jarKodas") AS rysiuKiekis,
-    SUM(stats.totalVerte) AS visoSutarciuVerte
+SELECT pr.vardas,
+       pr.pavarde,
+       COUNT(DISTINCT pr."jarKodas") AS rysiuKiekis,
+       SUM(stats.totalVerte)         AS visoSutarciuVerte
 FROM "pinregJuridiniaiRysiai" pr
-JOIN (
-    SELECT "tiekejoKodas", SUM(verte) AS totalVerte
-    FROM sutartys WHERE istrinta = false GROUP BY "tiekejoKodas"
-) stats ON stats."tiekejoKodas" = pr."jarKodas"
+         JOIN (SELECT "tiekejoKodas", SUM(verte) AS totalVerte
+               FROM sutartys
+               WHERE istrinta = false
+               GROUP BY "tiekejoKodas") stats ON stats."tiekejoKodas" = pr."jarKodas"
 GROUP BY pr.vardas, pr.pavarde
 HAVING COUNT(DISTINCT pr."jarKodas") >= 3
-ORDER BY visoSutarciuVerte DESC LIMIT 30;
+ORDER BY visoSutarciuVerte DESC
+LIMIT 30;
 ```
 
 GAP (DATA):
+
 - Needs VRK donor database and politician office/mandate register.
 
 > For human investigator: when considering escalation to STT on political favouritism, combine MCP signals with OSINT
@@ -977,24 +1194,35 @@ DETECT:
 SQL EXAMPLES:
 
 ```sql
--- Fully paid contracts to suppliers with active VDI labour violations (fictitious delivery signal)
-SELECT s."sutartiesUnikalusId", s.pavadinimas, s."sudarymoData", s."galiojimoData",
-    s."tiekejoKodas", j.pavadinimas AS tiekejas,
-    s.verte, s."faktineIvykdimoVerte",
-    COUNT(DISTINCT vdi.id) AS vdiPazeidimuKiekis
+-- Fully paid contracts to suppliers with VDI labour violations during the contract execution period
+SELECT s."sutartiesUnikalusId",
+       s.pavadinimas,
+       s."sudarymoData",
+       s."galiojimoData",
+       s."tiekejoKodas",
+       j.pavadinimas          AS tiekejas,
+       s.verte,
+       s."faktineIvykdimoVerte",
+       COUNT(DISTINCT vdi.id) AS vdiPazeidimuKiekis
 FROM sutartys s
-JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
-JOIN "vdiPazeidimai" vdi ON vdi."jarKodas" = s."tiekejoKodas"
+         JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
+JOIN "vdiPazeidimai" vdi
+ON vdi."jarKodas" = s."tiekejoKodas"
+-- Only violations that occurred during contract execution; verify date column name via get_schema.
+-- AND vdi."pažeidimoDatas" BETWEEN s."sudarymoData" AND COALESCE(s."galiojimoData", s."sudarymoData" + INTERVAL '2 years')
 WHERE s."faktineIvykdimoVerte" IS NOT NULL
   AND s."faktineIvykdimoVerte" >= s.verte * 0.95
   AND s.istrinta = false
 GROUP BY s."sutartiesUnikalusId", s.pavadinimas, s."sudarymoData", s."galiojimoData",
-         s."tiekejoKodas", j.pavadinimas, s.verte, s."faktineIvykdimoVerte"
+    s."tiekejoKodas", j.pavadinimas, s.verte, s."faktineIvykdimoVerte"
 HAVING COUNT(DISTINCT vdi.id) > 0
-ORDER BY s.verte DESC LIMIT 30;
+ORDER BY s.verte DESC
+LIMIT 30;
 ```
 
-GAP (DATA):, SABIS invoice-level data, or detailed STT/NKT audit trails in schema.
+GAP (DATA):
+
+- No SABIS invoice-level data or detailed STT/NKT audit trails in schema.
 
 ### 23. Vendor lock-in — incumbent supplier structural monopoly
 
@@ -1017,29 +1245,38 @@ SQL EXAMPLES:
 
 ```sql
 -- Suppliers with >70% of total revenue from a single buyer (structural lock-in signal)
-WITH supplier_totals AS (
-    SELECT "tiekejoKodas", SUM(verte) AS totalVerte, COUNT(*) AS kiekis
-    FROM sutartys WHERE istrinta = false AND "sudarymoData" >= CURRENT_DATE - INTERVAL '5 years'
-    GROUP BY "tiekejoKodas" HAVING SUM(verte) > 500000 AND COUNT(*) >= 5
-), buyer_share AS (
-    SELECT "perkanciosiosOrganizacijosKodas", "tiekejoKodas", SUM(verte) AS verteUzPirkejo
-    FROM sutartys WHERE istrinta = false AND "sudarymoData" >= CURRENT_DATE - INTERVAL '5 years'
-    GROUP BY 1, 2
-)
-SELECT bs."tiekejoKodas", j_s.pavadinimas AS tiekejas,
-    bs."perkanciosiosOrganizacijosKodas" AS pirkejoKodas, j_b.pavadinimas AS pirkejas,
-    st.totalVerte AS tiekejoVisoVerte, bs.verteUzPirkejo,
-    ROUND(100.0 * bs.verteUzPirkejo / st.totalVerte, 1) AS koncentracijaProc
+WITH supplier_totals AS (SELECT "tiekejoKodas", SUM(verte) AS totalVerte, COUNT(*) AS kiekis
+                         FROM sutartys
+                         WHERE istrinta = false
+                           AND "sudarymoData" >= CURRENT_DATE - INTERVAL '5 years'
+                         GROUP BY "tiekejoKodas"
+                         HAVING SUM(verte) > 500000 AND COUNT(*) >= 5),
+     buyer_share AS (SELECT "perkanciosiosOrganizacijosKodas", "tiekejoKodas", SUM(verte) AS verteUzPirkejo
+                     FROM sutartys
+                     WHERE istrinta = false
+                       AND "sudarymoData" >= CURRENT_DATE - INTERVAL '5 years'
+                     GROUP BY 1, 2)
+SELECT bs."tiekejoKodas",
+       j_s.pavadinimas                                     AS tiekejas,
+       bs."perkanciosiosOrganizacijosKodas"                AS pirkejoKodas,
+       j_b.pavadinimas                                     AS pirkejas,
+       st.totalVerte                                       AS tiekejoVisoVerte,
+       bs.verteUzPirkejo,
+       ROUND(100.0 * bs.verteUzPirkejo / st.totalVerte, 1) AS koncentracijaProc
 FROM buyer_share bs
-JOIN supplier_totals st ON st."tiekejoKodas" = bs."tiekejoKodas"
-JOIN "jarCsv" j_s ON j_s."jarKodas"::text = bs."tiekejoKodas"
-JOIN "jarCsv" j_b ON j_b."jarKodas"::text = bs."perkanciosiosOrganizacijosKodas"
+         JOIN supplier_totals st ON st."tiekejoKodas" = bs."tiekejoKodas"
+         JOIN "jarCsv" j_s ON j_s."jarKodas"::text = bs."tiekejoKodas"
+JOIN "jarCsv" j_b
+ON j_b."jarKodas":: text = bs."perkanciosiosOrganizacijosKodas"
 WHERE bs.verteUzPirkejo / st.totalVerte > 0.70
-ORDER BY bs.verteUzPirkejo DESC LIMIT 30;
+ORDER BY bs.verteUzPirkejo DESC
+LIMIT 30;
 ```
 
-GAP (DATA): or IP ownership from structured data.
-- Mechanism of lock-in (e.g. proprietary code, restrictive SLA clauses) only visible in contract texts.
+GAP (DATA):
+
+- No contract clause data or IP ownership information available in structured form; lock-in mechanism (e.g. proprietary
+  code, restrictive SLA clauses) only visible in contract texts.
 
 ## New / clarified themes for Lithuanian context
 
@@ -1063,22 +1300,32 @@ SQL EXAMPLES:
 
 ```sql
 -- EU-funded contracts ("esFinansavimas"=true) with high cost overruns, joined to CPVA project data
-SELECT s."sutartiesUnikalusId", s.pavadinimas,
-    s."perkanciosiosOrganizacijosKodas" AS pirkejoKodas, jb.pavadinimas AS pirkejas,
-    s."tiekejoKodas", js.pavadinimas AS tiekejas,
-    s.verte, s."faktineIvykdimoVerte",
-    ROUND(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0), 2) AS santykis,
-    cp."projektoNr", cp."pirkimoSutartiesSumaSusijusiSuProjektu" AS cpvaVerte
+SELECT s."sutartiesUnikalusId",
+       s.pavadinimas,
+       s."perkanciosiosOrganizacijosKodas"                     AS pirkejoKodas,
+       jb.pavadinimas                                          AS pirkejas,
+       s."tiekejoKodas",
+       js.pavadinimas                                          AS tiekejas,
+       s.verte,
+       s."faktineIvykdimoVerte",
+       ROUND(s."faktineIvykdimoVerte" / NULLIF(s.verte, 0), 2) AS santykis,
+       cp."projektoNr",
+       cp."pirkimoSutartiesSumaSusijusiSuProjektu"             AS cpvaVerte
 FROM sutartys s
-JOIN "jarCsv" jb ON jb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-JOIN "jarCsv" js ON js."jarKodas"::text = s."tiekejoKodas"
-LEFT JOIN "cpvaProjektuSutartys" cp ON cp."pirkimoSutartiesNr" = s."sutartiesUnikalusId"::text
-JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = s."pirkimoNumeris"
+         JOIN "jarCsv" jb ON jb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+JOIN "jarCsv" js
+ON js."jarKodas":: text = s."tiekejoKodas"
+    LEFT JOIN "cpvaProjektuSutartys" cp ON cp."pirkimoSutartiesNr" = s."sutartiesUnikalusId":: text
+    JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = s."pirkimoNumeris"
 WHERE vp."esFinansavimas" = true
-  AND s."faktineIvykdimoVerte" IS NOT NULL AND s.verte > 0
-  AND s."faktineIvykdimoVerte" > s.verte * 1.3
+  AND s."faktineIvykdimoVerte" IS NOT NULL
+  AND s.verte
+    > 0
+  AND s."faktineIvykdimoVerte"
+    > s.verte * 1.3
   AND s.istrinta = false
-ORDER BY santykis DESC LIMIT 30;
+ORDER BY santykis DESC
+LIMIT 30;
 ```
 
 > For human investigator: EPPO and OLAF are key external partners on EU funds fraud; FNTT leads financial crime
@@ -1094,6 +1341,14 @@ TOOLS: `execute_query`, future accounting/payment tables, `get_juridinis`
 GOAL: Flag procurement cases where contract payment flows show money-laundering typologies (layering, use of high-risk
 sectors, circular flows).
 
+> **Important caveat**: CPV diversification alone (working across 5+ CPV divisions) is a very weak and
+> high-false-positive
+> indicator. Large companies, construction firms, and technology integrators naturally span many CPV divisions. Do not
+> treat this query as a standalone money-laundering signal. Use it only as a filtering step to identify companies with
+> an unusually broad scope **combined with** other risk indicators (shell company signals, conflict of interest,
+> offshore
+> UBO structures).
+
 DETECT (requires future integration with financial transaction data):
 
 - Payments quickly transferred to other jurisdictions or high-risk entities.
@@ -1105,17 +1360,20 @@ SQL EXAMPLES:
 
 ```sql
 -- Suppliers diversifying into many unrelated CPV divisions (>=5 divisions) with high total value (layering signal)
-SELECT s."tiekejoKodas", j.pavadinimas AS tiekejas,
-    COUNT(DISTINCT LEFT(vp."bvpzKodai"[1], 2)) AS skirtinguCpvDivizijuKiekis,
-    COUNT(DISTINCT s."sutartiesUnikalusId") AS sutarciuKiekis,
-    SUM(s.verte) AS totalVerte
+SELECT s."tiekejoKodas",
+       j.pavadinimas                               AS tiekejas,
+       COUNT(DISTINCT LEFT (vp."bvpzKodai"[1], 2)) AS skirtinguCpvDivizijuKiekis,
+       COUNT(DISTINCT s."sutartiesUnikalusId")     AS sutarciuKiekis,
+       SUM(s.verte)                                AS totalVerte
 FROM sutartys s
-JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
-JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = s."pirkimoNumeris"
+         JOIN "jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
+JOIN "viesiejiPirkimai" vp
+ON vp."pirkimoId" = s."pirkimoNumeris"
 WHERE s.istrinta = false AND vp."bvpzKodai" IS NOT NULL
 GROUP BY s."tiekejoKodas", j.pavadinimas
-HAVING COUNT(DISTINCT LEFT(vp."bvpzKodai"[1], 2)) >= 5 AND SUM(s.verte) > 200000
-ORDER BY skirtinguCpvDivizijuKiekis DESC LIMIT 30;
+HAVING COUNT(DISTINCT LEFT (vp."bvpzKodai"[1], 2)) >= 5 AND SUM(s.verte) > 200000
+ORDER BY skirtinguCpvDivizijuKiekis DESC
+LIMIT 30;
 ```
 
 GAP (DATA):
@@ -1142,19 +1400,26 @@ SQL EXAMPLES:
 
 ```sql
 -- Buyers ranked by systemic weakness indicators: overruns + high non-competitive procedure share
-SELECT s."perkanciosiosOrganizacijosKodas" AS pirkejoKodas, jb.pavadinimas AS pirkejas,
-    COUNT(*) AS sutarciuKiekis,
-    COUNT(CASE WHEN s."faktineIvykdimoVerte" > s.verte * 1.3 THEN 1 END) AS virsijimukiekis,
-    ROUND(100.0 * COUNT(CASE WHEN s."faktineIvykdimoVerte" > s.verte * 1.3 THEN 1 END) / COUNT(*), 1) AS virsijimoProcProc,
-    COUNT(CASE WHEN vp.statusas IS NOT NULL AND vp."pirkimoBudas" NOT ILIKE '%atvir%' THEN 1 END) AS nekonkurenciniai,
-    ROUND(100.0 * COUNT(CASE WHEN vp."pirkimoBudas" NOT ILIKE '%atvir%' THEN 1 END) / COUNT(*), 1) AS nekonkurProcProc
+SELECT s."perkanciosiosOrganizacijosKodas"                                                               AS pirkejoKodas,
+       jb.pavadinimas                                                                                    AS pirkejas,
+       COUNT(*)                                                                                          AS sutarciuKiekis,
+       COUNT(CASE WHEN s."faktineIvykdimoVerte" > s.verte * 1.3 THEN 1 END)                              AS virsijimukiekis,
+       ROUND(100.0 * COUNT(CASE WHEN s."faktineIvykdimoVerte" > s.verte * 1.3 THEN 1 END) / COUNT(*),
+             1)                                                                                          AS virsijimoProcent,
+       COUNT(CASE WHEN vp.statusas IS NOT NULL AND vp."pirkimoBudas" NOT ILIKE '%atvir%' THEN 1
+             END)                                                                                        AS nekonkurenciniai,
+       ROUND(100.0 * COUNT(CASE WHEN vp.statusas IS NOT NULL AND vp."pirkimoBudas" NOT ILIKE '%atvir%' THEN 1 END) /
+             COUNT(*),
+             1)                                                                                          AS nekonkurProcent
 FROM sutartys s
-JOIN "jarCsv" jb ON jb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-LEFT JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = s."pirkimoNumeris"
+         JOIN "jarCsv" jb ON jb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+LEFT JOIN "viesiejiPirkimai" vp
+ON vp."pirkimoId" = s."pirkimoNumeris"
 WHERE s.istrinta = false AND s."faktineIvykdimoVerte" IS NOT NULL AND s.verte > 0
 GROUP BY s."perkanciosiosOrganizacijosKodas", jb.pavadinimas
 HAVING COUNT(*) >= 10
-ORDER BY virsijimoProcProc DESC LIMIT 30;
+ORDER BY virsijimoProcent DESC
+LIMIT 30;
 ```
 
 > For human investigator: VK and VPT audits highlight systemic weaknesses in internal control and risk management; use
@@ -1180,34 +1445,43 @@ SQL EXAMPLES:
 
 ```sql
 -- Healthcare (CPV 33xxx): tenders with single bidder only — limited competition signal
-SELECT vp."pirkimoId", vp.pavadinimas, a."pirkimoObjektoPavadinimas",
-    vp."numatomaVerteEUR" AS verteEur,
-    COUNT(DISTINCT d.kodas) AS dalyviumKiekis
+SELECT vp."pirkimoId",
+       vp.pavadinimas,
+       a."pirkimoObjektoPavadinimas",
+       vp."numatomaVerteEUR"   AS verteEur,
+       COUNT(DISTINCT d.kodas) AS dalyviuKiekis
 FROM "viesiejiPirkimai" vp
-JOIN "atn1ataskaitos" a ON a."pirkimoNumeris" = vp."pirkimoId"
-JOIN "atn1dalyviai" d ON d."ataskaitaId" = a.id
-WHERE vp."bvpzKodai"[1] LIKE '33%'
+         JOIN "atn1ataskaitos" a ON a."pirkimoNumeris" = vp."pirkimoId"
+         JOIN "atn1dalyviai" d ON d."ataskaitaId" = a.id
+WHERE EXISTS (SELECT 1 FROM unnest(vp."bvpzKodai") c WHERE c LIKE '33%')
 GROUP BY vp."pirkimoId", vp.pavadinimas, a."pirkimoObjektoPavadinimas", vp."numatomaVerteEUR"
-HAVING COUNT(DISTINCT d.kodas) = 1 AND vp."numatomaVerteEUR" > 30000
-ORDER BY verteEur DESC LIMIT 30;
+HAVING COUNT(DISTINCT d.kodas) = 1
+   AND vp."numatomaVerteEUR" > 30000
+ORDER BY verteEur DESC
+LIMIT 30;
 ```
 
 ```sql
 -- IT sector (CPV 72xxx): same supplier winning repeatedly from same buyer across 5+ years (lock-in signal)
-SELECT s."perkanciosiosOrganizacijosKodas" AS pirkejoKodas, jb.pavadinimas AS pirkejas,
-    s."tiekejoKodas", js.pavadinimas AS tiekejas,
-    COUNT(*) AS sutarciuKiekis, SUM(s.verte) AS totalVerte,
-    MIN(EXTRACT(YEAR FROM s."sudarymoData")) AS pirmiMetai,
-    MAX(EXTRACT(YEAR FROM s."sudarymoData")) AS paskutiMetai,
-    MAX(EXTRACT(YEAR FROM s."sudarymoData")) - MIN(EXTRACT(YEAR FROM s."sudarymoData")) AS metaiAktyvus
+SELECT s."perkanciosiosOrganizacijosKodas"                                                 AS pirkejoKodas,
+       jb.pavadinimas                                                                      AS pirkejas,
+       s."tiekejoKodas",
+       js.pavadinimas                                                                      AS tiekejas,
+       COUNT(*)                                                                            AS sutarciuKiekis,
+       SUM(s.verte)                                                                        AS totalVerte,
+       MIN(EXTRACT(YEAR FROM s."sudarymoData"))                                            AS pirmiMetai,
+       MAX(EXTRACT(YEAR FROM s."sudarymoData"))                                            AS paskutiMetai,
+       MAX(EXTRACT(YEAR FROM s."sudarymoData")) - MIN(EXTRACT(YEAR FROM s."sudarymoData")) AS metaiAktyvus
 FROM sutartys s
-JOIN "jarCsv" jb ON jb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-JOIN "jarCsv" js ON js."jarKodas"::text = s."tiekejoKodas"
-JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = s."pirkimoNumeris"
-WHERE vp."bvpzKodai"[1] LIKE '72%' AND s.istrinta = false
+         JOIN "jarCsv" jb ON jb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+JOIN "jarCsv" js
+ON js."jarKodas":: text = s."tiekejoKodas"
+    JOIN "viesiejiPirkimai" vp ON vp."pirkimoId" = s."pirkimoNumeris"
+WHERE EXISTS (SELECT 1 FROM unnest(vp."bvpzKodai") c WHERE c LIKE '72%') AND s.istrinta = false
 GROUP BY s."perkanciosiosOrganizacijosKodas", jb.pavadinimas, s."tiekejoKodas", js.pavadinimas
 HAVING COUNT(*) >= 5 AND MAX(EXTRACT(YEAR FROM s."sudarymoData")) - MIN(EXTRACT(YEAR FROM s."sudarymoData")) >= 5
-ORDER BY totalVerte DESC LIMIT 30;
+ORDER BY totalVerte DESC
+LIMIT 30;
 ```
 
 > For human investigator: sector context matters. Combine MCP outputs with sector-specific supervisory authorities and

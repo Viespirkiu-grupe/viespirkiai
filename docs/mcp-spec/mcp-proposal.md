@@ -531,7 +531,7 @@ undeclared subcontracting — another capacity-mismatch indicator.*
 | Component                                 | Effort | Notes                                                                                |
 |-------------------------------------------|--------|--------------------------------------------------------------------------------------|
 | `get_schema` MCP tool                     | Small  | Query `information_schema`, filter to whitelist                                      |
-| `execute_query` MCP tool    | Medium | SQL parser + guardrail stack + execution + pagination wrapper                        |
+| `execute_query` MCP tool                  | Medium | SQL parser + guardrail stack + execution + pagination wrapper                        |
 | Analyst pool with `on('connect')` hook    | Small  | Reuses existing read-only PG role; runs `TEMP_VIEWS_SQL` once                        |
 | SQL AST validation module                 | Medium | `node-sql-parser`, table whitelist, **strict** function whitelist, complexity checks |
 | Audit logging                             | None   | Reuses existing `logToolCall` → `mcpToolCalls`                                       |
@@ -1357,3 +1357,185 @@ docker compose stop postgres
 ```
 
 A green run of phases 1–4 in this section is the beta-release acceptance gate.
+
+---
+
+## Next Steps — Token-Efficient `getSchema` for LLM Agents
+
+The current `getSchema` implementation is a good foundation: it exposes curated views, redirects raw tables to views,
+and includes column lists with example SQL. The remaining gap is that the no-arg call returns a verbose documentation
+dump optimised for human browsing, not for an LLM agent's planning pass. The changes below tighten the contract between
+the schema tool and the investigator prompt without sacrificing procurement-risk investigation quality.
+
+### Background: agent workflow
+
+The investigator prompt drives a three-step loop:
+
+1. **Plan** — call `getSchema()` (no args) to choose the right entity.
+2. **Prepare** — call `getSchema({entity})` to confirm column names and join keys.
+3. **Execute** — call `executequery` with a fully-formed SQL statement.
+
+Token waste in step 1 pollutes the context for steps 2 and 3. The improvements below target each step precisely.
+
+---
+
+### 1. Shrink the no-arg inventory response
+
+**Current state:** each entity entry carries `description` (prose), `keyColumns`, `linksTo` (array of objects), and
+`example` (SQL string).
+
+**Target state:** return only the fields the agent needs for routing.
+
+| Field                     | Action                          | Reason                                                     |
+|---------------------------|---------------------------------|------------------------------------------------------------|
+| `id`                      | Keep                            | Required to call detail mode.                              |
+| `kind` (`view` / `table`) | Keep                            | Routes agent to curated views first.                       |
+| `tags`                    | **Add** — replace `description` | Task-oriented tags are faster to match than prose.         |
+| `keys`                    | Keep, cap at 3–5 columns        | Enough for recognition; drop the rest.                     |
+| `description`             | **Drop** (if `tags` exists)     | Redundant once compact tags are present.                   |
+| `linksTo`                 | **Move to detail mode**         | Join info is needed at query-build time, not routing time. |
+| `example`                 | **Move to detail / on-demand**  | High token cost, zero value at routing step.               |
+| `rowCountEstimate`        | Keep only for large raw tables  | Useful for cost-routing; omit for views.                   |
+
+Estimated token reduction from the no-arg call: **50–70 %** based on the current output size.
+
+---
+
+### 2. Replace prose descriptions with compact task tags
+
+Align tag values to the eight investigation themes in the investigator prompt:
+
+| Entity         | `tags`                                                               |
+|----------------|----------------------------------------------------------------------|
+| `vcompany`     | `["capacity","blacklist","labor","domains","court"]`                 |
+| `vsutartys`    | `["contracts","buyer-supplier","cpv","value","timing","frameworks"]` |
+| `vpirkimas`    | `["procedures","criteria","lot-count","single-bidder"]`              |
+| `vdalyviai`    | `["bid-ranking","rejections","co-bidding","single-bidder"]`          |
+| `vpersonlinks` | `["conflict-of-interest","directors","beneficial-owners"]`           |
+| `vbylos`       | `["court","litigation","enforcement"]`                               |
+
+The agent can match its current investigation theme to `tags` with a single token comparison rather than reasoning from
+natural-language descriptions. This moves knowledge from the (long) prompt into the (compact) schema tool output.
+
+---
+
+### 3. Add explicit `mode` parameter to `getSchema`
+
+Make the existing implicit tiers explicit so the agent requests exactly what it needs:
+
+| `mode`        | Returns                                       | Typical use                        |
+|---------------|-----------------------------------------------|------------------------------------|
+| `"inventory"` | `id`, `kind`, `tags`, `keys` for all entities | First call — entity selection      |
+| `"detail"`    | Full columns + types, PK, joins, one example  | Before writing a multi-field query |
+| `"columns"`   | Column names + types only                     | Forgot a column name               |
+| `"joins"`     | PK/FK/join hints only                         | Building a multi-table query       |
+| `"examples"`  | Example queries only                          | Need a query template              |
+
+Default (no `mode` arg) behaves as `"inventory"`. This follows the agent-tool principle: *return only the minimum
+information required for the next action*.
+
+---
+
+### 4. Prefer machine-readable compact fields over explanatory text
+
+**Current detail output** (representative excerpt):
+
+```json
+{
+  "relationships": [
+    {
+      "column": "pirkejoKodas",
+      "references": "vcompany.jarKodas",
+      "description": "Join key for buyer company details"
+    }
+  ]
+}
+```
+
+**Target compact output:**
+
+```json
+{
+  "entity": "vsutartys",
+  "pk": [
+    "sutartiesUnikalusId"
+  ],
+  "columns": {
+    "sutartiesUnikalusId": "bigint",
+    "pirkimoNumeris": "text",
+    "pirkejoKodas": "text",
+    "tiekejoKodas": "text",
+    "verte": "numeric",
+    "sudarymoData": "timestamp"
+  },
+  "joins": [
+    [
+      "pirkejoKodas",
+      "vcompany.jarKodas",
+      "strict"
+    ],
+    [
+      "tiekejoKodas",
+      "vcompany.jarKodas",
+      "strict"
+    ],
+    [
+      "pirkimoNumeris",
+      "vpirkimas.pirkimoId",
+      "semantic"
+    ]
+  ]
+}
+```
+
+The prose `"description"` field on each relationship is dropped. The join array encodes
+`[localColumn, foreignRef, joinType]` as a tuple — shorter, deterministically parseable, and still carries the caveat.
+The `joinType` values `"strict"` / `"semantic"` / `"sparse"` serve as quality guardrails that prevent bad analytical
+inferences in corruption-risk investigations (see §5 below).
+
+Short field names (`id`, `pk`, `tags`, `keys`, `joins`, `ex`) are safe to use **inside schema payloads** as long as the
+investigator prompt teaches them. Do not abbreviate user-facing strings.
+
+---
+
+### 5. Mark semantic traps and join caveats explicitly
+
+Some joins in procurement data are approximate or sparse (e.g. `vsutartys.pirkimoNumeris → vpirkimas.pirkimoId` is a
+logical relationship, not always a strict FK). Losing this signal causes incorrect multi-table inferences in risk
+investigations.
+
+Encode the caveat in the `joinType` tuple rather than in prose:
+
+| `joinType`   | Meaning                                            |
+|--------------|----------------------------------------------------|
+| `"strict"`   | Enforced FK; safe for `INNER JOIN`                 |
+| `"semantic"` | Logically related; may not have a matching row     |
+| `"sparse"`   | FK exists but large fraction of rows have no match |
+
+This adds ≈ 10 tokens per join and removes a class of analytical errors.
+
+---
+
+### 6. Keep examples, but move them to `mode:"examples"` or `mode:"detail"`
+
+Example SQL is the highest-value token spend because it reduces query errors. It is also the biggest single contributor
+to no-arg token bloat. The compromise:
+
+- **No** examples in `"inventory"` mode.
+- **One** short example in `"detail"` mode.
+- **Full** example set available via `mode:"examples"` on request.
+- Always include examples for the five curated views — they are the most common query targets.
+
+---
+
+### Implementation checklist
+
+- [ ] Redesign the `getSchema` no-arg response to return only `id`, `kind`, `tags`, `keys`.
+- [ ] Add `tags` / `bestForThemes` metadata to each curated view, aligned to the eight investigator prompt themes.
+- [ ] Implement `mode` parameter with values `inventory | detail | columns | joins | examples`.
+- [ ] Replace `relationships` array-of-objects with compact `joins` tuples `[local, foreign, joinType]`.
+- [ ] Add `joinType` enum (`strict | semantic | sparse`) to all documented join paths.
+- [ ] Remove `example` from inventory; add to `detail` (one) and `examples` mode (full set).
+- [ ] Update the investigator prompt to teach short field names (`id`, `pk`, `tags`, `joins`, `ex`) and the new `mode`
+  parameter.
+- [ ] Re-run the acceptance tests in §4 above after the changes to confirm agent behaviour is unchanged or improved.
