@@ -4,12 +4,12 @@ import { getColorScheme, getFont } from '../lib/failai.js';
 import CopyField from '@design-system/components/content/CopyField.astro';
 import Table from '@design-system/components/Table.astro';
 import TableWrapper from '@design-system/components/TableWrapper.astro';
-import { isMcpTransportRequest } from '@/src/lib/mcp';
+import { isMcpTransportRequest, handleMcpRequest } from '@/src/lib/mcp';
 
 const isTransportRequest = isMcpTransportRequest(Astro.request);
 
 if (isTransportRequest) {
-  return await (await import('@/src/lib/mcp')).handleMcpRequest(Astro.request);
+  return await handleMcpRequest(Astro.request);
 }
 
 const colorScheme = getColorScheme(Astro.cookies);
