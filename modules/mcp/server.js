@@ -11,6 +11,8 @@ import * as searchFailai from "./tools/searchFailai.js";
 import * as searchJuridiniai from "./tools/searchJuridiniai.js";
 import * as searchSutartys from "./tools/searchSutartys.js";
 import * as searchViesiejiPirkimai from "./tools/searchViesiejiPirkimai.js";
+import * as getSchema from "./tools/getSchema.js";
+import * as executeQuery from "./tools/executeQuery.js";
 
 function wrapHandler(toolName, handler) {
     return async (params) => {
@@ -46,6 +48,8 @@ const tools = [
     searchJuridiniai,
     searchSutartys,
     searchViesiejiPirkimai,
+    getSchema,
+    executeQuery,
 ];
 
 export function createMcpServer() {
