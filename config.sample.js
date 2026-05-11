@@ -63,4 +63,5 @@ export default {
 
     // Features
     enableGraph: false,
+    enableExecuteQueryMcp: false, // Rodyti get_schema ir execute_query MCP įrankius
 };

@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import config from "../../utils/config.js";
 import { logToolCall } from "./mcpLogger.js";
 import * as getFailas from "./tools/getFailas.js";
 import * as getFailasTekstas from "./tools/getFailasTekstas.js";
@@ -48,8 +49,7 @@ const tools = [
     searchJuridiniai,
     searchSutartys,
     searchViesiejiPirkimai,
-    getSchema,
-    executeQuery,
+    ...(config.enableExecuteQueryMcp ? [getSchema, executeQuery] : []),
 ];
 
 export function createMcpServer() {
