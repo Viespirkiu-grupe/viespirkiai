@@ -1,0 +1,88 @@
+---
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
+
+interface Props {
+  items: any[];
+}
+
+const { items } = Astro.props;
+---
+
+<TableWrapper className="ocr-latest-table-wrap">
+  <Table size="sm" className="ocr-latest-table">
+    <thead>
+      <tr>
+        <th class="cell-nowrap">Node</th>
+        <th class="cell-right cell-nowrap">ID</th>
+        <th class="cell-nowrap">Pateikta</th>
+        <th class="cell-right cell-nowrap">Trukmė</th>
+        <th class="cell-right cell-nowrap">Puslapiai</th>
+        <th class="cell-right cell-nowrap">Žodžiai</th>
+      </tr>
+    </thead>
+    {items.length === 0 ? (
+      <tbody data-ocr-latest-results-body>
+        <tr>
+          <td colspan="6" class="empty-state-cell">Naujausių OCR rezultatų nėra.</td>
+        </tr>
+      </tbody>
+    ) : (
+      <tbody data-ocr-latest-results-body>
+        {items.map((item) => (
+          <tr>
+            <td class="ocr-latest-col-node" data-label="Node">{item.nodeDisplay || item.node || '—'}</td>
+            <td class="cell-right cell-nowrap" data-label="ID"><a href={`/failas/${item.failas}`}>{item.failas}</a></td>
+            <td class="cell-nowrap ocr-latest-col-submitted" data-label="Pateikta">{item.submitTimestampDisplay}</td>
+            <td class="cell-right cell-nowrap" data-label="Trukmė">{item.durationDisplay}</td>
+            <td class="cell-right cell-nowrap" data-label="Puslapiai">{item.puslapiuSkaicius.toLocaleString('lt-LT')}</td>
+            <td class="cell-right cell-nowrap" data-label="Žodžiai">{item.zodziuSkaicius.toLocaleString('lt-LT')}</td>
+          </tr>
+        ))}
+      </tbody>
+    )}
+  </Table>
+</TableWrapper>
+
+<style>
+  :global(.ocr-latest-table) {
+    width: 100%;
+    table-layout: auto;
+    min-width: 760px;
+  }
+
+  :global(.ocr-latest-table-wrap) {
+    overflow-x: auto;
+  }
+
+  .ocr-latest-table :global(.ocr-latest-col-node),
+  .ocr-latest-table :global(.ocr-latest-col-submitted) {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  :global(.ocr-latest-table th),
+  :global(.ocr-latest-table td) {
+    background-clip: padding-box;
+  }
+
+  :global(.ocr-latest-table th.cell-nowrap),
+  :global(.ocr-latest-table td.cell-nowrap) {
+    max-width: none;
+  }
+
+  :global(.ocr-latest-table th:first-child),
+  :global(.ocr-latest-table td:first-child) {
+    width: 32%;
+  }
+
+  :global(.ocr-latest-table th:nth-child(2)),
+  :global(.ocr-latest-table td:nth-child(2)) {
+    width: 10%;
+  }
+
+  :global(.ocr-latest-table th:nth-child(3)),
+  :global(.ocr-latest-table td:nth-child(3)) {
+    width: 18%;
+  }
+</style>

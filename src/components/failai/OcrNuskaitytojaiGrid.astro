@@ -1,0 +1,29 @@
+---
+interface Props {
+  items: any[];
+}
+
+const { items } = Astro.props;
+---
+
+<div class="grid gap-3 pt-1 grid-cols-[repeat(auto-fill,minmax(190px,1fr))]">
+  {items.map((nuskaitytojas) => (
+    <div class="card">
+      <div class="card-body">
+        <div class="section-title mb-2">
+          <a href={`/failai/ocr/${nuskaitytojas.id}`}>{nuskaitytojas.viesasPavadinimas}</a>
+        </div>
+        <dl class="kv-list">
+          <dt>Dokumentai</dt>
+          <dd><span class="cell-mono">{nuskaitytojas.results.toLocaleString('lt-LT')}</span></dd>
+          <dt>Puslapiai</dt>
+          <dd><span class="cell-mono">{nuskaitytojas.pages.toLocaleString('lt-LT')}</span></dd>
+          <dt>Žodžiai</dt>
+          <dd><span class="cell-mono">{nuskaitytojas.words.toLocaleString('lt-LT')}</span></dd>
+          <dt>Rezervacijos</dt>
+          <dd><span class="cell-mono">{nuskaitytojas.rezervacijos.toLocaleString('lt-LT')}</span></dd>
+        </dl>
+      </div>
+    </div>
+  ))}
+</div>

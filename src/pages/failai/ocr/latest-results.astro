@@ -1,0 +1,10 @@
+---
+export const partial = true;
+
+import OcrLatestResultsTable from '../../../components/failai/OcrLatestResultsTable.astro';
+import { loadLatestOcrResults } from '../../../lib/ocrLatestResults.ts';
+
+const items = await loadLatestOcrResults(15);
+---
+
+<OcrLatestResultsTable items={items} />

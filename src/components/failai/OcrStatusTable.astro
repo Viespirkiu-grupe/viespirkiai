@@ -1,0 +1,31 @@
+---
+import Table from '@design-system/components/Table.astro';
+import TableWrapper from '@design-system/components/TableWrapper.astro';
+
+interface Props {
+  items: any[];
+}
+
+const { items } = Astro.props;
+---
+
+<TableWrapper className="mt-4">
+  <Table>
+    <thead>
+      <tr>
+        <th class="cell-center">ID</th>
+        <th>OCR būsena</th>
+        <th class="cell-right">Failų skaičius</th>
+      </tr>
+    </thead>
+    <tbody>
+      {items.map((status) => (
+        <tr>
+          <td class="cell-mono cell-center">{status.id}</td>
+          <td>{status.text}</td>
+          <td class="cell-mono cell-right">{status.count.toLocaleString('lt-LT')}</td>
+        </tr>
+      ))}
+    </tbody>
+  </Table>
+</TableWrapper>
