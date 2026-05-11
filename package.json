@@ -4,7 +4,7 @@
     "main": "index.js",
     "scripts": {
         "dev": "astro dev",
-        "start": "node dist/server/entry.mjs",
+        "start": "node start-server.mjs",
         "build": "astro build",
         "test": "vitest run",
         "test:integration": "vitest run --config vitest.integration.config.ts",
