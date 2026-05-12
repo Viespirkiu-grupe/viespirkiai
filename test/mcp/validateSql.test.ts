@@ -211,10 +211,12 @@ describe("Layer 4 — complexity limits", () => {
         expect(r).toContain("CTE");
     });
 
-    it("accepts WITH RECURSIVE", () => {
-        expect(validateSql(
+    it("rejects WITH RECURSIVE", () => {
+        const r = validateSql(
             "WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM r WHERE n < 5) SELECT * FROM r"
-        )).toBeNull();
+        );
+        expect(r).toBeTypeOf("string");
+        expect(r).toContain("RECURSIVE");
     });
 
     it("accepts non-recursive CTE", () => {

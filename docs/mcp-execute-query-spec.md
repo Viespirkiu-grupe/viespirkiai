@@ -233,8 +233,7 @@ Accepts a SQL SELECT, validates it through a four-layer guardrail stack, execute
 |     - max JOIN count: 6               |
 |     - max subquery depth: 3           |
 |     - max CTE count: 8               |
-|     - WITH RECURSIVE: allowed,        |
-|       flagged in audit log            |
+|     - WITH RECURSIVE: rejected        |
 +---------------------------------------+
 ```
 
@@ -309,7 +308,7 @@ allowed table list"`). Execution errors include the raw PostgreSQL error message
 | JOIN count > 6                          | 4     | "too many JOINs (max 6)"             |
 | Subquery depth > 3                      | 4     | "subquery nesting too deep (max 3)"  |
 | CTE count > 8                           | 4     | "too many CTEs (max 8)"              |
-| `WITH RECURSIVE` present                | 4     | Allow; `hasRecursive: true` returned |
+| `WITH RECURSIVE` present                | 4     | Reject; recursive CTEs not allowed   |
 | All layers pass                         | —     | Execute wrapped query                |
 
 ### Single-query execution flow

@@ -126,6 +126,10 @@ export function validateSql(sql) {
         return `Too many CTEs (${analysis.cteCount} — max ${MAX_CTES})`;
     }
 
+    if (analysis.hasRecursive) {
+        return "Recursive CTEs (WITH RECURSIVE) are not allowed.";
+    }
+
     return null;
 }
 
