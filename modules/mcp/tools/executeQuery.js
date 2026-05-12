@@ -1,6 +1,7 @@
 import {z} from "zod";
 import {analystPool} from "../analyst/pool.js";
 import {MAX_QUERY_LENGTH, validateSql} from "../analyst/validateSql.js";
+import {logToolCall} from "../mcpLogger.js";
 import config from "../../../utils/config.js";
 
 const PAGE_SIZE = 50;
@@ -29,13 +30,15 @@ export const schema = {
         .number()
         .int()
         .min(1)
+        .max(200)
         .default(1)
-        .describe("Page number (1-based). Page size is fixed at 50 rows."),
+        .describe("Page number (1-based). Page size is fixed at 50 rows. Max page is 200."),
 };
 
 export async function handler({query, purpose, page}) {
     const error = validateSql(query);
     if (error) {
+        // No logging via logToolCall is happening here, because invalid requests not worth logging
         return {
             content: [{type: "text", text: error}],
             isError: true,
@@ -68,10 +71,12 @@ export async function handler({query, purpose, page}) {
             durationMs,
         };
 
+        logToolCall({ toolName: name, durationMs, success: true });
         return {
             content: [{type: "text", text: JSON.stringify(payload)}],
         };
     } catch (err) {
+        logToolCall({ toolName: name, durationMs: Date.now() - start, success: false, errorMsg: err.message });
         return {
             content: [{type: "text", text: err.message}],
             isError: true,

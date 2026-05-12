@@ -2,6 +2,7 @@ import { z } from "zod";
 import { postgres } from "../../../postgres/postgres.js";
 import { TABLE_WHITELIST } from "../analyst/validateSql.js";
 import { VIEW_NAMES, COVERED_TABLES_BY_VIEWS } from "../analyst/tempViews.js";
+import { logToolCall } from "../mcpLogger.js";
 
 const COVERED_TABLES = new Set(Object.keys(COVERED_TABLES_BY_VIEWS));
 const TABLE_LIST = [...TABLE_WHITELIST].filter((t) => !COVERED_TABLES.has(t));
@@ -239,12 +240,20 @@ export async function handler({ table, mode } = {}) {
     const cacheKey = `${table ?? ""}:${effectiveMode}`;
 
     if (_cache.has(cacheKey)) {
+        logToolCall({ toolName: name, durationMs: 0, success: true });
         return _cache.get(cacheKey);
     }
 
-    const result = await _compute(table, effectiveMode);
-    _cache.set(cacheKey, result);
-    return result;
+    const start = Date.now();
+    try {
+        const result = await _compute(table, effectiveMode);
+        _cache.set(cacheKey, result);
+        logToolCall({ toolName: name, durationMs: Date.now() - start, success: true });
+        return result;
+    } catch (err) {
+        logToolCall({ toolName: name, durationMs: Date.now() - start, success: false, errorMsg: err.message });
+        throw err;
+    }
 }
 
 async function _compute(table, effectiveMode) {
