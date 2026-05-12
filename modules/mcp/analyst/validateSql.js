@@ -65,35 +65,32 @@ export const FUNCTION_WHITELIST = new Set([
 const MAX_JOINS = 6;
 const MAX_SUBQUERY_DEPTH = 3;
 const MAX_CTES = 8;
+export const MAX_QUERY_LENGTH = 3072;
 
-/**
- * Validates a SQL string through 4 layers of guardrails.
- * Returns { ok: true, hasRecursive?: boolean } or { ok: false, layer: number, message: string }.
- */
+// Returns null if valid, or an error message string if invalid.
 export function validateSql(sql) {
-    // Layer 1: Parse and assert single SELECT
+    if (sql.length > MAX_QUERY_LENGTH) {
+        return `Query exceeds the ${MAX_QUERY_LENGTH}-character limit.`;
+    }
+
     let ast;
     try {
         ast = parser.astify(sql, { database: "PostgreSQL" });
     } catch (err) {
-        return { ok: false, layer: 1, message: `SQL parse error: ${err.message}` };
+        return `SQL parse error: ${err.message}`;
     }
 
     if (Array.isArray(ast)) {
-        return { ok: false, layer: 1, message: "Only a single SELECT statement is allowed" };
+        return "Only a single SELECT statement is allowed";
     }
 
     if (ast.type !== "select") {
-        return {
-            ok: false, layer: 1,
-            message: `Only SELECT statements are allowed (got ${ast.type?.toUpperCase() ?? "unknown"})`,
-        };
+        return `Only SELECT statements are allowed (got ${ast.type?.toUpperCase() ?? "unknown"})`;
     }
 
-    // Collect all relevant information from the AST in one traversal
     const analysis = {
-        tables: [],       // { db, table }[]
-        functions: [],    // string[]
+        tables: [],
+        functions: [],
         joinCount: 0,
         cteNames: new Set(),
         maxSubqueryDepth: 0,
@@ -103,54 +100,33 @@ export function validateSql(sql) {
 
     walkSelect(ast, analysis, 0);
 
-    // Layer 2: Table whitelist
     const allowedTables = new Set([...TABLE_WHITELIST, ...VIEW_NAMES, ...analysis.cteNames]);
     for (const { db, table } of analysis.tables) {
         if (db != null) {
-            return {
-                ok: false, layer: 2,
-                message: `Table '${db}.${table}' is not in the allowed table list — schema-qualified references are not permitted. Call get_schema to see available tables.`,
-            };
+            return `Table '${db}.${table}' is not in the allowed table list — schema-qualified references are not permitted. Call get_schema to see available tables.`;
         }
         if (!allowedTables.has(table)) {
-            return {
-                ok: false, layer: 2,
-                message: `Table '${table}' is not in the allowed table list — call get_schema to see available tables.`,
-            };
+            return `Table '${table}' is not in the allowed table list — call get_schema to see available tables.`;
         }
     }
 
-    // Layer 3: Function whitelist (strict — reject anything not on the list)
     for (const fn of analysis.functions) {
         if (!FUNCTION_WHITELIST.has(fn)) {
-            return {
-                ok: false, layer: 3,
-                message: `Function '${fn}' is not on the allow list.`,
-            };
+            return `Function '${fn}' is not on the allow list.`;
         }
     }
 
-    // Layer 4: Complexity limits
     if (analysis.joinCount > MAX_JOINS) {
-        return {
-            ok: false, layer: 4,
-            message: `Too many JOINs (${analysis.joinCount} — max ${MAX_JOINS})`,
-        };
+        return `Too many JOINs (${analysis.joinCount} — max ${MAX_JOINS})`;
     }
     if (analysis.maxSubqueryDepth > MAX_SUBQUERY_DEPTH) {
-        return {
-            ok: false, layer: 4,
-            message: `Subquery nesting too deep (depth ${analysis.maxSubqueryDepth} — max ${MAX_SUBQUERY_DEPTH})`,
-        };
+        return `Subquery nesting too deep (depth ${analysis.maxSubqueryDepth} — max ${MAX_SUBQUERY_DEPTH})`;
     }
     if (analysis.cteCount > MAX_CTES) {
-        return {
-            ok: false, layer: 4,
-            message: `Too many CTEs (${analysis.cteCount} — max ${MAX_CTES})`,
-        };
+        return `Too many CTEs (${analysis.cteCount} — max ${MAX_CTES})`;
     }
 
-    return { ok: true, hasRecursive: analysis.hasRecursive };
+    return null;
 }
 
 function walkSelect(selectNode, result, depth) {

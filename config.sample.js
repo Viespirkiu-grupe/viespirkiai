@@ -48,6 +48,7 @@ export default {
     pgAnalystPassword: "CHANGE_ME",
     pgAnalystPort: 9118,
     pgAnalystMaxConnections: 16,
+    mcpQueryTimeout: 20, // Sekundės; execute_query SET LOCAL statement_timeout
 
     // Quickwit
     quickwitUp: true,
