@@ -1,11 +1,13 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import Chart from '@design-system/components/charts/Chart.astro';
-import Table from '@design-system/components/Table.astro';
-import TableWrapper from '@design-system/components/TableWrapper.astro';
 import OcrSpartaCards from '../../components/failai/OcrSpartaCards.astro';
+import OcrNuskaitytojaiGrid from '../../components/failai/OcrNuskaitytojaiGrid.astro';
+import OcrStatusTable from '../../components/failai/OcrStatusTable.astro';
+import OcrLatestResultsLive from '../../components/failai/OcrLatestResultsLive.astro';
 import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
 import { postgres, OCR_STATES, getColorScheme, getFont } from '../../lib/failai.js';
+import { loadLatestOcrResults } from '../../lib/ocrLatestResults.ts';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
@@ -20,7 +22,7 @@ const OCR_STATE_COLORS: Record<string, string> = {
   nepalaikoma: '#a855f7',
 };
 
-const [ocrStatsRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrStatsHourExistsRes] = await Promise.all([
+const [ocrStatsRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrStatsHourExistsRes, ocrLatestResults] = await Promise.all([
   postgres.query(`SELECT * FROM "failaiOcrStats" ORDER BY count DESC`),
   postgres.query(`SELECT * FROM "failaiOcrRezultataiStatsDay" ORDER BY date DESC`),
   postgres.query(`
@@ -42,6 +44,7 @@ const [ocrStatsRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrStatsHourExistsRes] 
         AND table_name = 'failaiOcrRezultataiStatsHour'
     ) AS exists
   `),
+  loadLatestOcrResults(15),
 ]);
 
 const ocrStatsHourRes = ocrStatsHourExistsRes.rows[0]?.exists
@@ -76,7 +79,7 @@ const formatNowLtParts = () => {
   };
 };
 
-const ocrStats = ocrStatsRes.rows.map((stat: any) => {
+const ocrStats: any[] = ocrStatsRes.rows.map((stat: any) => {
   const state = OCR_STATES.find((s: any) => s.camel === stat.tipas || s.text === stat.tipas);
   return {
     ...stat,
@@ -103,7 +106,7 @@ const ocrStatsHour = ocrStatsHourRes.rows.map((row: any) => ({
   words: Number(row.words || 0),
 }));
 
-const ocrNuskaitytojai = ocrNuskaitytojaiRes.rows.map((row: any) => ({
+const ocrNuskaitytojai: any[] = ocrNuskaitytojaiRes.rows.map((row: any) => ({
   ...row,
   nuskaitytiDokumentai: Number(row.nuskaitytiDokumentai || 0),
   rezervacijos: Number(row.rezervacijos || 0),
@@ -142,6 +145,14 @@ const ocrStatsChartData = {
   colors: ocrStats.map((item: any) => OCR_STATE_COLORS[item.camel] || '#78716c'),
 };
 
+const ocrStatsChartOptions = {
+  colors: ocrStatsChartData.colors,
+  stroke: {
+    width: 4,
+    colors: ['var(--white)'],
+  },
+};
+
 const ocrNuskaitytojaiTreemapColors = ['#0ea5e9', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4', '#f97316'];
 
 const ocrNuskaitytojaiChartData = {
@@ -156,12 +167,35 @@ const ocrNuskaitytojaiChartData = {
   ],
 };
 
+const ocrNuskaitytojaiChartOptions = {
+  colors: ocrNuskaitytojaiTreemapColors,
+  legend: {
+    show: false,
+  },
+  stroke: {
+    width: 1.25,
+    colors: ['var(--gray)'],
+  },
+  dataLabels: {
+    enabled: true,
+    style: {
+      colors: ['var(--black)'],
+      fontSize: '13px',
+      fontWeight: 600,
+    },
+    dropShadow: {
+      enabled: false,
+    },
+  },
+};
+
 const ocrStatsDayChartData = {
   labels: ocrStatsDay.map((item: any) => item.date),
   results: ocrStatsDay.map((item: any) => item.results),
   pages: ocrStatsDay.map((item: any) => item.pages),
   words: ocrStatsDay.map((item: any) => item.words),
 };
+
 ---
 <Layout
   pageTitle="OCR būsena"
@@ -204,27 +238,7 @@ const ocrStatsDayChartData = {
       <div class="grid-2 items-start">
         <div>
           <h2 class="mb-4"><a href="#nuskaitytojai" id="nuskaitytojai" class="no-style">OCR nuskaitytojai</a></h2>
-          <div class="grid gap-3 pt-1 grid-cols-[repeat(auto-fill,minmax(190px,1fr))]">
-            {ocrNuskaitytojai.map((nuskaitytojas: any) => (
-              <div class="card">
-                <div class="card-body">
-                  <div class="section-title mb-2">
-                    <a href={`/failai/ocr/${nuskaitytojas.id}`}>{nuskaitytojas.viesasPavadinimas}</a>
-                  </div>
-                  <dl class="kv-list">
-                    <dt>Dokumentai</dt>
-                    <dd><span class="cell-mono">{nuskaitytojas.results.toLocaleString('lt-LT')}</span></dd>
-                    <dt>Puslapiai</dt>
-                    <dd><span class="cell-mono">{nuskaitytojas.pages.toLocaleString('lt-LT')}</span></dd>
-                    <dt>Žodžiai</dt>
-                    <dd><span class="cell-mono">{nuskaitytojas.words.toLocaleString('lt-LT')}</span></dd>
-                    <dt>Rezervacijos</dt>
-                    <dd><span class="cell-mono">{nuskaitytojas.rezervacijos.toLocaleString('lt-LT')}</span></dd>
-                  </dl>
-                </div>
-              </div>
-            ))}
-          </div>
+          <OcrNuskaitytojaiGrid items={ocrNuskaitytojai} />
         </div>
 
         <div>
@@ -234,34 +248,9 @@ const ocrStatsDayChartData = {
             type="pie"
             labels={ocrStatsChartData.labels}
             series={ocrStatsChartData.series}
-            customOptions={{
-              colors: ocrStatsChartData.colors,
-              stroke: {
-                width: 4,
-                colors: ['var(--white)'],
-              },
-            }}
+            customOptions={ocrStatsChartOptions}
           />
-          <TableWrapper className="mt-4">
-            <Table>
-              <thead>
-                <tr>
-                  <th class="cell-center">ID</th>
-                  <th>OCR būsena</th>
-                  <th class="cell-right">Failų skaičius</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ocrStats.map((status: any) => (
-                  <tr>
-                    <td class="cell-mono cell-center">{status.id}</td>
-                    <td>{status.text}</td>
-                    <td class="cell-mono cell-right">{status.count.toLocaleString('lt-LT')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrapper>
+          <OcrStatusTable items={ocrStats} />
         </div>
       </div>
     </section>
@@ -273,27 +262,7 @@ const ocrStatsDayChartData = {
         type="treemap"
         labels={ocrNuskaitytojaiChartData.labels}
         series={ocrNuskaitytojaiChartData.series}
-        customOptions={{
-          colors: ocrNuskaitytojaiTreemapColors,
-          legend: {
-            show: false,
-          },
-          stroke: {
-            width: 1.25,
-            colors: ['var(--gray)'],
-          },
-          dataLabels: {
-            enabled: true,
-            style: {
-              colors: ['var(--black)'],
-              fontSize: '13px',
-              fontWeight: 600,
-            },
-            dropShadow: {
-              enabled: false,
-            },
-          },
-        }}
+        customOptions={ocrNuskaitytojaiChartOptions}
       />
     </section>
 
@@ -301,6 +270,11 @@ const ocrStatsDayChartData = {
       <LineDatetimeChart id="ocrStatsDayDiagrama" title="Rezultatų skaičius" anchor="rezultatai" labels={ocrStatsDayChartData.labels} series={ocrStatsDayChartData.results} />
       <LineDatetimeChart id="ocrStatsDayPagesDiagrama" title="Puslapių skaičius" anchor="puslapiai" labels={ocrStatsDayChartData.labels} series={ocrStatsDayChartData.pages} />
       <LineDatetimeChart id="ocrStatsDayWordsDiagrama" title="Žodžių skaičius" anchor="zodziai" labels={ocrStatsDayChartData.labels} series={ocrStatsDayChartData.words} />
+    </section>
+
+    <section class="mb-16 mt-16">
+      <h2 class="mb-3"><a href="#naujausi-rezultatai" id="naujausi-rezultatai" class="no-style">Naujausi rezultatai</a></h2>
+      <OcrLatestResultsLive items={ocrLatestResults} />
     </section>
   </main>
 </Layout>

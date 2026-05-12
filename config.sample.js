@@ -60,6 +60,10 @@ export default {
     // Failai
     internalFileBase: "https://failai.viespirkiai.org",
     ocrBandymai: 5,
+    ocrLatestResultsLiveUpdates: {
+        mode: "poll", // "poll" (tinka su PgBouncer) arba "notify"
+        intervalMs: 250, // naudojama tik kai mode === "poll"
+    },
 
     // Features
     enableGraph: false,

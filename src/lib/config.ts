@@ -1,16 +1,18 @@
 /**
- * Typed wrapper around the runtime configuration loaded from `@/config.js`.
+ * Typed wrapper around the runtime configuration loaded from the root
+ * `config.js`.
  *
- * The underlying JavaScript file (root `config.js`, copied from
- * `config.sample.js` at deploy time) has no types of its own.  This module
- * imports it once and re-exports it cast to a typed `SiteConfig`, so callers
- * can write `config.customHead` instead of `(config as any).customHead`.
+ * The root file has no types of its own, so this module re-exports it cast to
+ * `SiteConfig` and keeps callers ergonomic. We deliberately load through the
+ * runtime helper instead of importing `@/config.js` directly, because Astro's
+ * server build would otherwise inline the current config values into the
+ * bundle.
  *
  * Fields are marked optional where the sample config shows `undefined` or
- * comments imply the field may be absent.  Only the fields actually accessed
+ * comments imply the field may be absent. Only the fields actually accessed
  * from `src/` are listed; expand as new usages appear.
  */
-import rawConfig from '@/config.js';
+import rawConfig from '@/utils/config.js';
 
 export interface InfoBannerObject {
   type?: 'text' | 'html';
