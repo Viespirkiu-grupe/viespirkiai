@@ -55,7 +55,7 @@ export async function handler({query, purpose, page}) {
     const client = await analystPool.connect();
 
     try {
-        await client.query(`SET LOCAL statement_timeout = '${config.mcpQueryTimeout}s'`);
+        await client.query(`SET LOCAL statement_timeout = '${Number(config.mcpQueryTimeout)}s'`);
         const result = await client.query(wrappedSql);
 
         const durationMs = Date.now() - start;
