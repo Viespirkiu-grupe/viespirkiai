@@ -209,14 +209,14 @@ assertViewMetadataCompleteness();
 
 export const name = "get_schema";
 export const description =
-    "Returns schema for the procurement database. " +
-    "No args (mode: 'inventory'): compact list — id, kind, tags, keys for all entities. " +
-    "With table + mode 'detail' (default): pk, columns object {name→type}, joins tuples [local,foreign,joinType], one example. " +
-    "mode 'columns': column name→type map only. " +
-    "mode 'joins': pk and joins tuples only. " +
-    "mode 'examples': example SQL only. " +
-    "joinType values: 'strict' (enforced FK, safe for INNER JOIN), 'semantic' (logical only, may miss rows), 'sparse' (FK exists but many nulls). " +
-    "Call with no args at investigation start. Call with table+mode when you need column or join details.";
+    "Grąžina viešųjų pirkimų duomenų bazės schemą. " +
+    "Be argumentų (mode: 'inventory'): kompaktiškas sąrašas — id, tipas, žymos, raktai visiems objektams. " +
+    "Su table + mode 'detail' (numatytasis): pk, stulpeliai {pavadinimas→tipas}, jungtys [vietinis,išorinis,tipas], vienas pavyzdys. " +
+    "mode 'columns': tik stulpelių pavadinimų→tipų žemėlapis. " +
+    "mode 'joins': tik pk ir jungtys. " +
+    "mode 'examples': tik SQL pavyzdžiai. " +
+    "Jungčių tipai: 'strict' (privaloma FK, saugu INNER JOIN), 'semantic' (tik loginė, gali trūkti eilučių), 'sparse' (FK yra, bet daug NULL). " +
+    "Iškvieskite be argumentų tyrimo pradžioje. Iškvieskite su table+mode kai reikia tikslių stulpelių ar jungčių detalių prieš execute_query.";
 
 export const schema = {
     table: z

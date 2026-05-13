@@ -18,7 +18,7 @@ purpose-built search tools first. Check **Goal** → **Use first** mapping below
 
 - Find contracts by party, CPV, value, date → `search_sutartys`
 - Find companies by name or code → `search_juridiniai`
-- Find persons, emails, phones, IBANs in documents → `search_failai`
+- Find persons, emails, phones, IBANs in documents, or where full text search is needed → `search_failai`
 - Find procurement notices → `search_viesieji_pirkimai`
 - Aggregate, count, compute ratios, join tables → `execute_query`
 

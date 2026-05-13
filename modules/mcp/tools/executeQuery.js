@@ -8,12 +8,13 @@ const PAGE_SIZE = 50;
 
 export const name = "execute_query";
 export const description =
-    "Executes a read-only SQL SELECT against the procurement database. " +
-    "The query is validated through a multi-layer guardrail stack (AST parse, table whitelist, " +
-    "function whitelist, complexity limits) before execution. " +
-    "Results are paginated — " + PAGE_SIZE + " rows per page. Include a 'purpose' describing your investigation hypothesis. " +
-    "Primary views that you should consider using first: v_company, v_sutartys, v_pirkimas, v_person_links, v_dalyviai, v_bylos. " +
-    "Call get_schema first to understand the available views and additional tables, and their columns.";
+    "Vykdo tik skaitymo SQL SELECT užklausas viešųjų pirkimų duomenų bazėje. " +
+    "Naudok TIK agreguotai analizei: skaičiavimams, santykiams, statistikai, lentelių jungimui. " +
+    "Paieškai (sutarčių, dokumentų, skelbimų, įmonių) naudok specialius įrankius: " +
+    "search_sutartys, search_failai, search_viesieji_pirkimai, search_juridiniai — ne šį įrankį. " +
+    "Prieš rašant užklausą iškvieskite get_schema stulpelių pavadinimams patikrinti. " +
+    "Rezultatai puslapiuojami — " + PAGE_SIZE + " eilučių per puslapį. " +
+    "Pasiekiami rodiniai: v_company, v_sutartys, v_pirkimas, v_person_links, v_dalyviai, v_bylos.";
 
 export const schema = {
     query: z
