@@ -57,6 +57,72 @@ describe("execute_query — happy path without pagination", () => {
 });
 
 // ---------------------------------------------------------------------------
+// v_sutartys — happy path via execute_query
+// ---------------------------------------------------------------------------
+
+describe("execute_query — v_sutartys happy path", () => {
+    it("merged arrays and tipoPavadinimas are correctly computed", async () => {
+        const result = (await handler({
+            query: `SELECT * FROM v_sutartys WHERE "tipas" IS NOT NULL AND "bvpzKodas" IS NOT NULL AND "tiekejoKodas" IS NOT NULL ORDER BY "sutartiesUnikalusId"`,
+            purpose: "verify v_sutartys computed columns: merged arrays and tipoPavadinimas",
+            page: 1,
+        })) as AnyResult;
+
+        expect(result.isError).toBeFalsy();
+        const payload = JSON.parse(result.content[0].text);
+        expect(payload.rows.length, "expected at least one matching contract").toBeGreaterThan(0);
+        const row = payload.rows[0];
+
+        // Scalar columns added to the view
+        expect("dokumentuKiekis" in row, "missing dokumentuKiekis").toBe(true);
+        expect("perkanciojiOrganizacija" in row, "missing perkanciojiOrganizacija").toBe(true);
+        expect("tiekejoPavadinimas" in row, "missing tiekejoPavadinimas").toBe(true);
+        expect("paskutinioRedagavimoData" in row, "missing paskutinioRedagavimoData").toBe(true);
+        expect("paskutinioAtnaujinimoData" in row, "missing paskutinioAtnaujinimoData").toBe(true);
+        expect("paskutiniKartaMatyta" in row, "missing paskutiniKartaMatyta").toBe(true);
+        expect("paskutiniKartaAtnaujinta" in row, "missing paskutiniKartaAtnaujinta").toBe(true);
+
+        // tipoPavadinimas — CASE expression must yield a non-empty string
+        expect(typeof row.tipoPavadinimas).toBe("string");
+        expect(row.tipoPavadinimas.length, "tipoPavadinimas must not be empty").toBeGreaterThan(0);
+
+        // Merged BVPZ arrays: at least one element, first matches the primary column
+        expect(Array.isArray(row.bvpzKodai), "bvpzKodai must be an array").toBe(true);
+        expect(row.bvpzKodai.length).toBeGreaterThan(0);
+        expect(row.bvpzKodai[0], "bvpzKodai[0] must equal bvpzKodas").toBe(row.bvpzKodas);
+
+        expect(Array.isArray(row.bvpzPavadinimai), "bvpzPavadinimai must be an array").toBe(true);
+        expect(row.bvpzPavadinimai.length).toBeGreaterThan(0);
+        expect(row.bvpzPavadinimai[0], "bvpzPavadinimai[0] must equal bvpzPavadinimas").toBe(row.bvpzPavadinimas);
+
+        // Merged supplier arrays
+        expect(Array.isArray(row.tiekejaiKodai), "tiekejaiKodai must be an array").toBe(true);
+        expect(row.tiekejaiKodai.length).toBeGreaterThan(0);
+        expect(row.tiekejaiKodai[0], "tiekejaiKodai[0] must equal tiekejoKodas").toBe(row.tiekejoKodas);
+
+        expect(Array.isArray(row.tiekejai), "tiekejai must be an array").toBe(true);
+        expect(row.tiekejai.length).toBeGreaterThan(0);
+    });
+
+    it("tiekejaiKodai has exactly one entry for a single-supplier contract", async () => {
+        const result = (await handler({
+            query: `SELECT "tiekejoKodas", "tiekejaiKodai", "papildomiTiekejaiKodai" FROM v_sutartys WHERE "tiekejoKodas" IS NOT NULL AND ("papildomiTiekejaiKodai" IS NULL OR "papildomiTiekejaiKodai" = '{}') ORDER BY "sutartiesUnikalusId"`,
+            purpose: "verify tiekejaiKodai merging for single-supplier contracts",
+            page: 1,
+        })) as AnyResult;
+
+        expect(result.isError).toBeFalsy();
+        const payload = JSON.parse(result.content[0].text);
+        expect(payload.rows.length, "expected at least one single-supplier contract").toBeGreaterThan(0);
+        const row = payload.rows[0];
+
+        expect(Array.isArray(row.tiekejaiKodai), "tiekejaiKodai must be an array").toBe(true);
+        expect(row.tiekejaiKodai[0], "tiekejaiKodai[0] must equal tiekejoKodas").toBe(row.tiekejoKodas);
+        expect(row.tiekejaiKodai.length, "single-supplier contract must have exactly 1 entry").toBe(1);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // Happy path — with pagination (page 2)
 // ---------------------------------------------------------------------------
 
