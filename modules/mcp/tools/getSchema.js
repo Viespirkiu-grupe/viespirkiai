@@ -330,7 +330,7 @@ async function listAll() {
 
     const tables = TABLE_LIST.map((id) => {
         const cols = columnMap.get(id) ?? [];
-        const entry = { id, kind: "table", keys: cols.slice(0, 3) };
+        const entry = { id, kind: "table", keys: cols.slice(0, 3), note: "Call get_schema(table, mode:'detail') for full column list before querying." };
         const rc = rowCountMap[id];
         if (rc != null) entry.rowCountEstimate = rc;
         return entry;
@@ -343,7 +343,7 @@ async function listAll() {
         content: [
             {
                 type: "text",
-                text: `${entities.length} entities. Views: ${views.length} (use tags to route). Tables: ${tables.length}. Pass table+mode:'detail' for columns/joins.`,
+                text: `${entities.length} entities. Views: ${views.length} (use tags to route). Tables: ${tables.length}. IMPORTANT: Always call get_schema(table, mode:'detail') for the exact column list before writing any query — never guess column names from other tables or views.`,
             },
         ],
     };

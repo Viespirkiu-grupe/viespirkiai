@@ -12,7 +12,8 @@ export const description =
     "Naudok TIK agreguotai analizei: skaičiavimams, santykiams, statistikai, lentelių jungimui. " +
     "Paieškai (sutarčių, dokumentų, skelbimų, įmonių) naudok specialius įrankius: " +
     "search_sutartys, search_failai, search_viesieji_pirkimai, search_juridiniai — ne šį įrankį. " +
-    "Prieš rašant užklausą iškvieskite get_schema stulpelių pavadinimams patikrinti. " +
+    "PRIVALOMA: prieš kiekvieną užklausą iškvieskite get_schema(table, mode:'detail') tiksliam stulpelių sąrašui. " +
+    "Niekada nespėkite stulpelių pavadinimų iš kitų lentelių ar rodinių — jie skiriasi. " +
     "Rezultatai puslapiuojami — " + PAGE_SIZE + " eilučių per puslapį. " +
     "Pasiekiami rodiniai: v_company, v_sutartys, v_pirkimas, v_person_links, v_dalyviai, v_bylos.";
 
@@ -78,8 +79,13 @@ export async function handler({query, purpose, page}) {
         };
     } catch (err) {
         logToolCall({ toolName: name, durationMs: Date.now() - start, success: false, errorMsg: err.message });
+        let msg = err.message;
+        // PostgreSQL error code 42703 = undefined_column
+        if (err.code === "42703" || msg.includes("does not exist")) {
+            msg += "\n\nHINT: Column names differ between tables and views. Call get_schema with the exact table/view name and mode:'detail' to see the correct column list before retrying.";
+        }
         return {
-            content: [{type: "text", text: err.message}],
+            content: [{type: "text", text: msg}],
             isError: true,
         };
     } finally {

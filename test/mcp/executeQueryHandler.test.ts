@@ -48,3 +48,59 @@ describe("executeQuery handler — statement_timeout", () => {
         expect(Number.isFinite(timeout)).toBe(true);
     });
 });
+
+describe("executeQuery handler — column-not-found hint", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("appends get_schema HINT when DB returns undefined_column error (code 42703)", async () => {
+        const err = Object.assign(new Error(`column "neegzistuojantisStulpelis" does not exist`), { code: "42703" });
+        const client = {
+            query: vi.fn()
+                .mockResolvedValueOnce(undefined) // SET LOCAL statement_timeout
+                .mockRejectedValueOnce(err),
+            release: vi.fn(),
+        };
+        vi.mocked(analystPool.connect).mockResolvedValue(client as never);
+
+        const result = await handler({ query: VALID_QUERY, purpose: VALID_PURPOSE, page: 1 });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("HINT");
+        expect(result.content[0].text).toContain("get_schema");
+    });
+
+    it("appends get_schema HINT when error message contains 'does not exist' but no code", async () => {
+        const err = new Error(`column "foo" does not exist`);
+        const client = {
+            query: vi.fn()
+                .mockResolvedValueOnce(undefined)
+                .mockRejectedValueOnce(err),
+            release: vi.fn(),
+        };
+        vi.mocked(analystPool.connect).mockResolvedValue(client as never);
+
+        const result = await handler({ query: VALID_QUERY, purpose: VALID_PURPOSE, page: 1 });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("HINT");
+        expect(result.content[0].text).toContain("get_schema");
+    });
+
+    it("does not append HINT for unrelated DB errors", async () => {
+        const err = Object.assign(new Error("permission denied for table sutartys"), { code: "42501" });
+        const client = {
+            query: vi.fn()
+                .mockResolvedValueOnce(undefined)
+                .mockRejectedValueOnce(err),
+            release: vi.fn(),
+        };
+        vi.mocked(analystPool.connect).mockResolvedValue(client as never);
+
+        const result = await handler({ query: VALID_QUERY, purpose: VALID_PURPOSE, page: 1 });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).not.toContain("HINT");
+    });
+});
