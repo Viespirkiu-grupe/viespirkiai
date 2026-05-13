@@ -12,7 +12,7 @@ purpose-built search tools first. Check **Goal** → **Use first** mapping below
 
 - Find contracts by party, CPV, value, date → `search_sutartys`
 - Find companies by name or code → `search_juridiniai`
-- Find persons, emails, phones, IBANs in documents → `search_failai`
+- Find persons, emails, phones, IBANs in documents, or where full text search is needed → `search_failai`
 - Find procurement notices → `search_viesieji_pirkimai`
 - Aggregate, count, compute ratios, join tables → `execute_query`
 
@@ -82,7 +82,7 @@ DETECT:
 
 `[STT][KT]` – OSINT: **yes** (industry associations, local media)
 
-TOOLS: `execute_query`, `search_sutartys`
+TOOLS: `search_sutartys`, `execute_query`
 
 GOAL: Detect cover bidding — recurring losers always bidding just above winner.
 
@@ -103,7 +103,7 @@ DETECT:
 
 `[STT][KT]` – OSINT: **conditional** (sector analysis, competitor structure)
 
-TOOLS: `execute_query`, `search_sutartys`
+TOOLS: `search_sutartys`, `execute_query`
 
 GOAL: Detect companies alternating wins in same CPV — never competing simultaneously.
 
@@ -160,7 +160,7 @@ DETECT:
 
 `[STT][VK][VPT]` – OSINT: **yes** (local media, municipal council decisions)
 
-TOOLS: `execute_query`, `search_sutartys`, `get_juridinis`
+TOOLS: `search_sutartys`, `get_juridinis`, `execute_query`
 
 GOAL: Detect single-supplier dominance in one municipality or CPV category.
 
@@ -175,7 +175,7 @@ DETECT:
 
 `[STT][VPT][VK]` – OSINT: **yes** (audit reports, media)
 
-TOOLS: `execute_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`
+TOOLS: `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `execute_query`
 
 GOAL: Detect overuse of negotiated-without-publication or restricted procedures, and possible misclassification of
 urgency/exception conditions.
@@ -191,7 +191,7 @@ DETECT:
 
 `[STT][FNTT][VK]` – OSINT: **conditional** (market price benchmarks)
 
-TOOLS: `execute_query`, `get_sutartis`, `search_sutartys`
+TOOLS: `search_sutartys`, `get_sutartis`, `execute_query`
 
 GOAL: Detect contracts where `faktineIvykdimoVerte` significantly exceeds signed `verte` or where unit prices appear
 inflated.
@@ -237,7 +237,7 @@ DETECT:
 
 `[STT][FNTT]` – OSINT: **yes** (foreign company registers, OpenCorporates)
 
-TOOLS: `execute_query`, `get_pinreg_jar`, `get_juridinis`
+TOOLS: `get_pinreg_jar`, `get_juridinis`, `execute_query`
 
 GOAL: Detect shared control of competing bidders or buyer–supplier pairs through holding companies and back-office
 signals.
@@ -296,7 +296,7 @@ DETECT:
 
 `[STT][KT][VPT]` – OSINT: **yes** (technical standards, competing products, prior tenders)
 
-TOOLS: `execute_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `search_failai`, `get_failas_tekstas`
+TOOLS: `search_failai`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `get_failas_tekstas`, `execute_query`
 
 GOAL: Detect buyers with abnormally high single-bidder rate in a CPV category and specification patterns favouring one
 supplier.
@@ -313,7 +313,7 @@ DETECT:
 
 `[STT][VPT]` – OSINT: **conditional** (framework establishment documentation)
 
-TOOLS: `execute_query`, `search_sutartys`, `get_sutartis`
+TOOLS: `search_sutartys`, `get_sutartis`, `execute_query`
 
 GOAL: Detect framework agreements where all call-offs (`tipas = 'PPS'`) go to one supplier.
 
@@ -333,7 +333,7 @@ DETECT:
 
 `[STT][KT][FNTT]` – OSINT: **yes** (physical site checks, business registries)
 
-TOOLS: `execute_query`, `get_juridinis`, `search_juridiniai`
+TOOLS: `search_juridiniai`, `get_juridinis`, `execute_query`
 
 GOAL: Detect co-bidders sharing registered address or domain registrant.
 
@@ -374,7 +374,7 @@ DETECT:
 
 `[STT][FNTT][VK]` – OSINT: **yes** (audit reports, media on overruns)
 
-TOOLS: `execute_query`, `get_sutartis`, `search_failai`, `get_failas_tekstas`
+TOOLS: `search_failai`, `get_sutartis`, `get_failas_tekstas`, `execute_query`
 
 GOAL: Detect suppliers who systematically under-bid then inflate via amendments.
 
@@ -392,7 +392,7 @@ GAP (DATA):
 
 `[STT][VK][VPT]` – OSINT: **yes** (municipal decisions, press)
 
-TOOLS: `execute_query`, `get_pinreg_jar`, `search_sutartys`
+TOOLS: `search_sutartys`, `get_pinreg_jar`, `execute_query`
 
 GOAL: Detect municipality awarding contracts to its own subsidiary via shared-person or ownership proxies.
 
@@ -409,7 +409,7 @@ addresses.
 
 `[STT][KT][VPT]` – OSINT: **yes** (invitation letters, internal rules)
 
-TOOLS: `execute_query`, `search_viesieji_pirkimai`, `get_viesasis_pirkimas`
+TOOLS: `search_viesieji_pirkimai`, `get_viesasis_pirkimas`, `execute_query`
 
 GOAL: Detect restricted/negotiated procedure overuse and audit findings for direct awards.
 
@@ -467,7 +467,7 @@ GAP (DATA):
 
 `[STT][KT][VK]` – OSINT: **conditional** (system ownership, IP clauses)
 
-TOOLS: `execute_query`, `search_sutartys`, `get_juridinis`
+TOOLS: `search_sutartys`, `get_juridinis`, `execute_query`
 
 GOAL: Detect suppliers whose relationship with a single buyer is self-reinforcing — system builder becomes sole
 maintenance provider and captures future related contracts.
@@ -491,7 +491,7 @@ GAP (DATA):
 
 `[FNTT][VK][STT]` – OSINT: **yes** (EU OLAF/EPPO cases, cross-border company data)
 
-TOOLS: `execute_query`, `get_juridinis`, `search_sutartys`, `get_sutartis`
+TOOLS: `search_sutartys`, `get_juridinis`, `get_sutartis`, `execute_query`
 
 GOAL: Detect patterns in EU-funded procurements and projects that resemble known EU funds fraud schemes (overpricing,
 fictitious suppliers, self-dealing across borders).
@@ -536,7 +536,7 @@ GAP (DATA):
 
 `[VK][STT][VPT]` – OSINT: **yes** (VK, VPT, internal audit reports)
 
-TOOLS: `execute_query`, `search_sutartys`
+TOOLS: `search_sutartys`, `execute_query`
 
 GOAL: Identify buyers whose internal control weaknesses make them high-risk for corruption and fraud.
 
@@ -551,7 +551,7 @@ DETECT:
 
 `[STT][FNTT][VK]` – OSINT: **yes** (sector regulators, professional bodies)
 
-TOOLS: `execute_query`, `search_sutartys`, `search_viesieji_pirkimai`, `get_sutartis`
+TOOLS: `search_sutartys`, `search_viesieji_pirkimai`, `get_sutartis`, `execute_query`
 
 GOAL: Tailor risk detection to sectors known in Lithuania to be high-risk for corruption and procurement violations (
 e.g. healthcare, construction, IT).
