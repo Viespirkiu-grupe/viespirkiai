@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { DOMParser } from '@xmldom/xmldom'
@@ -26,9 +26,19 @@ const DOCUMENT_TYPE_LABELS = {
     BRIN: 'Verslo registracijos informacinis skelbimas',
 }
 
-const FIELDS_PATH = join(__dirname, 'data', 'fields.json')
-const LABELS_LT_PATH = join(__dirname, 'data', 'labels-lt.json')
-const NOTICE_TYPES_PATH = join(__dirname, 'data', 'notice-types.json')
+function resolveTedDataPath(filename) {
+    const runtimePath = join(process.cwd(), 'modules', 'ted', 'data', filename)
+    if (existsSync(runtimePath)) return runtimePath
+
+    const bundledPath = join(__dirname, 'data', filename)
+    if (existsSync(bundledPath)) return bundledPath
+
+    throw new Error(`TED data file not found: ${filename}`)
+}
+
+const FIELDS_PATH = resolveTedDataPath('fields.json')
+const LABELS_LT_PATH = resolveTedDataPath('labels-lt.json')
+const NOTICE_TYPES_PATH = resolveTedDataPath('notice-types.json')
 
 let fieldsCache = null
 let noticeTypesCache = null

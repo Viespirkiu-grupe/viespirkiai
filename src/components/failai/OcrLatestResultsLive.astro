@@ -18,7 +18,7 @@ const initialFirstKey = JSON.stringify([
   data-first-key={initialFirstKey}
 >
   <OcrLatestResultsTable items={items} />
-  <script type="application/json" data-ocr-initial-items set:html={JSON.stringify(items)}></script>
+  <script is:inline type="application/json" data-ocr-initial-items set:html={JSON.stringify(items)}></script>
 </div>
 
 <script>
@@ -56,7 +56,6 @@ const initialFirstKey = JSON.stringify([
     if (!body || !initialItemsEl || !sseUrl) continue;
 
     let evtSource: EventSource | null = null;
-    let lastFirstKey = root.dataset.firstKey || JSON.stringify([null, null]);
     let previousKeys = new Set<string>();
     let hasReceivedSseSnapshot = false;
 
@@ -91,7 +90,6 @@ const initialFirstKey = JSON.stringify([
       }
 
       previousKeys = new Set(nextKeys);
-      lastFirstKey = nextFirstKey;
       root.dataset.firstKey = nextFirstKey;
     };
 
