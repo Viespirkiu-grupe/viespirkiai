@@ -11,28 +11,16 @@ section headings. When you need a query pattern, search that file first — it i
 
 ## MCP Tool Quick Reference
 
-### Available tools
+### Tool selection — start with search, not SQL
 
-Each section below references tools by ID only. Full descriptions:
+Use `execute_query` for **aggregations and pattern analysis** — not for finding things. For discovery, always prefer the
+purpose-built search tools first. Check **Goal** → **Use first** mapping below:
 
-- `get_schema`: Schema tool. No args → compact inventory (`id`, `kind`, `tags`, `keys` per entity; no examples).
-  With `table`: detail by default (`pk`, `columns` object, `joins` tuples, one `ex`). Explicit modes: `columns`,
-  `joins`, `examples`.
-  `joins` tuple format: `[localCol, foreignRef, joinType]`. `joinType`: `"strict"` = enforced FK; `"semantic"` = logical
-  only; `"sparse"` = FK exists, many nulls.
-- `get_juridinis`: Full company profile (Sodra headcount/wages, contracts, PINREG, court cases, VDI, domains, ES
-  investments).
-- `search_juridiniai`: Search companies by name or code.
-- `search_sutartys`: Search contracts (buyer/supplier code, value, date range, CPV prefix, contract type).
-- `get_sutartis`: Single-contract record with documents JSONB and ES project links.
-- `search_viesieji_pirkimai`: Procurement announcements (buyer, `pirkimoBudas`, status, date, value, CPV).
-- `get_viesasis_pirkimas`: Single-procurement record with technical specification files.
-- `get_pinreg_jar`: PINREG declarations for a company (directors, shareholders, spouses).
-- `get_pinreg_asmuo`: PINREG declarations for a named individual across all employer/company links.
-- `search_failai`: Search procurement documents by filename or procurement ID.
-- `get_failas`: File metadata by numeric ID or MD5 hash.
-- `get_failas_tekstas`: OCR-extracted full text of a procurement document.
-- `execute_query`: Read-only SQL SELECT — analytical backbone for **all themes**.
+- Find contracts by party, CPV, value, date → `search_sutartys`
+- Find companies by name or code → `search_juridiniai`
+- Find persons, emails, phones, IBANs in documents → `search_failai`
+- Find procurement notices → `search_viesieji_pirkimai`
+- Aggregate, count, compute ratios, join tables → `execute_query`
 
 ### Views available inside `execute_query`
 

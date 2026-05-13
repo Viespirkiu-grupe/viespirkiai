@@ -1,33 +1,20 @@
 # MCP Risk Intelligence Tool — Enhanced Investigation Themes for Lithuanian Public Procurement
 
-
 **SQL cookbook**: all SQL examples from this document are collected in `mcp-investigator-prompt-sql.md`, organised by
 section headings. When you need a query pattern, search that file first — it is faster than scanning the full prompt.
 
 ## MCP Tool Quick Reference
 
-### Available tools
+### Tool selection — start with search, not SQL
 
-Each section below references tools by ID only. Full descriptions:
+Use `execute_query` for **aggregations and pattern analysis** — not for finding things. For discovery, always prefer the
+purpose-built search tools first. Check **Goal** → **Use first** mapping below:
 
-- `get_schema`: Schema tool. No args → compact inventory (`id`, `kind`, `tags`, `keys` per entity; no examples).
-  With `table`: detail by default (`pk`, `columns` object, `joins` tuples, one `ex`). Explicit modes: `columns`,
-  `joins`, `examples`.
-  `joins` tuple format: `[localCol, foreignRef, joinType]`. `joinType`: `"strict"` = enforced FK; `"semantic"` = logical
-  only; `"sparse"` = FK exists, many nulls.
-- `get_juridinis`: Full company profile (Sodra headcount/wages, contracts, PINREG, court cases, VDI, domains, ES
-  investments).
-- `search_juridiniai`: Search companies by name or code.
-- `search_sutartys`: Search contracts (buyer/supplier code, value, date range, CPV prefix, contract type).
-- `get_sutartis`: Single-contract record with documents JSONB and ES project links.
-- `search_viesieji_pirkimai`: Procurement announcements (buyer, `pirkimoBudas`, status, date, value, CPV).
-- `get_viesasis_pirkimas`: Single-procurement record with technical specification files.
-- `get_pinreg_jar`: PINREG declarations for a company (directors, shareholders, spouses).
-- `get_pinreg_asmuo`: PINREG declarations for a named individual across all employer/company links.
-- `search_failai`: Search procurement documents by filename or procurement ID.
-- `get_failas`: File metadata by numeric ID or MD5 hash.
-- `get_failas_tekstas`: OCR-extracted full text of a procurement document.
-- `execute_query`: Read-only SQL SELECT — analytical backbone for **all themes**.
+- Find contracts by party, CPV, value, date → `search_sutartys`
+- Find companies by name or code → `search_juridiniai`
+- Find persons, emails, phones, IBANs in documents → `search_failai`
+- Find procurement notices → `search_viesieji_pirkimai`
+- Aggregate, count, compute ratios, join tables → `execute_query`
 
 ### Views available inside `execute_query`
 
@@ -56,7 +43,6 @@ Prefer views to raw tables. Call `get_schema` to confirm column names.
 - `cpvaProjektuSutartys` — theme 12 (CPVA subcontractor data).
 - `neskelbiamosDerybos` — theme 20 (audit findings, single-table lookup).
 - other specialized tables (e.g. accounts, invoices) when added — see `get_schema`.
-
 
 ## Theme tagging for Lithuanian institutions and OSINT
 
@@ -92,10 +78,6 @@ DETECT:
 - Lack of visible operational footprint: no website, no employees on LinkedIn, no office in OSINT sources while handling
   large/complex contracts.
 
-
-
-
-
 ### 2. Bid rigging — cover bidding
 
 `[STT][KT]` – OSINT: **yes** (industry associations, local media)
@@ -117,9 +99,6 @@ DETECT:
 - Participation count vs. CPV national average (few bidders where market structure suggests more).
 - Persistent patterns where one supplier often wins, others rarely win except where the main supplier does not bid.
 
-
-
-
 ### 3. Bid rotation / carousel
 
 `[STT][KT]` – OSINT: **conditional** (sector analysis, competitor structure)
@@ -134,9 +113,6 @@ DETECT:
 - Mutual bidding absence (A wins when B does not participate and vice versa).
 - Cross-appearance as cover bidders for each other in other buyers’ tenders.
 - Rotation schemes aligned with calendar years, budget cycles, or EU funding phases.
-
-
-
 
 ### 4. Conflict of interest — shared people between buyer and seller
 
@@ -159,8 +135,6 @@ DETECT:
 - Ownership chain overlap (person is owner/co-owner in supplier while participating in buyer decisions).
 - Undeclared conflicts: persons visible in OSINT sources (boards, associations) but missing from PINREG.
 
-
-
 ### 5. Contract splitting to avoid thresholds
 
 `[STT][VPT][VK]` – OSINT: **conditional** (local press about repetitive small contracts)
@@ -182,10 +156,6 @@ DETECT:
 - Short time gaps between consecutive awards to same supplier or same CPV by same buyer.
 - Fragmentation of a clearly homogeneous need (e.g. IT system development) into many small contracts.
 
-
-
-
-
 ### 6. Geographic monopoly / local capture
 
 `[STT][VK][VPT]` – OSINT: **yes** (local media, municipal council decisions)
@@ -200,8 +170,6 @@ DETECT:
 - Competitors who stopped bidding or winning over time after one supplier begins to dominate.
 - Local registration bias (buyer awarding mostly to locally registered companies despite national markets).
 - Officer→supplier PINREG connections for local officials.
-
-
 
 ### 7. Procedure manipulation — unjustified direct award
 
@@ -219,8 +187,6 @@ DETECT:
 - Top beneficiary suppliers, especially newly created entities or those with conflicts of interest.
 - Justification text in procurement notices and documents indicating vague or repetitive reasons.
 
-
-
 ### 8. Price anomalies — over-invoicing and scope creep
 
 `[STT][FNTT][VK]` – OSINT: **conditional** (market price benchmarks)
@@ -237,8 +203,6 @@ DETECT:
 - Low-bid-then-inflate patterns where the same supplier frequently wins as the cheapest, then exhibits large amendments.
 - For homogeneous goods, systematic per-unit price differences vs. national average.
 
-
-
 ### 9. Compliance and blacklist cross-check
 
 `[STT][FNTT][VPT]` – OSINT: **conditional** (sanction lists, media on fraud)
@@ -254,8 +218,6 @@ DETECT:
 - Court cases where supplier is claimant against former or current buyers (`bylojeKaip = 'IEŠKOVAS'`).
 - Linked-company blacklist status (group companies, same owners, same address/domain).
 
-
-
 ### 10. Network — second-degree connections and corporate webs
 
 `[STT][FNTT]` – OSINT: **yes** (JAR extracts, foreign registers, company websites)
@@ -270,10 +232,6 @@ DETECT:
 - Shared address/domain clusters; offices shared among multiple bidders.
 - Ownership changes around contract award dates (transfers before large tenders).
 - Foreign beneficial ownership indicators (non-Lithuanian entities with unclear activity).
-
-
-
-
 
 ### 11. UBO risk — beneficial ownership through holding layers
 
@@ -293,9 +251,6 @@ ANSWERABLE NOW:
 
 - Shared declared persons across bidder set (including spouse links via `SUTUOKTINIO_DARBOVIETE`).
 - Shared domain registrant, address, or court history across co-bidders.
-
-
-
 
 GAP (DATA):
 
@@ -323,9 +278,6 @@ DETECT:
 - Shared PINREG persons between contractor and subcontractor.
 - Mismatches between declared procurement procedures and EU rules in audit reports.
 
-
-
-
 ### 13. Revolving door — procurement officer joins winning supplier
 
 `[STT]` – OSINT: **yes** (LinkedIn, public CVs)
@@ -339,8 +291,6 @@ DETECT:
 - Person left buyer organisation and joined supplier within a defined time window (e.g. 2 years).
 - Contracts awarded to that supplier after move date by same buyer.
 - Changes in procedure type and competition intensity before and after move.
-
-
 
 ### 14. Spec rigging — technical specifications written for one supplier
 
@@ -358,8 +308,6 @@ DETECT:
 - Technical specification language that matches one brand/model; repeated exclusionary requirements (e.g. specific
   patents, small deviations).
 - Use of overly narrow CPV codes or contract splitting to keep competition away.
-
-
 
 ### 15. Framework agreement abuse — single-supplier call-offs
 
@@ -381,8 +329,6 @@ DETECT:
 - Framework establishment procedure type and competition level.
 - Cross-check with single-bidder signals and direct awards.
 
-
-
 ### 16. Shared back-office — competing companies with the same address or domain
 
 `[STT][KT][FNTT]` – OSINT: **yes** (physical site checks, business registries)
@@ -397,9 +343,6 @@ DETECT:
 - Shared domain in `domenai` among suppliers.
 - Overlapping contract timelines and CPV categories.
 - Cross-link with PINREG persons to strengthen suspicion.
-
-
-
 
 ### 17. Price cartel — suspiciously uniform bid prices across a CPV category
 
@@ -425,9 +368,6 @@ DETECT:
 - Repeat suppliers in tenders with suspiciously uniform prices.
 - Clustering of low-variation tenders in certain buyers or regions.
 
-
-
-
 ## Partially supported and extended themes
 
 ### 18. Contract amendment escalation — low bid, then value inflated through amendments
@@ -443,8 +383,6 @@ DETECT:
 - `faktineIvykdimoVerte/verte` ratio >1.5 by supplier and buyer.
 - Buyers with highest tolerance for overruns (systemic behaviour).
 - Consistent under-bid pattern by supplier (often cheapest winner) followed by high amendment ratios.
-
-
 
 GAP (DATA):
 
@@ -464,8 +402,6 @@ DETECT:
 - Procedure type distribution (direct vs. competitive) for such pairs.
 - Structural patterns where one municipal company or group company receives majority of local contracts.
 
-
-
 GAP (DATA): (e.g. JAR "SAVIVALDYBĖ" participation data) — proxy via shared persons and
 addresses.
 
@@ -482,8 +418,6 @@ DETECT:
 - Procedure mix (restricted/negotiated vs. open) by buyer and CPV.
 - `neskelbiamosDerybos` audit findings by buyer.
 - Recurring small circle of invitees (if/when invitation data is available in future).
-
-
 
 GAP (DATA):
 
@@ -511,7 +445,6 @@ GAP (DATA):
 
 - Needs VRK donor database and politician office/mandate register.
 
-
 ### 22. Fictitious deliverables — contract marked complete but work never done
 
 `[STT][FNTT][VK]` – OSINT: **yes** (on-site inspections, beneficiary reports, media)
@@ -525,8 +458,6 @@ DETECT:
 - `faktineIvykdimoVerte` paid in full despite weak or missing acceptance documentation.
 - VDI violations (`vdiPazeidimai`) during execution suggesting lack of workforce capacity.
 - For works contracts, repeated complaints or negative findings in oversight reports (OSINT).
-
-
 
 GAP (DATA):
 
@@ -548,8 +479,6 @@ DETECT:
 - Escalating contract count and value over years.
 - No other supplier winning same CPV from same buyer.
 - Litigation (`bylojeKaip = 'IEŠKOVAS'`) against buyers who attempt to switch suppliers.
-
-
 
 GAP (DATA):
 
@@ -573,9 +502,6 @@ DETECT:
 - Clusters of projects where expenditure is later found ineligible in VK audits (once data integrated).
 - Cross-border supplier networks where Lithuanian beneficiary works with the same small set of foreign suppliers.
 - Early termination of contracts, repeated project modifications, or high rate of budget reallocations.
-
-
-
 
 ### 25. Money-laundering indicators around procurement flows
 
@@ -601,8 +527,6 @@ DETECT (requires future integration with financial transaction data):
 - Mismatches between contract scope and supplier’s usual business or risk profile (e.g. sudden expansion into unrelated
   sectors).
 
-
-
 GAP (DATA):
 
 - Current schema focuses on procurement and registries, not bank transaction data.
@@ -622,9 +546,6 @@ DETECT:
 - Frequent corrections or cancellations of procurements.
 - High rate of contracts with significant overruns or repeated amendments.
 - Repeated audit findings about conflict-of-interest management, planning, or contract management weaknesses.
-
-
-
 
 ### 27. Sector-specific red flags (healthcare, construction, IT)
 
