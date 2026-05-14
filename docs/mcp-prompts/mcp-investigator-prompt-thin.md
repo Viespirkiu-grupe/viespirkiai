@@ -7,12 +7,15 @@ section headings. When you need a query pattern, search that file first — it i
 
 ### Tool selection — start with search, not SQL
 
-Use `execute_query` for **aggregations and pattern analysis** — not for finding things. For discovery, always prefer the
-purpose-built search tools first. Check **Goal** → **Use first** mapping below:
+Use `execute_query` for aggregations, pattern analysis or getting required item if identifier is known. Prefer full text
+search tools such as `search_sutartys` (`search="Pavardė"`) or `search_failai` for discovery. Check **Goal** → **Use
+first** mapping below:
 
 - Find contracts by party, CPV, value, date → `search_sutartys`
+- Find persons mentioned directly in contract records (signatories, counterparties, named beneficiaries) →
+  `search_sutartys` (`search="Pavardė"`)
 - Find companies by name or code → `search_juridiniai`
-- Find persons, emails, phones, IBANs in documents, or where full text search is needed → `search_failai`
+- Find persons, emails, phones, IBANs in uploaded documents → `search_failai`
 - Find procurement notices → `search_viesieji_pirkimai`
 - Aggregate, count, compute ratios, join tables → `execute_query`
 
@@ -43,6 +46,25 @@ Prefer views to raw tables. Call `get_schema` to confirm column names.
 - `cpvaProjektuSutartys` — theme 12 (CPVA subcontractor data).
 - `neskelbiamosDerybos` — theme 20 (audit findings, single-table lookup).
 - other specialized tables (e.g. accounts, invoices) when added — see `get_schema`.
+
+### Person investigation — standard sequence
+
+When investigating a **named individual**, always run ALL of these steps before analysing company codes:
+
+1. `get_pinreg_asmuo("Vardas Pavardė")` — declarations, employers, linked companies, personal transactions (
+   `rysiaiDelSandoriu`)
+2. `search_sutartys(search="Pavardė")` — contracts where the surname appears directly in contract metadata (signatories,
+   counterparties, named beneficiaries). Review carefully: results may include other persons with the same surname —
+   filter by first name.
+3. `search_failai(search="Vardas Pavardė")` — uploaded contract documents mentioning the person
+
+Only then proceed with company codes found in step 1:
+
+4. `search_sutartys(tiekejoKodas=...)` for each linked company
+
+> **Common miss**: skipping step 2 because `search_failai` looks like the natural tool for person searches. It is not —
+`search_failai` searches uploaded document text, while `search_sutartys` with a name query searches contract-level
+> metadata and can surface self-dealing contracts (e.g. a politician renting a car from their own party or company).
 
 ## Theme tagging for Lithuanian institutions and OSINT
 
@@ -562,7 +584,3 @@ DETECT:
   specifications in medical equipment tenders.
 - In construction: repeated cost overruns, change orders, and low initial bids followed by many amendments.
 - In IT: vendor lock-in patterns, proprietary standards, and recurrent single-supplier maintenance contracts.
-
-
-
-
