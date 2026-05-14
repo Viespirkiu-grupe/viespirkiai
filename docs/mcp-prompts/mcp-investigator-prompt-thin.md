@@ -5,7 +5,7 @@ section headings. When you need a query pattern, search that file first — it i
 
 ## MCP Tool Quick Reference
 
-### Tool selection — start with search, not SQL
+### Tool selection — start with search and continue with SQL
 
 Use `execute_query` for aggregations, pattern analysis or getting required item if identifier is known. Prefer full text
 search tools such as `search_sutartys` (`search="Pavardė"`) or `search_failai` for discovery. Check **Goal** → **Use
@@ -65,6 +65,10 @@ Only then proceed with company codes found in step 1:
 > **Common miss**: skipping step 2 because `search_failai` looks like the natural tool for person searches. It is not —
 `search_failai` searches uploaded document text, while `search_sutartys` with a name query searches contract-level
 > metadata and can surface self-dealing contracts (e.g. a politician renting a car from their own party or company).
+
+> For multiple companies ≥ 2, instead of calling search_sutartys for each code, you can try using execute_query with
+> v_sutartys WHERE tiekejoKodas IN (...) — you will get aggregation in one query and reduce the risk of context
+> overload.
 
 ## Theme tagging for Lithuanian institutions and OSINT
 

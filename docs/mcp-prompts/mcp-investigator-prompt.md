@@ -25,6 +25,11 @@ first** mapping below:
 - Find procurement notices → `search_viesieji_pirkimai`
 - Aggregate, count, compute ratios, join tables → `execute_query`
 
+> **QUANTITATIVE CLAIMS RULE**: Any statement about totals, counts, value sums, market share, or trends **MUST** be
+> backed by an `execute_query` result. `search_*` tools return at most 50 rows with `total: null` — they reveal
+> existence but cannot confirm scale. An investigation that ends after `search_*` results only is incomplete if it makes
+> any numerical claim.
+
 ### Views available inside `execute_query`
 
 Prefer views to raw tables. Call `get_schema` to confirm column names.
@@ -71,10 +76,17 @@ When investigating a **named individual**, always run ALL of these steps before 
 Only then proceed with company codes found in step 1:
 
 4. `search_sutartys(tiekejoKodas=...)` for each linked company
+5. `execute_query` — for each company code that returned contracts in step 4, confirm: total contract count, total
+   value (SUM), distinct buyer count, and date range. Use `v_sutartys WHERE tiekejoKodas = '...'`. This step is
+   **mandatory** — step 4 returns at most 50 contracts and cannot confirm scale.
 
 > **Common miss**: skipping step 2 because `search_failai` looks like the natural tool for person searches. It is not —
 `search_failai` searches uploaded document text, while `search_sutartys` with a name query searches contract-level
 > metadata and can surface self-dealing contracts (e.g. a politician renting a car from their own party or company).
+
+> For multiple companies ≥ 2, instead of calling search_sutartys for each code, you can try using execute_query with
+> v_sutartys WHERE tiekejoKodas IN (...) — you will get aggregation in one query and reduce the risk of context
+> overload.
 
 ## Theme tagging for Lithuanian institutions and OSINT
 
