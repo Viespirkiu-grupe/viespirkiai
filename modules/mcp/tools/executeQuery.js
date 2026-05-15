@@ -1,6 +1,7 @@
 import {z} from "zod";
 import {analystPool} from "../analyst/pool.js";
 import {MAX_QUERY_LENGTH, validateSql} from "../analyst/validateSql.js";
+import {executeWithColumnFix} from "../analyst/columnFixer.js";
 import {logToolCall} from "../mcpLogger.js";
 import config from "../../../utils/config.js";
 
@@ -8,14 +9,19 @@ const PAGE_SIZE = 50;
 
 export const name = "execute_query";
 export const description =
-    "Vykdo tik skaitymo SQL SELECT užklausas viešųjų pirkimų duomenų bazėje. " +
-    "Naudok TIK agreguotai analizei: skaičiavimams, santykiams, statistikai, lentelių jungimui. " +
-    "Paieškai (sutarčių, dokumentų, skelbimų, įmonių) naudok specialius įrankius: " +
-    "search_sutartys, search_failai, search_viesieji_pirkimai, search_juridiniai — ne šį įrankį. " +
-    "PRIVALOMA: prieš kiekvieną užklausą iškvieskite get_schema(table, mode:'detail') tiksliam stulpelių sąrašui. " +
-    "Niekada nespėkite stulpelių pavadinimų iš kitų lentelių ar rodinių — jie skiriasi. " +
-    "Rezultatai puslapiuojami — " + PAGE_SIZE + " eilučių per puslapį. " +
-    "Pasiekiami rodiniai: v_company, v_sutartys, v_pirkimas, v_person_links, v_dalyviai, v_bylos.";
+    "Vykdo skaitymo SQL SELECT užklausas viešųjų pirkimų DB. " +
+    "NAUDOK visada kai reikia tikslių skaičių, sumų, procentų, tendencijų ar bet kokio kiekybinio fakto — " +
+    "search_* įrankiai grąžina maks. 50 eilučių su total=null ir NEGALI pagrįsti kiekybinių teiginių. " +
+    "Paieškai naudok: search_sutartys, search_failai, search_viesieji_pirkimai, search_juridiniai. " +
+    "Rodinių stulpeliai (get_schema nereikia — rašyk užklausą iš karto): " +
+    "v_sutartys→sutartiesUnikalusId,pirkejoKodas,pirkejas,tiekejoKodas,tiekejas,verte,sudarymoData,bvpzKodas,tipas,istrinta,pirkimoNumeris,faktineIvykdimoVerte; " +
+    "v_company→jarKodas,pavadinimas,darbuotojai,vidutinisAtlyginimas,imokuSuma,melagingisTiekejas,nepatikimasTiekejas,bylosSkaicius,domenaiSkaicius,registravimoData; " +
+    "v_pirkimas→pirkimoId,jarKodas,organizatorius,pirkimoBudas,statusas,numatomaVerteEUR,esFinansavimas,bvpzKodai,paskelbimoData; " +
+    "v_person_links→id,vardas,pavarde,jarKodas,imonesVardas,pareigos,irasoTipas,rysioPradzia,rysioPabaiga,yraJuridinisAsmuo,registruotaLietuvoje; " +
+    "v_dalyviai→pirkimoNumeris,pirkejoKodas,tiekejoKodas,tiekejas,eileNumeris,pasiulymoKaina,atmetimoPriezastis,interesuKonfliktasNustatytas; " +
+    "v_bylos→bylosId,jarKodas,bylosNumeris,bylosRusis,bylosData,teismas,bylojeKaip. " +
+    "Lentelėms (ne v_*) iškvieskite get_schema(table, mode:'detail') prieš rašant užklausą. " +
+    "Rezultatai puslapiuojami — " + PAGE_SIZE + " eilučių per puslapį.";
 
 export const schema = {
     query: z
@@ -47,6 +53,13 @@ export async function handler({query, purpose, page}) {
         };
     }
 
+    return await executeWithColumnFix(
+        (q) => _runQuery(q, purpose, page),
+        query,
+    );
+}
+
+async function _runQuery(query, purpose, page) {
     const offset = (page - 1) * PAGE_SIZE;
     // Fetch one extra row to detect whether more pages exist — avoids a full-scan COUNT(*) OVER ()
     const wrappedSql = `SELECT q.*

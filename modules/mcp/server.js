@@ -37,20 +37,22 @@ function wrapHandler(toolName, handler) {
     };
 }
 
-const tools = [
-    getFailas,
-    getFailasTekstas,
-    getJuridinis,
-    getPinregAsmuo,
-    getPinregJar,
-    getSutartis,
-    getViesasisPirkimas,
-    searchFailai,
-    searchJuridiniai,
-    searchSutartys,
-    searchViesiejiPirkimai,
-    ...(config.enableExecuteQueryMcp ? [getSchema, executeQuery] : []),
-];
+const tools = config.enableExecuteQueryMcpOnly
+    ? [getSchema, executeQuery]
+    : [
+          getFailas,
+          getFailasTekstas,
+          getJuridinis,
+          getPinregAsmuo,
+          getPinregJar,
+          getSutartis,
+          getViesasisPirkimas,
+          searchFailai,
+          searchJuridiniai,
+          searchSutartys,
+          searchViesiejiPirkimai,
+          ...(config.enableExecuteQueryMcp ? [getSchema, executeQuery] : []),
+      ];
 
 export function createMcpServer() {
     const server = new McpServer({ name: "viespirkiai", version: "1.0.0" });

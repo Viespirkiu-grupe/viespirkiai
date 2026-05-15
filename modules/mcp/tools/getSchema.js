@@ -17,7 +17,7 @@ const IDENTIFIER_CANDIDATES = [
     "pirkejoKodas",
 ];
 
-const VIEW_METADATA = {
+export const VIEW_METADATA = {
     v_company: {
         tags: ["capacity", "blacklist", "labor", "domains", "court"],
         keys: ["jarKodas", "pavadinimas", "darbuotojai", "melagingisTiekejas", "bylosSkaicius"],

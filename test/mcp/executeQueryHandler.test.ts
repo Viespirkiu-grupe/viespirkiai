@@ -10,6 +10,14 @@ vi.mock("../../modules/mcp/mcpLogger.js", () => ({
     logToolCall: vi.fn(),
 }));
 
+// columnFixer calls postgres to load table column names; return empty in unit tests
+// so the map only contains view columns (sufficient for these tests).
+vi.mock("../../postgres/postgres.js", () => ({
+    postgres: {
+        query: vi.fn().mockResolvedValue({ rows: [] }),
+    },
+}));
+
 import { analystPool } from "../../modules/mcp/analyst/pool.js";
 import config from "../../utils/config.js";
 import { handler } from "../../modules/mcp/tools/executeQuery.js";

@@ -3,7 +3,7 @@ import { searchFailai } from "../../failai/searchFailai.js";
 
 export const name = "search_failai";
 export const description =
-    "Vienintelis įrankis ieškoti dokumento viduje (OCR tekstas). Ieško viešųjų pirkimų dokumentuose pagal pilną tekstą, telefoną, el. paštą, domeną, IBAN, JAR kodą, plėtinį ir kt. Jeigu jau žinomas failo ID arba md5 — naudok get_failas.";
+    "Vienintelis įrankis ieškoti dokumento viduje (OCR tekstas). Ieško viešųjų pirkimų dokumentuose, palaiko pilno teksto paiešką, filtravimą pagal plėtinį, telefoną, el. paštą, domeną, IBAN, JAR kodą ir kt. Jeigu jau žinomas failo ID arba md5 — naudok get_failas.";
 
 export const schema = {
     search: z
