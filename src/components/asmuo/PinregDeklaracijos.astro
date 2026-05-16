@@ -1,5 +1,6 @@
 ---
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import SectionHeading from '@design-system/components/SectionHeading.astro';
 
 const { asmuo } = Astro.props;
 const pinreg = asmuo.pinreg;
@@ -11,7 +12,7 @@ const anyTruncated =
 ---
 
 <div class="page-section mb-10" id="pinreg">
-  <h2><a href="#pinreg" class="no-style">Privačių interesų deklaracijos</a></h2>
+  <SectionHeading id="pinreg" title="Privačių interesų deklaracijos" />
   {anyTruncated && (
     <p class="text-muted text-sm mb-4">
       Rodomos tik po {pinreg.limit} deklaracijos.

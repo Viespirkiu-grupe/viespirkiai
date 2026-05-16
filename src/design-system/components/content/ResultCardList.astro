@@ -1,4 +1,5 @@
 ---
+import ContentSection from '@design-system/components/ContentSection.astro';
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
 import ResultList from '@design-system/components/ResultList.astro';
 
@@ -15,12 +16,9 @@ interface Props {
 }
 
 const { title, items, titleTag = 'h2' } = Astro.props;
-const TitleTag = titleTag;
 ---
 
-<section>
-  {title && <TitleTag>{title}</TitleTag>}
-
+<ContentSection title={title} titleTag={titleTag}>
   <ResultList>
     {items.map((item) => (
       <ResultCardShell clickable={true}>
@@ -36,4 +34,4 @@ const TitleTag = titleTag;
       </ResultCardShell>
     ))}
   </ResultList>
-</section>
+</ContentSection>

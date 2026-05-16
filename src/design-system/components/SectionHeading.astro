@@ -1,0 +1,23 @@
+---
+import Link from '@design-system/components/Link.astro';
+
+interface Props {
+  id: string;
+  title: string;
+  tag?: 'h2' | 'h3' | 'h4';
+  className?: string;
+}
+
+const {
+  id,
+  title,
+  tag = 'h2',
+  className = '',
+} = Astro.props as Props;
+
+const Tag = tag;
+---
+
+<Tag class={className}>
+  <Link href={`#${id}`} variant="reset">{title}</Link>
+</Tag>

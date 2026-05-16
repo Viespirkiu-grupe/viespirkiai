@@ -1,0 +1,39 @@
+---
+interface Props {
+  href?: string;
+  variant?: 'default' | 'subtle' | 'muted' | 'reset';
+  icon?: boolean;
+  className?: string;
+  target?: string;
+  rel?: string;
+  ariaLabel?: string;
+  title?: string;
+}
+
+const {
+  href,
+  variant = 'default',
+  icon = false,
+  className = '',
+  target,
+  rel,
+  ariaLabel,
+  title,
+} = Astro.props as Props;
+
+const classes = [
+  variant === 'default' ? 'link' : `link-${variant}`,
+  icon ? 'link-icon' : '',
+  className,
+].filter(Boolean).join(' ');
+---
+
+{href ? (
+  <a href={href} class={classes} target={target} rel={rel} aria-label={ariaLabel} title={title}>
+    <slot />
+  </a>
+) : (
+  <span class={classes} aria-label={ariaLabel} title={title}>
+    <slot />
+  </span>
+)}

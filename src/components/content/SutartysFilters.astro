@@ -3,6 +3,7 @@ import FilterGroup from '@design-system/components/filters/FilterGroup.astro';
 import DateRangeFilter from '@design-system/components/filters/DateRangeFilter.astro';
 import NumberRangeFilter from '@design-system/components/filters/NumberRangeFilter.astro';
 import SortFilter from '@design-system/components/filters/SortFilter.astro';
+import Field from '@design-system/components/inputs/Field.astro';
 import TextInput from '@design-system/components/inputs/TextInput.astro';
 import NumberInput from '@design-system/components/inputs/NumberInput.astro';
 import CheckboxInput from '@design-system/components/inputs/CheckboxInput.astro';
@@ -54,12 +55,11 @@ const bvpzCurrent = String(values['bvpzPrefiksasKitas'] || values['bvpzPrefiksas
   />
 
   <FilterGroup legend="Klasifikacija">
-    <div class="ds-field ds-bvpz-field">
-      <label class="ds-field__label" for="bvpzPrefiksasKitas">BVPŽ prefiksas</label>
+    <Field label="BVPŽ prefiksas" name="bvpzPrefiksasKitas" className="ds-bvpz-field">
       <input type="hidden" name="bvpzPrefiksas" id="bvpzPrefiksas" value="" />
       <div class="ds-bvpz-group">
         <input
-          class="ds-bvpz-input"
+          class="ds-field__control ds-bvpz-input"
           type="text"
           name="bvpzPrefiksasKitas"
           id="bvpzPrefiksasKitas"
@@ -73,7 +73,7 @@ const bvpzCurrent = String(values['bvpzPrefiksasKitas'] || values['bvpzPrefiksas
           </svg>
         </button>
       </div>
-    </div>
+    </Field>
 
     <div class="modal-backdrop" id="bvpzDialogBackdrop" hidden>
       <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="bvpzDialogTitle">
@@ -117,14 +117,6 @@ const bvpzCurrent = String(values['bvpzPrefiksasKitas'] || values['bvpzPrefiksas
     margin-bottom: 0;
   }
 
-  .ds-bvpz-field .ds-field__label {
-    display: block;
-    margin-bottom: 4px;
-    color: var(--dark-gray);
-    font-size: var(--text-sm);
-    font-weight: 500;
-  }
-
   .ds-bvpz-group {
     display: flex;
     align-items: stretch;
@@ -142,25 +134,11 @@ const bvpzCurrent = String(values['bvpzPrefiksasKitas'] || values['bvpzPrefiksas
   }
 
   .ds-bvpz-input {
-    display: block;
-    width: 100%;
     flex: 1 1 auto;
     min-width: 0;
-    padding: 8px 12px;
     border: 0;
     border-right: var(--border);
     border-radius: 0;
-    background: var(--white);
-    color: var(--black);
-    font-family: var(--font-sans);
-    font-size: var(--text-base);
-    line-height: 1.5;
-    transition: border-color var(--transition), box-shadow var(--transition);
-    appearance: none;
-  }
-
-  .ds-bvpz-input::placeholder {
-    color: var(--gray);
   }
 
   .ds-bvpz-input:focus {

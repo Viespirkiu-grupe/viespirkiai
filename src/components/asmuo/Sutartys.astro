@@ -1,4 +1,5 @@
 ---
+import SectionHeading from '@design-system/components/SectionHeading.astro';
 import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
 import Table from '@design-system/components/Table.astro';
 import TableWrapper from '@design-system/components/TableWrapper.astro';
@@ -14,7 +15,7 @@ const tiekimaiSeries = tiekimai.map((d: any) => d.total || null);
 ---
 
 <div class="page-section mb-10" id="sutartys">
-  <h2><a href="#sutartys" class="no-style">Viešųjų pirkimų sutartys</a></h2>
+  <SectionHeading id="sutartys" title="Viešųjų pirkimų sutartys" />
   <div class="grid-2 mb-10">
     <div class="flex flex-col min-h-[350px]">
       <h3 class="text-sm font-bold mb-3">Numatytos pirkimų vertės pagal metus</h3>

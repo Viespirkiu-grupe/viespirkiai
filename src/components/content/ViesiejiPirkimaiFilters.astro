@@ -3,6 +3,7 @@ import FilterGroup from '@design-system/components/filters/FilterGroup.astro';
 import DateRangeFilter from '@design-system/components/filters/DateRangeFilter.astro';
 import NumberRangeFilter from '@design-system/components/filters/NumberRangeFilter.astro';
 import SortFilter from '@design-system/components/filters/SortFilter.astro';
+import Link from '@design-system/components/Link.astro';
 import SelectInput from '@design-system/components/inputs/SelectInput.astro';
 import TextInput from '@design-system/components/inputs/TextInput.astro';
 import { STATUSAS, PIRKIMO_BUDAS } from '@/modules/viesiejiPirkimai/viesiejiPirkimaiEnums.js';
@@ -82,7 +83,7 @@ const sortOptions = [
   <FilterGroup legend="Kodai" class="justify-start">
     <div>
       <TextInput label="BVPŽ prefiksai" name="bvpzPrefiksai" placeholder="Visi" values={values} />
-      <a href="/bvpz" class="text-sm">Žr. BVPŽ</a>
+      <Link href="/bvpz" className="text-sm">Žr. BVPŽ</Link>
     </div>
   </FilterGroup>
 </div>

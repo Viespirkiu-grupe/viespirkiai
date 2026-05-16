@@ -1,0 +1,74 @@
+---
+interface Props {
+  label: string;
+  name: string;
+  className?: string;
+}
+
+const {
+  label,
+  name,
+  className = '',
+} = Astro.props as Props;
+---
+
+<div class:list={['ds-field', className].filter(Boolean)}>
+  <label class="ds-field__label" for={name}>{label}</label>
+  <slot />
+</div>
+
+<style>
+  .ds-field {
+    margin-bottom: 16px;
+  }
+
+  .ds-field__label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .ds-field :global(.ds-field__control) {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    color: var(--black);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    appearance: none;
+  }
+
+  .ds-field :global(.ds-field__control::placeholder) {
+    color: var(--gray);
+  }
+
+  .ds-field :global(.ds-field__control:focus) {
+    outline: none;
+    border-color: var(--black);
+    box-shadow: 0 0 0 3px rgba(15, 15, 15, 0.08);
+  }
+
+  .ds-field :global(.ds-field__control:disabled) {
+    background: var(--lighter-gray);
+    color: var(--gray);
+    cursor: not-allowed;
+  }
+
+  .ds-field :global(.ds-field__control--select) {
+    color-scheme: inherit;
+    cursor: pointer;
+  }
+
+  .ds-field :global(.ds-field__control--select option),
+  .ds-field :global(.ds-field__control--select optgroup) {
+    background: var(--white);
+    color: var(--black);
+  }
+</style>

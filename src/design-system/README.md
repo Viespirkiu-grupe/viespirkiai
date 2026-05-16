@@ -10,6 +10,13 @@ features.
 - `components/`: reusable Astro UI components that do not import app-specific
   domain logic.
 
+## Good Candidates For Reuse
+
+- Foundation link, surface, stack, and inline primitives should be preferred
+  before adding page-specific wrappers.
+- Reusable components should compose foundation primitives and stay free of app
+  data fetching or domain terminology.
+
 ## Rules
 
 - Design-system components may import from `@design-system/*`.

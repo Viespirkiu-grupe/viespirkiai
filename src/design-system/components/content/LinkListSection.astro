@@ -1,4 +1,6 @@
 ---
+import ContentSection from '@design-system/components/ContentSection.astro';
+
 interface LinkItem {
   href: string;
   label: string;
@@ -12,13 +14,10 @@ interface Props {
 }
 
 const { title, items, titleTag = 'h3' } = Astro.props;
-const TitleTag = titleTag;
 ---
 
-<section>
-  <TitleTag>{title}</TitleTag>
-
-  <ul class="file-list">
+<ContentSection title={title} titleTag={titleTag}>
+  <ul class="stack stack-sm list-none m-0 p-0">
     {items.map((item) => (
       <li>
         <a href={item.href}>{item.label}</a>
@@ -26,16 +25,4 @@ const TitleTag = titleTag;
       </li>
     ))}
   </ul>
-</section>
-
-<style>
-  .file-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .file-list li + li {
-    margin-top: 0.5rem;
-  }
-</style>
+</ContentSection>

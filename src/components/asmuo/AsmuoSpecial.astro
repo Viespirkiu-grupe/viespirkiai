@@ -1,4 +1,5 @@
 ---
+import ActionButtonRow from '@design-system/components/ActionButtonRow.astro';
 import Layout from '../../layouts/Layout.astro';
 import config from '../../lib/config.ts';
 
@@ -11,6 +12,10 @@ interface Props {
 }
 
 const { jarKodas, pavadinimas, aprasymas, colorScheme = 'auto', font = 'ubuntu' } = Astro.props;
+const actions = [
+  { href: `/pirkejas/${jarKodas}`, label: '↗ Pirkimai' },
+  { href: `/tiekejas/${jarKodas}`, label: '↗ Pardavimai' },
+];
 ---
 
 <Layout
@@ -23,10 +28,7 @@ const { jarKodas, pavadinimas, aprasymas, colorScheme = 'auto', font = 'ubuntu' 
     <div class="page-header">
       <h1 class="mb-0">{pavadinimas} <code>{jarKodas}</code></h1>
     </div>
-    <div class="flex gap-2 mb-4">
-      <a href={`/pirkejas/${jarKodas}`} class="btn btn-outline btn-sm">↗ Pirkimai</a>
-      <a href={`/tiekejas/${jarKodas}`} class="btn btn-outline btn-sm">↗ Pardavimai</a>
-    </div>
+    <ActionButtonRow items={actions} className="mb-4" />
     <p class="text-muted">{aprasymas}</p>
   </main>
 </Layout>
