@@ -1,5 +1,6 @@
 ---
 import SectionHeading from '@design-system/components/SectionHeading.astro';
+import ChartTile from '@design-system/components/charts/ChartTile.astro';
 import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
 import Table from '@design-system/components/Table.astro';
 import TableWrapper from '@design-system/components/TableWrapper.astro';
@@ -17,38 +18,32 @@ const tiekimaiSeries = tiekimai.map((d: any) => d.total || null);
 <div class="page-section mb-10" id="sutartys">
   <SectionHeading id="sutartys" title="Viešųjų pirkimų sutartys" />
   <div class="grid-2 mb-10">
-    <div class="flex flex-col min-h-[350px]">
-      <h3 class="text-sm font-bold mb-3">Numatytos pirkimų vertės pagal metus</h3>
-      {pirkimai.length > 0 ? (
-        <LineDatetimeChart
-          id="pirkimaiPerMetus"
-          title="Numatytos pirkimų vertės pagal metus"
-          anchor="pirkimaiPerMetusAnchor"
-          labels={pirkimaiLabels}
-          series={pirkimaiSeries}
-          flags={['yEUR', 'yMin0', 'xYear']}
-          wrapperClass=""
-          titleClass="sr-only"
-          heightClass="h-[350px]"
-        />
-      ) : <div class="chart-empty">Nėra duomenų</div>}
-    </div>
-    <div class="flex flex-col min-h-[350px]">
-      <h3 class="text-sm font-bold mb-3">Numatytos pardavimų vertės pagal metus</h3>
-      {tiekimai.length > 0 ? (
-        <LineDatetimeChart
-          id="pardavimaiPerMetus"
-          title="Numatytos pardavimų vertės pagal metus"
-          anchor="pardavimaiPerMetusAnchor"
-          labels={tiekimaiLabels}
-          series={tiekimaiSeries}
-          flags={['yEUR', 'yMin0', 'xYear']}
-          wrapperClass=""
-          titleClass="sr-only"
-          heightClass="h-[350px]"
-        />
-      ) : <div class="chart-empty">Nėra duomenų</div>}
-    </div>
+    <ChartTile title="Numatytos pirkimų vertės pagal metus" hasData={pirkimai.length > 0}>
+      <LineDatetimeChart
+        id="pirkimaiPerMetus"
+        title="Numatytos pirkimų vertės pagal metus"
+        anchor="pirkimaiPerMetusAnchor"
+        labels={pirkimaiLabels}
+        series={pirkimaiSeries}
+        flags={['yEUR', 'yMin0', 'xYear']}
+        wrapperClass=""
+        titleClass="sr-only"
+        heightClass="h-[350px]"
+      />
+    </ChartTile>
+    <ChartTile title="Numatytos pardavimų vertės pagal metus" hasData={tiekimai.length > 0}>
+      <LineDatetimeChart
+        id="pardavimaiPerMetus"
+        title="Numatytos pardavimų vertės pagal metus"
+        anchor="pardavimaiPerMetusAnchor"
+        labels={tiekimaiLabels}
+        series={tiekimaiSeries}
+        flags={['yEUR', 'yMin0', 'xYear']}
+        wrapperClass=""
+        titleClass="sr-only"
+        heightClass="h-[350px]"
+      />
+    </ChartTile>
   </div>
 
   <div class="grid-2">

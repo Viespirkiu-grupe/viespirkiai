@@ -1,5 +1,5 @@
 ---
-import FileCard from '@design-system/components/FileCard.astro';
+import FileCardList from '@design-system/components/FileCardList.astro';
 
 interface Props {
   dokumentai: any[] | null | undefined;
@@ -19,31 +19,28 @@ function buildDocLinks(doc: any): { href: string; fileHref: string } {
   }
   return { href: doc.proxyUrl, fileHref: doc.proxyUrl };
 }
+
+const items = (dokumentai ?? []).map((doc: any) => {
+  const title = doc.pavadinimas || '—';
+  const ext = (doc.extension || (title.includes('.') ? title.split('.').pop() : '') || '').toLowerCase();
+  const { href, fileHref } = buildDocLinks(doc);
+  return {
+    title,
+    href,
+    ext,
+    actions: [
+      { href: fileHref, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
+      { href: doc.url, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
+    ],
+  };
+});
 ---
 
-<section class="span-full">
-  <h2>Dokumentai</h2>
-  {dokumentai && dokumentai.length > 0
-    ? <div class="flex flex-col gap-2">
-        {dokumentai.map((doc: any) => {
-          const title = doc.pavadinimas || '—';
-          const ext = (doc.extension || (title.includes('.') ? title.split('.').pop() : '') || '').toLowerCase();
-          const { href, fileHref } = buildDocLinks(doc);
-          return (
-            <div class="min-w-0">
-              <FileCard
-                title={title}
-                href={href}
-                ext={ext}
-                actions={[
-                  { href: fileHref, text: '↗ Failas', target: '_blank', rel: 'noopener noreferrer' },
-                  { href: doc.url, text: '↗ CVP IS', target: '_blank', rel: 'noopener noreferrer' },
-                ]}
-              />
-            </div>
-          );
-        })}
-      </div>
-    : <p class="text-muted">Pateiktų dokumentų nėra.</p>
-  }
-</section>
+<FileCardList
+  title="Dokumentai"
+  items={items}
+  emptyText="Pateiktų dokumentų nėra."
+  sectionClass="span-full"
+  listClass="flex flex-col gap-2"
+  hideWhenEmpty={false}
+/>
