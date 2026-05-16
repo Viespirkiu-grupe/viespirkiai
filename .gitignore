@@ -57,3 +57,5 @@ quickwit/qwdata
 
 # Dist
 dist
+
+!LICENSE.txt

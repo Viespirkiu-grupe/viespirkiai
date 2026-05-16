@@ -38,9 +38,10 @@ export const POST: APIRoute = async ({ request }) => {
     await client.query('BEGIN');
 
     const queueRes = await client.query(
-      `DELETE FROM public."failaiOcrQueue"
-      WHERE id = $1 AND "lockedBy" = $2
-       RETURNING "lockedAt"`,
+      `DELETE FROM public."failaiOcrQueue" q
+       USING public.failai f
+       WHERE q.id = $1 AND q."lockedBy" = $2 AND f.id = q.id
+       RETURNING q."lockedAt", f.md5`,
       [id, user.pavadinimas],
     );
     if (!queueRes.rows.length) {
@@ -48,7 +49,7 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response('Failas nerastas arba neužrakintas šiam vartotojui.', { status: 404 });
     }
 
-    const { lockedAt } = queueRes.rows[0];
+    const { lockedAt, md5 } = queueRes.rows[0];
     const puslapiuSkaicius = tekstas.length;
     const zodziuSkaicius = tekstas.reduce(
       (sum: number, page: string) => sum + page.split(/\s+/).filter(Boolean).length,
@@ -61,9 +62,9 @@ export const POST: APIRoute = async ({ request }) => {
         [id],
       ),
       client.query(
-        `INSERT INTO "failaiOcrRezultatai" (failas, tekstas, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
-         VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7)`,
-        [id, tekstas, user.pavadinimas, lockedAt, duration, puslapiuSkaicius, zodziuSkaicius],
+        `INSERT INTO "failaiOcrRezultatai" (failas, md5, tekstas, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
+         VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7, $8)`,
+        [id, md5, tekstas, user.pavadinimas, lockedAt, duration, puslapiuSkaicius, zodziuSkaicius],
       ),
       client.query(
         `UPDATE "ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
