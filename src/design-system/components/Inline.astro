@@ -1,0 +1,22 @@
+---
+interface Props {
+  as?: 'div' | 'nav' | 'section' | 'article' | 'ul';
+  gap?: 'xs' | 'sm' | 'md' | 'lg';
+  align?: 'start' | 'center' | 'between' | 'end';
+  className?: string;
+}
+
+const {
+  as = 'div',
+  gap = 'sm',
+  align = 'start',
+  className = '',
+} = Astro.props as Props;
+
+const Tag = as;
+const classes = ['inline', `inline-${gap}`, `inline-${align}`, className].filter(Boolean).join(' ');
+---
+
+<Tag class={classes}>
+  <slot />
+</Tag>

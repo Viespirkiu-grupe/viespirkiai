@@ -1,4 +1,5 @@
 ---
+import ChartTile from '@design-system/components/charts/ChartTile.astro';
 import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
 
 const { asmuo } = Astro.props;
@@ -12,37 +13,31 @@ const series2 = duomenys.map((d: any) => d.vidutinisAtlyginimas2 || null);
   <h2><a href="#uzmokestis" class="no-style">Vidutinis darbo užmokestis</a></h2>
   <p class="text-muted text-sm mb-7">Neatskaičius mokesčių, €/mėn.</p>
   <div class="grid-2">
-    <div class="flex flex-col min-h-87.5">
-      <h3 class="text-sm font-bold mb-3">Darbo sutartys, valstybės tarnautojai</h3>
-      {duomenys.length > 0 && asmuo.sodra?.turejoAtlyginimu ? (
-        <LineDatetimeChart
-          id="vidAtlyginimoDiagrama"
-          title="Darbo sutartys, valstybės tarnautojai"
-          anchor="uzmokestis-darbo-sutartys"
-          labels={labels}
-          series={series1}
-          flags={['yEURMen', 'yMin0']}
-          wrapperClass=""
-          titleClass="sr-only"
-          heightClass="h-75"
-        />
-      ) : <div class="chart-empty">Nėra duomenų</div>}
-    </div>
-    <div class="flex flex-col min-h-87.5">
-      <h3 class="text-sm font-bold mb-3">Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
-      {duomenys.length > 0 && asmuo.sodra?.turejoAtlyginimu2 ? (
-        <LineDatetimeChart
-          id="vidAtlyginimoIIDiagrama"
-          title="Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos"
-          anchor="uzmokestis-autorines"
-          labels={labels}
-          series={series2}
-          flags={['yEURMen', 'yMin0']}
-          wrapperClass=""
-          titleClass="sr-only"
-          heightClass="h-75"
-        />
-      ) : <div class="chart-empty">Nėra duomenų</div>}
-    </div>
+    <ChartTile title="Darbo sutartys, valstybės tarnautojai" hasData={duomenys.length > 0 && asmuo.sodra?.turejoAtlyginimu} minHeightClass="min-h-87.5">
+      <LineDatetimeChart
+        id="vidAtlyginimoDiagrama"
+        title="Darbo sutartys, valstybės tarnautojai"
+        anchor="uzmokestis-darbo-sutartys"
+        labels={labels}
+        series={series1}
+        flags={['yEURMen', 'yMin0']}
+        wrapperClass=""
+        titleClass="sr-only"
+        heightClass="h-75"
+      />
+    </ChartTile>
+    <ChartTile title="Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos" hasData={duomenys.length > 0 && asmuo.sodra?.turejoAtlyginimu2} minHeightClass="min-h-87.5">
+      <LineDatetimeChart
+        id="vidAtlyginimoIIDiagrama"
+        title="Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos"
+        anchor="uzmokestis-autorines"
+        labels={labels}
+        series={series2}
+        flags={['yEURMen', 'yMin0']}
+        wrapperClass=""
+        titleClass="sr-only"
+        heightClass="h-75"
+      />
+    </ChartTile>
   </div>
 </div>

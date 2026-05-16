@@ -55,6 +55,11 @@ export interface SiteConfig {
   internalFileBase: string;
   ocrBandymai?: number;
 
+  /** Toggles the experimental vector file search page. */
+  enableVectorSearch?: boolean;
+  /** Backend URL used by the experimental vector file search page. */
+  vectorSearchUrl?: string;
+
   /** Toggles the relationship-graph feature throughout the UI. */
   enableGraph: boolean;
 }

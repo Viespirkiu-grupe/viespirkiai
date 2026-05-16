@@ -61,4 +61,6 @@ export default {
 
     // Features
     enableGraph: false,
+    enableVectorSearch: false,
+    vectorSearchUrl: "",
 };

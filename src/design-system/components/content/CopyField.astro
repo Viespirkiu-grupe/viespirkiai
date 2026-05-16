@@ -18,11 +18,12 @@ interface Props {
 const { value, buttonId, buttonLabel = 'Kopijuoti' } = Astro.props;
 ---
 
-<div class="inline-flex border rounded-lg bg-lighter-gray max-w-full">
+<div class="inline-flex max-w-full rounded-lg overflow-hidden surface surface-muted">
   <code class="px-4 py-3 border-none bg-transparent overflow-auto">{value}</code>
   <Button
     id={buttonId}
     type="button"
+    variant="ghost"
     className="copy-field-button"
   >
     {buttonLabel}

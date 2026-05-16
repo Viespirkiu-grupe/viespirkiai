@@ -27,14 +27,6 @@
         @apply last:mb-0 mb-4;
     }
 
-    a {
-        @apply underline hover:decoration-transparent underline-offset-2 transition-colors text-link;
-
-        &.no-style {
-            @apply no-underline text-inherit;
-        }
-    }
-
     small { font-size: var(--text-sm); }
 
     strong { font-weight: 700; }

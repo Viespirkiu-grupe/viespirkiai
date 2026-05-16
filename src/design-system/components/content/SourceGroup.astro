@@ -1,5 +1,7 @@
 ---
 import Badge from '@design-system/components/Badge.astro';
+import ContentSection from '@design-system/components/ContentSection.astro';
+import Link from '@design-system/components/Link.astro';
 
 interface SourceLink {
   href: string;
@@ -20,24 +22,21 @@ interface Props {
 }
 
 const { title, items, titleTag = 'h3' } = Astro.props;
-const TitleTag = titleTag;
 ---
 
-<section class="space-y-4">
-  <TitleTag>{title}</TitleTag>
-
+<ContentSection title={title} titleTag={titleTag} bodyClass="stack stack-md">
   {items.map((item) => (
-    <div class="subsection">
+    <div class="stack stack-xs">
       <h4>{item.title}</h4>
-
-      {item.links.map((link, index) => (
-        <>
-          {index > 0 && <br />}
-          <a href={link.href}>{link.label}</a>
-          {link.badge && <Badge variant="muted" className="ml-2">{link.badge}</Badge>}
-          {link.suffixHtml && <Fragment set:html={` ${link.suffixHtml}`} />}
-        </>
-      ))}
+      <div class="stack stack-xs">
+        {item.links.map((link) => (
+          <div>
+            <Link href={link.href}>{link.label}</Link>
+            {link.badge && <Badge variant="muted" className="ml-2">{link.badge}</Badge>}
+            {link.suffixHtml && <Fragment set:html={` ${link.suffixHtml}`} />}
+          </div>
+        ))}
+      </div>
     </div>
   ))}
-</section>
+</ContentSection>

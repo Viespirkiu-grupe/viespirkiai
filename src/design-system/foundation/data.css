@@ -56,6 +56,139 @@
     font-weight: 500;
   }
 
+  .table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  .ds-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+  }
+
+  .ds-table th,
+  .ds-table td {
+    padding: 8px 12px;
+    border: var(--border);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  .ds-table thead th {
+    background: var(--lighter-gray);
+    color: var(--dark-gray);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .ds-table tbody tr:hover {
+    background: var(--shade-2);
+  }
+
+  .ds-table--striped tbody tr:nth-child(even) {
+    background: var(--shade-2);
+  }
+
+  .ds-table--fixed {
+    table-layout: fixed;
+  }
+
+  .ds-table--sm th,
+  .ds-table--sm td {
+    padding: 4px 8px;
+  }
+
+  .ds-table--lg th,
+  .ds-table--lg td {
+    padding: 12px 16px;
+  }
+
+  .ds-table td.cell-mono {
+    font-family: var(--font-mono);
+  }
+
+  .ds-table th.cell-center,
+  .ds-table td.cell-center {
+    text-align: center;
+  }
+
+  .ds-table th.cell-right,
+  .ds-table td.cell-right {
+    text-align: right;
+  }
+
+  .ds-table th.cell-nowrap,
+  .ds-table td.cell-nowrap {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ds-table td.cell-truncate {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ds-table td .cell-clamp {
+    display: -webkit-box;
+    max-height: 4ch;
+    overflow: hidden;
+    word-break: break-word;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .ds-table td .cell-truncate {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .ds-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .ds-table th.sortable::after {
+    content: " ↕";
+    color: var(--gray);
+    font-size: var(--text-xs);
+  }
+
+  .ds-table th.sortable.asc::after {
+    content: " ↑";
+    color: var(--black);
+  }
+
+  .ds-table th.sortable.desc::after {
+    content: " ↓";
+    color: var(--black);
+  }
+
+  .ds-table tr.row-success td {
+    background: var(--color-success-bg);
+  }
+
+  .ds-table tr.row-warning td {
+    background: var(--color-warning-bg);
+  }
+
+  .ds-table tr.row-danger td {
+    background: var(--color-danger-bg);
+  }
+
   .amount {
     font-weight: 700;
     color: var(--black);

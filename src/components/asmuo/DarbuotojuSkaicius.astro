@@ -1,4 +1,5 @@
 ---
+import ChartTile from '@design-system/components/charts/ChartTile.astro';
 import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
 
 const { asmuo } = Astro.props;
@@ -11,37 +12,31 @@ const series2 = duomenys.map((d: any) => d.draustieji2 || null);
 <div class="page-section mb-10" id="darbuotojai">
   <h2><a href="#darbuotojai" class="no-style">Darbuotojų skaičius</a></h2>
   <div class="grid-2">
-    <div class="flex flex-col min-h-[350px]">
-      <h3 class="text-sm font-bold mb-3">Darbo sutartys, valstybės tarnautojai</h3>
-      {duomenys.length > 0 && asmuo.sodra?.turejoDraustuju ? (
-        <LineDatetimeChart
-          id="darbuotojuSkaiciausDiagrama"
-          title="Darbo sutartys, valstybės tarnautojai"
-          anchor="darbuotojai-darbo-sutartys"
-          labels={labels}
-          series={series1}
-          flags={['yMin0']}
-          wrapperClass=""
-          titleClass="sr-only"
-          heightClass="h-[350px]"
-        />
-      ) : <div class="chart-empty">Nėra duomenų</div>}
-    </div>
-    <div class="flex flex-col min-h-[350px]">
-      <h3 class="text-sm font-bold mb-3">Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos</h3>
-      {duomenys.length > 0 && asmuo.sodra?.turejoDraustuju2 ? (
-        <LineDatetimeChart
-          id="darbuotojuSkaiciausIIDiagrama"
-          title="Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos"
-          anchor="darbuotojai-autorines"
-          labels={labels}
-          series={series2}
-          flags={['yMin0']}
-          wrapperClass=""
-          titleClass="sr-only"
-          heightClass="h-[350px]"
-        />
-      ) : <div class="chart-empty">Nėra duomenų</div>}
-    </div>
+    <ChartTile title="Darbo sutartys, valstybės tarnautojai" hasData={duomenys.length > 0 && asmuo.sodra?.turejoDraustuju}>
+      <LineDatetimeChart
+        id="darbuotojuSkaiciausDiagrama"
+        title="Darbo sutartys, valstybės tarnautojai"
+        anchor="darbuotojai-darbo-sutartys"
+        labels={labels}
+        series={series1}
+        flags={['yMin0']}
+        wrapperClass=""
+        titleClass="sr-only"
+        heightClass="h-[350px]"
+      />
+    </ChartTile>
+    <ChartTile title="Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos" hasData={duomenys.length > 0 && asmuo.sodra?.turejoDraustuju2}>
+      <LineDatetimeChart
+        id="darbuotojuSkaiciausIIDiagrama"
+        title="Autorinės, sporto ir atlikėjo veiklos sutartys, tantjemos"
+        anchor="darbuotojai-autorines"
+        labels={labels}
+        series={series2}
+        flags={['yMin0']}
+        wrapperClass=""
+        titleClass="sr-only"
+        heightClass="h-[350px]"
+      />
+    </ChartTile>
   </div>
 </div>

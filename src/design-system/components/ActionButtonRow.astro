@@ -1,0 +1,34 @@
+---
+import Button from '@design-system/components/Button.astro';
+import Inline from '@design-system/components/Inline.astro';
+
+interface ActionItem {
+  href: string;
+  label: string;
+  target?: string;
+  rel?: string;
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'link';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
+}
+
+interface Props {
+  items: ActionItem[];
+  className?: string;
+}
+
+const { items, className = '' } = Astro.props as Props;
+---
+
+<Inline className={className} gap="xs">
+  {items.map((item) => (
+    <Button
+      href={item.href}
+      target={item.target}
+      rel={item.rel}
+      variant={item.variant ?? 'outline'}
+      size={item.size ?? 'sm'}
+    >
+      {item.label}
+    </Button>
+  ))}
+</Inline>

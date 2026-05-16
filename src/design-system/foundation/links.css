@@ -1,0 +1,65 @@
+@layer base {
+    a {
+        color: var(--link);
+        text-decoration-line: underline;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 0.16em;
+        transition:
+            color var(--transition),
+            text-decoration-color var(--transition),
+            background-color var(--transition),
+            box-shadow var(--transition);
+    }
+
+    a:hover {
+        color: var(--black);
+        text-decoration-color: transparent;
+    }
+
+    a:focus-visible {
+        outline: none;
+        border-radius: var(--radius-sm);
+        box-shadow: 0 0 0 2px var(--white), 0 0 0 4px var(--black);
+    }
+
+    a.no-style {
+        color: inherit;
+        text-decoration: none;
+    }
+}
+
+@layer components {
+    .link {
+        color: var(--link);
+    }
+
+    .link-subtle {
+        color: inherit;
+        text-decoration-color: var(--light-gray);
+    }
+
+    .link-subtle:hover {
+        color: var(--black);
+        text-decoration-color: currentColor;
+    }
+
+    .link-muted {
+        color: var(--gray);
+        text-decoration-color: var(--light-gray);
+    }
+
+    .link-muted:hover {
+        color: var(--black);
+    }
+
+    .link-reset {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .link-icon {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+}

@@ -28,10 +28,10 @@ const hasActions = Astro.slots.has('actions');
 ---
 
 <div class={containerClass}>
-  <div>
-    <div class="flex justify-between items-center mb-4">
+  <div class="stack stack-md">
+    <div class="search-results-toolbar">
       <ResultsSummary html={numberOfResults} />
-      {hasActions && <div class="flex gap-3"><slot name="actions" /></div>}
+      {hasActions && <div class="search-results-actions"><slot name="actions" /></div>}
     </div>
 
     {resultCount === 0
@@ -45,3 +45,36 @@ const hasActions = Astro.slots.has('actions');
     }
   </div>
 </div>
+
+<style>
+  .search-results-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .search-results-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 720px) {
+    .search-results-toolbar {
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .search-results-actions {
+      width: 100%;
+      margin-left: 0;
+      flex-wrap: wrap;
+      white-space: normal;
+      justify-content: flex-start;
+    }
+  }
+</style>
