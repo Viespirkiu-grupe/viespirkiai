@@ -38,7 +38,7 @@ const ADP_DATASETS = [
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SutarciuSalys",
         limit: 1000,
         mapping: {
-            _type: "_type", _id: "_id", _revision: "_revision",
+            _id: "_id", _revision: "_revision",
             id: "id", sutarties_id: "sutartiesId", tipas: "tipas",
             validus_asmens_kodas: "validusAsmensKodas",
             validus_jar_kodas: "validusJarKodas",
@@ -72,7 +72,7 @@ const ADP_DATASETS = [
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/Sutartys",
         limit: 500,
         mapping: {
-            _type: "_type", _id: "_id", _revision: "_revision",
+            _id: "_id", _revision: "_revision",
             sutarties_id: "sutartiesId", sutarties_uid: "sutartiesUid",
             vp_id: "vpId", tipas: "tipas",
             sutarties_numeris: "sutartiesNumeris", pavadinimas: "pavadinimas",
