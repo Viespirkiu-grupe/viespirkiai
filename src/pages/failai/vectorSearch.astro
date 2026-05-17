@@ -1,0 +1,92 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import SearchForm from '@design-system/components/content/SearchForm.astro';
+import SearchResultsShell from '@design-system/components/content/SearchResultsShell.astro';
+import { buildNumberOfResults, cleanQuery, getColorScheme, getFont } from '../../lib/failai.js';
+import config from '../../lib/config.ts';
+import { fetchVectorSearchResults } from '../../lib/vectorSearch.ts';
+import FailasVectorResultCard from '../../components/failai/FailasVectorResultCard.astro';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+const cleaned = cleanQuery(Astro.url);
+if (cleaned.redirectTo) return Astro.redirect(cleaned.redirectTo);
+
+if (!config.enableVectorSearch) {
+  return Astro.redirect('/failai');
+}
+
+const query = cleaned.query;
+const search = query.search || '';
+const showInitialState = !search;
+
+let results: Awaited<ReturnType<typeof fetchVectorSearchResults>> = [];
+let numberOfResults = '';
+let errorMessage = '';
+
+if (!showInitialState) {
+  const startedAt = Date.now();
+  try {
+    results = await fetchVectorSearchResults(search);
+    numberOfResults = buildNumberOfResults({
+      rows: results,
+      total: results.length,
+      elapsed: Date.now() - startedAt,
+      engine: 'Vector',
+      approximate: false,
+    });
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : 'Paieška nepavyko.';
+  }
+}
+---
+<Layout
+  pageTitle="Vektorinė failų paieška"
+  pageDescription="Bandomasis tekstinės vektorinės failų paieškos puslapis"
+  pageImage="https://viespirkiai.org/failai.png"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <SearchForm
+      title="Vektorinė failų paieška"
+      searchValue={search}
+      searchPlaceholder="Pvz. vektorius"
+    >
+      <span slot="title-suffix" class="text-muted text-sm ml-2">Bandomoji tekstinė semantinė paieška</span>
+    </SearchForm>
+
+    <section class="mt-10 max-w-lg center mx-auto">
+      <p class="text-muted text-sm mb-4">
+        Užklausa siunčiama į atskirą vektorinės paieškos servisą, o rezultatai rodomi kaip failų sąrašas su panašumo įverčiu.
+      </p>
+    </section>
+
+    {showInitialState ? (
+      <div class="mt-10 max-w-lg center mx-auto">
+        <p class="text-muted text-sm">Įveskite tekstinę užklausą.</p>
+      </div>
+    ) : errorMessage ? (
+      <div class="mt-10 max-w-lg center mx-auto">
+        <div class="result-list">
+          <article class="result-card">
+            <div class="result-card-body">
+              <p class="text-sm">{errorMessage}</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    ) : (
+      <SearchResultsShell
+        numberOfResults={numberOfResults}
+        resultCount={results.length}
+        page={1}
+        pageCount={1}
+        queryParams={`search=${encodeURIComponent(search)}`}
+      >
+        {results.map((item) => <FailasVectorResultCard item={item} />)}
+      </SearchResultsShell>
+    )}
+  </main>
+</Layout>

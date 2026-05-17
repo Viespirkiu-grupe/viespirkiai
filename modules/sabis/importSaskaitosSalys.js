@@ -24,13 +24,13 @@ async function insertBatch(rows) {
     const placeholders = rows
         .map(
             (_, i) =>
-                `(${Array.from({ length: 14 }, (_, j) => `$${i * 14 + j + 1}`).join(", ")})`,
+                `(${Array.from({ length: 13 }, (_, j) => `$${i * 13 + j + 1}`).join(", ")})`,
         )
         .join(", ");
 
     const sql = `
         INSERT INTO "sabisSaskaituSalys" (
-            "_type", "_id", "_revision", "id", "sfId", "tipas",
+            "_id", "_revision", "id", "sfId", "tipas",
             "validusAsmensKodas", "validusJarKodas", "kitasKodas", "kitasKodasPaaiskinimas",
             "pavadinimas", "nePvmMoketojas", "veiklosVieta", "data"
         )
@@ -68,7 +68,6 @@ async function main() {
 
         for (const r of data._data) {
             batch.push([
-                r._type ?? null,
                 r._id ?? null,
                 r._revision ?? null,
                 r.id ?? null,

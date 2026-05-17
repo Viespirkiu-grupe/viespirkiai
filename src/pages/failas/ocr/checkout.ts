@@ -17,7 +17,7 @@ const handleCheckout: APIRoute = async ({ request }) => {
   if (error) return new Response(message, { status: error });
 
   const failas = await checkoutNextFile(user.pavadinimas);
-  if (!failas) return new Response('Nėra OCR laukiančių failų.', { status: 204 });
+  if (!failas) return new Response('Nėra OCR laukiančių failų.', { status: 404 });
 
   return Response.json({
     id: failas.id,

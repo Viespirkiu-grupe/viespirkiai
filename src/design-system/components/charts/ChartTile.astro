@@ -1,0 +1,32 @@
+---
+interface Props {
+  title?: string;
+  titleTag?: 'h2' | 'h3' | 'h4';
+  titleClass?: string;
+  hasData: boolean;
+  emptyText?: string;
+  minHeightClass?: string;
+  wrapperClass?: string;
+}
+
+const {
+  title,
+  titleTag = 'h3',
+  titleClass = 'text-sm font-bold mb-3',
+  hasData,
+  emptyText = 'Nėra duomenų',
+  minHeightClass = 'min-h-[350px]',
+  wrapperClass = 'flex flex-col',
+} = Astro.props;
+
+const TitleTag = titleTag;
+const wrapClasses = [wrapperClass, minHeightClass].filter(Boolean).join(' ');
+---
+
+<div class={wrapClasses}>
+  {title
+    ? <TitleTag class={titleClass}>{title}</TitleTag>
+    : <slot name="title" />
+  }
+  {hasData ? <slot /> : <div class="chart-empty">{emptyText}</div>}
+</div>

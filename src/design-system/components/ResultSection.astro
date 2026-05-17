@@ -1,0 +1,52 @@
+---
+import ResultList from '@design-system/components/ResultList.astro';
+import SectionHeading from '@design-system/components/SectionHeading.astro';
+import TruncationNotice from '@design-system/components/TruncationNotice.astro';
+
+interface Props {
+  id: string;
+  title: string;
+  className?: string;
+  bordered?: boolean;
+  count?: number;
+  shown?: number;
+  paramName?: string;
+  label?: string;
+  gender?: 'm' | 'f';
+}
+
+const {
+  id,
+  title,
+  className = 'page-section mb-10',
+  bordered = true,
+  count,
+  shown,
+  paramName,
+  label,
+  gender = 'm',
+} = Astro.props as Props;
+
+const hasNotice = typeof count === 'number'
+  && typeof shown === 'number'
+  && Boolean(paramName)
+  && Boolean(label);
+---
+
+<div class={className} id={id}>
+  <SectionHeading id={id} title={title} />
+  {Astro.slots.has('intro') && <slot name="intro" />}
+  {hasNotice && (
+    <TruncationNotice
+      count={count}
+      shown={shown}
+      anchor={id}
+      paramName={paramName!}
+      label={label!}
+      gender={gender}
+    />
+  )}
+  <ResultList bordered={bordered}>
+    <slot />
+  </ResultList>
+</div>

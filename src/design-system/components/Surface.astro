@@ -1,0 +1,30 @@
+---
+interface Props {
+  as?: 'div' | 'section' | 'article' | 'aside';
+  tone?: 'default' | 'muted' | 'strong';
+  padding?: 'none' | 'sm' | 'md' | 'lg';
+  shadow?: boolean;
+  className?: string;
+}
+
+const {
+  as = 'div',
+  tone = 'default',
+  padding = 'md',
+  shadow = false,
+  className = '',
+} = Astro.props as Props;
+
+const Tag = as;
+const classes = [
+  'surface',
+  tone !== 'default' ? `surface-${tone}` : '',
+  padding !== 'none' ? `surface-padding-${padding}` : '',
+  shadow ? 'surface-shadow' : '',
+  className,
+].filter(Boolean).join(' ');
+---
+
+<Tag class={classes}>
+  <slot />
+</Tag>

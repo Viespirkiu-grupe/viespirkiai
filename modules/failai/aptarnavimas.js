@@ -1,6 +1,7 @@
 import { Buffer } from "buffer";
 import { postgres, parsePgArray } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
+import { readRezultatasFs } from "../ocr/rezultataiFs.js";
 import { parseWKBPoint } from "../geografija/utils.js";
 import { formatDateTime, formatDuration } from "../../utils/time.js";
 
@@ -217,7 +218,7 @@ export async function fetchFailasMetadata(id) {
                 [id],
             ),
             postgres.query(
-                `SELECT id, tekstas, node, "lockTimestamp", "submitTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius"
+                `SELECT id, md5, node, "lockTimestamp", "submitTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius"
                  FROM "failaiOcrRezultatai"
                  WHERE failas = $1
                  ORDER BY id DESC`,
@@ -237,10 +238,10 @@ export async function fetchFailasMetadata(id) {
           }
         : null;
 
-    const ocr =
-        ocrResults.rows.length && ocrResults.rows[0].tekstas
-            ? parsePgArray(ocrResults.rows[0].tekstas)
-            : [];
+    const latestOcrFile = ocrResults.rows.length
+        ? await readRezultatasFs(ocrResults.rows[0].md5)
+        : null;
+    const ocr = Array.isArray(latestOcrFile?.tekstas) ? latestOcrFile.tekstas : [];
 
     if (tekstas.rows.length) {
         tekstas.rows[0].tekstas = tekstas.rows[0].tekstas

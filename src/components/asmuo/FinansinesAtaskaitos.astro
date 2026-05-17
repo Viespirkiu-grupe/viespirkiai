@@ -1,5 +1,6 @@
 ---
 import Chart from '@design-system/components/charts/Chart.astro';
+import ChartTile from '@design-system/components/charts/ChartTile.astro';
 import Table from '@design-system/components/Table.astro';
 import TableWrapper from '@design-system/components/TableWrapper.astro';
 const { asmuo, finansaiLimit } = Astro.props;
@@ -44,36 +45,30 @@ const profitChartOptions = {
   <h2><a href="#finansai" class="no-style">Finansinės ataskaitos</a></h2>
 
   <div class="grid-2 mb-10">
-    <div>
-      <h3 class="text-sm font-bold mb-3">Pardavimo pajamos</h3>
-      {metai.length > 0 && duomenys['Pardavimo pajamos'] ? (
-        <Chart
-          id="pardavimoPajamosChart"
-          type="line-datetime"
-          labels={mergedRevenueLabels}
-          series={mergedRevenueSeries}
-          flags={['yEUR', 'yMin0']}
-          wrapperClass=""
-          heightClass="h-75"
-        />
-      ) : <div class="chart-empty">Nėra duomenų</div>}
-    </div>
+    <ChartTile title="Pardavimo pajamos" hasData={metai.length > 0 && !!duomenys['Pardavimo pajamos']} minHeightClass="" wrapperClass="">
+      <Chart
+        id="pardavimoPajamosChart"
+        type="line-datetime"
+        labels={mergedRevenueLabels}
+        series={mergedRevenueSeries}
+        flags={['yEUR', 'yMin0']}
+        wrapperClass=""
+        heightClass="h-75"
+      />
+    </ChartTile>
 
-    <div>
-      <h3 class="text-sm font-bold mb-3">Grynasis pelnas (nuostoliai)</h3>
-      {metai.length > 0 ? (
-        <Chart
-          id="grynasisPelnas"
-          type="line-datetime"
-          labels={metai.map(String)}
-          series={pelnoSeries}
-          flags={['yEUR', 'yMinAuto']}
-          customOptions={profitChartOptions}
-          wrapperClass=""
-          heightClass="h-75"
-        />
-      ) : <div class="chart-empty">Nėra duomenų</div>}
-    </div>
+    <ChartTile title="Grynasis pelnas (nuostoliai)" hasData={metai.length > 0} minHeightClass="" wrapperClass="">
+      <Chart
+        id="grynasisPelnas"
+        type="line-datetime"
+        labels={metai.map(String)}
+        series={pelnoSeries}
+        flags={['yEUR', 'yMinAuto']}
+        customOptions={profitChartOptions}
+        wrapperClass=""
+        heightClass="h-75"
+      />
+    </ChartTile>
   </div>
 
   {metai.length > 0 && (

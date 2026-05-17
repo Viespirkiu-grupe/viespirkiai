@@ -6,36 +6,57 @@ interface Props {
 const hasSubtext = Astro.slots.has('subtext');
 const hasActions = Astro.slots.has('actions');
 const { className = '' } = Astro.props;
-const classes = ['page-header-shell', className].filter(Boolean).join(' ');
+const classes = ['page-header', className].filter(Boolean).join(' ');
 ---
 
 <div class={classes}>
-  <div>
+  <div class="page-header-copy">
     {hasSubtext && <p class="subtext"><slot name="subtext" /></p>}
     <h1><slot /></h1>
   </div>
   {hasActions && (
-    <div class="flex flex-wrap gap-3 items-center">
+    <div class="page-header-actions">
       <slot name="actions" />
     </div>
   )}
 </div>
 
 <style>
-  .page-header-shell {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 28px;
-    border-bottom: var(--border);
-    padding-top: 28px;
-    padding-bottom: 16px;
+  :global(.page-header) {
+    flex-wrap: nowrap;
   }
 
-  .page-header-shell :global(h1),
-  .page-header-shell :global(h2) {
-    margin-bottom: 0;
+  .page-header-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 0 0 auto;
+    margin-left: auto;
+    width: max-content;
+    max-width: none;
+    white-space: nowrap;
+    justify-content: flex-end;
+  }
+
+  @media (max-width: 720px) {
+    :global(.page-header) {
+      flex-wrap: wrap;
+    }
+
+    .page-header-actions {
+      width: 100%;
+      flex-basis: 100%;
+      margin-left: 0;
+      max-width: 100%;
+      gap: 12px;
+      white-space: normal;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+    }
   }
 </style>

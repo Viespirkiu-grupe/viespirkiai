@@ -6,9 +6,7 @@ interface Props {
 const { title } = Astro.props;
 ---
 
-<div class="card">
-  <div class="card-body">
-    <div class="section-title mb-3">{title}</div>
-    <slot />
-  </div>
+<div class="stat-card">
+  <div class="stat-label">{title}</div>
+  <slot />
 </div>

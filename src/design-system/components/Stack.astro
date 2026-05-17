@@ -1,0 +1,20 @@
+---
+interface Props {
+  as?: 'div' | 'section' | 'article' | 'aside' | 'ul' | 'ol';
+  gap?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
+}
+
+const {
+  as = 'div',
+  gap = 'md',
+  className = '',
+} = Astro.props as Props;
+
+const Tag = as;
+const classes = ['stack', `stack-${gap}`, className].filter(Boolean).join(' ');
+---
+
+<Tag class={classes}>
+  <slot />
+</Tag>

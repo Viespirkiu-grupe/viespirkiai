@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { validateOcrApiKey } from '@/modules/failai/auth.js';
 import { postgres } from '@/postgres/postgres.js';
 import { ocrLiveUpdates } from '../../../lib/ocrLiveUpdates.ts';
+import { saveRezultatasFs } from '@/modules/ocr/rezultataiFs.js';
 
 export const GET: APIRoute = async () => {
   return new Response('Method not allowed', { status: 405 });
@@ -38,9 +39,10 @@ export const POST: APIRoute = async ({ request }) => {
     await client.query('BEGIN');
 
     const queueRes = await client.query(
-      `DELETE FROM public."failaiOcrQueue"
-      WHERE id = $1 AND "lockedBy" = $2
-       RETURNING "lockedAt"`,
+      `DELETE FROM public."failaiOcrQueue" q
+       USING public.failai f
+       WHERE q.id = $1 AND q."lockedBy" = $2 AND f.id = q.id
+       RETURNING q."lockedAt", f.md5`,
       [id, user.pavadinimas],
     );
     if (!queueRes.rows.length) {
@@ -48,7 +50,7 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response('Failas nerastas arba neužrakintas šiam vartotojui.', { status: 404 });
     }
 
-    const { lockedAt } = queueRes.rows[0];
+    const { lockedAt, md5 } = queueRes.rows[0];
     const puslapiuSkaicius = tekstas.length;
     const zodziuSkaicius = tekstas.reduce(
       (sum: number, page: string) => sum + page.split(/\s+/).filter(Boolean).length,
@@ -61,9 +63,9 @@ export const POST: APIRoute = async ({ request }) => {
         [id],
       ),
       client.query(
-        `INSERT INTO "failaiOcrRezultatai" (failas, tekstas, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
+        `INSERT INTO "failaiOcrRezultatai" (failas, md5, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
          VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7)`,
-        [id, tekstas, user.pavadinimas, lockedAt, duration, puslapiuSkaicius, zodziuSkaicius],
+        [id, md5, user.pavadinimas, lockedAt, duration, puslapiuSkaicius, zodziuSkaicius],
       ),
       client.query(
         `UPDATE "ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
@@ -78,6 +80,9 @@ export const POST: APIRoute = async ({ request }) => {
     ]);
 
     await client.query('COMMIT');
+
+    await saveRezultatasFs({ failas: id, md5, tekstas, node: user.pavadinimas, submitTimestamp: new Date().toISOString(), lockTimestamp: lockedAt, duration, puslapiuSkaicius, zodziuSkaicius });
+
     return Response.json({ status: 'ok' });
   } catch (e) {
     await client.query('ROLLBACK');

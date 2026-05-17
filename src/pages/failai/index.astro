@@ -9,6 +9,7 @@ import { buildStatistika } from '../../lib/failaiStatistika.ts';
 import { postgres } from '../../../postgres/postgres.js';
 import { countFailai, searchFailai } from '../../../modules/failai/searchFailai.js';
 import FailasResultCard from '../../components/failai/FailasResultCard.astro';
+import config from '../../lib/config.ts';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
@@ -141,6 +142,7 @@ const statistikaPayload = buildStatistika(statistika);
             <a href="/failai/map" class="btn btn-outline btn-sm">↗ Failų žemėlapis</a>
             <a href="/failai/neparsiunciami" class="btn btn-outline btn-sm">↗ Neparsiunčiami failai</a>
             <a href="/failai/galerija" class="btn btn-outline btn-sm">↗ Nuotraukų galerija</a>
+            {config.enableVectorSearch && <a href="/failai/vectorSearch" class="btn btn-outline btn-sm">↗ Vektorinė paieška</a>}
           </div>
           <script is:inline>
             window.addEventListener('DOMContentLoaded', () => {

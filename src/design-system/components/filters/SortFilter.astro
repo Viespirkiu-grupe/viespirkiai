@@ -69,6 +69,7 @@ const current = values[name] ?? defaultValue ?? '';
     display: flex;
     align-items: stretch;
     min-height: 42px;
+    gap: 0;
     border: var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
@@ -122,5 +123,7 @@ const current = values[name] ?? defaultValue ?? '';
     margin-left: 0;
     border: 0;
     border-radius: 0;
+    min-width: 40px;
+    padding-inline: 10px;
   }
 </style>

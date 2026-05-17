@@ -1,0 +1,63 @@
+---
+import FileCard from './FileCard.astro';
+
+interface FileCardItem {
+  title: string;
+  href: string;
+  meta?: string;
+  ext?: string;
+  actions?: { href: string; text: string; target?: string; rel?: string }[];
+  titleTwoLines?: boolean;
+  hideMeta?: boolean;
+  target?: string;
+  rel?: string;
+}
+
+interface Props {
+  title?: string;
+  items: FileCardItem[];
+  emptyText?: string;
+  sectionClass?: string;
+  listClass?: string;
+  hideWhenEmpty?: boolean;
+}
+
+const {
+  title,
+  items,
+  emptyText,
+  sectionClass = 'mb-7',
+  listClass = 'flex flex-col gap-2 mt-4',
+  hideWhenEmpty = true,
+} = Astro.props;
+
+const hasItems = items && items.length > 0;
+const shouldRender = hasItems || !hideWhenEmpty;
+---
+
+{shouldRender && (
+  <section class={sectionClass}>
+    {title && <h2>{title}</h2>}
+    {hasItems ? (
+      <div class={listClass}>
+        {items.map((item) => (
+          <div class="min-w-0">
+            <FileCard
+              title={item.title}
+              href={item.href}
+              meta={item.meta}
+              ext={item.ext}
+              actions={item.actions}
+              titleTwoLines={item.titleTwoLines}
+              hideMeta={item.hideMeta}
+              target={item.target}
+              rel={item.rel}
+            />
+          </div>
+        ))}
+      </div>
+    ) : emptyText ? (
+      <p class="text-muted">{emptyText}</p>
+    ) : null}
+  </section>
+)}

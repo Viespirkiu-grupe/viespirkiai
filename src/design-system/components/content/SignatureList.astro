@@ -36,7 +36,7 @@ const hidden = signatures.slice(maxItems).filter(Boolean);
   {signatures.length > 0 ? (
     <>
       <p class="text-muted text-xs mb-2"><em>{disclaimerText}</em></p>
-      <div class="flex flex-col gap-2">
+      <div class="stack stack-sm">
         {visible.map((sig) => <SignatureItem sig={sig} />)}
       </div>
       {hidden.length > 0 && (
@@ -44,7 +44,7 @@ const hidden = signatures.slice(maxItems).filter(Boolean);
           <summary class="signature-list-summary">
             <span class="text-muted text-xs fw-bold">+ {hidden.length} daugiau</span>
           </summary>
-          <div class="flex flex-col gap-2 mt-2">
+          <div class="stack stack-sm mt-2">
             {hidden.map((sig) => <SignatureItem sig={sig} />)}
           </div>
         </details>

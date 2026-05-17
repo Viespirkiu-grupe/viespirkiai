@@ -1,6 +1,6 @@
 ---
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
-import TruncationNotice from '@design-system/components/TruncationNotice.astro';
+import ResultSection from '@design-system/components/ResultSection.astro';
 
 const { asmuo } = Astro.props;
 if (!(asmuo.vdiPazeidimai?.count > 0)) return;
@@ -16,22 +16,25 @@ const aggregated = Object.values(
 ) as any[];
 ---
 
-<div class="page-section mb-10" id="vdiPazeidimai">
-  <h2><a href="#vdiPazeidimai" class="no-style">Darbo teisės pažeidimai</a></h2>
-  <TruncationNotice count={count} shown={rows.length} anchor="vdiPazeidimai" paramName="vdiPazeidimaiLimit" label="pažeidimai" />
-  <div class="result-list">
-    {aggregated.map((p: any) => (
-      <ResultCardShell>
-        <dl slot="meta" class="result-card-meta">
-          <div><dt class="sr-only">Teisės aktas</dt><dd>{p.teisesAktas}</dd></div>
-          <div><dt class="sr-only">Straipsnis</dt><dd>{p.straipsnis} str.{p.dalis && ` ${p.dalis} d.`}</dd></div>
-          {p.pirmaKarta && <div><dd>Pirmą kartą</dd></div>}
-        </dl>
-        <h3 slot="title" class="result-card-title">
-          {p.kiekis > 1 && <span class="font-bold mr-1">{p.kiekis}&times;</span>}
-          {p.pavadinimas}
-        </h3>
-      </ResultCardShell>
-    ))}
-  </div>
-</div>
+<ResultSection
+  id="vdiPazeidimai"
+  title="Darbo teisės pažeidimai"
+  count={count}
+  shown={rows.length}
+  paramName="vdiPazeidimaiLimit"
+  label="pažeidimai"
+>
+  {aggregated.map((p: any) => (
+    <ResultCardShell>
+      <dl slot="meta" class="result-card-meta">
+        <div><dt class="sr-only">Teisės aktas</dt><dd>{p.teisesAktas}</dd></div>
+        <div><dt class="sr-only">Straipsnis</dt><dd>{p.straipsnis} str.{p.dalis && ` ${p.dalis} d.`}</dd></div>
+        {p.pirmaKarta && <div><dd>Pirmą kartą</dd></div>}
+      </dl>
+      <h3 slot="title" class="result-card-title">
+        {p.kiekis > 1 && <span class="font-bold mr-1">{p.kiekis}&times;</span>}
+        {p.pavadinimas}
+      </h3>
+    </ResultCardShell>
+  ))}
+</ResultSection>

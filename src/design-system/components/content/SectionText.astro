@@ -1,4 +1,6 @@
 ---
+import ContentSection from '@design-system/components/ContentSection.astro';
+
 interface Props {
   title: string;
   paragraphs: string[];
@@ -6,13 +8,10 @@ interface Props {
 }
 
 const { title, paragraphs, titleTag = 'h2' } = Astro.props;
-const TitleTag = titleTag;
 ---
 
-<section>
-  <TitleTag>{title}</TitleTag>
-
+<ContentSection title={title} titleTag={titleTag}>
   {paragraphs.map((paragraph) => <p set:html={paragraph} />)}
 
   <slot />
-</section>
+</ContentSection>

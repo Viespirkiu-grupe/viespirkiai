@@ -7,6 +7,7 @@
 @import "../design-system/foundation/theme.css";
 @import "../design-system/foundation/variables.css";
 @import "../design-system/foundation/reset.css";
+@import "../design-system/foundation/links.css";
 @import "../design-system/foundation/typography.css";
 @import "../design-system/foundation/layout-primitives.css";
 @import "../design-system/foundation/spacing.css";

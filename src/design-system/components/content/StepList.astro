@@ -1,4 +1,6 @@
 ---
+import ContentSection from '@design-system/components/ContentSection.astro';
+
 interface StepItem {
   title: string;
   body: string[];
@@ -7,17 +9,21 @@ interface StepItem {
 
 interface Props {
   items: StepItem[];
+  title?: string;
+  titleTag?: 'h2' | 'h3';
 }
 
-const { items } = Astro.props;
+const { items, title, titleTag = 'h2' } = Astro.props;
 ---
 
-<ol class="mt-4">
-  {items.map((item) => (
-    <li class="mb-4">
-      <h4>{item.title}</h4>
-      {item.body.map((paragraph) => <p set:html={paragraph} />)}
-      {item.mutedHtml && <p class="text-muted text-sm"><em set:html={item.mutedHtml} /></p>}
-    </li>
-  ))}
-</ol>
+<ContentSection title={title} titleTag={titleTag}>
+  <ol class="mt-4">
+    {items.map((item) => (
+      <li class="mb-4">
+        <h4>{item.title}</h4>
+        {item.body.map((paragraph) => <p set:html={paragraph} />)}
+        {item.mutedHtml && <p class="text-muted text-sm"><em set:html={item.mutedHtml} /></p>}
+      </li>
+    ))}
+  </ol>
+</ContentSection>

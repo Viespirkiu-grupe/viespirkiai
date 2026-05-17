@@ -1,4 +1,6 @@
 ---
+import ContentSection from '@design-system/components/ContentSection.astro';
+
 interface FaqItem {
   question: string;
   answerHtml: string;
@@ -12,14 +14,11 @@ interface Props {
 }
 
 const { items, title, headingLevel = 'h2', questionTag = 'h3' } = Astro.props;
-const HeadingTag = headingLevel;
 const QuestionTag = questionTag;
 ---
 
-<section>
-  {title && <HeadingTag>{title}</HeadingTag>}
-
-  <div class="faq">
+<ContentSection title={title} titleTag={headingLevel}>
+  <div class="faq stack stack-sm">
     {items.map((item) => (
       <div class="faq-item">
         <QuestionTag class="faq-question" set:html={item.question} />
@@ -27,14 +26,9 @@ const QuestionTag = questionTag;
       </div>
     ))}
   </div>
-</section>
+</ContentSection>
 
 <style>
-  .faq {
-    display: flex;
-    flex-direction: column;
-  }
-
   .faq-item {
     padding-top: 1rem;
     padding-bottom: 1rem;

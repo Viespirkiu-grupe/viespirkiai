@@ -68,6 +68,9 @@ export default {
 
     // Features
     enableGraph: false,
+    enableVectorSearch: false,
+    vectorSearchUrl: "",
+    ocrRezultataiLocation: undefined, // Absoliutus kelias OCR rezultatų blob saugoti (pvz. /data/ocrRezultatai)
     enableExecuteQueryMcp: false, // Rodyti get_schema ir execute_query MCP įrankius
     enableExecuteQueryMcpOnly: false, // Skirta local testavimui kartu su prod viespirkiai
 };

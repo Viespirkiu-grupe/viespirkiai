@@ -4,6 +4,7 @@ import { log } from "../../utils/log.js";
 import { postgres, parsePgArray } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import Timings from "../../utils/timings.js";
+import { readRezultatasFs } from "../ocr/rezultataiFs.js";
 
 const nodeName = process.env.NODE_NAME || "default";
 const nuskaitymoVersija = 12;
@@ -97,8 +98,7 @@ async function nuskaitytiDokNuskaitytojuje(
     timings.start("ocrRezultatai");
     try {
         const res = await postgres.query(
-            `SELECT *
-             FROM "failaiOcrRezultatai"
+            `SELECT md5 FROM "failaiOcrRezultatai"
              WHERE failas = $1
              ORDER BY id DESC
              LIMIT 1`,
@@ -106,10 +106,8 @@ async function nuskaitytiDokNuskaitytojuje(
         );
 
         if (res.rows.length > 0) {
-            const latestEntry = res.rows[0];
-            body.puslapiai = latestEntry.tekstas
-                ? parsePgArray(latestEntry.tekstas)
-                : [];
+            const rezultatas = await readRezultatasFs(res.rows[0].md5);
+            body.puslapiai = Array.isArray(rezultatas?.tekstas) ? rezultatas.tekstas : [];
         }
     } catch (e) {
         console.error(e);
