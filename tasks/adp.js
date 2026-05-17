@@ -8,7 +8,7 @@ const ADP_DATASETS = [
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SaskaituSalys",
         limit: 1000,
         mapping: {
-            _type: "_type", _id: "_id", _revision: "_revision",
+            _id: "_id", _revision: "_revision",
             id: "id", sf_id: "sfId", tipas: "tipas",
             validus_asmens_kodas: "validusAsmensKodas",
             validus_jar_kodas: "validusJarKodas",
