@@ -63,4 +63,6 @@ export default {
     enableGraph: false,
     enableVectorSearch: false,
     vectorSearchUrl: "",
+
+    ocrRezultataiLocation: undefined, // Absoliutus kelias OCR rezultatų blob saugoti (pvz. /data/ocrRezultatai)
 };

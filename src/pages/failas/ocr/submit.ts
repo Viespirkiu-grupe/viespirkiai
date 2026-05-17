@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { validateOcrApiKey } from '@/modules/failai/auth.js';
 import { postgres } from '@/postgres/postgres.js';
 import { ocrLiveUpdates } from '../../../lib/ocrLiveUpdates.ts';
+import { saveRezultatasFs } from '@/modules/ocr/rezultataiFs.js';
 
 export const GET: APIRoute = async () => {
   return new Response('Method not allowed', { status: 405 });
@@ -62,9 +63,9 @@ export const POST: APIRoute = async ({ request }) => {
         [id],
       ),
       client.query(
-        `INSERT INTO "failaiOcrRezultatai" (failas, md5, tekstas, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
-         VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7, $8)`,
-        [id, md5, tekstas, user.pavadinimas, lockedAt, duration, puslapiuSkaicius, zodziuSkaicius],
+        `INSERT INTO "failaiOcrRezultatai" (failas, md5, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
+         VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7)`,
+        [id, md5, user.pavadinimas, lockedAt, duration, puslapiuSkaicius, zodziuSkaicius],
       ),
       client.query(
         `UPDATE "ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
@@ -79,6 +80,9 @@ export const POST: APIRoute = async ({ request }) => {
     ]);
 
     await client.query('COMMIT');
+
+    await saveRezultatasFs({ failas: id, md5, tekstas, node: user.pavadinimas, submitTimestamp: new Date().toISOString(), lockTimestamp: lockedAt, duration, puslapiuSkaicius, zodziuSkaicius });
+
     return Response.json({ status: 'ok' });
   } catch (e) {
     await client.query('ROLLBACK');

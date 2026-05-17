@@ -2,21 +2,12 @@ import fs from "fs";
 import path from "path";
 import QueryStream from "pg-query-stream";
 import { postgres } from "../../postgres/postgres.js";
-import { parsePgArray } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import { readRezultatasFs } from "./rezultataiFs.js";
 
 const ROWS_PER_FILE = 100_000;
 const LOG_EVERY = 1_000;
 
-function tryParsePgArray(tekstas) {
-    try {
-        const arr = parsePgArray(tekstas);
-        if (arr.length > 0) return arr;
-    } catch {
-        // fall through
-    }
-    return tekstas;
-}
 
 async function run(outputDir) {
     if (!fs.existsSync(outputDir)) {
@@ -49,7 +40,7 @@ async function run(outputDir) {
     const client = await postgres.connect();
     try {
         const qs = new QueryStream(
-            `SELECT id, failas, md5, tekstas, node, "lockTimestamp", "submitTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius"
+            `SELECT id, failas, md5, node, "lockTimestamp", "submitTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius"
              FROM public."failaiOcrRezultatai"
              ORDER BY id ASC`,
         );
@@ -57,8 +48,8 @@ async function run(outputDir) {
 
         for await (const row of stream) {
             if (rowsInFile >= ROWS_PER_FILE) openNextFile();
-            const tekstas = row.tekstas != null ? tryParsePgArray(row.tekstas) : null;
-            fileStream.write(JSON.stringify({ ...row, tekstas }) + "\n");
+            const rezultatas = await readRezultatasFs(row.md5);
+            fileStream.write(JSON.stringify({ ...row, tekstas: rezultatas?.tekstas ?? null }) + "\n");
             rowsInFile++;
             totalRows++;
             if (totalRows - lastLogAt >= LOG_EVERY) {
