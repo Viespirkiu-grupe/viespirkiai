@@ -187,7 +187,7 @@ const ADP_DATASETS = [
         dataset: "datasets/gov/uzt/ldv/Vieta",
         limit: 1000,
         mapping: {
-            _type: "_type", _id: "_id", _revision: "_revision",
+            _id: "_id", _revision: "_revision",
             darbo_vietos_id: "darbo_vietos_id", statusas: "statusas",
             ikelimo_data: "ikelimo_data", galioja_nuo: "galioja_nuo",
             galioja_iki: "galioja_iki",
