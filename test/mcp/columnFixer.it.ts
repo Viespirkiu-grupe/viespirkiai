@@ -27,6 +27,18 @@ describe("extractBadColumnName", () => {
         expect(extractBadColumnName('column "pirkejokodas" does not exist')).toBe("pirkejokodas");
     });
 
+    it("strips table-qualifier prefix from quoted form: \"d.pirkimonumeris\" → \"pirkimonumeris\"", () => {
+        expect(extractBadColumnName('column "d.pirkimonumeris" does not exist')).toBe("pirkimonumeris");
+    });
+
+    it("handles unquoted form with table qualifier: column d.pirkimonumeris does not exist", () => {
+        expect(extractBadColumnName("column d.pirkimonumeris does not exist")).toBe("pirkimonumeris");
+    });
+
+    it("handles unquoted form without table qualifier: column pirkimonumeris does not exist", () => {
+        expect(extractBadColumnName("column pirkimonumeris does not exist")).toBe("pirkimonumeris");
+    });
+
     it("returns null for unrelated error text", () => {
         expect(extractBadColumnName("permission denied for table sutartys")).toBeNull();
     });
@@ -203,6 +215,19 @@ describe("execute_query — column case auto-fix (integration)", () => {
         expect(result.isError, "should succeed after auto-fix on raw table").toBeFalsy();
         const payload = JSON.parse(result.content[0].text);
         expect(payload.rows.length).toBeGreaterThan(0);
+    });
+
+    it("auto-fixes table-alias-qualified unquoted camelCase: d.pirkimoNumeris → d.\"pirkimoNumeris\"", async () => {
+        const result = (await handler({
+            query: "SELECT d.pirkimoNumeris FROM v_dalyviai d LIMIT 1",
+            purpose: "auto-fix integration: table-alias qualified unquoted camelCase",
+            page: 1,
+        })) as AnyResult;
+
+        expect(result.isError, "should succeed after auto-fix of table-qualified column").toBeFalsy();
+        const payload = JSON.parse(result.content[0].text);
+        expect(payload.rows.length).toBeGreaterThan(0);
+        expect("pirkimoNumeris" in payload.rows[0]).toBe(true);
     });
 
     it("returns isError when column is unknown (not fixable)", async () => {

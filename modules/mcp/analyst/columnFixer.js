@@ -48,9 +48,19 @@ async function _buildFullMap() {
 }
 
 // Extracts the lowercased column name from a PostgreSQL "does not exist" error message.
+// Handles both quoted form:   column "pirkimonumeris" does not exist
+// and unquoted qualified form: column d.pirkimonumeris does not exist
 export function extractBadColumnName(errorText) {
-    const match = errorText.match(/column "([^"]+)" does not exist/);
-    return match?.[1] ?? null;
+    const quotedMatch = errorText.match(/column "([^"]+)" does not exist/);
+    if (quotedMatch) {
+        // Strip any table-qualifier prefix (e.g. "d.pirkimonumeris" → "pirkimonumeris")
+        const col = quotedMatch[1];
+        const dotIdx = col.lastIndexOf(".");
+        return dotIdx >= 0 ? col.slice(dotIdx + 1) : col;
+    }
+    // Unquoted form with optional table qualifier: column d.pirkimonumeris does not exist
+    const unquotedMatch = errorText.match(/column (?:\w+\.)?(\w+) does not exist/);
+    return unquotedMatch?.[1] ?? null;
 }
 
 function escapeRegex(str) {
