@@ -106,7 +106,6 @@ export async function executeWithColumnFix(
         const nextQuery = fixColumnInQuery(query, badColLower, correctCol);
         if (nextQuery === query) break; // replacement made no change — stop
 
-        console.error(`[columnFixer] attempt ${attempt}: auto-correcting "${badColLower}" → "${correctCol}"`);
         query = nextQuery;
     }
 

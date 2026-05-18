@@ -2,6 +2,7 @@ import { z } from "zod";
 import { postgres } from "../../../postgres/postgres.js";
 import { TABLE_WHITELIST } from "../analyst/validateSql.js";
 import { VIEW_NAMES, COVERED_TABLES_BY_VIEWS } from "../analyst/tempViews.js";
+import { traceSQL, traceSQLFailure } from "../analyst/utils.js";
 import { logToolCall } from "../mcpLogger.js";
 
 const COVERED_TABLES = new Set(Object.keys(COVERED_TABLES_BY_VIEWS));
@@ -263,10 +264,9 @@ const _cache = new Map<string, object>();
 export async function handler({ table, mode }: { table?: string; mode?: string } = {}): Promise<object> {
     const effectiveMode = (!table || mode === "inventory") ? "inventory" : (mode ?? "detail");
     const cacheKey = `${table ?? ""}:${effectiveMode}`;
-    console.error(`[get_schema] CALL table=${table ?? "(none)"} mode=${effectiveMode}`);
+    traceSQL(`[get_schema] CALL table=${table ?? "(none)"} mode=${effectiveMode}`);
 
     if (_cache.has(cacheKey)) {
-        console.error(`[get_schema] OK (cache hit) table=${table ?? "(none)"} mode=${effectiveMode}`);
         logToolCall({ toolName: name, durationMs: 0, success: true, errorMsg: undefined });
         return _cache.get(cacheKey)!;
     }
@@ -275,12 +275,11 @@ export async function handler({ table, mode }: { table?: string; mode?: string }
     try {
         const result = await _compute(table, effectiveMode);
         _cache.set(cacheKey, result);
-        console.error(`[get_schema] OK durationMs=${Date.now() - start} table=${table ?? "(none)"} mode=${effectiveMode}`);
         logToolCall({ toolName: name, durationMs: Date.now() - start, success: true, errorMsg: undefined });
         return result;
     } catch (err: unknown) {
         const msg = (err as Error).message;
-        console.error(`[get_schema] ERROR table=${table ?? "(none)"} mode=${effectiveMode} error="${msg}"`);
+        traceSQLFailure(`[get_schema] ERROR table=${table ?? "(none)"} mode=${effectiveMode} error="${msg}"`);
         logToolCall({ toolName: name, durationMs: Date.now() - start, success: false, errorMsg: msg });
         throw err;
     }

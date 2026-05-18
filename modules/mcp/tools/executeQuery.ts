@@ -2,6 +2,7 @@ import { z } from "zod";
 import { analystPool } from "../analyst/pool.js";
 import { MAX_QUERY_LENGTH, validateSql } from "../analyst/validateSql.js";
 import { executeWithColumnFix } from "../analyst/columnFixer.js";
+import { traceSQL, traceSQLFailure } from "../analyst/utils.js";
 import { logToolCall } from "../mcpLogger.js";
 import configModule from "../../../utils/config.js";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,10 +47,10 @@ export const schema = {
 };
 
 export async function handler({ query, purpose, page }: { query: string; purpose: string; page: number }): Promise<object> {
-    console.error(`[execute_query] CALL query="${query}" purpose="${purpose}" page=${page}`);
+    traceSQL(`[execute_query] CALL query="${query}" purpose="${purpose}" page=${page}`);
     const error = validateSql(query);
     if (error) {
-        console.error(`[execute_query] INVALID query="${query}" reason="${error}"`);
+        traceSQLFailure(`[execute_query] INVALID query="${query}" reason="${error}"`);
         return {
             content: [{ type: "text", text: error }],
             isError: true,
@@ -89,7 +90,7 @@ async function _runQuery(query: string, purpose: string, page: number) {
             durationMs,
         };
 
-        console.error(`[execute_query] OK rows=${rows.length} hasMore=${hasMore} durationMs=${durationMs}`);
+        traceSQL(`[execute_query] OK rows=${rows.length} hasMore=${hasMore} durationMs=${durationMs}`);
         logToolCall({ toolName: name, durationMs, success: true, errorMsg: undefined });
         return {
             content: [{ type: "text", text: JSON.stringify(payload) }],
@@ -98,7 +99,7 @@ async function _runQuery(query: string, purpose: string, page: number) {
         const msg = (err as Error & { code?: string }).code === "42703" || (err as Error).message.includes("does not exist")
             ? (err as Error).message + "\n\nHINT: Column names differ between tables and views. Call get_schema with the exact table/view name and mode:'detail' to see the correct column list before retrying."
             : (err as Error).message;
-        console.error(`[execute_query] ERROR query="${query}" error="${(err as Error).message}"`);
+        traceSQLFailure(`[execute_query] ERROR query="${query}" error="${(err as Error).message}"`);
         logToolCall({ toolName: name, durationMs: Date.now() - start, success: false, errorMsg: (err as Error).message });
         return {
             content: [{ type: "text", text: msg }],
