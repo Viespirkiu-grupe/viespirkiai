@@ -1,10 +1,11 @@
 import pkg from "node-sql-parser";
 import { VIEW_NAMES } from "./tempViews.js";
+
 const { Parser } = pkg;
 
 const parser = new Parser();
 
-export const TABLE_WHITELIST = new Set([
+export const TABLE_WHITELIST: Set<string> = new Set([
     "sutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
     "jarCsv", "jar",
     "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai",
@@ -27,7 +28,7 @@ export const TABLE_WHITELIST = new Set([
     "mokesciai",
 ]);
 
-export const FUNCTION_WHITELIST = new Set([
+export const FUNCTION_WHITELIST: Set<string> = new Set([
     // Aggregates
     "count", "sum", "avg", "min", "max", "stddev", "stddev_pop", "stddev_samp",
     "variance", "var_pop", "var_samp", "bool_and", "bool_or", "every",
@@ -67,17 +68,28 @@ const MAX_SUBQUERY_DEPTH = 3;
 const MAX_CTES = 8;
 export const MAX_QUERY_LENGTH = 3072;
 
+interface SqlAnalysis {
+    tables: Array<{ db: string | null; table: string }>;
+    functions: string[];
+    joinCount: number;
+    cteNames: Set<string>;
+    maxSubqueryDepth: number;
+    cteCount: number;
+    hasRecursive: boolean;
+}
+
 // Returns null if valid, or an error message string if invalid.
-export function validateSql(sql) {
+export function validateSql(sql: string): string | null {
     if (sql.length > MAX_QUERY_LENGTH) {
         return `Query exceeds the ${MAX_QUERY_LENGTH}-character limit.`;
     }
 
-    let ast;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let ast: any;
     try {
         ast = parser.astify(sql, { database: "PostgreSQL" });
-    } catch (err) {
-        return `SQL parse error: ${err.message}`;
+    } catch (err: unknown) {
+        return `SQL parse error: ${(err as Error).message}`;
     }
 
     if (Array.isArray(ast)) {
@@ -88,7 +100,7 @@ export function validateSql(sql) {
         return `Only SELECT statements are allowed (got ${ast.type?.toUpperCase() ?? "unknown"})`;
     }
 
-    const analysis = {
+    const analysis: SqlAnalysis = {
         tables: [],
         functions: [],
         joinCount: 0,
@@ -133,7 +145,8 @@ export function validateSql(sql) {
     return null;
 }
 
-function walkSelect(selectNode, result, depth) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function walkSelect(selectNode: any, result: SqlAnalysis, depth: number): void {
     if (selectNode.with) {
         for (const cte of selectNode.with) {
             if (cte.name?.value) result.cteNames.add(cte.name.value);
@@ -163,7 +176,8 @@ function walkSelect(selectNode, result, depth) {
     walkExpr(selectNode.window, result, depth);
 }
 
-function walkExpr(node, result, depth) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function walkExpr(node: any, result: SqlAnalysis, depth: number): void {
     if (!node || typeof node !== "object") return;
 
     if (Array.isArray(node)) {

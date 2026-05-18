@@ -4,9 +4,14 @@ import { TABLE_WHITELIST } from "./validateSql.js";
 
 export const MAX_AUTO_RETRIES = 5;
 
+type ToolResult = {
+    isError?: boolean;
+    content: Array<{ type: string; text: string }>;
+};
+
 // Built synchronously from VIEW_METADATA at module init — no DB required.
 const _viewMap = (() => {
-    const m = new Map();
+    const m = new Map<string, string>();
     for (const meta of Object.values(VIEW_METADATA)) {
         for (const colStr of meta.columns) {
             const col = colStr.split(": ")[0];
@@ -18,15 +23,15 @@ const _viewMap = (() => {
 
 // Lazy-loaded promise that extends _viewMap with raw table columns from the DB.
 // Cached after the first call; safe to call concurrently.
-let _fullMapPromise = null;
+let _fullMapPromise: Promise<Map<string, string>> | null = null;
 
-export async function getMixedCaseMap() {
+export async function getMixedCaseMap(): Promise<Map<string, string>> {
     if (_fullMapPromise) return _fullMapPromise;
     _fullMapPromise = _buildFullMap();
     return _fullMapPromise;
 }
 
-async function _buildFullMap() {
+async function _buildFullMap(): Promise<Map<string, string>> {
     const map = new Map(_viewMap);
     try {
         const result = await postgres.query(
@@ -50,7 +55,7 @@ async function _buildFullMap() {
 // Extracts the lowercased column name from a PostgreSQL "does not exist" error message.
 // Handles both quoted form:   column "pirkimonumeris" does not exist
 // and unquoted qualified form: column d.pirkimonumeris does not exist
-export function extractBadColumnName(errorText) {
+export function extractBadColumnName(errorText: string): string | null {
     const quotedMatch = errorText.match(/column "([^"]+)" does not exist/);
     if (quotedMatch) {
         // Strip any table-qualifier prefix (e.g. "d.pirkimonumeris" → "pirkimonumeris")
@@ -63,7 +68,7 @@ export function extractBadColumnName(errorText) {
     return unquotedMatch?.[1] ?? null;
 }
 
-function escapeRegex(str) {
+function escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
@@ -72,7 +77,7 @@ function escapeRegex(str) {
  * quoted correct form.  Handles both quoted lowercase ("pirkejokodas") and unquoted
  * camelCase variants (pirkejoKodas, PIRKEJOKODAS, …).
  */
-export function fixColumnInQuery(query, badColLower, correctCol) {
+export function fixColumnInQuery(query: string, badColLower: string, correctCol: string): string {
     // 1. Replace quoted wrong-case: "pirkejokodas" → "pirkejoKodas"
     let fixed = query.replaceAll(`"${badColLower}"`, `"${correctCol}"`);
 
@@ -88,13 +93,12 @@ export function fixColumnInQuery(query, badColLower, correctCol) {
 /**
  * Executes `runAttempt(query)` and, on a "column does not exist" error, attempts to
  * correct the column name case and retry — up to MAX_AUTO_RETRIES times total.
- *
- * @param {(query: string) => Promise<{isError?: boolean, content: Array<{text: string}>}>} runAttempt
- * @param {string} initialQuery
- * @returns {Promise<{isError?: boolean, content: Array<{text: string}>}>}
  */
-export async function executeWithColumnFix(runAttempt, initialQuery) {
-    const errors = [];
+export async function executeWithColumnFix(
+    runAttempt: (query: string) => Promise<ToolResult>,
+    initialQuery: string,
+): Promise<ToolResult> {
+    const errors: Array<{ attempt: number; query: string; error: string }> = [];
     let query = initialQuery;
 
     for (let attempt = 1; attempt <= MAX_AUTO_RETRIES; attempt++) {

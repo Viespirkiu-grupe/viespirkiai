@@ -1,4 +1,4 @@
-export const VIEW_DEFINITIONS = {
+export const VIEW_DEFINITIONS: Record<string, string> = {
     v_company: `CREATE TEMP VIEW v_company AS
 SELECT j."jarKodas"::text,
        j.pavadinimas,
@@ -182,13 +182,11 @@ FROM "bylosDalyviai" bd
          LEFT JOIN "jarCsv" j ON j."jarKodas"::text = bd.kodas`,
 };
 
-export const TEMP_VIEWS_SQL = Object.values(VIEW_DEFINITIONS).join(';\n\n') + ';';
+export const TEMP_VIEWS_SQL: string = Object.values(VIEW_DEFINITIONS).join(';\n\n') + ';';
 
-export const VIEW_NAMES = new Set(Object.keys(VIEW_DEFINITIONS));
+export const VIEW_NAMES: Set<string> = new Set(Object.keys(VIEW_DEFINITIONS));
 
-// Maps each main (FROM-clause) table to the view that fully covers it.
-// getSchema uses this to suppress raw table listings in favour of the view.
-export const COVERED_TABLES_BY_VIEWS = {
+export const COVERED_TABLES_BY_VIEWS: Record<string, string> = {
     jarCsv:                  "v_company",
     sutartys:                "v_sutartys",
     viesiejiPirkimai:        "v_pirkimas",

@@ -17,7 +17,19 @@ const IDENTIFIER_CANDIDATES = [
     "pirkejoKodas",
 ];
 
-export const VIEW_METADATA = {
+type JoinType = "strict" | "semantic" | "sparse";
+type JoinDef = [string, string, JoinType];
+
+interface ViewMetadata {
+    tags: string[];
+    keys: string[];
+    joins: JoinDef[];
+    columns: string[];
+    primaryKeys: string[];
+    example: string;
+}
+
+export const VIEW_METADATA: Record<string, ViewMetadata> = {
     v_company: {
         tags: ["capacity", "blacklist", "labor", "domains", "court"],
         keys: ["jarKodas", "pavadinimas", "darbuotojai", "melagingisTiekejas", "bylosSkaicius"],
@@ -233,7 +245,7 @@ export const description =
 
 export const schema = {
     table: z
-        .enum([...TABLE_LIST, ...VIEW_LIST])
+        .enum([...TABLE_LIST, ...VIEW_LIST] as [string, ...string[]])
         .optional()
         .describe("Table or view name. Omit to list all entities (inventory mode)."),
     mode: z
@@ -246,50 +258,55 @@ export const schema = {
 
 // In-process cache: schema/inventory results are stable for the lifetime of the process.
 // Keyed by "<table>:<effectiveMode>" — empty string prefix for inventory.
-const _cache = new Map();
+const _cache = new Map<string, object>();
 
-export async function handler({ table, mode } = {}) {
+export async function handler({ table, mode }: { table?: string; mode?: string } = {}): Promise<object> {
     const effectiveMode = (!table || mode === "inventory") ? "inventory" : (mode ?? "detail");
     const cacheKey = `${table ?? ""}:${effectiveMode}`;
+    console.error(`[get_schema] CALL table=${table ?? "(none)"} mode=${effectiveMode}`);
 
     if (_cache.has(cacheKey)) {
-        logToolCall({ toolName: name, durationMs: 0, success: true });
-        return _cache.get(cacheKey);
+        console.error(`[get_schema] OK (cache hit) table=${table ?? "(none)"} mode=${effectiveMode}`);
+        logToolCall({ toolName: name, durationMs: 0, success: true, errorMsg: undefined });
+        return _cache.get(cacheKey)!;
     }
 
     const start = Date.now();
     try {
         const result = await _compute(table, effectiveMode);
         _cache.set(cacheKey, result);
-        logToolCall({ toolName: name, durationMs: Date.now() - start, success: true });
+        console.error(`[get_schema] OK durationMs=${Date.now() - start} table=${table ?? "(none)"} mode=${effectiveMode}`);
+        logToolCall({ toolName: name, durationMs: Date.now() - start, success: true, errorMsg: undefined });
         return result;
-    } catch (err) {
-        logToolCall({ toolName: name, durationMs: Date.now() - start, success: false, errorMsg: err.message });
+    } catch (err: unknown) {
+        const msg = (err as Error).message;
+        console.error(`[get_schema] ERROR table=${table ?? "(none)"} mode=${effectiveMode} error="${msg}"`);
+        logToolCall({ toolName: name, durationMs: Date.now() - start, success: false, errorMsg: msg });
         throw err;
     }
 }
 
-async function _compute(table, effectiveMode) {
+async function _compute(table: string | undefined, effectiveMode: string): Promise<object> {
     if (effectiveMode === "inventory") {
         return listAll();
     }
     if (effectiveMode === "columns") {
-        return VIEW_NAMES.has(table) ? describeViewColumns(table) : describeTableColumns(table);
+        return VIEW_NAMES.has(table!) ? describeViewColumns(table!) : describeTableColumns(table!);
     }
     if (effectiveMode === "joins") {
-        return VIEW_NAMES.has(table) ? describeViewJoins(table) : describeTableJoins(table);
+        return VIEW_NAMES.has(table!) ? describeViewJoins(table!) : describeTableJoins(table!);
     }
     if (effectiveMode === "examples") {
-        return VIEW_NAMES.has(table) ? describeViewExamples(table) : describeTableExamples(table);
+        return VIEW_NAMES.has(table!) ? describeViewExamples(table!) : describeTableExamples(table!);
     }
     // detail (default)
-    if (VIEW_NAMES.has(table)) {
-        return describeViewDetail(table);
+    if (VIEW_NAMES.has(table!)) {
+        return describeViewDetail(table!);
     }
-    return describeTableDetail(table);
+    return describeTableDetail(table!);
 }
 
-async function listAll() {
+async function listAll(): Promise<object> {
     const [statsResult, columnsResult] = await Promise.all([
         postgres.query(
             `
@@ -315,12 +332,12 @@ async function listAll() {
     const rowCountMap = Object.fromEntries(
         statsResult.rows.map((r) => [r.table_name, r.row_count_estimate])
     );
-    const columnMap = new Map();
+    const columnMap = new Map<string, string[]>();
     for (const row of columnsResult.rows) {
         if (!columnMap.has(row.table_name)) {
             columnMap.set(row.table_name, []);
         }
-        columnMap.get(row.table_name).push(row.column_name);
+        columnMap.get(row.table_name)!.push(row.column_name);
     }
 
     const views = VIEW_LIST.map((id) => {
@@ -330,7 +347,7 @@ async function listAll() {
 
     const tables = TABLE_LIST.map((id) => {
         const cols = columnMap.get(id) ?? [];
-        const entry = { id, kind: "table", keys: cols.slice(0, 3), note: "Call get_schema(table, mode:'detail') for full column list before querying." };
+        const entry: Record<string, unknown> = { id, kind: "table", keys: cols.slice(0, 3), note: "Call get_schema(table, mode:'detail') for full column list before querying." };
         const rc = rowCountMap[id];
         if (rc != null) entry.rowCountEstimate = rc;
         return entry;
@@ -351,7 +368,7 @@ async function listAll() {
 
 // --- View detail modes ---
 
-async function describeViewDetail(viewName) {
+async function describeViewDetail(viewName: string): Promise<object> {
     const metadata = VIEW_METADATA[viewName];
     if (!metadata) {
         return {
@@ -379,7 +396,7 @@ async function describeViewDetail(viewName) {
     };
 }
 
-async function describeViewColumns(viewName) {
+async function describeViewColumns(viewName: string): Promise<object> {
     const metadata = VIEW_METADATA[viewName];
     if (!metadata) {
         return {
@@ -394,7 +411,7 @@ async function describeViewColumns(viewName) {
     };
 }
 
-async function describeViewJoins(viewName) {
+async function describeViewJoins(viewName: string): Promise<object> {
     const metadata = VIEW_METADATA[viewName];
     if (!metadata) {
         return {
@@ -409,7 +426,7 @@ async function describeViewJoins(viewName) {
     };
 }
 
-async function describeViewExamples(viewName) {
+async function describeViewExamples(viewName: string): Promise<object> {
     const metadata = VIEW_METADATA[viewName];
     if (!metadata) {
         return {
@@ -426,7 +443,13 @@ async function describeViewExamples(viewName) {
 
 // --- Table detail modes ---
 
-async function describeTableDetail(tableName) {
+interface ColumnRow {
+    column_name: string;
+    data_type: string;
+    is_nullable?: string;
+}
+
+async function describeTableDetail(tableName: string): Promise<object> {
     const coveringView = COVERED_TABLES_BY_VIEWS[tableName];
     if (coveringView) {
         return {
@@ -498,7 +521,7 @@ async function describeTableDetail(tableName) {
 
     const primaryKeys = primaryKeyResult.rows.map((row) => row.column_name);
     const columns = columnsArrayToObject(
-        colResult.rows.map((r) => `${r.column_name}: ${r.data_type}`)
+        colResult.rows.map((r: ColumnRow) => `${r.column_name}: ${r.data_type}`)
     );
     const joins = foreignKeyResult.rows.map((row) => [
         row.column_name,
@@ -525,7 +548,7 @@ async function describeTableDetail(tableName) {
     };
 }
 
-async function describeTableColumns(tableName) {
+async function describeTableColumns(tableName: string): Promise<object> {
     const coveringView = COVERED_TABLES_BY_VIEWS[tableName];
     if (coveringView) {
         return {
@@ -551,14 +574,14 @@ async function describeTableColumns(tableName) {
         };
     }
 
-    const columns = columnsArrayToObject(colResult.rows.map((r) => `${r.column_name}: ${r.data_type}`));
+    const columns = columnsArrayToObject(colResult.rows.map((r: ColumnRow) => `${r.column_name}: ${r.data_type}`));
     return {
         structuredContent: { id: tableName, columns },
         content: [{ type: "text", text: `${tableName}: ${Object.keys(columns).length} columns.` }],
     };
 }
 
-async function describeTableJoins(tableName) {
+async function describeTableJoins(tableName: string): Promise<object> {
     const coveringView = COVERED_TABLES_BY_VIEWS[tableName];
     if (coveringView) {
         return {
@@ -604,7 +627,7 @@ async function describeTableJoins(tableName) {
     };
 }
 
-async function describeTableExamples(tableName) {
+async function describeTableExamples(tableName: string): Promise<object> {
     const coveringView = COVERED_TABLES_BY_VIEWS[tableName];
     if (coveringView) {
         return {
@@ -639,8 +662,8 @@ async function describeTableExamples(tableName) {
 
 // --- Helpers ---
 
-function columnsArrayToObject(colStrings) {
-    const obj = {};
+function columnsArrayToObject(colStrings: string[]): Record<string, string> {
+    const obj: Record<string, string> = {};
     for (const col of colStrings) {
         const colonIdx = col.indexOf(": ");
         if (colonIdx !== -1) {
@@ -650,7 +673,7 @@ function columnsArrayToObject(colStrings) {
     return obj;
 }
 
-function buildTableExample(tableName, rows) {
+function buildTableExample(tableName: string, rows: ColumnRow[]): string {
     if (rows.length === 0) {
         return `SELECT 1 FROM "${tableName}" WHERE 1 = 1`;
     }
@@ -661,7 +684,7 @@ function buildTableExample(tableName, rows) {
     return `SELECT ${selectColumns.join(", ")} FROM "${tableName}" WHERE ${wherePredicate}`;
 }
 
-function pickRecommendedWhereColumn(rows) {
+function pickRecommendedWhereColumn(rows: ColumnRow[]): ColumnRow {
     for (const candidate of IDENTIFIER_CANDIDATES) {
         const found = rows.find((r) => r.column_name === candidate);
         if (found) return found;
@@ -678,7 +701,7 @@ function pickRecommendedWhereColumn(rows) {
     return rows[0];
 }
 
-function buildWherePredicate(row) {
+function buildWherePredicate(row: ColumnRow): string {
     const quotedName = `"${row.column_name}"`;
     const lowerName = row.column_name.toLowerCase();
     const lowerType = row.data_type.toLowerCase();
@@ -712,7 +735,7 @@ function buildWherePredicate(row) {
     return `${quotedName} IS NOT NULL`;
 }
 
-function assertViewMetadataCompleteness() {
+function assertViewMetadataCompleteness(): void {
     for (const viewName of VIEW_LIST) {
         if (!VIEW_METADATA[viewName]) {
             throw new Error(`Missing VIEW_METADATA for '${viewName}'.`);
