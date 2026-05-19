@@ -123,57 +123,46 @@ const bvpzCurrent = String(values['bvpzPrefiksasKitas'] || values['bvpzPrefiksas
     min-height: 41px;
     border: var(--border);
     border-radius: var(--radius-md);
-    overflow: hidden;
     background: var(--white);
     transition: border-color var(--transition), box-shadow var(--transition);
-  }
 
-  .ds-bvpz-group:focus-within {
-    border-color: var(--black);
-    box-shadow: 0 0 0 3px rgba(15, 15, 15, 0.08);
-  }
+    .ds-bvpz-input {
+      flex: 1 1 auto;
+      min-width: 0;
+      border: 0;
+      border-right: var(--border);
+      border-radius: var(--radius-md) 0 0 var(--radius-md);
+    }
 
-  .ds-bvpz-input {
-    flex: 1 1 auto;
-    min-width: 0;
-    border: 0;
-    border-right: var(--border);
-    border-radius: 0;
-  }
+    .ds-bvpz-trigger {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 41px;
+      min-width: 41px;
+      border: 0;
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      background: var(--black);
+      color: var(--white);
+      cursor: pointer;
+      transition: background-color var(--transition), color var(--transition);
+    }
 
-  .ds-bvpz-input:focus {
-    outline: none;
-    box-shadow: none;
-  }
+    .ds-bvpz-trigger:hover {
+      background: var(--dark-gray);
+      color: var(--white);
+    }
 
-  .ds-bvpz-trigger {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 41px;
-    min-width: 41px;
-    border: 0;
-    border-radius: 0;
-    background: var(--black);
-    color: var(--white);
-    cursor: pointer;
-    transition: background-color var(--transition), color var(--transition);
-  }
+    .ds-bvpz-input:focus-visible + .ds-bvpz-trigger {
+      outline: var(--border-focus);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    }
 
-  .ds-bvpz-trigger:hover {
-    background: var(--dark-gray);
-    color: var(--white);
-  }
-
-  .ds-bvpz-trigger:focus-visible {
-    outline: none;
-    box-shadow: none;
-  }
-
-  .ds-bvpz-trigger svg {
-    width: 18px;
-    height: 18px;
+    .ds-bvpz-trigger svg {
+      width: 18px;
+      height: 18px;
+    }
   }
 
   #bvpzDialogBackdrop[hidden] {

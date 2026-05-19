@@ -145,7 +145,14 @@ const hasTitleSuffix = Astro.slots.has('title-suffix');
     transition: background-color var(--transition), color var(--transition);
   }
 
-  .search-filters-toggle:hover {
-    background: var(--lighter-gray);
+  .search-filters-toggle {
+    &:hover {
+      background: var(--lighter-gray);
+    }
+
+    &:focus-within {
+      outline: var(--border-focus);
+      border-radius: var(--radius-sm);
+    }
   }
 </style>
