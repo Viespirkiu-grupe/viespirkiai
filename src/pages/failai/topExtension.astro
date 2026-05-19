@@ -7,7 +7,7 @@ import '@/utils/linksniai.js';
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 const page = parseInt(Astro.url.searchParams.get('page') || '1') || 1;
-const DEFAULT_LIMIT = 25;
+const DEFAULT_LIMIT = 24;
 const offset = (page - 1) * DEFAULT_LIMIT;
 const [extensionRes, countRes] = await Promise.all([postgres.query('SELECT * FROM "failaiStatsExtension" WHERE count > 0 ORDER BY count DESC, extension ASC LIMIT $1 OFFSET $2', [DEFAULT_LIMIT, offset]), postgres.query('SELECT COUNT(*) AS total FROM "failaiStatsExtension" WHERE count > 0')]);
 const extension = extensionRes.rows;
