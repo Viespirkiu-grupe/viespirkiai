@@ -19,18 +19,20 @@ function pageLink(page: number) {
 }
 ---
 
-<ul class="pagination">
-  {current > 1
-    ? <li><a href={pageLink(current - 1) + queryParams}>←</a></li>
-    : <li class="disabled"><span>←</span></li>
-  }
-  {Array.from({ length: end - start + 1 }, (_, i) => start + i).map(i => (
-    <li class={i === current ? 'active' : ''}>
-      <a href={pageLink(i) + queryParams}>{i}</a>
-    </li>
-  ))}
-  {current < totalPages
-    ? <li><a href={pageLink(current + 1) + queryParams}>→</a></li>
-    : <li class="disabled"><span>→</span></li>
-  }
-</ul>
+<nav aria-label="Puslapiavimas">
+  <ul class="pagination">
+    {current > 1
+      ? <li><a href={pageLink(current - 1) + queryParams}>←</a></li>
+      : <li class="disabled"><span>←</span></li>
+    }
+    {Array.from({ length: end - start + 1 }, (_, i) => start + i).map(i => (
+      <li class={i === current ? 'active' : ''}>
+        <a href={pageLink(i) + queryParams}>{i}</a>
+      </li>
+    ))}
+    {current < totalPages
+      ? <li><a href={pageLink(current + 1) + queryParams}>→</a></li>
+      : <li class="disabled"><span>→</span></li>
+    }
+  </ul>
+</nav>
