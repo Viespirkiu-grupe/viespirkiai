@@ -1,4 +1,4 @@
-<p class="text-justify"><i>Šis failas – nepavykosio dokumento siuntimo faksu garso įrašas. Norint jį iškoduoti mūsų iniciatyva bandė viską: begalę fakso programų, hex editor ir netgi Windows XP. <br>Veikė tik vienas metodas:</i></p>
+<p class="text-justify"><i>Šis failas – nepavykusio dokumento siuntimo faksu garso įrašas. Norint jį iškoduoti mūsų iniciatyva bandė viską: begalę fakso programų, hex editor ir netgi Windows XP. <br>Veikė tik vienas metodas:</i></p>
 
 <pre class="code-block mb-4">sox -t raw -r 8000 -e a-law -b 8 -c 1 debug.fax output.wav
 docker run --rm -v $(pwd):/data -w /data ghcr.io/sieteunoseis/spandsp:main fax_decode output.wav</pre>
