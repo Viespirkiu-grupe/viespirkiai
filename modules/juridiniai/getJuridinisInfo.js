@@ -35,10 +35,11 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
         };
     }
 
-    // Fetch jarCsv and jar in parallel — they are independent
+    // Fetch jarCsv, jar, and isregistruoti in parallel — all independent
     timings.start("jarCsv");
     timings.start("jar");
-    const [{ rows: jarRezultatai }, jarRes] = await Promise.all([
+    timings.start("isregistruotas");
+    const [{ rows: jarRezultatai }, jarRes, { rows: isrRezultatai }] = await Promise.all([
         postgres.query(
             `SELECT *,
                         ST_X(location::geometry) AS lon,
@@ -49,9 +50,11 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
             [jarKodas],
         ),
         postgres.query(`SELECT * FROM "jar" WHERE "jarKodas" = $1`, [jarKodas]),
+        postgres.query(`SELECT * FROM "jarCsvIsregistruoti" WHERE "jarKodas" = $1 LIMIT 1`, [jarKodas]),
     ]);
     timings.end("jarCsv");
     timings.end("jar");
+    timings.end("isregistruotas");
 
     // data.gov.lt ID JAR
     let jarId;
@@ -59,8 +62,25 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
         jarId = jarRes.rows[0]._id;
     }
 
-    // 404
+    // Format isregistruoti dates
+    let isregistruotasAsmuo = null;
+    if (isrRezultatai.length > 0) {
+        const isr = isrRezultatai[0];
+        isr.registravimoData = isr.registravimoData ? new Date(isr.registravimoData).toLtDate() : null;
+        isr.isregistravimoData = isr.isregistravimoData ? new Date(isr.isregistravimoData).toLtDate() : null;
+        isr.duomenuData = isr.duomenuData ? new Date(isr.duomenuData).toLtDate() : null;
+        isregistruotasAsmuo = isr;
+    }
+
+    // 404 — not found in any main registry table
     if (jarRezultatai.length === 0 && jarRes.rows.length === 0) {
+        if (isregistruotasAsmuo) {
+            return {
+                isregistruotas: true,
+                isregistruotasAsmuo,
+                timings,
+            };
+        }
         return {
             error: 404,
             timings,
@@ -148,6 +168,7 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
     return {
         asmuo: {
             jar,
+            isregistruotasAsmuo,
             ...data,
         },
         timings,

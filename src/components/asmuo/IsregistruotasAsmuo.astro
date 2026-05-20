@@ -1,0 +1,66 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import Button from '@design-system/components/Button.astro';
+import Badge from '@design-system/components/Badge.astro';
+import config from '../../lib/config.ts';
+
+interface Props {
+  isregistruotasAsmuo: any;
+  colorScheme?: string;
+  font?: string;
+}
+
+const { isregistruotasAsmuo: isr, colorScheme = 'auto', font = 'ubuntu' } = Astro.props;
+---
+
+<Layout
+  pageTitle={isr.pavadinimas || isr.jarKodas}
+  pageDescription="Išregistruotas juridinis asmuo"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      {isr.pavadinimas || isr.jarKodas}
+      <Fragment slot="actions">
+        <Button href={`/pirkejas/${isr.jarKodas}`} variant="outline" size="sm">↗ Pirkimai</Button>
+        <Button href={`/tiekejas/${isr.jarKodas}`} variant="outline" size="sm">↗ Pardavimai</Button>
+      </Fragment>
+    </PageHeader>
+
+    <div class="mb-4">
+      <Badge variant="danger">Išregistruotas</Badge>
+    </div>
+
+    <KeyValueList>
+      <dt>JAR kodas</dt>
+      <dd>
+        <span class="cell-mono">{isr.jarKodas}</span>
+        {isr.formosPavadinimas && <> · {isr.formosPavadinimas}</>}
+      </dd>
+
+      {isr.adresas && <>
+        <dt>Adresas</dt>
+        <dd>{isr.adresas}</dd>
+      </>}
+
+      {isr.registravimoData && <>
+        <dt>Įregistruota</dt>
+        <dd>{isr.registravimoData}</dd>
+      </>}
+
+      {isr.isregistravimoData && <>
+        <dt>Išregistruota</dt>
+        <dd>{isr.isregistravimoData}</dd>
+      </>}
+
+      {isr.duomenuData && <>
+        <dt>Duomenų data</dt>
+        <dd>{isr.duomenuData}</dd>
+      </>}
+    </KeyValueList>
+  </main>
+</Layout>
