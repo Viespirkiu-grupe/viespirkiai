@@ -55,21 +55,23 @@ const adresai = adresaiRes.rows;
       <ResultsSummary html={numberOfResults} />
     </div>
 
-    <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-      {adresai.map((item: any) => (
-        <article class="card card-clickable">
-          <div class="card-body">
-            <h3 class="text-sm mb-2">
-              <a href={`/juridiniai?adresas=${encodeURIComponent(item.adresas)}`}>
-                {item.adresas}
-              </a>
-            </h3>
-            <p class="text-muted text-sm mb-0"><span class="cell-mono">{item.count}</span> įmonės</p>
-          </div>
-        </article>
-      ))}
-    </div>
+    <div class="stack stack-md">
+      <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+        {adresai.map((item: any) => (
+          <article class="card card-clickable">
+            <div class="card-body">
+              <h3 class="text-sm mb-2">
+                <a href={`/juridiniai?adresas=${encodeURIComponent(item.adresas)}`}>
+                  {item.adresas}
+                </a>
+              </h3>
+              <p class="text-muted text-sm mb-0"><span class="cell-mono">{item.count}</span> įmonės</p>
+            </div>
+          </article>
+        ))}
+      </div>
 
-    <Pagination currentPage={page} pageCount={pageCount} queryParams="" />
+      <Pagination currentPage={page} pageCount={pageCount} queryParams="" />
+    </div>
   </main>
 </Layout>
