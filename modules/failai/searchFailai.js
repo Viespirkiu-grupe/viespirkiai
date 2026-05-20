@@ -382,6 +382,11 @@ export async function searchFailai(
             queryParams,
             usedHiddenFields: qwUsedHiddenFields,
             engine: "Quickwit",
+            timings: [
+                { label: "Quickwit", phase: "search", start: 0, duration: qwMs },
+                { label: "Filtravimas", phase: "filter", start: qwMs, duration: filterMs },
+                { label: "Ištraukos", phase: "pg", start: qwMs + filterMs, duration: pgMs },
+            ],
             stream: null,
             client: null,
         };
