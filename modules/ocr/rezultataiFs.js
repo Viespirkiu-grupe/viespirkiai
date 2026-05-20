@@ -3,12 +3,19 @@ import path from "path";
 import config from "../../config.js";
 import { parsePgArray } from "../../postgres/postgres.js";
 
+function isRemoteLocation(location) {
+    return location?.startsWith("http://") || location?.startsWith("https://");
+}
+
 export function getRezultatasPath(md5) {
-    if (!config.ocrRezultataiLocation) return null;
+    if (!config.ocrRezultataiLocation || isRemoteLocation(config.ocrRezultataiLocation)) return null;
     return path.join(config.ocrRezultataiLocation, ...md5.slice(0, 5).split(""), `${md5}.json`);
 }
 
 export async function saveRezultatasFs(rezultatas) {
+    if (isRemoteLocation(config.ocrRezultataiLocation)) {
+        throw new Error(`ocrRezultataiLocation yra nuotolinis URL, negalima išsaugoti lokaliai (md5=${rezultatas.md5})`);
+    }
     const filePath = getRezultatasPath(rezultatas.md5);
     if (!filePath) {
         throw new Error(`ocrRezultataiLocation nenustatytas, negalima išsaugoti OCR rezultato (md5=${rezultatas.md5})`);
@@ -19,6 +26,20 @@ export async function saveRezultatasFs(rezultatas) {
 
 export async function readRezultatasFs(md5) {
     if (!md5) return null;
+    if (isRemoteLocation(config.ocrRezultataiLocation)) {
+        try {
+            const url = `${config.ocrRezultataiLocation}?md5=${encodeURIComponent(md5)}`;
+            const res = await fetch(url);
+            if (!res.ok) return null;
+            const rezultatas = await res.json();
+            if (typeof rezultatas.tekstas === "string") {
+                rezultatas.tekstas = parsePgArray(rezultatas.tekstas);
+            }
+            return rezultatas;
+        } catch {
+            return null;
+        }
+    }
     const filePath = getRezultatasPath(md5);
     if (!filePath) return null;
     try {
