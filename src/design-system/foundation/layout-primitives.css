@@ -15,10 +15,9 @@
         align-items: center;
         flex-wrap: wrap;
         gap: 12px;
-        margin-bottom: 28px;
         border-bottom: var(--border);
 
-        @apply pt-7 pb-4;
+        @apply mt-10 mb-7 pb-4;
     }
 
     .section { margin-block: 56px; }

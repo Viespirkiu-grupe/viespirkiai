@@ -55,6 +55,9 @@ public/dist/tailwind.css.map
 # Quickwit
 quickwit/qwdata
 
+# Astro generated
+.astro
+
 # Dist
 dist
 

@@ -46,6 +46,10 @@
         border-radius: var(--radius-sm);
     }
 
+    :is(input, textarea, select):focus-visible {
+        outline-offset: 0;
+    }
+
     :root {
         interpolate-size: allow-keywords;
     }

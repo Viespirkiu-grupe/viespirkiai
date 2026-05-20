@@ -186,19 +186,33 @@ const syncBtnId = `${instanceId}-sync-btn`;
       return el.value;
     }
 
+    function cpvSetOpen(nodeEl, open) {
+      nodeEl.classList.toggle("open", open);
+      const btn = nodeEl.querySelector(":scope > .cpv-row > .cpv-toggle");
+      if (btn) btn.setAttribute("aria-expanded", String(open));
+    }
+
     function bvpzBuildTree(nodes, container) {
       nodes.forEach((node) => {
-        const details = document.createElement("details");
-        const summary = document.createElement("summary");
+        const nodeEl = document.createElement("div");
+        nodeEl.className = "cpv-node";
         const hasChildren = node.children?.length > 0;
 
+        const row = document.createElement("div");
+        row.className = "cpv-row";
+
         if (hasChildren) {
-          const toggle = document.createElement("span");
+          const toggle = document.createElement("button");
+          toggle.type = "button";
           toggle.className = "cpv-toggle";
           toggle.textContent = "▶";
-          summary.appendChild(toggle);
+          toggle.setAttribute("aria-expanded", "false");
+          toggle.addEventListener("click", () => {
+            cpvSetOpen(nodeEl, !nodeEl.classList.contains("open"));
+          });
+          row.appendChild(toggle);
         } else {
-          details.className = "no-children";
+          nodeEl.classList.add("no-children");
         }
 
         const checkbox = document.createElement("input");
@@ -206,7 +220,7 @@ const syncBtnId = `${instanceId}-sync-btn`;
         checkbox.className = "form-check-input";
         checkbox.dataset.cpv = node.attributes.cpv_mask;
         checkbox.addEventListener("change", () => {
-          details.querySelectorAll("details input[type=checkbox]").forEach((cb) => {
+          nodeEl.querySelectorAll(".cpv-node input[type=checkbox]").forEach((cb) => {
             cb.checked = checkbox.checked;
           });
           bvpzUpdateOutput();
@@ -221,19 +235,19 @@ const syncBtnId = `${instanceId}-sync-btn`;
         label.appendChild(checkbox);
         label.appendChild(bvpzFormatCode(fullCode));
         label.appendChild(document.createTextNode(" " + labelText));
-        summary.appendChild(label);
-        details.appendChild(summary);
+        row.appendChild(label);
+        nodeEl.appendChild(row);
 
-        if (hasChildren) bvpzBuildTree(node.children, details);
-        container.appendChild(details);
+        if (hasChildren) bvpzBuildTree(node.children, nodeEl);
+        container.appendChild(nodeEl);
       });
     }
 
     function bvpzOpenSelected(node) {
-      if (!node.matches("details")) return { anyChecked: false, allChecked: false };
+      if (!node.matches(".cpv-node")) return { anyChecked: false, allChecked: false };
 
-      const checkbox = node.querySelector(":scope > summary label input[type=checkbox]");
-      const children = Array.from(node.querySelectorAll(":scope > details"));
+      const checkbox = node.querySelector(":scope > .cpv-row input[type=checkbox]");
+      const children = Array.from(node.querySelectorAll(":scope > .cpv-node"));
 
       if (children.length === 0) {
         const checked = checkbox?.checked ?? false;
@@ -252,7 +266,7 @@ const syncBtnId = `${instanceId}-sync-btn`;
       if (checkbox?.checked) anyChecked = true;
       else allChecked = false;
 
-      if (anyChecked && !allChecked) node.open = true;
+      if (anyChecked && !allChecked) cpvSetOpen(node, true);
 
       return { anyChecked, allChecked };
     }
@@ -276,10 +290,10 @@ const syncBtnId = `${instanceId}-sync-btn`;
     }
 
     function bvpzCollectMinimal(node) {
-      const checkbox = node.querySelector(":scope > summary label input[type=checkbox]");
+      const checkbox = node.querySelector(":scope > .cpv-row input[type=checkbox]");
       if (!checkbox) return { selected: false, prefixes: [] };
 
-      const children = Array.from(node.querySelectorAll(":scope > details"));
+      const children = Array.from(node.querySelectorAll(":scope > .cpv-node"));
       let allChildrenSelected = true;
       const collected = [];
 
@@ -308,10 +322,10 @@ const syncBtnId = `${instanceId}-sync-btn`;
           sel.endsWith("0") ? sel.slice(0, -1) === mask : mask.startsWith(sel)
         );
       });
-      treeNode.querySelectorAll("details").forEach((d) => {
-        d.open = false;
+      treeNode.querySelectorAll(".cpv-node").forEach((d) => {
+        cpvSetOpen(d, false);
       });
-      Array.from(treeNode.querySelectorAll(":scope > details")).forEach((detail) => bvpzOpenSelected(detail));
+      Array.from(treeNode.querySelectorAll(":scope > .cpv-node")).forEach((node) => bvpzOpenSelected(node));
       const selected = bvpzCollectSelected(treeNode);
       bvpzSetCodes(selected.length > 0 ? selected : selectedPrefixes);
     }
@@ -439,34 +453,36 @@ const syncBtnId = `${instanceId}-sync-btn`;
       font-size: var(--text-sm);
     }
 
-    .bvpz-picker .cpv-tree details {
+    .bvpz-picker .cpv-tree .cpv-node {
       margin-left: 28px;
     }
 
-    .bvpz-picker .cpv-tree > details {
+    .bvpz-picker .cpv-tree > .cpv-node {
       margin-left: 0;
     }
 
-    .bvpz-picker .cpv-tree summary {
+    .bvpz-picker .cpv-tree .cpv-node > .cpv-node {
+      display: none;
+    }
+
+    .bvpz-picker .cpv-tree .cpv-node.open > .cpv-node {
+      display: block;
+    }
+
+    .bvpz-picker .cpv-tree .cpv-row {
       display: flex;
       align-items: center;
       gap: 8px;
       padding: 8px;
       border-radius: var(--radius-sm);
-      list-style: none;
       user-select: none;
-      cursor: pointer;
     }
 
-    .bvpz-picker .cpv-tree summary::-webkit-details-marker {
-      display: none;
-    }
-
-    .bvpz-picker .cpv-tree summary:hover {
+    .bvpz-picker .cpv-tree .cpv-row:hover {
       background: var(--lightest-gray);
     }
 
-    .bvpz-picker .cpv-tree summary label {
+    .bvpz-picker .cpv-tree .cpv-row label {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -474,7 +490,7 @@ const syncBtnId = `${instanceId}-sync-btn`;
       flex: 1;
     }
 
-    .bvpz-picker .cpv-tree details.no-children > summary {
+    .bvpz-picker .cpv-tree .cpv-node.no-children > .cpv-row {
       padding-left: calc(18px + 8px);
     }
 
@@ -485,9 +501,13 @@ const syncBtnId = `${instanceId}-sync-btn`;
       flex-shrink: 0;
       text-align: center;
       transition: transform var(--transition);
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
     }
 
-    .bvpz-picker .cpv-tree details[open] > summary .cpv-toggle {
+    .bvpz-picker .cpv-tree .cpv-node.open > .cpv-row .cpv-toggle {
       transform: rotate(90deg);
     }
 

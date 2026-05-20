@@ -79,7 +79,8 @@ function buildPaginationHtml({ currentPage, pageCount, queryParams }: { currentP
   const pageLink = (page: number) => `?page=${page}`;
   const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
 
-  return `<nav aria-label="Puslapiavimas" class="mt-8"><ul class="pagination">${current > 1 ? `<li><a href="${pageLink(current - 1) + queryParams}" aria-label="Ankstesnis puslapis"><span aria-hidden="true">←</span></a></li>` : '<li class="disabled"><span aria-hidden="true">←</span></li>'}${pages.map(i => `<li${i === current ? ' class="active"' : ''}><a href="${pageLink(i) + queryParams}" aria-label="Puslapis ${i}"${i === current ? ' aria-current="page"' : ''}>${i}</a></li>`).join('')}${current < totalPages ? `<li><a href="${pageLink(current + 1) + queryParams}" aria-label="Kitas puslapis"><span aria-hidden="true">→</span></a></li>` : '<li class="disabled"><span aria-hidden="true">→</span></li>'}</ul></nav>`;
+  // Return only list items, because client-side update replaces innerHTML of the existing ul.pagination element.
+  return `${current > 1 ? `<li><a href="${pageLink(current - 1) + queryParams}" aria-label="Ankstesnis puslapis"><span aria-hidden="true">←</span></a></li>` : '<li class="disabled"><span aria-hidden="true">←</span></li>'}${pages.map(i => `<li${i === current ? ' class="active"' : ''}><a href="${pageLink(i) + queryParams}" aria-label="Puslapis ${i}"${i === current ? ' aria-current="page"' : ''}>${i}</a></li>`).join('')}${current < totalPages ? `<li><a href="${pageLink(current + 1) + queryParams}" aria-label="Kitas puslapis"><span aria-hidden="true">→</span></a></li>` : '<li class="disabled"><span aria-hidden="true">→</span></li>'}`;
 }
 
 void buildPaginationHtml;

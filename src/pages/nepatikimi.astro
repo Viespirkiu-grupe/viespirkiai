@@ -67,16 +67,12 @@ const searchResultsQuery = (tsQueryFunc: string, limitParam: number, offsetParam
   SELECT * FROM (
     SELECT ${NEPATIKIMAS_COLS}, NULL::text AS "irasymoPagrindas", 'Nepatikimas' AS "saltinis"
     FROM public."nepatikimiTiekejai" nd
-    LEFT JOIN public."nepatikimiTiekejaiPagrindimai" p
-      ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
     WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
 
     UNION ALL
 
     SELECT ${MELAGINGAS_COLS}, nd."irasymoPagrindas", 'Melagingas' AS "saltinis"
     FROM public."melagingiTiekejai" nd
-    LEFT JOIN public."melagingiTiekejaiPagrindimai" p
-      ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
     WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
   ) t
   ORDER BY "duomenuIvedimoData" DESC NULLS LAST
@@ -86,15 +82,11 @@ const defaultResultsQuery = () => `
   SELECT * FROM (
     SELECT ${NEPATIKIMAS_COLS}, NULL::text AS "irasymoPagrindas", 'Nepatikimas' AS "saltinis"
     FROM public."nepatikimiTiekejai" nd
-    LEFT JOIN public."nepatikimiTiekejaiPagrindimai" p
-      ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
 
     UNION ALL
 
     SELECT ${MELAGINGAS_COLS}, nd."irasymoPagrindas", 'Melagingas' AS "saltinis"
     FROM public."melagingiTiekejai" nd
-    LEFT JOIN public."melagingiTiekejaiPagrindimai" p
-      ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
   ) t
   ORDER BY "duomenuIvedimoData" DESC NULLS LAST
   LIMIT $1 OFFSET $2`;
@@ -122,15 +114,11 @@ const queryNepatikimi = async ({ cleanSearch, tsQueryFunc, limit, skip }: { clea
   const [resultsRes, totalRes] = await Promise.all([
     postgres.query(defaultResultsQuery(), [limit, skip]),
     postgres.query(`
-      SELECT (
-        SELECT COUNT(*) FROM public."nepatikimiTiekejai" nd
-        INNER JOIN public."nepatikimiTiekejaiPagrindimai" p
-          ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
-      ) + (
-        SELECT COUNT(*) FROM public."melagingiTiekejai" nd
-        INNER JOIN public."melagingiTiekejaiPagrindimai" p
-          ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
-      ) AS count`
+      SELECT COUNT(*) FROM (
+        SELECT 1 FROM public."nepatikimiTiekejai"
+        UNION ALL
+        SELECT 1 FROM public."melagingiTiekejai"
+      ) t`
     ),
   ]);
 
@@ -176,7 +164,7 @@ const queryParams = rawSearch ? `&search=${encodeURIComponent(rawSearch)}` : '';
   <main>
     <SearchForm title="Nepatikimų ir melagingą informaciją pateikusių tiekėjų paieška" searchValue={rawSearch} />
 
-    <div class="mt-10 max-w-lg center mx-auto">
+    <div class="mt-10 max-w-lg center mx-auto stack stack-md">
       <div class="flex justify-between items-center mb-4">
         <ResultsSummary html={numberOfResults} />
       </div>
