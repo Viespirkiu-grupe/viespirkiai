@@ -64,5 +64,6 @@ export default {
     enableVectorSearch: false,
     vectorSearchUrl: "",
 
-    ocrRezultataiLocation: undefined, // Absoliutus kelias OCR rezultatų blob saugoti (pvz. /data/ocrRezultatai)
+    ocrRezultataiLocation: undefined, // Absoliutus kelias (pvz. /data/ocrRezultatai) arba nuotolinis URL (pvz. https://host/api/ocr/rezultataiFiles)
+    failaiMetaduomenysLocation: undefined, // Absoliutus kelias (pvz. /data/failaiMetaduomenys) arba nuotolinis URL (pvz. https://host/api/failai/metaduomenysFiles)
 };

@@ -2,9 +2,36 @@ import { arrayToLithuanianTime } from "../../utils/time.js";
 import { postgres } from "../../postgres/postgres.js";
 import { FilterBuilder } from "../../utils/filter.js";
 import QueryStream from "pg-query-stream";
+import { Transform } from "stream";
 import config from "../../utils/config.js";
 import { search, countDocs } from "../../quickwit/quickwit.js";
 import { log } from "../../utils/log.js";
+import { readMetaduomenysFs } from "./metaduomenysFs.js";
+
+async function attachMetaduomenys(rows) {
+    await Promise.all(rows.map(async (r) => {
+        if (r.metaduomenysHash) {
+            r.metaduomenys = await readMetaduomenysFs(r.metaduomenysHash);
+        }
+    }));
+    return rows;
+}
+
+function metaduomenysTransform() {
+    return new Transform({
+        objectMode: true,
+        async transform(row, _enc, cb) {
+            try {
+                if (row?.metaduomenysHash) {
+                    row.metaduomenys = await readMetaduomenysFs(row.metaduomenysHash);
+                }
+                cb(null, row);
+            } catch (err) {
+                cb(err);
+            }
+        },
+    });
+}
 
 const failaiFilter = new FilterBuilder({
     fields: [
@@ -289,6 +316,9 @@ export async function searchFailai(
 
     if (stream) {
         const client = await postgres.connect();
+        const raw = client.query(new QueryStream(sql, params));
+        const enriched = raw.pipe(metaduomenysTransform());
+        raw.on("error", (err) => enriched.destroy(err));
         return {
             results: [],
             total: null,
@@ -296,7 +326,7 @@ export async function searchFailai(
             queryParams,
             usedHiddenFields,
             engine: "PostgreSQL",
-            stream: client.query(new QueryStream(sql, params)),
+            stream: enriched,
             client,
         };
     }
@@ -374,6 +404,8 @@ export async function searchFailai(
         const qwUsedHiddenFields = ['extension', 'saltinis', 'puslapiaiMin', 'puslapiaiMax', 'telefonas', 'email', 'domain', 'iban', 'jarKodas', 'location', 'md5']
             .some((f) => !!query[f]);
 
+        await attachMetaduomenys(rows);
+
         return {
             results: arrayToLithuanianTime(rows).map(aptvarkytiFailoRezultata),
             total,
@@ -391,6 +423,7 @@ export async function searchFailai(
         postgres.query(sql, params),
         postgres.query(sqlCount, paramsCount),
     ]);
+    await attachMetaduomenys(rows);
     return {
         results: arrayToLithuanianTime(rows).map(aptvarkytiFailoRezultata),
         total: parseInt(countRows[0].count, 10),

@@ -2,6 +2,7 @@ import { Buffer } from "buffer";
 import { postgres, parsePgArray } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import { readRezultatasFs } from "../ocr/rezultataiFs.js";
+import { readMetaduomenysFs } from "./metaduomenysFs.js";
 import { parseWKBPoint } from "../geografija/utils.js";
 import { formatDateTime, formatDuration } from "../../utils/time.js";
 
@@ -209,8 +210,7 @@ export async function fetchFailasMetadata(id) {
                 [id],
             ),
             postgres.query(
-                `SELECT metaduomenys FROM "failaiNuskaitymai"
-                 WHERE failas = $1 ORDER BY id DESC LIMIT 1`,
+                `SELECT "metaduomenysHash" FROM failai WHERE id = $1`,
                 [id],
             ),
             postgres.query(
@@ -257,7 +257,7 @@ export async function fetchFailasMetadata(id) {
         domains: domains.rows.map((r) => r.domain),
         telefonai: telefonai.rows,
         metaduomenys: metaduomenys.rows.length
-            ? metaduomenys.rows[0].metaduomenys
+            ? await readMetaduomenysFs(metaduomenys.rows[0].metaduomenysHash)
             : null,
         tekstas: tekstas.rows.length ? tekstas.rows[0].tekstas : null,
         ocrLatestResult: latestOcrResult,
