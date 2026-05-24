@@ -1,0 +1,27 @@
+---
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+
+interface Props {
+  item: {
+    remote_id: string | number | null;
+    text: string;
+    similarity: number;
+  };
+}
+
+const { item } = Astro.props;
+const remoteId = item.remote_id == null ? '' : String(item.remote_id);
+---
+
+<ResultCardShell clickable={false}>
+  <dl slot="meta" class="result-card-meta">
+    <div><dt class="sr-only">Nuosprendis</dt><dd>{remoteId || '—'}</dd></div>
+    <div><dt class="sr-only">Panašumas</dt><dd>{Number(item.similarity || 0).toFixed(6)}</dd></div>
+  </dl>
+
+  <h3 slot="title" class="result-card-title">
+    {remoteId ? `Nuosprendis #${remoteId}` : 'Nuosprendis'}
+  </h3>
+
+  {item.text && <p class="text-sm text-muted mt-2 text-justify">{item.text}</p>}
+</ResultCardShell>
