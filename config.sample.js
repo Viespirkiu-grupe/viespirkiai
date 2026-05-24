@@ -67,4 +67,6 @@ export default {
 
     ocrRezultataiLocation: undefined, // Absoliutus kelias (pvz. /data/ocrRezultatai) arba nuotolinis URL (pvz. https://host/api/ocr/rezultataiFiles)
     failaiMetaduomenysLocation: undefined, // Absoliutus kelias (pvz. /data/failaiMetaduomenys) arba nuotolinis URL (pvz. https://host/api/failai/metaduomenysFiles)
+    failaiTekstasLocation: undefined, // Absoliutus kelias (pvz. /data/failaiTekstas) arba nuotolinis URL (pvz. https://host/api/failai/tekstasFiles)
+    dokumentaiLocation: undefined, // Absoliutus kelias (pvz. /data/dokumentai) arba nuotolinis URL — JSON sidecar failai vienam dokumentui (raktas: md5)
 };

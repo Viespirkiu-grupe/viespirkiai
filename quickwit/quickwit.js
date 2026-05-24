@@ -1,5 +1,6 @@
 import { postgres } from "../postgres/postgres.js";
 import config from "../utils/config.js";
+import { uuidv7 } from "../utils/uuid.js";
 
 const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
 
@@ -49,9 +50,10 @@ async function qwCreateIndex(yaml) {
   return res.json();
 }
 
-async function qwIngestNdjson(indeksas, docs) {
+async function qwIngestNdjson(indeksas, docs, commit = "auto") {
   const body = docs.map((d) => JSON.stringify(d)).join("\n");
-  const res = await fetch(`${QW_URL}/api/v1/${indeksas}/ingest`, {
+  const qs = commit && commit !== "auto" ? `?commit=${encodeURIComponent(commit)}` : "";
+  const res = await fetch(`${QW_URL}/api/v1/${indeksas}/ingest${qs}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-ndjson" },
     body,
@@ -158,8 +160,8 @@ async function getOrCreateActiveShard(lentele, client) {
 /**
  * Index a single document. Thin wrapper around indexDocs.
  */
-export async function indexDoc(lentele, eilutesId, doc) {
-  return indexDocs(lentele, [{ eilutesId, doc }]);
+export async function indexDoc(lentele, eilutesId, doc, opts) {
+  return indexDocs(lentele, [{ eilutesId, doc }], opts);
 }
 
 /**
@@ -185,8 +187,9 @@ export async function indexDoc(lentele, eilutesId, doc) {
  *
  * @param {string} lentele
  * @param {{ eilutesId: string, doc: object }[]} items
+ * @param {{ commit?: "auto" | "wait_for" | "force" }} [opts]
  */
-export async function indexDocs(lentele, items) {
+export async function indexDocs(lentele, items, opts = {}) {
   if (!items.length) return;
 
   const t0 = Date.now();
@@ -236,7 +239,7 @@ export async function indexDocs(lentele, items) {
       currentShard ??= await getOrCreateActiveShard(lentele, client);
       for (const eilutesId of toUpdate) {
         assigned.set(eilutesId, {
-          quickwitId: crypto.randomUUID(),
+          quickwitId: uuidv7(),
           oldIndeksas: existingMap.get(eilutesId),
           indeksas: currentShard,
           doc: byEilutesId.get(eilutesId),
@@ -251,7 +254,7 @@ export async function indexDocs(lentele, items) {
       currentShard ??= await getOrCreateActiveShard(lentele, client);
       for (const eilutesId of toInsert) {
         assigned.set(eilutesId, {
-          quickwitId: crypto.randomUUID(),
+          quickwitId: uuidv7(),
           oldIndeksas: null,
           indeksas: currentShard,
           doc: byEilutesId.get(eilutesId),
@@ -355,7 +358,7 @@ export async function indexDocs(lentele, items) {
 
     await Promise.all(
       [...shardDocs.entries()].map(([indeksas, docs]) =>
-        qwIngestNdjson(indeksas, docs)
+        qwIngestNdjson(indeksas, docs, opts.commit)
       )
     );
     mark("ingest", tIngest);
