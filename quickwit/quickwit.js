@@ -1,5 +1,6 @@
 import { postgres } from "../postgres/postgres.js";
 import config from "../utils/config.js";
+import { uuidv7 } from "../utils/uuid.js";
 
 const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
 
@@ -236,7 +237,7 @@ export async function indexDocs(lentele, items) {
       currentShard ??= await getOrCreateActiveShard(lentele, client);
       for (const eilutesId of toUpdate) {
         assigned.set(eilutesId, {
-          quickwitId: crypto.randomUUID(),
+          quickwitId: uuidv7(),
           oldIndeksas: existingMap.get(eilutesId),
           indeksas: currentShard,
           doc: byEilutesId.get(eilutesId),
@@ -251,7 +252,7 @@ export async function indexDocs(lentele, items) {
       currentShard ??= await getOrCreateActiveShard(lentele, client);
       for (const eilutesId of toInsert) {
         assigned.set(eilutesId, {
-          quickwitId: crypto.randomUUID(),
+          quickwitId: uuidv7(),
           oldIndeksas: null,
           indeksas: currentShard,
           doc: byEilutesId.get(eilutesId),

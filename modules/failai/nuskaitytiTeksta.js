@@ -1,5 +1,6 @@
 import process from "process";
 import { Buffer } from "buffer";
+import { createHash } from "crypto";
 import { log } from "../../utils/log.js";
 import { postgres, parsePgArray } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
@@ -88,6 +89,10 @@ async function nuskaitytiDokNuskaitytojuje(
     timings.end("nuskaitytojas");
 
     const fetchUrl = `${nuskaitytojas.url}/extract`;
+
+    if (nuskaitytojas.fileHost) {
+        url = `${nuskaitytojas.fileHost}/${dokumentas.md5}`;
+    }
 
     log(`Dokumentas ${url} nuskaitomas ${nuskaitytojas.pavadinimas}`);
 
@@ -539,6 +544,9 @@ export async function nuskaitytiVienoDokumentoDuomenis(
 
     let autorius = metadata?.author || undefined;
 
+    const tekstasStr = truncateTo1MB(tekstas);
+    const tekstasHash = createHash("md5").update(tekstasStr).digest("hex");
+
     timings.start("failaiUpdate");
     await postgres.query(
         `UPDATE failai
@@ -550,7 +558,8 @@ export async function nuskaitytiVienoDokumentoDuomenis(
             "ocrState" = $6,
             location = ST_GeomFromText($7, 4326),
             "nuskaitymasTimestamp" = NOW(),
-            "autorius" = $8
+            "autorius" = $8,
+            "tekstasHash" = $10
         WHERE id = $9;`,
         [
             nuskaitymoVersija,
@@ -562,6 +571,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
             location,
             autorius,
             dokumentas.id,
+            tekstasHash,
         ],
     );
     timings.end("failaiUpdate");
@@ -584,7 +594,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
         `,
         [
             dokumentas.id,
-            truncateTo1MB(tekstas),
+            tekstasStr,
             wordCount,
             pageCount,
             characterCount,
