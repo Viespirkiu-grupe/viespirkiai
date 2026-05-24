@@ -98,8 +98,18 @@ export async function processDokumentaiIndexQueue() {
                 }),
             );
 
-            await indexDocs(LENTELE, items);
-            log(`indexed ${items.length} dokumentai`);
+            const totalBytes = items.reduce(
+                (sum, it) => sum + Buffer.byteLength(JSON.stringify(it.doc), "utf8"),
+                0,
+            );
+            const avgBytes = Math.round(totalBytes / items.length);
+            const t0 = Date.now();
+            await indexDocs(LENTELE, items, { commit: "force" });
+            const elapsedMs = Date.now() - t0;
+            const mbPerSec = (totalBytes / 1024 / 1024) / (elapsedMs / 1000);
+            log(
+                `indexed ${items.length} dokumentai | avg ${fmtBytes(avgBytes)} / doc | total ${fmtBytes(totalBytes)} in ${elapsedMs}ms = ${mbPerSec.toFixed(2)} MiB/s`,
+            );
         }
     }
 
@@ -168,6 +178,12 @@ function toRfc3339(v) {
     if (typeof v === "string") return v;
     if (v instanceof Date) return v.toISOString();
     return String(v);
+}
+
+function fmtBytes(n) {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KiB`;
+    return `${(n / 1024 / 1024).toFixed(2)} MiB`;
 }
 
 function foldLithuanian(str) {
