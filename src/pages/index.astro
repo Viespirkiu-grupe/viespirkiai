@@ -8,7 +8,7 @@ import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
 import config from '../lib/config.ts';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
 import { objectsToCsvStream } from '@/utils/csv.js';
-import { Readable as NodeReadable, PassThrough } from 'node:stream';
+import { Readable as NodeReadable, PassThrough, Transform } from 'node:stream';
 import { cleanQuery, getColorScheme, getFont } from '../lib/failai.ts';
 
 void NodeReadable;
@@ -123,8 +123,36 @@ if (query.jsonl || query.csv) {
   }
 
   if (query.csv) {
-    // Basic CSV fallback: map raw rows to CSV using generic object keys
-    stream.pipe(objectsToCsvStream()).pipe(pass);
+    const formatDate = (value: unknown): string => {
+      if (!value) return '';
+      const date = new Date(value as string | number | Date);
+      return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
+    };
+
+    const toCsvRow = new Transform({
+      objectMode: true,
+      transform(row: Record<string, unknown>, _enc, cb) {
+        cb(null, {
+          'Tipas': row.tipas ?? '',
+          'Kategorija': row.kategorija ?? '',
+          'Pavadinimas': row.pavadinimas ?? '',
+          'Numatyta vertė': row.verte ?? '',
+          'Faktinė vertė': row.faktineVerte ?? '',
+          'Pirkėjo pavadinimas': row.perkanciojiOrganizacija ?? '',
+          'Pirkėjo kodas': row.perkanciosiosOrganizacijosKodas ?? '',
+          'Tiekėjų pavadinimai': Array.isArray(row.tiekejai) ? (row.tiekejai as unknown[]).join('; ') : '',
+          'Tiekėjų kodai': Array.isArray(row.tiekejaiKodai) ? (row.tiekejaiKodai as unknown[]).join('; ') : '',
+          'Sudarymo data': formatDate(row.sudarymoData),
+          'Faktinė įvykdymo data': formatDate(row.faktineIvykdymoData),
+          'Redagavimo data': formatDate(row.paskutinioRedagavimoData),
+          'BVPZ kodai': Array.isArray(row.bvpzKodai) ? (row.bvpzKodai as unknown[]).filter(Boolean).join('; ') : '',
+          'Sutarties numeris': row.sutartiesNumeris ?? '',
+          'Unikalus ID': row.sutartiesUnikalusId ?? '',
+        });
+      },
+    });
+
+    stream.pipe(toCsvRow).pipe(objectsToCsvStream()).pipe(pass);
     return new Response(NodeReadable.toWeb(pass) as unknown as BodyInit, {
       headers: {
         'Content-Type': 'text/csv',
