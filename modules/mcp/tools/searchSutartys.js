@@ -3,7 +3,8 @@ import { searchSutartys } from "../../sutartys/searchSutartys.js";
 
 export const name = "search_sutartys";
 export const description =
-    "Ieško viešųjų pirkimų sutarčių Viešpirkių pilietinės iniciatyvos sistemoje (suimportuotos iš senos Viešųjų pirkimų tarnybos CVP IS). Palaiko pilno teksto paiešką, filtravimą pagal pirkėją, tiekėją, vertę, datą, BVPZ kodus ir sutarties tipą. Sumos - eurais.";
+    "Ieško viešųjų pirkimų sutarčių. Palaiko pilno teksto paiešką, filtravimą pagal pirkėją, tiekėją, vertę, datą, BVPZ kodus ir sutarties tipą. Sumos - eurais. " +
+    "SVARBU: grąžina maks. 50 eilučių puslapyje, total=null — bendra sutarčių suma, kiekis ar procentai iš šio įrankio negali būti nurodyti; tokiems skaičiams naudok execute_query su v_sutartys.";
 
 export const schema = {
     search: z.string().optional().describe("Pilno teksto paieškos užklausa"),

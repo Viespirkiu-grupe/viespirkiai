@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import config from "../../utils/config.js";
 import { logToolCall } from "./mcpLogger.js";
 import * as getFailas from "./tools/getFailas.js";
 import * as getFailasTekstas from "./tools/getFailasTekstas.js";
@@ -11,6 +12,8 @@ import * as searchFailai from "./tools/searchFailai.js";
 import * as searchJuridiniai from "./tools/searchJuridiniai.js";
 import * as searchSutartys from "./tools/searchSutartys.js";
 import * as searchViesiejiPirkimai from "./tools/searchViesiejiPirkimai.js";
+import * as getSchema from "./tools/getSchema.js";
+import * as executeQuery from "./tools/executeQuery.js";
 
 function wrapHandler(toolName, handler) {
     return async (params) => {
@@ -34,19 +37,22 @@ function wrapHandler(toolName, handler) {
     };
 }
 
-const tools = [
-    getFailas,
-    getFailasTekstas,
-    getJuridinis,
-    getPinregAsmuo,
-    getPinregJar,
-    getSutartis,
-    getViesasisPirkimas,
-    searchFailai,
-    searchJuridiniai,
-    searchSutartys,
-    searchViesiejiPirkimai,
-];
+const tools = config.enableExecuteQueryMcpOnly
+    ? [getSchema, executeQuery]
+    : [
+          getFailas,
+          getFailasTekstas,
+          getJuridinis,
+          getPinregAsmuo,
+          getPinregJar,
+          getSutartis,
+          getViesasisPirkimas,
+          searchFailai,
+          searchJuridiniai,
+          searchSutartys,
+          searchViesiejiPirkimai,
+          ...(config.enableExecuteQueryMcp ? [getSchema, executeQuery] : []),
+      ];
 
 export function createMcpServer() {
     const server = new McpServer({ name: "viespirkiai", version: "1.0.0" });

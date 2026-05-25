@@ -43,6 +43,13 @@ export default {
     pgPort: 9118,
     pgMaxConnections: 16,
 
+    // MCP analyst — existing read-only PostgreSQL role (direct PG port, not PgBouncer)
+    pgAnalystUser: "analyst",
+    pgAnalystPassword: "CHANGE_ME",
+    pgAnalystPort: 9118,
+    pgAnalystMaxConnections: 16,
+    mcpQueryTimeout: 20, // Sekundės; execute_query SET LOCAL statement_timeout
+
     // Quickwit
     quickwitUp: true,
     quickwitUrl: "http://localhost:7280",
@@ -65,6 +72,9 @@ export default {
     vectorSearchUrl: "",
     teismoNuosprendziaiVectorSearchUrl: "",
     enableDokumentaiSearch: false, // Prototipinis /dokumentai paieškos puslapis
+    enableExecuteQueryMcp: false, // Rodyti get_schema ir execute_query MCP įrankius
+    enableExecuteQueryMcpOnly: false, // Skirta local testavimui kartu su prod viespirkiai
+    enableExecuteQueryMcpTrace: false, // Įrašyti SQL užklausų ir rezultatų žurnalą į stderr
 
     ocrRezultataiLocation: undefined, // Absoliutus kelias (pvz. /data/ocrRezultatai) arba nuotolinis URL (pvz. https://host/api/ocr/rezultataiFiles)
     failaiMetaduomenysLocation: undefined, // Absoliutus kelias (pvz. /data/failaiMetaduomenys) arba nuotolinis URL (pvz. https://host/api/failai/metaduomenysFiles)
