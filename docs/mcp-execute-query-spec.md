@@ -505,3 +505,49 @@ pgAnalystUser: "...",            // existing read-only role
 :
 5,      // role is capped at 5 connections
 ```
+
+
+# PG config
+
+```sql
+-- Rolė
+CREATE ROLE analyst LOGIN PASSWORD 'CHANGE_ME';
+
+-- Defense-in-depth: nieko nesuteikiame pagal nutylėjimą
+REVOKE ALL ON DATABASE viespirkiai FROM analyst;
+REVOKE ALL ON SCHEMA public FROM analyst;
+
+-- Prieiga prie DB ir schemos
+GRANT CONNECT, TEMPORARY ON DATABASE viespirkiai TO analyst;
+GRANT USAGE ON SCHEMA public TO analyst;
+
+-- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
+GRANT SELECT ON
+    sutartys, "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
+    "jarCsv", jar,
+    "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai",
+    "pinregJuridiniaiRysiai", pinreg,
+    failai,
+    "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos", "sabisSaskaituSalys",
+    "cpvaProjektuSutartys", "cpvaProjektuSarasas",
+    "cvppViesiejiPirkimai",
+    "eiluciuSkaiciai", "bvpzKodai",
+    sodra, regitra,
+    "nepatikimiTiekejai", "melagingiTiekejai",
+    jadis, "rcInformaciniaiLeidiniaiPranesimai",
+    domenai, kotis,
+    "balansoAtaskaitos", "pelnoNuostoliuAtaskaitos",
+    "darboVieta", "istatinisKapitalas",
+    "atn1ataskaitos", atn1dalyviai, "atn1pasiulymuEile", "atn1atmestiPasiulymai",
+    "neskelbiamosDerybos",
+    "vdiPazeidimai",
+    bylos, "bylosDalyviai",
+    mokesciai
+TO analyst;
+
+-- Saugiklis: išjungti įrašymą net jei kažkas suteiks per error
+ALTER ROLE analyst SET default_transaction_read_only = on;
+
+-- (Pasirinktinai) griežtesnis pool-wide timeout
+ALTER ROLE analyst SET statement_timeout = '180s';
+```
