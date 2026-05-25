@@ -1,8 +1,10 @@
 import { postgres } from "../../postgres/postgres.js";
 import { indexDocs } from "../../quickwit/quickwit.js";
 import { log } from "../../utils/log.js";
+import { uuidv7 } from "../../utils/uuid.js";
 
 const BATCH_SIZE = 500;
+const LENTELE = "failai";
 
 export async function processFailaiIndexQueue() {
     // Fetch oldest unprocessed batch
@@ -42,11 +44,15 @@ export async function processFailaiIndexQueue() {
 
     // Handle deletes — mark dead in quickwitEilutes
     if (toDelete.length) {
+        const ids = toDelete.map(String);
+        const newIds = toDelete.map(() => uuidv7());
         await postgres.query(
-            `UPDATE "quickwitEilutes"
-         SET "quickwitId" = gen_random_uuid()
-         WHERE "lentele" = 'failai' AND "eilutesId" = ANY($1)`,
-            [toDelete.map(String)]
+            `UPDATE "quickwitEilutes" qe
+         SET "quickwitId" = v."quickwitId"::uuid
+         FROM (SELECT UNNEST($2::text[]) AS "eilutesId",
+                      UNNEST($3::text[]) AS "quickwitId") v
+         WHERE qe."lentele" = $1 AND qe."eilutesId" = v."eilutesId"`,
+            [LENTELE, ids, newIds]
         );
         await postgres.query(
             `UPDATE "quickwitIndeksai" qi
@@ -54,11 +60,11 @@ export async function processFailaiIndexQueue() {
          FROM (
            SELECT "indeksas", COUNT(*) AS cnt
            FROM "quickwitEilutes"
-           WHERE "lentele" = 'failai' AND "eilutesId" = ANY($1)
+           WHERE "lentele" = $1 AND "eilutesId" = ANY($2)
            GROUP BY "indeksas"
          ) sub
          WHERE qi."indeksas" = sub."indeksas"`,
-            [toDelete.map(String)]
+            [LENTELE, ids]
         );
         log(`deleted ${toDelete.length} from quickwit`);
     }
