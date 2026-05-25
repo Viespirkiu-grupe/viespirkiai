@@ -65,9 +65,12 @@ export function parseLimit(query: Record<string, string>, defaultLimit = DEFAULT
   return { limit: defaultLimit };
 }
 
-export function buildNumberOfResults({ rows, total, elapsed, engine = 'PostgreSQL', approximate = false }: { rows: unknown[]; total: number; elapsed: number; engine?: string; approximate?: boolean; }) {
+export type TimingPhase = { label: string; start: number; duration: number; phase?: string };
+
+export function buildNumberOfResults({ rows, total, elapsed, engine = 'PostgreSQL', approximate = false, timings }: { rows: unknown[]; total: number; elapsed: number; engine?: string; approximate?: boolean; timings?: TimingPhase[] | null; }) {
   const trukme = (elapsed / 1000).toFixed(2);
-  const source = `<span class="inline" data-duration="${trukme}">(${trukme}s, ${engine})</span>`;
+  const timingsAttr = timings && timings.length ? ` data-timings='${JSON.stringify(timings).replace(/'/g, '&#39;')}'` : '';
+  const source = `<span class="inline timing-source" data-duration="${trukme}"${timingsAttr}>(${trukme}s, ${engine})</span>`;
   if (approximate) {
     const rounded = Math.round(total / 100) * 100 || total;
     return `Apie ${formatPluralK(rounded, ['rezultato', 'rezultatų'])} ${source}`;

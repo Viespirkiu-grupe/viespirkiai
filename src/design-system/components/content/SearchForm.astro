@@ -19,8 +19,8 @@ const hasFilters = Astro.slots.has('filters');
 const hasTitleSuffix = Astro.slots.has('title-suffix');
 ---
 
-<form method="get" role="search" id="searchForm">
-  <h1 class="mt-7">
+<form method="get" role="search" id="searchForm" class="my-10">
+  <h1>
     {title}{hasTitleSuffix && <slot name="title-suffix" />}
   </h1>
 
@@ -145,7 +145,14 @@ const hasTitleSuffix = Astro.slots.has('title-suffix');
     transition: background-color var(--transition), color var(--transition);
   }
 
-  .search-filters-toggle:hover {
-    background: var(--lighter-gray);
+  .search-filters-toggle {
+    &:hover {
+      background: var(--lighter-gray);
+    }
+
+    &:focus-within {
+      outline: var(--border-focus);
+      border-radius: var(--radius-sm);
+    }
   }
 </style>

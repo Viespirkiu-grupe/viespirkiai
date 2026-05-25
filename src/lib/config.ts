@@ -59,6 +59,10 @@ export interface SiteConfig {
   enableVectorSearch?: boolean;
   /** Backend URL used by the experimental vector file search page. */
   vectorSearchUrl?: string;
+  /** Backend URL used by the experimental court judgment vector search page. */
+  teismoNuosprendziaiVectorSearchUrl?: string;
+  /** Toggles the prototype /dokumentai document search page. */
+  enableDokumentaiSearch?: boolean;
 
   /** Toggles the relationship-graph feature throughout the UI. */
   enableGraph: boolean;

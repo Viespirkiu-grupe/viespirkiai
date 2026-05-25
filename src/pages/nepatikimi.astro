@@ -67,16 +67,12 @@ const searchResultsQuery = (tsQueryFunc: string, limitParam: number, offsetParam
   SELECT * FROM (
     SELECT ${NEPATIKIMAS_COLS}, NULL::text AS "irasymoPagrindas", 'Nepatikimas' AS "saltinis"
     FROM public."nepatikimiTiekejai" nd
-    LEFT JOIN public."nepatikimiTiekejaiPagrindimai" p
-      ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
     WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
 
     UNION ALL
 
     SELECT ${MELAGINGAS_COLS}, nd."irasymoPagrindas", 'Melagingas' AS "saltinis"
     FROM public."melagingiTiekejai" nd
-    LEFT JOIN public."melagingiTiekejaiPagrindimai" p
-      ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
     WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
   ) t
   ORDER BY "duomenuIvedimoData" DESC NULLS LAST
@@ -86,63 +82,69 @@ const defaultResultsQuery = () => `
   SELECT * FROM (
     SELECT ${NEPATIKIMAS_COLS}, NULL::text AS "irasymoPagrindas", 'Nepatikimas' AS "saltinis"
     FROM public."nepatikimiTiekejai" nd
-    LEFT JOIN public."nepatikimiTiekejaiPagrindimai" p
-      ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
 
     UNION ALL
 
     SELECT ${MELAGINGAS_COLS}, nd."irasymoPagrindas", 'Melagingas' AS "saltinis"
     FROM public."melagingiTiekejai" nd
-    LEFT JOIN public."melagingiTiekejaiPagrindimai" p
-      ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
   ) t
   ORDER BY "duomenuIvedimoData" DESC NULLS LAST
   LIMIT $1 OFFSET $2`;
 
+const timed = async <T,>(promise: Promise<T>): Promise<{ value: T; ms: number }> => {
+  const t0 = Date.now();
+  const value = await promise;
+  return { value, ms: Date.now() - t0 };
+};
+
 const queryNepatikimi = async ({ cleanSearch, tsQueryFunc, limit, skip }: { cleanSearch: string; tsQueryFunc: string; limit: number; skip: number; }) => {
   if (cleanSearch) {
     const [resultsRes, totalRes] = await Promise.all([
-      postgres.query(searchResultsQuery(tsQueryFunc, 2, 3), [cleanSearch, limit, skip]),
-      postgres.query(
+      timed(postgres.query(searchResultsQuery(tsQueryFunc, 2, 3), [cleanSearch, limit, skip])),
+      timed(postgres.query(
         `SELECT COUNT(*) FROM (
           SELECT 1 FROM public."nepatikimiTiekejai" WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)
           UNION ALL
           SELECT 1 FROM public."melagingiTiekejai" WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)
         ) t`,
         [cleanSearch]
-      ),
+      )),
     ]);
 
     return {
-      rows: resultsRes.rows,
-      total: parseInt(totalRes.rows[0].count, 10),
+      rows: resultsRes.value.rows,
+      total: parseInt(totalRes.value.rows[0].count, 10),
+      timings: [
+        { label: 'Rezultatai', phase: 'search', start: 0, duration: resultsRes.ms },
+        { label: 'Skaičius', phase: 'count', start: 0, duration: totalRes.ms },
+      ],
     };
   }
 
   const [resultsRes, totalRes] = await Promise.all([
-    postgres.query(defaultResultsQuery(), [limit, skip]),
-    postgres.query(`
-      SELECT (
-        SELECT COUNT(*) FROM public."nepatikimiTiekejai" nd
-        INNER JOIN public."nepatikimiTiekejaiPagrindimai" p
-          ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
-      ) + (
-        SELECT COUNT(*) FROM public."melagingiTiekejai" nd
-        INNER JOIN public."melagingiTiekejaiPagrindimai" p
-          ON p."tiekejoJarKodas" = nd."tiekejoJarKodas" AND p."pirkimoNumeris" = nd."pirkimoNumeris"
-      ) AS count`
-    ),
+    timed(postgres.query(defaultResultsQuery(), [limit, skip])),
+    timed(postgres.query(`
+      SELECT COUNT(*) FROM (
+        SELECT 1 FROM public."nepatikimiTiekejai"
+        UNION ALL
+        SELECT 1 FROM public."melagingiTiekejai"
+      ) t`
+    )),
   ]);
 
   return {
-    rows: resultsRes.rows,
-    total: parseInt(totalRes.rows[0].count, 10),
+    rows: resultsRes.value.rows,
+    total: parseInt(totalRes.value.rows[0].count, 10),
+    timings: [
+      { label: 'Rezultatai', phase: 'search', start: 0, duration: resultsRes.ms },
+      { label: 'Skaičius', phase: 'count', start: 0, duration: totalRes.ms },
+    ],
   };
 };
 
 const startedAt = Date.now();
 const { tsQueryFunc, cleanSearch } = rawSearch ? parseSearch(rawSearch) : { tsQueryFunc: '', cleanSearch: '' };
-const { rows, total } = await queryNepatikimi({ cleanSearch, tsQueryFunc, limit, skip });
+const { rows, total, timings } = await queryNepatikimi({ cleanSearch, tsQueryFunc, limit, skip });
 const pageCount = Math.ceil(total / limit);
 
 if (typeof query.json !== 'undefined') {
@@ -162,6 +164,7 @@ const numberOfResults = buildNumberOfResults({
   total,
   elapsed: Date.now() - startedAt,
   engine: 'PostgreSQL',
+  timings,
 });
 
 const queryParams = rawSearch ? `&search=${encodeURIComponent(rawSearch)}` : '';
@@ -176,7 +179,7 @@ const queryParams = rawSearch ? `&search=${encodeURIComponent(rawSearch)}` : '';
   <main>
     <SearchForm title="Nepatikimų ir melagingą informaciją pateikusių tiekėjų paieška" searchValue={rawSearch} />
 
-    <div class="mt-10 max-w-lg center mx-auto">
+    <div class="mt-10 max-w-lg center mx-auto stack stack-md">
       <div class="flex justify-between items-center mb-4">
         <ResultsSummary html={numberOfResults} />
       </div>

@@ -32,9 +32,12 @@ function buildQueryParams(q: Record<string, string>) {
   return '&';
 }
 
-function buildNumberOfResults({ results, total, elapsed, searchEngine }: { results: unknown[]; total: number; elapsed: number; searchEngine: string }) {
+type Timing = { label: string; start: number; duration: number; phase?: string };
+
+function buildNumberOfResults({ results, total, elapsed, searchEngine, timings }: { results: unknown[]; total: number; elapsed: number; searchEngine: string; timings?: Timing[] | null }) {
   const trukme = (elapsed / 1000).toFixed(2) + 's';
-  const source = `<span class="inline">(${trukme}, ${searchEngine})</span>`;
+  const timingsAttr = timings && timings.length ? ` data-timings='${JSON.stringify(timings).replace(/'/g, '&#39;')}'` : '';
+  const source = `<span class="inline timing-source"${timingsAttr}>(${trukme}, ${searchEngine})</span>`;
   if (results.length < total) return `Rodomi ${results.length} iš ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`;
   return `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų'])} ${source}`;
 }
@@ -83,7 +86,10 @@ if (hasSearch) {
   ({ results, total, searchEngine } = await searchJar(query, { page, limit }));
   const elapsed = performance.now() - startas;
 
-  numberOfResults = buildNumberOfResults({ results, total, elapsed, searchEngine });
+  const timings: Timing[] = [
+    { label: 'Paieška', phase: 'search', start: 0, duration: Math.round(elapsed) },
+  ];
+  numberOfResults = buildNumberOfResults({ results, total, elapsed, searchEngine, timings });
   queryParams = buildQueryParams(query);
   galimaEksportuoti = total > 0 && total <= MAX_LIMIT;
   pageCount = Math.ceil(total / limit);

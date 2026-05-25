@@ -22,6 +22,7 @@ import VdiPazeidimai from '../../components/asmuo/VdiPazeidimai.astro';
 import Regitra from '../../components/asmuo/Regitra.astro';
 import TeismoNuosprendziai from '../../components/asmuo/TeismoNuosprendziai.astro';
 import PinregDeklaracijos from '../../components/asmuo/PinregDeklaracijos.astro';
+import IsregistruotasAsmuo from '../../components/asmuo/IsregistruotasAsmuo.astro';
 import { getJuridinisInfo } from '@/modules/juridiniai/getJuridinisInfo.js';
 import config from '../../lib/config.ts';
 import '@/utils/time.js';
@@ -68,6 +69,7 @@ const juridinioInfo = await getJuridinisInfo(jarKodas, parseLimitai(query));
 
 if (juridinioInfo.error === 404) return Astro.redirect('/404');
 
+
 if (juridinioInfo.special) {
   return Astro.rewrite(`/asmuo/special?${new URLSearchParams({
     id: jarKodas,
@@ -76,6 +78,7 @@ if (juridinioInfo.special) {
   })}`);
 }
 
+const isregistruotasAsmuo: any = 'isregistruotasAsmuo' in juridinioInfo ? juridinioInfo.isregistruotasAsmuo : undefined;
 const asmuo: any = 'asmuo' in juridinioInfo ? juridinioInfo.asmuo : undefined;
 
 if (format === 'json' && asmuo) {
@@ -159,6 +162,12 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
       <PinregDeklaracijos asmuo={asmuo} />
     </main>
   </Layout>
+) : isregistruotasAsmuo ? (
+  <IsregistruotasAsmuo
+    isregistruotasAsmuo={isregistruotasAsmuo}
+    colorScheme={colorScheme}
+    font={font}
+  />
 ) : (
   <AsmuoSpecial
     jarKodas={jarKodas}

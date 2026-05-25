@@ -115,48 +115,50 @@ const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
         : 'Įrašų nėra'}
     </p>
 
-    <TableWrapper>
-      <Table>
-        <thead>
-          <tr>
-            <th>Id</th>
-            <th>Pavadinimas</th>
-            <th>Plėtinys</th>
-            <th>Šaltinis</th>
-            <th>Šaltinio nuoroda</th>
-            <th class="cell-right">Bandymai</th>
-            <th>Paskutinis bandymas</th>
-          </tr>
-        </thead>
-        <tbody>
-          {files.length === 0 ? (
+    <div class="stack stack-md">
+      <TableWrapper>
+        <Table>
+          <thead>
             <tr>
-              <td colspan="7" class="empty-state-cell">Nėra neparsiunčiamų failų.</td>
+              <th>Id</th>
+              <th>Pavadinimas</th>
+              <th>Plėtinys</th>
+              <th>Šaltinis</th>
+              <th>Šaltinio nuoroda</th>
+              <th class="cell-right">Bandymai</th>
+              <th>Paskutinis bandymas</th>
             </tr>
-          ) : files.map((file: any) => (
-            <tr>
-              <td class="cell-mono">{file.id ? <a href={`/failas/${file.id}`}>{file.id}</a> : '—'}</td>
-              <td class="neparsiunciami-col-name">
-                <span class="cell-truncate">{file.pavadinimas || '—'}</span>
-              </td>
-              <td class="cell-mono">{file.extension || ''}</td>
-              <td>{file.saltinis || 'sutartys'}</td>
-              <td class="neparsiunciami-col-source-link">
-                {file.saltinioLink ? (
-                  <a href={file.saltinioLink} class="cell-truncate">
-                    {file.saltinioLink}
-                  </a>
-                ) : ''}
-              </td>
-              <td class="cell-mono cell-right">{file.parsiuntimoBandymai ?? 0}</td>
-              <td class="cell-nowrap">{file.paskutinisParsiuntimoBandymas ? String(new Date(file.paskutinisParsiuntimoBandymas).toLocaleString('lt-LT')) : '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-    </TableWrapper>
+          </thead>
+          <tbody>
+            {files.length === 0 ? (
+              <tr>
+                <td colspan="7" class="empty-state-cell">Nėra neparsiunčiamų failų.</td>
+              </tr>
+            ) : files.map((file: any) => (
+              <tr>
+                <td class="cell-mono">{file.id ? <a href={`/failas/${file.id}`}>{file.id}</a> : '—'}</td>
+                <td class="neparsiunciami-col-name">
+                  <span class="cell-truncate">{file.pavadinimas || '—'}</span>
+                </td>
+                <td class="cell-mono">{file.extension || ''}</td>
+                <td>{file.saltinis || 'sutartys'}</td>
+                <td class="neparsiunciami-col-source-link">
+                  {file.saltinioLink ? (
+                    <a href={file.saltinioLink} class="cell-truncate">
+                      {file.saltinioLink}
+                    </a>
+                  ) : ''}
+                </td>
+                <td class="cell-mono cell-right">{file.parsiuntimoBandymai ?? 0}</td>
+                <td class="cell-nowrap">{file.paskutinisParsiuntimoBandymas ? String(new Date(file.paskutinisParsiuntimoBandymas).toLocaleString('lt-LT')) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </TableWrapper>
 
-    <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
+      <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
+    </div>
   </main>
 </Layout>
 

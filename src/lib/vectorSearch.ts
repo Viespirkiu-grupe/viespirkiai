@@ -34,7 +34,7 @@ export async function fetchVectorSearchResults(search: string): Promise<VectorSe
   upstreamUrl.searchParams.set('q', trimmed);
 
   const response = await fetch(upstreamUrl, {
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(180000),
     headers: {
       Accept: 'application/json',
     },

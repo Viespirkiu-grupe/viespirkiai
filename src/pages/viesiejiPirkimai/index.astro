@@ -39,12 +39,15 @@ if ('error' in parsedLimit) {
 const { limit } = parsedLimit;
 const page = parseInt(query.page) || 1;
 
-function buildNumberOfResults({ shown, total, elapsed }: { shown: number; total: number | null; elapsed: number }) {
+type Timing = { label: string; start: number; duration: number; phase?: string };
+
+function buildNumberOfResults({ shown, total, elapsed, timings }: { shown: number; total: number | null; elapsed: number; timings?: Timing[] | null }) {
   const trukme = (elapsed / 1000).toFixed(2) + 's';
-  const source = `<span class="inline">(${trukme}, postgres)</span>`;
+  const timingsAttr = timings && timings.length ? ` data-timings='${JSON.stringify(timings).replace(/'/g, '&#39;')}'` : '';
+  const source = `<span class="inline timing-source"${timingsAttr}>(${trukme}, postgres)</span>`;
   if (total == null) {
     return {
-      numberOfResults: `Rodomi ${shown} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <span class="inline"> (${trukme}, postgres)</span>`,
+      numberOfResults: `Rodomi ${shown} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <span class="inline timing-source"${timingsAttr}> (${trukme}, postgres)</span>`,
       total: 10_000,
     };
   }
@@ -57,6 +60,12 @@ function buildNumberOfResults({ shown, total, elapsed }: { shown: number; total:
     numberOfResults: `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų'])} ${source}`,
     total,
   };
+}
+
+async function timed<T>(promise: Promise<T>): Promise<{ value: T; ms: number }> {
+  const t0 = performance.now();
+  const value = await promise;
+  return { value, ms: Math.round(performance.now() - t0) };
 }
 
 const CSV_HEADERS = ['Pirkimo ID','Pavadinimas','Vykdytojas','Paskelbimo data','Pasiūlymų terminas','Pirkimo būdas','Statusas','Žingsnis','Numatoma vertė','Tipas'];
@@ -108,12 +117,18 @@ if (query.csv || query.jsonl) {
 
 if (query.rezultatuSkaiciausPatikslinimas) {
   const startas = performance.now();
-  const [total, { values, queryParams }] = await Promise.all([
-    countViesiejiPirkimai(query),
-    searchViesiejiPirkimai(query, { limit: 1, page }),
+  const [countRes, searchRes] = await Promise.all([
+    timed(countViesiejiPirkimai(query)),
+    timed(searchViesiejiPirkimai(query, { limit: 1, page })),
   ]);
+  const total = countRes.value;
+  const { values, queryParams } = searchRes.value as { values: any; queryParams: string };
   const elapsed = performance.now() - startas + Number(query.trukme || 0);
-  const { numberOfResults } = buildNumberOfResults({ shown: limit, total, elapsed });
+  const timings: Timing[] = [
+    { label: 'Paieška', phase: 'search', start: 0, duration: searchRes.ms },
+    { label: 'Skaičius', phase: 'count', start: 0, duration: countRes.ms },
+  ];
+  const { numberOfResults } = buildNumberOfResults({ shown: limit, total, elapsed, timings });
   return new Response(JSON.stringify({ total, numberOfResults }), {
     headers: { 'Content-Type': 'application/json' },
   });
@@ -127,9 +142,13 @@ if (query.json) {
 }
 
 const startas = performance.now();
-const { results, total, values, queryParams } = await searchViesiejiPirkimai(query, { limit, page });
+const searchTimed = await timed(searchViesiejiPirkimai(query, { limit, page }));
+const { results, total, values, queryParams } = searchTimed.value;
 const elapsed = performance.now() - startas + Number(query.trukme || 0);
-const { numberOfResults } = buildNumberOfResults({ shown: results.length, total, elapsed });
+const initialTimings: Timing[] = [
+  { label: 'Paieška', phase: 'search', start: 0, duration: searchTimed.ms },
+];
+const { numberOfResults } = buildNumberOfResults({ shown: results.length, total, elapsed, timings: initialTimings });
 
 const galimaEksportuoti = Object.keys(values).length > 0 && (total ?? 0) <= MAX_POSTGRES_LIMIT;
 const usedHiddenFields = Object.keys(values).some(k => k !== 'search' && values[k] !== '' && values[k] !== undefined);
@@ -157,7 +176,7 @@ const font = getFont(Astro.cookies);
     </SearchForm>
 
     <div class="mt-10 max-w-lg center mx-auto">
-      <div>
+      <div class="stack stack-md">
         <div class="flex justify-between items-center mb-4">
           <ResultsSummary html={numberOfResults} />
           {galimaEksportuoti && (

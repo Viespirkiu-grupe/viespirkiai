@@ -37,7 +37,7 @@ if (!showStatistics) {
   const total = searchResult.total ?? await countFailai(query);
   pageCount = Math.min(100, Math.ceil(total / limit));
   const elapsed = Date.now() - startedAt;
-  numberOfResults = buildNumberOfResults({ rows: results, total, elapsed, engine: searchResult.engine, approximate });
+  numberOfResults = buildNumberOfResults({ rows: results, total, elapsed, engine: searchResult.engine, approximate, timings: (searchResult as any).timings ?? null });
   search = query.search || '';
 } else {
   const { rows } = await postgres.query(`SELECT metrika, eilute, verte FROM "failaiCounts";`);
@@ -178,7 +178,7 @@ const statistikaPayload = buildStatistika(statistika);
           </script>
         </div>
       ) : (
-        <div class="mt-10 max-w-lg center mx-auto">
+        <div class="mt-10 max-w-lg center mx-auto stack stack-md">
           <div class="flex justify-between items-center mb-4">
             <ResultsSummary html={numberOfResults} />
           </div>

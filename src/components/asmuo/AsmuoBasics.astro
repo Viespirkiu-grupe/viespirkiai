@@ -1,5 +1,6 @@
 ---
 import KeyValueList from '@design-system/components/KeyValueList.astro';
+import Badge from '@design-system/components/Badge.astro';
 
 interface Props {
   asmuo: any;
@@ -9,11 +10,23 @@ const { asmuo } = Astro.props;
 const jadis = asmuo.jadis ?? {};
 const hasJadis = Object.values(jadis).some((v: any) => Number(v) > 0);
 const istatinis = asmuo.istatinisKapitalas;
+const isr = asmuo.isregistruotasAsmuo;
+
+const AKTYVUS_STATUSAS = 'Teisinis stat neįregistruotas';
+const statusas = asmuo.jar.statusoPavadinimas;
+const neaktyvusStatusas = statusas && statusas !== AKTYVUS_STATUSAS ? statusas : null;
+
+const BANKROTO_STATUSAI = new Set(['Bankrutuojantis', 'Bankrutavęs', 'Likviduojamas dėl bankroto', 'Likviduojamas']);
+const statusoVariantas = neaktyvusStatusas && BANKROTO_STATUSAI.has(neaktyvusStatusas) ? 'danger' : 'warning';
 ---
 
 <KeyValueList>
   <dt>JAR kodas</dt>
-  <dd><span class="cell-mono">{asmuo.jar.jarKodas}</span> · {asmuo.jar.formosPavadinimas}</dd>
+  <dd>
+    <span class="cell-mono">{asmuo.jar.jarKodas}</span> · {asmuo.jar.formosPavadinimas}
+    {isr && <Badge variant="danger" className="ml-1">Išregistruotas</Badge>}
+    {neaktyvusStatusas && <Badge variant={statusoVariantas} className="ml-1">{neaktyvusStatusas}</Badge>}
+  </dd>
 
   {asmuo.sodra?.kodas && <>
     <dt>SODRA kodas</dt>
@@ -37,6 +50,19 @@ const istatinis = asmuo.istatinisKapitalas;
         : <em class="text-muted">Nenurodytas</em>
     }
   </dd>
+
+  {neaktyvusStatusas && <>
+    <dt>Statusas</dt>
+    <dd>
+      <Badge variant={statusoVariantas}>{neaktyvusStatusas}</Badge>
+      {asmuo.jar.statusasNuo && <span class="text-muted text-xs ml-1">nuo {asmuo.jar.statusasNuo}</span>}
+    </dd>
+  </>}
+
+  {isr?.isregistravimoData && <>
+    <dt>Išregistruota</dt>
+    <dd>{isr.isregistravimoData}</dd>
+  </>}
 
   {istatinis?.reiksme && <>
     <dt>Įstatinis kapitalas</dt>

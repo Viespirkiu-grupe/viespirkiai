@@ -1,10 +1,12 @@
 import process from "process";
 import { Buffer } from "buffer";
+import { createHash } from "crypto";
 import { log } from "../../utils/log.js";
 import { postgres, parsePgArray } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import Timings from "../../utils/timings.js";
 import { readRezultatasFs } from "../ocr/rezultataiFs.js";
+import { hashMetaduomenys, saveMetaduomenysFs } from "./metaduomenysFs.js";
 
 const nodeName = process.env.NODE_NAME || "default";
 const nuskaitymoVersija = 12;
@@ -87,6 +89,10 @@ async function nuskaitytiDokNuskaitytojuje(
     timings.end("nuskaitytojas");
 
     const fetchUrl = `${nuskaitytojas.url}/extract`;
+
+    if (nuskaitytojas.fileHost) {
+        url = `${nuskaitytojas.fileHost}/${dokumentas.md5}`;
+    }
 
     log(`Dokumentas ${url} nuskaitomas ${nuskaitytojas.pavadinimas}`);
 
@@ -247,6 +253,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
 
         metadata = cleanMetadata(metadata);
         timings.end("nuskaitymas");
+
     } catch (e) {
         let kodas = -1;
         if (e.message.includes("No password given")) {
@@ -293,6 +300,9 @@ export async function nuskaitytiVienoDokumentoDuomenis(
             throw e; // (Galimai) brokuotas nuskaitymas
         }
     }
+
+    const metaduomenysHash = hashMetaduomenys(metadata);
+    await saveMetaduomenysFs(metaduomenysHash, metadata);
 
     let reikalingasOcr = dokumentas.ocrState; // Nereikalingas / nebūtinas
     if (
@@ -534,22 +544,26 @@ export async function nuskaitytiVienoDokumentoDuomenis(
 
     let autorius = metadata?.author || undefined;
 
+    const tekstasStr = truncateTo1MB(tekstas);
+    const tekstasHash = createHash("md5").update(tekstasStr).digest("hex");
+
     timings.start("failaiUpdate");
     await postgres.query(
         `UPDATE failai
         SET nuskaitytas = $1,
-            metaduomenys = $2,
+            "metaduomenysHash" = $2,
             "zodziuSkaicius" = $3,
             "puslapiuSkaicius" = $4,
             "simboliuSkaicius" = $5,
             "ocrState" = $6,
             location = ST_GeomFromText($7, 4326),
             "nuskaitymasTimestamp" = NOW(),
-            "autorius" = $8
+            "autorius" = $8,
+            "tekstasHash" = $10
         WHERE id = $9;`,
         [
             nuskaitymoVersija,
-            metadata,
+            metaduomenysHash,
             wordCount,
             pageCount,
             characterCount,
@@ -557,6 +571,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
             location,
             autorius,
             dokumentas.id,
+            tekstasHash,
         ],
     );
     timings.end("failaiUpdate");
@@ -579,7 +594,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
         `,
         [
             dokumentas.id,
-            truncateTo1MB(tekstas),
+            tekstasStr,
             wordCount,
             pageCount,
             characterCount,
@@ -591,24 +606,23 @@ export async function nuskaitytiVienoDokumentoDuomenis(
     timings.start("failaiNuskaitymai");
     await postgres.query(
         `INSERT INTO "failaiNuskaitymai"
-            (failas, versija, metaduomenys, "timestamp", "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", location)
+            (failas, versija, "metaduomenysHash", "timestamp", "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", location)
          VALUES ($1, $2, $3, NOW() AT TIME ZONE 'Europe/Vilnius', $4, $5, $6, ST_GeomFromText($7, 4326))
          ON CONFLICT (failas, versija, "metaduomenysHash")
          DO UPDATE SET
-            metaduomenys = EXCLUDED.metaduomenys,
             "timestamp" = EXCLUDED."timestamp",
             "zodziuSkaicius" = EXCLUDED."zodziuSkaicius",
             "puslapiuSkaicius" = EXCLUDED."puslapiuSkaicius",
             "simboliuSkaicius" = EXCLUDED."simboliuSkaicius",
              location = EXCLUDED.location;`,
         [
-            dokumentas.id, // failas
-            nuskaitymoVersija, // versija
-            metadata, // metaduomenys
-            wordCount, // zodziuSkaicius
-            pageCount, // puslapiuSkaicius
-            characterCount, // simboliuSkaicius
-            location, // location
+            dokumentas.id,      // failas
+            nuskaitymoVersija,  // versija
+            metaduomenysHash,   // metaduomenysHash
+            wordCount,          // zodziuSkaicius
+            pageCount,          // puslapiuSkaicius
+            characterCount,     // simboliuSkaicius
+            location,           // location
         ],
     );
     timings.end("failaiNuskaitymai");

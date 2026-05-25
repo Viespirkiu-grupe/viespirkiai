@@ -12,7 +12,7 @@ const classes = ['page-header', className].filter(Boolean).join(' ');
 <div class={classes}>
   <div class="page-header-copy">
     {hasSubtext && <p class="subtext"><slot name="subtext" /></p>}
-    <h1><slot /></h1>
+    <h1 class="mt-0"><slot /></h1>
   </div>
   {hasActions && (
     <div class="page-header-actions">

@@ -70,8 +70,14 @@ export default {
     enableGraph: false,
     enableVectorSearch: false,
     vectorSearchUrl: "",
-    ocrRezultataiLocation: undefined, // Absoliutus kelias OCR rezultatų blob saugoti (pvz. /data/ocrRezultatai)
+    teismoNuosprendziaiVectorSearchUrl: "",
+    enableDokumentaiSearch: false, // Prototipinis /dokumentai paieškos puslapis
     enableExecuteQueryMcp: false, // Rodyti get_schema ir execute_query MCP įrankius
     enableExecuteQueryMcpOnly: false, // Skirta local testavimui kartu su prod viespirkiai
     enableExecuteQueryMcpTrace: false, // Įrašyti SQL užklausų ir rezultatų žurnalą į stderr
+
+    ocrRezultataiLocation: undefined, // Absoliutus kelias (pvz. /data/ocrRezultatai) arba nuotolinis URL (pvz. https://host/api/ocr/rezultataiFiles)
+    failaiMetaduomenysLocation: undefined, // Absoliutus kelias (pvz. /data/failaiMetaduomenys) arba nuotolinis URL (pvz. https://host/api/failai/metaduomenysFiles)
+    failaiTekstasLocation: undefined, // Absoliutus kelias (pvz. /data/failaiTekstas) arba nuotolinis URL (pvz. https://host/api/failai/tekstasFiles)
+    dokumentaiLocation: undefined, // Absoliutus kelias (pvz. /data/dokumentai) arba nuotolinis URL — JSON sidecar failai vienam dokumentui (raktas: md5)
 };

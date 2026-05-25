@@ -7,7 +7,7 @@ import '@/utils/linksniai.js';
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 const page = parseInt(Astro.url.searchParams.get('page') || '1') || 1;
-const DEFAULT_LIMIT = 25;
+const DEFAULT_LIMIT = 24;
 const offset = (page - 1) * DEFAULT_LIMIT;
 const [extensionRes, countRes] = await Promise.all([postgres.query('SELECT * FROM "failaiStatsExtension" WHERE count > 0 ORDER BY count DESC, extension ASC LIMIT $1 OFFSET $2', [DEFAULT_LIMIT, offset]), postgres.query('SELECT COUNT(*) AS total FROM "failaiStatsExtension" WHERE count > 0')]);
 const extension = extensionRes.rows;
@@ -17,7 +17,9 @@ const pageCount = Math.ceil(totalExtensionCount / DEFAULT_LIMIT);
 <Layout pageTitle="Dažniausi failų plėtiniai" pageDescription="Viešųjų pirkimų dokumentų plėtinių pasiskirstymas" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font}>
   <main>
     <PageHeader>Dažniausi failų plėtiniai</PageHeader>
-    <div class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">{(extension as any[]).map((item) => <article class="card card-clickable"><div class="card-body"><h3 class="text-xl font-bold cell-mono mb-3 mt-1"><a href={`/failai?extension=${item.extension}`}>{item.extension || '\u200b'}</a></h3><p class="text-muted text-sm mb-0">{Number(item.count).toLocaleString('lt-LT')} failų</p></div></article>)}</div>
-    <Pagination currentPage={page} pageCount={pageCount} queryParams="" />
+    <div class="stack stack-md">
+      <div class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">{(extension as any[]).map((item) => <article class="card card-clickable"><div class="card-body"><h3 class="text-xl font-bold cell-mono mb-3 mt-1"><a href={`/failai?extension=${item.extension}`}>{item.extension || '\u200b'}</a></h3><p class="text-muted text-sm mb-0">{Number(item.count).toLocaleString('lt-LT')} failų</p></div></article>)}</div>
+      <Pagination currentPage={page} pageCount={pageCount} queryParams="" />
+    </div>
   </main>
 </Layout>

@@ -8,7 +8,8 @@
         "build": "astro build",
         "test": "vitest run",
         "test:integration": "vitest run --config vitest.integration.config.ts",
-        "check": "astro check"
+        "check": "astro check",
+        "db:schema:dump": "node scripts/dumpDbSchema.js"
     },
     "overrides": {
         "vite": "^7"

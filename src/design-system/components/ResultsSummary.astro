@@ -31,4 +31,202 @@ const { html } = Astro.props;
       transform: rotate(360deg);
     }
   }
+
+  .numberOfResults :global(.timing-source[data-timings]) {
+    cursor: help;
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+  }
 </style>
+
+<style is:global>
+  .timing-waterfall-tooltip {
+    position: fixed;
+    z-index: var(--z-tooltip);
+    background: var(--shade-1);
+    border: var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    font-size: var(--text-xs);
+    font-family: var(--font-sans);
+    font-style: normal;
+    color: var(--black);
+    min-width: 260px;
+    box-shadow: var(--shadow-lg);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity var(--transition), transform var(--transition);
+  }
+
+  .timing-waterfall-tooltip.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .timing-waterfall-tooltip .twt-bar {
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform var(--transition-slow);
+  }
+
+  .timing-waterfall-tooltip.is-visible .twt-bar {
+    transform: scaleX(1);
+  }
+
+  .timing-waterfall-tooltip .twt-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray);
+  }
+
+  .timing-waterfall-tooltip .twt-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .timing-waterfall-tooltip .twt-row {
+    display: grid;
+    grid-template-columns: 84px 1fr 48px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .timing-waterfall-tooltip .twt-label { color: var(--dark-gray); }
+  .timing-waterfall-tooltip .twt-ms { text-align: right; color: var(--gray); font-variant-numeric: tabular-nums; }
+
+  .timing-waterfall-tooltip .twt-track {
+    position: relative;
+    height: 8px;
+    background: var(--shade-3);
+    border-radius: var(--radius-sm);
+  }
+
+  .timing-waterfall-tooltip .twt-bar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: var(--radius-sm);
+  }
+
+  .timing-waterfall-tooltip .twt-bar[data-phase="search"] { background: var(--color-info); }
+  .timing-waterfall-tooltip .twt-bar[data-phase="filter"] { background: var(--color-warning); }
+  .timing-waterfall-tooltip .twt-bar[data-phase="pg"]     { background: var(--color-success); }
+  .timing-waterfall-tooltip .twt-bar[data-phase="count"]  { background: var(--color-muted); }
+  .timing-waterfall-tooltip .twt-bar:not([data-phase])    { background: var(--gray); }
+
+  .timing-waterfall-tooltip .twt-total {
+    border-top: var(--border);
+    margin-top: 8px;
+    padding-top: 6px;
+    display: flex;
+    justify-content: space-between;
+    color: var(--dark-gray);
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+
+<script>
+  type Timing = { label: string; start: number; duration: number; phase?: string };
+
+  function buildTooltip(timings: Timing[]) {
+    const entries = timings.filter(t => t.duration > 0);
+    if (entries.length === 0) return null;
+    const wallclock = Math.max(...entries.map(t => t.start + t.duration));
+    if (wallclock === 0) return null;
+
+    const tip = document.createElement('div');
+    tip.className = 'timing-waterfall-tooltip';
+
+    const title = document.createElement('div');
+    title.className = 'twt-title';
+    title.textContent = 'Paieškos etapai';
+    tip.appendChild(title);
+
+    const rows = document.createElement('div');
+    rows.className = 'twt-rows';
+
+    for (const t of entries) {
+      const startPct = (t.start / wallclock) * 100;
+      const widthPct = (t.duration / wallclock) * 100;
+
+      const row = document.createElement('div');
+      row.className = 'twt-row';
+
+      const label = document.createElement('span');
+      label.className = 'twt-label';
+      label.textContent = t.label;
+
+      const track = document.createElement('div');
+      track.className = 'twt-track';
+
+      const bar = document.createElement('div');
+      bar.className = 'twt-bar';
+      if (t.phase) bar.dataset.phase = t.phase;
+      bar.style.left = `${startPct.toFixed(1)}%`;
+      bar.style.width = `${widthPct.toFixed(1)}%`;
+      track.appendChild(bar);
+
+      const msEl = document.createElement('span');
+      msEl.className = 'twt-ms';
+      msEl.textContent = `${t.duration} ms`;
+
+      row.append(label, track, msEl);
+      rows.appendChild(row);
+    }
+
+    tip.appendChild(rows);
+
+    const totalEl = document.createElement('div');
+    totalEl.className = 'twt-total';
+    totalEl.innerHTML = `<span>Iš viso</span><span>${wallclock} ms</span>`;
+    tip.appendChild(totalEl);
+
+    return tip;
+  }
+
+  function init() {
+    let active: HTMLElement | null = null;
+
+    document.addEventListener('mouseover', (e) => {
+      const src = (e.target as HTMLElement).closest?.('.timing-source[data-timings]') as HTMLElement | null;
+      if (!src) return;
+
+      if (active) active.remove();
+      let timings: Timing[];
+      try { timings = JSON.parse(src.dataset.timings!); } catch { return; }
+      if (!Array.isArray(timings)) return;
+
+      const tip = buildTooltip(timings);
+      if (!tip) return;
+      document.body.appendChild(tip);
+      active = tip;
+
+      const rect = src.getBoundingClientRect();
+      const tipW = tip.offsetWidth || 260;
+      let left = rect.left;
+      if (left + tipW > window.innerWidth - 8) left = window.innerWidth - tipW - 8;
+      tip.style.left = `${Math.max(8, left)}px`;
+      tip.style.top = `${rect.bottom + 6}px`;
+
+      requestAnimationFrame(() => tip.classList.add('is-visible'));
+    });
+
+    document.addEventListener('mouseout', (e) => {
+      const src = (e.target as HTMLElement).closest?.('.timing-source[data-timings]');
+      if (src && active) {
+        active.remove();
+        active = null;
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+</script>

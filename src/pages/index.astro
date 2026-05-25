@@ -8,7 +8,7 @@ import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
 import config from '../lib/config.ts';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
 import { objectsToCsvStream } from '@/utils/csv.js';
-import { Readable as NodeReadable, PassThrough } from 'node:stream';
+import { Readable as NodeReadable, PassThrough, Transform } from 'node:stream';
 import { cleanQuery, getColorScheme, getFont } from '../lib/failai.ts';
 
 void NodeReadable;
@@ -48,10 +48,13 @@ const limit = parseInt(query.limit) || DEFAULT_LIMIT;
 const page = parseInt(query.page) || 1;
 const engine = query.search && config.typesenseUp ? 'typesense' : 'postgres';
 
-function buildNumberOfResults({ shown, total, elapsed, engine }: { shown: number; total: number | null; elapsed: number; engine: string }) {
+type Timing = { label: string; start: number; duration: number; phase?: string };
+
+function buildNumberOfResults({ shown, total, elapsed, engine, timings }: { shown: number; total: number | null; elapsed: number; engine: string; timings?: Timing[] | null }) {
   const durationMs = Math.round(elapsed);
   const trukme = (elapsed / 1000).toFixed(2);
-  const source = `<span class="inline" data-duration="${durationMs}">(${trukme}s, ${engine})</span>`;
+  const timingsAttr = timings && timings.length ? ` data-timings='${JSON.stringify(timings).replace(/'/g, '&#39;')}'` : '';
+  const source = `<span class="inline timing-source" data-duration="${durationMs}"${timingsAttr}>(${trukme}s, ${engine})</span>`;
   if (total == null) {
     return `Rodomi ${shown} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų ${source}`;
   }
@@ -59,6 +62,12 @@ function buildNumberOfResults({ shown, total, elapsed, engine }: { shown: number
     return `Rodomi ${shown} iš ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`;
   }
   return `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų'])} ${source}`;
+}
+
+async function timed<T>(promise: Promise<T>): Promise<{ value: T; ms: number }> {
+  const t0 = performance.now();
+  const value = await promise;
+  return { value, ms: Math.round(performance.now() - t0) };
 }
 
 function buildPaginationHtml({ currentPage, pageCount, queryParams }: { currentPage: number; pageCount: number; queryParams: string }) {
@@ -79,7 +88,8 @@ function buildPaginationHtml({ currentPage, pageCount, queryParams }: { currentP
   const pageLink = (page: number) => `?page=${page}`;
   const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
 
-  return `<nav aria-label="Puslapiavimas" class="mt-8"><ul class="pagination">${current > 1 ? `<li><a href="${pageLink(current - 1) + queryParams}" aria-label="Ankstesnis puslapis"><span aria-hidden="true">←</span></a></li>` : '<li class="disabled"><span aria-hidden="true">←</span></li>'}${pages.map(i => `<li${i === current ? ' class="active"' : ''}><a href="${pageLink(i) + queryParams}" aria-label="Puslapis ${i}"${i === current ? ' aria-current="page"' : ''}>${i}</a></li>`).join('')}${current < totalPages ? `<li><a href="${pageLink(current + 1) + queryParams}" aria-label="Kitas puslapis"><span aria-hidden="true">→</span></a></li>` : '<li class="disabled"><span aria-hidden="true">→</span></li>'}</ul></nav>`;
+  // Return only list items, because client-side update replaces innerHTML of the existing ul.pagination element.
+  return `${current > 1 ? `<li><a href="${pageLink(current - 1) + queryParams}" aria-label="Ankstesnis puslapis"><span aria-hidden="true">←</span></a></li>` : '<li class="disabled"><span aria-hidden="true">←</span></li>'}${pages.map(i => `<li${i === current ? ' class="active"' : ''}><a href="${pageLink(i) + queryParams}" aria-label="Puslapis ${i}"${i === current ? ' aria-current="page"' : ''}>${i}</a></li>`).join('')}${current < totalPages ? `<li><a href="${pageLink(current + 1) + queryParams}" aria-label="Kitas puslapis"><span aria-hidden="true">→</span></a></li>` : '<li class="disabled"><span aria-hidden="true">→</span></li>'}`;
 }
 
 void buildPaginationHtml;
@@ -113,8 +123,36 @@ if (query.jsonl || query.csv) {
   }
 
   if (query.csv) {
-    // Basic CSV fallback: map raw rows to CSV using generic object keys
-    stream.pipe(objectsToCsvStream()).pipe(pass);
+    const formatDate = (value: unknown): string => {
+      if (!value) return '';
+      const date = new Date(value as string | number | Date);
+      return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
+    };
+
+    const toCsvRow = new Transform({
+      objectMode: true,
+      transform(row: Record<string, unknown>, _enc, cb) {
+        cb(null, {
+          'Tipas': row.tipas ?? '',
+          'Kategorija': row.kategorija ?? '',
+          'Pavadinimas': row.pavadinimas ?? '',
+          'Numatyta vertė': row.verte ?? '',
+          'Faktinė vertė': row.faktineVerte ?? '',
+          'Pirkėjo pavadinimas': row.perkanciojiOrganizacija ?? '',
+          'Pirkėjo kodas': row.perkanciosiosOrganizacijosKodas ?? '',
+          'Tiekėjų pavadinimai': Array.isArray(row.tiekejai) ? (row.tiekejai as unknown[]).join('; ') : '',
+          'Tiekėjų kodai': Array.isArray(row.tiekejaiKodai) ? (row.tiekejaiKodai as unknown[]).join('; ') : '',
+          'Sudarymo data': formatDate(row.sudarymoData),
+          'Faktinė įvykdymo data': formatDate(row.faktineIvykdymoData),
+          'Redagavimo data': formatDate(row.paskutinioRedagavimoData),
+          'BVPZ kodai': Array.isArray(row.bvpzKodai) ? (row.bvpzKodai as unknown[]).filter(Boolean).join('; ') : '',
+          'Sutarties numeris': row.sutartiesNumeris ?? '',
+          'Unikalus ID': row.sutartiesUnikalusId ?? '',
+        });
+      },
+    });
+
+    stream.pipe(toCsvRow).pipe(objectsToCsvStream()).pipe(pass);
     return new Response(NodeReadable.toWeb(pass) as unknown as BodyInit, {
       headers: {
         'Content-Type': 'text/csv',
@@ -127,18 +165,24 @@ if (query.jsonl || query.csv) {
 // Result count update (AJAX)
 if (query.rezultatuSkaiciausPatikslinimas) {
   const startas = performance.now();
-  const [total, { queryParams }] = await Promise.all([
-    countSutartys(query),
-    searchSutartys(query, { limit: 1, page, engine }),
-  ]) as [number, { values: SearchValues; queryParams: string }];
+  const [countRes, searchRes] = await Promise.all([
+    timed(countSutartys(query)),
+    timed(searchSutartys(query, { limit: 1, page, engine })),
+  ]);
+  const total = countRes.value as number;
+  const { queryParams } = searchRes.value as { values: SearchValues; queryParams: string };
   const pageCount = Math.ceil(total / limit);
   const elapsed = performance.now() - startas + Number(query.trukme || 0);
+  const timings: Timing[] = [
+    { label: 'Paieška', phase: 'search', start: 0, duration: searchRes.ms },
+    { label: 'Skaičius', phase: 'count', start: 0, duration: countRes.ms },
+  ];
   void [queryParams, pageCount, elapsed];
   return new Response(JSON.stringify({
     total,
     pageCount,
     queryParams,
-    numberOfResults: buildNumberOfResults({ shown: limit, total, elapsed, engine }),
+    numberOfResults: buildNumberOfResults({ shown: limit, total, elapsed, engine, timings }),
     pagination: buildPaginationHtml({ currentPage: page, pageCount, queryParams }),
     zinomasRezultatuSkaicius: true,
   }), {
@@ -147,7 +191,8 @@ if (query.rezultatuSkaiciausPatikslinimas) {
 }
 
 const startas = performance.now();
-const { results, total: searchedTotal, values, queryParams } = await searchSutartys(query, { limit, page, engine }) as {
+const searchTimed = await timed(searchSutartys(query, { limit, page, engine }));
+const { results, total: searchedTotal, values, queryParams } = searchTimed.value as {
   results: SearchResultItem[];
   total: number | null;
   values: SearchValues;
@@ -155,7 +200,10 @@ const { results, total: searchedTotal, values, queryParams } = await searchSutar
 };
 const elapsed = performance.now() - startas;
 const total = searchedTotal;
-const numberOfResults = buildNumberOfResults({ shown: results.length, total, elapsed, engine });
+const initialTimings: Timing[] = [
+  { label: 'Paieška', phase: 'search', start: 0, duration: searchTimed.ms },
+];
+const numberOfResults = buildNumberOfResults({ shown: results.length, total, elapsed, engine, timings: initialTimings });
 
 const pageCount = Math.ceil((total || 100_000) / limit);
 const usedHiddenFields = Object.keys(values).some(k => k !== 'search' && k !== 'limit' && values[k] !== '' && values[k] !== undefined);
