@@ -7,6 +7,7 @@ import config from "../../utils/config.js";
 import Timings from "../../utils/timings.js";
 import { readRezultatasFs } from "../ocr/rezultataiFs.js";
 import { hashMetaduomenys, saveMetaduomenysFs } from "./metaduomenysFs.js";
+import { saveTekstasFs } from "./tekstasFs.js";
 
 const nodeName = process.env.NODE_NAME || "default";
 const nuskaitymoVersija = 12;
@@ -547,6 +548,10 @@ export async function nuskaitytiVienoDokumentoDuomenis(
     const tekstasStr = truncateTo1MB(tekstas);
     const tekstasHash = createHash("md5").update(tekstasStr).digest("hex");
 
+    timings.start("tekstasFs");
+    await saveTekstasFs(tekstasHash, tekstasStr);
+    timings.end("tekstasFs");
+
     timings.start("failaiUpdate");
     await postgres.query(
         `UPDATE failai
@@ -643,7 +648,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
     const timingParts = [
         "queue", "nuskaitytojas", "ocrRezultatai", "fetch", "nuskaitytojaUpdate",
         "nuskaitymas", "archyvas", "susijusiaiDuomenys",
-        "failaiUpdate", "failaiTekstas", "failaiNuskaitymai", "queueUpdate", "all",
+        "tekstasFs", "failaiUpdate", "failaiTekstas", "failaiNuskaitymai", "queueUpdate", "all",
     ].map((k) => `${k}=${timings.humanDuration(k)}`).join(" ");
     log(
         `Nuskaitytas dokumentas ${dokumentas.id} / ${dokumentas.pavadinimas}, ${wordCount} žodž. | ${timingParts}`,
