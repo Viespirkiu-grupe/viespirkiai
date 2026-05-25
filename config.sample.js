@@ -64,6 +64,7 @@ export default {
     enableVectorSearch: false,
     vectorSearchUrl: "",
     teismoNuosprendziaiVectorSearchUrl: "",
+    enableDokumentaiSearch: false, // Prototipinis /dokumentai paieškos puslapis
 
     ocrRezultataiLocation: undefined, // Absoliutus kelias (pvz. /data/ocrRezultatai) arba nuotolinis URL (pvz. https://host/api/ocr/rezultataiFiles)
     failaiMetaduomenysLocation: undefined, // Absoliutus kelias (pvz. /data/failaiMetaduomenys) arba nuotolinis URL (pvz. https://host/api/failai/metaduomenysFiles)
