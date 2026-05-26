@@ -183,7 +183,7 @@ export async function loadFailasById(id: string): Promise<Failas | null> {
  */
 export async function enrichFailas(failas: Failas): Promise<Failas> {
   const { fetchFailasMetadata } = await import('@/modules/failai/aptarnavimas.js');
-  failas = { ...failas, ...(await fetchFailasMetadata(failas.id)) };
+  failas = { ...failas, ...(await fetchFailasMetadata(failas.id, failas.tekstasHash)) };
 
   if (failas.ocrLatestResult) {
     failas.ocrLatestResult.submitTimestampDisplay = formatOcrTimestampForVilnius(failas.ocrLatestResult.submitTimestamp);

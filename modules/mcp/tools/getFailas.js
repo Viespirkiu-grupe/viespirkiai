@@ -85,10 +85,9 @@ export async function handler({ id }) {
         return { content: [{ type: "text", text: message }], isError: true };
     }
 
-    const metadata = await fetchFailasMetadata(failas.id);
+    const metadata = await fetchFailasMetadata(failas.id, failas.tekstasHash);
     failas = { ...failas, ...metadata };
 
-    // Tekstas — stored as JSON string array in the tekstas column
     delete failas.search_index;
 
     const rawTekstas = failas.tekstas;

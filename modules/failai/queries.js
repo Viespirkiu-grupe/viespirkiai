@@ -4,28 +4,19 @@ export async function findFailas({ id, dokId, fileId }) {
     if (id) {
         if (/^[a-f0-9]{32}$/.test(id))
             return postgres.query(
-                `SELECT f.*, ft.tekstas
-                 FROM failai f
-                 LEFT JOIN "failaiTekstas" ft ON ft.id = f.id
-                 WHERE f."md5" = $1 LIMIT 1`,
+                `SELECT f.* FROM failai f WHERE f."md5" = $1 LIMIT 1`,
                 [id],
             );
         if (isNaN(id)) return null;
         return postgres.query(
-            `SELECT f.*, ft.tekstas
-             FROM failai f
-             LEFT JOIN "failaiTekstas" ft ON ft.id = f.id
-             WHERE f."id" = $1 LIMIT 1`,
+            `SELECT f.* FROM failai f WHERE f."id" = $1 LIMIT 1`,
             [id],
         );
     }
     if (dokId && fileId) {
         if (isNaN(dokId) || isNaN(fileId)) return null;
         return postgres.query(
-            `SELECT f.*, ft.tekstas
-             FROM failai f
-             LEFT JOIN "failaiTekstas" ft ON ft.id = f.id
-             WHERE f."dokId" = $1 AND f."fileId" = $2 LIMIT 1`,
+            `SELECT f.* FROM failai f WHERE f."dokId" = $1 AND f."fileId" = $2 LIMIT 1`,
             [dokId, fileId],
         );
     }

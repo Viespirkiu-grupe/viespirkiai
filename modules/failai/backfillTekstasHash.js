@@ -3,7 +3,7 @@ import { log } from "../../utils/log.js";
 import { getTekstasPath, hashTekstas, saveTekstasFs } from "./tekstasFs.js";
 import fs from "fs";
 
-const BATCH_SIZE = 10_000;
+const BATCH_SIZE = 1_000;
 const FS_CONCURRENCY = 32;
 
 async function fileExists(filePath) {
@@ -53,7 +53,7 @@ async function processBatch(rows) {
         await postgres.query(
             `UPDATE public.failai f
              SET "tekstasHash" = v.hash
-             FROM (SELECT UNNEST($1::int[]) AS id, UNNEST($2::text[]) AS hash) v
+             FROM (SELECT UNNEST($1::bigint[]) AS id, UNNEST($2::text[]) AS hash) v
              WHERE f.id = v.id
                AND f."tekstasHash" IS DISTINCT FROM v.hash`,
             [ids, hashes],

@@ -581,33 +581,6 @@ export async function nuskaitytiVienoDokumentoDuomenis(
     );
     timings.end("failaiUpdate");
 
-    timings.start("failaiTekstas");
-    await postgres.query(
-        `INSERT INTO "failaiTekstas" (id, tekstas, pavadinimas, extension, saltinis, "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", autorius)
-        SELECT $1, $2, pavadinimas, extension, saltinis, $3, $4, $5, $6
-        FROM failai
-        WHERE id = $1
-        ON CONFLICT (id) DO UPDATE SET
-            tekstas            = EXCLUDED.tekstas,
-            pavadinimas        = EXCLUDED.pavadinimas,
-            extension          = EXCLUDED.extension,
-            saltinis           = EXCLUDED.saltinis,
-            "zodziuSkaicius"   = EXCLUDED."zodziuSkaicius",
-            "puslapiuSkaicius" = EXCLUDED."puslapiuSkaicius",
-            "simboliuSkaicius" = EXCLUDED."simboliuSkaicius",
-            autorius           = EXCLUDED.autorius
-        `,
-        [
-            dokumentas.id,
-            tekstasStr,
-            wordCount,
-            pageCount,
-            characterCount,
-            autorius,
-        ],
-    );
-    timings.end("failaiTekstas");
-
     timings.start("failaiNuskaitymai");
     await postgres.query(
         `INSERT INTO "failaiNuskaitymai"
@@ -648,7 +621,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
     const timingParts = [
         "queue", "nuskaitytojas", "ocrRezultatai", "fetch", "nuskaitytojaUpdate",
         "nuskaitymas", "archyvas", "susijusiaiDuomenys",
-        "tekstasFs", "failaiUpdate", "failaiTekstas", "failaiNuskaitymai", "queueUpdate", "all",
+        "tekstasFs", "failaiUpdate", "failaiNuskaitymai", "queueUpdate", "all",
     ].map((k) => `${k}=${timings.humanDuration(k)}`).join(" ");
     log(
         `Nuskaitytas dokumentas ${dokumentas.id} / ${dokumentas.pavadinimas}, ${wordCount} žodž. | ${timingParts}`,

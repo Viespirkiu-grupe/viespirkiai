@@ -7,6 +7,36 @@ import config from "../../utils/config.js";
 import { search, countDocs } from "../../quickwit/quickwit.js";
 import { log } from "../../utils/log.js";
 import { readMetaduomenysFs } from "./metaduomenysFs.js";
+import { readTekstasFs } from "./tekstasFs.js";
+
+const SNIPPET_CONCURRENCY = 32;
+const SNIPPET_LEAD = 150;
+const SNIPPET_LEN = 400;
+
+async function buildSnippets(rows, positionTerm) {
+    let cursor = 0;
+    const out = new Array(rows.length);
+    const needle = positionTerm ? foldLithuanian(positionTerm).toLowerCase() : null;
+    await Promise.all(
+        Array.from({ length: Math.min(SNIPPET_CONCURRENCY, rows.length) }, async () => {
+            while (cursor < rows.length) {
+                const i = cursor++;
+                const hash = rows[i].tekstasHash;
+                if (!hash) { out[i] = null; continue; }
+                const raw = await readTekstasFs(hash);
+                if (!raw) { out[i] = null; continue; }
+                if (needle) {
+                    const pos = foldLithuanian(raw).toLowerCase().indexOf(needle);
+                    const start = pos < 0 ? 0 : Math.max(0, pos - SNIPPET_LEAD);
+                    out[i] = raw.slice(start, start + SNIPPET_LEN);
+                } else {
+                    out[i] = raw.slice(0, SNIPPET_LEN);
+                }
+            }
+        }),
+    );
+    return out;
+}
 
 async function attachMetaduomenys(rows) {
     await Promise.all(rows.map(async (r) => {
@@ -110,18 +140,10 @@ const failaiFilter = new FilterBuilder({
         {
             key: "search",
             hidden: true,
-            pgOverride: (addParam, val) => {
-                const quoteMatch = val.match(/^"(.*)"$/);
-                const clean = quoteMatch ? quoteMatch[1] : val.replace(/"/g, "");
-                const query = quoteMatch
-                    ? `'${clean}'`
-                    : clean.trim().split(/\s+/).join(' & ');
-                return `EXISTS (
-                    SELECT 1 FROM "failaiTekstas" ft
-                    WHERE ft.id = f.id
-                    AND ft.tekstas ### ${addParam(query)}
-                )`;
-            },
+            pgOnly: true,
+            // PG full-text on tekstas was removed (broken + column is being dropped).
+            // search-only queries must go through Quickwit; PG path no longer filters by tekstas.
+            pgOverride: () => null,
         },
         {
             key: "location",
@@ -367,28 +389,15 @@ export async function searchFailai(
                 positionTerm = isPhrase ? inner : inner.split(/\s+/)[0];
             }
 
-            const tekstasQuery = positionTerm
-                ? postgres.query(
-                    `SELECT id,
-                        SUBSTRING(tekstas FROM GREATEST(1, POSITION(lower($2) IN translate(lower(tekstas), 'ąčęėįšųūž', 'aceeisuuz')) - 150) FOR 400) AS tekstas
-                     FROM "failaiTekstas" WHERE id = ANY($1)`,
-                    [ids, positionTerm],
-                )
-                : postgres.query(
-                    `SELECT id, LEFT(tekstas, 400) AS tekstas FROM "failaiTekstas" WHERE id = ANY($1)`,
-                    [ids],
-                );
+            const { rows: pgRows } = await postgres.query(
+                `SELECT * FROM failai f WHERE f.id = ANY(${idParam})${extraWhere}`,
+                [...pgParams, ids],
+            );
 
-            const [{ rows: pgRows }, { rows: tekstasRows }] = await Promise.all([
-                postgres.query(
-                    `SELECT * FROM failai f WHERE f.id = ANY(${idParam})${extraWhere}`,
-                    [...pgParams, ids],
-                ),
-                tekstasQuery,
-            ]);
-            // Merge tekstas into rows, then restore Quickwit ranking order
-            const tekstasById = new Map(tekstasRows.map((r) => [r.id, r.tekstas]));
-            const byId = new Map(pgRows.map((r) => [r.id, { ...r, tekstas: tekstasById.get(r.id) ?? r.tekstas }]));
+            const snippets = await buildSnippets(pgRows, positionTerm);
+            const byId = new Map(
+                pgRows.map((r, i) => [r.id, { ...r, tekstas: snippets[i] ?? null }]),
+            );
             rows = ids.map((id) => byId.get(id)).filter(Boolean);
             pgMs = Date.now() - pgStart;
         }

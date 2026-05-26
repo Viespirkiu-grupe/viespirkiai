@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { saveDokumentasFs } from "./dokumentaiFs.js";
 import { readMetaduomenysFs } from "../failai/metaduomenysFs.js";
+import { readTekstasFs } from "../failai/tekstasFs.js";
 
 const SIDECAR_VERSION = "1";
 const CLASS = "viesiejiPirkimai";
@@ -38,7 +39,10 @@ export function splitSaltinioId(saltinis, saltinioId, dokId, fileId) {
 
 async function buildPayload(row) {
     const [s0, s1, s2] = splitSaltinioId(row.saltinis, row.saltinioId, row.dokId, row.fileId);
-    const metadata = row.metaduomenysHash ? await readMetaduomenysFs(row.metaduomenysHash) : null;
+    const [metadata, text] = await Promise.all([
+        row.metaduomenysHash ? readMetaduomenysFs(row.metaduomenysHash) : null,
+        row.tekstasHash ? readTekstasFs(row.tekstasHash) : null,
+    ]);
     const sidecar = {
         version: SIDECAR_VERSION,
         md5: row.md5,
@@ -55,7 +59,7 @@ async function buildPayload(row) {
         pageCount: row.puslapiuSkaicius ?? null,
         wordCount: row.zodziuSkaicius ?? null,
         characterCount: row.simboliuSkaicius ?? null,
-        text: row.tekstas ?? null,
+        text,
         metadata,
     };
     return { row, s0, s1, s2, sidecar };
@@ -68,12 +72,11 @@ export const FAILAI_SELECT_COLUMNS = `
     f."dokId", f."fileId",
     f.autorius, f.pavadinimas, f.extension,
     f."zodziuSkaicius", f."puslapiuSkaicius", f."simboliuSkaicius",
-    f."metaduomenysHash",
+    f."metaduomenysHash", f."tekstasHash",
     ST_AsEWKT(f.location) AS location_ewkt
 `;
 
-// Take an array of failai rows (with t.tekstas joined), write sidecars in
-// parallel, then bulk-upsert dokumentai. Returns timings + counts.
+
 export async function upsertBatch(rows) {
     const fsStart = Date.now();
     let skipped = 0;
@@ -173,17 +176,11 @@ export async function upsertBatch(rows) {
 // Fetch a slice of failai by id range (for backfill).
 export async function fetchFailaiSlice(afterId, limit) {
     const { rows } = await postgres.query(
-        `WITH base AS (
-            SELECT ${FAILAI_SELECT_COLUMNS}
-            FROM public.failai f
-            WHERE f.id > $1
-            ORDER BY f.id
-            LIMIT $2
-        )
-        SELECT b.*, t.tekstas
-        FROM base b
-        LEFT JOIN public."failaiTekstas" t ON t.id = b.id
-        ORDER BY b.id`,
+        `SELECT ${FAILAI_SELECT_COLUMNS}
+         FROM public.failai f
+         WHERE f.id > $1
+         ORDER BY f.id
+         LIMIT $2`,
         [afterId, limit],
     );
     return rows;
@@ -193,9 +190,8 @@ export async function fetchFailaiSlice(afterId, limit) {
 export async function fetchFailaiByIds(ids) {
     if (!ids.length) return [];
     const { rows } = await postgres.query(
-        `SELECT ${FAILAI_SELECT_COLUMNS}, t.tekstas
+        `SELECT ${FAILAI_SELECT_COLUMNS}
          FROM public.failai f
-         LEFT JOIN public."failaiTekstas" t ON t.id = f.id
          WHERE f.id = ANY($1)`,
         [ids],
     );

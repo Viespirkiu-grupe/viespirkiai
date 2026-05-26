@@ -3,6 +3,7 @@ import { postgres, parsePgArray } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import { readRezultatasFs } from "../ocr/rezultataiFs.js";
 import { readMetaduomenysFs } from "./metaduomenysFs.js";
+import { readTekstasFs } from "./tekstasFs.js";
 import { parseWKBPoint } from "../geografija/utils.js";
 import { formatDateTime, formatDuration } from "../../utils/time.js";
 
@@ -176,8 +177,14 @@ async function resolveRelatedFiles(failas) {
  * @param {number} id - The ID of the file for which to fetch metadata.
  * @returns {Promise<Object>} An object containing the fetched metadata categorized by type.
  */
-export async function fetchFailasMetadata(id) {
-    const [iban, jarKodai, links, emails, domains, telefonai, metaduomenys, tekstas, ocrResults] =
+export async function fetchFailasMetadata(id, tekstasHash) {
+    const tekstasPromise = tekstasHash !== undefined
+        ? readTekstasFs(tekstasHash)
+        : postgres
+            .query(`SELECT "tekstasHash" FROM failai WHERE id = $1`, [id])
+            .then((r) => (r.rows.length ? readTekstasFs(r.rows[0].tekstasHash) : null));
+
+    const [iban, jarKodai, links, emails, domains, telefonai, metaduomenys, tekstasRaw, ocrResults] =
         await Promise.all([
             postgres.query(
                 `SELECT iban, puslapiai FROM "failaiIban"
@@ -213,10 +220,7 @@ export async function fetchFailasMetadata(id) {
                 `SELECT "metaduomenysHash" FROM failai WHERE id = $1`,
                 [id],
             ),
-            postgres.query(
-                `SELECT tekstas FROM "failaiTekstas" WHERE id = $1 LIMIT 1`, // Should only be one row, but just in case, we take the first one
-                [id],
-            ),
+            tekstasPromise,
             postgres.query(
                 `SELECT id, md5, node, "lockTimestamp", "submitTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius"
                  FROM "failaiOcrRezultatai"
@@ -243,10 +247,16 @@ export async function fetchFailasMetadata(id) {
         : null;
     const ocr = Array.isArray(latestOcrFile?.tekstas) ? latestOcrFile.tekstas : [];
 
-    if (tekstas.rows.length) {
-        tekstas.rows[0].tekstas = tekstas.rows[0].tekstas
-            ? parsePgArray(tekstas.rows[0].tekstas)
-            : null;
+    let tekstas = null;
+    if (tekstasRaw) {
+        try {
+            const parsed = JSON.parse(tekstasRaw);
+            tekstas = Array.isArray(parsed) ? parsed : tekstasRaw;
+        } catch {
+            tekstas = tekstasRaw.startsWith("{") && tekstasRaw.endsWith("}")
+                ? parsePgArray(tekstasRaw)
+                : tekstasRaw;
+        }
     }
 
     return {
@@ -259,7 +269,7 @@ export async function fetchFailasMetadata(id) {
         metaduomenys: metaduomenys.rows.length
             ? await readMetaduomenysFs(metaduomenys.rows[0].metaduomenysHash)
             : null,
-        tekstas: tekstas.rows.length ? tekstas.rows[0].tekstas : null,
+        tekstas,
         ocrLatestResult: latestOcrResult,
         ocrRezultatuSkaicius: ocrResults.rows.length,
         ocr,
@@ -280,7 +290,7 @@ export async function aptarnautiFailą(
     failas,
     requestsJson = false,
 ) {
-    const metadata = await fetchFailasMetadata(failas.id);
+    const metadata = await fetchFailasMetadata(failas.id, failas.tekstasHash);
     failas = { ...failas, ...metadata };
 
     failas.metaduomenys?.signatures?.forEach((sig) => {

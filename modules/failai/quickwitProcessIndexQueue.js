@@ -2,8 +2,10 @@ import { postgres } from "../../postgres/postgres.js";
 import { indexDocs } from "../../quickwit/quickwit.js";
 import { log } from "../../utils/log.js";
 import { uuidv7 } from "../../utils/uuid.js";
+import { readTekstasFs } from "./tekstasFs.js";
 
 const BATCH_SIZE = 500;
+const FS_CONCURRENCY = 32;
 const LENTELE = "failai";
 
 export async function processFailaiIndexQueue() {
@@ -69,7 +71,7 @@ export async function processFailaiIndexQueue() {
         log(`deleted ${toDelete.length} from quickwit`);
     }
 
-    // Handle inserts + patches — fetch from failaiTekstas and index
+    // Handle inserts + patches — fetch metadata from failai, text from FS, index
     if (toIndex.length) {
         const { rows } = await postgres.query(
         `SELECT
@@ -77,25 +79,40 @@ export async function processFailaiIndexQueue() {
             f.pavadinimas,
             lower(f.extension) AS extension,
             f.saltinis,
-            ft.tekstas,
+            f."tekstasHash",
             f."zodziuSkaicius",
             f."puslapiuSkaicius",
             f."simboliuSkaicius",
             f."autorius"
         FROM failai f
-        LEFT JOIN "failaiTekstas" ft ON ft.id = f.id
         WHERE f.id = ANY($1)`,
         [toIndex]
         );
 
         if (rows.length) {
-            const items = rows.map((row) => ({
-                eilutesId: String(row.id),
-                doc: {
-                    ...row,
-                    tekstas: row.tekstas ? foldLithuanian(row.tekstas) : null,
-                },
-            }));
+            let cursor = 0;
+            const texts = new Array(rows.length);
+            await Promise.all(
+                Array.from({ length: Math.min(FS_CONCURRENCY, rows.length) }, async () => {
+                    while (cursor < rows.length) {
+                        const i = cursor++;
+                        texts[i] = rows[i].tekstasHash
+                            ? await readTekstasFs(rows[i].tekstasHash)
+                            : null;
+                    }
+                }),
+            );
+
+            const items = rows.map((row, i) => {
+                const { tekstasHash, ...rest } = row;
+                return {
+                    eilutesId: String(row.id),
+                    doc: {
+                        ...rest,
+                        tekstas: texts[i] ? foldLithuanian(texts[i]) : null,
+                    },
+                };
+            });
 
             await indexDocs("failai", items);
             log(`indexed ${rows.length}`);

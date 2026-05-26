@@ -121,11 +121,6 @@ export function makeExcerpt(text = '', searchTerm = '', maxChars = 250, leading 
 
 export function processSearchResults(rows: any[], searchTerm: string) {
   return rows.map((row) => {
-    try { row.tekstas = JSON.parse(row.tekstas).join(' '); } catch {}
-    if (row.tekstas) {
-      if (row.tekstas.startsWith('["')) row.tekstas = row.tekstas.slice(2);
-      if (row.tekstas.endsWith('"]')) row.tekstas = row.tekstas.slice(0, -2);
-    }
     row.metaduomenys?.signatures?.forEach((sig: any) => {
       if (sig.signerFullDistinguishedName) sig.signerFullDistinguishedName = sig.signerFullDistinguishedName.replace(/\d{4,}/g, '');
     });

@@ -1,8 +1,10 @@
 import { postgres } from "../../postgres/postgres.js";
 import { indexDocs } from "../../quickwit/quickwit.js";
 import { log } from "../../utils/log.js";
+import { readTekstasFs } from "./tekstasFs.js";
 
 const BATCH_SIZE = 1000;
+const FS_CONCURRENCY = 32;
 const lastId = process.argv[2] ? parseInt(process.argv[2]) : 0;
 
 function foldLithuanian(str) {
@@ -19,30 +21,46 @@ async function backfill() {
     while (true) {
         const { rows } = await postgres.query(
             `SELECT
-         ft.id,
-         ft.pavadinimas,
-         lower(ft.extension) AS extension,
-         ft.saltinis,
-         ft.tekstas,
-         ft."zodziuSkaicius",
-         ft."puslapiuSkaicius",
-         ft."simboliuSkaicius"
-       FROM "failaiTekstas" ft
-       WHERE ft.id > $1
-       ORDER BY ft.id
+         f.id,
+         f.pavadinimas,
+         lower(f.extension) AS extension,
+         f.saltinis,
+         f."tekstasHash",
+         f."zodziuSkaicius",
+         f."puslapiuSkaicius",
+         f."simboliuSkaicius"
+       FROM failai f
+       WHERE f.id > $1
+       ORDER BY f.id
        LIMIT $2`,
             [fromId, BATCH_SIZE]
         );
 
         if (!rows.length) break;
 
-        const items = rows.map((row) => ({
-            eilutesId: String(row.id),
-            doc: {
-                ...row,
-                tekstas: row.tekstas ? foldLithuanian(row.tekstas) : null,
-            },
-        }));
+        let cursor = 0;
+        const texts = new Array(rows.length);
+        await Promise.all(
+            Array.from({ length: Math.min(FS_CONCURRENCY, rows.length) }, async () => {
+                while (cursor < rows.length) {
+                    const i = cursor++;
+                    texts[i] = rows[i].tekstasHash
+                        ? await readTekstasFs(rows[i].tekstasHash)
+                        : null;
+                }
+            }),
+        );
+
+        const items = rows.map((row, i) => {
+            const { tekstasHash, ...rest } = row;
+            return {
+                eilutesId: String(row.id),
+                doc: {
+                    ...rest,
+                    tekstas: texts[i] ? foldLithuanian(texts[i]) : null,
+                },
+            };
+        });
 
         await indexDocs("failai", items);
 
