@@ -6,6 +6,7 @@ import { isVptWorkingHours } from "../sutartys/isWorkingHours.js";
 import { parseCfTDPSWS, parseFailai, parseVersijos } from "./parsers.js";
 import { NUSKAITYMO_VERSIJA } from "./parsers.js";
 import { extractTedNoticeNumber } from "./parsers.js";
+import { findSingleJuridinis } from "../juridiniai/search.js";
 
 const WINDOW_MS = 5000; // fixed smoothing window
 const timestamps = [];
@@ -243,6 +244,7 @@ async function processCfTDPSWSRecord(cft, options = {}) {
         }
 
         timings.start("updatePurchase");
+        let jarKodas = null;
         if (result.pirkimoVykdytojasId) {
             await postgres.query(
                 `
@@ -252,6 +254,17 @@ async function processCfTDPSWSRecord(cft, options = {}) {
                 `,
                 [result.pirkimoVykdytojasId],
             );
+            const { rows } = await postgres.query(
+                `SELECT "jarKodas" FROM public."viesiejiPirkimaiVykdytojai" WHERE id = $1`,
+                [result.pirkimoVykdytojasId],
+            );
+            jarKodas = rows[0]?.jarKodas ?? null;
+        }
+        if (!jarKodas && result.pirkimoVykdytojasPavadinimas) {
+            const juridinis = await findSingleJuridinis(
+                result.pirkimoVykdytojasPavadinimas,
+            );
+            jarKodas = juridinis?.jarKodas ?? null;
         }
         await postgres.query(
             `
@@ -264,7 +277,8 @@ async function processCfTDPSWSRecord(cft, options = {}) {
                 "bvpzKodai" = $4,
                 "pirkimoObjektoTipas" = $5,
                 "esFinansavimas" = $6,
-                "pirkimoVykdytojasId" = $7
+                "pirkimoVykdytojasId" = $7,
+                "jarKodas" = COALESCE($8, "jarKodas")
             WHERE "pirkimoId" = $2
             `,
             [
@@ -279,6 +293,7 @@ async function processCfTDPSWSRecord(cft, options = {}) {
                         ? false
                         : null,
                 result.pirkimoVykdytojasId ?? null,
+                jarKodas,
             ],
         );
         timings.end("updatePurchase");
