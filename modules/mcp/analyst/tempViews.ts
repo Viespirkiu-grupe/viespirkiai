@@ -1,9 +1,3 @@
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-
-const _viewsDir = join(dirname(fileURLToPath(import.meta.url)), "views");
-
 export const COVERED_TABLES_BY_VIEWS: Record<string, string> = {
     jarCsv:                 "v_company",
     sutartys:               "v_sutartys",
@@ -15,8 +9,14 @@ export const COVERED_TABLES_BY_VIEWS: Record<string, string> = {
 
 const _viewNames = [...new Set(Object.values(COVERED_TABLES_BY_VIEWS))].sort();
 
+const _sqlFiles = import.meta.glob("./views/*.sql", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+
 export const VIEW_DEFINITIONS: Record<string, string> = Object.fromEntries(
-    _viewNames.map((name) => [name, readFileSync(join(_viewsDir, `${name}.sql`), "utf-8").trim()]),
+    _viewNames.map((name) => {
+        const content = _sqlFiles[`./views/${name}.sql`];
+        if (!content) throw new Error(`Missing view SQL: ${name}.sql`);
+        return [name, content.trim()];
+    }),
 );
 
 export const TEMP_VIEWS_SQL: string = Object.values(VIEW_DEFINITIONS).join(";\n\n") + ";";
