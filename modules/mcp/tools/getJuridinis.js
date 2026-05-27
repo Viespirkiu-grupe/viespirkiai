@@ -1,6 +1,108 @@
 import { z } from "zod";
 import { getJuridinisInfo } from "../../juridiniai/getJuridinisInfo.js";
 
+/**
+ * Collapse 98 monthly Sodra rows into per-year averages + peak + zero-employee gaps.
+ * The raw duomenys are not useful for fraud reasoning — the LLM needs capacity signals,
+ * not individual months.
+ */
+function aggregateSodra(sodra) {
+    if (!sodra) return sodra;
+    const { duomenys = [], ...rest } = sodra;
+
+    const byYearMap = {};
+    let peak = null;
+    const gaps = [];
+
+    for (const d of duomenys) {
+        const yr = d.data?.slice(0, 4);
+        if (!yr) continue;
+
+        if (!byYearMap[yr]) {
+            byYearMap[yr] = {
+                metai: +yr,
+                sumDraustieji: 0,
+                sumAtlyginimas: 0,
+                countAtlyginimas: 0,
+                months: 0,
+            };
+        }
+        const y = byYearMap[yr];
+        y.sumDraustieji += d.draustieji ?? 0;
+        y.months++;
+        if (d.vidutinisAtlyginimas != null) {
+            y.sumAtlyginimas += d.vidutinisAtlyginimas;
+            y.countAtlyginimas++;
+        }
+
+        if (!peak || (d.draustieji ?? 0) > (peak.draustieji ?? 0)) {
+            peak = {
+                data: d.data,
+                draustieji: d.draustieji ?? 0,
+                vidutinisAtlyginimas: d.vidutinisAtlyginimas ?? null,
+            };
+        }
+
+        if ((d.draustieji ?? 0) === 0) gaps.push(d.data);
+    }
+
+    const byYear = Object.values(byYearMap)
+        .sort((a, b) => a.metai - b.metai)
+        .map(({ metai, sumDraustieji, sumAtlyginimas, countAtlyginimas, months }) => ({
+            metai,
+            avgDraustieji: months
+                ? Math.round((sumDraustieji / months) * 10) / 10
+                : null,
+            avgAtlyginimas: countAtlyginimas
+                ? Math.round(sumAtlyginimas / countAtlyginimas)
+                : null,
+        }));
+
+    return { ...rest, peak, byYear, gaps };
+}
+
+// Line name → output field. Match by lineName because lineTypeId changes between
+// accounting standard versions (BST101 → BST022 → BST122, etc.).
+const FINANSAI_FIELDS = [
+    { field: "pajamos",        names: ["Pardavimo pajamos"] },
+    { field: "pelnas",         names: ["Grynasis pelnas (nuostoliai)", "Pelnas (nuostoliai) prieš apmokestinimą"] },
+    { field: "ilgalaikis",     names: ["Ilgalaikis turtas"] },
+    { field: "trumpalaikis",   names: ["Trumpalaikis turtas"] },
+    { field: "kapitalas",      names: ["Nuosavas kapitalas"] },
+    { field: "isipareigojimai",names: ["Mokėtinos sumos ir kiti įsipareigojimai", "Mokėtinos sumos ir įsipareigojimai"] },
+];
+
+/**
+ * Collapse finansai into one compact row per year with only the 6 fraud-relevant
+ * signals. Drops pagalEilute (column-oriented duplicate of ataskaitos with repeated
+ * metadata) and all accounting schema fields (templateId, standardId, lineTypeId, etc.).
+ */
+function aggregateFinansai(finansai) {
+    if (!finansai) return finansai;
+    const ataskaitos = finansai.ataskaitos;
+    if (!Array.isArray(ataskaitos) || ataskaitos.length === 0) return { byYear: [] };
+
+    const byYear = ataskaitos
+        .map((a) => {
+            const metai = a.laikotarpisIki ? +a.laikotarpisIki.slice(0, 4) : null;
+            if (!metai) return null;
+
+            // Flatten all lines from all standards in this year's report
+            const allLines = (a.standards ?? []).flatMap((s) => s.lines ?? []);
+
+            const row = { metai };
+            for (const { field, names } of FINANSAI_FIELDS) {
+                const line = allLines.find((l) => names.includes(l.lineName));
+                row[field] = line?.reiksme ?? null;
+            }
+            return row;
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.metai - b.metai);
+
+    return { byYear };
+}
+
 const limitSchema = z.number().int().min(1).max(50);
 
 export const name = "get_juridinis";
@@ -99,7 +201,9 @@ export async function handler({
     }
 
     // Drop timings — not useful for Claude
-    const { asmuo } = result;
+    const asmuo = { ...result.asmuo };
+    asmuo.sodra = aggregateSodra(asmuo.sodra);
+    asmuo.finansai = aggregateFinansai(asmuo.finansai);
 
     return {
         content: [{ type: "text", text: JSON.stringify(asmuo, null, 2) }],
