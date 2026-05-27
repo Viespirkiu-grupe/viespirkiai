@@ -1,0 +1,2898 @@
+{
+  "jar" : {
+    "id" : 75013,
+    "jarKodas" : 302556251,
+    "pavadinimas" : "UAB \"D&G Reklama\"",
+    "adresas" : "Šiaulių r. sav., Kuršėnai, Žalioji g. 4, LT-81126",
+    "registravimoData" : "2010-10-20",
+    "formosKodas" : 310,
+    "formosPavadinimas" : "Uždaroji akcinė bendrovė",
+    "statusoKodas" : 0,
+    "statusoPavadinimas" : "Teisinis stat neįregistruotas",
+    "statusasNuo" : "2010-10-20",
+    "duomenuData" : "2026-01-27",
+    "location" : [ 55.990922704, 22.94627011 ],
+    "pavadinimasBase" : "D&G Reklama",
+    "locationState" : 1,
+    "locationVersion" : 1,
+    "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d"
+  },
+  "isregistruotasAsmuo" : null,
+  "sodra" : {
+    "kodas" : 2072029,
+    "jarKodas" : "302556251",
+    "pavadinimas" : "UAB \"D&G REKLAMA\"",
+    "savivaldybe" : "Šiaulių r. sav.",
+    "ekonominesVeiklosKodas" : "731100",
+    "ekonominesVeiklosPavadinimas" : "Reklamos agentūrų veikla",
+    "vidutinisAtlyginimas" : null,
+    "vidutinisAtlyginimas2" : null,
+    "draustieji" : 1,
+    "draustieji2" : 0,
+    "imokuSuma" : null,
+    "data" : "2026-02",
+    "bendrasDraustujuSkaicius" : 1,
+    "bendrasVidutinisAtlyginimas" : 0,
+    "atlyginimuIslaidos" : 0,
+    "duomenys" : [ {
+      "data" : "2018-01",
+      "vidutinisAtlyginimas" : 421.71,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 693.5
+    }, {
+      "data" : "2018-02",
+      "vidutinisAtlyginimas" : 383.16,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 628.47
+    }, {
+      "data" : "2018-03",
+      "vidutinisAtlyginimas" : 423.18,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 697.84
+    }, {
+      "data" : "2018-04",
+      "vidutinisAtlyginimas" : 398.88,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 658.68
+    }, {
+      "data" : "2018-05",
+      "vidutinisAtlyginimas" : 445,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 732.81
+    }, {
+      "data" : "2018-06",
+      "vidutinisAtlyginimas" : 445,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 732.81
+    }, {
+      "data" : "2018-07",
+      "vidutinisAtlyginimas" : 444.71,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 732.34
+    }, {
+      "data" : "2018-08",
+      "vidutinisAtlyginimas" : 492.77,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 809.68
+    }, {
+      "data" : "2018-09",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 3,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2018-10",
+      "vidutinisAtlyginimas" : 306.2,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 501.89
+    }, {
+      "data" : "2018-11",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 3,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2018-12",
+      "vidutinisAtlyginimas" : 420,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 868.19
+    }, {
+      "data" : "2019-01",
+      "vidutinisAtlyginimas" : 564.36,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 644.05
+    }, {
+      "data" : "2019-02",
+      "vidutinisAtlyginimas" : 632,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 742.93
+    }, {
+      "data" : "2019-03",
+      "vidutinisAtlyginimas" : 632,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 742.93
+    }, {
+      "data" : "2019-04",
+      "vidutinisAtlyginimas" : 601.59,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 852.03
+    }, {
+      "data" : "2019-05",
+      "vidutinisAtlyginimas" : 633.6,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 898.64
+    }, {
+      "data" : "2019-06",
+      "vidutinisAtlyginimas" : 605.61,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 847.28
+    }, {
+      "data" : "2019-07",
+      "vidutinisAtlyginimas" : 646.99,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 884.47
+    }, {
+      "data" : "2019-08",
+      "vidutinisAtlyginimas" : 639.38,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 873.57
+    }, {
+      "data" : "2019-09",
+      "vidutinisAtlyginimas" : 606.48,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 829.6
+    }, {
+      "data" : "2019-10",
+      "vidutinisAtlyginimas" : 633.37,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 866.66
+    }, {
+      "data" : "2019-11",
+      "vidutinisAtlyginimas" : 640,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 874.36
+    }, {
+      "data" : "2019-12",
+      "vidutinisAtlyginimas" : 667.83,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 915.8
+    }, {
+      "data" : "2020-01",
+      "vidutinisAtlyginimas" : 466.73,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 538.67
+    }, {
+      "data" : "2020-02",
+      "vidutinisAtlyginimas" : 534,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 610.22
+    }, {
+      "data" : "2020-03",
+      "vidutinisAtlyginimas" : 436.51,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 609.15
+    }, {
+      "data" : "2020-04",
+      "vidutinisAtlyginimas" : 363.13,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 498.43
+    }, {
+      "data" : "2020-05",
+      "vidutinisAtlyginimas" : 571.7,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 658.05
+    }, {
+      "data" : "2020-06",
+      "vidutinisAtlyginimas" : 600.25,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 818.37
+    }, {
+      "data" : "2020-07",
+      "vidutinisAtlyginimas" : 681.84,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 925.57
+    }, {
+      "data" : "2020-08",
+      "vidutinisAtlyginimas" : 671.96,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 912.35
+    }, {
+      "data" : "2020-09",
+      "vidutinisAtlyginimas" : 605.76,
+      "draustieji" : 7,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 961.63
+    }, {
+      "data" : "2020-10",
+      "vidutinisAtlyginimas" : 562.34,
+      "draustieji" : 7,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 901.86
+    }, {
+      "data" : "2020-11",
+      "vidutinisAtlyginimas" : 525.71,
+      "draustieji" : 7,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 823.77
+    }, {
+      "data" : "2020-12",
+      "vidutinisAtlyginimas" : 664.29,
+      "draustieji" : 7,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1062.48
+    }, {
+      "data" : "2021-01",
+      "vidutinisAtlyginimas" : 707.14,
+      "draustieji" : 7,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1133
+    }, {
+      "data" : "2021-02",
+      "vidutinisAtlyginimas" : 658.56,
+      "draustieji" : 7,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1060.67
+    }, {
+      "data" : "2021-03",
+      "vidutinisAtlyginimas" : 832.8,
+      "draustieji" : 7,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1320.08
+    }, {
+      "data" : "2021-04",
+      "vidutinisAtlyginimas" : 823.12,
+      "draustieji" : 7,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1326.07
+    }, {
+      "data" : "2021-05",
+      "vidutinisAtlyginimas" : 713.89,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1006.39
+    }, {
+      "data" : "2021-06",
+      "vidutinisAtlyginimas" : 763,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1076.66
+    }, {
+      "data" : "2021-07",
+      "vidutinisAtlyginimas" : 736.79,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1038.41
+    }, {
+      "data" : "2021-08",
+      "vidutinisAtlyginimas" : 776.74,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1092.51
+    }, {
+      "data" : "2021-09",
+      "vidutinisAtlyginimas" : 732.81,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1036.1
+    }, {
+      "data" : "2021-10",
+      "vidutinisAtlyginimas" : 741.18,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1046.11
+    }, {
+      "data" : "2021-11",
+      "vidutinisAtlyginimas" : 730,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 876.88
+    }, {
+      "data" : "2021-12",
+      "vidutinisAtlyginimas" : 651.64,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 784.2
+    }, {
+      "data" : "2022-01",
+      "vidutinisAtlyginimas" : 753.39,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 728.84
+    }, {
+      "data" : "2022-02",
+      "vidutinisAtlyginimas" : 639.01,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 618.22
+    }, {
+      "data" : "2022-03",
+      "vidutinisAtlyginimas" : 649.73,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 785.87
+    }, {
+      "data" : "2022-04",
+      "vidutinisAtlyginimas" : 737.08,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1050.22
+    }, {
+      "data" : "2022-05",
+      "vidutinisAtlyginimas" : 839.06,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 988.66
+    }, {
+      "data" : "2022-06",
+      "vidutinisAtlyginimas" : 826.47,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 973.38
+    }, {
+      "data" : "2022-07",
+      "vidutinisAtlyginimas" : 776.2,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 913.73
+    }, {
+      "data" : "2022-08",
+      "vidutinisAtlyginimas" : 837.82,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 986.63
+    }, {
+      "data" : "2022-09",
+      "vidutinisAtlyginimas" : 786.09,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 930.52
+    }, {
+      "data" : "2022-10",
+      "vidutinisAtlyginimas" : 826.04,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 972.86
+    }, {
+      "data" : "2022-11",
+      "vidutinisAtlyginimas" : 827,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 974.03
+    }, {
+      "data" : "2022-12",
+      "vidutinisAtlyginimas" : 827,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 974.02
+    }, {
+      "data" : "2023-01",
+      "vidutinisAtlyginimas" : 854.87,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1012.86
+    }, {
+      "data" : "2023-02",
+      "vidutinisAtlyginimas" : 860,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 834.91
+    }, {
+      "data" : "2023-03",
+      "vidutinisAtlyginimas" : 813.81,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 790.06
+    }, {
+      "data" : "2023-04",
+      "vidutinisAtlyginimas" : 860,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 834.91
+    }, {
+      "data" : "2023-05",
+      "vidutinisAtlyginimas" : 713.18,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1022.6
+    }, {
+      "data" : "2023-06",
+      "vidutinisAtlyginimas" : 866.45,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1234.74
+    }, {
+      "data" : "2023-07",
+      "vidutinisAtlyginimas" : 862.09,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1228.39
+    }, {
+      "data" : "2023-08",
+      "vidutinisAtlyginimas" : 878.61,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1250.76
+    }, {
+      "data" : "2023-09",
+      "vidutinisAtlyginimas" : 829.48,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1182.2
+    }, {
+      "data" : "2023-10",
+      "vidutinisAtlyginimas" : 857.77,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1222.11
+    }, {
+      "data" : "2023-11",
+      "vidutinisAtlyginimas" : 864.17,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1231.43
+    }, {
+      "data" : "2023-12",
+      "vidutinisAtlyginimas" : 864.17,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1231.43
+    }, {
+      "data" : "2024-01",
+      "vidutinisAtlyginimas" : 705.75,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 999.82
+    }, {
+      "data" : "2024-02",
+      "vidutinisAtlyginimas" : 759.5,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1086.46
+    }, {
+      "data" : "2024-03",
+      "vidutinisAtlyginimas" : 1185.44,
+      "draustieji" : 6,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1712.29
+    }, {
+      "data" : "2024-04",
+      "vidutinisAtlyginimas" : 930,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1100.65
+    }, {
+      "data" : "2024-05",
+      "vidutinisAtlyginimas" : 930,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1100.65
+    }, {
+      "data" : "2024-06",
+      "vidutinisAtlyginimas" : 822.32,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 969.98
+    }, {
+      "data" : "2024-07",
+      "vidutinisAtlyginimas" : 935.2,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1106.96
+    }, {
+      "data" : "2024-08",
+      "vidutinisAtlyginimas" : 1378.28,
+      "draustieji" : 5,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 1644.63
+    }, {
+      "data" : "2024-09",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 3,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2024-10",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 3,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2024-11",
+      "vidutinisAtlyginimas" : 894.13,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 840.11
+    }, {
+      "data" : "2024-12",
+      "vidutinisAtlyginimas" : 795.67,
+      "draustieji" : 4,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : 744.53
+    }, {
+      "data" : "2025-01",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 3,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2025-02",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 2,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2025-03",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 2,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2025-04",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 2,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2025-05",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 2,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2025-06",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 2,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2025-07",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 1,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2025-08",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 1,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2025-09",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 1,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2025-10",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 1,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2025-11",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 1,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2025-12",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 1,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : null,
+      "imokuSuma" : null
+    }, {
+      "data" : "2026-01",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 1,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : 0,
+      "imokuSuma" : null
+    }, {
+      "data" : "2026-02",
+      "vidutinisAtlyginimas" : null,
+      "draustieji" : 1,
+      "vidutinisAtlyginimas2" : null,
+      "draustieji2" : 0,
+      "imokuSuma" : null
+    } ],
+    "turejoDraustuju" : true,
+    "turejoDraustuju2" : false,
+    "turejoAtlyginimu" : true,
+    "turejoAtlyginimu2" : false
+  },
+  "regitra" : {
+    "limit" : 3,
+    "rows" : 0,
+    "transportoPriemones" : [ ]
+  },
+  "teismoNuosprendziai" : {
+    "limit" : 5,
+    "rows" : 0,
+    "nuosprendziai" : [ ]
+  },
+  "sutartys" : {
+    "pirkimaiKasMetus" : [ ],
+    "tiekimaiKasMetus" : [ {
+      "year" : 2015,
+      "total" : 15128.84
+    }, {
+      "year" : 2016,
+      "total" : 5516.9
+    }, {
+      "year" : 2017,
+      "total" : 21753.02
+    }, {
+      "year" : 2018,
+      "total" : 3611.85
+    }, {
+      "year" : 2019,
+      "total" : 1869.45
+    }, {
+      "year" : 2020,
+      "total" : 15210.72
+    }, {
+      "year" : 2021,
+      "total" : 4890.82
+    }, {
+      "year" : 2022,
+      "total" : 15187.64
+    }, {
+      "year" : 2023,
+      "total" : 13734.44
+    }, {
+      "year" : 2024,
+      "total" : 28425.95
+    }, {
+      "year" : 2026,
+      "total" : 242
+    } ],
+    "topPirkejai" : [ {
+      "jarKodas" : "191847935",
+      "pavadinimas" : "Viešoji įstaiga Šiaulių reabilitacijos centras",
+      "total" : 29583.18,
+      "count" : 6
+    }, {
+      "jarKodas" : "188726051",
+      "pavadinimas" : "Šiaulių rajono savivaldybės administracija",
+      "total" : 16997.44,
+      "count" : 9
+    }, {
+      "jarKodas" : "188719391",
+      "pavadinimas" : "Akmenės rajono savivaldybės administracija",
+      "total" : 13059.94,
+      "count" : 6
+    }, {
+      "jarKodas" : "171448341",
+      "pavadinimas" : "Viešoji įstaiga Radviliškio ligoninė",
+      "total" : 10126.42,
+      "count" : 3
+    }, {
+      "jarKodas" : "188726247",
+      "pavadinimas" : "Radviliškio rajono savivaldybės administracija",
+      "total" : 9437.52,
+      "count" : 1
+    } ],
+    "topTiekejai" : [ ]
+  },
+  "finansai" : {
+    "balansai" : [ {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0328",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00001",
+      "lineName" : "ILGALAIKIS TURTAS",
+      "reiksme" : 10459,
+      "laikotarpisNuo" : "2024-01-01",
+      "laikotarpisIki" : "2024-12-31",
+      "duomenuData" : "2025-05-29",
+      "_id" : "cb338587-4869-4e69-9376-fdf5bf223ac7"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0328",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00021",
+      "lineName" : "TRUMPALAIKIS TURTAS",
+      "reiksme" : 23592,
+      "laikotarpisNuo" : "2024-01-01",
+      "laikotarpisIki" : "2024-12-31",
+      "duomenuData" : "2025-05-29",
+      "_id" : "86546a6e-ef7e-4684-8921-6512eeeca668"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0328",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00040",
+      "lineName" : "NUOSAVAS KAPITALAS",
+      "reiksme" : 8751,
+      "laikotarpisNuo" : "2024-01-01",
+      "laikotarpisIki" : "2024-12-31",
+      "duomenuData" : "2025-05-29",
+      "_id" : "9d782b0d-c202-4079-a822-f1f77463ef68"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0328",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00467",
+      "lineName" : "MOKĖTINOS SUMOS IR KITI ĮSIPAREIGOJIMAI",
+      "reiksme" : 25722,
+      "laikotarpisNuo" : "2024-01-01",
+      "laikotarpisIki" : "2024-12-31",
+      "duomenuData" : "2025-05-29",
+      "_id" : "4491372f-7567-41c4-932e-844a606a8381"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00001",
+      "lineName" : "ILGALAIKIS TURTAS",
+      "reiksme" : 17197,
+      "laikotarpisNuo" : "2023-01-01",
+      "laikotarpisIki" : "2023-12-31",
+      "duomenuData" : "2024-04-18",
+      "_id" : "af08ca40-094c-46b9-8699-25db060354e1"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00021",
+      "lineName" : "TRUMPALAIKIS TURTAS",
+      "reiksme" : 23931,
+      "laikotarpisNuo" : "2023-01-01",
+      "laikotarpisIki" : "2023-12-31",
+      "duomenuData" : "2024-04-18",
+      "_id" : "e16c0f13-86a5-45b4-ba59-fafa4281ba55"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00040",
+      "lineName" : "NUOSAVAS KAPITALAS",
+      "reiksme" : 8287,
+      "laikotarpisNuo" : "2023-01-01",
+      "laikotarpisIki" : "2023-12-31",
+      "duomenuData" : "2024-04-18",
+      "_id" : "820aab24-5be8-4855-8165-595f3e51e4b7"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00467",
+      "lineName" : "MOKĖTINOS SUMOS IR KITI ĮSIPAREIGOJIMAI",
+      "reiksme" : 34008,
+      "laikotarpisNuo" : "2023-01-01",
+      "laikotarpisIki" : "2023-12-31",
+      "duomenuData" : "2024-04-18",
+      "_id" : "f5010dbc-e082-4a9b-8e05-fdc03ec60bf1"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00001",
+      "lineName" : "ILGALAIKIS TURTAS",
+      "reiksme" : 25149,
+      "laikotarpisNuo" : "2022-01-01",
+      "laikotarpisIki" : "2022-12-31",
+      "duomenuData" : "2023-05-17",
+      "_id" : "6cf2c5e5-9be3-4773-bc9f-41cdcc67bc9a"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00021",
+      "lineName" : "TRUMPALAIKIS TURTAS",
+      "reiksme" : 27407,
+      "laikotarpisNuo" : "2022-01-01",
+      "laikotarpisIki" : "2022-12-31",
+      "duomenuData" : "2023-05-17",
+      "_id" : "c2189242-af67-4c82-8ade-af452146c98e"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00040",
+      "lineName" : "NUOSAVAS KAPITALAS",
+      "reiksme" : 30182,
+      "laikotarpisNuo" : "2022-01-01",
+      "laikotarpisIki" : "2022-12-31",
+      "duomenuData" : "2023-05-17",
+      "_id" : "9cada56c-bbb1-42d0-9528-160a069451a4"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00467",
+      "lineName" : "MOKĖTINOS SUMOS IR KITI ĮSIPAREIGOJIMAI",
+      "reiksme" : 23123,
+      "laikotarpisNuo" : "2022-01-01",
+      "laikotarpisIki" : "2022-12-31",
+      "duomenuData" : "2023-05-17",
+      "_id" : "44954b9d-3e97-43b1-8f5e-90994a71602c"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00001",
+      "lineName" : "ILGALAIKIS TURTAS",
+      "reiksme" : 26533,
+      "laikotarpisNuo" : "2021-01-01",
+      "laikotarpisIki" : "2021-12-31",
+      "duomenuData" : "2022-05-11",
+      "_id" : "d681e624-67b7-4006-b167-01274d817f40"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00021",
+      "lineName" : "TRUMPALAIKIS TURTAS",
+      "reiksme" : 35036,
+      "laikotarpisNuo" : "2021-01-01",
+      "laikotarpisIki" : "2021-12-31",
+      "duomenuData" : "2022-05-11",
+      "_id" : "544e5263-4e51-413f-85bc-e55e1f0ab5ff"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00040",
+      "lineName" : "NUOSAVAS KAPITALAS",
+      "reiksme" : 39332,
+      "laikotarpisNuo" : "2021-01-01",
+      "laikotarpisIki" : "2021-12-31",
+      "duomenuData" : "2022-05-11",
+      "_id" : "ec2c63e8-c427-4270-a331-d0a6c8540382"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00467",
+      "lineName" : "MOKĖTINOS SUMOS IR KITI ĮSIPAREIGOJIMAI",
+      "reiksme" : 22968,
+      "laikotarpisNuo" : "2021-01-01",
+      "laikotarpisIki" : "2021-12-31",
+      "duomenuData" : "2022-05-11",
+      "_id" : "a74444b5-a860-4b11-8ad8-de9877dc4d40"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00001",
+      "lineName" : "ILGALAIKIS TURTAS",
+      "reiksme" : 29470,
+      "laikotarpisNuo" : "2020-01-01",
+      "laikotarpisIki" : "2020-12-31",
+      "duomenuData" : "2021-04-29",
+      "_id" : "17c0c1d8-5568-4b79-ac8a-ba7c1dbf3370"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00021",
+      "lineName" : "TRUMPALAIKIS TURTAS",
+      "reiksme" : 35741,
+      "laikotarpisNuo" : "2020-01-01",
+      "laikotarpisIki" : "2020-12-31",
+      "duomenuData" : "2021-04-29",
+      "_id" : "1ca0b3ac-02ec-4221-9d7f-16ae2a80e00a"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00040",
+      "lineName" : "NUOSAVAS KAPITALAS",
+      "reiksme" : 38405,
+      "laikotarpisNuo" : "2020-01-01",
+      "laikotarpisIki" : "2020-12-31",
+      "duomenuData" : "2021-04-29",
+      "_id" : "35bd8634-c357-4e8d-8c3d-53372939bbdf"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00467",
+      "lineName" : "MOKĖTINOS SUMOS IR KITI ĮSIPAREIGOJIMAI",
+      "reiksme" : 27647,
+      "laikotarpisNuo" : "2020-01-01",
+      "laikotarpisIki" : "2020-12-31",
+      "duomenuData" : "2021-04-29",
+      "_id" : "e3129100-dc08-4b43-b008-bdca98135ac3"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00001",
+      "lineName" : "ILGALAIKIS TURTAS",
+      "reiksme" : 32997,
+      "laikotarpisNuo" : "2019-01-01",
+      "laikotarpisIki" : "2019-12-31",
+      "duomenuData" : "2020-05-18",
+      "_id" : "0fb588b0-933d-414f-8cdc-e40b9b9b30b1"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00021",
+      "lineName" : "TRUMPALAIKIS TURTAS",
+      "reiksme" : 35456,
+      "laikotarpisNuo" : "2019-01-01",
+      "laikotarpisIki" : "2019-12-31",
+      "duomenuData" : "2020-05-18",
+      "_id" : "30d58571-4137-440d-bec1-7f858517bc71"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00040",
+      "lineName" : "NUOSAVAS KAPITALAS",
+      "reiksme" : 37377,
+      "laikotarpisNuo" : "2019-01-01",
+      "laikotarpisIki" : "2019-12-31",
+      "duomenuData" : "2020-05-18",
+      "_id" : "f2ec2764-e134-475c-9a5d-128d332d541c"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00467",
+      "lineName" : "MOKĖTINOS SUMOS IR KITI ĮSIPAREIGOJIMAI",
+      "reiksme" : 31864,
+      "laikotarpisNuo" : "2019-01-01",
+      "laikotarpisIki" : "2019-12-31",
+      "duomenuData" : "2020-05-18",
+      "_id" : "998ff1dd-1726-4c91-b2a6-e1d00bbc1632"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00001",
+      "lineName" : "ILGALAIKIS TURTAS",
+      "reiksme" : 24115,
+      "laikotarpisNuo" : "2018-01-01",
+      "laikotarpisIki" : "2018-12-31",
+      "duomenuData" : "2019-05-30",
+      "_id" : "d1c966a6-092d-4023-b60c-c06b5372ff12"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00021",
+      "lineName" : "TRUMPALAIKIS TURTAS",
+      "reiksme" : 28328,
+      "laikotarpisNuo" : "2018-01-01",
+      "laikotarpisIki" : "2018-12-31",
+      "duomenuData" : "2019-05-30",
+      "_id" : "db906bdc-fc42-4623-b42d-0bb6b9c5e949"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00040",
+      "lineName" : "NUOSAVAS KAPITALAS",
+      "reiksme" : 30745,
+      "laikotarpisNuo" : "2018-01-01",
+      "laikotarpisIki" : "2018-12-31",
+      "duomenuData" : "2019-05-30",
+      "_id" : "fdd13d46-e8ee-4682-b080-22ed0fa2dbaa"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00467",
+      "lineName" : "MOKĖTINOS SUMOS IR KITI ĮSIPAREIGOJIMAI",
+      "reiksme" : 23025,
+      "laikotarpisNuo" : "2018-01-01",
+      "laikotarpisIki" : "2018-12-31",
+      "duomenuData" : "2019-05-30",
+      "_id" : "10d9f2cf-fb45-4ec9-95d1-ab72035ebbc4"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00001",
+      "lineName" : "ILGALAIKIS TURTAS",
+      "reiksme" : 33683,
+      "laikotarpisNuo" : "2017-01-01",
+      "laikotarpisIki" : "2017-12-31",
+      "duomenuData" : "2018-03-28",
+      "_id" : "2059e4b9-dc41-4797-b4de-f09e230e70d9"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00021",
+      "lineName" : "TRUMPALAIKIS TURTAS",
+      "reiksme" : 26166,
+      "laikotarpisNuo" : "2017-01-01",
+      "laikotarpisIki" : "2017-12-31",
+      "duomenuData" : "2018-03-28",
+      "_id" : "76c8eb63-ded0-48ef-98a8-b0103c7be06e"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00040",
+      "lineName" : "NUOSAVAS KAPITALAS",
+      "reiksme" : 14765,
+      "laikotarpisNuo" : "2017-01-01",
+      "laikotarpisIki" : "2017-12-31",
+      "duomenuData" : "2018-03-28",
+      "_id" : "adfd9a3e-3fdf-418a-8f38-07687a2a639b"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST122",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00467",
+      "lineName" : "MOKĖTINOS SUMOS IR KITI ĮSIPAREIGOJIMAI",
+      "reiksme" : 46553,
+      "laikotarpisNuo" : "2017-01-01",
+      "laikotarpisIki" : "2017-12-31",
+      "duomenuData" : "2018-03-28",
+      "_id" : "96d7fb1f-8771-40c5-b783-51d8d622e306"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0028",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST022",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00001",
+      "lineName" : "ILGALAIKIS TURTAS",
+      "reiksme" : 36565,
+      "laikotarpisNuo" : "2016-01-01",
+      "laikotarpisIki" : "2016-12-31",
+      "duomenuData" : "2017-05-26",
+      "_id" : "19f3c027-5a2f-4fe7-b7b6-4b9e16afbb9d"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0028",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST022",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00021",
+      "lineName" : "TRUMPALAIKIS TURTAS",
+      "reiksme" : 26647,
+      "laikotarpisNuo" : "2016-01-01",
+      "laikotarpisIki" : "2016-12-31",
+      "duomenuData" : "2017-05-26",
+      "_id" : "fcc9b7c3-b5ae-4d41-bdbc-6d6ac1c837ce"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0028",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST022",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00040",
+      "lineName" : "NUOSAVAS KAPITALAS",
+      "reiksme" : 13247,
+      "laikotarpisNuo" : "2016-01-01",
+      "laikotarpisIki" : "2016-12-31",
+      "duomenuData" : "2017-05-26",
+      "_id" : "f4088aed-5004-4c54-80b7-8ac1cc1373ea"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0028",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "BST022",
+      "standardName" : "BALANSAS (Trumpas)",
+      "lineTypeId" : "BSLT00467",
+      "lineName" : "MOKĖTINOS SUMOS IR KITI ĮSIPAREIGOJIMAI",
+      "reiksme" : 50240,
+      "laikotarpisNuo" : "2016-01-01",
+      "laikotarpisIki" : "2016-12-31",
+      "duomenuData" : "2017-05-26",
+      "_id" : "bc673bc3-ab09-44e6-b8f0-a7c1bd164a90"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0301",
+      "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys",
+      "standardId" : "BST101",
+      "standardName" : "BALANSAS",
+      "lineTypeId" : "BSLT00001",
+      "lineName" : "ILGALAIKIS TURTAS",
+      "reiksme" : 37329,
+      "laikotarpisNuo" : "2015-01-01",
+      "laikotarpisIki" : "2015-12-31",
+      "duomenuData" : "2016-05-02",
+      "_id" : "15eb2d5d-9fa4-4c31-b93c-5e63b502170f"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0301",
+      "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys",
+      "standardId" : "BST101",
+      "standardName" : "BALANSAS",
+      "lineTypeId" : "BSLT00021",
+      "lineName" : "TRUMPALAIKIS TURTAS",
+      "reiksme" : 23815,
+      "laikotarpisNuo" : "2015-01-01",
+      "laikotarpisIki" : "2015-12-31",
+      "duomenuData" : "2016-05-02",
+      "_id" : "c2f65883-41ad-4f6d-a44e-dab13f0048e2"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0301",
+      "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys",
+      "standardId" : "BST101",
+      "standardName" : "BALANSAS",
+      "lineTypeId" : "BSLT00040",
+      "lineName" : "NUOSAVAS KAPITALAS",
+      "reiksme" : 32718,
+      "laikotarpisNuo" : "2015-01-01",
+      "laikotarpisIki" : "2015-12-31",
+      "duomenuData" : "2016-05-02",
+      "_id" : "0864b050-addd-4cbd-9a31-eb2d699725fc"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0301",
+      "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys",
+      "standardId" : "BST101",
+      "standardName" : "BALANSAS",
+      "lineTypeId" : "BSLT00055",
+      "lineName" : "MOKĖTINOS SUMOS IR ĮSIPAREIGOJIMAI",
+      "reiksme" : 28426,
+      "laikotarpisNuo" : "2015-01-01",
+      "laikotarpisIki" : "2015-12-31",
+      "duomenuData" : "2016-05-02",
+      "_id" : "f2c2f959-aca0-4736-bd31-129f458b59c3"
+    } ],
+    "pelnasNuostoliai" : [ {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0328",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00345",
+      "lineName" : "PARDAVIMO PAJAMOS",
+      "reiksme" : 142893,
+      "laikotarpisNuo" : "2024-01-01",
+      "laikotarpisIki" : "2024-12-31",
+      "duomenuData" : "2025-05-29",
+      "_id" : "6a6b9cd3-f427-4a0e-903a-3f6a894cd601"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0328",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00350",
+      "lineName" : "GRYNASIS PELNAS (NUOSTOLIAI)",
+      "reiksme" : -236,
+      "laikotarpisNuo" : "2024-01-01",
+      "laikotarpisIki" : "2024-12-31",
+      "duomenuData" : "2025-05-29",
+      "_id" : "0a7d5a64-c773-4d6a-a584-757423f21b24"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00345",
+      "lineName" : "PARDAVIMO PAJAMOS",
+      "reiksme" : 143658,
+      "laikotarpisNuo" : "2023-01-01",
+      "laikotarpisIki" : "2023-12-31",
+      "duomenuData" : "2024-04-18",
+      "_id" : "47d7dc48-b61d-43fd-9155-082bec6e0e3f"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00350",
+      "lineName" : "GRYNASIS PELNAS (NUOSTOLIAI)",
+      "reiksme" : -21895,
+      "laikotarpisNuo" : "2023-01-01",
+      "laikotarpisIki" : "2023-12-31",
+      "duomenuData" : "2024-04-18",
+      "_id" : "0d6feaf6-728f-4e51-99ee-55aa20abff02"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00345",
+      "lineName" : "PARDAVIMO PAJAMOS",
+      "reiksme" : 127218,
+      "laikotarpisNuo" : "2022-01-01",
+      "laikotarpisIki" : "2022-12-31",
+      "duomenuData" : "2023-05-17",
+      "_id" : "4f2cd4cc-c496-4f88-909e-59035e6d7cee"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00350",
+      "lineName" : "GRYNASIS PELNAS (NUOSTOLIAI)",
+      "reiksme" : 850,
+      "laikotarpisNuo" : "2022-01-01",
+      "laikotarpisIki" : "2022-12-31",
+      "duomenuData" : "2023-05-17",
+      "_id" : "52a67e7f-a19e-47c6-a32b-1f1359ae7ad3"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00345",
+      "lineName" : "PARDAVIMO PAJAMOS",
+      "reiksme" : 116690,
+      "laikotarpisNuo" : "2021-01-01",
+      "laikotarpisIki" : "2021-12-31",
+      "duomenuData" : "2022-05-11",
+      "_id" : "8e0f472a-ef54-4106-91da-254cdebbfd60"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00350",
+      "lineName" : "GRYNASIS PELNAS (NUOSTOLIAI)",
+      "reiksme" : 927,
+      "laikotarpisNuo" : "2021-01-01",
+      "laikotarpisIki" : "2021-12-31",
+      "duomenuData" : "2022-05-11",
+      "_id" : "8a7f4655-5f8f-4a4e-a948-7cc37c045868"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00345",
+      "lineName" : "PARDAVIMO PAJAMOS",
+      "reiksme" : 117442,
+      "laikotarpisNuo" : "2020-01-01",
+      "laikotarpisIki" : "2020-12-31",
+      "duomenuData" : "2021-04-29",
+      "_id" : "430148e2-e4c9-40ff-9ed6-1be85da1a1c8"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00350",
+      "lineName" : "GRYNASIS PELNAS (NUOSTOLIAI)",
+      "reiksme" : 1028,
+      "laikotarpisNuo" : "2020-01-01",
+      "laikotarpisIki" : "2020-12-31",
+      "duomenuData" : "2021-04-29",
+      "_id" : "69ec1aaa-150e-425f-a7b1-142771402cc2"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00345",
+      "lineName" : "PARDAVIMO PAJAMOS",
+      "reiksme" : 139938,
+      "laikotarpisNuo" : "2019-01-01",
+      "laikotarpisIki" : "2019-12-31",
+      "duomenuData" : "2020-05-18",
+      "_id" : "39c2e666-392d-452b-ad35-f985cdd8a033"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00350",
+      "lineName" : "GRYNASIS PELNAS (NUOSTOLIAI)",
+      "reiksme" : 6632,
+      "laikotarpisNuo" : "2019-01-01",
+      "laikotarpisIki" : "2019-12-31",
+      "duomenuData" : "2020-05-18",
+      "_id" : "f81dbe31-c251-4377-a9f0-13eaab79855a"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00345",
+      "lineName" : "PARDAVIMO PAJAMOS",
+      "reiksme" : 115135,
+      "laikotarpisNuo" : "2018-01-01",
+      "laikotarpisIki" : "2018-12-31",
+      "duomenuData" : "2019-05-30",
+      "_id" : "a6468009-fd12-4b2d-9582-d4ddac45fb88"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00350",
+      "lineName" : "GRYNASIS PELNAS (NUOSTOLIAI)",
+      "reiksme" : 15980,
+      "laikotarpisNuo" : "2018-01-01",
+      "laikotarpisIki" : "2018-12-31",
+      "duomenuData" : "2019-05-30",
+      "_id" : "a7ff1483-4cb6-4367-ac20-219fcf6972ba"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00345",
+      "lineName" : "PARDAVIMO PAJAMOS",
+      "reiksme" : 99709,
+      "laikotarpisNuo" : "2017-01-01",
+      "laikotarpisIki" : "2017-12-31",
+      "duomenuData" : "2018-03-28",
+      "_id" : "c8bfc434-a558-4e5a-b1c3-0e8c79ef18d0"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00350",
+      "lineName" : "GRYNASIS PELNAS (NUOSTOLIAI)",
+      "reiksme" : 1518,
+      "laikotarpisNuo" : "2017-01-01",
+      "laikotarpisIki" : "2017-12-31",
+      "duomenuData" : "2018-03-28",
+      "_id" : "53497eaa-768e-48f9-adac-5d80e5606317"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0028",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00345",
+      "lineName" : "PARDAVIMO PAJAMOS",
+      "reiksme" : 96566,
+      "laikotarpisNuo" : "2016-01-01",
+      "laikotarpisIki" : "2016-12-31",
+      "duomenuData" : "2017-05-26",
+      "_id" : "488d5240-7a5f-426b-9337-19cd6be82128"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0028",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standardId" : "IST023",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA (Trumpa)",
+      "lineTypeId" : "ISLT00350",
+      "lineName" : "GRYNASIS PELNAS (NUOSTOLIAI)",
+      "reiksme" : -19471,
+      "laikotarpisNuo" : "2016-01-01",
+      "laikotarpisIki" : "2016-12-31",
+      "duomenuData" : "2017-05-26",
+      "_id" : "0a61c740-b147-46c6-b64f-a3d47c214cfd"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0301",
+      "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys",
+      "standardId" : "IST101",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA",
+      "lineTypeId" : "ISLT00001",
+      "lineName" : "PARDAVIMO PAJAMOS",
+      "reiksme" : 92728,
+      "laikotarpisNuo" : "2015-01-01",
+      "laikotarpisIki" : "2015-12-31",
+      "duomenuData" : "2016-05-02",
+      "_id" : "a3c34f7d-57ad-48c8-b75d-a2be00e53326"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0301",
+      "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys",
+      "standardId" : "IST101",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA",
+      "lineTypeId" : "ISLT00017",
+      "lineName" : "PELNAS (NUOSTOLIAI) PRIEŠ APMOKESTINIMĄ",
+      "reiksme" : -16083,
+      "laikotarpisNuo" : "2015-01-01",
+      "laikotarpisIki" : "2015-12-31",
+      "duomenuData" : "2016-05-02",
+      "_id" : "85433b71-3a13-41a8-8d51-22efbf5348fb"
+    }, {
+      "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d",
+      "formaId" : "5c444113-5081-4d88-b94d-782c0779bb89",
+      "statusasId" : "5ef6b364-a5ff-47fb-8600-ff859214ef85",
+      "templateId" : "FS0301",
+      "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys",
+      "standardId" : "IST101",
+      "standardName" : "PELNO (NUOSTOLIŲ) ATASKAITA",
+      "lineTypeId" : "ISLT00019",
+      "lineName" : "GRYNASIS PELNAS (NUOSTOLIAI)",
+      "reiksme" : -16083,
+      "laikotarpisNuo" : "2015-01-01",
+      "laikotarpisIki" : "2015-12-31",
+      "duomenuData" : "2016-05-02",
+      "_id" : "a5a4ce2d-c7aa-4fc0-a60c-2592a9fd31c6"
+    } ],
+    "ataskaitos" : [ {
+      "laikotarpisNuo" : "2024-01-01",
+      "laikotarpisIki" : "2024-12-31",
+      "duomenuData" : "2025-05-29",
+      "templateId" : "FS0328",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standards" : [ {
+        "standardId" : "BST122",
+        "standardName" : "Balansas (trumpas)",
+        "lines" : [ {
+          "lineTypeId" : "BSLT00001",
+          "lineName" : "Ilgalaikis turtas",
+          "reiksme" : 10459
+        }, {
+          "lineTypeId" : "BSLT00021",
+          "lineName" : "Trumpalaikis turtas",
+          "reiksme" : 23592
+        }, {
+          "lineTypeId" : "BSLT00040",
+          "lineName" : "Nuosavas kapitalas",
+          "reiksme" : 8751
+        }, {
+          "lineTypeId" : "BSLT00467",
+          "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+          "reiksme" : 25722
+        } ]
+      }, {
+        "standardId" : "IST023",
+        "standardName" : "Pelno (nuostolių) ataskaita (trumpa)",
+        "lines" : [ {
+          "lineTypeId" : "ISLT00345",
+          "lineName" : "Pardavimo pajamos",
+          "reiksme" : 142893
+        }, {
+          "lineTypeId" : "ISLT00350",
+          "lineName" : "Grynasis pelnas (nuostoliai)",
+          "reiksme" : -236
+        } ]
+      } ]
+    }, {
+      "laikotarpisNuo" : "2023-01-01",
+      "laikotarpisIki" : "2023-12-31",
+      "duomenuData" : "2024-04-18",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standards" : [ {
+        "standardId" : "BST122",
+        "standardName" : "Balansas (trumpas)",
+        "lines" : [ {
+          "lineTypeId" : "BSLT00001",
+          "lineName" : "Ilgalaikis turtas",
+          "reiksme" : 17197
+        }, {
+          "lineTypeId" : "BSLT00021",
+          "lineName" : "Trumpalaikis turtas",
+          "reiksme" : 23931
+        }, {
+          "lineTypeId" : "BSLT00040",
+          "lineName" : "Nuosavas kapitalas",
+          "reiksme" : 8287
+        }, {
+          "lineTypeId" : "BSLT00467",
+          "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+          "reiksme" : 34008
+        } ]
+      }, {
+        "standardId" : "IST023",
+        "standardName" : "Pelno (nuostolių) ataskaita (trumpa)",
+        "lines" : [ {
+          "lineTypeId" : "ISLT00345",
+          "lineName" : "Pardavimo pajamos",
+          "reiksme" : 143658
+        }, {
+          "lineTypeId" : "ISLT00350",
+          "lineName" : "Grynasis pelnas (nuostoliai)",
+          "reiksme" : -21895
+        } ]
+      } ]
+    }, {
+      "laikotarpisNuo" : "2022-01-01",
+      "laikotarpisIki" : "2022-12-31",
+      "duomenuData" : "2023-05-17",
+      "templateId" : "FS0228",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standards" : [ {
+        "standardId" : "BST122",
+        "standardName" : "Balansas (trumpas)",
+        "lines" : [ {
+          "lineTypeId" : "BSLT00001",
+          "lineName" : "Ilgalaikis turtas",
+          "reiksme" : 25149
+        }, {
+          "lineTypeId" : "BSLT00021",
+          "lineName" : "Trumpalaikis turtas",
+          "reiksme" : 27407
+        }, {
+          "lineTypeId" : "BSLT00040",
+          "lineName" : "Nuosavas kapitalas",
+          "reiksme" : 30182
+        }, {
+          "lineTypeId" : "BSLT00467",
+          "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+          "reiksme" : 23123
+        } ]
+      }, {
+        "standardId" : "IST023",
+        "standardName" : "Pelno (nuostolių) ataskaita (trumpa)",
+        "lines" : [ {
+          "lineTypeId" : "ISLT00345",
+          "lineName" : "Pardavimo pajamos",
+          "reiksme" : 127218
+        }, {
+          "lineTypeId" : "ISLT00350",
+          "lineName" : "Grynasis pelnas (nuostoliai)",
+          "reiksme" : 850
+        } ]
+      } ]
+    }, {
+      "laikotarpisNuo" : "2021-01-01",
+      "laikotarpisIki" : "2021-12-31",
+      "duomenuData" : "2022-05-11",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standards" : [ {
+        "standardId" : "BST122",
+        "standardName" : "Balansas (trumpas)",
+        "lines" : [ {
+          "lineTypeId" : "BSLT00001",
+          "lineName" : "Ilgalaikis turtas",
+          "reiksme" : 26533
+        }, {
+          "lineTypeId" : "BSLT00021",
+          "lineName" : "Trumpalaikis turtas",
+          "reiksme" : 35036
+        }, {
+          "lineTypeId" : "BSLT00040",
+          "lineName" : "Nuosavas kapitalas",
+          "reiksme" : 39332
+        }, {
+          "lineTypeId" : "BSLT00467",
+          "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+          "reiksme" : 22968
+        } ]
+      }, {
+        "standardId" : "IST023",
+        "standardName" : "Pelno (nuostolių) ataskaita (trumpa)",
+        "lines" : [ {
+          "lineTypeId" : "ISLT00345",
+          "lineName" : "Pardavimo pajamos",
+          "reiksme" : 116690
+        }, {
+          "lineTypeId" : "ISLT00350",
+          "lineName" : "Grynasis pelnas (nuostoliai)",
+          "reiksme" : 927
+        } ]
+      } ]
+    }, {
+      "laikotarpisNuo" : "2020-01-01",
+      "laikotarpisIki" : "2020-12-31",
+      "duomenuData" : "2021-04-29",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standards" : [ {
+        "standardId" : "BST122",
+        "standardName" : "Balansas (trumpas)",
+        "lines" : [ {
+          "lineTypeId" : "BSLT00001",
+          "lineName" : "Ilgalaikis turtas",
+          "reiksme" : 29470
+        }, {
+          "lineTypeId" : "BSLT00021",
+          "lineName" : "Trumpalaikis turtas",
+          "reiksme" : 35741
+        }, {
+          "lineTypeId" : "BSLT00040",
+          "lineName" : "Nuosavas kapitalas",
+          "reiksme" : 38405
+        }, {
+          "lineTypeId" : "BSLT00467",
+          "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+          "reiksme" : 27647
+        } ]
+      }, {
+        "standardId" : "IST023",
+        "standardName" : "Pelno (nuostolių) ataskaita (trumpa)",
+        "lines" : [ {
+          "lineTypeId" : "ISLT00345",
+          "lineName" : "Pardavimo pajamos",
+          "reiksme" : 117442
+        }, {
+          "lineTypeId" : "ISLT00350",
+          "lineName" : "Grynasis pelnas (nuostoliai)",
+          "reiksme" : 1028
+        } ]
+      } ]
+    }, {
+      "laikotarpisNuo" : "2019-01-01",
+      "laikotarpisIki" : "2019-12-31",
+      "duomenuData" : "2020-05-18",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standards" : [ {
+        "standardId" : "BST122",
+        "standardName" : "Balansas (trumpas)",
+        "lines" : [ {
+          "lineTypeId" : "BSLT00001",
+          "lineName" : "Ilgalaikis turtas",
+          "reiksme" : 32997
+        }, {
+          "lineTypeId" : "BSLT00021",
+          "lineName" : "Trumpalaikis turtas",
+          "reiksme" : 35456
+        }, {
+          "lineTypeId" : "BSLT00040",
+          "lineName" : "Nuosavas kapitalas",
+          "reiksme" : 37377
+        }, {
+          "lineTypeId" : "BSLT00467",
+          "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+          "reiksme" : 31864
+        } ]
+      }, {
+        "standardId" : "IST023",
+        "standardName" : "Pelno (nuostolių) ataskaita (trumpa)",
+        "lines" : [ {
+          "lineTypeId" : "ISLT00345",
+          "lineName" : "Pardavimo pajamos",
+          "reiksme" : 139938
+        }, {
+          "lineTypeId" : "ISLT00350",
+          "lineName" : "Grynasis pelnas (nuostoliai)",
+          "reiksme" : 6632
+        } ]
+      } ]
+    }, {
+      "laikotarpisNuo" : "2018-01-01",
+      "laikotarpisIki" : "2018-12-31",
+      "duomenuData" : "2019-05-30",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standards" : [ {
+        "standardId" : "BST122",
+        "standardName" : "Balansas (trumpas)",
+        "lines" : [ {
+          "lineTypeId" : "BSLT00001",
+          "lineName" : "Ilgalaikis turtas",
+          "reiksme" : 24115
+        }, {
+          "lineTypeId" : "BSLT00021",
+          "lineName" : "Trumpalaikis turtas",
+          "reiksme" : 28328
+        }, {
+          "lineTypeId" : "BSLT00040",
+          "lineName" : "Nuosavas kapitalas",
+          "reiksme" : 30745
+        }, {
+          "lineTypeId" : "BSLT00467",
+          "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+          "reiksme" : 23025
+        } ]
+      }, {
+        "standardId" : "IST023",
+        "standardName" : "Pelno (nuostolių) ataskaita (trumpa)",
+        "lines" : [ {
+          "lineTypeId" : "ISLT00345",
+          "lineName" : "Pardavimo pajamos",
+          "reiksme" : 115135
+        }, {
+          "lineTypeId" : "ISLT00350",
+          "lineName" : "Grynasis pelnas (nuostoliai)",
+          "reiksme" : 15980
+        } ]
+      } ]
+    }, {
+      "laikotarpisNuo" : "2017-01-01",
+      "laikotarpisIki" : "2017-12-31",
+      "duomenuData" : "2018-03-28",
+      "templateId" : "FS0128",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standards" : [ {
+        "standardId" : "BST122",
+        "standardName" : "Balansas (trumpas)",
+        "lines" : [ {
+          "lineTypeId" : "BSLT00001",
+          "lineName" : "Ilgalaikis turtas",
+          "reiksme" : 33683
+        }, {
+          "lineTypeId" : "BSLT00021",
+          "lineName" : "Trumpalaikis turtas",
+          "reiksme" : 26166
+        }, {
+          "lineTypeId" : "BSLT00040",
+          "lineName" : "Nuosavas kapitalas",
+          "reiksme" : 14765
+        }, {
+          "lineTypeId" : "BSLT00467",
+          "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+          "reiksme" : 46553
+        } ]
+      }, {
+        "standardId" : "IST023",
+        "standardName" : "Pelno (nuostolių) ataskaita (trumpa)",
+        "lines" : [ {
+          "lineTypeId" : "ISLT00345",
+          "lineName" : "Pardavimo pajamos",
+          "reiksme" : 99709
+        }, {
+          "lineTypeId" : "ISLT00350",
+          "lineName" : "Grynasis pelnas (nuostoliai)",
+          "reiksme" : 1518
+        } ]
+      } ]
+    }, {
+      "laikotarpisNuo" : "2016-01-01",
+      "laikotarpisIki" : "2016-12-31",
+      "duomenuData" : "2017-05-26",
+      "templateId" : "FS0028",
+      "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys",
+      "standards" : [ {
+        "standardId" : "BST022",
+        "standardName" : "Balansas (trumpas)",
+        "lines" : [ {
+          "lineTypeId" : "BSLT00001",
+          "lineName" : "Ilgalaikis turtas",
+          "reiksme" : 36565
+        }, {
+          "lineTypeId" : "BSLT00021",
+          "lineName" : "Trumpalaikis turtas",
+          "reiksme" : 26647
+        }, {
+          "lineTypeId" : "BSLT00040",
+          "lineName" : "Nuosavas kapitalas",
+          "reiksme" : 13247
+        }, {
+          "lineTypeId" : "BSLT00467",
+          "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+          "reiksme" : 50240
+        } ]
+      }, {
+        "standardId" : "IST023",
+        "standardName" : "Pelno (nuostolių) ataskaita (trumpa)",
+        "lines" : [ {
+          "lineTypeId" : "ISLT00345",
+          "lineName" : "Pardavimo pajamos",
+          "reiksme" : 96566
+        }, {
+          "lineTypeId" : "ISLT00350",
+          "lineName" : "Grynasis pelnas (nuostoliai)",
+          "reiksme" : -19471
+        } ]
+      } ]
+    }, {
+      "laikotarpisNuo" : "2015-01-01",
+      "laikotarpisIki" : "2015-12-31",
+      "duomenuData" : "2016-05-02",
+      "templateId" : "FS0301",
+      "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys",
+      "standards" : [ {
+        "standardId" : "BST101",
+        "standardName" : "Balansas",
+        "lines" : [ {
+          "lineTypeId" : "BSLT00001",
+          "lineName" : "Ilgalaikis turtas",
+          "reiksme" : 37329
+        }, {
+          "lineTypeId" : "BSLT00021",
+          "lineName" : "Trumpalaikis turtas",
+          "reiksme" : 23815
+        }, {
+          "lineTypeId" : "BSLT00040",
+          "lineName" : "Nuosavas kapitalas",
+          "reiksme" : 32718
+        }, {
+          "lineTypeId" : "BSLT00055",
+          "lineName" : "Mokėtinos sumos ir įsipareigojimai",
+          "reiksme" : 28426
+        } ]
+      }, {
+        "standardId" : "IST101",
+        "standardName" : "Pelno (nuostolių) ataskaita",
+        "lines" : [ {
+          "lineTypeId" : "ISLT00001",
+          "lineName" : "Pardavimo pajamos",
+          "reiksme" : 92728
+        }, {
+          "lineTypeId" : "ISLT00017",
+          "lineName" : "Pelnas (nuostoliai) prieš apmokestinimą",
+          "reiksme" : -16083
+        }, {
+          "lineTypeId" : "ISLT00019",
+          "lineName" : "Grynasis pelnas (nuostoliai)",
+          "reiksme" : -16083
+        } ]
+      } ]
+    } ],
+    "pagalEilute" : {
+      "Ilgalaikis turtas" : [ {
+        "lineTypeId" : "BSLT00001",
+        "lineName" : "Ilgalaikis turtas",
+        "reiksme" : 10459,
+        "laikotarpisNuo" : "2024-01-01",
+        "laikotarpisIki" : "2024-12-31",
+        "duomenuData" : "2025-05-29",
+        "templateId" : "FS0328",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00001",
+        "lineName" : "Ilgalaikis turtas",
+        "reiksme" : 17197,
+        "laikotarpisNuo" : "2023-01-01",
+        "laikotarpisIki" : "2023-12-31",
+        "duomenuData" : "2024-04-18",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00001",
+        "lineName" : "Ilgalaikis turtas",
+        "reiksme" : 25149,
+        "laikotarpisNuo" : "2022-01-01",
+        "laikotarpisIki" : "2022-12-31",
+        "duomenuData" : "2023-05-17",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00001",
+        "lineName" : "Ilgalaikis turtas",
+        "reiksme" : 26533,
+        "laikotarpisNuo" : "2021-01-01",
+        "laikotarpisIki" : "2021-12-31",
+        "duomenuData" : "2022-05-11",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00001",
+        "lineName" : "Ilgalaikis turtas",
+        "reiksme" : 29470,
+        "laikotarpisNuo" : "2020-01-01",
+        "laikotarpisIki" : "2020-12-31",
+        "duomenuData" : "2021-04-29",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00001",
+        "lineName" : "Ilgalaikis turtas",
+        "reiksme" : 32997,
+        "laikotarpisNuo" : "2019-01-01",
+        "laikotarpisIki" : "2019-12-31",
+        "duomenuData" : "2020-05-18",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00001",
+        "lineName" : "Ilgalaikis turtas",
+        "reiksme" : 24115,
+        "laikotarpisNuo" : "2018-01-01",
+        "laikotarpisIki" : "2018-12-31",
+        "duomenuData" : "2019-05-30",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00001",
+        "lineName" : "Ilgalaikis turtas",
+        "reiksme" : 33683,
+        "laikotarpisNuo" : "2017-01-01",
+        "laikotarpisIki" : "2017-12-31",
+        "duomenuData" : "2018-03-28",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00001",
+        "lineName" : "Ilgalaikis turtas",
+        "reiksme" : 36565,
+        "laikotarpisNuo" : "2016-01-01",
+        "laikotarpisIki" : "2016-12-31",
+        "duomenuData" : "2017-05-26",
+        "templateId" : "FS0028",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00001",
+        "lineName" : "Ilgalaikis turtas",
+        "reiksme" : 37329,
+        "laikotarpisNuo" : "2015-01-01",
+        "laikotarpisIki" : "2015-12-31",
+        "duomenuData" : "2016-05-02",
+        "templateId" : "FS0301",
+        "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys"
+      } ],
+      "Trumpalaikis turtas" : [ {
+        "lineTypeId" : "BSLT00021",
+        "lineName" : "Trumpalaikis turtas",
+        "reiksme" : 23592,
+        "laikotarpisNuo" : "2024-01-01",
+        "laikotarpisIki" : "2024-12-31",
+        "duomenuData" : "2025-05-29",
+        "templateId" : "FS0328",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00021",
+        "lineName" : "Trumpalaikis turtas",
+        "reiksme" : 23931,
+        "laikotarpisNuo" : "2023-01-01",
+        "laikotarpisIki" : "2023-12-31",
+        "duomenuData" : "2024-04-18",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00021",
+        "lineName" : "Trumpalaikis turtas",
+        "reiksme" : 27407,
+        "laikotarpisNuo" : "2022-01-01",
+        "laikotarpisIki" : "2022-12-31",
+        "duomenuData" : "2023-05-17",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00021",
+        "lineName" : "Trumpalaikis turtas",
+        "reiksme" : 35036,
+        "laikotarpisNuo" : "2021-01-01",
+        "laikotarpisIki" : "2021-12-31",
+        "duomenuData" : "2022-05-11",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00021",
+        "lineName" : "Trumpalaikis turtas",
+        "reiksme" : 35741,
+        "laikotarpisNuo" : "2020-01-01",
+        "laikotarpisIki" : "2020-12-31",
+        "duomenuData" : "2021-04-29",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00021",
+        "lineName" : "Trumpalaikis turtas",
+        "reiksme" : 35456,
+        "laikotarpisNuo" : "2019-01-01",
+        "laikotarpisIki" : "2019-12-31",
+        "duomenuData" : "2020-05-18",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00021",
+        "lineName" : "Trumpalaikis turtas",
+        "reiksme" : 28328,
+        "laikotarpisNuo" : "2018-01-01",
+        "laikotarpisIki" : "2018-12-31",
+        "duomenuData" : "2019-05-30",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00021",
+        "lineName" : "Trumpalaikis turtas",
+        "reiksme" : 26166,
+        "laikotarpisNuo" : "2017-01-01",
+        "laikotarpisIki" : "2017-12-31",
+        "duomenuData" : "2018-03-28",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00021",
+        "lineName" : "Trumpalaikis turtas",
+        "reiksme" : 26647,
+        "laikotarpisNuo" : "2016-01-01",
+        "laikotarpisIki" : "2016-12-31",
+        "duomenuData" : "2017-05-26",
+        "templateId" : "FS0028",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00021",
+        "lineName" : "Trumpalaikis turtas",
+        "reiksme" : 23815,
+        "laikotarpisNuo" : "2015-01-01",
+        "laikotarpisIki" : "2015-12-31",
+        "duomenuData" : "2016-05-02",
+        "templateId" : "FS0301",
+        "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys"
+      } ],
+      "Nuosavas kapitalas" : [ {
+        "lineTypeId" : "BSLT00040",
+        "lineName" : "Nuosavas kapitalas",
+        "reiksme" : 8751,
+        "laikotarpisNuo" : "2024-01-01",
+        "laikotarpisIki" : "2024-12-31",
+        "duomenuData" : "2025-05-29",
+        "templateId" : "FS0328",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00040",
+        "lineName" : "Nuosavas kapitalas",
+        "reiksme" : 8287,
+        "laikotarpisNuo" : "2023-01-01",
+        "laikotarpisIki" : "2023-12-31",
+        "duomenuData" : "2024-04-18",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00040",
+        "lineName" : "Nuosavas kapitalas",
+        "reiksme" : 30182,
+        "laikotarpisNuo" : "2022-01-01",
+        "laikotarpisIki" : "2022-12-31",
+        "duomenuData" : "2023-05-17",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00040",
+        "lineName" : "Nuosavas kapitalas",
+        "reiksme" : 39332,
+        "laikotarpisNuo" : "2021-01-01",
+        "laikotarpisIki" : "2021-12-31",
+        "duomenuData" : "2022-05-11",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00040",
+        "lineName" : "Nuosavas kapitalas",
+        "reiksme" : 38405,
+        "laikotarpisNuo" : "2020-01-01",
+        "laikotarpisIki" : "2020-12-31",
+        "duomenuData" : "2021-04-29",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00040",
+        "lineName" : "Nuosavas kapitalas",
+        "reiksme" : 37377,
+        "laikotarpisNuo" : "2019-01-01",
+        "laikotarpisIki" : "2019-12-31",
+        "duomenuData" : "2020-05-18",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00040",
+        "lineName" : "Nuosavas kapitalas",
+        "reiksme" : 30745,
+        "laikotarpisNuo" : "2018-01-01",
+        "laikotarpisIki" : "2018-12-31",
+        "duomenuData" : "2019-05-30",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00040",
+        "lineName" : "Nuosavas kapitalas",
+        "reiksme" : 14765,
+        "laikotarpisNuo" : "2017-01-01",
+        "laikotarpisIki" : "2017-12-31",
+        "duomenuData" : "2018-03-28",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00040",
+        "lineName" : "Nuosavas kapitalas",
+        "reiksme" : 13247,
+        "laikotarpisNuo" : "2016-01-01",
+        "laikotarpisIki" : "2016-12-31",
+        "duomenuData" : "2017-05-26",
+        "templateId" : "FS0028",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00040",
+        "lineName" : "Nuosavas kapitalas",
+        "reiksme" : 32718,
+        "laikotarpisNuo" : "2015-01-01",
+        "laikotarpisIki" : "2015-12-31",
+        "duomenuData" : "2016-05-02",
+        "templateId" : "FS0301",
+        "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys"
+      } ],
+      "Mokėtinos sumos ir kiti įsipareigojimai" : [ {
+        "lineTypeId" : "BSLT00467",
+        "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+        "reiksme" : 25722,
+        "laikotarpisNuo" : "2024-01-01",
+        "laikotarpisIki" : "2024-12-31",
+        "duomenuData" : "2025-05-29",
+        "templateId" : "FS0328",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00467",
+        "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+        "reiksme" : 34008,
+        "laikotarpisNuo" : "2023-01-01",
+        "laikotarpisIki" : "2023-12-31",
+        "duomenuData" : "2024-04-18",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00467",
+        "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+        "reiksme" : 23123,
+        "laikotarpisNuo" : "2022-01-01",
+        "laikotarpisIki" : "2022-12-31",
+        "duomenuData" : "2023-05-17",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00467",
+        "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+        "reiksme" : 22968,
+        "laikotarpisNuo" : "2021-01-01",
+        "laikotarpisIki" : "2021-12-31",
+        "duomenuData" : "2022-05-11",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00467",
+        "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+        "reiksme" : 27647,
+        "laikotarpisNuo" : "2020-01-01",
+        "laikotarpisIki" : "2020-12-31",
+        "duomenuData" : "2021-04-29",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00467",
+        "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+        "reiksme" : 31864,
+        "laikotarpisNuo" : "2019-01-01",
+        "laikotarpisIki" : "2019-12-31",
+        "duomenuData" : "2020-05-18",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00467",
+        "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+        "reiksme" : 23025,
+        "laikotarpisNuo" : "2018-01-01",
+        "laikotarpisIki" : "2018-12-31",
+        "duomenuData" : "2019-05-30",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00467",
+        "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+        "reiksme" : 46553,
+        "laikotarpisNuo" : "2017-01-01",
+        "laikotarpisIki" : "2017-12-31",
+        "duomenuData" : "2018-03-28",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "BSLT00467",
+        "lineName" : "Mokėtinos sumos ir kiti įsipareigojimai",
+        "reiksme" : 50240,
+        "laikotarpisNuo" : "2016-01-01",
+        "laikotarpisIki" : "2016-12-31",
+        "duomenuData" : "2017-05-26",
+        "templateId" : "FS0028",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      } ],
+      "Pardavimo pajamos" : [ {
+        "lineTypeId" : "ISLT00345",
+        "lineName" : "Pardavimo pajamos",
+        "reiksme" : 142893,
+        "laikotarpisNuo" : "2024-01-01",
+        "laikotarpisIki" : "2024-12-31",
+        "duomenuData" : "2025-05-29",
+        "templateId" : "FS0328",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00345",
+        "lineName" : "Pardavimo pajamos",
+        "reiksme" : 143658,
+        "laikotarpisNuo" : "2023-01-01",
+        "laikotarpisIki" : "2023-12-31",
+        "duomenuData" : "2024-04-18",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00345",
+        "lineName" : "Pardavimo pajamos",
+        "reiksme" : 127218,
+        "laikotarpisNuo" : "2022-01-01",
+        "laikotarpisIki" : "2022-12-31",
+        "duomenuData" : "2023-05-17",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00345",
+        "lineName" : "Pardavimo pajamos",
+        "reiksme" : 116690,
+        "laikotarpisNuo" : "2021-01-01",
+        "laikotarpisIki" : "2021-12-31",
+        "duomenuData" : "2022-05-11",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00345",
+        "lineName" : "Pardavimo pajamos",
+        "reiksme" : 117442,
+        "laikotarpisNuo" : "2020-01-01",
+        "laikotarpisIki" : "2020-12-31",
+        "duomenuData" : "2021-04-29",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00345",
+        "lineName" : "Pardavimo pajamos",
+        "reiksme" : 139938,
+        "laikotarpisNuo" : "2019-01-01",
+        "laikotarpisIki" : "2019-12-31",
+        "duomenuData" : "2020-05-18",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00345",
+        "lineName" : "Pardavimo pajamos",
+        "reiksme" : 115135,
+        "laikotarpisNuo" : "2018-01-01",
+        "laikotarpisIki" : "2018-12-31",
+        "duomenuData" : "2019-05-30",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00345",
+        "lineName" : "Pardavimo pajamos",
+        "reiksme" : 99709,
+        "laikotarpisNuo" : "2017-01-01",
+        "laikotarpisIki" : "2017-12-31",
+        "duomenuData" : "2018-03-28",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00345",
+        "lineName" : "Pardavimo pajamos",
+        "reiksme" : 96566,
+        "laikotarpisNuo" : "2016-01-01",
+        "laikotarpisIki" : "2016-12-31",
+        "duomenuData" : "2017-05-26",
+        "templateId" : "FS0028",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00001",
+        "lineName" : "Pardavimo pajamos",
+        "reiksme" : 92728,
+        "laikotarpisNuo" : "2015-01-01",
+        "laikotarpisIki" : "2015-12-31",
+        "duomenuData" : "2016-05-02",
+        "templateId" : "FS0301",
+        "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys"
+      } ],
+      "Grynasis pelnas (nuostoliai)" : [ {
+        "lineTypeId" : "ISLT00350",
+        "lineName" : "Grynasis pelnas (nuostoliai)",
+        "reiksme" : -236,
+        "laikotarpisNuo" : "2024-01-01",
+        "laikotarpisIki" : "2024-12-31",
+        "duomenuData" : "2025-05-29",
+        "templateId" : "FS0328",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00350",
+        "lineName" : "Grynasis pelnas (nuostoliai)",
+        "reiksme" : -21895,
+        "laikotarpisNuo" : "2023-01-01",
+        "laikotarpisIki" : "2023-12-31",
+        "duomenuData" : "2024-04-18",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00350",
+        "lineName" : "Grynasis pelnas (nuostoliai)",
+        "reiksme" : 850,
+        "laikotarpisNuo" : "2022-01-01",
+        "laikotarpisIki" : "2022-12-31",
+        "duomenuData" : "2023-05-17",
+        "templateId" : "FS0228",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00350",
+        "lineName" : "Grynasis pelnas (nuostoliai)",
+        "reiksme" : 927,
+        "laikotarpisNuo" : "2021-01-01",
+        "laikotarpisIki" : "2021-12-31",
+        "duomenuData" : "2022-05-11",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00350",
+        "lineName" : "Grynasis pelnas (nuostoliai)",
+        "reiksme" : 1028,
+        "laikotarpisNuo" : "2020-01-01",
+        "laikotarpisIki" : "2020-12-31",
+        "duomenuData" : "2021-04-29",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00350",
+        "lineName" : "Grynasis pelnas (nuostoliai)",
+        "reiksme" : 6632,
+        "laikotarpisNuo" : "2019-01-01",
+        "laikotarpisIki" : "2019-12-31",
+        "duomenuData" : "2020-05-18",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00350",
+        "lineName" : "Grynasis pelnas (nuostoliai)",
+        "reiksme" : 15980,
+        "laikotarpisNuo" : "2018-01-01",
+        "laikotarpisIki" : "2018-12-31",
+        "duomenuData" : "2019-05-30",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00350",
+        "lineName" : "Grynasis pelnas (nuostoliai)",
+        "reiksme" : 1518,
+        "laikotarpisNuo" : "2017-01-01",
+        "laikotarpisIki" : "2017-12-31",
+        "duomenuData" : "2018-03-28",
+        "templateId" : "FS0128",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00350",
+        "lineName" : "Grynasis pelnas (nuostoliai)",
+        "reiksme" : -19471,
+        "laikotarpisNuo" : "2016-01-01",
+        "laikotarpisIki" : "2016-12-31",
+        "duomenuData" : "2017-05-26",
+        "templateId" : "FS0028",
+        "templateName" : "Labai mažų įmonių, taikančių išimtis, finansinių ataskaitų rinkinys"
+      }, {
+        "lineTypeId" : "ISLT00019",
+        "lineName" : "Grynasis pelnas (nuostoliai)",
+        "reiksme" : -16083,
+        "laikotarpisNuo" : "2015-01-01",
+        "laikotarpisIki" : "2015-12-31",
+        "duomenuData" : "2016-05-02",
+        "templateId" : "FS0301",
+        "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys"
+      } ],
+      "Mokėtinos sumos ir įsipareigojimai" : [ {
+        "lineTypeId" : "BSLT00055",
+        "lineName" : "Mokėtinos sumos ir įsipareigojimai",
+        "reiksme" : 28426,
+        "laikotarpisNuo" : "2015-01-01",
+        "laikotarpisIki" : "2015-12-31",
+        "duomenuData" : "2016-05-02",
+        "templateId" : "FS0301",
+        "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys"
+      } ],
+      "Pelnas (nuostoliai) prieš apmokestinimą" : [ {
+        "lineTypeId" : "ISLT00017",
+        "lineName" : "Pelnas (nuostoliai) prieš apmokestinimą",
+        "reiksme" : -16083,
+        "laikotarpisNuo" : "2015-01-01",
+        "laikotarpisIki" : "2015-12-31",
+        "duomenuData" : "2016-05-02",
+        "templateId" : "FS0301",
+        "templateName" : "Sutrumpintų finansinių ataskaitų rinkinys"
+      } ]
+    },
+    "lentele" : {
+      "metai" : [ 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024 ],
+      "duomenys" : {
+        "Ilgalaikis turtas" : [ 37329, 36565, 33683, 24115, 32997, 29470, 26533, 25149, 17197, 10459 ],
+        "Trumpalaikis turtas" : [ 23815, 26647, 26166, 28328, 35456, 35741, 35036, 27407, 23931, 23592 ],
+        "Nuosavas kapitalas" : [ 32718, 13247, 14765, 30745, 37377, 38405, 39332, 30182, 8287, 8751 ],
+        "Mokėtinos sumos ir kiti įsipareigojimai" : [ null, 50240, 46553, 23025, 31864, 27647, 22968, 23123, 34008, 25722 ],
+        "Pardavimo pajamos" : [ 92728, 96566, 99709, 115135, 139938, 117442, 116690, 127218, 143658, 142893 ],
+        "Grynasis pelnas (nuostoliai)" : [ -16083, -19471, 1518, 15980, 6632, 1028, 927, 850, -21895, -236 ],
+        "Mokėtinos sumos ir įsipareigojimai" : [ 28426, null, null, null, null, null, null, null, null, null ],
+        "Pelnas (nuostoliai) prieš apmokestinimą" : [ -16083, null, null, null, null, null, null, null, null, null ],
+        "Pelningumas" : [ -17.34, -20.16, 1.52, 13.88, 4.74, 0.88, 0.79, 0.67, -15.24, -0.17 ]
+      }
+    }
+  },
+  "istatinisKapitalas" : {
+    "data" : "2016-10-14",
+    "reiksme" : 2896,
+    "valiuta" : "EUR",
+    "duomenys" : [ {
+      "data" : "2016-10-14",
+      "reiksme" : 2896,
+      "valiuta" : "EUR"
+    } ]
+  },
+  "darboSkelbimai" : {
+    "limit" : 3,
+    "rows" : 1,
+    "skelbimai" : [ {
+      "_id" : "726bc062-488d-45d7-b988-4fef12b15c53",
+      "_revision" : "89fd890a-0599-406c-b5cc-d7dab67a42d5",
+      "darbo_vietos_id" : "DV-29-999040872",
+      "statusas" : "archyvuota",
+      "ikelimo_data" : "2012-10-01",
+      "galioja_nuo" : "2012-10-01",
+      "galioja_iki" : "2012-10-12",
+      "imones_iregistravimas" : "2010-10-20",
+      "prelim_darbo_uzmokestis" : null,
+      "vid_darbo_uzmokestis" : null,
+      "maks_darbo_uzmokestis" : null,
+      "valiuta" : "LTL",
+      "uzmokescio_komentaras_lt" : null,
+      "profesijos_pareigybes_pav" : "Interjero dizaineris",
+      "darbo_aprasymas_lt" : "//T-DRPR (DĮĮR) T-1 Dizaineris",
+      "ar_aktuali_siandien" : "0",
+      "ar_uzpildyta" : "0",
+      "ar_papildomai_remia" : "true",
+      "ar_darbina_po_mokymu" : "false",
+      "ar_apmoka_keliones" : "false",
+      "ar_apgyvendina" : "false",
+      "ar_maitina" : "false",
+      "pageidaujama_darbo_pradzia" : "2012-10-05",
+      "darbo_vietu_skaicius" : 1,
+      "darbo_vietos_adresas" : "Šiauliai, Lietuva",
+      "darbo_vietos_sav_pav" : "Šiaulių miesto sav.",
+      "registravimo_pagrindo_pav" : "Sukūrus naują darbo vietą",
+      "registravimo_budo_pav" : "Vidinis portalas",
+      "pageidavimo_pateikimo_pav" : "el. paštu",
+      "rizikos_lt" : null,
+      "jar_kodas" : "302556251",
+      "darbdavys" : "UAB \"D&G Reklama\"",
+      "teisinio_statuso_pav" : "Įregistruotas",
+      "teisines_formos_pav" : "Juridiniai asmenys",
+      "darbdavio_bustine" : "Šiaulių rajono sav., Kuršėnai, Žalioji g. 4, LT-81126",
+      "darbdavio_kontaktinis_asmuo" : "VAIDA JOKUBAITIENĖ",
+      "susisiekimo_budas" : null,
+      "darbdavio_tel_nr" : null,
+      "darbdavio_mob_nr" : "37065613363",
+      "darbdavio_el_pastas" : "Vaida.Jokubaitiene@ldb.lt",
+      "reik_darbo_patirtis" : null,
+      "reik_kompetencijos_lt" : null,
+      "reik_gebejimai" : null,
+      "reik_issilavinimo_pav" : "Aukštasis universitetinis",
+      "reik_mok_progr_pav" : null
+    } ]
+  },
+  "pinreg" : {
+    "darbovietes" : [ ],
+    "sutuoktinioDarbovietes" : [ ],
+    "rysiaiSuJa" : [ ],
+    "counts" : {
+      "darbovietes" : 0,
+      "sutuoktiniuDarbovietes" : 0,
+      "rysiaiSuJa" : 0
+    },
+    "total" : 0,
+    "rows" : 0,
+    "limit" : 3
+  },
+  "nepatikimi" : [ ],
+  "melagingi" : [ ],
+  "jadis" : {
+    "lrFiziniai" : 1,
+    "lrJuridiniai" : null,
+    "uzsienioFiziniai" : null,
+    "uzsienioJuridiniai" : null,
+    "_id" : "0ceb6e59-c3c1-4d40-976e-cd56b6ce73a9"
+  },
+  "rcPranesimai" : {
+    "limit" : 3,
+    "rows" : 18,
+    "pranesimai" : [ {
+      "leidinioOid" : "306869",
+      "title" : "Registro tvarkytojo skelbimai",
+      "subtitle" : "Įregistruoti juridinių asmenų duomenų ar informacijos pakeitimai",
+      "jarPavadinimas" : "UAB \"D&G Reklama\"",
+      "jarKodas" : "302556251",
+      "teisineForma" : "Uždaroji akcinė bendrovė",
+      "teisinisStatusas" : "Teisinis statusas neįregistruotas.",
+      "buveinesAdresas" : "Šiaulių r. sav., Kuršėnai, Žalioji g. 4, LT-81126",
+      "pranesimoNr" : "7046497",
+      "text" : "Pakeitimų įregistravimo data: 2025-05-29\nPakeisti duomenys: pateiktas ataskaitinio laikotarpio nuo 2024-01-01 iki 2024-12-31 Labai mažų įmonių, taikančių išimtis,\nfinansinių ataskaitų rinkinys;\nDokumentai: Finansinės atskaitomybės dokumentai / 2024 m. finansinė atskaitomybė (2025-05-29).",
+      "leidinioLink" : "https://www.registrucentras.lt/jar/infleid/download.do?oid=306869",
+      "leidinioData" : "2025-05-30",
+      "leidinioAtnaujinimas" : null,
+      "leidinioNumeris" : "2025-150"
+    }, {
+      "leidinioOid" : "281266",
+      "title" : "Registro tvarkytojo skelbimai",
+      "subtitle" : "Įregistruoti juridinių asmenų duomenų ar informacijos pakeitimai",
+      "jarPavadinimas" : "UAB \"D&G Reklama\"",
+      "jarKodas" : "302556251",
+      "teisineForma" : "Uždaroji akcinė bendrovė",
+      "teisinisStatusas" : "Teisinis statusas neįregistruotas.",
+      "buveinesAdresas" : "Šiaulių r. sav., Kuršėnai, Žalioji g. 4, LT-81126",
+      "pranesimoNr" : "6451271",
+      "text" : "Pakeitimų įregistravimo data: 2024-04-18\nPakeisti duomenys: pateiktas ataskaitinio laikotarpio nuo 2023-01-01 iki 2023-12-31 Labai mažų įmonių, taikančių išimtis,\nfinansinių ataskaitų rinkinys;\nDokumentai: Finansinės atskaitomybės dokumentai / 2023 m. finansinė atskaitomybė (2024-04-18).",
+      "leidinioLink" : "https://www.registrucentras.lt/jar/infleid/download.do?oid=281266",
+      "leidinioData" : "2024-04-19",
+      "leidinioAtnaujinimas" : "2024-11-19 12:43:00",
+      "leidinioNumeris" : "2024-110"
+    }, {
+      "leidinioOid" : "275565",
+      "title" : "Registro tvarkytojo skelbimai",
+      "subtitle" : "Įregistruoti juridinių asmenų duomenų ar informacijos pakeitimai",
+      "jarPavadinimas" : "UAB \"D&G Reklama\"",
+      "jarKodas" : "302556251",
+      "teisineForma" : "Uždaroji akcinė bendrovė",
+      "teisinisStatusas" : "Teisinis statusas neįregistruotas.",
+      "buveinesAdresas" : "Šiaulių r. sav., Kuršėnai, Žalioji g. 4, LT-81126",
+      "pranesimoNr" : "6309560",
+      "text" : "Pakeitimų įregistravimo data: 2024-01-16\nPakeisti duomenys: buveinės adreso; akcininko; kontaktiniai.\nDokumentai: Prašymas registruoti Juridinių asmenų registre JAR-1-E (2024-01-16); Prašymas registruoti Juridinių\nasmenų registre JAR-1-E (2024-01-16); Vienintelio akcininko sprendimas (2024-01-16); Sutikimas suteikti patalpas\njuridinio asmens buveinei (2024-01-16).",
+      "leidinioLink" : "https://www.registrucentras.lt/jar/infleid/download.do?oid=275565",
+      "leidinioData" : "2024-01-17",
+      "leidinioAtnaujinimas" : "2024-11-18 15:26:00",
+      "leidinioNumeris" : "2024-017"
+    } ]
+  },
+  "domenai" : {
+    "limit" : 3,
+    "count" : 0,
+    "rows" : [ ]
+  },
+  "kotis" : {
+    "limit" : 3,
+    "count" : 2,
+    "rows" : [ {
+      "id" : "2452751",
+      "gavejas" : "UAB \"D&G Reklama\"",
+      "teikejas" : "Valstybinė mokesčių inspekcija",
+      "suteikimoData" : "2025-01-02",
+      "suma" : 11.16,
+      "teisinisPagrindas" : null,
+      "pagalbosRusis" : "Bendroji nereikšminga (de minimis) pagalba",
+      "busena" : "Įregistruota",
+      "norminisTeisesAktas" : "Mokesčių administravimo įstatymo 88 straipsnis",
+      "individualusTeisesAktas" : "VMI prie LR FM viršininko 2024-10-23 įsakymas Nr. VA-83 „Dėl mokestinės nepriemokos ar baudos už administracinį nusižengimą mokėjimo atidėjimo ir (ar) išdėstymo taisyklių ir formų patvirtinimo\"",
+      "registracijosKodas" : "42508889",
+      "europosKomisijaNr" : null,
+      "gavejoKodas" : "302556251",
+      "pagalbosForma" : "C2A. Mokesčių atidėjimai",
+      "pagalbosTipas" : "Nereikšminga (de minimis) pagalba",
+      "gavejoTipas" : "Juridinis asmuo",
+      "produktoSektorius" : null,
+      "gavejoVeiklosKodas" : "73. Reklamos, rinkos tyrimų ir viešųjų ryšių veikla",
+      "pagrindinisTikslas" : null,
+      "antrinisTikslas" : null,
+      "tinkamosDengtiIslaidos" : null,
+      "pastaba" : "40630997",
+      "duomenuPildytojas" : "Valstybinė mokesčių inspekcija",
+      "taikomosTaisyklės" : null
+    }, {
+      "id" : "2408664",
+      "gavejas" : "UAB \"D&G Reklama\"",
+      "teikejas" : "Lietuvos Respublikos aplinkos ministerijos Aplinkos projektų valdymo agentūra",
+      "suteikimoData" : "2024-11-15",
+      "suma" : 1274.67,
+      "teisinisPagrindas" : null,
+      "pagalbosRusis" : "Bendroji nereikšminga (de minimis) pagalba",
+      "busena" : "Įregistruota",
+      "norminisTeisesAktas" : "LIETUVOS RESPUBLIKOS ENERGETIKOS MINISTRO ĮSAKYMAS DĖL ENERGETIKOS MINISTRO 2022 M. RUGSĖJO 7 D. ĮSAKYMO NR. 1-265 „DĖL 2021–2030 METŲ PLĖTROS PROGRAMOS VALDYTOJOS LIETUVOS RESPUBLIKOS ENERGETIKOS MINISTERIJOS ENERGETIKOS PLĖTROS PROGRAMOS PAŽANGOS PRIEMONĖS NR. 03- 001-06-03-02 „DIDINTI ATSINAUJINANČIŲ ENERGIJOS IŠTEKLIŲ DALĮ, UŽTIKRINANT ATSINAUJINANČIŲ IŠTEKLIŲ INTEGRACIJĄ Į ELEKTROS TINKLUS“ APRAŠO PATVIRTINIMO“ PAKEITIMO 2024 m. BALANDŽIO 26 d. Nr. 1-82 Vilnius",
+      "individualusTeisesAktas" : "LIETUVOS RESPUBLIKOS APLINKOS MINISTERIJOS APLINKOS PROJEKTŲ VALDYMO AGENTŪROS DIREKTORIAUS 2024 M. LAPKRIČIO 15 D. ĮSAKYMAS NR. T1-459 „DĖL PROJEKTO „FIZINIŲ ASMENŲ SAULĖS ELEKTRINIŲ ĮSIRENGIMAS NAMŲ ŪKIUOSE“ NR. 03-026-J-0001 PAREIŠKĖJŲ, KURIEMS SKIRIAMAS FINANSAVIMAS, SĄRAŠO PATVIRTINIMO“",
+      "registracijosKodas" : "42424789",
+      "europosKomisijaNr" : null,
+      "gavejoKodas" : "302556251",
+      "pagalbosForma" : "A1A. Subsidijos, dotacijos",
+      "pagalbosTipas" : "Nereikšminga (de minimis) pagalba",
+      "gavejoTipas" : "Juridinis asmuo",
+      "produktoSektorius" : null,
+      "gavejoVeiklosKodas" : "73.11. Reklamos agentūrų veikla",
+      "pagrindinisTikslas" : null,
+      "antrinisTikslas" : null,
+      "tinkamosDengtiIslaidos" : null,
+      "pastaba" : "03-026-J-0001-J03-08131",
+      "duomenuPildytojas" : "Lietuvos Respublikos aplinkos ministerijos Aplinkos projektų valdymo agentūra",
+      "taikomosTaisyklės" : null
+    } ]
+  },
+  "esInvesticijos" : {
+    "limit" : 3,
+    "count" : 0,
+    "rows" : [ ]
+  },
+  "mvpAprasai" : {
+    "limit" : 1,
+    "count" : 0,
+    "rows" : [ ]
+  },
+  "vdiPazeidimai" : {
+    "limit" : 10000000,
+    "count" : 0,
+    "rows" : [ ]
+  }
+}

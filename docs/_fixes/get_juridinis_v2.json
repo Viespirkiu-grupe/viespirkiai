@@ -1,0 +1,450 @@
+{
+  "jar" : {
+    "id" : 75013,
+    "jarKodas" : 302556251,
+    "pavadinimas" : "UAB \"D&G Reklama\"",
+    "adresas" : "Šiaulių r. sav., Kuršėnai, Žalioji g. 4, LT-81126",
+    "registravimoData" : "2010-10-20",
+    "formosKodas" : 310,
+    "formosPavadinimas" : "Uždaroji akcinė bendrovė",
+    "statusoKodas" : 0,
+    "statusoPavadinimas" : "Teisinis stat neįregistruotas",
+    "statusasNuo" : "2010-10-20",
+    "duomenuData" : "2026-01-27",
+    "location" : [ 55.990922704, 22.94627011 ],
+    "pavadinimasBase" : "D&G Reklama",
+    "locationState" : 1,
+    "locationVersion" : 1,
+    "jarId" : "d41c17e3-6a50-4d26-9d3e-6c6b04b89d4d"
+  },
+  "isregistruotasAsmuo" : null,
+  "sodra" : {
+    "kodas" : 2072029,
+    "jarKodas" : "302556251",
+    "pavadinimas" : "UAB \"D&G REKLAMA\"",
+    "savivaldybe" : "Šiaulių r. sav.",
+    "ekonominesVeiklosKodas" : "731100",
+    "ekonominesVeiklosPavadinimas" : "Reklamos agentūrų veikla",
+    "vidutinisAtlyginimas" : null,
+    "vidutinisAtlyginimas2" : null,
+    "draustieji" : 1,
+    "draustieji2" : 0,
+    "imokuSuma" : null,
+    "data" : "2026-02",
+    "bendrasDraustujuSkaicius" : 1,
+    "bendrasVidutinisAtlyginimas" : 0,
+    "atlyginimuIslaidos" : 0,
+    "turejoDraustuju" : true,
+    "turejoDraustuju2" : false,
+    "turejoAtlyginimu" : true,
+    "turejoAtlyginimu2" : false,
+    "peak" : {
+      "data" : "2020-09",
+      "draustieji" : 7,
+      "vidutinisAtlyginimas" : 605.76
+    },
+    "byYear" : [ {
+      "metai" : 2018,
+      "avgDraustieji" : 3.9,
+      "avgAtlyginimas" : 418
+    }, {
+      "metai" : 2019,
+      "avgDraustieji" : 5.8,
+      "avgAtlyginimas" : 625
+    }, {
+      "metai" : 2020,
+      "avgDraustieji" : 6.1,
+      "avgAtlyginimas" : 557
+    }, {
+      "metai" : 2021,
+      "avgDraustieji" : 6.2,
+      "avgAtlyginimas" : 739
+    }, {
+      "metai" : 2022,
+      "avgDraustieji" : 4.9,
+      "avgAtlyginimas" : 777
+    }, {
+      "metai" : 2023,
+      "avgDraustieji" : 5.4,
+      "avgAtlyginimas" : 844
+    }, {
+      "metai" : 2024,
+      "avgDraustieji" : 4.8,
+      "avgAtlyginimas" : 934
+    }, {
+      "metai" : 2025,
+      "avgDraustieji" : 1.6,
+      "avgAtlyginimas" : null
+    }, {
+      "metai" : 2026,
+      "avgDraustieji" : 1,
+      "avgAtlyginimas" : null
+    } ],
+    "gaps" : [ ]
+  },
+  "regitra" : {
+    "limit" : 3,
+    "rows" : 0,
+    "transportoPriemones" : [ ]
+  },
+  "teismoNuosprendziai" : {
+    "limit" : 5,
+    "rows" : 0,
+    "nuosprendziai" : [ ]
+  },
+  "sutartys" : {
+    "pirkimaiKasMetus" : [ ],
+    "tiekimaiKasMetus" : [ {
+      "year" : 2015,
+      "total" : 15128.84
+    }, {
+      "year" : 2016,
+      "total" : 5516.9
+    }, {
+      "year" : 2017,
+      "total" : 21753.02
+    }, {
+      "year" : 2018,
+      "total" : 3611.85
+    }, {
+      "year" : 2019,
+      "total" : 1869.45
+    }, {
+      "year" : 2020,
+      "total" : 15210.72
+    }, {
+      "year" : 2021,
+      "total" : 4890.82
+    }, {
+      "year" : 2022,
+      "total" : 15187.64
+    }, {
+      "year" : 2023,
+      "total" : 13734.44
+    }, {
+      "year" : 2024,
+      "total" : 28425.95
+    }, {
+      "year" : 2026,
+      "total" : 242
+    } ],
+    "topPirkejai" : [ {
+      "jarKodas" : "191847935",
+      "pavadinimas" : "Viešoji įstaiga Šiaulių reabilitacijos centras",
+      "total" : 29583.18,
+      "count" : 6
+    }, {
+      "jarKodas" : "188726051",
+      "pavadinimas" : "Šiaulių rajono savivaldybės administracija",
+      "total" : 16997.44,
+      "count" : 9
+    }, {
+      "jarKodas" : "188719391",
+      "pavadinimas" : "Akmenės rajono savivaldybės administracija",
+      "total" : 13059.94,
+      "count" : 6
+    }, {
+      "jarKodas" : "171448341",
+      "pavadinimas" : "Viešoji įstaiga Radviliškio ligoninė",
+      "total" : 10126.42,
+      "count" : 3
+    }, {
+      "jarKodas" : "188726247",
+      "pavadinimas" : "Radviliškio rajono savivaldybės administracija",
+      "total" : 9437.52,
+      "count" : 1
+    } ],
+    "topTiekejai" : [ ]
+  },
+  "finansai" : {
+    "byYear" : [ {
+      "metai" : 2015,
+      "pajamos" : 92728,
+      "pelnas" : -16083,
+      "ilgalaikis" : 37329,
+      "trumpalaikis" : 23815,
+      "kapitalas" : 32718,
+      "isipareigojimai" : 28426
+    }, {
+      "metai" : 2016,
+      "pajamos" : 96566,
+      "pelnas" : -19471,
+      "ilgalaikis" : 36565,
+      "trumpalaikis" : 26647,
+      "kapitalas" : 13247,
+      "isipareigojimai" : 50240
+    }, {
+      "metai" : 2017,
+      "pajamos" : 99709,
+      "pelnas" : 1518,
+      "ilgalaikis" : 33683,
+      "trumpalaikis" : 26166,
+      "kapitalas" : 14765,
+      "isipareigojimai" : 46553
+    }, {
+      "metai" : 2018,
+      "pajamos" : 115135,
+      "pelnas" : 15980,
+      "ilgalaikis" : 24115,
+      "trumpalaikis" : 28328,
+      "kapitalas" : 30745,
+      "isipareigojimai" : 23025
+    }, {
+      "metai" : 2019,
+      "pajamos" : 139938,
+      "pelnas" : 6632,
+      "ilgalaikis" : 32997,
+      "trumpalaikis" : 35456,
+      "kapitalas" : 37377,
+      "isipareigojimai" : 31864
+    }, {
+      "metai" : 2020,
+      "pajamos" : 117442,
+      "pelnas" : 1028,
+      "ilgalaikis" : 29470,
+      "trumpalaikis" : 35741,
+      "kapitalas" : 38405,
+      "isipareigojimai" : 27647
+    }, {
+      "metai" : 2021,
+      "pajamos" : 116690,
+      "pelnas" : 927,
+      "ilgalaikis" : 26533,
+      "trumpalaikis" : 35036,
+      "kapitalas" : 39332,
+      "isipareigojimai" : 22968
+    }, {
+      "metai" : 2022,
+      "pajamos" : 127218,
+      "pelnas" : 850,
+      "ilgalaikis" : 25149,
+      "trumpalaikis" : 27407,
+      "kapitalas" : 30182,
+      "isipareigojimai" : 23123
+    }, {
+      "metai" : 2023,
+      "pajamos" : 143658,
+      "pelnas" : -21895,
+      "ilgalaikis" : 17197,
+      "trumpalaikis" : 23931,
+      "kapitalas" : 8287,
+      "isipareigojimai" : 34008
+    }, {
+      "metai" : 2024,
+      "pajamos" : 142893,
+      "pelnas" : -236,
+      "ilgalaikis" : 10459,
+      "trumpalaikis" : 23592,
+      "kapitalas" : 8751,
+      "isipareigojimai" : 25722
+    } ]
+  },
+  "istatinisKapitalas" : {
+    "data" : "2016-10-14",
+    "reiksme" : 2896,
+    "valiuta" : "EUR",
+    "duomenys" : [ {
+      "data" : "2016-10-14",
+      "reiksme" : 2896,
+      "valiuta" : "EUR"
+    } ]
+  },
+  "darboSkelbimai" : {
+    "limit" : 3,
+    "rows" : 1,
+    "skelbimai" : [ {
+      "_id" : "726bc062-488d-45d7-b988-4fef12b15c53",
+      "_revision" : "89fd890a-0599-406c-b5cc-d7dab67a42d5",
+      "darbo_vietos_id" : "DV-29-999040872",
+      "statusas" : "archyvuota",
+      "ikelimo_data" : "2012-10-01",
+      "galioja_nuo" : "2012-10-01",
+      "galioja_iki" : "2012-10-12",
+      "imones_iregistravimas" : "2010-10-20",
+      "prelim_darbo_uzmokestis" : null,
+      "vid_darbo_uzmokestis" : null,
+      "maks_darbo_uzmokestis" : null,
+      "valiuta" : "LTL",
+      "uzmokescio_komentaras_lt" : null,
+      "profesijos_pareigybes_pav" : "Interjero dizaineris",
+      "darbo_aprasymas_lt" : "//T-DRPR (DĮĮR) T-1 Dizaineris",
+      "ar_aktuali_siandien" : "0",
+      "ar_uzpildyta" : "0",
+      "ar_papildomai_remia" : "true",
+      "ar_darbina_po_mokymu" : "false",
+      "ar_apmoka_keliones" : "false",
+      "ar_apgyvendina" : "false",
+      "ar_maitina" : "false",
+      "pageidaujama_darbo_pradzia" : "2012-10-05",
+      "darbo_vietu_skaicius" : 1,
+      "darbo_vietos_adresas" : "Šiauliai, Lietuva",
+      "darbo_vietos_sav_pav" : "Šiaulių miesto sav.",
+      "registravimo_pagrindo_pav" : "Sukūrus naują darbo vietą",
+      "registravimo_budo_pav" : "Vidinis portalas",
+      "pageidavimo_pateikimo_pav" : "el. paštu",
+      "rizikos_lt" : null,
+      "jar_kodas" : "302556251",
+      "darbdavys" : "UAB \"D&G Reklama\"",
+      "teisinio_statuso_pav" : "Įregistruotas",
+      "teisines_formos_pav" : "Juridiniai asmenys",
+      "darbdavio_bustine" : "Šiaulių rajono sav., Kuršėnai, Žalioji g. 4, LT-81126",
+      "darbdavio_kontaktinis_asmuo" : "VAIDA JOKUBAITIENĖ",
+      "susisiekimo_budas" : null,
+      "darbdavio_tel_nr" : null,
+      "darbdavio_mob_nr" : "37065613363",
+      "darbdavio_el_pastas" : "Vaida.Jokubaitiene@ldb.lt",
+      "reik_darbo_patirtis" : null,
+      "reik_kompetencijos_lt" : null,
+      "reik_gebejimai" : null,
+      "reik_issilavinimo_pav" : "Aukštasis universitetinis",
+      "reik_mok_progr_pav" : null
+    } ]
+  },
+  "pinreg" : {
+    "darbovietes" : [ ],
+    "sutuoktinioDarbovietes" : [ ],
+    "rysiaiSuJa" : [ ],
+    "counts" : {
+      "darbovietes" : 0,
+      "sutuoktiniuDarbovietes" : 0,
+      "rysiaiSuJa" : 0
+    },
+    "total" : 0,
+    "rows" : 0,
+    "limit" : 3
+  },
+  "nepatikimi" : [ ],
+  "melagingi" : [ ],
+  "jadis" : {
+    "lrFiziniai" : 1,
+    "lrJuridiniai" : null,
+    "uzsienioFiziniai" : null,
+    "uzsienioJuridiniai" : null,
+    "_id" : "0ceb6e59-c3c1-4d40-976e-cd56b6ce73a9"
+  },
+  "rcPranesimai" : {
+    "limit" : 3,
+    "rows" : 18,
+    "pranesimai" : [ {
+      "leidinioOid" : "306869",
+      "title" : "Registro tvarkytojo skelbimai",
+      "subtitle" : "Įregistruoti juridinių asmenų duomenų ar informacijos pakeitimai",
+      "jarPavadinimas" : "UAB \"D&G Reklama\"",
+      "jarKodas" : "302556251",
+      "teisineForma" : "Uždaroji akcinė bendrovė",
+      "teisinisStatusas" : "Teisinis statusas neįregistruotas.",
+      "buveinesAdresas" : "Šiaulių r. sav., Kuršėnai, Žalioji g. 4, LT-81126",
+      "pranesimoNr" : "7046497",
+      "text" : "Pakeitimų įregistravimo data: 2025-05-29\nPakeisti duomenys: pateiktas ataskaitinio laikotarpio nuo 2024-01-01 iki 2024-12-31 Labai mažų įmonių, taikančių išimtis,\nfinansinių ataskaitų rinkinys;\nDokumentai: Finansinės atskaitomybės dokumentai / 2024 m. finansinė atskaitomybė (2025-05-29).",
+      "leidinioLink" : "https://www.registrucentras.lt/jar/infleid/download.do?oid=306869",
+      "leidinioData" : "2025-05-30",
+      "leidinioAtnaujinimas" : null,
+      "leidinioNumeris" : "2025-150"
+    }, {
+      "leidinioOid" : "281266",
+      "title" : "Registro tvarkytojo skelbimai",
+      "subtitle" : "Įregistruoti juridinių asmenų duomenų ar informacijos pakeitimai",
+      "jarPavadinimas" : "UAB \"D&G Reklama\"",
+      "jarKodas" : "302556251",
+      "teisineForma" : "Uždaroji akcinė bendrovė",
+      "teisinisStatusas" : "Teisinis statusas neįregistruotas.",
+      "buveinesAdresas" : "Šiaulių r. sav., Kuršėnai, Žalioji g. 4, LT-81126",
+      "pranesimoNr" : "6451271",
+      "text" : "Pakeitimų įregistravimo data: 2024-04-18\nPakeisti duomenys: pateiktas ataskaitinio laikotarpio nuo 2023-01-01 iki 2023-12-31 Labai mažų įmonių, taikančių išimtis,\nfinansinių ataskaitų rinkinys;\nDokumentai: Finansinės atskaitomybės dokumentai / 2023 m. finansinė atskaitomybė (2024-04-18).",
+      "leidinioLink" : "https://www.registrucentras.lt/jar/infleid/download.do?oid=281266",
+      "leidinioData" : "2024-04-19",
+      "leidinioAtnaujinimas" : "2024-11-19 12:43:00",
+      "leidinioNumeris" : "2024-110"
+    }, {
+      "leidinioOid" : "275565",
+      "title" : "Registro tvarkytojo skelbimai",
+      "subtitle" : "Įregistruoti juridinių asmenų duomenų ar informacijos pakeitimai",
+      "jarPavadinimas" : "UAB \"D&G Reklama\"",
+      "jarKodas" : "302556251",
+      "teisineForma" : "Uždaroji akcinė bendrovė",
+      "teisinisStatusas" : "Teisinis statusas neįregistruotas.",
+      "buveinesAdresas" : "Šiaulių r. sav., Kuršėnai, Žalioji g. 4, LT-81126",
+      "pranesimoNr" : "6309560",
+      "text" : "Pakeitimų įregistravimo data: 2024-01-16\nPakeisti duomenys: buveinės adreso; akcininko; kontaktiniai.\nDokumentai: Prašymas registruoti Juridinių asmenų registre JAR-1-E (2024-01-16); Prašymas registruoti Juridinių\nasmenų registre JAR-1-E (2024-01-16); Vienintelio akcininko sprendimas (2024-01-16); Sutikimas suteikti patalpas\njuridinio asmens buveinei (2024-01-16).",
+      "leidinioLink" : "https://www.registrucentras.lt/jar/infleid/download.do?oid=275565",
+      "leidinioData" : "2024-01-17",
+      "leidinioAtnaujinimas" : "2024-11-18 15:26:00",
+      "leidinioNumeris" : "2024-017"
+    } ]
+  },
+  "domenai" : {
+    "limit" : 3,
+    "count" : 0,
+    "rows" : [ ]
+  },
+  "kotis" : {
+    "limit" : 3,
+    "count" : 2,
+    "rows" : [ {
+      "id" : "2452751",
+      "gavejas" : "UAB \"D&G Reklama\"",
+      "teikejas" : "Valstybinė mokesčių inspekcija",
+      "suteikimoData" : "2025-01-02",
+      "suma" : 11.16,
+      "teisinisPagrindas" : null,
+      "pagalbosRusis" : "Bendroji nereikšminga (de minimis) pagalba",
+      "busena" : "Įregistruota",
+      "norminisTeisesAktas" : "Mokesčių administravimo įstatymo 88 straipsnis",
+      "individualusTeisesAktas" : "VMI prie LR FM viršininko 2024-10-23 įsakymas Nr. VA-83 „Dėl mokestinės nepriemokos ar baudos už administracinį nusižengimą mokėjimo atidėjimo ir (ar) išdėstymo taisyklių ir formų patvirtinimo\"",
+      "registracijosKodas" : "42508889",
+      "europosKomisijaNr" : null,
+      "gavejoKodas" : "302556251",
+      "pagalbosForma" : "C2A. Mokesčių atidėjimai",
+      "pagalbosTipas" : "Nereikšminga (de minimis) pagalba",
+      "gavejoTipas" : "Juridinis asmuo",
+      "produktoSektorius" : null,
+      "gavejoVeiklosKodas" : "73. Reklamos, rinkos tyrimų ir viešųjų ryšių veikla",
+      "pagrindinisTikslas" : null,
+      "antrinisTikslas" : null,
+      "tinkamosDengtiIslaidos" : null,
+      "pastaba" : "40630997",
+      "duomenuPildytojas" : "Valstybinė mokesčių inspekcija",
+      "taikomosTaisyklės" : null
+    }, {
+      "id" : "2408664",
+      "gavejas" : "UAB \"D&G Reklama\"",
+      "teikejas" : "Lietuvos Respublikos aplinkos ministerijos Aplinkos projektų valdymo agentūra",
+      "suteikimoData" : "2024-11-15",
+      "suma" : 1274.67,
+      "teisinisPagrindas" : null,
+      "pagalbosRusis" : "Bendroji nereikšminga (de minimis) pagalba",
+      "busena" : "Įregistruota",
+      "norminisTeisesAktas" : "LIETUVOS RESPUBLIKOS ENERGETIKOS MINISTRO ĮSAKYMAS DĖL ENERGETIKOS MINISTRO 2022 M. RUGSĖJO 7 D. ĮSAKYMO NR. 1-265 „DĖL 2021–2030 METŲ PLĖTROS PROGRAMOS VALDYTOJOS LIETUVOS RESPUBLIKOS ENERGETIKOS MINISTERIJOS ENERGETIKOS PLĖTROS PROGRAMOS PAŽANGOS PRIEMONĖS NR. 03- 001-06-03-02 „DIDINTI ATSINAUJINANČIŲ ENERGIJOS IŠTEKLIŲ DALĮ, UŽTIKRINANT ATSINAUJINANČIŲ IŠTEKLIŲ INTEGRACIJĄ Į ELEKTROS TINKLUS“ APRAŠO PATVIRTINIMO“ PAKEITIMO 2024 m. BALANDŽIO 26 d. Nr. 1-82 Vilnius",
+      "individualusTeisesAktas" : "LIETUVOS RESPUBLIKOS APLINKOS MINISTERIJOS APLINKOS PROJEKTŲ VALDYMO AGENTŪROS DIREKTORIAUS 2024 M. LAPKRIČIO 15 D. ĮSAKYMAS NR. T1-459 „DĖL PROJEKTO „FIZINIŲ ASMENŲ SAULĖS ELEKTRINIŲ ĮSIRENGIMAS NAMŲ ŪKIUOSE“ NR. 03-026-J-0001 PAREIŠKĖJŲ, KURIEMS SKIRIAMAS FINANSAVIMAS, SĄRAŠO PATVIRTINIMO“",
+      "registracijosKodas" : "42424789",
+      "europosKomisijaNr" : null,
+      "gavejoKodas" : "302556251",
+      "pagalbosForma" : "A1A. Subsidijos, dotacijos",
+      "pagalbosTipas" : "Nereikšminga (de minimis) pagalba",
+      "gavejoTipas" : "Juridinis asmuo",
+      "produktoSektorius" : null,
+      "gavejoVeiklosKodas" : "73.11. Reklamos agentūrų veikla",
+      "pagrindinisTikslas" : null,
+      "antrinisTikslas" : null,
+      "tinkamosDengtiIslaidos" : null,
+      "pastaba" : "03-026-J-0001-J03-08131",
+      "duomenuPildytojas" : "Lietuvos Respublikos aplinkos ministerijos Aplinkos projektų valdymo agentūra",
+      "taikomosTaisyklės" : null
+    } ]
+  },
+  "esInvesticijos" : {
+    "limit" : 3,
+    "count" : 0,
+    "rows" : [ ]
+  },
+  "mvpAprasai" : {
+    "limit" : 1,
+    "count" : 0,
+    "rows" : [ ]
+  },
+  "vdiPazeidimai" : {
+    "limit" : 10000000,
+    "count" : 0,
+    "rows" : [ ]
+  }
+}
