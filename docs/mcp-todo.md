@@ -3,7 +3,7 @@
 [R] Žemiau pateikti komentarai yra agento, kuris atsakė paklaustas kaip sekėsi - atleiskit jam jei kažką suvarė ar šneka
 nekorektiškai :)
 
-## 1. get_juridinis grąžina per daug duomenų.
+## (FIXED) 1. get_juridinis grąžina per daug duomenų.
 
 Abiejų įmonių atsakymai buvo 150 000+ simbolių — viršijo kontekstą ir buvo išsaugoti į failus. Teko daryti grep
 atskirai. Tai sulėtino tyrimą ir kelia riziką praleisti svarbią informaciją (pvz., bylos, VDI pažeidimai, blacklistai).
@@ -23,18 +23,18 @@ nesusiję dokumentai. Be teksto ištraukos (~150 simbolių aplink atitikmenį) n
 Kai ieškojau įmonių pagal tiekejoKodas, gavau sąrašą, bet nežinojau bendros sumos ar sutarčių kiekio iš karto — reikėjo
 skaičiuoti rankiniu būdu arba kviesti execute_query (kurio šiam tyrimui nekviečiau).
 
-## 3.2 search_sutartys neturi tikslios vardo paieškos
+## (FIXED) 3.2 search_sutartys neturi tikslios vardo paieškos
 
 search="Žemaitaitis" grąžino 22 rezultatus su Agniumi, Viktoru, Gediminu, Eividu — visiškai nesusijusiais žmonėmis. Teko
 rankiniu būdu filtruoti.
 
-## 3.3 Fizinio asmens tiekėjo kodas = 809 negali būti naudojamas search_sutartys(tiekejoKodas=809)
+## (FIXED) 3.3 Fizinio asmens tiekėjo kodas = 809 negali būti naudojamas search_sutartys(tiekejoKodas=809)
 
 Žemaitaitis kaip tiekėjas turi kodą 809 (fizinis asmuo), todėl search_sutartys(tiekejoKodas=809) grąžintų visus
 fizinius asmenis — negalima filtruoti tik jo sutarčių pagal kodą. Teko ieškoti per search="Žemaitaitis" ir filtruoti
 rankiniu būdu.
 
-## 3.4 get_juridinis ir search_sutartys — atsakymų dydis
+## (FIXED) 3.4 get_juridinis ir search_sutartys — atsakymų dydis
 
 Abu įrankiai grąžino tiek duomenų, kad jie netelpo į pagrindinį kontekstą. Teko kurti subagentus, kurie skaitė failus po
 200 eilučių — tai sudėtinga, lėta ir neefektyvu. Visas tyrimas dėl to truko ~2x ilgiau.
