@@ -24,14 +24,14 @@ export const description =
     "NAUDOK visada kai reikia tikslių skaičių, sumų, procentų, tendencijų ar bet kokio kiekybinio fakto — " +
     "search_* įrankiai grąžina maks. 50 eilučių su total=null ir NEGALI pagrįsti kiekybinių teiginių. " +
     "Paieškai naudok: search_sutartys, search_failai, search_viesieji_pirkimai, search_juridiniai. " +
-    "Rodinių stulpeliai (get_schema nereikia — rašyk užklausą iš karto): " +
+    "Pagrindinės lentelės su stulpeliais: " +
     "v_sutartys→sutartiesUnikalusId,pirkejoKodas,pirkejas,tiekejoKodas,tiekejas,verte,sudarymoData,bvpzKodas,tipas,istrinta,pirkimoNumeris,faktineIvykdimoVerte; " +
     "v_company→jarKodas,pavadinimas,darbuotojai,vidutinisAtlyginimas,imokuSuma,melagingisTiekejas,nepatikimasTiekejas,bylosSkaicius,domenaiSkaicius,registravimoData; " +
     "v_pirkimas→pirkimoId,jarKodas,organizatorius,pirkimoBudas,statusas,numatomaVerteEUR,esFinansavimas,bvpzKodai,paskelbimoData; " +
     "v_person_links→id,vardas,pavarde,jarKodas,imonesVardas,pareigos,irasoTipas,rysioPradzia,rysioPabaiga,yraJuridinisAsmuo,registruotaLietuvoje; " +
     "v_dalyviai→pirkimoNumeris,pirkejoKodas,tiekejoKodas,tiekejas,eileNumeris,pasiulymoKaina,atmetimoPriezastis,interesuKonfliktasNustatytas; " +
     "v_bylos→bylosId,jarKodas,bylosNumeris,bylosRusis,bylosData,teismas,bylojeKaip. " +
-    "Lentelėms (ne v_*) iškvieskite get_schema(table, mode:'detail') prieš rašant užklausą. " +
+    "Naudok get_schema(table, mode:'detail') prieš rašant sudėtingą užklausą arba gavus klaidą. " +
     "Rezultatai puslapiuojami — " + PAGE_SIZE + " eilučių per puslapį.";
 
 export const schema = {

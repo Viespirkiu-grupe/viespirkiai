@@ -9,6 +9,11 @@ export default defineConfig({
         alias: { '@': root },
     },
     test: {
-        include: ['test/**/*.test.ts'],
+        include: ['test/**/*.test.ts', 'test/**/*.it.ts'],
+        setupFiles: ['./utils/time.js'],
+        hookTimeout: 120_000,
+        testTimeout: 120_000,
+        fileParallelism: false,
+        maxWorkers: 1,
     },
 });
