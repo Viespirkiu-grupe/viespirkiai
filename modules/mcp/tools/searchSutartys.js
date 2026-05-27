@@ -13,7 +13,8 @@ const MEANINGFUL_FILTERS = [
 export const name = "search_sutartys";
 export const description =
     "Ieško viešųjų pirkimų sutarčių. Palaiko pilno teksto paiešką, filtravimą pagal pirkėją, tiekėją, vertę, datą, BVPZ kodus ir sutarties tipą. Sumos - eurais. " +
-    "SVARBU: grąžina maks. 50 eilučių puslapyje, total=null — bendra sutarčių suma, kiekis ar procentai iš šio įrankio negali būti nurodyti; tokiems skaičiams naudok execute_query su v_sutartys.";
+    "Kai filtruojama pagal tiekejoKodas arba perkanciosiosOrganizacijosKodas, atsakyme grąžinama sutarciuKiekis ir bendraVerte (bendra sutarčių suma). " +
+    "SVARBU: grąžina maks. 50 eilučių puslapyje; sudėtingesnei analizei (grupavimui, procentams) naudok execute_query su v_sutartys.";
 
 export const schema = {
     search: z.string().optional().describe("Pilno teksto paieškos užklausa"),
@@ -99,7 +100,7 @@ export async function handler(params) {
         }
     }
 
-    const { results, total } = await searchSutartys(query, {
+    const { results, total, sutarciuKiekis, bendraVerte } = await searchSutartys(query, {
         limit,
         page,
         engine: query.search ? "typesense" : "postgres",
@@ -109,7 +110,11 @@ export async function handler(params) {
         content: [
             {
                 type: "text",
-                text: JSON.stringify({ results, total, page, limit }, null, 2),
+                text: JSON.stringify(
+                    { results, total, sutarciuKiekis, bendraVerte, page, limit },
+                    null,
+                    2,
+                ),
             },
         ],
     };

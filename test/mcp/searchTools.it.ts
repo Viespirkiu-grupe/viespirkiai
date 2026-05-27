@@ -101,6 +101,72 @@ describe("search_sutartys", () => {
         expect(result.isError).toBeFalsy();
         expect(result).toHaveProperty("content");
     });
+
+    // Bug report 3.1: no aggregates — user had to manually sum or call execute_query.
+    // Fix: postgres path returns sutarciuKiekis + bendraVerte when a selective entity
+    // filter (tiekejoKodas, perkanciosiosOrganizacijosKodas, etc.) is present.
+    // bendraVerte uses "suma" column (= faktineIvykdimoVerte when settled, else verte).
+    it("returns sutarciuKiekis and bendraVerte when selective filter is present", async () => {
+        const result = (await searchSutartysHandler({
+            perkanciosiosOrganizacijosKodas: "188710442",
+            page: 1,
+            limit: 5,
+        })) as AnyResult;
+
+        const payload = parseResult(result);
+        expect(typeof payload.sutarciuKiekis, "sutarciuKiekis must be a number").toBe("number");
+        expect(payload.sutarciuKiekis).toBeGreaterThan(0);
+        expect(typeof payload.bendraVerte, "bendraVerte must be a number").toBe("number");
+        expect(payload.bendraVerte).toBeGreaterThan(0);
+        expect(payload.sutarciuKiekis).toBeGreaterThanOrEqual(payload.results.length);
+    });
+
+    it("date-only filter returns null aggregates — too broad for a SUM scan", async () => {
+        const result = (await searchSutartysHandler({
+            sudarymoDataNuo: "2023-01-01",
+            sudarymoDataIki: "2023-12-31",
+            page: 1,
+            limit: 5,
+        })) as AnyResult;
+
+        const payload = parseResult(result);
+        expect(payload.sutarciuKiekis).toBeNull();
+        expect(payload.bendraVerte).toBeNull();
+    });
+
+    it("sutarciuKiekis narrows when date range is added to org filter", async () => {
+        const broad = parseResult(
+            (await searchSutartysHandler({
+                perkanciosiosOrganizacijosKodas: "188710442",
+                page: 1,
+                limit: 5,
+            })) as AnyResult,
+        );
+        const narrow = parseResult(
+            (await searchSutartysHandler({
+                perkanciosiosOrganizacijosKodas: "188710442",
+                sudarymoDataNuo: "2023-01-01",
+                sudarymoDataIki: "2023-12-31",
+                page: 1,
+                limit: 5,
+            })) as AnyResult,
+        );
+
+        expect(broad.sutarciuKiekis).toBeGreaterThanOrEqual(narrow.sutarciuKiekis);
+        expect(broad.bendraVerte).toBeGreaterThanOrEqual(narrow.bendraVerte);
+    });
+
+    it("typesense path (with search) returns null aggregates — use execute_query instead", async () => {
+        const result = (await searchSutartysHandler({
+            search: "švietimas",
+            page: 1,
+            limit: 5,
+        })) as AnyResult;
+
+        const payload = parseResult(result);
+        expect(payload.sutarciuKiekis).toBeNull();
+        expect(payload.bendraVerte).toBeNull();
+    });
 });
 
 // ---------------------------------------------------------------------------
