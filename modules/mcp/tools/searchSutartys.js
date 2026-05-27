@@ -1,5 +1,14 @@
 import { z } from "zod";
 import { searchSutartys } from "../../sutartys/searchSutartys.js";
+import { specialJarCodes } from "../../juridiniai/specialJarCodes.js";
+
+const MEANINGFUL_FILTERS = [
+    "search",
+    "perkanciosiosOrganizacijosKodas",
+    "sutartiesNumeris",
+    "pirkimoNumeris",
+    "sutartiesUnikalusID",
+];
 
 export const name = "search_sutartys";
 export const description =
@@ -70,6 +79,25 @@ export async function handler(params) {
     if (verteIki != null) query.verteIki = String(verteIki);
     if (ignoruotiSp) query.ignoruotiSp = "true";
     if (tikSuDokumentais) query.tikSuDokumentais = "true";
+
+    if (query.tiekejoKodas != null) {
+        const code = Number(query.tiekejoKodas);
+        const special = specialJarCodes[code];
+        if (special) {
+            const hasOtherFilter = MEANINGFUL_FILTERS.some((k) => query[k] != null);
+            if (!hasOtherFilter) {
+                return {
+                    isError: true,
+                    content: [
+                        {
+                            type: "text",
+                            text: `tiekejoKodas=${query.tiekejoKodas} yra bendrinis CVP IS kodas („${special.pavadinimas}"), kurį dalijasi visi tokio tipo asmenys sistemoje. Filtruoti pagal šį kodą vieną — beprasmiška: grąžintų šimtus nesusijusių sutarčių. Vietoj to naudok search="Vardas Pavardė" arba kartu pateik perkanciosiosOrganizacijosKodas.`,
+                        },
+                    ],
+                };
+            }
+        }
+    }
 
     const { results, total } = await searchSutartys(query, {
         limit,

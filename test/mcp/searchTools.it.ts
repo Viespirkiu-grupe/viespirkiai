@@ -62,6 +62,45 @@ describe("search_sutartys", () => {
         // Handler should not throw — it either returns results or isError
         expect(result).toHaveProperty("content");
     });
+
+    // Bug report: tiekejoKodas=809 is the CVP IS placeholder for all natural persons,
+    // so filtering by it alone returns hundreds of unrelated contracts.
+    it("rejects tiekejoKodas=809 (fizinis asmuo) used alone with isError", async () => {
+        const result = (await searchSutartysHandler({
+            tiekejoKodas: "809",
+            page: 1,
+            limit: 5,
+        })) as AnyResult;
+
+        expect(result.isError, "must be isError when special code used alone").toBe(true);
+        const text = result.content?.[0]?.text ?? "";
+        expect(text).toContain("809");
+    });
+
+    it("allows tiekejoKodas=809 when combined with a search term", async () => {
+        const result = (await searchSutartysHandler({
+            tiekejoKodas: "809",
+            search: "Žemaitaitis",
+            page: 1,
+            limit: 5,
+        })) as AnyResult;
+
+        // search narrows results enough — should proceed normally
+        expect(result.isError).toBeFalsy();
+        expect(result).toHaveProperty("content");
+    });
+
+    it("allows tiekejoKodas=809 when combined with perkanciosiosOrganizacijosKodas", async () => {
+        const result = (await searchSutartysHandler({
+            tiekejoKodas: "809",
+            perkanciosiosOrganizacijosKodas: "188710442",
+            page: 1,
+            limit: 5,
+        })) as AnyResult;
+
+        expect(result.isError).toBeFalsy();
+        expect(result).toHaveProperty("content");
+    });
 });
 
 // ---------------------------------------------------------------------------
