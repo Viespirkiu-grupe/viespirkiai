@@ -1,7 +1,4 @@
-import configModule from "../../../utils/config.js";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const config = configModule as any;
+import config from "../../../utils/config.js";
 
 export function traceSQL(message: string): void {
     if (config.enableExecuteQueryMcpTrace) {

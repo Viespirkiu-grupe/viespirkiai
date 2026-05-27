@@ -2,7 +2,7 @@ import {postgres} from "../../../postgres/postgres.js";
 import {VIEW_METADATA} from "../tools/getSchema.js";
 import {TABLE_WHITELIST} from "./validateSql.js";
 
-type ToolResult = {
+export type ToolResult = {
     isError?: boolean;
     content: Array<{ type: string; text: string }>;
 };

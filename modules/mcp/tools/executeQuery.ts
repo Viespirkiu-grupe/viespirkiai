@@ -1,14 +1,22 @@
 import { z } from "zod";
 import { analystPool } from "../analyst/pool.js";
 import { MAX_QUERY_LENGTH, validateSql } from "../analyst/validateSql.js";
-import { executeWithColumnFix } from "../analyst/columnFixer.js";
+import { executeWithColumnFix, type ToolResult } from "../analyst/columnFixer.js";
 import { traceSQL, traceSQLFailure } from "../analyst/utils.js";
 import { logToolCall } from "../mcpLogger.js";
-import configModule from "../../../utils/config.js";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const config = configModule as any;
+import config from "../../../utils/config.js";
 
 const PAGE_SIZE = 50;
+const DEFAULT_QUERY_TIMEOUT_SECONDS = 20;
+
+function resolveQueryTimeoutSeconds(value: unknown): number {
+    const timeout = Number(value);
+    return Number.isFinite(timeout) && timeout > 0
+        ? timeout
+        : DEFAULT_QUERY_TIMEOUT_SECONDS;
+}
+
+export const QUERY_TIMEOUT_SECONDS = resolveQueryTimeoutSeconds(config.mcpQueryTimeout);
 
 export const name = "execute_query";
 export const description =
@@ -46,7 +54,7 @@ export const schema = {
         .describe("Page number (1-based). Page size is fixed at 50 rows. Max page is 200."),
 };
 
-export async function handler({ query, purpose, page }: { query: string; purpose: string; page: number }): Promise<object> {
+export async function handler({ query, purpose, page }: { query: string; purpose: string; page: number }): Promise<ToolResult> {
     traceSQL(`[execute_query] CALL query="${query}" purpose="${purpose}" page=${page}`);
     const error = validateSql(query);
     if (error) {
@@ -63,7 +71,7 @@ export async function handler({ query, purpose, page }: { query: string; purpose
     );
 }
 
-async function _runQuery(query: string, purpose: string, page: number) {
+async function _runQuery(query: string, purpose: string, page: number): Promise<ToolResult> {
     const offset = (page - 1) * PAGE_SIZE;
     // Fetch one extra row to detect whether more pages exist — avoids a full-scan COUNT(*) OVER ()
     const wrappedSql = `SELECT q.*
@@ -74,7 +82,7 @@ async function _runQuery(query: string, purpose: string, page: number) {
     const client = await analystPool.connect();
 
     try {
-        await client.query(`SET LOCAL statement_timeout = '${Number(config.mcpQueryTimeout)}s'`);
+        await client.query(`SET LOCAL statement_timeout = '${QUERY_TIMEOUT_SECONDS}s'`);
         const result = await client.query(wrappedSql);
 
         const durationMs = Date.now() - start;

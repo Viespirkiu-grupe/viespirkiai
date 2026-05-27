@@ -19,8 +19,7 @@ vi.mock("../../postgres/postgres.js", () => ({
 }));
 
 import { analystPool } from "../../modules/mcp/analyst/pool.js";
-import config from "../../utils/config.js";
-import { handler } from "../../modules/mcp/tools/executeQuery.js";
+import { handler, QUERY_TIMEOUT_SECONDS } from "../../modules/mcp/tools/executeQuery.js";
 
 const VALID_QUERY = "SELECT id FROM sutartys LIMIT 1";
 const VALID_PURPOSE = "unit test";
@@ -47,13 +46,12 @@ describe("executeQuery handler — statement_timeout", () => {
             String(args[0]).startsWith("SET LOCAL statement_timeout"),
         );
         expect(timeoutCall).toBeDefined();
-        const expected = `SET LOCAL statement_timeout = '${Number(config.mcpQueryTimeout)}s'`;
+        const expected = `SET LOCAL statement_timeout = '${QUERY_TIMEOUT_SECONDS}s'`;
         expect(timeoutCall![0]).toBe(expected);
     });
 
     it("timeout value is a finite number (not NaN or Infinity)", async () => {
-        const timeout = Number(config.mcpQueryTimeout);
-        expect(Number.isFinite(timeout)).toBe(true);
+        expect(Number.isFinite(QUERY_TIMEOUT_SECONDS)).toBe(true);
     });
 });
 

@@ -1,10 +1,12 @@
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
+import { normalizeConfig } from "./configSchema.js";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
-let config = {};
+/** @type {import("./config.js").Config} */
+let config = normalizeConfig({});
 
 async function fileExists(filePath) {
     return fs
@@ -34,7 +36,7 @@ const configPath =
 if (configPath) {
     try {
         const imported = await import(pathToFileURL(configPath).href);
-        config = imported.default || imported;
+        config = normalizeConfig(imported.default || imported);
     } catch (error) {
         console.error("Error loading config:", error);
     }

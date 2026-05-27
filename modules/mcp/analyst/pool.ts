@@ -1,14 +1,17 @@
-import configModule from "../../../utils/config.js";
+import config from "../../../utils/config.js";
 import pkg from "pg";
+import type { PoolConfig } from "pg";
 import { TEMP_VIEWS_SQL } from "./tempViews.js";
 import { log } from "../../../utils/log.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const config = configModule as any;
 const { Pool } = pkg;
 // NOTE: type parsers (DATE→string, NUMERIC→float) are already set globally by postgres/postgres.js
 
-export const analystPool = new Pool({
+type PgBouncerPoolConfig = PoolConfig & {
+    statement_cache_size?: number;
+};
+
+const analystPoolConfig: PgBouncerPoolConfig = {
     host: config.pgHost,
     port: config.pgAnalystPort,  // CRITICAL: direct PostgreSQL port, NOT PgBouncer
     user: config.pgAnalystUser,
@@ -18,8 +21,9 @@ export const analystPool = new Pool({
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10_000,
     statement_cache_size: 0,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-} as any);
+};
+
+export const analystPool = new Pool(analystPoolConfig);
 
 // Create the six TEMP views once per physical backend connection.
 // TEMP views are session-scoped, so they persist for the lifetime of this backend
