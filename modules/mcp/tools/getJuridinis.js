@@ -6,7 +6,7 @@ import { getJuridinisInfo } from "../../juridiniai/getJuridinisInfo.js";
  * The raw duomenys are not useful for fraud reasoning — the LLM needs capacity signals,
  * not individual months.
  */
-function aggregateSodra(sodra) {
+export function aggregateSodra(sodra) {
     if (!sodra) return sodra;
     const { duomenys = [], ...rest } = sodra;
 
@@ -77,7 +77,7 @@ const FINANSAI_FIELDS = [
  * signals. Drops pagalEilute (column-oriented duplicate of ataskaitos with repeated
  * metadata) and all accounting schema fields (templateId, standardId, lineTypeId, etc.).
  */
-function aggregateFinansai(finansai) {
+export function aggregateFinansai(finansai) {
     if (!finansai) return finansai;
     const ataskaitos = finansai.ataskaitos;
     if (!Array.isArray(ataskaitos) || ataskaitos.length === 0) return { byYear: [] };
