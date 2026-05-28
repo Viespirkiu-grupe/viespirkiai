@@ -44,7 +44,7 @@ Abu įrankiai grąžino tiek duomenų, kad jie netelpo į pagrindinį kontekstą
 Žemaitaičiui grąžino 2 deklaracijas (skirtingos datos) su iš esmės tais pačiais duomenimis. Reikėjo perskaityti abu, kad
 įsitikintum, jog naujiena — tik versija.
 
-## 5. v_sutartys ne iki galo dirba su kodais
+## (FIXED) 5. v_sutartys ne iki galo dirba su kodais
 
 v_sutartys — fiziniai asmenys neturėtų būti null tiekejas laukas turėtų rodyti vardą net kai tiekejoKodas = '809'. Jei
 privatumo sumetimais tai neįmanoma, bent jau leisti filtruoti WHERE tiekejas ILIKE '%Žemaitaitis%' pačiame SQL.
