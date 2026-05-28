@@ -49,7 +49,7 @@ Abu įrankiai grąžino tiek duomenų, kad jie netelpo į pagrindinį kontekstą
 v_sutartys — fiziniai asmenys neturėtų būti null tiekejas laukas turėtų rodyti vardą net kai tiekejoKodas = '809'. Jei
 privatumo sumetimais tai neįmanoma, bent jau leisti filtruoti WHERE tiekejas ILIKE '%Žemaitaitis%' pačiame SQL.
 
-## 6. v_dalyviai — InnoForce visai nebuvo
+## (MITIGATED) 6. v_dalyviai — InnoForce visai nebuvo
 
 Pradėjau tikrinti konkurencingumą (kiek dalyvių InnoForce tenderuose), bet v_dalyviai grąžino 0 eilučių. Matyt ATN1
 sistema neapima visų pirkimų arba InnoForce pirkimų duomenų ten nėra. Tai sukūrė aklavietę — negalėjau patikrinti vieno

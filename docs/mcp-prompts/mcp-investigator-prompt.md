@@ -45,6 +45,11 @@ Prefer views to raw tables. Call `get_schema` to confirm column names.
   `registruotaLietuvoje`, `yraJuridinisAsmuo`.
 - `v_dalyviai` [themes 2–3, 14, 17]: `atn1ataskaitos` + `atn1dalyviai` + `atn1pasiulymuEile` + `atn1atmestiPasiulymai` +
   `jarCsv` → `pasiulymoKaina` (numeric), `eileNumeris`, `atmetimoPriezastis`, `tiekejas`.
+  **⚠ Coverage**: ATN1 contains ~443 reports from ~20 buyer organisations only (dominated by Kauno klinikos).
+  Before querying `v_dalyviai` for a specific supplier or buyer, verify coverage:
+  `SELECT COUNT(*) FROM atn1ataskaitos WHERE "perkanciosiosOrganizacijosKodas" = '<kodas>'`.
+  If the result is 0, competition analysis via this view is **not possible** for that entity — state this
+  explicitly rather than inferring absence of competition.
 - `v_bylos` [themes 9, 23–24]: `bylosDalyviai` + `bylos` + `jarCsv` → `bylosRusis`, `teismas`, `bylojeKaip`,
   `pavadinimas`.
 
@@ -186,6 +191,10 @@ GOAL: Detect cover bidding — recurring losers always bidding just above winner
 > **Note**: **Bid suppression** (potential bidders deliberately abstaining from a tender) cannot be detected from
 > available data. `atn1dalyviai` records only submitted bids, not invited parties. Do not claim bid suppression
 > detection; defer to Theme 20 for partial insight via invitation data gaps.
+
+> **Coverage warning**: `v_dalyviai` covers only ~20 buyer organisations that submitted ATN1 reports (~443 reports
+> total). If a supplier's buyers are not among them, `v_dalyviai` will return 0 rows — this means **no data**, not
+> no competition. Always verify coverage before drawing conclusions.
 
 DETECT:
 
