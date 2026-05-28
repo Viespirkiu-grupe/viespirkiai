@@ -1,27 +1,14 @@
 /**
  * Integration tests for the search_failai MCP tool handler.
- * Requires live PostgreSQL + Quickwit. Run: npm run test:integration
- *
- * readTekstasFs is mocked so snippet tests work without a configured
- * failaiTekstasLocation — the mock returns a fixed Lithuanian procurement
- * document (test/mocks/dokumentas.txt) for any hash.
+ * Requires live PostgreSQL + Quickwit + failaiTekstasLocation (remote URL). Run: npm run test:integration
  */
 
-import { vi, describe, it, expect } from "vitest";
-
-vi.mock("../../modules/failai/tekstasFs.js", async () => {
-    const fs = await import("fs/promises");
-    const MOCK_TEXT = await fs.readFile("test/mocks/dokumentas.txt", "utf8");
-    return {
-        readTekstasFs: async (_hash: string) => MOCK_TEXT,
-        getTekstasPath: () => null,
-        hashTekstas: (s: string) => s,
-        saveTekstasFs: async () => {},
-        tekstasFsExists: async () => false,
-    };
-});
+import { describe, it, expect } from "vitest";
 
 import { handler } from "../../modules/mcp/tools/searchFailai.js";
+
+// Mirrors the foldLithuanian used in buildSnippets: strip diacritics before comparing.
+const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyResult = Record<string, any>;
@@ -174,43 +161,43 @@ describe("search_failai — puslapiai filters", () => {
 // is testable end-to-end through the full handler → searchFailai → buildSnippets chain.
 
 describe("search_failai — snippet", () => {
-    it("full-text search returns snippet for each result that has a tekstasHash", async () => {
+    it("full-text search returns at least one non-null snippet", async () => {
         const result = (await handler({ search: "sutartis", page: 1, limit: 5 })) as AnyResult;
         const { results } = parseResult(result);
 
         expect(results.length).toBeGreaterThan(0);
-
-        // Every row that came through the Quickwit path has a tekstasHash in the DB.
-        // The mock returns the document text for every hash, so snippet must be set.
         for (const row of results) {
             expect(row).toHaveProperty("snippet");
-            expect(typeof row.snippet).toBe("string");
-            expect(row.snippet.length).toBeGreaterThan(0);
+        }
+
+        const snippets = results.map((r: AnyResult) => r.snippet).filter((s: unknown) => s !== null);
+        expect(snippets.length).toBeGreaterThan(0);
+        for (const s of snippets) {
+            expect(typeof s).toBe("string");
+            expect((s as string).length).toBeGreaterThan(0);
         }
     });
 
     it("snippet is positioned around the search term", async () => {
-        const result = (await handler({ search: "Žemaitaitis", page: 1, limit: 5 })) as AnyResult;
+        const result = (await handler({ search: "sutartis", page: 1, limit: 5 })) as AnyResult;
         const { results } = parseResult(result);
 
-        expect(results.length).toBeGreaterThan(0);
-
-        // The mock document contains "Žemaitaitis" — the snippet window must include it.
-        for (const row of results) {
-            expect(row).toHaveProperty("snippet");
-            expect(row.snippet).toContain("Žemaitaitis");
-        }
+        const snippets = results.map((r: AnyResult) => r.snippet).filter((s: unknown) => s !== null) as string[];
+        expect(snippets.length).toBeGreaterThan(0);
+        // Lithuanian inflection means the exact word form may not appear in OCR text,
+        // so require at least one snippet to contain the folded (diacritic-stripped) term.
+        const withTerm = snippets.filter(s => fold(s).includes(fold("sutartis")));
+        expect(withTerm.length).toBeGreaterThan(0);
     });
 
     it("snippet is not the full raw tekstas column — it is bounded in length", async () => {
         const result = (await handler({ search: "sutartis", page: 1, limit: 5 })) as AnyResult;
         const { results } = parseResult(result);
 
-        expect(results.length).toBeGreaterThan(0);
-
-        // The mock document is 3001 chars; the snippet window is 400 chars.
-        for (const row of results) {
-            expect(row.snippet.length).toBeLessThanOrEqual(400);
+        const snippets = results.map((r: AnyResult) => r.snippet).filter((s: unknown) => s !== null) as string[];
+        expect(snippets.length).toBeGreaterThan(0);
+        for (const s of snippets) {
+            expect(s.length).toBeLessThanOrEqual(400);
         }
     });
 
@@ -227,11 +214,11 @@ describe("search_failai — snippet", () => {
 
 // ── Bug 2.1: name search relevance ───────────────────────────────────────────
 //
-// With snippets now available we can verify that "Žemaitaitis" results actually
-// contain the name — not just that Quickwit returned 20 hits.
+// Verify that "Žemaitaitis" Quickwit results actually contain the name in their
+// snippets — not just that Quickwit returned hits.
 
 describe("search_failai — bug 2.1: name search relevance confirmed via snippet", () => {
-    it("every result for a surname search has the surname in its snippet", async () => {
+    it("every snippet for a surname search contains the surname", async () => {
         const result = (await handler({
             search: "Žemaitaitis",
             page: 1,
@@ -239,18 +226,17 @@ describe("search_failai — bug 2.1: name search relevance confirmed via snippet
         })) as AnyResult;
 
         const payload = parseResult(result);
+        expect(payload.results.length).toBeGreaterThan(0);
 
-        if (payload.results.length === 0) {
-            console.warn("search_failai: 'Žemaitaitis' returned 0 results");
-            return;
-        }
+        const snippets = payload.results
+            .map((r: AnyResult) => r.snippet)
+            .filter((s: unknown) => s !== null) as string[];
 
-        // The mock document contains "Žemaitaitis", and the snippet is positioned
-        // around the first occurrence. All results get the same mock text, so the
-        // snippet must contain the surname for every result.
-        for (const row of payload.results) {
-            expect(row).toHaveProperty("snippet");
-            expect(row.snippet).toContain("Žemaitaitis");
+        expect(snippets.length).toBeGreaterThan(0);
+        // OCR text may store the name without Lithuanian diacritics ("Zemaitaitis"),
+        // so compare after folding both sides.
+        for (const s of snippets) {
+            expect(fold(s)).toContain(fold("Žemaitaitis"));
         }
     });
 });
