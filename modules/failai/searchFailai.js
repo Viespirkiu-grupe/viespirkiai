@@ -10,10 +10,10 @@ import { readMetaduomenysFs } from "./metaduomenysFs.js";
 import { readTekstasFs } from "./tekstasFs.js";
 
 const SNIPPET_CONCURRENCY = 32;
-const SNIPPET_LEAD = 150;
-const SNIPPET_LEN = 400;
+export const SNIPPET_LEAD = 150;
+export const SNIPPET_LEN = 400;
 
-async function buildSnippets(rows, positionTerm) {
+export async function buildSnippets(rows, positionTerm, readFn = readTekstasFs) {
     let cursor = 0;
     const out = new Array(rows.length);
     const needle = positionTerm ? foldLithuanian(positionTerm).toLowerCase() : null;
@@ -23,7 +23,7 @@ async function buildSnippets(rows, positionTerm) {
                 const i = cursor++;
                 const hash = rows[i].tekstasHash;
                 if (!hash) { out[i] = null; continue; }
-                const raw = await readTekstasFs(hash);
+                const raw = await readFn(hash);
                 if (!raw) { out[i] = null; continue; }
                 if (needle) {
                     const pos = foldLithuanian(raw).toLowerCase().indexOf(needle);
@@ -396,7 +396,7 @@ export async function searchFailai(
 
             const snippets = await buildSnippets(pgRows, positionTerm);
             const byId = new Map(
-                pgRows.map((r, i) => [r.id, { ...r, tekstas: snippets[i] ?? null }]),
+                pgRows.map((r, i) => [r.id, { ...r, snippet: snippets[i] ?? null }]),
             );
             rows = ids.map((id) => byId.get(id)).filter(Boolean);
             pgMs = Date.now() - pgStart;

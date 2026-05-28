@@ -8,12 +8,12 @@ nekorektiškai :)
 Abiejų įmonių atsakymai buvo 150 000+ simbolių — viršijo kontekstą ir buvo išsaugoti į failus. Teko daryti grep
 atskirai. Tai sulėtino tyrimą ir kelia riziką praleisti svarbią informaciją (pvz., bylos, VDI pažeidimai, blacklistai).
 
-## 2.1 search_failai nerado nieko konkretaus.
+## (FIXED) 2.1 search_failai nerado nieko konkretaus.
 
 Grąžino 20 dokumentų, bet nė vienas nebuvo tiesiogiai susijęs su Žemaitaičiu — paieška pagal vardą pilname tekste yra
 triukšminga. Neaišku, ar dokumentuose jo vardas iš viso yra, ar tiesiog sutapo kiti raktažodžiai.
 
-## 2.2 search_failai nerodo konteksto
+## (FIXED) 2.2 search_failai nerodo konteksto
 
 Grąžino ~15 failų, tačiau nematyti, KUR dokumente atsiranda paieškos žodis. Teko spėlioti — ar tai tikras radinys, ar
 nesusiję dokumentai. Be teksto ištraukos (~150 simbolių aplink atitikmenį) neaišku, ar verta siųsti get_failas_tekstas.
