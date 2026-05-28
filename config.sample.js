@@ -179,4 +179,29 @@ export default {
 
     // Vienos SQL užklausos timeout sekundėmis (SET LOCAL statement_timeout).
     mcpQueryTimeout: 20,
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Spinta (atviri duomenys)
+    // Eksportas į „spintos“ tipo API serverį. Žiūrėk modules/spinta/.
+    // ─────────────────────────────────────────────────────────────────────
+
+    // Spintos serverio bazinis URL (su trailing slash arba be).
+    // Pvz. "https://put.duomenys.example.lt".
+    spintaServer: "",
+
+    // OAuth client-credentials prisijungimas. client_id + client_secret iš
+    // spintos administracijos.
+    spintaClient: "",
+    spintaSecret: "",
+
+    // Namespace, į kurį rašoma. Pvz. "datasets/gov/viespirkiai".
+    // Naudojamas tiek modelių kelio prefiksui, tiek default scope'ams
+    // sudaryti (spinta_<ns_su_pabraukimais>_insert ir pan.).
+    spintaNamespace: "",
+
+    // Konkretūs OAuth scope'ai. Paliekam tuščią — naudojam pilną rašymo
+    // rinkinį (spinta_getone/getall/search/changes/insert/upsert/update/
+    // patch/delete/set_meta_fields). Atitinka standartinį „writer“ klientą
+    // (`spinta client add --scope "spinta_getall spinta_getone ..."`).
+    spintaScopes: [],
 };

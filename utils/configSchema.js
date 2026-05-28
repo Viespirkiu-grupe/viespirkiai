@@ -79,6 +79,12 @@ const configSchema = z.object({
     pgAnalystPort: z.number().int().positive().optional(),
     pgAnalystMaxConnections: z.number().int().positive().default(16),
     mcpQueryTimeout: z.number().positive().default(20),
+
+    spintaServer: z.string().default(""),
+    spintaClient: z.string().default(""),
+    spintaSecret: z.string().default(""),
+    spintaNamespace: z.string().default(""),
+    spintaScopes: z.array(z.string()).default([]),
 }).passthrough();
 
 export function normalizeConfig(rawConfig) {
