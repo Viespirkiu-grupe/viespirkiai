@@ -59,9 +59,17 @@ export interface DokumentaiSearchResult {
   hostFilter: string[];
   jarFilter: string[];
   extFilter: string[];
+  langFilter: string[];
+  savFilter: string[];
+  apskritisFilter: string[];
+  sourceFilter: string[];
   typeCountMap: Record<string, number>;
   hostOptions: FacetOption[];
   extOptions: FacetOption[];
+  langOptions: FacetOption[];
+  savOptions: FacetOption[];
+  apskritisOptions: FacetOption[];
+  sourceOptions: FacetOption[];
 }
 
 // ── Quickwit helpers ─────────────────────────────────────────────────────────
@@ -130,12 +138,20 @@ function buildPartsExcluding(opts: {
   hosts: string[];
   jars: string[];
   exts: string[];
+  langs: string[];
+  savs: string[];
+  apskritys: string[];
+  sources: string[];
   excludeHost?: boolean;
   excludeJar?: boolean;
   excludeExt?: boolean;
   excludeType?: boolean;
+  excludeLang?: boolean;
+  excludeSav?: boolean;
+  excludeApskritis?: boolean;
+  excludeSource?: boolean;
 }): string {
-  const { textQuery, types, hosts, jars, exts } = opts;
+  const { textQuery, types, hosts, jars, exts, langs, savs, apskritys, sources } = opts;
   const p: string[] = [];
   if (!opts.excludeType && types.length) p.push(`(${types.map((t) => `type:${t}`).join(' OR ')})`);
   if (!opts.excludeHost && hosts.length) p.push(`(${hosts.map((h) => `host:${JSON.stringify(h)}`).join(' OR ')})`);
@@ -144,6 +160,10 @@ function buildPartsExcluding(opts: {
     if (numeric.length) p.push(`(${numeric.map((n) => `jarKodai:${n}`).join(' OR ')})`);
   }
   if (!opts.excludeExt && exts.length) p.push(`(${exts.map((e) => `extension:${JSON.stringify(e)}`).join(' OR ')})`);
+  if (!opts.excludeLang && langs.length) p.push(`(${langs.map((l) => `language:${JSON.stringify(l)}`).join(' OR ')})`);
+  if (!opts.excludeSav && savs.length) p.push(`(${savs.map((s) => `savivaldybe:${JSON.stringify(s)}`).join(' OR ')})`);
+  if (!opts.excludeApskritis && apskritys.length) p.push(`(${apskritys.map((a) => `apskritis:${JSON.stringify(a)}`).join(' OR ')})`);
+  if (!opts.excludeSource && sources.length) p.push(`(${sources.map((s) => `source:${JSON.stringify(s)}`).join(' OR ')})`);
   if (textQuery) {
     const folded = foldLithuanian(textQuery.replace(/"/g, ''));
     p.push(`(${folded})`);
@@ -208,6 +228,10 @@ export async function searchDokumentai(input: {
   host?: string | string[];
   jar?: string | string[];
   ext?: string | string[];
+  lang?: string | string[];
+  sav?: string | string[];
+  apskritis?: string | string[];
+  source?: string | string[];
 }): Promise<DokumentaiSearchResult> {
   const rawQ = (input.q ?? '').trim();
   const page = Math.max(1, Number(input.page) || 1);
@@ -216,6 +240,10 @@ export async function searchDokumentai(input: {
   const hostFilter = splitMulti(input.host);
   const jarFilter = splitMulti(input.jar);
   const extFilter = splitMulti(input.ext).map((e) => e.toLowerCase().replace(/^\./, ''));
+  const langFilter = splitMulti(input.lang);
+  const savFilter = splitMulti(input.sav);
+  const apskritisFilter = splitMulti(input.apskritis);
+  const sourceFilter = splitMulti(input.source);
 
   const { textQuery, types: inlineTypes, hosts: inlineHosts, jars: inlineJars, exts: inlineExts } =
     extractInlineTokens(rawQ);
@@ -224,6 +252,10 @@ export async function searchDokumentai(input: {
   const allHosts = [...new Set([...inlineHosts, ...hostFilter])];
   const allJars = [...new Set([...inlineJars, ...jarFilter])];
   const allExts = [...new Set([...inlineExts, ...extFilter.map((e) => e.toLowerCase())])];
+  const allLangs = [...new Set(langFilter)];
+  const allSavs = [...new Set(savFilter)];
+  const allApskritys = [...new Set(apskritisFilter)];
+  const allSources = [...new Set(sourceFilter)];
 
   const partsOpts = {
     textQuery,
@@ -231,19 +263,31 @@ export async function searchDokumentai(input: {
     hosts: allHosts,
     jars: allJars,
     exts: allExts,
+    langs: allLangs,
+    savs: allSavs,
+    apskritys: allApskritys,
+    sources: allSources,
   };
 
   const qwQuery = buildPartsExcluding(partsOpts);
   const hostFacetQuery = buildPartsExcluding({ ...partsOpts, excludeHost: true });
   const typeFacetQuery = buildPartsExcluding(partsOpts);
   const extFacetQuery = buildPartsExcluding({ ...partsOpts, excludeExt: true });
+  const langFacetQuery = buildPartsExcluding({ ...partsOpts, excludeLang: true });
+  const savFacetQuery = buildPartsExcluding({ ...partsOpts, excludeSav: true });
+  const apskritisFacetQuery = buildPartsExcluding({ ...partsOpts, excludeApskritis: true });
+  const sourceFacetQuery = buildPartsExcluding({ ...partsOpts, excludeSource: true });
 
   const t0 = Date.now();
-  const [result, hostBuckets, typeBuckets, extBuckets] = await Promise.all([
+  const [result, hostBuckets, typeBuckets, extBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets] = await Promise.all([
     search(LENTELE, { query: qwQuery }, { minHits: page * PAGE_SIZE }),
     qwAggregate('host', hostFacetQuery, 15),
     qwAggregate('type', typeFacetQuery, 10),
     qwAggregate('extension', extFacetQuery, 30),
+    qwAggregate('language', langFacetQuery, 12),
+    qwAggregate('savivaldybe', savFacetQuery, 60),
+    qwAggregate('apskritis', apskritisFacetQuery, 12),
+    qwAggregate('source', sourceFacetQuery, 12),
   ]);
   const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
 
@@ -300,13 +344,16 @@ export async function searchDokumentai(input: {
   const pageNums: number[] = [];
   if (totalPages > 0) for (let i = pStart; i <= pEnd; i++) pageNums.push(i);
 
-  const hostOptions = hostBuckets
-    .filter((b) => b.value)
-    .map((b) => ({ value: b.value, count: b.count }));
+  const toOptions = (buckets: FacetOption[]) =>
+    buckets.filter((b) => b.value).map((b) => ({ value: b.value, count: b.count }));
+
+  const hostOptions = toOptions(hostBuckets);
   const typeCountMap = Object.fromEntries(typeBuckets.map((b) => [b.value, b.count ?? 0]));
-  const extOptions = extBuckets
-    .filter((b) => b.value)
-    .map((b) => ({ value: b.value, count: b.count }));
+  const extOptions = toOptions(extBuckets);
+  const langOptions = toOptions(langBuckets);
+  const savOptions = toOptions(savBuckets);
+  const apskritisOptions = toOptions(apskritisBuckets);
+  const sourceOptions = toOptions(sourceBuckets);
 
   return {
     q: rawQ,
@@ -321,8 +368,16 @@ export async function searchDokumentai(input: {
     hostFilter: allHosts,
     jarFilter: allJars,
     extFilter: allExts,
+    langFilter: allLangs,
+    savFilter: allSavs,
+    apskritisFilter: allApskritys,
+    sourceFilter: allSources,
     typeCountMap,
     hostOptions,
     extOptions,
+    langOptions,
+    savOptions,
+    apskritisOptions,
+    sourceOptions,
   };
 }

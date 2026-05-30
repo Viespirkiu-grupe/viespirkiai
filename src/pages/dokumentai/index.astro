@@ -21,6 +21,10 @@ const rawTypeFilter = params.getAll('type').flatMap((v) => v.split(','));
 const rawHostFilter = params.getAll('host').flatMap((v) => v.split(','));
 const rawJarFilter = params.getAll('jar').flatMap((v) => v.split(','));
 const rawExtFilter = params.getAll('ext').flatMap((v) => v.split(','));
+const rawLangFilter = params.getAll('lang').flatMap((v) => v.split(','));
+const rawSavFilter = params.getAll('sav').flatMap((v) => v.split(','));
+const rawApskritisFilter = params.getAll('apskritis').flatMap((v) => v.split(','));
+const rawSourceFilter = params.getAll('source').flatMap((v) => v.split(','));
 
 // Promote inline `type:`/`host:`/`jar:`/`ext:` tokens out of the search box.
 {
@@ -43,7 +47,10 @@ const rawExtFilter = params.getAll('ext').flatMap((v) => v.split(','));
   }
 }
 
-const hasFilters = rawTypeFilter.length || rawHostFilter.length || rawJarFilter.length || rawExtFilter.length;
+const hasFilters = Boolean(
+  rawTypeFilter.length || rawHostFilter.length || rawJarFilter.length || rawExtFilter.length
+  || rawLangFilter.length || rawSavFilter.length || rawApskritisFilter.length || rawSourceFilter.length,
+);
 const showHome = !q && !hasFilters;
 
 let result: Awaited<ReturnType<typeof searchDokumentai>> | null = null;
@@ -57,6 +64,10 @@ if (!showHome) {
       host: rawHostFilter,
       jar: rawJarFilter,
       ext: rawExtFilter,
+      lang: rawLangFilter,
+      sav: rawSavFilter,
+      apskritis: rawApskritisFilter,
+      source: rawSourceFilter,
     });
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : 'Paieška nepavyko.';
@@ -67,9 +78,17 @@ const typeFilter = result?.typeFilter ?? [];
 const hostFilter = result?.hostFilter ?? [];
 const jarFilter = result?.jarFilter ?? [];
 const extFilter = result?.extFilter ?? [];
+const langFilter = result?.langFilter ?? [];
+const savFilter = result?.savFilter ?? [];
+const apskritisFilter = result?.apskritisFilter ?? [];
+const sourceFilter = result?.sourceFilter ?? [];
 const typeCountMap = result?.typeCountMap ?? {};
 const hostOptions: FacetOption[] = result?.hostOptions ?? [];
 const extOptions: FacetOption[] = result?.extOptions ?? [];
+const langOptions: FacetOption[] = result?.langOptions ?? [];
+const savOptions: FacetOption[] = result?.savOptions ?? [];
+const apskritisOptions: FacetOption[] = result?.apskritisOptions ?? [];
+const sourceOptions: FacetOption[] = result?.sourceOptions ?? [];
 const hits: DokumentasHit[] = result?.hits ?? [];
 
 const TIPAS_OPTS = [
@@ -83,11 +102,15 @@ const TYPE_LABEL: Record<string, string> = Object.fromEntries(TIPAS_OPTS.map((o)
 function fmt(n: number | null | undefined) {
   return n != null ? Number(n).toLocaleString('lt-LT') : '';
 }
-function buildUrl(overrides: { type?: string[]; host?: string[]; jar?: string[]; ext?: string[]; p?: number | null }) {
+function buildUrl(overrides: { type?: string[]; host?: string[]; jar?: string[]; ext?: string[]; lang?: string[]; sav?: string[]; apskritis?: string[]; source?: string[]; p?: number | null }) {
   const t = overrides.type ?? typeFilter;
   const h = overrides.host ?? hostFilter;
   const j = overrides.jar ?? jarFilter;
   const e = overrides.ext ?? extFilter;
+  const l = overrides.lang ?? langFilter;
+  const s = overrides.sav ?? savFilter;
+  const a = overrides.apskritis ?? apskritisFilter;
+  const so = overrides.source ?? sourceFilter;
   const p = overrides.p ?? null;
   const sp = new URLSearchParams();
   if (q) sp.set('search', q);
@@ -95,6 +118,10 @@ function buildUrl(overrides: { type?: string[]; host?: string[]; jar?: string[];
   if (h.length) sp.set('host', h.join(','));
   if (j.length) sp.set('jar', j.join(','));
   if (e.length) sp.set('ext', e.join(','));
+  if (l.length) sp.set('lang', l.join(','));
+  if (s.length) sp.set('sav', s.join(','));
+  if (a.length) sp.set('apskritis', a.join(','));
+  if (so.length) sp.set('source', so.join(','));
   if (p) sp.set('page', String(p));
   return `/dokumentai?${sp.toString()}`;
 }
@@ -105,6 +132,10 @@ const typeToggleUrl = (v: string) => buildUrl({ type: v ? toggle(typeFilter, v) 
 const hostToggleUrl = (v: string) => buildUrl({ host: v ? toggle(hostFilter, v) : [] });
 const jarToggleUrl = (v: string) => buildUrl({ jar: v ? toggle(jarFilter, v) : [] });
 const extToggleUrl = (v: string) => buildUrl({ ext: v ? toggle(extFilter, v) : [] });
+const langToggleUrl = (v: string) => buildUrl({ lang: v ? toggle(langFilter, v) : [] });
+const savToggleUrl = (v: string) => buildUrl({ sav: v ? toggle(savFilter, v) : [] });
+const apskritisToggleUrl = (v: string) => buildUrl({ apskritis: v ? toggle(apskritisFilter, v) : [] });
+const sourceToggleUrl = (v: string) => buildUrl({ source: v ? toggle(sourceFilter, v) : [] });
 const buildPageUrl = (p: number) => buildUrl({ p });
 const clearUrl = q ? `/dokumentai?search=${encodeURIComponent(q)}` : '/dokumentai';
 
@@ -124,10 +155,35 @@ const EXT_LIMIT = 6;
 const extVisible = shownExts.slice(0, EXT_LIMIT);
 const extHidden = shownExts.slice(EXT_LIMIT);
 
-const PAGINATION_LETTERS = ['D', 'o', 'k', 'u', 'm', 'e', 'n', 't', 'a', 'i'];
+// Build a {visible, hidden} facet list, pinning any selected-but-unlisted
+// values to the front so an active filter is always shown.
+function facetLists(options: FacetOption[], selected: string[], limit: number) {
+  const shown: FacetOption[] = [...options];
+  for (const sel of selected) {
+    if (!shown.find((o) => o.value === sel)) shown.unshift({ value: sel, count: null });
+  }
+  return { visible: shown.slice(0, limit), hidden: shown.slice(limit) };
+}
+
+const LANG_LABEL: Record<string, string> = {
+  lt: 'Lietuvių', en: 'Anglų', ru: 'Rusų', de: 'Vokiečių', fr: 'Prancūzų',
+  pl: 'Lenkų', lv: 'Latvių', et: 'Estų', uk: 'Ukrainiečių',
+};
+const SOURCE_LABEL: Record<string, string> = {
+  sutartys: 'Sutartys',
+  archive: 'Archyvas',
+  cvpp: 'CVPP',
+  cvpis: 'CVP IS',
+  mvpaprasai: 'MVP tvarkos',
+  neskelbiamosderybos: 'Neskelbiamos derybos',
+};
+const { visible: sourceVisible, hidden: sourceHidden } = facetLists(sourceOptions, sourceFilter, 8);
+const { visible: langVisible, hidden: langHidden } = facetLists(langOptions, langFilter, 8);
+const { visible: savVisible, hidden: savHidden } = facetLists(savOptions, savFilter, 6);
+const { visible: apskritisVisible, hidden: apskritisHidden } = facetLists(apskritisOptions, apskritisFilter, 6);
+
 const totalPages = result?.totalPages ?? 0;
 const pageNums = result?.pageNums ?? [];
-const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
 ---
 
 <Layout
@@ -147,6 +203,9 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
         <section class="dok-intro">
           <p class="text-muted text-sm">
             Tinklalapiai, failai, teisės aktai, teismo nuosprendžiai – paieška pagal pavadinimą, autorių ar turinį.
+          </p>
+          <p class="dok-intro-syntax">
+            Patikslink tiesiai paieškoje: <code>type:failas</code> · <code>jar:123456789</code> · <code>ext:pdf</code>
           </p>
         </section>
       </>
@@ -169,14 +228,14 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
 
           <section class="dok-filter-section">
             <span class="dok-filter-section-label">Tipas</span>
-            <a href={typeToggleUrl('')} class={`dok-filter-opt${typeFilter.length === 0 ? ' is-selected' : ''}`}>
+            <a href={typeToggleUrl('')} data-param="type" class={`dok-filter-opt dok-filter-all${typeFilter.length === 0 ? ' is-selected' : ''}`}>
               <span class="dok-filter-opt-label">Visi</span>
             </a>
             {TIPAS_OPTS.map((opt) => {
               const cnt = typeCountMap[opt.value];
               if (cnt == null && !typeFilter.includes(opt.value)) return null;
               return (
-                <a href={typeToggleUrl(opt.value)} class={`dok-filter-opt${typeFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                <a href={typeToggleUrl(opt.value)} data-param="type" data-value={opt.value} class={`dok-filter-opt${typeFilter.includes(opt.value) ? ' is-selected' : ''}`}>
                   <span class="dok-filter-opt-label">{opt.label}</span>
                   {cnt != null && <span class="dok-filter-opt-count">{fmt(cnt)}</span>}
                 </a>
@@ -184,15 +243,43 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
             })}
           </section>
 
+          {(sourceVisible.length > 0 || sourceFilter.length > 0) && (
+            <section class="dok-filter-section">
+              <span class="dok-filter-section-label">Šaltinis</span>
+              <a href={sourceToggleUrl('')} data-param="source" class={`dok-filter-opt dok-filter-all${sourceFilter.length === 0 ? ' is-selected' : ''}`}>
+                <span class="dok-filter-opt-label">Visi</span>
+              </a>
+              {sourceVisible.map((opt) => (
+                <a href={sourceToggleUrl(opt.value)} data-param="source" data-value={opt.value} class={`dok-filter-opt${sourceFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                  <span class="dok-filter-opt-label">{SOURCE_LABEL[opt.value] || opt.value}</span>
+                  {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                </a>
+              ))}
+              {sourceHidden.length > 0 && (
+                <>
+                  <div class="dok-more-list" hidden>
+                    {sourceHidden.map((opt) => (
+                      <a href={sourceToggleUrl(opt.value)} data-param="source" data-value={opt.value} class={`dok-filter-opt${sourceFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                        <span class="dok-filter-opt-label">{SOURCE_LABEL[opt.value] || opt.value}</span>
+                        {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                      </a>
+                    ))}
+                  </div>
+                  <button class="dok-more-btn" type="button">Rodyti daugiau</button>
+                </>
+              )}
+            </section>
+          )}
+
           <section class="dok-filter-section">
-            <span class="dok-filter-section-label">Puslapis</span>
+            <span class="dok-filter-section-label">Svetainė</span>
             {(hostVisible.length > 0 || hostFilter.length > 0) && (
-              <a href={hostToggleUrl('')} class={`dok-filter-opt${hostFilter.length === 0 ? ' is-selected' : ''}`}>
+              <a href={hostToggleUrl('')} data-param="host" class={`dok-filter-opt dok-filter-all${hostFilter.length === 0 ? ' is-selected' : ''}`}>
                 <span class="dok-filter-opt-label">Visi</span>
               </a>
             )}
             {hostVisible.map((opt) => (
-              <a href={hostToggleUrl(opt.value)} class={`dok-filter-opt${hostFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+              <a href={hostToggleUrl(opt.value)} data-param="host" data-value={opt.value} class={`dok-filter-opt${hostFilter.includes(opt.value) ? ' is-selected' : ''}`}>
                 <span class="dok-filter-opt-label">{opt.value.replace(/^www\./, '')}</span>
                 {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
               </a>
@@ -201,7 +288,7 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
               <>
                 <div class="dok-more-list" hidden>
                   {hostHidden.map((opt) => (
-                    <a href={hostToggleUrl(opt.value)} class={`dok-filter-opt${hostFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                    <a href={hostToggleUrl(opt.value)} data-param="host" data-value={opt.value} class={`dok-filter-opt${hostFilter.includes(opt.value) ? ' is-selected' : ''}`}>
                       <span class="dok-filter-opt-label">{opt.value.replace(/^www\./, '')}</span>
                       {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
                     </a>
@@ -211,7 +298,7 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
               </>
             )}
             <form class="dok-input-form" id="dok-host-form" autocomplete="off">
-              <input id="dok-host-input" type="text" class="dok-input" placeholder="pvz. vpt.lrv.lt" aria-label="Įvesti puslapį" />
+              <input id="dok-host-input" type="text" class="dok-input" placeholder="pvz. vpt.lrv.lt" aria-label="Įvesti svetainę" />
               <button type="submit" class="dok-input-btn" aria-label="Pridėti">+</button>
             </form>
           </section>
@@ -219,12 +306,12 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
           <section class="dok-filter-section">
             <span class="dok-filter-section-label">Įmonė (JAR)</span>
             {jarFilter.length > 0 && (
-              <a href={jarToggleUrl('')} class="dok-filter-opt is-selected">
+              <a href={jarToggleUrl('')} data-param="jar" class="dok-filter-opt dok-filter-all is-selected">
                 <span class="dok-filter-opt-label">Visi</span>
               </a>
             )}
             {jarFilter.map((code) => (
-              <a href={jarToggleUrl(code)} class="dok-filter-opt is-selected">
+              <a href={jarToggleUrl(code)} data-param="jar" data-value={code} class="dok-filter-opt is-selected">
                 <span class="dok-filter-opt-label">{code}</span>
               </a>
             ))}
@@ -237,12 +324,12 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
           <section class="dok-filter-section">
             <span class="dok-filter-section-label">Plėtinys</span>
             {(extVisible.length > 0 || extFilter.length > 0) && (
-              <a href={extToggleUrl('')} class={`dok-filter-opt${extFilter.length === 0 ? ' is-selected' : ''}`}>
+              <a href={extToggleUrl('')} data-param="ext" class={`dok-filter-opt dok-filter-all${extFilter.length === 0 ? ' is-selected' : ''}`}>
                 <span class="dok-filter-opt-label">Visi</span>
               </a>
             )}
             {extVisible.map((opt) => (
-              <a href={extToggleUrl(opt.value)} class={`dok-filter-opt${extFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+              <a href={extToggleUrl(opt.value)} data-param="ext" data-value={opt.value} class={`dok-filter-opt${extFilter.includes(opt.value) ? ' is-selected' : ''}`}>
                 <span class="dok-filter-opt-label">.{opt.value}</span>
                 {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
               </a>
@@ -251,7 +338,7 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
               <>
                 <div class="dok-more-list" hidden>
                   {extHidden.map((opt) => (
-                    <a href={extToggleUrl(opt.value)} class={`dok-filter-opt${extFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                    <a href={extToggleUrl(opt.value)} data-param="ext" data-value={opt.value} class={`dok-filter-opt${extFilter.includes(opt.value) ? ' is-selected' : ''}`}>
                       <span class="dok-filter-opt-label">.{opt.value}</span>
                       {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
                     </a>
@@ -265,14 +352,100 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
               <button type="submit" class="dok-input-btn" aria-label="Pridėti">+</button>
             </form>
           </section>
+
+          {(langVisible.length > 0 || langFilter.length > 0) && (
+            <section class="dok-filter-section">
+              <span class="dok-filter-section-label">Kalba</span>
+              <a href={langToggleUrl('')} data-param="lang" class={`dok-filter-opt dok-filter-all${langFilter.length === 0 ? ' is-selected' : ''}`}>
+                <span class="dok-filter-opt-label">Visi</span>
+              </a>
+              {langVisible.map((opt) => (
+                <a href={langToggleUrl(opt.value)} data-param="lang" data-value={opt.value} class={`dok-filter-opt${langFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                  <span class="dok-filter-opt-label">{LANG_LABEL[opt.value] || opt.value.toUpperCase()}</span>
+                  {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                </a>
+              ))}
+              {langHidden.length > 0 && (
+                <>
+                  <div class="dok-more-list" hidden>
+                    {langHidden.map((opt) => (
+                      <a href={langToggleUrl(opt.value)} data-param="lang" data-value={opt.value} class={`dok-filter-opt${langFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                        <span class="dok-filter-opt-label">{LANG_LABEL[opt.value] || opt.value.toUpperCase()}</span>
+                        {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                      </a>
+                    ))}
+                  </div>
+                  <button class="dok-more-btn" type="button">Rodyti daugiau</button>
+                </>
+              )}
+            </section>
+          )}
+
+          {(savVisible.length > 0 || savFilter.length > 0) && (
+            <section class="dok-filter-section">
+              <span class="dok-filter-section-label">Savivaldybė</span>
+              <a href={savToggleUrl('')} data-param="sav" class={`dok-filter-opt dok-filter-all${savFilter.length === 0 ? ' is-selected' : ''}`}>
+                <span class="dok-filter-opt-label">Visi</span>
+              </a>
+              {savVisible.map((opt) => (
+                <a href={savToggleUrl(opt.value)} data-param="sav" data-value={opt.value} class={`dok-filter-opt${savFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                  <span class="dok-filter-opt-label">{opt.value}</span>
+                  {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                </a>
+              ))}
+              {savHidden.length > 0 && (
+                <>
+                  <div class="dok-more-list" hidden>
+                    {savHidden.map((opt) => (
+                      <a href={savToggleUrl(opt.value)} data-param="sav" data-value={opt.value} class={`dok-filter-opt${savFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                        <span class="dok-filter-opt-label">{opt.value}</span>
+                        {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                      </a>
+                    ))}
+                  </div>
+                  <button class="dok-more-btn" type="button">Rodyti daugiau</button>
+                </>
+              )}
+            </section>
+          )}
+
+          {(apskritisVisible.length > 0 || apskritisFilter.length > 0) && (
+            <section class="dok-filter-section">
+              <span class="dok-filter-section-label">Apskritis</span>
+              <a href={apskritisToggleUrl('')} data-param="apskritis" class={`dok-filter-opt dok-filter-all${apskritisFilter.length === 0 ? ' is-selected' : ''}`}>
+                <span class="dok-filter-opt-label">Visi</span>
+              </a>
+              {apskritisVisible.map((opt) => (
+                <a href={apskritisToggleUrl(opt.value)} data-param="apskritis" data-value={opt.value} class={`dok-filter-opt${apskritisFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                  <span class="dok-filter-opt-label">{opt.value}</span>
+                  {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                </a>
+              ))}
+              {apskritisHidden.length > 0 && (
+                <>
+                  <div class="dok-more-list" hidden>
+                    {apskritisHidden.map((opt) => (
+                      <a href={apskritisToggleUrl(opt.value)} data-param="apskritis" data-value={opt.value} class={`dok-filter-opt${apskritisFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                        <span class="dok-filter-opt-label">{opt.value}</span>
+                        {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                      </a>
+                    ))}
+                  </div>
+                  <button class="dok-more-btn" type="button">Rodyti daugiau</button>
+                </>
+              )}
+            </section>
+          )}
         </aside>
 
-        <div class="dok-content">
+        <div class="dok-content" id="dokContent">
           <SearchForm
             title="Dokumentų paieška"
             searchValue={q}
             searchPlaceholder="Ieškoti dokumentų…"
+            hideTitle={true}
           />
+          <div class="dok-loading" aria-hidden="true"><span class="spinner spinner-lg"></span></div>
           {hits.length > 0 && (
             <p class="dok-results-meta text-xs text-muted">
               {result?.approximate ? 'Apie ' : ''}{(result?.total ?? 0).toLocaleString('lt-LT')} rezultatų ({result?.elapsed} sek.)
@@ -315,11 +488,7 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
                     <dl slot="footer" class="result-card-meta dok-meta">
                       {hit.type && <div><dt class="sr-only">Tipas</dt><dd>{TYPE_LABEL[hit.type] || hit.type}</dd></div>}
                       {hit.extension && <div><dt class="sr-only">Plėtinys</dt><dd>{String(hit.extension).toUpperCase()}</dd></div>}
-                      {hit.wordCount != null && <div><dt class="sr-only">Žodžiai</dt><dd>{Number(hit.wordCount).toLocaleString('lt-LT')} ž.</dd></div>}
-                      {hit.pageCount != null && <div><dt class="sr-only">Puslapiai</dt><dd>{Number(hit.pageCount).toLocaleString('lt-LT')} p.</dd></div>}
-                      {hit.language && <div><dt class="sr-only">Kalba</dt><dd>{hit.language}</dd></div>}
                       {happened && <div><dt class="sr-only">Data</dt><dd>{happened}</dd></div>}
-                      {hit.istaigaJar && <div><dt class="sr-only">Įstaiga</dt><dd>JAR {hit.istaigaJar}</dd></div>}
                     </dl>
                   </ResultCardShell>
                 );
@@ -329,41 +498,23 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
 
           {pageNums.length > 0 && (
             <nav class="dok-pagination" aria-label="Puslapiai">
-              <div class="dok-pagination-row">
-                <div class="dok-page-cell">
-                  {showLetters && <span class="dok-page-letter" aria-hidden="true"></span>}
-                  {page > 1 ? (
-                    <a href={buildPageUrl(page - 1)} class="dok-page-btn dok-page-nav" aria-label="Ankstesnis puslapis">‹</a>
-                  ) : (
-                    <span class="dok-page-btn dok-page-nav is-disabled" aria-disabled="true">‹</span>
-                  )}
-                </div>
-                {pageNums.map((pn, idx) => {
-                  const letter = PAGINATION_LETTERS[idx];
-                  return (
-                    <div class="dok-page-cell">
-                      {showLetters && (
-                        letter
-                          ? <span class={`dok-page-letter dok-letter-${idx % 2 === 0 ? 'a' : 'b'}`} aria-hidden="true">{letter}</span>
-                          : <span class="dok-page-letter" aria-hidden="true"></span>
-                      )}
-                      {pn === page ? (
-                        <span class="dok-page-btn is-current" aria-current="page">{pn}</span>
-                      ) : (
-                        <a href={buildPageUrl(pn)} class="dok-page-btn">{pn}</a>
-                      )}
-                    </div>
-                  );
-                })}
-                <div class="dok-page-cell">
-                  {showLetters && <span class="dok-page-letter" aria-hidden="true"></span>}
-                  {page < totalPages ? (
-                    <a href={buildPageUrl(page + 1)} class="dok-page-btn dok-page-nav" aria-label="Kitas puslapis">›</a>
-                  ) : (
-                    <span class="dok-page-btn dok-page-nav is-disabled" aria-disabled="true">›</span>
-                  )}
-                </div>
-              </div>
+              {page > 1 ? (
+                <a href={buildPageUrl(page - 1)} class="dok-page-btn dok-page-nav" aria-label="Ankstesnis puslapis">‹</a>
+              ) : (
+                <span class="dok-page-btn dok-page-nav is-disabled" aria-disabled="true">‹</span>
+              )}
+              {pageNums.map((pn) => (
+                pn === page ? (
+                  <span class="dok-page-btn is-current" aria-current="page">{pn}</span>
+                ) : (
+                  <a href={buildPageUrl(pn)} class="dok-page-btn">{pn}</a>
+                )
+              ))}
+              {page < totalPages ? (
+                <a href={buildPageUrl(page + 1)} class="dok-page-btn dok-page-nav" aria-label="Kitas puslapis">›</a>
+              ) : (
+                <span class="dok-page-btn dok-page-nav is-disabled" aria-disabled="true">›</span>
+              )}
             </nav>
           )}
         </div>
@@ -373,6 +524,93 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
 </Layout>
 
 <script>
+  // One live, in-memory copy of the query string. Every filter click mutates
+  // THIS — not a server-precomputed href — so rapid toggles accumulate instead
+  // of clobbering each other (clicking B no longer drops the A you just set).
+  const params = new URLSearchParams(window.location.search);
+  let navTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function showLoading() {
+    document.getElementById('dokContent')?.classList.add('is-loading');
+  }
+
+  // Remember each checkbox's true (server-rendered) state for THIS url, so an
+  // optimistic toggle can't leak into the back/forward cache snapshot.
+  const initialSelected = new WeakMap<Element, boolean>();
+  document.querySelectorAll('.dok-filter-opt').forEach((o) =>
+    initialSelected.set(o, o.classList.contains('is-selected')));
+  window.addEventListener('pagehide', () => {
+    document.querySelectorAll('.dok-filter-opt').forEach((o) =>
+      o.classList.toggle('is-selected', !!initialSelected.get(o)));
+    document.getElementById('dokContent')?.classList.remove('is-loading');
+  });
+  // Clear the veil if the page is restored from the back/forward cache.
+  window.addEventListener('pageshow', () => {
+    document.getElementById('dokContent')?.classList.remove('is-loading');
+  });
+
+  // Navigate to the accumulated state. Debounced so a flurry of toggles
+  // collapses into a single reload; `immediate` skips the wait.
+  function navigate(immediate = false) {
+    showLoading();
+    clearTimeout(navTimer);
+    const go = () => { window.location.href = '/dokumentai?' + params.toString(); };
+    if (immediate) go();
+    else navTimer = setTimeout(go, 350);
+  }
+
+  function setList(param: string, list: string[]) {
+    if (list.length) params.set(param, list.join(','));
+    else params.delete(param);
+  }
+  function getList(param: string) {
+    return (params.get(param) || '').split(',').map((s) => s.trim()).filter(Boolean);
+  }
+
+  // Optimistic toggle: flip the clicked filter's checkbox instantly so the
+  // change is visible during the round-trip. Mirrors the "Visi"/specific
+  // interplay within a section.
+  function optimisticToggle(opt: Element) {
+    const section = opt.closest('.dok-filter-section');
+    if (!section) return;
+    const all = section.querySelector('.dok-filter-all');
+    const opts = Array.from(section.querySelectorAll('.dok-filter-opt'));
+    if (opt.classList.contains('dok-filter-all')) {
+      opts.forEach((o) => o.classList.toggle('is-selected', o === opt));
+      return;
+    }
+    opt.classList.toggle('is-selected');
+    all?.classList.remove('is-selected');
+    const anySpecific = opts.some(
+      (o) => !o.classList.contains('dok-filter-all') && o.classList.contains('is-selected'),
+    );
+    if (!anySpecific) all?.classList.add('is-selected');
+  }
+
+  document.querySelectorAll<HTMLAnchorElement>('.dok-filter-opt[href]').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      const param = a.dataset.param;
+      if (!param) return;            // no JS metadata → fall back to the href
+      e.preventDefault();
+      params.delete('page');
+      if (a.classList.contains('dok-filter-all')) {
+        params.delete(param);       // "Visi" clears the section
+      } else {
+        const val = a.dataset.value ?? '';
+        const list = getList(param);
+        const i = list.indexOf(val);
+        if (i >= 0) list.splice(i, 1); else list.push(val);
+        setList(param, list);
+      }
+      optimisticToggle(a);
+      navigate();
+    });
+  });
+  document
+    .querySelectorAll<HTMLAnchorElement>('.dok-sidebar-clear, .dok-pagination a[href]')
+    .forEach((a) => a.addEventListener('click', showLoading));
+  document.getElementById('searchForm')?.addEventListener('submit', showLoading);
+
   function wireAddForm(formId: string, inputId: string, param: string, transform = (s: string) => s) {
     const form = document.getElementById(formId) as HTMLFormElement | null;
     if (!form) return;
@@ -381,12 +619,11 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
       const input = document.getElementById(inputId) as HTMLInputElement | null;
       const val = transform((input?.value ?? '').trim());
       if (!val) return;
-      const p = new URLSearchParams(window.location.search);
-      const existing = (p.get(param) || '').split(',').map((s) => s.trim()).filter(Boolean);
-      if (!existing.includes(val)) existing.push(val);
-      p.set(param, existing.join(','));
-      p.delete('page');
-      window.location.href = '/dokumentai?' + p.toString();
+      const list = getList(param);
+      if (!list.includes(val)) list.push(val);
+      setList(param, list);
+      params.delete('page');
+      navigate(true);
     });
   }
   wireAddForm('dok-host-form', 'dok-host-input', 'host', (s) => s.toLowerCase());
@@ -404,12 +641,23 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
 </script>
 
 <style is:global>
-  /* Override reset.css's `overflow-x: hidden` on html/body which makes
-     body a scroll container and breaks `position: sticky` inside.
-     `clip` clips without creating a scroll container — sticky works. */
+  /* Belt-and-braces against any horizontal overflow from the full-bleed
+     two-column layout (e.g. the filter hover pills that bleed a few px). */
   html:has(main.sidebar-main),
   html:has(main.sidebar-main) body {
     overflow-x: clip;
+  }
+
+  /* The search form lives in the results column now (no big centred title).
+     Drop its hero margins/centring so the bar fills the column, left-aligned
+     with the results, and its top sits level with the "Filtrai" rail.
+     Scoped by .dok-content, which only exists on this page. */
+  .dok-content #searchForm {
+    margin: 0 0 24px;
+    align-items: stretch;
+  }
+  .dok-content #searchForm .search-bar {
+    max-width: none;
   }
 </style>
 
@@ -419,31 +667,53 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
 
   .dok-intro {
     margin: 24px auto 0;
-    max-width: 480px;
+    max-width: 520px;
     text-align: center;
+  }
+  /* Quiet syntax hint — teaches the inline `type:`/`jar:`/`ext:` tokens
+     without nagging. The codes are the only emphasis on the line. */
+  .dok-intro-syntax {
+    margin-top: 10px;
+    font-size: var(--text-xs);
+    color: var(--gray);
+  }
+  .dok-intro-syntax code {
+    font-family: var(--font-mono);
+    color: var(--dark-gray);
+    background: var(--lighter-gray);
+    padding: 1px 5px;
+    border-radius: var(--radius-sm);
   }
   .dok-error { margin-top: 32px; }
 
-  /* Asymmetric two-column rail: narrow quiet sidebar, generous content.
-     The column gap is intentionally large so the rail reads as separate
-     air, not a panel pressed against the results.                       */
+  /* Left-anchored two-column block: a quiet rail of filters, then a capped
+     results column (Google-style — results hug the left, the right stays
+     open). The inline padding matches the site's normal page gutter so the
+     rail lines up with where every other page's content begins.           */
   .dok-shell {
     display: grid;
-    grid-template-columns: 220px minmax(0, 1fr);
-    align-items: start;
+    grid-template-columns: 220px minmax(0, 760px);
+    gap: 32px;
+    justify-content: start;
+    /* stretch: the filter rail matches the results' height and its divider
+       runs the full length of the page. */
+    align-items: stretch;
+    /* Match the navbar's 16px gutter so the filter rail lines up exactly
+       under the logo — the whole left edge reads as one vertical line.
+       No vertical padding here: the breath below the navbar lives INSIDE
+       each column, so the divider runs from the very top to the bottom.  */
+    padding-inline: 16px;
   }
 
-  /* ── Sidebar: full-height rail that sticks while you scroll ─── */
+  /* ── Sidebar: a plain full-height rail. Not sticky — it runs alongside the
+     results and scrolls away with the page. A hairline divider carries the
+     column down its whole length. Checkboxes sit at the shell's 16px edge,
+     in line with the navbar logo. */
   .dok-sidebar {
-    position: sticky;
-    top: 0;
-    height: 100vh;
-    overflow-y: auto;
-    background: var(--lighter-gray);
+    /* Top padding sits inside the column so the divider still starts at the
+       very top while "Filtrai" keeps its breath below the navbar. */
+    padding: 24px 20px 24px 0;
     border-right: var(--border);
-    padding: 16px 12px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--light-gray) transparent;
   }
   .dok-sidebar-head {
     display: flex;
@@ -466,9 +736,8 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
   }
   .dok-sidebar-clear:hover { color: var(--black); }
 
-  /* Generous space between sections, no divider needed inside the
-     surface — the surface itself carries the grouping. */
-  .dok-filter-section { padding-top: 16px; }
+  /* Generous space between sections; whitespace alone carries the grouping. */
+  .dok-filter-section { padding-top: 20px; }
   .dok-filter-section-label {
     display: block;
     font-size: 10px;
@@ -479,28 +748,49 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
     padding-bottom: 6px;
   }
 
-  /* Filter rows: full-bleed within the surface via negative margins so
-     hover/selection wash to the edges. Selection = weight + a 2px rail. */
+  /* Filter rows: full-width pills. Every row shares the same height and
+     metrics so labels start on one vertical line and counts land on one
+     right edge. Selected = a solid black pill (same idiom as the current
+     page in pagination) — unmistakable; hover = a faint wash.            */
   .dok-filter-opt {
     display: flex;
-    align-items: baseline;
-    padding: 4px 12px;
-    margin-inline: -12px;
+    align-items: center;
+    gap: 9px;
+    height: 28px;
+    /* Padding gives the hover wash breathing room; the matching negative
+       margin pulls the checkbox back onto the 16px line with the logo. */
+    padding-inline: 6px;
+    margin-inline: -6px;
     font-size: var(--text-sm);
     color: var(--dark-gray);
     text-decoration: none;
-    border-left: 2px solid transparent;
-    transition: background var(--transition), color var(--transition);
+    border-radius: var(--radius-md);
+    transition: color var(--transition), background var(--transition);
+  }
+  /* A checkbox box draws the affordance: clearly a togglable, multi-select
+     filter. The box sits at the rail's left edge (in line with the navbar
+     logo); selected rows fill it and stamp a centred SVG checkmark.        */
+  .dok-filter-opt::before {
+    content: "";
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    border: 1.5px solid var(--light-gray);
+    border-radius: var(--radius-sm);
+    background: var(--white) center / 0 no-repeat;
+    transition: background-color var(--transition), border-color var(--transition);
   }
   .dok-filter-opt:hover {
-    background: color-mix(in oklab, var(--black) 4%, transparent);
     color: var(--black);
+    background: var(--lighter-gray);
   }
-  .dok-filter-opt.is-selected {
-    color: var(--black);
-    font-weight: 500;
-    border-left-color: var(--black);
-    background: color-mix(in oklab, var(--black) 5%, transparent);
+  .dok-filter-opt:hover::before { border-color: var(--dark-gray); }
+  .dok-filter-opt.is-selected { color: var(--black); font-weight: 500; }
+  .dok-filter-opt.is-selected::before {
+    border-color: var(--black);
+    background-color: var(--black);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+    background-size: 11px;
   }
   .dok-filter-opt-label {
     flex: 1;
@@ -510,10 +800,10 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
     white-space: nowrap;
   }
   .dok-filter-opt-count {
+    flex-shrink: 0;
     font-size: var(--text-xs);
     color: var(--gray);
     font-variant-numeric: tabular-nums;
-    margin-left: 12px;
   }
 
   /* Add-by-text input: visually a different action from the option list. */
@@ -566,13 +856,38 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
   }
   .dok-more-btn:hover { color: var(--black); text-decoration: underline; }
 
-  /* ── Result list: flat, no outer container ───────────────────── */
+  /* ── Result list: flat, no outer container. Width and side air come
+     from the grid column + gap, so the column itself carries no padding. */
   .dok-content {
     min-width: 0;
-    padding: 8px 24px 0;
-    max-width: 760px;
+    position: relative;
+    /* Match the sidebar's top padding so the search bar and "Filtrai" start
+       on the same line, both breathing below the navbar. */
+    padding-top: 24px;
   }
   .dok-results-meta { margin: 0 0 24px; }
+
+  /* Loading veil: each filter / page click triggers a full server round-trip,
+     so dim the current results and float a spinner while the next page loads.
+     Reassurance beats a frozen screen. */
+  .dok-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 80px;
+    background: color-mix(in oklab, var(--white) 70%, transparent);
+    backdrop-filter: blur(1px);
+    /* Purely a visual veil — never swallow clicks, so filters stay usable
+       while the next page loads. */
+    pointer-events: none;
+  }
+  .dok-content.is-loading .dok-loading { display: flex; }
+  @media (prefers-reduced-motion: reduce) {
+    .dok-loading .spinner { animation-duration: 1.4s; }
+  }
 
   /* Borderless list. A whisper-thin divider lives on each row (except
      last), and rhythm comes from generous internal padding. */
@@ -639,45 +954,26 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
     font-weight: 600;
   }
 
-  /* Meta row sits looser still — it's secondary context. */
-  .dok-result-list :global(.result-card-footer) {
+  /* Meta row sits looser still — it's secondary context, one calm line
+     below the snippet. (Targets .dok-meta directly: the slotted <dl> is
+     the footer, so the shell's .result-card-footer selector never hits.) */
+  .dok-result-list :global(.dok-meta) {
     margin-top: 16px;
-  }
-  .dok-meta {
-    gap: 8px 20px;
+    gap: 6px 18px;
     font-size: var(--text-xs);
     color: var(--gray);
   }
 
-  /* ── Pagination ──────────────────────────────────────────────── */
-  /* Generous separation from the last result. */
-  .dok-pagination { margin: 48px 0 64px; }
-  .dok-pagination-row {
+  /* ── Pagination: plain numbers, generous separation from the results. ── */
+  .dok-pagination {
     display: flex;
-    align-items: flex-end;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-  /* Visually detach the prev/next arrows from the page numbers. */
-  .dok-pagination-row .dok-page-cell:first-child  { margin-right: 12px; }
-  .dok-pagination-row .dok-page-cell:last-child   { margin-left:  12px; }
-
-  .dok-page-cell {
-    display: flex;
-    flex-direction: column;
     align-items: center;
     gap: 4px;
+    flex-wrap: wrap;
+    margin: 48px 0 64px;
   }
-  .dok-page-letter {
-    font-family: var(--font-sans);
-    font-size: var(--text-xs);
-    font-weight: 500;
-    line-height: 1;
-    min-height: 12px;
-    letter-spacing: .08em;
-  }
-  .dok-letter-a { color: var(--black); }
-  .dok-letter-b { color: var(--gray); }
+  .dok-page-nav:first-child { margin-right: 8px; }
+  .dok-page-nav:last-child  { margin-left:  8px; }
 
   .dok-page-btn {
     display: inline-flex;
@@ -713,15 +1009,15 @@ const showLetters = pageNums.length >= PAGINATION_LETTERS.length;
   @media (max-width: 900px) {
     .dok-shell {
       grid-template-columns: 1fr;
+      gap: 0;
     }
     .dok-sidebar {
-      position: static;
-      min-height: 0;
-      max-height: none;
+      padding: 4px 0 16px;
+      margin-bottom: 16px;
       border-right: none;
       border-bottom: var(--border);
     }
-    .dok-content { padding: 16px; }
+    .dok-content { padding-top: 16px; }
     .dok-filter-section + .dok-filter-section { margin-top: 20px; }
   }
 </style>
