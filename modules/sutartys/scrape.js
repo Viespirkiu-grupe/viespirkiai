@@ -188,12 +188,17 @@ export async function cvpIsScrapePageContent(url, options = {}) {
                 .replace(/,/g, "."),
             sudarymoData: mainRow.querySelectorAll("td")[5].innerHTML,
             galiojimoData: mainRow.querySelectorAll("td")[6].innerHTML,
-            faktineIvykdimoVerte: mainRow
-                .querySelectorAll("td")[7]
-                .innerHTML.replace("&#160;", "")
-                .replace("€", "")
-                .replace(/\./g, "")
-                .replace(/,/g, "."),
+            faktineIvykdimoVerte: (() => {
+                let raw = mainRow
+                    .querySelectorAll("td")[7]
+                    .innerHTML.replace(/&#160;/g, "")
+                    .replace(/ /g, "")
+                    .replace("€", "")
+                    .trim();
+                return raw.includes(",")
+                    ? raw.replace(/\./g, "").replace(/,/g, ".")
+                    : raw;
+            })(),
             faktineIvykdimoData: mainRow
                 .querySelectorAll("td")[8]
                 .innerHTML.replace("&#160;", ""),

@@ -1,0 +1,100 @@
+/**
+ * Bendra domenų eksporto logika Spintai.
+ *
+ * Naudojama: scripts/pushDomenaiToSpinta.js
+ */
+import { postgres } from "../../postgres/postgres.js";
+
+export const DEFAULT_BATCH_SIZE = 500;
+
+function toStringOrNull(value) {
+    if (value === null || value === undefined) return null;
+    const s = String(value).trim();
+    return s.length ? s : null;
+}
+
+function extractNsHost(entry) {
+    if (entry == null) return null;
+    if (typeof entry === "string") {
+        const s = entry.trim();
+        if (s.startsWith("{")) {
+            try {
+                return toStringOrNull(JSON.parse(s)?.nsname);
+            } catch {
+                return null;
+            }
+        }
+        return s.length ? s : null;
+    }
+    if (typeof entry === "object") {
+        return toStringOrNull(entry.nsname);
+    }
+    return null;
+}
+
+function nsArray(value) {
+    if (!Array.isArray(value)) return [];
+    const hosts = value.map(extractNsHost).filter(Boolean);
+    return [...new Set(hosts)];
+}
+
+export function buildDomenasRecord(row) {
+    return {
+        parent: {
+            domain: row.domain,
+            status: toStringOrNull(row.status),
+            created: row.created,
+            expired: row.expired,
+            updated: row.updated,
+            savininkas: toStringOrNull(row.savininkas),
+            tiketinasSavininkoKodas: toStringOrNull(row.savininkoKodas),
+        },
+        ns: nsArray(row.domregNs),
+    };
+}
+
+export function buildIstorijaRecord(row) {
+    return {
+        parent: {
+            scrapeId: Number(row.scrapeId),
+            domain: row.domain,
+            domregData: row.domregData,
+            status: toStringOrNull(row.status),
+            expired: row.expired,
+            savininkas: toStringOrNull(row.savininkas),
+            tiketinasSavininkoKodas: toStringOrNull(row.savininkoKodas),
+        },
+        ns: nsArray(row.domregNs),
+    };
+}
+
+export async function* iterateDomenai({ batchSize = DEFAULT_BATCH_SIZE, startAfterId = 0 } = {}) {
+    let afterId = startAfterId;
+    while (true) {
+        const { rows } = await postgres.query(
+            `SELECT id, domain, status, created, expired, updated,
+                    "domregNs", savininkas, "savininkoKodas"
+             FROM domenai
+             WHERE id > $1
+             ORDER BY id ASC
+             LIMIT $2`,
+            [afterId, batchSize],
+        );
+        if (!rows.length) return;
+        afterId = Number(rows[rows.length - 1].id);
+        yield { rows, afterId };
+    }
+}
+
+export async function fetchScrapesForDomains(domainIds) {
+    if (!domainIds.length) return [];
+    const { rows } = await postgres.query(
+        `SELECT "scrapeId", "domainId", domain, "domregData", status, expired,
+                "domregNs", savininkas, "savininkoKodas"
+         FROM "domenaiScrapes"
+         WHERE "domainId" = ANY($1::int[])
+         ORDER BY "domainId" ASC, "scrapeId" ASC`,
+        [domainIds],
+    );
+    return rows;
+}

@@ -25,15 +25,23 @@ function defaultScopes() {
 }
 
 /**
- * Spinta API client.
+ * Spinta / Stalčius API client.
  *
- * - OAuth client-credentials token, cached and auto-refreshed.
+ * Both servers share the same write protocol (NDJSON `_op` batches, `_where`
+ * upserts, ref `{_id}`), differing only in authentication:
+ *   - Spinta:   OAuth client-credentials token, cached and auto-refreshed.
+ *   - Stalčius: a single static API key sent as `Authorization: Bearer …`.
+ *
+ * If an API key is configured it is used directly and the OAuth token endpoint
+ * is never touched; otherwise the OAuth client-credentials flow is used.
+ *
  * - JSON helpers for `getone`, `insert`, `patch`, `delete`.
  * - NDJSON helper for bulk `_op` batches.
  * - Retries transient failures (network, 5xx, 429).
  */
 export function createSpintaClient(options = {}) {
     const server   = options.server    || config.spintaServer;
+    const apiKey   = options.apiKey    || config.spintaApiKey || "";
     const client   = options.client    || config.spintaClient;
     const secret   = options.secret    || config.spintaSecret;
     const namespace = (options.namespace ?? config.spintaNamespace ?? "").replace(/^\/+|\/+$/g, "");
@@ -44,9 +52,11 @@ export function createSpintaClient(options = {}) {
     const maxRetries = options.maxRetries ?? 5;
 
     if (!server) throw new Error("Spinta: spintaServer not configured");
-    if (!client || !secret) throw new Error("Spinta: spintaClient/spintaSecret not configured");
+    if (!apiKey && (!client || !secret)) {
+        throw new Error("Spinta/Stalčius: configure spintaApiKey (Stalčius) or spintaClient/spintaSecret (Spinta OAuth)");
+    }
 
-    let cachedToken = null;          // { accessToken, expiresAt }
+    let cachedToken = null;          // { accessToken, expiresAt } — OAuth tik
 
     async function fetchToken() {
         const body = new URLSearchParams({
@@ -76,6 +86,7 @@ export function createSpintaClient(options = {}) {
     }
 
     async function getToken({ forceRefresh = false } = {}) {
+        if (apiKey) return apiKey;
         if (!forceRefresh && cachedToken && cachedToken.expiresAt > Date.now()) {
             return cachedToken.accessToken;
         }
@@ -115,7 +126,7 @@ export function createSpintaClient(options = {}) {
                 });
                 clearTimeout(timer);
 
-                if (res.status === 401 && attempt < retries) {
+                if (res.status === 401 && attempt < retries && !apiKey) {
                     cachedToken = null;
                     lastError = Object.assign(new Error("401 Unauthorized"), { status: 401 });
                     attempt++;

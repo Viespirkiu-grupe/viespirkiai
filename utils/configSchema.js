@@ -81,6 +81,7 @@ const configSchema = z.object({
     mcpQueryTimeout: z.number().positive().default(20),
 
     spintaServer: z.string().default(""),
+    spintaApiKey: z.string().default(""),
     spintaClient: z.string().default(""),
     spintaSecret: z.string().default(""),
     spintaNamespace: z.string().default(""),

@@ -18,8 +18,22 @@ function toIsoDate(value) {
 
 function toStringOrNull(value) {
     if (value === null || value === undefined) return null;
-    const s = String(value).trim();
+    // Pašalinam valdymo simbolius (pvz. „\r"/„\n", patekusius iš netvarkingų
+    // šaltinio duomenų), kad jie nesugadintų eksporto įrašo.
+    const s = String(value).replace(/[\u0000-\u001f\u007f]/g, "").trim();
     return s.length ? s : null;
+}
+
+/**
+ * Kodas (tiekėjo / BVPŽ) naudojamas ir kaip Spintos `_where` upsert raktas, todėl
+ * jame negali likti kabučių ar valdymo simbolių — netvarkinguose CSV duomenyse
+ * kodas kartais būna apgaubtas kabutėmis su įsiterpusiu „\r", kas sugriautų filtrą.
+ */
+function toCodeOrNull(value) {
+    const s = toStringOrNull(value);
+    if (!s) return null;
+    const cleaned = s.replace(/["']/g, "").trim();
+    return cleaned.length ? cleaned : null;
 }
 
 function parseDocIds(url) {
@@ -56,7 +70,7 @@ function buildTiekejai(row) {
     const pavadinimas = toStringOrNull(row.tiekejas);
     const patikslinimas = toStringOrNull(row.tiekPavPatikslinimasImp || row.tiekPavPatikslinimas);
     const tiekejas = {
-        kodas: toStringOrNull(row.tiekejoKodas),
+        kodas: toCodeOrNull(row.tiekejoKodas),
         pavadinimas,
         patikslinimas: patikslinimas && patikslinimas !== pavadinimas ? patikslinimas : null,
         salis: toStringOrNull(row.tiekSalisImp || row.tiekSalis),
@@ -67,7 +81,7 @@ function buildTiekejai(row) {
     const n = Math.max(extraKodai.length, extraPavadinimai.length);
     for (let i = 0; i < n; i++) {
         out.push({
-            kodas: toStringOrNull(extraKodai[i]),
+            kodas: toCodeOrNull(extraKodai[i]),
             pavadinimas: toStringOrNull(extraPavadinimai[i]),
             patikslinimas: null,
             salis: null,
