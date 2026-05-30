@@ -3,7 +3,8 @@ import { postgres } from "../../../postgres/postgres.js";
 import { aptvarkytiRezultata } from "../../viesiejiPirkimai/searchViesiejiPirkimai.js";
 
 export const name = "get_viesasis_pirkimas";
-export const description = `Grąžina išsamią informaciją apie vieną viešąjį pirkimą pagal pirkimo ID. Apima turinį, failus (sieti tik pagal versijos md5 arba versijos key "id"), vykdytojo duomenis. Gavus failo md5 arba numerinį id — naudok get_failas (ne search_failai!). Sumos - eurais.`;
+export const description = `Grąžina išsamią informaciją apie vieną viešąjį pirkimą pagal pirkimo ID. Apima turinį, failus (sieti tik pagal versijos md5 arba versijos key "id"), vykdytojo duomenis. Gavus failo md5 arba numerinį id — naudok get_failas (ne search_failai!). Sumos - eurais.
+Dalyviai ir pasiūlymų kainos: rask ATN-1 xlsx failą (pavadinimas prasideda "PPA-", "ATN-" arba "Atn-1") — tai Pirkimo procedūrų ataskaita. Tada get_failas_tekstas(id, puslapis=4, kiekis=4) grąžins: p.4 = dalyviai su kodais, p.6 = atmesti pasiūlymai su kainomis, p.7 = pasiūlymų eilė su kainomis, p.10 = sutarties sumos.`;
 
 export const schema = {
     pirkimoId: z.string().describe("Viešojo pirkimo ID"),
