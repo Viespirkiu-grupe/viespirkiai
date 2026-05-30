@@ -55,10 +55,12 @@ export const schema = {
 };
 
 export async function handler({ query, purpose, page }: { query: string; purpose: string; page: number }): Promise<ToolResult> {
-    traceSQL(`[execute_query] CALL query="${query}" purpose="${purpose}" page=${page}`);
-    const error = validateSql(query);
+    // Strip trailing semicolons/whitespace: theme examples and LLM-written SQL routinely end with ";"
+    const sql = query.replace(/[;\s]+$/, "");
+    traceSQL(`[execute_query] CALL query="${sql}" purpose="${purpose}" page=${page}`);
+    const error = validateSql(sql);
     if (error) {
-        traceSQLFailure(`[execute_query] INVALID query="${query}" reason="${error}"`);
+        traceSQLFailure(`[execute_query] INVALID query="${sql}" reason="${error}"`);
         return {
             content: [{ type: "text", text: error }],
             isError: true,
@@ -67,7 +69,7 @@ export async function handler({ query, purpose, page }: { query: string; purpose
 
     return await executeWithColumnFix(
         (q) => _runQuery(q, purpose, page),
-        query,
+        sql,
     );
 }
 

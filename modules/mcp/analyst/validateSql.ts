@@ -93,7 +93,10 @@ export function validateSql(sql: string): string | null {
     }
 
     if (Array.isArray(ast)) {
-        return "Only a single SELECT statement is allowed";
+        if (ast.length !== 1) {
+            return "Only a single SELECT statement is allowed";
+        }
+        ast = ast[0];
     }
 
     if (ast.type !== "select") {
