@@ -6,6 +6,19 @@ import rawConfig from '@/utils/config.js';
 const LENTELE = 'dokumentai';
 const QW_URL: string = (rawConfig as any).quickwitUrl ?? 'http://localhost:7280';
 
+// Quickwit's text fast field (used for term aggregations) lowercases values via
+// its default normalizer, but the searchable field is `raw` (case-sensitive).
+// So facets come back lowercased (`cvpis`) while a filter must query the true
+// casing (`cvpIs`) or it matches nothing. Map known source values back to their
+// canonical form for both the facet value and the query. (Proper fix would be a
+// `raw` normalizer on the fast field, which needs a re-index.)
+const SOURCE_CANONICAL: Record<string, string> = {
+  cvpis: 'cvpIs',
+  mvpaprasai: 'mvpAprasai',
+  neskelbiamosderybos: 'neskelbiamosDerybos',
+};
+const canonSource = (v: string) => SOURCE_CANONICAL[v.toLowerCase()] ?? v;
+
 export interface DokumentaiQuery {
   q?: string;
   /** comma-separated values (multi-select) */
@@ -243,7 +256,7 @@ export async function searchDokumentai(input: {
   const langFilter = splitMulti(input.lang);
   const savFilter = splitMulti(input.sav);
   const apskritisFilter = splitMulti(input.apskritis);
-  const sourceFilter = splitMulti(input.source);
+  const sourceFilter = splitMulti(input.source).map(canonSource);
 
   const { textQuery, types: inlineTypes, hosts: inlineHosts, jars: inlineJars, exts: inlineExts } =
     extractInlineTokens(rawQ);
@@ -353,7 +366,7 @@ export async function searchDokumentai(input: {
   const langOptions = toOptions(langBuckets);
   const savOptions = toOptions(savBuckets);
   const apskritisOptions = toOptions(apskritisBuckets);
-  const sourceOptions = toOptions(sourceBuckets);
+  const sourceOptions = toOptions(sourceBuckets).map((o) => ({ ...o, value: canonSource(o.value) }));
 
   return {
     q: rawQ,

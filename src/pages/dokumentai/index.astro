@@ -182,6 +182,9 @@ const { visible: langVisible, hidden: langHidden } = facetLists(langOptions, lan
 const { visible: savVisible, hidden: savHidden } = facetLists(savOptions, savFilter, 6);
 const { visible: apskritisVisible, hidden: apskritisHidden } = facetLists(apskritisOptions, apskritisFilter, 6);
 
+const activeFilterCount = typeFilter.length + hostFilter.length + jarFilter.length + extFilter.length
+  + langFilter.length + savFilter.length + apskritisFilter.length + sourceFilter.length;
+
 const totalPages = result?.totalPages ?? 0;
 const pageNums = result?.pageNums ?? [];
 ---
@@ -222,7 +225,10 @@ const pageNums = result?.pageNums ?? [];
       <div class="dok-shell">
         <aside class="dok-sidebar" id="dokSidebar" aria-label="Filtrai">
           <div class="dok-sidebar-head">
-            <span class="dok-sidebar-title">Filtrai</span>
+            <button type="button" class="dok-sidebar-title" id="dokFiltersToggle" aria-expanded="false" aria-controls="dokSidebar">
+              Filtrai{activeFilterCount > 0 && <span class="dok-filters-count">{activeFilterCount}</span>}
+              <span class="dok-filters-chevron" aria-hidden="true"></span>
+            </button>
             {hasFilters && <a href={clearUrl} class="dok-sidebar-clear">Panaikinti</a>}
           </div>
 
@@ -251,7 +257,7 @@ const pageNums = result?.pageNums ?? [];
               </a>
               {sourceVisible.map((opt) => (
                 <a href={sourceToggleUrl(opt.value)} data-param="source" data-value={opt.value} class={`dok-filter-opt${sourceFilter.includes(opt.value) ? ' is-selected' : ''}`}>
-                  <span class="dok-filter-opt-label">{SOURCE_LABEL[opt.value] || opt.value}</span>
+                  <span class="dok-filter-opt-label">{SOURCE_LABEL[opt.value.toLowerCase()] || opt.value}</span>
                   {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
                 </a>
               ))}
@@ -260,7 +266,7 @@ const pageNums = result?.pageNums ?? [];
                   <div class="dok-more-list" hidden>
                     {sourceHidden.map((opt) => (
                       <a href={sourceToggleUrl(opt.value)} data-param="source" data-value={opt.value} class={`dok-filter-opt${sourceFilter.includes(opt.value) ? ' is-selected' : ''}`}>
-                        <span class="dok-filter-opt-label">{SOURCE_LABEL[opt.value] || opt.value}</span>
+                        <span class="dok-filter-opt-label">{SOURCE_LABEL[opt.value.toLowerCase()] || opt.value}</span>
                         {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
                       </a>
                     ))}
@@ -609,7 +615,28 @@ const pageNums = result?.pageNums ?? [];
   document
     .querySelectorAll<HTMLAnchorElement>('.dok-sidebar-clear, .dok-pagination a[href]')
     .forEach((a) => a.addEventListener('click', showLoading));
-  document.getElementById('searchForm')?.addEventListener('submit', showLoading);
+  // The search form is a bare GET form (only the text input), so a native
+  // submit would drop every active filter. Intercept it and navigate via the
+  // live `params` instead, which already carries all the facet selections.
+  const searchForm = document.getElementById('searchForm');
+  searchForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const val = (document.getElementById('search') as HTMLInputElement | null)?.value.trim() ?? '';
+    if (val) params.set('search', val);
+    else params.delete('search');
+    params.delete('q');
+    params.delete('page');
+    navigate(true);
+  });
+
+  // Mobile: the "Filtrai" header collapses/expands the facet panel so results
+  // stay near the top. No-op visual on desktop (sections are always shown).
+  const filtersToggle = document.getElementById('dokFiltersToggle');
+  const dokSidebar = document.getElementById('dokSidebar');
+  filtersToggle?.addEventListener('click', () => {
+    const open = dokSidebar?.classList.toggle('is-open') ?? false;
+    filtersToggle.setAttribute('aria-expanded', String(open));
+  });
 
   function wireAddForm(formId: string, inputId: string, param: string, transform = (s: string) => s) {
     const form = document.getElementById(formId) as HTMLFormElement | null;
@@ -724,11 +751,40 @@ const pageNums = result?.pageNums ?? [];
     border-bottom: 1px solid var(--light-gray);
   }
   .dok-sidebar-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    /* button reset — it's only an actual toggle on mobile */
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
     font-size: var(--text-xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: .1em;
     color: var(--dark-gray);
+    cursor: default;
+  }
+  .dok-filters-count {
+    display: none;  /* shown only on mobile, where filters are collapsed */
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-pill);
+    background: var(--black);
+    color: var(--white);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  /* Chevron only appears on mobile, where the header becomes a real toggle. */
+  .dok-filters-chevron { display: none; }
+  .dok-filters-chevron::before {
+    content: "▾";
+    font-size: 11px;
   }
   .dok-sidebar-clear {
     font-size: var(--text-xs);
@@ -1011,13 +1067,40 @@ const pageNums = result?.pageNums ?? [];
       grid-template-columns: 1fr;
       gap: 0;
     }
+    /* Filters collapse behind the header so results sit near the top instead
+       of below a tall stack of facets. The rail becomes a tappable toggle. */
     .dok-sidebar {
-      padding: 4px 0 16px;
-      margin-bottom: 16px;
+      padding: 0;
       border-right: none;
       border-bottom: var(--border);
     }
+    .dok-sidebar-head {
+      padding-bottom: 0;
+      margin-bottom: 0;
+      border-bottom: none;
+      align-items: center;
+    }
+    .dok-sidebar-title {
+      cursor: pointer;
+      padding: 12px 0;            /* taller tap target */
+    }
+    .dok-filters-chevron {
+      display: inline-flex;
+      transition: transform var(--transition);
+    }
+    .dok-filters-count { display: inline-flex; }
+    .dok-sidebar.is-open .dok-filters-chevron { transform: rotate(180deg); }
+
+    /* Hidden until the user opens the panel. */
+    .dok-filter-section { display: none; padding-top: 14px; }
+    .dok-sidebar.is-open .dok-filter-section { display: block; }
+    .dok-sidebar.is-open { padding-bottom: 16px; }
+    .dok-filter-section + .dok-filter-section { margin-top: 8px; }
+
+    /* Comfortable but not bulky touch targets. */
+    .dok-filter-opt { height: 38px; }
+    .dok-input { font-size: var(--text-sm); padding: 8px 0; }
+
     .dok-content { padding-top: 16px; }
-    .dok-filter-section + .dok-filter-section { margin-top: 20px; }
   }
 </style>
