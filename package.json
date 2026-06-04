@@ -9,7 +9,9 @@
         "test": "vitest run",
         "test:integration": "vitest run --config vitest.integration.config.ts",
         "check": "astro check",
-        "db:schema:dump": "node scripts/dumpDbSchema.js"
+        "db:schema:dump": "node scripts/dumpDbSchema.js",
+        "export:sutartys": "node scripts/exportSutartys.js",
+        "push:sutartys": "node scripts/pushSutartysToSpinta.js"
     },
     "overrides": {
         "vite": "^7"

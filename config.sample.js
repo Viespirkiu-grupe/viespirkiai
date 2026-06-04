@@ -179,4 +179,40 @@ export default {
 
     // Vienos SQL užklausos timeout sekundėmis (SET LOCAL statement_timeout).
     mcpQueryTimeout: 20,
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Spinta / Stalčius (atviri duomenys)
+    // Eksportas į „spintos“ tipo API serverį. Žiūrėk modules/spinta/.
+    // Palaikomi du serveriai (vienodas rašymo protokolas — NDJSON `_op`):
+    //   • Spinta   — OAuth client-credentials (spintaClient/spintaSecret/scope'ai)
+    //   • Stalčius — vienas statinis API raktas (spintaApiKey)
+    // Klientas pasirenka pagal tai, kas užpildyta: jei nustatytas spintaApiKey,
+    // naudojamas jis (Bearer), o OAuth (token endpoint) praleidžiamas.
+    // ─────────────────────────────────────────────────────────────────────
+
+    // Serverio bazinis URL (su trailing slash arba be).
+    // Pvz. "https://put.duomenys.example.lt".
+    spintaServer: "",
+
+    // Stalčius: statinis rašymo API raktas (siunčiamas kaip Authorization:
+    // Bearer …). Atitinka Stalčiaus serverio API_KEY. Jei užpildytas — OAuth
+    // (spintaClient/spintaSecret/spintaScopes) ignoruojamas.
+    spintaApiKey: "",
+
+    // Spinta: OAuth client-credentials prisijungimas. client_id + client_secret
+    // iš spintos administracijos. Naudojama tik kai spintaApiKey tuščias.
+    spintaClient: "",
+    spintaSecret: "",
+
+    // Namespace, į kurį rašoma. Pvz. "datasets/gov/viespirkiai".
+    // Naudojamas tiek modelių kelio prefiksui, tiek default scope'ams
+    // sudaryti (spinta_<ns_su_pabraukimais>_insert ir pan.).
+    spintaNamespace: "",
+
+    // Spinta OAuth scope'ai. Paliekam tuščią — naudojam pilną rašymo
+    // rinkinį (spinta_getone/getall/search/changes/insert/upsert/update/
+    // patch/delete/set_meta_fields). Atitinka standartinį „writer“ klientą
+    // (`spinta client add --scope "spinta_getall spinta_getone ..."`).
+    // Stalčiui nereikia — jis naudoja vieną API raktą.
+    spintaScopes: [],
 };

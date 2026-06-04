@@ -6,6 +6,8 @@ interface Props {
   searchValue?: string | number | undefined;
   searchPlaceholder?: string;
   usedHiddenFields?: boolean;
+  /** Hide the visible <h1> (kept as an accessible label only). */
+  hideTitle?: boolean;
 }
 
 const {
@@ -13,6 +15,7 @@ const {
   searchValue = '',
   searchPlaceholder = 'Tekstinė paieška',
   usedHiddenFields = false,
+  hideTitle = false,
 } = Astro.props;
 
 const hasFilters = Astro.slots.has('filters');
@@ -20,9 +23,13 @@ const hasTitleSuffix = Astro.slots.has('title-suffix');
 ---
 
 <form method="get" role="search" id="searchForm" class="my-10">
-  <h1>
-    {title}{hasTitleSuffix && <slot name="title-suffix" />}
-  </h1>
+  {hideTitle ? (
+    <h1 class="sr-only">{title}</h1>
+  ) : (
+    <h1>
+      {title}{hasTitleSuffix && <slot name="title-suffix" />}
+    </h1>
+  )}
 
   <div class="search-bar">
     <label for="search">

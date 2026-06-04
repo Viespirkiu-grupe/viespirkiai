@@ -2,36 +2,46 @@ import { postgres } from "../../postgres/postgres.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
 import { log } from "../../utils/log.js";
 
-async function rastiSavininkuKodus() {
+const CONCURRENCY = 16;
+
+async function nextSavininkuBatch(limit) {
     let res = await postgres.query(
-        `SELECT * FROM domenai WHERE savininkas IS NOT NULL AND ("savininkoKodasStatus" IS NULL OR ("savininkoKodasStatus" >= 0 AND "savininkoKodasStatus" < 2)) LIMIT 1;`,
+        `SELECT DISTINCT savininkas FROM domenai WHERE savininkas IS NOT NULL AND ("savininkoKodasStatus" IS NULL OR ("savininkoKodasStatus" >= 0 AND "savininkoKodasStatus" < 2)) LIMIT $1;`,
+        [limit],
     );
+    if (res.rowCount > 0) return res.rows.map((r) => r.savininkas);
 
-    if (res.rowCount === 0) {
-        return false;
-    }
-
-    let domenas = res.rows[0];
-
-    let juridinisRes = await findSingleJuridinis(domenas.savininkas);
-    if (juridinisRes === null) {
-        log(
-            `Savininko kodas nerastas: ${domenas.savininkas} (domenas: ${domenas.domain})`,
-        );
-        await postgres.query(
-            `UPDATE domenai SET "savininkoKodas" = NULL, "savininkoKodasStatus" = 2 WHERE savininkas = $1;`,
-            [domenas.savininkas],
-        );
-    } else {
-        log(
-            `Savininko kodas rastas: ${domenas.savininkas} -> ${juridinisRes.jarKodas} (${juridinisRes.pavadinimas}) (domenas: ${domenas.domain})`,
-        );
-        await postgres.query(
-            `UPDATE domenai SET "savininkoKodas" = $1, "savininkoKodasStatus" = 2 WHERE savininkas = $2;`,
-            [juridinisRes.jarKodas, domenas.savininkas],
-        );
-    }
-    return true;
+    res = await postgres.query(
+        `SELECT DISTINCT savininkas FROM "domenaiScrapes" WHERE savininkas IS NOT NULL AND ("savininkoKodasStatus" IS NULL OR ("savininkoKodasStatus" >= 0 AND "savininkoKodasStatus" < 2)) LIMIT $1;`,
+        [limit],
+    );
+    return res.rows.map((r) => r.savininkas);
 }
 
-while (await rastiSavininkuKodus()) {}
+async function processSavininkas(savininkas) {
+    let juridinisRes = await findSingleJuridinis(savininkas);
+    let jarKodas = juridinisRes?.jarKodas ?? null;
+
+    if (jarKodas === null) {
+        log(`Savininko kodas nerastas: ${savininkas}`);
+    } else {
+        log(
+            `Savininko kodas rastas: ${savininkas} -> ${jarKodas} (${juridinisRes.pavadinimas})`,
+        );
+    }
+
+    await postgres.query(
+        `UPDATE domenai SET "savininkoKodas" = $1, "savininkoKodasStatus" = 2 WHERE savininkas = $2;`,
+        [jarKodas, savininkas],
+    );
+    await postgres.query(
+        `UPDATE "domenaiScrapes" SET "savininkoKodas" = $1, "savininkoKodasStatus" = 2 WHERE savininkas = $2;`,
+        [jarKodas, savininkas],
+    );
+}
+
+while (true) {
+    const batch = await nextSavininkuBatch(CONCURRENCY);
+    if (batch.length === 0) break;
+    await Promise.all(batch.map(processSavininkas));
+}

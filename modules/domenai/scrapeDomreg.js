@@ -2,6 +2,7 @@ import { postgres } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { log } from "../../utils/log.js";
+import { findSingleJuridinis } from "../juridiniai/search.js";
 import fetch from "node-fetch";
 import net from "net";
 import path from "path";
@@ -173,7 +174,17 @@ async function fetchDomainDetails(domain) {
  * @param {Date} scrapedAt
  * @returns {DomainSnapshot}
  */
-function buildSnapshot(domenas, data, scrapedAt) {
+/**
+ * @param {string | null} savininkas
+ * @returns {Promise<{ kodas: string | null, status: number }>}
+ */
+async function resolveSavininkoKodas(savininkas) {
+    if (!savininkas) return { kodas: null, status: 2 };
+    const j = await findSingleJuridinis(savininkas);
+    return { kodas: j?.jarKodas ?? null, status: 2 };
+}
+
+function buildSnapshot(domenas, data, scrapedAt, resolved) {
     return {
         domain: domenas.domain,
         domregData: scrapedAt,
@@ -187,12 +198,8 @@ function buildSnapshot(domenas, data, scrapedAt) {
         expired: data.details?.domain?.expired ?? null,
         updated: data.details?.domain?.updated ?? null,
         domregNs: data.details?.nameservers ?? null,
-        savininkoKodas:
-            data.details?.registrant?.code ?? data.details?.registrant?.id ?? null,
-        savininkoKodasStatus:
-            data.details?.registrant?.codeStatus ??
-            data.details?.registrant?.idStatus ??
-            null,
+        savininkoKodas: resolved?.kodas ?? null,
+        savininkoKodasStatus: resolved?.status ?? null,
     };
 }
 
@@ -205,7 +212,10 @@ function buildSnapshot(domenas, data, scrapedAt) {
  * @returns {Promise<void>}
  */
 async function saveDomainData(domenas, data, scrapeStatus, scrapedAt) {
-    const s = buildSnapshot(domenas, data, scrapedAt);
+    const resolved = await resolveSavininkoKodas(
+        data.details?.registrant?.org ?? null,
+    );
+    const s = buildSnapshot(domenas, data, scrapedAt, resolved);
 
     await postgres.query(
         `UPDATE public.domenai
