@@ -11,7 +11,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 6048M
+                    memory: 7048M
 
     postgres:
         build:
@@ -25,7 +25,12 @@ services:
         ports:
             - "9118:5432" # Not directly reachable from outside
         volumes:
-            - ./postgres/pgdata:/var/lib/postgresql/data
+#            - ./postgres/pgdata:/var/lib/postgresql/data
+#            - ./postgres:/var/lib/postgresql
+#             - ./postgres/18/docker:/var/lib/postgresql/data
+             - ./postgres/18:/var/lib/postgresql/18
+        environment:
+            PGDATA: /var/lib/postgresql/18/docker
         deploy:
             resources:
                 limits:

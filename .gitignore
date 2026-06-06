@@ -28,6 +28,7 @@ plausible/plausible-conf.env
 # Postgres
 pgdata
 pgadmin-data
+postgres/18
 
 # Typesense
 typesense/typesense

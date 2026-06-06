@@ -1,7 +1,7 @@
-FROM postgres:17.9
+FROM postgres:18
 
 RUN apt-get update \
     && apt-get install -y \
-        postgresql-17-repack \
-        postgresql-17-postgis-3 \
+        postgresql-18-repack \
+        postgresql-18-postgis-3 \
     && rm -rf /var/lib/apt/lists/*
