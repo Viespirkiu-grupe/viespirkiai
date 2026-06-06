@@ -1,3 +1,7 @@
+-- NEPATIKIMA: tik ~443 pirkimų užpildyta (vienkartinis rankinis paleidimas 2026-03-31).
+-- Kainos (pasiulymoKaina) yra NULL dėl parserio klaidos. Naudok get_viesasis_pirkimas +
+-- get_failas_tekstas su ATN-1 xlsx failu (pavadinimas: PPA-*, ATN-*, Atn-1*):
+-- p.4=dalyviai, p.6=atmesti pasiūlymai su kainomis, p.7=pasiūlymų eilė su kainomis.
 CREATE TEMP VIEW v_dalyviai AS
 SELECT a."pirkimoNumeris",
        a."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",

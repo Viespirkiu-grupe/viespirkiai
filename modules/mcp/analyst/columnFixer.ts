@@ -80,14 +80,25 @@ export function fixColumnInQuery(query: string, badColLower: string, correctCol:
     return fixed.replace(re, `"${correctCol}"`);
 }
 
+// Pre-quotes all known camelCase columns in the query so the first DB attempt succeeds.
+export async function preQuoteKnownColumns(query: string): Promise<string> {
+    const map = await getMixedCaseMap();
+    let result = query;
+    for (const [, correctCol] of map) {
+        result = fixColumnInQuery(result, correctCol.toLowerCase(), correctCol);
+    }
+    return result;
+}
+
 // Runs runAttempt(query) and retries on "column does not exist" errors by
 // auto-correcting column name casing — up to MAX_AUTO_RETRIES times.
+// All known camelCase columns are pre-quoted before the first attempt to minimise retries.
 export async function executeWithColumnFix(
     runAttempt: (query: string) => Promise<ToolResult>,
     initialQuery: string,
 ): Promise<ToolResult> {
     const errors: Array<{ attempt: number; query: string; error: string }> = [];
-    let query = initialQuery;
+    let query = await preQuoteKnownColumns(initialQuery);
 
     for (let attempt = 1; attempt <= MAX_AUTO_RETRIES; attempt++) {
         const result = await runAttempt(query);

@@ -116,7 +116,6 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         joins: [
             ["jarKodas", "v_company.jarKodas", "strict"],
             ["pirkimoId", "v_sutartys.pirkimoNumeris", "semantic"],
-            ["pirkimoId", "v_dalyviai.pirkimoNumeris", "semantic"],
         ],
         columns: [
             "pirkimoId: text",
@@ -172,41 +171,6 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         primaryKeys: ["id"],
         example:
             'SELECT vardas, pavarde, "imonesVardas", pareigos, "dalyvaujaViesuosePirkimuose" FROM v_person_links WHERE "jarKodas" = \'302556251\'',
-    },
-    v_dalyviai: {
-        tags: ["bid-ranking", "rejections", "co-bidding", "single-bidder"],
-        keys: ["pirkimoNumeris", "tiekejoKodas", "eileNumeris", "pasiulymoKaina", "interesuKonfliktasNustatytas"],
-        joins: [
-            ["pirkejoKodas", "v_company.jarKodas", "strict"],
-            ["tiekejoKodas", "v_company.jarKodas", "sparse"],
-            ["pirkimoNumeris", "v_pirkimas.pirkimoId", "semantic"],
-            ["pirkimoNumeris", "v_sutartys.pirkimoNumeris", "semantic"],
-        ],
-        columns: [
-            "pirkimoNumeris: text",
-            "pirkejoKodas: text",
-            "pirkimoBudas: text",
-            "ataskaitosData: timestamp with time zone",
-            "pirkimoObjektoPavadinimas: text",
-            "pagrindinisKodasBvpz: text",
-            "daliuSkaicius: integer",
-            "interesuKonfliktasNustatytas: boolean",
-            "interesuKonfliktoPriemones: text",
-            "konkurencijaIskreipiantisAsmuo: boolean",
-            "konkurencijosPriemones: text",
-            "pretenzijaPateikta: boolean",
-            "ieskinysTeismui: boolean",
-            "tiekejoKodas: text",
-            "tiekejas: text",
-            "fizinisAsmuo: boolean",
-            "salis: text",
-            "eileNumeris: integer",
-            "pasiulymoKaina: numeric",
-            "atmetimoPriezastis: text",
-        ],
-        primaryKeys: [],
-        example:
-            'SELECT "pirkimoNumeris", "tiekejoKodas", tiekejas, "eileNumeris", "pasiulymoKaina", "interesuKonfliktasNustatytas" FROM v_dalyviai WHERE "pirkimoNumeris" = \'1005158\'',
     },
     v_bylos: {
         tags: ["court", "litigation", "enforcement"],

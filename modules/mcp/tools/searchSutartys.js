@@ -1,10 +1,20 @@
 import { z } from "zod";
 import { searchSutartys } from "../../sutartys/searchSutartys.js";
+import { specialJarCodes } from "../../juridiniai/specialJarCodes.js";
+
+const MEANINGFUL_FILTERS = [
+    "search",
+    "perkanciosiosOrganizacijosKodas",
+    "sutartiesNumeris",
+    "pirkimoNumeris",
+    "sutartiesUnikalusID",
+];
 
 export const name = "search_sutartys";
 export const description =
     "Ieško viešųjų pirkimų sutarčių. Palaiko pilno teksto paiešką, filtravimą pagal pirkėją, tiekėją, vertę, datą, BVPZ kodus ir sutarties tipą. Sumos - eurais. " +
-    "SVARBU: grąžina maks. 50 eilučių puslapyje, total=null — bendra sutarčių suma, kiekis ar procentai iš šio įrankio negali būti nurodyti; tokiems skaičiams naudok execute_query su v_sutartys.";
+    "Kai filtruojama pagal tiekejoKodas arba perkanciosiosOrganizacijosKodas, atsakyme grąžinama sutarciuKiekis ir bendraVerte (bendra sutarčių suma). " +
+    "SVARBU: grąžina maks. 50 eilučių puslapyje; sudėtingesnei analizei (grupavimui, procentams) naudok execute_query su v_sutartys.";
 
 export const schema = {
     search: z.string().optional().describe("Pilno teksto paieškos užklausa"),
@@ -71,7 +81,26 @@ export async function handler(params) {
     if (ignoruotiSp) query.ignoruotiSp = "true";
     if (tikSuDokumentais) query.tikSuDokumentais = "true";
 
-    const { results, total } = await searchSutartys(query, {
+    if (query.tiekejoKodas != null) {
+        const code = Number(query.tiekejoKodas);
+        const special = specialJarCodes[code];
+        if (special) {
+            const hasOtherFilter = MEANINGFUL_FILTERS.some((k) => query[k] != null);
+            if (!hasOtherFilter) {
+                return {
+                    isError: true,
+                    content: [
+                        {
+                            type: "text",
+                            text: `tiekejoKodas=${query.tiekejoKodas} yra bendrinis CVP IS kodas („${special.pavadinimas}"), kurį dalijasi visi tokio tipo asmenys sistemoje. Filtruoti pagal šį kodą vieną — beprasmiška: grąžintų šimtus nesusijusių sutarčių. Vietoj to naudok search="Vardas Pavardė" arba kartu pateik perkanciosiosOrganizacijosKodas.`,
+                        },
+                    ],
+                };
+            }
+        }
+    }
+
+    const { results, total, sutarciuKiekis, bendraVerte } = await searchSutartys(query, {
         limit,
         page,
         engine: query.search ? "typesense" : "postgres",
@@ -81,7 +110,11 @@ export async function handler(params) {
         content: [
             {
                 type: "text",
-                text: JSON.stringify({ results, total, page, limit }, null, 2),
+                text: JSON.stringify(
+                    { results, total, sutarciuKiekis, bendraVerte, page, limit },
+                    null,
+                    2,
+                ),
             },
         ],
     };

@@ -145,6 +145,8 @@ export async function searchSutartys(
         return {
             results: arrayToLithuanianTime(raw).map(aptvarkytiRezultata),
             total,
+            sutarciuKiekis: null,
+            bendraVerte: null,
             values,
             queryParams,
             stream: null,
@@ -152,22 +154,22 @@ export async function searchSutartys(
         };
     }
 
-    const { sql, params, values, queryParams } = sutartysFilter.build(
-        query,
-        {
+    const { sql, sqlCount, params, paramsCount, values, queryParams } =
+        sutartysFilter.build(query, {
             table: "sutartys",
             fixedWhere: FIXED_WHERE,
             limit,
             page,
             sort,
-        },
-    );
+        });
 
     if (stream) {
         const client = await postgres.connect();
         return {
             results: [],
             total: null,
+            sutarciuKiekis: null,
+            bendraVerte: null,
             values,
             queryParams,
             stream: client.query(new QueryStream(sql, params)).pipe(
@@ -182,10 +184,36 @@ export async function searchSutartys(
         };
     }
 
-    const { rows } = await postgres.query(sql, params);
+    // Only compute aggregates when a selective entity filter is present.
+    // Date/value-only ranges can span millions of rows — too slow for a SUM scan.
+    const SELECTIVE_KEYS = [
+        "tiekejoKodas",
+        "perkanciosiosOrganizacijosKodas",
+        "sutartiesNumeris",
+        "pirkimoNumeris",
+        "sutartiesUnikalusID",
+    ];
+    const needsAgg = SELECTIVE_KEYS.some((k) => query[k] != null);
+
+    // "suma" = faktineIvykdimoVerte when settled, otherwise verte — same as Typesense index
+    const mainQuery = postgres.query(sql, params);
+    const aggQuery = needsAgg
+        ? postgres.query(
+              sqlCount.replace(
+                  "SELECT COUNT(*)",
+                  `SELECT COUNT(*) AS kiekis, COALESCE(SUM("suma"), 0) AS "bendraVerte"`,
+              ),
+              paramsCount,
+          )
+        : Promise.resolve(null);
+
+    const [{ rows }, aggResult] = await Promise.all([mainQuery, aggQuery]);
+
     return {
         results: rows.map(aptvarkytiRezultata),
         total: null,
+        sutarciuKiekis: aggResult ? parseInt(aggResult.rows[0].kiekis, 10) : null,
+        bendraVerte: aggResult ? parseFloat(aggResult.rows[0].bendraVerte) : null,
         values,
         queryParams,
         stream: null,

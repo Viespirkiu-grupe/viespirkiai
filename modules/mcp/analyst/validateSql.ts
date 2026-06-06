@@ -21,7 +21,7 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "domenai", "kotis",
     "balansoAtaskaitos", "pelnoNuostoliuAtaskaitos",
     "darboVieta", "istatinisKapitalas",
-    "atn1ataskaitos", "atn1dalyviai", "atn1pasiulymuEile", "atn1atmestiPasiulymai",
+
     "neskelbiamosDerybos",
     "vdiPazeidimai",
     "bylos", "bylosDalyviai",
@@ -93,7 +93,10 @@ export function validateSql(sql: string): string | null {
     }
 
     if (Array.isArray(ast)) {
-        return "Only a single SELECT statement is allowed";
+        if (ast.length !== 1) {
+            return "Only a single SELECT statement is allowed";
+        }
+        ast = ast[0];
     }
 
     if (ast.type !== "select") {

@@ -36,6 +36,18 @@ describe("Layer 1 — parser", () => {
         expect(validateSql("SELECT 1; SELECT 2")).toBeTypeOf("string");
     });
 
+    it("accepts a single statement with a trailing semicolon", () => {
+        expect(validateSql("SELECT 1;")).toBeNull();
+    });
+
+    it("accepts a CTE with a trailing semicolon", () => {
+        expect(validateSql("WITH cte AS (SELECT * FROM sutartys) SELECT * FROM cte;")).toBeNull();
+    });
+
+    it("still rejects two terminated statements (injection)", () => {
+        expect(validateSql("SELECT 1 FROM sutartys; DROP VIEW v_dalyviai;")).toBeTypeOf("string");
+    });
+
     it("rejects malformed SQL", () => {
         expect(validateSql("SELECT FROM WHERE AND")).toBeTypeOf("string");
     });

@@ -24,14 +24,13 @@ export const description =
     "NAUDOK visada kai reikia tikslių skaičių, sumų, procentų, tendencijų ar bet kokio kiekybinio fakto — " +
     "search_* įrankiai grąžina maks. 50 eilučių su total=null ir NEGALI pagrįsti kiekybinių teiginių. " +
     "Paieškai naudok: search_sutartys, search_failai, search_viesieji_pirkimai, search_juridiniai. " +
-    "Rodinių stulpeliai (get_schema nereikia — rašyk užklausą iš karto): " +
+    "Pagrindinės lentelės su stulpeliais: " +
     "v_sutartys→sutartiesUnikalusId,pirkejoKodas,pirkejas,tiekejoKodas,tiekejas,verte,sudarymoData,bvpzKodas,tipas,istrinta,pirkimoNumeris,faktineIvykdimoVerte; " +
     "v_company→jarKodas,pavadinimas,darbuotojai,vidutinisAtlyginimas,imokuSuma,melagingisTiekejas,nepatikimasTiekejas,bylosSkaicius,domenaiSkaicius,registravimoData; " +
     "v_pirkimas→pirkimoId,jarKodas,organizatorius,pirkimoBudas,statusas,numatomaVerteEUR,esFinansavimas,bvpzKodai,paskelbimoData; " +
     "v_person_links→id,vardas,pavarde,jarKodas,imonesVardas,pareigos,irasoTipas,rysioPradzia,rysioPabaiga,yraJuridinisAsmuo,registruotaLietuvoje; " +
-    "v_dalyviai→pirkimoNumeris,pirkejoKodas,tiekejoKodas,tiekejas,eileNumeris,pasiulymoKaina,atmetimoPriezastis,interesuKonfliktasNustatytas; " +
     "v_bylos→bylosId,jarKodas,bylosNumeris,bylosRusis,bylosData,teismas,bylojeKaip. " +
-    "Lentelėms (ne v_*) iškvieskite get_schema(table, mode:'detail') prieš rašant užklausą. " +
+    "Naudok get_schema(table, mode:'detail') prieš rašant sudėtingą užklausą arba gavus klaidą. " +
     "Rezultatai puslapiuojami — " + PAGE_SIZE + " eilučių per puslapį.";
 
 export const schema = {
@@ -55,10 +54,12 @@ export const schema = {
 };
 
 export async function handler({ query, purpose, page }: { query: string; purpose: string; page: number }): Promise<ToolResult> {
-    traceSQL(`[execute_query] CALL query="${query}" purpose="${purpose}" page=${page}`);
-    const error = validateSql(query);
+    // Strip trailing semicolons/whitespace: theme examples and LLM-written SQL routinely end with ";"
+    const sql = query.replace(/[;\s]+$/, "");
+    traceSQL(`[execute_query] CALL query="${sql}" purpose="${purpose}" page=${page}`);
+    const error = validateSql(sql);
     if (error) {
-        traceSQLFailure(`[execute_query] INVALID query="${query}" reason="${error}"`);
+        traceSQLFailure(`[execute_query] INVALID query="${sql}" reason="${error}"`);
         return {
             content: [{ type: "text", text: error }],
             isError: true,
@@ -67,7 +68,7 @@ export async function handler({ query, purpose, page }: { query: string; purpose
 
     return await executeWithColumnFix(
         (q) => _runQuery(q, purpose, page),
-        query,
+        sql,
     );
 }
 
