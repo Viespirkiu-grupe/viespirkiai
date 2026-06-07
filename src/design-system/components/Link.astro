@@ -1,4 +1,6 @@
 ---
+import { externalLinkRel } from '../lib/html.ts';
+
 interface Props {
   href?: string;
   variant?: 'default' | 'subtle' | 'muted' | 'reset';
@@ -26,10 +28,11 @@ const classes = [
   icon ? 'link-icon' : '',
   className,
 ].filter(Boolean).join(' ');
+const resolvedRel = externalLinkRel(target, rel);
 ---
 
 {href ? (
-  <a href={href} class={classes} target={target} rel={rel} aria-label={ariaLabel} title={title}>
+  <a href={href} class={classes} target={target} rel={resolvedRel} aria-label={ariaLabel} title={title}>
     <slot />
   </a>
 ) : (

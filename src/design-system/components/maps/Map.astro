@@ -1,4 +1,6 @@
 ---
+import { jsonForHtmlScript } from '../../lib/html.ts';
+
 interface Props {
   id: string;
   lat?: number;
@@ -37,7 +39,7 @@ const computedLinkText = linkText === 'auto' && pointLat != null && pointLon != 
   ? `${pointLat.toFixed(5)}, ${pointLon.toFixed(5)}`
   : linkText;
 const containerStyle = `height:${height};${styleExtra ? ` ${styleExtra}` : ''}`;
-const mapConfig = JSON.stringify(config ?? { mode: 'point', lat: pointLat, lon: pointLon, zoom: resolvedZoom, marker });
+const mapConfig = jsonForHtmlScript(config ?? { mode: 'point', lat: pointLat, lon: pointLon, zoom: resolvedZoom, marker });
 const configElementId = `${id}-map-config`;
 ---
 
@@ -51,7 +53,7 @@ const configElementId = `${id}-map-config`;
 
 {showLink && pointLat != null && pointLon != null && (
   <p class="text-muted text-xs mt-2">
-    <a href={`https://www.openstreetmap.org/?mlat=${pointLat}&mlon=${pointLon}&zoom=${resolvedLinkZoom}`} target="_blank">
+    <a href={`https://www.openstreetmap.org/?mlat=${pointLat}&mlon=${pointLon}&zoom=${resolvedLinkZoom}`} target="_blank" rel="noopener noreferrer">
       {computedLinkText}
     </a>
   </p>

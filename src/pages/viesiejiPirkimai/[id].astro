@@ -68,7 +68,7 @@ const font = getFont(Astro.cookies);
       )}
       <Fragment slot="actions">
         {cvpisUrl && (
-          <a href={cvpisUrl} class="btn btn-outline btn-sm" target="_blank" aria-label="Peržiūrėti CVP IS puslapį">↗ CVP IS</a>
+          <a href={cvpisUrl} class="btn btn-outline btn-sm" target="_blank" rel="noopener noreferrer" aria-label="Peržiūrėti CVP IS puslapį">↗ CVP IS</a>
         )}
         <a href={`/viesiejiPirkimai/${pirkimas.pirkimoId}.json`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti pirkimo JSON duomenis">↗ JSON</a>
       </Fragment>

@@ -14,6 +14,13 @@ import { findSingleBvpzPanel } from '../../lib/searchBvpzPanel.ts';
 import { findSingleJuridinisPanel } from '../../lib/searchJuridinisPanel.ts';
 import { findSutartisPanel } from '../../lib/searchSutartisPanel.ts';
 import {
+  buildDokumentaiUrl,
+  splitFacetOptions,
+  toggleValue,
+  type DokumentaiUrlOverrides,
+  type DokumentaiUrlState,
+} from '../../lib/dokumentaiUrl.ts';
+import {
   DOKUMENTAI_SORT_OPTIONS,
   searchDokumentai,
   extractInlineTokens,
@@ -182,52 +189,31 @@ function fmtDate(value: Date | string | null | undefined) {
 function dateKey(value: Date | string | null | undefined) {
   return value ? new Date(value).toISOString().slice(0, 10) : null;
 }
-function buildUrl(overrides: { type?: string[]; host?: string[]; jar?: string[]; ext?: string[]; lang?: string[]; sav?: string[]; apskritis?: string[]; source?: string[]; area?: typeof bbox; sort?: DokumentaiSort; p?: number | null }) {
-  const t = overrides.type ?? typeFilter;
-  const h = overrides.host ?? hostFilter;
-  const j = overrides.jar ?? jarFilter;
-  const e = overrides.ext ?? extFilter;
-  const l = overrides.lang ?? langFilter;
-  const s = overrides.sav ?? savFilter;
-  const a = overrides.apskritis ?? apskritisFilter;
-  const so = overrides.source ?? sourceFilter;
-  const ar = overrides.area === undefined ? bbox : overrides.area;
-  const selectedSort = overrides.sort ?? sort;
-  const p = overrides.p ?? null;
-  const sp = new URLSearchParams();
-  if (q) sp.set('search', q);
-  sp.set('mode', mode);
-  if (selectedSort !== 'relevance') sp.set('sort', selectedSort);
-  if (t.length) sp.set('type', t.join(','));
-  if (h.length) sp.set('host', h.join(','));
-  if (j.length) sp.set('jar', j.join(','));
-  if (e.length) sp.set('ext', e.join(','));
-  if (l.length) sp.set('lang', l.join(','));
-  if (s.length) sp.set('sav', s.join(','));
-  if (a.length) sp.set('apskritis', a.join(','));
-  if (so.length) sp.set('source', so.join(','));
-  if (ar) {
-    sp.set('minLat', String(ar.minLat));
-    sp.set('maxLat', String(ar.maxLat));
-    sp.set('minLon', String(ar.minLon));
-    sp.set('maxLon', String(ar.maxLon));
-  }
-  if (p) sp.set('page', String(p));
-  return `/dokumentai?${sp.toString()}`;
-}
+const urlState: DokumentaiUrlState = {
+  q,
+  mode,
+  sort,
+  type: typeFilter,
+  host: hostFilter,
+  jar: jarFilter,
+  ext: extFilter,
+  lang: langFilter,
+  sav: savFilter,
+  apskritis: apskritisFilter,
+  source: sourceFilter,
+  area: bbox,
+};
+const buildUrl = (overrides: DokumentaiUrlOverrides = {}) => buildDokumentaiUrl(urlState, overrides);
 const areaClearUrl = buildUrl({ area: null });
-function toggle(list: string[], val: string) {
-  return list.includes(val) ? list.filter((v) => v !== val) : [...list, val];
-}
-const typeToggleUrl = (v: string) => buildUrl({ type: v ? toggle(typeFilter, v) : [] });
-const hostToggleUrl = (v: string) => buildUrl({ host: v ? toggle(hostFilter, v) : [] });
-const jarToggleUrl = (v: string) => buildUrl({ jar: v ? toggle(jarFilter, v) : [] });
-const extToggleUrl = (v: string) => buildUrl({ ext: v ? toggle(extFilter, v) : [] });
-const langToggleUrl = (v: string) => buildUrl({ lang: v ? toggle(langFilter, v) : [] });
-const savToggleUrl = (v: string) => buildUrl({ sav: v ? toggle(savFilter, v) : [] });
-const apskritisToggleUrl = (v: string) => buildUrl({ apskritis: v ? toggle(apskritisFilter, v) : [] });
-const sourceToggleUrl = (v: string) => buildUrl({ source: v ? toggle(sourceFilter, v) : [] });
-const buildPageUrl = (p: number) => buildUrl({ p });
+const typeToggleUrl = (v: string) => buildUrl({ type: v ? toggleValue(typeFilter, v) : [] });
+const hostToggleUrl = (v: string) => buildUrl({ host: v ? toggleValue(hostFilter, v) : [] });
+const jarToggleUrl = (v: string) => buildUrl({ jar: v ? toggleValue(jarFilter, v) : [] });
+const extToggleUrl = (v: string) => buildUrl({ ext: v ? toggleValue(extFilter, v) : [] });
+const langToggleUrl = (v: string) => buildUrl({ lang: v ? toggleValue(langFilter, v) : [] });
+const savToggleUrl = (v: string) => buildUrl({ sav: v ? toggleValue(savFilter, v) : [] });
+const apskritisToggleUrl = (v: string) => buildUrl({ apskritis: v ? toggleValue(apskritisFilter, v) : [] });
+const sourceToggleUrl = (v: string) => buildUrl({ source: v ? toggleValue(sourceFilter, v) : [] });
+const buildPageUrl = (page: number) => buildUrl({ page });
 const clearUrl = (() => {
   const sp = new URLSearchParams();
   if (q) sp.set('search', q);
@@ -237,31 +223,10 @@ const clearUrl = (() => {
   return qs ? `/dokumentai?${qs}` : '/dokumentai';
 })();
 
-const shownHosts: FacetOption[] = [...hostOptions];
-for (const sel of hostFilter) {
-  if (!shownHosts.find((o) => o.value === sel)) shownHosts.unshift({ value: sel, count: null });
-}
 const HOST_LIMIT = 6;
-const hostVisible = shownHosts.slice(0, HOST_LIMIT);
-const hostHidden = shownHosts.slice(HOST_LIMIT);
-
-const shownExts: FacetOption[] = [...extOptions];
-for (const sel of extFilter) {
-  if (!shownExts.find((o) => o.value === sel)) shownExts.unshift({ value: sel, count: null });
-}
 const EXT_LIMIT = 6;
-const extVisible = shownExts.slice(0, EXT_LIMIT);
-const extHidden = shownExts.slice(EXT_LIMIT);
-
-// Build a {visible, hidden} facet list, pinning any selected-but-unlisted
-// values to the front so an active filter is always shown.
-function facetLists(options: FacetOption[], selected: string[], limit: number) {
-  const shown: FacetOption[] = [...options];
-  for (const sel of selected) {
-    if (!shown.find((o) => o.value === sel)) shown.unshift({ value: sel, count: null });
-  }
-  return { visible: shown.slice(0, limit), hidden: shown.slice(limit) };
-}
+const { visible: hostVisible, hidden: hostHidden } = splitFacetOptions(hostOptions, hostFilter, HOST_LIMIT);
+const { visible: extVisible, hidden: extHidden } = splitFacetOptions(extOptions, extFilter, EXT_LIMIT);
 
 const LANG_LABEL: Record<string, string> = {
   lt: 'Lietuvių', en: 'Anglų', ru: 'Rusų', de: 'Vokiečių', fr: 'Prancūzų',
@@ -275,10 +240,10 @@ const SOURCE_LABEL: Record<string, string> = {
   mvpaprasai: 'MVP tvarkos',
   neskelbiamosderybos: 'Neskelbiamos derybos',
 };
-const { visible: sourceVisible, hidden: sourceHidden } = facetLists(sourceOptions, sourceFilter, 8);
-const { visible: langVisible, hidden: langHidden } = facetLists(langOptions, langFilter, 8);
-const { visible: savVisible, hidden: savHidden } = facetLists(savOptions, savFilter, 6);
-const { visible: apskritisVisible, hidden: apskritisHidden } = facetLists(apskritisOptions, apskritisFilter, 6);
+const { visible: sourceVisible, hidden: sourceHidden } = splitFacetOptions(sourceOptions, sourceFilter, 8);
+const { visible: langVisible, hidden: langHidden } = splitFacetOptions(langOptions, langFilter, 8);
+const { visible: savVisible, hidden: savHidden } = splitFacetOptions(savOptions, savFilter, 6);
+const { visible: apskritisVisible, hidden: apskritisHidden } = splitFacetOptions(apskritisOptions, apskritisFilter, 6);
 
 const activeFilterCount = typeFilter.length + hostFilter.length + jarFilter.length + extFilter.length
   + langFilter.length + savFilter.length + apskritisFilter.length + sourceFilter.length + (bbox ? 1 : 0);

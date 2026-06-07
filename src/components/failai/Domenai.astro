@@ -10,7 +10,7 @@ const hidden = domains.slice(maxItems);
     <>
       <div class="flex flex-col gap-1">
         {visible.filter(Boolean).map(d => (
-          <a href={`https://${d}`} target="_blank" class="cell-truncate">{d}</a>
+          <a href={`https://${d}`} target="_blank" rel="noopener noreferrer" class="cell-truncate">{d}</a>
         ))}
       </div>
       {hidden.length > 0 && (
@@ -20,7 +20,7 @@ const hidden = domains.slice(maxItems);
           </summary>
           <div class="domain-list-expanded flex flex-col gap-1 mt-2">
             {hidden.filter(Boolean).map(d => (
-              <a href={`https://${d}`} target="_blank" class="cell-truncate">{d}</a>
+              <a href={`https://${d}`} target="_blank" rel="noopener noreferrer" class="cell-truncate">{d}</a>
             ))}
           </div>
         </details>

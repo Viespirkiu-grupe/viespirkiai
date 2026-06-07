@@ -44,7 +44,7 @@ const statusoVariantas = neaktyvusStatusas && BANKROTO_STATUSAI.has(neaktyvusSta
   <dt>Adresas</dt>
   <dd>
     {asmuo.jar.location
-      ? <a href={`https://www.openstreetmap.org/?mlat=${asmuo.jar.location[0]}&mlon=${asmuo.jar.location[1]}&zoom=16`} target="_blank">{asmuo.jar.adresas}</a>
+      ? <a href={`https://www.openstreetmap.org/?mlat=${asmuo.jar.location[0]}&mlon=${asmuo.jar.location[1]}&zoom=16`} target="_blank" rel="noopener noreferrer">{asmuo.jar.adresas}</a>
       : asmuo.jar.adresas
         ? asmuo.jar.adresas
         : <em class="text-muted">Nenurodytas</em>

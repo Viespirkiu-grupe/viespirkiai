@@ -72,7 +72,7 @@ await Promise.all(images.map(async (img: any) => {
 
         return (
           <div class="gallery-item">
-            <a href={`/failas/${img.id}`} target="_blank" style={`aspect-ratio: ${ratio}`}>
+            <a href={`/failas/${img.id}`} target="_blank" rel="noopener noreferrer" style={`aspect-ratio: ${ratio}`}>
               <img
                 src={`https://failai.viespirkiai.org/${img.id}`}
                 loading="lazy"

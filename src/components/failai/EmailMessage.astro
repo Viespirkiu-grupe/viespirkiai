@@ -35,7 +35,7 @@ const attachments: any[] = Array.isArray(m.attachments) ? m.attachments : [];
       <h3 class="mt-4 mb-2">Priedai</h3>
       <div class="flex flex-col gap-1">
         {attachments.filter(a => a?.name).map(a => (
-          <a href={`https://failai.viespirkiai.org/${failasId}/${a.name}`} target="_blank">{a.name}</a>
+          <a href={`https://failai.viespirkiai.org/${failasId}/${a.name}`} target="_blank" rel="noopener noreferrer">{a.name}</a>
         ))}
       </div>
     </>

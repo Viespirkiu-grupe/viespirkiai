@@ -1,4 +1,6 @@
 ---
+import { externalLinkRel } from '../lib/html.ts';
+
 interface Props {
   href?: string;
   type?: 'button' | 'submit' | 'reset';
@@ -37,6 +39,7 @@ const classes = [
   disabled ? 'disabled' : '',
   className,
 ].filter(Boolean).join(' ');
+const resolvedRel = externalLinkRel(target, rel);
 ---
 
 {href ? (
@@ -46,7 +49,7 @@ const classes = [
     aria-label={ariaLabel}
     title={title}
     target={target}
-    rel={rel}
+    rel={resolvedRel}
     id={id}
   >
     <slot />

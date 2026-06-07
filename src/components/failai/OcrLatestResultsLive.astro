@@ -1,5 +1,6 @@
 ---
 import OcrLatestResultsTable from './OcrLatestResultsTable.astro';
+import { jsonForHtmlScript } from '../../design-system/lib/html.ts';
 
 interface Props {
   items: any[];
@@ -18,7 +19,7 @@ const initialFirstKey = JSON.stringify([
   data-first-key={initialFirstKey}
 >
   <OcrLatestResultsTable items={items} />
-  <script is:inline type="application/json" data-ocr-initial-items set:html={JSON.stringify(items)}></script>
+  <script is:inline type="application/json" data-ocr-initial-items set:html={jsonForHtmlScript(items)}></script>
 </div>
 
 <script>

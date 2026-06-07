@@ -10,12 +10,7 @@ import SiteFooterShell from '@design-system/components/SiteFooterShell.astro';
   <a href="/analitika">↗ Analitika</a>
   <a href="/kodas">↗ Kodas</a>
   <a href="/privatumas">↗ Privatumo politika</a>
-  <button onclick="
-    const meta = document.querySelector('meta[data-font]');
-    const next = meta.dataset.font === 'comic' ? 'ubuntu' : 'comic';
-    meta.dataset.font = next;
-    document.cookie = 'font=' + next + ';path=/;max-age=31536000';
-  ">↗ Pakeisti šriftą</button>
+  <button type="button" id="fontToggle">↗ Pakeisti šriftą</button>
 
   <p slot="disclaimer" class="text-center text-sm text-muted mt-4 mb-0">
     <em>
@@ -25,3 +20,13 @@ import SiteFooterShell from '@design-system/components/SiteFooterShell.astro';
     </em>
   </p>
 </SiteFooterShell>
+
+<script>
+  document.getElementById('fontToggle')?.addEventListener('click', () => {
+    const meta = document.querySelector<HTMLElement>('meta[data-font]');
+    if (!meta) return;
+    const next = meta.dataset.font === 'comic' ? 'ubuntu' : 'comic';
+    meta.dataset.font = next;
+    document.cookie = `font=${next};path=/;max-age=31536000`;
+  });
+</script>
