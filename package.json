@@ -1,11 +1,11 @@
 {
     "name": "viespirkiai",
     "version": "1.0.0",
-    "main": "index.js",
+    "main": "start-server.mjs",
     "scripts": {
         "dev": "astro dev",
         "start": "node start-server.mjs",
-        "build": "astro build",
+        "build": "ASTRO_NO_PUBLIC_COPY=1 astro build && node scripts/linkPublic.mjs",
         "test": "vitest run",
         "test:integration": "vitest run --config vitest.integration.config.ts",
         "check": "astro check",

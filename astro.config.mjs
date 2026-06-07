@@ -10,6 +10,11 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   output: 'server',
   adapter: node({ mode: 'standalone' }),
+  // Per build (npm run build) public/ NEkopijuojamas į dist/client (kad nedubliuotų
+  // ~34MB). Vietoj kopijos po build'o sukuriami symlink'ai (scripts/linkPublic.mjs),
+  // tad standalone serveris statinius failus ima tiesiai iš public/.
+  // Dev metu (astro dev) public/ tiekiamas kaip įprasta.
+  publicDir: process.env.ASTRO_NO_PUBLIC_COPY ? './.nopublic' : './public',
   prefetch: {
     prefetchAll: true,
     defaultStrategy: 'hover',
