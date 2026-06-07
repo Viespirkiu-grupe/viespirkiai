@@ -1,0 +1,31 @@
+---
+import BvpzMiniTreeNode from './BvpzMiniTreeNode.astro';
+
+export interface BvpzMiniTreeNodeData {
+  mask: string;
+  pavadinimas: string;
+  current?: boolean;
+  children: BvpzMiniTreeNodeData[];
+}
+
+interface Props {
+  node: BvpzMiniTreeNodeData;
+}
+
+const { node } = Astro.props;
+---
+
+<li>
+  <a
+    class:list={['bvpz-mini-tree__row', { 'bvpz-mini-tree__row--current': node.current }]}
+    href={`/dokumentai?search=${encodeURIComponent(node.mask)}&mode=phrase`}
+  >
+    <span class="cell-mono">{node.mask}</span>
+    <span>{node.pavadinimas}</span>
+  </a>
+  {node.children.length > 0 && (
+    <ul>
+      {node.children.map((child) => <BvpzMiniTreeNode node={child} />)}
+    </ul>
+  )}
+</li>

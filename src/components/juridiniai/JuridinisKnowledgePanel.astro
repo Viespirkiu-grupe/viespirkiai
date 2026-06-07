@@ -1,0 +1,183 @@
+---
+import Map from '@design-system/components/maps/Map.astro';
+import { fmtEur, fmtNumber } from '../../lib/formatters.ts';
+import type { JuridinisPanel } from '../../lib/searchJuridinisPanel.ts';
+
+interface Props {
+  juridinis: JuridinisPanel;
+}
+
+const { juridinis } = Astro.props;
+const isActive = juridinis.statusoPavadinimas === 'Teisinis stat neįregistruotas';
+const money = (value: number | null) => value != null ? `${fmtEur(value)} €` : null;
+const hasStats = juridinis.darbuotojai != null || juridinis.vidutinisAtlyginimas != null
+  || juridinis.pirkimuSuma != null || juridinis.pardavimuSuma != null;
+---
+
+<aside class:list={['juridinis-panel', { 'juridinis-panel--has-map': juridinis.location }]} aria-label="Juridinio asmens informacija">
+  <div class="juridinis-panel__content">
+    <div class="juridinis-panel__eyebrow">
+      <span>Juridinis asmuo</span>
+      <span class="cell-mono">{juridinis.jarKodas}</span>
+    </div>
+    <h2><a href={`/asmuo/${juridinis.jarKodas}`}>{juridinis.pavadinimas}</a></h2>
+    {juridinis.formosPavadinimas && <p class="juridinis-panel__form">{juridinis.formosPavadinimas}</p>}
+
+    {hasStats && (
+      <div class="juridinis-panel__stats">
+        {juridinis.darbuotojai != null && <div><span>Darbuotojai</span><strong>{fmtNumber(juridinis.darbuotojai)}</strong></div>}
+        {juridinis.vidutinisAtlyginimas != null && <div><span>Vid. atlyginimas</span><strong>{money(juridinis.vidutinisAtlyginimas)}</strong></div>}
+        {juridinis.pirkimuSuma != null && <div><span>Viešieji pirkimai</span><strong>{money(juridinis.pirkimuSuma)}</strong></div>}
+        {juridinis.pardavimuSuma != null && <div><span>Viešieji pardavimai</span><strong>{money(juridinis.pardavimuSuma)}</strong></div>}
+      </div>
+    )}
+
+    <dl>
+      {juridinis.registravimoData && <div><dt>Įregistruota</dt><dd>{juridinis.registravimoData}</dd></div>}
+      {juridinis.adresas && <div><dt>Adresas</dt><dd>{juridinis.adresas}</dd></div>}
+      {juridinis.ekonominesVeiklosPavadinimas && <div><dt>Veikla</dt><dd>{juridinis.ekonominesVeiklosPavadinimas}{juridinis.ekonominesVeiklosKodas && <> <span class="text-muted">({juridinis.ekonominesVeiklosKodas})</span></>}</dd></div>}
+      {juridinis.istatinisKapitalas != null && <div><dt>Įstatinis kapitalas</dt><dd>{juridinis.istatinisKapitalas.toLocaleString('lt-LT', { style: 'currency', currency: juridinis.istatinioValiuta || 'EUR' })}</dd></div>}
+      {juridinis.vmiMokesciai != null && <div><dt>VMI mokesčiai</dt><dd>{money(juridinis.vmiMokesciai)} {juridinis.vmiData && <span class="text-muted">({juridinis.vmiData})</span>}</dd></div>}
+      {juridinis.statusoPavadinimas && !isActive && <div><dt>Statusas</dt><dd>{juridinis.statusoPavadinimas}</dd></div>}
+    </dl>
+
+    <nav class="juridinis-panel__actions" aria-label="Juridinio asmens nuorodos">
+      <a class="btn btn-primary juridinis-panel__profile" href={`/asmuo/${juridinis.jarKodas}`}>
+        Peržiūrėti visą informaciją
+      </a>
+      <div class="juridinis-panel__secondary-actions">
+        <a class="btn btn-outline btn-sm" href={`/pirkejas/${juridinis.jarKodas}`}>Pirkimai</a>
+        <a class="btn btn-outline btn-sm" href={`/tiekejas/${juridinis.jarKodas}`}>Pardavimai</a>
+        <a class="btn btn-outline btn-sm" href={`https://liteko.teismai.lt/viesasprendimupaieska/paieska.aspx?txt=${juridinis.jarKodas}`} target="_blank" rel="noopener">Bylos ↗</a>
+      </div>
+    </nav>
+  </div>
+
+  {juridinis.location && (
+    <div class="juridinis-panel__map">
+      <Map
+        id={`dokumentai-juridinis-${juridinis.jarKodas}`}
+        lat={juridinis.location[0]}
+        lon={juridinis.location[1]}
+        zoom={15}
+        height="190px"
+        style="border:0 !important; border-radius:0 !important;"
+      />
+    </div>
+  )}
+</aside>
+
+<style>
+  .juridinis-panel {
+    grid-area: panel;
+    align-self: start;
+    padding: 0;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+    overflow: hidden;
+  }
+  .juridinis-panel__content {
+    padding: 24px;
+  }
+  .juridinis-panel__eyebrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 8px;
+    color: var(--gray);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  h2 {
+    margin: 0;
+    font-size: var(--text-2xl);
+    line-height: 1.25;
+  }
+  h2 a {
+    color: var(--black);
+    text-decoration: none;
+  }
+  h2 a:hover { text-decoration: underline; }
+  .juridinis-panel__form {
+    margin: 6px 0 20px;
+    color: var(--gray);
+    font-size: var(--text-sm);
+  }
+  .juridinis-panel__stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 22px;
+  }
+  .juridinis-panel__stats div {
+    min-width: 0;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    background: var(--lightest-gray);
+  }
+  .juridinis-panel__stats span {
+    display: block;
+    color: var(--gray);
+    font-size: var(--text-xs);
+  }
+  .juridinis-panel__stats strong {
+    display: block;
+    margin-top: 4px;
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    overflow-wrap: anywhere;
+  }
+  dl {
+    display: grid;
+    gap: 12px;
+    margin: 0 0 18px;
+  }
+  dl div { display: grid; gap: 2px; }
+  dt {
+    color: var(--gray);
+    font-size: var(--text-xs);
+  }
+  dd {
+    margin: 0;
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+  .juridinis-panel__map {
+    margin: 0;
+    width: 100%;
+    border-top: var(--border);
+  }
+  .juridinis-panel__map :global(.map-container) {
+    width: 100%;
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+  .juridinis-panel__map :global(.leaflet-container) {
+    border-radius: 0 !important;
+  }
+  .juridinis-panel__actions {
+    display: grid;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .juridinis-panel__profile {
+    position: relative;
+    z-index: 1;
+    justify-content: center;
+    width: 100%;
+  }
+  .juridinis-panel__secondary-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .juridinis-panel__secondary-actions .btn {
+    justify-content: center;
+    min-width: 0;
+    padding-inline: 8px;
+  }
+</style>

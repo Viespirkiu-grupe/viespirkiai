@@ -1,11 +1,26 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import SearchForm from '@design-system/components/content/SearchForm.astro';
+import SearchSuggest from '@design-system/components/content/SearchSuggest.astro';
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import TimingWaterfall from '@design-system/components/TimingWaterfall.astro';
 import EmptyState from '@design-system/components/EmptyState.astro';
+import BvpzKnowledgePanel from '../../components/bvpz/BvpzKnowledgePanel.astro';
+import JuridinisKnowledgePanel from '../../components/juridiniai/JuridinisKnowledgePanel.astro';
+import SutartisKnowledgePanel from '../../components/sutartis/SutartisKnowledgePanel.astro';
 import config from '../../lib/config.ts';
 import { getColorScheme, getFont } from '../../lib/failai.js';
-import { searchDokumentai, extractInlineTokens, type DokumentasHit, type FacetOption } from '../../lib/searchDokumentai.ts';
+import { findSingleBvpzPanel } from '../../lib/searchBvpzPanel.ts';
+import { findSingleJuridinisPanel } from '../../lib/searchJuridinisPanel.ts';
+import { findSutartisPanel } from '../../lib/searchSutartisPanel.ts';
+import {
+  DOKUMENTAI_SORT_OPTIONS,
+  searchDokumentai,
+  extractInlineTokens,
+  type DokumentasHit,
+  type FacetOption,
+  type DokumentaiSort,
+} from '../../lib/searchDokumentai.ts';
 
 if (!config.enableDokumentaiSearch) return Astro.redirect('/');
 
@@ -16,6 +31,8 @@ const url = Astro.url;
 const params = url.searchParams;
 const q = (params.get('search') ?? params.get('q') ?? '').trim();
 const page = Math.max(1, parseInt(params.get('page') ?? params.get('p') ?? '1', 10) || 1);
+const mode = params.get('mode') === 'words' ? 'words' : 'phrase';
+const requestedSort = params.get('sort') ?? undefined;
 
 const rawTypeFilter = params.getAll('type').flatMap((v) => v.split(','));
 const rawHostFilter = params.getAll('host').flatMap((v) => v.split(','));
@@ -25,6 +42,15 @@ const rawLangFilter = params.getAll('lang').flatMap((v) => v.split(','));
 const rawSavFilter = params.getAll('sav').flatMap((v) => v.split(','));
 const rawApskritisFilter = params.getAll('apskritis').flatMap((v) => v.split(','));
 const rawSourceFilter = params.getAll('source').flatMap((v) => v.split(','));
+
+// Geografinė sritis (stačiakampis) — filtruojama per Quickwit lat/lon range.
+const rawArea = {
+  minLat: params.get('minLat') ?? undefined,
+  maxLat: params.get('maxLat') ?? undefined,
+  minLon: params.get('minLon') ?? undefined,
+  maxLon: params.get('maxLon') ?? undefined,
+};
+const hasArea = Boolean(rawArea.minLat && rawArea.maxLat && rawArea.minLon && rawArea.maxLon);
 
 // Promote inline `type:`/`host:`/`jar:`/`ext:` tokens out of the search box.
 {
@@ -42,6 +68,8 @@ const rawSourceFilter = params.getAll('source').flatMap((v) => v.split(','));
     if (h.length) sp.set('host', h.join(','));
     if (j.length) sp.set('jar', j.join(','));
     if (e.length) sp.set('ext', e.join(','));
+    sp.set('mode', mode);
+    if (requestedSort && requestedSort !== 'relevance') sp.set('sort', requestedSort);
     if (page > 1) sp.set('page', String(page));
     return Astro.redirect(`/dokumentai?${sp.toString()}`);
   }
@@ -49,26 +77,70 @@ const rawSourceFilter = params.getAll('source').flatMap((v) => v.split(','));
 
 const hasFilters = Boolean(
   rawTypeFilter.length || rawHostFilter.length || rawJarFilter.length || rawExtFilter.length
-  || rawLangFilter.length || rawSavFilter.length || rawApskritisFilter.length || rawSourceFilter.length,
+  || rawLangFilter.length || rawSavFilter.length || rawApskritisFilter.length || rawSourceFilter.length
+  || hasArea,
 );
 const showHome = !q && !hasFilters;
 
 let result: Awaited<ReturnType<typeof searchDokumentai>> | null = null;
+let juridinisPanel: Awaited<ReturnType<typeof findSingleJuridinisPanel>> = null;
+let bvpzPanel: Awaited<ReturnType<typeof findSingleBvpzPanel>> = null;
+let sutartisPanel: Awaited<ReturnType<typeof findSutartisPanel>> = null;
 let errorMessage = '';
 if (!showHome) {
   try {
-    result = await searchDokumentai({
-      q,
-      page,
-      type: rawTypeFilter,
-      host: rawHostFilter,
-      jar: rawJarFilter,
-      ext: rawExtFilter,
-      lang: rawLangFilter,
-      sav: rawSavFilter,
-      apskritis: rawApskritisFilter,
-      source: rawSourceFilter,
-    });
+    const panelsStart = performance.now();
+    let juridinisDuration = 0;
+    let bvpzDuration = 0;
+    let sutartisDuration = 0;
+    const timedJuridinis = async () => {
+      const start = performance.now();
+      const panel = await findSingleJuridinisPanel(q);
+      juridinisDuration = performance.now() - start;
+      return panel;
+    };
+    const timedBvpz = async () => {
+      const start = performance.now();
+      const panel = await findSingleBvpzPanel(q);
+      bvpzDuration = performance.now() - start;
+      return panel;
+    };
+    const timedSutartis = async () => {
+      const start = performance.now();
+      const panel = await findSutartisPanel(q);
+      sutartisDuration = performance.now() - start;
+      return panel;
+    };
+    [result, juridinisPanel, bvpzPanel, sutartisPanel] = await Promise.all([
+      searchDokumentai({
+        q,
+        page,
+        type: rawTypeFilter,
+        host: rawHostFilter,
+        jar: rawJarFilter,
+        ext: rawExtFilter,
+        lang: rawLangFilter,
+        sav: rawSavFilter,
+        apskritis: rawApskritisFilter,
+        source: rawSourceFilter,
+        minLat: rawArea.minLat,
+        maxLat: rawArea.maxLat,
+        minLon: rawArea.minLon,
+        maxLon: rawArea.maxLon,
+        sort: requestedSort,
+        mode,
+      }),
+      timedJuridinis(),
+      timedBvpz(),
+      timedSutartis(),
+    ]);
+    result.timings.push(
+      { label: 'Juridinis asmuo', phase: 'pg', start: 0, duration: Math.round(juridinisDuration) },
+      { label: 'BVPŽ kodas', phase: 'pg', start: 0, duration: Math.round(bvpzDuration) },
+      { label: 'Sutartis', phase: 'pg', start: 0, duration: Math.round(sutartisDuration) },
+    );
+    const totalElapsed = performance.now() - panelsStart;
+    result.elapsed = (totalElapsed / 1000).toFixed(2);
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : 'Paieška nepavyko.';
   }
@@ -89,7 +161,9 @@ const langOptions: FacetOption[] = result?.langOptions ?? [];
 const savOptions: FacetOption[] = result?.savOptions ?? [];
 const apskritisOptions: FacetOption[] = result?.apskritisOptions ?? [];
 const sourceOptions: FacetOption[] = result?.sourceOptions ?? [];
+const bbox = result?.bbox ?? null;
 const hits: DokumentasHit[] = result?.hits ?? [];
+const sort: DokumentaiSort = result?.sort ?? 'relevance';
 
 const TIPAS_OPTS = [
   { value: 'crawledPage', label: 'Tinklalapis' },
@@ -102,7 +176,13 @@ const TYPE_LABEL: Record<string, string> = Object.fromEntries(TIPAS_OPTS.map((o)
 function fmt(n: number | null | undefined) {
   return n != null ? Number(n).toLocaleString('lt-LT') : '';
 }
-function buildUrl(overrides: { type?: string[]; host?: string[]; jar?: string[]; ext?: string[]; lang?: string[]; sav?: string[]; apskritis?: string[]; source?: string[]; p?: number | null }) {
+function fmtDate(value: Date | string | null | undefined) {
+  return value ? new Date(value).toLocaleDateString('lt-LT') : null;
+}
+function dateKey(value: Date | string | null | undefined) {
+  return value ? new Date(value).toISOString().slice(0, 10) : null;
+}
+function buildUrl(overrides: { type?: string[]; host?: string[]; jar?: string[]; ext?: string[]; lang?: string[]; sav?: string[]; apskritis?: string[]; source?: string[]; area?: typeof bbox; sort?: DokumentaiSort; p?: number | null }) {
   const t = overrides.type ?? typeFilter;
   const h = overrides.host ?? hostFilter;
   const j = overrides.jar ?? jarFilter;
@@ -111,9 +191,13 @@ function buildUrl(overrides: { type?: string[]; host?: string[]; jar?: string[];
   const s = overrides.sav ?? savFilter;
   const a = overrides.apskritis ?? apskritisFilter;
   const so = overrides.source ?? sourceFilter;
+  const ar = overrides.area === undefined ? bbox : overrides.area;
+  const selectedSort = overrides.sort ?? sort;
   const p = overrides.p ?? null;
   const sp = new URLSearchParams();
   if (q) sp.set('search', q);
+  sp.set('mode', mode);
+  if (selectedSort !== 'relevance') sp.set('sort', selectedSort);
   if (t.length) sp.set('type', t.join(','));
   if (h.length) sp.set('host', h.join(','));
   if (j.length) sp.set('jar', j.join(','));
@@ -122,9 +206,16 @@ function buildUrl(overrides: { type?: string[]; host?: string[]; jar?: string[];
   if (s.length) sp.set('sav', s.join(','));
   if (a.length) sp.set('apskritis', a.join(','));
   if (so.length) sp.set('source', so.join(','));
+  if (ar) {
+    sp.set('minLat', String(ar.minLat));
+    sp.set('maxLat', String(ar.maxLat));
+    sp.set('minLon', String(ar.minLon));
+    sp.set('maxLon', String(ar.maxLon));
+  }
   if (p) sp.set('page', String(p));
   return `/dokumentai?${sp.toString()}`;
 }
+const areaClearUrl = buildUrl({ area: null });
 function toggle(list: string[], val: string) {
   return list.includes(val) ? list.filter((v) => v !== val) : [...list, val];
 }
@@ -137,7 +228,14 @@ const savToggleUrl = (v: string) => buildUrl({ sav: v ? toggle(savFilter, v) : [
 const apskritisToggleUrl = (v: string) => buildUrl({ apskritis: v ? toggle(apskritisFilter, v) : [] });
 const sourceToggleUrl = (v: string) => buildUrl({ source: v ? toggle(sourceFilter, v) : [] });
 const buildPageUrl = (p: number) => buildUrl({ p });
-const clearUrl = q ? `/dokumentai?search=${encodeURIComponent(q)}` : '/dokumentai';
+const clearUrl = (() => {
+  const sp = new URLSearchParams();
+  if (q) sp.set('search', q);
+  sp.set('mode', mode);
+  if (sort !== 'relevance') sp.set('sort', sort);
+  const qs = sp.toString();
+  return qs ? `/dokumentai?${qs}` : '/dokumentai';
+})();
 
 const shownHosts: FacetOption[] = [...hostOptions];
 for (const sel of hostFilter) {
@@ -183,10 +281,46 @@ const { visible: savVisible, hidden: savHidden } = facetLists(savOptions, savFil
 const { visible: apskritisVisible, hidden: apskritisHidden } = facetLists(apskritisOptions, apskritisFilter, 6);
 
 const activeFilterCount = typeFilter.length + hostFilter.length + jarFilter.length + extFilter.length
-  + langFilter.length + savFilter.length + apskritisFilter.length + sourceFilter.length;
+  + langFilter.length + savFilter.length + apskritisFilter.length + sourceFilter.length + (bbox ? 1 : 0);
 
 const totalPages = result?.totalPages ?? 0;
 const pageNums = result?.pageNums ?? [];
+
+// Results meta: count + a hoverable duration that reveals the per-phase timing
+// waterfall (which engine/index, how long each step took). Mirrors the sutarčių
+// paieškos `(0.25s, quickwit)` source on the home page.
+const resultsMetaHtml = (() => {
+  const prefix = result?.approximate ? 'Apie ' : '';
+  const count = (result?.total ?? 0).toLocaleString('lt-LT');
+  const elapsed = result?.elapsed ?? '';
+  const engine = result?.engine ?? '';
+  const timings = result?.timings ?? [];
+  const timingsAttr = timings.length
+    ? ` data-timings='${JSON.stringify(timings).replace(/'/g, '&#39;')}'`
+    : '';
+  const source = `<span class="timing-source"${timingsAttr}>(${elapsed} s · ${engine})</span>`;
+  return `${prefix}${count} rezultatų ${source}`;
+})();
+
+// Torn-edge zigzag for the mobile knowledge panel. A whole number of teeth
+// spanning the full viewBox width, stretched edge-to-edge with
+// preserveAspectRatio="none" so peaks always land exactly on both corners (the
+// tear meets the side borders cleanly). `tearLine` is the stroked seam;
+// `tearFill` closes it off below to erase the straight cut underneath.
+const TEAR_TEETH = 16;
+const TEAR_UNIT = 20;                       // viewBox units per tooth
+const TEAR_W = TEAR_TEETH * TEAR_UNIT;      // total viewBox width
+const TEAR_H = 10;                          // viewBox height (px-ish)
+const TEAR_PEAK = 1;                        // y of peaks (leave room for stroke)
+const TEAR_VALLEY = 8;                      // y of valleys
+let tearZig = `M0 ${TEAR_PEAK}`;
+for (let i = 0; i < TEAR_TEETH; i++) {
+  const mid = i * TEAR_UNIT + TEAR_UNIT / 2;
+  const end = (i + 1) * TEAR_UNIT;
+  tearZig += ` L${mid} ${TEAR_VALLEY} L${end} ${TEAR_PEAK}`;
+}
+const tearLine = tearZig;
+const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
 ---
 
 <Layout
@@ -202,6 +336,8 @@ const pageNums = result?.pageNums ?? [];
           title="Dokumentų paieška"
           searchValue={q}
           searchPlaceholder="Ieškoti dokumentų…"
+          searchModes={true}
+          searchMode={mode}
         />
         <section class="dok-intro">
           <p class="text-muted text-sm">
@@ -218,6 +354,8 @@ const pageNums = result?.pageNums ?? [];
           title="Dokumentų paieška"
           searchValue={q}
           searchPlaceholder="Ieškoti dokumentų…"
+          searchModes={true}
+          searchMode={mode}
         />
         <EmptyState message={errorMessage} />
       </div>
@@ -225,13 +363,14 @@ const pageNums = result?.pageNums ?? [];
       <div class="dok-shell">
         <aside class="dok-sidebar" id="dokSidebar" aria-label="Filtrai">
           <div class="dok-sidebar-head">
-            <button type="button" class="dok-sidebar-title" id="dokFiltersToggle" aria-expanded="false" aria-controls="dokSidebar">
+            <button type="button" class="dok-sidebar-title" id="dokFiltersToggle" aria-expanded="false" aria-controls="dokFiltersBody">
               Filtrai{activeFilterCount > 0 && <span class="dok-filters-count">{activeFilterCount}</span>}
               <span class="dok-filters-chevron" aria-hidden="true"></span>
             </button>
             {hasFilters && <a href={clearUrl} class="dok-sidebar-clear">Panaikinti</a>}
           </div>
 
+          <div class="dok-filters-body" id="dokFiltersBody">
           <section class="dok-filter-section">
             <span class="dok-filter-section-label">Tipas</span>
             <a href={typeToggleUrl('')} data-param="type" class={`dok-filter-opt dok-filter-all${typeFilter.length === 0 ? ' is-selected' : ''}`}>
@@ -341,22 +480,14 @@ const pageNums = result?.pageNums ?? [];
               </a>
             ))}
             {extHidden.length > 0 && (
-              <>
-                <div class="dok-more-list" hidden>
-                  {extHidden.map((opt) => (
-                    <a href={extToggleUrl(opt.value)} data-param="ext" data-value={opt.value} class={`dok-filter-opt${extFilter.includes(opt.value) ? ' is-selected' : ''}`}>
-                      <span class="dok-filter-opt-label">.{opt.value}</span>
-                      {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
-                    </a>
-                  ))}
-                </div>
-                <button class="dok-more-btn" type="button">Rodyti daugiau</button>
-              </>
+              <button
+                class="dok-more-btn"
+                type="button"
+                data-facet-modal="extension"
+                data-facet-param="ext"
+                data-facet-title="Plėtinys"
+              >Daugiau</button>
             )}
-            <form class="dok-input-form" id="dok-ext-form" autocomplete="off">
-              <input id="dok-ext-input" type="text" class="dok-input" placeholder="pvz. pdf" aria-label="Įvesti plėtinį" />
-              <button type="submit" class="dok-input-btn" aria-label="Pridėti">+</button>
-            </form>
           </section>
 
           {(langVisible.length > 0 || langFilter.length > 0) && (
@@ -442,20 +573,44 @@ const pageNums = result?.pageNums ?? [];
               )}
             </section>
           )}
+
+          <section class="dok-filter-section">
+            <span class="dok-filter-section-label">Vieta</span>
+            {bbox && (
+              <a href={areaClearUrl} class="dok-filter-opt is-selected" title="Panaikinti vietą">
+                <span class="dok-filter-opt-label">Pasirinkta vieta</span>
+              </a>
+            )}
+            <button type="button" class="dok-area-link" id="dokAreaBtn">Pasirinkti</button>
+          </section>
+          </div>
         </aside>
 
-        <div class="dok-content" id="dokContent">
+        <div class="dok-search">
           <SearchForm
             title="Dokumentų paieška"
             searchValue={q}
             searchPlaceholder="Ieškoti dokumentų…"
             hideTitle={true}
+            searchModes={true}
+            searchMode={mode}
           />
+        </div>
+
+        <div class="dok-content" id="dokContent">
           <div class="dok-loading" aria-hidden="true"><span class="spinner spinner-lg"></span></div>
           {hits.length > 0 && (
-            <p class="dok-results-meta text-xs text-muted">
-              {result?.approximate ? 'Apie ' : ''}{(result?.total ?? 0).toLocaleString('lt-LT')} rezultatų ({result?.elapsed} sek.)
-            </p>
+            <div class="dok-results-toolbar">
+              <p class="dok-results-meta text-xs text-muted" set:html={resultsMetaHtml} />
+              <label class="dok-sort">
+                <span class="sr-only">Rikiuoti pagal</span>
+                <select id="dokSort" aria-label="Rikiuoti pagal">
+                  {DOKUMENTAI_SORT_OPTIONS.map((option) => (
+                    <option value={option.value} selected={sort === option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
           )}
 
           {hits.length === 0 ? (
@@ -470,7 +625,17 @@ const pageNums = result?.pageNums ?? [];
                 const internalUrl = hit.failasId ? `/failas/${hit.failasId}` : null;
                 const targetUrl = internalUrl || externalUrl || '#';
                 const isExternal = !internalUrl && !!externalUrl;
-                const happened = hit.happenedAt ? new Date(hit.happenedAt).toLocaleDateString('lt-LT') : null;
+                const happened = fmtDate(hit.happenedAt);
+                const created = fmtDate(hit.createdAt);
+                const updated = fmtDate(hit.updatedAt);
+                const discovered = fmtDate(hit.discoveredAt);
+                const happenedKey = dateKey(hit.happenedAt);
+                const createdKey = dateKey(hit.createdAt);
+                const updatedKey = dateKey(hit.updatedAt);
+                const discoveredKey = dateKey(hit.discoveredAt);
+                const location = [hit.savivaldybe, hit.apskritis]
+                  .filter((value, index, values) => value && values.indexOf(value) === index)
+                  .join(', ');
                 return (
                   <ResultCardShell clickable={true} className="dok-card">
                     <div slot="meta" class="dok-provenance">
@@ -493,8 +658,18 @@ const pageNums = result?.pageNums ?? [];
                     )}
                     <dl slot="footer" class="result-card-meta dok-meta">
                       {hit.type && <div><dt class="sr-only">Tipas</dt><dd>{TYPE_LABEL[hit.type] || hit.type}</dd></div>}
+                      {hit.source && <div title="Šaltinis"><dt class="sr-only">Šaltinis</dt><dd>{SOURCE_LABEL[hit.source.toLowerCase()] || hit.source}</dd></div>}
                       {hit.extension && <div><dt class="sr-only">Plėtinys</dt><dd>{String(hit.extension).toUpperCase()}</dd></div>}
-                      {happened && <div><dt class="sr-only">Data</dt><dd>{happened}</dd></div>}
+                      {hit.language && <div><dt class="sr-only">Kalba</dt><dd>{LANG_LABEL[hit.language] || hit.language.toUpperCase()}</dd></div>}
+                      {hit.pageCount != null && hit.pageCount > 0 && <div><dt class="sr-only">Puslapiai</dt><dd>{fmt(hit.pageCount)} psl.</dd></div>}
+                      {hit.wordCount != null && hit.wordCount > 0 && <div><dt class="sr-only">Žodžiai</dt><dd>{fmt(hit.wordCount)} žodž.</dd></div>}
+                      {happened && <div title="Dokumento data"><dt>Data</dt><dd>{happened}</dd></div>}
+                      {created && createdKey !== happenedKey && <div title="Sukūrimo data"><dt>Sukurta</dt><dd>{created}</dd></div>}
+                      {updated && updatedKey !== happenedKey && updatedKey !== createdKey && <div title="Atnaujinimo data"><dt>Atnaujinta</dt><dd>{updated}</dd></div>}
+                      {discovered && discoveredKey !== happenedKey && discoveredKey !== createdKey && discoveredKey !== updatedKey && <div title="Aptikimo data"><dt>Aptikta</dt><dd>{discovered}</dd></div>}
+                      {hit.autorius && <div title="Autorius"><dt class="sr-only">Autorius</dt><dd>{hit.autorius}</dd></div>}
+                      {location && <div title="Vietovė"><dt class="sr-only">Vietovė</dt><dd>{location}</dd></div>}
+                      {hit.istaigaJar && <div title="Įstaigos JAR kodas"><dt>JAR</dt><dd>{hit.istaigaJar}</dd></div>}
                     </dl>
                   </ResultCardShell>
                 );
@@ -524,12 +699,82 @@ const pageNums = result?.pageNums ?? [];
             </nav>
           )}
         </div>
+        {(sutartisPanel || juridinisPanel || bvpzPanel) && (
+          <div class="dok-panel" id="dokPanel">
+            <div class="dok-panel__clip">
+              {sutartisPanel
+                ? <SutartisKnowledgePanel sutartis={sutartisPanel} />
+                : juridinisPanel
+                  ? <JuridinisKnowledgePanel juridinis={juridinisPanel} />
+                  : bvpzPanel && <BvpzKnowledgePanel bvpz={bvpzPanel} />
+              }
+            </div>
+            {/* Torn /\/\/\ edge. Inline SVG (not a CSS mask) so the tear has a
+               real stroked line — otherwise it's invisible on a white-on-white
+               card. Colours come from CSS vars, so it follows the theme. The
+               whole-teeth path stretched edge-to-edge keeps the seam aligned
+               with the side borders and a non-scaling 1px stroke matches them. */}
+            <svg class="dok-panel__tear" aria-hidden="true" viewBox={`0 0 ${TEAR_W} ${TEAR_H}`} preserveAspectRatio="none">
+              <path class="dok-panel__tear-fill" d={tearFill} />
+              <path class="dok-panel__tear-line" d={tearLine} vector-effect="non-scaling-stroke" />
+            </svg>
+            <button type="button" class="dok-panel__more" aria-expanded="false">Rodyti daugiau</button>
+          </div>
+        )}
+
+        <div class="dok-facet-modal" id="dokFacetModal" hidden>
+          <div class="dok-facet-modal__backdrop" data-facet-close></div>
+          <div class="dok-facet-modal__panel" role="dialog" aria-modal="true" aria-labelledby="dokFacetModalTitle">
+            <header class="dok-facet-modal__head">
+              <h2 class="dok-facet-modal__title" id="dokFacetModalTitle">Filtras</h2>
+              <button type="button" class="dok-facet-modal__close" data-facet-close aria-label="Užverti">✕</button>
+            </header>
+            <div class="dok-facet-modal__tools">
+              <input type="search" class="dok-facet-modal__search" placeholder="Filtruoti arba įvesti savo…" aria-label="Filtruoti arba įvesti savo reikšmę" autocomplete="off" />
+            </div>
+            <div class="dok-facet-modal__list" role="listbox" aria-multiselectable="true"></div>
+            <footer class="dok-facet-modal__foot">
+              <span class="dok-facet-modal__count" aria-live="polite"></span>
+              <span class="dok-facet-modal__actions">
+                <button type="button" class="btn btn-outline btn-sm" data-facet-clear>Išvalyti</button>
+                <button type="button" class="btn btn-primary btn-sm" data-facet-apply>Taikyti</button>
+              </span>
+            </footer>
+          </div>
+        </div>
+
+        <div class="dok-facet-modal" id="dokAreaModal" hidden>
+          <div class="dok-facet-modal__backdrop" data-area-close></div>
+          <div class="dok-facet-modal__panel" role="dialog" aria-modal="true" aria-labelledby="dokAreaTitle">
+            <header class="dok-facet-modal__head">
+              <h2 class="dok-facet-modal__title" id="dokAreaTitle">Pasirinkti sritį</h2>
+              <button type="button" class="dok-facet-modal__close" data-area-close aria-label="Užverti">✕</button>
+            </header>
+            <div class="dok-area-tools">
+              <button type="button" class="btn btn-outline btn-sm" id="dokAreaDraw">Žymėti sritį</button>
+              <button type="button" class="btn btn-outline btn-sm" id="dokAreaClear" hidden>Išvalyti</button>
+              <span class="dok-area-hint" id="dokAreaHint">Stumdyk žemėlapį laisvai. Spausk „Žymėti sritį" ir tempk stačiakampį.</span>
+            </div>
+            <div class="dok-area-map" id="dokAreaMap"></div>
+            <footer class="dok-facet-modal__foot">
+              <span class="dok-facet-modal__count"></span>
+              <span class="dok-facet-modal__actions">
+                <button type="button" class="btn btn-outline btn-sm" data-area-close>Atšaukti</button>
+                <button type="button" class="btn btn-primary btn-sm" id="dokAreaApply">Ieškoti šioje srityje</button>
+              </span>
+            </footer>
+          </div>
+        </div>
       </div>
     )}
+    <SearchSuggest />
+    <TimingWaterfall />
   </main>
 </Layout>
 
 <script>
+  import { ensureLeafletRuntime } from '@design-system/components/maps/mapRuntime';
+
   // One live, in-memory copy of the query string. Every filter click mutates
   // THIS — not a server-precomputed href — so rapid toggles accumulate instead
   // of clobbering each other (clicking B no longer drops the A you just set).
@@ -615,9 +860,23 @@ const pageNums = result?.pageNums ?? [];
   document
     .querySelectorAll<HTMLAnchorElement>('.dok-sidebar-clear, .dok-pagination a[href]')
     .forEach((a) => a.addEventListener('click', showLoading));
+
+  document.getElementById('dokSort')?.addEventListener('change', (event) => {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    if (value === 'relevance') params.delete('sort');
+    else params.set('sort', value);
+    params.delete('page');
+    navigate(true);
+  });
   // The search form is a bare GET form (only the text input), so a native
   // submit would drop every active filter. Intercept it and navigate via the
   // live `params` instead, which already carries all the facet selections.
+  // Įrašo dabar pasirinktą paieškos režimą (Žodžiai / Tiksli frazė) į `params`.
+  function syncMode() {
+    const checked = document.querySelector<HTMLInputElement>('input[name="mode"]:checked');
+    params.set('mode', checked?.value === 'words' ? 'words' : 'phrase');
+  }
+
   const searchForm = document.getElementById('searchForm');
   searchForm?.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -626,7 +885,18 @@ const pageNums = result?.pageNums ?? [];
     else params.delete('search');
     params.delete('q');
     params.delete('page');
+    syncMode();
     navigate(true);
+  });
+
+  // Perjungus režimą iš karto perleidžiam paiešką (jei jau yra užklausa), kaip ir
+  // su filtrais. Be užklausos – tik įsimenam pasirinkimą kitam pateikimui.
+  document.querySelectorAll<HTMLInputElement>('input[name="mode"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      syncMode();
+      params.delete('page');
+      if (params.get('search') || params.get('q')) navigate(true);
+    });
   });
 
   // Mobile: the "Filtrai" header collapses/expands the facet panel so results
@@ -655,15 +925,401 @@ const pageNums = result?.pageNums ?? [];
   }
   wireAddForm('dok-host-form', 'dok-host-input', 'host', (s) => s.toLowerCase());
   wireAddForm('dok-jar-form', 'dok-jar-input', 'jar');
-  wireAddForm('dok-ext-form', 'dok-ext-input', 'ext', (s) => s.toLowerCase().replace(/^\./, ''));
+  // Plėtinio savo įvedimas dabar gyvena „Daugiau" modale, ne sidebar'e.
+
+  // Assigned by initFacetModal below; called from the facet "show all" buttons.
+  let openFacetModal: (opts: { field: string; param: string; title: string }) => void = () => {};
 
   document.querySelectorAll<HTMLButtonElement>('.dok-more-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
+      // Facets with a `data-facet-modal` open the full-screen "show all" modal
+      // (huge list + custom entry) instead of the inline reveal.
+      if (btn.dataset.facetModal) {
+        openFacetModal({
+          field: btn.dataset.facetModal,
+          param: btn.dataset.facetParam || '',
+          title: btn.dataset.facetTitle || 'Filtras',
+        });
+        return;
+      }
       const more = btn.previousElementSibling as HTMLElement | null;
       if (!more || !more.classList.contains('dok-more-list')) return;
       more.hidden = false;
       btn.remove();
     });
+  });
+
+  // ── Facet "show all" modal ──────────────────────────────────────────────────
+  // A full-screen list of every value for one facet (fetched on demand, up to
+  // ~1k), with a client-side filter, a custom-entry field, and batched apply.
+  // Extensions render as `.pdf`; selection mirrors the live `params`.
+  (function initFacetModal() {
+    const modal = document.getElementById('dokFacetModal');
+    if (!modal) return;
+    const titleEl = modal.querySelector<HTMLElement>('.dok-facet-modal__title')!;
+    const searchEl = modal.querySelector<HTMLInputElement>('.dok-facet-modal__search')!;
+    const listEl = modal.querySelector<HTMLElement>('.dok-facet-modal__list')!;
+    const countEl = modal.querySelector<HTMLElement>('.dok-facet-modal__count')!;
+
+    let field = '';
+    let param = '';
+    let selected = new Set<string>();      // working copy; committed on Taikyti
+    let options: { value: string; count: number | null }[] = [];
+    let reqSeq = 0;
+
+    const isExt = () => param === 'ext';
+    const normalize = (v: string) => (isExt() ? v.toLowerCase().replace(/^\./, '') : v.trim());
+    const display = (v: string) => (isExt() ? `.${v}` : v);
+
+    function setOpen(open: boolean) {
+      modal!.hidden = !open;
+      document.documentElement.style.overflow = open ? 'hidden' : '';
+      if (open) searchEl.focus();
+    }
+
+    function updateCount() {
+      countEl.textContent = selected.size ? `Pažymėta: ${selected.size}` : '';
+    }
+
+    function toggle(value: string, row?: HTMLElement) {
+      if (selected.has(value)) selected.delete(value);
+      else selected.add(value);
+      const on = selected.has(value);
+      row?.classList.toggle('is-selected', on);
+      row?.setAttribute('aria-selected', String(on));
+      updateCount();
+    }
+
+    // Add whatever is typed as a custom value (the single input both filters and
+    // adds). Re-renders so it shows up selected and the "add" row disappears.
+    function addTyped() {
+      const value = normalize(searchEl.value);
+      if (!value) return;
+      selected.add(value);
+      searchEl.value = '';
+      updateCount();
+      render();
+    }
+
+    function makeRow(value: string, count: number | null) {
+      const on = selected.has(value);
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'dok-facet-row' + (on ? ' is-selected' : '');
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(on));
+      const label = document.createElement('span');
+      label.className = 'dok-facet-row__label';
+      label.textContent = display(value);
+      row.appendChild(label);
+      if (count != null) {
+        const cnt = document.createElement('span');
+        cnt.className = 'dok-facet-row__count';
+        cnt.textContent = Number(count).toLocaleString('lt-LT');
+        row.appendChild(cnt);
+      }
+      row.addEventListener('click', () => toggle(value, row));
+      return row;
+    }
+
+    function render() {
+      const needle = searchEl.value.trim().toLowerCase();
+      const typed = normalize(searchEl.value);
+      // Selected-but-unlisted values (custom or filtered out) pinned on top.
+      const listedValues = new Set(options.map((o) => o.value));
+      const pinned = [...selected].filter((v) => !listedValues.has(v)).map((v) => ({ value: v, count: null }));
+      const rows = [...pinned, ...options].filter(
+        (o) => !needle || o.value.toLowerCase().includes(needle) || display(o.value).toLowerCase().includes(needle),
+      );
+
+      listEl.textContent = '';
+      const frag = document.createDocumentFragment();
+
+      // Offer to add the typed value when it isn't an existing/selected option.
+      const canAdd = typed && !listedValues.has(typed) && !selected.has(typed);
+      if (canAdd) {
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'dok-facet-row dok-facet-row--add';
+        const label = document.createElement('span');
+        label.className = 'dok-facet-row__label';
+        label.textContent = `Pridėti „${display(typed)}“`;
+        add.appendChild(label);
+        add.addEventListener('click', addTyped);
+        frag.appendChild(add);
+      }
+
+      for (const o of rows) frag.appendChild(makeRow(o.value, o.count));
+      listEl.appendChild(frag);
+
+      if (!rows.length && !canAdd) {
+        const empty = document.createElement('p');
+        empty.className = 'dok-facet-modal__empty';
+        empty.textContent = 'Nieko nerasta.';
+        listEl.appendChild(empty);
+      }
+    }
+
+    async function load() {
+      const mySeq = ++reqSeq;
+      listEl.innerHTML = '<div class="dok-facet-modal__loading"><span class="spinner spinner-lg"></span></div>';
+      // Scoped to the current query/filters (the API drops this facet's own
+      // filter), so every listed value actually narrows the present results —
+      // picking one never lands on 0 hits. Just uncapped vs the sidebar preview.
+      const qs = new URLSearchParams(params.toString());
+      qs.set('field', field);
+      qs.delete('page');
+      try {
+        const res = await fetch(`/api/dokumentaiFacet?${qs.toString()}`);
+        const data = res.ok ? await res.json() : { options: [] };
+        if (mySeq !== reqSeq) return;            // a newer open superseded this
+        options = Array.isArray(data.options) ? data.options : [];
+      } catch {
+        if (mySeq !== reqSeq) return;
+        options = [];
+      }
+      render();
+    }
+
+    openFacetModal = (opts: { field: string; param: string; title: string }) => {
+      field = opts.field;
+      param = opts.param;
+      titleEl.textContent = opts.title;
+      selected = new Set(getList(param));
+      searchEl.value = '';
+      updateCount();
+      setOpen(true);
+      load();
+    };
+
+    searchEl.addEventListener('input', render);
+    searchEl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const typed = normalize(searchEl.value);
+      if (!typed) return;
+      // Enter adds the typed value unless it's an existing option — then toggle it.
+      if (options.some((o) => o.value === typed)) toggle(typed);
+      else selected.add(typed);
+      searchEl.value = '';
+      updateCount();
+      render();
+    });
+
+    modal.querySelector('[data-facet-clear]')?.addEventListener('click', () => {
+      selected.clear();
+      updateCount();
+      render();
+    });
+
+    modal.querySelector('[data-facet-apply]')?.addEventListener('click', () => {
+      setList(param, [...selected]);
+      params.delete('page');
+      setOpen(false);
+      navigate(true);
+    });
+
+    modal.querySelectorAll('[data-facet-close]').forEach((el) =>
+      el.addEventListener('click', () => setOpen(false)));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal.hidden) setOpen(false);
+    });
+  })();
+
+  // ── Area (bounding-box) picker ──────────────────────────────────────────────
+  // A full-screen Leaflet map; "Ieškoti šioje srityje" captures the current
+  // viewport bounds into minLat/maxLat/minLon/maxLon, which the search turns into
+  // a Quickwit lat/lon range query.
+  (function initAreaModal() {
+    const modal = document.getElementById('dokAreaModal');
+    const openBtn = document.getElementById('dokAreaBtn');
+    const mapEl = document.getElementById('dokAreaMap');
+    const applyBtn = document.getElementById('dokAreaApply');
+    const drawBtn = document.getElementById('dokAreaDraw');
+    const clearBtn = document.getElementById('dokAreaClear');
+    const hintEl = document.getElementById('dokAreaHint');
+    if (!modal || !openBtn || !mapEl) return;
+
+    let map: any = null;
+    let L: any = null;
+    let rect: any = null;            // the marked rectangle
+    let selectedBounds: any = null;  // committed selection
+    let drawMode = false;            // "Žymėti sritį" toggled on
+    let drawing = false;             // a drag is in progress
+    let startPt: any = null;         // first corner (latlng)
+
+    function currentArea() {
+      const v = (k: string) => parseFloat(params.get(k) || '');
+      const a = { minLat: v('minLat'), maxLat: v('maxLat'), minLon: v('minLon'), maxLon: v('maxLon') };
+      return Object.values(a).every((n) => Number.isFinite(n)) ? a : null;
+    }
+
+    function setOpen(open: boolean) {
+      modal!.hidden = !open;
+      document.documentElement.style.overflow = open ? 'hidden' : '';
+    }
+
+    function syncTools() {
+      if (clearBtn) clearBtn.hidden = !selectedBounds;
+      if (drawBtn) {
+        drawBtn.classList.toggle('is-active', drawMode);
+        drawBtn.textContent = drawMode ? 'Tempk stačiakampį…' : (selectedBounds ? 'Žymėti iš naujo' : 'Žymėti sritį');
+      }
+      if (hintEl) {
+        hintEl.textContent = drawMode
+          ? 'Tempk pele (ar pirštu) nuo vieno kampo iki kito.'
+          : 'Stumdyk žemėlapį laisvai. Spausk „Žymėti sritį" ir tempk stačiakampį.';
+      }
+    }
+
+    function clearRect() {
+      if (rect) { map.removeLayer(rect); rect = null; }
+      selectedBounds = null;
+      syncTools();
+    }
+
+    // Commit a finished rectangle as the marked area.
+    function setRect(bounds: any) {
+      if (rect) map.removeLayer(rect);
+      rect = L.rectangle(bounds, { color: '#111', weight: 2, fillColor: '#111', fillOpacity: 0.08 }).addTo(map);
+      selectedBounds = rect.getBounds();
+      syncTools();
+    }
+
+    // Dashed live preview while dragging.
+    function previewRect(a: any, b: any) {
+      if (rect) map.removeLayer(rect);
+      rect = L.rectangle([a, b], { color: '#111', weight: 2, dashArray: '4', fillColor: '#111', fillOpacity: 0.06 }).addTo(map);
+    }
+
+    function setDrawMode(on: boolean) {
+      drawMode = on;
+      mapEl!.style.cursor = on ? 'crosshair' : '';
+      if (on) map.dragging.disable();
+      else { map.dragging.enable(); drawing = false; startPt = null; }
+      syncTools();
+    }
+
+    // Translate a client point to a map latlng (for native touch handling).
+    function clientToLatLng(clientX: number, clientY: number) {
+      const box = mapEl!.getBoundingClientRect();
+      return map.containerPointToLatLng([clientX - box.left, clientY - box.top]);
+    }
+
+    function beginDraw(latlng: any) { drawing = true; startPt = latlng; clearRect(); }
+    function moveDraw(latlng: any) { if (drawing && startPt) previewRect(startPt, latlng); }
+    function endDraw(latlng: any) {
+      if (!drawing) return;
+      drawing = false;
+      if (startPt && latlng && !startPt.equals(latlng)) {
+        setRect([startPt, latlng]);
+        startPt = null;
+        setDrawMode(false);           // one rectangle done → back to panning
+      } else {
+        startPt = null;               // a stray click: stay armed
+        clearRect();
+      }
+    }
+
+    async function ensureMap() {
+      if (map) return map;
+      await ensureLeafletRuntime();
+      L = (window as any).L;
+      map = L.map(mapEl, { zoomControl: true }).setView([55.17, 23.88], 7);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(map);
+      // Document density heatmap (precomputed tiles, postgres/gis) — same as the
+      // juridiniai overlay, blurred the same way (overlayBlurPx: 5).
+      const overlay = L.tileLayer('/dokumentai/map/tiles/{z}/{x}/{y}.png', {
+        opacity: 0.6,
+        maxNativeZoom: 16,
+        maxZoom: 19,
+      }).addTo(map);
+      const blurContainer = () => { const c = overlay.getContainer(); if (c) c.style.filter = 'blur(5px)'; };
+      blurContainer();
+      overlay.on('load', blurContainer);
+
+      // Mouse: press → drag → release to mark, only while draw mode is on (so the
+      // map still pans normally otherwise).
+      map.on('mousedown', (e: any) => { if (drawMode) beginDraw(e.latlng); });
+      map.on('mousemove', (e: any) => { if (drawMode) moveDraw(e.latlng); });
+      map.on('mouseup', (e: any) => { if (drawMode) endDraw(e.latlng); });
+
+      // Touch: Leaflet's mouse events don't fire on touch, so handle it natively.
+      mapEl!.addEventListener('touchstart', (ev) => {
+        if (!drawMode || !ev.touches[0]) return;
+        ev.preventDefault();
+        beginDraw(clientToLatLng(ev.touches[0].clientX, ev.touches[0].clientY));
+      }, { passive: false });
+      mapEl!.addEventListener('touchmove', (ev) => {
+        if (!drawMode || !drawing || !ev.touches[0]) return;
+        ev.preventDefault();
+        moveDraw(clientToLatLng(ev.touches[0].clientX, ev.touches[0].clientY));
+      }, { passive: false });
+      mapEl!.addEventListener('touchend', (ev) => {
+        if (!drawMode || !drawing) return;
+        const t = ev.changedTouches[0];
+        endDraw(t ? clientToLatLng(t.clientX, t.clientY) : null);
+      });
+      return map;
+    }
+
+    openBtn.addEventListener('click', async () => {
+      setOpen(true);
+      const m = await ensureMap();
+      // The container had no size while hidden — let Leaflet re-measure, then
+      // restore/frame the existing area (if any).
+      setTimeout(() => {
+        m.invalidateSize();
+        setDrawMode(false);
+        const a = currentArea();
+        if (a) {
+          const b: [[number, number], [number, number]] = [[a.minLat, a.minLon], [a.maxLat, a.maxLon]];
+          setRect(b);
+          m.fitBounds(b);
+        } else {
+          clearRect();
+        }
+      }, 60);
+    });
+
+    drawBtn?.addEventListener('click', () => {
+      if (drawMode) { setDrawMode(false); return; }   // pressing again cancels
+      clearRect();        // the instant the button is pressed, drop the rectangle
+      setDrawMode(true);  // …and arm drawing
+    });
+    clearBtn?.addEventListener('click', () => { setDrawMode(false); clearRect(); });
+
+    applyBtn?.addEventListener('click', () => {
+      if (!map) return;
+      // Use the marked rectangle; fall back to the visible area if none drawn.
+      const b = selectedBounds || map.getBounds();
+      params.set('minLat', b.getSouth().toFixed(6));
+      params.set('maxLat', b.getNorth().toFixed(6));
+      params.set('minLon', b.getWest().toFixed(6));
+      params.set('maxLon', b.getEast().toFixed(6));
+      params.delete('page');
+      setOpen(false);
+      navigate(true);
+    });
+
+    modal.querySelectorAll('[data-area-close]').forEach((el) =>
+      el.addEventListener('click', () => setOpen(false)));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal.hidden) setOpen(false);
+    });
+  })();
+
+  // Phone: reveal the rest of the knowledge panel. Adding `is-open` drops the
+  // peek clamp + torn edge and animates height from the peek to auto (opt-in
+  // via the global `interpolate-size: allow-keywords`).
+  const dokPanel = document.getElementById('dokPanel');
+  const dokPanelMore = dokPanel?.querySelector<HTMLButtonElement>('.dok-panel__more');
+  dokPanelMore?.addEventListener('click', () => {
+    dokPanel?.classList.add('is-open');
+    dokPanelMore.setAttribute('aria-expanded', 'true');
   });
 </script>
 
@@ -675,16 +1331,113 @@ const pageNums = result?.pageNums ?? [];
     overflow-x: clip;
   }
 
-  /* The search form lives in the results column now (no big centred title).
-     Drop its hero margins/centring so the bar fills the column, left-aligned
-     with the results, and its top sits level with the "Filtrai" rail.
-     Scoped by .dok-content, which only exists on this page. */
-  .dok-content #searchForm {
+  /* Opt in to animating to/from intrinsic sizes (height: auto). Lets the
+     mobile knowledge-panel "Rodyti daugiau" reveal transition its height
+     from the collapsed peek to auto. Ignored gracefully where unsupported
+     (the reveal just snaps open). */
+  :root {
+    interpolate-size: allow-keywords;
+  }
+
+  /* The search form sits in its own row above the results/panel (no big
+     centred title). Drop its hero margins/centring so the bar fills the
+     column, left-aligned with the results, and its top sits level with the
+     "Filtrai" rail. Scoped by .dok-search, which only exists on this page. */
+  .dok-search #searchForm {
     margin: 0 0 24px;
     align-items: stretch;
   }
-  .dok-content #searchForm .search-bar {
+  .dok-search #searchForm .search-bar {
     max-width: none;
+  }
+
+  /* Perjungus režimą kraunasi rezultatai: režimo perjungiklį padarom inertišką
+     ir paslepiam jo tooltip'ą, kad nekabėtų virš krovimo. */
+  .dok-shell:has(.dok-content.is-loading) .search-mode {
+    pointer-events: none;
+  }
+  .dok-shell:has(.dok-content.is-loading) .search-mode-opt::after {
+    opacity: 0 !important;
+  }
+
+  /* ── Facet modal rows (created in JS, so they need global, scope-free styles).
+     Mirrors the sidebar filter pill: a checkbox affordance + label + count. */
+  .dok-facet-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 40px;
+    padding-inline: 10px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    color: var(--dark-gray);
+    text-align: left;
+    cursor: pointer;
+    transition: color var(--transition), background var(--transition);
+  }
+  .dok-facet-row::before {
+    content: "";
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--light-gray);
+    border-radius: var(--radius-sm);
+    background: var(--white) center / 0 no-repeat;
+    transition: background-color var(--transition), border-color var(--transition);
+  }
+  .dok-facet-row:hover { color: var(--black); background: var(--lighter-gray); }
+  .dok-facet-row:hover::before { border-color: var(--dark-gray); }
+  .dok-facet-row.is-selected { color: var(--black); font-weight: 500; }
+  .dok-facet-row.is-selected::before {
+    border-color: var(--black);
+    background-color: var(--black);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+    background-size: 11px;
+  }
+  .dok-facet-row__label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dok-facet-row__count {
+    flex-shrink: 0;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+  }
+  /* "Pridėti „…"" row — distinct accent, spans the full grid width on top. */
+  .dok-facet-row--add {
+    grid-column: 1 / -1;
+    color: var(--link);
+    font-weight: 500;
+  }
+  .dok-facet-row--add::before {
+    border-color: var(--link);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%230369a1' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M8 3.5v9M3.5 8h9'/%3E%3C/svg%3E");
+    background-size: 11px;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+  .dok-facet-row--add:hover::before { border-color: var(--link); }
+  .dok-facet-modal__loading {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    padding: 48px 0;
+  }
+  .dok-facet-modal__empty {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 32px 12px;
+    text-align: center;
+    color: var(--gray);
+    font-size: var(--text-sm);
   }
 </style>
 
@@ -719,8 +1472,14 @@ const pageNums = result?.pageNums ?? [];
      rail lines up with where every other page's content begins.           */
   .dok-shell {
     display: grid;
-    grid-template-columns: 220px minmax(0, 760px);
-    gap: 32px;
+    grid-template-columns: 220px minmax(0, 760px) minmax(360px, 460px);
+    /* The search bar gets its own row so the knowledge panel can start level
+       with the results below it, not next to the search bar. The cell to the
+       right of the search bar (row 1, col 3) stays empty. */
+    grid-template-areas:
+      "sidebar search  ."
+      "sidebar content panel";
+    column-gap: 32px;
     justify-content: start;
     /* stretch: the filter rail matches the results' height and its divider
        runs the full length of the page. */
@@ -737,6 +1496,7 @@ const pageNums = result?.pageNums ?? [];
      column down its whole length. Checkboxes sit at the shell's 16px edge,
      in line with the navbar logo. */
   .dok-sidebar {
+    grid-area: sidebar;
     /* Top padding sits inside the column so the divider still starts at the
        very top while "Filtrai" keeps its breath below the navbar. */
     padding: 24px 20px 24px 0;
@@ -898,7 +1658,8 @@ const pageNums = result?.pageNums ?? [];
   }
   .dok-input-btn:hover { color: var(--black); }
 
-  .dok-more-btn {
+  .dok-more-btn,
+  .dok-area-link {
     display: block;
     margin-top: 6px;
     font-family: var(--font-sans);
@@ -910,18 +1671,192 @@ const pageNums = result?.pageNums ?? [];
     cursor: pointer;
     text-align: left;
   }
-  .dok-more-btn:hover { color: var(--black); text-decoration: underline; }
+  .dok-more-btn:hover,
+  .dok-area-link:hover { color: var(--black); text-decoration: underline; }
+
+  /* ── Facet "show all" modal ──────────────────────────────────────────────
+     Full-screen overlay listing every value for one facet, with a filter, a
+     custom-entry field and batched apply. */
+  .dok-facet-modal {
+    position: fixed;
+    inset: 0;
+    /* Above everything, incl. Leaflet panes/controls (z-index up to 1000). The
+       design token --z-modal is only 300, i.e. *below* the map, so use a
+       literal that clears both the map and the (2000) sticky navbar. */
+    z-index: 5000;
+  }
+  .dok-facet-modal[hidden] { display: none; }
+  .dok-facet-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: var(--white);
+  }
+  /* Full-screen panel; content is centred to a readable column inside it. */
+  .dok-facet-modal__panel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--white);
+    overflow: hidden;
+    animation: dok-facet-pop 160ms ease;
+  }
+  @keyframes dok-facet-pop {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  /* Shared horizontal centring: full-bleed dividers, wide content column for
+     the multi-column list. */
+  .dok-facet-modal__head,
+  .dok-facet-modal__tools,
+  .dok-facet-modal__foot { padding-inline: max(20px, calc((100% - 1080px) / 2)); }
+  .dok-facet-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-block: 18px;
+    border-bottom: 1px solid var(--lighter-gray);
+  }
+  .dok-facet-modal__title {
+    margin: 0;
+    font-size: var(--text-xl);
+    font-weight: 600;
+  }
+  .dok-facet-modal__close {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    border-radius: var(--radius-md);
+    color: var(--dark-gray);
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .dok-facet-modal__close:hover { background: var(--lighter-gray); color: var(--black); }
+  .dok-facet-modal__tools {
+    padding-block: 14px;
+    border-bottom: 1px solid var(--lighter-gray);
+  }
+  .dok-facet-modal__search {
+    width: 100%;
+    max-width: 440px;
+    padding: 9px 12px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    color: var(--black);
+    font: inherit;
+    font-size: var(--text-sm);
+    outline: none;
+  }
+  .dok-facet-modal__search:focus-visible { outline: var(--border-focus); }
+  /* Multi-column grid so the full-screen width carries many short values. */
+  .dok-facet-modal__list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 2px 24px;
+    align-content: start;
+    padding-block: 12px;
+    padding-inline: max(16px, calc((100% - 1080px) / 2));
+  }
+  /* Row + loading + empty styles live in the global block below — those nodes
+     are created in JS, so they don't carry Astro's scoped attribute. */
+  .dok-facet-modal__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-block: 14px;
+    border-top: 1px solid var(--lighter-gray);
+  }
+  .dok-facet-modal__count {
+    font-size: var(--text-sm);
+    color: var(--gray);
+  }
+  .dok-facet-modal__actions {
+    display: inline-flex;
+    gap: 8px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dok-facet-modal__panel { animation: none; }
+  }
+  @media (max-width: 600px) {
+    .dok-facet-modal__search { max-width: none; }
+  }
+
+  /* Area picker: the map + draw tools inside the (shared) modal shell. */
+  .dok-area-tools {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 14px max(20px, calc((100% - 1080px) / 2));
+    border-bottom: 1px solid var(--lighter-gray);
+  }
+  .dok-area-tools .btn.is-active {
+    background: var(--black);
+    color: var(--white);
+    border-color: var(--black);
+  }
+  .dok-area-hint {
+    margin: 0;
+    color: var(--gray);
+    font-size: var(--text-sm);
+  }
+  .dok-area-map {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+  }
+
+  /* The search bar lives in its own grid row above the results, so the panel
+     beside the results can start level with the top of the results. Its top
+     padding matches the sidebar's so the bar and "Filtrai" start on the same
+     line, both breathing below the navbar. */
+  .dok-search {
+    grid-area: search;
+    padding-top: 24px;
+  }
 
   /* ── Result list: flat, no outer container. Width and side air come
      from the grid column + gap, so the column itself carries no padding. */
   .dok-content {
+    grid-area: content;
     min-width: 0;
     position: relative;
-    /* Match the sidebar's top padding so the search bar and "Filtrai" start
-       on the same line, both breathing below the navbar. */
-    padding-top: 24px;
   }
-  .dok-results-meta { margin: 0 0 24px; }
+  .dok-results-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0 0 24px;
+  }
+  .dok-results-meta { margin: 0; }
+  .dok-sort {
+    flex-shrink: 0;
+  }
+  .dok-sort select {
+    min-width: 190px;
+    padding: 7px 10px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    color: var(--black);
+    font: inherit;
+    font-size: var(--text-sm);
+  }
+  .dok-sort select:focus-visible {
+    outline: var(--border-focus);
+  }
 
   /* Loading veil: each filter / page click triggers a full server round-trip,
      so dim the current results and float a spinner while the next page loads.
@@ -1019,6 +1954,18 @@ const pageNums = result?.pageNums ?? [];
     font-size: var(--text-xs);
     color: var(--gray);
   }
+  .dok-result-list :global(.dok-meta div) {
+    display: inline-flex;
+    gap: 4px;
+    min-width: 0;
+  }
+  .dok-result-list :global(.dok-meta dt:not(.sr-only)) {
+    color: var(--dark-gray);
+    font-weight: 500;
+  }
+  .dok-result-list :global(.dok-meta dd) {
+    overflow-wrap: anywhere;
+  }
 
   /* ── Pagination: plain numbers, generous separation from the results. ── */
   .dok-pagination {
@@ -1061,16 +2008,48 @@ const pageNums = result?.pageNums ?? [];
     pointer-events: none;
   }
 
+  /* ── Knowledge panel wrapper ─────────────────────────────────────
+     On desktop/tablet it's a transparent passthrough — the card shows in
+     full. The collapse-to-a-peek + torn edge + "Rodyti daugiau" reveal only
+     kicks in on phones (see the ≤900px block). */
+  .dok-panel {
+    grid-area: panel;
+    align-self: start;
+  }
+  .dok-panel__more,
+  .dok-panel__tear { display: none; }
+
   /* ── Responsive ──────────────────────────────────────────────── */
+  @media (max-width: 1400px) {
+    .dok-shell {
+      grid-template-columns: 220px minmax(0, 760px);
+      grid-template-areas:
+        "sidebar search"
+        "sidebar content"
+        "sidebar panel";
+    }
+    .dok-panel {
+      margin: 24px 0 48px;
+    }
+  }
+
   @media (max-width: 900px) {
     .dok-shell {
       grid-template-columns: 1fr;
-      gap: 0;
+      /* The knowledge card sits above the results on phones — its peek is the
+         answer; the result list is the long tail below it. */
+      grid-template-areas:
+        "sidebar"
+        "search"
+        "panel"
+        "content";
+      column-gap: 0;
     }
     /* Filters collapse behind the header so results sit near the top instead
        of below a tall stack of facets. The rail becomes a tappable toggle. */
     .dok-sidebar {
       padding: 0;
+      margin-top: 4px;
       border-right: none;
       border-bottom: var(--border);
     }
@@ -1091,16 +2070,108 @@ const pageNums = result?.pageNums ?? [];
     .dok-filters-count { display: inline-flex; }
     .dok-sidebar.is-open .dok-filters-chevron { transform: rotate(180deg); }
 
-    /* Hidden until the user opens the panel. */
-    .dok-filter-section { display: none; padding-top: 14px; }
-    .dok-sidebar.is-open .dok-filter-section { display: block; }
-    .dok-sidebar.is-open { padding-bottom: 16px; }
+    /* Collapsed until the user opens the panel. Animate the body's height from
+       0 to auto — same interpolate-size opt-in as the knowledge card — instead
+       of a hard display toggle. */
+    .dok-filters-body {
+      box-sizing: border-box;
+      height: 0;
+      overflow: hidden;
+      transition: height 0.4s ease;
+    }
+    .dok-sidebar.is-open .dok-filters-body {
+      height: auto;
+      padding-bottom: 16px;
+    }
+    .dok-filter-section { padding-top: 14px; }
     .dok-filter-section + .dok-filter-section { margin-top: 8px; }
 
     /* Comfortable but not bulky touch targets. */
     .dok-filter-opt { height: 38px; }
     .dok-input { font-size: var(--text-sm); padding: 8px 0; }
 
-    .dok-content { padding-top: 16px; }
+    .dok-search { padding-top: 16px; }
+    /* Keep the count on the left and the sort select on the right; only let it
+       wrap to its own line if the row genuinely doesn't fit. */
+    .dok-results-toolbar {
+      flex-wrap: wrap;
+      gap: 8px 16px;
+    }
+    .dok-sort select { min-width: 160px; }
+
+    .dok-panel {
+      margin: 16px 0 24px;
+    }
+
+    /* ── Phone-only: the card peeks ~3.5 lines, then a torn /\/\/\ edge cuts
+       through the text. "Rodyti daugiau" floats over the tear and reveals the
+       rest, animating height from the peek to auto (opt-in via the global
+       `interpolate-size: allow-keywords`). */
+    .dok-panel { position: relative; }
+    .dok-panel__clip {
+      /* ~3.5 lines of card content before the tear. */
+      --peek: 9.5rem;
+      height: var(--peek);
+      overflow: hidden;
+      /* Match the card's rounded top corners so overflow:hidden doesn't shave
+         them off; the bottom stays square (the tear handles it). */
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      transition: height 0.45s ease;
+    }
+    .dok-panel.is-open .dok-panel__clip { height: auto; }
+
+    /* The torn edge: teeth filled with the card/page colour (erasing the
+       straight cut) under a stroked zigzag seam that makes the tear read. */
+    .dok-panel__tear {
+      display: block;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1;
+      width: 100%;
+      height: 10px;
+    }
+    .dok-panel__tear-fill { fill: var(--white); }
+    .dok-panel__tear-line {
+      fill: none;
+      stroke: var(--light-gray);
+      stroke-width: 1;             /* matches the 1px card border */
+      stroke-linejoin: round;
+    }
+    .dok-panel.is-open .dok-panel__tear { display: none; }
+
+    .dok-panel__more {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      position: absolute;
+      left: 50%;
+      /* Sit centred on the torn edge — half the button hangs below it. */
+      bottom: -13px;
+      transform: translateX(-50%);
+      z-index: 2;
+      padding: 7px 16px;
+      font-family: var(--font-sans);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: var(--black);
+      background: var(--white);
+      border: var(--border);
+      border-radius: var(--radius-pill);
+      box-shadow: var(--shadow-md);
+      cursor: pointer;
+    }
+    .dok-panel__more::after {
+      content: "▾";
+      font-size: 11px;
+      line-height: 1;
+    }
+    .dok-panel.is-open .dok-panel__more { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dok-panel__clip,
+    .dok-filters-body { transition: none; }
   }
 </style>

@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import SearchForm from '@design-system/components/content/SearchForm.astro';
+import SearchSuggest from '@design-system/components/content/SearchSuggest.astro';
 import SutartysFilters from '../components/content/SutartysFilters.astro';
 import SearchResults from '../components/content/SearchResults.astro';
 import { searchSutartys, countSutartys } from '@/modules/sutartys/searchSutartys.js';
@@ -235,6 +236,7 @@ const sortOptions = [
     >
       <SutartysFilters slot="filters" values={values} sortOptions={sortOptions} />
     </SearchForm>
+    <SearchSuggest saltinis="sutartysPavadinimai" />
     <SearchResults
       numberOfResults={numberOfResults}
       results={results}
