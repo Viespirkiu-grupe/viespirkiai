@@ -72,7 +72,7 @@ export async function handler({ query, purpose, page }: { query: string; purpose
     );
 }
 
-async function _runQuery(query: string, purpose: string, page: number): Promise<ToolResult> {
+async function _runQuery(query: string, _purpose: string, page: number): Promise<ToolResult> {
     const offset = (page - 1) * PAGE_SIZE;
     // Fetch one extra row to detect whether more pages exist — avoids a full-scan COUNT(*) OVER ()
     const wrappedSql = `SELECT q.*

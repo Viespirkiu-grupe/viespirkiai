@@ -26,8 +26,9 @@ const total = parseInt(countRes.rows[0].total, 10);
 const elapsed = performance.now() - startas;
 const trukme = (elapsed / 1000).toFixed(2) + 's';
 const source = `<span class="inline">(${trukme}, PostgreSQL)</span>`;
-const numberOfResults = adresaiRes.rowCount < total
-  ? `Rodomi ${adresaiRes.rowCount} iš ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`
+const shown = adresaiRes.rowCount ?? 0;
+const numberOfResults = shown < total
+  ? `Rodomi ${shown} iš ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`
   : `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų'])} ${source}`;
 
 const pageCount = Math.ceil(total / DEFAULT_LIMIT);

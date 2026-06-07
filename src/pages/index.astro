@@ -178,6 +178,7 @@ if (query.rezultatuSkaiciausPatikslinimas) {
     { label: 'Paieška', phase: 'search', start: 0, duration: searchRes.ms },
     { label: 'Skaičius', phase: 'count', start: 0, duration: countRes.ms },
   ];
+  void timings;
   void [queryParams, pageCount, elapsed];
   return new Response(JSON.stringify({
     total,

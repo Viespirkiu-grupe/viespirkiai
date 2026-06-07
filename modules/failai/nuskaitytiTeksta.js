@@ -2,7 +2,7 @@ import process from "process";
 import { Buffer } from "buffer";
 import { createHash } from "crypto";
 import { log } from "../../utils/log.js";
-import { postgres, parsePgArray } from "../../postgres/postgres.js";
+import { postgres } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import Timings from "../../utils/timings.js";
 import { readRezultatasFs } from "../ocr/rezultataiFs.js";

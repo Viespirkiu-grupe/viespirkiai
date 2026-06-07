@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import type { PoolClient } from 'pg';
 import { postgres } from '../../../../postgres/postgres.js';
 import { loadLatestOcrResults } from '../../../lib/ocrLatestResults.ts';
 import { ocrLiveUpdates } from '../../../lib/ocrLiveUpdates.ts';
@@ -19,7 +20,7 @@ export const GET: APIRoute = async ({ request }) => {
       let closed = false;
       let heartbeat: ReturnType<typeof setInterval> | undefined;
       let interval: ReturnType<typeof setInterval> | undefined;
-      let client: Awaited<ReturnType<typeof postgres.connect>> | undefined;
+      let client: PoolClient | undefined;
       let lastPayload = '';
 
       const sendItems = async () => {

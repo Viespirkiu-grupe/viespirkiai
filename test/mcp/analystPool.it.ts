@@ -8,6 +8,7 @@
 
 import { describe, it, expect, afterAll } from "vitest";
 import pkg from "pg";
+import type { PoolClient } from "pg";
 import config from "../../utils/config.js";
 import { TEMP_VIEWS_SQL, VIEW_NAMES } from "../../modules/mcp/analyst/tempViews.js";
 
@@ -32,7 +33,7 @@ testPool.on("connect", (client) => {
 
 // One shared client so all view tests run on the same backend connection,
 // guaranteeing the TEMP views created on connect are still present.
-let sharedClient: Awaited<ReturnType<typeof testPool.connect>> | null = null;
+let sharedClient: PoolClient | null = null;
 
 async function getClient() {
     if (!sharedClient) sharedClient = await testPool.connect();

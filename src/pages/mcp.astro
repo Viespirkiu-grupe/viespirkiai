@@ -6,6 +6,8 @@ import Table from '@design-system/components/Table.astro';
 import TableWrapper from '@design-system/components/TableWrapper.astro';
 import { isMcpTransportRequest, handleMcpRequest } from '@/src/lib/mcp';
 
+void handleMcpRequest;
+
 const isTransportRequest = isMcpTransportRequest(Astro.request);
 
 if (isTransportRequest) {

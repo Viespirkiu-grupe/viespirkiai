@@ -98,7 +98,7 @@ describe("aggregateSodra", () => {
                 { data: "2023-01", draustieji: 4 },
             ],
         });
-        expect(result.byYear.map((r) => r.metai)).toEqual([2022, 2023, 2024]);
+        expect(result.byYear.map((r: { metai: number }) => r.metai)).toEqual([2022, 2023, 2024]);
     });
 
     it("identifies the peak month by highest draustieji", () => {
@@ -301,7 +301,7 @@ describe("aggregateFinansai", () => {
                 { laikotarpisIki: "2023-12-31", standards: [] },
             ],
         });
-        expect(result.byYear.map((r) => r.metai)).toEqual([2022, 2023, 2024]);
+        expect(result.byYear.map((r: { metai: number }) => r.metai)).toEqual([2022, 2023, 2024]);
     });
 
     it("filters out ataskaita entries without laikotarpisIki", () => {

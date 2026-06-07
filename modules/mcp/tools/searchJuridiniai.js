@@ -28,6 +28,16 @@ export const schema = {
         .describe("Rezultatų skaičius puslapyje (maks. 50)"),
 };
 
+/**
+ * @param {{
+ *   search?: string,
+ *   adresas?: string,
+ *   location?: string,
+ *   locationRadius?: number,
+ *   page: number,
+ *   limit: number
+ * }} params
+ */
 export async function handler({
     search,
     adresas,
@@ -60,6 +70,7 @@ export async function handler({
         };
     }
 
+    /** @type {Record<string, string>} */
     const query = {};
     if (search) query.search = search;
     if (adresas) query.adresas = adresas;

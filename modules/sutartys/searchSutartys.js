@@ -104,8 +104,22 @@ const FIXED_WHERE = [`NOT COALESCE("istrinta", false)`];
  */
 
 /**
+ * @typedef {Record<string, any> & {
+ *   sutartiesUnikalusId: string | number,
+ *   tipas: string,
+ *   kategorija: string,
+ *   perkanciosiosOrganizacijosKodas: string,
+ *   perkanciojiOrganizacija: string,
+ *   pavadinimas: string,
+ *   tiekejai: string[],
+ *   tiekejaiKodai: string[],
+ *   bvpzKodai: string[]
+ * }} ContractSearchRow
+ */
+
+/**
  * @typedef {object} SearchResult
- * @property {object[]} results - Processed rows. Empty when streaming.
+ * @property {ContractSearchRow[]} results - Processed rows. Empty when streaming.
  * @property {number | null} total - Total matching rows. Null if count timed out.
  * @property {object} values - Resolved filter values for form repopulation.
  * @property {string} queryParams - URL query string fragment for pagination links.
@@ -244,8 +258,8 @@ export async function countSutartys(query) {
 }
 
 /**
- * @param {object} r
- * @returns {object}
+ * @param {Record<string, any>} r
+ * @returns {ContractSearchRow}
  */
 export function aptvarkytiRezultata(r) {
     if (r.id) {
@@ -287,7 +301,7 @@ export function aptvarkytiRezultata(r) {
         delete r.dokumentai;
     }
 
-    return r;
+    return /** @type {ContractSearchRow} */ (r);
 }
 
 /**
