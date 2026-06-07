@@ -88,7 +88,7 @@ const chartFlagDefaults: Record<string, any> = {
   yEURMen: { yaxis: { labels: { formatter: (value: unknown) => typeof value === 'number' ? eurFormatter(value) + ' / mėn.' : 'Nėra duomenų' } } },
   yMin0: { yaxis: { min: 0 } },
   yMinAuto: { yaxis: { min: undefined } },
-  xYear: { xaxis: { labels: { format: 'yyyy' } }, tooltip: { x: { format: 'yyyy' } } },
+  xYear: { xaxis: { type: 'category', tickAmount: undefined, labels: { format: undefined } }, tooltip: { x: { format: undefined } } },
   xAxisYearMonth: { xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'yyyy-MM' } }, tooltip: { x: { format: 'yyyy-MM' } } },
   xAxisDay: { xaxis: { type: 'datetime', tickAmount: 6, labels: { format: 'yyyy-MM-dd' } }, tooltip: { x: { format: 'yyyy-MM-dd' } } },
   xAxisHourMinute: { xaxis: { type: 'datetime', labels: { format: 'HH:mm' } }, tooltip: { x: { format: 'HH:mm' } } },
