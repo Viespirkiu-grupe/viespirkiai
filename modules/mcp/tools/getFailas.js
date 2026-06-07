@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { findFailas, checkFailasAccessible } from "../../failai/queries.js";
 import { fetchFailasMetadata } from "../../failai/aptarnavimas.js";
+import { aprasytiNuskaityma, aprasytiParsiusima } from "../../failai/busena.js";
 import { parsePgArray } from "../../../postgres/postgres.js";
 
 const PREVIEW_PAGES = 3;
@@ -55,7 +56,7 @@ function formatPageSlice(pages, startPage, count) {
 
 export const name = "get_failas";
 export const description =
-    "Grąžina išsamią informaciją apie viešojo pirkimo sutarties dokumentą pagal jo ID arba md5. Apima metaduomenis, IBAN numerius, JAR kodus, el. pašto adresus, nuorodas ir parašus. Tekstas pateikiamas pagal faktinius dokumento puslapius (preview: pirmi 3) - naudokite get_failas_tekstas norėdami gauti daugiau (iki 15 vienu metu).";
+    "Grąžina išsamią informaciją apie viešojo pirkimo sutarties dokumentą pagal jo ID arba md5. Apima metaduomenis, IBAN numerius, JAR kodus, el. pašto adresus, nuorodas ir parašus. Tekstas pateikiamas pagal faktinius dokumento puslapius (preview: pirmi 3) - naudokite get_failas_tekstas norėdami gauti daugiau (iki 15 vienu metu). DĖMESIO dėl būsenų: `nuskaitytas` TEIGIAMA reikšmė (pvz. 12) reiškia SĖKMINGĄ nuskaitymą (skaičius = nuskaitymo versija, NE klaida); 0/null = dar nenuskaityta; NEIGIAMA = klaida. Žmogui suprantamos būsenos pateikiamos laukuose `nuskaitymoBusena` ir `parsiusimoBusena`. Lauke `url` yra nuoroda į patį failą — pasiūlykite ją vartotojui, jei jis nori dokumentą peržiūrėti ar perskaityti pats.";
 
 export const schema = {
     id: z
@@ -89,6 +90,10 @@ export async function handler({ id }) {
     failas = { ...failas, ...metadata };
 
     delete failas.search_index;
+
+    failas.url = `https://failai.viespirkiai.org/${failas.id || failas.md5}`;
+    failas.nuskaitymoBusena = aprasytiNuskaityma(failas.nuskaitytas);
+    failas.parsiusimoBusena = aprasytiParsiusima(failas.parsiustas);
 
     const rawTekstas = failas.tekstas;
     delete failas.tekstas;

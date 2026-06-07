@@ -66,8 +66,11 @@ export async function handler(params) {
 
     const { results } = await searchFailai(query, { limit, page });
 
-    // Strip heavy fields not useful for Claude
-    const cleaned = results.map(({ tekstas, search_index, ...r }) => r);
+    // Strip heavy fields not useful for Claude; pridedame nuorodą į patį failą
+    const cleaned = results.map(({ tekstas, search_index, ...r }) => ({
+        ...r,
+        url: `https://failai.viespirkiai.org/${r.id || r.md5}`,
+    }));
 
     return {
         content: [
