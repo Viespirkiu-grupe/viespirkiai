@@ -47,6 +47,9 @@ const {
 
 const rootId = `${instanceId}-root`;
 const treeId = `${instanceId}-tree`;
+const searchInputId = `${instanceId}-search-input`;
+const searchClearId = `${instanceId}-search-clear`;
+const resultsInfoId = `${instanceId}-results-info`;
 const countId = `${instanceId}-count`;
 const selectedCodesId = `${instanceId}-selected-codes`;
 const searchBtnId = `${instanceId}-search-btn`;
@@ -91,6 +94,26 @@ const syncBtnId = `${instanceId}-sync-btn`;
     </div>
   </div>}
 
+  <div class="search-bar bvpz-search mb-3">
+    <label for={searchInputId}>
+      <svg class="search-icon" aria-hidden="true" width="20" height="20" viewBox="0 1 24 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M10.502 2C5.80753 2 2.00195 5.80558 2.00195 10.5C2.00195 15.1944 5.80753 19 10.502 19C12.4884 19 14.3169 18.3176 15.7637 17.176L20.5877 22C20.9783 22.3905 21.6114 22.3905 22.002 22C22.3925 21.6095 22.3925 20.9763 22.002 20.5858L17.1779 15.7618C18.3196 14.3149 19.002 12.4865 19.002 10.5C19.002 5.80558 15.1964 2 10.502 2ZM4.00195 10.5C4.00195 6.91015 6.9121 4 10.502 4C14.0918 4 17.002 6.91015 17.002 10.5C17.002 12.2952 16.2755 13.9188 15.0981 15.0962C13.9208 16.2736 12.2972 17 10.502 17C6.9121 17 4.00195 14.0899 4.00195 10.5Z" fill="currentColor"/>
+      </svg>
+      <span class="sr-only">Paieška</span>
+    </label>
+    <input
+      id={searchInputId}
+      class="search-bar__input"
+      type="search"
+      autocomplete="off"
+      enterkeyhint="search"
+      placeholder="Ieškoti kodo arba pavadinimo…"
+    />
+    <button class="bvpz-search-clear" id={searchClearId} type="button" aria-label="Išvalyti paiešką" hidden>×</button>
+  </div>
+
+  <div id={resultsInfoId} class="cpv-results-info text-muted text-sm mb-2" hidden></div>
+
   <div id={treeId} class="cpv-tree loading mb-4">
     <span class="spinner spinner-xl"></span>
   </div>
@@ -119,7 +142,7 @@ const syncBtnId = `${instanceId}-sync-btn`;
     </div>
   </div>
 
-  <script is:inline define:vars={{ treeUrl, rootId, treeId, countId, selectedCodesId, searchBtnId, searchDropdownId, copyBtnId, manualInputId, applyManualBtnId, syncBtnId, initialCodes }}>
+  <script is:inline define:vars={{ treeUrl, rootId, treeId, countId, selectedCodesId, searchBtnId, searchDropdownId, copyBtnId, manualInputId, applyManualBtnId, syncBtnId, searchInputId, searchClearId, resultsInfoId, initialCodes }}>
     // @ts-nocheck
     const root = document.getElementById(rootId);
     const treeEl = document.getElementById(treeId);
@@ -131,7 +154,14 @@ const syncBtnId = `${instanceId}-sync-btn`;
     const searchBtn = document.getElementById(searchBtnId);
     const searchDropdown = document.getElementById(searchDropdownId);
     const copyBtn = document.getElementById(copyBtnId);
+    const searchInput = document.getElementById(searchInputId);
+    const searchClear = document.getElementById(searchClearId);
+    const resultsInfoEl = document.getElementById(resultsInfoId);
     const syncInputIdValue = root?.dataset.syncInputId ?? "";
+    const bvpzFlatIndex = [];
+    const BVPZ_MATCH_LIMIT = 400;
+    let bvpzMarkedShow = [];
+    let bvpzMarkedOpen = [];
     const clearInputIdValue = root?.dataset.clearInputId ?? "";
     const copiedText = "Nukopijuota ✓";
     const copyLabel = "Kopijuoti";
@@ -192,7 +222,7 @@ const syncBtnId = `${instanceId}-sync-btn`;
       if (btn) btn.setAttribute("aria-expanded", String(open));
     }
 
-    function bvpzBuildTree(nodes, container) {
+    function bvpzBuildTree(nodes, container, ancestors = []) {
       nodes.forEach((node) => {
         const nodeEl = document.createElement("div");
         nodeEl.className = "cpv-node";
@@ -234,11 +264,21 @@ const syncBtnId = `${instanceId}-sync-btn`;
         const label = document.createElement("label");
         label.appendChild(checkbox);
         label.appendChild(bvpzFormatCode(fullCode));
-        label.appendChild(document.createTextNode(" " + labelText));
+        const nameEl = document.createElement("span");
+        nameEl.className = "cpv-name";
+        nameEl.textContent = " " + labelText;
+        label.appendChild(nameEl);
         row.appendChild(label);
         nodeEl.appendChild(row);
 
-        if (hasChildren) bvpzBuildTree(node.children, nodeEl);
+        const path = ancestors.concat(nodeEl);
+        bvpzFlatIndex.push({
+          el: nodeEl,
+          path,
+          search: (fullCode + " " + node.attributes.cpv_mask + " " + labelText).toLowerCase(),
+        });
+
+        if (hasChildren) bvpzBuildTree(node.children, nodeEl, path);
         container.appendChild(nodeEl);
       });
     }
@@ -276,6 +316,7 @@ const syncBtnId = `${instanceId}-sync-btn`;
       if (!treeEl) return;
       treeEl.classList.remove("loading");
       treeEl.innerHTML = "";
+      bvpzFlatIndex.length = 0;
       bvpzBuildTree(data, treeEl);
       bvpzApplyInitial();
     }
@@ -354,6 +395,87 @@ const syncBtnId = `${instanceId}-sync-btn`;
       } else if (target === "viesiejiPirkimaiTeikimas") {
         window.location.href = `/viesiejiPirkimai?statusas=teikimas&bvpzPrefiksai=${encodeURIComponent(codes)}`;
       }
+    }
+
+    // Filtering marks only the matching nodes and their ancestor path with
+    // `cpv-show` (and ancestors with `cpv-search-open`). In `.searching` mode CSS
+    // hides everything except `.cpv-show`, so a keystroke touches a bounded set of
+    // nodes — the ~9.5k-node tree is never reflowed wholesale. Selection keeps
+    // using the real tree checkboxes, so nothing about that logic changes.
+    function bvpzClearMarks() {
+      for (const el of bvpzMarkedShow) el.classList.remove("cpv-show");
+      for (const el of bvpzMarkedOpen) el.classList.remove("cpv-search-open");
+      bvpzMarkedShow = [];
+      bvpzMarkedOpen = [];
+    }
+
+    function bvpzApplyFilter(value) {
+      if (!treeEl) return;
+      const q = String(value || "").trim().toLowerCase();
+      if (searchClear) searchClear.hidden = q.length === 0;
+      bvpzClearMarks();
+
+      if (!q) {
+        treeEl.classList.remove("searching");
+        if (resultsInfoEl) resultsInfoEl.hidden = true;
+        return;
+      }
+
+      const showSet = new Set();
+      const openSet = new Set();
+      let total = 0;
+      let shownMatches = 0;
+      for (const entry of bvpzFlatIndex) {
+        if (entry.search.indexOf(q) === -1) continue;
+        total++;
+        if (shownMatches >= BVPZ_MATCH_LIMIT) continue;
+        shownMatches++;
+        const path = entry.path;
+        for (let i = 0; i < path.length; i++) {
+          showSet.add(path[i]);
+          if (i < path.length - 1) openSet.add(path[i]);
+        }
+      }
+
+      showSet.forEach((el) => {
+        el.classList.add("cpv-show");
+        bvpzMarkedShow.push(el);
+      });
+      openSet.forEach((el) => {
+        el.classList.add("cpv-search-open");
+        bvpzMarkedOpen.push(el);
+      });
+      treeEl.classList.add("searching");
+
+      if (resultsInfoEl) {
+        resultsInfoEl.hidden = false;
+        if (total === 0) {
+          resultsInfoEl.textContent = "Nieko nerasta.";
+        } else if (total > shownMatches) {
+          resultsInfoEl.textContent = `Rodoma ${shownMatches} iš ${total} — patikslinkite paiešką.`;
+        } else {
+          resultsInfoEl.textContent = `Rasta: ${total}`;
+        }
+      }
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener("input", () => bvpzApplyFilter(searchInput.value));
+      searchInput.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && searchInput.value) {
+          event.preventDefault();
+          searchInput.value = "";
+          bvpzApplyFilter("");
+        }
+      });
+    }
+
+    if (searchClear) {
+      searchClear.addEventListener("click", () => {
+        if (searchInput) searchInput.value = "";
+        bvpzApplyFilter("");
+        searchInput?.focus();
+      });
     }
 
     if (copyBtn) {
@@ -520,6 +642,67 @@ const syncBtnId = `${instanceId}-sync-btn`;
 
     .bvpz-picker .cpv-code-dim {
       opacity: 0.3;
+    }
+
+    .bvpz-picker .cpv-code,
+    .bvpz-picker .cpv-name {
+      user-select: text;
+    }
+
+    .bvpz-picker .cpv-tree.searching .cpv-node {
+      display: none !important;
+    }
+
+    .bvpz-picker .cpv-tree.searching .cpv-node.cpv-show {
+      display: block !important;
+    }
+
+    .bvpz-picker .cpv-tree.searching .cpv-node.cpv-search-open > .cpv-row .cpv-toggle {
+      transform: rotate(90deg);
+    }
+
+    .bvpz-picker .bvpz-search {
+      display: flex;
+      width: 100%;
+      gap: 10px;
+      padding: 9px 10px 9px 14px;
+      border-radius: var(--radius-md);
+    }
+
+    .bvpz-picker .bvpz-search label {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .bvpz-picker .bvpz-search .search-icon {
+      color: var(--gray);
+    }
+
+    .bvpz-picker .bvpz-search .search-bar__input::-webkit-search-cancel-button {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .bvpz-picker .bvpz-search-clear {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      line-height: 1;
+      color: var(--gray);
+      background: none;
+      border: none;
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      transition: background-color var(--transition), color var(--transition);
+    }
+
+    .bvpz-picker .bvpz-search-clear:hover {
+      background: var(--lightest-gray);
+      color: var(--black);
     }
 
     .bvpz-picker .cpv-tree.loading {
