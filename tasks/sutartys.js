@@ -1,6 +1,7 @@
 import { isVptWorkingHours } from "../modules/sutartys/isWorkingHours.js";
 import { cvpIsScrapeLeastRecentDate } from "../modules/sutartys/scrapeDay.js";
 import { cvpIsScrapeOldestContract } from "../modules/sutartys/scrapeOldestContract.js";
+import { cvpIsScrapeOldestDeletedContract } from "../modules/sutartys/scrapeOldestDeletedContract.js";
 import { cvpIsRequestLatest } from "../modules/sutartys/scrape.js";
 
 export default [
@@ -33,6 +34,17 @@ export default [
         errorCooldown: 30,
         job: async () => {
             if (!isVptWorkingHours()) return cvpIsScrapeOldestContract();
+            return false;
+        },
+    },
+    {
+        name: "sutartysScrapeOldestDeletedContract",
+        mode: "asap",
+        priority: 6,
+        cooldown: 30,
+        errorCooldown: 30,
+        job: async () => {
+            if (!isVptWorkingHours()) return cvpIsScrapeOldestDeletedContract();
             return false;
         },
     },

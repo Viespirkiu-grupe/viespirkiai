@@ -16,7 +16,7 @@ import {
 
 const BATCH_SIZE = 500;
 
-let processed = 0;
+let collectionReady = false;
 
 async function fetchBatch(client) {
     const res = await client.query(
@@ -70,32 +70,33 @@ async function processBatch(client, rows) {
 
     // Pašalinam apdorotus eilės įrašus
     await deleteQueueRows(client, queueIds);
-    processed += rows.length;
 }
 
-async function main() {
-    await ensureSuggestionCollection({ ignoreTypesenseUp: true });
-
-    const client = await postgres.connect();
-    try {
-        while (true) {
-            const rows = await fetchBatch(client);
-            if (rows.length === 0) break;
-            await processBatch(client, rows);
-            log(`Processed ${processed} queue rows so far...`);
-        }
-        log(`Done. Total processed: ${processed}`);
-    } finally {
-        client.release();
+/**
+ * Apdoroja vieną eilės partiją. Grąžina `true` jei buvo darbo (dar gali būti),
+ * `false` jei eilė tuščia — taip TaskRunner žino kada eiti į cooldown.
+ */
+export async function processSuggestionQueue() {
+    if (!collectionReady) {
+        await ensureSuggestionCollection({ ignoreTypesenseUp: true });
+        collectionReady = true;
     }
+
+    const rows = await fetchBatch(postgres);
+    if (rows.length === 0) return false;
+
+    await processBatch(postgres, rows);
+    log(`Processed ${rows.length} search suggestion queue rows`);
+    return true;
 }
 
-main()
-    .then(() => {
-        log("Search suggestion queue processing complete.");
-        postgres.end();
-    })
-    .catch((err) => {
-        console.error("Error processing search suggestion queue:", err);
-        postgres.end();
-    });
+// CLI — nudreniruoja visą eilę ir baigia
+if (
+    import.meta.url === process.argv[1] ||
+    import.meta.url === `file://${process.argv[1]}`
+) {
+    while (await processSuggestionQueue()) {}
+    log("Search suggestion queue processing complete.");
+    await postgres.end();
+    process.exit(0);
+}

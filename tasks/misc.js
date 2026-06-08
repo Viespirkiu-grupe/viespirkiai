@@ -13,6 +13,10 @@ import { nuskaitytiInformaciniLeidini } from "../modules/registruCentrasPranesim
 import { nuskaitytiVisasNeskelbiamasDerybas } from "../modules/neskelbiamosDerybos/scrape.js";
 import { importuotiMelagingusTiekejus } from "../modules/vptSarasai/melagingiScrape.js";
 import { importuotiNepatikimusTiekejus } from "../modules/vptSarasai/nepatikimiScrape.js";
+import { nuskaitytiMvpTvarkosAprasuSubjektus } from "../modules/mvpTvarkosAprasai/scrape.js";
+import { scrapeMvmUntilNow } from "../modules/mvpTvarkosAprasai/scrapeContent.js";
+import { updateVdiPazeidimai } from "../modules/vdi/scrapePazeidimai.js";
+import { processSuggestionQueue } from "../modules/searchSuggestion/processSuggestionQueue.js";
 
 export default [
     {
@@ -118,5 +122,29 @@ export default [
         name: "importuotiNepatikimusTiekejus",
         schedule: "0 */1 * * *",
         job: importuotiNepatikimusTiekejus,
+    },
+    {
+        // Pirma atnaujinamas subjektų sąrašas, tada (vėliau) jų turinys
+        name: "nuskaitytiMvpTvarkosAprasuSubjektus",
+        schedule: "0 5 * * *",
+        job: nuskaitytiMvpTvarkosAprasuSubjektus,
+    },
+    {
+        name: "scrapeMvpTvarkosAprasai",
+        schedule: "30 5 * * *",
+        job: scrapeMvmUntilNow,
+    },
+    {
+        name: "updateVdiPazeidimai",
+        schedule: "0 4 * * *",
+        job: updateVdiPazeidimai,
+    },
+    {
+        name: "processSearchSuggestionQueue",
+        mode: "asap",
+        priority: 5,
+        cooldown: 30,
+        errorCooldown: 30,
+        job: processSuggestionQueue,
     },
 ];
