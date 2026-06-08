@@ -90,6 +90,33 @@ const sutartysFilter = new FilterBuilder({
 const FIXED_WHERE = [`NOT COALESCE("istrinta", false)`];
 
 /**
+ * Loads complete contract rows from PostgreSQL while preserving Typesense order.
+ * Missing or deleted PostgreSQL rows are omitted.
+ * @param {{ id?: string | number }[]} typesenseRows
+ * @returns {Promise<object[]>}
+ */
+async function loadTypesenseRowsFromPostgres(typesenseRows) {
+    const ids = typesenseRows
+        .map((row) => Number(row.id))
+        .filter(Number.isSafeInteger);
+
+    if (ids.length === 0) return [];
+
+    const { rows } = await postgres.query(
+        `SELECT *
+         FROM sutartys
+         WHERE "sutartiesUnikalusId" = ANY($1::int[])
+           AND NOT COALESCE(istrinta, false)`,
+        [ids],
+    );
+    const rowsById = new Map(
+        rows.map((row) => [Number(row.sutartiesUnikalusId), row]),
+    );
+
+    return ids.map((id) => rowsById.get(id)).filter(Boolean);
+}
+
+/**
  * @typedef {"postgres" | "typesense"} Engine
  */
 
@@ -123,6 +150,7 @@ const FIXED_WHERE = [`NOT COALESCE("istrinta", false)`];
  * @property {number | null} total - Total matching rows. Null if count timed out.
  * @property {object} values - Resolved filter values for form repopulation.
  * @property {string} queryParams - URL query string fragment for pagination links.
+ * @property {{label: string, phase: string, start: number, duration: number}[]} timings
  * @property {import("node:stream").Readable | null} stream - Raw stream, or null.
  * @property {import("pg").PoolClient | null} client - Live pg client when streaming, else null.
  */
@@ -137,6 +165,8 @@ export async function searchSutartys(
     query,
     { limit, page = 1, engine = "postgres", stream = false, sort = true } = {},
 ) {
+    const searchStarted = performance.now();
+
     if (engine === "typesense") {
         const { filterBy, sortBy, values, queryParams } =
             sutartysFilter.build(query);
@@ -147,22 +177,43 @@ export async function searchSutartys(
                 total: null,
                 values,
                 queryParams,
+                timings: [],
                 stream: Readable.from(streamTypesenseResults(query)),
                 client: null,
             };
         }
 
+        const typesenseStarted = performance.now();
         const { results: raw, total } = await searchDocuments(
             query.search || "*",
             { page, filterBy, sortBy, limit },
         );
+        const typesenseEnded = performance.now();
+
+        const postgresStarted = performance.now();
+        const rows = await loadTypesenseRowsFromPostgres(raw);
+        const postgresEnded = performance.now();
         return {
-            results: arrayToLithuanianTime(raw).map(aptvarkytiRezultata),
+            results: arrayToLithuanianTime(rows).map(aptvarkytiRezultata),
             total,
             sutarciuKiekis: null,
             bendraVerte: null,
             values,
             queryParams,
+            timings: [
+                {
+                    label: "Typesense",
+                    phase: "search",
+                    start: Math.round(typesenseStarted - searchStarted),
+                    duration: Math.round(typesenseEnded - typesenseStarted),
+                },
+                {
+                    label: "PostgreSQL",
+                    phase: "pg",
+                    start: Math.round(postgresStarted - searchStarted),
+                    duration: Math.round(postgresEnded - postgresStarted),
+                },
+            ],
             stream: null,
             client: null,
         };
@@ -186,6 +237,7 @@ export async function searchSutartys(
             bendraVerte: null,
             values,
             queryParams,
+            timings: [],
             stream: client.query(new QueryStream(sql, params)).pipe(
                 new Transform({
                     objectMode: true,
@@ -222,6 +274,7 @@ export async function searchSutartys(
         : Promise.resolve(null);
 
     const [{ rows }, aggResult] = await Promise.all([mainQuery, aggQuery]);
+    const postgresEnded = performance.now();
 
     return {
         results: rows.map(aptvarkytiRezultata),
@@ -230,6 +283,14 @@ export async function searchSutartys(
         bendraVerte: aggResult ? parseFloat(aggResult.rows[0].bendraVerte) : null,
         values,
         queryParams,
+        timings: [
+            {
+                label: "PostgreSQL",
+                phase: "pg",
+                start: 0,
+                duration: Math.round(postgresEnded - searchStarted),
+            },
+        ],
         stream: null,
         client: null,
     };
@@ -326,7 +387,8 @@ export async function* streamTypesenseResults(query) {
         if (page === 1) total = t;
         if (!results.length) break;
 
-        for (const row of arrayToLithuanianTime(results).map(
+        const rows = await loadTypesenseRowsFromPostgres(results);
+        for (const row of arrayToLithuanianTime(rows).map(
             aptvarkytiRezultata,
         )) {
             yield row;

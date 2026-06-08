@@ -255,6 +255,7 @@ export async function searchDocuments(query, options = {}) {
                 "sutartiesNumeris,pavadinimas,perkanciojiOrganizacija,tiekejas,bvpzPavadinimas,papildomiTiekejai,papildomiBvpzPavadinimai",
             sort_by: sortBy,
             filter_by: filterBy,
+            include_fields: "id",
             per_page: limit,
             page: page,
         });
@@ -284,6 +285,7 @@ export async function searchDocuments(query, options = {}) {
                     "sutartiesNumeris,pavadinimas,perkanciojiOrganizacija,tiekejas,bvpzPavadinimas,papildomiTiekejai,papildomiBvpzPavadinimai",
                 sort_by: sortBy,
                 filter_by: filterBy,
+                include_fields: "id",
                 per_page: size,
                 page: currentPage,
             });

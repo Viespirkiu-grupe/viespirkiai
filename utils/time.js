@@ -3,8 +3,8 @@ import { DateTime } from "luxon";
 /**
  * Converts a UTC Date object to Lithuanian local time (Europe/Vilnius),
  * accounting for daylight saving time.
- * @param {Date|null|undefined} utcDate - A UTC Date object, null, or undefined.
- * @returns {String|null|undefined} - A formatted date string or the original input if null/undefined.
+ * @param {Date|string|number|null|undefined} utcDate - A UTC date value.
+ * @returns {string|number|null|undefined} - A formatted date string or the original input if it cannot be converted.
  */
 export function toLithuanianTime(utcDate) {
     if (
@@ -23,10 +23,22 @@ export function toLithuanianTime(utcDate) {
             .toFormat("yyyy-MM-dd HH:mm:ss");
     }
 
-    // Otherwise, treat it as a Date object
-    return DateTime.fromJSDate(utcDate, { zone: "utc" })
-        .setZone("Europe/Vilnius")
-        .toFormat("yyyy-MM-dd HH:mm:ss");
+    let dateTime;
+
+    if (utcDate instanceof Date) {
+        dateTime = DateTime.fromJSDate(utcDate, { zone: "utc" });
+    } else if (typeof utcDate === "string") {
+        dateTime = DateTime.fromSQL(utcDate, { zone: "utc" });
+        if (!dateTime.isValid) {
+            dateTime = DateTime.fromISO(utcDate, { zone: "utc" });
+        }
+    } else {
+        return utcDate;
+    }
+
+    return dateTime.isValid
+        ? dateTime.setZone("Europe/Vilnius").toFormat("yyyy-MM-dd HH:mm:ss")
+        : utcDate;
 }
 
 /**

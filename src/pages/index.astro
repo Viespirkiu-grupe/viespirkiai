@@ -171,11 +171,17 @@ if (query.rezultatuSkaiciausPatikslinimas) {
     timed(searchSutartys(query, { limit: 1, page, engine })),
   ]);
   const total = countRes.value as number;
-  const { queryParams } = searchRes.value as { values: SearchValues; queryParams: string };
+  const { queryParams, timings: searchTimings } = searchRes.value as {
+    values: SearchValues;
+    queryParams: string;
+    timings?: Timing[];
+  };
   const pageCount = Math.ceil(total / limit);
   const elapsed = performance.now() - startas + Number(query.trukme || 0);
   const timings: Timing[] = [
-    { label: 'Paieška', phase: 'search', start: 0, duration: searchRes.ms },
+    ...(searchTimings?.length
+      ? searchTimings
+      : [{ label: 'Paieška', phase: 'search', start: 0, duration: searchRes.ms }]),
     { label: 'Skaičius', phase: 'count', start: 0, duration: countRes.ms },
   ];
   void timings;
@@ -194,17 +200,18 @@ if (query.rezultatuSkaiciausPatikslinimas) {
 
 const startas = performance.now();
 const searchTimed = await timed(searchSutartys(query, { limit, page, engine }));
-const { results, total: searchedTotal, values, queryParams } = searchTimed.value as {
+const { results, total: searchedTotal, values, queryParams, timings: searchTimings } = searchTimed.value as {
   results: SearchResultItem[];
   total: number | null;
   values: SearchValues;
   queryParams: string;
+  timings?: Timing[];
 };
 const elapsed = performance.now() - startas;
 const total = searchedTotal;
-const initialTimings: Timing[] = [
-  { label: 'Paieška', phase: 'search', start: 0, duration: searchTimed.ms },
-];
+const initialTimings: Timing[] = searchTimings?.length
+  ? searchTimings
+  : [{ label: 'Paieška', phase: 'search', start: 0, duration: searchTimed.ms }];
 const numberOfResults = buildNumberOfResults({ shown: results.length, total, elapsed, engine, timings: initialTimings });
 
 const pageCount = Math.ceil((total || 100_000) / limit);
