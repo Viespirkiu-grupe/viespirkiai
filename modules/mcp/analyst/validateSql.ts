@@ -24,7 +24,7 @@ export const TABLE_WHITELIST: Set<string> = new Set([
 
     "neskelbiamosDerybos",
     "vdiPazeidimai",
-    "bylos", "bylosDalyviai",
+    "teismoNuosprendziai", "teismoNuosprendziaiDalyviai",
     "mokesciai",
 ]);
 

@@ -5,7 +5,7 @@ import { nuskaitytiPinregDeklaracija } from "../modules/pinreg/nuskaityti.js";
 import { getNewestPinreg } from "../modules/pinreg/scrapeNewest.js";
 import { nuskaitytiDomregDomena } from "../modules/domenai/scrapeDomreg.js";
 import { litekoScrapeLatestDays } from "../modules/liteko/scrape.js";
-import { surastiBylosSalis } from "../modules/liteko/scrapeContent.js";
+import { surastiNuosprendzioDalyvius } from "../modules/liteko/scrapeContent.js";
 import { pravalytiOcrRezervacijas } from "../modules/ocr/pravalytiRezervacijas.js";
 import { geolocateJarCsv } from "../modules/juridiniai/findCoordinates.js";
 import { nuskaitytiInformaciniusLeidinius } from "../modules/registruCentrasPranesimai/scrape.js";
@@ -73,7 +73,7 @@ export default [
         priority: 5,
         cooldown: 60,
         errorCooldown: 10,
-        job: surastiBylosSalis,
+        job: surastiNuosprendzioDalyvius,
     },
     {
         name: "pravalytiOcrRezervacijas",

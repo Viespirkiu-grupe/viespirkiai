@@ -60,6 +60,7 @@ export interface Timing {
 export interface DokumentasHit {
   id: number;
   md5: string | null;
+  class: string | null;
   type: string | null;
   url: string | null;
   host: string | null;
@@ -96,6 +97,7 @@ export interface DokumentaiSearchResult {
   totalPages: number;
   pageNums: number[];
   sort: DokumentaiSort;
+  classFilter: string[];
   typeFilter: string[];
   hostFilter: string[];
   jarFilter: string[];
@@ -107,8 +109,13 @@ export interface DokumentaiSearchResult {
   savFilter: string[];
   apskritisFilter: string[];
   sourceFilter: string[];
+  courtFilter: string[];
+  caseTypeFilter: string[];
+  categoryFilter: string[];
+  judgeFilter: string[];
   bbox: Bbox | null;
   typeCountMap: Record<string, number>;
+  classCountMap: Record<string, number>;
   hostOptions: FacetOption[];
   extOptions: FacetOption[];
   authorOptions: FacetOption[];
@@ -118,6 +125,10 @@ export interface DokumentaiSearchResult {
   savOptions: FacetOption[];
   apskritisOptions: FacetOption[];
   sourceOptions: FacetOption[];
+  courtOptions: FacetOption[];
+  caseTypeOptions: FacetOption[];
+  categoryOptions: FacetOption[];
+  judgeOptions: FacetOption[];
 }
 
 // ── Quickwit helpers ─────────────────────────────────────────────────────────
@@ -171,11 +182,13 @@ function splitMulti(raw: string | string[] | undefined): string[] {
  *  return them as filter additions plus the remainder. Mirrors langelis. */
 export function extractInlineTokens(q: string) {
   let textQuery = q;
+  const classes: string[] = [];
   const types: string[] = [];
   const hosts: string[] = [];
   const jars: string[] = [];
   const exts: string[] = [];
 
+  textQuery = textQuery.replace(/\b(?:class|klase|klasė|sritis):(\S+)/gi, (_, v) => { classes.push(v); return ''; });
   textQuery = textQuery.replace(/\b(?:type|tipas):(\S+)/gi, (_, v) => { types.push(v); return ''; });
   textQuery = textQuery.replace(/\b(?:host|site|puslapis):(\S+)/gi, (_, v) => { hosts.push(v); return ''; });
   textQuery = textQuery.replace(/\b(?:jar|juridiniai|jarkodas):(\S+)/gi, (_, v) => { jars.push(v); return ''; });
@@ -184,7 +197,7 @@ export function extractInlineTokens(q: string) {
     return '';
   });
 
-  return { textQuery: textQuery.trim(), types, hosts, jars, exts };
+  return { textQuery: textQuery.trim(), classes, types, hosts, jars, exts };
 }
 
 /** Geografinis stačiakampis (sritis), filtruojamas per Quickwit lat/lon range. */
@@ -197,6 +210,7 @@ export interface Bbox {
 
 function buildPartsExcluding(opts: {
   textQuery: string;
+  classes: string[];
   types: string[];
   hosts: string[];
   jars: string[];
@@ -208,7 +222,12 @@ function buildPartsExcluding(opts: {
   savs: string[];
   apskritys: string[];
   sources: string[];
+  courts: string[];
+  caseTypes: string[];
+  categories: string[];
+  judges: string[];
   bbox?: Bbox | null;
+  excludeClass?: boolean;
   excludeHost?: boolean;
   excludeJar?: boolean;
   excludeExt?: boolean;
@@ -220,13 +239,23 @@ function buildPartsExcluding(opts: {
   excludeSav?: boolean;
   excludeApskritis?: boolean;
   excludeSource?: boolean;
+  excludeCourt?: boolean;
+  excludeCaseType?: boolean;
+  excludeCategory?: boolean;
+  excludeJudge?: boolean;
   /** Tiksli frazė: tekstą paduodam Quickwit'ui kabutėse ("…"), kad žodžiai būtų
    *  randami tiksliai greta ir ta pačia tvarka, o ne kaip atskiri terminai. */
   phrase?: boolean;
 }): string {
-  const { textQuery, types, hosts, jars, exts, authors, creators, producers, langs, savs, apskritys, sources, bbox } = opts;
+  const { textQuery, classes, types, hosts, jars, exts, authors, creators, producers, langs, savs, apskritys, sources, courts, caseTypes, categories, judges, bbox } = opts;
   const p: string[] = [];
+  if (!opts.excludeClass && classes.length) p.push(`(${classes.map((c) => `class:${JSON.stringify(c)}`).join(' OR ')})`);
   if (!opts.excludeType && types.length) p.push(`(${types.map((t) => `type:${t}`).join(' OR ')})`);
+  // Teismo nuosprendžių metadata filtrai (metadata.* yra json/raw — tiksli atitiktis).
+  if (!opts.excludeCourt && courts.length) p.push(`(${courts.map((v) => `metadata.teismas:${JSON.stringify(v)}`).join(' OR ')})`);
+  if (!opts.excludeCaseType && caseTypes.length) p.push(`(${caseTypes.map((v) => `metadata.bylosRusis:${JSON.stringify(v)}`).join(' OR ')})`);
+  if (!opts.excludeCategory && categories.length) p.push(`(${categories.map((v) => `metadata.kategorijos:${JSON.stringify(v)}`).join(' OR ')})`);
+  if (!opts.excludeJudge && judges.length) p.push(`(${judges.map((v) => `metadata.teisejai:${JSON.stringify(v)}`).join(' OR ')})`);
   if (!opts.excludeHost && hosts.length) p.push(`(${hosts.map((h) => `host:${JSON.stringify(h)}`).join(' OR ')})`);
   if (!opts.excludeJar && jars.length) {
     const numeric = jars.map((j) => parseInt(j, 10)).filter((n) => Number.isFinite(n));
@@ -279,6 +308,7 @@ function parseBbox(input: {
 // the standalone facet-options fetch (the "show all" modal).
 function buildPartsOpts(input: {
   q?: string;
+  klase?: string | string[];
   type?: string | string[];
   host?: string | string[];
   jar?: string | string[];
@@ -290,6 +320,10 @@ function buildPartsOpts(input: {
   sav?: string | string[];
   apskritis?: string | string[];
   source?: string | string[];
+  teismas?: string | string[];
+  bylosRusis?: string | string[];
+  kategorija?: string | string[];
+  teisejas?: string | string[];
   minLat?: string | number;
   maxLat?: string | number;
   minLon?: string | number;
@@ -299,6 +333,7 @@ function buildPartsOpts(input: {
   const rawQ = (input.q ?? '').trim();
   const phrase = input.mode === 'phrase';
 
+  const classFilter = splitMulti(input.klase);
   const typeFilter = splitMulti(input.type);
   const hostFilter = splitMulti(input.host);
   const jarFilter = splitMulti(input.jar);
@@ -310,12 +345,19 @@ function buildPartsOpts(input: {
   const savFilter = splitMulti(input.sav);
   const apskritisFilter = splitMulti(input.apskritis);
   const sourceFilter = splitMulti(input.source).map(canonSource);
+  // Nuosprendžių metadata filtrai gali turėti kablelių vardo viduje (pvz. kategorijų
+  // pavadinimai), todėl jų NEskaidom per kablelį — imam kaip atskiras reikšmes.
+  const courtFilter = Array.isArray(input.teismas) ? input.teismas.filter(Boolean) : input.teismas ? [input.teismas] : [];
+  const caseTypeFilter = Array.isArray(input.bylosRusis) ? input.bylosRusis.filter(Boolean) : input.bylosRusis ? [input.bylosRusis] : [];
+  const categoryFilter = Array.isArray(input.kategorija) ? input.kategorija.filter(Boolean) : input.kategorija ? [input.kategorija] : [];
+  const judgeFilter = Array.isArray(input.teisejas) ? input.teisejas.filter(Boolean) : input.teisejas ? [input.teisejas] : [];
 
-  const { textQuery, types: inlineTypes, hosts: inlineHosts, jars: inlineJars, exts: inlineExts } =
+  const { textQuery, classes: inlineClasses, types: inlineTypes, hosts: inlineHosts, jars: inlineJars, exts: inlineExts } =
     extractInlineTokens(rawQ);
 
   return {
     textQuery,
+    classes: [...new Set([...inlineClasses, ...classFilter])],
     types: [...new Set([...inlineTypes, ...typeFilter])],
     hosts: [...new Set([...inlineHosts, ...hostFilter])],
     jars: [...new Set([...inlineJars, ...jarFilter])],
@@ -327,6 +369,10 @@ function buildPartsOpts(input: {
     savs: [...new Set(savFilter)],
     apskritys: [...new Set(apskritisFilter)],
     sources: [...new Set(sourceFilter)],
+    courts: [...new Set(courtFilter)],
+    caseTypes: [...new Set(caseTypeFilter)],
+    categories: [...new Set(categoryFilter)],
+    judges: [...new Set(judgeFilter)],
     bbox: parseBbox(input),
     phrase,
   };
@@ -335,9 +381,11 @@ function buildPartsOpts(input: {
 // Quickwit field → the "exclude this facet's own filter" flag, so a facet lists
 // every value available under the *other* active filters.
 type FacetExcludeKey =
-  | 'excludeHost' | 'excludeExt' | 'excludeAuthor' | 'excludeCreator' | 'excludeProducer' | 'excludeLang'
-  | 'excludeSav' | 'excludeApskritis' | 'excludeSource';
+  | 'excludeClass' | 'excludeHost' | 'excludeExt' | 'excludeAuthor' | 'excludeCreator' | 'excludeProducer' | 'excludeLang'
+  | 'excludeSav' | 'excludeApskritis' | 'excludeSource'
+  | 'excludeCourt' | 'excludeCaseType' | 'excludeCategory' | 'excludeJudge';
 const FACET_EXCLUDE: Record<string, FacetExcludeKey> = {
+  class: 'excludeClass',
   host: 'excludeHost',
   extension: 'excludeExt',
   author: 'excludeAuthor',
@@ -347,6 +395,10 @@ const FACET_EXCLUDE: Record<string, FacetExcludeKey> = {
   savivaldybe: 'excludeSav',
   apskritis: 'excludeApskritis',
   source: 'excludeSource',
+  'metadata.teismas': 'excludeCourt',
+  'metadata.bylosRusis': 'excludeCaseType',
+  'metadata.kategorijos': 'excludeCategory',
+  'metadata.teisejai': 'excludeJudge',
 };
 
 /**
@@ -490,6 +542,7 @@ export function makeSnippet(
 export async function searchDokumentai(input: {
   q?: string;
   page?: number;
+  klase?: string | string[];
   type?: string | string[];
   host?: string | string[];
   jar?: string | string[];
@@ -501,6 +554,10 @@ export async function searchDokumentai(input: {
   sav?: string | string[];
   apskritis?: string | string[];
   source?: string | string[];
+  teismas?: string | string[];
+  bylosRusis?: string | string[];
+  kategorija?: string | string[];
+  teisejas?: string | string[];
   minLat?: string | number;
   maxLat?: string | number;
   minLon?: string | number;
@@ -519,6 +576,7 @@ export async function searchDokumentai(input: {
   const { textQuery } = partsOpts;
 
   const qwQuery = buildPartsExcluding(partsOpts);
+  const classFacetQuery = buildPartsExcluding({ ...partsOpts, excludeClass: true });
   const hostFacetQuery = buildPartsExcluding({ ...partsOpts, excludeHost: true });
   const typeFacetQuery = buildPartsExcluding(partsOpts);
   const extFacetQuery = buildPartsExcluding({ ...partsOpts, excludeExt: true });
@@ -529,6 +587,10 @@ export async function searchDokumentai(input: {
   const savFacetQuery = buildPartsExcluding({ ...partsOpts, excludeSav: true });
   const apskritisFacetQuery = buildPartsExcluding({ ...partsOpts, excludeApskritis: true });
   const sourceFacetQuery = buildPartsExcluding({ ...partsOpts, excludeSource: true });
+  const courtFacetQuery = buildPartsExcluding({ ...partsOpts, excludeCourt: true });
+  const caseTypeFacetQuery = buildPartsExcluding({ ...partsOpts, excludeCaseType: true });
+  const categoryFacetQuery = buildPartsExcluding({ ...partsOpts, excludeCategory: true });
+  const judgeFacetQuery = buildPartsExcluding({ ...partsOpts, excludeJudge: true });
 
   const t0 = Date.now();
   const mark = () => Date.now() - t0;
@@ -547,6 +609,11 @@ export async function searchDokumentai(input: {
   const aggsPromise = Promise.all([
     qwAggregate('host', hostFacetQuery, 15),
     qwAggregate('type', typeFacetQuery, 10),
+    qwAggregate('class', classFacetQuery, 10),
+    qwAggregate('metadata.teismas', courtFacetQuery, 60),
+    qwAggregate('metadata.bylosRusis', caseTypeFacetQuery, 12),
+    qwAggregate('metadata.kategorijos', categoryFacetQuery, 60),
+    qwAggregate('metadata.teisejai', judgeFacetQuery, 60),
     // Sidebar previews only 6 extensions; +1 is enough to know whether to show
     // the "Daugiau" button. The full list is fetched on demand by the modal
     // (/api/dokumentaiFacet), so there's no need to over-aggregate here.
@@ -573,7 +640,7 @@ export async function searchDokumentai(input: {
   if (filterMs > 0) {
     timings.push({ label: 'Gyvų atranka', phase: 'pg', start: searchStart + qwMs, duration: filterMs });
   }
-  const [hostBuckets, typeBuckets, extBuckets, authorBuckets, creatorBuckets, producerBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets] = await aggsPromise;
+  const [hostBuckets, typeBuckets, classBuckets, courtBuckets, caseTypeBuckets, categoryBuckets, judgeBuckets, extBuckets, authorBuckets, creatorBuckets, producerBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets] = await aggsPromise;
   timings.push({ label: 'Facetai', phase: 'filter', start: aggsStart, duration: mark() - aggsStart });
 
   const total = result.numHitsEstimate ?? result.hits.length;
@@ -587,7 +654,7 @@ export async function searchDokumentai(input: {
     const pgStart = mark();
     const { rows: pgRows } = await postgres.query(
       `SELECT
-         id, md5, type, url, host, domain, source, pavadinimas, autorius,
+         id, md5, "class", type, url, host, domain, source, pavadinimas, autorius,
          extension, language, "pageCount", "wordCount", "characterCount",
          savivaldybe, apskritis, "istaigaJar",
          "happenedAt", "createdAt", "updatedAt", "discoveredAt", "failasId"
@@ -640,6 +707,11 @@ export async function searchDokumentai(input: {
 
   const hostOptions = toOptions(hostBuckets);
   const typeCountMap = Object.fromEntries(typeBuckets.map((b) => [b.value, b.count ?? 0]));
+  const classCountMap = Object.fromEntries(classBuckets.map((b) => [b.value, b.count ?? 0]));
+  const courtOptions = toOptions(courtBuckets);
+  const caseTypeOptions = toOptions(caseTypeBuckets);
+  const categoryOptions = toOptions(categoryBuckets);
+  const judgeOptions = toOptions(judgeBuckets);
   const extOptions = toOptions(extBuckets);
   const authorOptions = toOptions(authorBuckets);
   const creatorOptions = toOptions(creatorBuckets);
@@ -674,6 +746,7 @@ export async function searchDokumentai(input: {
     totalPages,
     pageNums,
     sort,
+    classFilter: partsOpts.classes,
     typeFilter: partsOpts.types,
     hostFilter: partsOpts.hosts,
     jarFilter: partsOpts.jars,
@@ -685,8 +758,13 @@ export async function searchDokumentai(input: {
     savFilter: partsOpts.savs,
     apskritisFilter: partsOpts.apskritys,
     sourceFilter: partsOpts.sources,
+    courtFilter: partsOpts.courts,
+    caseTypeFilter: partsOpts.caseTypes,
+    categoryFilter: partsOpts.categories,
+    judgeFilter: partsOpts.judges,
     bbox: partsOpts.bbox,
     typeCountMap,
+    classCountMap,
     hostOptions,
     extOptions,
     authorOptions,
@@ -696,5 +774,9 @@ export async function searchDokumentai(input: {
     savOptions,
     apskritisOptions,
     sourceOptions,
+    courtOptions,
+    caseTypeOptions,
+    categoryOptions,
+    judgeOptions,
   };
 }

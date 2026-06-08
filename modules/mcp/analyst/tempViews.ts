@@ -4,7 +4,7 @@ export const COVERED_TABLES_BY_VIEWS: Record<string, string> = {
     viesiejiPirkimai:       "v_pirkimas",
     pinregJuridiniaiRysiai: "v_person_links",
 
-    bylosDalyviai:          "v_bylos",
+    teismoNuosprendziaiDalyviai: "v_bylos",
 };
 
 const _viewNames = [...new Set(Object.values(COVERED_TABLES_BY_VIEWS))].sort();

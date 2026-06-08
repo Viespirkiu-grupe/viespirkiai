@@ -3,8 +3,21 @@ Parsiunčia bylų metaduomenis iš Liteko sistemos ir įterpia jas į Postgres d
 */
 
 import { parseHTML } from "linkedom";
+import { createHash } from "node:crypto";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+
+const LITEKO_BASE = "https://liteko.teismai.lt/viesasprendimupaieska/";
+
+/** LITEKO detalės puslapio UUID iš santykinės nuorodos (tekstas.aspx?id=<uuid>). */
+function litekoIdFromHref(fileHref) {
+    const m = /[?&]id=([^&]+)/i.exec(fileHref || "");
+    return m ? decodeURIComponent(m[1]) : fileHref;
+}
+
+function md5Hex(str) {
+    return createHash("md5").update(String(str)).digest("hex");
+}
 
 /**
  * Nuskaito bylas iš Liteko sistemos nurodytai dienai.
@@ -220,14 +233,18 @@ var eilute = 0;
 async function insertBatch(rows) {
     if (rows.length === 0) return;
 
+    // Tekstas DB nesaugomas — čia tik metaduomenys iš paieškos rezultatų puslapio.
+    // teisminisProcesoNr / instancija / skyrius užpildomi vėliau, nuskaitant turinį.
+    const cols = [
+        "litekoId", "bylosNumeris", "bylosRusis", "data",
+        "teismas", "teismoRumai", "url", "fileHref", "md5",
+    ];
     const sql = `
-         INSERT INTO bylos (
-             "bylosNumeris", "bylosRusis", data, teisejai, salys,
-             "citavimasKitoseBylose", teismas, "teismoRumai", "fileText", "fileHref"
-         ) VALUES ${rows
+         INSERT INTO "teismoNuosprendziai" (${cols.map((c) => `"${c}"`).join(", ")})
+         VALUES ${rows
              .map(
                  (_, i) =>
-                     `($${i * 10 + 1},$${i * 10 + 2},$${i * 10 + 3},$${i * 10 + 4},$${i * 10 + 5},$${i * 10 + 6},$${i * 10 + 7},$${i * 10 + 8},$${i * 10 + 9},$${i * 10 + 10})`,
+                     `(${cols.map((_, j) => `$${i * cols.length + j + 1}`).join(",")})`,
              )
              .join(", ")}
          ON CONFLICT ("fileHref") DO NOTHING
@@ -254,18 +271,22 @@ async function importuotiDiena(date) {
         return false;
     }
 
-    let rows = dienosBylos.map((byla) => [
-        byla.bylosNumeris || null,
-        byla.bylosRusis || null,
-        byla.data || null,
-        byla.teisejai || null,
-        byla.salys || null,
-        byla.citavimasKitoseBylose || null,
-        byla.teismas || null,
-        byla.teismoRumai || null,
-        byla.fileText || null,
-        byla.fileHref || null,
-    ]);
+    let rows = dienosBylos
+        .filter((byla) => byla.fileHref && byla.bylosNumeris && byla.teismas && byla.data)
+        .map((byla) => {
+            const litekoId = litekoIdFromHref(byla.fileHref);
+            return [
+                litekoId,
+                byla.bylosNumeris,
+                byla.bylosRusis || null,
+                byla.data,
+                byla.teismas,
+                byla.teismoRumai || null,
+                LITEKO_BASE + byla.fileHref,
+                byla.fileHref,
+                md5Hex(litekoId),
+            ];
+        });
 
     await insertBatch(rows);
 }
@@ -280,7 +301,7 @@ async function scrapeAllDays(startDate) {
     if (!startDate) {
         // Check database for the last scraped date
         const { rows } = await postgres.query(
-            `SELECT MAX(data) AS "lastDate" FROM bylos`,
+            `SELECT MAX(data) AS "lastDate" FROM "teismoNuosprendziai"`,
         );
 
         if (rows[0].lastDate) {
@@ -321,7 +342,7 @@ async function scrapeAllDays(startDate) {
 export async function litekoScrapeLatestDays(days = 90) {
     // Check database for the last scraped date
     const { rows } = await postgres.query(
-        `SELECT MAX(data) AS "lastDate" FROM bylos`,
+        `SELECT MAX(data) AS "lastDate" FROM "teismoNuosprendziai"`,
     );
 
     let startDate;
@@ -334,4 +355,15 @@ export async function litekoScrapeLatestDays(days = 90) {
     }
 
     await scrapeAllDays(startDate);
+}
+
+// Paleistas tiesiogiai (node modules/liteko/scrape.js) — pilnas istorinis nuskaitymas
+// nuo pačios pradžios (2005-01-06). Esami įrašai praleidžiami (ON CONFLICT DO NOTHING).
+// Pasirinktinai galima nurodyti pradžios datą: node modules/liteko/scrape.js 2020-01-01
+if (import.meta.url === `file://${process.argv[1]}`) {
+    const arg = process.argv[2];
+    const startDate = arg ? new Date(arg) : new Date("2005-01-06");
+    await scrapeAllDays(startDate);
+    await postgres.end();
+    process.exit(0);
 }

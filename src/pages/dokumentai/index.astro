@@ -41,6 +41,7 @@ const page = Math.max(1, parseInt(params.get('page') ?? params.get('p') ?? '1', 
 const mode = params.get('mode') === 'words' ? 'words' : 'phrase';
 const requestedSort = params.get('sort') ?? undefined;
 
+const rawClassFilter = params.getAll('klase').flatMap((v) => v.split(','));
 const rawTypeFilter = params.getAll('type').flatMap((v) => v.split(','));
 const rawHostFilter = params.getAll('host').flatMap((v) => v.split(','));
 const rawJarFilter = params.getAll('jar').flatMap((v) => v.split(','));
@@ -52,6 +53,11 @@ const rawLangFilter = params.getAll('lang').flatMap((v) => v.split(','));
 const rawSavFilter = params.getAll('sav').flatMap((v) => v.split(','));
 const rawApskritisFilter = params.getAll('apskritis').flatMap((v) => v.split(','));
 const rawSourceFilter = params.getAll('source').flatMap((v) => v.split(','));
+// Nuosprendžių metadata filtrai — reikšmės gali turėti kablelių, todėl NEskaidom.
+const rawCourtFilter = params.getAll('teismas').filter(Boolean);
+const rawCaseTypeFilter = params.getAll('bylosRusis').filter(Boolean);
+const rawCategoryFilter = params.getAll('kategorija').filter(Boolean);
+const rawJudgeFilter = params.getAll('teisejas').filter(Boolean);
 
 // Geografinė sritis (stačiakampis) — filtruojama per Quickwit lat/lon range.
 const rawArea = {
@@ -62,18 +68,20 @@ const rawArea = {
 };
 const hasArea = Boolean(rawArea.minLat && rawArea.maxLat && rawArea.minLon && rawArea.maxLon);
 
-// Promote inline `type:`/`host:`/`jar:`/`ext:` tokens out of the search box.
+// Promote inline `class:`/`type:`/`host:`/`jar:`/`ext:` tokens out of the search box.
 {
-  const { textQuery, types, hosts, jars, exts } = extractInlineTokens(q);
-  if (types.length || hosts.length || jars.length || exts.length) {
+  const { textQuery, classes, types, hosts, jars, exts } = extractInlineTokens(q);
+  if (classes.length || types.length || hosts.length || jars.length || exts.length) {
     const sp = new URLSearchParams();
     if (textQuery) sp.set('search', textQuery);
     const merge = (existing: string[], incoming: string[]) =>
       [...new Set([...existing.map((v) => v.trim()).filter(Boolean), ...incoming])];
+    const c = merge(rawClassFilter, classes);
     const t = merge(rawTypeFilter, types);
     const h = merge(rawHostFilter, hosts);
     const j = merge(rawJarFilter, jars);
     const e = merge(rawExtFilter, exts.map((x) => x.toLowerCase()));
+    if (c.length) sp.set('klase', c.join(','));
     if (t.length) sp.set('type', t.join(','));
     if (h.length) sp.set('host', h.join(','));
     if (j.length) sp.set('jar', j.join(','));
@@ -81,6 +89,10 @@ const hasArea = Boolean(rawArea.minLat && rawArea.maxLat && rawArea.minLon && ra
     rawAuthorFilter.forEach((value) => sp.append('author', value));
     rawCreatorFilter.forEach((value) => sp.append('creator', value));
     rawProducerFilter.forEach((value) => sp.append('producer', value));
+    rawCourtFilter.forEach((value) => sp.append('teismas', value));
+    rawCaseTypeFilter.forEach((value) => sp.append('bylosRusis', value));
+    rawCategoryFilter.forEach((value) => sp.append('kategorija', value));
+    rawJudgeFilter.forEach((value) => sp.append('teisejas', value));
     sp.set('mode', mode);
     if (requestedSort && requestedSort !== 'relevance') sp.set('sort', requestedSort);
     if (page > 1) sp.set('page', String(page));
@@ -89,9 +101,10 @@ const hasArea = Boolean(rawArea.minLat && rawArea.maxLat && rawArea.minLon && ra
 }
 
 const hasFilters = Boolean(
-  rawTypeFilter.length || rawHostFilter.length || rawJarFilter.length || rawExtFilter.length
+  rawClassFilter.length || rawTypeFilter.length || rawHostFilter.length || rawJarFilter.length || rawExtFilter.length
   || rawAuthorFilter.length || rawCreatorFilter.length || rawProducerFilter.length
   || rawLangFilter.length || rawSavFilter.length || rawApskritisFilter.length || rawSourceFilter.length
+  || rawCourtFilter.length || rawCaseTypeFilter.length || rawCategoryFilter.length || rawJudgeFilter.length
   || hasArea,
 );
 const showHome = !q && !hasFilters;
@@ -129,6 +142,7 @@ if (!showHome) {
       searchDokumentai({
         q,
         page,
+        klase: rawClassFilter,
         type: rawTypeFilter,
         host: rawHostFilter,
         jar: rawJarFilter,
@@ -140,6 +154,10 @@ if (!showHome) {
         sav: rawSavFilter,
         apskritis: rawApskritisFilter,
         source: rawSourceFilter,
+        teismas: rawCourtFilter,
+        bylosRusis: rawCaseTypeFilter,
+        kategorija: rawCategoryFilter,
+        teisejas: rawJudgeFilter,
         minLat: rawArea.minLat,
         maxLat: rawArea.maxLat,
         minLon: rawArea.minLon,
@@ -163,6 +181,7 @@ if (!showHome) {
   }
 }
 
+const classFilter = result?.classFilter ?? [];
 const typeFilter = result?.typeFilter ?? [];
 const hostFilter = result?.hostFilter ?? [];
 const jarFilter = result?.jarFilter ?? [];
@@ -174,7 +193,12 @@ const langFilter = result?.langFilter ?? [];
 const savFilter = result?.savFilter ?? [];
 const apskritisFilter = result?.apskritisFilter ?? [];
 const sourceFilter = result?.sourceFilter ?? [];
+const courtFilter = result?.courtFilter ?? [];
+const caseTypeFilter = result?.caseTypeFilter ?? [];
+const categoryFilter = result?.categoryFilter ?? [];
+const judgeFilter = result?.judgeFilter ?? [];
 const typeCountMap = result?.typeCountMap ?? {};
+const classCountMap = result?.classCountMap ?? {};
 const hostOptions: FacetOption[] = result?.hostOptions ?? [];
 const extOptions: FacetOption[] = result?.extOptions ?? [];
 const authorOptions: FacetOption[] = result?.authorOptions ?? [];
@@ -184,6 +208,10 @@ const langOptions: FacetOption[] = result?.langOptions ?? [];
 const savOptions: FacetOption[] = result?.savOptions ?? [];
 const apskritisOptions: FacetOption[] = result?.apskritisOptions ?? [];
 const sourceOptions: FacetOption[] = result?.sourceOptions ?? [];
+const courtOptions: FacetOption[] = result?.courtOptions ?? [];
+const caseTypeOptions: FacetOption[] = result?.caseTypeOptions ?? [];
+const categoryOptions: FacetOption[] = result?.categoryOptions ?? [];
+const judgeOptions: FacetOption[] = result?.judgeOptions ?? [];
 const bbox = result?.bbox ?? null;
 const hits: DokumentasHit[] = result?.hits ?? [];
 const sort: DokumentaiSort = result?.sort ?? 'relevance';
@@ -209,6 +237,7 @@ const urlState: DokumentaiUrlState = {
   q,
   mode,
   sort,
+  klase: classFilter,
   type: typeFilter,
   host: hostFilter,
   jar: jarFilter,
@@ -220,10 +249,15 @@ const urlState: DokumentaiUrlState = {
   sav: savFilter,
   apskritis: apskritisFilter,
   source: sourceFilter,
+  teismas: courtFilter,
+  bylosRusis: caseTypeFilter,
+  kategorija: categoryFilter,
+  teisejas: judgeFilter,
   area: bbox,
 };
 const buildUrl = (overrides: DokumentaiUrlOverrides = {}) => buildDokumentaiUrl(urlState, overrides);
 const areaClearUrl = buildUrl({ area: null });
+const classToggleUrl = (v: string) => buildUrl({ klase: v ? toggleValue(classFilter, v) : [] });
 const typeToggleUrl = (v: string) => buildUrl({ type: v ? toggleValue(typeFilter, v) : [] });
 const hostToggleUrl = (v: string) => buildUrl({ host: v ? toggleValue(hostFilter, v) : [] });
 const jarToggleUrl = (v: string) => buildUrl({ jar: v ? toggleValue(jarFilter, v) : [] });
@@ -235,6 +269,10 @@ const langToggleUrl = (v: string) => buildUrl({ lang: v ? toggleValue(langFilter
 const savToggleUrl = (v: string) => buildUrl({ sav: v ? toggleValue(savFilter, v) : [] });
 const apskritisToggleUrl = (v: string) => buildUrl({ apskritis: v ? toggleValue(apskritisFilter, v) : [] });
 const sourceToggleUrl = (v: string) => buildUrl({ source: v ? toggleValue(sourceFilter, v) : [] });
+const courtToggleUrl = (v: string) => buildUrl({ teismas: v ? toggleValue(courtFilter, v) : [] });
+const caseTypeToggleUrl = (v: string) => buildUrl({ bylosRusis: v ? toggleValue(caseTypeFilter, v) : [] });
+const categoryToggleUrl = (v: string) => buildUrl({ kategorija: v ? toggleValue(categoryFilter, v) : [] });
+const judgeToggleUrl = (v: string) => buildUrl({ teisejas: v ? toggleValue(judgeFilter, v) : [] });
 const buildPageUrl = (page: number) => buildUrl({ page });
 const clearUrl = (() => {
   const sp = new URLSearchParams();
@@ -264,15 +302,35 @@ const SOURCE_LABEL: Record<string, string> = {
   cvpis: 'CVP IS',
   mvpaprasai: 'MVP tvarkos',
   neskelbiamosderybos: 'Neskelbiamos derybos',
+  liteko: 'LITEKO',
 };
+// Klasė = plati dokumento sritis (viešieji pirkimai vs teisė).
+const CLASS_LABEL: Record<string, string> = {
+  viesiejiPirkimai: 'Viešieji pirkimai',
+  teise: 'Teisė',
+};
+const CLASS_OPTS = [
+  { value: 'viesiejiPirkimai', label: 'Viešieji pirkimai' },
+  { value: 'teise', label: 'Teisė' },
+];
+// Nuosprendžių (teisė) facetai rodomi tik kai pasirinkta „teise" klasė arba aktyvus
+// kuris nors nuosprendžių filtras.
+const showVerdictFacets = classFilter.includes('teise')
+  || courtFilter.length > 0 || caseTypeFilter.length > 0
+  || categoryFilter.length > 0 || judgeFilter.length > 0;
 const { visible: sourceVisible, hidden: sourceHidden } = splitFacetOptions(sourceOptions, sourceFilter, 8);
 const { visible: langVisible, hidden: langHidden } = splitFacetOptions(langOptions, langFilter, 8);
 const { visible: savVisible, hidden: savHidden } = splitFacetOptions(savOptions, savFilter, 6);
 const { visible: apskritisVisible, hidden: apskritisHidden } = splitFacetOptions(apskritisOptions, apskritisFilter, 6);
+const { visible: courtVisible, hidden: courtHidden } = splitFacetOptions(courtOptions, courtFilter, 8);
+const { visible: caseTypeVisible, hidden: caseTypeHidden } = splitFacetOptions(caseTypeOptions, caseTypeFilter, 8);
+const { visible: categoryVisible, hidden: categoryHidden } = splitFacetOptions(categoryOptions, categoryFilter, 8);
+const { visible: judgeVisible, hidden: judgeHidden } = splitFacetOptions(judgeOptions, judgeFilter, 8);
 
-const activeFilterCount = typeFilter.length + hostFilter.length + jarFilter.length + extFilter.length
+const activeFilterCount = classFilter.length + typeFilter.length + hostFilter.length + jarFilter.length + extFilter.length
   + authorFilter.length + creatorFilter.length + producerFilter.length
-  + langFilter.length + savFilter.length + apskritisFilter.length + sourceFilter.length + (bbox ? 1 : 0);
+  + langFilter.length + savFilter.length + apskritisFilter.length + sourceFilter.length
+  + courtFilter.length + caseTypeFilter.length + categoryFilter.length + judgeFilter.length + (bbox ? 1 : 0);
 
 const totalPages = result?.totalPages ?? 0;
 const pageNums = result?.pageNums ?? [];
@@ -362,6 +420,24 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
           </div>
 
           <div class="dok-filters-body" id="dokFiltersBody">
+          {(Object.keys(classCountMap).length > 0 || classFilter.length > 0) && (
+            <section class="dok-filter-section">
+              <span class="dok-filter-section-label">Sritis</span>
+              <a href={classToggleUrl('')} data-param="klase" class={`dok-filter-opt dok-filter-all${classFilter.length === 0 ? ' is-selected' : ''}`}>
+                <span class="dok-filter-opt-label">Visos</span>
+              </a>
+              {CLASS_OPTS.map((opt) => {
+                const cnt = classCountMap[opt.value];
+                if (cnt == null && !classFilter.includes(opt.value)) return null;
+                return (
+                  <a href={classToggleUrl(opt.value)} data-param="klase" data-value={opt.value} class={`dok-filter-opt${classFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                    <span class="dok-filter-opt-label">{CLASS_LABEL[opt.value] || opt.label}</span>
+                    {cnt != null && <span class="dok-filter-opt-count">{fmt(cnt)}</span>}
+                  </a>
+                );
+              })}
+            </section>
+          )}
           <section class="dok-filter-section">
             <span class="dok-filter-section-label">Tipas</span>
             <a href={typeToggleUrl('')} data-param="type" class={`dok-filter-opt dok-filter-all${typeFilter.length === 0 ? ' is-selected' : ''}`}>
@@ -378,6 +454,92 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
               );
             })}
           </section>
+
+          {showVerdictFacets && (
+            <>
+              <section class="dok-filter-section">
+                <span class="dok-filter-section-label">Teismas</span>
+                {(courtVisible.length > 0 || courtFilter.length > 0) && (
+                  <a href={courtToggleUrl('')} data-param="teismas" class={`dok-filter-opt dok-filter-all${courtFilter.length === 0 ? ' is-selected' : ''}`}>
+                    <span class="dok-filter-opt-label">Visi</span>
+                  </a>
+                )}
+                {courtVisible.map((opt) => (
+                  <a href={courtToggleUrl(opt.value)} data-param="teismas" data-value={opt.value} class={`dok-filter-opt${courtFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                    <span class="dok-filter-opt-label">{opt.value}</span>
+                    {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                  </a>
+                ))}
+                {courtHidden.length > 0 && (
+                  <button class="dok-more-btn" type="button" data-facet-modal="metadata.teismas" data-facet-param="teismas" data-facet-title="Teismas">Daugiau</button>
+                )}
+              </section>
+
+              {(caseTypeVisible.length > 0 || caseTypeFilter.length > 0) && (
+                <section class="dok-filter-section">
+                  <span class="dok-filter-section-label">Bylos rūšis</span>
+                  <a href={caseTypeToggleUrl('')} data-param="bylosRusis" class={`dok-filter-opt dok-filter-all${caseTypeFilter.length === 0 ? ' is-selected' : ''}`}>
+                    <span class="dok-filter-opt-label">Visos</span>
+                  </a>
+                  {caseTypeVisible.map((opt) => (
+                    <a href={caseTypeToggleUrl(opt.value)} data-param="bylosRusis" data-value={opt.value} class={`dok-filter-opt${caseTypeFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                      <span class="dok-filter-opt-label">{opt.value}</span>
+                      {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                    </a>
+                  ))}
+                  {caseTypeHidden.length > 0 && (
+                    <>
+                      <div class="dok-more-list" hidden>
+                        {caseTypeHidden.map((opt) => (
+                          <a href={caseTypeToggleUrl(opt.value)} data-param="bylosRusis" data-value={opt.value} class={`dok-filter-opt${caseTypeFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                            <span class="dok-filter-opt-label">{opt.value}</span>
+                            {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                          </a>
+                        ))}
+                      </div>
+                      <button class="dok-more-btn" type="button">Rodyti daugiau</button>
+                    </>
+                  )}
+                </section>
+              )}
+
+              <section class="dok-filter-section">
+                <span class="dok-filter-section-label">Kategorija</span>
+                {(categoryVisible.length > 0 || categoryFilter.length > 0) && (
+                  <a href={categoryToggleUrl('')} data-param="kategorija" class={`dok-filter-opt dok-filter-all${categoryFilter.length === 0 ? ' is-selected' : ''}`}>
+                    <span class="dok-filter-opt-label">Visos</span>
+                  </a>
+                )}
+                {categoryVisible.map((opt) => (
+                  <a href={categoryToggleUrl(opt.value)} data-param="kategorija" data-value={opt.value} class={`dok-filter-opt${categoryFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                    <span class="dok-filter-opt-label">{opt.value}</span>
+                    {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                  </a>
+                ))}
+                {categoryHidden.length > 0 && (
+                  <button class="dok-more-btn" type="button" data-facet-modal="metadata.kategorijos" data-facet-param="kategorija" data-facet-title="Kategorija">Daugiau</button>
+                )}
+              </section>
+
+              <section class="dok-filter-section">
+                <span class="dok-filter-section-label">Teisėjas</span>
+                {(judgeVisible.length > 0 || judgeFilter.length > 0) && (
+                  <a href={judgeToggleUrl('')} data-param="teisejas" class={`dok-filter-opt dok-filter-all${judgeFilter.length === 0 ? ' is-selected' : ''}`}>
+                    <span class="dok-filter-opt-label">Visi</span>
+                  </a>
+                )}
+                {judgeVisible.map((opt) => (
+                  <a href={judgeToggleUrl(opt.value)} data-param="teisejas" data-value={opt.value} class={`dok-filter-opt${judgeFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                    <span class="dok-filter-opt-label">{opt.value}</span>
+                    {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                  </a>
+                ))}
+                {judgeHidden.length > 0 && (
+                  <button class="dok-more-btn" type="button" data-facet-modal="metadata.teisejai" data-facet-param="teisejas" data-facet-title="Teisėjas">Daugiau</button>
+                )}
+              </section>
+            </>
+          )}
 
           {(sourceVisible.length > 0 || sourceFilter.length > 0) && (
             <section class="dok-filter-section">
@@ -690,8 +852,13 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
           ) : (
             <div class="dok-result-list">
               {hits.map((hit) => {
-                const domain = (hit.host || hit.domain || '').replace(/^www\./, '');
-                const pathPart = hit.url ? hit.url.replace(/^https?:\/\/[^/]+/, '').replace(/^\//, '') : '';
+                const isVerdict = hit.class === 'teise';
+                let domain = (hit.host || hit.domain || '').replace(/^www\./, '');
+                if (!domain && hit.url) {
+                  try { domain = new URL(hit.url).host.replace(/^www\./, ''); } catch { /* ignore */ }
+                }
+                // Nuosprendžių URL kelias yra ASP id — neinformatyvus, todėl jo nerodom.
+                const pathPart = isVerdict ? '' : (hit.url ? hit.url.replace(/^https?:\/\/[^/]+/, '').replace(/^\//, '') : '');
                 const title = hit.title || hit.url || hit.md5 || `Dokumentas #${hit.id}`;
                 const externalUrl = hit.url || null;
                 const internalUrl = hit.failasId ? `/failas/${hit.failasId}` : null;

@@ -22,8 +22,8 @@ SELECT j."jarKodas"::text,
         FROM "vdiPazeidimai" v
         WHERE v."jarKodas" = j."jarKodas"::text)                                    AS "vdiPazeidimuSkaicius",
        (SELECT COUNT(*)
-        FROM "bylosDalyviai" bd
-        WHERE bd.kodas = j."jarKodas"::text)                                        AS "bylosSkaicius",
+        FROM "teismoNuosprendziaiDalyviai" d
+        WHERE d.kodas = j."jarKodas"::text)                                         AS "bylosSkaicius",
        (SELECT COUNT(*)
         FROM domenai d
         WHERE d."savininkoKodas" = j."jarKodas"::text)                              AS "domenaiSkaicius",

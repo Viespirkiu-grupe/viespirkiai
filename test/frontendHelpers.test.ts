@@ -6,6 +6,7 @@ const state = {
   q: 'keliai',
   mode: 'phrase' as const,
   sort: 'relevance' as const,
+  klase: [],
   type: ['failas'],
   host: [],
   jar: [],
@@ -17,6 +18,10 @@ const state = {
   sav: [],
   apskritis: [],
   source: [],
+  teismas: [],
+  bylosRusis: [],
+  kategorija: [],
+  teisejas: [],
   area: null,
 };
 

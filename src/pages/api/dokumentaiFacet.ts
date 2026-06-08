@@ -7,6 +7,7 @@ import { dokumentaiFacetOptions } from '../../lib/searchDokumentai';
 const ALLOWED = new Set([
   'extension', 'host', 'language', 'savivaldybe', 'apskritis', 'source', 'author',
   'metadata.creator', 'metadata.producer',
+  'class', 'metadata.teismas', 'metadata.bylosRusis', 'metadata.kategorijos', 'metadata.teisejai',
 ]);
 
 export const GET: APIRoute = async ({ url }) => {
@@ -24,6 +25,7 @@ export const GET: APIRoute = async ({ url }) => {
       field,
       {
         q: p.get('search') ?? p.get('q') ?? '',
+        klase: p.getAll('klase'),
         type: p.getAll('type'),
         host: p.getAll('host'),
         jar: p.getAll('jar'),
@@ -35,6 +37,10 @@ export const GET: APIRoute = async ({ url }) => {
         sav: p.getAll('sav'),
         apskritis: p.getAll('apskritis'),
         source: p.getAll('source'),
+        teismas: p.getAll('teismas'),
+        bylosRusis: p.getAll('bylosRusis'),
+        kategorija: p.getAll('kategorija'),
+        teisejas: p.getAll('teisejas'),
         minLat: p.get('minLat') ?? undefined,
         maxLat: p.get('maxLat') ?? undefined,
         minLon: p.get('minLon') ?? undefined,
