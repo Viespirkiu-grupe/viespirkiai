@@ -4,7 +4,10 @@ import { dokumentaiFacetOptions } from '../../lib/searchDokumentai';
 // Full option list for a single document-search facet under the current
 // query/filters. Backs the "show all" modal in the filter sidebar, so it can
 // return far more values (up to ~1k) than the sidebar previews inline.
-const ALLOWED = new Set(['extension', 'host', 'language', 'savivaldybe', 'apskritis', 'source']);
+const ALLOWED = new Set([
+  'extension', 'host', 'language', 'savivaldybe', 'apskritis', 'source', 'author',
+  'metadata.creator', 'metadata.producer',
+]);
 
 export const GET: APIRoute = async ({ url }) => {
   const p = url.searchParams;
@@ -25,6 +28,9 @@ export const GET: APIRoute = async ({ url }) => {
         host: p.getAll('host'),
         jar: p.getAll('jar'),
         ext: p.getAll('ext'),
+        author: p.getAll('author'),
+        creator: p.getAll('creator'),
+        producer: p.getAll('producer'),
         lang: p.getAll('lang'),
         sav: p.getAll('sav'),
         apskritis: p.getAll('apskritis'),

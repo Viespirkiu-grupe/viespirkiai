@@ -10,6 +10,8 @@
         "test:integration": "vitest run --config vitest.integration.config.ts",
         "check": "astro check",
         "db:schema:dump": "node scripts/dumpDbSchema.js",
+        "quickwit:count-producer": "node scripts/countQuickwitMetadataProducer.js",
+        "quickwit:top-pdf-metadata": "node scripts/topQuickwitPdfMetadata.js",
         "export:sutartys": "node scripts/exportSutartys.js",
         "push:sutartys": "node scripts/pushSutartysToSpinta.js"
     },

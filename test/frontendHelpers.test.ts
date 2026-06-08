@@ -10,6 +10,9 @@ const state = {
   host: [],
   jar: [],
   ext: ['pdf'],
+  author: [],
+  creator: [],
+  producer: [],
   lang: [],
   sav: [],
   apskritis: [],
@@ -26,6 +29,19 @@ describe('document search URL helpers', () => {
     expect(buildDokumentaiUrl(state, { type: [], page: 3 }))
       .toBe('/dokumentai?search=keliai&mode=phrase&ext=pdf&page=3');
     expect(state.type).toEqual(['failas']);
+  });
+
+  it('URL-encodes author, creator and producer values without splitting commas', () => {
+    const url = buildDokumentaiUrl(state, {
+      author: ['Doe, Jane'],
+      creator: ['Adobe, Inc.'],
+      producer: ['FREE PDFill PDF and Image Writer'],
+    });
+    const params = new URL(url, 'https://example.test').searchParams;
+
+    expect(params.getAll('author')).toEqual(['Doe, Jane']);
+    expect(params.getAll('creator')).toEqual(['Adobe, Inc.']);
+    expect(params.getAll('producer')).toEqual(['FREE PDFill PDF and Image Writer']);
   });
 
   it('toggles values and pins selected facet options', () => {

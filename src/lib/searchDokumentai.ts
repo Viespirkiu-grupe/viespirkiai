@@ -100,6 +100,9 @@ export interface DokumentaiSearchResult {
   hostFilter: string[];
   jarFilter: string[];
   extFilter: string[];
+  authorFilter: string[];
+  creatorFilter: string[];
+  producerFilter: string[];
   langFilter: string[];
   savFilter: string[];
   apskritisFilter: string[];
@@ -108,6 +111,9 @@ export interface DokumentaiSearchResult {
   typeCountMap: Record<string, number>;
   hostOptions: FacetOption[];
   extOptions: FacetOption[];
+  authorOptions: FacetOption[];
+  creatorOptions: FacetOption[];
+  producerOptions: FacetOption[];
   langOptions: FacetOption[];
   savOptions: FacetOption[];
   apskritisOptions: FacetOption[];
@@ -195,6 +201,9 @@ function buildPartsExcluding(opts: {
   hosts: string[];
   jars: string[];
   exts: string[];
+  authors: string[];
+  creators: string[];
+  producers: string[];
   langs: string[];
   savs: string[];
   apskritys: string[];
@@ -203,6 +212,9 @@ function buildPartsExcluding(opts: {
   excludeHost?: boolean;
   excludeJar?: boolean;
   excludeExt?: boolean;
+  excludeAuthor?: boolean;
+  excludeCreator?: boolean;
+  excludeProducer?: boolean;
   excludeType?: boolean;
   excludeLang?: boolean;
   excludeSav?: boolean;
@@ -212,7 +224,7 @@ function buildPartsExcluding(opts: {
    *  randami tiksliai greta ir ta pačia tvarka, o ne kaip atskiri terminai. */
   phrase?: boolean;
 }): string {
-  const { textQuery, types, hosts, jars, exts, langs, savs, apskritys, sources, bbox } = opts;
+  const { textQuery, types, hosts, jars, exts, authors, creators, producers, langs, savs, apskritys, sources, bbox } = opts;
   const p: string[] = [];
   if (!opts.excludeType && types.length) p.push(`(${types.map((t) => `type:${t}`).join(' OR ')})`);
   if (!opts.excludeHost && hosts.length) p.push(`(${hosts.map((h) => `host:${JSON.stringify(h)}`).join(' OR ')})`);
@@ -221,6 +233,9 @@ function buildPartsExcluding(opts: {
     if (numeric.length) p.push(`(${numeric.map((n) => `jarKodai:${n}`).join(' OR ')})`);
   }
   if (!opts.excludeExt && exts.length) p.push(`(${exts.map((e) => `extension:${JSON.stringify(e)}`).join(' OR ')})`);
+  if (!opts.excludeAuthor && authors.length) p.push(`(${authors.map((v) => `author:${JSON.stringify(v)}`).join(' OR ')})`);
+  if (!opts.excludeCreator && creators.length) p.push(`(${creators.map((v) => `metadata.creator:${JSON.stringify(v)}`).join(' OR ')})`);
+  if (!opts.excludeProducer && producers.length) p.push(`(${producers.map((v) => `metadata.producer:${JSON.stringify(v)}`).join(' OR ')})`);
   if (!opts.excludeLang && langs.length) p.push(`(${langs.map((l) => `language:${JSON.stringify(l)}`).join(' OR ')})`);
   if (!opts.excludeSav && savs.length) p.push(`(${savs.map((s) => `savivaldybe:${JSON.stringify(s)}`).join(' OR ')})`);
   if (!opts.excludeApskritis && apskritys.length) p.push(`(${apskritys.map((a) => `apskritis:${JSON.stringify(a)}`).join(' OR ')})`);
@@ -268,6 +283,9 @@ function buildPartsOpts(input: {
   host?: string | string[];
   jar?: string | string[];
   ext?: string | string[];
+  author?: string | string[];
+  creator?: string | string[];
+  producer?: string | string[];
   lang?: string | string[];
   sav?: string | string[];
   apskritis?: string | string[];
@@ -285,6 +303,9 @@ function buildPartsOpts(input: {
   const hostFilter = splitMulti(input.host);
   const jarFilter = splitMulti(input.jar);
   const extFilter = splitMulti(input.ext).map((e) => e.toLowerCase().replace(/^\./, ''));
+  const authorFilter = Array.isArray(input.author) ? input.author.filter(Boolean) : input.author ? [input.author] : [];
+  const creatorFilter = Array.isArray(input.creator) ? input.creator.filter(Boolean) : input.creator ? [input.creator] : [];
+  const producerFilter = Array.isArray(input.producer) ? input.producer.filter(Boolean) : input.producer ? [input.producer] : [];
   const langFilter = splitMulti(input.lang);
   const savFilter = splitMulti(input.sav);
   const apskritisFilter = splitMulti(input.apskritis);
@@ -299,6 +320,9 @@ function buildPartsOpts(input: {
     hosts: [...new Set([...inlineHosts, ...hostFilter])],
     jars: [...new Set([...inlineJars, ...jarFilter])],
     exts: [...new Set([...inlineExts, ...extFilter.map((e) => e.toLowerCase())])],
+    authors: [...new Set(authorFilter)],
+    creators: [...new Set(creatorFilter)],
+    producers: [...new Set(producerFilter)],
     langs: [...new Set(langFilter)],
     savs: [...new Set(savFilter)],
     apskritys: [...new Set(apskritisFilter)],
@@ -311,11 +335,14 @@ function buildPartsOpts(input: {
 // Quickwit field → the "exclude this facet's own filter" flag, so a facet lists
 // every value available under the *other* active filters.
 type FacetExcludeKey =
-  | 'excludeHost' | 'excludeExt' | 'excludeLang'
+  | 'excludeHost' | 'excludeExt' | 'excludeAuthor' | 'excludeCreator' | 'excludeProducer' | 'excludeLang'
   | 'excludeSav' | 'excludeApskritis' | 'excludeSource';
 const FACET_EXCLUDE: Record<string, FacetExcludeKey> = {
   host: 'excludeHost',
   extension: 'excludeExt',
+  author: 'excludeAuthor',
+  'metadata.creator': 'excludeCreator',
+  'metadata.producer': 'excludeProducer',
   language: 'excludeLang',
   savivaldybe: 'excludeSav',
   apskritis: 'excludeApskritis',
@@ -467,6 +494,9 @@ export async function searchDokumentai(input: {
   host?: string | string[];
   jar?: string | string[];
   ext?: string | string[];
+  author?: string | string[];
+  creator?: string | string[];
+  producer?: string | string[];
   lang?: string | string[];
   sav?: string | string[];
   apskritis?: string | string[];
@@ -492,6 +522,9 @@ export async function searchDokumentai(input: {
   const hostFacetQuery = buildPartsExcluding({ ...partsOpts, excludeHost: true });
   const typeFacetQuery = buildPartsExcluding(partsOpts);
   const extFacetQuery = buildPartsExcluding({ ...partsOpts, excludeExt: true });
+  const authorFacetQuery = buildPartsExcluding({ ...partsOpts, excludeAuthor: true });
+  const creatorFacetQuery = buildPartsExcluding({ ...partsOpts, excludeCreator: true });
+  const producerFacetQuery = buildPartsExcluding({ ...partsOpts, excludeProducer: true });
   const langFacetQuery = buildPartsExcluding({ ...partsOpts, excludeLang: true });
   const savFacetQuery = buildPartsExcluding({ ...partsOpts, excludeSav: true });
   const apskritisFacetQuery = buildPartsExcluding({ ...partsOpts, excludeApskritis: true });
@@ -518,6 +551,12 @@ export async function searchDokumentai(input: {
     // the "Daugiau" button. The full list is fetched on demand by the modal
     // (/api/dokumentaiFacet), so there's no need to over-aggregate here.
     qwAggregate('extension', extFacetQuery, 7),
+    qwAggregate('author', authorFacetQuery, 8),
+    // Creator/producer commonly contain an empty-string bucket. Fetch one
+    // extra so, after empty values are removed, the sidebar still knows there
+    // are more than six values and can show the shared "Daugiau" modal.
+    qwAggregate('metadata.creator', creatorFacetQuery, 8),
+    qwAggregate('metadata.producer', producerFacetQuery, 8),
     qwAggregate('language', langFacetQuery, 12),
     qwAggregate('savivaldybe', savFacetQuery, 60),
     qwAggregate('apskritis', apskritisFacetQuery, 12),
@@ -534,7 +573,7 @@ export async function searchDokumentai(input: {
   if (filterMs > 0) {
     timings.push({ label: 'Gyvų atranka', phase: 'pg', start: searchStart + qwMs, duration: filterMs });
   }
-  const [hostBuckets, typeBuckets, extBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets] = await aggsPromise;
+  const [hostBuckets, typeBuckets, extBuckets, authorBuckets, creatorBuckets, producerBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets] = await aggsPromise;
   timings.push({ label: 'Facetai', phase: 'filter', start: aggsStart, duration: mark() - aggsStart });
 
   const total = result.numHitsEstimate ?? result.hits.length;
@@ -602,6 +641,9 @@ export async function searchDokumentai(input: {
   const hostOptions = toOptions(hostBuckets);
   const typeCountMap = Object.fromEntries(typeBuckets.map((b) => [b.value, b.count ?? 0]));
   const extOptions = toOptions(extBuckets);
+  const authorOptions = toOptions(authorBuckets);
+  const creatorOptions = toOptions(creatorBuckets);
+  const producerOptions = toOptions(producerBuckets);
   const langOptions = toOptions(langBuckets);
   const savOptions = toOptions(savBuckets);
   const apskritisOptions = toOptions(apskritisBuckets);
@@ -636,6 +678,9 @@ export async function searchDokumentai(input: {
     hostFilter: partsOpts.hosts,
     jarFilter: partsOpts.jars,
     extFilter: partsOpts.exts,
+    authorFilter: partsOpts.authors,
+    creatorFilter: partsOpts.creators,
+    producerFilter: partsOpts.producers,
     langFilter: partsOpts.langs,
     savFilter: partsOpts.savs,
     apskritisFilter: partsOpts.apskritys,
@@ -644,6 +689,9 @@ export async function searchDokumentai(input: {
     typeCountMap,
     hostOptions,
     extOptions,
+    authorOptions,
+    creatorOptions,
+    producerOptions,
     langOptions,
     savOptions,
     apskritisOptions,

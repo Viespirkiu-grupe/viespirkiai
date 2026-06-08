@@ -15,6 +15,9 @@ export interface DokumentaiUrlState {
   host: string[];
   jar: string[];
   ext: string[];
+  author: string[];
+  creator: string[];
+  producer: string[];
   lang: string[];
   sav: string[];
   apskritis: string[];
@@ -45,6 +48,9 @@ export function buildDokumentaiUrl(
 
   for (const key of ['type', 'host', 'jar', 'ext', 'lang', 'sav', 'apskritis', 'source'] as const) {
     if (selected[key].length) params.set(key, selected[key].join(','));
+  }
+  for (const key of ['author', 'creator', 'producer'] as const) {
+    for (const value of selected[key]) params.append(key, value);
   }
 
   if (selected.area) {
