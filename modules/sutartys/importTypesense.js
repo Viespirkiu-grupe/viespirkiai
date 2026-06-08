@@ -3,21 +3,11 @@ Importuoja sutarčių duomenis iš PostgreSQL į Typesense paieškos sistemą (i
 */
 
 import {
-    client as typesenseClient,
+    addDocumentsToSearch,
     ensureSearchCollection,
 } from "../../typesense/typesense.js";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
-
-/**
- * Konvertuoja datą į Unix timestamp (sekundėmis nuo 1970-01-01).
- * @param {Date|string} date - Data, kurią reikia konvertuoti
- * @returns {number} Unix timestamp
- */
-function toUnixTimestamp(date) {
-    const ts = new Date(date).getTime();
-    return Number.isFinite(ts) ? Math.floor(ts / 1000) : 0;
-}
 
 // Užtikrina, kad Typesense kolekcija "sutartys" egzistuoja
 await ensureSearchCollection({ ignoreTypesenseUp: true });
@@ -74,59 +64,8 @@ async function importToTypesense() {
     await fetchSutartysBatches(BATCH_SIZE, async (batch) => {
         // Remove docs where istrinta = true
         batch = batch.filter((doc) => !doc.istrinta);
-        const formattedDocs = batch.map((doc) => {
-            return {
-                id: doc.sutartiesUnikalusId?.toString() || "",
-                tipas: doc.tipas || "",
-                pavadinimas: doc.pavadinimas || "",
-                kategorija: doc.kategorija || "",
-                perkanciojiOrganizacija: doc.perkanciojiOrganizacija || "",
-                perkanciosiosOrganizacijosKodas:
-                    doc.perkanciosiosOrganizacijosKodas || "",
-                tiekejas: doc.tiekejas || "",
-                tiekejoKodas: doc.tiekejoKodas || "",
-                verte: typeof doc.verte === "number" ? doc.verte : 0,
-                // Either faktineIvykdimoVerte or verte, depending on which is available. This allows faceting on "suma" even if faktineIvykdimoVerte is missing.
-                suma: typeof doc.faktineIvykdimoVerte === "number"
-                    ? doc.faktineIvykdimoVerte
-                    : typeof doc.verte === "number"
-                    ? doc.verte
-                    : 0,
-                faktineIvykdimoVerte:
-                    typeof doc.faktineIvykdimoVerte === "number"
-                        ? doc.faktineIvykdimoVerte
-                        : 0,
-                sudarymoData: toUnixTimestamp(doc.sudarymoData),
-                galiojimoData: toUnixTimestamp(doc.galiojimoData),
-                paskelbimoData: toUnixTimestamp(doc.paskelbimoData),
-                paskutinioAtnaujinimoData: toUnixTimestamp(
-                    doc.paskutinioAtnaujinimoData,
-                ),
-                paskutinioRedagavimoData: toUnixTimestamp(
-                    doc.paskutinioRedagavimoData,
-                ),
-                faktineIvykdimoData: toUnixTimestamp(doc.faktineIvykdimoData),
-                bvpzKodas: doc.bvpzKodas || "",
-                bvpzPavadinimas: doc.bvpzPavadinimas || "",
-                sutartiesNumeris: doc.sutartiesNumeris || "",
-                sutartiesUnikalusId: Number(doc.sutartiesUnikalusId),
-                dokumentuKiekis: doc.dokumentuKiekis || 0,
-                pirkimoNumeris: doc.pirkimoNumeris || "",
-                papildomiTiekejai: doc.papildomiTiekejai || [],
-                papildomiTiekejaiKodai: doc.papildomiTiekejaiKodai || [],
-                papildomiBvpzKodai: doc.papildomiBvpzKodai || [],
-                papildomiBvpzPavadinimai: doc.papildomiBvpzPavadinimai || [],
-                paskutiniKartaMatyta: toUnixTimestamp(doc.paskutiniKartaMatyta),
-                pirkimoNumeris: doc.pirkimoNumeris || "",
-            };
-        });
-
-        await typesenseClient
-            .collections("sutartys")
-            .documents()
-            .import(formattedDocs, { action: "upsert" });
-
-        log(`Imported batch of ${formattedDocs.length} documents`);
+        await addDocumentsToSearch(batch);
+        log(`Imported batch of ${batch.length} documents`);
     });
 }
 

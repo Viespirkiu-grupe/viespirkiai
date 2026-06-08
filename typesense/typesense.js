@@ -11,38 +11,30 @@ export const client = new Typesense.Client({
 export const typesense = client;
 
 const COLLECTION = "sutartys";
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 const schema = {
     name: COLLECTION,
     fields: [
         { name: "id", type: "string" },
-        { name: "tipas", type: "string", facet: true },
+        { name: "tipas", type: "string" },
         { name: "pavadinimas", type: "string" },
-        { name: "kategorija", type: "string" },
         { name: "perkanciojiOrganizacija", type: "string" },
         { name: "perkanciosiosOrganizacijosKodas", type: "string" },
         { name: "tiekejas", type: "string" },
         { name: "tiekejoKodas", type: "string" },
-        { name: "verte", type: "float", facet: true },
-        { name: "suma", type: "float", facet: true },
-        { name: "faktineIvykdimoVerte", type: "float", facet: true },
-        { name: "faktineIvykdimoData", type: "int64" },
-        { name: "dokumentuKiekis", type: "int32", facet: true },
-        { name: "paskutinioAtnaujinimoData", type: "int64" },
+        { name: "verte", type: "float" },
+        { name: "suma", type: "float" },
+        { name: "dokumentuKiekis", type: "int32" },
         { name: "paskutinioRedagavimoData", type: "int64" },
         { name: "sudarymoData", type: "int64" },
-        { name: "galiojimoData", type: "int64" },
-        { name: "bvpzKodas", type: "string" },
         { name: "bvpzPavadinimas", type: "string" },
         { name: "paskelbimoData", type: "int64" },
         { name: "sutartiesNumeris", type: "string" },
         { name: "sutartiesUnikalusId", type: "int32" },
         { name: "papildomiTiekejai", type: "string[]" },
         { name: "papildomiTiekejaiKodai", type: "string[]" },
-        { name: "papildomiBvpzKodai", type: "string[]" },
         { name: "papildomiBvpzPavadinimai", type: "string[]" },
-        { name: "paskutiniKartaMatyta", type: "int64" },
         { name: "pirkimoNumeris", type: "string" },
     ],
     default_sorting_field: "paskutinioRedagavimoData",
@@ -102,63 +94,62 @@ function toUnixTimestamp(date) {
 }
 
 /**
+ * Paruošia sutartį Typesense indeksui.
+ * Priima tiek scraperio sutartiesUnikalusID, tiek PostgreSQL sutartiesUnikalusId.
+ * @param {Object} doc
+ * @returns {Object}
+ */
+export function formatSutartisSearchDocument(doc) {
+    const sutartiesUnikalusId = Number(
+        doc.sutartiesUnikalusID ?? doc.sutartiesUnikalusId,
+    );
+
+    if (!Number.isSafeInteger(sutartiesUnikalusId)) {
+        throw new TypeError("Sutartis must have a valid sutartiesUnikalusId");
+    }
+
+    return {
+        id: sutartiesUnikalusId.toString(),
+        tipas: doc.tipas || "",
+        pavadinimas: doc.pavadinimas || "",
+        perkanciojiOrganizacija: doc.perkanciojiOrganizacija || "",
+        perkanciosiosOrganizacijosKodas:
+            doc.perkanciosiosOrganizacijosKodas || "",
+        tiekejas: doc.tiekejas || "",
+        tiekejoKodas: doc.tiekejoKodas || "",
+        verte: typeof doc.verte === "number" ? doc.verte : 0,
+        suma:
+            typeof doc.faktineIvykdimoVerte === "number" &&
+            doc.faktineIvykdimoVerte > 0
+                ? doc.faktineIvykdimoVerte
+                : typeof doc.verte === "number"
+                  ? doc.verte
+                  : 0,
+        dokumentuKiekis: doc.dokumentuKiekis || 0,
+        paskutinioRedagavimoData: toUnixTimestamp(doc.paskutinioRedagavimoData),
+        sudarymoData: toUnixTimestamp(doc.sudarymoData),
+        paskelbimoData: toUnixTimestamp(doc.paskelbimoData),
+        bvpzPavadinimas: doc.bvpzPavadinimas || "",
+        sutartiesNumeris: doc.sutartiesNumeris || "",
+        sutartiesUnikalusId,
+        papildomiTiekejai: doc.papildomiTiekejai || [],
+        papildomiTiekejaiKodai: doc.papildomiTiekejaiKodai || [],
+        papildomiBvpzPavadinimai: doc.papildomiBvpzPavadinimai || [],
+        pirkimoNumeris: doc.pirkimoNumeris || "",
+    };
+}
+
+/**
  * Prideda dokumentą į Typesense paieškos kolekciją.
  * @param {Object} doc - Dokumentas, kurį reikia pridėti
  * @returns {Promise<void>}
  * @throws {Error} Jei nepavyksta pridėti dokumento
  */
 export async function addDocumentToSearch(doc) {
-    const tsDoc = {
-        id: doc.sutartiesUnikalusID?.toString() || "",
-
-        tipas: doc.tipas || "",
-        pavadinimas: doc.pavadinimas || "",
-        kategorija: doc.kategorija || "",
-
-        perkanciojiOrganizacija: doc.perkanciojiOrganizacija || "",
-        perkanciosiosOrganizacijosKodas:
-            doc.perkanciosiosOrganizacijosKodas || "",
-
-        tiekejas: doc.tiekejas || "",
-        tiekejoKodas: doc.tiekejoKodas || "",
-
-        verte: typeof doc.verte === "number" ? doc.verte : 0,
-        faktineIvykdimoVerte:
-            typeof doc.faktineIvykdimoVerte === "number"
-                ? doc.faktineIvykdimoVerte
-                : 0,
-        suma:
-            typeof doc.faktineIvykdimoVerte === "number" && doc.faktineIvykdimoVerte > 0
-                ? doc.faktineIvykdimoVerte
-                : typeof doc.verte === "number"
-                ? doc.verte
-                : 0,
-
-        sudarymoData: toUnixTimestamp(doc.sudarymoData),
-        galiojimoData: toUnixTimestamp(doc.galiojimoData),
-        paskelbimoData: toUnixTimestamp(doc.paskelbimoData),
-        paskutinioAtnaujinimoData: toUnixTimestamp(
-            doc.paskutinioAtnaujinimoData,
-        ),
-        paskutinioRedagavimoData: toUnixTimestamp(doc.paskutinioRedagavimoData),
-        faktineIvykdimoData: toUnixTimestamp(doc.faktineIvykdimoData),
-
-        bvpzKodas: doc.bvpzKodas || "",
-        bvpzPavadinimas: doc.bvpzPavadinimas || "",
-
-        sutartiesNumeris: doc.sutartiesNumeris || "",
-        sutartiesUnikalusId: doc.sutartiesUnikalusID.toString(),
-        dokumentuKiekis: doc.dokumentuKiekis || 0,
-        pirkimoNumeris: doc.pirkimoNumeris || "",
-        papildomiTiekejai: doc.papildomiTiekejai || [],
-        papildomiTiekejaiKodai: doc.papildomiTiekejaiKodai || [],
-        papildomiBvpzKodai: doc.papildomiBvpzKodai || [],
-        papildomiBvpzPavadinimai: doc.papildomiBvpzPavadinimai || [],
-        paskutiniKartaMatyta: toUnixTimestamp(doc.paskutiniKartaMatyta),
-        pirkimoNumeris: doc.pirkimoNumeris || "",
-    };
-
-    return client.collections(COLLECTION).documents().upsert(tsDoc);
+    return client
+        .collections(COLLECTION)
+        .documents()
+        .upsert(formatSutartisSearchDocument(doc));
 }
 
 /**
@@ -170,56 +161,7 @@ export async function addDocumentToSearch(doc) {
 export async function addDocumentsToSearch(docs) {
     if (!Array.isArray(docs) || docs.length === 0) return;
 
-    const tsDocs = docs.map((doc) => ({
-        id: doc.sutartiesUnikalusID?.toString() || "",
-
-        tipas: doc.tipas || "",
-        pavadinimas: doc.pavadinimas || "",
-        kategorija: doc.kategorija || "",
-
-        perkanciojiOrganizacija: doc.perkanciojiOrganizacija || "",
-        perkanciosiosOrganizacijosKodas:
-            doc.perkanciosiosOrganizacijosKodas || "",
-
-        tiekejas: doc.tiekejas || "",
-        tiekejoKodas: doc.tiekejoKodas || "",
-
-        verte: typeof doc.verte === "number" ? doc.verte : 0,
-        faktineIvykdimoVerte:
-            typeof doc.faktineIvykdimoVerte === "number"
-                ? doc.faktineIvykdimoVerte
-                : 0,
-
-        // Suma is faktineIvykdimoVerte or verte, depending on which one is available
-        suma:
-            typeof doc.faktineIvykdimoVerte === "number" && doc.faktineIvykdimoVerte > 0
-                ? doc.faktineIvykdimoVerte
-                : typeof doc.verte === "number"
-                ? doc.verte
-                : 0,
-
-        sudarymoData: toUnixTimestamp(doc.sudarymoData),
-        galiojimoData: toUnixTimestamp(doc.galiojimoData),
-        paskelbimoData: toUnixTimestamp(doc.paskelbimoData),
-        paskutinioAtnaujinimoData: toUnixTimestamp(
-            doc.paskutinioAtnaujinimoData,
-        ),
-        paskutinioRedagavimoData: toUnixTimestamp(doc.paskutinioRedagavimoData),
-        faktineIvykdimoData: toUnixTimestamp(doc.faktineIvykdimoData),
-
-        bvpzKodas: doc.bvpzKodas || "",
-        bvpzPavadinimas: doc.bvpzPavadinimas || "",
-
-        sutartiesNumeris: doc.sutartiesNumeris || "",
-        sutartiesUnikalusId: doc.sutartiesUnikalusID,
-        dokumentuKiekis: doc.dokumentuKiekis || 0,
-        pirkimoNumeris: doc.pirkimoNumeris || "",
-        papildomiTiekejai: doc.papildomiTiekejai || [],
-        papildomiTiekejaiKodai: doc.papildomiTiekejaiKodai || [],
-        papildomiBvpzKodai: doc.papildomiBvpzKodai || [],
-        papildomiBvpzPavadinimai: doc.papildomiBvpzPavadinimai || [],
-        paskutiniKartaMatyta: toUnixTimestamp(doc.paskutiniKartaMatyta),
-    }));
+    const tsDocs = docs.map(formatSutartisSearchDocument);
 
     return client
         .collections(COLLECTION)
