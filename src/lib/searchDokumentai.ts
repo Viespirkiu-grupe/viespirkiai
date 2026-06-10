@@ -35,6 +35,8 @@ export interface DokumentaiQuery {
 export interface FacetOption {
   value: string;
   count: number | null;
+  /** Žmogui skirtas pavadinimas (pvz. istaigaJar kodui — įstaigos pavadinimas). */
+  label?: string;
 }
 
 export const DOKUMENTAI_SORT_OPTIONS = [
@@ -78,6 +80,7 @@ export interface DokumentasHit {
   savivaldybe: string | null;
   apskritis: string | null;
   istaigaJar: string | null;
+  istaigaPavadinimas: string | null;
   happenedAt: Date | null;
   createdAt: Date | null;
   updatedAt: Date | null;
@@ -162,6 +165,22 @@ async function qwAggregate(field: string, query: string, size: number): Promise<
   } catch {
     return [];
   }
+}
+
+/** Papildo istaigaJar facetus įstaigų pavadinimais iš jar lentelės (žmogui
+ *  pavadinimas svarbiausias; JAR kodas lieka kaip antrinė eilutė + filtravimo
+ *  reikšmė). Nerasti kodai lieka be label. */
+async function attachIstaigaNames(options: FacetOption[]): Promise<FacetOption[]> {
+  const codes = [...new Set(options.map((o) => o.value).filter(Boolean))];
+  if (!codes.length) return options;
+  const { rows } = await postgres.query(
+    `SELECT "jarKodas", pavadinimas FROM public.jar WHERE "jarKodas" = ANY($1)`,
+    [codes],
+  );
+  const names = new Map<string, string>(
+    rows.filter((r: any) => r.pavadinimas).map((r: any) => [String(r.jarKodas), String(r.pavadinimas)]),
+  );
+  return options.map((o) => ({ ...o, label: names.get(o.value) }));
 }
 
 // ── Query parsing ────────────────────────────────────────────────────────────
@@ -428,7 +447,9 @@ export async function dokumentaiFacetOptions(
   const partsOpts = buildPartsOpts(input);
   const query = buildPartsExcluding({ ...partsOpts, [excludeKey]: true });
   const buckets = await qwAggregate(field, query, size);
-  return buckets.filter((b) => b.value).map((b) => ({ value: b.value, count: b.count }));
+  const options = buckets.filter((b) => b.value).map((b) => ({ value: b.value, count: b.count }));
+  if (field === 'istaigaJar') return attachIstaigaNames(options);
+  return options;
 }
 
 // ── Snippets ─────────────────────────────────────────────────────────────────
@@ -669,12 +690,14 @@ export async function searchDokumentai(input: {
     const pgStart = mark();
     const { rows: pgRows } = await postgres.query(
       `SELECT
-         id, md5, "class", type, url, host, domain, source, pavadinimas, autorius,
-         extension, language, "pageCount", "wordCount", "characterCount",
-         savivaldybe, apskritis, "istaigaJar",
-         "happenedAt", "createdAt", "updatedAt", "discoveredAt", "failasId"
-       FROM public.dokumentai
-       WHERE id = ANY($1)`,
+         d.id, d.md5, d."class", d.type, d.url, d.host, d.domain, d.source,
+         d.pavadinimas, d.autorius,
+         d.extension, d.language, d."pageCount", d."wordCount", d."characterCount",
+         d.savivaldybe, d.apskritis, d."istaigaJar", j.pavadinimas AS "istaigaPavadinimas",
+         d."happenedAt", d."createdAt", d."updatedAt", d."discoveredAt", d."failasId"
+       FROM public.dokumentai d
+       LEFT JOIN public.jar j ON j."jarKodas" = d."istaigaJar"
+       WHERE d.id = ANY($1)`,
       [ids],
     );
     timings.push({ label: 'Duomenys', phase: 'pg', start: pgStart, duration: mark() - pgStart });
@@ -721,7 +744,7 @@ export async function searchDokumentai(input: {
     buckets.filter((b) => b.value).map((b) => ({ value: b.value, count: b.count }));
 
   const hostOptions = toOptions(hostBuckets);
-  const istaigaJarOptions = toOptions(istaigaBuckets);
+  const istaigaJarOptions = await attachIstaigaNames(toOptions(istaigaBuckets));
   const typeCountMap = Object.fromEntries(typeBuckets.map((b) => [b.value, b.count ?? 0]));
   const classCountMap = Object.fromEntries(classBuckets.map((b) => [b.value, b.count ?? 0]));
   const courtOptions = toOptions(courtBuckets);

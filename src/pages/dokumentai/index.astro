@@ -583,8 +583,11 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
                 <span class="dok-filter-opt-label">Visos</span>
               </a>
               {istaigaVisible.map((opt) => (
-                <a href={istaigaToggleUrl(opt.value)} data-param="istaiga" data-value={opt.value} class={`dok-filter-opt${istaigaJarFilter.includes(opt.value) ? ' is-selected' : ''}`}>
-                  <span class="dok-filter-opt-label">{opt.value}</span>
+                <a href={istaigaToggleUrl(opt.value)} data-param="istaiga" data-value={opt.value} title={opt.label ? `${opt.label} (${opt.value})` : opt.value} class={`dok-filter-opt dok-filter-opt--stack${istaigaJarFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                  <span class="dok-filter-opt-text">
+                    <span class="dok-filter-opt-label">{opt.label || opt.value}</span>
+                    {opt.label && <span class="dok-filter-opt-sub">{opt.value}</span>}
+                  </span>
                   {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
                 </a>
               ))}
@@ -933,7 +936,12 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
                       {discovered && discoveredKey !== happenedKey && discoveredKey !== createdKey && discoveredKey !== updatedKey && <div title="Aptikimo data"><dt>Aptikta</dt><dd>{discovered}</dd></div>}
                       {hit.autorius && <div title="Autorius"><dt class="sr-only">Autorius</dt><dd>{hit.autorius}</dd></div>}
                       {location && <div title="Vietovė"><dt class="sr-only">Vietovė</dt><dd>{location}</dd></div>}
-                      {hit.istaigaJar && <div title="Įstaigos JAR kodas"><dt>JAR</dt><dd>{hit.istaigaJar}</dd></div>}
+                      {hit.istaigaJar && (
+                        <div title={hit.istaigaPavadinimas ? `Paskelbusi įstaiga: ${hit.istaigaPavadinimas} (${hit.istaigaJar})` : `Paskelbusi įstaiga (JAR ${hit.istaigaJar})`}>
+                          <dt class="sr-only">Paskelbusi įstaiga</dt>
+                          <dd>{hit.istaigaPavadinimas || hit.istaigaJar}</dd>
+                        </div>
+                      )}
                     </dl>
                   </ResultCardShell>
                 );
@@ -1233,7 +1241,7 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
     let field = '';
     let param = '';
     let selected = new Set<string>();      // working copy; committed on Taikyti
-    let options: { value: string; count: number | null }[] = [];
+    let options: { value: string; count: number | null; label?: string }[] = [];
     let reqSeq = 0;
 
     const isExt = () => param === 'ext';
@@ -1270,21 +1278,34 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
       render();
     }
 
-    function makeRow(value: string, count: number | null) {
+    function makeRow(o: { value: string; count: number | null; label?: string }) {
+      const value = o.value;
       const on = selected.has(value);
       const row = document.createElement('button');
       row.type = 'button';
-      row.className = 'dok-facet-row' + (on ? ' is-selected' : '');
+      row.className = 'dok-facet-row' + (o.label ? ' dok-facet-row--stack' : '') + (on ? ' is-selected' : '');
       row.setAttribute('role', 'option');
       row.setAttribute('aria-selected', String(on));
+      // Pavadinimas apkarpomas iki 1 eilutės — pilnas tekstas pasiekiamas hover'iu.
+      if (o.label) row.title = `${o.label} (${display(value)})`;
+      // Su label (pvz. įstaigos pavadinimu) — dvi eilutės: pavadinimas + kodas.
+      const text = document.createElement('span');
+      text.className = 'dok-facet-row__text';
       const label = document.createElement('span');
       label.className = 'dok-facet-row__label';
-      label.textContent = display(value);
-      row.appendChild(label);
-      if (count != null) {
+      label.textContent = o.label || display(value);
+      text.appendChild(label);
+      if (o.label) {
+        const sub = document.createElement('span');
+        sub.className = 'dok-facet-row__sub';
+        sub.textContent = display(value);
+        text.appendChild(sub);
+      }
+      row.appendChild(text);
+      if (o.count != null) {
         const cnt = document.createElement('span');
         cnt.className = 'dok-facet-row__count';
-        cnt.textContent = Number(count).toLocaleString('lt-LT');
+        cnt.textContent = Number(o.count).toLocaleString('lt-LT');
         row.appendChild(cnt);
       }
       row.addEventListener('click', () => toggle(value, row));
@@ -1296,9 +1317,9 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
       const typed = normalize(searchEl.value);
       // Selected-but-unlisted values (custom or filtered out) pinned on top.
       const listedValues = new Set(options.map((o) => o.value));
-      const pinned = [...selected].filter((v) => !listedValues.has(v)).map((v) => ({ value: v, count: null }));
+      const pinned: typeof options = [...selected].filter((v) => !listedValues.has(v)).map((v) => ({ value: v, count: null }));
       const rows = [...pinned, ...options].filter(
-        (o) => !needle || o.value.toLowerCase().includes(needle) || display(o.value).toLowerCase().includes(needle),
+        (o) => !needle || o.value.toLowerCase().includes(needle) || display(o.value).toLowerCase().includes(needle) || (o.label?.toLowerCase().includes(needle) ?? false),
       );
 
       listEl.textContent = '';
@@ -1318,7 +1339,7 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
         frag.appendChild(add);
       }
 
-      for (const o of rows) frag.appendChild(makeRow(o.value, o.count));
+      for (const o of rows) frag.appendChild(makeRow(o));
       listEl.appendChild(frag);
 
       if (!rows.length && !canAdd) {
@@ -1353,6 +1374,9 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
     openFacetModal = (opts: { field: string; param: string; title: string }) => {
       field = opts.field;
       param = opts.param;
+      // Įstaigų facetas turi ilgus dvieilius (pavadinimas + kodas) įrašus —
+      // kelių stulpelių grid'e jie susimaišo, todėl jį rodom vienu stulpeliu.
+      listEl.classList.toggle('dok-facet-modal__list--stack', field === 'istaigaJar');
       titleEl.textContent = opts.title;
       selected = new Set(getList(param));
       searchEl.value = '';
@@ -1680,6 +1704,46 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
     color: var(--gray);
     font-variant-numeric: tabular-nums;
   }
+  /* Su pavadinimu (įstaiga) — pavadinimas + kodas stulpeliu. Sąlygos keliamos ir
+     ant LIST konteinerio (.dok-facet-modal__list--stack .dok-facet-row), kad
+     veiktų net jei JS eilutei nepridėtų --stack klasės — kitaip eilutė liktų su
+     baziniu FIKSUOTU height:40px, o vyniojamas pavadinimas užlįstų ant gretimos
+     (vertikaliai sugrūsta). Todėl height:auto — eilutė auga pagal turinį. */
+  .dok-facet-row--stack,
+  .dok-facet-modal__list--stack .dok-facet-row {
+    height: auto;
+    min-height: 40px;
+    align-items: flex-start;
+    padding-block: 8px;
+  }
+  .dok-facet-row--stack::before,
+  .dok-facet-modal__list--stack .dok-facet-row::before { margin-top: 2px; }
+  /* BLOCK srautas (ne flex): pavadinimas + kodas dedasi vienas po kito natūraliais
+     aukščiais. Flex-stulpelyje pavadinimas paveldėdavo `flex:1` ir augdavo
+     vertikaliai, todėl kodas išlįsdavo ant kitos eilutės. */
+  .dok-facet-row__text {
+    flex: 1;
+    min-width: 0;
+    display: block;
+  }
+  .dok-facet-row--stack .dok-facet-row__label,
+  .dok-facet-modal__list--stack .dok-facet-row__label {
+    display: block;
+    flex: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.35;
+  }
+  .dok-facet-row__sub {
+    display: block;
+    margin-top: 3px;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+  }
+  .dok-facet-row--stack .dok-facet-row__count,
+  .dok-facet-modal__list--stack .dok-facet-row__count { margin-top: 1px; }
   /* "Pridėti „…"" row — distinct accent, spans the full grid width on top. */
   .dok-facet-row--add {
     grid-column: 1 / -1;
@@ -1931,6 +1995,39 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
     font-variant-numeric: tabular-nums;
   }
 
+  /* Įstaigų variantas: pavadinimas + JAR kodas dviem eilutėmis. Eilutė auga į
+     aukštį, checkbox lygiuojamas prie viršaus, pavadinimas vyniojamas iki 2 eil. */
+  .dok-filter-opt--stack {
+    height: auto;
+    align-items: flex-start;
+    padding-block: 5px;
+  }
+  .dok-filter-opt--stack::before { margin-top: 2px; }
+  /* BLOCK srautas (ne flex): pavadinimas + kodas dedasi vienas po kito natūraliais
+     aukščiais. Flex-stulpelyje pavadinimas paveldėdavo `flex:1` ir augdavo
+     vertikaliai, todėl kodas išlįsdavo ant kitos eilutės. */
+  .dok-filter-opt-text {
+    flex: 1;
+    min-width: 0;
+    display: block;
+  }
+  .dok-filter-opt--stack .dok-filter-opt-label {
+    display: block;
+    flex: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+  }
+  .dok-filter-opt-sub {
+    display: block;
+    margin-top: 1px;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+  }
+  .dok-filter-opt--stack .dok-filter-opt-count { margin-top: 1px; }
+
   /* Add-by-text input: visually a different action from the option list. */
   .dok-input-form {
     display: flex;
@@ -2075,6 +2172,15 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
     align-content: start;
     padding-block: 12px;
     padding-inline: max(16px, calc((100% - 1080px) / 2));
+  }
+  /* Įstaigų sąrašas — KELI stulpeliai per grid `auto-fill minmax`: sukuria tiek
+     ~320px stulpelių, kiek TELPA į plotį (todėl horizontaliai neperžengia, kitaip
+     nei CSS `columns` slankiame konteineryje). `align-items: start` + eilučių
+     `height: auto` leidžia aukštam įrašui išplėsti savo eilutę be persidengimo. */
+  .dok-facet-modal__list--stack {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    align-items: start;
+    gap: 4px 24px;
   }
   /* Row + loading + empty styles live in the global block below — those nodes
      are created in JS, so they don't carry Astro's scoped attribute. */
@@ -2397,8 +2503,10 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
     .dok-filter-section { padding-top: 14px; }
     .dok-filter-section + .dok-filter-section { margin-top: 8px; }
 
-    /* Comfortable but not bulky touch targets. */
-    .dok-filter-opt { height: 38px; }
+    /* Comfortable but not bulky touch targets. Įstaigų (dvieilis pavadinimas +
+       kodas) variantui fiksuotas aukštis netinka — kitaip turinys užlįstų ant
+       kitos eilutės, todėl jį paliekam augantį (height: auto iš --stack). */
+    .dok-filter-opt:not(.dok-filter-opt--stack) { height: 38px; }
     .dok-input { font-size: var(--text-sm); padding: 8px 0; }
 
     .dok-search { padding-top: 16px; }
