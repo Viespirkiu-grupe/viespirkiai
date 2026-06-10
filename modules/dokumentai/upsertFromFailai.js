@@ -67,13 +67,42 @@ async function buildPayload(row) {
 
 // Columns the failai SELECT must return for upsertBatch. Used by both the
 // backfill (id-range CTE) and the queue consumer (id = ANY).
+//
+// "istaigaJar" — perkančiosios / paskelbusios organizacijos JAR kodas, paimtas
+// pagal šaltinį iš susijusios lentelės (žr. FAILAI_ISTAIGA_JOINS). cvpp neturi
+// JAR kodo → NULL; archive (child) failai paveldi iš tėvo atskirame passe.
 export const FAILAI_SELECT_COLUMNS = `
     f.id, f.md5, f.saltinis, f."saltinioId",
     f."dokId", f."fileId",
     f.autorius, f.pavadinimas, f.extension,
     f."zodziuSkaicius", f."puslapiuSkaicius", f."simboliuSkaicius",
     f."metaduomenysHash", f."tekstasHash",
-    ST_AsEWKT(f.location) AS location_ewkt
+    ST_AsEWKT(f.location) AS location_ewkt,
+    COALESCE(
+        vp."jarKodas",
+        s."perkanciosiosOrganizacijosKodas",
+        (SELECT nd."jarKodas"
+         FROM public."neskelbiamosDerybos" nd
+         WHERE f.saltinis = 'neskelbiamosDerybos'
+           AND nd.link = 'https://eviesiejipirkimai.lt/sutikimai_laikini/' || f."saltinioId"
+         LIMIT 1)
+    ) AS "istaigaJar"
+`;
+
+// LEFT JOIN'ai į šaltinių lenteles, kad apskaičiuotume "istaigaJar". Raktai
+// remiasi tik į jau atrenkamus failai stulpelius (saltinis/saltinioId/dokId),
+// todėl tinka ir backfill (f.id > $1), ir queue consumer (f.id = ANY($1)).
+// Abu JOIN raktai unikalūs (viesiejiPirkimai.pirkimoId UNIQUE,
+// sutartys.sutartiesUnikalusId PK), todėl eilučių nedaugina. neskelbiamosDerybos
+// link NEunikalus (PK = hash), todėl jis imamas skaliariniu subquery (LIMIT 1)
+// FAILAI_SELECT_COLUMNS viduje, ne JOIN'u.
+export const FAILAI_ISTAIGA_JOINS = `
+    LEFT JOIN public."viesiejiPirkimai" vp
+        ON f.saltinis = 'cvpIs'
+       AND vp."pirkimoId" = split_part(f."saltinioId", '/', 1)
+    LEFT JOIN public.sutartys s
+        ON (f.saltinis IS NULL OR f.saltinis IN ('sutartis', 'sutartys'))
+       AND s."sutartiesUnikalusId" = f."dokId"
 `;
 
 
@@ -119,6 +148,7 @@ export async function upsertBatch(rows) {
     const pageCounts = built.map((b) => b.row.puslapiuSkaicius);
     const charCounts = built.map((b) => b.row.simboliuSkaicius);
     const locEwkts = built.map((b) => b.row.location_ewkt);
+    const istaigaJars = built.map((b) => b.row.istaigaJar);
 
     const insertStart = Date.now();
     await postgres.query(
@@ -127,23 +157,26 @@ export async function upsertBatch(rows) {
             "saltinioId0", "saltinioId1", "saltinioId2",
             autorius, pavadinimas, extension,
             "wordCount", "pageCount", "characterCount",
-            location
+            location, host, domain, url, "istaigaJar"
          )
          SELECT
             t."failasId", t.md5, $13::text, $14::text, t.source,
             t.s0, t.s1, t.s2,
             t.autorius, t.pavadinimas, t.extension,
             t."wordCount", t."pageCount", t."charCount",
-            CASE WHEN t.loc IS NULL THEN NULL ELSE ST_GeogFromText(t.loc) END
+            CASE WHEN t.loc IS NULL THEN NULL ELSE ST_GeogFromText(t.loc) END,
+            'viespirkiai.org', 'viespirkiai.org',
+            'https://viespirkiai.org/failas/' || t."failasId"::text,
+            t."istaigaJar"
          FROM unnest(
             $1::bigint[], $2::text[], $3::text[],
             $4::text[], $5::text[], $6::text[],
             $7::text[], $8::text[], $9::text[],
             $10::int[], $11::int[], $12::int[],
-            $15::text[]
+            $15::text[], $16::text[]
          ) AS t("failasId", md5, source, s0, s1, s2,
                 autorius, pavadinimas, extension,
-                "wordCount", "pageCount", "charCount", loc)
+                "wordCount", "pageCount", "charCount", loc, "istaigaJar")
          ON CONFLICT ("failasId") WHERE "failasId" IS NOT NULL DO UPDATE SET
             md5             = EXCLUDED.md5,
             class           = EXCLUDED.class,
@@ -158,14 +191,18 @@ export async function upsertBatch(rows) {
             "wordCount"     = EXCLUDED."wordCount",
             "pageCount"     = EXCLUDED."pageCount",
             "characterCount" = EXCLUDED."characterCount",
-            location        = EXCLUDED.location`,
+            location        = EXCLUDED.location,
+            host            = EXCLUDED.host,
+            domain          = EXCLUDED.domain,
+            url             = EXCLUDED.url,
+            "istaigaJar"    = EXCLUDED."istaigaJar"`,
         [
             failasIds, md5s, sources,
             s0s, s1s, s2s,
             autoriai, pavadinimai, extensions,
             wordCounts, pageCounts, charCounts,
             CLASS, TYPE,
-            locEwkts,
+            locEwkts, istaigaJars,
         ],
     );
     const insertMs = Date.now() - insertStart;
@@ -178,6 +215,7 @@ export async function fetchFailaiSlice(afterId, limit) {
     const { rows } = await postgres.query(
         `SELECT ${FAILAI_SELECT_COLUMNS}
          FROM public.failai f
+         ${FAILAI_ISTAIGA_JOINS}
          WHERE f.id > $1
          ORDER BY f.id
          LIMIT $2`,
@@ -192,6 +230,7 @@ export async function fetchFailaiByIds(ids) {
     const { rows } = await postgres.query(
         `SELECT ${FAILAI_SELECT_COLUMNS}
          FROM public.failai f
+         ${FAILAI_ISTAIGA_JOINS}
          WHERE f.id = ANY($1)`,
         [ids],
     );

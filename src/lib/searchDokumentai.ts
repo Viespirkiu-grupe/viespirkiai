@@ -25,6 +25,8 @@ export interface DokumentaiQuery {
   type?: string[];
   host?: string[];
   jar?: string[];
+  /** paskelbusios įstaigos JAR kodas (istaigaJar) */
+  istaiga?: string[];
   ext?: string[];
   md5?: string;
   language?: string;
@@ -101,6 +103,7 @@ export interface DokumentaiSearchResult {
   typeFilter: string[];
   hostFilter: string[];
   jarFilter: string[];
+  istaigaJarFilter: string[];
   extFilter: string[];
   authorFilter: string[];
   creatorFilter: string[];
@@ -117,6 +120,7 @@ export interface DokumentaiSearchResult {
   typeCountMap: Record<string, number>;
   classCountMap: Record<string, number>;
   hostOptions: FacetOption[];
+  istaigaJarOptions: FacetOption[];
   extOptions: FacetOption[];
   authorOptions: FacetOption[];
   creatorOptions: FacetOption[];
@@ -214,6 +218,7 @@ function buildPartsExcluding(opts: {
   types: string[];
   hosts: string[];
   jars: string[];
+  istaigos: string[];
   exts: string[];
   authors: string[];
   creators: string[];
@@ -230,6 +235,7 @@ function buildPartsExcluding(opts: {
   excludeClass?: boolean;
   excludeHost?: boolean;
   excludeJar?: boolean;
+  excludeIstaiga?: boolean;
   excludeExt?: boolean;
   excludeAuthor?: boolean;
   excludeCreator?: boolean;
@@ -247,7 +253,7 @@ function buildPartsExcluding(opts: {
    *  randami tiksliai greta ir ta pačia tvarka, o ne kaip atskiri terminai. */
   phrase?: boolean;
 }): string {
-  const { textQuery, classes, types, hosts, jars, exts, authors, creators, producers, langs, savs, apskritys, sources, courts, caseTypes, categories, judges, bbox } = opts;
+  const { textQuery, classes, types, hosts, jars, istaigos, exts, authors, creators, producers, langs, savs, apskritys, sources, courts, caseTypes, categories, judges, bbox } = opts;
   const p: string[] = [];
   if (!opts.excludeClass && classes.length) p.push(`(${classes.map((c) => `class:${JSON.stringify(c)}`).join(' OR ')})`);
   if (!opts.excludeType && types.length) p.push(`(${types.map((t) => `type:${t}`).join(' OR ')})`);
@@ -261,6 +267,8 @@ function buildPartsExcluding(opts: {
     const numeric = jars.map((j) => parseInt(j, 10)).filter((n) => Number.isFinite(n));
     if (numeric.length) p.push(`(${numeric.map((n) => `jarKodai:${n}`).join(' OR ')})`);
   }
+  // Paskelbusi įstaiga: tiksli atitiktis pagal istaigaJar (raw tokenizer).
+  if (!opts.excludeIstaiga && istaigos.length) p.push(`(${istaigos.map((v) => `istaigaJar:${JSON.stringify(v)}`).join(' OR ')})`);
   if (!opts.excludeExt && exts.length) p.push(`(${exts.map((e) => `extension:${JSON.stringify(e)}`).join(' OR ')})`);
   if (!opts.excludeAuthor && authors.length) p.push(`(${authors.map((v) => `author:${JSON.stringify(v)}`).join(' OR ')})`);
   if (!opts.excludeCreator && creators.length) p.push(`(${creators.map((v) => `metadata.creator:${JSON.stringify(v)}`).join(' OR ')})`);
@@ -312,6 +320,7 @@ function buildPartsOpts(input: {
   type?: string | string[];
   host?: string | string[];
   jar?: string | string[];
+  istaiga?: string | string[];
   ext?: string | string[];
   author?: string | string[];
   creator?: string | string[];
@@ -337,6 +346,7 @@ function buildPartsOpts(input: {
   const typeFilter = splitMulti(input.type);
   const hostFilter = splitMulti(input.host);
   const jarFilter = splitMulti(input.jar);
+  const istaigaFilter = splitMulti(input.istaiga);
   const extFilter = splitMulti(input.ext).map((e) => e.toLowerCase().replace(/^\./, ''));
   const authorFilter = Array.isArray(input.author) ? input.author.filter(Boolean) : input.author ? [input.author] : [];
   const creatorFilter = Array.isArray(input.creator) ? input.creator.filter(Boolean) : input.creator ? [input.creator] : [];
@@ -361,6 +371,7 @@ function buildPartsOpts(input: {
     types: [...new Set([...inlineTypes, ...typeFilter])],
     hosts: [...new Set([...inlineHosts, ...hostFilter])],
     jars: [...new Set([...inlineJars, ...jarFilter])],
+    istaigos: [...new Set(istaigaFilter)],
     exts: [...new Set([...inlineExts, ...extFilter.map((e) => e.toLowerCase())])],
     authors: [...new Set(authorFilter)],
     creators: [...new Set(creatorFilter)],
@@ -381,12 +392,13 @@ function buildPartsOpts(input: {
 // Quickwit field → the "exclude this facet's own filter" flag, so a facet lists
 // every value available under the *other* active filters.
 type FacetExcludeKey =
-  | 'excludeClass' | 'excludeHost' | 'excludeExt' | 'excludeAuthor' | 'excludeCreator' | 'excludeProducer' | 'excludeLang'
+  | 'excludeClass' | 'excludeHost' | 'excludeIstaiga' | 'excludeExt' | 'excludeAuthor' | 'excludeCreator' | 'excludeProducer' | 'excludeLang'
   | 'excludeSav' | 'excludeApskritis' | 'excludeSource'
   | 'excludeCourt' | 'excludeCaseType' | 'excludeCategory' | 'excludeJudge';
 const FACET_EXCLUDE: Record<string, FacetExcludeKey> = {
   class: 'excludeClass',
   host: 'excludeHost',
+  istaigaJar: 'excludeIstaiga',
   extension: 'excludeExt',
   author: 'excludeAuthor',
   'metadata.creator': 'excludeCreator',
@@ -546,6 +558,7 @@ export async function searchDokumentai(input: {
   type?: string | string[];
   host?: string | string[];
   jar?: string | string[];
+  istaiga?: string | string[];
   ext?: string | string[];
   author?: string | string[];
   creator?: string | string[];
@@ -578,6 +591,7 @@ export async function searchDokumentai(input: {
   const qwQuery = buildPartsExcluding(partsOpts);
   const classFacetQuery = buildPartsExcluding({ ...partsOpts, excludeClass: true });
   const hostFacetQuery = buildPartsExcluding({ ...partsOpts, excludeHost: true });
+  const istaigaFacetQuery = buildPartsExcluding({ ...partsOpts, excludeIstaiga: true });
   const typeFacetQuery = buildPartsExcluding(partsOpts);
   const extFacetQuery = buildPartsExcluding({ ...partsOpts, excludeExt: true });
   const authorFacetQuery = buildPartsExcluding({ ...partsOpts, excludeAuthor: true });
@@ -628,6 +642,7 @@ export async function searchDokumentai(input: {
     qwAggregate('savivaldybe', savFacetQuery, 60),
     qwAggregate('apskritis', apskritisFacetQuery, 12),
     qwAggregate('source', sourceFacetQuery, 12),
+    qwAggregate('istaigaJar', istaigaFacetQuery, 12),
   ]);
 
   const result = await searchPromise;
@@ -640,7 +655,7 @@ export async function searchDokumentai(input: {
   if (filterMs > 0) {
     timings.push({ label: 'Gyvų atranka', phase: 'pg', start: searchStart + qwMs, duration: filterMs });
   }
-  const [hostBuckets, typeBuckets, classBuckets, courtBuckets, caseTypeBuckets, categoryBuckets, judgeBuckets, extBuckets, authorBuckets, creatorBuckets, producerBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets] = await aggsPromise;
+  const [hostBuckets, typeBuckets, classBuckets, courtBuckets, caseTypeBuckets, categoryBuckets, judgeBuckets, extBuckets, authorBuckets, creatorBuckets, producerBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets, istaigaBuckets] = await aggsPromise;
   timings.push({ label: 'Facetai', phase: 'filter', start: aggsStart, duration: mark() - aggsStart });
 
   const total = result.numHitsEstimate ?? result.hits.length;
@@ -706,6 +721,7 @@ export async function searchDokumentai(input: {
     buckets.filter((b) => b.value).map((b) => ({ value: b.value, count: b.count }));
 
   const hostOptions = toOptions(hostBuckets);
+  const istaigaJarOptions = toOptions(istaigaBuckets);
   const typeCountMap = Object.fromEntries(typeBuckets.map((b) => [b.value, b.count ?? 0]));
   const classCountMap = Object.fromEntries(classBuckets.map((b) => [b.value, b.count ?? 0]));
   const courtOptions = toOptions(courtBuckets);
@@ -750,6 +766,7 @@ export async function searchDokumentai(input: {
     typeFilter: partsOpts.types,
     hostFilter: partsOpts.hosts,
     jarFilter: partsOpts.jars,
+    istaigaJarFilter: partsOpts.istaigos,
     extFilter: partsOpts.exts,
     authorFilter: partsOpts.authors,
     creatorFilter: partsOpts.creators,
@@ -766,6 +783,7 @@ export async function searchDokumentai(input: {
     typeCountMap,
     classCountMap,
     hostOptions,
+    istaigaJarOptions,
     extOptions,
     authorOptions,
     creatorOptions,

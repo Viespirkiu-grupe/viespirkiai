@@ -10,6 +10,7 @@ const state = {
   type: ['failas'],
   host: [],
   jar: [],
+  istaiga: [],
   ext: ['pdf'],
   author: [],
   creator: [],

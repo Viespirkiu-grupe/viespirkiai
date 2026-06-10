@@ -3,12 +3,18 @@ import { log } from "../../utils/log.js";
 
 const BATCH_SIZE = 5000;
 
-// Pass 2 of the failai → dokumentai migration: resolve `parent`.
-// For each failai with parent IS NOT NULL, find its dokumentai row and
-// the parent failai's dokumentai row, then set dokumentai.parent to that id.
+// Pass 2 of the failai → dokumentai migration: resolve `parent` ir paveldi
+// `istaigaJar`.
 //
-// Runs in repeated passes — if a child was migrated before its parent, the
-// next pass picks it up once both exist.
+// 1) Kiekvienam failai su parent IS NOT NULL randam jo dokumentai eilutę ir
+//    tėvo failai dokumentai eilutę, tada nustatom dokumentai.parent.
+// 2) Archive (child) failai šaltinio JOIN'ų neatitinka (žr. upsertFromFailai.js),
+//    todėl jų istaigaJar lieka NULL — čia jį paveldim iš tėvo dokumento.
+//
+// Abu žingsniai sukasi kartotiniais passais — jei vaikas migruotas anksčiau už
+// tėvą (arba įdėtiniai archyvai), kitas passas pasiima, kai abu jau egzistuoja.
+// istaigaJar paveldėjimas NEsiriša su parent išsprendimu (atskira sąlyga
+// d."istaigaJar" IS NULL), kad įdėtinių archyvų lygiai užsipildytų po vieną.
 
 async function runPass() {
     let lastFailasId = 0;
@@ -30,7 +36,7 @@ async function runPass() {
         const ids = rows.map((r) => r.id);
         lastFailasId = rows[rows.length - 1].id;
 
-        const upd = await postgres.query(
+        const updParent = await postgres.query(
             `WITH src AS (
                 SELECT d.id AS doc_id, p.id AS parent_doc_id
                 FROM public.failai f
@@ -47,10 +53,28 @@ async function runPass() {
             [ids],
         );
 
-        updated += upd.rowCount;
+        const updJar = await postgres.query(
+            `WITH src AS (
+                SELECT d.id AS doc_id, p."istaigaJar" AS parent_jar
+                FROM public.failai f
+                JOIN public.dokumentai d
+                    ON d."failasId" = f.id AND d."istaigaJar" IS NULL
+                JOIN public.dokumentai p
+                    ON p."failasId" = f.parent AND p."istaigaJar" IS NOT NULL
+                WHERE f.id = ANY($1)
+            )
+            UPDATE public.dokumentai d
+            SET "istaigaJar" = src.parent_jar
+            FROM src
+            WHERE d.id = src.doc_id`,
+            [ids],
+        );
+
+        const batchUpdated = updParent.rowCount + updJar.rowCount;
+        updated += batchUpdated;
         batchNum++;
         log(
-            `  batch ${batchNum} | iki failai.id=${lastFailasId} | atnaujinta: ${upd.rowCount} | viso šiame pass: ${updated.toLocaleString()}`,
+            `  batch ${batchNum} | iki failai.id=${lastFailasId} | parent: ${updParent.rowCount} | istaigaJar: ${updJar.rowCount} | viso šiame pass: ${updated.toLocaleString()}`,
         );
     }
 
@@ -85,6 +109,20 @@ async function run() {
     );
     if (count > 0) {
         log(`Pastaba: ${count.toLocaleString()} dokumentų liko be parent — tėvų failai dar nemigruoti į dokumentai.`);
+    }
+
+    // Diagnostic: child dokumentai, kurių istaigaJar liko NULL nors tėvas jį turi.
+    const {
+        rows: [{ count: jarCount }],
+    } = await postgres.query(
+        `SELECT COUNT(*)::int AS count
+         FROM public.failai f
+         JOIN public.dokumentai d ON d."failasId" = f.id AND d."istaigaJar" IS NULL
+         JOIN public.dokumentai p ON p."failasId" = f.parent AND p."istaigaJar" IS NOT NULL
+         WHERE f.parent IS NOT NULL`,
+    );
+    if (jarCount > 0) {
+        log(`Pastaba: ${jarCount.toLocaleString()} child dokumentų liko be istaigaJar nors tėvas jį turi — paleisti pass pakartotinai.`);
     }
 }
 

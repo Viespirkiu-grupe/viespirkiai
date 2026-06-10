@@ -45,6 +45,7 @@ const rawClassFilter = params.getAll('klase').flatMap((v) => v.split(','));
 const rawTypeFilter = params.getAll('type').flatMap((v) => v.split(','));
 const rawHostFilter = params.getAll('host').flatMap((v) => v.split(','));
 const rawJarFilter = params.getAll('jar').flatMap((v) => v.split(','));
+const rawIstaigaFilter = params.getAll('istaiga').flatMap((v) => v.split(','));
 const rawExtFilter = params.getAll('ext').flatMap((v) => v.split(','));
 const rawAuthorFilter = params.getAll('author').filter(Boolean);
 const rawCreatorFilter = params.getAll('creator').filter(Boolean);
@@ -101,7 +102,7 @@ const hasArea = Boolean(rawArea.minLat && rawArea.maxLat && rawArea.minLon && ra
 }
 
 const hasFilters = Boolean(
-  rawClassFilter.length || rawTypeFilter.length || rawHostFilter.length || rawJarFilter.length || rawExtFilter.length
+  rawClassFilter.length || rawTypeFilter.length || rawHostFilter.length || rawJarFilter.length || rawIstaigaFilter.length || rawExtFilter.length
   || rawAuthorFilter.length || rawCreatorFilter.length || rawProducerFilter.length
   || rawLangFilter.length || rawSavFilter.length || rawApskritisFilter.length || rawSourceFilter.length
   || rawCourtFilter.length || rawCaseTypeFilter.length || rawCategoryFilter.length || rawJudgeFilter.length
@@ -146,6 +147,7 @@ if (!showHome) {
         type: rawTypeFilter,
         host: rawHostFilter,
         jar: rawJarFilter,
+        istaiga: rawIstaigaFilter,
         ext: rawExtFilter,
         author: rawAuthorFilter,
         creator: rawCreatorFilter,
@@ -185,6 +187,7 @@ const classFilter = result?.classFilter ?? [];
 const typeFilter = result?.typeFilter ?? [];
 const hostFilter = result?.hostFilter ?? [];
 const jarFilter = result?.jarFilter ?? [];
+const istaigaJarFilter = result?.istaigaJarFilter ?? [];
 const extFilter = result?.extFilter ?? [];
 const authorFilter = result?.authorFilter ?? [];
 const creatorFilter = result?.creatorFilter ?? [];
@@ -200,6 +203,7 @@ const judgeFilter = result?.judgeFilter ?? [];
 const typeCountMap = result?.typeCountMap ?? {};
 const classCountMap = result?.classCountMap ?? {};
 const hostOptions: FacetOption[] = result?.hostOptions ?? [];
+const istaigaJarOptions: FacetOption[] = result?.istaigaJarOptions ?? [];
 const extOptions: FacetOption[] = result?.extOptions ?? [];
 const authorOptions: FacetOption[] = result?.authorOptions ?? [];
 const creatorOptions: FacetOption[] = result?.creatorOptions ?? [];
@@ -241,6 +245,7 @@ const urlState: DokumentaiUrlState = {
   type: typeFilter,
   host: hostFilter,
   jar: jarFilter,
+  istaiga: istaigaJarFilter,
   ext: extFilter,
   author: authorFilter,
   creator: creatorFilter,
@@ -261,6 +266,7 @@ const classToggleUrl = (v: string) => buildUrl({ klase: v ? toggleValue(classFil
 const typeToggleUrl = (v: string) => buildUrl({ type: v ? toggleValue(typeFilter, v) : [] });
 const hostToggleUrl = (v: string) => buildUrl({ host: v ? toggleValue(hostFilter, v) : [] });
 const jarToggleUrl = (v: string) => buildUrl({ jar: v ? toggleValue(jarFilter, v) : [] });
+const istaigaToggleUrl = (v: string) => buildUrl({ istaiga: v ? toggleValue(istaigaJarFilter, v) : [] });
 const extToggleUrl = (v: string) => buildUrl({ ext: v ? toggleValue(extFilter, v) : [] });
 const authorToggleUrl = (v: string) => buildUrl({ author: v ? toggleValue(authorFilter, v) : [] });
 const creatorToggleUrl = (v: string) => buildUrl({ creator: v ? toggleValue(creatorFilter, v) : [] });
@@ -286,6 +292,7 @@ const clearUrl = (() => {
 const HOST_LIMIT = 6;
 const EXT_LIMIT = 6;
 const { visible: hostVisible, hidden: hostHidden } = splitFacetOptions(hostOptions, hostFilter, HOST_LIMIT);
+const { visible: istaigaVisible, hidden: istaigaHidden } = splitFacetOptions(istaigaJarOptions, istaigaJarFilter, HOST_LIMIT);
 const { visible: extVisible, hidden: extHidden } = splitFacetOptions(extOptions, extFilter, EXT_LIMIT);
 const { visible: authorVisible, hidden: authorHidden } = splitFacetOptions(authorOptions, authorFilter, EXT_LIMIT);
 const { visible: creatorVisible, hidden: creatorHidden } = splitFacetOptions(creatorOptions, creatorFilter, EXT_LIMIT);
@@ -327,7 +334,7 @@ const { visible: caseTypeVisible, hidden: caseTypeHidden } = splitFacetOptions(c
 const { visible: categoryVisible, hidden: categoryHidden } = splitFacetOptions(categoryOptions, categoryFilter, 8);
 const { visible: judgeVisible, hidden: judgeHidden } = splitFacetOptions(judgeOptions, judgeFilter, 8);
 
-const activeFilterCount = classFilter.length + typeFilter.length + hostFilter.length + jarFilter.length + extFilter.length
+const activeFilterCount = classFilter.length + typeFilter.length + hostFilter.length + jarFilter.length + istaigaJarFilter.length + extFilter.length
   + authorFilter.length + creatorFilter.length + producerFilter.length
   + langFilter.length + savFilter.length + apskritisFilter.length + sourceFilter.length
   + courtFilter.length + caseTypeFilter.length + categoryFilter.length + judgeFilter.length + (bbox ? 1 : 0);
@@ -565,6 +572,24 @@ const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
                   </div>
                   <button class="dok-more-btn" type="button">Rodyti daugiau</button>
                 </>
+              )}
+            </section>
+          )}
+
+          {(istaigaVisible.length > 0 || istaigaJarFilter.length > 0) && (
+            <section class="dok-filter-section">
+              <span class="dok-filter-section-label">Paskelbusi įstaiga</span>
+              <a href={istaigaToggleUrl('')} data-param="istaiga" class={`dok-filter-opt dok-filter-all${istaigaJarFilter.length === 0 ? ' is-selected' : ''}`}>
+                <span class="dok-filter-opt-label">Visos</span>
+              </a>
+              {istaigaVisible.map((opt) => (
+                <a href={istaigaToggleUrl(opt.value)} data-param="istaiga" data-value={opt.value} class={`dok-filter-opt${istaigaJarFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                  <span class="dok-filter-opt-label">{opt.value}</span>
+                  {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                </a>
+              ))}
+              {istaigaHidden.length > 0 && (
+                <button class="dok-more-btn" type="button" data-facet-modal="istaigaJar" data-facet-param="istaiga" data-facet-title="Paskelbusi įstaiga">Daugiau</button>
               )}
             </section>
           )}

@@ -5,7 +5,7 @@ import { dokumentaiFacetOptions } from '../../lib/searchDokumentai';
 // query/filters. Backs the "show all" modal in the filter sidebar, so it can
 // return far more values (up to ~1k) than the sidebar previews inline.
 const ALLOWED = new Set([
-  'extension', 'host', 'language', 'savivaldybe', 'apskritis', 'source', 'author',
+  'extension', 'host', 'istaigaJar', 'language', 'savivaldybe', 'apskritis', 'source', 'author',
   'metadata.creator', 'metadata.producer',
   'class', 'metadata.teismas', 'metadata.bylosRusis', 'metadata.kategorijos', 'metadata.teisejai',
 ]);
@@ -29,6 +29,7 @@ export const GET: APIRoute = async ({ url }) => {
         type: p.getAll('type'),
         host: p.getAll('host'),
         jar: p.getAll('jar'),
+        istaiga: p.getAll('istaiga'),
         ext: p.getAll('ext'),
         author: p.getAll('author'),
         creator: p.getAll('creator'),
