@@ -14,7 +14,10 @@ import { gautiNepatikimuTiekejuIrasusPagalJarKoda } from "../vptSarasai/nepatiki
 import { gautiMelaginguTiekejuIrasusPagalJarKoda } from "../vptSarasai/melagingiTiekejai.js";
 import { gautiJadisDalyvius } from "../jadis/jadisDuomenys.js";
 import { gautiRcPranesimusPagalJarKoda } from "../registruCentrasPranesimai/rcPranesimai.js";
-import { gautiSutarciuDuomenisPagalJarKoda } from "../sutartys/pagalJarKoda.js";
+import {
+    gautiSutarciuDuomenisPagalJarKoda,
+    arTuriSutarciu,
+} from "../sutartys/pagalJarKoda.js";
 import { rastiDomenusPagalJarKoda } from "../domenai/rastiPagalJarKoda.js";
 import { rastiKotisPagalGavejoKoda } from "../kotis/getByJarKodas.js";
 import { getEsInvesticijosByJar } from "../2014esinvesticijos/getEsInvesticijosByJar.js";
@@ -81,6 +84,26 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
                 timings,
             };
         }
+
+        // Nėra JAR registre, bet gali turėti sutarčių (pvz. užsienio tiekėjas,
+        // fizinis asmuo ar registro lentelėse trūkstamas asmuo) — tada vietoj
+        // 404 rodome ribotą puslapį su sutartimis.
+        timings.start("sutartys");
+        const sutartys = await gautiSutarciuDuomenisPagalJarKoda(
+            jarKodas,
+            options?.sutartys,
+        );
+        timings.end("sutartys");
+
+        if (arTuriSutarciu(sutartys)) {
+            return {
+                tikSutartys: true,
+                jarKodas,
+                sutartys,
+                timings,
+            };
+        }
+
         return {
             error: 404,
             timings,

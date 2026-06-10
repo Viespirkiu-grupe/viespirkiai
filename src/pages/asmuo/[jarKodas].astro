@@ -23,6 +23,7 @@ import Regitra from '../../components/asmuo/Regitra.astro';
 import TeismoNuosprendziai from '../../components/asmuo/TeismoNuosprendziai.astro';
 import PinregDeklaracijos from '../../components/asmuo/PinregDeklaracijos.astro';
 import IsregistruotasAsmuo from '../../components/asmuo/IsregistruotasAsmuo.astro';
+import AsmuoTikSutartys from '../../components/asmuo/AsmuoTikSutartys.astro';
 import { getJuridinisInfo } from '@/modules/juridiniai/getJuridinisInfo.js';
 import config from '../../lib/config.ts';
 import '@/utils/time.js';
@@ -78,8 +79,15 @@ if (juridinioInfo.special) {
   })}`);
 }
 
+const tikSutartys: any = 'tikSutartys' in juridinioInfo ? juridinioInfo : undefined;
 const isregistruotasAsmuo: any = 'isregistruotasAsmuo' in juridinioInfo ? juridinioInfo.isregistruotasAsmuo : undefined;
 const asmuo: any = 'asmuo' in juridinioInfo ? juridinioInfo.asmuo : undefined;
+
+if (format === 'json' && tikSutartys) {
+  return new Response(JSON.stringify({ jarKodas, sutartys: tikSutartys.sutartys }, null, 2), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
 if (format === 'json' && asmuo) {
   return new Response(JSON.stringify(asmuo, null, 2), {
@@ -162,6 +170,13 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
       <PinregDeklaracijos asmuo={asmuo} />
     </main>
   </Layout>
+) : tikSutartys ? (
+  <AsmuoTikSutartys
+    jarKodas={jarKodas}
+    sutartys={tikSutartys.sutartys}
+    colorScheme={colorScheme}
+    font={font}
+  />
 ) : isregistruotasAsmuo ? (
   <IsregistruotasAsmuo
     isregistruotasAsmuo={isregistruotasAsmuo}

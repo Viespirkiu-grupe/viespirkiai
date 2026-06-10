@@ -200,6 +200,27 @@ export async function handler({
         };
     }
 
+    // Nerastas registre, bet turi sutarčių
+    if (result.tikSutartys) {
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: JSON.stringify(
+                        {
+                            jarKodas: result.jarKodas,
+                            pastaba:
+                                "Asmuo nerastas Juridinių asmenų registre, tačiau turi viešųjų pirkimų sutarčių.",
+                            sutartys: result.sutartys,
+                        },
+                        null,
+                        2,
+                    ),
+                },
+            ],
+        };
+    }
+
     // Drop timings — not useful for Claude
     const asmuo = { ...result.asmuo };
     asmuo.sodra = aggregateSodra(asmuo.sodra);

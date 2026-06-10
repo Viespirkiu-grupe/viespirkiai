@@ -1,0 +1,41 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import Button from '@design-system/components/Button.astro';
+import Sutartys from './Sutartys.astro';
+import config from '../../lib/config.ts';
+
+interface Props {
+  jarKodas: string;
+  sutartys: any;
+  colorScheme?: string;
+  font?: string;
+}
+
+const { jarKodas, sutartys, colorScheme = 'auto', font = 'ubuntu' } = Astro.props;
+
+// Minimalus „asmuo" objektas, kurio reikia Sutartys komponentui
+const asmuo = { jar: { jarKodas }, sutartys };
+---
+
+<Layout
+  pageTitle={jarKodas}
+  pageDescription="Asmuo su viešųjų pirkimų sutartimis"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      {jarKodas}
+      <Fragment slot="actions">
+        <Button href={`/pirkejas/${jarKodas}`} variant="outline" size="sm">↗ Pirkimai</Button>
+        <Button href={`/tiekejas/${jarKodas}`} variant="outline" size="sm">↗ Pardavimai</Button>
+      </Fragment>
+    </PageHeader>
+
+    <p>Asmuo nerastas Juridinių asmenų registre, tačiau turi viešųjų pirkimų sutarčių.</p>
+
+    <Sutartys asmuo={asmuo} />
+  </main>
+</Layout>

@@ -46,3 +46,13 @@ export async function gautiSutarciuDuomenisPagalJarKoda(
 
     return { pirkimaiKasMetus, tiekimaiKasMetus, topPirkejai, topTiekejai };
 }
+
+// Ar yra bent viena sutartis pagal kodą (kaip pirkėjo arba tiekėjo)
+export function arTuriSutarciu(sutartys) {
+    return (
+        sutartys.pirkimaiKasMetus.length > 0 ||
+        sutartys.tiekimaiKasMetus.length > 0 ||
+        sutartys.topTiekejai.length > 0 ||
+        sutartys.topPirkejai.length > 0
+    );
+}
