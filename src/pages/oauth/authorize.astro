@@ -1,0 +1,126 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getColorScheme, getFont } from '../../lib/failai.js';
+import {
+  DUMMY_AUTHORIZATION_CODE,
+  logDummyOAuthRequest,
+  parseDummyAuthorizationRequest,
+} from '@/src/lib/dummyOAuth';
+
+void logDummyOAuthRequest;
+
+const params = Astro.request.method === 'POST'
+  ? await Astro.request.formData()
+  : Astro.url.searchParams;
+const parsed = parseDummyAuthorizationRequest(params);
+
+if (parsed.error) {
+  logDummyOAuthRequest('authorization_error', Astro.request, { error: parsed.error });
+  return new Response(parsed.error, {
+    status: 400,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  });
+}
+
+const authorization = parsed.request!;
+
+if (Astro.request.method === 'POST') {
+  logDummyOAuthRequest('authorization_approved', Astro.request, {
+    clientId: authorization.clientId,
+    redirectOrigin: new URL(authorization.redirectUri).origin,
+    hasState: authorization.state !== null,
+    hasCodeChallenge: authorization.codeChallenge !== null,
+    hasResource: authorization.resource !== null,
+  });
+
+  const redirectUrl = new URL(authorization.redirectUri);
+  redirectUrl.searchParams.set('code', DUMMY_AUTHORIZATION_CODE);
+  if (authorization.state !== null) redirectUrl.searchParams.set('state', authorization.state);
+  return Astro.redirect(redirectUrl.toString(), 302);
+}
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+logDummyOAuthRequest('authorization_page', Astro.request, {
+  clientId: authorization.clientId,
+  redirectOrigin: new URL(authorization.redirectUri).origin,
+  hasState: authorization.state !== null,
+  hasCodeChallenge: authorization.codeChallenge !== null,
+  codeChallengeMethod: authorization.codeChallengeMethod,
+  hasResource: authorization.resource !== null,
+});
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<Layout
+  pageTitle="Imitacinis prisijungimas"
+  pageDescription="Patvirtinkite imitacinį prisijungimą prie Viešpirkių MCP."
+  colorScheme={colorScheme}
+  font={font}
+  hideFooter
+>
+  <main>
+    <div class="dummy-auth-card">
+      <p class="dummy-auth-kicker">MCP prisijungimas</p>
+      <h1>Suvaidinkime prisijungimą</h1>
+      <p>
+        Šis MCP serveris viešas ir tikro prisijungimo nereikalauja. Tačiau kai kurie MCP klientai,
+        įskaitant „Microsoft Copilot“, be AUTH prisijungti nemoka.
+      </p>
+      <p>
+        Paspaudus „Gerai, tęsti“, bus imituotas OAuth prisijungimas ir grįšite į savo MCP klientą.
+        Jokios paskyros ar asmens duomenų neprašome.
+      </p>
+
+      <form method="post">
+        <input type="hidden" name="client_id" value={authorization.clientId} />
+        <input type="hidden" name="redirect_uri" value={authorization.redirectUri} />
+        <input type="hidden" name="response_type" value="code" />
+        {authorization.state !== null && <input type="hidden" name="state" value={authorization.state} />}
+        {authorization.codeChallenge !== null && <input type="hidden" name="code_challenge" value={authorization.codeChallenge} />}
+        {authorization.codeChallengeMethod !== null && <input type="hidden" name="code_challenge_method" value={authorization.codeChallengeMethod} />}
+        {authorization.resource !== null && <input type="hidden" name="resource" value={authorization.resource} />}
+        <button type="submit" class="btn btn-primary">Gerai, tęsti</button>
+      </form>
+
+      <p class="dummy-auth-client">Klientas: <code>{authorization.clientId}</code></p>
+    </div>
+  </main>
+
+  <style>
+    main {
+      min-height: calc(100vh - 90px);
+      display: grid;
+      place-items: center;
+      padding: 32px 16px;
+    }
+
+    .dummy-auth-card {
+      width: min(100%, 640px);
+      padding: clamp(24px, 5vw, 48px);
+      border: var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--shade-1);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .dummy-auth-kicker {
+      margin: 0 0 8px;
+      color: var(--text-muted);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 { margin-top: 0; }
+    form { margin-top: 28px; }
+
+    .dummy-auth-client {
+      margin: 24px 0 0;
+      color: var(--text-muted);
+      font-size: var(--text-sm);
+      overflow-wrap: anywhere;
+    }
+  </style>
+</Layout>

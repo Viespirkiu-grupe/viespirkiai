@@ -1,0 +1,23 @@
+---
+import { isMcpTransportRequest, handleMcpRequest } from '@/src/lib/mcp';
+import { createDummyAuthChallenge, hasValidDummyBearerToken, logDummyOAuthRequest } from '@/src/lib/dummyOAuth';
+
+void handleMcpRequest;
+void createDummyAuthChallenge;
+void logDummyOAuthRequest;
+
+if (!hasValidDummyBearerToken(Astro.request)) {
+  return createDummyAuthChallenge(Astro.request);
+}
+
+if (isMcpTransportRequest(Astro.request)) {
+  logDummyOAuthRequest('mcp_authenticated_request', Astro.request);
+  return await handleMcpRequest(Astro.request);
+}
+
+logDummyOAuthRequest('mcp_authenticated_method_not_allowed', Astro.request);
+return new Response('Method Not Allowed', {
+  status: 405,
+  headers: { Allow: 'POST, GET, DELETE' },
+});
+---
