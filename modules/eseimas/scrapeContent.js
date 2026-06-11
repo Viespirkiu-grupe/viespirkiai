@@ -9,10 +9,22 @@ import {
 import { upsertTeisekuraDokumentas } from "../teisekura/upsertDokumentas.js";
 import { cleanEseimasUrl } from "./scrape.js";
 
-export const TURINIO_VERSIJA = 1;
+export const TURINIO_VERSIJA = 2;
+
+export function cleanEseimasText(value) {
+    return (value ?? "")
+        .replace(/\b(?:el\.\s*p\.|el\.\s*paštas|elektroninis\s+paštas)\s*:?\s*\[email protected\]\s*[,;]?\s*/gi, "")
+        .replace(/\s*[,;]?\s*\[email protected\]\s*[,;]?\s*/gi, ", ")
+        .replace(/\s+([,;:.])/g, "$1")
+        .replace(/([,;])(?:\s*[;,])+/g, "$1")
+        .replace(/,\s*([.!?])/g, "$1")
+        .replace(/\s+/g, " ")
+        .replace(/^[,;]\s*|[,;]\s*$/g, "")
+        .trim();
+}
 
 function collapse(value) {
-    return (value ?? "").replace(/\s+/g, " ").trim();
+    return cleanEseimasText(value);
 }
 
 function normalizeText(value) {
