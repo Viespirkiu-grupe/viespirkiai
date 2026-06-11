@@ -61,6 +61,19 @@ export function buildSsePayload(h) {
       approxRowCount: Number(l.approxRowCount).toLocaleString('lt-LT'),
       isTotal: l.tableName === 'Iš viso',
     })),
+    quickwitIndeksai: h.quickwitIndeksai.map((i) => ({
+      id: Number(i.id).toLocaleString('lt-LT'),
+      lentele: i.lentele,
+      seq: Number(i.seq).toLocaleString('lt-LT'),
+      indeksas: i.indeksas,
+      shardSize: Number(i.shardSize).toLocaleString('lt-LT'),
+      gyvosEilutes: Number(i.gyvosEilutes).toLocaleString('lt-LT'),
+      sukurta: formatDateTime(i.sukurta),
+      indexConfigHash: i.indexConfigHash ?? '',
+      current: i.current ? 'Taip' : 'Ne',
+      iterptosEilutes: Number(i.iterptosEilutes).toLocaleString('lt-LT'),
+      mirusiosEilutes: Number(i.mirusiosEilutes).toLocaleString('lt-LT'),
+    })),
   };
 }
 
@@ -101,11 +114,12 @@ export async function gautiStatistika() {
   const now = Date.now();
   if (cache && now - cacheTime < 50) return cache;
 
-  const [failaiCountsRes, lentelesRes, topRes, dbRes] = await Promise.all([
+  const [failaiCountsRes, lentelesRes, topRes, dbRes, quickwitIndeksaiRes] = await Promise.all([
     postgres.query(`SELECT metrika, eilute, verte FROM "failaiCounts";`),
     postgres.query(`SELECT s.relname AS "tableName", pg_table_size(s.relid) AS "dataSize", pg_indexes_size(s.relid) AS "indexSize", pg_table_size(s.relid) + pg_indexes_size(s.relid) AS "totalSize", st.n_live_tup AS "approxRowCount" FROM pg_catalog.pg_statio_user_tables s JOIN pg_catalog.pg_stat_user_tables st ON s.relid = st.relid ORDER BY s.relname ASC;`),
     postgres.query(`SELECT "nuskaitytidokumentai", "viesasPavadinimas" FROM "dokNuskaitytojai" ORDER BY "nuskaitytidokumentai" DESC LIMIT 100;`),
     postgres.query(`SELECT current_database() AS db, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, deadlocks, temp_files, temp_bytes, extract(epoch from now() - stats_reset) AS stats_age_seconds, extract(epoch from now() - pg_postmaster_start_time()) AS uptime_seconds FROM pg_stat_database WHERE datname = current_database();`),
+    postgres.query(`SELECT * FROM "quickwitIndeksai" ORDER BY "lentele", "seq";`),
   ]);
 
   const counts = failaiCountsRes.rows.reduce((acc, { metrika, eilute, verte }) => {
@@ -169,6 +183,7 @@ export async function gautiStatistika() {
   statistika.nuskaitymas.zodziuSkaicius = statistika.nuskaitymas.zodziai.total;
   statistika.topDokNuskaitytojai = topRes.rows;
   statistika.database = dbRes.rows[0];
+  statistika.quickwitIndeksai = quickwitIndeksaiRes.rows;
   statistika.atnaujinta = new Date();
 
   cache = statistika;

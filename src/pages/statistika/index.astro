@@ -144,6 +144,46 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
         </div>
       </div>
 
+      <!-- Quickwit indeksai -->
+      <div class="page-section">
+        <h2 class="mb-1"><a href="#quickwit-indeksai" id="quickwit-indeksai" class="no-style">Quickwit indeksai</a></h2>
+        <p class="text-muted text-sm mb-4">Paieškos indeksų shardai ir jų eilučių būsena</p>
+        <TableWrapper>
+          <Table>
+            <thead><tr>
+              <th>ID</th>
+              <th>Lentelė</th>
+              <th class="cell-right">Sekos nr.</th>
+              <th>Indeksas</th>
+              <th class="cell-right">Talpa</th>
+              <th class="cell-right">Gyvos eilutės</th>
+              <th class="cell-right">Įterptos eilutės</th>
+              <th class="cell-right">Mirusios eilutės</th>
+              <th>Dabartinis</th>
+              <th>Sukurta</th>
+              <th>Konfigūracijos hash</th>
+            </tr></thead>
+            <tbody id="quickwitIndeksaiBody">
+              {statistika.quickwitIndeksai.map((i: any) => (
+                <tr>
+                  <td class="cell-mono cell-right cell-nowrap">{Number(i.id).toLocaleString('lt-LT')}</td>
+                  <td>{i.lentele}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{Number(i.seq).toLocaleString('lt-LT')}</td>
+                  <td class="cell-mono cell-nowrap">{i.indeksas}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{Number(i.shardSize).toLocaleString('lt-LT')}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{Number(i.gyvosEilutes).toLocaleString('lt-LT')}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{Number(i.iterptosEilutes).toLocaleString('lt-LT')}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{Number(i.mirusiosEilutes).toLocaleString('lt-LT')}</td>
+                  <td>{i.current ? 'Taip' : 'Ne'}</td>
+                  <td class="cell-mono cell-nowrap">{new Date(i.sukurta).toLocaleString('lt-LT', { hour12: false })}</td>
+                  <td class="cell-mono cell-nowrap">{i.indexConfigHash}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </TableWrapper>
+      </div>
+
       <!-- Duomenų bazė -->
       <div class="page-section">
         <h2 class="mb-1"><a href="#duomenuBaze" id="duomenuBaze" class="no-style">Duomenų bazė</a></h2>
@@ -246,6 +286,13 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
       if (lBody && payload.lenteles) {
         lBody.innerHTML = payload.lenteles.map((l: any) =>
           `<tr class="${l.isTotal ? 'font-bold' : ''}"><td>${escapeHtml(l.tableName)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.dataSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.indexSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.totalSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.approxRowCount)}</td></tr>`
+        ).join('');
+      }
+
+      const qiBody = document.getElementById('quickwitIndeksaiBody');
+      if (qiBody && payload.quickwitIndeksai) {
+        qiBody.innerHTML = payload.quickwitIndeksai.map((i: any) =>
+          `<tr><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.id)}</td><td>${escapeHtml(i.lentele)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.seq)}</td><td class="cell-mono cell-nowrap">${escapeHtml(i.indeksas)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.shardSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.gyvosEilutes)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.iterptosEilutes)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.mirusiosEilutes)}</td><td>${escapeHtml(i.current)}</td><td class="cell-mono cell-nowrap">${escapeHtml(i.sukurta)}</td><td class="cell-mono cell-nowrap">${escapeHtml(i.indexConfigHash)}</td></tr>`
         ).join('');
       }
     };
