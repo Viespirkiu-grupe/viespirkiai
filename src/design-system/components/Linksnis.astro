@@ -1,0 +1,31 @@
+---
+/**
+ * Linksnis — lietuviškas daiktavardžio linksniavimas pagal skaičių.
+ *
+ * Parenka tinkamą formą (vienas / keli 2–9 / daug / trupmena) naudodama bendrą
+ * `linksniuoti` logiką iš utils/linksniai.js, kad visas projektas linksniuotų
+ * vienodai (viena tiesos vieta, o ne kopijuojama kiekvienam komponentui).
+ *
+ * @example
+ *   <Linksnis n={5} forms={['dokumentas', 'dokumentai', 'dokumentų', 'dokumento']} />
+ *     → „5 dokumentų"
+ *   <Linksnis n={1} forms={[...]} showNumber={false} />
+ *     → „dokumentas" (tik žodis, be skaičiaus)
+ */
+import { linksniuoti, linksniuotiOnly } from '../../../utils/linksniai.js';
+
+interface Props {
+  /** Skaičius, pagal kurį parenkama forma. */
+  n: number;
+  /** Formos: [vienas, keli (2–9), daug (0, 10–20, …), trupmena]. */
+  forms: [string, string, string, string];
+  /** Ar rodyti patį skaičių prieš žodį (numatyta — taip). */
+  showNumber?: boolean;
+  /** Klasė šakniniam <span> (kai reikia stiliaus). Be jos — grynas tekstas. */
+  class?: string;
+}
+
+const { n, forms, showNumber = true, class: className } = Astro.props;
+const text = showNumber ? linksniuoti(n, forms) : linksniuotiOnly(n, forms);
+---
+{className ? <span class={className}>{text}</span> : <Fragment>{text}</Fragment>}

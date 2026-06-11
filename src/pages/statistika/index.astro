@@ -144,6 +144,20 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
         </div>
       </div>
 
+      <!-- Eilės -->
+      <div class="page-section">
+        <h2 class="mb-1"><a href="#eiles" id="eiles" class="no-style">Eilės</a></h2>
+        <p class="text-muted text-sm mb-4">Apytikslis laukiančių įrašų skaičius pagal PostgreSQL statistiką</p>
+        <div class="grid-3">
+          {statistika.eiles.map((e: any) => (
+            <div class="card"><div class="card-body">
+              <div class="section-title mb-2">{e.tableName}</div>
+              <span class="cell-mono text-xl font-bold" data-queue={e.tableName}>{Number(e.approxRowCount).toLocaleString('lt-LT')}</span>
+            </div></div>
+          ))}
+        </div>
+      </div>
+
       <!-- Quickwit indeksai -->
       <div class="page-section">
         <h2 class="mb-1"><a href="#quickwit-indeksai" id="quickwit-indeksai" class="no-style">Quickwit indeksai</a></h2>
@@ -287,6 +301,13 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
         lBody.innerHTML = payload.lenteles.map((l: any) =>
           `<tr class="${l.isTotal ? 'font-bold' : ''}"><td>${escapeHtml(l.tableName)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.dataSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.indexSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.totalSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.approxRowCount)}</td></tr>`
         ).join('');
+      }
+
+      if (payload.eiles) {
+        payload.eiles.forEach((e: any) => {
+          const value = document.querySelector(`[data-queue="${CSS.escape(e.tableName)}"]`);
+          if (value) value.textContent = e.approxRowCount;
+        });
       }
 
       const qiBody = document.getElementById('quickwitIndeksaiBody');

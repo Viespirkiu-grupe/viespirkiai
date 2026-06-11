@@ -12,7 +12,7 @@ const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:72
 // enough that fresh ingest activity is reflected quickly.
 const _deadRatioCache = new Map(); // lentele → { value, expiresAt }
 
-async function getDeadRatio(lentele) {
+export async function getDeadRatio(lentele) {
   const cached = _deadRatioCache.get(lentele);
   if (cached && Date.now() < cached.expiresAt) return cached.value;
 
@@ -453,7 +453,7 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
     : 100;
 
   const liveHits = [];
-  let searchAfter = null;
+  let offset = 0;
   let numHitsMax = null;
   let requests = 0;
   let totalElapsed = 0;
@@ -461,13 +461,23 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
   let filterMs = 0;
   let rawExhausted = false;
 
-  while (liveHits.length < minHits) {
+  // Quickwit 0.8 has no `search_after` (the body only accepts `start_offset`),
+  // so we page forward with start_offset until we've gathered `minHits` live
+  // hits or run out. The first page already over-fetches for the average dead
+  // ratio, so this normally completes in one request; extra pages only kick in
+  // when a stretch is unusually tombstone-heavy. Cap the page count so a
+  // pathological run can't loop indefinitely. NOTE: offset paging assumes a
+  // stable order across requests, so callers paging deep must sort by a
+  // concrete field — an all-equal `_score` (match-all) gives an arbitrary order.
+  const MAX_PAGES = 12;
+
+  while (liveHits.length < minHits && requests < MAX_PAGES) {
     requests++;
     const reqParams = {
       ...params,
       max_hits: fetchSize,
+      start_offset: offset,
       format: "json",
-      ...(searchAfter ? { search_after: searchAfter } : {}),
     };
 
     const qwStart = Date.now();
@@ -492,9 +502,7 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
       rawExhausted = true;
       break;
     }
-    // No sort key → can't paginate further, but the index is NOT exhausted.
-    searchAfter = hits[hits.length - 1].sort ?? null;
-    if (!searchAfter) break;
+    offset += fetchSize;
   }
 
   return {

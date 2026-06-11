@@ -61,6 +61,10 @@ export function buildSsePayload(h) {
       approxRowCount: Number(l.approxRowCount).toLocaleString('lt-LT'),
       isTotal: l.tableName === 'Iš viso',
     })),
+    eiles: h.eiles.map((e) => ({
+      tableName: e.tableName,
+      approxRowCount: Number(e.approxRowCount).toLocaleString('lt-LT'),
+    })),
     quickwitIndeksai: h.quickwitIndeksai.map((i) => ({
       id: Number(i.id).toLocaleString('lt-LT'),
       lentele: i.lentele,
@@ -146,6 +150,7 @@ export async function gautiStatistika() {
     },
   };
 
+  statistika.eiles = lentelesRes.rows.filter((lentele) => lentele.tableName.endsWith('Queue'));
   statistika.lenteles = lentelesRes.rows;
   statistika.lenteles.push({
     tableName: 'Iš viso',

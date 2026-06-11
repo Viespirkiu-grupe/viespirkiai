@@ -1,5 +1,5 @@
 import { postgres } from '@/postgres/postgres.js';
-import { search } from '@/quickwit/quickwit.js';
+import { search, getDeadRatio } from '@/quickwit/quickwit.js';
 import { readDokumentasFs } from '@/modules/dokumentai/dokumentaiFs.js';
 import rawConfig from '@/utils/config.js';
 
@@ -302,7 +302,11 @@ function buildPartsExcluding(opts: {
     p.push(`lat:[${bbox.minLat} TO ${bbox.maxLat}]`);
     p.push(`lon:[${bbox.minLon} TO ${bbox.maxLon}]`);
   }
-  if (textQuery) {
+  // A lone `*` means "match everything" in both modes — add no text constraint
+  // (so it ANDs cleanly with any active filters, or falls through to the `*`
+  // default below). Without this it would be sent as `"*"`/`(*)` and Quickwit
+  // would look for a literal asterisk and match nothing.
+  if (textQuery && textQuery !== '*') {
     const folded = foldLithuanian(textQuery.replace(/"/g, ''));
     p.push(opts.phrase ? `"${folded}"` : `(${folded})`);
   }
@@ -450,6 +454,146 @@ export async function dokumentaiFacetOptions(
   const options = buckets.filter((b) => b.value).map((b) => ({ value: b.value, count: b.count }));
   if (field === 'istaigaJar') return attachIstaigaNames(options);
   return options;
+}
+
+// ── Home overview (aggregations) ─────────────────────────────────────────────
+
+/** One document-size metric (pages / words / characters) summarised by a
+ *  Quickwit `percentiles` aggregation. Unlike a happenedAt timeline (sparse —
+ *  many docs have no date), these numeric fast fields are populated on almost
+ *  every document, so they portray the whole corpus honestly, long tail and all. */
+export interface HomeSizeMetric {
+  key: 'words' | 'pages' | 'chars';
+  /** Short tab label, e.g. "Žodžiai". */
+  label: string;
+  /** Genitive unit for captions, e.g. "žodžių". */
+  unit: string;
+  /** p10…p99 breakpoints, ascending. */
+  percentiles: { p: number; value: number }[];
+  median: number;
+  /** How many documents actually carry this field (denominator for honesty). */
+  coverage: number;
+}
+
+/** Pre-aggregated portrait of the whole corpus, shown on the empty search home.
+ *  Every block is a Quickwit aggregation; the values double as one-click entry
+ *  points into a filtered search. */
+export interface DokumentaiHomeOverview {
+  total: number;
+  totalPages: number;
+  totalWords: number;
+  byType: FacetOption[];
+  byClass: FacetOption[];
+  bySource: FacetOption[];
+  byExt: FacetOption[];
+  topIstaiga: FacetOption[];
+  sizeMetrics: HomeSizeMetric[];
+}
+
+const HOME_OVERVIEW_TTL_MS = 10 * 60 * 1000;
+const SIZE_PERCENTILES = [10, 25, 50, 75, 90, 99];
+let homeOverviewCache: { at: number; data: DokumentaiHomeOverview } | null = null;
+
+const EMPTY_OVERVIEW: DokumentaiHomeOverview = {
+  total: 0, totalPages: 0, totalWords: 0,
+  byType: [], byClass: [], bySource: [], byExt: [], topIstaiga: [], sizeMetrics: [],
+};
+
+export async function dokumentaiHomeOverview(): Promise<DokumentaiHomeOverview> {
+  if (homeOverviewCache && Date.now() - homeOverviewCache.at < HOME_OVERVIEW_TTL_MS) {
+    return homeOverviewCache.data;
+  }
+  try {
+    // Quickwit counts (num_hits, sums, facet doc_counts) include tombstones, so
+    // they overstate the live corpus. Scale them by the live ratio (1 − dead),
+    // the same correction search() applies to its result total.
+    const [res, deadRatio] = await Promise.all([
+      fetch(`${QW_URL}/api/v1/${LENTELE}_*/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: '*',
+        max_hits: 0,
+        aggs: {
+          byType: { terms: { field: 'type', size: 10 } },
+          byClass: { terms: { field: 'class', size: 10 } },
+          bySource: { terms: { field: 'source', size: 12 } },
+          byExt: { terms: { field: 'extension', size: 14 } },
+          byIstaiga: { terms: { field: 'istaigaJar', size: 8 } },
+          wordsPct: { percentiles: { field: 'wordCount', percents: SIZE_PERCENTILES } },
+          wordsCnt: { value_count: { field: 'wordCount' } },
+          pagesPct: { percentiles: { field: 'pageCount', percents: SIZE_PERCENTILES } },
+          pagesCnt: { value_count: { field: 'pageCount' } },
+          charsPct: { percentiles: { field: 'characterCount', percents: SIZE_PERCENTILES } },
+          charsCnt: { value_count: { field: 'characterCount' } },
+          pages: { sum: { field: 'pageCount' } },
+          words: { sum: { field: 'wordCount' } },
+        },
+        format: 'json',
+      }),
+      }),
+      getDeadRatio(LENTELE).catch(() => 0),
+    ]);
+    if (!res.ok) return EMPTY_OVERVIEW;
+    const data: any = await res.json();
+    const aggs = data?.aggregations ?? {};
+
+    const liveRatio = Math.max(0.01, 1 - Number(deadRatio || 0));
+    const scaleCount = (n: number) => Math.round(n * liveRatio);
+
+    const termOptions = (key: string): FacetOption[] =>
+      (aggs[key]?.buckets ?? [])
+        .filter((b: any) => b.key !== '' && b.key != null)
+        .map((b: any) => ({ value: String(b.key), count: scaleCount(Number(b.doc_count)) }));
+
+    // Merge inconsistently-cased source buckets (cvpIs / cvpis …), like the sidebar.
+    const sourceCounts = new Map<string, number>();
+    for (const b of aggs.bySource?.buckets ?? []) {
+      if (!b.key) continue;
+      const k = canonSource(String(b.key));
+      sourceCounts.set(k, (sourceCounts.get(k) ?? 0) + Number(b.doc_count));
+    }
+    const bySource: FacetOption[] = [...sourceCounts.entries()]
+      .map(([value, count]) => ({ value, count: scaleCount(count) }))
+      .sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+
+    // Build one size metric from its percentiles + value_count aggregations.
+    // Quickwit returns percentile keys as stringified floats ("50.0"). Skip a
+    // metric whose distribution is degenerate (no spread between p10 and p99).
+    const buildMetric = (
+      key: HomeSizeMetric['key'], label: string, unit: string, pctAgg: any, cntAgg: any,
+    ): HomeSizeMetric | null => {
+      const pv: Record<string, any> = pctAgg?.values ?? {};
+      const percentiles = SIZE_PERCENTILES
+        .map((p) => ({ p, value: Math.round(Number(pv[`${p}.0`] ?? pv[p])) }))
+        .filter((x) => Number.isFinite(x.value) && x.value >= 0);
+      if (percentiles.length <= 1) return null;
+      if (percentiles[0].value === percentiles[percentiles.length - 1].value) return null;
+      const median = percentiles.find((x) => x.p === 50)?.value ?? 0;
+      return { key, label, unit, percentiles, median, coverage: Math.round(Number(cntAgg?.value ?? 0)) };
+    };
+    const sizeMetrics = [
+      buildMetric('words', 'Žodžiai', 'žodžių', aggs.wordsPct, aggs.wordsCnt),
+      buildMetric('pages', 'Puslapiai', 'puslapių', aggs.pagesPct, aggs.pagesCnt),
+      buildMetric('chars', 'Simboliai', 'simbolių', aggs.charsPct, aggs.charsCnt),
+    ].filter((m): m is HomeSizeMetric => m !== null);
+
+    const data_: DokumentaiHomeOverview = {
+      total: scaleCount(Number(data?.num_hits ?? 0)),
+      totalPages: scaleCount(Number(aggs.pages?.value ?? 0)),
+      totalWords: scaleCount(Number(aggs.words?.value ?? 0)),
+      byType: termOptions('byType'),
+      byClass: termOptions('byClass'),
+      bySource,
+      byExt: termOptions('byExt'),
+      topIstaiga: await attachIstaigaNames(termOptions('byIstaiga')),
+      sizeMetrics,
+    };
+    homeOverviewCache = { at: Date.now(), data: data_ };
+    return data_;
+  } catch {
+    return EMPTY_OVERVIEW;
+  }
 }
 
 // ── Snippets ─────────────────────────────────────────────────────────────────
@@ -604,10 +748,19 @@ export async function searchDokumentai(input: {
   const page = Math.max(1, Number(input.page) || 1);
   const phrase = input.mode === 'phrase';
   const sort = resolveSort(input.sort);
-  const sortBy = DOKUMENTAI_SORT_MAP.get(sort)!;
+  let sortBy = DOKUMENTAI_SORT_MAP.get(sort)!;
 
   const partsOpts = buildPartsOpts(input);
   const { textQuery } = partsOpts;
+
+  // Without query terms (a bare `*` or filter-only browse), `_score` is the same
+  // for every document, so Quickwit returns them in an arbitrary, unstable order.
+  // After the tombstone filter that can leave a page with too few — sometimes
+  // zero — live hits, and it makes the result set flicker between requests. Fall
+  // back to a stable, always-present field (`id`, newest first) so browsing is
+  // deterministic and start_offset paging stays consistent.
+  const noTextTerms = !textQuery || textQuery === '*';
+  if (sort === 'relevance' && noTextTerms) sortBy = 'id';
 
   const qwQuery = buildPartsExcluding(partsOpts);
   const classFacetQuery = buildPartsExcluding({ ...partsOpts, excludeClass: true });
@@ -711,8 +864,9 @@ export async function searchDokumentai(input: {
         snippet: null,
       } as DokumentasHit));
 
-    // Snippets from sidecar JSON
-    if (rawQ) {
+    // Snippets from sidecar JSON. Skip for a bare `*` (match-all): there's no
+    // term to highlight, so it'd only burn a sidecar read per hit.
+    if (rawQ && textQuery !== '*') {
       const snipStart = mark();
       await Promise.all(
         rows.map(async (row) => {
