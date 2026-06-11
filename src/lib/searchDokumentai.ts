@@ -602,6 +602,33 @@ function escapeHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** Failų sidecar `text` saugomas kaip `JSON.stringify(pages)` — puslapių masyvo
+ *  eilutė (pvz. `["1 psl.","2 psl."]`). Vartotojui to rodyti negalima, todėl jei
+ *  tekstas yra JSON eilučių masyvas, sulipdom puslapius į vientisą tekstą. Kitų
+ *  šaltinių (nuosprendžių) tekstas — paprasta eilutė, grąžinam kaip yra. */
+export function normalizeDocText(text: string | unknown[]): string {
+  // Retais atvejais sidecar tekstas gali būti jau išparsintas masyvas.
+  if (Array.isArray(text)) return text.filter((p) => typeof p === 'string').join(' ');
+  if (typeof text !== 'string') return '';
+  const trimmed = text.trimStart();
+  if (!trimmed.startsWith('[')) return text;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((p) => typeof p === 'string').join(' ');
+    }
+  } catch {
+    // Labai dideli tekstai saugomi nukirsti (1 MB riba + „…"), todėl JSON masyvas
+    // gali būti nebaigtas ir neparsinamas. Tokiu atveju nuimam masyvo sintaksę
+    // (laužtinius skliaustus ir eilučių ribas `","`) rankiniu būdu.
+    return trimmed
+      .replace(/^\[\s*"/, '')
+      .replace(/"\s*\]\s*$/, '')
+      .replace(/"\s*,\s*"/g, ' ');
+  }
+  return text;
+}
+
 function extractTerms(q: string): string[] {
   if (!q) return [];
   const out: string[] = [];
@@ -864,24 +891,24 @@ export async function searchDokumentai(input: {
         snippet: null,
       } as DokumentasHit));
 
-    // Snippets from sidecar JSON. Skip for a bare `*` (match-all): there's no
-    // term to highlight, so it'd only burn a sidecar read per hit.
-    if (rawQ && textQuery !== '*') {
-      const snipStart = mark();
-      await Promise.all(
-        rows.map(async (row) => {
-          if (!row.md5) return;
-          try {
-            const sidecar: any = await readDokumentasFs(row.md5);
-            const text = sidecar?.text;
-            if (typeof text === 'string' && text.length) {
-              row.snippet = makeSnippet(text, textQuery, phrase ? 'phrase' : 'words');
-            }
-          } catch { /* sidecar miss is fine */ }
-        }),
-      );
-      timings.push({ label: 'Ištraukos', phase: 'count', start: snipStart, duration: mark() - snipStart });
-    }
+    // Snippets from sidecar JSON. With query terms we highlight them; without a
+    // text query (filter-only browse) we still show a leading preview from the
+    // start of the document so every card has context.
+    const snippetQuery = textQuery && textQuery !== '*' ? textQuery : '';
+    const snipStart = mark();
+    await Promise.all(
+      rows.map(async (row) => {
+        if (!row.md5) return;
+        try {
+          const sidecar: any = await readDokumentasFs(row.md5);
+          const text = normalizeDocText(sidecar?.text);
+          if (text.length) {
+            row.snippet = makeSnippet(text, snippetQuery, phrase ? 'phrase' : 'words');
+          }
+        } catch { /* sidecar miss is fine */ }
+      }),
+    );
+    timings.push({ label: 'Ištraukos', phase: 'count', start: snipStart, duration: mark() - snipStart });
   }
 
   const elapsed = (mark() / 1000).toFixed(2);

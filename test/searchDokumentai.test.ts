@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOKUMENTAI_SORT_OPTIONS, makeSnippet } from '@/src/lib/searchDokumentai.ts';
+import { DOKUMENTAI_SORT_OPTIONS, makeSnippet, normalizeDocText } from '@/src/lib/searchDokumentai.ts';
 
 describe('dokumentai sorting', () => {
   it('passes one valid Quickwit REST sort field per option', () => {
@@ -54,5 +54,38 @@ describe('dokumentai snippets', () => {
     const snippet = makeSnippet('Čia minima žalia spalva ir atskirai sutartis', 'zalia sutartis', 'phrase');
     expect(snippet).toContain('<strong>žalia</strong>');
     expect(snippet).toContain('<strong>sutartis</strong>');
+  });
+
+  it('shows a leading preview when there is no text query', () => {
+    const snippet = makeSnippet('Pirmas sakinys apie pirkimą. Antras sakinys.', '', 'words');
+    expect(snippet).not.toBeNull();
+    expect(snippet).toContain('Pirmas sakinys');
+    expect(snippet).not.toContain('<strong>');
+  });
+});
+
+describe('normalizeDocText', () => {
+  it('joins a JSON array of pages into plain text (hides the ["…] wrapper)', () => {
+    const out = normalizeDocText(JSON.stringify(['Pirmas puslapis', 'Antras puslapis']));
+    expect(out).toBe('Pirmas puslapis Antras puslapis');
+    expect(out.startsWith('[')).toBe(false);
+  });
+
+  it('keeps a plain string as-is', () => {
+    expect(normalizeDocText('Paprastas tekstas')).toBe('Paprastas tekstas');
+  });
+
+  it('falls back gracefully on a truncated/invalid JSON array', () => {
+    const out = normalizeDocText('["Pirmas puslapis","Antras pusl');
+    expect(out.startsWith('[')).toBe(false);
+    expect(out).toContain('Pirmas puslapis');
+  });
+
+  it('handles an already-parsed array', () => {
+    expect(normalizeDocText(['a', 'b'])).toBe('a b');
+  });
+
+  it('returns empty string for nullish/non-text input', () => {
+    expect(normalizeDocText(undefined as unknown as string)).toBe('');
   });
 });
