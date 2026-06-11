@@ -13,6 +13,11 @@
         "quickwit:count-producer": "node scripts/countQuickwitMetadataProducer.js",
         "quickwit:delete-dead-indexes": "node quickwit/deleteDeadIndexes.js",
         "quickwit:top-pdf-metadata": "node scripts/topQuickwitPdfMetadata.js",
+        "teisekura:backfill": "node modules/teisekura/backfill.js",
+        "teisekura:etar-content": "node modules/etar/scrapeContent.js",
+        "teisekura:eseimas-backfill": "node modules/eseimas/scrape.js --all",
+        "teisekura:eseimas-content": "node modules/eseimas/scrapeContent.js",
+        "teisekura:audit": "node modules/teisekura/audit.js",
         "export:sutartys": "node scripts/exportSutartys.js",
         "push:sutartys": "node scripts/pushSutartysToSpinta.js"
     },

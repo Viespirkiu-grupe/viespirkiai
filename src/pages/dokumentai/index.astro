@@ -61,6 +61,11 @@ const rawCourtFilter = params.getAll('teismas').filter(Boolean);
 const rawCaseTypeFilter = params.getAll('bylosRusis').filter(Boolean);
 const rawCategoryFilter = params.getAll('kategorija').filter(Boolean);
 const rawJudgeFilter = params.getAll('teisejas').filter(Boolean);
+const rawActTypeFilter = params.getAll('aktoRusis').filter(Boolean);
+const rawValidityFilter = params.getAll('galiojimas').filter(Boolean);
+const rawEditionTypeFilter = params.getAll('redakcija').filter(Boolean);
+const rawProjectStatusFilter = params.getAll('projektoBusena').filter(Boolean);
+const rawEurovocFilter = params.getAll('eurovoc').filter(Boolean);
 
 // Geografinė sritis (stačiakampis) — filtruojama per Quickwit lat/lon range.
 const rawArea = {
@@ -96,6 +101,11 @@ const hasArea = Boolean(rawArea.minLat && rawArea.maxLat && rawArea.minLon && ra
     rawCaseTypeFilter.forEach((value) => sp.append('bylosRusis', value));
     rawCategoryFilter.forEach((value) => sp.append('kategorija', value));
     rawJudgeFilter.forEach((value) => sp.append('teisejas', value));
+    rawActTypeFilter.forEach((value) => sp.append('aktoRusis', value));
+    rawValidityFilter.forEach((value) => sp.append('galiojimas', value));
+    rawEditionTypeFilter.forEach((value) => sp.append('redakcija', value));
+    rawProjectStatusFilter.forEach((value) => sp.append('projektoBusena', value));
+    rawEurovocFilter.forEach((value) => sp.append('eurovoc', value));
     sp.set('mode', mode);
     if (requestedSort && requestedSort !== 'relevance') sp.set('sort', requestedSort);
     if (page > 1) sp.set('page', String(page));
@@ -108,6 +118,7 @@ const hasFilters = Boolean(
   || rawAuthorFilter.length || rawCreatorFilter.length || rawProducerFilter.length
   || rawLangFilter.length || rawSavFilter.length || rawApskritisFilter.length || rawSourceFilter.length
   || rawCourtFilter.length || rawCaseTypeFilter.length || rawCategoryFilter.length || rawJudgeFilter.length
+  || rawActTypeFilter.length || rawValidityFilter.length || rawEditionTypeFilter.length || rawProjectStatusFilter.length || rawEurovocFilter.length
   || hasArea,
 );
 const showHome = !q && !hasFilters;
@@ -162,6 +173,11 @@ if (!showHome) {
         bylosRusis: rawCaseTypeFilter,
         kategorija: rawCategoryFilter,
         teisejas: rawJudgeFilter,
+        aktoRusis: rawActTypeFilter,
+        galiojimas: rawValidityFilter,
+        redakcija: rawEditionTypeFilter,
+        projektoBusena: rawProjectStatusFilter,
+        eurovoc: rawEurovocFilter,
         minLat: rawArea.minLat,
         maxLat: rawArea.maxLat,
         minLon: rawArea.minLon,
@@ -205,6 +221,11 @@ const courtFilter = result?.courtFilter ?? [];
 const caseTypeFilter = result?.caseTypeFilter ?? [];
 const categoryFilter = result?.categoryFilter ?? [];
 const judgeFilter = result?.judgeFilter ?? [];
+const actTypeFilter = result?.actTypeFilter ?? [];
+const validityFilter = result?.validityFilter ?? [];
+const editionTypeFilter = result?.editionTypeFilter ?? [];
+const projectStatusFilter = result?.projectStatusFilter ?? [];
+const eurovocFilter = result?.eurovocFilter ?? [];
 const typeCountMap = result?.typeCountMap ?? {};
 const classCountMap = result?.classCountMap ?? {};
 const hostOptions: FacetOption[] = result?.hostOptions ?? [];
@@ -221,6 +242,11 @@ const courtOptions: FacetOption[] = result?.courtOptions ?? [];
 const caseTypeOptions: FacetOption[] = result?.caseTypeOptions ?? [];
 const categoryOptions: FacetOption[] = result?.categoryOptions ?? [];
 const judgeOptions: FacetOption[] = result?.judgeOptions ?? [];
+const actTypeOptions: FacetOption[] = result?.actTypeOptions ?? [];
+const validityOptions: FacetOption[] = result?.validityOptions ?? [];
+const editionTypeOptions: FacetOption[] = result?.editionTypeOptions ?? [];
+const projectStatusOptions: FacetOption[] = result?.projectStatusOptions ?? [];
+const eurovocOptions: FacetOption[] = result?.eurovocOptions ?? [];
 const bbox = result?.bbox ?? null;
 const hits: DokumentasHit[] = result?.hits ?? [];
 const sort: DokumentaiSort = result?.sort ?? 'relevance';
@@ -229,6 +255,7 @@ const TIPAS_OPTS = [
   { value: 'crawledPage', label: 'Tinklalapis' },
   { value: 'failas', label: 'Failas' },
   { value: 'teisesAktas', label: 'Teisės aktas' },
+  { value: 'teisesAktoProjektas', label: 'Teisės akto projektas' },
   { value: 'teismoNuosprendis', label: 'Teismo nuosprendis' },
 ];
 const TYPE_LABEL: Record<string, string> = Object.fromEntries(TIPAS_OPTS.map((o) => [o.value, o.label]));
@@ -263,6 +290,11 @@ const urlState: DokumentaiUrlState = {
   bylosRusis: caseTypeFilter,
   kategorija: categoryFilter,
   teisejas: judgeFilter,
+  aktoRusis: actTypeFilter,
+  galiojimas: validityFilter,
+  redakcija: editionTypeFilter,
+  projektoBusena: projectStatusFilter,
+  eurovoc: eurovocFilter,
   area: bbox,
 };
 const buildUrl = (overrides: DokumentaiUrlOverrides = {}) => buildDokumentaiUrl(urlState, overrides);
@@ -284,6 +316,11 @@ const courtToggleUrl = (v: string) => buildUrl({ teismas: v ? toggleValue(courtF
 const caseTypeToggleUrl = (v: string) => buildUrl({ bylosRusis: v ? toggleValue(caseTypeFilter, v) : [] });
 const categoryToggleUrl = (v: string) => buildUrl({ kategorija: v ? toggleValue(categoryFilter, v) : [] });
 const judgeToggleUrl = (v: string) => buildUrl({ teisejas: v ? toggleValue(judgeFilter, v) : [] });
+const actTypeToggleUrl = (v: string) => buildUrl({ aktoRusis: v ? toggleValue(actTypeFilter, v) : [] });
+const validityToggleUrl = (v: string) => buildUrl({ galiojimas: v ? toggleValue(validityFilter, v) : [] });
+const editionTypeToggleUrl = (v: string) => buildUrl({ redakcija: v ? toggleValue(editionTypeFilter, v) : [] });
+const projectStatusToggleUrl = (v: string) => buildUrl({ projektoBusena: v ? toggleValue(projectStatusFilter, v) : [] });
+const eurovocToggleUrl = (v: string) => buildUrl({ eurovoc: v ? toggleValue(eurovocFilter, v) : [] });
 const buildPageUrl = (page: number) => buildUrl({ page });
 const clearUrl = (() => {
   const sp = new URLSearchParams();
@@ -315,21 +352,28 @@ const SOURCE_LABEL: Record<string, string> = {
   mvpaprasai: 'MVP tvarkos',
   neskelbiamosderybos: 'Neskelbiamos derybos',
   liteko: 'LITEKO',
+  etar: 'e-TAR',
+  eseimas: 'e-Seimas',
 };
 // Klasė = plati dokumento sritis (viešieji pirkimai vs teisė).
 const CLASS_LABEL: Record<string, string> = {
   viesiejiPirkimai: 'Viešieji pirkimai',
   teise: 'Teisė',
+  teisekura: 'Teisėkūra',
 };
 const CLASS_OPTS = [
   { value: 'viesiejiPirkimai', label: 'Viešieji pirkimai' },
   { value: 'teise', label: 'Teisė' },
+  { value: 'teisekura', label: 'Teisėkūra' },
 ];
 // Nuosprendžių (teisė) facetai rodomi tik kai pasirinkta „teise" klasė arba aktyvus
 // kuris nors nuosprendžių filtras.
 const showVerdictFacets = classFilter.includes('teise')
   || courtFilter.length > 0 || caseTypeFilter.length > 0
   || categoryFilter.length > 0 || judgeFilter.length > 0;
+const showTeisekuraFacets = classFilter.includes('teisekura')
+  || actTypeFilter.length > 0 || validityFilter.length > 0 || editionTypeFilter.length > 0
+  || projectStatusFilter.length > 0 || eurovocFilter.length > 0;
 const { visible: sourceVisible, hidden: sourceHidden } = splitFacetOptions(sourceOptions, sourceFilter, 8);
 const { visible: langVisible, hidden: langHidden } = splitFacetOptions(langOptions, langFilter, 8);
 const { visible: savVisible, hidden: savHidden } = splitFacetOptions(savOptions, savFilter, 6);
@@ -338,11 +382,18 @@ const { visible: courtVisible, hidden: courtHidden } = splitFacetOptions(courtOp
 const { visible: caseTypeVisible, hidden: caseTypeHidden } = splitFacetOptions(caseTypeOptions, caseTypeFilter, 8);
 const { visible: categoryVisible, hidden: categoryHidden } = splitFacetOptions(categoryOptions, categoryFilter, 8);
 const { visible: judgeVisible, hidden: judgeHidden } = splitFacetOptions(judgeOptions, judgeFilter, 8);
+const { visible: actTypeVisible, hidden: actTypeHidden } = splitFacetOptions(actTypeOptions, actTypeFilter, 8);
+const { visible: validityVisible } = splitFacetOptions(validityOptions, validityFilter, 8);
+const { visible: editionTypeVisible } = splitFacetOptions(editionTypeOptions, editionTypeFilter, 8);
+const { visible: projectStatusVisible, hidden: projectStatusHidden } = splitFacetOptions(projectStatusOptions, projectStatusFilter, 8);
+const { visible: eurovocVisible, hidden: eurovocHidden } = splitFacetOptions(eurovocOptions, eurovocFilter, 8);
 
 const activeFilterCount = classFilter.length + typeFilter.length + hostFilter.length + jarFilter.length + istaigaJarFilter.length + extFilter.length
   + authorFilter.length + creatorFilter.length + producerFilter.length
   + langFilter.length + savFilter.length + apskritisFilter.length + sourceFilter.length
-  + courtFilter.length + caseTypeFilter.length + categoryFilter.length + judgeFilter.length + (bbox ? 1 : 0);
+  + courtFilter.length + caseTypeFilter.length + categoryFilter.length + judgeFilter.length
+  + actTypeFilter.length + validityFilter.length + editionTypeFilter.length + projectStatusFilter.length + eurovocFilter.length
+  + (bbox ? 1 : 0);
 
 const totalPages = result?.totalPages ?? 0;
 const pageNums = result?.pageNums ?? [];
@@ -713,6 +764,69 @@ function distModel(m: typeof sizeMetrics[number]) {
                   <button class="dok-more-btn" type="button" data-facet-modal="metadata.teisejai" data-facet-param="teisejas" data-facet-title="Teisėjas">Daugiau</button>
                 )}
               </section>
+            </>
+          )}
+
+          {showTeisekuraFacets && (
+            <>
+              {(actTypeVisible.length > 0 || actTypeFilter.length > 0) && (
+                <section class="dok-filter-section">
+                  <span class="dok-filter-section-label">Teisės akto rūšis</span>
+                  {actTypeVisible.map((opt) => (
+                    <a href={actTypeToggleUrl(opt.value)} data-param="aktoRusis" data-value={opt.value} class={`dok-filter-opt${actTypeFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                      <span class="dok-filter-opt-label">{opt.value}</span>
+                      {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                    </a>
+                  ))}
+                  {actTypeHidden.length > 0 && <button class="dok-more-btn" type="button" data-facet-modal="metadata.rusis" data-facet-param="aktoRusis" data-facet-title="Teisės akto rūšis">Daugiau</button>}
+                </section>
+              )}
+              {(validityVisible.length > 0 || validityFilter.length > 0) && (
+                <section class="dok-filter-section">
+                  <span class="dok-filter-section-label">Galiojimas</span>
+                  {validityVisible.map((opt) => (
+                    <a href={validityToggleUrl(opt.value)} data-param="galiojimas" data-value={opt.value} class={`dok-filter-opt${validityFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                      <span class="dok-filter-opt-label">{opt.value}</span>
+                      {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                    </a>
+                  ))}
+                </section>
+              )}
+              {(editionTypeVisible.length > 0 || editionTypeFilter.length > 0) && (
+                <section class="dok-filter-section">
+                  <span class="dok-filter-section-label">Redakcija</span>
+                  {editionTypeVisible.map((opt) => (
+                    <a href={editionTypeToggleUrl(opt.value)} data-param="redakcija" data-value={opt.value} class={`dok-filter-opt${editionTypeFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                      <span class="dok-filter-opt-label">{opt.value}</span>
+                      {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                    </a>
+                  ))}
+                </section>
+              )}
+              {(projectStatusVisible.length > 0 || projectStatusFilter.length > 0) && (
+                <section class="dok-filter-section">
+                  <span class="dok-filter-section-label">Projekto būsena</span>
+                  {projectStatusVisible.map((opt) => (
+                    <a href={projectStatusToggleUrl(opt.value)} data-param="projektoBusena" data-value={opt.value} class={`dok-filter-opt${projectStatusFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                      <span class="dok-filter-opt-label">{opt.value}</span>
+                      {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                    </a>
+                  ))}
+                  {projectStatusHidden.length > 0 && <button class="dok-more-btn" type="button" data-facet-modal="metadata.busena" data-facet-param="projektoBusena" data-facet-title="Projekto būsena">Daugiau</button>}
+                </section>
+              )}
+              {(eurovocVisible.length > 0 || eurovocFilter.length > 0) && (
+                <section class="dok-filter-section">
+                  <span class="dok-filter-section-label">Eurovoc</span>
+                  {eurovocVisible.map((opt) => (
+                    <a href={eurovocToggleUrl(opt.value)} data-param="eurovoc" data-value={opt.value} class={`dok-filter-opt${eurovocFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                      <span class="dok-filter-opt-label">{opt.value}</span>
+                      {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+                    </a>
+                  ))}
+                  {eurovocHidden.length > 0 && <button class="dok-more-btn" type="button" data-facet-modal="metadata.eurovocTerminai" data-facet-param="eurovoc" data-facet-title="Eurovoc">Daugiau</button>}
+                </section>
+              )}
             </>
           )}
 

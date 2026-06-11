@@ -28,6 +28,11 @@ export interface DokumentaiUrlState {
   bylosRusis: string[];
   kategorija: string[];
   teisejas: string[];
+  aktoRusis?: string[];
+  galiojimas?: string[];
+  redakcija?: string[];
+  projektoBusena?: string[];
+  eurovoc?: string[];
   area: DokumentaiArea | null;
 }
 
@@ -56,8 +61,8 @@ export function buildDokumentaiUrl(
     if (selected[key].length) params.set(key, selected[key].join(','));
   }
   // Reikšmės gali turėti kablelių (autoriai, kategorijų/teismų pavadinimai) — kartojam.
-  for (const key of ['author', 'creator', 'producer', 'teismas', 'bylosRusis', 'kategorija', 'teisejas'] as const) {
-    for (const value of selected[key]) params.append(key, value);
+  for (const key of ['author', 'creator', 'producer', 'teismas', 'bylosRusis', 'kategorija', 'teisejas', 'aktoRusis', 'galiojimas', 'redakcija', 'projektoBusena', 'eurovoc'] as const) {
+    for (const value of selected[key] ?? []) params.append(key, value);
   }
 
   if (selected.area) {

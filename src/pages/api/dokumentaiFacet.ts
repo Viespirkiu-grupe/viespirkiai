@@ -8,6 +8,7 @@ const ALLOWED = new Set([
   'extension', 'host', 'istaigaJar', 'language', 'savivaldybe', 'apskritis', 'source', 'author',
   'metadata.creator', 'metadata.producer',
   'class', 'metadata.teismas', 'metadata.bylosRusis', 'metadata.kategorijos', 'metadata.teisejai',
+  'metadata.rusis', 'metadata.galiojimas', 'metadata.editionType', 'metadata.busena', 'metadata.eurovocTerminai',
 ]);
 
 export const GET: APIRoute = async ({ url }) => {
@@ -42,6 +43,11 @@ export const GET: APIRoute = async ({ url }) => {
         bylosRusis: p.getAll('bylosRusis'),
         kategorija: p.getAll('kategorija'),
         teisejas: p.getAll('teisejas'),
+        aktoRusis: p.getAll('aktoRusis'),
+        galiojimas: p.getAll('galiojimas'),
+        redakcija: p.getAll('redakcija'),
+        projektoBusena: p.getAll('projektoBusena'),
+        eurovoc: p.getAll('eurovoc'),
         minLat: p.get('minLat') ?? undefined,
         maxLat: p.get('maxLat') ?? undefined,
         minLon: p.get('minLon') ?? undefined,

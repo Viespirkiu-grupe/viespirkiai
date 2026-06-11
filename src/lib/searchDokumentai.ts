@@ -119,6 +119,11 @@ export interface DokumentaiSearchResult {
   caseTypeFilter: string[];
   categoryFilter: string[];
   judgeFilter: string[];
+  actTypeFilter: string[];
+  validityFilter: string[];
+  editionTypeFilter: string[];
+  projectStatusFilter: string[];
+  eurovocFilter: string[];
   bbox: Bbox | null;
   typeCountMap: Record<string, number>;
   classCountMap: Record<string, number>;
@@ -136,6 +141,11 @@ export interface DokumentaiSearchResult {
   caseTypeOptions: FacetOption[];
   categoryOptions: FacetOption[];
   judgeOptions: FacetOption[];
+  actTypeOptions: FacetOption[];
+  validityOptions: FacetOption[];
+  editionTypeOptions: FacetOption[];
+  projectStatusOptions: FacetOption[];
+  eurovocOptions: FacetOption[];
 }
 
 // ── Quickwit helpers ─────────────────────────────────────────────────────────
@@ -250,6 +260,11 @@ function buildPartsExcluding(opts: {
   caseTypes: string[];
   categories: string[];
   judges: string[];
+  actTypes: string[];
+  validities: string[];
+  editionTypes: string[];
+  projectStatuses: string[];
+  eurovoc: string[];
   bbox?: Bbox | null;
   excludeClass?: boolean;
   excludeHost?: boolean;
@@ -268,11 +283,16 @@ function buildPartsExcluding(opts: {
   excludeCaseType?: boolean;
   excludeCategory?: boolean;
   excludeJudge?: boolean;
+  excludeActType?: boolean;
+  excludeValidity?: boolean;
+  excludeEditionType?: boolean;
+  excludeProjectStatus?: boolean;
+  excludeEurovoc?: boolean;
   /** Tiksli frazė: tekstą paduodam Quickwit'ui kabutėse ("…"), kad žodžiai būtų
    *  randami tiksliai greta ir ta pačia tvarka, o ne kaip atskiri terminai. */
   phrase?: boolean;
 }): string {
-  const { textQuery, classes, types, hosts, jars, istaigos, exts, authors, creators, producers, langs, savs, apskritys, sources, courts, caseTypes, categories, judges, bbox } = opts;
+  const { textQuery, classes, types, hosts, jars, istaigos, exts, authors, creators, producers, langs, savs, apskritys, sources, courts, caseTypes, categories, judges, actTypes, validities, editionTypes, projectStatuses, eurovoc, bbox } = opts;
   const p: string[] = [];
   if (!opts.excludeClass && classes.length) p.push(`(${classes.map((c) => `class:${JSON.stringify(c)}`).join(' OR ')})`);
   if (!opts.excludeType && types.length) p.push(`(${types.map((t) => `type:${t}`).join(' OR ')})`);
@@ -281,6 +301,11 @@ function buildPartsExcluding(opts: {
   if (!opts.excludeCaseType && caseTypes.length) p.push(`(${caseTypes.map((v) => `metadata.bylosRusis:${JSON.stringify(v)}`).join(' OR ')})`);
   if (!opts.excludeCategory && categories.length) p.push(`(${categories.map((v) => `metadata.kategorijos:${JSON.stringify(v)}`).join(' OR ')})`);
   if (!opts.excludeJudge && judges.length) p.push(`(${judges.map((v) => `metadata.teisejai:${JSON.stringify(v)}`).join(' OR ')})`);
+  if (!opts.excludeActType && actTypes.length) p.push(`(${actTypes.map((v) => `metadata.rusis:${JSON.stringify(v)}`).join(' OR ')})`);
+  if (!opts.excludeValidity && validities.length) p.push(`(${validities.map((v) => `metadata.galiojimas:${JSON.stringify(v)}`).join(' OR ')})`);
+  if (!opts.excludeEditionType && editionTypes.length) p.push(`(${editionTypes.map((v) => `metadata.editionType:${JSON.stringify(v)}`).join(' OR ')})`);
+  if (!opts.excludeProjectStatus && projectStatuses.length) p.push(`(${projectStatuses.map((v) => `metadata.busena:${JSON.stringify(v)}`).join(' OR ')})`);
+  if (!opts.excludeEurovoc && eurovoc.length) p.push(`(${eurovoc.map((v) => `metadata.eurovocTerminai:${JSON.stringify(v)}`).join(' OR ')})`);
   if (!opts.excludeHost && hosts.length) p.push(`(${hosts.map((h) => `host:${JSON.stringify(h)}`).join(' OR ')})`);
   if (!opts.excludeJar && jars.length) {
     const numeric = jars.map((j) => parseInt(j, 10)).filter((n) => Number.isFinite(n));
@@ -356,6 +381,11 @@ function buildPartsOpts(input: {
   bylosRusis?: string | string[];
   kategorija?: string | string[];
   teisejas?: string | string[];
+  aktoRusis?: string | string[];
+  galiojimas?: string | string[];
+  redakcija?: string | string[];
+  projektoBusena?: string | string[];
+  eurovoc?: string | string[];
   minLat?: string | number;
   maxLat?: string | number;
   minLon?: string | number;
@@ -384,6 +414,11 @@ function buildPartsOpts(input: {
   const caseTypeFilter = Array.isArray(input.bylosRusis) ? input.bylosRusis.filter(Boolean) : input.bylosRusis ? [input.bylosRusis] : [];
   const categoryFilter = Array.isArray(input.kategorija) ? input.kategorija.filter(Boolean) : input.kategorija ? [input.kategorija] : [];
   const judgeFilter = Array.isArray(input.teisejas) ? input.teisejas.filter(Boolean) : input.teisejas ? [input.teisejas] : [];
+  const actTypeFilter = Array.isArray(input.aktoRusis) ? input.aktoRusis.filter(Boolean) : input.aktoRusis ? [input.aktoRusis] : [];
+  const validityFilter = Array.isArray(input.galiojimas) ? input.galiojimas.filter(Boolean) : input.galiojimas ? [input.galiojimas] : [];
+  const editionTypeFilter = Array.isArray(input.redakcija) ? input.redakcija.filter(Boolean) : input.redakcija ? [input.redakcija] : [];
+  const projectStatusFilter = Array.isArray(input.projektoBusena) ? input.projektoBusena.filter(Boolean) : input.projektoBusena ? [input.projektoBusena] : [];
+  const eurovocFilter = Array.isArray(input.eurovoc) ? input.eurovoc.filter(Boolean) : input.eurovoc ? [input.eurovoc] : [];
 
   const { textQuery, classes: inlineClasses, types: inlineTypes, hosts: inlineHosts, jars: inlineJars, exts: inlineExts } =
     extractInlineTokens(rawQ);
@@ -407,6 +442,11 @@ function buildPartsOpts(input: {
     caseTypes: [...new Set(caseTypeFilter)],
     categories: [...new Set(categoryFilter)],
     judges: [...new Set(judgeFilter)],
+    actTypes: [...new Set(actTypeFilter)],
+    validities: [...new Set(validityFilter)],
+    editionTypes: [...new Set(editionTypeFilter)],
+    projectStatuses: [...new Set(projectStatusFilter)],
+    eurovoc: [...new Set(eurovocFilter)],
     bbox: parseBbox(input),
     phrase,
   };
@@ -417,7 +457,8 @@ function buildPartsOpts(input: {
 type FacetExcludeKey =
   | 'excludeClass' | 'excludeHost' | 'excludeIstaiga' | 'excludeExt' | 'excludeAuthor' | 'excludeCreator' | 'excludeProducer' | 'excludeLang'
   | 'excludeSav' | 'excludeApskritis' | 'excludeSource'
-  | 'excludeCourt' | 'excludeCaseType' | 'excludeCategory' | 'excludeJudge';
+  | 'excludeCourt' | 'excludeCaseType' | 'excludeCategory' | 'excludeJudge'
+  | 'excludeActType' | 'excludeValidity' | 'excludeEditionType' | 'excludeProjectStatus' | 'excludeEurovoc';
 const FACET_EXCLUDE: Record<string, FacetExcludeKey> = {
   class: 'excludeClass',
   host: 'excludeHost',
@@ -434,6 +475,11 @@ const FACET_EXCLUDE: Record<string, FacetExcludeKey> = {
   'metadata.bylosRusis': 'excludeCaseType',
   'metadata.kategorijos': 'excludeCategory',
   'metadata.teisejai': 'excludeJudge',
+  'metadata.rusis': 'excludeActType',
+  'metadata.galiojimas': 'excludeValidity',
+  'metadata.editionType': 'excludeEditionType',
+  'metadata.busena': 'excludeProjectStatus',
+  'metadata.eurovocTerminai': 'excludeEurovoc',
 };
 
 /**
@@ -763,6 +809,11 @@ export async function searchDokumentai(input: {
   bylosRusis?: string | string[];
   kategorija?: string | string[];
   teisejas?: string | string[];
+  aktoRusis?: string | string[];
+  galiojimas?: string | string[];
+  redakcija?: string | string[];
+  projektoBusena?: string | string[];
+  eurovoc?: string | string[];
   minLat?: string | number;
   maxLat?: string | number;
   minLon?: string | number;
@@ -806,6 +857,11 @@ export async function searchDokumentai(input: {
   const caseTypeFacetQuery = buildPartsExcluding({ ...partsOpts, excludeCaseType: true });
   const categoryFacetQuery = buildPartsExcluding({ ...partsOpts, excludeCategory: true });
   const judgeFacetQuery = buildPartsExcluding({ ...partsOpts, excludeJudge: true });
+  const actTypeFacetQuery = buildPartsExcluding({ ...partsOpts, excludeActType: true });
+  const validityFacetQuery = buildPartsExcluding({ ...partsOpts, excludeValidity: true });
+  const editionTypeFacetQuery = buildPartsExcluding({ ...partsOpts, excludeEditionType: true });
+  const projectStatusFacetQuery = buildPartsExcluding({ ...partsOpts, excludeProjectStatus: true });
+  const eurovocFacetQuery = buildPartsExcluding({ ...partsOpts, excludeEurovoc: true });
 
   const t0 = Date.now();
   const mark = () => Date.now() - t0;
@@ -829,6 +885,11 @@ export async function searchDokumentai(input: {
     qwAggregate('metadata.bylosRusis', caseTypeFacetQuery, 12),
     qwAggregate('metadata.kategorijos', categoryFacetQuery, 60),
     qwAggregate('metadata.teisejai', judgeFacetQuery, 60),
+    qwAggregate('metadata.rusis', actTypeFacetQuery, 60),
+    qwAggregate('metadata.galiojimas', validityFacetQuery, 20),
+    qwAggregate('metadata.editionType', editionTypeFacetQuery, 10),
+    qwAggregate('metadata.busena', projectStatusFacetQuery, 30),
+    qwAggregate('metadata.eurovocTerminai', eurovocFacetQuery, 60),
     // Sidebar previews only 6 extensions; +1 is enough to know whether to show
     // the "Daugiau" button. The full list is fetched on demand by the modal
     // (/api/dokumentaiFacet), so there's no need to over-aggregate here.
@@ -856,7 +917,7 @@ export async function searchDokumentai(input: {
   if (filterMs > 0) {
     timings.push({ label: 'Gyvų atranka', phase: 'pg', start: searchStart + qwMs, duration: filterMs });
   }
-  const [hostBuckets, typeBuckets, classBuckets, courtBuckets, caseTypeBuckets, categoryBuckets, judgeBuckets, extBuckets, authorBuckets, creatorBuckets, producerBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets, istaigaBuckets] = await aggsPromise;
+  const [hostBuckets, typeBuckets, classBuckets, courtBuckets, caseTypeBuckets, categoryBuckets, judgeBuckets, actTypeBuckets, validityBuckets, editionTypeBuckets, projectStatusBuckets, eurovocBuckets, extBuckets, authorBuckets, creatorBuckets, producerBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets, istaigaBuckets] = await aggsPromise;
   timings.push({ label: 'Facetai', phase: 'filter', start: aggsStart, duration: mark() - aggsStart });
 
   const total = result.numHitsEstimate ?? result.hits.length;
@@ -932,6 +993,11 @@ export async function searchDokumentai(input: {
   const caseTypeOptions = toOptions(caseTypeBuckets);
   const categoryOptions = toOptions(categoryBuckets);
   const judgeOptions = toOptions(judgeBuckets);
+  const actTypeOptions = toOptions(actTypeBuckets);
+  const validityOptions = toOptions(validityBuckets);
+  const editionTypeOptions = toOptions(editionTypeBuckets);
+  const projectStatusOptions = toOptions(projectStatusBuckets);
+  const eurovocOptions = toOptions(eurovocBuckets);
   const extOptions = toOptions(extBuckets);
   const authorOptions = toOptions(authorBuckets);
   const creatorOptions = toOptions(creatorBuckets);
@@ -983,6 +1049,11 @@ export async function searchDokumentai(input: {
     caseTypeFilter: partsOpts.caseTypes,
     categoryFilter: partsOpts.categories,
     judgeFilter: partsOpts.judges,
+    actTypeFilter: partsOpts.actTypes,
+    validityFilter: partsOpts.validities,
+    editionTypeFilter: partsOpts.editionTypes,
+    projectStatusFilter: partsOpts.projectStatuses,
+    eurovocFilter: partsOpts.eurovoc,
     bbox: partsOpts.bbox,
     typeCountMap,
     classCountMap,
@@ -1000,5 +1071,10 @@ export async function searchDokumentai(input: {
     caseTypeOptions,
     categoryOptions,
     judgeOptions,
+    actTypeOptions,
+    validityOptions,
+    editionTypeOptions,
+    projectStatusOptions,
+    eurovocOptions,
   };
 }
