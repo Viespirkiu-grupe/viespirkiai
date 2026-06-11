@@ -17,6 +17,7 @@ import { nuskaitytiMvpTvarkosAprasuSubjektus } from "../modules/mvpTvarkosAprasa
 import { scrapeMvmUntilNow } from "../modules/mvpTvarkosAprasai/scrapeContent.js";
 import { updateVdiPazeidimai } from "../modules/vdi/scrapePazeidimai.js";
 import { processSuggestionQueue } from "../modules/searchSuggestion/processSuggestionQueue.js";
+import { deleteDeadIndexes } from "../quickwit/deleteDeadIndexes.js";
 
 export default [
     {
@@ -138,6 +139,14 @@ export default [
         name: "updateVdiPazeidimai",
         schedule: "0 4 * * *",
         job: updateVdiPazeidimai,
+    },
+    {
+        name: "deleteDeadQuickwitIndexes",
+        schedule: "43 3 * * *",
+        job: async () => {
+            const { failed } = await deleteDeadIndexes();
+            if (failed) throw new Error(`Nepavyko ištrinti ${failed} Quickwit indeksų`);
+        },
     },
     {
         name: "processSearchSuggestionQueue",

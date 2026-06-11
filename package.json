@@ -11,6 +11,7 @@
         "check": "astro check",
         "db:schema:dump": "node scripts/dumpDbSchema.js",
         "quickwit:count-producer": "node scripts/countQuickwitMetadataProducer.js",
+        "quickwit:delete-dead-indexes": "node quickwit/deleteDeadIndexes.js",
         "quickwit:top-pdf-metadata": "node scripts/topQuickwitPdfMetadata.js",
         "export:sutartys": "node scripts/exportSutartys.js",
         "push:sutartys": "node scripts/pushSutartysToSpinta.js"

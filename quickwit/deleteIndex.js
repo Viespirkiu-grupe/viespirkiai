@@ -1,67 +1,117 @@
+import { pathToFileURL } from "url";
 import { postgres } from "../postgres/postgres.js";
 import config from "../utils/config.js";
 
-const QW_URL = config.quickwitUrl;
-const args = process.argv.slice(2);
-const force = args.includes("--force");
-const indeksas = args.find((a) => !a.startsWith("--"));
+const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
 
-if (!indeksas) {
-  console.error("usage: node deleteIndex.js <indeksas> [--force]");
-  process.exit(1);
-}
+/**
+ * Delete one Quickwit index and its quickwitIndeksai row.
+ *
+ * @param {string} indeksas
+ * @param {{ allowLive?: boolean, protectLatest?: boolean, dryRun?: boolean }} options
+ * @returns {Promise<{ deleted: boolean, reason?: string, alreadyAbsent?: boolean, live: number }>}
+ */
+export async function deleteIndex(
+  indeksas,
+  { allowLive = false, protectLatest = false, dryRun = false } = {},
+) {
+  const client = await postgres.connect();
 
-const lentele = indeksas.replace(/_\d+$/, "");
+  try {
+    await client.query("BEGIN");
 
-// Check shard exists
-const { rows: shardRows } = await postgres.query(
-  `SELECT "gyvosEilutes", "mirusiosEilutes", "current"
-   FROM "quickwitIndeksai"
-   WHERE "indeksas" = $1`,
-  [indeksas]
-);
+    const { rows: indexRows } = await client.query(
+      `SELECT "lentele"
+       FROM "quickwitIndeksai"
+       WHERE "indeksas" = $1`,
+      [indeksas],
+    );
+    if (!indexRows.length) {
+      await client.query("ROLLBACK");
+      return { deleted: false, reason: "indeksas nerastas DB", live: 0 };
+    }
 
-if (!shardRows.length) {
-  console.error(`no shard found for ${indeksas}`);
-  process.exit(1);
-}
+    const lentele = indexRows[0].lentele;
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, [lentele]);
 
-const { gyvosEilutes, mirusiosEilutes, current } = shardRows[0];
-console.log(`indeksas:  ${indeksas}`);
-console.log(`lentele:   ${lentele}`);
-console.log(`current:   ${current}`);
-console.log(`gyva:      ${gyvosEilutes}`);
-console.log(`mirusios:  ${mirusiosEilutes}`);
+    const { rows } = await client.query(
+      `SELECT COUNT(e.*)::int AS "live",
+              i."seq" = latest."seq" AS "latest"
+       FROM "quickwitIndeksai" i
+       CROSS JOIN LATERAL (
+         SELECT MAX("seq") AS "seq"
+         FROM "quickwitIndeksai"
+         WHERE "lentele" = i."lentele"
+       ) latest
+       LEFT JOIN "quickwitEilutes" e
+         ON e."lentele" = i."lentele" AND e."indeksas" = i."indeksas"
+       WHERE i."lentele" = $1 AND i."indeksas" = $2
+       GROUP BY i."lentele", i."seq", latest."seq"`,
+      [lentele, indeksas],
+    );
+    const live = rows[0]?.live ?? 0;
 
-// Check for live rows in quickwitEilutes
-if (!force) {
-  const { rows: liveRows } = await postgres.query(
-    `SELECT COUNT(*) AS cnt
-     FROM "quickwitEilutes"
-     WHERE "lentele" = $1 AND "indeksas" = $2`,
-    [lentele, indeksas]
-  );
-  const live = Number(liveRows[0].cnt);
-  if (live > 0) {
-    console.error(`\n${live} live rows still point to this shard. migrate them first or use --force.`);
-    process.exit(1);
+    if (protectLatest && rows[0]?.latest) {
+      await client.query("ROLLBACK");
+      return { deleted: false, reason: "paskutinis lentelės indeksas", live };
+    }
+    if (!allowLive && live > 0) {
+      await client.query("ROLLBACK");
+      return { deleted: false, reason: `${live} faktinių gyvų eilučių`, live };
+    }
+    if (dryRun) {
+      await client.query("ROLLBACK");
+      return { deleted: false, reason: "dry-run", live };
+    }
+
+    const response = await fetch(`${QW_URL}/api/v1/indexes/${encodeURIComponent(indeksas)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`Quickwit DELETE returned ${response.status}: ${await response.text()}`);
+    }
+
+    await client.query(`DELETE FROM "quickwitIndeksai" WHERE "indeksas" = $1`, [indeksas]);
+    await client.query("COMMIT");
+    return { deleted: true, alreadyAbsent: response.status === 404, live };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
-// Delete from Quickwit
-const res = await fetch(`${QW_URL}/api/v1/indexes/${indeksas}`, {
-  method: "DELETE",
-});
-if (!res.ok) {
-  console.error(`Quickwit DELETE ${indeksas} → ${res.status}: ${await res.text()}`);
-  process.exit(1);
+async function main() {
+  const args = process.argv.slice(2);
+  const force = args.includes("--force");
+  const dryRun = args.includes("--dry-run");
+  const indeksas = args.find((arg) => !arg.startsWith("--"));
+
+  if (!indeksas) {
+    console.error("usage: node quickwit/deleteIndex.js <indeksas> [--force] [--dry-run]");
+    process.exitCode = 1;
+    return;
+  }
+
+  const result = await deleteIndex(indeksas, { allowLive: force, dryRun });
+  if (result.deleted) {
+    console.log(`deleted ${indeksas}${result.alreadyAbsent ? " (Quickwit jau nebuvo)" : ""}`);
+  } else if (dryRun && result.reason === "dry-run") {
+    console.log(`[dry-run] būtų ištrintas ${indeksas}, faktinių gyvų eilučių: ${result.live}`);
+  } else {
+    console.error(`neištrintas ${indeksas}: ${result.reason}`);
+    process.exitCode = 1;
+  }
 }
 
-// Delete from Postgres
-await postgres.query(
-  `DELETE FROM "quickwitIndeksai" WHERE "indeksas" = $1`,
-  [indeksas]
-);
-
-console.log(`deleted ${indeksas}`);
-await postgres.end();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main()
+    .catch((error) => {
+      console.error(`Nepavyko ištrinti Quickwit indekso: ${error.message}`);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await postgres.end();
+    });
+}
