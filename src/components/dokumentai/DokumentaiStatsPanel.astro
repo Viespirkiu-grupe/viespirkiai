@@ -1,0 +1,531 @@
+---
+import type { DokumentaiStats } from '../../lib/searchDokumentai.ts';
+import {
+  buildDokumentaiUrl,
+  toggleValue,
+  type DokumentaiUrlState,
+} from '../../lib/dokumentaiUrl.ts';
+
+interface Props {
+  stats: DokumentaiStats;
+  urlState: DokumentaiUrlState;
+}
+
+const { stats, urlState } = Astro.props;
+
+// Self-contained label maps (mirror the page's; kept local so the panel is a
+// drop-in). Unknown values fall back to the raw key.
+const TYPE_LABEL: Record<string, string> = {
+  crawledPage: 'Tinklalapiai',
+  failas: 'Failai',
+  teisesAktas: 'Teisės aktai',
+  teisesAktoProjektas: 'Teisės aktų projektai',
+  teismoNuosprendis: 'Teismo nuosprendžiai',
+};
+const SOURCE_LABEL: Record<string, string> = {
+  sutartys: 'Sutartys', archive: 'Archyvas', cvpp: 'CVPP', cvpis: 'CVP IS',
+  mvpaprasai: 'MVP tvarkos', neskelbiamosderybos: 'Neskelbiamos derybos',
+  liteko: 'LITEKO', etar: 'e-TAR', eseimas: 'e-Seimas',
+};
+
+// Quiet, distinguishable palette for the type composition segments — reads on
+// white without shouting. Indexed by position; wraps if ever exceeded.
+const SEG_PALETTE = ['#2563eb', '#0891b2', '#7c3aed', '#d97706', '#16a34a', '#db2777'];
+const segColor = (i: number) => SEG_PALETTE[i % SEG_PALETTE.length];
+
+function fmt(n: number | null | undefined) {
+  return n != null ? Number(n).toLocaleString('lt-LT') : '';
+}
+function fmtCompact(n: number | null | undefined): string {
+  const v = Number(n ?? 0);
+  if (!Number.isFinite(v)) return '0';
+  if (v >= 1e9) return (v / 1e9).toFixed(1).replace('.', ',') + ' mlrd.';
+  if (v >= 1e6) return (v / 1e6).toFixed(1).replace('.', ',') + ' mln.';
+  if (v >= 1e4) return Math.round(v / 1e3).toLocaleString('lt-LT') + ' tūkst.';
+  return v.toLocaleString('lt-LT');
+}
+
+const typeUrl = (v: string) => buildDokumentaiUrl(urlState, { type: toggleValue(urlState.type, v) });
+const sourceUrl = (v: string) => buildDokumentaiUrl(urlState, { source: toggleValue(urlState.source, v) });
+const istaigaUrl = (v: string) => buildDokumentaiUrl(urlState, { istaiga: toggleValue(urlState.istaiga, v) });
+
+// ── Timeline ────────────────────────────────────────────────────────────────
+// Interactive column chart over years. Each bar carries its target height as a
+// CSS var (scaleY animates in, correct with JS off) and is a link that filters
+// the search to that year. Hover/focus drives a live readout (wired in the
+// script below); the active (filtered) year, if any, is emphasised.
+const timeline = stats.timeline;
+const tlMax = Math.max(1, ...timeline.map((t) => t.count));
+const tlPeakYear = timeline.reduce((best, t) => (t.count > (best?.count ?? -1) ? t : best), timeline[0])?.year;
+const tlFirst = timeline[0]?.year;
+const tlLast = timeline[timeline.length - 1]?.year;
+const tlByYear = new Map(timeline.map((t) => [t.year, t.count]));
+const activeYears = new Set(stats.activeYears.filter((y) => tlByYear.has(y)));
+const tlFiltered = activeYears.size > 0;
+const yearUrl = (year: number) => buildDokumentaiUrl(urlState, { metai: toggleValue(urlState.metai, String(year)) });
+// The readout's resting state names the active year (or the peak when none).
+const readoutYear = stats.activeYears.find((y) => tlByYear.has(y)) ?? tlPeakYear;
+const readoutCount = readoutYear != null ? (tlByYear.get(readoutYear) ?? 0) : 0;
+
+// ── Composition by type ───────────────────────────────────────────────────────
+// Segmented bar + legend. Widths are shares of the shown types; the legend also
+// reports each share of the whole selection.
+const typeShown = stats.byType.filter((t) => (t.count ?? 0) > 0).slice(0, 6);
+const typeSum = typeShown.reduce((s, t) => s + (t.count ?? 0), 0) || 1;
+const total = Math.max(1, stats.total);
+
+// ── Reach metrics ─────────────────────────────────────────────────────────────
+// Compact stat cells, each shown only when it carries signal.
+const span = tlFirst != null && tlLast != null
+  ? (tlFirst === tlLast ? String(tlFirst) : `${tlFirst}–${tlLast}`)
+  : null;
+const metrics = [
+  stats.uniqIstaiga > 0 && { label: 'Įstaigų', value: fmtCompact(stats.uniqIstaiga), approx: true },
+  stats.uniqHost > 1 && { label: 'Svetainių', value: fmtCompact(stats.uniqHost), approx: true },
+  span && { label: 'Laikotarpis', value: span, approx: false },
+  stats.wordsMetric && { label: 'Žodžių (mediana)', value: fmtCompact(stats.wordsMetric.median), approx: false },
+].filter(Boolean) as { label: string; value: string; approx: boolean }[];
+
+// ── Top agencies ──────────────────────────────────────────────────────────────
+const topIstaiga = stats.topIstaiga.filter((i) => (i.count ?? 0) > 0).slice(0, 6);
+const istaigaMax = Math.max(1, ...topIstaiga.map((i) => i.count ?? 0));
+const pct = (n: number | null | undefined, max: number) => Math.round(((n ?? 0) / max) * 100);
+
+const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length > 0 || metrics.length > 0;
+---
+
+{hasBody && (
+  <aside class="dok-stats" aria-label="Atrankos statistinė analizė">
+    <header class="dok-stats__head">
+      <span class="dok-stats__eyebrow">Atrankos analizė</span>
+      <div class="dok-stats__hero">
+        <span class="dok-stats__hero-num">{fmtCompact(stats.total)}</span>
+        <span class="dok-stats__hero-unit">{stats.total === 1 ? 'dokumentas' : 'dokumentų'}</span>
+      </div>
+      {(stats.totalPages > 0 || stats.totalWords > 0) && (
+        <p class="dok-stats__hero-sub">
+          {stats.totalPages > 0 && <span><strong>{fmtCompact(stats.totalPages)}</strong> psl.</span>}
+          {stats.totalPages > 0 && stats.totalWords > 0 && <span class="dok-stats__dot" aria-hidden="true"></span>}
+          {stats.totalWords > 0 && <span><strong>{fmtCompact(stats.totalWords)}</strong> žodž.</span>}
+        </p>
+      )}
+    </header>
+
+    {metrics.length > 0 && (
+      <div class="dok-stats__metrics">
+        {metrics.map((m) => (
+          <div class="dok-stats__metric">
+            <span class="dok-stats__metric-val">{m.approx && <i aria-hidden="true">~</i>}{m.value}</span>
+            <span class="dok-stats__metric-lbl">{m.label}</span>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {timeline.length > 1 && (
+      <section class="dok-stats__block dok-stats__timeline">
+        <div class="dok-stats__h-row">
+          <h3 class="dok-stats__h">Dokumentai pagal metus</h3>
+          <output class="dok-stats__readout" aria-hidden="true" data-default-year={readoutYear} data-default-count={fmtCompact(readoutCount)}>
+            <span class="dok-stats__readout-count">{fmtCompact(readoutCount)}</span>
+            <span class="dok-stats__readout-year">{readoutYear}</span>
+          </output>
+        </div>
+        <div class={`dok-stats__chart${tlFiltered ? ' is-filtered' : ''}`} style={`--n:${timeline.length}`}>
+          {timeline.map((t, i) => (
+            <a
+              href={yearUrl(t.year)}
+              class={`dok-stats__col${t.year === tlPeakYear ? ' is-peak' : ''}${activeYears.has(t.year) ? ' is-active' : ''}`}
+              style={`--h:${Math.max(2, Math.round((t.count / tlMax) * 100))};--i:${i}`}
+              data-year={t.year}
+              data-count={fmtCompact(t.count)}
+              aria-label={`${t.year}: ${fmt(t.count)} dokumentų${activeYears.has(t.year) ? ' (pasirinkta)' : ''}`}
+            >
+              <span class="dok-stats__col-bar" aria-hidden="true"></span>
+            </a>
+          ))}
+        </div>
+        <div class="dok-stats__axis">
+          <span>{tlFirst}</span>
+          {tlPeakYear != null && tlPeakYear !== tlFirst && tlPeakYear !== tlLast && (
+            <span class="dok-stats__axis-peak" style={`--p:${((tlPeakYear - (tlFirst ?? 0)) / Math.max(1, (tlLast ?? 0) - (tlFirst ?? 0))) * 100}%`}>{tlPeakYear}</span>
+          )}
+          <span>{tlLast}</span>
+        </div>
+        <p class="dok-stats__hint">Spustelėk metus, kad filtruotum</p>
+      </section>
+    )}
+
+    {typeShown.length > 1 && (
+      <section class="dok-stats__block">
+        <h3 class="dok-stats__h">Pasiskirstymas pagal tipą</h3>
+        <div class="dok-stats__seg" role="img" aria-label="Tipų pasiskirstymas">
+          {typeShown.map((t, i) => (
+            <span class="dok-stats__seg-part" style={`--w:${((t.count ?? 0) / typeSum) * 100}%;--c:${segColor(i)}`} title={`${TYPE_LABEL[t.value] || t.value}: ${fmt(t.count)}`}></span>
+          ))}
+        </div>
+        <ul class="dok-stats__legend">
+          {typeShown.map((t, i) => (
+            <li>
+              <a href={typeUrl(t.value)} class="dok-stats__legend-row">
+                <span class="dok-stats__legend-dot" style={`--c:${segColor(i)}`} aria-hidden="true"></span>
+                <span class="dok-stats__legend-lbl">{TYPE_LABEL[t.value] || t.value}</span>
+                <span class="dok-stats__legend-pct">{Math.round(((t.count ?? 0) / total) * 100)}%</span>
+                <span class="dok-stats__legend-cnt">{fmtCompact(t.count)}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+
+    {topIstaiga.length > 0 && (
+      <section class="dok-stats__block">
+        <h3 class="dok-stats__h">Aktyviausios įstaigos</h3>
+        <div class="dok-stats__rank">
+          {topIstaiga.map((it, i) => (
+            <a
+              class="dok-stats__rank-row"
+              href={istaigaUrl(it.value)}
+              style={`--pct:${pct(it.count, istaigaMax)};--i:${i}`}
+              title={it.label ? `${it.label} (${it.value})` : it.value}
+            >
+              <span class="dok-stats__rank-bar" aria-hidden="true"></span>
+              <span class="dok-stats__rank-name">{it.label || it.value}</span>
+              <span class="dok-stats__rank-cnt">{fmtCompact(it.count)}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    {stats.bySource.length > 1 && (
+      <section class="dok-stats__block">
+        <h3 class="dok-stats__h">Šaltiniai</h3>
+        <div class="dok-stats__chips">
+          {stats.bySource.slice(0, 8).map((s) => (
+            <a class="dok-stats__chip" href={sourceUrl(s.value)}>
+              <span>{SOURCE_LABEL[s.value.toLowerCase()] || s.value}</span>
+              <span class="dok-stats__chip-cnt">{fmtCompact(s.count)}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+  </aside>
+)}
+
+<style>
+  .dok-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+    padding: 20px;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+  }
+  .dok-stats__head { display: flex; flex-direction: column; gap: 8px; }
+  .dok-stats__eyebrow {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--gray);
+  }
+  .dok-stats__hero {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .dok-stats__hero-num {
+    font-size: clamp(28px, 6vw, 38px);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -.02em;
+    color: var(--black);
+    font-variant-numeric: tabular-nums;
+  }
+  .dok-stats__hero-unit { font-size: var(--text-sm); color: var(--gray); }
+  .dok-stats__hero-sub {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--text-sm);
+    color: var(--gray);
+  }
+  .dok-stats__hero-sub strong { color: var(--dark-gray); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .dok-stats__dot { width: 3px; height: 3px; border-radius: 50%; background: var(--light-gray); }
+
+  .dok-stats__h {
+    margin: 0 0 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--gray);
+  }
+
+  /* Reach metric cells */
+  .dok-stats__metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    background: var(--light-gray);
+    border: 1px solid var(--light-gray);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  .dok-stats__metric {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px 14px;
+    background: var(--white);
+  }
+  .dok-stats__metric-val {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--black);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.01em;
+  }
+  .dok-stats__metric-val i { color: var(--gray); font-style: normal; font-weight: 500; margin-right: 1px; }
+  .dok-stats__metric-lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--gray);
+  }
+
+  /* Timeline column chart (interactive) */
+  .dok-stats__h-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .dok-stats__h-row .dok-stats__h { margin: 0; }
+  /* Live hover/focus readout — the hovered year's count, year beneath it. */
+  .dok-stats__readout {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    line-height: 1;
+  }
+  .dok-stats__readout-count {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--black);
+    font-variant-numeric: tabular-nums;
+  }
+  .dok-stats__readout-year {
+    font-size: var(--text-xs);
+    color: var(--link);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .dok-stats__chart {
+    display: grid;
+    grid-template-columns: repeat(var(--n), 1fr);
+    align-items: end;
+    gap: 2px;
+    height: 86px;
+  }
+  .dok-stats__col {
+    display: flex;
+    align-items: flex-end;
+    height: 100%;
+    min-width: 0;
+    padding-top: 6px;            /* clickable headroom above short bars */
+    border-radius: 2px 2px 0 0;
+    cursor: pointer;
+  }
+  .dok-stats__col-bar {
+    width: 100%;
+    height: calc(var(--h, 0) * 1%);
+    border-radius: 2px 2px 0 0;
+    background: color-mix(in srgb, var(--link) 32%, var(--lighter-gray));
+    transform-origin: bottom;
+    transition: background .12s, opacity .12s;
+    animation: dokStatsGrowY .6s cubic-bezier(.2, .7, .2, 1) both;
+    animation-delay: calc(var(--i, 0) * 18ms + 60ms);
+  }
+  .dok-stats__col.is-peak .dok-stats__col-bar { background: color-mix(in srgb, var(--link) 60%, var(--lighter-gray)); }
+  /* Hover/focus (pointer + keyboard + the JS-driven .is-hover) lights the bar. */
+  .dok-stats__col:hover .dok-stats__col-bar,
+  .dok-stats__col:focus-visible .dok-stats__col-bar,
+  .dok-stats__col.is-hover .dok-stats__col-bar { background: color-mix(in srgb, var(--link) 80%, transparent); }
+  .dok-stats__col:focus-visible { outline: none; }
+  .dok-stats__col:focus-visible .dok-stats__col-bar { box-shadow: 0 0 0 2px color-mix(in srgb, var(--link) 30%, transparent); }
+  /* When a year is filtered, the rest recede so the selection pops. */
+  .dok-stats__chart.is-filtered .dok-stats__col-bar { opacity: .4; }
+  .dok-stats__chart.is-filtered .dok-stats__col.is-active .dok-stats__col-bar,
+  .dok-stats__chart.is-filtered .dok-stats__col:hover .dok-stats__col-bar,
+  .dok-stats__chart.is-filtered .dok-stats__col.is-hover .dok-stats__col-bar { opacity: 1; }
+  .dok-stats__col.is-active .dok-stats__col-bar { background: var(--link); }
+  .dok-stats__hint {
+    margin: 8px 0 0;
+    font-size: 10px;
+    color: var(--gray);
+  }
+  .dok-stats__axis {
+    position: relative;
+    margin-top: 7px;
+    height: 14px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+  }
+  .dok-stats__axis-peak {
+    position: absolute;
+    left: var(--p, 50%);
+    transform: translateX(-50%);
+    color: var(--link);
+    font-weight: 600;
+  }
+
+  /* Type composition: segmented bar + legend */
+  .dok-stats__seg {
+    display: flex;
+    height: 10px;
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    background: var(--lighter-gray);
+  }
+  .dok-stats__seg-part {
+    width: var(--w, 0);
+    background: var(--c, #2563eb);
+    transform-origin: left;
+    animation: dokStatsGrowX .6s cubic-bezier(.2, .7, .2, 1) both;
+    animation-delay: .1s;
+  }
+  .dok-stats__legend { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+  .dok-stats__legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px;
+    border-radius: var(--radius-sm);
+    color: inherit;
+  }
+  .dok-stats__legend-row:hover { background: var(--lighter-gray); }
+  .dok-stats__legend-dot { flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--c, #2563eb); }
+  .dok-stats__legend-lbl {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: var(--text-sm);
+    color: var(--black);
+  }
+  .dok-stats__legend-pct { flex: none; font-size: 10px; color: var(--gray); font-variant-numeric: tabular-nums; }
+  .dok-stats__legend-cnt {
+    flex: none;
+    min-width: 40px;
+    text-align: right;
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Ranked agencies */
+  .dok-stats__rank { display: flex; flex-direction: column; gap: 2px; }
+  .dok-stats__rank-row {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    color: inherit;
+  }
+  .dok-stats__rank-bar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(var(--pct, 0) * 1%);
+    z-index: -1;
+    background: color-mix(in srgb, var(--link) 11%, transparent);
+    transform-origin: left;
+    animation: dokStatsGrowX .6s cubic-bezier(.2, .7, .2, 1) both;
+    animation-delay: calc(var(--i, 0) * 40ms + 100ms);
+  }
+  .dok-stats__rank-row:hover .dok-stats__rank-bar { background: color-mix(in srgb, var(--link) 18%, transparent); }
+  .dok-stats__rank-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: var(--text-sm);
+    color: var(--black);
+  }
+  .dok-stats__rank-cnt { flex: none; font-size: var(--text-xs); color: var(--gray); font-variant-numeric: tabular-nums; }
+
+  /* Source chips */
+  .dok-stats__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dok-stats__chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 5px 12px;
+    border: var(--border);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    color: var(--black);
+    transition: border-color .15s, background .15s;
+  }
+  .dok-stats__chip:hover { border-color: var(--gray); background: var(--lighter-gray); }
+  .dok-stats__chip-cnt { color: var(--gray); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+
+  @keyframes dokStatsGrowX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @keyframes dokStatsGrowY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dok-stats__col-bar, .dok-stats__seg-part, .dok-stats__rank-bar { animation: none !important; transform: none !important; }
+  }
+</style>
+
+<script>
+  // Timeline interactivity: hovering or focusing a year column updates the live
+  // readout (count + year) and highlights that bar; leaving the chart restores
+  // the resting state (the active/peak year). Clicking a column is a normal link
+  // that filters the search to that year — no JS needed for that part.
+  for (const tl of document.querySelectorAll<HTMLElement>('.dok-stats__timeline')) {
+    const chart = tl.querySelector<HTMLElement>('.dok-stats__chart');
+    const out = tl.querySelector<HTMLElement>('.dok-stats__readout');
+    const yearEl = out?.querySelector<HTMLElement>('.dok-stats__readout-year');
+    const countEl = out?.querySelector<HTMLElement>('.dok-stats__readout-count');
+    if (!chart || !out || !yearEl || !countEl) continue;
+    const cols = [...chart.querySelectorAll<HTMLElement>('.dok-stats__col')];
+    const defYear = out.dataset.defaultYear ?? '';
+    const defCount = out.dataset.defaultCount ?? '';
+
+    const show = (col: HTMLElement) => {
+      for (const c of cols) c.classList.toggle('is-hover', c === col);
+      yearEl.textContent = col.dataset.year ?? '';
+      countEl.textContent = col.dataset.count ?? '';
+    };
+    const reset = () => {
+      for (const c of cols) c.classList.remove('is-hover');
+      yearEl.textContent = defYear;
+      countEl.textContent = defCount;
+    };
+
+    for (const col of cols) {
+      col.addEventListener('pointerenter', () => show(col));
+      col.addEventListener('focus', () => show(col));
+    }
+    chart.addEventListener('pointerleave', reset);
+    chart.addEventListener('focusout', (e) => {
+      if (!chart.contains(e.relatedTarget as Node)) reset();
+    });
+  }
+</script>

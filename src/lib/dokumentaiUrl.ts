@@ -24,6 +24,8 @@ export interface DokumentaiUrlState {
   sav: string[];
   apskritis: string[];
   source: string[];
+  /** Pasirinkti metai (happenedAt) — kelių metų OR atranka iš laiko juostos. */
+  metai: string[];
   teismas: string[];
   bylosRusis: string[];
   kategorija: string[];
@@ -57,7 +59,7 @@ export function buildDokumentaiUrl(
   params.set('mode', selected.mode);
   if (selected.sort !== 'relevance') params.set('sort', selected.sort);
 
-  for (const key of ['klase', 'type', 'host', 'jar', 'istaiga', 'ext', 'lang', 'sav', 'apskritis', 'source'] as const) {
+  for (const key of ['klase', 'type', 'host', 'jar', 'istaiga', 'ext', 'lang', 'sav', 'apskritis', 'source', 'metai'] as const) {
     if (selected[key].length) params.set(key, selected[key].join(','));
   }
   // Reikšmės gali turėti kablelių (autoriai, kategorijų/teismų pavadinimai) — kartojam.

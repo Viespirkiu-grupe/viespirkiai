@@ -19,6 +19,7 @@ const state = {
   sav: [],
   apskritis: [],
   source: [],
+  metai: [],
   teismas: [],
   bylosRusis: [],
   kategorija: [],

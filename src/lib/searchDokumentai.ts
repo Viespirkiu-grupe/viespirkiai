@@ -115,6 +115,7 @@ export interface DokumentaiSearchResult {
   savFilter: string[];
   apskritisFilter: string[];
   sourceFilter: string[];
+  metaiFilter: string[];
   courtFilter: string[];
   caseTypeFilter: string[];
   categoryFilter: string[];
@@ -256,6 +257,7 @@ function buildPartsExcluding(opts: {
   savs: string[];
   apskritys: string[];
   sources: string[];
+  years: string[];
   courts: string[];
   caseTypes: string[];
   categories: string[];
@@ -279,6 +281,7 @@ function buildPartsExcluding(opts: {
   excludeSav?: boolean;
   excludeApskritis?: boolean;
   excludeSource?: boolean;
+  excludeMetai?: boolean;
   excludeCourt?: boolean;
   excludeCaseType?: boolean;
   excludeCategory?: boolean;
@@ -292,7 +295,7 @@ function buildPartsExcluding(opts: {
    *  randami tiksliai greta ir ta pačia tvarka, o ne kaip atskiri terminai. */
   phrase?: boolean;
 }): string {
-  const { textQuery, classes, types, hosts, jars, istaigos, exts, authors, creators, producers, langs, savs, apskritys, sources, courts, caseTypes, categories, judges, actTypes, validities, editionTypes, projectStatuses, eurovoc, bbox } = opts;
+  const { textQuery, classes, types, hosts, jars, istaigos, exts, authors, creators, producers, langs, savs, apskritys, sources, years, courts, caseTypes, categories, judges, actTypes, validities, editionTypes, projectStatuses, eurovoc, bbox } = opts;
   const p: string[] = [];
   if (!opts.excludeClass && classes.length) p.push(`(${classes.map((c) => `class:${JSON.stringify(c)}`).join(' OR ')})`);
   if (!opts.excludeType && types.length) p.push(`(${types.map((t) => `type:${t}`).join(' OR ')})`);
@@ -321,6 +324,12 @@ function buildPartsExcluding(opts: {
   if (!opts.excludeSav && savs.length) p.push(`(${savs.map((s) => `savivaldybe:${JSON.stringify(s)}`).join(' OR ')})`);
   if (!opts.excludeApskritis && apskritys.length) p.push(`(${apskritys.map((a) => `apskritis:${JSON.stringify(a)}`).join(' OR ')})`);
   if (!opts.excludeSource && sources.length) p.push(`(${sources.map((s) => `source:${JSON.stringify(s)}`).join(' OR ')})`);
+  // Metai: dokumento data (happenedAt) patenka į pasirinktus kalendorinius metus.
+  // Inkliuzyvi apatinė riba, ekskliuzyvi viršutinė — [sausio 1 TO kitų sausio 1}.
+  if (!opts.excludeMetai && years.length) {
+    const yrs = years.map((y) => parseInt(y, 10)).filter((y) => Number.isFinite(y));
+    if (yrs.length) p.push(`(${yrs.map((y) => `happenedAt:[${y}-01-01T00:00:00Z TO ${y + 1}-01-01T00:00:00Z}`).join(' OR ')})`);
+  }
   // Sritis: dokumentai, kurių taškas patenka į pasirinktą stačiakampį. Filtruojam
   // per Quickwit lat/lon fast laukų range užklausą (inkliuzyvūs rėžiai).
   if (bbox) {
@@ -377,6 +386,7 @@ function buildPartsOpts(input: {
   sav?: string | string[];
   apskritis?: string | string[];
   source?: string | string[];
+  metai?: string | string[];
   teismas?: string | string[];
   bylosRusis?: string | string[];
   kategorija?: string | string[];
@@ -408,6 +418,7 @@ function buildPartsOpts(input: {
   const savFilter = splitMulti(input.sav);
   const apskritisFilter = splitMulti(input.apskritis);
   const sourceFilter = splitMulti(input.source).map(canonSource);
+  const metaiFilter = splitMulti(input.metai);
   // Nuosprendžių metadata filtrai gali turėti kablelių vardo viduje (pvz. kategorijų
   // pavadinimai), todėl jų NEskaidom per kablelį — imam kaip atskiras reikšmes.
   const courtFilter = Array.isArray(input.teismas) ? input.teismas.filter(Boolean) : input.teismas ? [input.teismas] : [];
@@ -438,6 +449,7 @@ function buildPartsOpts(input: {
     savs: [...new Set(savFilter)],
     apskritys: [...new Set(apskritisFilter)],
     sources: [...new Set(sourceFilter)],
+    years: [...new Set(metaiFilter)],
     courts: [...new Set(courtFilter)],
     caseTypes: [...new Set(caseTypeFilter)],
     categories: [...new Set(categoryFilter)],
@@ -540,6 +552,23 @@ const HOME_OVERVIEW_TTL_MS = 10 * 60 * 1000;
 const SIZE_PERCENTILES = [10, 25, 50, 75, 90, 99];
 let homeOverviewCache: { at: number; data: DokumentaiHomeOverview } | null = null;
 
+// Build one size metric from its percentiles + value_count aggregations.
+// Quickwit returns percentile keys as stringified floats ("50.0"). Returns null
+// for a degenerate distribution (no spread between the first and last
+// percentile) so callers can simply drop it.
+function buildSizeMetric(
+  key: HomeSizeMetric['key'], label: string, unit: string, pctAgg: any, cntAgg: any,
+): HomeSizeMetric | null {
+  const pv: Record<string, any> = pctAgg?.values ?? {};
+  const percentiles = SIZE_PERCENTILES
+    .map((p) => ({ p, value: Math.round(Number(pv[`${p}.0`] ?? pv[p])) }))
+    .filter((x) => Number.isFinite(x.value) && x.value >= 0);
+  if (percentiles.length <= 1) return null;
+  if (percentiles[0].value === percentiles[percentiles.length - 1].value) return null;
+  const median = percentiles.find((x) => x.p === 50)?.value ?? 0;
+  return { key, label, unit, percentiles, median, coverage: Math.round(Number(cntAgg?.value ?? 0)) };
+}
+
 const EMPTY_OVERVIEW: DokumentaiHomeOverview = {
   total: 0, totalPages: 0, totalWords: 0,
   byType: [], byClass: [], bySource: [], byExt: [], topIstaiga: [], sizeMetrics: [],
@@ -603,25 +632,10 @@ export async function dokumentaiHomeOverview(): Promise<DokumentaiHomeOverview> 
       .map(([value, count]) => ({ value, count: scaleCount(count) }))
       .sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
 
-    // Build one size metric from its percentiles + value_count aggregations.
-    // Quickwit returns percentile keys as stringified floats ("50.0"). Skip a
-    // metric whose distribution is degenerate (no spread between p10 and p99).
-    const buildMetric = (
-      key: HomeSizeMetric['key'], label: string, unit: string, pctAgg: any, cntAgg: any,
-    ): HomeSizeMetric | null => {
-      const pv: Record<string, any> = pctAgg?.values ?? {};
-      const percentiles = SIZE_PERCENTILES
-        .map((p) => ({ p, value: Math.round(Number(pv[`${p}.0`] ?? pv[p])) }))
-        .filter((x) => Number.isFinite(x.value) && x.value >= 0);
-      if (percentiles.length <= 1) return null;
-      if (percentiles[0].value === percentiles[percentiles.length - 1].value) return null;
-      const median = percentiles.find((x) => x.p === 50)?.value ?? 0;
-      return { key, label, unit, percentiles, median, coverage: Math.round(Number(cntAgg?.value ?? 0)) };
-    };
     const sizeMetrics = [
-      buildMetric('words', 'Žodžiai', 'žodžių', aggs.wordsPct, aggs.wordsCnt),
-      buildMetric('pages', 'Puslapiai', 'puslapių', aggs.pagesPct, aggs.pagesCnt),
-      buildMetric('chars', 'Simboliai', 'simbolių', aggs.charsPct, aggs.charsCnt),
+      buildSizeMetric('words', 'Žodžiai', 'žodžių', aggs.wordsPct, aggs.wordsCnt),
+      buildSizeMetric('pages', 'Puslapiai', 'puslapių', aggs.pagesPct, aggs.pagesCnt),
+      buildSizeMetric('chars', 'Simboliai', 'simbolių', aggs.charsPct, aggs.charsCnt),
     ].filter((m): m is HomeSizeMetric => m !== null);
 
     const data_: DokumentaiHomeOverview = {
@@ -639,6 +653,180 @@ export async function dokumentaiHomeOverview(): Promise<DokumentaiHomeOverview> 
     return data_;
   } catch {
     return EMPTY_OVERVIEW;
+  }
+}
+
+// ── Filter-scoped statistics (right-rail analysis) ───────────────────────────
+// When the user narrows the corpus with filters, the right rail paints a live
+// portrait of *that selection* — a timeline, composition, reach and size —
+// computed in one Quickwit aggregation request scoped to the active query.
+
+/** One year column in the selection timeline. `count` is tombstone-corrected. */
+export interface StatsTimelineBucket {
+  year: number;
+  count: number;
+}
+
+export interface DokumentaiStats {
+  /** Matched documents (tombstone-corrected). */
+  total: number;
+  totalPages: number;
+  totalWords: number;
+  /** Distinct publishing agencies (istaigaJar) — HyperLogLog approximation. */
+  uniqIstaiga: number;
+  /** Distinct websites (host) — HyperLogLog approximation. */
+  uniqHost: number;
+  /** Documents per year (happenedAt), leading/trailing empty years trimmed.
+   *  Always the full distribution of the selection *excluding* any year filter,
+   *  so the chart stays whole while a chosen year is highlighted. */
+  timeline: StatsTimelineBucket[];
+  /** Years currently filtered on (for highlighting the timeline). */
+  activeYears: number[];
+  byType: FacetOption[];
+  byClass: FacetOption[];
+  bySource: FacetOption[];
+  topIstaiga: FacetOption[];
+  /** Size distribution (words) for the selection, or null if too sparse. */
+  wordsMetric: HomeSizeMetric | null;
+  pagesMetric: HomeSizeMetric | null;
+}
+
+// happenedAt is stored as an i64 of nanoseconds since the epoch (the index'
+// internal datetime representation, confirmed against the live index). Range
+// aggregation boundaries must therefore be nanoseconds, not the milliseconds the
+// upstream docs describe. Year boundaries land far below 2^53 ulp at this scale,
+// so a `Date.UTC(...) * 1e6` boundary is exact to well under a second.
+const NS_PER_MS = 1_000_000;
+// Quickwit datetimes start in 2004 in this corpus; never go earlier.
+const STATS_FIRST_YEAR = 2004;
+
+/** Yearly `range` buckets [Jan 1 y, Jan 1 y+1) in nanoseconds, inclusive of both
+ *  ends of the [fromYear, toYear] span. */
+export function buildYearRanges(fromYear: number, toYear: number) {
+  const ranges: { key: string; from: number; to: number }[] = [];
+  for (let y = fromYear; y <= toYear; y++) {
+    ranges.push({ key: String(y), from: Date.UTC(y, 0, 1) * NS_PER_MS, to: Date.UTC(y + 1, 0, 1) * NS_PER_MS });
+  }
+  return ranges;
+}
+
+/** Parse the timeline `range` buckets into year columns, dropping the two
+ *  open-ended buckets Quickwit adds and trimming empty years off both ends so
+ *  the chart hugs the data. */
+export function parseTimelineBuckets(
+  buckets: any[] | undefined,
+  scale: (n: number) => number,
+): StatsTimelineBucket[] {
+  const years = (buckets ?? [])
+    .map((b) => ({ year: Number(b.key), count: scale(Number(b.doc_count ?? 0)) }))
+    .filter((b) => Number.isInteger(b.year) && b.year > 1900)
+    .sort((a, b) => a.year - b.year);
+  let start = 0;
+  let end = years.length - 1;
+  while (start <= end && years[start].count === 0) start++;
+  while (end >= start && years[end].count === 0) end--;
+  return years.slice(start, end + 1);
+}
+
+/**
+ * Aggregated portrait of the current selection (query + filters), for the right
+ * rail. One Quickwit request, scoped to exactly the search query. Returns null
+ * on any failure so the caller simply omits the panel. `knownTotal` lets the
+ * caller align the headline with the (tombstone-corrected) results count.
+ */
+export async function dokumentaiFilterStats(
+  input: Parameters<typeof buildPartsOpts>[0],
+  knownTotal?: number,
+): Promise<DokumentaiStats | null> {
+  try {
+    const partsOpts = buildPartsOpts(input);
+    const mainQuery = buildPartsExcluding(partsOpts);
+    // The timeline drops its own year filter so the whole distribution stays
+    // visible (the chosen year is merely highlighted). When no year is active
+    // both scopes match and the timeline rides along in the single main request.
+    const timelineQuery = buildPartsExcluding({ ...partsOpts, excludeMetai: true });
+    const sameScope = timelineQuery === mainQuery;
+    const timelineAgg = { range: { field: 'happenedAt', ranges: buildYearRanges(STATS_FIRST_YEAR, new Date().getUTCFullYear()) } };
+
+    const mainAggs: Record<string, unknown> = {
+      pages: { sum: { field: 'pageCount' } },
+      words: { sum: { field: 'wordCount' } },
+      byType: { terms: { field: 'type', size: 8 } },
+      byClass: { terms: { field: 'class', size: 6 } },
+      bySource: { terms: { field: 'source', size: 10 } },
+      byIstaiga: { terms: { field: 'istaigaJar', size: 6 } },
+      uniqIstaiga: { cardinality: { field: 'istaigaJar' } },
+      uniqHost: { cardinality: { field: 'host' } },
+      wordsPct: { percentiles: { field: 'wordCount', percents: SIZE_PERCENTILES } },
+      wordsCnt: { value_count: { field: 'wordCount' } },
+      pagesPct: { percentiles: { field: 'pageCount', percents: SIZE_PERCENTILES } },
+      pagesCnt: { value_count: { field: 'pageCount' } },
+    };
+    if (sameScope) mainAggs.timeline = timelineAgg;
+
+    const qwFetch = (query: string, aggs: Record<string, unknown>) =>
+      fetch(`${QW_URL}/api/v1/${LENTELE}_*/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, max_hits: 0, aggs, format: 'json' }),
+      });
+
+    const [res, timelineRes, deadRatio] = await Promise.all([
+      qwFetch(mainQuery, mainAggs),
+      sameScope ? Promise.resolve(null) : qwFetch(timelineQuery, { timeline: timelineAgg }),
+      getDeadRatio(LENTELE).catch(() => 0),
+    ]);
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const aggs = data?.aggregations ?? {};
+
+    // Timeline buckets come from the main request when the scope matches, else
+    // from the dedicated year-excluded request.
+    let timelineBuckets = aggs.timeline?.buckets;
+    if (!sameScope && timelineRes?.ok) {
+      timelineBuckets = (await timelineRes.json())?.aggregations?.timeline?.buckets;
+    }
+
+    const liveRatio = Math.max(0.01, 1 - Number(deadRatio || 0));
+    const scaleCount = (n: number) => Math.round(Number(n || 0) * liveRatio);
+
+    const termOptions = (key: string): FacetOption[] =>
+      (aggs[key]?.buckets ?? [])
+        .filter((b: any) => b.key !== '' && b.key != null)
+        .map((b: any) => ({ value: String(b.key), count: scaleCount(Number(b.doc_count)) }));
+
+    // Merge inconsistently-cased source buckets (cvpIs / cvpis …), like the sidebar.
+    const sourceCounts = new Map<string, number>();
+    for (const b of aggs.bySource?.buckets ?? []) {
+      if (!b.key) continue;
+      const k = canonSource(String(b.key));
+      sourceCounts.set(k, (sourceCounts.get(k) ?? 0) + Number(b.doc_count));
+    }
+    const bySource: FacetOption[] = [...sourceCounts.entries()]
+      .map(([value, count]) => ({ value, count: scaleCount(count) }))
+      .sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+
+    const total = knownTotal ?? scaleCount(Number(data?.num_hits ?? 0));
+
+    return {
+      total,
+      totalPages: scaleCount(Number(aggs.pages?.value ?? 0)),
+      totalWords: scaleCount(Number(aggs.words?.value ?? 0)),
+      // Cardinality is already a distinct count; tombstones rarely own a unique
+      // value of their own, so leave it unscaled (it's approximate anyway).
+      uniqIstaiga: Math.round(Number(aggs.uniqIstaiga?.value ?? 0)),
+      uniqHost: Math.round(Number(aggs.uniqHost?.value ?? 0)),
+      timeline: parseTimelineBuckets(timelineBuckets, scaleCount),
+      activeYears: partsOpts.years.map((y) => parseInt(y, 10)).filter((y) => Number.isFinite(y)),
+      byType: termOptions('byType'),
+      byClass: termOptions('byClass'),
+      bySource,
+      topIstaiga: await attachIstaigaNames(termOptions('byIstaiga')),
+      wordsMetric: buildSizeMetric('words', 'Žodžiai', 'žodžių', aggs.wordsPct, aggs.wordsCnt),
+      pagesMetric: buildSizeMetric('pages', 'Puslapiai', 'puslapių', aggs.pagesPct, aggs.pagesCnt),
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -805,6 +993,7 @@ export async function searchDokumentai(input: {
   sav?: string | string[];
   apskritis?: string | string[];
   source?: string | string[];
+  metai?: string | string[];
   teismas?: string | string[];
   bylosRusis?: string | string[];
   kategorija?: string | string[];
@@ -1045,6 +1234,7 @@ export async function searchDokumentai(input: {
     savFilter: partsOpts.savs,
     apskritisFilter: partsOpts.apskritys,
     sourceFilter: partsOpts.sources,
+    metaiFilter: partsOpts.years,
     courtFilter: partsOpts.courts,
     caseTypeFilter: partsOpts.caseTypes,
     categoryFilter: partsOpts.categories,

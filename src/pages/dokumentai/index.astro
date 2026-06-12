@@ -9,6 +9,7 @@ import Linksnis from '@design-system/components/Linksnis.astro';
 import BvpzKnowledgePanel from '../../components/bvpz/BvpzKnowledgePanel.astro';
 import JuridinisKnowledgePanel from '../../components/juridiniai/JuridinisKnowledgePanel.astro';
 import SutartisKnowledgePanel from '../../components/sutartis/SutartisKnowledgePanel.astro';
+import DokumentaiStatsPanel from '../../components/dokumentai/DokumentaiStatsPanel.astro';
 import config from '../../lib/config.ts';
 import { getColorScheme, getFont } from '../../lib/failai.js';
 import { findSingleBvpzPanel } from '../../lib/searchBvpzPanel.ts';
@@ -25,6 +26,7 @@ import {
   DOKUMENTAI_SORT_OPTIONS,
   searchDokumentai,
   dokumentaiHomeOverview,
+  dokumentaiFilterStats,
   extractInlineTokens,
   type DokumentasHit,
   type FacetOption,
@@ -56,6 +58,8 @@ const rawLangFilter = params.getAll('lang').flatMap((v) => v.split(','));
 const rawSavFilter = params.getAll('sav').flatMap((v) => v.split(','));
 const rawApskritisFilter = params.getAll('apskritis').flatMap((v) => v.split(','));
 const rawSourceFilter = params.getAll('source').flatMap((v) => v.split(','));
+// Metai (happenedAt) — iš laiko juostos pasirinkti kalendoriniai metai.
+const rawMetaiFilter = params.getAll('metai').flatMap((v) => v.split(',')).map((v) => v.trim()).filter(Boolean);
 // Nuosprendžių metadata filtrai — reikšmės gali turėti kablelių, todėl NEskaidom.
 const rawCourtFilter = params.getAll('teismas').filter(Boolean);
 const rawCaseTypeFilter = params.getAll('bylosRusis').filter(Boolean);
@@ -94,6 +98,7 @@ const hasArea = Boolean(rawArea.minLat && rawArea.maxLat && rawArea.minLon && ra
     if (h.length) sp.set('host', h.join(','));
     if (j.length) sp.set('jar', j.join(','));
     if (e.length) sp.set('ext', e.join(','));
+    if (rawMetaiFilter.length) sp.set('metai', rawMetaiFilter.join(','));
     rawAuthorFilter.forEach((value) => sp.append('author', value));
     rawCreatorFilter.forEach((value) => sp.append('creator', value));
     rawProducerFilter.forEach((value) => sp.append('producer', value));
@@ -116,17 +121,52 @@ const hasArea = Boolean(rawArea.minLat && rawArea.maxLat && rawArea.minLon && ra
 const hasFilters = Boolean(
   rawClassFilter.length || rawTypeFilter.length || rawHostFilter.length || rawJarFilter.length || rawIstaigaFilter.length || rawExtFilter.length
   || rawAuthorFilter.length || rawCreatorFilter.length || rawProducerFilter.length
-  || rawLangFilter.length || rawSavFilter.length || rawApskritisFilter.length || rawSourceFilter.length
+  || rawLangFilter.length || rawSavFilter.length || rawApskritisFilter.length || rawSourceFilter.length || rawMetaiFilter.length
   || rawCourtFilter.length || rawCaseTypeFilter.length || rawCategoryFilter.length || rawJudgeFilter.length
   || rawActTypeFilter.length || rawValidityFilter.length || rawEditionTypeFilter.length || rawProjectStatusFilter.length || rawEurovocFilter.length
   || hasArea,
 );
 const showHome = !q && !hasFilters;
 
+// Shared filter/query input — drives both the hit search and the right-rail
+// statistics aggregation, so they describe exactly the same selection.
+const searchInput = {
+  q,
+  klase: rawClassFilter,
+  type: rawTypeFilter,
+  host: rawHostFilter,
+  jar: rawJarFilter,
+  istaiga: rawIstaigaFilter,
+  ext: rawExtFilter,
+  author: rawAuthorFilter,
+  creator: rawCreatorFilter,
+  producer: rawProducerFilter,
+  lang: rawLangFilter,
+  sav: rawSavFilter,
+  apskritis: rawApskritisFilter,
+  source: rawSourceFilter,
+  metai: rawMetaiFilter,
+  teismas: rawCourtFilter,
+  bylosRusis: rawCaseTypeFilter,
+  kategorija: rawCategoryFilter,
+  teisejas: rawJudgeFilter,
+  aktoRusis: rawActTypeFilter,
+  galiojimas: rawValidityFilter,
+  redakcija: rawEditionTypeFilter,
+  projektoBusena: rawProjectStatusFilter,
+  eurovoc: rawEurovocFilter,
+  minLat: rawArea.minLat,
+  maxLat: rawArea.maxLat,
+  minLon: rawArea.minLon,
+  maxLon: rawArea.maxLon,
+  mode,
+};
+
 let result: Awaited<ReturnType<typeof searchDokumentai>> | null = null;
 let juridinisPanel: Awaited<ReturnType<typeof findSingleJuridinisPanel>> = null;
 let bvpzPanel: Awaited<ReturnType<typeof findSingleBvpzPanel>> = null;
 let sutartisPanel: Awaited<ReturnType<typeof findSutartisPanel>> = null;
+let filterStats: Awaited<ReturnType<typeof dokumentaiFilterStats>> = null;
 let errorMessage = '';
 if (!showHome) {
   try {
@@ -152,47 +192,30 @@ if (!showHome) {
       sutartisDuration = performance.now() - start;
       return panel;
     };
-    [result, juridinisPanel, bvpzPanel, sutartisPanel] = await Promise.all([
-      searchDokumentai({
-        q,
-        page,
-        klase: rawClassFilter,
-        type: rawTypeFilter,
-        host: rawHostFilter,
-        jar: rawJarFilter,
-        istaiga: rawIstaigaFilter,
-        ext: rawExtFilter,
-        author: rawAuthorFilter,
-        creator: rawCreatorFilter,
-        producer: rawProducerFilter,
-        lang: rawLangFilter,
-        sav: rawSavFilter,
-        apskritis: rawApskritisFilter,
-        source: rawSourceFilter,
-        teismas: rawCourtFilter,
-        bylosRusis: rawCaseTypeFilter,
-        kategorija: rawCategoryFilter,
-        teisejas: rawJudgeFilter,
-        aktoRusis: rawActTypeFilter,
-        galiojimas: rawValidityFilter,
-        redakcija: rawEditionTypeFilter,
-        projektoBusena: rawProjectStatusFilter,
-        eurovoc: rawEurovocFilter,
-        minLat: rawArea.minLat,
-        maxLat: rawArea.maxLat,
-        minLon: rawArea.minLon,
-        maxLon: rawArea.maxLon,
-        sort: requestedSort,
-        mode,
-      }),
+    // The statistics rail only appears once the user narrows the corpus with
+    // filters; a bare text query is served by the knowledge panels instead.
+    let statsDuration = 0;
+    const timedStats = async () => {
+      if (!hasFilters) return null;
+      const start = performance.now();
+      const stats = await dokumentaiFilterStats(searchInput);
+      statsDuration = performance.now() - start;
+      return stats;
+    };
+    [result, juridinisPanel, bvpzPanel, sutartisPanel, filterStats] = await Promise.all([
+      searchDokumentai({ ...searchInput, page, sort: requestedSort }),
       timedJuridinis(),
       timedBvpz(),
       timedSutartis(),
+      timedStats(),
     ]);
+    // Align the panel headline with the (tombstone-corrected) results count.
+    if (filterStats) filterStats.total = result.total;
     result.timings.push(
       { label: 'Juridinis asmuo', phase: 'pg', start: 0, duration: Math.round(juridinisDuration) },
       { label: 'BVPŽ kodas', phase: 'pg', start: 0, duration: Math.round(bvpzDuration) },
       { label: 'Sutartis', phase: 'pg', start: 0, duration: Math.round(sutartisDuration) },
+      { label: 'Statistika', phase: 'pg', start: 0, duration: Math.round(statsDuration) },
     );
     const totalElapsed = performance.now() - panelsStart;
     result.elapsed = (totalElapsed / 1000).toFixed(2);
@@ -217,6 +240,7 @@ const langFilter = result?.langFilter ?? [];
 const savFilter = result?.savFilter ?? [];
 const apskritisFilter = result?.apskritisFilter ?? [];
 const sourceFilter = result?.sourceFilter ?? [];
+const metaiFilter = result?.metaiFilter ?? [];
 const courtFilter = result?.courtFilter ?? [];
 const caseTypeFilter = result?.caseTypeFilter ?? [];
 const categoryFilter = result?.categoryFilter ?? [];
@@ -286,6 +310,7 @@ const urlState: DokumentaiUrlState = {
   sav: savFilter,
   apskritis: apskritisFilter,
   source: sourceFilter,
+  metai: metaiFilter,
   teismas: courtFilter,
   bylosRusis: caseTypeFilter,
   kategorija: categoryFilter,
@@ -312,6 +337,7 @@ const langToggleUrl = (v: string) => buildUrl({ lang: v ? toggleValue(langFilter
 const savToggleUrl = (v: string) => buildUrl({ sav: v ? toggleValue(savFilter, v) : [] });
 const apskritisToggleUrl = (v: string) => buildUrl({ apskritis: v ? toggleValue(apskritisFilter, v) : [] });
 const sourceToggleUrl = (v: string) => buildUrl({ source: v ? toggleValue(sourceFilter, v) : [] });
+const metaiToggleUrl = (v: string) => buildUrl({ metai: v ? toggleValue(metaiFilter, v) : [] });
 const courtToggleUrl = (v: string) => buildUrl({ teismas: v ? toggleValue(courtFilter, v) : [] });
 const caseTypeToggleUrl = (v: string) => buildUrl({ bylosRusis: v ? toggleValue(caseTypeFilter, v) : [] });
 const categoryToggleUrl = (v: string) => buildUrl({ kategorija: v ? toggleValue(categoryFilter, v) : [] });
@@ -390,7 +416,7 @@ const { visible: eurovocVisible, hidden: eurovocHidden } = splitFacetOptions(eur
 
 const activeFilterCount = classFilter.length + typeFilter.length + hostFilter.length + jarFilter.length + istaigaJarFilter.length + extFilter.length
   + authorFilter.length + creatorFilter.length + producerFilter.length
-  + langFilter.length + savFilter.length + apskritisFilter.length + sourceFilter.length
+  + langFilter.length + savFilter.length + apskritisFilter.length + sourceFilter.length + metaiFilter.length
   + courtFilter.length + caseTypeFilter.length + categoryFilter.length + judgeFilter.length
   + actTypeFilter.length + validityFilter.length + editionTypeFilter.length + projectStatusFilter.length + eurovocFilter.length
   + (bbox ? 1 : 0);
@@ -606,19 +632,11 @@ function distModel(m: typeof sizeMetrics[number]) {
               </section>
             )}
 
-            <section class="dok-home-foot">
-              <p class="dok-intro-syntax">
-                Patikslink tiesiai paieškoje: <code>type:failas</code> · <code>jar:123456789</code> · <code>ext:pdf</code>
-              </p>
-            </section>
           </div>
         ) : (
           <section class="dok-intro">
             <p class="text-muted text-sm">
               Tinklalapiai, failai, teisės aktai, teismo nuosprendžiai – paieška pagal pavadinimą, autorių ar turinį.
-            </p>
-            <p class="dok-intro-syntax">
-              Patikslink tiesiai paieškoje: <code>type:failas</code> · <code>jar:123456789</code> · <code>ext:pdf</code>
             </p>
           </section>
         )}
@@ -1118,6 +1136,20 @@ function distModel(m: typeof sizeMetrics[number]) {
             </section>
           )}
 
+          {metaiFilter.length > 0 && (
+            <section class="dok-filter-section">
+              <span class="dok-filter-section-label">Metai</span>
+              <a href={metaiToggleUrl('')} data-param="metai" class="dok-filter-opt dok-filter-all">
+                <span class="dok-filter-opt-label">Visi</span>
+              </a>
+              {[...metaiFilter].sort().map((year) => (
+                <a href={metaiToggleUrl(year)} data-param="metai" data-value={year} class="dok-filter-opt is-selected">
+                  <span class="dok-filter-opt-label">{year}</span>
+                </a>
+              ))}
+            </section>
+          )}
+
           <section class="dok-filter-section">
             <span class="dok-filter-section-label">Vieta</span>
             {bbox && (
@@ -1253,26 +1285,31 @@ function distModel(m: typeof sizeMetrics[number]) {
             </nav>
           )}
         </div>
-        {(sutartisPanel || juridinisPanel || bvpzPanel) && (
+        {(sutartisPanel || juridinisPanel || bvpzPanel || filterStats) && (
           <div class="dok-panel" id="dokPanel">
-            <div class="dok-panel__clip">
-              {sutartisPanel
-                ? <SutartisKnowledgePanel sutartis={sutartisPanel} />
-                : juridinisPanel
-                  ? <JuridinisKnowledgePanel juridinis={juridinisPanel} />
-                  : bvpzPanel && <BvpzKnowledgePanel bvpz={bvpzPanel} />
-              }
-            </div>
-            {/* Torn /\/\/\ edge. Inline SVG (not a CSS mask) so the tear has a
-               real stroked line — otherwise it's invisible on a white-on-white
-               card. Colours come from CSS vars, so it follows the theme. The
-               whole-teeth path stretched edge-to-edge keeps the seam aligned
-               with the side borders and a non-scaling 1px stroke matches them. */}
-            <svg class="dok-panel__tear" aria-hidden="true" viewBox={`0 0 ${TEAR_W} ${TEAR_H}`} preserveAspectRatio="none">
-              <path class="dok-panel__tear-fill" d={tearFill} />
-              <path class="dok-panel__tear-line" d={tearLine} vector-effect="non-scaling-stroke" />
-            </svg>
-            <button type="button" class="dok-panel__more" aria-expanded="false">Rodyti daugiau</button>
+            {(sutartisPanel || juridinisPanel || bvpzPanel) && (
+              <div class="dok-panel__knowledge">
+                <div class="dok-panel__clip">
+                  {sutartisPanel
+                    ? <SutartisKnowledgePanel sutartis={sutartisPanel} />
+                    : juridinisPanel
+                      ? <JuridinisKnowledgePanel juridinis={juridinisPanel} />
+                      : bvpzPanel && <BvpzKnowledgePanel bvpz={bvpzPanel} />
+                  }
+                </div>
+                {/* Torn /\/\/\ edge. Inline SVG (not a CSS mask) so the tear has a
+                   real stroked line — otherwise it's invisible on a white-on-white
+                   card. Colours come from CSS vars, so it follows the theme. The
+                   whole-teeth path stretched edge-to-edge keeps the seam aligned
+                   with the side borders and a non-scaling 1px stroke matches them. */}
+                <svg class="dok-panel__tear" aria-hidden="true" viewBox={`0 0 ${TEAR_W} ${TEAR_H}`} preserveAspectRatio="none">
+                  <path class="dok-panel__tear-fill" d={tearFill} />
+                  <path class="dok-panel__tear-line" d={tearLine} vector-effect="non-scaling-stroke" />
+                </svg>
+                <button type="button" class="dok-panel__more" aria-expanded="false">Rodyti daugiau</button>
+              </div>
+            )}
+            {filterStats && <DokumentaiStatsPanel stats={filterStats} urlState={urlState} />}
           </div>
         )}
 
@@ -2090,20 +2127,6 @@ function distModel(m: typeof sizeMetrics[number]) {
     max-width: 520px;
     text-align: center;
   }
-  /* Quiet syntax hint — teaches the inline `type:`/`jar:`/`ext:` tokens
-     without nagging. The codes are the only emphasis on the line. */
-  .dok-intro-syntax {
-    margin-top: 10px;
-    font-size: var(--text-xs);
-    color: var(--gray);
-  }
-  .dok-intro-syntax code {
-    font-family: var(--font-mono);
-    color: var(--dark-gray);
-    background: var(--lighter-gray);
-    padding: 1px 5px;
-    border-radius: var(--radius-sm);
-  }
   .dok-error { margin-top: 32px; }
 
   /* Empty-search home: a touch more breathing room above the title + search box.
@@ -2386,20 +2409,11 @@ function distModel(m: typeof sizeMetrics[number]) {
     font-variant-numeric: tabular-nums;
   }
 
-  /* Footer: class shortcuts + syntax hint */
-  .dok-home-foot {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    padding-top: 2px;
-  }
   /* Staggered fade-up for the blocks */
   .dok-home-title,
   .dok-home-hero,
   .dok-home-classes,
   .dok-home-cols,
-  .dok-home-foot,
   .dok-home > .dok-home-block { animation: dokFadeUp .5s ease both; }
   .dok-home-title { animation-delay: .02s; }
   .dok-home-hero { animation-delay: .06s; }
@@ -2407,7 +2421,6 @@ function distModel(m: typeof sizeMetrics[number]) {
   .dok-home > .dok-home-block:nth-of-type(3) { animation-delay: .16s; }
   .dok-home-cols { animation-delay: .2s; }
   .dok-home > .dok-home-block:nth-of-type(5) { animation-delay: .24s; }
-  .dok-home-foot { animation-delay: .28s; }
 
   @keyframes dokGrowX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   @keyframes dokGrowY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
@@ -3055,6 +3068,9 @@ function distModel(m: typeof sizeMetrics[number]) {
   .dok-panel {
     grid-area: panel;
     align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
   }
   .dok-panel__more,
   .dok-panel__tear { display: none; }
@@ -3151,7 +3167,7 @@ function distModel(m: typeof sizeMetrics[number]) {
        through the text. "Rodyti daugiau" floats over the tear and reveals the
        rest, animating height from the peek to auto (opt-in via the global
        `interpolate-size: allow-keywords`). */
-    .dok-panel { position: relative; }
+    .dok-panel__knowledge { position: relative; }
     .dok-panel__clip {
       /* ~3.5 lines of card content before the tear. */
       --peek: 9.5rem;

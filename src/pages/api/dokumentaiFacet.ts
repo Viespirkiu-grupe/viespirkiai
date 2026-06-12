@@ -39,6 +39,7 @@ export const GET: APIRoute = async ({ url }) => {
         sav: p.getAll('sav'),
         apskritis: p.getAll('apskritis'),
         source: p.getAll('source'),
+        metai: p.getAll('metai'),
         teismas: p.getAll('teismas'),
         bylosRusis: p.getAll('bylosRusis'),
         kategorija: p.getAll('kategorija'),
