@@ -9,6 +9,7 @@
         "test": "vitest run",
         "test:integration": "vitest run --config vitest.integration.config.ts",
         "check": "astro check",
+        "deps:report": "node scripts/dependencySizes.js",
         "db:schema:dump": "node scripts/dumpDbSchema.js",
         "quickwit:count-producer": "node scripts/countQuickwitMetadataProducer.js",
         "quickwit:delete-dead-indexes": "node quickwit/deleteDeadIndexes.js",
