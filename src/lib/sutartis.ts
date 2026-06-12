@@ -58,23 +58,44 @@ async function attachJarPavadinimai(salys: any[]) {
   }
 }
 
+function groupBy(rows: any[], key: string) {
+  const map = new Map<any, any[]>();
+  for (const row of rows) {
+    const group = map.get(row[key]);
+    if (group) group.push(row);
+    else map.set(row[key], [row]);
+  }
+  return map;
+}
+
 async function loadSabisSutartys(vpId: number) {
   const sabis = await postgres.query(`SELECT * FROM "sabisSutartys" WHERE "vpId" = $1`, [vpId]).then((r: any) => r.rows);
-  await Promise.all(sabis.map(async (s: any) => {
-    s.salys = await postgres.query(`SELECT * FROM "sabisSutarciuSalys" WHERE "sutartiesId" = $1`, [s.sutartiesId]).then((r: any) => r.rows);
-    const saskaitos = await postgres.query(`SELECT * FROM "sabisSaskaitos" WHERE "sutartiesUid" = $1 ORDER BY "israsymoData" DESC NULLS LAST`, [s.sutartiesUid]).then((r: any) => r.rows);
-    await Promise.all(saskaitos.map(async (sk: any) => {
-      sk.salys = await postgres.query(`SELECT * FROM "sabisSaskaituSalys" WHERE "sfId" = $1`, [sk.sfId]).then((r: any) => r.rows);
-      await attachJarPavadinimai(sk.salys);
-    }));
-    s.saskaitos = saskaitos;
-    await attachJarPavadinimai(s.salys);
-  }));
+  if (sabis.length === 0) return sabis;
+
+  const [sutarciuSalys, saskaitos] = await Promise.all([
+    postgres.query(`SELECT * FROM "sabisSutarciuSalys" WHERE "sutartiesId" = ANY($1)`, [sabis.map((s: any) => s.sutartiesId)]).then((r: any) => r.rows),
+    postgres.query(`SELECT * FROM "sabisSaskaitos" WHERE "sutartiesUid" = ANY($1) ORDER BY "israsymoData" DESC NULLS LAST`, [sabis.map((s: any) => s.sutartiesUid)]).then((r: any) => r.rows),
+  ]);
+  const saskaituSalys = saskaitos.length > 0
+    ? await postgres.query(`SELECT * FROM "sabisSaskaituSalys" WHERE "sfId" = ANY($1)`, [saskaitos.map((sk: any) => sk.sfId)]).then((r: any) => r.rows)
+    : [];
+
+  const sutarciuSalysById = groupBy(sutarciuSalys, 'sutartiesId');
+  const saskaitosByUid = groupBy(saskaitos, 'sutartiesUid');
+  const saskaituSalysBySfId = groupBy(saskaituSalys, 'sfId');
+
+  for (const sk of saskaitos) sk.salys = saskaituSalysBySfId.get(sk.sfId) || [];
+  for (const s of sabis) {
+    s.salys = sutarciuSalysById.get(s.sutartiesId) || [];
+    s.saskaitos = saskaitosByUid.get(s.sutartiesUid) || [];
+  }
+  await attachJarPavadinimai([...sutarciuSalys, ...saskaituSalys]);
   return sabis;
 }
 
 async function annotateDokumentai(dokumentai: any[]) {
-  await Promise.all(dokumentai.map(async (failas: any) => {
+  if (!Array.isArray(dokumentai)) return;
+  for (const failas of dokumentai) {
     const dokIdMatch = failas.url.match(/dok_id=(\d+)/);
     const fileIdMatch = failas.url.match(/file_id=(\d+)/);
     failas.dok_id = dokIdMatch ? dokIdMatch[1] : '';
@@ -82,17 +103,25 @@ async function annotateDokumentai(dokumentai: any[]) {
     failas.proxyUrl = failas.dok_id && failas.file_id
       ? `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dok_id}&file_id=${failas.file_id}`
       : '';
-    const busena = failas.dok_id && failas.file_id ? await postgres.query(
-      `SELECT "dokId", "fileId", ("parsiustas" > 0) AS parsiustas, ("nuskaitytas" IS NOT NULL AND "nuskaitytas" > 0) AS nuskaitytas, id FROM failai WHERE "dokId" = $1 AND "fileId" = $2`,
-      [failas.dok_id, failas.file_id],
-    ).then((r: any) => r.rows[0]) : undefined;
+  }
+  const poros = dokumentai.filter((f: any) => f.dok_id && f.file_id);
+  const busenos = poros.length > 0 ? await postgres.query(
+    `SELECT f."dokId", f."fileId", (f."parsiustas" > 0) AS parsiustas, (f."nuskaitytas" IS NOT NULL AND f."nuskaitytas" > 0) AS nuskaitytas, f.id
+     FROM failai f
+     JOIN unnest($1::int[], $2::int[]) AS t("dokId", "fileId")
+       ON f."dokId" = t."dokId" AND f."fileId" = t."fileId"`,
+    [poros.map((f: any) => f.dok_id), poros.map((f: any) => f.file_id)],
+  ).then((r: any) => r.rows) : [];
+  const busenaByPora = new Map<string, any>(busenos.map((b: any) => [`${b.dokId}:${b.fileId}`, b]));
+  for (const failas of dokumentai) {
+    const busena = busenaByPora.get(`${failas.dok_id}:${failas.file_id}`);
     failas.parsiustas = busena?.parsiustas || false;
     failas.nuskaitytas = busena?.nuskaitytas || false;
     if (busena?.parsiustas) {
       failas.id = busena.id;
       failas.proxyUrl = `https://failai.viespirkiai.org/${failas.id}`;
     }
-  }));
+  }
 }
 
 async function loadCpvaProjektai(pirkimoNumeris: string | null | undefined) {
@@ -101,12 +130,17 @@ async function loadCpvaProjektai(pirkimoNumeris: string | null | undefined) {
     `SELECT * FROM "cpvaProjektuSutartys" WHERE "pirkimoNrCvpis" = $1`,
     [pirkimoNumeris],
   ).then((r: any) => r.rows);
-  for (const ps of sutartys) {
-    const proj = await postgres.query(
-      `SELECT * FROM "cpvaProjektuSarasas" WHERE "projektoNr" = $1`,
-      [ps.projektoNr],
-    ).then((r: any) => r.rows[0]);
-    if (proj) ps.projektas = proj;
+  const projektuNr = Array.from(new Set(sutartys.map((ps: any) => ps.projektoNr).filter(Boolean)));
+  if (projektuNr.length > 0) {
+    const projektai = await postgres.query(
+      `SELECT * FROM "cpvaProjektuSarasas" WHERE "projektoNr" = ANY($1)`,
+      [projektuNr],
+    ).then((r: any) => r.rows);
+    const byNr = new Map<any, any>(projektai.map((p: any) => [p.projektoNr, p]));
+    for (const ps of sutartys) {
+      const proj = byNr.get(ps.projektoNr);
+      if (proj) ps.projektas = proj;
+    }
   }
   return sutartys;
 }

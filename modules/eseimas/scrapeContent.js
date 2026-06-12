@@ -155,7 +155,15 @@ export async function scrapeNextProjectBatch(batchSize = 10) {
         return false;
     }
     log(`Gauta ${rows.length} e-Seimo projektų, pradedamas turinio nuskaitymas`);
-    await Promise.all(rows.map(scrapeOne));
+    // Ne daugiau 3 lygiagrečių užklausų į e-Seimą
+    let cursor = 0;
+    await Promise.all(
+        Array.from({ length: Math.min(3, rows.length) }, async () => {
+            while (cursor < rows.length) {
+                await scrapeOne(rows[cursor++]);
+            }
+        }),
+    );
     log(`Baigta e-Seimo turinio partija: ${rows.length} projektų`);
     return true;
 }

@@ -352,36 +352,29 @@ export async function nuskaitytiVienoDokumentoDuomenis(
             flattenFiles(metadata.filesTree);
         }
 
-        // Insert into postgres
-        for (const child of children) {
-            // Check if file already exists
-            const existsRes = await postgres.query(
-                `SELECT id FROM failai WHERE "saltinioId" = $1 AND parent = $2 AND saltinis = 'archive'`,
-                [child.saltinioId, child.parent],
-            );
-
-            // Only insert if it doesn't exist
-            if (existsRes.rows.length === 0) {
-                await postgres.query(
-                    `INSERT INTO failai (
-                pavadinimas, extension, dydis, md5,
-                "saltinioId", parent, parsiustas, saltinis
-                ) VALUES (
-                   $1, $2, $3, $4, $5, $6, $7, $8
+        // Insert into postgres one batch at a time; ON CONFLICT skips existing rows
+        if (children.length) {
+            await postgres.query(
+                `INSERT INTO failai (
+                    pavadinimas, extension, dydis, md5,
+                    "saltinioId", parent, parsiustas, saltinis
+                )
+                SELECT * FROM unnest(
+                    $1::text[], $2::text[], $3::int[], $4::text[],
+                    $5::text[], $6::bigint[], $7::int[], $8::text[]
                 )
                 ON CONFLICT ("saltinioId", parent) WHERE saltinis = 'archive' DO NOTHING;`,
-                    [
-                        child.pavadinimas,
-                        child.extension,
-                        child.dydis,
-                        child.md5,
-                        child.saltinioId,
-                        child.parent,
-                        child.parsiustas,
-                        child.saltinis,
-                    ],
-                );
-            }
+                [
+                    children.map((c) => c.pavadinimas),
+                    children.map((c) => c.extension),
+                    children.map((c) => c.dydis),
+                    children.map((c) => c.md5),
+                    children.map((c) => c.saltinioId),
+                    children.map((c) => c.parent),
+                    children.map((c) => c.parsiustas),
+                    children.map((c) => c.saltinis),
+                ],
+            );
         }
     }
 
@@ -409,118 +402,111 @@ export async function nuskaitytiVienoDokumentoDuomenis(
             docId,
         ]);
 
-        // helper: bulk insert (max 100 rows per call)
+        // helper: bulk insert; chunkuojama viduje, kad neviršytume pg
+        // protokolo 65535 parametrų limito
         async function bulkInsert({ table, columns, rows, client }) {
             if (!rows.length) return;
 
-            const values = [];
-            const placeholders = rows.map((row, i) => {
-                const base = i * columns.length;
-                columns.forEach((col) => values.push(row[col]));
-                return `(${columns.map((_, j) => `$${base + j + 1}`).join(", ")})`;
-            });
+            const chunkSize = Math.max(1, Math.floor(30000 / columns.length));
+            const quotedColumns = columns.map((col) => `"${col}"`).join(", ");
 
-            let quotedColumns = columns.map((col) => `"${col}"`).join(", ");
+            for (let start = 0; start < rows.length; start += chunkSize) {
+                const chunk = rows.slice(start, start + chunkSize);
+                const values = [];
+                const placeholders = chunk.map((row, i) => {
+                    const base = i * columns.length;
+                    columns.forEach((col) => values.push(row[col]));
+                    return `(${columns.map((_, j) => `$${base + j + 1}`).join(", ")})`;
+                });
 
-            await client.query(
-                `INSERT INTO "${table}"(${quotedColumns}) VALUES ${placeholders.join(", ")} ON CONFLICT DO NOTHING`,
-                values,
-            );
+                await client.query(
+                    `INSERT INTO "${table}"(${quotedColumns}) VALUES ${placeholders.join(", ")} ON CONFLICT DO NOTHING`,
+                    values,
+                );
+            }
         }
 
         // IBAN
         if (results.ibans?.length) {
-            for (let i = 0; i < results.ibans.length; i += 100) {
-                await bulkInsert({
-                    table: "failaiIban",
-                    columns: ["id", "iban", "puslapiai"],
-                    rows: results.ibans.slice(i, i + 100).map((x) => ({
-                        id: docId,
-                        iban: x.iban,
-                        puslapiai: x.pages,
-                    })),
-                    client,
-                });
-            }
+            await bulkInsert({
+                table: "failaiIban",
+                columns: ["id", "iban", "puslapiai"],
+                rows: results.ibans.map((x) => ({
+                    id: docId,
+                    iban: x.iban,
+                    puslapiai: x.pages,
+                })),
+                client,
+            });
         }
 
         // JAR kodai
         if (results.companyIds?.length) {
-            for (let i = 0; i < results.companyIds.length; i += 100) {
-                await bulkInsert({
-                    table: "failaiJarKodai",
-                    columns: ["id", "jarKodas", "puslapiai"],
-                    rows: results.companyIds.slice(i, i + 100).map((x) => ({
-                        id: docId,
-                        jarKodas: x.code,
-                        puslapiai: x.pages,
-                    })),
-                    client,
-                });
-            }
+            await bulkInsert({
+                table: "failaiJarKodai",
+                columns: ["id", "jarKodas", "puslapiai"],
+                rows: results.companyIds.map((x) => ({
+                    id: docId,
+                    jarKodas: x.code,
+                    puslapiai: x.pages,
+                })),
+                client,
+            });
         }
 
         // Links
         if (results.links?.length) {
-            for (let i = 0; i < results.links.length; i += 100) {
-                await bulkInsert({
-                    table: "failaiLinks",
-                    columns: ["id", "link", "puslapiai"],
-                    rows: results.links.slice(i, i + 100).map((x) => ({
-                        id: docId,
-                        link: x.uri?.slice(0, 1024),
-                        puslapiai: x.pages,
-                    })),
-                    client,
-                });
-            }
+            await bulkInsert({
+                table: "failaiLinks",
+                columns: ["id", "link", "puslapiai"],
+                rows: results.links.map((x) => ({
+                    id: docId,
+                    link: x.uri?.slice(0, 1024),
+                    puslapiai: x.pages,
+                })),
+                client,
+            });
         }
 
         // Emails
         if (results.emails?.length) {
-            for (let i = 0; i < results.emails.length; i += 100) {
-                await bulkInsert({
-                    table: "failaiEmails",
-                    columns: ["id", "email", "puslapiai"],
-                    rows: results.emails.slice(i, i + 100).map((x) => ({
-                        id: docId,
-                        email: x.email,
-                        puslapiai: x.pages,
-                    })),
-                    client,
-                });
-            }
+            await bulkInsert({
+                table: "failaiEmails",
+                columns: ["id", "email", "puslapiai"],
+                rows: results.emails.map((x) => ({
+                    id: docId,
+                    email: x.email,
+                    puslapiai: x.pages,
+                })),
+                client,
+            });
         }
 
         // Domains
         if (results.domains?.length) {
-            for (let i = 0; i < results.domains.length; i += 100) {
-                await bulkInsert({
-                    table: "failaiDomains",
-                    columns: ["id", "domain"],
-                    rows: results.domains.slice(i, i + 100).map((domain) => ({
-                        id: docId,
-                        domain,
-                    })),
-                    client,
-                });
-            }
+            await bulkInsert({
+                table: "failaiDomains",
+                columns: ["id", "domain"],
+                rows: results.domains.map((domain) => ({
+                    id: docId,
+                    domain,
+                })),
+                client,
+            });
         }
 
         // Telefonai
         if (results.phones?.length) {
-            for (let i = 0; i < results.phones.length; i += 100) {
-                await bulkInsert({
-                    table: "failaiTelefonai",
-                    columns: ["id", "telefonas", "puslapiai"],
-                    rows: results.phones.slice(i, i + 100).map((x) => ({
-                        id: docId,
-                        telefonas: x.phone,
-                        puslapiai: x.pages,
-                    })),
-                    client,
-                });
-            }
+            await bulkInsert({
+                table: "failaiTelefonai",
+                columns: ["id", "telefonas", "puslapiai"],
+                rows: results.phones.map((x) => ({
+                    id: docId,
+                    telefonas: x.phone,
+                    puslapiai: x.pages,
+                })),
+                client,
+            });
         }
 
         await client.query("COMMIT");

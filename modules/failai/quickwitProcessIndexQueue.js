@@ -78,13 +78,24 @@ export async function processFailaiIndexQueue() {
         if (rows.length) {
             let cursor = 0;
             const texts = new Array(rows.length);
+            // Tas pats tekstasHash batch'e gali kartotis — promise dedamas į Map
+            // sinchroniškai, tad lygiagretūs workeriai dalinasi vienu FS skaitymu.
+            const tekstaiByHash = new Map();
             await Promise.all(
                 Array.from({ length: Math.min(FS_CONCURRENCY, rows.length) }, async () => {
                     while (cursor < rows.length) {
                         const i = cursor++;
-                        texts[i] = rows[i].tekstasHash
-                            ? await readTekstasFs(rows[i].tekstasHash)
-                            : null;
+                        const hash = rows[i].tekstasHash;
+                        if (!hash) {
+                            texts[i] = null;
+                            continue;
+                        }
+                        let promise = tekstaiByHash.get(hash);
+                        if (!promise) {
+                            promise = readTekstasFs(hash);
+                            tekstaiByHash.set(hash, promise);
+                        }
+                        texts[i] = await promise;
                     }
                 }),
             );

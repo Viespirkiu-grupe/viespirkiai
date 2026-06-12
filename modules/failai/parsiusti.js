@@ -3,6 +3,7 @@ Parsisiunčia duomenų bazėje nurodytus failus į viešdėžes.
 */
 
 import { postgres } from "../../postgres/postgres.js";
+import { getProxyBySite } from "../scrapeProxies/getProxyBySite.js";
 import { log } from "../../utils/log.js";
 import Timings from "../../utils/timings.js";
 import { Agent } from "undici";
@@ -74,19 +75,6 @@ export async function parsiustiFaila(options = {}) {
 
     try {
         // Pateikiame parsisiuntimo užklausą
-        async function getProxyBySite(site) {
-            const proxyRes = await postgres.query(
-                `SELECT * FROM "scrapeProxies" WHERE enabled = true AND site = $1 AND type = 'httpReverse'`,
-                [site],
-            );
-            if (proxyRes.rows.length === 0) {
-                return null;
-            }
-            return proxyRes.rows[
-                Math.floor(Math.random() * proxyRes.rows.length)
-            ];
-        }
-
         let url;
         let saltinis = failas.saltinis;
         if (!saltinis) {

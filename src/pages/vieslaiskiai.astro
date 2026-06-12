@@ -20,6 +20,8 @@ const vieslaiskiuTiles = vieslaiskiai.map((vieslaiskis: any) => ({
 
 const ziniasklaidojeRes = await postgres.query('SELECT * FROM "vieslaiskiaiZiniasklaidoje" ORDER BY date DESC, id DESC;');
 const vieslaiskiaiZiniasklaidoje = ziniasklaidojeRes.rows;
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
 <Layout
   pageTitle="Viešlaiškiai"

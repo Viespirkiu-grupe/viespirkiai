@@ -168,6 +168,8 @@ const numberOfResults = buildNumberOfResults({
 });
 
 const queryParams = rawSearch ? `&search=${encodeURIComponent(rawSearch)}` : '';
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
 <Layout
   pageTitle="Nepatikimų ir melagingą informaciją pateikusių tiekėjų paieška"

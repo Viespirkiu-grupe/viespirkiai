@@ -37,11 +37,22 @@ export function splitSaltinioId(saltinis, saltinioId, dokId, fileId) {
     return [saltinioId, null, null];
 }
 
-async function buildPayload(row) {
+// Tas pats hash'as batch'e gali kartotis — promise įdedamas į Map sinchroniškai,
+// todėl lygiagretūs workeriai dalinasi vienu FS skaitymu.
+function readCached(map, hash, read) {
+    let promise = map.get(hash);
+    if (!promise) {
+        promise = read(hash);
+        map.set(hash, promise);
+    }
+    return promise;
+}
+
+async function buildPayload(row, caches) {
     const [s0, s1, s2] = splitSaltinioId(row.saltinis, row.saltinioId, row.dokId, row.fileId);
     const [metadata, text] = await Promise.all([
-        row.metaduomenysHash ? readMetaduomenysFs(row.metaduomenysHash) : null,
-        row.tekstasHash ? readTekstasFs(row.tekstasHash) : null,
+        row.metaduomenysHash ? readCached(caches.metaduomenys, row.metaduomenysHash, readMetaduomenysFs) : null,
+        row.tekstasHash ? readCached(caches.tekstai, row.tekstasHash, readTekstasFs) : null,
     ]);
     const sidecar = {
         version: SIDECAR_VERSION,
@@ -119,11 +130,12 @@ export async function upsertBatch(rows) {
     }
 
     const built = [];
+    const caches = { tekstai: new Map(), metaduomenys: new Map() };
     let cursor = 0;
     async function worker() {
         while (cursor < ready.length) {
             const row = ready[cursor++];
-            const b = await buildPayload(row);
+            const b = await buildPayload(row, caches);
             await saveDokumentasFs(row.md5, b.sidecar);
             built.push(b);
         }

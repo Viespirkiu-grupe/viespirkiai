@@ -163,7 +163,17 @@ async function resolveArchiveFiles(failas: Failas) {
 }
 
 export async function loadFailasById(id: string): Promise<Failas | null> {
-  const result = await postgres.query(`SELECT * FROM failai WHERE "id" = $1 LIMIT 1`, [id]);
+  // Visi stulpeliai išskyrus "password" — jo web sluoksniui nereikia.
+  const result = await postgres.query(
+    `SELECT id, "dokId", "fileId", pavadinimas, extension, dydis, md5, parsiustas, nuskaitytas,
+            "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", "ocrState", "ocrNode",
+            "ocrLockTimestamp", "ocrDuration", "ocrTimestamp", saltinis, "saltinioId", parent,
+            "nuskaitymasTimestamp", location, "ocrBandymai", "parsiuntimoBandymai",
+            "paskutinisParsiuntimoBandymas", tipas, "tipasNuskaitymas", autorius,
+            "metaduomenysHash", "tekstasHash"
+     FROM failai WHERE "id" = $1 LIMIT 1`,
+    [id],
+  );
   return result.rows[0] || null;
 }
 

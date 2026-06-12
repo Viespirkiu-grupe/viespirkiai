@@ -5,6 +5,7 @@ Kaip argumentą galima pateikti puslapio numerį, nuo kurio pradėti nuskaitymą
 
 import { parseHTML } from "linkedom";
 import { postgres } from "../../postgres/postgres.js";
+import { getProxyBySite } from "../scrapeProxies/getProxyBySite.js";
 import { cvpIsImportArray } from "./import.js";
 import { log } from "../../utils/log.js";
 import { DateTime } from "luxon";
@@ -20,13 +21,7 @@ export async function cvpIsScrapePageContent(url, options = {}) {
     timings.start("cvpIsScrapePageContent");
 
     timings.start("findProxy");
-    let scrapeProxyRes = await postgres.query(
-        `SELECT * FROM "scrapeProxies" WHERE site = 'eviesiejipirkimai' AND enabled = true AND type = 'httpReverse';`,
-    );
-    let proxy =
-        scrapeProxyRes.rows[
-            Math.floor(Math.random() * scrapeProxyRes.rows.length)
-        ];
+    let proxy = await getProxyBySite("eviesiejipirkimai");
 
     let requestUrl = url;
     if (proxy) {

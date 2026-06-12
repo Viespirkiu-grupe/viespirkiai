@@ -89,6 +89,19 @@ const sutartysFilter = new FilterBuilder({
 
 const FIXED_WHERE = [`NOT COALESCE("istrinta", false)`];
 
+// Visi sutarčių stulpeliai išskyrus search_tsv — sugeneruotas tsvector yra
+// didelis ir rezultatuose nereikalingas (nutekėtų ir į MCP atsakymus).
+export const SUTARTYS_COLUMNS = [
+    `"sutartiesUnikalusId"`, `"pavadinimas"`, `"bvpzKodas"`, `"bvpzPavadinimas"`,
+    `"dokumentai"`, `"dokumentuKiekis"`, `"faktineIvykdimoData"`, `"faktineIvykdimoVerte"`,
+    `"galiojimoData"`, `"kategorija"`, `"paskelbimoData"`, `"paskutinioAtnaujinimoData"`,
+    `"paskutinioRedagavimoData"`, `"perkanciojiOrganizacija"`, `"perkanciosiosOrganizacijosKodas"`,
+    `"sudarymoData"`, `"sutartiesNumeris"`, `"tiekejas"`, `"tiekejoKodas"`, `"tipas"`,
+    `"verte"`, `"pirkimoNumeris"`, `"papildomiTiekejai"`, `"papildomiTiekejaiKodai"`,
+    `"papildomiBvpzKodai"`, `"papildomiBvpzPavadinimai"`, `"paskutiniKartaMatyta"`,
+    `"suma"`, `"istrinta"`, `"paskutiniKartaAtnaujinta"`,
+].join(", ");
+
 /**
  * Loads complete contract rows from PostgreSQL while preserving Typesense order.
  * Missing or deleted PostgreSQL rows are omitted.
@@ -103,7 +116,7 @@ async function loadTypesenseRowsFromPostgres(typesenseRows) {
     if (ids.length === 0) return [];
 
     const { rows } = await postgres.query(
-        `SELECT *
+        `SELECT ${SUTARTYS_COLUMNS}
          FROM sutartys
          WHERE "sutartiesUnikalusId" = ANY($1::int[])
            AND NOT COALESCE(istrinta, false)`,
@@ -222,6 +235,7 @@ export async function searchSutartys(
     const { sql, sqlCount, params, paramsCount, values, queryParams } =
         sutartysFilter.build(query, {
             table: "sutartys",
+            select: SUTARTYS_COLUMNS,
             fixedWhere: FIXED_WHERE,
             limit,
             page,

@@ -19,7 +19,8 @@ async function attachLocalFailai(pirkimoId: string, failai: any[]) {
   if (!saltinioIds.length) return;
 
   const { rows: failaiRows } = await postgres.query(
-    `SELECT * FROM public."failai" WHERE saltinis = 'cvpIs' AND "saltinioId" = ANY($1)`,
+    `SELECT id, "saltinioId", extension, parsiustas, nuskaitytas, "zodziuSkaicius", "puslapiuSkaicius", dydis, md5
+     FROM public."failai" WHERE saltinis = 'cvpIs' AND "saltinioId" = ANY($1)`,
     [saltinioIds],
   );
   const lokalusFailai = Object.fromEntries(failaiRows.map((f: any) => [f.saltinioId, f]));

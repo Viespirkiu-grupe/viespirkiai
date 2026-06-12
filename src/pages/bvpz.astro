@@ -17,6 +17,8 @@ const searchTargets = [
   { label: 'Viešieji pirkimai', value: 'viesiejiPirkimai' },
   { label: 'Sutartys', value: 'sutartys' },
 ];
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
 
 <Layout
