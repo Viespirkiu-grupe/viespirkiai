@@ -331,10 +331,18 @@ function parseRelatedLinks(document, pageUrl) {
         .filter((item) => item.url);
 }
 
+// Raw-source download links (PDF/DOCX/ODT/print) live under /rs/.../format/... — the
+// "actualedition" segment in their path otherwise matches the /actualEdition/i edition
+// filter below, so they would be registered as bogus redakcija objects.
+function isDownloadLink(url) {
+    return /\/rs\//i.test(url) || /\/format\//i.test(url);
+}
+
 function parseEditions(document, pageUrl, rootId) {
     const seen = new Set();
     return parseRelatedLinks(document, pageUrl)
         .filter((item) => /legalActEditions|editionId|actualEdition/i.test(item.url))
+        .filter((item) => !isDownloadLink(item.url))
         .map((item) => {
             const id = editionSourceIdFromUrl(item.url, rootId);
             if (!id || seen.has(id)) return null;
@@ -443,7 +451,7 @@ export function buildDokumentas(aktas, scraped) {
     };
 }
 
-export const TURINIO_VERSIJA = 2;
+export const TURINIO_VERSIJA = 3;
 
 async function scrapeOne(aktas) {
     log(`Skaitomas e-TAR ${aktas.kind} ${aktas.sourceId}`);

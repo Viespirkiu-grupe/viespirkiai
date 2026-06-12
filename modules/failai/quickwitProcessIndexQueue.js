@@ -1,7 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
 import { indexDocs } from "../../quickwit/quickwit.js";
 import { log } from "../../utils/log.js";
-import { uuidv7 } from "../../utils/uuid.js";
 import { readTekstasFs } from "./tekstasFs.js";
 
 const BATCH_SIZE = 500;
@@ -44,29 +43,16 @@ export async function processFailaiIndexQueue() {
         .filter(([, k]) => k === "insert" || k === "patch")
         .map(([id]) => id);
 
-    // Handle deletes — mark dead in quickwitEilutes
+    // Handle deletes — drop the quickwitEilutes mapping so search's filterLive()
+    // stops matching the orphaned Quickwit doc (it lingers in the shard until
+    // deleteDeadIndexes retires the whole shard). The quickwitEilutesGyvosDel
+    // trigger decrements gyvosEilutes, which raises the generated mirusiosEilutes
+    // — so counters need no manual touch here.
     if (toDelete.length) {
-        const ids = toDelete.map(String);
-        const newIds = toDelete.map(() => uuidv7());
         await postgres.query(
-            `UPDATE "quickwitEilutes" qe
-         SET "quickwitId" = v."quickwitId"::uuid
-         FROM (SELECT UNNEST($2::text[]) AS "eilutesId",
-                      UNNEST($3::text[]) AS "quickwitId") v
-         WHERE qe."lentele" = $1 AND qe."eilutesId" = v."eilutesId"`,
-            [LENTELE, ids, newIds]
-        );
-        await postgres.query(
-            `UPDATE "quickwitIndeksai" qi
-         SET "mirusiosEilutes" = "mirusiosEilutes" + sub.cnt
-         FROM (
-           SELECT "indeksas", COUNT(*) AS cnt
-           FROM "quickwitEilutes"
-           WHERE "lentele" = $1 AND "eilutesId" = ANY($2)
-           GROUP BY "indeksas"
-         ) sub
-         WHERE qi."indeksas" = sub."indeksas"`,
-            [LENTELE, ids]
+            `DELETE FROM "quickwitEilutes"
+         WHERE "lentele" = $1 AND "eilutesId" = ANY($2)`,
+            [LENTELE, toDelete.map(String)]
         );
         log(`deleted ${toDelete.length} from quickwit`);
     }

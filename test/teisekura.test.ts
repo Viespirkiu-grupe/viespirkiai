@@ -74,6 +74,17 @@ describe("e-TAR parsing", () => {
         expect(parsed.metadata.prieme).toBe("Šilalės rajono savivaldybės taryba");
         expect((parsed.editions[0] as any).sourceId).toBe("abc:edition:edition-1");
     });
+
+    it("ignores raw-source download links masquerading as editions", () => {
+        const parsed = parseActPage(`
+          <span id="mainForm:laTitle">Testas</span>
+          <iframe id="legalActFrame" src="/rs/legalact/abc/"></iframe>
+          <a href="https://e-tar.lt/rs/actualedition/abc/doYQlgHucm/format/MSO2010_DOCX/">DOCX</a>
+          <a href="https://e-tar.lt/rs/actualedition/abc/doYQlgHucm/format/OO3_ODT/">ODT</a>
+          <a href="/portal/lt/legalAct/abc?editionId=red-1">Redakcija</a>
+        `, "https://e-tar.lt/portal/lt/legalAct/abc");
+        expect(parsed.editions.map((e: any) => e.sourceId)).toEqual(["abc:edition:red-1"]);
+    });
 });
 
 describe("e-Seimas parsing", () => {
