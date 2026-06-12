@@ -58,6 +58,17 @@ describe("e-TAR parsing", () => {
         expect(rows[0].pavadinimas).toBe("Aktas");
     });
 
+    it("omits an empty effective date from an edition row", () => {
+        const rows: any[] = parseResultsHtml(`
+          <table><tr data-ri="0"><td></td><td>1</td><td>Įsakymas</td>
+          <td><a href="/portal/lt/legalAct/abc">Aktas</a>
+          <a class="link-blue" href="/portal/lt/legalAct/abc?editionId=red-1">Suvestinė redakcija</a></td>
+          <td>V-1</td><td>2022-10-19</td><td></td><td></td></tr></table>
+        `);
+        expect(rows[0].suvestineHref).toContain("editionId=red-1");
+        expect(rows[0]).not.toHaveProperty("isigaliojimoData");
+    });
+
     it("keeps rich metadata outside postgres-ready inventory", () => {
         const parsed = parseActPage(`
           <span id="mainForm:laTitle">Testas</span>
