@@ -1,5 +1,9 @@
 import { postgres } from "../../postgres/postgres.js";
 
+function nullableTimestamp(value) {
+    return typeof value === "string" && value.trim() === "" ? null : value ?? null;
+}
+
 export async function upsertInventoryObject(object) {
     const { rows } = await postgres.query(
         `INSERT INTO public."teisekuraObjektai" (
@@ -30,8 +34,8 @@ export async function upsertInventoryObject(object) {
             object.source, object.sourceId, object.rootSourceId ?? object.sourceId,
             object.parentSourceId ?? null, object.kind, object.url,
             object.pavadinimas ?? null, object.registracijosNr ?? null,
-            object.dokumentoNr ?? null, object.happenedAt ?? null,
-            object.sourceUpdatedAt ?? null,
+            object.dokumentoNr ?? null, nullableTimestamp(object.happenedAt),
+            nullableTimestamp(object.sourceUpdatedAt),
             object.forceRefresh ?? false,
         ],
     );

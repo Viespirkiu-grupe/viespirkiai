@@ -228,9 +228,10 @@ function parsePavadinimasTd(td) {
 function parseIsigaliojimoDataTd(td) {
     const result = {};
     const dateSpan = td.querySelector("span.dateColumn");
-    result.isigaliojimoData = dateSpan
+    const isigaliojimoData = dateSpan
         ? collapseWhitespace(dateSpan.textContent)
         : collapseWhitespace(td.textContent).split(" ")[0];
+    if (isigaliojimoData) result.isigaliojimoData = isigaliojimoData;
 
     // Any text after a <br> is a note about specific provisions
     let pastBr = false;
