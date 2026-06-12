@@ -129,6 +129,7 @@ export interface DokumentaiSearchResult {
   typeCountMap: Record<string, number>;
   classCountMap: Record<string, number>;
   hostOptions: FacetOption[];
+  jarOptions: FacetOption[];
   istaigaJarOptions: FacetOption[];
   extOptions: FacetOption[];
   authorOptions: FacetOption[];
@@ -467,13 +468,14 @@ function buildPartsOpts(input: {
 // Quickwit field → the "exclude this facet's own filter" flag, so a facet lists
 // every value available under the *other* active filters.
 type FacetExcludeKey =
-  | 'excludeClass' | 'excludeHost' | 'excludeIstaiga' | 'excludeExt' | 'excludeAuthor' | 'excludeCreator' | 'excludeProducer' | 'excludeLang'
+  | 'excludeClass' | 'excludeHost' | 'excludeJar' | 'excludeIstaiga' | 'excludeExt' | 'excludeAuthor' | 'excludeCreator' | 'excludeProducer' | 'excludeLang'
   | 'excludeSav' | 'excludeApskritis' | 'excludeSource'
   | 'excludeCourt' | 'excludeCaseType' | 'excludeCategory' | 'excludeJudge'
   | 'excludeActType' | 'excludeValidity' | 'excludeEditionType' | 'excludeProjectStatus' | 'excludeEurovoc';
 const FACET_EXCLUDE: Record<string, FacetExcludeKey> = {
   class: 'excludeClass',
   host: 'excludeHost',
+  jarKodai: 'excludeJar',
   istaigaJar: 'excludeIstaiga',
   extension: 'excludeExt',
   author: 'excludeAuthor',
@@ -510,7 +512,7 @@ export async function dokumentaiFacetOptions(
   const query = buildPartsExcluding({ ...partsOpts, [excludeKey]: true });
   const buckets = await qwAggregate(field, query, size);
   const options = buckets.filter((b) => b.value).map((b) => ({ value: b.value, count: b.count }));
-  if (field === 'istaigaJar') return attachIstaigaNames(options);
+  if (field === 'jarKodai' || field === 'istaigaJar') return attachIstaigaNames(options);
   return options;
 }
 
@@ -1032,6 +1034,7 @@ export async function searchDokumentai(input: {
   const qwQuery = buildPartsExcluding(partsOpts);
   const classFacetQuery = buildPartsExcluding({ ...partsOpts, excludeClass: true });
   const hostFacetQuery = buildPartsExcluding({ ...partsOpts, excludeHost: true });
+  const jarFacetQuery = buildPartsExcluding({ ...partsOpts, excludeJar: true });
   const istaigaFacetQuery = buildPartsExcluding({ ...partsOpts, excludeIstaiga: true });
   const typeFacetQuery = buildPartsExcluding(partsOpts);
   const extFacetQuery = buildPartsExcluding({ ...partsOpts, excludeExt: true });
@@ -1068,6 +1071,7 @@ export async function searchDokumentai(input: {
   const aggsStart = mark();
   const aggsPromise = Promise.all([
     qwAggregate('host', hostFacetQuery, 15),
+    qwAggregate('jarKodai', jarFacetQuery, 7),
     qwAggregate('type', typeFacetQuery, 10),
     qwAggregate('class', classFacetQuery, 10),
     qwAggregate('metadata.teismas', courtFacetQuery, 60),
@@ -1106,7 +1110,7 @@ export async function searchDokumentai(input: {
   if (filterMs > 0) {
     timings.push({ label: 'Gyvų atranka', phase: 'pg', start: searchStart + qwMs, duration: filterMs });
   }
-  const [hostBuckets, typeBuckets, classBuckets, courtBuckets, caseTypeBuckets, categoryBuckets, judgeBuckets, actTypeBuckets, validityBuckets, editionTypeBuckets, projectStatusBuckets, eurovocBuckets, extBuckets, authorBuckets, creatorBuckets, producerBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets, istaigaBuckets] = await aggsPromise;
+  const [hostBuckets, jarBuckets, typeBuckets, classBuckets, courtBuckets, caseTypeBuckets, categoryBuckets, judgeBuckets, actTypeBuckets, validityBuckets, editionTypeBuckets, projectStatusBuckets, eurovocBuckets, extBuckets, authorBuckets, creatorBuckets, producerBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets, istaigaBuckets] = await aggsPromise;
   timings.push({ label: 'Facetai', phase: 'filter', start: aggsStart, duration: mark() - aggsStart });
 
   const total = result.numHitsEstimate ?? result.hits.length;
@@ -1175,7 +1179,15 @@ export async function searchDokumentai(input: {
     buckets.filter((b) => b.value).map((b) => ({ value: b.value, count: b.count }));
 
   const hostOptions = toOptions(hostBuckets);
-  const istaigaJarOptions = await attachIstaigaNames(toOptions(istaigaBuckets));
+  const withSelected = (options: FacetOption[], selected: string[]) => {
+    const values = new Set(options.map((option) => option.value));
+    return [
+      ...selected.filter((value) => !values.has(value)).map((value) => ({ value, count: null })),
+      ...options,
+    ];
+  };
+  const jarOptions = await attachIstaigaNames(withSelected(toOptions(jarBuckets), partsOpts.jars));
+  const istaigaJarOptions = await attachIstaigaNames(withSelected(toOptions(istaigaBuckets), partsOpts.istaigos));
   const typeCountMap = Object.fromEntries(typeBuckets.map((b) => [b.value, b.count ?? 0]));
   const classCountMap = Object.fromEntries(classBuckets.map((b) => [b.value, b.count ?? 0]));
   const courtOptions = toOptions(courtBuckets);
@@ -1248,6 +1260,7 @@ export async function searchDokumentai(input: {
     typeCountMap,
     classCountMap,
     hostOptions,
+    jarOptions,
     istaigaJarOptions,
     extOptions,
     authorOptions,

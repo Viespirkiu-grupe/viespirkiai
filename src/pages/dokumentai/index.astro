@@ -253,6 +253,7 @@ const eurovocFilter = result?.eurovocFilter ?? [];
 const typeCountMap = result?.typeCountMap ?? {};
 const classCountMap = result?.classCountMap ?? {};
 const hostOptions: FacetOption[] = result?.hostOptions ?? [];
+const jarOptions: FacetOption[] = result?.jarOptions ?? [];
 const istaigaJarOptions: FacetOption[] = result?.istaigaJarOptions ?? [];
 const extOptions: FacetOption[] = result?.extOptions ?? [];
 const authorOptions: FacetOption[] = result?.authorOptions ?? [];
@@ -360,6 +361,7 @@ const clearUrl = (() => {
 const HOST_LIMIT = 6;
 const EXT_LIMIT = 6;
 const { visible: hostVisible, hidden: hostHidden } = splitFacetOptions(hostOptions, hostFilter, HOST_LIMIT);
+const { visible: jarVisible } = splitFacetOptions(jarOptions, jarFilter, EXT_LIMIT);
 const { visible: istaigaVisible, hidden: istaigaHidden } = splitFacetOptions(istaigaJarOptions, istaigaJarFilter, HOST_LIMIT);
 const { visible: extVisible, hidden: extHidden } = splitFacetOptions(extOptions, extFilter, EXT_LIMIT);
 const { visible: authorVisible, hidden: authorHidden } = splitFacetOptions(authorOptions, authorFilter, EXT_LIMIT);
@@ -930,21 +932,32 @@ function distModel(m: typeof sizeMetrics[number]) {
           </section>
 
           <section class="dok-filter-section">
-            <span class="dok-filter-section-label">Įmonė (JAR)</span>
-            {jarFilter.length > 0 && (
-              <a href={jarToggleUrl('')} data-param="jar" class="dok-filter-opt dok-filter-all is-selected">
+            <span class="dok-filter-section-label">Asmuo (JAR)</span>
+            {(jarVisible.length > 0 || jarFilter.length > 0) && (
+              <a href={jarToggleUrl('')} data-param="jar" class={`dok-filter-opt dok-filter-all${jarFilter.length === 0 ? ' is-selected' : ''}`}>
                 <span class="dok-filter-opt-label">Visi</span>
               </a>
             )}
-            {jarFilter.map((code) => (
-              <a href={jarToggleUrl(code)} data-param="jar" data-value={code} class="dok-filter-opt is-selected">
-                <span class="dok-filter-opt-label">{code}</span>
+            {jarVisible.map((opt) => (
+              <a href={jarToggleUrl(opt.value)} data-param="jar" data-value={opt.value} class={`dok-filter-opt${opt.label ? ' dok-filter-opt--stack' : ''}${jarFilter.includes(opt.value) ? ' is-selected' : ''}`}>
+                <span class="dok-filter-opt-text">
+                  <span class="dok-filter-opt-label">{opt.label || opt.value}</span>
+                  {opt.label && <span class="dok-filter-opt-sub">{opt.value}</span>}
+                </span>
+                {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
               </a>
             ))}
             <form class="dok-input-form" id="dok-jar-form" autocomplete="off">
               <input id="dok-jar-input" type="text" class="dok-input" placeholder="pvz. 123456789" aria-label="Įvesti JAR kodą" />
               <button type="submit" class="dok-input-btn" aria-label="Pridėti">+</button>
             </form>
+            <button
+              class="dok-more-btn"
+              type="button"
+              data-facet-modal="jarKodai"
+              data-facet-param="jar"
+              data-facet-title="Asmuo (JAR)"
+            >Daugiau</button>
           </section>
 
           <section class="dok-filter-section">
@@ -1562,6 +1575,7 @@ function distModel(m: typeof sizeMetrics[number]) {
     let selected = new Set<string>();      // working copy; committed on Taikyti
     let options: { value: string; count: number | null; label?: string }[] = [];
     let reqSeq = 0;
+    let searchTimer = 0;
 
     const isExt = () => param === 'ext';
     const normalize = (v: string) => (isExt() ? v.toLowerCase().replace(/^\./, '') : v.trim());
@@ -1669,7 +1683,7 @@ function distModel(m: typeof sizeMetrics[number]) {
       }
     }
 
-    async function load() {
+    async function load(optionSearch = '') {
       const mySeq = ++reqSeq;
       listEl.innerHTML = '<div class="dok-facet-modal__loading"><span class="spinner spinner-lg"></span></div>';
       // Scoped to the current query/filters (the API drops this facet's own
@@ -1677,6 +1691,7 @@ function distModel(m: typeof sizeMetrics[number]) {
       // picking one never lands on 0 hits. Just uncapped vs the sidebar preview.
       const qs = new URLSearchParams(params.toString());
       qs.set('field', field);
+      if (optionSearch) qs.set('optionSearch', optionSearch);
       qs.delete('page');
       try {
         const res = await fetch(`/api/dokumentaiFacet?${qs.toString()}`);
@@ -1695,7 +1710,7 @@ function distModel(m: typeof sizeMetrics[number]) {
       param = opts.param;
       // Įstaigų facetas turi ilgus dvieilius (pavadinimas + kodas) įrašus —
       // kelių stulpelių grid'e jie susimaišo, todėl jį rodom vienu stulpeliu.
-      listEl.classList.toggle('dok-facet-modal__list--stack', field === 'istaigaJar');
+      listEl.classList.toggle('dok-facet-modal__list--stack', field === 'istaigaJar' || field === 'jarKodai');
       titleEl.textContent = opts.title;
       selected = new Set(getList(param));
       searchEl.value = '';
@@ -1704,7 +1719,12 @@ function distModel(m: typeof sizeMetrics[number]) {
       load();
     };
 
-    searchEl.addEventListener('input', render);
+    searchEl.addEventListener('input', () => {
+      render();
+      if (field !== 'jarKodai') return;
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => load(searchEl.value.trim()), 250);
+    });
     searchEl.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
