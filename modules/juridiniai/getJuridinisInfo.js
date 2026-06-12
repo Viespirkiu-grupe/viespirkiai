@@ -155,6 +155,17 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
             mvpAprasaiPagalJarKoda(jarKodas, options?.mvpAprasai),
         vdiPazeidimai: async () =>
             getVdiPazeidimai(jarKodas, options?.vdiPazeidimai),
+        turiViesujuPirkimu: async () => {
+            const { rows } = await postgres.query(
+                `SELECT EXISTS (
+                    SELECT 1
+                    FROM "viesiejiPirkimai"
+                    WHERE "jarKodas" = $1
+                ) AS "turiViesujuPirkimu"`,
+                [jarKodas],
+            );
+            return rows[0]?.turiViesujuPirkimu === true;
+        },
     };
 
     // Run all tasks in parallel with timings

@@ -21,7 +21,9 @@ const jarKodas = asmuo.jar.jarKodas;
     {asmuo.sodra?.kodas && (
       <Button href={`https://atvira.sodra.lt/imones/detaliai/index.html?code=${asmuo.sodra.kodas}`} variant="outline" size="sm">↗ SODRA</Button>
     )}
-    <Button href={`https://liteko.teismai.lt/viesasprendimupaieska/paieska.aspx?txt=${jarKodas}`} variant="outline" size="sm">↗ Bylos</Button>
+    {asmuo.turiViesujuPirkimu && (
+      <Button href={`/viesiejiPirkimai?pvJarKodas=${jarKodas}`} variant="outline" size="sm">↗ Viešieji pirkimai</Button>
+    )}
     <Button href={`/pirkejas/${jarKodas}`} variant="outline" size="sm">↗ Pirkimai</Button>
     <Button href={`/tiekejas/${jarKodas}`} variant="outline" size="sm">↗ Pardavimai</Button>
   </Fragment>
