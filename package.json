@@ -13,6 +13,7 @@
         "db:schema:dump": "node scripts/dumpDbSchema.js",
         "quickwit:count-producer": "node scripts/countQuickwitMetadataProducer.js",
         "quickwit:delete-dead-indexes": "node quickwit/deleteDeadIndexes.js",
+        "quickwit:requeue-live": "node quickwit/requeueLiveRows.js",
         "quickwit:top-pdf-metadata": "node scripts/topQuickwitPdfMetadata.js",
         "teisekura:backfill": "node modules/teisekura/backfill.js",
         "teisekura:etar-content": "node modules/etar/scrapeContent.js",
