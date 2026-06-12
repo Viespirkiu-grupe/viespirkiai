@@ -3,6 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import Map from '@design-system/components/maps/Map.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
 import KeyValueList from '@design-system/components/KeyValueList.astro';
+import Alert from '@design-system/components/Alert.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
 import { loadFailasById, enrichFailas, parseSuffix } from '../../lib/failas.js';
 import { checkDokFileRemoved } from '@/modules/failai/queries.js';
@@ -108,6 +109,12 @@ const search = Astro.url.searchParams.get('search') || '';
 
     <div class="failas-grid mb-10">
       <div class="flex flex-col gap-4">
+
+        {failas.password && (
+          <Alert variant="warning" icon="!" title="Failas apsaugotas slaptažodžiu" className="w-fit max-w-full mb-0">
+            Slaptažodis: <strong class="cell-mono wrap-anywhere">{failas.password}</strong>
+          </Alert>
+        )}
 
         <div>
           <h2 class="mb-3 no-style">Failas</h2>

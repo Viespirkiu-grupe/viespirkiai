@@ -163,11 +163,10 @@ async function resolveArchiveFiles(failas: Failas) {
 }
 
 export async function loadFailasById(id: string): Promise<Failas | null> {
-  // Visi stulpeliai išskyrus "password" — jo web sluoksniui nereikia.
   const result = await postgres.query(
     `SELECT id, "dokId", "fileId", pavadinimas, extension, dydis, md5, parsiustas, nuskaitytas,
             "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", "ocrState", "ocrNode",
-            "ocrLockTimestamp", "ocrDuration", "ocrTimestamp", saltinis, "saltinioId", parent,
+            "ocrLockTimestamp", "ocrDuration", "ocrTimestamp", saltinis, "saltinioId", password, parent,
             "nuskaitymasTimestamp", location, "ocrBandymai", "parsiuntimoBandymai",
             "paskutinisParsiuntimoBandymas", tipas, "tipasNuskaitymas", autorius,
             "metaduomenysHash", "tekstasHash"
