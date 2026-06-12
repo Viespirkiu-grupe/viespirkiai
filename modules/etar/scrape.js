@@ -31,14 +31,34 @@ function appendCookies(jar, headers) {
     return Array.from(cookies, ([name, value]) => `${name}=${value}`).join("; ");
 }
 
-async function getInitialPage() {
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// e-TAR occasionally returns a stripped/error page under load (missing the
+// search form), which would otherwise abort a multi-hour backfill. Retry the
+// initial load a few times with linear backoff before giving up.
+async function getInitialPage(attempts = 4) {
     log("Kraunamas pradinis puslapis (ViewState)");
-    const res = await fetch(BASE_URL, { headers: HEADERS });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const html = await res.text();
-    const searchForm = parseSearchForm(html);
-    const cookies = appendCookies("", res.headers);
-    return { searchForm, cookies, html };
+    let lastError;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+            const res = await fetch(BASE_URL, { headers: HEADERS, signal: AbortSignal.timeout(60_000) });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const html = await res.text();
+            const searchForm = parseSearchForm(html);
+            const cookies = appendCookies("", res.headers);
+            return { searchForm, cookies, html };
+        } catch (error) {
+            lastError = error;
+            if (attempt < attempts) {
+                const delay = 5_000 * attempt;
+                log(`Pradinio puslapio klaida (bandymas ${attempt}/${attempts}): ${error.message} — kartojama po ${delay / 1000} s`);
+                await sleep(delay);
+            }
+        }
+    }
+    throw lastError;
 }
 
 export function parseSearchForm(html) {
@@ -404,10 +424,15 @@ function assertRowsWithinRange(rows, { from = "", to = "" }, context) {
 
 // Enumerate all legal acts down to startDate. e-TAR currently ignores ascending
 // sorting, so each 100-page batch uses an upper date bound and walks backwards.
-export async function scrapeAllFrom(startDate) {
+// resumeFrom (yyyy-mm-dd) sets the initial upper bound so an interrupted run can
+// pick up where it left off instead of re-walking from the newest record; pass
+// the date from the last "tęsiama iki ..." log line.
+export async function scrapeAllFrom(startDate, { resumeFrom = "" } = {}) {
     let totalInserted = 0;
-    let untilDate = "";
+    let untilDate = resumeFrom;
     let pageNr = 0;
+
+    if (resumeFrom) log(`Tęsiama nuo ankstesnės sustojimo vietos: iki ${resumeFrom}`);
 
     while (true) {
         const seen = new Set();
@@ -475,9 +500,10 @@ export async function scrapeAllFrom(startDate) {
 if (import.meta.url === `file://${process.argv[1]}`) {
     const args = process.argv.slice(2);
     const allFlag = args.includes("--all");
+    const resumeFrom = args.find(a => a.startsWith("--resume-from="))?.split("=")[1] ?? "";
     const date = args.find(a => !a.startsWith("--"));
     if (allFlag) {
-        const total = await scrapeAllFrom(date ?? "1800-01-01");
+        const total = await scrapeAllFrom(date ?? "1800-01-01", { resumeFrom });
         console.error(`Scraped ${total} records total`);
     } else {
         const results = date ? await scrapeDay(date) : await scrapeLatest(3);

@@ -11,7 +11,15 @@ async function run() {
         return;
     }
 
-    const total = await scrapeAllFrom(date ?? "1800-01-01");
+    // --resume-from=YYYY-MM-DD tęsia nuo nurodytos viršutinės datos ribos
+    // (iš paskutinės „tęsiama iki ..." eilutės), užuot iš naujo perėjus
+    // nuo naujausių įrašų.
+    const resumeFrom = args.find((arg) => arg.startsWith("--resume-from="))?.split("=")[1] ?? "";
+    if (resumeFrom && !/^\d{4}-\d{2}-\d{2}$/.test(resumeFrom)) {
+        throw new Error("--resume-from reikalauja YYYY-MM-DD datos");
+    }
+
+    const total = await scrapeAllFrom(date ?? "1800-01-01", { resumeFrom });
     console.log(`e-TAR inventoriaus backfill baigtas: ${total} įrašų`);
 }
 
