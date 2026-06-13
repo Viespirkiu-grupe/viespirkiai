@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 // adm-zip does not publish TypeScript declarations.
 // @ts-expect-error
 import AdmZip from "adm-zip";
-import { buildAnalize, buildAnalizeXlsx } from "@/modules/sutartys/analize.js";
+import {
+    buildAnalize,
+    buildAnalizeXlsx,
+    canExportAnalizeXlsx,
+    XLSX_EXPORT_LIMIT,
+} from "@/modules/sutartys/analize.js";
 
 const rows = [
     {
@@ -23,6 +28,13 @@ const rows = [
 ];
 
 describe("sutarčių analizės eksportas", () => {
+    it("leidžia eksportuoti iki 50 000 sutarčių imtinai", () => {
+        expect(XLSX_EXPORT_LIMIT).toBe(50_000);
+        expect(canExportAnalizeXlsx(50_000)).toBe(true);
+        expect(canExportAnalizeXlsx(50_001)).toBe(false);
+        expect(canExportAnalizeXlsx(-1)).toBe(false);
+    });
+
     it("grupuoja pagal tiekėjus, pirkėjus, BVPŽ ir metus", () => {
         const analysis = buildAnalize(rows);
         expect(analysis.tiekejai[0]).toMatchObject({ kodas: "2", suma: 120, kiekis: 1 });

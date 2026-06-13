@@ -2,6 +2,11 @@ import AdmZip from "adm-zip";
 import { specialJarCodes } from "../juridiniai/specialJarCodes.js";
 
 const EUR_FORMAT = '#,##0.00 [$€-lt-LT]';
+export const XLSX_EXPORT_LIMIT = 50_000;
+
+export function canExportAnalizeXlsx(count) {
+    return Number.isInteger(count) && count >= 0 && count <= XLSX_EXPORT_LIMIT;
+}
 
 const xml = (value) => String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -292,4 +297,3 @@ export function buildAnalizeXlsx(results, metadata = {}) {
     add("xl/charts/chart3.xml", chart("Didžiausi pirkėjai pagal vertę", "Pirkėjai", `$B$2:$B$${topPirkejaiEnd}`, `$C$2:$C$${topPirkejaiEnd}`, "bar", "78716C", sheets[3].rows.length === 0));
     return zip.toBuffer();
 }
-

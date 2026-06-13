@@ -191,7 +191,7 @@ export async function searchSutartys(
                 values,
                 queryParams,
                 timings: [],
-                stream: Readable.from(streamTypesenseResults(query)),
+                stream: Readable.from(streamTypesenseResults(query, limit)),
                 client: null,
             };
         }
@@ -380,19 +380,20 @@ export function aptvarkytiRezultata(r) {
 }
 
 /**
- * Async generator that paginates through ALL Typesense results.
+ * Async generator that paginates through Typesense results.
  * Yields one processed row at a time.
  * @param {object} query
+ * @param {number | null} [limit=null] - Maximum number of Typesense hits to process.
  * @returns {AsyncGenerator<object>}
  */
-export async function* streamTypesenseResults(query) {
+export async function* streamTypesenseResults(query, limit = null) {
     const { filterBy, sortBy } = sutartysFilter.build(query);
     const pageSize = 250;
     let page = 1;
     let fetched = 0;
     let total = Infinity;
 
-    while (fetched < total) {
+    while (fetched < total && (limit == null || fetched < limit)) {
         const { results, total: t } = await searchDocuments(
             query.search || "*",
             { page, filterBy, sortBy, limit: pageSize },
@@ -401,7 +402,8 @@ export async function* streamTypesenseResults(query) {
         if (page === 1) total = t;
         if (!results.length) break;
 
-        const rows = await loadTypesenseRowsFromPostgres(results);
+        const remaining = limit == null ? results : results.slice(0, limit - fetched);
+        const rows = await loadTypesenseRowsFromPostgres(remaining);
         for (const row of arrayToLithuanianTime(rows).map(
             aptvarkytiRezultata,
         )) {
