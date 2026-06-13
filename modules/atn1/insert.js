@@ -125,7 +125,7 @@ export async function upsertAtn1(client, failasId, ppa) {
                     d.adresas,
                     d.salis,
                     d.grupe,
-                    d.atrinktoPasirinkomoPriezastys,
+                    d.pasirinkimoPriezastis,
                 ]),
             );
         }
@@ -161,10 +161,10 @@ export async function upsertAtn1(client, failasId, ppa) {
                     d.statusas,
                     d.nepakviestoPriezastys,
                     d.atsiemimoPriezastys,
-                    d.atmetimoTeisinisPageindas,
+                    d.atmetimoTeisinisPagrindas,
                     d.atmetimoPriezastys,
-                    d.pasiulymoKaina,
-                    d.kainosIsraiska,
+                    d.pasiulymoKainaSanaudos,
+                    d.kainosSanauduIsraiska,
                 ]),
             );
         }
@@ -181,12 +181,12 @@ export async function upsertAtn1(client, failasId, ppa) {
                 ppa.pasiulymuEile.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
-                    d.eileNumeris,
+                    d.eilesNumeris,
                     d.dalyvioKodas,
                     d.dalyvioPavadinimas,
-                    d.kainosSantykis,
-                    d.kaina,
-                    d.kainosIsraiska,
+                    d.kainosKokybesSantykis,
+                    d.kainaSanaudos,
+                    d.kainosSanauduIsraiska,
                 ]),
             );
         }
@@ -222,16 +222,16 @@ export async function upsertAtn1(client, failasId, ppa) {
                 `insert into "atn1sutartys" ("ataskaitaId","daliesNumeriai","tiekejosKodas","teikejoPavadinimas","sutartisSudarymoData","sutartiesGaliojimas","sutartiesVerte","orientacineVerte","subrangosKetinama","subrangosInfo","centralizuotasPirkimas","centralizacijosTipas","zaliasisPirkimas","energetiniaiReikalavimai","energetikosPriemones","inovatyvusProduktas","kelioTransportoPriemones") values ${vals}`,
                 ppa.sutartys.flatMap((d) => [
                     ataskaitaId,
-                    d.daliesNumeriai,
-                    d.tiekejosKodas,
-                    d.teikejoPavadinimas,
-                    d.sutartisSudarymoData ?? null,
-                    d.sutartiesGaliojimas,
+                    d.daliesNumeris,
+                    d.tiekejoKodas,
+                    d.tiekejoPavadinimas,
+                    d.sutartiesSudarymoData ?? null,
+                    d.sutartiesGaliojimoTerminas,
                     d.sutartiesVerte
                         ? parseFloat(d.sutartiesVerte.replace(/,/g, ""))
                         : null,
-                    d.orientacineVerte,
-                    d.subrangosKetinama,
+                    d.arOrientacineVerte,
+                    d.arKetinamaSubranga,
                     d.subrangosInfo,
                     d.centralizuotasPirkimas,
                     d.centralizacijosTipas,

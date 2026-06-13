@@ -26,6 +26,9 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "vdiPazeidimai",
     "teismoNuosprendziai", "teismoNuosprendziaiDalyviai",
     "mokesciai",
+
+    "atn1ataskaitos", "atn1dalyviai", "atn1sutartys",
+    "atn1pasiulymuEile", "atn1atmestiPasiulymai",
 ]);
 
 export const FUNCTION_WHITELIST: Set<string> = new Set([

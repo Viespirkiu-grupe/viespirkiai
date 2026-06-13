@@ -63,7 +63,7 @@ function parseI_III(wb) {
     if (!d) throw new Error("PPA parse error: I.–III. missing data row");
     return {
         teisinisPageindas: str(cell(d, 0)),
-        ataskaiposTipas: str(cell(d, 1)),
+        ataskaitosTipas: str(cell(d, 1)),
         pirkimoNumeris: str(cell(d, 2)),
         pirkimoObjektoPavadinimas: str(cell(d, 3)),
         pirkimoVerte: str(cell(d, 4)),
@@ -306,7 +306,7 @@ async function processAtn1(fileId) {
     }
 }
 
-const ATN_NUSKAITYMAS_VERSIJA = 1;
+const ATN_NUSKAITYMAS_VERSIJA = 2;
 export async function doOneAtn1() {
     // get one from failai where tipas = ATN-1 and tipasNuskaitymas < ATN_NUSKAITYMAS_VERSIJA but >=0
     let rowRes = await postgres.query(
