@@ -10,6 +10,7 @@ import PirkimasSalygos from '../../components/viesiejiPirkimai/PirkimasSalygos.a
 import PirkimasDokumentai from '../../components/viesiejiPirkimai/PirkimasDokumentai.astro';
 import PirkimasSkelbimai from '../../components/viesiejiPirkimai/PirkimasSkelbimai.astro';
 import PirkimasTedNuorodos from '../../components/viesiejiPirkimai/PirkimasTedNuorodos.astro';
+import PirkimasDalyviai from '../../components/viesiejiPirkimai/PirkimasDalyviai.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
 import { loadPirkimas, buildTimelineItems, buildTedKorteles, getCvpisUrl } from '../../lib/viesiejiPirkimai.js';
 
@@ -88,6 +89,7 @@ const font = getFont(Astro.cookies);
       <PirkimasVykdytojas pirkimas={pirkimas} />
       <PirkimasTerminai items={timelineItems} />
       <PirkimasKlasifikacija pirkimas={pirkimas} />
+      {pirkimas.atn1 && <PirkimasDalyviai atn1={pirkimas.atn1} />}
       <PirkimasVerte pirkimas={pirkimas} />
       <PirkimasSalygos pirkimas={pirkimas} />
     </div>

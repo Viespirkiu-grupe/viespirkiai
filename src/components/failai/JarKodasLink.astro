@@ -1,0 +1,12 @@
+---
+// Renders a JAR (legal-entity) code as a link to /asmuo/{kodas}.
+// Falls back to a plain mono span when `link` is false (e.g. physical persons)
+// or to an em-dash when there is no code at all.
+const { kodas, link = true } = Astro.props as { kodas: any; link?: boolean };
+const has = kodas != null && kodas !== '';
+---
+{has
+  ? (link
+      ? <a href={`/asmuo/${kodas}`} class="cell-mono">{kodas}</a>
+      : <span class="cell-mono">{kodas}</span>)
+  : <span class="cell-mono">—</span>}

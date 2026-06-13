@@ -16,6 +16,8 @@ import Telefonai from '../../components/failai/Telefonai.astro';
 import IbanNumeriai from '../../components/failai/IbanNumeriai.astro';
 import Parasai from '@design-system/components/content/SignatureList.astro';
 import FailasPasalintas from '../../components/failai/FailasPasalintas.astro';
+import Atn1Ataskaita from '../../components/failai/Atn1Ataskaita.astro';
+import { loadAtn1ByFailasId } from '../../lib/atn1.js';
 import { convertUnit } from '@/utils/units.js';
 
 const { id: rawId } = Astro.params;
@@ -46,8 +48,12 @@ if (format === 'json') {
   });
 }
 
+let atn1 = null;
 if (!isPasalintas) {
   failas = await enrichFailas(failas);
+  if (failas.tipas === 'ATN-1') {
+    atn1 = await loadAtn1ByFailasId(failas.id);
+  }
 }
 
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');
@@ -67,6 +73,14 @@ const search = Astro.url.searchParams.get('search') || '';
 >
   <style>
     .failas-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 28px; align-items: start; }
+    .failas-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--color-border); margin-bottom: 24px; }
+    .failas-tab {
+      appearance: none; background: none; border: none; cursor: pointer;
+      padding: 10px 16px; font: inherit; font-weight: 600; color: var(--color-muted);
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .failas-tab:hover { color: inherit; }
+    .failas-tab.is-active { color: inherit; border-bottom-color: var(--color-primary); }
     @media (max-width: 900px) {
       .failas-grid { grid-template-columns: 1fr; }
       .failas-grid > div:last-child { order: -1; }
@@ -187,9 +201,49 @@ const search = Astro.url.searchParams.get('search') || '';
       </div>
 
       <div>
-        <FailasPreview failas={failas} search={search} />
+        {atn1 ? (
+          <>
+            <div class="failas-tabs" role="tablist" aria-label="Failo turinys">
+              <button type="button" class="failas-tab is-active" role="tab" aria-selected="true" aria-controls="panel-ataskaita" data-tab="ataskaita">Ataskaita (ATN-1)</button>
+              <button type="button" class="failas-tab" role="tab" aria-selected="false" aria-controls="panel-failas" data-tab="failas">Failas</button>
+            </div>
+            <div id="panel-ataskaita" role="tabpanel">
+              <Atn1Ataskaita atn1={atn1} />
+            </div>
+            <div id="panel-failas" role="tabpanel" hidden>
+              <FailasPreview failas={failas} search={search} />
+            </div>
+          </>
+        ) : (
+          <FailasPreview failas={failas} search={search} />
+        )}
       </div>
     </div>
   </main>
+  )}
+
+  {atn1 && (
+    <script is:inline>
+      (() => {
+        const tabs = document.querySelectorAll('.failas-tab');
+        const panels = {
+          failas: document.getElementById('panel-failas'),
+          ataskaita: document.getElementById('panel-ataskaita'),
+        };
+        tabs.forEach((tab) => {
+          tab.addEventListener('click', () => {
+            const key = tab.getAttribute('data-tab');
+            tabs.forEach((t) => {
+              const on = t === tab;
+              t.classList.toggle('is-active', on);
+              t.setAttribute('aria-selected', String(on));
+            });
+            for (const [k, el] of Object.entries(panels)) {
+              if (el) el.hidden = k !== key;
+            }
+          });
+        });
+      })();
+    </script>
   )}
 </Layout>

@@ -106,6 +106,9 @@ export async function loadPirkimas(pirkimoId: string): Promise<Pirkimas | null> 
   const sutartysRes = await searchSutartys({ pirkimoNumeris: pirkimas.pirkimoId });
   pirkimas.sutartys = sutartysRes.results;
 
+  const { loadAtn1ForPirkimas } = await import('./atn1.js');
+  pirkimas.atn1 = await loadAtn1ForPirkimas(pirkimas.pirkimoId);
+
   return pirkimas;
 }
 
