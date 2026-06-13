@@ -104,6 +104,7 @@ export async function handler(params) {
         limit,
         page,
         engine: query.search ? "typesense" : "postgres",
+        includeAggregates: true,
     });
 
     return {

@@ -89,6 +89,11 @@ const sutartysFilter = new FilterBuilder({
 
 const FIXED_WHERE = [`NOT COALESCE("istrinta", false)`];
 
+export function getSutartysQueryMetadata(query) {
+    const { values, queryParams } = sutartysFilter.build(query);
+    return { values, queryParams };
+}
+
 // Visi sutarčių stulpeliai išskyrus search_tsv — sugeneruotas tsvector yra
 // didelis ir rezultatuose nereikalingas (nutekėtų ir į MCP atsakymus).
 export const SUTARTYS_COLUMNS = [
@@ -141,6 +146,8 @@ async function loadTypesenseRowsFromPostgres(typesenseRows) {
  * @property {boolean} [stream=false] - Return a raw stream instead of rows.
  *   When true, caller must release the returned `client`.
  * @property {boolean} [sort=true] - Whether to apply default sorting.
+ * @property {boolean} [includeAggregates=false] - Compute matching row count and
+ *   value sum for selective entity filters.
  */
 
 /**
@@ -161,6 +168,8 @@ async function loadTypesenseRowsFromPostgres(typesenseRows) {
  * @typedef {object} SearchResult
  * @property {ContractSearchRow[]} results - Processed rows. Empty when streaming.
  * @property {number | null} total - Total matching rows. Null if count timed out.
+ * @property {number | null} sutarciuKiekis - Matching row count when aggregates were requested.
+ * @property {number | null} bendraVerte - Matching value sum when aggregates were requested.
  * @property {object} values - Resolved filter values for form repopulation.
  * @property {string} queryParams - URL query string fragment for pagination links.
  * @property {{label: string, phase: string, start: number, duration: number}[]} timings
@@ -176,7 +185,14 @@ async function loadTypesenseRowsFromPostgres(typesenseRows) {
  */
 export async function searchSutartys(
     query,
-    { limit, page = 1, engine = "postgres", stream = false, sort = true } = {},
+    {
+        limit,
+        page = 1,
+        engine = "postgres",
+        stream = false,
+        sort = true,
+        includeAggregates = false,
+    } = {},
 ) {
     const searchStarted = performance.now();
 
@@ -273,7 +289,8 @@ export async function searchSutartys(
         "pirkimoNumeris",
         "sutartiesUnikalusID",
     ];
-    const needsAgg = SELECTIVE_KEYS.some((k) => query[k] != null);
+    const needsAgg =
+        includeAggregates && SELECTIVE_KEYS.some((k) => query[k] != null);
 
     // "suma" = faktineIvykdimoVerte when settled, otherwise verte — same as Typesense index
     const mainQuery = postgres.query(sql, params);

@@ -4,7 +4,7 @@ import SearchForm from '@design-system/components/content/SearchForm.astro';
 import SearchSuggest from '@design-system/components/content/SearchSuggest.astro';
 import SutartysFilters from '../components/content/SutartysFilters.astro';
 import SearchResults from '../components/content/SearchResults.astro';
-import { searchSutartys, countSutartys } from '@/modules/sutartys/searchSutartys.js';
+import { searchSutartys, countSutartys, getSutartysQueryMetadata } from '@/modules/sutartys/searchSutartys.js';
 import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
 import config from '../lib/config.ts';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
@@ -232,22 +232,12 @@ if (query.jsonl || query.csv || query.xlsx) {
 // Result count update (AJAX)
 if (query.rezultatuSkaiciausPatikslinimas) {
   const startas = performance.now();
-  const [countRes, searchRes] = await Promise.all([
-    timed(countSutartys(query)),
-    timed(searchSutartys(query, { limit: 1, page, engine })),
-  ]);
+  const countRes = await timed(countSutartys(query));
   const total = countRes.value as number;
-  const { queryParams, timings: searchTimings } = searchRes.value as {
-    values: SearchValues;
-    queryParams: string;
-    timings?: Timing[];
-  };
+  const { queryParams } = getSutartysQueryMetadata(query);
   const pageCount = Math.ceil(total / limit);
   const elapsed = performance.now() - startas + Number(query.trukme || 0);
   const timings: Timing[] = [
-    ...(searchTimings?.length
-      ? searchTimings
-      : [{ label: 'Paieška', phase: 'search', start: 0, duration: searchRes.ms }]),
     { label: 'Skaičius', phase: 'count', start: 0, duration: countRes.ms },
   ];
   void timings;

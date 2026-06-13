@@ -6,6 +6,19 @@
 import { describe, it, expect } from "vitest";
 import { searchSutartys } from "../../modules/sutartys/searchSutartys.js";
 
+describe("searchSutartys (postgres engine)", () => {
+    it("does not compute aggregates unless explicitly requested", async () => {
+        const { results, sutarciuKiekis, bendraVerte } = await searchSutartys(
+            { perkanciosiosOrganizacijosKodas: "188710442" },
+            { engine: "postgres", limit: 5, page: 1 },
+        );
+
+        expect(results.length).toBeGreaterThan(0);
+        expect(sutarciuKiekis).toBeNull();
+        expect(bendraVerte).toBeNull();
+    });
+});
+
 describe("searchSutartys (typesense engine)", () => {
     it("returns results and expected shape for a keyword search", async () => {
         const { results, total } = await searchSutartys(
