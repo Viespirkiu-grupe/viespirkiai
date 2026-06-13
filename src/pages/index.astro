@@ -9,6 +9,7 @@ import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
 import config from '../lib/config.ts';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
 import { objectsToCsvStream } from '@/utils/csv.js';
+import { buildAnalizeXlsx } from '@/modules/sutartys/analize.js';
 import { Readable as NodeReadable, PassThrough, Transform } from 'node:stream';
 import { cleanQuery, getColorScheme, getFont } from '../lib/failai.ts';
 
@@ -96,7 +97,7 @@ function buildPaginationHtml({ currentPage, pageCount, queryParams }: { currentP
 void buildPaginationHtml;
 
 // Stream exports (JSONL / CSV) short-circuit
-if (query.jsonl || query.csv) {
+if (query.jsonl || query.csv || query.xlsx) {
   const { stream, client } = await searchSutartys(query, { limit: null, page, stream: true, sort: false, engine }) as {
     stream: import('node:stream').Readable | null;
     client: { release(): void } | null;
@@ -104,6 +105,52 @@ if (query.jsonl || query.csv) {
 
   if (!stream) {
     return new Response(null, { status: 500 });
+  }
+
+  if (query.xlsx) {
+    const rows: Record<string, unknown>[] = [];
+    try {
+      for await (const row of stream) rows.push(row as Record<string, unknown>);
+    } finally {
+      client?.release();
+    }
+    const viewUrl = new URL(Astro.url);
+    viewUrl.protocol = 'https:';
+    ['xlsx', 'csv', 'jsonl', 'limit', 'page'].forEach(key => viewUrl.searchParams.delete(key));
+    const filterLabels: Record<string, string> = {
+      search: 'Paieška',
+      perkanciosiosOrganizacijosKodas: 'Pirkėjo kodas',
+      tiekejoKodas: 'Tiekėjo kodas',
+      sutartiesNumeris: 'Sutarties numeris',
+      pirkimoNumeris: 'Pirkimo numeris',
+      sutartiesUnikalusID: 'Sutarties ID',
+      tipas: 'Sutarties tipas',
+      sudarymoDataNuo: 'Sudaryta nuo',
+      sudarymoDataIki: 'Sudaryta iki',
+      verteNuo: 'Vertė nuo',
+      verteIki: 'Vertė iki',
+      bvpzPrefiksas: 'BVPŽ kodas',
+      tikSuDokumentais: 'Tik su dokumentais',
+      ignoruotiSp: 'Be pakeitimų',
+      sort: 'Rikiavimas',
+      dir: 'Rikiavimo kryptis',
+    };
+    const filters = [...viewUrl.searchParams.entries()]
+      .map(([key, value]) => `${filterLabels[key] ?? key}: ${value}`)
+      .join('; ');
+    const metadata = {
+      exportedAt: new Date(),
+      viewUrl: viewUrl.toString(),
+      filters,
+    };
+    const body = buildAnalizeXlsx(rows, metadata);
+    void body;
+    return new Response(body as unknown as BodyInit, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename=viespirkiai-analize-${new Date().toISOString()}.xlsx`,
+      },
+    });
   }
 
   const pass = new PassThrough();

@@ -46,6 +46,9 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
       <a href={`/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
         <span aria-hidden="true">↗</span> CSV
       </a>
+      <a href={`/?${queryParams}&xlsx=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti analizę kaip XLSX">
+        <span aria-hidden="true">↗</span> XLSX
+      </a>
     </Fragment>
   )}
   {results.map(item => (
