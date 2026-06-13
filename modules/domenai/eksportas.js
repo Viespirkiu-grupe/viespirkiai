@@ -13,6 +13,17 @@ function toStringOrNull(value) {
     return s.length ? s : null;
 }
 
+function toIsoTimestamp(value) {
+    if (!value) return null;
+    const text = String(value).trim();
+    if (!text) return null;
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(text)) {
+        return `${text.replace(" ", "T")}${text.includes(".") ? "" : ".000"}Z`;
+    }
+    const date = new Date(text);
+    return Number.isNaN(date.getTime()) ? text : date.toISOString();
+}
+
 function extractNsHost(entry) {
     if (entry == null) return null;
     if (typeof entry === "string") {
@@ -43,9 +54,9 @@ export function buildDomenasRecord(row) {
         parent: {
             domain: row.domain,
             status: toStringOrNull(row.status),
-            created: row.created,
-            expired: row.expired,
-            updated: row.updated,
+            created: toIsoTimestamp(row.created),
+            expired: toIsoTimestamp(row.expired),
+            updated: toIsoTimestamp(row.updated),
             savininkas: toStringOrNull(row.savininkas),
             tiketinasSavininkoKodas: toStringOrNull(row.savininkoKodas),
         },
@@ -58,9 +69,9 @@ export function buildIstorijaRecord(row) {
         parent: {
             scrapeId: Number(row.scrapeId),
             domain: row.domain,
-            domregData: row.domregData,
+            domregData: toIsoTimestamp(row.domregData),
             status: toStringOrNull(row.status),
-            expired: row.expired,
+            expired: toIsoTimestamp(row.expired),
             savininkas: toStringOrNull(row.savininkas),
             tiketinasSavininkoKodas: toStringOrNull(row.savininkoKodas),
         },

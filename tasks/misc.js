@@ -18,6 +18,7 @@ import { scrapeMvmUntilNow } from "../modules/mvpTvarkosAprasai/scrapeContent.js
 import { updateVdiPazeidimai } from "../modules/vdi/scrapePazeidimai.js";
 import { processSuggestionQueue } from "../modules/searchSuggestion/processSuggestionQueue.js";
 import { deleteDeadIndexes } from "../quickwit/deleteDeadIndexes.js";
+import { processDomenaiAdpQueue } from "../modules/domenai/processAdpQueue.js";
 
 export default [
     {
@@ -155,5 +156,13 @@ export default [
         cooldown: 30,
         errorCooldown: 30,
         job: processSuggestionQueue,
+    },
+    {
+        name: "processDomenaiAdpQueue",
+        mode: "asap",
+        priority: 4,
+        cooldown: 30,
+        errorCooldown: 60,
+        job: processDomenaiAdpQueue,
     },
 ];

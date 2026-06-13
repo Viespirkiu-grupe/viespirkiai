@@ -22,7 +22,9 @@
         "teisekura:audit": "node modules/teisekura/audit.js",
         "export:sutartys": "node scripts/exportSutartys.js",
         "push:sutartys": "node scripts/pushSutartysToSpinta.js",
-        "process:sutartys-adp-queue": "node modules/sutartys/processAdpQueue.js"
+        "process:sutartys-adp-queue": "node modules/sutartys/processAdpQueue.js",
+        "push:domenai": "node scripts/pushDomenaiToSpinta.js",
+        "process:domenai-adp-queue": "node modules/domenai/processAdpQueue.js"
     },
     "overrides": {
         "vite": "^7"
