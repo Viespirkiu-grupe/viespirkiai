@@ -15,10 +15,9 @@ export default defineConfig({
   // tad standalone serveris statinius failus ima tiesiai iš public/.
   // Dev metu (astro dev) public/ tiekiamas kaip įprasta.
   publicDir: process.env.ASTRO_NO_PUBLIC_COPY ? './.nopublic' : './public',
-  prefetch: {
-    prefetchAll: true,
-    defaultStrategy: 'hover',
-  },
+  // A custom fetch-based hover prefetch is loaded by Layout.astro because
+  // Firefox may ignore the low-priority <link rel="prefetch"> Astro creates.
+  prefetch: false,
   security: { checkOrigin: false },
   server: {
     port: config.port,

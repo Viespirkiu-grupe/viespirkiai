@@ -71,6 +71,9 @@ const faviconSVGURLEncoded = encodeURIComponent(faviconSVG);
       navigator.serviceWorker.register('/service-worker.js');
     }
   </script>
+  <script>
+    import '../scripts/hoverPrefetch.ts';
+  </script>
 
   {customHead && <Fragment set:html={customHead} />}
 </head>
