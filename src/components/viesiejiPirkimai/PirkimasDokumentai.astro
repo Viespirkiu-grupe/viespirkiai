@@ -31,4 +31,8 @@ const items = (failai ?? []).map((failas: any) => {
 });
 ---
 
-<FileCardList title="Dokumentai" items={items} />
+<FileCardList
+  title="Dokumentai"
+  items={items}
+  listClass="grid [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))] gap-2 mt-4"
+/>

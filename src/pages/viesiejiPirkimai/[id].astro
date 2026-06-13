@@ -94,8 +94,10 @@ const font = getFont(Astro.cookies);
       <PirkimasSalygos pirkimas={pirkimas} />
     </div>
 
-    <section class="grid-2">
-      <PirkimasDokumentai failai={t.failai ?? []} />
+    <section class="grid-3">
+      <div class="dok-span-2">
+        <PirkimasDokumentai failai={t.failai ?? []} />
+      </div>
       <PirkimasSkelbimai skelbimai={t.skelbimai} />
       <PirkimasTedNuorodos korteles={tedKorteles} />
 
@@ -112,3 +114,12 @@ const font = getFont(Astro.cookies);
     </section>
   </main>
 </Layout>
+
+<style>
+  /* Documents block fills two of the three columns; cards inside flow into
+     as many sub-columns as fit (see PirkimasDokumentai listClass). */
+  .dok-span-2 { grid-column: span 2; }
+  @media (max-width: 640px) {
+    .dok-span-2 { grid-column: auto; }
+  }
+</style>
