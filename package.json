@@ -21,7 +21,8 @@
         "teisekura:eseimas-content": "node modules/eseimas/scrapeContent.js",
         "teisekura:audit": "node modules/teisekura/audit.js",
         "export:sutartys": "node scripts/exportSutartys.js",
-        "push:sutartys": "node scripts/pushSutartysToSpinta.js"
+        "push:sutartys": "node scripts/pushSutartysToSpinta.js",
+        "process:sutartys-adp-queue": "node modules/sutartys/processAdpQueue.js"
     },
     "overrides": {
         "vite": "^7"

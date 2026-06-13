@@ -3,6 +3,7 @@ import { cvpIsScrapeLeastRecentDate } from "../modules/sutartys/scrapeDay.js";
 import { cvpIsScrapeOldestContract } from "../modules/sutartys/scrapeOldestContract.js";
 import { cvpIsScrapeOldestDeletedContract } from "../modules/sutartys/scrapeOldestDeletedContract.js";
 import { cvpIsRequestLatest } from "../modules/sutartys/scrape.js";
+import { processSutartysAdpQueue } from "../modules/sutartys/processAdpQueue.js";
 
 export default [
     {
@@ -47,5 +48,13 @@ export default [
             if (!isVptWorkingHours()) return cvpIsScrapeOldestDeletedContract();
             return false;
         },
+    },
+    {
+        name: "processSutartysAdpQueue",
+        mode: "asap",
+        priority: 4,
+        cooldown: 30,
+        errorCooldown: 60,
+        job: processSutartysAdpQueue,
     },
 ];

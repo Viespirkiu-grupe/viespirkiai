@@ -187,6 +187,10 @@ export function createSpintaClient(options = {}) {
             return request("GET", `${modelPath(model)}/${id}`);
         },
 
+        async getAll(model, filters = {}) {
+            return request("GET", modelPath(model), { query: filters });
+        },
+
         async insert(model, data) {
             return request("POST", modelPath(model), {
                 body: JSON.stringify(data),
