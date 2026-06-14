@@ -68,8 +68,9 @@ describe("Layer 2 — table whitelist", () => {
         expect(validateSql("SELECT * FROM v_company")).toBeNull();
     });
 
-    it("accepts all six TEMP view names", () => {
-        for (const v of ["v_company", "v_sutartys", "v_pirkimas", "v_person_links", "v_dalyviai", "v_bylos"]) {
+    it("accepts all five TEMP view names", () => {
+        // v_dalyviai is intentionally not wired up (unreliable data) — do not whitelist it.
+        for (const v of ["v_company", "v_sutartys", "v_pirkimas", "v_person_links", "v_bylos"]) {
             expect(validateSql(`SELECT * FROM ${v}`), `Expected ${v} to be accepted`).toBeNull();
         }
     });
@@ -164,7 +165,7 @@ describe("Layer 3 — function whitelist", () => {
         const queries = [
             `SELECT DATE_TRUNC('year', "sudarymoData")::date AS metai, COUNT(*) AS n, ROUND(SUM(verte)/1000) AS v, ROUND(SUM("faktineIvykdimoVerte")/NULLIF(SUM(verte),0),2) AS r FROM v_sutartys WHERE "tiekejoKodas" = '1' AND istrinta IS NOT TRUE GROUP BY metai`,
             `SELECT "pirkimoBudas", COUNT(*) AS n, ROUND(SUM("numatomaVerteEUR")) AS v FROM v_pirkimas WHERE "jarKodas" = '1' GROUP BY "pirkimoBudas" ORDER BY n DESC`,
-            `SELECT COUNT(*) FILTER (WHERE rank = 1) AS wins, ROUND(AVG(bidders), 1) AS avg FROM (SELECT RANK() OVER (PARTITION BY "pirkimoNumeris" ORDER BY "pasiulymoKaina") AS rank, COUNT(*) OVER (PARTITION BY "pirkimoNumeris") AS bidders FROM v_dalyviai) q`,
+            `SELECT COUNT(*) FILTER (WHERE rank = 1) AS wins, ROUND(AVG(bidders), 1) AS avg FROM (SELECT RANK() OVER (PARTITION BY "pirkimoNumeris" ORDER BY verte) AS rank, COUNT(*) OVER (PARTITION BY "pirkimoNumeris") AS bidders FROM v_sutartys) q`,
         ];
         for (const q of queries) {
             expect(validateSql(q), `Expected valid for: ${q.substring(0, 60)}`).toBeNull();

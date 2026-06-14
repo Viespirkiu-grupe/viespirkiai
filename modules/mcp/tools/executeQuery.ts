@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { analystPool } from "../analyst/pool.js";
 import { MAX_QUERY_LENGTH, validateSql } from "../analyst/validateSql.js";
+import { normalizeSql } from "../analyst/normalizeSql.js";
 import { executeWithColumnFix, type ToolResult } from "../analyst/columnFixer.js";
 import { traceSQL, traceSQLFailure } from "../analyst/utils.js";
 import { logToolCall } from "../mcpLogger.js";
@@ -54,14 +55,18 @@ export const schema = {
 };
 
 export async function handler({ query, purpose, page }: { query: string; purpose: string; page: number }): Promise<ToolResult> {
-    // Strip trailing semicolons/whitespace: theme examples and LLM-written SQL routinely end with ";"
-    const sql = query.replace(/[;\s]+$/, "");
+    // Normalize whitespace and PostgreSQL-specific constructs the parser rejects,
+    // then strip trailing semicolons: theme examples and LLM-written SQL routinely end with ";"
+    const sql = normalizeSql(query).replace(/;+$/, "");
     traceSQL(`[execute_query] CALL query="${sql}" purpose="${purpose}" page=${page}`);
     const error = validateSql(sql);
     if (error) {
         traceSQLFailure(`[execute_query] INVALID query="${sql}" reason="${error}"`);
+        const text = error.startsWith("SQL parse error")
+            ? `${error}\n\nHINT: If the query uses '::' type casts, try CAST(expr AS type) instead — the parser sometimes rejects '::' in this position.`
+            : error;
         return {
-            content: [{ type: "text", text: error }],
+            content: [{ type: "text", text }],
             isError: true,
         };
     }

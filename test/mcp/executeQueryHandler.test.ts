@@ -18,7 +18,14 @@ vi.mock("../../postgres/postgres.js", () => ({
     },
 }));
 
+// Mock only validateSql; spread all other exports (TABLE_WHITELIST etc.) from the real module.
+vi.mock(import("../../modules/mcp/analyst/validateSql.js"), async (importOriginal) => {
+    const actual = await importOriginal();
+    return { ...actual, validateSql: vi.fn().mockReturnValue(null) };
+});
+
 import { analystPool } from "../../modules/mcp/analyst/pool.js";
+import { validateSql } from "../../modules/mcp/analyst/validateSql.js";
 import { handler, QUERY_TIMEOUT_SECONDS } from "../../modules/mcp/tools/executeQuery.js";
 
 const VALID_QUERY = "SELECT id FROM sutartys LIMIT 1";
@@ -34,6 +41,7 @@ function makeClient(rows: object[] = []) {
 describe("executeQuery handler — statement_timeout", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(validateSql).mockReturnValue(null);
     });
 
     it("sets statement_timeout using numeric mcpQueryTimeout", async () => {
@@ -58,6 +66,7 @@ describe("executeQuery handler — statement_timeout", () => {
 describe("executeQuery handler — column-not-found hint", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(validateSql).mockReturnValue(null);
     });
 
     it("appends get_schema HINT when DB returns undefined_column error (code 42703)", async () => {
@@ -108,5 +117,99 @@ describe("executeQuery handler — column-not-found hint", () => {
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).not.toContain("HINT");
+    });
+});
+
+describe("executeQuery handler — SQL normalization (whitespace + IS DISTINCT FROM)", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(validateSql).mockReturnValue(null);
+    });
+
+    it("normalises a multi-line query and passes the single-line form to the pool", async () => {
+        const client = makeClient([{ id: 1 }]);
+        vi.mocked(analystPool.connect).mockResolvedValue(client as never);
+
+        const multiLineQuery = `SELECT id
+FROM sutartys
+LIMIT 1`;
+        const result = await handler({ query: multiLineQuery, purpose: VALID_PURPOSE, page: 1 });
+
+        expect(result.isError).toBeUndefined();
+        // The pool should receive the collapsed single-line SQL (wrapped in pagination subquery)
+        const executedSql: string = client.query.mock.calls
+            .map((args) => String(args[0]))
+            .find((s) => s.includes("SELECT id FROM sutartys")) ?? "";
+        expect(executedSql).toContain("SELECT id FROM sutartys LIMIT 1");
+    });
+
+    it("rewrites IS DISTINCT FROM true → IS NOT TRUE before executing", async () => {
+        const client = makeClient([{ id: 1 }]);
+        vi.mocked(analystPool.connect).mockResolvedValue(client as never);
+
+        const result = await handler({
+            query: "SELECT id FROM sutartys WHERE istrinta IS DISTINCT FROM true LIMIT 1",
+            purpose: VALID_PURPOSE,
+            page: 1,
+        });
+
+        expect(result.isError).toBeUndefined();
+        const executedSql: string = client.query.mock.calls
+            .map((args) => String(args[0]))
+            .find((s) => s.includes("IS NOT TRUE")) ?? "";
+        expect(executedSql).toContain("IS NOT TRUE");
+    });
+
+    it("rewrites IS DISTINCT FROM false → IS NOT FALSE before executing", async () => {
+        const client = makeClient([]);
+        vi.mocked(analystPool.connect).mockResolvedValue(client as never);
+
+        const result = await handler({
+            query: "SELECT id FROM sutartys WHERE istrinta IS DISTINCT FROM false LIMIT 1",
+            purpose: VALID_PURPOSE,
+            page: 1,
+        });
+
+        expect(result.isError).toBeUndefined();
+        const executedSql: string = client.query.mock.calls
+            .map((args) => String(args[0]))
+            .find((s) => s.includes("IS NOT FALSE")) ?? "";
+        expect(executedSql).toContain("IS NOT FALSE");
+    });
+});
+
+describe("executeQuery handler — SQL parse error hint", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(validateSql).mockReturnValue(null);
+    });
+
+    it("appends HINT when validation returns a SQL parse error", async () => {
+        vi.mocked(validateSql).mockReturnValueOnce("SQL parse error: Expected [A-Za-z0-9] but '::' found.");
+
+        const result = await handler({ query: VALID_QUERY, purpose: VALID_PURPOSE, page: 1 });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toMatch(/SQL parse error/);
+        expect(result.content[0].text).toContain("HINT");
+        expect(result.content[0].text).toContain("CAST");
+    });
+
+    it("does not append HINT for non-parse validation errors (table not whitelisted)", async () => {
+        vi.mocked(validateSql).mockReturnValueOnce("Table 'pg_class' is not in the allowed table list");
+
+        const result = await handler({ query: VALID_QUERY, purpose: VALID_PURPOSE, page: 1 });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).not.toContain("HINT:");
+    });
+
+    it("does not append HINT for function not on allow list errors", async () => {
+        vi.mocked(validateSql).mockReturnValueOnce("Function 'pg_sleep' is not on the allow list.");
+
+        const result = await handler({ query: VALID_QUERY, purpose: VALID_PURPOSE, page: 1 });
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).not.toContain("HINT:");
     });
 });
