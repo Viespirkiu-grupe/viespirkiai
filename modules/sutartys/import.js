@@ -117,9 +117,9 @@ export async function cvpIsImportArray(data, options = {}) {
             const pirkimoNumeris =
                 item.pirkimoNumeris?.replace(/\x00/g, "").trim() || null;
 
-            const baseIndex = i * 28;
+            const baseIndex = i * 26;
             placeholders.push(
-                `(${Array.from({ length: 28 }, (_, j) => `$${baseIndex + j + 1}`).join(",")})`,
+                `(${Array.from({ length: 26 }, (_, j) => `$${baseIndex + j + 1}`).join(",")})`,
             );
 
             values.push(
@@ -149,8 +149,6 @@ export async function cvpIsImportArray(data, options = {}) {
                 item.papildomiTiekejaiKodai,
                 item.papildomiBvpzKodai,
                 item.papildomiBvpzPavadinimai,
-                item.paskutiniKartaMatyta,
-                item.paskutiniKartaMatyta,
             );
 
             if (!item.dokumentai || !Array.isArray(item.dokumentai)) return;
@@ -199,9 +197,7 @@ export async function cvpIsImportArray(data, options = {}) {
               "papildomiTiekejai",
               "papildomiTiekejaiKodai",
               "papildomiBvpzKodai",
-              "papildomiBvpzPavadinimai",
-              "paskutiniKartaMatyta",
-              "paskutiniKartaAtnaujinta"
+              "papildomiBvpzPavadinimai"
             ) VALUES ${placeholders.join(",")}
             ON CONFLICT ("sutartiesUnikalusId") DO UPDATE SET
               "pirkimoNumeris" = EXCLUDED."pirkimoNumeris",
@@ -228,12 +224,63 @@ export async function cvpIsImportArray(data, options = {}) {
               "papildomiTiekejai" = EXCLUDED."papildomiTiekejai",
               "papildomiTiekejaiKodai" = EXCLUDED."papildomiTiekejaiKodai",
               "papildomiBvpzKodai" = EXCLUDED."papildomiBvpzKodai",
-              "papildomiBvpzPavadinimai" = EXCLUDED."papildomiBvpzPavadinimai",
-              "paskutiniKartaMatyta" = EXCLUDED."paskutiniKartaMatyta",
-              "paskutiniKartaAtnaujinta" = EXCLUDED."paskutiniKartaAtnaujinta";`,
+              "papildomiBvpzPavadinimai" = EXCLUDED."papildomiBvpzPavadinimai"
+            WHERE "sutartys"."pirkimoNumeris" IS DISTINCT FROM EXCLUDED."pirkimoNumeris"
+               OR "sutartys"."pavadinimas" IS DISTINCT FROM EXCLUDED."pavadinimas"
+               OR "sutartys"."bvpzKodas" IS DISTINCT FROM EXCLUDED."bvpzKodas"
+               OR "sutartys"."bvpzPavadinimas" IS DISTINCT FROM EXCLUDED."bvpzPavadinimas"
+               OR "sutartys"."dokumentai" IS DISTINCT FROM EXCLUDED."dokumentai"
+               OR "sutartys"."dokumentuKiekis" IS DISTINCT FROM EXCLUDED."dokumentuKiekis"
+               OR "sutartys"."faktineIvykdimoData" IS DISTINCT FROM EXCLUDED."faktineIvykdimoData"
+               OR "sutartys"."faktineIvykdimoVerte" IS DISTINCT FROM EXCLUDED."faktineIvykdimoVerte"
+               OR "sutartys"."galiojimoData" IS DISTINCT FROM EXCLUDED."galiojimoData"
+               OR "sutartys"."kategorija" IS DISTINCT FROM EXCLUDED."kategorija"
+               OR "sutartys"."paskelbimoData" IS DISTINCT FROM EXCLUDED."paskelbimoData"
+               OR "sutartys"."paskutinioAtnaujinimoData" IS DISTINCT FROM EXCLUDED."paskutinioAtnaujinimoData"
+               OR "sutartys"."paskutinioRedagavimoData" IS DISTINCT FROM EXCLUDED."paskutinioRedagavimoData"
+               OR "sutartys"."perkanciojiOrganizacija" IS DISTINCT FROM EXCLUDED."perkanciojiOrganizacija"
+               OR "sutartys"."perkanciosiosOrganizacijosKodas" IS DISTINCT FROM EXCLUDED."perkanciosiosOrganizacijosKodas"
+               OR "sutartys"."sudarymoData" IS DISTINCT FROM EXCLUDED."sudarymoData"
+               OR "sutartys"."sutartiesNumeris" IS DISTINCT FROM EXCLUDED."sutartiesNumeris"
+               OR "sutartys"."tiekejas" IS DISTINCT FROM EXCLUDED."tiekejas"
+               OR "sutartys"."tiekejoKodas" IS DISTINCT FROM EXCLUDED."tiekejoKodas"
+               OR "sutartys"."tipas" IS DISTINCT FROM EXCLUDED."tipas"
+               OR "sutartys"."verte" IS DISTINCT FROM EXCLUDED."verte"
+               OR "sutartys"."papildomiTiekejai" IS DISTINCT FROM EXCLUDED."papildomiTiekejai"
+               OR "sutartys"."papildomiTiekejaiKodai" IS DISTINCT FROM EXCLUDED."papildomiTiekejaiKodai"
+               OR "sutartys"."papildomiBvpzKodai" IS DISTINCT FROM EXCLUDED."papildomiBvpzKodai"
+               OR "sutartys"."papildomiBvpzPavadinimai" IS DISTINCT FROM EXCLUDED."papildomiBvpzPavadinimai";`,
             values,
         );
         timings.end("importPostgresUpsert");
+
+        // "paskutiniKartaMatyta" / "paskutiniKartaAtnaujinta" iškelti į plonąją
+        // sutartysAtnaujinimai lentelę (1:1), kad dažni "matyta dabar" rašymai
+        // nebebloatintų sutartys eilutės. Abu laukai gauna tą pačią reikšmę,
+        // kaip darydavo ankstesnis bendras upsert.
+        timings.start("importPostgresAtnaujinimaiUpsert");
+        const atnaujinimaiValues = [];
+        const atnaujinimaiPlaceholders = items.map((item, i) => {
+            atnaujinimaiValues.push(
+                item.sutartiesUnikalusID,
+                item.paskutiniKartaMatyta,
+                item.paskutiniKartaMatyta,
+            );
+            const base = i * 3;
+            return `($${base + 1}, $${base + 2}, $${base + 3})`;
+        });
+        await postgres.query(
+            `INSERT INTO "sutartysAtnaujinimai" (
+              "sutartiesUnikalusId",
+              "paskutiniKartaMatyta",
+              "paskutiniKartaAtnaujinta"
+            ) VALUES ${atnaujinimaiPlaceholders.join(",")}
+            ON CONFLICT ("sutartiesUnikalusId") DO UPDATE SET
+              "paskutiniKartaMatyta" = EXCLUDED."paskutiniKartaMatyta",
+              "paskutiniKartaAtnaujinta" = EXCLUDED."paskutiniKartaAtnaujinta";`,
+            atnaujinimaiValues,
+        );
+        timings.end("importPostgresAtnaujinimaiUpsert");
 
         timings.start("importPostgresFailaiUpsert");
         if (newFailai.length > 0) {

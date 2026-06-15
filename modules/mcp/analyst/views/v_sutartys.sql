@@ -8,8 +8,8 @@ SELECT s."sutartiesUnikalusId",
        s."faktineIvykdimoData",
        s."paskutinioRedagavimoData",
        s."paskutinioAtnaujinimoData",
-       s."paskutiniKartaMatyta",
-       s."paskutiniKartaAtnaujinta",
+       a."paskutiniKartaMatyta",
+       a."paskutiniKartaAtnaujinta",
        s.verte,
        s.suma,
        s."faktineIvykdimoVerte",
@@ -48,5 +48,6 @@ SELECT s."sutartiesUnikalusId",
        ARRAY[s."tiekejoKodas"] || COALESCE(s."papildomiTiekejaiKodai", '{}')     AS "tiekejaiKodai",
        ARRAY[s."tiekejas"] || COALESCE(s."papildomiTiekejai", '{}')              AS tiekejai
 FROM sutartys s
+         LEFT JOIN "sutartysAtnaujinimai" a ON a."sutartiesUnikalusId" = s."sutartiesUnikalusId"
          LEFT JOIN "jarCsv" pb ON pb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
          LEFT JOIN "jarCsv" tb ON tb."jarKodas"::text = s."tiekejoKodas"

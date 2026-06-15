@@ -107,6 +107,11 @@ export const SUTARTYS_COLUMNS = [
     `"suma"`, `"istrinta"`, `"paskutiniKartaAtnaujinta"`,
 ].join(", ");
 
+// sutartys + 1:1 sutartysAtnaujinimai (paskutiniKarta* iškelti į atskirą lentelę).
+// USING palieka "sutartiesUnikalusId" vienareikšmį, kiti stulpeliai unikalūs,
+// tad WHERE/ORDER BY/SELECT su nekvalifikuotais vardais veikia be pakeitimų.
+const SUTARTYS_FROM = `sutartys LEFT JOIN "sutartysAtnaujinimai" USING ("sutartiesUnikalusId")`;
+
 /**
  * Loads complete contract rows from PostgreSQL while preserving Typesense order.
  * Missing or deleted PostgreSQL rows are omitted.
@@ -123,6 +128,7 @@ async function loadTypesenseRowsFromPostgres(typesenseRows) {
     const { rows } = await postgres.query(
         `SELECT ${SUTARTYS_COLUMNS}
          FROM sutartys
+         LEFT JOIN "sutartysAtnaujinimai" USING ("sutartiesUnikalusId")
          WHERE "sutartiesUnikalusId" = ANY($1::int[])
            AND NOT COALESCE(istrinta, false)`,
         [ids],
@@ -250,7 +256,7 @@ export async function searchSutartys(
 
     const { sql, sqlCount, params, paramsCount, values, queryParams } =
         sutartysFilter.build(query, {
-            table: "sutartys",
+            table: SUTARTYS_FROM,
             select: SUTARTYS_COLUMNS,
             fixedWhere: FIXED_WHERE,
             limit,

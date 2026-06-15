@@ -6,12 +6,10 @@ nes scrape.js iki 2026-05-28 klaidingai dalindavo reikšmę 100x per daug
 Vienas iškvietimas atnaujina vieną seniausią sutartį iš tų, kurios dar
 neatnaujintos po klaidos pataisymo. Kartoti per loop'ą / cron, kol grąžins false.
 
-Pagalbinis indeksas (sukurti rankiniu būdu, žr. apačioje):
-
-  CREATE INDEX CONCURRENTLY IF NOT EXISTS
-    "sutartys_faktine_verte_atnaujinta_idx"
-  ON public.sutartys ("paskutiniKartaAtnaujinta" NULLS FIRST)
-  WHERE "faktineIvykdimoVerte" IS NOT NULL;
+PASTABA: "paskutiniKartaAtnaujinta" iškeltas į sutartysAtnaujinimai lentelę, o
+"faktineIvykdimoVerte" lieka sutartys, todėl seniausiosios paieška dabar yra
+JOIN'as (buvęs partial indeksas sutartys_faktine_verte_atnaujinta_idx panaikintas).
+Skriptas laikinas (cutoff žemiau), tad lėtesnė užklausa priimtina.
 */
 
 import { postgres } from "../../postgres/postgres.js";
@@ -28,12 +26,13 @@ export async function cvpIsRescrapeFaktineVerte() {
     let timings = new Timings();
     timings.start("findOldestFaktineVerte");
     let oldestRes = await postgres.query(
-        `SELECT "sutartiesUnikalusId", "paskutiniKartaAtnaujinta"
-           FROM public.sutartys
-          WHERE "faktineIvykdimoVerte" IS NOT NULL
-            AND ("paskutiniKartaAtnaujinta" IS NULL
-                 OR "paskutiniKartaAtnaujinta" < $1::timestamp)
-          ORDER BY "paskutiniKartaAtnaujinta" ASC NULLS FIRST
+        `SELECT a."sutartiesUnikalusId", a."paskutiniKartaAtnaujinta"
+           FROM public."sutartysAtnaujinimai" a
+           JOIN public."sutartys" s ON s."sutartiesUnikalusId" = a."sutartiesUnikalusId"
+          WHERE s."faktineIvykdimoVerte" IS NOT NULL
+            AND (a."paskutiniKartaAtnaujinta" IS NULL
+                 OR a."paskutiniKartaAtnaujinta" < $1::timestamp)
+          ORDER BY a."paskutiniKartaAtnaujinta" ASC NULLS FIRST
           LIMIT 1;`,
         [FIX_CUTOFF],
     );
@@ -52,20 +51,26 @@ export async function cvpIsRescrapeFaktineVerte() {
     ({ timings, count } = await cvpIsScrpeById(id, { timings }));
 
     timings.start("updatePaskutiniKartaAtnaujinta");
+    await postgres.query(
+        `UPDATE public."sutartysAtnaujinimai"
+            SET "paskutiniKartaAtnaujinta" = NOW() AT TIME ZONE 'Europe/Vilnius'
+          WHERE "sutartiesUnikalusId" = $1;`,
+        [id],
+    );
     if (count == 1) {
         await postgres.query(
             `UPDATE public.sutartys
-                SET "paskutiniKartaAtnaujinta" = NOW() AT TIME ZONE 'Europe/Vilnius',
-                    "istrinta" = false
-              WHERE "sutartiesUnikalusId" = $1;`,
+                SET "istrinta" = false
+              WHERE "sutartiesUnikalusId" = $1
+                AND "istrinta" IS DISTINCT FROM false;`,
             [id],
         );
     } else if (count == 0) {
         await postgres.query(
             `UPDATE public.sutartys
-                SET "paskutiniKartaAtnaujinta" = NOW() AT TIME ZONE 'Europe/Vilnius',
-                    "istrinta" = true
-              WHERE "sutartiesUnikalusId" = $1;`,
+                SET "istrinta" = true
+              WHERE "sutartiesUnikalusId" = $1
+                AND "istrinta" IS DISTINCT FROM true;`,
             [id],
         );
         let doc = null;

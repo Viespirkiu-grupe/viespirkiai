@@ -7,13 +7,14 @@ import { typesense } from "../../typesense/typesense.js";
 export async function cvpIsScrapeOldestDeletedContract() {
     let timings = new Timings();
     timings.start("findOldestScrapedSutartis");
-    let oldestRes = await postgres.query(`SELECT *
-    FROM public."sutartys"
-    WHERE "istrinta" = true
-      AND "paskutiniKartaAtnaujinta" < (
+    let oldestRes = await postgres.query(`SELECT a."sutartiesUnikalusId", a."paskutiniKartaAtnaujinta"
+    FROM public."sutartysAtnaujinimai" a
+    JOIN public."sutartys" s ON s."sutartiesUnikalusId" = a."sutartiesUnikalusId"
+    WHERE s."istrinta" = true
+      AND a."paskutiniKartaAtnaujinta" < (
         timezone('Europe/Vilnius', now()) - INTERVAL '1 hour'
       )
-    ORDER BY "paskutiniKartaAtnaujinta" ASC NULLS FIRST
+    ORDER BY a."paskutiniKartaAtnaujinta" ASC NULLS FIRST
     LIMIT 1;`);
     timings.end("findOldestScrapedSutartis");
 
@@ -28,22 +29,30 @@ export async function cvpIsScrapeOldestDeletedContract() {
     let count;
     ({ timings, count } = await cvpIsScrpeById(id, { timings }));
 
-    // Update the "paskutiniKartaAtnaujinta" field to the current timestamp
+    // Update the "paskutiniKartaAtnaujinta" field to the current timestamp.
+    // Timestamp keliauja į plonąją sutartysAtnaujinimai lentelę; istrinta
+    // rašoma į sutartys tik kai reikšmė keičiasi, kad nebloatintų eilutės.
     timings.start("updatePaskutiniKartaAtnaujinta");
+    await postgres.query(
+        `UPDATE public."sutartysAtnaujinimai"
+         SET "paskutiniKartaAtnaujinta" = NOW() AT TIME ZONE 'Europe/Vilnius'
+         WHERE "sutartiesUnikalusId" = $1;`,
+        [id],
+    );
     if (count == 1) {
         await postgres.query(
             `UPDATE public.sutartys
-             SET "paskutiniKartaAtnaujinta" = NOW() AT TIME ZONE 'Europe/Vilnius',
-                 "istrinta" = false
-             WHERE "sutartiesUnikalusId" = $1;`,
+             SET "istrinta" = false
+             WHERE "sutartiesUnikalusId" = $1
+               AND "istrinta" IS DISTINCT FROM false;`,
             [id],
         );
     } else if (count == 0) {
         await postgres.query(
             `UPDATE public.sutartys
-             SET "paskutiniKartaAtnaujinta" = NOW() AT TIME ZONE 'Europe/Vilnius',
-                 "istrinta" = true
-             WHERE "sutartiesUnikalusId" = $1;`,
+             SET "istrinta" = true
+             WHERE "sutartiesUnikalusId" = $1
+               AND "istrinta" IS DISTINCT FROM true;`,
             [id],
         );
 
