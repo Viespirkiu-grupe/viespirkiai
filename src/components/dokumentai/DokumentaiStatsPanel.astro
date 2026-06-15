@@ -350,7 +350,13 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
     background: color-mix(in srgb, var(--link) 32%, var(--lighter-gray));
     transform-origin: bottom;
     transition: background .12s, opacity .12s;
-    animation: dokStatsGrowY .6s cubic-bezier(.2, .7, .2, 1) both;
+    /* `backwards`, not `both`: keep the collapsed start state before the
+       animation, but DON'T retain the final `scaleY(1)` afterwards. A lingering
+       (identity) transform puts the bar on its own raster layer scaled against
+       the chart's fractional baseline, which anti-aliases the bottom edge a
+       different amount per bar — the ~1px height jitter. Reverting to the
+       static `height` paints the baseline crisply. */
+    animation: dokStatsGrowY .6s cubic-bezier(.2, .7, .2, 1) backwards;
     animation-delay: calc(var(--i, 0) * 18ms + 60ms);
   }
   .dok-stats__col.is-peak .dok-stats__col-bar { background: color-mix(in srgb, var(--link) 60%, var(--lighter-gray)); }
@@ -401,7 +407,7 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
     width: var(--w, 0);
     background: var(--c, #2563eb);
     transform-origin: left;
-    animation: dokStatsGrowX .6s cubic-bezier(.2, .7, .2, 1) both;
+    animation: dokStatsGrowX .6s cubic-bezier(.2, .7, .2, 1) backwards;
     animation-delay: .1s;
   }
   .dok-stats__legend { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -454,7 +460,7 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
     z-index: -1;
     background: color-mix(in srgb, var(--link) 11%, transparent);
     transform-origin: left;
-    animation: dokStatsGrowX .6s cubic-bezier(.2, .7, .2, 1) both;
+    animation: dokStatsGrowX .6s cubic-bezier(.2, .7, .2, 1) backwards;
     animation-delay: calc(var(--i, 0) * 40ms + 100ms);
   }
   .dok-stats__rank-row:hover .dok-stats__rank-bar { background: color-mix(in srgb, var(--link) 18%, transparent); }

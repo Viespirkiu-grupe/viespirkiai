@@ -3112,7 +3112,11 @@ function distModel(m: typeof sizeMetrics[number]) {
 
   @media (max-width: 900px) {
     .dok-shell {
-      grid-template-columns: 1fr;
+      /* minmax(0, 1fr), not 1fr: a bare 1fr track is minmax(auto, 1fr), whose
+         auto minimum grows to the widest child's min-content (the sidebar
+         filter options), forcing the single column — and the whole page —
+         wider than the viewport. minmax(0,…) lets the column shrink. */
+      grid-template-columns: minmax(0, 1fr);
       /* The knowledge card sits above the results on phones — its peek is the
          answer; the result list is the long tail below it. */
       grid-template-areas:
