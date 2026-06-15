@@ -120,6 +120,7 @@ describe("v_pirkimas", () => {
         const row = rows[0];
         expect("saltinis" in row, "missing saltinis").toBe(true);
         expect("pirkimoId" in row, "missing pirkimoId").toBe(true);
+        expect("jarKodasSaltinis" in row, "missing jarKodasSaltinis").toBe(true);
         expect("organizatorius" in row, "missing organizatorius (joined from viesiejiPirkimaiVykdytojai)").toBe(true);
         expect("numatomaVerteEUR" in row, "missing numatomaVerteEUR").toBe(true);
     });
@@ -141,17 +142,49 @@ describe("v_pirkimas", () => {
         const client = await getClient();
         // @ts-ignore
         const { rows } = await client.query(
-            `SELECT * FROM v_pirkimas WHERE saltinis = 'cvpp' LIMIT 1`,
+            `SELECT * FROM v_pirkimas WHERE saltinis = 'cvpp' AND "jarKodasSaltinis" IS NULL LIMIT 1`,
         );
-        expect(rows.length, "expected at least one cvpp row").toBeGreaterThan(0);
+        expect(rows.length, "expected at least one cvpp row without a jarKodas match").toBeGreaterThan(0);
         const row = rows[0];
         expect(row.jarKodas).toBeNull();
+        expect(row.jarKodasSaltinis).toBeNull();
         expect(row.pirkimoBudas).toBeNull();
         expect(row.statusas).toBeNull();
         expect(row.numatomaVerteEUR).toBeNull();
         expect(row.bvpzKodai).toBeNull();
         expect(typeof row.informacija).toBe("string");
         expect(row.informacija.startsWith("http"), "informacija should be a CVPP link").toBe(true);
+    });
+
+    it("cvpis rows have NULL jarKodasSaltinis (jarKodas is direct, not derived)", async () => {
+        const client = await getClient();
+        // @ts-ignore
+        const { rows } = await client.query(
+            `SELECT count(*) AS cnt FROM v_pirkimas WHERE saltinis = 'cvpis' AND "jarKodasSaltinis" IS NOT NULL`,
+        );
+        expect(Number(rows[0].cnt)).toBe(0);
+    });
+
+    it("enriches cvpp jarKodas via sutartys.pirkimoNumeris join (Opcija A)", async () => {
+        const client = await getClient();
+        // @ts-ignore
+        const { rows } = await client.query(
+            `SELECT "pirkimoId", "jarKodas", "jarKodasSaltinis" FROM v_pirkimas
+             WHERE saltinis = 'cvpp' AND "jarKodasSaltinis" = 'sutartys-join' LIMIT 1`,
+        );
+        expect(rows.length, "expected at least one cvpp row enriched via sutartys join").toBeGreaterThan(0);
+        const row = rows[0];
+        expect(typeof row.jarKodas).toBe("string");
+        expect(row.jarKodas.length).toBeGreaterThan(0);
+
+        // @ts-ignore
+        const { rows: sutartysRows } = await client.query(
+            `SELECT DISTINCT "perkanciosiosOrganizacijosKodas" FROM sutartys
+             WHERE "pirkimoNumeris" = $1 AND "perkanciosiosOrganizacijosKodas" IS NOT NULL`,
+            [row.pirkimoId],
+        );
+        const kodai = sutartysRows.map((r: { perkanciosiosOrganizacijosKodas: string }) => r.perkanciosiosOrganizacijosKodas);
+        expect(kodai, "jarKodas should come from a matching sutartys row").toContain(row.jarKodas);
     });
 
     it("excludes cvpp rows whose pirkimoNumeris already exists in viesiejiPirkimai (no duplicates)", async () => {

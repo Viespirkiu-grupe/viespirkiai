@@ -3,6 +3,7 @@ SELECT 'cvpis' AS saltinis,
        p."pirkimoId",
        p.pavadinimas,
        p."jarKodas",
+       NULL::text AS "jarKodasSaltinis",
        o.pavadinimas AS organizatorius,
        o.trumpinys,
        o.miestas,
@@ -22,7 +23,8 @@ UNION ALL
 SELECT 'cvpp' AS saltinis,
        c."pirkimoNumeris" AS "pirkimoId",
        c.pavadinimas,
-       NULL AS "jarKodas",
+       sj."perkanciosiosOrganizacijosKodas" AS "jarKodas",
+       CASE WHEN sj."perkanciosiosOrganizacijosKodas" IS NOT NULL THEN 'sutartys-join' END AS "jarKodasSaltinis",
        c."pirkimoVykdytojas" AS organizatorius,
        NULL AS trumpinys,
        NULL AS miestas,
@@ -37,6 +39,13 @@ SELECT 'cvpp' AS saltinis,
        NULL AS "bvpzKodai",
        c.link AS informacija
 FROM "cvppViesiejiPirkimai" c
+         LEFT JOIN LATERAL (
+             SELECT s."perkanciosiosOrganizacijosKodas"
+             FROM sutartys s
+             WHERE s."pirkimoNumeris" = c."pirkimoNumeris"
+               AND s."perkanciosiosOrganizacijosKodas" IS NOT NULL
+             LIMIT 1
+         ) sj ON true
 WHERE c."skelbimoTipas" = 'Skelbimas apie pirkimą'
   AND NOT EXISTS (
       SELECT 1 FROM "viesiejiPirkimai" p

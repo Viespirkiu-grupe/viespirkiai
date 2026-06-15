@@ -123,6 +123,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             "pirkimoId: text",
             "pavadinimas: text",
             "jarKodas: text",
+            "jarKodasSaltinis: text",
             "organizatorius: text",
             "trumpinys: text",
             "miestas: text",
@@ -141,9 +142,14 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         example:
             'SELECT "pirkimoId", pavadinimas, organizatorius, statusas, "numatomaVerteEUR" FROM v_pirkimas WHERE statusas = \'Paskelbtas\'',
         notes:
-            "saltinis = 'cvpis' (CVP IS, ~2022 m. rugsėjis – dabar) arba 'cvpp' (CVPP archyvas, iki 2022 m., tik 'Skelbimas apie pirkimą' tipo skelbimai, " +
-            "be dublikatų su CVP IS). 'cvpp' eilutėms jarKodas, pirkimoBudas, statusas, zingsnis, pirkimoObjektoTipas, numatomaVerteEUR, esFinansavimas, bvpzKodai yra NULL, " +
-            "o informacija yra nuoroda (link) į originalų CVPP skelbimą. Filtruojant pagal pirkėją senuose (CVPP) pirkimuose naudok organizatorius (tekstas), nes jarKodas nėra.",
+            "Du šaltiniai (saltinis):\n" +
+            "- 'cvpis': CVP IS, ~2022-09–dabar. jarKodas tiesioginis, jarKodasSaltinis=NULL.\n" +
+            "- 'cvpp': CVPP archyvas, iki 2022 (tik 'Skelbimas apie pirkimą', be CVP IS dublikatų). " +
+            "pirkimoBudas/statusas/zingsnis/pirkimoObjektoTipas/numatomaVerteEUR/esFinansavimas/bvpzKodai=NULL; " +
+            "informacija=nuoroda į CVPP skelbimą.\n" +
+            "jarKodas 'cvpp' eilutėms gaunamas per sutartys.pirkimoNumeris atitikmenį (~45% atvejų): " +
+            "jarKodasSaltinis='sutartys-join' jei rastas; kitaip jarKodas ir jarKodasSaltinis=NULL — " +
+            "tokiu atveju pirkėją filtruok per organizatorius (tekstas), ne jarKodas.",
     },
     v_person_links: {
         tags: ["conflict-of-interest", "directors", "beneficial-owners"],
