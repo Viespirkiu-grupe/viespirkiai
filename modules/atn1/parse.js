@@ -306,7 +306,7 @@ async function processAtn1(fileId) {
     }
 }
 
-const ATN_NUSKAITYMAS_VERSIJA = 2;
+const ATN_NUSKAITYMAS_VERSIJA = 3;
 export async function doOneAtn1() {
     // get one from failai where tipas = ATN-1 and tipasNuskaitymas < ATN_NUSKAITYMAS_VERSIJA but >=0
     let rowRes = await postgres.query(

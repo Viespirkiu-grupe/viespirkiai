@@ -152,7 +152,7 @@ export async function upsertAtn1(client, failasId, ppa) {
                 })
                 .join(",");
             await client.query(
-                `insert into "atn1atmestiPasiulymai" ("ataskaitaId","daliesNumeris","dalyvioKodas","dalyvioPavadinimas","statusas","nepakviestoPriezastys","atsiemimoPriezastys","atmetimoTeisinisPageindas","atmetimoPriezastys","pasiulymoKaina","kainosIsraiska") values ${vals}`,
+                `insert into "atn1atmestiPasiulymai" ("ataskaitaId","daliesNumeris","dalyvioKodas","dalyvioPavadinimas","statusas","nepakviestoPriezastys","atsiemimoPriezastys","atmetimoTeisinisPagrindas","atmetimoPriezastys","pasiulymoKaina","kainosIsraiska") values ${vals}`,
                 ppa.atmestiPasiulymai.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
@@ -163,7 +163,11 @@ export async function upsertAtn1(client, failasId, ppa) {
                     d.atsiemimoPriezastys,
                     d.atmetimoTeisinisPagrindas,
                     d.atmetimoPriezastys,
-                    d.pasiulymoKainaSanaudos,
+                    d.pasiulymoKainaSanaudos
+                        ? parseFloat(
+                              d.pasiulymoKainaSanaudos.replace(/,/g, ""),
+                          )
+                        : null,
                     d.kainosSanauduIsraiska,
                 ]),
             );
@@ -185,7 +189,9 @@ export async function upsertAtn1(client, failasId, ppa) {
                     d.dalyvioKodas,
                     d.dalyvioPavadinimas,
                     d.kainosKokybesSantykis,
-                    d.kainaSanaudos,
+                    d.kainaSanaudos
+                        ? parseFloat(d.kainaSanaudos.replace(/,/g, ""))
+                        : null,
                     d.kainosSanauduIsraiska,
                 ]),
             );
