@@ -28,6 +28,7 @@ interface ViewMetadata {
     columns: string[];
     primaryKeys: string[];
     example: string;
+    notes?: string;
 }
 
 export const VIEW_METADATA: Record<string, ViewMetadata> = {
@@ -111,13 +112,14 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             'SELECT "sutartiesUnikalusId", pirkejas, tiekejas, verte, "bvpzPavadinimas", "sudarymoData" FROM v_sutartys WHERE "sudarymoData" >= CURRENT_DATE - INTERVAL \'1 year\'',
     },
     v_pirkimas: {
-        tags: ["procedures", "criteria", "lot-count", "single-bidder"],
-        keys: ["pirkimoId", "jarKodas", "pirkimoBudas", "statusas", "numatomaVerteEUR"],
+        tags: ["procedures", "criteria", "lot-count", "single-bidder", "cvpp-archive"],
+        keys: ["pirkimoId", "saltinis", "jarKodas", "pirkimoBudas", "statusas", "numatomaVerteEUR"],
         joins: [
             ["jarKodas", "v_company.jarKodas", "strict"],
             ["pirkimoId", "v_sutartys.pirkimoNumeris", "semantic"],
         ],
         columns: [
+            "saltinis: text",
             "pirkimoId: text",
             "pavadinimas: text",
             "jarKodas: text",
@@ -138,6 +140,10 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         primaryKeys: ["pirkimoId"],
         example:
             'SELECT "pirkimoId", pavadinimas, organizatorius, statusas, "numatomaVerteEUR" FROM v_pirkimas WHERE statusas = \'Paskelbtas\'',
+        notes:
+            "saltinis = 'cvpis' (CVP IS, ~2022 m. rugsėjis – dabar) arba 'cvpp' (CVPP archyvas, iki 2022 m., tik 'Skelbimas apie pirkimą' tipo skelbimai, " +
+            "be dublikatų su CVP IS). 'cvpp' eilutėms jarKodas, pirkimoBudas, statusas, zingsnis, pirkimoObjektoTipas, numatomaVerteEUR, esFinansavimas, bvpzKodai yra NULL, " +
+            "o informacija yra nuoroda (link) į originalų CVPP skelbimą. Filtruojant pagal pirkėją senuose (CVPP) pirkimuose naudok organizatorius (tekstas), nes jarKodas nėra.",
     },
     v_person_links: {
         tags: ["conflict-of-interest", "directors", "beneficial-owners"],
@@ -340,13 +346,14 @@ async function describeViewDetail(viewName: string): Promise<object> {
         };
     }
 
-    const result = {
+    const result: Record<string, unknown> = {
         id: viewName,
         pk: metadata.primaryKeys,
         columns: columnsArrayToObject(metadata.columns),
         joins: metadata.joins,
         ex: metadata.example,
     };
+    if (metadata.notes) result.notes = metadata.notes;
 
     return {
         structuredContent: result,

@@ -118,9 +118,64 @@ describe("v_pirkimas", () => {
         const { rows } = await client.query("SELECT * FROM v_pirkimas LIMIT 1");
         expect(rows.length, "v_pirkimas returned no rows").toBeGreaterThan(0);
         const row = rows[0];
+        expect("saltinis" in row, "missing saltinis").toBe(true);
         expect("pirkimoId" in row, "missing pirkimoId").toBe(true);
         expect("organizatorius" in row, "missing organizatorius (joined from viesiejiPirkimaiVykdytojai)").toBe(true);
         expect("numatomaVerteEUR" in row, "missing numatomaVerteEUR").toBe(true);
+    });
+
+    it("includes both cvpis and cvpp sources", async () => {
+        const client = await getClient();
+        // @ts-ignore
+        const { rows } = await client.query(
+            `SELECT saltinis, count(*) AS cnt FROM v_pirkimas GROUP BY saltinis ORDER BY saltinis`,
+        );
+        const counts = Object.fromEntries(
+            rows.map((r: { saltinis: string; cnt: string }) => [r.saltinis, Number(r.cnt)]),
+        );
+        expect(counts.cvpis, "expected cvpis rows").toBeGreaterThan(0);
+        expect(counts.cvpp, "expected cvpp rows").toBeGreaterThan(0);
+    });
+
+    it("cvpp rows have NULL for CVP IS-only fields and a link in informacija", async () => {
+        const client = await getClient();
+        // @ts-ignore
+        const { rows } = await client.query(
+            `SELECT * FROM v_pirkimas WHERE saltinis = 'cvpp' LIMIT 1`,
+        );
+        expect(rows.length, "expected at least one cvpp row").toBeGreaterThan(0);
+        const row = rows[0];
+        expect(row.jarKodas).toBeNull();
+        expect(row.pirkimoBudas).toBeNull();
+        expect(row.statusas).toBeNull();
+        expect(row.numatomaVerteEUR).toBeNull();
+        expect(row.bvpzKodai).toBeNull();
+        expect(typeof row.informacija).toBe("string");
+        expect(row.informacija.startsWith("http"), "informacija should be a CVPP link").toBe(true);
+    });
+
+    it("excludes cvpp rows whose pirkimoNumeris already exists in viesiejiPirkimai (no duplicates)", async () => {
+        const client = await getClient();
+        // @ts-ignore
+        const { rows } = await client.query(`
+            SELECT count(*) AS cnt FROM v_pirkimas v
+            WHERE v.saltinis = 'cvpp'
+              AND EXISTS (SELECT 1 FROM "viesiejiPirkimai" p WHERE p."pirkimoId" = v."pirkimoId")
+        `);
+        expect(Number(rows[0].cnt)).toBe(0);
+    });
+
+    it("only includes 'Skelbimas apie pirkimą' notices from the cvpp archive", async () => {
+        const client = await getClient();
+        // @ts-ignore
+        const { rows } = await client.query(`
+            SELECT count(*) AS cnt FROM v_pirkimas v
+            WHERE v.saltinis = 'cvpp'
+              AND v."pirkimoId" NOT IN (
+                  SELECT "pirkimoNumeris" FROM "cvppViesiejiPirkimai" WHERE "skelbimoTipas" = 'Skelbimas apie pirkimą'
+              )
+        `);
+        expect(Number(rows[0].cnt)).toBe(0);
     });
 });
 
