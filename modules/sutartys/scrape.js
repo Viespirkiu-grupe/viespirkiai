@@ -315,14 +315,18 @@ export async function cvpIsScrapePageContent(url, options = {}) {
                     .querySelectorAll("td")[1]
                     .querySelectorAll("a");
 
+                // Atmetame nuorodas, kurios nėra tikri sutarties failai
+                // (pvz. bendra "Asmens duomenų tvarkymo politika" nuoroda į
+                // Politika.pdf). Tikri failai turi dok_id ir file_id parametrus.
                 dokumentuLink.forEach((link) => {
+                    if (!/file_id=\d+/.test(link.href)) return;
                     sutartis.dokumentai.push({
                         pavadinimas: link.innerHTML,
                         url: "https://eviesiejipirkimai.lt" + link.href,
                     });
                 });
 
-                sutartis.dokumentuKiekis = dokumentuLink.length;
+                sutartis.dokumentuKiekis = sutartis.dokumentai.length;
             } else {
                 throw new Error("Nerastas laukelis: " + tr.innerHTML);
             }
