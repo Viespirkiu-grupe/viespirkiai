@@ -212,6 +212,46 @@ describe("v_pirkimas", () => {
     });
 });
 
+describe("v_dalyviai", () => {
+    it("returns rows with expected columns", async () => {
+        const client = await getClient();
+        // @ts-ignore
+        const { rows } = await client.query("SELECT * FROM v_dalyviai LIMIT 1");
+        expect(rows.length, "v_dalyviai returned no rows").toBeGreaterThan(0);
+        const row = rows[0];
+        expect("pirkimoNumeris" in row, "missing pirkimoNumeris").toBe(true);
+        expect("tiekejoKodas" in row, "missing tiekejoKodas").toBe(true);
+        expect("tiekejas" in row, "missing tiekejas (joined from jarCsv)").toBe(true);
+        expect("daliesNumeris" in row, "missing daliesNumeris").toBe(true);
+        expect("pasiulymoKaina" in row, "missing pasiulymoKaina").toBe(true);
+        expect("atmetimoPriezastis" in row, "missing atmetimoPriezastis").toBe(true);
+    });
+
+    it("has non-null pasiulymoKaina for at least some rows", async () => {
+        const client = await getClient();
+        // @ts-ignore
+        const { rows } = await client.query(
+            `SELECT count(*) AS cnt FROM v_dalyviai WHERE "pasiulymoKaina" IS NOT NULL`,
+        );
+        expect(Number(rows[0].cnt), "expected some rows with a non-null pasiulymoKaina").toBeGreaterThan(0);
+    });
+
+    it("does not fan out across lots — no cartesian explosion from the eile/atmetimai join", async () => {
+        const client = await getClient();
+        // @ts-ignore
+        const { rows } = await client.query(`
+            SELECT max(cnt) AS max_cnt FROM (
+                SELECT "pirkimoNumeris", "tiekejoKodas", "daliesNumeris", "eileNumeris", "atmetimoPriezastis", count(*) AS cnt
+                FROM v_dalyviai
+                GROUP BY 1, 2, 3, 4, 5
+            ) x
+        `);
+        // A handful of duplicate atn1ataskaitos rows exist for the same pirkimoNumeris (re-scraped reports),
+        // so small counts are expected. A cartesian fanout across lots would produce counts in the dozens/hundreds.
+        expect(Number(rows[0].max_cnt), "unexpected large fanout for a (pirkimas, tiekejas, dalis, eile, atmetimas) combination").toBeLessThan(10);
+    });
+});
+
 describe("v_person_links", () => {
     it("returns rows with expected columns", async () => {
         const client = await getClient();
@@ -223,20 +263,6 @@ describe("v_person_links", () => {
         expect("vardas" in row, "missing vardas").toBe(true);
         expect("imonesVardas" in row, "missing imonesVardas (joined from jarCsv)").toBe(true);
         expect("rysioPobudzioPavadinimas" in row, "missing rysioPobudzioPavadinimas").toBe(true);
-    });
-});
-
-describe("v_dalyviai", () => {
-    it("returns rows with expected columns", async () => {
-        const client = await getClient();
-        // @ts-ignore
-        const { rows } = await client.query("SELECT * FROM v_dalyviai LIMIT 1");
-        expect(rows.length, "v_dalyviai returned no rows").toBeGreaterThan(0);
-        const row = rows[0];
-        expect("pirkimoNumeris" in row, "missing pirkimoNumeris").toBe(true);
-        expect("tiekejoKodas" in row, "missing tiekejoKodas").toBe(true);
-        expect("tiekejas" in row, "missing tiekejas (joined from jarCsv)").toBe(true);
-        expect("pasiulymoKaina" in row, "missing pasiulymoKaina").toBe(true);
     });
 });
 

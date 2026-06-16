@@ -68,6 +68,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             ["pirkejoKodas", "v_company.jarKodas", "strict"],
             ["tiekejoKodas", "v_company.jarKodas", "strict"],
             ["pirkimoNumeris", "v_pirkimas.pirkimoId", "semantic"],
+            ["pirkimoNumeris", "v_dalyviai.pirkimoNumeris", "semantic"],
         ],
         columns: [
             "sutartiesUnikalusId: bigint",
@@ -117,6 +118,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         joins: [
             ["jarKodas", "v_company.jarKodas", "strict"],
             ["pirkimoId", "v_sutartys.pirkimoNumeris", "semantic"],
+            ["pirkimoId", "v_dalyviai.pirkimoNumeris", "semantic"],
         ],
         columns: [
             "saltinis: text",
@@ -150,6 +152,47 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             "jarKodas 'cvpp' eilutėms gaunamas per sutartys.pirkimoNumeris atitikmenį (~45% atvejų): " +
             "jarKodasSaltinis='sutartys-join' jei rastas; kitaip jarKodas ir jarKodasSaltinis=NULL — " +
             "tokiu atveju pirkėją filtruok per organizatorius (tekstas), ne jarKodas.",
+    },
+    v_dalyviai: {
+        tags: ["bid-ranking", "rejections", "co-bidding", "single-bidder"],
+        keys: ["pirkimoNumeris", "tiekejoKodas", "daliesNumeris", "eileNumeris", "pasiulymoKaina", "interesuKonfliktasNustatytas"],
+        joins: [
+            ["pirkejoKodas", "v_company.jarKodas", "strict"],
+            ["tiekejoKodas", "v_company.jarKodas", "sparse"],
+            ["pirkimoNumeris", "v_pirkimas.pirkimoId", "semantic"],
+            ["pirkimoNumeris", "v_sutartys.pirkimoNumeris", "semantic"],
+        ],
+        columns: [
+            "pirkimoNumeris: text",
+            "pirkejoKodas: text",
+            "pirkimoBudas: text",
+            "ataskaitosData: timestamp with time zone",
+            "pirkimoObjektoPavadinimas: text",
+            "pagrindinisKodasBvpz: text",
+            "daliuSkaicius: integer",
+            "interesuKonfliktasNustatytas: boolean",
+            "interesuKonfliktoPriemones: text",
+            "konkurencijaIskreipiantisAsmuo: boolean",
+            "konkurencijosPriemones: text",
+            "pretenzijaPateikta: boolean",
+            "ieskinysTeismui: boolean",
+            "tiekejoKodas: text",
+            "tiekejas: text",
+            "fizinisAsmuo: boolean",
+            "salis: text",
+            "daliesNumeris: text",
+            "eileNumeris: integer",
+            "pasiulymoKaina: numeric",
+            "atmetimoPriezastis: text",
+        ],
+        primaryKeys: [],
+        example:
+            'SELECT "pirkimoNumeris", "tiekejoKodas", tiekejas, "daliesNumeris", "eileNumeris", "pasiulymoKaina", "interesuKonfliktasNustatytas" FROM v_dalyviai WHERE "pirkimoNumeris" = \'1005158\'',
+        notes:
+            "Vienas eilutė per (pirkimas, tiekėjas, pirkimo dalis). Apima ~403 pirkimus (ATN-1 ataskaitos). " +
+            "eileNumeris/pasiulymoKaina — laimėtojo/ne atmestų pasiūlymų eilė konkrečioje dalyje (daliesNumeris); " +
+            "atmetimoPriezastis užpildytas, jei pasiūlymas tos dalies buvo atmestas. " +
+            "Abu gali būti NULL tai pačiai (pirkimas, tiekėjas, dalis) eilutei, jei duomenų nėra.",
     },
     v_person_links: {
         tags: ["conflict-of-interest", "directors", "beneficial-owners"],
