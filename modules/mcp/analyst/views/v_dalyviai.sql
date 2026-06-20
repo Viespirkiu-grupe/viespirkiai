@@ -1,6 +1,5 @@
--- NEPATIKIMA: tik ~443 pirkimų užpildyta (vienkartinis rankinis paleidimas 2026-03-31).
--- Kainos (pasiulymoKaina) yra NULL dėl parserio klaidos. Naudok get_viesasis_pirkimas +
--- get_failas_tekstas su ATN-1 xlsx failu (pavadinimas: PPA-*, ATN-*, Atn-1*):
+-- Vienas eilutė per (pirkimas, tiekėjas, pirkimo dalis). Naudok get_failas_tekstas su ATN-1
+-- xlsx failu (pavadinimas: PPA-*, ATN-*, Atn-1*) jei reikia papildomos detalės:
 -- p.4=dalyviai, p.6=atmesti pasiūlymai su kainomis, p.7=pasiūlymų eilė su kainomis.
 CREATE TEMP VIEW v_dalyviai AS
 SELECT a."pirkimoNumeris",
@@ -20,13 +19,23 @@ SELECT a."pirkimoNumeris",
        j.pavadinimas                       AS tiekejas,
        d."fizinisAsmuo",
        d.salis,
-       e."eileNumeris",
-       e.kaina::numeric                    AS "pasiulymoKaina",
-       ap.statusas                         AS "atmetimoPriezastis"
+       p."daliesNumeris",
+       p."eileNumeris",
+       p."pasiulymoKaina",
+       p."atmetimoPriezastis"
 FROM atn1ataskaitos a
          JOIN atn1dalyviai d ON d."ataskaitaId" = a.id
-         LEFT JOIN "atn1pasiulymuEile" e
-                   ON e."ataskaitaId" = a.id AND e."dalyvioKodas" = d.kodas
-         LEFT JOIN "atn1atmestiPasiulymai" ap
-                   ON ap."ataskaitaId" = a.id AND ap."dalyvioKodas" = d.kodas
+         LEFT JOIN LATERAL (
+             SELECT COALESCE(e."daliesNumeris", ap."daliesNumeris") AS "daliesNumeris",
+                    e."eileNumeris"                                 AS "eileNumeris",
+                    e.kaina::numeric                                AS "pasiulymoKaina",
+                    ap.statusas                                     AS "atmetimoPriezastis"
+             FROM "atn1pasiulymuEile" e
+                      FULL OUTER JOIN "atn1atmestiPasiulymai" ap
+                                      ON ap."ataskaitaId" = e."ataskaitaId"
+                                          AND ap."dalyvioKodas" = e."dalyvioKodas"
+                                          AND ap."daliesNumeris" = e."daliesNumeris"
+             WHERE COALESCE(e."ataskaitaId", ap."ataskaitaId") = a.id
+               AND COALESCE(e."dalyvioKodas", ap."dalyvioKodas") = d.kodas
+         ) p ON true
          LEFT JOIN "jarCsv" j ON j."jarKodas"::text = d.kodas

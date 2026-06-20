@@ -43,7 +43,7 @@ describe("get_juridinis", () => {
 
     it("returns isError for a non-existent jarKodas", async () => {
         const result = (await handler({
-            jarKodas: "100000001",
+            jarKodas: "100000002",
             sutartysLimit: 5,
             pinregLimit: 3,
             teismoNuosprendziaiLimit: 5,
@@ -57,7 +57,7 @@ describe("get_juridinis", () => {
         })) as AnyResult;
 
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain("100000001");
+        expect(result.content[0].text).toContain("100000002");
     });
 
     it("sodra is aggregated — no raw duomenys, has byYear and peak", async () => {
