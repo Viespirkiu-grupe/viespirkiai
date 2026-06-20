@@ -2,7 +2,8 @@ import fs from "fs/promises";
 import path from "path";
 import AdmZip from "adm-zip";
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 function decodeXmlEntities(text) {
     if (!text) return "";
@@ -128,7 +129,7 @@ async function main() {
     const rows = parseCpvXml(xmlText);
 
     if (!rows.length) {
-        log("No LT CPV entries found in XML.");
+        logger.log("No LT CPV entries found in XML.");
         return;
     }
 
@@ -137,7 +138,7 @@ async function main() {
         await client.query("BEGIN");
         await bulkInsertRows(rows, client);
         await client.query("COMMIT");
-        log(`Imported ${rows.length} LT CPV codes.`);
+        logger.log(`Imported ${rows.length} LT CPV codes.`);
     } catch (err) {
         await client.query("ROLLBACK");
         throw err;

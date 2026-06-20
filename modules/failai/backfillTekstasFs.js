@@ -1,6 +1,7 @@
 import fs from "fs";
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { getTekstasPath, hashTekstas, saveTekstasFs } from "./tekstasFs.js";
 
 const BATCH_SIZE = 1_000;
@@ -38,7 +39,7 @@ async function processBatch(rows) {
                 await saveTekstasFs(hash, row.tekstas);
                 written++;
             } else if (existing !== row.tekstas) {
-                log(`MISMATCH id=${row.id} hash=${hash} — perrašoma`);
+                logger.log(`MISMATCH id=${row.id} hash=${hash} — perrašoma`);
                 await saveTekstasFs(hash, row.tekstas);
                 mismatched++;
             } else {
@@ -89,7 +90,7 @@ async function run() {
         const batchMs = Date.now() - batchStart;
         const elapsed = (Date.now() - startTime) / 1000;
         const speed = Math.round(totalSeen / elapsed);
-        log(
+        logger.log(
             `Batch ${batchNum} | iki id=${lastId} | rašyta: ${written} | sutapo: ${okExisting} | mismatch: ${mismatched} | praleista: ${skipped} | viso: ${totalSeen.toLocaleString()} | greitis: ${speed.toLocaleString()} eil/s | batch: ${batchMs}ms`,
         );
 
@@ -97,7 +98,7 @@ async function run() {
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    log(
+    logger.log(
         `Baigta. Peržiūrėta: ${totalSeen.toLocaleString()} | rašyta į FS: ${totalWritten.toLocaleString()} | sutapo: ${totalOk.toLocaleString()} | mismatch: ${totalMismatched.toLocaleString()} | praleista: ${totalSkipped.toLocaleString()} per ${elapsed}s`,
     );
 }

@@ -1,6 +1,7 @@
 import { Agent } from "undici";
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 const FETCH_TIMEOUT_MS = 5 * 60 * 1000;
 const fetchDispatcher = new Agent({
@@ -228,7 +229,7 @@ export async function kopijuotiFailus(from, to, options = {}) {
         throw new Error(`Nerasta šaltinio dėžė: "${from}"`);
     }
 
-    log(
+    logger.log(
         [
             colorTag("COPY_PLAN", ANSI_BLUE),
             kv("from", color(from ?? "*", ANSI_GREEN)),
@@ -256,7 +257,7 @@ export async function kopijuotiFailus(from, to, options = {}) {
             direct,
         });
 
-        log(
+        logger.log(
             `${colorTag("COPY_START", ANSI_CYAN)} | ${formatFailasSummary({
                 failas,
                 source: currentFromDeze.pavadinimas,
@@ -264,13 +265,13 @@ export async function kopijuotiFailus(from, to, options = {}) {
         );
 
         if (dryRun) {
-            log(
+            logger.log(
                 `${colorTag("COPY_DRY", ANSI_YELLOW)} | ${formatFailasSummary({
                     failas,
                     source: currentFromDeze.pavadinimas,
                 })}`,
             );
-            log(
+            logger.log(
                 `${colorTag("LAST", ANSI_YELLOW)} | ${kv("md5", color(failas.md5, ANSI_CYAN))} | ${kv("id", color(failas.firstId, ANSI_YELLOW))}`,
             );
             return {
@@ -294,7 +295,7 @@ export async function kopijuotiFailus(from, to, options = {}) {
 
         if (!response.ok) {
             const text = await response.text();
-            log(
+            logger.log(
                 `${colorTag("COPY_ERROR", ANSI_RED)} | ${kv("md5", color(failas.md5, ANSI_CYAN))} | ${kv("status", color(response.status, ANSI_RED))} | ${kv("body", color(JSON.stringify(text), ANSI_DIM))}`,
             );
             throw new Error(
@@ -327,13 +328,13 @@ export async function kopijuotiFailus(from, to, options = {}) {
 
         const used = await updateDezeUsage(toDeze);
 
-        log(
+        logger.log(
             `${colorTag("COPY_DONE", ANSI_GREEN)} | ${formatFailasSummary({
                 failas,
                 source: currentFromDeze.pavadinimas,
             })} | ${kv("used", color(formatBytes(used), ANSI_BLUE))}`,
         );
-        log(
+        logger.log(
             `${colorTag("LAST", ANSI_GREEN)} | ${kv("md5", color(failas.md5, ANSI_CYAN))} | ${kv("id", color(failas.firstId, ANSI_YELLOW))}`,
         );
 
@@ -359,7 +360,7 @@ export async function kopijuotiFailus(from, to, options = {}) {
 
         if (!failai.length) {
             if (totalCount === 0) {
-                log("Nėra daugiau failų kopijavimui pagal nurodytus kriterijus.");
+                logger.log("Nėra daugiau failų kopijavimui pagal nurodytus kriterijus.");
             }
             break;
         }
@@ -380,7 +381,7 @@ export async function kopijuotiFailus(from, to, options = {}) {
                     await kopijuotiVienaFaila(failai[index], sourceDezes);
                     totalCount++;
                 } catch (error) {
-                    log(
+                    logger.log(
                         `${colorTag("COPY_FAIL", ANSI_RED)} | ${kv("md5", color(failai[index].md5, ANSI_CYAN))} | ${kv("error", color(error.message, ANSI_RED))}`,
                     );
                 }
@@ -395,7 +396,7 @@ export async function kopijuotiFailus(from, to, options = {}) {
         currentMd5 = failai[failai.length - 1].md5;
     }
 
-    log(
+    logger.log(
         `${colorTag("COPY_END", ANSI_GREEN)} | ${kv("count", color(totalCount, ANSI_YELLOW))} | ${kv("to", color(toDeze.pavadinimas, ANSI_GREEN))}`,
     );
 
@@ -518,7 +519,7 @@ if (
     const { positional, options } = parseArgs(process.argv.slice(2));
 
     if (positional.length < 1 || positional.length > 2) {
-        log(CLI_USAGE);
+        logger.log(CLI_USAGE);
         process.exit(1);
     }
 

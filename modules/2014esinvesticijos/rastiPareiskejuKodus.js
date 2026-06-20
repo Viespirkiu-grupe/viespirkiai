@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 const STATUS_VERSION = 5;
 
@@ -30,7 +31,7 @@ export async function rastiEsInvesticijosPareiskejoJarKoda() {
     const juridinisRes = await findSingleJuridinis(projektas.pareiskejas);
 
     if (juridinisRes === null) {
-        log(
+        logger.log(
             `Pareiškėjo JAR kodas nerastas: ${projektas.pareiskejas} (projektas: ${projektas.kodas})`,
         );
         await postgres.query(
@@ -43,7 +44,7 @@ export async function rastiEsInvesticijosPareiskejoJarKoda() {
             [STATUS_VERSION, projektas.pareiskejas],
         );
     } else {
-        log(
+        logger.log(
             `Pareiškėjo JAR kodas rastas: ${projektas.pareiskejas} -> ${juridinisRes.jarKodas} (${juridinisRes.pavadinimas}) (projektas: ${projektas.kodas})`,
         );
         await postgres.query(

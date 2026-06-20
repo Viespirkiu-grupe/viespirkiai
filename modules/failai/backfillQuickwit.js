@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { indexDocs } from "../../quickwit/quickwit.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { readTekstasFs } from "./tekstasFs.js";
 
 const BATCH_SIZE = 1000;
@@ -66,10 +67,10 @@ async function backfill() {
 
         fromId = rows[rows.length - 1].id;
         total += rows.length;
-        log(`indexed ${total} — last id: ${fromId}`);
+        logger.log(`indexed ${total} — last id: ${fromId}`);
     }
 
-    log(`done. total indexed: ${total}`);
+    logger.log(`done. total indexed: ${total}`);
     await postgres.end();
 }
 

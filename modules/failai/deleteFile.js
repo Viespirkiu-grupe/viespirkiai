@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 export async function deleteFile(id) {
     const query = `SELECT * FROM failai WHERE id = $1 LIMIT 1`;
@@ -33,7 +34,7 @@ export async function deleteFile(id) {
         const url = `${deze.url}/file/${file.md5}.${file.extension}`;
         const apiKey = deze.apiKey;
 
-        log(url);
+        logger.log(url);
 
         await fetch(url, {
             method: "DELETE",
@@ -42,7 +43,7 @@ export async function deleteFile(id) {
             },
         });
 
-        log(`Deleted file from deze: ${deze.pavadinimas}`);
+        logger.log(`Deleted file from deze: ${deze.pavadinimas}`);
 
         // Delete it from failaiDezes table
         await postgres.query(
@@ -54,7 +55,7 @@ export async function deleteFile(id) {
 
     // Finally, delete the file record from failai table
     await postgres.query(`DELETE FROM failai WHERE id = $1;`, [id]);
-    log(`Deleted file record with id: ${id}`);
+    logger.log(`Deleted file record with id: ${id}`);
 }
 
 if (

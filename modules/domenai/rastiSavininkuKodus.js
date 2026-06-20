@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 const CONCURRENCY = 16;
 
@@ -23,9 +24,9 @@ async function processSavininkas(savininkas) {
     let jarKodas = juridinisRes?.jarKodas ?? null;
 
     if (jarKodas === null) {
-        log(`Savininko kodas nerastas: ${savininkas}`);
+        logger.log(`Savininko kodas nerastas: ${savininkas}`);
     } else {
-        log(
+        logger.log(
             `Savininko kodas rastas: ${savininkas} -> ${jarKodas} (${juridinisRes.pavadinimas})`,
         );
     }

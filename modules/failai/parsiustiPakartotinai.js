@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 export async function parsiustiPakartotinai(kiekis = 100) {
     try {
@@ -14,7 +15,7 @@ export async function parsiustiPakartotinai(kiekis = 100) {
             )
         `, [kiekis]);
 
-        log(`Updated ${res.rowCount}`);
+        logger.log(`Updated ${res.rowCount}`);
         return res.rowCount > 0;
     } catch (err) {
         console.error(err);

@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import {
     fetchFailaiByIds,
     upsertBatch,
@@ -62,7 +63,7 @@ export async function processFailaiDokumentaiQueue() {
         skipped = r.skipped;
     }
 
-    log(
+    logger.log(
         `failaiDokumentaiQueue: claimed ${queue.length} (deduped ${deduped.size}) | upserted ${inserted} | skipped ${skipped} | deleted ${deleted}`,
     );
     return true;

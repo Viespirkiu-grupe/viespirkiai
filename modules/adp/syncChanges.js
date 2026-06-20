@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 /**
  * Sinchronizuoja bet kurį :changes dataset pagal CONFIG
@@ -42,7 +43,7 @@ export async function syncAdpChanges(CONFIG) {
 
     async function fetchChanges(fromCid) {
         const url = `${BASE}/${fromCid}?limit(${CONFIG.limit})`;
-        log(`Fetching changes from: ${url}`);
+        logger.log(`Fetching changes from: ${url}`);
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -142,7 +143,7 @@ export async function syncAdpChanges(CONFIG) {
         }
     }
 
-    log(
+    logger.log(
         `${CONFIG.dataset} – Inserts: ${inserts.length}, patches: ${patches.length}, deletes: ${deletes.length}`,
     );
     await applyInsert(inserts);

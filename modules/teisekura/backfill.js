@@ -1,4 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { scrapeAllFrom, scrapeDay } from "../etar/scrape.js";
 
 async function run() {
@@ -20,7 +22,7 @@ async function run() {
     }
 
     const total = await scrapeAllFrom(date ?? "1800-01-01", { resumeFrom });
-    console.log(`e-TAR inventoriaus backfill baigtas: ${total} įrašų`);
+    logger.log(`e-TAR inventoriaus backfill baigtas: ${total} įrašų`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

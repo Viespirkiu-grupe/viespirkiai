@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { getArDataSources } from "./adresuRegistrasDataSources.js";
 import AdmZip from "adm-zip";
 import { pipeline } from "stream/promises";
@@ -82,7 +83,7 @@ async function updateAdresai() {
         );
 
         total += batch.length;
-        log(`Įkelta ${total}`);
+        logger.log(`Įkelta ${total}`);
         batch = [];
     };
 
@@ -113,7 +114,7 @@ async function updateAdresai() {
 
     await unlink(TMP_JSON);
 
-    log("Atnaujinti adresų taškai");
+    logger.log("Atnaujinti adresų taškai");
     return true;
 }
 

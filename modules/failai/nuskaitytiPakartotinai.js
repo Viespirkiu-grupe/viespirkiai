@@ -3,7 +3,8 @@ Failus nuskaitytus su klaidomis (-1) nustato kaip nenučítytus (0)
 */
 
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 async function nuskaitytiPakartotinai(kiekis = 10, workerId) {
     const query = `
@@ -23,7 +24,7 @@ async function nuskaitytiPakartotinai(kiekis = 10, workerId) {
     try {
         const res = await postgres.query(query, [kiekis]);
         if (res.rowCount > 0) {
-            log(`Worker ${workerId} updated ${res.rowCount}`);
+            logger.log(`Worker ${workerId} updated ${res.rowCount}`);
         }
         return res.rowCount; // number of rows updated
     } catch (err) {

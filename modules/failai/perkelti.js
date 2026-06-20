@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 export async function perkeltiFailus(from, to, kiekis = 1) {
     for (let i = 0; i < kiekis; i++) {
@@ -11,11 +12,11 @@ export async function perkeltiFailus(from, to, kiekis = 1) {
         const failas = failasRes.rows[0];
 
         if (!failas) {
-            log(`Nėra daugiau failų perkelti iš "${from}" į "${to}".`);
+            logger.log(`Nėra daugiau failų perkelti iš "${from}" į "${to}".`);
             break;
         }
 
-        log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
+        logger.log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
 
         const dezeToRes = await postgres.query(
             `SELECT * FROM dezes WHERE pavadinimas = $1`,
@@ -42,7 +43,7 @@ export async function perkeltiFailus(from, to, kiekis = 1) {
         try {
             let url = `https://failai.viespirkiai.org/${failas.id}`;
 
-            log(url);
+            logger.log(url);
 
             let response = await fetch(`${dezeTo.url}/download-url`, {
                 method: "POST",
@@ -78,7 +79,7 @@ export async function perkeltiFailus(from, to, kiekis = 1) {
                 throw new Error("Nepavyko ištrinti seno failo.");
             }
 
-            log(md5);
+            logger.log(md5);
 
             // Atnaujiname informaciją apie failą
             await postgres.query(
@@ -117,7 +118,7 @@ export async function perkeltiFailus(from, to, kiekis = 1) {
                 dezeTo.id,
             ]);
 
-            log(`Failas ${failas.id} perkeltas į dėžę "${dezeTo.pavadinimas}"`);
+            logger.log(`Failas ${failas.id} perkeltas į dėžę "${dezeTo.pavadinimas}"`);
         } catch (error) {
             console.error("Klaida parsisiunčiant failą:", error);
             throw error;
@@ -132,7 +133,7 @@ export async function perkeltiFailus(from, to, kiekis = 1) {
 const args = process.argv.slice(2);
 
 if (args.length < 2) {
-    log("Naudojimas: node perkeltiFailus.js <iš_dėžės> <į_dėžę> [kiekis]");
+    logger.log("Naudojimas: node perkeltiFailus.js <iš_dėžės> <į_dėžę> [kiekis]");
     process.exit(1);
 }
 
@@ -142,7 +143,7 @@ const kiekis = args[2] ? parseInt(args[2], 10) : 1;
 
 perkeltiFailus(from, to, kiekis)
     .then(() => {
-        log("Viskas baigta.");
+        logger.log("Viskas baigta.");
         process.exit(0);
     })
     .catch((error) => {

@@ -1,5 +1,7 @@
 import { pathToFileURL } from "url";
 import { postgres } from "../postgres/postgres.js";
+import { Logger } from "../utils/log.js";
+const logger = new Logger();
 import { deleteIndex } from "./deleteIndex.js";
 
 // Cached counters only narrow the candidate set. Actual liveness and latest
@@ -27,7 +29,7 @@ export async function deleteDeadIndexes({ dryRun = false } = {}) {
   const candidates = await findCandidates();
 
   if (!candidates.length) {
-    console.log("Nėra tikrintinų ne paskutinių Quickwit indeksų.");
+    logger.log("Nėra tikrintinų ne paskutinių Quickwit indeksų.");
     return { deleted: 0, empty: 0, skipped: 0, failed: 0 };
   }
 
@@ -42,17 +44,17 @@ export async function deleteDeadIndexes({ dryRun = false } = {}) {
 
       if (result.deleted) {
         deleted++;
-        console.log(
-          `deleted ${candidate.indeksas}${result.alreadyAbsent ? " (Quickwit jau nebuvo)" : ""}`,
+        logger.log(
+          `Ištrintas ${candidate.indeksas}${result.alreadyAbsent ? " (Quickwit jau nebuvo)" : ""}`,
         );
       } else if (result.reason === "dry-run") {
         empty++;
-        console.log(
+        logger.log(
           `[dry-run] ${candidate.indeksas}: faktas=0, skaitiklis=${candidate.gyvosEilutes}, mirusios=${candidate.mirusiosEilutes}`,
         );
       } else {
         skipped++;
-        console.log(`skip ${candidate.indeksas}: ${result.reason}`);
+        logger.log(`Praleista ${candidate.indeksas}: ${result.reason}`);
       }
     } catch (error) {
       failed++;
@@ -60,7 +62,7 @@ export async function deleteDeadIndexes({ dryRun = false } = {}) {
     }
   }
 
-  console.log(
+  logger.log(
     dryRun
       ? `Baigta [dry-run]: tuščių ${empty}, praleista ${skipped}, klaidų ${failed}.`
       : `Baigta: ištrinta ${deleted}, praleista ${skipped}, klaidų ${failed}.`,

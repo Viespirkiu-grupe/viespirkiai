@@ -4,7 +4,8 @@ Importuoja gyvenamąsias vietoves iš data.gov.lt API į Postgres
 https://data.gov.lt/datasets/1287/
 */
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 const BASE =
     "https://get.data.gov.lt/datasets/gov/rc/ar/gyvenamojivietove/GyvenamojiVietove";
@@ -35,11 +36,11 @@ async function main() {
         const data = await fetchPage(nextPage);
 
         if (!data._data || data._data.length === 0) {
-            log("Baigta. Daugiau duomenų nėra.");
+            logger.log("Baigta. Daugiau duomenų nėra.");
             break;
         }
 
-        log(`Page ${pageNr}: ${data._data.length} įrašų`);
+        logger.log(`Page ${pageNr}: ${data._data.length} įrašų`);
 
         let batch = [];
 
@@ -73,7 +74,7 @@ async function main() {
         pageNr++;
     }
 
-    log("DONE. Iš viso įterpta:", totalInserted);
+    logger.log("DONE. Iš viso įterpta:", totalInserted);
 }
 
 async function insertBatch(rows) {
@@ -102,7 +103,7 @@ async function insertBatch(rows) {
         totalInserted += rows.length;
 
         if (totalInserted % 1000 === 0) {
-            log(`Įterpta ${totalInserted}`);
+            logger.log(`Įterpta ${totalInserted}`);
         }
     } catch (err) {
         console.error(`Insert failed at ${totalInserted} rows:`, err.message);

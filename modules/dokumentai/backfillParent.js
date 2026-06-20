@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 const BATCH_SIZE = 5000;
 
@@ -73,7 +74,7 @@ async function runPass() {
         const batchUpdated = updParent.rowCount + updJar.rowCount;
         updated += batchUpdated;
         batchNum++;
-        log(
+        logger.log(
             `  batch ${batchNum} | iki failai.id=${lastFailasId} | parent: ${updParent.rowCount} | istaigaJar: ${updJar.rowCount} | viso šiame pass: ${updated.toLocaleString()}`,
         );
     }
@@ -88,15 +89,15 @@ async function run() {
 
     while (true) {
         pass++;
-        log(`Pass ${pass} pradedame…`);
+        logger.log(`Pass ${pass} pradedame…`);
         const passUpdated = await runPass();
         totalUpdated += passUpdated;
-        log(`Pass ${pass} baigtas. Atnaujinta: ${passUpdated.toLocaleString()}`);
+        logger.log(`Pass ${pass} baigtas. Atnaujinta: ${passUpdated.toLocaleString()}`);
         if (passUpdated === 0) break;
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    log(`Baigta. Viso atnaujinta tėvų: ${totalUpdated.toLocaleString()} per ${elapsed}s (${pass} pass)`);
+    logger.log(`Baigta. Viso atnaujinta tėvų: ${totalUpdated.toLocaleString()} per ${elapsed}s (${pass} pass)`);
 
     // Diagnostic: how many remain unresolved?
     const {
@@ -108,7 +109,7 @@ async function run() {
          WHERE f.parent IS NOT NULL AND d.parent IS NULL`,
     );
     if (count > 0) {
-        log(`Pastaba: ${count.toLocaleString()} dokumentų liko be parent — tėvų failai dar nemigruoti į dokumentai.`);
+        logger.log(`Pastaba: ${count.toLocaleString()} dokumentų liko be parent — tėvų failai dar nemigruoti į dokumentai.`);
     }
 
     // Diagnostic: child dokumentai, kurių istaigaJar liko NULL nors tėvas jį turi.
@@ -122,7 +123,7 @@ async function run() {
          WHERE f.parent IS NOT NULL`,
     );
     if (jarCount > 0) {
-        log(`Pastaba: ${jarCount.toLocaleString()} child dokumentų liko be istaigaJar nors tėvas jį turi — paleisti pass pakartotinai.`);
+        logger.log(`Pastaba: ${jarCount.toLocaleString()} child dokumentų liko be istaigaJar nors tėvas jį turi — paleisti pass pakartotinai.`);
     }
 }
 

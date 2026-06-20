@@ -1,5 +1,6 @@
 import { parseHTML } from "linkedom";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { postgres } from "../../postgres/postgres.js";
 import { upsertInventoryObject } from "../teisekura/storage.js";
 
@@ -102,7 +103,7 @@ function partialUpdates(xml) {
 }
 
 async function initialSearch() {
-    log("Kraunama e-Seimo projektų paieškos forma");
+    logger.log("Kraunama e-Seimo projektų paieškos forma");
     const res = await fetch(SEARCH_URL, { headers: HEADERS, signal: AbortSignal.timeout(60_000) });
     if (!res.ok) throw new Error(`e-Seimas HTTP ${res.status}`);
     const html = await res.text();
@@ -132,7 +133,7 @@ async function initialSearch() {
     body.set("javax.faces.ViewState", viewState);
 
     const action = new URL(form.getAttribute("action") || res.url, res.url).href;
-    log("Vykdoma e-Seimo projektų paieška");
+    logger.log("Vykdoma e-Seimo projektų paieška");
     const post = await fetch(action, {
         method: "POST",
         signal: AbortSignal.timeout(60_000),
@@ -174,12 +175,12 @@ export async function scrapeLatest() {
         .map((match) => match[1]).join("\n") || response.text;
     const rows = parseProjectResults(html);
     await upsertProjectRows(rows);
-    log(`Atnaujintas ${rows.length} e-Seimo projektų inventorius`);
+    logger.log(`Atnaujintas ${rows.length} e-Seimo projektų inventorius`);
     return rows;
 }
 
 export async function scrapeAllProjects() {
-    log("Pradedamas visų e-Seimo projektų inventoriaus backfill");
+    logger.log("Pradedamas visų e-Seimo projektų inventoriaus backfill");
     const response = await initialSearch();
     let updates = partialUpdates(response.text);
     let html = Object.values(updates).join("\n");
@@ -189,7 +190,7 @@ export async function scrapeAllProjects() {
     const rowCount = Number(html.match(/rowCount:(\d+)/)?.[1] ?? 0);
     if (!tableId || !formId || !viewState) throw new Error("e-Seimas rezultatų puslapiavimo struktūra pasikeitė");
     if (!rowCount) throw new Error("e-Seimo projektų paieška netikėtai grąžino 0 įrašų");
-    log(`e-Seimo paieškoje rasta ${rowCount} projektų`);
+    logger.log(`e-Seimo paieškoje rasta ${rowCount} projektų`);
 
     let total = 0;
     for (let first = 0; first < rowCount; first += ROWS_PER_PAGE) {
@@ -228,7 +229,7 @@ export async function scrapeAllProjects() {
         const rows = parseProjectResults(html);
         await upsertProjectRows(rows);
         total += rows.length;
-        log(`e-Seimas projektai: ${total}/${rowCount}`);
+        logger.log(`e-Seimas projektai: ${total}/${rowCount}`);
     }
     return total;
 }
@@ -238,7 +239,7 @@ export { ROWS_PER_PAGE };
 if (import.meta.url === `file://${process.argv[1]}`) {
     try {
         const result = process.argv.includes("--all") ? await scrapeAllProjects() : await scrapeLatest();
-        log(`e-Seimo inventoriaus nuskaitymas baigtas: ${Array.isArray(result) ? result.length : result} įrašų`);
+        logger.log(`e-Seimo inventoriaus nuskaitymas baigtas: ${Array.isArray(result) ? result.length : result} įrašų`);
     } finally {
         await postgres.end();
     }

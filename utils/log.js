@@ -98,30 +98,93 @@ function getCallerFileFolder() {
     });
     const filePath = normalizeFileName(caller?.getFileName());
 
-    if (typeof filePath !== "string") return "unknown";
+    return folderFileFromPath(filePath);
+}
 
-    const dir = path.basename(path.dirname(filePath));
-    const file = path.basename(filePath);
+/**
+ * Build the "folder/file" label from a filesystem path (or file:// URL).
+ * @param {string|null|undefined} filePath
+ * @returns {string}
+ */
+function folderFileFromPath(filePath) {
+    const normalized = normalizeFileName(filePath);
+    if (typeof normalized !== "string") return "unknown";
 
+    const dir = path.basename(path.dirname(normalized));
+    const file = path.basename(normalized);
     return `${dir}/${file}`;
 }
 
-/** Log a message with timestamp and caller file, color-coded.
- * @param {string} text - The message to log.
- * @param {object} options - Additional options (currently unused).
- */
-export function log(text, options = {}) {
-    const time = new Date().toLocaleTimeString("lt-LT", {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-    });
+// Pastel colors are deterministic per label, so compute each once and reuse.
+const colorCache = new Map();
+function colorFor(caller) {
+    let color = colorCache.get(caller);
+    if (!color) {
+        color = pastelColor(caller);
+        colorCache.set(caller, color);
+    }
+    return color;
+}
 
-    const caller = getCallerFileFolder();
-    const color = pastelColor(caller);
+/**
+ * Print one formatted line: [time] [caller] text.
+ * @param {string} caller - folder/file label.
+ * @param {string} color - ANSI color for the label.
+ * @param {string} text - The message to log.
+ */
+function emit(caller, color, text) {
+    // Manual HH:MM:SS (local time) — much cheaper than toLocaleTimeString/Intl.
+    const now = new Date();
+    const time = `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
     const reset = "\x1b[0m";
     const gray = "\x1b[90m";
 
     console.log(`${gray}[${time}]${reset} ${color}[${caller}]${reset} ${text}`);
+}
+
+/**
+ * Pad a 0–59 number to two digits without Intl/String.padStart overhead.
+ * @param {number} n
+ * @returns {string}
+ */
+function pad2(n) {
+    return n < 10 ? "0" + n : "" + n;
+}
+
+/**
+ * Logger bound to a single file. Resolve the "folder/file" label and its color
+ * once in the constructor, then reuse them on every call — so the ~0.2ms
+ * stack-trace walk happens a single time at module load, not per `log()` call.
+ *
+ * The caller is detected automatically from the stack at construction. Pass
+ * `import.meta.url` explicitly only if you want to skip even that one-time walk.
+ *
+ * @example
+ *   const log = new Logger();
+ *   log.log("labas");
+ */
+export class Logger {
+    /** @param {string} [metaUrl] - Optional import.meta.url to skip auto-detection. */
+    constructor(metaUrl) {
+        this.caller = metaUrl ? folderFileFromPath(metaUrl) : getCallerFileFolder();
+        this.color = colorFor(this.caller);
+    }
+
+    /** @param {string} text - The message to log. */
+    log(text) {
+        emit(this.caller, this.color, text);
+    }
+}
+
+/**
+ * Backwards-compatible logger: infers the caller from the stack on every call.
+ * Prefer `new Logger()` in hot paths — that pays the stack-trace walk once at
+ * construction, whereas this variant pays it on every call.
+ *
+ * @param {string} text - The message to log.
+ * @param {object} options - Additional options (currently unused).
+ */
+export function log(text, options = {}) {
+    const caller = getCallerFileFolder();
+    emit(caller, colorFor(caller), text);
 }

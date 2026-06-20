@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 /**
  * Išvalo užstrigusias parsisiuntimo užduotis iš eilės (lockedAt > 10 minučių).
@@ -20,7 +21,7 @@ export async function pravalytiParsiuntimoRezervacijas() {
     );
 
     if (res.rowCount > 0) {
-        log(`Išvalytos ${res.rowCount} parsisiuntimo rezervacijos`);
+        logger.log(`Išvalytos ${res.rowCount} parsisiuntimo rezervacijos`);
         return true;
     }
     return false;

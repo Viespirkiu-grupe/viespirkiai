@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { getArDataSources } from "./adresuRegistrasDataSources.js";
 import { createInterface } from "readline";
 import { Readable } from "stream";
@@ -50,7 +51,7 @@ async function updatePatalposAdresai() {
             params,
         );
         total += batch.length;
-        log(`Įkelta ${total}`);
+        logger.log(`Įkelta ${total}`);
         batch = [];
     };
 
@@ -75,7 +76,7 @@ async function updatePatalposAdresai() {
         await flushBatch();
     }
 
-    log("Atnaujinti patalpų adresai");
+    logger.log("Atnaujinti patalpų adresai");
     return true;
 }
 

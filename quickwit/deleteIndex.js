@@ -1,6 +1,8 @@
 import { pathToFileURL } from "url";
 import { postgres } from "../postgres/postgres.js";
 import config from "../utils/config.js";
+import { Logger } from "../utils/log.js";
+const logger = new Logger();
 
 const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
 
@@ -96,9 +98,9 @@ async function main() {
 
   const result = await deleteIndex(indeksas, { allowLive: force, dryRun });
   if (result.deleted) {
-    console.log(`deleted ${indeksas}${result.alreadyAbsent ? " (Quickwit jau nebuvo)" : ""}`);
+    logger.log(`Ištrintas ${indeksas}${result.alreadyAbsent ? " (Quickwit jau nebuvo)" : ""}`);
   } else if (dryRun && result.reason === "dry-run") {
-    console.log(`[dry-run] būtų ištrintas ${indeksas}, faktinių gyvų eilučių: ${result.live}`);
+    logger.log(`[dry-run] būtų ištrintas ${indeksas}, faktinių gyvų eilučių: ${result.live}`);
   } else {
     console.error(`neištrintas ${indeksas}: ${result.reason}`);
     process.exitCode = 1;

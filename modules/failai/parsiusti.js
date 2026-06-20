@@ -4,7 +4,8 @@ Parsisiunčia duomenų bazėje nurodytus failus į viešdėžes.
 
 import { postgres } from "../../postgres/postgres.js";
 import { getProxyBySite } from "../scrapeProxies/getProxyBySite.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import Timings from "../../utils/timings.js";
 import { Agent } from "undici";
 
@@ -51,7 +52,7 @@ export async function parsiustiFaila(options = {}) {
     const failas = result.rows[0];
     timings.end("getFileFromBucket");
 
-    log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
+    logger.log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
 
     // Randame dėžę, kuri dar turi vietos
     timings.start("getDeze");
@@ -163,7 +164,7 @@ export async function parsiustiFaila(options = {}) {
         timings.end("fetchDownloadUrl");
 
         if (!response.ok || response.status !== 200) {
-            log(await response.text());
+            logger.log(await response.text());
             throw new Error("Nepavyko parsisiųsti failo.");
         }
 
@@ -211,7 +212,7 @@ export async function parsiustiFaila(options = {}) {
         throw error;
     }
 
-    log(
+    logger.log(
         `Failas ${failas.pavadinimas} (${failas.id}) parsisiųstas ir atnaujintas (dydis=${size}B)`,
     );
 
@@ -232,7 +233,7 @@ export async function parsiustiFaila(options = {}) {
     ]);
     timings.end("updateDezeUsage");
 
-    log(`Parsiuntimas užtruko: ${timings.humanDuration("fetchDownloadUrl")}`);
+    logger.log(`Parsiuntimas užtruko: ${timings.humanDuration("fetchDownloadUrl")}`);
     return true;
 }
 

@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { readMetaduomenysFs } from "./metaduomenysFs.js";
 
 const BATCH_SIZE = 1_000;
@@ -12,7 +13,7 @@ async function run(outputDir) {
     if (!fs.existsSync(outputDir)) {
         const parent = path.dirname(outputDir);
         if (!fs.existsSync(parent)) {
-            log(`Klaida: tėvinis aplankas neegzistuoja: ${parent}`);
+            logger.log(`Klaida: tėvinis aplankas neegzistuoja: ${parent}`);
             process.exit(1);
         }
         fs.mkdirSync(outputDir);
@@ -30,7 +31,7 @@ async function run(outputDir) {
         fileStream = fs.createWriteStream(filePath, { encoding: "utf8" });
         fileIndex++;
         rowsInFile = 0;
-        log(`Atidaromas failas: ${filePath}`);
+        logger.log(`Atidaromas failas: ${filePath}`);
     }
 
     openNextFile();
@@ -65,7 +66,7 @@ async function run(outputDir) {
 
         const elapsed = (Date.now() - startTime) / 1000;
         const speed = Math.round(totalRows / elapsed);
-        log(`Eksportuota ${totalRows.toLocaleString()} eilučių | greitis: ${speed.toLocaleString()} eil/s | paskutinis id: ${cursor}`);
+        logger.log(`Eksportuota ${totalRows.toLocaleString()} eilučių | greitis: ${speed.toLocaleString()} eil/s | paskutinis id: ${cursor}`);
 
         if (rows.length < BATCH_SIZE) break;
     }
@@ -74,13 +75,13 @@ async function run(outputDir) {
 
     const elapsed = (Date.now() - startTime) / 1000;
     const speed = Math.round(totalRows / elapsed);
-    log(`Baigta. Iš viso: ${totalRows.toLocaleString()} eilučių per ${elapsed.toFixed(1)}s (${speed.toLocaleString()} eil/s)`);
+    logger.log(`Baigta. Iš viso: ${totalRows.toLocaleString()} eilučių per ${elapsed.toFixed(1)}s (${speed.toLocaleString()} eil/s)`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
     const outputDir = process.argv[2];
     if (!outputDir) {
-        log("Naudojimas: node modules/failai/eksportuotiMetaduomenis.js <kelias/į/aplanką>");
+        logger.log("Naudojimas: node modules/failai/eksportuotiMetaduomenis.js <kelias/į/aplanką>");
         process.exit(1);
     }
 

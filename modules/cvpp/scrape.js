@@ -1,4 +1,5 @@
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
 
@@ -19,14 +20,14 @@ export async function nuskaitytiCvppViesuosiusPirkimus(
 
 async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
     let url = `https://cvpp.eviesiejipirkimai.lt/?IncludeExpired=true&PublishedFromDate=${data}&PublishedToDate=${data}&PageSize=1000`;
-    log(`Nuskaitymas iš ${url}`);
+    logger.log(`Nuskaitymas iš ${url}`);
 
     let response = await fetch(url);
     let text = await response.text();
     let { document } = parseHTML(text);
 
     let skelbimaiElementai = document.querySelectorAll(".notice-search-item");
-    log(`Rasta skelbimų: ${skelbimaiElementai.length}`);
+    logger.log(`Rasta skelbimų: ${skelbimaiElementai.length}`);
 
     let skelbimai = [];
     skelbimaiElementai.forEach((el) => {
@@ -87,7 +88,6 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
                     ?.getAttribute("href") || "",
         };
 
-        console.log(skelbimas.link, skelbimas.dokumentaiLink);
         if (skelbimas.link && skelbimas.link.startsWith("/")) {
             skelbimas.link = `https://cvpp.eviesiejipirkimai.lt${skelbimas.link}`;
         }
@@ -137,7 +137,7 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
         values,
     );
 
-    log(`Įrašyta/atnaujinta įrašų: ${skelbimai.length}`);
+    logger.log(`Įrašyta/atnaujinta įrašų: ${skelbimai.length}`);
 }
 
 // CLI
@@ -152,7 +152,7 @@ if (
 
     nuskaitytiCvppViesuosiusPirkimus(startDateArg)
         .then(() => {
-            log("Nuskaitymas baigtas");
+            logger.log("Nuskaitymas baigtas");
             postgres.end();
         })
         .catch((err) => {

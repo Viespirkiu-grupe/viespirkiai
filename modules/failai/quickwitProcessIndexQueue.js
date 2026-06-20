@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { indexDocs } from "../../quickwit/quickwit.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { readTekstasFs } from "./tekstasFs.js";
 
 const BATCH_SIZE = 500;
@@ -54,7 +55,7 @@ export async function processFailaiIndexQueue() {
          WHERE "lentele" = $1 AND "eilutesId" = ANY($2)`,
             [LENTELE, toDelete.map(String)]
         );
-        log(`deleted ${toDelete.length} from quickwit`);
+        logger.log(`deleted ${toDelete.length} from quickwit`);
     }
 
     // Handle inserts + patches — fetch metadata from failai, text from FS, index
@@ -112,7 +113,7 @@ export async function processFailaiIndexQueue() {
             });
 
             await indexDocs("failai", items);
-            log(`indexed ${rows.length}`);
+            logger.log(`indexed ${rows.length}`);
         }
     }
     return true;

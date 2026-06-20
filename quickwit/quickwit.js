@@ -1,5 +1,7 @@
 import { postgres } from "../postgres/postgres.js";
 import config from "../utils/config.js";
+import { Logger } from "../utils/log.js";
+const logger = new Logger();
 import { uuidv7 } from "../utils/uuid.js";
 
 const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
@@ -388,7 +390,7 @@ export async function indexDocs(lentele, items, opts = {}) {
     const phases = Object.entries(timings)
       .map(([k, v]) => `${k}=${v}ms`)
       .join(" ");
-    console.log(
+    logger.log(
       `indexDocs ${lentele}: ${items.length} items ` +
       `(${toInsert.length} new, ${toUpdate.length} updated: ` +
       `${stayedCount} stayed, ${movedCount} moved) ` +

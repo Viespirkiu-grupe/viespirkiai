@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import fs from "fs";
 import readline from "readline";
 
@@ -18,13 +19,13 @@ async function updateDomain(domain, lineNumber) {
         );
 
         if (res.rowCount === 0) {
-            log(`Line ${lineNumber}: ${domain} not found, skipping`);
+            logger.log(`Line ${lineNumber}: ${domain} not found, skipping`);
             return;
         }
 
         const currentValue = res.rows[0].domregNuskaitymas;
         if (currentValue === 1) {
-            log(`Line ${lineNumber}: ${domain} domregNuskaitymas=1, skipping`);
+            logger.log(`Line ${lineNumber}: ${domain} domregNuskaitymas=1, skipping`);
             return;
         }
 
@@ -34,7 +35,7 @@ async function updateDomain(domain, lineNumber) {
              WHERE domain = $1`,
             [domain],
         );
-        log(`Line ${lineNumber}: updated ${domain} to -404`);
+        logger.log(`Line ${lineNumber}: updated ${domain} to -404`);
     } catch (err) {
         console.error(
             `Line ${lineNumber}: error updating ${domain}`,
@@ -59,7 +60,7 @@ async function main() {
         }
     }
 
-    log("All domains processed.");
+    logger.log("All domains processed.");
     await postgres.end();
 }
 

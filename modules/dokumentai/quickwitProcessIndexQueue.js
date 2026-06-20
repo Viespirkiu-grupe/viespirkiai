@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { indexDocs } from "../../quickwit/quickwit.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { readDokumentasFs } from "./dokumentaiFs.js";
 
 const BATCH_SIZE = 500;
@@ -51,7 +52,7 @@ export async function processDokumentaiIndexQueue() {
              WHERE "lentele" = $1 AND "eilutesId" = ANY($2)`,
             [LENTELE, toDelete.map(String)],
         );
-        log(`deleted ${toDelete.length} from quickwit`);
+        logger.log(`deleted ${toDelete.length} from quickwit`);
     }
 
     // Inserts + patches — fetch DB row, merge with sidecar JSON, send to Quickwit.
@@ -91,7 +92,7 @@ export async function processDokumentaiIndexQueue() {
             await indexDocs(LENTELE, items, { commit: "force" });
             const elapsedMs = Date.now() - t0;
             const mbPerSec = (totalBytes / 1024 / 1024) / (elapsedMs / 1000);
-            log(
+            logger.log(
                 `indexed ${items.length} dokumentai | avg ${fmtBytes(avgBytes)} / doc | total ${fmtBytes(totalBytes)} in ${elapsedMs}ms = ${mbPerSec.toFixed(2)} MiB/s`,
             );
         }
@@ -189,7 +190,7 @@ if (
             const didWork = await processDokumentaiIndexQueue();
             if (!didWork) break;
         } catch (err) {
-            log(`processDokumentaiIndexQueue klaida, kartosime po ${RETRY_MS / 1000}s: ${err.message}`);
+            logger.log(`processDokumentaiIndexQueue klaida, kartosime po ${RETRY_MS / 1000}s: ${err.message}`);
             await new Promise((r) => setTimeout(r, RETRY_MS));
         }
     }

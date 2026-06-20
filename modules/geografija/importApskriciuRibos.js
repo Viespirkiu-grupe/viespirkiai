@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { getArDataSources } from "./adresuRegistrasDataSources.js";
 import proj4 from "proj4";
 
@@ -36,7 +37,7 @@ async function updateApskritys() {
         );
     }
 
-    log("Atnaujintos apskričių ribos");
+    logger.log("Atnaujintos apskričių ribos");
     return true;
 }
 

@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { getTekstasPath, hashTekstas, saveTekstasFs } from "./tekstasFs.js";
 import fs from "fs";
 
@@ -98,7 +99,7 @@ async function run() {
         const batchMs = Date.now() - batchStart;
         const elapsed = (Date.now() - startTime) / 1000;
         const speed = Math.round(totalSeen / elapsed);
-        log(
+        logger.log(
             `Batch ${batchNum} | iki id=${lastId} | rašyta: ${written} | atnaujinta: ${updated} | praleista: ${skipped} | viso: ${totalSeen.toLocaleString()} | greitis: ${speed.toLocaleString()} eil/s | batch: ${batchMs}ms`,
         );
 
@@ -106,7 +107,7 @@ async function run() {
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    log(
+    logger.log(
         `Baigta. Peržiūrėta: ${totalSeen.toLocaleString()} | rašyta į FS: ${totalWritten.toLocaleString()} | atnaujinta DB: ${totalUpdated.toLocaleString()} | praleista: ${totalSkipped.toLocaleString()} per ${elapsed}s`,
     );
 }

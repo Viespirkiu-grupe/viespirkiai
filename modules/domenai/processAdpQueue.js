@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import {
     createDomenaiSpintaClient,
     isDomenaiSpintaConfigured,
@@ -30,7 +31,7 @@ export async function processDomenaiAdpQueue() {
             domain,
             spinta: createDomenaiSpintaClient(),
         });
-        log(
+        logger.log(
             `domenaiAdpQueue domain=${domain} | insert=${stats.insert} patch=${stats.patch} delete=${stats.delete} unchanged=${stats.unchanged}`,
         );
         return true;

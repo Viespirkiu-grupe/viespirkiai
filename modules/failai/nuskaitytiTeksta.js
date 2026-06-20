@@ -1,7 +1,8 @@
 import process from "process";
 import { Buffer } from "buffer";
 import { createHash } from "crypto";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { postgres } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import Timings from "../../utils/timings.js";
@@ -95,7 +96,7 @@ async function nuskaitytiDokNuskaitytojuje(
         url = `${nuskaitytojas.fileHost}/${dokumentas.md5}`;
     }
 
-    log(`Dokumentas ${url} nuskaitomas ${nuskaitytojas.pavadinimas}`);
+    logger.log(`Dokumentas ${url} nuskaitomas ${nuskaitytojas.pavadinimas}`);
 
     const body = {
         url,
@@ -136,7 +137,7 @@ async function nuskaitytiDokNuskaitytojuje(
     // JSON response, if status is 200, return json (.result)
     if (response.status !== 200) {
         let text = await response.text();
-        log(
+        logger.log(
             `Nuskaitytojo klaida: ${response.status} ${response.statusText} - ${text}`,
         );
         throw new Error(`Nuskaitytojo klaida: ${response.status} ${text}`);
@@ -232,7 +233,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
     let url = `${config.internalFileBase}/${dokumentas.md5}`;
     let viesasUrl = `https://failai.viespirkiai.org/${dokumentas.md5}`;
 
-    log(viesasUrl);
+    logger.log(viesasUrl);
 
     let results;
     let tekstas, metadata, wordCount, characterCount, pageCount;
@@ -313,7 +314,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
     ) {
         reikalingasOcr = 0; // Rekomenduojamas
     }
-    log(`${dokumentas.id} - ${dokumentas.ocrState} o ocr ${reikalingasOcr}`);
+    logger.log(`${dokumentas.id} - ${dokumentas.ocrState} o ocr ${reikalingasOcr}`);
 
     timings.start("archyvas");
     if (
@@ -609,7 +610,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
         "nuskaitymas", "archyvas", "susijusiaiDuomenys",
         "tekstasFs", "failaiUpdate", "failaiNuskaitymai", "queueUpdate", "all",
     ].map((k) => `${k}=${timings.humanDuration(k)}`).join(" ");
-    log(
+    logger.log(
         `Nuskaitytas dokumentas ${dokumentas.id} / ${dokumentas.pavadinimas}, ${wordCount} žodž. | ${timingParts}`,
     );
 

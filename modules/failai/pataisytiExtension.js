@@ -2,7 +2,8 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { createInterface } from "readline";
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import config from "../../utils/config.js";
 import { writeFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
@@ -65,14 +66,14 @@ async function detectMimeType(id) {
     try {
         const response = await fetch(url);
         if (!response.ok) {
-            log(`SKIP  id=${id} — HTTP ${response.status}`);
+            logger.log(`SKIP  id=${id} — HTTP ${response.status}`);
             return null;
         }
         const contentLength = Number(
             response.headers.get("content-length") ?? 0,
         );
         if (contentLength === 0) {
-            log(`SKIP  id=${id} — 0 bytes`);
+            logger.log(`SKIP  id=${id} — 0 bytes`);
             await response.body?.cancel();
             return null;
         }
@@ -96,7 +97,7 @@ async function detectMimeType(id) {
         ]);
         return stdout.trim();
     } catch (err) {
-        log(`SKIP  id=${id} — ${err.message}`);
+        logger.log(`SKIP  id=${id} — ${err.message}`);
         return null;
     } finally {
         if (tmpPath) await unlink(tmpPath).catch(() => {});
@@ -120,7 +121,7 @@ async function processRows(rows) {
     for (const row of rows) {
         const currentExt = (row.extension ?? "").replace(/^\./, "");
         const isEbvpdOrEspd = EBVPD_ESPD_RE.test(row.pavadinimas ?? "");
-        log(
+        logger.log(
             `Processing id=${row.id} "${row.pavadinimas}" (extension: "${currentExt}")`,
         );
 
@@ -129,7 +130,7 @@ async function processRows(rows) {
             totalSkipped++;
             continue;
         }
-        log(`id=${row.id} — detected mime: ${mime}`);
+        logger.log(`id=${row.id} — detected mime: ${mime}`);
 
         const detectedExt =
             MIME_TO_EXTENSION[mime] ??
@@ -141,18 +142,18 @@ async function processRows(rows) {
         }
 
         if (currentExt === detectedExt) {
-            log(`SKIP  id=${row.id} — extension already correct`);
+            logger.log(`SKIP  id=${row.id} — extension already correct`);
             totalSkipped++;
             continue;
         }
 
-        log(
+        logger.log(
             `FIX   id=${row.id} "${row.pavadinimas}" — "${currentExt || "(none)"}" → "${detectedExt}"${APPLY ? "" : " [dry-run]"}`,
         );
 
         if (APPLY) {
             if (ASK && !(await ask(`  Apply fix for id=${row.id}?`))) {
-                log(`SKIP  id=${row.id} — skipped by user`);
+                logger.log(`SKIP  id=${row.id} — skipped by user`);
                 totalSkipped++;
                 continue;
             }
@@ -178,8 +179,8 @@ if (BOTTOM_UP) {
         );
         if (rows.length === 0) continue;
 
-        log(`\nExtension "${ext}" — ${rows.length} file(s):`);
-        for (const r of rows) log(`  id=${r.id} "${r.pavadinimas}"`);
+        logger.log(`\nExtension "${ext}" — ${rows.length} file(s):`);
+        for (const r of rows) logger.log(`  id=${r.id} "${r.pavadinimas}"`);
 
         totalInspected += rows.length;
         await processRows(rows);
@@ -193,7 +194,7 @@ if (BOTTOM_UP) {
         [EXTENSION.toLowerCase()],
     );
     totalInspected = rows.length;
-    log(
+    logger.log(
         `Found ${rows.length} files to inspect (extension filter: "${EXTENSION}")`,
     );
     await processRows(rows);
@@ -206,20 +207,20 @@ if (BOTTOM_UP) {
         [uniqueExts],
     );
     totalInspected = rows.length;
-    log(`Found ${rows.length} files to inspect`);
+    logger.log(`Found ${rows.length} files to inspect`);
     await processRows(rows);
 }
 
 rl.close();
 
 if (unknownMimes.size > 0) {
-    log(`Unrecognised mimes:`);
+    logger.log(`Unrecognised mimes:`);
     for (const [mime, count] of [...unknownMimes.entries()].sort(
         (a, b) => b[1] - a[1],
     )) {
-        log(`  ${count}x ${mime}`);
+        logger.log(`  ${count}x ${mime}`);
     }
 }
-log(
+logger.log(
     `Done. inspected=${totalInspected} fixed=${totalFixed} skipped=${totalSkipped}`,
 );

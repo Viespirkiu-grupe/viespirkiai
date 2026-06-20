@@ -5,7 +5,8 @@ import QueryStream from "pg-query-stream";
 import { Transform } from "stream";
 import config from "../../utils/config.js";
 import { search, countDocs } from "../../quickwit/quickwit.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { readMetaduomenysFs } from "./metaduomenysFs.js";
 import { readTekstasFs } from "./tekstasFs.js";
 
@@ -402,7 +403,7 @@ export async function searchFailai(
             pgMs = Date.now() - pgStart;
         }
 
-        if (config.dev) log(`qw=${qwMs}ms filter=${filterMs}ms pg=${pgMs}ms hits=${hits.length}/${needed}`);
+        if (config.dev) logger.log(`qw=${qwMs}ms filter=${filterMs}ms pg=${pgMs}ms hits=${hits.length}/${needed}`);
 
         // When Quickwit exhausts its results, its tokenization may differ from
         // Postgres (e.g. "a" matches 39 in QW vs 7000+ via Postgres ###). Return

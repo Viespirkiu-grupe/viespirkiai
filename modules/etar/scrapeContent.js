@@ -1,5 +1,6 @@
 import { parseHTML } from "linkedom";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { postgres } from "../../postgres/postgres.js";
 import {
     claimInventoryBatch,
@@ -454,7 +455,7 @@ export function buildDokumentas(aktas, scraped) {
 export const TURINIO_VERSIJA = 3;
 
 async function scrapeOne(aktas) {
-    log(`Skaitomas e-TAR ${aktas.kind} ${aktas.sourceId}`);
+    logger.log(`Skaitomas e-TAR ${aktas.kind} ${aktas.sourceId}`);
     try {
         const scraped = await scrapeContent(aktas.url);
         for (const edition of scraped.editions) {
@@ -474,31 +475,31 @@ async function scrapeOne(aktas) {
             contentHash: result.contentHash,
             md5: result.md5,
         });
-        log(`Nuskaitytas e-TAR ${aktas.kind} ${aktas.sourceId}: ${scraped.title ?? aktas.pavadinimas ?? "be pavadinimo"}`);
+        logger.log(`Nuskaitytas e-TAR ${aktas.kind} ${aktas.sourceId}: ${scraped.title ?? aktas.pavadinimas ?? "be pavadinimo"}`);
         return result;
     } catch (error) {
         await markInventoryFailure(aktas.id, error);
-        log(`Klaida nuskaitant e-TAR ${aktas.sourceId}: ${error.message}`);
+        logger.log(`Klaida nuskaitant e-TAR ${aktas.sourceId}: ${error.message}`);
         return null;
     }
 }
 
 export async function scrapeNextBatch(batchSize = 10) {
-    log(`Ieškoma iki ${batchSize} laukiančių e-TAR objektų`);
+    logger.log(`Ieškoma iki ${batchSize} laukiančių e-TAR objektų`);
     const rows = await claimInventoryBatch("etar", ["aktas", "redakcija"], TURINIO_VERSIJA, batchSize);
     if (!rows.length) {
-        log("Visi teisės aktai nuskaityti.");
+        logger.log("Visi teisės aktai nuskaityti.");
         return false;
     }
-    log(`Gauta ${rows.length} e-TAR objektų, pradedamas turinio nuskaitymas`);
+    logger.log(`Gauta ${rows.length} e-TAR objektų, pradedamas turinio nuskaitymas`);
     await Promise.all(rows.map(scrapeOne));
-    log(`Baigta e-TAR turinio partija: ${rows.length} objektų`);
+    logger.log(`Baigta e-TAR turinio partija: ${rows.length} objektų`);
     return true;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-    log("Pradedamas e-TAR turinio nuskaitymas");
+    logger.log("Pradedamas e-TAR turinio nuskaitymas");
     while (await scrapeNextBatch()) {}
-    log("e-TAR turinio nuskaitymas baigtas");
+    logger.log("e-TAR turinio nuskaitymas baigtas");
     await postgres.end();
 }

@@ -12,7 +12,8 @@ Lygiagretumą valdo pats surastiNuosprendzioDalyvius (CONCURRENCY).
 */
 
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { surastiNuosprendzioDalyvius } from "../liteko/scrapeContent.js";
 
 async function run() {
@@ -22,7 +23,7 @@ async function run() {
         const { rowCount } = await postgres.query(
             `UPDATE "teismoNuosprendziai" SET "turinioNuskaitymas" = 0`,
         );
-        log(`--refresh: atstatyta ${rowCount} eilučių pakartotiniam nuskaitymui`);
+        logger.log(`--refresh: atstatyta ${rowCount} eilučių pakartotiniam nuskaitymui`);
     } else {
         // Tik tie, kurių dar nėra dokumentai (source='liteko') ir kurie nebuvo
         // pažymėti klaida (-1). Klaidingus galima perleisti su --refresh.
@@ -35,7 +36,7 @@ async function run() {
                  WHERE d.source = 'liteko' AND d.md5 = tn.md5
                )`,
         );
-        log(`Pažymėta ${rowCount} dar neįkeltų nuosprendžių nuskaitymui`);
+        logger.log(`Pažymėta ${rowCount} dar neįkeltų nuosprendžių nuskaitymui`);
     }
 
     const startTime = Date.now();
@@ -47,12 +48,12 @@ async function run() {
         batches++;
         if (batches % 10 === 0) {
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
-            log(`Apdorota ~${batches} paketų per ${elapsed}s`);
+            logger.log(`Apdorota ~${batches} paketų per ${elapsed}s`);
         }
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    log(`Baigta. Apdorota ${batches} paketų per ${elapsed}s`);
+    logger.log(`Baigta. Apdorota ${batches} paketų per ${elapsed}s`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

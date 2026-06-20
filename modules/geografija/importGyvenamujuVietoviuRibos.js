@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { getArDataSources } from "./adresuRegistrasDataSources.js";
 import proj4 from "proj4";
 
@@ -45,7 +46,7 @@ async function updateGyvenvietesRibos() {
         );
     }
 
-    log("Atnaujintos gyvenamųjų vietovių ribos");
+    logger.log("Atnaujintos gyvenamųjų vietovių ribos");
     return true;
 }
 

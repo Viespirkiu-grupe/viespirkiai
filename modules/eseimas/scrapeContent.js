@@ -1,5 +1,6 @@
 import { parseHTML } from "linkedom";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { postgres } from "../../postgres/postgres.js";
 import {
     claimInventoryBatch,
@@ -131,7 +132,7 @@ function buildDokumentas(project, scraped) {
 }
 
 async function scrapeOne(project) {
-    log(`Skaitomas e-Seimo projektas ${project.sourceId}`);
+    logger.log(`Skaitomas e-Seimo projektas ${project.sourceId}`);
     try {
         const scraped = await scrapeProjectContent(project.url);
         const result = await upsertTeisekuraDokumentas(buildDokumentas(project, scraped));
@@ -140,21 +141,21 @@ async function scrapeOne(project) {
             contentHash: result.contentHash,
             md5: result.md5,
         });
-        log(`Nuskaitytas e-Seimo projektas ${project.sourceId}: ${scraped.title || project.pavadinimas || "be pavadinimo"}`);
+        logger.log(`Nuskaitytas e-Seimo projektas ${project.sourceId}: ${scraped.title || project.pavadinimas || "be pavadinimo"}`);
     } catch (error) {
         await markInventoryFailure(project.id, error);
-        log(`Klaida nuskaitant e-Seimo projektą ${project.sourceId}: ${error.message}`);
+        logger.log(`Klaida nuskaitant e-Seimo projektą ${project.sourceId}: ${error.message}`);
     }
 }
 
 export async function scrapeNextProjectBatch(batchSize = 10) {
-    log(`Ieškoma iki ${batchSize} laukiančių e-Seimo projektų`);
+    logger.log(`Ieškoma iki ${batchSize} laukiančių e-Seimo projektų`);
     const rows = await claimInventoryBatch("eseimas", ["projektas"], TURINIO_VERSIJA, batchSize);
     if (!rows.length) {
-        log("Visi e-Seimo projektai nuskaityti.");
+        logger.log("Visi e-Seimo projektai nuskaityti.");
         return false;
     }
-    log(`Gauta ${rows.length} e-Seimo projektų, pradedamas turinio nuskaitymas`);
+    logger.log(`Gauta ${rows.length} e-Seimo projektų, pradedamas turinio nuskaitymas`);
     // Ne daugiau 3 lygiagrečių užklausų į e-Seimą
     let cursor = 0;
     await Promise.all(
@@ -164,15 +165,15 @@ export async function scrapeNextProjectBatch(batchSize = 10) {
             }
         }),
     );
-    log(`Baigta e-Seimo turinio partija: ${rows.length} projektų`);
+    logger.log(`Baigta e-Seimo turinio partija: ${rows.length} projektų`);
     return true;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
     try {
-        log("Pradedamas e-Seimo projektų turinio nuskaitymas");
+        logger.log("Pradedamas e-Seimo projektų turinio nuskaitymas");
         while (await scrapeNextProjectBatch()) {}
-        log("e-Seimo projektų turinio nuskaitymas baigtas");
+        logger.log("e-Seimo projektų turinio nuskaitymas baigtas");
     } finally {
         await postgres.end();
     }

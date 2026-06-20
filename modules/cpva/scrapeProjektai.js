@@ -5,7 +5,8 @@ Parsiunčia ir importuoja CPVA adminstruojamų projektų ir tiekėjų sąrašą
 import * as XLSX from "xlsx";
 import path from "node:path";
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { parseHTML } from "linkedom";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -34,7 +35,7 @@ const execFileAsync = promisify(execFile);
 export async function nuskaitytiCpvaProjektaiTiekejai() {
     const url =
         "https://2021.esinvesticijos.lt/dokumentai/cpva-adminstruojami-projektai-ir-tiekejai";
-    log(`Nuskaitymas iš ${url}`);
+    logger.log(`Nuskaitymas iš ${url}`);
 
     // 1. Load HTML via curl
     const { stdout: html } = await execFileAsync("curl", ["-k", "-fsSL", url]);
@@ -62,7 +63,7 @@ export async function nuskaitytiCpvaProjektaiTiekejai() {
         },
     );
 
-    log(`Fetched ${filename}, size: ${fileBuffer.length} bytes`);
+    logger.log(`Fetched ${filename}, size: ${fileBuffer.length} bytes`);
 
     // Nuskaitome duomenis iš XLSX failo
     const workbook = XLSX.read(fileBuffer, { type: "buffer" });
@@ -287,7 +288,7 @@ async function insertCpvaProjektuSutartys(rows) {
         try {
             await postgres.query(sql, values);
         } catch (err) {
-            log(
+            logger.log(
                 `Klaida įterpiant projektoNr ${row.projektoNr}, sutartiesNr ${row.pirkimoSutartiesNr}: ${err.message}`,
             );
         }
@@ -300,7 +301,7 @@ if (
 ) {
     try {
         await nuskaitytiCpvaProjektaiTiekejai();
-        log("Importavimas baigtas");
+        logger.log("Importavimas baigtas");
     } catch (err) {
         console.error("Klaida importuojant:", err);
     } finally {

@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { fetchFailaiSlice, upsertBatch } from "./upsertFromFailai.js";
 
 const BATCH_SIZE = 1_000;
@@ -13,10 +14,10 @@ async function run() {
     let lastId;
     if (fromId != null && Number.isFinite(fromId)) {
         lastId = fromId;
-        log(`--from ${fromId}: pradedame nuo failai.id > ${fromId} (ON CONFLICT atnaujins esamus)`);
+        logger.log(`--from ${fromId}: pradedame nuo failai.id > ${fromId} (ON CONFLICT atnaujins esamus)`);
     } else if (refresh) {
         lastId = 0;
-        log(`--refresh: pradedame nuo failai.id > 0, jau esantys įrašai bus atnaujinti per ON CONFLICT`);
+        logger.log(`--refresh: pradedame nuo failai.id > 0, jau esantys įrašai bus atnaujinti per ON CONFLICT`);
     } else {
         const {
             rows: [{ max }],
@@ -25,7 +26,7 @@ async function run() {
              FROM public.dokumentai WHERE "failasId" IS NOT NULL`,
         );
         lastId = Number(max);
-        log(`Pradedame nuo failai.id > ${lastId} (--refresh peržiūrėti visus, --from <id> nuo konkretaus)`);
+        logger.log(`Pradedame nuo failai.id > ${lastId} (--refresh peržiūrėti visus, --from <id> nuo konkretaus)`);
     }
 
     let batchNum = 0;
@@ -60,16 +61,16 @@ async function run() {
         const batchMs = Date.now() - batchStart;
         const elapsed = (Date.now() - startTime) / 1000;
         const speed = Math.round(totalInserted / elapsed);
-        log(
+        logger.log(
             `Batch ${batchNum} | iki id=${lastId} | sukurta: ${inserted} | praleista: ${skipped} | viso: ${totalInserted.toLocaleString()} | ${speed.toLocaleString()} eil/s | batch ${batchMs}ms (select ${selectMs}ms, fs ${fsMs}ms, insert ${insertMs}ms)`,
         );
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    log(
+    logger.log(
         `Baigta. Sukurta dokumentai: ${totalInserted.toLocaleString()} | praleista: ${totalSkipped.toLocaleString()} per ${elapsed}s`,
     );
-    log(`Pastaba: 'parent' nuoroda dar neišspręsta — paleisti pass 2 atskirai.`);
+    logger.log(`Pastaba: 'parent' nuoroda dar neišspręsta — paleisti pass 2 atskirai.`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

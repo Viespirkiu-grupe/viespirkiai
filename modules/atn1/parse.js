@@ -1,4 +1,6 @@
 import config from "../../utils/config.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import XLSX from "xlsx";
 import { postgres } from "../../postgres/postgres.js";
 
@@ -314,11 +316,11 @@ export async function doOneAtn1() {
         [ATN_NUSKAITYMAS_VERSIJA],
     );
     if (rowRes.rowCount === 0) {
-        console.log("No ATN-1 files to process");
+        logger.log("Nėra ATN-1 failų apdorojimui");
         return false;
     }
     const fileId = rowRes.rows[0].id;
-    console.log(`Processing ATN-1 file ${fileId}`);
+    logger.log(`Apdorojamas ATN-1 failas ${fileId}`);
     try {
         await processAtn1(fileId);
         await postgres.query(

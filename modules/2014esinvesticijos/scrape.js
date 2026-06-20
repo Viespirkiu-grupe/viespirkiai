@@ -1,4 +1,5 @@
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
 import RPSCounter from "../../utils/rpsCounter.js";
@@ -201,17 +202,17 @@ export async function update2014EsInvesticijosData(starting = 0) {
     const results = [];
 
     while (true) {
-        log(`Nuskaitomas puslapis ${page}`);
+        logger.log(`Nuskaitomas puslapis ${page}`);
 
         const data = await nuskaityti2014EsinvesticijosPuslapi(page);
 
         if (data.length === 0) {
-            log("Nėra daugiau duomenų, baigiama.");
+            logger.log("Nėra daugiau duomenų, baigiama.");
             break;
         }
 
         totalRecords += data.length;
-        log(
+        logger.log(
             `Puslapyje rasta įrašų: ${data.length}, iš viso: ${totalRecords}, RPS: ${rps.getRPS().toFixed(2)}`,
         );
 
@@ -219,7 +220,7 @@ export async function update2014EsInvesticijosData(starting = 0) {
         page += 1;
     }
 
-    log(`Iš viso nuskaityta įrašų: ${totalRecords}`);
+    logger.log(`Iš viso nuskaityta įrašų: ${totalRecords}`);
     return results;
 }
 
@@ -230,7 +231,7 @@ if (
 ) {
     update2014EsInvesticijosData(0)
         .then(() => {
-            log("Nuskaitymas baigtas");
+            logger.log("Nuskaitymas baigtas");
             postgres.end();
         })
         .catch((err) => {

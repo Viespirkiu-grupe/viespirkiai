@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 
 const NUSKAITYMO_VERSIJA = 2;
 const KLAIDOS_BUSENA = -1;
@@ -181,7 +182,7 @@ async function insertCvppFiles(toInsert) {
 
 async function syncCvppFiles(files, notice) {
     if (!files.length) {
-        log(`[CVPP] ${notice.skelbimoKodas}: dokumentų įrašų nerasta`);
+        logger.log(`[CVPP] ${notice.skelbimoKodas}: dokumentų įrašų nerasta`);
         return;
     }
 
@@ -191,7 +192,7 @@ async function syncCvppFiles(files, notice) {
     const toUpdate = getUpdateCandidates(files, existingSet);
     const updatedCount = await updateLegacyIds(toUpdate);
     if (toUpdate.length > 0) {
-        log(
+        logger.log(
             `[CVPP] ${notice.skelbimoKodas}: ID migracijos kandidatai=${toUpdate.length}, atnaujinta=${updatedCount}`,
         );
     }
@@ -202,11 +203,11 @@ async function syncCvppFiles(files, notice) {
     const insertedCount = await insertCvppFiles(toInsert);
 
     if (toInsert.length > 0) {
-        log(
+        logger.log(
             `[CVPP] ${notice.skelbimoKodas}: insert kandidatai=${toInsert.length}, įterpta=${insertedCount}`,
         );
     } else {
-        log(`[CVPP] ${notice.skelbimoKodas}: naujų failų nėra`);
+        logger.log(`[CVPP] ${notice.skelbimoKodas}: naujų failų nėra`);
     }
 }
 
@@ -221,17 +222,17 @@ async function scrapeCvppNotice() {
     }
 
     const notice = noticeResult.rows[0];
-    log(`[CVPP] Apdorojamas skelbimas ${notice.skelbimoKodas}`);
+    logger.log(`[CVPP] Apdorojamas skelbimas ${notice.skelbimoKodas}`);
 
     try {
         if (!notice.dokumentaiLink) {
-            log(`[CVPP] ${notice.skelbimoKodas}: dokumentaiLink nėra`);
+            logger.log(`[CVPP] ${notice.skelbimoKodas}: dokumentaiLink nėra`);
             await setNoticeStatus(notice.skelbimoKodas, NUSKAITYMO_VERSIJA);
             return true;
         }
 
         if (String(notice.dokumentaiLink).includes("vpt.lrv.lt")) {
-            log(`[CVPP] ${notice.skelbimoKodas}: vpt.lrv.lt šaltinis, praleidžiama`);
+            logger.log(`[CVPP] ${notice.skelbimoKodas}: vpt.lrv.lt šaltinis, praleidžiama`);
             await setNoticeStatus(notice.skelbimoKodas, VPT_BUSENA);
             return true;
         }
@@ -242,12 +243,12 @@ async function scrapeCvppNotice() {
 
         const { merged, invalidLinkCount } = extractCvppFiles(document, pid);
         if (invalidLinkCount > 0) {
-            log(
+            logger.log(
                 `[CVPP] ${notice.skelbimoKodas}: praleista netinkamų dokumentų nuorodų=${invalidLinkCount}`,
             );
         }
 
-        log(
+        logger.log(
             `[CVPP] ${notice.skelbimoKodas}: rasta failų=${merged.length}, pid=${pid || "nėra"}`,
         );
         await syncCvppFiles(merged, notice);
@@ -255,15 +256,15 @@ async function scrapeCvppNotice() {
         await setNoticeStatus(notice.skelbimoKodas, NUSKAITYMO_VERSIJA);
         return true;
     } catch (error) {
-        log(
+        logger.log(
             `[CVPP] ${notice.skelbimoKodas}: klaida apdorojant skelbimą - ${error.message}`,
         );
 
         try {
             await setNoticeStatus(notice.skelbimoKodas, KLAIDOS_BUSENA);
-            log(`[CVPP] ${notice.skelbimoKodas}: pažymėta klaidos būsena`);
+            logger.log(`[CVPP] ${notice.skelbimoKodas}: pažymėta klaidos būsena`);
         } catch (updateError) {
-            log(
+            logger.log(
                 `[CVPP] ${notice.skelbimoKodas}: nepavyko pažymėti klaidos būsenos - ${updateError.message}`,
             );
         }

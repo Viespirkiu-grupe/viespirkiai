@@ -1,7 +1,8 @@
 import { postgres } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import { SocksProxyAgent } from "socks-proxy-agent";
-import { log } from "../../utils/log.js";
+import { Logger } from "../../utils/log.js";
+const logger = new Logger();
 import { findSingleJuridinis } from "../juridiniai/search.js";
 import fetch from "node-fetch";
 import net from "net";
@@ -309,18 +310,18 @@ export async function nuskaitytiDomregDomena() {
     /** @type {DbDomainRow | undefined} */
     const domenas = result.rows[0];
     if (!domenas) {
-        log("No domains to scrape");
+        logger.log("No domains to scrape");
         return false;
     }
 
-    log(`Scraping: ${domenas.domain}`);
+    logger.log(`Scraping: ${domenas.domain}`);
 
     try {
         const data = await fetchDomainDetails(domenas.domain);
         const scrapedAt = now();
 
         if (data.error === 100) {
-            log(`Rate limited for ${domenas.domain}; rotating Tor identity`);
+            logger.log(`Rate limited for ${domenas.domain}; rotating Tor identity`);
             await newTorIdentity();
             await sleep(TOR_WAIT_MS);
             return nuskaitytiDomregDomena();
@@ -329,21 +330,21 @@ export async function nuskaitytiDomregDomena() {
         if (data.error === 0) {
             const savininkas = data.details?.registrant?.org ?? "unknown";
             await saveDomainData(domenas, data, STATUS.SCRAPED, scrapedAt);
-            log(`Scraped successfully: ${domenas.domain}; savininkas: ${savininkas}`);
+            logger.log(`Scraped successfully: ${domenas.domain}; savininkas: ${savininkas}`);
             return true;
         }
 
         if (data.error === 2) {
             await saveDomainData(domenas, data, STATUS.NOT_FOUND, scrapedAt);
-            log(`Domain not found: ${domenas.domain}`);
+            logger.log(`Domain not found: ${domenas.domain}`);
             return true;
         }
 
         await saveDomainData(domenas, data, STATUS.ERROR, scrapedAt);
-        log(`Unexpected API error ${data.error} for ${domenas.domain}`);
+        logger.log(`Unexpected API error ${data.error} for ${domenas.domain}`);
         return true;
     } catch (error) {
-        log(`Fetch error for ${domenas.domain}: ${error.message}`);
+        logger.log(`Fetch error for ${domenas.domain}: ${error.message}`);
         await postgres.query(
             `UPDATE public.domenai
              SET "domregNuskaitymas" = $1,
@@ -360,14 +361,14 @@ export async function nuskaitytiDomregDomena() {
  * @returns {Promise<void>}
  */
 async function main() {
-    log("Starting domain scraper...");
+    logger.log("Starting domain scraper...");
 
     while (true) {
         try {
             const processed = await nuskaitytiDomregDomena();
             await sleep(processed ? RATE_LIMIT_MS : 30000);
         } catch (err) {
-            log(`Fatal loop error: ${err.message}`);
+            logger.log(`Fatal loop error: ${err.message}`);
             await sleep(5000);
         }
     }
