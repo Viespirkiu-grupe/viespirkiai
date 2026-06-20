@@ -339,11 +339,20 @@ function isDownloadLink(url) {
     return /\/rs\//i.test(url) || /\/format\//i.test(url);
 }
 
+// Print/export views (legalActPrint, legalActExport, ...) carry an "actualEditionId"
+// query param, whose "actualEdition" substring matches the editions filter below. They
+// are not editions, so they must be excluded or they get registered as bogus redakcija
+// objects and surface in search.
+function isViewLink(url) {
+    return /legalAct(Print|Export|Pdf|Compare|Translation)/i.test(url);
+}
+
 function parseEditions(document, pageUrl, rootId) {
     const seen = new Set();
     return parseRelatedLinks(document, pageUrl)
         .filter((item) => /legalActEditions|editionId|actualEdition/i.test(item.url))
         .filter((item) => !isDownloadLink(item.url))
+        .filter((item) => !isViewLink(item.url))
         .map((item) => {
             const id = editionSourceIdFromUrl(item.url, rootId);
             if (!id || seen.has(id)) return null;

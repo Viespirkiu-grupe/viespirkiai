@@ -96,6 +96,17 @@ describe("e-TAR parsing", () => {
         `, "https://e-tar.lt/portal/lt/legalAct/abc");
         expect(parsed.editions.map((e: any) => e.sourceId)).toEqual(["abc:edition:red-1"]);
     });
+
+    it("ignores print/export view links masquerading as editions", () => {
+        const parsed = parseActPage(`
+          <span id="mainForm:laTitle">Testas</span>
+          <iframe id="legalActFrame" src="/rs/legalact/abc/"></iframe>
+          <a href="https://e-tar.lt/portal/lt/legalActPrint?actualEditionId=CxPBstMLRx&documentId=abc">Spausdinti</a>
+          <a href="https://e-tar.lt/portal/lt/legalActExport?actualEditionId=CxPBstMLRx&documentId=abc">Eksportuoti</a>
+          <a href="/portal/lt/legalAct/abc?editionId=red-1">Redakcija</a>
+        `, "https://e-tar.lt/portal/lt/legalAct/abc");
+        expect(parsed.editions.map((e: any) => e.sourceId)).toEqual(["abc:edition:red-1"]);
+    });
 });
 
 describe("e-Seimas parsing", () => {
