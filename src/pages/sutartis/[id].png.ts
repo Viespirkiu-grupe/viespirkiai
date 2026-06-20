@@ -1,5 +1,6 @@
 import { postgres } from '@/postgres/postgres.js';
 import { getOpenGraphImage } from '@/utils/openGraphImage.js';
+import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
 
 export async function GET({ params }: { params: { id: string } }) {
   const numId = parseInt(params.id);
@@ -14,11 +15,14 @@ export async function GET({ params }: { params: { id: string } }) {
   const verte = Number(sutartis.faktineIvykdimoVerte || sutartis.verte)
     .toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  const tipo = (sutartis.tipas || '').trim().toUpperCase();
+  const tipoPavadinimas = (CONTRACT_TYPES as Record<string, string>)[tipo] || tipo;
+
   const buffer = await getOpenGraphImage(
-    sutartis.tipoPavadinimas,
+    tipoPavadinimas,
     `${verte} €   ${sutartis.pavadinimas}`,
     `Pirkėjas: ${sutartis.perkanciojiOrganizacija}<br>Tiekėjas: ${sutartis.tiekejas}`,
-    `viespirkiai.org/sutartis/${sutartis.sutartiesUnikalusID}`,
+    `viespirkiai.org/sutartis/${sutartis.sutartiesUnikalusId}`,
   );
 
   return new Response(new Uint8Array(buffer), {
