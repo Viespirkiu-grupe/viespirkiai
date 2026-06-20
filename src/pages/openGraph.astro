@@ -81,8 +81,9 @@ const safeAprasymas = DOMPurify.sanitize(aprasymas || '', {
       color: var(--gray);
     }
 
-    .og-logo svg {
+    .og-logo :global(svg) {
       width: 30ch !important;
+      height: auto !important;
       display: block;
     }
   </style>
