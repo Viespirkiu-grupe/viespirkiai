@@ -14,7 +14,22 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   if (config.onionAddress) {
     const safeUrl = config.onionAddress + encodeURI(context.url.pathname + context.url.search);
-    response.headers.set('Onion-Location', safeUrl);
+
+    // `Response.redirect()` (naudojamas pvz. /kodas, /analitika) grąžina atsakymą
+    // su nekeičiamomis (immutable) antraštėmis — `headers.set` tokiu atveju meta
+    // `TypeError: immutable`. Tokiu atveju atkuriame atsakymą su keičiamomis
+    // antraštėmis.
+    try {
+      response.headers.set('Onion-Location', safeUrl);
+    } catch {
+      const headers = new Headers(response.headers);
+      headers.set('Onion-Location', safeUrl);
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
   }
 
   return response;
