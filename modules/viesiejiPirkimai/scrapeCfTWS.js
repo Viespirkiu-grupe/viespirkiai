@@ -12,9 +12,10 @@ import {
     parseSkelbimai,
     parseVersijos,
 } from "./parsers.js";
+import config from "../../utils/config.js";
 
 const WINDOW_MS = 5000; // fixed smoothing window
-const HOST = "https://viesiejipirkimai.lt";
+const HOST = config.viesiejiPirkimaiUrl;
 const timestamps = [];
 
 /**
@@ -125,10 +126,10 @@ async function fetchText(url) {
 
     const redirectedUrl = response.url || "";
     const wasRedirectedToCas =
-        redirectedUrl.startsWith("https://viesiejipirkimai.lt/cas/login?") ||
+        redirectedUrl.startsWith(`${HOST}/cas/login?`) ||
         response.headers
             .get("location")
-            ?.startsWith("https://viesiejipirkimai.lt/cas/login?");
+            ?.startsWith(`${HOST}/cas/login?`);
 
     if (wasRedirectedToCas) {
         const error = new Error("CAS redirect");

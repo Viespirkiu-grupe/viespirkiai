@@ -53,6 +53,11 @@ const configSchema = z.object({
     torAddress: z.string().default("socks5h://127.0.0.1:9050"),
     torPassword: z.string().default(""),
 
+    // Baziniai išorinių šaltinių URL — leidžia perrašyti į mirror/proxy.
+    // Be trailing slash.
+    dataGovUrl: z.string().default("https://get.data.gov.lt"),
+    viesiejiPirkimaiUrl: z.string().default("https://viesiejipirkimai.lt"),
+
     internalFileBase: z.string().default(""),
     ocrBandymai: z.number().int().positive().default(5),
     ocrLatestResultsLiveUpdates: ocrLiveUpdatesSchema.default({

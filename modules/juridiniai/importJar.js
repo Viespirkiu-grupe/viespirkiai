@@ -5,9 +5,9 @@ https://get.data.gov.lt/datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo
 */
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import config from "../../utils/config.js";
 
-const BASE =
-    "https://get.data.gov.lt/datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo";
+const BASE = `${config.dataGovUrl}/datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo`;
 const LIMIT = 10_000;
 const BATCH_SIZE = 200;
 

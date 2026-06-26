@@ -5,10 +5,10 @@ https://data.gov.lt/datasets/1806/
 */
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
+import config from "../../utils/config.js";
 const logger = new Logger();
 
-const BASE =
-    "https://get.data.gov.lt/datasets/gov/rc/jar/balanso_ataskaitos/BalansoAtaskaita";
+const BASE = `${config.dataGovUrl}/datasets/gov/rc/jar/balanso_ataskaitos/BalansoAtaskaita`;
 const LIMIT = 10_000;
 const BATCH_SIZE = 100;
 

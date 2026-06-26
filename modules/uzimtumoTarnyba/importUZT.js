@@ -5,8 +5,9 @@ https://data.gov.lt/datasets/2894/
 */
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import config from "../../utils/config.js";
 
-const BASE = "https://get.data.gov.lt/datasets/gov/uzt/ldv/Vieta";
+const BASE = `${config.dataGovUrl}/datasets/gov/uzt/ldv/Vieta`;
 const LIMIT = 100_000;
 const BATCH_SIZE = 1000;
 

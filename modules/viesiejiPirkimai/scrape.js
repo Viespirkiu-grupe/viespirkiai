@@ -3,6 +3,7 @@ import PQueue from "p-queue";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import Timings from "../../utils/timings.js";
+import config from "../../utils/config.js";
 
 const PAGE_SIZE = 1000;
 
@@ -105,7 +106,7 @@ export async function updateCFTS(options = {}) {
 
     const fetchPage = async (page) => {
         const timings = new Timings();
-        const url = `https://viesiejipirkimai.lt/epps/viewCFTSAction.do?T01_ps=${puslapyje}&d-3680175-p=${page}`;
+        const url = `${config.viesiejiPirkimaiUrl}/epps/viewCFTSAction.do?T01_ps=${puslapyje}&d-3680175-p=${page}`;
         // d-3680175-p=2 // page 2
 
         timings.start("fetch");

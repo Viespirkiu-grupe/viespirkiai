@@ -5,8 +5,9 @@ https://data.gov.lt/datasets/1732/
 */
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import config from "../../utils/config.js";
 
-const BASE = "https://get.data.gov.lt/datasets/gov/rc/jadis/dalyviai/Dalyvis";
+const BASE = `${config.dataGovUrl}/datasets/gov/rc/jadis/dalyviai/Dalyvis`;
 const LIMIT = 10_000;
 const BATCH_SIZE = 200;
 

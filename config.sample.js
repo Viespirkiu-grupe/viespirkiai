@@ -97,6 +97,12 @@ export default {
     torAddress: "socks5h://127.0.0.1:9050",
     torPassword: "CHANGE_ME",
 
+    // Išorinių duomenų šaltinių baziniai URL. Galima perrašyti į mirror/proxy
+    // (pvz. lokalų cache). Be trailing slash. Paliekam numatytuosius —
+    // tikrieji viešieji šaltiniai.
+    dataGovUrl: "https://get.data.gov.lt",
+    viesiejiPirkimaiUrl: "https://viesiejipirkimai.lt",
+
     // ─────────────────────────────────────────────────────────────────────
     // Failai ir OCR
     // ─────────────────────────────────────────────────────────────────────

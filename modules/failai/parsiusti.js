@@ -4,6 +4,7 @@ Parsisiunčia duomenų bazėje nurodytus failus į viešdėžes.
 
 import { postgres } from "../../postgres/postgres.js";
 import { getProxyBySite } from "../scrapeProxies/getProxyBySite.js";
+import config from "../../utils/config.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import Timings from "../../utils/timings.js";
@@ -106,7 +107,7 @@ export async function parsiustiFaila(options = {}) {
 
             let proxy = await getProxyBySite("viesiejipirkimai");
             if (!proxy) {
-                url = `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${versionId}&documentId=${documentId}`;
+                url = `${config.viesiejiPirkimaiUrl}/epps/cft/downloadDocumentVersion.do?versionId=${versionId}&documentId=${documentId}`;
             } else {
                 url =
                     proxy.url +
