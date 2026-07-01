@@ -5,6 +5,10 @@ import {
   toggleValue,
   type DokumentaiUrlState,
 } from '../../lib/dokumentaiUrl.ts';
+import { fmt, fmtCompact } from '../../lib/dokumentaiFormat.ts';
+import { SOURCE_LABEL } from '../../lib/dokumentaiLabels.ts';
+import BarList from '@design-system/components/BarList.astro';
+import StatChip from '@design-system/components/StatChip.astro';
 
 interface Props {
   stats: DokumentaiStats;
@@ -13,8 +17,8 @@ interface Props {
 
 const { stats, urlState } = Astro.props;
 
-// Self-contained label maps (mirror the page's; kept local so the panel is a
-// drop-in). Unknown values fall back to the raw key.
+// Statistikos skydelyje tipus rodom daugiskaita (skiriasi nuo bendro
+// vienaskaitos TYPE_LABEL rezultatų kortelėse).
 const TYPE_LABEL: Record<string, string> = {
   crawledPage: 'Tinklalapiai',
   failas: 'Failai',
@@ -22,28 +26,11 @@ const TYPE_LABEL: Record<string, string> = {
   teisesAktoProjektas: 'Teisės aktų projektai',
   teismoNuosprendis: 'Teismo nuosprendžiai',
 };
-const SOURCE_LABEL: Record<string, string> = {
-  sutartys: 'Sutartys', archive: 'Archyvas', cvpp: 'CVPP', cvpis: 'CVP IS',
-  mvpaprasai: 'MVP tvarkos', neskelbiamosderybos: 'Neskelbiamos derybos',
-  liteko: 'LITEKO', etar: 'e-TAR', eseimas: 'e-Seimas',
-};
 
 // Quiet, distinguishable palette for the type composition segments — reads on
 // white without shouting. Indexed by position; wraps if ever exceeded.
 const SEG_PALETTE = ['#2563eb', '#0891b2', '#7c3aed', '#d97706', '#16a34a', '#db2777'];
 const segColor = (i: number) => SEG_PALETTE[i % SEG_PALETTE.length];
-
-function fmt(n: number | null | undefined) {
-  return n != null ? Number(n).toLocaleString('lt-LT') : '';
-}
-function fmtCompact(n: number | null | undefined): string {
-  const v = Number(n ?? 0);
-  if (!Number.isFinite(v)) return '0';
-  if (v >= 1e9) return (v / 1e9).toFixed(1).replace('.', ',') + ' mlrd.';
-  if (v >= 1e6) return (v / 1e6).toFixed(1).replace('.', ',') + ' mln.';
-  if (v >= 1e4) return Math.round(v / 1e3).toLocaleString('lt-LT') + ' tūkst.';
-  return v.toLocaleString('lt-LT');
-}
 
 const typeUrl = (v: string) => buildDokumentaiUrl(urlState, { type: toggleValue(urlState.type, v) });
 const sourceUrl = (v: string) => buildDokumentaiUrl(urlState, { source: toggleValue(urlState.source, v) });
@@ -94,8 +81,6 @@ const metrics = [
 
 // ── Top agencies ──────────────────────────────────────────────────────────────
 const topIstaiga = stats.topIstaiga.filter((i) => (i.count ?? 0) > 0).slice(0, 6);
-const istaigaMax = Math.max(1, ...topIstaiga.map((i) => i.count ?? 0));
-const pct = (n: number | null | undefined, max: number) => Math.round(((n ?? 0) / max) * 100);
 
 const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length > 0 || metrics.length > 0;
 ---
@@ -186,20 +171,15 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
     {topIstaiga.length > 0 && (
       <section class="dok-stats__block">
         <h3 class="dok-stats__h">Aktyviausios įstaigos</h3>
-        <div class="dok-stats__rank">
-          {topIstaiga.map((it, i) => (
-            <a
-              class="dok-stats__rank-row"
-              href={istaigaUrl(it.value)}
-              style={`--pct:${pct(it.count, istaigaMax)};--i:${i}`}
-              title={it.label ? `${it.label} (${it.value})` : it.value}
-            >
-              <span class="dok-stats__rank-bar" aria-hidden="true"></span>
-              <span class="dok-stats__rank-name">{it.label || it.value}</span>
-              <span class="dok-stats__rank-cnt">{fmtCompact(it.count)}</span>
-            </a>
-          ))}
-        </div>
+        <BarList
+          items={topIstaiga.map((it) => ({
+            label: it.label || it.value,
+            value: it.count ?? 0,
+            href: istaigaUrl(it.value),
+            title: it.label ? `${it.label} (${it.value})` : it.value,
+          }))}
+          formatValue={fmtCompact}
+        />
       </section>
     )}
 
@@ -208,10 +188,7 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
         <h3 class="dok-stats__h">Šaltiniai</h3>
         <div class="dok-stats__chips">
           {stats.bySource.slice(0, 8).map((s) => (
-            <a class="dok-stats__chip" href={sourceUrl(s.value)}>
-              <span>{SOURCE_LABEL[s.value.toLowerCase()] || s.value}</span>
-              <span class="dok-stats__chip-cnt">{fmtCompact(s.count)}</span>
-            </a>
+            <StatChip href={sourceUrl(s.value)} label={SOURCE_LABEL[s.value.toLowerCase()] || s.value} count={fmtCompact(s.count)} />
           ))}
         </div>
       </section>
@@ -439,62 +416,14 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
     font-variant-numeric: tabular-nums;
   }
 
-  /* Ranked agencies */
-  .dok-stats__rank { display: flex; flex-direction: column; gap: 2px; }
-  .dok-stats__rank-row {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    border-radius: var(--radius-md);
-    color: inherit;
-  }
-  .dok-stats__rank-bar {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: calc(var(--pct, 0) * 1%);
-    z-index: -1;
-    background: color-mix(in srgb, var(--link) 11%, transparent);
-    transform-origin: left;
-    animation: dokStatsGrowX .6s cubic-bezier(.2, .7, .2, 1) backwards;
-    animation-delay: calc(var(--i, 0) * 40ms + 100ms);
-  }
-  .dok-stats__rank-row:hover .dok-stats__rank-bar { background: color-mix(in srgb, var(--link) 18%, transparent); }
-  .dok-stats__rank-name {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font-size: var(--text-sm);
-    color: var(--black);
-  }
-  .dok-stats__rank-cnt { flex: none; font-size: var(--text-xs); color: var(--gray); font-variant-numeric: tabular-nums; }
-
   /* Source chips */
   .dok-stats__chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .dok-stats__chip {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 7px;
-    padding: 5px 12px;
-    border: var(--border);
-    border-radius: var(--radius-pill);
-    font-size: var(--text-sm);
-    color: var(--black);
-    transition: border-color .15s, background .15s;
-  }
-  .dok-stats__chip:hover { border-color: var(--gray); background: var(--lighter-gray); }
-  .dok-stats__chip-cnt { color: var(--gray); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
 
   @keyframes dokStatsGrowX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   @keyframes dokStatsGrowY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 
   @media (prefers-reduced-motion: reduce) {
-    .dok-stats__col-bar, .dok-stats__seg-part, .dok-stats__rank-bar { animation: none !important; transform: none !important; }
+    .dok-stats__col-bar, .dok-stats__seg-part { animation: none !important; transform: none !important; }
   }
 </style>
 

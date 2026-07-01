@@ -1,0 +1,125 @@
+---
+// A full-screen modal shell: a backdrop + panel with a header (title + close),
+// an optional tools strip, a body (default slot) and an optional footer. Opens
+// via openModal(id) from './modal.ts'; closes itself on backdrop / ✕ / Escape.
+// Generic: the body and footer content come entirely from the caller's slots.
+interface Props {
+  id: string;
+  title: string;
+  className?: string;
+}
+
+const { id, title, className = '' } = Astro.props;
+const titleId = `${id}Title`;
+const hasTools = Astro.slots.has('tools');
+const hasFooter = Astro.slots.has('footer');
+---
+
+<div class={['ds-modal', className].filter(Boolean).join(' ')} id={id} hidden>
+  <div class="ds-modal__backdrop" data-modal-close></div>
+  <div class="ds-modal__panel" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+    <header class="ds-modal__head">
+      <h2 class="ds-modal__title" id={titleId}>{title}</h2>
+      <button type="button" class="ds-modal__close" data-modal-close aria-label="Užverti">✕</button>
+    </header>
+    {hasTools && <div class="ds-modal__tools"><slot name="tools" /></div>}
+    <slot />
+    {hasFooter && <footer class="ds-modal__foot"><slot name="footer" /></footer>}
+  </div>
+</div>
+
+<script>
+  import { closeModal } from './modal.ts';
+  document.querySelectorAll<HTMLElement>('.ds-modal').forEach((modal) => {
+    modal.querySelectorAll('[data-modal-close]').forEach((el) =>
+      el.addEventListener('click', () => closeModal(modal)));
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    document.querySelectorAll<HTMLElement>('.ds-modal:not([hidden])').forEach((m) => closeModal(m));
+  });
+</script>
+
+<style>
+  .ds-modal {
+    position: fixed;
+    inset: 0;
+    /* Above everything, incl. Leaflet panes/controls (z-index up to 1000) and
+       the sticky navbar (2000). The --z-modal token (300) is below the map. */
+    z-index: 5000;
+  }
+  .ds-modal[hidden] { display: none; }
+  .ds-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: var(--white);
+  }
+  .ds-modal__panel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--white);
+    overflow: hidden;
+    animation: ds-modal-pop 160ms ease;
+  }
+  @keyframes ds-modal-pop {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  /* Shared horizontal centring: full-bleed dividers, readable content column. */
+  .ds-modal__head,
+  .ds-modal__tools,
+  .ds-modal__foot { padding-inline: max(20px, calc((100% - 1080px) / 2)); }
+  .ds-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-block: 18px;
+    border-bottom: 1px solid var(--lighter-gray);
+  }
+  .ds-modal__title {
+    margin: 0;
+    font-size: var(--text-xl);
+    font-weight: 600;
+  }
+  .ds-modal__close {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    border-radius: var(--radius-md);
+    color: var(--dark-gray);
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .ds-modal__close:hover { background: var(--lighter-gray); color: var(--black); }
+  .ds-modal__tools {
+    padding-block: 14px;
+    border-bottom: 1px solid var(--lighter-gray);
+  }
+  .ds-modal__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-block: 14px;
+    border-top: 1px solid var(--lighter-gray);
+  }
+  .ds-modal__count {
+    font-size: var(--text-sm);
+    color: var(--gray);
+  }
+  .ds-modal__actions {
+    display: inline-flex;
+    gap: 8px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ds-modal__panel { animation: none; }
+  }
+</style>

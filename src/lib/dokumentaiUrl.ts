@@ -1,5 +1,13 @@
 import type { DokumentaiSort, FacetOption } from './searchDokumentai.ts';
 
+/** One sidebar facet: its selection, shown + overflow options, and toggle-url. */
+export interface DokFacet {
+  filter: string[];
+  visible: FacetOption[];
+  hidden?: FacetOption[];
+  toggleUrl: (value: string) => string;
+}
+
 export interface DokumentaiArea {
   minLat: number;
   maxLat: number;

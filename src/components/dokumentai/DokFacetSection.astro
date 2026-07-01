@@ -1,0 +1,279 @@
+---
+// One filter facet section in the /dokumentai sidebar: a label, an optional
+// "Visos/Visi" reset row, the visible options, and either an inline "Rodyti
+// daugiau" reveal or a full-screen "Daugiau" modal button for the overflow.
+//
+// Owns the styling of every facet row (used here and by DokFilters' own "Vieta"
+// section). Every option keeps the data-param / data-value / data-facet-* hooks
+// the DokFilters script binds to.
+import type { FacetOption } from '../../lib/searchDokumentai.ts';
+import type { DokFacet } from '../../lib/dokumentaiUrl.ts';
+import { fmt } from '../../lib/dokumentaiFormat.ts';
+
+interface Props {
+  label: string;
+  param: string;
+  /** The facet's selection, shown + overflow options and toggle-url builder. */
+  facet: DokFacet;
+  /** Text for the reset row ("Visos"/"Visi"). Omit ⇒ no reset row. */
+  allLabel?: string;
+  /** Always render the reset row, even with no options yet (class / type). */
+  alwaysAll?: boolean;
+  /** Transform a raw value into its display label (host strips www, ext dots…). */
+  formatLabel?: (value: string) => string;
+  /** Two-line label + sub-code rows (įstaiga / JAR). */
+  stacked?: boolean;
+  /** Overflow opens the full-screen facet modal instead of an inline reveal. */
+  modal?: { field: string; title: string; always?: boolean };
+  /** Adds an inline "type your own value" form (svetainė / JAR). */
+  addForm?: { id: string; inputId: string; placeholder: string; ariaLabel: string };
+}
+
+const {
+  label,
+  param,
+  facet,
+  allLabel,
+  alwaysAll = false,
+  formatLabel = (v: string) => v,
+  stacked = false,
+  modal,
+  addForm,
+} = Astro.props;
+
+const { filter, visible, hidden = [], toggleUrl } = facet;
+
+const showAll = allLabel != null && (alwaysAll || visible.length > 0 || filter.length > 0);
+const showModalBtn = !!modal && (hidden.length > 0 || !!modal.always);
+const showInlineHidden = !modal && hidden.length > 0;
+
+const optClass = (opt: FacetOption) =>
+  `dok-filter-opt${stacked && opt.label ? ' dok-filter-opt--stack' : ''}${
+    filter.includes(opt.value) ? ' is-selected' : ''
+  }`;
+---
+
+<section class="dok-filter-section">
+  <span class="dok-filter-section-label">{label}</span>
+
+  {showAll && (
+    <a href={toggleUrl('')} data-param={param} class={`dok-filter-opt dok-filter-all${filter.length === 0 ? ' is-selected' : ''}`}>
+      <span class="dok-filter-opt-label">{allLabel}</span>
+    </a>
+  )}
+
+  {visible.map((opt) => (
+    <a
+      href={toggleUrl(opt.value)}
+      data-param={param}
+      data-value={opt.value}
+      title={stacked && opt.label ? `${opt.label} (${opt.value})` : undefined}
+      class={optClass(opt)}
+    >
+      {stacked ? (
+        <span class="dok-filter-opt-text">
+          <span class="dok-filter-opt-label">{opt.label || formatLabel(opt.value)}</span>
+          {opt.label && <span class="dok-filter-opt-sub">{opt.value}</span>}
+        </span>
+      ) : (
+        <span class="dok-filter-opt-label">{formatLabel(opt.value)}</span>
+      )}
+      {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+    </a>
+  ))}
+
+  {showInlineHidden && (
+    <>
+      <div class="dok-more-list" hidden>
+        {hidden.map((opt) => (
+          <a href={toggleUrl(opt.value)} data-param={param} data-value={opt.value} class={optClass(opt)}>
+            <span class="dok-filter-opt-label">{formatLabel(opt.value)}</span>
+            {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
+          </a>
+        ))}
+      </div>
+      <button class="dok-more-btn" type="button">Rodyti daugiau</button>
+    </>
+  )}
+
+  {addForm && (
+    <form class="dok-input-form" id={addForm.id} autocomplete="off">
+      <input id={addForm.inputId} type="text" class="dok-input" placeholder={addForm.placeholder} aria-label={addForm.ariaLabel} />
+      <button type="submit" class="dok-input-btn" aria-label="Pridėti">+</button>
+    </form>
+  )}
+
+  {showModalBtn && (
+    <button
+      class="dok-more-btn"
+      type="button"
+      data-facet-modal={modal!.field}
+      data-facet-param={param}
+      data-facet-title={modal!.title}
+    >Daugiau</button>
+  )}
+</section>
+
+<style is:global>
+  /* Facet section + option rows. Global (not scoped) because DokFilters' own
+     "Vieta" section reuses .dok-filter-section / .dok-filter-opt too. */
+  .dok-filter-section { padding-top: 20px; }
+  .dok-filter-section-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--gray);
+    padding-bottom: 6px;
+  }
+
+  /* Filter rows: full-width pills. Every row shares the same height and
+     metrics so labels start on one vertical line and counts land on one
+     right edge. Selected = a solid black pill; hover = a faint wash. */
+  .dok-filter-opt {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    height: 28px;
+    /* Padding gives the hover wash breathing room; the matching negative
+       margin pulls the checkbox back onto the 16px line with the logo. */
+    padding-inline: 6px;
+    margin-inline: -6px;
+    font-size: var(--text-sm);
+    color: var(--dark-gray);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    transition: color var(--transition), background var(--transition);
+  }
+  /* A checkbox box draws the affordance: a togglable, multi-select filter.
+     Selected rows fill it and stamp a centred SVG checkmark. */
+  .dok-filter-opt::before {
+    content: "";
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    border: 1.5px solid var(--light-gray);
+    border-radius: var(--radius-sm);
+    background: var(--white) center / 0 no-repeat;
+    transition: background-color var(--transition), border-color var(--transition);
+  }
+  .dok-filter-opt:hover {
+    color: var(--black);
+    background: var(--lighter-gray);
+  }
+  .dok-filter-opt:hover::before { border-color: var(--dark-gray); }
+  .dok-filter-opt.is-selected { color: var(--black); font-weight: 500; }
+  .dok-filter-opt.is-selected::before {
+    border-color: var(--black);
+    background-color: var(--black);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+    background-size: 11px;
+  }
+  .dok-filter-opt-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dok-filter-opt-count {
+    flex-shrink: 0;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Įstaigų variantas: pavadinimas + JAR kodas dviem eilutėmis. Eilutė auga į
+     aukštį, checkbox lygiuojamas prie viršaus, pavadinimas vyniojamas iki 2 eil. */
+  .dok-filter-opt--stack {
+    height: auto;
+    align-items: flex-start;
+    padding-block: 5px;
+  }
+  .dok-filter-opt--stack::before { margin-top: 2px; }
+  /* BLOCK srautas (ne flex): pavadinimas + kodas dedasi vienas po kito
+     natūraliais aukščiais, kad kodas neišlįstų ant kitos eilutės. */
+  .dok-filter-opt-text {
+    flex: 1;
+    min-width: 0;
+    display: block;
+  }
+  .dok-filter-opt--stack .dok-filter-opt-label {
+    display: block;
+    flex: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+  }
+  .dok-filter-opt-sub {
+    display: block;
+    margin-top: 1px;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+  }
+  .dok-filter-opt--stack .dok-filter-opt-count { margin-top: 1px; }
+
+  /* Add-by-text input: visually a different action from the option list. */
+  .dok-input-form {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 10px;
+  }
+  .dok-input {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    color: var(--black);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--light-gray);
+    padding: 2px 0;
+    outline: none;
+  }
+  .dok-input:focus { border-bottom-color: var(--black); }
+  .dok-input::placeholder { color: var(--gray); }
+  .dok-input-btn {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    background: none;
+    border: none;
+    color: var(--dark-gray);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+  }
+  .dok-input-btn:hover { color: var(--black); }
+
+  /* Overflow trigger — also used by DokFilters' "Pasirinkti" area link. */
+  .dok-more-btn,
+  .dok-area-link {
+    display: block;
+    margin-top: 6px;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+  }
+  .dok-more-btn:hover,
+  .dok-area-link:hover { color: var(--black); text-decoration: underline; }
+
+  @media (max-width: 900px) {
+    .dok-filter-section { padding-top: 14px; }
+    .dok-filter-section + .dok-filter-section { margin-top: 8px; }
+    /* Comfortable touch targets (the two-line įstaiga rows stay auto-height). */
+    .dok-filter-opt:not(.dok-filter-opt--stack) { height: 38px; }
+    .dok-input { font-size: var(--text-sm); padding: 8px 0; }
+  }
+</style>

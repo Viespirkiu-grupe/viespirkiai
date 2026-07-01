@@ -1,0 +1,229 @@
+---
+// Area (bounding-box) picker: a full-screen Leaflet map inside the generic
+// Modal. "Ieškoti šioje srityje" captures the viewport bounds into
+// minLat/maxLat/minLon/maxLon. Owns only the map/tools styling; the behaviour
+// lives in the <script> below, bound via #dokAreaModal and the id hooks.
+import Modal from '@design-system/components/Modal.astro';
+---
+
+<Modal id="dokAreaModal" title="Pasirinkti sritį">
+  <div slot="tools" class="dok-area-tools">
+    <button type="button" class="btn btn-outline btn-sm" id="dokAreaDraw">Žymėti sritį</button>
+    <button type="button" class="btn btn-outline btn-sm" id="dokAreaClear" hidden>Išvalyti</button>
+    <span class="dok-area-hint" id="dokAreaHint">Stumdyk žemėlapį laisvai. Spausk „Žymėti sritį" ir tempk stačiakampį.</span>
+  </div>
+  <div class="dok-area-map" id="dokAreaMap"></div>
+  <Fragment slot="footer">
+    <span class="ds-modal__count"></span>
+    <span class="ds-modal__actions">
+      <button type="button" class="btn btn-outline btn-sm" data-modal-close>Atšaukti</button>
+      <button type="button" class="btn btn-primary btn-sm" id="dokAreaApply">Ieškoti šioje srityje</button>
+    </span>
+  </Fragment>
+</Modal>
+
+<style is:global>
+  /* Area picker: the map + draw tools inside the (shared) modal shell. */
+  .dok-area-tools {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+  .dok-area-tools .btn.is-active {
+    background: var(--black);
+    color: var(--white);
+    border-color: var(--black);
+  }
+  .dok-area-hint {
+    margin: 0;
+    color: var(--gray);
+    font-size: var(--text-sm);
+  }
+  .dok-area-map {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+  }
+</style>
+
+<script>
+  // Area (bounding-box) picker: a full-screen Leaflet map. "Ieškoti šioje
+  // srityje" captures the viewport bounds into minLat/maxLat/minLon/maxLon, which
+  // the search turns into a Quickwit lat/lon range query.
+  import { ensureLeafletRuntime } from '@design-system/components/maps/mapRuntime';
+  import { params, navigate } from '../../scripts/dokumentaiNav.ts';
+  import { openModal, closeModal } from '@design-system/components/modal.ts';
+
+  const modal = document.getElementById('dokAreaModal');
+  const openBtn = document.getElementById('dokAreaBtn');
+  const mapEl = document.getElementById('dokAreaMap');
+  const applyBtn = document.getElementById('dokAreaApply');
+  const drawBtn = document.getElementById('dokAreaDraw');
+  const clearBtn = document.getElementById('dokAreaClear');
+  const hintEl = document.getElementById('dokAreaHint');
+  if (modal && openBtn && mapEl) {
+    let map: any = null;
+    let L: any = null;
+    let rect: any = null;            // the marked rectangle
+    let selectedBounds: any = null;  // committed selection
+    let drawMode = false;            // "Žymėti sritį" toggled on
+    let drawing = false;             // a drag is in progress
+    let startPt: any = null;         // first corner (latlng)
+
+    function currentArea() {
+      const v = (k: string) => parseFloat(params.get(k) || '');
+      const a = { minLat: v('minLat'), maxLat: v('maxLat'), minLon: v('minLon'), maxLon: v('maxLon') };
+      return Object.values(a).every((n) => Number.isFinite(n)) ? a : null;
+    }
+
+    const setOpen = (open: boolean) => (open ? openModal(modal!) : closeModal(modal!));
+
+    function syncTools() {
+      if (clearBtn) clearBtn.hidden = !selectedBounds;
+      if (drawBtn) {
+        drawBtn.classList.toggle('is-active', drawMode);
+        drawBtn.textContent = drawMode ? 'Tempk stačiakampį…' : (selectedBounds ? 'Žymėti iš naujo' : 'Žymėti sritį');
+      }
+      if (hintEl) {
+        hintEl.textContent = drawMode
+          ? 'Tempk pele (ar pirštu) nuo vieno kampo iki kito.'
+          : 'Stumdyk žemėlapį laisvai. Spausk „Žymėti sritį" ir tempk stačiakampį.';
+      }
+    }
+
+    function clearRect() {
+      if (rect) { map.removeLayer(rect); rect = null; }
+      selectedBounds = null;
+      syncTools();
+    }
+
+    // Commit a finished rectangle as the marked area.
+    function setRect(bounds: any) {
+      if (rect) map.removeLayer(rect);
+      rect = L.rectangle(bounds, { color: '#111', weight: 2, fillColor: '#111', fillOpacity: 0.08 }).addTo(map);
+      selectedBounds = rect.getBounds();
+      syncTools();
+    }
+
+    // Dashed live preview while dragging.
+    function previewRect(a: any, b: any) {
+      if (rect) map.removeLayer(rect);
+      rect = L.rectangle([a, b], { color: '#111', weight: 2, dashArray: '4', fillColor: '#111', fillOpacity: 0.06 }).addTo(map);
+    }
+
+    function setDrawMode(on: boolean) {
+      drawMode = on;
+      mapEl!.style.cursor = on ? 'crosshair' : '';
+      if (on) map.dragging.disable();
+      else { map.dragging.enable(); drawing = false; startPt = null; }
+      syncTools();
+    }
+
+    // Translate a client point to a map latlng (for native touch handling).
+    function clientToLatLng(clientX: number, clientY: number) {
+      const box = mapEl!.getBoundingClientRect();
+      return map.containerPointToLatLng([clientX - box.left, clientY - box.top]);
+    }
+
+    function beginDraw(latlng: any) { drawing = true; startPt = latlng; clearRect(); }
+    function moveDraw(latlng: any) { if (drawing && startPt) previewRect(startPt, latlng); }
+    function endDraw(latlng: any) {
+      if (!drawing) return;
+      drawing = false;
+      if (startPt && latlng && !startPt.equals(latlng)) {
+        setRect([startPt, latlng]);
+        startPt = null;
+        setDrawMode(false);           // one rectangle done → back to panning
+      } else {
+        startPt = null;               // a stray click: stay armed
+        clearRect();
+      }
+    }
+
+    async function ensureMap() {
+      if (map) return map;
+      await ensureLeafletRuntime();
+      L = (window as any).L;
+      map = L.map(mapEl, { zoomControl: true }).setView([55.17, 23.88], 7);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(map);
+      // Document density heatmap (precomputed tiles, postgres/gis) — same as the
+      // juridiniai overlay, blurred the same way (overlayBlurPx: 5).
+      const overlay = L.tileLayer('/dokumentai/map/tiles/{z}/{x}/{y}.png', {
+        opacity: 0.6,
+        maxNativeZoom: 16,
+        maxZoom: 19,
+      }).addTo(map);
+      const blurContainer = () => { const c = overlay.getContainer(); if (c) c.style.filter = 'blur(5px)'; };
+      blurContainer();
+      overlay.on('load', blurContainer);
+
+      // Mouse: press → drag → release to mark, only while draw mode is on (so the
+      // map still pans normally otherwise).
+      map.on('mousedown', (e: any) => { if (drawMode) beginDraw(e.latlng); });
+      map.on('mousemove', (e: any) => { if (drawMode) moveDraw(e.latlng); });
+      map.on('mouseup', (e: any) => { if (drawMode) endDraw(e.latlng); });
+
+      // Touch: Leaflet's mouse events don't fire on touch, so handle it natively.
+      mapEl!.addEventListener('touchstart', (ev) => {
+        if (!drawMode || !ev.touches[0]) return;
+        ev.preventDefault();
+        beginDraw(clientToLatLng(ev.touches[0].clientX, ev.touches[0].clientY));
+      }, { passive: false });
+      mapEl!.addEventListener('touchmove', (ev) => {
+        if (!drawMode || !drawing || !ev.touches[0]) return;
+        ev.preventDefault();
+        moveDraw(clientToLatLng(ev.touches[0].clientX, ev.touches[0].clientY));
+      }, { passive: false });
+      mapEl!.addEventListener('touchend', (ev) => {
+        if (!drawMode || !drawing) return;
+        const t = ev.changedTouches[0];
+        endDraw(t ? clientToLatLng(t.clientX, t.clientY) : null);
+      });
+      return map;
+    }
+
+    openBtn.addEventListener('click', async () => {
+      setOpen(true);
+      const m = await ensureMap();
+      // The container had no size while hidden — let Leaflet re-measure, then
+      // restore/frame the existing area (if any).
+      setTimeout(() => {
+        m.invalidateSize();
+        setDrawMode(false);
+        const a = currentArea();
+        if (a) {
+          const b: [[number, number], [number, number]] = [[a.minLat, a.minLon], [a.maxLat, a.maxLon]];
+          setRect(b);
+          m.fitBounds(b);
+        } else {
+          clearRect();
+        }
+      }, 60);
+    });
+
+    drawBtn?.addEventListener('click', () => {
+      if (drawMode) { setDrawMode(false); return; }   // pressing again cancels
+      clearRect();        // the instant the button is pressed, drop the rectangle
+      setDrawMode(true);  // …and arm drawing
+    });
+    clearBtn?.addEventListener('click', () => { setDrawMode(false); clearRect(); });
+
+    applyBtn?.addEventListener('click', () => {
+      if (!map) return;
+      // Use the marked rectangle; fall back to the visible area if none drawn.
+      const b = selectedBounds || map.getBounds();
+      params.set('minLat', b.getSouth().toFixed(6));
+      params.set('maxLat', b.getNorth().toFixed(6));
+      params.set('minLon', b.getWest().toFixed(6));
+      params.set('maxLon', b.getEast().toFixed(6));
+      params.delete('page');
+      setOpen(false);
+      navigate(true);
+    });
+    // Backdrop / ✕ / Escape / "Atšaukti" closing is handled generically by Modal.
+  }
+</script>

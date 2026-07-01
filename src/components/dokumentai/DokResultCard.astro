@@ -1,0 +1,80 @@
+---
+// One /dokumentai search hit rendered as a result card. Pure markup — the list
+// styles live in DokResults.astro. Derives its provenance line, target URL and
+// the (de-duplicated) date/meta row from the hit.
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import type { DokumentasHit } from '../../lib/searchDokumentai.ts';
+import { fmt, fmtDate, dateKey } from '../../lib/dokumentaiFormat.ts';
+import { TYPE_LABEL, SOURCE_LABEL, LANG_LABEL } from '../../lib/dokumentaiLabels.ts';
+
+interface Props {
+  hit: DokumentasHit;
+}
+
+const { hit } = Astro.props;
+
+const isVerdict = hit.class === 'teise';
+let domain = (hit.host || hit.domain || '').replace(/^www\./, '');
+if (!domain && hit.url) {
+  try { domain = new URL(hit.url).host.replace(/^www\./, ''); } catch { /* ignore */ }
+}
+// Nuosprendžių URL kelias yra ASP id — neinformatyvus, todėl jo nerodom.
+const pathPart = isVerdict ? '' : (hit.url ? hit.url.replace(/^https?:\/\/[^/]+/, '').replace(/^\//, '') : '');
+const title = hit.title || hit.url || hit.md5 || `Dokumentas #${hit.id}`;
+const externalUrl = hit.url || null;
+const internalUrl = hit.failasId ? `/failas/${hit.failasId}` : null;
+const targetUrl = internalUrl || externalUrl || '#';
+const isExternal = !internalUrl && !!externalUrl;
+const happened = fmtDate(hit.happenedAt);
+const created = fmtDate(hit.createdAt);
+const updated = fmtDate(hit.updatedAt);
+const discovered = fmtDate(hit.discoveredAt);
+const happenedKey = dateKey(hit.happenedAt);
+const createdKey = dateKey(hit.createdAt);
+const updatedKey = dateKey(hit.updatedAt);
+const discoveredKey = dateKey(hit.discoveredAt);
+const location = [hit.savivaldybe, hit.apskritis]
+  .filter((value, index, values) => value && values.indexOf(value) === index)
+  .join(', ');
+---
+
+<ResultCardShell clickable={true} className="dok-card">
+  <div slot="meta" class="dok-provenance">
+    {domain && <span class="dok-domain">{domain}</span>}
+    {pathPart && (
+      <>
+        <span class="dok-provenance-sep" aria-hidden="true">›</span>
+        <span class="dok-path">{pathPart}</span>
+      </>
+    )}
+  </div>
+  <h3 slot="title" class="result-card-title">
+    <a
+      href={targetUrl}
+      {...isExternal ? { target: '_blank', rel: 'noopener' } : {}}
+    >{title}</a>
+  </h3>
+  {hit.snippet && (
+    <p class="dok-snippet text-sm text-muted mt-2" set:html={hit.snippet} />
+  )}
+  <dl slot="footer" class="result-card-meta dok-meta">
+    {hit.type && <div><dt class="sr-only">Tipas</dt><dd>{TYPE_LABEL[hit.type] || hit.type}</dd></div>}
+    {hit.source && <div title="Šaltinis"><dt class="sr-only">Šaltinis</dt><dd>{SOURCE_LABEL[hit.source.toLowerCase()] || hit.source}</dd></div>}
+    {hit.extension && <div><dt class="sr-only">Plėtinys</dt><dd>{String(hit.extension).toUpperCase()}</dd></div>}
+    {hit.language && <div><dt class="sr-only">Kalba</dt><dd>{LANG_LABEL[hit.language] || hit.language.toUpperCase()}</dd></div>}
+    {hit.pageCount != null && hit.pageCount > 0 && <div><dt class="sr-only">Puslapiai</dt><dd>{fmt(hit.pageCount)} psl.</dd></div>}
+    {hit.wordCount != null && hit.wordCount > 0 && <div><dt class="sr-only">Žodžiai</dt><dd>{fmt(hit.wordCount)} žodž.</dd></div>}
+    {happened && <div title="Dokumento data"><dt>Data</dt><dd>{happened}</dd></div>}
+    {created && createdKey !== happenedKey && <div title="Sukūrimo data"><dt>Sukurta</dt><dd>{created}</dd></div>}
+    {updated && updatedKey !== happenedKey && updatedKey !== createdKey && <div title="Atnaujinimo data"><dt>Atnaujinta</dt><dd>{updated}</dd></div>}
+    {discovered && discoveredKey !== happenedKey && discoveredKey !== createdKey && discoveredKey !== updatedKey && <div title="Aptikimo data"><dt>Aptikta</dt><dd>{discovered}</dd></div>}
+    {hit.autorius && <div title="Autorius"><dt class="sr-only">Autorius</dt><dd>{hit.autorius}</dd></div>}
+    {location && <div title="Vietovė"><dt class="sr-only">Vietovė</dt><dd>{location}</dd></div>}
+    {hit.istaigaJar && (
+      <div title={hit.istaigaPavadinimas ? `Paskelbusi įstaiga: ${hit.istaigaPavadinimas} (${hit.istaigaJar})` : `Paskelbusi įstaiga (JAR ${hit.istaigaJar})`}>
+        <dt class="sr-only">Paskelbusi įstaiga</dt>
+        <dd>{hit.istaigaPavadinimas || hit.istaigaJar}</dd>
+      </div>
+    )}
+  </dl>
+</ResultCardShell>

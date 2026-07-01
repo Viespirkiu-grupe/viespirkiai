@@ -1,0 +1,201 @@
+---
+// The /dokumentai filter sidebar. The facet catalog (which facets, labels,
+// overflow) lives in lib/dokumentaiSections.ts; here we just render the sidebar
+// shell and map each group onto DokFacetSection. Owns the shell styling; the
+// behaviour is imported from scripts/dokumentaiFilters.ts.
+import { buildFilterSections, type FiltersData } from '../../lib/dokumentaiSections.ts';
+import DokFacetSection from './DokFacetSection.astro';
+
+type Props = FiltersData;
+const p = Astro.props;
+const s = buildFilterSections(p);
+const otherOpen = p.author.filter.length > 0 || p.creator.filter.length > 0 || p.producer.filter.length > 0;
+const otherCount = p.author.filter.length + p.creator.filter.length + p.producer.filter.length;
+---
+
+<aside class="dok-sidebar" id="dokSidebar" aria-label="Filtrai">
+  <div class="dok-sidebar-head">
+    <button type="button" class="dok-sidebar-title" id="dokFiltersToggle" aria-expanded="false" aria-controls="dokFiltersBody">
+      Filtrai{p.activeFilterCount > 0 && <span class="dok-filters-count">{p.activeFilterCount}</span>}
+      <span class="dok-filters-chevron" aria-hidden="true"></span>
+    </button>
+    {p.hasFilters && <a href={p.clearUrl} class="dok-sidebar-clear">Panaikinti</a>}
+  </div>
+
+  <div class="dok-filters-body" id="dokFiltersBody">
+    {s.top.map((x) => <DokFacetSection {...x} />)}
+    {p.showVerdictFacets && s.verdict.map((x) => <DokFacetSection {...x} />)}
+    {p.showTeisekuraFacets && s.teisekura.map((x) => <DokFacetSection {...x} />)}
+    {s.mid.map((x) => <DokFacetSection {...x} />)}
+
+    <details class="dok-other-filters" open={otherOpen}>
+      <summary>
+        Kiti filtrai
+        {otherCount > 0 && <span class="dok-other-filters-count">{otherCount}</span>}
+      </summary>
+      {s.other.map((x) => <DokFacetSection {...x} />)}
+    </details>
+
+    {s.geo.map((x) => <DokFacetSection {...x} />)}
+
+    <section class="dok-filter-section">
+      <span class="dok-filter-section-label">Vieta</span>
+      {p.bbox && (
+        <a href={p.areaClearUrl} class="dok-filter-opt is-selected" title="Panaikinti vietą">
+          <span class="dok-filter-opt-label">Pasirinkta vieta</span>
+        </a>
+      )}
+      <button type="button" class="dok-area-link" id="dokAreaBtn">Pasirinkti</button>
+    </section>
+  </div>
+</aside>
+
+<style is:global>
+  /* ── Sidebar: a plain full-height rail. Not sticky — it runs alongside the
+     results and scrolls away with the page. A hairline divider carries the
+     column down its whole length. Checkboxes sit at the shell's 16px edge,
+     in line with the navbar logo. */
+  .dok-sidebar {
+    grid-area: sidebar;
+    /* Top padding sits inside the column so the divider still starts at the
+       very top while "Filtrai" keeps its breath below the navbar. */
+    padding: 24px 20px 24px 0;
+    border-right: var(--border);
+  }
+  .dok-sidebar-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--light-gray);
+  }
+  .dok-sidebar-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    /* button reset — it's only an actual toggle on mobile */
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--dark-gray);
+    cursor: default;
+  }
+  .dok-filters-count {
+    display: none;  /* shown only on mobile, where filters are collapsed */
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-pill);
+    background: var(--black);
+    color: var(--white);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  /* Chevron only appears on mobile, where the header becomes a real toggle. */
+  .dok-filters-chevron { display: none; }
+  .dok-filters-chevron::before {
+    content: "▾";
+    font-size: 11px;
+  }
+  .dok-sidebar-clear {
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+  }
+  .dok-sidebar-clear:hover { color: var(--black); }
+
+  .dok-other-filters {
+    margin-top: 20px;
+    border-top: 1px solid var(--light-gray);
+  }
+  .dok-other-filters summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-top: 12px;
+    color: var(--dark-gray);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    cursor: pointer;
+    list-style: none;
+  }
+  .dok-other-filters summary::-webkit-details-marker { display: none; }
+  .dok-other-filters summary::before {
+    content: "▸";
+    font-size: 11px;
+    transition: transform var(--transition);
+  }
+  .dok-other-filters[open] summary::before { transform: rotate(90deg); }
+  .dok-other-filters-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-pill);
+    background: var(--black);
+    color: var(--white);
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+
+  @media (max-width: 900px) {
+    /* Filters collapse behind the header so results sit near the top instead
+       of below a tall stack of facets. The rail becomes a tappable toggle. */
+    .dok-sidebar {
+      padding: 0;
+      margin-top: 4px;
+      border-right: none;
+      border-bottom: var(--border);
+    }
+    .dok-sidebar-head {
+      padding-bottom: 0;
+      margin-bottom: 0;
+      border-bottom: none;
+      align-items: center;
+    }
+    .dok-sidebar-title {
+      cursor: pointer;
+      padding: 12px 0;            /* taller tap target */
+    }
+    .dok-filters-chevron {
+      display: inline-flex;
+      transition: transform var(--transition);
+    }
+    .dok-filters-count { display: inline-flex; }
+    .dok-sidebar.is-open .dok-filters-chevron { transform: rotate(180deg); }
+
+    /* Collapsed until the user opens the panel. Animate the body's height from
+       0 to auto — same interpolate-size opt-in as the knowledge card — instead
+       of a hard display toggle. */
+    .dok-filters-body {
+      box-sizing: border-box;
+      height: 0;
+      overflow: hidden;
+      transition: height 0.4s ease;
+    }
+    .dok-sidebar.is-open .dok-filters-body {
+      height: auto;
+      padding-bottom: 16px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dok-filters-body { transition: none; }
+  }
+</style>
+
+<script>
+  import '../../scripts/dokumentaiFilters.ts';
+</script>

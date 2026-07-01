@@ -1,0 +1,156 @@
+---
+// The knowledge card shown beside the /dokumentai results — a single Sutartis,
+// Juridinis asmuo or BVPŽ panel (whichever matched the query). On phones it
+// collapses to a peek behind a torn /\/\/\ edge with a "Rodyti daugiau" reveal
+// (wired by the <script> below). Renders nothing when no panel matched.
+import BvpzKnowledgePanel from '../bvpz/BvpzKnowledgePanel.astro';
+import JuridinisKnowledgePanel from '../juridiniai/JuridinisKnowledgePanel.astro';
+import SutartisKnowledgePanel from '../sutartis/SutartisKnowledgePanel.astro';
+import { findSingleBvpzPanel } from '../../lib/searchBvpzPanel.ts';
+import { findSingleJuridinisPanel } from '../../lib/searchJuridinisPanel.ts';
+import { findSutartisPanel } from '../../lib/searchSutartisPanel.ts';
+
+interface Props {
+  sutartisPanel: Awaited<ReturnType<typeof findSutartisPanel>>;
+  juridinisPanel: Awaited<ReturnType<typeof findSingleJuridinisPanel>>;
+  bvpzPanel: Awaited<ReturnType<typeof findSingleBvpzPanel>>;
+}
+
+const { sutartisPanel, juridinisPanel, bvpzPanel } = Astro.props;
+const hasPanel = !!(sutartisPanel || juridinisPanel || bvpzPanel);
+
+// Torn-edge zigzag for the mobile knowledge panel. A whole number of teeth
+// spanning the full viewBox width, stretched edge-to-edge with
+// preserveAspectRatio="none" so peaks always land exactly on both corners (the
+// tear meets the side borders cleanly). `tearLine` is the stroked seam;
+// `tearFill` closes it off below to erase the straight cut underneath.
+const TEAR_TEETH = 16;
+const TEAR_UNIT = 20;                       // viewBox units per tooth
+const TEAR_W = TEAR_TEETH * TEAR_UNIT;      // total viewBox width
+const TEAR_H = 10;                          // viewBox height (px-ish)
+const TEAR_PEAK = 1;                        // y of peaks (leave room for stroke)
+const TEAR_VALLEY = 8;                      // y of valleys
+let tearZig = `M0 ${TEAR_PEAK}`;
+for (let i = 0; i < TEAR_TEETH; i++) {
+  const mid = i * TEAR_UNIT + TEAR_UNIT / 2;
+  const end = (i + 1) * TEAR_UNIT;
+  tearZig += ` L${mid} ${TEAR_VALLEY} L${end} ${TEAR_PEAK}`;
+}
+const tearLine = tearZig;
+const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
+---
+
+{hasPanel && (
+  <div class="dok-panel__knowledge">
+    <div class="dok-panel__clip">
+      {sutartisPanel
+        ? <SutartisKnowledgePanel sutartis={sutartisPanel} />
+        : juridinisPanel
+          ? <JuridinisKnowledgePanel juridinis={juridinisPanel} />
+          : bvpzPanel && <BvpzKnowledgePanel bvpz={bvpzPanel} />
+      }
+    </div>
+    {/* Torn /\/\/\ edge. Inline SVG (not a CSS mask) so the tear has a
+       real stroked line — otherwise it's invisible on a white-on-white
+       card. Colours come from CSS vars, so it follows the theme. The
+       whole-teeth path stretched edge-to-edge keeps the seam aligned
+       with the side borders and a non-scaling 1px stroke matches them. */}
+    <svg class="dok-panel__tear" aria-hidden="true" viewBox={`0 0 ${TEAR_W} ${TEAR_H}`} preserveAspectRatio="none">
+      <path class="dok-panel__tear-fill" d={tearFill} />
+      <path class="dok-panel__tear-line" d={tearLine} vector-effect="non-scaling-stroke" />
+    </svg>
+    <button type="button" class="dok-panel__more" aria-expanded="false">Rodyti daugiau</button>
+  </div>
+)}
+
+<style is:global>
+  /* On desktop/tablet the panel is a transparent passthrough — the card shows
+     in full. The collapse-to-a-peek + torn edge + "Rodyti daugiau" reveal only
+     kicks in on phones (see the ≤900px block). */
+  .dok-panel__more,
+  .dok-panel__tear { display: none; }
+
+  @media (max-width: 900px) {
+    /* ── Phone-only: the card peeks ~3.5 lines, then a torn /\/\/\ edge cuts
+       through the text. "Rodyti daugiau" floats over the tear and reveals the
+       rest, animating height from the peek to auto (opt-in via the global
+       `interpolate-size: allow-keywords`). */
+    .dok-panel__knowledge { position: relative; }
+    .dok-panel__clip {
+      /* ~3.5 lines of card content before the tear. */
+      --peek: 9.5rem;
+      height: var(--peek);
+      overflow: hidden;
+      /* Match the card's rounded top corners so overflow:hidden doesn't shave
+         them off; the bottom stays square (the tear handles it). */
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      transition: height 0.45s ease;
+    }
+    .dok-panel.is-open .dok-panel__clip { height: auto; }
+
+    /* The torn edge: teeth filled with the card/page colour (erasing the
+       straight cut) under a stroked zigzag seam that makes the tear read. */
+    .dok-panel__tear {
+      display: block;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1;
+      width: 100%;
+      height: 10px;
+    }
+    .dok-panel__tear-fill { fill: var(--white); }
+    .dok-panel__tear-line {
+      fill: none;
+      stroke: var(--light-gray);
+      stroke-width: 1;             /* matches the 1px card border */
+      stroke-linejoin: round;
+    }
+    .dok-panel.is-open .dok-panel__tear { display: none; }
+
+    .dok-panel__more {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      position: absolute;
+      left: 50%;
+      /* Sit centred on the torn edge — half the button hangs below it. */
+      bottom: -13px;
+      transform: translateX(-50%);
+      z-index: 2;
+      padding: 7px 16px;
+      font-family: var(--font-sans);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: var(--black);
+      background: var(--white);
+      border: var(--border);
+      border-radius: var(--radius-pill);
+      box-shadow: var(--shadow-md);
+      cursor: pointer;
+    }
+    .dok-panel__more::after {
+      content: "▾";
+      font-size: 11px;
+      line-height: 1;
+    }
+    .dok-panel.is-open .dok-panel__more { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dok-panel__clip { transition: none; }
+  }
+</style>
+
+<script>
+  // Phone: reveal the rest of the knowledge panel. Adding `is-open` drops the
+  // peek clamp + torn edge and animates height from the peek to auto (opt-in via
+  // the global `interpolate-size: allow-keywords`).
+  const dokPanel = document.getElementById('dokPanel');
+  const dokPanelMore = dokPanel?.querySelector<HTMLButtonElement>('.dok-panel__more');
+  dokPanelMore?.addEventListener('click', () => {
+    dokPanel?.classList.add('is-open');
+    dokPanelMore.setAttribute('aria-expanded', 'true');
+  });
+</script>

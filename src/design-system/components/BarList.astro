@@ -1,0 +1,86 @@
+---
+// A ranked list where each row carries a proportional background bar (value ÷
+// max), a label and a formatted value. Rows link when given an href. Generic:
+// works for any "top N by count" breakdown.
+interface BarItem {
+  label: string;
+  value: number;
+  href?: string;
+  title?: string;
+}
+
+interface Props {
+  items: BarItem[];
+  /** Format the numeric value for display (defaults to a plain locale number). */
+  formatValue?: (value: number) => string;
+  className?: string;
+}
+
+const { items, formatValue = (v: number) => v.toLocaleString(), className = '' } = Astro.props;
+const max = Math.max(1, ...items.map((i) => i.value ?? 0));
+const pct = (v: number) => Math.round(((v ?? 0) / max) * 100);
+---
+
+<div class={['ds-bar-list', className].filter(Boolean).join(' ')}>
+  {items.map((item, i) => {
+    const Tag = item.href ? 'a' : 'div';
+    return (
+      <Tag class="ds-bar-list__row" href={item.href} title={item.title} style={`--pct:${pct(item.value)};--i:${i}`}>
+        <span class="ds-bar-list__bar" aria-hidden="true"></span>
+        <span class="ds-bar-list__label">{item.label}</span>
+        <span class="ds-bar-list__value">{formatValue(item.value)}</span>
+      </Tag>
+    );
+  })}
+</div>
+
+<style>
+  .ds-bar-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .ds-bar-list__row {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: var(--radius-md);
+    color: inherit;
+    text-decoration: none;
+  }
+  .ds-bar-list__bar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(var(--pct, 0) * 1%);
+    z-index: -1;
+    background: color-mix(in srgb, var(--link) 11%, transparent);
+    transform-origin: left;
+    animation: ds-bar-grow .7s cubic-bezier(.2, .7, .2, 1) both;
+    animation-delay: calc(var(--i, 0) * 45ms + 120ms);
+  }
+  .ds-bar-list__row:hover .ds-bar-list__bar { background: color-mix(in srgb, var(--link) 18%, transparent); }
+  .ds-bar-list__label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: var(--text-sm);
+    color: var(--black);
+  }
+  .ds-bar-list__value {
+    flex: none;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @keyframes ds-bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @media (prefers-reduced-motion: reduce) {
+    .ds-bar-list__bar { transform: none !important; animation: none !important; }
+  }
+</style>

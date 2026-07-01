@@ -1,0 +1,383 @@
+---
+// Facet "show all" content inside the generic Modal: a search/filter input, a
+// (JS-rendered) multi-column list of every value for one facet, and a
+// clear/apply footer. Rows are created in JS (in the <script> below), so their
+// styles are global. Behaviour registers itself on the shared dokumentaiNav
+// `facetModal`.
+import Modal from '@design-system/components/Modal.astro';
+---
+
+<Modal id="dokFacetModal" title="Filtras">
+  <input slot="tools" type="search" class="dok-facet-modal__search" placeholder="Filtruoti arba įvesti savo…" aria-label="Filtruoti arba įvesti savo reikšmę" autocomplete="off" />
+  <div class="dok-facet-modal__list" role="listbox" aria-multiselectable="true"></div>
+  <Fragment slot="footer">
+    <span class="ds-modal__count" aria-live="polite"></span>
+    <span class="ds-modal__actions">
+      <button type="button" class="btn btn-outline btn-sm" data-facet-clear>Išvalyti</button>
+      <button type="button" class="btn btn-primary btn-sm" data-facet-apply>Taikyti</button>
+    </span>
+  </Fragment>
+</Modal>
+
+<style is:global>
+  /* ── Facet modal rows (created in JS, so they need global, scope-free styles).
+     Mirrors the sidebar filter pill: a checkbox affordance + label + count. */
+  .dok-facet-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 40px;
+    padding-inline: 10px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    color: var(--dark-gray);
+    text-align: left;
+    cursor: pointer;
+    transition: color var(--transition), background var(--transition);
+  }
+  .dok-facet-row::before {
+    content: "";
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--light-gray);
+    border-radius: var(--radius-sm);
+    background: var(--white) center / 0 no-repeat;
+    transition: background-color var(--transition), border-color var(--transition);
+  }
+  .dok-facet-row:hover { color: var(--black); background: var(--lighter-gray); }
+  .dok-facet-row:hover::before { border-color: var(--dark-gray); }
+  .dok-facet-row.is-selected { color: var(--black); font-weight: 500; }
+  .dok-facet-row.is-selected::before {
+    border-color: var(--black);
+    background-color: var(--black);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+    background-size: 11px;
+  }
+  .dok-facet-row__label {
+    /* Nested inside the block `__text` wrapper, so `flex:1` is inert — it needs
+       `display:block` to fill the (width-constrained, min-width:0) wrapper and
+       actually clip. Without it the inline label sizes to content and overflows. */
+    display: block;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dok-facet-row__count {
+    flex-shrink: 0;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+  }
+  /* Su pavadinimu (įstaiga) — pavadinimas + kodas stulpeliu. Sąlygos keliamos ir
+     ant LIST konteinerio (.dok-facet-modal__list--stack .dok-facet-row), kad
+     veiktų net jei JS eilutei nepridėtų --stack klasės — kitaip eilutė liktų su
+     baziniu FIKSUOTU height:40px, o vyniojamas pavadinimas užlįstų ant gretimos
+     (vertikaliai sugrūsta). Todėl height:auto — eilutė auga pagal turinį. */
+  .dok-facet-row--stack,
+  .dok-facet-modal__list--stack .dok-facet-row {
+    height: auto;
+    min-height: 40px;
+    align-items: flex-start;
+    padding-block: 8px;
+  }
+  .dok-facet-row--stack::before,
+  .dok-facet-modal__list--stack .dok-facet-row::before { margin-top: 2px; }
+  /* BLOCK srautas (ne flex): pavadinimas + kodas dedasi vienas po kito natūraliais
+     aukščiais. Flex-stulpelyje pavadinimas paveldėdavo `flex:1` ir augdavo
+     vertikaliai, todėl kodas išlįsdavo ant kitos eilutės. */
+  .dok-facet-row__text {
+    flex: 1;
+    min-width: 0;
+    display: block;
+  }
+  .dok-facet-row--stack .dok-facet-row__label,
+  .dok-facet-modal__list--stack .dok-facet-row__label {
+    display: block;
+    flex: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.35;
+  }
+  .dok-facet-row__sub {
+    display: block;
+    margin-top: 3px;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+  }
+  .dok-facet-row--stack .dok-facet-row__count,
+  .dok-facet-modal__list--stack .dok-facet-row__count { margin-top: 1px; }
+  /* "Pridėti „…"" row — distinct accent, spans the full grid width on top. */
+  .dok-facet-row--add {
+    grid-column: 1 / -1;
+    color: var(--link);
+    font-weight: 500;
+  }
+  .dok-facet-row--add::before {
+    border-color: var(--link);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%230369a1' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M8 3.5v9M3.5 8h9'/%3E%3C/svg%3E");
+    background-size: 11px;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+  .dok-facet-row--add:hover::before { border-color: var(--link); }
+  .dok-facet-modal__loading {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    padding: 48px 0;
+  }
+  .dok-facet-modal__empty {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 32px 12px;
+    text-align: center;
+    color: var(--gray);
+    font-size: var(--text-sm);
+  }
+
+  .dok-facet-modal__search {
+    width: 100%;
+    max-width: 440px;
+    padding: 9px 12px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    color: var(--black);
+    font: inherit;
+    font-size: var(--text-sm);
+    outline: none;
+  }
+  .dok-facet-modal__search:focus-visible { outline: var(--border-focus); }
+  /* Multi-column grid so the full-screen width carries many short values. */
+  .dok-facet-modal__list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 2px 24px;
+    align-content: start;
+    padding-block: 12px;
+    padding-inline: max(16px, calc((100% - 1080px) / 2));
+  }
+  /* Įstaigų sąrašas — KELI stulpeliai per grid `auto-fill minmax`: sukuria tiek
+     ~320px stulpelių, kiek TELPA į plotį (todėl horizontaliai neperžengia, kitaip
+     nei CSS `columns` slankiame konteineryje). `align-items: start` + eilučių
+     `height: auto` leidžia aukštam įrašui išplėsti savo eilutę be persidengimo. */
+  .dok-facet-modal__list--stack {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    align-items: start;
+    gap: 4px 24px;
+  }
+  @media (max-width: 600px) {
+    .dok-facet-modal__search { max-width: none; }
+  }
+</style>
+
+<script>
+  // Facet "show all" modal: a full-screen list of every value for one facet
+  // (fetched on demand, up to ~1k), with a client-side filter, a custom-entry
+  // field and batched apply. Extensions render as `.pdf`; selection mirrors the
+  // live query string. Registers itself on the shared facetModal so the sidebar
+  // "Daugiau" buttons can open it.
+  import { params, navigate, getList, setList, facetModal } from '../../scripts/dokumentaiNav.ts';
+  import { openModal, closeModal } from '@design-system/components/modal.ts';
+
+  const modal = document.getElementById('dokFacetModal');
+  if (modal) {
+    const titleEl = modal.querySelector<HTMLElement>('.ds-modal__title')!;
+    const searchEl = modal.querySelector<HTMLInputElement>('.dok-facet-modal__search')!;
+    const listEl = modal.querySelector<HTMLElement>('.dok-facet-modal__list')!;
+    const countEl = modal.querySelector<HTMLElement>('.ds-modal__count')!;
+
+    let field = '';
+    let param = '';
+    let selected = new Set<string>();      // working copy; committed on Taikyti
+    let options: { value: string; count: number | null; label?: string }[] = [];
+    let reqSeq = 0;
+    let searchTimer = 0;
+
+    const isExt = () => param === 'ext';
+    const normalize = (v: string) => (isExt() ? v.toLowerCase().replace(/^\./, '') : v.trim());
+    const display = (v: string) => (isExt() ? `.${v}` : v);
+
+    function setOpen(open: boolean) {
+      if (open) { openModal(modal!); searchEl.focus(); }
+      else closeModal(modal!);
+    }
+
+    function updateCount() {
+      countEl.textContent = selected.size ? `Pažymėta: ${selected.size}` : '';
+    }
+
+    function toggle(value: string, row?: HTMLElement) {
+      if (selected.has(value)) selected.delete(value);
+      else selected.add(value);
+      const on = selected.has(value);
+      row?.classList.toggle('is-selected', on);
+      row?.setAttribute('aria-selected', String(on));
+      updateCount();
+    }
+
+    // Add whatever is typed as a custom value (the single input both filters and
+    // adds). Re-renders so it shows up selected and the "add" row disappears.
+    function addTyped() {
+      const value = normalize(searchEl.value);
+      if (!value) return;
+      selected.add(value);
+      searchEl.value = '';
+      updateCount();
+      render();
+    }
+
+    function makeRow(o: { value: string; count: number | null; label?: string }) {
+      const value = o.value;
+      const on = selected.has(value);
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'dok-facet-row' + (o.label ? ' dok-facet-row--stack' : '') + (on ? ' is-selected' : '');
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(on));
+      // Pavadinimas apkarpomas iki 1 eilutės — pilnas tekstas pasiekiamas hover'iu.
+      if (o.label) row.title = `${o.label} (${display(value)})`;
+      // Su label (pvz. įstaigos pavadinimu) — dvi eilutės: pavadinimas + kodas.
+      const text = document.createElement('span');
+      text.className = 'dok-facet-row__text';
+      const label = document.createElement('span');
+      label.className = 'dok-facet-row__label';
+      label.textContent = o.label || display(value);
+      text.appendChild(label);
+      if (o.label) {
+        const sub = document.createElement('span');
+        sub.className = 'dok-facet-row__sub';
+        sub.textContent = display(value);
+        text.appendChild(sub);
+      }
+      row.appendChild(text);
+      if (o.count != null) {
+        const cnt = document.createElement('span');
+        cnt.className = 'dok-facet-row__count';
+        cnt.textContent = Number(o.count).toLocaleString('lt-LT');
+        row.appendChild(cnt);
+      }
+      row.addEventListener('click', () => toggle(value, row));
+      return row;
+    }
+
+    function render() {
+      const needle = searchEl.value.trim().toLowerCase();
+      const typed = normalize(searchEl.value);
+      // Selected-but-unlisted values (custom or filtered out) pinned on top.
+      const listedValues = new Set(options.map((o) => o.value));
+      const pinned: typeof options = [...selected].filter((v) => !listedValues.has(v)).map((v) => ({ value: v, count: null }));
+      const rows = [...pinned, ...options].filter(
+        (o) => !needle || o.value.toLowerCase().includes(needle) || display(o.value).toLowerCase().includes(needle) || (o.label?.toLowerCase().includes(needle) ?? false),
+      );
+
+      listEl.textContent = '';
+      const frag = document.createDocumentFragment();
+
+      // Offer to add the typed value when it isn't an existing/selected option.
+      const canAdd = typed && !listedValues.has(typed) && !selected.has(typed);
+      if (canAdd) {
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'dok-facet-row dok-facet-row--add';
+        const label = document.createElement('span');
+        label.className = 'dok-facet-row__label';
+        label.textContent = `Pridėti „${display(typed)}“`;
+        add.appendChild(label);
+        add.addEventListener('click', addTyped);
+        frag.appendChild(add);
+      }
+
+      for (const o of rows) frag.appendChild(makeRow(o));
+      listEl.appendChild(frag);
+
+      if (!rows.length && !canAdd) {
+        const empty = document.createElement('p');
+        empty.className = 'dok-facet-modal__empty';
+        empty.textContent = 'Nieko nerasta.';
+        listEl.appendChild(empty);
+      }
+    }
+
+    async function load(optionSearch = '') {
+      const mySeq = ++reqSeq;
+      listEl.innerHTML = '<div class="dok-facet-modal__loading"><span class="spinner spinner-lg"></span></div>';
+      // Scoped to the current query/filters (the API drops this facet's own
+      // filter), so every listed value actually narrows the present results —
+      // picking one never lands on 0 hits. Just uncapped vs the sidebar preview.
+      const qs = new URLSearchParams(params.toString());
+      qs.set('field', field);
+      if (optionSearch) qs.set('optionSearch', optionSearch);
+      qs.delete('page');
+      try {
+        const res = await fetch(`/api/dokumentaiFacet?${qs.toString()}`);
+        const data = res.ok ? await res.json() : { options: [] };
+        if (mySeq !== reqSeq) return;            // a newer open superseded this
+        options = Array.isArray(data.options) ? data.options : [];
+      } catch {
+        if (mySeq !== reqSeq) return;
+        options = [];
+      }
+      render();
+    }
+
+    facetModal.open = (opts: { field: string; param: string; title: string }) => {
+      field = opts.field;
+      param = opts.param;
+      // Įstaigų facetas turi ilgus dvieilius (pavadinimas + kodas) įrašus —
+      // kelių stulpelių grid'e jie susimaišo, todėl jį rodom vienu stulpeliu.
+      listEl.classList.toggle('dok-facet-modal__list--stack', field === 'istaigaJar' || field === 'jarKodai');
+      titleEl.textContent = opts.title;
+      selected = new Set(getList(param));
+      searchEl.value = '';
+      updateCount();
+      setOpen(true);
+      load();
+    };
+
+    searchEl.addEventListener('input', () => {
+      render();
+      if (field !== 'jarKodai') return;
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => load(searchEl.value.trim()), 250);
+    });
+    searchEl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const typed = normalize(searchEl.value);
+      if (!typed) return;
+      // Enter adds the typed value unless it's an existing option — then toggle it.
+      if (options.some((o) => o.value === typed)) toggle(typed);
+      else selected.add(typed);
+      searchEl.value = '';
+      updateCount();
+      render();
+    });
+
+    modal.querySelector('[data-facet-clear]')?.addEventListener('click', () => {
+      selected.clear();
+      updateCount();
+      render();
+    });
+
+    modal.querySelector('[data-facet-apply]')?.addEventListener('click', () => {
+      setList(param, [...selected]);
+      params.delete('page');
+      setOpen(false);
+      navigate(true);
+    });
+    // Backdrop / ✕ / Escape closing is handled generically by Modal.
+  }
+</script>

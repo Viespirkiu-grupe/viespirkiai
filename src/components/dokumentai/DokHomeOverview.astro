@@ -1,0 +1,219 @@
+---
+// The empty-search /dokumentai home: a Quickwit-aggregated portrait of the
+// corpus. This file only maps the overview data onto generic design-system
+// pieces (StatChip, BarList, DistributionStrip) and owns the page-specific
+// layout (hero, column grid, staggered fade-in). Falls back to a one-line intro
+// when the overview has no data.
+import Linksnis from '@design-system/components/Linksnis.astro';
+import StatChip from '@design-system/components/StatChip.astro';
+import BarList from '@design-system/components/BarList.astro';
+import DistributionStrip from '@design-system/components/DistributionStrip.astro';
+import { fmt, fmtCompact } from '../../lib/dokumentaiFormat.ts';
+import { CLASS_LABEL, SOURCE_LABEL } from '../../lib/dokumentaiLabels.ts';
+import { dokumentaiHomeOverview } from '../../lib/searchDokumentai.ts';
+
+type Overview = NonNullable<Awaited<ReturnType<typeof dokumentaiHomeOverview>>>;
+
+interface Props {
+  overview: Overview | null;
+}
+
+const { overview: ov } = Astro.props;
+const homeReady = !!ov && ov.total > 0;
+
+const enc = (v: string) => encodeURIComponent(v);
+const sourceChips = ov?.bySource.map((s) => ({ label: SOURCE_LABEL[s.value.toLowerCase()] || s.value, count: fmtCompact(s.count), href: `/dokumentai?source=${enc(s.value)}` })) ?? [];
+const extChips = ov?.byExt.map((e) => ({ label: `.${e.value}`, count: fmtCompact(e.count), href: `/dokumentai?ext=${enc(e.value)}` })) ?? [];
+const agencyBars = ov?.topIstaiga.map((it) => ({
+  label: it.label || it.value,
+  value: it.count ?? 0,
+  href: `/dokumentai?istaiga=${enc(it.value)}`,
+  title: it.label ? `${it.label} (${it.value})` : it.value,
+})) ?? [];
+
+const distCaption = ({ p25, p75, p90, median, unit }: { p25: number; p75: number; p90: number; median: number; unit: string }) =>
+  `Pusė dokumentų – nuo ${fmt(p25)} iki ${fmt(p75)} ${unit}, mediana ${fmt(median)}. Kas dešimtas viršija ${fmt(p90)}.`;
+---
+
+{homeReady && ov ? (
+  <div class="dok-home" id="dokHome">
+    <h2 class="dok-home-title">Statistika</h2>
+
+    <section class="dok-home-hero">
+      <div class="dok-home-hero-main">
+        <span class="dok-home-hero-approx">apie</span>
+        <span class="dok-home-hero-num">{ov.total.toLocaleString('lt-LT')}</span>
+        <span class="dok-home-hero-unit"><Linksnis n={ov.total} forms={['dokumentas', 'dokumentai', 'dokumentų', 'dokumento']} showNumber={false} /></span>
+      </div>
+      <div class="dok-home-hero-sub">
+        <span><strong>{fmtCompact(ov.totalPages)}</strong> puslapių</span>
+        <span class="dok-home-hero-dot" aria-hidden="true"></span>
+        <span><strong>{fmtCompact(ov.totalWords)}</strong> žodžių</span>
+      </div>
+    </section>
+
+    {ov.byClass.length > 0 && (
+      <section class="dok-home-classes">
+        {ov.byClass.map((c) => (
+          <StatChip variant="solid" href={`/dokumentai?klase=${enc(c.value)}`} label={CLASS_LABEL[c.value] || c.value} count={fmtCompact(c.count)} />
+        ))}
+      </section>
+    )}
+
+    {ov.sizeMetrics.length > 0 && (
+      <section class="dok-home-block">
+        <DistributionStrip title="Dokumentų apimtis" metrics={ov.sizeMetrics} formatValue={fmt} caption={distCaption} />
+      </section>
+    )}
+
+    <div class="dok-home-cols">
+      {sourceChips.length > 0 && (
+        <section class="dok-home-block">
+          <h2 class="dok-home-h">Šaltiniai</h2>
+          <div class="dok-home-chips">
+            {sourceChips.map((c) => <StatChip href={c.href} label={c.label} count={c.count} />)}
+          </div>
+        </section>
+      )}
+      {extChips.length > 0 && (
+        <section class="dok-home-block">
+          <h2 class="dok-home-h">Failų tipai</h2>
+          <div class="dok-home-chips">
+            {extChips.map((c) => <StatChip href={c.href} label={c.label} count={c.count} />)}
+          </div>
+        </section>
+      )}
+    </div>
+
+    {agencyBars.length > 0 && (
+      <section class="dok-home-block">
+        <h2 class="dok-home-h">Daugiausiai dokumentų paskelbusios įstaigos</h2>
+        <BarList items={agencyBars} formatValue={fmtCompact} />
+      </section>
+    )}
+
+  </div>
+) : (
+  <section class="dok-intro">
+    <p class="text-muted text-sm">
+      Tinklalapiai, failai, teisės aktai, teismo nuosprendžiai – paieška pagal pavadinimą, autorių ar turinį.
+    </p>
+  </section>
+)}
+
+<style is:global>
+  .dok-intro {
+    margin: 24px auto 0;
+    max-width: 520px;
+    text-align: center;
+  }
+
+  /* ── Empty-search home overview ────────────────────────────────────────────
+     Layout + rhythm for the corpus portrait; the individual pieces (chips, the
+     agency bars, the size distribution) are generic design-system components. */
+  .dok-home {
+    max-width: 760px;
+    margin: 104px auto 0;
+    display: flex;
+    flex-direction: column;
+    gap: 60px;
+  }
+  .dok-home-title {
+    margin: 0 auto;
+    text-align: center;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--gray);
+  }
+  .dok-home-h {
+    margin: 0 0 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--gray);
+  }
+
+  /* Hero */
+  .dok-home-hero { text-align: center; }
+  .dok-home-hero-main {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .dok-home-hero-num {
+    font-size: clamp(36px, 9vw, 56px);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -.02em;
+    color: var(--black);
+    font-variant-numeric: tabular-nums;
+  }
+  .dok-home-hero-approx,
+  .dok-home-hero-unit {
+    font-size: var(--text-lg);
+    color: var(--gray);
+  }
+  .dok-home-hero-sub {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: var(--text-sm);
+    color: var(--gray);
+  }
+  .dok-home-hero-sub strong {
+    color: var(--dark-gray);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .dok-home-hero-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--light-gray);
+  }
+
+  /* Chip rows (class breakdown = left-aligned pills; source/ext = bordered). */
+  .dok-home-classes,
+  .dok-home-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .dok-home-classes { gap: 10px; }
+
+  /* Source / extension two-column block. */
+  .dok-home-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+  }
+
+  /* Staggered fade-up for the blocks */
+  .dok-home-title,
+  .dok-home-hero,
+  .dok-home-classes,
+  .dok-home-cols,
+  .dok-home > .dok-home-block { animation: dokFadeUp .5s ease both; }
+  .dok-home-title { animation-delay: .02s; }
+  .dok-home-hero { animation-delay: .06s; }
+  .dok-home-classes { animation-delay: .12s; }
+  .dok-home > .dok-home-block:nth-of-type(3) { animation-delay: .16s; }
+  .dok-home-cols { animation-delay: .2s; }
+  .dok-home > .dok-home-block:nth-of-type(5) { animation-delay: .24s; }
+
+  @keyframes dokFadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  @media (max-width: 640px) {
+    .dok-home-cols { grid-template-columns: 1fr; gap: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dok-home *, .dok-home { animation: none !important; }
+  }
+</style>

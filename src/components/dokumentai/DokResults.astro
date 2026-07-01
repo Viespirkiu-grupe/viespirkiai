@@ -1,0 +1,249 @@
+---
+// The /dokumentai results region: a toolbar (count + sort), the borderless list
+// of result cards (or an empty state), and pagination. Owns the results
+// styling. The loading veil + #dokContent wrapper stay on the page. Sort +
+// pagination behaviour lives in the <script> below (shared dokumentaiNav).
+import EmptyState from '@design-system/components/EmptyState.astro';
+import DokResultCard from './DokResultCard.astro';
+import type { DokumentasHit, DokumentaiSort } from '../../lib/searchDokumentai.ts';
+
+interface Props {
+  hits: DokumentasHit[];
+  resultsMetaHtml: string;
+  sort: DokumentaiSort;
+  sortOptions: readonly { value: string; label: string }[];
+  q: string;
+  page: number;
+  totalPages: number;
+  pageNums: number[];
+  buildPageUrl: (page: number) => string;
+}
+
+const { hits, resultsMetaHtml, sort, sortOptions, q, page, totalPages, pageNums, buildPageUrl } = Astro.props;
+---
+
+{hits.length > 0 && (
+  <div class="dok-results-toolbar">
+    <p class="dok-results-meta text-xs text-muted" set:html={resultsMetaHtml} />
+    <label class="dok-sort">
+      <span class="sr-only">Rikiuoti pagal</span>
+      <select id="dokSort" aria-label="Rikiuoti pagal">
+        {sortOptions.map((option) => (
+          <option value={option.value} selected={sort === option.value}>{option.label}</option>
+        ))}
+      </select>
+    </label>
+  </div>
+)}
+
+{hits.length === 0 ? (
+  <EmptyState message={q ? `Jokių rezultatų pagal „${q}".` : 'Jokių rezultatų.'} />
+) : (
+  <div class="dok-result-list">
+    {hits.map((hit) => <DokResultCard hit={hit} />)}
+  </div>
+)}
+
+{pageNums.length > 0 && (
+  <nav class="dok-pagination" aria-label="Puslapiai">
+    {page > 1 ? (
+      <a href={buildPageUrl(page - 1)} class="dok-page-btn dok-page-nav" aria-label="Ankstesnis puslapis">‹</a>
+    ) : (
+      <span class="dok-page-btn dok-page-nav is-disabled" aria-disabled="true">‹</span>
+    )}
+    {pageNums.map((pn) => (
+      pn === page ? (
+        <span class="dok-page-btn is-current" aria-current="page">{pn}</span>
+      ) : (
+        <a href={buildPageUrl(pn)} class="dok-page-btn">{pn}</a>
+      )
+    ))}
+    {page < totalPages ? (
+      <a href={buildPageUrl(page + 1)} class="dok-page-btn dok-page-nav" aria-label="Kitas puslapis">›</a>
+    ) : (
+      <span class="dok-page-btn dok-page-nav is-disabled" aria-disabled="true">›</span>
+    )}
+  </nav>
+)}
+
+<style is:global>
+  .dok-results-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0 0 24px;
+  }
+  .dok-results-meta { margin: 0; }
+  .dok-sort {
+    flex-shrink: 0;
+  }
+  .dok-sort select {
+    min-width: 190px;
+    padding: 7px 10px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    color: var(--black);
+    font: inherit;
+    font-size: var(--text-sm);
+  }
+  .dok-sort select:focus-visible {
+    outline: var(--border-focus);
+  }
+
+  /* Borderless list. A whisper-thin divider lives on each row (except
+     last), and rhythm comes from generous internal padding. */
+  .dok-result-list .result-card {
+    padding: 0 0 24px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--lighter-gray);
+    transition: none;
+  }
+  .dok-result-list .result-card.card-clickable:hover {
+    box-shadow: none;  /* No card-style hover on a borderless list. */
+  }
+  .dok-result-list .result-card:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+  .dok-result-list .result-card-title {
+    /* Tight from provenance, loose to snippet — varied internal rhythm. */
+    margin: 2px 0 0;
+    font-size: var(--text-lg);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .dok-result-list .result-card-title a { color: var(--black); }
+  .dok-result-list .result-card-title a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* Provenance: muted, lightweight, sits tight under nothing — it's the
+     "where this came from" line above the title. */
+  .dok-provenance {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .dok-domain {
+    color: var(--dark-gray);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .dok-provenance-sep { flex-shrink: 0; }
+  .dok-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  /* Generous gap from title — the snippet is the content "body". */
+  .dok-snippet {
+    margin-top: 12px;
+    line-height: 1.6;
+    max-width: 60ch;
+  }
+  .dok-snippet strong,
+  .dok-snippet mark {
+    background: none;
+    color: var(--black);
+    font-weight: 600;
+  }
+
+  /* Meta row sits looser still — it's secondary context, one calm line
+     below the snippet. (Targets .dok-meta directly: the slotted <dl> is
+     the footer, so the shell's .result-card-footer selector never hits.) */
+  .dok-result-list .dok-meta {
+    margin-top: 16px;
+    gap: 6px 18px;
+    font-size: var(--text-xs);
+    color: var(--gray);
+  }
+  .dok-result-list .dok-meta div {
+    display: inline-flex;
+    gap: 4px;
+    min-width: 0;
+  }
+  .dok-result-list .dok-meta dt:not(.sr-only) {
+    color: var(--dark-gray);
+    font-weight: 500;
+  }
+  .dok-result-list .dok-meta dd {
+    overflow-wrap: anywhere;
+  }
+
+  /* ── Pagination: plain numbers, generous separation from the results. ── */
+  .dok-pagination {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin: 48px 0 64px;
+  }
+  .dok-page-nav:first-child { margin-right: 8px; }
+  .dok-page-nav:last-child  { margin-left:  8px; }
+
+  .dok-page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    text-decoration: none;
+    color: var(--dark-gray);
+    transition: background var(--transition), color var(--transition);
+  }
+  .dok-page-btn:is(a):hover {
+    background: var(--lighter-gray);
+    color: var(--black);
+  }
+  .dok-page-btn.is-current {
+    background: var(--black);
+    color: var(--white);
+    font-weight: 500;
+  }
+  .dok-page-btn.dok-page-nav {
+    font-size: var(--text-lg);
+    min-width: 24px;
+  }
+  .dok-page-btn.is-disabled {
+    color: var(--gray);
+    pointer-events: none;
+  }
+
+  @media (max-width: 900px) {
+    /* Keep the count on the left and the sort select on the right; only let it
+       wrap to its own line if the row genuinely doesn't fit. */
+    .dok-results-toolbar {
+      flex-wrap: wrap;
+      gap: 8px 16px;
+    }
+    .dok-sort select { min-width: 160px; }
+  }
+</style>
+
+<script>
+  // Sort select + pagination: both trigger a full server round-trip, so show the
+  // loading veil and (for sort) navigate via the shared live query string.
+  import { params, navigate, showLoading } from '../../scripts/dokumentaiNav.ts';
+
+  document.getElementById('dokSort')?.addEventListener('change', (event) => {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    if (value === 'relevance') params.delete('sort');
+    else params.set('sort', value);
+    params.delete('page');
+    navigate(true);
+  });
+
+  document.querySelectorAll<HTMLAnchorElement>('.dok-pagination a[href]')
+    .forEach((a) => a.addEventListener('click', showLoading));
+</script>
