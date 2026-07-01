@@ -5,8 +5,9 @@ https://data.gov.lt/datasets/673/
 */
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import config from "../../utils/config.js";
 
-const BASE = "https://get.data.gov.lt/datasets/gov/vmi/ja_mokesciai/Moketojas";
+const BASE = `${config.dataGovUrl}/datasets/gov/vmi/ja_mokesciai/Moketojas`;
 const LIMIT = 10_000;
 const BATCH_SIZE = 200;
 

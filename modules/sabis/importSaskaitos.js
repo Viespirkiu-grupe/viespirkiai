@@ -4,9 +4,9 @@ https://get.data.gov.lt/datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/Saskaitos
 */
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import config from "../../utils/config.js";
 
-const BASE =
-    "https://get.data.gov.lt/datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/Saskaitos";
+const BASE = `${config.dataGovUrl}/datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/Saskaitos`;
 const LIMIT = 5000;
 const BATCH_SIZE = 500;
 

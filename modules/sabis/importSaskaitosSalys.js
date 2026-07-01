@@ -1,8 +1,8 @@
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import config from "../../utils/config.js";
 
-const BASE =
-    "https://get.data.gov.lt/datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SaskaituSalys";
+const BASE = `${config.dataGovUrl}/datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SaskaituSalys`;
 const LIMIT = 100000;
 const BATCH_SIZE = 1000;
 

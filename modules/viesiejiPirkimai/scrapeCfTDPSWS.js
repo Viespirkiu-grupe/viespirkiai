@@ -7,8 +7,10 @@ import { parseCfTDPSWS, parseFailai, parseVersijos } from "./parsers.js";
 import { NUSKAITYMO_VERSIJA } from "./parsers.js";
 import { extractTedNoticeNumber } from "./parsers.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
+import config from "../../utils/config.js";
 
 const WINDOW_MS = 5000; // fixed smoothing window
+const HOST = config.viesiejiPirkimaiUrl;
 const timestamps = [];
 
 /**
@@ -119,10 +121,10 @@ async function fetchText(url) {
 
     const redirectedUrl = response.url || "";
     const wasRedirectedToCas =
-        redirectedUrl.startsWith("https://viesiejipirkimai.lt/cas/login?") ||
+        redirectedUrl.startsWith(`${HOST}/cas/login?`) ||
         response.headers
             .get("location")
-            ?.startsWith("https://viesiejipirkimai.lt/cas/login?");
+            ?.startsWith(`${HOST}/cas/login?`);
 
     if (wasRedirectedToCas) {
         const error = new Error("CAS redirect");
@@ -146,14 +148,14 @@ async function processCfTDPSWSRecord(cft, options = {}) {
 
     const timings = new Timings();
     try {
-        const url = `https://viesiejipirkimai.lt/epps/dps/prepareViewCfTDPSWS.do?resourceId=${cft.pirkimoId}`;
+        const url = `${HOST}/epps/dps/prepareViewCfTDPSWS.do?resourceId=${cft.pirkimoId}`;
         timings.start("fetchMain");
         const text = await fetchText(url);
         timings.end("fetchMain");
 
         const result = await parseCfTDPSWS(text);
 
-        const failaiUrl = `https://viesiejipirkimai.lt/epps/pmc/listPmcContractDocuments.do?d-5419-p=&resourceId=${cft.pirkimoId}&T02_ps=10000`;
+        const failaiUrl = `${HOST}/epps/pmc/listPmcContractDocuments.do?d-5419-p=&resourceId=${cft.pirkimoId}&T02_ps=10000`;
         timings.start("fetchFiles");
         const textFailai = await fetchText(failaiUrl);
         timings.end("fetchFiles");
@@ -168,7 +170,7 @@ async function processCfTDPSWSRecord(cft, options = {}) {
                 limit(async () => {
                     if (!file.versijosExists) return;
 
-                    const versijosUrl = `https://viesiejipirkimai.lt/epps/cft/viewDocumentVersions.do?resourceId=${file.dokumentasId}&d-16398-p=&T02_ps=10000`;
+                    const versijosUrl = `${HOST}/epps/cft/viewDocumentVersions.do?resourceId=${file.dokumentasId}&d-16398-p=&T02_ps=10000`;
                     const textVersijos = await fetchText(versijosUrl);
                     file.versijos = await parseVersijos(textVersijos);
                 }),

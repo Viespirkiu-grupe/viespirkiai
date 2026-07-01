@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
+import appConfig from "../../utils/config.js";
 const logger = new Logger();
 
 /**
@@ -12,7 +13,7 @@ const logger = new Logger();
  * @returns {Promise<boolean>} - true jei dar yra duomenų, false jei pabaiga
  */
 export async function syncAdpChanges(CONFIG) {
-    const BASE = `https://get.data.gov.lt/${CONFIG.dataset}/:changes`;
+    const BASE = `${appConfig.dataGovUrl}/${CONFIG.dataset}/:changes`;
 
     async function getLastState() {
         const res = await postgres.query(

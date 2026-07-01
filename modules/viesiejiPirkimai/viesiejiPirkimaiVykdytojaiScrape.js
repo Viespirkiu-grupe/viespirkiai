@@ -3,8 +3,9 @@ import { parseHTML } from "linkedom";
 import { isVptWorkingHours } from "../sutartys/isWorkingHours.js";
 import { log } from "../../utils/log.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
+import config from "../../utils/config.js";
 
-const HOST = "https://viesiejipirkimai.lt";
+const HOST = config.viesiejiPirkimaiUrl;
 const NUSKAITYMO_VERSIJA = 9;
 const NUSKAITYMO_INTERVAL = "7 days";
 
