@@ -60,6 +60,12 @@ const tlPeakYear = timeline.reduce((best, t) => (t.count > (best?.count ?? -1) ?
 const tlFirst = timeline[0]?.year;
 const tlLast = timeline[timeline.length - 1]?.year;
 const tlByYear = new Map(timeline.map((t) => [t.year, t.count]));
+// Position of the peak label along the axis (0–1). Only label the peak when it
+// sits clear of the first/last labels, otherwise it overlaps them at the edges.
+const tlPeakPos = tlPeakYear != null && tlFirst != null && tlLast != null && tlLast !== tlFirst
+  ? (tlPeakYear - tlFirst) / (tlLast - tlFirst)
+  : null;
+const showPeakLabel = tlPeakPos != null && tlPeakPos > 0.12 && tlPeakPos < 0.88;
 const activeYears = new Set(stats.activeYears.filter((y) => tlByYear.has(y)));
 const tlFiltered = activeYears.size > 0;
 const yearUrl = (year: number) => buildDokumentaiUrl(urlState, { metai: toggleValue(urlState.metai, String(year)) });
@@ -97,7 +103,6 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
 {hasBody && (
   <aside class="dok-stats" aria-label="Atrankos statistinė analizė">
     <header class="dok-stats__head">
-      <span class="dok-stats__eyebrow">Atrankos analizė</span>
       <div class="dok-stats__hero">
         <span class="dok-stats__hero-num">{fmtCompact(stats.total)}</span>
         <span class="dok-stats__hero-unit">{stats.total === 1 ? 'dokumentas' : 'dokumentų'}</span>
@@ -125,7 +130,7 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
     {timeline.length > 1 && (
       <section class="dok-stats__block dok-stats__timeline">
         <div class="dok-stats__h-row">
-          <h3 class="dok-stats__h">Dokumentai pagal metus</h3>
+          <h3 class="dok-stats__h">Pagal metus</h3>
           <output class="dok-stats__readout" aria-hidden="true" data-default-year={readoutYear} data-default-count={fmtCompact(readoutCount)}>
             <span class="dok-stats__readout-count">{fmtCompact(readoutCount)}</span>
             <span class="dok-stats__readout-year">{readoutYear}</span>
@@ -147,12 +152,11 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
         </div>
         <div class="dok-stats__axis">
           <span>{tlFirst}</span>
-          {tlPeakYear != null && tlPeakYear !== tlFirst && tlPeakYear !== tlLast && (
-            <span class="dok-stats__axis-peak" style={`--p:${((tlPeakYear - (tlFirst ?? 0)) / Math.max(1, (tlLast ?? 0) - (tlFirst ?? 0))) * 100}%`}>{tlPeakYear}</span>
+          {showPeakLabel && (
+            <span class="dok-stats__axis-peak" style={`--p:${(tlPeakPos ?? 0) * 100}%`}>{tlPeakYear}</span>
           )}
           <span>{tlLast}</span>
         </div>
-        <p class="dok-stats__hint">Spustelėk metus, kad filtruotum</p>
       </section>
     )}
 
@@ -372,11 +376,6 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
   .dok-stats__chart.is-filtered .dok-stats__col:hover .dok-stats__col-bar,
   .dok-stats__chart.is-filtered .dok-stats__col.is-hover .dok-stats__col-bar { opacity: 1; }
   .dok-stats__col.is-active .dok-stats__col-bar { background: var(--link); }
-  .dok-stats__hint {
-    margin: 8px 0 0;
-    font-size: 10px;
-    color: var(--gray);
-  }
   .dok-stats__axis {
     position: relative;
     margin-top: 7px;

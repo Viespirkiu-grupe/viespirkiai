@@ -526,7 +526,7 @@ function distModel(m: typeof sizeMetrics[number]) {
               <div class="dok-home-hero-main">
                 <span class="dok-home-hero-approx">apie</span>
                 <span class="dok-home-hero-num">{ov.total.toLocaleString('lt-LT')}</span>
-                <Linksnis class="dok-home-hero-unit" n={ov.total} forms={['dokumentas', 'dokumentai', 'dokumentų', 'dokumento']} showNumber={false} />
+                <span class="dok-home-hero-unit"><Linksnis n={ov.total} forms={['dokumentas', 'dokumentai', 'dokumentų', 'dokumento']} showNumber={false} /></span>
               </div>
               <div class="dok-home-hero-sub">
                 <span><strong>{fmtCompact(ov.totalPages)}</strong> puslapių</span>
