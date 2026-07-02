@@ -5,10 +5,19 @@ export async function gautiFinansuDuomenis(jarId) {
 
     if (jarId) {
         const balansoRes = await postgres.query(
-            `SELECT *
-               FROM "balansoAtaskaitos"
-               WHERE "jarId" = $1
-               ORDER BY "laikotarpisNuo" DESC, "lineTypeId" ASC`,
+            `SELECT a.*,
+                    template."templateName",
+                    standard."standardName",
+                    line."lineName"
+               FROM "balansoAtaskaitos" a
+               LEFT JOIN "balansoAtaskaitosTemplatePavadinimai" template
+                 ON template."templateId" = a."templateId"
+               LEFT JOIN "balansoAtaskaitosStandardPavadinimai" standard
+                 ON standard."standardId" = a."standardId"
+               LEFT JOIN "balansoAtaskaitosLinePavadinimai" line
+                 ON line."lineTypeId" = a."lineTypeId"
+               WHERE a."jarId" = $1
+               ORDER BY a."laikotarpisNuo" DESC, a."lineTypeId" ASC`,
             [jarId],
         );
 
@@ -17,10 +26,19 @@ export async function gautiFinansuDuomenis(jarId) {
         }
 
         const pelnoNuostoliuRes = await postgres.query(
-            `SELECT *
-               FROM "pelnoNuostoliuAtaskaitos"
-               WHERE "jarId" = $1
-               ORDER BY "laikotarpisNuo" DESC, "lineTypeId" ASC`,
+            `SELECT a.*,
+                    template."templateName",
+                    standard."standardName",
+                    line."lineName"
+               FROM "pelnoNuostoliuAtaskaitos" a
+               LEFT JOIN "pelnoNuostoliuAtaskaitosTemplatePavadinimai" template
+                 ON template."templateId" = a."templateId"
+               LEFT JOIN "pelnoNuostoliuAtaskaitosStandardPavadinimai" standard
+                 ON standard."standardId" = a."standardId"
+               LEFT JOIN "pelnoNuostoliuAtaskaitosLinePavadinimai" line
+                 ON line."lineTypeId" = a."lineTypeId"
+               WHERE a."jarId" = $1
+               ORDER BY a."laikotarpisNuo" DESC, a."lineTypeId" ASC`,
             [jarId],
         );
 

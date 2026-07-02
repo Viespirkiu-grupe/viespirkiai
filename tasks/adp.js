@@ -1,5 +1,156 @@
 import { syncAdpChanges } from "../modules/adp/syncChanges.js";
 
+const FINANSINES_ATASKAITOS_COLUMNS = [
+    "_id",
+    "jarId",
+    "formaId",
+    "statusasId",
+    "templateId",
+    "standardId",
+    "lineTypeId",
+    "reiksme",
+    "laikotarpisNuo",
+    "laikotarpisIki",
+    "duomenuData",
+];
+
+async function upsertPavadinimai(postgres, table, idColumn, nameColumn, rows) {
+    const filtered = rows.filter(
+        (row) => row[idColumn] != null && row[nameColumn] !== undefined,
+    );
+    if (!filtered.length) return;
+
+    const values = [];
+    const placeholders = filtered
+        .map((row) => {
+            values.push(row[idColumn], row[nameColumn]);
+            return `($${values.length - 1}, $${values.length})`;
+        })
+        .join(",");
+
+    await postgres.query(
+        `
+        INSERT INTO "${table}" ("${idColumn}", "${nameColumn}")
+        VALUES ${placeholders}
+        ON CONFLICT ("${idColumn}") DO UPDATE
+        SET "${nameColumn}" = EXCLUDED."${nameColumn}"
+        WHERE EXCLUDED."${nameColumn}" IS NOT NULL
+          AND "${table}"."${nameColumn}" IS DISTINCT FROM EXCLUDED."${nameColumn}"
+        `,
+        values,
+    );
+}
+
+function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
+    return async ({ inserts, patches, postgres }) => {
+        await upsertPavadinimai(
+            postgres,
+            `${prefix}TemplatePavadinimai`,
+            "templateId",
+            "templateName",
+            inserts,
+        );
+        await upsertPavadinimai(
+            postgres,
+            `${prefix}StandardPavadinimai`,
+            "standardId",
+            "standardName",
+            inserts,
+        );
+        await upsertPavadinimai(
+            postgres,
+            `${prefix}LinePavadinimai`,
+            "lineTypeId",
+            "lineName",
+            inserts,
+        );
+
+        for (const row of inserts) {
+            delete row.templateName;
+            delete row.standardName;
+            delete row.lineName;
+        }
+
+        for (const patch of patches) {
+            const currentRes = await postgres.query(
+                `SELECT "templateId", "standardId", "lineTypeId" FROM "${mainTable}" WHERE "_id" = $1`,
+                [patch._id],
+            );
+            const current = currentRes.rows[0];
+            if (current) {
+                await upsertPavadinimai(
+                    postgres,
+                    `${prefix}TemplatePavadinimai`,
+                    "templateId",
+                    "templateName",
+                    [
+                        {
+                            templateId: patch.patch.template_id ?? current.templateId,
+                            templateName:
+                                patch.patch.template_name ??
+                                (patch.patch.template_id !== undefined ? null : undefined),
+                        },
+                    ],
+                );
+                await upsertPavadinimai(
+                    postgres,
+                    `${prefix}StandardPavadinimai`,
+                    "standardId",
+                    "standardName",
+                    [
+                        {
+                            standardId: patch.patch.standard_id ?? current.standardId,
+                            standardName:
+                                patch.patch.standard_name ??
+                                (patch.patch.standard_id !== undefined ? null : undefined),
+                        },
+                    ],
+                );
+                await upsertPavadinimai(
+                    postgres,
+                    `${prefix}LinePavadinimai`,
+                    "lineTypeId",
+                    "lineName",
+                    [
+                        {
+                            lineTypeId: patch.patch.line_type_id ?? current.lineTypeId,
+                            lineName:
+                                patch.patch.line_name ??
+                                (patch.patch.line_type_id !== undefined ? null : undefined),
+                        },
+                    ],
+                );
+            }
+
+            const values = [];
+            const set = [];
+            const names = [
+                ["templateId", "templateName", "template_id", "template_name"],
+                ["standardId", "standardName", "standard_id", "standard_name"],
+                ["lineTypeId", "lineName", "line_type_id", "line_name"],
+            ];
+
+            for (const [idColumn, nameColumn, idKey, nameKey] of names) {
+                const hasName = patch.patch[nameKey] !== undefined;
+                const hasId = patch.patch[idKey] !== undefined;
+                if (!hasName && !hasId) continue;
+                if (hasId) {
+                    set.push(`"${idColumn}" = $${values.length + 1}`);
+                    values.push(patch.patch[idKey]);
+                }
+            }
+
+            if (set.length) {
+                values.push(patch._id);
+                await postgres.query(
+                    `UPDATE "${mainTable}" SET ${set.join(", ")} WHERE "_id" = $${values.length}`,
+                    values,
+                );
+            }
+        }
+    };
+}
+
 // All ADP datasets in one place — add/remove datasets here, not as new task objects
 const ADP_DATASETS = [
     {
@@ -87,6 +238,11 @@ const ADP_DATASETS = [
         table: "balansoAtaskaitos",
         dataset: "datasets/gov/rc/jar/balanso_ataskaitos/BalansoAtaskaita",
         limit: 2500,
+        columns: FINANSINES_ATASKAITOS_COLUMNS,
+        beforeApply: finansinesAtaskaitosBeforeApply(
+            "balansoAtaskaitos",
+            "balansoAtaskaitos",
+        ),
         mapping: {
             _id: "_id",
             "juridinis_asmuo._id": "jarId", "forma._id": "formaId",
@@ -169,6 +325,11 @@ const ADP_DATASETS = [
         table: "pelnoNuostoliuAtaskaitos",
         dataset: "datasets/gov/rc/jar/pelno_ataskaitos/PelnoAtaskaita",
         limit: 1000,
+        columns: FINANSINES_ATASKAITOS_COLUMNS,
+        beforeApply: finansinesAtaskaitosBeforeApply(
+            "pelnoNuostoliuAtaskaitos",
+            "pelnoNuostoliuAtaskaitos",
+        ),
         mapping: {
             _id: "_id",
             "juridinis_asmuo._id": "jarId", "forma._id": "formaId",

@@ -9,6 +9,8 @@ const logger = new Logger();
  * @param {string} CONFIG.table - DB lentelė
  * @param {string} CONFIG.dataset - dataset path
  * @param {Object} CONFIG.mapping - API key -> DB stulpelis
+ * @param {string[]} [CONFIG.columns] - DB stulpeliai, kuriuos rašyti į pagrindinę lentelę
+ * @param {Function} [CONFIG.beforeApply] - optional hook prieš INSERT/PATCH/DELETE
  * @param {number} CONFIG.limit - batch limit
  * @returns {Promise<boolean>} - true jei dar yra duomenų, false jei pabaiga
  */
@@ -53,7 +55,7 @@ export async function syncAdpChanges(CONFIG) {
     async function applyInsert(rows) {
         if (!rows || rows.length === 0) return;
 
-        const dbCols = Object.values(CONFIG.mapping);
+        const dbCols = CONFIG.columns ?? Object.values(CONFIG.mapping);
         const filteredRows = rows.filter((r) =>
             dbCols.some((col) => r[col] !== null && r[col] !== undefined),
         );
@@ -86,6 +88,7 @@ export async function syncAdpChanges(CONFIG) {
             let i = 1;
             for (const [apiKey, dbCol] of Object.entries(CONFIG.mapping)) {
                 if (apiKey === "_id") continue;
+                if (CONFIG.columns && !CONFIG.columns.includes(dbCol)) continue;
                 const val = r.patch[apiKey];
                 if (val !== undefined) {
                     fields.push(`"${dbCol}" = $${i++}`);
@@ -147,6 +150,9 @@ export async function syncAdpChanges(CONFIG) {
     logger.log(
         `${CONFIG.dataset} – Inserts: ${inserts.length}, patches: ${patches.length}, deletes: ${deletes.length}`,
     );
+    if (CONFIG.beforeApply) {
+        await CONFIG.beforeApply({ inserts, patches, deletes, postgres });
+    }
     await applyInsert(inserts);
     await applyPatch(patches);
     await applyDelete(deletes);

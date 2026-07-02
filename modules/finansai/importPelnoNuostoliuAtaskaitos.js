@@ -44,6 +44,7 @@ async function main() {
 
         for (const obj of data._data) {
             batch.push([
+                obj._id ?? null, // _id
                 obj.juridinis_asmuo?._id ?? null, // jarId
                 obj.forma?._id ?? null, // formaId
                 obj.statusas?._id ?? null, // statusasId
@@ -94,12 +95,52 @@ async function insertBatch(rows) {
         .join(", ");
 
     const sql = `
-        INSERT INTO "pelnoNuostoliuAtaskaitos" (
-            "jarId", "formaId", "statusasId", "templateId", "templateName",
+        WITH input (
+            "_id", "jarId", "formaId", "statusasId", "templateId", "templateName",
             "standardId", "standardName", "lineTypeId", "lineName", "reiksme",
             "laikotarpisNuo", "laikotarpisIki", "duomenuData"
-        ) VALUES ${placeholders}
-        ON CONFLICT ("jarId", "lineName", "laikotarpisNuo", "laikotarpisIki", "duomenuData") DO NOTHING
+        ) AS (
+            VALUES ${placeholders}
+        ),
+        templates AS (
+            INSERT INTO "pelnoNuostoliuAtaskaitosTemplatePavadinimai" ("templateId", "templateName")
+            SELECT DISTINCT "templateId", "templateName"
+            FROM input
+            WHERE "templateId" IS NOT NULL
+            ON CONFLICT ("templateId") DO UPDATE
+            SET "templateName" = EXCLUDED."templateName"
+            WHERE "pelnoNuostoliuAtaskaitosTemplatePavadinimai"."templateName" IS DISTINCT FROM EXCLUDED."templateName"
+        ),
+        standards AS (
+            INSERT INTO "pelnoNuostoliuAtaskaitosStandardPavadinimai" ("standardId", "standardName")
+            SELECT DISTINCT "standardId", "standardName"
+            FROM input
+            WHERE "standardId" IS NOT NULL
+            ON CONFLICT ("standardId") DO UPDATE
+            SET "standardName" = EXCLUDED."standardName"
+            WHERE "pelnoNuostoliuAtaskaitosStandardPavadinimai"."standardName" IS DISTINCT FROM EXCLUDED."standardName"
+        ),
+        lines AS (
+            INSERT INTO "pelnoNuostoliuAtaskaitosLinePavadinimai" ("lineTypeId", "lineName")
+            SELECT DISTINCT "lineTypeId", "lineName"
+            FROM input
+            WHERE "lineTypeId" IS NOT NULL
+            ON CONFLICT ("lineTypeId") DO UPDATE
+            SET "lineName" = EXCLUDED."lineName"
+            WHERE "pelnoNuostoliuAtaskaitosLinePavadinimai"."lineName" IS DISTINCT FROM EXCLUDED."lineName"
+        )
+        INSERT INTO "pelnoNuostoliuAtaskaitos" (
+            "_id", "jarId", "formaId", "statusasId", "templateId", "standardId", "lineTypeId",
+            "reiksme", "laikotarpisNuo", "laikotarpisIki", "duomenuData"
+        )
+        SELECT input."_id", input."jarId", input."formaId", input."statusasId",
+               input."templateId", input."standardId", input."lineTypeId",
+               input."reiksme", input."laikotarpisNuo", input."laikotarpisIki", input."duomenuData"
+        FROM input
+        ON CONFLICT (
+            "jarId", "lineTypeId",
+            "laikotarpisNuo", "laikotarpisIki", "duomenuData"
+        ) DO NOTHING
     `;
 
     try {
