@@ -93,26 +93,30 @@ async function loadSabisSutartys(vpId: number) {
   return sabis;
 }
 
-async function annotateDokumentai(dokumentai: any[]) {
-  if (!Array.isArray(dokumentai)) return;
+async function annotateDokumentai(sutartis: any) {
+  const dokumentai: any[] = Array.isArray(sutartis.dokumentai) ? sutartis.dokumentai : [];
   for (const failas of dokumentai) {
-    const dokIdMatch = failas.url.match(/dok_id=(\d+)/);
-    const fileIdMatch = failas.url.match(/file_id=(\d+)/);
+    const dokIdMatch = failas.url?.match(/dok_id=(\d+)/);
+    const fileIdMatch = failas.url?.match(/file_id=(\d+)/);
     failas.dok_id = dokIdMatch ? dokIdMatch[1] : '';
     failas.file_id = fileIdMatch ? fileIdMatch[1] : '';
     failas.proxyUrl = failas.dok_id && failas.file_id
       ? `https://eviesiejipirkimai.lt/download.php?dok_id=${failas.dok_id}&file_id=${failas.file_id}`
       : '';
   }
-  const poros = dokumentai.filter((f: any) => f.dok_id && f.file_id);
-  const busenos = poros.length > 0 ? await postgres.query(
-    `SELECT f."dokId", f."fileId", (f."parsiustas" > 0) AS parsiustas, (f."nuskaitytas" IS NOT NULL AND f."nuskaitytas" > 0) AS nuskaitytas, f.id
+
+  // Visada užklausiame visus sutarties failus (saltinis = 'sutartys' arba NULL),
+  // kad prijungtume ir tuos, kurių nėra sutartys.dokumentai sąraše.
+  const busenos = await postgres.query(
+    `SELECT f."dokId", f."fileId", (f."parsiustas" > 0) AS parsiustas,
+            (f."nuskaitytas" IS NOT NULL AND f."nuskaitytas" > 0) AS nuskaitytas,
+            f.id, f.pavadinimas, f.extension
      FROM failai f
-     JOIN unnest($1::int[], $2::int[]) AS t("dokId", "fileId")
-       ON f."dokId" = t."dokId" AND f."fileId" = t."fileId"`,
-    [poros.map((f: any) => f.dok_id), poros.map((f: any) => f.file_id)],
-  ).then((r: any) => r.rows) : [];
+     WHERE f."dokId" = $1 AND (f.saltinis = 'sutartys' OR f.saltinis IS NULL)`,
+    [sutartis.sutartiesUnikalusId],
+  ).then((r: any) => r.rows);
   const busenaByPora = new Map<string, any>(busenos.map((b: any) => [`${b.dokId}:${b.fileId}`, b]));
+
   for (const failas of dokumentai) {
     const busena = busenaByPora.get(`${failas.dok_id}:${failas.file_id}`);
     failas.parsiustas = busena?.parsiustas || false;
@@ -122,6 +126,29 @@ async function annotateDokumentai(dokumentai: any[]) {
       failas.proxyUrl = `https://failai.viespirkiai.org/${failas.id}`;
     }
   }
+
+  // Failai, esantys DB, bet nesantys sutarties dokumentų sąraše.
+  const esamosPoros = new Set(dokumentai.map((f: any) => `${f.dok_id}:${f.file_id}`));
+  for (const b of busenos) {
+    if (esamosPoros.has(`${b.dokId}:${b.fileId}`)) continue;
+    const dok_id = String(b.dokId);
+    const file_id = String(b.fileId);
+    dokumentai.push({
+      pavadinimas: b.pavadinimas,
+      extension: b.extension,
+      url: `https://eviesiejipirkimai.lt/download.php?dok_id=${dok_id}&file_id=${file_id}`,
+      dok_id,
+      file_id,
+      parsiustas: b.parsiustas,
+      nuskaitytas: b.nuskaitytas,
+      id: b.parsiustas ? b.id : undefined,
+      proxyUrl: b.parsiustas
+        ? `https://failai.viespirkiai.org/${b.id}`
+        : `https://eviesiejipirkimai.lt/download.php?dok_id=${dok_id}&file_id=${file_id}`,
+    });
+  }
+
+  sutartis.dokumentai = dokumentai;
 }
 
 async function loadCpvaProjektai(pirkimoNumeris: string | null | undefined) {
@@ -165,7 +192,7 @@ export async function loadSutartis(id: number): Promise<Sutartis | null> {
   const [panasios, sabis, , cpva, pirkimai] = await Promise.all([
     loadPanasiosSutartys(sutartis),
     loadSabisSutartys(sutartis.sutartiesUnikalusId),
-    annotateDokumentai(sutartis.dokumentai),
+    annotateDokumentai(sutartis),
     loadCpvaProjektai(sutartis.pirkimoNumeris),
     loadPirkimai(sutartis.pirkimoNumeris),
   ]);
