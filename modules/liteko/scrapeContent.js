@@ -236,10 +236,33 @@ async function nuskaitytiNuosprendi(n) {
                 .map((_, i) => `($${i * 3 + 1},$${i * 3 + 2},$${i * 3 + 3})`)
                 .join(", ");
             const params = katRows.flatMap((k) => [n.id, k.kodas, k.pavadinimas]);
+            // Pavadinimai dedublikuojami į atskirą lentelę; kategorijų lentelėje
+            // laikoma tik nuoroda ("pavadinimoId").
             await postgres.query(
-                `INSERT INTO "teismoNuosprendziaiKategorijos"
-                   ("nuosprendzioId","kodas","pavadinimas")
-                 VALUES ${vals}`,
+                `WITH input AS (
+                     SELECT v.col1::bigint AS "nuosprendzioId",
+                            v.col2::text   AS "kodas",
+                            v.col3::text   AS "pavadinimas"
+                     FROM (VALUES ${vals}) AS v(col1, col2, col3)
+                 ),
+                 upserted AS (
+                     INSERT INTO "teismoNuosprendziaiKategorijuPavadinimai" ("pavadinimas")
+                     SELECT DISTINCT "pavadinimas" FROM input WHERE "pavadinimas" IS NOT NULL
+                     ON CONFLICT ("pavadinimas") DO NOTHING
+                     RETURNING "id", "pavadinimas"
+                 ),
+                 pavadinimai AS (
+                     SELECT "id", "pavadinimas" FROM upserted
+                     UNION
+                     SELECT p."id", p."pavadinimas"
+                     FROM "teismoNuosprendziaiKategorijuPavadinimai" p
+                     WHERE p."pavadinimas" IN (SELECT "pavadinimas" FROM input WHERE "pavadinimas" IS NOT NULL)
+                 )
+                 INSERT INTO "teismoNuosprendziaiKategorijos"
+                   ("nuosprendzioId","kodas","pavadinimoId")
+                 SELECT i."nuosprendzioId", i."kodas", p."id"
+                 FROM input i
+                 LEFT JOIN pavadinimai p ON p."pavadinimas" = i."pavadinimas"`,
                 params,
             );
         }
