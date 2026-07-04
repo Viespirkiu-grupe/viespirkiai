@@ -238,6 +238,48 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
           </Table>
         </TableWrapper>
       </div>
+
+      <!-- Replikacija -->
+      <div class="page-section">
+        <h2 class="mb-1"><a href="#replikacija" id="replikacija" class="no-style">Replikacija</a></h2>
+        <p class="text-muted text-sm mb-4">Prisijungusių replikų būsena ir atsilikimas nuo pagrindinės DB (pg_stat_replication)</p>
+        <TableWrapper>
+          <Table>
+            <thead><tr>
+              <th>Klientas</th>
+              <th>Būsena</th>
+              <th class="cell-right">Sent LSN</th>
+              <th class="cell-right">Write LSN</th>
+              <th class="cell-right">Flush LSN</th>
+              <th class="cell-right">Replay LSN</th>
+              <th class="cell-right">Write lag</th>
+              <th class="cell-right">Flush lag</th>
+              <th class="cell-right">Replay lag</th>
+              <th class="cell-right">Pagrindinės LSN</th>
+              <th class="cell-right">Atsilikimas</th>
+            </tr></thead>
+            <tbody id="replikacijaBody">
+              {statistika.replikacija.length === 0 ? (
+                <tr><td colspan="11" class="text-muted">Nėra prisijungusių replikų</td></tr>
+              ) : statistika.replikacija.map((r: any) => (
+                <tr>
+                  <td class="cell-mono cell-nowrap">{r.client_addr}</td>
+                  <td>{r.state}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{r.sent_lsn}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{r.write_lsn}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{r.flush_lsn}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{r.replay_lsn}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{r.write_lag}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{r.flush_lag}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{r.replay_lag}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{r.primary_current_lsn}</td>
+                  <td class="cell-mono cell-right cell-nowrap">{r.bytes_behind == null ? '' : convertUnit(Number(r.bytes_behind), 'B')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </TableWrapper>
+      </div>
     </div>
   </main>
 
@@ -315,6 +357,15 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
         qiBody.innerHTML = payload.quickwitIndeksai.map((i: any) =>
           `<tr><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.id)}</td><td>${escapeHtml(i.lentele)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.seq)}</td><td class="cell-mono cell-nowrap">${escapeHtml(i.indeksas)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.shardSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.gyvosEilutes)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.iterptosEilutes)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(i.mirusiosEilutes)}</td><td>${escapeHtml(i.current)}</td><td class="cell-mono cell-nowrap">${escapeHtml(i.sukurta)}</td><td class="cell-mono cell-nowrap">${escapeHtml(i.indexConfigHash)}</td></tr>`
         ).join('');
+      }
+
+      const rBody = document.getElementById('replikacijaBody');
+      if (rBody && payload.replikacija) {
+        rBody.innerHTML = payload.replikacija.length === 0
+          ? `<tr><td colspan="11" class="text-muted">Nėra prisijungusių replikų</td></tr>`
+          : payload.replikacija.map((r: any) =>
+            `<tr><td class="cell-mono cell-nowrap">${escapeHtml(r.client_addr)}</td><td>${escapeHtml(r.state)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.sent_lsn)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.write_lsn)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.flush_lsn)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.replay_lsn)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.write_lag)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.flush_lag)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.replay_lag)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.primary_current_lsn)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.bytes_behind)}</td></tr>`
+          ).join('');
       }
     };
 

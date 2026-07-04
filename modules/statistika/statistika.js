@@ -78,6 +78,19 @@ export function buildSsePayload(h) {
       iterptosEilutes: Number(i.iterptosEilutes).toLocaleString('lt-LT'),
       mirusiosEilutes: Number(i.mirusiosEilutes).toLocaleString('lt-LT'),
     })),
+    replikacija: (h.replikacija ?? []).map((r) => ({
+      client_addr: r.client_addr ?? '',
+      state: r.state ?? '',
+      sent_lsn: r.sent_lsn ?? '',
+      write_lsn: r.write_lsn ?? '',
+      flush_lsn: r.flush_lsn ?? '',
+      replay_lsn: r.replay_lsn ?? '',
+      write_lag: r.write_lag ?? '',
+      flush_lag: r.flush_lag ?? '',
+      replay_lag: r.replay_lag ?? '',
+      primary_current_lsn: r.primary_current_lsn ?? '',
+      bytes_behind: r.bytes_behind == null ? '' : convertUnit(Number(r.bytes_behind), 'B'),
+    })),
   };
 }
 
@@ -118,12 +131,13 @@ export async function gautiStatistika() {
   const now = Date.now();
   if (cache && now - cacheTime < 50) return cache;
 
-  const [failaiCountsRes, lentelesRes, topRes, dbRes, quickwitIndeksaiRes] = await Promise.all([
+  const [failaiCountsRes, lentelesRes, topRes, dbRes, quickwitIndeksaiRes, replikacijaRes] = await Promise.all([
     postgres.query(`SELECT metrika, eilute, verte FROM "failaiCounts";`),
     postgres.query(`SELECT s.relname AS "tableName", pg_table_size(s.relid) AS "dataSize", pg_indexes_size(s.relid) AS "indexSize", pg_table_size(s.relid) + pg_indexes_size(s.relid) AS "totalSize", st.n_live_tup AS "approxRowCount" FROM pg_catalog.pg_statio_user_tables s JOIN pg_catalog.pg_stat_user_tables st ON s.relid = st.relid ORDER BY s.relname ASC;`),
     postgres.query(`SELECT "nuskaitytidokumentai", "viesasPavadinimas" FROM "dokNuskaitytojai" ORDER BY "nuskaitytidokumentai" DESC LIMIT 100;`),
     postgres.query(`SELECT current_database() AS db, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, deadlocks, temp_files, temp_bytes, extract(epoch from now() - stats_reset) AS stats_age_seconds, extract(epoch from now() - pg_postmaster_start_time()) AS uptime_seconds FROM pg_stat_database WHERE datname = current_database();`),
     postgres.query(`SELECT * FROM "quickwitIndeksai" ORDER BY "lentele", "seq";`),
+    postgres.query(`SELECT client_addr::text AS client_addr, state, sent_lsn::text AS sent_lsn, write_lsn::text AS write_lsn, flush_lsn::text AS flush_lsn, replay_lsn::text AS replay_lsn, write_lag::text AS write_lag, flush_lag::text AS flush_lag, replay_lag::text AS replay_lag, pg_current_wal_lsn()::text AS primary_current_lsn, pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_behind FROM pg_stat_replication;`),
   ]);
 
   const counts = failaiCountsRes.rows.reduce((acc, { metrika, eilute, verte }) => {
@@ -189,6 +203,7 @@ export async function gautiStatistika() {
   statistika.topDokNuskaitytojai = topRes.rows;
   statistika.database = dbRes.rows[0];
   statistika.quickwitIndeksai = quickwitIndeksaiRes.rows;
+  statistika.replikacija = replikacijaRes.rows;
   statistika.atnaujinta = new Date();
 
   cache = statistika;
