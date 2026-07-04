@@ -46,7 +46,7 @@ export async function cvpIsScrapeOldestDeletedContract() {
             `UPDATE public.sutartys
              SET "istrinta" = false
              WHERE "sutartiesUnikalusId" = $1
-               AND "istrinta" IS DISTINCT FROM false;`,
+               AND "istrinta" IS TRUE;`,
             [id],
         );
     } else if (count == 0) {

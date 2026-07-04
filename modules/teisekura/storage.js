@@ -44,20 +44,56 @@ export async function upsertInventoryObject(object) {
 
 export async function claimInventoryBatch(source, kinds, scrapeVersion, limit = 10) {
     const { rows } = await postgres.query(
-        `WITH claimed AS (
-            SELECT id
+        // Sąlyga išskaidyta į 4 tarpusavyje nesikertančias šakas (pagal scrapeState:
+        // 0 / >0 / -1 / -2), kad kiekviena galėtų naudoti queue_idx
+        // (source, kind, scrapeState, retryAt) vietoj seq scan'o dėl didelio OR.
+        // FOR UPDATE negalimas tiesiogiai su UNION, tad kiekviena šaka – atskiras
+        // CTE su savo LIMIT + SKIP LOCKED; galutinis claimed perrikiuoja ir ima top $4.
+        `WITH
+         c_new AS (
+            SELECT id, "happenedAt"
             FROM public."teisekuraObjektai"
-            WHERE source = $1
-              AND kind = ANY($2)
+            WHERE source = $1 AND kind = ANY($2)
+              AND "scrapeState" = 0
               AND ("retryAt" IS NULL OR "retryAt" <= now())
-              AND (
-                "scrapeState" = 0
-                OR ("scrapeState" > 0 AND "scrapeVersion" < $3)
-                OR ("scrapeState" = -1 AND "retryAt" <= now())
-                OR ("scrapeState" = -2 AND "checkedAt" < now() - interval '1 hour')
-              )
             ORDER BY "happenedAt" DESC NULLS LAST, id
-            FOR UPDATE SKIP LOCKED
+            LIMIT $4 FOR UPDATE SKIP LOCKED
+         ),
+         c_stale AS (
+            SELECT id, "happenedAt"
+            FROM public."teisekuraObjektai"
+            WHERE source = $1 AND kind = ANY($2)
+              AND "scrapeState" > 0 AND "scrapeVersion" < $3
+              AND ("retryAt" IS NULL OR "retryAt" <= now())
+            ORDER BY "happenedAt" DESC NULLS LAST, id
+            LIMIT $4 FOR UPDATE SKIP LOCKED
+         ),
+         c_retry AS (
+            SELECT id, "happenedAt"
+            FROM public."teisekuraObjektai"
+            WHERE source = $1 AND kind = ANY($2)
+              AND "scrapeState" = -1 AND "retryAt" <= now()
+            ORDER BY "happenedAt" DESC NULLS LAST, id
+            LIMIT $4 FOR UPDATE SKIP LOCKED
+         ),
+         c_inflight AS (
+            SELECT id, "happenedAt"
+            FROM public."teisekuraObjektai"
+            WHERE source = $1 AND kind = ANY($2)
+              AND "scrapeState" = -2 AND "checkedAt" < now() - interval '1 hour'
+              AND ("retryAt" IS NULL OR "retryAt" <= now())
+            ORDER BY "happenedAt" DESC NULLS LAST, id
+            LIMIT $4 FOR UPDATE SKIP LOCKED
+         ),
+         claimed AS (
+            SELECT id
+            FROM (
+                SELECT id, "happenedAt" FROM c_new
+                UNION ALL SELECT id, "happenedAt" FROM c_stale
+                UNION ALL SELECT id, "happenedAt" FROM c_retry
+                UNION ALL SELECT id, "happenedAt" FROM c_inflight
+            ) u
+            ORDER BY "happenedAt" DESC NULLS LAST, id
             LIMIT $4
          )
          UPDATE public."teisekuraObjektai" t
