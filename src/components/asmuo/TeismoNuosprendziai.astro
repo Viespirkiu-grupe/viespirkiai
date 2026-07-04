@@ -3,6 +3,7 @@ import Table from '@design-system/components/Table.astro';
 import TableWrapper from '@design-system/components/TableWrapper.astro';
 import TruncationNotice from '@design-system/components/TruncationNotice.astro';
 import Button from '@design-system/components/Button.astro';
+import config from '../../lib/config.ts';
 
 const { asmuo } = Astro.props;
 if (!(asmuo.teismoNuosprendziai?.rows > 0)) return;
@@ -12,7 +13,9 @@ const dokumentaiUrl = `/dokumentai?mode=phrase&type=teismoNuosprendis&jar=${enco
 
 <div class="page-section mb-10" id="teismai">
   <h2><a href="#teismai" class="no-style">Teismo nuosprendžiai</a></h2>
-  <p><Button href={dokumentaiUrl} variant="secondary" size="sm">Atverti dokumentų paieškoje</Button></p>
+  {config.enableDokumentaiSearch && (
+    <p><Button href={dokumentaiUrl} variant="secondary" size="sm">Atverti dokumentų paieškoje</Button></p>
+  )}
   <TruncationNotice count={rows} shown={nuosprendziai.length} anchor="teismai" paramName="teismoNuosprendziaiLimit" label="naujausi nuosprendžiai" />
   <TableWrapper>
     <Table>
