@@ -51,7 +51,7 @@ const profitChartOptions = {
         type="line-datetime"
         labels={mergedRevenueLabels}
         series={mergedRevenueSeries}
-        flags={['yEUR', 'yMin0']}
+        flags={['yEUR', 'yMin0', 'xYear']}
         wrapperClass=""
         heightClass="h-75"
       />
@@ -63,7 +63,7 @@ const profitChartOptions = {
         type="line-datetime"
         labels={metai.map(String)}
         series={pelnoSeries}
-        flags={['yEUR', 'yMinAuto']}
+        flags={['yEUR', 'yMinAuto', 'xYear']}
         customOptions={profitChartOptions}
         wrapperClass=""
         heightClass="h-75"
