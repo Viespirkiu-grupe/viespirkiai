@@ -86,8 +86,10 @@ async function annotateTedSkelbimai(turinys: any) {
 
 export async function loadPirkimas(pirkimoId: string): Promise<Pirkimas | null> {
   const { rows } = await postgres.query(
-    `SELECT p.*, v.pavadinimas AS "vykdytojoPavadinimas", v."jarKodas"
+    `SELECT p.*, a."turinioNuskaitymoData", a."turinioNuskaitymas",
+            v.pavadinimas AS "vykdytojoPavadinimas", v."jarKodas"
        FROM public."viesiejiPirkimai" p
+       LEFT JOIN public."viesiejiPirkimaiAtnaujinimai" a ON a."pirkimoId" = p."pirkimoId"
        LEFT JOIN public."viesiejiPirkimaiVykdytojai" v ON v.id = p."pirkimoVykdytojasId"
       WHERE p."pirkimoId" = $1`,
     [pirkimoId],

@@ -73,6 +73,15 @@ export default {
     // Maksimalus vienalaikis pool dydis aplikacijos užklausoms.
     pgMaxConnections: 16,
 
+    // Debuginimui: logina visas per postgres.query() einančias užklausas su
+    // trukme (connect() paimti klientai/streamai neliečiami).
+    pgLogQueries: false,
+    // Logina tik užklausas, trukusias >= tiek ms (0 = visas).
+    pgLogQueriesMinMs: 0,
+    // Jei nurodytas kelias – užklausos papildomai rašomos į šį failą (be ANSI
+    // spalvų, su pilna data). null = rašoma tik į konsolę.
+    pgLogQueriesFile: null,
+
     // ─────────────────────────────────────────────────────────────────────
     // Typesense — sutarčių ir juridinių asmenų paieška
     // ─────────────────────────────────────────────────────────────────────

@@ -87,7 +87,9 @@ const sutartysFilter = new FilterBuilder({
         },
 });
 
-const FIXED_WHERE = [`NOT COALESCE("istrinta", false)`];
+// istrinta yra ir sutartys, ir (denormalizuotai) sutartysAtnaujinimai lentelėse,
+// tad kvalifikuojame sutartys – kad join'e nebūtų dviprasmiška.
+const FIXED_WHERE = [`NOT COALESCE(sutartys."istrinta", false)`];
 
 export function getSutartysQueryMetadata(query) {
     const { values, queryParams } = sutartysFilter.build(query);
@@ -104,12 +106,13 @@ export const SUTARTYS_COLUMNS = [
     `"sudarymoData"`, `"sutartiesNumeris"`, `"tiekejas"`, `"tiekejoKodas"`, `"tipas"`,
     `"verte"`, `"pirkimoNumeris"`, `"papildomiTiekejai"`, `"papildomiTiekejaiKodai"`,
     `"papildomiBvpzKodai"`, `"papildomiBvpzPavadinimai"`, `"paskutiniKartaMatyta"`,
-    `"suma"`, `"istrinta"`, `"paskutiniKartaAtnaujinta"`,
+    `"suma"`, `sutartys."istrinta"`, `"paskutiniKartaAtnaujinta"`,
 ].join(", ");
 
 // sutartys + 1:1 sutartysAtnaujinimai (paskutiniKarta* iškelti į atskirą lentelę).
-// USING palieka "sutartiesUnikalusId" vienareikšmį, kiti stulpeliai unikalūs,
-// tad WHERE/ORDER BY/SELECT su nekvalifikuotais vardais veikia be pakeitimų.
+// USING palieka "sutartiesUnikalusId" vienareikšmį. Dauguma stulpelių unikalūs,
+// tad nekvalifikuoti vardai veikia; išimtis – "istrinta" (yra abiejose lentelėse),
+// jį kvalifikuojame sutartys.
 const SUTARTYS_FROM = `sutartys LEFT JOIN "sutartysAtnaujinimai" USING ("sutartiesUnikalusId")`;
 
 /**
@@ -130,7 +133,7 @@ async function loadTypesenseRowsFromPostgres(typesenseRows) {
          FROM sutartys
          LEFT JOIN "sutartysAtnaujinimai" USING ("sutartiesUnikalusId")
          WHERE "sutartiesUnikalusId" = ANY($1::int[])
-           AND NOT COALESCE(istrinta, false)`,
+           AND NOT COALESCE(sutartys."istrinta", false)`,
         [ids],
     );
     const rowsById = new Map(

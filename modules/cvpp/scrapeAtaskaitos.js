@@ -1,5 +1,59 @@
 // https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol?pageNumber=1317&pageSize=100&OrderingType=1&OrderingDirection=1&ReportsOrProtocolIds=1%2C2%2C3%2C4%2C5%2C6&IncludeExpired=true
 import { parseHTML } from "linkedom";
+import { postgres } from "../../postgres/postgres.js";
+
+// Stulpeliai, kuriuos valdo scraperis. "turinioMd5" specialiai neįtrauktas —
+// jį pildo kitas procesas, tad upsert jo neliečia.
+const ATASKAITOS_COLUMNS = [
+    "ataskaitosNumeris",
+    "pavadinimas",
+    "link",
+    "formTypeId",
+    "pirkimoVykdytojas",
+    "pirkimoVykdytojoLink",
+    "pirkimoVykdytojoKodas",
+    "tipas",
+    "pirkimoNumeris",
+    "paskelbimoData",
+    "redagavimoData",
+];
+
+// Upsertina ataskaitas į public."cvppAtaskaitos" pagal "ataskaitosNumeris".
+// Grąžina upsertintų eilučių skaičių.
+export async function upsertAtaskaitos(ataskaitos) {
+    const rows = ataskaitos.filter((a) => a?.ataskaitosNumeris);
+    if (rows.length === 0) return 0;
+
+    const placeholders = rows
+        .map(
+            (_, r) =>
+                `(${ATASKAITOS_COLUMNS.map(
+                    (_, c) => `$${r * ATASKAITOS_COLUMNS.length + c + 1}`,
+                ).join(", ")})`,
+        )
+        .join(", ");
+
+    const values = rows.flatMap((a) =>
+        ATASKAITOS_COLUMNS.map((col) => a[col] ?? null),
+    );
+
+    const updates = ATASKAITOS_COLUMNS.filter(
+        (col) => col !== "ataskaitosNumeris",
+    )
+        .map((col) => `"${col}" = EXCLUDED."${col}"`)
+        .join(", ");
+
+    await postgres.query(
+        `INSERT INTO public."cvppAtaskaitos" (${ATASKAITOS_COLUMNS.map(
+            (col) => `"${col}"`,
+        ).join(", ")})
+         VALUES ${placeholders}
+         ON CONFLICT ("ataskaitosNumeris") DO UPDATE SET ${updates}`,
+        values,
+    );
+
+    return rows.length;
+}
 
 export async function scrapeAtaskaitosPuslapis(pageNumber) {
     const url = `https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol?pageNumber=${pageNumber}&pageSize=100&OrderingType=1&OrderingDirection=1&ReportsOrProtocolIds=1%2C2%2C3%2C4%2C5%2C6&IncludeExpired=true`;
@@ -83,13 +137,34 @@ export async function scrapeAtaskaitosPuslapis(pageNumber) {
     });
 }
 
+// Praeina visus puslapius nuo startPage, kol randa tuščią puslapį, ir kiekvieną
+// iškart upsertina. Grąžina bendrą upsertintų ataskaitų skaičių.
+export async function scrapeVisusAtaskaitas(startPage = 1) {
+    let total = 0;
+    for (let page = startPage; ; page++) {
+        const ataskaitos = await scrapeAtaskaitosPuslapis(page);
+        if (ataskaitos.length === 0) break;
+        const count = await upsertAtaskaitos(ataskaitos);
+        total += count;
+        console.log(`Puslapis ${page}: upsertinta ${count} (viso ${total})`);
+    }
+    return total;
+}
+
 // CLI
 if (
     import.meta.url === process.argv[1] ||
     import.meta.url === `file://${process.argv[1]}`
 ) {
-    const pageNumber = parseInt(process.argv[2] ?? "1", 10);
-    scrapeAtaskaitosPuslapis(pageNumber).then((ataskaitos) => {
-        console.log(JSON.stringify(ataskaitos, null, 2));
-    });
+    const startPage = parseInt(process.argv[2] ?? "1", 10);
+    scrapeVisusAtaskaitas(startPage)
+        .then(async (total) => {
+            console.log(`Viso upsertinta ataskaitų: ${total}`);
+            await postgres.end();
+        })
+        .catch(async (err) => {
+            console.error(err);
+            await postgres.end();
+            process.exit(1);
+        });
 }

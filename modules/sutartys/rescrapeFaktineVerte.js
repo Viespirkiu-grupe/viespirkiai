@@ -62,7 +62,7 @@ export async function cvpIsRescrapeFaktineVerte() {
             `UPDATE public.sutartys
                 SET "istrinta" = false
               WHERE "sutartiesUnikalusId" = $1
-                AND "istrinta" IS DISTINCT FROM false;`,
+                AND "istrinta" IS TRUE;`,
             [id],
         );
     } else if (count == 0) {

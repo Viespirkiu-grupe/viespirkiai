@@ -73,18 +73,18 @@ async function refillQueue() {
             `
        WITH candidate AS (
          SELECT "pirkimoId"
-         FROM public."viesiejiPirkimai"
+         FROM public."viesiejiPirkimaiAtnaujinimai"
          WHERE type = 'Pmc'
            AND ("turinioNuskaitymas" IS NULL OR "turinioNuskaitymas" = 0)
          FOR UPDATE SKIP LOCKED
          LIMIT $1
        )
-       UPDATE public."viesiejiPirkimai" v
+       UPDATE public."viesiejiPirkimaiAtnaujinimai" v
        SET "turinioNuskaitymas" = -2,
            "scrapeReservation" = NOW()
        FROM candidate
        WHERE v."pirkimoId" = candidate."pirkimoId"
-       RETURNING v.*;
+       RETURNING v."pirkimoId";
        `,
             [QUEUE_SIZE],
         );
@@ -267,13 +267,12 @@ async function processPmcRecord(cft, options = {}) {
             );
             jarKodas = juridinis?.jarKodas ?? null;
         }
+        // Turinį rašom į storąją lentelę tik jei kas nors pasikeitė (IS DISTINCT FROM),
+        // kad nekintantis 12h perskaitymas neperrašytų storosios eilutės ir nebloatintų.
         await postgres.query(
             `
             UPDATE public."viesiejiPirkimai"
-            SET "turinioNuskaitymas" = ${NUSKAITYMO_VERSIJA},
-            "turinioNuskaitymoData" = (now() AT TIME ZONE 'Europe/Vilnius'),
-                "scrapeReservation" = NULL,
-                turinys = $1,
+            SET turinys = $1,
                 "numatomaVerteEUR" = $3,
                 "bvpzKodai" = $4,
                 "pirkimoObjektoTipas" = $5,
@@ -281,6 +280,15 @@ async function processPmcRecord(cft, options = {}) {
                 "pirkimoVykdytojasId" = $7,
                 "jarKodas" = COALESCE($8, "jarKodas")
             WHERE "pirkimoId" = $2
+              AND (
+                  turinys IS DISTINCT FROM $1
+                  OR "numatomaVerteEUR" IS DISTINCT FROM $3
+                  OR "bvpzKodai" IS DISTINCT FROM $4
+                  OR "pirkimoObjektoTipas" IS DISTINCT FROM $5
+                  OR "esFinansavimas" IS DISTINCT FROM $6
+                  OR "pirkimoVykdytojasId" IS DISTINCT FROM $7
+                  OR "jarKodas" IS DISTINCT FROM COALESCE($8, "jarKodas")
+              )
             `,
             [
                 result,
@@ -297,6 +305,17 @@ async function processPmcRecord(cft, options = {}) {
                 jarKodas,
             ],
         );
+        // Nuskaitymo būsena/data visada į plonąją lentelę.
+        await postgres.query(
+            `
+            UPDATE public."viesiejiPirkimaiAtnaujinimai"
+            SET "turinioNuskaitymas" = ${NUSKAITYMO_VERSIJA},
+                "turinioNuskaitymoData" = (now() AT TIME ZONE 'Europe/Vilnius'),
+                "scrapeReservation" = NULL
+            WHERE "pirkimoId" = $1
+            `,
+            [cft.pirkimoId],
+        );
         timings.end("updatePurchase");
 
         timings.end("all");
@@ -310,7 +329,7 @@ async function processPmcRecord(cft, options = {}) {
 
         await postgres.query(
             `
-      UPDATE public."viesiejiPirkimai"
+      UPDATE public."viesiejiPirkimaiAtnaujinimai"
       SET "turinioNuskaitymas" = $1,
           "turinioNuskaitymoData" = NOW(),
           "scrapeReservation" = NULL
@@ -351,7 +370,7 @@ export async function processOldestPmcOffHours(options = {}) {
         `
         WITH candidate AS (
             SELECT "pirkimoId"
-            FROM public."viesiejiPirkimai"
+            FROM public."viesiejiPirkimaiAtnaujinimai"
             WHERE type = 'Pmc'
               AND "turinioNuskaitymas" != -2
               AND (
@@ -362,12 +381,12 @@ export async function processOldestPmcOffHours(options = {}) {
             FOR UPDATE SKIP LOCKED
             LIMIT 1
         )
-        UPDATE public."viesiejiPirkimai" v
+        UPDATE public."viesiejiPirkimaiAtnaujinimai" v
         SET "turinioNuskaitymas" = -2,
             "scrapeReservation" = (now() AT TIME ZONE 'Europe/Vilnius')
         FROM candidate
         WHERE v."pirkimoId" = candidate."pirkimoId"
-        RETURNING v.*;
+        RETURNING v."pirkimoId";
         `,
     );
 

@@ -12,6 +12,7 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "pinregJuridiniaiRysiai", "pinreg",
     "failai",
     "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos", "sabisSaskaituSalys",
+    "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
     "cpvaProjektuSutartys", "cpvaProjektuSarasas",
     "cvppViesiejiPirkimai",
     "eiluciuSkaiciai", "bvpzKodai",

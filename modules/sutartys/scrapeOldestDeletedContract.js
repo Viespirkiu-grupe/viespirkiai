@@ -7,14 +7,16 @@ import { typesense } from "../../typesense/typesense.js";
 export async function cvpIsScrapeOldestDeletedContract() {
     let timings = new Timings();
     timings.start("findOldestScrapedSutartis");
-    let oldestRes = await postgres.query(`SELECT a."sutartiesUnikalusId", a."paskutiniKartaAtnaujinta"
-    FROM public."sutartysAtnaujinimai" a
-    JOIN public."sutartys" s ON s."sutartiesUnikalusId" = a."sutartiesUnikalusId"
-    WHERE s."istrinta" = true
-      AND a."paskutiniKartaAtnaujinta" < (
+    // istrinta denormalizuotas į sutartysAtnaujinimai (sinchronizuoja trigeris),
+    // tad be JOIN – dalinis indeksas sutartysAtnaujinimai_istrinta_atnaujinta_idx
+    // grąžina seniausią ištrintą per vieną indekso įrašą.
+    let oldestRes = await postgres.query(`SELECT "sutartiesUnikalusId", "paskutiniKartaAtnaujinta"
+    FROM public."sutartysAtnaujinimai"
+    WHERE "istrinta"
+      AND "paskutiniKartaAtnaujinta" < (
         timezone('Europe/Vilnius', now()) - INTERVAL '1 hour'
       )
-    ORDER BY a."paskutiniKartaAtnaujinta" ASC NULLS FIRST
+    ORDER BY "paskutiniKartaAtnaujinta" ASC NULLS FIRST
     LIMIT 1;`);
     timings.end("findOldestScrapedSutartis");
 
@@ -44,7 +46,7 @@ export async function cvpIsScrapeOldestDeletedContract() {
             `UPDATE public.sutartys
              SET "istrinta" = false
              WHERE "sutartiesUnikalusId" = $1
-               AND "istrinta" IS DISTINCT FROM false;`,
+               AND "istrinta" IS TRUE;`,
             [id],
         );
     } else if (count == 0) {
