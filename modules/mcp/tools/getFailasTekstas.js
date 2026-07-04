@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { findFailas, checkFailasAccessible } from "../../failai/queries.js";
+import { findFailas, checkFailasAccessible, findArchyvoVaikai } from "../../failai/queries.js";
 import { readTekstasFs } from "../../failai/tekstasFs.js";
 import { parsePgArray } from "../../../postgres/postgres.js";
 
@@ -41,6 +41,21 @@ function parseTekstasPages(rawTekstas) {
     }
 
     return [rawTekstas];
+}
+
+// Kai failas neturi teksto, jis dažnai yra archyvas — nukreipiam AI į vaikinius
+// failus, o ne paliekam aklaviete „Šis failas neturi teksto".
+async function tuscioTekstoPranesimas(failas) {
+    if (failas.parent == null) {
+        const vaikai = await findArchyvoVaikai(failas.id);
+        if (vaikai.length) {
+            const sarasas = vaikai
+                .map((v) => `- ID ${v.id}: ${v.pavadinimas} (${v.zodziuSkaicius ?? 0} žodž.)`)
+                .join("\n");
+            return `Šis failas yra archyvas ir pats teksto neturi. Turinys — vaikiniuose failuose (jau nuskaityti). Iškviesk get_failas su reikiamo ID:\n${sarasas}`;
+        }
+    }
+    return "Šis failas neturi teksto.";
 }
 
 export const name = "get_failas_tekstas";
@@ -85,17 +100,9 @@ export async function handler({
     }
 
     const rawTekstas = failas.tekstasHash ? await readTekstasFs(failas.tekstasHash) : null;
-    if (!rawTekstas) {
-        return {
-            content: [{ type: "text", text: "Šis failas neturi teksto." }],
-        };
-    }
-
-    const pages = parseTekstasPages(rawTekstas);
+    const pages = rawTekstas ? parseTekstasPages(rawTekstas) : [];
     if (!pages.length) {
-        return {
-            content: [{ type: "text", text: "Šis failas neturi teksto." }],
-        };
+        return { content: [{ type: "text", text: await tuscioTekstoPranesimas(failas) }] };
     }
 
     const startIndex = puslapis - 1;

@@ -23,6 +23,24 @@ export async function findFailas({ id, dokId, fileId }) {
     return null;
 }
 
+/**
+ * Grąžina archyvo (zip/7z/rar/adoc) viduje esančius išarchyvuotus failus.
+ * Naudojama, kad AI nesustotų ties „tuščiu" archyvu — realus turinys yra vaikuose.
+ * @param {number|string} parentId - Archyvo (tėvinio) failo ID.
+ */
+export async function findArchyvoVaikai(parentId) {
+    if (parentId == null || isNaN(parentId)) return [];
+    const result = await postgres.query(
+        `SELECT id, pavadinimas, extension, md5,
+                "zodziuSkaicius", "puslapiuSkaicius", nuskaitytas, parsiustas
+         FROM failai
+         WHERE parent = $1
+         ORDER BY pavadinimas ASC`,
+        [parentId],
+    );
+    return result.rows;
+}
+
 export async function getDezeForMd5(md5) {
     const result = await postgres.query(
         `
