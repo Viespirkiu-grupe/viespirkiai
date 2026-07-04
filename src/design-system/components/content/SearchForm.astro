@@ -33,13 +33,15 @@ const hasTitleBadge = Astro.slots.has('title-badge');
 <form method="get" role="search" id="searchForm" class="my-10">
   {hideTitle ? (
     <h1 class="sr-only">{title}</h1>
-  ) : (
+  ) : hasTitleBadge ? (
     <div class="search-title">
-      <h1>
-        {title}{hasTitleSuffix && <slot name="title-suffix" />}
-      </h1>
-      {hasTitleBadge && <slot name="title-badge" />}
+      <h1>{title}{hasTitleSuffix && <slot name="title-suffix" />}</h1>
+      <slot name="title-badge" />
     </div>
+  ) : (
+    <h1>
+      {title}{hasTitleSuffix && <slot name="title-suffix" />}
+    </h1>
   )}
 
   <div class="search-bar">
