@@ -21,6 +21,7 @@ export default [
         name: "dokumentaiQuickwitProcessIndexQueue",
         mode: "asap",
         priority: 5,
+        concurrency: 4,
         cooldown: 30,
         errorCooldown: 30,
         job: processDokumentaiIndexQueue,

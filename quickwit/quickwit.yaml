@@ -1,17 +1,21 @@
 version: 0.8
 
+node_id: quickwit-node-1
+
 rest:
   listen_port: 7280
 
 ingest_api:
-  max_queue_memory_usage: 1GiB
-  max_queue_disk_usage: 4GiB
+  max_queue_memory_usage: 2GiB
+  max_queue_disk_usage: 8GiB
   content_length_limit: 500MiB
   shard_burst_limit: 1500MiB
 
 indexer:
-  split_store_max_num_bytes: 5G
+  merge_concurrency: 8
+  split_store_max_num_bytes: 20G
   max_concurrent_split_uploads: 8
+  cpu_capacity: 8
 
 searcher:
   fast_field_cache_capacity: 4G
