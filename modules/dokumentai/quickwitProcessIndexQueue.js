@@ -82,7 +82,7 @@ export async function processDokumentaiIndexQueue({ shard, shardCount } = {}) {
         if (toDelete.length) {
             await client.query(
                 `DELETE FROM "quickwitEilutes"
-                 WHERE "lentele" = $1 AND "eilutesId" = ANY($2)`,
+                 WHERE "lentele" = $1 AND "eilutesId" = ANY($2::bigint[])`,
                 [LENTELE, toDelete.map(String)],
             );
             logger.log(`deleted ${toDelete.length} from quickwit`);
@@ -148,7 +148,7 @@ export async function processDokumentaiIndexQueue({ shard, shardCount } = {}) {
             if (vanished.length) {
                 await client.query(
                     `DELETE FROM "quickwitEilutes"
-                     WHERE "lentele" = $1 AND "eilutesId" = ANY($2)`,
+                     WHERE "lentele" = $1 AND "eilutesId" = ANY($2::bigint[])`,
                     [LENTELE, vanished],
                 );
                 logger.log(`deleted ${vanished.length} vanished from quickwit`);

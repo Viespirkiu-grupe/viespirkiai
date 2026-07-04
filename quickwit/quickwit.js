@@ -218,7 +218,7 @@ export async function indexDocs(lentele, items, opts = {}) {
     const { rows: existing } = await client.query(
       `SELECT "eilutesId", "indeksas"
        FROM "quickwitEilutes"
-       WHERE "lentele" = $1 AND "eilutesId" = ANY($2)`,
+       WHERE "lentele" = $1 AND "eilutesId" = ANY($2::bigint[])`,
       [lentele, eilutesIds]
     );
     mark("selectExisting", tExisting);
@@ -287,7 +287,7 @@ export async function indexDocs(lentele, items, opts = {}) {
       if (stayed.length) {
         const tStayed = Date.now();
         const vals = stayed
-          .map((_, i) => `($${i * 2 + 1}::text, $${i * 2 + 2}::uuid)`)
+          .map((_, i) => `($${i * 2 + 1}::bigint, $${i * 2 + 2}::uuid)`)
           .join(", ");
         const params = stayed.flatMap((id) => [id, assigned.get(id).quickwitId]);
         await client.query(
@@ -304,7 +304,7 @@ export async function indexDocs(lentele, items, opts = {}) {
       if (moved.length) {
         const tMoved = Date.now();
         const vals = moved
-          .map((_, i) => `($${i * 3 + 1}::text, $${i * 3 + 2}::uuid, $${i * 3 + 3}::text)`)
+          .map((_, i) => `($${i * 3 + 1}::bigint, $${i * 3 + 2}::uuid, $${i * 3 + 3}::text)`)
           .join(", ");
         const params = moved.flatMap((id) => {
           const { quickwitId, indeksas } = assigned.get(id);
@@ -329,7 +329,7 @@ export async function indexDocs(lentele, items, opts = {}) {
     if (toInsert.length) {
       const indeksas = currentShard;
       const vals = toInsert
-        .map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}::uuid)`)
+        .map((_, i) => `($${i * 2 + 1}::bigint, $${i * 2 + 2}::uuid)`)
         .join(", ");
       const params = toInsert.flatMap((id) => [id, assigned.get(id).quickwitId]);
 
