@@ -125,7 +125,11 @@ export async function handler({ id }) {
             await Promise.all(
                 saskaitos.map(async (saskaita) => {
                     const itemRes = await postgres.query(
-                        `SELECT * FROM "sabisSaskaituSalys" WHERE "sfId" = $1`,
+                        `SELECT ss.*, t.tipas, v."veiklosVieta"
+                         FROM "sabisSaskaituSalys" ss
+                         LEFT JOIN "sabisSaskaituSalysTipai" t ON t.id = ss."tipasId"
+                         LEFT JOIN "sabisSaskaituSalysVeiklosVieta" v ON v.id = ss."veiklosVietaId"
+                         WHERE ss."sfId" = $1`,
                         [saskaita.sfId],
                     );
                     saskaita.salys = itemRes.rows;

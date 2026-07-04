@@ -77,7 +77,7 @@ async function loadSabisSutartys(vpId: number) {
     postgres.query(`SELECT * FROM "sabisSaskaitos" WHERE "sutartiesUid" = ANY($1) ORDER BY "israsymoData" DESC NULLS LAST`, [sabis.map((s: any) => s.sutartiesUid)]).then((r: any) => r.rows),
   ]);
   const saskaituSalys = saskaitos.length > 0
-    ? await postgres.query(`SELECT * FROM "sabisSaskaituSalys" WHERE "sfId" = ANY($1)`, [saskaitos.map((sk: any) => sk.sfId)]).then((r: any) => r.rows)
+    ? await postgres.query(`SELECT ss.*, t.tipas, v."veiklosVieta" FROM "sabisSaskaituSalys" ss LEFT JOIN "sabisSaskaituSalysTipai" t ON t.id = ss."tipasId" LEFT JOIN "sabisSaskaituSalysVeiklosVieta" v ON v.id = ss."veiklosVietaId" WHERE ss."sfId" = ANY($1)`, [saskaitos.map((sk: any) => sk.sfId)]).then((r: any) => r.rows)
     : [];
 
   const sutarciuSalysById = groupBy(sutarciuSalys, 'sutartiesId');

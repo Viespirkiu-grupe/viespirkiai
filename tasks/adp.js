@@ -151,6 +151,94 @@ function finansinesAtaskaitosBeforeApply(prefix, mainTable) {
     };
 }
 
+// Normalizuoti string stulpeliai -> lookup lentelių ID (ADP ID neduoda,
+// juos generuojam patys, kaip balansoAtaskaitos pavadinimai).
+const saskaituSalysTipaiCache = new Map();
+const saskaituSalysVeiklosVietaCache = new Map();
+
+async function ensureLookupId(postgres, { table, column, cache }, value) {
+    if (value == null) return null;
+    if (cache.has(value)) return cache.get(value);
+
+    await postgres.query(
+        `INSERT INTO "${table}" ("${column}")
+         VALUES ($1) ON CONFLICT ("${column}") DO NOTHING`,
+        [value],
+    );
+    const { rows } = await postgres.query(
+        `SELECT id FROM "${table}" WHERE "${column}" = $1`,
+        [value],
+    );
+    const id = rows[0]?.id ?? null;
+    cache.set(value, id);
+    return id;
+}
+
+const SASKAITU_TIPAI = {
+    table: "sabisSaskaituSalysTipai",
+    column: "tipas",
+    cache: saskaituSalysTipaiCache,
+};
+const SASKAITU_VEIKLOS_VIETA = {
+    table: "sabisSaskaituSalysVeiklosVieta",
+    column: "veiklosVieta",
+    cache: saskaituSalysVeiklosVietaCache,
+};
+
+// "12345" -> 12345; tuščias / ne skaitmenys -> null
+function toInt(v) {
+    if (v == null || v === "") return null;
+    const n = Number.parseInt(v, 10);
+    return Number.isNaN(n) ? null : n;
+}
+
+async function saskaituSalysBeforeApply({ inserts, patches, postgres }) {
+    // Insert'ai: tipas/veiklosVieta string -> ID, validusJarKodas -> int
+    for (const row of inserts) {
+        row.tipasId = await ensureLookupId(postgres, SASKAITU_TIPAI, row.tipas);
+        row.veiklosVietaId = await ensureLookupId(
+            postgres,
+            SASKAITU_VEIKLOS_VIETA,
+            row.veiklosVieta,
+        );
+        row.validusJarKodas = toInt(row.validusJarKodas);
+        delete row.tipas;
+        delete row.veiklosVieta;
+    }
+
+    // Patch'ai: tipas/veiklos_vieta nėra CONFIG.columns sąraše, tad string -> ID
+    // taikom rankiniu būdu; validus_jar_kodas normalizuojam vietoje, o likusį
+    // UPDATE'ą atlieka generinis applyPatch (validusJarKodas yra columns sąraše).
+    for (const patch of patches) {
+        const set = [];
+        const values = [];
+        if (patch.patch.tipas !== undefined) {
+            set.push(`"tipasId" = $${values.length + 1}`);
+            values.push(await ensureLookupId(postgres, SASKAITU_TIPAI, patch.patch.tipas));
+        }
+        if (patch.patch.veiklos_vieta !== undefined) {
+            set.push(`"veiklosVietaId" = $${values.length + 1}`);
+            values.push(
+                await ensureLookupId(
+                    postgres,
+                    SASKAITU_VEIKLOS_VIETA,
+                    patch.patch.veiklos_vieta,
+                ),
+            );
+        }
+        if (set.length) {
+            values.push(patch._id);
+            await postgres.query(
+                `UPDATE "sabisSaskaituSalys" SET ${set.join(", ")} WHERE "_id" = $${values.length}`,
+                values,
+            );
+        }
+        if (patch.patch.validus_jar_kodas !== undefined) {
+            patch.patch.validus_jar_kodas = toInt(patch.patch.validus_jar_kodas);
+        }
+    }
+}
+
 // All ADP datasets in one place — add/remove datasets here, not as new task objects
 const ADP_DATASETS = [
     {
@@ -158,6 +246,12 @@ const ADP_DATASETS = [
         table: "sabisSaskaituSalys",
         dataset: "datasets/gov/nbfc/viesojo_sektoriaus_saskaitos/SaskaituSalys",
         limit: 1000,
+        columns: [
+            "_id", "_revision", "id", "sfId", "tipasId",
+            "validusAsmensKodas", "validusJarKodas", "kitasKodas", "kitasKodasPaaiskinimas",
+            "pavadinimas", "nePvmMoketojas", "veiklosVietaId", "data",
+        ],
+        beforeApply: saskaituSalysBeforeApply,
         mapping: {
             _id: "_id", _revision: "_revision",
             id: "id", sf_id: "sfId", tipas: "tipas",

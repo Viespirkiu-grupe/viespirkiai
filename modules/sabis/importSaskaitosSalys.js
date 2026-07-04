@@ -8,6 +8,38 @@ const BATCH_SIZE = 1000;
 
 let totalInserted = 0;
 
+// Normalizuoti string stulpeliai -> lookup lentelių ID (ADP ID neduoda,
+// juos generuojam patys). Kiekvienam – atskira lentelė ir cache.
+const tipaiCache = new Map();
+const veiklosVietaCache = new Map();
+
+// Generinis lookup: užtikrina, kad visos reikšmės turėtų ID, ir sudeda į cache.
+async function resolveIds(values, { table, column, cache }) {
+    const unknown = [...new Set(values.filter((v) => v != null && !cache.has(v)))];
+    if (!unknown.length) return;
+
+    const placeholders = unknown.map((_, i) => `($${i + 1})`).join(", ");
+    await postgres.query(
+        `INSERT INTO "${table}" ("${column}")
+         VALUES ${placeholders}
+         ON CONFLICT ("${column}") DO NOTHING`,
+        unknown,
+    );
+
+    const { rows } = await postgres.query(
+        `SELECT id, "${column}" AS val FROM "${table}" WHERE "${column}" = ANY($1)`,
+        [unknown],
+    );
+    for (const row of rows) cache.set(row.val, row.id);
+}
+
+// "12345" -> 12345; tuščias / ne skaitmenys -> null
+function toInt(v) {
+    if (v == null || v === "") return null;
+    const n = Number.parseInt(v, 10);
+    return Number.isNaN(n) ? null : n;
+}
+
 async function fetchPage(pageToken = null) {
     const params = [`limit(${LIMIT})`];
     if (pageToken) params.push(`page("${pageToken}")`);
@@ -21,6 +53,25 @@ async function fetchPage(pageToken = null) {
 async function insertBatch(rows) {
     if (!rows.length) return;
 
+    // tipas (idx 4) -> tipasId
+    await resolveIds(rows.map((r) => r[4]), {
+        table: "sabisSaskaituSalysTipai",
+        column: "tipas",
+        cache: tipaiCache,
+    });
+    for (const r of rows) r[4] = r[4] == null ? null : tipaiCache.get(r[4]);
+
+    // veiklosVieta (idx 11) -> veiklosVietaId
+    await resolveIds(rows.map((r) => r[11]), {
+        table: "sabisSaskaituSalysVeiklosVieta",
+        column: "veiklosVieta",
+        cache: veiklosVietaCache,
+    });
+    for (const r of rows) r[11] = r[11] == null ? null : veiklosVietaCache.get(r[11]);
+
+    // validusJarKodas (idx 6) text -> int
+    for (const r of rows) r[6] = toInt(r[6]);
+
     const placeholders = rows
         .map(
             (_, i) =>
@@ -30,23 +81,23 @@ async function insertBatch(rows) {
 
     const sql = `
         INSERT INTO "sabisSaskaituSalys" (
-            "_id", "_revision", "id", "sfId", "tipas",
+            "_id", "_revision", "id", "sfId", "tipasId",
             "validusAsmensKodas", "validusJarKodas", "kitasKodas", "kitasKodasPaaiskinimas",
-            "pavadinimas", "nePvmMoketojas", "veiklosVieta", "data"
+            "pavadinimas", "nePvmMoketojas", "veiklosVietaId", "data"
         )
         VALUES ${placeholders}
         ON CONFLICT ("_id") DO UPDATE SET
             "_revision" = EXCLUDED."_revision",
             "id" = EXCLUDED."id",
             "sfId" = EXCLUDED."sfId",
-            "tipas" = EXCLUDED."tipas",
+            "tipasId" = EXCLUDED."tipasId",
             "validusAsmensKodas" = EXCLUDED."validusAsmensKodas",
             "validusJarKodas" = EXCLUDED."validusJarKodas",
             "kitasKodas" = EXCLUDED."kitasKodas",
             "kitasKodasPaaiskinimas" = EXCLUDED."kitasKodasPaaiskinimas",
             "pavadinimas" = EXCLUDED."pavadinimas",
             "nePvmMoketojas" = EXCLUDED."nePvmMoketojas",
-            "veiklosVieta" = EXCLUDED."veiklosVieta",
+            "veiklosVietaId" = EXCLUDED."veiklosVietaId",
             "data" = EXCLUDED."data";
     `;
 
