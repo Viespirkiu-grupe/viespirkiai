@@ -47,6 +47,9 @@ async function cvpIsScrapeDay(date = new Date().toISOString().slice(0, 10)) {
 export async function cvpIsScrapeLeastRecentDate() {
     let dateRes = await postgres.query(`SELECT *
     FROM public."sutartysSudarymoDatos"
+    WHERE "scrapeTimestamp" IS NULL OR "scrapeTimestamp" < (
+        timezone('Europe/Vilnius', now()) - INTERVAL '1 day'
+    )
     ORDER BY
         "scrapeTimestamp" ASC NULLS FIRST,
         "count" ASC

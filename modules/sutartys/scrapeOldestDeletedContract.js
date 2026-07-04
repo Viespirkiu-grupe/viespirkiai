@@ -14,7 +14,7 @@ export async function cvpIsScrapeOldestDeletedContract() {
     FROM public."sutartysAtnaujinimai"
     WHERE "istrinta"
       AND "paskutiniKartaAtnaujinta" < (
-        timezone('Europe/Vilnius', now()) - INTERVAL '1 hour'
+        timezone('Europe/Vilnius', now()) - INTERVAL '3 days'
       )
     ORDER BY "paskutiniKartaAtnaujinta" ASC NULLS FIRST
     LIMIT 1;`);
