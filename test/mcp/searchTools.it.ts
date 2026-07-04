@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { handler as searchSutartysHandler } from "../../modules/mcp/tools/searchSutartys.js";
 import { handler as searchJuridiniaiHandler } from "../../modules/mcp/tools/searchJuridiniai.js";
-import { handler as searchFailaiHandler } from "../../modules/mcp/tools/searchFailai.js";
+import { handler as searchDokumentaiHandler } from "../../modules/mcp/tools/searchDokumentai.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyResult = Record<string, any>;
@@ -213,39 +213,54 @@ describe("search_juridiniai", () => {
 });
 
 // ---------------------------------------------------------------------------
-// search_failai
+// search_dokumentai
 // ---------------------------------------------------------------------------
 
-describe("search_failai", () => {
+describe("search_dokumentai", () => {
     it("returns results filtered by extension", async () => {
-        const result = (await searchFailaiHandler({
-            extension: "pdf",
-            limit: 5,
+        const result = (await searchDokumentaiHandler({
+            extension: ["pdf"],
+            mode: "words",
+            sort: "relevance",
             page: 1,
         })) as AnyResult;
 
         const payload = parseResult(result);
-        expect(Array.isArray(payload.results), "results must be array").toBe(true);
-        expect(payload.results.length, "must return at least 1 result").toBeGreaterThan(0);
+        expect(Array.isArray(payload.dokumentai), "dokumentai must be array").toBe(true);
+        expect(payload.dokumentai.length, "must return at least 1 result").toBeGreaterThan(0);
         expect(payload.page).toBe(1);
-        expect(payload.limit).toBe(5);
+        expect(payload).toHaveProperty("totalPages");
 
-        const row = payload.results[0];
+        const row = payload.dokumentai[0];
         expect(row).toHaveProperty("id");
-        // Heavy fields stripped in handler
+        expect(row.pletinys).toBe("pdf");
+        // Heavy fields never leak through the handler.
         expect(row).not.toHaveProperty("tekstas");
         expect(row).not.toHaveProperty("search_index");
     });
 
     it("returns results for a full-text search via Quickwit", async () => {
-        const result = (await searchFailaiHandler({
+        const result = (await searchDokumentaiHandler({
             search: "sutartis",
-            limit: 5,
+            mode: "words",
+            sort: "relevance",
             page: 1,
         })) as AnyResult;
 
         const payload = parseResult(result);
-        expect(Array.isArray(payload.results)).toBe(true);
-        expect(payload.results.length).toBeGreaterThan(0);
+        expect(Array.isArray(payload.dokumentai)).toBe(true);
+        expect(payload.dokumentai.length).toBeGreaterThan(0);
+    });
+
+    it("does not crash on a trailing backslash in phrase mode (Quickwit parse bug)", async () => {
+        const result = (await searchDokumentaiHandler({
+            search: "test\\",
+            mode: "phrase",
+            sort: "relevance",
+            page: 1,
+        })) as AnyResult;
+
+        const payload = parseResult(result);
+        expect(Array.isArray(payload.dokumentai)).toBe(true);
     });
 });

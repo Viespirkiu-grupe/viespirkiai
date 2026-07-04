@@ -8,7 +8,7 @@ import * as getPinregAsmuo from "./tools/getPinregAsmuo.js";
 import * as getPinregJar from "./tools/getPinregJar.js";
 import * as getSutartis from "./tools/getSutartis.js";
 import * as getViesasisPirkimas from "./tools/getViesasisPirkimas.js";
-import * as searchFailai from "./tools/searchFailai.js";
+import * as searchDokumentai from "./tools/searchDokumentai.js";
 import * as searchJuridiniai from "./tools/searchJuridiniai.js";
 import * as searchSutartys from "./tools/searchSutartys.js";
 import * as searchViesiejiPirkimai from "./tools/searchViesiejiPirkimai.js";
@@ -47,7 +47,7 @@ const tools = config.enableExecuteQueryMcpOnly
           getPinregJar,
           getSutartis,
           getViesasisPirkimas,
-          searchFailai,
+          searchDokumentai,
           searchJuridiniai,
           searchSutartys,
           searchViesiejiPirkimai,

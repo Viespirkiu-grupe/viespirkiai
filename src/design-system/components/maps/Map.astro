@@ -116,7 +116,15 @@ const configElementId = `${id}-map-config`;
         });
         if (config.clickUrlTemplate) {
           marker.on('click', () => {
-            window.location.href = resolveTemplate(config.clickUrlTemplate, { lat, lon });
+            // Alongside {lat}/{lon}, expose a small bounding box around the point
+            // so templates can link to bbox-based filters (e.g. /dokumentai area).
+            const d = config.clickBboxDelta ?? 0.01;
+            const round = (n: number) => Number(n.toFixed(6));
+            window.location.href = resolveTemplate(config.clickUrlTemplate, {
+              lat, lon,
+              minLat: round(lat - d), maxLat: round(lat + d),
+              minLon: round(lon - d), maxLon: round(lon + d),
+            });
           });
         }
         marker.addTo(layerGroup);

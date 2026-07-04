@@ -18,7 +18,7 @@ const pageCount = Math.ceil(totalExtensionCount / DEFAULT_LIMIT);
   <main>
     <PageHeader>Dažniausi failų plėtiniai</PageHeader>
     <div class="stack stack-md">
-      <div class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">{(extension as any[]).map((item) => <article class="card card-clickable"><div class="card-body"><h3 class="text-xl font-bold cell-mono mb-3 mt-1"><a href={`/failai?extension=${item.extension}`}>{item.extension || '\u200b'}</a></h3><p class="text-muted text-sm mb-0">{Number(item.count).toLocaleString('lt-LT')} failų</p></div></article>)}</div>
+      <div class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">{(extension as any[]).map((item) => <article class="card card-clickable"><div class="card-body"><h3 class="text-xl font-bold cell-mono mb-3 mt-1"><a href={`/dokumentai?ext=${item.extension}`}>{item.extension || '\u200b'}</a></h3><p class="text-muted text-sm mb-0">{Number(item.count).toLocaleString('lt-LT')} failų</p></div></article>)}</div>
       <Pagination currentPage={page} pageCount={pageCount} queryParams="" />
     </div>
   </main>

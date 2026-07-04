@@ -342,7 +342,10 @@ function buildPartsExcluding(opts: {
   // default below). Without this it would be sent as `"*"`/`(*)` and Quickwit
   // would look for a literal asterisk and match nothing.
   if (textQuery && textQuery !== '*') {
-    const folded = foldLithuanian(textQuery.replace(/"/g, ''));
+    // Escape backslashes so a trailing/embedded `\` can't escape the wrapping
+    // quote (phrase) or paren (words) and break Quickwit's query parser
+    // (e.g. `test\` → `"test\"` used to fail with a parse error).
+    const folded = foldLithuanian(textQuery.replace(/"/g, '')).replace(/\\/g, '\\\\');
     p.push(opts.phrase ? `"${folded}"` : `(${folded})`);
   }
   return p.join(' AND ') || '*';
