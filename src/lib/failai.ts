@@ -1,5 +1,4 @@
 import { postgres } from '@/postgres/postgres.js';
-import { searchFailai, countFailai } from '@/modules/failai/searchFailai.js';
 import { OCR_STATES } from '@/modules/failai/ocr.js';
 
 export const DEFAULT_LIMIT = 25;
@@ -129,4 +128,4 @@ export function processSearchResults(rows: any[], searchTerm: string) {
   });
 }
 
-export { postgres, searchFailai, countFailai, OCR_STATES };
+export { postgres, OCR_STATES };

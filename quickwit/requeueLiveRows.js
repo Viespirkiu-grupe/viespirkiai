@@ -4,7 +4,6 @@ import { postgres } from "../postgres/postgres.js";
 
 const TABLES = {
   dokumentai: { queue: "dokumentaiIndexQueue", queueId: "dokumentoId", source: "dokumentai" },
-  failai: { queue: "failaiIndexQueue", queueId: "failoId", source: "failai" },
 };
 
 const HELP = `Perkelia pasirinktų Quickwit indeksų gyvas eilutes į indeksavimo eilę.
@@ -18,7 +17,7 @@ Pasirinkimas:
   --top-ratio N       N indeksų, turinčių didžiausią mirusių eilučių procentą
   --all               visi filtrus atitinkantys indeksai
   --list              tik parodyti indeksus
-  --lentele PAV       dokumentai (numatyta) arba failai
+  --lentele PAV       dokumentai (numatyta)
   --min-dead N        tik turintys bent N mirusių eilučių
   --min-dead-ratio N  tik turintys bent N% mirusių eilučių
 
