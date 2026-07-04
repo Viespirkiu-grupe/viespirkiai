@@ -77,6 +77,25 @@ async function upsertCFTS(cfts) {
     `;
 
     await postgres.query(query, values);
+
+    // Nuskaitymo/rezervacijos metaduomenys gyvena plonojoje "viesiejiPirkimaiAtnaujinimai"
+    // lentelėje. Naujiems pirkimams sukuriame eilutę (turinioNuskaitymas lieka NULL, tad
+    // pateks į skaitymo eilę); esamiems tik atnaujiname denormalizuotą type, nepaliesdami
+    // skaitymo būsenos.
+    const atnValues = [];
+    const atnPlaceholders = cfts.map((cft, idx) => {
+        atnValues.push(cft.pirkimoId, cft.type);
+        const offset = idx * 2;
+        return `($${offset + 1}, $${offset + 2})`;
+    });
+    await postgres.query(
+        `
+        INSERT INTO public."viesiejiPirkimaiAtnaujinimai" ("pirkimoId", "type")
+        VALUES ${atnPlaceholders.join(", ")}
+        ON CONFLICT ("pirkimoId") DO UPDATE SET "type" = EXCLUDED."type";
+        `,
+        atnValues,
+    );
 }
 
 /**

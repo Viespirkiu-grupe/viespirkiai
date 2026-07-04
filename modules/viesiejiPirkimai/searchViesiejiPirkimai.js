@@ -77,11 +77,6 @@ const viesiejiPirkimaiFilter = new FilterBuilder({
             pgOnly: true,
         },
         {
-            key: "turinioNuskaitymas",
-            type: "integer",
-            hidden: true,
-        },
-        {
             key: "bvpzPrefiksai",
             hidden: true,
             pgOverride: (addParam, val) => {
