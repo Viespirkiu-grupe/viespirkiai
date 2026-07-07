@@ -275,7 +275,10 @@ if (
     let stopping = false;
     const wakeups = new Set(); // pertraukiam laukiančius retry `sleep`'us
     const requestStop = (sig) => {
-        if (stopping) return;
+        if (stopping) {
+            logger.log(`gauta ${sig} dar kartą, išeiname iš karto`);
+            process.exit(130);
+        }
         stopping = true;
         logger.log(`gauta ${sig}, baigiame dabartinį darbą ir išeisime...`);
         for (const resolve of wakeups) resolve();

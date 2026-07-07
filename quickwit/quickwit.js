@@ -5,6 +5,7 @@ const logger = new Logger();
 import { uuidv7 } from "../utils/uuid.js";
 
 const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
+const QW_TIMEOUT_MS = config.quickwitTimeoutMs ?? 120_000;
 
 // ── Dead-ratio cache ─────────────────────────────────────────────────────────
 // The ratio mirusios/(gyvos+mirusios) is only used to decide how many hits to
@@ -36,7 +37,9 @@ export async function getDeadRatio(lentele) {
 // ── Quickwit HTTP helpers ────────────────────────────────────────────────────
 
 async function qwGet(path) {
-  const res = await fetch(`${QW_URL}${path}`);
+  const res = await fetch(`${QW_URL}${path}`, {
+    signal: AbortSignal.timeout(QW_TIMEOUT_MS),
+  });
   if (!res.ok) throw new Error(`Quickwit GET ${path} → ${res.status}`);
   return res.json();
 }
@@ -46,6 +49,7 @@ async function qwCreateIndex(yaml) {
     method: "POST",
     headers: { "Content-Type": "application/yaml" },
     body: yaml,
+    signal: AbortSignal.timeout(QW_TIMEOUT_MS),
   });
   if (!res.ok)
     throw new Error(`Quickwit create index → ${res.status}: ${await res.text()}`);
@@ -59,10 +63,17 @@ async function qwIngestNdjson(indeksas, docs, commit = "auto") {
     method: "POST",
     headers: { "Content-Type": "application/x-ndjson" },
     body,
+    signal: AbortSignal.timeout(QW_TIMEOUT_MS),
   });
   if (!res.ok)
     throw new Error(`Quickwit ingest ${indeksas} → ${res.status}: ${await res.text()}`);
-  return res.json();
+  const result = await res.json();
+  if (result.num_rejected_docs) {
+    throw new Error(
+      `Quickwit ingest ${indeksas} rejected ${result.num_rejected_docs}/${result.num_docs_for_processing} docs`,
+    );
+  }
+  return result;
 }
 
 async function qwSearch(indeksas, params) {
@@ -70,6 +81,7 @@ async function qwSearch(indeksas, params) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
+    signal: AbortSignal.timeout(QW_TIMEOUT_MS),
   });
   const text = await res.text();
   const parsed = JSON.parse(text);

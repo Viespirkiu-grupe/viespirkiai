@@ -4,6 +4,7 @@ import { cvpIsScrapeOldestContract } from "../modules/sutartys/scrapeOldestContr
 import { cvpIsScrapeOldestDeletedContract } from "../modules/sutartys/scrapeOldestDeletedContract.js";
 import { cvpIsRequestLatest } from "../modules/sutartys/scrape.js";
 import { processSutartysAdpQueue } from "../modules/sutartys/processAdpQueue.js";
+import { processSutartysIndexQueue } from "../modules/sutartys/quickwitProcessIndexQueue.js";
 
 export default [
     {
@@ -56,5 +57,14 @@ export default [
         cooldown: 30,
         errorCooldown: 60,
         job: processSutartysAdpQueue,
+    },
+    {
+        name: "sutartysQuickwitProcessIndexQueue",
+        mode: "asap",
+        priority: 5,
+        concurrency: 2,
+        cooldown: 30,
+        errorCooldown: 30,
+        job: processSutartysIndexQueue,
     },
 ];

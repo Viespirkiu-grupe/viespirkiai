@@ -3,7 +3,13 @@ import { pathToFileURL } from "node:url";
 import { postgres } from "../postgres/postgres.js";
 
 const TABLES = {
-  dokumentai: { queue: "dokumentaiIndexQueue", queueId: "dokumentoId", source: "dokumentai" },
+  dokumentai: { queue: "dokumentaiIndexQueue", queueId: "dokumentoId", source: "dokumentai", sourceId: "id" },
+  sutartys: {
+    queue: "sutartysIndexQueue",
+    queueId: "sutartiesUnikalusId",
+    source: "sutartys",
+    sourceId: "sutartiesUnikalusId",
+  },
 };
 
 const HELP = `Perkelia pasirinktų Quickwit indeksų gyvas eilutes į indeksavimo eilę.
@@ -17,7 +23,7 @@ Pasirinkimas:
   --top-ratio N       N indeksų, turinčių didžiausią mirusių eilučių procentą
   --all               visi filtrus atitinkantys indeksai
   --list              tik parodyti indeksus
-  --lentele PAV       dokumentai (numatyta)
+  --lentele PAV       dokumentai arba sutartys (numatyta dokumentai)
   --min-dead N        tik turintys bent N mirusių eilučių
   --min-dead-ratio N  tik turintys bent N% mirusių eilučių
 
@@ -188,7 +194,7 @@ async function requeueIndexes(indexes, { dryRun, lentele }) {
       `INSERT INTO "${table.queue}" ("${table.queueId}", "keitimas")
        SELECT e."eilutesId"::bigint, 'patch'
        FROM "quickwitEilutes" e
-       JOIN "${table.source}" s ON s.id = e."eilutesId"::bigint
+       JOIN "${table.source}" s ON s."${table.sourceId}" = e."eilutesId"::bigint
        WHERE e."lentele" = $1 AND e."indeksas" = ANY($2::text[])`,
       [lentele, names],
     );
@@ -196,8 +202,8 @@ async function requeueIndexes(indexes, { dryRun, lentele }) {
       `INSERT INTO "${table.queue}" ("${table.queueId}", "keitimas")
        SELECT e."eilutesId"::bigint, 'delete'
        FROM "quickwitEilutes" e
-       LEFT JOIN "${table.source}" s ON s.id = e."eilutesId"::bigint
-       WHERE e."lentele" = $1 AND e."indeksas" = ANY($2::text[]) AND s.id IS NULL`,
+       LEFT JOIN "${table.source}" s ON s."${table.sourceId}" = e."eilutesId"::bigint
+       WHERE e."lentele" = $1 AND e."indeksas" = ANY($2::text[]) AND s."${table.sourceId}" IS NULL`,
       [lentele, names],
     );
     await client.query("COMMIT");

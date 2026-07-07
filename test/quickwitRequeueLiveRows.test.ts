@@ -14,6 +14,13 @@ describe("requeueLiveRows CLI", () => {
     });
   });
 
+  it("accepts sutartys as a table", () => {
+    expect(parseArgs(["--lentele", "sutartys", "--top-ratio", "2"])).toMatchObject({
+      lentele: "sutartys",
+      topRatio: 2,
+    });
+  });
+
   it("rejects conflicting selectors", () => {
     expect(() => parseArgs(["dokumentai_2", "--top", "2"])).toThrow(/tik vieną pasirinkimo būdą/);
   });
