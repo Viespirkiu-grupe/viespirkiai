@@ -28,10 +28,10 @@ const rows = [
 ];
 
 describe("sutarčių analizės eksportas", () => {
-    it("leidžia eksportuoti iki 50 000 sutarčių imtinai", () => {
-        expect(XLSX_EXPORT_LIMIT).toBe(50_000);
-        expect(canExportAnalizeXlsx(50_000)).toBe(true);
-        expect(canExportAnalizeXlsx(50_001)).toBe(false);
+    it("leidžia eksportuoti iki 20 000 sutarčių imtinai", () => {
+        expect(XLSX_EXPORT_LIMIT).toBe(20_000);
+        expect(canExportAnalizeXlsx(20_000)).toBe(true);
+        expect(canExportAnalizeXlsx(20_001)).toBe(false);
         expect(canExportAnalizeXlsx(-1)).toBe(false);
     });
 
@@ -49,7 +49,11 @@ describe("sutarčių analizės eksportas", () => {
         expect(workbook).toContain('name="Sutartys"');
         expect(workbook).toContain('name="BVPŽ"');
         expect(zip.readAsText("xl/worksheets/sheet2.xml")).toContain("Testas &amp; patikra");
-        expect(zip.getEntry("xl/charts/chart1.xml")).toBeTruthy();
+        // Diagramos pašalintos — jokių chart/drawing dalių ar nuorodų į jas.
+        expect(zip.getEntry("xl/charts/chart1.xml")).toBeFalsy();
+        expect(zip.getEntry("xl/drawings/drawing1.xml")).toBeFalsy();
+        expect(zip.readAsText("[Content_Types].xml")).not.toMatch(/chart|drawing/i);
+        expect(zip.readAsText("xl/worksheets/sheet1.xml")).not.toContain("<drawing");
     });
 
     it("neįtraukia SP pakeitimų į analizės sumas", () => {

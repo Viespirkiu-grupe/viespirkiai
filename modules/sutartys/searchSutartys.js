@@ -1,11 +1,11 @@
-import { getDeadRatio, search as quickwitSearch } from "../../quickwit/quickwit.js";
+import { getDeadRatio, search as quickwitSearch, searchAll as quickwitSearchAll, countDocs as quickwitCountDocs } from "../../quickwit/quickwit.js";
 import { specialJarCodes } from "../juridiniai/specialJarCodes.js";
 import { searchJar } from "../juridiniai/search.js";
 import config from "../../utils/config.js";
 import { postgres } from "../../postgres/postgres.js";
 import { FilterBuilder } from "../../utils/filter.js";
 import { fixHtmlEntities } from "../../utils/fixHtmlEntities.js";
-import { Transform } from "node:stream";
+import { Transform, Readable } from "node:stream";
 import { CONTRACT_TYPES } from "./contractTypes.js";
 import QueryStream from "pg-query-stream";
 
@@ -161,6 +161,10 @@ const SUTARTYS_FROM = `sutartys LEFT JOIN "sutartysAtnaujinimai" USING ("sutarti
 
 const QUICKWIT_LENTELE = "sutartys";
 const QUICKWIT_PAGE_SIZE = 50;
+// Viršutinė riba eksportams (CSV/JSONL/XLSX) per Quickwit. Quickwit 0.8 leidžia
+// pasiekti nebent 20 000 įrašų (max_hits + start_offset ribos, žr. searchAll),
+// tad tiek daugiausiai ir surenkam.
+const QUICKWIT_EXPORT_LIMIT = 20_000;
 
 // Tekstinei paieškai skenuojami keli tekstiniai (tokenizuoti) laukai — ne vien
 // `tekstas` (default_search_fields), kad sutaptų ir pavadinimas, tiekėjas ir kt.
@@ -885,6 +889,41 @@ export async function searchSutartys(
         };
     }
 
+    // Eksportai (stream) su Quickwit varikliu: atrenkam atitinkančius įrašus per
+    // Quickwit (kaip ir ekrane — su prefiksais/wildcard'ais), tada pilnas eilutes
+    // užkraunam iš Postgres išsaugant Quickwit tvarką. Kitaip eksportas eitų per
+    // Postgres pilnatekstę paiešką (`plainto_tsquery`), kuri `brok*` traktuoja kaip
+    // tikslų leksemą ir grąžina kitą (dažnai tuščią) rinkinį nei rodoma ekrane.
+    if (engine === "quickwit" && stream) {
+        const { values, queryParams } = sutartysFilter.build(query);
+        const qwQuery = buildSutartysQuickwitQuery(query);
+        const effLimit = limit ?? QUICKWIT_EXPORT_LIMIT;
+
+        // Eksportui puslapiuojam per Quickwit po 10 000 (max_hits riba) kol
+        // surenkam iki `effLimit` gyvų įrašų arba baigiasi indeksas.
+        const result = await quickwitSearchAll(
+            QUICKWIT_LENTELE,
+            { query: qwQuery, sort_by: quickwitSortBy(query) },
+            { limit: effLimit },
+        );
+        const hits = result.hits;
+        const rows = await loadSearchRowsFromPostgres(
+            hits.map((h) => ({ id: h.sutartiesUnikalusId })),
+        );
+
+        return {
+            results: [],
+            total: null,
+            sutarciuKiekis: null,
+            bendraVerte: null,
+            values,
+            queryParams,
+            timings: [],
+            stream: Readable.from(rows.map(aptvarkytiRezultata), { objectMode: true }),
+            client: null,
+        };
+    }
+
     const { sql, sqlCount, params, paramsCount, values, queryParams } =
         sutartysFilter.build(query, {
             table: SUTARTYS_FROM,
@@ -984,6 +1023,19 @@ export async function countSutartys(query) {
 
     const { rows } = await postgres.query(sqlCount, params);
     return parseInt(rows[0].count, 10);
+}
+
+/**
+ * Įvertintas atitinkančių gyvų sutarčių skaičius per Quickwit — atspindi tą patį
+ * rinkinį kaip ekrane (su prefiksais/wildcard'ais), skirtingai nei Postgres
+ * `countSutartys`. Naudojama eksporto ribų tikrinimui, kai variklis — Quickwit.
+ * @param {object} query
+ * @returns {Promise<number>}
+ */
+export async function countSutartysQuickwit(query) {
+    return quickwitCountDocs(QUICKWIT_LENTELE, {
+        query: buildSutartysQuickwitQuery(query),
+    });
 }
 
 /**

@@ -1,0 +1,493 @@
+---
+// Bendras BVPŽ „Daugiau" dialogas su dviem skiltimis (tab):
+//   1) Dažniausiai pasitaikę — facetų kodų sąrašas (laukas bvpzKodai) su paieška/įvedimu.
+//   2) Visas medis — pilnas CPV medis (BvpzPicker).
+// Abi skiltys dalinasi ta pačia pažymėtų kodų aibe; „Pritaikyti" įrašo `param`
+// (tarpais atskirti prefiksai). Medis yra „tiesos šaltinis", kai jame dirbama;
+// facetų skiltis atnaujina tą pačią aibę.
+//
+// Vienas komponentas, parametrizuotas per props — naudoja ir /sutartys
+// (bvpzPrefiksasKitas + paslėptas bvpzPrefiksas), ir /viesiejiPirkimai
+// (bvpzPrefiksai). Konfigūracija į bundlinamą skriptą perduodama per data-*
+// atributus, nes į modulinį `<script>` Astro props tiesiogiai neįterpiami.
+import Modal from '@design-system/components/Modal.astro';
+import BvpzPicker from './BvpzPicker.astro';
+import '@design-system/foundation/facet-modal.css';
+
+interface Preset { label: string; codes: string; }
+
+interface Props {
+  /** Modalo elemento id (pvz. „sutBvpzModal"). */
+  modalId: string;
+  /** BvpzPicker instanceId (pvz. „sutBvpzTree"). */
+  instanceId: string;
+  /** URL parametras, į kurį įrašomi prefiksai (pvz. „bvpzPrefiksasKitas"). */
+  param: string;
+  /** Papildomas paslėptas laukas, dalinantis reikšmę su `param` — išvalomas kartu. */
+  hiddenParam?: string;
+  /** Kur nukreipti pritaikius (pvz. „/" ar „/viesiejiPirkimai/"). */
+  redirectBase: string;
+  /** Facetų API kelias (pvz. „/api/sutartysFacet"). */
+  facetEndpoint: string;
+  /** Selektorius „Daugiau" mygtukams šoninėje juostoje. */
+  facetTriggerSelector: string;
+  /** Greiti pasirinkimai medžio skiltyje. Numatytieji — bendri visiems puslapiams. */
+  presets?: Preset[];
+}
+
+// Bendri greiti pasirinkimai („Visas medis" skiltyje) — tie patys kaip /bvpz;
+// vienodi visuose puslapiuose (sutartys, viešieji pirkimai).
+const DEFAULT_PRESETS: Preset[] = [
+  { label: 'Informacinės technologijos', codes: '48 72' },
+  { label: 'Vaistai', codes: '3360 3361 3362 3363 3364 3365 3366 3367 33690 33691' },
+  { label: 'Draudimas', codes: '665 667' },
+  { label: 'Draudimo brokeriai', codes: '66518' },
+];
+
+const {
+  modalId,
+  instanceId,
+  param,
+  hiddenParam = '',
+  redirectBase,
+  facetEndpoint,
+  facetTriggerSelector,
+  presets = DEFAULT_PRESETS,
+} = Astro.props;
+---
+
+<Modal id={modalId} title="BVPŽ klasifikacija" className="sut-bvpz-modal">
+  <div
+    class="bvpz-facet-tree"
+    data-bvpz-facet-tree
+    data-modal-id={modalId}
+    data-instance-id={instanceId}
+    data-param={param}
+    data-hidden-param={hiddenParam}
+    data-redirect-base={redirectBase}
+    data-facet-endpoint={facetEndpoint}
+    data-facet-trigger={facetTriggerSelector}
+  >
+    <div class="sut-bvpz-tabs" role="tablist">
+      <button type="button" class="sut-bvpz-tab is-active" data-tab="facets" role="tab" aria-selected="true">Dažniausiai pasitaikę</button>
+      <button type="button" class="sut-bvpz-tab" data-tab="tree" role="tab" aria-selected="false">Visas medis</button>
+    </div>
+
+    <div class="sut-bvpz-panel" data-panel="facets" role="tabpanel">
+      <input type="search" class="dok-facet-modal__search" placeholder="Filtruoti pagal kodą ar pavadinimą…" aria-label="Filtruoti BVPŽ kodus" autocomplete="off" />
+      <div class="dok-facet-modal__list dok-facet-modal__list--stack" role="listbox" aria-multiselectable="true"></div>
+    </div>
+
+    <div class="sut-bvpz-panel" data-panel="tree" role="tabpanel" hidden>
+      <BvpzPicker
+        presets={presets}
+        showPresets={true}
+        showManualInput={false}
+        actionBarMode="attached"
+        instanceId={instanceId}
+        autoLoad={false}
+      />
+    </div>
+  </div>
+
+  <Fragment slot="footer">
+    <input
+      type="text"
+      class="ds-modal__prefixes"
+      inputmode="numeric"
+      autocomplete="off"
+      placeholder="BVPŽ prefiksai (pvz. 48 72 3360)"
+      aria-label="Pasirinkti BVPŽ prefiksai"
+    />
+    <span class="ds-modal__actions">
+      <button type="button" class="btn btn-outline btn-sm" data-bvpz-modal-clear>Išvalyti</button>
+      <button type="button" class="btn btn-primary btn-sm" data-bvpz-modal-apply>Pritaikyti</button>
+    </span>
+  </Fragment>
+</Modal>
+
+<script>
+  import { openModal, closeModal } from '@design-system/components/modal.ts';
+  import { isMobileFilter, writeParam, readParam } from '@/src/lib/mobileFilterBatch';
+
+  type Option = { value: string; count: number | null; label?: string };
+
+  function initBvpzFacetTreeModal(cfg: HTMLElement) {
+    const modalId = cfg.dataset.modalId!;
+    const instanceId = cfg.dataset.instanceId!;
+    const PARAM = cfg.dataset.param!;
+    const HIDDEN_PARAM = cfg.dataset.hiddenParam || '';
+    const REDIRECT_BASE = cfg.dataset.redirectBase || '/';
+    const FACET_ENDPOINT = cfg.dataset.facetEndpoint!;
+    const FACET_TRIGGER = cfg.dataset.facetTrigger!;
+
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+
+    const searchEl = modal.querySelector<HTMLInputElement>('.dok-facet-modal__search')!;
+    const listEl = modal.querySelector<HTMLElement>('.dok-facet-modal__list')!;
+    const prefixInput = modal.querySelector<HTMLInputElement>('.ds-modal__prefixes')!;
+    const tabs = [...modal.querySelectorAll<HTMLButtonElement>('.sut-bvpz-tab')];
+    const panels = [...modal.querySelectorAll<HTMLElement>('.sut-bvpz-panel')];
+    const pickerRoot = document.getElementById(`${instanceId}-root`);
+    const pickerCodesEl = document.getElementById(`${instanceId}-selected-codes`) as HTMLInputElement | null;
+
+    let selected = new Set<string>();
+    let options: Option[] = [];
+    let activeTab = 'facets';
+    let reqSeq = 0;
+    let searchTimer = 0;
+
+    const normalize = (v: string) => Array.from(new Set(String(v || '').match(/\d{2,9}/g) || []));
+    const getList = (p: string) => normalize(new URLSearchParams(location.search).get(p) || '');
+    const getPickerCodes = () => normalize(pickerCodesEl?.value || '');
+    const pushPicker = (list: string[]) =>
+      pickerRoot?.dispatchEvent(new CustomEvent('bvpz:setCodes', { detail: { codes: list.join(' ') } }));
+
+    const commit = (list: string[]) => {
+      // Telefone — sukaupiam į formą ir uždarom (be perkrovimo); pritaikoma per „Ieškoti".
+      if (isMobileFilter()) {
+        writeParam(PARAM, list, ' ');
+        if (HIDDEN_PARAM) writeParam(HIDDEN_PARAM, [], ' '); // paslėptas laukas dalinasi reikšme
+        closeModal(modal!);
+        return;
+      }
+      const p = new URLSearchParams(location.search);
+      if (list.length) p.set(PARAM, list.join(' '));
+      else p.delete(PARAM);
+      if (HIDDEN_PARAM) p.delete(HIDDEN_PARAM); // paslėptas laukas dalinasi reikšme
+      p.delete('page');
+      location.href = REDIRECT_BASE + '?' + p.toString();
+    };
+
+    // Apačios laukelis visada atspindi dabartinę pažymėtų prefiksų aibę.
+    function updateCount() {
+      prefixInput.value = [...selected].join(' ');
+    }
+
+    function toggle(value: string, row?: HTMLElement) {
+      if (selected.has(value)) selected.delete(value);
+      else selected.add(value);
+      const on = selected.has(value);
+      row?.classList.toggle('is-selected', on);
+      row?.setAttribute('aria-selected', String(on));
+      updateCount();
+    }
+
+    function makeRow(o: Option) {
+      const on = selected.has(o.value);
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'dok-facet-row' + (o.label ? ' dok-facet-row--stack' : '') + (on ? ' is-selected' : '');
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(on));
+      if (o.label) row.title = `${o.label} (${o.value})`;
+      const text = document.createElement('span');
+      text.className = 'dok-facet-row__text';
+      const label = document.createElement('span');
+      label.className = 'dok-facet-row__label';
+      label.textContent = o.label || o.value;
+      text.appendChild(label);
+      if (o.label) {
+        const sub = document.createElement('span');
+        sub.className = 'dok-facet-row__sub';
+        sub.textContent = o.value;
+        text.appendChild(sub);
+      }
+      row.appendChild(text);
+      if (o.count != null) {
+        const cnt = document.createElement('span');
+        cnt.className = 'dok-facet-row__count';
+        cnt.textContent = Number(o.count).toLocaleString('lt-LT');
+        row.appendChild(cnt);
+      }
+      row.addEventListener('click', () => toggle(o.value, row));
+      return row;
+    }
+
+    function render() {
+      const needle = searchEl.value.trim().toLowerCase();
+      const typed = searchEl.value.trim();
+      const listedValues = new Set(options.map((o) => o.value));
+      const pinned = [...selected]
+        .filter((v) => !listedValues.has(v))
+        .map((v) => ({ value: v, count: null as number | null, label: undefined as string | undefined }));
+      const rows = [...pinned, ...options].filter(
+        (o) => !needle || o.value.toLowerCase().includes(needle) || (o.label?.toLowerCase().includes(needle) ?? false),
+      );
+
+      listEl.textContent = '';
+      const frag = document.createDocumentFragment();
+
+      const canAdd = /^\d{2,9}$/.test(typed) && !listedValues.has(typed) && !selected.has(typed);
+      if (canAdd) {
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'dok-facet-row dok-facet-row--add';
+        const label = document.createElement('span');
+        label.className = 'dok-facet-row__label';
+        label.textContent = `Pridėti „${typed}“`;
+        add.appendChild(label);
+        add.addEventListener('click', () => {
+          selected.add(typed);
+          searchEl.value = '';
+          updateCount();
+          render();
+        });
+        frag.appendChild(add);
+      }
+
+      for (const o of rows) frag.appendChild(makeRow(o));
+      listEl.appendChild(frag);
+
+      if (!rows.length && !canAdd) {
+        const empty = document.createElement('p');
+        empty.className = 'dok-facet-modal__empty';
+        empty.textContent = 'Nieko nerasta.';
+        listEl.appendChild(empty);
+      }
+    }
+
+    async function load(optionSearch = '') {
+      const mySeq = ++reqSeq;
+      listEl.innerHTML = '<div class="dok-facet-modal__loading"><span class="spinner spinner-lg"></span></div>';
+      const qs = new URLSearchParams(location.search);
+      qs.set('field', 'bvpzKodai');
+      if (optionSearch) qs.set('optionSearch', optionSearch);
+      qs.delete('page');
+      try {
+        const res = await fetch(`${FACET_ENDPOINT}?${qs.toString()}`);
+        const data = res.ok ? await res.json() : { options: [] };
+        if (mySeq !== reqSeq) return;
+        options = Array.isArray(data.options) ? data.options : [];
+      } catch {
+        if (mySeq !== reqSeq) return;
+        options = [];
+      }
+      render();
+    }
+
+    function switchTab(tab: string) {
+      if (tab === activeTab) return;
+      // Išeinant iš medžio — pasiimam naujausią jo atranką.
+      if (activeTab === 'tree') selected = new Set(getPickerCodes());
+      activeTab = tab;
+      for (const t of tabs) {
+        const on = t.dataset.tab === tab;
+        t.classList.toggle('is-active', on);
+        t.setAttribute('aria-selected', String(on));
+      }
+      for (const p of panels) p.hidden = p.dataset.panel !== tab;
+      if (tab === 'tree') pushPicker([...selected]);
+      else render();
+      updateCount();
+    }
+
+    let treeRequested = false;
+    function open() {
+      // Reopening should preserve the current draft in the footer field.
+      // If it is empty, fall back to the persisted URL state.
+      const draft = normalize(prefixInput.value);
+      const current = draft.length ? draft : (isMobileFilter() ? normalize(readParam(PARAM, ' ').join(' ')) : getList(PARAM));
+      selected = new Set(current);
+      searchEl.value = '';
+      updateCount();
+      render();
+      // Medį užkraunam tingiai (860 KB JSON) — tik pirmą kartą atvėrus dialogą.
+      if (!treeRequested) {
+        treeRequested = true;
+        pushPicker([...selected]);
+        pickerRoot?.dispatchEvent(new Event('bvpz:load'));
+      } else {
+        pushPicker([...selected]);
+      }
+      openModal(modal!);
+      if (activeTab === 'facets') searchEl.focus();
+      load();
+    }
+
+    // Medžio pakeitimai (varnelės arba prefiksų laukas) → atnaujinam bendrą aibę.
+    pickerRoot?.addEventListener('change', (e) => {
+      const t = e.target as HTMLElement;
+      if (t && (t.matches('input[type="checkbox"]') || t.matches('.action-bar-input'))) {
+        selected = new Set(getPickerCodes());
+        updateCount();
+      }
+    });
+
+    pickerRoot?.addEventListener('bvpz:codeschange', () => {
+      selected = new Set(getPickerCodes());
+      updateCount();
+      if (activeTab === 'facets') render();
+    });
+
+    // Vartotojas gali įrašyti prefiksus tiesiai apačios laukelyje. Rašant —
+    // atnaujinam aibę ir facetų sąrašą; Enter/palikus lauką — sinchronizuojam
+    // medį. Rašymo metu updateCount() nekviečiam, kad neperrašytų žymeklio.
+    prefixInput.addEventListener('input', () => {
+      selected = new Set(normalize(prefixInput.value));
+      if (activeTab === 'facets') render();
+    });
+    const syncPrefixInput = () => {
+      selected = new Set(normalize(prefixInput.value));
+      if (activeTab === 'tree') pushPicker([...selected]);
+      else render();
+    };
+    prefixInput.addEventListener('change', syncPrefixInput);
+    prefixInput.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      syncPrefixInput();
+    });
+
+    tabs.forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab || 'facets')));
+
+    // „Daugiau" mygtukas šoninėje juostoje (tik BVPŽ facetas).
+    document.querySelectorAll<HTMLButtonElement>(FACET_TRIGGER).forEach((btn) => {
+      btn.addEventListener('click', () => open());
+    });
+
+    searchEl.addEventListener('input', () => {
+      render();
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => load(searchEl.value.trim()), 250);
+    });
+    searchEl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const typed = searchEl.value.trim();
+      if (!/^\d{2,9}$/.test(typed)) return;
+      if (options.some((o) => o.value === typed)) toggle(typed);
+      else selected.add(typed);
+      searchEl.value = '';
+      updateCount();
+      render();
+    });
+
+    modal.querySelector('[data-bvpz-modal-clear]')?.addEventListener('click', () => {
+      selected.clear();
+      pushPicker([]);
+      render();
+      updateCount();
+    });
+    modal.querySelector('[data-bvpz-modal-apply]')?.addEventListener('click', () => {
+      if (activeTab === 'tree') selected = new Set(getPickerCodes());
+      commit([...selected]);
+      closeModal(modal!);
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-bvpz-facet-tree]').forEach(initBvpzFacetTreeModal);
+</script>
+
+<style is:global>
+  .sut-bvpz-modal .sut-bvpz-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 10px max(20px, calc((100% - 1080px) / 2)) 0;
+  }
+  .sut-bvpz-modal .sut-bvpz-tab {
+    padding: 8px 14px;
+    border: none;
+    background: none;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--gray);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+  }
+  .sut-bvpz-modal .sut-bvpz-tab:hover { color: var(--black); }
+  .sut-bvpz-modal .sut-bvpz-tab.is-active {
+    color: var(--black);
+    border-bottom-color: var(--black);
+  }
+
+  /* Apačios prefiksų laukelis — redaguojamas, rodo dabar pasirinktus prefiksus. */
+  .sut-bvpz-modal .ds-modal__prefixes {
+    flex: 1;
+    min-width: 0;
+    max-width: 480px;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    padding: 7px 10px;
+    color: var(--black);
+    background: var(--white);
+    border: var(--border);
+    border-radius: var(--radius-md);
+  }
+  .sut-bvpz-modal .ds-modal__prefixes:focus-within { outline: var(--border-focus); }
+  .sut-bvpz-modal .ds-modal__prefixes::placeholder {
+    font-family: var(--font-sans, inherit);
+    color: var(--gray);
+  }
+
+  /* Wrapper užpildo modalo kūną, kad skiltys galėtų slinkti viduje. */
+  .sut-bvpz-modal .bvpz-facet-tree {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Skiltys užpildo likusį aukštį ir slenka viduje. */
+  .sut-bvpz-modal .sut-bvpz-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sut-bvpz-modal .sut-bvpz-panel[data-panel="facets"] {
+    padding: 12px max(20px, calc((100% - 1080px) / 2)) 0;
+  }
+  .sut-bvpz-modal .sut-bvpz-panel[data-panel="facets"] .dok-facet-modal__search {
+    margin-bottom: 10px;
+  }
+  .sut-bvpz-modal .sut-bvpz-panel[data-panel="facets"] .dok-facet-modal__list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .sut-bvpz-modal .sut-bvpz-panel[data-panel="tree"] {
+    padding: 12px max(20px, calc((100% - 1080px) / 2)) 0;
+    overflow-y: auto;
+  }
+
+  /* Medžio komponentas turi savo veiksmų juostą — dialoge naudojam bendrą
+     apačios juostą, tad picker'io action-bar paslepiam. */
+  .sut-bvpz-modal .bvpz-picker .action-bar { display: none; }
+
+  /* Medžio paieškos langelis — identiškas facetų skilties `.dok-facet-modal__search`
+     dizainui (paprastas rėmelis, be ikonos), kad abi skiltys atrodytų vienodai. */
+  .sut-bvpz-modal .bvpz-picker .bvpz-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    max-width: 440px;
+    padding: 9px 12px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+  }
+  .sut-bvpz-modal .bvpz-picker .bvpz-search:focus-within { outline: var(--border-focus); }
+  .sut-bvpz-modal .bvpz-picker .bvpz-search > label { display: none; } /* ikona */
+  .sut-bvpz-modal .bvpz-picker .bvpz-search .search-bar__input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    outline: none;
+    font: inherit;
+    font-size: var(--text-sm);
+    color: var(--black);
+  }
+  .sut-bvpz-modal .bvpz-picker .bvpz-search-clear {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    font-size: 16px;
+  }
+</style>

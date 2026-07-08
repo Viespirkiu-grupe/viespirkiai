@@ -28,13 +28,15 @@ interface Props {
   pageCount: number;
   queryParams: string;
   galimaEksportuoti: boolean;
+  eksportasPerDaug?: boolean;
+  eksportoRiba?: number;
   containerClass?: string;
   flat?: boolean;
   sortOptions?: SortOption[];
   sortValue?: string;
 }
 
-const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti, containerClass, flat = false, sortOptions = [], sortValue = '' } = Astro.props;
+const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti, eksportasPerDaug = false, eksportoRiba = 20_000, containerClass, flat = false, sortOptions = [], sortValue = '' } = Astro.props;
 ---
 
 <ResultPageShell
@@ -59,15 +61,23 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
 
   {galimaEksportuoti && (
     <Fragment slot="actions">
-      <a href={`/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
-        <span aria-hidden="true">↗</span> JSONL
-      </a>
-      <a href={`/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
-        <span aria-hidden="true">↗</span> CSV
-      </a>
-      <a href={`/?${queryParams}&xlsx=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti analizę kaip XLSX">
-        <span aria-hidden="true">↗</span> XLSX
-      </a>
+      {eksportasPerDaug ? (
+        <span class="eksportas-per-daug text-muted text-sm" role="note">
+          Eksportuoti galima iki {eksportoRiba.toLocaleString('lt-LT')} rezultatų<br />Patikslinkite filtrus
+        </span>
+      ) : (
+        <>
+          <a href={`/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
+            <span aria-hidden="true">↗</span> JSONL
+          </a>
+          <a href={`/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
+            <span aria-hidden="true">↗</span> CSV
+          </a>
+          <a href={`/?${queryParams}&xlsx=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti analizę kaip XLSX">
+            <span aria-hidden="true">↗</span> XLSX
+          </a>
+        </>
+      )}
     </Fragment>
   )}
   {results.map(item => (
@@ -108,3 +118,9 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
     });
   });
 </script>
+
+<style>
+  .eksportas-per-daug {
+    text-align: right;
+  }
+</style>

@@ -54,7 +54,6 @@ const treeId = `${instanceId}-tree`;
 const searchInputId = `${instanceId}-search-input`;
 const searchClearId = `${instanceId}-search-clear`;
 const resultsInfoId = `${instanceId}-results-info`;
-const countId = `${instanceId}-count`;
 const selectedCodesId = `${instanceId}-selected-codes`;
 const searchBtnId = `${instanceId}-search-btn`;
 const searchDropdownId = `${instanceId}-search-dropdown`;
@@ -124,8 +123,16 @@ const syncBtnId = `${instanceId}-sync-btn`;
 
   <div class:list={['action-bar', actionBarMode === 'sticky' && 'action-bar-sticky', actionBarMode === 'attached' && 'action-bar-attached']}>
     <div class="action-bar-left">
-      <span id={countId} class="text-sm font-bold text-muted">Nepasirinkta</span>
-      <span id={selectedCodesId} class="action-bar-codes"></span>
+      <input
+        id={selectedCodesId}
+        class="action-bar-input"
+        type="text"
+        inputmode="numeric"
+        autocomplete="off"
+        placeholder="BVPŽ prefiksai (pvz. 48 72 3360)"
+        value={initialCodes}
+        aria-label="Pasirinkti BVPŽ prefiksai"
+      />
     </div>
     <div class="action-bar-right">
       <button class="btn btn-ghost btn-sm" type="button" data-bvpz-clear>Išvalyti</button>
@@ -146,11 +153,10 @@ const syncBtnId = `${instanceId}-sync-btn`;
     </div>
   </div>
 
-  <script is:inline define:vars={{ treeUrl, rootId, treeId, countId, selectedCodesId, searchBtnId, searchDropdownId, copyBtnId, manualInputId, applyManualBtnId, syncBtnId, searchInputId, searchClearId, resultsInfoId, initialCodes, autoLoad }}>
+  <script is:inline define:vars={{ treeUrl, rootId, treeId, selectedCodesId, searchBtnId, searchDropdownId, copyBtnId, manualInputId, applyManualBtnId, syncBtnId, searchInputId, searchClearId, resultsInfoId, initialCodes, autoLoad }}>
     // @ts-nocheck
     const root = document.getElementById(rootId);
     const treeEl = document.getElementById(treeId);
-    const countEl = document.getElementById(countId);
     const codesEl = document.getElementById(selectedCodesId);
     const manualInput = document.getElementById(manualInputId);
     const applyManualBtn = document.getElementById(applyManualBtnId);
@@ -169,6 +175,7 @@ const syncBtnId = `${instanceId}-sync-btn`;
     const clearInputIdValue = root?.dataset.clearInputId ?? "";
     const copiedText = "Nukopijuota ✓";
     const copyLabel = "Kopijuoti";
+    let currentCodes = bvpzNormalizeCodes(initialCodes || new URLSearchParams(window.location.search).get("code") || "");
 
     function bvpzNormalizeCodes(value) {
       const matches = String(value || "").match(/\d{2,9}/g) || [];
@@ -182,19 +189,18 @@ const syncBtnId = `${instanceId}-sync-btn`;
     function bvpzSetCodes(codes, { syncTree = false } = {}) {
       const normalized = bvpzNormalizeCodes(Array.isArray(codes) ? codes.join(" ") : codes);
       const text = normalized.join(" ");
+      currentCodes = normalized;
       if (manualInput) manualInput.value = text;
-      if (codesEl) codesEl.textContent = text;
-      if (countEl) {
-        countEl.textContent = normalized.length > 0 ? `${normalized.length} pasirinkti` : "Nepasirinkta";
-        countEl.className = `text-sm font-bold${normalized.length > 0 ? "" : " text-muted"}`;
-      }
+      if (codesEl) codesEl.value = text;
       if (syncTree && treeEl) bvpzApplySelection(treeEl, normalized);
+      root?.dispatchEvent(new CustomEvent("bvpz:codeschange", { detail: { codes: text } }));
       return normalized;
     }
 
     function bvpzGetCodes() {
       const syncInput = syncInputIdValue ? document.getElementById(syncInputIdValue) : null;
-      return bvpzNormalizeCodes(manualInput?.value ?? codesEl?.textContent ?? syncInput?.value ?? "");
+      const domCodes = bvpzNormalizeCodes(manualInput?.value ?? codesEl?.value ?? syncInput?.value ?? "");
+      return domCodes.length ? domCodes : currentCodes;
     }
 
     function bvpzFormatCode(mask) {
@@ -384,9 +390,7 @@ const syncBtnId = `${instanceId}-sync-btn`;
     }
 
     function bvpzApplyInitial() {
-      const params = new URLSearchParams(window.location.search);
-      const code = initialCodes || params.get("code") || "";
-      bvpzSetCodes(code, { syncTree: true });
+      bvpzSetCodes(currentCodes, { syncTree: true });
     }
 
     function bvpzClear() {
@@ -516,6 +520,19 @@ const syncBtnId = `${instanceId}-sync-btn`;
       });
     }
 
+    // Action-bar prefiksų laukas: redaguojant (Enter arba palikus lauką)
+    // pritaikom įvestus prefiksus medžiui. Skaitom tiesiai iš šio lauko, kad
+    // neįsimaišytų viršutinis „manualInput" (jei toks yra).
+    if (codesEl) {
+      const applyActionCodes = () => bvpzSetCodes(codesEl.value, { syncTree: true });
+      codesEl.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        applyActionCodes();
+      });
+      codesEl.addEventListener("change", applyActionCodes);
+    }
+
     root?.querySelectorAll("[data-bvpz-preset]").forEach((button) => {
       button.addEventListener("click", () => {
         bvpzApplyPreset(button.getAttribute("data-bvpz-preset") || "");
@@ -622,7 +639,9 @@ const syncBtnId = `${instanceId}-sync-btn`;
     }
 
     .bvpz-picker .cpv-tree .cpv-node.no-children > .cpv-row {
-      padding-left: calc(18px + 8px);
+      /* Nėra toggle — atstojam jo vietą (bazinis padding 8px + toggle 18px + gap
+         8px), kad lapo tekstas sutaptų su node'ų, turinčių dropdown. */
+      padding-left: calc(8px + 18px + 8px);
     }
 
     .bvpz-picker .cpv-toggle {
@@ -767,16 +786,25 @@ const syncBtnId = `${instanceId}-sync-btn`;
       flex-direction: column;
       gap: 2px;
       min-width: 0;
+      flex: 1 1 auto;
     }
 
-    .bvpz-picker .action-bar-codes {
+    .bvpz-picker .action-bar-input {
+      width: 100%;
+      min-width: 200px;
+      max-width: 420px;
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
+      font-size: var(--text-sm);
+      padding: 7px 10px;
+      color: var(--black);
+      background: var(--white);
+      border: var(--border);
+      border-radius: var(--radius-md);
+    }
+
+    .bvpz-picker .action-bar-input::placeholder {
+      font-family: var(--font-sans, inherit);
       color: var(--gray);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 60vw;
     }
 
     .bvpz-picker .action-bar-right {

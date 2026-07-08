@@ -10,7 +10,7 @@ import SutartysSumaFilter from '../components/content/SutartysSumaFilter.astro';
 import SutartysLaikotarpisFilter from '../components/content/SutartysLaikotarpisFilter.astro';
 import { splitFacetOptions } from '../lib/dokumentaiUrl.ts';
 import SearchResults from '../components/content/SearchResults.astro';
-import { searchSutartys, countSutartys, getSutartysQueryMetadata } from '@/modules/sutartys/searchSutartys.js';
+import { searchSutartys, countSutartys, countSutartysQuickwit, getSutartysQueryMetadata } from '@/modules/sutartys/searchSutartys.js';
 import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
 import config from '../lib/config.ts';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
@@ -120,11 +120,17 @@ void buildPaginationHtml;
 
 // Stream exports (JSONL / CSV / XLSX) short-circuit
 if (query.jsonl || query.csv || query.xlsx) {
-  if (query.xlsx) {
-    const total = await countSutartys(query);
+  // Eksportai (xlsx/csv/jsonl) ribojami iki XLSX_EXPORT_LIMIT: XLSX visada
+  // (kaupiamas atmintyje), o Quickwit varikliu — ir CSV/JSONL, nes Quickwit gali
+  // pasiekti nebent tiek įrašų (žr. searchAll). Postgres CSV/JSONL lieka be ribos
+  // (srautinamas tiesiai). Riba tikrinama pagal eksporto variklį, kad Quickwit
+  // rezultatai (prefiksai/wildcard'ai) neatitiktų Postgres tikslaus skaičiaus.
+  const capped = Boolean(query.xlsx) || engine === 'quickwit';
+  if (capped) {
+    const total = engine === 'quickwit' ? await countSutartysQuickwit(query) : await countSutartys(query);
     if (!canExportAnalizeXlsx(total)) {
       return new Response(
-        `XLSX eksportas galimas iki ${XLSX_EXPORT_LIMIT.toLocaleString('lt-LT')} sutarčių. Pagal pasirinktus filtrus rasta ${total.toLocaleString('lt-LT')}.`,
+        `Eksportas galimas iki ${XLSX_EXPORT_LIMIT.toLocaleString('lt-LT')} sutarčių. Pagal pasirinktus filtrus rasta ${total.toLocaleString('lt-LT')}.`,
         {
           status: 413,
           headers: { 'Content-Type': 'text/plain; charset=utf-8' },
@@ -134,8 +140,8 @@ if (query.jsonl || query.csv || query.xlsx) {
   }
 
   const { stream, client } = await searchSutartys(query, {
-    limit: query.xlsx ? XLSX_EXPORT_LIMIT : null,
-    page: query.xlsx ? 1 : page,
+    limit: capped ? XLSX_EXPORT_LIMIT : null,
+    page: 1,
     stream: true,
     sort: false,
     engine,
@@ -350,6 +356,10 @@ const numberOfResults = buildNumberOfResults({ shown: results.length, total, ela
 const pageCount = Math.ceil((total || 100_000) / limit);
 
 let galimaEksportuoti = Object.keys(values).length > 0;
+// Eksportas įmanomas tik iki XLSX_EXPORT_LIMIT (Quickwit pasiekiama riba). Kai
+// rezultatų daugiau, mygtukai vestų į 413 — vietoj jų parodom paaiškinimą.
+// Quickwit `total` yra tas pats įvertis, kurį naudoja serverio riba, tad sutampa.
+const eksportasPerDaug = engine === 'quickwit' && total != null && total > XLSX_EXPORT_LIMIT;
 values.limit = limit;
 
 // Kiekviena parinktis koduoja lauką ir kryptį (`laukas:kryptis`); numatytoji
@@ -467,6 +477,8 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
           pageCount={pageCount}
           queryParams={queryParams}
           galimaEksportuoti={galimaEksportuoti}
+          eksportasPerDaug={eksportasPerDaug}
+          eksportoRiba={XLSX_EXPORT_LIMIT}
           containerClass="mt-0"
           flat={true}
           sortOptions={sortOptions}

@@ -612,6 +612,60 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
   };
 }
 
+// Quickwit 0.8 riboja ir max_hits, ir start_offset iki 10 000 (400 Bad Request
+// virš to). Tad puslapiuojam po 10 000 ir galim pasiekti nebent offset 10 000 —
+// t.y. iš viso ne daugiau kaip 20 000 rezultatų. Eksporto riba tuo ir remiasi.
+const QW_MAX_HITS = 10_000;
+const QW_MAX_START_OFFSET = 10_000;
+export const QW_EXPORT_CEILING = QW_MAX_HITS + QW_MAX_START_OFFSET;
+
+/**
+ * Page a table's shards `QW_MAX_HITS` hits at a time (Quickwit's hard `max_hits`
+ * ceiling), filtering out tombstones, until the raw index is exhausted, `limit`
+ * live hits are collected, or Quickwit's `start_offset` ceiling is reached.
+ * Unlike `search`, this never sets a `max_hits` above the ceiling — it walks
+ * `start_offset` forward — so it suits large exports. Because `start_offset`
+ * itself tops out at 10 000, at most `QW_EXPORT_CEILING` (20 000) hits are
+ * reachable.
+ *
+ * @param {string} lentele
+ * @param {object} params        - Quickwit search body (must sort by a concrete
+ *                                  field for stable offset paging)
+ * @param {object} [opts]
+ * @param {number} [opts.limit]  - stop after this many live hits; Infinity = all
+ */
+export async function searchAll(lentele, params, { limit = Infinity } = {}) {
+  const deadRatio = await getDeadRatio(lentele);
+  const liveHits = [];
+  let offset = 0;
+  let numHitsMax = null;
+
+  while (liveHits.length < limit) {
+    const data = await qwSearch(`${lentele}_*`, {
+      ...params,
+      max_hits: QW_MAX_HITS,
+      start_offset: offset,
+      format: "json",
+    });
+    const hits = data.hits ?? [];
+    if (numHitsMax === null) numHitsMax = data.num_hits ?? 0;
+
+    const live = deadRatio === 0 ? hits : await filterLive(lentele, hits);
+    liveHits.push(...live);
+
+    // Short page → index exhausted. Also stop before exceeding Quickwit's
+    // start_offset ceiling (next offset would 400).
+    if (hits.length < QW_MAX_HITS || offset >= QW_MAX_START_OFFSET) break;
+    offset += QW_MAX_HITS;
+  }
+
+  return {
+    hits: Number.isFinite(limit) ? liveHits.slice(0, limit) : liveHits,
+    numHitsMax,
+    numHitsEstimate: numHitsMax == null ? null : Math.round(numHitsMax * (1 - deadRatio)),
+  };
+}
+
 // ── Count ────────────────────────────────────────────────────────────────────
 
 /**
