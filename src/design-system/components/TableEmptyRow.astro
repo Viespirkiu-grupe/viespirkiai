@@ -1,0 +1,13 @@
+---
+interface Props {
+  colspan: number;
+  message: string;
+  className?: string;
+}
+
+const { colspan, message, className = 'empty-state-cell' } = Astro.props as Props;
+---
+
+<tr>
+  <td colspan={colspan} class={className}>{message}</td>
+</tr>

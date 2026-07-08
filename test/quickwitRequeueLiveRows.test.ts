@@ -21,19 +21,26 @@ describe("requeueLiveRows CLI", () => {
     });
   });
 
+  it("accepts viesiejiPirkimai as a table", () => {
+    expect(parseArgs(["--lentele", "viesiejiPirkimai", "--top-ratio", "2"])).toMatchObject({
+      lentele: "viesiejiPirkimai",
+      topRatio: 2,
+    });
+  });
+
   it("rejects conflicting selectors", () => {
     expect(() => parseArgs(["dokumentai_2", "--top", "2"])).toThrow(/tik vieną pasirinkimo būdą/);
   });
 
   it("parses interactive ranges", () => {
-    expect(parseInteractiveSelection("1,3-3", indexes).map((index) => index.indeksas))
+    expect(parseInteractiveSelection("1,3-3", indexes).map((index: any) => index.indeksas))
       .toEqual(["dokumentai_1", "dokumentai_3"]);
   });
 
   it("selects interactive top dead rows or ratio", () => {
-    expect(parseInteractiveSelection("top 2", indexes).map((index) => index.indeksas))
+    expect(parseInteractiveSelection("top 2", indexes).map((index: any) => index.indeksas))
       .toEqual(["dokumentai_3", "dokumentai_1"]);
-    expect(parseInteractiveSelection("ratio 2", indexes).map((index) => index.indeksas))
+    expect(parseInteractiveSelection("ratio 2", indexes).map((index: any) => index.indeksas))
       .toEqual(["dokumentai_2", "dokumentai_3"]);
   });
 });

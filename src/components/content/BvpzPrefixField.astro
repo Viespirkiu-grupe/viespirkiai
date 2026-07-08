@@ -1,0 +1,164 @@
+---
+import PickerField from '@design-system/components/inputs/PickerField.astro';
+import BvpzPicker from './BvpzPicker.astro';
+
+interface Preset {
+  label: string;
+  codes: string;
+}
+
+interface Props {
+  values: Record<string, string | number | undefined>;
+  name?: string;
+  legacyName?: string;
+  instanceId?: string;
+  presets?: Preset[];
+}
+
+const {
+  values,
+  name = 'bvpzPrefiksasKitas',
+  legacyName = 'bvpzPrefiksas',
+  instanceId = 'sutartys-bvpz',
+  presets = [
+    { label: 'Informacinės technologijos', codes: '48 72' },
+    { label: 'Vaistai', codes: '3360 3361 3362 3363 3364 3365 3366 3367 33690 33691' },
+  ],
+} = Astro.props as Props;
+
+const current = String(values[name] || values[legacyName] || '');
+const modalId = `${instanceId}-dialog`;
+const titleId = `${instanceId}-dialog-title`;
+const triggerId = `${instanceId}-dialog-trigger`;
+const legacyId = `${legacyName}-${instanceId}`;
+---
+
+<div
+  class="bvpz-prefix-field"
+  data-bvpz-prefix-field
+  data-input-id={name}
+  data-legacy-id={legacyId}
+  data-modal-id={modalId}
+  data-trigger-id={triggerId}
+  data-picker-root-id={`${instanceId}-root`}
+>
+  <PickerField
+    label="BVPŽ prefiksas"
+    name={name}
+    inputId={name}
+    value={current}
+    placeholder="Pvz. 48 72 3360"
+    buttonLabel="Pasirinkti BVPŽ prefiksus"
+    modalId={modalId}
+    buttonId={triggerId}
+    legacyClearName={legacyName}
+    legacyClearId={legacyId}
+  />
+
+  <div class="modal-backdrop bvpz-prefix-field__backdrop" id={modalId} hidden>
+    <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div class="modal-header">
+        <h3 id={titleId}>BVPŽ pasirinkimas</h3>
+        <button class="modal-close" type="button" data-bvpz-close aria-label="Uždaryti">×</button>
+      </div>
+      <BvpzPicker
+        presets={presets}
+        searchTargets={[]}
+        instanceId={instanceId}
+        initialCodes={current}
+        syncInputId={name}
+        clearInputId={legacyId}
+        syncButtonLabel="Naudoti paieškoje"
+        actionBarMode="attached"
+        showPresets={true}
+        showManualInput={false}
+      />
+    </div>
+  </div>
+</div>
+
+<style>
+  .bvpz-prefix-field__backdrop[hidden] {
+    display: none;
+  }
+
+  .bvpz-prefix-field__backdrop {
+    z-index: calc(var(--z-sticky) + 50);
+  }
+
+  .bvpz-prefix-field__backdrop .modal {
+    max-width: 980px;
+    overflow: hidden;
+  }
+
+  .bvpz-prefix-field__backdrop :global(.bvpz-picker) {
+    padding: 0;
+  }
+
+  .bvpz-prefix-field__backdrop :global(.bvpz-picker > .text-muted),
+  .bvpz-prefix-field__backdrop :global(.bvpz-picker > .flex.flex-wrap) {
+    padding-inline: 28px;
+  }
+
+  .bvpz-prefix-field__backdrop :global(.bvpz-picker > .text-muted) {
+    padding-top: 20px;
+  }
+
+  .bvpz-prefix-field__backdrop :global(.bvpz-picker .cpv-tree) {
+    max-height: 55vh;
+    overflow: auto;
+    padding: 0 28px 0 28px;
+  }
+</style>
+
+<script>
+  function normalizeBvpzCodes(value: string) {
+    const matches = String(value || '').match(/\d{2,9}/g) || [];
+    return Array.from(new Set(matches)).join(' ');
+  }
+
+  function initBvpzPrefixField(root: HTMLElement) {
+    if (root.dataset.bvpzReady === 'true') return;
+    root.dataset.bvpzReady = 'true';
+
+    const input = document.getElementById(root.dataset.inputId || '') as HTMLInputElement | null;
+    const legacyInput = document.getElementById(root.dataset.legacyId || '') as HTMLInputElement | null;
+    const modal = document.getElementById(root.dataset.modalId || '') as HTMLElement | null;
+    const trigger = document.getElementById(root.dataset.triggerId || '') as HTMLButtonElement | null;
+    const pickerRoot = document.getElementById(root.dataset.pickerRootId || '');
+    const closeButton = root.querySelector<HTMLButtonElement>('[data-bvpz-close]');
+
+    function closeDialog() {
+      if (!modal) return;
+      modal.hidden = true;
+      document.body.style.removeProperty('overflow');
+    }
+
+    function openDialog() {
+      if (!modal) return;
+      pickerRoot?.dispatchEvent(new CustomEvent('bvpz:setCodes', {
+        bubbles: true,
+        detail: { codes: normalizeBvpzCodes(input?.value || '') },
+      }));
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+    }
+
+    trigger?.addEventListener('click', openDialog);
+    closeButton?.addEventListener('click', closeDialog);
+    modal?.addEventListener('click', (event) => {
+      if (event.target === modal) closeDialog();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && modal && !modal.hidden) closeDialog();
+    });
+
+    input?.addEventListener('change', () => {
+      input.value = normalizeBvpzCodes(input.value);
+      if (legacyInput && input.value) legacyInput.value = '';
+    });
+    pickerRoot?.addEventListener('bvpz:sync', closeDialog);
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-bvpz-prefix-field]').forEach(initBvpzPrefixField);
+</script>

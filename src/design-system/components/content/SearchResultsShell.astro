@@ -2,6 +2,7 @@
 import EmptyState from '@design-system/components/EmptyState.astro';
 import Pagination from '@design-system/components/Pagination.astro';
 import ResultList from '@design-system/components/ResultList.astro';
+import FlatResultList from '@design-system/components/content/FlatResultList.astro';
 import ResultsSummary from '@design-system/components/ResultsSummary.astro';
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
   queryParams: string;
   emptyText?: string;
   containerClass?: string;
+  /** Borderless dokumentai-style list instead of the bordered card list. */
+  flat?: boolean;
 }
 
 const {
@@ -22,24 +25,30 @@ const {
   queryParams,
   emptyText = 'Rezultatų nerasta.',
   containerClass = 'mt-10 max-w-lg center mx-auto',
+  flat = false,
 } = Astro.props;
 
 const hasActions = Astro.slots.has('actions');
+const hasSort = Astro.slots.has('sort');
 ---
 
 <div class={containerClass}>
   <div class="stack stack-md">
     <div class="search-results-toolbar">
       <ResultsSummary html={numberOfResults} />
-      {hasActions && <div class="search-results-actions"><slot name="actions" /></div>}
+      <div class="search-results-tools">
+        {hasSort && <div class="search-results-sort"><slot name="sort" /></div>}
+        {hasActions && <div class="search-results-actions"><slot name="actions" /></div>}
+      </div>
     </div>
 
     {resultCount === 0
       ? <EmptyState message={emptyText} />
       : <>
-          <ResultList>
-            <slot />
-          </ResultList>
+          {flat
+            ? <FlatResultList><slot /></FlatResultList>
+            : <ResultList><slot /></ResultList>
+          }
           <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
         </>
     }
@@ -54,11 +63,33 @@ const hasActions = Astro.slots.has('actions');
     gap: 12px;
   }
 
+  .search-results-tools {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: auto;
+  }
+
+  .search-results-sort :global(select) {
+    min-width: 170px;
+    padding: 7px 10px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    color: var(--black);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .search-results-sort :global(select:focus-visible) {
+    outline: var(--border-focus);
+  }
+
   .search-results-actions {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-left: auto;
     flex-wrap: nowrap;
     white-space: nowrap;
   }
@@ -69,9 +100,13 @@ const hasActions = Astro.slots.has('actions');
       align-items: flex-start;
     }
 
-    .search-results-actions {
+    .search-results-tools {
       width: 100%;
       margin-left: 0;
+      flex-wrap: wrap;
+    }
+
+    .search-results-actions {
       flex-wrap: wrap;
       white-space: normal;
       justify-content: flex-start;

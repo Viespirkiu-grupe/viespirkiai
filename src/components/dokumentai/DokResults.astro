@@ -4,6 +4,7 @@
 // styling. The loading veil + #dokContent wrapper stay on the page. Sort +
 // pagination behaviour lives in the <script> below (shared dokumentaiNav).
 import EmptyState from '@design-system/components/EmptyState.astro';
+import FlatResultList from '@design-system/components/content/FlatResultList.astro';
 import DokResultCard from './DokResultCard.astro';
 import type { DokumentasHit, DokumentaiSort } from '../../lib/searchDokumentai.ts';
 
@@ -39,9 +40,9 @@ const { hits, resultsMetaHtml, sort, sortOptions, q, page, totalPages, pageNums,
 {hits.length === 0 ? (
   <EmptyState message={q ? `Jokių rezultatų pagal „${q}".` : 'Jokių rezultatų.'} />
 ) : (
-  <div class="dok-result-list">
+  <FlatResultList className="dok-result-list">
     {hits.map((hit) => <DokResultCard hit={hit} />)}
-  </div>
+  </FlatResultList>
 )}
 
 {pageNums.length > 0 && (
@@ -92,34 +93,8 @@ const { hits, resultsMetaHtml, sort, sortOptions, q, page, totalPages, pageNums,
     outline: var(--border-focus);
   }
 
-  /* Borderless list. A whisper-thin divider lives on each row (except
-     last), and rhythm comes from generous internal padding. */
-  .dok-result-list .result-card {
-    padding: 0 0 24px;
-    margin-bottom: 24px;
-    border-bottom: 1px solid var(--lighter-gray);
-    transition: none;
-  }
-  .dok-result-list .result-card.card-clickable:hover {
-    box-shadow: none;  /* No card-style hover on a borderless list. */
-  }
-  .dok-result-list .result-card:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
-  }
-  .dok-result-list .result-card-title {
-    /* Tight from provenance, loose to snippet — varied internal rhythm. */
-    margin: 2px 0 0;
-    font-size: var(--text-lg);
-    font-weight: 600;
-    line-height: 1.3;
-  }
-  .dok-result-list .result-card-title a { color: var(--black); }
-  .dok-result-list .result-card-title a:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
+  /* The borderless list + title styling is shared — see FlatResultList. Only
+     the /dokumentai-specific rows (provenance, snippet, meta) live here. */
 
   /* Provenance: muted, lightweight, sits tight under nothing — it's the
      "where this came from" line above the title. */

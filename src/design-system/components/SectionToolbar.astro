@@ -1,0 +1,55 @@
+---
+interface Props {
+  title: string;
+  titleTag?: 'h3' | 'h4';
+  className?: string;
+}
+
+const {
+  title,
+  titleTag = 'h3',
+  className = '',
+} = Astro.props as Props;
+
+const TitleTag = titleTag;
+const classes = ['ds-section-toolbar', className].filter(Boolean).join(' ');
+---
+
+<div class={classes}>
+  <div class="ds-section-toolbar__main">
+    <TitleTag class="ds-section-toolbar__title">{title}</TitleTag>
+    <slot />
+  </div>
+  {Astro.slots.has('actions') && (
+    <div class="ds-section-toolbar__actions">
+      <slot name="actions" />
+    </div>
+  )}
+</div>
+
+<style>
+  .ds-section-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .ds-section-toolbar__main {
+    min-width: 0;
+  }
+
+  .ds-section-toolbar__title {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: 700;
+  }
+
+  .ds-section-toolbar__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+</style>

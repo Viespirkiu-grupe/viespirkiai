@@ -2,6 +2,8 @@
 import Layout from '../../layouts/Layout.astro';
 import Pagination from '@design-system/components/Pagination.astro';
 import ResultsSummary from '@design-system/components/ResultsSummary.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
+import TopListCard from '@design-system/components/TopListCard.astro';
 import { postgres } from '@/postgres/postgres.js';
 import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
 import { getColorScheme, getFont } from '../../lib/failai.ts';
@@ -57,20 +59,11 @@ const adresai = adresaiRes.rows;
     </div>
 
     <div class="stack stack-md">
-      <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+      <MetricCardGrid minWidth="260px">
         {adresai.map((item: any) => (
-          <article class="card card-clickable">
-            <div class="card-body">
-              <h3 class="text-sm mb-2">
-                <a href={`/juridiniai?adresas=${encodeURIComponent(item.adresas)}`}>
-                  {item.adresas}
-                </a>
-              </h3>
-              <p class="text-muted text-sm mb-0"><span class="cell-mono">{item.count}</span> įmonės</p>
-            </div>
-          </article>
+          <TopListCard label={item.adresas} href={`/juridiniai?adresas=${encodeURIComponent(item.adresas)}`} meta={`${item.count} įmonės`} />
         ))}
-      </div>
+      </MetricCardGrid>
 
       <Pagination currentPage={page} pageCount={pageCount} queryParams="" />
     </div>

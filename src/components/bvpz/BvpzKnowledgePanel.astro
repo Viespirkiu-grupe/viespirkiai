@@ -1,4 +1,5 @@
 ---
+import KnowledgePanelShell from '@design-system/components/KnowledgePanelShell.astro';
 import type { BvpzPanel } from '../../lib/searchBvpzPanel.ts';
 import BvpzMiniTreeNode, { type BvpzMiniTreeNodeData } from './BvpzMiniTreeNode.astro';
 
@@ -27,16 +28,14 @@ for (const ancestor of [...bvpz.ancestors].reverse()) {
 }
 ---
 
-<aside class="bvpz-panel" aria-label="BVPŽ kodo informacija">
-  <div class="bvpz-panel__eyebrow">
-    <span>BVPŽ kodas</span>
-    <span class="cell-mono">{bvpz.fullCode}</span>
-  </div>
-  <h2>{bvpz.pavadinimas}</h2>
-  <p>
-    Bendrojo viešųjų pirkimų žodyno klasifikacijos kodas.
-  </p>
-
+<KnowledgePanelShell
+  ariaLabel="BVPŽ kodo informacija"
+  eyebrowLabel="BVPŽ kodas"
+  eyebrowValue={bvpz.fullCode}
+  title={bvpz.pavadinimas}
+  description="Bendrojo viešųjų pirkimų žodyno klasifikacijos kodas."
+  className="bvpz-panel"
+>
   <div class="bvpz-mini-tree" aria-label="BVPŽ kodo vieta klasifikatoriuje">
     <ul>
       <BvpzMiniTreeNode node={treeRoot} />
@@ -44,7 +43,7 @@ for (const ancestor of [...bvpz.ancestors].reverse()) {
     {bvpz.children.length === 8 && <div class="bvpz-mini-tree__more">Rodomos pirmos subkategorijos</div>}
   </div>
 
-  <nav class="bvpz-panel__actions" aria-label="BVPŽ kodo nuorodos">
+  <Fragment slot="actions">
     <a class="btn btn-primary bvpz-panel__contracts" href={`/?bvpzPrefiksasKitas=${code}`}>Sutartys</a>
     <div class="bvpz-panel__secondary-actions">
       <details class="bvpz-panel__dropdown">
@@ -65,40 +64,10 @@ for (const ancestor of [...bvpz.ancestors].reverse()) {
       </details>
       <a class="btn btn-outline btn-sm" href={`/bvpz?code=${code}`}>BVPŽ medis</a>
     </div>
-  </nav>
-</aside>
+  </Fragment>
+</KnowledgePanelShell>
 
 <style>
-  .bvpz-panel {
-    grid-area: panel;
-    align-self: start;
-    padding: 24px;
-    border: var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--white);
-  }
-  .bvpz-panel__eyebrow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 10px;
-    color: var(--gray);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-  }
-  h2 {
-    margin: 0;
-    font-size: var(--text-xl);
-    line-height: 1.3;
-  }
-  p {
-    margin: 12px 0 18px;
-    color: var(--gray);
-    font-size: var(--text-sm);
-  }
   .bvpz-mini-tree {
     margin-bottom: 22px;
     padding: 10px 0;
@@ -166,14 +135,6 @@ for (const ancestor of [...bvpz.ancestors].reverse()) {
     padding: 7px 8px 0 28px;
     color: var(--gray);
     font-size: var(--text-xs);
-  }
-  .bvpz-panel__actions {
-    display: grid;
-    gap: 8px;
-  }
-  .bvpz-panel__contracts {
-    justify-content: center;
-    width: 100%;
   }
   .bvpz-panel__secondary-actions {
     display: grid;

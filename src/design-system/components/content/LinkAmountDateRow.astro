@@ -5,7 +5,7 @@ interface Props {
   href: string;
   title: string;
   leadingText?: string;
-  amount: string;
+  amount?: string;
   date?: string;
 }
 
@@ -13,9 +13,12 @@ const {
   href,
   title,
   leadingText = '',
-  amount,
+  amount = '',
   date = '',
 } = Astro.props;
+
+const hasAmountSlot = Astro.slots.has('amount');
+const hasDateSlot = Astro.slots.has('date');
 ---
 
 <Link href={href} variant="reset" className="flex items-baseline gap-3 px-2 py-1 rounded-md text-sm hover:bg-shade-2">
@@ -23,6 +26,10 @@ const {
   <span class="flex-1 truncate min-w-0">
     {title ? title : <em>Nenurodyta</em>}
   </span>
-  <span class="tabular-nums whitespace-nowrap shrink-0 text-black">{amount}</span>
-  <time class="text-muted tabular-nums whitespace-nowrap shrink-0" datetime={date}>{date || '—'}</time>
+  <span class="tabular-nums whitespace-nowrap shrink-0 text-black">
+    {hasAmountSlot ? <slot name="amount" /> : amount}
+  </span>
+  <span class="text-muted tabular-nums whitespace-nowrap shrink-0">
+    {hasDateSlot ? <slot name="date" /> : <time datetime={date}>{date || '—'}</time>}
+  </span>
 </Link>

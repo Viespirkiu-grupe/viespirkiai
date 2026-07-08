@@ -1,0 +1,49 @@
+---
+import MetricCard from './MetricCard.astro';
+
+interface Props {
+  label: string;
+  href?: string;
+  value?: unknown;
+  meta?: string;
+  mono?: boolean;
+  clickable?: boolean;
+  className?: string;
+}
+
+const {
+  label,
+  href,
+  value,
+  meta,
+  mono = false,
+  clickable = false,
+  className = '',
+} = Astro.props as Props;
+
+const hasContent = Astro.slots.has('default');
+---
+
+{hasContent ? (
+  <MetricCard
+    label={label}
+    href={href}
+    value={value}
+    meta={meta}
+    clickable={clickable || !!href}
+    labelBaseClassName={mono ? 'text-xl font-bold cell-mono mb-3 mt-1' : 'section-title mb-2'}
+    className={className}
+  >
+    <slot />
+  </MetricCard>
+) : (
+  <MetricCard
+    label={label}
+    href={href}
+    value={value}
+    meta={meta}
+    clickable={clickable || !!href}
+    labelBaseClassName={mono ? 'text-xl font-bold cell-mono mb-3 mt-1' : 'section-title mb-2'}
+    className={className}
+  />
+)}

@@ -4,6 +4,7 @@ import { processCfTWS, processOldestCfTWSOffHours } from "../modules/viesiejiPir
 import { processPmc, processOldestPmcOffHours } from "../modules/viesiejiPirkimai/scrapePmc.js";
 import { cleanReservations } from "../modules/viesiejiPirkimai/cleanReservations.js";
 import { processNextVykdytojas } from "../modules/viesiejiPirkimai/viesiejiPirkimaiVykdytojaiScrape.js";
+import { processViesiejiPirkimaiIndexQueue } from "../modules/viesiejiPirkimai/quickwitProcessIndexQueue.js";
 
 export default [
     {
@@ -45,6 +46,15 @@ export default [
         cooldown: 60,
         errorCooldown: 60,
         job: processNextVykdytojas,
+    },
+    {
+        name: "viesiejiPirkimaiQuickwitProcessIndexQueue",
+        mode: "asap",
+        priority: 5,
+        concurrency: 2,
+        cooldown: 30,
+        errorCooldown: 30,
+        job: processViesiejiPirkimaiIndexQueue,
     },
     {
         // 24 concurrent backfill workers — lowest priority so they yield to everything else

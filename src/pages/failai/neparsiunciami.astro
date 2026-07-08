@@ -3,9 +3,8 @@ import Button from '@design-system/components/Button.astro';
 import Layout from '../../layouts/Layout.astro';
 import Pagination from '@design-system/components/Pagination.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
+import DataTable from '@design-system/components/DataTable.astro';
 import SelectInput from '@design-system/components/inputs/SelectInput.astro';
-import Table from '@design-system/components/Table.astro';
-import TableWrapper from '@design-system/components/TableWrapper.astro';
 import { postgres, parseLimit, enrichFailasRow, getColorScheme, getFont, cleanQuery, buildSaltinioLink } from '../../lib/failai.js';
 import '@/utils/linksniai.js';
 
@@ -116,46 +115,39 @@ const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
     </p>
 
     <div class="stack stack-md">
-      <TableWrapper>
-        <Table>
-          <thead>
-            <tr>
-              <th>Id</th>
-              <th>Pavadinimas</th>
-              <th>Plėtinys</th>
-              <th>Šaltinis</th>
-              <th>Šaltinio nuoroda</th>
-              <th class="cell-right">Bandymai</th>
-              <th>Paskutinis bandymas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {files.length === 0 ? (
-              <tr>
-                <td colspan="7" class="empty-state-cell">Nėra neparsiunčiamų failų.</td>
-              </tr>
-            ) : files.map((file: any) => (
-              <tr>
-                <td class="cell-mono">{file.id ? <a href={`/failas/${file.id}`}>{file.id}</a> : '—'}</td>
-                <td class="neparsiunciami-col-name">
-                  <span class="cell-truncate">{file.pavadinimas || '—'}</span>
-                </td>
-                <td class="cell-mono">{file.extension || ''}</td>
-                <td>{file.saltinis || 'sutartys'}</td>
-                <td class="neparsiunciami-col-source-link">
-                  {file.saltinioLink ? (
-                    <a href={file.saltinioLink} class="cell-truncate">
-                      {file.saltinioLink}
-                    </a>
-                  ) : ''}
-                </td>
-                <td class="cell-mono cell-right">{file.parsiuntimoBandymai ?? 0}</td>
-                <td class="cell-nowrap">{file.paskutinisParsiuntimoBandymas ? String(new Date(file.paskutinisParsiuntimoBandymas).toLocaleString('lt-LT')) : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      </TableWrapper>
+      <DataTable
+        rows={files}
+        emptyText="Nėra neparsiunčiamų failų."
+        columns={[
+          { label: 'Id' },
+          { label: 'Pavadinimas' },
+          { label: 'Plėtinys' },
+          { label: 'Šaltinis' },
+          { label: 'Šaltinio nuoroda' },
+          { label: 'Bandymai', headerClassName: 'cell-right' },
+          { label: 'Paskutinis bandymas' },
+        ]}
+      >
+        {files.map((file: any) => (
+          <tr>
+            <td class="cell-mono">{file.id ? <a href={`/failas/${file.id}`}>{file.id}</a> : '—'}</td>
+            <td class="neparsiunciami-col-name">
+              <span class="cell-truncate">{file.pavadinimas || '—'}</span>
+            </td>
+            <td class="cell-mono">{file.extension || ''}</td>
+            <td>{file.saltinis || 'sutartys'}</td>
+            <td class="neparsiunciami-col-source-link">
+              {file.saltinioLink ? (
+                <a href={file.saltinioLink} class="cell-truncate">
+                  {file.saltinioLink}
+                </a>
+              ) : ''}
+            </td>
+            <td class="cell-mono cell-right">{file.parsiuntimoBandymai ?? 0}</td>
+            <td class="cell-nowrap">{file.paskutinisParsiuntimoBandymas ? String(new Date(file.paskutinisParsiuntimoBandymas).toLocaleString('lt-LT')) : '—'}</td>
+          </tr>
+        ))}
+      </DataTable>
 
       <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
     </div>

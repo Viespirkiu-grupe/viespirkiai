@@ -6,6 +6,7 @@ interface Props {
   message?: string;
   className?: string;
   messageClass?: string;
+  compact?: boolean;
 }
 
 const {
@@ -15,13 +16,14 @@ const {
   message,
   className = '',
   messageClass = 'text-muted',
+  compact = false,
 } = Astro.props;
 
 const TitleTag = titleTag;
 const hasContent = Astro.slots.has('default');
 ---
 
-<div class:list={['empty-state', className].filter(Boolean)}>
+<div class:list={['empty-state', compact && 'empty-state--compact', className].filter(Boolean)}>
   {icon && <div class="empty-state-icon">{icon}</div>}
   {title && <TitleTag>{title}</TitleTag>}
   {hasContent
@@ -47,5 +49,10 @@ const hasContent = Astro.slots.has('default');
     font-size: 3.75rem;
     line-height: 1;
     opacity: 0.4;
+  }
+
+  .empty-state--compact {
+    min-height: 0;
+    padding: 0.75rem;
   }
 </style>

@@ -1,0 +1,331 @@
+---
+// Numatomos vertės filtras: log-skalės histograma + dvipusis slankiklis (dvi
+// rankenėlės) + du laukeliai (min kairėje, max dešinėje). Domenas dinamiškas —
+// [domainMin, domainMax] atspindi realų duomenų rėžį (backend nukerpa tuščius
+// kaušus). Laukeliai vadinasi verteNuo/verteIki, tad keliauja su GET forma.
+// Struktūra atkartoja /sutartys „Suma" filtrą.
+interface Bucket { from: number; to: number | null; count: number }
+interface Props {
+  hist: { buckets: Bucket[]; domainMin: number; domainMax: number };
+  verteNuo?: string | number;
+  verteIki?: string | number;
+}
+const { hist, verteNuo, verteIki } = Astro.props;
+const domainMin = Math.max(0, hist.domainMin || 0);
+const domainMax = Math.max(domainMin + 1, hist.domainMax || 100_000_000);
+
+const parse = (v: string | number | undefined) => {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+};
+const hasNuo = parse(verteNuo) != null;
+const hasIki = parse(verteIki) != null;
+const minVal = parse(verteNuo) ?? domainMin;
+const maxVal = parse(verteIki) ?? domainMax;
+
+const maxCount = Math.max(1, ...hist.buckets.map((b) => b.count));
+const effMax = maxVal >= domainMax ? Infinity : maxVal;
+
+const bars = hist.buckets.map((b) => {
+  const upper = b.to == null ? Infinity : b.to;
+  const height = b.count > 0 ? 8 + 92 * Math.sqrt(b.count / maxCount) : 0;
+  const active = upper > minVal && b.from < effMax;
+  return { from: b.from, to: b.to, count: b.count, height, active };
+});
+
+const fmtEur = (n: number): string => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString('lt-LT', { maximumFractionDigits: 1 })} mln.`;
+  if (n >= 1_000) return `${Math.round(n / 1_000).toLocaleString('lt-LT')} tūkst.`;
+  return String(Math.round(n));
+};
+---
+
+<section class="dok-filter-section vp-verte" data-domain-min={domainMin} data-domain-max={domainMax}>
+  <span class="dok-filter-section-label">Vertė</span>
+
+  <div class="suma-chart" aria-hidden="true">
+    {bars.map((b) => (
+      <span
+        class={`suma-bar${b.active ? ' is-active' : ''}`}
+        data-from={b.from}
+        data-to={b.to ?? ''}
+        style={`height:${b.height}%`}
+        title={`${fmtEur(b.from)} – ${b.to != null ? fmtEur(b.to) : '∞'} €: ${b.count.toLocaleString('lt-LT')}`}
+      ></span>
+    ))}
+  </div>
+
+  <div class="suma-slider" data-suma-slider>
+    <span class="suma-track"></span>
+    <span class="suma-range"></span>
+    <input type="range" class="suma-handle suma-handle--min" min="0" max="1000" step="1" value="0" aria-label="Mažiausia vertė" />
+    <input type="range" class="suma-handle suma-handle--max" min="0" max="1000" step="1" value="1000" aria-label="Didžiausia vertė" />
+    <span class="suma-bubble suma-bubble--min" aria-hidden="true"></span>
+    <span class="suma-bubble suma-bubble--max" aria-hidden="true"></span>
+  </div>
+
+  <div class="suma-inputs">
+    <label class="suma-box suma-box--min">
+      <input type="number" name="verteNuo" min="0" step="1" inputmode="numeric" placeholder={fmtEur(domainMin)}
+             value={hasNuo ? String(Math.round(minVal)) : ''} aria-label="Vertė nuo" />
+      <span class="suma-box-unit">€</span>
+    </label>
+    <label class="suma-box suma-box--max">
+      <input type="number" name="verteIki" min="0" step="1" inputmode="numeric" placeholder={fmtEur(domainMax) + '+'}
+             value={hasIki ? String(Math.round(maxVal)) : ''} aria-label="Vertė iki" />
+      <span class="suma-box-unit">€</span>
+    </label>
+  </div>
+</section>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector('.vp-verte');
+    if (!root) return;
+    const domainMin = Number(root.getAttribute('data-domain-min')) || 0;
+    const domainMax = Number(root.getAttribute('data-domain-max')) || 100_000_000;
+    const STEPS = 1000;
+
+    const hMin = root.querySelector('.suma-handle--min');
+    const hMax = root.querySelector('.suma-handle--max');
+    const rangeEl = root.querySelector('.suma-range');
+    const bubMin = root.querySelector('.suma-bubble--min');
+    const bubMax = root.querySelector('.suma-bubble--max');
+    const inMin = root.querySelector('input[name="verteNuo"]');
+    const inMax = root.querySelector('input[name="verteIki"]');
+    const bars = [...root.querySelectorAll('.suma-bar')];
+
+    const bkts = bars.map((bar) => ({
+      from: Number(bar.dataset.from),
+      to: bar.dataset.to ? Number(bar.dataset.to) : domainMax,
+    }));
+    if (bkts.length === 0) bkts.push({ from: domainMin, to: domainMax });
+    const N = bkts.length;
+
+    const frac = (v) => {
+      if (v <= domainMin) return 0;
+      if (v >= domainMax) return 1;
+      for (let i = 0; i < N; i++) {
+        const { from, to } = bkts[i];
+        if (v < to || i === N - 1) {
+          const local = to > from ? (v - from) / (to - from) : 0;
+          return (i + Math.min(1, Math.max(0, local))) / N;
+        }
+      }
+      return 1;
+    };
+    const posToVal = (p) => {
+      if (p <= 0) return domainMin;
+      if (p >= STEPS) return domainMax;
+      const x = (p / STEPS) * N;
+      const i = Math.min(N - 1, Math.floor(x));
+      const { from, to } = bkts[i];
+      return from + (x - i) * (to - from);
+    };
+    const valToPos = (v) => Math.round(frac(v) * STEPS);
+    const nice = (v) => {
+      if (v <= 0) return 0;
+      const mag = Math.pow(10, Math.floor(Math.log10(v)) - 1);
+      return Math.round(v / mag) * mag;
+    };
+    const fmtEur = (n) => {
+      if (n >= 1e6) return (n / 1e6).toLocaleString('lt-LT', { maximumFractionDigits: 1 }) + ' mln. €';
+      if (n >= 1e3) return Math.round(n / 1e3).toLocaleString('lt-LT') + ' tūkst. €';
+      return Math.round(n).toLocaleString('lt-LT') + ' €';
+    };
+    const readNum = (el) => {
+      const n = parseFloat((el.value || '').replace(',', '.'));
+      return Number.isFinite(n) ? n : null;
+    };
+
+    let minVal = readNum(inMin) ?? domainMin;
+    let maxVal = readNum(inMax) ?? domainMax;
+
+    function paint() {
+      const lo = frac(minVal) * 100;
+      const hi = frac(maxVal) * 100;
+      rangeEl.style.left = lo + '%';
+      rangeEl.style.width = Math.max(0, hi - lo) + '%';
+      bubMin.style.left = lo + '%';
+      bubMax.style.left = hi + '%';
+      bubMin.textContent = fmtEur(minVal);
+      bubMax.textContent = maxVal >= domainMax ? fmtEur(domainMax) + '+' : fmtEur(maxVal);
+      const effMax = maxVal >= domainMax ? Infinity : maxVal;
+      for (const bar of bars) {
+        const from = Number(bar.dataset.from);
+        const to = bar.dataset.to ? Number(bar.dataset.to) : Infinity;
+        bar.classList.toggle('is-active', to > minVal && from < effMax);
+      }
+    }
+
+    function syncFromSlider() {
+      let a = Number(hMin.value);
+      let b = Number(hMax.value);
+      if (a > b) [a, b] = [b, a];
+      minVal = a <= 0 ? domainMin : nice(posToVal(a));
+      maxVal = b >= STEPS ? domainMax : nice(posToVal(b));
+      inMin.value = minVal > domainMin ? String(minVal) : '';
+      inMax.value = maxVal < domainMax ? String(maxVal) : '';
+      paint();
+    }
+    function syncFromInputs() {
+      minVal = Math.max(domainMin, readNum(inMin) ?? domainMin);
+      maxVal = readNum(inMax) ?? domainMax;
+      if (maxVal <= 0) maxVal = domainMax;
+      if (minVal > maxVal) minVal = maxVal;
+      hMin.value = String(valToPos(minVal));
+      hMax.value = String(maxVal >= domainMax ? STEPS : valToPos(maxVal));
+      paint();
+    }
+    function commit() {
+      // Telefone (≤900px) neperkraunam — laukeliai (verteNuo/verteIki) yra formos
+      // laukai ir pritaikomi per „Ieškoti". Darbastalyje — įprasta navigacija.
+      if (window.matchMedia('(max-width: 900px)').matches) return;
+      const p = new URLSearchParams(location.search);
+      if (minVal > domainMin) p.set('verteNuo', String(Math.round(minVal))); else p.delete('verteNuo');
+      if (maxVal < domainMax) p.set('verteIki', String(Math.round(maxVal))); else p.delete('verteIki');
+      p.delete('page');
+      location.href = '/viesiejiPirkimai/?' + p.toString();
+    }
+
+    hMin.value = String(valToPos(minVal));
+    hMax.value = String(maxVal >= domainMax ? STEPS : valToPos(maxVal));
+    paint();
+
+    hMin.addEventListener('input', syncFromSlider);
+    hMax.addEventListener('input', syncFromSlider);
+    hMin.addEventListener('change', commit);
+    hMax.addEventListener('change', commit);
+    for (const el of [inMin, inMax]) {
+      el.addEventListener('input', syncFromInputs);
+      el.addEventListener('change', commit);
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+    }
+  })();
+</script>
+
+<style>
+  .suma-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 44px;
+    margin: 8px 0 6px;
+  }
+  .suma-bar {
+    flex: 1;
+    min-width: 0;
+    background-color: var(--light-gray);
+    border-radius: 1.5px 1.5px 0 0;
+    transition: background-color var(--transition);
+    cursor: pointer;
+  }
+  .suma-bar.is-active { background-color: var(--black); }
+  .suma-chart:hover .suma-bar { background-color: var(--lighter-gray); }
+  .suma-chart:hover .suma-bar.is-active { background-color: var(--dark-gray); }
+  .suma-bar:hover,
+  .suma-chart:hover .suma-bar:hover { background-color: var(--black); }
+
+  .suma-slider { position: relative; height: 20px; }
+  .suma-track,
+  .suma-range {
+    position: absolute;
+    top: 50%;
+    height: 3px;
+    border-radius: 2px;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  .suma-track { left: 0; width: 100%; background: var(--light-gray); }
+  .suma-range { background: var(--black); }
+
+  .suma-handle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    background: none;
+    pointer-events: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .suma-handle::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    pointer-events: auto;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--white);
+    border: 2px solid var(--black);
+    cursor: pointer;
+    box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, .2));
+  }
+  .suma-handle::-moz-range-thumb {
+    pointer-events: auto;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--white);
+    border: 2px solid var(--black);
+    cursor: pointer;
+  }
+  .suma-handle::-webkit-slider-runnable-track { background: none; }
+  .suma-handle::-moz-range-track { background: none; }
+
+  .suma-bubble {
+    position: absolute;
+    bottom: 100%;
+    margin-bottom: 4px;
+    transform: translateX(-50%);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--black);
+    color: var(--white);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--transition);
+  }
+  .suma-handle--min:active ~ .suma-bubble--min,
+  .suma-handle--min:focus-visible ~ .suma-bubble--min,
+  .suma-handle--max:active ~ .suma-bubble--max,
+  .suma-handle--max:focus-visible ~ .suma-bubble--max { opacity: 1; }
+
+  .suma-inputs {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .suma-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 7px;
+    border: var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+  }
+  .suma-box:focus-within { border-color: var(--black); }
+  .suma-box input {
+    width: 7ch;
+    border: none;
+    outline: none;
+    background: none;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+    -moz-appearance: textfield;
+  }
+  .suma-box--min input { text-align: left; }
+  .suma-box--max input { text-align: right; }
+  .suma-box input:focus { color: var(--black); }
+  .suma-box input::placeholder { color: var(--gray); }
+  .suma-box input::-webkit-outer-spin-button,
+  .suma-box input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .suma-box-unit { flex-shrink: 0; font-size: var(--text-xs); color: var(--gray); }
+</style>

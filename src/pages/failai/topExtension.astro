@@ -2,6 +2,8 @@
 import Layout from '../../layouts/Layout.astro';
 import Pagination from '@design-system/components/Pagination.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
+import TopListCard from '@design-system/components/TopListCard.astro';
 import { postgres, getColorScheme, getFont } from '../../lib/failai.js';
 import '@/utils/linksniai.js';
 const colorScheme = getColorScheme(Astro.cookies);
@@ -18,7 +20,16 @@ const pageCount = Math.ceil(totalExtensionCount / DEFAULT_LIMIT);
   <main>
     <PageHeader>Dažniausi failų plėtiniai</PageHeader>
     <div class="stack stack-md">
-      <div class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">{(extension as any[]).map((item) => <article class="card card-clickable"><div class="card-body"><h3 class="text-xl font-bold cell-mono mb-3 mt-1"><a href={`/dokumentai?ext=${item.extension}`}>{item.extension || '\u200b'}</a></h3><p class="text-muted text-sm mb-0">{Number(item.count).toLocaleString('lt-LT')} failų</p></div></article>)}</div>
+      <MetricCardGrid minWidth="200px">
+        {(extension as any[]).map((item) => (
+          <TopListCard
+            label={item.extension || '\u200b'}
+            href={`/dokumentai?ext=${item.extension}`}
+            mono
+            meta={`${Number(item.count).toLocaleString('lt-LT')} failų`}
+          />
+        ))}
+      </MetricCardGrid>
       <Pagination currentPage={page} pageCount={pageCount} queryParams="" />
     </div>
   </main>

@@ -1,4 +1,6 @@
 ---
+import DetailsSection from '@design-system/components/DetailsSection.astro';
+import DateValue from '@design-system/components/DateValue.astro';
 import Timeline from '@design-system/components/Timeline.astro';
 import TimelineItem from '@design-system/components/TimelineItem.astro';
 
@@ -15,18 +17,17 @@ const isPast = (dateStr: any) => {
 };
 ---
 
-<section>
-  <h2>Terminai</h2>
+<DetailsSection title="Terminai">
   <Timeline>
     {items.map((item, i) => {
       const past = isPast(item.date);
       const nextPast = i + 1 < items.length && isPast(items[i + 1].date);
       return (
         <TimelineItem active={past} lineActive={nextPast}>
-          <div class="text-xs text-muted">{String(item.date).slice(0, 16).replace('T', ' ')}</div>
+          <div class="text-xs text-muted"><DateValue value={item.date} mode="datetime" /></div>
           <strong>{item.label}</strong>
         </TimelineItem>
       );
     })}
   </Timeline>
-</section>
+</DetailsSection>

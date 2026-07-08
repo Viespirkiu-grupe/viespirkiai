@@ -1,6 +1,7 @@
 ---
+import DateValue from '@design-system/components/DateValue.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
-import { fmtEur } from '../../lib/formatters.ts';
 import SaskaitaItem from './SaskaitaItem.astro';
 
 interface Props {
@@ -23,11 +24,13 @@ const saskaitosHidden = saskaitos.slice(maxSaskaitos);
   <div slot="meta" class="result-card-meta">
     <span>{item.tipas}</span>
     <span>{item.sutartiesNumeris}</span>
-    <span>{d1 ? `Sut. ${d1}${d1 !== d2 ? ' — ' + d2 : ''}` : '—'}</span>
+    <span>
+      {d1 ? <>Sut. <DateValue value={item.sutartiesPasirasymoData} />{d1 !== d2 && <> — <DateValue value={item.sutartiesGaliojimoData} /></>}</> : '—'}
+    </span>
   </div>
 
   <h3 slot="title" class="result-card-title">
-    <span class={`amount${sumaBold ? ' font-bold' : ''}`}>{fmtEur(item.suma)} €</span>
+    <span class="amount"><MoneyValue value={item.suma} bold={sumaBold} mono={false} /></span>
     &nbsp;{item.pavadinimas.length < 1 ? <em>Nenurodyta</em> : item.pavadinimas}
   </h3>
 

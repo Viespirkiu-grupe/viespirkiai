@@ -1,244 +1,105 @@
 ---
 import FilterGroup from '@design-system/components/filters/FilterGroup.astro';
+import FilterPanel from '@design-system/components/filters/FilterPanel.astro';
 import DateRangeFilter from '@design-system/components/filters/DateRangeFilter.astro';
-import NumberRangeFilter from '@design-system/components/filters/NumberRangeFilter.astro';
-import SortFilter from '@design-system/components/filters/SortFilter.astro';
-import Field from '@design-system/components/inputs/Field.astro';
 import TextInput from '@design-system/components/inputs/TextInput.astro';
 import NumberInput from '@design-system/components/inputs/NumberInput.astro';
 import CheckboxInput from '@design-system/components/inputs/CheckboxInput.astro';
-import BvpzPicker from './BvpzPicker.astro';
-
-interface SortOption {
-  value: string;
-  label: string;
-}
 
 interface Props {
   values: Record<string, string | number | undefined>;
-  sortOptions: SortOption[];
+  /** Paslepia „Dalyviai" (pirkėjo/tiekėjo kodas) grupę — kai jie rodomi kaip
+   *  facetai su įterptu kodo įvedimu (Quickwit režimas). */
+  hideParticipants?: boolean;
 }
 
-const { values, sortOptions } = Astro.props;
-
-const bvpzPresets = [
-  { label: 'Informacinės technologijos', codes: '48 72' },
-  { label: 'Vaistai', codes: '3360 3361 3362 3363 3364 3365 3366 3367 33690 33691' },
-];
-const bvpzCurrent = String(values['bvpzPrefiksasKitas'] || values['bvpzPrefiksas'] || '');
+const { values, hideParticipants = false } = Astro.props;
 ---
 
-<div class="search-filters-grid">
-  <FilterGroup legend="Dalyviai">
-    <TextInput label="Pirkėjo kodas" name="perkanciosiosOrganizacijosKodas" placeholder="Nenurodyta" values={values} />
-    <TextInput label="Tiekėjo kodas" name="tiekejoKodas" placeholder="Nenurodyta" values={values} />
-  </FilterGroup>
+<FilterPanel variant="rail" className="sut-filters-rail">
+  {!hideParticipants && (
+    <FilterGroup legend="Dalyviai">
+      <TextInput label="Pirkėjo kodas" name="perkanciosiosOrganizacijosKodas" placeholder="Nenurodyta" values={values} />
+      <TextInput label="Tiekėjo kodas" name="tiekejoKodas" placeholder="Nenurodyta" values={values} />
+    </FilterGroup>
+  )}
 
-  <DateRangeFilter
-    legend="Laikotarpis"
-    nameFrom="sudarymoDataNuo"
-    nameTo="sudarymoDataIki"
-    labelFrom="Sudaryta nuo"
-    labelTo="Sudaryta iki"
-    values={values}
-  />
-
-  <NumberRangeFilter
-    legend="Vertė"
-    nameFrom="verteNuo"
-    nameTo="verteIki"
-    labelFrom="Vertė nuo"
-    labelTo="Vertė iki"
-    placeholderFrom="0 €"
-    placeholderTo="∞ €"
-    values={values}
-  />
-
-  <FilterGroup legend="Klasifikacija">
-    <Field label="BVPŽ prefiksas" name="bvpzPrefiksasKitas" className="ds-bvpz-field">
-      <input type="hidden" name="bvpzPrefiksas" id="bvpzPrefiksas" value="" />
-      <div class="ds-bvpz-group">
-        <input
-          class="ds-field__control ds-bvpz-input"
-          type="text"
-          name="bvpzPrefiksasKitas"
-          id="bvpzPrefiksasKitas"
-          value={bvpzCurrent}
-          placeholder="Pvz. 48 72 3360"
-        />
-        <button class="ds-bvpz-trigger" type="button" id="openBvpzDialog" aria-label="Pasirinkti BVPŽ prefiksus" title="Pasirinkti BVPŽ prefiksus">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 7h16M4 12h10M4 17h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"></path>
-            <path d="M17 14l3 3 4-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
-          </svg>
-        </button>
-      </div>
-    </Field>
-
-    <div class="modal-backdrop" id="bvpzDialogBackdrop" hidden>
-      <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="bvpzDialogTitle">
-        <div class="modal-header">
-          <h3 id="bvpzDialogTitle">BVPŽ pasirinkimas</h3>
-          <button class="modal-close" type="button" id="closeBvpzDialog" aria-label="Uždaryti">×</button>
-        </div>
-        <BvpzPicker
-          presets={bvpzPresets}
-          searchTargets={[]}
-          instanceId="sutartys-bvpz"
-          initialCodes={bvpzCurrent}
-          syncInputId="bvpzPrefiksasKitas"
-          clearInputId="bvpzPrefiksas"
-          syncButtonLabel="Naudoti paieškoje"
-          actionBarMode="attached"
-          showPresets={true}
-          showManualInput={false}
-        />
-      </div>
-    </div>
-  </FilterGroup>
+  {!hideParticipants && (
+    <DateRangeFilter
+      legend="Laikotarpis"
+      nameFrom="sudarymoDataNuo"
+      nameTo="sudarymoDataIki"
+      labelFrom="Sudaryta nuo"
+      labelTo="Sudaryta iki"
+      values={values}
+    />
+  )}
 
   <FilterGroup legend="Identifikatoriai">
-    <NumberInput label="Unikalus ID" name="sutartiesUnikalusID" placeholder="Nenurodyta" values={values} />
-    <TextInput label="Sut. numeris" name="sutartiesNumeris" placeholder="Nenurodyta" values={values} />
+    <NumberInput label="Sutarties unikalus ID" name="sutartiesUnikalusID" placeholder="Nenurodyta" values={values} />
+    <TextInput label="Sutarties numeris" name="sutartiesNumeris" placeholder="Nenurodyta" values={values} />
     <TextInput label="Pirkimo numeris" name="pirkimoNumeris" placeholder="Nenurodyta" values={values} />
   </FilterGroup>
 
-  <SortFilter options={sortOptions} values={values} />
-
   <FilterGroup legend="Filtrai" class="justify-start">
     <CheckboxInput name="tikSuDokumentais" label="Tik su dokumentais" values={values} />
-    <CheckboxInput name="ignoruotiSp" label="Nerodyti pakeitimų (SP)" values={values} />
   </FilterGroup>
-</div>
-<p class="text-muted text-xs mt-7">Veikia tik ne tekstinėse paieškose</p>
+</FilterPanel>
 
-<style>
-  .ds-bvpz-field {
-    margin-bottom: 0;
+<style is:global>
+  /* Suderinam su facetų sekcijų antraštėmis viršuje (`.dok-filter-section-label`:
+     10px / 600 / letter-spacing), kad „Identifikatoriai"/„Filtrai" nebūtų
+     stambesni ir nedertų su likusia šonine juosta. */
+  .sut-filters-rail .filter-group-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    color: var(--gray);
+    margin-bottom: 6px;
+  }
+  /* Įvesties laukų ir žymimojo langelio tekstas — kompaktiškas, kaip likusi
+     juosta. Didesnis specifiškumas (2 klasės), kad nugalėtų komponentų pačių
+     scope'intus stilius (`.ds-field__control` text-sm, `.ds-checkbox__label`
+     text-base). */
+  .sut-filters-rail .filter-group .ds-field__control {
+    font-size: 13px;
   }
 
-  .ds-bvpz-group {
-    display: flex;
-    align-items: stretch;
-    min-height: 41px;
-    border: var(--border);
+  /* „Tik su dokumentais" gyvena toje pačioje šoninėje juostoje kaip facetai, tad
+     turi atrodyti kaip faceto eilutė (`.dok-filter-opt`), o ne kaip stambesnis
+     dizaino sistemos žymimasis langelis. Perrašom eilutės metriką ir dėžutės
+     išvaizdą (15px / 1.5px / SVG varnelė), kad sutaptų su facetų checkbox'ais. */
+  .sut-filters-rail .ds-checkbox {
+    gap: 9px;
+    min-height: 28px;
+    padding-block: 0;
+    padding-inline: 6px;
+    margin-inline: -6px;
     border-radius: var(--radius-md);
-    background: var(--white);
-    transition: border-color var(--transition), box-shadow var(--transition);
-
-    .ds-bvpz-input {
-      flex: 1 1 auto;
-      min-width: 0;
-      border: 0;
-      border-right: var(--border);
-      border-radius: var(--radius-md) 0 0 var(--radius-md);
-    }
-
-    .ds-bvpz-trigger {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 41px;
-      min-width: 41px;
-      border: 0;
-      border-radius: 0 var(--radius-md) var(--radius-md) 0;
-      background: var(--black);
-      color: var(--white);
-      cursor: pointer;
-      transition: background-color var(--transition), color var(--transition);
-    }
-
-    .ds-bvpz-trigger:hover {
-      background: var(--dark-gray);
-      color: var(--white);
-    }
-
-    .ds-bvpz-input:focus-visible + .ds-bvpz-trigger {
-      outline: var(--border-focus);
-      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    }
-
-    .ds-bvpz-trigger svg {
-      width: 18px;
-      height: 18px;
-    }
+    transition: background var(--transition);
   }
-
-  #bvpzDialogBackdrop[hidden] {
-    display: none;
+  .sut-filters-rail .ds-checkbox:hover {
+    background: var(--lighter-gray);
   }
-
-  #bvpzDialogBackdrop {
-    z-index: calc(var(--z-sticky) + 50);
+  .sut-filters-rail .ds-checkbox .ds-checkbox__label {
+    font-size: var(--text-sm);
+    color: var(--dark-gray);
   }
-
-  #bvpzDialogBackdrop .modal {
-    max-width: 980px;
-    overflow: hidden;
+  .sut-filters-rail .ds-checkbox:hover .ds-checkbox__label {
+    color: var(--black);
   }
-
-  #bvpzDialogBackdrop :global(.bvpz-picker) {
-    padding: 0;
+  /* Dėžutės dydis suvienodinamas su facetų checkbox'ais (15px / 1.5px rėmelis);
+     SVG varnelė ir juodas užpildas ateina iš paties komponento. */
+  .sut-filters-rail .ds-checkbox__input {
+    width: 15px;
+    min-width: 15px;
+    height: 15px;
+    border-width: 1.5px;
   }
-
-  #bvpzDialogBackdrop :global(.bvpz-picker > .text-muted),
-  #bvpzDialogBackdrop :global(.bvpz-picker > .flex.flex-wrap) {
-    padding-inline: 28px;
+  .sut-filters-rail .ds-checkbox__input:checked {
+    background-size: 11px;
   }
-
-  #bvpzDialogBackdrop :global(.bvpz-picker > .text-muted) {
-    padding-top: 20px;
+  .sut-filters-rail .ds-checkbox:hover .ds-checkbox__input {
+    border-color: var(--dark-gray);
   }
-
-  #bvpzDialogBackdrop :global(.bvpz-picker .cpv-tree) {
-    max-height: 55vh;
-    overflow: auto;
-    padding: 0 28px 0 28px;
-  }
-
 </style>
-
-<script is:inline>
-  const bvpzInput = document.getElementById('bvpzPrefiksasKitas');
-  const bvpzLegacyInput = document.getElementById('bvpzPrefiksas');
-  const dialogBackdrop = document.getElementById('bvpzDialogBackdrop');
-  const openDialogBtn = document.getElementById('openBvpzDialog');
-  const closeDialogBtn = document.getElementById('closeBvpzDialog');
-
-  function normalizeBvpzCodes(value) {
-    const matches = String(value || '').match(/\d{2,9}/g) || [];
-    return Array.from(new Set(matches)).join(' ');
-  }
-
-  function closeBvpzDialog() {
-    if (!dialogBackdrop) return;
-    dialogBackdrop.hidden = true;
-    document.body.style.removeProperty('overflow');
-  }
-
-  function openBvpzDialog() {
-    if (!dialogBackdrop) return;
-    document.getElementById('sutartys-bvpz-root')?.dispatchEvent(new CustomEvent('bvpz:setCodes', {
-      bubbles: true,
-      detail: { codes: normalizeBvpzCodes(bvpzInput?.value || '') },
-    }));
-    dialogBackdrop.hidden = false;
-    document.body.style.overflow = 'hidden';
-  }
-
-  openDialogBtn?.addEventListener('click', openBvpzDialog);
-  closeDialogBtn?.addEventListener('click', closeBvpzDialog);
-  dialogBackdrop?.addEventListener('click', (event) => {
-    if (event.target === dialogBackdrop) closeBvpzDialog();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && dialogBackdrop && !dialogBackdrop.hidden) closeBvpzDialog();
-  });
-
-  bvpzInput?.addEventListener('change', () => {
-    bvpzInput.value = normalizeBvpzCodes(bvpzInput.value);
-    if (bvpzLegacyInput && bvpzInput.value) bvpzLegacyInput.value = '';
-  });
-  document.getElementById('sutartys-bvpz-root')?.addEventListener('bvpz:sync', closeBvpzDialog);
-</script>

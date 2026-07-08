@@ -366,4 +366,187 @@
   .search-bar .btn {
     @apply shrink-0;
   }
+
+  /* ── Sidebar layout (variant="sidebar") ────────────────────────────────
+     A persistent left filter rail beside the results (same idiom as
+     /dokumentai): the search bar sits in its own row atop the results, and
+     a hairline divider carries the rail down the full height of the page.
+     Everything stays inside one #searchForm so filters submit with search. */
+  /* Apsauga nuo horizontalaus persislinkimo dviejų stulpelių maketuose (pvz.
+     facetų „hover" pilės ar histograma prasibrauna kelis px) — kitaip mobilus
+     dešinysis paraštės tarpas „dingsta" dėl horizontalaus slinkimo. */
+  html:has(main.sidebar-main),
+  html:has(main.sidebar-main) body {
+    overflow-x: clip;
+  }
+
+  #searchForm.searchform-sidebar {
+    display: grid;
+    /* Rail is fixed; the right column fills ALL remaining width so the
+       search bar and results center within the whole area right of the
+       divider (not within a capped, off-centre column). */
+    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-areas:
+      "rail search"
+      "rail results";
+    grid-template-rows: auto 1fr;
+    align-items: stretch;
+    /* Left-anchored (Google/dokumentai idiom): the grid hugs the left edge,
+       the right stays open. The 16px gutter lines the rail up under the navbar
+       logo. No top padding — the breath below the navbar lives inside each
+       column, so the divider runs from the very top to the bottom. */
+    justify-content: start;
+    column-gap: 32px;
+    /* Override the base #searchForm centering (max-width + margin auto) so the
+       shell spans full width and hugs the left instead of centering. */
+    max-width: none;
+    width: 100%;
+    margin-inline: 0;
+    /* Align the rail's left edge with the navbar logo (16px gutter). */
+    padding-inline: 16px;
+    padding-bottom: 40px;
+  }
+
+  .sf-rail {
+    grid-area: rail;
+    min-width: 0;
+    padding: 24px 16px 24px 0;
+    border-right: var(--border);
+  }
+
+  /* Mobilaus perjungiklio antraštė ir „Ieškoti" mygtukas — tik ≤900px. */
+  .sf-rail-head { display: none; }
+  .sf-rail-search { display: none; }
+
+  .sf-search {
+    grid-area: search;
+    min-width: 0;
+    /* Match the rail's top padding so the bar starts level with "Filtrai". */
+    padding-top: 24px;
+    margin-bottom: 20px;
+  }
+
+  /* Search field + results share one left-aligned column width in the right
+     area, just to the right of the divider. */
+  #searchForm.searchform-sidebar {
+    --sf-content-width: 880px;
+  }
+
+  #searchForm.searchform-sidebar .search-bar {
+    display: flex;
+    width: 100%;
+    max-width: var(--sf-content-width);
+    margin-inline: 0;
+  }
+
+  .sf-results {
+    grid-area: results;
+    min-width: 0;
+  }
+
+  /* Results left-aligned in the right area (no extra top margin — the search
+     row already provides the gap). */
+  .sf-results > * {
+    max-width: var(--sf-content-width);
+    margin-top: 0;
+    margin-inline: 0;
+  }
+
+  @media (max-width: 900px) {
+    #searchForm.searchform-sidebar {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "search"
+        "rail"
+        "results";
+      grid-template-rows: auto;
+      column-gap: 0;
+      /* Daugiau tarpo šonuose — turinys nebeprilimpa prie ekrano krašto. */
+      padding-inline: 24px;
+    }
+
+    /* Filtrai suskleidžiami už antraštės — rezultatai lieka arti viršaus, o ne po
+       aukšta facetų sekcijų kaladėle (kaip /dokumentai). Antraštė tampa mygtuku. */
+    .sf-rail {
+      padding: 0 0 12px;
+      margin-bottom: 16px;
+      border-right: none;
+      border-bottom: var(--border);
+    }
+
+    .sf-rail-head {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .sf-rail-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 12px 0;               /* aukštesnis palietimo taikinys */
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--dark-gray);
+      cursor: pointer;
+    }
+    .sf-filters-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      border-radius: var(--radius-pill);
+      background: var(--black);
+      color: var(--white);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+    .sf-filters-chevron { display: inline-flex; transition: transform var(--transition); }
+    .sf-filters-chevron::before { content: "▾"; font-size: 11px; }
+    .sf-rail.is-open .sf-filters-chevron { transform: rotate(180deg); }
+
+    /* Suskleista, kol naudotojas atveria. Animuojam kūno aukštį 0 → auto. */
+    .sf-rail-body {
+      box-sizing: border-box;
+      height: 0;
+      overflow: hidden;
+      transition: height 0.4s ease;
+    }
+    .sf-rail.is-open .sf-rail-body {
+      height: auto;
+      padding-bottom: 8px;
+    }
+
+    /* „Ieškoti" mygtukas filtrų apačioje — matomas tik atvėrus juostą. */
+    .sf-rail.is-open .sf-rail-search {
+      display: block;
+      width: 100%;
+      margin-top: 16px;
+      padding: 12px;
+      border: none;
+      border-radius: var(--radius-md);
+      background: var(--black);
+      color: var(--white);
+      font-family: inherit;
+      font-size: var(--text-sm);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .sf-search {
+      padding-top: 16px;
+      margin-bottom: 16px;
+    }
+  }
+
+  @media (max-width: 900px) and (prefers-reduced-motion: reduce) {
+    .sf-rail-body { transition: none; }
+  }
 }

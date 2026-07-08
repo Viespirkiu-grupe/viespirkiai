@@ -1,6 +1,6 @@
 ---
-import Table from '@design-system/components/Table.astro';
-import TableWrapper from '@design-system/components/TableWrapper.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import NumberValue from '@design-system/components/NumberValue.astro';
 
 interface Props {
   items: any[];
@@ -9,23 +9,19 @@ interface Props {
 const { items } = Astro.props;
 ---
 
-<TableWrapper className="mt-4">
-  <Table>
-    <thead>
-      <tr>
-        <th class="cell-center">ID</th>
-        <th>OCR būsena</th>
-        <th class="cell-right">Failų skaičius</th>
-      </tr>
-    </thead>
-    <tbody>
-      {items.map((status) => (
-        <tr>
-          <td class="cell-mono cell-center">{status.id}</td>
-          <td>{status.text}</td>
-          <td class="cell-mono cell-right">{status.count.toLocaleString('lt-LT')}</td>
-        </tr>
-      ))}
-    </tbody>
-  </Table>
-</TableWrapper>
+<DataTable
+  wrapperClassName="mt-4"
+  columns={[
+    { label: 'ID', headerClassName: 'cell-center' },
+    { label: 'OCR būsena' },
+    { label: 'Failų skaičius', headerClassName: 'cell-right' },
+  ]}
+>
+  {items.map((status) => (
+    <tr>
+      <td class="cell-mono cell-center">{status.id}</td>
+      <td>{status.text}</td>
+      <td class="cell-mono cell-right"><NumberValue value={status.count} mono={false} /></td>
+    </tr>
+  ))}
+</DataTable>

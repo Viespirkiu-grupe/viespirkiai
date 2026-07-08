@@ -1,4 +1,8 @@
 ---
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
+
 interface Props {
   items: any[];
 }
@@ -6,24 +10,17 @@ interface Props {
 const { items } = Astro.props;
 ---
 
-<div class="grid gap-3 pt-1 grid-cols-[repeat(auto-fill,minmax(190px,1fr))]">
+<MetricCardGrid minWidth="190px" className="pt-1">
   {items.map((nuskaitytojas) => (
-    <div class="card">
-      <div class="card-body">
-        <div class="section-title mb-2">
-          <a href={`/failai/ocr/${nuskaitytojas.id}`}>{nuskaitytojas.viesasPavadinimas}</a>
-        </div>
-        <dl class="kv-list">
-          <dt>Dokumentai</dt>
-          <dd><span class="cell-mono">{nuskaitytojas.results.toLocaleString('lt-LT')}</span></dd>
-          <dt>Puslapiai</dt>
-          <dd><span class="cell-mono">{nuskaitytojas.pages.toLocaleString('lt-LT')}</span></dd>
-          <dt>Žodžiai</dt>
-          <dd><span class="cell-mono">{nuskaitytojas.words.toLocaleString('lt-LT')}</span></dd>
-          <dt>Rezervacijos</dt>
-          <dd><span class="cell-mono">{nuskaitytojas.rezervacijos.toLocaleString('lt-LT')}</span></dd>
-        </dl>
-      </div>
-    </div>
+    <MetricCard label={nuskaitytojas.viesasPavadinimas} href={`/failai/ocr/${nuskaitytojas.id}`} clickable>
+      <KeyValueList
+        items={[
+          { label: 'Dokumentai', value: nuskaitytojas.results.toLocaleString('lt-LT'), valueClassName: 'cell-mono' },
+          { label: 'Puslapiai', value: nuskaitytojas.pages.toLocaleString('lt-LT'), valueClassName: 'cell-mono' },
+          { label: 'Žodžiai', value: nuskaitytojas.words.toLocaleString('lt-LT'), valueClassName: 'cell-mono' },
+          { label: 'Rezervacijos', value: nuskaitytojas.rezervacijos.toLocaleString('lt-LT'), valueClassName: 'cell-mono' },
+        ]}
+      />
+    </MetricCard>
   ))}
-</div>
+</MetricCardGrid>

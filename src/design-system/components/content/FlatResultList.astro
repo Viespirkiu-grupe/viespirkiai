@@ -1,0 +1,50 @@
+---
+// Reusable borderless results list, shared by the search pages (sutartys,
+// dokumentai). No outer border: each ResultCardShell becomes a row with a
+// hairline divider and generous internal padding, and the title gets the
+// lighter, search-result weight. Page-specific bits (provenance, snippet,
+// meta rows) are layered on top via an extra `className` from the caller.
+interface Props {
+  className?: string;
+}
+
+const { className = '' } = Astro.props;
+---
+
+<div class:list={['result-list--flat', className]}>
+  <slot />
+</div>
+
+<style is:global>
+  /* Flat list overrides the default bordered .result-card (ResultCardShell). */
+  .result-list--flat .result-card {
+    padding: 0 0 24px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--lighter-gray);
+    transition: none;
+  }
+  .result-list--flat .result-card.card-clickable:hover {
+    box-shadow: none;
+  }
+  .result-list--flat .result-card:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .result-list--flat .result-card-title {
+    margin: 2px 0 0;
+    font-size: var(--text-lg);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .result-list--flat .result-card-title a { color: var(--black); }
+  .result-list--flat .result-card-title a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  @media (max-width: 600px) {
+    .result-list--flat .result-card { padding-inline: 0; }
+  }
+</style>

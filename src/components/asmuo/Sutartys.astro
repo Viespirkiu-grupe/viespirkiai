@@ -1,5 +1,8 @@
 ---
-import SectionHeading from '@design-system/components/SectionHeading.astro';
+import ExportLinks from '@design-system/components/ExportLinks.astro';
+import PageSection from '@design-system/components/PageSection.astro';
+import SectionGrid from '@design-system/components/SectionGrid.astro';
+import SectionToolbar from '@design-system/components/SectionToolbar.astro';
 import ChartTile from '@design-system/components/charts/ChartTile.astro';
 import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
 import Table from '@design-system/components/Table.astro';
@@ -13,11 +16,18 @@ const pirkimaiLabels = pirkimai.map((d: any) => String(d.year));
 const pirkimaiSeries = pirkimai.map((d: any) => d.total || null);
 const tiekimaiLabels = tiekimai.map((d: any) => String(d.year));
 const tiekimaiSeries = tiekimai.map((d: any) => d.total || null);
+const topTiekejaiExport = [
+  { href: `/asmuo/${asmuo.jar.jarKodas}/sutartys/topTiekejai.csv`, label: 'CSV' },
+  { href: `/asmuo/${asmuo.jar.jarKodas}/sutartys/topTiekejai.jsonl`, label: 'JSONL' },
+];
+const topPirkejaiExport = [
+  { href: `/asmuo/${asmuo.jar.jarKodas}/sutartys/topPirkejai.csv`, label: 'CSV' },
+  { href: `/asmuo/${asmuo.jar.jarKodas}/sutartys/topPirkejai.jsonl`, label: 'JSONL' },
+];
 ---
 
-<div class="page-section mb-10" id="sutartys">
-  <SectionHeading id="sutartys" title="Viešųjų pirkimų sutartys" />
-  <div class="grid-2 mb-10">
+<PageSection id="sutartys" title="Viešųjų pirkimų sutartys">
+  <SectionGrid columns={2} className="mb-10">
     <ChartTile title="Numatytos pirkimų vertės pagal metus" hasData={pirkimai.length > 0}>
       <LineDatetimeChart
         id="pirkimaiPerMetus"
@@ -44,17 +54,13 @@ const tiekimaiSeries = tiekimai.map((d: any) => d.total || null);
         heightClass="h-[350px]"
       />
     </ChartTile>
-  </div>
+  </SectionGrid>
 
-  <div class="grid-2">
+  <SectionGrid columns={2}>
     <div class="flex flex-col">
-      <div class="flex justify-between items-center mb-3">
-        <h3 class="text-sm font-bold mb-0">TOP 10 tiekėjų</h3>
-        <div class="flex gap-2">
-          <a href={`/asmuo/${asmuo.jar.jarKodas}/sutartys/topTiekejai.csv`} class="btn btn-outline btn-sm">↗ CSV</a>
-          <a href={`/asmuo/${asmuo.jar.jarKodas}/sutartys/topTiekejai.jsonl`} class="btn btn-outline btn-sm">↗ JSONL</a>
-        </div>
-      </div>
+      <SectionToolbar title="TOP 10 tiekėjų">
+        <Fragment slot="actions"><ExportLinks items={topTiekejaiExport} /></Fragment>
+      </SectionToolbar>
       {topTiekejai.length > 0 ? (
         <TableWrapper className="flex-1">
           <Table>
@@ -79,13 +85,9 @@ const tiekimaiSeries = tiekimai.map((d: any) => d.total || null);
     </div>
 
     <div class="flex flex-col">
-      <div class="flex justify-between items-center mb-3">
-        <h3 class="text-sm font-bold mb-0">TOP 10 pirkėjų</h3>
-        <div class="flex gap-2">
-          <a href={`/asmuo/${asmuo.jar.jarKodas}/sutartys/topPirkejai.csv`} class="btn btn-outline btn-sm">↗ CSV</a>
-          <a href={`/asmuo/${asmuo.jar.jarKodas}/sutartys/topPirkejai.jsonl`} class="btn btn-outline btn-sm">↗ JSONL</a>
-        </div>
-      </div>
+      <SectionToolbar title="TOP 10 pirkėjų">
+        <Fragment slot="actions"><ExportLinks items={topPirkejaiExport} /></Fragment>
+      </SectionToolbar>
       {topPirkejai.length > 0 ? (
         <TableWrapper className="flex-1">
           <Table>
@@ -108,8 +110,8 @@ const tiekimaiSeries = tiekimai.map((d: any) => d.total || null);
         </TableWrapper>
       ) : <div class="chart-empty flex-1">Nėra duomenų</div>}
     </div>
-  </div>
-</div>
+  </SectionGrid>
+</PageSection>
 
 <style>
   .sutartys-col-party {

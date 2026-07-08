@@ -1,0 +1,44 @@
+---
+interface Props {
+  href?: string | null;
+  label?: string;
+  source?: 'cvpis' | 'ted' | 'file' | 'court' | 'map' | 'generic';
+  variant?: 'link' | 'button';
+  size?: 'sm' | 'md';
+  className?: string;
+  ariaLabel?: string;
+  icon?: boolean;
+}
+
+const {
+  href,
+  label,
+  source = 'generic',
+  variant = 'link',
+  size = 'sm',
+  className = '',
+  ariaLabel,
+  icon = true,
+} = Astro.props as Props;
+
+const labels: Record<string, string> = {
+  cvpis: 'CVP IS',
+  ted: 'TED',
+  file: 'Failas',
+  court: 'Teismo sprendimas',
+  map: 'Žemėlapis',
+  generic: 'Nuoroda',
+};
+
+const text = label ?? labels[source] ?? labels.generic;
+const classes = [
+  variant === 'button' ? `btn btn-outline btn-${size}` : '',
+  className,
+].filter(Boolean).join(' ');
+---
+
+{href && (
+  <a href={href} class={classes || undefined} target="_blank" rel="noopener noreferrer" aria-label={ariaLabel}>
+    {icon ? <>↗ {text}</> : text}
+  </a>
+)}

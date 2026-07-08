@@ -1,0 +1,331 @@
+---
+// Laikotarpio (paskelbimo datos) filtras: histograma + dvipusis slankiklis + du
+// datos laukeliai. Analogiškas vertės filtrui, tik reikšmės — epoch millis, o
+// laukeliai vadinasi paskelbimoDataNuo/Iki. Struktūra atkartoja /sutartys
+// „Laikotarpis" filtrą.
+interface Bucket { from: number; to: number | null; count: number }
+interface Props {
+  hist: { buckets: Bucket[]; domainMin: number; domainMax: number };
+  dataNuo?: string;
+  dataIki?: string;
+}
+const { hist, dataNuo, dataIki } = Astro.props;
+
+const DAY = 86_400_000;
+const now = Date.now();
+const domainMin = hist.domainMin || now - 365 * DAY;
+const domainMax = hist.domainMax && hist.domainMax > domainMin ? hist.domainMax : now;
+
+const parseMs = (v: string | undefined) => {
+  const t = Date.parse(String(v ?? ''));
+  return Number.isFinite(t) ? t : null;
+};
+const toDateStr = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+const fmtData = (ms: number) => new Date(ms).toLocaleDateString('lt-LT');
+
+const hasNuo = parseMs(dataNuo) != null;
+const hasIki = parseMs(dataIki) != null;
+const minVal = parseMs(dataNuo) ?? domainMin;
+const maxVal = parseMs(dataIki) ?? domainMax;
+
+const maxCount = Math.max(1, ...hist.buckets.map((b) => b.count));
+const effMax = maxVal >= domainMax ? Infinity : maxVal;
+
+const bars = hist.buckets.map((b) => {
+  const upper = b.to == null ? Infinity : b.to;
+  const height = b.count > 0 ? 8 + 92 * Math.sqrt(b.count / maxCount) : 0;
+  const active = upper > minVal && b.from < effMax;
+  return { from: b.from, to: b.to, count: b.count, height, active };
+});
+---
+
+<section class="dok-filter-section vp-laik" data-domain-min={domainMin} data-domain-max={domainMax}>
+  <span class="dok-filter-section-label">Laikotarpis</span>
+
+  <div class="laik-chart" aria-hidden="true">
+    {bars.map((b) => (
+      <span
+        class={`laik-bar${b.active ? ' is-active' : ''}`}
+        data-from={b.from}
+        data-to={b.to ?? ''}
+        style={`height:${b.height}%`}
+        title={`${fmtData(b.from)} – ${b.to != null ? fmtData(b.to) : '∞'}: ${b.count.toLocaleString('lt-LT')}`}
+      ></span>
+    ))}
+  </div>
+
+  <div class="laik-slider" data-laik-slider>
+    <span class="laik-track"></span>
+    <span class="laik-range"></span>
+    <input type="range" class="laik-handle laik-handle--min" min="0" max="1000" step="1" value="0" aria-label="Ankstyviausia data" />
+    <input type="range" class="laik-handle laik-handle--max" min="0" max="1000" step="1" value="1000" aria-label="Vėliausia data" />
+    <span class="laik-bubble laik-bubble--min" aria-hidden="true"></span>
+    <span class="laik-bubble laik-bubble--max" aria-hidden="true"></span>
+  </div>
+
+  <div class="laik-inputs">
+    <label class="laik-box laik-box--min">
+      <input type="date" name="paskelbimoDataNuo"
+             value={hasNuo ? toDateStr(minVal) : ''} aria-label="Paskelbta nuo" />
+    </label>
+    <label class="laik-box laik-box--max">
+      <input type="date" name="paskelbimoDataIki"
+             value={hasIki ? toDateStr(maxVal) : ''} aria-label="Paskelbta iki" />
+    </label>
+  </div>
+</section>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector('.vp-laik');
+    if (!root) return;
+    const domainMin = Number(root.getAttribute('data-domain-min')) || 0;
+    const domainMax = Number(root.getAttribute('data-domain-max')) || (domainMin + 1);
+    const STEPS = 1000;
+    const DAY = 86400000;
+
+    const hMin = root.querySelector('.laik-handle--min');
+    const hMax = root.querySelector('.laik-handle--max');
+    const rangeEl = root.querySelector('.laik-range');
+    const bubMin = root.querySelector('.laik-bubble--min');
+    const bubMax = root.querySelector('.laik-bubble--max');
+    const inMin = root.querySelector('input[name="paskelbimoDataNuo"]');
+    const inMax = root.querySelector('input[name="paskelbimoDataIki"]');
+    const bars = [...root.querySelectorAll('.laik-bar')];
+
+    const bkts = bars.map((bar) => ({
+      from: Number(bar.dataset.from),
+      to: bar.dataset.to ? Number(bar.dataset.to) : domainMax,
+    }));
+    if (bkts.length === 0) bkts.push({ from: domainMin, to: domainMax });
+    const N = bkts.length;
+
+    const frac = (v) => {
+      if (v <= domainMin) return 0;
+      if (v >= domainMax) return 1;
+      for (let i = 0; i < N; i++) {
+        const { from, to } = bkts[i];
+        if (v < to || i === N - 1) {
+          const local = to > from ? (v - from) / (to - from) : 0;
+          return (i + Math.min(1, Math.max(0, local))) / N;
+        }
+      }
+      return 1;
+    };
+    const posToVal = (p) => {
+      if (p <= 0) return domainMin;
+      if (p >= STEPS) return domainMax;
+      const x = (p / STEPS) * N;
+      const i = Math.min(N - 1, Math.floor(x));
+      const { from, to } = bkts[i];
+      return from + (x - i) * (to - from);
+    };
+    const valToPos = (v) => Math.round(frac(v) * STEPS);
+    const snapDay = (ms) => Math.round(ms / DAY) * DAY;
+    const toDateStr = (ms) => new Date(ms).toISOString().slice(0, 10);
+    const fmtData = (ms) => new Date(ms).toLocaleDateString('lt-LT');
+    const readDate = (el) => {
+      const t = Date.parse(el.value || '');
+      return Number.isFinite(t) ? t : null;
+    };
+
+    let minVal = readDate(inMin) ?? domainMin;
+    let maxVal = readDate(inMax) ?? domainMax;
+
+    function paint() {
+      const lo = frac(minVal) * 100;
+      const hi = frac(maxVal) * 100;
+      rangeEl.style.left = lo + '%';
+      rangeEl.style.width = Math.max(0, hi - lo) + '%';
+      bubMin.style.left = lo + '%';
+      bubMax.style.left = hi + '%';
+      bubMin.textContent = fmtData(minVal);
+      bubMax.textContent = fmtData(maxVal);
+      const effMax = maxVal >= domainMax ? Infinity : maxVal;
+      for (const bar of bars) {
+        const from = Number(bar.dataset.from);
+        const to = bar.dataset.to ? Number(bar.dataset.to) : Infinity;
+        bar.classList.toggle('is-active', to > minVal && from < effMax);
+      }
+    }
+
+    function syncFromSlider() {
+      let a = Number(hMin.value);
+      let b = Number(hMax.value);
+      if (a > b) [a, b] = [b, a];
+      minVal = a <= 0 ? domainMin : snapDay(posToVal(a));
+      maxVal = b >= STEPS ? domainMax : snapDay(posToVal(b));
+      inMin.value = minVal > domainMin ? toDateStr(minVal) : '';
+      inMax.value = maxVal < domainMax ? toDateStr(maxVal) : '';
+      paint();
+    }
+    function syncFromInputs() {
+      minVal = readDate(inMin) ?? domainMin;
+      maxVal = readDate(inMax) ?? domainMax;
+      if (minVal > maxVal) minVal = maxVal;
+      hMin.value = String(valToPos(minVal));
+      hMax.value = String(maxVal >= domainMax ? STEPS : valToPos(maxVal));
+      paint();
+    }
+    function commit() {
+      // Telefone (≤900px) neperkraunam — datos laukeliai yra formos laukai ir
+      // pritaikomi per „Ieškoti". Darbastalyje — įprasta navigacija.
+      if (window.matchMedia('(max-width: 900px)').matches) return;
+      const p = new URLSearchParams(location.search);
+      if (minVal > domainMin) p.set('paskelbimoDataNuo', toDateStr(minVal)); else p.delete('paskelbimoDataNuo');
+      if (maxVal < domainMax) p.set('paskelbimoDataIki', toDateStr(maxVal)); else p.delete('paskelbimoDataIki');
+      p.delete('page');
+      location.href = '/viesiejiPirkimai/?' + p.toString();
+    }
+
+    hMin.value = String(valToPos(minVal));
+    hMax.value = String(maxVal >= domainMax ? STEPS : valToPos(maxVal));
+    paint();
+
+    hMin.addEventListener('input', syncFromSlider);
+    hMax.addEventListener('input', syncFromSlider);
+    hMin.addEventListener('change', commit);
+    hMax.addEventListener('change', commit);
+    for (const el of [inMin, inMax]) {
+      el.addEventListener('input', syncFromInputs);
+      el.addEventListener('change', commit);
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+    }
+  })();
+</script>
+
+<style>
+  .laik-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 44px;
+    margin: 8px 0 6px;
+  }
+  .laik-bar {
+    flex: 1;
+    min-width: 0;
+    background-color: var(--light-gray);
+    border-radius: 1.5px 1.5px 0 0;
+    transition: background-color var(--transition);
+    cursor: pointer;
+  }
+  .laik-bar.is-active { background-color: var(--black); }
+  .laik-chart:hover .laik-bar { background-color: var(--lighter-gray); }
+  .laik-chart:hover .laik-bar.is-active { background-color: var(--dark-gray); }
+  .laik-bar:hover,
+  .laik-chart:hover .laik-bar:hover { background-color: var(--black); }
+
+  .laik-slider { position: relative; height: 20px; }
+  .laik-track,
+  .laik-range {
+    position: absolute;
+    top: 50%;
+    height: 3px;
+    border-radius: 2px;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  .laik-track { left: 0; width: 100%; background: var(--light-gray); }
+  .laik-range { background: var(--black); }
+
+  .laik-handle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    background: none;
+    pointer-events: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .laik-handle::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    pointer-events: auto;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--white);
+    border: 2px solid var(--black);
+    cursor: pointer;
+    box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, .2));
+  }
+  .laik-handle::-moz-range-thumb {
+    pointer-events: auto;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--white);
+    border: 2px solid var(--black);
+    cursor: pointer;
+  }
+  .laik-handle::-webkit-slider-runnable-track { background: none; }
+  .laik-handle::-moz-range-track { background: none; }
+
+  .laik-bubble {
+    position: absolute;
+    bottom: 100%;
+    margin-bottom: 4px;
+    transform: translateX(-50%);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--black);
+    color: var(--white);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--transition);
+  }
+  .laik-handle--min:active ~ .laik-bubble--min,
+  .laik-handle--min:focus-visible ~ .laik-bubble--min,
+  .laik-handle--max:active ~ .laik-bubble--max,
+  .laik-handle--max:focus-visible ~ .laik-bubble--max { opacity: 1; }
+
+  .laik-inputs {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .laik-box {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    padding: 3px 6px;
+    border: var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+  }
+  .laik-box:focus-within { border-color: var(--black); }
+  .laik-box input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+    border: none;
+    outline: none;
+    background: none;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    line-height: 1.2;
+    color: var(--dark-gray);
+    -webkit-appearance: none;
+    appearance: none;
+    height: auto;
+    min-height: 0;
+  }
+  .laik-box input::-webkit-datetime-edit { padding: 0; }
+  .laik-box input::-webkit-inner-spin-button { display: none; }
+  .laik-box input:focus { color: var(--black); }
+  .laik-box input::-webkit-calendar-picker-indicator {
+    padding: 0;
+    margin-left: 2px;
+    opacity: .5;
+    cursor: pointer;
+  }
+</style>

@@ -1,6 +1,8 @@
 ---
-import Table from '@design-system/components/Table.astro';
-import TableWrapper from '@design-system/components/TableWrapper.astro';
+import PageSection from '@design-system/components/PageSection.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import DateValue from '@design-system/components/DateValue.astro';
+import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
 import TruncationNotice from '@design-system/components/TruncationNotice.astro';
 import Button from '@design-system/components/Button.astro';
 import config from '../../lib/config.ts';
@@ -11,42 +13,39 @@ const { rows, nuosprendziai } = asmuo.teismoNuosprendziai;
 const dokumentaiUrl = `/dokumentai?mode=phrase&type=teismoNuosprendis&jar=${encodeURIComponent(asmuo.jar.jarKodas)}`;
 ---
 
-<div class="page-section mb-10" id="teismai">
-  <h2><a href="#teismai" class="no-style">Teismo nuosprendžiai</a></h2>
+<PageSection id="teismai" title="Teismo nuosprendžiai">
   {config.enableDokumentaiSearch && (
     <p><Button href={dokumentaiUrl} variant="secondary" size="sm">Atverti dokumentų paieškoje</Button></p>
   )}
   <TruncationNotice count={rows} shown={nuosprendziai.length} anchor="teismai" paramName="teismoNuosprendziaiLimit" label="naujausi nuosprendžiai" />
-  <TableWrapper>
-    <Table>
-      <thead>
-        <tr>
-          <th>Bylos numeris</th><th>Rūšis</th><th class="cell-center">Data</th>
-          <th>Rolė</th><th>Teismas</th>
-        </tr>
-      </thead>
-      <tbody>
-        {nuosprendziai.map((n: any) => (
-          <tr>
-            <td class="cell-nowrap">
-              <a href={`https://liteko.teismai.lt/viesasprendimupaieska/${n.fileHref}`} target="_blank" rel="noopener noreferrer">{n.bylosNumeris}</a>
-            </td>
-            <td class="teismai-col-rusis">
-              <span class="cell-truncate">{n.bylosRusis}</span>
-            </td>
-            <td class="cell-center cell-mono cell-nowrap">{new Date(n.data).toLocaleDateString('lt-LT')}</td>
-            <td class:list={['teismai-col-role', n.bylojeKaip === 'Atsakovas' && 'font-bold']}>
-              <span class="cell-truncate">{n.bylojeKaip}</span>
-            </td>
-            <td class="teismai-col-court">
-              <span class="cell-truncate">{n.teismas}</span>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  </TableWrapper>
-</div>
+  <DataTable
+    columns={[
+      { label: 'Bylos numeris' },
+      { label: 'Rūšis' },
+      { label: 'Data', headerClassName: 'cell-center' },
+      { label: 'Rolė' },
+      { label: 'Teismas' },
+    ]}
+  >
+    {nuosprendziai.map((n: any) => (
+      <tr>
+        <td class="cell-nowrap">
+          <ExternalSourceLink href={`https://liteko.teismai.lt/viesasprendimupaieska/${n.fileHref}`} label={n.bylosNumeris} source="court" icon={false} />
+        </td>
+        <td class="teismai-col-rusis">
+          <span class="cell-truncate">{n.bylosRusis}</span>
+        </td>
+        <td class="cell-center cell-mono cell-nowrap"><DateValue value={n.data} mono={false} /></td>
+        <td class:list={['teismai-col-role', n.bylojeKaip === 'Atsakovas' && 'font-bold']}>
+          <span class="cell-truncate">{n.bylojeKaip}</span>
+        </td>
+        <td class="teismai-col-court">
+          <span class="cell-truncate">{n.teismas}</span>
+        </td>
+      </tr>
+    ))}
+  </DataTable>
+</PageSection>
 
 <style>
   .teismai-col-rusis,

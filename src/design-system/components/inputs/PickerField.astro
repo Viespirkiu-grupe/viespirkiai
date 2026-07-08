@@ -1,0 +1,110 @@
+---
+import Field from './Field.astro';
+
+interface Props {
+  label: string;
+  name: string;
+  value?: string | number | null;
+  placeholder?: string;
+  buttonLabel: string;
+  modalId: string;
+  legacyClearName?: string;
+  legacyClearId?: string;
+  inputId?: string;
+  buttonId?: string;
+  className?: string;
+}
+
+const {
+  label,
+  name,
+  value = '',
+  placeholder = '',
+  buttonLabel,
+  modalId,
+  legacyClearName,
+  legacyClearId = legacyClearName,
+  inputId = name,
+  buttonId = `${modalId}Trigger`,
+  className = '',
+} = Astro.props as Props;
+---
+
+<Field label={label} name={inputId} className={className}>
+  {legacyClearName && <input type="hidden" name={legacyClearName} id={legacyClearId} value="" />}
+  <div class="ds-picker-field__group">
+    <input
+      class="ds-field__control ds-picker-field__input"
+      type="text"
+      name={name}
+      id={inputId}
+      value={value ?? ''}
+      placeholder={placeholder}
+    />
+    <button
+      class="ds-picker-field__trigger"
+      type="button"
+      id={buttonId}
+      aria-label={buttonLabel}
+      title={buttonLabel}
+      aria-controls={modalId}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 7h16M4 12h10M4 17h7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"></path>
+        <path d="M17 14l3 3 4-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+      </svg>
+    </button>
+  </div>
+</Field>
+
+<slot />
+
+<style>
+  .ds-picker-field__group {
+    display: flex;
+    align-items: stretch;
+    min-height: 41px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    transition: border-color var(--transition), box-shadow var(--transition);
+  }
+
+  .ds-picker-field__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    border-right: var(--border);
+    border-radius: var(--radius-md) 0 0 var(--radius-md);
+  }
+
+  .ds-picker-field__trigger {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 41px;
+    min-width: 41px;
+    border: 0;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    background: var(--black);
+    color: var(--white);
+    cursor: pointer;
+    transition: background-color var(--transition), color var(--transition);
+  }
+
+  .ds-picker-field__trigger:hover {
+    background: var(--dark-gray);
+    color: var(--white);
+  }
+
+  .ds-picker-field__input:focus-visible + .ds-picker-field__trigger {
+    outline: var(--border-focus);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+
+  .ds-picker-field__trigger svg {
+    width: 18px;
+    height: 18px;
+  }
+</style>

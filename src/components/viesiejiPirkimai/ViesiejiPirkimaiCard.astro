@@ -1,36 +1,50 @@
 ---
+import DateValue from '@design-system/components/DateValue.astro';
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import ResultCardFooter from '@design-system/components/ResultCardFooter.astro';
+import ResultCardMeta from '@design-system/components/ResultCardMeta.astro';
 
 interface Props {
   item: any;
 }
 const { item } = Astro.props;
+const metaItems = [
+  item.statusas && {
+    label: 'Statusas',
+    value: item.statusas,
+    valueClassName: item.statusas === 'Vykdomas' ? 'badge-active' : '',
+  },
+  item.pirkimoBudas && { label: 'Pirkimo būdas', value: item.pirkimoBudas },
+].filter(Boolean);
+const footerItems = [
+  item.pirkimoVykdytojas && {
+    label: 'Vykdytojas',
+    value: `${item.pirkimoVykdytojas.slice(0, 80)}${item.pirkimoVykdytojas.length > 80 ? '…' : ''}`,
+  },
+  item.pasiulymuPateikimoTerminas && {
+    label: 'Pasiūlymų terminas',
+    value: String(item.pasiulymuPateikimoTerminas).slice(0, 16).replace('T', ' '),
+  },
+  item.numatomaBendraPirkimoVerte && {
+    label: 'Numatoma vertė',
+    value: `${Number(item.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00A0€`,
+  },
+  item.informacija && item.informacija !== item.pavadinimas && { value: item.informacija },
+].filter(Boolean);
 ---
 
 <ResultCardShell clickable={true}>
-  <dl slot="meta" class="result-card-meta">
-    {item.statusas && (
-      <div>
-        <dt class="sr-only">Statusas</dt>
-        <dd class={item.statusas === 'Vykdomas' ? 'badge-active' : ''}>{item.statusas}</dd>
-      </div>
-    )}
-    {item.pirkimoBudas && (
-      <div>
-        <dt class="sr-only">Pirkimo būdas</dt>
-        <dd>{item.pirkimoBudas}</dd>
-      </div>
-    )}
+  <ResultCardMeta slot="meta" items={metaItems}>
     {item.paskelbimoData && (
       <div>
         <dt class="sr-only">Paskelbimo data</dt>
         <dd>
           <abbr aria-hidden="true" title="Paskelbimo data" class="relative z-1">Paskelb.</abbr>
-          <time datetime={String(item.paskelbimoData).slice(0, 10)}>{String(item.paskelbimoData).slice(0, 10)}</time>
+          <DateValue value={item.paskelbimoData} />
         </dd>
       </div>
     )}
-  </dl>
+  </ResultCardMeta>
 
   <div slot="title" class="flex align-baseline gap-3">
     <h3 class="result-card-title">
@@ -42,27 +56,5 @@ const { item } = Astro.props;
     </h3>
   </div>
 
-  <div slot="footer" class="result-card-footer">
-    {item.pirkimoVykdytojas && (
-      <span>
-        <strong>Vykdytojas:</strong>
-        {item.pirkimoVykdytojas.slice(0, 80)}{item.pirkimoVykdytojas.length > 80 ? '…' : ''}
-      </span>
-    )}
-    {item.pasiulymuPateikimoTerminas && (
-      <span>
-        <strong>Pasiūlymų terminas:</strong>
-        <time datetime={String(item.pasiulymuPateikimoTerminas).slice(0, 10)}>
-          {String(item.pasiulymuPateikimoTerminas).slice(0, 16).replace('T', ' ')}
-        </time>
-      </span>
-    )}
-    {item.numatomaBendraPirkimoVerte && (
-      <span>
-        <strong>Numatoma vertė:</strong>
-        <span>{Number(item.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;€</span>
-      </span>
-    )}
-    {item.informacija && item.informacija !== item.pavadinimas && item.informacija}
-  </div>
+  <ResultCardFooter slot="footer" items={footerItems} />
 </ResultCardShell>

@@ -31,7 +31,7 @@ const { label, name, values } = Astro.props;
     appearance: none;
     border: 2px solid var(--light-gray);
     border-radius: var(--radius-sm);
-    background: var(--white);
+    background: var(--white) center / 0 no-repeat;
     cursor: pointer;
     transition: background-color var(--transition), border-color var(--transition);
   }
@@ -40,20 +40,12 @@ const { label, name, values } = Astro.props;
     border-color: var(--black);
   }
 
+  /* Pažymėta: juodas užpildas + centruota SVG varnelė (background-size centruoja
+     savaime, nereikia ranka derinti top/left kaip su CSS trikampiu). */
   .ds-checkbox__input:checked {
     border-color: var(--black);
-    background: var(--black);
-  }
-
-  .ds-checkbox__input:checked::after {
-    content: "";
-    position: absolute;
-    top: 2px;
-    left: 5px;
-    width: 4px;
-    height: 8px;
-    border: solid var(--white);
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
+    background-color: var(--black);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+    background-size: 12px;
   }
 </style>

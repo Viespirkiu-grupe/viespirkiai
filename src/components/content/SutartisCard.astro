@@ -1,5 +1,10 @@
 ---
+import DateValue from '@design-system/components/DateValue.astro';
+import EntityLink from '@design-system/components/EntityLink.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import ResultCardFooter from '@design-system/components/ResultCardFooter.astro';
+import ResultCardMeta from '@design-system/components/ResultCardMeta.astro';
 
 interface SutartisCardItem {
   tipas: string;
@@ -42,18 +47,20 @@ const truncate = (s: string | null | undefined, n = 80) => {
 const verte = Number(item.faktineIvykdimoVerte || item.verte);
 const sudaryta = item.sudarymoData ? String(item.sudarymoData).slice(0, 10) : '';
 const galioja = item.galiojimoData ? String(item.galiojimoData).slice(0, 10) : '';
+const metaItems = [
+  { label: 'Tipas', value: item.tipas },
+  { label: 'Kategorija', value: item.kategorija },
+].filter((meta) => meta.value);
 ---
 
 <ResultCardShell clickable={true}>
-  <dl slot="meta" class="result-card-meta">
-    <div><dt class="sr-only">Tipas</dt><dd>{item.tipas}</dd></div>
-    <div><dt class="sr-only">Kategorija</dt><dd>{item.kategorija}</dd></div>
+  <ResultCardMeta slot="meta" items={metaItems}>
     <div>
       <dt class="sr-only">Sutarties galiojimas</dt>
       <dd>
         <abbr aria-hidden="true" title="Sutarties galiojimas" class="relative z-1">Sut.</abbr>
         {sudaryta && galioja
-          ? <><time datetime={sudaryta}>{sudaryta}</time>{sudaryta !== galioja && <> – <time datetime={galioja}>{galioja}</time></>}</>
+          ? <><DateValue value={item.sudarymoData} />{sudaryta !== galioja && <> – <DateValue value={item.galiojimoData} /></>}</>
           : '—'
         }
       </dd>
@@ -64,49 +71,43 @@ const galioja = item.galiojimoData ? String(item.galiojimoData).slice(0, 10) : '
         <dd>{item.dokumentuKiekis} <abbr aria-hidden="true" title="Dokumentai" class="relative z-1">dok.</abbr></dd>
       </div>
     )}
-  </dl>
+  </ResultCardMeta>
 
   <div slot="title" class="flex align-baseline gap-3">
     <h3 class="result-card-title">
       <a href={`/sutartis/${item.sutartiesUnikalusId}`}>
         <span class={`amount${verte > 10000 ? ' font-bold' : ''}`}>
-          {verte.toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;€
+          <MoneyValue value={verte} suffix={'\u00A0€'} mono={false} />
         </span>
         {item.pavadinimas.length < 1 ? <em>Nenurodyta</em> : item.pavadinimas}
       </a>
     </h3>
   </div>
 
-  <div slot="footer" class="result-card-footer">
+  <ResultCardFooter slot="footer">
     {item.perkanciosiosOrganizacijosKodas && (
       <span>
         <strong>Pirkėjas:</strong>
-        <a href={`/asmuo/${item.perkanciosiosOrganizacijosKodas}`} class="relative z-1">
-          {truncate(item.perkanciojiOrganizacija)}
-        </a>
+        <EntityLink kodas={item.perkanciosiosOrganizacijosKodas} label={truncate(item.perkanciojiOrganizacija)} className="relative z-1" />
       </span>
     )}
     {tiekejai.length === 1
       ? <span>
           <strong>Tiekėjas:</strong>
-          <a href={`/asmuo/${tiekejaiKodai[0]}`} class="relative z-1">
-            {truncate(tiekejai[0] || 'Nenurodytas')}
-          </a>
+          <EntityLink kodas={tiekejaiKodai[0]} label={truncate(tiekejai[0] || 'Nenurodytas')} className="relative z-1" />
         </span>
       : tiekejai.length > 1 && (
           <span class="flex align-start gap-2">
             <strong>Tiekėjai:</strong>
             <span class="flex flex-col gap-1">
               {tiekejai.map((t, i) => (
-                <a href={`/asmuo/${tiekejaiKodai[i]}`} class="relative z-1">
-                  {truncate(t || 'Nenurodytas')}
-                </a>
+                <EntityLink kodas={tiekejaiKodai[i]} label={truncate(t || 'Nenurodytas')} className="relative z-1" />
               ))}
             </span>
           </span>
         )
     }
-  </div>
+  </ResultCardFooter>
 
   {showRedagavimoData && (
     <div slot="after-footer" class="text-muted text-sm mt-4">

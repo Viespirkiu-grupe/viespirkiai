@@ -1,0 +1,29 @@
+---
+interface Props {
+  value?: unknown;
+  fallback?: string;
+  unit?: string;
+  mono?: boolean;
+  fractionDigits?: number;
+  className?: string;
+}
+
+const {
+  value,
+  fallback = '—',
+  unit = '',
+  mono = true,
+  fractionDigits,
+  className = '',
+} = Astro.props as Props;
+
+const number = Number(value);
+const hasValue = value != null && value !== '' && !Number.isNaN(number);
+const options = fractionDigits == null
+  ? {}
+  : { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits };
+const formatted = hasValue ? number.toLocaleString('lt-LT', options) : fallback;
+const classes = [mono ? 'cell-mono' : '', className].filter(Boolean).join(' ');
+---
+
+<span class={classes || undefined}>{hasValue ? `${formatted}${unit}` : formatted}</span>

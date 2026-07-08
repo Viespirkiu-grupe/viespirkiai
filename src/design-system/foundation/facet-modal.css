@@ -1,0 +1,158 @@
+/* Facet "show all" dialog rows + list. Shared by /dokumentai (DokFacetModal) and
+   sutarčių paieška (SutartysFacetModal). Rows are created in JS, so the styles
+   are global and scope-free. Mirrors the sidebar filter pill: a checkbox
+   affordance + label + count. */
+.dok-facet-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  padding-inline: 10px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--dark-gray);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition);
+}
+.dok-facet-row::before {
+  content: "";
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--light-gray);
+  border-radius: var(--radius-sm);
+  background: var(--white) center / 0 no-repeat;
+  transition: background-color var(--transition), border-color var(--transition);
+}
+.dok-facet-row:hover { color: var(--black); background: var(--lighter-gray); }
+.dok-facet-row:hover::before { border-color: var(--dark-gray); }
+.dok-facet-row.is-selected { color: var(--black); font-weight: 500; }
+.dok-facet-row.is-selected::before {
+  border-color: var(--black);
+  background-color: var(--black);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+  background-size: 11px;
+}
+.dok-facet-row__label {
+  /* Nested inside the block `__text` wrapper, so `flex:1` is inert — it needs
+     `display:block` to fill the (width-constrained, min-width:0) wrapper and
+     actually clip. Without it the inline label sizes to content and overflows. */
+  display: block;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dok-facet-row__count {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--gray);
+  font-variant-numeric: tabular-nums;
+}
+/* Su pavadinimu (įstaiga/įmonė) — pavadinimas + kodas stulpeliu. Sąlygos keliamos
+   ir ant LIST konteinerio (.dok-facet-modal__list--stack .dok-facet-row), kad
+   veiktų net jei JS eilutei nepridėtų --stack klasės. Todėl height:auto — eilutė
+   auga pagal turinį. */
+.dok-facet-row--stack,
+.dok-facet-modal__list--stack .dok-facet-row {
+  height: auto;
+  min-height: 40px;
+  align-items: flex-start;
+  padding-block: 8px;
+}
+.dok-facet-row--stack::before,
+.dok-facet-modal__list--stack .dok-facet-row::before { margin-top: 2px; }
+/* BLOCK srautas (ne flex): pavadinimas + kodas dedasi vienas po kito natūraliais
+   aukščiais. */
+.dok-facet-row__text {
+  flex: 1;
+  min-width: 0;
+  display: block;
+}
+.dok-facet-row--stack .dok-facet-row__label,
+.dok-facet-modal__list--stack .dok-facet-row__label {
+  display: block;
+  flex: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.35;
+}
+.dok-facet-row__sub {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--text-xs);
+  color: var(--gray);
+  font-variant-numeric: tabular-nums;
+}
+.dok-facet-row--stack .dok-facet-row__count,
+.dok-facet-modal__list--stack .dok-facet-row__count { margin-top: 1px; }
+/* "Pridėti „…"" row — distinct accent, spans the full grid width on top. */
+.dok-facet-row--add {
+  grid-column: 1 / -1;
+  color: var(--link);
+  font-weight: 500;
+}
+.dok-facet-row--add::before {
+  border-color: var(--link);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%230369a1' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M8 3.5v9M3.5 8h9'/%3E%3C/svg%3E");
+  background-size: 11px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.dok-facet-row--add:hover::before { border-color: var(--link); }
+.dok-facet-modal__loading {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+.dok-facet-modal__empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 32px 12px;
+  text-align: center;
+  color: var(--gray);
+  font-size: var(--text-sm);
+}
+
+.dok-facet-modal__search {
+  width: 100%;
+  max-width: 440px;
+  padding: 9px 12px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--black);
+  font: inherit;
+  font-size: var(--text-sm);
+  outline: none;
+}
+.dok-facet-modal__search:focus-visible { outline: var(--border-focus); }
+/* Multi-column grid so the full-screen width carries many short values. */
+.dok-facet-modal__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 2px 24px;
+  align-content: start;
+  padding-block: 12px;
+  padding-inline: max(16px, calc((100% - 1080px) / 2));
+}
+/* Įstaigų/įmonių sąrašas — keli stulpeliai per grid `auto-fill minmax`. */
+.dok-facet-modal__list--stack {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  align-items: start;
+  gap: 4px 24px;
+}
+@media (max-width: 600px) {
+  .dok-facet-modal__search { max-width: none; }
+}

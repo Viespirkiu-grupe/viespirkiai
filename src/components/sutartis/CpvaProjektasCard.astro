@@ -1,4 +1,6 @@
 ---
+import EntityLink from '@design-system/components/EntityLink.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
 
 interface Props {
@@ -25,12 +27,12 @@ const proj = item.projektas;
     <div slot="sidebar" class="result-card-sidebar">
       {proj.projektoVykdytojas && (
         <span class="text-sm">
-          <a href={`/asmuo/${proj.projektoVykdytojoKodas}`}>{proj.projektoVykdytojas}</a>
+          <EntityLink kodas={proj.projektoVykdytojoKodas} label={proj.projektoVykdytojas} />
         </span>
       )}
       {proj.isViso && (
         <span class="amount amount-sm">
-          {Number(proj.isViso).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+          <MoneyValue value={proj.isViso} mono={false} />
         </span>
       )}
     </div>

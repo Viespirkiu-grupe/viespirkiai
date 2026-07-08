@@ -1,6 +1,6 @@
 ---
-import Table from '@design-system/components/Table.astro';
-import TableWrapper from '@design-system/components/TableWrapper.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import NumberValue from '@design-system/components/NumberValue.astro';
 
 interface Props {
   items: any[];
@@ -9,40 +9,33 @@ interface Props {
 const { items } = Astro.props;
 ---
 
-<TableWrapper className="ocr-latest-table-wrap">
-  <Table size="sm" className="ocr-latest-table">
-    <thead>
-      <tr>
-        <th class="cell-nowrap">Node</th>
-        <th class="cell-right cell-nowrap">ID</th>
-        <th class="cell-nowrap">Pateikta</th>
-        <th class="cell-right cell-nowrap">Trukmė</th>
-        <th class="cell-right cell-nowrap">Puslapiai</th>
-        <th class="cell-right cell-nowrap">Žodžiai</th>
-      </tr>
-    </thead>
-    {items.length === 0 ? (
-      <tbody data-ocr-latest-results-body>
-        <tr>
-          <td colspan="6" class="empty-state-cell">Naujausių OCR rezultatų nėra.</td>
-        </tr>
-      </tbody>
-    ) : (
-      <tbody data-ocr-latest-results-body>
-        {items.map((item) => (
-          <tr>
-            <td class="ocr-latest-col-node" data-label="Node">{item.nodeDisplay || item.node || '—'}</td>
-            <td class="cell-right cell-nowrap" data-label="ID"><a href={`/failas/${item.failas}`}>{item.failas}</a></td>
-            <td class="cell-nowrap ocr-latest-col-submitted" data-label="Pateikta">{item.submitTimestampDisplay}</td>
-            <td class="cell-right cell-nowrap" data-label="Trukmė">{item.durationDisplay}</td>
-            <td class="cell-right cell-nowrap" data-label="Puslapiai">{item.puslapiuSkaicius.toLocaleString('lt-LT')}</td>
-            <td class="cell-right cell-nowrap" data-label="Žodžiai">{item.zodziuSkaicius.toLocaleString('lt-LT')}</td>
-          </tr>
-        ))}
-      </tbody>
-    )}
-  </Table>
-</TableWrapper>
+<DataTable
+  rows={items}
+  emptyText="Naujausių OCR rezultatų nėra."
+  size="sm"
+  className="ocr-latest-table"
+  wrapperClassName="ocr-latest-table-wrap"
+  bodyAttributes={{ 'data-ocr-latest-results-body': true }}
+  columns={[
+    { label: 'Node', headerClassName: 'cell-nowrap' },
+    { label: 'ID', headerClassName: 'cell-right cell-nowrap' },
+    { label: 'Pateikta', headerClassName: 'cell-nowrap' },
+    { label: 'Trukmė', headerClassName: 'cell-right cell-nowrap' },
+    { label: 'Puslapiai', headerClassName: 'cell-right cell-nowrap' },
+    { label: 'Žodžiai', headerClassName: 'cell-right cell-nowrap' },
+  ]}
+>
+  {items.map((item) => (
+    <tr>
+      <td class="ocr-latest-col-node" data-label="Node">{item.nodeDisplay || item.node || '—'}</td>
+      <td class="cell-right cell-nowrap" data-label="ID"><a href={`/failas/${item.failas}`}>{item.failas}</a></td>
+      <td class="cell-nowrap ocr-latest-col-submitted" data-label="Pateikta">{item.submitTimestampDisplay}</td>
+      <td class="cell-right cell-nowrap" data-label="Trukmė">{item.durationDisplay}</td>
+      <td class="cell-right cell-nowrap" data-label="Puslapiai"><NumberValue value={item.puslapiuSkaicius} mono={false} /></td>
+      <td class="cell-right cell-nowrap" data-label="Žodžiai"><NumberValue value={item.zodziuSkaicius} mono={false} /></td>
+    </tr>
+  ))}
+</DataTable>
 
 <style>
   :global(.ocr-latest-table) {

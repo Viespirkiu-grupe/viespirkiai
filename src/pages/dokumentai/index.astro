@@ -175,7 +175,7 @@ const {
      rail lines up with where every other page's content begins.           */
   .dok-shell {
     display: grid;
-    grid-template-columns: 220px minmax(0, 760px) minmax(360px, 460px);
+    grid-template-columns: 240px minmax(0, 760px) minmax(360px, 460px);
     /* The search bar gets its own row so the knowledge panel can start level
        with the results below it, not next to the search bar. The cell to the
        right of the search bar (row 1, col 3) stays empty. */
@@ -249,7 +249,7 @@ const {
   /* ── Responsive ──────────────────────────────────────────────── */
   @media (max-width: 1400px) {
     .dok-shell {
-      grid-template-columns: 220px minmax(0, 760px);
+      grid-template-columns: 240px minmax(0, 760px);
       grid-template-areas:
         "sidebar search"
         "sidebar content"

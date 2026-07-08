@@ -1,8 +1,6 @@
 ---
-import EmptyState from '@design-system/components/EmptyState.astro';
-import Pagination from '@design-system/components/Pagination.astro';
+import ResultPageShell from '@design-system/components/content/ResultPageShell.astro';
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
-import ResultsSummary from '@design-system/components/ResultsSummary.astro';
 
 interface Props {
   results: any[];
@@ -16,42 +14,36 @@ interface Props {
 const { results, numberOfResults, galimaEksportuoti, queryParams, page, pageCount } = Astro.props;
 ---
 
-<div class="mt-10 max-w-lg center mx-auto">
-  <div class="stack stack-md">
-    <div class="flex justify-between items-center mb-4">
-      <ResultsSummary html={numberOfResults} />
-      {galimaEksportuoti && (
-        <div class="flex gap-3">
-          <a href={`/juridiniai/?${queryParams}&json=true&limit=max`} class="btn btn-outline btn-sm">↗ JSON</a>
-          <a href={`/juridiniai/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm">↗ JSONL</a>
-          <a href={`/juridiniai/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm">↗ CSV</a>
-        </div>
-      )}
-    </div>
-    {results.length === 0
-      ? <EmptyState message="Rezultatų nerasta." />
-      : <>
-          <div class="result-list">
-            {results.map((item: any) => (
-              <ResultCardShell clickable={true}>
-                <dl slot="meta" class="result-card-meta">
-                  <div><dt class="sr-only">Tipas</dt><dd>{item.formosPavadinimas}</dd></div>
-                </dl>
-                <h3 slot="title" class="result-card-title">
-                  {!item.pavadinimas || item.pavadinimas.length === 0
-                    ? <em>Nenurodyta</em>
-                    : <a href={`/asmuo/${item.jarKodas}`}>{item.pavadinimas}</a>
-                  }
-                </h3>
-                <div slot="footer" class="result-card-footer">
-                  <span><strong>Adresas:</strong> {item.adresas}</span>
-                  <span><strong>Registruota:</strong> {item.registravimoData}</span>
-                </div>
-              </ResultCardShell>
-            ))}
-          </div>
-          <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
-        </>
-    }
-  </div>
-</div>
+<ResultPageShell
+  numberOfResults={numberOfResults}
+  resultCount={results.length}
+  page={page}
+  pageCount={pageCount}
+  queryParams={queryParams}
+>
+  {galimaEksportuoti && (
+    <Fragment slot="actions">
+      <a href={`/juridiniai/?${queryParams}&json=true&limit=max`} class="btn btn-outline btn-sm">↗ JSON</a>
+      <a href={`/juridiniai/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm">↗ JSONL</a>
+      <a href={`/juridiniai/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm">↗ CSV</a>
+    </Fragment>
+  )}
+
+  {results.map((item: any) => (
+    <ResultCardShell clickable={true}>
+      <dl slot="meta" class="result-card-meta">
+        <div><dt class="sr-only">Tipas</dt><dd>{item.formosPavadinimas}</dd></div>
+      </dl>
+      <h3 slot="title" class="result-card-title">
+        {!item.pavadinimas || item.pavadinimas.length === 0
+          ? <em>Nenurodyta</em>
+          : <a href={`/asmuo/${item.jarKodas}`}>{item.pavadinimas}</a>
+        }
+      </h3>
+      <div slot="footer" class="result-card-footer">
+        <span><strong>Adresas:</strong> {item.adresas}</span>
+        <span><strong>Registruota:</strong> {item.registravimoData}</span>
+      </div>
+    </ResultCardShell>
+  ))}
+</ResultPageShell>

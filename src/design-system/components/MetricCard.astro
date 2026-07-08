@@ -1,0 +1,74 @@
+---
+interface Props {
+  label: string;
+  value?: unknown;
+  href?: string;
+  meta?: string;
+  unit?: string;
+  clickable?: boolean;
+  labelTag?: 'div' | 'h3' | 'h4';
+  labelBaseClassName?: string;
+  labelClassName?: string;
+  valueClassName?: string;
+  className?: string;
+}
+
+const {
+  label,
+  value,
+  href,
+  meta,
+  unit,
+  clickable = false,
+  labelTag,
+  labelBaseClassName = 'section-title mb-2',
+  labelClassName = '',
+  valueClassName = '',
+  className = '',
+} = Astro.props as Props;
+
+const classes = ['card', (clickable || href) ? 'card-clickable' : '', className].filter(Boolean).join(' ');
+const LabelTag = labelTag ?? ((clickable || href) ? 'h3' : 'div');
+const labelClasses = [labelBaseClassName, labelClassName].filter(Boolean).join(' ');
+const valueClasses = ['cell-mono', 'metric-card__value', valueClassName].filter(Boolean).join(' ');
+---
+
+<article class={classes}>
+  <div class="card-body">
+    <LabelTag class={labelClasses}>
+      {href ? <a href={href}>{label}</a> : label}
+    </LabelTag>
+    {Astro.slots.has('default') ? (
+      <slot />
+    ) : (
+      <>
+        {value !== undefined && value !== null && value !== '' && (
+          <div class="metric-card__value-row">
+            <span class={valueClasses}>{value}</span>
+            {unit && <span class="metric-card__unit">{unit}</span>}
+          </div>
+        )}
+        {meta && <p class="text-muted text-sm mb-0">{meta}</p>}
+      </>
+    )}
+  </div>
+</article>
+
+<style>
+  .metric-card__value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .metric-card__value {
+    font-size: 1.6rem;
+    font-weight: 600;
+  }
+
+  .metric-card__unit {
+    color: var(--gray);
+    font-size: var(--text-xs);
+    font-weight: 500;
+  }
+</style>

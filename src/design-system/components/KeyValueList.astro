@@ -1,9 +1,33 @@
 ---
-const { as = 'dl', className = '' }: { as?: 'dl' | 'div'; className?: string } = Astro.props;
+interface KeyValueItem {
+  label: string;
+  value?: unknown;
+  html?: string;
+  valueClassName?: string;
+  labelClassName?: string;
+}
+
+interface Props {
+  as?: 'dl' | 'div';
+  className?: string;
+  items?: KeyValueItem[];
+}
+
+const { as = 'dl', className = '', items = [] } = Astro.props as Props;
 const Tag = as;
 const classes = ['kv-list', className].filter(Boolean).join(' ');
+const visibleItems = items.filter((item) => {
+  const value = item.html ?? item.value;
+  return value !== null && value !== undefined && value !== false && value !== '';
+});
 ---
 
 <Tag class={classes}>
+  {visibleItems.map((item) => (
+    <>
+      <dt class={item.labelClassName}>{item.label}</dt>
+      <dd class={item.valueClassName}>{item.html ? <Fragment set:html={item.html} /> : item.value}</dd>
+    </>
+  ))}
   <slot />
 </Tag>

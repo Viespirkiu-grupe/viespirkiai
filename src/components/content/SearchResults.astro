@@ -1,5 +1,5 @@
 ---
-import SearchResultsShell from '@design-system/components/content/SearchResultsShell.astro';
+import ResultPageShell from '@design-system/components/content/ResultPageShell.astro';
 import SutartisCard from './SutartisCard.astro';
 
 type SearchResultItem = {
@@ -19,6 +19,8 @@ type SearchResultItem = {
   paskutinioRedagavimoData?: string | null;
 };
 
+interface SortOption { value: string; label: string; }
+
 interface Props {
   numberOfResults: string;
   results: SearchResultItem[];
@@ -26,18 +28,35 @@ interface Props {
   pageCount: number;
   queryParams: string;
   galimaEksportuoti: boolean;
+  containerClass?: string;
+  flat?: boolean;
+  sortOptions?: SortOption[];
+  sortValue?: string;
 }
 
-const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti } = Astro.props;
+const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti, containerClass, flat = false, sortOptions = [], sortValue = '' } = Astro.props;
 ---
 
-<SearchResultsShell
+<ResultPageShell
   numberOfResults={numberOfResults}
   resultCount={results.length}
   page={page}
   pageCount={pageCount}
+  containerClass={containerClass}
   queryParams={queryParams}
+  flat={flat}
 >
+  {sortOptions.length > 0 && (
+    <Fragment slot="sort">
+      <label class="sr-only" for="sutSort">Rikiuoti pagal</label>
+      <select id="sutSort" name="sort" data-autosubmit aria-label="Rikiuoti pagal">
+        {sortOptions.map((option) => (
+          <option value={option.value} selected={sortValue === option.value}>{option.label}</option>
+        ))}
+      </select>
+    </Fragment>
+  )}
+
   {galimaEksportuoti && (
     <Fragment slot="actions">
       <a href={`/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
@@ -54,7 +73,7 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
   {results.map(item => (
     <SutartisCard item={item} />
   ))}
-</SearchResultsShell>
+</ResultPageShell>
 
 <script>
   const span = document.querySelector('.rezultatai-nezinomas-total');
@@ -77,4 +96,15 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
       })
       .catch(() => span.classList.remove('spin'));
   }
+
+  // Sort select lives in the results toolbar but belongs to #searchForm —
+  // changing it re-runs the search (resetting to page 1) like /dokumentai.
+  document.querySelectorAll<HTMLSelectElement>('select[data-autosubmit]').forEach((select) => {
+    select.addEventListener('change', () => {
+      const form = select.form;
+      if (!form) return;
+      form.querySelector<HTMLInputElement>('input[name="page"]')?.remove();
+      form.requestSubmit();
+    });
+  });
 </script>

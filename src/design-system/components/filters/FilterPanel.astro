@@ -1,0 +1,74 @@
+---
+interface Props {
+  variant?: 'grid' | 'rail';
+  className?: string;
+  hint?: string;
+}
+
+const {
+  variant = 'grid',
+  className = '',
+  hint,
+} = Astro.props as Props;
+
+const classes = [
+  'ds-filter-panel',
+  variant === 'grid' ? 'search-filters-grid' : 'ds-filter-panel--rail',
+  className,
+].filter(Boolean).join(' ');
+---
+
+<div class={classes}>
+  <slot />
+  {hint && <p class="ds-filter-panel__hint">{hint}</p>}
+</div>
+
+<style>
+  .ds-filter-panel--rail {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .ds-filter-panel--rail :global(.filter-group) {
+    gap: 18px;
+  }
+
+  .ds-filter-panel--rail :global(.ds-field),
+  .ds-filter-panel--rail :global(.form-group) {
+    margin-bottom: 0;
+  }
+
+  .ds-filter-panel--rail :global(.ds-field__control),
+  .ds-filter-panel--rail :global(input[type="date"]),
+  .ds-filter-panel--rail :global(.sort-filter-select) {
+    min-height: 34px;
+    padding-block: 6px;
+    font-size: var(--text-sm);
+  }
+
+  .ds-filter-panel--rail :global(.ds-field__label),
+  .ds-filter-panel--rail :global(.sort-filter-label) {
+    margin-bottom: 3px;
+    font-size: var(--text-xs);
+  }
+
+  .ds-filter-panel--rail :global(.sort-filter-group),
+  .ds-filter-panel--rail :global(.ds-picker-field__group) {
+    min-height: 34px;
+  }
+
+  .ds-filter-panel--rail :global(.ds-picker-field__trigger) {
+    width: 34px;
+    min-width: 34px;
+  }
+
+  .ds-filter-panel__hint {
+    margin: 4px 0 0;
+    padding-top: 14px;
+    border-top: var(--border);
+    color: var(--gray);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+  }
+</style>

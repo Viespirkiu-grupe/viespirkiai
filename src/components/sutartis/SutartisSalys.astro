@@ -1,4 +1,6 @@
 ---
+import EntityLink from '@design-system/components/EntityLink.astro';
+
 interface Props {
   sutartis: any;
 }
@@ -12,7 +14,7 @@ const showPatikslinimas = sutartis.tiekejasPatikslinimas && sutartis.tiekejasPat
   <div class="grid-3">
     <section>
       <h2>Pirkėjas</h2>
-      <h3><a href={`/asmuo/${sutartis.perkanciosiosOrganizacijosKodas}`}>{sutartis.perkanciojiOrganizacija}</a></h3>
+      <h3><EntityLink kodas={sutartis.perkanciosiosOrganizacijosKodas} label={sutartis.perkanciojiOrganizacija} /></h3>
       <span class="text-muted">{sutartis.perkanciosiosOrganizacijosKodas}</span>
     </section>
 
@@ -21,12 +23,12 @@ const showPatikslinimas = sutartis.tiekejasPatikslinimas && sutartis.tiekejasPat
         <>
           <h2>Tiekėjai</h2>
           <div class="mb-3">
-            <h3><a href={`/asmuo/${sutartis.tiekejoKodas}`}>{sutartis.tiekejas}</a></h3>
+            <h3><EntityLink kodas={sutartis.tiekejoKodas} label={sutartis.tiekejas} /></h3>
             <span class="text-muted">{sutartis.tiekejoKodas}</span>
           </div>
           {sutartis.papildomiTiekejai.map((t: string, i: number) => (
             <div class="mt-3">
-              <h3><a href={`/asmuo/${sutartis.papildomiTiekejaiKodai[i]}`}>{t}</a></h3>
+              <h3><EntityLink kodas={sutartis.papildomiTiekejaiKodai[i]} label={t} /></h3>
               <span class="text-muted">{sutartis.papildomiTiekejaiKodai[i]}</span>
             </div>
           ))}
@@ -35,7 +37,7 @@ const showPatikslinimas = sutartis.tiekejasPatikslinimas && sutartis.tiekejasPat
         <>
           <h2>Tiekėjas</h2>
           {showPatikslinimas && <p class="text-muted text-sm mb-1">{sutartis.tiekejasPatikslinimas}</p>}
-          <h3><a href={`/asmuo/${sutartis.tiekejoKodas}`}>{sutartis.tiekejas}</a></h3>
+          <h3><EntityLink kodas={sutartis.tiekejoKodas} label={sutartis.tiekejas} /></h3>
           {sutartis.tiekejasSalis && <p class="text-muted text-sm">{sutartis.tiekejasSalis}</p>}
           <span class="text-muted">{sutartis.tiekejoKodas}</span>
         </>

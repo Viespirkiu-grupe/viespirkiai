@@ -1,4 +1,5 @@
 ---
+import ChartSection from '@design-system/components/charts/ChartSection.astro';
 import ChartTile from '@design-system/components/charts/ChartTile.astro';
 import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
 
@@ -9,9 +10,7 @@ const series1 = duomenys.map((d: any) => d.draustieji || null);
 const series2 = duomenys.map((d: any) => d.draustieji2 || null);
 ---
 
-<div class="page-section mb-10" id="darbuotojai">
-  <h2><a href="#darbuotojai" class="no-style">Darbuotojų skaičius</a></h2>
-  <div class="grid-2">
+<ChartSection id="darbuotojai" title="Darbuotojų skaičius">
     <ChartTile title="Darbo sutartys, valstybės tarnautojai" hasData={duomenys.length > 0 && asmuo.sodra?.turejoDraustuju}>
       <LineDatetimeChart
         id="darbuotojuSkaiciausDiagrama"
@@ -38,5 +37,4 @@ const series2 = duomenys.map((d: any) => d.draustieji2 || null);
         heightClass="h-[350px]"
       />
     </ChartTile>
-  </div>
-</div>
+</ChartSection>

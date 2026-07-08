@@ -1,22 +1,25 @@
 ---
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+
 interface Props {
   pirkimas: any;
 }
 const { pirkimas } = Astro.props;
 const t = pirkimas.turinys || {};
+const items = [
+  pirkimas.statusas && { label: 'Statusas', value: pirkimas.statusas },
+  pirkimas.pirkimoObjektoTipas && { label: 'Objekto tipas', value: pirkimas.pirkimoObjektoTipas },
+  t.direktyva && { label: 'Direktyva', value: t.direktyva },
+  t.nutsKodai && { label: 'NUTS kodas', value: t.nutsKodai },
+  pirkimas.esFinansavimas != null && { label: 'ES finansavimas', value: pirkimas.esFinansavimas ? 'Taip' : 'Ne' },
+  t.pasiulymuVertinimoKriterijai && { label: 'Vertinimo kriterijai', value: t.pasiulymuVertinimoKriterijai },
+  t.virsArbaZemiauTarptautinioPirkimoVertesRibos && { label: 'Tarpt. vertės riba', value: t.virsArbaZemiauTarptautinioPirkimoVertesRibos },
+].filter(Boolean);
 ---
 
 <section>
   <h2>Klasifikacija</h2>
-  <dl class="kv-list mb-4">
-    {pirkimas.statusas && <><dt>Statusas</dt><dd>{pirkimas.statusas}</dd></>}
-    {pirkimas.pirkimoObjektoTipas && <><dt>Objekto tipas</dt><dd>{pirkimas.pirkimoObjektoTipas}</dd></>}
-    {t.direktyva && <><dt>Direktyva</dt><dd>{t.direktyva}</dd></>}
-    {t.nutsKodai && <><dt>NUTS kodas</dt><dd>{t.nutsKodai}</dd></>}
-    {pirkimas.esFinansavimas != null && <><dt>ES finansavimas</dt><dd>{pirkimas.esFinansavimas ? 'Taip' : 'Ne'}</dd></>}
-    {t.pasiulymuVertinimoKriterijai && <><dt>Vertinimo kriterijai</dt><dd>{t.pasiulymuVertinimoKriterijai}</dd></>}
-    {t.virsArbaZemiauTarptautinioPirkimoVertesRibos && <><dt>Tarpt. vertės riba</dt><dd>{t.virsArbaZemiauTarptautinioPirkimoVertesRibos}</dd></>}
-  </dl>
+  <KeyValueList className="mb-4" items={items} />
   {pirkimas.bvpzKodai && pirkimas.bvpzKodai.length > 0 && (
     <>
       <h3 class="mb-2">BVPŽ kodai</h3>

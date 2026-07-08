@@ -1,0 +1,42 @@
+---
+import { externalLinkRel } from '../lib/html.ts';
+
+interface FooterItem {
+  label?: string;
+  value?: unknown;
+  html?: string;
+  href?: string;
+  target?: string;
+  rel?: string;
+  className?: string;
+}
+
+interface Props {
+  items?: FooterItem[];
+  className?: string;
+}
+
+const { items = [], className = '' } = Astro.props as Props;
+const classes = ['result-card-footer', className].filter(Boolean).join(' ');
+const visibleItems = items.filter((item) => {
+  const value = item.html ?? item.value;
+  return value !== null && value !== undefined && value !== false && value !== '';
+});
+---
+
+<div class={classes}>
+  {visibleItems.map((item) => {
+    const rel = externalLinkRel(item.target, item.rel);
+    const content = item.html ? <Fragment set:html={item.html} /> : item.value;
+    return (
+      <span class={item.className}>
+        {item.label && <><strong>{item.label}:</strong>{' '}</>}
+        {item.href
+          ? <a href={item.href} target={item.target} rel={rel} class="relative z-1">{content}</a>
+          : content
+        }
+      </span>
+    );
+  })}
+  <slot />
+</div>

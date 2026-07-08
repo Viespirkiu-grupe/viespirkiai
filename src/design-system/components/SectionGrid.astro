@@ -1,0 +1,21 @@
+---
+interface Props {
+  columns?: 2 | 3 | 'auto';
+  gap?: 'sm' | 'md' | 'lg';
+  className?: string;
+}
+
+const {
+  columns = 2,
+  gap = 'md',
+  className = '',
+} = Astro.props as Props;
+
+const gridClass = columns === 'auto' ? 'grid-auto' : `grid-${columns}`;
+const gapClass = gap === 'sm' ? 'gap-3' : gap === 'lg' ? 'gap-7' : '';
+const classes = [gridClass, gapClass, className].filter(Boolean).join(' ');
+---
+
+<div class={classes}>
+  <slot />
+</div>

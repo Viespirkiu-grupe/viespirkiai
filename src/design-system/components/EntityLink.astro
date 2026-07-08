@@ -1,0 +1,33 @@
+---
+interface Props {
+  kodas?: string | number | null;
+  label?: string | number | null;
+  hrefBase?: string;
+  link?: boolean;
+  mono?: boolean;
+  fallback?: string;
+  className?: string;
+  target?: '_blank' | '_self';
+}
+
+const {
+  kodas,
+  label,
+  hrefBase = '/asmuo',
+  link = true,
+  mono = false,
+  fallback = '—',
+  className = '',
+  target,
+} = Astro.props as Props;
+
+const text = label ?? kodas ?? fallback;
+const href = kodas ? `${hrefBase}/${encodeURIComponent(String(kodas))}` : '';
+const classes = [mono ? 'cell-mono' : '', className].filter(Boolean).join(' ');
+const rel = target === '_blank' ? 'noopener noreferrer' : undefined;
+---
+
+{kodas && link
+  ? <a href={href} class={classes || undefined} target={target} rel={rel}>{text}</a>
+  : <span class={classes || undefined}>{text}</span>
+}

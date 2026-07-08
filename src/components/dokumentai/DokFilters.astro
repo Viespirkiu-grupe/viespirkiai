@@ -16,7 +16,7 @@ const otherCount = p.author.filter.length + p.creator.filter.length + p.producer
 <aside class="dok-sidebar" id="dokSidebar" aria-label="Filtrai">
   <div class="dok-sidebar-head">
     <button type="button" class="dok-sidebar-title" id="dokFiltersToggle" aria-expanded="false" aria-controls="dokFiltersBody">
-      Filtrai{p.activeFilterCount > 0 && <span class="dok-filters-count">{p.activeFilterCount}</span>}
+      <span class="sr-only">Filtrai</span>{p.activeFilterCount > 0 && <span class="dok-filters-count">{p.activeFilterCount}</span>}
       <span class="dok-filters-chevron" aria-hidden="true"></span>
     </button>
     {p.hasFilters && <a href={p.clearUrl} class="dok-sidebar-clear">Panaikinti</a>}
@@ -66,9 +66,9 @@ const otherCount = p.author.filter.length + p.creator.filter.length + p.producer
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    padding-bottom: 10px;
-    margin-bottom: 2px;
-    border-bottom: 1px solid var(--light-gray);
+    /* "Filtrai" label removed — no orphan divider on desktop; the head just
+       carries the "Panaikinti" clear link (and, on mobile, the toggle). */
+    min-height: 0;
   }
   .dok-sidebar-title {
     display: inline-flex;

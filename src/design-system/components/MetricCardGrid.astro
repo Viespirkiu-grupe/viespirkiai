@@ -1,0 +1,21 @@
+---
+interface Props {
+  minWidth?: string;
+  className?: string;
+}
+
+const { minWidth = '180px', className = '' } = Astro.props as Props;
+const classes = ['metric-card-grid', className].filter(Boolean).join(' ');
+---
+
+<div class={classes} style={`--metric-card-min-width: ${minWidth}`}>
+  <slot />
+</div>
+
+<style>
+  .metric-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--metric-card-min-width), 1fr));
+    gap: 12px;
+  }
+</style>

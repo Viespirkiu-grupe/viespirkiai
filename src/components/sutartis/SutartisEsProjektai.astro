@@ -1,4 +1,5 @@
 ---
+import DetailsSection from '@design-system/components/DetailsSection.astro';
 import CpvaProjektasCard from './CpvaProjektasCard.astro';
 
 interface Props {
@@ -12,8 +13,7 @@ const truncated = list.length > 3 && !showAll;
 ---
 
 {list.length > 0 && (
-  <section>
-    <h2>Europos sąjungos projektai</h2>
+  <DetailsSection title="Europos sąjungos projektai">
     {truncated ? (
       <>
         <p class="text-muted mt-4">
@@ -26,5 +26,5 @@ const truncated = list.length > 3 && !showAll;
         {list.map((ps: any) => <CpvaProjektasCard item={ps} />)}
       </div>
     )}
-  </section>
+  </DetailsSection>
 )}

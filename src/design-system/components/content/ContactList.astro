@@ -10,22 +10,26 @@ interface Item {
 interface Props {
   items: Item[];
   title: string;
-  type: 'email' | 'phone' | 'link' | 'iban';
+  type: 'email' | 'phone' | 'link' | 'iban' | 'domain' | 'plain';
   maxItems?: number;
   emptyText?: string;
+  titleTagMode?: 'dt' | 'heading';
 }
 
-const { items = [], title, type, maxItems = 3, emptyText = 'Nerasta' } = Astro.props;
+const { items = [], title, type, maxItems = 3, emptyText = 'Nerasta', titleTagMode = 'dt' } = Astro.props;
 
 const visible = items.slice(0, maxItems);
 const hidden = items.slice(maxItems);
 const isMono = type === 'iban';
-const isExternal = type === 'link';
+const isExternal = type === 'link' || type === 'domain';
+const TitleTag = titleTagMode === 'heading' ? 'h3' : 'dt';
+const BodyTag = titleTagMode === 'heading' ? 'div' : 'dd';
 
 function getHref(item: Item) {
   if (type === 'email') return `mailto:${item.value}`;
   if (type === 'phone') return `tel:${item.value}`;
   if (type === 'link') return item.fullValue || item.value;
+  if (type === 'domain') return `https://${item.fullValue || item.value}`;
   return '#';
 }
 
@@ -35,14 +39,16 @@ function pageLabel(item: Item) {
 }
 ---
 
-<dt>{title}</dt>
-<dd class={`contact-list contact-list--${type}`}>
+<TitleTag>{title}</TitleTag>
+<BodyTag class={`contact-list contact-list--${type}`}>
   {items.length > 0 ? (
     <>
       <div class="stack stack-xs">
         {visible.map((item) => item?.value && (
           <div class="inline inline-xs contact-item">
-            {isMono
+            {type === 'plain'
+              ? <span>{item.value}</span>
+              : isMono
               ? <span class="cell-mono">{item.value}</span>
               : isExternal
                 ? <Link href={getHref(item)} target="_blank" className="cell-truncate">{item.value}</Link>
@@ -62,7 +68,9 @@ function pageLabel(item: Item) {
           <div class="stack stack-xs mt-2">
             {hidden.map((item) => item?.value && (
               <div class="inline inline-xs contact-item">
-                {isMono
+                {type === 'plain'
+                  ? <span>{item.value}</span>
+                  : isMono
                   ? <span class="cell-mono">{item.value}</span>
                   : isExternal
                     ? <Link href={getHref(item)} target="_blank" className="cell-truncate">{item.value}</Link>
@@ -80,4 +88,4 @@ function pageLabel(item: Item) {
   ) : (
     <em class="text-muted">{emptyText}</em>
   )}
-</dd>
+</BodyTag>

@@ -1,5 +1,7 @@
 ---
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import ResultCardFooter from '@design-system/components/ResultCardFooter.astro';
+import ResultCardMeta from '@design-system/components/ResultCardMeta.astro';
 
 interface Props {
   item: any;
@@ -18,12 +20,15 @@ const formatBytes = (value: unknown) => {
 ---
 
 <ResultCardShell clickable={true}>
-  <dl slot="meta" class="result-card-meta">
-    <div><dt class="sr-only">Formatas</dt><dd>{String(item.extension || '').toUpperCase()}</dd></div>
-    <div><dt class="sr-only">Dydis</dt><dd>{formatBytes(item.dydis)}</dd></div>
-    {item.metaduomenys && item.metaduomenys.pageCount && <div><dt class="sr-only">Puslapiai</dt><dd>{Number(item.metaduomenys.pageCount).toLocaleString('lt-LT')} p.</dd></div>}
-    <div><dt class="sr-only">Žodžiai</dt><dd>{Number(item.zodziuSkaicius).toLocaleString('lt-LT') || '—'} ž.</dd></div>
-  </dl>
+  <ResultCardMeta
+    slot="meta"
+    items={[
+      { label: 'Formatas', value: String(item.extension || '').toUpperCase() },
+      { label: 'Dydis', value: formatBytes(item.dydis) },
+      item.metaduomenys && item.metaduomenys.pageCount && { label: 'Puslapiai', value: `${Number(item.metaduomenys.pageCount).toLocaleString('lt-LT')} p.` },
+      { label: 'Žodžiai', value: `${Number(item.zodziuSkaicius).toLocaleString('lt-LT') || '—'} ž.` },
+    ].filter(Boolean)}
+  />
 
   <h3 slot="title" class="result-card-title">
     <a href={`/failas/${item.id}?search=${encodeURIComponent(search)}`}>
@@ -33,9 +38,5 @@ const formatBytes = (value: unknown) => {
 
   {item.excerpt && <div class="text-sm text-muted mt-2 text-justify" set:html={item.excerpt} />}
 
-  {item.dokId && (
-    <div slot="footer" class="result-card-footer">
-      <span><a href={`/sutartis/${item.dokId}`} class="relative z-1">↗ Sutartis</a></span>
-    </div>
-  )}
+  {item.dokId && <ResultCardFooter slot="footer" items={[{ value: '↗ Sutartis', href: `/sutartis/${item.dokId}` }]} />}
 </ResultCardShell>

@@ -1,0 +1,22 @@
+---
+import Button from './Button.astro';
+
+interface ExportLinkItem {
+  href: string;
+  label: string;
+  ariaLabel?: string;
+}
+
+interface Props {
+  items: ExportLinkItem[];
+  size?: 'sm' | 'md';
+}
+
+const { items, size = 'sm' } = Astro.props as Props;
+---
+
+{items.map((item) => (
+  <Button href={item.href} variant="outline" size={size} ariaLabel={item.ariaLabel || `Eksportuoti kaip ${item.label}`}>
+    <span aria-hidden="true">↗</span> {item.label}
+  </Button>
+))}

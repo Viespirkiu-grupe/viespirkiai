@@ -1,5 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import DateValue from '@design-system/components/DateValue.astro';
+import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
 import SutartisCard from '../../components/content/SutartisCard.astro';
 import PirkimasVykdytojas from '../../components/viesiejiPirkimai/PirkimasVykdytojas.astro';
@@ -65,11 +68,11 @@ const font = getFont(Astro.cookies);
       <Fragment slot="subtext">{pirkimas.pirkimoBudas}{pirkimas.statusas && <> · <span class="text-muted">{pirkimas.statusas}</span></>}</Fragment>
       {(!pirkimas.pavadinimas || pirkimas.pavadinimas.length < 1) ? <em>Nenurodyta</em> : pirkimas.pavadinimas}
       {pirkimas.numatomaBendraPirkimoVerte && (
-        <> už <span class="amount">{Number(pirkimas.numatomaBendraPirkimoVerte).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;€</span></>
+        <> už <span class="amount"><MoneyValue value={pirkimas.numatomaBendraPirkimoVerte} suffix={'\u00A0€'} mono={false} /></span></>
       )}
       <Fragment slot="actions">
         {cvpisUrl && (
-          <a href={cvpisUrl} class="btn btn-outline btn-sm" target="_blank" rel="noopener noreferrer" aria-label="Peržiūrėti CVP IS puslapį">↗ CVP IS</a>
+          <ExternalSourceLink href={cvpisUrl} source="cvpis" variant="button" ariaLabel="Peržiūrėti CVP IS puslapį" />
         )}
         <a href={`/viesiejiPirkimai/${pirkimas.pirkimoId}.json`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti pirkimo JSON duomenis">↗ JSON</a>
       </Fragment>
@@ -77,7 +80,7 @@ const font = getFont(Astro.cookies);
 
     <div class="mb-10">
       <div class="text-muted mb-4 text-sm">
-          Duomenys atnaujinti {String(pirkimas.turinioNuskaitymoData).slice(0, 16).replace('T', ' ')}</i>
+          Duomenys atnaujinti <DateValue value={pirkimas.turinioNuskaitymoData} mode="datetime" /></i>
       </div>
       {pirkimas.informacija && pirkimas.informacija !== pirkimas.pavadinimas && (
         <div class="text-justify">{pirkimas.informacija}</div>

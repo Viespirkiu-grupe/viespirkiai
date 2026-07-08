@@ -1,5 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
 import SutartisSalys from '../../components/sutartis/SutartisSalys.astro';
 import SutartisDetails from '../../components/sutartis/SutartisDetails.astro';
@@ -53,10 +55,10 @@ const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
     <PageHeader>
       <Fragment slot="subtext">{sutartis.tipoPavadinimas}</Fragment>
       {sutartis.pavadinimas.length < 1 ? <em>Nenurodyta</em> : sutartis.pavadinimas}
-      {' '}už <span class="amount">{fmtEur(verte)}&nbsp;€</span>
+      {' '}už <span class="amount"><MoneyValue value={verte} suffix={'\u00A0€'} mono={false} /></span>
       <Fragment slot="actions">
         <a href={`/sutartis/${sutartiesUnikalusID}.json`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties JSON duomenis">↗ JSON</a>
-        <a href={cvpisUrl} class="btn btn-outline btn-sm" aria-label="Peržiūrėti sutarties CVP IS duomenis">↗ CVP IS</a>
+        <ExternalSourceLink href={cvpisUrl} source="cvpis" variant="button" ariaLabel="Peržiūrėti sutarties CVP IS duomenis" />
         {config.enableGraph && (
           <a href={`/rysiai/asmuo/${sutartis.perkanciosiosOrganizacijosKodas}#o_2=${sutartis.tiekejoKodas}&f_2=DSLMGPABC&c_3=${sutartiesUnikalusID}&f_3=DSLMGPABC`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti ryšių grafą">↗ Ryšiai</a>
         )}

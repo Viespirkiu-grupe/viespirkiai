@@ -1,6 +1,9 @@
 ---
+import DetailsSection from '@design-system/components/DetailsSection.astro';
+import DateValue from '@design-system/components/DateValue.astro';
+import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
 import KeyValueList from '@design-system/components/KeyValueList.astro';
-import { fmtEur } from '../../lib/formatters.ts';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
 
 interface Props {
   sutartis: any;
@@ -12,11 +15,10 @@ const cvpis = sutartis.cvpisPirkimas;
 const cvpp = sutartis.cvppPirkimas;
 ---
 
-<section>
-  <h2>Pranešimas</h2>
+<DetailsSection title="Pranešimas">
   <div class="flex items-center gap-2 mb-4">
     <span class="text-muted">{sutartis.sutartiesUnikalusId}</span>
-    <a href={cvpisUrl} class="text-sm">↗ CVP IS</a>
+    <ExternalSourceLink href={cvpisUrl} source="cvpis" className="text-sm" />
   </div>
 
   <KeyValueList className="mb-4">
@@ -34,23 +36,21 @@ const cvpp = sutartis.cvppPirkimas;
   </KeyValueList>
 
   {cvpis && (
-    <section>
-      <br />
-      <h2>Viešasis pirkimas</h2>
+    <DetailsSection title="Viešasis pirkimas">
       <div class="flex items-center gap-2 mb-4">
         <a href={`/viesiejiPirkimai/${cvpis.pirkimoId}`}><span>{cvpis.pavadinimas}</span></a>
       </div>
       <KeyValueList>
         {cvpis.pasiulymuPateikimoTerminas && <>
           <dt>Pasiūlymų pateikimo terminas</dt>
-          <dd>{String(cvpis.pasiulymuPateikimoTerminas).slice(0, 10)}</dd>
+          <dd><DateValue value={cvpis.pasiulymuPateikimoTerminas} /></dd>
         </>}
         {cvpis.numatomaVerteEUR && Number(cvpis.numatomaVerteEUR) > 0 && <>
           <dt>Numatoma vertė</dt>
-          <dd class="cell-mono">{fmtEur(cvpis.numatomaVerteEUR)} €</dd>
+          <dd><MoneyValue value={cvpis.numatomaVerteEUR} /></dd>
         </>}
       </KeyValueList>
       {cvpis.informacija && <p class="text-muted text-sm">{cvpis.informacija}</p>}
-    </section>
+    </DetailsSection>
   )}
-</section>
+</DetailsSection>

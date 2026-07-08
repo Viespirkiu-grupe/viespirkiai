@@ -10,6 +10,14 @@ const TABLES = {
     source: "sutartys",
     sourceId: "sutartiesUnikalusId",
   },
+  viesiejiPirkimai: {
+    queue: "viesiejiPirkimaiIndexQueue",
+    queueId: "pirkimoId",
+    source: "viesiejiPirkimai",
+    sourceId: "pirkimoId",
+    queueValue: `e."eilutesId"::text`,
+    sourceValue: `e."eilutesId"::text`,
+  },
 };
 
 const HELP = `Perkelia pasirinktų Quickwit indeksų gyvas eilutes į indeksavimo eilę.
@@ -23,7 +31,7 @@ Pasirinkimas:
   --top-ratio N       N indeksų, turinčių didžiausią mirusių eilučių procentą
   --all               visi filtrus atitinkantys indeksai
   --list              tik parodyti indeksus
-  --lentele PAV       dokumentai arba sutartys (numatyta dokumentai)
+  --lentele PAV       dokumentai, sutartys arba viesiejiPirkimai (numatyta dokumentai)
   --min-dead N        tik turintys bent N mirusių eilučių
   --min-dead-ratio N  tik turintys bent N% mirusių eilučių
 
@@ -186,23 +194,23 @@ async function requeueIndexes(indexes, { dryRun, lentele }) {
     const { rowCount: replacedQueueRows } = await client.query(
       `DELETE FROM "${table.queue}" q USING "quickwitEilutes" e
        WHERE e."lentele" = $1 AND e."indeksas" = ANY($2::text[])
-         AND q."${table.queueId}" = e."eilutesId"::bigint`,
+         AND q."${table.queueId}" = ${table.queueValue ?? `e."eilutesId"::bigint`}`,
       [lentele, names],
     );
 
     const { rowCount: queuedPatches } = await client.query(
       `INSERT INTO "${table.queue}" ("${table.queueId}", "keitimas")
-       SELECT e."eilutesId"::bigint, 'patch'
+       SELECT ${table.queueValue ?? `e."eilutesId"::bigint`}, 'patch'
        FROM "quickwitEilutes" e
-       JOIN "${table.source}" s ON s."${table.sourceId}" = e."eilutesId"::bigint
+       JOIN "${table.source}" s ON s."${table.sourceId}" = ${table.sourceValue ?? `e."eilutesId"::bigint`}
        WHERE e."lentele" = $1 AND e."indeksas" = ANY($2::text[])`,
       [lentele, names],
     );
     const { rowCount: queuedDeletes } = await client.query(
       `INSERT INTO "${table.queue}" ("${table.queueId}", "keitimas")
-       SELECT e."eilutesId"::bigint, 'delete'
+       SELECT ${table.queueValue ?? `e."eilutesId"::bigint`}, 'delete'
        FROM "quickwitEilutes" e
-       LEFT JOIN "${table.source}" s ON s."${table.sourceId}" = e."eilutesId"::bigint
+       LEFT JOIN "${table.source}" s ON s."${table.sourceId}" = ${table.sourceValue ?? `e."eilutesId"::bigint`}
        WHERE e."lentele" = $1 AND e."indeksas" = ANY($2::text[]) AND s."${table.sourceId}" IS NULL`,
       [lentele, names],
     );

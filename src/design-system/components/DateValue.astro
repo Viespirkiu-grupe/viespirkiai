@@ -1,0 +1,31 @@
+---
+interface Props {
+  value?: unknown;
+  mode?: 'date' | 'datetime';
+  fallback?: string;
+  mono?: boolean;
+  className?: string;
+}
+
+const {
+  value,
+  mode = 'date',
+  fallback = '—',
+  mono = false,
+  className = '',
+} = Astro.props as Props;
+
+const raw = value == null || value === '' ? '' : String(value);
+const text = raw
+  ? mode === 'datetime'
+    ? raw.slice(0, 16).replace('T', ' ')
+    : raw.slice(0, 10)
+  : fallback;
+const datetime = raw ? (mode === 'datetime' ? raw.slice(0, 16) : raw.slice(0, 10)) : undefined;
+const classes = [mono ? 'cell-mono' : '', className].filter(Boolean).join(' ');
+---
+
+{raw
+  ? <time datetime={datetime} class={classes || undefined}>{text}</time>
+  : <span class={classes || undefined}>{text}</span>
+}

@@ -1,0 +1,37 @@
+---
+import PageSection from '@design-system/components/PageSection.astro';
+import SectionGrid from '@design-system/components/SectionGrid.astro';
+
+interface Props {
+  id: string;
+  title?: string;
+  description?: string;
+  columns?: 2 | 3 | 'auto';
+  className?: string;
+  gridClassName?: string;
+}
+
+const {
+  id,
+  title = '',
+  description,
+  columns = 2,
+  className = '',
+  gridClassName = '',
+} = Astro.props as Props;
+---
+
+{title ? (
+  <PageSection id={id} title={title} description={description} className={className}>
+    <SectionGrid columns={columns} className={gridClassName}>
+      <slot />
+    </SectionGrid>
+  </PageSection>
+) : (
+  <div class={`page-section mb-10 ${className}`.trim()} id={id}>
+    {description && <p class="text-muted text-sm mb-7">{description}</p>}
+    <SectionGrid columns={columns} className={gridClassName}>
+      <slot />
+    </SectionGrid>
+  </div>
+)}

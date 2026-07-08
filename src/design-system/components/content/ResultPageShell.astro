@@ -1,0 +1,22 @@
+---
+import SearchResultsShell from './SearchResultsShell.astro';
+
+interface Props {
+  numberOfResults: string;
+  resultCount: number;
+  page: number;
+  pageCount: number;
+  queryParams: string;
+  emptyText?: string;
+  containerClass?: string;
+  flat?: boolean;
+}
+
+const props = Astro.props as Props;
+---
+
+<SearchResultsShell {...props}>
+  {Astro.slots.has('sort') && <Fragment slot="sort"><slot name="sort" /></Fragment>}
+  {Astro.slots.has('actions') && <Fragment slot="actions"><slot name="actions" /></Fragment>}
+  <slot />
+</SearchResultsShell>

@@ -73,7 +73,7 @@ export async function handler(params) {
     if (verteNuo != null) query.verteNuo = String(verteNuo);
     if (verteIki != null) query.verteIki = String(verteIki);
 
-    const { results } = await searchViesiejiPirkimai(query, { limit, page });
+    const { results } = await searchViesiejiPirkimai(query, { limit, page, engine: "quickwit" });
 
     // Delete results[].turinys.failai
     for (const r of results) {

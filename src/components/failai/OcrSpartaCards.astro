@@ -1,4 +1,6 @@
 ---
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
 import { fmtNumber } from '../../lib/formatters.ts';
 
 interface Props {
@@ -15,21 +17,13 @@ const { title, anchor, results, pages, words } = Astro.props;
   <h2 class="mb-3">
     <a href={`#${anchor}`} id={anchor} class="no-style">{title}</a>
   </h2>
-  <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
+  <MetricCardGrid>
     {[
       { label: 'Dokumentai', value: results },
       { label: 'Puslapiai', value: pages },
       { label: 'Žodžiai', value: words },
     ].map(({ label, value }) => (
-      <div class="card">
-        <div class="card-body">
-          <div class="section-title mb-2">{label}</div>
-          <div class="flex items-baseline gap-1">
-            <span class="cell-mono text-[1.6rem] font-semibold">{fmtNumber(value)}</span>
-            <span class="text-xs text-muted font-medium">/min.</span>
-          </div>
-        </div>
-      </div>
+      <MetricCard label={label} value={fmtNumber(value)} unit="/min." />
     ))}
-  </div>
+  </MetricCardGrid>
 </div>

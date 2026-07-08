@@ -1,0 +1,34 @@
+---
+import Modal from './Modal.astro';
+import '@design-system/foundation/facet-modal.css';
+
+interface Props {
+  id: string;
+  title?: string;
+  searchPlaceholder?: string;
+  searchAriaLabel?: string;
+  listClassName?: string;
+}
+
+const {
+  id,
+  title = 'Filtras',
+  searchPlaceholder = 'Filtruoti arba įvesti savo…',
+  searchAriaLabel = 'Filtruoti arba įvesti savo reikšmę',
+  listClassName = '',
+} = Astro.props as Props;
+
+const listClasses = ['dok-facet-modal__list', listClassName].filter(Boolean).join(' ');
+---
+
+<Modal id={id} title={title}>
+  <input slot="tools" type="search" class="dok-facet-modal__search" placeholder={searchPlaceholder} aria-label={searchAriaLabel} autocomplete="off" />
+  <div class={listClasses} role="listbox" aria-multiselectable="true"></div>
+  <Fragment slot="footer">
+    <span class="ds-modal__count" aria-live="polite"></span>
+    <span class="ds-modal__actions">
+      <button type="button" class="btn btn-outline btn-sm" data-facet-clear>Išvalyti</button>
+      <button type="button" class="btn btn-primary btn-sm" data-facet-apply>Taikyti</button>
+    </span>
+  </Fragment>
+</Modal>

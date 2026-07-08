@@ -1,0 +1,34 @@
+---
+import SectionHeading from '@design-system/components/SectionHeading.astro';
+
+interface Props {
+  id: string;
+  title: string;
+  tag?: 'section' | 'div';
+  headingTag?: 'h2' | 'h3';
+  className?: string;
+  bodyClass?: string;
+  description?: string;
+}
+
+const {
+  id,
+  title,
+  tag = 'div',
+  headingTag = 'h2',
+  className = '',
+  bodyClass = '',
+  description,
+} = Astro.props as Props;
+
+const Tag = tag;
+const classes = ['page-section', 'mb-10', className].filter(Boolean).join(' ');
+---
+
+<Tag class={classes} id={id}>
+  <SectionHeading id={id} title={title} tag={headingTag} />
+  {description && <p class="text-muted text-sm mb-7">{description}</p>}
+  <div class={bodyClass}>
+    <slot />
+  </div>
+</Tag>

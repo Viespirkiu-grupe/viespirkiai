@@ -1,6 +1,5 @@
 ---
-import Table from '@design-system/components/Table.astro';
-import TableWrapper from '@design-system/components/TableWrapper.astro';
+import DataTable from '@design-system/components/DataTable.astro';
 import type { Atn1Santrauka } from '../../lib/atn1.js';
 
 const { atn1 } = Astro.props as { atn1: Atn1Santrauka };
@@ -21,22 +20,17 @@ const keliosDalys = eile.some((e) => e.daliesNumeris != null && Number(e.daliesN
   </div>
 
   {dalyviai.length > 0 ? (
-    <TableWrapper>
-      <Table size="sm">
-        <thead><tr><th>Dalyvis</th><th>Šalis</th></tr></thead>
-        <tbody>
-          {dalyviai.map((d) => {
-            const l = asmuoLink(d.kodas, d.fizinisAsmuo, d.pavadinimas);
-            return (
-              <tr>
-                <td>{l ? <a href={l.href}>{l.text}</a> : val(d.pavadinimas)}</td>
-                <td>{val(d.salis)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </Table>
-    </TableWrapper>
+    <DataTable size="sm" columns={[{ label: 'Dalyvis' }, { label: 'Šalis' }]}>
+      {dalyviai.map((d) => {
+        const l = asmuoLink(d.kodas, d.fizinisAsmuo, d.pavadinimas);
+        return (
+          <tr>
+            <td>{l ? <a href={l.href}>{l.text}</a> : val(d.pavadinimas)}</td>
+            <td>{val(d.salis)}</td>
+          </tr>
+        );
+      })}
+    </DataTable>
   ) : (
     <p class="text-muted text-sm">Dalyvių sąrašas nepateiktas.</p>
   )}
@@ -44,31 +38,27 @@ const keliosDalys = eile.some((e) => e.daliesNumeris != null && Number(e.daliesN
   {eile.length > 0 && (
     <>
       <h3 class="mt-6 mb-3">Pasiūlymų eilė</h3>
-      <TableWrapper>
-        <Table size="sm">
-          <thead>
+      <DataTable
+        size="sm"
+        columns={[
+          ...(keliosDalys ? [{ label: 'Dalis', headerClassName: 'dalyviai-col-num' }] : []),
+          { label: 'Eilė', headerClassName: 'dalyviai-col-num' },
+          { label: 'Dalyvis' },
+          { label: 'Kaina', headerClassName: 'cell-right' },
+        ]}
+      >
+        {eile.map((e) => {
+          const l = asmuoLink(e.dalyvioKodas, false, e.dalyvioPavadinimas);
+          return (
             <tr>
-              {keliosDalys && <th class="dalyviai-col-num">Dalis</th>}
-              <th class="dalyviai-col-num">Eilė</th>
-              <th>Dalyvis</th>
-              <th class="cell-right">Kaina</th>
+              {keliosDalys && <td class="cell-mono">{val(e.daliesNumeris)}</td>}
+              <td class="cell-mono">{val(e.eileNumeris)}</td>
+              <td>{l ? <a href={l.href}>{l.text}</a> : val(e.dalyvioPavadinimas)}</td>
+              <td class="cell-mono cell-right">{e.kaina ? `${e.kaina}${e.kainosIsraiska ? ` ${e.kainosIsraiska}` : ''}` : '—'}</td>
             </tr>
-          </thead>
-          <tbody>
-            {eile.map((e) => {
-              const l = asmuoLink(e.dalyvioKodas, false, e.dalyvioPavadinimas);
-              return (
-                <tr>
-                  {keliosDalys && <td class="cell-mono">{val(e.daliesNumeris)}</td>}
-                  <td class="cell-mono">{val(e.eileNumeris)}</td>
-                  <td>{l ? <a href={l.href}>{l.text}</a> : val(e.dalyvioPavadinimas)}</td>
-                  <td class="cell-mono cell-right">{e.kaina ? `${e.kaina}${e.kainosIsraiska ? ` ${e.kainosIsraiska}` : ''}` : '—'}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
-      </TableWrapper>
+          );
+        })}
+      </DataTable>
     </>
   )}
 </section>

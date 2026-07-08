@@ -1,8 +1,18 @@
 ---
+import KeyValueList from '@design-system/components/KeyValueList.astro';
 import { formatDateTime, formatDuration } from '@/utils/time.js';
 interface Props { failas: any; }
 const { failas } = Astro.props;
 const ocrLatest = failas.ocrLatestResult;
+const items = [
+  failas.ocrStateKey && failas.ocrStateKey !== '1' && { label: 'Būsena', value: failas.ocrStateText },
+  ocrLatest && (ocrLatest.duration || ocrLatest.duration === 0) && { label: 'Trukmė', value: formatDuration(ocrLatest.duration), valueClassName: 'cell-mono' },
+  ocrLatest && (ocrLatest.puslapiuSkaicius || ocrLatest.puslapiuSkaicius === 0) && { label: 'Puslapiai', value: Number(ocrLatest.puslapiuSkaicius).toLocaleString('lt-LT'), valueClassName: 'cell-mono' },
+  ocrLatest && (ocrLatest.zodziuSkaicius || ocrLatest.zodziuSkaicius === 0) && { label: 'Žodžiai', value: Number(ocrLatest.zodziuSkaicius).toLocaleString('lt-LT'), valueClassName: 'cell-mono' },
+  typeof failas.ocrBandymai === 'number' && failas.ocrBandymai > 0 && { label: 'Bandymų sk.', value: failas.ocrBandymai, valueClassName: 'cell-mono' },
+  typeof failas.ocrRezultatuSkaicius === 'number' && failas.ocrRezultatuSkaicius > 1 && { label: 'Rezultatų įrašai', value: failas.ocrRezultatuSkaicius, valueClassName: 'cell-mono' },
+  failas.ocrNode && { label: 'Nuskaitytojas', value: failas.ocrNode, valueClassName: 'cell-mono' },
+].filter(Boolean);
 ---
 <div>
   <h2 class="mb-1 no-style">OCR</h2>
@@ -14,27 +24,5 @@ const ocrLatest = failas.ocrLatestResult;
       : null
   }
 
-  <dl class="kv-list mb-0">
-    {failas.ocrStateKey && failas.ocrStateKey !== '1' && (
-      <><dt>Būsena</dt><dd>{failas.ocrStateText}</dd></>
-    )}
-    {ocrLatest && (ocrLatest.duration || ocrLatest.duration === 0) && (
-      <><dt>Trukmė</dt><dd><span class="cell-mono">{formatDuration(ocrLatest.duration)}</span></dd></>
-    )}
-    {ocrLatest && (ocrLatest.puslapiuSkaicius || ocrLatest.puslapiuSkaicius === 0) && (
-      <><dt>Puslapiai</dt><dd><span class="cell-mono">{Number(ocrLatest.puslapiuSkaicius).toLocaleString('lt-LT')}</span></dd></>
-    )}
-    {ocrLatest && (ocrLatest.zodziuSkaicius || ocrLatest.zodziuSkaicius === 0) && (
-      <><dt>Žodžiai</dt><dd><span class="cell-mono">{Number(ocrLatest.zodziuSkaicius).toLocaleString('lt-LT')}</span></dd></>
-    )}
-    {typeof failas.ocrBandymai === 'number' && failas.ocrBandymai > 0 && (
-      <><dt>Bandymų sk.</dt><dd><span class="cell-mono">{failas.ocrBandymai}</span></dd></>
-    )}
-    {typeof failas.ocrRezultatuSkaicius === 'number' && failas.ocrRezultatuSkaicius > 1 && (
-      <><dt>Rezultatų įrašai</dt><dd><span class="cell-mono">{failas.ocrRezultatuSkaicius}</span></dd></>
-    )}
-    {failas.ocrNode && (
-      <><dt>Nuskaitytojas</dt><dd><span class="cell-mono">{failas.ocrNode}</span></dd></>
-    )}
-  </dl>
+  <KeyValueList className="mb-0" items={items} />
 </div>

@@ -1,8 +1,14 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import SearchForm from '@design-system/components/content/SearchForm.astro';
+import Button from '@design-system/components/Button.astro';
 import SearchSuggest from '@design-system/components/content/SearchSuggest.astro';
 import SutartysFilters from '../components/content/SutartysFilters.astro';
+import DokFacetSection from '../components/dokumentai/DokFacetSection.astro';
+import SutartysFacetModal from '../components/content/SutartysFacetModal.astro';
+import SutartysBvpzModal from '../components/content/SutartysBvpzModal.astro';
+import SutartysSumaFilter from '../components/content/SutartysSumaFilter.astro';
+import SutartysLaikotarpisFilter from '../components/content/SutartysLaikotarpisFilter.astro';
+import { splitFacetOptions } from '../lib/dokumentaiUrl.ts';
 import SearchResults from '../components/content/SearchResults.astro';
 import { searchSutartys, countSutartys, getSutartysQueryMetadata } from '@/modules/sutartys/searchSutartys.js';
 import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
@@ -45,10 +51,25 @@ const font = getFont(Astro.cookies);
 const cleaned = cleanQuery(Astro.url);
 if (cleaned.redirectTo) return Astro.redirect(cleaned.redirectTo);
 const query: Record<string, string> = cleaned.query;
+// Rikiavimo <select> koduoja lauką ir kryptį viename `sort` parametre
+// (`laukas:kryptis`, pvz. `sudarymoData:asc`), kad vienas dropdown valdytų abu.
+// Išskaidom į `sort` + `sortDir`, kaip tikisi paieška/filtrai žemiau.
+if (query.sort?.includes(':')) {
+  const [field, dir] = query.sort.split(':');
+  query.sort = field;
+  if (dir) query.sortDir = dir;
+}
 const DEFAULT_LIMIT = 50;
 const limit = parseInt(query.limit) || DEFAULT_LIMIT;
 const page = parseInt(query.page) || 1;
-const engine = query.search && config.typesenseUp ? 'typesense' : 'postgres';
+// Quickwit (eksperimentinis) naudojamas visada, kai įjungtas — įsk. tuščią
+// pradinį puslapį (be filtrų), kad ir ten rodytųsi facetai. Kitaip: tekstinei
+// paieškai — Typesense, likusiam — Postgres.
+const engine = config.sutartysQuickwit && config.quickwitUp
+  ? 'quickwit'
+  : query.search && config.typesenseUp
+    ? 'typesense'
+    : 'postgres';
 
 type Timing = { label: string; start: number; duration: number; phase?: string };
 
@@ -254,15 +275,70 @@ if (query.rezultatuSkaiciausPatikslinimas) {
   });
 }
 
+type FacetOption = import('../lib/searchDokumentai').FacetOption;
+type SutartysFacetData = {
+  tipas: FacetOption[];
+  kategorija: FacetOption[];
+  buyers: FacetOption[];
+  suppliers: FacetOption[];
+  bvpz: FacetOption[];
+  suma: { buckets: { from: number; to: number | null; count: number }[]; domainMin: number; domainMax: number };
+  laikotarpis: { buckets: { from: number; to: number | null; count: number }[]; domainMin: number; domainMax: number };
+};
+
 const startas = performance.now();
-const searchTimed = await timed(searchSutartys(query, { limit, page, engine }));
-const { results, total: searchedTotal, values, queryParams, timings: searchTimings } = searchTimed.value as {
+const searchTimed = await timed(searchSutartys(query, { limit, page, engine, includeFacets: engine === 'quickwit' }));
+const { results, total: searchedTotal, values, queryParams, timings: searchTimings, facets } = searchTimed.value as {
   results: SearchResultItem[];
   total: number | null;
   values: SearchValues;
   queryParams: string;
   timings?: Timing[];
+  facets?: SutartysFacetData | null;
 };
+
+// Facetų parametrų dabartinės reikšmės (iš URL) sąrašais + daugiareikšmės
+// (multi-select) atrankos nuoroda: perjungiam reikšmę parametro sąraše, atstatom
+// puslapį. BVPŽ dalijasi tarpais atskirtu lauku su parinkikliu; kiti — kableliu.
+const FACET_PARAMS = ['tipas', 'kategorija', 'perkanciosiosOrganizacijosKodas', 'tiekejoKodas', 'bvpzPrefiksasKitas'];
+const facetSep = (param: string) => (param === 'bvpzPrefiksasKitas' ? ' ' : ',');
+const splitFacet = (param: string, raw: string) =>
+  raw.split(facetSep(param)).map((s) => s.trim()).filter(Boolean);
+const facetSelected: Record<string, string[]> = Object.fromEntries(
+  FACET_PARAMS.map((k) => [k, splitFacet(k, Astro.url.searchParams.get(k) ?? '')]),
+);
+
+// Aktyvių filtrų skaičius mobilaus „Filtrai" mygtuko ženkliukui (kaip /dokumentai).
+const FILTER_KEYS = [
+  'perkanciosiosOrganizacijosKodas', 'tiekejoKodas', 'tipas', 'kategorija',
+  'bvpzPrefiksasKitas', 'sumaNuo', 'sumaIki', 'sudarymoDataNuo', 'sudarymoDataIki',
+  'sutartiesUnikalusID', 'sutartiesNumeris', 'pirkimoNumeris', 'tikSuDokumentais',
+];
+const activeFilterCount = FILTER_KEYS.filter((k) => (Astro.url.searchParams.get(k) ?? '').trim() !== '').length;
+function facetToggleUrl(param: string, value: string): string {
+  const p = new URLSearchParams(Astro.url.search);
+  const sep = facetSep(param);
+  const cur = splitFacet(param, p.get(param) ?? '');
+  let next: string[];
+  if (value === '') next = [];
+  else if (cur.includes(value)) next = cur.filter((v) => v !== value);
+  else next = [...cur, value];
+  if (next.length) p.set(param, next.join(sep));
+  else p.delete(param);
+  // BVPŽ facetas ir paslėptas laukas dalijasi reikšme — išvalom nesutampantį.
+  if (param === 'bvpzPrefiksasKitas') p.delete('bvpzPrefiksas');
+  p.delete('page');
+  const s = p.toString();
+  return s ? `/?${s}` : '/';
+}
+
+// Pastato DokFacet objektą (kaip /dokumentai) DokFacetSection komponentui:
+// dabartinė atranka, matomi + perpildos variantai, ir reikšmės perjungimo URL.
+function mkFacet(param: string, options: FacetOption[], limit = 8) {
+  const sel = facetSelected[param] ?? [];
+  const { visible, hidden } = splitFacetOptions(options, sel, limit);
+  return { filter: sel, visible, hidden, toggleUrl: (v: string) => facetToggleUrl(param, v) };
+}
 const elapsed = performance.now() - startas;
 const total = searchedTotal;
 const initialTimings: Timing[] = searchTimings?.length
@@ -271,17 +347,31 @@ const initialTimings: Timing[] = searchTimings?.length
 const numberOfResults = buildNumberOfResults({ shown: results.length, total, elapsed, engine, timings: initialTimings });
 
 const pageCount = Math.ceil((total || 100_000) / limit);
-const usedHiddenFields = Object.keys(values).some(k => k !== 'search' && k !== 'limit' && values[k] !== '' && values[k] !== undefined);
 
 let galimaEksportuoti = Object.keys(values).length > 0;
 values.limit = limit;
 
+// Kiekviena parinktis koduoja lauką ir kryptį (`laukas:kryptis`); numatytoji
+// (naujausiai redaguotos) turi tuščią reikšmę — sistemos numatytasis rikiavimas.
 const sortOptions = [
-  { value: 'paskutinioRedagavimoData', label: 'Red. data' },
-  { value: 'sudarymoData', label: 'Sut. data' },
-  { value: 'suma', label: 'Suma' },
-  { value: 'paskelbimoData', label: 'Paskelb. data' },
+  { value: '', label: 'Naujausiai redaguotos' },
+  { value: 'paskutinioRedagavimoData:asc', label: 'Seniausiai redaguotos' },
+  { value: 'sudarymoData:desc', label: 'Naujausiai sudarytos' },
+  { value: 'sudarymoData:asc', label: 'Seniausiai sudarytos' },
+  { value: 'suma:desc', label: 'Didžiausia suma' },
+  { value: 'suma:asc', label: 'Mažiausia suma' },
+  { value: 'paskelbimoData:desc', label: 'Naujausiai paskelbtos' },
+  { value: 'paskelbimoData:asc', label: 'Seniausiai paskelbtos' },
  ] satisfies SortOption[];
+
+// Dabartinės atrankos reikšmė dropdown'ui: sujungiam lauką ir kryptį atgal į
+// `laukas:kryptis`. Numatytasis (paskutinioRedagavimoData desc) atitinka tuščią
+// reikšmę, kad URL liktų švarus.
+const sortValue = values.sort
+  ? (values.sort === 'paskutinioRedagavimoData' && (values.sortDir ?? 'desc') === 'desc'
+      ? ''
+      : `${values.sort}:${values.sortDir ?? 'desc'}`)
+  : '';
 
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
@@ -294,22 +384,142 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
   font={font}
   customHead={config.customHead}
 >
-  <main>
-    <SearchForm
-      title="Sutarčių paieška"
-      searchValue={values.search as string | undefined}
-      usedHiddenFields={usedHiddenFields}
-    >
-      <SutartysFilters slot="filters" values={values} sortOptions={sortOptions} />
-    </SearchForm>
+  <main class="sut-main sidebar-main">
+    <form method="get" role="search" id="searchForm" class="searchform-sidebar">
+      <h1 class="sr-only">Sutarčių paieška</h1>
+
+      {/* Facetų atranka gyvena tik URL'e (ne formos laukuose). Kad rikiavimo
+          keitimas ar „Ieškoti" (formos pateikimas) jos neprarastų, perduodam
+          paslėptais laukais. `bvpzPrefiksasKitas` jau yra formos laukas
+          (SutartysFilters), tad jo čia nekartojam. */}
+      {facets && ['tipas', 'kategorija', 'perkanciosiosOrganizacijosKodas', 'tiekejoKodas'].map((k) => {
+        const v = Astro.url.searchParams.get(k);
+        return v ? <input type="hidden" name={k} value={v} /> : null;
+      })}
+
+      <aside class="sf-rail" aria-label="Filtrai">
+        <div class="sf-rail-head">
+          <button type="button" class="sf-rail-toggle" id="sfFiltersToggle" aria-expanded="false" aria-controls="sfRailBody">
+            <span class="sf-rail-toggle-label">Filtrai</span>
+            {activeFilterCount > 0 && <span class="sf-filters-count">{activeFilterCount}</span>}
+            <span class="sf-filters-chevron" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="sf-rail-body" id="sfRailBody">
+          {facets && (
+            <div class="sut-facets">
+              <DokFacetSection
+                label="Pirkėjas"
+                param="perkanciosiosOrganizacijosKodas"
+                facet={mkFacet('perkanciosiosOrganizacijosKodas', facets.buyers, 5)}
+                allLabel="Visi"
+                stacked
+                modal={{ field: 'perkanciosiosOrganizacijosKodas', title: 'Pirkėjas', always: true }}
+              />
+              <DokFacetSection
+                label="Tiekėjas"
+                param="tiekejoKodas"
+                facet={mkFacet('tiekejoKodas', facets.suppliers, 5)}
+                allLabel="Visi"
+                stacked
+                modal={{ field: 'tiekejaiKodai', title: 'Tiekėjas', always: true }}
+              />
+              <SutartysSumaFilter hist={facets.suma} sumaNuo={values.sumaNuo as string | undefined} sumaIki={values.sumaIki as string | undefined} />
+              <SutartysLaikotarpisFilter hist={facets.laikotarpis} dataNuo={values.sudarymoDataNuo as string | undefined} dataIki={values.sudarymoDataIki as string | undefined} />
+              <DokFacetSection label="BVPŽ" param="bvpzPrefiksasKitas" facet={mkFacet('bvpzPrefiksasKitas', facets.bvpz, 8)} allLabel="Visi" stacked modal={{ field: 'bvpzKodai', title: 'BVPŽ klasifikacija', always: true }} />
+              <DokFacetSection label="Tipas" param="tipas" facet={mkFacet('tipas', facets.tipas, 5)} allLabel="Visi" alwaysAll />
+              <DokFacetSection label="Kategorija" param="kategorija" facet={mkFacet('kategorija', facets.kategorija, 6)} allLabel="Visos" />
+            </div>
+          )}
+          <SutartysFilters values={values} hideParticipants={!!facets} />
+          <button type="submit" class="sf-rail-search">Ieškoti</button>
+        </div>
+      </aside>
+
+      <div class="sf-search">
+        <div class="search-bar">
+          <label for="search">
+            <svg class="search-icon" aria-hidden="true" width="20" height="20" viewBox="0 1 24 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M10.502 2C5.80753 2 2.00195 5.80558 2.00195 10.5C2.00195 15.1944 5.80753 19 10.502 19C12.4884 19 14.3169 18.3176 15.7637 17.176L20.5877 22C20.9783 22.3905 21.6114 22.3905 22.002 22C22.3925 21.6095 22.3925 20.9763 22.002 20.5858L17.1779 15.7618C18.3196 14.3149 19.002 12.4865 19.002 10.5C19.002 5.80558 15.1964 2 10.502 2ZM4.00195 10.5C4.00195 6.91015 6.9121 4 10.502 4C14.0918 4 17.002 6.91015 17.002 10.5C17.002 12.2952 16.2755 13.9188 15.0981 15.0962C13.9208 16.2736 12.2972 17 10.502 17C6.9121 17 4.00195 14.0899 4.00195 10.5Z" fill="currentColor"/>
+            </svg>
+            <span class="sr-only">Paieška</span>
+          </label>
+          <input
+            type="search"
+            name="search"
+            id="search"
+            class="search-bar__input"
+            value={values.search as string | undefined}
+            placeholder="Tekstinė paieška"
+            enterkeyhint="search"
+          />
+          <Button type="submit">Ieškoti</Button>
+        </div>
+      </div>
+
+      <div class="sf-results">
+        <SearchResults
+          numberOfResults={numberOfResults}
+          results={results}
+          page={page}
+          pageCount={pageCount}
+          queryParams={queryParams}
+          galimaEksportuoti={galimaEksportuoti}
+          containerClass="mt-0"
+          flat={true}
+          sortOptions={sortOptions}
+          sortValue={sortValue}
+        />
+      </div>
+    </form>
     <SearchSuggest saltinis="sutartysPavadinimai" />
-    <SearchResults
-      numberOfResults={numberOfResults}
-      results={results}
-      page={page}
-      pageCount={pageCount}
-      queryParams={queryParams}
-      galimaEksportuoti={galimaEksportuoti}
-    />
+    {facets && <SutartysFacetModal />}
+    {facets && <SutartysBvpzModal />}
   </main>
 </Layout>
+
+<style>
+  /* Pirmoji facetų sekcija be viršutinio tarpo — DokFacetSection prideda
+     padding-top:20px kiekvienai sekcijai, bet viršuje jis palieka tuščią plyšį. */
+  .sut-facets :global(.dok-filter-section:first-child) {
+    padding-top: 0;
+  }
+
+  /* Tarpas tarp Quickwit facetų ir tikslių įvesties filtrų apačioje (be linijos). */
+  .sut-facets + :global(.ds-filter-panel--rail) {
+    margin-top: 24px;
+  }
+</style>
+
+<script is:inline>
+  // DokFacetSection elgsena sutarčių puslapyje (be dokumentai AJAX runtime):
+  // toggle nuorodos veikia natūraliai per href. Čia tik: (1) „Rodyti daugiau"
+  // inline atskleidimas ir (2) pirkėjo/tiekėjo kodo įvedimo laukai.
+  // „Rodyti daugiau" inline atskleidimas facetams be dialogo (tipas/kategorija/
+  // BVPŽ). Pirkėjo/tiekėjo „Daugiau" atidaro dialogą (žr. SutartysFacetModal).
+  document.querySelectorAll('.sut-facets .dok-more-btn').forEach((btn) => {
+    if (btn.dataset.facetModal) return; // šiuos tvarko dialogas
+    btn.addEventListener('click', () => {
+      const more = btn.previousElementSibling;
+      if (more && more.classList.contains('dok-more-list')) {
+        more.hidden = false;
+        btn.remove();
+      }
+    });
+  });
+
+  // Mobilus filtrų perjungiklis: antraštė suskleidžia/atskleidžia juostą (≤900px).
+  const sfToggle = document.getElementById('sfFiltersToggle');
+  const sfRail = document.querySelector('.sf-rail');
+  sfToggle?.addEventListener('click', () => {
+    const open = sfRail?.classList.toggle('is-open') ?? false;
+    sfToggle.setAttribute('aria-expanded', String(open));
+  });
+</script>
+
+<script>
+  // Telefone (≤900px) šoninės juostos facetai kaupiami formoje, o pritaikomi per
+  // „Ieškoti" (žr. mobileFilterBatch). Darbastalyje nuorodos veikia įprastai.
+  import { initRailFacetBatch } from '@/src/lib/mobileFilterBatch';
+  initRailFacetBatch('.sut-facets', (p) => (p === 'bvpzPrefiksasKitas' ? ' ' : ','));
+</script>

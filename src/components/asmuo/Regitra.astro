@@ -1,6 +1,7 @@
 ---
-import Table from '@design-system/components/Table.astro';
-import TableWrapper from '@design-system/components/TableWrapper.astro';
+import PageSection from '@design-system/components/PageSection.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
 import TruncationNotice from '@design-system/components/TruncationNotice.astro';
 
 const { asmuo } = Astro.props;
@@ -8,38 +9,36 @@ if (!(asmuo.regitra?.rows > 0)) return;
 const { rows, transportoPriemones } = asmuo.regitra;
 ---
 
-<div class="page-section mb-10" id="transportoPriemones">
-  <h2><a href="#transportoPriemones" class="no-style">Transporto priemonės</a></h2>
+<PageSection id="transportoPriemones" title="Transporto priemonės">
   <TruncationNotice count={rows} shown={transportoPriemones.length} anchor="transportoPriemones" paramName="transportoPriemonesLimit" label="transporto priemonės" gender="f" />
-  <TableWrapper>
-    <Table>
-      <thead>
-        <tr>
-          <th>Markė</th><th>Pavadinimas</th><th class="cell-center">Kategorija</th>
-          <th class="cell-center">Degalai</th><th class="cell-center">Galia (kW)</th>
-          <th class="cell-center">Vietos</th><th class="cell-center">Pirm. registracija</th>
-          <th class="cell-center">Savininkas</th>
-        </tr>
-      </thead>
-      <tbody>
-        {transportoPriemones.map((auto: any) => (
-          <tr>
-            <td>{auto.marke}</td>
-            <td>
-              {auto.komercinisPavadinimas === 'Nuasmeninta'
-                ? <span class="text-muted">{auto.komercinisPavadinimas}</span>
-                : <a href={`https://duckduckgo.com/?t=h_&q=${encodeURIComponent(auto.marke)}+${encodeURIComponent(auto.komercinisPavadinimas)}&ia=images&iax=images`} target="_blank" rel="noopener noreferrer">{auto.komercinisPavadinimas}</a>
-              }
-            </td>
-            <td class="cell-center cell-mono">{auto.kategorijaKlase}</td>
-            <td class="cell-center">{auto.degalai || '—'}</td>
-            <td class="cell-center cell-mono">{auto.galia || '—'}</td>
-            <td class="cell-center cell-mono">{(Number(auto.sedimuVietuSkaicius) + Number(auto.stovimuVietuSkaicius)) || '—'}</td>
-            <td class="cell-center cell-mono">{auto.pirmosiosRegistracijosData || '—'}</td>
-            <td class="cell-center">{auto.valdymoTeise === 'A' ? 'Taip' : 'Ne'}</td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  </TableWrapper>
-</div>
+  <DataTable
+    columns={[
+      { label: 'Markė' },
+      { label: 'Pavadinimas' },
+      { label: 'Kategorija', headerClassName: 'cell-center' },
+      { label: 'Degalai', headerClassName: 'cell-center' },
+      { label: 'Galia (kW)', headerClassName: 'cell-center' },
+      { label: 'Vietos', headerClassName: 'cell-center' },
+      { label: 'Pirm. registracija', headerClassName: 'cell-center' },
+      { label: 'Savininkas', headerClassName: 'cell-center' },
+    ]}
+  >
+    {transportoPriemones.map((auto: any) => (
+      <tr>
+        <td>{auto.marke}</td>
+        <td>
+          {auto.komercinisPavadinimas === 'Nuasmeninta'
+            ? <span class="text-muted">{auto.komercinisPavadinimas}</span>
+            : <ExternalSourceLink href={`https://duckduckgo.com/?t=h_&q=${encodeURIComponent(auto.marke)}+${encodeURIComponent(auto.komercinisPavadinimas)}&ia=images&iax=images`} label={auto.komercinisPavadinimas} icon={false} />
+          }
+        </td>
+        <td class="cell-center cell-mono">{auto.kategorijaKlase}</td>
+        <td class="cell-center">{auto.degalai || '—'}</td>
+        <td class="cell-center cell-mono">{auto.galia || '—'}</td>
+        <td class="cell-center cell-mono">{(Number(auto.sedimuVietuSkaicius) + Number(auto.stovimuVietuSkaicius)) || '—'}</td>
+        <td class="cell-center cell-mono">{auto.pirmosiosRegistracijosData || '—'}</td>
+        <td class="cell-center">{auto.valdymoTeise === 'A' ? 'Taip' : 'Ne'}</td>
+      </tr>
+    ))}
+  </DataTable>
+</PageSection>

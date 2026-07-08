@@ -1,4 +1,9 @@
 ---
+import PageSection from '@design-system/components/PageSection.astro';
+import SectionGrid from '@design-system/components/SectionGrid.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
 import Chart from '@design-system/components/charts/Chart.astro';
 import ChartTile from '@design-system/components/charts/ChartTile.astro';
 import Table from '@design-system/components/Table.astro';
@@ -41,10 +46,8 @@ const profitChartOptions = {
 };
 ---
 
-<div class="page-section mb-10" id="finansai">
-  <h2><a href="#finansai" class="no-style">Finansinės ataskaitos</a></h2>
-
-  <div class="grid-2 mb-10">
+<PageSection id="finansai" title="Finansinės ataskaitos">
+  <SectionGrid columns={2} className="mb-10">
     <ChartTile title="Pardavimo pajamos" hasData={metai.length > 0 && !!duomenys['Pardavimo pajamos']} minHeightClass="" wrapperClass="">
       <Chart
         id="pardavimoPajamosChart"
@@ -69,7 +72,7 @@ const profitChartOptions = {
         heightClass="h-75"
       />
     </ChartTile>
-  </div>
+  </SectionGrid>
 
   {metai.length > 0 && (
     <TableWrapper className="mb-7">
@@ -115,23 +118,21 @@ const profitChartOptions = {
         <span class="text-muted text-xs font-normal">({laikotarpis.templateId}, {laikotarpis.duomenuData})</span>
       </h3>
       <p class="text-muted text-sm mb-4">{laikotarpis.laikotarpisNuo} – {laikotarpis.laikotarpisIki}</p>
-      <div class="grid-auto items-start">
+      <MetricCardGrid minWidth="220px" className="items-start">
         {laikotarpis.standards.map((std: any) => (
-          <div class="card">
-            <div class="card-body">
-              <div class="section-title mb-3">{std.standardName} <span class="text-muted font-normal">({std.standardId})</span></div>
-              <dl class="kv-list">
-                {std.lines.map((line: any) => (
-                  <>
-                    <dt>{line.lineName} <span class="text-muted text-xs">({line.lineTypeId})</span></dt>
-                    <dd><span class="cell-mono">{new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(line.reiksme)}</span></dd>
-                  </>
-                ))}
-              </dl>
-            </div>
-          </div>
+          <MetricCard label={std.standardName} labelBaseClassName="section-title mb-3">
+            <p class="text-muted text-xs font-normal mb-3">({std.standardId})</p>
+            <KeyValueList>
+              {std.lines.map((line: any) => (
+                <>
+                  <dt>{line.lineName} <span class="text-muted text-xs">({line.lineTypeId})</span></dt>
+                  <dd><span class="cell-mono">{new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(line.reiksme)}</span></dd>
+                </>
+              ))}
+            </KeyValueList>
+          </MetricCard>
         ))}
-      </div>
+      </MetricCardGrid>
     </div>
   ))}
-</div>
+</PageSection>

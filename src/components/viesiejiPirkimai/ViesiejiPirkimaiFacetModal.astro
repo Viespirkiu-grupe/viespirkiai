@@ -1,0 +1,207 @@
+---
+import FacetModalBase from '@design-system/components/FacetModalBase.astro';
+---
+
+<FacetModalBase id="vpFacetModal" searchPlaceholder="Filtruoti arba įvesti kodą…" searchAriaLabel="Filtruoti arba įvesti reikšmę" listClassName="dok-facet-modal__list--stack" />
+
+<script>
+  import { openModal, closeModal } from '@design-system/components/modal.ts';
+  import { isMobileFilter, writeParam, readParam } from '@/src/lib/mobileFilterBatch';
+
+  const modal = document.getElementById('vpFacetModal');
+  if (modal) {
+    const titleEl = modal.querySelector<HTMLElement>('.ds-modal__title')!;
+    const searchEl = modal.querySelector<HTMLInputElement>('.dok-facet-modal__search')!;
+    const listEl = modal.querySelector<HTMLElement>('.dok-facet-modal__list')!;
+    const countEl = modal.querySelector<HTMLElement>('.ds-modal__count')!;
+
+    let field = '';
+    let param = '';
+    let selected = new Set<string>();
+    let options: { value: string; count: number | null; label?: string }[] = [];
+    let reqSeq = 0;
+    let searchTimer = 0;
+
+    // Filtrai gyvena URL'e (kableliu atskirtas sąrašas). Skaitom/rašom tiesiai.
+    const getList = (p: string) =>
+      (new URLSearchParams(location.search).get(p) || '').split(',').map((s) => s.trim()).filter(Boolean);
+    const commit = (list: string[]) => {
+      // Telefone — sukaupiam į formą ir uždarom (be perkrovimo); pritaikoma per „Ieškoti".
+      if (isMobileFilter()) {
+        writeParam(param, list, ',');
+        closeModal(modal!);
+        return;
+      }
+      const p = new URLSearchParams(location.search);
+      if (list.length) p.set(param, list.join(','));
+      else p.delete(param);
+      p.delete('page');
+      location.href = '/viesiejiPirkimai/?' + p.toString();
+    };
+
+    function updateCount() {
+      countEl.textContent = selected.size ? `Pažymėta: ${selected.size}` : '';
+    }
+
+    function toggle(value: string, row?: HTMLElement) {
+      if (selected.has(value)) selected.delete(value);
+      else selected.add(value);
+      const on = selected.has(value);
+      row?.classList.toggle('is-selected', on);
+      row?.setAttribute('aria-selected', String(on));
+      updateCount();
+    }
+
+    function addTyped() {
+      const value = searchEl.value.trim();
+      if (!value) return;
+      selected.add(value);
+      searchEl.value = '';
+      updateCount();
+      render();
+    }
+
+    function makeRow(o: { value: string; count: number | null; label?: string }) {
+      const value = o.value;
+      const on = selected.has(value);
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'dok-facet-row' + (o.label ? ' dok-facet-row--stack' : '') + (on ? ' is-selected' : '');
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(on));
+      if (o.label) row.title = `${o.label} (${value})`;
+      const text = document.createElement('span');
+      text.className = 'dok-facet-row__text';
+      const label = document.createElement('span');
+      label.className = 'dok-facet-row__label';
+      label.textContent = o.label || value;
+      text.appendChild(label);
+      if (o.label) {
+        const sub = document.createElement('span');
+        sub.className = 'dok-facet-row__sub';
+        sub.textContent = value;
+        text.appendChild(sub);
+      }
+      row.appendChild(text);
+      if (o.count != null) {
+        const cnt = document.createElement('span');
+        cnt.className = 'dok-facet-row__count';
+        cnt.textContent = Number(o.count).toLocaleString('lt-LT');
+        row.appendChild(cnt);
+      }
+      row.addEventListener('click', () => toggle(value, row));
+      return row;
+    }
+
+    function render() {
+      const needle = searchEl.value.trim().toLowerCase();
+      const typed = searchEl.value.trim();
+      const listedValues = new Set(options.map((o) => o.value));
+      const pinned: { value: string; count: number | null; label?: string }[] = [...selected]
+        .filter((v) => !listedValues.has(v))
+        .map((v) => ({ value: v, count: null }));
+      const rows = [...pinned, ...options].filter(
+        (o) => !needle || o.value.toLowerCase().includes(needle) || (o.label?.toLowerCase().includes(needle) ?? false),
+      );
+
+      listEl.textContent = '';
+      const frag = document.createDocumentFragment();
+
+      const canAdd = typed && !listedValues.has(typed) && !selected.has(typed);
+      if (canAdd) {
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'dok-facet-row dok-facet-row--add';
+        const label = document.createElement('span');
+        label.className = 'dok-facet-row__label';
+        label.textContent = `Pridėti „${typed}“`;
+        add.appendChild(label);
+        add.addEventListener('click', addTyped);
+        frag.appendChild(add);
+      }
+
+      for (const o of rows) frag.appendChild(makeRow(o));
+      listEl.appendChild(frag);
+
+      if (!rows.length && !canAdd) {
+        const empty = document.createElement('p');
+        empty.className = 'dok-facet-modal__empty';
+        empty.textContent = 'Nieko nerasta.';
+        listEl.appendChild(empty);
+      }
+    }
+
+    async function load(optionSearch = '') {
+      const mySeq = ++reqSeq;
+      listEl.innerHTML = '<div class="dok-facet-modal__loading"><span class="spinner spinner-lg"></span></div>';
+      // Sritis apribota esamai užklausai/filtrams (API pašalina šio faceto filtrą),
+      // tad kiekviena rodoma reikšmė iš tiesų siaurina rezultatus.
+      const qs = new URLSearchParams(location.search);
+      qs.set('field', field);
+      if (optionSearch) qs.set('optionSearch', optionSearch);
+      qs.delete('page');
+      try {
+        const res = await fetch(`/api/viesiejiPirkimaiFacet?${qs.toString()}`);
+        const data = res.ok ? await res.json() : { options: [] };
+        if (mySeq !== reqSeq) return;
+        options = Array.isArray(data.options) ? data.options : [];
+      } catch {
+        if (mySeq !== reqSeq) return;
+        options = [];
+      }
+      render();
+    }
+
+    function open(opts: { field: string; param: string; title: string }) {
+      field = opts.field;
+      param = opts.param;
+      titleEl.textContent = opts.title;
+      // Telefone pradinę atranką imam iš formos (kad matytųsi laukiantys pakeitimai).
+      selected = new Set(isMobileFilter() ? readParam(param, ',') : getList(param));
+      searchEl.value = '';
+      updateCount();
+      openModal(modal!);
+      searchEl.focus();
+      load();
+    }
+
+    // „Daugiau" mygtukai šoninėje juostoje (DokFacetSection modal prop). BVPŽ turi
+    // atskirą dialogą su skiltimis (ViesiejiPirkimaiBvpzModal), tad jį praleidžiam.
+    document.querySelectorAll<HTMLButtonElement>('.vp-facets [data-facet-modal]:not([data-facet-modal="bvpzKodai"])').forEach((btn) => {
+      btn.addEventListener('click', () =>
+        open({
+          field: btn.dataset.facetModal || '',
+          param: btn.dataset.facetParam || '',
+          title: btn.dataset.facetTitle || 'Filtras',
+        }),
+      );
+    });
+
+    searchEl.addEventListener('input', () => {
+      render();
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => load(searchEl.value.trim()), 250);
+    });
+    searchEl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const typed = searchEl.value.trim();
+      if (!typed) return;
+      if (options.some((o) => o.value === typed)) toggle(typed);
+      else selected.add(typed);
+      searchEl.value = '';
+      updateCount();
+      render();
+    });
+
+    modal.querySelector('[data-facet-clear]')?.addEventListener('click', () => {
+      selected.clear();
+      updateCount();
+      render();
+    });
+    modal.querySelector('[data-facet-apply]')?.addEventListener('click', () => {
+      commit([...selected]);
+      closeModal(modal!);
+    });
+  }
+</script>

@@ -1,4 +1,6 @@
 ---
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+
 interface Props {
   pirkimas: any;
 }
@@ -6,18 +8,19 @@ const { pirkimas } = Astro.props;
 const t = pirkimas.turinys || {};
 
 const has = t.eAukcionuSukurimas || t.pirkimasSkaidomasIDaliuDPSIKategorijas || t.leidziamaPateiktisAlternatyviusPasiulymus || t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais || t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus || t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims;
+const items = [
+  t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims && { label: 'Sutarties tipas', value: t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims },
+  t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus && { label: 'Sutarties trukmė', value: t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus },
+  t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais && { label: 'Pasiūlymo galiojimas', value: t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais },
+  t.eAukcionuSukurimas && { label: 'El. aukcionas', value: t.eAukcionuSukurimas },
+  t.leidziamaPateiktisAlternatyviusPasiulymus && { label: 'Alternatyvūs pasiūlymai', value: t.leidziamaPateiktisAlternatyviusPasiulymus },
+  t.pirkimasSkaidomasIDaliuDPSIKategorijas && { label: 'Skaidoma į dalis', value: t.pirkimasSkaidomasIDaliuDPSIKategorijas },
+].filter(Boolean);
 ---
 
 {has && (
   <section>
     <h2>Sąlygos</h2>
-    <dl class="kv-list">
-      {t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims && <><dt>Sutarties tipas</dt><dd>{t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims}</dd></>}
-      {t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus && <><dt>Sutarties trukmė</dt><dd>{t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus}</dd></>}
-      {t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais && <><dt>Pasiūlymo galiojimas</dt><dd>{t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais}</dd></>}
-      {t.eAukcionuSukurimas && <><dt>El. aukcionas</dt><dd>{t.eAukcionuSukurimas}</dd></>}
-      {t.leidziamaPateiktisAlternatyviusPasiulymus && <><dt>Alternatyvūs pasiūlymai</dt><dd>{t.leidziamaPateiktisAlternatyviusPasiulymus}</dd></>}
-      {t.pirkimasSkaidomasIDaliuDPSIKategorijas && <><dt>Skaidoma į dalis</dt><dd>{t.pirkimasSkaidomasIDaliuDPSIKategorijas}</dd></>}
-    </dl>
+    <KeyValueList items={items} />
   </section>
 )}

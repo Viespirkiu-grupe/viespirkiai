@@ -1,0 +1,33 @@
+---
+interface MetaItem {
+  label: string;
+  value?: unknown;
+  html?: string;
+  title?: string;
+  className?: string;
+  valueClassName?: string;
+  hiddenLabel?: boolean;
+}
+
+interface Props {
+  items?: MetaItem[];
+  className?: string;
+}
+
+const { items = [], className = '' } = Astro.props as Props;
+const classes = ['result-card-meta', className].filter(Boolean).join(' ');
+const visibleItems = items.filter((item) => {
+  const value = item.html ?? item.value;
+  return value !== null && value !== undefined && value !== false && value !== '';
+});
+---
+
+<dl class={classes}>
+  {visibleItems.map((item) => (
+    <div class={item.className} title={item.title}>
+      <dt class:list={[{ 'sr-only': item.hiddenLabel !== false }]}>{item.label}</dt>
+      <dd class={item.valueClassName}>{item.html ? <Fragment set:html={item.html} /> : item.value}</dd>
+    </div>
+  ))}
+  <slot />
+</dl>

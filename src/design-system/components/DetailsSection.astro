@@ -1,0 +1,34 @@
+---
+import KeyValueList from './KeyValueList.astro';
+
+interface KeyValueItem {
+  label: string;
+  value?: unknown;
+  html?: string;
+  valueClassName?: string;
+  labelClassName?: string;
+}
+
+interface Props {
+  title: string;
+  titleTag?: 'h2' | 'h3' | 'h4';
+  items?: KeyValueItem[];
+  className?: string;
+  listClassName?: string;
+}
+
+const {
+  title,
+  titleTag = 'h2',
+  items,
+  className = '',
+  listClassName = '',
+} = Astro.props as Props;
+
+const TitleTag = titleTag;
+---
+
+<section class={className}>
+  <TitleTag>{title}</TitleTag>
+  {items ? <KeyValueList className={listClassName} items={items} /> : <slot />}
+</section>

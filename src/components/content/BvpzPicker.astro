@@ -25,6 +25,9 @@ interface Props {
   actionBarMode?: 'fixed' | 'sticky' | 'attached';
   showPresets?: boolean;
   showManualInput?: boolean;
+  /** Kai false — CPV medžio JSON (didelis) neužkraunamas iškart; užkraunama
+   *  gavus `bvpz:load` įvykį ant šakninio elemento (lazy — pvz. dialoge). */
+  autoLoad?: boolean;
 }
 
 const cpvJsonPath = fileURLToPath(new URL('../../../public/dist/cpv.json', import.meta.url));
@@ -43,6 +46,7 @@ const {
   actionBarMode = 'fixed',
   showPresets = true,
   showManualInput = true,
+  autoLoad = true,
 } = Astro.props;
 
 const rootId = `${instanceId}-root`;
@@ -142,7 +146,7 @@ const syncBtnId = `${instanceId}-sync-btn`;
     </div>
   </div>
 
-  <script is:inline define:vars={{ treeUrl, rootId, treeId, countId, selectedCodesId, searchBtnId, searchDropdownId, copyBtnId, manualInputId, applyManualBtnId, syncBtnId, searchInputId, searchClearId, resultsInfoId, initialCodes }}>
+  <script is:inline define:vars={{ treeUrl, rootId, treeId, countId, selectedCodesId, searchBtnId, searchDropdownId, copyBtnId, manualInputId, applyManualBtnId, syncBtnId, searchInputId, searchClearId, resultsInfoId, initialCodes, autoLoad }}>
     // @ts-nocheck
     const root = document.getElementById(rootId);
     const treeEl = document.getElementById(treeId);
@@ -311,7 +315,10 @@ const syncBtnId = `${instanceId}-sync-btn`;
       return { anyChecked, allChecked };
     }
 
+    let bvpzLoadStarted = false;
     async function bvpzLoadData() {
+      if (bvpzLoadStarted) return;
+      bvpzLoadStarted = true;
       const data = await fetch(treeUrl).then((r) => r.json());
       if (!treeEl) return;
       treeEl.classList.remove("loading");
@@ -319,6 +326,7 @@ const syncBtnId = `${instanceId}-sync-btn`;
       bvpzFlatIndex.length = 0;
       bvpzBuildTree(data, treeEl);
       bvpzApplyInitial();
+      root?.dispatchEvent(new CustomEvent("bvpz:loaded"));
     }
 
     function bvpzUpdateOutput() {
@@ -556,7 +564,8 @@ const syncBtnId = `${instanceId}-sync-btn`;
       });
     }
 
-    bvpzLoadData();
+    if (autoLoad) bvpzLoadData();
+    else root?.addEventListener("bvpz:load", () => bvpzLoadData());
   </script>
 
   <style is:global>

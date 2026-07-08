@@ -1,5 +1,6 @@
 ---
-import { fmtEurOrNull } from '../../lib/formatters.ts';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
 
 interface Props {
   pirkimas: any;
@@ -7,19 +8,23 @@ interface Props {
 const { pirkimas } = Astro.props;
 const t = pirkimas.turinys || {};
 
-const numatoma = fmtEurOrNull(pirkimas.numatomaBendraPirkimoVerte) || fmtEurOrNull(t.numatomaVerteEUR);
-const bendra = fmtEurOrNull(t.bendraSutarciuVerte);
-const dpsMax = fmtEurOrNull(t.suteiktaVertemaksimaliDPSVerte);
-const hasAny = numatoma || bendra || dpsMax;
+const numatoma = pirkimas.numatomaBendraPirkimoVerte || t.numatomaVerteEUR;
+const bendra = t.bendraSutarciuVerte;
+const dpsMax = t.suteiktaVertemaksimaliDPSVerte;
+const hasMoney = (value: unknown) => {
+  const number = Number(value);
+  return value != null && value !== '' && !Number.isNaN(number) && number > 0;
+};
+const hasAny = hasMoney(numatoma) || hasMoney(bendra) || hasMoney(dpsMax);
 ---
 
 {hasAny && (
   <section>
     <h2>Vertė</h2>
-    <dl class="kv-list">
-      {numatoma && <><dt>Numatoma</dt><dd class="cell-mono">{numatoma}</dd></>}
-      {bendra && <><dt>Bendra sutarčių</dt><dd class="cell-mono">{bendra}</dd></>}
-      {dpsMax && <><dt>Maksimali DPS</dt><dd class="cell-mono">{dpsMax}</dd></>}
-    </dl>
+    <KeyValueList>
+      {hasMoney(numatoma) && <><dt>Numatoma</dt><dd><MoneyValue value={numatoma} /></dd></>}
+      {hasMoney(bendra) && <><dt>Bendra sutarčių</dt><dd><MoneyValue value={bendra} /></dd></>}
+      {hasMoney(dpsMax) && <><dt>Maksimali DPS</dt><dd><MoneyValue value={dpsMax} /></dd></>}
+    </KeyValueList>
   </section>
 )}

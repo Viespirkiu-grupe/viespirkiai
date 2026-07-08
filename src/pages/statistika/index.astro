@@ -1,8 +1,10 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
-import Table from '@design-system/components/Table.astro';
-import TableWrapper from '@design-system/components/TableWrapper.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
 import { gautiStatistika, humanizeStatistika } from '@/modules/statistika/statistika.js';
 import { convertUnit } from '@/utils/units.js';
 import '@/utils/linksniai.js';
@@ -46,36 +48,39 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
             <div class="grid-2">
               <div>
                 <p class="text-sm font-bold mb-3">Pagal būseną</p>
-                <TableWrapper>
-                  <Table>
-                    <thead><tr><th>Nuskaitymas</th><th class="cell-right">Failai</th><th class="cell-right">Dalis</th></tr></thead>
-                    <tbody id="pagalVersijaBody">
-                      {statistika.nuskaitymas.pagalVersija.map((v: any) => (
-                        <tr>
-                          <td>{v.status}</td>
-                          <td class="cell-mono cell-right cell-nowrap">{Number(v.kiekis).toLocaleString('lt-LT')}</td>
-                          <td class="cell-mono cell-right cell-nowrap">{Number(v.procentai).toLocaleString('lt-LT')} %</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </TableWrapper>
+                <DataTable
+                  bodyAttributes={{ id: 'pagalVersijaBody' }}
+                  columns={[
+                    { label: 'Nuskaitymas' },
+                    { label: 'Failai', headerClassName: 'cell-right' },
+                    { label: 'Dalis', headerClassName: 'cell-right' },
+                  ]}
+                >
+                  {statistika.nuskaitymas.pagalVersija.map((v: any) => (
+                    <tr>
+                      <td>{v.status}</td>
+                      <td class="cell-mono cell-right cell-nowrap">{Number(v.kiekis).toLocaleString('lt-LT')}</td>
+                      <td class="cell-mono cell-right cell-nowrap">{Number(v.procentai).toLocaleString('lt-LT')} %</td>
+                    </tr>
+                  ))}
+                </DataTable>
               </div>
               <div>
                 <p class="text-sm font-bold mb-3">Pagal nuskaitytoją</p>
-                <TableWrapper>
-                  <Table>
-                    <thead><tr><th>Nuskaitytojas</th><th class="cell-right">Failų skaičius</th></tr></thead>
-                    <tbody id="topNuskaitytojaiBody">
-                      {statistika.topDokNuskaitytojai.map((n: any) => (
-                        <tr>
-                          <td>{n.viesasPavadinimas}</td>
-                          <td class="cell-mono cell-right cell-nowrap">{Number(n.nuskaitytidokumentai).toLocaleString('lt-LT')}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </TableWrapper>
+                <DataTable
+                  bodyAttributes={{ id: 'topNuskaitytojaiBody' }}
+                  columns={[
+                    { label: 'Nuskaitytojas' },
+                    { label: 'Failų skaičius', headerClassName: 'cell-right' },
+                  ]}
+                >
+                  {statistika.topDokNuskaitytojai.map((n: any) => (
+                    <tr>
+                      <td>{n.viesasPavadinimas}</td>
+                      <td class="cell-mono cell-right cell-nowrap">{Number(n.nuskaitytidokumentai).toLocaleString('lt-LT')}</td>
+                    </tr>
+                  ))}
+                </DataTable>
               </div>
             </div>
           </div>
@@ -87,59 +92,51 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
             <h3 class="mb-1"><a href="#indeksavimas" id="indeksavimas" class="no-style">Indeksavimas</a></h3>
             <p class="text-muted text-sm mb-4">Surašymas duomenų bazėje, kad būtų galima greičiau ieškoti.</p>
             <p class="text-sm font-bold mb-3">Žodžiai</p>
-            <div class="grid-2">
-              <div class="card"><div class="card-body">
-                <div class="section-title mb-2">Iš viso</div>
+            <MetricCardGrid minWidth="180px" className="grid-2">
+              <MetricCard label="Iš viso">
                 <span class="cell-mono" data-stat="nuskaitymas.zodziai.total">{(Number(statistika.nuskaitymas.zodziai.total) as any).linksniuoti(['žodis', 'žodžiai', 'žodžių', 'žodžio'])}</span>
-              </div></div>
-              <div class="card"><div class="card-body">
-                <div class="section-title mb-2">Vidurkis</div>
+              </MetricCard>
+              <MetricCard label="Vidurkis">
                 <span class="cell-mono" data-stat="nuskaitymas.zodziai.vidurkis">{(Number(statistika.nuskaitymas.zodziai.vidurkis) as any).linksniuoti(['žodis', 'žodžiai', 'žodžių', 'žodžio'])}</span>
-              </div></div>
-              <div class="card"><div class="card-body">
-                <div class="section-title mb-2">Vidurkis (be 0)</div>
+              </MetricCard>
+              <MetricCard label="Vidurkis (be 0)">
                 <span class="cell-mono" data-stat="nuskaitymas.zodziai.vidurkisNeNulis">{(Number(statistika.nuskaitymas.zodziai.vidurkisNeNulis) as any).linksniuoti(['žodis', 'žodžiai', 'žodžių', 'žodžio'])}</span>
-              </div></div>
-              <div class="card"><div class="card-body">
-                <div class="section-title mb-2">Failų su žodžiais dalis</div>
+              </MetricCard>
+              <MetricCard label="Failų su žodžiais dalis">
                 <span class="cell-mono" data-stat="nuskaitymas.zodziai.failuSuZodziaisDalis">{Number(statistika.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2)} %</span>
-              </div></div>
-            </div>
+              </MetricCard>
+            </MetricCardGrid>
           </div>
 
           <!-- Parsiuntimas -->
           <div class="page-section">
             <h3 class="text-sm font-bold mb-3">Parsiuntimas</h3>
-            <div class="grid-2">
-              <div class="card"><div class="card-body">
-                <div class="section-title mb-3">Visi failai</div>
-                <dl class="kv-list">
+            <MetricCardGrid minWidth="180px" className="grid-2">
+              <MetricCard label="Visi failai" labelBaseClassName="section-title mb-3">
+                <KeyValueList>
                   <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.visi">{statistika.failai.kiekiai.visi}</span></dd>
                   <dt>Dydis *</dt><dd><span class="cell-mono" data-stat="failai.dydziai.visi">{statistika.failai.dydziai.visi}</span></dd>
-                </dl>
-              </div></div>
-              <div class="card"><div class="card-body">
-                <div class="section-title mb-3">Parsiųsti failai</div>
-                <dl class="kv-list">
+                </KeyValueList>
+              </MetricCard>
+              <MetricCard label="Parsiųsti failai" labelBaseClassName="section-title mb-3">
+                <KeyValueList>
                   <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.parsiusti">{statistika.failai.kiekiai.parsiusti}</span></dd>
                   <dt>Dydis</dt><dd><span class="cell-mono" data-stat="failai.dydziai.parsiusti">{statistika.failai.dydziai.parsiusti}</span></dd>
-                </dl>
-              </div></div>
-              <div class="card"><div class="card-body">
-                <div class="section-title mb-3">Neparsiųsti (klaida)</div>
-                <dl class="kv-list">
+                </KeyValueList>
+              </MetricCard>
+              <MetricCard label="Neparsiųsti (klaida)" labelBaseClassName="section-title mb-3">
+                <KeyValueList>
                   <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.klaida">{statistika.failai.kiekiai.klaida}</span></dd>
                   <dt>Dydis *</dt><dd><span class="cell-mono" data-stat="failai.dydziai.klaida">{statistika.failai.dydziai.klaida}</span></dd>
-                </dl>
-              </div></div>
-              <div class="card"><div class="card-body">
-                <div class="section-title mb-3">Neparsiųsti</div>
-                <dl class="kv-list">
+                </KeyValueList>
+              </MetricCard>
+              <MetricCard label="Neparsiųsti" labelBaseClassName="section-title mb-3">
+                <KeyValueList>
                   <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.neparsiusti">{statistika.failai.kiekiai.neparsiusti}</span></dd>
                   <dt>Dydis *</dt><dd><span class="cell-mono" data-stat="failai.dydziai.neparsiusti">{statistika.failai.dydziai.neparsiusti}</span></dd>
-                </dl>
-              </div></div>
-            </div>
+                </KeyValueList>
+              </MetricCard>
+            </MetricCardGrid>
           </div>
         </div>
       </div>
@@ -148,54 +145,51 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
       <div class="page-section">
         <h2 class="mb-1"><a href="#eiles" id="eiles" class="no-style">Eilės</a></h2>
         <p class="text-muted text-sm mb-4">Apytikslis laukiančių įrašų skaičius pagal PostgreSQL statistiką</p>
-        <div class="grid-3">
+        <MetricCardGrid minWidth="180px" className="grid-3">
           {statistika.eiles.map((e: any) => (
-            <div class="card"><div class="card-body">
-              <div class="section-title mb-2">{e.tableName}</div>
+            <MetricCard label={e.tableName}>
               <span class="cell-mono text-xl font-bold" data-queue={e.tableName}>{Number(e.approxRowCount).toLocaleString('lt-LT')}</span>
-            </div></div>
+            </MetricCard>
           ))}
-        </div>
+        </MetricCardGrid>
       </div>
 
       <!-- Quickwit indeksai -->
       <div class="page-section">
         <h2 class="mb-1"><a href="#quickwit-indeksai" id="quickwit-indeksai" class="no-style">Quickwit indeksai</a></h2>
         <p class="text-muted text-sm mb-4">Paieškos indeksų shardai ir jų eilučių būsena</p>
-        <TableWrapper>
-          <Table>
-            <thead><tr>
-              <th>ID</th>
-              <th>Lentelė</th>
-              <th class="cell-right">Sekos nr.</th>
-              <th>Indeksas</th>
-              <th class="cell-right">Talpa</th>
-              <th class="cell-right">Gyvos eilutės</th>
-              <th class="cell-right">Įterptos eilutės</th>
-              <th class="cell-right">Mirusios eilutės</th>
-              <th>Dabartinis</th>
-              <th>Sukurta</th>
-              <th>Konfigūracijos hash</th>
-            </tr></thead>
-            <tbody id="quickwitIndeksaiBody">
-              {statistika.quickwitIndeksai.map((i: any) => (
-                <tr>
-                  <td class="cell-mono cell-right cell-nowrap">{Number(i.id).toLocaleString('lt-LT')}</td>
-                  <td>{i.lentele}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{Number(i.seq).toLocaleString('lt-LT')}</td>
-                  <td class="cell-mono cell-nowrap">{i.indeksas}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{Number(i.shardSize).toLocaleString('lt-LT')}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{Number(i.gyvosEilutes).toLocaleString('lt-LT')}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{Number(i.iterptosEilutes).toLocaleString('lt-LT')}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{Number(i.mirusiosEilutes).toLocaleString('lt-LT')}</td>
-                  <td>{i.current ? 'Taip' : 'Ne'}</td>
-                  <td class="cell-mono cell-nowrap">{new Date(i.sukurta).toLocaleString('lt-LT', { hour12: false })}</td>
-                  <td class="cell-mono cell-nowrap">{i.indexConfigHash}</td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </TableWrapper>
+        <DataTable
+          bodyAttributes={{ id: 'quickwitIndeksaiBody' }}
+          columns={[
+            { label: 'ID' },
+            { label: 'Lentelė' },
+            { label: 'Sekos nr.', headerClassName: 'cell-right' },
+            { label: 'Indeksas' },
+            { label: 'Talpa', headerClassName: 'cell-right' },
+            { label: 'Gyvos eilutės', headerClassName: 'cell-right' },
+            { label: 'Įterptos eilutės', headerClassName: 'cell-right' },
+            { label: 'Mirusios eilutės', headerClassName: 'cell-right' },
+            { label: 'Dabartinis' },
+            { label: 'Sukurta' },
+            { label: 'Konfigūracijos hash' },
+          ]}
+        >
+          {statistika.quickwitIndeksai.map((i: any) => (
+            <tr>
+              <td class="cell-mono cell-right cell-nowrap">{Number(i.id).toLocaleString('lt-LT')}</td>
+              <td>{i.lentele}</td>
+              <td class="cell-mono cell-right cell-nowrap">{Number(i.seq).toLocaleString('lt-LT')}</td>
+              <td class="cell-mono cell-nowrap">{i.indeksas}</td>
+              <td class="cell-mono cell-right cell-nowrap">{Number(i.shardSize).toLocaleString('lt-LT')}</td>
+              <td class="cell-mono cell-right cell-nowrap">{Number(i.gyvosEilutes).toLocaleString('lt-LT')}</td>
+              <td class="cell-mono cell-right cell-nowrap">{Number(i.iterptosEilutes).toLocaleString('lt-LT')}</td>
+              <td class="cell-mono cell-right cell-nowrap">{Number(i.mirusiosEilutes).toLocaleString('lt-LT')}</td>
+              <td>{i.current ? 'Taip' : 'Ne'}</td>
+              <td class="cell-mono cell-nowrap">{new Date(i.sukurta).toLocaleString('lt-LT', { hour12: false })}</td>
+              <td class="cell-mono cell-nowrap">{i.indexConfigHash}</td>
+            </tr>
+          ))}
+        </DataTable>
       </div>
 
       <!-- Duomenų bazė -->
@@ -205,80 +199,77 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
         <div class="grid-2 mb-7 items-start">
           <div>
             <h3 class="text-sm font-bold mb-3">Apkrova</h3>
-            <dl class="kv-list">
+            <KeyValueList>
               <dt>Atliktos užklausos</dt><dd><span class="cell-mono" data-stat="database.xact_commit">{Number(statistika.database.xact_commit).toLocaleString('lt-LT')}</span></dd>
               <dt>Įterptos eilutės</dt><dd><span class="cell-mono" data-stat="database.tup_inserted">{Number(statistika.database.tup_inserted).toLocaleString('lt-LT')}</span></dd>
               <dt>Atnaujintos eilutės</dt><dd><span class="cell-mono" data-stat="database.tup_updated">{Number(statistika.database.tup_updated).toLocaleString('lt-LT')}</span></dd>
               <dt>Ištrintos eilutės</dt><dd><span class="cell-mono" data-stat="database.tup_deleted">{Number(statistika.database.tup_deleted).toLocaleString('lt-LT')}</span></dd>
               <dt>Skaitytos eilutės</dt><dd><span class="cell-mono" data-stat="database.tup_fetched">{Number(statistika.database.tup_fetched).toLocaleString('lt-LT')}</span></dd>
-            </dl>
+            </KeyValueList>
           </div>
         </div>
         <h3 class="text-sm font-bold mb-3">Lentelės</h3>
-        <TableWrapper>
-          <Table>
-            <thead><tr>
-              <th>Pavadinimas</th>
-              <th class="cell-right">Duomenų dydis</th>
-              <th class="cell-right">Indekso dydis</th>
-              <th class="cell-right">Visas dydis</th>
-              <th class="cell-right">Eilutės *</th>
-            </tr></thead>
-            <tbody id="lentelesBody">
-              {statistika.lenteles.map((l: any) => (
-                <tr class={l.tableName === 'Iš viso' ? 'font-bold' : ''}>
-                  <td>{l.tableName}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.dataSize), 'B')}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.indexSize), 'B')}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.totalSize), 'B')}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{Number(l.approxRowCount).toLocaleString('lt-LT')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </TableWrapper>
+        <DataTable
+          bodyAttributes={{ id: 'lentelesBody' }}
+          columns={[
+            { label: 'Pavadinimas' },
+            { label: 'Duomenų dydis', headerClassName: 'cell-right' },
+            { label: 'Indekso dydis', headerClassName: 'cell-right' },
+            { label: 'Visas dydis', headerClassName: 'cell-right' },
+            { label: 'Eilutės *', headerClassName: 'cell-right' },
+          ]}
+        >
+          {statistika.lenteles.map((l: any) => (
+            <tr class={l.tableName === 'Iš viso' ? 'font-bold' : ''}>
+              <td>{l.tableName}</td>
+              <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.dataSize), 'B')}</td>
+              <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.indexSize), 'B')}</td>
+              <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.totalSize), 'B')}</td>
+              <td class="cell-mono cell-right cell-nowrap">{Number(l.approxRowCount).toLocaleString('lt-LT')}</td>
+            </tr>
+          ))}
+        </DataTable>
       </div>
 
       <!-- Replikacija -->
       <div class="page-section">
         <h2 class="mb-1"><a href="#replikacija" id="replikacija" class="no-style">Replikacija</a></h2>
         <p class="text-muted text-sm mb-4">Prisijungusių replikų būsena ir atsilikimas nuo pagrindinės DB (pg_stat_replication)</p>
-        <TableWrapper>
-          <Table>
-            <thead><tr>
-              <th>Klientas</th>
-              <th>Būsena</th>
-              <th class="cell-right">Sent LSN</th>
-              <th class="cell-right">Write LSN</th>
-              <th class="cell-right">Flush LSN</th>
-              <th class="cell-right">Replay LSN</th>
-              <th class="cell-right">Write lag</th>
-              <th class="cell-right">Flush lag</th>
-              <th class="cell-right">Replay lag</th>
-              <th class="cell-right">Pagrindinės LSN</th>
-              <th class="cell-right">Atsilikimas</th>
-            </tr></thead>
-            <tbody id="replikacijaBody">
-              {statistika.replikacija.length === 0 ? (
-                <tr><td colspan="11" class="text-muted">Nėra prisijungusių replikų</td></tr>
-              ) : statistika.replikacija.map((r: any) => (
-                <tr>
-                  <td class="cell-mono cell-nowrap">{r.client_addr}</td>
-                  <td>{r.state}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{r.sent_lsn}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{r.write_lsn}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{r.flush_lsn}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{r.replay_lsn}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{r.write_lag}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{r.flush_lag}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{r.replay_lag}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{r.primary_current_lsn}</td>
-                  <td class="cell-mono cell-right cell-nowrap">{r.bytes_behind == null ? '' : convertUnit(Number(r.bytes_behind), 'B')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </TableWrapper>
+        <DataTable
+          rows={statistika.replikacija}
+          emptyText="Nėra prisijungusių replikų"
+          emptyClassName="text-muted"
+          bodyAttributes={{ id: 'replikacijaBody' }}
+          columns={[
+            { label: 'Klientas' },
+            { label: 'Būsena' },
+            { label: 'Sent LSN', headerClassName: 'cell-right' },
+            { label: 'Write LSN', headerClassName: 'cell-right' },
+            { label: 'Flush LSN', headerClassName: 'cell-right' },
+            { label: 'Replay LSN', headerClassName: 'cell-right' },
+            { label: 'Write lag', headerClassName: 'cell-right' },
+            { label: 'Flush lag', headerClassName: 'cell-right' },
+            { label: 'Replay lag', headerClassName: 'cell-right' },
+            { label: 'Pagrindinės LSN', headerClassName: 'cell-right' },
+            { label: 'Atsilikimas', headerClassName: 'cell-right' },
+          ]}
+        >
+          {statistika.replikacija.map((r: any) => (
+            <tr>
+              <td class="cell-mono cell-nowrap">{r.client_addr}</td>
+              <td>{r.state}</td>
+              <td class="cell-mono cell-right cell-nowrap">{r.sent_lsn}</td>
+              <td class="cell-mono cell-right cell-nowrap">{r.write_lsn}</td>
+              <td class="cell-mono cell-right cell-nowrap">{r.flush_lsn}</td>
+              <td class="cell-mono cell-right cell-nowrap">{r.replay_lsn}</td>
+              <td class="cell-mono cell-right cell-nowrap">{r.write_lag}</td>
+              <td class="cell-mono cell-right cell-nowrap">{r.flush_lag}</td>
+              <td class="cell-mono cell-right cell-nowrap">{r.replay_lag}</td>
+              <td class="cell-mono cell-right cell-nowrap">{r.primary_current_lsn}</td>
+              <td class="cell-mono cell-right cell-nowrap">{r.bytes_behind == null ? '' : convertUnit(Number(r.bytes_behind), 'B')}</td>
+            </tr>
+          ))}
+        </DataTable>
       </div>
     </div>
   </main>

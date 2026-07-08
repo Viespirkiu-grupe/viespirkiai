@@ -1,0 +1,71 @@
+---
+import Table from './Table.astro';
+import TableWrapper from './TableWrapper.astro';
+import TableEmptyRow from './TableEmptyRow.astro';
+
+interface DataTableColumn {
+  key?: string;
+  label: string;
+  className?: string;
+  headerClassName?: string;
+  cellClassName?: string;
+}
+
+interface Props {
+  columns: DataTableColumn[];
+  rows?: any[];
+  emptyText?: string;
+  emptyClassName?: string;
+  size?: 'md' | 'sm' | 'lg';
+  className?: string;
+  wrapperClassName?: string;
+  bodyAttributes?: Record<string, any>;
+  striped?: boolean;
+  fixed?: boolean;
+}
+
+const {
+  columns,
+  rows,
+  emptyText,
+  emptyClassName,
+  size = 'md',
+  className = '',
+  wrapperClassName = '',
+  bodyAttributes = {},
+  striped = false,
+  fixed = false,
+} = Astro.props as Props;
+
+const hasSlotRows = Astro.slots.has('default');
+const showEmpty = Array.isArray(rows) && rows.length === 0 && !!emptyText;
+---
+
+<TableWrapper className={wrapperClassName}>
+  <Table size={size} className={className} striped={striped} fixed={fixed}>
+    <thead>
+      <tr>
+        {columns.map((column) => (
+          <th class={column.headerClassName ?? column.className}>{column.label}</th>
+        ))}
+      </tr>
+    </thead>
+    <tbody {...bodyAttributes}>
+      {showEmpty ? (
+        <TableEmptyRow colspan={columns.length} message={emptyText} className={emptyClassName} />
+      ) : hasSlotRows ? (
+        <slot />
+      ) : (
+        rows?.map((row) => (
+          <tr>
+            {columns.map((column) => (
+              <td class={column.cellClassName ?? column.className}>
+                {column.key ? row[column.key] : ''}
+              </td>
+            ))}
+          </tr>
+        ))
+      )}
+    </tbody>
+  </Table>
+</TableWrapper>

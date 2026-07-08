@@ -1,7 +1,7 @@
 ---
 import KeyValueList from '@design-system/components/KeyValueList.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
 import StatCard from '@design-system/components/StatCard.astro';
-import { fmtEur } from '../../lib/formatters.ts';
 
 interface Props {
   asmuo: any;
@@ -27,15 +27,15 @@ const mokesciai = asmuo.mokesciai;
     {sodra.vidutinisAtlyginimas ? (
       <KeyValueList>
         <dt>Darbo sutartys</dt>
-        <dd><span class="cell-mono">{fmtEur(sodra.vidutinisAtlyginimas)} €/mėn.</span></dd>
+        <dd><MoneyValue value={sodra.vidutinisAtlyginimas} suffix=" €/mėn." /></dd>
         <dt>Autorinės ir kitos</dt>
         <dd>
           {sodra.vidutinisAtlyginimas2
-            ? <span class="cell-mono">{fmtEur(sodra.vidutinisAtlyginimas2)} €/mėn.</span>
+            ? <MoneyValue value={sodra.vidutinisAtlyginimas2} suffix=" €/mėn." />
             : <em class="text-muted">Nėra duomenų</em>}
         </dd>
         <dt>Bendrai</dt>
-        <dd><span class="cell-mono font-bold">{fmtEur(sodra.bendrasVidutinisAtlyginimas)} €/mėn.</span></dd>
+        <dd><MoneyValue value={sodra.bendrasVidutinisAtlyginimas} suffix=" €/mėn." bold /></dd>
       </KeyValueList>
     ) : <em class="text-muted">Nėra duomenų</em>}
   </StatCard>
@@ -45,19 +45,19 @@ const mokesciai = asmuo.mokesciai;
       <dt>Mokesčiai (VMI)</dt>
       <dd>
         {mokesciai?.suma
-          ? <><span class="cell-mono">{fmtEur(mokesciai.suma)} €</span> <span class="text-muted text-xs">({mokesciai.data})</span></>
+          ? <><MoneyValue value={mokesciai.suma} /> <span class="text-muted text-xs">({mokesciai.data})</span></>
           : <em class="text-muted">Nėra duomenų</em>}
       </dd>
       <dt>Atlyginimai</dt>
       <dd>
         {sodra.atlyginimuIslaidos
-          ? <span class="cell-mono">{fmtEur(sodra.atlyginimuIslaidos)} €/mėn.</span>
+          ? <MoneyValue value={sodra.atlyginimuIslaidos} suffix=" €/mėn." />
           : <em class="text-muted">Nėra duomenų</em>}
       </dd>
       <dt>SODRA įmokos</dt>
       <dd>
         {sodra.imokuSuma
-          ? <span class="cell-mono">{fmtEur(sodra.imokuSuma)} €</span>
+          ? <MoneyValue value={sodra.imokuSuma} />
           : <em class="text-muted">Nėra duomenų</em>}
       </dd>
     </KeyValueList>

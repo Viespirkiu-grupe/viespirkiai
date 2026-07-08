@@ -1,0 +1,48 @@
+---
+interface Props {
+  columns?: 2 | 3;
+  className?: string;
+}
+
+const { columns = 2, className = '' } = Astro.props as Props;
+const classes = [
+  'ds-filter-field-grid',
+  columns === 3 ? 'ds-filter-field-grid--cols-3' : '',
+  className,
+].filter(Boolean).join(' ');
+---
+
+<div class={classes}>
+  <slot />
+</div>
+
+<style>
+  .ds-filter-field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .ds-filter-field-grid--cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ds-filter-field-grid :global(.ds-field),
+  .ds-filter-field-grid :global(.form-group) {
+    margin-bottom: 0;
+  }
+
+  @media (max-width: 640px) {
+    .ds-filter-field-grid,
+    .ds-filter-field-grid--cols-3 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 420px) {
+    .ds-filter-field-grid,
+    .ds-filter-field-grid--cols-3 {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
