@@ -70,7 +70,7 @@ export async function findSingleJuridinisPanel(q: string): Promise<JuridinisPane
     const jarId = jarRes?.rows[0]?.jarId;
     const [sodra, vmi, sutartys, kapitalasRes] = await Promise.all([
       optional(gautiSodrosDuomenis(item.jarKodas)),
-      optional(gautiVmiDuomenis(item.jarKodas)),
+      optional(gautiVmiDuomenis(item.jarKodas, jarId)),
       optional(gautiSutarciuDuomenisPagalJarKoda(item.jarKodas, { limit: 1 })),
       jarId
         ? optional(postgres.query(

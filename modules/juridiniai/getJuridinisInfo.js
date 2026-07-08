@@ -127,7 +127,7 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
 
     const taskMap = {
         sodra: async () => gautiSodrosDuomenis(jarKodas),
-        vmi: async () => gautiVmiDuomenis(jarKodas),
+        vmi: async () => gautiVmiDuomenis(jarKodas, jarId),
         regitra: async () => gautiRegitrosDuomenis(jarKodas, options?.regitra),
         teismoNuosprendziai: async () =>
             gautiTeismoNuosprendzius(jarKodas, options?.teismoNuosprendziai),
