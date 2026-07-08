@@ -1,24 +1,25 @@
 /**
- * Integration tests for the analyst pool and TEMP views.
+ * Integration tests for the analyst pool and persistent v_* views.
  * Uses the existing read-only database user from config.js (pgUser / pgPassword)
  * so no separate mcp_analyst role is required to run these tests.
  *
  * Run: npm run test:integration
  */
 
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pkg from "pg";
 import type { PoolClient } from "pg";
 import config from "../../utils/config.js";
-import { TEMP_VIEWS_SQL, VIEW_NAMES } from "../../modules/mcp/analyst/tempViews.js";
+import { VIEW_DEFINITIONS, VIEW_NAMES } from "../../modules/mcp/analyst/tempViews.js";
 
 const { Pool } = pkg;
 
-// Test pool: same credentials as the main app user but on the direct PG port
-// (not PgBouncer) so TEMP views survive across queries on the same connection.
+// Test pool: admin credentials, so it can create the persistent v_* views the same
+// way ensureViews.ts does in production. The views are permanent (not session-scoped),
+// so no connect hook or shared connection is required.
 const testPool = new Pool({
     host: config.pgHost,
-    port: config.pgPort, // direct PostgreSQL port — TEMP views are session-scoped
+    port: config.pgPort,
     user: config.pgUser,
     password: config.pgPassword,
     database: config.pgDatabase,
@@ -27,18 +28,20 @@ const testPool = new Pool({
     connectionTimeoutMillis: 10_000,
 });
 
-testPool.on("connect", (client) => {
-    client.query(TEMP_VIEWS_SQL).catch(() => {});
-});
-
-// One shared client so all view tests run on the same backend connection,
-// guaranteeing the TEMP views created on connect are still present.
 let sharedClient: PoolClient | null = null;
 
 async function getClient() {
     if (!sharedClient) sharedClient = await testPool.connect();
     return sharedClient;
 }
+
+beforeAll(async () => {
+    const client = await getClient();
+    for (const definition of Object.values(VIEW_DEFINITIONS)) {
+        // @ts-ignore
+        await client.query(definition);
+    }
+});
 
 afterAll(async () => {
     if (sharedClient) sharedClient.release();
@@ -59,28 +62,28 @@ describe("analyst pool — connectivity", () => {
 });
 
 // ---------------------------------------------------------------------------
-// TEMP views — presence after connect
+// Persistent views — presence
 // ---------------------------------------------------------------------------
 
-describe("analyst pool — TEMP views are present after connect", () => {
-    it("all 6 views exist in pg_temp schema", async () => {
+describe("analyst pool — persistent views are present", () => {
+    it("all 6 views exist as regular (non-temp) views", async () => {
         const client = await getClient();
         // @ts-ignore
         const { rows } = await client.query(`
             SELECT viewname
             FROM pg_views
-            WHERE schemaname LIKE 'pg_temp%'
+            WHERE schemaname NOT LIKE 'pg_temp%'
             ORDER BY viewname
         `);
         const found = new Set(rows.map((r: { viewname: string }) => r.viewname));
         for (const viewName of VIEW_NAMES) {
-            expect(found.has(viewName), `TEMP view '${viewName}' not found — pool.on('connect') may not have fired`).toBe(true);
+            expect(found.has(viewName), `view '${viewName}' not found — ensureAnalystViews may not have run`).toBe(true);
         }
     });
 });
 
 // ---------------------------------------------------------------------------
-// TEMP views — each view returns rows with expected columns
+// Views — each view returns rows with expected columns
 // ---------------------------------------------------------------------------
 
 describe("v_company", () => {

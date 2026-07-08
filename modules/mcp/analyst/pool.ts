@@ -1,7 +1,6 @@
 import config from "../../../utils/config.js";
 import pkg from "pg";
 import type { PoolConfig } from "pg";
-import { TEMP_VIEWS_SQL } from "./tempViews.js";
 import { log } from "../../../utils/log.js";
 
 const { Pool } = pkg;
@@ -25,14 +24,9 @@ const analystPoolConfig: PgBouncerPoolConfig = {
 
 export const analystPool = new Pool(analystPoolConfig);
 
-// Create the six TEMP views once per physical backend connection.
-// TEMP views are session-scoped, so they persist for the lifetime of this backend
-// connection and are dropped automatically when it closes.
-analystPool.on("connect", (client) => {
-    client.query(TEMP_VIEWS_SQL).catch((err: Error) => {
-        log(`analyst pool: TEMP view creation failed: ${err.message}`);
-    });
-});
+// The v_* helper views are created as PERSISTENT views by the admin pool
+// (see ensureViews.ts) — the read-only analyst role cannot create them itself.
+// This pool only runs read-only SELECTs against them.
 
 analystPool.on("error", (err: Error) => {
     log(`analyst pool error: ${err.message}`);

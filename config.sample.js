@@ -172,7 +172,7 @@ export default {
     // MCP execute_query įrankis
     // Read-only SQL prieigai per MCP. Naudoja atskirą "analyst" rolę su
     // savo pool'u — jungiamasi tiesiai į PG (ne per PgBouncer), kad veiktų
-    // SET LOCAL statement_timeout.
+    // statement_timeout.
     // ─────────────────────────────────────────────────────────────────────
 
     // Rodyti `get_schema` ir `execute_query` MCP įrankius.
@@ -192,7 +192,7 @@ export default {
     pgAnalystPort: 9118,
     pgAnalystMaxConnections: 16,
 
-    // Vienos SQL užklausos timeout sekundėmis (SET LOCAL statement_timeout).
+    // Vienos SQL užklausos timeout sekundėmis (statement_timeout).
     mcpQueryTimeout: 20,
 
     // ─────────────────────────────────────────────────────────────────────

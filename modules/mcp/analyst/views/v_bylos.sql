@@ -1,4 +1,4 @@
-CREATE TEMP VIEW v_bylos AS
+CREATE OR REPLACE VIEW v_bylos AS
 SELECT n.id           AS "bylosId",
        n."bylosNumeris",
        n."bylosRusis",

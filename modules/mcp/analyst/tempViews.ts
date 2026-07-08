@@ -20,6 +20,4 @@ export const VIEW_DEFINITIONS: Record<string, string> = Object.fromEntries(
     }),
 );
 
-export const TEMP_VIEWS_SQL: string = Object.values(VIEW_DEFINITIONS).join(";\n\n") + ";";
-
 export const VIEW_NAMES: Set<string> = new Set(_viewNames);

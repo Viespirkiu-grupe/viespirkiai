@@ -1,4 +1,4 @@
-CREATE TEMP VIEW v_person_links AS
+CREATE OR REPLACE VIEW v_person_links AS
 SELECT r.id,
        r.deklaracija,
        r.vardas,

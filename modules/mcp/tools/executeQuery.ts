@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { analystPool } from "../analyst/pool.js";
+import { ensureAnalystViews } from "../analyst/ensureViews.js";
 import { MAX_QUERY_LENGTH, validateSql } from "../analyst/validateSql.js";
 import { normalizeSql } from "../analyst/normalizeSql.js";
 import { executeWithColumnFix, type ToolResult } from "../analyst/columnFixer.js";
@@ -72,6 +73,19 @@ export async function handler({ query, purpose, page }: { query: string; purpose
         };
     }
 
+    // Ensure the v_* views exist before querying. Memoized — the DDL actually runs
+    // only on the first call per process; afterwards this awaits an already-resolved promise.
+    try {
+        await ensureAnalystViews();
+    } catch (err: unknown) {
+        const msg = (err as Error).message;
+        traceSQLFailure(`[execute_query] ensureAnalystViews failed: ${msg}`);
+        return {
+            content: [{ type: "text", text: `Nepavyko paruošti analitinių v_* view'ų: ${msg}` }],
+            isError: true,
+        };
+    }
+
     return await executeWithColumnFix(
         (q) => _runQuery(q, purpose, page),
         sql,
@@ -89,7 +103,7 @@ async function _runQuery(query: string, _purpose: string, page: number): Promise
     const client = await analystPool.connect();
 
     try {
-        await client.query(`SET LOCAL statement_timeout = '${QUERY_TIMEOUT_SECONDS}s'`);
+        await client.query(`SET statement_timeout = '${QUERY_TIMEOUT_SECONDS}s'`);
         const result = await client.query(wrappedSql);
 
         const durationMs = Date.now() - start;

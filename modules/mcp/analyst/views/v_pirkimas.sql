@@ -1,4 +1,4 @@
-CREATE TEMP VIEW v_pirkimas AS
+CREATE OR REPLACE VIEW v_pirkimas AS
 SELECT 'cvpis' AS saltinis,
        p."pirkimoId",
        p.pavadinimas,

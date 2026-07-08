@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { handler } from "../../modules/mcp/tools/getSchema.js";
 import { postgres } from "../../postgres/postgres.js";
-import { TEMP_VIEWS_SQL, VIEW_NAMES } from "../../modules/mcp/analyst/tempViews.js";
+import { VIEW_DEFINITIONS, VIEW_NAMES } from "../../modules/mcp/analyst/tempViews.js";
 
 function printResult(label: string, payload: unknown) {
     const text = JSON.stringify(payload, null, 2);
@@ -184,10 +184,12 @@ describe("MCP get_schema — uncovered table detail", () => {
 });
 
 describe("MCP get_schema — curated metadata matches DB columns", () => {
-    it("all view columns match information_schema for each temp view", async () => {
+    it("all view columns match information_schema for each view", async () => {
         const client = await postgres.connect();
         try {
-            await client.query(TEMP_VIEWS_SQL);
+            for (const definition of Object.values(VIEW_DEFINITIONS)) {
+                await client.query(definition);
+            }
             for (const viewName of VIEW_NAMES) {
                 const toolResult = (await handler({ table: viewName })) as AnyResult;
                 const sc = toolResult?.structuredContent as AnyResult;
@@ -197,7 +199,7 @@ describe("MCP get_schema — curated metadata matches DB columns", () => {
                         SELECT column_name
                         FROM information_schema.columns
                         WHERE table_name = $1
-                          AND table_schema LIKE 'pg_temp_%'
+                          AND table_schema NOT LIKE 'pg_temp%'
                         ORDER BY ordinal_position
                     `,
                     [viewName]

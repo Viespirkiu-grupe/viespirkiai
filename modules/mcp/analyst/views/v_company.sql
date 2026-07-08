@@ -1,4 +1,4 @@
-CREATE TEMP VIEW v_company AS
+CREATE OR REPLACE VIEW v_company AS
 SELECT j."jarKodas"::text,
        j.pavadinimas,
        j.adresas,

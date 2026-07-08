@@ -1,4 +1,4 @@
-CREATE TEMP VIEW v_sutartys AS
+CREATE OR REPLACE VIEW v_sutartys AS
 SELECT s."sutartiesUnikalusId",
        s."sutartiesNumeris",
        s."pirkimoNumeris",
