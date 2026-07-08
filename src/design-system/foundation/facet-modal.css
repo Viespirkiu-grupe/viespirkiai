@@ -121,6 +121,22 @@
   color: var(--gray);
   font-size: var(--text-sm);
 }
+.dok-facet-note {
+  display: block;
+  margin-top: 14px;
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--gray);
+}
+.dok-facet-modal__footnote {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.dok-facet-modal__footnote .dok-facet-note {
+  margin-top: 0;
+}
 
 .dok-facet-modal__search {
   width: 100%;

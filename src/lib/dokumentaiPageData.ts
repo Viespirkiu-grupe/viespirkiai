@@ -311,7 +311,8 @@ export async function loadDokumentaiPage(url: URL) {
   // Results meta: count + a hoverable duration that reveals the per-phase timing
   // waterfall (which engine/index, how long each step took).
   const resultsMetaHtml = (() => {
-    const prefix = result?.approximate ? 'Apie ' : '';
+    const shown = result?.hits.length ?? 0;
+    const prefix = result?.approximate ? 'apie ' : '';
     const count = (result?.total ?? 0).toLocaleString('lt-LT');
     const elapsed = result?.elapsed ?? '';
     const engine = result?.engine ?? '';
@@ -320,7 +321,7 @@ export async function loadDokumentaiPage(url: URL) {
       ? ` data-timings='${JSON.stringify(timings).replace(/'/g, '&#39;')}'`
       : '';
     const source = `<span class="timing-source"${timingsAttr}>(${elapsed} s · ${engine})</span>`;
-    return `${prefix}${count} rezultatų ${source}`;
+    return `Rodomi ${shown} iš ${prefix}${count} rezultatų ${source}`;
   })();
 
   return {

@@ -25,7 +25,10 @@ const listClasses = ['dok-facet-modal__list', listClassName].filter(Boolean).joi
   <input slot="tools" type="search" class="dok-facet-modal__search" placeholder={searchPlaceholder} aria-label={searchAriaLabel} autocomplete="off" />
   <div class={listClasses} role="listbox" aria-multiselectable="true"></div>
   <Fragment slot="footer">
-    <span class="ds-modal__count" aria-live="polite"></span>
+    <span class="dok-facet-modal__footnote">
+      <span class="ds-modal__count" aria-live="polite"></span>
+      <span class="dok-facet-note">Rodomi apytiksliai skaičiai.</span>
+    </span>
     <span class="ds-modal__actions">
       <button type="button" class="btn btn-outline btn-sm" data-facet-clear>Išvalyti</button>
       <button type="button" class="btn btn-primary btn-sm" data-facet-apply>Taikyti</button>

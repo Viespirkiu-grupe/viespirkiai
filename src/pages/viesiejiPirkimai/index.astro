@@ -15,7 +15,7 @@ import PirkimasLaikotarpisFilter from '../../components/viesiejiPirkimai/Pirkima
 import { splitFacetOptions } from '../../lib/dokumentaiUrl.ts';
 import { searchViesiejiPirkimai, countViesiejiPirkimai } from '@/modules/viesiejiPirkimai/searchViesiejiPirkimai.js';
 import { STATUSAS, PIRKIMO_BUDAS } from '@/modules/viesiejiPirkimai/viesiejiPirkimaiEnums.js';
-import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
+import { linksniuotiK } from '@/utils/linksniai.js';
 import config from '../../lib/config.ts';
 import { objectsToCsvStream } from '@/utils/csv.js';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
@@ -65,17 +65,17 @@ function buildNumberOfResults({ shown, total, elapsed, timings }: { shown: numbe
   const source = `<span class="inline timing-source"${timingsAttr}>(${trukme}, ${engine})</span>`;
   if (total == null) {
     return {
-      numberOfResults: `Rodomi ${shown} iš <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <span class="inline timing-source"${timingsAttr}> (${trukme}, ${engine})</span>`,
+      numberOfResults: `Rodomi ${shown} iš apie <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <span class="inline timing-source"${timingsAttr}> (${trukme}, ${engine})</span>`,
       total: 10_000,
     };
   }
   if (shown < total)
     return {
-      numberOfResults: `Rodomi ${shown} iš ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`,
+      numberOfResults: `Rodomi ${shown} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`,
       total,
     };
   return {
-    numberOfResults: `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų'])} ${source}`,
+    numberOfResults: `Rodomi ${shown} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`,
     total,
   };
 }
@@ -272,6 +272,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
               <PirkimasLaikotarpisFilter hist={facets.laikotarpis} dataNuo={values.paskelbimoDataNuo as string | undefined} dataIki={values.paskelbimoDataIki as string | undefined} />
               <PirkimasVerteFilter hist={facets.verte} verteNuo={values.verteNuo as string | undefined} verteIki={values.verteIki as string | undefined} />
               <DokFacetSection label="BVPŽ" param="bvpzPrefiksai" facet={mkFacet('bvpzPrefiksai', facets.bvpz, 8)} allLabel="Visi" stacked modal={{ field: 'bvpzKodai', title: 'BVPŽ klasifikacija', always: true }} />
+              <p class="dok-facet-note">Rodomi apytiksliai skaičiai.</p>
             </div>
           )}
           <ViesiejiPirkimaiFilters values={values} rail={true} hideParticipants={!!facets} />
