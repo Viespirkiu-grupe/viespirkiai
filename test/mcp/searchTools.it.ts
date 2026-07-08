@@ -121,7 +121,7 @@ describe("search_sutartys", () => {
         expect(payload.sutarciuKiekis).toBeGreaterThanOrEqual(payload.results.length);
     });
 
-    it("date-only filter returns null aggregates — too broad for a SUM scan", async () => {
+    it("date-only filter returns Quickwit aggregates", async () => {
         const result = (await searchSutartysHandler({
             sudarymoDataNuo: "2023-01-01",
             sudarymoDataIki: "2023-12-31",
@@ -130,8 +130,9 @@ describe("search_sutartys", () => {
         })) as AnyResult;
 
         const payload = parseResult(result);
-        expect(payload.sutarciuKiekis).toBeNull();
-        expect(payload.bendraVerte).toBeNull();
+        expect(typeof payload.sutarciuKiekis).toBe("number");
+        expect(payload.sutarciuKiekis).toBeGreaterThan(0);
+        expect(typeof payload.bendraVerte).toBe("number");
     });
 
     it("sutarciuKiekis narrows when date range is added to org filter", async () => {
@@ -156,7 +157,7 @@ describe("search_sutartys", () => {
         expect(broad.bendraVerte).toBeGreaterThanOrEqual(narrow.bendraVerte);
     });
 
-    it("typesense path (with search) returns null aggregates — use execute_query instead", async () => {
+    it("search path still returns the standard aggregate fields", async () => {
         const result = (await searchSutartysHandler({
             search: "švietimas",
             page: 1,
@@ -164,8 +165,8 @@ describe("search_sutartys", () => {
         })) as AnyResult;
 
         const payload = parseResult(result);
-        expect(payload.sutarciuKiekis).toBeNull();
-        expect(payload.bendraVerte).toBeNull();
+        expect(payload).toHaveProperty("sutarciuKiekis");
+        expect(payload).toHaveProperty("bendraVerte");
     });
 });
 

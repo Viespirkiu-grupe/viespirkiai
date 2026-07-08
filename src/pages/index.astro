@@ -62,14 +62,11 @@ if (query.sort?.includes(':')) {
 const DEFAULT_LIMIT = 50;
 const limit = parseInt(query.limit) || DEFAULT_LIMIT;
 const page = parseInt(query.page) || 1;
-// Quickwit (eksperimentinis) naudojamas visada, kai įjungtas — įsk. tuščią
-// pradinį puslapį (be filtrų), kad ir ten rodytųsi facetai. Kitaip: tekstinei
-// paieškai — Typesense, likusiam — Postgres.
-const engine = config.sutartysQuickwit && config.quickwitUp
+// Quickwit naudojamas visada, kai įjungtas — įsk. tuščią pradinį puslapį
+// (be filtrų), kad ir ten rodytųsi facetai. Kitaip krentam į Postgres.
+const engine = config.quickwitUp
   ? 'quickwit'
-  : query.search && config.typesenseUp
-    ? 'typesense'
-    : 'postgres';
+  : 'postgres';
 
 type Timing = { label: string; start: number; duration: number; phase?: string };
 

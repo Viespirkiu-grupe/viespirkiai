@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { searchSutartys } from "../../sutartys/searchSutartys.js";
 import { specialJarCodes } from "../../juridiniai/specialJarCodes.js";
+import config from "../../../utils/config.js";
 
 const MEANINGFUL_FILTERS = [
     "search",
@@ -100,12 +101,30 @@ export async function handler(params) {
         }
     }
 
-    const { results, total, sutarciuKiekis, bendraVerte } = await searchSutartys(query, {
-        limit,
-        page,
-        engine: query.search ? "typesense" : "postgres",
-        includeAggregates: true,
-    });
+    let searchResult;
+    if (config.quickwitUp) {
+        try {
+            searchResult = await searchSutartys(query, {
+                limit,
+                page,
+                engine: "quickwit",
+                includeAggregates: true,
+            });
+        } catch {
+            searchResult = null;
+        }
+    }
+
+    if (!searchResult) {
+        searchResult = await searchSutartys(query, {
+            limit,
+            page,
+            engine: "postgres",
+            includeAggregates: true,
+        });
+    }
+
+    const { results, total, sutarciuKiekis, bendraVerte } = searchResult;
 
     return {
         content: [

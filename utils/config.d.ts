@@ -48,8 +48,6 @@ export interface Config {
     quickwitUrl?: string;
     quickwitHost?: string;
     quickwitTimeoutMs?: number;
-    /** Eksperimentinis: sutarčių tekstinę paiešką vykdyti per Quickwit. */
-    sutartysQuickwit?: boolean;
 
     scrapeProxy?: string;
     torAddress: string;

@@ -2,7 +2,6 @@ import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import { cvpIsScrpeById } from "./atnaujintiPagalUnikalu.js";
 import Timings from "../../utils/timings.js";
-import { typesense } from "../../typesense/typesense.js";
 
 export async function cvpIsScrapeOldestContract() {
     let timings = new Timings();
@@ -53,23 +52,6 @@ export async function cvpIsScrapeOldestContract() {
                AND "istrinta" IS DISTINCT FROM true;`,
             [id],
         );
-        let doc = null;
-        try {
-            doc = await typesense
-                .collections("sutartys")
-                .documents(id)
-                .retrieve();
-        } catch (err) {
-            if (err?.httpStatus === 404) {
-                doc = null; // not found – handle silently
-            } else {
-                throw err; // real error
-            }
-        }
-
-        if (doc) {
-            await typesense.collections("sutartys").documents(id).delete();
-        }
     } else {
         throw new Error(
             `Unexpected additional contracts: ${count} for ID ${id}`,

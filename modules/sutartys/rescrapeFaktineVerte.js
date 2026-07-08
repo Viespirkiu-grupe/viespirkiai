@@ -16,7 +16,6 @@ import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import { cvpIsScrpeById } from "./atnaujintiPagalUnikalu.js";
 import Timings from "../../utils/timings.js";
-import { typesense } from "../../typesense/typesense.js";
 
 // Klaidos pataisymo laikas (Europe/Vilnius). Įrašai atnaujinti po šios datos
 // jau turi teisingą faktineIvykdimoVerte.
@@ -73,22 +72,6 @@ export async function cvpIsRescrapeFaktineVerte() {
                 AND "istrinta" IS DISTINCT FROM true;`,
             [id],
         );
-        let doc = null;
-        try {
-            doc = await typesense
-                .collections("sutartys")
-                .documents(id)
-                .retrieve();
-        } catch (err) {
-            if (err?.httpStatus === 404) {
-                doc = null;
-            } else {
-                throw err;
-            }
-        }
-        if (doc) {
-            await typesense.collections("sutartys").documents(id).delete();
-        }
     } else {
         throw new Error(
             `Unexpected additional contracts: ${count} for ID ${id}`,

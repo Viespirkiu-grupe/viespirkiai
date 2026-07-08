@@ -83,7 +83,7 @@ export default {
     pgLogQueriesFile: null,
 
     // ─────────────────────────────────────────────────────────────────────
-    // Typesense — sutarčių ir juridinių asmenų paieška
+    // Typesense — paieškos pasiūlymai ir juridinių asmenų paieška
     // ─────────────────────────────────────────────────────────────────────
 
     // Jei Typesense nepasiekiamas — false, susijusios paieškos bus išjungtos.

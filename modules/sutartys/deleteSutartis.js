@@ -1,5 +1,4 @@
 import { postgres } from "../../postgres/postgres.js";
-import { client } from "../../typesense/typesense.js";
 import { deleteFile } from "../failai/deleteFile.js";
 import { log } from "../../utils/log.js";
 
@@ -39,17 +38,6 @@ async function cvpIsDeleteSutartis(id) {
         `DELETE FROM sutartys WHERE "sutartiesUnikalusId" = $1`,
         [id],
     );
-
-    // Delete it from Typesense as well
-    try {
-        await client.collections("sutartys").documents(id).delete();
-        log(`Deleted sutartis with id ${id} from Typesense.`);
-    } catch (error) {
-        console.error(
-            `Error deleting sutartis with id ${id} from Typesense:`,
-            error,
-        );
-    }
 
     log(`Deleted sutartis with id ${id} from sutartys table.`);
 }

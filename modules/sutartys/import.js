@@ -1,8 +1,7 @@
 /*
-Importuoja sutarčių duomenis į Postgres ir Typesense.
+Importuoja sutarčių duomenis į Postgres.
 */
 
-import { addDocumentsToSearch } from "../../typesense/typesense.js";
 import { postgres } from "../../postgres/postgres.js";
 import Timings from "../../utils/timings.js";
 
@@ -32,7 +31,7 @@ function dateOnly(d) {
 }
 
 /**
- * Importuoja sutarčių duomenys į Postgres ir Typesense.
+ * Importuoja sutarčių duomenis į Postgres.
  * @param {Array} data - Duomenų masyvas, kuriame yra sutarčių informacija.
  * @returns {Promise<void>}
  */
@@ -92,11 +91,6 @@ export async function cvpIsImportArray(data, options = {}) {
     timings.end("importDataCleanup");
 
     if (items.length > 0) {
-        // Įterpiame į Typesense
-        timings.start("importTypesenseUpsert");
-        await addDocumentsToSearch(items);
-        timings.end("importTypesenseUpsert");
-
         // Į lentelę sutartys
         const values = [];
         const placeholders = [];

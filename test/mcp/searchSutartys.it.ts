@@ -1,6 +1,6 @@
 /**
- * Integration tests for searchSutartys with Typesense engine.
- * Requires live Typesense. Run: npm run test:integration
+ * Integration tests for searchSutartys engines.
+ * Requires live PostgreSQL/Quickwit. Run: npm run test:integration
  */
 
 import { describe, it, expect } from "vitest";
@@ -19,11 +19,11 @@ describe("searchSutartys (postgres engine)", () => {
     });
 });
 
-describe("searchSutartys (typesense engine)", () => {
+describe("searchSutartys (quickwit engine)", () => {
     it("returns results and expected shape for a keyword search", async () => {
         const { results, total } = await searchSutartys(
             { search: "švietimas" },
-            { engine: "typesense", limit: 5, page: 1 },
+            { engine: "quickwit", limit: 5, page: 1 },
         );
 
         expect(Array.isArray(results)).toBe(true);
@@ -42,14 +42,14 @@ describe("searchSutartys (typesense engine)", () => {
     it("filters by tiekejoKodas", async () => {
         const first = await searchSutartys(
             { search: "*" },
-            { engine: "typesense", limit: 1, page: 1 },
+            { engine: "quickwit", limit: 1, page: 1 },
         );
         expect(first.results.length).toBeGreaterThan(0);
 
         const kodas = first.results[0].tiekejaiKodai[0];
         const { results } = await searchSutartys(
             { tiekejoKodas: kodas },
-            { engine: "typesense", limit: 5, page: 1 },
+            { engine: "quickwit", limit: 5, page: 1 },
         );
 
         expect(Array.isArray(results)).toBe(true);
@@ -62,7 +62,7 @@ describe("searchSutartys (typesense engine)", () => {
     it("filters by sudarymoDataNuo and sudarymoDataIki", async () => {
         const { results } = await searchSutartys(
             { sudarymoDataNuo: "2022-01-01", sudarymoDataIki: "2022-12-31" },
-            { engine: "typesense", limit: 5, page: 1 },
+            { engine: "quickwit", limit: 5, page: 1 },
         );
 
         expect(Array.isArray(results)).toBe(true);
@@ -71,11 +71,11 @@ describe("searchSutartys (typesense engine)", () => {
     it("paginates correctly", async () => {
         const page1 = await searchSutartys(
             { search: "sutartis" },
-            { engine: "typesense", limit: 3, page: 1 },
+            { engine: "quickwit", limit: 3, page: 1 },
         );
         const page2 = await searchSutartys(
             { search: "sutartis" },
-            { engine: "typesense", limit: 3, page: 2 },
+            { engine: "quickwit", limit: 3, page: 2 },
         );
 
         expect(page1.results.length).toBeGreaterThan(0);
@@ -99,7 +99,7 @@ describe("searchSutartys (typesense engine)", () => {
     it("surname search – all results contain the queried surname (no false positives)", async () => {
         const { results, total } = await searchSutartys(
             { search: "Žemaitaitis" },
-            { engine: "typesense", limit: 50, page: 1 },
+            { engine: "quickwit", limit: 50, page: 1 },
         );
 
         expect(total).toBeGreaterThan(0);
@@ -124,17 +124,21 @@ describe("searchSutartys (typesense engine)", () => {
     it("stream mode returns an async iterable of rows", async () => {
         const { stream, client, results } = await searchSutartys(
             { search: "švietimas" },
-            { engine: "typesense", stream: true },
+            { engine: "quickwit", stream: true },
         );
 
         expect(results).toEqual([]);
-        expect(client).toBeNull();
+        expect(client).not.toBeNull();
         expect(stream).not.toBeNull();
 
         const rows: object[] = [];
-        for await (const row of stream!) {
-            rows.push(row);
-            if (rows.length >= 3) break;
+        try {
+            for await (const row of stream!) {
+                rows.push(row);
+                if (rows.length >= 3) break;
+            }
+        } finally {
+            client?.release();
         }
 
         expect(rows.length).toBeGreaterThan(0);

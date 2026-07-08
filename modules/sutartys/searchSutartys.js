@@ -1,13 +1,11 @@
-import { arrayToLithuanianTime } from "../../utils/time.js";
-import { searchDocuments } from "../../typesense/typesense.js";
-import { search as quickwitSearch } from "../../quickwit/quickwit.js";
+import { getDeadRatio, search as quickwitSearch } from "../../quickwit/quickwit.js";
 import { specialJarCodes } from "../juridiniai/specialJarCodes.js";
 import { searchJar } from "../juridiniai/search.js";
 import config from "../../utils/config.js";
 import { postgres } from "../../postgres/postgres.js";
 import { FilterBuilder } from "../../utils/filter.js";
 import { fixHtmlEntities } from "../../utils/fixHtmlEntities.js";
-import { Readable, Transform } from "node:stream";
+import { Transform } from "node:stream";
 import { CONTRACT_TYPES } from "./contractTypes.js";
 import QueryStream from "pg-query-stream";
 
@@ -195,7 +193,7 @@ function qwDate(raw, endOfDay = false) {
 
 /**
  * Pastato Quickwit užklausą iš sutarčių paieškos parametrų. Atspindi tuos
- * pačius filtrus kaip Postgres/Typesense `sutartysFilter`.
+ * pačius filtrus kaip Postgres `sutartysFilter`.
  *
  * `exclude` leidžia praleisti konkretaus faceto filtrą, kad to faceto agregacija
  * rodytų visas reikšmes pagal KITUS aktyvius filtrus (kaip /dokumentai). Raktai
@@ -343,6 +341,33 @@ async function qwFacet(field, query, size) {
         }));
     } catch {
         return [];
+    }
+}
+
+async function sutartysQuickwitAggregates(query) {
+    try {
+        const [deadRatio, res] = await Promise.all([
+            getDeadRatio(QUICKWIT_LENTELE),
+            fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    query: buildSutartysQuickwitQuery(query),
+                    max_hits: 0,
+                    aggs: { suma: { sum: { field: "suma" } } },
+                    format: "json",
+                }),
+            }),
+        ]);
+        if (!res.ok) return { sutarciuKiekis: null, bendraVerte: null };
+        const data = await res.json();
+        const liveRatio = Math.max(0, 1 - deadRatio);
+        return {
+            sutarciuKiekis: Math.round(Number(data?.num_hits ?? 0) * liveRatio),
+            bendraVerte: Number(data?.aggregations?.suma?.value ?? 0) * liveRatio,
+        };
+    } catch {
+        return { sutarciuKiekis: null, bendraVerte: null };
     }
 }
 
@@ -707,13 +732,13 @@ export async function sutartysFacetOptions(field, query, size = 1000, optionSear
 }
 
 /**
- * Loads complete contract rows from PostgreSQL while preserving Typesense order.
+ * Loads complete contract rows from PostgreSQL while preserving search engine order.
  * Missing or deleted PostgreSQL rows are omitted.
- * @param {{ id?: string | number }[]} typesenseRows
+ * @param {{ id?: string | number }[]} searchRows
  * @returns {Promise<object[]>}
  */
-async function loadTypesenseRowsFromPostgres(typesenseRows) {
-    const ids = typesenseRows
+async function loadSearchRowsFromPostgres(searchRows) {
+    const ids = searchRows
         .map((row) => Number(row.id))
         .filter(Number.isSafeInteger);
 
@@ -735,7 +760,7 @@ async function loadTypesenseRowsFromPostgres(typesenseRows) {
 }
 
 /**
- * @typedef {"postgres" | "typesense" | "quickwit"} Engine
+ * @typedef {"postgres" | "quickwit"} Engine
  */
 
 /**
@@ -781,7 +806,7 @@ async function loadTypesenseRowsFromPostgres(typesenseRows) {
  */
 
 /**
- * Searches the sutartys table using Postgres or Typesense.
+ * Searches the sutartys table using Postgres or Quickwit.
  * @param {object} query - Express request query object.
  * @param {SearchOptions} options
  * @returns {Promise<SearchResult>}
@@ -800,8 +825,8 @@ export async function searchSutartys(
 ) {
     const searchStarted = performance.now();
 
-    // Eksperimentinis Quickwit variklis (tik nestriminei paieškai — eksportai
-    // (stream) tebeeina Postgres keliu žemiau). Rezultatų eilutės pilnai
+    // Quickwit variklis naudojamas tik nestriminei paieškai — eksportai
+    // (stream) tebeeina Postgres keliu žemiau. Rezultatų eilutės pilnai
     // užkraunamos iš Postgres išsaugant Quickwit tvarką.
     if (engine === "quickwit" && !stream) {
         const { values, queryParams } = sutartysFilter.build(query);
@@ -811,20 +836,24 @@ export async function searchSutartys(
 
         const quickwitStarted = performance.now();
         // Pagrindinė paieška ir facetų agregacijos vyksta lygiagrečiai.
-        const [result, facets] = await Promise.all([
+        const aggregatePromise = includeAggregates
+            ? sutartysQuickwitAggregates(query)
+            : Promise.resolve({ sutarciuKiekis: null, bendraVerte: null });
+        const [result, facets, aggregates] = await Promise.all([
             quickwitSearch(
                 QUICKWIT_LENTELE,
                 { query: qwQuery, sort_by: quickwitSortBy(query) },
                 { minHits: page * effLimit },
             ),
             includeFacets ? sutartysFacets(query) : Promise.resolve(null),
+            aggregatePromise,
         ]);
         const quickwitEnded = performance.now();
 
         const pageHits = result.hits.slice((page - 1) * effLimit, page * effLimit);
 
         const postgresStarted = performance.now();
-        const rows = await loadTypesenseRowsFromPostgres(
+        const rows = await loadSearchRowsFromPostgres(
             pageHits.map((h) => ({ id: h.sutartiesUnikalusId })),
         );
         const postgresEnded = performance.now();
@@ -832,8 +861,8 @@ export async function searchSutartys(
         return {
             results: rows.map(aptvarkytiRezultata),
             total: result.numHitsEstimate ?? result.hits.length,
-            sutarciuKiekis: null,
-            bendraVerte: null,
+            sutarciuKiekis: aggregates.sutarciuKiekis,
+            bendraVerte: aggregates.bendraVerte,
             facets,
             values,
             queryParams,
@@ -843,58 +872,6 @@ export async function searchSutartys(
                     phase: "search",
                     start: Math.round(quickwitStarted - searchStarted),
                     duration: Math.round(quickwitEnded - quickwitStarted),
-                },
-                {
-                    label: "PostgreSQL",
-                    phase: "pg",
-                    start: Math.round(postgresStarted - searchStarted),
-                    duration: Math.round(postgresEnded - postgresStarted),
-                },
-            ],
-            stream: null,
-            client: null,
-        };
-    }
-
-    if (engine === "typesense") {
-        const { filterBy, sortBy, values, queryParams } =
-            sutartysFilter.build(query);
-
-        if (stream) {
-            return {
-                results: [],
-                total: null,
-                values,
-                queryParams,
-                timings: [],
-                stream: Readable.from(streamTypesenseResults(query, limit)),
-                client: null,
-            };
-        }
-
-        const typesenseStarted = performance.now();
-        const { results: raw, total } = await searchDocuments(
-            query.search || "*",
-            { page, filterBy, sortBy, limit },
-        );
-        const typesenseEnded = performance.now();
-
-        const postgresStarted = performance.now();
-        const rows = await loadTypesenseRowsFromPostgres(raw);
-        const postgresEnded = performance.now();
-        return {
-            results: arrayToLithuanianTime(rows).map(aptvarkytiRezultata),
-            total,
-            sutarciuKiekis: null,
-            bendraVerte: null,
-            values,
-            queryParams,
-            timings: [
-                {
-                    label: "Typesense",
-                    phase: "search",
-                    start: Math.round(typesenseStarted - searchStarted),
-                    duration: Math.round(typesenseEnded - typesenseStarted),
                 },
                 {
                     label: "PostgreSQL",
@@ -952,7 +929,7 @@ export async function searchSutartys(
     const needsAgg =
         includeAggregates && SELECTIVE_KEYS.some((k) => query[k] != null);
 
-    // "suma" = faktineIvykdimoVerte when settled, otherwise verte — same as Typesense index
+    // "suma" = faktineIvykdimoVerte when settled, otherwise verte.
     const mainQuery = postgres.query(sql, params);
     const aggQuery = needsAgg
         ? postgres.query(
@@ -1054,40 +1031,4 @@ export function aptvarkytiRezultata(r) {
     }
 
     return /** @type {ContractSearchRow} */ (r);
-}
-
-/**
- * Async generator that paginates through Typesense results.
- * Yields one processed row at a time.
- * @param {object} query
- * @param {number | null} [limit=null] - Maximum number of Typesense hits to process.
- * @returns {AsyncGenerator<object>}
- */
-export async function* streamTypesenseResults(query, limit = null) {
-    const { filterBy, sortBy } = sutartysFilter.build(query);
-    const pageSize = 250;
-    let page = 1;
-    let fetched = 0;
-    let total = Infinity;
-
-    while (fetched < total && (limit == null || fetched < limit)) {
-        const { results, total: t } = await searchDocuments(
-            query.search || "*",
-            { page, filterBy, sortBy, limit: pageSize },
-        );
-
-        if (page === 1) total = t;
-        if (!results.length) break;
-
-        const remaining = limit == null ? results : results.slice(0, limit - fetched);
-        const rows = await loadTypesenseRowsFromPostgres(remaining);
-        for (const row of arrayToLithuanianTime(rows).map(
-            aptvarkytiRezultata,
-        )) {
-            yield row;
-        }
-
-        fetched += results.length;
-        page++;
-    }
 }
