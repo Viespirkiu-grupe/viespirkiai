@@ -2,6 +2,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { indexDocs } from "../../quickwit/quickwit.js";
 import { Logger } from "../../utils/log.js";
 import { pathToFileURL } from "node:url";
+import { DateTime } from "luxon";
 
 const logger = new Logger();
 
@@ -200,12 +201,13 @@ function toNumber(value) {
     return Number.isFinite(number) ? number : null;
 }
 
-function toRfc3339(value) {
+export function toRfc3339(value) {
     if (value == null) return null;
     if (typeof value === "string") {
         if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00:00Z`;
         if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value)) {
-            return `${value.replace(" ", "T")}Z`;
+            const dt = DateTime.fromSQL(value, { zone: "Europe/Vilnius" });
+            return dt.isValid ? dt.toUTC().toISO({ suppressMilliseconds: true }) : value;
         }
         return value;
     }
