@@ -67,7 +67,8 @@ export async function processViesiejiPirkimaiIndexQueue({ shard, shardCount } = 
         if (toDelete.length) {
             await client.query(
                 `DELETE FROM "quickwitEilutes"
-                 WHERE "lentele" = $1 AND "eilutesId" = ANY($2::bigint[])`,
+                 WHERE "lentelesId" = (SELECT id FROM "quickwitLenteles" WHERE "lentele" = $1)
+                   AND "eilutesId" = ANY($2::bigint[])`,
                 [LENTELE, toDelete.map(toEilutesId)],
             );
             logger.log(`deleted ${toDelete.length} viesiejiPirkimai from quickwit`);
@@ -115,7 +116,8 @@ export async function processViesiejiPirkimaiIndexQueue({ shard, shardCount } = 
             if (vanished.length) {
                 await client.query(
                     `DELETE FROM "quickwitEilutes"
-                     WHERE "lentele" = $1 AND "eilutesId" = ANY($2::bigint[])`,
+                     WHERE "lentelesId" = (SELECT id FROM "quickwitLenteles" WHERE "lentele" = $1)
+                       AND "eilutesId" = ANY($2::bigint[])`,
                     [LENTELE, vanished.map(toEilutesId)],
                 );
                 logger.log(`deleted ${vanished.length} vanished viesiejiPirkimai from quickwit`);

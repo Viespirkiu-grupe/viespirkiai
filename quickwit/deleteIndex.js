@@ -46,7 +46,7 @@ export async function deleteIndex(
          WHERE "lentele" = i."lentele"
        ) latest
        LEFT JOIN "quickwitEilutes" e
-         ON e."lentele" = i."lentele" AND e."indeksas" = i."indeksas"
+         ON e."indeksaiId" = i.id
        WHERE i."lentele" = $1 AND i."indeksas" = $2
        GROUP BY i."lentele", i."seq", latest."seq"`,
       [lentele, indeksas],

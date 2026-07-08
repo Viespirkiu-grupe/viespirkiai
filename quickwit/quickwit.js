@@ -2,7 +2,6 @@ import { postgres } from "../postgres/postgres.js";
 import config from "../utils/config.js";
 import { Logger } from "../utils/log.js";
 const logger = new Logger();
-import { uuidv7 } from "../utils/uuid.js";
 
 const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
 const QW_TIMEOUT_MS = config.quickwitTimeoutMs ?? 120_000;
@@ -14,6 +13,7 @@ const QW_TIMEOUT_MS = config.quickwitTimeoutMs ?? 120_000;
 // search. 60s is a pragmatic tradeoff: long enough to amortize well, short
 // enough that fresh ingest activity is reflected quickly.
 const _deadRatioCache = new Map(); // lentele → { value, expiresAt }
+const _tableIdCache = new Map(); // lentele -> id
 
 export async function getDeadRatio(lentele) {
   const cached = _deadRatioCache.get(lentele);
@@ -32,6 +32,23 @@ export async function getDeadRatio(lentele) {
   const value = total ? Number(mirusi) / total : 0;
   _deadRatioCache.set(lentele, { value, expiresAt: Date.now() + 60_000 });
   return value;
+}
+
+async function getQuickwitTableId(lentele, client = postgres) {
+  const cached = _tableIdCache.get(lentele);
+  if (cached != null) return cached;
+
+  const { rows } = await client.query(
+    `SELECT id
+     FROM "quickwitLenteles"
+     WHERE "lentele" = $1`,
+    [lentele]
+  );
+  if (!rows.length) throw new Error(`Unknown lentele: ${lentele}`);
+
+  const id = rows[0].id;
+  _tableIdCache.set(lentele, id);
+  return id;
 }
 
 // ── Quickwit HTTP helpers ────────────────────────────────────────────────────
@@ -116,14 +133,14 @@ async function ensureQuickwitIndex(indeksas, indexConfig) {
  *
  * @param {string} lentele
  * @param {import('pg').PoolClient} client
- * @returns {Promise<string>} indeksas
+ * @returns {Promise<{ id: number, indeksas: string }>}
  */
 async function getOrCreateActiveShard(lentele, client) {
   // iterptosEilutes is monotonic (every Quickwit ingest event bumps it), so
   // it's the right "has this shard been filled?" signal. gyvos + mirusios
   // would also work but requires reading the generated column.
   const { rows } = await client.query(
-    `SELECT "indeksas"
+    `SELECT id, "indeksas"
      FROM "quickwitIndeksai"
      WHERE "lentele" = $1
        AND "iterptosEilutes" < "shardSize"
@@ -133,7 +150,7 @@ async function getOrCreateActiveShard(lentele, client) {
     [lentele]
   );
 
-  if (rows.length) return rows[0].indeksas;
+  if (rows.length) return rows[0];
 
   // No current shard has room — create a fresh one.
   const { rows: cfg } = await client.query(
@@ -154,10 +171,11 @@ async function getOrCreateActiveShard(lentele, client) {
   const nextSeq = seqRows[0].nextSeq;
   const indeksas = `${lentele}_${nextSeq}`;
 
-  await client.query(
+  const { rows: inserted } = await client.query(
     `INSERT INTO "quickwitIndeksai"
        ("lentele", "seq", "shardSize", "indexConfig", "indexConfigHash", "current")
-     VALUES ($1, $2, $3, $4, $5, true)`,
+     VALUES ($1, $2, $3, $4, $5, true)
+     RETURNING id, "indeksas"`,
     [lentele, nextSeq, defaultShardSize, indexConfig, indexConfigHash]
   );
 
@@ -166,7 +184,29 @@ async function getOrCreateActiveShard(lentele, client) {
   // just try the index create again. Idempotent by design.
   await ensureQuickwitIndex(indeksas, indexConfig);
 
-  return indeksas;
+  if (inserted.length) return inserted[0];
+
+  const { rows: created } = await client.query(
+    `SELECT id, "indeksas"
+     FROM "quickwitIndeksai"
+     WHERE "lentele" = $1 AND "seq" = $2`,
+    [lentele, nextSeq]
+  );
+  return created[0];
+}
+
+async function allocateQuickwitIdInts(client, count) {
+  if (!count) return [];
+
+  const { rows } = await client.query(
+    `SELECT nextval('"quickwitIdIntSeq"'::regclass)::int AS id
+     FROM generate_series(1, $1)`,
+    [count]
+  );
+  if (rows.length !== count) {
+    throw new Error(`Expected ${count} quickwitIdInt values, got ${rows.length}`);
+  }
+  return rows.map((r) => r.id);
 }
 
 // ── Indexing ─────────────────────────────────────────────────────────────────
@@ -183,11 +223,11 @@ export async function indexDoc(lentele, eilutesId, doc, opts) {
  *
  * Per-row behaviour:
  *   - NEW eilutesId: INSERT into quickwitEilutes on the current shard.
- *   - EXISTING on a current shard: UPDATE quickwitEilutes (rotate quickwitId
- *     in place). The old quickwitId becomes a tombstone once the new doc
+ *   - EXISTING on a current shard: UPDATE quickwitEilutes (rotate quickwitIdInt
+ *     in place). The old quickwitId/quickwitIdInt becomes a tombstone once the new doc
  *     lands in Quickwit.
  *   - EXISTING on a non-current shard: migrate — UPDATE quickwitEilutes to
- *     point at the active current shard with a fresh quickwitId.
+ *     point at the active current shard with a fresh quickwitIdInt.
  *
  * Counter ownership split:
  *   - gyvosEilutes (live row count per shard) is maintained by statement-
@@ -223,23 +263,34 @@ export async function indexDocs(lentele, items, opts = {}) {
       `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`,
       [lentele]
     );
+    const lentelesId = await getQuickwitTableId(lentele, client);
     mark("beginAndLock", tTx);
 
     // ── Figure out which ids are new vs. existing ───────────────────────────
     const tExisting = Date.now();
     const { rows: existing } = await client.query(
-      `SELECT "eilutesId", "indeksas"
-       FROM "quickwitEilutes"
-       WHERE "lentele" = $1 AND "eilutesId" = ANY($2::bigint[])`,
-      [lentele, eilutesIds]
+      `SELECT e."eilutesId", e."indeksaiId", i."indeksas"
+       FROM "quickwitEilutes" e
+       JOIN "quickwitIndeksai" i ON i.id = e."indeksaiId"
+       WHERE e."lentelesId" = $1 AND e."eilutesId" = ANY($2::bigint[])`,
+      [lentelesId, eilutesIds]
     );
     mark("selectExisting", tExisting);
 
-    const existingMap = new Map(existing.map((r) => [r.eilutesId, r.indeksas]));
+    const existingMap = new Map(existing.map((r) => [r.eilutesId, {
+      indeksaiId: r.indeksaiId,
+      indeksas: r.indeksas,
+    }]));
     const toInsert = eilutesIds.filter((id) => !existingMap.has(id));
     const toUpdate = eilutesIds.filter((id) => existingMap.has(id));
 
-    // assigned: eilutesId → { quickwitId, oldIndeksas, indeksas, doc }
+    const idsToAssign = [...toUpdate, ...toInsert];
+    const quickwitIdInts = await allocateQuickwitIdInts(client, idsToAssign.length);
+    const quickwitIdIntByEilutesId = new Map(
+      idsToAssign.map((id, i) => [id, quickwitIdInts[i]])
+    );
+
+    // assigned: eilutesId -> { quickwitId, quickwitIdInt, oldIndeksas, indeksaiId, indeksas, doc }
     const assigned = new Map();
     let currentShard = null;
 
@@ -252,10 +303,13 @@ export async function indexDocs(lentele, items, opts = {}) {
     if (toUpdate.length) {
       currentShard ??= await getOrCreateActiveShard(lentele, client);
       for (const eilutesId of toUpdate) {
+        const quickwitIdInt = quickwitIdIntByEilutesId.get(eilutesId);
         assigned.set(eilutesId, {
-          quickwitId: uuidv7(),
-          oldIndeksas: existingMap.get(eilutesId),
-          indeksas: currentShard,
+          quickwitId: String(quickwitIdInt),
+          quickwitIdInt,
+          oldIndeksas: existingMap.get(eilutesId).indeksas,
+          indeksaiId: currentShard.id,
+          indeksas: currentShard.indeksas,
           doc: byEilutesId.get(eilutesId),
         });
       }
@@ -267,10 +321,13 @@ export async function indexDocs(lentele, items, opts = {}) {
     if (toInsert.length) {
       currentShard ??= await getOrCreateActiveShard(lentele, client);
       for (const eilutesId of toInsert) {
+        const quickwitIdInt = quickwitIdIntByEilutesId.get(eilutesId);
         assigned.set(eilutesId, {
-          quickwitId: uuidv7(),
+          quickwitId: String(quickwitIdInt),
+          quickwitIdInt,
           oldIndeksas: null,
-          indeksas: currentShard,
+          indeksaiId: currentShard.id,
+          indeksas: currentShard.indeksas,
           doc: byEilutesId.get(eilutesId),
         });
       }
@@ -298,7 +355,7 @@ export async function indexDocs(lentele, items, opts = {}) {
     // ── Batch UPDATE quickwitEilutes for existing rows ──────────────────────
     // Split into stayed (same shard, rotate quickwitId) and moved (migration
     // across shards). Two statements so the stayed path only rewrites the
-    // quickwitId column. The trigger on quickwitEilutes handles gyvos.
+    // id columns. The trigger on quickwitEilutes handles gyvos.
     let stayedCount = 0;
     let movedCount = 0;
     const tUpdate = Date.now();
@@ -317,16 +374,17 @@ export async function indexDocs(lentele, items, opts = {}) {
       if (stayed.length) {
         const tStayed = Date.now();
         const vals = stayed
-          .map((_, i) => `($${i * 2 + 1}::bigint, $${i * 2 + 2}::uuid)`)
+          .map((_, i) => `($${i * 2 + 1}::bigint, $${i * 2 + 2}::int)`)
           .join(", ");
-        const params = stayed.flatMap((id) => [id, assigned.get(id).quickwitId]);
+        const params = stayed.flatMap((id) => [id, assigned.get(id).quickwitIdInt]);
         await client.query(
           `UPDATE "quickwitEilutes" AS qe
-           SET "quickwitId" = v."quickwitId"
-           FROM (VALUES ${vals}) AS v("eilutesId", "quickwitId")
-           WHERE qe."lentele" = $${params.length + 1}
+           SET "quickwitId" = NULL,
+               "quickwitIdInt" = v."quickwitIdInt"
+           FROM (VALUES ${vals}) AS v("eilutesId", "quickwitIdInt")
+           WHERE qe."lentelesId" = $${params.length + 1}
              AND qe."eilutesId" = v."eilutesId"`,
-          [...params, lentele]
+          [...params, lentelesId]
         );
         mark("updateStayed", tStayed);
       }
@@ -334,20 +392,21 @@ export async function indexDocs(lentele, items, opts = {}) {
       if (moved.length) {
         const tMoved = Date.now();
         const vals = moved
-          .map((_, i) => `($${i * 3 + 1}::bigint, $${i * 3 + 2}::uuid, $${i * 3 + 3}::text)`)
+          .map((_, i) => `($${i * 3 + 1}::bigint, $${i * 3 + 2}::int, $${i * 3 + 3}::int)`)
           .join(", ");
         const params = moved.flatMap((id) => {
-          const { quickwitId, indeksas } = assigned.get(id);
-          return [id, quickwitId, indeksas];
+          const { quickwitIdInt, indeksaiId } = assigned.get(id);
+          return [id, quickwitIdInt, indeksaiId];
         });
         await client.query(
           `UPDATE "quickwitEilutes" AS qe
-           SET "quickwitId" = v."quickwitId",
-               "indeksas"   = v."indeksas"
-           FROM (VALUES ${vals}) AS v("eilutesId", "quickwitId", "indeksas")
-           WHERE qe."lentele" = $${params.length + 1}
+           SET "quickwitId" = NULL,
+               "quickwitIdInt" = v."quickwitIdInt",
+               "indeksaiId" = v."indeksaiId"
+           FROM (VALUES ${vals}) AS v("eilutesId", "quickwitIdInt", "indeksaiId")
+           WHERE qe."lentelesId" = $${params.length + 1}
              AND qe."eilutesId" = v."eilutesId"`,
-          [...params, lentele]
+          [...params, lentelesId]
         );
         mark("updateMoved", tMoved);
       }
@@ -357,17 +416,17 @@ export async function indexDocs(lentele, items, opts = {}) {
     // ── Batch INSERT quickwitEilutes for new rows ───────────────────────────
     const tInsert = Date.now();
     if (toInsert.length) {
-      const indeksas = currentShard;
+      const indeksaiId = currentShard.id;
       const vals = toInsert
-        .map((_, i) => `($${i * 2 + 1}::bigint, $${i * 2 + 2}::uuid)`)
+        .map((_, i) => `($${i * 2 + 1}::bigint, $${i * 2 + 2}::int)`)
         .join(", ");
-      const params = toInsert.flatMap((id) => [id, assigned.get(id).quickwitId]);
+      const params = toInsert.flatMap((id) => [id, assigned.get(id).quickwitIdInt]);
 
       await client.query(
-        `INSERT INTO "quickwitEilutes"("lentele", "eilutesId", "indeksas", "quickwitId")
-         SELECT $${params.length + 1}, v."eilutesId", $${params.length + 2}, v."quickwitId"
-         FROM (VALUES ${vals}) AS v("eilutesId", "quickwitId")`,
-        [...params, lentele, indeksas]
+        `INSERT INTO "quickwitEilutes"("lentelesId", "eilutesId", "indeksaiId", "quickwitIdInt")
+         SELECT $${params.length + 1}, v."eilutesId", $${params.length + 2}, v."quickwitIdInt"
+         FROM (VALUES ${vals}) AS v("eilutesId", "quickwitIdInt")`,
+        [...params, lentelesId, indeksaiId]
       );
     }
     mark("insert", tInsert);
@@ -418,26 +477,48 @@ export async function indexDocs(lentele, items, opts = {}) {
 // ── Staleness filter ─────────────────────────────────────────────────────────
 
 /**
- * Given Quickwit search hits, return only those whose quickwitId is still
- * live in Postgres. Scoped by lentele so it plays well with a (lentele,
- * quickwitId) index and to sidestep the vanishingly-unlikely UUID collision
- * across tables.
+ * Given Quickwit search hits, return only those whose quickwitId is still live
+ * in Postgres. During the gradual migration, Quickwit stores both legacy UUIDs
+ * and new integer ids as strings in the same quickwitId document field.
  *
  * @param {string} lentele
  * @param {{ quickwitId: string, [key: string]: any }[]} hits
  */
 export async function filterLive(lentele, hits) {
   if (!hits.length) return [];
+  const lentelesId = await getQuickwitTableId(lentele);
 
-  const ids = hits.map((h) => h.quickwitId);
-  const { rows } = await postgres.query(
-    `SELECT "quickwitId"
-     FROM "quickwitEilutes"
-     WHERE "lentele" = $1 AND "quickwitId" = ANY($2)`,
-    [lentele, ids]
-  );
-  const live = new Set(rows.map((r) => r.quickwitId));
-  return hits.filter((h) => live.has(h.quickwitId));
+  const quickwitIdInts = [];
+  const quickwitIds = [];
+  for (const hit of hits) {
+    const id = String(hit.quickwitId);
+    if (/^\d+$/.test(id)) quickwitIdInts.push(id);
+    else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      quickwitIds.push(id);
+    }
+  }
+
+  const live = new Set();
+  if (quickwitIdInts.length) {
+    const { rows } = await postgres.query(
+      `SELECT "quickwitIdInt"
+       FROM "quickwitEilutes"
+       WHERE "lentelesId" = $1 AND "quickwitIdInt" = ANY($2::int[])`,
+      [lentelesId, quickwitIdInts]
+    );
+    for (const row of rows) live.add(String(row.quickwitIdInt));
+  }
+  if (quickwitIds.length) {
+    const { rows } = await postgres.query(
+      `SELECT "quickwitId"
+       FROM "quickwitEilutes"
+       WHERE "lentelesId" = $1 AND "quickwitId" = ANY($2::uuid[])`,
+      [lentelesId, quickwitIds]
+    );
+    for (const row of rows) live.add(String(row.quickwitId));
+  }
+
+  return hits.filter((h) => live.has(String(h.quickwitId)));
 }
 
 // ── Search ───────────────────────────────────────────────────────────────────
@@ -588,6 +669,7 @@ export async function shardStats(lentele) {
  * to be touched directly.
  */
 export async function reconcileCounters(lentele) {
+  const lentelesId = await getQuickwitTableId(lentele);
   await postgres.query("BEGIN");
   try {
     // Recompute gyvos from quickwitEilutes. Shards with no rows get 0.
@@ -595,13 +677,13 @@ export async function reconcileCounters(lentele) {
       `UPDATE "quickwitIndeksai" i
        SET "gyvosEilutes" = COALESCE(a.cnt, 0)
        FROM (
-         SELECT "indeksas", COUNT(*)::int AS cnt
+         SELECT "indeksaiId", COUNT(*)::int AS cnt
          FROM "quickwitEilutes"
-         WHERE "lentele" = $1
-         GROUP BY "indeksas"
+         WHERE "lentelesId" = $2
+         GROUP BY "indeksaiId"
        ) a
-       WHERE i."lentele" = $1 AND i."indeksas" = a."indeksas"`,
-      [lentele]
+       WHERE i."lentele" = $1 AND i.id = a."indeksaiId"`,
+      [lentele, lentelesId]
     );
     await postgres.query(
       `UPDATE "quickwitIndeksai" i
@@ -609,9 +691,9 @@ export async function reconcileCounters(lentele) {
        WHERE i."lentele" = $1
          AND NOT EXISTS (
            SELECT 1 FROM "quickwitEilutes" e
-           WHERE e."lentele" = $1 AND e."indeksas" = i."indeksas"
+           WHERE e."lentelesId" = $2 AND e."indeksaiId" = i.id
          )`,
-      [lentele]
+      [lentele, lentelesId]
     );
     // Keep the generated mirusios >= 0.
     await postgres.query(

@@ -89,7 +89,7 @@ export function parseArgs(argv) {
 
 async function getIndexes({ lentele, minDead, minDeadRatio }) {
   const { rows } = await postgres.query(
-    `SELECT i."indeksas", i."seq", i."current",
+    `SELECT i.id, i."indeksas", i."seq", i."current",
             i."gyvosEilutes", i."mirusiosEilutes", i."iterptosEilutes",
             CASE WHEN i."iterptosEilutes" = 0 THEN 0
                  ELSE 100.0 * i."mirusiosEilutes" / i."iterptosEilutes" END AS "deadRatio"
@@ -101,7 +101,7 @@ async function getIndexes({ lentele, minDead, minDeadRatio }) {
     [lentele, minDead, minDeadRatio],
   );
   return rows.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) =>
-    ["deadRatio", "gyvosEilutes", "iterptosEilutes", "mirusiosEilutes", "seq"].includes(key)
+    ["deadRatio", "gyvosEilutes", "id", "iterptosEilutes", "mirusiosEilutes", "seq"].includes(key)
       ? [key, Number(value)] : [key, value])));
 }
 
@@ -173,6 +173,7 @@ async function chooseInteractively(indexes) {
 async function requeueIndexes(indexes, { dryRun, lentele }) {
   const table = TABLES[lentele];
   const names = indexes.map((index) => index.indeksas);
+  const indexIds = indexes.map((index) => index.id);
   const client = await postgres.connect();
   try {
     await client.query("BEGIN");
@@ -181,8 +182,8 @@ async function requeueIndexes(indexes, { dryRun, lentele }) {
     const { rows: countRows } = await client.query(
       `SELECT COUNT(*)::int AS total
        FROM "quickwitEilutes"
-       WHERE "lentele" = $1 AND "indeksas" = ANY($2::text[])`,
-      [lentele, names],
+       WHERE "indeksaiId" = ANY($1::int[])`,
+      [indexIds],
     );
     if (dryRun) {
       await client.query("ROLLBACK");
@@ -193,9 +194,9 @@ async function requeueIndexes(indexes, { dryRun, lentele }) {
     await client.query(`UPDATE "quickwitIndeksai" SET "current" = false WHERE "lentele" = $1 AND "indeksas" = ANY($2::text[])`, [lentele, names]);
     const { rowCount: replacedQueueRows } = await client.query(
       `DELETE FROM "${table.queue}" q USING "quickwitEilutes" e
-       WHERE e."lentele" = $1 AND e."indeksas" = ANY($2::text[])
+       WHERE e."indeksaiId" = ANY($1::int[])
          AND q."${table.queueId}" = ${table.queueValue ?? `e."eilutesId"::bigint`}`,
-      [lentele, names],
+      [indexIds],
     );
 
     const { rowCount: queuedPatches } = await client.query(
@@ -203,16 +204,16 @@ async function requeueIndexes(indexes, { dryRun, lentele }) {
        SELECT ${table.queueValue ?? `e."eilutesId"::bigint`}, 'patch'
        FROM "quickwitEilutes" e
        JOIN "${table.source}" s ON s."${table.sourceId}" = ${table.sourceValue ?? `e."eilutesId"::bigint`}
-       WHERE e."lentele" = $1 AND e."indeksas" = ANY($2::text[])`,
-      [lentele, names],
+       WHERE e."indeksaiId" = ANY($1::int[])`,
+      [indexIds],
     );
     const { rowCount: queuedDeletes } = await client.query(
       `INSERT INTO "${table.queue}" ("${table.queueId}", "keitimas")
        SELECT ${table.queueValue ?? `e."eilutesId"::bigint`}, 'delete'
        FROM "quickwitEilutes" e
        LEFT JOIN "${table.source}" s ON s."${table.sourceId}" = ${table.sourceValue ?? `e."eilutesId"::bigint`}
-       WHERE e."lentele" = $1 AND e."indeksas" = ANY($2::text[]) AND s."${table.sourceId}" IS NULL`,
-      [lentele, names],
+       WHERE e."indeksaiId" = ANY($1::int[]) AND s."${table.sourceId}" IS NULL`,
+      [indexIds],
     );
     await client.query("COMMIT");
     return {
