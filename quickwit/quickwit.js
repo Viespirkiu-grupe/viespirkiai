@@ -277,6 +277,24 @@ export async function indexDocs(lentele, items, opts = {}) {
     }
     mark("assignInserts", tAssignInserts);
 
+    // ── Ingest into Quickwit, grouped by shard ──────────────────────────────
+    // Do this before publishing the new quickwitEilutes mappings. If Quickwit
+    // rejects the batch, ROLLBACK keeps existing rows pointed at the previous
+    // accepted docs and new rows stay invisible to search.
+    const tIngest = Date.now();
+    const shardDocs = new Map();
+    for (const { quickwitId, indeksas, doc } of assigned.values()) {
+      if (!shardDocs.has(indeksas)) shardDocs.set(indeksas, []);
+      shardDocs.get(indeksas).push({ ...doc, quickwitId });
+    }
+
+    await Promise.all(
+      [...shardDocs.entries()].map(([indeksas, docs]) =>
+        qwIngestNdjson(indeksas, docs, opts.commit)
+      )
+    );
+    mark("ingest", tIngest);
+
     // ── Batch UPDATE quickwitEilutes for existing rows ──────────────────────
     // Split into stayed (same shard, rotate quickwitId) and moved (migration
     // across shards). Two statements so the stayed path only rewrites the
@@ -354,33 +372,10 @@ export async function indexDocs(lentele, items, opts = {}) {
     }
     mark("insert", tInsert);
 
-    const tCommit = Date.now();
-    await client.query("COMMIT");
-    mark("commit", tCommit);
-
-    // ── Ingest into Quickwit, grouped by shard ──────────────────────────────
-    // Postgres is committed at this point. Any ingest failure here leaves
-    // rows "live" in Postgres but missing from Quickwit — search won't find
-    // them, filterLive still thinks they exist. If that becomes a real
-    // problem, wire up retries or a deadletter queue here.
-    const tIngest = Date.now();
-    const shardDocs = new Map();
-    for (const { quickwitId, indeksas, doc } of assigned.values()) {
-      if (!shardDocs.has(indeksas)) shardDocs.set(indeksas, []);
-      shardDocs.get(indeksas).push({ ...doc, quickwitId });
-    }
-
-    await Promise.all(
-      [...shardDocs.entries()].map(([indeksas, docs]) =>
-        qwIngestNdjson(indeksas, docs, opts.commit)
-      )
-    );
-    mark("ingest", tIngest);
-
     // ── Bump iterptosEilutes per shard ──────────────────────────────────────
     // One row per affected shard, so this is cheap regardless of batch size.
-    // Done AFTER ingest so a failed ingest doesn't falsely advance iterptos
-    // (which drives shard-fullness decisions in getOrCreateActiveShard).
+    // Done in the same transaction as quickwitEilutes publication, after
+    // successful ingest, so DB-visible mappings and counters move together.
     const tIterptos = Date.now();
     const shardCounts = [...shardDocs.entries()];
     if (shardCounts.length) {
@@ -388,7 +383,7 @@ export async function indexDocs(lentele, items, opts = {}) {
         .map((_, i) => `($${i * 2 + 1}::text, $${i * 2 + 2}::int)`)
         .join(", ");
       const params = shardCounts.flatMap(([indeksas, docs]) => [indeksas, docs.length]);
-      await postgres.query(
+      await client.query(
         `UPDATE "quickwitIndeksai" i
          SET "iterptosEilutes" = i."iterptosEilutes" + v.cnt
          FROM (VALUES ${vals}) AS v("indeksas", "cnt")
@@ -397,6 +392,10 @@ export async function indexDocs(lentele, items, opts = {}) {
       );
     }
     mark("iterptos", tIterptos);
+
+    const tCommit = Date.now();
+    await client.query("COMMIT");
+    mark("commit", tCommit);
 
     const total = Date.now() - t0;
     const phases = Object.entries(timings)
