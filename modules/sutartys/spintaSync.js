@@ -158,6 +158,10 @@ async function getRemoteState(spinta, externalId) {
     return { parent, children };
 }
 
+async function findRemoteSutartisId(spinta, externalId) {
+    return rows(await spinta.getAll("Sutartis", { id: Number(externalId) }))[0]?._id ?? null;
+}
+
 async function removeRemoteSutartis(spinta, state, dryRun) {
     if (!state.parent) return { insert: 0, patch: 0, delete: 0, unchanged: 1 };
     let deleted = 0;
@@ -187,7 +191,7 @@ export async function syncSutartisToSpinta({
     if (!state.parent) {
         const op = { _op: "insert", ...desired.parent };
         const result = await checkedBatch(spinta, "Sutartis", [op], dryRun);
-        parentId = dryRun ? `dry-${id}` : rows(result)[0]?._id;
+        parentId = dryRun ? `dry-${id}` : rows(result)[0]?._id ?? await findRemoteSutartisId(spinta, id);
         if (!parentId) throw new Error(`Sutartis ${id}: Spinta negrąžino parent _id`);
         stats.insert++;
     } else {

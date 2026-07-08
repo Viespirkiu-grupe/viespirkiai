@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPatch, diffChildren } from "@/modules/sutartys/spintaSync.js";
+import { buildPatch, diffChildren, syncSutartisToSpinta } from "@/modules/sutartys/spintaSync.js";
 
 describe("sutarčių Spintos diff", () => {
     it("nekuria patch, kai reikšmės sutampa", () => {
@@ -66,5 +66,35 @@ describe("sutarčių Spintos diff", () => {
         expect(diff.deletes).toEqual([{ _op: "delete", _id: "b" }]);
         expect(diff.patches).toEqual([]);
         expect(diff.inserts).toEqual([]);
+    });
+
+    it("po parent insert randa _id pagal sutarties id, jei batch atsakyme jo nėra", async () => {
+        const calls: Array<{ model: string; params: unknown }> = [];
+        const spinta = {
+            async getAll(model: string, params: unknown) {
+                calls.push({ model, params });
+                if (model === "Sutartis" && calls.filter((call) => call.model === "Sutartis").length === 2) {
+                    return { _data: [{ _id: "parent-1", id: 1676067013 }] };
+                }
+                return { _data: [] };
+            },
+            async batch(model: string, ops: unknown[]) {
+                expect(model).toBe("Sutartis");
+                expect(ops).toHaveLength(1);
+                return { _data: [{}] };
+            },
+        };
+
+        const stats = await syncSutartisToSpinta({
+            id: 1676067013,
+            row: { sutartiesUnikalusId: 1676067013 },
+            spinta,
+        });
+
+        expect(stats.insert).toBe(1);
+        expect(calls).toEqual([
+            { model: "Sutartis", params: { id: 1676067013 } },
+            { model: "Sutartis", params: { id: 1676067013 } },
+        ]);
     });
 });
