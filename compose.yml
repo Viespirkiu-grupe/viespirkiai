@@ -2,16 +2,20 @@ services:
     typesense:
         image: typesense/typesense:28.0
         container_name: viespirkiai_typesense
-        command: "--data-dir /data --api-key=${TYPESENSE_API_KEY} --enable-cors"
-        ports:
-            - "9021:8108" # Not directly reachable from outside
+        command: "--data-dir /data --api-key=${TYPESENSE_API_KEY} --enable-cors --peering-address=${TYPESENSE_PEERING_ADDRESS} --nodes=/nodes"
+        network_mode: host
+#        ports:
+#            - "9021:8108" # Not directly reachable from outside
+#            - "8107:8107"   # Peering — must be reachable by the other nodes
+#            - "8108:8108"   # API for peers over WireGuard
         volumes:
             - ./typesense/data:/data
+            - ./typesense/nodes:/nodes:ro
         restart: unless-stopped
         deploy:
             resources:
                 limits:
-                    memory: 7048M
+                    memory: 1024M
 
     postgres:
         build:
