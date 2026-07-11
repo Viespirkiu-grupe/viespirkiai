@@ -38,6 +38,8 @@ export interface FacetOption {
   count: number | null;
   /** Žmogui skirtas pavadinimas (pvz. istaigaJar kodui — įstaigos pavadinimas). */
   label?: string;
+  /** Nepilnas BVPŽ kodas (prefiksinė paieška) — atvaizduojamas su „*" ženklu. */
+  isPrefix?: boolean;
 }
 
 export const DOKUMENTAI_SORT_OPTIONS = [

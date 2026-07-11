@@ -181,17 +181,20 @@ const {
       row.className = 'dok-facet-row' + (o.label ? ' dok-facet-row--stack' : '') + (on ? ' is-selected' : '');
       row.setAttribute('role', 'option');
       row.setAttribute('aria-selected', String(on));
-      if (o.label) row.title = `${o.label} (${o.value})`;
+      // Nepilnas kodas (mažiau nei 8 skaitm.) — prefiksinė paieška, rodom su „*".
+      const isPrefix = o.value.replace(/\D/g, '').length < 8;
+      const display = isPrefix ? `${o.value}*` : o.value;
+      if (o.label) row.title = `${o.label} (${display})`;
       const text = document.createElement('span');
       text.className = 'dok-facet-row__text';
       const label = document.createElement('span');
       label.className = 'dok-facet-row__label';
-      label.textContent = o.label || o.value;
+      label.textContent = o.label || display;
       text.appendChild(label);
       if (o.label) {
         const sub = document.createElement('span');
         sub.className = 'dok-facet-row__sub';
-        sub.textContent = o.value;
+        sub.textContent = display;
         text.appendChild(sub);
       }
       row.appendChild(text);

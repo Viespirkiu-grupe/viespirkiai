@@ -56,6 +56,11 @@ const optClass = (opt: FacetOption) =>
   `dok-filter-opt${stacked && opt.label ? ' dok-filter-opt--stack' : ''}${
     filter.includes(opt.value) ? ' is-selected' : ''
   }`;
+
+// Nepilnas BVPŽ kodas (prefiksas) rodomas su „*" ženklu — reikšmė URL'e lieka
+// nepakitusi (be „*"), keičiasi tik atvaizdavimas.
+const dispLabel = (opt: FacetOption) => `${formatLabel(opt.value)}${opt.isPrefix ? '*' : ''}`;
+const dispSub = (opt: FacetOption) => `${opt.value}${opt.isPrefix ? '*' : ''}`;
 ---
 
 <section class="dok-filter-section">
@@ -79,11 +84,11 @@ const optClass = (opt: FacetOption) =>
     >
       {stacked ? (
         <span class="dok-filter-opt-text">
-          <span class="dok-filter-opt-label">{opt.label || formatLabel(opt.value)}</span>
-          {opt.label && <span class="dok-filter-opt-sub">{opt.value}</span>}
+          <span class="dok-filter-opt-label">{opt.label || dispLabel(opt)}</span>
+          {opt.label && <span class="dok-filter-opt-sub">{dispSub(opt)}</span>}
         </span>
       ) : (
-        <span class="dok-filter-opt-label">{formatLabel(opt.value)}</span>
+        <span class="dok-filter-opt-label">{dispLabel(opt)}</span>
       )}
       {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
     </a>
@@ -94,7 +99,7 @@ const optClass = (opt: FacetOption) =>
       <div class="dok-more-list" hidden>
         {hidden.map((opt) => (
           <a href={toggleUrl(opt.value)} data-param={param} data-value={opt.value} class={optClass(opt)}>
-            <span class="dok-filter-opt-label">{formatLabel(opt.value)}</span>
+            <span class="dok-filter-opt-label">{dispLabel(opt)}</span>
             {opt.count != null && <span class="dok-filter-opt-count">{fmt(opt.count)}</span>}
           </a>
         ))}

@@ -595,6 +595,39 @@ async function attachBvpzNames(options) {
     return codes.map((code) => ({ value: code, label: names.get(code), count: byCode.get(code) }));
 }
 
+/** Pažymėtus BVPŽ prefiksus išrenka iš užklausos (matomas + paslėptas laukas). */
+function selectedBvpzPrefixes(query) {
+    return [...new Set(
+        [query.bvpzPrefiksas, query.bvpzPrefiksasKitas]
+            .filter(Boolean)
+            .flatMap((raw) => String(raw).split(" "))
+            .map((p) => p.trim())
+            .filter(Boolean),
+    )];
+}
+
+/** Pažymėtiems BVPŽ prefiksams priskiria prefiksinės atitikties sutarčių skaičių
+ *  pagal kitus filtrus (facet-exclude), kad šoninėje juostoje ir dialoge nepilni
+ *  kodai rodytųsi su „*" ženklu ir sutarčių skaičiumi. Pavadinimo nerodom — vien
+ *  kodas su „*", kad aiškiai skirtųsi nuo konkretaus (pilno) kodo. */
+async function attachSelectedBvpz(prefixes, query) {
+    const uniq = [...new Set(prefixes)].filter(Boolean);
+    if (!uniq.length) return [];
+    const base = buildSutartysQuickwitQuery(query, { exclude: ["bvpz"] });
+    const counts = await Promise.all(
+        uniq.map((p) =>
+            quickwitCountDocs(QUICKWIT_LENTELE, {
+                query: base === "*" ? `bvpzKodai:${p}*` : `(${base}) AND bvpzKodai:${p}*`,
+            }).catch(() => null),
+        ),
+    );
+    return uniq.map((value, i) => ({
+        value,
+        count: counts[i],
+        isPrefix: value.replace(/\D/g, "").length < 8,
+    }));
+}
+
 /**
  * Suskaičiuoja visus sutarčių šoninės juostos facetus vienai užklausai.
  * Kiekvienas facetas naudoja facet-exclude, kad rodytų reikšmes pagal kitus
@@ -617,11 +650,17 @@ export async function sutartysFacets(query) {
         sutartysDataHistogram(query),
     ]);
 
-    const [buyersNamed, suppliersNamed, bvpzNamed] = await Promise.all([
+    const [buyersNamed, suppliersNamed, bvpzNamed, bvpzSelected] = await Promise.all([
         attachJarNames(buyers),
         attachJarNames(suppliers),
         attachBvpzNames(bvpz),
+        attachSelectedBvpz(selectedBvpzPrefixes(query), query),
     ]);
+
+    // Pasirinktus BVPŽ prefiksus (nepilnus kodus), kurių nėra tarp dažniausių,
+    // pridedam priekyje su pavadinimu + prefiksinės atitikties skaičiumi.
+    const bvpzPresent = new Set(bvpzNamed.map((o) => o.value));
+    const bvpzFinal = [...bvpzSelected.filter((o) => !bvpzPresent.has(o.value)), ...bvpzNamed];
 
     // Pasirinktus (įsk. „custom" įvestus) kodus, kurių nėra tarp dažniausių,
     // pridedam priekyje su JAR pavadinimu — kad šoninėje juostoje matytųsi ne
@@ -644,7 +683,7 @@ export async function sutartysFacets(query) {
         kategorija: kategorija.filter((o) => o.value),
         buyers: buyersFinal,
         suppliers: suppliersFinal,
-        bvpz: bvpzNamed,
+        bvpz: bvpzFinal,
         suma,
         laikotarpis,
     };
@@ -679,7 +718,16 @@ export async function sutartysFacetOptions(field, query, size = 1000, optionSear
     // paieška — pagal kodo prefiksą ar pavadinimą (registro/žinyno papildymas).
     if (field === "bvpzKodai") {
         const options = await attachBvpzNames(buckets);
-        if (!optionSearch) return options;
+        if (!optionSearch) {
+            // Pažymėtus prefiksus (nepilnus kodus) rodom priekyje su „*" ženklu
+            // ir prefiksinės atitikties skaičiumi — kaip šoninėje juostoje.
+            const present = new Set(options.map((o) => o.value));
+            const selected = await attachSelectedBvpz(
+                selectedBvpzPrefixes(query).filter((v) => !present.has(v)),
+                query,
+            );
+            return [...selected, ...options];
+        }
         const needle = optionSearch.toLowerCase();
         const inline = options.filter(
             (o) => o.value.includes(optionSearch) || (o.label?.toLowerCase().includes(needle) ?? false),
