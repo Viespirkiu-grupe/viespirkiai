@@ -60,10 +60,18 @@ const otherCount = p.author.filter.length + p.creator.filter.length + p.producer
   .dok-sidebar {
     grid-area: sidebar;
     /* Top padding sits inside the column so the divider still starts at the
-       very top while "Filtrai" keeps its breath below the navbar. */
+       very top while "Filtrai" keeps its breath below the navbar. Skiriamąją
+       liniją piešia main.sidebar-main::before (forms.css) — per visą puslapio
+       aukštį iki footerio, ne tik iki šio stulpelio apačios. */
     padding: 24px 20px 24px 0;
-    border-right: var(--border);
   }
+  /* Pirmoji facetų sekcija be viršutinio tarpo — DokFacetSection prideda
+     padding-top:20px kiekvienai sekcijai, bet viršuje (po galvute) jis
+     paliktų tuščią plyšį, kurio kituose puslapiuose nėra. */
+  .dok-filters-body > .dok-filter-section:first-child {
+    padding-top: 0;
+  }
+
   .dok-sidebar-head {
     display: flex;
     align-items: baseline;
@@ -200,4 +208,6 @@ const otherCount = p.author.filter.length + p.creator.filter.length + p.producer
 
 <script>
   import '../../scripts/dokumentaiFilters.ts';
+  import { initStickyRail } from '../../lib/stickyRail';
+  initStickyRail('.dok-sidebar');
 </script>

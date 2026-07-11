@@ -10,6 +10,8 @@ import SutartysSumaFilter from '../components/content/SutartysSumaFilter.astro';
 import SutartysLaikotarpisFilter from '../components/content/SutartysLaikotarpisFilter.astro';
 import { splitFacetOptions } from '../lib/dokumentaiUrl.ts';
 import SearchResults from '../components/content/SearchResults.astro';
+import Reklama from '../components/reklamos/Reklama.astro';
+import { pickReklama } from '@/modules/reklamos/pickReklama.js';
 import { searchSutartys, countSutartys, countSutartysQuickwit, getSutartysQueryMetadata } from '@/modules/sutartys/searchSutartys.js';
 import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
 import config from '../lib/config.ts';
@@ -47,6 +49,12 @@ type SortOption = {
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
+
+// Reklama paieškos apačioje. Jei vartotojas paspaudė „Neberodyti niekada",
+// cookie `reklamosPaslepta=1` ir SSR jos visai nekuria.
+const reklama = Astro.cookies.get('reklamosPaslepta')?.value === '1'
+  ? null
+  : await pickReklama('sutartys');
 
 const cleaned = cleanQuery(Astro.url);
 if (cleaned.redirectTo) return Astro.redirect(cleaned.redirectTo);
@@ -484,6 +492,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
           sortOptions={sortOptions}
           sortValue={sortValue}
         />
+        {reklama && <Reklama reklama={reklama} />}
       </div>
     </form>
     <SearchSuggest saltinis="sutartysPavadinimai" />
@@ -535,5 +544,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
   // Telefone (≤900px) šoninės juostos facetai kaupiami formoje, o pritaikomi per
   // „Ieškoti" (žr. mobileFilterBatch). Darbastalyje nuorodos veikia įprastai.
   import { initRailFacetBatch } from '@/src/lib/mobileFilterBatch';
+  import { initStickyRail } from '@/src/lib/stickyRail';
   initRailFacetBatch('.sut-facets', (p) => (p === 'bvpzPrefiksasKitas' ? ' ' : ','));
+  initStickyRail();
 </script>

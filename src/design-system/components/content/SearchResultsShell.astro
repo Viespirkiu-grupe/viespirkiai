@@ -49,13 +49,31 @@ const hasSort = Astro.slots.has('sort');
             ? <FlatResultList><slot /></FlatResultList>
             : <ResultList><slot /></ResultList>
           }
-          <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
+          <div class="search-pagination">
+            <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
+          </div>
         </>
     }
   </div>
 </div>
 
 <style>
+  /* Puslapiavimas centruotas su papildomu tarpu virš jo. */
+  .search-pagination {
+    margin-top: 32px;
+  }
+  .search-pagination :global(ul.pagination) {
+    justify-content: center;
+    gap: 8px;
+  }
+  /* Didesnis tarpas atskiriant rodykles (←, →) nuo skaičių grupės. */
+  .search-pagination :global(ul.pagination li:first-child) {
+    margin-right: 12px;
+  }
+  .search-pagination :global(ul.pagination li:last-child) {
+    margin-left: 12px;
+  }
+
   .search-results-toolbar {
     display: flex;
     align-items: center;

@@ -14,6 +14,8 @@ import PirkimasVerteFilter from '../../components/viesiejiPirkimai/PirkimasVerte
 import PirkimasLaikotarpisFilter from '../../components/viesiejiPirkimai/PirkimasLaikotarpisFilter.astro';
 import { splitFacetOptions } from '../../lib/dokumentaiUrl.ts';
 import { searchViesiejiPirkimai, countViesiejiPirkimai } from '@/modules/viesiejiPirkimai/searchViesiejiPirkimai.js';
+import Reklama from '../../components/reklamos/Reklama.astro';
+import { pickReklama } from '@/modules/reklamos/pickReklama.js';
 import { STATUSAS, PIRKIMO_BUDAS } from '@/modules/viesiejiPirkimai/viesiejiPirkimaiEnums.js';
 import { linksniuotiK } from '@/utils/linksniai.js';
 import config from '../../lib/config.ts';
@@ -37,9 +39,9 @@ if (query.sort?.includes(':')) {
   if (dir) query.sortDir = dir;
 }
 
-// Quickwit variklis naudojamas visada, kai pakelta (kaip anksčiau). Facetai
-// grąžinami tik tada, kai Quickwit šaka aktyvi.
-const engine = 'quickwit';
+// Quickwit naudojamas visada, kai pakeltas — kitaip krentam į Postgres (be
+// facetų, lėtesnė tekstinė paieška), kaip ir sutarčių paieškoje.
+const engine = config.quickwitUp ? 'quickwit' : 'postgres';
 const withFacets = !!config.quickwitUp;
 
 function parseLimit(q: Record<string, string>) {
@@ -227,6 +229,11 @@ const sortValue = values.sort
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
+// Reklama paieškos apačioje; „Neberodyti niekada" cookie ją paslepia (SSR).
+const reklama = Astro.cookies.get('reklamosPaslepta')?.value === '1'
+  ? null
+  : await pickReklama('viesiejiPirkimai');
+
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
 
@@ -335,6 +342,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 
           {results.map((item: any) => <ViesiejiPirkimaiCard item={item} />)}
         </ResultPageShell>
+        {reklama && <Reklama reklama={reklama} />}
       </div>
     </form>
     {facets && <ViesiejiPirkimaiFacetModal />}
@@ -411,5 +419,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
   // Telefone (≤900px) šoninės juostos facetai kaupiami formoje, o pritaikomi per
   // „Ieškoti" (žr. mobileFilterBatch). Darbastalyje nuorodos veikia įprastai.
   import { initRailFacetBatch } from '@/src/lib/mobileFilterBatch';
+  import { initStickyRail } from '@/src/lib/stickyRail';
   initRailFacetBatch('.vp-facets', (p) => (p === 'bvpzPrefiksai' ? ' ' : ','));
+  initStickyRail();
 </script>

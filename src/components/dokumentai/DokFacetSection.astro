@@ -43,8 +43,13 @@ const {
 
 const { filter, visible, hidden = [], toggleUrl } = facet;
 
-const showAll = allLabel != null && (alwaysAll || visible.length > 0 || filter.length > 0);
-const showModalBtn = !!modal && (hidden.length > 0 || !!modal.always);
+// Be parinkčių (pvz. paieška be rezultatų) sekcija lieka, bet vietoj tuščio
+// sąrašo rodoma „Nėra duomenų", o „Daugiau"/„Visi" nerodomi (nebent filtras
+// pasirinktas — tada „Visi" leidžia jį nusiimti).
+const isEmpty = visible.length === 0 && hidden.length === 0;
+
+const showAll = allLabel != null && (alwaysAll || visible.length > 0 || filter.length > 0) && (!isEmpty || filter.length > 0);
+const showModalBtn = !!modal && !isEmpty && (hidden.length > 0 || !!modal.always);
 const showInlineHidden = !modal && hidden.length > 0;
 
 const optClass = (opt: FacetOption) =>
@@ -55,6 +60,8 @@ const optClass = (opt: FacetOption) =>
 
 <section class="dok-filter-section">
   <span class="dok-filter-section-label">{label}</span>
+
+  {isEmpty && <p class="dok-facet-empty">Nėra duomenų</p>}
 
   {showAll && (
     <a href={toggleUrl('')} data-param={param} class={`dok-filter-opt dok-filter-all${filter.length === 0 ? ' is-selected' : ''}`}>
@@ -118,6 +125,11 @@ const optClass = (opt: FacetOption) =>
   /* Facet section + option rows. Global (not scoped) because DokFilters' own
      "Vieta" section reuses .dok-filter-section / .dok-filter-opt too. */
   .dok-filter-section { padding-top: 20px; }
+  .dok-facet-empty {
+    margin: 4px 0 0;
+    font-size: var(--text-sm);
+    color: var(--gray);
+  }
   .dok-filter-section-label {
     display: block;
     font-size: 10px;
