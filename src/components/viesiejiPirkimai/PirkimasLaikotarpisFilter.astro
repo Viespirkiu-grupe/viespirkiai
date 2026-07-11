@@ -37,31 +37,39 @@ const bars = hist.buckets.map((b) => {
   const active = upper > minVal && b.from < effMax;
   return { from: b.from, to: b.to, count: b.count, height, active };
 });
+
+// Be duomenų (pvz. paieška be rezultatų) diagramos ir slankiklio nerodom —
+// tik „Nėra duomenų" ir laukelius, kad filtrą būtų galima pakeisti/nusiimti.
+const histTuscia = !hist.buckets.length || hist.buckets.every((b) => !b.count);
 ---
 
 <section class="dok-filter-section vp-laik" data-domain-min={domainMin} data-domain-max={domainMax}>
   <span class="dok-filter-section-label">Laikotarpis</span>
 
-  <div class="laik-chart" aria-hidden="true">
-    {bars.map((b) => (
-      <span
-        class={`laik-bar${b.active ? ' is-active' : ''}`}
-        data-from={b.from}
-        data-to={b.to ?? ''}
-        style={`height:${b.height}%`}
-        title={`${fmtData(b.from)} – ${b.to != null ? fmtData(b.to) : '∞'}: ${b.count.toLocaleString('lt-LT')}`}
-      ></span>
-    ))}
-  </div>
+  {histTuscia ? <p class="dok-facet-empty">Nėra duomenų</p> : (
+    <>
+      <div class="laik-chart" aria-hidden="true">
+        {bars.map((b) => (
+          <span
+            class={`laik-bar${b.active ? ' is-active' : ''}`}
+            data-from={b.from}
+            data-to={b.to ?? ''}
+            style={`height:${b.height}%`}
+            title={`${fmtData(b.from)} – ${b.to != null ? fmtData(b.to) : '∞'}: ${b.count.toLocaleString('lt-LT')}`}
+          ></span>
+        ))}
+      </div>
 
-  <div class="laik-slider" data-laik-slider>
-    <span class="laik-track"></span>
-    <span class="laik-range"></span>
-    <input type="range" class="laik-handle laik-handle--min" min="0" max="1000" step="1" value="0" aria-label="Ankstyviausia data" />
-    <input type="range" class="laik-handle laik-handle--max" min="0" max="1000" step="1" value="1000" aria-label="Vėliausia data" />
-    <span class="laik-bubble laik-bubble--min" aria-hidden="true"></span>
-    <span class="laik-bubble laik-bubble--max" aria-hidden="true"></span>
-  </div>
+      <div class="laik-slider" data-laik-slider>
+        <span class="laik-track"></span>
+        <span class="laik-range"></span>
+        <input type="range" class="laik-handle laik-handle--min" min="0" max="1000" step="1" value="0" aria-label="Ankstyviausia data" />
+        <input type="range" class="laik-handle laik-handle--max" min="0" max="1000" step="1" value="1000" aria-label="Vėliausia data" />
+        <span class="laik-bubble laik-bubble--min" aria-hidden="true"></span>
+        <span class="laik-bubble laik-bubble--max" aria-hidden="true"></span>
+      </div>
+    </>
+  )}
 
   <div class="laik-inputs">
     <label class="laik-box laik-box--min">
@@ -78,7 +86,8 @@ const bars = hist.buckets.map((b) => {
 <script is:inline>
   (() => {
     const root = document.querySelector('.vp-laik');
-    if (!root) return;
+    // Be duomenų slankiklio/diagramos nėra — nėra ko inicializuoti.
+    if (!root || !root.querySelector('.laik-slider')) return;
     const domainMin = Number(root.getAttribute('data-domain-min')) || 0;
     const domainMax = Number(root.getAttribute('data-domain-max')) || (domainMin + 1);
     const STEPS = 1000;

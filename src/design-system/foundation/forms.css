@@ -411,7 +411,38 @@
     grid-area: rail;
     min-width: 0;
     padding: 24px 16px 24px 0;
-    border-right: var(--border);
+  }
+
+  /* „Dvigubai sticky" filtrų juosta (tik sutarčių/VP paieškose): kai rezultatai
+     ilgesni už facetus, juosta slenka kartu ir prilimpa apačia slenkant žemyn,
+     viršumi (po nav) slenkant aukštyn. `top`/`margin-top` valdo stickyRail.ts;
+     be JS ji tiesiog inertiška (be top offset sticky nelimpa). */
+  #searchForm.searchform-sidebar .sf-rail,
+  .dok-shell .dok-sidebar {
+    position: sticky;
+    align-self: start;
+  }
+
+  /* Skiriamoji linija tęsiasi per visą main aukštį (ne tik formos), tad
+     nusidriekia iki footerio, o ne nutrūksta ties rezultatų/reklamos apačia.
+     Linija ties rail dešiniuoju kraštu: padding-inline 16px + 240px stulpelis. */
+  /* Sutarčių/VP maketui ir dokumentų .dok-shell (jo .dok-sidebar sava
+     kraštinė nuimta — kitaip gautųsi dviguba linija). */
+  main.sidebar-main:has(> #searchForm.searchform-sidebar),
+  main.sidebar-main:has(> .dok-shell) {
+    position: relative;
+  }
+  main.sidebar-main:has(> #searchForm.searchform-sidebar)::before,
+  main.sidebar-main:has(> .dok-shell)::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    /* -40px uždengia footerio viršutinę 40px paraštę, kad linija pasiektų
+       footerio kraštinę, o ne nutrūktų prieš ją. */
+    bottom: -40px;
+    left: 256px;
+    border-left: var(--border);
+    pointer-events: none;
   }
 
   /* Mobilaus perjungiklio antraštė ir „Ieškoti" mygtukas — tik ≤900px. */
@@ -453,6 +484,12 @@
   }
 
   @media (max-width: 900px) {
+    /* Vieno stulpelio maketas — vertikalios linijos nebėra. */
+    main.sidebar-main:has(> #searchForm.searchform-sidebar)::before,
+    main.sidebar-main:has(> .dok-shell)::before {
+      display: none;
+    }
+
     #searchForm.searchform-sidebar {
       grid-template-columns: minmax(0, 1fr);
       grid-template-areas:

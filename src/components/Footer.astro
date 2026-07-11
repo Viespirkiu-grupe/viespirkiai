@@ -11,6 +11,7 @@ import SiteFooterShell from '@design-system/components/SiteFooterShell.astro';
   <a href="/kodas">↗ Kodas</a>
   <a href="/privatumas">↗ Privatumo politika</a>
   <button type="button" id="fontToggle">↗ Pakeisti šriftą</button>
+  <button type="button" id="rodytiReklamas" hidden>↗ Rodyti reklamas</button>
 
   <p slot="disclaimer" class="text-center text-sm text-muted mt-4 mb-0">
     <em>
@@ -29,4 +30,15 @@ import SiteFooterShell from '@design-system/components/SiteFooterShell.astro';
     meta.dataset.font = next;
     document.cookie = `font=${next};path=/;max-age=31536000`;
   });
+
+  // „Rodyti reklamas" – matoma tik jei anksčiau paspausta „Niekada neberodyti".
+  // Ištrina slapuką ir perkrauna, kad SSR vėl rodytų reklamas.
+  const rodytiReklamas = document.getElementById('rodytiReklamas');
+  if (rodytiReklamas && /(?:^|;\s*)reklamosPaslepta=1(?:;|$)/.test(document.cookie)) {
+    rodytiReklamas.hidden = false;
+    rodytiReklamas.addEventListener('click', () => {
+      document.cookie = 'reklamosPaslepta=;path=/;max-age=0;samesite=lax';
+      location.reload();
+    });
+  }
 </script>

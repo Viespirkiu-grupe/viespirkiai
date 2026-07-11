@@ -1,0 +1,195 @@
+---
+import Button from '@design-system/components/Button.astro';
+
+interface Reklama {
+  id: number;
+  tipas: 'juosta' | 'kortele' | 'tekstas' | 'baneris';
+  antraste?: string | null;
+  tekstas?: string | null;
+  mygtukoTekstas?: string | null;
+  nuoroda?: string | null;
+}
+
+const { reklama } = Astro.props as { reklama: Reklama };
+const { tipas, antraste, tekstas, mygtukoTekstas, nuoroda } = reklama;
+const cta = mygtukoTekstas || 'Susisiekti';
+const href = nuoroda || '/kontaktai';
+---
+
+<aside class={`rek rek--${tipas}`} aria-label="Reklama">
+  <div class="rek__eyebrow">
+    <span class="rek__label">„REKLAMA“</span>
+    <button type="button" class="rek__hide">Niekada neberodyti</button>
+  </div>
+
+  {tipas === 'juosta' && (
+    <div class="rek__row">
+      <div class="rek__copy">
+        {antraste && <p class="rek__antraste">{antraste}</p>}
+        {tekstas && <p class="rek__tekstas">{tekstas}</p>}
+      </div>
+      <Button href={href} variant="primary" size="sm" className="rek__cta">{cta} →</Button>
+    </div>
+  )}
+
+  {tipas === 'kortele' && (
+    <div class="rek__panel">
+      <div class="rek__copy">
+        {antraste && <p class="rek__antraste">{antraste}</p>}
+        {tekstas && <p class="rek__tekstas">{tekstas}</p>}
+      </div>
+      <Button href={href} variant="outline" size="sm" className="rek__cta">{cta} →</Button>
+    </div>
+  )}
+
+  {tipas === 'tekstas' && (
+    <p class="rek__inline">
+      {antraste && <strong>{antraste}</strong>}
+      {tekstas && <span> {tekstas}</span>}
+      {' '}<a href={href} class="link rek__link">{cta} →</a>
+    </p>
+  )}
+
+  {tipas === 'baneris' && (
+    <div class="rek__banner">
+      {antraste && <p class="rek__antraste rek__antraste--lg">{antraste}</p>}
+      {tekstas && <p class="rek__tekstas">{tekstas}</p>}
+      <Button href={href} variant="primary" size="sm" className="rek__cta">{cta} →</Button>
+    </div>
+  )}
+</aside>
+
+<style>
+  /* Reklamos blokas turi atrodyti kaip natūrali svetainės dalis: plokščia,
+     kraštinės skiria, stone neutralai, sky tik nuorodoms — jokių gradientų,
+     šešėlių ar spalvotų dėžučių. */
+  .rek {
+    margin-top: 72px;
+    padding-top: 24px;
+    border-top: var(--border);
+  }
+
+  .rek__eyebrow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 14px;
+  }
+
+  .rek__label {
+    font-size: var(--text-xs);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gray);
+  }
+
+  /* „Neberodyti niekada" — link-tipo tekstas, nepabrauktas kol nėra hover. */
+  .rek__hide {
+    appearance: none;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    text-decoration: none;
+    transition: color var(--transition);
+  }
+  .rek__hide:hover {
+    color: var(--black);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .rek__antraste {
+    margin: 0;
+    font-weight: 600;
+    color: var(--black);
+    line-height: 1.3;
+  }
+  .rek__antraste--lg {
+    font-size: clamp(1.05rem, 0.9rem + 1vw, 1.4rem);
+  }
+  .rek__tekstas {
+    margin: 4px 0 0;
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    max-width: 54ch;
+  }
+  .rek :global(.rek__cta) {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  /* juosta — kopija kairėje, mygtukas dešinėje, be dėžutės */
+  .rek__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px 32px;
+    flex-wrap: wrap;
+  }
+  .rek__copy { min-width: 0; }
+
+  /* kortelė — subtili stone plokštė (ne sky), plona kraštinė */
+  .rek__panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px 32px;
+    flex-wrap: wrap;
+    padding: 18px 20px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--shade-2);
+  }
+
+  /* tekstas — minimalus vientisas sakinys su inline nuoroda */
+  .rek__inline {
+    margin: 0;
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    max-width: 64ch;
+  }
+  .rek__inline strong { color: var(--black); }
+  .rek__link { white-space: nowrap; }
+
+  /* baneris — platesnis, centruotas, vis tiek plokščias */
+  .rek__banner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+    padding: 28px 20px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--shade-2);
+  }
+  .rek__banner .rek__tekstas { max-width: 46ch; }
+  .rek__banner :global(.rek__cta) { margin-top: 12px; }
+
+  @media (max-width: 600px) {
+    .rek__row :global(.rek__cta),
+    .rek__panel :global(.rek__cta) {
+      width: 100%;
+      text-align: center;
+    }
+  }
+</style>
+
+<script>
+  // „Neberodyti niekada" — įrašo cookie (~400 d. = naršyklės maksimumas) ir
+  // pašalina bloką; kitą kartą SSR jo nebekuria (žr. paieškos puslapius).
+  document.querySelectorAll('.rek__hide').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.cookie = 'reklamosPaslepta=1;path=/;max-age=34560000;samesite=lax';
+      btn.closest('.rek')?.remove();
+    });
+  });
+</script>

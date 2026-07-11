@@ -38,31 +38,39 @@ const fmtEur = (n: number): string => {
   if (n >= 1_000) return `${Math.round(n / 1_000).toLocaleString('lt-LT')} tūkst.`;
   return String(Math.round(n));
 };
+
+// Be duomenų (pvz. paieška be rezultatų) diagramos ir slankiklio nerodom —
+// tik „Nėra duomenų" ir laukelius, kad filtrą būtų galima pakeisti/nusiimti.
+const histTuscia = !hist.buckets.length || hist.buckets.every((b) => !b.count);
 ---
 
 <section class="dok-filter-section vp-verte" data-domain-min={domainMin} data-domain-max={domainMax}>
   <span class="dok-filter-section-label">Vertė</span>
 
-  <div class="suma-chart" aria-hidden="true">
-    {bars.map((b) => (
-      <span
-        class={`suma-bar${b.active ? ' is-active' : ''}`}
-        data-from={b.from}
-        data-to={b.to ?? ''}
-        style={`height:${b.height}%`}
-        title={`${fmtEur(b.from)} – ${b.to != null ? fmtEur(b.to) : '∞'} €: ${b.count.toLocaleString('lt-LT')}`}
-      ></span>
-    ))}
-  </div>
+  {histTuscia ? <p class="dok-facet-empty">Nėra duomenų</p> : (
+    <>
+      <div class="suma-chart" aria-hidden="true">
+        {bars.map((b) => (
+          <span
+            class={`suma-bar${b.active ? ' is-active' : ''}`}
+            data-from={b.from}
+            data-to={b.to ?? ''}
+            style={`height:${b.height}%`}
+            title={`${fmtEur(b.from)} – ${b.to != null ? fmtEur(b.to) : '∞'} €: ${b.count.toLocaleString('lt-LT')}`}
+          ></span>
+        ))}
+      </div>
 
-  <div class="suma-slider" data-suma-slider>
-    <span class="suma-track"></span>
-    <span class="suma-range"></span>
-    <input type="range" class="suma-handle suma-handle--min" min="0" max="1000" step="1" value="0" aria-label="Mažiausia vertė" />
-    <input type="range" class="suma-handle suma-handle--max" min="0" max="1000" step="1" value="1000" aria-label="Didžiausia vertė" />
-    <span class="suma-bubble suma-bubble--min" aria-hidden="true"></span>
-    <span class="suma-bubble suma-bubble--max" aria-hidden="true"></span>
-  </div>
+      <div class="suma-slider" data-suma-slider>
+        <span class="suma-track"></span>
+        <span class="suma-range"></span>
+        <input type="range" class="suma-handle suma-handle--min" min="0" max="1000" step="1" value="0" aria-label="Mažiausia vertė" />
+        <input type="range" class="suma-handle suma-handle--max" min="0" max="1000" step="1" value="1000" aria-label="Didžiausia vertė" />
+        <span class="suma-bubble suma-bubble--min" aria-hidden="true"></span>
+        <span class="suma-bubble suma-bubble--max" aria-hidden="true"></span>
+      </div>
+    </>
+  )}
 
   <div class="suma-inputs">
     <label class="suma-box suma-box--min">
@@ -81,7 +89,8 @@ const fmtEur = (n: number): string => {
 <script is:inline>
   (() => {
     const root = document.querySelector('.vp-verte');
-    if (!root) return;
+    // Be duomenų slankiklio/diagramos nėra — nėra ko inicializuoti.
+    if (!root || !root.querySelector('.suma-slider')) return;
     const domainMin = Number(root.getAttribute('data-domain-min')) || 0;
     const domainMax = Number(root.getAttribute('data-domain-max')) || 100_000_000;
     const STEPS = 1000;
