@@ -63,12 +63,14 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
             })(),
 
             paskelbimoData: (() => {
-                const elText = el
-                    .querySelector(".right-col div:nth-of-type(3)")
-                    ?.textContent?.trim();
-                return elText && elText.includes("Paskelbimo data:")
-                    ? elText.replace("Paskelbimo data:", "").trim()
-                    : null;
+                const divs = el.querySelectorAll(".right-col > div");
+                for (const div of divs) {
+                    const elText = div.textContent?.trim();
+                    if (elText && elText.includes("Paskelbimo data:")) {
+                        return elText.replace("Paskelbimo data:", "").trim();
+                    }
+                }
+                return null;
             })(),
             zenkliukas:
                 el
@@ -86,11 +88,47 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
                 el
                     .querySelector(".notice-search-item-header a.doc-icon")
                     ?.getAttribute("href") || "",
+            ataskaitosLink:
+                el
+                    .querySelector(
+                        '.right-col a[href*="/ReportsOrProtocol/"]',
+                    )
+                    ?.getAttribute("href")
+                    ?.trim() || null,
         };
 
         if (skelbimas.link && skelbimas.link.startsWith("/")) {
             skelbimas.link = `https://cvpp.eviesiejipirkimai.lt${skelbimas.link}`;
         }
+
+        // Ataskaitos kodas ir tipo id iš nuorodos
+        // pvz. /ReportsOrProtocol/Details/2023-624284?formTypeId=1
+        if (skelbimas.ataskaitosLink) {
+            skelbimas.ataskaitosKodas =
+                skelbimas.ataskaitosLink.match(
+                    /\/Details\/([^/?#]+)/,
+                )?.[1] || null;
+            const tipoId = skelbimas.ataskaitosLink.match(
+                /[?&]formTypeId=(\d+)/,
+            )?.[1];
+            skelbimas.ataskaitosTipoId = tipoId ? Number(tipoId) : null;
+            if (skelbimas.ataskaitosLink.startsWith("/")) {
+                skelbimas.ataskaitosLink = `https://cvpp.eviesiejipirkimai.lt${skelbimas.ataskaitosLink}`;
+            }
+        } else {
+            skelbimas.ataskaitosKodas = null;
+            skelbimas.ataskaitosTipoId = null;
+        }
+
+        // Perkančiosios organizacijos id iš pirkimo vykdytojo nuorodos
+        // pvz. .../ctm/Company/CompanyInformation/Index/34617
+        skelbimas.perkanciosiosOrganizacijosId = (() => {
+            const id = skelbimas.pirkimoVykdytojoLink?.match(
+                /\/CompanyInformation\/Index\/(\d+)/,
+            )?.[1];
+            return id ? Number(id) : null;
+        })();
+
         skelbimai.push(skelbimas);
     });
 
@@ -100,9 +138,9 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
     const placeholders = [];
 
     skelbimai.forEach((s, i) => {
-        const idx = i * 11; // 11 columns
+        const idx = i * 15; // 15 columns
         placeholders.push(
-            `($${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, $${idx + 9}, $${idx + 10}, $${idx + 11})`,
+            `($${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6}, $${idx + 7}, $${idx + 8}, $${idx + 9}, $${idx + 10}, $${idx + 11}, $${idx + 12}, $${idx + 13}, $${idx + 14}, $${idx + 15})`,
         );
         values.push(
             s.skelbimoKodas,
@@ -116,12 +154,16 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
             s.zenkliukas,
             s.link,
             s.dokumentaiLink,
+            s.ataskaitosLink,
+            s.ataskaitosKodas,
+            s.ataskaitosTipoId,
+            s.perkanciosiosOrganizacijosId,
         );
     });
 
     await postgres.query(
         `INSERT INTO "cvppViesiejiPirkimai"
-        ("skelbimoKodas", pavadinimas, "pirkimoVykdytojas", "pirkimoVykdytojoLink", "skelbimoTipas", "pirkimoNumeris", "pasiulymuPateikimoTerminas", "paskelbimoData", zenkliukas, link, "dokumentaiLink")
+        ("skelbimoKodas", pavadinimas, "pirkimoVykdytojas", "pirkimoVykdytojoLink", "skelbimoTipas", "pirkimoNumeris", "pasiulymuPateikimoTerminas", "paskelbimoData", zenkliukas, link, "dokumentaiLink", "ataskaitosLink", "ataskaitosKodas", "ataskaitosTipoId", "perkanciosiosOrganizacijosId")
         VALUES ${placeholders.join(", ")}
         ON CONFLICT ("skelbimoKodas") DO UPDATE SET
           pavadinimas = EXCLUDED.pavadinimas,
@@ -133,7 +175,11 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
           "paskelbimoData" = EXCLUDED."paskelbimoData",
           zenkliukas = EXCLUDED.zenkliukas,
           link = EXCLUDED.link,
-          "dokumentaiLink" = EXCLUDED."dokumentaiLink"`,
+          "dokumentaiLink" = EXCLUDED."dokumentaiLink",
+          "ataskaitosLink" = EXCLUDED."ataskaitosLink",
+          "ataskaitosKodas" = EXCLUDED."ataskaitosKodas",
+          "ataskaitosTipoId" = EXCLUDED."ataskaitosTipoId",
+          "perkanciosiosOrganizacijosId" = EXCLUDED."perkanciosiosOrganizacijosId"`,
         values,
     );
 

@@ -1,14 +1,44 @@
-/* 6 types, create scrape functions for all
+/* Ataskaitų tipai (formTypeId) ir parseriai.
 Atn-1 https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol/Details/2017-624732?formTypeId=1
-Atn-2 // TODO later
+Atn-2 (formTypeId=2) — DB tokių ataskaitų nėra (0 eilučių), tad parserio nėra.
 Atn-3 https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol/Details/2024-613433?formTypeId=3
 AtGn-1 https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol/Details/2024-677876?formTypeId=4
 AtGn-2 https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol/Details/2024-650900?formTypeId=5
 Atk-1 https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol/Details/2024-698325?formTypeId=6
 */
 import { parseHTML } from "linkedom";
+import { postgres } from "../../postgres/postgres.js";
+
+const ORIGIN = "https://cvpp.eviesiejipirkimai.lt";
+
+// Turinio parsinimo būsena valdoma "nuskaitymas" stulpeliu (kaip scrapeNotice.js):
+//   null  -> dar nesuparsinta,
+//   >= 1  -> suparsinta ta versija,
+//   -1    -> klaida.
+// v3: pridėtas struktūrinis "pirkimoObjektoRusis" stulpelis (iš turinio).
+const NUSKAITYMO_VERSIJA = 3;
+const KLAIDOS_BUSENA = -1;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
+
+// Lengvas HTML minify tik saugojimui: nuimam komentarus (paliekam IE conditional)
+// ir suspaudžiam tarpus tarp tag'ų. .tab-content viduje pre/script/style nebūna.
+function minifyHtml(html) {
+    return String(html ?? "")
+        .replace(/<!--(?!\[if)[\s\S]*?-->/g, "")
+        .replace(/>\s+</g, "><")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+}
+
+// Iš ataskaitos Details nuorodos ištraukia { id, formTypeId }.
+// pvz. https://.../ReportsOrProtocol/Details/2024-677876?formTypeId=4
+export function parseAtaskaitosLink(link) {
+    const u = new URL(link, ORIGIN);
+    const id = u.pathname.match(/\/Details\/([^/?#]+)/)?.[1] || null;
+    const formTypeId = u.searchParams.get("formTypeId");
+    return { id, formTypeId };
+}
 
 const txt = (el) => el?.textContent.replace(/\s+/g, " ").trim() || null;
 const bool = (v) => {
@@ -166,6 +196,41 @@ function findBody(container, nr) {
 const fld = (container, nr) => txt(findBody(container, nr));
 const boolFld = (container, nr) => bool(fld(container, nr));
 
+// Like findBody, but matches a sub-section by its label text (used for fields
+// with no numeric index, e.g. the Atn-3 §II 30 000 € question).
+function findBodyByLabel(container, substring) {
+    const isBody = (el) =>
+        el &&
+        !el.classList.contains("eps-sub-section-head") &&
+        !el.classList.contains("eps-section-head");
+
+    for (const head of container?.querySelectorAll(".eps-sub-section-head") || []) {
+        if (!head.querySelector(".body")?.textContent.includes(substring)) continue;
+
+        // Body as a direct child of the head
+        const childBody = [...head.children].find((c) =>
+            c.classList.contains("eps-sub-section-body"),
+        );
+        if (childBody) return childBody;
+
+        // Body as the head's next sibling
+        if (isBody(head.nextElementSibling)) return head.nextElementSibling;
+
+        // Head alone in an .eps-text wrapper → answer is the wrapper's next sibling
+        const wrap = head.parentElement;
+        if (wrap && wrap.children.length === 1 && isBody(wrap.nextElementSibling))
+            return wrap.nextElementSibling;
+
+        return null;
+    }
+    return null;
+}
+
+const fldByLabel = (container, substring) =>
+    txt(findBodyByLabel(container, substring));
+const boolFldByLabel = (container, substring) =>
+    bool(fldByLabel(container, substring));
+
 // Auto-detect body type and parse accordingly
 function parseBody(bodyEl) {
     if (!bodyEl) return null;
@@ -206,17 +271,32 @@ function parseRecords(bodyEl) {
 
         const heading = el.querySelector("h4, h5");
         if (heading) {
-            lastKey = toCamel(heading.textContent.trim());
+            const rawKey = toCamelRaw(heading.textContent.trim());
+            lastKey = LABEL_MAP[rawKey] ?? rawKey;
             // Value in child eps-sub-section-body (h5-pattern used in AtGn forms)
             const childBody = el.querySelector(".eps-sub-section-body");
             const rawVal = childBody
                 ? txt(childBody)
                 : (el.textContent.replace(heading.textContent, "").replace(/\s+/g, " ").trim() ||
                       null);
-            cur[lastKey] = NUM_KEY_RE.test(lastKey) ? numLt(rawVal) : rawVal;
+            // "Kodas, pavadinimas" combined columns: same label maps to a 2nd key
+            // (…Pavadinimas2) in LABEL_MAP – split "kodas, pavadinimas" into code + name.
+            // Separator varies in the source: "162576776, Pavadinimas" (comma) or
+            // "302416819 Pavadinimas" (leading code + space).
+            const pavKey = LABEL_MAP[rawKey + "2"];
+            const codeName = pavKey && rawVal
+                ? rawVal.match(/^\s*([^,]+?)\s*,\s*(.+)$/s) || rawVal.match(/^\s*(\d+)\s+(\S.*)$/s)
+                : null;
+            if (codeName) {
+                cur[lastKey] = codeName[1].trim() || null;
+                cur[pavKey] = codeName[2].trim() || null;
+            } else {
+                cur[lastKey] = NUM_KEY_RE.test(lastKey) ? numLt(rawVal) : rawVal;
+            }
         } else {
             const v = txt(el);
-            if (v && lastKey && cur[lastKey] === null) cur[lastKey] = v;
+            if (v && lastKey && cur[lastKey] === null)
+                cur[lastKey] = NUM_KEY_RE.test(lastKey) ? numLt(v) : v;
         }
     }
     if (Object.keys(cur).length) records.push(cur);
@@ -425,7 +505,7 @@ function parseOrgTable(secEl) {
 
 // Returns array of all eps-sub-section-body texts from the "Teisinis pagrindas" section.
 // [0] = legal basis, [1] = tipas (Atn-1) or ataskaitiniaiMetai (Atn-3)
-function parseTeisinisPageindas(notice) {
+function parseTeisinisPagrindas(notice) {
     const tSec = findSection(notice, "Teisinis pagrindas");
     if (!tSec) return [];
     const inner = tSec.children[0];
@@ -444,7 +524,7 @@ function parseAtsakingasAsmuo(container, nr) {
 // ─── Atn-1 (formType 1) ───────────────────────────────────────────────────────
 
 function parseAtn1(notice) {
-    const [teisinisPageindas, ataskaitosTipas] = parseTeisinisPageindas(notice);
+    const [teisinisPagrindas, ataskaitosTipas] = parseTeisinisPagrindas(notice);
     const sI = findSection(notice, "I. BENDRA INFORMACIJA");
     const sII = findSection(notice, "II. PERKANČIOJI ORGANIZACIJA");
     const bvpzBody = findBody(notice, "III.4.");
@@ -452,7 +532,7 @@ function parseAtn1(notice) {
         parseBvpz(bvpzBody);
 
     return {
-        teisinisPageindas,
+        teisinisPagrindas,
         ataskaitosTipas,
         pirkimoNumeris: fld(notice, "1.1."),
         pirkimoObjektoPavadinimas: fld(notice, "2.1."),
@@ -468,6 +548,7 @@ function parseAtn1(notice) {
         papildomiKodaiBvpz,
         pirkimoDalys: parseRecords(findBody(notice, "III.5.")),
         pirkimoBudas: fld(notice, "V.1."),
+        ankstesnisPirkimas: parseBody(findBody(notice, "V.3.")),
         pajamosReikalavimas: boolFld(notice, "VI.2.1."),
         dalyviai: parseRecords(findBody(notice, "VI.1.")),
         vertinimoKriterijai: (() => {
@@ -524,8 +605,8 @@ function parseDidesniosVerte(sVI) {
 // ─── Atn-3 (formType 3) ───────────────────────────────────────────────────────
 
 function parseAtn3(notice) {
-    const bodies = parseTeisinisPageindas(notice);
-    const teisinisPageindas = bodies[0] ?? null;
+    const bodies = parseTeisinisPagrindas(notice);
+    const teisinisPagrindas = bodies[0] ?? null;
     const ataskaitiniaiMetai = bodies[1] ?? null;
     const sII = findSection(notice, "II. PERKANČIOJI ORGANIZACIJA");
     const sIII = findSection(notice, "III. MAŽOS VERTĖS");
@@ -537,7 +618,7 @@ function parseAtn3(notice) {
 
     // Section VII — internal transactions
     const sVII = findSection(notice, "VII. VIEŠŲJŲ PIRKIMŲ");
-    const vidusSandoriai = sVII ? parseTableRows(sVII.querySelector("table")) : null;
+    const vidausSandoriai = sVII ? parseTableRows(sVII.querySelector("table")) : null;
 
     // Section VII¹ — simplified procurements
     const sVII1 = findSection(notice, "VII");
@@ -546,13 +627,16 @@ function parseAtn3(notice) {
         : null;
 
     return {
-        teisinisPageindas,
+        teisinisPagrindas,
         ataskaitiniaiMetai,
         perkanciojiOrganizacija: parseOrgEpsText(sII),
+        bendraVerteNevirsijo30000: sII
+            ? boolFldByLabel(sII, "neviršijo 30 000")
+            : null,
         mazosVertesPirkimai: sIII ? parseBody(findBody(sIII, "1.")) : null,
         keliuTransportoPriemones: sIII ? boolFld(sIII, "2.") : null,
         didesnesVertesPirkimai,
-        vidusSandoriai,
+        vidausSandoriai,
         supaprastintiPirkimai,
         atsakingasAsmuo: sVIII ? parseAtsakingasAsmuo(sVIII, "1.") : null,
         papildomaInformacija: (() => {
@@ -608,7 +692,7 @@ function parseAtGn1(notice) {
         sutartiesSavybes: {
             subrangosKetinama: sIX ? bool(fld(sIX, "2.1.")) : null,
         },
-        islaptinaInformacija: sX
+        islaptintaInformacija: sX
             ? {
                   naudojama: sX ? bool(fld(sX, "1.")) : null,
                   naudojimoBudas: sX ? fld(sX, "1.1.") : null,
@@ -716,6 +800,8 @@ function parseAtk1(notice) {
         suteikimoBudas: sIV ? fld(sIV, "1.") : null,
         dalyviai: sV ? parseBody(findBody(sV, "1.")) : null,
         dalyvioInformacija: sV ? parseBody(findBody(sV, "2.")) : null,
+        dalyviuPasalinimoPagrindai: sV ? parseBody(findBody(sV, "3.")) : null,
+        dalyvisPasalintas: sV ? boolFldByLabel(sV, "buvo pašalintas") : null,
         pasiulymuVertinimas: sV ? parseBody(findBody(sV, "5.")) : null,
         skundai: {
             pretenzijaPateikta: sVI ? bool(fld(sVI, "1.")) : null,
@@ -730,35 +816,130 @@ function parseAtk1(notice) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export async function scrapeAtaskaitosContent(id, formTypeId) {
-    const url = `https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol/Details/${id}?formTypeId=${formTypeId}`;
-    const response = await fetch(url);
-    const text = await response.text();
-    const { document } = parseHTML(text);
-    const notice = document.querySelector("#notice");
-    if (!notice) return null;
-
+// Pagal formTypeId parenka atitinkamą parserį ir grąžina JSON objektą.
+function parseNoticeByType(notice, formTypeId) {
     const ft = Number(formTypeId);
     if (ft === 1) return parseAtn1(notice);
     if (ft === 3) return parseAtn3(notice);
     if (ft === 4) return parseAtGn1(notice);
     if (ft === 5) return parseAtGn2(notice);
     if (ft === 6) return parseAtk1(notice);
-    return null; // ft === 2 — TODO later
+    return null; // ft === 2 (Atn-2) — DB tokių ataskaitų nėra
+}
+
+// Grąžina { turinys, turinysHtml }:
+//   turinys     — struktūrizuotas JSON (pagal formTypeId parserį),
+//   turinysHtml — minifikuotas .tab-content innerHTML (žalias atsarginis variantas).
+export async function scrapeAtaskaitosContent(id, formTypeId) {
+    const url = `${ORIGIN}/ReportsOrProtocol/Details/${id}?formTypeId=${formTypeId}`;
+    const response = await fetch(url);
+    const text = await response.text();
+    const { document } = parseHTML(text);
+
+    const notice = document.querySelector("#notice");
+    if (!notice) return null;
+
+    const tabContent = document.querySelector(".tab-content");
+    const turinysHtml = tabContent ? minifyHtml(tabContent.innerHTML) : null;
+
+    return {
+        turinys: parseNoticeByType(notice, formTypeId),
+        turinysHtml,
+    };
+}
+
+async function setStatus(ataskaitosNumeris, status) {
+    await postgres.query(
+        `UPDATE public."cvppAtaskaitos" SET nuskaitymas = $1 WHERE "ataskaitosNumeris" = $2`,
+        [status, ataskaitosNumeris],
+    );
+}
+
+// Paima vieną dar nesuparsintą (ar senesnės versijos / null) cvppAtaskaitos eilutę,
+// suparsina ir įrašo "turinys" (jsonb) + "turinysHtml", nuskaitymas = versija.
+// Klaidas pažymi nuskaitymas = -1. Grąžina false, kai eilučių nebeliko.
+export async function scrapeVienaAtaskaita() {
+    const { rows } = await postgres.query(
+        `SELECT "ataskaitosNumeris", "formTypeId"
+         FROM public."cvppAtaskaitos"
+         WHERE (nuskaitymas < $1 AND nuskaitymas >= 0) OR nuskaitymas IS NULL
+         LIMIT 1`,
+        [NUSKAITYMO_VERSIJA],
+    );
+
+    if (rows.length < 1) return false;
+
+    const { ataskaitosNumeris, formTypeId } = rows[0];
+    try {
+        const res = await scrapeAtaskaitosContent(ataskaitosNumeris, formTypeId);
+        if (!res) throw new Error("nėra #notice");
+        await postgres.query(
+            `UPDATE public."cvppAtaskaitos"
+             SET "turinys" = $1, "turinysHtml" = $2, "pirkimoObjektoRusis" = $3, nuskaitymas = $4
+             WHERE "ataskaitosNumeris" = $5`,
+            [
+                res.turinys ? JSON.stringify(res.turinys) : null,
+                res.turinysHtml,
+                res.turinys?.pirkimoObjektoRusis ?? null,
+                NUSKAITYMO_VERSIJA,
+                ataskaitosNumeris,
+            ],
+        );
+        console.log(`[CVPP ataskaita] ${ataskaitosNumeris}: suparsinta`);
+        return true;
+    } catch (err) {
+        console.error(`[CVPP ataskaita] ${ataskaitosNumeris}: klaida - ${err.message}`);
+        try {
+            await setStatus(ataskaitosNumeris, KLAIDOS_BUSENA);
+        } catch (updateError) {
+            console.error(
+                `[CVPP ataskaita] ${ataskaitosNumeris}: nepavyko pažymėti klaidos - ${updateError.message}`,
+            );
+        }
+        return true;
+    }
 }
 
 // CLI
+//   Be argumentų: pereina per visas eilutes pagal "nuskaitymas" ir įrašo į DB.
+//   Dry run (be DB): node scrapeAtaskaitosContent.js <link>
+//                    node scrapeAtaskaitosContent.js <id> <formTypeId>
 if (
     import.meta.url === process.argv[1] ||
     import.meta.url === `file://${process.argv[1]}`
 ) {
-    const id = process.argv[2];
-    const formTypeId = process.argv[3];
-    if (!id || !formTypeId) {
-        console.error("Usage: node scrapeAtaskaitosContent.js <id> <formTypeId>");
-        process.exit(1);
+    const [arg1, arg2] = process.argv.slice(2);
+
+    if (!arg1) {
+        // Įrašymas į DB: visos eilutės pagal nuskaitymo būseną.
+        (async () => {
+            while (await scrapeVienaAtaskaita()) {}
+            await postgres.end();
+            console.log("[CVPP ataskaita] Nuskaitymas baigtas");
+        })().catch(async (err) => {
+            console.error(err);
+            await postgres.end();
+            process.exit(1);
+        });
+    } else {
+        // Dry run: priima arba pilną nuorodą, arba <id> <formTypeId>.
+        let id = arg1;
+        let formTypeId = arg2;
+        if (/^https?:\/\//.test(arg1)) {
+            ({ id, formTypeId } = parseAtaskaitosLink(arg1));
+        }
+        if (!id || !formTypeId) {
+            console.error(
+                "Usage: node scrapeAtaskaitosContent.js            (įrašo visas į DB)\n" +
+                    "       node scrapeAtaskaitosContent.js <link>\n" +
+                    "       node scrapeAtaskaitosContent.js <id> <formTypeId>",
+            );
+            process.exit(1);
+        }
+        scrapeAtaskaitosContent(id, formTypeId)
+            .then((data) => {
+                console.log(JSON.stringify(data, null, 2));
+            })
+            .finally(() => postgres.end());
     }
-    scrapeAtaskaitosContent(id, formTypeId).then((data) => {
-        console.log(JSON.stringify(data, null, 2));
-    });
 }

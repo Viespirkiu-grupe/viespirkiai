@@ -12,6 +12,7 @@ const ATASKAITOS_COLUMNS = [
     "pirkimoVykdytojas",
     "pirkimoVykdytojoLink",
     "pirkimoVykdytojoKodas",
+    "perkanciosiosOrganizacijosId",
     "tipas",
     "pirkimoNumeris",
     "paskelbimoData",
@@ -71,6 +72,10 @@ export async function scrapeAtaskaitosPuslapis(pageNumber) {
             new URL(fullLink, "https://cvpp.eviesiejipirkimai.lt").searchParams.get(
                 "formTypeId",
             ) || null;
+        // Ataskaitos kodas iš nuorodos, pvz.
+        // /ReportsOrProtocol/Details/2024-677876?formTypeId=4 -> 2024-677876
+        const ataskaitosKodasIsLink =
+            href.match(/\/Details\/([^/?#]+)/)?.[1] || null;
 
         const vykdytojasEl = el.querySelector(".left-col a");
 
@@ -81,6 +86,15 @@ export async function scrapeAtaskaitosPuslapis(pageNumber) {
             ? kodaDiv.textContent.replace(/.*juridinio asmens kodas:/, "").trim() ||
               null
             : null;
+
+        const pirkimoVykdytojoLink =
+            vykdytojasEl?.getAttribute("href")?.trim() || null;
+        // Perkančiosios organizacijos id iš vykdytojo nuorodos
+        // pvz. .../ctm/Company/CompanyInformation/Index/5477
+        const perkOrgId = pirkimoVykdytojoLink?.match(
+            /\/CompanyInformation\/Index\/(\d+)/,
+        )?.[1];
+        const perkanciosiosOrganizacijosId = perkOrgId ? Number(perkOrgId) : null;
 
         const tipasEl = el.querySelector(".left-col strong");
 
@@ -96,11 +110,12 @@ export async function scrapeAtaskaitosPuslapis(pageNumber) {
         const ataskaitosNumerisDiv = rightDivs.find((d) =>
             d.textContent.includes("Ataskaitos numeris:"),
         );
-        const ataskaitosNumeris = ataskaitosNumerisDiv
-            ? ataskaitosNumerisDiv.textContent
-                  .replace("Ataskaitos numeris:", "")
-                  .trim() || null
-            : null;
+        const ataskaitosNumeris =
+            (ataskaitosNumerisDiv
+                ? ataskaitosNumerisDiv.textContent
+                      .replace("Ataskaitos numeris:", "")
+                      .trim() || null
+                : null) || ataskaitosKodasIsLink;
 
         const paskelbimoDataDiv = rightDivs.find((d) =>
             d.textContent.includes("Paskelbimo data:"),
@@ -126,9 +141,9 @@ export async function scrapeAtaskaitosPuslapis(pageNumber) {
             formTypeId,
             ataskaitosNumeris,
             pirkimoVykdytojas: vykdytojasEl?.textContent.trim() || null,
-            pirkimoVykdytojoLink:
-                vykdytojasEl?.getAttribute("href")?.trim() || null,
+            pirkimoVykdytojoLink,
             pirkimoVykdytojoKodas,
+            perkanciosiosOrganizacijosId,
             tipas: tipasEl?.textContent.trim() || null,
             pirkimoNumeris,
             paskelbimoData,
