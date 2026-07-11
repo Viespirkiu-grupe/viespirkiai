@@ -161,10 +161,8 @@ const SUTARTYS_FROM = `sutartys LEFT JOIN "sutartysAtnaujinimai" USING ("sutarti
 
 const QUICKWIT_LENTELE = "sutartys";
 const QUICKWIT_PAGE_SIZE = 50;
-// Viršutinė riba eksportams (CSV/JSONL/XLSX) per Quickwit. Quickwit 0.8 leidžia
-// pasiekti nebent 20 000 įrašų (max_hits + start_offset ribos, žr. searchAll),
-// tad tiek daugiausiai ir surenkam.
-const QUICKWIT_EXPORT_LIMIT = 20_000;
+export const SUTARTYS_EXPORT_LIMIT = 100_000;
+const QUICKWIT_EXPORT_WINDOW = 5_000;
 
 // Tekstinei paieškai skenuojami keli tekstiniai (tokenizuoti) laukai — ne vien
 // `tekstas` (default_search_fields), kad sutaptų ir pavadinimas, tiekėjas ir kt.
@@ -764,6 +762,55 @@ async function loadSearchRowsFromPostgres(searchRows) {
 }
 
 /**
+ * Iterates a large Quickwit export without deep offsets. Each 5k window is
+ * sorted by the unique contract ID; the next query starts strictly after the
+ * final raw Quickwit hit, so tombstones at a window boundary cannot skip rows.
+ * @param {object} query
+ * @param {object} [options]
+ * @param {number} [options.limit]
+ * @param {AbortSignal} [options.signal]
+ * @param {(progress: {processed: number}) => void} [options.onBatch]
+ */
+export async function* iterateSutartysQuickwitExport(
+    query,
+    { limit = SUTARTYS_EXPORT_LIMIT, signal, onBatch } = /** @type {any} */ ({}),
+) {
+    const baseQuery = buildSutartysQuickwitQuery(query);
+    let afterId = null;
+    let processed = 0;
+
+    while (processed < limit) {
+        if (signal?.aborted) throw new DOMException("Exportas atšauktas", "AbortError");
+        const cursorQuery = afterId == null
+            ? baseQuery
+            : `(${baseQuery}) AND sutartiesUnikalusId:{${afterId} TO *]`;
+        const result = await quickwitSearchAll(
+            QUICKWIT_LENTELE,
+            { query: cursorQuery, sort_by: "-sutartiesUnikalusId" },
+            {
+                limit: Math.min(QUICKWIT_EXPORT_WINDOW, limit - processed),
+                pageSize: Math.min(QUICKWIT_EXPORT_WINDOW, limit - processed),
+                maxPages: 1,
+            },
+        );
+        const rawCursor = Number(result.lastRawHit?.sutartiesUnikalusId);
+        const rows = await loadSearchRowsFromPostgres(
+            result.hits.map((hit) => ({ id: hit.sutartiesUnikalusId })),
+        );
+
+        for (const row of rows) {
+            if (processed >= limit) return;
+            processed++;
+            yield aptvarkytiRezultata(row);
+        }
+        onBatch?.({ processed });
+
+        if (!Number.isSafeInteger(rawCursor) || rawCursor === afterId || result.rawExhausted) return;
+        afterId = rawCursor;
+    }
+}
+
+/**
  * @typedef {"postgres" | "quickwit"} Engine
  */
 
@@ -896,20 +943,7 @@ export async function searchSutartys(
     // tikslų leksemą ir grąžina kitą (dažnai tuščią) rinkinį nei rodoma ekrane.
     if (engine === "quickwit" && stream) {
         const { values, queryParams } = sutartysFilter.build(query);
-        const qwQuery = buildSutartysQuickwitQuery(query);
-        const effLimit = limit ?? QUICKWIT_EXPORT_LIMIT;
-
-        // Eksportui puslapiuojam per Quickwit po 10 000 (max_hits riba) kol
-        // surenkam iki `effLimit` gyvų įrašų arba baigiasi indeksas.
-        const result = await quickwitSearchAll(
-            QUICKWIT_LENTELE,
-            { query: qwQuery, sort_by: quickwitSortBy(query) },
-            { limit: effLimit },
-        );
-        const hits = result.hits;
-        const rows = await loadSearchRowsFromPostgres(
-            hits.map((h) => ({ id: h.sutartiesUnikalusId })),
-        );
+        const effLimit = limit ?? SUTARTYS_EXPORT_LIMIT;
 
         return {
             results: [],
@@ -919,7 +953,7 @@ export async function searchSutartys(
             values,
             queryParams,
             timings: [],
-            stream: Readable.from(rows.map(aptvarkytiRezultata), { objectMode: true }),
+            stream: Readable.from(iterateSutartysQuickwitExport(query, { limit: effLimit }), { objectMode: true }),
             client: null,
         };
     }

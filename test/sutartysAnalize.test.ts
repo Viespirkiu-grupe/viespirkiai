@@ -28,10 +28,11 @@ const rows = [
 ];
 
 describe("sutarčių analizės eksportas", () => {
-    it("leidžia eksportuoti iki 20 000 sutarčių imtinai", () => {
-        expect(XLSX_EXPORT_LIMIT).toBe(20_000);
-        expect(canExportAnalizeXlsx(20_000)).toBe(true);
-        expect(canExportAnalizeXlsx(20_001)).toBe(false);
+    it("leidžia eksportuoti iki 100 000 sutarčių imtinai", () => {
+        expect(XLSX_EXPORT_LIMIT).toBe(100_000);
+        expect(canExportAnalizeXlsx(100_000)).toBe(true);
+        expect(canExportAnalizeXlsx(100_001)).toBe(false);
+        expect(canExportAnalizeXlsx(20_001)).toBe(true);
         expect(canExportAnalizeXlsx(-1)).toBe(false);
     });
 

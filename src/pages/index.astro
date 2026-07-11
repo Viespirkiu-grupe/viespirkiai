@@ -11,7 +11,7 @@ import { splitFacetOptions } from '../lib/dokumentaiUrl.ts';
 import SearchResults from '../components/content/SearchResults.astro';
 import Reklama from '../components/reklamos/Reklama.astro';
 import { pickReklama } from '@/modules/reklamos/pickReklama.js';
-import { searchSutartys, countSutartys, countSutartysQuickwit, getSutartysQueryMetadata } from '@/modules/sutartys/searchSutartys.js';
+import { searchSutartys, countSutartys, countSutartysQuickwit, getSutartysQueryMetadata, iterateSutartysQuickwitExport } from '@/modules/sutartys/searchSutartys.js';
 import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
 import config from '../lib/config.ts';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
@@ -125,6 +125,161 @@ function buildPaginationHtml({ currentPage, pageCount, queryParams }: { currentP
 
 void buildPaginationHtml;
 
+const EXPORT_FRAME = { progress: 1, fileStart: 2, fileChunk: 3, complete: 4, error: 5 } as const;
+const exportEncoder = new TextEncoder();
+function exportFrame(type: number, payload: Uint8Array | string | object = new Uint8Array()) {
+  const body = payload instanceof Uint8Array
+    ? payload
+    : exportEncoder.encode(typeof payload === 'string' ? payload : JSON.stringify(payload));
+  const frame = new Uint8Array(5 + body.byteLength);
+  frame[0] = type;
+  new DataView(frame.buffer).setUint32(1, body.byteLength, false);
+  frame.set(body, 5);
+  return frame;
+}
+
+function exportCsvRow(row: Record<string, unknown>) {
+  const formatDate = (value: unknown) => {
+    if (!value) return '';
+    const date = new Date(value as string | number | Date);
+    return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
+  };
+  return {
+    'Tipas': row.tipas ?? '', 'Kategorija': row.kategorija ?? '', 'Pavadinimas': row.pavadinimas ?? '',
+    'Numatyta vertė': row.verte ?? '', 'Faktinė vertė': row.faktineVerte ?? '',
+    'Pirkėjo pavadinimas': row.perkanciojiOrganizacija ?? '', 'Pirkėjo kodas': row.perkanciosiosOrganizacijosKodas ?? '',
+    'Tiekėjų pavadinimai': Array.isArray(row.tiekejai) ? row.tiekejai.join('; ') : '',
+    'Tiekėjų kodai': Array.isArray(row.tiekejaiKodai) ? row.tiekejaiKodai.join('; ') : '',
+    'Sudarymo data': formatDate(row.sudarymoData), 'Faktinė įvykdymo data': formatDate(row.faktineIvykdymoData),
+    'Redagavimo data': formatDate(row.paskutinioRedagavimoData),
+    'BVPZ kodai': Array.isArray(row.bvpzKodai) ? row.bvpzKodai.filter(Boolean).join('; ') : '',
+    'Sutarties numeris': row.sutartiesNumeris ?? '', 'Unikalus ID': row.sutartiesUnikalusId ?? '',
+  };
+}
+
+function csvLine(values: unknown[]) {
+  return values.map((value) => {
+    const text = value == null ? '' : String(value);
+    return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  }).join(',') + '\n';
+}
+
+// Progresas ir failas viename atsakyme. Penkių baitų kadro antraštė turi tipą
+// bei payload ilgį; todėl JSON įvykiai gali būti saugiai maišomi su XLSX baitais.
+if ((query.jsonl || query.csv || query.xlsx) && query.exportStream) {
+  const format = query.xlsx ? 'xlsx' : query.csv ? 'csv' : 'jsonl';
+  const contentType = format === 'xlsx'
+    ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    : format === 'csv' ? 'text/csv; charset=utf-8' : 'application/x-ndjson; charset=utf-8';
+  const filename = format === 'xlsx'
+    ? `viespirkiai-analize-${new Date().toISOString()}.xlsx`
+    : `viespirkiai-${new Date().toISOString()}.${format}`;
+
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      void (async () => {
+        try {
+          const total = engine === 'quickwit' ? await countSutartysQuickwit(query) : await countSutartys(query);
+          if (!canExportAnalizeXlsx(total)) {
+            controller.enqueue(exportFrame(EXPORT_FRAME.error, {
+              message: `Eksportas galimas iki ${XLSX_EXPORT_LIMIT.toLocaleString('lt-LT')} sutarčių. Pagal pasirinktus filtrus rasta ${total.toLocaleString('lt-LT')}.`,
+            }));
+            controller.close();
+            return;
+          }
+          controller.enqueue(exportFrame(EXPORT_FRAME.progress, { phase: 'searching', processed: 0, total, percent: 0 }));
+          if (format !== 'xlsx') controller.enqueue(exportFrame(EXPORT_FRAME.fileStart, { filename, contentType }));
+          const rows: Record<string, unknown>[] = [];
+          let processed = 0;
+          let csvHeaders: string[] | null = null;
+          let textBuffer = '';
+          let transferredBytes = 0;
+          const source = engine === 'quickwit'
+            ? iterateSutartysQuickwitExport(query, { limit: XLSX_EXPORT_LIMIT, signal: Astro.request.signal })
+            : (async function* () {
+                const result = await searchSutartys(query, { limit: XLSX_EXPORT_LIMIT, page: 1, stream: true, sort: false, engine });
+                try { for await (const row of result.stream!) yield row as Record<string, unknown>; }
+                finally { result.client?.release(); }
+              })();
+
+          for await (const row of source) {
+            if (Astro.request.signal.aborted) throw new DOMException('Exportas atšauktas', 'AbortError');
+            processed++;
+            if (format === 'xlsx') {
+              rows.push(row);
+            } else if (format === 'jsonl') {
+              textBuffer += JSON.stringify(row) + '\n';
+            } else {
+              const mapped = exportCsvRow(row);
+              if (!csvHeaders) {
+                csvHeaders = Object.keys(mapped);
+                textBuffer += csvLine(csvHeaders);
+              }
+              textBuffer += csvLine(csvHeaders.map((key) => mapped[key as keyof typeof mapped]));
+            }
+            if (processed % 500 === 0) {
+              if (textBuffer) {
+                const chunk = exportEncoder.encode(textBuffer);
+                transferredBytes += chunk.byteLength;
+                controller.enqueue(exportFrame(EXPORT_FRAME.fileChunk, chunk));
+                textBuffer = '';
+              }
+              controller.enqueue(exportFrame(EXPORT_FRAME.progress, {
+                phase: 'searching', processed, total, percent: total ? Math.min(99, Math.round(processed / total * 100)) : 0,
+                downloadedBytes: transferredBytes || undefined,
+              }));
+            }
+          }
+
+          if (textBuffer) {
+            const chunk = exportEncoder.encode(textBuffer);
+            transferredBytes += chunk.byteLength;
+            controller.enqueue(exportFrame(EXPORT_FRAME.fileChunk, chunk));
+          }
+          controller.enqueue(exportFrame(EXPORT_FRAME.progress, {
+            phase: 'collected', processed, total: processed, percent: 100, downloadedBytes: transferredBytes || undefined,
+          }));
+
+          if (format === 'xlsx') {
+            controller.enqueue(exportFrame(EXPORT_FRAME.progress, { phase: 'formatting', processed, total, percent: 100 }));
+            await new Promise<void>((resolve) => setImmediate(resolve));
+            const viewUrl = new URL(Astro.url);
+            viewUrl.protocol = 'https:';
+            ['xlsx', 'csv', 'jsonl', 'exportStream', 'limit', 'page'].forEach((key) => viewUrl.searchParams.delete(key));
+            const xlsx = new Uint8Array(buildAnalizeXlsx(rows, { exportedAt: new Date(), viewUrl: viewUrl.toString(), filters: viewUrl.searchParams.toString() }));
+            controller.enqueue(exportFrame(EXPORT_FRAME.fileStart, { filename, contentType, size: xlsx.byteLength }));
+            for (let offset = 0; offset < xlsx.byteLength; offset += 64 * 1024) {
+              const chunk = xlsx.subarray(offset, offset + 64 * 1024);
+              controller.enqueue(exportFrame(EXPORT_FRAME.fileChunk, chunk));
+              const downloaded = Math.min(offset + chunk.byteLength, xlsx.byteLength);
+              controller.enqueue(exportFrame(EXPORT_FRAME.progress, {
+                phase: 'downloading', processed, total, percent: Math.round(downloaded / xlsx.byteLength * 100),
+                downloadedBytes: downloaded, totalBytes: xlsx.byteLength,
+              }));
+            }
+          }
+          controller.enqueue(exportFrame(EXPORT_FRAME.progress, { phase: 'complete', processed, total: processed, percent: 100 }));
+          controller.enqueue(exportFrame(EXPORT_FRAME.complete));
+          controller.close();
+        } catch (error) {
+          if (!Astro.request.signal.aborted) {
+            controller.enqueue(exportFrame(EXPORT_FRAME.error, { message: error instanceof Error ? error.message : 'Eksporto klaida' }));
+            controller.close();
+          }
+        }
+      })();
+    },
+  });
+  void body;
+  return new Response(body, {
+    headers: {
+      'Content-Type': 'application/x-viespirkiai-export',
+      'Cache-Control': 'no-store',
+      'X-Accel-Buffering': 'no',
+    },
+  });
+}
+
 // Stream exports (JSONL / CSV / XLSX) short-circuit
 if (query.jsonl || query.csv || query.xlsx) {
   // Eksportai (xlsx/csv/jsonl) ribojami iki XLSX_EXPORT_LIMIT: XLSX visada
@@ -132,7 +287,7 @@ if (query.jsonl || query.csv || query.xlsx) {
   // pasiekti nebent tiek įrašų (žr. searchAll). Postgres CSV/JSONL lieka be ribos
   // (srautinamas tiesiai). Riba tikrinama pagal eksporto variklį, kad Quickwit
   // rezultatai (prefiksai/wildcard'ai) neatitiktų Postgres tikslaus skaičiaus.
-  const capped = Boolean(query.xlsx) || engine === 'quickwit';
+  const capped = true;
   if (capped) {
     const total = engine === 'quickwit' ? await countSutartysQuickwit(query) : await countSutartys(query);
     if (!canExportAnalizeXlsx(total)) {
@@ -486,6 +641,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
           galimaEksportuoti={galimaEksportuoti}
           eksportasPerDaug={eksportasPerDaug}
           eksportoRiba={XLSX_EXPORT_LIMIT}
+          exportTotal={total}
           containerClass="mt-0"
           flat={true}
           sortOptions={sortOptions}
