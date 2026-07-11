@@ -26,21 +26,18 @@
         "push:domenai": "node scripts/pushDomenaiToSpinta.js",
         "process:domenai-adp-queue": "node modules/domenai/processAdpQueue.js"
     },
-    "overrides": {
-        "vite": "^7"
-    },
     "keywords": [],
     "author": "",
     "description": "",
     "dependencies": {
-        "@astrojs/node": "^10.0.6",
+        "@astrojs/node": "^11.0.2",
         "@modelcontextprotocol/sdk": "^1.27.1",
         "@sigma/edge-curve": "^3.1.0",
         "@sigma/node-border": "^3.0.0",
         "@sigma/node-image": "^3.0.0",
         "@xmldom/xmldom": "^0.9.8",
         "adm-zip": "^0.5.16",
-        "astro": "^6.2.2",
+        "astro": "^7.0.7",
         "dompurify": "^3.3.1",
         "graphology": "^0.26.0",
         "graphology-layout-forceatlas2": "^0.10.1",
