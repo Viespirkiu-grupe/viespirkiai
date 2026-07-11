@@ -1,5 +1,10 @@
-# Nodejs
+# Node.js
 node_modules
+
+# Konfigūracija
+/config.js
+.env
+.vscode
 
 # Tasks
 taskState
@@ -7,8 +12,25 @@ taskState
 # VPN / Proxy
 wireproxy/proxy.wg
 
+# Postgres
+pgdata
+pgadmin-data
+postgres/18
+
 # Typesense
 typesense/data
+typesense/nodes
+typesense/typesense
+
+# Quickwit
+quickwit/qwdata
+
+# Plausible
+plausible/clickhouse
+plausible/db-data
+plausible/event-logs
+plausible/event-data
+plausible/plausible-conf.env
 
 # Exports / datasets
 *.csv
@@ -18,52 +40,21 @@ typesense/data
 *.txt
 !pgbouncer/userlist.txt
 
-# Plausible
-plausible/clickhouse
-plausible/db-data
-plausible/event-logs
-plausible/event-data
-plausible/plausible-conf.env
-
-# Postgres
-pgdata
-pgadmin-data
-postgres/18
-
-# Typesense
-typesense/typesense
-
-# Konfiguracija
-/config.js
-.env
-.vscode
-
 # Viešinami dokumentai
 public/vieslaiskiai
 public/veiklosAtaskaitos
 public/specialus
 
-# Old
-old
-backup
-
-# Temp
-tmp/*
-
-# Tailwind CSS build output
+# Build output
 public/dist/tailwind.css
 public/dist/tailwind.css.map
-# Quickwit
-quickwit/qwdata
-
-# Astro generated
+dist
 .astro
 
-# Dist
-dist
-
-!LICENSE.txt
-
+# Misc
 dbSchema
-
 modules/cvpp/ataskaitos
+tmp/*
+old
+backup
+!LICENSE.txt
