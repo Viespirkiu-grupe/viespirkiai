@@ -613,6 +613,14 @@ export async function viesiejiPirkimaiFacetOptions(field, query, size = 1000, op
     const options = await attachJarNames(buckets);
     if (!optionSearch) return options;
 
+    // Pirmiausia — facetuoti pasirinkimai (su skaičiais pagal esamą užklausą),
+    // atitinkantys paiešką. Tik jei tokių nėra, krentam į registro paiešką.
+    const needle = optionSearch.toLowerCase();
+    const inline = options.filter(
+        (o) => o.value.includes(optionSearch) || (o.label?.toLowerCase().includes(needle) ?? false),
+    );
+    if (inline.length) return inline;
+
     const counts = new Map(options.map((o) => [o.value, o.count]));
     const registryRows = /^\d+$/.test(optionSearch)
         ? (

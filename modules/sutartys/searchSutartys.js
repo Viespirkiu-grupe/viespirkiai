@@ -710,6 +710,14 @@ export async function sutartysFacetOptions(field, query, size = 1000, optionSear
 
     if (!optionSearch) return options;
 
+    // Pirmiausia — facetuoti pasirinkimai (su skaičiais pagal esamą užklausą),
+    // atitinkantys paiešką. Tik jei tokių nėra, krentam į registro paiešką.
+    const needle = optionSearch.toLowerCase();
+    const inline = options.filter(
+        (o) => o.value.includes(optionSearch) || (o.label?.toLowerCase().includes(needle) ?? false),
+    );
+    if (inline.length) return inline;
+
     // Registro paieška: skaičius → kodo prefiksas jar lentelėje; kitaip — vardo
     // paieška. Skaičius iš agregacijos prisegam prie rasto kodo (kiek sutarčių).
     const counts = new Map(options.map((o) => [o.value, o.count]));

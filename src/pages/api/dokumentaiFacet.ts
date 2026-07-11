@@ -61,6 +61,13 @@ export const GET: APIRoute = async ({ url }) => {
     );
     const optionSearch = p.get('optionSearch')?.trim() || '';
     if (field === 'jarKodai' && optionSearch) {
+      // Pirmiausia — facetuoti pasirinkimai (su skaičiais pagal esamą užklausą),
+      // atitinkantys paiešką. Tik jei tokių nėra, krentam į registro paiešką.
+      const needle = optionSearch.toLowerCase();
+      const inline = options.filter(
+        (option) => option.value.includes(optionSearch) || (option.label?.toLowerCase().includes(needle) ?? false),
+      );
+      if (inline.length) return json({ options: inline });
       const counts = new Map(options.map((option) => [option.value, option.count]));
       const registryResults = /^\d+$/.test(optionSearch)
         ? (await postgres.query(
