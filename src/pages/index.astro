@@ -6,8 +6,7 @@ import SutartysFilters from '../components/content/SutartysFilters.astro';
 import DokFacetSection from '../components/dokumentai/DokFacetSection.astro';
 import SutartysFacetModal from '../components/content/SutartysFacetModal.astro';
 import SutartysBvpzModal from '../components/content/SutartysBvpzModal.astro';
-import SutartysSumaFilter from '../components/content/SutartysSumaFilter.astro';
-import SutartysLaikotarpisFilter from '../components/content/SutartysLaikotarpisFilter.astro';
+import HistogramRangeFilter from '@design-system/components/filters/HistogramRangeFilter.astro';
 import { splitFacetOptions } from '../lib/dokumentaiUrl.ts';
 import SearchResults from '../components/content/SearchResults.astro';
 import Reklama from '../components/reklamos/Reklama.astro';
@@ -443,8 +442,8 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
                 stacked
                 modal={{ field: 'tiekejaiKodai', title: 'Tiekėjas', always: true }}
               />
-              <SutartysSumaFilter hist={facets.suma} sumaNuo={values.sumaNuo as string | undefined} sumaIki={values.sumaIki as string | undefined} />
-              <SutartysLaikotarpisFilter hist={facets.laikotarpis} dataNuo={values.sudarymoDataNuo as string | undefined} dataIki={values.sudarymoDataIki as string | undefined} />
+              <HistogramRangeFilter mode="number" legend="Suma" unit="€" nameFrom="sumaNuo" nameTo="sumaIki" redirectBase="/" hist={facets.suma} valueFrom={values.sumaNuo as string | undefined} valueTo={values.sumaIki as string | undefined} ariaFrom="Suma nuo" ariaTo="Suma iki" />
+              <HistogramRangeFilter mode="date" legend="Laikotarpis" nameFrom="sudarymoDataNuo" nameTo="sudarymoDataIki" redirectBase="/" hist={facets.laikotarpis} valueFrom={values.sudarymoDataNuo as string | undefined} valueTo={values.sudarymoDataIki as string | undefined} ariaFrom="Sudaryta nuo" ariaTo="Sudaryta iki" />
               <DokFacetSection label="BVPŽ" param="bvpzPrefiksasKitas" facet={mkFacet('bvpzPrefiksasKitas', facets.bvpz, 8)} allLabel="Visi" stacked modal={{ field: 'bvpzKodai', title: 'BVPŽ klasifikacija', always: true }} />
               <DokFacetSection label="Tipas" param="tipas" facet={mkFacet('tipas', facets.tipas, 5)} allLabel="Visi" alwaysAll />
               <DokFacetSection label="Kategorija" param="kategorija" facet={mkFacet('kategorija', facets.kategorija, 6)} allLabel="Visos" />
@@ -545,6 +544,8 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
   // „Ieškoti" (žr. mobileFilterBatch). Darbastalyje nuorodos veikia įprastai.
   import { initRailFacetBatch } from '@/src/lib/mobileFilterBatch';
   import { initStickyRail } from '@/src/lib/stickyRail';
+  import { initHistogramRangeFilters } from '@design-system/components/filters/histogramRangeFilter';
   initRailFacetBatch('.sut-facets', (p) => (p === 'bvpzPrefiksasKitas' ? ' ' : ','));
   initStickyRail();
+  initHistogramRangeFilters();
 </script>

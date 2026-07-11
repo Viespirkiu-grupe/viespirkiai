@@ -1,0 +1,175 @@
+---
+// Interaktyvi stulpelinė diagrama per seką (pvz. metus). Kiekvienas stulpelis
+// neša tikslinį aukštį kaip CSS kintamąjį (scaleY animuojasi, teisinga ir be JS)
+// ir yra nuoroda (pvz. filtruoja į tuos metus). Užvedus/fokusavus rodomas gyvas
+// rodmuo (žr. timelineChart.ts); aktyvus (filtruotas) stulpelis paryškinamas.
+// Generinis: kviečiantysis paduoda paruoštus stulpelius (etiketė, skaičius,
+// suformatuotas tekstas, href, active). Piko etiketė ašyje rodoma tik kai
+// etiketės skaitinės ir pikas netrukdo kraštinėms etiketėms.
+interface Bar {
+  label: string | number;
+  count: number;
+  countText: string;
+  href?: string;
+  active?: boolean;
+  ariaLabel?: string;
+}
+interface Props {
+  title: string;
+  bars: Bar[];
+}
+const { title, bars } = Astro.props;
+
+const max = Math.max(1, ...bars.map((b) => b.count));
+const peak = bars.reduce((best, b) => (b.count > (best?.count ?? -1) ? b : best), bars[0]);
+const first = bars[0]?.label;
+const last = bars[bars.length - 1]?.label;
+const filtered = bars.some((b) => b.active);
+
+// Piko etiketės pozicija ašyje (0–1). Tik jei etiketės skaitinės ir pikas nesėdi
+// prie kraštų (kitaip persidengtų su first/last).
+const nFirst = Number(first);
+const nLast = Number(last);
+const nPeak = Number(peak?.label);
+const peakPos = Number.isFinite(nFirst) && Number.isFinite(nLast) && Number.isFinite(nPeak) && nLast !== nFirst
+  ? (nPeak - nFirst) / (nLast - nFirst)
+  : null;
+const showPeakLabel = peakPos != null && peakPos > 0.12 && peakPos < 0.88;
+
+// Ramybės rodmuo: pirmas aktyvus stulpelis, kitaip pikas.
+const readout = bars.find((b) => b.active) ?? peak;
+---
+
+<section class="tlc">
+  <div class="tlc__h-row">
+    <h3 class="tlc__h">{title}</h3>
+    <output class="tlc__readout" aria-hidden="true" data-default-label={String(readout?.label ?? '')} data-default-count={readout?.countText ?? ''}>
+      <span class="tlc__readout-count">{readout?.countText}</span>
+      <span class="tlc__readout-label">{readout?.label}</span>
+    </output>
+  </div>
+  <div class={`tlc__chart${filtered ? ' is-filtered' : ''}`} style={`--n:${bars.length}`}>
+    {bars.map((b, i) => (
+      <a
+        href={b.href}
+        class={`tlc__col${b.label === peak?.label ? ' is-peak' : ''}${b.active ? ' is-active' : ''}`}
+        style={`--h:${Math.max(2, Math.round((b.count / max) * 100))};--i:${i}`}
+        data-label={String(b.label)}
+        data-count={b.countText}
+        aria-label={b.ariaLabel ?? `${b.label}: ${b.countText}`}
+      >
+        <span class="tlc__col-bar" aria-hidden="true"></span>
+      </a>
+    ))}
+  </div>
+  <div class="tlc__axis">
+    <span>{first}</span>
+    {showPeakLabel && (
+      <span class="tlc__axis-peak" style={`--p:${(peakPos ?? 0) * 100}%`}>{peak?.label}</span>
+    )}
+    <span>{last}</span>
+  </div>
+</section>
+
+<style>
+  .tlc__h {
+    margin: 0;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--gray);
+  }
+  .tlc__h-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  /* Gyvas užvedimo/fokuso rodmuo — užvesto stulpelio skaičius, etiketė po juo. */
+  .tlc__readout {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    line-height: 1;
+  }
+  .tlc__readout-count {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--black);
+    font-variant-numeric: tabular-nums;
+  }
+  .tlc__readout-label {
+    font-size: var(--text-xs);
+    color: var(--link);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .tlc__chart {
+    display: grid;
+    grid-template-columns: repeat(var(--n), 1fr);
+    align-items: end;
+    gap: 2px;
+    height: 86px;
+  }
+  .tlc__col {
+    display: flex;
+    align-items: flex-end;
+    height: 100%;
+    min-width: 0;
+    padding-top: 6px;            /* clickable headroom above short bars */
+    border-radius: 2px 2px 0 0;
+    cursor: pointer;
+  }
+  .tlc__col-bar {
+    width: 100%;
+    height: calc(var(--h, 0) * 1%);
+    border-radius: 2px 2px 0 0;
+    background: color-mix(in srgb, var(--link) 32%, var(--lighter-gray));
+    transform-origin: bottom;
+    transition: background .12s, opacity .12s;
+    /* `backwards`, not `both`: keep the collapsed start state before the
+       animation, but DON'T retain the final `scaleY(1)` afterwards. A lingering
+       (identity) transform puts the bar on its own raster layer scaled against
+       the chart's fractional baseline, which anti-aliases the bottom edge a
+       different amount per bar — the ~1px height jitter. Reverting to the
+       static `height` paints the baseline crisply. */
+    animation: tlcGrowY .6s cubic-bezier(.2, .7, .2, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 18ms + 60ms);
+  }
+  .tlc__col.is-peak .tlc__col-bar { background: color-mix(in srgb, var(--link) 60%, var(--lighter-gray)); }
+  /* Hover/focus (pointer + keyboard + JS-driven .is-hover) lights the bar. */
+  .tlc__col:hover .tlc__col-bar,
+  .tlc__col:focus-visible .tlc__col-bar,
+  .tlc__col.is-hover .tlc__col-bar { background: color-mix(in srgb, var(--link) 80%, transparent); }
+  .tlc__col:focus-visible { outline: none; }
+  .tlc__col:focus-visible .tlc__col-bar { box-shadow: 0 0 0 2px color-mix(in srgb, var(--link) 30%, transparent); }
+  /* When a bar is filtered, the rest recede so the selection pops. */
+  .tlc__chart.is-filtered .tlc__col-bar { opacity: .4; }
+  .tlc__chart.is-filtered .tlc__col.is-active .tlc__col-bar,
+  .tlc__chart.is-filtered .tlc__col:hover .tlc__col-bar,
+  .tlc__chart.is-filtered .tlc__col.is-hover .tlc__col-bar { opacity: 1; }
+  .tlc__col.is-active .tlc__col-bar { background: var(--link); }
+  .tlc__axis {
+    position: relative;
+    margin-top: 7px;
+    height: 14px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+  }
+  .tlc__axis-peak {
+    position: absolute;
+    left: var(--p, 50%);
+    transform: translateX(-50%);
+    color: var(--link);
+    font-weight: 600;
+  }
+  @keyframes tlcGrowY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+  @media (prefers-reduced-motion: reduce) {
+    .tlc__col-bar { animation: none !important; transform: none !important; }
+  }
+</style>

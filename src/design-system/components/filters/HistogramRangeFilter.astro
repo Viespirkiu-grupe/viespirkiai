@@ -1,0 +1,334 @@
+---
+// Generinis histogramos + dvipusio slankiklio rėžio filtras. Vienas komponentas dviem
+// režimams (mode="number" — pvz. suma/vertė €; mode="date" — laikotarpis). Domenas
+// dinamiškas: [domainMin, domainMax] atspindi realų duomenų rėžį (backend nukerpa
+// tuščius kaušus). Reikšmę rodom pagal tai, ar naudotojas ją įvedė (parametras yra) —
+// NE pagal domeną: domenas dinamiškai apkarpomas pagal kitus filtrus, tad įvesta riba
+// gali atsidurti už jo. Elgesys — histogramRangeFilter.ts (skaito data-atributus).
+interface Bucket { from: number; to: number | null; count: number }
+interface Props {
+  /** Sekcijos antraštė (pvz. „Suma", „Laikotarpis"). */
+  legend: string;
+  /** GET formos laukų vardai — jie ir keliauja URL'e. */
+  nameFrom: string;
+  nameTo: string;
+  /** number: reikšmės skaičiai; date: reikšmės epoch-millis, laukeliai type=date. */
+  mode: 'number' | 'date';
+  hist: { buckets: Bucket[]; domainMin: number; domainMax: number };
+  valueFrom?: string | number;
+  valueTo?: string | number;
+  /** Kur nukreipia „commit" darbastalyje (pvz. „/" ar „/viesiejiPirkimai/"). */
+  redirectBase: string;
+  /** number režimo vienetas (pvz. „€"). */
+  unit?: string;
+  ariaFrom?: string;
+  ariaTo?: string;
+}
+const {
+  legend, nameFrom, nameTo, mode, hist,
+  valueFrom, valueTo, redirectBase, unit = '',
+  ariaFrom = `${legend} nuo`, ariaTo = `${legend} iki`,
+} = Astro.props;
+
+const isDate = mode === 'date';
+const now = Date.now();
+const DAY = 86_400_000;
+
+const domainMin = isDate
+  ? (hist.domainMin || now - 365 * DAY)
+  : Math.max(0, hist.domainMin || 0);
+const domainMax = isDate
+  ? (hist.domainMax && hist.domainMax > domainMin ? hist.domainMax : now)
+  : Math.max(domainMin + 1, hist.domainMax || 100_000_000);
+
+const parse = (v: string | number | undefined): number | null => {
+  if (isDate) {
+    const t = Date.parse(String(v ?? ''));
+    return Number.isFinite(t) ? t : null;
+  }
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+};
+
+const hasNuo = parse(valueFrom) != null;
+const hasIki = parse(valueTo) != null;
+const minVal = parse(valueFrom) ?? domainMin;
+const maxVal = parse(valueTo) ?? domainMax;
+
+const toDateStr = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+const fmtData = (ms: number) => new Date(ms).toLocaleDateString('lt-LT');
+// Kompaktiškas skaičiaus formatas burbulams / vietaženkliams.
+const fmtNum = (n: number): string => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString('lt-LT', { maximumFractionDigits: 1 })} mln.`;
+  if (n >= 1_000) return `${Math.round(n / 1_000).toLocaleString('lt-LT')} tūkst.`;
+  return String(Math.round(n));
+};
+const fmt = (n: number) => (isDate ? fmtData(n) : fmtNum(n));
+const fieldValue = (n: number) => (isDate ? toDateStr(n) : String(Math.round(n)));
+
+const maxCount = Math.max(1, ...hist.buckets.map((b) => b.count));
+const effMax = maxVal >= domainMax ? Infinity : maxVal;
+
+// Vienodo pločio stulpeliai — po vieną kaušui. „Aktyvus", jei kaušo rėžis
+// persidengia su pasirinktu [minVal, effMax].
+const unitSuffix = !isDate && unit ? ` ${unit}` : '';
+const bars = hist.buckets.map((b) => {
+  const upper = b.to == null ? Infinity : b.to;
+  const height = b.count > 0 ? 8 + 92 * Math.sqrt(b.count / maxCount) : 0;
+  const active = upper > minVal && b.from < effMax;
+  const title = `${fmt(b.from)} – ${b.to != null ? fmt(b.to) : '∞'}${unitSuffix}: ${b.count.toLocaleString('lt-LT')}`;
+  return { from: b.from, to: b.to, count: b.count, height, active, title };
+});
+
+// Be duomenų (pvz. paieška be rezultatų) diagramos ir slankiklio nerodom — tik
+// „Nėra duomenų" ir laukelius, kad filtrą būtų galima pakeisti/nusiimti.
+const histTuscia = !hist.buckets.length || hist.buckets.every((b) => !b.count);
+
+const inputType = isDate ? 'date' : 'number';
+const placeholderMin = isDate ? undefined : fmtNum(domainMin);
+const placeholderMax = isDate ? undefined : fmtNum(domainMax) + '+';
+
+// SSR slankiklio pozicijos — apskaičiuojam serveryje ta pačia atkarpų per kaušus
+// logika kaip histogramRangeFilter.ts, kad rankenėlės / užpildas nemirksėtų nuo
+// kraštų (0/1000), kol įsijungia moduliaris JS (jis dažnai atidėtas — defer).
+const STEPS = 1000;
+const posBkts = bars.length
+  ? bars.map((b) => ({ from: b.from, to: b.to == null ? domainMax : b.to }))
+  : [{ from: domainMin, to: domainMax }];
+const N = posBkts.length;
+const frac = (v: number): number => {
+  if (v <= domainMin) return 0;
+  if (v >= domainMax) return 1;
+  for (let i = 0; i < N; i++) {
+    const { from, to } = posBkts[i];
+    if (v < to || i === N - 1) {
+      const local = to > from ? (v - from) / (to - from) : 0;
+      return (i + Math.min(1, Math.max(0, local))) / N;
+    }
+  }
+  return 1;
+};
+const valToPos = (v: number) => Math.round(frac(v) * STEPS);
+const posMin = valToPos(minVal);
+const posMax = maxVal >= domainMax ? STEPS : valToPos(maxVal);
+const loPct = frac(minVal) * 100;
+const hiPct = frac(maxVal) * 100;
+const bubMinText = fmt(minVal);
+const bubMaxText = !isDate && maxVal >= domainMax ? fmt(domainMax) + '+' : fmt(maxVal);
+---
+
+<section
+  class="dok-filter-section hrf"
+  data-hrf
+  data-mode={mode}
+  data-domain-min={domainMin}
+  data-domain-max={domainMax}
+  data-name-from={nameFrom}
+  data-name-to={nameTo}
+  data-redirect-base={redirectBase}
+  data-unit={unit}
+>
+  <span class="dok-filter-section-label">{legend}</span>
+
+  {histTuscia ? <p class="dok-facet-empty">Nėra duomenų</p> : (
+    <>
+      <div class="hrf-chart" aria-hidden="true">
+        {bars.map((b) => (
+          <span
+            class={`hrf-bar${b.active ? ' is-active' : ''}`}
+            data-from={b.from}
+            data-to={b.to ?? ''}
+            style={`height:${b.height}%`}
+            title={b.title}
+          ></span>
+        ))}
+      </div>
+
+      <div class="hrf-slider">
+        <span class="hrf-track"></span>
+        <span class="hrf-range" style={`left:${loPct}%;width:${Math.max(0, hiPct - loPct)}%`}></span>
+        <input type="range" class="hrf-handle hrf-handle--min" min="0" max="1000" step="1" value={posMin} aria-label={ariaFrom} />
+        <input type="range" class="hrf-handle hrf-handle--max" min="0" max="1000" step="1" value={posMax} aria-label={ariaTo} />
+        <span class="hrf-bubble hrf-bubble--min" style={`left:${loPct}%`} aria-hidden="true">{bubMinText}</span>
+        <span class="hrf-bubble hrf-bubble--max" style={`left:${hiPct}%`} aria-hidden="true">{bubMaxText}</span>
+      </div>
+    </>
+  )}
+
+  <div class={`hrf-inputs hrf-inputs--${mode}`}>
+    <label class="hrf-box hrf-box--min">
+      <input type={inputType} name={nameFrom} min={isDate ? undefined : '0'} step="1"
+             inputmode={isDate ? undefined : 'numeric'} placeholder={placeholderMin}
+             value={hasNuo ? fieldValue(minVal) : ''} aria-label={ariaFrom} class="hrf-input--min" />
+      {unit && !isDate && <span class="hrf-box-unit">{unit}</span>}
+    </label>
+    <label class="hrf-box hrf-box--max">
+      <input type={inputType} name={nameTo} min={isDate ? undefined : '0'} step="1"
+             inputmode={isDate ? undefined : 'numeric'} placeholder={placeholderMax}
+             value={hasIki ? fieldValue(maxVal) : ''} aria-label={ariaTo} class="hrf-input--max" />
+      {unit && !isDate && <span class="hrf-box-unit">{unit}</span>}
+    </label>
+  </div>
+</section>
+
+<style>
+  /* Histograma: vienodo pločio stulpeliai (po vieną kaušui). */
+  .hrf-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 44px;
+    margin: 8px 0 6px;
+  }
+  .hrf-bar {
+    flex: 1;
+    min-width: 0;
+    background-color: var(--light-gray);
+    border-radius: 1.5px 1.5px 0 0;
+    transition: background-color var(--transition);
+    cursor: pointer;
+  }
+  .hrf-bar.is-active { background-color: var(--black); }
+  /* Hover reakcija — tamsėja (ir virš pasirinkto rėžio). */
+  .hrf-chart:hover .hrf-bar { background-color: var(--lighter-gray); }
+  .hrf-chart:hover .hrf-bar.is-active { background-color: var(--dark-gray); }
+  .hrf-bar:hover,
+  .hrf-chart:hover .hrf-bar:hover { background-color: var(--black); }
+
+  /* Dvipusis slankiklis. */
+  .hrf-slider { position: relative; height: 20px; }
+  .hrf-track,
+  .hrf-range {
+    position: absolute;
+    top: 50%;
+    height: 3px;
+    border-radius: 2px;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  .hrf-track { left: 0; width: 100%; background: var(--light-gray); }
+  .hrf-range { background: var(--black); }
+
+  .hrf-handle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    background: none;
+    pointer-events: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .hrf-handle::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    pointer-events: auto;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--white);
+    border: 2px solid var(--black);
+    cursor: pointer;
+    box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, .2));
+  }
+  .hrf-handle::-moz-range-thumb {
+    pointer-events: auto;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--white);
+    border: 2px solid var(--black);
+    cursor: pointer;
+  }
+  .hrf-handle::-webkit-slider-runnable-track { background: none; }
+  .hrf-handle::-moz-range-track { background: none; }
+
+  /* Reikšmės „burbulas" virš vilkamos rankenėlės. */
+  .hrf-bubble {
+    position: absolute;
+    bottom: 100%;
+    margin-bottom: 4px;
+    transform: translateX(-50%);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--black);
+    color: var(--white);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--transition);
+  }
+  /* Burbulas matomas tik vilkant/fokusuojant rankenėlę (CSS :active — automatiškai
+     dingsta paleidus, tad neįstringa). */
+  .hrf-handle--min:active ~ .hrf-bubble--min,
+  .hrf-handle--min:focus-visible ~ .hrf-bubble--min,
+  .hrf-handle--max:active ~ .hrf-bubble--max,
+  .hrf-handle--max:focus-visible ~ .hrf-bubble--max { opacity: 1; }
+
+  /* Du kompaktiški langeliai — „nuo" kairėje, „iki" dešinėje. */
+  .hrf-inputs {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .hrf-inputs--date { gap: 6px; }
+  .hrf-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 7px;
+    border: var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+  }
+  .hrf-inputs--date .hrf-box { min-width: 0; padding: 3px 6px; }
+  .hrf-box:focus-within { border-color: var(--black); }
+  .hrf-box input {
+    width: 7ch;
+    border: none;
+    outline: none;
+    background: none;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+    -moz-appearance: textfield;
+  }
+  .hrf-box--min input { text-align: left; }
+  .hrf-box--max input { text-align: right; }
+  .hrf-box input:focus { color: var(--black); }
+  .hrf-box input::placeholder { color: var(--gray); }
+  .hrf-box input::-webkit-outer-spin-button,
+  .hrf-box input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .hrf-box-unit { flex-shrink: 0; font-size: var(--text-xs); color: var(--gray); }
+
+  /* Datos režimas: laukeliai per visą plotį, be teksto lygiavimo triukų. */
+  .hrf-inputs--date .hrf-box input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+    line-height: 1.2;
+    text-align: left;
+    /* Nuimam native date valdiklio aukštį — kad langelis būtų toks pat žemas kaip
+       kiti. Globalus `input[type="date"]{min-height:40.5px}` (@layer components) —
+       perrašom min-height (nesluoksniuotas stilius nugali). */
+    -webkit-appearance: none;
+    appearance: none;
+    height: auto;
+    min-height: 0;
+  }
+  .hrf-inputs--date .hrf-box--max input { text-align: left; }
+  .hrf-inputs--date .hrf-box input::-webkit-datetime-edit { padding: 0; }
+  .hrf-inputs--date .hrf-box input::-webkit-inner-spin-button { display: none; }
+  .hrf-inputs--date .hrf-box input::-webkit-calendar-picker-indicator {
+    padding: 0;
+    margin-left: 2px;
+    opacity: .5;
+    cursor: pointer;
+  }
+</style>

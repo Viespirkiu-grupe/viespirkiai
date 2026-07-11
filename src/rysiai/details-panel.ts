@@ -1,6 +1,7 @@
 import type {NodeAttrs} from './entity-types.ts';
 import {isConfigurableNode, isContractNode, isOrgNode, isPersonNode, isProcurementNode} from './entity-types.ts';
 import type {LegendState} from './legend-state.ts';
+import {escapeHtml as esc} from '@design-system/lib/html.ts';
 
 export interface NodeHandlers {
     onExpand?: () => void;
@@ -64,10 +65,6 @@ function formatContractValue(verte: number | null | undefined): string {
 
 function link(href: string, label: string): string {
     return `<a href="${href}" target="_blank" rel="noopener" class="vd-link">${label} ↗</a>`;
-}
-
-function esc(s: unknown): string {
-    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function formatDate(d: string | null | undefined): string {

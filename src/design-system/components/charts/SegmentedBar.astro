@@ -1,0 +1,99 @@
+---
+// Segmentuota juosta + legenda. Segmentų pločiai — dalys nuo rodomų reikšmių
+// sumos; legenda papildomai gali rodyti kiekvieno dalį nuo visumos (pctText) ir
+// skaičių (countText). Generinis: kviečiantysis paduoda segmentus (etiketė,
+// reikšmė, href, spalva). Papildo esamus BarList / StatChip.
+interface Segment {
+  label: string;
+  value: number;
+  href?: string;
+  title?: string;
+  /** Dalis nuo visumos, jau suformatuota (pvz. „42%"). */
+  pctText?: string;
+  /** Skaičius, jau suformatuotas. */
+  countText?: string;
+  /** Spalva; jei nenurodyta — imama iš numatytos paletės pagal poziciją. */
+  color?: string;
+}
+interface Props {
+  segments: Segment[];
+  ariaLabel?: string;
+}
+const { segments, ariaLabel = 'Pasiskirstymas' } = Astro.props;
+
+// Rami, atskiriama numatyta paletė — skaitosi ant balto nerėkdama. Indeksuojama
+// pagal poziciją; jei viršyta — kartojasi.
+const PALETTE = ['#2563eb', '#0891b2', '#7c3aed', '#d97706', '#16a34a', '#db2777'];
+const color = (seg: Segment, i: number) => seg.color ?? PALETTE[i % PALETTE.length];
+const sum = segments.reduce((s, seg) => s + seg.value, 0) || 1;
+---
+
+<div class="sgb">
+  <div class="sgb__bar" role="img" aria-label={ariaLabel}>
+    {segments.map((seg, i) => (
+      <span class="sgb__part" style={`--w:${(seg.value / sum) * 100}%;--c:${color(seg, i)}`} title={seg.title ?? `${seg.label}: ${seg.countText ?? seg.value}`}></span>
+    ))}
+  </div>
+  <ul class="sgb__legend">
+    {segments.map((seg, i) => (
+      <li>
+        <a href={seg.href} class="sgb__row">
+          <span class="sgb__dot" style={`--c:${color(seg, i)}`} aria-hidden="true"></span>
+          <span class="sgb__lbl">{seg.label}</span>
+          {seg.pctText && <span class="sgb__pct">{seg.pctText}</span>}
+          {seg.countText && <span class="sgb__cnt">{seg.countText}</span>}
+        </a>
+      </li>
+    ))}
+  </ul>
+</div>
+
+<style>
+  .sgb__bar {
+    display: flex;
+    height: 10px;
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    background: var(--lighter-gray);
+  }
+  .sgb__part {
+    width: var(--w, 0);
+    background: var(--c, #2563eb);
+    transform-origin: left;
+    animation: sgbGrowX .6s cubic-bezier(.2, .7, .2, 1) backwards;
+    animation-delay: .1s;
+  }
+  .sgb__legend { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+  .sgb__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px;
+    border-radius: var(--radius-sm);
+    color: inherit;
+  }
+  .sgb__row:hover { background: var(--lighter-gray); }
+  .sgb__dot { flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--c, #2563eb); }
+  .sgb__lbl {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: var(--text-sm);
+    color: var(--black);
+  }
+  .sgb__pct { flex: none; font-size: 10px; color: var(--gray); font-variant-numeric: tabular-nums; }
+  .sgb__cnt {
+    flex: none;
+    min-width: 40px;
+    text-align: right;
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+    font-variant-numeric: tabular-nums;
+  }
+  @keyframes sgbGrowX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @media (prefers-reduced-motion: reduce) {
+    .sgb__part { animation: none !important; transform: none !important; }
+  }
+</style>

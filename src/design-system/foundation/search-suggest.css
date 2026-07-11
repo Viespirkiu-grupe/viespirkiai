@@ -1,0 +1,100 @@
+/* ── Paieškos pasiūlymų (autocomplete) iškrentantis sąrašas ──────────────────
+   Panelė įdedama į `.search-bar` ir pozicionuojama absoliučiai, todėl ji
+   nedalyvauja flex'o sraute ir tiksliai pasidengia po langeliu. Klasė
+   `.ss-has-suggest` pridedama tik ten, kur naudojamas šis komponentas, tad
+   globalios taisyklės neliečia kitų `.search-bar`. */
+.search-bar.ss-has-suggest {
+  position: relative;
+}
+.ss-suggest-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: var(--white);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 28px -6px color-mix(in oklab, var(--black) 18%, transparent);
+  overflow: hidden;
+  animation: ss-suggest-in 120ms ease;
+}
+@keyframes ss-suggest-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-suggest-panel { animation: none; }
+}
+.ss-suggest-list {
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  padding: 6px;
+}
+.ss-suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--black);
+  text-align: left;
+  cursor: pointer;
+}
+.ss-suggest-item.is-active { background: var(--lighter-gray); }
+.ss-suggest-glyph {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--gray);
+}
+.ss-suggest-item.is-active .ss-suggest-glyph { color: var(--dark-gray); }
+.ss-suggest-glyph svg { width: 18px; height: 18px; }
+.ss-suggest-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ss-suggest-title mark {
+  background: none;
+  color: var(--black);
+  font-weight: 600;
+}
+.ss-suggest-q { font-weight: 600; }
+.ss-suggest-meta {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--gray);
+  font-variant-numeric: tabular-nums;
+}
+.ss-suggest-foot {
+  display: flex;
+  gap: 16px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--lighter-gray);
+  font-size: var(--text-xs);
+  color: var(--gray);
+}
+.ss-suggest-foot kbd {
+  display: inline-block;
+  min-width: 16px;
+  margin-right: 2px;
+  padding: 1px 4px;
+  border: 1px solid var(--light-gray);
+  border-radius: var(--radius-sm);
+  background: var(--lightest-gray);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--dark-gray);
+}
+@media (max-width: 600px) {
+  .ss-suggest-foot { display: none; }
+}

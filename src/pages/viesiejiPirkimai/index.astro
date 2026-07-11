@@ -10,8 +10,7 @@ import ViesiejiPirkimaiCard from '../../components/viesiejiPirkimai/ViesiejiPirk
 import DokFacetSection from '../../components/dokumentai/DokFacetSection.astro';
 import ViesiejiPirkimaiFacetModal from '../../components/viesiejiPirkimai/ViesiejiPirkimaiFacetModal.astro';
 import ViesiejiPirkimaiBvpzModal from '../../components/viesiejiPirkimai/ViesiejiPirkimaiBvpzModal.astro';
-import PirkimasVerteFilter from '../../components/viesiejiPirkimai/PirkimasVerteFilter.astro';
-import PirkimasLaikotarpisFilter from '../../components/viesiejiPirkimai/PirkimasLaikotarpisFilter.astro';
+import HistogramRangeFilter from '@design-system/components/filters/HistogramRangeFilter.astro';
 import { splitFacetOptions } from '../../lib/dokumentaiUrl.ts';
 import { searchViesiejiPirkimai, countViesiejiPirkimai } from '@/modules/viesiejiPirkimai/searchViesiejiPirkimai.js';
 import Reklama from '../../components/reklamos/Reklama.astro';
@@ -276,8 +275,8 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
               />
               <DokFacetSection label="Statusas" param="statusas" facet={mkFacet('statusas', facets.statusas, 6)} allLabel="Visi" formatLabel={(v) => STATUSAS[v] ?? v} />
               <DokFacetSection label="Pirkimo būdas" param="pirkimoBudas" facet={mkFacet('pirkimoBudas', facets.pirkimoBudas, 6)} allLabel="Visi" formatLabel={(v) => PIRKIMO_BUDAS[v] ?? v} />
-              <PirkimasLaikotarpisFilter hist={facets.laikotarpis} dataNuo={values.paskelbimoDataNuo as string | undefined} dataIki={values.paskelbimoDataIki as string | undefined} />
-              <PirkimasVerteFilter hist={facets.verte} verteNuo={values.verteNuo as string | undefined} verteIki={values.verteIki as string | undefined} />
+              <HistogramRangeFilter mode="date" legend="Laikotarpis" nameFrom="paskelbimoDataNuo" nameTo="paskelbimoDataIki" redirectBase="/viesiejiPirkimai/" hist={facets.laikotarpis} valueFrom={values.paskelbimoDataNuo as string | undefined} valueTo={values.paskelbimoDataIki as string | undefined} ariaFrom="Paskelbta nuo" ariaTo="Paskelbta iki" />
+              <HistogramRangeFilter mode="number" legend="Vertė" unit="€" nameFrom="verteNuo" nameTo="verteIki" redirectBase="/viesiejiPirkimai/" hist={facets.verte} valueFrom={values.verteNuo as string | undefined} valueTo={values.verteIki as string | undefined} ariaFrom="Vertė nuo" ariaTo="Vertė iki" />
               <DokFacetSection label="BVPŽ" param="bvpzPrefiksai" facet={mkFacet('bvpzPrefiksai', facets.bvpz, 8)} allLabel="Visi" stacked modal={{ field: 'bvpzKodai', title: 'BVPŽ klasifikacija', always: true }} />
               <p class="dok-facet-note">Rodomi apytiksliai skaičiai.</p>
             </div>
@@ -420,6 +419,8 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
   // „Ieškoti" (žr. mobileFilterBatch). Darbastalyje nuorodos veikia įprastai.
   import { initRailFacetBatch } from '@/src/lib/mobileFilterBatch';
   import { initStickyRail } from '@/src/lib/stickyRail';
+  import { initHistogramRangeFilters } from '@design-system/components/filters/histogramRangeFilter';
   initRailFacetBatch('.vp-facets', (p) => (p === 'bvpzPrefiksai' ? ' ' : ','));
   initStickyRail();
+  initHistogramRangeFilters();
 </script>

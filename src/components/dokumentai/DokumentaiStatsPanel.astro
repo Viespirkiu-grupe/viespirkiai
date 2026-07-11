@@ -9,6 +9,8 @@ import { fmt, fmtCompact } from '../../lib/dokumentaiFormat.ts';
 import { SOURCE_LABEL } from '../../lib/dokumentaiLabels.ts';
 import BarList from '@design-system/components/BarList.astro';
 import StatChip from '@design-system/components/StatChip.astro';
+import TimelineColumnChart from '@design-system/components/charts/TimelineColumnChart.astro';
+import SegmentedBar from '@design-system/components/charts/SegmentedBar.astro';
 
 interface Props {
   stats: DokumentaiStats;
@@ -27,11 +29,6 @@ const TYPE_LABEL: Record<string, string> = {
   teismoNuosprendis: 'Teismo nuosprendžiai',
 };
 
-// Quiet, distinguishable palette for the type composition segments — reads on
-// white without shouting. Indexed by position; wraps if ever exceeded.
-const SEG_PALETTE = ['#2563eb', '#0891b2', '#7c3aed', '#d97706', '#16a34a', '#db2777'];
-const segColor = (i: number) => SEG_PALETTE[i % SEG_PALETTE.length];
-
 const typeUrl = (v: string) => buildDokumentaiUrl(urlState, { type: toggleValue(urlState.type, v) });
 const sourceUrl = (v: string) => buildDokumentaiUrl(urlState, { source: toggleValue(urlState.source, v) });
 const istaigaUrl = (v: string) => buildDokumentaiUrl(urlState, { istaiga: toggleValue(urlState.istaiga, v) });
@@ -42,29 +39,18 @@ const istaigaUrl = (v: string) => buildDokumentaiUrl(urlState, { istaiga: toggle
 // the search to that year. Hover/focus drives a live readout (wired in the
 // script below); the active (filtered) year, if any, is emphasised.
 const timeline = stats.timeline;
-const tlMax = Math.max(1, ...timeline.map((t) => t.count));
-const tlPeakYear = timeline.reduce((best, t) => (t.count > (best?.count ?? -1) ? t : best), timeline[0])?.year;
 const tlFirst = timeline[0]?.year;
 const tlLast = timeline[timeline.length - 1]?.year;
 const tlByYear = new Map(timeline.map((t) => [t.year, t.count]));
-// Position of the peak label along the axis (0–1). Only label the peak when it
-// sits clear of the first/last labels, otherwise it overlaps them at the edges.
-const tlPeakPos = tlPeakYear != null && tlFirst != null && tlLast != null && tlLast !== tlFirst
-  ? (tlPeakYear - tlFirst) / (tlLast - tlFirst)
-  : null;
-const showPeakLabel = tlPeakPos != null && tlPeakPos > 0.12 && tlPeakPos < 0.88;
+// Piko/aktyvumo emphazę bei rodmenį apskaičiuoja pats TimelineColumnChart; čia
+// tik nustatom, kurie metai aktyvūs (filtruoti), kad pažymėtume stulpelius.
 const activeYears = new Set(stats.activeYears.filter((y) => tlByYear.has(y)));
-const tlFiltered = activeYears.size > 0;
 const yearUrl = (year: number) => buildDokumentaiUrl(urlState, { metai: toggleValue(urlState.metai, String(year)) });
-// The readout's resting state names the active year (or the peak when none).
-const readoutYear = stats.activeYears.find((y) => tlByYear.has(y)) ?? tlPeakYear;
-const readoutCount = readoutYear != null ? (tlByYear.get(readoutYear) ?? 0) : 0;
 
 // ── Composition by type ───────────────────────────────────────────────────────
 // Segmented bar + legend. Widths are shares of the shown types; the legend also
 // reports each share of the whole selection.
 const typeShown = stats.byType.filter((t) => (t.count ?? 0) > 0).slice(0, 6);
-const typeSum = typeShown.reduce((s, t) => s + (t.count ?? 0), 0) || 1;
 const total = Math.max(1, stats.total);
 
 // ── Reach metrics ─────────────────────────────────────────────────────────────
@@ -83,6 +69,24 @@ const metrics = [
 const topIstaiga = stats.topIstaiga.filter((i) => (i.count ?? 0) > 0).slice(0, 6);
 
 const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length > 0 || metrics.length > 0;
+
+// Paruošti duomenys generiniams grafikams (TimelineColumnChart / SegmentedBar).
+const timelineBars = timeline.map((t) => ({
+  label: t.year,
+  count: t.count,
+  countText: fmtCompact(t.count),
+  href: yearUrl(t.year),
+  active: activeYears.has(t.year),
+  ariaLabel: `${t.year}: ${fmt(t.count)} dokumentų${activeYears.has(t.year) ? ' (pasirinkta)' : ''}`,
+}));
+const typeSegments = typeShown.map((t) => ({
+  label: TYPE_LABEL[t.value] || t.value,
+  value: t.count ?? 0,
+  href: typeUrl(t.value),
+  title: `${TYPE_LABEL[t.value] || t.value}: ${fmt(t.count)}`,
+  pctText: `${Math.round(((t.count ?? 0) / total) * 100)}%`,
+  countText: fmtCompact(t.count),
+}));
 ---
 
 {hasBody && (
@@ -113,58 +117,15 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
     )}
 
     {timeline.length > 1 && (
-      <section class="dok-stats__block dok-stats__timeline">
-        <div class="dok-stats__h-row">
-          <h3 class="dok-stats__h">Pagal metus</h3>
-          <output class="dok-stats__readout" aria-hidden="true" data-default-year={readoutYear} data-default-count={fmtCompact(readoutCount)}>
-            <span class="dok-stats__readout-count">{fmtCompact(readoutCount)}</span>
-            <span class="dok-stats__readout-year">{readoutYear}</span>
-          </output>
-        </div>
-        <div class={`dok-stats__chart${tlFiltered ? ' is-filtered' : ''}`} style={`--n:${timeline.length}`}>
-          {timeline.map((t, i) => (
-            <a
-              href={yearUrl(t.year)}
-              class={`dok-stats__col${t.year === tlPeakYear ? ' is-peak' : ''}${activeYears.has(t.year) ? ' is-active' : ''}`}
-              style={`--h:${Math.max(2, Math.round((t.count / tlMax) * 100))};--i:${i}`}
-              data-year={t.year}
-              data-count={fmtCompact(t.count)}
-              aria-label={`${t.year}: ${fmt(t.count)} dokumentų${activeYears.has(t.year) ? ' (pasirinkta)' : ''}`}
-            >
-              <span class="dok-stats__col-bar" aria-hidden="true"></span>
-            </a>
-          ))}
-        </div>
-        <div class="dok-stats__axis">
-          <span>{tlFirst}</span>
-          {showPeakLabel && (
-            <span class="dok-stats__axis-peak" style={`--p:${(tlPeakPos ?? 0) * 100}%`}>{tlPeakYear}</span>
-          )}
-          <span>{tlLast}</span>
-        </div>
+      <section class="dok-stats__block">
+        <TimelineColumnChart title="Pagal metus" bars={timelineBars} />
       </section>
     )}
 
     {typeShown.length > 1 && (
       <section class="dok-stats__block">
         <h3 class="dok-stats__h">Pasiskirstymas pagal tipą</h3>
-        <div class="dok-stats__seg" role="img" aria-label="Tipų pasiskirstymas">
-          {typeShown.map((t, i) => (
-            <span class="dok-stats__seg-part" style={`--w:${((t.count ?? 0) / typeSum) * 100}%;--c:${segColor(i)}`} title={`${TYPE_LABEL[t.value] || t.value}: ${fmt(t.count)}`}></span>
-          ))}
-        </div>
-        <ul class="dok-stats__legend">
-          {typeShown.map((t, i) => (
-            <li>
-              <a href={typeUrl(t.value)} class="dok-stats__legend-row">
-                <span class="dok-stats__legend-dot" style={`--c:${segColor(i)}`} aria-hidden="true"></span>
-                <span class="dok-stats__legend-lbl">{TYPE_LABEL[t.value] || t.value}</span>
-                <span class="dok-stats__legend-pct">{Math.round(((t.count ?? 0) / total) * 100)}%</span>
-                <span class="dok-stats__legend-cnt">{fmtCompact(t.count)}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
+        <SegmentedBar segments={typeSegments} ariaLabel="Tipų pasiskirstymas" />
       </section>
     )}
 
@@ -280,186 +241,6 @@ const hasBody = timeline.length > 0 || typeShown.length > 0 || topIstaiga.length
     color: var(--gray);
   }
 
-  /* Timeline column chart (interactive) */
-  .dok-stats__h-row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-  .dok-stats__h-row .dok-stats__h { margin: 0; }
-  /* Live hover/focus readout — the hovered year's count, year beneath it. */
-  .dok-stats__readout {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 6px;
-    line-height: 1;
-  }
-  .dok-stats__readout-count {
-    font-size: var(--text-sm);
-    font-weight: 700;
-    color: var(--black);
-    font-variant-numeric: tabular-nums;
-  }
-  .dok-stats__readout-year {
-    font-size: var(--text-xs);
-    color: var(--link);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-  }
-  .dok-stats__chart {
-    display: grid;
-    grid-template-columns: repeat(var(--n), 1fr);
-    align-items: end;
-    gap: 2px;
-    height: 86px;
-  }
-  .dok-stats__col {
-    display: flex;
-    align-items: flex-end;
-    height: 100%;
-    min-width: 0;
-    padding-top: 6px;            /* clickable headroom above short bars */
-    border-radius: 2px 2px 0 0;
-    cursor: pointer;
-  }
-  .dok-stats__col-bar {
-    width: 100%;
-    height: calc(var(--h, 0) * 1%);
-    border-radius: 2px 2px 0 0;
-    background: color-mix(in srgb, var(--link) 32%, var(--lighter-gray));
-    transform-origin: bottom;
-    transition: background .12s, opacity .12s;
-    /* `backwards`, not `both`: keep the collapsed start state before the
-       animation, but DON'T retain the final `scaleY(1)` afterwards. A lingering
-       (identity) transform puts the bar on its own raster layer scaled against
-       the chart's fractional baseline, which anti-aliases the bottom edge a
-       different amount per bar — the ~1px height jitter. Reverting to the
-       static `height` paints the baseline crisply. */
-    animation: dokStatsGrowY .6s cubic-bezier(.2, .7, .2, 1) backwards;
-    animation-delay: calc(var(--i, 0) * 18ms + 60ms);
-  }
-  .dok-stats__col.is-peak .dok-stats__col-bar { background: color-mix(in srgb, var(--link) 60%, var(--lighter-gray)); }
-  /* Hover/focus (pointer + keyboard + the JS-driven .is-hover) lights the bar. */
-  .dok-stats__col:hover .dok-stats__col-bar,
-  .dok-stats__col:focus-visible .dok-stats__col-bar,
-  .dok-stats__col.is-hover .dok-stats__col-bar { background: color-mix(in srgb, var(--link) 80%, transparent); }
-  .dok-stats__col:focus-visible { outline: none; }
-  .dok-stats__col:focus-visible .dok-stats__col-bar { box-shadow: 0 0 0 2px color-mix(in srgb, var(--link) 30%, transparent); }
-  /* When a year is filtered, the rest recede so the selection pops. */
-  .dok-stats__chart.is-filtered .dok-stats__col-bar { opacity: .4; }
-  .dok-stats__chart.is-filtered .dok-stats__col.is-active .dok-stats__col-bar,
-  .dok-stats__chart.is-filtered .dok-stats__col:hover .dok-stats__col-bar,
-  .dok-stats__chart.is-filtered .dok-stats__col.is-hover .dok-stats__col-bar { opacity: 1; }
-  .dok-stats__col.is-active .dok-stats__col-bar { background: var(--link); }
-  .dok-stats__axis {
-    position: relative;
-    margin-top: 7px;
-    height: 14px;
-    display: flex;
-    justify-content: space-between;
-    font-size: 10px;
-    color: var(--gray);
-    font-variant-numeric: tabular-nums;
-  }
-  .dok-stats__axis-peak {
-    position: absolute;
-    left: var(--p, 50%);
-    transform: translateX(-50%);
-    color: var(--link);
-    font-weight: 600;
-  }
-
-  /* Type composition: segmented bar + legend */
-  .dok-stats__seg {
-    display: flex;
-    height: 10px;
-    border-radius: var(--radius-pill);
-    overflow: hidden;
-    background: var(--lighter-gray);
-  }
-  .dok-stats__seg-part {
-    width: var(--w, 0);
-    background: var(--c, #2563eb);
-    transform-origin: left;
-    animation: dokStatsGrowX .6s cubic-bezier(.2, .7, .2, 1) backwards;
-    animation-delay: .1s;
-  }
-  .dok-stats__legend { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
-  .dok-stats__legend-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 6px;
-    border-radius: var(--radius-sm);
-    color: inherit;
-  }
-  .dok-stats__legend-row:hover { background: var(--lighter-gray); }
-  .dok-stats__legend-dot { flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--c, #2563eb); }
-  .dok-stats__legend-lbl {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font-size: var(--text-sm);
-    color: var(--black);
-  }
-  .dok-stats__legend-pct { flex: none; font-size: 10px; color: var(--gray); font-variant-numeric: tabular-nums; }
-  .dok-stats__legend-cnt {
-    flex: none;
-    min-width: 40px;
-    text-align: right;
-    font-size: var(--text-xs);
-    color: var(--dark-gray);
-    font-variant-numeric: tabular-nums;
-  }
-
   /* Source chips */
   .dok-stats__chips { display: flex; flex-wrap: wrap; gap: 8px; }
-
-  @keyframes dokStatsGrowX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-  @keyframes dokStatsGrowY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-
-  @media (prefers-reduced-motion: reduce) {
-    .dok-stats__col-bar, .dok-stats__seg-part { animation: none !important; transform: none !important; }
-  }
 </style>
-
-<script>
-  // Timeline interactivity: hovering or focusing a year column updates the live
-  // readout (count + year) and highlights that bar; leaving the chart restores
-  // the resting state (the active/peak year). Clicking a column is a normal link
-  // that filters the search to that year — no JS needed for that part.
-  for (const tl of document.querySelectorAll<HTMLElement>('.dok-stats__timeline')) {
-    const chart = tl.querySelector<HTMLElement>('.dok-stats__chart');
-    const out = tl.querySelector<HTMLElement>('.dok-stats__readout');
-    const yearEl = out?.querySelector<HTMLElement>('.dok-stats__readout-year');
-    const countEl = out?.querySelector<HTMLElement>('.dok-stats__readout-count');
-    if (!chart || !out || !yearEl || !countEl) continue;
-    const cols = [...chart.querySelectorAll<HTMLElement>('.dok-stats__col')];
-    const defYear = out.dataset.defaultYear ?? '';
-    const defCount = out.dataset.defaultCount ?? '';
-
-    const show = (col: HTMLElement) => {
-      for (const c of cols) c.classList.toggle('is-hover', c === col);
-      yearEl.textContent = col.dataset.year ?? '';
-      countEl.textContent = col.dataset.count ?? '';
-    };
-    const reset = () => {
-      for (const c of cols) c.classList.remove('is-hover');
-      yearEl.textContent = defYear;
-      countEl.textContent = defCount;
-    };
-
-    for (const col of cols) {
-      col.addEventListener('pointerenter', () => show(col));
-      col.addEventListener('focus', () => show(col));
-    }
-    chart.addEventListener('pointerleave', reset);
-    chart.addEventListener('focusout', (e) => {
-      if (!chart.contains(e.relatedTarget as Node)) reset();
-    });
-  }
-</script>

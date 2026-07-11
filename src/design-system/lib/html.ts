@@ -1,3 +1,16 @@
+/** Ekranuoja HTML metasimbolius, kad reikšmę būtų saugu įterpti į innerHTML /
+ *  atributą. Priima bet ką — `null`/`undefined` virsta tuščia eilute. Vienas
+ *  kanoninis variantas: ekranuoja & < > " ' (superaibė, tinka ir tekstui, ir
+ *  atributams). */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 export function jsonForHtmlScript(value: unknown): string {
   return JSON.stringify(value)
     .replaceAll('<', '\\u003c')
