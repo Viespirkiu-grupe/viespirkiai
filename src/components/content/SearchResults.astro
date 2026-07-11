@@ -90,11 +90,14 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
 <Modal id="sutExportModal" title="Ruošiamas eksportas" className="sut-export-modal">
   <div class="sut-export-body" data-export-total={exportTotal ?? ''}>
     <div class="sut-export-work">
-      <p class="sut-export-status" aria-live="polite">Pradedama…</p>
+      <div class="sut-export-head">
+        <span class="sut-export-icon" aria-hidden="true"></span>
+        <p class="sut-export-status" aria-live="polite">Pradedama…</p>
+      </div>
       <div class="sut-export-progress" role="progressbar" aria-label="Eksporto progresas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <span class="sut-export-progress__fill"></span>
       </div>
-      <p class="sut-export-count text-muted text-sm" aria-live="polite"></p>
+      <p class="sut-export-count text-sm" aria-live="polite"></p>
       <p class="sut-export-estimate-note text-sm" hidden>Numatomas rezultatų skaičius buvo netikslus.</p>
       <p class="sut-export-download text-muted text-sm" aria-live="polite" hidden></p>
     </div>
@@ -222,6 +225,7 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
       exportTrigger = link;
       exportAbort?.abort();
       exportAbort = new AbortController();
+      body.classList.remove('is-done', 'is-error');
       status.textContent = 'Pradedama…';
       count.textContent = '';
       estimateNote.hidden = true;
@@ -316,12 +320,14 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
         download.click();
         setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
         status.textContent = 'Eksportas paruoštas ir atsisiunčiamas.';
+        body.classList.add('is-done');
         updateBar(100, 'complete');
         if (close) {
           close.textContent = 'Uždaryti';
         }
       } catch (error) {
         if ((error as Error).name === 'AbortError') return;
+        body.classList.add('is-error');
         status.textContent = error instanceof Error ? error.message : 'Eksporto klaida.';
         count.textContent = 'Bandykite dar kartą.';
         progress.classList.remove('is-striped');
@@ -334,37 +340,80 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
 
 <style is:global>
   .sut-export-modal .ds-modal__backdrop {
-    background: rgb(0 0 0 / 45%);
+    background: color-mix(in srgb, var(--black) 55%, transparent);
   }
   @media (min-width: 641px) {
     .sut-export-modal .ds-modal__panel {
       inset: auto;
       top: 50%;
       left: 50%;
-      width: min(500px, calc(100vw - 32px));
+      width: min(460px, calc(100vw - 32px));
       max-height: calc(100vh - 32px);
+      border: var(--border);
       border-radius: var(--radius-xl);
       box-shadow: var(--shadow-lg);
       transform: translate(-50%, -50%);
       animation: none;
-    }
-    .sut-export-modal .ds-modal__head,
-    .sut-export-modal .ds-modal__foot {
-      padding-inline: 20px;
     }
   }
   .sut-export-modal .ds-modal__foot {
     justify-content: flex-end;
   }
   .sut-export-body {
-    padding: 24px 20px;
+    padding: 24px;
   }
-  .sut-export-status { margin: 0 0 12px; }
+  .sut-export-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  /* Būsenos ikona: sukasi kraunant, virsta varnele / šauktuku pabaigus. */
+  .sut-export-icon {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-pill);
+    border: 2px solid var(--lighter-gray);
+    border-top-color: var(--color-primary);
+    animation: sut-export-spin 700ms linear infinite;
+  }
+  .sut-export-body.is-done .sut-export-icon,
+  .sut-export-body.is-error .sut-export-icon {
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--white);
+    font-size: 13px;
+    font-weight: 700;
+    animation: sut-export-pop 200ms ease;
+  }
+  .sut-export-body.is-done .sut-export-icon {
+    background: var(--color-success);
+  }
+  .sut-export-body.is-done .sut-export-icon::before { content: "✓"; }
+  .sut-export-body.is-error .sut-export-icon {
+    background: var(--color-danger);
+  }
+  .sut-export-body.is-error .sut-export-icon::before { content: "!"; }
+  @keyframes sut-export-spin { to { transform: rotate(360deg); } }
+  @keyframes sut-export-pop {
+    from { transform: scale(0.6); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .sut-export-status {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--black);
+  }
+  .sut-export-body.is-error .sut-export-status { color: var(--color-danger); }
   .sut-export-progress {
     width: 100%;
-    height: 10px;
+    height: 8px;
     overflow: hidden;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--lighter-gray);
   }
   .sut-export-progress__fill {
@@ -372,13 +421,15 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
     width: var(--export-progress, 0%);
     height: 100%;
     border-radius: inherit;
-    background: var(--black);
-    transition: width 180ms ease;
+    background: var(--color-primary);
+    transition: width 180ms ease, background-color 180ms ease;
   }
+  .sut-export-body.is-done .sut-export-progress__fill { background: var(--color-success); }
+  .sut-export-body.is-error .sut-export-progress__fill { background: var(--color-danger); }
   .sut-export-progress.is-striped .sut-export-progress__fill {
     width: 100%;
-    background-color: var(--black);
-    background-image: linear-gradient(45deg, rgb(255 255 255 / 22%) 25%, transparent 25%, transparent 50%, rgb(255 255 255 / 22%) 50%, rgb(255 255 255 / 22%) 75%, transparent 75%);
+    background-color: var(--color-primary);
+    background-image: linear-gradient(45deg, color-mix(in srgb, var(--white) 25%, transparent) 25%, transparent 25%, transparent 50%, color-mix(in srgb, var(--white) 25%, transparent) 50%, color-mix(in srgb, var(--white) 25%, transparent) 75%, transparent 75%);
     background-size: 24px 24px;
     animation: sut-export-stripes 700ms linear infinite;
   }
@@ -386,17 +437,18 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
     to { background-position: 24px 0; }
   }
   .sut-export-count {
-    margin: 10px 0 0;
+    margin: 12px 0 0;
+    color: var(--gray);
     view-transition-name: sut-export-count;
   }
-  .sut-export-count del { color: var(--gray); }
-  .sut-export-count strong { color: var(--black); }
+  .sut-export-count del { color: var(--light-gray); }
+  .sut-export-count strong { color: var(--black); font-weight: 600; }
   .sut-export-estimate-note {
     margin: 14px 0 0;
     padding: 10px 12px;
     border-radius: var(--radius-md);
-    background: var(--lighter-gray);
-    color: var(--dark-gray);
+    background: var(--color-warning-bg);
+    color: var(--color-warning);
     animation: sut-export-note-in 180ms ease-out;
   }
   .sut-export-download { margin: 10px 0 0; }
@@ -406,7 +458,8 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
   }
   ::view-transition-group(sut-export-count) { animation-duration: 180ms; }
   @media (prefers-reduced-motion: reduce) {
-    .sut-export-progress__fill { transition: none; }
+    .sut-export-icon,
+    .sut-export-progress__fill { transition: none; animation: none; }
     .sut-export-progress.is-striped .sut-export-progress__fill,
     .sut-export-estimate-note { animation: none; }
   }
@@ -415,7 +468,6 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
     .sut-export-body {
       flex: 1;
       overflow-y: auto;
-      padding: 24px 20px;
     }
   }
 </style>
