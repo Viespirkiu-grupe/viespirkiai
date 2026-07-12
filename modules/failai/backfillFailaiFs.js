@@ -4,19 +4,9 @@ const logger = new Logger();
 import { readMetaduomenysFs } from "./metaduomenysFs.js";
 import { readTekstasFs } from "./tekstasFs.js";
 import { getFailaiPath, hashFailai, saveFailaiFs } from "./failaiFs.js";
-import fs from "fs";
 
-const BATCH_SIZE = 1_000;
-const FS_CONCURRENCY = 32;
-
-async function fileExists(filePath) {
-    try {
-        await fs.promises.access(filePath, fs.constants.F_OK);
-        return true;
-    } catch {
-        return false;
-    }
-}
+const BATCH_SIZE = Number(process.env.BATCH_SIZE) || 1_000;
+const FS_CONCURRENCY = Number(process.env.FS_CONCURRENCY) || 64;
 
 // Grupuoja subjektų eilutes pagal failo id į Map<id, mappedRow[]>.
 function groupBy(rows, map) {
@@ -32,37 +22,37 @@ function groupBy(rows, map) {
     return grouped;
 }
 
-async function fetchEntities(ids) {
+// Naudojam id RUOŽO scan (id BETWEEN min AND max), ne id = ANY(1000 taškų).
+// Batch'o eilutės surūšiuotos pagal id, tad ruožas efektyviai naudoja (id, ...)
+// composite indeksus vietoj 1000 atskirų probe'ų. ORDER BY nereikia — tvarka
+// JSON'e nesvarbi (skaitymo kelias rūšiuoja rodydamas). Ruožas gali paimti
+// šiek tiek papildomų id (kurių nėra šiame batch'e) — jie tiesiog ignoruojami.
+async function fetchEntities(minId, maxId) {
+    const range = [minId, maxId];
     const [iban, jarKodai, links, emails, domains, telefonai] = await Promise.all([
         postgres.query(
-            `SELECT id, iban, puslapiai FROM "failaiIban"
-             WHERE id = ANY($1) ORDER BY id, COALESCE(puslapiai[1], 9999), iban ASC`,
-            [ids],
+            `SELECT id, iban, puslapiai FROM "failaiIban" WHERE id >= $1 AND id <= $2`,
+            range,
         ),
         postgres.query(
-            `SELECT id, "jarKodas", puslapiai FROM "failaiJarKodai"
-             WHERE id = ANY($1) ORDER BY id, COALESCE(puslapiai[1], 9999), "jarKodas" ASC`,
-            [ids],
+            `SELECT id, "jarKodas", puslapiai FROM "failaiJarKodai" WHERE id >= $1 AND id <= $2`,
+            range,
         ),
         postgres.query(
-            `SELECT id, link, puslapiai FROM "failaiLinks"
-             WHERE id = ANY($1) ORDER BY id, COALESCE(puslapiai[1], 9999), link ASC`,
-            [ids],
+            `SELECT id, link, puslapiai FROM "failaiLinks" WHERE id >= $1 AND id <= $2`,
+            range,
         ),
         postgres.query(
-            `SELECT id, email, puslapiai FROM "failaiEmails"
-             WHERE id = ANY($1) ORDER BY id, COALESCE(puslapiai[1], 9999), email ASC`,
-            [ids],
+            `SELECT id, email, puslapiai FROM "failaiEmails" WHERE id >= $1 AND id <= $2`,
+            range,
         ),
         postgres.query(
-            `SELECT id, domain FROM "failaiDomains"
-             WHERE id = ANY($1) ORDER BY id, domain ASC`,
-            [ids],
+            `SELECT id, domain FROM "failaiDomains" WHERE id >= $1 AND id <= $2`,
+            range,
         ),
         postgres.query(
-            `SELECT id, telefonas, puslapiai FROM "failaiTelefonai"
-             WHERE id = ANY($1) ORDER BY id, COALESCE(puslapiai[1], 9999), telefonas ASC`,
-            [ids],
+            `SELECT id, telefonas, puslapiai FROM "failaiTelefonai" WHERE id >= $1 AND id <= $2`,
+            range,
         ),
     ]);
 
@@ -77,8 +67,16 @@ async function fetchEntities(ids) {
 }
 
 async function processBatch(rows) {
-    const ids = rows.map((r) => r.id);
-    const entities = await fetchEntities(ids);
+    // Laiko išskaidymas — agreguoti ms per visas gijas (persidengia, tad rodo
+    // santykinį svorį, ne wall-time). readMax/writeMax — lėčiausia atskira operacija.
+    const t = { entities: 0, read: 0, hash: 0, write: 0, upsert: 0, readMax: 0, writeMax: 0 };
+    let readCount = 0;
+    let readNull = 0;
+
+    let ts = performance.now();
+    // rows surūšiuotos pagal id didėjančiai → ruožas = [pirmas, paskutinis].
+    const entities = await fetchEntities(rows[0].id, rows[rows.length - 1].id);
+    t.entities = performance.now() - ts;
 
     const updates = []; // [{ id, hash }]
     let written = 0;
@@ -89,10 +87,16 @@ async function processBatch(rows) {
         while (cursor < rows.length) {
             const row = rows[cursor++];
 
+            const rs = performance.now();
             const [metaduomenys, tekstas] = await Promise.all([
                 row.metaduomenysHash ? readMetaduomenysFs(row.metaduomenysHash) : Promise.resolve(null),
                 row.tekstasHash ? readTekstasFs(row.tekstasHash) : Promise.resolve(null),
             ]);
+            const rd = performance.now() - rs;
+            t.read += rd;
+            if (rd > t.readMax) t.readMax = rd;
+            readCount++;
+            if ((row.metaduomenysHash && metaduomenys == null) || (row.tekstasHash && tekstas == null)) readNull++;
 
             const iban = entities.iban.get(row.id) ?? [];
             const jarKodai = entities.jarKodai.get(row.id) ?? [];
@@ -121,15 +125,22 @@ async function processBatch(rows) {
                 domains,
                 telefonai,
             };
+            const hs = performance.now();
             const hash = hashFailai(turinys);
+            t.hash += performance.now() - hs;
+
             const filePath = getFailaiPath(hash);
             if (!filePath) {
                 throw new Error("failaiLocation nenustatytas arba yra nuotolinis URL");
             }
-            if (!(await fileExists(filePath))) {
-                await saveFailaiFs(hash, turinys);
-                written++;
-            }
+            // Rašom visada (idempotentiška: tas pats turinys → tas pats failas).
+            // Vengiam papildomo fileExists stat'o — brangaus IOP'o šiam raidz pool'ui.
+            const ws = performance.now();
+            await saveFailaiFs(hash, turinys);
+            const wd = performance.now() - ws;
+            t.write += wd;
+            if (wd > t.writeMax) t.writeMax = wd;
+            written++;
             updates.push({ id: row.id, hash });
         }
     }
@@ -140,6 +151,7 @@ async function processBatch(rows) {
     if (updates.length > 0) {
         const upIds = updates.map((u) => u.id);
         const hashes = updates.map((u) => u.hash);
+        ts = performance.now();
         // Rašoma į atskirą žemėlapio lentelę — failai NEliečiama (jokių trigerių).
         await postgres.query(
             `INSERT INTO public."failaiInfoFailai" (id, "failasHash")
@@ -147,9 +159,10 @@ async function processBatch(rows) {
              ON CONFLICT (id) DO UPDATE SET "failasHash" = EXCLUDED."failasHash"`,
             [upIds, hashes],
         );
+        t.upsert = performance.now() - ts;
     }
 
-    return { written, skipped, updated: updates.length };
+    return { written, skipped, updated: updates.length, t, readCount, readNull };
 }
 
 async function run() {
@@ -164,6 +177,7 @@ async function run() {
     while (true) {
         const batchStart = Date.now();
         // Tik dar nesutvarkytos eilutės (be įrašo failaiInfoFailai), turinčios seną turinį.
+        const selStart = performance.now();
         const { rows } = await postgres.query(
             `SELECT f.id, f."metaduomenysHash", f."tekstasHash"
              FROM public.failai f
@@ -175,10 +189,11 @@ async function run() {
              LIMIT $2`,
             [lastId, BATCH_SIZE],
         );
+        const selectMs = performance.now() - selStart;
 
         if (rows.length === 0) break;
 
-        const { written, skipped, updated } = await processBatch(rows);
+        const { written, skipped, updated, t, readCount, readNull } = await processBatch(rows);
 
         lastId = rows[rows.length - 1].id;
         batchNum++;
@@ -190,8 +205,16 @@ async function run() {
         const batchMs = Date.now() - batchStart;
         const elapsed = (Date.now() - startTime) / 1000;
         const speed = Math.round(totalSeen / elapsed);
+        const ms = (x) => Math.round(x);
+        // t.read/t.write — agreguota per gijas (persidengia). read/write avg — vidutinė
+        // vienos operacijos trukmė (aiškiausias rodiklis). max — lėčiausia atskira op.
+        const readAvg = readCount ? (t.read / readCount).toFixed(1) : "0";
+        const writeAvg = written ? (t.write / written).toFixed(1) : "0";
         logger.log(
-            `Batch ${batchNum} | iki id=${lastId} | rašyta: ${written} | atnaujinta: ${updated} | praleista: ${skipped} | viso: ${totalSeen.toLocaleString()} | greitis: ${speed.toLocaleString()} eil/s | batch: ${batchMs}ms`,
+            `Batch ${batchNum} | iki id=${lastId} | rašyta: ${written} | atnaujinta: ${updated} | praleista: ${skipped} | viso: ${totalSeen.toLocaleString()} | greitis: ${speed.toLocaleString()} eil/s | batch: ${batchMs}ms` +
+            ` || select: ${ms(selectMs)}ms | entities: ${ms(t.entities)}ms | upsert: ${ms(t.upsert)}ms` +
+            ` | read Σ${ms(t.read)}ms avg${readAvg} max${ms(t.readMax)} (null:${readNull})` +
+            ` | write Σ${ms(t.write)}ms avg${writeAvg} max${ms(t.writeMax)} | hash Σ${ms(t.hash)}ms`,
         );
 
         if (rows.length < BATCH_SIZE) break;
