@@ -2,6 +2,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { saveDokumentasFs } from "./dokumentaiFs.js";
 import { readMetaduomenysFs } from "../failai/metaduomenysFs.js";
 import { readTekstasFs } from "../failai/tekstasFs.js";
+import { readFailaiFs } from "../failai/failaiFs.js";
 
 const SIDECAR_VERSION = "1";
 const CLASS = "viesiejiPirkimai";
@@ -50,10 +51,19 @@ function readCached(map, hash, read) {
 
 async function buildPayload(row, caches) {
     const [s0, s1, s2] = splitSaltinioId(row.saltinis, row.saltinioId, row.dokId, row.fileId);
-    const [metadata, text] = await Promise.all([
-        row.metaduomenysHash ? readCached(caches.metaduomenys, row.metaduomenysHash, readMetaduomenysFs) : null,
-        row.tekstasHash ? readCached(caches.tekstai, row.tekstasHash, readTekstasFs) : null,
-    ]);
+    let metadata, text;
+    if (row.failasHash) {
+        // Naujas kelias — sujungtas FS failas.
+        const turinys = await readCached(caches.failai, row.failasHash, readFailaiFs);
+        metadata = turinys?.metaduomenys ?? null;
+        text = turinys?.tekstas ?? null;
+    } else {
+        // Pereinamasis kelias — seni atskiri FS failai.
+        [metadata, text] = await Promise.all([
+            row.metaduomenysHash ? readCached(caches.metaduomenys, row.metaduomenysHash, readMetaduomenysFs) : null,
+            row.tekstasHash ? readCached(caches.tekstai, row.tekstasHash, readTekstasFs) : null,
+        ]);
+    }
     const sidecar = {
         version: SIDECAR_VERSION,
         md5: row.md5,
@@ -87,7 +97,7 @@ export const FAILAI_SELECT_COLUMNS = `
     f."dokId", f."fileId",
     f.autorius, f.pavadinimas, f.extension,
     f."zodziuSkaicius", f."puslapiuSkaicius", f."simboliuSkaicius",
-    f."metaduomenysHash", f."tekstasHash",
+    i."failasHash", f."metaduomenysHash", f."tekstasHash",
     ST_AsEWKT(f.location) AS location_ewkt,
     COALESCE(
         vp."jarKodas",
@@ -108,6 +118,8 @@ export const FAILAI_SELECT_COLUMNS = `
 // link NEunikalus (PK = hash), todėl jis imamas skaliariniu subquery (LIMIT 1)
 // FAILAI_SELECT_COLUMNS viduje, ne JOIN'u.
 export const FAILAI_ISTAIGA_JOINS = `
+    LEFT JOIN public."failaiInfoFailai" i
+        ON i.id = f.id
     LEFT JOIN public."viesiejiPirkimai" vp
         ON f.saltinis = 'cvpIs'
        AND vp."pirkimoId" = split_part(f."saltinioId", '/', 1)
@@ -130,7 +142,7 @@ export async function upsertBatch(rows) {
     }
 
     const built = [];
-    const caches = { tekstai: new Map(), metaduomenys: new Map() };
+    const caches = { tekstai: new Map(), metaduomenys: new Map(), failai: new Map() };
     let cursor = 0;
     async function worker() {
         while (cursor < ready.length) {

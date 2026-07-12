@@ -2,13 +2,16 @@
 import Layout from '../../layouts/Layout.astro';
 import { postgres, getColorScheme, getFont } from '../../lib/failai.js';
 import { readMetaduomenysFs } from '@/modules/failai/metaduomenysFs.js';
+import { readFailaiFs } from '@/modules/failai/failaiFs.js';
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
-const { rows } = await postgres.query(`SELECT * FROM failai WHERE "ocrState" = 1 AND ("zodziuSkaicius" IS NULL OR "zodziuSkaicius" <= 10) AND lower(extension) = ANY(ARRAY['jpg','jpeg','png','bmp','gif','webp','heic']) ORDER BY random() LIMIT 50`);
+const { rows } = await postgres.query(`SELECT f.*, i."failasHash" FROM failai f LEFT JOIN "failaiInfoFailai" i ON i.id = f.id WHERE f."ocrState" = 1 AND (f."zodziuSkaicius" IS NULL OR f."zodziuSkaicius" <= 10) AND lower(f.extension) = ANY(ARRAY['jpg','jpeg','png','bmp','gif','webp','heic']) ORDER BY random() LIMIT 50`);
 const seen = new Set();
 const images = (rows as any[]).filter((r) => !seen.has(r.id) && seen.add(r.id));
 await Promise.all(images.map(async (img: any) => {
-  if (img.metaduomenysHash) img.metaduomenys = await readMetaduomenysFs(img.metaduomenysHash);
+  // Naujas kelias — metaduomenys iš sujungto FS failo; pereinamasis — senas failas.
+  if (img.failasHash) img.metaduomenys = (await readFailaiFs(img.failasHash))?.metaduomenys ?? null;
+  else if (img.metaduomenysHash) img.metaduomenys = await readMetaduomenysFs(img.metaduomenysHash);
 }));
 ---
 <Layout pageTitle="Failų galerija" pageDescription="Atsitiktinė viešųjų pirkimų dokumentų nuotraukų galerija" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font}>

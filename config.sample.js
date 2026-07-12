@@ -148,6 +148,11 @@ export default {
     // Failų išgauto teksto saugykla.
     failaiTekstasLocation: undefined,
 
+    // Sujungti failo turinio JSON failai (raktas: failasHash) — apima tekstą,
+    // metaduomenis ir išgautus subjektus (iban, jarKodai, links, emails,
+    // domains, telefonai). Pakeičia failaiMetaduomenysLocation + failaiTekstasLocation.
+    failaiLocation: undefined,
+
     // Dokumentų JSON sidecar failai (raktas: md5).
     dokumentaiLocation: undefined,
 

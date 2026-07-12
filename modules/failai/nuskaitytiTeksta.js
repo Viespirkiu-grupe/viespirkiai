@@ -1,14 +1,12 @@
 import process from "process";
 import { Buffer } from "buffer";
-import { createHash } from "crypto";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import { postgres } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import Timings from "../../utils/timings.js";
 import { readRezultatasFs } from "../ocr/rezultataiFs.js";
-import { hashMetaduomenys, saveMetaduomenysFs } from "./metaduomenysFs.js";
-import { saveTekstasFs } from "./tekstasFs.js";
+import { hashFailai, saveFailaiFs } from "./failaiFs.js";
 
 const nodeName = process.env.NODE_NAME || "default";
 const nuskaitymoVersija = 12;
@@ -303,9 +301,6 @@ export async function nuskaitytiVienoDokumentoDuomenis(
         }
     }
 
-    const metaduomenysHash = hashMetaduomenys(metadata);
-    await saveMetaduomenysFs(metaduomenysHash, metadata);
-
     let reikalingasOcr = dokumentas.ocrState; // Nereikalingas / nebūtinas
     if (
         wordCount == 0 &&
@@ -381,143 +376,29 @@ export async function nuskaitytiVienoDokumentoDuomenis(
 
     timings.end("archyvas");
 
-    timings.start("susijusiaiDuomenys");
-    let client;
-    try {
-        client = await postgres.connect();
-        await client.query("BEGIN");
-
-        const docId = dokumentas.id;
-
-        // Delete old entries
-        await client.query(`DELETE FROM "failaiIban" WHERE id = $1`, [docId]);
-        await client.query(`DELETE FROM "failaiJarKodai" WHERE id = $1`, [
-            docId,
-        ]);
-        await client.query(`DELETE FROM "failaiLinks" WHERE id = $1`, [docId]);
-        await client.query(`DELETE FROM "failaiEmails" WHERE id = $1`, [docId]);
-        await client.query(`DELETE FROM "failaiDomains" WHERE id = $1`, [
-            docId,
-        ]);
-        await client.query(`DELETE FROM "failaiTelefonai" WHERE id = $1`, [
-            docId,
-        ]);
-
-        // helper: bulk insert; chunkuojama viduje, kad neviršytume pg
-        // protokolo 65535 parametrų limito
-        async function bulkInsert({ table, columns, rows, client }) {
-            if (!rows.length) return;
-
-            const chunkSize = Math.max(1, Math.floor(30000 / columns.length));
-            const quotedColumns = columns.map((col) => `"${col}"`).join(", ");
-
-            for (let start = 0; start < rows.length; start += chunkSize) {
-                const chunk = rows.slice(start, start + chunkSize);
-                const values = [];
-                const placeholders = chunk.map((row, i) => {
-                    const base = i * columns.length;
-                    columns.forEach((col) => values.push(row[col]));
-                    return `(${columns.map((_, j) => `$${base + j + 1}`).join(", ")})`;
-                });
-
-                await client.query(
-                    `INSERT INTO "${table}"(${quotedColumns}) VALUES ${placeholders.join(", ")} ON CONFLICT DO NOTHING`,
-                    values,
-                );
-            }
-        }
-
-        // IBAN
-        if (results.ibans?.length) {
-            await bulkInsert({
-                table: "failaiIban",
-                columns: ["id", "iban", "puslapiai"],
-                rows: results.ibans.map((x) => ({
-                    id: docId,
-                    iban: x.iban,
-                    puslapiai: x.pages,
-                })),
-                client,
-            });
-        }
-
-        // JAR kodai
-        if (results.companyIds?.length) {
-            await bulkInsert({
-                table: "failaiJarKodai",
-                columns: ["id", "jarKodas", "puslapiai"],
-                rows: results.companyIds.map((x) => ({
-                    id: docId,
-                    jarKodas: x.code,
-                    puslapiai: x.pages,
-                })),
-                client,
-            });
-        }
-
-        // Links
-        if (results.links?.length) {
-            await bulkInsert({
-                table: "failaiLinks",
-                columns: ["id", "link", "puslapiai"],
-                rows: results.links.map((x) => ({
-                    id: docId,
-                    link: x.uri?.slice(0, 1024),
-                    puslapiai: x.pages,
-                })),
-                client,
-            });
-        }
-
-        // Emails
-        if (results.emails?.length) {
-            await bulkInsert({
-                table: "failaiEmails",
-                columns: ["id", "email", "puslapiai"],
-                rows: results.emails.map((x) => ({
-                    id: docId,
-                    email: x.email,
-                    puslapiai: x.pages,
-                })),
-                client,
-            });
-        }
-
-        // Domains
-        if (results.domains?.length) {
-            await bulkInsert({
-                table: "failaiDomains",
-                columns: ["id", "domain"],
-                rows: results.domains.map((domain) => ({
-                    id: docId,
-                    domain,
-                })),
-                client,
-            });
-        }
-
-        // Telefonai
-        if (results.phones?.length) {
-            await bulkInsert({
-                table: "failaiTelefonai",
-                columns: ["id", "telefonas", "puslapiai"],
-                rows: results.phones.map((x) => ({
-                    id: docId,
-                    telefonas: x.phone,
-                    puslapiai: x.pages,
-                })),
-                client,
-            });
-        }
-
-        await client.query("COMMIT");
-        timings.end("susijusiaiDuomenys");
-    } catch (e) {
-        if (client) await client.query("ROLLBACK");
-        throw e;
-    } finally {
-        if (client) client.release();
-    }
+    // Išgauti subjektai — saugomi sujungtame failo turinio faile (žr. žemiau),
+    // ne atskirose DB lentelėse. Šablonai atitinka fetchFailasMetadata grąžinamą formą.
+    const iban = (results.ibans ?? []).map((x) => ({
+        iban: x.iban,
+        puslapiai: x.pages,
+    }));
+    const jarKodai = (results.companyIds ?? []).map((x) => ({
+        jarKodas: x.code,
+        puslapiai: x.pages,
+    }));
+    const links = (results.links ?? []).map((x) => ({
+        link: x.uri?.slice(0, 1024),
+        puslapiai: x.pages,
+    }));
+    const emails = (results.emails ?? []).map((x) => ({
+        email: x.email,
+        puslapiai: x.pages,
+    }));
+    const domains = results.domains ?? [];
+    const telefonai = (results.phones ?? []).map((x) => ({
+        telefonas: x.phone,
+        puslapiai: x.pages,
+    }));
 
     let location = null;
 
@@ -532,30 +413,41 @@ export async function nuskaitytiVienoDokumentoDuomenis(
 
     let autorius = metadata?.author || undefined;
 
+    // tekstas išsaugomas kaip tekstinė reikšmė (tokia pati kaip senasis tekstasFs
+    // turinys), kad skaitymo kelias galėtų JSON.parse arba naudoti kaip stringą.
     const tekstasStr = truncateTo1MB(tekstas);
-    const tekstasHash = createHash("md5").update(tekstasStr).digest("hex");
 
-    timings.start("tekstasFs");
-    await saveTekstasFs(tekstasHash, tekstasStr);
-    timings.end("tekstasFs");
+    // Sujungtas failo turinys — tekstas + metaduomenys + išgauti subjektai.
+    const failaiTurinys = {
+        tekstas: tekstasStr,
+        metaduomenys: metadata,
+        iban,
+        jarKodai,
+        links,
+        emails,
+        domains,
+        telefonai,
+    };
+    const failasHash = hashFailai(failaiTurinys);
+
+    timings.start("failaiFs");
+    await saveFailaiFs(failasHash, failaiTurinys);
+    timings.end("failaiFs");
 
     timings.start("failaiUpdate");
     await postgres.query(
         `UPDATE failai
         SET nuskaitytas = $1,
-            "metaduomenysHash" = $2,
-            "zodziuSkaicius" = $3,
-            "puslapiuSkaicius" = $4,
-            "simboliuSkaicius" = $5,
-            "ocrState" = $6,
-            location = ST_GeomFromText($7, 4326),
+            "zodziuSkaicius" = $2,
+            "puslapiuSkaicius" = $3,
+            "simboliuSkaicius" = $4,
+            "ocrState" = $5,
+            location = ST_GeomFromText($6, 4326),
             "nuskaitymasTimestamp" = NOW(),
-            "autorius" = $8,
-            "tekstasHash" = $10
-        WHERE id = $9;`,
+            "autorius" = $7
+        WHERE id = $8;`,
         [
             nuskaitymoVersija,
-            metaduomenysHash,
             wordCount,
             pageCount,
             characterCount,
@@ -563,13 +455,25 @@ export async function nuskaitytiVienoDokumentoDuomenis(
             location,
             autorius,
             dokumentas.id,
-            tekstasHash,
         ],
     );
     timings.end("failaiUpdate");
 
+    // failasHash saugomas atskiroje žemėlapio lentelėje (id → failasHash),
+    // kad nereikėtų liesti sudėtingos failai lentelės (trigeriai ir pan.).
+    timings.start("failaiInfoFailai");
+    await postgres.query(
+        `INSERT INTO "failaiInfoFailai" (id, "failasHash")
+         VALUES ($1, $2)
+         ON CONFLICT (id) DO UPDATE SET "failasHash" = EXCLUDED."failasHash"`,
+        [dokumentas.id, failasHash],
+    );
+    timings.end("failaiInfoFailai");
+
     timings.start("failaiNuskaitymai");
     await postgres.query(
+        // failaiNuskaitymai schema lieka nepaliesta — jo "metaduomenysHash"
+        // stulpelyje saugomas naujasis failasHash (turinio raktas šiam nuskaitymui).
         `INSERT INTO "failaiNuskaitymai"
             (failas, versija, "metaduomenysHash", "timestamp", "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", location)
          VALUES ($1, $2, $3, NOW() AT TIME ZONE 'Europe/Vilnius', $4, $5, $6, ST_GeomFromText($7, 4326))
@@ -583,7 +487,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
         [
             dokumentas.id,      // failas
             nuskaitymoVersija,  // versija
-            metaduomenysHash,   // metaduomenysHash
+            failasHash,         // metaduomenysHash stulpelis (saugom failasHash)
             wordCount,          // zodziuSkaicius
             pageCount,          // puslapiuSkaicius
             characterCount,     // simboliuSkaicius
@@ -607,8 +511,8 @@ export async function nuskaitytiVienoDokumentoDuomenis(
 
     const timingParts = [
         "queue", "nuskaitytojas", "ocrRezultatai", "fetch", "nuskaitytojaUpdate",
-        "nuskaitymas", "archyvas", "susijusiaiDuomenys",
-        "tekstasFs", "failaiUpdate", "failaiNuskaitymai", "queueUpdate", "all",
+        "nuskaitymas", "archyvas",
+        "failaiFs", "failaiUpdate", "failaiInfoFailai", "failaiNuskaitymai", "queueUpdate", "all",
     ].map((k) => `${k}=${timings.humanDuration(k)}`).join(" ");
     logger.log(
         `Nuskaitytas dokumentas ${dokumentas.id} / ${dokumentas.pavadinimas}, ${wordCount} žodž. | ${timingParts}`,

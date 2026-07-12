@@ -164,13 +164,15 @@ async function resolveArchiveFiles(failas: Failas) {
 
 export async function loadFailasById(id: string): Promise<Failas | null> {
   const result = await postgres.query(
-    `SELECT id, "dokId", "fileId", pavadinimas, extension, dydis, md5, parsiustas, nuskaitytas,
+    `SELECT failai.id, "dokId", "fileId", pavadinimas, extension, dydis, md5, parsiustas, nuskaitytas,
             "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", "ocrState", "ocrNode",
             "ocrLockTimestamp", "ocrDuration", "ocrTimestamp", saltinis, "saltinioId", password, parent,
             "nuskaitymasTimestamp", location, "ocrBandymai", "parsiuntimoBandymai",
             "paskutinisParsiuntimoBandymas", tipas, "tipasNuskaitymas", autorius,
-            "metaduomenysHash", "tekstasHash"
-     FROM failai WHERE "id" = $1 LIMIT 1`,
+            i."failasHash", "metaduomenysHash", "tekstasHash"
+     FROM failai
+     LEFT JOIN "failaiInfoFailai" i ON i.id = failai.id
+     WHERE failai."id" = $1 LIMIT 1`,
     [id],
   );
   return result.rows[0] || null;
@@ -192,7 +194,7 @@ export async function loadFailasById(id: string): Promise<Failas | null> {
  */
 export async function enrichFailas(failas: Failas): Promise<Failas> {
   const { fetchFailasMetadata } = await import('@/modules/failai/aptarnavimas.js');
-  failas = { ...failas, ...(await fetchFailasMetadata(failas.id, failas.tekstasHash)) };
+  failas = { ...failas, ...(await fetchFailasMetadata(failas.id, failas)) };
 
   if (failas.ocrLatestResult) {
     failas.ocrLatestResult.submitTimestampDisplay = formatOcrTimestampForVilnius(failas.ocrLatestResult.submitTimestamp);

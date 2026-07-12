@@ -4,6 +4,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import { readMetaduomenysFs } from "./metaduomenysFs.js";
+import { readFailaiFs } from "./failaiFs.js";
 
 const BATCH_SIZE = 1_000;
 const ROWS_PER_FILE = 100_000;
@@ -39,26 +40,32 @@ async function run(outputDir) {
     let cursor = 0;
     while (true) {
         const { rows } = await postgres.query(
-            `SELECT id, "metaduomenysHash"
-             FROM public.failai
-             WHERE id > $1
-             ORDER BY id ASC
+            `SELECT f.id, i."failasHash", f."metaduomenysHash"
+             FROM public.failai f
+             LEFT JOIN public."failaiInfoFailai" i ON i.id = f.id
+             WHERE f.id > $1
+             ORDER BY f.id ASC
              LIMIT $2`,
             [cursor, BATCH_SIZE],
         );
         if (rows.length === 0) break;
         cursor = rows[rows.length - 1].id;
 
-        const withHash = rows.filter((r) => r.metaduomenysHash);
+        const withHash = rows.filter((r) => r.failasHash || r.metaduomenysHash);
         const metaduomenysList = await Promise.all(
-            withHash.map((r) => readMetaduomenysFs(r.metaduomenysHash)),
+            // Naujas kelias — metaduomenys iš sujungto FS failo; pereinamasis — senas failas.
+            withHash.map((r) =>
+                r.failasHash
+                    ? readFailaiFs(r.failasHash).then((t) => t?.metaduomenys ?? null)
+                    : readMetaduomenysFs(r.metaduomenysHash),
+            ),
         );
 
         for (let i = 0; i < withHash.length; i++) {
             if (rowsInFile >= ROWS_PER_FILE) openNextFile();
             const r = withHash[i];
             fileStream.write(
-                JSON.stringify({ id: r.id, metaduomenysHash: r.metaduomenysHash, metaduomenys: metaduomenysList[i] }) + "\n",
+                JSON.stringify({ id: r.id, failasHash: r.failasHash, metaduomenysHash: r.metaduomenysHash, metaduomenys: metaduomenysList[i] }) + "\n",
             );
             rowsInFile++;
             totalRows++;

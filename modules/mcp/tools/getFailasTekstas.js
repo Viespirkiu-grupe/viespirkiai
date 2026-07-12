@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { findFailas, checkFailasAccessible, findArchyvoVaikai } from "../../failai/queries.js";
 import { readTekstasFs } from "../../failai/tekstasFs.js";
+import { readFailaiFs } from "../../failai/failaiFs.js";
 import { parsePgArray } from "../../../postgres/postgres.js";
 
 const DEFAULT_PAGE_BATCH = 3;
@@ -99,7 +100,12 @@ export async function handler({
         return { content: [{ type: "text", text: message }], isError: true };
     }
 
-    const rawTekstas = failas.tekstasHash ? await readTekstasFs(failas.tekstasHash) : null;
+    // Naujas kelias — tekstas iš sujungto FS failo; pereinamasis — senas tekstasFs failas.
+    const rawTekstas = failas.failasHash
+        ? (await readFailaiFs(failas.failasHash))?.tekstas ?? null
+        : failas.tekstasHash
+            ? await readTekstasFs(failas.tekstasHash)
+            : null;
     const pages = rawTekstas ? parseTekstasPages(rawTekstas) : [];
     if (!pages.length) {
         return { content: [{ type: "text", text: await tuscioTekstoPranesimas(failas) }] };

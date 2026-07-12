@@ -91,7 +91,7 @@ export async function handler({ id }) {
         return { content: [{ type: "text", text: message }], isError: true };
     }
 
-    const metadata = await fetchFailasMetadata(failas.id, failas.tekstasHash);
+    const metadata = await fetchFailasMetadata(failas.id, failas);
     failas = { ...failas, ...metadata };
 
     delete failas.search_index;

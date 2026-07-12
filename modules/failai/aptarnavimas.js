@@ -4,6 +4,7 @@ import config from "../../utils/config.js";
 import { readRezultatasFs } from "../ocr/rezultataiFs.js";
 import { readMetaduomenysFs } from "./metaduomenysFs.js";
 import { readTekstasFs } from "./tekstasFs.js";
+import { readFailaiFs } from "./failaiFs.js";
 import { parseWKBPoint } from "../geografija/utils.js";
 import { formatDateTime, formatDuration } from "../../utils/time.js";
 
@@ -177,14 +178,102 @@ async function resolveRelatedFiles(failas) {
  * @param {number} id - The ID of the file for which to fetch metadata.
  * @returns {Promise<Object>} An object containing the fetched metadata categorized by type.
  */
-export async function fetchFailasMetadata(id, tekstasHash) {
-    const tekstasPromise = tekstasHash !== undefined
-        ? readTekstasFs(tekstasHash)
-        : postgres
-            .query(`SELECT "tekstasHash" FROM failai WHERE id = $1`, [id])
-            .then((r) => (r.rows.length ? readTekstasFs(r.rows[0].tekstasHash) : null));
+/**
+ * Konvertuoja saugomą tekstą (JSON masyvas, pg masyvas arba paprastas stringas)
+ * į skaitymo formą — tokia pati logika kaip senajame tekstasFs kelyje.
+ */
+function parseTekstas(tekstasRaw) {
+    if (!tekstasRaw) return null;
+    if (Array.isArray(tekstasRaw)) return tekstasRaw;
+    if (typeof tekstasRaw !== "string") return tekstasRaw;
+    try {
+        const parsed = JSON.parse(tekstasRaw);
+        return Array.isArray(parsed) ? parsed : tekstasRaw;
+    } catch {
+        return tekstasRaw.startsWith("{") && tekstasRaw.endsWith("}")
+            ? parsePgArray(tekstasRaw)
+            : tekstasRaw;
+    }
+}
 
-    const [iban, jarKodai, links, emails, domains, telefonai, metaduomenys, tekstasRaw, ocrResults] =
+/**
+ * Grąžina failo išvestinius duomenis (subjektai, metaduomenys, tekstas, OCR).
+ * Naujas kelias: viskas iš sujungto FS failo (failasHash). Pereinamasis kelias:
+ * jei failasHash dar nenustatytas — skaitoma iš senų DB lentelių + FS failų.
+ * @param {number} id
+ * @param {Object|null} failas - failo eilutė su failasHash / metaduomenysHash / tekstasHash (nebūtina).
+ */
+export async function fetchFailasMetadata(id, failas = null) {
+    let failasHash = failas?.failasHash;
+    let metaduomenysHash = failas?.metaduomenysHash;
+    let tekstasHash = failas?.tekstasHash;
+
+    // failasHash gyvena atskiroje failaiInfoFailai lentelėje. Jei jo dar neturime,
+    // pasiimame kartu su senais hash'ais vienu join'u.
+    if (failasHash === undefined) {
+        const r = await postgres.query(
+            `SELECT i."failasHash", f."metaduomenysHash", f."tekstasHash"
+             FROM failai f
+             LEFT JOIN "failaiInfoFailai" i ON i.id = f.id
+             WHERE f.id = $1`,
+            [id],
+        );
+        if (r.rows.length) {
+            failasHash = r.rows[0].failasHash;
+            if (metaduomenysHash === undefined) metaduomenysHash = r.rows[0].metaduomenysHash;
+            if (tekstasHash === undefined) tekstasHash = r.rows[0].tekstasHash;
+        }
+    }
+
+    const ocrResults = await postgres.query(
+        `SELECT id, md5, node, "lockTimestamp", "submitTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius"
+         FROM "failaiOcrRezultatai"
+         WHERE failas = $1
+         ORDER BY id DESC`,
+        [id],
+    );
+
+    const latestOcrResult = ocrResults.rows.length
+        ? {
+              id: ocrResults.rows[0].id,
+              node: ocrResults.rows[0].node,
+              lockTimestamp: ocrResults.rows[0].lockTimestamp,
+              submitTimestamp: ocrResults.rows[0].submitTimestamp,
+              duration: ocrResults.rows[0].duration,
+              puslapiuSkaicius: ocrResults.rows[0].puslapiuSkaicius,
+              zodziuSkaicius: ocrResults.rows[0].zodziuSkaicius,
+          }
+        : null;
+
+    const latestOcrFile = ocrResults.rows.length
+        ? await readRezultatasFs(ocrResults.rows[0].md5)
+        : null;
+    const ocr = Array.isArray(latestOcrFile?.tekstas) ? latestOcrFile.tekstas : [];
+
+    const ocrMeta = {
+        ocrLatestResult: latestOcrResult,
+        ocrRezultatuSkaicius: ocrResults.rows.length,
+        ocr,
+    };
+
+    // Naujas kelias — sujungtas FS failas.
+    if (failasHash) {
+        const turinys = await readFailaiFs(failasHash);
+        return {
+            ibanNumeriai: turinys?.iban ?? [],
+            jarKodai: turinys?.jarKodai ?? [],
+            links: turinys?.links ?? [],
+            emails: turinys?.emails ?? [],
+            domains: turinys?.domains ?? [],
+            telefonai: turinys?.telefonai ?? [],
+            metaduomenys: turinys?.metaduomenys ?? null,
+            tekstas: parseTekstas(turinys?.tekstas),
+            ...ocrMeta,
+        };
+    }
+
+    // Pereinamasis kelias — seni DB lentelių + FS failų duomenys.
+    const [iban, jarKodai, links, emails, domains, telefonai, tekstasRaw] =
         await Promise.all([
             postgres.query(
                 `SELECT iban, puslapiai FROM "failaiIban"
@@ -216,48 +305,8 @@ export async function fetchFailasMetadata(id, tekstasHash) {
                  WHERE id = $1 ORDER BY COALESCE(puslapiai[1], 9999), telefonas ASC`,
                 [id],
             ),
-            postgres.query(
-                `SELECT "metaduomenysHash" FROM failai WHERE id = $1`,
-                [id],
-            ),
-            tekstasPromise,
-            postgres.query(
-                `SELECT id, md5, node, "lockTimestamp", "submitTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius"
-                 FROM "failaiOcrRezultatai"
-                 WHERE failas = $1
-                 ORDER BY id DESC`,
-                [id],
-            ),
+            tekstasHash != null ? readTekstasFs(tekstasHash) : Promise.resolve(null),
         ]);
-
-    const latestOcrResult = ocrResults.rows.length
-        ? {
-              id: ocrResults.rows[0].id,
-              node: ocrResults.rows[0].node,
-              lockTimestamp: ocrResults.rows[0].lockTimestamp,
-              submitTimestamp: ocrResults.rows[0].submitTimestamp,
-              duration: ocrResults.rows[0].duration,
-              puslapiuSkaicius: ocrResults.rows[0].puslapiuSkaicius,
-              zodziuSkaicius: ocrResults.rows[0].zodziuSkaicius,
-          }
-        : null;
-
-    const latestOcrFile = ocrResults.rows.length
-        ? await readRezultatasFs(ocrResults.rows[0].md5)
-        : null;
-    const ocr = Array.isArray(latestOcrFile?.tekstas) ? latestOcrFile.tekstas : [];
-
-    let tekstas = null;
-    if (tekstasRaw) {
-        try {
-            const parsed = JSON.parse(tekstasRaw);
-            tekstas = Array.isArray(parsed) ? parsed : tekstasRaw;
-        } catch {
-            tekstas = tekstasRaw.startsWith("{") && tekstasRaw.endsWith("}")
-                ? parsePgArray(tekstasRaw)
-                : tekstasRaw;
-        }
-    }
 
     return {
         ibanNumeriai: iban.rows,
@@ -266,13 +315,9 @@ export async function fetchFailasMetadata(id, tekstasHash) {
         emails: emails.rows,
         domains: domains.rows.map((r) => r.domain),
         telefonai: telefonai.rows,
-        metaduomenys: metaduomenys.rows.length
-            ? await readMetaduomenysFs(metaduomenys.rows[0].metaduomenysHash)
-            : null,
-        tekstas,
-        ocrLatestResult: latestOcrResult,
-        ocrRezultatuSkaicius: ocrResults.rows.length,
-        ocr,
+        metaduomenys: metaduomenysHash != null ? await readMetaduomenysFs(metaduomenysHash) : null,
+        tekstas: parseTekstas(tekstasRaw),
+        ...ocrMeta,
     };
 }
 
@@ -290,7 +335,7 @@ export async function aptarnautiFailą(
     failas,
     requestsJson = false,
 ) {
-    const metadata = await fetchFailasMetadata(failas.id, failas.tekstasHash);
+    const metadata = await fetchFailasMetadata(failas.id, failas);
     failas = { ...failas, ...metadata };
 
     failas.metaduomenys?.signatures?.forEach((sig) => {

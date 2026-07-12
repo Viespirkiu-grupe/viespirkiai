@@ -1,22 +1,27 @@
 import { postgres } from "../../postgres/postgres.js";
 
 export async function findFailas({ id, dokId, fileId }) {
+    // i."failasHash" — raktas į sujungtą FS turinio failą (atskira žemėlapio lentelė).
+    const withInfo = `
+        SELECT f.*, i."failasHash"
+        FROM failai f
+        LEFT JOIN "failaiInfoFailai" i ON i.id = f.id`;
     if (id) {
         if (/^[a-f0-9]{32}$/.test(id))
             return postgres.query(
-                `SELECT f.* FROM failai f WHERE f."md5" = $1 LIMIT 1`,
+                `${withInfo} WHERE f."md5" = $1 LIMIT 1`,
                 [id],
             );
         if (isNaN(id)) return null;
         return postgres.query(
-            `SELECT f.* FROM failai f WHERE f."id" = $1 LIMIT 1`,
+            `${withInfo} WHERE f."id" = $1 LIMIT 1`,
             [id],
         );
     }
     if (dokId && fileId) {
         if (isNaN(dokId) || isNaN(fileId)) return null;
         return postgres.query(
-            `SELECT f.* FROM failai f WHERE f."dokId" = $1 AND f."fileId" = $2 LIMIT 1`,
+            `${withInfo} WHERE f."dokId" = $1 AND f."fileId" = $2 LIMIT 1`,
             [dokId, fileId],
         );
     }
