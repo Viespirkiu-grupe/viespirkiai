@@ -1,5 +1,5 @@
 import { postgres } from "../../postgres/postgres.js";
-import { search as quickwitSearch } from "../../quickwit/quickwit.js";
+import { search as quickwitSearch, countDocs as quickwitCountDocs } from "../../quickwit/quickwit.js";
 import { FilterBuilder } from "../../utils/filter.js";
 import { fixHtmlEntities } from "../../utils/fixHtmlEntities.js";
 import { Transform } from "node:stream";
@@ -499,6 +499,37 @@ async function attachBvpzNames(options) {
     return codes.map((code) => ({ value: code, label: names.get(code), count: byCode.get(code) }));
 }
 
+/** Pažymėtus BVPŽ prefiksus išrenka iš užklausos. */
+function selectedBvpzPrefixes(query) {
+    return [...new Set(
+        String(query.bvpzPrefiksai ?? "")
+            .split(/[\s,;]+/)
+            .map((p) => p.trim())
+            .filter(Boolean),
+    )];
+}
+
+/** Pažymėtiems BVPŽ prefiksams priskiria prefiksinės atitikties pirkimų skaičių
+ *  pagal kitus filtrus (facet-exclude), kad nepilni kodai rodytųsi su „*" ženklu
+ *  ir skaičiumi. Pavadinimo nerodom — vien kodas su „*". */
+async function attachSelectedBvpz(prefixes, query) {
+    const uniq = [...new Set(prefixes)].filter(Boolean);
+    if (!uniq.length) return [];
+    const base = buildViesiejiPirkimaiQuickwitQuery(query, { exclude: ["bvpz"] });
+    const counts = await Promise.all(
+        uniq.map((p) =>
+            quickwitCountDocs(QUICKWIT_LENTELE, {
+                query: base === "*" ? `bvpzKodai:${p}*` : `(${base}) AND bvpzKodai:${p}*`,
+            }).catch(() => null),
+        ),
+    );
+    return uniq.map((value, i) => ({
+        value,
+        count: counts[i],
+        isPrefix: value.replace(/\D/g, "").length < 8,
+    }));
+}
+
 // Enum facetui (pirkimoBudas/statusas): agregacija grąžina saugomą pavadinimą;
 // atvaizduojam kaip { value: raktas, label: pavadinimas }, kad URL'e keliautų
 // raktas (suderinama su tiksliniu filtru ir MCP). Nežinomus pavadinimus praleidžiam.
@@ -534,10 +565,16 @@ export async function viesiejiPirkimaiFacets(query) {
             viesiejiPirkimaiLaikotarpisHistogram(query),
         ]);
 
-    const [vykdytojaiNamed, bvpzNamed] = await Promise.all([
+    const [vykdytojaiNamed, bvpzNamed, bvpzSelected] = await Promise.all([
         attachJarNames(vykdytojaiRaw.filter((b) => b.value)),
         attachBvpzNames(bvpz.filter((b) => b.value)),
+        attachSelectedBvpz(selectedBvpzPrefixes(query), query),
     ]);
+
+    // Pasirinktus BVPŽ prefiksus (nepilnus kodus), kurių nėra tarp dažniausių,
+    // pridedam priekyje su pavadinimu + prefiksinės atitikties skaičiumi.
+    const bvpzPresent = new Set(bvpzNamed.map((o) => o.value));
+    const bvpzFinal = [...bvpzSelected.filter((o) => !bvpzPresent.has(o.value)), ...bvpzNamed];
 
     // Pasirinktus (įsk. „custom" įvestus) kodus, kurių nėra tarp dažniausių,
     // pridedam priekyje su JAR pavadinimu.
@@ -551,7 +588,7 @@ export async function viesiejiPirkimaiFacets(query) {
         vykdytojai: vykdytojaiFinal,
         pirkimoBudas: mapEnumFacet(pirkimoBudasRaw.filter((b) => b.value), PIRKIMO_BUDAS),
         statusas: mapEnumFacet(statusasRaw.filter((b) => b.value), STATUSAS),
-        bvpz: bvpzNamed,
+        bvpz: bvpzFinal,
         verte,
         laikotarpis,
     };
@@ -583,7 +620,14 @@ export async function viesiejiPirkimaiFacetOptions(field, query, size = 1000, op
 
     if (field === "bvpzKodai") {
         const options = await attachBvpzNames(buckets);
-        if (!optionSearch) return options;
+        if (!optionSearch) {
+            const present = new Set(options.map((o) => o.value));
+            const selected = await attachSelectedBvpz(
+                selectedBvpzPrefixes(query).filter((v) => !present.has(v)),
+                query,
+            );
+            return [...selected, ...options];
+        }
         const needle = optionSearch.toLowerCase();
         const inline = options.filter(
             (o) => o.value.includes(optionSearch) || (o.label?.toLowerCase().includes(needle) ?? false),
@@ -612,6 +656,14 @@ export async function viesiejiPirkimaiFacetOptions(field, query, size = 1000, op
 
     const options = await attachJarNames(buckets);
     if (!optionSearch) return options;
+
+    // Pirmiausia — facetuoti pasirinkimai (su skaičiais pagal esamą užklausą),
+    // atitinkantys paiešką. Tik jei tokių nėra, krentam į registro paiešką.
+    const needle = optionSearch.toLowerCase();
+    const inline = options.filter(
+        (o) => o.value.includes(optionSearch) || (o.label?.toLowerCase().includes(needle) ?? false),
+    );
+    if (inline.length) return inline;
 
     const counts = new Map(options.map((o) => [o.value, o.count]));
     const registryRows = /^\d+$/.test(optionSearch)

@@ -2,6 +2,7 @@ import { postgres } from '@/postgres/postgres.js';
 import { search, getDeadRatio } from '@/quickwit/quickwit.js';
 import { readDokumentasFs } from '@/modules/dokumentai/dokumentaiFs.js';
 import rawConfig from '@/utils/config.js';
+import { foldLithuanian, makeSnippet, normalizeDocText } from './dokumentai/snippet.ts';
 
 const LENTELE = 'dokumentai';
 const QW_URL: string = (rawConfig as any).quickwitUrl ?? 'http://localhost:7280';
@@ -37,6 +38,8 @@ export interface FacetOption {
   count: number | null;
   /** Žmogui skirtas pavadinimas (pvz. istaigaJar kodui — įstaigos pavadinimas). */
   label?: string;
+  /** Nepilnas BVPŽ kodas (prefiksinė paieška) — atvaizduojamas su „*" ženklu. */
+  isPrefix?: boolean;
 }
 
 export const DOKUMENTAI_SORT_OPTIONS = [
@@ -152,9 +155,6 @@ export interface DokumentaiSearchResult {
 
 // ── Quickwit helpers ─────────────────────────────────────────────────────────
 
-function foldLithuanian(str: string) {
-  return str.normalize('NFD').replace(/[̀-ͯ]/g, '').normalize('NFC');
-}
 
 async function qwAggregate(field: string, query: string, size: number): Promise<FacetOption[]> {
   try {
@@ -243,93 +243,95 @@ export interface Bbox {
   maxLon: number;
 }
 
-function buildPartsExcluding(opts: {
-  textQuery: string;
-  classes: string[];
-  types: string[];
-  hosts: string[];
-  jars: string[];
-  istaigos: string[];
-  exts: string[];
-  authors: string[];
-  creators: string[];
-  producers: string[];
-  langs: string[];
-  savs: string[];
-  apskritys: string[];
-  sources: string[];
-  years: string[];
-  courts: string[];
-  caseTypes: string[];
-  categories: string[];
-  judges: string[];
-  actTypes: string[];
-  validities: string[];
-  editionTypes: string[];
-  projectStatuses: string[];
-  eurovoc: string[];
-  bbox?: Bbox | null;
-  excludeClass?: boolean;
-  excludeHost?: boolean;
-  excludeJar?: boolean;
-  excludeIstaiga?: boolean;
-  excludeExt?: boolean;
-  excludeAuthor?: boolean;
-  excludeCreator?: boolean;
-  excludeProducer?: boolean;
-  excludeType?: boolean;
-  excludeLang?: boolean;
-  excludeSav?: boolean;
-  excludeApskritis?: boolean;
-  excludeSource?: boolean;
-  excludeMetai?: boolean;
-  excludeCourt?: boolean;
-  excludeCaseType?: boolean;
-  excludeCategory?: boolean;
-  excludeJudge?: boolean;
-  excludeActType?: boolean;
-  excludeValidity?: boolean;
-  excludeEditionType?: boolean;
-  excludeProjectStatus?: boolean;
-  excludeEurovoc?: boolean;
-  /** Tiksli frazė: tekstą paduodam Quickwit'ui kabutėse ("…"), kad žodžiai būtų
-   *  randami tiksliai greta ir ta pačia tvarka, o ne kaip atskiri terminai. */
-  phrase?: boolean;
-}): string {
-  const { textQuery, classes, types, hosts, jars, istaigos, exts, authors, creators, producers, langs, savs, apskritys, sources, years, courts, caseTypes, categories, judges, actTypes, validities, editionTypes, projectStatuses, eurovoc, bbox } = opts;
-  const p: string[] = [];
-  if (!opts.excludeClass && classes.length) p.push(`(${classes.map((c) => `class:${JSON.stringify(c)}`).join(' OR ')})`);
-  if (!opts.excludeType && types.length) p.push(`(${types.map((t) => `type:${t}`).join(' OR ')})`);
+// ── Fasetų deskriptorius ─────────────────────────────────────────────────────
+// Vienas šaltinis visiems fasetams: kaip parse'inti param'ą (splitMulti vs
+// vienas/masyvas), kokį Quickwit lauką ir citavimą naudoti filtro sąlygoje, ir
+// kuri „exclude" vėliava jį praleidžia. Iš čia valdomi ir buildPartsOpts (parse),
+// ir buildPartsExcluding (sąlygos). Masyvo tvarka = sąlygų tvarka užklausoje.
+type FacetKind = 'term' | 'jar' | 'years';
+interface FacetDef {
+  /** Parse'into masyvo raktas (pvz. „classes"). */
+  key: string;
+  /** buildPartsOpts input param'as (pvz. „klase"). */
+  param: string;
+  /** Quickwit laukas sąlygoje (pvz. „class", „metadata.teismas"). */
+  field: string;
+  /** „exclude" vėliava, praleidžianti šį fasetą (fasetų sąrašui — kad rodytų
+   *  reikšmes pagal KITUS filtrus). */
+  exclude: string;
+  kind: FacetKind;
+  /** Ar reikšmę citavti JSON.stringify (term režime). */
+  quote: boolean;
+  /** splitMulti (kablelis) vs vienas/masyvas be skaidymo. */
+  parse: 'split' | 'array';
+  /** Inline tokenų (iš q) raktas, sujungiamas su filtru (prepend). */
+  inline?: 'classes' | 'types' | 'hosts' | 'jars' | 'exts';
+  /** Reikšmės transformacija po parse (pvz. ext lowercase, source canon). */
+  transform?: (v: string) => string;
+}
+const FACETS = [
+  { key: 'classes', param: 'klase', field: 'class', exclude: 'excludeClass', kind: 'term', quote: true, parse: 'split', inline: 'classes' },
+  { key: 'types', param: 'type', field: 'type', exclude: 'excludeType', kind: 'term', quote: false, parse: 'split', inline: 'types' },
   // Teismo nuosprendžių metadata filtrai (metadata.* yra json/raw — tiksli atitiktis).
-  if (!opts.excludeCourt && courts.length) p.push(`(${courts.map((v) => `metadata.teismas:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeCaseType && caseTypes.length) p.push(`(${caseTypes.map((v) => `metadata.bylosRusis:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeCategory && categories.length) p.push(`(${categories.map((v) => `metadata.kategorijos:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeJudge && judges.length) p.push(`(${judges.map((v) => `metadata.teisejai:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeActType && actTypes.length) p.push(`(${actTypes.map((v) => `metadata.rusis:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeValidity && validities.length) p.push(`(${validities.map((v) => `metadata.galiojimas:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeEditionType && editionTypes.length) p.push(`(${editionTypes.map((v) => `metadata.editionType:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeProjectStatus && projectStatuses.length) p.push(`(${projectStatuses.map((v) => `metadata.busena:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeEurovoc && eurovoc.length) p.push(`(${eurovoc.map((v) => `metadata.eurovocTerminai:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeHost && hosts.length) p.push(`(${hosts.map((h) => `host:${JSON.stringify(h)}`).join(' OR ')})`);
-  if (!opts.excludeJar && jars.length) {
-    const numeric = jars.map((j) => parseInt(j, 10)).filter((n) => Number.isFinite(n));
-    if (numeric.length) p.push(`(${numeric.map((n) => `jarKodai:${n}`).join(' OR ')})`);
-  }
+  // Šie NEskaidomi per kablelį (vardai gali turėti kablelių) — imam kaip masyvą.
+  { key: 'courts', param: 'teismas', field: 'metadata.teismas', exclude: 'excludeCourt', kind: 'term', quote: true, parse: 'array' },
+  { key: 'caseTypes', param: 'bylosRusis', field: 'metadata.bylosRusis', exclude: 'excludeCaseType', kind: 'term', quote: true, parse: 'array' },
+  { key: 'categories', param: 'kategorija', field: 'metadata.kategorijos', exclude: 'excludeCategory', kind: 'term', quote: true, parse: 'array' },
+  { key: 'judges', param: 'teisejas', field: 'metadata.teisejai', exclude: 'excludeJudge', kind: 'term', quote: true, parse: 'array' },
+  { key: 'actTypes', param: 'aktoRusis', field: 'metadata.rusis', exclude: 'excludeActType', kind: 'term', quote: true, parse: 'array' },
+  { key: 'validities', param: 'galiojimas', field: 'metadata.galiojimas', exclude: 'excludeValidity', kind: 'term', quote: true, parse: 'array' },
+  { key: 'editionTypes', param: 'redakcija', field: 'metadata.editionType', exclude: 'excludeEditionType', kind: 'term', quote: true, parse: 'array' },
+  { key: 'projectStatuses', param: 'projektoBusena', field: 'metadata.busena', exclude: 'excludeProjectStatus', kind: 'term', quote: true, parse: 'array' },
+  { key: 'eurovoc', param: 'eurovoc', field: 'metadata.eurovocTerminai', exclude: 'excludeEurovoc', kind: 'term', quote: true, parse: 'array' },
+  { key: 'hosts', param: 'host', field: 'host', exclude: 'excludeHost', kind: 'term', quote: true, parse: 'split', inline: 'hosts' },
+  { key: 'jars', param: 'jar', field: 'jarKodai', exclude: 'excludeJar', kind: 'jar', quote: false, parse: 'split', inline: 'jars' },
   // Paskelbusi įstaiga: tiksli atitiktis pagal istaigaJar (raw tokenizer).
-  if (!opts.excludeIstaiga && istaigos.length) p.push(`(${istaigos.map((v) => `istaigaJar:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeExt && exts.length) p.push(`(${exts.map((e) => `extension:${JSON.stringify(e)}`).join(' OR ')})`);
-  if (!opts.excludeAuthor && authors.length) p.push(`(${authors.map((v) => `author:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeCreator && creators.length) p.push(`(${creators.map((v) => `metadata.creator:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeProducer && producers.length) p.push(`(${producers.map((v) => `metadata.producer:${JSON.stringify(v)}`).join(' OR ')})`);
-  if (!opts.excludeLang && langs.length) p.push(`(${langs.map((l) => `language:${JSON.stringify(l)}`).join(' OR ')})`);
-  if (!opts.excludeSav && savs.length) p.push(`(${savs.map((s) => `savivaldybe:${JSON.stringify(s)}`).join(' OR ')})`);
-  if (!opts.excludeApskritis && apskritys.length) p.push(`(${apskritys.map((a) => `apskritis:${JSON.stringify(a)}`).join(' OR ')})`);
-  if (!opts.excludeSource && sources.length) p.push(`(${sources.map((s) => `source:${JSON.stringify(s)}`).join(' OR ')})`);
+  { key: 'istaigos', param: 'istaiga', field: 'istaigaJar', exclude: 'excludeIstaiga', kind: 'term', quote: true, parse: 'split' },
+  { key: 'exts', param: 'ext', field: 'extension', exclude: 'excludeExt', kind: 'term', quote: true, parse: 'split', inline: 'exts', transform: (e: string) => e.toLowerCase().replace(/^\./, '') },
+  { key: 'authors', param: 'author', field: 'author', exclude: 'excludeAuthor', kind: 'term', quote: true, parse: 'array' },
+  { key: 'creators', param: 'creator', field: 'metadata.creator', exclude: 'excludeCreator', kind: 'term', quote: true, parse: 'array' },
+  { key: 'producers', param: 'producer', field: 'metadata.producer', exclude: 'excludeProducer', kind: 'term', quote: true, parse: 'array' },
+  { key: 'langs', param: 'lang', field: 'language', exclude: 'excludeLang', kind: 'term', quote: true, parse: 'split' },
+  { key: 'savs', param: 'sav', field: 'savivaldybe', exclude: 'excludeSav', kind: 'term', quote: true, parse: 'split' },
+  { key: 'apskritys', param: 'apskritis', field: 'apskritis', exclude: 'excludeApskritis', kind: 'term', quote: true, parse: 'split' },
+  { key: 'sources', param: 'source', field: 'source', exclude: 'excludeSource', kind: 'term', quote: true, parse: 'split', transform: canonSource },
   // Metai: dokumento data (happenedAt) patenka į pasirinktus kalendorinius metus.
   // Inkliuzyvi apatinė riba, ekskliuzyvi viršutinė — [sausio 1 TO kitų sausio 1}.
-  if (!opts.excludeMetai && years.length) {
-    const yrs = years.map((y) => parseInt(y, 10)).filter((y) => Number.isFinite(y));
-    if (yrs.length) p.push(`(${yrs.map((y) => `happenedAt:[${y}-01-01T00:00:00Z TO ${y + 1}-01-01T00:00:00Z}`).join(' OR ')})`);
+  { key: 'years', param: 'metai', field: 'happenedAt', exclude: 'excludeMetai', kind: 'years', quote: false, parse: 'split' },
+] as const;
+
+type FacetKey = typeof FACETS[number]['key'];
+type ExcludeKey = typeof FACETS[number]['exclude'];
+type ParsedParts = {
+  textQuery: string;
+  bbox: Bbox | null;
+  /** Tiksli frazė: tekstą paduodam Quickwit'ui kabutėse ("…"), kad žodžiai būtų
+   *  randami tiksliai greta ir ta pačia tvarka, o ne kaip atskiri terminai. */
+  phrase: boolean;
+} & Record<FacetKey, string[]>;
+
+/** Vienos/masyvo reikšmės normalizavimas į string[] (be tuščių). */
+const asArray = (x: string | string[] | undefined): string[] =>
+  Array.isArray(x) ? x.filter(Boolean) : x ? [x] : [];
+
+export function buildPartsExcluding(
+  opts: ParsedParts & Partial<Record<ExcludeKey, boolean>>,
+): string {
+  const { textQuery, bbox } = opts;
+  const p: string[] = [];
+  for (const f of FACETS as readonly FacetDef[]) {
+    if ((opts as Record<string, unknown>)[f.exclude]) continue;
+    const vals = opts[f.key as FacetKey];
+    if (!vals?.length) continue;
+    if (f.kind === 'term') {
+      p.push(`(${vals.map((v) => `${f.field}:${f.quote ? JSON.stringify(v) : v}`).join(' OR ')})`);
+    } else if (f.kind === 'jar') {
+      const numeric = vals.map((j) => parseInt(j, 10)).filter((n) => Number.isFinite(n));
+      if (numeric.length) p.push(`(${numeric.map((n) => `${f.field}:${n}`).join(' OR ')})`);
+    } else {
+      const yrs = vals.map((y) => parseInt(y, 10)).filter((y) => Number.isFinite(y));
+      if (yrs.length) p.push(`(${yrs.map((y) => `${f.field}:[${y}-01-01T00:00:00Z TO ${y + 1}-01-01T00:00:00Z}`).join(' OR ')})`);
+    }
   }
   // Sritis: dokumentai, kurių taškas patenka į pasirinktą stačiakampį. Filtruojam
   // per Quickwit lat/lon fast laukų range užklausą (inkliuzyvūs rėžiai).
@@ -375,7 +377,7 @@ function parseBbox(input: {
 
 // Shared filter/query parts for a request — used both by the full search and by
 // the standalone facet-options fetch (the "show all" modal).
-function buildPartsOpts(input: {
+export function buildPartsOpts(input: {
   q?: string;
   klase?: string | string[];
   type?: string | string[];
@@ -405,67 +407,25 @@ function buildPartsOpts(input: {
   minLon?: string | number;
   maxLon?: string | number;
   mode?: string;
-}) {
+}): ParsedParts {
   const rawQ = (input.q ?? '').trim();
   const phrase = input.mode === 'phrase';
+  const inline = extractInlineTokens(rawQ);
+  const src = input as Record<string, string | string[] | undefined>;
 
-  const classFilter = splitMulti(input.klase);
-  const typeFilter = splitMulti(input.type);
-  const hostFilter = splitMulti(input.host);
-  const jarFilter = splitMulti(input.jar);
-  const istaigaFilter = splitMulti(input.istaiga);
-  const extFilter = splitMulti(input.ext).map((e) => e.toLowerCase().replace(/^\./, ''));
-  const authorFilter = Array.isArray(input.author) ? input.author.filter(Boolean) : input.author ? [input.author] : [];
-  const creatorFilter = Array.isArray(input.creator) ? input.creator.filter(Boolean) : input.creator ? [input.creator] : [];
-  const producerFilter = Array.isArray(input.producer) ? input.producer.filter(Boolean) : input.producer ? [input.producer] : [];
-  const langFilter = splitMulti(input.lang);
-  const savFilter = splitMulti(input.sav);
-  const apskritisFilter = splitMulti(input.apskritis);
-  const sourceFilter = splitMulti(input.source).map(canonSource);
-  const metaiFilter = splitMulti(input.metai);
-  // Nuosprendžių metadata filtrai gali turėti kablelių vardo viduje (pvz. kategorijų
-  // pavadinimai), todėl jų NEskaidom per kablelį — imam kaip atskiras reikšmes.
-  const courtFilter = Array.isArray(input.teismas) ? input.teismas.filter(Boolean) : input.teismas ? [input.teismas] : [];
-  const caseTypeFilter = Array.isArray(input.bylosRusis) ? input.bylosRusis.filter(Boolean) : input.bylosRusis ? [input.bylosRusis] : [];
-  const categoryFilter = Array.isArray(input.kategorija) ? input.kategorija.filter(Boolean) : input.kategorija ? [input.kategorija] : [];
-  const judgeFilter = Array.isArray(input.teisejas) ? input.teisejas.filter(Boolean) : input.teisejas ? [input.teisejas] : [];
-  const actTypeFilter = Array.isArray(input.aktoRusis) ? input.aktoRusis.filter(Boolean) : input.aktoRusis ? [input.aktoRusis] : [];
-  const validityFilter = Array.isArray(input.galiojimas) ? input.galiojimas.filter(Boolean) : input.galiojimas ? [input.galiojimas] : [];
-  const editionTypeFilter = Array.isArray(input.redakcija) ? input.redakcija.filter(Boolean) : input.redakcija ? [input.redakcija] : [];
-  const projectStatusFilter = Array.isArray(input.projektoBusena) ? input.projektoBusena.filter(Boolean) : input.projektoBusena ? [input.projektoBusena] : [];
-  const eurovocFilter = Array.isArray(input.eurovoc) ? input.eurovoc.filter(Boolean) : input.eurovoc ? [input.eurovoc] : [];
-
-  const { textQuery, classes: inlineClasses, types: inlineTypes, hosts: inlineHosts, jars: inlineJars, exts: inlineExts } =
-    extractInlineTokens(rawQ);
-
-  return {
-    textQuery,
-    classes: [...new Set([...inlineClasses, ...classFilter])],
-    types: [...new Set([...inlineTypes, ...typeFilter])],
-    hosts: [...new Set([...inlineHosts, ...hostFilter])],
-    jars: [...new Set([...inlineJars, ...jarFilter])],
-    istaigos: [...new Set(istaigaFilter)],
-    exts: [...new Set([...inlineExts, ...extFilter.map((e) => e.toLowerCase())])],
-    authors: [...new Set(authorFilter)],
-    creators: [...new Set(creatorFilter)],
-    producers: [...new Set(producerFilter)],
-    langs: [...new Set(langFilter)],
-    savs: [...new Set(savFilter)],
-    apskritys: [...new Set(apskritisFilter)],
-    sources: [...new Set(sourceFilter)],
-    years: [...new Set(metaiFilter)],
-    courts: [...new Set(courtFilter)],
-    caseTypes: [...new Set(caseTypeFilter)],
-    categories: [...new Set(categoryFilter)],
-    judges: [...new Set(judgeFilter)],
-    actTypes: [...new Set(actTypeFilter)],
-    validities: [...new Set(validityFilter)],
-    editionTypes: [...new Set(editionTypeFilter)],
-    projectStatuses: [...new Set(projectStatusFilter)],
-    eurovoc: [...new Set(eurovocFilter)],
+  const parsed: Record<string, unknown> = {
+    textQuery: inline.textQuery,
     bbox: parseBbox(input),
     phrase,
   };
+  for (const f of FACETS as readonly FacetDef[]) {
+    let vals = f.parse === 'split' ? splitMulti(src[f.param]) : asArray(src[f.param]);
+    if (f.transform) vals = vals.map(f.transform);
+    // Inline tokenai (iš q, pvz. „class:failas") sujungiami PIRMA prieš filtrą.
+    if (f.inline) vals = [...((inline as unknown as Record<string, string[]>)[f.inline] ?? []), ...vals];
+    parsed[f.key] = [...new Set(vals)];
+  }
+  return parsed as ParsedParts;
 }
 
 // Quickwit field → the "exclude this facet's own filter" flag, so a facet lists
@@ -835,150 +795,9 @@ export async function dokumentaiFilterStats(
   }
 }
 
-// ── Snippets ─────────────────────────────────────────────────────────────────
+// ── Snippets (iškelta į ./dokumentai/snippet.ts; re-eksportuojam viešajam API) ──
+export { normalizeDocText, makeSnippet, foldLithuanian };
 
-function escapeHtml(s: string) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-/** Failų sidecar `text` saugomas kaip `JSON.stringify(pages)` — puslapių masyvo
- *  eilutė (pvz. `["1 psl.","2 psl."]`). Vartotojui to rodyti negalima, todėl jei
- *  tekstas yra JSON eilučių masyvas, sulipdom puslapius į vientisą tekstą. Kitų
- *  šaltinių (nuosprendžių) tekstas — paprasta eilutė, grąžinam kaip yra. */
-export function normalizeDocText(text: string | unknown[]): string {
-  // Retais atvejais sidecar tekstas gali būti jau išparsintas masyvas.
-  if (Array.isArray(text)) return text.filter((p) => typeof p === 'string').join(' ');
-  if (typeof text !== 'string') return '';
-  const trimmed = text.trimStart();
-  if (!trimmed.startsWith('[')) return text;
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (Array.isArray(parsed)) {
-      return parsed.filter((p) => typeof p === 'string').join(' ');
-    }
-  } catch {
-    // Labai dideli tekstai saugomi nukirsti (1 MB riba + „…"), todėl JSON masyvas
-    // gali būti nebaigtas ir neparsinamas. Tokiu atveju nuimam masyvo sintaksę
-    // (laužtinius skliaustus ir eilučių ribas `","`) rankiniu būdu.
-    return trimmed
-      .replace(/^\[\s*"/, '')
-      .replace(/"\s*\]\s*$/, '')
-      .replace(/"\s*,\s*"/g, ' ');
-  }
-  return text;
-}
-
-function extractTerms(q: string): string[] {
-  if (!q) return [];
-  const out: string[] = [];
-  const re = /"([^"]+)"|(\S+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(q)) !== null) {
-    if (m[1]) {
-      out.push(...m[1].split(/\s+/).filter(Boolean));
-    } else {
-      const tok = m[2];
-      if (/^\w+:/.test(tok)) continue;
-      if (tok) out.push(tok);
-    }
-  }
-  return [...new Set(out)];
-}
-
-function findAll(haystack: string, needle: string): number[] {
-  if (!needle) return [];
-  const matches: number[] = [];
-  let from = 0;
-  while (from < haystack.length) {
-    const index = haystack.indexOf(needle, from);
-    if (index < 0) break;
-    matches.push(index);
-    from = index + Math.max(1, needle.length);
-  }
-  return matches;
-}
-
-function bestSnippetStart(
-  matches: { start: number; end: number }[],
-  textLength: number,
-  maxChars: number,
-  leading: number,
-) {
-  if (!matches.length) return 0;
-  let bestStart = Math.max(0, matches[0].start - leading);
-  let bestCount = 0;
-  for (const match of matches) {
-    const candidate = Math.max(0, match.start - leading);
-    const end = candidate + maxChars;
-    const count = matches.filter((m) => m.start < end && m.end > candidate).length;
-    if (count > bestCount) {
-      bestCount = count;
-      bestStart = candidate;
-    }
-  }
-  return Math.min(bestStart, Math.max(0, textLength - maxChars));
-}
-
-function highlightRanges(text: string, ranges: { start: number; end: number }[]) {
-  if (!ranges.length) return escapeHtml(text);
-  const merged: { start: number; end: number }[] = [];
-  for (const range of [...ranges].sort((a, b) => a.start - b.start || b.end - a.end)) {
-    const last = merged.at(-1);
-    if (last && range.start <= last.end) last.end = Math.max(last.end, range.end);
-    else merged.push({ ...range });
-  }
-
-  let html = '';
-  let cursor = 0;
-  for (const range of merged) {
-    html += escapeHtml(text.slice(cursor, range.start));
-    html += `<strong>${escapeHtml(text.slice(range.start, range.end))}</strong>`;
-    cursor = range.end;
-  }
-  return html + escapeHtml(text.slice(cursor));
-}
-
-export function makeSnippet(
-  text: string,
-  q: string,
-  mode: 'phrase' | 'words' = 'words',
-  maxChars = 240,
-  leading = 80,
-): string | null {
-  if (!text) return null;
-  const normalizedText = text.replace(/\s+/g, ' ').trim();
-  if (!normalizedText) return null;
-  const terms = extractTerms(q);
-  const foldedText = foldLithuanian(normalizedText).toLowerCase();
-  const foldedTerms = terms.map((term) => foldLithuanian(term).toLowerCase()).filter(Boolean);
-  const phrase = foldLithuanian(q.replace(/"/g, '').replace(/\s+/g, ' ').trim()).toLowerCase();
-
-  let matches: { start: number; end: number }[] = [];
-  if (mode === 'phrase' && phrase) {
-    matches = findAll(foldedText, phrase).map((start) => ({ start, end: start + phrase.length }));
-  }
-  // A document may match in its title/author while its sidecar text does not
-  // contain the exact phrase. In that case, still produce a useful snippet and
-  // mark every query term found in the text.
-  if (!matches.length) {
-    matches = foldedTerms.flatMap((term) =>
-      findAll(foldedText, term).map((start) => ({ start, end: start + term.length })),
-    );
-  }
-
-  const start = bestSnippetStart(matches, normalizedText.length, maxChars, leading);
-  const end = Math.min(normalizedText.length, start + maxChars);
-  const localMatches = matches
-    .filter((match) => match.start < end && match.end > start)
-    .map((match) => ({
-      start: Math.max(0, match.start - start),
-      end: Math.min(end, match.end) - start,
-    }));
-  let s = highlightRanges(normalizedText.slice(start, end), localMatches);
-  if (start > 0) s = '…' + s;
-  if (end < normalizedText.length) s += '…';
-  return s;
-}
 
 // ── Public API ───────────────────────────────────────────────────────────────
 

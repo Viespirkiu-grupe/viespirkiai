@@ -2,9 +2,9 @@ import AdmZip from "adm-zip";
 import { specialJarCodes } from "../juridiniai/specialJarCodes.js";
 
 const EUR_FORMAT = '#,##0.00 [$€-lt-LT]';
-// Eksporto viršutinė riba. Quickwit 0.8 leidžia pasiekti nebent 20 000 įrašų
-// (max_hits 10 000 + start_offset 10 000), tad tiek ir eksportuojam (xlsx/csv/jsonl).
-export const XLSX_EXPORT_LIMIT = 20_000;
+// Bendra interaktyvių sutarčių eksportų riba. Quickwit 20 000 paieškos langas
+// apeinamas eksportą tęsiant pagal unikalų sutarties ID.
+export const XLSX_EXPORT_LIMIT = 100_000;
 
 export function canExportAnalizeXlsx(count) {
     return Number.isInteger(count) && count >= 0 && count <= XLSX_EXPORT_LIMIT;

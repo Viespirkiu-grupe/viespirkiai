@@ -73,6 +73,16 @@ const faviconSVGURLEncoded = encodeURIComponent(faviconSVG);
   </script>
   <script>
     import '../scripts/hoverPrefetch.ts';
+    // Antraštės elgesys (visuose puslapiuose per <Header>) ir bet kur esantys
+    // TimelineColumnChart primityvai inicijuojami iš šio globalaus modulinio
+    // script'o. (Šiame Astro variante įdėtinių komponentų <script> hoisting'as
+    // nepatikimas, tad initą kviečiame iš puslapio/Layout lygio — kaip
+    // mobileFilterBatch/stickyRail.)
+    import { initSchemeToggle, initSiteHeader } from '../lib/siteHeader.ts';
+    import { initTimelineColumnCharts } from '@design-system/lib/timelineChart.ts';
+    initSchemeToggle();
+    initSiteHeader();
+    initTimelineColumnCharts();
   </script>
 
   {customHead && <Fragment set:html={customHead} />}

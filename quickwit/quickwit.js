@@ -633,21 +633,33 @@ export const QW_EXPORT_CEILING = QW_MAX_HITS + QW_MAX_START_OFFSET;
  *                                  field for stable offset paging)
  * @param {object} [opts]
  * @param {number} [opts.limit]  - stop after this many live hits; Infinity = all
+ * @param {number} [opts.pageSize] - raw hits per request (max 10 000)
+ * @param {number} [opts.maxPages] - optional request cap for cursor windows
  */
-export async function searchAll(lentele, params, { limit = Infinity } = {}) {
+export async function searchAll(
+  lentele,
+  params,
+  { limit = Infinity, pageSize = QW_MAX_HITS, maxPages = Infinity } = {},
+) {
+  const fetchSize = Math.max(1, Math.min(QW_MAX_HITS, Math.trunc(pageSize)));
   const deadRatio = await getDeadRatio(lentele);
   const liveHits = [];
   let offset = 0;
   let numHitsMax = null;
+  let lastRawHit = null;
+  let rawExhausted = false;
+  let pages = 0;
 
-  while (liveHits.length < limit) {
+  while (liveHits.length < limit && pages < maxPages) {
+    pages++;
     const data = await qwSearch(`${lentele}_*`, {
       ...params,
-      max_hits: QW_MAX_HITS,
+      max_hits: fetchSize,
       start_offset: offset,
       format: "json",
     });
     const hits = data.hits ?? [];
+    if (hits.length) lastRawHit = hits[hits.length - 1];
     if (numHitsMax === null) numHitsMax = data.num_hits ?? 0;
 
     const live = deadRatio === 0 ? hits : await filterLive(lentele, hits);
@@ -655,14 +667,22 @@ export async function searchAll(lentele, params, { limit = Infinity } = {}) {
 
     // Short page → index exhausted. Also stop before exceeding Quickwit's
     // start_offset ceiling (next offset would 400).
-    if (hits.length < QW_MAX_HITS || offset >= QW_MAX_START_OFFSET) break;
-    offset += QW_MAX_HITS;
+    if (hits.length < fetchSize) {
+      rawExhausted = true;
+      break;
+    }
+    if (offset >= QW_MAX_START_OFFSET) break;
+    offset += fetchSize;
   }
 
   return {
     hits: Number.isFinite(limit) ? liveHits.slice(0, limit) : liveHits,
     numHitsMax,
     numHitsEstimate: numHitsMax == null ? null : Math.round(numHitsMax * (1 - deadRatio)),
+    // Cursor callers must advance past the last raw hit, not the last live hit:
+    // the tail of a page may consist entirely of tombstones.
+    lastRawHit,
+    rawExhausted,
   };
 }
 

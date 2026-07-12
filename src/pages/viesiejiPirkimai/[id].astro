@@ -80,7 +80,7 @@ const font = getFont(Astro.cookies);
 
     <div class="mb-10">
       <div class="text-muted mb-4 text-sm">
-          Duomenys atnaujinti <DateValue value={pirkimas.turinioNuskaitymoData} mode="datetime" /></i>
+          Duomenys atnaujinti <DateValue value={pirkimas.turinioNuskaitymoData} mode="datetime" />
       </div>
       {pirkimas.informacija && pirkimas.informacija !== pirkimas.pavadinimas && (
         <div class="text-justify">{pirkimas.informacija}</div>

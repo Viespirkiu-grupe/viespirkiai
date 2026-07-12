@@ -1,5 +1,6 @@
 ---
 import ResultPageShell from '@design-system/components/content/ResultPageShell.astro';
+import Modal from '@design-system/components/Modal.astro';
 import SutartisCard from './SutartisCard.astro';
 
 type SearchResultItem = {
@@ -30,13 +31,14 @@ interface Props {
   galimaEksportuoti: boolean;
   eksportasPerDaug?: boolean;
   eksportoRiba?: number;
+  exportTotal?: number | null;
   containerClass?: string;
   flat?: boolean;
   sortOptions?: SortOption[];
   sortValue?: string;
 }
 
-const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti, eksportasPerDaug = false, eksportoRiba = 20_000, containerClass, flat = false, sortOptions = [], sortValue = '' } = Astro.props;
+const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti, eksportasPerDaug = false, eksportoRiba = 20_000, exportTotal = null, containerClass, flat = false, sortOptions = [], sortValue = '' } = Astro.props;
 ---
 
 <ResultPageShell
@@ -67,13 +69,13 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
         </span>
       ) : (
         <>
-          <a href={`/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
+          <a href={`/?${queryParams}&jsonl=true&limit=max`} data-sutartys-export="jsonl" class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip JSONL">
             <span aria-hidden="true">↗</span> JSONL
           </a>
-          <a href={`/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
+          <a href={`/?${queryParams}&csv=true&limit=max`} data-sutartys-export="csv" class="btn btn-outline btn-sm" aria-label="Eksportuoti kaip CSV">
             <span aria-hidden="true">↗</span> CSV
           </a>
-          <a href={`/?${queryParams}&xlsx=true&limit=max`} class="btn btn-outline btn-sm" aria-label="Eksportuoti analizę kaip XLSX">
+          <a href={`/?${queryParams}&xlsx=true&limit=max`} data-sutartys-export="xlsx" class="btn btn-outline btn-sm" aria-label="Eksportuoti analizę kaip XLSX">
             <span aria-hidden="true">↗</span> XLSX
           </a>
         </>
@@ -84,6 +86,28 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
     <SutartisCard item={item} />
   ))}
 </ResultPageShell>
+
+<Modal id="sutExportModal" title="Ruošiamas eksportas" className="sut-export-modal">
+  <div class="sut-export-body" data-export-total={exportTotal ?? ''}>
+    <div class="sut-export-work">
+      <div class="sut-export-head">
+        <span class="sut-export-icon" aria-hidden="true"></span>
+        <p class="sut-export-status" aria-live="polite">Pradedama…</p>
+      </div>
+      <div class="sut-export-progress" role="progressbar" aria-label="Eksporto progresas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span class="sut-export-progress__fill"></span>
+      </div>
+      <p class="sut-export-count text-sm" aria-live="polite"></p>
+      <p class="sut-export-estimate-note text-sm" hidden>Numatomas rezultatų skaičius buvo netikslus.</p>
+      <p class="sut-export-download text-muted text-sm" aria-live="polite" hidden></p>
+    </div>
+  </div>
+  <Fragment slot="footer">
+    <span class="ds-modal__actions">
+      <button type="button" class="btn btn-outline btn-sm" id="sutExportCancel" data-modal-close>Atšaukti</button>
+    </span>
+  </Fragment>
+</Modal>
 
 <script>
   const span = document.querySelector('.rezultatai-nezinomas-total');
@@ -117,7 +141,336 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
       form.requestSubmit();
     });
   });
+
+  import { openModal } from '@design-system/components/modal.ts';
+
+  const dialog = document.querySelector<HTMLElement>('#sutExportModal');
+  const title = dialog?.querySelector<HTMLElement>('.ds-modal__title');
+  const body = dialog?.querySelector<HTMLElement>('.sut-export-body');
+  const work = dialog?.querySelector<HTMLElement>('.sut-export-work');
+  const status = dialog?.querySelector<HTMLElement>('.sut-export-status');
+  const count = dialog?.querySelector<HTMLElement>('.sut-export-count');
+  const progress = dialog?.querySelector<HTMLElement>('.sut-export-progress');
+  const progressFill = dialog?.querySelector<HTMLElement>('.sut-export-progress__fill');
+  const estimateNote = dialog?.querySelector<HTMLElement>('.sut-export-estimate-note');
+  const downloadStatus = dialog?.querySelector<HTMLElement>('.sut-export-download');
+  const close = dialog?.querySelector<HTMLButtonElement>('#sutExportCancel');
+  let exportAbort: AbortController | null = null;
+  let exportTrigger: HTMLAnchorElement | null = null;
+  let inertElements: Array<{ element: HTMLElement; wasInert: boolean }> = [];
+
+  const setPageInert = (inert: boolean) => {
+    if (!dialog) return;
+    if (inert) {
+      // Modalį perkeliame tiesiai po body, kad jo neužblokuotų inert protėvis.
+      if (dialog.parentElement !== document.body) document.body.append(dialog);
+      inertElements = Array.from(document.body.children)
+        .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== dialog)
+        .map((element) => ({ element, wasInert: element.inert }));
+      inertElements.forEach(({ element }) => { element.inert = true; });
+      return;
+    }
+    inertElements.forEach(({ element, wasInert }) => { element.inert = wasInert; });
+    inertElements = [];
+  };
+
+  const phaseLabel = (phase: string) => phase === 'formatting'
+    ? 'Formuojamas XLSX failas…'
+    : phase === 'downloading' ? 'Siunčiamas paruoštas failas…'
+    : phase === 'collected' ? 'Duomenys surinkti.'
+    : phase === 'complete' ? 'Eksportas paruoštas.' : 'Atrenkamos ir apdorojamos sutartys…';
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toLocaleString('lt-LT', { maximumFractionDigits: 0 })} KB`;
+    return `${(bytes / 1024 / 1024).toLocaleString('lt-LT', { maximumFractionDigits: 1 })} MB`;
+  };
+
+  const updateBar = (percent: number, phase: string) => {
+    const value = Math.max(0, Math.min(100, Number(percent) || 0));
+    progress?.setAttribute('aria-valuenow', String(value));
+    progressFill?.style.setProperty('--export-progress', `${value}%`);
+    progress?.classList.toggle('is-striped', phase === 'formatting');
+  };
+
+  const showCorrectedEstimate = (expected: number, actual: number) => {
+    if (!dialog || !count || !estimateNote || expected === actual) return;
+    const update = () => {
+      count.innerHTML = `${actual.toLocaleString('lt-LT')} iš <del>${expected.toLocaleString('lt-LT')}</del> <strong>${actual.toLocaleString('lt-LT')}</strong> sutarčių (100 %)`;
+      estimateNote.hidden = false;
+    };
+    const transitionDocument = document as Document & { startViewTransition?: (callback: () => void) => unknown };
+    transitionDocument.startViewTransition ? transitionDocument.startViewTransition(update) : update();
+  };
+
+  dialog?.querySelectorAll('[data-modal-close]').forEach((button) => button.addEventListener('click', () => {
+    exportAbort?.abort();
+    exportAbort = null;
+    setPageInert(false);
+    queueMicrotask(() => exportTrigger?.focus());
+  }));
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && dialog && !dialog.hidden) {
+      exportAbort?.abort();
+      setPageInert(false);
+      queueMicrotask(() => exportTrigger?.focus());
+    }
+  });
+
+  document.querySelectorAll<HTMLAnchorElement>('a[data-sutartys-export]').forEach((link) => {
+    link.addEventListener('click', async (event) => {
+      const enhancedExportTotal = body?.dataset.exportTotal ? Number(body.dataset.exportTotal) : null;
+      if (enhancedExportTotal != null && enhancedExportTotal <= 5_000) return;
+      if (!dialog || !title || !body || !work || !status || !count || !progress || !progressFill || !estimateNote || !downloadStatus || !window.ReadableStream) return;
+      event.preventDefault();
+      exportTrigger = link;
+      exportAbort?.abort();
+      exportAbort = new AbortController();
+      body.classList.remove('is-done', 'is-error');
+      status.textContent = 'Pradedama…';
+      count.textContent = '';
+      estimateNote.hidden = true;
+      downloadStatus.hidden = true;
+      downloadStatus.textContent = '';
+      updateBar(0, 'searching');
+      const format = (link.dataset.sutartysExport || '').toUpperCase();
+      title.textContent = `${format} eksportas`;
+      if (close) {
+        close.textContent = 'Atšaukti';
+      }
+      setPageInert(true);
+      openModal(dialog);
+      close?.focus();
+
+      try {
+        const url = new URL(link.href);
+        url.searchParams.set('exportStream', 'true');
+        const response = await fetch(url, {
+          signal: exportAbort.signal,
+        });
+        if (!response.ok || !response.body) throw new Error(await response.text() || 'Nepavyko pradėti eksporto.');
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let pending = new Uint8Array();
+        let filename = `viespirkiai.${link.dataset.sutartysExport}`;
+        let contentType = 'application/octet-stream';
+        const fileChunks: BlobPart[] = [];
+        let completed = false;
+        let expectedTotal: number | null = null;
+        let correctedEstimate = false;
+
+        const handleFrame = (type: number, payload: Uint8Array) => {
+          if (type === 1) {
+            const data = JSON.parse(decoder.decode(payload));
+            const processed = Number(data.processed);
+            const total = Number(data.total);
+            if (expectedTotal == null && Number.isFinite(total)) expectedTotal = total;
+            status.textContent = phaseLabel(data.phase);
+            updateBar(data.percent, data.phase);
+            if ((data.phase === 'collected' || data.phase === 'complete') && expectedTotal != null && processed !== expectedTotal) {
+              correctedEstimate = true;
+              showCorrectedEstimate(expectedTotal, processed);
+            } else if (!correctedEstimate && data.phase !== 'downloading') {
+              count.textContent = `${processed.toLocaleString('lt-LT')} iš ${total.toLocaleString('lt-LT')} sutarčių (${Number(data.percent) || 0} %)`;
+            }
+            if (data.phase === 'downloading' && Number.isFinite(data.totalBytes)) {
+              downloadStatus.hidden = false;
+              downloadStatus.textContent = `Atsisiųsta ${formatBytes(Number(data.downloadedBytes))} iš ${formatBytes(Number(data.totalBytes))} (${Number(data.percent) || 0} %)`;
+            } else if (Number(data.downloadedBytes) > 0) {
+              downloadStatus.hidden = false;
+              downloadStatus.textContent = `Gauta ${formatBytes(Number(data.downloadedBytes))} failo duomenų`;
+            }
+          } else if (type === 2) {
+            const data = JSON.parse(decoder.decode(payload));
+            filename = data.filename;
+            contentType = data.contentType;
+          } else if (type === 3) {
+            fileChunks.push(payload.slice());
+          } else if (type === 4) {
+            completed = true;
+          } else if (type === 5) {
+            const data = JSON.parse(decoder.decode(payload));
+            throw new Error(data.message || 'Eksporto klaida.');
+          }
+        };
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (value?.byteLength) {
+            const joined = new Uint8Array(pending.byteLength + value.byteLength);
+            joined.set(pending);
+            joined.set(value, pending.byteLength);
+            pending = joined;
+          }
+          let offset = 0;
+          while (pending.byteLength - offset >= 5) {
+            const length = new DataView(pending.buffer, pending.byteOffset + offset + 1, 4).getUint32(0, false);
+            if (pending.byteLength - offset < 5 + length) break;
+            handleFrame(pending[offset], pending.subarray(offset + 5, offset + 5 + length));
+            offset += 5 + length;
+          }
+          if (offset) pending = pending.slice(offset);
+          if (done) break;
+        }
+        if (!completed || pending.byteLength) throw new Error('Eksporto atsakymas nutrūko nebaigtas.');
+
+        const objectUrl = URL.createObjectURL(new Blob(fileChunks, { type: contentType }));
+        const download = document.createElement('a');
+        download.href = objectUrl;
+        download.download = filename;
+        download.click();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+        status.textContent = 'Eksportas paruoštas ir atsisiunčiamas.';
+        body.classList.add('is-done');
+        updateBar(100, 'complete');
+        if (close) {
+          close.textContent = 'Uždaryti';
+        }
+      } catch (error) {
+        if ((error as Error).name === 'AbortError') return;
+        body.classList.add('is-error');
+        status.textContent = error instanceof Error ? error.message : 'Eksporto klaida.';
+        count.textContent = 'Bandykite dar kartą.';
+        progress.classList.remove('is-striped');
+      } finally {
+        exportAbort = null;
+      }
+    });
+  });
 </script>
+
+<style is:global>
+  .sut-export-modal .ds-modal__backdrop {
+    background: color-mix(in srgb, var(--black) 55%, transparent);
+  }
+  @media (min-width: 641px) {
+    .sut-export-modal .ds-modal__panel {
+      inset: auto;
+      top: 50%;
+      left: 50%;
+      width: min(460px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      border: var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg);
+      transform: translate(-50%, -50%);
+      animation: none;
+    }
+  }
+  .sut-export-modal .ds-modal__foot {
+    justify-content: flex-end;
+  }
+  .sut-export-body {
+    padding: 24px;
+  }
+  .sut-export-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  /* Būsenos ikona: sukasi kraunant, virsta varnele / šauktuku pabaigus. */
+  .sut-export-icon {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-pill);
+    border: 2px solid var(--lighter-gray);
+    border-top-color: var(--color-primary);
+    animation: sut-export-spin 700ms linear infinite;
+  }
+  .sut-export-body.is-done .sut-export-icon,
+  .sut-export-body.is-error .sut-export-icon {
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--white);
+    font-size: 13px;
+    font-weight: 700;
+    animation: sut-export-pop 200ms ease;
+  }
+  .sut-export-body.is-done .sut-export-icon {
+    background: var(--color-success);
+  }
+  .sut-export-body.is-done .sut-export-icon::before { content: "✓"; }
+  .sut-export-body.is-error .sut-export-icon {
+    background: var(--color-danger);
+  }
+  .sut-export-body.is-error .sut-export-icon::before { content: "!"; }
+  @keyframes sut-export-spin { to { transform: rotate(360deg); } }
+  @keyframes sut-export-pop {
+    from { transform: scale(0.6); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .sut-export-status {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--black);
+  }
+  .sut-export-body.is-error .sut-export-status { color: var(--color-danger); }
+  .sut-export-progress {
+    width: 100%;
+    height: 8px;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--lighter-gray);
+  }
+  .sut-export-progress__fill {
+    display: block;
+    width: var(--export-progress, 0%);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-primary);
+    transition: width 180ms ease, background-color 180ms ease;
+  }
+  .sut-export-body.is-done .sut-export-progress__fill { background: var(--color-success); }
+  .sut-export-body.is-error .sut-export-progress__fill { background: var(--color-danger); }
+  .sut-export-progress.is-striped .sut-export-progress__fill {
+    width: 100%;
+    background-color: var(--color-primary);
+    background-image: linear-gradient(45deg, color-mix(in srgb, var(--white) 25%, transparent) 25%, transparent 25%, transparent 50%, color-mix(in srgb, var(--white) 25%, transparent) 50%, color-mix(in srgb, var(--white) 25%, transparent) 75%, transparent 75%);
+    background-size: 24px 24px;
+    animation: sut-export-stripes 700ms linear infinite;
+  }
+  @keyframes sut-export-stripes {
+    to { background-position: 24px 0; }
+  }
+  .sut-export-count {
+    margin: 12px 0 0;
+    color: var(--gray);
+    view-transition-name: sut-export-count;
+  }
+  .sut-export-count del { color: var(--light-gray); }
+  .sut-export-count strong { color: var(--black); font-weight: 600; }
+  .sut-export-estimate-note {
+    margin: 14px 0 0;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    background: var(--color-warning-bg);
+    color: var(--color-warning);
+    animation: sut-export-note-in 180ms ease-out;
+  }
+  .sut-export-download { margin: 10px 0 0; }
+  @keyframes sut-export-note-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  ::view-transition-group(sut-export-count) { animation-duration: 180ms; }
+  @media (prefers-reduced-motion: reduce) {
+    .sut-export-icon,
+    .sut-export-progress__fill { transition: none; animation: none; }
+    .sut-export-progress.is-striped .sut-export-progress__fill,
+    .sut-export-estimate-note { animation: none; }
+  }
+  @media (max-width: 640px) {
+    .sut-export-modal .ds-modal__backdrop { background: var(--white); }
+    .sut-export-body {
+      flex: 1;
+      overflow-y: auto;
+    }
+  }
+</style>
 
 <style>
   .eksportas-per-daug {

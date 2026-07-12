@@ -130,6 +130,10 @@
         --light-gray: var(--color-stone-300);
         --lighter-gray: var(--color-stone-200);
         --link: var(--color-sky-800);
+        /* Varnelės ikona pažymėtam checkbox'ui (užpildas = --black). Spalva turi
+           atitikti --white, kad kontrastuotų abiejose temose. url() negali skaityti
+           CSS kintamųjų, todėl reikšmė apibrėžta po vieną kartą kiekvienai temai. */
+        --checkmark-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fafaf9' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
 
         --color-primary: var(--color-stone-950);
         --color-primary-hover: var(--color-stone-800);
@@ -162,6 +166,7 @@
             --light-gray: var(--color-stone-800);
             --lighter-gray: var(--color-stone-900);
             --link: var(--color-sky-200);
+            --checkmark-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%230c0a09' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
 
             --color-primary: var(--color-stone-50);
             --color-primary-hover: var(--color-stone-300);

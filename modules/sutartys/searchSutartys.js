@@ -161,10 +161,8 @@ const SUTARTYS_FROM = `sutartys LEFT JOIN "sutartysAtnaujinimai" USING ("sutarti
 
 const QUICKWIT_LENTELE = "sutartys";
 const QUICKWIT_PAGE_SIZE = 50;
-// Viršutinė riba eksportams (CSV/JSONL/XLSX) per Quickwit. Quickwit 0.8 leidžia
-// pasiekti nebent 20 000 įrašų (max_hits + start_offset ribos, žr. searchAll),
-// tad tiek daugiausiai ir surenkam.
-const QUICKWIT_EXPORT_LIMIT = 20_000;
+export const SUTARTYS_EXPORT_LIMIT = 100_000;
+const QUICKWIT_EXPORT_WINDOW = 5_000;
 
 // Tekstinei paieškai skenuojami keli tekstiniai (tokenizuoti) laukai — ne vien
 // `tekstas` (default_search_fields), kad sutaptų ir pavadinimas, tiekėjas ir kt.
@@ -597,6 +595,39 @@ async function attachBvpzNames(options) {
     return codes.map((code) => ({ value: code, label: names.get(code), count: byCode.get(code) }));
 }
 
+/** Pažymėtus BVPŽ prefiksus išrenka iš užklausos (matomas + paslėptas laukas). */
+function selectedBvpzPrefixes(query) {
+    return [...new Set(
+        [query.bvpzPrefiksas, query.bvpzPrefiksasKitas]
+            .filter(Boolean)
+            .flatMap((raw) => String(raw).split(" "))
+            .map((p) => p.trim())
+            .filter(Boolean),
+    )];
+}
+
+/** Pažymėtiems BVPŽ prefiksams priskiria prefiksinės atitikties sutarčių skaičių
+ *  pagal kitus filtrus (facet-exclude), kad šoninėje juostoje ir dialoge nepilni
+ *  kodai rodytųsi su „*" ženklu ir sutarčių skaičiumi. Pavadinimo nerodom — vien
+ *  kodas su „*", kad aiškiai skirtųsi nuo konkretaus (pilno) kodo. */
+async function attachSelectedBvpz(prefixes, query) {
+    const uniq = [...new Set(prefixes)].filter(Boolean);
+    if (!uniq.length) return [];
+    const base = buildSutartysQuickwitQuery(query, { exclude: ["bvpz"] });
+    const counts = await Promise.all(
+        uniq.map((p) =>
+            quickwitCountDocs(QUICKWIT_LENTELE, {
+                query: base === "*" ? `bvpzKodai:${p}*` : `(${base}) AND bvpzKodai:${p}*`,
+            }).catch(() => null),
+        ),
+    );
+    return uniq.map((value, i) => ({
+        value,
+        count: counts[i],
+        isPrefix: value.replace(/\D/g, "").length < 8,
+    }));
+}
+
 /**
  * Suskaičiuoja visus sutarčių šoninės juostos facetus vienai užklausai.
  * Kiekvienas facetas naudoja facet-exclude, kad rodytų reikšmes pagal kitus
@@ -619,11 +650,17 @@ export async function sutartysFacets(query) {
         sutartysDataHistogram(query),
     ]);
 
-    const [buyersNamed, suppliersNamed, bvpzNamed] = await Promise.all([
+    const [buyersNamed, suppliersNamed, bvpzNamed, bvpzSelected] = await Promise.all([
         attachJarNames(buyers),
         attachJarNames(suppliers),
         attachBvpzNames(bvpz),
+        attachSelectedBvpz(selectedBvpzPrefixes(query), query),
     ]);
+
+    // Pasirinktus BVPŽ prefiksus (nepilnus kodus), kurių nėra tarp dažniausių,
+    // pridedam priekyje su pavadinimu + prefiksinės atitikties skaičiumi.
+    const bvpzPresent = new Set(bvpzNamed.map((o) => o.value));
+    const bvpzFinal = [...bvpzSelected.filter((o) => !bvpzPresent.has(o.value)), ...bvpzNamed];
 
     // Pasirinktus (įsk. „custom" įvestus) kodus, kurių nėra tarp dažniausių,
     // pridedam priekyje su JAR pavadinimu — kad šoninėje juostoje matytųsi ne
@@ -646,7 +683,7 @@ export async function sutartysFacets(query) {
         kategorija: kategorija.filter((o) => o.value),
         buyers: buyersFinal,
         suppliers: suppliersFinal,
-        bvpz: bvpzNamed,
+        bvpz: bvpzFinal,
         suma,
         laikotarpis,
     };
@@ -681,7 +718,16 @@ export async function sutartysFacetOptions(field, query, size = 1000, optionSear
     // paieška — pagal kodo prefiksą ar pavadinimą (registro/žinyno papildymas).
     if (field === "bvpzKodai") {
         const options = await attachBvpzNames(buckets);
-        if (!optionSearch) return options;
+        if (!optionSearch) {
+            // Pažymėtus prefiksus (nepilnus kodus) rodom priekyje su „*" ženklu
+            // ir prefiksinės atitikties skaičiumi — kaip šoninėje juostoje.
+            const present = new Set(options.map((o) => o.value));
+            const selected = await attachSelectedBvpz(
+                selectedBvpzPrefixes(query).filter((v) => !present.has(v)),
+                query,
+            );
+            return [...selected, ...options];
+        }
         const needle = optionSearch.toLowerCase();
         const inline = options.filter(
             (o) => o.value.includes(optionSearch) || (o.label?.toLowerCase().includes(needle) ?? false),
@@ -711,6 +757,14 @@ export async function sutartysFacetOptions(field, query, size = 1000, optionSear
     const options = await attachJarNames(buckets);
 
     if (!optionSearch) return options;
+
+    // Pirmiausia — facetuoti pasirinkimai (su skaičiais pagal esamą užklausą),
+    // atitinkantys paiešką. Tik jei tokių nėra, krentam į registro paiešką.
+    const needle = optionSearch.toLowerCase();
+    const inline = options.filter(
+        (o) => o.value.includes(optionSearch) || (o.label?.toLowerCase().includes(needle) ?? false),
+    );
+    if (inline.length) return inline;
 
     // Registro paieška: skaičius → kodo prefiksas jar lentelėje; kitaip — vardo
     // paieška. Skaičius iš agregacijos prisegam prie rasto kodo (kiek sutarčių).
@@ -761,6 +815,55 @@ async function loadSearchRowsFromPostgres(searchRows) {
     );
 
     return ids.map((id) => rowsById.get(id)).filter(Boolean);
+}
+
+/**
+ * Iterates a large Quickwit export without deep offsets. Each 5k window is
+ * sorted by the unique contract ID; the next query starts strictly after the
+ * final raw Quickwit hit, so tombstones at a window boundary cannot skip rows.
+ * @param {object} query
+ * @param {object} [options]
+ * @param {number} [options.limit]
+ * @param {AbortSignal} [options.signal]
+ * @param {(progress: {processed: number}) => void} [options.onBatch]
+ */
+export async function* iterateSutartysQuickwitExport(
+    query,
+    { limit = SUTARTYS_EXPORT_LIMIT, signal, onBatch } = /** @type {any} */ ({}),
+) {
+    const baseQuery = buildSutartysQuickwitQuery(query);
+    let afterId = null;
+    let processed = 0;
+
+    while (processed < limit) {
+        if (signal?.aborted) throw new DOMException("Exportas atšauktas", "AbortError");
+        const cursorQuery = afterId == null
+            ? baseQuery
+            : `(${baseQuery}) AND sutartiesUnikalusId:{${afterId} TO *]`;
+        const result = await quickwitSearchAll(
+            QUICKWIT_LENTELE,
+            { query: cursorQuery, sort_by: "-sutartiesUnikalusId" },
+            {
+                limit: Math.min(QUICKWIT_EXPORT_WINDOW, limit - processed),
+                pageSize: Math.min(QUICKWIT_EXPORT_WINDOW, limit - processed),
+                maxPages: 1,
+            },
+        );
+        const rawCursor = Number(result.lastRawHit?.sutartiesUnikalusId);
+        const rows = await loadSearchRowsFromPostgres(
+            result.hits.map((hit) => ({ id: hit.sutartiesUnikalusId })),
+        );
+
+        for (const row of rows) {
+            if (processed >= limit) return;
+            processed++;
+            yield aptvarkytiRezultata(row);
+        }
+        onBatch?.({ processed });
+
+        if (!Number.isSafeInteger(rawCursor) || rawCursor === afterId || result.rawExhausted) return;
+        afterId = rawCursor;
+    }
 }
 
 /**
@@ -896,20 +999,7 @@ export async function searchSutartys(
     // tikslų leksemą ir grąžina kitą (dažnai tuščią) rinkinį nei rodoma ekrane.
     if (engine === "quickwit" && stream) {
         const { values, queryParams } = sutartysFilter.build(query);
-        const qwQuery = buildSutartysQuickwitQuery(query);
-        const effLimit = limit ?? QUICKWIT_EXPORT_LIMIT;
-
-        // Eksportui puslapiuojam per Quickwit po 10 000 (max_hits riba) kol
-        // surenkam iki `effLimit` gyvų įrašų arba baigiasi indeksas.
-        const result = await quickwitSearchAll(
-            QUICKWIT_LENTELE,
-            { query: qwQuery, sort_by: quickwitSortBy(query) },
-            { limit: effLimit },
-        );
-        const hits = result.hits;
-        const rows = await loadSearchRowsFromPostgres(
-            hits.map((h) => ({ id: h.sutartiesUnikalusId })),
-        );
+        const effLimit = limit ?? SUTARTYS_EXPORT_LIMIT;
 
         return {
             results: [],
@@ -919,7 +1009,7 @@ export async function searchSutartys(
             values,
             queryParams,
             timings: [],
-            stream: Readable.from(rows.map(aptvarkytiRezultata), { objectMode: true }),
+            stream: Readable.from(iterateSutartysQuickwitExport(query, { limit: effLimit }), { objectMode: true }),
             client: null,
         };
     }
