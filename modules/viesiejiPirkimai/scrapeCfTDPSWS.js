@@ -75,7 +75,7 @@ async function refillQueue() {
        WITH candidate AS (
          SELECT "pirkimoId"
          FROM public."viesiejiPirkimaiAtnaujinimai"
-         WHERE type = 'CfTDPSWS'
+         WHERE "typeId" = 3 -- CfTDPSWS
            AND ("turinioNuskaitymas" IS NULL OR "turinioNuskaitymas" = 0)
          FOR UPDATE SKIP LOCKED
          LIMIT $1
@@ -366,7 +366,7 @@ export async function processOldestCfTDPSWSOffHours(options = {}) {
         WITH candidate AS (
             SELECT "pirkimoId"
             FROM public."viesiejiPirkimaiAtnaujinimai"
-            WHERE type = 'CfTDPSWS'
+            WHERE "typeId" = 3 -- CfTDPSWS
               AND "turinioNuskaitymas" != -2
               AND (
                   ("turinioNuskaitymas" < ${NUSKAITYMO_VERSIJA} AND "turinioNuskaitymas" >= 0)

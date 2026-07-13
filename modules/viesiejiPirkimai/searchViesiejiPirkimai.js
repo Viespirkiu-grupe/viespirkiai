@@ -693,7 +693,7 @@ async function loadQuickwitRowsFromPostgres(hits) {
     const { rows } = await postgres.query(
         `SELECT *
          FROM public."viesiejiPirkimai"
-         WHERE "pirkimoId" = ANY($1::text[])`,
+         WHERE "pirkimoId" = ANY($1::int[])`,
         [ids],
     );
     const rowsById = new Map(rows.map((row) => [String(row.pirkimoId), row]));

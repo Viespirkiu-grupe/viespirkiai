@@ -23,7 +23,7 @@ export async function processViesiejiPirkimaiIndexQueue({ shard, shardCount } = 
         const claim = sharded
             ? `SELECT id, "pirkimoId", keitimas
                FROM "viesiejiPirkimaiIndexQueue"
-               WHERE abs(hashtext("pirkimoId")::bigint) % $2 = $3
+               WHERE abs(hashtext("pirkimoId"::text)::bigint) % $2 = $3
                ORDER BY id
                LIMIT $1
                FOR UPDATE SKIP LOCKED`
@@ -84,7 +84,7 @@ export async function processViesiejiPirkimaiIndexQueue({ shard, shardCount } = 
                     "pirkimoObjektoTipas", "esFinansavimas",
                     "pirkimoVykdytojasId", "jarKodas"
                  FROM public."viesiejiPirkimai"
-                 WHERE "pirkimoId" = ANY($1::text[])`,
+                 WHERE "pirkimoId" = ANY($1::int[])`,
                 [toIndex],
             );
 

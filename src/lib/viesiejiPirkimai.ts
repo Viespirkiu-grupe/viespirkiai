@@ -109,11 +109,13 @@ export async function loadPirkimas(pirkimoId: string): Promise<Pirkimas | null> 
 
   await annotateTedSkelbimai(pirkimas.turinys);
 
-  const sutartysRes = await searchSutartys({ pirkimoNumeris: pirkimas.pirkimoId });
+  // pirkimoId dabar int — paieškos/filtrų parametrus paduodam kaip string
+  // (sutartys.pirkimoNumeris, atn1ataskaitos.pirkimoNumeris yra text stulpeliai).
+  const sutartysRes = await searchSutartys({ pirkimoNumeris: String(pirkimas.pirkimoId) });
   pirkimas.sutartys = sutartysRes.results;
 
   const { loadAtn1ForPirkimas } = await import('./atn1.js');
-  pirkimas.atn1 = await loadAtn1ForPirkimas(pirkimas.pirkimoId);
+  pirkimas.atn1 = await loadAtn1ForPirkimas(String(pirkimas.pirkimoId));
 
   return pirkimas;
 }

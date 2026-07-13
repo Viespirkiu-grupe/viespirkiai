@@ -1,3 +1,11 @@
+// Pirkimo tipo kodas → viesiejiPirkimaiTipai.id (žr. decompose migracijas).
+// Naudojama Atnaujinimai.typeId rašymui ir scrape eilės filtrui.
+export const TIPO_ID = {
+    CfTWS: 1,
+    Pmc: 2,
+    CfTDPSWS: 3,
+};
+
 export const STATUSAS = {
     atlikta: "Atlikta",
     laukiama: "Laukiama susipažinimo su pasiūlymais",

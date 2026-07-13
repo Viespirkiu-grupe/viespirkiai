@@ -4,6 +4,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import Timings from "../../utils/timings.js";
 import config from "../../utils/config.js";
+import { TIPO_ID } from "./viesiejiPirkimaiEnums.js";
 
 const PAGE_SIZE = 1000;
 
@@ -84,15 +85,15 @@ async function upsertCFTS(cfts) {
     // skaitymo būsenos.
     const atnValues = [];
     const atnPlaceholders = cfts.map((cft, idx) => {
-        atnValues.push(cft.pirkimoId, cft.type);
+        atnValues.push(cft.pirkimoId, TIPO_ID[cft.type] ?? null);
         const offset = idx * 2;
         return `($${offset + 1}, $${offset + 2})`;
     });
     await postgres.query(
         `
-        INSERT INTO public."viesiejiPirkimaiAtnaujinimai" ("pirkimoId", "type")
+        INSERT INTO public."viesiejiPirkimaiAtnaujinimai" ("pirkimoId", "typeId")
         VALUES ${atnPlaceholders.join(", ")}
-        ON CONFLICT ("pirkimoId") DO UPDATE SET "type" = EXCLUDED."type";
+        ON CONFLICT ("pirkimoId") DO UPDATE SET "typeId" = EXCLUDED."typeId";
         `,
         atnValues,
     );
