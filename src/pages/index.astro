@@ -698,10 +698,23 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 <script>
   // Telefone (≤900px) šoninės juostos facetai kaupiami formoje, o pritaikomi per
   // „Ieškoti" (žr. mobileFilterBatch). Darbastalyje nuorodos veikia įprastai.
-  import { initRailFacetBatch } from '@/src/lib/mobileFilterBatch';
+  import { initRailFacetBatch, isMobileFilter } from '@/src/lib/mobileFilterBatch';
   import { initStickyRail } from '@/src/lib/stickyRail';
   import { initHistogramRangeFilters } from '@design-system/components/filters/histogramRangeFilter';
   initRailFacetBatch('.sut-facets', (p) => (p === 'bvpzPrefiksasKitas' ? ' ' : ','));
   initStickyRail();
   initHistogramRangeFilters();
+
+  // „Tik su dokumentais" gyvena tarp facetų, tad darbastalyje turi elgtis kaip
+  // facetas — pažymėjus iškart perleisti paiešką. Telefone lieka kaupiamas
+  // formoje ir pritaikomas per „Ieškoti" (kaip kiti šoninės juostos filtrai).
+  const dokCheckbox = document.getElementById('tikSuDokumentais') as HTMLInputElement | null;
+  dokCheckbox?.addEventListener('change', () => {
+    if (isMobileFilter()) return; // telefone – kaupiama formoje
+    const url = new URL(location.href);
+    if (dokCheckbox.checked) url.searchParams.set('tikSuDokumentais', 'true');
+    else url.searchParams.delete('tikSuDokumentais');
+    url.searchParams.delete('page');
+    location.assign(url.toString());
+  });
 </script>
