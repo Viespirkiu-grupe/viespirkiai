@@ -97,7 +97,7 @@ export const FAILAI_SELECT_COLUMNS = `
     f."dokId", f."fileId",
     f.autorius, f.pavadinimas, f.extension,
     f."zodziuSkaicius", f."puslapiuSkaicius", f."simboliuSkaicius",
-    i."failasHash", f."metaduomenysHash", f."tekstasHash",
+    i."failasHash",
     ST_AsEWKT(f.location) AS location_ewkt,
     COALESCE(
         vp."jarKodas",
@@ -122,7 +122,7 @@ export const FAILAI_ISTAIGA_JOINS = `
         ON i.id = f.id
     LEFT JOIN public."viesiejiPirkimai" vp
         ON f.saltinis = 'cvpIs'
-       AND vp."pirkimoId" = split_part(f."saltinioId", '/', 1)
+       AND vp."pirkimoId" = split_part(f."saltinioId", '/', 1)::integer
     LEFT JOIN public.sutartys s
         ON (f.saltinis IS NULL OR f.saltinis IN ('sutartis', 'sutartys'))
        AND s."sutartiesUnikalusId" = f."dokId"

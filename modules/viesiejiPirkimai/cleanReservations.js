@@ -1,5 +1,10 @@
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import { TIPO_ID } from "./viesiejiPirkimaiEnums.js";
+
+const TIPO_PAVADINIMAS = Object.fromEntries(
+    Object.entries(TIPO_ID).map(([type, typeId]) => [typeId, type]),
+);
 
 /**
  * Clears stuck reservation flags (turinioNuskaitymas = -2) for CfTWS/CfTDPSWS/Pmc
@@ -18,26 +23,34 @@ export async function cleanReservations({
         return { total: 0, perType: {} };
     }
 
+    const typeIds = types
+        .map((type) => TIPO_ID[type])
+        .filter((typeId) => typeId !== undefined);
+
+    if (typeIds.length === 0) {
+        return { total: 0, perType: {} };
+    }
+
     const { rows } = await postgres.query(
         `
         WITH reset AS (
             UPDATE public."viesiejiPirkimaiAtnaujinimai" v
             SET "turinioNuskaitymas" = -1,
                 "scrapeReservation" = NULL
-            WHERE v.type = ANY($1)
+            WHERE v."typeId" = ANY($1::int[])
               AND v."turinioNuskaitymas" = -2
               AND v."scrapeReservation" <= (now() AT TIME ZONE 'Europe/Vilnius') - ($2 || ' minutes')::interval
-            RETURNING v.type
+            RETURNING v."typeId"
         )
-        SELECT type, COUNT(*)::int AS count
+        SELECT "typeId", COUNT(*)::int AS count
         FROM reset
-        GROUP BY type
+        GROUP BY "typeId"
         `,
-        [types, String(maxAgeMinutes)],
+        [typeIds, String(maxAgeMinutes)],
     );
 
     const perType = Object.fromEntries(
-        rows.map((r) => [r.type, Number(r.count)]),
+        rows.map((r) => [TIPO_PAVADINIMAS[r.typeId], Number(r.count)]),
     );
     const total = rows.reduce((acc, r) => acc + Number(r.count), 0);
 
