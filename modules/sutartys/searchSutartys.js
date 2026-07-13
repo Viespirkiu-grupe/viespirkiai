@@ -8,6 +8,9 @@ import { fixHtmlEntities } from "../../utils/fixHtmlEntities.js";
 import { Transform, Readable } from "node:stream";
 import { CONTRACT_TYPES } from "./contractTypes.js";
 import QueryStream from "pg-query-stream";
+import { createTtlPromiseCache } from "../../utils/ttlPromiseCache.js";
+
+const cachedHomepageSearch = createTtlPromiseCache(5_000);
 
 // Kableliu atskirtų reikšmių pagalbininkai (multi-select facetai). Vieną reikšmę
 // grąžina kaip paprastą atitiktį, kelias — sujungtas OR.
@@ -918,7 +921,7 @@ export async function* iterateSutartysQuickwitExport(
  * @param {SearchOptions} options
  * @returns {Promise<SearchResult>}
  */
-export async function searchSutartys(
+async function searchSutartysUncached(
     query,
     {
         limit,
@@ -1091,6 +1094,35 @@ export async function searchSutartys(
         stream: null,
         client: null,
     };
+}
+
+export async function searchSutartys(query, options = {}) {
+    const {
+        limit,
+        page = 1,
+        engine = "postgres",
+        stream = false,
+        sort = true,
+        includeAggregates = false,
+        includeFacets = false,
+    } = options;
+    const { visiIrasai, orderBy } = sutartysFilter.build(query);
+
+    if (stream || page !== 1 || !visiIrasai) {
+        return searchSutartysUncached(query, options);
+    }
+
+    const cacheKey = JSON.stringify({
+        limit: limit ?? null,
+        engine,
+        sort,
+        orderBy,
+        includeAggregates,
+        includeFacets,
+    });
+    return cachedHomepageSearch(cacheKey, () =>
+        searchSutartysUncached(query, options),
+    );
 }
 
 /**

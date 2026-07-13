@@ -8,6 +8,9 @@ import { STATUSAS, PIRKIMO_BUDAS } from "./viesiejiPirkimaiEnums.js";
 import { specialJarCodes } from "../juridiniai/specialJarCodes.js";
 import { searchJar } from "../juridiniai/search.js";
 import config from "../../utils/config.js";
+import { createTtlPromiseCache } from "../../utils/ttlPromiseCache.js";
+
+const cachedHomepageSearch = createTtlPromiseCache(5_000);
 
 const splitCsv = (val) => String(val ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
@@ -724,7 +727,7 @@ async function loadQuickwitRowsFromPostgres(hits) {
  * @param {SearchOptions} options
  * @returns {Promise<SearchResult>}
  */
-export async function searchViesiejiPirkimai(
+async function searchViesiejiPirkimaiUncached(
     query,
     { limit, page = 1, engine = "postgres", stream = false, sort = true, includeFacets = false } = {},
 ) {
@@ -823,6 +826,33 @@ export async function searchViesiejiPirkimai(
         stream: null,
         client: null,
     };
+}
+
+export async function searchViesiejiPirkimai(query, options = {}) {
+    const {
+        limit,
+        page = 1,
+        engine = "postgres",
+        stream = false,
+        sort = true,
+        includeFacets = false,
+    } = options;
+    const { visiIrasai, orderBy } = viesiejiPirkimaiFilter.build(query);
+
+    if (stream || page !== 1 || !visiIrasai) {
+        return searchViesiejiPirkimaiUncached(query, options);
+    }
+
+    const cacheKey = JSON.stringify({
+        limit: limit ?? null,
+        engine,
+        sort,
+        orderBy,
+        includeFacets,
+    });
+    return cachedHomepageSearch(cacheKey, () =>
+        searchViesiejiPirkimaiUncached(query, options),
+    );
 }
 
 /**
