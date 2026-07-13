@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { postgres } from "../../../postgres/postgres.js";
 import { aptvarkytiRezultata } from "../../viesiejiPirkimai/searchViesiejiPirkimai.js";
+import { assembleTurinys } from "../../viesiejiPirkimai/assembleTurinys.js";
 
 export const name = "get_viesasis_pirkimas";
 export const description = `Grąžina išsamią informaciją apie vieną viešąjį pirkimą pagal pirkimo ID. Apima turinį, failus (sieti tik pagal versijos md5 arba versijos key "id"), vykdytojo duomenis. Gavus failo md5 arba numerinį id — naudok get_failas (ne search_dokumentai!). Sumos - eurais.
@@ -31,6 +32,7 @@ export async function handler({ pirkimoId }) {
     }
 
     rows[0] = aptvarkytiRezultata(rows[0]);
+    rows[0].turinys = await assembleTurinys(pirkimoId);
 
     const failai = rows[0].turinys?.failai ?? [];
     const saltinioIds = failai.flatMap((failas) =>

@@ -75,11 +75,10 @@ export async function handler(params) {
 
     const { results } = await searchViesiejiPirkimai(query, { limit, page, engine: "quickwit" });
 
-    // Delete results[].turinys.failai
+    // `turinys` jsonb išardytas į atskiras lenteles — sąrašo išvestyje jo nerodom
+    // (detalės pasiekiamos per get_viesasis_pirkimas).
     for (const r of results) {
-        if (r.turinys && r.turinys.failai) {
-            delete r.turinys.failai;
-        }
+        delete r.turinys;
     }
 
     return {

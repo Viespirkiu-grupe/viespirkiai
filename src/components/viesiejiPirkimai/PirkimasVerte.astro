@@ -8,7 +8,7 @@ interface Props {
 const { pirkimas } = Astro.props;
 const t = pirkimas.turinys || {};
 
-const numatoma = pirkimas.numatomaBendraPirkimoVerte || t.numatomaVerteEUR;
+const numatoma = pirkimas.numatomaBendraPirkimoVerte || pirkimas.numatomaVerteEUR;
 const bendra = t.bendraSutarciuVerte;
 const dpsMax = t.suteiktaVertemaksimaliDPSVerte;
 const hasMoney = (value: unknown) => {

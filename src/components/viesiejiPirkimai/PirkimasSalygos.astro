@@ -7,9 +7,9 @@ interface Props {
 const { pirkimas } = Astro.props;
 const t = pirkimas.turinys || {};
 
-const has = t.eAukcionuSukurimas || t.pirkimasSkaidomasIDaliuDPSIKategorijas || t.leidziamaPateiktisAlternatyviusPasiulymus || t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais || t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus || t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims;
+const has = t.eAukcionuSukurimas || t.pirkimasSkaidomasIDaliuDPSIKategorijas || t.leidziamaPateiktisAlternatyviusPasiulymus || t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais || t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus || t.sutartiesTipas;
 const items = [
-  t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims && { label: 'Sutarties tipas', value: t.sutartiesTipasPasirinkusSutartiesTipaJisBusTaikomasVisomsPirkimoDalims },
+  t.sutartiesTipas && { label: 'Sutarties tipas', value: t.sutartiesTipas },
   t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus && { label: 'Sutarties trukmė', value: t.sutartiesTrukmeMenesiaisArbaMetaisIsskyrusPratesimus },
   t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais && { label: 'Pasiūlymo galiojimas', value: t.pasiulymoGaliojimoTerminasDienomisArbaMenesiais },
   t.eAukcionuSukurimas && { label: 'El. aukcionas', value: t.eAukcionuSukurimas },

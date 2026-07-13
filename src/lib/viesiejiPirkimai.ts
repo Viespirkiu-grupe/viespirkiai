@@ -1,6 +1,7 @@
 import { postgres } from '@/postgres/postgres.js';
 import { buildTedNoticeViewModel } from '@/modules/ted/viewer.js';
 import { searchSutartys } from '@/modules/sutartys/searchSutartys.js';
+import { assembleTurinys } from '@/modules/viesiejiPirkimai/assembleTurinys.js';
 
 export type Pirkimas = Record<string, any>;
 
@@ -96,6 +97,9 @@ export async function loadPirkimas(pirkimoId: string): Promise<Pirkimas | null> 
   );
   const pirkimas = rows[0];
   if (!pirkimas) return null;
+
+  // `turinys` jsonb pakeistas reliacinėmis lentelėmis — atkuriam suderinamą objektą.
+  pirkimas.turinys = await assembleTurinys(pirkimoId);
 
   await attachLocalFailai(pirkimoId, pirkimas.turinys?.failai ?? []);
 

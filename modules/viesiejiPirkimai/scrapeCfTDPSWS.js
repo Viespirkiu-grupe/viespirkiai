@@ -5,6 +5,7 @@ import { log } from "../../utils/log.js";
 import { isVptWorkingHours } from "../sutartys/isWorkingHours.js";
 import { parseCfTDPSWS, parseFailai, parseVersijos } from "./parsers.js";
 import { NUSKAITYMO_VERSIJA } from "./parsers.js";
+import { persistPirkimoTurinys } from "./persistTurinys.js";
 import { extractTedNoticeNumber } from "./parsers.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
 import config from "../../utils/config.js";
@@ -268,31 +269,28 @@ async function processCfTDPSWSRecord(cft, options = {}) {
             );
             jarKodas = juridinis?.jarKodas ?? null;
         }
-        // Turinį rašom į storąją lentelę tik jei kas nors pasikeitė (IS DISTINCT FROM),
-        // kad nekintantis 12h perskaitymas neperrašytų storosios eilutės ir nebloatintų.
+        // Promoted stulpelius rašom į storąją lentelę tik jei kas nors pasikeitė
+        // (IS DISTINCT FROM), kad nekintantis 12h perskaitymas nebloatintų eilutės.
         await postgres.query(
             `
             UPDATE public."viesiejiPirkimai"
-            SET turinys = $1,
-                "numatomaVerteEUR" = $3,
-                "bvpzKodai" = $4,
-                "pirkimoObjektoTipas" = $5,
-                "esFinansavimas" = $6,
-                "pirkimoVykdytojasId" = $7,
-                "jarKodas" = COALESCE($8, "jarKodas")
-            WHERE "pirkimoId" = $2
+            SET "numatomaVerteEUR" = $2,
+                "bvpzKodai" = $3,
+                "pirkimoObjektoTipas" = $4,
+                "esFinansavimas" = $5,
+                "pirkimoVykdytojasId" = $6,
+                "jarKodas" = COALESCE($7, "jarKodas")
+            WHERE "pirkimoId" = $1
               AND (
-                  turinys IS DISTINCT FROM $1
-                  OR "numatomaVerteEUR" IS DISTINCT FROM $3
-                  OR "bvpzKodai" IS DISTINCT FROM $4
-                  OR "pirkimoObjektoTipas" IS DISTINCT FROM $5
-                  OR "esFinansavimas" IS DISTINCT FROM $6
-                  OR "pirkimoVykdytojasId" IS DISTINCT FROM $7
-                  OR "jarKodas" IS DISTINCT FROM COALESCE($8, "jarKodas")
+                  "numatomaVerteEUR" IS DISTINCT FROM $2
+                  OR "bvpzKodai" IS DISTINCT FROM $3
+                  OR "pirkimoObjektoTipas" IS DISTINCT FROM $4
+                  OR "esFinansavimas" IS DISTINCT FROM $5
+                  OR "pirkimoVykdytojasId" IS DISTINCT FROM $6
+                  OR "jarKodas" IS DISTINCT FROM COALESCE($7, "jarKodas")
               )
             `,
             [
-                result,
                 cft.pirkimoId,
                 result.numatomaVerteEUR ?? null,
                 result.bvpzKodai ?? [],
@@ -306,6 +304,8 @@ async function processCfTDPSWSRecord(cft, options = {}) {
                 jarKodas,
             ],
         );
+        // Turinys → reliacinės lentelės (Keys/Dalys/Failai/Skelbimai).
+        await persistPirkimoTurinys(cft.pirkimoId, result);
         // Nuskaitymo būsena/data visada į plonąją lentelę.
         await postgres.query(
             `
