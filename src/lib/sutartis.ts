@@ -4,6 +4,16 @@ import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
 
 export type Sutartis = Record<string, any>;
 
+const POSTGRES_INTEGER_MAX = 2_147_483_647;
+
+function parsePirkimoId(pirkimoNumeris: string | null | undefined): number | null {
+  if (!pirkimoNumeris || !/^\d+$/.test(pirkimoNumeris)) return null;
+  const pirkimoId = Number(pirkimoNumeris);
+  return Number.isSafeInteger(pirkimoId) && pirkimoId <= POSTGRES_INTEGER_MAX
+    ? pirkimoId
+    : null;
+}
+
 /**
  * Apply the supplier-name "patikslinimas" (clarification) to a contract.
  *
@@ -152,7 +162,7 @@ async function annotateDokumentai(sutartis: any) {
 }
 
 async function loadCpvaProjektai(pirkimoNumeris: string | null | undefined) {
-  if (!pirkimoNumeris) return [];
+  if (parsePirkimoId(pirkimoNumeris) === null) return [];
   const sutartys = await postgres.query(
     `SELECT * FROM "cpvaProjektuSutartys" WHERE "pirkimoNrCvpis" = $1`,
     [pirkimoNumeris],
@@ -173,10 +183,11 @@ async function loadCpvaProjektai(pirkimoNumeris: string | null | undefined) {
 }
 
 async function loadPirkimai(pirkimoNumeris: string | null | undefined) {
-  if (!pirkimoNumeris) return { cvppPirkimas: undefined, cvpisPirkimas: undefined };
+  const pirkimoId = parsePirkimoId(pirkimoNumeris);
+  if (pirkimoId === null) return { cvppPirkimas: undefined, cvpisPirkimas: undefined };
   const [cvppPirkimas, cvpisPirkimas] = await Promise.all([
-    postgres.query(`SELECT * FROM "cvppViesiejiPirkimai" WHERE "pirkimoNumeris" = $1`, [pirkimoNumeris]).then((r: any) => r.rows[0]),
-    postgres.query(`SELECT * FROM "viesiejiPirkimai" WHERE "pirkimoId" = $1`, [pirkimoNumeris]).then((r: any) => r.rows[0]),
+    postgres.query(`SELECT * FROM "cvppViesiejiPirkimai" WHERE "pirkimoNumeris" = $1`, [pirkimoId]).then((r: any) => r.rows[0]),
+    postgres.query(`SELECT * FROM "viesiejiPirkimai" WHERE "pirkimoId" = $1`, [pirkimoId]).then((r: any) => r.rows[0]),
   ]);
   return { cvppPirkimas, cvpisPirkimas };
 }
