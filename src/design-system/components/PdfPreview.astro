@@ -2,6 +2,7 @@
 interface Props {
   failasId: string | number;
   search?: string;
+  page?: number | string;
   height?: string;
   rounded?: boolean;
   border?: string;
@@ -11,6 +12,7 @@ interface Props {
 const {
   failasId,
   search = '',
+  page,
   height = '70vh',
   rounded = true,
   border = 'none',
@@ -18,7 +20,9 @@ const {
 } = Astro.props;
 
 const fileUrl = `/failas/${failasId}/preview`;
-const viewerSrc = `/dist/pdfjs/web/viewer.html?file=${encodeURIComponent(fileUrl)}#search=${encodeURIComponent(search)}`;
+const hashParts = [`search=${encodeURIComponent(search)}`];
+if (page) hashParts.unshift(`page=${encodeURIComponent(String(page))}`);
+const viewerSrc = `/dist/pdfjs/web/viewer.html?file=${encodeURIComponent(fileUrl)}#${hashParts.join('&')}`;
 const style = `border:${border}; width:100%; height:${height}; display:block;${rounded ? ' border-radius:var(--radius-md);' : ''}`;
 ---
 

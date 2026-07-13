@@ -4,15 +4,15 @@ import PdfPreview from '@design-system/components/PdfPreview.astro';
 import ArchiveTree from './ArchiveTree.astro';
 import EmailMessage from './EmailMessage.astro';
 import FaxSpecial from './FaxSpecial.astro';
-interface Props { failas: any; search?: string; }
-const { failas, search = '' } = Astro.props;
+interface Props { failas: any; search?: string; page?: number | string; }
+const { failas, search = '', page } = Astro.props;
 ---
 {failas.previewType === 'pdf' && (
   <>
     {failas.isLibreFormat && (
       <p class="text-muted text-xs mb-3"><em>Dokumentas konvertuotas į PDF naudojant LibreOffice, gali būti atvaizduojamas iškraipytas.</em></p>
     )}
-    <PdfPreview failasId={failas.id} search={search} height="70vh" rounded={true} border="none" />
+    <PdfPreview failasId={failas.id} search={search} page={page} height="70vh" rounded={true} border="none" />
   </>
 )}
 

@@ -169,7 +169,7 @@ export async function loadFailasById(id: string): Promise<Failas | null> {
             "ocrLockTimestamp", "ocrDuration", "ocrTimestamp", saltinis, "saltinioId", password, parent,
             "nuskaitymasTimestamp", location, "ocrBandymai", "parsiuntimoBandymai",
             "paskutinisParsiuntimoBandymas", tipas, "tipasNuskaitymas", autorius,
-            i."failasHash", "metaduomenysHash", "tekstasHash"
+            i."failasHash"
      FROM failai
      LEFT JOIN "failaiInfoFailai" i ON i.id = failai.id
      WHERE failai."id" = $1 LIMIT 1`,

@@ -63,6 +63,8 @@ const font = getFont(Astro.cookies);
 const ogTitle = isPasalintas ? 'Dokumentas nerodomas' : (failas.metaduomenys?.Title || failas.pavadinimas || 'Failas');
 const ogParts = [failas.extension?.toUpperCase(), failas.dydis ? convertUnit(failas.dydis, 'B') : null].filter(Boolean);
 const search = Astro.url.searchParams.get('search') || '';
+const pageParam = Astro.url.searchParams.get('puslapis') || Astro.url.searchParams.get('page') || '';
+const page = /^\d+$/.test(pageParam) ? pageParam : '';
 ---
 <Layout
   pageTitle={ogTitle}
@@ -109,7 +111,7 @@ const search = Astro.url.searchParams.get('search') || '';
           <span aria-hidden="true">↗</span> Failas
         </a>
         {failas.previewType === 'pdf' && (
-          <a href={`/dist/pdfjs/web/viewer.html?file=${encodeURIComponent(`/failas/${failas.id}/preview`)}#search=${encodeURIComponent(search)}`} class="btn btn-outline btn-sm" aria-label="Atidaryti PDF peržiūrą">
+          <a href={`/dist/pdfjs/web/viewer.html?file=${encodeURIComponent(`/failas/${failas.id}/preview`)}#${page ? `page=${encodeURIComponent(page)}&` : ''}search=${encodeURIComponent(search)}`} class="btn btn-outline btn-sm" aria-label="Atidaryti PDF peržiūrą">
             <span aria-hidden="true">↗</span> Padidinti
           </a>
         )}
@@ -211,11 +213,11 @@ const search = Astro.url.searchParams.get('search') || '';
               <Atn1Ataskaita atn1={atn1} />
             </div>
             <div id="panel-failas" role="tabpanel" hidden>
-              <FailasPreview failas={failas} search={search} />
+              <FailasPreview failas={failas} search={search} page={page} />
             </div>
           </>
         ) : (
-          <FailasPreview failas={failas} search={search} />
+          <FailasPreview failas={failas} search={search} page={page} />
         )}
       </div>
     </div>

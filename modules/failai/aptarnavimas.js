@@ -2,8 +2,6 @@ import { Buffer } from "buffer";
 import { postgres, parsePgArray } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import { readRezultatasFs } from "../ocr/rezultataiFs.js";
-import { readMetaduomenysFs } from "./metaduomenysFs.js";
-import { readTekstasFs } from "./tekstasFs.js";
 import { readFailaiFs } from "./failaiFs.js";
 import { parseWKBPoint } from "../geografija/utils.js";
 import { formatDateTime, formatDuration } from "../../utils/time.js";
@@ -199,20 +197,18 @@ function parseTekstas(tekstasRaw) {
 /**
  * Grąžina failo išvestinius duomenis (subjektai, metaduomenys, tekstas, OCR).
  * Naujas kelias: viskas iš sujungto FS failo (failasHash). Pereinamasis kelias:
- * jei failasHash dar nenustatytas — skaitoma iš senų DB lentelių + FS failų.
+ * jei failasHash dar nenustatytas — skaitoma iš senų DB lentelių.
  * @param {number} id
- * @param {Object|null} failas - failo eilutė su failasHash / metaduomenysHash / tekstasHash (nebūtina).
+ * @param {Object|null} failas - failo eilutė su failasHash (nebūtina).
  */
 export async function fetchFailasMetadata(id, failas = null) {
     let failasHash = failas?.failasHash;
-    let metaduomenysHash = failas?.metaduomenysHash;
-    let tekstasHash = failas?.tekstasHash;
 
     // failasHash gyvena atskiroje failaiInfoFailai lentelėje. Jei jo dar neturime,
-    // pasiimame kartu su senais hash'ais vienu join'u.
+    // pasiimame jį atskiru join'u.
     if (failasHash === undefined) {
         const r = await postgres.query(
-            `SELECT i."failasHash", f."metaduomenysHash", f."tekstasHash"
+            `SELECT i."failasHash"
              FROM failai f
              LEFT JOIN "failaiInfoFailai" i ON i.id = f.id
              WHERE f.id = $1`,
@@ -220,8 +216,6 @@ export async function fetchFailasMetadata(id, failas = null) {
         );
         if (r.rows.length) {
             failasHash = r.rows[0].failasHash;
-            if (metaduomenysHash === undefined) metaduomenysHash = r.rows[0].metaduomenysHash;
-            if (tekstasHash === undefined) tekstasHash = r.rows[0].tekstasHash;
         }
     }
 
@@ -272,8 +266,8 @@ export async function fetchFailasMetadata(id, failas = null) {
         };
     }
 
-    // Pereinamasis kelias — seni DB lentelių + FS failų duomenys.
-    const [iban, jarKodai, links, emails, domains, telefonai, tekstasRaw] =
+    // Pereinamasis kelias — seni DB lentelių duomenys (failasHash dar nenustatytas).
+    const [iban, jarKodai, links, emails, domains, telefonai] =
         await Promise.all([
             postgres.query(
                 `SELECT iban, puslapiai FROM "failaiIban"
@@ -305,7 +299,6 @@ export async function fetchFailasMetadata(id, failas = null) {
                  WHERE id = $1 ORDER BY COALESCE(puslapiai[1], 9999), telefonas ASC`,
                 [id],
             ),
-            tekstasHash != null ? readTekstasFs(tekstasHash) : Promise.resolve(null),
         ]);
 
     return {
@@ -315,8 +308,8 @@ export async function fetchFailasMetadata(id, failas = null) {
         emails: emails.rows,
         domains: domains.rows.map((r) => r.domain),
         telefonai: telefonai.rows,
-        metaduomenys: metaduomenysHash != null ? await readMetaduomenysFs(metaduomenysHash) : null,
-        tekstas: parseTekstas(tekstasRaw),
+        metaduomenys: null,
+        tekstas: parseTekstas(null),
         ...ocrMeta,
     };
 }
