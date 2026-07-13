@@ -60,7 +60,7 @@ const configElementId = `${id}-map-config`;
 )}
 
 <script>
-  import { ensureLeafletRuntime } from './mapRuntime';
+  import { ensureLeafletRuntime, createHeatmapLayer } from './mapRuntime';
 
   await ensureLeafletRuntime();
 
@@ -133,8 +133,7 @@ const configElementId = `${id}-map-config`;
     }
 
     if (config.mode === 'juridiniai') {
-      const overlay = L.tileLayer(config.overlayTileUrl, {
-        tileSize: 256,
+      const overlay = createHeatmapLayer(L, config.overlayTileUrl, {
         opacity: config.overlayOpacity ?? 0.6,
         maxNativeZoom: config.maxNativeZoom ?? 16,
         maxZoom: config.maxZoom ?? 16,

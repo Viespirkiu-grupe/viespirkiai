@@ -51,7 +51,7 @@ import Modal from '@design-system/components/Modal.astro';
   // Area (bounding-box) picker: a full-screen Leaflet map. "Ieškoti šioje
   // srityje" captures the viewport bounds into minLat/maxLat/minLon/maxLon, which
   // the search turns into a Quickwit lat/lon range query.
-  import { ensureLeafletRuntime } from '@design-system/components/maps/mapRuntime';
+  import { ensureLeafletRuntime, createHeatmapLayer } from '@design-system/components/maps/mapRuntime';
   import { params, navigate } from '../../scripts/dokumentaiNav.ts';
   import { openModal, closeModal } from '@design-system/components/modal.ts';
 
@@ -152,7 +152,7 @@ import Modal from '@design-system/components/Modal.astro';
       }).addTo(map);
       // Document density heatmap (precomputed tiles, postgres/gis) — same as the
       // juridiniai overlay, blurred the same way (overlayBlurPx: 5).
-      const overlay = L.tileLayer('/dokumentai/map/tiles/{z}/{x}/{y}.png', {
+      const overlay = createHeatmapLayer(L, '/dokumentai/map/tiles/{z}/{x}/{y}.json', {
         opacity: 0.6,
         maxNativeZoom: 16,
         maxZoom: 19,
