@@ -953,7 +953,10 @@ export async function searchDokumentai(input: {
          d."happenedAt", d."createdAt", d."updatedAt", d."discoveredAt", d."failasId"
        FROM public.dokumentai d
        LEFT JOIN public.jar j ON j."jarKodas" = d."istaigaJar"
-       WHERE d.id = ANY($1)`,
+       WHERE d.id = ANY($1)
+         AND NOT EXISTS (
+           SELECT 1 FROM public."failaiNerodyti" n WHERE n.id = d."failasId"
+         )`,
       [ids],
     );
     timings.push({ label: 'Duomenys', phase: 'pg', start: pgStart, duration: mark() - pgStart });

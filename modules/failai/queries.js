@@ -63,31 +63,32 @@ export async function getDezeForMd5(md5) {
 }
 
 /**
- * Checks if a file has been legally removed or isn't yet downloaded.
+ * Grąžina failo „nerodymo" įrašą iš `failaiNerodyti` (jei toks yra), arba null.
+ * `priezastis` — vieša priežastis, `status` — HTTP statusas (pvz. 451).
+ */
+export async function getFailasNerodymas(id) {
+    if (id == null || isNaN(id)) return null;
+    const result = await postgres.query(
+        `SELECT priezastis, status FROM "failaiNerodyti" WHERE id = $1 LIMIT 1`,
+        [id],
+    );
+    return result.rows[0] ?? null;
+}
+
+/**
+ * Checks if a file is hidden (failaiNerodyti) or isn't yet downloaded.
  * Returns { error, message } if inaccessible, or {} if fine.
  */
 export async function checkFailasAccessible(failas) {
-    const removalCheck = await postgres.query(
-        `SELECT 1 FROM "failuPasalinimai" WHERE "failoId" = $1 AND salinti = true LIMIT 1`,
-        [failas.id],
-    );
-    if (removalCheck.rows.length)
+    const nerodymas = await getFailasNerodymas(failas.id);
+    if (nerodymas)
         return {
-            error: 451,
-            message: "Failas pašalintas. Removed for legal reasons.",
+            error: nerodymas.status ?? 451,
+            message: nerodymas.priezastis || "Dokumentas nerodomas.",
         };
     if (failas.parsiustas === 0)
         return { error: 404, message: "Failas dar neparsiųstas." };
     if (failas.parsiustas === -1)
         return { error: 404, message: "Failas nepavykęs parsiųsti." };
     return {};
-}
-
-/** Returns true if the file has been marked for removal by dokId+fileId. */
-export async function checkDokFileRemoved(dokId, fileId) {
-    const result = await postgres.query(
-        `SELECT 1 FROM "failuPasalinimai" WHERE "dokId" = $1 AND "fileId" = $2 AND salinti = true LIMIT 1`,
-        [dokId, fileId],
-    );
-    return result.rows.length > 0;
 }

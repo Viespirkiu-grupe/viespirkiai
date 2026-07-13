@@ -1,12 +1,31 @@
 ---
 import EmptyState from '@design-system/components/EmptyState.astro';
 /**
- * 451 Unavailable For Legal Reasons body fragment.
+ * „Dokumentas nerodomas" body fragment (buvęs „Failas pašalintas").
  *
+ * Rodomas failo puslapyje, kai failas yra `failaiNerodyti` lentelėje.
  * Rendered inside the parent page's `<Layout>` — does not embed its own.
- * The page is responsible for setting `Astro.response.status = 451`.
+ * Puslapis atsakingas už `Astro.response.status` nustatymą.
  */
+interface Props {
+  /** Vieša priežastis, rodoma lankytojui. */
+  priezastis?: string | null;
+  /** HTTP statuso kodas (pvz. 451). */
+  status?: number;
+}
+const { priezastis, status = 451 } = Astro.props;
+const message = priezastis && priezastis.trim()
+  ? priezastis
+  : `${status} — dokumentas nerodomas.`;
 ---
-<main>
-  <EmptyState title="Failas pašalintas" titleTag="h1" message="451 Unavailable For Legal Reasons — kol kas neturime daugiau informacijos." messageClass="text-muted text-sm" />
+<main class="failas-nerodomas">
+  <EmptyState title="Dokumentas nerodomas" titleTag="h1" message={message} messageClass="text-muted text-sm" />
 </main>
+
+<style>
+  /* Kairinis lygiavimas vietoje EmptyState numatyto centro. */
+  .failas-nerodomas :global(.empty-state) {
+    align-items: flex-start;
+    text-align: left;
+  }
+</style>

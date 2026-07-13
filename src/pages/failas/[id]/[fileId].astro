@@ -1,6 +1,5 @@
 ---
 import { postgres } from '@/postgres/postgres.js';
-import { checkDokFileRemoved } from '@/modules/failai/queries.js';
 
 function stripJsonSuffix(raw: string): { value: string; requestsJson: boolean } {
   if (raw.endsWith('.json')) return { value: raw.slice(0, -5), requestsJson: true };
@@ -13,13 +12,8 @@ const { value: fileId } = stripJsonSuffix(rawFileId ?? '');
 
 if (isNaN(Number(dokId)) || isNaN(Number(fileId))) return new Response(null, { status: 404 });
 
-if (await checkDokFileRemoved(dokId, fileId)) {
-  return new Response(
-    await (await import('../../../components/failai/FailasPasalintas.astro')).default.toString(),
-    { status: 451 },
-  );
-}
-
+// Nerodomo failo patikra atliekama nukreipimo tiksle (/failas/{id}), kuris
+// naudoja `failaiNerodyti` pagal failo id.
 const result = await postgres.query(
   `SELECT id FROM failai WHERE "dokId" = $1 AND "fileId" = $2 LIMIT 1`,
   [dokId, fileId],

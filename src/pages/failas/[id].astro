@@ -6,7 +6,7 @@ import KeyValueList from '@design-system/components/KeyValueList.astro';
 import Alert from '@design-system/components/Alert.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
 import { loadFailasById, enrichFailas, parseSuffix } from '../../lib/failas.js';
-import { checkDokFileRemoved } from '@/modules/failai/queries.js';
+import { getFailasNerodymas } from '@/modules/failai/queries.js';
 import FailasPreview from '../../components/failai/FailasPreview.astro';
 import FailasOcr from '../../components/failai/FailasOcr.astro';
 import Domenai from '../../components/failai/Domenai.astro';
@@ -34,12 +34,12 @@ if (format === 'png') {
   });
 }
 
-const isPasalintas = await checkDokFileRemoved(failas.dokId, failas.fileId);
+// Ar failas paslėptas (failaiNerodyti) — jei taip, rodom skirtą puslapį su
+// vieša priežastimi ir lentelėje nurodytu HTTP statusu (numatyta 451).
+const nerodymas = await getFailasNerodymas(failas.id);
+const isPasalintas = !!nerodymas;
 if (isPasalintas) {
-  // 451 Unavailable For Legal Reasons — render the dedicated page component
-  // through the regular Astro template (the previous `.toString()` trick on
-  // the compiled component module did not actually produce HTML).
-  Astro.response.status = 451;
+  Astro.response.status = nerodymas!.status ?? 451;
 }
 
 if (format === 'json') {
@@ -60,7 +60,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
-const ogTitle = isPasalintas ? 'Failas pašalintas' : (failas.metaduomenys?.Title || failas.pavadinimas || 'Failas');
+const ogTitle = isPasalintas ? 'Dokumentas nerodomas' : (failas.metaduomenys?.Title || failas.pavadinimas || 'Failas');
 const ogParts = [failas.extension?.toUpperCase(), failas.dydis ? convertUnit(failas.dydis, 'B') : null].filter(Boolean);
 const search = Astro.url.searchParams.get('search') || '';
 ---
@@ -89,7 +89,7 @@ const search = Astro.url.searchParams.get('search') || '';
   </style>
 
   {isPasalintas ? (
-    <FailasPasalintas />
+    <FailasPasalintas priezastis={nerodymas!.priezastis} status={nerodymas!.status ?? 451} />
   ) : (
   <main>
     <PageHeader>
