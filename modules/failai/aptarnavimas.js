@@ -196,8 +196,7 @@ function parseTekstas(tekstasRaw) {
 
 /**
  * Grąžina failo išvestinius duomenis (subjektai, metaduomenys, tekstas, OCR).
- * Naujas kelias: viskas iš sujungto FS failo (failasHash). Pereinamasis kelias:
- * jei failasHash dar nenustatytas — skaitoma iš senų DB lentelių.
+ * Turinys skaitomas iš sujungto FS failo (failasHash).
  * @param {number} id
  * @param {Object|null} failas - failo eilutė su failasHash (nebūtina).
  */
@@ -250,66 +249,17 @@ export async function fetchFailasMetadata(id, failas = null) {
         ocr,
     };
 
-    // Naujas kelias — sujungtas FS failas.
-    if (failasHash) {
-        const turinys = await readFailaiFs(failasHash);
-        return {
-            ibanNumeriai: turinys?.iban ?? [],
-            jarKodai: turinys?.jarKodai ?? [],
-            links: turinys?.links ?? [],
-            emails: turinys?.emails ?? [],
-            domains: turinys?.domains ?? [],
-            telefonai: turinys?.telefonai ?? [],
-            metaduomenys: turinys?.metaduomenys ?? null,
-            tekstas: parseTekstas(turinys?.tekstas),
-            ...ocrMeta,
-        };
-    }
-
-    // Pereinamasis kelias — seni DB lentelių duomenys (failasHash dar nenustatytas).
-    const [iban, jarKodai, links, emails, domains, telefonai] =
-        await Promise.all([
-            postgres.query(
-                `SELECT iban, puslapiai FROM "failaiIban"
-                 WHERE id = $1 ORDER BY COALESCE(puslapiai[1], 9999), iban ASC`,
-                [id],
-            ),
-            postgres.query(
-                `SELECT "jarKodas", puslapiai FROM "failaiJarKodai"
-                 WHERE id = $1 ORDER BY COALESCE(puslapiai[1], 9999), "jarKodas" ASC`,
-                [id],
-            ),
-            postgres.query(
-                `SELECT link, puslapiai FROM "failaiLinks"
-                 WHERE id = $1 ORDER BY COALESCE(puslapiai[1], 9999), link ASC`,
-                [id],
-            ),
-            postgres.query(
-                `SELECT email, puslapiai FROM "failaiEmails"
-                 WHERE id = $1 ORDER BY COALESCE(puslapiai[1], 9999), email ASC`,
-                [id],
-            ),
-            postgres.query(
-                `SELECT domain FROM "failaiDomains"
-                 WHERE id = $1 ORDER BY domain ASC`,
-                [id],
-            ),
-            postgres.query(
-                `SELECT telefonas, puslapiai FROM "failaiTelefonai"
-                 WHERE id = $1 ORDER BY COALESCE(puslapiai[1], 9999), telefonas ASC`,
-                [id],
-            ),
-        ]);
+    const turinys = await readFailaiFs(failasHash);
 
     return {
-        ibanNumeriai: iban.rows,
-        jarKodai: jarKodai.rows,
-        links: links.rows,
-        emails: emails.rows,
-        domains: domains.rows.map((r) => r.domain),
-        telefonai: telefonai.rows,
-        metaduomenys: null,
-        tekstas: parseTekstas(null),
+        ibanNumeriai: turinys?.iban ?? [],
+        jarKodai: turinys?.jarKodai ?? [],
+        links: turinys?.links ?? [],
+        emails: turinys?.emails ?? [],
+        domains: turinys?.domains ?? [],
+        telefonai: turinys?.telefonai ?? [],
+        metaduomenys: turinys?.metaduomenys ?? null,
+        tekstas: parseTekstas(turinys?.tekstas),
         ...ocrMeta,
     };
 }
