@@ -10,6 +10,63 @@ import { log } from "../../utils/log.js";
 const FILE_URL =
     "https://vptlt-my.sharepoint.com/:x:/g/personal/it_vpt_lt/EcX5fHG_a3hIiSKACcIXMjsBerJ0ThaXIR_i1zE61VM_SA?e=DjLbEy&download=1";
 
+function formatUtcDate(date) {
+    const yyyy = date.getUTCFullYear();
+    const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(date.getUTCDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function validDateParts(year, month, day) {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return (
+        date.getUTCFullYear() === year &&
+        date.getUTCMonth() === month - 1 &&
+        date.getUTCDate() === day
+    );
+}
+
+function normalizeSingleDate(value) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return formatUtcDate(
+            new Date(Math.round((value - 25569) * 86400 * 1000)),
+        );
+    }
+
+    const text = String(value).trim();
+    let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    let year;
+    let month;
+    let day;
+    if (match) {
+        [, year, month, day] = match.map(Number);
+    } else if ((match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) {
+        // VPT workbook uses Excel's month/day/year representation here.
+        month = Number(match[1]);
+        day = Number(match[2]);
+        year = Number(match[3]);
+    } else if ((match = text.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/))) {
+        day = Number(match[1]);
+        month = Number(match[2]);
+        year = Number(match[3]);
+    } else {
+        throw new Error(`Unsupported VPT date: ${JSON.stringify(value)}`);
+    }
+
+    if (!validDateParts(year, month, day)) {
+        throw new Error(`Invalid VPT date: ${JSON.stringify(value)}`);
+    }
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Normalize an Excel date or a '+' separated date history to one DB date. */
+export function normalizeVptDate(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const values = typeof value === "string" ? value.split("+") : [value];
+    // A singular DB column represents the latest explanation submission.
+    return values.map(normalizeSingleDate).sort().at(-1);
+}
+
 export async function importuotiNepatikimusTiekejus() {
     // Atliekama užklausa
     const firstResponse = await fetch(FILE_URL, {
@@ -94,14 +151,8 @@ export async function importuotiNepatikimusTiekejus() {
         ];
 
         excelDateKeys.forEach((key) => {
-            if (row[key] && typeof row[key] === "number") {
-                const date = new Date(
-                    Math.round((row[key] - 25569) * 86400 * 1000),
-                );
-                const yyyy = date.getUTCFullYear();
-                const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-                const dd = String(date.getUTCDate()).padStart(2, "0");
-                row[key] = `${yyyy}-${mm}-${dd}`;
+            if (row[key] !== null && row[key] !== undefined) {
+                row[key] = normalizeVptDate(row[key]);
             }
         });
     });
@@ -147,14 +198,8 @@ export async function importuotiNepatikimusTiekejus() {
         ];
 
         excelDateKeys.forEach((key) => {
-            if (row[key] && typeof row[key] === "number") {
-                const date = new Date(
-                    Math.round((row[key] - 25569) * 86400 * 1000),
-                );
-                const yyyy = date.getUTCFullYear();
-                const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-                const dd = String(date.getUTCDate()).padStart(2, "0");
-                row[key] = `${yyyy}-${mm}-${dd}`;
+            if (row[key] !== null && row[key] !== undefined) {
+                row[key] = normalizeVptDate(row[key]);
             }
         });
     });
