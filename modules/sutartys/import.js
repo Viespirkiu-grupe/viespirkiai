@@ -20,14 +20,26 @@ function toPostgresTimestamp(date) {
     );
 }
 
-/**
- * Grąžina datą be laiko komponento.
- * @param {Date|null} d - Data, iš kurios reikia pašalinti laiką.
- * @returns {Date|null}
- */
-function dateOnly(d) {
-    if (!d) return null;
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+export function parseDateOnly(value, field = "date", contractId = "unknown") {
+    if (value === null || value === undefined || value === "") return null;
+    const match = String(value).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+        throw new Error(
+            `Invalid ${field} for contract ${contractId}: ${JSON.stringify(value)}`,
+        );
+    }
+    const [, year, month, day] = match.map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+    ) {
+        throw new Error(
+            `Invalid ${field} for contract ${contractId}: ${JSON.stringify(value)}`,
+        );
+    }
+    return `${match[1]}-${match[2]}-${match[3]}`;
 }
 
 export function parseNullableNumber(value, field, contractId) {
@@ -72,15 +84,25 @@ export async function cvpIsImportArray(data, options = {}) {
         );
 
         // Datos
-        const dateFields = [
+        const dateOnlyFields = [
             "sudarymoData",
             "galiojimoData",
             "faktineIvykdimoData",
+        ];
+        for (const field of dateOnlyFields) {
+            item[field] = parseDateOnly(
+                item[field],
+                field,
+                item.sutartiesUnikalusID,
+            );
+        }
+
+        const timestampFields = [
             "paskelbimoData",
             "paskutinioAtnaujinimoData",
             "paskutinioRedagavimoData",
         ];
-        for (const field of dateFields) {
+        for (const field of timestampFields) {
             if (item[field]) {
                 const d = new Date(item[field]);
                 item[field] = isNaN(d) ? null : d; // Replace invalid dates with null
@@ -140,16 +162,16 @@ export async function cvpIsImportArray(data, options = {}) {
                 item.bvpzPavadinimas,
                 JSON.stringify(item.dokumentai || []),
                 item.dokumentuKiekis,
-                toPostgresTimestamp(item.faktineIvykdimoData),
+                item.faktineIvykdimoData,
                 faktineIvykdimoVerte,
-                dateOnly(item.galiojimoData),
+                item.galiojimoData,
                 item.kategorija,
                 toPostgresTimestamp(item.paskelbimoData),
                 toPostgresTimestamp(item.paskutinioAtnaujinimoData),
                 toPostgresTimestamp(item.paskutinioRedagavimoData),
                 item.perkanciojiOrganizacija,
                 item.perkanciosiosOrganizacijosKodas,
-                dateOnly(item.sudarymoData),
+                item.sudarymoData,
                 item.sutartiesNumeris,
                 item.tiekejas,
                 item.tiekejoKodas,
