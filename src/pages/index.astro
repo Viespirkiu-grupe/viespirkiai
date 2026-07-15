@@ -517,11 +517,18 @@ const numberOfResults = buildNumberOfResults({ shown: results.length, total, ela
 
 const pageCount = Math.ceil((total || 100_000) / limit);
 
-let galimaEksportuoti = Object.keys(values).length > 0;
+const EXPORT_GUIDANCE_LIMIT = 250_000;
+const turiEksportoFiltru = Object.keys(values).length > 0;
 // Eksportas įmanomas tik iki XLSX_EXPORT_LIMIT (Quickwit pasiekiama riba). Kai
-// rezultatų daugiau, mygtukai vestų į 413 — vietoj jų parodom paaiškinimą.
-// Quickwit `total` yra tas pats įvertis, kurį naudoja serverio riba, tad sutampa.
-const eksportasPerDaug = engine === 'quickwit' && total != null && total > XLSX_EXPORT_LIMIT;
+// rezultatų yra iki 250 tūkst., vietoj mygtukų parodom paaiškinimą. Platesnėse
+// paieškose eksporto srities nerodom, kol vartotojas labiau susiaurins paiešką.
+// Quickwit `total` yra tas pats įvertis, kurį naudoja serverio riba.
+const quickwitTotalZinomas = engine === 'quickwit' && total != null;
+const galimaEksportuoti = turiEksportoFiltru
+  && !(quickwitTotalZinomas && total > EXPORT_GUIDANCE_LIMIT);
+const eksportasPerDaug = quickwitTotalZinomas
+  && total > XLSX_EXPORT_LIMIT
+  && total <= EXPORT_GUIDANCE_LIMIT;
 values.limit = limit;
 
 // Kiekviena parinktis koduoja lauką ir kryptį (`laukas:kryptis`); numatytoji
@@ -641,7 +648,6 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
           galimaEksportuoti={galimaEksportuoti}
           eksportasPerDaug={eksportasPerDaug}
           eksportoRiba={XLSX_EXPORT_LIMIT}
-          exportTotal={total}
           containerClass="mt-0"
           flat={true}
           sortOptions={sortOptions}

@@ -31,14 +31,13 @@ interface Props {
   galimaEksportuoti: boolean;
   eksportasPerDaug?: boolean;
   eksportoRiba?: number;
-  exportTotal?: number | null;
   containerClass?: string;
   flat?: boolean;
   sortOptions?: SortOption[];
   sortValue?: string;
 }
 
-const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti, eksportasPerDaug = false, eksportoRiba = 20_000, exportTotal = null, containerClass, flat = false, sortOptions = [], sortValue = '' } = Astro.props;
+const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti, eksportasPerDaug = false, eksportoRiba = 20_000, containerClass, flat = false, sortOptions = [], sortValue = '' } = Astro.props;
 ---
 
 <ResultPageShell
@@ -88,7 +87,7 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
 </ResultPageShell>
 
 <Modal id="sutExportModal" title="Ruošiamas eksportas" className="sut-export-modal">
-  <div class="sut-export-body" data-export-total={exportTotal ?? ''}>
+  <div class="sut-export-body">
     <div class="sut-export-work">
       <div class="sut-export-head">
         <span class="sut-export-icon" aria-hidden="true"></span>
@@ -218,9 +217,7 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
 
   document.querySelectorAll<HTMLAnchorElement>('a[data-sutartys-export]').forEach((link) => {
     link.addEventListener('click', async (event) => {
-      const enhancedExportTotal = body?.dataset.exportTotal ? Number(body.dataset.exportTotal) : null;
-      if (enhancedExportTotal != null && enhancedExportTotal <= 5_000) return;
-      if (!dialog || !title || !body || !work || !status || !count || !progress || !progressFill || !estimateNote || !downloadStatus || !window.ReadableStream) return;
+      if (!dialog || !title || !body || !work || !status || !count || !progress || !progressFill || !estimateNote || !downloadStatus || !window.WebSocket) return;
       event.preventDefault();
       exportTrigger = link;
       exportAbort?.abort();
@@ -243,14 +240,10 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
 
       try {
         const url = new URL(link.href);
-        url.searchParams.set('exportStream', 'true');
-        const response = await fetch(url, {
-          signal: exportAbort.signal,
-        });
-        if (!response.ok || !response.body) throw new Error(await response.text() || 'Nepavyko pradėti eksporto.');
-        const reader = response.body.getReader();
+        url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+        url.pathname = '/ws/sutartys/export';
+        url.searchParams.set('format', link.dataset.sutartysExport || 'jsonl');
         const decoder = new TextDecoder();
-        let pending = new Uint8Array();
         let filename = `viespirkiai.${link.dataset.sutartysExport}`;
         let contentType = 'application/octet-stream';
         const fileChunks: BlobPart[] = [];
@@ -293,25 +286,45 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
           }
         };
 
-        while (true) {
-          const { value, done } = await reader.read();
-          if (value?.byteLength) {
-            const joined = new Uint8Array(pending.byteLength + value.byteLength);
-            joined.set(pending);
-            joined.set(value, pending.byteLength);
-            pending = joined;
-          }
-          let offset = 0;
-          while (pending.byteLength - offset >= 5) {
-            const length = new DataView(pending.buffer, pending.byteOffset + offset + 1, 4).getUint32(0, false);
-            if (pending.byteLength - offset < 5 + length) break;
-            handleFrame(pending[offset], pending.subarray(offset + 5, offset + 5 + length));
-            offset += 5 + length;
-          }
-          if (offset) pending = pending.slice(offset);
-          if (done) break;
-        }
-        if (!completed || pending.byteLength) throw new Error('Eksporto atsakymas nutrūko nebaigtas.');
+        await new Promise<void>((resolve, reject) => {
+          const socket = new WebSocket(url);
+          socket.binaryType = 'arraybuffer';
+          let settled = false;
+          const finish = (callback: () => void) => {
+            if (settled) return;
+            settled = true;
+            exportAbort?.signal.removeEventListener('abort', abort);
+            callback();
+          };
+          const abort = () => {
+            socket.close(1000, 'Eksportas atšauktas');
+            finish(() => reject(new DOMException('Eksportas atšauktas', 'AbortError')));
+          };
+          exportAbort?.signal.addEventListener('abort', abort, { once: true });
+          socket.addEventListener('message', (event) => {
+            try {
+              if (!(event.data instanceof ArrayBuffer)) throw new Error('Gautas netinkamas eksporto atsakymas.');
+              const message = new Uint8Array(event.data);
+              if (message.byteLength < 5) throw new Error('Gautas nepilnas eksporto atsakymas.');
+              const length = new DataView(message.buffer, message.byteOffset + 1, 4).getUint32(0, false);
+              if (message.byteLength !== 5 + length) throw new Error('Gautas sugadintas eksporto atsakymas.');
+              handleFrame(message[0], message.subarray(5));
+              if (completed) {
+                socket.close(1000, 'Eksportas gautas');
+                finish(resolve);
+              }
+            } catch (error) {
+              socket.close(1011, 'Eksporto klaida');
+              finish(() => reject(error));
+            }
+          });
+          socket.addEventListener('error', () => {
+            finish(() => reject(new Error('Nepavyko prisijungti prie eksporto serverio.')));
+          });
+          socket.addEventListener('close', () => {
+            if (!completed) finish(() => reject(new Error('Eksporto jungtis nutrūko.')));
+          });
+        });
 
         const objectUrl = URL.createObjectURL(new Blob(fileChunks, { type: contentType }));
         const download = document.createElement('a');

@@ -39,10 +39,15 @@ ENV PUPPETEER_SKIP_DOWNLOAD=1 \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Produkcinės priklausomybės iš deps (be typescript/vitest/tailwind/astro-check),
-# statinis build'as iš builder'io. config.js / public / modules montuojami per compose.
+# statinis build'as ir WebSocket eksporto priklausomybės. config.js / public /
+# modules montuojami per compose, bet modules kopija paliekama ir image'e.
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/start-server.mjs ./
+COPY --from=builder /app/modules ./modules
+COPY --from=builder /app/postgres ./postgres
+COPY --from=builder /app/quickwit ./quickwit
+COPY --from=builder /app/utils ./utils
 
 # Prievadą nustato start-server.mjs iš config.js (9019). network_mode: host,
 # tad EXPOSE tik informacinis.

@@ -36,6 +36,14 @@ export default defineConfig({
     plugins: [
       tailwindcss(),
       {
+        name: 'sutartys-export-websocket',
+        configureServer(server) {
+          if (!server.httpServer) return;
+          void import('./modules/sutartys/exportWebSocket.js')
+            .then(({ attachSutartysExportWebSocket }) => attachSutartysExportWebSocket(server.httpServer));
+        },
+      },
+      {
         name: 'immutable-cache',
         configureServer(server) {
           server.middlewares.use((req, res, next) => {
