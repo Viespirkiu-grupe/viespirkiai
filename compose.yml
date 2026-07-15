@@ -1,4 +1,32 @@
 services:
+    frontend:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: viespirkiai_frontend
+        # host tinklas – kad pasiektų localhost servisus (pgbouncer 9120,
+        # typesense 8108, quickwit 7280) ir atidarytų config.js port'ą (9019).
+        network_mode: host
+        restart: unless-stopped
+        volumes:
+            # Runtime konfigūracija ir katalogai – NEsukepti į image'ą.
+            - ./config.js:/app/config.js:ro
+            - ./public:/app/public:ro
+            - ./modules:/app/modules:ro
+            # Absoliutūs duomenų keliai iš config.js (ocr/failai/dokumentai/...)
+            - /flashas/viespirkiai:/flashas/viespirkiai
+        healthcheck:
+            # Namų puslapis turi atsidaryti (HTTP 200).
+            test: ["CMD", "node", "-e", "fetch('http://localhost:9019/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+            interval: 30s
+            timeout: 30s
+            retries: 3
+            start_period: 40s
+        deploy:
+            resources:
+                limits:
+                    memory: 2G
+
     typesense:
         image: typesense/typesense:28.0
         container_name: viespirkiai_typesense

@@ -1,0 +1,33 @@
+# Priklausomybės perinstaliuojamos konteineryje (npm ci)
+node_modules
+
+# Build output (statoma iš naujo konteineryje)
+dist
+.astro
+.nopublic
+
+# Git ir redaktorius
+.git
+.vscode
+
+# Duomenų / servisų katalogai (montuojami arba nereikalingi build metu)
+postgres/18
+postgres/pgdata
+postgres/pgadmin-data
+typesense/data
+typesense/nodes
+typesense/typesense
+quickwit/qwdata
+plausible
+wireproxy/proxy.wg
+tmp
+old
+backup
+dbSchema
+
+# Logai / eksportai
+*.log
+starts.txt
+taskRunnerStarts.txt
+exports
+modules/cvpp/ataskaitos
