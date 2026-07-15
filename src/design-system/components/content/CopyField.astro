@@ -23,7 +23,7 @@ const { value, buttonId, buttonLabel = 'Kopijuoti' } = Astro.props;
   <Button
     id={buttonId}
     type="button"
-    variant="ghost"
+    variant="primary"
     className="copy-field-button"
   >
     {buttonLabel}
@@ -45,7 +45,7 @@ const { value, buttonId, buttonLabel = 'Kopijuoti' } = Astro.props;
   })();
 </script>
 
-<style>
+<style is:global>
   .copy-field-button {
     border: 0;
     border-left: var(--border);

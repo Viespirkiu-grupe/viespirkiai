@@ -39,7 +39,7 @@ const categories = [
   {
     number: '03',
     title: 'Dokumentai',
-    description: 'Pilna tekstinė paieška sutarčių dokumentuose, bei jų skaitymas, naršymas archyvuose. OCR rezultatai kur atlikta',
+    description: 'Pilna tekstinė paieška sutarčių dokumentuose, jų skaitymas bei naršymas archyvuose. OCR rezultatai, kur atlikta',
   },
   {
     number: '04',
@@ -50,6 +50,11 @@ const categories = [
     number: '05',
     title: 'Privatūs interesai',
     description: 'PINREG deklaracijos - ryšiai su verslu, darbovietės, sutuoktinių ryšiai. Pagal vardą arba juridinį asmenį',
+  },
+  {
+    number: '06',
+    title: 'Teismo nuosprendžiai',
+    description: 'Pilna tekstinė teismo nuosprendžių paieška dokumentų paieškoje',
   },
 ];
 
@@ -207,7 +212,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
     <div class="py-7 border-b mcp-mobile-px">
       <p class="section-title mb-3">Model Context Protocol</p>
       <h1 class="mb-3">Viešpirkiai Jūsų DI programoje</h1>
-      <p class="lead mb-7">Leiskite savo DI asistentui pačiam rasti atsakymus viešųjų pirkimų duomenyse</p>
+      <p class="lead mb-7">Leiskite savo DI asistentui pačiam rasti atsakymus viešųjų pirkimų duomenyse bei teismo nuosprendžiuose</p>
       <CopyField value={mcpUrl} buttonId="mcpCopyUrlBtnHero" buttonLabel="Kopijuoti URL" />
     </div>
 
