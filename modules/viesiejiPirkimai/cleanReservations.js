@@ -64,6 +64,11 @@ export async function cleanReservations({
     return { total, perType };
 }
 
+/** TaskRunner adapter: retry immediately only when the cleanup changed rows. */
+export async function cleanReservationsHasMore(options) {
+    return (await cleanReservations(options)).total > 0;
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
     (async () => {
         try {

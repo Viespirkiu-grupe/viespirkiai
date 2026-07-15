@@ -2,7 +2,7 @@ import { updateCFTS } from "../modules/viesiejiPirkimai/scrape.js";
 import { processCfTDPSWS, processOldestCfTDPSWSOffHours } from "../modules/viesiejiPirkimai/scrapeCfTDPSWS.js";
 import { processCfTWS, processOldestCfTWSOffHours } from "../modules/viesiejiPirkimai/scrapeCfTWS.js";
 import { processPmc, processOldestPmcOffHours } from "../modules/viesiejiPirkimai/scrapePmc.js";
-import { cleanReservations } from "../modules/viesiejiPirkimai/cleanReservations.js";
+import { cleanReservationsHasMore } from "../modules/viesiejiPirkimai/cleanReservations.js";
 import { processNextVykdytojas } from "../modules/viesiejiPirkimai/viesiejiPirkimaiVykdytojaiScrape.js";
 import { processViesiejiPirkimaiIndexQueue } from "../modules/viesiejiPirkimai/quickwitProcessIndexQueue.js";
 
@@ -93,6 +93,6 @@ export default [
         priority: 4,
         cooldown: 60,
         errorCooldown: 60,
-        job: cleanReservations,
+        job: cleanReservationsHasMore,
     },
 ];

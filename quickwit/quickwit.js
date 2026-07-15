@@ -75,6 +75,7 @@ async function qwCreateIndex(yaml) {
 
 async function qwIngestNdjson(indeksas, docs, commit = "auto") {
   const body = docs.map((d) => JSON.stringify(d)).join("\n");
+  const serializedBytes = Buffer.byteLength(body, "utf8");
   const qs = commit && commit !== "auto" ? `?commit=${encodeURIComponent(commit)}` : "";
   const res = await fetch(`${QW_URL}/api/v1/${indeksas}/ingest${qs}`, {
     method: "POST",
@@ -90,7 +91,7 @@ async function qwIngestNdjson(indeksas, docs, commit = "auto") {
       `Quickwit ingest ${indeksas} rejected ${result.num_rejected_docs}/${result.num_docs_for_processing} docs`,
     );
   }
-  return result;
+  return { result, serializedBytes };
 }
 
 async function qwSearch(indeksas, params) {
@@ -242,9 +243,10 @@ export async function indexDoc(lentele, eilutesId, doc, opts) {
  * @param {string} lentele
  * @param {{ eilutesId: string, doc: object }[]} items
  * @param {{ commit?: "auto" | "wait_for" | "force" }} [opts]
+ * @returns {Promise<{ documentCount: number, serializedBytes: number }>}
  */
 export async function indexDocs(lentele, items, opts = {}) {
-  if (!items.length) return;
+  if (!items.length) return { documentCount: 0, serializedBytes: 0 };
 
   const t0 = Date.now();
   const timings = {};
@@ -345,10 +347,14 @@ export async function indexDocs(lentele, items, opts = {}) {
       shardDocs.get(indeksas).push({ ...doc, quickwitId });
     }
 
-    await Promise.all(
+    const ingestResults = await Promise.all(
       [...shardDocs.entries()].map(([indeksas, docs]) =>
         qwIngestNdjson(indeksas, docs, opts.commit)
       )
+    );
+    const serializedBytes = ingestResults.reduce(
+      (total, ingest) => total + ingest.serializedBytes,
+      0
     );
     mark("ingest", tIngest);
 
@@ -466,6 +472,7 @@ export async function indexDocs(lentele, items, opts = {}) {
       `${stayedCount} stayed, ${movedCount} moved) ` +
       `→ ${shardDocs.size} shard(s) in ${total}ms [${phases}]`
     );
+    return { documentCount: items.length, serializedBytes };
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     throw err;

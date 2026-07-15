@@ -127,16 +127,16 @@ export async function processDokumentaiIndexQueue({ shard, shardCount } = {}) {
                     }),
                 );
 
-                const totalBytes = items.reduce(
-                    (sum, it) => sum + Buffer.byteLength(JSON.stringify(it.doc), "utf8"),
-                    0,
-                );
-                const avgBytes = Math.round(totalBytes / items.length);
                 const t0 = Date.now();
                 // Ne tranzakcinis, bet idempotentiškas: insert/patch pagal doc id,
                 // tad pakartotinis indeksavimas (po ROLLBACK/crash) yra saugus.
-                await indexDocs(LENTELE, items, { commit: "force" });
+                const { serializedBytes: totalBytes } = await indexDocs(
+                    LENTELE,
+                    items,
+                    { commit: "force" },
+                );
                 const elapsedMs = Date.now() - t0;
+                const avgBytes = Math.round(totalBytes / items.length);
                 const mbPerSec = (totalBytes / 1024 / 1024) / (elapsedMs / 1000);
                 logger.log(
                     `indexed ${items.length} dokumentai | avg ${fmtBytes(avgBytes)} / doc | total ${fmtBytes(totalBytes)} in ${elapsedMs}ms = ${mbPerSec.toFixed(2)} MiB/s`,

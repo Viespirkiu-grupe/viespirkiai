@@ -12,7 +12,10 @@ vi.mock("../utils/log.js", () => ({
 }));
 
 import { postgres } from "../postgres/postgres.js";
-import { cleanReservations } from "../modules/viesiejiPirkimai/cleanReservations.js";
+import {
+    cleanReservations,
+    cleanReservationsHasMore,
+} from "../modules/viesiejiPirkimai/cleanReservations.js";
 
 describe("cleanReservations", () => {
     beforeEach(() => {
@@ -50,5 +53,14 @@ describe("cleanReservations", () => {
             perType: {},
         });
         expect(postgres.query).not.toHaveBeenCalled();
+    });
+
+    it("returns TaskRunner has-more semantics instead of an always-truthy result object", async () => {
+        vi.mocked(postgres.query)
+            .mockResolvedValueOnce({ rows: [] } as never)
+            .mockResolvedValueOnce({ rows: [{ typeId: 1, count: 2 }] } as never);
+
+        await expect(cleanReservationsHasMore()).resolves.toBe(false);
+        await expect(cleanReservationsHasMore()).resolves.toBe(true);
     });
 });

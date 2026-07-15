@@ -7,6 +7,7 @@ import { cvpIsScrapePageContent } from "./scrape.js";
 import { postgres } from "../../postgres/postgres.js";
 import Timings from "../../utils/timings.js";
 import { log } from "../../utils/log.js";
+import { pathToFileURL } from "node:url";
 
 /**
  * Parsiunčia ir importuoja nurodytą sutartį pagal unikalų ID.
@@ -31,7 +32,11 @@ export async function cvpIsScrpeById(unikalusId, options = {}) {
 }
 
 // Jeigu pateiktas argumentas
-if (process.argv.length > 2) {
+if (
+    process.argv[1] &&
+    import.meta.url === pathToFileURL(process.argv[1]).href &&
+    process.argv.length > 2
+) {
     const unikalusId = process.argv[2];
     log(`Importuojama sutartis: ${unikalusId}`);
     cvpIsScrpeById(unikalusId)

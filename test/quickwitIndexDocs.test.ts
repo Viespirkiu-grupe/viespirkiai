@@ -99,7 +99,7 @@ describe("indexDocs", () => {
     const fetchMock = vi.fn(async (url: string, options?: any) => {
       if (url.endsWith("/api/v1/indexes/test_1")) {
         events.push("fetch:index-get");
-        return { ok: false, status: 404, text: async () => "missing", json: async () => ({}) };
+        return { ok: false, status: 404, text: async (): Promise<string> => "missing", json: async () => ({}) };
       }
       if (url.endsWith("/api/v1/indexes")) {
         events.push("fetch:index-create");
@@ -119,7 +119,7 @@ describe("indexDocs", () => {
 
     const { indexDocs } = await loadQuickwit(events, fetchMock);
 
-    await indexDocs("test", [{ eilutesId: "10", doc: { title: "ok" } }]);
+    const stats = await indexDocs("test", [{ eilutesId: "10", doc: { title: "ok" } }]);
 
     const ingestAt = events.indexOf("fetch:ingest");
     const insertAt = events.findIndex((event) => event.startsWith("INSERT INTO \"quickwitEilutes\""));
@@ -135,6 +135,10 @@ describe("indexDocs", () => {
     expect(iterptosAt).toBeGreaterThan(insertAt);
     expect(commitAt).toBeGreaterThan(iterptosAt);
     expect(events.some((event) => event.startsWith("pool:UPDATE \"quickwitIndeksai\""))).toBe(false);
+    expect(stats).toEqual({
+      documentCount: 1,
+      serializedBytes: Buffer.byteLength(JSON.stringify({ title: "ok", quickwitId: "101" })),
+    });
   });
 
   it("rolls back without publishing quickwitEilutes when ingest fails", async () => {
@@ -142,7 +146,7 @@ describe("indexDocs", () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith("/api/v1/indexes/test_1")) {
         events.push("fetch:index-get");
-        return { ok: false, status: 404, text: async () => "missing", json: async () => ({}) };
+        return { ok: false, status: 404, text: async (): Promise<string> => "missing", json: async () => ({}) };
       }
       if (url.endsWith("/api/v1/indexes")) {
         events.push("fetch:index-create");
@@ -150,7 +154,7 @@ describe("indexDocs", () => {
       }
       if (url.endsWith("/api/v1/test_1/ingest")) {
         events.push("fetch:ingest");
-        return { ok: false, status: 500, text: async () => "boom" };
+        return { ok: false, status: 500, text: async (): Promise<string> => "boom" };
       }
       throw new Error(`unexpected fetch: ${url}`);
     });

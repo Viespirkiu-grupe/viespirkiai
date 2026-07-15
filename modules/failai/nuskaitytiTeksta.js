@@ -6,7 +6,7 @@ import { postgres } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import Timings from "../../utils/timings.js";
 import { readRezultatasFs } from "../ocr/rezultataiFs.js";
-import { hashFailai, saveFailaiFs } from "./failaiFs.js";
+import { prepareFailaiFs, savePreparedFailaiFs } from "./failaiFs.js";
 
 const nodeName = process.env.NODE_NAME || "default";
 const nuskaitymoVersija = 12;
@@ -428,10 +428,10 @@ export async function nuskaitytiVienoDokumentoDuomenis(
         domains,
         telefonai,
     };
-    const failasHash = hashFailai(failaiTurinys);
+    const { hash: failasHash, json: failaiJson } = prepareFailaiFs(failaiTurinys);
 
     timings.start("failaiFs");
-    await saveFailaiFs(failasHash, failaiTurinys);
+    await savePreparedFailaiFs(failasHash, failaiJson);
     timings.end("failaiFs");
 
     timings.start("failaiUpdate");

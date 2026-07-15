@@ -96,17 +96,17 @@ export async function processViesiejiPirkimaiIndexQueue({ shard, shardCount } = 
                     eilutesId: toEilutesId(row.pirkimoId),
                     doc: buildDoc(row),
                 }));
-                const totalBytes = items.reduce(
-                    (sum, item) => sum + Buffer.byteLength(JSON.stringify(item.doc), "utf8"),
-                    0,
-                );
-                const avgBytes = Math.round(totalBytes / items.length);
                 const t0 = Date.now();
 
                 logger.log(`indexing ${items.length} viesiejiPirkimai into Quickwit...`);
-                await indexDocs(LENTELE, items, { commit: "auto" });
+                const { serializedBytes: totalBytes } = await indexDocs(
+                    LENTELE,
+                    items,
+                    { commit: "auto" },
+                );
 
                 const elapsedMs = Date.now() - t0;
+                const avgBytes = Math.round(totalBytes / items.length);
                 const mbPerSec = (totalBytes / 1024 / 1024) / (elapsedMs / 1000);
                 logger.log(
                     `indexed ${items.length} viesiejiPirkimai | avg ${fmtBytes(avgBytes)} / doc | total ${fmtBytes(totalBytes)} in ${elapsedMs}ms = ${mbPerSec.toFixed(2)} MiB/s`,

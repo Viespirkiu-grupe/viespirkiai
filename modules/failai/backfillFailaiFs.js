@@ -3,7 +3,11 @@ import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import { readMetaduomenysFs } from "./metaduomenysFs.js";
 import { readTekstasFs } from "./tekstasFs.js";
-import { getFailaiPath, hashFailai, saveFailaiFs } from "./failaiFs.js";
+import {
+    getFailaiPath,
+    prepareFailaiFs,
+    savePreparedFailaiFs,
+} from "./failaiFs.js";
 
 const BATCH_SIZE = Number(process.env.BATCH_SIZE) || 1_000;
 const FS_CONCURRENCY = Number(process.env.FS_CONCURRENCY) || 64;
@@ -126,7 +130,7 @@ async function processBatch(rows) {
                 telefonai,
             };
             const hs = performance.now();
-            const hash = hashFailai(turinys);
+            const { hash, json } = prepareFailaiFs(turinys);
             t.hash += performance.now() - hs;
 
             const filePath = getFailaiPath(hash);
@@ -136,7 +140,7 @@ async function processBatch(rows) {
             // Rašom visada (idempotentiška: tas pats turinys → tas pats failas).
             // Vengiam papildomo fileExists stat'o — brangaus IOP'o šiam raidz pool'ui.
             const ws = performance.now();
-            await saveFailaiFs(hash, turinys);
+            await savePreparedFailaiFs(hash, json);
             const wd = performance.now() - ws;
             t.write += wd;
             if (wd > t.writeMax) t.writeMax = wd;

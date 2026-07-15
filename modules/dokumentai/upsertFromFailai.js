@@ -121,15 +121,19 @@ export const FAILAI_ISTAIGA_JOINS = `
     LEFT JOIN public."failaiInfoFailai" i
         ON i.id = f.id
     LEFT JOIN public."viesiejiPirkimai" vp
-        ON f.saltinis = 'cvpIs'
-       AND vp."pirkimoId" = split_part(f."saltinioId", '/', 1)::integer
+        ON vp."pirkimoId" = CASE
+            WHEN f.saltinis = 'cvpIs'
+             AND split_part(f."saltinioId", '/', 1) ~ '^[0-9]+$'
+            THEN split_part(f."saltinioId", '/', 1)::integer
+            ELSE NULL
+        END
     LEFT JOIN public.sutartys s
         ON (f.saltinis IS NULL OR f.saltinis IN ('sutartis', 'sutartys'))
        AND s."sutartiesUnikalusId" = f."dokId"
 `;
 
 
-export async function upsertBatch(rows) {
+export async function upsertBatch(rows, db = postgres) {
     const fsStart = Date.now();
     let skipped = 0;
     const ready = [];
@@ -175,7 +179,7 @@ export async function upsertBatch(rows) {
     const istaigaJars = built.map((b) => b.row.istaigaJar);
 
     const insertStart = Date.now();
-    await postgres.query(
+    await db.query(
         `INSERT INTO public.dokumentai (
             "failasId", md5, class, type, source,
             "saltinioId0", "saltinioId1", "saltinioId2",
@@ -249,9 +253,9 @@ export async function fetchFailaiSlice(afterId, limit) {
 }
 
 // Fetch specific failai by id list (for queue consumer).
-export async function fetchFailaiByIds(ids) {
+export async function fetchFailaiByIds(ids, db = postgres) {
     if (!ids.length) return [];
-    const { rows } = await postgres.query(
+    const { rows } = await db.query(
         `SELECT ${FAILAI_SELECT_COLUMNS}
          FROM public.failai f
          ${FAILAI_ISTAIGA_JOINS}
@@ -265,9 +269,9 @@ export async function fetchFailaiByIds(ids) {
 // that were removed (caller may want to GC sidecar files, though those may
 // be shared across multiple dokumentai with the same md5 — leave them alone
 // by default).
-export async function deleteDokumentaiByFailasIds(failasIds) {
+export async function deleteDokumentaiByFailasIds(failasIds, db = postgres) {
     if (!failasIds.length) return [];
-    const { rows } = await postgres.query(
+    const { rows } = await db.query(
         `DELETE FROM public.dokumentai
          WHERE "failasId" = ANY($1)
          RETURNING md5`,

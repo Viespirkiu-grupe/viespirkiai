@@ -30,6 +30,21 @@ function dateOnly(d) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+export function parseNullableNumber(value, field, contractId) {
+    if (value === null || value === undefined || value === "") return null;
+    if (typeof value === "number") {
+        if (Number.isFinite(value)) return value;
+    } else if (typeof value === "string") {
+        const parsed = Number(
+            value.replace(/[\s\u00a0\u202f]+/gu, "").replace(/,/g, "."),
+        );
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    throw new Error(
+        `Invalid ${field} for contract ${contractId ?? "unknown"}: ${JSON.stringify(value)}`,
+    );
+}
+
 /**
  * Importuoja sutarčių duomenis į Postgres.
  * @param {Array} data - Duomenų masyvas, kuriame yra sutarčių informacija.
@@ -45,15 +60,16 @@ export async function cvpIsImportArray(data, options = {}) {
         let item = data[i];
 
         // Skaičiai
-        item.verte =
-            typeof item.verte === "string"
-                ? parseFloat(item.verte.replace(/,/g, "."))
-                : null;
-        item.faktineIvykdimoVerte =
-            typeof item.faktineIvykdimoVerte === "string" &&
-                item.faktineIvykdimoVerte !== ""
-                ? parseFloat(item.faktineIvykdimoVerte.replace(/,/g, "."))
-                : null;
+        item.verte = parseNullableNumber(
+            item.verte,
+            "verte",
+            item.sutartiesUnikalusID,
+        );
+        item.faktineIvykdimoVerte = parseNullableNumber(
+            item.faktineIvykdimoVerte,
+            "faktineIvykdimoVerte",
+            item.sutartiesUnikalusID,
+        );
 
         // Datos
         const dateFields = [

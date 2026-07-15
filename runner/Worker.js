@@ -8,12 +8,24 @@ export class Worker {
     #onAdmit;
     #onRelease;
     #onSuccess;
+    #onStopped;
 
     #abortController = null;
-    #waitCycles = 0;
+    #stopping = false;
     #wakeWaiters = new Set();
 
-    constructor({ taskName, jobFn, cooldown, errorCooldown, priority, staggerMs, onAdmit, onRelease, onSuccess }) {
+    constructor({
+        taskName,
+        jobFn,
+        cooldown,
+        errorCooldown,
+        priority,
+        staggerMs,
+        onAdmit,
+        onRelease,
+        onSuccess,
+        onStopped,
+    }) {
         this.#taskName = taskName;
         this.#jobFn = jobFn;
         this.#cooldown = cooldown * 1000;
@@ -23,36 +35,31 @@ export class Worker {
         this.#onAdmit = onAdmit;
         this.#onRelease = onRelease;
         this.#onSuccess = onSuccess ?? null;
+        this.#onStopped = onStopped ?? null;
     }
 
     get taskName() { return this.#taskName; }
     get priority() { return this.#priority; }
-    get waitCycles() { return this.#waitCycles; }
     get isRunning() { return this.#abortController !== null; }
-
-    // Effective priority with aging — increases 0.1 per wait cycle to prevent starvation
-    get effectivePriority() {
-        return this.#priority + this.#waitCycles * 0.1;
-    }
-
-    resetWaitCycles() {
-        this.#waitCycles = 0;
-    }
-
-    incrementWaitCycles() {
-        this.#waitCycles++;
-    }
+    get isStopping() { return this.#stopping; }
 
     start(workerIndex = 0) {
         if (this.#abortController) return;
         this.#abortController = new AbortController();
-        this.#run(workerIndex);
+        this.#stopping = false;
+        void this.#run(workerIndex).catch((err) => {
+            console.error(`[${this.#taskName}] worker loop failed:`, err);
+        }).finally(() => {
+            this.#abortController = null;
+            this.#stopping = false;
+            this.#onStopped?.(this);
+        });
     }
 
     stop() {
-        if (!this.#abortController) return;
+        if (!this.#abortController || this.#stopping) return;
+        this.#stopping = true;
         this.#abortController.abort();
-        this.#abortController = null;
     }
 
     wake() {
@@ -64,33 +71,47 @@ export class Worker {
     async #run(workerIndex) {
         const signal = this.#abortController.signal;
 
-        // Stagger startup to avoid DB stampede
+        // Stagger startup to avoid DB stampede.
         if (this.#staggerMs && workerIndex > 0) {
             await sleep(workerIndex * this.#staggerMs, signal);
             if (signal.aborted) return;
         }
 
         while (!signal.aborted) {
-            // Wait for runner to admit this worker based on priority + capacity
-            await this.#onAdmit(this, signal);
-            if (signal.aborted) { this.#onRelease(); break; }
+            // Admission returns false when this worker is cancelled while queued.
+            const admitted = await this.#onAdmit(this, signal);
+            if (!admitted) break;
 
-            this.resetWaitCycles();
-
+            let hasMore;
+            let succeeded = false;
             try {
-                const hasMore = await this.#jobFn();
-                this.#onRelease();
-                if (this.#onSuccess) this.#onSuccess();
-
-                if (hasMore === false) {
-                    await this.#sleepWithWake(this.#cooldown, signal);
-                }
-                // if hasMore is true/undefined, loop immediately
+                hasMore = await this.#jobFn();
+                succeeded = true;
             } catch (err) {
-                this.#onRelease();
                 console.error(`[${this.#taskName}] job failed:`, err);
-                await this.#sleepWithWake(this.#errorCooldown, signal);
+            } finally {
+                // Exactly one release for every successful admission.
+                this.#onRelease();
             }
+
+            if (!succeeded) {
+                await this.#sleepWithWake(this.#errorCooldown, signal);
+                continue;
+            }
+
+            if (this.#onSuccess) {
+                try {
+                    await this.#onSuccess();
+                } catch (err) {
+                    // The job already completed. Do not replay it just because its hook failed.
+                    console.error(`[${this.#taskName}] success hook failed:`, err);
+                }
+            }
+
+            if (hasMore === false) {
+                await this.#sleepWithWake(this.#cooldown, signal);
+            }
+            // If hasMore is true/undefined, loop immediately.
         }
     }
 
@@ -121,7 +142,17 @@ export class Worker {
 export function sleep(ms, signal) {
     return new Promise((resolve) => {
         if (signal?.aborted) return resolve();
-        const timer = setTimeout(resolve, ms);
-        signal?.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
+
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            signal?.removeEventListener("abort", onAbort);
+            resolve();
+        };
+        const onAbort = () => finish();
+        const timer = setTimeout(finish, ms);
+        signal?.addEventListener("abort", onAbort, { once: true });
     });
 }

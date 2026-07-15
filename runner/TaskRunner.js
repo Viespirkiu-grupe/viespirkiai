@@ -1,16 +1,20 @@
-import { Worker, sleep } from "./Worker.js";
+import { Worker } from "./Worker.js";
 import { log } from "../utils/log.js";
 import cron from "node-cron";
 
-const SCHEDULER_INTERVAL_MS = 100; // how often priority queue is re-evaluated
+// The previous scheduler added 0.1 priority every 100 ms.
+const PRIORITY_AGING_PER_MS = 1 / 1000;
 
 export class TaskRunner {
-    #tasks = new Map();           // name -> task def
-    #workers = new Map();         // workerKey -> Worker
-    #waitingWorkers = new Set();  // workers blocked on admission
+    #tasks = new Map();                // name -> task def
+    #workers = new Map();              // workerKey -> Worker (including stopping workers)
+    #desiredWorkerCounts = new Map();  // taskName -> desired count
+    #waitingWorkers = new Set();       // admission entries
     #activeJobs = 0;
     #maxConcurrentJobs;
-    #nudgeTimers = new Map();     // taskName -> timer (for nudge())
+    #nextQueueSequence = 0;
+    #started = false;
+    #dispatchPaused = false;
 
     constructor({ maxConcurrentJobs = 20 } = {}) {
         this.#maxConcurrentJobs = maxConcurrentJobs;
@@ -32,62 +36,62 @@ export class TaskRunner {
     }
 
     start() {
-        for (const [, def] of this.#tasks) {
-            if (def.mode === "asap") {
-                this.setWorkerCount(def.name, def.concurrency);
-            } else if (def.schedule) {
-                this.#scheduleCron(def);
-            } else {
-                console.error(`[TaskRunner] Task "${def.name}" has no mode and no schedule — skipped`);
+        if (this.#started) return;
+        this.#started = true;
+        this.#dispatchPaused = true;
+
+        try {
+            for (const [, def] of this.#tasks) {
+                if (def.mode === "asap") {
+                    this.setWorkerCount(def.name, def.concurrency);
+                } else if (def.schedule) {
+                    this.#scheduleCron(def);
+                } else {
+                    console.error(`[TaskRunner] Task "${def.name}" has no mode and no schedule — skipped`);
+                }
             }
+        } finally {
+            this.#dispatchPaused = false;
         }
 
-        this.#runScheduler();
+        this.#dispatch();
         log("[TaskRunner] started");
     }
 
     /**
      * Scale workers for a task up or down — safe to call at any time.
-     * Used by dynamic task syncing (e.g. dokNuskaitytojai).
+     * A worker finishing an in-flight job remains tracked until it stops, so a
+     * fast down/up sequence cannot create a duplicate worker for the same slot.
      */
     setWorkerCount(taskName, count) {
         const def = this.#tasks.get(taskName);
         if (!def) throw new Error(`Unknown task: ${taskName}`);
-
-        const existing = this.#workersForTask(taskName);
-
-        if (count > existing.length) {
-            for (let i = existing.length; i < count; i++) {
-                this.#spawnWorker(def, i);
-            }
-        } else if (count < existing.length) {
-            const toStop = existing.slice(count);
-            for (const [key, worker] of toStop) {
-                worker.stop();
-                this.#workers.delete(key);
-                this.#waitingWorkers.delete(worker);
-            }
+        const normalizedCount = typeof count === "string" && count.trim() !== ""
+            ? Number(count)
+            : count;
+        if (!Number.isInteger(normalizedCount) || normalizedCount < 0) {
+            throw new Error(`Worker count for ${taskName} must be an integer >= 0`);
         }
+
+        this.#desiredWorkerCounts.set(taskName, normalizedCount);
+        this.#reconcileWorkers(def);
     }
 
-    /**
-     * Wake sleeping workers for a task immediately without respawning them.
-     * Useful after a trigger task produces work for a downstream task.
-     */
+    /** Wake sleeping workers for a task immediately without respawning them. */
     nudge(taskName) {
         const workers = this.#workersForTask(taskName);
 
         if (workers.length > 0) {
-            for (const [, worker] of workers) {
-                worker.wake();
-            }
+            for (const [, worker] of workers) worker.wake();
             return;
         }
 
-        // If workers are currently scaled to 0, spawn the configured baseline.
         const def = this.#tasks.get(taskName);
-        if (def?.mode === "asap" && def.concurrency > 0) {
-            this.setWorkerCount(taskName, def.concurrency);
+        const desired = this.#desiredWorkerCounts.get(taskName);
+        // An explicit zero means the task was disabled by dynamic syncing.
+        // Do not let a downstream success hook silently re-enable it.
+        if (def?.mode === "asap" && desired !== 0 && def.concurrency > 0) {
+            this.setWorkerCount(taskName, desired ?? def.concurrency);
         }
     }
 
@@ -107,6 +111,28 @@ export class TaskRunner {
     // Internal
     // -------------------------------------------------------------------------
 
+    #reconcileWorkers(def) {
+        const desired = this.#desiredWorkerCounts.get(def.name) ?? 0;
+        const existing = this.#workersForTask(def.name);
+
+        if (existing.length > desired) {
+            // Stop highest indexes first. Keep them in the map until their
+            // current work completes and #handleWorkerStopped runs.
+            for (const [, worker] of existing.slice(desired)) worker.stop();
+            return;
+        }
+
+        if (existing.length < desired) {
+            const occupied = new Set(existing.map(([key]) => Number(key.slice(key.lastIndexOf("#") + 1))));
+            for (let index = 0; this.#workersForTask(def.name).length < desired; index++) {
+                if (!occupied.has(index)) {
+                    occupied.add(index);
+                    this.#spawnWorker(def, index);
+                }
+            }
+        }
+    }
+
     #spawnWorker(def, index) {
         const key = `${def.name}#${index}`;
         if (this.#workers.has(key)) return;
@@ -119,8 +145,9 @@ export class TaskRunner {
             priority: def.priority,
             staggerMs: def.staggerMs,
             onAdmit: (w, signal) => this.#waitForAdmission(w, signal),
-            onRelease: () => { this.#activeJobs = Math.max(0, this.#activeJobs - 1); },
+            onRelease: () => this.#releaseJob(),
             onSuccess: def.onSuccess ? () => def.onSuccess(this) : null,
+            onStopped: (w) => this.#handleWorkerStopped(key, w, def),
         });
 
         this.#workers.set(key, worker);
@@ -128,72 +155,83 @@ export class TaskRunner {
         log(`[TaskRunner] spawned worker ${key} (priority=${def.priority})`);
     }
 
+    #handleWorkerStopped(key, worker, def) {
+        if (this.#workers.get(key) !== worker) return;
+        this.#workers.delete(key);
+        this.#reconcileWorkers(def);
+    }
+
     #workersForTask(taskName) {
         const result = [];
         for (const [key, worker] of this.#workers) {
             if (worker.taskName === taskName) result.push([key, worker]);
         }
+        result.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
         return result;
     }
 
     /**
-     * Each worker calls this and awaits it. The scheduler resolves these
-     * promises in priority order when slots are available.
+     * Queue a worker for admission. Abort listeners are removed as soon as an
+     * entry is admitted so long-lived workers do not accumulate listeners.
      */
     #waitForAdmission(worker, signal) {
+        if (signal.aborted) return Promise.resolve(false);
+
         return new Promise((resolve) => {
-            const entry = { worker, resolve, signal };
+            const entry = {
+                worker,
+                resolve,
+                signal,
+                enqueuedAt: Date.now(),
+                sequence: this.#nextQueueSequence++,
+                onAbort: null,
+            };
+            entry.onAbort = () => {
+                if (!this.#waitingWorkers.delete(entry)) return;
+                resolve(false);
+            };
 
             this.#waitingWorkers.add(entry);
-
-            signal.addEventListener("abort", () => {
-                this.#waitingWorkers.delete(entry);
-                resolve(); // let the worker loop exit cleanly
-            }, { once: true });
+            signal.addEventListener("abort", entry.onAbort, { once: true });
+            this.#dispatch();
         });
     }
 
-    /**
-     * Core scheduler loop — runs every SCHEDULER_INTERVAL_MS.
-     * Sorts waiting workers by effectivePriority, admits as many as capacity allows,
-     * and increments waitCycles for those still waiting (aging).
-     */
-    #runScheduler() {
-        setInterval(() => {
-            const available = this.#maxConcurrentJobs - this.#activeJobs;
-            if (available <= 0 || this.#waitingWorkers.size === 0) {
-                // Age workers that are still waiting
-                for (const { worker } of this.#waitingWorkers) {
-                    worker.incrementWaitCycles();
-                }
-                return;
+    /** Dispatch only in response to queue/capacity changes; no polling timer. */
+    #dispatch() {
+        if (this.#dispatchPaused) return;
+        let available = this.#maxConcurrentJobs - this.#activeJobs;
+        if (available <= 0 || this.#waitingWorkers.size === 0) return;
+
+        const now = Date.now();
+        const sorted = [...this.#waitingWorkers].sort((a, b) => {
+            const aPriority = a.worker.priority + (now - a.enqueuedAt) * PRIORITY_AGING_PER_MS;
+            const bPriority = b.worker.priority + (now - b.enqueuedAt) * PRIORITY_AGING_PER_MS;
+            return bPriority - aPriority || a.sequence - b.sequence;
+        });
+
+        for (const entry of sorted) {
+            if (available <= 0) break;
+            if (!this.#waitingWorkers.delete(entry)) continue;
+            entry.signal.removeEventListener("abort", entry.onAbort);
+            if (entry.signal.aborted) {
+                entry.resolve(false);
+                continue;
             }
 
-            // Sort by effectivePriority descending
-            const sorted = [...this.#waitingWorkers].sort(
-                (a, b) => b.worker.effectivePriority - a.worker.effectivePriority
-            );
+            this.#activeJobs++;
+            available--;
+            entry.resolve(true);
+        }
+    }
 
-            let admitted = 0;
-            for (const entry of sorted) {
-                if (admitted >= available) break;
-                if (entry.signal.aborted) {
-                    this.#waitingWorkers.delete(entry);
-                    continue;
-                }
-
-                this.#waitingWorkers.delete(entry);
-                this.#activeJobs++;
-                admitted++;
-                entry.worker.resetWaitCycles();
-                entry.resolve();
-            }
-
-            // Age remaining waiters
-            for (const { worker } of this.#waitingWorkers) {
-                worker.incrementWaitCycles();
-            }
-        }, SCHEDULER_INTERVAL_MS);
+    #releaseJob() {
+        if (this.#activeJobs <= 0) {
+            console.error("[TaskRunner] attempted to release a job with no active jobs");
+            return;
+        }
+        this.#activeJobs--;
+        this.#dispatch();
     }
 
     #scheduleCron(def) {
