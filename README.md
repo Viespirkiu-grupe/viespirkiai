@@ -4,8 +4,6 @@ Pilietinės iniciatyvos Viešpirkiai puslapio https://viespirkiai.org kodas.
 
 Daugiau informacijos el. paštu viespirkiai@viespirkiai.org
 
-![Viešpirkių sistemos schema](./assets/viespirkiaiSchema.png)
-
 ## Tailwind CSS
 
 Astro port (`src/`) now uses Tailwind v4 directly through Astro/Vite.
