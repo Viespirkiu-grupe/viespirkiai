@@ -3,7 +3,6 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
-        container_name: viespirkiai_frontend
         # host tinklas – kad pasiektų localhost servisus (pgbouncer 9120,
         # typesense 8108, quickwit 7280) ir atidarytų config.js port'ą (9019).
         network_mode: host

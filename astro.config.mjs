@@ -7,6 +7,21 @@ import config from './config.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 
+function sutartysExportEntryPlugin() {
+  return {
+    name: 'sutartys-export-websocket-entry',
+    apply: 'build',
+    buildStart() {
+      if (this.environment?.name !== 'ssr') return;
+      this.emitFile({
+        type: 'chunk',
+        id: path.join(root, 'modules/sutartys/exportWebSocket.js'),
+        fileName: 'exportWebSocket.mjs',
+      });
+    },
+  };
+}
+
 export default defineConfig({
   output: 'server',
   adapter: node({ mode: 'standalone' }),
@@ -35,6 +50,7 @@ export default defineConfig({
     },
     plugins: [
       tailwindcss(),
+      sutartysExportEntryPlugin(),
       {
         name: 'sutartys-export-websocket',
         configureServer(server) {

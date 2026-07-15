@@ -3,7 +3,6 @@ import http from 'node:http';
 import https from 'node:https';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { attachSutartysExportWebSocket } from './modules/sutartys/exportWebSocket.js';
 
 const configPath = path.join(process.cwd(), 'config.js');
 
@@ -29,6 +28,7 @@ if (!process.env.PORT) {
 // ir porto galėtume prijungti WebSocket `upgrade` užklausas.
 process.env.ASTRO_NODE_AUTOSTART = 'disabled';
 const { handler } = await import('./dist/server/entry.mjs');
+const { attachSutartysExportWebSocket } = await import('./dist/server/exportWebSocket.mjs');
 const server = process.env.SERVER_CERT_PATH && process.env.SERVER_KEY_PATH
   ? https.createServer({
       cert: fs.readFileSync(process.env.SERVER_CERT_PATH),
