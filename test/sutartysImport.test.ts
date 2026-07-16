@@ -9,6 +9,7 @@ vi.mock("../postgres/postgres.js", () => ({
 describe("sutartys import validation", () => {
     beforeEach(() => {
         query.mockReset();
+        query.mockResolvedValue({ rows: [] });
     });
 
     it("keeps date-only contract fields independent from the local timezone", async () => {
@@ -58,6 +59,16 @@ describe("sutartys import validation", () => {
         expect(values[7]).toBe("2022-06-30");
         expect(values[9]).toBe("2022-07-01");
         expect(values[16]).toBe("2022-01-01");
+        expect(
+            query.mock.calls.some(
+                ([sql, params]) =>
+                    String(sql).includes(
+                        'INSERT INTO public."vpmSutartys"',
+                    ) &&
+                    String(params?.[0]).includes('"unikalusId":1') &&
+                    /^[a-f0-9]{32}$/.test(String(params?.[1])),
+            ),
+        ).toBe(true);
     });
 
     it("rejects malformed numeric values before writing anything", async () => {

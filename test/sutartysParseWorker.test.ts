@@ -122,4 +122,52 @@ describe("sutartys HTML parser worker", () => {
             bvpzPavadinimas: "Įvairūs dekoratyviniai daiktai",
         });
     });
+
+    it("recovers an actual execution date placed in the value cell", () => {
+        const html = `<table id="lenetele_table">
+          <tr id="topRow"><th>H</th></tr>
+          <tr id="vptpublic_main_2005349637">
+            <td></td>
+            <td><a>Mokomosios programos</a><span class="ProcurementType">Prekės</span></td>
+            <td><a>Vilniaus Gabijos gimnazija</a><a>305607530</a></td>
+            <td><a>Gyvenimo universitetas LT</a><a>302612796</a></td>
+            <td>&euro;200,00</td><td>2022-02-18</td><td>2022-03-31</td>
+            <td>&nbsp;2022-03-31</td><td>&nbsp;</td><td>MVPŽ</td>
+          </tr>
+          <tr id="vptpublic_extra_2005349637"><td></td><td><table>
+            <tr><td><b>Sutarties unikalus ID:</b></td><td>2005349637</td></tr>
+          </table></td></tr>
+        </table>`;
+
+        const result = parseSutartysHtml(html);
+        expect(result.sutartys[0]).toMatchObject({
+            sutartiesUnikalusID: "2005349637",
+            faktineIvykdimoVerte: "",
+            faktineIvykdimoData: "2022-03-31",
+        });
+    });
+
+    it("discards a date from the value cell when the date cell is populated", () => {
+        const html = `<table id="lenetele_table">
+          <tr id="topRow"><th>H</th></tr>
+          <tr id="vptpublic_main_2005343445">
+            <td></td>
+            <td><a>Transporto paslaugos</a><span class="ProcurementType">Paslaugos</span></td>
+            <td><a>Visagino Draugystės progimnazija</a><a>300135691</a></td>
+            <td><a>Meteorit turas</a><a>155902759</a></td>
+            <td>&euro;203,51</td><td>2022-04-07</td><td>2022-04-14</td>
+            <td>&nbsp;2022-04-14</td><td>&nbsp;2022-04-14</td><td>MVP</td>
+          </tr>
+          <tr id="vptpublic_extra_2005343445"><td></td><td><table>
+            <tr><td><b>Sutarties unikalus ID:</b></td><td>2005343445</td></tr>
+          </table></td></tr>
+        </table>`;
+
+        const result = parseSutartysHtml(html);
+        expect(result.sutartys[0]).toMatchObject({
+            sutartiesUnikalusID: "2005343445",
+            faktineIvykdimoVerte: "",
+            faktineIvykdimoData: "2022-04-14",
+        });
+    });
 });

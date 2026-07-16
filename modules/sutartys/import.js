@@ -4,6 +4,8 @@ Importuoja sutarčių duomenis į Postgres.
 
 import { postgres } from "../../postgres/postgres.js";
 import Timings from "../../utils/timings.js";
+import { prepareCanonicalSutartis } from "./canonicalSutartis.js";
+import { upsertVpmSutartis } from "./upsertVpmSutartis.js";
 
 /**
  * Konvertuoja datą į Postgres timestamp formatą.
@@ -135,6 +137,7 @@ export async function cvpIsImportArray(data, options = {}) {
 
         // Į lentelę failai
         const newFailai = [];
+        const canonicalSutartys = [];
 
         // Paruošiame duomenis įterpimui
         items.forEach((item, i) => {
@@ -148,6 +151,13 @@ export async function cvpIsImportArray(data, options = {}) {
 
             const pirkimoNumeris =
                 item.pirkimoNumeris?.replace(/\x00/g, "").trim() || null;
+
+            const canonical = prepareCanonicalSutartis({
+                ...item,
+                pirkimoNumeris,
+                faktineIvykdimoVerte,
+            });
+            canonicalSutartys.push(canonical);
 
             const baseIndex = i * 26;
             placeholders.push(
@@ -340,6 +350,12 @@ export async function cvpIsImportArray(data, options = {}) {
             }
         }
         timings.end("importPostgresFailaiUpsert");
+
+        timings.start("importVpmSutartysUpsert");
+        for (const canonical of canonicalSutartys) {
+            await upsertVpmSutartis(canonical);
+        }
+        timings.end("importVpmSutartysUpsert");
     }
 
     return { timings };

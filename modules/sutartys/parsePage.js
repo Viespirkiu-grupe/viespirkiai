@@ -180,10 +180,20 @@ function parseContract(mainRow, extraRow) {
     const buyerLinks = findAll(cells[2], (node) => node.name === "a");
     const supplierLinks = findAll(cells[3], (node) => node.name === "a");
 
-    const actualValueRaw = textContent(cells[7])
+    let actualValueRaw = textContent(cells[7])
         .replace(/ /g, "")
         .replace("€", "")
         .trim();
+    let actualDateRaw = textContent(cells[8]).replace(/ /g, "").trim();
+
+    // Some CVP IS rows contain an execution date in the value cell. The real
+    // date cell may be empty (2005349637) or repeat the date (2005343445).
+    // A plain ISO date can never be an amount, so discard it as a value and use
+    // it as the date only when the dedicated date cell is empty.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(actualValueRaw)) {
+        if (!actualDateRaw) actualDateRaw = actualValueRaw;
+        actualValueRaw = "";
+    }
 
     const sutartis = {
         pavadinimas: innerHTML(titleLink).trimEnd(),
@@ -209,7 +219,7 @@ function parseContract(mainRow, extraRow) {
         faktineIvykdimoVerte: actualValueRaw.includes(",")
             ? actualValueRaw.replace(/\./g, "").replace(/,/g, ".")
             : actualValueRaw,
-        faktineIvykdimoData: textContent(cells[8]).replace(/ /g, ""),
+        faktineIvykdimoData: actualDateRaw,
         tipas: textContent(cells[9]),
         bvpzKodas: "",
         bvpzPavadinimas: "",

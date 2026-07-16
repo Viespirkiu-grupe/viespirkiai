@@ -9,7 +9,7 @@ export async function cvpIsScrapeOldestContract() {
     let oldestRes = await postgres.query(`SELECT "sutartiesUnikalusId", "paskutiniKartaAtnaujinta"
       FROM public."sutartysAtnaujinimai"
       WHERE "paskutiniKartaAtnaujinta" IS NULL OR "paskutiniKartaAtnaujinta" < (
-        timezone('Europe/Vilnius', now()) - INTERVAL '3 days'
+        timezone('Europe/Vilnius', now()) - INTERVAL '2 days'
       )
       ORDER BY "paskutiniKartaAtnaujinta" ASC NULLS FIRST
       LIMIT 1;`);

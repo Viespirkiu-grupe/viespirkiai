@@ -1,121 +1,63 @@
 {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://viespirkiai.org/schemas/sutartis.schema.json",
-    "title": "Sutartis",
-    "description": "Viešojo pirkimo sutartis (data export record).",
-    "type": "object",
-    "required": [
-        "id",
-        "datos",
-        "vertes",
-        "klasifikacija",
-        "pirkejas",
-        "tiekejai",
-        "dokumentai"
-    ],
-    "additionalProperties": false,
-    "properties": {
-        "id": {
-            "type": "integer",
-            "description": "sutartiesUnikalusId (CVP IS dok_id)."
-        },
-        "sutartiesNumeris": { "type": ["string", "null"] },
-        "pavadinimas":      { "type": ["string", "null"] },
-        "tipas":            { "type": ["string", "null"], "description": "Sutarties tipo kodas (TSP, MVP, SP, ...)." },
-        "tipoPavadinimas":  { "type": ["string", "null"], "description": "Žmogui suprantamas tipo pavadinimas." },
-        "pirkimoNumeris":   { "type": ["string", "null"], "description": "Susieto viešojo pirkimo numeris (jei nurodytas)." },
-
-        "datos": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["sudaryta", "galioja", "ivykdyta", "paskelbta", "redaguota"],
-            "properties": {
-                "sudaryta": { "type": ["string", "null"], "format": "date" },
-                "galioja":  { "type": ["string", "null"], "format": "date", "description": "Sutarties galiojimo pabaiga." },
-                "ivykdyta": { "type": ["string", "null"], "format": "date", "description": "Faktinė įvykdymo data, jei paskelbta." },
-                "paskelbta":{ "type": ["string", "null"], "format": "date" },
-                "redaguota":{ "type": ["string", "null"], "format": "date", "description": "Paskutinio redagavimo data CVP IS." }
-            }
-        },
-
-        "vertes": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["numatyta", "faktine", "suma"],
-            "description": "Visos vertės eurais.",
-            "properties": {
-                "numatyta": { "type": ["number", "null"] },
-                "faktine":  { "type": ["number", "null"] },
-                "suma":     { "type": ["number", "null"] }
-            }
-        },
-
-        "klasifikacija": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["kategorija", "bvpz"],
-            "properties": {
-                "kategorija": { "type": ["string", "null"] },
-                "bvpz": {
-                    "type": "array",
-                    "description": "BVPŽ (CPV) klasifikatoriaus kodai. Pirmasis – pagrindinis, likę – papildomi.",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "required": ["kodas"],
-                        "properties": {
-                            "kodas":      { "type": "string", "pattern": "^[0-9]+$", "description": "BVPŽ kodas be kontrolinio skaitmens (pvz. „45233140“)." },
-                            "pavadinimas":{ "type": ["string", "null"] }
-                        }
-                    }
-                }
-            }
-        },
-
-        "pirkejas": {
-            "oneOf": [
-                { "type": "null" },
-                {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": ["kodas", "pavadinimas"],
-                    "properties": {
-                        "kodas":      { "type": ["string", "null"] },
-                        "pavadinimas":{ "type": ["string", "null"] }
-                    }
-                }
-            ]
-        },
-
-        "tiekejai": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["kodas", "pavadinimas"],
-                "properties": {
-                    "kodas":         { "type": ["string", "null"] },
-                    "pavadinimas":   { "type": ["string", "null"], "description": "Pavadinimas, kaip nurodytas CVP IS sutarties įraše (gali turėti rašybos klaidų, trūkstamą teisinę formą)." },
-                    "patikslinimas": { "type": ["string", "null"], "description": "Patikslintas pavadinimas iš VPT atvirų duomenų (jei skiriasi nuo „pavadinimas“)." },
-                    "salis":         { "type": ["string", "null"], "description": "ISO 3166-1 alpha-2 šalies kodas (pvz. „LT“)." }
-                }
-            }
-        },
-
-        "dokumentai": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["dokId", "fileId"],
-                "description": "Sutarties dokumentas CVP IS sistemoje. Atsisiuntimo nuoroda: `https://eviesiejipirkimai.lt/download.php?dok_id={dokId}&file_id={fileId}`. Sutarties puslapis CVP IS: `https://eviesiejipirkimai.lt/index.php?option=com_vptpublic&task=sutartys&Itemid=109&filter_dok_id={dokId}` (sutartis.id == dokId).",
-                "properties": {
-                    "dokId":       { "type": "string", "pattern": "^[0-9]+$", "description": "CVP IS dokumento ID (sutapatinamas su sutarties id)." },
-                    "fileId":      { "type": "string", "pattern": "^[0-9]+$", "description": "CVP IS prikabinto failo ID dokumento viduje." },
-                    "pavadinimas": { "type": ["string", "null"] },
-                    "md5":         { "type": "string", "pattern": "^[0-9a-f]{32}$", "description": "MD5 sąsiuntinio failo turinio, jei jis jau parsiųstas." }
-                }
-            }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "vpmSutartis-canonical",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "unikalusId", "pavadinimas", "sudarymoData", "galiojimoData",
+    "faktineIvykdimoData", "paskelbimoData", "redagavimoData",
+    "perkanciosiosOrganizacijosKodas", "perkanciosiosOrganizacijosPavadinimas",
+    "sutartiesNumeris", "pirkimoNumeris", "numatomaVerte", "faktineVerte",
+    "pirmoTiekejoKodas", "pirmoTiekejoPavadinimas", "papildomiTiekejai",
+    "tipas", "kategorija", "bvpzKodas", "papildomiBvpzKodai", "dokumentai", "istrinta", "pakeitimas"
+  ],
+  "properties": {
+    "unikalusId":                            { "type": "integer" },
+    "pavadinimas":                           { "type": ["string", "null"] },
+    "sudarymoData":                          { "type": ["string", "null"], "format": "date" },
+    "galiojimoData":                         { "type": ["string", "null"], "format": "date" },
+    "faktineIvykdimoData":                   { "type": ["string", "null"], "format": "date" },
+    "paskelbimoData":                        { "type": ["string", "null"], "format": "date-time" },
+    "redagavimoData":                        { "type": ["string", "null"], "format": "date-time" },
+    "perkanciosiosOrganizacijosKodas":       { "type": ["string", "null"] },
+    "perkanciosiosOrganizacijosPavadinimas": { "type": ["string", "null"] },
+    "sutartiesNumeris":                      { "type": ["string", "null"] },
+    "pirkimoNumeris":                        { "type": ["string", "null"] },
+    "numatomaVerte":                         { "type": ["number", "null"] },
+    "faktineVerte":                          { "type": ["number", "null"] },
+    "pirmoTiekejoKodas":                     { "type": ["string", "null"] },
+    "pirmoTiekejoPavadinimas":               { "type": ["string", "null"] },
+    "papildomiTiekejai": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kodas", "pavadinimas"],
+        "properties": {
+          "kodas":       { "type": ["string", "null"] },
+          "pavadinimas": { "type": ["string", "null"] }
         }
-    }
+      }
+    },
+    "tipas":              { "type": ["string", "null"] },
+    "kategorija":         { "type": ["string", "null"] },
+    "bvpzKodas":          { "type": ["integer", "null"] },
+    "papildomiBvpzKodai": { "type": "array", "items": { "type": "integer" } },
+    "dokumentai": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pavadinimas", "fileId"],
+        "properties": {
+          "pavadinimas": { "type": ["string", "null"] },
+          "fileId":      { "type": ["integer", "null"] }
+        }
+      }
+    },
+    "istrinta":           { "type": "boolean" },
+    "pakeitimas":         { "type": "boolean" }
+  }
 }
+
+
