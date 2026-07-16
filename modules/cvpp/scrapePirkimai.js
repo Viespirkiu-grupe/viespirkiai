@@ -69,12 +69,23 @@ async function ensureLithuanianSession() {
 
 async function fetchPublicPurchase(pid) {
     await ensureLithuanianSession();
-    const url = `${ORIGIN}/ctm/Supplier/PublicPurchase/${pid}?B=PPO`;
-    const res = await fetch(url, {
+    const initialUrl = `${ORIGIN}/ctm/Supplier/PublicPurchase/${pid}?B=PPO`;
+    const initialResponse = await fetch(initialUrl, {
         headers: cookieHeader ? { cookie: cookieHeader } : undefined,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return { url, html: await res.text() };
+    if (!initialResponse.ok) throw new Error(`HTTP ${initialResponse.status}`);
+
+    const initialHtml = await initialResponse.text();
+    const detailsUrl = findPublicPurchaseDetailsUrl(initialHtml, pid);
+    if (!detailsUrl) return { url: initialUrl, html: initialHtml };
+
+    const detailsResponse = await fetch(detailsUrl, {
+        headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+    });
+    if (!detailsResponse.ok)
+        throw new Error(`details HTTP ${detailsResponse.status}`);
+
+    return { url: detailsUrl, html: await detailsResponse.text() };
 }
 
 // Paketo dokumentų sąrašo puslapis (atskiri failai su DVID).
@@ -93,6 +104,34 @@ async function fetchDocs(pid, lid) {
 // ─── Parsinimo pagalbininkai ───────────────────────────────────────────────────
 
 const txt = (el) => el?.textContent.replace(/\s+/g, " ").trim() || null;
+
+// Kai kuriems pirkimams bazinis PublicPurchase URL grąžina ne detales, o
+// tarpinį puslapį su mygtuku į tikrąjį /{pid}/{step}/{package} puslapį.
+// Priimame tik to paties pirkimo nuorodą iš CVP IS domeno.
+export function findPublicPurchaseDetailsUrl(html, pid) {
+    const { document } = parseHTML(html);
+    if (document.querySelector("#tenderInfoSection")) return null;
+
+    const href = document
+        .querySelector("#showTenderDetails")
+        ?.getAttribute("href")
+        ?.trim();
+    if (!href) return null;
+
+    let url;
+    try {
+        url = new URL(href, ORIGIN);
+    } catch {
+        return null;
+    }
+
+    const expectedPath = new RegExp(
+        `^/ctm/Supplier/PublicPurchase/${Number(pid)}/\\d+/\\d+/?$`,
+    );
+    if (url.origin !== ORIGIN || !expectedPath.test(url.pathname)) return null;
+
+    return url.href;
+}
 
 function minifyHtml(html) {
     return String(html ?? "")
