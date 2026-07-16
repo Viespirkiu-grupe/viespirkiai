@@ -195,6 +195,12 @@ function parseContract(mainRow, extraRow) {
         actualValueRaw = "";
     }
 
+    // Some manually entered CVP IS amounts use a hyphen instead of the
+    // decimal separator (contract 2005428528 contains "217-08"). Only accept
+    // the unambiguous cents form so other malformed values remain visible to
+    // the strict import validation.
+    actualValueRaw = actualValueRaw.replace(/^(\d+)-(\d{2})$/, "$1.$2");
+
     const sutartis = {
         pavadinimas: innerHTML(titleLink).trimEnd(),
         kategorija: innerHTML(category),

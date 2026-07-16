@@ -170,4 +170,28 @@ describe("sutartys HTML parser worker", () => {
             faktineIvykdimoData: "2022-04-14",
         });
     });
+
+    it("normalizes a hyphen used as the actual value decimal separator", () => {
+        const html = `<table id="lenetele_table">
+          <tr id="topRow"><th>H</th></tr>
+          <tr id="vptpublic_main_2005428528">
+            <td></td>
+            <td><a>Priežiūros paslaugos</a><span class="ProcurementType">Paslaugos</span></td>
+            <td><a>LITEXPO</a><a>120080713</a></td>
+            <td><a>Firesta</a><a>303517358</a></td>
+            <td>&euro;217,08</td><td>2022-05-18</td><td>2022-06-01</td>
+            <td>&nbsp;217-08</td><td>&nbsp;2022-05-20</td><td>MVPŽ</td>
+          </tr>
+          <tr id="vptpublic_extra_2005428528"><td></td><td><table>
+            <tr><td><b>Sutarties unikalus ID:</b></td><td>2005428528</td></tr>
+          </table></td></tr>
+        </table>`;
+
+        const result = parseSutartysHtml(html);
+        expect(result.sutartys[0]).toMatchObject({
+            sutartiesUnikalusID: "2005428528",
+            faktineIvykdimoVerte: "217.08",
+            faktineIvykdimoData: "2022-05-20",
+        });
+    });
 });
