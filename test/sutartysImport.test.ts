@@ -28,7 +28,7 @@ describe("sutartys import validation", () => {
         ).toThrow("Invalid faktineIvykdimoData");
     });
 
-    it("accepts contract amounts with regular and non-breaking thousands spaces", async () => {
+    it("accepts contract amounts with thousands spaces and an EUR suffix", async () => {
         const { parseNullableNumber } = await import(
             "../modules/sutartys/import.js"
         );
@@ -36,6 +36,14 @@ describe("sutartys import validation", () => {
         expect(parseNullableNumber("2 787.20", "verte", 1)).toBe(2787.2);
         expect(parseNullableNumber("1 234,56", "verte", 1)).toBe(1234.56);
         expect(parseNullableNumber("9 876,54", "verte", 1)).toBe(9876.54);
+        expect(
+            parseNullableNumber(
+                "121.00 eur",
+                "faktineIvykdimoVerte",
+                2005487264,
+            ),
+        ).toBe(121);
+        expect(parseNullableNumber("1 234,56 EUR", "verte", 1)).toBe(1234.56);
         expect(parseNullableNumber("", "verte", 1)).toBeNull();
     });
 

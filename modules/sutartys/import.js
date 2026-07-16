@@ -49,9 +49,12 @@ export function parseNullableNumber(value, field, contractId) {
     if (typeof value === "number") {
         if (Number.isFinite(value)) return value;
     } else if (typeof value === "string") {
-        const parsed = Number(
-            value.replace(/[\s\u00a0\u202f]+/gu, "").replace(/,/g, "."),
-        );
+        const normalized = value
+            .trim()
+            .replace(/[\s\u00a0\u202f]+eur$/iu, "")
+            .replace(/[\s\u00a0\u202f]+/gu, "")
+            .replace(/,/g, ".");
+        const parsed = normalized === "" ? NaN : Number(normalized);
         if (Number.isFinite(parsed)) return parsed;
     }
     throw new Error(
