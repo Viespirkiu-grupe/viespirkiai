@@ -192,6 +192,14 @@ export async function loadFailasById(id: string): Promise<Failas | null> {
  *
  * Mutates and returns the same object for convenience.
  */
+export async function findFailasIdBySaltinioId(saltinis: string, saltinioId: string): Promise<string | null> {
+  const result = await postgres.query(
+    `SELECT id FROM failai WHERE saltinis = $1 AND "saltinioId" = $2 LIMIT 1`,
+    [saltinis, saltinioId],
+  );
+  return result.rows[0]?.id != null ? String(result.rows[0].id) : null;
+}
+
 export async function enrichFailas(failas: Failas): Promise<Failas> {
   const { fetchFailasMetadata } = await import('@/modules/failai/aptarnavimas.js');
   failas = { ...failas, ...(await fetchFailasMetadata(failas.id, failas)) };

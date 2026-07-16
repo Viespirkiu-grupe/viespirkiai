@@ -1,0 +1,15 @@
+---
+import { findFailasIdBySaltinioId } from '../../../lib/failas.js';
+
+// Nukreipimas iš žmogui suprantamo CVPP kelio /failas/cvpp/<pid>/<dvid>/<lid>
+// į kanoninį /failas/<id>. saltinioId formatas: "pid/dvid/lid".
+const rest = Astro.params.rest ?? '';
+const saltinioId = String(rest).split('/').filter(Boolean).join('/');
+
+if (!saltinioId) return Astro.redirect('/404');
+
+const id = await findFailasIdBySaltinioId('cvpp', saltinioId);
+if (!id) return Astro.redirect('/404');
+
+return Astro.redirect(`/failas/${id}`, 301);
+---
