@@ -11,8 +11,6 @@ export async function pravalytiParsiuntimoRezervacijas() {
         UPDATE public."failaiParsiuntimoQueue"
         SET "lockedBy"           = NULL,
             "lockedAt"           = NULL,
-            "paskutinisBandymas" = NOW(),
-            bandymai             = bandymai + 1,
             state                = -1
         WHERE "lockedBy" IS NOT NULL
           AND "lockedAt" <= NOW() - INTERVAL '15 minutes'

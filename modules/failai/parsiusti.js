@@ -41,7 +41,10 @@ export async function parsiustiFaila(options = {}) {
         ),
         locked AS (
             UPDATE public."failaiParsiuntimoQueue" q
-            SET "lockedBy" = $1, "lockedAt" = NOW()
+            SET "lockedBy" = $1,
+                "lockedAt" = NOW(),
+                "paskutinisBandymas" = NOW(),
+                bandymai = COALESCE(q.bandymai, 0) + 1
             FROM cte WHERE q.id = cte.id
             RETURNING q.id
         )
@@ -202,8 +205,6 @@ export async function parsiustiFaila(options = {}) {
         await postgres.query(
             `UPDATE public."failaiParsiuntimoQueue"
             SET state = -1,
-                bandymai = bandymai + 1,
-                "paskutinisBandymas" = NOW(),
                 "lockedBy" = NULL,
                 "lockedAt" = NULL
             WHERE id = $1`,
