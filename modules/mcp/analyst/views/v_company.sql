@@ -33,8 +33,8 @@ SELECT j."jarKodas"::text,
 FROM "jarCsv" j
          LEFT JOIN LATERAL (
     SELECT draustieji, draustieji2, "vidutinisAtlyginimas", "imokuSuma", data
-    FROM sodra
-    WHERE "jarKodas" = j."jarKodas"::text
+    FROM "sodraMonthly"
+    WHERE "jarKodas" = j."jarKodas"::integer
     ORDER BY data DESC NULLS LAST
     LIMIT 1
     ) s ON true

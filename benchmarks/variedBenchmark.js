@@ -115,8 +115,8 @@ const QUERIES = [
                        avg("vidutinisAtlyginimas")::numeric(12,2) AS atlyg,
                        max(draustieji)                            AS draustieji
                 FROM (
-                    SELECT "jarKodas", "vidutinisAtlyginimas", draustieji
-                    FROM sodra WHERE ctid < '(:PAGES2,0)'::tid
+                    SELECT "jarKodas"::text AS "jarKodas", "vidutinisAtlyginimas", draustieji
+                    FROM "sodraMonthly" WHERE ctid < '(:PAGES2,0)'::tid
                 ) s
                 WHERE "jarKodas" IS NOT NULL
                 GROUP BY "jarKodas"
@@ -145,7 +145,7 @@ const QUERIES = [
                 SELECT "jarKodas", data, draustieji
                 FROM (
                     SELECT "jarKodas", data, draustieji
-                    FROM sodra WHERE ctid < '(:PAGES2,0)'::tid
+                    FROM "sodraMonthly" WHERE ctid < '(:PAGES2,0)'::tid
                 ) x
                 WHERE draustieji IS NOT NULL AND "jarKodas" IS NOT NULL
             )
@@ -155,7 +155,7 @@ const QUERIES = [
                 max(a.draustieji - b.draustieji)                AS max_augimas,
                 min(a.draustieji - b.draustieji)                AS max_kritimas
             FROM s a
-            JOIN s b ON a."jarKodas" = b."jarKodas" AND a.data = b.data + 1`,
+            JOIN s b ON a."jarKodas" = b."jarKodas" AND a.data = b.data + interval '1 month'`,
     },
     {
         id: "Q6",

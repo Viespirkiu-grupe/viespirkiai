@@ -2,16 +2,31 @@ import { postgres } from "../../postgres/postgres.js";
 
 export async function gautiSodrosDuomenis(jarKodas) {
     const { rows: sodraRezultatai } = await postgres.query(
-        `SELECT * FROM sodra WHERE "jarKodas" = $1 ORDER BY "data" ASC`,
+        `SELECT
+             m.kodas,
+             m."jarKodas",
+             p.pavadinimas,
+             sv.pavadinimas AS savivaldybe,
+             e.kodas AS "ekonominesVeiklosKodas",
+             e.pavadinimas AS "ekonominesVeiklosPavadinimas",
+             m."vidutinisAtlyginimas",
+             m."vidutinisAtlyginimas2",
+             m.draustieji,
+             m.draustieji2,
+             m."imokuSuma",
+             to_char(m.data, 'YYYY-MM') AS data
+         FROM "sodraMonthly" m
+         LEFT JOIN "sodraMonthlyPavadinimai" p  ON p.id  = m."pavadinimasId"
+         LEFT JOIN "sodraMonthlySavivaldybes" sv ON sv.id = m."savivaldybeId"
+         LEFT JOIN "sodraMonthlyEvrk" e          ON e.id  = m."evrkId"
+         WHERE m."jarKodas" = $1::integer
+         ORDER BY m.data ASC`,
         [jarKodas],
     );
 
     let sodra;
     if (sodraRezultatai.length > 0) {
         const pirmas = sodraRezultatai.at(-1);
-
-        const formatDate = (date) =>
-            `${date}`.slice(0, 4) + "-" + `${date}`.slice(4, 6);
 
         const naudojamiNaujausi = [
             "kodas",
@@ -31,7 +46,7 @@ export async function gautiSodrosDuomenis(jarKodas) {
             naudojamiNaujausi.map((key) => [key, pirmas[key]]),
         );
 
-        sodra.data = formatDate(pirmas.data);
+        sodra.data = pirmas.data;
 
         sodra.bendrasDraustujuSkaicius = pirmas.draustieji + pirmas.draustieji2;
 
@@ -53,7 +68,7 @@ export async function gautiSodrosDuomenis(jarKodas) {
         }
 
         sodra.duomenys = sodraRezultatai.map((row) => ({
-            data: formatDate(row.data),
+            data: row.data,
             vidutinisAtlyginimas: row.vidutinisAtlyginimas,
             draustieji: row.draustieji,
             vidutinisAtlyginimas2: row.vidutinisAtlyginimas2,
