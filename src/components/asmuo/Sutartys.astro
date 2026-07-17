@@ -7,6 +7,7 @@ import ChartTile from '@design-system/components/charts/ChartTile.astro';
 import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
 import Table from '@design-system/components/Table.astro';
 import TableWrapper from '@design-system/components/TableWrapper.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
 const { asmuo } = Astro.props;
 const pirkimai = asmuo.sutartys?.pirkimaiKasMetus ?? [];
 const tiekimai = asmuo.sutartys?.tiekimaiKasMetus ?? [];
@@ -74,7 +75,7 @@ const topPirkejaiExport = [
                       {t.pavadinimas}
                     </a>
                   </td>
-                  <td class="cell-mono cell-right">{t.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' })}</td>
+                  <td class="cell-right"><MoneyValue value={t.total} /></td>
                   <td class="cell-mono cell-right">{t.count.toLocaleString('lt-LT')}</td>
                 </tr>
               ))}
@@ -101,7 +102,7 @@ const topPirkejaiExport = [
                       {p.pavadinimas}
                     </a>
                   </td>
-                  <td class="cell-mono cell-right">{p.total.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' })}</td>
+                  <td class="cell-right"><MoneyValue value={p.total} /></td>
                   <td class="cell-mono cell-right">{p.count.toLocaleString('lt-LT')}</td>
                 </tr>
               ))}

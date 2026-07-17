@@ -32,13 +32,13 @@ export async function gautiSutarciuDuomenisPagalJarKoda(
         ),
         postgres.query(
             `SELECT agg."tiekejoKodas" AS "jarKodas", COALESCE(j."pavadinimas", 'Nežinomas') AS "pavadinimas", agg."suma" AS "total", agg."kiekis" AS "count"
-             FROM (SELECT "tiekejoKodas", "suma", "kiekis" FROM "sutartysSaliuSumos" WHERE "pirkejoKodas" = $1 ORDER BY "suma" DESC ${limitSql}) agg
+             FROM (SELECT "tiekejoKodas", "suma", "kiekis" FROM "sutartysSaliuSumos" WHERE "pirkejoKodas" = $1 ORDER BY ("suma" = 'NaN'::numeric), "suma" DESC ${limitSql}) agg
              LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = agg."tiekejoKodas"`,
             [jarKodas],
         ),
         postgres.query(
             `SELECT agg."pirkejoKodas" AS "jarKodas", COALESCE(j."pavadinimas", 'Nežinomas') AS "pavadinimas", agg."suma" AS "total", agg."kiekis" AS "count"
-             FROM (SELECT "pirkejoKodas", "suma", "kiekis" FROM "sutartysSaliuSumos" WHERE "tiekejoKodas" = $1 ORDER BY "suma" DESC ${limitSql}) agg
+             FROM (SELECT "pirkejoKodas", "suma", "kiekis" FROM "sutartysSaliuSumos" WHERE "tiekejoKodas" = $1 ORDER BY ("suma" = 'NaN'::numeric), "suma" DESC ${limitSql}) agg
              LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = agg."pirkejoKodas"`,
             [jarKodas],
         ),
