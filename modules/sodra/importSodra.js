@@ -7,6 +7,7 @@ import path from "path";
 import { postgres } from "../../postgres/postgres.js";
 import readline from "readline";
 import { log } from "../../utils/log.js";
+import { upsertSodraMonthly } from "./upsertSodraMonthly.js";
 
 const filename = process.argv[2];
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -24,7 +25,7 @@ const rl = readline.createInterface({
 });
 
 let isFirstLine = true;
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 1_000;
 let batch = [];
 let eilute = 0;
 let skipped = 0;
@@ -104,8 +105,15 @@ for await (const line of rl) {
         continue;
     }
 
+    const parsedCode = toInt(code);
+    if (parsedCode === null) {
+        console.warn(`[Line ${eilute}] Missing draudėjo code — skipping`);
+        skipped++;
+        continue;
+    }
+
     const row = {
-        kodas: toInt(code),
+        kodas: parsedCode,
         jarKodas: jarCode,
         pavadinimas: name,
         savivaldybe: municipality,
@@ -114,11 +122,10 @@ for await (const line of rl) {
         ekonominesVeiklosPavadinimas: ecoActName,
         data: parsedMonth,
         vidutinisAtlyginimas: toFloat(avgWage),
-        draustieji: toInt(numInsured),
+        draustieji: toInt(numInsured) ?? 0,
         vidutinisAtlyginimas2: toFloat(avgWage2),
-        draustieji2: toInt(numInsured2),
+        draustieji2: toInt(numInsured2) ?? 0,
         imokuSuma: toFloat(tax),
-        importFile: path.basename(filename),
     };
 
     if (DRY_RUN) {
@@ -147,21 +154,18 @@ if (!DRY_RUN) await postgres.end();
 
 /**
  * Parses month field — handles both integer (200012) and string (2000-12) formats.
- * Returns an integer like 200012, or null if unrecognized.
+ * Returns the first day of the month as YYYY-MM-01, or null if unrecognized.
  */
 function parseMonth(val) {
     if (!val) return null;
 
-    // Already a plain integer: 200012
-    if (/^\d{6}$/.test(val)) return parseInt(val);
+    const match = String(val).match(/^(\d{4})-?(\d{2})$/);
+    if (!match) return null;
 
-    // YYYY-MM format: 2000-12
-    const match = val.match(/^(\d{4})-(\d{2})$/);
-    if (match) return parseInt(match[1]) * 100 + parseInt(match[2]);
+    const month = Number(match[2]);
+    if (month < 1 || month > 12) return null;
 
-    // Fallback: try plain parseInt
-    const n = parseInt(val);
-    return isNaN(n) ? null : n;
+    return `${match[1]}-${match[2]}-01`;
 }
 
 function toInt(val) {
@@ -215,34 +219,8 @@ function parseCSVLine(line) {
 async function insertBatch(rows) {
     if (!rows.length) return;
 
-    const columns = Object.keys(rows[0]);
-    const placeholders = rows
-        .map(
-            (_, i) =>
-                `(${columns.map((_, j) => `$${i * columns.length + j + 1}`).join(", ")})`,
-        )
-        .join(", ");
-
-    const sql = `
-        INSERT INTO sodra (${columns.map((c) => `"${c}"`).join(", ")})
-        VALUES ${placeholders}
-        ON CONFLICT ("kodas", "jarKodas", "data") DO UPDATE SET
-            pavadinimas = EXCLUDED.pavadinimas,
-            savivaldybe = EXCLUDED.savivaldybe,
-            "ekonominesVeiklosKodas" = EXCLUDED."ekonominesVeiklosKodas",
-            "ekonominesVeiklosPavadinimas" = EXCLUDED."ekonominesVeiklosPavadinimas",
-            "vidutinisAtlyginimas" = EXCLUDED."vidutinisAtlyginimas",
-            draustieji = EXCLUDED.draustieji,
-            "vidutinisAtlyginimas2" = EXCLUDED."vidutinisAtlyginimas2",
-            draustieji2 = EXCLUDED.draustieji2,
-            "imokuSuma" = EXCLUDED."imokuSuma",
-            "importFile" = EXCLUDED."importFile"
-    `;
-
-    const values = rows.flatMap((r) => columns.map((c) => r[c]));
-
     try {
-        await postgres.query(sql, values);
+        await upsertSodraMonthly(rows, path.basename(filename));
         log(`Inserted ${rows.length} rows (total: ${eilute - skipped})`);
     } catch (err) {
         console.error("Insert failed:", err.message);
