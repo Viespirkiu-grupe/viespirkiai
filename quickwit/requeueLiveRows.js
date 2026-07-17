@@ -15,8 +15,6 @@ const TABLES = {
     queueId: "pirkimoId",
     source: "viesiejiPirkimai",
     sourceId: "pirkimoId",
-    queueValue: `e."eilutesId"::text`,
-    sourceValue: `e."eilutesId"::text`,
   },
 };
 
@@ -24,14 +22,17 @@ const HELP = `Perkelia pasirinktų Quickwit indeksų gyvas eilutes į indeksavim
 Apdorojus eilę pasirinkti indeksai turės 0 gyvų eilučių (100% mirusių).
 
 Naudojimas:
-  npm run quickwit:requeue-live -- [indeksas ...] [parinktys]
+  npm run quickwit:requeue-live -- [QUICKWIT_INDEKSO_PAVADINIMAS ...] [parinktys]
+
+Indeksą nurodykite stulpelio „quickwit_indeksas“ reikšme, pvz. dokumentai_32.
+Šaltinio lentelės įrašo ID ir vidinis quickwitIndeksai.id čia nenaudojami.
 
 Pasirinkimas:
   --top N             N indeksų, turinčių daugiausia mirusių eilučių
   --top-ratio N       N indeksų, turinčių didžiausią mirusių eilučių procentą
   --all               visi filtrus atitinkantys indeksai
   --list              tik parodyti indeksus
-  --lentele PAV       dokumentai, sutartys arba viesiejiPirkimai (numatyta dokumentai)
+  --lentele PAV       filtruoti pagal dokumentai, sutartys arba viesiejiPirkimai
   --min-dead N        tik turintys bent N mirusių eilučių
   --min-dead-ratio N  tik turintys bent N% mirusių eilučių
 
@@ -39,7 +40,9 @@ Vykdymas:
   --dry-run           parodyti rezultatą nekeičiant DB
   --help              parodyti šią pagalbą
 
-Be pasirinkimo argumentų terminale atidaromas interaktyvus pasirinkimas.
+Be pasirinkimo argumentų terminale atidaromas interaktyvus pasirinkimas. Jame
+įvedamos pirmojo stulpelio „pasirinkimo_nr“ reikšmės, o ne DB įrašų ID.
+Nenurodžius --lentele rodomi visų lentelių Quickwit indeksai.
 
 Pavyzdžiai:
   npm run quickwit:requeue-live -- dokumentai_12 dokumentai_18
@@ -61,7 +64,7 @@ function parsePositiveInteger(value, option) {
 
 export function parseArgs(argv) {
   const options = {
-    all: false, dryRun: false, help: false, indexes: [], lentele: "dokumentai",
+    all: false, dryRun: false, help: false, indexes: [], lentele: null,
     list: false, minDead: 0, minDeadRatio: 0, top: null, topRatio: null,
   };
 
@@ -80,8 +83,18 @@ export function parseArgs(argv) {
     else options.indexes.push(arg);
   }
 
-  if (!TABLES[options.lentele]) throw new Error(`--lentele turi būti viena iš: ${Object.keys(TABLES).join(", ")}`);
+  if (options.lentele !== null && !TABLES[options.lentele]) {
+    throw new Error(`--lentele turi būti viena iš: ${Object.keys(TABLES).join(", ")}`);
+  }
   if (options.minDeadRatio > 100) throw new Error("--min-dead-ratio negali būti daugiau nei 100");
+  const numericIndex = options.indexes.find((index) => /^\d+$/.test(index));
+  if (numericIndex) {
+    throw new Error(
+      `„${numericIndex}“ yra tik skaičius. Komandinėje eilutėje nurodykite Quickwit indekso ` +
+      `pavadinimą iš stulpelio „quickwit_indeksas“ (pvz. dokumentai_32); ` +
+      "sąrašo numeriai naudojami tik interaktyviame pasirinkime",
+    );
+  }
   const selectors = [options.all, options.indexes.length > 0, options.top !== null, options.topRatio !== null].filter(Boolean);
   if (selectors.length > 1) throw new Error("Naudokite tik vieną pasirinkimo būdą: indeksus, --top, --top-ratio arba --all");
   return options;
@@ -89,15 +102,15 @@ export function parseArgs(argv) {
 
 async function getIndexes({ lentele, minDead, minDeadRatio }) {
   const { rows } = await postgres.query(
-    `SELECT i.id, i."indeksas", i."seq", i."current",
+    `SELECT i.id, i."lentele", i."indeksas", i."seq", i."current",
             i."gyvosEilutes", i."mirusiosEilutes", i."iterptosEilutes",
             CASE WHEN i."iterptosEilutes" = 0 THEN 0
                  ELSE 100.0 * i."mirusiosEilutes" / i."iterptosEilutes" END AS "deadRatio"
      FROM "quickwitIndeksai" i
-     WHERE i."lentele" = $1 AND i."mirusiosEilutes" >= $2
+     WHERE ($1::text IS NULL OR i."lentele" = $1) AND i."mirusiosEilutes" >= $2
        AND CASE WHEN i."iterptosEilutes" = 0 THEN 0
                 ELSE 100.0 * i."mirusiosEilutes" / i."iterptosEilutes" END >= $3
-     ORDER BY i."seq"`,
+     ORDER BY i."lentele", i."seq"`,
     [lentele, minDead, minDeadRatio],
   );
   return rows.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) =>
@@ -109,16 +122,39 @@ function formatNumber(number) {
   return number.toLocaleString("lt-LT");
 }
 
+export function formatIndexesTable(indexes) {
+  const columns = [
+    { key: "selection", label: "pasirinkimo_nr", align: "right" },
+    { key: "table", label: "lentele", align: "left" },
+    { key: "index", label: "quickwit_indeksas", align: "left" },
+    { key: "live", label: "gyvos", align: "right" },
+    { key: "dead", label: "mirusios", align: "right" },
+    { key: "ratio", label: "mirusios_%", align: "right" },
+    { key: "current", label: "current", align: "left" },
+  ];
+  const rows = indexes.map((index, i) => ({
+    selection: String(i + 1),
+    table: index.lentele,
+    index: index.indeksas,
+    live: formatNumber(index.gyvosEilutes),
+    dead: formatNumber(index.mirusiosEilutes),
+    ratio: index.deadRatio.toFixed(2),
+    current: String(index.current),
+  }));
+  const widths = Object.fromEntries(columns.map(({ key, label }) => [
+    key,
+    Math.max(label.length, ...rows.map((row) => row[key].length)),
+  ]));
+  const formatRow = (row) => columns.map(({ key, align }) =>
+    align === "right" ? row[key].padStart(widths[key]) : row[key].padEnd(widths[key])).join("  ");
+  const header = Object.fromEntries(columns.map(({ key, label }) => [key, label]));
+  const separator = columns.map(({ key }) => "─".repeat(widths[key])).join("  ");
+  return [formatRow(header), separator, ...rows.map(formatRow)].join("\n");
+}
+
 function printIndexes(indexes) {
   if (!indexes.length) return console.log("Filtrus atitinkančių indeksų nėra.");
-  console.table(indexes.map((index, i) => ({
-    nr: i + 1,
-    indeksas: index.indeksas,
-    gyvos: formatNumber(index.gyvosEilutes),
-    mirusios: formatNumber(index.mirusiosEilutes),
-    "mirusios_%": index.deadRatio.toFixed(2),
-    current: index.current,
-  })));
+  console.log(formatIndexesTable(indexes));
 }
 
 export function parseInteractiveSelection(input, indexes) {
@@ -134,10 +170,12 @@ export function parseInteractiveSelection(input, indexes) {
   const numbers = new Set();
   for (const part of normalized.split(",")) {
     const range = part.trim().match(/^(\d+)(?:-(\d+))?$/);
-    if (!range) throw new Error(`Nesuprastas pasirinkimas: ${part.trim()}`);
+    if (!range) throw new Error(`Nesuprasta „pasirinkimo_nr“ reikšmė: ${part.trim()}`);
     const from = Number(range[1]);
     const to = Number(range[2] ?? range[1]);
-    if (from > to || from < 1 || to > indexes.length) throw new Error(`Pasirinkimas nepatenka į 1-${indexes.length}: ${part.trim()}`);
+    if (from > to || from < 1 || to > indexes.length) {
+      throw new Error(`„pasirinkimo_nr“ turi patekti į 1-${indexes.length}: ${part.trim()}`);
+    }
     for (let number = from; number <= to; number++) numbers.add(number);
   }
   return [...numbers].map((number) => indexes[number - 1]);
@@ -147,7 +185,12 @@ function selectIndexes(indexes, options) {
   if (options.indexes.length) {
     const byName = new Map(indexes.map((index) => [index.indeksas, index]));
     const missing = options.indexes.filter((name) => !byName.has(name));
-    if (missing.length) throw new Error(`Indeksai nerasti arba neatitinka filtrų: ${missing.join(", ")}`);
+    if (missing.length) {
+      throw new Error(
+        `Quickwit indeksai nerasti arba neatitinka filtrų: ${missing.join(", ")}. ` +
+        "Naudokite „quickwit_indeksas“ stulpelio reikšmes iš --list",
+      );
+    }
     return options.indexes.map((name) => byName.get(name));
   }
   if (options.top !== null) return [...indexes].filter((x) => x.gyvosEilutes > 0)
@@ -163,22 +206,23 @@ async function chooseInteractively(indexes) {
   if (!indexes.length) return [];
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
-    const answer = await rl.question("Pasirinkite numerius / intervalus (pvz. 1,3-5), „top N“, „ratio N“ arba „all“: ");
+    const answer = await rl.question(
+      "Įveskite „pasirinkimo_nr“ reikšmes / intervalus (pvz. 1,3-5), „top N“, „ratio N“ arba „all“: ",
+    );
     return parseInteractiveSelection(answer, indexes);
   } finally {
     rl.close();
   }
 }
 
-async function requeueIndexes(indexes, { dryRun, lentele }) {
+export async function requeueIndexes(indexes, { dryRun, lentele }, db = postgres) {
   const table = TABLES[lentele];
   const names = indexes.map((index) => index.indeksas);
   const indexIds = indexes.map((index) => index.id);
-  const client = await postgres.connect();
+  const client = await db.connect();
   try {
     await client.query("BEGIN");
     await client.query(`SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, [lentele]);
-    await client.query(`LOCK TABLE "${table.queue}" IN SHARE ROW EXCLUSIVE MODE`);
     const { rows: countRows } = await client.query(
       `SELECT COUNT(*)::int AS total
        FROM "quickwitEilutes"
@@ -230,6 +274,20 @@ async function requeueIndexes(indexes, { dryRun, lentele }) {
   }
 }
 
+export async function requeueSelectedIndexes(indexes, options, db = postgres) {
+  const byTable = Map.groupBy(indexes, (index) => index.lentele);
+  const results = [];
+  for (const [lentele, tableIndexes] of byTable) {
+    results.push(await requeueIndexes(tableIndexes, { ...options, lentele }, db));
+  }
+  return results.reduce((total, result) => ({
+    queuedPatches: total.queuedPatches + result.queuedPatches,
+    queuedDeletes: total.queuedDeletes + result.queuedDeletes,
+    replacedQueueRows: total.replacedQueueRows + result.replacedQueueRows,
+    total: total.total + result.total,
+  }), { queuedPatches: 0, queuedDeletes: 0, replacedQueueRows: 0, total: 0 });
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) return console.log(HELP);
@@ -243,7 +301,7 @@ async function main() {
   if (!selected.length) return console.log("Nėra indeksų su gyvomis eilutėmis.");
   console.log(options.dryRun ? "Pasirinkta [dry-run]:" : "Pasirinkta:");
   printIndexes(selected);
-  const result = await requeueIndexes(selected, options);
+  const result = await requeueSelectedIndexes(selected, options);
   if (options.dryRun) return console.log(`[dry-run] Į eilę būtų įdėta ${formatNumber(result.total)} gyvų eilučių.`);
   console.log(`Į eilę įdėta ${formatNumber(result.queuedPatches)} patch ir ${formatNumber(result.queuedDeletes)} delete eilučių; pakeista senų eilės eilučių: ${formatNumber(result.replacedQueueRows)}.`);
   console.log("Apdorojus eilę pasirinkti indeksai turės 0 gyvų eilučių ir galės būti ištrinti.");
