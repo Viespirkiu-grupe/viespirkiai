@@ -60,11 +60,11 @@ export function isVptWorkingHours() {
 
     let openMinutes, closeMinutes;
     if (day >= 1 && day <= 4) {
-        openMinutes = 8 * 60;
-        closeMinutes = 17 * 60;
+        openMinutes = 7 * 60;
+        closeMinutes = 19 * 60;
     } else {
-        openMinutes = 8 * 60;
-        closeMinutes = 15 * 60 + 45;
+        openMinutes = 7 * 60;
+        closeMinutes = 19 * 60;
     }
 
     const nowMinutes = hours * 60 + minutes;
