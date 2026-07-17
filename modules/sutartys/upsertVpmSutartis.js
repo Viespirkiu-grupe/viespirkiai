@@ -313,6 +313,209 @@ inserted_files AS (
         LIMIT 1
     ) previous ON true
     RETURNING id
+),
+search_upsert AS (
+    INSERT INTO public."vpmSutartysSearch" ("unikalusId", "searchTsv")
+    SELECT
+        (i.doc->>'unikalusId')::bigint,
+        to_tsvector('simple', $3)
+    FROM incoming i
+    JOIN main_upsert changed
+      ON changed."unikalusId" = (i.doc->>'unikalusId')::bigint
+    ON CONFLICT ("unikalusId") DO UPDATE SET
+        "searchTsv" = EXCLUDED."searchTsv"
+    RETURNING "unikalusId"
+),
+agg_events AS MATERIALIZED (
+    SELECT
+        -1 AS sign,
+        NULLIF(o.doc->>'perkanciosiosOrganizacijosKodas', '') AS pirkejas,
+        NULLIF(o.doc->>'pirmoTiekejoKodas', '') AS pirmas_tiekejas,
+        o.doc->'papildomiTiekejai' AS papildomi_tiekejai,
+        COALESCE(
+            (o.doc->>'faktineVerte')::numeric,
+            (o.doc->>'numatomaVerte')::numeric
+        ) AS verte,
+        o.doc->>'sudarymoData' AS sudaryta
+    FROM old_document o
+    JOIN main_upsert changed
+      ON changed."unikalusId" = (o.doc->>'unikalusId')::bigint
+    WHERE (o.doc->>'istrinta')::boolean = false
+      AND (o.doc->>'pakeitimas')::boolean = false
+
+    UNION ALL
+
+    SELECT
+        1,
+        NULLIF(i.doc->>'perkanciosiosOrganizacijosKodas', ''),
+        NULLIF(i.doc->>'pirmoTiekejoKodas', ''),
+        i.doc->'papildomiTiekejai',
+        COALESCE(
+            (i.doc->>'faktineVerte')::numeric,
+            (i.doc->>'numatomaVerte')::numeric
+        ),
+        i.doc->>'sudarymoData'
+    FROM incoming i
+    JOIN main_upsert changed
+      ON changed."unikalusId" = (i.doc->>'unikalusId')::bigint
+    WHERE (i.doc->>'istrinta')::boolean = false
+      AND (i.doc->>'pakeitimas')::boolean = false
+),
+agg_tiekejai AS MATERIALIZED (
+    SELECT
+        e.sign,
+        e.pirkejas,
+        e.verte,
+        e.sudaryta,
+        e.pirmas_tiekejas AS tiekejas
+    FROM agg_events e
+    WHERE e.pirmas_tiekejas IS NOT NULL
+
+    UNION ALL
+
+    SELECT
+        e.sign,
+        e.pirkejas,
+        e.verte,
+        e.sudaryta,
+        NULLIF(supplier->>'kodas', '')
+    FROM agg_events e
+    CROSS JOIN LATERAL jsonb_array_elements(
+        COALESCE(e.papildomi_tiekejai, '[]'::jsonb)
+    ) supplier
+    WHERE NULLIF(supplier->>'kodas', '') IS NOT NULL
+),
+agg_sumos_delta AS MATERIALIZED (
+    SELECT
+        contribution.salies_kodas,
+        SUM(contribution.pirkimai)::integer AS pirkimai,
+        SUM(contribution.pirkimu_suma) AS pirkimu_suma,
+        SUM(contribution.pardavimai)::integer AS pardavimai,
+        SUM(contribution.pardavimu_suma) AS pardavimu_suma
+    FROM (
+        SELECT
+            e.pirkejas AS salies_kodas,
+            e.sign AS pirkimai,
+            e.sign * COALESCE(e.verte, 0) AS pirkimu_suma,
+            0 AS pardavimai,
+            0::numeric AS pardavimu_suma
+        FROM agg_events e
+        WHERE e.pirkejas IS NOT NULL
+
+        UNION ALL
+
+        SELECT
+            e.tiekejas,
+            0,
+            0::numeric,
+            e.sign,
+            e.sign * COALESCE(e.verte, 0)
+        FROM agg_tiekejai e
+    ) contribution
+    GROUP BY contribution.salies_kodas
+    HAVING SUM(contribution.pirkimai) <> 0
+        OR SUM(contribution.pirkimu_suma) <> 0
+        OR SUM(contribution.pardavimai) <> 0
+        OR SUM(contribution.pardavimu_suma) <> 0
+),
+d_sumos AS (
+    INSERT INTO public."vpmSutartysSumos" AS current (
+        "saliesKodas", pirkimai, "pirkimuSuma", pardavimai, "pardavimuSuma"
+    )
+    SELECT
+        salies_kodas,
+        pirkimai,
+        pirkimu_suma,
+        pardavimai,
+        pardavimu_suma
+    FROM agg_sumos_delta
+    ON CONFLICT ("saliesKodas") DO UPDATE SET
+        pirkimai = current.pirkimai + EXCLUDED.pirkimai,
+        "pirkimuSuma" = current."pirkimuSuma" + EXCLUDED."pirkimuSuma",
+        pardavimai = current.pardavimai + EXCLUDED.pardavimai,
+        "pardavimuSuma" = current."pardavimuSuma" + EXCLUDED."pardavimuSuma"
+    RETURNING "saliesKodas"
+),
+agg_metai_delta AS MATERIALIZED (
+    SELECT
+        contribution.salies_kodas,
+        contribution.metai,
+        SUM(contribution.pirkimai)::integer AS pirkimai,
+        SUM(contribution.pirkimu_suma) AS pirkimu_suma,
+        SUM(contribution.pardavimai)::integer AS pardavimai,
+        SUM(contribution.pardavimu_suma) AS pardavimu_suma
+    FROM (
+        SELECT
+            e.pirkejas AS salies_kodas,
+            EXTRACT(YEAR FROM e.sudaryta::date)::integer AS metai,
+            e.sign AS pirkimai,
+            e.sign * COALESCE(e.verte, 0) AS pirkimu_suma,
+            0 AS pardavimai,
+            0::numeric AS pardavimu_suma
+        FROM agg_events e
+        WHERE e.pirkejas IS NOT NULL
+          AND e.sudaryta IS NOT NULL
+
+        UNION ALL
+
+        SELECT
+            e.tiekejas,
+            EXTRACT(YEAR FROM e.sudaryta::date)::integer,
+            0,
+            0::numeric,
+            e.sign,
+            e.sign * COALESCE(e.verte, 0)
+        FROM agg_tiekejai e
+        WHERE e.sudaryta IS NOT NULL
+    ) contribution
+    GROUP BY contribution.salies_kodas, contribution.metai
+    HAVING SUM(contribution.pirkimai) <> 0
+        OR SUM(contribution.pirkimu_suma) <> 0
+        OR SUM(contribution.pardavimai) <> 0
+        OR SUM(contribution.pardavimu_suma) <> 0
+),
+d_metai AS (
+    INSERT INTO public."vpmSutartysSumosMetai" AS current (
+        "saliesKodas", metai,
+        pirkimai, "pirkimuSuma", pardavimai, "pardavimuSuma"
+    )
+    SELECT
+        salies_kodas,
+        metai,
+        pirkimai,
+        pirkimu_suma,
+        pardavimai,
+        pardavimu_suma
+    FROM agg_metai_delta
+    ON CONFLICT ("saliesKodas", metai) DO UPDATE SET
+        pirkimai = current.pirkimai + EXCLUDED.pirkimai,
+        "pirkimuSuma" = current."pirkimuSuma" + EXCLUDED."pirkimuSuma",
+        pardavimai = current.pardavimai + EXCLUDED.pardavimai,
+        "pardavimuSuma" = current."pardavimuSuma" + EXCLUDED."pardavimuSuma"
+    RETURNING "saliesKodas", metai
+),
+agg_pt_delta AS MATERIALIZED (
+    SELECT
+        e.pirkejas,
+        e.tiekejas,
+        SUM(e.sign)::integer AS pirkimai,
+        SUM(e.sign * COALESCE(e.verte, 0)) AS suma
+    FROM agg_tiekejai e
+    WHERE e.pirkejas IS NOT NULL
+    GROUP BY e.pirkejas, e.tiekejas
+    HAVING SUM(e.sign) <> 0
+        OR SUM(e.sign * COALESCE(e.verte, 0)) <> 0
+),
+d_pt AS (
+    INSERT INTO public."vpmSutartysSumosPirkejasTiekejas" AS current (
+        "pirkejoKodas", "tiekejoKodas", pirkimai, suma
+    )
+    SELECT pirkejas, tiekejas, pirkimai, suma
+    FROM agg_pt_delta
+    ON CONFLICT ("pirkejoKodas", "tiekejoKodas") DO UPDATE SET
+        pirkimai = current.pirkimai + EXCLUDED.pirkimai,
+        suma = current.suma + EXCLUDED.suma
+    RETURNING "pirkejoKodas", "tiekejoKodas"
 )
 SELECT
     EXISTS(SELECT 1 FROM existing) AS existed,
@@ -321,12 +524,48 @@ SELECT
     EXISTS(SELECT 1 FROM tracking) AS tracked;
 `;
 
+/** Build the full-text-search input from the canonical contract JSON. */
+export function buildVpmSutartisSearchText(canonicalJson) {
+    const contract = typeof canonicalJson === "string"
+        ? JSON.parse(canonicalJson)
+        : canonicalJson;
+    const values = [
+        contract.unikalusId,
+        contract.pavadinimas,
+        contract.bvpzKodas,
+        contract.kategorija,
+        contract.perkanciosiosOrganizacijosPavadinimas,
+        contract.perkanciosiosOrganizacijosKodas,
+        contract.sutartiesNumeris,
+        contract.pirmoTiekejoPavadinimas,
+        contract.pirmoTiekejoKodas,
+        contract.tipas,
+        contract.pirkimoNumeris,
+        ...(contract.papildomiTiekejai ?? []).flatMap((supplier) => [
+            supplier.pavadinimas,
+            supplier.kodas,
+        ]),
+        ...(contract.papildomiBvpzKodai ?? []),
+    ];
+
+    return values
+        .filter((value) => value !== null && value !== undefined)
+        .map((value) => String(value).trim())
+        .filter((value) => value !== "")
+        .join(" ");
+}
+
 /**
  * Upsert one normalized VPM contract. The statement is atomic: an old version
  * is archived before a changed hash replaces the normalized rows.
  */
 export async function upsertVpmSutartis(prepared, db = postgres) {
-    const result = await db.query(UPSERT_SQL, [prepared.json, prepared.md5]);
+    const searchText = buildVpmSutartisSearchText(prepared.json);
+    const result = await db.query(UPSERT_SQL, [
+        prepared.json,
+        prepared.md5,
+        searchText,
+    ]);
     return result.rows[0];
 }
 

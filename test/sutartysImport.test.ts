@@ -79,22 +79,53 @@ describe("sutartys import validation", () => {
         ).toBe(true);
     });
 
-    it("rejects malformed numeric values before writing anything", async () => {
+    it("records and skips a malformed contract without stopping the batch", async () => {
         const { cvpIsImportArray } = await import(
             "../modules/sutartys/import.js"
         );
 
-        await expect(
-            cvpIsImportArray([
-                {
-                    sutartiesUnikalusID: "1675305860",
-                    verte: "&euro;29.00",
-                    faktineIvykdimoVerte: "",
-                },
-            ]),
-        ).rejects.toThrow(
-            'Invalid verte for contract 1675305860: "&euro;29.00"',
+        await cvpIsImportArray([
+            {
+                sutartiesUnikalusID: "1",
+                verte: "10",
+                faktineIvykdimoVerte: "9",
+                faktineIvykdimoData: "",
+                galiojimoData: "",
+                sudarymoData: "",
+                dokumentai: [],
+            },
+            {
+                sutartiesUnikalusID: "2005493961",
+                verte: "313.00",
+                faktineIvykdimoVerte: "3.13.00",
+            },
+        ]);
+
+        const brokasCall = query.mock.calls.find(([sql]) =>
+            String(sql).includes('INSERT INTO public."vpmSutartysBrokas"'),
         );
+        expect(brokasCall?.[1]).toEqual([2005493961]);
+
+        const sutartysCall = query.mock.calls.find(([sql]) =>
+            String(sql).includes('INSERT INTO "sutartys"'),
+        );
+        expect(sutartysCall?.[1]?.[0]).toBe(1);
+        expect(sutartysCall?.[1]).not.toContain(2005493961);
+    });
+
+    it("does not write an unidentifiable malformed row to the reject table", async () => {
+        const { cvpIsImportArray } = await import(
+            "../modules/sutartys/import.js"
+        );
+
+        await cvpIsImportArray([
+            {
+                sutartiesUnikalusID: "not-an-id",
+                verte: "&euro;29.00",
+                faktineIvykdimoVerte: "",
+            },
+        ]);
+
         expect(query).not.toHaveBeenCalled();
     });
 });

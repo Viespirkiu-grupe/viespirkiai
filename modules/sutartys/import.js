@@ -73,45 +73,50 @@ export async function cvpIsImportArray(data, options = {}) {
 
     // Aptvarkome duomenų tipus
     let items = [];
+    const brokuotiIds = new Set();
     for (let i = 0; i < data.length; i++) {
         let item = data[i];
+        const rawId = item.sutartiesUnikalusID;
 
-        // Skaičiai
-        item.verte = parseNullableNumber(
-            item.verte,
-            "verte",
-            item.sutartiesUnikalusID,
-        );
-        item.faktineIvykdimoVerte = parseNullableNumber(
-            item.faktineIvykdimoVerte,
-            "faktineIvykdimoVerte",
-            item.sutartiesUnikalusID,
-        );
-
-        // Datos
-        const dateOnlyFields = [
-            "sudarymoData",
-            "galiojimoData",
-            "faktineIvykdimoData",
-        ];
-        for (const field of dateOnlyFields) {
-            item[field] = parseDateOnly(
-                item[field],
-                field,
-                item.sutartiesUnikalusID,
+        try {
+            // Skaičiai
+            item.verte = parseNullableNumber(
+                item.verte,
+                "verte",
+                rawId,
             );
-        }
+            item.faktineIvykdimoVerte = parseNullableNumber(
+                item.faktineIvykdimoVerte,
+                "faktineIvykdimoVerte",
+                rawId,
+            );
 
-        const timestampFields = [
-            "paskelbimoData",
-            "paskutinioAtnaujinimoData",
-            "paskutinioRedagavimoData",
-        ];
-        for (const field of timestampFields) {
-            if (item[field]) {
-                const d = new Date(item[field]);
-                item[field] = isNaN(d) ? null : d; // Replace invalid dates with null
+            // Datos
+            const dateOnlyFields = [
+                "sudarymoData",
+                "galiojimoData",
+                "faktineIvykdimoData",
+            ];
+            for (const field of dateOnlyFields) {
+                item[field] = parseDateOnly(item[field], field, rawId);
             }
+
+            const timestampFields = [
+                "paskelbimoData",
+                "paskutinioAtnaujinimoData",
+                "paskutinioRedagavimoData",
+            ];
+            for (const field of timestampFields) {
+                if (item[field]) {
+                    const d = new Date(item[field]);
+                    item[field] = isNaN(d) ? null : d;
+                }
+            }
+        } catch (error) {
+            const id = Number(rawId);
+            if (Number.isSafeInteger(id) && id > 0) brokuotiIds.add(id);
+            console.warn(error);
+            continue;
         }
 
         // ID
@@ -132,6 +137,19 @@ export async function cvpIsImportArray(data, options = {}) {
     }
     items = Array.from(uniqueItemsMap.values());
     timings.end("importDataCleanup");
+
+    if (brokuotiIds.size > 0) {
+        timings.start("importPostgresBrokasUpsert");
+        const ids = Array.from(brokuotiIds);
+        await postgres.query(
+            `INSERT INTO public."vpmSutartysBrokas" ("unikalusId")
+             VALUES ${ids.map((_, i) => `($${i + 1})`).join(",")}
+             ON CONFLICT ("unikalusId") DO UPDATE SET
+               "timestamp" = timezone('Europe/Vilnius', now());`,
+            ids,
+        );
+        timings.end("importPostgresBrokasUpsert");
+    }
 
     if (items.length > 0) {
         // Į lentelę sutartys

@@ -22,6 +22,7 @@
         "teisekura:eseimas-content": "node modules/eseimas/scrapeContent.js",
         "teisekura:audit": "node modules/teisekura/audit.js",
         "export:sutartys": "node scripts/exportSutartys.js",
+        "sutartys:changes": "node scripts/showRecentSutartysChanges.js",
         "push:sutartys": "node scripts/pushSutartysToSpinta.js",
         "process:sutartys-adp-queue": "node modules/sutartys/processAdpQueue.js",
         "push:domenai": "node scripts/pushDomenaiToSpinta.js",
