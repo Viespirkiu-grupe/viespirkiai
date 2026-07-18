@@ -25,6 +25,14 @@ old
 backup
 dbSchema
 
+# Build'ui nereikalingi katalogai (public/ NEtrinamas – linkPublic.mjs jį skaito)
+benchmarks
+docs
+grafana
+test
+runner
+schemas
+
 # Logai / eksportai
 *.log
 starts.txt
