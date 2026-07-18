@@ -112,7 +112,7 @@ Kiekviena reikšmė gali būti **absoliutus kelias** (lokalus katalogas, pvz.
 
 | Kintamasis | Paaiškinimas |
 | --- | --- |
-| `INTERNAL_FILE_BASE` | Vidinio failų CDN bazinis URL — preview nuorodoms sudaryti. |
+| `INTERNAL_FILE_BASE` | Vidinio failų CDN bazinis URL — preview nuorodoms sudaryti. Numatyta: `https://failai.viespirkiai.org`. |
 | `OCR_REZULTATAI_LOCATION` | OCR rezultatų blob saugykla. |
 | `DOKUMENTAI_LOCATION` | Dokumentų JSON sidecar failai (raktas: `md5`). |
 | `FAILAI_LOCATION` | Sujungti failo turinio JSON failai (tekstas + metaduomenys + subjektai). |

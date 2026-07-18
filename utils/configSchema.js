@@ -45,7 +45,7 @@ const configSchema = z.object({
     dataGovUrl: z.string().default("https://get.data.gov.lt"),
     viesiejiPirkimaiUrl: z.string().default("https://viesiejipirkimai.lt"),
 
-    internalFileBase: z.string().default(""),
+    internalFileBase: z.string().default("https://failai.viespirkiai.org"),
     ocrBandymai: z.number().int().positive().default(5),
 
     ocrRezultataiLocation: z.string().optional(),

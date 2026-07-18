@@ -2,13 +2,10 @@ import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
-const configPath = path.join(process.cwd(), 'config.js');
-
-// Įkeliam `.env` (jei yra), kad PORT ir kiti kintamieji būtų prieinami net be
-// primontuoto config.js. Runtime image'e utils/ nėra, tad naudojam įmontuotą
-// process.loadEnvFile ir esamų kintamųjų NEperrašom.
+// Konfigūracija imama TIK iš aplinkos kintamųjų (`.env` arba tikros aplinkos).
+// Runtime image'e utils/ nėra, tad naudojam įmontuotą process.loadEnvFile ir
+// esamų kintamųjų NEperrašom.
 const envPath = path.join(process.cwd(), '.env');
 if (await fs.promises.access(envPath).then(() => true).catch(() => false)) {
   const snapshot = { ...process.env };
@@ -18,24 +15,6 @@ if (await fs.promises.access(envPath).then(() => true).catch(() => false)) {
     for (const key of preexisting) process.env[key] = snapshot[key];
   } catch (error) {
     console.error('Error loading .env file:', error);
-  }
-}
-
-if (!process.env.PORT) {
-  const hasConfig = await fs.promises.access(configPath).then(() => true).catch(() => false);
-
-  if (hasConfig) {
-    try {
-      const imported = await import(pathToFileURL(configPath).href);
-      const config = imported.default || imported;
-      const port = Number(config?.port);
-
-      if (Number.isFinite(port) && port > 0) {
-        process.env.PORT = String(port);
-      }
-    } catch (error) {
-      console.error('Error loading runtime config for server start:', error);
-    }
   }
 }
 
