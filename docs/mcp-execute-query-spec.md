@@ -37,8 +37,8 @@ graph LR
     AP --> PG
 ```
 
-The analyst pool connects **directly to PostgreSQL** (not PgBouncer) because `CREATE TEMP VIEW` is session-scoped.
-PgBouncer transaction-pooling mode may route the next query to a different backend, making views invisible. The
+The read-only analyst role cannot create the `v_*` helper views itself, so they are created as **persistent
+views** by the admin pool (see `ensureViews.ts`); the analyst pool only runs read-only SELECTs against them. The
 main pool is used only for `get_schema` schema introspection (no views needed there).
 
 Key files:
@@ -500,7 +500,7 @@ pgAnalystUser: "...",            // existing read-only role
 "...",
     pgAnalystPort
 :
-9118,             // direct PG port, NOT PgBouncer
+9118,             // PG port
     pgAnalystMaxConnections
 :
 5,      // role is capped at 5 connections

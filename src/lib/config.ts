@@ -11,8 +11,9 @@
  * The shared contract lives next to the runtime loader in `utils/config.d.ts`.
  */
 import rawConfig from '@/utils/config.js';
-import type { Config, InfoBannerObject } from '@/utils/config.js';
+import type { Config } from '@/utils/config.js';
 
+/** Informacinio banerio forma (šaltinis – DB lentelė `infoBaneris`, žr. infoBanner.ts). */
 export interface InfoBanner {
   type: 'text' | 'html';
   content: string;
@@ -20,32 +21,5 @@ export interface InfoBanner {
 }
 
 const config: Config = rawConfig;
-
-export function normalizeInfoBanner(rawInfoBanner?: string | InfoBannerObject): InfoBanner | null {
-  if (typeof rawInfoBanner === 'string' && rawInfoBanner.trim()) {
-    return {
-      type: 'text',
-      content: rawInfoBanner.trim(),
-      important: false,
-    };
-  }
-
-  if (!rawInfoBanner || typeof rawInfoBanner !== 'object') {
-    return null;
-  }
-
-  const type = rawInfoBanner.type === 'html' ? 'html' : 'text';
-  const content = typeof rawInfoBanner.content === 'string' ? rawInfoBanner.content.trim() : '';
-
-  if (!content) {
-    return null;
-  }
-
-  return {
-    type,
-    content,
-    important: rawInfoBanner.important === true,
-  };
-}
 
 export default config;

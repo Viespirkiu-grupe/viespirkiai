@@ -1,6 +1,7 @@
 ---
 import SiteHeaderShell from '@design-system/components/SiteHeaderShell.astro';
-import config, { normalizeInfoBanner } from '../lib/config.ts';
+import config from '../lib/config.ts';
+import { getInfoBanner } from '../lib/infoBanner.ts';
 import logoSvg from '../assets/branding/viespirkiaiLogo.svg?raw';
 
 interface Props {
@@ -34,7 +35,8 @@ const secondaryLinks: NavLink[] = [
   { href: '/vieslaiskiai', label: 'Viešlaiškiai' },
 ];
 
-const infoBanner = normalizeInfoBanner(config.infoBanner);
+// Baneris valdomas per DB lentelę `infoBaneris` (enabled + aplinka), atnaujinamas per pg_notify.
+const infoBanner = await getInfoBanner();
 ---
 
 <SiteHeaderShell

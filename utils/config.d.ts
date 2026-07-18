@@ -1,11 +1,3 @@
-export interface InfoBannerObject {
-    type?: "text" | "html";
-    content: string;
-    important?: boolean;
-}
-
-export type InfoBannerConfig = string | InfoBannerObject;
-
 export interface TypesenseNodeConfig {
     host: string;
     port: number;
@@ -23,7 +15,6 @@ export interface Config {
     customHead: string;
     analitikaUrl: string;
     onionAddress?: string;
-    infoBanner?: InfoBannerConfig;
 
     port: number;
     proxyIp: string;

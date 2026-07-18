@@ -19,18 +19,9 @@ export default {
     // jei nenaudojame Tor.
     onionAddress: undefined,
 
-    // Informacinis baneris viršuje. Variantai:
-    //   1) String — automatinis judantis tekstas (marquee):
-    //        infoBanner: "Dalis funkcijų gali laikinai neveikti dėl atnaujinimo."
-    //   2) Objektas su lauku `type` ("text" arba "html"), `content` ir
-    //      `important` (jei true — light mode juodas fonas, dark mode baltas):
-    //        infoBanner: {
-    //            type: "html",
-    //            content: "<strong>Svarbu:</strong> dalis funkcijų neveikia.",
-    //            important: true,
-    //        }
-    // undefined — baneris nerodomas.
-    infoBanner: undefined,
+    // Informacinis baneris viršuje valdomas per DB lentelę public."infoBaneris"
+    // (laukai: content, type, important, enabled, aplinka [NULL=visur | 'dev' | 'prod']).
+    // Lentelė sukuriama automatiškai; keitimai pasklinda per pg_notify trigger'į.
 
     // ─────────────────────────────────────────────────────────────────────
     // HTTP serveris
@@ -123,8 +114,8 @@ export default {
     ocrBandymai: 5,
 
     // OCR rezultatų live atnaujinimai puslapyje:
-    //   mode: "poll"   — periodiškas tikrinimas; veikia su PgBouncer.
-    //   mode: "notify" — PostgreSQL LISTEN/NOTIFY; reikalingas tiesioginis PG.
+    //   mode: "poll"   — periodiškas tikrinimas.
+    //   mode: "notify" — PostgreSQL LISTEN/NOTIFY.
     ocrLatestResultsLiveUpdates: {
         mode: "poll",
         intervalMs: 250, // naudojama tik mode === "poll" atveju
@@ -176,8 +167,7 @@ export default {
     // ─────────────────────────────────────────────────────────────────────
     // MCP execute_query įrankis
     // Read-only SQL prieigai per MCP. Naudoja atskirą "analyst" rolę su
-    // savo pool'u — jungiamasi tiesiai į PG (ne per PgBouncer), kad veiktų
-    // statement_timeout.
+    // savo pool'u.
     // ─────────────────────────────────────────────────────────────────────
 
     // Rodyti `get_schema` ir `execute_query` MCP įrankius.
@@ -191,7 +181,7 @@ export default {
     enableExecuteQueryMcpTrace: false,
 
     // Read-only PG rolė SQL užklausoms. Atskira nuo pgUser, kad teisės būtų
-    // ribotos. pgAnalystPort turi rodyti tiesiai į PG (ne PgBouncer).
+    // ribotos.
     pgAnalystUser: "analyst",
     pgAnalystPassword: "CHANGE_ME",
     pgAnalystPort: 9118,

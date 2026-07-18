@@ -1,6 +1,6 @@
 /**
  * Integration tests for the MCP execute_query handler.
- * Requires a real PostgreSQL database (direct connection, not PgBouncer).
+ * Requires a real PostgreSQL database.
  *
  * Run: npm run test:integration
  */

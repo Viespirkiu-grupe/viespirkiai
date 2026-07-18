@@ -41,8 +41,7 @@ const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "")
     .split(",")
     .filter(Boolean);
 
-// Sąmoningai mažas work_mem, kad rūšiavimai/hash'ai lietųsi į diską;
-// statement_cache_size=0 jau nustatytas pool'e (pgbouncer).
+// Sąmoningai mažas work_mem, kad rūšiavimai/hash'ai lietųsi į diską.
 const SESSION_SETUP = [
     "SET jit = on",
     "SET work_mem = '16MB'",

@@ -6,20 +6,15 @@ import { log } from "../../../utils/log.js";
 const { Pool } = pkg;
 // NOTE: type parsers (DATE→string, NUMERIC→float) are already set globally by postgres/postgres.js
 
-type PgBouncerPoolConfig = PoolConfig & {
-    statement_cache_size?: number;
-};
-
-const analystPoolConfig: PgBouncerPoolConfig = {
+const analystPoolConfig: PoolConfig = {
     host: config.pgHost,
-    port: config.pgAnalystPort,  // CRITICAL: direct PostgreSQL port, NOT PgBouncer
+    port: config.pgAnalystPort,
     user: config.pgAnalystUser,
     password: config.pgAnalystPassword,
     database: config.pgDatabase,
     max: config.pgAnalystMaxConnections,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10_000,
-    statement_cache_size: 0,
 };
 
 export const analystPool = new Pool(analystPoolConfig);

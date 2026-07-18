@@ -1,6 +1,5 @@
 import type { APIRoute } from 'astro';
-import type { PoolClient } from 'pg';
-import { postgres } from '../../../../postgres/postgres.js';
+import { subscribe } from '../../../../postgres/pgNotifyHub.js';
 import { loadLatestOcrResults } from '../../../lib/ocrLatestResults.ts';
 import { ocrLiveUpdates } from '../../../lib/ocrLiveUpdates.ts';
 
@@ -20,7 +19,7 @@ export const GET: APIRoute = async ({ request }) => {
       let closed = false;
       let heartbeat: ReturnType<typeof setInterval> | undefined;
       let interval: ReturnType<typeof setInterval> | undefined;
-      let client: PoolClient | undefined;
+      let unsubscribe: (() => void) | undefined;
       let lastPayload = '';
 
       const sendItems = async () => {
@@ -32,32 +31,27 @@ export const GET: APIRoute = async ({ request }) => {
           lastPayload = nextPayload;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ items })}\n\n`));
         } catch {
-          await stop();
+          stop();
         }
       };
 
-      const onNotification = () => { void sendItems(); };
-
-      const stop = async () => {
+      const stop = () => {
         if (closed) return;
         closed = true;
         if (heartbeat) clearInterval(heartbeat);
         if (interval) clearInterval(interval);
-        if (client) {
-          client.removeListener('notification', onNotification);
-          try {
-            await client.query(`UNLISTEN ${OCR_RESULTS_CHANNEL}`);
-          } catch {}
-          client.release();
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = undefined;
         }
       };
 
-      request.signal.addEventListener('abort', () => { void stop(); }, { once: true });
+      request.signal.addEventListener('abort', () => { stop(); }, { once: true });
 
       try {
         controller.enqueue(encoder.encode('retry: 1000\n\n'));
       } catch {
-        await stop();
+        stop();
         return;
       }
 
@@ -66,7 +60,7 @@ export const GET: APIRoute = async ({ request }) => {
         try {
           controller.enqueue(encoder.encode(': ping\n\n'));
         } catch {
-          void stop();
+          stop();
         }
       }, 15000);
 
@@ -79,12 +73,10 @@ export const GET: APIRoute = async ({ request }) => {
       }
 
       try {
-        client = await postgres.connect();
-        await client.query(`LISTEN ${OCR_RESULTS_CHANNEL}`);
-        client.on('notification', onNotification);
+        unsubscribe = subscribe(OCR_RESULTS_CHANNEL, () => { void sendItems(); });
         await sendItems();
       } catch {
-        await stop();
+        stop();
       }
     },
   });
