@@ -3,7 +3,11 @@ import node from '@astrojs/node';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import config from './config.js';
+
+// Dev/preview serverio prievadas. Standalone runtime prievadą nustato
+// start-server.mjs iš config.js (runtime metu), tad config.js čia NEimportuojamas –
+// kad build'as neturėtų priklausomybės nuo config.js (jo nėra CI checkout'e).
+const devPort = Number(process.env.PORT ?? process.env.ASTRO_PORT ?? 9019);
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 
@@ -35,7 +39,7 @@ export default defineConfig({
   prefetch: false,
   security: { checkOrigin: false },
   server: {
-    port: config.port,
+    port: devPort,
     host: '0.0.0.0',
   },
   vite: {

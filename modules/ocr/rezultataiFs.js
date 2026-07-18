@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import config from "../../config.js";
+import config from "../../utils/config.js";
 import { parsePgArray } from "../../postgres/postgres.js";
 
 function isRemoteLocation(location) {

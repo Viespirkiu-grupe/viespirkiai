@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { createHash } from "crypto";
-import config from "../../config.js";
+import config from "../../utils/config.js";
 
 function isRemoteLocation(location) {
     return location?.startsWith("http://") || location?.startsWith("https://");
