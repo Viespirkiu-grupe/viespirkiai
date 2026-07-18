@@ -37,3 +37,16 @@ const host = process.env.HOST || '0.0.0.0';
 server.listen(port, host, () => {
   console.log(`Server listening on http://${host}:${port}`);
 });
+
+// Graceful shutdown – kitaip Node kaip PID 1 ignoruoja SIGTERM ir Docker laukia
+// visą stop grace period (10 s) prieš SIGKILL.
+const shutdown = (signal) => {
+  console.log(`${signal} gautas – uždaromas serveris...`);
+  server.close(() => process.exit(0));
+  // WebSocket / keep-alive jungtys neleistų server.close() užbaigti iškart.
+  server.closeAllConnections?.();
+  // Kraštutinis fallback, jei kažkas vis tiek kabo.
+  setTimeout(() => process.exit(0), 3000).unref();
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
