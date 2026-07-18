@@ -22,7 +22,7 @@ const OCR_STATE_COLORS: Record<string, string> = {
   nepalaikoma: '#a855f7',
 };
 
-const [ocrStatsRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrStatsHourExistsRes, ocrLatestResults] = await Promise.all([
+const [ocrStatsRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocrLatestResults] = await Promise.all([
   postgres.query(`SELECT * FROM "failaiOcrStats" ORDER BY count DESC`),
   postgres.query(`SELECT * FROM "failaiOcrRezultataiStatsDay" ORDER BY date DESC`),
   postgres.query(`
@@ -36,20 +36,17 @@ const [ocrStatsRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrStatsHourExistsRes, 
     ORDER BY n."nuskaitytiDokumentai" DESC
     LIMIT 100
   `),
+  // „Paskutinė 1h" – slankiojantis 60 minučių langas (ne valandos bucket'as).
   postgres.query(`
-    SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-        AND table_name = 'failaiOcrRezultataiStatsHour'
-    ) AS exists
+    SELECT
+      COUNT(*)::int AS results,
+      COALESCE(SUM("puslapiuSkaicius"), 0)::bigint AS pages,
+      COALESCE(SUM("zodziuSkaicius"), 0)::bigint AS words
+    FROM "failaiOcrRezultatai"
+    WHERE "submitTimestamp" >= NOW() - INTERVAL '60 minutes'
   `),
   loadLatestOcrResults(15),
 ]);
-
-const ocrStatsHourRes = ocrStatsHourExistsRes.rows[0]?.exists
-  ? await postgres.query(`SELECT * FROM "failaiOcrRezultataiStatsHour" ORDER BY date DESC`)
-  : { rows: [] };
 
 const formatLtDate = (value: unknown) =>
   new Intl.DateTimeFormat('en-CA', {
@@ -98,14 +95,6 @@ const ocrStatsDay = ocrStatsDayRes.rows.map((row: any) => ({
   words: Number(row.words || 0),
 }));
 
-const ocrStatsHour = ocrStatsHourRes.rows.map((row: any) => ({
-  ...row,
-  date: formatLtDate(row.date),
-  results: Number(row.results || 0),
-  pages: Number(row.pages || 0),
-  words: Number(row.words || 0),
-}));
-
 const ocrNuskaitytojai: any[] = ocrNuskaitytojaiRes.rows.map((row: any) => ({
   ...row,
   nuskaitytiDokumentai: Number(row.nuskaitytiDokumentai || 0),
@@ -131,13 +120,15 @@ const ocrPerMinute = latestDay
     })()
   : null;
 
-  const ocrLastHour = ocrStatsHour.length
-    ? {
-        results: Number((ocrStatsHour[0].results / 60).toFixed(2)),
-        pages: Number((ocrStatsHour[0].pages / 60).toFixed(2)),
-        words: Number((ocrStatsHour[0].words / 60).toFixed(2)),
-      }
-    : null;
+// „Paskutinė 1h" – vidurkis per minutę iš paskutinių 60 minučių (slankiojantis langas).
+const last60 = ocrLast60Res.rows[0];
+const ocrLastHour = last60
+  ? {
+      results: Number((Number(last60.results || 0) / 60).toFixed(2)),
+      pages: Number((Number(last60.pages || 0) / 60).toFixed(2)),
+      words: Number((Number(last60.words || 0) / 60).toFixed(2)),
+    }
+  : null;
 
 const ocrStatsChartData = {
   labels: ocrStats.map((item: any) => item.text),
