@@ -1,25 +1,38 @@
 ---
-import OcrLatestResultsTable from './OcrLatestResultsTable.astro';
-import { jsonForHtmlScript } from '../../design-system/lib/html.ts';
-
 interface Props {
   items: any[];
 }
 
 const { items } = Astro.props;
-const initialFirstKey = JSON.stringify([
-  items[0]?.failas ?? null,
-  items[0]?.submitTimestampDisplay ?? null,
-]);
+
+const MAX_CARDS = 20;
+
+const fmt = (value: unknown) => Number(value || 0).toLocaleString('lt-LT');
+const cardKey = (item: any) => JSON.stringify([item?.failas ?? null, item?.submitTimestampDisplay ?? null]);
+
+const initialItems = (Array.isArray(items) ? items : []).slice(0, MAX_CARDS);
 ---
 
-<div
-  class="ocr-live-results"
-  data-sse-url="/failai/ocr/latestResultsSse"
-  data-first-key={initialFirstKey}
->
-  <OcrLatestResultsTable items={items} />
-  <script is:inline type="application/json" data-ocr-initial-items set:html={jsonForHtmlScript(items)}></script>
+<div class="ocr-live-results" data-sse-url="/failai/ocr/latestResultsSse" data-max={MAX_CARDS}>
+  <div class="ocr-cards" data-ocr-cards role="list" aria-label="Naujausi OCR rezultatai">
+    {initialItems.length === 0 && (
+      <p class="ocr-cards__empty" data-ocr-empty>Naujausių OCR rezultatų nėra.</p>
+    )}
+    {initialItems.map((item) => (
+      <article class="ocr-card" role="listitem" data-ocr-card-key={cardKey(item)}>
+        <div class="ocr-card__top">
+          <span class="ocr-card__node" title={item.nodeDisplay || item.node || '—'}>{item.nodeDisplay || item.node || '—'}</span>
+          <a class="ocr-card__id" href={`/failas/${item.failas}`}>#{item.failas}</a>
+        </div>
+        <div class="ocr-card__time">{item.submitTimestampDisplay}</div>
+        <dl class="ocr-card__stats">
+          <div><dt>Trukmė</dt><dd>{item.durationDisplay}</dd></div>
+          <div><dt>Puslapiai</dt><dd>{fmt(item.puslapiuSkaicius)}</dd></div>
+          <div><dt>Žodžiai</dt><dd>{fmt(item.zodziuSkaicius)}</dd></div>
+        </dl>
+      </article>
+    ))}
+  </div>
 </div>
 
 <script>
@@ -30,81 +43,137 @@ const initialFirstKey = JSON.stringify([
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 
-  const renderRows = (body: HTMLTableSectionElement, items: any[]) => {
-    if (!Array.isArray(items) || items.length === 0) {
-      body.innerHTML = '<tr><td colspan="6" class="empty-state-cell">Naujausių OCR rezultatų nėra.</td></tr>';
-      return;
-    }
+  const fmt = (value: unknown) => Number(value || 0).toLocaleString('lt-LT');
+  const keyOf = (item: any) => JSON.stringify([item?.failas ?? null, item?.submitTimestampDisplay ?? null]);
 
-    const rowsHtml = items.map((item) => `
-      <tr data-ocr-row-key="${escapeHtml(JSON.stringify([item.failas ?? null, item.submitTimestampDisplay ?? null]))}">
-        <td class="ocr-latest-col-node" data-label="Node">${escapeHtml(item.nodeDisplay || item.node || '—')}</td>
-        <td class="cell-right cell-nowrap" data-label="ID"><a href="/failas/${encodeURIComponent(item.failas)}">${escapeHtml(item.failas)}</a></td>
-        <td class="cell-nowrap" data-label="Pateikta">${escapeHtml(item.submitTimestampDisplay)}</td>
-        <td class="cell-right cell-nowrap" data-label="Trukmė">${escapeHtml(item.durationDisplay)}</td>
-        <td class="cell-right cell-nowrap" data-label="Puslapiai">${escapeHtml(Number(item.puslapiuSkaicius || 0).toLocaleString('lt-LT'))}</td>
-        <td class="cell-right cell-nowrap" data-label="Žodžiai">${escapeHtml(Number(item.zodziuSkaicius || 0).toLocaleString('lt-LT'))}</td>
-      </tr>
-    `).join('');
+  const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+  const DURATION = 320;
 
-    body.innerHTML = rowsHtml;
+  const buildCardHtml = (item: any) => {
+    const node = item.nodeDisplay || item.node || '—';
+    return `
+      <article class="ocr-card" role="listitem" data-ocr-card-key="${escapeHtml(keyOf(item))}">
+        <div class="ocr-card__top">
+          <span class="ocr-card__node" title="${escapeHtml(node)}">${escapeHtml(node)}</span>
+          <a class="ocr-card__id" href="/failas/${encodeURIComponent(item.failas)}">#${escapeHtml(item.failas)}</a>
+        </div>
+        <div class="ocr-card__time">${escapeHtml(item.submitTimestampDisplay)}</div>
+        <dl class="ocr-card__stats">
+          <div><dt>Trukmė</dt><dd>${escapeHtml(item.durationDisplay)}</dd></div>
+          <div><dt>Puslapiai</dt><dd>${escapeHtml(fmt(item.puslapiuSkaicius))}</dd></div>
+          <div><dt>Žodžiai</dt><dd>${escapeHtml(fmt(item.zodziuSkaicius))}</dd></div>
+        </dl>
+      </article>`;
+  };
+
+  const createCard = (item: any): HTMLElement => {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = buildCardHtml(item).trim();
+    return tpl.content.firstElementChild as HTMLElement;
   };
 
   for (const root of document.querySelectorAll<HTMLElement>('.ocr-live-results')) {
-    const body = root.querySelector<HTMLTableSectionElement>('[data-ocr-latest-results-body]');
-    const initialItemsEl = root.querySelector<HTMLScriptElement>('[data-ocr-initial-items]');
+    const container = root.querySelector<HTMLElement>('[data-ocr-cards]');
     const sseUrl = root.dataset.sseUrl;
-    if (!body || !initialItemsEl || !sseUrl) continue;
+    if (!container || !sseUrl) continue;
 
-    let evtSource: EventSource | null = null;
-    let previousKeys = new Set<string>();
-    let hasReceivedSseSnapshot = false;
+    const MAX = Math.max(1, Number(root.dataset.max) || 20);
+    const seen = new Set<string>();
+    // Animuojam tik kai juostoje jau yra kortelių; pirmo (tuščio) užpildymo neanimuojam.
+    let primed = container.querySelector('.ocr-card') !== null;
 
-    const animateNewRows = (newKeys: string[]) => {
-      if (newKeys.length <= 0) return;
-      newKeys.forEach((key, index) => {
-        const row = body.querySelector<HTMLTableRowElement>(`tr[data-ocr-row-key="${CSS.escape(key)}"]`);
-        if (!row) return;
-        row.classList.remove('ocr-row-enter');
-        row.style.setProperty('--ocr-row-enter-delay', `${index * 45}ms`);
-        void row.getBoundingClientRect();
-        row.classList.add('ocr-row-enter');
-      });
-    };
+    for (const el of container.querySelectorAll<HTMLElement>('.ocr-card')) {
+      const k = el.dataset.ocrCardKey;
+      if (k) seen.add(k);
+    }
 
-    const updateItems = (items: any[], source: 'initial' | 'sse') => {
-      renderRows(body, items);
-      const nextKeys = items.map((item) => JSON.stringify([item.failas ?? null, item.submitTimestampDisplay ?? null]));
-      const nextFirstKey = JSON.stringify([items[0]?.failas ?? null, items[0]?.submitTimestampDisplay ?? null]);
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const canAnimate = typeof Element.prototype.animate === 'function' && !prefersReducedMotion;
 
-      if (source === 'sse') {
-        const newKeys = nextKeys.filter((key) => !previousKeys.has(key));
-        if (hasReceivedSseSnapshot) {
-          const newPrefixKeys: string[] = [];
-          for (const key of nextKeys) {
-            if (!previousKeys.has(key)) newPrefixKeys.push(key);
-            else break;
-          }
-          animateNewRows(newPrefixKeys.length > 0 ? newPrefixKeys : newKeys);
-        }
-        hasReceivedSseSnapshot = true;
+    const removeEmpty = () => container.querySelector('[data-ocr-empty]')?.remove();
+
+    const update = (items: any[]) => {
+      if (!Array.isArray(items)) return;
+      // Naujos kortelės = neapžiūrėtų prefiksas (snapshot rikiuotas naujausi → seniausi).
+      const newItems: any[] = [];
+      for (const item of items) {
+        const k = keyOf(item);
+        if (seen.has(k)) break;
+        newItems.push(item);
+      }
+      if (newItems.length === 0) return;
+
+      const animate = primed && canAnimate;
+
+      // FLIP: fiksuojam esamų kortelių pozicijas PRIEŠ mutaciją.
+      const existing = animate ? Array.from(container.querySelectorAll<HTMLElement>('.ocr-card')) : [];
+      // Užbaigiam bet kokias dar veikiančias animacijas, kad matuotume ŠVARIĄ
+      // (netransformuotą) poziciją – kitaip persidengiantys atnaujinimai palieka
+      // korteles „pakibusias" per vidurį.
+      for (const el of existing) el.getAnimations().forEach((a) => a.finish());
+      const firstRects = new Map(existing.map((el) => [el, el.getBoundingClientRect()] as const));
+
+      removeEmpty();
+      const incoming: HTMLElement[] = [];
+      // Prepend'inam nuo seniausios naujos link naujausios, kad naujausia liktų priekyje.
+      for (let i = newItems.length - 1; i >= 0; i--) {
+        const item = newItems[i];
+        const el = createCard(item);
+        container.prepend(el);
+        seen.add(keyOf(item));
+        incoming.push(el);
+      }
+      // Nukerpam perteklių (21+) — kad DOM nesikauptų.
+      while (container.children.length > MAX) {
+        const last = container.lastElementChild as HTMLElement | null;
+        if (!last) break;
+        if (last.dataset.ocrCardKey) seen.delete(last.dataset.ocrCardKey);
+        last.remove();
       }
 
-      previousKeys = new Set(nextKeys);
-      root.dataset.firstKey = nextFirstKey;
+      // Scroll anchoring pridėjus kortelę priekyje pastumia scrollLeft ir pirmoji
+      // kortelė atsiduria po kraštu (nukirsta). Grąžinam į pradžią.
+      container.scrollLeft = 0;
+      container.scrollTop = 0;
+
+      primed = true;
+      if (!animate) return;
+
+      // FLIP: esamos kortelės sklandžiai nuslenka iš senos į naują poziciją.
+      for (const el of existing) {
+        if (!el.isConnected) continue;
+        const first = firstRects.get(el);
+        if (!first) continue;
+        const last = el.getBoundingClientRect();
+        const dx = first.left - last.left;
+        const dy = first.top - last.top;
+        if (!dx && !dy) continue;
+        el.animate(
+          [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+          { duration: DURATION, easing: EASE },
+        );
+      }
+
+      // Naujos kortelės įvažiuoja iš krašto.
+      const vertical = window.matchMedia('(max-width: 640px)').matches;
+      const from = vertical ? 'translateY(-32px) scale(0.97)' : 'translateX(-40px) scale(0.97)';
+      for (const el of incoming) {
+        el.animate(
+          [{ opacity: 0, transform: from }, { opacity: 1, transform: 'none' }],
+          { duration: DURATION, easing: EASE },
+        );
+      }
     };
 
-    try {
-      const initialItems = JSON.parse(initialItemsEl.textContent || '[]');
-      updateItems(initialItems, 'initial');
-    } catch {}
+    // SSR jau atvaizdavo pradines korteles (jos „seen" aibėje), tad initialItems
+    // čia papildomai nerenderinam – SSE snapshot'ai prideda tik naujas.
 
+    let evtSource: EventSource | null = null;
     const start = () => {
       evtSource = new EventSource(sseUrl);
       evtSource.onmessage = (event) => {
         try {
-          const payload = JSON.parse(event.data);
-          updateItems(payload.items, 'sse');
+          update(JSON.parse(event.data).items);
         } catch {}
       };
       evtSource.onerror = () => {
@@ -112,30 +181,111 @@ const initialFirstKey = JSON.stringify([
         window.setTimeout(start, 1000);
       };
     };
-
     start();
     window.addEventListener('beforeunload', () => evtSource?.close(), { once: true });
   }
 </script>
 
-<style>
-  @keyframes ocr-row-enter {
-    from {
-      opacity: 0;
-      transform: translateY(-8px);
-      background-color: color-mix(in srgb, var(--color-success-bg) 70%, transparent);
+<!-- is:global – kad stilius galiotų ir JS per innerHTML sukurtoms naujoms kortelėms
+     (Astro scoped stilius jų nepasiektų, nes jos negauna data-astro-* atributo). -->
+<style is:global>
+  .ocr-cards {
+    display: flex;
+    align-items: flex-start;      /* kortelės pagal savo turinį, nesitempia iki aukščiausios */
+    gap: 12px;
+    overflow: hidden;             /* jokio scroll'o – perteklius nukerpamas */
+    overflow-anchor: none;        /* kad pridėjus kortelę priekyje nepasistumtų scroll'as */
+    padding: 4px 2px;
+  }
+
+  .ocr-cards__empty {
+    color: var(--gray);
+    font-size: var(--text-sm);
+    margin: 8px 2px;
+  }
+
+  .ocr-card {
+    flex: 0 0 auto;
+    width: 220px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .ocr-card__top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .ocr-card__node {
+    font-weight: 600;
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ocr-card__id {
+    font-size: var(--text-xs);
+    color: var(--gray);
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  .ocr-card__time {
+    font-size: var(--text-xs);
+    color: var(--gray);
+  }
+
+  .ocr-card__stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin: 0;
+  }
+
+  .ocr-card__stats div {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .ocr-card__stats dt {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--gray);
+  }
+
+  .ocr-card__stats dd {
+    margin: 0;
+    font-weight: 600;
+    font-size: var(--text-sm);
+    white-space: nowrap;
+  }
+
+  /* Mobilus: vertikaliai, matosi ~3.5 kortelės, toliau – nukerpama (be scroll'o). */
+  @media (max-width: 640px) {
+    .ocr-cards {
+      flex-direction: column;
+      align-items: stretch;
+      max-height: 22rem;
     }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-      background-color: transparent;
+
+    .ocr-card {
+      width: auto;
     }
   }
 
-  .ocr-live-results :global(.ocr-row-enter td) {
-    animation: ocr-row-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
-    animation-delay: var(--ocr-row-enter-delay, 0ms);
-    animation-fill-mode: both;
-    will-change: transform, opacity, background-color;
-  }
+  /* Įvažiavimo / pasistūmimo animacijos daromos JS (Web Animations API, FLIP). */
 </style>
