@@ -11,11 +11,8 @@ import DokHomeOverview from '../../components/dokumentai/DokHomeOverview.astro';
 import DokKnowledgePanel from '../../components/dokumentai/DokKnowledgePanel.astro';
 import DokFacetModal from '../../components/dokumentai/DokFacetModal.astro';
 import DokAreaModal from '../../components/dokumentai/DokAreaModal.astro';
-import config from '../../lib/config.ts';
 import { getColorScheme, getFont } from '../../lib/failai.js';
 import { loadDokumentaiPage } from '../../lib/dokumentaiPageData.ts';
-
-if (!config.enableDokumentaiSearch) return Astro.redirect('/');
 
 const data = await loadDokumentaiPage(Astro.url);
 if (data.redirect) return Astro.redirect(data.redirect);

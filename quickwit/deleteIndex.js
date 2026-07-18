@@ -4,7 +4,7 @@ import config from "../utils/config.js";
 import { Logger } from "../utils/log.js";
 const logger = new Logger();
 
-const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
+const QW_URL = config.quickwitUrl ?? "http://localhost:7280";
 
 /**
  * Delete one Quickwit index and its quickwitIndeksai row.

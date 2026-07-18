@@ -6,6 +6,21 @@ import { pathToFileURL } from 'node:url';
 
 const configPath = path.join(process.cwd(), 'config.js');
 
+// Įkeliam `.env` (jei yra), kad PORT ir kiti kintamieji būtų prieinami net be
+// primontuoto config.js. Runtime image'e utils/ nėra, tad naudojam įmontuotą
+// process.loadEnvFile ir esamų kintamųjų NEperrašom.
+const envPath = path.join(process.cwd(), '.env');
+if (await fs.promises.access(envPath).then(() => true).catch(() => false)) {
+  const snapshot = { ...process.env };
+  const preexisting = new Set(Object.keys(process.env));
+  try {
+    process.loadEnvFile(envPath);
+    for (const key of preexisting) process.env[key] = snapshot[key];
+  } catch (error) {
+    console.error('Error loading .env file:', error);
+  }
+}
+
 if (!process.env.PORT) {
   const hasConfig = await fs.promises.access(configPath).then(() => true).catch(() => false);
 

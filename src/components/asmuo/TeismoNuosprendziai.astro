@@ -5,7 +5,6 @@ import DateValue from '@design-system/components/DateValue.astro';
 import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
 import TruncationNotice from '@design-system/components/TruncationNotice.astro';
 import Button from '@design-system/components/Button.astro';
-import config from '../../lib/config.ts';
 
 const { asmuo } = Astro.props;
 if (!(asmuo.teismoNuosprendziai?.rows > 0)) return;
@@ -14,9 +13,7 @@ const dokumentaiUrl = `/dokumentai?mode=phrase&type=teismoNuosprendis&jar=${enco
 ---
 
 <PageSection id="teismai" title="Teismo nuosprendžiai">
-  {config.enableDokumentaiSearch && (
-    <p><Button href={dokumentaiUrl} variant="secondary" size="sm">Atverti dokumentų paieškoje</Button></p>
-  )}
+  <p><Button href={dokumentaiUrl} variant="secondary" size="sm">Atverti dokumentų paieškoje</Button></p>
   <TruncationNotice count={rows} shown={nuosprendziai.length} anchor="teismai" paramName="teismoNuosprendziaiLimit" label="naujausi nuosprendžiai" />
   <DataTable
     columns={[

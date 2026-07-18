@@ -1,6 +1,6 @@
 import config from "../utils/config.js";
 
-const quickwitUrl = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
+const quickwitUrl = config.quickwitUrl ?? "http://localhost:7280";
 const args = process.argv.slice(2);
 const prefix = args.includes("--prefix");
 const producer = args.filter((arg) => arg !== "--prefix").join(" ") || "FREE PDFill PDF and Image Writer";

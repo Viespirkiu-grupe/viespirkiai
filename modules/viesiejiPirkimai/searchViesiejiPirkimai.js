@@ -285,7 +285,7 @@ function quickwitSortBy(query) {
 // reikšmės po kitų filtrų. Kodinis facetas (vykdytojas) papildomas JAR
 // pavadinimais; enum facetai (pirkimo būdas/statusas) — žmogui skirtais.
 
-const QW_URL = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
+const QW_URL = config.quickwitUrl ?? "http://localhost:7280";
 
 /** Viena Quickwit term agregacija. Grąžina [{ value, count }]. */
 async function qwFacet(field, query, size) {

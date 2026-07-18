@@ -5,9 +5,11 @@ services:
             dockerfile: Dockerfile
         network_mode: host
         restart: unless-stopped
+        # Konfigūracija per .env (žr. .env.sample).
+        env_file:
+            - .env
         volumes:
-            # Runtime konfigūracija ir katalogai – NEsukepti į image'ą.
-            - ./config.js:/app/config.js:ro
+            # Runtime katalogai – NEsukepti į image'ą.
             - ./public:/app/public:ro
             - ./modules:/app/modules:ro
             # Absoliutūs duomenų keliai iš config.js (ocr/failai/dokumentai/...)

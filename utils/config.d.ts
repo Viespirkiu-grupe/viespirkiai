@@ -5,22 +5,13 @@ export interface TypesenseNodeConfig {
     [key: string]: unknown;
 }
 
-export interface OcrLatestResultsLiveUpdatesConfig {
-    mode: "poll" | "notify";
-    intervalMs: number;
-    [key: string]: unknown;
-}
-
 export interface Config {
     customHead: string;
     analitikaUrl: string;
     onionAddress?: string;
 
     port: number;
-    proxyIp: string;
-    enableMinification: boolean;
-    parallelRouteLoading: boolean;
-    workerCount: number;
+    /** Nustatomas automatiškai pagal NODE_ENV (ne per config/.env). */
     dev: boolean;
 
     pgHost: string;
@@ -33,20 +24,16 @@ export interface Config {
     typesenseUp: boolean;
     typesenseNodes: TypesenseNodeConfig[];
     typesenseApiKey: string;
-    typesenseCollection: string;
 
     quickwitUp: boolean;
     quickwitUrl?: string;
-    quickwitHost?: string;
     quickwitTimeoutMs?: number;
 
-    scrapeProxy?: string;
     torAddress: string;
     torPassword: string;
 
     internalFileBase: string;
     ocrBandymai: number;
-    ocrLatestResultsLiveUpdates: OcrLatestResultsLiveUpdatesConfig;
 
     ocrRezultataiLocation?: string;
     failaiMetaduomenysLocation?: string;
@@ -54,10 +41,6 @@ export interface Config {
     dokumentaiLocation?: string;
 
     enableGraph: boolean;
-    enableVectorSearch: boolean;
-    vectorSearchUrl: string;
-    teismoNuosprendziaiVectorSearchUrl: string;
-    enableDokumentaiSearch: boolean;
 
     enableExecuteQueryMcp: boolean;
     enableExecuteQueryMcpOnly: boolean;

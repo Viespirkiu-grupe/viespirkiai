@@ -1,7 +1,6 @@
 import type { APIRoute } from 'astro';
 import { subscribe } from '../../../../postgres/pgNotifyHub.js';
 import { loadLatestOcrResults } from '../../../lib/ocrLatestResults.ts';
-import { ocrLiveUpdates } from '../../../lib/ocrLiveUpdates.ts';
 
 const OCR_RESULTS_CHANNEL = 'ocr_latest_results';
 
@@ -18,7 +17,6 @@ export const GET: APIRoute = async ({ request }) => {
       const encoder = new TextEncoder();
       let closed = false;
       let heartbeat: ReturnType<typeof setInterval> | undefined;
-      let interval: ReturnType<typeof setInterval> | undefined;
       let unsubscribe: (() => void) | undefined;
       let lastPayload = '';
 
@@ -39,7 +37,6 @@ export const GET: APIRoute = async ({ request }) => {
         if (closed) return;
         closed = true;
         if (heartbeat) clearInterval(heartbeat);
-        if (interval) clearInterval(interval);
         if (unsubscribe) {
           unsubscribe();
           unsubscribe = undefined;
@@ -63,14 +60,6 @@ export const GET: APIRoute = async ({ request }) => {
           stop();
         }
       }, 15000);
-
-      if (ocrLiveUpdates.mode === 'poll') {
-        await sendItems();
-        interval = setInterval(() => {
-          void sendItems();
-        }, ocrLiveUpdates.intervalMs);
-        return;
-      }
 
       try {
         unsubscribe = subscribe(OCR_RESULTS_CHANNEL, () => { void sendItems(); });

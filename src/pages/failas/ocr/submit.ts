@@ -1,7 +1,6 @@
 import type { APIRoute } from 'astro';
 import { validateOcrApiKey } from '@/modules/failai/auth.js';
 import { postgres } from '@/postgres/postgres.js';
-import { ocrLiveUpdates } from '../../../lib/ocrLiveUpdates.ts';
 import { saveRezultatasFs } from '@/modules/ocr/rezultataiFs.js';
 
 export const GET: APIRoute = async () => {
@@ -73,12 +72,10 @@ export const POST: APIRoute = async ({ request }) => {
       `UPDATE "ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
       [user.id],
     );
-    if (ocrLiveUpdates.mode === 'notify') {
-      await client.query(
-        `SELECT pg_notify('ocr_latest_results', json_build_object('failas', $1, 'node', $2)::text)`,
-        [id, user.pavadinimas],
-      );
-    }
+    await client.query(
+      `SELECT pg_notify('ocr_latest_results', json_build_object('failas', $1, 'node', $2)::text)`,
+      [id, user.pavadinimas],
+    );
 
     await client.query('COMMIT');
 

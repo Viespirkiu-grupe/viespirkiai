@@ -4,7 +4,7 @@ import config from "../utils/config.js";
 
 const LIMIT = 1_000;
 const OUTPUT_DIR = path.resolve("tmp");
-const quickwitUrl = config.quickwitUrl ?? config.quickwitHost ?? "http://localhost:7280";
+const quickwitUrl = config.quickwitUrl ?? "http://localhost:7280";
 
 const response = await fetch(`${quickwitUrl}/api/v1/dokumentai_*/search`, {
     method: "POST",

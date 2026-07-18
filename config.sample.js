@@ -30,27 +30,6 @@ export default {
     // Portas, kuriame klausosi serveris.
     port: 9019,
 
-    // Reverse proxy IP, kurio X-Forwarded-* antraštėmis pasitikim. Be šio
-    // nustatymo klientų IP bus matomas kaip proxy IP.
-    proxyIp: "127.0.0.1",
-
-    // ─────────────────────────────────────────────────────────────────────
-    // App elgsena
-    // ─────────────────────────────────────────────────────────────────────
-
-    // HTML atsako minifikacija. Įjungti tik production'e — dev'e apsunkina
-    // debug'inimą.
-    enableMinification: false,
-
-    // Ar lygiagrečiai krauti maršrutus (greitesnis startup, daugiau RAM).
-    parallelRouteLoading: true,
-
-    // Astro/Node worker procesų skaičius. Padidinti pagal CPU branduolius.
-    workerCount: 2,
-
-    // Dev rėžimas — papildomi log'ai, jokios minifikacijos, hot reload.
-    dev: false,
-
     // ─────────────────────────────────────────────────────────────────────
     // PostgreSQL — pagrindinė DB
     // ─────────────────────────────────────────────────────────────────────
@@ -81,7 +60,6 @@ export default {
     typesenseUp: true,
     typesenseNodes: [{ host: "localhost", port: 9021, protocol: "http" }],
     typesenseApiKey: "CHANGE_ME",
-    typesenseCollection: "viespirkiai",
 
     // ─────────────────────────────────────────────────────────────────────
     // Quickwit — pilnatekstė failų turinio paieška
@@ -112,14 +90,6 @@ export default {
 
     // Kiek kartų bandyti OCR vienam failui prieš pažymint kaip nepavykusį.
     ocrBandymai: 5,
-
-    // OCR rezultatų live atnaujinimai puslapyje:
-    //   mode: "poll"   — periodiškas tikrinimas.
-    //   mode: "notify" — PostgreSQL LISTEN/NOTIFY.
-    ocrLatestResultsLiveUpdates: {
-        mode: "poll",
-        intervalMs: 250, // naudojama tik mode === "poll" atveju
-    },
 
     // ─────────────────────────────────────────────────────────────────────
     // Blob saugyklų vietos
@@ -153,16 +123,6 @@ export default {
 
     // Ryšių grafiko funkcija visoje UI.
     enableGraph: false,
-
-    // Vektorinė failų paieška.
-    enableVectorSearch: false,
-    vectorSearchUrl: "",
-
-    // Vektorinė teismo nuosprendžių paieška (atskiras backend'as).
-    teismoNuosprendziaiVectorSearchUrl: "",
-
-    // Prototipinis /dokumentai paieškos puslapis.
-    enableDokumentaiSearch: false,
 
     // ─────────────────────────────────────────────────────────────────────
     // MCP execute_query įrankis

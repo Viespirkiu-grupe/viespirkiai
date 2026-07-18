@@ -40,7 +40,7 @@ function computeOriginalusLinkas(failas) {
     if (failas.saltinis === "cvpIs") {
         const parts = failas.saltinioId.split("/");
         return {
-            linkas: `${config.viesiejiPirkimaiUrl}/epps/cft/downloadDocumentVersion.do?versionId=${parts[2]}&documentId=${parts[1]}`,
+            linkas: `https://viesiejipirkimai.lt/epps/cft/downloadDocumentVersion.do?versionId=${parts[2]}&documentId=${parts[1]}`,
             pavadinimas: "CVP IS",
         };
     }
