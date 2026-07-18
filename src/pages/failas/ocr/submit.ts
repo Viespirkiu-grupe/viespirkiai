@@ -57,27 +57,28 @@ export const POST: APIRoute = async ({ request }) => {
       0,
     );
 
-    await Promise.all([
-      client.query(
-        `UPDATE failai SET "ocrState" = 1, "nuskaitytas" = 0, "ocrLockTimestamp" = NULL WHERE id = $1`,
-        [id],
-      ),
-      client.query(
-        `INSERT INTO "failaiOcrRezultatai" (failas, md5, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
-         VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7)`,
-        [id, md5, user.pavadinimas, lockedAt, duration, puslapiuSkaicius, zodziuSkaicius],
-      ),
-      client.query(
-        `UPDATE "ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
-        [user.id],
-      ),
-      ...(ocrLiveUpdates.mode === 'notify'
-        ? [client.query(
-            `SELECT pg_notify('ocr_latest_results', json_build_object('failas', $1, 'node', $2)::text)`,
-            [id, user.pavadinimas],
-          )]
-        : []),
-    ]);
+    // Vienas pg klientas gali vykdyti tik po vieną užklausą – tranzakcijoje jos
+    // vis tiek serializuojamos, todėl vykdom nuosekliai (Promise.all sukeltų
+    // "client is already executing a query" perspėjimą).
+    await client.query(
+      `UPDATE failai SET "ocrState" = 1, "nuskaitytas" = 0, "ocrLockTimestamp" = NULL WHERE id = $1`,
+      [id],
+    );
+    await client.query(
+      `INSERT INTO "failaiOcrRezultatai" (failas, md5, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
+       VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7)`,
+      [id, md5, user.pavadinimas, lockedAt, duration, puslapiuSkaicius, zodziuSkaicius],
+    );
+    await client.query(
+      `UPDATE "ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
+      [user.id],
+    );
+    if (ocrLiveUpdates.mode === 'notify') {
+      await client.query(
+        `SELECT pg_notify('ocr_latest_results', json_build_object('failas', $1, 'node', $2)::text)`,
+        [id, user.pavadinimas],
+      );
+    }
 
     await client.query('COMMIT');
 
