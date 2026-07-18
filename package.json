@@ -34,6 +34,7 @@
     "dependencies": {
         "@astrojs/node": "^11.0.2",
         "@modelcontextprotocol/sdk": "^1.27.1",
+        "@resvg/resvg-js": "^2.6.2",
         "@sigma/edge-curve": "^3.1.0",
         "@sigma/node-border": "^3.0.0",
         "@sigma/node-image": "^3.0.0",
@@ -59,7 +60,7 @@
         "pg": "^8.16.3",
         "pg-query-stream": "^4.10.3",
         "proj4": "^2.20.4",
-        "puppeteer": "^24.16.1",
+        "satori": "^0.28.0",
         "sharp": "^0.34.5",
         "sigma": "^3.0.2",
         "socks-proxy-agent": "^8.0.5",

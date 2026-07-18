@@ -1,0 +1,115 @@
+---
+import { postgres } from '@/postgres/postgres.js';
+
+// Cache buster — naujas kiekvienam puslapio užkrovimui
+const v = Date.now();
+
+async function randomIds(sql: string, fallbackSql: string): Promise<string[]> {
+  try {
+    const r = await postgres.query(sql);
+    if (r.rows.length) return r.rows.map((row: any) => String(Object.values(row)[0]));
+  } catch {
+    /* TABLESAMPLE gali nepavykti (pvz., view) — krentam į fallback */
+  }
+  const r = await postgres.query(fallbackSql);
+  return r.rows.map((row: any) => String(Object.values(row)[0]));
+}
+
+const [sutartys, pirkimai, failai, asmenys] = await Promise.all([
+  randomIds(
+    `SELECT "sutartiesUnikalusId" FROM sutartys TABLESAMPLE SYSTEM (0.1) LIMIT 3`,
+    `SELECT "sutartiesUnikalusId" FROM sutartys LIMIT 3`,
+  ),
+  randomIds(
+    `SELECT "pirkimoId" FROM "viesiejiPirkimai" TABLESAMPLE SYSTEM (0.1) LIMIT 3`,
+    `SELECT "pirkimoId" FROM "viesiejiPirkimai" LIMIT 3`,
+  ),
+  randomIds(
+    `SELECT id FROM failai TABLESAMPLE SYSTEM (0.01) WHERE pavadinimas IS NOT NULL LIMIT 2`,
+    `SELECT id FROM failai WHERE pavadinimas IS NOT NULL LIMIT 2`,
+  ),
+  randomIds(
+    `SELECT "jarKodas" FROM "jar" TABLESAMPLE SYSTEM (0.1) LIMIT 2`,
+    `SELECT "jarKodas" FROM "jar" LIMIT 2`,
+  ),
+]);
+
+const staticPages = [
+  '/statistika.png',
+  '/viesiejiPirkimai.png',
+  '/juridiniai.png',
+  '/nepatikimi.png',
+  '/neskelbiamos.png',
+  '/bvpz.png',
+  '/duomenys.png',
+  '/failas.png',
+  '/kontaktai.png',
+  '/privatumas.png',
+  '/mcp.png',
+  '/vieslaiskiai/vieslaiskiai.png',
+  '/pinreg/scrape.png',
+];
+
+const groups: { label: string; urls: string[] }[] = [
+  { label: 'Sutartys (atsitiktinės)', urls: sutartys.map((id) => `/sutartis/${id}.png`) },
+  { label: 'Viešieji pirkimai (atsitiktiniai)', urls: pirkimai.map((id) => `/viesiejiPirkimai/${id}.png`) },
+  { label: 'Failai (atsitiktiniai)', urls: failai.map((id) => `/failas/${id}.png`) },
+  { label: 'Asmenys (atsitiktiniai)', urls: asmenys.map((k) => `/asmuo/${k}.png`) },
+  { label: 'Statiniai puslapiai', urls: staticPages },
+];
+---
+
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>OpenGraph testas</title>
+  <style>
+    body {
+      font-family: "Ubuntu", system-ui, sans-serif;
+      margin: 24px;
+      background: #fafaf9;
+      color: #0c0a09;
+    }
+    h1 { font-size: 22px; }
+    h2 { font-size: 16px; margin: 32px 0 12px; }
+    .meta { color: #78716c; font-size: 14px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+      gap: 16px;
+    }
+    figure { margin: 0; }
+    img {
+      width: 100%;
+      aspect-ratio: 1200 / 630;
+      border: 1px solid #d6d3d1;
+      background:
+        repeating-conic-gradient(#e7e5e4 0 25%, transparent 0 50%) 50% / 20px 20px;
+    }
+    figcaption { font-size: 13px; margin-top: 4px; }
+    figcaption a { color: #57534e; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>OpenGraph testas</h1>
+  <p class="meta">
+    Cache buster: <code>{v}</code> — <a href="/openGraphTest">perkrauti su naujais atsitiktiniais įrašais</a>
+  </p>
+  {groups.map((group) => (
+    <section>
+      <h2>{group.label}</h2>
+      <div class="grid">
+        {group.urls.map((url) => (
+          <figure>
+            <img src={`${url}?v=${v}`} loading="lazy" alt={url} />
+            <figcaption><a href={`${url}?v=${v}`}>{url}</a></figcaption>
+          </figure>
+        ))}
+      </div>
+    </section>
+  ))}
+</body>
+</html>

@@ -1,4 +1,7 @@
-import puppeteer from "puppeteer";
+import { parseHTML } from "linkedom";
+
+const BASE = "https://www.registrucentras.lt";
+const SLUG = "adresu-registro-pirminiai-duomenys-raw-data";
 
 const SECTION_KEYS = [
     "adminUnits",
@@ -15,75 +18,64 @@ const COLUMN_MAP = {
     Duomenys: "geojson",
 };
 
+/**
+ * RC portalas yra SPA — turinys (su lentelėmis) ateina iš jų Strapi CMS.
+ * Viešas CMS adresas ir token'as publikuojami pačių RC /config.js faile.
+ */
+async function getCmsConfig() {
+    const res = await fetch(`${BASE}/config.js`);
+    if (!res.ok) throw new Error(`config.js: HTTP ${res.status}`);
+    const text = await res.text();
+    const url = text.match(/ENV_FRONTEND_CMS_URL:\s*"([^"]+)"/)?.[1];
+    const token = text.match(/ENV_FRONTEND_CMS_TOKEN:\s*"([^"]+)"/)?.[1];
+    if (!url || !token)
+        throw new Error("config.js: nerastas CMS URL arba token");
+    return { url, token };
+}
+
 export async function getArDataSources() {
-    const browser = await puppeteer.launch({
-        headless: "new",
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    const cms = await getCmsConfig();
+    const res = await fetch(
+        `${cms.url}/api/open-data-pages?` +
+            new URLSearchParams({
+                "filters[slug][$eq]": SLUG,
+                populate: "*",
+            }),
+        { headers: { Authorization: `Bearer ${cms.token}` } },
+    );
+    if (!res.ok) throw new Error(`CMS API: HTTP ${res.status}`);
+    const page = (await res.json()).data?.[0];
+    const html = page?.content?.content;
+    if (!html) throw new Error(`CMS API: nerastas puslapio "${SLUG}" turinys`);
+
+    const { document } = parseHTML(`<body>${html}</body>`);
+
+    const result = {};
+    [...document.querySelectorAll("table")].forEach((table, i) => {
+        const headers = [...table.querySelectorAll("thead th, thead td")].map(
+            (th) => th.textContent.trim().replace(/\s+/g, " "),
+        );
+        const rows = [...table.querySelectorAll("tbody tr")].flatMap((tr) => {
+            const cells = [...tr.querySelectorAll("td")];
+            if (!cells.length) return [];
+            const entry = {
+                name: cells[0].textContent.trim().replace(/ /g, " "),
+            };
+            cells.slice(1).forEach((td, j) => {
+                const href = td.querySelector("a")?.getAttribute("href");
+                const field = COLUMN_MAP[headers[j + 1]] ?? `col${j + 1}`;
+                entry[field] = href
+                    ? href.startsWith("http")
+                        ? href
+                        : `${BASE}${href}`
+                    : null;
+            });
+            return [entry];
+        });
+        result[SECTION_KEYS[i] ?? `section_${i}`] = rows;
     });
 
-    try {
-        const page = await browser.newPage();
-        await page.setUserAgent({
-            userAgent:
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        });
-        await page.goto(
-            "https://www.registrucentras.lt/atviri-duomenys-ir-statistika/adresu-registro-pirminiai-duomenys-raw-data",
-            { waitUntil: "networkidle2", timeout: 60000 },
-        );
-        await page.waitForSelector("table", { timeout: 15000 });
-
-        const raw = await page.evaluate(() => {
-            const BASE = "https://www.registrucentras.lt";
-            return [...document.querySelectorAll("table")].map((table) => {
-                const headers = [
-                    ...table.querySelectorAll("thead th, thead td"),
-                ].map((th) => th.textContent.trim().replace(/\s+/g, " "));
-                const rows = [...table.querySelectorAll("tbody tr")].flatMap(
-                    (tr) => {
-                        const cells = [...tr.querySelectorAll("td")];
-                        if (!cells.length) return [];
-                        const row = {
-                            name: cells[0].textContent
-                                .trim()
-                                .replace(/\u00A0/g, " "),
-                        };
-                        cells.slice(1).forEach((td, i) => {
-                            const a = td.querySelector("a");
-                            row[headers[i + 1] ?? `col${i + 1}`] = a
-                                ? {
-                                      url: a
-                                          .getAttribute("href")
-                                          ?.startsWith("http")
-                                          ? a.getAttribute("href")
-                                          : `${BASE}${a.getAttribute("href")}`,
-                                  }
-                                : null;
-                        });
-                        return [row];
-                    },
-                );
-                return { headers, rows };
-            });
-        });
-
-        const result = {};
-        raw.forEach(({ headers, rows }, i) => {
-            const sectionKey = SECTION_KEYS[i] ?? `section_${i}`;
-            result[sectionKey] = rows.map((row) => {
-                const entry = { name: row.name };
-                headers.slice(1).forEach((h) => {
-                    const field = COLUMN_MAP[h] ?? h;
-                    entry[field] = row[h]?.url ?? null;
-                });
-                return entry;
-            });
-        });
-
-        return result;
-    } finally {
-        await browser.close();
-    }
+    return result;
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
