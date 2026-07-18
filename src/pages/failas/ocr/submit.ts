@@ -73,7 +73,7 @@ export const POST: APIRoute = async ({ request }) => {
       [user.id],
     );
     await client.query(
-      `SELECT pg_notify('ocr_latest_results', json_build_object('failas', $1, 'node', $2)::text)`,
+      `SELECT pg_notify('ocr_latest_results', json_build_object('failas', $1::int, 'node', $2::text)::text)`,
       [id, user.pavadinimas],
     );
 
