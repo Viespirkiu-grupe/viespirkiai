@@ -42,7 +42,6 @@ plausible/plausible-conf.env
 
 # Viešinami dokumentai
 public/vieslaiskiai
-public/veiklosAtaskaitos
 public/specialus
 
 # Build output

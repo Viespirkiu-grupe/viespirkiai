@@ -4,7 +4,6 @@ import { getColorScheme, getFont } from '../lib/failai.js';
 import SectionText from '@design-system/components/content/SectionText.astro';
 import WordCloud from '@design-system/components/content/WordCloud.astro';
 import FaqList from '@design-system/components/content/FaqList.astro';
-import ResultCardList from '@design-system/components/content/ResultCardList.astro';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
@@ -29,14 +28,6 @@ const wordCloudItems = [
   { label: 'viešumas', size: 1.7, rotation: 0.14 },
   { label: 'rizikų mažinimas', size: 1.6, rotation: 0.97 },
   { label: 'atsakinga kontrolė', size: 1.8, rotation: 0.38 },
-];
-
-const activityReports = [
-  {
-    href: '/veiklosAtaskaitos/0.5.pdf',
-    title: 'Pusės metų veiklos ataskaita',
-    meta: ['2025-12-03'],
-  },
 ];
 
 const faqItems = [
@@ -102,10 +93,6 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
         <SectionText title="Kas mes?" paragraphs={aboutParagraphs}>
           <WordCloud items={wordCloudItems} />
         </SectionText>
-
-        <div class="mt-10">
-          <ResultCardList title="Veiklos ataskaitos" items={activityReports} />
-        </div>
       </div>
 
       <FaqList title="Dažniausiai užduodami klausimai" items={faqItems} />
