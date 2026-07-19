@@ -78,45 +78,50 @@ export async function cvpIsImportArray(data, options = {}) {
         let item = data[i];
         const rawId = item.sutartiesUnikalusID;
 
-        try {
-            // Skaičiai
-            item.verte = parseNullableNumber(
-                item.verte,
-                "verte",
-                rawId,
-            );
-            item.faktineIvykdimoVerte = parseNullableNumber(
-                item.faktineIvykdimoVerte,
-                "faktineIvykdimoVerte",
-                rawId,
-            );
-
-            // Datos
-            const dateOnlyFields = [
-                "sudarymoData",
-                "galiojimoData",
-                "faktineIvykdimoData",
-            ];
-            for (const field of dateOnlyFields) {
-                item[field] = parseDateOnly(item[field], field, rawId);
-            }
-
-            const timestampFields = [
-                "paskelbimoData",
-                "paskutinioAtnaujinimoData",
-                "paskutinioRedagavimoData",
-            ];
-            for (const field of timestampFields) {
-                if (item[field]) {
-                    const d = new Date(item[field]);
-                    item[field] = isNaN(d) ? null : d;
-                }
-            }
-        } catch (error) {
+        // Brokuoti laukai (pvz., "0000-00-00", "0022-10-12", "3.13.00")
+        // nustatomi į null, kad sutartis vis tiek būtų importuota; ID
+        // fiksuojamas vpmSutartysBrokas auditui.
+        const markBrokas = (error) => {
             const id = Number(rawId);
             if (Number.isSafeInteger(id) && id > 0) brokuotiIds.add(id);
             console.warn(error);
-            continue;
+        };
+
+        // Skaičiai
+        for (const field of ["verte", "faktineIvykdimoVerte"]) {
+            try {
+                item[field] = parseNullableNumber(item[field], field, rawId);
+            } catch (error) {
+                markBrokas(error);
+                item[field] = null;
+            }
+        }
+
+        // Datos
+        const dateOnlyFields = [
+            "sudarymoData",
+            "galiojimoData",
+            "faktineIvykdimoData",
+        ];
+        for (const field of dateOnlyFields) {
+            try {
+                item[field] = parseDateOnly(item[field], field, rawId);
+            } catch (error) {
+                markBrokas(error);
+                item[field] = null;
+            }
+        }
+
+        const timestampFields = [
+            "paskelbimoData",
+            "paskutinioAtnaujinimoData",
+            "paskutinioRedagavimoData",
+        ];
+        for (const field of timestampFields) {
+            if (item[field]) {
+                const d = new Date(item[field]);
+                item[field] = isNaN(d) ? null : d;
+            }
         }
 
         // ID

@@ -79,7 +79,7 @@ describe("sutartys import validation", () => {
         ).toBe(true);
     });
 
-    it("records and skips a malformed contract without stopping the batch", async () => {
+    it("records a malformed contract and imports it with the broken field nulled", async () => {
         const { cvpIsImportArray } = await import(
             "../modules/sutartys/import.js"
         );
@@ -110,7 +110,9 @@ describe("sutartys import validation", () => {
             String(sql).includes('INSERT INTO "sutartys"'),
         );
         expect(sutartysCall?.[1]?.[0]).toBe(1);
-        expect(sutartysCall?.[1]).not.toContain(2005493961);
+        expect(sutartysCall?.[1]?.[26]).toBe(2005493961);
+        expect(sutartysCall?.[1]?.[26 + 21]).toBe(313);
+        expect(sutartysCall?.[1]?.[26 + 8]).toBeNull();
     });
 
     it("does not write an unidentifiable malformed row to the reject table", async () => {
