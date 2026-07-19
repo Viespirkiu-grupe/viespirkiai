@@ -39,7 +39,9 @@ export async function cvpIsScrapePageContent(url, options = {}) {
     timings.start("cvpIsScrapePageContent");
 
     timings.start("findProxy");
-    let proxy = await getProxyBySite("eviesiejipirkimai");
+    let proxy = options.useProxy === false
+        ? null
+        : await getProxyBySite("eviesiejipirkimai");
 
     let requestUrl = url;
     if (proxy) {
@@ -66,9 +68,11 @@ export async function cvpIsScrapePageContent(url, options = {}) {
     });
 
     if (response.status === 403) {
-        timings.start("insertCvpIsGedimai");
-        await recordCvpIsFailure("403");
-        timings.end("insertCvpIsGedimai");
+        if (options.recordFailures !== false) {
+            timings.start("insertCvpIsGedimai");
+            await recordCvpIsFailure("403");
+            timings.end("insertCvpIsGedimai");
+        }
         throw new Error("Gauta 403 klaida, užklausa blokuojama");
     }
 
@@ -81,16 +85,20 @@ export async function cvpIsScrapePageContent(url, options = {}) {
 
     if (parsed.status === "maintenance") {
         log(`Svetainėje vykdomi sistemos atnaujinimo darbai`);
-        timings.start("insertCvpIsGedimai");
-        await recordCvpIsFailure("sistemosAtnaujinimoDarbai");
-        timings.end("insertCvpIsGedimai");
+        if (options.recordFailures !== false) {
+            timings.start("insertCvpIsGedimai");
+            await recordCvpIsFailure("sistemosAtnaujinimoDarbai");
+            timings.end("insertCvpIsGedimai");
+        }
         throw new Error("Svetainėje vykdomi sistemos atnaujinimo darbai");
     }
     if (parsed.status === "missing-table") {
         log(`Nerasta lentelė`);
-        timings.start("insertCvpIsGedimai");
-        await recordCvpIsFailure("nerastaLentele");
-        timings.end("insertCvpIsGedimai");
+        if (options.recordFailures !== false) {
+            timings.start("insertCvpIsGedimai");
+            await recordCvpIsFailure("nerastaLentele");
+            timings.end("insertCvpIsGedimai");
+        }
         throw new Error("Nerasta lentelė");
     }
 

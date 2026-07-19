@@ -4,48 +4,13 @@ Importuoja sutarčių duomenis į Postgres.
 
 import { postgres } from "../../postgres/postgres.js";
 import Timings from "../../utils/timings.js";
-import { prepareCanonicalSutartis } from "./canonicalSutartis.js";
 import { upsertVpmSutartis } from "./upsertVpmSutartis.js";
+import {
+    normalizeScrapedSutartis,
+    prepareNormalizedScrapedCanonical,
+} from "./prepareScrapedCanonical.js";
 
-export function parseDateOnly(value, field = "date", contractId = "unknown") {
-    if (value === null || value === undefined || value === "") return null;
-    const match = String(value).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!match) {
-        throw new Error(
-            `Invalid ${field} for contract ${contractId}: ${JSON.stringify(value)}`,
-        );
-    }
-    const [, year, month, day] = match.map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    if (
-        date.getUTCFullYear() !== year ||
-        date.getUTCMonth() !== month - 1 ||
-        date.getUTCDate() !== day
-    ) {
-        throw new Error(
-            `Invalid ${field} for contract ${contractId}: ${JSON.stringify(value)}`,
-        );
-    }
-    return `${match[1]}-${match[2]}-${match[3]}`;
-}
-
-export function parseNullableNumber(value, field, contractId) {
-    if (value === null || value === undefined || value === "") return null;
-    if (typeof value === "number") {
-        if (Number.isFinite(value)) return value;
-    } else if (typeof value === "string") {
-        const normalized = value
-            .trim()
-            .replace(/[\s\u00a0\u202f]+eur$/iu, "")
-            .replace(/[\s\u00a0\u202f]+/gu, "")
-            .replace(/,/g, ".");
-        const parsed = normalized === "" ? NaN : Number(normalized);
-        if (Number.isFinite(parsed)) return parsed;
-    }
-    throw new Error(
-        `Invalid ${field} for contract ${contractId ?? "unknown"}: ${JSON.stringify(value)}`,
-    );
-}
+export { parseDateOnly, parseNullableNumber } from "./prepareScrapedCanonical.js";
 
 /**
  * Importuoja sutarčių duomenis į Postgres.
@@ -60,8 +25,7 @@ export async function cvpIsImportArray(data, options = {}) {
     let items = [];
     const brokuotiIds = new Set();
     for (let i = 0; i < data.length; i++) {
-        let item = data[i];
-        const rawId = item.sutartiesUnikalusID;
+        const rawId = data[i].sutartiesUnikalusID;
 
         // Brokuoti laukai (pvz., "0000-00-00", "0022-10-12", "3.13.00")
         // nustatomi į null, kad sutartis vis tiek būtų importuota; ID
@@ -71,48 +35,7 @@ export async function cvpIsImportArray(data, options = {}) {
             if (Number.isSafeInteger(id) && id > 0) brokuotiIds.add(id);
             console.warn(error);
         };
-
-        // Skaičiai
-        for (const field of ["verte", "faktineIvykdimoVerte"]) {
-            try {
-                item[field] = parseNullableNumber(item[field], field, rawId);
-            } catch (error) {
-                markBrokas(error);
-                item[field] = null;
-            }
-        }
-
-        // Datos
-        const dateOnlyFields = [
-            "sudarymoData",
-            "galiojimoData",
-            "faktineIvykdimoData",
-        ];
-        for (const field of dateOnlyFields) {
-            try {
-                item[field] = parseDateOnly(item[field], field, rawId);
-            } catch (error) {
-                markBrokas(error);
-                item[field] = null;
-            }
-        }
-
-        const timestampFields = [
-            "paskelbimoData",
-            "paskutinioAtnaujinimoData",
-            "paskutinioRedagavimoData",
-        ];
-        for (const field of timestampFields) {
-            if (item[field]) {
-                const d = new Date(item[field]);
-                item[field] = isNaN(d) ? null : d;
-            }
-        }
-
-        // ID
-        item.sutartiesUnikalusID = item.sutartiesUnikalusID
-            ? parseInt(item.sutartiesUnikalusID, 10)
-            : null;
+        const item = normalizeScrapedSutartis(data[i], { onInvalid: markBrokas });
 
         // Praleidžiame be unikalaus ID (nors tokių neturėtų būti)
         if (!item.sutartiesUnikalusID) continue;
@@ -148,22 +71,7 @@ export async function cvpIsImportArray(data, options = {}) {
 
         // Paruošiame duomenis įterpimui
         items.forEach((item) => {
-            const faktineIvykdimoVerte =
-                typeof item.faktineIvykdimoVerte === "string" &&
-                    item.faktineIvykdimoVerte !== ""
-                    ? parseFloat(item.faktineIvykdimoVerte.replace(/,/g, "."))
-                    : typeof item.faktineIvykdimoVerte === "number"
-                        ? item.faktineIvykdimoVerte
-                        : null;
-
-            const pirkimoNumeris =
-                item.pirkimoNumeris?.replace(/\x00/g, "").trim() || null;
-
-            const canonical = prepareCanonicalSutartis({
-                ...item,
-                pirkimoNumeris,
-                faktineIvykdimoVerte,
-            });
+            const canonical = prepareNormalizedScrapedCanonical(item);
             canonicalSutartys.push(canonical);
 
             if (!item.dokumentai || !Array.isArray(item.dokumentai)) return;

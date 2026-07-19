@@ -63,9 +63,9 @@ LEFT JOIN LATERAL (
             'galiojimoData', current."galiojimoData",
             'faktineIvykdimoData', current."faktineIvykdimoData",
             'paskelbimoData', CASE WHEN current."paskelbimoData" IS NULL THEN NULL
-                ELSE to_char(current."paskelbimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+                ELSE to_char(current."paskelbimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS') END,
             'redagavimoData', CASE WHEN current."redagavimoData" IS NULL THEN NULL
-                ELSE to_char(current."redagavimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+                ELSE to_char(current."redagavimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS') END,
             'perkanciosiosOrganizacijosKodas', current."perkanciosiosOrganizacijosKodas",
             'perkanciosiosOrganizacijosPavadinimas', buyer_name.pavadinimas,
             'sutartiesNumeris', current."sutartiesNumeris",

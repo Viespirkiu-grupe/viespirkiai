@@ -10,9 +10,9 @@ const DOC_JSONB_SQL = `jsonb_build_object(
             'galiojimoData', e."galiojimoData",
             'faktineIvykdimoData', e."faktineIvykdimoData",
             'paskelbimoData', CASE WHEN e."paskelbimoData" IS NULL THEN NULL
-                ELSE to_char(e."paskelbimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+                ELSE to_char(e."paskelbimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS') END,
             'redagavimoData', CASE WHEN e."redagavimoData" IS NULL THEN NULL
-                ELSE to_char(e."redagavimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+                ELSE to_char(e."redagavimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS') END,
             'perkanciosiosOrganizacijosKodas', e."perkanciosiosOrganizacijosKodas",
             'perkanciosiosOrganizacijosPavadinimas', buyer_name.pavadinimas,
             'sutartiesNumeris', e."sutartiesNumeris",

@@ -10,6 +10,11 @@ import {
 import { writeWithPager } from "../scripts/showRecentSutartysChanges.js";
 
 describe("recent VPM contract changes", () => {
+    it("atstato timestamp kaip lokalų laiką be klaidingo Z", () => {
+        expect(RECENT_CHANGES_SQL).toContain("'YYYY-MM-DD\"T\"HH24:MI:SS.MS'");
+        expect(RECENT_CHANGES_SQL).not.toContain('HH24:MI:SS.MS\"Z\"');
+    });
+
     it("parses filters and output options", () => {
         expect(parseRecentChangesArgs([
             "--limit", "25", "--id=123", "--json", "--no-color",

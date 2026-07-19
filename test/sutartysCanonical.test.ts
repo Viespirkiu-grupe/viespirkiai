@@ -75,4 +75,18 @@ describe("canonical sutartis", () => {
             createHash("md5").update(prepared.json).digest("hex"),
         );
     });
+
+    it("išlaiko šaltinio timestamp laiką be UTC poslinkio", () => {
+        const prepared = prepareCanonicalSutartis({
+            ...item,
+            paskelbimoData: "2026-07-19 23:07:28",
+            paskutinioRedagavimoData: "2026-07-19 23:07:28",
+        });
+
+        expect(prepared.sutartis.paskelbimoData)
+            .toBe("2026-07-19T23:07:28.000");
+        expect(prepared.sutartis.redagavimoData)
+            .toBe("2026-07-19T23:07:28.000");
+        expect(prepared.json).not.toContain("20:07:28.000Z");
+    });
 });

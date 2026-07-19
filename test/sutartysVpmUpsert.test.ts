@@ -50,6 +50,9 @@ describe("VPM sutartis upsert", () => {
         expect(UPSERT_SQL).toMatch(/matyta = now\(\),\s+atnaujinta = now\(\)/);
         expect(UPSERT_SQL).toContain("FROM main_upsert changed");
         expect(UPSERT_SQL).toContain("to_tsvector('simple', $3)");
+        expect(UPSERT_SQL).toContain("(i.doc->>'paskelbimoData')::timestamp");
+        expect(UPSERT_SQL).toContain("'YYYY-MM-DD\"T\"HH24:MI:SS.MS'");
+        expect(UPSERT_SQL).not.toContain('HH24:MI:SS.MS\"Z\"');
         expect(UPSERT_SQL).toMatch(
             /JOIN main_upsert changed\s+ON changed\."unikalusId"/,
         );

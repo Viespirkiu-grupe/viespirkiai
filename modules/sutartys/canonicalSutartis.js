@@ -4,10 +4,39 @@ function nullable(value) {
     return value === undefined ? null : value;
 }
 
-function dateTime(value) {
+/**
+ * Normalizuoja šaltinio wall-clock laiką nekeisdamas jo laiko juostos.
+ * VPM timestamp stulpeliai yra WITHOUT TIME ZONE, todėl `Z` čia nepridedamas.
+ */
+export function localDateTime(value) {
     if (!value) return null;
-    const date = value instanceof Date ? value : new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime())
+            ? null
+            : value.toISOString().slice(0, -1);
+    }
+
+    const match = String(value).trim().match(
+        /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?)?(?:Z|[+-]\d{2}:?\d{2})?$/,
+    );
+    if (!match) return null;
+
+    const [, year, month, day, hour = "00", minute = "00", second = "00"] = match;
+    const millisecond = (match[7] ?? "").padEnd(3, "0");
+    const date = new Date(Date.UTC(
+        Number(year), Number(month) - 1, Number(day),
+        Number(hour), Number(minute), Number(second), Number(millisecond),
+    ));
+    if (
+        date.getUTCFullYear() !== Number(year) ||
+        date.getUTCMonth() !== Number(month) - 1 ||
+        date.getUTCDate() !== Number(day) ||
+        date.getUTCHours() !== Number(hour) ||
+        date.getUTCMinutes() !== Number(minute) ||
+        date.getUTCSeconds() !== Number(second)
+    ) return null;
+
+    return `${year}-${month}-${day}T${hour}:${minute}:${second}.${millisecond || "000"}`;
 }
 
 function bvpzNumber(value) {
@@ -53,8 +82,8 @@ export function buildCanonicalSutartis(item) {
         sudarymoData: nullable(item.sudarymoData),
         galiojimoData: nullable(item.galiojimoData),
         faktineIvykdimoData: nullable(item.faktineIvykdimoData),
-        paskelbimoData: dateTime(item.paskelbimoData),
-        redagavimoData: dateTime(item.paskutinioRedagavimoData),
+        paskelbimoData: localDateTime(item.paskelbimoData),
+        redagavimoData: localDateTime(item.paskutinioRedagavimoData),
         perkanciosiosOrganizacijosKodas: nullable(
             item.perkanciosiosOrganizacijosKodas,
         ),
