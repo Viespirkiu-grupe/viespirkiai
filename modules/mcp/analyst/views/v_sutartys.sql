@@ -1,28 +1,34 @@
 CREATE OR REPLACE VIEW v_sutartys AS
-SELECT s."sutartiesUnikalusId",
+SELECT s."unikalusId" AS "sutartiesUnikalusId",
        s."sutartiesNumeris",
        s."pirkimoNumeris",
-       s."sudarymoData",
+       s."sudarymoData"::timestamp AS "sudarymoData",
        s."paskelbimoData",
-       s."galiojimoData",
-       s."faktineIvykdimoData",
-       s."paskutinioRedagavimoData",
-       s."paskutinioAtnaujinimoData",
-       a."paskutiniKartaMatyta",
-       a."paskutiniKartaAtnaujinta",
-       s.verte,
-       s.suma,
-       s."faktineIvykdimoVerte",
+       s."galiojimoData"::timestamp AS "galiojimoData",
+       s."faktineIvykdimoData"::timestamp AS "faktineIvykdimoData",
+       s."redagavimoData" AS "paskutinioRedagavimoData",
+       a.matyta AS "paskutinioAtnaujinimoData",
+       a.matyta AS "paskutiniKartaMatyta",
+       a.atnaujinta AS "paskutiniKartaAtnaujinta",
+       s."numatomaVerte"::numeric AS verte,
+       s.verte::numeric AS suma,
+       s."faktineVerte"::numeric AS "faktineIvykdimoVerte",
        s.pavadinimas,
-       s."bvpzKodas",
-       s."bvpzPavadinimas",
-       s."papildomiBvpzKodai",
-       s."papildomiBvpzPavadinimai",
-       ARRAY[s."bvpzKodas"] || COALESCE(s."papildomiBvpzKodai", '{}')           AS "bvpzKodai",
-       ARRAY[s."bvpzPavadinimas"] || COALESCE(s."papildomiBvpzPavadinimai", '{}') AS "bvpzPavadinimai",
-       s.kategorija,
-       s.tipas,
-       CASE UPPER(TRIM(s.tipas))
+       COALESCE(
+           b.code || CASE WHEN NULLIF(b.checksum, '') IS NULL THEN '' ELSE '-' || b.checksum END,
+           s."bvpzKodas"::text
+       ) AS "bvpzKodas",
+       b.pavadinimas AS "bvpzPavadinimas",
+       COALESCE(eb.kodai, '{}'::text[]) AS "papildomiBvpzKodai",
+       COALESCE(eb.pavadinimai, '{}'::text[]) AS "papildomiBvpzPavadinimai",
+       ARRAY[COALESCE(
+           b.code || CASE WHEN NULLIF(b.checksum, '') IS NULL THEN '' ELSE '-' || b.checksum END,
+           s."bvpzKodas"::text
+       )] || COALESCE(eb.kodai, '{}'::text[]) AS "bvpzKodai",
+       ARRAY[b.pavadinimas] || COALESCE(eb.pavadinimai, '{}'::text[]) AS "bvpzPavadinimai",
+       k.kategorija,
+       t.tipas,
+       CASE UPPER(TRIM(t.tipas))
            WHEN 'TSP'            THEN 'Tarptautinis arba supaprastintas pirkimas'
            WHEN 'MVP'            THEN 'Mažos vertės pirkimas'
            WHEN 'ŽS'             THEN 'Žodinė sutartis'
@@ -33,21 +39,48 @@ SELECT s."sutartiesUnikalusId",
            WHEN 'SP'             THEN 'Sutarties pakeitimas'
            WHEN 'PSĮ'            THEN 'Pirkimas iš susijusios įmonės'
            WHEN 'ILGALAIKĖ MVPŽ' THEN 'Ilgalaikis mažos vertės pirkimas (žodinė sutartis)'
-           ELSE UPPER(TRIM(s.tipas))
-       END                                                                        AS "tipoPavadinimas",
+           ELSE UPPER(TRIM(t.tipas))
+       END AS "tipoPavadinimas",
        s.istrinta,
-       s."dokumentuKiekis",
+       s."failuSkaicius" AS "dokumentuKiekis",
        s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
-       s."perkanciojiOrganizacija",
-       pb.pavadinimas                      AS pirkejas,
-       s."tiekejoKodas",
-       s."tiekejas"                        AS "tiekejoPavadinimas",
-       COALESCE(tb.pavadinimas, s."tiekejas") AS tiekejas,
-       s."papildomiTiekejai",
-       s."papildomiTiekejaiKodai",
-       ARRAY[s."tiekejoKodas"] || COALESCE(s."papildomiTiekejaiKodai", '{}')     AS "tiekejaiKodai",
-       ARRAY[s."tiekejas"] || COALESCE(s."papildomiTiekejai", '{}')              AS tiekejai
-FROM sutartys s
-         LEFT JOIN "sutartysAtnaujinimai" a ON a."sutartiesUnikalusId" = s."sutartiesUnikalusId"
-         LEFT JOIN "jarCsv" pb ON pb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-         LEFT JOIN "jarCsv" tb ON tb."jarKodas"::text = s."tiekejoKodas"
+       buyer_name.pavadinimas AS "perkanciojiOrganizacija",
+       pb.pavadinimas AS pirkejas,
+       s."pirmoTiekejoKodas" AS "tiekejoKodas",
+       supplier_name.pavadinimas AS "tiekejoPavadinimas",
+       COALESCE(tb.pavadinimas, supplier_name.pavadinimas) AS tiekejas,
+       COALESCE(et.pavadinimai, '{}'::text[]) AS "papildomiTiekejai",
+       COALESCE(et.kodai, '{}'::text[]) AS "papildomiTiekejaiKodai",
+       ARRAY[s."pirmoTiekejoKodas"] || COALESCE(et.kodai, '{}'::text[]) AS "tiekejaiKodai",
+       ARRAY[supplier_name.pavadinimas] || COALESCE(et.pavadinimai, '{}'::text[]) AS tiekejai
+FROM "vpmSutartys" s
+LEFT JOIN "vpmSutartysAtnaujinimai" a ON a."unikalusId" = s."unikalusId"
+LEFT JOIN "vpmSutartysSalys" buyer_name ON buyer_name.id = s."perkanciosiosOrganizacijosPavadinimoId"
+LEFT JOIN "vpmSutartysSalys" supplier_name ON supplier_name.id = s."pirmoTiekejoPavadinimoId"
+LEFT JOIN "vpmSutartysTipai" t ON t.id = s."tipasId"
+LEFT JOIN "vpmSutartysKategorijos" k ON k.id = s."kategorijaId"
+LEFT JOIN LATERAL (
+    SELECT code.code, code.checksum, code.pavadinimas
+    FROM "bvpzKodai" code
+    WHERE code.code = s."bvpzKodas"::text
+    LIMIT 1
+) b ON true
+LEFT JOIN "jarCsv" pb ON pb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+LEFT JOIN "jarCsv" tb ON tb."jarKodas"::text = s."pirmoTiekejoKodas"
+LEFT JOIN LATERAL (
+    SELECT array_agg(COALESCE(
+               b2.code || CASE WHEN NULLIF(b2.checksum, '') IS NULL THEN '' ELSE '-' || b2.checksum END,
+               x."bvpzKodas"::text
+           ) ORDER BY x.id) AS kodai,
+           array_agg(b2.pavadinimas ORDER BY x.id) AS pavadinimai
+    FROM "vpmSutartysPapildomiBvpzKodai" x
+    LEFT JOIN "bvpzKodai" b2 ON b2.code = x."bvpzKodas"::text
+    WHERE x."unikalusId" = s."unikalusId"
+) eb ON true
+LEFT JOIN LATERAL (
+    SELECT array_agg(n.pavadinimas ORDER BY x.id) AS pavadinimai,
+           array_agg(x."tiekejoKodas" ORDER BY x.id) AS kodai
+    FROM "vpmSutartysPapildomiTiekejai" x
+    LEFT JOIN "vpmSutartysSalys" n ON n.id = x."tiekejoPavadinimoId"
+    WHERE x."unikalusId" = s."unikalusId"
+) et ON true

@@ -10,7 +10,7 @@ describe('loadSutartis', () => {
   beforeEach(() => {
     pgQuery.mockReset();
     pgQuery.mockImplementation((sql: string) => {
-      if (sql.includes('FROM sutartys WHERE "sutartiesUnikalusId" = $1')) {
+      if (sql.includes('public."vpmSutartys" s') && sql.includes('WHERE "sutartiesUnikalusId" = $1')) {
         return Promise.resolve({
           rows: [{
             sutartiesUnikalusId: 1670337988,
@@ -25,7 +25,7 @@ describe('loadSutartis', () => {
       }
       if (sql.includes('sutartysAtviriDuomenys')) return Promise.resolve({ rows: [] });
       if (sql.includes('sutartysAtviriDuomenysImp')) return Promise.resolve({ rows: [] });
-      if (sql.includes('FROM sutartys WHERE "sutartiesUnikalusId" != $1')) return Promise.resolve({ rows: [] });
+      if (sql.includes('public."vpmSutartys" s') && sql.includes('WHERE "sutartiesUnikalusId" != $1')) return Promise.resolve({ rows: [] });
       if (sql.includes('FROM "sabisSutartys"')) return Promise.resolve({ rows: [] });
       if (sql.includes('FROM failai f')) return Promise.resolve({ rows: [] });
       throw new Error(`Netikėta užklausa: ${sql}`);

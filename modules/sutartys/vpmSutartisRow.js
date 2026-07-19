@@ -4,16 +4,22 @@ lentelių. Naudojama pereinamuoju laikotarpiu ten, kur vartotojai
 (Quickwit doc builder, Spinta/JSONL eksportas) dar tikisi senos plokščios
 eilutės, bet duomenų šaltinis jau yra vpm.
 
-BVPŽ pavadinimai ir pilnas kodas su kontroline cifra (pvz. "45000000-7")
-vpm nesaugomi, todėl atstatomi iš bvpzKodai žodyno (code -> mask,
-pavadinimas).
+BVPŽ pavadinimai ir kontrolinė cifra (pvz. „-7“ kode „45000000-7“)
+vpm nesaugomi, todėl atstatomi iš bvpzKodai žodyno. Žodyno `mask`
+yra sutrumpintas hierarchinis kodas, todėl rodomas kodas sudedamas iš
+`code` ir `checksum`.
 */
 
 export const VPM_SUTARTIS_ROW_SELECT = `
     s."unikalusId" AS "sutartiesUnikalusId",
     s.pavadinimas,
+    s."pirkimoNumeris",
     CASE WHEN s."bvpzKodas" IS NULL THEN NULL
-         ELSE COALESCE(bvpz.mask, s."bvpzKodas"::text) END AS "bvpzKodas",
+         ELSE COALESCE(
+             bvpz.code || CASE WHEN NULLIF(bvpz.checksum, '') IS NULL
+                               THEN '' ELSE '-' || bvpz.checksum END,
+             s."bvpzKodas"::text
+         ) END AS "bvpzKodas",
     bvpz.pavadinimas AS "bvpzPavadinimas",
     COALESCE((
         SELECT jsonb_agg(jsonb_build_object(
@@ -31,6 +37,8 @@ export const VPM_SUTARTIS_ROW_SELECT = `
     kategorija.kategorija AS kategorija,
     s."paskelbimoData",
     atn.matyta AS "paskutinioAtnaujinimoData",
+    atn.matyta AS "paskutiniKartaMatyta",
+    atn.atnaujinta AS "paskutiniKartaAtnaujinta",
     s."redagavimoData" AS "paskutinioRedagavimoData",
     buyer_name.pavadinimas AS "perkanciojiOrganizacija",
     s."perkanciosiosOrganizacijosKodas",
@@ -45,7 +53,8 @@ export const VPM_SUTARTIS_ROW_SELECT = `
     COALESCE(extra_tiekejai.kodai, '{}'::text[]) AS "papildomiTiekejaiKodai",
     COALESCE(extra_bvpz.kodai, '{}'::text[]) AS "papildomiBvpzKodai",
     COALESCE(extra_bvpz.pavadinimai, '{}'::text[]) AS "papildomiBvpzPavadinimai",
-    s.istrinta`;
+    s.istrinta,
+    search."searchTsv" AS search_tsv`;
 
 export const VPM_SUTARTIS_ROW_FROM = `
     public."vpmSutartys" s
@@ -56,9 +65,16 @@ export const VPM_SUTARTIS_ROW_FROM = `
     LEFT JOIN public."vpmSutartysTipai" tipas ON tipas.id = s."tipasId"
     LEFT JOIN public."vpmSutartysKategorijos" kategorija
       ON kategorija.id = s."kategorijaId"
-    LEFT JOIN public."bvpzKodai" bvpz ON bvpz.code = s."bvpzKodas"::text
+    LEFT JOIN LATERAL (
+        SELECT b.code, b.checksum, b.pavadinimas
+        FROM public."bvpzKodai" b
+        WHERE b.code = s."bvpzKodas"::text
+        LIMIT 1
+    ) bvpz ON true
     LEFT JOIN public."vpmSutartysAtnaujinimai" atn
       ON atn."unikalusId" = s."unikalusId"
+    LEFT JOIN public."vpmSutartysSearch" search
+      ON search."unikalusId" = s."unikalusId"
     LEFT JOIN LATERAL (
         SELECT
             array_agg(en.pavadinimas ORDER BY e.id) AS pavadinimai,
@@ -70,9 +86,18 @@ export const VPM_SUTARTIS_ROW_FROM = `
     ) extra_tiekejai ON true
     LEFT JOIN LATERAL (
         SELECT
-            array_agg(COALESCE(b.mask, eb."bvpzKodas"::text) ORDER BY eb.id) AS kodai,
+            array_agg(COALESCE(
+                b.code || CASE WHEN NULLIF(b.checksum, '') IS NULL
+                               THEN '' ELSE '-' || b.checksum END,
+                eb."bvpzKodas"::text
+            ) ORDER BY eb.id) AS kodai,
             array_agg(b.pavadinimas ORDER BY eb.id) AS pavadinimai
         FROM public."vpmSutartysPapildomiBvpzKodai" eb
         LEFT JOIN public."bvpzKodai" b ON b.code = eb."bvpzKodas"::text
         WHERE eb."unikalusId" = s."unikalusId"
     ) extra_bvpz ON true`;
+
+/** Pilna senos eilutės formos subužklausa skaitymo vartotojams. */
+export const VPM_SUTARTIS_ROW_SQL = `
+    SELECT ${VPM_SUTARTIS_ROW_SELECT}
+    FROM ${VPM_SUTARTIS_ROW_FROM}`;

@@ -5,10 +5,10 @@ import { postgres } from "../postgres/postgres.js";
 const TABLES = {
   dokumentai: { queue: "dokumentaiIndexQueue", queueId: "dokumentoId", source: "dokumentai", sourceId: "id" },
   sutartys: {
-    queue: "sutartysIndexQueue",
-    queueId: "sutartiesUnikalusId",
-    source: "sutartys",
-    sourceId: "sutartiesUnikalusId",
+    queue: "vpmSutartysIndexQueue",
+    queueId: "unikalusId",
+    source: "vpmSutartys",
+    sourceId: "unikalusId",
   },
   viesiejiPirkimai: {
     queue: "viesiejiPirkimaiIndexQueue",

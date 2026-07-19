@@ -9,6 +9,10 @@ import { Transform, Readable } from "node:stream";
 import { CONTRACT_TYPES } from "./contractTypes.js";
 import QueryStream from "pg-query-stream";
 import { createTtlPromiseCache } from "../../utils/ttlPromiseCache.js";
+import {
+    VPM_SUTARTIS_ROW_FROM,
+    VPM_SUTARTIS_ROW_SELECT,
+} from "./vpmSutartisRow.js";
 
 const cachedHomepageSearch = createTtlPromiseCache(5_000);
 
@@ -31,7 +35,7 @@ const sutartysFilter = new FilterBuilder({
         {
             key: "perkanciosiosOrganizacijosKodas",
             hidden: true,
-            pgOverride: pgMultiEq(`"perkanciosiosOrganizacijosKodas"`),
+            pgOverride: pgMultiEq(`s."perkanciosiosOrganizacijosKodas"`),
             tsOverride: tsMultiEq("perkanciosiosOrganizacijosKodas"),
         },
         {
@@ -41,7 +45,15 @@ const sutartysFilter = new FilterBuilder({
                 const vals = splitCsv(val);
                 if (!vals.length) return null;
                 return `(${vals
-                    .map((v) => `("tiekejoKodas" = ${addParam(v)} OR "papildomiTiekejaiKodai" @> ARRAY[${addParam(v)}])`)
+                    .map((v) => {
+                        const mainParam = addParam(v);
+                        const extraParam = addParam(v);
+                        return `(s."pirmoTiekejoKodas" = ${mainParam} OR EXISTS (
+                            SELECT 1 FROM public."vpmSutartysPapildomiTiekejai" pt
+                            WHERE pt."unikalusId" = s."unikalusId"
+                              AND pt."tiekejoKodas" = ${extraParam}
+                        ))`;
+                    })
                     .join(" OR ")})`;
             },
             tsOverride: (val) => {
@@ -52,11 +64,11 @@ const sutartysFilter = new FilterBuilder({
                     .join(" || ")})`;
             },
         },
-        { key: "sutartiesNumeris", hidden: true },
-        { key: "pirkimoNumeris", hidden: true },
+        { key: "sutartiesNumeris", col: `s."sutartiesNumeris"`, hidden: true },
+        { key: "pirkimoNumeris", col: `s."pirkimoNumeris"`, hidden: true },
         {
             key: "sutartiesUnikalusID",
-            col: `"sutartiesUnikalusId"`,
+            col: `s."unikalusId"`,
             tsCol: "sutartiesUnikalusId",
             type: "integer",
             hidden: true,
@@ -64,58 +76,58 @@ const sutartysFilter = new FilterBuilder({
         {
             key: "tipas",
             hidden: true,
-            pgOverride: pgMultiEq(`"tipas"`),
+            pgOverride: pgMultiEq(`tipas.tipas`),
             tsOverride: tsMultiEq("tipas"),
         },
         {
             key: "kategorija",
             hidden: true,
-            pgOverride: pgMultiEq(`"kategorija"`),
+            pgOverride: pgMultiEq(`kategorija.kategorija`),
             tsOverride: tsMultiEq("kategorija"),
         },
         {
             key: "sudarymoDataNuo",
-            col: `"sudarymoData"`,
+            col: `s."sudarymoData"`,
             tsCol: "sudarymoData",
             type: "gte_date",
             hidden: true,
         },
         {
             key: "sudarymoDataIki",
-            col: `"sudarymoData"`,
+            col: `s."sudarymoData"`,
             tsCol: "sudarymoData",
             type: "lte_date",
             hidden: true,
         },
-        { key: "verteNuo", col: `"verte"`, tsCol: "verte", type: "gte_number", hidden: true },
-        { key: "verteIki", col: `"verte"`, tsCol: "verte", type: "lte_number", hidden: true },
-        { key: "sumaNuo", col: `"suma"`, tsCol: "suma", type: "gte_number", hidden: true },
-        { key: "sumaIki", col: `"suma"`, tsCol: "suma", type: "lte_number", hidden: true },
+        { key: "verteNuo", col: `s."numatomaVerte"`, tsCol: "verte", type: "gte_number", hidden: true },
+        { key: "verteIki", col: `s."numatomaVerte"`, tsCol: "verte", type: "lte_number", hidden: true },
+        { key: "sumaNuo", col: `s.verte`, tsCol: "suma", type: "gte_number", hidden: true },
+        { key: "sumaIki", col: `s.verte`, tsCol: "suma", type: "lte_number", hidden: true },
         {
             key: "tikSuDokumentais",
             isBoolean: true,
             hidden: true,
-            pgOverride: () => `"dokumentuKiekis" > 0`,
+            pgOverride: () => `s."failuSkaicius" > 0`,
             tsOverride: () => `dokumentuKiekis:>0`,
         },
         {
             key: "ignoruotiSp",
             isBoolean: true,
             hidden: true,
-            pgOverride: () => `"tipas" != 'SP'`,
+            pgOverride: () => `tipas.tipas != 'SP'`,
             tsOverride: () => `tipas:!=SP`,
         },
-        { key: "search", col: `"search_tsv"`, type: "tsvector", pgOnly: true },
+        { key: "search", col: `search."searchTsv"`, type: "tsvector", pgOnly: true },
         {
             key: "bvpzPrefiksas",
-            col: `"bvpzKodas"`,
+            col: `s."bvpzKodas"::text`,
             type: "prefix_range",
             hidden: true,
             pgOnly: true,
         },
         {
             key: "bvpzPrefiksasKitas",
-            col: `"bvpzKodas"`,
+            col: `s."bvpzKodas"::text`,
             type: "prefix_range",
             hidden: true,
             pgOnly: true,
@@ -131,12 +143,11 @@ const sutartysFilter = new FilterBuilder({
             "paskelbimoData",
             "suma",
         ],
-        },
+        nullsLast: true,
+    },
 });
 
-// istrinta yra ir sutartys, ir (denormalizuotai) sutartysAtnaujinimai lentelėse,
-// tad kvalifikuojame sutartys – kad join'e nebūtų dviprasmiška.
-const FIXED_WHERE = [`NOT COALESCE(sutartys."istrinta", false)`];
+const FIXED_WHERE = [`s.istrinta = false`];
 
 export function getSutartysQueryMetadata(query) {
     const { values, queryParams } = sutartysFilter.build(query);
@@ -145,22 +156,8 @@ export function getSutartysQueryMetadata(query) {
 
 // Visi sutarčių stulpeliai išskyrus search_tsv — sugeneruotas tsvector yra
 // didelis ir rezultatuose nereikalingas (nutekėtų ir į MCP atsakymus).
-export const SUTARTYS_COLUMNS = [
-    `"sutartiesUnikalusId"`, `"pavadinimas"`, `"bvpzKodas"`, `"bvpzPavadinimas"`,
-    `"dokumentai"`, `"dokumentuKiekis"`, `"faktineIvykdimoData"`, `"faktineIvykdimoVerte"`,
-    `"galiojimoData"`, `"kategorija"`, `"paskelbimoData"`, `"paskutinioAtnaujinimoData"`,
-    `"paskutinioRedagavimoData"`, `"perkanciojiOrganizacija"`, `"perkanciosiosOrganizacijosKodas"`,
-    `"sudarymoData"`, `"sutartiesNumeris"`, `"tiekejas"`, `"tiekejoKodas"`, `"tipas"`,
-    `"verte"`, `"pirkimoNumeris"`, `"papildomiTiekejai"`, `"papildomiTiekejaiKodai"`,
-    `"papildomiBvpzKodai"`, `"papildomiBvpzPavadinimai"`, `"paskutiniKartaMatyta"`,
-    `"suma"`, `sutartys."istrinta"`, `"paskutiniKartaAtnaujinta"`,
-].join(", ");
-
-// sutartys + 1:1 sutartysAtnaujinimai (paskutiniKarta* iškelti į atskirą lentelę).
-// USING palieka "sutartiesUnikalusId" vienareikšmį. Dauguma stulpelių unikalūs,
-// tad nekvalifikuoti vardai veikia; išimtis – "istrinta" (yra abiejose lentelėse),
-// jį kvalifikuojame sutartys.
-const SUTARTYS_FROM = `sutartys LEFT JOIN "sutartysAtnaujinimai" USING ("sutartiesUnikalusId")`;
+export const SUTARTYS_COLUMNS = VPM_SUTARTIS_ROW_SELECT;
+const SUTARTYS_FROM = VPM_SUTARTIS_ROW_FROM;
 
 const QUICKWIT_LENTELE = "sutartys";
 const QUICKWIT_PAGE_SIZE = 50;
@@ -807,10 +804,9 @@ async function loadSearchRowsFromPostgres(searchRows) {
 
     const { rows } = await postgres.query(
         `SELECT ${SUTARTYS_COLUMNS}
-         FROM sutartys
-         LEFT JOIN "sutartysAtnaujinimai" USING ("sutartiesUnikalusId")
-         WHERE "sutartiesUnikalusId" = ANY($1::int[])
-           AND NOT COALESCE(sutartys."istrinta", false)`,
+         FROM ${SUTARTYS_FROM}
+         WHERE s."unikalusId" = ANY($1::bigint[])
+           AND s.istrinta = false`,
         [ids],
     );
     const rowsById = new Map(
@@ -1067,7 +1063,7 @@ async function searchSutartysUncached(
         ? postgres.query(
               sqlCount.replace(
                   "SELECT COUNT(*)",
-                  `SELECT COUNT(*) AS kiekis, COALESCE(SUM("suma"), 0) AS "bendraVerte"`,
+                  `SELECT COUNT(*) AS kiekis, COALESCE(SUM(s.verte), 0) AS "bendraVerte"`,
               ),
               paramsCount,
           )
@@ -1132,13 +1128,13 @@ export async function searchSutartys(query, options = {}) {
  */
 export async function countSutartys(query) {
     const { sqlCount, params, visiIrasai } = sutartysFilter.build(query, {
-        table: "sutartys",
+        table: SUTARTYS_FROM,
         fixedWhere: FIXED_WHERE,
     });
 
     if (visiIrasai) {
         const { rows } = await postgres.query(
-            `SELECT "rowCount" FROM "eiluciuSkaiciai" WHERE "tableName" = 'sutartys'`,
+            `SELECT COUNT(*) AS "rowCount" FROM public."vpmSutartys" WHERE istrinta = false`,
         );
         return Number(rows[0].rowCount);
     }

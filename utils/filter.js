@@ -211,6 +211,7 @@ const COMPARISON_TYPES = {
  * @property {string[]} allowed - Allowed sort column names.
  * @property {Record<string, string>} [pgAliases] - Maps query column names to Postgres column names.
  * @property {Record<string, string>} [tsAliases] - Maps query column names to Typesense field names.
+ * @property {boolean} [nullsLast=false] - Appends NULLS LAST to Postgres sorting.
  */
 
 /**
@@ -397,6 +398,7 @@ export class FilterBuilder {
             allowed,
             pgAliases = {},
             tsAliases = {},
+            nullsLast = false,
         } = this.sort;
         const allowedSet = new Set(allowed);
 
@@ -420,7 +422,7 @@ export class FilterBuilder {
         const tsCol = tsAliases[col] ?? col;
 
         return {
-            orderBy: `"${pgCol}" ${dir.toUpperCase()}`,
+            orderBy: `"${pgCol}" ${dir.toUpperCase()}${nullsLast ? " NULLS LAST" : ""}`,
             sortBy: `${tsCol}:${dir}`,
         };
     }

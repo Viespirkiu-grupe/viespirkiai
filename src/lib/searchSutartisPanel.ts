@@ -1,5 +1,6 @@
 import { postgres } from '@/postgres/postgres.js';
 import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
+import { VPM_SUTARTIS_ROW_SQL } from '@/modules/sutartys/vpmSutartisRow.js';
 
 export interface SutartisPanel {
   id: string;
@@ -44,9 +45,9 @@ export async function findSutartisPanel(q: string): Promise<SutartisPanel | null
          "bvpzKodas",
          "bvpzPavadinimas",
          "dokumentuKiekis"
-       FROM public.sutartys
+       FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
        WHERE "sutartiesUnikalusId" = $1
-         AND NOT COALESCE(istrinta, false)
+         AND istrinta = false
        LIMIT 1`,
       [id],
     );

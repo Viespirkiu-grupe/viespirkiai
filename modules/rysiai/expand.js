@@ -329,11 +329,11 @@ export async function expandOrg(jarKodas) {
         ),
         // Top contracts where this org is the buyer
         postgres.query(
-            `SELECT s."sutartiesUnikalusId",
+            `SELECT s."unikalusId" AS "sutartiesUnikalusId",
                     s."pavadinimas",
-                    s."verte",
+                    s."numatomaVerte" AS "verte",
                     s."pirkimoNumeris",
-                    s."tiekejoKodas",
+                    s."pirmoTiekejoKodas" AS "tiekejoKodas",
                     s."sudarymoData"::date        AS "sudarymoData",
                     s."galiojimoData"::date       AS "galiojimoData",
                     s."paskelbimoData"::date      AS "paskelbimoData",
@@ -343,20 +343,22 @@ export async function expandOrg(jarKodas) {
                     seller."registravimoData"     AS "tiekejoRegistravimoData",
                     seller."statusasNuo"          AS "tiekejoStatusasNuo",
                     seller."statusoKodas"         AS "tiekejoStatusoKodas"
-             FROM   public."sutartys" s
-             LEFT JOIN public."jarCsv" seller ON seller."jarKodas"::text = s."tiekejoKodas"
+             FROM   public."vpmSutartys" s
+             LEFT JOIN public."vpmSutartysTipai" st ON st.id = s."tipasId"
+             LEFT JOIN public."jarCsv" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
              WHERE  s."perkanciosiosOrganizacijosKodas" = $1
-               AND  s."tipas" <> 'SP'
-               AND  s."verte" IS NOT NULL
-             ORDER BY s."verte" DESC NULLS LAST
+               AND  st."tipas" <> 'SP'
+               AND  s."numatomaVerte" IS NOT NULL
+               AND  s.istrinta = false
+             ORDER BY s."numatomaVerte" DESC NULLS LAST
              LIMIT 20`,
             [jk],
         ),
         // Top contracts where this org is the seller
         postgres.query(
-            `SELECT s."sutartiesUnikalusId",
+            `SELECT s."unikalusId" AS "sutartiesUnikalusId",
                     s."pavadinimas",
-                    s."verte",
+                    s."numatomaVerte" AS "verte",
                     s."pirkimoNumeris",
                     s."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
                     s."sudarymoData"::date              AS "sudarymoData",
@@ -368,12 +370,14 @@ export async function expandOrg(jarKodas) {
                     buyer."registravimoData"            AS "pirkejoRegistravimoData",
                     buyer."statusasNuo"                 AS "pirkejoStatusasNuo",
                     buyer."statusoKodas"                AS "pirkejoStatusoKodas"
-             FROM   public."sutartys" s
+             FROM   public."vpmSutartys" s
+             LEFT JOIN public."vpmSutartysTipai" st ON st.id = s."tipasId"
              LEFT JOIN public."jarCsv" buyer ON buyer."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-             WHERE  s."tiekejoKodas" = $1
-               AND  s."tipas" <> 'SP'
-               AND  s."verte" IS NOT NULL
-             ORDER BY s."verte" DESC NULLS LAST
+             WHERE  s."pirmoTiekejoKodas" = $1
+               AND  st."tipas" <> 'SP'
+               AND  s."numatomaVerte" IS NOT NULL
+               AND  s.istrinta = false
+             ORDER BY s."numatomaVerte" DESC NULLS LAST
              LIMIT 20`,
             [jk],
         ),
@@ -564,21 +568,22 @@ export async function expandProcurement(pirkimoId) {
     const procId = `procurement:${id}`;
 
     const winnersRes = await postgres.query(
-        `SELECT s."tiekejoKodas",
+        `SELECT s."pirmoTiekejoKodas" AS "tiekejoKodas",
                 j."pavadinimas",
                 j."formosKodas",
                 j."registravimoData",
                 j."statusasNuo",
                 j."statusoKodas",
-                SUM(s."verte") AS "totalVerte",
+                SUM(s."numatomaVerte") AS "totalVerte",
                 MIN(LEAST(COALESCE(s."sudarymoData"::date, s."paskelbimoData"::date),
                           COALESCE(s."paskelbimoData"::date, s."sudarymoData"::date)))::text AS "awardFromDate",
                 MAX(GREATEST(COALESCE(s."galiojimoData"::date, s."faktineIvykdimoData"::date),
                              COALESCE(s."faktineIvykdimoData"::date, s."galiojimoData"::date)))::text AS "awardToDate"
-         FROM   public."sutartys" s
-         LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
+         FROM   public."vpmSutartys" s
+         LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
          WHERE  s."pirkimoNumeris" = $1
-         GROUP  BY s."tiekejoKodas", j."pavadinimas", j."formosKodas", j."registravimoData", j."statusasNuo", j."statusoKodas"`,
+           AND  s.istrinta = false
+         GROUP  BY s."pirmoTiekejoKodas", j."pavadinimas", j."formosKodas", j."registravimoData", j."statusasNuo", j."statusoKodas"`,
         [id],
     );
 
@@ -627,21 +632,22 @@ export async function expandContract(pirkimoNumeris) {
         ),
         // Winners via sutartys
         postgres.query(
-            `SELECT s."tiekejoKodas",
+            `SELECT s."pirmoTiekejoKodas" AS "tiekejoKodas",
                     j."pavadinimas",
                     j."formosKodas",
                     j."registravimoData",
                     j."statusasNuo",
                     j."statusoKodas",
-                    SUM(s."verte") AS "totalVerte",
+                    SUM(s."numatomaVerte") AS "totalVerte",
                     MIN(LEAST(COALESCE(s."sudarymoData"::date, s."paskelbimoData"::date),
                               COALESCE(s."paskelbimoData"::date, s."sudarymoData"::date)))::text AS "awardFromDate",
                     MAX(GREATEST(COALESCE(s."galiojimoData"::date, s."faktineIvykdimoData"::date),
                                  COALESCE(s."faktineIvykdimoData"::date, s."galiojimoData"::date)))::text AS "awardToDate"
-             FROM   public."sutartys" s
-             LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = s."tiekejoKodas"
+             FROM   public."vpmSutartys" s
+             LEFT JOIN public."jarCsv" j ON j."jarKodas"::text = s."pirmoTiekejoKodas"
              WHERE  s."pirkimoNumeris" = $1
-             GROUP  BY s."tiekejoKodas", j."pavadinimas", j."formosKodas", j."registravimoData", j."statusasNuo", j."statusoKodas"`,
+               AND  s.istrinta = false
+             GROUP  BY s."pirmoTiekejoKodas", j."pavadinimas", j."formosKodas", j."registravimoData", j."statusasNuo", j."statusoKodas"`,
             [pirkNr],
         ),
         // Best-effort losers from ATN1 (Lithuanian bidders only)
@@ -716,8 +722,9 @@ export async function expandSutartis(sutartiesUnikalusId) {
     const id = String(sutartiesUnikalusId);
 
     const sutartisRes = await postgres.query(
-        `SELECT s."sutartiesUnikalusId", s."pavadinimas", s."verte", s."pirkimoNumeris",
-                s."perkanciosiosOrganizacijosKodas", s."tiekejoKodas",
+        `SELECT s."unikalusId" AS "sutartiesUnikalusId", s."pavadinimas",
+                s."numatomaVerte" AS "verte", s."pirkimoNumeris",
+                s."perkanciosiosOrganizacijosKodas", s."pirmoTiekejoKodas" AS "tiekejoKodas",
                 s."sudarymoData"::date         AS "sudarymoData",
                 s."galiojimoData"::date        AS "galiojimoData",
                 s."paskelbimoData"::date       AS "paskelbimoData",
@@ -732,10 +739,10 @@ export async function expandSutartis(sutartiesUnikalusId) {
                 seller."registravimoData"      AS "tiekejoRegistravimoData",
                 seller."statusasNuo"           AS "tiekejoStatusasNuo",
                 seller."statusoKodas"          AS "tiekejoStatusoKodas"
-         FROM   public."sutartys" s
+         FROM   public."vpmSutartys" s
          LEFT JOIN public."jarCsv" buyer  ON buyer."jarKodas"::text  = s."perkanciosiosOrganizacijosKodas"
-         LEFT JOIN public."jarCsv" seller ON seller."jarKodas"::text = s."tiekejoKodas"
-         WHERE  s."sutartiesUnikalusId" = $1
+         LEFT JOIN public."jarCsv" seller ON seller."jarKodas"::text = s."pirmoTiekejoKodas"
+         WHERE  s."unikalusId" = $1
          LIMIT  1`,
         [id],
     );

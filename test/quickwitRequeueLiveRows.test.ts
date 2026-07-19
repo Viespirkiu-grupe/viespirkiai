@@ -73,6 +73,32 @@ describe("requeueLiveRows CLI", () => {
 });
 
 describe("requeueLiveRows transaction", () => {
+  it("requeues sutartys through the VPM source and queue", async () => {
+    const queries: string[] = [];
+    const client = {
+      async query(sql: string) {
+        const normalized = sql.replace(/\s+/g, " ").trim();
+        queries.push(normalized);
+        if (normalized.startsWith("SELECT COUNT(*)")) return { rows: [{ total: 1 }], rowCount: 1 };
+        return { rows: [], rowCount: 0 };
+      },
+      release() {},
+    };
+    const db = { async connect() { return client; } } as any;
+
+    await requeueIndexes(
+      [{ id: 2, indeksas: "sutartys_2" }],
+      { dryRun: false, lentele: "sutartys" },
+      db,
+    );
+
+    const sql = queries.join("\n");
+    expect(sql).toContain('"vpmSutartysIndexQueue"');
+    expect(sql).toContain('JOIN "vpmSutartys"');
+    expect(sql).toContain('s."unikalusId"');
+    expect(sql).not.toContain('"sutartysIndexQueue"');
+  });
+
   it("groups indexes from different tables into separate transactions", async () => {
     const connectedTables: string[] = [];
     const db = {

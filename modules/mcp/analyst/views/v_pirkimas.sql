@@ -1,6 +1,6 @@
 CREATE OR REPLACE VIEW v_pirkimas AS
 SELECT 'cvpis' AS saltinis,
-       p."pirkimoId",
+       p."pirkimoId"::text AS "pirkimoId",
        p.pavadinimas,
        p."jarKodas",
        NULL::text AS "jarKodasSaltinis",
@@ -41,13 +41,14 @@ SELECT 'cvpp' AS saltinis,
 FROM "cvppViesiejiPirkimai" c
          LEFT JOIN LATERAL (
              SELECT s."perkanciosiosOrganizacijosKodas"
-             FROM sutartys s
+             FROM "vpmSutartys" s
              WHERE s."pirkimoNumeris" = c."pirkimoNumeris"
                AND s."perkanciosiosOrganizacijosKodas" IS NOT NULL
+               AND s.istrinta = false
              LIMIT 1
          ) sj ON true
 WHERE c."skelbimoTipas" = 'Skelbimas apie pirkimą'
   AND NOT EXISTS (
       SELECT 1 FROM "viesiejiPirkimai" p
-      WHERE p."pirkimoId" = c."pirkimoNumeris"
+      WHERE p."pirkimoId"::text = c."pirkimoNumeris"
   )

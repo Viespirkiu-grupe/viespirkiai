@@ -2,6 +2,7 @@ import { z } from "zod";
 import { postgres } from "../../../postgres/postgres.js";
 import { fixHtmlEntities } from "../../../utils/fixHtmlEntities.js";
 import { CONTRACT_TYPES } from "../../sutartys/contractTypes.js";
+import { VPM_SUTARTIS_ROW_SQL } from "../../sutartys/vpmSutartisRow.js";
 
 export const name = "get_sutartis";
 export const description =
@@ -13,7 +14,8 @@ export const schema = {
 export async function handler({ id }) {
     let sutartis = await postgres
         .query(
-            'SELECT * FROM sutartys WHERE "sutartiesUnikalusId" = $1 LIMIT 1',
+            `SELECT * FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
+             WHERE "sutartiesUnikalusId" = $1 LIMIT 1`,
             [id],
         )
         .then((r) => r.rows[0]);
@@ -53,11 +55,12 @@ export async function handler({ id }) {
     // Panašios sutartys
     const panasios = await postgres.query(
         `SELECT "sutartiesUnikalusId", pavadinimas, verte, "faktineIvykdimoVerte", "sudarymoData", tipas
-         FROM sutartys
+         FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
          WHERE "sutartiesUnikalusId" != $1
            AND "perkanciosiosOrganizacijosKodas" = $2
            AND "tiekejoKodas" = $3
            AND verte = $4
+           AND istrinta = false
          ORDER BY "paskutinioRedagavimoData" DESC`,
         [
             id,

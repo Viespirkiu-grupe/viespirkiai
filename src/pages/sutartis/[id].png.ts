@@ -1,13 +1,15 @@
 import { postgres } from '@/postgres/postgres.js';
 import { getOpenGraphImage } from '@/utils/openGraphImage.js';
 import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
+import { VPM_SUTARTIS_ROW_SQL } from '@/modules/sutartys/vpmSutartisRow.js';
 
 export async function GET({ params }: { params: { id: string } }) {
   const numId = parseInt(params.id);
   if (isNaN(numId)) return new Response(null, { status: 404 });
 
   const sutartis = await postgres
-    .query('SELECT * FROM sutartys WHERE "sutartiesUnikalusId" = $1 LIMIT 1', [numId])
+    .query(`SELECT * FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
+            WHERE "sutartiesUnikalusId" = $1 LIMIT 1`, [numId])
     .then((r: any) => r.rows[0]);
 
   if (!sutartis) return new Response(null, { status: 404 });

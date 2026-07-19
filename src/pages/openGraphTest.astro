@@ -17,8 +17,8 @@ async function randomIds(sql: string, fallbackSql: string): Promise<string[]> {
 
 const [sutartys, pirkimai, failai, asmenys] = await Promise.all([
   randomIds(
-    `SELECT "sutartiesUnikalusId" FROM sutartys TABLESAMPLE SYSTEM (0.1) LIMIT 3`,
-    `SELECT "sutartiesUnikalusId" FROM sutartys LIMIT 3`,
+    `SELECT "unikalusId" FROM "vpmSutartys" TABLESAMPLE SYSTEM (0.1) WHERE istrinta = false LIMIT 3`,
+    `SELECT "unikalusId" FROM "vpmSutartys" WHERE istrinta = false LIMIT 3`,
   ),
   randomIds(
     `SELECT "pirkimoId" FROM "viesiejiPirkimai" TABLESAMPLE SYSTEM (0.1) LIMIT 3`,
