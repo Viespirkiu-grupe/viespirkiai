@@ -377,6 +377,29 @@ export async function cvpIsImportArray(data, options = {}) {
         }
         timings.end("importPostgresFailaiUpsert");
 
+        // Užtikriname, kad visos matytos sudarymo datos būtų
+        // vpmSutartysSudarymoDatos lentelėje (dienų scrapinimo sekimui).
+        // Daroma PRIEŠ vpm upsert'us: procesui nulūžus tarp šių žingsnių
+        // liktų nebent perteklinė data (nekenksminga), o ne sutartis be
+        // užregistruotos dienos, kuri niekada nebūtų perscrapinta.
+        timings.start("importSudarymoDatosUpsert");
+        const sudarymoDatos = [
+            ...new Set(
+                canonicalSutartys
+                    .map((c) => c.sutartis.sudarymoData)
+                    .filter(Boolean),
+            ),
+        ];
+        if (sudarymoDatos.length > 0) {
+            await postgres.query(
+                `INSERT INTO public."vpmSutartysSudarymoDatos" ("sudarymoData")
+                 VALUES ${sudarymoDatos.map((_, i) => `($${i + 1})`).join(",")}
+                 ON CONFLICT ("sudarymoData") DO NOTHING;`,
+                sudarymoDatos,
+            );
+        }
+        timings.end("importSudarymoDatosUpsert");
+
         timings.start("importVpmSutartysUpsert");
         for (const canonical of canonicalSutartys) {
             await upsertVpmSutartis(canonical);

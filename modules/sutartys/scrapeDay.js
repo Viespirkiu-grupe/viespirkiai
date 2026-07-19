@@ -46,13 +46,13 @@ async function cvpIsScrapeDay(date = new Date().toISOString().slice(0, 10)) {
 
 export async function cvpIsScrapeLeastRecentDate() {
     let dateRes = await postgres.query(`SELECT *
-    FROM public."sutartysSudarymoDatos"
-    WHERE "scrapeTimestamp" IS NULL OR "scrapeTimestamp" < (
+    FROM public."vpmSutartysSudarymoDatos"
+    WHERE "atnaujinta" IS NULL OR "atnaujinta" < (
         timezone('Europe/Vilnius', now()) - INTERVAL '1 day'
     )
     ORDER BY
-        "scrapeTimestamp" ASC NULLS FIRST,
-        "count" ASC
+        "atnaujinta" ASC NULLS FIRST,
+        "sudarymoData" ASC
     LIMIT 1;`);
 
     if (dateRes.rows.length === 0) {
@@ -61,16 +61,17 @@ export async function cvpIsScrapeLeastRecentDate() {
 
     let date = dateRes.rows[0].sudarymoData;
     log(
-        `Scrape'inama data ${date} (scrape'inta ${dateRes.rows[0].scrapeTimestamp}, count: ${dateRes.rows[0].count})`,
+        `Scrape'inama data ${date} (atnaujinta ${dateRes.rows[0].atnaujinta})`,
     );
-    let result = await cvpIsScrapeDay(date);
+    await cvpIsScrapeDay(date);
 
-    // Update the scrape timestamp and count
+    // Fiksuojame pilną dienos perėjimą
     await postgres.query(
-        `UPDATE public."sutartysSudarymoDatos"
-        SET "scrapeTimestamp" = NOW(), "scrapeResultCount" = $1, scrapes = scrapes + 1
-        WHERE "sudarymoData" = $2;`,
-        [result.length, date],
+        `INSERT INTO public."vpmSutartysSudarymoDatos" ("sudarymoData", "atnaujinta")
+        VALUES ($1, timezone('Europe/Vilnius', now()))
+        ON CONFLICT ("sudarymoData") DO UPDATE SET
+          "atnaujinta" = timezone('Europe/Vilnius', now());`,
+        [date],
     );
     return true;
 }
