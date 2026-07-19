@@ -15,18 +15,18 @@ if (!Number.isInteger(concurrency) || concurrency <= 0) {
 }
 
 const snapshot = await postgres.query(
-    `SELECT "sutartiesUnikalusId"
-       FROM "sutartysAtnaujinimai"
-      WHERE "paskutiniKartaMatyta" >=
+    `SELECT "unikalusId"
+       FROM "vpmSutartysAtnaujinimai"
+      WHERE "matyta" >=
             (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Vilnius')
             - make_interval(mins => $1)
-        AND "paskutiniKartaMatyta" <=
+        AND "matyta" <=
             (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Vilnius')
-      ORDER BY "paskutiniKartaMatyta", "sutartiesUnikalusId"`,
+      ORDER BY "matyta", "unikalusId"`,
     [minutes],
 );
 
-const ids = snapshot.rows.map((row) => String(row.sutartiesUnikalusId));
+const ids = snapshot.rows.map((row) => String(row.unikalusId));
 console.log(
     `Rescraping ${ids.length} contracts seen in the last ${minutes} minutes ` +
         `with concurrency=${concurrency}`,

@@ -8,6 +8,10 @@
  */
 import { postgres } from "../../postgres/postgres.js";
 import { CONTRACT_TYPES } from "./contractTypes.js";
+import {
+    VPM_SUTARTIS_ROW_SELECT,
+    VPM_SUTARTIS_ROW_FROM,
+} from "./vpmSutartisRow.js";
 
 export const DEFAULT_BATCH_SIZE = 500;
 
@@ -208,18 +212,17 @@ export async function fetchMd5Lookup(rows) {
 export async function fetchBatch(afterId, batchSize = DEFAULT_BATCH_SIZE) {
     const { rows } = await postgres.query(
         `
-        SELECT
-            s.*,
+        SELECT ${VPM_SUTARTIS_ROW_SELECT},
             a."tiekPavPatikslinimas",
             a."tiekSalis",
             ai."tiekSbjPatikslinimas" AS "tiekPavPatikslinimasImp",
             ai."tiekSalis"            AS "tiekSalisImp"
-        FROM sutartys s
-        LEFT JOIN "sutartysAtviriDuomenys"    a  ON a."dokId"  = s."sutartiesUnikalusId"
-        LEFT JOIN "sutartysAtviriDuomenysImp" ai ON ai."dokId" = s."sutartiesUnikalusId"
-        WHERE s."sutartiesUnikalusId" > $1
-          AND COALESCE(s.istrinta, false) = false
-        ORDER BY s."sutartiesUnikalusId" ASC
+        FROM ${VPM_SUTARTIS_ROW_FROM}
+        LEFT JOIN "sutartysAtviriDuomenys"    a  ON a."dokId"  = s."unikalusId"
+        LEFT JOIN "sutartysAtviriDuomenysImp" ai ON ai."dokId" = s."unikalusId"
+        WHERE s."unikalusId" > $1
+          AND s.istrinta = false
+        ORDER BY s."unikalusId" ASC
         LIMIT $2
         `,
         [afterId, batchSize],

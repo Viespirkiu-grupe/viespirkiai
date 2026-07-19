@@ -23,10 +23,10 @@ async function main() {
 
     while (true) {
         const { rows } = await postgres.query(
-            `SELECT "sutartiesUnikalusId"
-             FROM public.sutartys
-             WHERE "sutartiesUnikalusId" > $1
-             ORDER BY "sutartiesUnikalusId"
+            `SELECT "unikalusId" AS "sutartiesUnikalusId"
+             FROM public."vpmSutartys"
+             WHERE "unikalusId" > $1
+             ORDER BY "unikalusId"
              LIMIT $2`,
             [afterId, batchSize],
         );

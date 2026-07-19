@@ -1,4 +1,68 @@
 import { postgres } from "../../postgres/postgres.js";
+import { canonicalJsonMd5 } from "./canonicalSutartis.js";
+
+// Canonical dokumento atstatymas iš normalizuotų lentelių; eilutės alias — "e".
+// Naudojama ir UPSERT_SQL old_document CTE, ir markVpmSutartisIstrinta selecte.
+const DOC_JSONB_SQL = `jsonb_build_object(
+            'unikalusId', e."unikalusId",
+            'pavadinimas', e.pavadinimas,
+            'sudarymoData', e."sudarymoData",
+            'galiojimoData', e."galiojimoData",
+            'faktineIvykdimoData', e."faktineIvykdimoData",
+            'paskelbimoData', CASE WHEN e."paskelbimoData" IS NULL THEN NULL
+                ELSE to_char(e."paskelbimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+            'redagavimoData', CASE WHEN e."redagavimoData" IS NULL THEN NULL
+                ELSE to_char(e."redagavimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+            'perkanciosiosOrganizacijosKodas', e."perkanciosiosOrganizacijosKodas",
+            'perkanciosiosOrganizacijosPavadinimas', buyer_name.pavadinimas,
+            'sutartiesNumeris', e."sutartiesNumeris",
+            'pirkimoNumeris', e."pirkimoNumeris",
+            'numatomaVerte', e."numatomaVerte",
+            'faktineVerte', e."faktineVerte",
+            'pirmoTiekejoKodas', e."pirmoTiekejoKodas",
+            'pirmoTiekejoPavadinimas', supplier_name.pavadinimas,
+            'papildomiTiekejai', COALESCE((
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+                        'kodas', extra."tiekejoKodas",
+                        'pavadinimas', extra_name.pavadinimas
+                    ) ORDER BY extra.id
+                )
+                FROM public."vpmSutartysPapildomiTiekejai" extra
+                LEFT JOIN public."vpmSutartysSalys" extra_name
+                  ON extra_name.id = extra."tiekejoPavadinimoId"
+                WHERE extra."unikalusId" = e."unikalusId"
+            ), '[]'::jsonb),
+            'tipas', type_name.tipas,
+            'kategorija', category_name.kategorija,
+            'bvpzKodas', e."bvpzKodas",
+            'papildomiBvpzKodai', COALESCE((
+                SELECT jsonb_agg(extra_bvpz."bvpzKodas" ORDER BY extra_bvpz.id)
+                FROM public."vpmSutartysPapildomiBvpzKodai" extra_bvpz
+                WHERE extra_bvpz."unikalusId" = e."unikalusId"
+            ), '[]'::jsonb),
+            'dokumentai', COALESCE((
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+                        'pavadinimas', file.pavadinimas,
+                        'fileId', file."fileId"
+                    ) ORDER BY file.id
+                )
+                FROM public."vpmSutartysFailai" file
+                WHERE file."unikalusId" = e."unikalusId"
+            ), '[]'::jsonb),
+            'istrinta', e.istrinta,
+            'pakeitimas', e.pakeitimas
+        )`;
+
+const DOC_JOINS_SQL = `LEFT JOIN public."vpmSutartysSalys" buyer_name
+      ON buyer_name.id = e."perkanciosiosOrganizacijosPavadinimoId"
+    LEFT JOIN public."vpmSutartysSalys" supplier_name
+      ON supplier_name.id = e."pirmoTiekejoPavadinimoId"
+    LEFT JOIN public."vpmSutartysTipai" type_name
+      ON type_name.id = e."tipasId"
+    LEFT JOIN public."vpmSutartysKategorijos" category_name
+      ON category_name.id = e."kategorijaId"`;
 
 const UPSERT_SQL = `
 WITH incoming AS MATERIALIZED (
@@ -52,66 +116,9 @@ inserted_category AS (
 old_document AS MATERIALIZED (
     SELECT
         e.hash,
-        jsonb_build_object(
-            'unikalusId', e."unikalusId",
-            'pavadinimas', e.pavadinimas,
-            'sudarymoData', e."sudarymoData",
-            'galiojimoData', e."galiojimoData",
-            'faktineIvykdimoData', e."faktineIvykdimoData",
-            'paskelbimoData', CASE WHEN e."paskelbimoData" IS NULL THEN NULL
-                ELSE to_char(e."paskelbimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
-            'redagavimoData', CASE WHEN e."redagavimoData" IS NULL THEN NULL
-                ELSE to_char(e."redagavimoData", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
-            'perkanciosiosOrganizacijosKodas', e."perkanciosiosOrganizacijosKodas",
-            'perkanciosiosOrganizacijosPavadinimas', buyer_name.pavadinimas,
-            'sutartiesNumeris', e."sutartiesNumeris",
-            'pirkimoNumeris', e."pirkimoNumeris",
-            'numatomaVerte', e."numatomaVerte",
-            'faktineVerte', e."faktineVerte",
-            'pirmoTiekejoKodas', e."pirmoTiekejoKodas",
-            'pirmoTiekejoPavadinimas', supplier_name.pavadinimas,
-            'papildomiTiekejai', COALESCE((
-                SELECT jsonb_agg(
-                    jsonb_build_object(
-                        'kodas', extra."tiekejoKodas",
-                        'pavadinimas', extra_name.pavadinimas
-                    ) ORDER BY extra.id
-                )
-                FROM public."vpmSutartysPapildomiTiekejai" extra
-                LEFT JOIN public."vpmSutartysSalys" extra_name
-                  ON extra_name.id = extra."tiekejoPavadinimoId"
-                WHERE extra."unikalusId" = e."unikalusId"
-            ), '[]'::jsonb),
-            'tipas', type_name.tipas,
-            'kategorija', category_name.kategorija,
-            'bvpzKodas', e."bvpzKodas",
-            'papildomiBvpzKodai', COALESCE((
-                SELECT jsonb_agg(extra_bvpz."bvpzKodas" ORDER BY extra_bvpz.id)
-                FROM public."vpmSutartysPapildomiBvpzKodai" extra_bvpz
-                WHERE extra_bvpz."unikalusId" = e."unikalusId"
-            ), '[]'::jsonb),
-            'dokumentai', COALESCE((
-                SELECT jsonb_agg(
-                    jsonb_build_object(
-                        'pavadinimas', file.pavadinimas,
-                        'fileId', file."fileId"
-                    ) ORDER BY file.id
-                )
-                FROM public."vpmSutartysFailai" file
-                WHERE file."unikalusId" = e."unikalusId"
-            ), '[]'::jsonb),
-            'istrinta', e.istrinta,
-            'pakeitimas', e.pakeitimas
-        ) AS doc
+        ${DOC_JSONB_SQL} AS doc
     FROM existing e
-    LEFT JOIN public."vpmSutartysSalys" buyer_name
-      ON buyer_name.id = e."perkanciosiosOrganizacijosPavadinimoId"
-    LEFT JOIN public."vpmSutartysSalys" supplier_name
-      ON supplier_name.id = e."pirmoTiekejoPavadinimoId"
-    LEFT JOIN public."vpmSutartysTipai" type_name
-      ON type_name.id = e."tipasId"
-    LEFT JOIN public."vpmSutartysKategorijos" category_name
-      ON category_name.id = e."kategorijaId"
+    ${DOC_JOINS_SQL}
 ),
 history AS (
     INSERT INTO public."vpmSutartysChanges" (
@@ -226,11 +233,13 @@ tracking AS (
     INSERT INTO public."vpmSutartysAtnaujinimai" (
         "unikalusId", matyta, atnaujinta, istrinta
     )
-    SELECT "unikalusId", now(), now(), false FROM target_contract
+    SELECT
+        t."unikalusId", now(), now(), (i.doc->>'istrinta')::boolean
+    FROM target_contract t, incoming i
     ON CONFLICT ("unikalusId") DO UPDATE SET
         matyta = now(),
         atnaujinta = now(),
-        istrinta = false
+        istrinta = EXCLUDED.istrinta
     RETURNING "unikalusId"
 ),
 deleted_suppliers AS (
@@ -567,6 +576,30 @@ export async function upsertVpmSutartis(prepared, db = postgres) {
         searchText,
     ]);
     return result.rows[0];
+}
+
+/**
+ * Pažymi vpm sutartį kaip ištrintą šaltinyje. Vietoje tiesioginio istrinta
+ * UPDATE (kuris apeitų vpmSutartysChanges archyvą ir inkrementinius
+ * vpmSutartysSumos* agregatus) atstato saugomą canonical dokumentą,
+ * nustato istrinta=true ir perleidžia per įprastą upsert kelią.
+ * @returns {Promise<boolean>} true jei sutartis buvo pažymėta, false jei
+ *   jos nėra arba jau ištrinta.
+ */
+export async function markVpmSutartisIstrinta(unikalusId, db = postgres) {
+    const res = await db.query(
+        `SELECT ${DOC_JSONB_SQL} AS doc
+         FROM public."vpmSutartys" e
+         ${DOC_JOINS_SQL}
+         WHERE e."unikalusId" = $1;`,
+        [unikalusId],
+    );
+    const doc = res.rows[0]?.doc;
+    if (!doc || doc.istrinta) return false;
+
+    doc.istrinta = true;
+    await upsertVpmSutartis(canonicalJsonMd5(doc), db);
+    return true;
 }
 
 export { UPSERT_SQL };

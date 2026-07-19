@@ -2,6 +2,10 @@ import { postgres } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import { createSpintaClient } from "../spinta/index.js";
 import { buildSpintaRecords, fetchMd5Lookup } from "./eksportas.js";
+import {
+    VPM_SUTARTIS_ROW_SELECT,
+    VPM_SUTARTIS_ROW_FROM,
+} from "./vpmSutartisRow.js";
 
 const DATASET = "sutartys";
 const CHILD_MODELS = [
@@ -126,19 +130,18 @@ export function isSutartysSpintaConfigured() {
 export async function fetchActiveSutartysByIds(ids) {
     if (!ids.length) return [];
     const { rows } = await postgres.query(
-        `SELECT
-            s.*,
+        `SELECT ${VPM_SUTARTIS_ROW_SELECT},
             a."tiekPavPatikslinimas",
             a."tiekSalis",
             ai."tiekSbjPatikslinimas" AS "tiekPavPatikslinimasImp",
             ai."tiekSalis" AS "tiekSalisImp"
-         FROM public.sutartys s
+         FROM ${VPM_SUTARTIS_ROW_FROM}
          LEFT JOIN public."sutartysAtviriDuomenys" a
-           ON a."dokId" = s."sutartiesUnikalusId"
+           ON a."dokId" = s."unikalusId"
          LEFT JOIN public."sutartysAtviriDuomenysImp" ai
-           ON ai."dokId" = s."sutartiesUnikalusId"
-         WHERE s."sutartiesUnikalusId" = ANY($1::bigint[])
-           AND COALESCE(s.istrinta, false) = false`,
+           ON ai."dokId" = s."unikalusId"
+         WHERE s."unikalusId" = ANY($1::bigint[])
+           AND s.istrinta = false`,
         [ids],
     );
     return rows;

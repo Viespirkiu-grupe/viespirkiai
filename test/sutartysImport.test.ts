@@ -63,20 +63,17 @@ describe("sutartys import validation", () => {
             },
         ]);
 
-        const values = query.mock.calls[0][1];
-        expect(values[7]).toBe("2022-06-30");
-        expect(values[9]).toBe("2022-07-01");
-        expect(values[16]).toBe("2022-01-01");
-        expect(
-            query.mock.calls.some(
-                ([sql, params]) =>
-                    String(sql).includes(
-                        'INSERT INTO public."vpmSutartys"',
-                    ) &&
-                    String(params?.[0]).includes('"unikalusId":1') &&
-                    /^[a-f0-9]{32}$/.test(String(params?.[1])),
-            ),
-        ).toBe(true);
+        const vpmCall = query.mock.calls.find(
+            ([sql, params]) =>
+                String(sql).includes('INSERT INTO public."vpmSutartys"') &&
+                String(params?.[0]).includes('"unikalusId":1') &&
+                /^[a-f0-9]{32}$/.test(String(params?.[1])),
+        );
+        expect(vpmCall).toBeDefined();
+        const doc = JSON.parse(vpmCall![1][0]);
+        expect(doc.faktineIvykdimoData).toBe("2022-06-30");
+        expect(doc.galiojimoData).toBe("2022-07-01");
+        expect(doc.sudarymoData).toBe("2022-01-01");
     });
 
     it("records a malformed contract and imports it with the broken field nulled", async () => {
@@ -106,13 +103,15 @@ describe("sutartys import validation", () => {
         );
         expect(brokasCall?.[1]).toEqual([2005493961]);
 
-        const sutartysCall = query.mock.calls.find(([sql]) =>
-            String(sql).includes('INSERT INTO "sutartys"'),
-        );
-        expect(sutartysCall?.[1]?.[0]).toBe(1);
-        expect(sutartysCall?.[1]?.[26]).toBe(2005493961);
-        expect(sutartysCall?.[1]?.[26 + 21]).toBe(313);
-        expect(sutartysCall?.[1]?.[26 + 8]).toBeNull();
+        const vpmDocs = query.mock.calls
+            .filter(([sql]) =>
+                String(sql).includes('INSERT INTO public."vpmSutartys"'),
+            )
+            .map(([, params]) => JSON.parse(params[0]));
+        expect(vpmDocs.map((doc) => doc.unikalusId)).toEqual([1, 2005493961]);
+        const brokuota = vpmDocs.find((doc) => doc.unikalusId === 2005493961);
+        expect(brokuota?.numatomaVerte).toBe(313);
+        expect(brokuota?.faktineVerte).toBeNull();
     });
 
     it("does not write an unidentifiable malformed row to the reject table", async () => {

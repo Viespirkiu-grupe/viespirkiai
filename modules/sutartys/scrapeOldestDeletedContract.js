@@ -1,21 +1,19 @@
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import { cvpIsScrpeById } from "./atnaujintiPagalUnikalu.js";
+import { pazymetiScrapeRezultata } from "./scrapeOldestContract.js";
 import Timings from "../../utils/timings.js";
 
 export async function cvpIsScrapeOldestDeletedContract() {
     let timings = new Timings();
     timings.start("findOldestScrapedSutartis");
-    // istrinta denormalizuotas į sutartysAtnaujinimai (sinchronizuoja trigeris),
-    // tad be JOIN – dalinis indeksas sutartysAtnaujinimai_istrinta_atnaujinta_idx
-    // grąžina seniausią ištrintą per vieną indekso įrašą.
-    let oldestRes = await postgres.query(`SELECT "sutartiesUnikalusId", "paskutiniKartaAtnaujinta"
-    FROM public."sutartysAtnaujinimai"
+    let oldestRes = await postgres.query(`SELECT "unikalusId", "atnaujinta"
+    FROM public."vpmSutartysAtnaujinimai"
     WHERE "istrinta"
-      AND "paskutiniKartaAtnaujinta" < (
+      AND "atnaujinta" < (
         timezone('Europe/Vilnius', now()) - INTERVAL '3 days'
       )
-    ORDER BY "paskutiniKartaAtnaujinta" ASC NULLS FIRST
+    ORDER BY "atnaujinta" ASC NULLS FIRST
     LIMIT 1;`);
     timings.end("findOldestScrapedSutartis");
 
@@ -23,46 +21,16 @@ export async function cvpIsScrapeOldestDeletedContract() {
         return false;
     }
 
-    let id = oldestRes.rows[0].sutartiesUnikalusId;
+    let id = oldestRes.rows[0].unikalusId;
     log(
-        `Seniausia sutartis pagal atnaujinimo datą: ID ${id}, data: ${oldestRes.rows[0].paskutiniKartaAtnaujinta}`,
+        `Seniausia ištrinta sutartis pagal atnaujinimo datą: ID ${id}, data: ${oldestRes.rows[0].atnaujinta}`,
     );
     let count;
     ({ timings, count } = await cvpIsScrpeById(id, { timings }));
 
-    // Update the "paskutiniKartaAtnaujinta" field to the current timestamp.
-    // Timestamp keliauja į plonąją sutartysAtnaujinimai lentelę; istrinta
-    // rašoma į sutartys tik kai reikšmė keičiasi, kad nebloatintų eilutės.
-    timings.start("updatePaskutiniKartaAtnaujinta");
-    await postgres.query(
-        `UPDATE public."sutartysAtnaujinimai"
-         SET "paskutiniKartaAtnaujinta" = NOW() AT TIME ZONE 'Europe/Vilnius'
-         WHERE "sutartiesUnikalusId" = $1;`,
-        [id],
-    );
-    if (count == 1) {
-        await postgres.query(
-            `UPDATE public.sutartys
-             SET "istrinta" = false
-             WHERE "sutartiesUnikalusId" = $1
-               AND "istrinta" IS TRUE;`,
-            [id],
-        );
-    } else if (count == 0) {
-        await postgres.query(
-            `UPDATE public.sutartys
-             SET "istrinta" = true
-             WHERE "sutartiesUnikalusId" = $1
-               AND "istrinta" IS DISTINCT FROM true;`,
-            [id],
-        );
-    } else {
-        throw new Error(
-            `Unexpected additional contracts: ${count} for ID ${id}`,
-        );
-    }
-
-    timings.end("updatePaskutiniKartaAtnaujinta");
+    timings.start("updateAtnaujinta");
+    await pazymetiScrapeRezultata(id, count);
+    timings.end("updateAtnaujinta");
     return true;
 }
 

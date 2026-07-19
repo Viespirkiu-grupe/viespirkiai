@@ -47,14 +47,15 @@ async function main() {
             SELECT
                 ("sudarymoData"::date - DATE '${DATE_START}')::int AS x,
                 CASE
-                    WHEN suma >=  1 THEN  log(suma)
-                    WHEN suma <= -1 THEN -log(-suma)
+                    WHEN verte >=  1 THEN  log(verte)
+                    WHEN verte <= -1 THEN -log(-verte)
                     ELSE 0
                 END AS u
-            FROM sutartys
+            FROM "vpmSutartys"
             WHERE "sudarymoData" >= DATE '${DATE_START}'
               AND "sudarymoData" <  DATE '${DATE_END}'
-              AND suma IS NOT NULL
+              AND verte IS NOT NULL
+              AND istrinta = false
         ), mapped AS (
             SELECT
                 x,

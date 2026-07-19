@@ -1,17 +1,47 @@
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import { cvpIsScrpeById } from "./atnaujintiPagalUnikalu.js";
+import { markVpmSutartisIstrinta } from "./upsertVpmSutartis.js";
 import Timings from "../../utils/timings.js";
+
+/**
+ * Po sutarties scrape'o pažymi atnaujinimą ir sinchronizuoja istrinta
+ * vėliavą pagal rastų sutarčių kiekį (1 = yra, 0 = ištrinta šaltinyje).
+ *
+ * Kai sutartis rasta (count=1), importas jau perleido ją per
+ * upsertVpmSutartis (atnaujinta bump + istrinta=false + agregatai).
+ * Kai nerasta (count=0), markVpmSutartisIstrinta perleidžia saugomą
+ * dokumentą per tą patį upsert kelią su istrinta=true, kad archyvas ir
+ * vpmSutartysSumos* agregatai liktų teisingi. Atnaujinta bump'inama
+ * visada — ir jau ištrintai sutarčiai, kad ji nebūtų renkamasi iš naujo.
+ */
+export async function pazymetiScrapeRezultata(id, count) {
+    if (count !== 0 && count !== 1) {
+        throw new Error(
+            `Unexpected additional contracts: ${count} for ID ${id}`,
+        );
+    }
+
+    if (count === 0) {
+        await markVpmSutartisIstrinta(id);
+    }
+    await postgres.query(
+        `UPDATE public."vpmSutartysAtnaujinimai"
+         SET "atnaujinta" = timezone('Europe/Vilnius', now())
+         WHERE "unikalusId" = $1;`,
+        [id],
+    );
+}
 
 export async function cvpIsScrapeOldestContract() {
     let timings = new Timings();
     timings.start("findOldestScrapedSutartis");
-    let oldestRes = await postgres.query(`SELECT "sutartiesUnikalusId", "paskutiniKartaAtnaujinta"
-      FROM public."sutartysAtnaujinimai"
-      WHERE "paskutiniKartaAtnaujinta" IS NULL OR "paskutiniKartaAtnaujinta" < (
+    let oldestRes = await postgres.query(`SELECT "unikalusId", "atnaujinta"
+      FROM public."vpmSutartysAtnaujinimai"
+      WHERE "atnaujinta" IS NULL OR "atnaujinta" < (
         timezone('Europe/Vilnius', now()) - INTERVAL '2 days'
       )
-      ORDER BY "paskutiniKartaAtnaujinta" ASC NULLS FIRST
+      ORDER BY "atnaujinta" ASC NULLS FIRST
       LIMIT 1;`);
     timings.end("findOldestScrapedSutartis");
 
@@ -19,46 +49,16 @@ export async function cvpIsScrapeOldestContract() {
         return false;
     }
 
-    let id = oldestRes.rows[0].sutartiesUnikalusId;
+    let id = oldestRes.rows[0].unikalusId;
     log(
-        `Seniausia sutartis pagal atnaujinimo datą: ID ${id}, data: ${oldestRes.rows[0].paskutiniKartaAtnaujinta}`,
+        `Seniausia sutartis pagal atnaujinimo datą: ID ${id}, data: ${oldestRes.rows[0].atnaujinta}`,
     );
     let count;
     ({ timings, count } = await cvpIsScrpeById(id, { timings }));
 
-    // Update the "paskutiniKartaAtnaujinta" field to the current timestamp.
-    // Timestamp keliauja į plonąją sutartysAtnaujinimai lentelę; istrinta
-    // rašoma į sutartys tik kai reikšmė keičiasi, kad nebloatintų eilutės.
-    timings.start("updatePaskutiniKartaAtnaujinta");
-    await postgres.query(
-        `UPDATE public."sutartysAtnaujinimai"
-         SET "paskutiniKartaAtnaujinta" = NOW() AT TIME ZONE 'Europe/Vilnius'
-         WHERE "sutartiesUnikalusId" = $1;`,
-        [id],
-    );
-    if (count == 1) {
-        await postgres.query(
-            `UPDATE public.sutartys
-             SET "istrinta" = false
-             WHERE "sutartiesUnikalusId" = $1
-               AND "istrinta" IS TRUE;`,
-            [id],
-        );
-    } else if (count == 0) {
-        await postgres.query(
-            `UPDATE public.sutartys
-             SET "istrinta" = true
-             WHERE "sutartiesUnikalusId" = $1
-               AND "istrinta" IS DISTINCT FROM true;`,
-            [id],
-        );
-    } else {
-        throw new Error(
-            `Unexpected additional contracts: ${count} for ID ${id}`,
-        );
-    }
-
-    timings.end("updatePaskutiniKartaAtnaujinta");
+    timings.start("updateAtnaujinta");
+    await pazymetiScrapeRezultata(id, count);
+    timings.end("updateAtnaujinta");
     return true;
 }
 

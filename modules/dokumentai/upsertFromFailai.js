@@ -114,7 +114,7 @@ export const FAILAI_SELECT_COLUMNS = `
 // remiasi tik į jau atrenkamus failai stulpelius (saltinis/saltinioId/dokId),
 // todėl tinka ir backfill (f.id > $1), ir queue consumer (f.id = ANY($1)).
 // Abu JOIN raktai unikalūs (viesiejiPirkimai.pirkimoId UNIQUE,
-// sutartys.sutartiesUnikalusId PK), todėl eilučių nedaugina. neskelbiamosDerybos
+// vpmSutartys.unikalusId PK), todėl eilučių nedaugina. neskelbiamosDerybos
 // link NEunikalus (PK = hash), todėl jis imamas skaliariniu subquery (LIMIT 1)
 // FAILAI_SELECT_COLUMNS viduje, ne JOIN'u.
 export const FAILAI_ISTAIGA_JOINS = `
@@ -127,9 +127,9 @@ export const FAILAI_ISTAIGA_JOINS = `
             THEN split_part(f."saltinioId", '/', 1)::integer
             ELSE NULL
         END
-    LEFT JOIN public.sutartys s
+    LEFT JOIN public."vpmSutartys" s
         ON (f.saltinis IS NULL OR f.saltinis IN ('sutartis', 'sutartys'))
-       AND s."sutartiesUnikalusId" = f."dokId"
+       AND s."unikalusId" = f."dokId"
 `;
 
 

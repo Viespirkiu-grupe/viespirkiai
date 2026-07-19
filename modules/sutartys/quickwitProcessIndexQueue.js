@@ -1,4 +1,8 @@
 import { postgres } from "../../postgres/postgres.js";
+import {
+    VPM_SUTARTIS_ROW_SELECT,
+    VPM_SUTARTIS_ROW_FROM,
+} from "./vpmSutartisRow.js";
 import { indexDocs } from "../../quickwit/quickwit.js";
 import { Logger } from "../../utils/log.js";
 import { pathToFileURL } from "node:url";
@@ -10,7 +14,7 @@ const BATCH_SIZE = 2500;
 const LENTELE = "sutartys";
 
 /**
- * Drain one sutartysIndexQueue batch into Quickwit.
+ * Drain one vpmSutartysIndexQueue batch into Quickwit.
  *
  * Queue rows stay locked inside the transaction until the Quickwit ingest and
  * quickwitEilutes cleanup have succeeded. Any error rolls the batch back.
@@ -25,14 +29,14 @@ export async function processSutartysIndexQueue({ shard, shardCount } = {}) {
         await client.query("BEGIN");
 
         const claim = sharded
-            ? `SELECT id, "sutartiesUnikalusId", keitimas
-               FROM "sutartysIndexQueue"
-               WHERE abs(hashtext("sutartiesUnikalusId"::text)::bigint) % $2 = $3
+            ? `SELECT id, "unikalusId", keitimas
+               FROM "vpmSutartysIndexQueue"
+               WHERE abs(hashtext("unikalusId"::text)::bigint) % $2 = $3
                ORDER BY id
                LIMIT $1
                FOR UPDATE SKIP LOCKED`
-            : `SELECT id, "sutartiesUnikalusId", keitimas
-               FROM "sutartysIndexQueue"
+            : `SELECT id, "unikalusId", keitimas
+               FROM "vpmSutartysIndexQueue"
                ORDER BY id
                LIMIT $1
                FOR UPDATE SKIP LOCKED`;
@@ -43,18 +47,18 @@ export async function processSutartysIndexQueue({ shard, shardCount } = {}) {
 
         if (!queue.length) {
             await client.query("COMMIT");
-            logger.log(`sutartysIndexQueue${sharded ? `[${shard}/${shardCount}]` : ""}: empty`);
+            logger.log(`vpmSutartysIndexQueue${sharded ? `[${shard}/${shardCount}]` : ""}: empty`);
             return false;
         }
 
-        logger.log(`sutartysIndexQueue${sharded ? `[${shard}/${shardCount}]` : ""}: claimed ${queue.length} rows`);
+        logger.log(`vpmSutartysIndexQueue${sharded ? `[${shard}/${shardCount}]` : ""}: claimed ${queue.length} rows`);
 
         const claimedIds = queue.map((row) => row.id);
         const priority = { delete: 0, patch: 1, insert: 2 };
         const deduped = new Map();
 
         for (const row of queue) {
-            const key = row.sutartiesUnikalusId;
+            const key = row.unikalusId;
             const existing = deduped.get(key);
             if (!existing || priority[row.keitimas] < priority[existing]) {
                 deduped.set(key, row.keitimas);
@@ -80,20 +84,10 @@ export async function processSutartysIndexQueue({ shard, shardCount } = {}) {
 
         if (toIndex.length) {
             const { rows } = await client.query(
-                `SELECT
-                    "sutartiesUnikalusId", pavadinimas, "sutartiesNumeris",
-                    "pirkimoNumeris", tipas, kategorija,
-                    "perkanciojiOrganizacija", "perkanciosiosOrganizacijosKodas",
-                    tiekejas, "tiekejoKodas", "papildomiTiekejai",
-                    "papildomiTiekejaiKodai", "bvpzKodas", "papildomiBvpzKodai",
-                    "bvpzPavadinimas", "papildomiBvpzPavadinimai",
-                    verte, suma, "faktineIvykdimoVerte", "dokumentuKiekis",
-                    "sudarymoData", "paskelbimoData", "galiojimoData",
-                    "faktineIvykdimoData", "paskutinioRedagavimoData",
-                    "paskutinioAtnaujinimoData"
-                 FROM public.sutartys
-                 WHERE "sutartiesUnikalusId" = ANY($1::bigint[])
-                   AND NOT COALESCE(istrinta, false)`,
+                `SELECT ${VPM_SUTARTIS_ROW_SELECT}
+                 FROM ${VPM_SUTARTIS_ROW_FROM}
+                 WHERE s."unikalusId" = ANY($1::bigint[])
+                   AND s.istrinta = false`,
                 [toIndex],
             );
 
@@ -136,7 +130,7 @@ export async function processSutartysIndexQueue({ shard, shardCount } = {}) {
         }
 
         await client.query(
-            `DELETE FROM "sutartysIndexQueue" WHERE id = ANY($1::bigint[])`,
+            `DELETE FROM "vpmSutartysIndexQueue" WHERE id = ANY($1::bigint[])`,
             [claimedIds],
         );
         await client.query("COMMIT");

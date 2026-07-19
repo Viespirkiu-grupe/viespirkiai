@@ -93,10 +93,14 @@ function sortKeys(value) {
     return value;
 }
 
-/** Return the exact minified bytes used for the contract's MD5. */
-export function prepareCanonicalSutartis(item) {
-    const sutartis = buildCanonicalSutartis(item);
+/** Canonical JSON + MD5 iš jau paruošto canonical objekto. */
+export function canonicalJsonMd5(sutartis) {
     const json = JSON.stringify(sortKeys(sutartis));
     const md5 = createHash("md5").update(json).digest("hex");
     return { sutartis, json, md5 };
+}
+
+/** Return the exact minified bytes used for the contract's MD5. */
+export function prepareCanonicalSutartis(item) {
+    return canonicalJsonMd5(buildCanonicalSutartis(item));
 }

@@ -154,8 +154,10 @@ async function cvpIsScrapePage(page = 0, options = {}) {
 export async function cvpIsRequestLatest(options = {}) {
     let timings = options.timings || new Timings();
     timings.start("cvpIsNewestTimestamp");
+    // WHERE istrinta = false, kad naudotų dalinį vpmSutartys_redagavimoData_idx
     let naujausioAtnaujinimoTimestampRes = await postgres.query(
-        `SELECT max("paskutinioRedagavimoData") FROM sutartys;`,
+        `SELECT max("redagavimoData") FROM public."vpmSutartys"
+         WHERE istrinta = false;`,
     );
     let naujausioAtnaujinimoTimestamp =
         naujausioAtnaujinimoTimestampRes.rows[0].max; // String formatas "YYYY-MM-DD HH:MM:SS"
