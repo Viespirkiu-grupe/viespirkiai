@@ -22,6 +22,7 @@
         "teisekura:eseimas-content": "node modules/eseimas/scrapeContent.js",
         "teisekura:audit": "node modules/teisekura/audit.js",
         "export:sutartys": "node scripts/exportSutartys.js",
+        "export:sutartys-canonical": "node scripts/exportSutartysCanonical.js",
         "sutartys:changes": "node scripts/showRecentSutartysChanges.js",
         "sutartys:canonical-json": "node scripts/scrapeSutartisCanonical.js",
         "push:sutartys": "node scripts/pushSutartysToSpinta.js",

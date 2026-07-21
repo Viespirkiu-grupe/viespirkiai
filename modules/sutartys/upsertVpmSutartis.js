@@ -602,4 +602,4 @@ export async function markVpmSutartisIstrinta(unikalusId, db = postgres) {
     return true;
 }
 
-export { UPSERT_SQL };
+export { UPSERT_SQL, DOC_JSONB_SQL, DOC_JOINS_SQL };
