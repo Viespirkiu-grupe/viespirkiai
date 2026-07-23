@@ -112,13 +112,13 @@ const profitChartOptions = {
   )}
 
   {ataskaitos.slice(0, finansaiLimit).map((laikotarpis: any) => (
-    <div class="subsection">
+    <div class="subsection mb-10">
       <h3>
         {laikotarpis.templateName}
-        <span class="text-muted text-xs font-normal">({laikotarpis.templateId}, {laikotarpis.duomenuData})</span>
+        <span class="text-muted text-xs font-normal ml-2">({laikotarpis.templateId}, {laikotarpis.duomenuData})</span>
       </h3>
       <p class="text-muted text-sm mb-4">{laikotarpis.laikotarpisNuo} – {laikotarpis.laikotarpisIki}</p>
-      <MetricCardGrid minWidth="220px" className="items-start">
+      <MetricCardGrid minWidth="300px" maxWidth="480px" className="items-start">
         {laikotarpis.standards.map((std: any) => (
           <MetricCard label={std.standardName} labelBaseClassName="section-title mb-3">
             <p class="text-muted text-xs font-normal mb-3">({std.standardId})</p>

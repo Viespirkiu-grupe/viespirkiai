@@ -41,7 +41,7 @@
 
   .kv-list {
     display: grid;
-    grid-template-columns: max-content 1fr;
+    grid-template-columns: minmax(0, 1fr) max-content;
     gap: 4px 16px;
     font-size: var(--text-sm);
   }
@@ -49,6 +49,8 @@
   .kv-list dt {
     color: var(--gray);
     font-weight: 400;
+    min-width: 0;
+    overflow-wrap: break-word;
   }
 
   .kv-list dd {

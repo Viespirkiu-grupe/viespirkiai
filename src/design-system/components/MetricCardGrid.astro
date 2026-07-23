@@ -1,21 +1,28 @@
 ---
 interface Props {
   minWidth?: string;
+  maxWidth?: string;
   className?: string;
 }
 
-const { minWidth = '180px', className = '' } = Astro.props as Props;
-const classes = ['metric-card-grid', className].filter(Boolean).join(' ');
+const { minWidth = '180px', maxWidth = '', className = '' } = Astro.props as Props;
+const classes = ['metric-card-grid', maxWidth ? 'metric-card-grid--capped' : '', className].filter(Boolean).join(' ');
+const styles = [`--metric-card-min-width: ${minWidth}`, maxWidth ? `--metric-card-max-width: ${maxWidth}` : ''].filter(Boolean).join('; ');
 ---
 
-<div class={classes} style={`--metric-card-min-width: ${minWidth}`}>
+<div class={classes} style={styles}>
   <slot />
 </div>
 
 <style>
   .metric-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(var(--metric-card-min-width), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(var(--metric-card-min-width), 1fr));
     gap: 12px;
+  }
+
+  .metric-card-grid--capped {
+    grid-template-columns: repeat(auto-fit, minmax(var(--metric-card-min-width), var(--metric-card-max-width)));
+    justify-content: start;
   }
 </style>
