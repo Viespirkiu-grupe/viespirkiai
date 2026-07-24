@@ -7,9 +7,15 @@ import config from "../../utils/config.js";
 import Timings from "../../utils/timings.js";
 import { readRezultatasFs } from "../ocr/rezultataiFs.js";
 import { prepareFailaiFs, savePreparedFailaiFs } from "./failaiFs.js";
+import {
+    iEile,
+    isEiles,
+    NUSKAITYMO_BANDYMAI,
+    NUSKAITYMO_VERSIJA,
+} from "./nuskaitymoEile.js";
 
 const nodeName = process.env.NODE_NAME || "default";
-const nuskaitymoVersija = 12;
+const nuskaitymoVersija = NUSKAITYMO_VERSIJA;
 
 /**
  * Cleans metadata object by removing null characters and trimming strings.
@@ -178,7 +184,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
     const result = failasId
         ? await postgres.query(
             `WITH locked AS (
-                UPDATE public."failaiNuskaitymoQueue" q
+                UPDATE public."filesNuskaitymasQueue" q
                 SET "lockedBy" = $1, "lockedAt" = NOW()
                 WHERE q.id = $2
                   AND q."lockedBy" IS NULL
@@ -189,39 +195,26 @@ export async function nuskaitytiVienoDokumentoDuomenis(
             [nodeName, failasId],
         )
         : await postgres.query(
-            `WITH first AS (
-        SELECT q.id FROM public."failaiNuskaitymoQueue" q
+            // Nebandyti failai (bandymai = 0, kitasBandymas NULL) imami pirma, naujesni pirmiau;
+            // klaidos — tik atėjus jų atidėjimo laikui.
+            `WITH cte AS (
+        SELECT q.id FROM public."filesNuskaitymasQueue" q
         WHERE q."lockedBy" IS NULL
-        AND q.versija >= 0
-        AND q.versija < $2
-        ORDER BY q.versija ASC, q.id DESC
+        AND q.bandymai < $2
+        AND (q."kitasBandymas" IS NULL OR q."kitasBandymas" <= NOW())
+        ORDER BY q.bandymai, q."kitasBandymas" NULLS FIRST, q.id DESC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
-    ),
-    second AS (
-        SELECT q.id FROM public."failaiNuskaitymoQueue" q
-        WHERE q."lockedBy" IS NULL
-        AND q.versija < 0
-        AND q.bandymai < 5
-        ORDER BY q."paskutinisBandymas" ASC NULLS FIRST
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED
-    ),
-    cte AS (
-        SELECT id FROM first
-        UNION ALL
-        SELECT id FROM second
-        LIMIT 1
     ),
     locked AS (
-        UPDATE public."failaiNuskaitymoQueue" q
+        UPDATE public."filesNuskaitymasQueue" q
         SET "lockedBy" = $1, "lockedAt" = NOW()
         FROM cte WHERE q.id = cte.id
         RETURNING q.id
     )
     SELECT f.* FROM public.failai f
     WHERE f.id = (SELECT id FROM locked)`,
-            [nodeName, nuskaitymoVersija],
+            [nodeName, NUSKAITYMO_BANDYMAI],
         );
 
     timings.end("queue");
@@ -271,20 +264,28 @@ export async function nuskaitytiVienoDokumentoDuomenis(
 
         if (dokumentas && dokumentas.id) {
             try {
-                await postgres.query(
-                    `UPDATE public."failaiNuskaitymoQueue"
-                    SET versija          = $1,
-                        bandymai = COALESCE(bandymai, 0) + 1,
-                        "paskutinisBandymas" = NOW(),
-                        "lockedBy"       = NULL,
-                        "lockedAt"       = NULL
-                    WHERE id = $2`,
-                    [kodas, dokumentas.id],
-                );
-                // still update failai for the error code
+                // Klaidos kodas — failai lentelėje; eilėje tik bandymų skaitiklis su
+                // eksponentiniu atidėjimu, o viršijus ribą eilutė pašalinama.
                 await postgres.query(
                     `UPDATE failai SET nuskaitytas = $1, "nuskaitymasTimestamp" = NOW() WHERE id = $2`,
                     [kodas, dokumentas.id],
+                );
+                await postgres.query(
+                    `WITH bumped AS (
+                        UPDATE public."filesNuskaitymasQueue"
+                        SET bandymai = bandymai + 1,
+                            "kitasBandymas" = NOW() + LEAST(
+                                INTERVAL '1 day',
+                                INTERVAL '5 minutes' * POWER(2, bandymai)
+                            ),
+                            "lockedBy" = NULL,
+                            "lockedAt" = NULL
+                        WHERE id = $1
+                        RETURNING id, bandymai
+                    )
+                    DELETE FROM public."filesNuskaitymasQueue"
+                    WHERE id IN (SELECT id FROM bumped WHERE bandymai >= $2)`,
+                    [dokumentas.id, NUSKAITYMO_BANDYMAI],
                 );
             } catch (updateErr) {
                 console.error(
@@ -350,7 +351,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
 
         // Insert into postgres one batch at a time; ON CONFLICT skips existing rows
         if (children.length) {
-            await postgres.query(
+            const inserted = await postgres.query(
                 `INSERT INTO failai (
                     pavadinimas, extension, dydis, md5,
                     "saltinioId", parent, parsiustas, saltinis
@@ -359,7 +360,8 @@ export async function nuskaitytiVienoDokumentoDuomenis(
                     $1::text[], $2::text[], $3::int[], $4::text[],
                     $5::text[], $6::bigint[], $7::int[], $8::text[]
                 )
-                ON CONFLICT ("saltinioId", parent) WHERE saltinis = 'archive' DO NOTHING;`,
+                ON CONFLICT ("saltinioId", parent) WHERE saltinis = 'archive' DO NOTHING
+                RETURNING id;`,
                 [
                     children.map((c) => c.pavadinimas),
                     children.map((c) => c.extension),
@@ -371,6 +373,9 @@ export async function nuskaitytiVienoDokumentoDuomenis(
                     children.map((c) => c.saltinis),
                 ],
             );
+
+            // Išskleisti failai iš karto tampa nuskaitomi
+            await iEile(inserted.rows.map((r) => r.id));
         }
     }
 
@@ -497,16 +502,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
     timings.end("failaiNuskaitymai");
 
     timings.start("queueUpdate");
-    await postgres.query(
-        `UPDATE public."failaiNuskaitymoQueue"
-        SET versija    = $2,
-            bandymai   = 0,
-            "paskutinisBandymas" = NULL,
-            "lockedBy" = NULL,
-            "lockedAt" = NULL
-        WHERE id = $1`,
-        [dokumentas.id, nuskaitymoVersija],
-    );
+    await isEiles([dokumentas.id]);
     timings.end("queueUpdate");
 
     const timingParts = [

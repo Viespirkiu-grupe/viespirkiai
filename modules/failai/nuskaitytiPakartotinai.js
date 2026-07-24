@@ -4,6 +4,7 @@ Failus nuskaitytus su klaidomis (-1) nustato kaip nenučítytus (0)
 
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
+import { iEile } from "./nuskaitymoEile.js";
 const logger = new Logger();
 
 async function nuskaitytiPakartotinai(kiekis = 10, workerId) {
@@ -18,11 +19,14 @@ async function nuskaitytiPakartotinai(kiekis = 10, workerId) {
         UPDATE failai f
         SET nuskaitytas = 0
         FROM to_update t
-        WHERE f.id = t.id;
+        WHERE f.id = t.id
+        RETURNING f.id;
     `;
 
     try {
         const res = await postgres.query(query, [kiekis]);
+        // Grąžiname į eilę tuos, kurie iš jos jau buvo iškritę (viršiję bandymus)
+        await iEile(res.rows.map((r) => r.id));
         if (res.rowCount > 0) {
             logger.log(`Worker ${workerId} updated ${res.rowCount}`);
         }

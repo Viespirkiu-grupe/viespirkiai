@@ -8,6 +8,7 @@ import config from "../../utils/config.js";
 import { writeFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { iEile } from "./nuskaitymoEile.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -161,6 +162,8 @@ async function processRows(rows) {
                 `UPDATE failai SET extension = $1 WHERE id = $2`,
                 [detectedExt, row.id],
             );
+            // Pasikeitęs plėtinys gali failą padaryti nuskaitomu
+            await iEile([row.id]);
         }
 
         totalFixed++;

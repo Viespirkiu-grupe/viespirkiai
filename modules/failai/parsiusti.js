@@ -9,6 +9,7 @@ import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import Timings from "../../utils/timings.js";
 import { Agent } from "undici";
+import { iEile } from "./nuskaitymoEile.js";
 
 const slowAgent = new Agent({ headersTimeout: 30 * 60_000 }); // 30 min
 const nodeName = process.env.NODE_NAME || "default";
@@ -198,6 +199,8 @@ export async function parsiustiFaila(options = {}) {
             `DELETE FROM public."failaiParsiuntimoQueue" WHERE id = $1`,
             [failas.id],
         );
+        // Parsisiuntęs failas tampa nuskaitomu
+        await iEile([failas.id]);
         timings.end("updateFailas");
     } catch (error) {
         console.error("Klaida parsisiunčiant failą:", error);

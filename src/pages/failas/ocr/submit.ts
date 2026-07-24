@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { validateOcrApiKey } from '@/modules/failai/auth.js';
 import { postgres } from '@/postgres/postgres.js';
 import { saveRezultatasFs } from '@/modules/ocr/rezultataiFs.js';
+import { iEile } from '@/modules/failai/nuskaitymoEile.js';
 
 export const GET: APIRoute = async () => {
   return new Response('Method not allowed', { status: 405 });
@@ -63,6 +64,8 @@ export const POST: APIRoute = async ({ request }) => {
       `UPDATE failai SET "ocrState" = 1, "nuskaitytas" = 0, "ocrLockTimestamp" = NULL WHERE id = $1`,
       [id],
     );
+    // Po OCR failą reikia nuskaityti iš naujo
+    await iEile([id], client);
     await client.query(
       `INSERT INTO "failaiOcrRezultatai" (failas, md5, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
        VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7)`,
