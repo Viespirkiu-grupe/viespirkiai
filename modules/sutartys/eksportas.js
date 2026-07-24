@@ -3,8 +3,8 @@
  * eilutės transformacija į „švarų“ įrašą.
  *
  * Naudojama:
- *   - scripts/exportSutartys.js (į JSONL)
- *   - scripts/pushSutartysToSpinta.js (į Spintos API)
+ *   - modules/sutartys/eksportuotiJsonl.js (į JSONL)
+ *   - modules/sutartys/pushToSpinta.js (į Spintos API)
  */
 import { postgres } from "../../postgres/postgres.js";
 import { CONTRACT_TYPES } from "./contractTypes.js";

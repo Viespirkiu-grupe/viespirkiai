@@ -1,7 +1,7 @@
 /**
  * Bendra domenų eksporto logika Spintai.
  *
- * Naudojama: scripts/pushDomenaiToSpinta.js
+ * Naudojama: modules/domenai/pushToSpinta.js
  */
 import { postgres } from "../../postgres/postgres.js";
 

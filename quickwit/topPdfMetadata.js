@@ -1,41 +1,34 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import config from "../utils/config.js";
+import { searchIndexPattern } from "./qwHttp.js";
+
+// Dažniausi PDF `creator`/`producer` metaduomenys → tmp/*.txt lentelės.
+//   npm run quickwit:top-pdf-metadata
 
 const LIMIT = 1_000;
 const OUTPUT_DIR = path.resolve("tmp");
-const quickwitUrl = config.quickwitUrl ?? "http://localhost:7280";
 
-const response = await fetch(`${quickwitUrl}/api/v1/dokumentai_*/search`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-        query: "extension:pdf",
-        max_hits: 0,
-        aggs: {
-            creators: {
-                terms: {
-                    field: "metadata.creator",
-                    size: LIMIT + 100,
-                    shard_size: 20_000,
-                },
-            },
-            producers: {
-                terms: {
-                    field: "metadata.producer",
-                    size: LIMIT + 100,
-                    shard_size: 20_000,
-                },
+const result = await searchIndexPattern("dokumentai_*", {
+    query: "extension:pdf",
+    max_hits: 0,
+    aggs: {
+        creators: {
+            terms: {
+                field: "metadata.creator",
+                size: LIMIT + 100,
+                shard_size: 20_000,
             },
         },
-    }),
+        producers: {
+            terms: {
+                field: "metadata.producer",
+                size: LIMIT + 100,
+                shard_size: 20_000,
+            },
+        },
+    },
 });
 
-if (!response.ok) {
-    throw new Error(`Quickwit search failed (${response.status}): ${await response.text()}`);
-}
-
-const result = await response.json();
 const totalPdfs = Number(result.num_hits ?? 0);
 const elapsedMs = Number(result.elapsed_time_micros ?? 0) / 1_000;
 

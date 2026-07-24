@@ -14,7 +14,7 @@
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { postgres } from "../../postgres/postgres.js";
+import { postgres } from "../../../postgres/postgres.js";
 
 const DATE_START = "2014-01-01";
 const DATE_END   = "2028-01-01";   // pusiau atviras

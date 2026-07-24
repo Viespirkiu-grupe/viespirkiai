@@ -1,23 +1,15 @@
-import config from "../utils/config.js";
+import { searchIndexPattern } from "./qwHttp.js";
 
-const quickwitUrl = config.quickwitUrl ?? "http://localhost:7280";
+// Kiek dokumentų sukurta konkrečiu PDF generatoriumi.
+//   npm run quickwit:count-producer -- [--prefix] [gamintojo pavadinimas]
+
 const args = process.argv.slice(2);
 const prefix = args.includes("--prefix");
 const producer = args.filter((arg) => arg !== "--prefix").join(" ") || "FREE PDFill PDF and Image Writer";
 const queryValue = producer.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 const query = `metadata.producer:"${queryValue}"${prefix ? "*" : ""}`;
 
-const response = await fetch(`${quickwitUrl}/api/v1/dokumentai_*/search`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, max_hits: 0 }),
-});
-
-if (!response.ok) {
-    throw new Error(`Quickwit search failed (${response.status}): ${await response.text()}`);
-}
-
-const result = await response.json();
+const result = await searchIndexPattern("dokumentai_*", { query, max_hits: 0 });
 const elapsedMs = Number(result.elapsed_time_micros ?? 0) / 1_000;
 
 console.log(`Producer: ${producer}`);

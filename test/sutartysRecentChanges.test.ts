@@ -7,7 +7,7 @@ import {
     parseRecentChangesArgs,
     RECENT_CHANGES_SQL,
 } from "../modules/sutartys/recentChanges.js";
-import { writeWithPager } from "../scripts/showRecentSutartysChanges.js";
+import { writeWithPager } from "../utils/pager.js";
 
 describe("recent VPM contract changes", () => {
     it("atstato timestamp kaip lokalų laiką be klaidingo Z", () => {

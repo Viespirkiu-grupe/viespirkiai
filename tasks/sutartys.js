@@ -56,6 +56,7 @@ export default [
         priority: 4,
         cooldown: 30,
         errorCooldown: 60,
+        concurrency: 50,
         job: processSutartysAdpQueue,
     },
     {

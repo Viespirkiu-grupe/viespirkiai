@@ -1,6 +1,6 @@
 import { pathToFileURL } from "node:url";
-import { cvpIsScrapePageContent } from "../modules/sutartys/scrape.js";
-import { prepareScrapedCanonical } from "../modules/sutartys/prepareScrapedCanonical.js";
+import { cvpIsScrapePageContent } from "./scrape.js";
+import { prepareScrapedCanonical } from "./prepareScrapedCanonical.js";
 
 export const HELP = "Naudojimas: npm run sutartys:canonical-json -- <unikalusId>";
 

@@ -5,7 +5,7 @@
  * (naudojama pakeitimų archyvavimui ir markVpmSutartisIstrinta), todėl dump'as
  * visada atitinka tą pačią schemą, kuria tikrinamas rašymas.
  *
- * Naudojama: scripts/exportSutartysCanonical.js
+ * Naudojama: modules/sutartys/eksportuotiCanonicalJsonl.js
  */
 import { postgres } from "../../postgres/postgres.js";
 import { DOC_JOINS_SQL, DOC_JSONB_SQL } from "./upsertVpmSutartis.js";
