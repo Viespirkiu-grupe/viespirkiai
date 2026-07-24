@@ -122,9 +122,10 @@ old_document AS MATERIALIZED (
 ),
 history AS (
     INSERT INTO public."vpmSutartysChanges" (
-        "unikalusId", sutartis, "sutartisHash"
+        "unikalusId", sutartis, "sutartisHash", "pakeitimoData"
     )
-    SELECT (i.doc->>'unikalusId')::bigint, old.doc, old.hash
+    SELECT (i.doc->>'unikalusId')::bigint, old.doc, old.hash,
+        (now() AT TIME ZONE 'Europe/Vilnius')
     FROM incoming i
     JOIN old_document old ON old.hash IS DISTINCT FROM i.hash
     RETURNING id
