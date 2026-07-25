@@ -36,14 +36,16 @@ export async function mvpAprasaiPagalJarKoda(jarKodas, options = {}) {
         }
     }
 
-    // Batch-fetch parsiustas status from failai
+    // Batch-fetch parsiustas status from files (mvpAprasai saltinioId nedalinamas → sourceId0)
     const failaiMap = new Map();
     if (allSaltinioIds.size > 0) {
         const failaiRes = await postgres.query(
-            `SELECT "saltinioId", "id", "parsiustas", "dydis", "extension"
-           FROM public."failai"
-           WHERE "saltinis" = 'mvpAprasai'
-             AND "saltinioId" = ANY($1)`,
+            `SELECT f."sourceId0" AS "saltinioId", f."id",
+                    f."downloadStatus" AS "parsiustas", f."filesize" AS "dydis", e."extension"
+           FROM public.files f
+           LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+           WHERE f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'mvpAprasai')
+             AND f."sourceId0" = ANY($1)`,
             [Array.from(allSaltinioIds)],
         );
         for (const f of failaiRes.rows) {

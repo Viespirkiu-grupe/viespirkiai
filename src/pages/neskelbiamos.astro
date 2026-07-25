@@ -38,10 +38,12 @@ const timed = async <T,>(promise: Promise<T>): Promise<{ value: T; ms: number }>
 };
 
 const queryNeskelbiamos = async ({ cleanSearch, tsQueryFunc, limit, skip }: { cleanSearch: string; tsQueryFunc: string; limit: number; skip: number; }) => {
+  // neskelbiamosDerybos saltinioId nedalinamas — visas kelias lieka sourceId0.
   const fileJoin = `
-    LEFT JOIN public."failai" f
-      ON replace(nd.link, 'https://eviesiejipirkimai.lt/', '') = f."saltinioId"
-      AND f."parsiustas" = 1`;
+    LEFT JOIN public.files f
+      ON replace(nd.link, 'https://eviesiejipirkimai.lt/', '') = f."sourceId0"
+      AND f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'neskelbiamosDerybos')
+      AND f."downloadStatus" = 1`;
 
   if (cleanSearch) {
     const [resultsRes, totalRes] = await Promise.all([

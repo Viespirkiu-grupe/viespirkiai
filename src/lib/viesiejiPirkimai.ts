@@ -2,7 +2,7 @@ import { postgres } from '@/postgres/postgres.js';
 import { buildTedNoticeViewModel } from '@/modules/ted/viewer.js';
 import { searchSutartys } from '@/modules/sutartys/searchSutartys.js';
 import { assembleTurinys } from '@/modules/viesiejiPirkimai/assembleTurinys.js';
-import { FILES_SELECT, FILES_JOINS, papildytiFaila } from '@/modules/failai/filesSkaitymas.js';
+import { prisegtiLokaliusFailus } from '@/modules/viesiejiPirkimai/prisegtiLokaliusFailus.js';
 
 export type Pirkimas = Record<string, any>;
 
@@ -13,42 +13,6 @@ const parseTedNoticeNumber = (url: string) => {
   const fallbackMatch = trimmed.match(/(\d{4,}-\d{4})/);
   return fallbackMatch?.[1] || null;
 };
-
-async function attachLocalFailai(pirkimoId: string, failai: any[]) {
-  // cvpIs šaltinio ID `pirkimoId/dokumentasId/versionId` naujoje schemoje guli
-  // trijuose stulpeliuose: sourceId0..2. Visos versijos priklauso tam pačiam
-  // pirkimui, tad užtenka filtro pagal sourceId0 + dokumentų sąrašą.
-  const dokumentuIds = [
-    ...new Set(
-      failai
-        .filter((failas: any) => (failas.versijos ?? []).length)
-        .map((failas: any) => String(failas.dokumentasId)),
-    ),
-  ];
-  if (!dokumentuIds.length) return;
-
-  const { rows } = await postgres.query(
-    `SELECT ${FILES_SELECT}
-     FROM public.files f
-     ${FILES_JOINS}
-     WHERE f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'cvpIs')
-       AND f."sourceId0" = $1 AND f."sourceId1" = ANY($2)`,
-    [String(pirkimoId), dokumentuIds],
-  );
-
-  const lokalusFailai = new Map<string, any>(
-    rows.map((f: any) => [`${f.sourceId1}/${f.sourceId2}`, papildytiFaila(f)]),
-  );
-  for (const failas of failai) {
-    for (const versija of failas.versijos ?? []) {
-      const lokalus = lokalusFailai.get(`${failas.dokumentasId}/${versija.versionId}`);
-      if (lokalus) {
-        const { id, pavadinimas, extension, parsiustas, nuskaitytas, zodziuSkaicius, puslapiuSkaicius, dydis, md5 } = lokalus;
-        Object.assign(versija, { id, pavadinimas, extension, parsiustas, nuskaitytas, zodziuSkaicius, puslapiuSkaicius, dydis, md5 });
-      }
-    }
-  }
-}
 
 function fixSkelbimaiUrls(skelbimai: any[]) {
   return skelbimai.map((s: any) => {
@@ -114,7 +78,7 @@ export async function loadPirkimas(pirkimoId: string): Promise<Pirkimas | null> 
   // `turinys` jsonb pakeistas reliacinėmis lentelėmis — atkuriam suderinamą objektą.
   pirkimas.turinys = await assembleTurinys(pirkimoId);
 
-  await attachLocalFailai(pirkimoId, pirkimas.turinys?.failai ?? []);
+  await prisegtiLokaliusFailus(pirkimoId, pirkimas.turinys?.failai ?? []);
 
   if (Array.isArray(pirkimas?.turinys?.skelbimai)) {
     pirkimas.turinys.skelbimai = fixSkelbimaiUrls(pirkimas.turinys.skelbimai);

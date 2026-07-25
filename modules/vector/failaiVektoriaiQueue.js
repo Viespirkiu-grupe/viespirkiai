@@ -195,7 +195,8 @@ async function main() {
     } else {
         const tc = performance.now();
         const { rows: countRows } = await postgres.query(
-            `SELECT COUNT(*) AS c FROM public."failai" WHERE "saltinis" = 'cvpIs'`,
+            `SELECT COUNT(*) AS c FROM public.files f
+             WHERE f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'cvpIs')`,
         );
         totalFailai = Number(countRows[0].c);
         console.log(`COUNT(*): ${nf(totalFailai)} cvpIs failų per ${secs(performance.now() - tc)}s`);
