@@ -2,6 +2,7 @@ import { postgres } from '@/postgres/postgres.js';
 import { buildTedNoticeViewModel } from '@/modules/ted/viewer.js';
 import { searchSutartys } from '@/modules/sutartys/searchSutartys.js';
 import { assembleTurinys } from '@/modules/viesiejiPirkimai/assembleTurinys.js';
+import { FILES_SELECT, FILES_JOINS, papildytiFaila } from '@/modules/failai/filesSkaitymas.js';
 
 export type Pirkimas = Record<string, any>;
 
@@ -14,24 +15,36 @@ const parseTedNoticeNumber = (url: string) => {
 };
 
 async function attachLocalFailai(pirkimoId: string, failai: any[]) {
-  const saltinioIds = failai.flatMap((failas: any) =>
-    (failas.versijos ?? []).map((v: any) => `${pirkimoId}/${failas.dokumentasId}/${v.versionId}`),
-  );
-  if (!saltinioIds.length) return;
+  // cvpIs šaltinio ID `pirkimoId/dokumentasId/versionId` naujoje schemoje guli
+  // trijuose stulpeliuose: sourceId0..2. Visos versijos priklauso tam pačiam
+  // pirkimui, tad užtenka filtro pagal sourceId0 + dokumentų sąrašą.
+  const dokumentuIds = [
+    ...new Set(
+      failai
+        .filter((failas: any) => (failas.versijos ?? []).length)
+        .map((failas: any) => String(failas.dokumentasId)),
+    ),
+  ];
+  if (!dokumentuIds.length) return;
 
-  const { rows: failaiRows } = await postgres.query(
-    `SELECT id, "saltinioId", extension, parsiustas, nuskaitytas, "zodziuSkaicius", "puslapiuSkaicius", dydis, md5
-     FROM public."failai" WHERE saltinis = 'cvpIs' AND "saltinioId" = ANY($1)`,
-    [saltinioIds],
+  const { rows } = await postgres.query(
+    `SELECT ${FILES_SELECT}
+     FROM public.files f
+     ${FILES_JOINS}
+     WHERE f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'cvpIs')
+       AND f."sourceId0" = $1 AND f."sourceId1" = ANY($2)`,
+    [String(pirkimoId), dokumentuIds],
   );
-  const lokalusFailai = Object.fromEntries(failaiRows.map((f: any) => [f.saltinioId, f]));
+
+  const lokalusFailai = new Map<string, any>(
+    rows.map((f: any) => [`${f.sourceId1}/${f.sourceId2}`, papildytiFaila(f)]),
+  );
   for (const failas of failai) {
     for (const versija of failas.versijos ?? []) {
-      const saltinioId = `${pirkimoId}/${failas.dokumentasId}/${versija.versionId}`;
-      const lokalus = (lokalusFailai as any)[saltinioId];
+      const lokalus = lokalusFailai.get(`${failas.dokumentasId}/${versija.versionId}`);
       if (lokalus) {
-        const { id, filename, extension, parsiustas, nuskaitytas, zodziuSkaicius, puslapiuSkaicius, dydis, md5 } = lokalus;
-        Object.assign(versija, { id, filename, extension, parsiustas, nuskaitytas, zodziuSkaicius, puslapiuSkaicius, dydis, md5 });
+        const { id, pavadinimas, extension, parsiustas, nuskaitytas, zodziuSkaicius, puslapiuSkaicius, dydis, md5 } = lokalus;
+        Object.assign(versija, { id, pavadinimas, extension, parsiustas, nuskaitytas, zodziuSkaicius, puslapiuSkaicius, dydis, md5 });
       }
     }
   }
