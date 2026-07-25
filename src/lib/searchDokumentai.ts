@@ -89,6 +89,7 @@ export interface DokumentasHit {
   updatedAt: Date | null;
   discoveredAt: Date | null;
   failasId: number | null;
+  saltinioId2: string | null;
   title: string | null;
   snippet: string | null;
 }
@@ -950,7 +951,8 @@ export async function searchDokumentai(input: {
          d.pavadinimas, d.autorius,
          d.extension, d.language, d."pageCount", d."wordCount", d."characterCount",
          d.savivaldybe, d.apskritis, d."istaigaJar", j.pavadinimas AS "istaigaPavadinimas",
-         d."happenedAt", d."createdAt", d."updatedAt", d."discoveredAt", d."failasId"
+         d."happenedAt", d."createdAt", d."updatedAt", d."discoveredAt", d."failasId",
+         d."saltinioId2"
        FROM public.dokumentai d
        LEFT JOIN public.jar j ON j."jarKodas" = d."istaigaJar"
        WHERE d.id = ANY($1)

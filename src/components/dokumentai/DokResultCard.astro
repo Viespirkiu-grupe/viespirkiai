@@ -23,7 +23,9 @@ if (!domain && hit.url) {
 const pathPart = isVerdict ? '' : (hit.url ? hit.url.replace(/^https?:\/\/[^/]+/, '').replace(/^\//, '') : '');
 const title = hit.title || hit.url || hit.md5 || `Dokumentas #${hit.id}`;
 const externalUrl = hit.url || null;
-const internalUrl = hit.failasId ? `/failas/${hit.failasId}` : null;
+const internalUrl = hit.type === 'teismoNuosprendis' && hit.saltinioId2
+  ? `/teismoNuosprendis/${hit.saltinioId2}`
+  : hit.failasId ? `/failas/${hit.failasId}` : null;
 const targetUrl = internalUrl || externalUrl || '#';
 const isExternal = !internalUrl && !!externalUrl;
 const happened = fmtDate(hit.happenedAt);

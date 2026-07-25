@@ -1,0 +1,248 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import DetailsSection from '@design-system/components/DetailsSection.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
+import { postgres } from '@/postgres/postgres.js';
+import { readDokumentasFs } from '@/modules/dokumentai/dokumentaiFs.js';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
+import config from '../../lib/config.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const { uuid } = Astro.params;
+if (!uuid) return Astro.redirect('/404');
+
+// litekoId = LITEKO detalės puslapio UUID (unikalus indeksas).
+const { rows } = await postgres.query(
+  `SELECT id, md5, "litekoId", "bylosNumeris", "teisminisProcesoNr", "bylosRusis",
+          teismas, "teismoRumai", skyrius, instancija, data, "fileHref"
+     FROM public."teismoNuosprendziai" WHERE "litekoId" = $1`,
+  [uuid],
+);
+const n = rows[0];
+if (!n) return Astro.redirect('/404');
+
+const [dalyviaiRes, kategorijosRes] = await Promise.all([
+  postgres.query(
+    `SELECT pavadinimas, kodas, "bylojeKaip"
+       FROM public."teismoNuosprendziaiDalyviai"
+      WHERE "nuosprendzioId" = $1
+      ORDER BY "bylojeKaip" NULLS LAST, pavadinimas`,
+    [n.id],
+  ),
+  postgres.query(
+    `SELECT k.kodas, p.pavadinimas
+       FROM public."teismoNuosprendziaiKategorijos" k
+       LEFT JOIN public."teismoNuosprendziaiKategorijuPavadinimai" p ON p.id = k."pavadinimoId"
+      WHERE k."nuosprendzioId" = $1
+      ORDER BY p.pavadinimas NULLS LAST`,
+    [n.id],
+  ),
+]);
+// isJar — 9 skaitmenų kodas yra JAR kodas (juridinis asmuo) → nuoroda į /asmuo.
+const dalyviai = (dalyviaiRes.rows as any[]).map((d) => ({ ...d, isJar: /^\d{9}$/.test(d.kodas || '') }));
+
+// Trūkstamus dalyvių pavadinimus papildom iš JAR (pagal kodą).
+const trukstamiKodai = [...new Set(dalyviai.filter((d) => !d.pavadinimas && d.isJar).map((d) => d.kodas))];
+if (trukstamiKodai.length) {
+  const { rows: jarRows } = await postgres.query(
+    `SELECT "jarKodas", pavadinimas FROM public.jar WHERE "jarKodas" = ANY($1)`,
+    [trukstamiKodai],
+  );
+  const jarVardai: Record<string, string> = Object.fromEntries(jarRows.map((r: any) => [r.jarKodas, r.pavadinimas]));
+  for (const d of dalyviai) if (!d.pavadinimas && jarVardai[d.kodas]) d.pavadinimas = jarVardai[d.kodas];
+}
+
+// Rodom tik įvardintas kategorijas — be pavadinimo lieka tik kodas (pvz. „2.4.2.2"), jo neberodom.
+const kategorijos = (kategorijosRes.rows as any[]).filter((k) => k.pavadinimas);
+
+// Pilnas tekstas ir papildomi metaduomenys — iš dokumento sidecar JSON (pagal md5).
+let sidecar: any = null;
+try { sidecar = n.md5 ? await readDokumentasFs(n.md5) : null; } catch { sidecar = null; }
+// Nuvalom tekstą: pašalinam eilučių pradžios tarpus, sutraukiam >1 tuščią eilutę iki vienos.
+const tekstas: string | null = sidecar?.text
+  ? String(sidecar.text)
+      .replace(/^[ \t]+/gm, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  : null;
+const teisejai: string[] = sidecar?.metadata?.teisejai ?? [];
+const vieta: string | null = sidecar?.metadata?.vieta ?? null;
+
+const dataStr = n.data ? new Date(n.data).toLocaleDateString('lt-LT') : null;
+const litekoUrl = `https://liteko.teismai.lt/viesasprendimupaieska/${n.fileHref}`;
+const dokumentaiUrl = `/dokumentai?mode=phrase&type=teismoNuosprendis&q=${encodeURIComponent(n.bylosNumeris)}`;
+
+const bylaItems = [
+  { label: 'Teismas', value: n.teismas },
+  { label: 'Rūmai', value: n.teismoRumai },
+  { label: 'Skyrius', value: n.skyrius },
+  { label: 'Instancija', value: n.instancija },
+  { label: 'Bylos rūšis', value: n.bylosRusis },
+  { label: 'Teisminio proceso nr.', value: n.teisminisProcesoNr, valueClassName: 'cell-mono' },
+  { label: 'Data', value: dataStr },
+  { label: 'Vieta', value: vieta },
+  { label: 'Teisėjai', value: teisejai.length ? teisejai.join(', ') : null },
+];
+
+const pageTitle = n.teismas ? `${n.bylosNumeris} — ${n.teismas}` : n.bylosNumeris;
+const pageDescription = [n.teismas, n.bylosRusis, dataStr].filter(Boolean).join('\n');
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=60');
+---
+
+<Layout
+  pageTitle={pageTitle}
+  pageDescription={pageDescription}
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      <Fragment slot="subtext">Teismo nuosprendis</Fragment>
+      {n.bylosNumeris}
+      <Fragment slot="actions">
+        <a href={dokumentaiUrl} class="btn btn-outline btn-sm" aria-label="Ieškoti pagal bylos numerį">↗ Paieška pagal bylos numerį</a>
+        <ExternalSourceLink href={litekoUrl} source="court" label="Senas LITEKO" variant="button" ariaLabel="Peržiūrėti senoje LITEKO sistemoje" />
+      </Fragment>
+    </PageHeader>
+
+    {/* Dešinioji kolona (desktop float): kategorijos + dalyviai. Dalyviai prasideda
+        ties kategorijų pabaiga, o „Byla" ir tekstas teka kairėje. */}
+    <div class="tn-side">
+      {kategorijos.length > 0 && (
+        <DetailsSection title="Kategorijos" className="mb-7">
+          <ul class="tn-kategorijos">
+            {kategorijos.map((k) => (
+              <li>
+                <a class="tn-kategorija" href={`/dokumentai?type=teismoNuosprendis&kategorija=${encodeURIComponent(k.pavadinimas)}`}>
+                  {k.pavadinimas}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </DetailsSection>
+      )}
+
+      {dalyviai.length > 0 && (
+        <DetailsSection title="Dalyviai">
+          <DataTable
+            className="tn-dalyviai"
+            wrapperClassName="tn-dalyviai-wrap"
+            columns={[
+              { label: 'Pavadinimas' },
+              { label: 'Kodas' },
+              { label: 'Vaidmuo byloje' },
+            ]}
+          >
+            {dalyviai.map((d) => (
+              <tr>
+                <td>{d.pavadinimas || '—'}</td>
+                <td class="cell-mono cell-nowrap">
+                  {d.isJar ? <a href={`/asmuo/${d.kodas}`}>{d.kodas}</a> : d.kodas}
+                </td>
+                <td class:list={[d.bylojeKaip === 'Atsakovas' && 'font-bold']}>{d.bylojeKaip || '—'}</td>
+              </tr>
+            ))}
+          </DataTable>
+        </DetailsSection>
+      )}
+    </div>
+
+    <DetailsSection title="Byla" items={bylaItems} className="mb-7" />
+
+    {tekstas ? (
+      <DetailsSection title="Nuosprendžio tekstas" className="mb-7">
+        <article class="tn-tekstas">{tekstas}</article>
+      </DetailsSection>
+    ) : (
+      <DetailsSection title="Nuosprendžio tekstas" className="mb-7">
+        <p class="text-muted">Teksto turinys dar nenuskaitytas. Peržiūrėkite
+          <a href={litekoUrl}> LITEKO sistemoje</a>.</p>
+      </DetailsSection>
+    )}
+
+    <div class="tn-clear"></div>
+  </main>
+</Layout>
+
+<style>
+  .tn-kategorijos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tn-kategorija {
+    display: inline-flex;
+    align-items: baseline;
+    padding: 6px 12px;
+    border: var(--border);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    color: var(--black);
+    text-decoration: none;
+    transition: border-color var(--transition), background-color var(--transition);
+  }
+
+  .tn-kategorija:hover {
+    border-color: var(--gray);
+    background: var(--lighter-gray);
+  }
+
+  /* Dalyvių lentelė — plotis pagal turinį, ne per visą ekraną (ir konteineris). */
+  :global(.table-wrapper.tn-dalyviai-wrap) {
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  :global(.ds-table.tn-dalyviai) {
+    width: auto;
+    max-width: 100%;
+  }
+
+  /* Visą teksto bloką centruojam pagal ilgiausią eilutę (ne kiekvieną eilutę). */
+  .tn-tekstas {
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    text-align: justify;
+    line-height: 1.95;
+    font-size: var(--text-md);
+  }
+
+  .tn-clear {
+    clear: both;
+  }
+
+  /* Telefone dešinioji kolona stack'inasi — tarpas iki „Byla". */
+  .tn-side {
+    margin-bottom: 28px;
+  }
+
+  /* Desktop: dešinioji kolona (kategorijos + dalyviai) float'ina dešinėje,
+     „Byla" ir tekstas teka kairėje ir apsiveja. */
+  @media (min-width: 880px) {
+    .tn-side {
+      float: right;
+      max-width: 56%;
+      margin: 0 0 16px 36px;
+    }
+
+    .tn-tekstas {
+      width: auto;
+      max-width: none;
+      margin-inline: 0;
+    }
+  }
+</style>
