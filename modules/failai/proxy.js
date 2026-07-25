@@ -1,6 +1,11 @@
 import mime from "mime";
 import { Readable } from "stream";
 
+/**
+ * @param {Record<string, any>} failas
+ * @param {Record<string, any>} deze
+ * @param {Record<string, any>|null} [parent] - archyvo tėvas, jei failas iš archyvo
+ */
 export function buildProxyResponse(failas, deze, parent = null) {
     const contentType =
         mime.getType(failas.extension) || "application/octet-stream";

@@ -196,11 +196,13 @@ export async function fetchMd5Lookup(rows) {
     const lookup = new Map();
     if (!dokIds.length) return lookup;
     const { rows: md5Rows } = await postgres.query(
-        `SELECT f."dokId", f."fileId", f.md5
-         FROM failai f
+        `SELECT f."sourceId0"::int AS "dokId", f."sourceId1"::int AS "fileId", m.md5
+         FROM public.files f
+         JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+         JOIN public."filesMd5" m ON m.id = f."md5Id"
          JOIN unnest($1::int[], $2::int[]) AS x("dokId", "fileId")
-           ON f."dokId" = x."dokId" AND f."fileId" = x."fileId"
-         WHERE f.md5 IS NOT NULL`,
+           ON f."sourceId0" = x."dokId"::text AND f."sourceId1" = x."fileId"::text
+         WHERE st.title = 'sutartys'`,
         [dokIds, fileIds],
     );
     for (const r of md5Rows) {

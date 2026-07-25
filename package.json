@@ -11,7 +11,6 @@
         "check": "astro check",
         "deps:report": "node scripts/dependencySizes.js",
         "db:schema:dump": "node postgres/dumpSchema.js",
-        "failai:backfill-failai-fs": "node modules/failai/backfillFailaiFs.js",
         "failai:info-to-sqlite": "node modules/failai/failaiInfoToSqlite.js",
         "failai:info-benchmark": "node modules/failai/failaiInfoBenchmark.js",
         "failai:nuskaitymo-eile": "node modules/failai/nuskaitymoEilesPapildymas.js",

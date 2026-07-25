@@ -10,6 +10,11 @@ const logger = new Logger();
 import Timings from "../../utils/timings.js";
 import { Agent } from "undici";
 import { iEile } from "./nuskaitymoEile.js";
+import {
+    paimtiParsiuntimui,
+    pazymetiKlaida,
+    pazymetiParsiusta,
+} from "./parsiuntimoEile.js";
 
 const slowAgent = new Agent({ headersTimeout: 30 * 60_000 }); // 30 min
 const nodeName = process.env.NODE_NAME || "default";
@@ -23,38 +28,9 @@ export async function parsiustiFaila(options = {}) {
 
     timings.start("getFileFromBucket");
 
-    const result = await postgres.query(
-        `WITH cte AS (
-            SELECT q.id FROM public."failaiParsiuntimoQueue" q
-            WHERE q."lockedBy" IS NULL
-            AND (
-                q.state = 0
-                OR (q.state = -1 AND (
-                    (q.bandymai < 6   AND q."paskutinisBandymas" <= NOW() - interval '3 hours')
-                    OR (q.bandymai < 30  AND q."paskutinisBandymas" <= NOW() - interval '12 hours')
-                    OR (q.bandymai < 54  AND q."paskutinisBandymas" <= NOW() - interval '1 day')
-                    OR q."paskutinisBandymas" <= NOW() - interval '3 days'
-                ))
-            )
-            ORDER BY q.bandymai, q.id
-            LIMIT 1
-            FOR UPDATE SKIP LOCKED
-        ),
-        locked AS (
-            UPDATE public."failaiParsiuntimoQueue" q
-            SET "lockedBy" = $1,
-                "lockedAt" = NOW(),
-                "paskutinisBandymas" = NOW(),
-                bandymai = COALESCE(q.bandymai, 0) + 1
-            FROM cte WHERE q.id = cte.id
-            RETURNING q.id
-        )
-        SELECT f.* FROM public.failai f
-        WHERE f.id = (SELECT id FROM locked)`,
-        [nodeName],
-    );
-    if (!result.rows.length) return false;
-    const failas = result.rows[0];
+    // Migracijos metu imama iš abiejų eilių — pirmenybė senajai (žr. parsiuntimoEile.js)
+    const failas = await paimtiParsiuntimui(nodeName);
+    if (!failas) return false;
     timings.end("getFileFromBucket");
 
     logger.log(`Parsiunčiamas: ${failas.id} (${failas.pavadinimas})`);
@@ -179,40 +155,22 @@ export async function parsiustiFaila(options = {}) {
             throw new Error("Nepavyko gauti failo.");
         }
 
-        // Įterpiame į failaiDezes (columns: md5, deze, dydis) jei nėra
-        timings.start("insertIntoFailaiDezes");
-        await postgres.query(
-            `INSERT INTO "failaiDezes" (md5, deze, dydis)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (md5, deze) DO NOTHING`,
-            [md5, deze.pavadinimas, size],
-        );
-        timings.end("insertIntoFailaiDezes");
-
-        // Atnaujiname informaciją apie failą
+        // Dėžės įrašas, failo būsena ir eilė
         timings.start("updateFailas");
-        await postgres.query(
-            `UPDATE failai SET parsiustas = 1, md5 = $1, dydis = $2 WHERE id = $3`,
-            [md5, size, failas.id],
-        );
-        await postgres.query(
-            `DELETE FROM public."failaiParsiuntimoQueue" WHERE id = $1`,
-            [failas.id],
-        );
+        await pazymetiParsiusta({
+            id: failas.id,
+            md5,
+            dydis: size,
+            dezeId: deze.id,
+            extension: failas.extension,
+        });
         // Parsisiuntęs failas tampa nuskaitomu
         await iEile([failas.id]);
         timings.end("updateFailas");
     } catch (error) {
         console.error("Klaida parsisiunčiant failą:", error);
         timings.start("updateFailas");
-        await postgres.query(
-            `UPDATE public."failaiParsiuntimoQueue"
-            SET state = -1,
-                "lockedBy" = NULL,
-                "lockedAt" = NULL
-            WHERE id = $1`,
-            [failas.id],
-        );
+        await pazymetiKlaida(failas.id);
         timings.end("updateFailas");
         throw error;
     }

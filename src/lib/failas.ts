@@ -123,8 +123,8 @@ function normalizeTekstasPerziurai(failas: Failas) {
  * Decorate the entries of an archive (zip/tar/...) with their DB-resident
  * file IDs so the UI can render them as clickable links.
  *
- * When an archive file is OCR'd we store each member individually in `failai`
- * with `parent = <archive id>` and `saltinioId = <member path>`.  The
+ * When an archive file is OCR'd we store each member individually in `files`
+ * with `parent = <archive id>` and `sourceId0 = <member path>`.  The
  * extractor metadata in `metaduomenys.files` knows the paths but not the
  * IDs, so we look them up here and inject `{ id, extension }` onto each
  * matching entry — both the flat `files` array and the recursive
@@ -135,7 +135,10 @@ async function resolveArchiveFiles(failas: Failas) {
   const paths = failas.metaduomenys.files.map((f: any) => f.path).filter(Boolean);
   if (!paths.length) return;
   const related = await postgres.query(
-    `SELECT * FROM failai WHERE parent = $1 AND "saltinioId" = ANY($2)`,
+    `SELECT f.id, f."sourceId0" AS "saltinioId", e.extension
+     FROM public.files f
+     LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+     WHERE f.parent = $1 AND f."sourceId0" = ANY($2)`,
     [failas.id, paths],
   );
   const relatedFiles = related.rows;
@@ -163,19 +166,8 @@ async function resolveArchiveFiles(failas: Failas) {
 }
 
 export async function loadFailasById(id: string): Promise<Failas | null> {
-  const result = await postgres.query(
-    `SELECT failai.id, "dokId", "fileId", pavadinimas, extension, dydis, md5, parsiustas, nuskaitytas,
-            "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", "ocrState", "ocrNode",
-            "ocrLockTimestamp", "ocrDuration", "ocrTimestamp", saltinis, "saltinioId", password, parent,
-            "nuskaitymasTimestamp", location, "ocrBandymai", "parsiuntimoBandymai",
-            "paskutinisParsiuntimoBandymas", tipas, "tipasNuskaitymas", autorius,
-            i."failasHash"
-     FROM failai
-     LEFT JOIN "failaiInfoFailai" i ON i.id = failai.id
-     WHERE failai."id" = $1 LIMIT 1`,
-    [id],
-  );
-  return result.rows[0] || null;
+  const { gautiFaila } = await import('@/modules/failai/filesSkaitymas.js');
+  return (await gautiFaila(Number(id))) as Failas | null;
 }
 
 /**
@@ -193,9 +185,20 @@ export async function loadFailasById(id: string): Promise<Failas | null> {
  * Mutates and returns the same object for convenience.
  */
 export async function findFailasIdBySaltinioId(saltinis: string, saltinioId: string): Promise<string | null> {
+  // saltinioId išskaidomas taip pat, kaip įrašant (žr. failuIrasymas.js SALTINIAI).
+  const { skaidytiSaltinioId } = await import('@/modules/failai/failuIrasymas.js');
+  const [s0, s1, s2, s3] = skaidytiSaltinioId(saltinis, saltinioId);
   const result = await postgres.query(
-    `SELECT id FROM failai WHERE saltinis = $1 AND "saltinioId" = $2 LIMIT 1`,
-    [saltinis, saltinioId],
+    `SELECT f.id
+     FROM public.files f
+     JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+     WHERE st.title = $1
+       AND f."sourceId0" IS NOT DISTINCT FROM $2
+       AND f."sourceId1" IS NOT DISTINCT FROM $3
+       AND f."sourceId2" IS NOT DISTINCT FROM $4
+       AND f."sourceId3" IS NOT DISTINCT FROM $5
+     LIMIT 1`,
+    [saltinis, s0, s1, s2, s3],
   );
   return result.rows[0]?.id != null ? String(result.rows[0].id) : null;
 }

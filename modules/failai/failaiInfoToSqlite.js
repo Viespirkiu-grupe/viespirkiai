@@ -18,7 +18,7 @@ import {
 } from "./failaiInfoSqlite.js";
 
 // Eksperimentinis migravimas: failaiInfo folder tree (md5 → .json) → SQLite + zstd blob.
-// Failų sąrašą imam iš DB (failaiInfoFailai."failasHash"), ne iš FS – tik tie hash'ai
+// Failų sąrašą imam iš DB (filesInfoFiles."fileHash"), ne iš FS – tik tie hash'ai
 // realiai naudojami. Einam didėjančia hash tvarka, todėl nutrūkus galima tęsti nuo
 // paskutinio įrašyto hash.
 //
@@ -47,11 +47,11 @@ const ZSTD_OPTS = { params: { [zlib.constants.ZSTD_c_compressionLevel]: LEVEL } 
 /** Vienas puslapis DISTINCT hash'ų didėjančia tvarka (keyset – be OFFSET). */
 async function fetchHashPage(cursor, pageSize) {
     const { rows } = await postgres.query(
-        `SELECT DISTINCT "failasHash"
-         FROM public."failaiInfoFailai"
-         WHERE "failasHash" IS NOT NULL
-           AND ($1::text IS NULL OR "failasHash" > $1)
-         ORDER BY "failasHash"
+        `SELECT DISTINCT "fileHash" AS "failasHash"
+         FROM public."filesInfoFiles"
+         WHERE "fileHash" IS NOT NULL
+           AND ($1::text IS NULL OR "fileHash" > $1)
+         ORDER BY "fileHash"
          LIMIT $2`,
         [cursor, pageSize],
     );
@@ -106,7 +106,7 @@ async function main() {
     );
 
     const { rows: countRows } = await postgres.query(
-        `SELECT COUNT(DISTINCT "failasHash") AS c FROM public."failaiInfoFailai" WHERE "failasHash" IS NOT NULL`,
+        `SELECT COUNT(DISTINCT "fileHash") AS c FROM public."filesInfoFiles" WHERE "fileHash" IS NOT NULL`,
     );
     const totalHashes = Math.min(Number(countRows[0].c), already + LIMIT);
     console.log(

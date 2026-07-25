@@ -955,7 +955,7 @@ export async function searchDokumentai(input: {
        LEFT JOIN public.jar j ON j."jarKodas" = d."istaigaJar"
        WHERE d.id = ANY($1)
          AND NOT EXISTS (
-           SELECT 1 FROM public."failaiNerodyti" n WHERE n.id = d."failasId"
+           SELECT 1 FROM public."filesHidden" n WHERE n.id = d."failasId"
          )`,
       [ids],
     );

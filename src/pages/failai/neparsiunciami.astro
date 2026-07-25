@@ -19,22 +19,35 @@ const limit = parsedLimit.limit;
 const page = Math.max(1, parseInt(query.page) || 1);
 const offset = (page - 1) * limit;
 const saltinis = query.saltinis || null;
-const where = saltinis ? (saltinis === 'sutartys' ? 'WHERE (f.saltinis = $1 OR f.saltinis IS NULL)' : 'WHERE f.saltinis = $1') : '';
+const where = saltinis ? 'WHERE st.title = $1' : '';
 const params = saltinis ? [saltinis] : [];
-const countRes = await postgres.query(`SELECT COUNT(*) AS total FROM public."failaiParsiuntimoQueue" q JOIN public.failai f ON f.id = q.id ${where}`, params);
+// Eilės eilutė + failo duomenys iš naujos schemos; senų stulpelių vardai išlaikomi,
+// kad puslapio šablonas ir CSV nesikeistų.
+const FROM_JOINS = `
+     FROM public."filesDownloadQueue" q
+     JOIN public.files f ON f.id = q.id
+     LEFT JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+     LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
+     LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"`;
+const SELECT_COLS = `
+     f.id, fn.filename AS pavadinimas, e.extension,
+     CASE WHEN st.title = 'sutartys' THEN NULL ELSE f."sourceId0" END AS "saltinioId",
+     st.title AS saltinis,
+     q.attempts AS "parsiuntimoBandymai",
+     q."nextAttempt" AS "paskutinisParsiuntimoBandymas",
+     f."downloadStatus" AS state,
+     CASE WHEN st.title = 'sutartys' THEN f."sourceId0" END AS "dokId",
+     CASE WHEN st.title = 'sutartys' THEN f."sourceId1" END AS "fileId"`;
+const countRes = await postgres.query(`SELECT COUNT(*) AS total ${FROM_JOINS} ${where}`, params);
 const total = parseInt(countRes.rows[0].total, 10) || 0;
 
 if (typeof query.csv !== 'undefined') {
   const csvLimit = Math.min(100000, Math.max(1, parseInt(query.csvLimit) || 10000));
   const rowsRes = await postgres.query(
-    `SELECT f.id, f.pavadinimas, f.extension, f."saltinioId", f.saltinis,
-            q.bandymai AS "parsiuntimoBandymai",
-            q."paskutinisBandymas" AS "paskutinisParsiuntimoBandymas",
-            q.state, f."dokId", f."fileId"
-     FROM public."failaiParsiuntimoQueue" q
-     JOIN public.failai f ON f.id = q.id
+    `SELECT ${SELECT_COLS}
+     ${FROM_JOINS}
      ${where}
-     ORDER BY q."paskutinisBandymas" ASC NULLS FIRST
+     ORDER BY q."nextAttempt" ASC NULLS FIRST
      LIMIT $${params.length + 1}`,
     [...params, csvLimit]
   );
@@ -76,7 +89,7 @@ if (typeof query.csv !== 'undefined') {
   });
 }
 
-const result = await postgres.query(`SELECT f.id, f.pavadinimas, f.extension, f."saltinioId", f.saltinis, q.bandymai AS "parsiuntimoBandymai", q."paskutinisBandymas" AS "paskutinisParsiuntimoBandymas", q.state, f."dokId", f."fileId" FROM public."failaiParsiuntimoQueue" q JOIN public.failai f ON f.id = q.id ${where} ORDER BY q."paskutinisBandymas" ASC NULLS FIRST LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, limit, offset]);
+const result = await postgres.query(`SELECT ${SELECT_COLS} ${FROM_JOINS} ${where} ORDER BY q."nextAttempt" ASC NULLS FIRST LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, limit, offset]);
 const files = result.rows.map(enrichFailasRow) as any[];
 const pageCount = Math.max(1, Math.ceil(total / limit));
 const queryParamsRaw = [saltinis && `saltinis=${encodeURIComponent(saltinis)}`, query.limit && `limit=${encodeURIComponent(query.limit)}`].filter(Boolean).join('&');

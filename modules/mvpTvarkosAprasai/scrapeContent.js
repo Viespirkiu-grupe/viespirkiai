@@ -3,6 +3,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
 import Timings from "../../utils/timings.js";
 import crypto from "node:crypto";
+import { irasytiFailus } from "../failai/failuIrasymas.js";
 
 export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
     let timings = options.timings || new Timings();
@@ -154,29 +155,10 @@ export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
             (a.saltinioId || "").localeCompare(b.saltinioId || ""),
         );
 
-        if (merged.length > 0) {
-            const existsResult = await postgres.query(
-                `SELECT "saltinis", "saltinioId" FROM failai
-         WHERE ("saltinis", "saltinioId") IN (${merged.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(', ')})
-           AND saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL`,
-                merged.flatMap(f => [f.saltinis, f.saltinioId])
-            );
-
-            const existingSet = new Set(existsResult.rows.map(r => `${r.saltinis}:${r.saltinioId}`));
-            const toInsert = merged.filter(f => !existingSet.has(`${f.saltinis}:${f.saltinioId}`));
-
-            if (toInsert.length > 0) {
-                const placeholders = toInsert.map((_, i) =>
-                    `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`
-                );
-                await postgres.query(
-                    `INSERT INTO failai ("saltinis", "saltinioId", "pavadinimas", "extension")
-             VALUES ${placeholders.join(', ')}
-             ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL) DO NOTHING`,
-                    toInsert.flatMap(f => [f.saltinis ?? null, f.saltinioId ?? null, f.pavadinimas ?? null, f.extension ?? null])
-                );
-                log(`Inserted ${toInsert.length} rows into public.failai (duplicates ignored)`);
-            }
+        // Dublikatus atmeta files unikalūs indeksai (žr. failuIrasymas.js).
+        const nauji = await irasytiFailus(merged);
+        if (nauji.length) {
+            log(`Inserted ${nauji.length} rows into public.files`);
         }
     } catch (err) {
         console.error("Klaida insertinant i failai:", err);

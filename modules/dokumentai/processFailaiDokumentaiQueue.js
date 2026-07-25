@@ -17,8 +17,8 @@ export async function processFailaiDokumentaiQueue() {
         // Keep rows locked, but present, until all downstream work succeeds.
         // An error rolls the claim back instead of losing the entire batch.
         const { rows: queue } = await client.query(
-            `SELECT id, "failoId", keitimas
-             FROM "failaiDokumentaiQueue"
+            `SELECT id, "fileId" AS "failoId", change AS keitimas
+             FROM public."filesDocumentsQueue"
              ORDER BY id
              LIMIT $1
              FOR UPDATE SKIP LOCKED`,
@@ -69,13 +69,13 @@ export async function processFailaiDokumentaiQueue() {
         }
 
         await client.query(
-            `DELETE FROM "failaiDokumentaiQueue" WHERE id = ANY($1::bigint[])`,
+            `DELETE FROM public."filesDocumentsQueue" WHERE id = ANY($1::bigint[])`,
             [queue.map((row) => row.id)],
         );
         await client.query("COMMIT");
 
         logger.log(
-            `failaiDokumentaiQueue: claimed ${queue.length} (deduped ${deduped.size}) | upserted ${inserted} | skipped ${skipped} | deleted ${deleted}`,
+            `filesDocumentsQueue: claimed ${queue.length} (deduped ${deduped.size}) | upserted ${inserted} | skipped ${skipped} | deleted ${deleted}`,
         );
         return true;
     } catch (err) {

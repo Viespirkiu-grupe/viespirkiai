@@ -14,28 +14,28 @@ export async function pravalytiNuskaitymoRezervacijas() {
         `
         WITH stale AS (
             SELECT id
-            FROM public."filesNuskaitymasQueue"
+            FROM public."filesExtractionQueue"
             WHERE "lockedBy" IS NOT NULL
               AND "lockedAt" <= NOW() - INTERVAL '30 minutes'
             LIMIT $1
             FOR UPDATE SKIP LOCKED
         ),
         bumped AS (
-            UPDATE public."filesNuskaitymasQueue" q
-            SET bandymai = q.bandymai + 1,
-                "kitasBandymas" = NOW() + LEAST(
+            UPDATE public."filesExtractionQueue" q
+            SET attempts = q.attempts + 1,
+                "nextAttempt" = NOW() + LEAST(
                     INTERVAL '1 day',
-                    INTERVAL '5 minutes' * POWER(2, q.bandymai)
+                    INTERVAL '5 minutes' * POWER(2, q.attempts)
                 ),
                 "lockedBy" = NULL,
                 "lockedAt" = NULL
             FROM stale s
             WHERE q.id = s.id
-            RETURNING q.id, q.bandymai
+            RETURNING q.id, q.attempts
         ),
         pasalinti AS (
-            DELETE FROM public."filesNuskaitymasQueue"
-            WHERE id IN (SELECT id FROM bumped WHERE bandymai >= $2)
+            DELETE FROM public."filesExtractionQueue"
+            WHERE id IN (SELECT id FROM bumped WHERE attempts >= $2)
             RETURNING id
         )
         SELECT (SELECT count(*) FROM bumped)::int    AS atlaisvinta,

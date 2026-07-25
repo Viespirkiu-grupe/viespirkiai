@@ -9,10 +9,15 @@ import { readRezultatasFs } from "../ocr/rezultataiFs.js";
 import { prepareFailaiFs, savePreparedFailaiFs } from "./failaiFs.js";
 import {
     iEile,
-    isEiles,
-    NUSKAITYMO_BANDYMAI,
+    paimtiNuskaitymui,
+    pazymetiNuskaitymoBandyma,
     NUSKAITYMO_VERSIJA,
 } from "./nuskaitymoEile.js";
+import { irasytiFailus } from "./failuIrasymas.js";
+import {
+    pazymetiNuskaityta,
+    pazymetiNuskaitymoKlaida,
+} from "./nuskaitymoRezultatas.js";
 
 const nodeName = process.env.NODE_NAME || "default";
 const nuskaitymoVersija = NUSKAITYMO_VERSIJA;
@@ -107,18 +112,18 @@ async function nuskaitytiDokNuskaitytojuje(
         extension,
     };
 
+    // Jei failas jau OCR'intas, jo tekstą paduodam nuskaitytojui. Rodyklę į FS
+    // rezultatą laiko filesOcrStatus."resultHash".
     timings.start("ocrRezultatai");
     try {
         const res = await postgres.query(
-            `SELECT md5 FROM "failaiOcrRezultatai"
-             WHERE failas = $1
-             ORDER BY id DESC
-             LIMIT 1`,
+            `SELECT "resultHash" FROM public."filesOcrStatus"
+             WHERE id = $1 AND "resultHash" IS NOT NULL`,
             [dokumentas.id],
         );
 
         if (res.rows.length > 0) {
-            const rezultatas = await readRezultatasFs(res.rows[0].md5);
+            const rezultatas = await readRezultatasFs(res.rows[0].resultHash);
             body.puslapiai = Array.isArray(rezultatas?.tekstas) ? rezultatas.tekstas : [];
         }
     } catch (e) {
@@ -154,6 +159,9 @@ async function nuskaitytiDokNuskaitytojuje(
         throw new Error("Nuskaitytojo klaida: nėra rezultato.");
     }
 
+    // Kuris nuskaitytojas apdorojo — įrašoma į filesDataExtraction."nodeId".
+    data.result.nuskaitytojoId = nuskaitytojas.id;
+
     timings.start("nuskaitytojaUpdate");
     await postgres.query(
         `
@@ -181,45 +189,10 @@ export async function nuskaitytiVienoDokumentoDuomenis(
     const timings = new Timings();
 
     timings.start("queue");
-    const result = failasId
-        ? await postgres.query(
-            `WITH locked AS (
-                UPDATE public."filesNuskaitymasQueue" q
-                SET "lockedBy" = $1, "lockedAt" = NOW()
-                WHERE q.id = $2
-                  AND q."lockedBy" IS NULL
-                RETURNING q.id
-            )
-            SELECT f.* FROM public.failai f
-            WHERE f.id = (SELECT id FROM locked)`,
-            [nodeName, failasId],
-        )
-        : await postgres.query(
-            // Nebandyti failai (bandymai = 0, kitasBandymas NULL) imami pirma, naujesni pirmiau;
-            // klaidos — tik atėjus jų atidėjimo laikui.
-            `WITH cte AS (
-        SELECT q.id FROM public."filesNuskaitymasQueue" q
-        WHERE q."lockedBy" IS NULL
-        AND q.bandymai < $2
-        AND (q."kitasBandymas" IS NULL OR q."kitasBandymas" <= NOW())
-        ORDER BY q.bandymai, q."kitasBandymas" NULLS FIRST, q.id DESC
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED
-    ),
-    locked AS (
-        UPDATE public."filesNuskaitymasQueue" q
-        SET "lockedBy" = $1, "lockedAt" = NOW()
-        FROM cte WHERE q.id = cte.id
-        RETURNING q.id
-    )
-    SELECT f.* FROM public.failai f
-    WHERE f.id = (SELECT id FROM locked)`,
-            [nodeName, NUSKAITYMO_BANDYMAI],
-        );
-
+    // Migracijos metu imama iš abiejų eilių — pirmenybė senajai (žr. nuskaitymoEile.js)
+    const dokumentas = await paimtiNuskaitymui(nodeName, failasId);
     timings.end("queue");
-    if (!result.rows.length) return false;
-    const dokumentas = result.rows[0];
+    if (!dokumentas) return false;
 
     let url = `${config.internalFileBase}/${dokumentas.md5}`;
     let viesasUrl = `https://failai.viespirkiai.org/${dokumentas.md5}`;
@@ -264,29 +237,10 @@ export async function nuskaitytiVienoDokumentoDuomenis(
 
         if (dokumentas && dokumentas.id) {
             try {
-                // Klaidos kodas — failai lentelėje; eilėje tik bandymų skaitiklis su
+                // Klaidos kodas — į abi schemas; eilėse tik bandymų skaitiklis su
                 // eksponentiniu atidėjimu, o viršijus ribą eilutė pašalinama.
-                await postgres.query(
-                    `UPDATE failai SET nuskaitytas = $1, "nuskaitymasTimestamp" = NOW() WHERE id = $2`,
-                    [kodas, dokumentas.id],
-                );
-                await postgres.query(
-                    `WITH bumped AS (
-                        UPDATE public."filesNuskaitymasQueue"
-                        SET bandymai = bandymai + 1,
-                            "kitasBandymas" = NOW() + LEAST(
-                                INTERVAL '1 day',
-                                INTERVAL '5 minutes' * POWER(2, bandymai)
-                            ),
-                            "lockedBy" = NULL,
-                            "lockedAt" = NULL
-                        WHERE id = $1
-                        RETURNING id, bandymai
-                    )
-                    DELETE FROM public."filesNuskaitymasQueue"
-                    WHERE id IN (SELECT id FROM bumped WHERE bandymai >= $2)`,
-                    [dokumentas.id, NUSKAITYMO_BANDYMAI],
-                );
+                await pazymetiNuskaitymoKlaida(dokumentas.id, kodas);
+                await pazymetiNuskaitymoBandyma(dokumentas.id);
             } catch (updateErr) {
                 console.error(
                     "Nepavyko pažymėti klaidingo nuskaitymo:",
@@ -349,33 +303,12 @@ export async function nuskaitytiVienoDokumentoDuomenis(
             flattenFiles(metadata.filesTree);
         }
 
-        // Insert into postgres one batch at a time; ON CONFLICT skips existing rows
+        // Dublikatai praleidžiami; rašoma į abi schemas (failai + files).
         if (children.length) {
-            const inserted = await postgres.query(
-                `INSERT INTO failai (
-                    pavadinimas, extension, dydis, md5,
-                    "saltinioId", parent, parsiustas, saltinis
-                )
-                SELECT * FROM unnest(
-                    $1::text[], $2::text[], $3::int[], $4::text[],
-                    $5::text[], $6::bigint[], $7::int[], $8::text[]
-                )
-                ON CONFLICT ("saltinioId", parent) WHERE saltinis = 'archive' DO NOTHING
-                RETURNING id;`,
-                [
-                    children.map((c) => c.pavadinimas),
-                    children.map((c) => c.extension),
-                    children.map((c) => c.dydis),
-                    children.map((c) => c.md5),
-                    children.map((c) => c.saltinioId),
-                    children.map((c) => c.parent),
-                    children.map((c) => c.parsiustas),
-                    children.map((c) => c.saltinis),
-                ],
-            );
+            const nauji = await irasytiFailus(children);
 
             // Išskleisti failai iš karto tampa nuskaitomi
-            await iEile(inserted.rows.map((r) => r.id));
+            await iEile(nauji);
         }
     }
 
@@ -439,76 +372,25 @@ export async function nuskaitytiVienoDokumentoDuomenis(
     await savePreparedFailaiFs(failasHash, failaiJson);
     timings.end("failaiFs");
 
+    // Rezultatas rašomas į abi schemas ir failas išimamas iš abiejų eilių.
     timings.start("failaiUpdate");
-    await postgres.query(
-        `UPDATE failai
-        SET nuskaitytas = $1,
-            "zodziuSkaicius" = $2,
-            "puslapiuSkaicius" = $3,
-            "simboliuSkaicius" = $4,
-            "ocrState" = $5,
-            location = ST_GeomFromText($6, 4326),
-            "nuskaitymasTimestamp" = NOW(),
-            "autorius" = $7
-        WHERE id = $8;`,
-        [
-            nuskaitymoVersija,
-            wordCount,
-            pageCount,
-            characterCount,
-            reikalingasOcr,
-            location,
-            autorius,
-            dokumentas.id,
-        ],
-    );
+    await pazymetiNuskaityta({
+        id: dokumentas.id,
+        versija: nuskaitymoVersija,
+        wordCount,
+        pageCount,
+        characterCount,
+        ocrState: reikalingasOcr,
+        location,
+        autorius,
+        failasHash,
+        nodeId: results.nuskaitytojoId ?? nuskaitytojoId ?? null,
+    });
     timings.end("failaiUpdate");
-
-    // failasHash saugomas atskiroje žemėlapio lentelėje (id → failasHash),
-    // kad nereikėtų liesti sudėtingos failai lentelės (trigeriai ir pan.).
-    timings.start("failaiInfoFailai");
-    await postgres.query(
-        `INSERT INTO "failaiInfoFailai" (id, "failasHash")
-         VALUES ($1, $2)
-         ON CONFLICT (id) DO UPDATE SET "failasHash" = EXCLUDED."failasHash"`,
-        [dokumentas.id, failasHash],
-    );
-    timings.end("failaiInfoFailai");
-
-    timings.start("failaiNuskaitymai");
-    await postgres.query(
-        // failaiNuskaitymai schema lieka nepaliesta — jo "metaduomenysHash"
-        // stulpelyje saugomas naujasis failasHash (turinio raktas šiam nuskaitymui).
-        `INSERT INTO "failaiNuskaitymai"
-            (failas, versija, "metaduomenysHash", "timestamp", "zodziuSkaicius", "puslapiuSkaicius", "simboliuSkaicius", location)
-         VALUES ($1, $2, $3, NOW() AT TIME ZONE 'Europe/Vilnius', $4, $5, $6, ST_GeomFromText($7, 4326))
-         ON CONFLICT (failas, versija, "metaduomenysHash")
-         DO UPDATE SET
-            "timestamp" = EXCLUDED."timestamp",
-            "zodziuSkaicius" = EXCLUDED."zodziuSkaicius",
-            "puslapiuSkaicius" = EXCLUDED."puslapiuSkaicius",
-            "simboliuSkaicius" = EXCLUDED."simboliuSkaicius",
-             location = EXCLUDED.location;`,
-        [
-            dokumentas.id,      // failas
-            nuskaitymoVersija,  // versija
-            failasHash,         // metaduomenysHash stulpelis (saugom failasHash)
-            wordCount,          // zodziuSkaicius
-            pageCount,          // puslapiuSkaicius
-            characterCount,     // simboliuSkaicius
-            location,           // location
-        ],
-    );
-    timings.end("failaiNuskaitymai");
-
-    timings.start("queueUpdate");
-    await isEiles([dokumentas.id]);
-    timings.end("queueUpdate");
 
     const timingParts = [
         "queue", "nuskaitytojas", "ocrRezultatai", "fetch", "nuskaitytojaUpdate",
-        "nuskaitymas", "archyvas",
-        "failaiFs", "failaiUpdate", "failaiInfoFailai", "failaiNuskaitymai", "queueUpdate", "all",
+        "nuskaitymas", "archyvas", "failaiFs", "failaiUpdate", "all",
     ].map((k) => `${k}=${timings.humanDuration(k)}`).join(" ");
     logger.log(
         `Nuskaitytas dokumentas ${dokumentas.id} / ${dokumentas.pavadinimas}, ${wordCount} žodž. | ${timingParts}`,

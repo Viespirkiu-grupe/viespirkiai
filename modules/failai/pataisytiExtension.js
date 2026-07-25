@@ -111,10 +111,11 @@ let totalSkipped = 0;
 const unknownMimes = new Map();
 
 const { rows: extRows } = await postgres.query(
-    `SELECT lower(extension) AS extension, count
-     FROM "failaiStatsExtension"
-     WHERE count <= 10
-     ORDER BY count ${BOTTOM_UP ? "ASC" : "DESC"}`,
+    `SELECT lower(e.extension) AS extension, s.files AS count
+     FROM public."filesStats" s
+     JOIN public."filesExtensions" e ON e.id = s."extensionId"
+     WHERE s.files <= 10
+     ORDER BY s.files ${BOTTOM_UP ? "ASC" : "DESC"}`,
 );
 const uniqueExts = extRows.map((r) => r.extension);
 
@@ -158,11 +159,19 @@ async function processRows(rows) {
                 totalSkipped++;
                 continue;
             }
+            // Plėtinys — žodyno įrašas; sukuriam, jei tokio dar nėra.
             await postgres.query(
-                `UPDATE failai SET extension = $1 WHERE id = $2`,
-                [detectedExt, row.id],
+                `WITH ext AS (
+                    INSERT INTO public."filesExtensions" (extension) VALUES ($1)
+                    ON CONFLICT (extension) DO UPDATE SET extension = EXCLUDED.extension
+                    RETURNING id
+                )
+                UPDATE public.files SET "extensionId" = (SELECT id FROM ext) WHERE id = $2`,
+                [String(detectedExt).toLowerCase(), row.id],
             );
-            // Pasikeitęs plėtinys gali failą padaryti nuskaitomu
+            // Pasikeitęs plėtinys gali failą padaryti nuskaitomu.
+            // filesStats skaitikliai persiskaičiuoja per files trigerį, bet
+            // extracted/words/ocr* lieka prie seno plėtinio — žr. filesSchema.md §4.
             await iEile([row.id]);
         }
 
@@ -174,10 +183,12 @@ if (BOTTOM_UP) {
     for (const extRow of extRows) {
         const ext = extRow.extension;
         const { rows } = await postgres.query(
-            `SELECT id, pavadinimas, lower(extension) AS extension
-             FROM failai
-             WHERE (parsiustas = 1 OR parsiustas = -5)
-               AND lower(extension) = $1`,
+            `SELECT f.id, fn.filename AS pavadinimas, lower(e.extension) AS extension
+             FROM public.files f
+             LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
+             JOIN public."filesExtensions" e ON e.id = f."extensionId"
+             WHERE f."downloadStatus" IN (1, -5)
+               AND lower(e.extension) = $1`,
             [ext],
         );
         if (rows.length === 0) continue;
@@ -190,10 +201,12 @@ if (BOTTOM_UP) {
     }
 } else if (EXTENSION !== undefined) {
     const { rows } = await postgres.query(
-        `SELECT id, pavadinimas, lower(extension) AS extension
-         FROM failai
-         WHERE (parsiustas = 1 OR parsiustas = -5)
-           AND lower(extension) = $1`,
+        `SELECT f.id, fn.filename AS pavadinimas, lower(e.extension) AS extension
+         FROM public.files f
+         LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
+         JOIN public."filesExtensions" e ON e.id = f."extensionId"
+         WHERE f."downloadStatus" IN (1, -5)
+           AND lower(e.extension) = $1`,
         [EXTENSION.toLowerCase()],
     );
     totalInspected = rows.length;
@@ -203,10 +216,12 @@ if (BOTTOM_UP) {
     await processRows(rows);
 } else {
     const { rows } = await postgres.query(
-        `SELECT id, pavadinimas, lower(extension) AS extension
-         FROM failai
-         WHERE (parsiustas = 1 OR parsiustas = -5)
-           AND lower(extension) = ANY($1)`,
+        `SELECT f.id, fn.filename AS pavadinimas, lower(e.extension) AS extension
+         FROM public.files f
+         LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
+         JOIN public."filesExtensions" e ON e.id = f."extensionId"
+         WHERE f."downloadStatus" IN (1, -5)
+           AND lower(e.extension) = ANY($1)`,
         [uniqueExts],
     );
     totalInspected = rows.length;

@@ -86,11 +86,15 @@ export async function handler({ id }) {
 
                 const failoBusena = await postgres
                     .query(
-                        `SELECT "dokId", "fileId", ("parsiustas" > 0) AS parsiustas,
-                                ("nuskaitytas" IS NOT NULL AND "nuskaitytas" > 0) AS nuskaitytas, id
-                         FROM failai
-                         WHERE "dokId" = $1 AND "fileId" = $2`,
-                        [failas.dok_id, failas.file_id],
+                        `SELECT f.id,
+                                (f."downloadStatus" > 0) AS parsiustas,
+                                (d.version IS NOT NULL AND d.version > 0) AS nuskaitytas
+                         FROM public.files f
+                         JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+                         LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
+                         WHERE st.title = 'sutartys'
+                           AND f."sourceId0" = $1::text AND f."sourceId1" = $2::text`,
+                        [String(failas.dok_id), String(failas.file_id)],
                     )
                     .then((r) => r.rows[0]);
 

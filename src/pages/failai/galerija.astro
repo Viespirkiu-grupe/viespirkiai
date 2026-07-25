@@ -1,17 +1,28 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { postgres, getColorScheme, getFont } from '../../lib/failai.js';
-import { readMetaduomenysFs } from '@/modules/failai/metaduomenysFs.js';
 import { readFailaiFs } from '@/modules/failai/failaiFs.js';
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
-const { rows } = await postgres.query(`SELECT f.*, i."failasHash" FROM failai f LEFT JOIN "failaiInfoFailai" i ON i.id = f.id WHERE f."ocrState" = 1 AND (f."zodziuSkaicius" IS NULL OR f."zodziuSkaicius" <= 10) AND lower(f.extension) = ANY(ARRAY['jpg','jpeg','png','bmp','gif','webp','heic']) ORDER BY random() LIMIT 50`);
+// OCR'inti paveikslėliai be teksto — trys sąlygos iš trijų lentelių, tad
+// atskiro partial indekso (buvusio idx_failai_galerija) atitikmens nebėra.
+const { rows } = await postgres.query(`
+  SELECT f.id, fn.filename AS pavadinimas, e.extension, i."fileHash" AS "failasHash"
+  FROM public."filesOcrStatus" o
+  JOIN public.files f ON f.id = o.id
+  JOIN public."filesExtensions" e ON e.id = f."extensionId"
+  LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
+  LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
+  LEFT JOIN public."filesInfoFiles" i ON i.id = f.id
+  WHERE o.status = 1
+    AND (d."wordCount" IS NULL OR d."wordCount" <= 10)
+    AND lower(e.extension) = ANY(ARRAY['jpg','jpeg','png','bmp','gif','webp','heic'])
+  ORDER BY random()
+  LIMIT 50`);
 const seen = new Set();
 const images = (rows as any[]).filter((r) => !seen.has(r.id) && seen.add(r.id));
 await Promise.all(images.map(async (img: any) => {
-  // Naujas kelias — metaduomenys iš sujungto FS failo; pereinamasis — senas failas.
   if (img.failasHash) img.metaduomenys = (await readFailaiFs(img.failasHash))?.metaduomenys ?? null;
-  else if (img.metaduomenysHash) img.metaduomenys = await readMetaduomenysFs(img.metaduomenysHash);
 }));
 ---
 <Layout pageTitle="Failų galerija" pageDescription="Atsitiktinė viešųjų pirkimų dokumentų nuotraukų galerija" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font}>

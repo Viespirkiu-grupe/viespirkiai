@@ -1,39 +1,39 @@
 import { postgres } from '../../../postgres/postgres.js';
 
-async function gautiStatistika() {
-  const { rows } = await postgres.query(`SELECT metrika, eilute, verte FROM "failaiCounts";`);
-  const counts = rows.reduce((acc: any, row: any) => {
-    const { metrika, eilute, verte } = row;
-    if (!acc[metrika]) acc[metrika] = eilute === 'ALL' ? verte : {};
-    if (eilute === 'ALL') acc[metrika] = verte;
-    else acc[metrika][eilute] = verte;
-    return acc;
-  }, {});
+export async function gautiFailuStatistika() {
+  const { rows } = await postgres.query(`SELECT
+      COALESCE(SUM(files), 0)            AS visi,
+      COALESCE(SUM(bytes), 0)            AS dydis,
+      COALESCE(SUM(downloaded), 0)       AS parsiusti,
+      COALESCE(SUM("downloadFailed"), 0) AS klaida,
+      COALESCE(SUM(extracted), 0)        AS nuskaityti,
+      COALESCE(SUM(words), 0)            AS "zodziuSuma"
+    FROM public."filesStats";`);
+
+  const c = Object.fromEntries(Object.entries(rows[0] ?? {}).map(([k, v]) => [k, Number(v)]));
+  const neparsiusti = c.visi - c.parsiusti - c.klaida;
+  const baitasFailui = c.parsiusti > 0 ? c.dydis / c.parsiusti : 0;
 
   return {
     atnaujinta: new Date().toISOString(),
     failai: {
-      kiekiai: {
-        visi: counts.visi,
-        klaida: counts.klaida,
-        parsiusti: counts.parsiusti,
-        neparsiusti: counts.visi - counts.parsiusti - counts.klaida - counts.extracted,
-      },
+      kiekiai: { visi: c.visi, klaida: c.klaida, parsiusti: c.parsiusti, neparsiusti },
       dydziai: {
-        visi: (counts.dydis / counts.parsiusti) * counts.visi,
-        klaida: (counts.dydis / counts.parsiusti) * counts.klaida,
-        parsiusti: counts.dydis,
-        neparsiusti: (counts.dydis / counts.parsiusti) * (counts.visi - counts.parsiusti - counts.klaida - counts.extracted),
+        // Tikras dydis žinomas tik parsiųstiems, likusiems ekstrapoliuojama.
+        visi: baitasFailui * c.visi,
+        klaida: baitasFailui * c.klaida,
+        parsiusti: c.dydis,
+        neparsiusti: baitasFailui * neparsiusti,
       },
     },
     nuskaitymas: {
-      zodziai: {
-        total: counts.zodziuSuma,
-        failaiSuZodziais: counts.zodziuKiekisNeNulis,
-      },
+      zodziai: { total: c.zodziuSuma },
+      nuskaityti: c.nuskaityti,
     },
   };
 }
+
+const gautiStatistika = gautiFailuStatistika;
 
 export async function GET() {
   const statistika = await gautiStatistika();

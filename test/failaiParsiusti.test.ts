@@ -31,14 +31,18 @@ describe("failų parsisiuntimo bandymai", () => {
     });
 
     it("inkrementuoja bandymus atominiu būdu rezervuojant failą", async () => {
-        mocks.query
-            .mockResolvedValueOnce({
-                rows: [{ id: 42, pavadinimas: "sutartis.pdf", dokId: 7, fileId: 8 }],
-            })
-            .mockResolvedValueOnce({
-                rows: [{ id: 3, pavadinimas: "dėžė", url: "https://box.test", apiKey: "key" }],
-            })
-            .mockResolvedValueOnce({ rows: [], rowCount: 1 });
+        // Užklausos atpažįstamos pagal SQL, ne pagal eiliškumą.
+        mocks.query.mockImplementation(async (sql: string) => {
+            if (String(sql).includes('"filesDownloadQueue" q')) {
+                return { rows: [{ id: 42, pavadinimas: "sutartis.pdf", saltinis: "sutartys", sourceId0: "7", sourceId1: "8" }] };
+            }
+            if (String(sql).includes("FROM public.dezes")) {
+                return {
+                    rows: [{ id: 3, pavadinimas: "dėžė", url: "https://box.test", apiKey: "key" }],
+                };
+            }
+            return { rows: [], rowCount: 1 };
+        });
 
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
             ok: false,
@@ -48,13 +52,19 @@ describe("failų parsisiuntimo bandymai", () => {
 
         await expect(parsiustiFaila()).rejects.toThrow("Nepavyko parsisiųsti failo");
 
-        const claimSql = String(mocks.query.mock.calls[0][0]);
-        expect(claimSql).toContain("bandymai = COALESCE(q.bandymai, 0) + 1");
-        expect(claimSql).toContain('"paskutinisBandymas" = NOW()');
+        const visos = mocks.query.mock.calls.map((args) => String(args[0]));
 
-        const failureSql = String(mocks.query.mock.calls[2][0]);
-        expect(failureSql).not.toMatch(/bandymai\s*=/);
-        expect(failureSql).toContain('"lockedBy" = NULL');
+        // Bandymas užskaitomas rezervuojant, kartu apskaičiuojamas atidėjimas.
+        const claimSql = visos.find((sql) => sql.includes('"filesDownloadQueue" q'))!;
+        expect(claimSql).toContain("attempts = q.attempts + 1");
+        expect(claimSql).toContain('"nextAttempt" = NOW() +');
+
+        // Klaidos kelias bandymų nebeskaičiuoja — jie suskaičiuoti rezervuojant.
+        const klaidosSql = visos.filter((sql) => /SET\s+"downloadStatus" = -1/.test(sql));
+        expect(klaidosSql.length).toBeGreaterThan(0);
+        for (const sql of klaidosSql) {
+            expect(sql).not.toMatch(/attempts\s*=/);
+        }
     });
 
     it("valant užstrigusią rezervaciją to paties bandymo antrąkart neskaičiuoja", async () => {
@@ -63,7 +73,8 @@ describe("failų parsisiuntimo bandymai", () => {
         await expect(pravalytiParsiuntimoRezervacijas()).resolves.toBe(true);
 
         const sql = String(mocks.query.mock.calls[0][0]);
-        expect(sql).not.toMatch(/bandymai\s*=/);
-        expect(sql).toContain("state                = -1");
+        expect(sql).toContain('"filesDownloadQueue"');
+        expect(sql).not.toMatch(/attempts\s*=/);
+        expect(sql).toContain('"downloadStatus" = -1');
     });
 });

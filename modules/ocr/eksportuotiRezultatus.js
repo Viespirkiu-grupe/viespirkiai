@@ -28,7 +28,7 @@ async function run(outputDir) {
 
     function openNextFile() {
         if (fileStream) fileStream.end();
-        const filePath = path.join(outputDir, `failaiOcrRezultatai_${String(fileIndex).padStart(4, "0")}.jsonl`);
+        const filePath = path.join(outputDir, `filesOcrStatus_${String(fileIndex).padStart(4, "0")}.jsonl`);
         fileStream = fs.createWriteStream(filePath, { encoding: "utf8" });
         fileIndex++;
         rowsInFile = 0;
@@ -39,10 +39,24 @@ async function run(outputDir) {
 
     const client = await postgres.connect();
     try {
+        // Rezultatų istorijos nebėra — eksportuojamas paskutinis kiekvieno failo
+        // rezultatas iš filesOcrStatus. `md5` čia yra resultHash (raktas į FS),
+        // o puslapių/žodžių skaičiai — iš po OCR atlikto nuskaitymo.
         const qs = new QueryStream(
-            `SELECT id, failas, md5, node, "lockTimestamp", "submitTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius"
-             FROM public."failaiOcrRezultatai"
-             ORDER BY id ASC`,
+            `SELECT o.id AS failas,
+                    o."resultHash" AS md5,
+                    n.pavadinimas AS node,
+                    o."lockTimestamp",
+                    o."ocrTimestamp" AS "submitTimestamp",
+                    o.duration,
+                    o."resultsCount",
+                    d."pageCount" AS "puslapiuSkaicius",
+                    d."wordCount" AS "zodziuSkaicius"
+             FROM public."filesOcrStatus" o
+             LEFT JOIN public."ocrNuskaitytojai" n ON n.id = o."nodeId"
+             LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
+             WHERE o."resultHash" IS NOT NULL
+             ORDER BY o.id ASC`,
         );
         const stream = client.query(qs);
 
@@ -55,7 +69,7 @@ async function run(outputDir) {
             if (totalRows - lastLogAt >= LOG_EVERY) {
                 const elapsed = (Date.now() - startTime) / 1000;
                 const speed = Math.round(totalRows / elapsed);
-                log(`Eksportuota ${totalRows.toLocaleString()} eilučių | greitis: ${speed.toLocaleString()} eil/s | paskutinis id: ${row.id}`);
+                log(`Eksportuota ${totalRows.toLocaleString()} eilučių | greitis: ${speed.toLocaleString()} eil/s | paskutinis failas: ${row.failas}`);
                 lastLogAt = totalRows;
             }
         }

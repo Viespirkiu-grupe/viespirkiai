@@ -1,4 +1,3 @@
-import { postgres } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 
 export const OCR_BANDYMAI = config.ocrBandymai || 5;
@@ -39,39 +38,14 @@ export const OCR_DOC_EXTS = [
     "docx",
 ];
 
-export async function checkoutNextFile(nodeName) {
-    const result = await postgres.query(
-        `WITH cte AS (
-            SELECT q.id FROM public."failaiOcrQueue" q
-            WHERE q."lockedBy" IS NULL
-              AND q.bandymai < $2
-            ORDER BY q.priority, q.id
-            LIMIT 1
-            FOR UPDATE SKIP LOCKED
-        ),
-        locked AS (
-            UPDATE public."failaiOcrQueue" q
-            SET "lockedBy" = $1,
-                "lockedAt" = NOW()
-            FROM cte
-            WHERE q.id = cte.id
-            RETURNING q.id
-        )
-        UPDATE public.failai
-        SET "ocrState" = -3,
-            "ocrNode" = $1,
-            "ocrLockTimestamp" = NOW() AT TIME ZONE 'Europe/Vilnius'
-            WHERE id = (SELECT id FROM locked)
-        RETURNING *`,
-        [nodeName, OCR_BANDYMAI],
-    );
-
-    if (!result.rows.length) {
-        return null;
-    }
-
-    const failas = result.rows[0];
-    return failas;
+/**
+ * Rezervuoja kitą failą OCR'ui. Migracijos metu dirbama su abiem eilėmis —
+ * logika gyvena ocrEile.js, čia lieka tik įėjimo taškas.
+ * @param {Object} node - ocrNuskaitytojai eilutė ({ id, pavadinimas })
+ */
+export async function checkoutNextFile(node) {
+    const { paimtiOcr } = await import("./ocrEile.js");
+    return paimtiOcr(node);
 }
 
 export function buildFileUri(failas) {

@@ -4,6 +4,7 @@ Importuoja sutarčių duomenis į Postgres.
 
 import { postgres } from "../../postgres/postgres.js";
 import Timings from "../../utils/timings.js";
+import { irasytiFailus } from "../failai/failuIrasymas.js";
 import { upsertVpmSutartis } from "./upsertVpmSutartis.js";
 import {
     normalizeScrapedSutartis,
@@ -92,31 +93,9 @@ export async function cvpIsImportArray(data, options = {}) {
         });
 
 
+        // Dublikatus atmeta files unikalūs indeksai (žr. failuIrasymas.js).
         timings.start("importPostgresFailaiUpsert");
-        if (newFailai.length > 0) {
-            const existsResult = await postgres.query(
-                `SELECT "dokId", "fileId" FROM failai
-         WHERE ("dokId", "fileId") IN (${newFailai.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(', ')})
-           AND "dokId" IS NOT NULL AND "fileId" IS NOT NULL`,
-                newFailai.flatMap(r => [r.dokId, r.fileId])
-            );
-
-            const existingSet = new Set(existsResult.rows.map(r => `${r.dokId}:${r.fileId}`));
-
-            const toInsert = newFailai.filter(r => !existingSet.has(`${r.dokId}:${r.fileId}`));
-
-            if (toInsert.length > 0) {
-                const placeholders = toInsert.map((_, i) =>
-                    `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`
-                );
-                await postgres.query(
-                    `INSERT INTO failai ("dokId", "fileId", "pavadinimas", "extension", "saltinis")
-             VALUES ${placeholders.join(', ')}
-             ON CONFLICT ("dokId", "fileId") WHERE ("dokId" IS NOT NULL AND "fileId" IS NOT NULL) DO NOTHING`,
-                    toInsert.flatMap(r => [r.dokId, r.fileId, r.pavadinimas, r.extension, r.saltinis])
-                );
-            }
-        }
+        await irasytiFailus(newFailai);
         timings.end("importPostgresFailaiUpsert");
 
         // Užtikriname, kad visos matytos sudarymo datos būtų

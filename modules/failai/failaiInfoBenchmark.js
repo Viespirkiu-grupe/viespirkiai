@@ -80,10 +80,10 @@ function printSummary(s) {
 }
 
 async function main() {
-    console.log(`Renkam ${N} atsitiktinių hash'ų iš failaiInfoFailai...`);
+    console.log(`Renkam ${N} atsitiktinių hash'ų iš filesInfoFiles...`);
     const { rows } = await postgres.query(
-        `SELECT "failasHash" FROM public."failaiInfoFailai"
-         WHERE "failasHash" IS NOT NULL
+        `SELECT "fileHash" AS "failasHash" FROM public."filesInfoFiles"
+         WHERE "fileHash" IS NOT NULL
          ORDER BY random() LIMIT $1`,
         [N],
     );

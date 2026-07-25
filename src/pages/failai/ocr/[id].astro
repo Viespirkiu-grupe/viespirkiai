@@ -35,16 +35,16 @@ const [nuskaitytojasRes, ocrStatsDayRes] = await Promise.all([
   postgres.query(
     `SELECT n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos",
       COALESCE(SUM(s.results), 0) AS "results", COALESCE(SUM(s.pages), 0) AS "pages", COALESCE(SUM(s.words), 0) AS "words"
-     FROM "ocrNuskaitytojai" n
-     LEFT JOIN "failaiOcrRezultataiStatsDayNode" s ON s.node = n.pavadinimas
+     FROM public."ocrNuskaitytojai" n
+     LEFT JOIN public."filesOcrStatsDay" s ON s."nodeId" = n.id
      WHERE n.id = $1
      GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos"`,
     [nodeId],
   ),
   postgres.query(
-    `SELECT s.* FROM "failaiOcrRezultataiStatsDayNode" s
-     JOIN "ocrNuskaitytojai" n ON n.pavadinimas = s.node
-     WHERE n.id = $1
+    `SELECT s.date, s.results, s.pages, s.words
+     FROM public."filesOcrStatsDay" s
+     WHERE s."nodeId" = $1
      ORDER BY s.date DESC`,
     [nodeId],
   ),

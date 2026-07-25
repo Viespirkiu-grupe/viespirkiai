@@ -1,3 +1,11 @@
+/*
+Avarinis įrankis: nepavykusius parsiuntimus grąžina į eilę nedelsiant.
+
+Įprastai pakartojimą tvarko pati eilė — `filesDownloadQueue."nextAttempt"` atideda
+bandymą pagal pakopas (3 val. / 12 val. / 1 d. / 3 d., žr. parsiuntimoEile.js).
+Šitas scriptas tą atidėjimą nuima ir grąžina `files."downloadStatus"` į 0.
+*/
+
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
@@ -5,14 +13,25 @@ const logger = new Logger();
 export async function parsiustiPakartotinai(kiekis = 100) {
     try {
         const res = await postgres.query(`
-            UPDATE public."failaiParsiuntimoQueue"
-            SET state = 0
-            WHERE id IN (
-                SELECT id FROM public."failaiParsiuntimoQueue"
-                WHERE state = -1
-                  AND "lockedBy" IS NULL
+            WITH atrinkti AS (
+                SELECT q.id
+                FROM public."filesDownloadQueue" q
+                JOIN public.files f ON f.id = q.id
+                WHERE f."downloadStatus" = -1
+                  AND q."lockedBy" IS NULL
                 LIMIT $1
+            ),
+            eile AS (
+                UPDATE public."filesDownloadQueue" q
+                SET "nextAttempt" = NULL
+                FROM atrinkti a
+                WHERE q.id = a.id
+                RETURNING q.id
             )
+            UPDATE public.files f
+            SET "downloadStatus" = 0
+            FROM eile e
+            WHERE f.id = e.id
         `, [kiekis]);
 
         logger.log(`Updated ${res.rowCount}`);

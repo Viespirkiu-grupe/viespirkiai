@@ -30,7 +30,7 @@ describe("processFailaiDokumentaiQueue", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.client.query.mockImplementation(async (sql: string) => {
-            if (sql.includes("SELECT id, \"failoId\"")) {
+            if (sql.includes('FROM public."filesDocumentsQueue"')) {
                 return { rows: [{ id: "91", failoId: 42, keitimas: "insert" }] };
             }
             return { rows: [] };
@@ -45,7 +45,7 @@ describe("processFailaiDokumentaiQueue", () => {
         expect(mocks.fetchFailaiByIds).toHaveBeenCalledWith([42], mocks.client);
         expect(mocks.upsertBatch).toHaveBeenCalledWith([{ id: 42 }], mocks.client);
         const sqlCalls = mocks.client.query.mock.calls.map(([sql]) => String(sql));
-        const deleteAt = sqlCalls.findIndex((sql) => sql.includes("DELETE FROM \"failaiDokumentaiQueue\""));
+        const deleteAt = sqlCalls.findIndex((sql) => sql.includes('DELETE FROM public."filesDocumentsQueue"'));
         const commitAt = sqlCalls.indexOf("COMMIT");
         expect(deleteAt).toBeGreaterThan(0);
         expect(commitAt).toBeGreaterThan(deleteAt);
@@ -59,7 +59,7 @@ describe("processFailaiDokumentaiQueue", () => {
 
         const sqlCalls = mocks.client.query.mock.calls.map(([sql]) => String(sql));
         expect(sqlCalls).toContain("ROLLBACK");
-        expect(sqlCalls.some((sql) => sql.includes("DELETE FROM \"failaiDokumentaiQueue\""))).toBe(false);
+        expect(sqlCalls.some((sql) => sql.includes('DELETE FROM public."filesDocumentsQueue"'))).toBe(false);
         expect(mocks.client.release).toHaveBeenCalledOnce();
     });
 });

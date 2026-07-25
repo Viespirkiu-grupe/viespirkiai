@@ -20,11 +20,14 @@ describe("fetchFailaiByIds", () => {
         await fetchFailaiByIds([123]);
 
         const [sql, params] = vi.mocked(postgres.query).mock.calls[0];
+        expect(sql).toContain("FROM public.files f");
+        // Šaltinio ID jau išskaidytas stulpeliuose — split_part nebereikia,
+        // bet skaitinis castas vis tiek turi būti apsaugotas regexp'u.
         expect(sql).toContain('vp."pirkimoId" = CASE');
-        expect(sql).toContain("split_part(f.\"saltinioId\", '/', 1) ~ '^[0-9]+$'");
-        expect(sql).toContain("THEN split_part(f.\"saltinioId\", '/', 1)::integer");
-        expect(sql).not.toContain('f."metaduomenysHash"');
-        expect(sql).not.toContain('f."tekstasHash"');
+        expect(sql).toContain(`f."sourceId0" ~ '^[0-9]+$'`);
+        expect(sql).toContain(`THEN f."sourceId0"::integer`);
+        expect(sql).not.toContain("split_part");
+        expect(sql).not.toContain("public.failai");
         expect(params).toEqual([[123]]);
     });
 });

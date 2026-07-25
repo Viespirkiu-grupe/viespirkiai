@@ -32,14 +32,10 @@ export function buildSsePayload(h) {
       zodziai: {
         total: Number(h.nuskaitymas.zodziai.total).linksniuoti(['žodis', 'žodžiai', 'žodžių', 'žodžio']),
         vidurkis: Number(h.nuskaitymas.zodziai.vidurkis).linksniuoti(['žodis', 'žodžiai', 'žodžių', 'žodžio']),
-        vidurkisNeNulis: Number(h.nuskaitymas.zodziai.vidurkisNeNulis).linksniuoti(['žodis', 'žodžiai', 'žodžių', 'žodžio']),
-        failuSuZodziaisDalis: `${Number(h.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2)} %`,
       },
-      pagalVersija: h.nuskaitymas.pagalVersija.map((v) => ({
-        status: v.status,
-        kiekis: Number(v.kiekis).toLocaleString('lt-LT'),
-        procentai: `${Number(v.procentai).toLocaleString('lt-LT')} %`,
-      })),
+      nuskaityti: Number(h.nuskaitymas.nuskaityti).toLocaleString('lt-LT'),
+      klaidos: Number(h.nuskaitymas.klaidos).toLocaleString('lt-LT'),
+      likoNuskaityti: Number(h.nuskaitymas.likoNuskaityti).toLocaleString('lt-LT'),
     },
     topDokNuskaitytojai: h.topDokNuskaitytojai.map((n) => ({
       viesasPavadinimas: n.viesasPavadinimas,
@@ -141,20 +137,16 @@ export function buildPrometheusMetrics(statistika) {
     [{ value: nuskaitymas.zodziai.total }]);
   metric('nuskaitymas_zodziu_vidurkis', 'gauge', 'Vidutinis žodžių skaičius faile',
     [{ value: nuskaitymas.zodziai.vidurkis }]);
-  metric('nuskaitymas_zodziu_vidurkis_ne_nulis', 'gauge', 'Vidutinis žodžių skaičius faile (tik failai su žodžiais)',
-    [{ value: nuskaitymas.zodziai.vidurkisNeNulis }]);
-  metric('nuskaitymas_failai_su_zodziais', 'gauge', 'Failų su bent vienu žodžiu skaičius',
-    [{ value: nuskaitymas.zodziai.failaiSuZodziais }]);
-  metric('nuskaitymas_failai_be_zodziu', 'gauge', 'Failų be žodžių skaičius',
-    [{ value: nuskaitymas.zodziai.failaiBeZodziu }]);
-  metric('nuskaitymas_failu_su_zodziais_dalis', 'gauge', 'Failų su žodžiais dalis procentais',
-    [{ value: nuskaitymas.zodziai.failuSuZodziaisDalis }]);
+  metric('nuskaitymas_puslapiu_suma', 'gauge', 'Bendra nuskaitytų puslapių suma',
+    [{ value: nuskaitymas.puslapiai }]);
+  metric('nuskaitymas_simboliu_suma', 'gauge', 'Bendra nuskaitytų simbolių suma',
+    [{ value: nuskaitymas.simboliai }]);
+  metric('nuskaitymas_nuskaityti', 'gauge', 'Sėkmingai nuskaitytų failų kiekis',
+    [{ value: nuskaitymas.nuskaityti }]);
+  metric('nuskaitymas_klaidos', 'gauge', 'Nuskaitymo klaidų kiekis',
+    [{ value: nuskaitymas.klaidos }]);
   metric('nuskaitymas_liko_nuskaityti', 'gauge', 'Kiek parsisiųstų failų dar liko nuskaityti',
     [{ value: nuskaitymas.likoNuskaityti }]);
-  metric('nuskaitymas_pagal_versija', 'gauge', 'Failų kiekis pagal nuskaitymo versijos statusą',
-    nuskaitymas.pagalVersija.map((v) => ({ labels: { status: v.status }, value: v.kiekis })));
-  metric('nuskaitymas_pagal_versija_procentai', 'gauge', 'Failų dalis procentais pagal nuskaitymo versijos statusą',
-    nuskaitymas.pagalVersija.map((v) => ({ labels: { status: v.status }, value: v.procentai })));
 
   // Lentelės (be suvestinės „Iš viso" eilutės – ją Prometheus gali susumuoti pats).
   // Eilės (…Queue) yra šių metrikų poaibis (žr. lentelės pavadinimą).
@@ -265,7 +257,17 @@ export async function gautiStatistika() {
   if (cache && now - cacheTime < 50) return cache;
 
   const [failaiCountsRes, lentelesRes, topRes, dbRes, quickwitIndeksaiRes, replikacijaRes] = await Promise.all([
-    postgres.query(`SELECT metrika, eilute, verte FROM "failaiCounts";`),
+    postgres.query(`SELECT
+        COALESCE(SUM(files), 0)            AS visi,
+        COALESCE(SUM(bytes), 0)            AS dydis,
+        COALESCE(SUM(downloaded), 0)       AS parsiusti,
+        COALESCE(SUM("downloadFailed"), 0) AS klaida,
+        COALESCE(SUM(extracted), 0)        AS nuskaityti,
+        COALESCE(SUM("extractFailed"), 0)  AS "nuskaitymoKlaidos",
+        COALESCE(SUM(words), 0)            AS "zodziuSuma",
+        COALESCE(SUM(pages), 0)            AS "puslapiuSuma",
+        COALESCE(SUM(characters), 0)       AS "simboliuSuma"
+      FROM public."filesStats";`),
     postgres.query(`SELECT s.relname AS "tableName", pg_table_size(s.relid) AS "dataSize", pg_indexes_size(s.relid) AS "indexSize", pg_table_size(s.relid) + pg_indexes_size(s.relid) AS "totalSize", st.n_live_tup AS "approxRowCount" FROM pg_catalog.pg_statio_user_tables s JOIN pg_catalog.pg_stat_user_tables st ON s.relid = st.relid ORDER BY s.relname ASC;`),
     postgres.query(`SELECT "nuskaitytidokumentai", "viesasPavadinimas" FROM "dokNuskaitytojai" ORDER BY "nuskaitytidokumentai" DESC LIMIT 100;`),
     postgres.query(`SELECT current_database() AS db, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, deadlocks, temp_files, temp_bytes, extract(epoch from now() - stats_reset) AS stats_age_seconds, extract(epoch from now() - pg_postmaster_start_time()) AS uptime_seconds FROM pg_stat_database WHERE datname = current_database();`),
@@ -273,27 +275,29 @@ export async function gautiStatistika() {
     postgres.query(`SELECT client_addr::text AS client_addr, state, sent_lsn::text AS sent_lsn, write_lsn::text AS write_lsn, flush_lsn::text AS flush_lsn, replay_lsn::text AS replay_lsn, write_lag::text AS write_lag, flush_lag::text AS flush_lag, replay_lag::text AS replay_lag, extract(epoch from write_lag) AS write_lag_seconds, extract(epoch from flush_lag) AS flush_lag_seconds, extract(epoch from replay_lag) AS replay_lag_seconds, pg_current_wal_lsn()::text AS primary_current_lsn, pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_behind FROM pg_stat_replication;`),
   ]);
 
-  const counts = failaiCountsRes.rows.reduce((acc, { metrika, eilute, verte }) => {
-    if (!acc[metrika]) acc[metrika] = eilute === 'ALL' ? verte : {};
-    if (eilute === 'ALL') acc[metrika] = verte;
-    else acc[metrika][eilute] = verte;
-    return acc;
-  }, {});
+  // filesStats yra per plėtinį, tad bendros reikšmės — SUM(...) (žr. užklausą aukščiau).
+  const counts = Object.fromEntries(
+    Object.entries(failaiCountsRes.rows[0] ?? {}).map(([k, v]) => [k, Number(v)]),
+  );
 
   const statistika = {};
+
+  const neparsiusti = counts.visi - counts.parsiusti - counts.klaida;
+  const baitasFailui = counts.parsiusti > 0 ? counts.dydis / counts.parsiusti : 0;
 
   statistika.failai = {
     kiekiai: {
       visi: counts.visi,
       klaida: counts.klaida,
       parsiusti: counts.parsiusti,
-      neparsiusti: counts.visi - counts.parsiusti - counts.klaida - counts.extracted,
+      neparsiusti,
     },
     dydziai: {
-      visi: (counts.dydis / counts.parsiusti) * counts.visi,
-      klaida: (counts.dydis / counts.parsiusti) * counts.klaida,
+      // Tikras dydis žinomas tik parsiųstiems, likusiems ekstrapoliuojama.
+      visi: baitasFailui * counts.visi,
+      klaida: baitasFailui * counts.klaida,
       parsiusti: counts.dydis,
-      neparsiusti: (counts.dydis / counts.parsiusti) * (counts.visi - counts.parsiusti - counts.klaida - counts.extracted),
+      neparsiusti: baitasFailui * neparsiusti,
     },
   };
 
@@ -307,35 +311,24 @@ export async function gautiStatistika() {
     approxRowCount: statistika.lenteles.reduce((a, b) => a + (parseInt(b.approxRowCount, 10) || 0), 0),
   });
 
+  // Metrikos, kurių naujoje schemoje nebėra (failai su >0 žodžių, pjūvis pagal
+  // nuskaitymo versiją), išmestos — `filesStats` laiko tik sumas ir būsenų kiekius.
   statistika.nuskaitymas = {
     zodziai: {
       total: counts.zodziuSuma,
-      vidurkis: counts.zodziuSuma / counts.zodziuKiekis,
-      failaiSuZodziais: counts.zodziuKiekisNeNulis,
-      failaiBeZodziu: statistika.failai.kiekiai.visi - counts.zodziuKiekisNeNulis,
-      vidurkisNeNulis: counts.zodziuSuma / counts.zodziuKiekisNeNulis,
-      failuSuZodziaisDalis: (counts.zodziuKiekisNeNulis / statistika.failai.kiekiai.visi) * 100,
+      vidurkis: counts.nuskaityti > 0 ? counts.zodziuSuma / counts.nuskaityti : 0,
     },
+    puslapiai: counts.puslapiuSuma,
+    simboliai: counts.simboliuSuma,
+    nuskaityti: counts.nuskaityti,
+    klaidos: counts.nuskaitymoKlaidos,
+    // „Liko nuskaityti" = visi failai minus jau apdoroti (sėkmingai arba su klaida).
+    // Apsaugom nuo neigiamų dėl skaitiklių lenktynių.
+    likoNuskaityti: Math.max(
+      0,
+      counts.visi - counts.nuskaityti - counts.nuskaitymoKlaidos,
+    ),
   };
-
-  statistika.nuskaitymas.pagalVersija = Object.entries(counts.nuskaitytas)
-    .map(([status, kiekis]) => ({ status, kiekis, procentai: (kiekis / statistika.failai.kiekiai.visi) * 100 || 0 }))
-    .sort((a, b) => a.status.localeCompare(b.status));
-
-  const didziausiasStatusas = statistika.nuskaitymas.pagalVersija
-    .map((o) => Number(o.status)).filter((n) => !isNaN(n))
-    .reduce((max, n) => (n > max ? n : max), -Infinity);
-
-  const nuskaitytaKiekis = statistika.nuskaitymas.pagalVersija.reduce((sum, o) => {
-    if (o.status === String(didziausiasStatusas) || (o.status !== 'Nenuskaityta' && isNaN(Number(o.status)))) return sum + o.kiekis;
-    return sum;
-  }, 0);
-
-  // „Liko nuskaityti" = visi failai minus jau apdoroti (naujausia versija +
-  // Klaida/Šifruotas). NENAUDOJAM `parsiusti`, nes tai momentinė būsena
-  // (parsisiųsta-bet-neišskleista), o `nuskaitytaKiekis` – kaupiamasis; jų
-  // atimtis duotų neigiamą skaičių. Apsaugom nuo neigiamų dėl skaitiklių lenktynių.
-  statistika.nuskaitymas.likoNuskaityti = Math.max(0, statistika.failai.kiekiai.visi - nuskaitytaKiekis);
   statistika.nuskaitymas.zodziuSkaicius = statistika.nuskaitymas.zodziai.total;
   statistika.topDokNuskaitytojai = topRes.rows;
   statistika.database = dbRes.rows[0];

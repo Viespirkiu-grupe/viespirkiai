@@ -2,7 +2,7 @@
  * Statistics-page helpers for `/failai`.
  *
  * The "no query" view of /failai is a stats dashboard fed by SSE updates.
- * `buildStatistika` formats the raw `failaiCounts`-derived stat object into
+ * `buildStatistika` formats the raw `filesStats`-derived stat object into
  * the strings the dashboard renders; the same shape is later sent over SSE
  * so the client-side updater can swap text nodes in place.
  */
@@ -40,24 +40,25 @@ export interface StatistikaPayload {
 }
 
 /**
- * Convert the raw stat aggregate (from the `failaiCounts` view) into
- * pre-formatted strings ready to render in the dashboard.  The same shape is
- * pushed through SSE so the client can update spans without re-rendering.
+ * Convert the raw stat aggregate (from `filesStats`) into pre-formatted strings
+ * ready to render in the dashboard.  The same shape is pushed through SSE so the
+ * client can update spans without re-rendering.
+ *
+ * `filesWithWords*` dabar rodo sėkmingai nuskaitytų failų kiekį — metrikos „failai
+ * su >0 žodžių" naujoje schemoje nebėra.
  */
 export function buildStatistika(stat: any): StatistikaPayload | null {
   if (!stat) return null;
   const totalWords = Number(stat.nuskaitymas.zodziai.total);
-  const failaiSuZodziais = Number(stat.nuskaitymas.zodziai.failaiSuZodziais);
-  const visiFailai = Number(stat.failai.kiekiai.visi);
-  const visiDydziai = Number(stat.failai.dydziai.visi);
-  const duomenuBaitai = visiDydziai * (visiFailai > 0 ? failaiSuZodziais / visiFailai : 0);
+  const nuskaityti = Number(stat.nuskaitymas.nuskaityti);
+  const parsiustuBaitai = Number(stat.failai.dydziai.parsiusti);
 
   return {
     atnaujinta: formatLtDateTime(stat.atnaujinta),
     totalWordsNumber: totalWords.toLocaleString('lt-LT'),
     totalWordsLabel: `${formatPluralOnly(totalWords, ['žodis', 'žodžiai', 'žodžių', 'žodžio'])} teksto`,
-    dataSize: `${(duomenuBaitai / 1024 / 1024 / 1024).toFixed(2)} GB`,
-    filesWithWordsNumber: failaiSuZodziais.toLocaleString('lt-LT'),
-    filesWithWordsLabel: formatPluralOnly(failaiSuZodziais, ['failas', 'failai', 'failų', 'failo']),
+    dataSize: `${(parsiustuBaitai / 1024 / 1024 / 1024).toFixed(2)} GB`,
+    filesWithWordsNumber: nuskaityti.toLocaleString('lt-LT'),
+    filesWithWordsLabel: formatPluralOnly(nuskaityti, ['failas', 'failai', 'failų', 'failo']),
   };
 }

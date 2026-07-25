@@ -21,21 +21,32 @@ function formatLtDateTime(value: unknown) {
   return '—';
 }
 
+/**
+ * Paskutiniai OCR rezultatai.
+ *
+ * Rezultatų istorijos nebėra — `filesOcrStatus` laiko po vieną (paskutinę) eilutę
+ * failui, tad sąrašas rodo vėliausiai OCR'intus failus. Skirtumas nuo senosios
+ * versijos vienintelis: jei tas pats failas OCR'intas kelis kartus, jis rodomas
+ * vieną kartą. Puslapių ir žodžių skaičiai imami iš po OCR atlikto nuskaitymo.
+ */
 export async function loadLatestOcrResults(limit = 15): Promise<any[]> {
   const res = await postgres.query(`
     SELECT
-      r.failas,
-      r.node,
-      COALESCE(n."viesasPavadinimas", r.node) AS "nodeDisplay",
-      r."submitTimestamp",
-      r.duration,
-      r."puslapiuSkaicius",
-      r."zodziuSkaicius",
-      f.pavadinimas
-    FROM "failaiOcrRezultatai" r
-    LEFT JOIN failai f ON f.id = r.failas
-    LEFT JOIN "ocrNuskaitytojai" n ON n.pavadinimas = r.node
-    ORDER BY r."submitTimestamp" DESC NULLS LAST
+      o.id AS failas,
+      n.pavadinimas AS node,
+      COALESCE(n."viesasPavadinimas", n.pavadinimas) AS "nodeDisplay",
+      o."ocrTimestamp" AS "submitTimestamp",
+      o.duration,
+      d."pageCount" AS "puslapiuSkaicius",
+      d."wordCount" AS "zodziuSkaicius",
+      fn.filename AS pavadinimas
+    FROM public."filesOcrStatus" o
+    LEFT JOIN public.files f ON f.id = o.id
+    LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
+    LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
+    LEFT JOIN public."ocrNuskaitytojai" n ON n.id = o."nodeId"
+    WHERE o."ocrTimestamp" IS NOT NULL
+    ORDER BY o."ocrTimestamp" DESC
     LIMIT $1
   `, [limit]);
 

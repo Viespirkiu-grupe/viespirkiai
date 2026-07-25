@@ -1,32 +1,37 @@
 /*
-Failus nuskaitytus su klaidomis (-1) nustato kaip nenučítytus (0)
+Avarinis įrankis: failus, nuskaitytus su klaidomis (-1 arba -4), grąžina į eilę.
+Įprastai pakartojimą tvarko eilės atidėjimas (filesExtractionQueue.nextAttempt).
 */
 
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 import { iEile } from "./nuskaitymoEile.js";
+import { atstatytiNuskaityma } from "./nuskaitymoRezultatas.js";
 const logger = new Logger();
 
 async function nuskaitytiPakartotinai(kiekis = 10, workerId) {
     const query = `
         WITH to_update AS (
             SELECT id
-            FROM failai
-            WHERE nuskaitytas = -1 OR nuskaitytas = -4
+            FROM public."filesDataExtraction"
+            WHERE status IN (-1, -4)
             LIMIT $1
             FOR UPDATE SKIP LOCKED
         )
-        UPDATE failai f
-        SET nuskaitytas = 0
+        UPDATE public."filesDataExtraction" d
+        SET status = 0
         FROM to_update t
-        WHERE f.id = t.id
-        RETURNING f.id;
+        WHERE d.id = t.id
+        RETURNING d.id;
     `;
 
     try {
         const res = await postgres.query(query, [kiekis]);
+        const ids = res.rows.map((r) => r.id);
+        // Versija nulinama, kitaip eilė failo nepriimtų.
+        await atstatytiNuskaityma(ids);
         // Grąžiname į eilę tuos, kurie iš jos jau buvo iškritę (viršiję bandymus)
-        await iEile(res.rows.map((r) => r.id));
+        await iEile(ids);
         if (res.rowCount > 0) {
             logger.log(`Worker ${workerId} updated ${res.rowCount}`);
         }

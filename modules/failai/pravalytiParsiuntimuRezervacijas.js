@@ -3,18 +3,26 @@ import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 
 /**
- * Išvalo užstrigusias parsisiuntimo užduotis iš eilės (lockedAt > 10 minučių).
+ * Išvalo užstrigusias parsisiuntimo užduotis (lockedAt > 15 minučių).
+ * Bandymų skaitiklis jau padidintas rezervuojant, tad čia jo neliečiam — tik
+ * atlaisvinam ir pažymim klaidą.
  */
 export async function pravalytiParsiuntimoRezervacijas() {
     const res = await postgres.query(
         `
-        UPDATE public."failaiParsiuntimoQueue"
-        SET "lockedBy"           = NULL,
-            "lockedAt"           = NULL,
-            state                = -1
-        WHERE "lockedBy" IS NOT NULL
-          AND "lockedAt" <= NOW() - INTERVAL '15 minutes'
-        RETURNING id
+        WITH atlaisvinti AS (
+            UPDATE public."filesDownloadQueue"
+            SET "lockedBy" = NULL,
+                "lockedAt" = NULL
+            WHERE "lockedBy" IS NOT NULL
+              AND "lockedAt" <= NOW() - INTERVAL '15 minutes'
+            RETURNING id
+        )
+        UPDATE public.files f
+        SET "downloadStatus" = -1
+        FROM atlaisvinti a
+        WHERE f.id = a.id
+        RETURNING f.id
         `,
     );
 

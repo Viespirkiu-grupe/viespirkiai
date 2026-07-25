@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
-import { postgres } from '@/postgres/postgres.js';
 import { validateReverseProxyApiKey } from '@/modules/failai/auth.js';
 import { findFailas, getDezeForMd5, checkFailasAccessible } from '@/modules/failai/queries.js';
+import { gautiFaila } from '@/modules/failai/filesSkaitymas.js';
 import { buildProxyResponse } from '@/modules/failai/proxy.js';
 
 export const GET: APIRoute = async ({ params, request }) => {
@@ -16,13 +16,13 @@ export const GET: APIRoute = async ({ params, request }) => {
   if (accessError) return new Response(accessMessage, { status: accessError });
 
   if (failas.parent || failas.parsiustas === -5) {
-    const parentRes = await postgres.query(`SELECT * FROM failai WHERE id = $1 LIMIT 1`, [failas.parent]);
-    if (!parentRes.rows.length) return new Response('Tėvinis failas nerastas.', { status: 404 });
+    const parent = await gautiFaila(failas.parent);
+    if (!parent) return new Response('Tėvinis failas nerastas.', { status: 404 });
 
-    const deze = await getDezeForMd5(parentRes.rows[0].md5);
+    const deze = await getDezeForMd5(parent.md5);
     if (!deze) return new Response('Dėžė nerasta.', { status: 404 });
 
-    return Response.json(buildProxyResponse(failas, deze, parentRes.rows[0]));
+    return Response.json(buildProxyResponse(failas, deze, parent));
   }
 
   const deze = await getDezeForMd5(failas.md5);

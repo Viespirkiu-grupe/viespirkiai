@@ -4,5 +4,5 @@ const md5 = Astro.params.md5 || '00000000000000000000000000000000';
 if (!/^[a-fA-F0-9]{32}$/.test(md5)) return new Response('Neteisingas MD5 formatas.', { status: 400 });
 const parsedLimit = parseLimit(Object.fromEntries(Astro.url.searchParams), 100, 10000);
 if ('error' in parsedLimit) return new Response('Limitas per didelis. Maksimalus limitas yra 10000.', { status: 400 });
-return new Response(JSON.stringify({ failai: (await (await import('../../../../lib/failai.js')).postgres.query('SELECT id, md5, dydis, pavadinimas, extension FROM failai WHERE md5 > $1 AND parsiustas = 1 ORDER BY md5 ASC LIMIT $2', [md5, parsedLimit.limit])).rows }, null, 2), { headers: { 'Content-Type': 'application/json' } });
+return new Response(JSON.stringify({ failai: (await (await import('../../../../lib/failai.js')).postgres.query('SELECT f.id, m.md5, f.filesize AS dydis, fn.filename AS pavadinimas, e.extension FROM public.files f JOIN public."filesMd5" m ON m.id = f."md5Id" LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId" LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId" WHERE m.md5 > $1 AND f."downloadStatus" = 1 ORDER BY m.md5 ASC LIMIT $2', [md5, parsedLimit.limit])).rows }, null, 2), { headers: { 'Content-Type': 'application/json' } });
 ---

@@ -22,31 +22,68 @@ const OCR_STATE_COLORS: Record<string, string> = {
   nepalaikoma: '#a855f7',
 };
 
-const [ocrStatsRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocrLatestResults] = await Promise.all([
-  postgres.query(`SELECT * FROM "failaiOcrStats" ORDER BY count DESC`),
-  postgres.query(`SELECT * FROM "failaiOcrRezultataiStatsDay" ORDER BY date DESC`),
+// Būsenų kiekiai imami iš filesStats (ji per plėtinį, tad „galima"/„nepalaikoma"
+// suskaičiuojami čia — jie nėra būsenos, o išvada iš plėtinio; žr. sql/filesOcrStats.sql).
+const [ocrStatsPerExtRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocrLatestResults] = await Promise.all([
+  postgres.query(`
+    SELECT e.extension, s.files, s."ocrDone", s."ocrFailed",
+           s."ocrPending", s."ocrReserved", s."ocrExceeded"
+    FROM public."filesStats" s
+    JOIN public."filesExtensions" e ON e.id = s."extensionId"
+  `),
+  postgres.query(`
+    SELECT date, SUM(results)::int AS results, SUM(pages)::bigint AS pages, SUM(words)::bigint AS words
+    FROM public."filesOcrStatsDay"
+    GROUP BY date
+    ORDER BY date DESC
+  `),
   postgres.query(`
     SELECT n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos",
       COALESCE(SUM(s.results), 0) AS "results",
       COALESCE(SUM(s.pages), 0) AS "pages",
       COALESCE(SUM(s.words), 0) AS "words"
-    FROM "ocrNuskaitytojai" n
-    LEFT JOIN "failaiOcrRezultataiStatsDayNode" s ON s.node = n.pavadinimas
+    FROM public."ocrNuskaitytojai" n
+    LEFT JOIN public."filesOcrStatsDay" s ON s."nodeId" = n.id
     GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos"
     ORDER BY n."nuskaitytiDokumentai" DESC
     LIMIT 100
   `),
   // „Paskutinė 1h" – slankiojantis 60 minučių langas (ne valandos bucket'as).
+  // Puslapiai/žodžiai — iš po OCR atlikto nuskaitymo.
   postgres.query(`
     SELECT
       COUNT(*)::int AS results,
-      COALESCE(SUM("puslapiuSkaicius"), 0)::bigint AS pages,
-      COALESCE(SUM("zodziuSkaicius"), 0)::bigint AS words
-    FROM "failaiOcrRezultatai"
-    WHERE "submitTimestamp" >= NOW() - INTERVAL '60 minutes'
+      COALESCE(SUM(d."pageCount"), 0)::bigint AS pages,
+      COALESCE(SUM(d."wordCount"), 0)::bigint AS words
+    FROM public."filesOcrStatus" o
+    LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
+    WHERE o."ocrTimestamp" >= NOW() - INTERVAL '60 minutes'
   `),
   loadLatestOcrResults(15),
 ]);
+
+// OCR galimi plėtiniai — tas pats sąrašas, kurį naudoja eilė (ocr.js).
+const { OCR_IMAGE_EXTS, OCR_DOC_EXTS } = await import('@/modules/failai/ocr.js');
+const ocrGalimi = new Set([...OCR_IMAGE_EXTS, ...OCR_DOC_EXTS]);
+
+const ocrSuma = { baigta: 0, rekomenduojama: 0, nepavyko: 0, rezervuota: 0, virsijoBandymus: 0, galima: 0, nepalaikoma: 0 };
+for (const r of ocrStatsPerExtRes.rows as any[]) {
+  const busenos = Number(r.ocrDone) + Number(r.ocrFailed) + Number(r.ocrPending)
+    + Number(r.ocrReserved) + Number(r.ocrExceeded);
+  ocrSuma.baigta += Number(r.ocrDone);
+  ocrSuma.rekomenduojama += Number(r.ocrPending);
+  ocrSuma.nepavyko += Number(r.ocrFailed);
+  ocrSuma.rezervuota += Number(r.ocrReserved);
+  ocrSuma.virsijoBandymus += Number(r.ocrExceeded);
+  if (ocrGalimi.has(String(r.extension).toLowerCase())) {
+    ocrSuma.galima += Math.max(0, Number(r.files) - busenos);
+  } else {
+    ocrSuma.nepalaikoma += Number(r.files);
+  }
+}
+const ocrStatsRes = {
+  rows: Object.entries(ocrSuma).map(([tipas, count]) => ({ tipas, count })).sort((a, b) => b.count - a.count),
+};
 
 const formatLtDate = (value: unknown) =>
   new Intl.DateTimeFormat('en-CA', {
@@ -82,7 +119,8 @@ const ocrStats: any[] = ocrStatsRes.rows.map((stat: any) => {
     ...stat,
     ...state,
     count: Number(stat.count || 0),
-    id: stat.id ?? '-',
+    // „galima"/„nepalaikoma" nėra būsenos, tad status kodo neturi.
+    id: state?.id ?? '-',
     text: state?.text || stat.tipas || 'Nežinoma',
   };
 });

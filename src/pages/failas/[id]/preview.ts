@@ -1,16 +1,15 @@
 import type { APIRoute } from 'astro';
 import mime from 'mime';
 import config from '../../../lib/config.ts';
-import { postgres } from '@/postgres/postgres.js';
 import { checkFailasAccessible } from '@/modules/failai/queries.js';
+import { gautiFaila } from '@/modules/failai/filesSkaitymas.js';
 
 export const GET: APIRoute = async ({ params }) => {
   const id = params.id;
   if (!id || isNaN(Number(id))) return new Response(null, { status: 404 });
 
-  const result = await postgres.query(`SELECT * FROM failai WHERE "id" = $1 LIMIT 1`, [id]);
-  if (!result.rows.length) return new Response(null, { status: 404 });
-  const failas = result.rows[0];
+  const failas = await gautiFaila(Number(id));
+  if (!failas) return new Response(null, { status: 404 });
 
   const { error, message } = await checkFailasAccessible(failas);
   if (error) return new Response(message, { status: error });

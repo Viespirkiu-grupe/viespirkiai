@@ -92,33 +92,40 @@ async function getDezeByName(name) {
 }
 
 async function getKopijuotiniFailai({ from, to, extension, startMd5, limit }) {
+    // Dėžių žemėlapis dabar yra filesMd5Boxes (md5Id → boxId), o dėžės atpažįstamos
+    // per dezes.id, ne pavadinimą. `sourceDeze`/`dydis`/`pavadinimas` vardai išlaikyti,
+    // kad likęs scripto kodas nesikeistų.
     const result = await postgres.query(
         `
         WITH kandidatai AS (
             SELECT
-                fd.md5,
-                fd.deze AS "sourceDeze",
-                COALESCE(f.dydis, fd.dydis, 0) AS dydis
-            FROM public."failaiDezes" fd
+                m.md5,
+                sd.pavadinimas AS "sourceDeze",
+                COALESCE(f.filesize, b.filesize, 0) AS dydis
+            FROM public."filesMd5Boxes" b
+            JOIN public."filesMd5" m ON m.id = b."md5Id"
+            JOIN public.dezes sd ON sd.id = b."boxId"
             JOIN LATERAL (
-                SELECT f.dydis
-                FROM public.failai f
-                WHERE f.md5 = fd.md5
-                  AND f.parsiustas = 1
-                  AND ($2::text IS NULL OR lower(f.extension) = lower($2))
+                SELECT f.filesize
+                FROM public.files f
+                LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+                WHERE f."md5Id" = b."md5Id"
+                  AND f."downloadStatus" = 1
+                  AND ($2::text IS NULL OR lower(e.extension) = lower($2))
                 ORDER BY f.id ASC
                 LIMIT 1
             ) f ON TRUE
-            WHERE ($1::text IS NULL OR fd.deze = $1)
-              AND COALESCE(f.dydis, fd.dydis, 0) > 0
-              AND ($3::text IS NULL OR fd.md5 > $3)
+            WHERE ($1::text IS NULL OR sd.pavadinimas = $1)
+              AND COALESCE(f.filesize, b.filesize, 0) > 0
+              AND ($3::text IS NULL OR m.md5 > $3)
               AND NOT EXISTS (
                   SELECT 1
-                  FROM public."failaiDezes" t
-                  WHERE t.md5 = fd.md5
-                    AND t.deze = $4
+                  FROM public."filesMd5Boxes" t
+                  JOIN public.dezes td ON td.id = t."boxId"
+                  WHERE t."md5Id" = b."md5Id"
+                    AND td.pavadinimas = $4
               )
-            ORDER BY fd.md5 ASC
+            ORDER BY m.md5 ASC
             LIMIT $5
         )
         SELECT
@@ -130,24 +137,28 @@ async function getKopijuotiniFailai({ from, to, extension, startMd5, limit }) {
             k.dydis,
             ids."fileIds"
         FROM kandidatai k
+        JOIN public."filesMd5" km ON km.md5 = k.md5
         JOIN LATERAL (
             SELECT
                 f.id AS "firstId",
-                f.pavadinimas,
-                f.extension
-            FROM public.failai f
-            WHERE f.md5 = k.md5
-              AND f.parsiustas = 1
-              AND ($2::text IS NULL OR lower(f.extension) = lower($2))
+                fn.filename AS pavadinimas,
+                e.extension
+            FROM public.files f
+            LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
+            LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+            WHERE f."md5Id" = km.id
+              AND f."downloadStatus" = 1
+              AND ($2::text IS NULL OR lower(e.extension) = lower($2))
             ORDER BY f.id ASC
             LIMIT 1
         ) first_failas ON TRUE
         JOIN LATERAL (
             SELECT ARRAY_AGG(f.id ORDER BY f.id) AS "fileIds"
-            FROM public.failai f
-            WHERE f.md5 = k.md5
-              AND f.parsiustas = 1
-              AND ($2::text IS NULL OR lower(f.extension) = lower($2))
+            FROM public.files f
+            LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+            WHERE f."md5Id" = km.id
+              AND f."downloadStatus" = 1
+              AND ($2::text IS NULL OR lower(e.extension) = lower($2))
         ) ids ON TRUE
         ORDER BY k.md5 ASC
         `,
@@ -317,13 +328,19 @@ export async function kopijuotiFailus(from, to, options = {}) {
             );
         }
 
+        // Naujoje dėžėje objektas vadinasi taip pat, tad plėtinys perimamas iš
+        // pirminio įrašo (filesMd5Boxes."extensionId").
         await postgres.query(
             `
-            INSERT INTO public."failaiDezes" (md5, deze, dydis)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (md5, deze) DO NOTHING
+            INSERT INTO public."filesMd5Boxes" ("md5Id", "boxId", filesize, "extensionId")
+            SELECT m.id, $2::int, $3::bigint,
+                   (SELECT b."extensionId" FROM public."filesMd5Boxes" b
+                    WHERE b."md5Id" = m.id AND b."extensionId" IS NOT NULL LIMIT 1)
+            FROM public."filesMd5" m
+            WHERE m.md5 = $1
+            ON CONFLICT ("md5Id", "boxId") DO NOTHING
             `,
-            [copiedMd5, toDeze.pavadinimas, copiedSize],
+            [copiedMd5, toDeze.id, copiedSize],
         );
 
         const used = await updateDezeUsage(toDeze);

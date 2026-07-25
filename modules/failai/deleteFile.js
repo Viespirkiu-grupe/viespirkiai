@@ -1,61 +1,35 @@
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
+import { gautiFaila } from "./filesSkaitymas.js";
 const logger = new Logger();
 
 export async function deleteFile(id) {
-    const query = `SELECT * FROM failai WHERE id = $1 LIMIT 1`;
-    const values = [id];
-    const res = await postgres.query(query, values);
-    if (res.rows.length === 0) {
+    const file = await gautiFaila(id);
+    if (!file) {
         throw new Error("File not found");
     }
-    const file = res.rows[0];
-    const failaiDezesRes = await postgres.query(
-        `SELECT * FROM "failaiDezes" WHERE md5 = $1;`,
-        [file.md5],
-    );
-    const failaiDezes = failaiDezesRes.rows;
 
-    for (let failaiDeze of failaiDezes) {
-        const dezeRes = await postgres.query(
-            `
-        SELECT d.*, a."apiKey"
-        FROM dezes d
-        JOIN public."apiRaktai" a ON a.id = d."apiRaktasId"
-        WHERE d.pavadinimas = $1
-        LIMIT 1
-        `,
-            [failaiDeze.deze],
-        );
-        const deze = dezeRes.rows[0];
-
-        if (!deze) continue;
-
-        const url = `${deze.url}/file/${file.md5}.${file.extension}`;
-        const apiKey = deze.apiKey;
-
-        logger.log(url);
-
-        await fetch(url, {
-            method: "DELETE",
-            headers: {
-                "x-api-key": apiKey,
-            },
-        });
-
-        logger.log(`Deleted file from deze: ${deze.pavadinimas}`);
-
-        // Delete it from failaiDezes table
-        await postgres.query(
-            `DELETE FROM "failaiDezes" WHERE md5 = $1 AND deze = $2;`,
-            [file.md5, failaiDeze.deze],
-        );
-    }
-
-
-    // Finally, delete the file record from failai table
-    await postgres.query(`DELETE FROM failai WHERE id = $1;`, [id]);
-    logger.log(`Deleted file record with id: ${id}`);
+    // IŠKOMENTUOTA — fizinio failo trynimas buvo klaidingas.
+    //
+    // md5 nėra unikalus: tas pats turinys dedubliuojamas per daug failų
+    // (`files."md5Id"` nėra unique). Šis ciklas ištrindavo blobą iš visų dėžių pagal
+    // md5, todėl kartu „nudegdavo" ir kiti failai, rodantys į tą patį turinį.
+    // Antra klaida — objekto vardas `{md5}.{extension}` imamas iš trinamo failo,
+    // nors įkeliant galėjo būti naudotas kito failo plėtinys (dabar tikrąjį
+    // plėtinį laiko `filesMd5Boxes."extensionId"`).
+    //
+    // Taisymas (kai bus files schema): trinti tik jei niekas kitas nebesiremia md5,
+    // o vardą imti iš filesMd5Boxes."extensionId", ne iš files.
+    //
+    //   DELETE FROM "filesMd5Boxes" b
+    //   WHERE b."md5Id" = $1
+    //     AND NOT EXISTS (SELECT 1 FROM files f WHERE f."md5Id" = b."md5Id" AND f.id <> $2)
+    //   RETURNING b."boxId", b."extensionId"
+    //
+    // Trinamas tik DB įrašas; blobas dėžėse lieka (žr. komentarą aukščiau).
+    // Šoninės lentelės ir eilės nusitrina per ON DELETE CASCADE.
+    await postgres.query(`DELETE FROM public.files WHERE id = $1;`, [id]);
+    logger.log(`Deleted file record with id: ${id} (md5=${file.md5}, blobas dėžėse nepaliestas)`);
 }
 
 if (

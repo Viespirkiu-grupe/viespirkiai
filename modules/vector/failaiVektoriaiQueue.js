@@ -54,15 +54,18 @@ function tekstasToString(tekstas) {
     return String(tekstas);
 }
 
-// Vienas keyset puslapis. failasHash imam atskira užklausa `WHERE id = ANY(...)` —
-// kitaip planner'is renkasi Merge Join su failaiInfoFailai ir skenuoja milijonus
-// eilučių nuo pradžios (žr. EXPLAIN). Du index scan'ai (failai_saltinis_id_idx +
+// Vienas keyset puslapis. fileHash imam atskira užklausa `WHERE id = ANY(...)` —
+// kitaip planner'is renkasi Merge Join su filesInfoFiles ir skenuoja milijonus
+// eilučių nuo pradžios (žr. EXPLAIN). Du index scan'ai (files_source_lookup_idx +
 // PK lookup'ai) = akimirksnis.
 async function fetchPage(cursor, pageSize) {
     const { rows } = await postgres.query(
-        `SELECT f."id", f."saltinioId", f."dokId", f."fileId"
-         FROM public."failai" f
-         WHERE f."saltinis" = 'cvpIs'
+        `SELECT f."id",
+                f."sourceId0" || '/' || f."sourceId1" || '/' || f."sourceId2" AS "saltinioId",
+                NULL::int AS "dokId", NULL::int AS "fileId"
+         FROM public.files f
+         JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+         WHERE st.title = 'cvpIs'
            AND ($1::bigint IS NULL OR f."id" > $1)
          ORDER BY f."id"
          LIMIT $2`,
@@ -71,7 +74,7 @@ async function fetchPage(cursor, pageSize) {
     if (rows.length > 0) {
         const ids = rows.map((r) => r.id);
         const { rows: infoRows } = await postgres.query(
-            `SELECT "id", "failasHash" FROM public."failaiInfoFailai" WHERE "id" = ANY($1::bigint[])`,
+            `SELECT "id", "fileHash" AS "failasHash" FROM public."filesInfoFiles" WHERE "id" = ANY($1::bigint[])`,
             [ids],
         );
         const hashById = new Map(infoRows.map((r) => [r.id, r.failasHash]));

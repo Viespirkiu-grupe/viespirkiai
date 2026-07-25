@@ -309,11 +309,33 @@ async function processAtn1(fileId) {
 }
 
 const ATN_NUSKAITYMAS_VERSIJA = 3;
+const ATN1_TIPAS = "ATN-1";
+
+/** Įrašo ATN-1 apdorojimo versiją (arba -1 klaidai) į filesSpecialTypes. */
+async function pazymetiAtn1(fileId, statusas) {
+    await postgres.query(
+        `WITH tipas AS (
+            INSERT INTO public."filesSpecialTypeNames" (type) VALUES ($1)
+            ON CONFLICT (type) DO UPDATE SET type = EXCLUDED.type
+            RETURNING id
+        )
+        INSERT INTO public."filesSpecialTypes" (id, "typeId", status)
+        SELECT $2, t.id, $3 FROM tipas t
+        ON CONFLICT (id, "typeId") DO UPDATE SET status = EXCLUDED.status`,
+        [ATN1_TIPAS, fileId, statusas],
+    );
+}
+
 export async function doOneAtn1() {
-    // get one from failai where tipas = ATN-1 and tipasNuskaitymas < ATN_NUSKAITYMAS_VERSIJA but >=0
+    // Vienas ATN-1 failas, kurio apdorojimo versija senesnė už dabartinę.
     let rowRes = await postgres.query(
-        `SELECT id FROM failai WHERE tipas = 'ATN-1' AND (("tipasNuskaitymas" < $1 AND "tipasNuskaitymas" >= 0) OR "tipasNuskaitymas" IS NULL) LIMIT 1`,
-        [ATN_NUSKAITYMAS_VERSIJA],
+        `SELECT st.id
+         FROM public."filesSpecialTypes" st
+         JOIN public."filesSpecialTypeNames" tn ON tn.id = st."typeId"
+         WHERE tn.type = $1
+           AND ((st.status < $2 AND st.status >= 0) OR st.status IS NULL)
+         LIMIT 1`,
+        [ATN1_TIPAS, ATN_NUSKAITYMAS_VERSIJA],
     );
     if (rowRes.rowCount === 0) {
         logger.log("Nėra ATN-1 failų apdorojimui");
@@ -323,15 +345,9 @@ export async function doOneAtn1() {
     logger.log(`Apdorojamas ATN-1 failas ${fileId}`);
     try {
         await processAtn1(fileId);
-        await postgres.query(
-            `UPDATE failai SET "tipasNuskaitymas" = $1 WHERE id = $2`,
-            [ATN_NUSKAITYMAS_VERSIJA, fileId],
-        );
+        await pazymetiAtn1(fileId, ATN_NUSKAITYMAS_VERSIJA);
     } catch (e) {
-        await postgres.query(
-            `UPDATE failai SET "tipasNuskaitymas" = $1 WHERE id = $2`,
-            [-1, fileId],
-        );
+        await pazymetiAtn1(fileId, -1);
         throw e;
     }
     return true;

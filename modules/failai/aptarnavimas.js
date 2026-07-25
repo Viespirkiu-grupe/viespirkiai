@@ -164,8 +164,12 @@ async function resolveRelatedFiles(failas) {
     const paths = failas.metaduomenys.files.map((f) => f.path).filter(Boolean);
     if (!paths.length) return;
 
+    // Archyvo vaikų kelias archyve yra sourceId0 (žr. files_child_uniq).
     const result = await postgres.query(
-        `SELECT * FROM failai WHERE parent = $1 AND "saltinioId" = ANY($2)`,
+        `SELECT f.id, f."sourceId0" AS "saltinioId", e.extension
+         FROM public.files f
+         LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+         WHERE f.parent = $1 AND f."sourceId0" = ANY($2)`,
         [failas.id, paths],
     );
 
@@ -203,13 +207,13 @@ function parseTekstas(tekstasRaw) {
 export async function fetchFailasMetadata(id, failas = null) {
     let failasHash = failas?.failasHash;
 
-    // failasHash gyvena atskiroje failaiInfoFailai lentelėje. Jei jo dar neturime,
-    // pasiimame jį atskiru join'u.
+    // failasHash gyvena atskiroje filesInfoFiles lentelėje. Jei jo dar neturime,
+    // pasiimame jį atskira užklausa.
     if (failasHash === undefined) {
         const r = await postgres.query(
-            `SELECT i."failasHash"
-             FROM failai f
-             LEFT JOIN "failaiInfoFailai" i ON i.id = f.id
+            `SELECT i."fileHash" AS "failasHash"
+             FROM public.files f
+             LEFT JOIN public."filesInfoFiles" i ON i.id = f.id
              WHERE f.id = $1`,
             [id],
         );
@@ -218,34 +222,42 @@ export async function fetchFailasMetadata(id, failas = null) {
         }
     }
 
-    const ocrResults = await postgres.query(
-        `SELECT id, md5, node, "lockTimestamp", "submitTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius"
-         FROM "failaiOcrRezultatai"
-         WHERE failas = $1
-         ORDER BY id DESC`,
+    // Naujoje schemoje OCR rezultatų istorijos nėra — laikomas tik paskutinis
+    // rezultatas (filesOcrStatus) ir bendras jų skaičius (resultsCount).
+    // Puslapių ir žodžių skaičiai — iš po OCR atlikto nuskaitymo, nes būtent jis
+    // suskaičiuoja OCR gautą tekstą.
+    const ocrRes = await postgres.query(
+        `SELECT o."resultHash", o."resultsCount", o.duration, o."ocrTimestamp",
+                o."lockTimestamp", n.pavadinimas AS node,
+                d."pageCount", d."wordCount"
+         FROM public."filesOcrStatus" o
+         LEFT JOIN public."ocrNuskaitytojai" n ON n.id = o."nodeId"
+         LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
+         WHERE o.id = $1`,
         [id],
     );
+    const ocrRow = ocrRes.rows[0] ?? null;
 
-    const latestOcrResult = ocrResults.rows.length
+    const latestOcrResult = ocrRow?.resultHash
         ? {
-              id: ocrResults.rows[0].id,
-              node: ocrResults.rows[0].node,
-              lockTimestamp: ocrResults.rows[0].lockTimestamp,
-              submitTimestamp: ocrResults.rows[0].submitTimestamp,
-              duration: ocrResults.rows[0].duration,
-              puslapiuSkaicius: ocrResults.rows[0].puslapiuSkaicius,
-              zodziuSkaicius: ocrResults.rows[0].zodziuSkaicius,
+              id: null,
+              node: ocrRow.node,
+              lockTimestamp: ocrRow.lockTimestamp,
+              submitTimestamp: ocrRow.ocrTimestamp,
+              duration: ocrRow.duration,
+              puslapiuSkaicius: ocrRow.pageCount,
+              zodziuSkaicius: ocrRow.wordCount,
           }
         : null;
 
-    const latestOcrFile = ocrResults.rows.length
-        ? await readRezultatasFs(ocrResults.rows[0].md5)
+    const latestOcrFile = ocrRow?.resultHash
+        ? await readRezultatasFs(ocrRow.resultHash)
         : null;
     const ocr = Array.isArray(latestOcrFile?.tekstas) ? latestOcrFile.tekstas : [];
 
     const ocrMeta = {
         ocrLatestResult: latestOcrResult,
-        ocrRezultatuSkaicius: ocrResults.rows.length,
+        ocrRezultatuSkaicius: ocrRow?.resultsCount ?? 0,
         ocr,
     };
 

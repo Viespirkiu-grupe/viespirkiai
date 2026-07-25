@@ -3,6 +3,8 @@ import { validateOcrApiKey } from '@/modules/failai/auth.js';
 import { postgres } from '@/postgres/postgres.js';
 import { saveRezultatasFs } from '@/modules/ocr/rezultataiFs.js';
 import { iEile } from '@/modules/failai/nuskaitymoEile.js';
+import { pazymetiOcrRezultata } from '@/modules/failai/ocrEile.js';
+import { atstatytiNuskaityma } from '@/modules/failai/nuskaitymoRezultatas.js';
 
 export const GET: APIRoute = async () => {
   return new Response('Method not allowed', { status: 405 });
@@ -38,11 +40,13 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     await client.query('BEGIN');
 
+    // Rezervacija ir yra autorizacija: eilutė paimama tik jei ją laiko būtent šis node'as.
     const queueRes = await client.query(
-      `DELETE FROM public."failaiOcrQueue" q
-       USING public.failai f
+      `DELETE FROM public."filesOcrQueue" q
+       USING public.files f
+       LEFT JOIN public."filesMd5" m ON m.id = f."md5Id"
        WHERE q.id = $1 AND q."lockedBy" = $2 AND f.id = q.id
-       RETURNING q."lockedAt", f.md5`,
+       RETURNING q."lockedAt", m.md5`,
       [id, user.pavadinimas],
     );
     if (!queueRes.rows.length) {
@@ -60,17 +64,15 @@ export const POST: APIRoute = async ({ request }) => {
     // Vienas pg klientas gali vykdyti tik po vieną užklausą – tranzakcijoje jos
     // vis tiek serializuojamos, todėl vykdom nuosekliai (Promise.all sukeltų
     // "client is already executing a query" perspėjimą).
-    await client.query(
-      `UPDATE failai SET "ocrState" = 1, "nuskaitytas" = 0, "ocrLockTimestamp" = NULL WHERE id = $1`,
-      [id],
+    await pazymetiOcrRezultata(
+      { id, nodeId: user.id, md5, duration, pageCount: puslapiuSkaicius, wordCount: zodziuSkaicius },
+      client,
     );
-    // Po OCR failą reikia nuskaityti iš naujo
+
+    // Po OCR failą reikia nuskaityti iš naujo — versija nulinama, tik tada eilė jį priims.
+    await atstatytiNuskaityma([id], client);
     await iEile([id], client);
-    await client.query(
-      `INSERT INTO "failaiOcrRezultatai" (failas, md5, node, "submitTimestamp", "lockTimestamp", duration, "puslapiuSkaicius", "zodziuSkaicius")
-       VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7)`,
-      [id, md5, user.pavadinimas, lockedAt, duration, puslapiuSkaicius, zodziuSkaicius],
-    );
+
     await client.query(
       `UPDATE "ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
       [user.id],

@@ -122,15 +122,20 @@ async function annotateDokumentai(sutartis: any) {
       : '';
   }
 
-  // Visada užklausiame visus sutarties failus (saltinis = 'sutartys' arba NULL),
-  // kad prijungtume ir tuos, kurių nėra sutartys.dokumentai sąraše.
+  // Visada užklausiame visus sutarties failus, kad prijungtume ir tuos, kurių
+  // nėra sutartys.dokumentai sąraše. Sutarčių raktas — sourceId0/sourceId1.
   const busenos = await postgres.query(
-    `SELECT f."dokId", f."fileId", (f."parsiustas" > 0) AS parsiustas,
-            (f."nuskaitytas" IS NOT NULL AND f."nuskaitytas" > 0) AS nuskaitytas,
-            f.id, f.pavadinimas, f.extension
-     FROM failai f
-     WHERE f."dokId" = $1 AND (f.saltinis = 'sutartys' OR f.saltinis IS NULL)`,
-    [sutartis.sutartiesUnikalusId],
+    `SELECT f."sourceId0" AS "dokId", f."sourceId1" AS "fileId",
+            (f."downloadStatus" > 0) AS parsiustas,
+            (d.version IS NOT NULL AND d.version > 0) AS nuskaitytas,
+            f.id, fn.filename AS pavadinimas, e.extension
+     FROM public.files f
+     JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+     LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
+     LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+     LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
+     WHERE st.title = 'sutartys' AND f."sourceId0" = $1::text`,
+    [String(sutartis.sutartiesUnikalusId)],
   ).then((r: any) => r.rows);
   const busenaByPora = new Map<string, any>(busenos.map((b: any) => [`${b.dokId}:${b.fileId}`, b]));
 

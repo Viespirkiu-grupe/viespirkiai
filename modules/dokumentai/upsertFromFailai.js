@@ -1,7 +1,5 @@
 import { postgres } from "../../postgres/postgres.js";
 import { saveDokumentasFs } from "./dokumentaiFs.js";
-import { readMetaduomenysFs } from "../failai/metaduomenysFs.js";
-import { readTekstasFs } from "../failai/tekstasFs.js";
 import { readFailaiFs } from "../failai/failaiFs.js";
 
 const SIDECAR_VERSION = "1";
@@ -15,27 +13,13 @@ export function normalizeSource(saltinis) {
     return saltinis;
 }
 
-// See docs/dokumentai-migracija.md → "saltinioId layout per source".
-export function splitSaltinioId(saltinis, saltinioId, dokId, fileId) {
-    if (saltinis == null || saltinis === "sutartys" || saltinis === "sutartis") {
-        return [
-            dokId == null ? null : String(dokId),
-            fileId == null ? null : String(fileId),
-            null,
-        ];
-    }
-    if (saltinioId == null) return [null, null, null];
-    if (saltinis === "cvpp") {
-        const parts = saltinioId.split("/");
-        if (parts.length >= 3) return [parts[0], parts[1], parts[2]];
-        if (parts.length === 2) return [null, parts[0], parts[1]];
-        return [saltinioId, null, null];
-    }
-    if (saltinis === "cvpIs") {
-        const parts = saltinioId.split("/");
-        return [parts[0] ?? null, parts[1] ?? null, parts[2] ?? null];
-    }
-    return [saltinioId, null, null];
+// `files` jau laiko šaltinio ID išskaidytą po stulpelius (žr. failuIrasymas.js
+// SALTINIAI), tad čia nieko nebedalinam — tik suvienodinam vieną skirtumą:
+// senoje cvpp formoje be `pid` dokumentai.saltinioId0 buvo NULL, o `files` toje
+// pozicijoje laiko `-1`. Grąžinam NULL, kad indekso reikšmės nepasikeistų.
+export function saltinioIdPozicijos(row) {
+    const s0 = row.saltinis === "cvpp" && row.sourceId0 === "-1" ? null : row.sourceId0 ?? null;
+    return [s0, row.sourceId1 ?? null, row.sourceId2 ?? null];
 }
 
 // Tas pats hash'as batch'e gali kartotis — promise įdedamas į Map sinchroniškai,
@@ -50,20 +34,12 @@ function readCached(map, hash, read) {
 }
 
 async function buildPayload(row, caches) {
-    const [s0, s1, s2] = splitSaltinioId(row.saltinis, row.saltinioId, row.dokId, row.fileId);
-    let metadata, text;
-    if (row.failasHash) {
-        // Naujas kelias — sujungtas FS failas.
-        const turinys = await readCached(caches.failai, row.failasHash, readFailaiFs);
-        metadata = turinys?.metaduomenys ?? null;
-        text = turinys?.tekstas ?? null;
-    } else {
-        // Pereinamasis kelias — seni atskiri FS failai.
-        [metadata, text] = await Promise.all([
-            row.metaduomenysHash ? readCached(caches.metaduomenys, row.metaduomenysHash, readMetaduomenysFs) : null,
-            row.tekstasHash ? readCached(caches.tekstai, row.tekstasHash, readTekstasFs) : null,
-        ]);
-    }
+    const [s0, s1, s2] = saltinioIdPozicijos(row);
+    const turinys = row.failasHash
+        ? await readCached(caches.failai, row.failasHash, readFailaiFs)
+        : null;
+    const metadata = turinys?.metaduomenys ?? null;
+    const text = turinys?.tekstas ?? null;
     const sidecar = {
         version: SIDECAR_VERSION,
         md5: row.md5,
@@ -86,50 +62,65 @@ async function buildPayload(row, caches) {
     return { row, s0, s1, s2, sidecar };
 }
 
-// Columns the failai SELECT must return for upsertBatch. Used by both the
-// backfill (id-range CTE) and the queue consumer (id = ANY).
+// Stulpeliai, kurių upsertBatch reikia iš `files`. Naudoja ir backfill (id > $1),
+// ir eilės vartotojas (id = ANY).
+//
+// Šaltinio ID nebedalinamas užklausoje — `files` jau turi sourceId0..2.
 //
 // "istaigaJar" — perkančiosios / paskelbusios organizacijos JAR kodas, paimtas
-// pagal šaltinį iš susijusios lentelės (žr. FAILAI_ISTAIGA_JOINS). cvpp neturi
+// pagal šaltinį iš susijusios lentelės (žr. FILES_ISTAIGA_JOINS). cvpp neturi
 // JAR kodo → NULL; archive (child) failai paveldi iš tėvo atskirame passe.
 export const FAILAI_SELECT_COLUMNS = `
-    f.id, f.md5, f.saltinis, f."saltinioId",
-    f."dokId", f."fileId",
-    f.autorius, f.pavadinimas, f.extension,
-    f."zodziuSkaicius", f."puslapiuSkaicius", f."simboliuSkaicius",
-    i."failasHash",
-    ST_AsEWKT(f.location) AS location_ewkt,
+    f.id,
+    m.md5,
+    st.title AS saltinis,
+    f."sourceId0", f."sourceId1", f."sourceId2",
+    a.author AS autorius,
+    fn.filename AS pavadinimas,
+    e.extension,
+    d."wordCount" AS "zodziuSkaicius",
+    d."pageCount" AS "puslapiuSkaicius",
+    d."characterCount" AS "simboliuSkaicius",
+    i."fileHash" AS "failasHash",
+    ST_AsEWKT(loc.location) AS location_ewkt,
     COALESCE(
         vp."jarKodas",
         s."perkanciosiosOrganizacijosKodas",
         (SELECT nd."jarKodas"
          FROM public."neskelbiamosDerybos" nd
-         WHERE f.saltinis = 'neskelbiamosDerybos'
-           AND nd.link = 'https://eviesiejipirkimai.lt/sutikimai_laikini/' || f."saltinioId"
+         WHERE st.title = 'neskelbiamosDerybos'
+           AND nd.link = 'https://eviesiejipirkimai.lt/' || f."sourceId0"
          LIMIT 1)
     ) AS "istaigaJar"
 `;
 
-// LEFT JOIN'ai į šaltinių lenteles, kad apskaičiuotume "istaigaJar". Raktai
-// remiasi tik į jau atrenkamus failai stulpelius (saltinis/saltinioId/dokId),
-// todėl tinka ir backfill (f.id > $1), ir queue consumer (f.id = ANY($1)).
-// Abu JOIN raktai unikalūs (viesiejiPirkimai.pirkimoId UNIQUE,
-// vpmSutartys.unikalusId PK), todėl eilučių nedaugina. neskelbiamosDerybos
-// link NEunikalus (PK = hash), todėl jis imamas skaliariniu subquery (LIMIT 1)
-// FAILAI_SELECT_COLUMNS viduje, ne JOIN'u.
+// LEFT JOIN'ai: žodynai, turinio hash'as, koordinatės ir šaltinių lentelės
+// "istaigaJar" apskaičiavimui. Raktai remiasi tik į atrenkamus stulpelius, todėl
+// tinka ir backfill'ui, ir eilės vartotojui.
+// viesiejiPirkimai.pirkimoId UNIQUE, vpmSutartys.unikalusId PK — eilučių nedaugina.
+// neskelbiamosDerybos link NEunikalus (PK = hash), todėl jis imamas skaliariniu
+// subquery (LIMIT 1) FAILAI_SELECT_COLUMNS viduje, ne JOIN'u.
 export const FAILAI_ISTAIGA_JOINS = `
-    LEFT JOIN public."failaiInfoFailai" i
-        ON i.id = f.id
+    LEFT JOIN public."filesMd5"            m   ON m.id   = f."md5Id"
+    LEFT JOIN public."filesFilenames"      fn  ON fn.id  = f."filenameId"
+    LEFT JOIN public."filesExtensions"     e   ON e.id   = f."extensionId"
+    LEFT JOIN public."filesAuthors"        a   ON a.id   = f."authorId"
+    LEFT JOIN public."filesSourceTitles"   st  ON st.id  = f."sourceTitleId"
+    LEFT JOIN public."filesDataExtraction" d   ON d.id   = f.id
+    LEFT JOIN public."filesInfoFiles"      i   ON i.id   = f.id
+    LEFT JOIN public."filesLocations"      loc ON loc.id = f.id
     LEFT JOIN public."viesiejiPirkimai" vp
         ON vp."pirkimoId" = CASE
-            WHEN f.saltinis = 'cvpIs'
-             AND split_part(f."saltinioId", '/', 1) ~ '^[0-9]+$'
-            THEN split_part(f."saltinioId", '/', 1)::integer
+            WHEN st.title = 'cvpIs' AND f."sourceId0" ~ '^[0-9]+$'
+            THEN f."sourceId0"::integer
             ELSE NULL
         END
     LEFT JOIN public."vpmSutartys" s
-        ON (f.saltinis IS NULL OR f.saltinis IN ('sutartis', 'sutartys'))
-       AND s."unikalusId" = f."dokId"
+        ON s."unikalusId" = CASE
+            WHEN st.title = 'sutartys' AND f."sourceId0" ~ '^[0-9]+$'
+            THEN f."sourceId0"::bigint
+            ELSE NULL
+        END
 `;
 
 
@@ -242,7 +233,7 @@ export async function upsertBatch(rows, db = postgres) {
 export async function fetchFailaiSlice(afterId, limit) {
     const { rows } = await postgres.query(
         `SELECT ${FAILAI_SELECT_COLUMNS}
-         FROM public.failai f
+         FROM public.files f
          ${FAILAI_ISTAIGA_JOINS}
          WHERE f.id > $1
          ORDER BY f.id
@@ -257,7 +248,7 @@ export async function fetchFailaiByIds(ids, db = postgres) {
     if (!ids.length) return [];
     const { rows } = await db.query(
         `SELECT ${FAILAI_SELECT_COLUMNS}
-         FROM public.failai f
+         FROM public.files f
          ${FAILAI_ISTAIGA_JOINS}
          WHERE f.id = ANY($1)`,
         [ids],

@@ -16,7 +16,7 @@ const handleCheckout: APIRoute = async ({ request }) => {
   const { user, error, message } = await validateOcrApiKey(apiKey);
   if (error) return new Response(message, { status: error });
 
-  const failas = await checkoutNextFile(user.pavadinimas);
+  const failas = await checkoutNextFile(user);
   if (!failas) return new Response('Nėra OCR laukiančių failų.', { status: 404 });
 
   return Response.json({

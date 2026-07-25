@@ -1,5 +1,5 @@
 /*
-Suvienodina filesNuskaitymasQueue su failai lentele.
+Suvienodina filesExtractionQueue su files lentele.
 
 Eilę įprastai pildo kodas (žr. nuskaitymoEile.js), tad šitas scriptas reikalingas tada, kai failai
 buvo pakeisti aplenkiant tuos taškus:
@@ -28,7 +28,7 @@ export async function papildytiEile() {
 
     for (;;) {
         const { rows } = await postgres.query(
-            `SELECT id FROM public.failai
+            `SELECT id FROM public.files
              WHERE id > $1
              ORDER BY id
              LIMIT $2`,
@@ -55,14 +55,16 @@ export async function papildytiEile() {
  */
 export async function isvalytiEile() {
     const res = await postgres.query(
-        `DELETE FROM public."filesNuskaitymasQueue" q
-         USING public.failai f
+        `DELETE FROM public."filesExtractionQueue" q
+         USING public.files f
+         LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+         LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
          WHERE f.id = q.id
            AND q."lockedBy" IS NULL
            AND (
-               f.parsiustas NOT IN (1, -5)
-               OR LOWER(f.extension) <> ALL($1::text[])
-               OR COALESCE(f.nuskaitytas, 0) >= $2
+               f."downloadStatus" NOT IN (1, -5)
+               OR LOWER(e.extension) <> ALL($1::text[])
+               OR COALESCE(d.version, 0) >= $2
            )`,
         [NUSKAITYMO_PLETINIAI, NUSKAITYMO_VERSIJA],
     );

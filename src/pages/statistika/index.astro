@@ -48,22 +48,20 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
             <div class="grid-2">
               <div>
                 <p class="text-sm font-bold mb-3">Pagal būseną</p>
-                <DataTable
-                  bodyAttributes={{ id: 'pagalVersijaBody' }}
-                  columns={[
-                    { label: 'Nuskaitymas' },
-                    { label: 'Failai', headerClassName: 'cell-right' },
-                    { label: 'Dalis', headerClassName: 'cell-right' },
-                  ]}
-                >
-                  {statistika.nuskaitymas.pagalVersija.map((v: any) => (
-                    <tr>
-                      <td>{v.status}</td>
-                      <td class="cell-mono cell-right cell-nowrap">{Number(v.kiekis).toLocaleString('lt-LT')}</td>
-                      <td class="cell-mono cell-right cell-nowrap">{Number(v.procentai).toLocaleString('lt-LT')} %</td>
-                    </tr>
-                  ))}
-                </DataTable>
+                <MetricCardGrid minWidth="150px" className="grid-2">
+                  <MetricCard label="Nuskaityta">
+                    <span class="cell-mono" data-stat="nuskaitymas.nuskaityti">{Number(statistika.nuskaitymas.nuskaityti).toLocaleString('lt-LT')}</span>
+                  </MetricCard>
+                  <MetricCard label="Klaidos">
+                    <span class="cell-mono" data-stat="nuskaitymas.klaidos">{Number(statistika.nuskaitymas.klaidos).toLocaleString('lt-LT')}</span>
+                  </MetricCard>
+                  <MetricCard label="Liko nuskaityti">
+                    <span class="cell-mono" data-stat="nuskaitymas.likoNuskaityti">{Number(statistika.nuskaitymas.likoNuskaityti).toLocaleString('lt-LT')}</span>
+                  </MetricCard>
+                  <MetricCard label="Puslapiai">
+                    <span class="cell-mono">{Number(statistika.nuskaitymas.puslapiai).toLocaleString('lt-LT')}</span>
+                  </MetricCard>
+                </MetricCardGrid>
               </div>
               <div>
                 <p class="text-sm font-bold mb-3">Pagal nuskaitytoją</p>
@@ -99,11 +97,8 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
               <MetricCard label="Vidurkis">
                 <span class="cell-mono" data-stat="nuskaitymas.zodziai.vidurkis">{(Number(statistika.nuskaitymas.zodziai.vidurkis) as any).linksniuoti(['žodis', 'žodžiai', 'žodžių', 'žodžio'])}</span>
               </MetricCard>
-              <MetricCard label="Vidurkis (be 0)">
-                <span class="cell-mono" data-stat="nuskaitymas.zodziai.vidurkisNeNulis">{(Number(statistika.nuskaitymas.zodziai.vidurkisNeNulis) as any).linksniuoti(['žodis', 'žodžiai', 'žodžių', 'žodžio'])}</span>
-              </MetricCard>
-              <MetricCard label="Failų su žodžiais dalis">
-                <span class="cell-mono" data-stat="nuskaitymas.zodziai.failuSuZodziaisDalis">{Number(statistika.nuskaitymas.zodziai.failuSuZodziaisDalis).toFixed(2)} %</span>
+              <MetricCard label="Simboliai">
+                <span class="cell-mono">{Number(statistika.nuskaitymas.simboliai).toLocaleString('lt-LT')}</span>
               </MetricCard>
             </MetricCardGrid>
           </div>

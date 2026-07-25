@@ -1,5 +1,10 @@
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
+import {
+    irasytiFailus,
+    skaidytiSaltinioId,
+    sujungtiSaltinioId,
+} from "../failai/failuIrasymas.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 
@@ -102,15 +107,26 @@ function buildIdsToCheck(files) {
 async function getExistingCvppIdSet(idsToCheck) {
     if (!idsToCheck.length) return new Set();
 
+    // `files` laiko cvpp raktą trimis stulpeliais (pid, dvid, lid), o senoje formoje
+    // be pid vietoje jo yra -1. Ieškom pagal stabilią (dvid, lid) porą ir atkuriam
+    // saltinioId, kad likusi scraperio logika liktų nepakitusi.
+    const poros = idsToCheck.map((id) => skaidytiSaltinioId("cvpp", id));
+
     const existsResult = await postgres.query(
-        `SELECT "saltinioId" FROM failai
-         WHERE saltinis = 'cvpp'
-           AND "saltinioId" = ANY($1)
-           AND "saltinioId" IS NOT NULL`,
-        [idsToCheck],
+        `SELECT f."sourceId0", f."sourceId1", f."sourceId2"
+         FROM public.files f
+         JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+         JOIN unnest($1::text[], $2::text[]) AS x(dvid, lid)
+           ON f."sourceId1" = x.dvid AND f."sourceId2" = x.lid
+         WHERE st.title = 'cvpp'`,
+        [poros.map((p) => p[1]), poros.map((p) => p[2])],
     );
 
-    return new Set(existsResult.rows.map((r) => String(r.saltinioId)));
+    return new Set(
+        existsResult.rows.map((r) =>
+            sujungtiSaltinioId("cvpp", [r.sourceId0, r.sourceId1, r.sourceId2, null]),
+        ),
+    );
 }
 
 function getUpdateCandidates(files, existingSet) {
@@ -122,25 +138,32 @@ function getUpdateCandidates(files, existingSet) {
     );
 }
 
+/**
+ * Senos formos (be pid) įrašui priskiria tikrą pid — vietoj -1, kurį naudoja
+ * skaidymas, kai pid nežinomas. Praleidžia, jei naujos formos įrašas jau yra.
+ */
 async function updateLegacyIds(toUpdate) {
     if (!toUpdate.length) return 0;
 
-    const placeholders = toUpdate.map(
-        (_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`,
-    );
+    const nauji = toUpdate.map((f) => skaidytiSaltinioId("cvpp", f.saltinioId));
+
     const result = await postgres.query(
-        `UPDATE failai AS f
-         SET "saltinioId" = m.new_id
-         FROM (VALUES ${placeholders.join(", ")}) AS m(old_id, new_id)
-         WHERE f.saltinis = 'cvpp'
-           AND f."saltinioId" = m.old_id
+        `UPDATE public.files AS f
+         SET "sourceId0" = m.pid
+         FROM unnest($1::text[], $2::text[], $3::text[]) AS m(pid, dvid, lid)
+         JOIN public."filesSourceTitles" st ON st.title = 'cvpp'
+         WHERE f."sourceTitleId" = st.id
+           AND f."sourceId0" = '-1'
+           AND f."sourceId1" = m.dvid
+           AND f."sourceId2" = m.lid
            AND NOT EXISTS (
-               SELECT 1
-               FROM failai AS x
-               WHERE x.saltinis = 'cvpp'
-                 AND x."saltinioId" = m.new_id
+               SELECT 1 FROM public.files AS x
+               WHERE x."sourceTitleId" = st.id
+                 AND x."sourceId0" = m.pid
+                 AND x."sourceId1" = m.dvid
+                 AND x."sourceId2" = m.lid
            )`,
-        toUpdate.flatMap((f) => [f.oldSaltinioId, f.saltinioId]),
+        [nauji.map((p) => p[0]), nauji.map((p) => p[1]), nauji.map((p) => p[2])],
     );
 
     return result.rowCount ?? 0;
@@ -156,28 +179,8 @@ function getInsertCandidates(files, existingSet) {
 async function insertCvppFiles(toInsert) {
     if (!toInsert.length) return 0;
 
-    const placeholders = toInsert.map(
-        (_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`,
-    );
-
-    const result = await postgres.query(
-        `INSERT INTO failai ("saltinis", "saltinioId", "pavadinimas", "extension")
-         VALUES ${placeholders.join(", ")}
-         ON CONFLICT ("saltinis", "saltinioId")
-         WHERE (
-             saltinis IS NOT NULL
-             AND saltinis <> 'archive'
-             AND "saltinioId" IS NOT NULL
-         ) DO NOTHING`,
-        toInsert.flatMap((f) => [
-            f.saltinis,
-            f.saltinioId,
-            f.pavadinimas,
-            f.extension,
-        ]),
-    );
-
-    return result.rowCount ?? 0;
+    const ids = await irasytiFailus(toInsert);
+    return ids.length;
 }
 
 async function syncCvppFiles(files, notice) {

@@ -9,46 +9,46 @@ import { OCR_BANDYMAI } from "../failai/ocr.js";
 export async function pravalytiOcrRezervacijas() {
     const limit = 10;
 
+    // Eilutė grąžinama į eilę arba pašalinama, o filesOcrStatus gauna
+    // -6 (viršijo bandymus) arba 0 (vėl rekomenduojama).
     const res = await postgres.query(
         `
         WITH stale AS (
-            SELECT id, bandymai
-            FROM public."failaiOcrQueue"
+            SELECT id, attempts
+            FROM public."filesOcrQueue"
             WHERE "lockedBy" IS NOT NULL
               AND "lockedAt" <= NOW() - INTERVAL '1 hour'
             LIMIT $1
             FOR UPDATE SKIP LOCKED
         ),
-        updated_queue AS (
-            UPDATE public."failaiOcrQueue" q
+        bumped AS (
+            UPDATE public."filesOcrQueue" q
             SET "lockedBy" = NULL,
                 "lockedAt" = NULL,
-                bandymai   = s.bandymai + 1
+                attempts   = s.attempts + 1
             FROM stale s
             WHERE q.id = s.id
-            RETURNING q.id, s.bandymai + 1 AS new_bandymai
+            RETURNING q.id, q.attempts
         ),
-        exceeded AS (
-            DELETE FROM public."failaiOcrQueue"
-            WHERE id IN (
-                SELECT id FROM updated_queue WHERE new_bandymai >= $2
-            )
+        pasalinti AS (
+            DELETE FROM public."filesOcrQueue"
+            WHERE id IN (SELECT id FROM bumped WHERE attempts >= $2)
             RETURNING id
         )
-        UPDATE public.failai f
-        SET "ocrBandymai"      = uq.new_bandymai,
-            "ocrState"         = CASE WHEN uq.new_bandymai >= $2 THEN -6 ELSE 0 END,
-            "ocrNode"          = NULL,
-            "ocrLockTimestamp" = NULL
-        FROM updated_queue uq
-        WHERE f.id = uq.id
-        RETURNING f.id, uq.new_bandymai, f."ocrState"
+        UPDATE public."filesOcrStatus" o
+        SET status          = CASE WHEN b.attempts >= $2 THEN -6 ELSE 0 END,
+            "nodeId"        = NULL,
+            "lockTimestamp" = NULL,
+            attempts        = b.attempts
+        FROM bumped b
+        WHERE o.id = b.id
+        RETURNING o.id, o.status
         `,
         [limit, OCR_BANDYMAI],
     );
 
     if (res.rowCount > 0) {
-        const exceeded = res.rows.filter((r) => r.ocrState === -6).length;
+        const exceeded = res.rows.filter((r) => r.status === -6).length;
         const requeued = res.rowCount - exceeded;
         log(
             `Išvalytos ${res.rowCount} OCR rezervacijos: ${requeued} grąžinta į eilę, ${exceeded} viršijo bandymus`,

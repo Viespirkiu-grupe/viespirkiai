@@ -8,6 +8,7 @@ import { NUSKAITYMO_VERSIJA } from "./parsers.js";
 import { persistPirkimoTurinys } from "./persistTurinys.js";
 import { extractTedNoticeNumber } from "./parsers.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
+import { irasytiFailus } from "../failai/failuIrasymas.js";
 import config from "../../utils/config.js";
 
 const WINDOW_MS = 5000; // fixed smoothing window
@@ -191,30 +192,10 @@ async function processPmcRecord(cft, options = {}) {
             }));
         });
 
+        // Dublikatus atmeta files unikalūs indeksai (žr. failuIrasymas.js),
+        // tad atskiros „ar jau yra" patikros nebereikia.
         timings.start("upsertFiles");
-        if (failaiFlat.length > 0) {
-            const existsResult = await postgres.query(
-                `SELECT "saltinis", "saltinioId" FROM failai
-         WHERE ("saltinis", "saltinioId") IN (${failaiFlat.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(', ')})
-           AND saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL`,
-                failaiFlat.flatMap(f => [f.saltinis, f.saltinioId])
-            );
-
-            const existingSet = new Set(existsResult.rows.map(r => `${r.saltinis}:${r.saltinioId}`));
-            const toInsert = failaiFlat.filter(f => !existingSet.has(`${f.saltinis}:${f.saltinioId}`));
-
-            if (toInsert.length > 0) {
-                const placeholders = toInsert.map((_, i) =>
-                    `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`
-                );
-                await postgres.query(
-                    `INSERT INTO failai ("saltinis", "saltinioId", "pavadinimas", "extension")
-             VALUES ${placeholders.join(', ')}
-             ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL) DO NOTHING`,
-                    toInsert.flatMap(f => [f.saltinis, f.saltinioId, f.pavadinimas, f.extension])
-                );
-            }
-        }
+        await irasytiFailus(failaiFlat);
         timings.end("upsertFiles");
 
         const tedNoticeNumbers = [

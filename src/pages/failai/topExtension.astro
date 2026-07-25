@@ -11,7 +11,15 @@ const font = getFont(Astro.cookies);
 const page = parseInt(Astro.url.searchParams.get('page') || '1') || 1;
 const DEFAULT_LIMIT = 24;
 const offset = (page - 1) * DEFAULT_LIMIT;
-const [extensionRes, countRes] = await Promise.all([postgres.query('SELECT * FROM "failaiStatsExtension" WHERE count > 0 ORDER BY count DESC, extension ASC LIMIT $1 OFFSET $2', [DEFAULT_LIMIT, offset]), postgres.query('SELECT COUNT(*) AS total FROM "failaiStatsExtension" WHERE count > 0')]);
+const [extensionRes, countRes] = await Promise.all([
+  postgres.query(`SELECT e.extension, s.files AS count
+                  FROM public."filesStats" s
+                  JOIN public."filesExtensions" e ON e.id = s."extensionId"
+                  WHERE s.files > 0
+                  ORDER BY s.files DESC, e.extension ASC
+                  LIMIT $1 OFFSET $2`, [DEFAULT_LIMIT, offset]),
+  postgres.query('SELECT COUNT(*) AS total FROM public."filesStats" WHERE files > 0'),
+]);
 const extension = extensionRes.rows;
 const totalExtensionCount = parseInt(countRes.rows[0].total, 10);
 const pageCount = Math.ceil(totalExtensionCount / DEFAULT_LIMIT);

@@ -5,6 +5,7 @@ Parsiunčia ir įdeda į duomenų bazę neskelbiamas derybas iš eviesiejipirkim
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
 import { getProxyBySite } from "../scrapeProxies/getProxyBySite.js";
+import { irasytiFailus } from "../failai/failuIrasymas.js";
 import { parseHTML } from "linkedom";
 import crypto from "crypto";
 
@@ -169,29 +170,8 @@ export async function nuskaitytiVisasNeskelbiamasDerybas() {
             });
         });
 
-        if (failai.length > 0) {
-            const existsResult = await postgres.query(
-                `SELECT "saltinis", "saltinioId" FROM failai
-         WHERE ("saltinis", "saltinioId") IN (${failai.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(', ')})
-           AND saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL`,
-                failai.flatMap(f => [f.saltinis, f.saltinioId])
-            );
-
-            const existingSet = new Set(existsResult.rows.map(r => `${r.saltinis}:${r.saltinioId}`));
-            const toInsert = failai.filter(f => !existingSet.has(`${f.saltinis}:${f.saltinioId}`));
-
-            if (toInsert.length > 0) {
-                const placeholders = toInsert.map((_, i) =>
-                    `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`
-                );
-                await postgres.query(
-                    `INSERT INTO failai ("saltinis", "saltinioId", "pavadinimas", "extension")
-             VALUES ${placeholders.join(', ')}
-             ON CONFLICT ("saltinis", "saltinioId") WHERE (saltinis IS NOT NULL AND saltinis <> 'archive' AND "saltinioId" IS NOT NULL) DO NOTHING`,
-                    toInsert.flatMap(f => [f.saltinis, f.saltinioId, f.pavadinimas, f.extension])
-                );
-            }
-        }
+        // Dublikatus atmeta files unikalūs indeksai (žr. failuIrasymas.js).
+        await irasytiFailus(failai);
     }
 }
 

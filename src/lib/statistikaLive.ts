@@ -32,8 +32,11 @@ export function initStatistikaLive() {
     const z = payload.nuskaitymas?.zodziai;
     if (z?.total !== undefined) setText('nuskaitymas.zodziai.total', z.total);
     if (z?.vidurkis !== undefined) setText('nuskaitymas.zodziai.vidurkis', z.vidurkis);
-    if (z?.vidurkisNeNulis !== undefined) setText('nuskaitymas.zodziai.vidurkisNeNulis', z.vidurkisNeNulis);
-    if (z?.failuSuZodziaisDalis !== undefined) setText('nuskaitymas.zodziai.failuSuZodziaisDalis', z.failuSuZodziaisDalis);
+
+    const n = payload.nuskaitymas;
+    if (n?.nuskaityti !== undefined) setText('nuskaitymas.nuskaityti', n.nuskaityti);
+    if (n?.klaidos !== undefined) setText('nuskaitymas.klaidos', n.klaidos);
+    if (n?.likoNuskaityti !== undefined) setText('nuskaitymas.likoNuskaityti', n.likoNuskaityti);
 
     const db = payload.database;
     if (db?.uptime !== undefined) setText('database.uptime', db.uptime);
@@ -42,13 +45,6 @@ export function initStatistikaLive() {
     if (db?.tup_updated !== undefined) setText('database.tup_updated', db.tup_updated);
     if (db?.tup_deleted !== undefined) setText('database.tup_deleted', db.tup_deleted);
     if (db?.tup_fetched !== undefined) setText('database.tup_fetched', db.tup_fetched);
-
-    const pvBody = document.getElementById('pagalVersijaBody');
-    if (pvBody && payload.nuskaitymas?.pagalVersija) {
-      pvBody.innerHTML = payload.nuskaitymas.pagalVersija.map((v: any) =>
-        `<tr><td>${escapeHtml(v.status)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(v.kiekis)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(v.procentai)}</td></tr>`
-      ).join('');
-    }
 
     const tnBody = document.getElementById('topNuskaitytojaiBody');
     if (tnBody && payload.topDokNuskaitytojai) {

@@ -25,7 +25,7 @@ async function runPass() {
     while (true) {
         const { rows } = await postgres.query(
             `SELECT id
-             FROM public.failai
+             FROM public.files
              WHERE parent IS NOT NULL AND id > $1
              ORDER BY id
              LIMIT $2`,
@@ -40,7 +40,7 @@ async function runPass() {
         const updParent = await postgres.query(
             `WITH src AS (
                 SELECT d.id AS doc_id, p.id AS parent_doc_id
-                FROM public.failai f
+                FROM public.files f
                 JOIN public.dokumentai d
                     ON d."failasId" = f.id AND d.parent IS NULL
                 JOIN public.dokumentai p
@@ -57,7 +57,7 @@ async function runPass() {
         const updJar = await postgres.query(
             `WITH src AS (
                 SELECT d.id AS doc_id, p."istaigaJar" AS parent_jar
-                FROM public.failai f
+                FROM public.files f
                 JOIN public.dokumentai d
                     ON d."failasId" = f.id AND d."istaigaJar" IS NULL
                 JOIN public.dokumentai p
@@ -75,7 +75,7 @@ async function runPass() {
         updated += batchUpdated;
         batchNum++;
         logger.log(
-            `  batch ${batchNum} | iki failai.id=${lastFailasId} | parent: ${updParent.rowCount} | istaigaJar: ${updJar.rowCount} | viso šiame pass: ${updated.toLocaleString()}`,
+            `  batch ${batchNum} | iki files.id=${lastFailasId} | parent: ${updParent.rowCount} | istaigaJar: ${updJar.rowCount} | viso šiame pass: ${updated.toLocaleString()}`,
         );
     }
 
@@ -104,7 +104,7 @@ async function run() {
         rows: [{ count }],
     } = await postgres.query(
         `SELECT COUNT(*)::int AS count
-         FROM public.failai f
+         FROM public.files f
          JOIN public.dokumentai d ON d."failasId" = f.id
          WHERE f.parent IS NOT NULL AND d.parent IS NULL`,
     );
@@ -117,7 +117,7 @@ async function run() {
         rows: [{ count: jarCount }],
     } = await postgres.query(
         `SELECT COUNT(*)::int AS count
-         FROM public.failai f
+         FROM public.files f
          JOIN public.dokumentai d ON d."failasId" = f.id AND d."istaigaJar" IS NULL
          JOIN public.dokumentai p ON p."failasId" = f.parent AND p."istaigaJar" IS NOT NULL
          WHERE f.parent IS NOT NULL`,
