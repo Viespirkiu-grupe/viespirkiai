@@ -19,6 +19,10 @@ const kryptiesZenklas: Record<string, string> = {
 };
 ---
 
+<p class="pakeitimai-pastaba">
+  Nurodytas laikas – kada pakeitimą pastebėjo mūsų sistema, o ne pakeitimo momentas.
+</p>
+
 <Timeline>
   {pakeitimai.map((p, i) => (
     <TimelineItem active lineActive={i + 1 < pakeitimai.length}>
@@ -58,6 +62,12 @@ const kryptiesZenklas: Record<string, string> = {
 </Timeline>
 
 <style>
+  .pakeitimai-pastaba {
+    margin: 0 0 16px;
+    font-size: var(--text-sm);
+    color: var(--gray);
+  }
+
   .pakeitimas-antraste {
     display: flex;
     align-items: baseline;
