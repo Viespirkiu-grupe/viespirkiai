@@ -11,28 +11,58 @@ interface Props {
 
 const { pathname, colorScheme } = Astro.props;
 
-interface NavLink {
-  href: string;
-  /** Label shown in the desktop navbar. */
-  label: string;
-  /** Optional longer label used in the mobile menu (defaults to `label`). */
-  mobileLabel?: string;
-}
+import type { NavMenuItem } from '@design-system/components/NavigationMenu.astro';
 
-const primaryLinks: NavLink[] = [
-  { href: '/',                 label: 'Sutartys' },
-  { href: '/viesiejiPirkimai', label: 'Viešieji pirkimai' },
-  { href: '/dokumentai',       label: 'Dokumentai' },
-  { href: '/juridiniai',       label: 'Juridiniai',   mobileLabel: 'Juridiniai asmenys' },
-  { href: '/neskelbiamos',     label: 'Neskelbiamos', mobileLabel: 'Neskelbiamos derybos' },
-  { href: '/nepatikimi',       label: 'Nepatikimi ir melagiai' },
+// Pagrindiniai 3 skyriai (kairėje) su dropdown'ais, „Apie" – dešinėje.
+const primaryMenu: NavMenuItem[] = [
+  {
+    label: 'Viešieji pirkimai',
+    href: '/',
+    children: [
+      {
+        href: '/', label: 'Sutartys', desc: 'Viešojo sektoriaus sudarytos sutartys',
+        children: [
+          { href: '/sutartys/redagavimai', label: 'Sutarčių redagavimai', desc: 'Sutarčių įrašų pakeitimai' },
+        ],
+      },
+      { href: '/viesiejiPirkimai', label: 'Viešieji pirkimai',    desc: 'Naujos CVP IS viešieji pirkimai' },
+      { href: '/neskelbiamos',     label: 'Neskelbiamos derybos', desc: 'Viešųjų pirkimų tarnybos sutikimai' },
+      { href: '/nepatikimi',       label: 'Nepatikimi ir melagiai', desc: 'Juodieji sąrašai' },
+      { href: '/bvpz',             label: 'BVPŽ kodai',           desc: 'Bendrasis viešųjų pirkimų žodynas' },
+    ],
+  },
+  {
+    label: 'Dokumentai',
+    href: '/dokumentai',
+    children: [
+      { href: '/dokumentai?klase=viesiejiPirkimai', label: 'Viešųjų pirkimų dokumentai', desc: 'Sutartys, pirkimai, neskelbiamos derybos...' },
+      { href: '/dokumentai?klase=teise',            label: 'Teismo nuosprendžiai',          desc: 'Senos LITEKO viešų teismo nuosprendžių paieška' },
+      {
+        href: '/failai', label: 'Failai', desc: 'Viešųjų pirkimų dokumentų archyvas',
+        children: [
+          { href: '/failai/galerija',      label: 'Galerija',       desc: 'Atsitiktinės nuotraukos iš viešųjų pirkimų dokumentų' },
+          { href: '/failai/map',           label: 'Žemėlapis',      desc: 'Failų su GPS koordinatėmis žemėlapis' },
+          { href: '/failai/topExtension',  label: 'Plėtiniai',      desc: 'Dažniausi failų tipai archyve' },
+          { href: '/failai/neparsiunciami', label: 'Neparsiunčiami', desc: 'Failai, kurių nepavyko parsiųsti' },
+        ],
+      },
+    ],
+  },
+  { label: 'Juridiniai', href: '/juridiniai' },
 ];
 
-const secondaryLinks: NavLink[] = [
-  { href: '/apie',         label: 'Apie' },
-  { href: '/kontaktai',    label: 'Kontaktai' },
-  { href: '/duomenys',     label: 'Duomenys' },
-  { href: '/vieslaiskiai', label: 'Viešlaiškiai' },
+const secondaryMenu: NavMenuItem[] = [
+  {
+    label: 'Apie',
+    align: 'end',
+    children: [
+      { href: '/apie',      label: 'Apie',      desc: 'Apie projektą ir tikslus' },
+      { href: '/kontaktai', label: 'Kontaktai', desc: 'Susisiekite su mumis' },
+      { href: '/duomenys',  label: 'Duomenys',  desc: 'Duomenų šaltiniai ir atsisiuntimas' },
+      { href: '/mcp',       label: 'MCP',       desc: 'Duomenų prieiga per MCP serverį' },
+    ],
+  },
+  { label: 'Viešlaiškiai', href: '/vieslaiskiai' },
 ];
 
 // Baneris valdomas per DB lentelę `infoBaneris` (enabled + aplinka), atnaujinamas per pg_notify.
@@ -45,8 +75,8 @@ const infoBanner = await getInfoBanner();
   brandHref="/"
   brandLabel="Viešpirkiai"
   logoHtml={logoSvg}
-  primaryLinks={primaryLinks}
-  secondaryLinks={secondaryLinks}
+  primaryMenu={primaryMenu}
+  secondaryMenu={secondaryMenu}
   infoBanner={infoBanner}
   mirrorLogo={config.dev}
 />

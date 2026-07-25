@@ -6,7 +6,24 @@ import PageHeader from '@design-system/components/PageHeader.astro';
 import DataTable from '@design-system/components/DataTable.astro';
 import SelectInput from '@design-system/components/inputs/SelectInput.astro';
 import { postgres, parseLimit, enrichFailasRow, getColorScheme, getFont, cleanQuery, buildSaltinioLink } from '../../lib/failai.js';
+import { sujungtiSaltinioId } from '@/modules/failai/failuIrasymas.js';
 import '@/utils/linksniai.js';
+
+// Šaltinio nuoroda atkuriama iš pozicinių sourceId0..3 (cvpp/cvpIs — sudėtiniai raktai,
+// pvz. cvpp = pid/dvid/lid). Sutartims pozicijos yra dokId/fileId.
+function withLinkFields(row: any) {
+  const saltinis = row.saltinis || 'sutartys';
+  if (saltinis === 'sutartys') {
+    return { ...row, saltinis, saltinioId: null, dokId: row.sourceId0, fileId: row.sourceId1 };
+  }
+  return {
+    ...row,
+    saltinis,
+    saltinioId: sujungtiSaltinioId(saltinis, [row.sourceId0, row.sourceId1, row.sourceId2, row.sourceId3]),
+    dokId: null,
+    fileId: null,
+  };
+}
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
@@ -19,27 +36,61 @@ const limit = parsedLimit.limit;
 const page = Math.max(1, parseInt(query.page) || 1);
 const offset = (page - 1) * limit;
 const saltinis = query.saltinis || null;
-const where = saltinis ? 'WHERE st.title = $1' : '';
-const params = saltinis ? [saltinis] : [];
-// Eilės eilutė + failo duomenys iš naujos schemos; senų stulpelių vardai išlaikomi,
-// kad puslapio šablonas ir CSV nesikeistų.
+// „Neparsiunčiami" = failai, kurių parsiuntimas nepavyko (downloadStatus = -1).
+// Jungiam pradedant nuo `files` — filtras naudoja files_downloadStatus_idx; eilės
+// metaduomenys prisijungiami LEFT JOIN, kad matytųsi ir tie, kurių eilėje nebėra.
+const conditions = ['f."downloadStatus" = -1'];
+const params: any[] = [];
+if (saltinis) { params.push(saltinis); conditions.push(`st.title = $${params.length}`); }
+const where = `WHERE ${conditions.join(' AND ')}`;
 const FROM_JOINS = `
-     FROM public."filesDownloadQueue" q
-     JOIN public.files f ON f.id = q.id
+     FROM public.files f
+     LEFT JOIN public."filesDownloadQueue" q ON q.id = f.id
      LEFT JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
      LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
      LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"`;
 const SELECT_COLS = `
      f.id, fn.filename AS pavadinimas, e.extension,
-     CASE WHEN st.title = 'sutartys' THEN NULL ELSE f."sourceId0" END AS "saltinioId",
+     f."sourceId0", f."sourceId1", f."sourceId2", f."sourceId3",
      st.title AS saltinis,
      q.attempts AS "parsiuntimoBandymai",
-     q."nextAttempt" AS "paskutinisParsiuntimoBandymas",
-     f."downloadStatus" AS state,
-     CASE WHEN st.title = 'sutartys' THEN f."sourceId0" END AS "dokId",
-     CASE WHEN st.title = 'sutartys' THEN f."sourceId1" END AS "fileId"`;
+     q."nextAttempt" AS "kitasBandymas",
+     f."downloadStatus" AS state`;
 const countRes = await postgres.query(`SELECT COUNT(*) AS total ${FROM_JOINS} ${where}`, params);
 const total = parseInt(countRes.rows[0].total, 10) || 0;
+
+// „Pagal šaltinį" — visada per visus nepavykusius (veikia ir kaip filtro navigacija).
+// „Pagal plėtinį" — agreguojama pagal pasirinktą šaltinį (jei nurodytas).
+const [saltiniaiRes, pletiniaiRes] = await Promise.all([
+  postgres.query(`SELECT COALESCE(st.title, 'sutartys') AS saltinis, COUNT(*)::int AS n
+     FROM public.files f
+     LEFT JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+     WHERE f."downloadStatus" = -1
+     GROUP BY 1 ORDER BY n DESC`),
+  postgres.query(`SELECT COALESCE(e.extension, '—') AS extension, COUNT(*)::int AS n
+     FROM public.files f
+     LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+     LEFT JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+     WHERE f."downloadStatus" = -1${saltinis ? ' AND st.title = $1' : ''}
+     GROUP BY 1 ORDER BY n DESC LIMIT 8`, saltinis ? [saltinis] : []),
+]);
+const saltiniai = saltiniaiRes.rows as any[];
+const pletiniai = pletiniaiRes.rows as any[];
+const saltiniaiTotal = saltiniai.reduce((a, s) => a + Number(s.n), 0);
+// „Pagal plėtinį" procentų bazė — pasirinkto šaltinio suma (arba visų).
+const filteredTotal = saltinis
+  ? Number(saltiniai.find((s) => s.saltinis === saltinis)?.n ?? 0)
+  : saltiniaiTotal;
+const fmtPct = (n: number, base: number) =>
+  (base ? `${(n / base * 100) < 10 ? (n / base * 100).toFixed(1) : Math.round(n / base * 100)}%` : '—');
+
+// Šaltinio nuoroda breakdown'e = filtro perjungimas (paspaudus aktyvų — išvalo).
+const sourceHref = (s: string) => {
+  const parts: string[] = [];
+  if (s !== saltinis) parts.push(`saltinis=${encodeURIComponent(s)}`);
+  if (query.limit) parts.push(`limit=${encodeURIComponent(query.limit)}`);
+  return `/failai/neparsiunciami${parts.length ? `?${parts.join('&')}` : ''}`;
+};
 
 if (typeof query.csv !== 'undefined') {
   const csvLimit = Math.min(100000, Math.max(1, parseInt(query.csvLimit) || 10000));
@@ -65,7 +116,7 @@ if (typeof query.csv !== 'undefined') {
     'saltinis',
     'saltinioNuoroda',
     'parsiuntimoBandymai',
-    'paskutinisParsiuntimoBandymas',
+    'kitasBandymas',
   ];
 
   const lines = [header.join(',')];
@@ -75,9 +126,9 @@ if (typeof query.csv !== 'undefined') {
       escapeCsv(row.pavadinimas),
       escapeCsv(row.extension),
       escapeCsv(row.saltinis || 'sutartys'),
-      escapeCsv(buildSaltinioLink(row)),
+      escapeCsv(buildSaltinioLink(withLinkFields(row))),
       escapeCsv(row.parsiuntimoBandymai),
-      escapeCsv(row.paskutinisParsiuntimoBandymas),
+      escapeCsv(row.kitasBandymas),
     ].join(','));
   }
 
@@ -90,7 +141,7 @@ if (typeof query.csv !== 'undefined') {
 }
 
 const result = await postgres.query(`SELECT ${SELECT_COLS} ${FROM_JOINS} ${where} ORDER BY q."nextAttempt" ASC NULLS FIRST LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, limit, offset]);
-const files = result.rows.map(enrichFailasRow) as any[];
+const files = result.rows.map(withLinkFields).map(enrichFailasRow) as any[];
 const pageCount = Math.max(1, Math.ceil(total / limit));
 const queryParamsRaw = [saltinis && `saltinis=${encodeURIComponent(saltinis)}`, query.limit && `limit=${encodeURIComponent(query.limit)}`].filter(Boolean).join('&');
 const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
@@ -98,9 +149,40 @@ const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
 <Layout pageTitle="Neparsiunčiami failai" pageDescription="Sąrašas failų, kurių parsisiuntimas nepavyko" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font}>
   <main>
     <PageHeader>
-      Neparsiunčiami failai
+      Failai, kurių nepavyko parsiųsti
       <Button slot="actions" href={`/failai/neparsiunciami?csv=true${queryParams}&limit=max`} variant="outline" size="sm">↗ CSV</Button>
     </PageHeader>
+
+    {saltiniaiTotal > 0 && (
+      <div class="nps-summary mb-5">
+        <div class="nps-breakdown">
+          <div class="nps-breakdown__title">Pagal šaltinį</div>
+          <ul class="nps-breakdown__list">
+            {saltiniai.map((r: any) => (
+              <li class:list={['nps-row', 'nps-row--link', r.saltinis === saltinis && 'is-active']}>
+                <a class="nps-row__label" href={sourceHref(r.saltinis)} title={r.saltinis === saltinis ? 'Išvalyti filtrą' : `Filtruoti: ${r.saltinis}`}>{r.saltinis}</a>
+                <span class="nps-row__track"><span class="nps-row__fill" style={`width:${(Number(r.n) / saltiniaiTotal) * 100}%`} /></span>
+                <span class="nps-row__n cell-mono">{Number(r.n).toLocaleString('lt-LT')}</span>
+                <span class="nps-row__pct">{fmtPct(Number(r.n), saltiniaiTotal)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div class="nps-breakdown">
+          <div class="nps-breakdown__title">Pagal plėtinį{saltinis ? ` · ${saltinis}` : ''}</div>
+          <ul class="nps-breakdown__list">
+            {pletiniai.map((r: any) => (
+              <li class="nps-row">
+                <span class="nps-row__label">{r.extension}</span>
+                <span class="nps-row__track"><span class="nps-row__fill" style={`width:${(Number(r.n) / (filteredTotal || 1)) * 100}%`} /></span>
+                <span class="nps-row__n cell-mono">{Number(r.n).toLocaleString('lt-LT')}</span>
+                <span class="nps-row__pct">{fmtPct(Number(r.n), filteredTotal)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    )}
 
     <form method="get" action="/failai/neparsiunciami" class="filter-bar mb-4">
       <SelectInput
@@ -138,7 +220,7 @@ const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
           { label: 'Šaltinis' },
           { label: 'Šaltinio nuoroda' },
           { label: 'Bandymai', headerClassName: 'cell-right' },
-          { label: 'Paskutinis bandymas' },
+          { label: 'Kitas bandymas' },
         ]}
       >
         {files.map((file: any) => (
@@ -157,7 +239,7 @@ const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
               ) : ''}
             </td>
             <td class="cell-mono cell-right">{file.parsiuntimoBandymai ?? 0}</td>
-            <td class="cell-nowrap">{file.paskutinisParsiuntimoBandymas ? String(new Date(file.paskutinisParsiuntimoBandymas).toLocaleString('lt-LT')) : '—'}</td>
+            <td class="cell-nowrap">{file.kitasBandymas ? String(new Date(file.kitasBandymas).toLocaleString('lt-LT')) : '—'}</td>
           </tr>
         ))}
       </DataTable>
@@ -174,5 +256,85 @@ const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
 
   .neparsiunciami-col-source-link {
     max-width: 44ch;
+  }
+
+  .nps-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 300px));
+    justify-content: start;
+    gap: 16px 40px;
+  }
+
+  .nps-breakdown__title {
+    margin-bottom: 8px;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .nps-breakdown__list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .nps-row {
+    display: grid;
+    grid-template-columns: minmax(4.5em, 7em) 1fr auto 3.2em;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-sm);
+  }
+
+  .nps-row__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  a.nps-row__label {
+    color: var(--color-link);
+    text-decoration: none;
+  }
+
+  .nps-row--link:hover a.nps-row__label {
+    text-decoration: underline;
+  }
+
+  .nps-row.is-active a.nps-row__label {
+    color: var(--black);
+    font-weight: 600;
+  }
+
+  .nps-row.is-active .nps-row__fill {
+    background: var(--color-primary);
+  }
+
+  .nps-row__track {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--lighter-gray);
+    overflow: hidden;
+  }
+
+  .nps-row__fill {
+    display: block;
+    height: 100%;
+    min-width: 2px;
+    border-radius: 999px;
+    background: var(--color-danger);
+  }
+
+  .nps-row__n {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .nps-row__pct {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--gray);
   }
 </style>

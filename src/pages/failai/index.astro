@@ -1,4 +1,619 @@
 ---
-// Sena failų paieška pakeista nauja dokumentų paieška.
-return Astro.redirect('/dokumentai');
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import { gautiFailuStatistika } from './statistika.json.ts';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
+import { fmtNumber } from '../../lib/formatters.ts';
+import config from '../../lib/config.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+// Gyvos sumos tiesiai iš `filesStats` (tas pats šaltinis kaip SSE) — ne precomputed.
+let stats: Awaited<ReturnType<typeof gautiFailuStatistika>> | null = null;
+try {
+  stats = await gautiFailuStatistika();
+} catch {
+  stats = null;
+}
+
+const kiekiai = stats?.failai.kiekiai;
+const nusk = stats?.nuskaitymas;
+
+const visi = kiekiai?.visi ?? 0;
+const parsiusti = kiekiai?.parsiusti ?? 0;
+const parsiuntKlaida = kiekiai?.klaida ?? 0;
+const pending = kiekiai?.pending ?? 0;
+const unarchived = kiekiai?.unarchived ?? 0;
+const atpazinta = nusk?.nuskaityti ?? 0;
+const nuskKlaidos = nusk?.klaidos ?? 0;
+// „Eilėje" — tikras filesExtractionQueue ilgis, atėmus jau nepavykusius (min 0).
+const likoNuskaityti = Math.max(0, (nusk?.eilesApprox ?? 0) - nuskKlaidos);
+const zodziai = nusk?.zodziai.total ?? 0;
+const puslapiai = nusk?.puslapiai ?? 0;
+const dydis = stats?.failai.dydziai.parsiusti ?? 0;
+const dydisGb = (dydis / 1024 / 1024 / 1024).toLocaleString('lt-LT', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const fmtPct = (val: number, total: number) => {
+  if (!total) return '—';
+  const p = (val / total) * 100;
+  return `${p < 10 && p > 0 ? p.toFixed(1) : Math.round(p)}%`;
+};
+
+// Dvi apdorojimo grandinės pjūviai proporcinei juostai. „tone" atitinka
+// semantinę spalvą (success / warning / danger / muted).
+// Bazė = segmentų suma, kad juostos visada susidėtų iki 100%.
+const suma = (segs: { value: number }[]) => segs.reduce((a, s) => a + s.value, 0);
+
+const parsiuntimoSegmentai = [
+  { tone: 'ok',   label: 'Parsiųsta',  value: parsiusti },
+  { tone: 'info', label: 'Iš archyvų', value: unarchived },
+  { tone: 'wait', label: 'Laukia',     value: pending },
+  { tone: 'err',  label: 'Nepavyko',   value: parsiuntKlaida },
+];
+const nuskaitymoSegmentai = [
+  { tone: 'ok',   label: 'Tekstas atpažintas', value: atpazinta },
+  { tone: 'wait', label: 'Eilėje',             value: likoNuskaityti },
+  { tone: 'err',  label: 'Nepavyko',           value: nuskKlaidos },
+];
+
+const parsiuntimoJuosta = { bazė: suma(parsiuntimoSegmentai), segmentai: parsiuntimoSegmentai };
+const nuskaitymoJuosta = { bazė: suma(nuskaitymoSegmentai), segmentai: nuskaitymoSegmentai };
+
+const destinacijos = [
+  {
+    href: '/dokumentai?type=failas',
+    title: 'Dokumentų paieška',
+    desc: 'Paieška pagal failų turinį.',
+  },
+  {
+    href: '/failai/galerija',
+    title: 'Galerija',
+    desc: 'Atsitiktinės nuotraukos iš viešųjų pirkimų dokumentų.',
+  },
+  {
+    href: '/failai/map',
+    title: 'Žemėlapis',
+    desc: 'Failų su GPS koordinatėmis žemėlapis.',
+  },
+  {
+    href: '/failai/topExtension',
+    title: 'Plėtiniai',
+    desc: 'Dažniausi failų tipai ir jų pasiskirstymas archyve.',
+  },
+  {
+    href: '/failai/neparsiunciami',
+    title: 'Neparsiunčiami',
+    desc: 'Failai, kurių nepavyko parsiųsti.',
+  },
+];
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=60');
 ---
+
+<Layout
+  pageTitle="Failų archyvas"
+  pageDescription="Viešųjų pirkimų dokumentų failų archyvas: parsiųsti, atpažinti ir indeksuoti CVP IS failai"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      Viešųjų pirkimų failų archyvas
+    </PageHeader>
+
+    <div class="failai-lead">
+      <figure class="failai-diagram-figure">
+        <div class="failai-diagram">
+          <svg class="fd-svg fd-svg--wide" viewBox="0 0 860 372" role="img" preserveAspectRatio="xMidYMid meet"
+               aria-label="Failo apdorojimo grandinė: parsiųstas failas patenka į teksto atpažinimą; jei dokumentas sveikas, atliekamas OCR, kurio rezultatas grąžinamas atgal (kiekvienam puslapiui parenkamas kokybiškesnis tekstas); toliau apdorojamos ataskaitų formos, o duomenys indeksuojami į paiešką.">
+            <title>Failo apdorojimo grandinė</title>
+            <defs>
+              <marker id="fdArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" class="fd-arrowhead" />
+              </marker>
+            </defs>
+
+            {/* Jungtys (po mazgais, kad mazgai persidengtų viršuje) */}
+            <path class="fd-edge" d="M192 186 H300"   marker-end="url(#fdArrow)" />
+            <path class="fd-edge" d="M524 186 H636"   marker-end="url(#fdArrow)" />
+            <path class="fd-edge" d="M412 222 V290"   marker-end="url(#fdArrow)" />
+            <path class="fd-edge" d="M382 150 V92"    marker-end="url(#fdArrow)" />
+            <path class="fd-edge" d="M442 92 V150"    marker-end="url(#fdArrow)" />
+
+            <text class="fd-edge-label" x="372" y="112" text-anchor="end">jei dokumentas</text>
+            <text class="fd-edge-label" x="372" y="127" text-anchor="end">sveikas</text>
+            <text class="fd-edge-label" x="452" y="112">renkamas kokybiškesnis</text>
+            <text class="fd-edge-label" x="452" y="127">tekstas kiekvienam psl.</text>
+
+            {/* Mazgai */}
+            <rect class="fd-node" x="24"  y="150" width="168" height="72" rx="12" />
+            <text class="fd-title" x="108" y="181" text-anchor="middle">Failas</text>
+            <text class="fd-sub"   x="108" y="199" text-anchor="middle">parsiunčiamas</text>
+
+            <rect class="fd-node" x="316" y="28" width="192" height="64" rx="12" />
+            <text class="fd-title" x="412" y="55"  text-anchor="middle">OCR</text>
+            <text class="fd-sub"   x="412" y="73"  text-anchor="middle">vizualiai gaunamas tekstas</text>
+
+            <rect class="fd-node fd-node--hub" x="300" y="150" width="224" height="72" rx="12" />
+            <text class="fd-title" x="412" y="181" text-anchor="middle">Teksto atpažinimas</text>
+            <text class="fd-sub"   x="412" y="199" text-anchor="middle">ištraukiami duomenys</text>
+
+            <rect class="fd-node fd-node--end" x="636" y="150" width="200" height="72" rx="12" />
+            <text class="fd-title" x="736" y="181" text-anchor="middle">Indeksavimas</text>
+            <text class="fd-sub"   x="736" y="199" text-anchor="middle">į paiešką</text>
+
+            <rect class="fd-node" x="312" y="290" width="200" height="64" rx="12" />
+            <text class="fd-title" x="412" y="317" text-anchor="middle">Ataskaitų formų</text>
+            <text class="fd-sub"   x="412" y="335" text-anchor="middle">apdorojimas</text>
+          </svg>
+
+          {/* Vertikali versija telefonui — tas pats srautas, sustatytas stulpeliu. */}
+          <svg class="fd-svg fd-svg--tall" viewBox="0 0 360 388" role="img" preserveAspectRatio="xMidYMid meet"
+               aria-label="Failo apdorojimo grandinė: parsiųstas failas patenka į teksto atpažinimą; jei dokumentas sveikas, atliekamas OCR, kurio rezultatas grąžinamas atgal; toliau apdorojamos ataskaitų formos, o duomenys indeksuojami į paiešką.">
+            <title>Failo apdorojimo grandinė</title>
+            <defs>
+              <marker id="fdArrowM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" class="fd-arrowhead" />
+              </marker>
+            </defs>
+
+            {/* Jungtys */}
+            <path class="fd-edge" d="M110 70 V150"        marker-end="url(#fdArrowM)" />
+            <path class="fd-edge" d="M186 178 H250"       marker-end="url(#fdArrowM)" />
+            <path class="fd-edge" d="M250 200 H186"       marker-end="url(#fdArrowM)" />
+            <path class="fd-edge" d="M110 224 V258" />
+            <path class="fd-edge" d="M110 258 H90 V300"   marker-end="url(#fdArrowM)" />
+            <path class="fd-edge" d="M110 258 H270 V300"  marker-end="url(#fdArrowM)" />
+
+            {/* Mazgai */}
+            <rect class="fd-node" x="40" y="14" width="140" height="56" rx="12" />
+            <text class="fd-title" x="110" y="40" text-anchor="middle">Failas</text>
+            <text class="fd-sub"   x="110" y="56" text-anchor="middle">parsiunčiamas</text>
+
+            <rect class="fd-node fd-node--hub" x="26" y="150" width="160" height="74" rx="12" />
+            <text class="fd-title" x="106" y="183" text-anchor="middle">Teksto atpažinimas</text>
+            <text class="fd-sub"   x="106" y="201" text-anchor="middle">ištraukiami duomenys</text>
+
+            <rect class="fd-node" x="250" y="155" width="100" height="64" rx="12" />
+            <text class="fd-title" x="300" y="183" text-anchor="middle">OCR</text>
+            <text class="fd-sub"   x="300" y="200" text-anchor="middle">vaizdinis tekstas</text>
+
+            <rect class="fd-node" x="10" y="300" width="160" height="64" rx="12" />
+            <text class="fd-title" x="90" y="326" text-anchor="middle">Ataskaitų formų</text>
+            <text class="fd-sub"   x="90" y="344" text-anchor="middle">apdorojimas</text>
+
+            <rect class="fd-node fd-node--end" x="190" y="300" width="160" height="64" rx="12" />
+            <text class="fd-title" x="270" y="326" text-anchor="middle">Indeksavimas</text>
+            <text class="fd-sub"   x="270" y="344" text-anchor="middle">į paiešką</text>
+
+            {/* Kilpos žyma — piešiama paskutinė, kad būtų virš visko */}
+            <text class="fd-edge-label" x="218" y="171" text-anchor="middle">jei sveikas</text>
+          </svg>
+        </div>
+        <figcaption class="failai-diagram-title">Kaip failas virsta paieškos rezultatu</figcaption>
+      </figure>
+
+      <p>
+        Prie viešųjų pirkimų ir sutarčių neišvengiamai pridedami įvairus dokumentai: techninės
+        specifikacijos, sutartys, protokolai, sąmatos ir t.t. Mes juos automatiškai parsiunčiame,
+        išsaugome mūsų infrastruktūroje, atpažįstame tekstą (papildomai ir vizualiai, naudojant OCR –
+        <i>angl. optical character recognition</i>, <i>liaud. iš nuotraukų</i>)
+        ir į dokumentų paieškos sistemą suindeksuojame visą atpažintą turinį, kad būtų galima patogiai ieškoti.
+
+        Apdorojame ir failų viduje esančius failus, (pavyzdžiui zip, rar, 7z, adoc archyvus) bei įprastų formų ataskaitas.
+
+        Šis archyvas yra atviras, viešai prieinamas ir nuolat pildomas. Jame saugomi visi parsiųsti failai,
+        net jei nepavyko atpažinti teksto ar jie buvo pašalinti CVP IS.
+      </p>
+
+      <p>Šiame puslapyje rasite šiek tiek statistikos bei informaciją apie sistemos architektūrą.</p>
+
+      {visi > 0 && (
+        <div class="failai-metrics">
+          <MetricCard label="Failų skaičius" value={fmtNumber(visi)} />
+          <MetricCard label="Failų dydis" value={dydisGb} unit="GB" />
+          <MetricCard label="Puslapiai" value={fmtNumber(puslapiai)} />
+          <MetricCard label="Žodžiai" value={fmtNumber(zodziai)} />
+        </div>
+      )}
+    </div>
+
+    {visi > 0 && (
+      <section class="failai-stats">
+        <div class="failai-pipeline">
+          {[
+            { title: 'Parsiuntimas', sub: 'iš kur atsirado failai (CVP IS ir archyvai)', juosta: parsiuntimoJuosta },
+            { title: 'Teksto atpažinimas', sub: 'kiek prieinamų failų tekstas perskaitytas', juosta: nuskaitymoJuosta },
+          ].map(({ title, sub, juosta }) => (
+            <div class="failai-funnel">
+              <div class="failai-funnel__head">
+                <span class="failai-funnel__title">{title}</span>
+                <span class="failai-funnel__sub">{sub}</span>
+              </div>
+              <div class="failai-bar" role="img" aria-label={juosta.segmentai.map((s) => `${s.label}: ${fmtNumber(s.value)}`).join(', ')}>
+                {juosta.segmentai.filter((s) => s.value > 0).map((s) => (
+                  <span
+                    class={`failai-bar__seg failai-bar__seg--${s.tone}`}
+                    style={`width:${(s.value / (juosta.bazė || 1)) * 100}%`}
+                    title={`${s.label}: ${fmtNumber(s.value)} (${fmtPct(s.value, juosta.bazė)})`}
+                  />
+                ))}
+              </div>
+              <ul class="failai-legend">
+                {juosta.segmentai.map((s) => (
+                  <li class="failai-legend__item">
+                    <span class={`failai-legend__dot failai-legend__dot--${s.tone}`} aria-hidden="true" />
+                    <span class="failai-legend__label">{s.label}</span>
+                    <span class="failai-legend__value">{fmtNumber(s.value)}</span>
+                    <span class="failai-legend__pct">{fmtPct(s.value, juosta.bazė)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <h2 class="failai-skiltis">Failų atsisiuntimas</h2>
+    <p>
+      Kiekvienas archyvo failas pasiekiamas tiesiogine nuoroda – pagal failo ID
+      arba jo md5:
+    </p>
+    <ul class="failai-download">
+      <li>
+        <a href="https://failai.viespirkiai.org/45908256">failai.viespirkiai.org/45908256</a>
+      </li>
+      <li>
+        <a href="https://failai.viespirkiai.org/015699f5370e3ed39a3f956ded1e46f9">failai.viespirkiai.org/015699f5370e3ed39a3f956ded1e46f9</a>
+      </li>
+    </ul>
+
+    <p class="failai-fineprint">
+      Pilietinei iniciatyvai už šiuos pavyzdžius nebuvo sumokėta, o „Močiutės uogienės"
+      iš <a href="/sutartis/2008006839">šios sutarties</a> ji taip pat neragavo. <br> 
+      Norint atsisiųsti daugiau nei 10 000 failų, prašome pirma <a href="/kontaktai">susisiekti</a>.
+
+    </p><br>
+
+    <h2 class="failai-skiltis">Funkcionalumas bei kelios įdomybės</h2>
+    <div class="failai-korteles">
+      {destinacijos.map((d) => (
+        <a class="failai-kortele" href={d.href}>
+          <span class="failai-kortele__title">{d.title}</span>
+          <span class="failai-kortele__desc">{d.desc}</span>
+          <span class="failai-kortele__arrow" aria-hidden="true">→</span>
+        </a>
+      ))}
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .failai-stats {
+    margin-bottom: 36px;
+  }
+
+  .failai-pipeline {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .failai-funnel {
+    padding: 18px 20px;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+  }
+
+  .failai-funnel__head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-bottom: 12px;
+  }
+
+  .failai-funnel__title {
+    font-size: var(--text-md);
+    font-weight: 600;
+  }
+
+  .failai-funnel__sub {
+    font-size: var(--text-xs);
+    color: var(--gray);
+  }
+
+  .failai-bar {
+    display: flex;
+    height: 12px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--lighter-gray);
+  }
+
+  .failai-bar__seg {
+    height: 100%;
+    min-width: 2px;
+    transition: width var(--transition);
+  }
+
+  .failai-bar__seg--ok,
+  .failai-legend__dot--ok   { background: var(--color-success); }
+  .failai-bar__seg--info,
+  .failai-legend__dot--info { background: var(--color-info); }
+  .failai-bar__seg--wait,
+  .failai-legend__dot--wait { background: var(--color-muted); }
+  .failai-bar__seg--err,
+  .failai-legend__dot--err  { background: var(--color-danger); }
+
+  .failai-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .failai-legend__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-sm);
+  }
+
+  .failai-legend__dot {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+  }
+
+  .failai-legend__label {
+    color: var(--dark-gray);
+  }
+
+  .failai-legend__value {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+
+  .failai-legend__pct {
+    width: 3.5em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--gray);
+  }
+
+  /* Įžanga: aprašymas kairėje, sekos grafikas float'ina dešinėje (desktop). */
+  .failai-lead::after {
+    content: '';
+    display: block;
+    clear: both;
+  }
+
+  .failai-lead p {
+    line-height: 1.75;
+  }
+
+  /* Metrikos 2×2 iškart po tekstu, kairėje (apsiveja aplink float'inantį grafiką). */
+  .failai-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin: 8px 0 28px;
+  }
+
+  /* Telefone — vienas stulpelis, kad dideli skaičiai tilptų, ir liktų tarpas. */
+  @media (max-width: 600px) {
+    .failai-metrics {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .failai-diagram-figure {
+    margin: 0 0 20px;
+  }
+
+  @media (min-width: 880px) {
+    .failai-diagram-figure {
+      float: right;
+      width: 50%;
+      margin: 6px 0 16px 28px;
+    }
+  }
+
+  .failai-diagram-title {
+    margin: 8px 0 0;
+    font-size: var(--text-sm);
+    color: var(--gray);
+    text-align: center;
+  }
+
+  .failai-diagram {
+    padding: 12px 8px;
+    overflow-x: auto;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+  }
+
+  .failai-diagram svg {
+    height: auto;
+    margin-inline: auto;
+  }
+
+  .fd-svg--wide {
+    display: block;
+    width: 100%;
+    min-width: 460px;
+    max-width: 860px;
+  }
+
+  .fd-svg--tall {
+    display: none;
+    width: 100%;
+    max-width: 360px;
+  }
+
+  /* Telefone: vertikali diagrama telpa be horizontalaus slinkimo. */
+  @media (max-width: 600px) {
+    .failai-diagram {
+      overflow-x: visible;
+    }
+
+    .fd-svg--wide {
+      display: none;
+    }
+
+    .fd-svg--tall {
+      display: block;
+    }
+  }
+
+  .fd-node {
+    fill: var(--white);
+    stroke: var(--color-border);
+    stroke-width: 1.5;
+  }
+
+  .fd-node--hub {
+    stroke: var(--color-primary);
+    stroke-width: 2;
+  }
+
+  .fd-node--end {
+    fill: var(--color-success-bg);
+    stroke: var(--color-success);
+  }
+
+  .fd-title,
+  .fd-sub,
+  .fd-edge-label {
+    font-family: inherit;
+  }
+
+  .fd-title {
+    fill: var(--black);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .fd-sub {
+    fill: var(--gray);
+    font-size: 11px;
+  }
+
+  .fd-edge {
+    fill: none;
+    stroke: var(--gray);
+    stroke-width: 1.5;
+  }
+
+  .fd-arrowhead {
+    fill: var(--gray);
+  }
+
+  .fd-edge-label {
+    fill: var(--gray);
+    font-size: 11px;
+  }
+
+  .failai-skiltis {
+    margin: 0 0 16px;
+    font-size: var(--text-lg);
+  }
+
+  .failai-korteles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .failai-kortele {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 20px 22px;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+    text-decoration: none;
+    color: var(--black);
+    transition: border-color var(--transition), transform var(--transition);
+  }
+
+  .failai-kortele:hover {
+    border-color: var(--gray);
+    transform: translateY(-2px);
+  }
+
+  .failai-kortele__title {
+    font-size: var(--text-md);
+    font-weight: 600;
+  }
+
+  .failai-kortele__desc {
+    font-size: var(--text-sm);
+    color: var(--gray);
+    line-height: 1.5;
+  }
+
+  .failai-kortele__arrow {
+    position: absolute;
+    top: 18px;
+    right: 20px;
+    color: var(--color-muted);
+    transition: transform var(--transition), color var(--transition);
+  }
+
+  .failai-kortele:hover .failai-kortele__arrow {
+    transform: translateX(3px);
+    color: var(--black);
+  }
+
+  .failai-download {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 0 24px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .failai-download li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+  }
+
+  .failai-download a {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--text-sm);
+    word-break: break-all;
+  }
+
+  .failai-download__note {
+    font-size: var(--text-xs);
+    color: var(--gray);
+  }
+
+  .failai-fineprint {
+    margin: 0 0 10px;
+    font-size: var(--text-sm);
+    color: var(--gray);
+    line-height: 1.6;
+  }
+</style>

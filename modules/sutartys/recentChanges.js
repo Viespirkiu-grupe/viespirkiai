@@ -27,15 +27,9 @@ const CANONICAL_FIELD_ORDER = [
     "pakeitimas",
 ];
 
-export const RECENT_CHANGES_SQL = `
-WITH recent_changes AS MATERIALIZED (
-    SELECT change.*
-    FROM public."vpmSutartysChanges" change
-    WHERE ($2::bigint IS NULL OR change."unikalusId" = $2)
-      AND ($3::integer IS NULL OR change.id < $3)
-    ORDER BY change.id DESC
-    LIMIT $1
-)
+// Projekcija, paverčianti `recent_changes` CTE eilutes į before/after dokumentus.
+// Naudojama `RECENT_CHANGES_SQL` užklausoje – CTE gali skirtis, projekcija ta pati.
+const CHANGES_PROJECTION = `
 SELECT
     recent.id,
     recent."unikalusId",
@@ -121,6 +115,46 @@ LEFT JOIN LATERAL (
 ) current_contract ON true
 ORDER BY recent.id DESC
 `;
+
+// Konkrečios sutarties pakeitimai su papildomu id kursoriumi (beforeId).
+export const RECENT_CHANGES_SQL = `
+WITH recent_changes AS MATERIALIZED (
+    SELECT change.*
+    FROM public."vpmSutartysChanges" change
+    WHERE ($2::bigint IS NULL OR change."unikalusId" = $2)
+      AND ($3::integer IS NULL OR change.id < $3)
+    ORDER BY change.id DESC
+    LIMIT $1
+)
+${CHANGES_PROJECTION}`;
+
+// Redaguotos sutartys, naujausiai redaguotos viršuje, su puslapiavimu.
+// Grąžina po vieną eilutę kiekvienai sutarčiai su bendru jos pakeitimų skaičiumi.
+export async function fetchChangedContractsPage({ limit = 20, skip = 0 } = {}, db = postgres) {
+    const result = await db.query(
+        `SELECT "unikalusId", COUNT(*)::int AS viso, MAX(id) AS "maxId"
+         FROM public."vpmSutartysChanges"
+         GROUP BY "unikalusId"
+         ORDER BY "maxId" DESC
+         LIMIT $1 OFFSET $2`,
+        [limit, skip],
+    );
+    return result.rows;
+}
+
+export async function countChangedContracts(db = postgres) {
+    const result = await db.query(
+        `SELECT COUNT(DISTINCT "unikalusId")::bigint AS count FROM public."vpmSutartysChanges"`,
+    );
+    return Number(result.rows[0].count);
+}
+
+export async function countChanges(db = postgres) {
+    const result = await db.query(
+        `SELECT COUNT(*)::bigint AS count FROM public."vpmSutartysChanges"`,
+    );
+    return Number(result.rows[0].count);
+}
 
 function positiveInteger(value, option) {
     if (!/^\d+$/.test(value ?? "") || Number(value) < 1) {

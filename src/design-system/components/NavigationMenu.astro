@@ -1,0 +1,514 @@
+---
+// Duomenimis valdomas navigacijos meniu, sukurtas base-ui „Navigation Menu"
+// kompozicijos principu (List › Item › Trigger › Content › Link), bet grynu
+// Astro + CSS steku (be React/base-ui). Perėjimai tarp dropdown'ų: vienas bendras
+// „viewport" morphinasi (slenka + keičia dydį), o „Sutartys" turi į dešinę
+// atsidarantį sub-dropdown flyout.
+
+export interface NavMenuChild {
+  href: string;
+  label: string;
+  /** Trumpas paaiškinimas po nuoroda dropdown'e. */
+  desc?: string;
+  /** Įdėtinis submeniu (rodomas į dešinę atsidarančiu flyout skydeliu). */
+  children?: NavMenuChild[];
+}
+
+export interface NavMenuItem {
+  label: string;
+  /** Tiesioginė nuoroda (be dropdown), kai nėra `children`. */
+  href?: string;
+  children?: NavMenuChild[];
+  /** Dropdown lygiuotė: prie kairio (start) ar dešinio (end) trigger krašto. */
+  align?: 'start' | 'end';
+}
+
+interface Props {
+  items: NavMenuItem[];
+  pathname: string;
+  ariaLabel: string;
+  className?: string;
+}
+
+const { items, pathname, ariaLabel, className = '' } = Astro.props;
+
+function isActive(href: string) {
+  return href === pathname || (href !== '/' && pathname.startsWith(href));
+}
+
+function itemActive(item: NavMenuItem) {
+  if (item.href) return isActive(item.href);
+  return (item.children ?? []).some((c) => isActive(c.href));
+}
+
+const classes = ['ds-navmenu', className].filter(Boolean).join(' ');
+---
+
+<nav class={classes} aria-label={ariaLabel} data-navmenu>
+  <ul class="ds-navmenu__list">
+    {items.map((item) => (
+      <li class="ds-navmenu__item" data-navmenu-item>
+        {item.children ? (
+          <>
+            {item.href ? (
+              /* Nuoroda-trigger: paspaudus naviguoja, dropdown atsidaro užvedus/fokusu. */
+              <a
+                href={item.href}
+                class:list={['ds-navmenu__trigger', itemActive(item) && 'is-active']}
+                aria-current={itemActive(item) ? 'page' : undefined}
+              >
+                {item.label}
+                <svg class="ds-navmenu__chevron" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                  <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </a>
+            ) : (
+              <button
+                type="button"
+                class:list={['ds-navmenu__trigger', itemActive(item) && 'is-active']}
+                aria-expanded="false"
+                aria-haspopup="true"
+                data-navmenu-trigger
+              >
+                {item.label}
+                <svg class="ds-navmenu__chevron" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                  <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            )}
+            <div class:list={['ds-navmenu__content', item.align === 'end' && 'ds-navmenu__content--end']} data-navmenu-content>
+              <ul class="ds-navmenu__links">
+                {item.children.map((c) => (
+                  <li class:list={['ds-navmenu__child', c.children && 'ds-navmenu__child--parent']}>
+                    <a
+                      href={c.href}
+                      class:list={['ds-navmenu__link', isActive(c.href) && 'is-active']}
+                      aria-current={isActive(c.href) ? 'page' : undefined}
+                      aria-haspopup={c.children ? 'true' : undefined}
+                    >
+                      <span class="ds-navmenu__link-main">
+                        <span class="ds-navmenu__link-title">{c.label}</span>
+                        {c.desc && <span class="ds-navmenu__link-desc">{c.desc}</span>}
+                      </span>
+                      {c.children && (
+                        <svg class="ds-navmenu__caret" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                          <path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                      )}
+                    </a>
+                    {c.children && (
+                      <div class="ds-navmenu__flyout">
+                        <ul class="ds-navmenu__links">
+                          {c.children.map((sc) => (
+                            <li>
+                              <a
+                                href={sc.href}
+                                class:list={['ds-navmenu__link', isActive(sc.href) && 'is-active']}
+                                aria-current={isActive(sc.href) ? 'page' : undefined}
+                              >
+                                <span class="ds-navmenu__link-main">
+                                  <span class="ds-navmenu__link-title">{sc.label}</span>
+                                  {sc.desc && <span class="ds-navmenu__link-desc">{sc.desc}</span>}
+                                </span>
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        ) : (
+          <a
+            href={item.href}
+            class:list={['ds-navmenu__trigger', itemActive(item) && 'is-active']}
+            aria-current={itemActive(item) ? 'page' : undefined}
+          >
+            {item.label}
+          </a>
+        )}
+      </li>
+    ))}
+  </ul>
+
+  {/* Bendras „viewport" – vienas skydelis, kuris pavirsta (slenka + keičia dydį)
+      iš vieno meniu turinio į kitą (base-ui NavigationMenu principu). */}
+  <div class="ds-navmenu__viewport" data-navmenu-viewport aria-hidden="true">
+    <div class="ds-navmenu__viewport-inner" data-navmenu-viewport-inner></div>
+  </div>
+</nav>
+
+<style>
+  .ds-navmenu {
+    position: relative;
+  }
+
+  .ds-navmenu__list {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .ds-navmenu__item {
+    position: relative;
+  }
+
+  .ds-navmenu__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--gray);
+    font: inherit;
+    font-size: var(--text-sm);
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--transition), background-color var(--transition);
+  }
+
+  .ds-navmenu__trigger:hover,
+  .ds-navmenu__trigger:focus-visible {
+    color: var(--black);
+    background: var(--lighter-gray);
+  }
+
+  .ds-navmenu__trigger.is-active {
+    color: var(--black);
+    font-weight: 600;
+  }
+
+  .ds-navmenu__chevron {
+    transition: transform var(--transition);
+  }
+
+  .ds-navmenu__item.is-open .ds-navmenu__chevron {
+    transform: rotate(180deg);
+  }
+
+  /* Šaltinio turinys – tik šablonas dydžiui matuoti (nematomas, bet turi layout). */
+  .ds-navmenu__content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+    /* Plotis pagal turinį – skydelis platėja, kad tekstas tilptų vienoje eilutėje. */
+    width: max-content;
+    min-width: 240px;
+    padding: 8px;
+    border: var(--border);
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* Viena eilutė, be laužymo (ir be nukirpimo) – plotis prisitaiko prie teksto. */
+  .ds-navmenu__link-title,
+  .ds-navmenu__link-desc {
+    white-space: nowrap;
+  }
+
+  .ds-navmenu__content--end {
+    left: auto;
+    right: 0;
+  }
+
+  /* Bendras skydelis, kuris morphinasi tarp meniu. */
+  .ds-navmenu__viewport {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: var(--z-sticky);
+    box-sizing: border-box;
+    width: 240px;
+    height: 0;
+    padding: 8px;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+    box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.25);
+    opacity: 0;
+    overflow: hidden;
+    transform: translateX(0) translateY(-6px);
+    transform-origin: top left;
+    pointer-events: none;
+    transition:
+      transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+      width 260ms cubic-bezier(0.22, 1, 0.36, 1),
+      height 260ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 160ms ease;
+  }
+
+  .ds-navmenu[data-nav-open] .ds-navmenu__viewport {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .ds-navmenu__viewport-inner {
+    transition: opacity 130ms ease;
+  }
+
+  .ds-navmenu__links {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .ds-navmenu__link {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    color: var(--black);
+    text-decoration: none;
+    transition: background-color var(--transition);
+  }
+
+  .ds-navmenu__link-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .ds-navmenu__caret {
+    flex: none;
+    color: var(--color-muted);
+    transition: transform var(--transition), color var(--transition);
+  }
+
+  .ds-navmenu__child--parent:hover > .ds-navmenu__link .ds-navmenu__caret,
+  .ds-navmenu__child--parent:focus-within > .ds-navmenu__link .ds-navmenu__caret {
+    transform: translateX(2px);
+    color: var(--gray);
+  }
+
+  .ds-navmenu__link:hover,
+  .ds-navmenu__link:focus-visible {
+    background: var(--lighter-gray);
+  }
+
+  .ds-navmenu__link.is-active {
+    background: var(--lighter-gray);
+  }
+
+  .ds-navmenu__link-title {
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .ds-navmenu__link.is-active .ds-navmenu__link-title {
+    color: var(--black);
+  }
+
+  .ds-navmenu__link-desc {
+    font-size: var(--text-xs);
+    color: var(--gray);
+    line-height: 1.4;
+  }
+
+  .ds-navmenu__child {
+    position: relative;
+  }
+
+  /* Į dešinę atsidarantis sub-dropdown (kaskadinis flyout). */
+  .ds-navmenu__flyout {
+    position: absolute;
+    top: -8px;
+    left: calc(100% + 6px);
+    z-index: 1;
+    min-width: 220px;
+    padding: 8px;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+    box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.25);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-6px);
+    transition: opacity 160ms ease, transform 160ms cubic-bezier(0.22, 1, 0.36, 1), visibility 160ms;
+  }
+
+  .ds-navmenu__child--parent:hover > .ds-navmenu__flyout,
+  .ds-navmenu__child--parent:focus-within > .ds-navmenu__flyout {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ds-navmenu__flyout,
+    .ds-navmenu__caret {
+      transition: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ds-navmenu__viewport,
+    .ds-navmenu__viewport-inner,
+    .ds-navmenu__chevron {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  // Bendras „viewport": vienas skydelis morphinasi (slenka + keičia dydį) tarp
+  // meniu turinių. Šaltinio `.ds-navmenu__content` lieka DOM'e tik matavimui.
+  document.querySelectorAll<HTMLElement>('[data-navmenu]').forEach((menu) => {
+    const viewport = menu.querySelector<HTMLElement>('[data-navmenu-viewport]');
+    const inner = menu.querySelector<HTMLElement>('[data-navmenu-viewport-inner]');
+    if (!viewport || !inner) return;
+
+    const items = Array.from(menu.querySelectorAll<HTMLElement>('[data-navmenu-item]'));
+    let openItem: HTMLElement | null = null;
+    let closeTimer: number | undefined;
+    let swapTimer: number | undefined;
+    let overflowTimer: number | undefined;
+
+    // Morpho metu skydelis kerpa perpildymą (kad turinys neišlįstų keičiant dydį),
+    // o nusistovėjus leidžia perpildymą – kad į dešinę atsivertų sub-dropdown flyout.
+    const clipThenRelease = () => {
+      window.clearTimeout(overflowTimer);
+      viewport.style.overflow = 'hidden';
+      overflowTimer = window.setTimeout(() => { viewport.style.overflow = 'visible'; }, 290);
+    };
+
+    const contentOf = (item: HTMLElement) =>
+      item.querySelector<HTMLElement>('[data-navmenu-content]');
+
+    const setChevron = (active: HTMLElement | null) => {
+      items.forEach((it) => it.classList.toggle('is-open', it === active));
+    };
+
+    const setExpanded = (active: HTMLElement | null) => {
+      items.forEach((it) => {
+        const t = it.querySelector('[data-navmenu-trigger]');
+        if (t) t.setAttribute('aria-expanded', it === active ? 'true' : 'false');
+      });
+    };
+
+    const open = (item: HTMLElement) => {
+      const src = contentOf(item);
+      if (!src) { close(); return; }
+      window.clearTimeout(closeTimer);
+      window.clearTimeout(swapTimer);
+      clipThenRelease();
+
+      const links = src.querySelector('.ds-navmenu__links');
+      const w = src.offsetWidth;
+      const h = src.offsetHeight;
+      const itemRect = item.getBoundingClientRect();
+      const navRect = menu.getBoundingClientRect();
+      const x = src.classList.contains('ds-navmenu__content--end')
+        ? itemRect.right - navRect.left - w
+        : itemRect.left - navRect.left;
+
+      const wasOpen = menu.hasAttribute('data-nav-open');
+
+      if (!wasOpen) {
+        // Šaltas atidarymas – pozicionuojam be perėjimo (neslysta iš kairės),
+        // turinį įdedam iškart, tada tik plonai atsiranda (opacity).
+        if (links) inner.replaceChildren(links.cloneNode(true));
+        inner.style.opacity = '1';
+        viewport.style.transition = 'none';
+        viewport.style.width = `${w}px`;
+        viewport.style.height = `${h}px`;
+        viewport.style.transform = `translateX(${x}px) translateY(0)`;
+        viewport.getBoundingClientRect(); // priverstinis reflow
+        viewport.style.transition = '';
+        menu.setAttribute('data-nav-open', '');
+      } else {
+        // Jau atviras – skydelis slenka ir keičia dydį (su perėjimu = morphas).
+        viewport.style.width = `${w}px`;
+        viewport.style.height = `${h}px`;
+        viewport.style.transform = `translateX(${x}px) translateY(0)`;
+        if (item !== openItem) {
+          // Kitas meniu – trumpai persiliejam turinį, kol skydelis morphinasi.
+          inner.style.opacity = '0';
+          swapTimer = window.setTimeout(() => {
+            if (links) inner.replaceChildren(links.cloneNode(true));
+            inner.style.opacity = '1';
+          }, 110);
+        }
+      }
+
+      openItem = item;
+      setChevron(item);
+      setExpanded(item);
+    };
+
+    const close = () => {
+      window.clearTimeout(closeTimer);
+      window.clearTimeout(overflowTimer);
+      viewport.style.overflow = 'hidden';
+      menu.removeAttribute('data-nav-open');
+      viewport.style.transform = viewport.style.transform.replace(/translateY\([^)]*\)/, 'translateY(-6px)');
+      openItem = null;
+      setChevron(null);
+      setExpanded(null);
+    };
+
+    const scheduleClose = () => {
+      window.clearTimeout(closeTimer);
+      closeTimer = window.setTimeout(close, 140);
+    };
+
+    items.forEach((item) => {
+      const hasContent = !!contentOf(item);
+      const trigger = item.querySelector<HTMLElement>('.ds-navmenu__trigger');
+
+      item.addEventListener('pointerenter', () => {
+        if (hasContent) open(item);
+        else scheduleClose();
+      });
+
+      item.addEventListener('focusin', () => {
+        if (hasContent) open(item);
+      });
+
+      // Mygtukas be href – paspaudus perjungia; nuoroda-trigger naviguoja.
+      if (trigger && trigger.tagName === 'BUTTON') {
+        trigger.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (openItem === item) close();
+          else open(item);
+        });
+      }
+
+      item.addEventListener('keydown', (e) => {
+        if ((e as KeyboardEvent).key === 'Escape') {
+          close();
+          trigger?.focus();
+        }
+      });
+    });
+
+    menu.addEventListener('pointerenter', () => window.clearTimeout(closeTimer));
+    menu.addEventListener('pointerleave', scheduleClose);
+    menu.addEventListener('focusout', (e) => {
+      if (!menu.contains((e as FocusEvent).relatedTarget as Node)) close();
+    });
+    document.addEventListener('click', (e) => {
+      if (!menu.contains(e.target as Node)) close();
+    });
+    window.addEventListener('resize', () => {
+      if (openItem) open(openItem);
+    });
+  });
+</script>

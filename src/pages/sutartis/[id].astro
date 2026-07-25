@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import Alert from '@design-system/components/Alert.astro';
 import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
 import MoneyValue from '@design-system/components/MoneyValue.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
@@ -11,7 +12,10 @@ import SutartisDokumentai from '../../components/sutartis/SutartisDokumentai.ast
 import SutartisEsProjektai from '../../components/sutartis/SutartisEsProjektai.astro';
 import SutartisSabis from '../../components/sutartis/SutartisSabis.astro';
 import SutartisPanasios from '../../components/sutartis/SutartisPanasios.astro';
+import SutartisPakeitimai from '../../components/sutartis/SutartisPakeitimai.astro';
+import DetailsSection from '@design-system/components/DetailsSection.astro';
 import { loadSutartis } from '../../lib/sutartis.js';
+import { loadSutartisPakeitimai } from '../../lib/sutartisPakeitimai.ts';
 import { fmtEur } from '../../lib/formatters.ts';
 import { getColorScheme, getFont } from '../../lib/failai.ts';
 import config from '../../lib/config.ts';
@@ -28,6 +32,8 @@ if (!sutartis) return Astro.redirect('/404');
 if (Astro.url.pathname.endsWith('.json') || (Astro.request?.headers.get('accept') || '').includes('application/json')) {
   return new Response(JSON.stringify(sutartis, null, 2), { headers: { 'Content-Type': 'application/json' } });
 }
+
+const pakeitimai = await loadSutartisPakeitimai(sutartis.sutartiesUnikalusId);
 
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 
@@ -66,6 +72,15 @@ const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
       </Fragment>
     </PageHeader>
 
+    {sutartis.istrinta && (
+      <div class="sutartis-istrinta-alert">
+        <Alert variant="danger" icon="🗑" title="Ištrinta">
+          Sutartis buvo pašalinta iš CVP ISI . Žemiau pateikiami
+          paskutiniai mūsų užfiksuoti duomenys.
+        </Alert>
+      </div>
+    )}
+
     <SutartisSalys sutartis={sutartis} />
 
     <div class="grid-3 mb-7">
@@ -75,6 +90,12 @@ const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
       <SutartisDokumentai dokumentai={sutartis.dokumentai} />
     </div>
 
+    {pakeitimai.length > 0 && (
+      <DetailsSection title="Pakeitimai" className="mb-7">
+        <SutartisPakeitimai pakeitimai={pakeitimai} />
+      </DetailsSection>
+    )}
+
     <div class="grid-2">
       <SutartisEsProjektai sutartys={sutartis.cpvaProjektuSutartys} showAll={showCpvaAll} />
       <SutartisSabis sutartys={sutartis.sabisSutartys} />
@@ -83,3 +104,9 @@ const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
 
   </main>
 </Layout>
+
+<style>
+  .sutartis-istrinta-alert {
+    margin-top: 24px;
+  }
+</style>

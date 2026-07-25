@@ -1,11 +1,8 @@
 ---
 import '@design-system/foundation/site-header-shell.css';
 import { SUN_SVG, MOON_SVG } from '@/src/lib/siteHeader.ts';
-interface NavLink {
-  href: string;
-  label: string;
-  mobileLabel?: string;
-}
+import NavigationMenu from './NavigationMenu.astro';
+import type { NavMenuItem } from './NavigationMenu.astro';
 
 interface InfoBanner {
   type: 'text' | 'html';
@@ -19,8 +16,8 @@ interface Props {
   brandHref: string;
   brandLabel: string;
   logoHtml: string;
-  primaryLinks: NavLink[];
-  secondaryLinks: NavLink[];
+  primaryMenu: NavMenuItem[];
+  secondaryMenu: NavMenuItem[];
   infoBanner?: InfoBanner | null;
   mirrorLogo?: boolean;
 }
@@ -31,8 +28,8 @@ const {
   brandHref,
   brandLabel,
   logoHtml,
-  primaryLinks,
-  secondaryLinks,
+  primaryMenu,
+  secondaryMenu,
   infoBanner = null,
   mirrorLogo = false,
 } = Astro.props;
@@ -40,6 +37,9 @@ const {
 function isActive(path: string) {
   return pathname === path || (path !== '/' && pathname.startsWith(path)) ? 'active' : '';
 }
+
+// Mobiliame meniu grupės išskleidžiamos į plokščią sąrašą su antraštėmis.
+const mobileGroups = [...primaryMenu, ...secondaryMenu];
 ---
 
 <header class="site-header-shell">
@@ -71,18 +71,19 @@ function isActive(path: string) {
       }
     </a>
 
-    <ul class="navbar-nav navbar-main mr-2">
-      {primaryLinks.map((l) => (
-        <li><a href={l.href} class={isActive(l.href)} aria-current={isActive(l.href) === 'active' ? 'page' : undefined}>{l.label}</a></li>
-      ))}
-    </ul>
+    <NavigationMenu
+      items={primaryMenu}
+      pathname={pathname}
+      ariaLabel="Pagrindinė navigacija"
+      className="navbar-main"
+    />
 
     <div class="navbar-actions">
-      <ul class="navbar-nav">
-        {secondaryLinks.map((l) => (
-          <li><a href={l.href} class={isActive(l.href)} aria-current={isActive(l.href) === 'active' ? 'page' : undefined}>{l.label}</a></li>
-        ))}
-      </ul>
+      <NavigationMenu
+        items={secondaryMenu}
+        pathname={pathname}
+        ariaLabel="Papildoma navigacija"
+      />
 
       <slot name="actions" />
 
@@ -103,16 +104,60 @@ function isActive(path: string) {
 
   <div class="navbar-mobile" id="navMobile" aria-hidden="true">
     <ul class="navbar-mobile-nav">
-      {primaryLinks.map((l) => (
-        <li><a href={l.href} class={isActive(l.href)} aria-current={isActive(l.href) === 'active' ? 'page' : undefined}>{l.mobileLabel ?? l.label}</a></li>
-      ))}
-      <li class="navbar-mobile-divider"></li>
-      {secondaryLinks.map((l) => (
-        <li><a href={l.href} class={isActive(l.href)} aria-current={isActive(l.href) === 'active' ? 'page' : undefined}>{l.mobileLabel ?? l.label}</a></li>
+      {mobileGroups.map((item) => (
+        item.children ? (
+          <li class="navbar-mobile-group">
+            <span class="navbar-mobile-group-title">{item.label}</span>
+            <ul>
+              {item.children.map((c) => (
+                <>
+                  <li><a href={c.href} class={isActive(c.href)} aria-current={isActive(c.href) === 'active' ? 'page' : undefined}>{c.label}</a></li>
+                  {c.children?.map((sc) => (
+                    <li class="navbar-mobile-subitem"><a href={sc.href} class={isActive(sc.href)} aria-current={isActive(sc.href) === 'active' ? 'page' : undefined}>{sc.label}</a></li>
+                  ))}
+                </>
+              ))}
+            </ul>
+          </li>
+        ) : (
+          <li><a href={item.href} class={isActive(item.href!)} aria-current={isActive(item.href!) === 'active' ? 'page' : undefined}>{item.label}</a></li>
+        )
       ))}
     </ul>
   </div>
 </header>
+
+<style>
+  .navbar-mobile-group {
+    margin-top: 4px;
+  }
+
+  .navbar-mobile-group-title {
+    display: block;
+    padding: 8px 8px 4px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-muted);
+  }
+
+  .navbar-mobile-group ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .navbar-mobile-group ul a {
+    padding-left: 16px;
+  }
+
+  .navbar-mobile-subitem a {
+    padding-left: 28px;
+    font-size: var(--text-sm);
+    color: var(--gray);
+  }
+</style>
 
 <script is:inline>
   (function() {

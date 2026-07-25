@@ -2,43 +2,145 @@
 import Layout from '../../layouts/Layout.astro';
 import Pagination from '@design-system/components/Pagination.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
+import DataTable from '@design-system/components/DataTable.astro';
 import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
-import TopListCard from '@design-system/components/TopListCard.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
 import { postgres, getColorScheme, getFont } from '../../lib/failai.js';
-import '@/utils/linksniai.js';
+import { fmtNumber } from '../../lib/formatters.ts';
+import { convertUnit } from '@/utils/units.js';
+
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
+
 const page = parseInt(Astro.url.searchParams.get('page') || '1') || 1;
-const DEFAULT_LIMIT = 24;
+const DEFAULT_LIMIT = 100;
 const offset = (page - 1) * DEFAULT_LIMIT;
-const [extensionRes, countRes] = await Promise.all([
-  postgres.query(`SELECT e.extension, s.files AS count
-                  FROM public."filesStats" s
-                  JOIN public."filesExtensions" e ON e.id = s."extensionId"
-                  WHERE s.files > 0
-                  ORDER BY s.files DESC, e.extension ASC
-                  LIMIT $1 OFFSET $2`, [DEFAULT_LIMIT, offset]),
-  postgres.query('SELECT COUNT(*) AS total FROM public."filesStats" WHERE files > 0'),
+
+const [extensionRes, totalsRes] = await Promise.all([
+  postgres.query(
+    `SELECT e.extension,
+            s.files,
+            s."downloadedBytes"       AS bytes,
+            s.extracted,
+            s.words,
+            s.pages
+       FROM public."filesStats" s
+       JOIN public."filesExtensions" e ON e.id = s."extensionId"
+      WHERE s.files > 0
+      ORDER BY s.files DESC, e.extension ASC
+      LIMIT $1 OFFSET $2`,
+    [DEFAULT_LIMIT, offset],
+  ),
+  postgres.query(
+    `SELECT COUNT(*) FILTER (WHERE files > 0)                 AS total_ext,
+            COUNT(*) FILTER (WHERE extracted > 0)             AS processed_ext,
+            COALESCE(SUM(files), 0)                           AS total_files,
+            COALESCE(SUM(files) FILTER (WHERE extracted > 0), 0) AS processed_files
+       FROM public."filesStats"`,
+  ),
 ]);
-const extension = extensionRes.rows;
-const totalExtensionCount = parseInt(countRes.rows[0].total, 10);
-const pageCount = Math.ceil(totalExtensionCount / DEFAULT_LIMIT);
+
+const extension = extensionRes.rows as any[];
+const t = totalsRes.rows[0] ?? {};
+const totalExt = Number(t.total_ext ?? 0);
+const processedExt = Number(t.processed_ext ?? 0);
+const totalFiles = Number(t.total_files ?? 0);
+const processedFiles = Number(t.processed_files ?? 0);
+const unprocessedExt = totalExt - processedExt;
+const unprocessedFiles = totalFiles - processedFiles;
+const coverage = totalFiles ? (processedFiles / totalFiles) * 100 : 0;
+const pageCount = Math.ceil(totalExt / DEFAULT_LIMIT);
+
+const fmtPct = (p: number) => (p <= 0 ? '—' : `${p < 10 ? p.toFixed(1) : Math.round(p)}%`);
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=60');
 ---
-<Layout pageTitle="Dažniausi failų plėtiniai" pageDescription="Viešųjų pirkimų dokumentų plėtinių pasiskirstymas" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font}>
+<Layout
+  pageTitle="Dažniausi failų plėtiniai"
+  pageDescription="Viešųjų pirkimų dokumentų plėtinių pasiskirstymas: kiekiai, dydžiai ir teksto atpažinimas"
+  colorScheme={colorScheme}
+  font={font}
+>
   <main>
-    <PageHeader>Dažniausi failų plėtiniai</PageHeader>
+    <PageHeader>
+      <Fragment slot="subtext">Failų archyvas</Fragment>
+      Dažniausi failų plėtiniai
+    </PageHeader>
+
+    <MetricCardGrid className="mb-7" minWidth="150px" maxWidth="200px">
+      <MetricCard label="Plėtinių" value={fmtNumber(totalExt)} />
+      <MetricCard label="Apdorojami" value={fmtNumber(processedExt)} meta={`padengia ${fmtPct(coverage)} failų`} />
+      <MetricCard label="Neapdorojami" value={fmtNumber(unprocessedExt)} meta={`${fmtNumber(unprocessedFiles)} failų`} />
+    </MetricCardGrid>
+
     <div class="stack stack-md">
-      <MetricCardGrid minWidth="200px">
-        {(extension as any[]).map((item) => (
-          <TopListCard
-            label={item.extension || '\u200b'}
-            href={`/dokumentai?ext=${item.extension}`}
-            mono
-            meta={`${Number(item.count).toLocaleString('lt-LT')} failų`}
-          />
-        ))}
-      </MetricCardGrid>
+      <DataTable
+        columns={[
+          { label: 'Plėtinys' },
+          { label: 'Failų', headerClassName: 'cell-right' },
+          { label: 'Dalis' },
+          { label: 'Dydis', headerClassName: 'cell-right' },
+          { label: 'Apdorota', headerClassName: 'cell-right' },
+          { label: 'Žodžių', headerClassName: 'cell-right' },
+        ]}
+      >
+        {extension.map((item) => {
+          const files = Number(item.files);
+          const share = totalFiles ? (files / totalFiles) * 100 : 0;
+          const atpazinta = files ? (Number(item.extracted) / files) * 100 : 0;
+          return (
+            <tr>
+              <td>
+                <a href={`/dokumentai?ext=${item.extension}`} class="cell-mono">{item.extension || '—'}</a>
+              </td>
+              <td class="cell-mono cell-right cell-nowrap">{fmtNumber(files)}</td>
+              <td>
+                <div class="ext-share">
+                  <span class="ext-share__track"><span class="ext-share__fill" style={`width:${share}%`} /></span>
+                  <span class="ext-share__pct">{fmtPct(share)}</span>
+                </div>
+              </td>
+              <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(item.bytes), 'B')}</td>
+              <td class="cell-mono cell-right cell-nowrap">{fmtPct(atpazinta)}</td>
+              <td class="cell-mono cell-right cell-nowrap">{fmtNumber(item.words)}</td>
+            </tr>
+          );
+        })}
+      </DataTable>
       <Pagination currentPage={page} pageCount={pageCount} queryParams="" />
     </div>
   </main>
 </Layout>
+
+<style>
+  .ext-share {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 140px;
+  }
+
+  .ext-share__track {
+    flex: 1;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--lighter-gray);
+    overflow: hidden;
+  }
+
+  .ext-share__fill {
+    display: block;
+    height: 100%;
+    min-width: 2px;
+    border-radius: 999px;
+    background: var(--color-primary);
+  }
+
+  .ext-share__pct {
+    width: 3.5em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--text-sm);
+    color: var(--gray);
+  }
+</style>

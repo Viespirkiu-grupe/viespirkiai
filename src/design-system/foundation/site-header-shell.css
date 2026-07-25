@@ -303,7 +303,8 @@
       margin-left: auto;
     }
 
-    .site-header-shell .navbar-actions .navbar-nav {
+    .site-header-shell .navbar-actions .navbar-nav,
+    .site-header-shell .navbar-actions .ds-navmenu {
       display: none;
     }
 
