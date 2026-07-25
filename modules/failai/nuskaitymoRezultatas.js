@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { isEiles } from "./nuskaitymoEile.js";
 import { iOcrEile } from "./ocrEile.js";
+import { atnaujintiFilesPhotos } from "./photosLentele.js";
 
 /*
 Nuskaitymo rezultato įrašymas.
@@ -11,6 +12,7 @@ Rezultatas išsiskaido po kelias lenteles:
   filesLocations       koordinatės (jų neturintiems eilutės nėra)
   files."authorId"     autorius per filesAuthors žodyną
   filesOcrStatus       ar failui rekomenduojamas OCR
+  filesPhotos          galerijos aibė (tik nuotraukoms; žr. photosLentele.js)
 
 Versija ir klaidos kodas laikomi atskirai (`version` >= 0, `status` 0 arba klaida) —
 senoje schemoje tai buvo viena perkrauta `failai.nuskaitytas` reikšmė.
@@ -46,6 +48,7 @@ async function autoriausId(klientas, autorius) {
  * @param {string|null} p.autorius
  * @param {string} p.failasHash - sujungto FS turinio raktas
  * @param {number|null} [p.nodeId] - dokNuskaitytojai.id
+ * @param {{width: number|null, height: number|null}} [p.dydis] - nuotraukos matmenys galerijai
  * @param {import("pg").ClientBase} [klientas]
  */
 export async function pazymetiNuskaityta(
@@ -60,6 +63,7 @@ export async function pazymetiNuskaityta(
         autorius,
         failasHash,
         nodeId = null,
+        dydis = {},
     },
     klientas = postgres,
 ) {
@@ -118,6 +122,10 @@ export async function pazymetiNuskaityta(
 
     // OCR eilę pildo kodas. Tinkamumą sprendžia pati užklausa.
     await iOcrEile([id], klientas);
+
+    // Galerijos aibė — čia paaiškėja galutinis wordCount, tad failas arba įrašomas,
+    // arba (jei pernuskaičius atsirado žodžių) išimamas.
+    await atnaujintiFilesPhotos(id, dydis, klientas);
 
     await isEiles([id], klientas);
 }

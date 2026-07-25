@@ -1,29 +1,15 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { postgres, getColorScheme, getFont } from '../../lib/failai.js';
-import { readFailaiFs } from '@/modules/failai/failaiFs.js';
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
-// OCR'inti paveikslėliai be teksto — trys sąlygos iš trijų lentelių, tad
-// atskiro partial indekso (buvusio idx_failai_galerija) atitikmens nebėra.
-const { rows } = await postgres.query(`
-  SELECT f.id, fn.filename AS pavadinimas, e.extension, i."fileHash" AS "failasHash"
-  FROM public."filesOcrStatus" o
-  JOIN public.files f ON f.id = o.id
-  JOIN public."filesExtensions" e ON e.id = f."extensionId"
-  LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
-  LEFT JOIN public."filesDataExtraction" d ON d.id = f.id
-  LEFT JOIN public."filesInfoFiles" i ON i.id = f.id
-  WHERE o.status = 1
-    AND (d."wordCount" IS NULL OR d."wordCount" <= 10)
-    AND lower(e.extension) = ANY(ARRAY['jpg','jpeg','png','bmp','gif','webp','heic'])
+// Aibę ir matmenis iš anksto sudėlioja nuskaitymas (modules/failai/photosLentele.js),
+// tad čia lieka seq scan per ~31k eilučių — be join'ų ir be FS skaitymų.
+const { rows: images } = await postgres.query(`
+  SELECT id, width, height
+  FROM public."filesPhotos"
   ORDER BY random()
   LIMIT 50`);
-const seen = new Set();
-const images = (rows as any[]).filter((r) => !seen.has(r.id) && seen.add(r.id));
-await Promise.all(images.map(async (img: any) => {
-  if (img.failasHash) img.metaduomenys = (await readFailaiFs(img.failasHash))?.metaduomenys ?? null;
-}));
 ---
 <Layout pageTitle="Failų galerija" pageDescription="Atsitiktinė viešųjų pirkimų dokumentų nuotraukų galerija" pageImage="https://viespirkiai.org/failai.png" colorScheme={colorScheme} font={font}>
   <style>
@@ -79,10 +65,7 @@ await Promise.all(images.map(async (img: any) => {
 
     <div class="gallery-grid">
       {images.map((img: any) => {
-        const w = img.metaduomenys?.width || img.metaduomenys?.exif?.['Image Width']?.value;
-        const h = img.metaduomenys?.height || img.metaduomenys?.exif?.['Image Height']?.value;
-        const valid = w && h && w > 10 && h > 10 && w < 20000 && h < 20000 && (h / w) < 2 && (w / h) < 10;
-        const ratio = valid ? `${w}/${h}` : '4/3';
+        const ratio = img.width && img.height ? `${img.width}/${img.height}` : '4/3';
 
         return (
           <div class="gallery-item">

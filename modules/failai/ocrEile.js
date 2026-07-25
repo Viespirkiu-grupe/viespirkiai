@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { FILES_JOINS, FILES_SELECT, papildytiFaila } from "./filesSkaitymas.js";
 import { OCR_BANDYMAI, OCR_DOC_EXTS, OCR_IMAGE_EXTS } from "./ocr.js";
+import { atnaujintiFilesPhotos } from "./photosLentele.js";
 
 /*
 OCR eilė — `filesOcrQueue`, būsena — `filesOcrStatus`.
@@ -144,6 +145,10 @@ export async function pazymetiOcrRezultata(
         `DELETE FROM public."filesOcrQueue" WHERE id = $1`,
         [id],
     );
+
+    // Ką tik įrašytas status = 1 yra momentas, kai nuotrauka tampa tinkama galerijai.
+    // Matmenų šis kelias neturi — juos užpildys po OCR sekantis pernuskaitymas.
+    await atnaujintiFilesPhotos(id, {}, klientas);
 
     // Dienos statistika — vietoj buvusių trijų failaiOcrRezultataiStats* lentelių.
     await klientas.query(

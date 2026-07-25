@@ -14,6 +14,7 @@
         "failai:info-to-sqlite": "node modules/failai/failaiInfoToSqlite.js",
         "failai:info-benchmark": "node modules/failai/failaiInfoBenchmark.js",
         "failai:nuskaitymo-eile": "node modules/failai/nuskaitymoEilesPapildymas.js",
+        "failai:photos-backfill": "node modules/failai/backfillPhotos.js",
         "vector:queue": "node modules/vector/failaiVektoriaiQueue.js",
         "vector:embed": "node modules/vector/failaiVektoriaiEmbed.js",
         "vector:inspect": "node modules/vector/failaiVektoriaiInspect.js",

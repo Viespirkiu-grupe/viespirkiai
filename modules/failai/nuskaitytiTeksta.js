@@ -18,6 +18,7 @@ import {
     pazymetiNuskaityta,
     pazymetiNuskaitymoKlaida,
 } from "./nuskaitymoRezultatas.js";
+import { matmenys } from "./photosLentele.js";
 
 const nodeName = process.env.NODE_NAME || "default";
 const nuskaitymoVersija = NUSKAITYMO_VERSIJA;
@@ -385,6 +386,7 @@ export async function nuskaitytiVienoDokumentoDuomenis(
         autorius,
         failasHash,
         nodeId: results.nuskaitytojoId ?? nuskaitytojoId ?? null,
+        dydis: matmenys(metadata),
     });
     timings.end("failaiUpdate");
 
