@@ -48,8 +48,6 @@ const ENV_MAP = [
     ["OCR_BANDYMAI", "ocrBandymai", "number"],
 
     ["OCR_REZULTATAI_LOCATION", "ocrRezultataiLocation", "string"],
-    ["FAILAI_METADUOMENYS_LOCATION", "failaiMetaduomenysLocation", "string"],
-    ["FAILAI_TEKSTAS_LOCATION", "failaiTekstasLocation", "string"],
     ["DOKUMENTAI_LOCATION", "dokumentaiLocation", "string"],
     ["FAILAI_LOCATION", "failaiLocation", "string"],
 

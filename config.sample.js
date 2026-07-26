@@ -103,15 +103,9 @@ export default {
     // OCR rezultatų blob saugyklą.
     ocrRezultataiLocation: undefined,
 
-    // Failų metaduomenų sidecar JSON failai.
-    failaiMetaduomenysLocation: undefined,
-
-    // Failų išgauto teksto saugykla.
-    failaiTekstasLocation: undefined,
-
     // Sujungti failo turinio JSON failai (raktas: failasHash) — apima tekstą,
     // metaduomenis ir išgautus subjektus (iban, jarKodai, links, emails,
-    // domains, telefonai). Pakeičia failaiMetaduomenysLocation + failaiTekstasLocation.
+    // domains, telefonai).
     failaiLocation: undefined,
 
     // Dokumentų JSON sidecar failai (raktas: md5).

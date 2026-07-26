@@ -100,15 +100,24 @@ Pilnatekstė paieška ir facetavimas.
 ### Failų / dokumentų vietos
 
 Kiekviena reikšmė gali būti **absoliutus kelias** (lokalus katalogas, pvz.
-`/data/failaiTekstas`) arba **HTTPS URL** (nuotolinis sidecar endpoint'as, pvz.
-`https://failai.example.lt/api/failai/tekstasFiles`). Tuščia — funkcija išjungta.
+`/data/failaiInfo`) arba **HTTPS URL** (nuotolinis sidecar endpoint'as, pvz.
+`https://failai.example.lt/api/dokumentai/dokumentaiFiles`). Tuščia — funkcija išjungta.
 
 - **Lokalus kelias** — failai skaitomi/rašomi tiesiai diske (sharding'as pagal
-  `md5` pirmus simbolius).
-- **Nuotolinis URL** — turinys **skaitomas** HTTP užklausa `<URL>?md5=<md5>`
-  (naudinga, kai frontend'as ir duomenų diskas skirtinguose host'uose). Į
-  nuotolinę vietą **rašyti negalima** — tik lokalus kelias palaiko įrašymą (OCR
-  rezultatų / teksto išsaugojimą daro taskrunneris, turintis lokalų diską).
+  rakto pirmus 5 simbolius).
+- **Nuotolinis URL** — turinys **skaitomas** HTTP užklausa (naudinga, kai
+  frontend'as ir duomenų diskas skirtinguose host'uose). Į nuotolinę vietą
+  **rašyti negalima** — tik lokalus kelias palaiko įrašymą (išsaugojimą daro
+  taskrunneris, turintis lokalų diską).
+
+Nuotolinį režimą aptarnauja šie endpoint'ai (juos rodo tas mazgas, kuris turi
+lokalų diską; kitas mazgas jų URL įsirašo į atitinkamą `*_LOCATION`):
+
+| Kintamasis | Endpoint'as | Užklausa |
+| --- | --- | --- |
+| `FAILAI_LOCATION` | `src/pages/api/failai/failaiInfoFiles.ts` | `<URL>?hash=<hash>` |
+| `DOKUMENTAI_LOCATION` | `src/pages/api/dokumentai/dokumentaiFiles.ts` | `<URL>?md5=<md5>` |
+| `OCR_REZULTATAI_LOCATION` | `src/pages/api/ocr/rezultataiFiles.ts` | `<URL>?md5=<md5>` |
 
 | Kintamasis | Paaiškinimas |
 | --- | --- |
@@ -116,8 +125,6 @@ Kiekviena reikšmė gali būti **absoliutus kelias** (lokalus katalogas, pvz.
 | `OCR_REZULTATAI_LOCATION` | OCR rezultatų blob saugykla. |
 | `DOKUMENTAI_LOCATION` | Dokumentų JSON sidecar failai (raktas: `md5`). |
 | `FAILAI_LOCATION` | Sujungti failo turinio JSON failai (tekstas + metaduomenys + subjektai). |
-| `FAILAI_METADUOMENYS_LOCATION` | Failų metaduomenų sidecar JSON. _Senas — bus perkelta į `FAILAI_LOCATION`._ |
-| `FAILAI_TEKSTAS_LOCATION` | Failų išgauto teksto saugykla. _Senas — bus perkelta į `FAILAI_LOCATION`._ |
 
 ### Kita
 

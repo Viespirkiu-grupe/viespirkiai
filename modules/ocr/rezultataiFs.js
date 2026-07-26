@@ -1,55 +1,30 @@
-import fs from "fs";
-import path from "path";
-import config from "../../utils/config.js";
+import { createSidecarStore } from "../../utils/sidecarStore.js";
 import { parsePgArray } from "../../postgres/postgres.js";
 
-function isRemoteLocation(location) {
-    return location?.startsWith("http://") || location?.startsWith("https://");
-}
-
-export function getRezultatasPath(md5) {
-    if (!config.ocrRezultataiLocation || isRemoteLocation(config.ocrRezultataiLocation)) return null;
-    return path.join(config.ocrRezultataiLocation, ...md5.slice(0, 5).split(""), `${md5}.json`);
-}
-
-export async function saveRezultatasFs(rezultatas) {
-    if (isRemoteLocation(config.ocrRezultataiLocation)) {
-        throw new Error(`ocrRezultataiLocation yra nuotolinis URL, negalima išsaugoti lokaliai (md5=${rezultatas.md5})`);
-    }
-    const filePath = getRezultatasPath(rezultatas.md5);
-    if (!filePath) {
-        throw new Error(`ocrRezultataiLocation nenustatytas, negalima išsaugoti OCR rezultato (md5=${rezultatas.md5})`);
-    }
-    await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.promises.writeFile(filePath, JSON.stringify(rezultatas));
-}
-
-export async function readRezultatasFs(md5) {
-    if (!md5) return null;
-    if (isRemoteLocation(config.ocrRezultataiLocation)) {
-        try {
-            const url = `${config.ocrRezultataiLocation}?md5=${encodeURIComponent(md5)}`;
-            const res = await fetch(url);
-            if (!res.ok) return null;
-            const rezultatas = await res.json();
-            if (typeof rezultatas.tekstas === "string") {
-                rezultatas.tekstas = parsePgArray(rezultatas.tekstas);
-            }
-            return rezultatas;
-        } catch {
-            return null;
-        }
-    }
-    const filePath = getRezultatasPath(md5);
-    if (!filePath) return null;
-    try {
-        const content = await fs.promises.readFile(filePath, "utf8");
-        const rezultatas = JSON.parse(content);
+// OCR rezultatų sidecar JSON.
+const store = createSidecarStore({
+    locationKey: "ocrRezultataiLocation",
+    extension: "json",
+    label: "OCR rezultato",
+    deserialize: (text) => {
+        const rezultatas = JSON.parse(text);
+        // Istorinis paveldas: dalis rezultatų `tekstas` lauką turi ne masyvu, o
+        // PostgreSQL masyvo literalu („{a,b}") — jį išskleidžiam skaitant.
         if (typeof rezultatas.tekstas === "string") {
             rezultatas.tekstas = parsePgArray(rezultatas.tekstas);
         }
         return rezultatas;
-    } catch {
-        return null;
-    }
-}
+    },
+});
+
+export const getRezultatasPath = store.getPath;
+
+/**
+ * Raktas imamas iš paties rezultato (`rezultatas.md5`), todėl signatūra
+ * skiriasi nuo kitų saugyklų.
+ * @param {{ md5: string }} rezultatas
+ */
+export const saveRezultatasFs = (rezultatas) => store.save(rezultatas.md5, rezultatas);
+
+/** @param {string} md5 */
+export const readRezultatasFs = store.read;

@@ -49,8 +49,6 @@ const configSchema = z.object({
     ocrBandymai: z.number().int().positive().default(5),
 
     ocrRezultataiLocation: z.string().optional(),
-    failaiMetaduomenysLocation: z.string().optional(),
-    failaiTekstasLocation: z.string().optional(),
     dokumentaiLocation: z.string().optional(),
 
     enableGraph: z.boolean().default(false),

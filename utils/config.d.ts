@@ -36,8 +36,6 @@ export interface Config {
     ocrBandymai: number;
 
     ocrRezultataiLocation?: string;
-    failaiMetaduomenysLocation?: string;
-    failaiTekstasLocation?: string;
     dokumentaiLocation?: string;
 
     enableGraph: boolean;
