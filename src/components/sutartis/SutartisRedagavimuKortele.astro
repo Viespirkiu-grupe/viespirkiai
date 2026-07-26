@@ -32,7 +32,7 @@ const praleistaTekstas = linksniuoti(praleista, ['ankstesnis redagavimas', 'anks
     </div>
   )}
 
-  <SutartisPakeitimai pakeitimai={pakeitimai} />
+  <SutartisPakeitimai pakeitimai={pakeitimai} pastaba={false} />
 
   {praleista > 0 && (
     <a class="redagavimu-kortele__daugiau" href={`/sutartis/${unikalusId}`}>

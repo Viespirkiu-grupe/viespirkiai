@@ -6,9 +6,10 @@ import type { SutartiesPakeitimas } from '../../lib/sutartisPakeitimai.ts';
 
 interface Props {
   pakeitimai: SutartiesPakeitimas[];
+  pastaba?: boolean;
 }
 
-const { pakeitimai } = Astro.props;
+const { pakeitimai, pastaba = true } = Astro.props;
 
 if (!pakeitimai || pakeitimai.length === 0) return null;
 
@@ -19,9 +20,11 @@ const kryptiesZenklas: Record<string, string> = {
 };
 ---
 
-<p class="pakeitimai-pastaba">
-  Nurodytas laikas – kada pakeitimą pastebėjo mūsų sistema, o ne pakeitimo momentas.
-</p>
+{pastaba && (
+  <p class="pakeitimai-pastaba">
+    Nurodytas laikas – kada pakeitimą pastebėjo mūsų sistema, o ne pakeitimo momentas.
+  </p>
+)}
 
 <Timeline>
   {pakeitimai.map((p, i) => (

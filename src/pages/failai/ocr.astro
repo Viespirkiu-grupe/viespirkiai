@@ -6,7 +6,9 @@ import OcrNuskaitytojaiGrid from '../../components/failai/OcrNuskaitytojaiGrid.a
 import OcrStatusTable from '../../components/failai/OcrStatusTable.astro';
 import OcrLatestResultsLive from '../../components/failai/OcrLatestResultsLive.astro';
 import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
 import { postgres, OCR_STATES, getColorScheme, getFont } from '../../lib/failai.js';
+import { fmtNumber } from '../../lib/formatters.ts';
 import { loadLatestOcrResults } from '../../lib/ocrLatestResults.ts';
 
 const colorScheme = getColorScheme(Astro.cookies);
@@ -19,12 +21,18 @@ const OCR_STATE_COLORS: Record<string, string> = {
   rezervuota: '#3b82f6',
   virsijoBandymus: '#f97316',
   galima: '#06b6d4',
+  neparuosta: '#94a3b8',
   nepalaikoma: '#a855f7',
 };
 
-// Būsenų kiekiai imami iš filesStats (ji per plėtinį, tad „galima"/„nepalaikoma"
-// suskaičiuojami čia — jie nėra būsenos, o išvada iš plėtinio; žr. sql/filesOcrStats.sql).
-const [ocrStatsPerExtRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocrLatestResults] = await Promise.all([
+// Ne būsenos, o išvados — savo pavadinimų OCR_STATES neturi.
+const OCR_PSEUDO_STATES: Record<string, string> = {
+  neparuosta: 'Neparuošta',
+};
+
+// Būsenų kiekiai imami iš filesStats (ji per plėtinį). „Nepalaikoma" — išvada iš
+// plėtinio, „galima" — iš OCR eilės dydžio (žr. žemiau); jie nėra būsenos.
+const [ocrStatsPerExtRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocrEilesDydisRes, ocrLatestResults] = await Promise.all([
   postgres.query(`
     SELECT e.extension, s.files, s."ocrDone", s."ocrFailed",
            s."ocrPending", s."ocrReserved", s."ocrExceeded"
@@ -59,6 +67,15 @@ const [ocrStatsPerExtRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocr
     LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
     WHERE o."ocrTimestamp" >= NOW() - INTERVAL '60 minutes'
   `),
+  // „Galima" imama iš eilės, o ne iš plėtinių: eilėje lieka ir nepavykę bei bandymus
+  // viršiję failai (jie ištrinami tik po sėkmingo OCR), tad skaičiuojame tik tuos,
+  // kurie dar neturi jokios būsenos. Eilė maža, tad užklausa pigi.
+  postgres.query(`
+    SELECT COUNT(*)::bigint AS galima
+    FROM public."filesOcrQueue" q
+    LEFT JOIN public."filesOcrStatus" o ON o.id = q.id
+    WHERE o.status IS NULL
+  `),
   loadLatestOcrResults(15),
 ]);
 
@@ -66,21 +83,28 @@ const [ocrStatsPerExtRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocr
 const { OCR_IMAGE_EXTS, OCR_DOC_EXTS } = await import('@/modules/failai/ocr.js');
 const ocrGalimi = new Set([...OCR_IMAGE_EXTS, ...OCR_DOC_EXTS]);
 
-const ocrSuma = { baigta: 0, rekomenduojama: 0, nepavyko: 0, rezervuota: 0, virsijoBandymus: 0, galima: 0, nepalaikoma: 0 };
+const ocrSuma = { baigta: 0, rekomenduojama: 0, nepavyko: 0, rezervuota: 0, virsijoBandymus: 0, galima: 0, neparuosta: 0, nepalaikoma: 0 };
+let visoFailu = 0;
 for (const r of ocrStatsPerExtRes.rows as any[]) {
-  const busenos = Number(r.ocrDone) + Number(r.ocrFailed) + Number(r.ocrPending)
-    + Number(r.ocrReserved) + Number(r.ocrExceeded);
+  visoFailu += Number(r.files);
   ocrSuma.baigta += Number(r.ocrDone);
   ocrSuma.rekomenduojama += Number(r.ocrPending);
   ocrSuma.nepavyko += Number(r.ocrFailed);
   ocrSuma.rezervuota += Number(r.ocrReserved);
   ocrSuma.virsijoBandymus += Number(r.ocrExceeded);
-  if (ocrGalimi.has(String(r.extension).toLowerCase())) {
-    ocrSuma.galima += Math.max(0, Number(r.files) - busenos);
-  } else {
+  if (!ocrGalimi.has(String(r.extension).toLowerCase())) {
     ocrSuma.nepalaikoma += Number(r.files);
   }
 }
+
+ocrSuma.galima = Number(ocrEilesDydisRes.rows[0]?.galima || 0);
+
+// Likutis: tinkamo plėtinio failai be OCR būsenos ir dar ne eilėje — jiems tik
+// neištrauktas tekstas (filesDataExtraction), tad į OCR eilę dar nepateko.
+const ocrTaikoma = visoFailu - ocrSuma.nepalaikoma;
+ocrSuma.neparuosta = Math.max(0, ocrTaikoma
+  - ocrSuma.baigta - ocrSuma.rekomenduojama - ocrSuma.nepavyko
+  - ocrSuma.rezervuota - ocrSuma.virsijoBandymus - ocrSuma.galima);
 const ocrStatsRes = {
   rows: Object.entries(ocrSuma).map(([tipas, count]) => ({ tipas, count })).sort((a, b) => b.count - a.count),
 };
@@ -120,8 +144,9 @@ const ocrStats: any[] = ocrStatsRes.rows.map((stat: any) => {
     ...state,
     count: Number(stat.count || 0),
     // „galima"/„nepalaikoma" nėra būsenos, tad status kodo neturi.
+    camel: state?.camel ?? stat.tipas,
     id: state?.id ?? '-',
-    text: state?.text || stat.tipas || 'Nežinoma',
+    text: state?.text || OCR_PSEUDO_STATES[stat.tipas] || stat.tipas || 'Nežinoma',
   };
 });
 
@@ -168,20 +193,6 @@ const ocrLastHour = last60
     }
   : null;
 
-const ocrStatsChartData = {
-  labels: ocrStats.map((item: any) => item.text),
-  series: ocrStats.map((item: any) => item.count),
-  colors: ocrStats.map((item: any) => OCR_STATE_COLORS[item.camel] || '#78716c'),
-};
-
-const ocrStatsChartOptions = {
-  colors: ocrStatsChartData.colors,
-  stroke: {
-    width: 4,
-    colors: ['var(--white)'],
-  },
-};
-
 const ocrNuskaitytojaiTreemapColors = ['#0ea5e9', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4', '#f97316'];
 
 const ocrNuskaitytojaiChartData = {
@@ -198,6 +209,8 @@ const ocrNuskaitytojaiChartData = {
 
 const ocrNuskaitytojaiChartOptions = {
   colors: ocrNuskaitytojaiTreemapColors,
+  // Diagrama tempiasi iki stulpelio apačios, kad abu stulpeliai baigtųsi vienodai.
+  chart: { height: '100%' },
   legend: {
     show: false,
   },
@@ -225,6 +238,22 @@ const ocrStatsDayChartData = {
   words: ocrStatsDay.map((item: any) => item.words),
 };
 
+// Juostos ir lentelės dalys — procentai nuo viso archyvo.
+const fmtProc = (dalis: number, baze: number) => {
+  if (!baze) return '—';
+  const p = (dalis / baze) * 100;
+  return `${p.toLocaleString('lt-LT', { maximumFractionDigits: 1 })} %`;
+};
+
+// Būsenų pasiskirstymo juosta — tas pats pjūvis kaip diagramoje, tik kompaktiškiau.
+const busenuJuosta = ocrStats
+  .filter((item: any) => item.count > 0)
+  .map((item: any) => ({
+    ...item,
+    dalis: (item.count / (visoFailu || 1)) * 100,
+    spalva: OCR_STATE_COLORS[item.camel] || '#78716c',
+  }));
+
 ---
 <Layout
   pageTitle="OCR būsena"
@@ -234,9 +263,9 @@ const ocrStatsDayChartData = {
   font={font}
 >
   <main>
-    <div class="page-header">
-      <h1 class="mb-0">OCR būsena</h1>
-    </div>
+    <PageHeader>
+      OCR būsena
+    </PageHeader>
 
     {(ocrPerMinute || ocrLastHour) && (
       <section class="mb-16">
@@ -264,46 +293,109 @@ const ocrStatsDayChartData = {
     )}
 
     <section class="mb-16">
-      <div class="grid-2 items-start">
+      <div class="grid-2 ocr-grid">
         <div>
           <h2 class="mb-4"><a href="#nuskaitytojai" id="nuskaitytojai" class="no-style">OCR nuskaitytojai</a></h2>
           <OcrNuskaitytojaiGrid items={ocrNuskaitytojai} />
         </div>
 
-        <div>
+        <div class="ocr-grid__col">
           <h2 class="mb-3"><a href="#busena" id="busena" class="no-style">Failai pagal būseną</a></h2>
-          <Chart
-            id="ocrStatsDiagrama"
-            type="pie"
-            labels={ocrStatsChartData.labels}
-            series={ocrStatsChartData.series}
-            customOptions={ocrStatsChartOptions}
-          />
-          <OcrStatusTable items={ocrStats} />
+          <div
+            class="ocr-juosta"
+            role="img"
+            aria-label={busenuJuosta.map((s: any) => `${s.text}: ${fmtNumber(s.count)}`).join(', ')}
+          >
+            {busenuJuosta.map((s: any) => (
+              <span
+                class="ocr-juosta__seg"
+                style={`width:${s.dalis}%;background:${s.spalva}`}
+                title={`${s.text}: ${fmtNumber(s.count)} (${fmtProc(s.count, visoFailu)})`}
+              />
+            ))}
+          </div>
+          <OcrStatusTable items={ocrStats} colors={OCR_STATE_COLORS} />
+
+          <h2 class="mb-3 mt-10"><a href="#pagalNuskaitytoją" id="pagalNuskaitytoją" class="no-style">Failų dalis pagal nuskaitytoją</a></h2>
+          <div class="ocr-treemap">
+            <Chart
+              id="ocrNuskaitytojaiDiagrama"
+              type="treemap"
+              labels={ocrNuskaitytojaiChartData.labels}
+              series={ocrNuskaitytojaiChartData.series}
+              customOptions={ocrNuskaitytojaiChartOptions}
+              wrapperClass="min-w-0 flex flex-col flex-1"
+              heightClass=""
+            />
+          </div>
         </div>
       </div>
     </section>
 
     <section class="mb-16">
-      <h2 class="mb-3"><a href="#pagalNuskaitytoją" id="pagalNuskaitytoją" class="no-style">Failų dalis pagal nuskaitytoją</a></h2>
-      <Chart
-        id="ocrNuskaitytojaiDiagrama"
-        type="treemap"
-        labels={ocrNuskaitytojaiChartData.labels}
-        series={ocrNuskaitytojaiChartData.series}
-        customOptions={ocrNuskaitytojaiChartOptions}
-      />
+      <h2 class="mb-3"><a href="#naujausi-rezultatai" id="naujausi-rezultatai" class="no-style">Naujausi rezultatai</a></h2>
+      <OcrLatestResultsLive items={ocrLatestResults} />
     </section>
 
-    <section class="grid-2">
+    <section class="grid-2 mb-16">
       <LineDatetimeChart id="ocrStatsDayDiagrama" title="Rezultatų skaičius" anchor="rezultatai" labels={ocrStatsDayChartData.labels} series={ocrStatsDayChartData.results} />
       <LineDatetimeChart id="ocrStatsDayPagesDiagrama" title="Puslapių skaičius" anchor="puslapiai" labels={ocrStatsDayChartData.labels} series={ocrStatsDayChartData.pages} />
       <LineDatetimeChart id="ocrStatsDayWordsDiagrama" title="Žodžių skaičius" anchor="zodziai" labels={ocrStatsDayChartData.labels} series={ocrStatsDayChartData.words} />
     </section>
-
-    <section class="mb-16 mt-16">
-      <h2 class="mb-3"><a href="#naujausi-rezultatai" id="naujausi-rezultatai" class="no-style">Naujausi rezultatai</a></h2>
-      <OcrLatestResultsLive items={ocrLatestResults} />
-    </section>
   </main>
 </Layout>
+
+<style>
+  /* Abu stulpeliai baigiasi vienodai: aukštį diktuoja nuskaitytojų kortelės,
+     o būsenų diagrama tempiasi iki likusios vietos apačioje. */
+  .ocr-grid {
+    align-items: stretch;
+  }
+
+  .ocr-grid__col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .ocr-treemap {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 280px;
+  }
+
+  .ocr-treemap :global(.chart-frame) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .ocr-treemap :global(.chart) {
+    flex: 1 1 auto;
+    min-height: 240px;
+  }
+
+  .ocr-juosta {
+    display: flex;
+    width: 100%;
+    height: 14px;
+    margin-top: 4px;
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    background: var(--light-gray);
+  }
+
+  .ocr-juosta__seg {
+    min-width: 2px;
+    transition: opacity var(--transition);
+  }
+
+  .ocr-juosta:hover .ocr-juosta__seg {
+    opacity: 0.65;
+  }
+
+  .ocr-juosta__seg:hover {
+    opacity: 1;
+  }
+</style>
