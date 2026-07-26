@@ -4,9 +4,18 @@ import NumberValue from '@design-system/components/NumberValue.astro';
 
 interface Props {
   items: any[];
+  /** Būsenos → spalva; ta pati, kuria dažoma pasiskirstymo juosta. */
+  colors?: Record<string, string>;
 }
 
-const { items } = Astro.props;
+const { items, colors = {} } = Astro.props;
+
+const viso = items.reduce((suma: number, item: any) => suma + Number(item.count || 0), 0) || 1;
+const fmtDalis = (count: number) => {
+  const dalis = (Number(count) / viso) * 100;
+  if (dalis > 0 && dalis < 0.1) return '<0,1 %';
+  return `${dalis.toLocaleString('lt-LT', { maximumFractionDigits: 1 })} %`;
+};
 ---
 
 <DataTable
@@ -15,13 +24,40 @@ const { items } = Astro.props;
     { label: 'ID', headerClassName: 'cell-center' },
     { label: 'OCR būsena' },
     { label: 'Failų skaičius', headerClassName: 'cell-right' },
+    { label: 'Dalis', headerClassName: 'cell-right' },
   ]}
 >
   {items.map((status) => (
     <tr>
       <td class="cell-mono cell-center">{status.id}</td>
-      <td>{status.text}</td>
+      <td>
+        <span class="ocr-status-name">
+          <span
+            class="ocr-status-dot"
+            style={`background:${colors[status.camel] || 'var(--color-muted)'}`}
+            aria-hidden="true"
+          />
+          {status.text}
+        </span>
+      </td>
       <td class="cell-mono cell-right"><NumberValue value={status.count} mono={false} /></td>
+      <td class="cell-mono cell-right text-muted">{fmtDalis(status.count)}</td>
     </tr>
   ))}
 </DataTable>
+
+<style>
+  .ocr-status-name {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .ocr-status-dot {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    transform: translateY(-1px);
+  }
+</style>

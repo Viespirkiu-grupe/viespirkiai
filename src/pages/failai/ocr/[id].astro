@@ -1,6 +1,6 @@
 ---
 import LineDatetimeChart from '@design-system/components/charts/LineDatetimeChart.astro';
-import KeyValueList from '@design-system/components/KeyValueList.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
 import Layout from '../../../layouts/Layout.astro';
 import { getColorScheme, getFont } from '../../../lib/failai.js';
@@ -60,6 +60,19 @@ const ocrStatsDay = ocrStatsDayRes.rows as OcrStatDay[];
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
+const dokumentai = Number(nuskaitytojas.nuskaitytiDokumentai || 0);
+const puslapiai = Number(nuskaitytojas.pages || 0);
+const zodziai = Number(nuskaitytojas.words || 0);
+
+const fmt = (value: number) => Number(value || 0).toLocaleString('lt-LT');
+
+const metrikos = [
+  { label: 'Dokumentai', value: fmt(dokumentai) },
+  { label: 'Puslapiai', value: fmt(puslapiai) },
+  { label: 'Žodžiai', value: fmt(zodziai) },
+  { label: 'Rezervacijos', value: fmt(Number(nuskaitytojas.rezervacijos || 0)) },
+];
+
 const ocrLabels = ocrStatsDay.map(item => item.date);
 const ocrResults = ocrStatsDay.map(item => item.results);
 const ocrResultsPages = ocrStatsDay.map(item => item.pages);
@@ -76,30 +89,15 @@ const ocrResultsWords = ocrStatsDay.map(item => item.words);
   <main>
 
     <PageHeader>
-      <Fragment>
-        <a href="/failai/ocr" class="breadcrumb-link">OCR būsena</a>
-        <span class="breadcrumb-sep">›</span>
-        {nuskaitytojas.viesasPavadinimas}
-      </Fragment>
+      {nuskaitytojas.viesasPavadinimas}
+      <span class="node-id">#{nuskaitytojas.id}</span>
     </PageHeader>
 
-    <div class="page-section">
-      <h2 class="mb-3">Nuskaitytojas</h2>
-      <div class="card max-w-[360px]">
-        <div class="card-body">
-          <KeyValueList>
-            <dt>Dokumentai</dt>
-            <dd><span class="cell-mono">{Number(nuskaitytojas.nuskaitytiDokumentai).toLocaleString('lt-LT')}</span></dd>
-            <dt>Puslapiai</dt>
-            <dd><span class="cell-mono">{Number(nuskaitytojas.pages).toLocaleString('lt-LT')}</span></dd>
-            <dt>Žodžiai</dt>
-            <dd><span class="cell-mono">{Number(nuskaitytojas.words).toLocaleString('lt-LT')}</span></dd>
-            <dt>Rezervacijos</dt>
-            <dd><span class="cell-mono">{Number(nuskaitytojas.rezervacijos).toLocaleString('lt-LT')}</span></dd>
-          </KeyValueList>
-        </div>
-      </div>
-    </div>
+    <section class="node-metrikos">
+      {metrikos.map((m) => (
+        <MetricCard label={m.label} value={m.value} />
+      ))}
+    </section>
 
     <div class="grid-2">
       <LineDatetimeChart
@@ -134,3 +132,24 @@ const ocrResultsWords = ocrStatsDay.map(item => item.words);
     </div>
   </main>
 </Layout>
+
+<style>
+  .node-id {
+    display: inline-block;
+    margin-left: 10px;
+    vertical-align: middle;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--light-gray);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+  }
+
+  .node-metrikos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+</style>
