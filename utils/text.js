@@ -44,6 +44,32 @@ export function toAscii(str) {
 }
 
 /**
+ * Nuima diakritinius ženklus, bet palieka raides („ą" → „a", „š" → „s").
+ *
+ * Skiriasi nuo `toAscii`: čia nedaromi rankiniai lietuviškų raidžių pakeitimai ir
+ * rezultatas grąžinamas NFC forma — būtent tokia forma indeksuojamas ir ieškomas
+ * tekstas Quickwit'e, kad paieška veiktų ir be lietuviškų raidžių.
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+export function foldLithuanian(str) {
+    return String(str ?? "")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .normalize("NFC");
+}
+
+/**
+ * Sutraukia bet kokį tarpų/naujų eilučių pluoštą į vieną tarpą ir nukerpa kraštus.
+ * @param {string|null|undefined} str
+ * @returns {string}
+ */
+export function collapseWhitespace(str) {
+    return (str ?? "").replace(/\s+/g, " ").trim();
+}
+
+/**
  * Converts a string into camelCase format.
  *
  * The function first converts the string to ASCII (removing accents and special Lithuanian letters),

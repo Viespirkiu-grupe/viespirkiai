@@ -78,6 +78,50 @@ export function arrayToLithuanianTime(data) {
     return data.map(dataToLithuanianTime);
 }
 
+/**
+ * Bet kokią datos/laiko reikšmę paverčia RFC 3339 (UTC) eilute — tokia forma, kokios
+ * tikisi Quickwit `datetime` laukai.
+ *
+ * SVARBU dėl laiko juostos: PostgreSQL `timestamp without time zone` stulpeliai per
+ * `postgres/postgres.js` tipo parserį grįžta kaip paprasta eilutė („2026-07-07 23:31:29")
+ * BE juostos žymės, o duomenys į juos rašomi Lietuvos vietos laiku. Todėl tokia eilutė
+ * čia interpretuojama kaip `Europe/Vilnius` ir konvertuojama į UTC. Anksčiau kiekvienas
+ * Quickwit indeksuotojas turėjo savo `toRfc3339` kopiją ir jos elgėsi skirtingai —
+ * viešųjų pirkimų versija Vilniaus laiką laikė UTC ir pastumdavo laiką 2–3 val.
+ *
+ * `timestamp with time zone` stulpeliai grįžta kaip `Date` — jiems juostos spėlioti
+ * nereikia, `toISOString()` jau duoda teisingą UTC.
+ *
+ * Vien datos reikšmė („2026-06-30") juostos neturi ir turėti negali — paliekama kaip
+ * UTC vidurnaktis, kad nenuslinktų į praėjusią dieną.
+ *
+ * @param {Date|string|number|null|undefined} value
+ * @returns {string|null} RFC 3339 eilutė UTC juostoje arba null.
+ */
+export function toRfc3339(value) {
+    if (value == null) return null;
+    if (value instanceof Date) return value.toISOString();
+
+    if (typeof value === "string") {
+        // Vien data — be juostos, paliekam UTC vidurnaktį.
+        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00:00Z`;
+
+        // „YYYY-MM-DD HH:MM:SS[.fff]" — PostgreSQL timestamp be juostos, saugomas
+        // Lietuvos vietos laiku.
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value)) {
+            const dt = DateTime.fromSQL(value, { zone: "Europe/Vilnius" });
+            return dt.isValid
+                ? dt.toUTC().toISO({ suppressMilliseconds: true })
+                : value;
+        }
+
+        // Jau su juosta (ISO su Z arba ±HH:MM) arba nežinomas formatas — nekeičiam.
+        return value;
+    }
+
+    return String(value);
+}
+
 export function formatDateTime(value) {
     if (!value) return "—";
     const dt = new Date(value);

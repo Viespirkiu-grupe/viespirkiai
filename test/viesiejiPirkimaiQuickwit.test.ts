@@ -5,6 +5,9 @@ const pgQuery = vi.fn();
 
 vi.mock("../quickwit/quickwit.js", () => ({
     search: quickwitSearch,
+    // quickwitProcessIndexQueue.js per indexQueueDrainer.js importuoja indexDocs —
+    // šiuose testuose jis nekviečiamas, bet turi egzistuoti mock'e.
+    indexDocs: vi.fn(),
 }));
 
 vi.mock("../postgres/postgres.js", () => ({
@@ -99,7 +102,9 @@ describe("viesiejiPirkimai Quickwit document", () => {
         expect(doc.tekstas).toContain("Zalios elektros pirkimas");
         expect(doc.tekstas).toContain("Vilniaus miesto savivaldybe");
         expect(doc.numatomaBendraPirkimoVerte).toBe(123.45);
-        expect(doc.paskelbimoData).toBe("2026-07-07T10:11:12Z");
+        // `paskelbimoData` yra `timestamp without time zone` ir saugomas Lietuvos
+        // vietos laiku — į Quickwit turi keliauti UTC (vasarą −3 val.).
+        expect(doc.paskelbimoData).toBe("2026-07-07T07:11:12Z");
         expect(doc.bvpzKodai).toEqual(["09310000"]);
     });
 });

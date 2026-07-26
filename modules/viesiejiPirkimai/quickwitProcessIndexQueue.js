@@ -1,6 +1,9 @@
 import { postgres } from "../../postgres/postgres.js";
-import { indexDocs } from "../../quickwit/quickwit.js";
+import { drainIndexQueue, runShardedDrain } from "../../quickwit/indexQueueDrainer.js";
 import { Logger } from "../../utils/log.js";
+import { foldLithuanian } from "../../utils/text.js";
+import { compact, toNumber } from "../../utils/coerce.js";
+import { toRfc3339 } from "../../utils/time.js";
 import { pathToFileURL } from "node:url";
 
 const logger = new Logger();
@@ -9,133 +12,42 @@ const BATCH_SIZE = 2500;
 const LENTELE = "viesiejiPirkimai";
 
 /**
- * Drain one viesiejiPirkimaiIndexQueue batch into Quickwit.
+ * Nusausina vieną `viesiejiPirkimaiIndexQueue` porciją į Quickwit.
+ * Karkasas (tranzakcija, dedup, shard'inimas) — `quickwit/indexQueueDrainer.js`.
  *
  * @param {{ shard?: number, shardCount?: number }} [opts]
- * @returns {Promise<boolean>} true when work was done.
+ * @returns {Promise<boolean>} `true`, kai buvo darbo.
  */
-export async function processViesiejiPirkimaiIndexQueue({ shard, shardCount } = {}) {
-    const sharded = shardCount > 1;
-    const client = await postgres.connect();
-    try {
-        await client.query("BEGIN");
-
-        const claim = sharded
-            ? `SELECT id, "pirkimoId", keitimas
-               FROM "viesiejiPirkimaiIndexQueue"
-               WHERE abs(hashtext("pirkimoId"::text)::bigint) % $2 = $3
-               ORDER BY id
-               LIMIT $1
-               FOR UPDATE SKIP LOCKED`
-            : `SELECT id, "pirkimoId", keitimas
-               FROM "viesiejiPirkimaiIndexQueue"
-               ORDER BY id
-               LIMIT $1
-               FOR UPDATE SKIP LOCKED`;
-        const claimParams = sharded
-            ? [BATCH_SIZE, shardCount, shard]
-            : [BATCH_SIZE];
-        const { rows: queue } = await client.query(claim, claimParams);
-
-        if (!queue.length) {
-            await client.query("COMMIT");
-            logger.log(`viesiejiPirkimaiIndexQueue${sharded ? `[${shard}/${shardCount}]` : ""}: empty`);
-            return false;
-        }
-
-        logger.log(`viesiejiPirkimaiIndexQueue${sharded ? `[${shard}/${shardCount}]` : ""}: claimed ${queue.length} rows`);
-
-        const claimedIds = queue.map((row) => row.id);
-        const priority = { delete: 0, patch: 1, insert: 2 };
-        const deduped = new Map();
-
-        for (const row of queue) {
-            const key = String(row.pirkimoId);
-            const existing = deduped.get(key);
-            if (!existing || priority[row.keitimas] < priority[existing]) {
-                deduped.set(key, row.keitimas);
-            }
-        }
-
-        const toDelete = [...deduped.entries()]
-            .filter(([, change]) => change === "delete")
-            .map(([id]) => id);
-        const toIndex = [...deduped.entries()]
-            .filter(([, change]) => change === "insert" || change === "patch")
-            .map(([id]) => id);
-
-        if (toDelete.length) {
-            await client.query(
-                `DELETE FROM "quickwitEilutes"
-                 WHERE "lentelesId" = (SELECT id FROM "quickwitLenteles" WHERE "lentele" = $1)
-                   AND "eilutesId" = ANY($2::bigint[])`,
-                [LENTELE, toDelete.map(toEilutesId)],
-            );
-            logger.log(`deleted ${toDelete.length} viesiejiPirkimai from quickwit`);
-        }
-
-        if (toIndex.length) {
-            const { rows } = await client.query(
-                `SELECT
-                    "pirkimoId", pavadinimas, "pirkimoVykdytojas", informacija,
-                    "paskelbimoData", "pasiulymuPateikimoTerminas",
-                    "pirkimoBudas", statusas, "numatomaBendraPirkimoVerte",
-                    zingsnis, type, "numatomaVerteEUR", "bvpzKodai",
-                    "pirkimoObjektoTipas", "esFinansavimas",
-                    "pirkimoVykdytojasId", "jarKodas"
-                 FROM public."viesiejiPirkimai"
-                 WHERE "pirkimoId" = ANY($1::int[])`,
-                [toIndex],
-            );
-
-            const found = new Set(rows.map((row) => String(row.pirkimoId)));
-            const vanished = toIndex.filter((id) => !found.has(id));
-
-            if (rows.length) {
-                const items = rows.map((row) => ({
-                    eilutesId: toEilutesId(row.pirkimoId),
-                    doc: buildDoc(row),
-                }));
-                const t0 = Date.now();
-
-                logger.log(`indexing ${items.length} viesiejiPirkimai into Quickwit...`);
-                const { serializedBytes: totalBytes } = await indexDocs(
-                    LENTELE,
-                    items,
-                    { commit: "auto" },
+export async function processViesiejiPirkimaiIndexQueue(opts = {}) {
+    return drainIndexQueue(
+        {
+            lentele: LENTELE,
+            queueTable: "viesiejiPirkimaiIndexQueue",
+            keyColumn: "pirkimoId",
+            batchSize: BATCH_SIZE,
+            commit: "auto",
+            toEilutesId,
+            rowId: (row) => row.pirkimoId,
+            buildDoc,
+            fetchRows: async (client, ids) => {
+                const { rows } = await client.query(
+                    `SELECT
+                        "pirkimoId", pavadinimas, "pirkimoVykdytojas", informacija,
+                        "paskelbimoData", "pasiulymuPateikimoTerminas",
+                        "pirkimoBudas", statusas, "numatomaBendraPirkimoVerte",
+                        zingsnis, type, "numatomaVerteEUR", "bvpzKodai",
+                        "pirkimoObjektoTipas", "esFinansavimas",
+                        "pirkimoVykdytojasId", "jarKodas"
+                     FROM public."viesiejiPirkimai"
+                     WHERE "pirkimoId" = ANY($1::int[])`,
+                    [ids],
                 );
-
-                const elapsedMs = Date.now() - t0;
-                const avgBytes = Math.round(totalBytes / items.length);
-                const mbPerSec = (totalBytes / 1024 / 1024) / (elapsedMs / 1000);
-                logger.log(
-                    `indexed ${items.length} viesiejiPirkimai | avg ${fmtBytes(avgBytes)} / doc | total ${fmtBytes(totalBytes)} in ${elapsedMs}ms = ${mbPerSec.toFixed(2)} MiB/s`,
-                );
-            }
-
-            if (vanished.length) {
-                await client.query(
-                    `DELETE FROM "quickwitEilutes"
-                     WHERE "lentelesId" = (SELECT id FROM "quickwitLenteles" WHERE "lentele" = $1)
-                       AND "eilutesId" = ANY($2::bigint[])`,
-                    [LENTELE, vanished.map(toEilutesId)],
-                );
-                logger.log(`deleted ${vanished.length} vanished viesiejiPirkimai from quickwit`);
-            }
-        }
-
-        await client.query(
-            `DELETE FROM "viesiejiPirkimaiIndexQueue" WHERE id = ANY($1::bigint[])`,
-            [claimedIds],
-        );
-        await client.query("COMMIT");
-        return true;
-    } catch (err) {
-        await client.query("ROLLBACK").catch(() => {});
-        throw err;
-    } finally {
-        client.release();
-    }
+                return rows;
+            },
+            logger,
+        },
+        opts,
+    );
 }
 
 export function buildDoc(row) {
@@ -184,52 +96,12 @@ function toEilutesId(pirkimoId) {
     return String(pirkimoId);
 }
 
-function compact(values) {
-    return values.filter((value) => value != null && value !== "");
-}
-
-function foldLithuanian(str) {
-    return str.normalize("NFD").replace(/[̀-ͯ]/g, "").normalize("NFC");
-}
-
-function toNumber(value) {
-    if (value == null || value === "") return null;
-    const number = Number(value);
-    return Number.isFinite(number) ? number : null;
-}
-
-function toRfc3339(value) {
-    if (value == null) return null;
-    if (typeof value === "string") {
-        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00:00Z`;
-        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value)) {
-            return `${value.replace(" ", "T")}Z`;
-        }
-        return value;
-    }
-    if (value instanceof Date) return value.toISOString();
-    return String(value);
-}
-
-function fmtBytes(n) {
-    if (n < 1024) return `${n} B`;
-    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KiB`;
-    return `${(n / 1024 / 1024).toFixed(2)} MiB`;
-}
-
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-    drainViesiejiPirkimaiIndexQueue()
-        .catch((error) => {
-            console.error(`Nepavyko apdoroti viesiejiPirkimaiIndexQueue: ${error.message}`);
-            process.exitCode = 1;
-        })
-        .finally(async () => postgres.end());
-}
-
-async function drainViesiejiPirkimaiIndexQueue() {
-    let batches = 0;
-    while (await processViesiejiPirkimaiIndexQueue()) {
-        batches++;
-    }
-    logger.log(`viesiejiPirkimaiIndexQueue: drained ${batches} batch(es)`);
+    await runShardedDrain({
+        work: processViesiejiPirkimaiIndexQueue,
+        label: "viesiejiPirkimai",
+        logger,
+    });
+    await postgres.end();
+    process.exit(0);
 }

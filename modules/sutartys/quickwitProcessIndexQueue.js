@@ -3,144 +3,51 @@ import {
     VPM_SUTARTIS_ROW_SELECT,
     VPM_SUTARTIS_ROW_FROM,
 } from "./vpmSutartisRow.js";
-import { indexDocs } from "../../quickwit/quickwit.js";
+import { drainIndexQueue, runShardedDrain } from "../../quickwit/indexQueueDrainer.js";
 import { Logger } from "../../utils/log.js";
+import { foldLithuanian } from "../../utils/text.js";
+import { compact, toNumber } from "../../utils/coerce.js";
+import { toRfc3339 } from "../../utils/time.js";
 import { pathToFileURL } from "node:url";
-import { DateTime } from "luxon";
 
 const logger = new Logger();
 
 const BATCH_SIZE = 2500;
 const LENTELE = "sutartys";
 
+export { toRfc3339 };
+
 /**
- * Drain one vpmSutartysIndexQueue batch into Quickwit.
- *
- * Queue rows stay locked inside the transaction until the Quickwit ingest and
- * quickwitEilutes cleanup have succeeded. Any error rolls the batch back.
+ * Nusausina vieną `vpmSutartysIndexQueue` porciją į Quickwit.
+ * Karkasas (tranzakcija, dedup, shard'inimas) — `quickwit/indexQueueDrainer.js`.
  *
  * @param {{ shard?: number, shardCount?: number }} [opts]
- * @returns {Promise<boolean>} true when work was done.
+ * @returns {Promise<boolean>} `true`, kai buvo darbo.
  */
-export async function processSutartysIndexQueue({ shard, shardCount } = {}) {
-    const sharded = shardCount > 1;
-    const client = await postgres.connect();
-    try {
-        await client.query("BEGIN");
-
-        const claim = sharded
-            ? `SELECT id, "unikalusId", keitimas
-               FROM "vpmSutartysIndexQueue"
-               WHERE abs(hashtext("unikalusId"::text)::bigint) % $2 = $3
-               ORDER BY id
-               LIMIT $1
-               FOR UPDATE SKIP LOCKED`
-            : `SELECT id, "unikalusId", keitimas
-               FROM "vpmSutartysIndexQueue"
-               ORDER BY id
-               LIMIT $1
-               FOR UPDATE SKIP LOCKED`;
-        const claimParams = sharded
-            ? [BATCH_SIZE, shardCount, shard]
-            : [BATCH_SIZE];
-        const { rows: queue } = await client.query(claim, claimParams);
-
-        if (!queue.length) {
-            await client.query("COMMIT");
-            logger.log(`vpmSutartysIndexQueue${sharded ? `[${shard}/${shardCount}]` : ""}: empty`);
-            return false;
-        }
-
-        logger.log(`vpmSutartysIndexQueue${sharded ? `[${shard}/${shardCount}]` : ""}: claimed ${queue.length} rows`);
-
-        const claimedIds = queue.map((row) => row.id);
-        const priority = { delete: 0, patch: 1, insert: 2 };
-        const deduped = new Map();
-
-        for (const row of queue) {
-            const key = row.unikalusId;
-            const existing = deduped.get(key);
-            if (!existing || priority[row.keitimas] < priority[existing]) {
-                deduped.set(key, row.keitimas);
-            }
-        }
-
-        const toDelete = [...deduped.entries()]
-            .filter(([, change]) => change === "delete")
-            .map(([id]) => id);
-        const toIndex = [...deduped.entries()]
-            .filter(([, change]) => change === "insert" || change === "patch")
-            .map(([id]) => id);
-
-        if (toDelete.length) {
-            await client.query(
-                `DELETE FROM "quickwitEilutes"
-                 WHERE "lentelesId" = (SELECT id FROM "quickwitLenteles" WHERE "lentele" = $1)
-                   AND "eilutesId" = ANY($2::bigint[])`,
-                [LENTELE, toDelete.map(String)],
-            );
-            logger.log(`deleted ${toDelete.length} sutartys from quickwit`);
-        }
-
-        if (toIndex.length) {
-            const { rows } = await client.query(
-                `SELECT ${VPM_SUTARTIS_ROW_SELECT}
-                 FROM ${VPM_SUTARTIS_ROW_FROM}
-                 WHERE s."unikalusId" = ANY($1::bigint[])
-                   AND s.istrinta = false`,
-                [toIndex],
-            );
-
-            const found = new Set(rows.map((row) => String(row.sutartiesUnikalusId)));
-            const vanished = toIndex
-                .map(String)
-                .filter((id) => !found.has(id));
-
-            if (rows.length) {
-                const items = rows.map((row) => ({
-                    eilutesId: String(row.sutartiesUnikalusId),
-                    doc: buildDoc(row),
-                }));
-                const t0 = Date.now();
-
-                logger.log(`indexing ${items.length} sutartys into Quickwit...`);
-                const { serializedBytes: totalBytes } = await indexDocs(
-                    LENTELE,
-                    items,
-                    { commit: "auto" },
+export async function processSutartysIndexQueue(opts = {}) {
+    return drainIndexQueue(
+        {
+            lentele: LENTELE,
+            queueTable: "vpmSutartysIndexQueue",
+            keyColumn: "unikalusId",
+            batchSize: BATCH_SIZE,
+            commit: "auto",
+            rowId: (row) => row.sutartiesUnikalusId,
+            buildDoc,
+            fetchRows: async (client, ids) => {
+                const { rows } = await client.query(
+                    `SELECT ${VPM_SUTARTIS_ROW_SELECT}
+                     FROM ${VPM_SUTARTIS_ROW_FROM}
+                     WHERE s."unikalusId" = ANY($1::bigint[])
+                       AND s.istrinta = false`,
+                    [ids],
                 );
-
-                const elapsedMs = Date.now() - t0;
-                const avgBytes = Math.round(totalBytes / items.length);
-                const mbPerSec = (totalBytes / 1024 / 1024) / (elapsedMs / 1000);
-                logger.log(
-                    `indexed ${items.length} sutartys | avg ${fmtBytes(avgBytes)} / doc | total ${fmtBytes(totalBytes)} in ${elapsedMs}ms = ${mbPerSec.toFixed(2)} MiB/s`,
-                );
-            }
-
-            if (vanished.length) {
-                await client.query(
-                    `DELETE FROM "quickwitEilutes"
-                     WHERE "lentelesId" = (SELECT id FROM "quickwitLenteles" WHERE "lentele" = $1)
-                       AND "eilutesId" = ANY($2::bigint[])`,
-                    [LENTELE, vanished],
-                );
-                logger.log(`deleted ${vanished.length} vanished sutartys from quickwit`);
-            }
-        }
-
-        await client.query(
-            `DELETE FROM "vpmSutartysIndexQueue" WHERE id = ANY($1::bigint[])`,
-            [claimedIds],
-        );
-        await client.query("COMMIT");
-        return true;
-    } catch (err) {
-        await client.query("ROLLBACK").catch(() => {});
-        throw err;
-    } finally {
-        client.release();
-    }
+                return rows;
+            },
+            logger,
+        },
+        opts,
+    );
 }
 
 function buildDoc(row) {
@@ -187,108 +94,12 @@ function buildDoc(row) {
     };
 }
 
-function compact(values) {
-    return values.filter((value) => value != null && value !== "");
-}
-
-function toNumber(value) {
-    if (value == null || value === "") return null;
-    const number = Number(value);
-    return Number.isFinite(number) ? number : null;
-}
-
-export function toRfc3339(value) {
-    if (value == null) return null;
-    if (typeof value === "string") {
-        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00:00Z`;
-        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value)) {
-            const dt = DateTime.fromSQL(value, { zone: "Europe/Vilnius" });
-            return dt.isValid ? dt.toUTC().toISO({ suppressMilliseconds: true }) : value;
-        }
-        return value;
-    }
-    if (value instanceof Date) return value.toISOString();
-    return String(value);
-}
-
-function fmtBytes(n) {
-    if (n < 1024) return `${n} B`;
-    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KiB`;
-    return `${(n / 1024 / 1024).toFixed(2)} MiB`;
-}
-
-function foldLithuanian(str) {
-    return str
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .normalize("NFC");
-}
-
-function parseConcurrency(argv) {
-    for (let i = 0; i < argv.length; i++) {
-        const arg = argv[i];
-        const match = arg.match(/^--concurrency=(.+)$/);
-        if (match) return match[1];
-        if (arg === "--concurrency" || arg === "-c") return argv[i + 1];
-    }
-    return "1";
-}
-
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-    const RETRY_MS = 60_000;
-
-    const concurrency = parseInt(parseConcurrency(process.argv.slice(2)), 10);
-    if (!Number.isInteger(concurrency) || concurrency < 1) {
-        logger.log("Invalid --concurrency: expected an integer >= 1");
-        process.exit(1);
-    }
-
-    logger.log(`starting sutartys Quickwit queue drain with concurrency=${concurrency}`);
-
-    let stopping = false;
-    const wakeups = new Set();
-    const requestStop = (signal) => {
-        if (stopping) {
-            logger.log(`received ${signal} again, exiting now`);
-            process.exit(130);
-        }
-        stopping = true;
-        logger.log(`received ${signal}, finishing current work before exit...`);
-        for (const resolve of wakeups) resolve();
-    };
-    process.on("SIGINT", () => requestStop("SIGINT"));
-    process.on("SIGTERM", () => requestStop("SIGTERM"));
-
-    const sleep = (ms) =>
-        new Promise((resolve) => {
-            const timer = setTimeout(done, ms);
-            function done() {
-                clearTimeout(timer);
-                wakeups.delete(done);
-                resolve();
-            }
-            wakeups.add(done);
-        });
-
-    async function worker(shard) {
-        const opts = concurrency > 1 ? { shard, shardCount: concurrency } : {};
-        while (!stopping) {
-            try {
-                const didWork = await processSutartysIndexQueue(opts);
-                if (!didWork) break;
-            } catch (err) {
-                logger.log(
-                    `processSutartysIndexQueue[${shard}] failed, retrying after ${RETRY_MS / 1000}s: ${err.message}`,
-                );
-                await sleep(RETRY_MS);
-            }
-        }
-    }
-
-    await Promise.all(
-        Array.from({ length: concurrency }, (_, i) => worker(i)),
-    );
-    logger.log("sutartys Quickwit queue drain finished");
+    await runShardedDrain({
+        work: processSutartysIndexQueue,
+        label: "sutartys",
+        logger,
+    });
     await postgres.end();
     process.exit(0);
 }

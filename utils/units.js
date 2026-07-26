@@ -104,6 +104,22 @@ export function convertUnit(value, categoryOrOptions, options = {}) {
     }
 }
 
+/**
+ * Baitai → trumpa binarinė forma („12 B", „3.4 KiB", „1.20 MiB").
+ *
+ * Atskira nuo `convertUnit` sąmoningai: čia naudojami IEC vienetai (KiB/MiB), nes
+ * tai skirta techniniams logams (indeksavimo greitis, dokumentų dydžiai), o
+ * `convertUnit` „data" kategorija rodo vartotojui įprastus KB/MB.
+ *
+ * @param {number} n - baitų skaičius
+ * @returns {string}
+ */
+export function fmtBytes(n) {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KiB`;
+    return `${(n / 1024 / 1024).toFixed(2)} MiB`;
+}
+
 Number.prototype.convertUnit = function (categoryOrOptions, options) {
     return convertUnit(this.valueOf(), categoryOrOptions, options);
 };
