@@ -1,11 +1,10 @@
 import { postgres } from '@/postgres/postgres.js';
 import { search, getDeadRatio } from '@/quickwit/quickwit.js';
 import { readDokumentasFs } from '@/modules/dokumentai/dokumentaiFs.js';
-import rawConfig from '@/utils/config.js';
+import { QW_URL } from '@/quickwit/qwHttp.js';
 import { foldLithuanian, makeSnippet, normalizeDocText } from './dokumentai/snippet.ts';
 
 const LENTELE = 'dokumentai';
-const QW_URL: string = (rawConfig as any).quickwitUrl ?? 'http://localhost:7280';
 
 // Quickwit's text fast field (used for term aggregations) lowercases values via
 // its default normalizer, but the searchable field is `raw` (case-sensitive).

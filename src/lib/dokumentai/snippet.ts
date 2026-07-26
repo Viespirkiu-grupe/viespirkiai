@@ -2,11 +2,12 @@
 // searchDokumentai.ts. Randa geriausią teksto atkarpą apie paieškos terminus ir
 // paryškina radinius <strong> žymėmis. Be I/O — lengva testuoti.
 import { escapeHtml } from '@design-system/lib/html.ts';
+// Diakritikų pašalinimas (ė→e), išlaikant NFC. Ta pati funkcija naudojama ir
+// indeksuojant (quickwit/indexQueueDrainer vartotojai), tad ji gyvena utils/.
+// Re-eksportuojam, nes snippet.ts yra šio modulio viešasis API.
+import { foldLithuanian } from '@/utils/text.js';
 
-/** Diakritikų pašalinimas (ė→e), išlaikant NFC. Naudojama ir užklausų sudarymui. */
-export function foldLithuanian(str: string) {
-  return str.normalize('NFD').replace(/[̀-ͯ]/g, '').normalize('NFC');
-}
+export { foldLithuanian };
 
 /** Failų sidecar `text` saugomas kaip `JSON.stringify(pages)` — puslapių masyvo
  *  eilutė (pvz. `["1 psl.","2 psl."]`). Vartotojui to rodyti negalima, todėl jei

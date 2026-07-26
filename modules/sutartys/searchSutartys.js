@@ -1,7 +1,6 @@
 import { getDeadRatio, search as quickwitSearch, searchAll as quickwitSearchAll, countDocs as quickwitCountDocs } from "../../quickwit/quickwit.js";
 import { specialJarCodes } from "../juridiniai/specialJarCodes.js";
 import { searchJar } from "../juridiniai/search.js";
-import config from "../../utils/config.js";
 import { postgres } from "../../postgres/postgres.js";
 import { FilterBuilder } from "../../utils/filter.js";
 import { fixHtmlEntities } from "../../utils/fixHtmlEntities.js";
@@ -9,6 +8,10 @@ import { Transform, Readable } from "node:stream";
 import { CONTRACT_TYPES } from "./contractTypes.js";
 import QueryStream from "pg-query-stream";
 import { createTtlPromiseCache } from "../../utils/ttlPromiseCache.js";
+// Diakritikų nuėmimas („ą" sutampa su „a") — indeksas laikomas suredukuotas
+// lygiai taip pat, kaip ir dokumentuose.
+import { foldLithuanian } from "../../utils/text.js";
+import { QW_URL } from "../../quickwit/qwHttp.js";
 import {
     VPM_SUTARTIS_ROW_FROM,
     VPM_SUTARTIS_ROW_SELECT,
@@ -174,12 +177,6 @@ const QUICKWIT_TEXT_FIELDS = [
     "bvpzPavadinimai",
 ];
 
-// Nuima lietuviškus diakritikus, kad „ą" sutaptų su „a" (indeksas laikomas
-// suredukuotas taip pat, kaip ir dokumentuose).
-function foldLithuanian(str) {
-    return str.normalize("NFD").replace(/[̀-ͯ]/g, "").normalize("NFC");
-}
-
 // Quickwit reikšmę, kurioje gali būti tarpų ar specialiųjų simbolių, saugu
 // paduoti kabutėse (raw laukams — tiksli atitiktis).
 function qwQuote(value) {
@@ -319,8 +316,6 @@ function quickwitSortBy(query) {
 // užklausą, iš kurios pašalintas TO PATIES faceto filtras, kad matytųsi visos
 // reikšmės po kitų filtrų. Kodiniai facetai (pirkėjai/tiekėjai/BVPŽ) papildomi
 // žmogui skirtais pavadinimais.
-
-const QW_URL = config.quickwitUrl ?? "http://localhost:7280";
 
 /** Viena Quickwit term agregacija. Grąžina [{ value, count }]. */
 async function qwFacet(field, query, size) {

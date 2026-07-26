@@ -1,14 +1,13 @@
 import { postgres } from "../../postgres/postgres.js";
 import { spawn } from "child_process";
 import { log } from "../../utils/log.js";
+import { sleep } from "../../utils/time.js";
 
 const BASE_URL = "https://pinreg.vtek.lt/external/deklaracijos/viesa";
 const PARAMS_BASE =
     "irasuSkaiciusPuslapyje=50&rusiuojamiStulpeliai=PID_TEIKIMO_DATA&rusiavimoKryptis=DESC&v=523b0df25";
 
 const SLEEP_MS = 100;
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function curlFetch(url) {
     return new Promise((resolve, reject) => {

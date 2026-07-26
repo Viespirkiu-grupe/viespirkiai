@@ -3,6 +3,7 @@ import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import { postgres } from "../../postgres/postgres.js";
 import { upsertInventoryObject } from "../teisekura/storage.js";
+import { collapseWhitespace as collapse } from "../../utils/text.js";
 
 const SEARCH_URL = "https://e-seimas.lrs.lt/portal/legalActProjectSearch/lt";
 const ROWS_PER_PAGE = 20;
@@ -10,10 +11,6 @@ const HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/136 Safari/537.36",
     "Accept-Language": "lt-LT,lt;q=0.9,en;q=0.7",
 };
-
-function collapse(value) {
-    return (value ?? "").replace(/\s+/g, " ").trim();
-}
 
 export function cleanEseimasUrl(href, base = SEARCH_URL) {
     if (!href) return null;

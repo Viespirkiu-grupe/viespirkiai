@@ -7,8 +7,10 @@ import QueryStream from "pg-query-stream";
 import { STATUSAS, PIRKIMO_BUDAS } from "./viesiejiPirkimaiEnums.js";
 import { specialJarCodes } from "../juridiniai/specialJarCodes.js";
 import { searchJar } from "../juridiniai/search.js";
-import config from "../../utils/config.js";
 import { createTtlPromiseCache } from "../../utils/ttlPromiseCache.js";
+// Diakritikų nuėmimas („ą" sutampa su „a") — kaip sutartyse ir dokumentuose.
+import { foldLithuanian } from "../../utils/text.js";
+import { QW_URL } from "../../quickwit/qwHttp.js";
 
 const cachedHomepageSearch = createTtlPromiseCache(5_000);
 
@@ -153,10 +155,6 @@ function splitValues(val) {
     return String(val ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 }
 
-function foldLithuanian(str) {
-    return str.normalize("NFD").replace(/[̀-ͯ]/g, "").normalize("NFC");
-}
-
 function qwQuote(value) {
     return JSON.stringify(String(value));
 }
@@ -284,8 +282,6 @@ function quickwitSortBy(query) {
 // užklausą, iš kurios pašalintas TO PATIES faceto filtras, kad matytųsi visos
 // reikšmės po kitų filtrų. Kodinis facetas (vykdytojas) papildomas JAR
 // pavadinimais; enum facetai (pirkimo būdas/statusas) — žmogui skirtais.
-
-const QW_URL = config.quickwitUrl ?? "http://localhost:7280";
 
 /** Viena Quickwit term agregacija. Grąžina [{ value, count }]. */
 async function qwFacet(field, query, size) {

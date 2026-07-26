@@ -1,10 +1,9 @@
 // Ollama /api/embed klientas. Vienas backend'as arba N Ollamų už Caddy least-conn
 // balansuotojo – klientui skirtumo nėra, keičiasi tik URL ir concurrency.
+import { sleep } from "../../utils/time.js";
 
 export const DEFAULT_OLLAMA_URL = "http://192.168.255.99:11434";
 export const DEFAULT_EMBED_MODEL = "bge-m3";
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * @typedef {Object} EmbedStats

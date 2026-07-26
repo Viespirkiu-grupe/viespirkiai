@@ -1,5 +1,7 @@
 import { parseHTML } from "linkedom";
 import { log } from "../../utils/log.js";
+import { collapseWhitespace } from "../../utils/text.js";
+import { sleep } from "../../utils/time.js";
 import { upsertInventoryObject, recordInterval } from "../teisekura/storage.js";
 import { actIdFromUrl, editionSourceIdFromUrl } from "./ids.js";
 
@@ -29,10 +31,6 @@ function appendCookies(jar, headers) {
         if (separator > 0) cookies.set(pair.slice(0, separator), pair.slice(separator + 1));
     }
     return Array.from(cookies, ([name, value]) => `${name}=${value}`).join("; ");
-}
-
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // e-TAR occasionally returns a stripped/error page under load (missing the
@@ -179,10 +177,6 @@ export function parseResultsHtml(html) {
 function fullUrl(href) {
     if (!href) return href;
     return href.startsWith("http") ? href : ORIGIN + href;
-}
-
-function collapseWhitespace(str) {
-    return (str ?? "").replace(/\s+/g, " ").trim();
 }
 
 function parsePavadinimasTd(td) {

@@ -9,6 +9,7 @@ import {
     upsertInventoryObject,
 } from "../teisekura/storage.js";
 import { upsertTeisekuraDokumentas } from "../teisekura/upsertDokumentas.js";
+import { collapseWhitespace } from "../../utils/text.js";
 import { actIdFromUrl, editionSourceIdFromUrl } from "./ids.js";
 
 const ORIGIN = "https://www.e-tar.lt";
@@ -34,10 +35,6 @@ function appendCookies(jar, newSetCookie) {
 function fullUrl(href, baseUrl = ORIGIN) {
     if (!href) return null;
     return href.startsWith("http") ? href : new URL(href, baseUrl).toString();
-}
-
-function collapseWhitespace(value) {
-    return (value ?? "").replace(/\s+/g, " ").trim();
 }
 
 function normalizeText(value) {

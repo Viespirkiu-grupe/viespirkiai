@@ -1,10 +1,8 @@
 import { pathToFileURL } from "url";
 import { postgres } from "../postgres/postgres.js";
-import config from "../utils/config.js";
 import { Logger } from "../utils/log.js";
+import { QW_URL } from "./qwHttp.js";
 const logger = new Logger();
-
-const QW_URL = config.quickwitUrl ?? "http://localhost:7280";
 
 /**
  * Delete one Quickwit index and its quickwitIndeksai row.

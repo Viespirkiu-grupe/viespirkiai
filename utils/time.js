@@ -79,6 +79,20 @@ export function arrayToLithuanianTime(data) {
 }
 
 /**
+ * Palaukia nurodytą milisekundžių skaičių.
+ *
+ * Nepertraukiamas — jei reikia laukimo, kurį galima nutraukti signalu (ilgai
+ * veikiančių darbininkų retry), žr. `runShardedDrain` iš
+ * `quickwit/indexQueueDrainer.js`.
+ *
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+export function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Bet kokią datos/laiko reikšmę paverčia RFC 3339 (UTC) eilute — tokia forma, kokios
  * tikisi Quickwit `datetime` laukai.
  *

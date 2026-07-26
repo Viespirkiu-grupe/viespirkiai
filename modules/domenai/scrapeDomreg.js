@@ -4,6 +4,7 @@ import { SocksProxyAgent } from "socks-proxy-agent";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import { findSingleJuridinis } from "../juridiniai/search.js";
+import { sleep } from "../../utils/time.js";
 import fetch from "node-fetch";
 import net from "net";
 import path from "path";
@@ -108,15 +109,6 @@ export function newTorIdentity(password = config.torPassword) {
             }
         });
     });
-}
-
-/**
- * Sleep utility.
- * @param {number} ms
- * @returns {Promise<void>}
- */
-function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
