@@ -19,6 +19,7 @@
         "vector:embed": "node modules/vector/failaiVektoriaiEmbed.js",
         "vector:inspect": "node modules/vector/failaiVektoriaiInspect.js",
         "vector:patikra": "node modules/vector/failaiVektoriaiPatikra.js",
+        "vector:paieska": "node modules/vector/failaiVektoriaiPaieska.js",
         "quickwit:count-producer": "node quickwit/countMetadataProducer.js",
         "quickwit:delete-dead-indexes": "node quickwit/deleteDeadIndexes.js",
         "quickwit:requeue-live": "node quickwit/requeueLiveRows.js",
