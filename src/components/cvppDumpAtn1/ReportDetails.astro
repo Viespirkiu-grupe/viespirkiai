@@ -1,0 +1,583 @@
+---
+// ATN-1 ataskaitos turinys. Maketas — toks pat kaip kituose objektų puslapiuose
+// (/viesiejiPirkimai/[id]): `grid-3` trumpų DetailsSection blokų, po jų sekcijos
+// su antraštėmis. Lentelių čia sąmoningai nėra: eilutės retos ir nevienodo ilgio,
+// tad vietoj tinklelio — plokšti sąrašai (pavadinimas + tyli meta eilutė + suma
+// dešinėje) ir laiko juosta procedūrų pabaigai. Tuščios eilutės ir sekcijos
+// nerodomos, tad į `items` paduodam žalias reikšmes, ne „—".
+import DateValue from '@design-system/components/DateValue.astro';
+import DetailsSection from '@design-system/components/DetailsSection.astro';
+import EntityLink from '@design-system/components/EntityLink.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import Surface from '@design-system/components/Surface.astro';
+import type { CvppDumpAtn1Report } from '../../lib/cvppDumpAtn1.js';
+import {
+  cvppDumpAtn1AwardProcedureLabel,
+  cvppDumpAtn1ProcedureEndLabel,
+  cvppDumpAtn1YesNoUnknownLabel,
+} from '../../lib/cvppDumpAtn1Labels.js';
+
+const { data } = Astro.props as { data: CvppDumpAtn1Report };
+const a = data.report;
+
+const empty = (value: unknown) => value == null || value === '';
+const value = (input: unknown) => empty(input) ? '—' : String(input);
+const yesNo = (input: unknown) =>
+  input === true ? 'Taip' : input === false ? 'Ne' : value(input);
+// Vėliavėlės tipo laukai: rodom tik tada, kai TAIP — „Ne" eilutė nieko nesako.
+const flag = (input: unknown) => input === true ? 'Taip' : '';
+const display = (input: unknown) => {
+  if (typeof input === 'boolean') return yesNo(input);
+  if (typeof input === 'object' && input !== null) return JSON.stringify(input);
+  return value(input);
+};
+const optional = (input: unknown) => empty(input) ? '' : String(input);
+// Tyli meta eilutė po pavadinimu: tuščios dalys iškrenta, likusios – su taškais.
+const meta = (...pieces: unknown[]) =>
+  pieces.filter((piece) => !empty(piece)).join(' · ');
+
+const label = (map: Record<string, string>, input: unknown) =>
+  map[String(input ?? '')] ?? optional(input);
+const procurementType = (input: unknown) => label({
+  PUBLIC_PROCUREMENT: 'Viešųjų pirkimų įstatymas',
+  UTILITIES_SECTOR_PROCUREMENT: 'Pirkimų įstatymas',
+}, input);
+const contractType = (input: unknown) => label({
+  WORKS: 'Darbai',
+  SERVICES: 'Paslaugos',
+  SUPPLIES: 'Prekės',
+}, input);
+const contestValue = (input: unknown) => label({
+  SIMPLIFIED_PROCUREMENT: 'Supaprastintas pirkimas',
+  INTERNATIONAL_PROCUREMENT: 'Tarptautinis pirkimas',
+}, input);
+const humanize = (key: string) => key
+  .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+  .replace(/(\D)(\d+)/g, '$1 $2')
+  .replace(/^./, (letter) => letter.toLocaleUpperCase('lt-LT'));
+
+const overviewFields = new Set([
+  'id', 'title', 'publishedDate', 'authorityOrgNr', 'tenderId', 'formName',
+  'published', 'epsRefNr', 'procurementType1', 'lawArticle1', 'lawParagraph1',
+  'lawSubParagraph1', 'totalContractValue', 'procurementReport',
+  'reportingCalendarYear', 'procurementNumber', 'procurementProcedureNumber',
+  'procurementObjectName', 'procurementDesignName', 'designContestValue',
+  'procurementFinancedByFunds', 'procurementFinancedByEu', 'projectCode',
+  'projectName', 'viaPublicProcurementInformationSystem',
+  'carriedOutViaCentralSystemUtilities', 'carriedOutViaCentralSystemPublic',
+  'carriedOutViaCentralSystemReason', 'officialName1', 'legalEntityCode1',
+  'postalAddress1', 'town1', 'postalCode1', 'country1', 'phone1', 'fax1',
+  'emailAddress1', 'contactPoint1', 'urlGeneral1', 'urlBuyer1',
+  'otherInformation1', 'codeOfContractingAuthorityOrEntity',
+  'isProcurementPowerGrantedToAnotherAuthority', 'officialName2',
+  'legalEntityCode2', 'postalAddress2', 'town2', 'postalCode2', 'country2',
+  'phone2', 'fax2', 'emailAddress2', 'contactPoint2', 'urlGeneral2',
+  'urlBuyer2', 'otherInformation2', 'codeOfAuthorisedOrganisation',
+  'isProcurementConcludedToFrameworkAgreement',
+  'isProcurementToCreateDynamicPurchaseSystem', 'typeOfContract', 'cpvMain1',
+  'cpvCodes1', 'cpvIds1', 'cpvMain2', 'cpvCodes2', 'cpvIds2', 'numberOfParts',
+  'typeOfAwardProcedure', 'lawArticle2', 'lawParagraph2', 'lawSubparagraph2',
+  'reasonIfSupplierIncomeMoreThanAnticipatedValue', 'priceQualityRatio',
+  'priceQualityRatioParts', 'costQualityRatio', 'costQualityRatioParts', 'cost',
+  'costParts', 'price', 'priceParts', 'isClaimSubmitted', 'anyLegayClaims',
+  'isConflictDetected', 'measuresTakenToDetectConflict',
+  'isProcurementProcedureInvolvesCandidate',
+  'measuresTakenToMaintainCompetition',
+  'totalValueOfPartInFrameworkAgreement',
+  'isProcurementConcludedInCentralisedManner',
+  'isProcurementDocInclEnvironmentCriteria',
+  'isRoadVehiclesInclInEnergyConsumption',
+  'willSubcontractBeConcluded',
+  'isInnovativeProcurementCriteriaImposed',
+  'isEnergyConsumptionEfficiencyImposed',
+  'isEnergyConsumptionAndEnvironmentImposed', 'insertDate', 'updateDate',
+]);
+const otherFields = Object.entries(a)
+  .filter(([key, fieldValue]) => !overviewFields.has(key) && !empty(fieldValue));
+
+const hasAny = (row: Record<string, any>, fields: string[]) =>
+  fields.some((field) => !empty(row[field]));
+const parts = data.parts.filter((row) =>
+  hasAny(row, ['subject', 'partNumber', 'cpvMain1', 'cpvCodes1', 'cpvMain2', 'cpvCodes2']));
+const tenderers = data.tenderers.filter((row) =>
+  hasAny(row, ['name', 'selectedTenderer', 'code', 'address', 'country', 'groupName']));
+const rejectedCandidates = data.rejectedCandidates.filter((row) =>
+  hasAny(row, [
+    'partNo', 'tendererName', 'tendererNameOther', 'notSubmittedReason',
+    'reasonsRejecting', 'legalGroundsRejectingPublicProcurement',
+    'legalGroundsRejectingUtilitiesProcurement', 'priceCostTender',
+  ]));
+const contractedCandidates = data.contractedCandidates.filter((row) =>
+  hasAny(row, [
+    'partNo', 'tendererName', 'tendererNameOther', 'tenderId',
+    'priceCostTender', 'priceQualityRatio',
+  ]));
+const procedureEnds = data.procedureEnds.filter((row) =>
+  hasAny(row, [
+    'endOfProcedures', 'partNumberOfObject', 'decisionDate',
+    'reasonForMakingDecision',
+  ]));
+const previousProcurements = data.previousProcurements.filter((row) =>
+  hasAny(row, ['procurementNo']));
+const contracts = data.contracts.filter((row) =>
+  hasAny(row, ['name', 'selectedTenderer', 'code', 'totalValueOfPart']));
+const unknownSubcontractors = data.unknownSubcontractors.filter((row) =>
+  hasAny(row, ['name', 'selectedTenderer', 'code', 'address', 'priceCostTender']));
+
+const subcontractorsFor = (
+  contractId: number,
+): Array<Record<string, any> & { known: boolean }> => {
+  const rows = [
+    ...data.contractSubcontractors
+      .filter((row) => row.atn1ContractListId === contractId)
+      .map((row) => ({ ...row, known: true })),
+    ...data.contractUnknownSubcontractors
+      .filter((row) => row.atn1ContractListId === contractId)
+      .map((row) => ({ ...row, known: false })),
+  ];
+  return rows.filter((row) =>
+    hasAny(row, ['name', 'selectedTenderer', 'code', 'address', 'priceCostTender']));
+};
+
+const buyerAddress = [a.postalAddress1, a.town1, a.postalCode1, a.country1].filter(Boolean).join(', ');
+const buyerCode = a.legalEntityCode1 ?? a.authorityOrgNr;
+const agentAddress = [a.postalAddress2, a.town2, a.postalCode2, a.country2].filter(Boolean).join(', ');
+const legalBasis = [a.lawArticle2, a.lawParagraph2, a.lawSubparagraph2]
+  .filter((v) => !empty(v)).join(' / ');
+
+const reportItems = [
+  { label: 'Ataskaitos numeris', value: a.epsRefNr, valueClassName: 'cell-mono' },
+  { label: 'Ataskaitos ID', value: a.id, valueClassName: 'cell-mono' },
+  { label: 'Reglamentavimas', value: procurementType(a.procurementType1) },
+  { label: 'Paskelbimo data', value: String(a.publishedDate ?? '').slice(0, 10), valueClassName: 'cell-mono' },
+  { label: 'Ataskaitiniai metai', value: a.reportingCalendarYear, valueClassName: 'cell-mono' },
+  { label: 'Nepaskelbta', value: a.published === false ? 'Taip' : '' },
+];
+
+const procurementItems = [
+  { label: 'Pirkimo numeris', value: a.procurementNumber ?? a.tenderId, valueClassName: 'cell-mono' },
+  { label: 'Procedūros numeris', value: a.procurementProcedureNumber, valueClassName: 'cell-mono' },
+  { label: 'Pirkimo būdas', value: empty(a.typeOfAwardProcedure) ? '' : cvppDumpAtn1AwardProcedureLabel(a.typeOfAwardProcedure) },
+  { label: 'Pirkimo rūšis', value: contractType(a.typeOfContract) },
+  { label: 'Vertės kategorija', value: contestValue(a.designContestValue) },
+  { label: 'Teisinis pagrindas', value: legalBasis, valueClassName: 'cell-mono' },
+  { label: 'Pagrindinis BVPŽ', value: a.cpvMain1 ?? a.cpvCodes1, valueClassName: 'cell-mono' },
+  { label: 'Papildomi BVPŽ', value: a.cpvMain2 ?? a.cpvCodes2, valueClassName: 'cell-mono' },
+  { label: 'Dalių skaičius', value: a.numberOfParts, valueClassName: 'cell-mono' },
+  { label: 'Projekto pavadinimas', value: a.procurementDesignName },
+  // Antraštėje ši vertė rodoma tik tada, kai šaltinio tekstą pavyksta perskaityti
+  // kaip skaičių, tad žalią reikšmę visada paliekam ir čia.
+  { label: 'Bendra sutarčių vertė', value: a.totalContractValue, valueClassName: 'cell-mono' },
+];
+
+const agentItems = [
+  { label: 'Juridinio asmens kodas', value: a.legalEntityCode2, valueClassName: 'cell-mono' },
+  { label: 'Adresas', value: agentAddress },
+  { label: 'Kontaktinis asmuo', value: a.contactPoint2 },
+  { label: 'Telefonas', value: a.phone2, valueClassName: 'cell-mono' },
+  { label: 'El. paštas', value: a.emailAddress2 },
+  { label: 'Kita informacija', value: a.otherInformation2 },
+];
+
+const conditionItems = [
+  { label: 'Preliminarioji sutartis', value: flag(a.isProcurementConcludedToFrameworkAgreement) },
+  { label: 'Dinaminė pirkimo sistema', value: flag(a.isProcurementToCreateDynamicPurchaseSystem) },
+  { label: 'Elektroninis pirkimas', value: flag(a.viaPublicProcurementInformationSystem) },
+  { label: 'Centralizuotas pirkimas', value: flag(a.isProcurementConcludedInCentralisedManner) },
+  { label: 'Aplinkos apsaugos kriterijai', value: flag(a.isProcurementDocInclEnvironmentCriteria) },
+  { label: 'Inovatyvaus pirkimo kriterijai', value: flag(a.isInnovativeProcurementCriteriaImposed) },
+  { label: 'Centralizuoto pirkimo priežastis', value: a.carriedOutViaCentralSystemReason },
+];
+
+const fundingItems = [
+  { label: 'Finansuojamas ES lėšomis', value: flag(a.procurementFinancedByEu) },
+  { label: 'Finansuojamas fondų lėšomis', value: flag(a.procurementFinancedByFunds) },
+  { label: 'Projekto kodas', value: a.projectCode, valueClassName: 'cell-mono' },
+  { label: 'Projekto pavadinimas', value: a.projectName },
+  { label: 'Vertė preliminariojoje sutartyje', value: a.totalValueOfPartInFrameworkAgreement, valueClassName: 'cell-mono' },
+  { label: 'Vertinama kaina', value: flag(a.price) },
+  { label: 'Vertinamos sąnaudos', value: flag(a.cost) },
+  { label: 'Kainos ir kokybės santykis', value: flag(a.priceQualityRatio) },
+  { label: 'Sąnaudų ir kokybės santykis', value: flag(a.costQualityRatio) },
+];
+
+const claimItems = [
+  { label: 'Pateikta pretenzija', value: flag(a.isClaimSubmitted) },
+  { label: 'Ieškinys teismui', value: flag(a.anyLegayClaims) },
+  { label: 'Nustatytas interesų konfliktas', value: flag(a.isConflictDetected) },
+  { label: 'Taikytos priemonės', value: a.measuresTakenToDetectConflict },
+  { label: 'Pirkimui rengtis padėjo dalyvis', value: flag(a.isProcurementProcedureInvolvesCandidate) },
+  { label: 'Konkurencijos užtikrinimo priemonės', value: a.measuresTakenToMaintainCompetition },
+  { label: 'Pagrindimas, kai pajamos viršija numatytą vertę', value: a.reasonIfSupplierIncomeMoreThanAnticipatedValue },
+];
+
+const shown = (items: Array<{ value?: unknown }>) =>
+  items.filter((item) => !empty(item.value)).length;
+const hasAgent = a.isProcurementPowerGrantedToAnotherAuthority === true
+  && (!empty(a.officialName2) || shown(agentItems) > 0);
+---
+
+<div class="grid-3 mb-10">
+  <DetailsSection title="Ataskaita" items={reportItems} />
+
+  <DetailsSection title="Pirkimas" items={procurementItems} />
+
+  <DetailsSection title="Pirkėjas">
+    <h3><EntityLink kodas={buyerCode} label={a.officialName1} link={!!buyerCode} /></h3>
+    {buyerCode && <span class="text-muted">{buyerCode}</span>}
+    <KeyValueList className="mt-2">
+      {buyerAddress && <><dt>Adresas</dt><dd>{buyerAddress}</dd></>}
+      {a.contactPoint1 && <><dt>Kontaktinis asmuo</dt><dd>{a.contactPoint1}</dd></>}
+      {a.phone1 && <><dt>Telefonas</dt><dd class="cell-mono">{a.phone1}</dd></>}
+      {a.emailAddress1 && <><dt>El. paštas</dt><dd><a href={`mailto:${a.emailAddress1}`}>{a.emailAddress1}</a></dd></>}
+      {a.urlGeneral1 && (
+        <>
+          <dt>Svetainė</dt>
+          <dd><a href={a.urlGeneral1} target="_blank" rel="noopener noreferrer">{a.urlGeneral1}</a></dd>
+        </>
+      )}
+    </KeyValueList>
+  </DetailsSection>
+
+  {hasAgent && (
+    <DetailsSection title="Įgaliotoji organizacija">
+      <h3>{value(a.officialName2)}</h3>
+      <KeyValueList className="mt-2" items={agentItems} />
+    </DetailsSection>
+  )}
+
+  {shown(conditionItems) > 0 && (
+    <DetailsSection title="Pirkimo sąlygos" items={conditionItems} />
+  )}
+
+  {shown(fundingItems) > 0 && (
+    <DetailsSection title="Finansavimas ir kriterijai" items={fundingItems} />
+  )}
+
+  {shown(claimItems) > 0 && (
+    <DetailsSection title="Skundai ir interesų konfliktai" items={claimItems} />
+  )}
+</div>
+
+{parts.length > 0 && (
+  <section class="mb-10">
+    <h2>Pirkimo dalys</h2>
+    <ul class="atn1-list">
+      {parts.map((row) => (
+        <li class="atn1-row">
+          <div class="atn1-row-main">
+            <span class="atn1-row-title">{row.subject || `Dalis ${value(row.item ?? row.partNumber)}`}</span>
+            <span class="atn1-row-meta">
+              {meta(
+                empty(row.item ?? row.partNumber) ? '' : `Nr. ${row.item ?? row.partNumber}`,
+                empty(row.cpvMain1 ?? row.cpvCodes1) ? '' : `BVPŽ ${row.cpvMain1 ?? row.cpvCodes1}`,
+                empty(row.cpvMain2 ?? row.cpvCodes2) ? '' : `papildomi ${row.cpvMain2 ?? row.cpvCodes2}`,
+              )}
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </section>
+)}
+
+{tenderers.length > 0 && (
+  <section class="mb-10">
+    <h2>Dalyviai ir kandidatai</h2>
+    <ul class="atn1-list">
+      {tenderers.map((row) => (
+        <li class="atn1-row">
+          <div class="atn1-row-main">
+            <span class="atn1-row-title">
+              <EntityLink kodas={row.code} label={row.name ?? row.selectedTenderer} />
+            </span>
+            <span class="atn1-row-meta">{meta(row.code, row.address, row.country, row.groupName)}</span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </section>
+)}
+
+{rejectedCandidates.length > 0 && (
+  <section class="mb-10">
+    <h2>Nepateikti ir atmesti pasiūlymai</h2>
+    <ul class="atn1-list">
+      {rejectedCandidates.map((row) => (
+        <li class="atn1-row">
+          <div class="atn1-row-main">
+            <span class="atn1-row-title">{value(row.tendererName ?? row.tendererNameOther)}</span>
+            <span class="atn1-row-meta">
+              {meta(
+                empty(row.partNo) ? '' : `Dalis ${row.partNo}`,
+                row.legalGroundsRejectingPublicProcurement ?? row.legalGroundsRejectingUtilitiesProcurement,
+              )}
+            </span>
+            {(row.notSubmittedReason || row.reasonsRejecting) && (
+              <p class="atn1-row-note">{row.notSubmittedReason ?? row.reasonsRejecting}</p>
+            )}
+          </div>
+          {row.priceCostTender && <span class="atn1-row-amount">{row.priceCostTender}</span>}
+        </li>
+      ))}
+    </ul>
+  </section>
+)}
+
+{contractedCandidates.length > 0 && (
+  <section class="mb-10">
+    <h2>Pasiūlymų eilė</h2>
+    <ol class="atn1-list">
+      {contractedCandidates.map((row) => (
+        <li class="atn1-row">
+          {!empty(row.tenderId) && <span class="atn1-rank">{row.tenderId}</span>}
+          <div class="atn1-row-main">
+            <span class="atn1-row-title">{value(row.tendererName ?? row.tendererNameOther)}</span>
+            <span class="atn1-row-meta">
+              {meta(
+                empty(row.partNo) ? '' : `Dalis ${row.partNo}`,
+                empty(row.priceQualityRatio) ? '' : `Kokybės santykis ${row.priceQualityRatio}`,
+              )}
+            </span>
+          </div>
+          {row.priceCostTender && (
+            <span class="atn1-row-amount">
+              {row.priceCostTender}{row.priceCostTenderExpression ? ` ${row.priceCostTenderExpression}` : ''}
+            </span>
+          )}
+        </li>
+      ))}
+    </ol>
+  </section>
+)}
+
+{procedureEnds.length > 0 && (
+  <section class="mb-10">
+    <h2>Procedūrų pabaiga</h2>
+    <ol class="ds-timeline">
+      {procedureEnds.map((row) => (
+        <li class="ds-timeline-item">
+          <span class="ds-timeline-dot ds-timeline-dot--active" aria-hidden="true"></span>
+          <div class="ds-timeline-body">
+            <span class="atn1-row-title">{cvppDumpAtn1ProcedureEndLabel(row.endOfProcedures)}</span>
+            <span class="atn1-row-meta">
+              {row.decisionDate && <DateValue value={row.decisionDate} />}
+              {row.decisionDate && !empty(row.partNumberOfObject) && ' · '}
+              {!empty(row.partNumberOfObject) && `Dalis ${row.partNumberOfObject}`}
+            </span>
+            {row.reasonForMakingDecision && (
+              <p class="atn1-row-note">{row.reasonForMakingDecision}</p>
+            )}
+          </div>
+        </li>
+      ))}
+    </ol>
+  </section>
+)}
+
+{contracts.length > 0 && (
+  <section class="mb-10">
+    <h2>Sutartys</h2>
+    <div class="stack stack-md mt-4">
+      {contracts.map((contract) => {
+        const subcontractors = subcontractorsFor(contract.id);
+        return (
+          <Surface as="article" padding="md" className="stack stack-md w-max max-w-full">
+            <h3 class="mt-0">
+              <EntityLink
+                kodas={contract.code}
+                label={contract.name || contract.selectedTenderer || `Sutartis #${contract.id}`}
+              />
+            </h3>
+            <KeyValueList
+              items={[
+                { label: 'Tiekėjo kodas', value: contract.code, valueClassName: 'cell-mono' },
+                { label: 'Pirkimo dalys', value: contract.partNumber, valueClassName: 'cell-mono' },
+                { label: 'Sudarymo data', value: contract.conclusionDate, valueClassName: 'cell-mono' },
+                { label: 'Galiojimo pabaiga', value: contract.expiryDate, valueClassName: 'cell-mono' },
+                { label: 'Vertė', value: contract.totalValueOfPart, valueClassName: 'cell-mono' },
+                { label: 'Orientacinė vertė', value: flag(contract.isIndicative) },
+                { label: 'Centralizuotas pirkimas', value: flag(contract.isProcurementConcludedInCentralisedManner) },
+                { label: 'Aplinkos apsaugos kriterijai', value: flag(contract.isProcurementDocInclEnvironmentCriteria) },
+                { label: 'Inovatyvaus pirkimo kriterijai', value: flag(contract.isInnovativeProcurementCriteriaImposed) },
+                { label: 'Bus pasitelkta subranga', value: empty(contract.willSubcontractBeConcluded) ? '' : cvppDumpAtn1YesNoUnknownLabel(contract.willSubcontractBeConcluded) },
+                { label: 'Apimtis eurais', value: contract.valueInEur, valueClassName: 'cell-mono' },
+                { label: 'Apimtis procentais', value: contract.percentage, valueClassName: 'cell-mono' },
+              ]}
+            />
+            {subcontractors.length > 0 && (
+              <div>
+                <h4>Subrangovai ir subtiekėjai</h4>
+                <ul class="atn1-list">
+                  {subcontractors.map((row) => (
+                    <li class="atn1-row">
+                      <div class="atn1-row-main">
+                        <span class="atn1-row-title">
+                          <EntityLink kodas={row.code} label={row.name ?? row.selectedTenderer} />
+                        </span>
+                        <span class="atn1-row-meta">
+                          {meta(row.code, row.address, row.country, row.known ? 'žinomas' : 'nežinomas')}
+                        </span>
+                      </div>
+                      {row.priceCostTender && <span class="atn1-row-amount">{row.priceCostTender}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Surface>
+        );
+      })}
+    </div>
+  </section>
+)}
+
+{unknownSubcontractors.length > 0 && (
+  <section class="mb-10">
+    <h2>Kiti subtiekėjai</h2>
+    <ul class="atn1-list">
+      {unknownSubcontractors.map((row) => (
+        <li class="atn1-row">
+          <div class="atn1-row-main">
+            <span class="atn1-row-title">
+              <EntityLink kodas={row.code} label={row.name ?? row.selectedTenderer} />
+            </span>
+            <span class="atn1-row-meta">{meta(row.code, row.address, row.country)}</span>
+          </div>
+          {row.priceCostTender && <span class="atn1-row-amount">{row.priceCostTender}</span>}
+        </li>
+      ))}
+    </ul>
+  </section>
+)}
+
+{previousProcurements.length > 0 && (
+  <section class="mb-10">
+    <h2>Ankstesni pirkimai</h2>
+    <ul class="atn1-chips">
+      {previousProcurements.map((row) => (
+        <li class="cell-mono">
+          {!empty(row.seqNo) && <span class="text-muted">{row.seqNo}.</span>}
+          {value(row.procurementNo)}
+        </li>
+      ))}
+    </ul>
+  </section>
+)}
+
+{otherFields.length > 0 && (
+  <details class="mb-10">
+    <summary>Kiti šaltinio laukai ({otherFields.length})</summary>
+    <KeyValueList className="mt-4">
+      {otherFields.map(([key, fieldValue]) => (
+        <>
+          <dt>{humanize(key)}</dt>
+          <dd class="cell-mono">{display(fieldValue)}</dd>
+        </>
+      ))}
+    </KeyValueList>
+  </details>
+)}
+
+<p class="text-muted text-sm">
+  Šaltinio įrašas sukurtas <DateValue value={a.insertDate} mode="datetime" /> ·
+  atnaujintas <DateValue value={a.updateDate} mode="datetime" />.
+</p>
+
+<style>
+  /* Plokščias įrašų sąrašas vietoj lentelės: plaukelio storio linija tarp
+     eilučių, pavadinimas viršuje, tyli meta eilutė po juo, suma – dešinėje.
+     Sąrašas nesitempia per visą plotį: ilgesnis tekstas skaitomas iki ~90ch. */
+  .atn1-list {
+    max-width: 90ch;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .atn1-row {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--lighter-gray);
+  }
+
+  .atn1-row:last-child { border-bottom: 0; }
+
+  .atn1-row-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .atn1-row-title {
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .atn1-row-meta {
+    color: var(--gray);
+    font-size: var(--text-xs);
+  }
+
+  .atn1-row-meta:empty { display: none; }
+
+  .atn1-row-note {
+    margin: 4px 0 0;
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+  }
+
+  .atn1-row-amount {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Pasiūlymų eilės numeris – tylus apskritimas prieš pavadinimą. */
+  .atn1-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: var(--radius-pill);
+    background: var(--lightest-gray);
+    color: var(--dark-gray);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+
+  /* Laiko juostos tekstas – tie patys eilutės stiliai. */
+  .ds-timeline-body .atn1-row-title,
+  .ds-timeline-body .atn1-row-meta {
+    display: block;
+  }
+
+  /* Trumpi numeriai – ne sąrašas per visą plotį, o eilė žetonų. */
+  .atn1-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .atn1-chips li {
+    display: inline-flex;
+    gap: 6px;
+    padding: 3px 10px;
+    border: 1px solid var(--light-gray);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+  }
+</style>

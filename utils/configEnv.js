@@ -21,6 +21,8 @@ const ENV_MAP = [
     ["ONION_ADDRESS", "onionAddress", "string"],
 
     ["PORT", "port", "number"],
+    ["LOG_REQUESTS", "logRequests", "boolean"],
+    ["ENABLE_ATN1", "enableAtn1", "boolean"],
 
     ["PG_HOST", "pgHost", "string"],
     ["PG_PORT", "pgPort", "number"],

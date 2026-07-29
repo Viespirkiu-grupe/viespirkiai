@@ -1,0 +1,401 @@
+---
+// Visų CVPP archyvo ataskaitų paieška. Maketas — tas pats šoninės juostos
+// idiomas kaip /viesiejiPirkimai ir /dokumentai: visi filtrai gyvena kairėje
+// juostoje viename #searchForm, o rezultatai — plokščiu sąrašu dešinėje.
+import Layout from '../../../layouts/Layout.astro';
+import Button from '@design-system/components/Button.astro';
+import DateValue from '@design-system/components/DateValue.astro';
+import ResultCardFooter from '@design-system/components/ResultCardFooter.astro';
+import ResultCardMeta from '@design-system/components/ResultCardMeta.astro';
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import ResultPageShell from '@design-system/components/content/ResultPageShell.astro';
+import DateRangeFilter from '@design-system/components/filters/DateRangeFilter.astro';
+import FilterGroup from '@design-system/components/filters/FilterGroup.astro';
+import FilterPanel from '@design-system/components/filters/FilterPanel.astro';
+import SelectInput from '@design-system/components/inputs/SelectInput.astro';
+import TextInput from '@design-system/components/inputs/TextInput.astro';
+import { buildNumberOfResults, getColorScheme, getFont } from '../../../lib/failai.js';
+import {
+  searchCvppDumpAtn1,
+  type CvppDumpAtn1SearchInput,
+} from '../../../lib/cvppDumpAtn1.js';
+import {
+  cvppDumpAtn1AwardProcedureLabel,
+  cvppReportTypeLabel,
+} from '../../../lib/cvppDumpAtn1Labels.js';
+
+const params = Astro.url.searchParams;
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+const dateFrom = params.get('dateFrom')?.trim() ?? '';
+const dateTo = params.get('dateTo')?.trim() ?? '';
+const formTypeId = params.get('formTypeId')?.trim() ?? '';
+
+if ((dateFrom && !datePattern.test(dateFrom)) || (dateTo && !datePattern.test(dateTo))) {
+  return new Response('Datos turi būti YYYY-MM-DD formato.', { status: 400 });
+}
+if (formTypeId && !['1', '3', '4', '5', '6'].includes(formTypeId)) {
+  return new Response('Nežinoma ataskaitos rūšis.', { status: 400 });
+}
+
+const input: CvppDumpAtn1SearchInput = {
+  search: params.get('search') ?? '',
+  formTypeId,
+  procurementNumber: params.get('procurementNumber') ?? '',
+  authorityCode: params.get('authorityCode') ?? '',
+  dateFrom,
+  dateTo,
+  procurementType: params.get('procurementType') ?? '',
+  typeOfContract: params.get('typeOfContract') ?? '',
+  awardProcedure: params.get('awardProcedure') ?? '',
+  sort: params.get('sort') ?? '',
+  page: Number(params.get('page') ?? 1),
+};
+
+const result = await searchCvppDumpAtn1(input);
+const numberOfResults = buildNumberOfResults({
+  rows: result.rows,
+  total: result.total,
+  elapsed: result.elapsedMs,
+  engine: 'PostgreSQL',
+});
+const preservedParams = new URLSearchParams(params);
+preservedParams.delete('page');
+const serializedParams = preservedParams.toString();
+const queryParams = serializedParams ? `&${serializedParams}` : '';
+
+// Filtrų laukai – be `search` ir `sort`: juostos skaitiklis skaičiuoja tik tai,
+// kas iš tikrųjų siaurina rezultatus.
+const FILTER_KEYS = [
+  'formTypeId', 'procurementNumber', 'authorityCode', 'dateFrom', 'dateTo',
+  'procurementType', 'typeOfContract', 'awardProcedure',
+] as const;
+const activeFilterCount = FILTER_KEYS
+  .filter((key) => (params.get(key) ?? '').trim() !== '').length;
+const hasFilters = activeFilterCount > 0;
+
+// `values` – bendra forma DS įvesties komponentams (jie skaito values[name]).
+const values: Record<string, string> = {
+  formTypeId: input.formTypeId ?? '',
+  procurementNumber: input.procurementNumber ?? '',
+  authorityCode: input.authorityCode ?? '',
+  dateFrom,
+  dateTo,
+  procurementType: input.procurementType ?? '',
+  typeOfContract: input.typeOfContract ?? '',
+  awardProcedure: input.awardProcedure ?? '',
+};
+
+const REPORT_TYPES = [1, 3, 4, 5, 6]
+  .map((value) => ({ value: String(value), label: cvppReportTypeLabel(value) }));
+const PROCUREMENT_TYPES = [
+  { value: 'PUBLIC_PROCUREMENT', label: 'Viešųjų pirkimų įstatymas' },
+  { value: 'UTILITIES_SECTOR_PROCUREMENT', label: 'Pirkimų įstatymas' },
+];
+const CONTRACT_TYPES = [
+  { value: 'SUPPLIES', label: 'Prekės' },
+  { value: 'SERVICES', label: 'Paslaugos' },
+  { value: 'WORKS', label: 'Darbai' },
+];
+const AWARD_PROCEDURES = [
+  'PROCTYPE_OPEN',
+  'PROCTYPE_RESTRICTED',
+  'PROC_TYPE_NEGOTIATED_WITH_PUB',
+  'PROC_TYPE_NEGOTIATED_WO_PUB',
+  'PROCTYPE_COMP_DIALOGUE',
+  'PROCTYPE_INNOVATION',
+  'PROC_TYPE_DYNAMIC_PURCHASE',
+  'AWARD_DYNAMIC_PURCHASE',
+].map((value) => ({ value, label: cvppDumpAtn1AwardProcedureLabel(value) }));
+
+const sortOptions = [
+  { value: '', label: 'Naujausiai paskelbtos' },
+  { value: 'publishedAsc', label: 'Seniausiai paskelbtos' },
+  { value: 'titleAsc', label: 'Pagal pavadinimą' },
+  { value: 'organizationAsc', label: 'Pagal pirkėją' },
+];
+
+const procurementTypeLabel = (value: unknown) =>
+  PROCUREMENT_TYPES.find((t) => t.value === String(value ?? ''))?.label
+    ?? String(value ?? '');
+const contractTypeLabel = (value: unknown) =>
+  CONTRACT_TYPES.find((t) => t.value === String(value ?? ''))?.label
+    ?? String(value ?? '');
+
+// Vertė šaltinyje – tekstas („12345,67", „12 345.67 EUR"). Parodom sutvarkytą
+// sumą tik tada, kai ją pavyksta patikimai perskaityti; kitaip – žalią tekstą.
+const formatValue = (raw: unknown) => {
+  if (raw == null || raw === '') return null;
+  const text = String(raw).trim();
+  const normalized = text.replace(/\s/g, '').replace(/,/g, '.');
+  const parsed = Number(normalized.replace(/[^\d.-]/g, ''));
+  if (!Number.isFinite(parsed) || parsed <= 0) return text;
+  return `${parsed.toLocaleString('lt-LT', { maximumFractionDigits: 2 })} €`;
+};
+
+const title = (row: Record<string, any>) =>
+  row.procurementObjectName || row.procurementDesignName || row.title || 'Pavadinimas nenurodytas';
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+---
+
+<Layout
+  pageTitle="CVPP ataskaitų paieška"
+  pageDescription="CVPP archyvo viešųjų pirkimų ataskaitų paieška."
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main class="sidebar-main">
+    <form method="get" role="search" id="searchForm" class="searchform-sidebar">
+      <h1 class="sr-only">CVPP ataskaitų paieška</h1>
+
+      <aside class="sf-rail" aria-label="Filtrai">
+        <div class="sf-rail-head">
+          <button type="button" class="sf-rail-toggle" id="sfFiltersToggle" aria-expanded="false" aria-controls="sfRailBody">
+            <span class="sf-rail-toggle-label">Filtrai</span>
+            {activeFilterCount > 0 && <span class="sf-filters-count">{activeFilterCount}</span>}
+            <span class="sf-filters-chevron" aria-hidden="true"></span>
+          </button>
+        </div>
+
+        <div class="sf-rail-body" id="sfRailBody">
+          {hasFilters && (
+            <div class="atn1-rail-head">
+              <a href="/cvpp/ataskaitos" class="atn1-rail-clear">Panaikinti</a>
+            </div>
+          )}
+
+          <FilterPanel variant="rail" className="atn1-filters-rail">
+            <FilterGroup legend="Ataskaita">
+              <SelectInput
+                label="Ataskaitos rūšis"
+                name="formTypeId"
+                options={REPORT_TYPES}
+                values={values}
+                placeholder="Visos"
+              />
+            </FilterGroup>
+
+            <FilterGroup legend="Pirkimas">
+              <SelectInput
+                label="Reglamentavimas"
+                name="procurementType"
+                options={PROCUREMENT_TYPES}
+                values={values}
+                placeholder="Visi"
+              />
+              <SelectInput
+                label="Pirkimo rūšis"
+                name="typeOfContract"
+                options={CONTRACT_TYPES}
+                values={values}
+                placeholder="Visos"
+              />
+              <SelectInput
+                label="Pirkimo būdas"
+                name="awardProcedure"
+                options={AWARD_PROCEDURES}
+                values={values}
+                placeholder="Visi"
+              />
+            </FilterGroup>
+
+            <DateRangeFilter
+              legend="Paskelbimo data"
+              nameFrom="dateFrom"
+              nameTo="dateTo"
+              labelFrom="Paskelbta nuo"
+              labelTo="Paskelbta iki"
+              values={values}
+            />
+
+            <FilterGroup legend="Identifikatoriai">
+              <TextInput
+                label="Pirkimo numeris"
+                name="procurementNumber"
+                placeholder="Nenurodyta"
+                values={values}
+              />
+              <TextInput
+                label="Pirkėjo kodas"
+                name="authorityCode"
+                placeholder="Nenurodyta"
+                values={values}
+              />
+            </FilterGroup>
+          </FilterPanel>
+
+          <button type="submit" class="sf-rail-search">Ieškoti</button>
+        </div>
+      </aside>
+
+      <div class="sf-search">
+        <div class="search-bar">
+          <label for="search">
+            <svg class="search-icon" aria-hidden="true" width="20" height="20" viewBox="0 1 24 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M10.502 2C5.80753 2 2.00195 5.80558 2.00195 10.5C2.00195 15.1944 5.80753 19 10.502 19C12.4884 19 14.3169 18.3176 15.7637 17.176L20.5877 22C20.9783 22.3905 21.6114 22.3905 22.002 22C22.3925 21.6095 22.3925 20.9763 22.002 20.5858L17.1779 15.7618C18.3196 14.3149 19.002 12.4865 19.002 10.5C19.002 5.80558 15.1964 2 10.502 2ZM4.00195 10.5C4.00195 6.91015 6.9121 4 10.502 4C14.0918 4 17.002 6.91015 17.002 10.5C17.002 12.2952 16.2755 13.9188 15.0981 15.0962C13.9208 16.2736 12.2972 17 10.502 17C6.9121 17 4.00195 14.0899 4.00195 10.5Z" fill="currentColor"/>
+            </svg>
+            <span class="sr-only">Paieška</span>
+          </label>
+          <input
+            type="search"
+            name="search"
+            id="search"
+            class="search-bar__input"
+            value={input.search}
+            placeholder="Pavadinimas, pirkėjas arba ataskaitos numeris"
+            enterkeyhint="search"
+          />
+          <Button type="submit">Ieškoti</Button>
+        </div>
+      </div>
+
+      <div class="sf-results">
+        <ResultPageShell
+          numberOfResults={numberOfResults}
+          resultCount={result.rows.length}
+          page={result.page}
+          pageCount={result.pageCount}
+          queryParams={queryParams}
+          emptyText="Ataskaitų pagal pasirinktus kriterijus nerasta."
+          containerClass="mt-0"
+          flat={true}
+        >
+          <Fragment slot="sort">
+            <label class="sr-only" for="atn1Sort">Rikiuoti pagal</label>
+            <select id="atn1Sort" name="sort" data-autosubmit aria-label="Rikiuoti pagal">
+              {sortOptions.map((option) => (
+                <option value={option.value} selected={(input.sort ?? '') === option.value}>{option.label}</option>
+              ))}
+            </select>
+          </Fragment>
+
+          {result.rows.map((row) => (
+            <ResultCardShell clickable={true}>
+              <ResultCardMeta
+                slot="meta"
+                items={[
+                  { label: 'Ataskaitos rūšis', value: cvppReportTypeLabel(row.formTypeId), valueClassName: 'atn1-badge' },
+                  { label: 'Ataskaitos numeris', value: row.epsRefNr, valueClassName: 'cell-mono' },
+                  { label: 'Pirkimo rūšis', value: contractTypeLabel(row.typeOfContract) },
+                ]}
+              >
+                {row.publishedDate && (
+                  <div>
+                    <dt class="sr-only">Paskelbimo data</dt>
+                    <dd><DateValue value={row.publishedDate} /></dd>
+                  </div>
+                )}
+              </ResultCardMeta>
+
+              <h2 slot="title" class="result-card-title">
+                <a href={`/cvpp/ataskaitos/${row.ataskaitosNumeris}`}>{title(row)}</a>
+              </h2>
+
+              <ResultCardFooter
+                slot="footer"
+                items={[
+                  { label: 'Pirkėjas', value: row.officialName1 || 'nenurodytas' },
+                  {
+                    label: 'Pirkimo nr.',
+                    html: `<span class="cell-mono">${row.procurementNumber ?? row.tenderId ?? 'nenurodytas'}</span>`,
+                  },
+                  row.procurementType1 && {
+                    label: 'Reglamentavimas',
+                    value: procurementTypeLabel(row.procurementType1),
+                  },
+                  row.typeOfAwardProcedure && {
+                    label: 'Pirkimo būdas',
+                    value: cvppDumpAtn1AwardProcedureLabel(row.typeOfAwardProcedure),
+                  },
+                  formatValue(row.totalContractValue) && {
+                    label: 'Sutarčių vertė',
+                    value: formatValue(row.totalContractValue),
+                  },
+                  (row.tenderersCount > 0 || row.contractsCount > 0) && {
+                    value: [
+                      row.tenderersCount > 0 ? `${row.tenderersCount} dalyvių` : '',
+                      row.contractsCount > 0 ? `${row.contractsCount} sutarčių` : '',
+                    ].filter(Boolean).join(' · '),
+                    className: 'text-muted',
+                  },
+                ].filter(Boolean) as any[]}
+              />
+            </ResultCardShell>
+          ))}
+        </ResultPageShell>
+      </div>
+    </form>
+  </main>
+</Layout>
+
+<style is:global>
+  /* Filtrų nunulinimas – tik kai yra ką nunulinti (kaip /dokumentai juostoje). */
+  .atn1-rail-head {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+  }
+  .atn1-rail-clear {
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+  }
+  .atn1-rail-clear:hover { color: var(--black); }
+
+  /* Kompaktiškesnės grupių antraštės – kaip .vp-filters-rail. */
+  .atn1-filters-rail .filter-group-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    color: var(--gray);
+    margin-bottom: 6px;
+  }
+  .atn1-filters-rail .filter-group .ds-field__control {
+    font-size: 13px;
+  }
+
+  /* Ataskaitos rūšies žymė – tyli piliulė, kad rūšis būtų atpažįstama iš karto. */
+  .result-card-meta .atn1-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    background: var(--lightest-gray);
+    color: var(--dark-gray);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: .04em;
+  }
+
+  @media (max-width: 900px) {
+    /* Telefone antraštę neša .sf-rail-head perjungiklis. */
+    .atn1-rail-head { display: none; }
+  }
+</style>
+
+<script is:inline>
+  // Mobilus filtrų perjungiklis (tas pats elgesys kaip /viesiejiPirkimai).
+  const sfToggle = document.getElementById('sfFiltersToggle');
+  const sfRail = document.querySelector('.sf-rail');
+  sfToggle?.addEventListener('click', () => {
+    const open = sfRail?.classList.toggle('is-open') ?? false;
+    sfToggle.setAttribute('aria-expanded', String(open));
+  });
+
+  // Rikiavimo select priklauso #searchForm — keitimas iš naujo paleidžia paiešką
+  // nuo pirmo puslapio.
+  document.querySelectorAll('select[data-autosubmit]').forEach((select) => {
+    select.addEventListener('change', () => {
+      const form = select.form;
+      if (!form) return;
+      form.querySelector('input[name="page"]')?.remove();
+      form.requestSubmit();
+    });
+  });
+</script>
+
+<script>
+  import { initStickyRail } from '@/src/lib/stickyRail';
+  initStickyRail();
+</script>

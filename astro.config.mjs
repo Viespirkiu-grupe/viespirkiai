@@ -3,6 +3,8 @@ import node from '@astrojs/node';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { loadEnv } from 'vite';
+import { envFlag, logNodeRequest } from './requestLog.mjs';
 
 // Dev/preview serverio prievadas. Standalone runtime prievadą nustato
 // start-server.mjs iš config.js (runtime metu), tad config.js čia NEimportuojamas –
@@ -55,6 +57,18 @@ export default defineConfig({
     plugins: [
       tailwindcss(),
       sutartysExportEntryPlugin(),
+      {
+        name: 'request-logger',
+        configureServer(server) {
+          const env = loadEnv(server.config.mode, root, '');
+          if (!envFlag(env.LOG_REQUESTS)) return;
+          server.middlewares.use((request, _response, next) => {
+            logNodeRequest(request);
+            next();
+          });
+          server.httpServer?.on('upgrade', logNodeRequest);
+        },
+      },
       {
         name: 'sutartys-export-websocket',
         configureServer(server) {

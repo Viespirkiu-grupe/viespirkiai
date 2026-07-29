@@ -1,0 +1,8 @@
+---
+// Perkelta į /cvpp/ataskaitos/atn1/[id] (žr. /atn1/index.astro).
+const rawId = Astro.params.id ?? '';
+if (!/^\d+(\.json)?$/.test(rawId)) {
+  return new Response(null, { status: 404 });
+}
+return Astro.redirect(`/cvpp/ataskaitos/atn1/${rawId}${Astro.url.search}`, 301);
+---

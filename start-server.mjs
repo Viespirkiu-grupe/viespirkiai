@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
 import path from 'node:path';
+import { envFlag, logNodeRequest } from './requestLog.mjs';
 
 // Konfigūracija imama TIK iš aplinkos kintamųjų (`.env` arba tikros aplinkos).
 // Runtime image'e utils/ nėra, tad naudojam įmontuotą process.loadEnvFile ir
@@ -23,13 +24,21 @@ if (await fs.promises.access(envPath).then(() => true).catch(() => false)) {
 process.env.ASTRO_NODE_AUTOSTART = 'disabled';
 const { handler } = await import('./dist/server/entry.mjs');
 const { attachSutartysExportWebSocket } = await import('./dist/server/exportWebSocket.mjs');
+const logRequests = envFlag(process.env.LOG_REQUESTS);
+const requestHandler = logRequests
+  ? (request, response) => {
+      logNodeRequest(request);
+      return handler(request, response);
+    }
+  : handler;
 const server = process.env.SERVER_CERT_PATH && process.env.SERVER_KEY_PATH
   ? https.createServer({
       cert: fs.readFileSync(process.env.SERVER_CERT_PATH),
       key: fs.readFileSync(process.env.SERVER_KEY_PATH),
-    }, handler)
-  : http.createServer(handler);
+    }, requestHandler)
+  : http.createServer(requestHandler);
 
+if (logRequests) server.on('upgrade', logNodeRequest);
 attachSutartysExportWebSocket(server);
 
 const port = Number(process.env.PORT) || 9019;

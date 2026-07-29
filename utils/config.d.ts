@@ -11,6 +11,10 @@ export interface Config {
     onionAddress?: string;
 
     port: number;
+    /** Į stderr rašyti struktūrizuotą kiekvienos HTTP užklausos žurnalą. */
+    logRequests: boolean;
+    /** Rodyti CVPP / ATN-1 archyvo puslapius ir navigacijos nuorodą. */
+    enableAtn1: boolean;
     /** Nustatomas automatiškai pagal NODE_ENV (ne per config/.env). */
     dev: boolean;
 

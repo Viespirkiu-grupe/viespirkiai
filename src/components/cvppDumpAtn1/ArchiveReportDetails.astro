@@ -1,0 +1,349 @@
+---
+import DataTable from '@design-system/components/DataTable.astro';
+import DetailsSection from '@design-system/components/DetailsSection.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import Surface from '@design-system/components/Surface.astro';
+import type { CvppArchiveReport } from '../../lib/cvppDumpAtn1.js';
+import { cvppReportTypeLabel } from '../../lib/cvppDumpAtn1Labels.js';
+
+const { report } = Astro.props as { report: CvppArchiveReport };
+const content = report.turinys ?? {};
+
+const labels: Record<string, string> = {
+  ataskaitosTipas: 'Ataskaitos tipas',
+  pirkimoNumeris: 'Pirkimo numeris',
+  pirkimoObjektoPavadinimas: 'Pirkimo objekto pavadinimas',
+  pirkimoObjektoRusis: 'Pirkimo objekto rūšis',
+  pirkimoTipas: 'Pirkimo tipas',
+  pirkimoBudas: 'Pirkimo būdas',
+  teisinisPagrindas: 'Teisinis pagrindas',
+  ataskaitiniaiMetai: 'Ataskaitiniai metai',
+  bendraVerteNevirsijo30000: 'Bendra pirkimų vertė neviršijo 30 000 €',
+  pagrindinisKodasBvpz: 'Pagrindinis BVPŽ kodas',
+  papildomiKodaiBvpz: 'Papildomi BVPŽ kodai',
+  perkanciojiOrganizacija: 'Perkančioji organizacija',
+  suteikiancioji: 'Suteikiančioji institucija',
+  igaliojimasKitaiPO: 'Įgaliojimas kitai organizacijai',
+  igaliojimasKitaiSuteikiancioji: 'Įgaliojimas kitai suteikiančiajai institucijai',
+  preliminariSutartis: 'Preliminarioji sutartis',
+  dinamineSistema: 'Dinaminė pirkimo sistema',
+  elektroninisPirkimas: 'Elektroninis pirkimas',
+  finansuojamasEsLesomis: 'Finansuojamas ES lėšomis',
+  pajamosReikalavimas: 'Pajamų reikalavimas',
+  keliuTransportoPriemones: 'Kelių transporto priemonių pirkimai',
+  vertinimoKriterijai: 'Vertinimo kriterijai',
+  mazosVertesPirkimai: 'Mažos vertės pirkimai',
+  didesnesVertesPirkimai: 'Didesnės vertės pirkimai',
+  supaprastintiPirkimai: 'Supaprastinti pirkimai',
+  vidausSandoriai: 'Vidaus sandoriai',
+  pagalSlaptumoZyma: 'Pirkimai pagal slaptumo žymą',
+  papildomaInformacija: 'Papildoma informacija',
+  atsakingasAsmuo: 'Atsakingas asmuo',
+  pirkimoDalys: 'Pirkimo dalys',
+  dalyviai: 'Dalyviai',
+  dalyvioInformacija: 'Dalyvio informacija',
+  dalyviuPasalinimoPagrindai: 'Dalyvių pašalinimo pagrindai',
+  dalyvisPasalintas: 'Dalyvis pašalintas',
+  atmestiPasiulymai: 'Atmesti pasiūlymai',
+  pasiulymuEile: 'Pasiūlymų eilė',
+  pasiulymuVertinimas: 'Pasiūlymų vertinimas',
+  ankstesnisPirkimas: 'Ankstesni pirkimai',
+  sutartys: 'Sutartys',
+  sutartiesSavybes: 'Sutarties savybės',
+  skundai: 'Skundai ir interesų konfliktai',
+  islaptintaInformacija: 'Įslaptinta informacija',
+  naudojama: 'Naudojama įslaptinta informacija',
+  naudojimoBudas: 'Įslaptintos informacijos naudojimo būdas',
+  auksciausiaSlaptumoZyma: 'Aukščiausia slaptumo žyma',
+  koncesijosNumeris: 'Koncesijos numeris',
+  koncesijosPavadinimas: 'Koncesijos pavadinimas',
+  koncesijosVerte: 'Koncesijos vertė',
+  sutartiesTipas: 'Sutarties tipas',
+  suteikimoBudas: 'Suteikimo būdas',
+  daliuSkaicius: 'Dalių skaičius',
+  pavadinimas: 'Pavadinimas',
+  pavadinimoPatikslinimas: 'Pavadinimo patikslinimas',
+  kodas: 'Kodas',
+  grupe: 'Grupė',
+  tipas: 'Tipas',
+  adresas: 'Adresas',
+  miestas: 'Miestas',
+  salis: 'Šalis',
+  asmuo: 'Kontaktinis asmuo',
+  telefonas: 'Telefonas',
+  elPastas: 'El. paštas',
+  faksas: 'Faksas',
+  svetaine: 'Interneto svetainė',
+  pastoKodas: 'Pašto kodas',
+  pirkejoProfilis: 'Pirkėjo profilis',
+  vardas: 'Vardas, pavardė',
+  daliesNr: 'Dalies nr.',
+  eileNr: 'Eilės nr.',
+  verte: 'Vertė',
+  kaina: 'Kaina',
+  pirkimuSkaicius: 'Pirkimų skaičius',
+  nr: 'Sutarties eilės nr.',
+  sudarymoData: 'Sutarties sudarymo data',
+  trukme: 'Sutarties galiojimo pabaiga',
+  mazosVertesVerte: 'Mažos vertės pirkimų vertė',
+  mazosVertesSkaicius: 'Mažos vertės pirkimų skaičius',
+  tarptautinoVerte: 'Tarptautinių pirkimų vertė',
+  tarptautinoSkaicius: 'Tarptautinių pirkimų skaičius',
+  supaprastintoVerte: 'Supaprastintų pirkimų vertė',
+  supaprastintoSkaicius: 'Supaprastintų pirkimų skaičius',
+  slaptaiVerte: 'Slaptų pirkimų vertė',
+  slaptaiSkaicius: 'Slaptų pirkimų skaičius',
+  konfidencialiaiVerte: 'Konfidencialių pirkimų vertė',
+  konfidencialiaiSkaicius: 'Konfidencialių pirkimų skaičius',
+  ribotoNaudojimoVerte: 'Riboto naudojimo pirkimų vertė',
+  ribotoNaudojimoSkaicius: 'Riboto naudojimo pirkimų skaičius',
+  sprendimoPriemimoData: 'Sprendimo priėmimo data',
+  priezastys: 'Priežastys',
+  proceduruPabaiga: 'Procedūrų pabaiga',
+  procedurosPabaiga: 'Procedūros pabaiga',
+  paraiska: 'Pateikė paraišką',
+  preliminarisPasiulymas: 'Pateikė preliminarų pasiūlymą',
+  preliminaroPriezastys: 'Preliminaraus pasiūlymo nepateikimo priežastys',
+  issamusPasiulymas: 'Pateikė išsamų pasiūlymą',
+  issamoPriezastys: 'Išsamaus pasiūlymo nepateikimo priežastys',
+  galutinisPasiulymas: 'Pateikė galutinį pasiūlymą',
+  galutinioPriezastys: 'Galutinio pasiūlymo nepateikimo priežastys',
+  charakteristikos: 'Pasiūlymo charakteristikos',
+  pretenzijaPateikta: 'Pateikta pretenzija',
+  ieskinysTeismui: 'Pateiktas ieškinys teismui',
+  interesuKonfliktas: 'Nustatytas interesų konfliktas',
+  konkurencijaIskreipiama: 'Galėjo būti iškreipta konkurencija',
+  subrangosKetinama: 'Ketinama pasitelkti subrangovus',
+  centralizuotasPirkimas: 'Centralizuotas pirkimas',
+  zaliasisPirkimas: 'Žaliasis pirkimas',
+  energetiniaiReikalavimai: 'Energijos vartojimo efektyvumo reikalavimai',
+  inovatyvusProduktas: 'Inovatyvus produktas',
+};
+
+const humanize = (key: string) => {
+  if (labels[key]) return labels[key];
+  const words = key
+    .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+    .replace(/(\D)(\d+)/g, '$1 $2')
+    .toLocaleLowerCase('lt-LT');
+  return words.replace(/^./, (letter) => letter.toLocaleUpperCase('lt-LT'));
+};
+const isEmpty = (input: unknown): boolean => {
+  if (input == null || input === '') return true;
+  if (Array.isArray(input)) return input.every(isEmpty);
+  if (typeof input === 'object') return Object.values(input).every(isEmpty);
+  return false;
+};
+const numberFormat = new Intl.NumberFormat('lt-LT', {
+  maximumFractionDigits: 2,
+});
+const isMoneyKey = (key: string) =>
+  /(?:verte|kaina|suma|apimtis)$/i.test(key);
+const display = (input: unknown, key = ''): string => {
+  if (input === true) return 'Taip';
+  if (input === false) return 'Ne';
+  if (input == null || input === '') return '—';
+  if (typeof input === 'number') {
+    const formatted = numberFormat.format(input);
+    return isMoneyKey(key) ? `${formatted} €` : formatted;
+  }
+  if (Array.isArray(input)) {
+    return input
+      .filter((item) => !isEmpty(item))
+      .map((item) => display(item, key))
+      .join(', ') || '—';
+  }
+  if (typeof input === 'object') {
+    return Object.entries(input)
+      .filter(([, item]) => !isEmpty(item))
+      .map(([itemKey, item]) => `${humanize(itemKey)}: ${display(item, itemKey)}`)
+      .join('; ') || '—';
+  }
+  return String(input);
+};
+
+const entries = Object.entries(content).filter(([, input]) => !isEmpty(input));
+const scalarEntries = entries.filter(([, input]) =>
+  !Array.isArray(input) && (typeof input !== 'object' || input === null));
+const objectEntries = entries.filter(([, input]) =>
+  input !== null && !Array.isArray(input) && typeof input === 'object');
+const arrayEntries = entries.filter(([, input]) => Array.isArray(input));
+const meaningfulRows = (input: unknown[]) => input.filter((item) => !isEmpty(item));
+const collapseSpannedColumns = (row: unknown) => {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
+  const record = row as Record<string, unknown>;
+
+  return Object.fromEntries(Object.entries(record).filter(([key, input]) => {
+    const baseKey = key.replace(/\d+$/, '');
+    if (baseKey === key || !(baseKey in record)) return true;
+
+    // CVPP lentelių colspan langelius parseris kartais pakartoja kaip grupe2,
+    // grupe3 ir pan. Numeruotą kopiją slepiame tik kai ji tuščia arba sutampa.
+    return !isEmpty(input) && input !== record[baseKey];
+  }));
+};
+const defaultColumnPriority = [
+  'daliesNr',
+  'eileNr',
+  'kodas',
+  'pavadinimas',
+  'pavadinimoPatikslinimas',
+  'adresas',
+  'salis',
+  'grupe',
+];
+const sectionColumnPriority: Record<string, string[]> = {
+  sutartys: [
+    'nr',
+    'daliesNr',
+    'kodas',
+    'pavadinimas',
+    'grupe',
+    'sudarymoData',
+    'trukme',
+    'verte',
+  ],
+  proceduruPabaiga: [
+    'daliesNr',
+    'proceduruPabaiga',
+    'procedurosPabaiga',
+    'sprendimoPriemimoData',
+    'priezastys',
+  ],
+  dalyvioInformacija: [
+    'kodas',
+    'pavadinimas',
+    'paraiska',
+    'preliminarisPasiulymas',
+    'preliminaroPriezastys',
+    'issamusPasiulymas',
+    'issamoPriezastys',
+    'galutinisPasiulymas',
+    'galutinioPriezastys',
+  ],
+  pasiulymuVertinimas: [
+    'daliesNr',
+    'eileNr',
+    'kodas',
+    'pavadinimas',
+    'charakteristikos',
+  ],
+};
+const columnsFor = (rows: unknown[], sectionKey: string) => {
+  const columnPriority = sectionColumnPriority[sectionKey] ?? defaultColumnPriority;
+  return [
+    ...new Set(rows.flatMap((row) =>
+      row && typeof row === 'object' && !Array.isArray(row) ? Object.keys(row) : [])),
+  ]
+    .filter((column) => rows.some((row) =>
+      row
+      && typeof row === 'object'
+      && !Array.isArray(row)
+      && !isEmpty((row as Record<string, unknown>)[column])))
+    .sort((left, right) => {
+    const leftIndex = columnPriority.indexOf(left);
+    const rightIndex = columnPriority.indexOf(right);
+    if (leftIndex === -1 && rightIndex === -1) return 0;
+    if (leftIndex === -1) return 1;
+    if (rightIndex === -1) return -1;
+    return leftIndex - rightIndex;
+    });
+};
+---
+
+<div class="stack stack-xl">
+  <div class="grid-3 items-start">
+    <DetailsSection
+      title="Ataskaita"
+      items={[
+        { label: 'Rūšis', value: cvppReportTypeLabel(report.formTypeId) },
+        { label: 'Ataskaitos numeris', value: report.ataskaitosNumeris, valueClassName: 'cell-mono' },
+        { label: 'Paskelbimo data', value: report.paskelbimoData, valueClassName: 'cell-mono' },
+        { label: 'Redagavimo data', value: report.redagavimoData, valueClassName: 'cell-mono' },
+      ]}
+    />
+    <DetailsSection
+      title={report.formTypeId === 6
+        ? 'Koncesija'
+        : [3, 5].includes(report.formTypeId)
+          ? 'Ataskaitos objektas'
+          : 'Pirkimas'}
+      items={[
+        { label: 'Pavadinimas', value: report.pavadinimas },
+        { label: 'Pirkimo numeris', value: report.pirkimoNumeris, valueClassName: 'cell-mono' },
+        { label: 'Pirkimo objekto rūšis', value: report.pirkimoObjektoRusis },
+      ]}
+    />
+    <DetailsSection
+      title="Pirkėjas"
+      items={[
+        { label: 'Pavadinimas', value: report.pirkimoVykdytojas },
+        { label: 'Juridinio asmens kodas', value: report.pirkimoVykdytojoKodas, valueClassName: 'cell-mono' },
+      ]}
+    />
+  </div>
+
+  {scalarEntries.length > 0 && (
+    <Surface as="section" padding="md">
+      <h2 class="mt-0">Ataskaitos informacija</h2>
+      <KeyValueList>
+        {scalarEntries.map(([key, input]) => (
+          <>
+            <dt>{humanize(key)}</dt>
+            <dd>{display(input, key)}</dd>
+          </>
+        ))}
+      </KeyValueList>
+    </Surface>
+  )}
+
+  {objectEntries.map(([key, input]) => (
+    <DetailsSection
+      title={humanize(key)}
+      items={Object.entries(input as Record<string, unknown>)
+        .filter(([, item]) => !isEmpty(item))
+        .map(([itemKey, item]) => ({
+          label: humanize(itemKey),
+          value: display(item, itemKey),
+        }))}
+    />
+  ))}
+
+  {arrayEntries.map(([key, input]) => {
+    const rows = meaningfulRows(input as unknown[]).map(collapseSpannedColumns);
+    const columns = columnsFor(rows, key);
+    const objectRows = columns.length > 0;
+
+    return (
+      <section>
+        <h2>{humanize(key)}</h2>
+        {objectRows ? (
+          <DataTable
+            size="sm"
+            columns={columns.map((column) => ({ label: humanize(column) }))}
+          >
+            {rows.map((row) => (
+              <tr>
+                {columns.map((column) => (
+                  <td>{display((row as Record<string, unknown>)[column], column)}</td>
+                ))}
+              </tr>
+            ))}
+          </DataTable>
+        ) : (
+          <ul>
+            {rows.map((row) => <li>{display(row)}</li>)}
+          </ul>
+        )}
+      </section>
+    );
+  })}
+
+  {!report.turinys && (
+    <Surface as="section" padding="md">
+      <h2 class="mt-0">Ataskaitos turinys dar nenuskaitytas</h2>
+      <p>Paieškoje pateikiami CVPP sąrašo metaduomenys.</p>
+    </Surface>
+  )}
+
+</div>

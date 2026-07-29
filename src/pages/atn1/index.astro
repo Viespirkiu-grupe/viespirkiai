@@ -1,0 +1,6 @@
+---
+// Puslapis perkeltas į /cvpp/ataskaitos. Senas kelias lieka nuolatiniu
+// peradresavimu, kad išoriškai pasidalintos nuorodos nesulūžtų.
+const search = Astro.url.search;
+return Astro.redirect(`/cvpp/ataskaitos${search}`, 301);
+---

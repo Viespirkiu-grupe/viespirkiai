@@ -45,6 +45,8 @@ _(taskrunneris juos irgi naudoja)_
 | Kintamasis | Numatyta | Paaiškinimas |
 | --- | --- | --- |
 | `PORT` | `9019` | Portas, kuriame klausosi web serveris. |
+| `LOG_REQUESTS` | `false` | Į `stderr` JSON formatu žurnaluoja kiekvieną HTTP užklausą: metodą, URL, tikrą kliento IP (atsižvelgiant į „Cloudflare“ antraštes) ir `User-Agent`. |
+| `ENABLE_ATN1` | `false` | Įjungia CVPP / ATN-1 archyvo puslapius ir jų nuorodą navigacijoje. Išjungus tiesioginės šių puslapių užklausos grąžina `404`. |
 
 ### DB prisijungimas
 

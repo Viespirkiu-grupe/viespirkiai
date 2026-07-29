@@ -22,6 +22,8 @@ const configSchema = z.object({
     infoBanner: infoBannerSchema.optional(),
 
     port: z.number().int().positive().default(9019),
+    logRequests: z.boolean().default(false),
+    enableAtn1: z.boolean().default(false),
 
     pgHost: z.string().default("localhost"),
     pgPort: z.number().int().positive().default(5432),

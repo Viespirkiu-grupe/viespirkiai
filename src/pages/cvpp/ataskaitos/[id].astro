@@ -1,0 +1,107 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import ArchiveReportDetails from '../../../components/cvppDumpAtn1/ArchiveReportDetails.astro';
+import ReportDetails from '../../../components/cvppDumpAtn1/ReportDetails.astro';
+import { getColorScheme, getFont } from '../../../lib/failai.js';
+import {
+  loadCvppArchiveReport,
+  loadCvppDumpAtn1Report,
+} from '../../../lib/cvppDumpAtn1.js';
+import {
+  cvppDumpAtn1AwardProcedureLabel,
+  cvppReportTypeLabel,
+} from '../../../lib/cvppDumpAtn1Labels.js';
+
+const rawId = Astro.params.id ?? '';
+const isJson = rawId.endsWith('.json');
+const normalizedId = rawId.replace(/\.json$/, '');
+
+if (!/^(?:\d+|\d{4}-\d+)$/.test(normalizedId)) {
+  return new Response(null, { status: 404 });
+}
+
+// Skaitinis ID paliktas senų CSV nuorodų suderinamumui. Naujos nuorodos visoms
+// ataskaitų rūšims naudoja stabilų CVPP ataskaitos numerį.
+const archive = /^\d{4}-\d+$/.test(normalizedId)
+  ? await loadCvppArchiveReport(normalizedId)
+  : null;
+const dumpId = archive?.dumpId
+  ?? (/^\d+$/.test(normalizedId) ? Number(normalizedId) : null);
+const data = dumpId ? await loadCvppDumpAtn1Report(dumpId) : null;
+
+if (!data && !archive) {
+  return new Response(null, { status: 404 });
+}
+
+if (isJson) {
+  return new Response(JSON.stringify(data ?? archive), {
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
+}
+
+const a = data?.report;
+const reportType = cvppReportTypeLabel(archive?.formTypeId ?? 1);
+const title = a
+  ? (
+      a.procurementObjectName
+      || a.procurementDesignName
+      || a.title
+      || `${reportType} ataskaita ${a.epsRefNr ?? a.id}`
+    )
+  : (
+      archive?.turinys?.pirkimoObjektoPavadinimas
+      || archive?.turinys?.koncesijosPavadinimas
+      || archive?.pavadinimas
+      || `${reportType} ataskaita ${archive?.ataskaitosNumeris}`
+    );
+
+const totalValue = Number(
+  String(a?.totalContractValue ?? '').replace(/\s/g, '').replace(/,/g, '.'),
+);
+const hasTotalValue = Number.isFinite(totalValue) && totalValue > 0;
+const cvppLink = archive?.link
+  ?? (a?.epsRefNr
+    ? `https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol/Details/${a.epsRefNr}?formTypeId=1`
+    : null);
+const subtext = [
+  `${reportType} ataskaita`,
+  a?.epsRefNr ?? archive?.ataskaitosNumeris,
+  a?.typeOfAwardProcedure
+    ? cvppDumpAtn1AwardProcedureLabel(a.typeOfAwardProcedure)
+    : archive?.turinys?.pirkimoBudas ?? archive?.turinys?.suteikimoBudas,
+].filter(Boolean).join(' · ');
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+---
+
+<Layout
+  pageTitle={title}
+  pageDescription={`${reportType} ataskaita. ${a?.officialName1 ?? archive?.pirkimoVykdytojas ?? ''}`}
+  pageAuthor={a?.officialName1 ?? archive?.pirkimoVykdytojas}
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <PageHeader>
+      <Fragment slot="subtext">{subtext}</Fragment>
+      {title}
+      {hasTotalValue && (
+        <> už <span class="amount"><MoneyValue value={totalValue} suffix={' €'} mono={false} /></span></>
+      )}
+      <Fragment slot="actions">
+        {cvppLink && (
+          <a href={cvppLink} class="btn btn-outline btn-sm" rel="noreferrer">↗ CVPP</a>
+        )}
+        <a href={`/cvpp/ataskaitos/${normalizedId}.json`} class="btn btn-outline btn-sm" aria-label="Peržiūrėti ataskaitos JSON duomenis">↗ JSON</a>
+      </Fragment>
+    </PageHeader>
+
+    {data
+      ? <ReportDetails data={data} />
+      : archive && <ArchiveReportDetails report={archive} />}
+  </main>
+</Layout>

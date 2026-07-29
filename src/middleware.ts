@@ -1,5 +1,6 @@
 import { defineMiddleware } from 'astro:middleware';
 import config from './lib/config.ts';
+import { isAtn1Path } from './lib/featureRoutes.ts';
 
 /**
  * Onion-Location antraštė.
@@ -10,6 +11,10 @@ import config from './lib/config.ts';
  * domene — Tor naršyklė pasiūlo vartotojui pereiti į onion versiją.
  */
 export const onRequest = defineMiddleware(async (context, next) => {
+  if (!config.enableAtn1 && isAtn1Path(context.url.pathname)) {
+    return new Response(null, { status: 404 });
+  }
+
   const response = await next();
 
   if (config.onionAddress) {

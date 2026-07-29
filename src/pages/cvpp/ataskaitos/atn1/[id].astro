@@ -1,0 +1,8 @@
+---
+// Suderinamumas su pirmąja CSV ATN-1 puslapio versija.
+const rawId = Astro.params.id ?? '';
+if (!/^(?:\d+|\d{4}-\d+)(?:\.json)?$/.test(rawId)) {
+  return new Response(null, { status: 404 });
+}
+return Astro.redirect(`/cvpp/ataskaitos/${rawId}${Astro.url.search}`, 301);
+---

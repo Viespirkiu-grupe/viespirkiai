@@ -39,6 +39,7 @@ ENV NODE_ENV=production
 COPY --link --from=deps /app/node_modules ./node_modules
 COPY --link --from=builder /app/dist ./dist
 COPY --link --from=builder /app/start-server.mjs ./
+COPY --link --from=builder /app/requestLog.mjs ./
 # Šriftai ir logotipas OG generavimui — openGraphImage.js juos skaito iš
 # src/assets santykinai nuo cwd (/app) runtime metu.
 COPY --link --from=builder /app/src/assets/fontai ./src/assets/fontai
