@@ -25,8 +25,8 @@ describe("viesiejiPirkimai Quickwit query", () => {
         const query = buildViesiejiPirkimaiQuickwitQuery({
             search: "žalia\\ energija",
             pvJarKodas: "188656261",
-            statusas: "Paskelbtas",
-            pirkimoBudas: "Atviras konkursas",
+            statusas: "atlikta",
+            pirkimoBudas: "atviras",
             paskelbimoDataNuo: "2026-01-02",
             paskelbimoDataIki: "2026-01-03",
             verteNuo: "10,5",
@@ -34,9 +34,9 @@ describe("viesiejiPirkimai Quickwit query", () => {
             bvpzPrefiksai: "45, 72",
         });
 
-        expect(query).toContain("pavadinimas:(zalia\\\\ energija)");
+        expect(query).toContain('pavadinimas:("zalia\\\\" "energija")');
         expect(query).toContain('jarKodas:"188656261"');
-        expect(query).toContain('statusas:"Paskelbtas"');
+        expect(query).toContain('statusas:"Atlikta"');
         expect(query).toContain('pirkimoBudas:"Atviras konkursas"');
         expect(query).toContain("paskelbimoData:[2026-01-02T00:00:00Z TO *]");
         expect(query).toContain("paskelbimoData:[* TO 2026-01-03T23:59:59Z]");

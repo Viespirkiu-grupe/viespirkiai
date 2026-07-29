@@ -11,6 +11,7 @@ import { createTtlPromiseCache } from "../../utils/ttlPromiseCache.js";
 // Diakritikų nuėmimas („ą" sutampa su „a") — kaip sutartyse ir dokumentuose.
 import { foldLithuanian } from "../../utils/text.js";
 import { QW_URL } from "../../quickwit/qwHttp.js";
+import { qwUserText } from "../../quickwit/qwUserText.js";
 
 const cachedHomepageSearch = createTtlPromiseCache(5_000);
 
@@ -188,11 +189,11 @@ export function buildViesiejiPirkimaiQuickwitQuery(query, { exclude = [] } = {})
     const parts = [];
     const skip = (key) => exclude.includes(key);
 
-    const rawSearch = (query.search ?? "").trim();
-    if (rawSearch && rawSearch !== "*") {
-        const folded = foldLithuanian(rawSearch.replace(/"/g, "")).replace(/\\/g, "\\\\");
+    // Naudotojo tekstas → saugūs Quickwit terminai (žr. qwUserText).
+    const terms = qwUserText(foldLithuanian(query.search ?? ""));
+    if (terms) {
         parts.push(
-            `(${QUICKWIT_TEXT_FIELDS.map((field) => `${field}:(${folded})`).join(" OR ")})`,
+            `(${QUICKWIT_TEXT_FIELDS.map((field) => `${field}:(${terms})`).join(" OR ")})`,
         );
     }
 

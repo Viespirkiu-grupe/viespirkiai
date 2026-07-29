@@ -2,6 +2,7 @@ import { postgres } from '@/postgres/postgres.js';
 import { search, getDeadRatio } from '@/quickwit/quickwit.js';
 import { readDokumentasFs } from '@/modules/dokumentai/dokumentaiFs.js';
 import { QW_URL } from '@/quickwit/qwHttp.js';
+import { qwUserText } from '@/quickwit/qwUserText.js';
 import { foldLithuanian, makeSnippet, normalizeDocText } from './dokumentai/snippet.ts';
 
 const LENTELE = 'dokumentai';
@@ -344,11 +345,11 @@ export function buildPartsExcluding(
   // default below). Without this it would be sent as `"*"`/`(*)` and Quickwit
   // would look for a literal asterisk and match nothing.
   if (textQuery && textQuery !== '*') {
-    // Escape backslashes so a trailing/embedded `\` can't escape the wrapping
-    // quote (phrase) or paren (words) and break Quickwit's query parser
-    // (e.g. `test\` → `"test\"` used to fail with a parse error).
-    const folded = foldLithuanian(textQuery.replace(/"/g, '')).replace(/\\/g, '\\\\');
-    p.push(opts.phrase ? `"${folded}"` : `(${folded})`);
+    // The user's text is turned into quoted terms so no query-language character
+    // (`test:`, `a{b`, a dangling `AND`) can break Quickwit's parser — see
+    // qwUserText. Empty result (punctuation only) → no text constraint.
+    const terms = qwUserText(foldLithuanian(textQuery), { phrase: opts.phrase });
+    if (terms) p.push(opts.phrase ? terms : `(${terms})`);
   }
   return p.join(' AND ') || '*';
 }
