@@ -37,6 +37,10 @@
         "sutartys:rescrape-recent": "node modules/sutartys/rescrapeRecent.js",
         "push:sutartys": "node modules/sutartys/pushToSpinta.js",
         "process:sutartys-adp-queue": "node modules/sutartys/processAdpQueue.js",
+        "s3backup:queue": "node modules/s3backup/s3backupQueue.js",
+        "s3backup:upload": "node modules/s3backup/s3backupUpload.js",
+        "s3backup:status": "node modules/s3backup/s3backupStatus.js",
+        "s3backup:get": "node modules/s3backup/s3backupGet.js",
         "push:domenai": "node modules/domenai/pushToSpinta.js",
         "process:domenai-adp-queue": "node modules/domenai/processAdpQueue.js"
     },
@@ -45,6 +49,8 @@
     "description": "",
     "dependencies": {
         "@astrojs/node": "^11.0.2",
+        "@aws-sdk/client-s3": "^3.1098.0",
+        "@aws-sdk/lib-storage": "^3.1098.0",
         "@huggingface/transformers": "^4.2.0",
         "@modelcontextprotocol/sdk": "^1.27.1",
         "@resvg/resvg-js": "^2.6.2",

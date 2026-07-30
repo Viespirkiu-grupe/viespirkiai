@@ -59,3 +59,5 @@ backup
 !LICENSE.txt
 
 compose.yml
+
+s3backup/s3backup.sqlite*
