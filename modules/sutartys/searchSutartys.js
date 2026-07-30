@@ -12,6 +12,7 @@ import { createTtlPromiseCache } from "../../utils/ttlPromiseCache.js";
 // lygiai taip pat, kaip ir dokumentuose.
 import { foldLithuanian } from "../../utils/text.js";
 import { QW_URL } from "../../quickwit/qwHttp.js";
+import { qwUserText } from "../../quickwit/qwUserText.js";
 import {
     VPM_SUTARTIS_ROW_FROM,
     VPM_SUTARTIS_ROW_SELECT,
@@ -207,13 +208,12 @@ export function buildSutartysQuickwitQuery(query, { exclude = [] } = {}) {
     const parts = [];
     const skip = (key) => exclude.includes(key);
 
-    const rawSearch = (query.search ?? "").trim();
-    if (rawSearch && rawSearch !== "*") {
-        // Foldinam, nuimam kabutes (kad neįsimaišytų į frazės sintaksę) ir
-        // ekranuojam atgalinius brūkšnius, kad neišsprūstų iš skliaustų.
-        const folded = foldLithuanian(rawSearch.replace(/"/g, "")).replace(/\\/g, "\\\\");
+    // Naudotojo tekstą sulietuvinam ir paverčiam saugiais terminais (žr.
+    // qwUserText — kitaip `test:` ar `a{b` sugriautų Quickwit parserį).
+    const terms = qwUserText(foldLithuanian(query.search ?? ""));
+    if (terms) {
         parts.push(
-            `(${QUICKWIT_TEXT_FIELDS.map((f) => `${f}:(${folded})`).join(" OR ")})`,
+            `(${QUICKWIT_TEXT_FIELDS.map((f) => `${f}:(${terms})`).join(" OR ")})`,
         );
     }
 
