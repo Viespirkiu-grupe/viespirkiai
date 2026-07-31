@@ -5,7 +5,7 @@
     "scripts": {
         "dev": "astro dev",
         "start": "node start-server.mjs",
-        "build": "ASTRO_NO_PUBLIC_COPY=1 astro build && node scripts/linkPublic.mjs",
+        "build": "ASTRO_NO_PUBLIC_COPY=1 astro build && node scripts/linkPublic.mjs && node scripts/writeBuildInfo.mjs",
         "test": "vitest run",
         "test:integration": "vitest run --config vitest.integration.config.ts",
         "check": "astro check",

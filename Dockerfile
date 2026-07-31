@@ -22,6 +22,14 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Šaltinis (config.js build'ui nereikia – astro.config.mjs jo neimportuoja)
 COPY . .
+
+# Commit'o hash'as footer'iui. Paprastai jo paduoti nereikia – build'as jį
+# nuskaito iš .git/HEAD (į kontekstą įleisti tik HEAD ir refs, žr.
+# .dockerignore). `--build-arg GIT_COMMIT=...` naudingas ten, kur .git
+# nepasiekiamas (pvz. build iš archyvo).
+ARG GIT_COMMIT=""
+ENV GIT_COMMIT=$GIT_COMMIT
+
 RUN npm run build
 
 # ---- runtime ----
@@ -40,19 +48,13 @@ COPY --link --from=deps /app/node_modules ./node_modules
 COPY --link --from=builder /app/dist ./dist
 COPY --link --from=builder /app/start-server.mjs ./
 COPY --link --from=builder /app/requestLog.mjs ./
+# Paleistos versijos commit'as (footer'iui) – sugeneruotas build metu iš .git
+# arba iš GIT_COMMIT build-arg'o. Žr. scripts/writeBuildInfo.mjs.
+COPY --link --from=builder /app/build-info.json ./
 # Šriftai ir logotipas OG generavimui — openGraphImage.js juos skaito iš
 # src/assets santykinai nuo cwd (/app) runtime metu.
 COPY --link --from=builder /app/src/assets/fontai ./src/assets/fontai
 COPY --link --from=builder /app/src/assets/branding ./src/assets/branding
-
-# Paleistos versijos commit'as – rodomas footer'yje (src/lib/buildInfo.ts).
-# `.git` neįeina į build kontekstą, tad hash'as paduodamas iš išorės:
-# CI – `--build-arg GIT_COMMIT=${{ github.sha }}`, lokaliai –
-# `GIT_COMMIT=$(git rev-parse HEAD) docker compose build`. Nenustačius footer'is
-# versijos eilutės nerodo. Laikoma paskutiniuose sluoksniuose, kad kiekvienas
-# naujas hash'as neperstatytų COPY sluoksnių.
-ARG GIT_COMMIT=""
-ENV GIT_COMMIT=$GIT_COMMIT
 
 # Prievadą nustato start-server.mjs iš .env PORT (numatytas 9019). network_mode: host,
 # tad EXPOSE tik informacinis.

@@ -47,7 +47,7 @@ _(taskrunneris juos irgi naudoja)_
 | `PORT` | `9019` | Portas, kuriame klausosi web serveris. |
 | `LOG_REQUESTS` | `false` | Į `stderr` JSON formatu žurnaluoja kiekvieną HTTP užklausą: metodą, URL, tikrą kliento IP (atsižvelgiant į „Cloudflare“ antraštes) ir `User-Agent`. |
 | `ENABLE_ATN1` | `false` | Įjungia CVPP / ATN-1 archyvo puslapius ir jų nuorodą navigacijoje. Išjungus tiesioginės šių puslapių užklausos grąžina `404`. |
-| `GIT_COMMIT` | _(iš `git rev-parse HEAD`)_ | Paleistos versijos commit'o hash'as – footer'yje rodomas trumpasis hash'as su nuoroda į GitHub. Container'yje `.git` nepasiekiamas, tad paduodamas per `--build-arg GIT_COMMIT=...` (CI tai daro automatiškai) arba `.env`. Nenustačius ir be git'o versijos eilutė nerodoma. Alternatyvūs pavadinimai: `GIT_SHA`, `SOURCE_COMMIT`. |
+| `GIT_COMMIT` | _(iš `.git` arba `build-info.json`)_ | Paleistos versijos commit'o hash'as – footer'yje rodomas trumpasis hash'as su nuoroda į GitHub. **Paprastai nustatinėti nereikia:** `npm run build` (taip pat ir Docker build'as) hash'ą nuskaito iš `.git` ir įrašo į `build-info.json`, kuris įkepamas į image'ą. Kintamasis reikalingas tik ten, kur `.git` nepasiekiamas (build iš archyvo), arba norint reikšmę perrašyti. Alternatyvūs pavadinimai: `GIT_SHA`, `SOURCE_COMMIT`. |
 
 ### DB prisijungimas
 
