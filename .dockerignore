@@ -8,6 +8,12 @@ dist
 
 # Git ir redaktorius
 .git
+# ...bet HEAD ir refs paliekami: iš jų build metu nustatomas commit'o hash'as
+# (scripts/writeBuildInfo.mjs), nes git binary'o image'e nėra. Tai keli
+# šimtai baitų – objektų istorija į kontekstą nepatenka.
+!.git/HEAD
+!.git/refs/**
+!.git/packed-refs
 .github
 .vscode
 

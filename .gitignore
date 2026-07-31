@@ -61,3 +61,6 @@ backup
 compose.yml
 
 s3backup/s3backup.sqlite*
+
+# Sugeneruojama per `npm run build` (scripts/writeBuildInfo.mjs)
+build-info.json

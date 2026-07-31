@@ -4,8 +4,9 @@ services:
             context: .
             dockerfile: Dockerfile
             args:
-                # Footer'io versijos nuoroda. Statant lokaliai:
-                # `GIT_COMMIT=$(git rev-parse HEAD) docker compose build frontend`
+                # Footer'io versijos nuoroda. Paprastai palikti tuščią – build'as
+                # hash'ą pasiima iš .git. Nurodyti reikia tik statant ten, kur
+                # .git nepasiekiamas (pvz. iš archyvo).
                 GIT_COMMIT: ${GIT_COMMIT:-}
         network_mode: host
         restart: unless-stopped
