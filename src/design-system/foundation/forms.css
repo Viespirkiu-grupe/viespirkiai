@@ -437,12 +437,21 @@
     content: "";
     position: absolute;
     top: 0;
-    /* -40px uždengia footerio viršutinę 40px paraštę, kad linija pasiektų
-       footerio kraštinę, o ne nutrūktų prieš ją. */
-    bottom: -40px;
+    /* Neigiamas bottom uždengia footerio viršutinę paraštę (.site-footer-shell
+       margin-block-start), kad linija pasiektų footerio kraštinę, o ne nutrūktų
+       prieš ją. Paraštė siaurėja ties 1200px — žr. media query žemiau. */
+    bottom: -64px;
     left: 256px;
     border-left: var(--border);
     pointer-events: none;
+  }
+
+  /* Ties ≤1200px footerio viršutinė paraštė sumažėja iki 40px. */
+  @media (max-width: 1200px) {
+    main.sidebar-main:has(> #searchForm.searchform-sidebar)::before,
+    main.sidebar-main:has(> .dok-shell)::before {
+      bottom: -40px;
+    }
   }
 
   /* Mobilaus perjungiklio antraštė ir „Ieškoti" mygtukas — tik ≤900px. */

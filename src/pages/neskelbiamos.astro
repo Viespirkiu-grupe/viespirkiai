@@ -1,19 +1,31 @@
 ---
+// Neskelbiamų derybų paieška. Maketas — tas pats šoninės juostos idiomas kaip
+// /sutartys ir /cvpp/ataskaitos: facetai kairėje juostoje viename #searchForm,
+// rezultatai plokščiu sąrašu dešinėje. Variklis — vien Postgres: lentelėje ~1 tūkst.
+// eilučių, tad ir rezultatai, ir facetų `GROUP BY` skaičiuojami tiesiogiai.
 import Layout from '../layouts/Layout.astro';
-import EmptyState from '@design-system/components/EmptyState.astro';
-import Pagination from '@design-system/components/Pagination.astro';
+import Button from '@design-system/components/Button.astro';
+import DateValue from '@design-system/components/DateValue.astro';
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
-import ResultsSummary from '@design-system/components/ResultsSummary.astro';
-import SearchForm from '@design-system/components/content/SearchForm.astro';
-import { postgres, getColorScheme, getFont, cleanQuery, parseLimit, buildNumberOfResults } from '../lib/failai.js';
+import ResultPageShell from '@design-system/components/content/ResultPageShell.astro';
+import HistogramRangeFilter from '@design-system/components/filters/HistogramRangeFilter.astro';
+import DokFacetSection from '../components/dokumentai/DokFacetSection.astro';
+import PgFacetModal from '../components/content/PgFacetModal.astro';
+import { postgres, getColorScheme, getFont, parseLimit, buildNumberOfResults } from '../lib/failai.js';
+import {
+  SqlParams, attachJarNames, buildMonthHistogram, makeFacet, makeFacetToggleUrl,
+  parseMultiParam, stripEmptyParams, toFacetOptions,
+} from '../lib/pgFacets.ts';
 import '@/utils/linksniai.js';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
-const cleaned = cleanQuery(Astro.url);
-if ('redirectTo' in cleaned) return Astro.redirect(cleaned.redirectTo);
-const query = cleaned.query;
+// Tuščius laukus (GET forma pateikia ir tuščius) nusukam iš URL. Savo valymas, o
+// ne bendras `cleanQuery` — tas suplotų kartojamus facetų parametrus į vieną.
+const redirectTo = stripEmptyParams(Astro.url);
+if (redirectTo) return Astro.redirect(redirectTo);
+const query = Object.fromEntries(Astro.url.searchParams) as Record<string, string>;
 
 const parsedLimit = parseLimit(query, 50, 250);
 if ('error' in parsedLimit) return new Response(parsedLimit.error, { status: 400 });
@@ -23,13 +35,64 @@ const currentPage = Math.max(1, parseInt(query.page) || 1);
 const skip = (currentPage - 1) * limit;
 const rawSearch = query.search || '';
 
-const parseSearch = (searchTerm: string) => {
-  const quoteMatch = searchTerm.match(/^"(.*)"$/);
-  return {
-    tsQueryFunc: quoteMatch ? 'phraseto_tsquery' : 'plainto_tsquery',
-    cleanSearch: quoteMatch ? quoteMatch[1] : searchTerm,
-  };
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+const dataNuo = (query.dataNuo || '').trim();
+const dataIki = (query.dataIki || '').trim();
+if ((dataNuo && !datePattern.test(dataNuo)) || (dataIki && !datePattern.test(dataIki))) {
+  return new Response('Datos turi būti YYYY-MM-DD formato.', { status: 400 });
+}
+
+const FACET_PARAMS = ['jarKodas', 'isvada'] as const;
+const selected: Record<string, string[]> = Object.fromEntries(
+  FACET_PARAMS.map((param) => [param, parseMultiParam(Astro.url, param)]),
+);
+const toggleUrl = makeFacetToggleUrl(Astro.url, '/neskelbiamos');
+
+const activeFilterCount = selected.jarKodas.length + selected.isvada.length
+  + (dataNuo ? 1 : 0) + (dataIki ? 1 : 0);
+
+// Cituota paieška (`"..."`) — frazė, kitaip atskiri žodžiai.
+const quoteMatch = rawSearch.match(/^"(.*)"$/);
+const tsQueryFunc = quoteMatch ? 'phraseto_tsquery' : 'plainto_tsquery';
+const cleanSearch = quoteMatch ? quoteMatch[1] : rawSearch;
+
+/**
+ * WHERE sąlygos iš paieškos + filtrų. `skipFacet` praleidžia vieną filtrą — jo
+ * paties skaičiavimams (facet-exclude), kad daugiareikšmė atranka nenumuštų
+ * likusių to paties faceto variantų iki nulio, o datos histograma rodytų visą
+ * rėžį, o ne tik pasirinktą jo gabalą.
+ */
+function buildWhere(params: SqlParams, skipFacet?: string) {
+  const conditions: string[] = [];
+  if (cleanSearch) {
+    conditions.push(`nd."search_index" @@ ${tsQueryFunc}('simple', ${params.add(cleanSearch)})`);
+  }
+  if (skipFacet !== 'jarKodas' && selected.jarKodas.length) {
+    conditions.push(`nd."jarKodas" = ANY(${params.add(selected.jarKodas)}::text[])`);
+  }
+  if (skipFacet !== 'isvada' && selected.isvada.length) {
+    conditions.push(`nd.isvada = ANY(${params.add(selected.isvada)}::text[])`);
+  }
+  if (skipFacet !== 'data') {
+    if (dataNuo) conditions.push(`nd.data >= ${params.add(dataNuo)}::date`);
+    if (dataIki) conditions.push(`nd.data <= ${params.add(dataIki)}::date`);
+  }
+  return conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+}
+
+const SORTS: Record<string, string> = {
+  '': 'nd.data DESC NULLS LAST',
+  dataAsc: 'nd.data ASC NULLS LAST',
+  pirkejas: 'nd."jarPavadinimas" ASC NULLS LAST, nd.data DESC',
 };
+const sort = SORTS[query.sort ?? ''] ? (query.sort ?? '') : '';
+
+// neskelbiamosDerybos saltinioId nedalinamas — visas kelias lieka sourceId0.
+const FILE_JOIN = `
+  LEFT JOIN public.files f
+    ON replace(nd.link, 'https://eviesiejipirkimai.lt/', '') = f."sourceId0"
+    AND f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'neskelbiamosDerybos')
+    AND f."downloadStatus" = 1`;
 
 const timed = async <T,>(promise: Promise<T>): Promise<{ value: T; ms: number }> => {
   const t0 = Date.now();
@@ -37,64 +100,69 @@ const timed = async <T,>(promise: Promise<T>): Promise<{ value: T; ms: number }>
   return { value, ms: Date.now() - t0 };
 };
 
-const queryNeskelbiamos = async ({ cleanSearch, tsQueryFunc, limit, skip }: { cleanSearch: string; tsQueryFunc: string; limit: number; skip: number; }) => {
-  // neskelbiamosDerybos saltinioId nedalinamas — visas kelias lieka sourceId0.
-  const fileJoin = `
-    LEFT JOIN public.files f
-      ON replace(nd.link, 'https://eviesiejipirkimai.lt/', '') = f."sourceId0"
-      AND f."sourceTitleId" = (SELECT id FROM public."filesSourceTitles" WHERE title = 'neskelbiamosDerybos')
-      AND f."downloadStatus" = 1`;
-
-  if (cleanSearch) {
-    const [resultsRes, totalRes] = await Promise.all([
-      timed(postgres.query(
-        `SELECT nd.*, f.id AS "failoId"
-         FROM public."neskelbiamosDerybos" nd ${fileJoin}
-         WHERE nd."search_index" @@ ${tsQueryFunc}('simple', $1)
-         LIMIT $2 OFFSET $3`,
-        [cleanSearch, limit, skip]
-      )),
-      timed(postgres.query(
-        `SELECT COUNT(*) FROM public."neskelbiamosDerybos"
-         WHERE "search_index" @@ ${tsQueryFunc}('simple', $1)`,
-        [cleanSearch]
-      )),
-    ]);
-
-    return {
-      rows: resultsRes.value.rows,
-      total: parseInt(totalRes.value.rows[0].count, 10),
-      timings: [
-        { label: 'Rezultatai', phase: 'search', start: 0, duration: resultsRes.ms },
-        { label: 'Skaičius', phase: 'count', start: 0, duration: totalRes.ms },
-      ],
-    };
-  }
-
-  const [resultsRes, totalRes] = await Promise.all([
-    timed(postgres.query(
-      `SELECT nd.*, f.id AS "failoId"
-       FROM public."neskelbiamosDerybos" nd ${fileJoin}
-       ORDER BY nd.data DESC NULLS LAST
-       LIMIT $1 OFFSET $2`,
-      [limit, skip]
-    )),
-    timed(postgres.query(`SELECT COUNT(*) FROM public."neskelbiamosDerybos"`)),
-  ]);
-
-  return {
-    rows: resultsRes.value.rows,
-    total: parseInt(totalRes.value.rows[0].count, 10),
-    timings: [
-      { label: 'Rezultatai', phase: 'search', start: 0, duration: resultsRes.ms },
-      { label: 'Skaičius', phase: 'count', start: 0, duration: totalRes.ms },
-    ],
-  };
-};
+/**
+ * Vieno faceto skaičiai — su visais kitais filtrais, bet be paties faceto.
+ * Pažymėtos reikšmės rikiuojamos į patį viršų: kitaip retesnė (už `max` ribos)
+ * atranka iškristų iš atsakymo ir juostoje liktų be pavadinimo bei skaičiaus.
+ */
+function facetQuery(param: string, valueExpr: string, labelExpr: string | null, max = 500) {
+  const params = new SqlParams();
+  const where = buildWhere(params, param);
+  const label = labelExpr ? `, MIN(${labelExpr}) AS label` : '';
+  const pinned = selected[param]?.length
+    ? `(${valueExpr} = ANY(${params.add(selected[param])}::text[])) DESC, `
+    : '';
+  return postgres.query(
+    `SELECT ${valueExpr} AS value, COUNT(*)::int AS count${label}
+     FROM public."neskelbiamosDerybos" nd
+     ${where}
+     GROUP BY 1
+     HAVING ${valueExpr} IS NOT NULL AND ${valueExpr}::text <> ''
+     ORDER BY ${pinned}count DESC, 1
+     LIMIT ${max}`,
+    params.values,
+  );
+}
 
 const startedAt = Date.now();
-const { tsQueryFunc, cleanSearch } = rawSearch ? parseSearch(rawSearch) : { tsQueryFunc: '', cleanSearch: '' };
-const { rows, total, timings } = await queryNeskelbiamos({ cleanSearch, tsQueryFunc, limit, skip });
+
+const resultParams = new SqlParams();
+const resultWhere = buildWhere(resultParams);
+const limitPh = resultParams.add(limit);
+const offsetPh = resultParams.add(skip);
+
+const countParams = new SqlParams();
+const countWhere = buildWhere(countParams);
+
+const histParams = new SqlParams();
+const histWhere = buildWhere(histParams, 'data');
+
+const [resultsRes, totalRes, pirkejasRes, isvadaRes, histRes] = await Promise.all([
+  timed(postgres.query(
+    `SELECT nd.*, f.id AS "failoId"
+     FROM public."neskelbiamosDerybos" nd ${FILE_JOIN}
+     ${resultWhere}
+     ORDER BY ${SORTS[sort]}
+     LIMIT ${limitPh} OFFSET ${offsetPh}`,
+    resultParams.values,
+  )),
+  timed(postgres.query(
+    `SELECT COUNT(*)::int AS count FROM public."neskelbiamosDerybos" nd ${countWhere}`,
+    countParams.values,
+  )),
+  timed(facetQuery('jarKodas', 'nd."jarKodas"', 'nd."jarPavadinimas"')),
+  timed(facetQuery('isvada', 'nd.isvada', null, 100)),
+  timed(postgres.query(
+    `SELECT date_trunc('month', nd.data)::date AS bucket, COUNT(*)::int AS count
+     FROM public."neskelbiamosDerybos" nd
+     ${histWhere}${histWhere ? ' AND' : 'WHERE'} nd.data IS NOT NULL
+     GROUP BY 1 ORDER BY 1`,
+    histParams.values,
+  )),
+]);
+
+const rows = resultsRes.value.rows;
+const total = totalRes.value.rows[0].count;
 const pageCount = Math.ceil(total / limit);
 
 if (typeof query.json !== 'undefined') {
@@ -102,20 +170,45 @@ if (typeof query.json !== 'undefined') {
     data: rows,
     currentPage,
     pageCount,
+    total,
+    limit,
   }), {
     headers: { 'Content-Type': 'application/json' },
   });
 }
+
+// Pirkėjo pavadinimas šaltinyje būna tuščias — tada imam jį iš `jar` registro.
+const pirkejasOptions = await attachJarNames(toFacetOptions(pirkejasRes.value.rows));
+const isvadaOptions = toFacetOptions(isvadaRes.value.rows);
+
+const facets = {
+  jarKodas: makeFacet('jarKodas', pirkejasOptions, selected.jarKodas, toggleUrl, 5),
+  isvada: makeFacet('isvada', isvadaOptions, selected.isvada, toggleUrl, 6),
+};
+const hist = buildMonthHistogram(histRes.value.rows);
 
 const numberOfResults = buildNumberOfResults({
   rows,
   total,
   elapsed: Date.now() - startedAt,
   engine: 'PostgreSQL',
-  timings,
+  timings: [
+    { label: 'Rezultatai', phase: 'search', start: 0, duration: resultsRes.ms },
+    { label: 'Skaičius', phase: 'count', start: 0, duration: totalRes.ms },
+    { label: 'Facetai', phase: 'facets', start: 0, duration: Math.max(pirkejasRes.ms, isvadaRes.ms, histRes.ms) },
+  ],
 });
 
-const queryParams = rawSearch ? `&search=${encodeURIComponent(rawSearch)}` : '';
+const preserved = new URLSearchParams(Astro.url.search);
+preserved.delete('page');
+const serialized = preserved.toString();
+const queryParams = serialized ? `&${serialized}` : '';
+
+const sortOptions = [
+  { value: '', label: 'Naujausios' },
+  { value: 'dataAsc', label: 'Seniausios' },
+  { value: 'pirkejas', label: 'Pagal pirkėją' },
+];
 
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
@@ -126,63 +219,215 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
   colorScheme={colorScheme}
   font={font}
 >
-  <main>
-    <SearchForm title="Neskelbiamų derybų paieška" searchValue={rawSearch} />
+  <main class="sidebar-main">
+    <form method="get" role="search" id="searchForm" class="searchform-sidebar">
+      <h1 class="sr-only">Neskelbiamų derybų paieška</h1>
 
-    <div class="mt-10 max-w-lg center mx-auto stack stack-md">
-      <div class="flex justify-between items-center mb-4">
-        <ResultsSummary html={numberOfResults} />
+      {/* Facetų atranka gyvena tik URL'e — kad rikiavimas ar „Ieškoti" jos
+          neprarastų, perduodam paslėptais laukais (po vieną kiekvienai reikšmei). */}
+      {FACET_PARAMS.flatMap((param) =>
+        selected[param].map((value) => <input type="hidden" name={param} value={value} />),
+      )}
+
+      <aside class="sf-rail" aria-label="Filtrai">
+        <div class="sf-rail-head">
+          <button type="button" class="sf-rail-toggle" id="sfFiltersToggle" aria-expanded="false" aria-controls="sfRailBody">
+            <span class="sf-rail-toggle-label">Filtrai</span>
+            {activeFilterCount > 0 && <span class="sf-filters-count">{activeFilterCount}</span>}
+            <span class="sf-filters-chevron" aria-hidden="true"></span>
+          </button>
+        </div>
+
+        <div class="sf-rail-body" id="sfRailBody">
+          {activeFilterCount > 0 && (
+            <div class="nsk-rail-head">
+              <a href="/neskelbiamos" class="nsk-rail-clear">Panaikinti</a>
+            </div>
+          )}
+
+          <div class="nsk-facets">
+            <DokFacetSection
+              label="Pirkėjas"
+              param="jarKodas"
+              facet={facets.jarKodas}
+              allLabel="Visi"
+              stacked
+              modal={{ field: 'jarKodas', title: 'Pirkėjas', always: true }}
+            />
+            <DokFacetSection
+              label="Išvada"
+              param="isvada"
+              facet={facets.isvada}
+              allLabel="Visos"
+              modal={{ field: 'isvada', title: 'Išvada' }}
+            />
+            <HistogramRangeFilter
+              mode="date"
+              legend="Data"
+              nameFrom="dataNuo"
+              nameTo="dataIki"
+              redirectBase="/neskelbiamos"
+              hist={hist}
+              valueFrom={dataNuo}
+              valueTo={dataIki}
+              ariaFrom="Data nuo"
+              ariaTo="Data iki"
+            />
+          </div>
+
+          <button type="submit" class="sf-rail-search">Ieškoti</button>
+        </div>
+      </aside>
+
+      <div class="sf-search">
+        <div class="search-bar">
+          <label for="search">
+            <svg class="search-icon" aria-hidden="true" width="20" height="20" viewBox="0 1 24 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M10.502 2C5.80753 2 2.00195 5.80558 2.00195 10.5C2.00195 15.1944 5.80753 19 10.502 19C12.4884 19 14.3169 18.3176 15.7637 17.176L20.5877 22C20.9783 22.3905 21.6114 22.3905 22.002 22C22.3925 21.6095 22.3925 20.9763 22.002 20.5858L17.1779 15.7618C18.3196 14.3149 19.002 12.4865 19.002 10.5C19.002 5.80558 15.1964 2 10.502 2ZM4.00195 10.5C4.00195 6.91015 6.9121 4 10.502 4C14.0918 4 17.002 6.91015 17.002 10.5C17.002 12.2952 16.2755 13.9188 15.0981 15.0962C13.9208 16.2736 12.2972 17 10.502 17C6.9121 17 4.00195 14.0899 4.00195 10.5Z" fill="currentColor"/>
+            </svg>
+            <span class="sr-only">Paieška</span>
+          </label>
+          <input
+            type="search"
+            name="search"
+            id="search"
+            class="search-bar__input"
+            value={rawSearch}
+            placeholder="Aprašymas, pirkėjas arba išvada"
+            enterkeyhint="search"
+          />
+          <Button type="submit">Ieškoti</Button>
+        </div>
       </div>
 
-      {rows.length === 0 ? (
-        <EmptyState message="Rezultatų nerasta." />
-      ) : (
-        <>
-          <div class="result-list">
-            {rows.map((item: any) => {
-              const href = item.failoId ? `/failas/${item.failoId}` : `https://eviesiejipirkimai.lt/${item.link}`;
-              return (
-                <ResultCardShell clickable={true}>
-                  <dl slot="meta" class="result-card-meta">
-                    <div>
-                      <dt class="sr-only">Data</dt>
-                      <dd>
-                        {item.data ? <time datetime={item.data}>{item.data}</time> : '—'}
-                      </dd>
-                    </div>
+      <div class="sf-results">
+        <ResultPageShell
+          numberOfResults={numberOfResults}
+          resultCount={rows.length}
+          page={currentPage}
+          pageCount={pageCount}
+          queryParams={queryParams}
+          emptyText="Rezultatų nerasta."
+          containerClass="mt-0"
+          flat={true}
+        >
+          <Fragment slot="sort">
+            <label class="sr-only" for="nskSort">Rikiuoti pagal</label>
+            <select id="nskSort" name="sort" data-autosubmit aria-label="Rikiuoti pagal">
+              {sortOptions.map((option) => (
+                <option value={option.value} selected={sort === option.value}>{option.label}</option>
+              ))}
+            </select>
+          </Fragment>
 
-                    <div>
-                      <dt class="sr-only">Išvada</dt>
-                      <dd>{item.isvada || '—'}</dd>
-                    </div>
-                  </dl>
+          {rows.map((item: any) => {
+            const href = item.failoId ? `/failas/${item.failoId}` : `https://eviesiejipirkimai.lt/${item.link}`;
+            return (
+              <ResultCardShell clickable={true}>
+                <dl slot="meta" class="result-card-meta">
+                  <div>
+                    <dt class="sr-only">Data</dt>
+                    <dd>{item.data ? <DateValue value={item.data} /> : '—'}</dd>
+                  </div>
 
-                  <h3 slot="title" class="result-card-title">
-                    {item.aprasymas && item.aprasymas.length > 0 ? (
-                      <a href={href}>{item.aprasymas}</a>
+                  <div>
+                    <dt class="sr-only">Išvada</dt>
+                    <dd>{item.isvada || '—'}</dd>
+                  </div>
+                </dl>
+
+                <h3 slot="title" class="result-card-title">
+                  {item.aprasymas && item.aprasymas.length > 0 ? (
+                    <a href={href}>{item.aprasymas}</a>
+                  ) : (
+                    <em>Nenurodyta</em>
+                  )}
+                </h3>
+
+                <div slot="footer" class="result-card-footer">
+                  <span>
+                    <strong>Perkančioji organizacija:</strong>{' '}
+                    {item.jarKodas && item.jarPavadinimas ? (
+                      <a href={`/asmuo/${item.jarKodas}`} class="relative z-1">{item.jarPavadinimas}</a>
                     ) : (
                       <em>Nenurodyta</em>
                     )}
-                  </h3>
+                  </span>
+                </div>
+              </ResultCardShell>
+            );
+          })}
+        </ResultPageShell>
+      </div>
+    </form>
 
-                  <div slot="footer" class="result-card-footer">
-                    <span>
-                      <strong>Perkančioji organizacija:</strong>{' '}
-                      {item.jarKodas && item.jarPavadinimas ? (
-                        <a href={`/asmuo/${item.jarKodas}`} class="relative z-1">{item.jarPavadinimas}</a>
-                      ) : (
-                        <em>Nenurodyta</em>
-                      )}
-                    </span>
-                  </div>
-                </ResultCardShell>
-              );
-            })}
-          </div>
-
-          <Pagination currentPage={currentPage} pageCount={pageCount} queryParams={queryParams} />
-        </>
-      )}
-    </div>
+    <PgFacetModal
+      basePath="/neskelbiamos"
+      facetsSelector=".nsk-facets"
+      options={{ jarKodas: pirkejasOptions, isvada: isvadaOptions }}
+    />
   </main>
 </Layout>
+
+<style>
+  /* Pirmoji facetų sekcija be viršutinio tarpo — DokFacetSection kiekvienai
+     prideda padding-top:20px, bet viršuje jis palieka tuščią plyšį. */
+  .nsk-facets :global(.dok-filter-section:first-child) {
+    padding-top: 0;
+  }
+
+  .nsk-rail-head {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+  }
+  .nsk-rail-clear {
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+  }
+  .nsk-rail-clear:hover { color: var(--black); }
+
+  @media (max-width: 900px) {
+    /* Telefone antraštę neša .sf-rail-head perjungiklis. */
+    .nsk-rail-head { display: none; }
+  }
+</style>
+
+<script is:inline>
+  // Mobilus filtrų perjungiklis: antraštė suskleidžia/atskleidžia juostą (≤900px).
+  const sfToggle = document.getElementById('sfFiltersToggle');
+  const sfRail = document.querySelector('.sf-rail');
+  sfToggle?.addEventListener('click', () => {
+    const open = sfRail?.classList.toggle('is-open') ?? false;
+    sfToggle.setAttribute('aria-expanded', String(open));
+  });
+
+  // „Rodyti daugiau" inline atskleidimas facetams be dialogo.
+  document.querySelectorAll('.nsk-facets .dok-more-btn').forEach((btn) => {
+    if (btn.dataset.facetModal) return; // šiuos tvarko dialogas
+    btn.addEventListener('click', () => {
+      const more = btn.previousElementSibling;
+      if (more && more.classList.contains('dok-more-list')) {
+        more.hidden = false;
+        btn.remove();
+      }
+    });
+  });
+
+  // Rikiavimo select priklauso #searchForm — keitimas paleidžia paiešką iš naujo.
+  document.querySelectorAll('select[data-autosubmit]').forEach((select) => {
+    select.addEventListener('change', () => {
+      const form = select.form;
+      if (!form) return;
+      form.querySelector('input[name="page"]')?.remove();
+      form.requestSubmit();
+    });
+  });
+</script>
+
+<script>
+  import { initStickyRail } from '@/src/lib/stickyRail';
+  import { initHistogramRangeFilters } from '@design-system/components/filters/histogramRangeFilter';
+  initStickyRail();
+  initHistogramRangeFilters();
+</script>
