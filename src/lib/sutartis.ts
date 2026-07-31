@@ -2,18 +2,9 @@ import { postgres } from '@/postgres/postgres.js';
 import { fixHtmlEntities } from '@/utils/fixHtmlEntities.js';
 import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
 import { VPM_SUTARTIS_ROW_SQL } from '@/modules/sutartys/vpmSutartisRow.js';
+import { loadPirkimoAtitikmenys, parsePirkimoId } from './sutartisPirkimai.ts';
 
 export type Sutartis = Record<string, any>;
-
-const POSTGRES_INTEGER_MAX = 2_147_483_647;
-
-function parsePirkimoId(pirkimoNumeris: string | null | undefined): number | null {
-  if (!pirkimoNumeris || !/^\d+$/.test(pirkimoNumeris)) return null;
-  const pirkimoId = Number(pirkimoNumeris);
-  return Number.isSafeInteger(pirkimoId) && pirkimoId <= POSTGRES_INTEGER_MAX
-    ? pirkimoId
-    : null;
-}
 
 /**
  * Apply the supplier-name "patikslinimas" (clarification) to a contract.
@@ -194,15 +185,6 @@ async function loadCpvaProjektai(pirkimoNumeris: string | null | undefined) {
   return sutartys;
 }
 
-async function loadPirkimai(pirkimoNumeris: string | null | undefined) {
-  const pirkimoId = parsePirkimoId(pirkimoNumeris);
-  if (pirkimoId === null) return { cvppPirkimas: undefined, cvpisPirkimas: undefined };
-  const [cvppPirkimas, cvpisPirkimas] = await Promise.all([
-    postgres.query(`SELECT * FROM "cvppViesiejiPirkimai" WHERE "pirkimoNumeris" = $1`, [pirkimoId]).then((r: any) => r.rows[0]),
-    postgres.query(`SELECT * FROM "viesiejiPirkimai" WHERE "pirkimoId" = $1`, [pirkimoId]).then((r: any) => r.rows[0]),
-  ]);
-  return { cvppPirkimas, cvpisPirkimas };
-}
 
 export async function loadSutartis(id: number): Promise<Sutartis | null> {
   const sutartis = await postgres
@@ -218,14 +200,16 @@ export async function loadSutartis(id: number): Promise<Sutartis | null> {
     loadSabisSutartys(sutartis.sutartiesUnikalusId),
     annotateDokumentai(sutartis),
     loadCpvaProjektai(sutartis.pirkimoNumeris),
-    loadPirkimai(sutartis.pirkimoNumeris),
+    loadPirkimoAtitikmenys(sutartis),
   ]);
 
   if (panasios.length > 0) sutartis.panasiosSutartys = panasios;
   sutartis.sabisSutartys = sabis;
   sutartis.cpvaProjektuSutartys = cpva;
+  sutartis.pirkimoAtitikmenys = pirkimai.atitikmenys;
+  // Suderinamumui su ankstesniu JSON formatu.
   if (pirkimai.cvppPirkimas) sutartis.cvppPirkimas = pirkimai.cvppPirkimas;
-  if (pirkimai.cvpisPirkimas) sutartis.cvpisPirkimas = pirkimai.cvpisPirkimas;
+  if (pirkimai.naujosSistemosPirkimas) sutartis.cvpisPirkimas = pirkimai.naujosSistemosPirkimas;
 
   sutartis.pavadinimas = fixHtmlEntities(sutartis.pavadinimas);
   sutartis.perkanciojiOrganizacija = fixHtmlEntities(sutartis.perkanciojiOrganizacija);

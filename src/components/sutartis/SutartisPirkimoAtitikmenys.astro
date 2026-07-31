@@ -1,0 +1,120 @@
+---
+import Badge from '@design-system/components/Badge.astro';
+import DateValue from '@design-system/components/DateValue.astro';
+import KeyValueList from '@design-system/components/KeyValueList.astro';
+import type { PirkimoAtitikmuo } from '../../lib/sutartisPirkimai.ts';
+
+interface Props {
+  atitikmenys: PirkimoAtitikmuo[];
+}
+
+const { atitikmenys = [] } = Astro.props as Props;
+
+const patikimumoZyma: Record<PirkimoAtitikmuo['patikimumas'], { tekstas: string; variant: 'success' | 'warning' | 'muted' }> = {
+  tikslus: { tekstas: 'Tikslus atitikmuo', variant: 'success' },
+  galimas: { tekstas: 'Galimas atitikmuo', variant: 'warning' },
+  silpnas: { tekstas: 'Tik sutampa numeris', variant: 'muted' },
+};
+
+// Kai kandidatas vienas ir jis tikslus, abejonių nėra — patikimumo žyma ir
+// požymių paaiškinimas tik triukšmauja.
+const vienintelisTikslus = atitikmenys.length === 1 && atitikmenys[0].patikimumas === 'tikslus';
+---
+
+{atitikmenys.length > 0 && (
+  <section class="pirkimo-atitikmenys">
+    {atitikmenys.length > 1 && (
+      <p class="text-muted text-sm mb-4">
+        Šis numeris randamas keliose sistemose – jų numeracijos nepriklausomos, todėl
+        dalis sutapimų atsitiktiniai. Pateikiami visi kandidatai, patikimiausias viršuje.
+      </p>
+    )}
+
+    <ul class="atitikmenu-sarasas">
+      {atitikmenys.map((a) => (
+        <li class={`atitikmuo atitikmuo--${vienintelisTikslus ? 'neutralus' : a.patikimumas}`}>
+          <div class="atitikmuo-antraste">
+            <Badge variant={a.sistema === 'nauja' ? 'info' : 'default'}>{a.sistemosPavadinimas}</Badge>
+            {!vienintelisTikslus && (
+              <Badge variant={patikimumoZyma[a.patikimumas].variant}>{patikimumoZyma[a.patikimumas].tekstas}</Badge>
+            )}
+          </div>
+
+          <div class="atitikmuo-pavadinimas">
+            {a.vidineNuoroda
+              ? <a href={a.vidineNuoroda}>{a.pavadinimas || 'Nenurodyta'}</a>
+              : a.isorineNuoroda
+                ? <a href={a.isorineNuoroda} target="_blank" rel="noopener noreferrer">↗ {a.pavadinimas || 'Nenurodyta'}</a>
+                : <span>{a.pavadinimas || 'Nenurodyta'}</span>}
+          </div>
+
+          <div class="atitikmuo-meta text-muted text-sm">
+            {a.pirkejas && <span>{a.pirkejas}</span>}
+            {a.paskelbimoData && <span><DateValue value={a.paskelbimoData} /></span>}
+            {a.papildoma && <span>{a.papildoma}</span>}
+          </div>
+
+          {a.detales.length > 0 && (
+            <KeyValueList className="mt-2" items={a.detales.map((d) => ({ label: d.label, value: d.value }))} />
+          )}
+
+          {a.informacija && <p class="atitikmuo-informacija text-muted text-sm">{a.informacija}</p>}
+
+          {!vienintelisTikslus && a.pozymiai.length > 0 && (
+            <div class="atitikmuo-pozymiai text-muted text-sm">{a.pozymiai.join(' · ')}</div>
+          )}
+        </li>
+      ))}
+    </ul>
+  </section>
+)}
+
+<style>
+  .atitikmenu-sarasas {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .atitikmuo {
+    padding: 12px;
+    border: 1px solid var(--light-gray);
+    border-left-width: 3px;
+    border-radius: var(--radius-md);
+  }
+
+  .atitikmuo--neutralus { border-left-color: var(--light-gray); }
+  .atitikmuo--tikslus { border-left-color: var(--color-success); }
+  .atitikmuo--galimas { border-left-color: var(--color-warning); }
+  .atitikmuo--silpnas { border-left-color: var(--light-gray); }
+
+  .atitikmuo-antraste {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .atitikmuo-pavadinimas {
+    font-weight: 600;
+  }
+
+  .atitikmuo-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 4px;
+  }
+
+  .atitikmuo-informacija {
+    margin-top: 8px;
+  }
+
+  .atitikmuo-pozymiai {
+    margin-top: 4px;
+    font-style: italic;
+  }
+</style>
