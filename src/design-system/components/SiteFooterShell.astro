@@ -1,7 +1,22 @@
+---
+/**
+ * Puslapio poraštės karkasas: viršuje ženklas + nuorodų stulpeliai
+ * (`FooterColumn`), apačioje – atsakomybės tekstas ir versijos eilutė.
+ */
+---
 <footer class="site-footer-shell">
   <div class="footer-inner">
-    <slot />
+    <div class="footer-brand">
+      <slot name="brand" />
+    </div>
+
+    <nav class="footer-columns" aria-label="Poraštė">
+      <slot />
+    </nav>
   </div>
 
-  <slot name="disclaimer" />
+  <div class="footer-bottom">
+    <slot name="disclaimer" />
+    <slot name="meta" />
+  </div>
 </footer>

@@ -45,6 +45,15 @@ COPY --link --from=builder /app/requestLog.mjs ./
 COPY --link --from=builder /app/src/assets/fontai ./src/assets/fontai
 COPY --link --from=builder /app/src/assets/branding ./src/assets/branding
 
+# Paleistos versijos commit'as – rodomas footer'yje (src/lib/buildInfo.ts).
+# `.git` neįeina į build kontekstą, tad hash'as paduodamas iš išorės:
+# CI – `--build-arg GIT_COMMIT=${{ github.sha }}`, lokaliai –
+# `GIT_COMMIT=$(git rev-parse HEAD) docker compose build`. Nenustačius footer'is
+# versijos eilutės nerodo. Laikoma paskutiniuose sluoksniuose, kad kiekvienas
+# naujas hash'as neperstatytų COPY sluoksnių.
+ARG GIT_COMMIT=""
+ENV GIT_COMMIT=$GIT_COMMIT
+
 # Prievadą nustato start-server.mjs iš .env PORT (numatytas 9019). network_mode: host,
 # tad EXPOSE tik informacinis.
 EXPOSE 9019

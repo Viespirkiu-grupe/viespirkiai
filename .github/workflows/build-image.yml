@@ -56,6 +56,9 @@ jobs:
         with:
           context: .
           push: true
+          # Footer'yje rodomas commit'as (.git į build kontekstą nepatenka).
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

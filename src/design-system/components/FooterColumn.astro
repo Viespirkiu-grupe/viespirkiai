@@ -1,0 +1,14 @@
+---
+/** Poraštės nuorodų stulpelis: antraštė + vertikalus `<a>` / `<button>` sąrašas. */
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+<div class="footer-col">
+  <h2 class="footer-col-title">{title}</h2>
+  <div class="footer-col-links">
+    <slot />
+  </div>
+</div>

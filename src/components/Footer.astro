@@ -1,25 +1,60 @@
 ---
 import SiteFooterShell from '@design-system/components/SiteFooterShell.astro';
+import FooterColumn from '@design-system/components/FooterColumn.astro';
+import buildInfo from '../lib/buildInfo.ts';
+import { showFooterDisclaimer } from '../lib/footerDisclaimer.ts';
+import logoSvg from '../assets/branding/viespirkiaiLogo.svg?raw';
+
+const rodytiIspejima = showFooterDisclaimer(Astro.url.pathname);
 ---
 <SiteFooterShell>
-  <a href="https://www.facebook.com/profile.php?id=100003117510876" rel="me">↗ Facebook</a>
-  <a href="https://river.group.lt/@viespirkiai" rel="me">↗ Mastodon</a>
-  <a href="/duomenys#duomenu-saltiniai">↗ Duomenų šaltiniai</a>
-  <a href="/mcp">↗ MCP</a>
-  <a href="/kontaktai">↗ Kontaktai</a>
-  <a href="/analitika">↗ Analitika</a>
-  <a href="/kodas">↗ Kodas</a>
-  <a href="/privatumas">↗ Privatumo politika</a>
-  <button type="button" id="fontToggle">↗ Pakeisti šriftą</button>
-  <button type="button" id="rodytiReklamas" hidden>↗ Rodyti reklamas</button>
+  <Fragment slot="brand">
+    <p class="footer-brand-tagline">Pilietinė iniciatyva</p>
+    <a href="/" class="footer-brand-mark" aria-label="Viešpirkiai – pradžia">
+      <Fragment set:html={logoSvg} />
+    </a>
+  </Fragment>
 
-  <p slot="disclaimer" class="text-center text-sm text-muted mt-4 mb-0">
-    <em>
-      Rekomenduojame tikrinti pateiktą informaciją. Ji buvo automatiškai surinkta remiantis tik viešais šaltiniais, gali būti pasenusi, klaidinga.
-      <br>Jeigu yra priežastis, kodėl tokia ji turėtų būti neskelbiama, šalinama ar pataisyta – prašome susisiekti.
-      Daugiau informacijos rasite <a href="/kontaktai#informacijosTikslumas" class="text-inherit">kontaktų puslapyje</a>.
-    </em>
-  </p>
+  <FooterColumn title="Duomenys">
+    <a href="/duomenys#duomenu-saltiniai">Duomenų šaltiniai</a>
+    <a href="/mcp">MCP</a>
+    <a href="/analitika">Analitika</a>
+    <a href="/kodas" class="footer-link-external">Kodas</a>
+  </FooterColumn>
+
+  <FooterColumn title="Projektas">
+    <a href="/kontaktai">Kontaktai</a>
+    <a href="/privatumas">Privatumo politika</a>
+    <a href="https://www.facebook.com/profile.php?id=100003117510876" rel="me" class="footer-link-external">Facebook</a>
+    <a href="https://river.group.lt/@viespirkiai" rel="me" class="footer-link-external">Mastodon</a>
+  </FooterColumn>
+
+  <FooterColumn title="Nustatymai">
+    <button type="button" id="fontToggle">Pakeisti šriftą</button>
+    <button type="button" id="rodytiReklamas" hidden>Rodyti reklamas</button>
+  </FooterColumn>
+
+  {rodytiIspejima && (
+    <p slot="disclaimer" class="footer-disclaimer">
+      <em>
+        Rekomenduojame tikrinti pateiktą informaciją. Ji buvo automatiškai surinkta remiantis tik viešais šaltiniais, gali būti pasenusi, klaidinga.
+        <br>Jeigu yra priežastis, kodėl tokia ji turėtų būti neskelbiama, šalinama ar pataisyta – prašome susisiekti.
+        Daugiau informacijos rasite <a href="/kontaktai#informacijosTikslumas" class="text-inherit">kontaktų puslapyje</a>.
+      </em>
+    </p>
+  )}
+
+  {buildInfo && (
+    <div slot="meta" class="footer-meta">
+      <span>Versija</span>
+      <a
+        href={buildInfo.commitUrl}
+        class="footer-commit footer-link-external"
+        rel="noopener"
+        title={`Commit ${buildInfo.commit}`}
+      >{buildInfo.shortCommit}</a>
+    </div>
+  )}
 </SiteFooterShell>
 
 <script>

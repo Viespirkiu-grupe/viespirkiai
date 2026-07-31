@@ -125,33 +125,130 @@
 
     .site-footer-shell {
         width: 100%;
-        min-height: 4rem;
-        margin-block: 40px;
-        padding: 28px 16px;
+        margin-block-start: 64px;
+        padding: 40px 56px 24px;
         border-top: var(--border);
-    }
-
-    .footer-inner {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 16px;
         color: var(--gray);
         font-size: var(--text-sm);
     }
 
-    .footer-inner a,
-    .footer-inner button {
+    .footer-inner {
+        display: grid;
+        grid-template-columns: minmax(200px, 1fr) minmax(0, 2.4fr);
+        gap: 32px var(--col-gap);
+        max-width: var(--max-width);
+        margin-inline: auto;
+    }
+
+    .footer-brand {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .footer-brand-mark {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--black);
+        /* Logotipo SVG plotis nurodytas ch vienetais, tad jį valdo font-size. */
+        font-size: var(--text-lg);
+        text-decoration: none;
+    }
+
+    .footer-columns {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 24px var(--col-gap);
+    }
+
+    /* Ženklo antraštė ir stulpelių antraštės turi vienodas metrikas, kad
+       pirmosios eilutės poraštėje sutaptų. */
+    .footer-col-title,
+    .footer-brand-tagline {
+        margin: 0 0 12px;
+        color: var(--dark-gray);
+        font-size: var(--text-xs);
+        font-weight: 500;
+        line-height: 1.4;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .footer-col-links {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 9px;
+    }
+
+    .footer-col-links a,
+    .footer-col-links button {
+        padding: 0;
         cursor: pointer;
         color: inherit;
+        text-align: left;
         text-decoration: underline;
         text-decoration-color: transparent;
+        text-underline-offset: 0.2em;
         transition: color var(--transition), text-decoration-color var(--transition);
     }
 
-    .footer-inner a:hover,
-    .footer-inner button:hover {
+    .footer-col-links a:hover,
+    .footer-col-links button:hover {
+        color: var(--black);
+        text-decoration-color: currentColor;
+    }
+
+    /* Išorinės nuorodos pažymimos rodykle – vidinės lieka švarios. */
+    .footer-link-external::after {
+        content: "↗";
+        margin-inline-start: 4px;
+        font-size: 0.85em;
+        vertical-align: baseline;
+    }
+
+    .footer-bottom {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px var(--col-gap);
+        max-width: var(--max-width);
+        margin: 32px auto 0;
+        padding-top: 20px;
+        border-top: var(--border);
+    }
+
+    .footer-disclaimer {
+        /* flex-basis eilutės kryptimi = plotis; stulpelyje (žr. ≤640px) jis
+           virstų aukščiu, tad ten atstatoma į `auto`. */
+        flex: 1 1 480px;
+        margin: 0;
+        font-size: var(--text-xs);
+        line-height: 1.6;
+    }
+
+    .footer-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-inline-start: auto;
+        font-size: var(--text-xs);
+        white-space: nowrap;
+    }
+
+    .footer-commit {
+        color: inherit;
+        font-family: var(--font-mono);
+        text-decoration: underline;
+        text-decoration-color: transparent;
+        text-underline-offset: 0.2em;
+        transition: color var(--transition), text-decoration-color var(--transition);
+    }
+
+    .footer-commit:hover {
+        color: var(--black);
         text-decoration-color: currentColor;
     }
 
@@ -195,19 +292,44 @@
 
     @media (max-width: 1200px){
         .site-footer-shell {
-            margin-block: 28px;
-            padding-top: 16px;
-        }
-
-        .footer-inner {
-            gap: 12px;
+            margin-block-start: 40px;
+            padding: 32px 28px 20px;
         }
     }
 
-    @media (max-width: 480px) {
+    @media (max-width: 900px) {
         .footer-inner {
+            grid-template-columns: 1fr;
+            gap: 28px;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .footer-columns {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 24px 24px;
+        }
+
+        .footer-bottom {
             flex-direction: column;
-            gap: 8px;
+            align-items: flex-start;
+        }
+
+        .footer-disclaimer {
+            flex: 0 1 auto;
+        }
+
+        .footer-meta {
+            /* Stulpelio kryptimi margin-inline-start:auto nebeveikia – reikia
+               align-self, kad versija liktų dešinėje. */
+            align-self: flex-end;
+            margin-inline-start: 0;
+        }
+    }
+
+    @media (max-width: 380px) {
+        .footer-columns {
+            grid-template-columns: 1fr;
         }
     }
 
