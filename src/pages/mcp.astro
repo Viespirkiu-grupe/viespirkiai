@@ -14,6 +14,13 @@ if (isTransportRequest) {
   return await handleMcpRequest(Astro.request);
 }
 
+if (Astro.request.method !== 'GET' && Astro.request.method !== 'HEAD') {
+  return new Response('Method Not Allowed', {
+    status: 405,
+    headers: { Allow: 'GET, POST' },
+  });
+}
+
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 const mcpUrl = 'https://viespirkiai.org/mcp';

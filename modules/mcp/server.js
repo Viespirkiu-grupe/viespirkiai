@@ -1,4 +1,5 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import { z } from "zod";
 import config from "../../utils/config.js";
 import { logToolCall } from "./mcpLogger.js";
 import * as getFailas from "./tools/getFailas.js";
@@ -61,7 +62,9 @@ export function createMcpServer() {
             tool.name,
             {
                 description: tool.description,
-                inputSchema: tool.schema,
+                // Įrankiai eksportuoja žalią laukų rinkinį — SDK v2 nori pilnos
+                // Standard Schema schemos, todėl apvyniojam z.object.
+                inputSchema: z.object(tool.schema),
             },
             wrapHandler(tool.name, tool.handler),
         );
