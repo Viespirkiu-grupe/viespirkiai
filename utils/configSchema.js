@@ -46,6 +46,9 @@ const configSchema = z.object({
     // Be trailing slash.
     dataGovUrl: z.string().default("https://get.data.gov.lt"),
     viesiejiPirkimaiUrl: z.string().default("https://viesiejipirkimai.lt"),
+    esInvesticijos2021Url: z
+        .string()
+        .default("https://2021.esinvesticijos.lt"),
 
     internalFileBase: z.string().default("https://failai.viespirkiai.org"),
     ocrBandymai: z.number().int().positive().default(5),

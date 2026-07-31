@@ -20,3 +20,18 @@ describe('optional server features', () => {
     expect(config.enableAtn1).toBe(true);
   });
 });
+
+describe('external source URLs', () => {
+  it('reads the CPVA ES investments mirror from the environment', () => {
+    const config = normalizeConfig(configFromEnv({
+      '2021_ESINVESTICIJOS': 'http://10.1.10.1:9204/',
+    }));
+
+    expect(config.esInvesticijos2021Url).toBe('http://10.1.10.1:9204/');
+  });
+
+  it('uses the public CPVA source by default', () => {
+    expect(normalizeConfig({}).esInvesticijos2021Url)
+      .toBe('https://2021.esinvesticijos.lt');
+  });
+});

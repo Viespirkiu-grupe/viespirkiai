@@ -80,6 +80,7 @@ export default {
     // tikrieji viešieji šaltiniai.
     dataGovUrl: "https://get.data.gov.lt",
     viesiejiPirkimaiUrl: "https://viesiejipirkimai.lt",
+    esInvesticijos2021Url: "https://2021.esinvesticijos.lt",
 
     // ─────────────────────────────────────────────────────────────────────
     // Failai ir OCR

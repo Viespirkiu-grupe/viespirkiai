@@ -160,6 +160,7 @@ Baziniai URL — galima perrašyti į mirror/proxy. Be trailing slash.
 | --- | --- | --- |
 | `DATA_GOV_URL` | `https://get.data.gov.lt` | data.gov.lt bazinis URL (import scraperiai). |
 | `VIESIEJI_PIRKIMAI_URL` | `https://viesiejipirkimai.lt` | Viešųjų pirkimų portalo (EPPS) bazinis URL scrapinimui/parsisiuntimui. |
+| `2021_ESINVESTICIJOS` | `https://2021.esinvesticijos.lt` | 2021–2027 ES investicijų portalo bazinis URL CPVA duomenų scrapinimui. |
 
 ### Spinta / Stalčius (atviri duomenys)
 

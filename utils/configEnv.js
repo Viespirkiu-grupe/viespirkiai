@@ -45,6 +45,7 @@ const ENV_MAP = [
 
     ["DATA_GOV_URL", "dataGovUrl", "string"],
     ["VIESIEJI_PIRKIMAI_URL", "viesiejiPirkimaiUrl", "string"],
+    ["2021_ESINVESTICIJOS", "esInvesticijos2021Url", "string"],
 
     ["INTERNAL_FILE_BASE", "internalFileBase", "string"],
     ["OCR_BANDYMAI", "ocrBandymai", "number"],
