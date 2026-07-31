@@ -5,12 +5,29 @@ import { processPmc, processOldestPmcOffHours } from "../modules/viesiejiPirkima
 import { cleanReservationsHasMore } from "../modules/viesiejiPirkimai/cleanReservations.js";
 import { processNextVykdytojas } from "../modules/viesiejiPirkimai/viesiejiPirkimaiVykdytojaiScrape.js";
 import { processViesiejiPirkimaiIndexQueue } from "../modules/viesiejiPirkimai/quickwitProcessIndexQueue.js";
+import { updateRecentPlanuojamiPirkimai } from "../modules/viesiejiPirkimai/updatePlanuojamiPirkimai.js";
+import { processNextPlanuojamuPirkimuVykdytojas } from "../modules/viesiejiPirkimai/planuojamiPirkimaiVykdytojai.js";
 
 export default [
     {
         name: "updateCFTS",
         schedule: "0 */1 * * *",
         job: updateCFTS,
+    },
+    {
+        name: "updateRecentPlanuojamiPirkimai",
+        // Tikrinama kas valandą; pats job'as VPT darbo metu iškart praleidžia darbą.
+        schedule: "23 * * * *",
+        job: updateRecentPlanuojamiPirkimai,
+    },
+    {
+        name: "processNextPlanuojamuPirkimuVykdytojas",
+        mode: "asap",
+        priority: 1,
+        concurrency: 1,
+        cooldown: 30,
+        errorCooldown: 60,
+        job: processNextPlanuojamuPirkimuVykdytojas,
     },
     {
         name: "processCfTDPSWS",
