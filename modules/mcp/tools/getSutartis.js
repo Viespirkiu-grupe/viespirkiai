@@ -3,6 +3,7 @@ import { postgres } from "../../../postgres/postgres.js";
 import { fixHtmlEntities } from "../../../utils/fixHtmlEntities.js";
 import { CONTRACT_TYPES } from "../../sutartys/contractTypes.js";
 import { VPM_SUTARTIS_ROW_SQL } from "../../sutartys/vpmSutartisRow.js";
+import { loadCpvaProjektai } from "../../cpva/loadProjektai.js";
 
 export const name = "get_sutartis";
 export const description =
@@ -148,24 +149,7 @@ export async function handler({ id }) {
     );
 
     // ES projektai su pilnu projekto objektu
-    sutartis.cpvaProjektuSutartys = [];
-    if (sutartis.pirkimoNumeris) {
-        const cpva = await postgres.query(
-            `SELECT * FROM "cpvaProjektuSutartys" WHERE "pirkimoNrCvpis" = $1`,
-            [sutartis.pirkimoNumeris],
-        );
-        sutartis.cpvaProjektuSutartys = cpva.rows;
-
-        for (const projektoSutartis of sutartis.cpvaProjektuSutartys) {
-            const projektasRes = await postgres.query(
-                `SELECT * FROM "cpvaProjektuSarasas" WHERE "projektoNr" = $1`,
-                [projektoSutartis.projektoNr],
-            );
-            if (projektasRes.rows.length > 0) {
-                projektoSutartis.projektas = projektasRes.rows[0];
-            }
-        }
-    }
+    sutartis.cpvaProjektuSutartys = await loadCpvaProjektai(sutartis);
 
     // CVPP ir CVPIS pirkimai
     const cvppRes = await postgres.query(

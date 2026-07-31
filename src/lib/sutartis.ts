@@ -2,7 +2,8 @@ import { postgres } from '@/postgres/postgres.js';
 import { fixHtmlEntities } from '@/utils/fixHtmlEntities.js';
 import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
 import { VPM_SUTARTIS_ROW_SQL } from '@/modules/sutartys/vpmSutartisRow.js';
-import { loadPirkimoAtitikmenys, parsePirkimoId } from './sutartisPirkimai.ts';
+import { loadCpvaProjektai } from '@/modules/cpva/loadProjektai.js';
+import { loadPirkimoAtitikmenys } from './sutartisPirkimai.ts';
 
 export type Sutartis = Record<string, any>;
 
@@ -164,28 +165,6 @@ async function annotateDokumentai(sutartis: any) {
   sutartis.dokumentai = dokumentai;
 }
 
-async function loadCpvaProjektai(pirkimoNumeris: string | null | undefined) {
-  if (parsePirkimoId(pirkimoNumeris) === null) return [];
-  const sutartys = await postgres.query(
-    `SELECT * FROM "cpvaProjektuSutartys" WHERE "pirkimoNrCvpis" = $1`,
-    [pirkimoNumeris],
-  ).then((r: any) => r.rows);
-  const projektuNr = Array.from(new Set(sutartys.map((ps: any) => ps.projektoNr).filter(Boolean)));
-  if (projektuNr.length > 0) {
-    const projektai = await postgres.query(
-      `SELECT * FROM "cpvaProjektuSarasas" WHERE "projektoNr" = ANY($1)`,
-      [projektuNr],
-    ).then((r: any) => r.rows);
-    const byNr = new Map<any, any>(projektai.map((p: any) => [p.projektoNr, p]));
-    for (const ps of sutartys) {
-      const proj = byNr.get(ps.projektoNr);
-      if (proj) ps.projektas = proj;
-    }
-  }
-  return sutartys;
-}
-
-
 export async function loadSutartis(id: number): Promise<Sutartis | null> {
   const sutartis = await postgres
     .query(`SELECT * FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
@@ -199,7 +178,7 @@ export async function loadSutartis(id: number): Promise<Sutartis | null> {
     loadPanasiosSutartys(sutartis),
     loadSabisSutartys(sutartis.sutartiesUnikalusId),
     annotateDokumentai(sutartis),
-    loadCpvaProjektai(sutartis.pirkimoNumeris),
+    loadCpvaProjektai(sutartis),
     loadPirkimoAtitikmenys(sutartis),
   ]);
 

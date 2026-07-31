@@ -9,12 +9,17 @@ interface Props {
 
 const { item } = Astro.props;
 const proj = item.projektas;
+const pradzia = proj?.projektoVeikluPradziosData || '';
+const pabaiga = proj?.projektoVeikluPabaigosData || '';
+const laikotarpis = pradzia && pabaiga
+  ? `${pradzia} — ${pabaiga}`
+  : pradzia || pabaiga;
 ---
 
 <ResultCardShell clickable={true}>
   <div slot="meta" class="result-card-meta">
     <span>{item.projektoNr || ''}</span>
-    {proj && <span>{proj.projektoVeikluPradziosData || ''} — {proj.projektoVeikluPabaigosData || ''}</span>}
+    {laikotarpis && <span>{laikotarpis}</span>}
   </div>
 
   <h3 slot="title" class="result-card-title">
