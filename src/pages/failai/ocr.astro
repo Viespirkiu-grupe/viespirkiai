@@ -46,13 +46,21 @@ const [ocrStatsPerExtRes, ocrStatsDayRes, ocrNuskaitytojaiRes, ocrLast60Res, ocr
     ORDER BY date DESC
   `),
   postgres.query(`
-    SELECT n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos",
+    SELECT n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas",
+      COALESCE(r.rezervacijos, 0) AS "rezervacijos",
       COALESCE(SUM(s.results), 0) AS "results",
       COALESCE(SUM(s.pages), 0) AS "pages",
       COALESCE(SUM(s.words), 0) AS "words"
     FROM public."ocrNuskaitytojai" n
+    -- Dabartinės rezervacijos, o ne kaupiamas skaitiklis: status = -3 pjūvis mažas,
+    -- o daliniam indeksui (filesOcrStatus_rezervuoti_idx) tai index-only scan.
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::int AS rezervacijos
+      FROM public."filesOcrStatus" o
+      WHERE o."nodeId" = n.id AND o.status = -3
+    ) r ON TRUE
     LEFT JOIN public."filesOcrStatsDay" s ON s."nodeId" = n.id
-    GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos"
+    GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", r.rezervacijos
     ORDER BY n."nuskaitytiDokumentai" DESC
     LIMIT 100
   `),

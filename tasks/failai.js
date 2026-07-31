@@ -1,6 +1,7 @@
 import { parsiustiFaila } from "../modules/failai/parsiusti.js";
 import { pravalytiParsiuntimoRezervacijas } from "../modules/failai/pravalytiParsiuntimuRezervacijas.js";
 import { pravalytiNuskaitymoRezervacijas } from "../modules/failai/pravalytiNuskaitymoRezervacijas.js";
+import { pravalytiOcrRezervacijas } from "../modules/failai/pravalytiOcrRezervacijas.js";
 
 export default [
     {
@@ -33,5 +34,13 @@ export default [
         cooldown: 60,
         errorCooldown: 60,
         job: pravalytiNuskaitymoRezervacijas,
+    },
+    {
+        name: "pravalytiOcrRezervacijas",
+        mode: "asap",
+        priority: 4,
+        cooldown: 60,
+        errorCooldown: 60,
+        job: pravalytiOcrRezervacijas,
     }
 ];

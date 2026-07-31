@@ -8,22 +8,33 @@ dist
 
 # Git ir redaktorius
 .git
+.github
 .vscode
+
+# Paslaptys ir vietinė konfigūracija — build'ui nereikia (astro.config.mjs
+# config.js neimportuoja), o runtime jos paduodamos per env_file / compose.
+.env
+.env.*
+config.js
+compose.yml
+plausible/plausible-conf.env
+wireproxy/proxy.wg
 
 # Duomenų / servisų katalogai (montuojami arba nereikalingi build metu)
 postgres/18
-postgres/pgdata
-postgres/pgadmin-data
+pgdata
+pgadmin-data
 typesense/data
 typesense/nodes
 typesense/typesense
 quickwit/qwdata
 plausible
-wireproxy/proxy.wg
 tmp
 old
 backup
 dbSchema
+taskState
+s3backup/*.sqlite*
 
 # Build'ui nereikalingi katalogai (public/ NEtrinamas – linkPublic.mjs jį skaito)
 benchmarks
@@ -33,9 +44,21 @@ test
 runner
 schemas
 
-# Logai / eksportai
+# Logai / eksportai / duomenų rinkiniai
 *.log
+*.csv
+*.zip
+!modules/bvpz/cpv.zip
+*.jsonl
+*.txt
+!LICENSE.txt
+!pgbouncer/userlist.txt
 starts.txt
 taskRunnerStarts.txt
 exports
 modules/cvpp/ataskaitos
+
+# public/ turinys nefiltruojamas: linkPublic.mjs symlink'us kuria pagal tai, ką
+# mato build metu, tad iškirptas robots.txt ar bet kuris kitas failas runtime
+# virstų 404, nors primontuotame public/ jis ir yra.
+!public/**

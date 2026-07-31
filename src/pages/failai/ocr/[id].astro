@@ -33,12 +33,19 @@ if (isNaN(nodeId)) {
 
 const [nuskaitytojasRes, ocrStatsDayRes] = await Promise.all([
   postgres.query(
-    `SELECT n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos",
+    `SELECT n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas",
+      COALESCE(r.rezervacijos, 0) AS "rezervacijos",
       COALESCE(SUM(s.results), 0) AS "results", COALESCE(SUM(s.pages), 0) AS "pages", COALESCE(SUM(s.words), 0) AS "words"
      FROM public."ocrNuskaitytojai" n
+     -- Dabartinės rezervacijos — tas pats pjūvis kaip /failai/ocr sąraše.
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS rezervacijos
+       FROM public."filesOcrStatus" o
+       WHERE o."nodeId" = n.id AND o.status = -3
+     ) r ON TRUE
      LEFT JOIN public."filesOcrStatsDay" s ON s."nodeId" = n.id
      WHERE n.id = $1
-     GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", n."rezervacijos"`,
+     GROUP BY n.id, n."nuskaitytiDokumentai", n."viesasPavadinimas", n."pavadinimas", r.rezervacijos`,
     [nodeId],
   ),
   postgres.query(

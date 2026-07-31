@@ -107,6 +107,10 @@ export async function paimtiOcr(node, klientas = postgres) {
         [failas.id, node.id],
     );
 
+    // ocrNuskaitytojai."rezervacijos" čia sąmoningai neliečiamas: rodoma reikšmė
+    // yra dabartinių rezervacijų kiekis, o jis skaičiuojamas gyvai iš status = -3
+    // (žr. ocr.astro). Rankinis skaitiklis reikalautų dekremento visuose grąžinimo
+    // keliuose ir neišvengiamai nudriftuotų.
     return failas;
 }
 
@@ -160,5 +164,14 @@ export async function pazymetiOcrRezultata(
             words    = public."filesOcrStatsDay".words + EXCLUDED.words,
             duration = public."filesOcrStatsDay".duration + EXCLUDED.duration`,
         [nodeId, pageCount, wordCount, duration],
+    );
+
+    // Kaupiamasis nuskaitytojo skaitiklis — pernuskaitymas skaičiuojamas kaip
+    // atskiras nuskaitymas (kaip ir filesOcrStatus."resultsCount").
+    await klientas.query(
+        `UPDATE public."ocrNuskaitytojai"
+         SET "nuskaitytiDokumentai" = COALESCE("nuskaitytiDokumentai", 0) + 1
+         WHERE id = $1`,
+        [nodeId],
     );
 }
