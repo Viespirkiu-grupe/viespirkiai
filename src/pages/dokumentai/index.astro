@@ -43,9 +43,7 @@ const {
             searchPlaceholder="Ieškoti dokumentų…"
             searchModes={true}
             searchMode={mode}
-          >
-            <sup slot="title-badge" class="dok-beta">BETA</sup>
-          </SearchForm>
+          />
         </div>
         <DokHomeOverview overview={homeOverview} />
       </>
@@ -57,9 +55,7 @@ const {
           searchPlaceholder="Ieškoti dokumentų…"
           searchModes={true}
           searchMode={mode}
-        >
-          <sup slot="title-badge" class="dok-beta">BETA</sup>
-        </SearchForm>
+        />
         <EmptyState message={errorMessage} />
       </div>
     ) : (
@@ -140,21 +136,6 @@ const {
 </style>
 
 <style>
-  /* BETA žymė greta antraštės (superscript'u, bet ne <h1> viduje). */
-  .dok-beta {
-    align-self: flex-start;
-    margin-top: 0.15em;
-    padding: 2px 6px;
-    border-radius: var(--radius-sm);
-    background: var(--lightest-gray);
-    color: var(--gray);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    line-height: 1;
-    text-transform: uppercase;
-  }
-
   /* Spacing scale (matches Tailwind's 4-based steps used elsewhere)
      2px • 4 • 8 • 12 • 16 • 24 • 32 • 48 • 64                       */
 

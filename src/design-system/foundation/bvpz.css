@@ -153,19 +153,45 @@
       min-height: 200px;
     }
 
+    /* „Atvirkštinis" sticky: juosta kabo ekrano apačioje, kol medis dar tęsiasi
+       žemyn, o pasiekus sąrašo pabaigą – atsikabina ir atsisėda savo vietoje
+       (dokas, iškart virš poraštės), nebeuždengdama turinio.
+       Kodėl ne `position: sticky; bottom: 0`: html/body turi `overflow-x: hidden`
+       (reset.css), tad slinkties konteineriu tampa body ir apatinis sticky
+       niekada nepakimba. Todėl kabėjimą neša `position: fixed`, o atsikabinimą
+       ties doku – bvpzActionBarDock skriptas (žr. BvpzPicker.astro).
+       Pilnas plotis atsisėdus gaunamas neutralizuojant <main> šoninę paraštę
+       (56/28px) ir ją atkuriant kaip vidinę. */
+    .bvpz-picker .action-bar-dock {
+      --bvpz-bar-edge: 56px;
+      margin-inline: calc(-1 * var(--bvpz-bar-edge));
+    }
+
     .bvpz-picker .action-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
+      --bvpz-bar-edge: 56px;
+      position: static;
       background: var(--white);
       border-top: var(--border);
-      padding: 12px 28px;
+      padding: 12px var(--bvpz-bar-edge);
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
       z-index: var(--z-sticky);
+    }
+
+    /* Kabo, kol dokas dar žemiau matomos srities. */
+    .bvpz-picker .action-bar.is-floating {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+
+    @media (max-width: 1200px) {
+      /* Sutampa su main padding-inline (žr. layout-primitives.css). */
+      .bvpz-picker .action-bar,
+      .bvpz-picker .action-bar-dock { --bvpz-bar-edge: 28px; }
     }
 
     .bvpz-picker .action-bar.action-bar-sticky {
@@ -185,6 +211,8 @@
       right: auto;
       z-index: auto;
       margin-top: 0;
+      /* Dialoge/lauke juosta lieka konteinerio pločio — be pilno pločio išlindimo. */
+      margin-inline: 0;
       border-top: var(--border);
       border-left: 0;
       border-right: 0;

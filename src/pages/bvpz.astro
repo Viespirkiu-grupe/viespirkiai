@@ -39,3 +39,11 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 
   </main>
 </Layout>
+
+<style is:global>
+  /* Veiksmų juosta atsisėda pačiame main gale — poraštės viršutinė paraštė
+     paliktų tarpą tarp jos ir poraštės linijos, tad čia jos nereikia. */
+  body:has(.bvpz-picker .action-bar-dock) .site-footer-shell {
+    margin-block-start: 0;
+  }
+</style>

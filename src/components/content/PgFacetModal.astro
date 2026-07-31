@@ -1,0 +1,175 @@
+---
+// Bendras facetų dialogas Postgres puslapiams (/neskelbiamos, /nepatikimi).
+//
+// Skirtingai nuo SutartysFacetModal, čia nėra API: šių sąrašų facetų reikšmių
+// yra šimtai (ne milijonai), tad visos parinktys atkeliauja kartu su puslapiu
+// JSON blokelyje, o filtravimas dialoge vyksta naršyklėje — be tinklo.
+import FacetModalBase from '@design-system/components/FacetModalBase.astro';
+import type { FacetOption } from '../../lib/searchDokumentai.ts';
+
+interface Props {
+  /** Puslapio kelias, į kurį grįžtama pritaikius atranką (pvz. „/neskelbiamos"). */
+  basePath: string;
+  /** Facetų juostos konteineris, kurio „Daugiau" mygtukai atidaro dialogą. */
+  facetsSelector: string;
+  /** Visos parinktys pagal parametrą — tos pačios, iš kurių sudėta juosta. */
+  options: Record<string, FacetOption[]>;
+  id?: string;
+}
+
+const { basePath, facetsSelector, options, id = 'pgFacetModal' } = Astro.props as Props;
+---
+
+<div
+  class="pg-facet-modal-root"
+  data-modal-id={id}
+  data-base={basePath}
+  data-facets={facetsSelector}
+>
+  <FacetModalBase id={id} searchPlaceholder="Filtruoti…" searchAriaLabel="Filtruoti reikšmes" listClassName="dok-facet-modal__list--stack" />
+  <script type="application/json" data-facet-options is:inline set:html={JSON.stringify(options)}></script>
+</div>
+
+<script>
+  import { openModal } from '@design-system/components/modal.ts';
+
+  const root = document.querySelector<HTMLElement>('.pg-facet-modal-root');
+  const modal = root && document.getElementById(root.dataset.modalId || '');
+  if (root && modal) {
+    const basePath = root.dataset.base || '/';
+    const facetsSelector = root.dataset.facets || '';
+    const optionsByParam: Record<string, { value: string; count: number | null; label?: string }[]> =
+      JSON.parse(root.querySelector('[data-facet-options]')?.textContent || '{}');
+
+    const titleEl = modal.querySelector<HTMLElement>('.ds-modal__title')!;
+    const searchEl = modal.querySelector<HTMLInputElement>('.dok-facet-modal__search')!;
+    const listEl = modal.querySelector<HTMLElement>('.dok-facet-modal__list')!;
+    const countEl = modal.querySelector<HTMLElement>('.ds-modal__count')!;
+
+    let param = '';
+    let selected = new Set<string>();
+    let options: { value: string; count: number | null; label?: string }[] = [];
+
+    // Atranka gyvena URL'e kartojamais parametrais (reikšmėse pasitaiko kablelių).
+    const getList = (name: string) =>
+      new URLSearchParams(location.search).getAll(name).map((s) => s.trim()).filter(Boolean);
+
+    const commit = (list: string[]) => {
+      const params = new URLSearchParams(location.search);
+      params.delete(param);
+      for (const value of list) params.append(param, value);
+      params.delete('page');
+      const search = params.toString();
+      location.href = search ? `${basePath}?${search}` : basePath;
+    };
+
+    function updateCount() {
+      countEl.textContent = selected.size ? `Pažymėta: ${selected.size}` : '';
+    }
+
+    function toggle(value: string, row: HTMLElement) {
+      if (selected.has(value)) selected.delete(value);
+      else selected.add(value);
+      const on = selected.has(value);
+      row.classList.toggle('is-selected', on);
+      row.setAttribute('aria-selected', String(on));
+      updateCount();
+    }
+
+    function makeRow(option: { value: string; count: number | null; label?: string }) {
+      const on = selected.has(option.value);
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'dok-facet-row' + (option.label ? ' dok-facet-row--stack' : '') + (on ? ' is-selected' : '');
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(on));
+      if (option.label) row.title = `${option.label} (${option.value})`;
+
+      const text = document.createElement('span');
+      text.className = 'dok-facet-row__text';
+      const label = document.createElement('span');
+      label.className = 'dok-facet-row__label';
+      label.textContent = option.label || option.value;
+      text.appendChild(label);
+      if (option.label) {
+        const sub = document.createElement('span');
+        sub.className = 'dok-facet-row__sub';
+        sub.textContent = option.value;
+        text.appendChild(sub);
+      }
+      row.appendChild(text);
+
+      if (option.count != null) {
+        const count = document.createElement('span');
+        count.className = 'dok-facet-row__count';
+        count.textContent = Number(option.count).toLocaleString('lt-LT');
+        row.appendChild(count);
+      }
+      row.addEventListener('click', () => toggle(option.value, row));
+      return row;
+    }
+
+    function render() {
+      const needle = searchEl.value.trim().toLowerCase();
+      // Pažymėtos reikšmės — visada viršuje (ir tos, kurių sąraše nebėra), kad
+      // ilgame sąraše nereikėtų jų medžioti.
+      const byValue = new Map(options.map((option) => [option.value, option]));
+      const chosen: typeof options = [...selected].map(
+        (value) => byValue.get(value) ?? { value, count: null },
+      );
+      const rest = options.filter((option) => !selected.has(option.value));
+      const rows = [...chosen, ...rest].filter(
+        (option) =>
+          !needle ||
+          option.value.toLowerCase().includes(needle) ||
+          (option.label?.toLowerCase().includes(needle) ?? false),
+      );
+
+      listEl.textContent = '';
+      const frag = document.createDocumentFragment();
+      for (const option of rows) frag.appendChild(makeRow(option));
+      listEl.appendChild(frag);
+
+      if (!rows.length) {
+        const empty = document.createElement('p');
+        empty.className = 'dok-facet-modal__empty';
+        empty.textContent = 'Nieko nerasta.';
+        listEl.appendChild(empty);
+      }
+    }
+
+    document.querySelectorAll<HTMLButtonElement>(`${facetsSelector} [data-facet-modal]`).forEach((btn) => {
+      btn.addEventListener('click', () => {
+        param = btn.dataset.facetParam || '';
+        titleEl.textContent = btn.dataset.facetTitle || 'Filtras';
+        options = optionsByParam[param] ?? [];
+        selected = new Set(getList(param));
+        searchEl.value = '';
+        updateCount();
+        render();
+        openModal(modal!);
+        searchEl.focus();
+      });
+    });
+
+    searchEl.addEventListener('input', render);
+    searchEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        commit([...selected]);
+      }
+    });
+
+    modal.querySelector('[data-facet-clear]')?.addEventListener('click', () => {
+      selected.clear();
+      updateCount();
+      render();
+    });
+    modal.querySelector('[data-facet-apply]')?.addEventListener('click', () => commit([...selected]));
+  }
+</script>
+
+<style is:global>
+  /* Skaičiai čia tikslūs (Postgres), o ne apytiksliai kaip Quickwit paieškose. */
+  .pg-facet-modal-root .dok-facet-note { display: none; }
+</style>

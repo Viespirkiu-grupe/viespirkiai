@@ -122,6 +122,9 @@ const syncBtnId = `${instanceId}-sync-btn`;
     <span class="spinner spinner-xl"></span>
   </div>
 
+  {/* Dokas — vieta, kurioje juosta atsisėda pasiekus sąrašo pabaigą. Iki tol ji
+      kabo ekrano apačioje (`is-floating`), o dokas laiko jos aukščio tarpą. */}
+  <div class:list={[actionBarMode === 'fixed' && 'action-bar-dock']}>
   <div class:list={['action-bar', actionBarMode === 'sticky' && 'action-bar-sticky', actionBarMode === 'attached' && 'action-bar-attached']}>
     <div class="action-bar-left">
       <input
@@ -153,6 +156,39 @@ const syncBtnId = `${instanceId}-sync-btn`;
       )}
     </div>
   </div>
+  </div>
+
+  <script is:inline define:vars={{ rootId }}>
+    // Veiksmų juostos „atvirkštinis" sticky: kabo ekrano apačioje, kol dokas
+    // (jos vieta sąrašo gale) dar žemiau matomos srities; nuslinkus iki galo —
+    // atsikabina ir atsisėda doke, virš poraštės. Grynas CSS `position: sticky`
+    // čia netinka: html/body `overflow-x: hidden` (reset.css) paverčia body
+    // slinkties konteineriu ir apatinis sticky nebepakimba.
+    (() => {
+      const root = document.getElementById(rootId);
+      const dock = root?.querySelector('.action-bar-dock');
+      const bar = dock?.querySelector('.action-bar');
+      if (!dock || !bar) return;
+
+      let floating = null;
+      const update = () => {
+        // Vieta rezervuota visada — kitaip kabanti juosta uždengtų sąrašo pabaigą.
+        dock.style.height = `${bar.offsetHeight}px`;
+        const shouldFloat = dock.getBoundingClientRect().bottom > window.innerHeight + 0.5;
+        if (shouldFloat === floating) return;
+        floating = shouldFloat;
+        bar.classList.toggle('is-floating', shouldFloat);
+      };
+
+      update();
+      window.addEventListener('scroll', update, { passive: true });
+      window.addEventListener('resize', update);
+      // Medis kraunasi asinchroniškai, juosta gali persilaužti į kelias eilutes —
+      // abu keičia aukščius be jokio scroll/resize įvykio.
+      new ResizeObserver(update).observe(root);
+      new ResizeObserver(update).observe(bar);
+    })();
+  </script>
 
   <script is:inline define:vars={{ treeUrl, rootId, treeId, selectedCodesId, searchBtnId, searchDropdownId, copyBtnId, manualInputId, applyManualBtnId, syncBtnId, searchInputId, searchClearId, resultsInfoId, initialCodes, autoLoad }}>
     // @ts-nocheck

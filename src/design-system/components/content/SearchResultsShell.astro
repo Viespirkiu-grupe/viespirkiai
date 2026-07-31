@@ -112,6 +112,12 @@ const hasSort = Astro.slots.has('sort');
     white-space: nowrap;
   }
 
+  /* Be eksporto mygtukų blokas lieka tuščias — tada `.search-results-tools` gap
+     paliktų tarpą dešinėje nuo rikiavimo dropdown'o. Išimam jį iš flex srauto. */
+  .search-results-actions:empty {
+    display: none;
+  }
+
   @media (max-width: 720px) {
     .search-results-toolbar {
       flex-wrap: wrap;

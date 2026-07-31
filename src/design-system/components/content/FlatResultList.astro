@@ -26,10 +26,11 @@ const { className = '' } = Astro.props;
   .result-list--flat .result-card.card-clickable:hover {
     box-shadow: none;
   }
+  /* Paskutinė kortelė lieka be linijos, bet vidinį apatinį tarpą išlaiko — kitaip
+     tekstas prilimpa prie puslapiavimo. Paraštė nuimama, kad tarpas nesidubliuotų. */
   .result-list--flat .result-card:last-child {
     border-bottom: none;
     margin-bottom: 0;
-    padding-bottom: 0;
   }
 
   .result-list--flat .result-card-title {
