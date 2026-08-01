@@ -15,7 +15,12 @@ export const name = "search_sutartys";
 export const description =
     "Ieško viešųjų pirkimų sutarčių. Palaiko pilno teksto paiešką, filtravimą pagal pirkėją, tiekėją, vertę, datą, BVPZ kodus ir sutarties tipą. Sumos - eurais. " +
     "Kai filtruojama pagal tiekejoKodas arba perkanciosiosOrganizacijosKodas, atsakyme grąžinama sutarciuKiekis ir bendraVerte (bendra sutarčių suma). " +
-    "SVARBU: grąžina maks. 50 eilučių puslapyje; sudėtingesnei analizei (grupavimui, procentams) naudok execute_query su v_sutartys.";
+    "SVARBU: grąžina maks. 50 eilučių puslapyje; sudėtingesnei analizei (grupavimui, procentams) naudok execute_query su v_sutartys. " +
+    "DĖMESIO dėl 8xx tiekėjų kodų: 801, 802, 803, 804, 807, 808, 809 nėra realūs juridinių asmenų kodai — tai bendriniai CVP IS sistemos kodai, " +
+    "kuriuos dalijasi visi tokio tipo tiekėjai (801 – pilietis, 802 – ūkininkas, 803 – užsienio įmonė, 804 – LR ambasada, 807 – kitas asmuo, " +
+    "808 – Europos Komisijos atstovybė Lietuvoje, 809 – fizinis asmuo). Todėl tiekejoKodas=8xx negrupuoja vieno tiekėjo sutarčių, o sumaišo šimtus nesusijusių: " +
+    "sutarciuKiekis ir bendraVerte tokiu atveju nerodo vieno tiekėjo apyvartos. Konkretaus tokio tiekėjo sutarčių ieškok pagal search=\"Vardas Pavardė\" (arba įmonės pavadinimą), " +
+    "prireikus kartu su perkanciosiosOrganizacijosKodas. Filtruoti vien pagal tiekejoKodas=8xx be kitų filtrų neleidžiama.";
 
 export const schema = {
     search: z.string().optional().describe("Pilno teksto paieškos užklausa"),
@@ -23,8 +28,21 @@ export const schema = {
         .string()
         .optional()
         .describe("Perkančiosios organizacijos kodas"),
-    tiekejoKodas: z.string().optional().describe("Tiekėjo įmonės kodas"),
-    tipas: z.string().optional().describe("Sutarties tipas, pvz. 'SP', 'K'"),
+    tiekejoKodas: z
+        .string()
+        .optional()
+        .describe(
+            "Tiekėjo įmonės kodas. Kodai 801–809 yra bendriniai CVP IS kodai (pilietis, ūkininkas, užsienio įmonė ir pan.), o ne konkretus tiekėjas – žr. įrankio aprašymą.",
+        ),
+    tipas: z
+        .string()
+        .optional()
+        .describe(
+            "Sutarties tipas. Galimos reikšmės: TSP (tarptautinis arba supaprastintas pirkimas), MVP (mažos vertės pirkimas), " +
+                "ŽS (žodinė sutartis), MVPŽ (mažos vertės pirkimas, žodinė sutartis), SPŽ (supaprastintas pirkimas, žodinė sutartis), " +
+                "PPS (pagrindinė pirkimo sutartis), VS (vidaus sandoris), SP (sutarties pakeitimas), PSĮ (pirkimas iš susijusios įmonės), " +
+                "'ILGALAIKĖ MVPŽ' (ilgalaikis mažos vertės pirkimas, žodinė sutartis)",
+        ),
     sudarymoDataNuo: z
         .string()
         .optional()
