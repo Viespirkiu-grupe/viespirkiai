@@ -1,0 +1,562 @@
+---
+// EPPS planuojamų pirkimų paieška. Maketas — tas pats šoninės juostos idiomas
+// kaip /sutartys, /neskelbiamos ir /nepatikimi: facetai kairėje juostoje viename
+// #searchForm, rezultatai plokščiu sąrašu dešinėje.
+//
+// Filtrų ir facetų užklausos gyvena `lib/planuojamiPirkimai.ts` — tą patį modulį
+// naudoja ir „Daugiau" dialogų API (/api/planuojamiPirkimaiFacet), tad abi vietos
+// filtrus supranta vienodai.
+import Layout from '../layouts/Layout.astro';
+import Button from '@design-system/components/Button.astro';
+import DateValue from '@design-system/components/DateValue.astro';
+import MoneyValue from '@design-system/components/MoneyValue.astro';
+import ResultCardFooter from '@design-system/components/ResultCardFooter.astro';
+import ResultCardMeta from '@design-system/components/ResultCardMeta.astro';
+import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import ResultPageShell from '@design-system/components/content/ResultPageShell.astro';
+import HistogramRangeFilter from '@design-system/components/filters/HistogramRangeFilter.astro';
+import BvpzFacetTreeModal from '../components/content/BvpzFacetTreeModal.astro';
+import DokFacetSection from '../components/dokumentai/DokFacetSection.astro';
+import PgFacetModal from '../components/content/PgFacetModal.astro';
+import { postgres, getColorScheme, getFont, parseLimit, buildNumberOfResults } from '../lib/failai.js';
+import {
+  AMOUNT_EDGES, SqlParams, buildAmountHistogram, buildMonthHistogram, makeFacet,
+  makeFacetToggleUrl, stripEmptyParams, toFacetOptions,
+} from '../lib/pgFacets.ts';
+import {
+  BVPZ_PARAM, BVPZ_SEP, DATA_JOIN, FACET_PARAMS, PIRKEJAS_PARAM,
+  bvpzFacetOptions, pirkejasFacetOptions, planuojamiContext, sepFor,
+} from '../lib/planuojamiPirkimai.ts';
+import '@/utils/linksniai.js';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const redirectTo = stripEmptyParams(Astro.url);
+if (redirectTo) return Astro.redirect(redirectTo);
+const query = Object.fromEntries(Astro.url.searchParams) as Record<string, string>;
+
+const parsedLimit = parseLimit(query, 50, 250);
+if ('error' in parsedLimit) return new Response(parsedLimit.error, { status: 400 });
+const limit = parsedLimit.limit;
+
+const currentPage = Math.max(1, parseInt(query.page) || 1);
+const skip = (currentPage - 1) * limit;
+
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+if ((query.pradziaNuo && !datePattern.test(query.pradziaNuo.trim()))
+  || (query.pradziaIki && !datePattern.test(query.pradziaIki.trim()))) {
+  return new Response('Datos turi būti YYYY-MM-DD formato.', { status: 400 });
+}
+if ((query.kainaNuo && !/^\d+$/.test(query.kainaNuo.trim()))
+  || (query.kainaIki && !/^\d+$/.test(query.kainaIki.trim()))) {
+  return new Response('Kaina turi būti sveikas skaičius.', { status: 400 });
+}
+
+const ctx = await planuojamiContext(Astro.url);
+const { selected, buildWhere, needsData, tipaiById, budaiById, direktyvosById } = ctx;
+const toggleUrl = makeFacetToggleUrl(Astro.url, '/planuojamiPirkimai', sepFor);
+
+const SORTS: Record<string, string> = {
+  '': 'd."pirkimoPradziosData" DESC NULLS LAST, p.id DESC',
+  pradziaAsc: 'd."pirkimoPradziosData" ASC NULLS LAST, p.id',
+  kainaDesc: 'd."apskaiciuotaKaina" DESC NULLS LAST, p.id',
+  kainaAsc: 'NULLIF(d."apskaiciuotaKaina", 0) ASC NULLS LAST, p.id',
+  pavadinimas: 'p."pirkimoPavadinimas" ASC NULLS LAST',
+};
+const sort = SORTS[query.sort ?? ''] ? (query.sort ?? '') : '';
+
+const timed = async <T,>(promise: Promise<T>): Promise<{ value: T; ms: number }> => {
+  const t0 = Date.now();
+  const value = await promise;
+  return { value, ms: Date.now() - t0 };
+};
+
+/** Žinynų facetas (tipas / būdas / direktyva) — grupuojama pagal ID stulpelį. */
+function dimFacetQuery(param: string, column: string, max = 50) {
+  const params = new SqlParams();
+  const where = buildWhere(params, param);
+  const ids = ctx.selectedIds[param] ?? [];
+  const pinned = ids.length ? `(p."${column}" = ANY(${params.add(ids)}::bigint[])) DESC, ` : '';
+  return postgres.query(
+    `SELECT p."${column}" AS value, COUNT(*)::int AS count
+     FROM public."planuojamiPirkimai" p
+     ${needsData(param) ? DATA_JOIN : ''}
+     ${where}
+     GROUP BY 1
+     HAVING p."${column}" IS NOT NULL
+     ORDER BY ${pinned}count DESC, 1
+     LIMIT ${max}`,
+    params.values,
+  );
+}
+
+// Sveiko proto datos rėžiai histogramai: duomenyse pasitaiko šiukšlių (1905 m.
+// ar 2031 m.), kurios kitaip ištemptų slankiklio domeną per visą amžių.
+const DATA_BOUND_MIN = '2018-01-01';
+const dataBoundMax = `${new Date().getUTCFullYear() + 3}-01-01`;
+
+const startedAt = Date.now();
+
+const resultParams = new SqlParams();
+const resultWhere = buildWhere(resultParams);
+const limitPh = resultParams.add(limit);
+const offsetPh = resultParams.add(skip);
+
+const countParams = new SqlParams();
+const countWhere = buildWhere(countParams);
+
+const kainaParams = new SqlParams();
+const kainaWhere = buildWhere(kainaParams, 'kaina');
+const edgesPh = kainaParams.add(AMOUNT_EDGES);
+
+const pradziaParams = new SqlParams();
+const pradziaWhere = buildWhere(pradziaParams, 'pradzia');
+const boundMinPh = pradziaParams.add(DATA_BOUND_MIN);
+const boundMaxPh = pradziaParams.add(dataBoundMax);
+
+const [resultsRes, totalRes, pirkejasRes, tipasRes, budasRes, direktyvaRes, bvpzRes, kainaRes, pradziaRes] =
+  await Promise.all([
+    timed(postgres.query(
+      `SELECT p.id, p."pirkimoPavadinimas",
+              v.pavadinimas AS vykdytojas, NULLIF(v."jarKodas", '') AS "jarKodas",
+              p."pirkimoTipoId", p."pirkimoBudoId", p."direktyvosId",
+              d.aprasymas, d."apskaiciuotaKaina" AS kaina,
+              d."pirkimoPradziosData" AS pradzia, d."pasiulymuTeikimoData" AS teikimas,
+              d."numatomaSutartiesTrukmeMenesiais" AS trukme,
+              d."sutartiesTrukmesMatavimoVienetas" AS "trukmesVienetas",
+              (SELECT array_agg(bk."bvpzKodas" ORDER BY bk."bvpzKodas")
+               FROM public."planuojamiPirkimaiBvpzKodai" bk WHERE bk."pirkimoId" = p.id) AS "bvpzKodai"
+       FROM public."planuojamiPirkimai" p
+       ${DATA_JOIN}
+       LEFT JOIN public."planuojamiPirkimaiVykdytojai" v ON v.id = p."vykdytojoId"
+       ${resultWhere}
+       ORDER BY ${SORTS[sort]}
+       LIMIT ${limitPh} OFFSET ${offsetPh}`,
+      resultParams.values,
+    )),
+    timed(postgres.query(
+      `SELECT COUNT(*)::int AS count FROM public."planuojamiPirkimai" p
+       ${needsData() ? DATA_JOIN : ''} ${countWhere}`,
+      countParams.values,
+    )),
+    timed(pirkejasFacetOptions(ctx)),
+    timed(dimFacetQuery('tipas', 'pirkimoTipoId')),
+    timed(dimFacetQuery('budas', 'pirkimoBudoId')),
+    timed(dimFacetQuery('direktyva', 'direktyvosId')),
+    timed(bvpzFacetOptions(ctx)),
+    timed(postgres.query(
+      `SELECT width_bucket(d."apskaiciuotaKaina", ${edgesPh}::numeric[]) AS idx, COUNT(*)::int AS count
+       FROM public."planuojamiPirkimai" p ${DATA_JOIN}
+       ${kainaWhere}${kainaWhere ? ' AND' : 'WHERE'} d."apskaiciuotaKaina" > 0
+       GROUP BY 1`,
+      kainaParams.values,
+    )),
+    timed(postgres.query(
+      `SELECT date_trunc('month', d."pirkimoPradziosData")::date AS bucket, COUNT(*)::int AS count
+       FROM public."planuojamiPirkimai" p ${DATA_JOIN}
+       ${pradziaWhere}${pradziaWhere ? ' AND' : 'WHERE'} d."pirkimoPradziosData" >= ${boundMinPh}::date
+         AND d."pirkimoPradziosData" < ${boundMaxPh}::date
+       GROUP BY 1 ORDER BY 1`,
+      pradziaParams.values,
+    )),
+  ]);
+
+const rows = resultsRes.value.rows;
+const total = totalRes.value.rows[0].count;
+const pageCount = Math.ceil(total / limit);
+
+if (typeof query.json !== 'undefined') {
+  return new Response(JSON.stringify({
+    data: rows,
+    currentPage,
+    pageCount,
+    total,
+    limit,
+  }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+/** ID → pavadinimas žinynų facetų parinktims. */
+const dimOptions = (queryRows: { value: unknown; count: unknown }[], names: Map<number, string>) =>
+  toFacetOptions(
+    queryRows.map((row) => ({ value: names.get(Number(row.value)) ?? '', count: row.count })),
+  );
+
+const pirkejasOptions = pirkejasRes.value;
+const bvpzOptions = bvpzRes.value;
+const tipasOptions = dimOptions(tipasRes.value.rows, tipaiById);
+const budasOptions = dimOptions(budasRes.value.rows, budaiById);
+const direktyvaOptions = dimOptions(direktyvaRes.value.rows, direktyvosById);
+
+const facets = {
+  [PIRKEJAS_PARAM]: makeFacet(PIRKEJAS_PARAM, pirkejasOptions, selected[PIRKEJAS_PARAM], toggleUrl, 5),
+  tipas: makeFacet('tipas', tipasOptions, selected.tipas, toggleUrl, 4),
+  budas: makeFacet('budas', budasOptions, selected.budas, toggleUrl, 6),
+  direktyva: makeFacet('direktyva', direktyvaOptions, selected.direktyva, toggleUrl, 5),
+  [BVPZ_PARAM]: makeFacet(BVPZ_PARAM, bvpzOptions, selected[BVPZ_PARAM], toggleUrl, 6),
+};
+const kainaHist = buildAmountHistogram(kainaRes.value.rows);
+const pradziaHist = buildMonthHistogram(pradziaRes.value.rows);
+
+// BVPŽ pavadinimai kortelėms: kodų nedaug (≤50 eilučių), tad vienas žinyno
+// užklausimas; nerastas kodas rodomas plikas.
+const kortelesKodai = [...new Set(rows.flatMap((row: any) => row.bvpzKodai ?? []))] as string[];
+const bvpzVardai = new Map<string, string>(
+  kortelesKodai.length
+    ? (await postgres.query(
+        'SELECT code, pavadinimas FROM public."bvpzKodai" WHERE code = ANY($1)',
+        [kortelesKodai],
+      )).rows.map((row: any) => [String(row.code), row.pavadinimas as string])
+    : [],
+);
+const bvpzLabel = (code: string) => {
+  const name = bvpzVardai.get(code);
+  return name ? `${name} (${code})` : code;
+};
+
+const numberOfResults = buildNumberOfResults({
+  rows,
+  total,
+  elapsed: Date.now() - startedAt,
+  engine: 'PostgreSQL',
+  timings: [
+    { label: 'Rezultatai', phase: 'search', start: 0, duration: resultsRes.ms },
+    { label: 'Skaičius', phase: 'count', start: 0, duration: totalRes.ms },
+    {
+      label: 'Facetai',
+      phase: 'facets',
+      start: 0,
+      duration: Math.max(
+        pirkejasRes.ms, tipasRes.ms, budasRes.ms, direktyvaRes.ms, bvpzRes.ms, kainaRes.ms, pradziaRes.ms,
+      ),
+    },
+  ],
+});
+
+const preserved = new URLSearchParams(Astro.url.search);
+preserved.delete('page');
+const serialized = preserved.toString();
+const queryParams = serialized ? `&${serialized}` : '';
+
+const sortOptions = [
+  { value: '', label: 'Vėliausiai planuojami' },
+  { value: 'pradziaAsc', label: 'Anksčiausiai planuojami' },
+  { value: 'kainaDesc', label: 'Didžiausia kaina' },
+  { value: 'kainaAsc', label: 'Mažiausia kaina' },
+  { value: 'pavadinimas', label: 'Pagal pavadinimą' },
+];
+
+// Dalis EPPS aprašymų prasideda ta pačia teisine pastaba apie „0" vertę — ji
+// kartojasi šimtuose kortelių ir nieko nepasako apie patį pirkimą. Pastaba
+// nuimama — kaina tokiais atvejais tiesiog nerodoma.
+const VERTES_PASTABA = /pagal\s+gynybos\s+įstatymą[\s\S]{0,200}?nėra\s+viešinama\.?/giu;
+const aprasymas = (text: unknown, max = 220) => {
+  const value = String(text ?? '').replace(VERTES_PASTABA, '').replace(/\s+/g, ' ').trim();
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+};
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
+---
+<Layout
+  pageTitle="Planuojamų pirkimų paieška"
+  pageDescription="Perkančiųjų organizacijų paskelbti planuojami viešieji pirkimai: kada numatomi, už kiek ir ko."
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main class="sidebar-main">
+    <form method="get" role="search" id="searchForm" class="searchform-sidebar">
+      <h1 class="sr-only">Planuojamų pirkimų paieška</h1>
+
+      {/* Facetų atranka gyvena tik URL'e — kad rikiavimas ar „Ieškoti" jos
+          neprarastų, perduodam paslėptais laukais. BVPŽ kodai dalinasi vienu
+          tarpais skiriamu lauku (kaip /sutartys), kiti — po lauką reikšmei. */}
+      {FACET_PARAMS.flatMap((param) =>
+        sepFor(param)
+          ? (selected[param].length
+              ? [<input type="hidden" name={param} value={selected[param].join(BVPZ_SEP)} />]
+              : [])
+          : selected[param].map((value) => <input type="hidden" name={param} value={value} />),
+      )}
+
+      <aside class="sf-rail" aria-label="Filtrai">
+        <div class="sf-rail-head">
+          <button type="button" class="sf-rail-toggle" id="sfFiltersToggle" aria-expanded="false" aria-controls="sfRailBody">
+            <span class="sf-rail-toggle-label">Filtrai</span>
+            {ctx.activeFilterCount > 0 && <span class="sf-filters-count">{ctx.activeFilterCount}</span>}
+            <span class="sf-filters-chevron" aria-hidden="true"></span>
+          </button>
+        </div>
+
+        <div class="sf-rail-body" id="sfRailBody">
+          {ctx.activeFilterCount > 0 && (
+            <div class="plp-rail-head">
+              <a href="/planuojamiPirkimai" class="plp-rail-clear">Panaikinti</a>
+            </div>
+          )}
+
+          <div class="plp-facets">
+            <DokFacetSection
+              label="Pirkėjas"
+              param={PIRKEJAS_PARAM}
+              facet={facets[PIRKEJAS_PARAM]}
+              allLabel="Visi"
+              stacked
+              modal={{ field: PIRKEJAS_PARAM, title: 'Pirkėjas', always: true }}
+            />
+            <DokFacetSection label="Pirkimo tipas" param="tipas" facet={facets.tipas} allLabel="Visi" alwaysAll />
+            <DokFacetSection
+              label="Pirkimo būdas"
+              param="budas"
+              facet={facets.budas}
+              allLabel="Visi"
+              modal={{ field: 'budas', title: 'Pirkimo būdas' }}
+            />
+            <DokFacetSection label="Direktyva" param="direktyva" facet={facets.direktyva} allLabel="Visos" />
+            <DokFacetSection
+              label="BVPŽ"
+              param={BVPZ_PARAM}
+              facet={facets[BVPZ_PARAM]}
+              allLabel="Visi"
+              stacked
+              modal={{ field: 'bvpzKodai', title: 'BVPŽ klasifikacija', always: true }}
+            />
+            <HistogramRangeFilter
+              mode="number"
+              legend="Numatoma kaina"
+              unit="€"
+              nameFrom="kainaNuo"
+              nameTo="kainaIki"
+              redirectBase="/planuojamiPirkimai"
+              hist={kainaHist}
+              valueFrom={ctx.kainaNuo}
+              valueTo={ctx.kainaIki}
+              ariaFrom="Kaina nuo"
+              ariaTo="Kaina iki"
+            />
+            <HistogramRangeFilter
+              mode="date"
+              legend="Pirkimo pradžia"
+              nameFrom="pradziaNuo"
+              nameTo="pradziaIki"
+              redirectBase="/planuojamiPirkimai"
+              hist={pradziaHist}
+              valueFrom={ctx.pradziaNuo}
+              valueTo={ctx.pradziaIki}
+              ariaFrom="Pradžia nuo"
+              ariaTo="Pradžia iki"
+            />
+            <p class="dok-facet-note">Kaina rodoma tik ten, kur ji viešinama.</p>
+          </div>
+
+          <button type="submit" class="sf-rail-search">Ieškoti</button>
+        </div>
+      </aside>
+
+      <div class="sf-search">
+        <div class="search-bar">
+          <label for="search">
+            <svg class="search-icon" aria-hidden="true" width="20" height="20" viewBox="0 1 24 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M10.502 2C5.80753 2 2.00195 5.80558 2.00195 10.5C2.00195 15.1944 5.80753 19 10.502 19C12.4884 19 14.3169 18.3176 15.7637 17.176L20.5877 22C20.9783 22.3905 21.6114 22.3905 22.002 22C22.3925 21.6095 22.3925 20.9763 22.002 20.5858L17.1779 15.7618C18.3196 14.3149 19.002 12.4865 19.002 10.5C19.002 5.80558 15.1964 2 10.502 2ZM4.00195 10.5C4.00195 6.91015 6.9121 4 10.502 4C14.0918 4 17.002 6.91015 17.002 10.5C17.002 12.2952 16.2755 13.9188 15.0981 15.0962C13.9208 16.2736 12.2972 17 10.502 17C6.9121 17 4.00195 14.0899 4.00195 10.5Z" fill="currentColor"/>
+            </svg>
+            <span class="sr-only">Paieška</span>
+          </label>
+          <input
+            type="search"
+            name="search"
+            id="search"
+            class="search-bar__input"
+            value={ctx.search}
+            placeholder="Pirkimo pavadinimas, pirkėjas arba BVPŽ kodas"
+            enterkeyhint="search"
+          />
+          <Button type="submit">Ieškoti</Button>
+        </div>
+      </div>
+
+      <div class="sf-results">
+        <ResultPageShell
+          numberOfResults={numberOfResults}
+          resultCount={rows.length}
+          page={currentPage}
+          pageCount={pageCount}
+          queryParams={queryParams}
+          emptyText="Planuojamų pirkimų pagal pasirinktus kriterijus nerasta."
+          containerClass="mt-0"
+          flat={true}
+        >
+          <Fragment slot="sort">
+            <label class="sr-only" for="plpSort">Rikiuoti pagal</label>
+            <select id="plpSort" name="sort" data-autosubmit aria-label="Rikiuoti pagal">
+              {sortOptions.map((option) => (
+                <option value={option.value} selected={sort === option.value}>{option.label}</option>
+              ))}
+            </select>
+          </Fragment>
+
+          {rows.map((item: any) => {
+            const kodai: string[] = item.bvpzKodai ?? [];
+            const aprasas = aprasymas(item.aprasymas);
+            const kaina = Number(item.kaina);
+            return (
+              <ResultCardShell>
+                <ResultCardMeta
+                  slot="meta"
+                  items={[
+                    { label: 'Pirkimo tipas', value: tipaiById.get(Number(item.pirkimoTipoId)) },
+                    { label: 'Pirkimo būdas', value: budaiById.get(Number(item.pirkimoBudoId)) },
+                  ]}
+                >
+                  <div>
+                    <dt class="sr-only">Numatoma pirkimo pradžia</dt>
+                    <dd>
+                      <abbr aria-hidden="true" title="Numatoma pirkimo pradžia">Prad.</abbr>{' '}
+                      <DateValue value={item.pradzia} />
+                    </dd>
+                  </div>
+                  {item.teikimas && (
+                    <div>
+                      <dt class="sr-only">Pasiūlymų teikimo data</dt>
+                      <dd>
+                        <abbr aria-hidden="true" title="Pasiūlymų teikimo data">Pasiūl.</abbr>{' '}
+                        <DateValue value={item.teikimas} />
+                      </dd>
+                    </div>
+                  )}
+                </ResultCardMeta>
+
+                <div slot="title" class="flex align-baseline gap-3">
+                  <h3 class="result-card-title">
+                    {/* Kaina „0" šaltinyje reiškia, kad vertė neviešinama —
+                        tuomet antraštėje jos tiesiog nerodom. */}
+                    {kaina > 0 && (
+                      <>
+                        <span class={`amount plp-amount${kaina > 100000 ? ' font-bold' : ''}`}>
+                          <MoneyValue value={kaina} suffix={'\u00A0€'} mono={false} />
+                        </span>{' '}
+                      </>
+                    )}
+                    {item.pirkimoPavadinimas || <em>Nenurodyta</em>}
+                  </h3>
+                </div>
+
+                {aprasas && <p class="text-sm mt-2 text-muted">{aprasas}</p>}
+
+                <ResultCardFooter
+                  slot="footer"
+                  items={[
+                    {
+                      label: 'Pirkėjas',
+                      value: item.vykdytojas || 'nenurodytas',
+                      href: item.jarKodas ? `/asmuo/${item.jarKodas}` : undefined,
+                    },
+                    Number(item.trukme) > 0 && {
+                      label: 'Trukmė',
+                      value: `${Number(item.trukme)} ${item.trukmesVienetas || 'mėn.'}`,
+                    },
+                    kodai.length > 0 && {
+                      label: 'BVPŽ',
+                      value: kodai.slice(0, 3).map(bvpzLabel).join('; ')
+                        + (kodai.length > 3 ? ` +${kodai.length - 3}` : ''),
+                    },
+                    item.direktyvosId && {
+                      value: direktyvosById.get(Number(item.direktyvosId)),
+                      className: 'text-muted',
+                    },
+                  ].filter(Boolean) as any[]}
+                />
+              </ResultCardShell>
+            );
+          })}
+        </ResultPageShell>
+      </div>
+    </form>
+
+    {/* Pirkėjo ir būdo „Daugiau" — bendras PG dialogas; BVPŽ — tas pats dviejų
+        skilčių (sąrašas + visas CPV medis) dialogas kaip /sutartys. */}
+    <PgFacetModal
+      basePath="/planuojamiPirkimai"
+      facetsSelector=".plp-facets"
+      options={{ [PIRKEJAS_PARAM]: pirkejasOptions, budas: budasOptions }}
+      customParams={[PIRKEJAS_PARAM]}
+    />
+    <BvpzFacetTreeModal
+      modalId="plpBvpzModal"
+      instanceId="plpBvpzTree"
+      param={BVPZ_PARAM}
+      redirectBase="/planuojamiPirkimai"
+      facetEndpoint="/api/planuojamiPirkimaiFacet"
+      facetTriggerSelector='.plp-facets [data-facet-modal="bvpzKodai"]'
+    />
+  </main>
+</Layout>
+
+<style>
+  /* Pirmoji facetų sekcija be viršutinio tarpo — DokFacetSection kiekvienai
+     prideda padding-top:20px, bet viršuje jis palieka tuščią plyšį. */
+  .plp-facets :global(.dok-filter-section:first-child) {
+    padding-top: 0;
+  }
+
+  /* Kaina antraštėje — kaip sutarčių kortelėse, tik be pabraukimo: šie įrašai
+     neturi atskiro puslapio, tad antraštė nėra nuoroda. */
+  :global(.plp-amount) {
+    text-decoration: none;
+  }
+
+  .plp-rail-head {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+  }
+  .plp-rail-clear {
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+  }
+  .plp-rail-clear:hover { color: var(--black); }
+
+  @media (max-width: 900px) {
+    /* Telefone antraštę neša .sf-rail-head perjungiklis. */
+    .plp-rail-head { display: none; }
+  }
+</style>
+
+<script is:inline>
+  // Mobilus filtrų perjungiklis: antraštė suskleidžia/atskleidžia juostą (≤900px).
+  const sfToggle = document.getElementById('sfFiltersToggle');
+  const sfRail = document.querySelector('.sf-rail');
+  sfToggle?.addEventListener('click', () => {
+    const open = sfRail?.classList.toggle('is-open') ?? false;
+    sfToggle.setAttribute('aria-expanded', String(open));
+  });
+
+  // „Rodyti daugiau" inline atskleidimas facetams be dialogo.
+  document.querySelectorAll('.plp-facets .dok-more-btn').forEach((btn) => {
+    if (btn.dataset.facetModal) return; // šiuos tvarko dialogai
+    btn.addEventListener('click', () => {
+      const more = btn.previousElementSibling;
+      if (more && more.classList.contains('dok-more-list')) {
+        more.hidden = false;
+        btn.remove();
+      }
+    });
+  });
+
+  // Rikiavimo select priklauso #searchForm — keitimas paleidžia paiešką iš naujo.
+  document.querySelectorAll('select[data-autosubmit]').forEach((select) => {
+    select.addEventListener('change', () => {
+      const form = select.form;
+      if (!form) return;
+      form.querySelector('input[name="page"]')?.remove();
+      form.requestSubmit();
+    });
+  });
+</script>
+
+<script>
+  import { initStickyRail } from '@/src/lib/stickyRail';
+  import { initHistogramRangeFilters } from '@design-system/components/filters/histogramRangeFilter';
+  initStickyRail();
+  initHistogramRangeFilters();
+</script>

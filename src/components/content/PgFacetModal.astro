@@ -5,7 +5,7 @@
 // yra šimtai (ne milijonai), tad visos parinktys atkeliauja kartu su puslapiu
 // JSON blokelyje, o filtravimas dialoge vyksta naršyklėje — be tinklo.
 import FacetModalBase from '@design-system/components/FacetModalBase.astro';
-import type { FacetOption } from '../../lib/searchDokumentai.ts';
+import type { PgFacetOption } from '../../lib/pgFacets.ts';
 
 interface Props {
   /** Puslapio kelias, į kurį grįžtama pritaikius atranką (pvz. „/neskelbiamos"). */
@@ -13,11 +13,15 @@ interface Props {
   /** Facetų juostos konteineris, kurio „Daugiau" mygtukai atidaro dialogą. */
   facetsSelector: string;
   /** Visos parinktys pagal parametrą — tos pačios, iš kurių sudėta juosta. */
-  options: Record<string, FacetOption[]>;
+  options: Record<string, PgFacetOption[]>;
+  /** Parametrai, kurių reikšmės gyvena viename lauke su skirtuku (pvz. BVPŽ — tarpas). */
+  separators?: Record<string, string>;
+  /** Parametrai, kuriems leidžiama įvesti savo reikšmę (pvz. pirkėjo JAR kodas). */
+  customParams?: string[];
   id?: string;
 }
 
-const { basePath, facetsSelector, options, id = 'pgFacetModal' } = Astro.props as Props;
+const { basePath, facetsSelector, options, separators = {}, customParams = [], id = 'pgFacetModal' } = Astro.props as Props;
 ---
 
 <div
@@ -25,6 +29,8 @@ const { basePath, facetsSelector, options, id = 'pgFacetModal' } = Astro.props a
   data-modal-id={id}
   data-base={basePath}
   data-facets={facetsSelector}
+  data-separators={JSON.stringify(separators)}
+  data-custom-params={JSON.stringify(customParams)}
 >
   <FacetModalBase id={id} searchPlaceholder="Filtruoti…" searchAriaLabel="Filtruoti reikšmes" listClassName="dok-facet-modal__list--stack" />
   <script type="application/json" data-facet-options is:inline set:html={JSON.stringify(options)}></script>
@@ -38,7 +44,7 @@ const { basePath, facetsSelector, options, id = 'pgFacetModal' } = Astro.props a
   if (root && modal) {
     const basePath = root.dataset.base || '/';
     const facetsSelector = root.dataset.facets || '';
-    const optionsByParam: Record<string, { value: string; count: number | null; label?: string }[]> =
+    const optionsByParam: Record<string, { value: string; count: number | null; label?: string; sub?: string }[]> =
       JSON.parse(root.querySelector('[data-facet-options]')?.textContent || '{}');
 
     const titleEl = modal.querySelector<HTMLElement>('.ds-modal__title')!;
@@ -48,16 +54,28 @@ const { basePath, facetsSelector, options, id = 'pgFacetModal' } = Astro.props a
 
     let param = '';
     let selected = new Set<string>();
-    let options: { value: string; count: number | null; label?: string }[] = [];
+    let options: { value: string; count: number | null; label?: string; sub?: string }[] = [];
 
-    // Atranka gyvena URL'e kartojamais parametrais (reikšmėse pasitaiko kablelių).
-    const getList = (name: string) =>
-      new URLSearchParams(location.search).getAll(name).map((s) => s.trim()).filter(Boolean);
+    // Atranka gyvena URL'e kartojamais parametrais (reikšmėse pasitaiko kablelių),
+    // o nusistovėjusio formato parametrai (BVPŽ) — viename lauke su skirtuku.
+    const separators: Record<string, string> = JSON.parse(root.dataset.separators || '{}');
+    const customParams: string[] = JSON.parse(root.dataset.customParams || '[]');
+    const getList = (name: string) => {
+      const params = new URLSearchParams(location.search);
+      const sep = separators[name];
+      const raw = sep ? (params.get(name) ?? '').split(sep) : params.getAll(name);
+      return raw.map((s) => s.trim()).filter(Boolean);
+    };
 
     const commit = (list: string[]) => {
       const params = new URLSearchParams(location.search);
+      const sep = separators[param];
       params.delete(param);
-      for (const value of list) params.append(param, value);
+      if (sep) {
+        if (list.length) params.set(param, list.join(sep));
+      } else {
+        for (const value of list) params.append(param, value);
+      }
       params.delete('page');
       const search = params.toString();
       location.href = search ? `${basePath}?${search}` : basePath;
@@ -76,14 +94,17 @@ const { basePath, facetsSelector, options, id = 'pgFacetModal' } = Astro.props a
       updateCount();
     }
 
-    function makeRow(option: { value: string; count: number | null; label?: string }) {
+    function makeRow(option: { value: string; count: number | null; label?: string; sub?: string }) {
       const on = selected.has(option.value);
+      // Antra eilutė: `sub` (pvz. pirkėjo JAR kodas, kai reikšmė yra pavadinimas)
+      // arba pati reikšmė, kai ji koduota (kodas + jo pavadinimas kaip antraštė).
+      const subText = option.sub ?? (option.label ? option.value : '');
       const row = document.createElement('button');
       row.type = 'button';
-      row.className = 'dok-facet-row' + (option.label ? ' dok-facet-row--stack' : '') + (on ? ' is-selected' : '');
+      row.className = 'dok-facet-row' + (subText ? ' dok-facet-row--stack' : '') + (on ? ' is-selected' : '');
       row.setAttribute('role', 'option');
       row.setAttribute('aria-selected', String(on));
-      if (option.label) row.title = `${option.label} (${option.value})`;
+      if (subText) row.title = `${option.label || option.value} (${subText})`;
 
       const text = document.createElement('span');
       text.className = 'dok-facet-row__text';
@@ -91,10 +112,10 @@ const { basePath, facetsSelector, options, id = 'pgFacetModal' } = Astro.props a
       label.className = 'dok-facet-row__label';
       label.textContent = option.label || option.value;
       text.appendChild(label);
-      if (option.label) {
+      if (subText) {
         const sub = document.createElement('span');
         sub.className = 'dok-facet-row__sub';
-        sub.textContent = option.value;
+        sub.textContent = subText;
         text.appendChild(sub);
       }
       row.appendChild(text);
@@ -127,10 +148,32 @@ const { basePath, facetsSelector, options, id = 'pgFacetModal' } = Astro.props a
 
       listEl.textContent = '';
       const frag = document.createDocumentFragment();
+
+      // Savo reikšmė (pvz. juostoje nematomas pirkėjo JAR kodas) — kaip /sutartys.
+      const typed = searchEl.value.trim();
+      const canAdd = customParams.includes(param) && typed
+        && !options.some((option) => option.value === typed) && !selected.has(typed);
+      if (canAdd) {
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'dok-facet-row dok-facet-row--add';
+        const label = document.createElement('span');
+        label.className = 'dok-facet-row__label';
+        label.textContent = `Pridėti „${typed}“`;
+        add.appendChild(label);
+        add.addEventListener('click', () => {
+          selected.add(typed);
+          searchEl.value = '';
+          updateCount();
+          render();
+        });
+        frag.appendChild(add);
+      }
+
       for (const option of rows) frag.appendChild(makeRow(option));
       listEl.appendChild(frag);
 
-      if (!rows.length) {
+      if (!rows.length && !canAdd) {
         const empty = document.createElement('p');
         empty.className = 'dok-facet-modal__empty';
         empty.textContent = 'Nieko nerasta.';
@@ -138,9 +181,12 @@ const { basePath, facetsSelector, options, id = 'pgFacetModal' } = Astro.props a
       }
     }
 
+    // Tik tie „Daugiau", kurių parinktis turim — BVPŽ turi savo medžio dialogą.
     document.querySelectorAll<HTMLButtonElement>(`${facetsSelector} [data-facet-modal]`).forEach((btn) => {
+      const btnParam = btn.dataset.facetParam || '';
+      if (!(btnParam in optionsByParam)) return;
       btn.addEventListener('click', () => {
-        param = btn.dataset.facetParam || '';
+        param = btnParam;
         titleEl.textContent = btn.dataset.facetTitle || 'Filtras';
         options = optionsByParam[param] ?? [];
         selected = new Set(getList(param));
@@ -154,10 +200,17 @@ const { basePath, facetsSelector, options, id = 'pgFacetModal' } = Astro.props a
 
     searchEl.addEventListener('input', render);
     searchEl.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        commit([...selected]);
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      const typed = searchEl.value.trim();
+      if (customParams.includes(param) && typed) {
+        selected.add(typed);
+        searchEl.value = '';
+        updateCount();
+        render();
+        return;
       }
+      commit([...selected]);
     });
 
     modal.querySelector('[data-facet-clear]')?.addEventListener('click', () => {
