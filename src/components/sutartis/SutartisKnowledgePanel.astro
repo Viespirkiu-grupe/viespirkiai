@@ -1,5 +1,6 @@
 ---
 import KnowledgePanelShell from '@design-system/components/KnowledgePanelShell.astro';
+import EntityLink from '@design-system/components/EntityLink.astro';
 import { fmtEur, fmtNumber } from '../../lib/formatters.ts';
 import type { SutartisPanel } from '../../lib/searchSutartisPanel.ts';
 
@@ -22,8 +23,8 @@ const verte = sutartis.faktineVerte ?? sutartis.verte;
   actionsColumns={2}
 >
   <Fragment slot="details">
-    {sutartis.pirkejas && <div class="ds-knowledge-panel__wide"><dt>Pirkėjas</dt><dd>{sutartis.pirkejoKodas ? <a href={`/asmuo/${sutartis.pirkejoKodas}`}>{sutartis.pirkejas}</a> : sutartis.pirkejas}</dd></div>}
-    {sutartis.tiekejas && <div class="ds-knowledge-panel__wide"><dt>Tiekėjas</dt><dd>{sutartis.tiekejoKodas ? <a href={`/asmuo/${sutartis.tiekejoKodas}`}>{sutartis.tiekejas}</a> : sutartis.tiekejas}</dd></div>}
+    {sutartis.pirkejas && <div class="ds-knowledge-panel__wide"><dt>Pirkėjas</dt><dd><EntityLink kodas={sutartis.pirkejoKodas} label={sutartis.pirkejas} /></dd></div>}
+    {sutartis.tiekejas && <div class="ds-knowledge-panel__wide"><dt>Tiekėjas</dt><dd><EntityLink kodas={sutartis.tiekejoKodas} label={sutartis.tiekejas} /></dd></div>}
     {sutartis.sudarymoData && <div><dt>Sudaryta</dt><dd>{sutartis.sudarymoData}</dd></div>}
     {sutartis.galiojimoData && <div><dt>Galioja iki</dt><dd>{sutartis.galiojimoData}</dd></div>}
     {sutartis.sutartiesNumeris && <div><dt>Sutarties numeris</dt><dd class="cell-mono">{sutartis.sutartiesNumeris}</dd></div>}

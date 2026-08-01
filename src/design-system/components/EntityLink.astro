@@ -1,4 +1,6 @@
 ---
+import { specialKodoPaieskosNuoroda } from '@/src/lib/specialKodoNuoroda.ts';
+
 interface Props {
   kodas?: string | number | null;
   label?: string | number | null;
@@ -22,7 +24,9 @@ const {
 } = Astro.props as Props;
 
 const text = label ?? kodas ?? fallback;
-const href = kodas ? `${hrefBase}/${encodeURIComponent(String(kodas))}` : '';
+// 8xx yra bendrinis CVP IS kodas, o ne asmuo — vedame į paiešką pagal pavadinimą.
+const specialHref = hrefBase === '/asmuo' ? specialKodoPaieskosNuoroda(kodas, label) : null;
+const href = specialHref || (kodas ? `${hrefBase}/${encodeURIComponent(String(kodas))}` : '');
 const classes = [mono ? 'cell-mono' : '', className].filter(Boolean).join(' ');
 const rel = target === '_blank' ? 'noopener noreferrer' : undefined;
 ---
