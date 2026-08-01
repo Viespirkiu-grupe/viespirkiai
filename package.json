@@ -11,6 +11,7 @@
         "check": "astro check",
         "deps:report": "node scripts/dependencySizes.js",
         "db:schema:dump": "node postgres/dumpSchema.js",
+        "regitra:atnaujinti": "node modules/regitra/atnaujintiRegitra.js",
         "scrape:planuojami-pirkimai": "node modules/viesiejiPirkimai/updatePlanuojamiPirkimai.js",
         "export:planuojami-pirkimai-jsonl": "node modules/viesiejiPirkimai/scrapePlanuojamiPirkimai.js",
         "failai:info-to-sqlite": "node modules/failai/failaiInfoToSqlite.js",

@@ -7,10 +7,16 @@ import TruncationNotice from '@design-system/components/TruncationNotice.astro';
 const { asmuo } = Astro.props;
 if (!(asmuo.regitra?.rows > 0)) return;
 const { rows, transportoPriemones } = asmuo.regitra;
+
+// `rows` skaičiuoja transporto priemones, o lentelės eilutė gali atstoti kelias
+// vienodas TP (anonimizuotuose duomenyse jos neatskiriamos, žr. `kiekis`).
+// Todėl ir „rodoma" turi būti TP suma — kitaip `count > shown` liktų teisinga
+// net viską parodžius, ir pranešimas niekada nedingtų.
+const rodomaTp = transportoPriemones.reduce((suma: number, auto: any) => suma + Number(auto.kiekis ?? 1), 0);
 ---
 
 <PageSection id="transportoPriemones" title="Transporto priemonės">
-  <TruncationNotice count={rows} shown={transportoPriemones.length} anchor="transportoPriemones" paramName="transportoPriemonesLimit" label="transporto priemonės" gender="f" />
+  <TruncationNotice count={rows} shown={rodomaTp} anchor="transportoPriemones" paramName="transportoPriemonesLimit" label="transporto priemonės" gender="f" />
   <DataTable
     columns={[
       { label: 'Markė' },
@@ -31,6 +37,7 @@ const { rows, transportoPriemones } = asmuo.regitra;
             ? <span class="text-muted">{auto.komercinisPavadinimas}</span>
             : <ExternalSourceLink href={`https://duckduckgo.com/?t=h_&q=${encodeURIComponent(auto.marke)}+${encodeURIComponent(auto.komercinisPavadinimas)}&ia=images&iax=images`} label={auto.komercinisPavadinimas} icon={false} />
           }
+          {auto.kiekis > 1 && <span class="text-muted" title="Vienodų transporto priemonių skaičius — anonimizuotuose duomenyse jos neatskiriamos"> × {auto.kiekis}</span>}
         </td>
         <td class="cell-center cell-mono">{auto.kategorijaKlase}</td>
         <td class="cell-center">{auto.degalai || '—'}</td>

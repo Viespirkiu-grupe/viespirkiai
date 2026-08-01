@@ -107,7 +107,7 @@ const limitSchema = z.number().int().min(1).max(50);
 
 export const name = "get_juridinis";
 export const description =
-    "Grąžina išsamią informaciją apie juridinį asmenį pagal JAR kodą. Apima įmonės duomenis, Sodros statistiką, VMI, sutartis, finansus, PINREG deklaracijas, teismo nuosprendžius ir kt. Duomenys grąžinami su numatytaisiais limitais — nurodykite override parametrus jei reikia daugiau.";
+    "Grąžina išsamią informaciją apie juridinį asmenį pagal JAR kodą. Apima įmonės duomenis, Sodros statistiką, VMI, sutartis, finansus, PINREG deklaracijas, teismo nuosprendžius ir kt. Duomenys grąžinami su numatytaisiais limitais — nurodykite override parametrus jei reikia daugiau. DĖMESIO dėl `regitra`: anonimizuotuose Regitros duomenyse nėra nei VIN, nei valstybinio numerio, todėl vienodos transporto priemonės sutraukiamos į vieną eilutę su lauku `kiekis` (pvz. `kiekis: 92` reiškia 92 identiškas TP). Bendras TP skaičius yra `regitra.rows` — NE `transportoPriemones` masyvo ilgis. `regitra.atnaujinimoData` rodo, kokios datos yra Regitros nuotrauka.";
 
 export const schema = {
     jarKodas: z

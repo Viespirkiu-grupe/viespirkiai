@@ -16,6 +16,7 @@ import { importuotiNepatikimusTiekejus } from "../modules/vptSarasai/nepatikimiS
 import { nuskaitytiMvpTvarkosAprasuSubjektus } from "../modules/mvpTvarkosAprasai/scrape.js";
 import { scrapeMvmUntilNow } from "../modules/mvpTvarkosAprasai/scrapeContent.js";
 import { updateVdiPazeidimai } from "../modules/vdi/scrapePazeidimai.js";
+import { atnaujintiRegitrosDuomenis } from "../modules/regitra/atnaujintiRegitra.js";
 import { processSuggestionQueue } from "../modules/searchSuggestion/processSuggestionQueue.js";
 import { deleteDeadIndexes } from "../quickwit/deleteDeadIndexes.js";
 import { processDomenaiAdpQueue } from "../modules/domenai/processAdpQueue.js";
@@ -140,6 +141,14 @@ export default [
         name: "updateVdiPazeidimai",
         schedule: "0 4 * * *",
         job: updateVdiPazeidimai,
+    },
+    {
+        // Regitra parką skelbia kartą per mėnesį, bet tikslus laikas nežinomas,
+        // todėl tikriname kas naktį. Patikra yra pigus HEAD — siunčiama tik tada,
+        // kai pasikeičia etag / Last-Modified.
+        name: "atnaujintiRegitrosDuomenis",
+        schedule: "40 2 * * *",
+        job: atnaujintiRegitrosDuomenis,
     },
     {
         name: "deleteDeadQuickwitIndexes",
