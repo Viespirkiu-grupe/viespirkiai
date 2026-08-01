@@ -11,7 +11,9 @@ import {
     ensureJarCollection,
 } from "../../typesense/typesense.js";
 
-await ensureJarCollection();
+// Jei importuojame į Typesense, schemą privalome patikrinti net kai bendras
+// `typesenseUp` jungiklis išjungtas: dokumentų siuntimas žemiau vis tiek vyksta.
+await ensureJarCollection({ ignoreTypesenseUp: true });
 let eilute = 0;
 
 // Patikrina, ar nurodytas CSV failo pavadinimas

@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { postgres } from '@/postgres/postgres.js';
+import { juridiniaiViewportPoints } from '@/modules/juridiniai/quickwitMap.js';
 
 export const GET: APIRoute = async ({ url }) => {
   const minLat = parseFloat(url.searchParams.get('minLat') || '');
@@ -11,16 +11,10 @@ export const GET: APIRoute = async ({ url }) => {
     return new Response('Invalid viewport bounds', { status: 400 });
   }
 
-  const { rows } = await postgres.query(
-    `SELECT DISTINCT ST_Y(location) AS lat, ST_X(location) AS lon
-     FROM public."jarCsv"
-     WHERE location IS NOT NULL
-       AND ST_X(location) BETWEEN $1 AND $2
-       AND ST_Y(location) BETWEEN $3 AND $4`,
-    [minLon, maxLon, minLat, maxLat],
-  );
+  const query = Object.fromEntries(url.searchParams);
+  const locations = await juridiniaiViewportPoints(query, { minLat, minLon, maxLat, maxLon });
 
-  return new Response(JSON.stringify({ locations: rows.map((r: any) => [r.lat, r.lon]) }), {
-    headers: { 'Content-Type': 'application/json' },
+  return new Response(JSON.stringify({ locations }), {
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=15' },
   });
 };

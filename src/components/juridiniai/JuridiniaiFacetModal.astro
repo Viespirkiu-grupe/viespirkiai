@@ -1,0 +1,148 @@
+---
+import FacetModalBase from '@design-system/components/FacetModalBase.astro';
+---
+
+<FacetModalBase id="jurFacetModal" searchPlaceholder="Ieškoti reikšmės…" searchAriaLabel="Ieškoti filtro reikšmės" listClassName="dok-facet-modal__list--stack" />
+
+<script>
+  import { openModal, closeModal } from '@design-system/components/modal.ts';
+  import { isMobileFilter, writeParam, readParam } from '@/src/lib/mobileFilterBatch';
+
+  const modal = document.getElementById('jurFacetModal');
+  if (modal) {
+    const titleEl = modal.querySelector<HTMLElement>('.ds-modal__title')!;
+    const searchEl = modal.querySelector<HTMLInputElement>('.dok-facet-modal__search')!;
+    const listEl = modal.querySelector<HTMLElement>('.dok-facet-modal__list')!;
+    const countEl = modal.querySelector<HTMLElement>('.ds-modal__count')!;
+    let field = '';
+    let param = '';
+    let selected = new Set<string>();
+    let options: { value: string; count: number | null; label?: string }[] = [];
+    let requestSequence = 0;
+    let searchTimer = 0;
+
+    const currentList = (name: string) =>
+      (new URLSearchParams(location.search).get(name) || '').split(',').map((value) => value.trim()).filter(Boolean);
+
+    const commit = (values: string[]) => {
+      if (isMobileFilter()) {
+        writeParam(param, values, ',');
+        closeModal(modal!);
+        return;
+      }
+      const params = new URLSearchParams(location.search);
+      if (values.length) params.set(param, values.join(','));
+      else params.delete(param);
+      params.delete('page');
+      const search = params.toString();
+      location.href = search ? `/juridiniai?${search}` : '/juridiniai';
+    };
+
+    function updateCount() {
+      countEl.textContent = selected.size ? `Pažymėta: ${selected.size}` : '';
+    }
+
+    function makeRow(option: { value: string; count: number | null; label?: string }) {
+      const isSelected = selected.has(option.value);
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = `dok-facet-row${option.label ? ' dok-facet-row--stack' : ''}${isSelected ? ' is-selected' : ''}`;
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(isSelected));
+
+      const text = document.createElement('span');
+      text.className = 'dok-facet-row__text';
+      const label = document.createElement('span');
+      label.className = 'dok-facet-row__label';
+      label.textContent = option.label || option.value;
+      text.appendChild(label);
+      if (option.label) {
+        const code = document.createElement('span');
+        code.className = 'dok-facet-row__sub';
+        code.textContent = option.value;
+        text.appendChild(code);
+      }
+      row.appendChild(text);
+      if (option.count != null) {
+        const count = document.createElement('span');
+        count.className = 'dok-facet-row__count';
+        count.textContent = Number(option.count).toLocaleString('lt-LT');
+        row.appendChild(count);
+      }
+      row.addEventListener('click', () => {
+        if (selected.has(option.value)) selected.delete(option.value);
+        else selected.add(option.value);
+        row.classList.toggle('is-selected', selected.has(option.value));
+        row.setAttribute('aria-selected', String(selected.has(option.value)));
+        updateCount();
+      });
+      return row;
+    }
+
+    function render() {
+      const byValue = new Map(options.map((option) => [option.value, option]));
+      const rows = [
+        ...[...selected].map((value) => byValue.get(value) ?? { value, count: null }),
+        ...options.filter((option) => !selected.has(option.value)),
+      ];
+      listEl.textContent = '';
+      const fragment = document.createDocumentFragment();
+      for (const option of rows) fragment.appendChild(makeRow(option));
+      listEl.appendChild(fragment);
+      if (!rows.length) {
+        const empty = document.createElement('p');
+        empty.className = 'dok-facet-modal__empty';
+        empty.textContent = 'Nieko nerasta.';
+        listEl.appendChild(empty);
+      }
+    }
+
+    async function load(optionSearch = '') {
+      const sequence = ++requestSequence;
+      listEl.innerHTML = '<div class="dok-facet-modal__loading"><span class="spinner spinner-lg"></span></div>';
+      const params = new URLSearchParams(location.search);
+      params.set('field', field);
+      if (optionSearch) params.set('optionSearch', optionSearch);
+      else params.delete('optionSearch');
+      params.delete('page');
+      try {
+        const response = await fetch(`/api/juridiniaiFacet?${params}`);
+        const data = response.ok ? await response.json() : { options: [] };
+        if (sequence !== requestSequence) return;
+        options = Array.isArray(data.options) ? data.options : [];
+      } catch {
+        if (sequence !== requestSequence) return;
+        options = [];
+      }
+      render();
+    }
+
+    document.querySelectorAll<HTMLButtonElement>('.jur-facets [data-facet-modal]').forEach((button) => {
+      button.addEventListener('click', () => {
+        field = button.dataset.facetModal || '';
+        param = button.dataset.facetParam || '';
+        titleEl.textContent = button.dataset.facetTitle || 'Filtras';
+        selected = new Set(isMobileFilter() ? readParam(param, ',') : currentList(param));
+        searchEl.value = '';
+        updateCount();
+        openModal(modal!);
+        searchEl.focus();
+        load();
+      });
+    });
+
+    searchEl.addEventListener('input', () => {
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => load(searchEl.value.trim()), 250);
+    });
+    searchEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') event.preventDefault();
+    });
+    modal.querySelector('[data-facet-clear]')?.addEventListener('click', () => {
+      selected.clear();
+      updateCount();
+      render();
+    });
+    modal.querySelector('[data-facet-apply]')?.addEventListener('click', () => commit([...selected]));
+  }
+</script>
