@@ -10,4 +10,4 @@ SELECT n.id           AS "bylosId",
        d."bylojeKaip"
 FROM "teismoNuosprendziaiDalyviai" d
          JOIN "teismoNuosprendziai" n ON n.id = d."nuosprendzioId"
-         LEFT JOIN "jarCsv" j ON j."jarKodas"::text = d.kodas
+         LEFT JOIN "jarAsmenys" j ON j."jarKodas"::text = d.kodas

@@ -2,6 +2,11 @@ import { postgres } from "../../postgres/postgres.js";
 import { toLithuanianTime } from "../../utils/time.js";
 import { typesense } from "../../typesense/typesense.js";
 import { levenshtein, toAscii } from "../../utils/text.js";
+import {
+    JAR_ADDRESS_JOINS,
+    JAR_ADDRESS_SQL,
+    JAR_LOCATION_SQL,
+} from "./jarReadSql.js";
 
 /**
  * Searches for juridinis records using Typesense or PostgreSQL.
@@ -69,11 +74,20 @@ export async function searchJar(query = {}, options = {}) {
 
         const { rows, rowCount } = await postgres.query(
             `
-            SELECT *
-            FROM public."jarCsv"
-            WHERE location IS NOT NULL
+            SELECT jar_person.*,
+                   jar_form."pavadinimas" AS "formosPavadinimas",
+                   jar_status."pavadinimas" AS "statusoPavadinimas",
+                   ${JAR_ADDRESS_SQL} AS "adresas",
+                   ${JAR_LOCATION_SQL} AS location
+            FROM public."jarAsmenys" jar_person
+            LEFT JOIN public."jarFormos" jar_form
+              ON jar_form."kodas" = jar_person."formosKodas"
+            LEFT JOIN public."jarStatusai" jar_status
+              ON jar_status."kodas" = jar_person."statusoKodas"
+            ${JAR_ADDRESS_JOINS}
+            WHERE ${JAR_LOCATION_SQL} IS NOT NULL
               AND ST_DWithin(
-                  location::geography,
+                  (${JAR_LOCATION_SQL})::geography,
                   ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
                   $3
               )
@@ -88,10 +102,19 @@ export async function searchJar(query = {}, options = {}) {
 
         const { rows, rowCount } = await postgres.query(
             `
-            SELECT *
-            FROM public."jarCsv"
-            WHERE "adresas" = $1
-            ORDER BY "registravimoData" DESC
+            SELECT jar_person.*,
+                   jar_form."pavadinimas" AS "formosPavadinimas",
+                   jar_status."pavadinimas" AS "statusoPavadinimas",
+                   ${JAR_ADDRESS_SQL} AS "adresas",
+                   ${JAR_LOCATION_SQL} AS location
+            FROM public."jarAsmenys" jar_person
+            LEFT JOIN public."jarFormos" jar_form
+              ON jar_form."kodas" = jar_person."formosKodas"
+            LEFT JOIN public."jarStatusai" jar_status
+              ON jar_status."kodas" = jar_person."statusoKodas"
+            ${JAR_ADDRESS_JOINS}
+            WHERE ${JAR_ADDRESS_SQL} = $1
+            ORDER BY jar_person."registravimoData" DESC
             `,
             [adresas],
         );

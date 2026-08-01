@@ -1,5 +1,10 @@
 import { pathToFileURL } from "node:url";
 import { postgres } from "../../postgres/postgres.js";
+import {
+    JAR_ADDRESS_JOINS,
+    JAR_ADDRESS_SQL,
+    JAR_LOCATION_SQL,
+} from "./jarReadSql.js";
 
 const DEFAULT_BATCH_SIZE = 5_000;
 const LOCK_KEY = "juridiniai-backfill";
@@ -49,10 +54,8 @@ async function upsertDictionaries(client) {
 
     await client.query(`
         INSERT INTO public."juridiniaiStatusai" ("kodas", "pavadinimas")
-        SELECT DISTINCT ON ("statusoKodas")
-            "statusoKodas", "statusoPavadinimas"
-        FROM public."jarCsv"
-        ORDER BY "statusoKodas", "duomenuData" DESC
+        SELECT "kodas", "pavadinimas"
+        FROM public."jarStatusai"
         ON CONFLICT ("kodas") DO UPDATE SET
             "pavadinimas" = EXCLUDED."pavadinimas"
         WHERE "juridiniaiStatusai"."pavadinimas"
@@ -80,21 +83,21 @@ async function upsertDictionaries(client) {
 
 }
 
-const UPSERT_BATCH_SQL = `
+export const UPSERT_BATCH_SQL = `
     WITH batch AS MATERIALIZED (
-        SELECT j.*
-        FROM public."jar" j
-        WHERE j."jarKodas" > $1
-        ORDER BY j."jarKodas"
+        SELECT jar_person.*
+        FROM public."jarAsmenys" jar_person
+        WHERE jar_person."jarKodas" > $1
+        ORDER BY jar_person."jarKodas"
         LIMIT $2
     ),
     source AS MATERIALIZED (
         SELECT
             j."jarKodas",
             j."pavadinimas",
-            COALESCE(jc."adresas", ji."adresas", j."adresas") AS "adresas",
-            jf."kodas" AS "formosKodas",
-            jc."statusoKodas",
+            ${JAR_ADDRESS_SQL} AS "adresas",
+            j."formosKodas",
+            j."statusoKodas",
             j."isregistravimoData" IS NOT NULL AS "isregistruotas",
             j."registravimoData",
             j."isregistravimoData",
@@ -104,7 +107,7 @@ const UPSERT_BATCH_SQL = `
             sodra."darbuotojai",
             sodra."vidutinisAtlyginimas",
             vmi."suma" AS "vmiMokesciai",
-            kapitalas."reiksme" AS "istatinisKapitalas",
+            kapitalas."kapitalas" AS "istatinisKapitalas",
             COALESCE(sutartys."pirkimai", 0)::bigint AS "pirkimuKiekis",
             COALESCE(NULLIF(sutartys."pirkimuSuma", 'NaN'::numeric), 0)
                 AS "pirkimuSuma",
@@ -114,14 +117,12 @@ const UPSERT_BATCH_SQL = `
             COALESCE(bylos."count", 0)::bigint AS "byluKiekis",
             vdi."count"::bigint AS "vdiPazeidimuKiekis",
             COALESCE(domenai."domainCount", 0)::bigint AS "domenuKiekis",
-            jc."location"
+            ${JAR_LOCATION_SQL} AS "location"
         FROM batch j
-        LEFT JOIN public."jarCsv" jc
-            ON jc."jarKodas"::text = j."jarKodas"
-        LEFT JOIN public."jarCsvIsregistruoti" ji
-            ON ji."jarKodas" = j."jarKodas"
-        LEFT JOIN public."jarFormos" jf
-            ON jf."_id" = j."formaId"
+        -- Bendram fragmentui reikia vienodo pagrindinės lentelės aliaso.
+        LEFT JOIN public."jarAsmenys" jar_person
+            ON jar_person."jarKodas" = j."jarKodas"
+        ${JAR_ADDRESS_JOINS}
         LEFT JOIN LATERAL (
             SELECT
                 sm."evrkId",
@@ -143,9 +144,7 @@ const UPSERT_BATCH_SQL = `
                     )
                 END AS "vidutinisAtlyginimas"
             FROM public."sodraMonthly" sm
-            WHERE sm."jarKodas" = CASE
-                WHEN j."jarKodas" ~ '^[0-9]+$' THEN j."jarKodas"::integer
-            END
+            WHERE sm."jarKodas" = j."jarKodas"
             ORDER BY sm."data" DESC
             LIMIT 1
         ) sodra ON true
@@ -156,43 +155,32 @@ const UPSERT_BATCH_SQL = `
         LEFT JOIN LATERAL (
             SELECT m."suma"
             FROM public."mokesciai" m
-            WHERE m."jarKodas" = j."jarKodas"
+            WHERE m."jarKodas" = j."jarKodas"::text
             ORDER BY m."metai" DESC, m."menuo" DESC, m."duomenuData" DESC
             LIMIT 1
         ) vmi ON true
         LEFT JOIN LATERAL (
-            SELECT k."reiksme"
-            FROM public."istatinisKapitalas" k
-            WHERE k."jarId" = j."_id"
-            ORDER BY k."data" DESC
+            SELECT k."kapitalas"
+            FROM public."jarKapitalas" k
+            WHERE k."jarKodas" = j."jarKodas"
+            ORDER BY k."kapitalasNuo" DESC, k."duomenuData" DESC
             LIMIT 1
         ) kapitalas ON true
         LEFT JOIN public."vpmSutartysSumos" sutartys
-            ON sutartys."saliesKodas" = j."jarKodas"
+            ON sutartys."saliesKodas" = j."jarKodas"::text
         LEFT JOIN public."teismoNuosprendziaiDalyviaiCounts" bylos
-            ON bylos."jarKodas" = j."jarKodas"
+            ON bylos."jarKodas" = j."jarKodas"::text
         LEFT JOIN LATERAL (
             SELECT count(*) AS "count"
             FROM public."vdiPazeidimai" v
-            WHERE v."jarKodas" = j."jarKodas"
+            WHERE v."jarKodas" = j."jarKodas"::text
         ) vdi ON true
         LEFT JOIN public."domenaiCounts" domenai
-            ON domenai."savininkoKodas" = j."jarKodas"
-        LEFT JOIN LATERAL (
-            SELECT
-                sav."pavadinimas" AS "savivaldybe",
-                aps."pavadinimas" AS "apskritis"
-            FROM public."arSavivaldybes" sav
-            LEFT JOIN public."arApskritys" aps
-                ON aps."kodas" = sav."apskritiesKodas"
-            WHERE jc."location" IS NOT NULL
-              AND ST_Covers(sav."geometrija", jc."location")
-            LIMIT 1
-        ) teritorija ON true
+            ON domenai."savininkoKodas" = j."jarKodas"::text
         LEFT JOIN public."juridiniaiSavivaldybesPavadinimai" sav_dict
-            ON sav_dict."pavadinimas" = teritorija."savivaldybe"
+            ON sav_dict."pavadinimas" = jar_municipality."pavadinimas"
         LEFT JOIN public."juridiniaiApskritysPavadinimai" aps_dict
-            ON aps_dict."pavadinimas" = teritorija."apskritis"
+            ON aps_dict."pavadinimas" = jar_county."pavadinimas"
     ),
     upserted AS (
         INSERT INTO public."juridiniai" AS old (
@@ -271,7 +259,7 @@ const UPSERT_BATCH_SQL = `
 
 export async function backfillJuridiniai({ batchSize = DEFAULT_BATCH_SIZE } = {}) {
     const client = await postgres.connect();
-    let lastJarKodas = "";
+    let lastJarKodas = 0;
     let scannedTotal = 0;
     let changedTotal = 0;
 

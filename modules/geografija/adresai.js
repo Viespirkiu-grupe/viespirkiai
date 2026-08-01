@@ -183,8 +183,8 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
 
     if (arg === "--test") {
         const { rows } = await postgres.query(
-            `SELECT "adresas" FROM "jarCsv"
-           WHERE "adresas" IS NOT NULL
+            `SELECT "adresas" FROM "jarAsmenuAdresai"
+           WHERE "aobKodas" IS NULL AND "adresas" IS NOT NULL
            ORDER BY RANDOM()
            LIMIT 1000`,
         );

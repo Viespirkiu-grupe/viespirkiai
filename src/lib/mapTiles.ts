@@ -15,7 +15,6 @@ export type TileCell = [number, number, number];
 // Allowed table names — kept as a whitelist so the interpolated identifier can
 // never come from user input.
 const TILE_TABLES = {
-  jar: 'jarCsvLocationTiles',
   dokumentai: 'dokumentaiLocationTiles',
 } as const;
 
