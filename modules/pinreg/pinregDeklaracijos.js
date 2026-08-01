@@ -1,4 +1,8 @@
 import { postgres } from "../../postgres/postgres.js";
+import {
+    WINDOW_COUNT_SQL,
+    splitWindowCount,
+} from "../../utils/windowCount.js";
 
 export async function gautiPinregDeklaracijasPagalJarKoda(
     jarKodas,
@@ -6,78 +10,38 @@ export async function gautiPinregDeklaracijasPagalJarKoda(
 ) {
     let limit = options.limit ? Number(options.limit) : null;
 
-    const [
-        darbovietesQuery,
-        darbovietesCountsQuery,
-        rysiaiQuery,
-        rysiaiCountsQuery,
-        sutuoktiniuQuery,
-        sutuoktiniuCountsQuery,
-    ] = await Promise.all([
-        // 1. Deklaruojancio darbovietes data
+    // Kiekvienam įrašo tipui – viena užklausa; bendras kiekis paimamas lango
+    // funkcija toje pačioje užklausoje (anksčiau buvo atskiras COUNT(*)).
+    // `irasoTipas` rašomas literalu (reikšmės – fiksuotos, ne iš vartotojo), nes
+    // daliniai indeksai (`WHERE "irasoTipas" = '...'`) pritaikomi tik tada, kai
+    // sąlyga matoma planavimo metu.
+    const pagalTipa = (irasoTipas) =>
         postgres.query(
-            `SELECT * FROM public."pinregJuridiniaiRysiai"
+            `SELECT *, ${WINDOW_COUNT_SQL} FROM public."pinregJuridiniaiRysiai"
            WHERE "jarKodas" = $1
-           AND "irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE'
+           AND "irasoTipas" = '${irasoTipas}'
            ORDER BY "pateikimoData" DESC
            ${limit ? "LIMIT $2" : ""}`,
             limit ? [jarKodas, limit] : [jarKodas],
-        ),
-        // 2. Deklaruojancio darbovietes count
-        postgres.query(
-            `SELECT COUNT(*)::int AS "count" FROM public."pinregJuridiniaiRysiai"
-           WHERE "jarKodas" = $1
-           AND "irasoTipas" = 'DEKLARUOJANCIO_DARBOVIETE'`,
-            [jarKodas],
-        ),
-        // 3. Kiti rysiai su JA data
-        postgres.query(
-            `SELECT * FROM public."pinregJuridiniaiRysiai"
-           WHERE "jarKodas" = $1
-           AND "irasoTipas" = 'KITI_RYSIAI_SU_JA'
-           ORDER BY "pateikimoData" DESC
-           ${limit ? "LIMIT $2" : ""}`,
-            limit ? [jarKodas, limit] : [jarKodas],
-        ),
-        // 4. Kiti rysiai su JA count
-        postgres.query(
-            `SELECT COUNT(*)::int AS "count" FROM public."pinregJuridiniaiRysiai"
-           WHERE "jarKodas" = $1
-           AND "irasoTipas" = 'KITI_RYSIAI_SU_JA'`,
-            [jarKodas],
-        ),
-        // 5. Sutuoktinio darbovietes data
-        postgres.query(
-            `SELECT * FROM public."pinregJuridiniaiRysiai"
-           WHERE "jarKodas" = $1
-           AND "irasoTipas" = 'SUTUOKTINIO_DARBOVIETE'
-           ORDER BY "pateikimoData" DESC
-           ${limit ? "LIMIT $2" : ""}`,
-            limit ? [jarKodas, limit] : [jarKodas],
-        ),
-        // 6. Sutuoktinio darbovietes count
-        postgres.query(
-            `SELECT COUNT(*)::int AS "count" FROM public."pinregJuridiniaiRysiai"
-           WHERE "jarKodas" = $1
-           AND "irasoTipas" = 'SUTUOKTINIO_DARBOVIETE'`,
-            [jarKodas],
-        ),
-    ]);
+        );
 
-    const darbovietesRows = darbovietesQuery.rows;
-    const darbovietesCounts = darbovietesCountsQuery.rows;
-    const rysiaiRows = rysiaiQuery.rows;
+    const [darbovietesQuery, rysiaiQuery, sutuoktiniuQuery] = await Promise.all(
+        [
+            pagalTipa("DEKLARUOJANCIO_DARBOVIETE"),
+            pagalTipa("KITI_RYSIAI_SU_JA"),
+            pagalTipa("SUTUOKTINIO_DARBOVIETE"),
+        ],
+    );
 
-    const rysiaiCounts = rysiaiCountsQuery.rows;
-    const sutuoktiniuRows = sutuoktiniuQuery.rows;
-    const sutuoktiniuCounts = sutuoktiniuCountsQuery.rows;
-
-    const rysiaiCount =
-        rysiaiCounts.length > 0 ? Number(rysiaiCounts[0].count) : 0;
-    const darbovietesCount =
-        darbovietesCounts.length > 0 ? Number(darbovietesCounts[0].count) : 0;
-    const sutuoktiniuCount =
-        sutuoktiniuCounts.length > 0 ? Number(sutuoktiniuCounts[0].count) : 0;
+    const { rows: darbovietesRows, viso: darbovietesCount } = splitWindowCount(
+        darbovietesQuery.rows,
+    );
+    const { rows: rysiaiRows, viso: rysiaiCount } = splitWindowCount(
+        rysiaiQuery.rows,
+    );
+    const { rows: sutuoktiniuRows, viso: sutuoktiniuCount } = splitWindowCount(
+        sutuoktiniuQuery.rows,
+    );
 
     // Prepare result arrays
     let darbovietes = [];

@@ -15,9 +15,10 @@ import DokFacetSection from '../components/dokumentai/DokFacetSection.astro';
 import PgFacetModal from '../components/content/PgFacetModal.astro';
 import { postgres, getColorScheme, getFont, parseLimit, buildNumberOfResults } from '../lib/failai.js';
 import {
-  SqlParams, buildMonthHistogram, makeFacet, makeFacetToggleUrl,
+  SqlParams, buildMonthHistogram, cachePageData, makeFacet, makeFacetToggleUrl,
   parseMultiParam, stripEmptyParams, toFacetOptions,
 } from '../lib/pgFacets.ts';
+import { WINDOW_COUNT_SQL, splitWindowCount } from '@/utils/windowCount.js';
 import '@/utils/linksniai.js';
 
 const colorScheme = getColorScheme(Astro.cookies);
@@ -151,70 +152,105 @@ const timed = async <T,>(promise: Promise<T>): Promise<{ value: T; ms: number }>
  * Vieno faceto skaičiai — su visais kitais filtrais, bet be paties faceto.
  * Pažymėtos reikšmės rikiuojamos į patį viršų: kitaip retesnė (už `max` ribos)
  * atranka iškristų iš atsakymo ir juostoje liktų be pavadinimo bei skaičiaus.
+ *
+ * Grąžina vieną `UNION ALL` šaką — visos jos sudedamos į vieną užklausą, kad
+ * `BASE_CTE` (UNION ALL + window funkcija) būtų skaičiuojamas kartą, o ne po
+ * kartą kiekvienam facetui. Kelis kartus naudojamo CTE Postgres neinlainina,
+ * tad jis materializuojamas viename plane ir dalinamas visoms šakoms.
  */
-function facetQuery(param: string, valueExpr: string, labelExpr: string | null = null, max = 500) {
-  const params = new SqlParams();
+function facetBranch(
+  params: SqlParams,
+  param: string,
+  valueExpr: string,
+  labelExpr: string | null = null,
+  max = 500,
+) {
   const where = buildWhere(params, param);
-  const label = labelExpr ? `, MIN(${labelExpr}) AS label` : '';
+  const label = labelExpr ? `MIN(${labelExpr})` : 'NULL';
   const pinned = selected[param]?.length
     ? `(${valueExpr} = ANY(${params.add(selected[param])}::text[])) DESC, `
     : '';
-  return postgres.query(
-    `${BASE_CTE}
-     SELECT ${valueExpr} AS value, COUNT(*)::int AS count${label}
+  return `SELECT * FROM (
+     SELECT ${params.add(param)}::text AS facet, ${valueExpr}::text AS value,
+            ${label}::text AS label, NULL::date AS bucket, COUNT(*)::int AS count
      FROM nd
      ${where}
-     GROUP BY 1
+     GROUP BY 2
      HAVING ${valueExpr} IS NOT NULL AND ${valueExpr}::text <> ''
-     ORDER BY ${pinned}count DESC, 1
-     LIMIT ${max}`,
-    params.values,
-  );
+     ORDER BY ${pinned}count DESC, 2
+     LIMIT ${max}
+   ) ${param}_facet`;
 }
 
 const startedAt = Date.now();
+
+// Rezultatų stulpeliai vardais, o ne `nd.*` — kad į atsakymą (ir ?json) nekeliautų
+// `search_index` tsvector'ius, kuris naudingas tik `@@` filtrui.
+const ROW_COLUMNS = [
+  'atvejoNr', 'duomenuIvedimoData', 'pirkimoVykdytojoPavadinimas', 'tiekejoPavadinimas',
+  'tiekejoJarKodas', 'pirkimoNumeris', 'sutartiesNutraukimoData', 'dataNuoKuriosSkaiciuojama',
+  'itrauktasIki', 'teismoData', 'teismoSprendimoData', 'teismoSprendimoLink', 'metai',
+  'paskutiniKartaMatytaSarase', 'irasymoPagrindas', 'saltinis', 'sarasoData', 'busena',
+].map((column) => `nd."${column}"`).join(', ');
 
 const resultParams = new SqlParams();
 const resultWhere = buildWhere(resultParams);
 const limitPh = resultParams.add(limit);
 const offsetPh = resultParams.add(skip);
 
-const countParams = new SqlParams();
-const countWhere = buildWhere(countParams);
+// Visi facetai ir histograma – viena užklausa. `BASE_CTE` joje skaičiuojamas
+// kartą (kelis kartus naudojamo CTE Postgres neinlainina), o ne po kartą
+// kiekvienam facetui, kaip būdavo su penkiomis atskiromis užklausomis.
+const facetParams = new SqlParams();
+const facetSql = [
+  facetBranch(facetParams, 'saltinis', 'nd.saltinis'),
+  facetBranch(facetParams, 'busena', 'nd.busena'),
+  facetBranch(facetParams, 'pirkejas', 'nd."pirkimoVykdytojoPavadinimas"'),
+  facetBranch(facetParams, 'tiekejoKodas', 'nd."tiekejoJarKodas"', 'nd."tiekejoPavadinimas"'),
+];
+const histWhere = buildWhere(facetParams, 'ivesta');
+// Histogramos eiliškumu rūpinasi `buildMonthHistogram`, tad ORDER BY nereikia.
+facetSql.push(`SELECT ${facetParams.add('ivesta')}::text AS facet, NULL::text AS value,
+     NULL::text AS label, date_trunc('month', nd."duomenuIvedimoData")::date AS bucket,
+     COUNT(*)::int AS count
+   FROM nd
+   ${histWhere}${histWhere ? ' AND' : 'WHERE'} nd."duomenuIvedimoData" IS NOT NULL
+   GROUP BY 4`);
 
-const histParams = new SqlParams();
-const histWhere = buildWhere(histParams, 'ivesta');
-
-const [resultsRes, totalRes, saltinisRes, busenaRes, pirkejasRes, tiekejasRes, histRes] = await Promise.all([
+const [resultsRes, facetsRes] = await cachePageData(Astro.url, () => Promise.all([
   timed(postgres.query(
     `${BASE_CTE}
-     SELECT nd.* FROM nd
+     SELECT ${ROW_COLUMNS}, ${WINDOW_COUNT_SQL} FROM nd
      ${resultWhere}
      ORDER BY ${SORTS[sort]}
      LIMIT ${limitPh} OFFSET ${offsetPh}`,
     resultParams.values,
   )),
   timed(postgres.query(
+    `${BASE_CTE}\n${facetSql.join('\n UNION ALL\n')}`,
+    facetParams.values,
+  )),
+]));
+
+const { rows, viso } = splitWindowCount(resultsRes.value.rows);
+// Lango funkcija duoda kiekį tik tada, kai eilučių yra. Už paskutinio puslapio
+// (OFFSET per didelis) atskirai paklausiam, kad pager'is nerodytų nulio.
+let total = viso;
+if (!rows.length && skip > 0) {
+  const countParams = new SqlParams();
+  const countWhere = buildWhere(countParams);
+  const countRes = await postgres.query(
     `${BASE_CTE} SELECT COUNT(*)::int AS count FROM nd ${countWhere}`,
     countParams.values,
-  )),
-  timed(facetQuery('saltinis', 'nd.saltinis')),
-  timed(facetQuery('busena', 'nd.busena')),
-  timed(facetQuery('pirkejas', 'nd."pirkimoVykdytojoPavadinimas"')),
-  timed(facetQuery('tiekejoKodas', 'nd."tiekejoJarKodas"', 'nd."tiekejoPavadinimas"')),
-  timed(postgres.query(
-    `${BASE_CTE}
-     SELECT date_trunc('month', nd."duomenuIvedimoData")::date AS bucket, COUNT(*)::int AS count
-     FROM nd
-     ${histWhere}${histWhere ? ' AND' : 'WHERE'} nd."duomenuIvedimoData" IS NOT NULL
-     GROUP BY 1 ORDER BY 1`,
-    histParams.values,
-  )),
-]);
-
-const rows = resultsRes.value.rows;
-const total = totalRes.value.rows[0].count;
+  );
+  total = countRes.rows[0].count;
+}
 const pageCount = Math.ceil(total / limit);
+
+const facetRows = facetsRes.value.rows as {
+  facet: string; value: string | null; label: string | null; bucket: string | null; count: number;
+}[];
+const facetRowsOf = (name: string) => facetRows.filter((row) => row.facet === name);
 
 if (typeof query.json !== 'undefined') {
   return new Response(JSON.stringify({
@@ -235,10 +271,10 @@ const BUSENA_LABELS: Record<string, string> = {
   nezinoma: 'Terminas nenurodytas',
 };
 
-const saltinisOptions = toFacetOptions(saltinisRes.value.rows);
-const busenaOptions = toFacetOptions(busenaRes.value.rows);
-const pirkejasOptions = toFacetOptions(pirkejasRes.value.rows);
-const tiekejasOptions = toFacetOptions(tiekejasRes.value.rows);
+const saltinisOptions = toFacetOptions(facetRowsOf('saltinis'));
+const busenaOptions = toFacetOptions(facetRowsOf('busena'));
+const pirkejasOptions = toFacetOptions(facetRowsOf('pirkejas'));
+const tiekejasOptions = toFacetOptions(facetRowsOf('tiekejoKodas'));
 
 const facets = {
   saltinis: makeFacet('saltinis', saltinisOptions, selected.saltinis, toggleUrl, 4),
@@ -246,7 +282,7 @@ const facets = {
   pirkejas: makeFacet('pirkejas', pirkejasOptions, selected.pirkejas, toggleUrl, 5),
   tiekejoKodas: makeFacet('tiekejoKodas', tiekejasOptions, selected.tiekejoKodas, toggleUrl, 5),
 };
-const hist = buildMonthHistogram(histRes.value.rows);
+const hist = buildMonthHistogram(facetRowsOf('ivesta'));
 
 const numberOfResults = buildNumberOfResults({
   rows,
@@ -255,8 +291,7 @@ const numberOfResults = buildNumberOfResults({
   engine: 'PostgreSQL',
   timings: [
     { label: 'Rezultatai', phase: 'search', start: 0, duration: resultsRes.ms },
-    { label: 'Skaičius', phase: 'count', start: 0, duration: totalRes.ms },
-    { label: 'Facetai', phase: 'facets', start: 0, duration: Math.max(saltinisRes.ms, busenaRes.ms, pirkejasRes.ms, tiekejasRes.ms, histRes.ms) },
+    { label: 'Facetai', phase: 'facets', start: 0, duration: facetsRes.ms },
   ],
 });
 

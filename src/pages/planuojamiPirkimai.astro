@@ -20,8 +20,8 @@ import DokFacetSection from '../components/dokumentai/DokFacetSection.astro';
 import PgFacetModal from '../components/content/PgFacetModal.astro';
 import { postgres, getColorScheme, getFont, parseLimit, buildNumberOfResults } from '../lib/failai.js';
 import {
-  AMOUNT_EDGES, SqlParams, buildAmountHistogram, buildMonthHistogram, makeFacet,
-  makeFacetToggleUrl, stripEmptyParams, toFacetOptions,
+  AMOUNT_EDGES, SqlParams, buildAmountHistogram, buildMonthHistogram, cachePageData,
+  makeFacet, makeFacetToggleUrl, stripEmptyParams, toFacetOptions,
 } from '../lib/pgFacets.ts';
 import {
   BVPZ_PARAM, BVPZ_SEP, DATA_JOIN, FACET_PARAMS, PIRKEJAS_PARAM,
@@ -116,7 +116,7 @@ const boundMinPh = pradziaParams.add(DATA_BOUND_MIN);
 const boundMaxPh = pradziaParams.add(dataBoundMax);
 
 const [resultsRes, totalRes, pirkejasRes, tipasRes, budasRes, direktyvaRes, bvpzRes, kainaRes, pradziaRes] =
-  await Promise.all([
+  await cachePageData(Astro.url, () => Promise.all([
     timed(postgres.query(
       `SELECT p.id, p."pirkimoPavadinimas",
               v.pavadinimas AS vykdytojas, NULLIF(v."jarKodas", '') AS "jarKodas",
@@ -160,7 +160,7 @@ const [resultsRes, totalRes, pirkejasRes, tipasRes, budasRes, direktyvaRes, bvpz
        GROUP BY 1 ORDER BY 1`,
       pradziaParams.values,
     )),
-  ]);
+  ]));
 
 const rows = resultsRes.value.rows;
 const total = totalRes.value.rows[0].count;

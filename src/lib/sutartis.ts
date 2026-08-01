@@ -1,7 +1,7 @@
 import { postgres } from '@/postgres/postgres.js';
 import { fixHtmlEntities } from '@/utils/fixHtmlEntities.js';
 import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
-import { VPM_SUTARTIS_ROW_SQL } from '@/modules/sutartys/vpmSutartisRow.js';
+import { panasiosSutartys, sutartisPagalId } from '@/modules/sutartys/vpmSutartisRow.js';
 import { loadCpvaProjektai } from '@/modules/cpva/loadProjektai.js';
 import { loadPirkimoAtitikmenys } from './sutartisPirkimai.ts';
 
@@ -38,14 +38,12 @@ async function applyTiekejasPatikslinimas(sutartis: Sutartis) {
 
 async function loadPanasiosSutartys(sutartis: Sutartis): Promise<Sutartis[]> {
   const r = await postgres.query(
-    `SELECT * FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
-     WHERE "sutartiesUnikalusId" != $1
-       AND "perkanciosiosOrganizacijosKodas" = $2
-       AND "tiekejoKodas" = $3
-       AND verte = $4
-       AND istrinta = false
-     ORDER BY "paskutinioRedagavimoData" DESC`,
-    [sutartis.sutartiesUnikalusId, sutartis.perkanciosiosOrganizacijosKodas, sutartis.tiekejoKodas, sutartis.verte],
+    panasiosSutartys([
+      sutartis.sutartiesUnikalusId,
+      sutartis.perkanciosiosOrganizacijosKodas,
+      sutartis.tiekejoKodas,
+      sutartis.verte,
+    ]),
   );
   return r.rows;
 }
@@ -167,8 +165,7 @@ async function annotateDokumentai(sutartis: any) {
 
 export async function loadSutartis(id: number): Promise<Sutartis | null> {
   const sutartis = await postgres
-    .query(`SELECT * FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
-            WHERE "sutartiesUnikalusId" = $1 LIMIT 1`, [id])
+    .query(sutartisPagalId([id]))
     .then((r: any) => r.rows[0]);
   if (!sutartis) return null;
 

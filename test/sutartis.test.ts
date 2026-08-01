@@ -9,7 +9,9 @@ vi.mock('../postgres/postgres.js', () => ({
 describe('loadSutartis', () => {
   beforeEach(() => {
     pgQuery.mockReset();
-    pgQuery.mockImplementation((sql: string) => {
+    // Dalis užklausų paduodamos kaip prepared statement config'as ({name, text}).
+    pgQuery.mockImplementation((sqlOrConfig: string | { text: string }) => {
+      const sql = typeof sqlOrConfig === 'string' ? sqlOrConfig : sqlOrConfig.text;
       if (sql.includes('public."vpmSutartys" s') && sql.includes('WHERE "sutartiesUnikalusId" = $1')) {
         return Promise.resolve({
           rows: [{

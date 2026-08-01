@@ -1,4 +1,8 @@
 import { postgres } from "../../postgres/postgres.js";
+import {
+    WINDOW_COUNT_SQL,
+    splitWindowCount,
+} from "../../utils/windowCount.js";
 
 export async function getEsInvesticijosByJar(jarKodas, options = {}) {
     let limit = options.limit || 10_000_000;
@@ -6,20 +10,15 @@ export async function getEsInvesticijosByJar(jarKodas, options = {}) {
         limit = 10_000_000;
     }
 
-    let [esInvesticijosRes, esInvesticijosCountRes] = await Promise.all([
-        postgres.query(
-            `SELECT * FROM "2014Esinvesticijos" WHERE "pareiskejasJarKodas" = $1 ORDER BY "pabaigosData" DESC LIMIT $2;`,
-            [jarKodas, limit],
-        ),
-        postgres.query(
-            `SELECT COUNT(*) FROM "2014Esinvesticijos" WHERE "pareiskejasJarKodas" = $1;`,
-            [jarKodas],
-        ),
-    ]);
+    const esInvesticijosRes = await postgres.query(
+        `SELECT *, ${WINDOW_COUNT_SQL} FROM "2014Esinvesticijos" WHERE "pareiskejasJarKodas" = $1 ORDER BY "pabaigosData" DESC LIMIT $2;`,
+        [jarKodas, limit],
+    );
+    const { rows, viso } = splitWindowCount(esInvesticijosRes.rows);
 
     return {
         limit,
-        count: parseInt(esInvesticijosCountRes.rows[0].count, 10),
-        rows: esInvesticijosRes.rows,
+        count: viso,
+        rows,
     };
 }

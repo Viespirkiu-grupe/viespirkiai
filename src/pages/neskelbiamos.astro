@@ -13,7 +13,7 @@ import DokFacetSection from '../components/dokumentai/DokFacetSection.astro';
 import PgFacetModal from '../components/content/PgFacetModal.astro';
 import { postgres, getColorScheme, getFont, parseLimit, buildNumberOfResults } from '../lib/failai.js';
 import {
-  SqlParams, attachJarNames, buildMonthHistogram, makeFacet, makeFacetToggleUrl,
+  SqlParams, attachJarNames, buildMonthHistogram, cachePageData, makeFacet, makeFacetToggleUrl,
   parseMultiParam, stripEmptyParams, toFacetOptions,
 } from '../lib/pgFacets.ts';
 import '@/utils/linksniai.js';
@@ -137,7 +137,7 @@ const countWhere = buildWhere(countParams);
 const histParams = new SqlParams();
 const histWhere = buildWhere(histParams, 'data');
 
-const [resultsRes, totalRes, pirkejasRes, isvadaRes, histRes] = await Promise.all([
+const [resultsRes, totalRes, pirkejasRes, isvadaRes, histRes] = await cachePageData(Astro.url, () => Promise.all([
   timed(postgres.query(
     `SELECT nd.*, f.id AS "failoId"
      FROM public."neskelbiamosDerybos" nd ${FILE_JOIN}
@@ -159,7 +159,7 @@ const [resultsRes, totalRes, pirkejasRes, isvadaRes, histRes] = await Promise.al
      GROUP BY 1 ORDER BY 1`,
     histParams.values,
   )),
-]);
+]));
 
 const rows = resultsRes.value.rows;
 const total = totalRes.value.rows[0].count;

@@ -64,8 +64,7 @@ async function ensureTable(): Promise<void> {
 }
 
 async function reload(): Promise<void> {
-  try {
-    const { rows } = await postgres.query(
+  const { rows } = await postgres.query(
       `SELECT type, content, important
          FROM public."infoBaneris"
         WHERE enabled = true
@@ -73,29 +72,44 @@ async function reload(): Promise<void> {
         ORDER BY important DESC, atnaujinta DESC
         LIMIT 1`,
       [currentEnv],
-    );
-    const row = rows[0];
-    const content = typeof row?.content === 'string' ? row.content.trim() : '';
-    cached = content
-      ? {
-          type: row.type === 'html' ? 'html' : 'text',
-          content,
-          important: row.important === true,
-        }
-      : null;
+  );
+  const row = rows[0];
+  const content = typeof row?.content === 'string' ? row.content.trim() : '';
+  cached = content
+    ? {
+        type: row.type === 'html' ? 'html' : 'text',
+        content,
+        important: row.important === true,
+      }
+    : null;
+}
+
+/** Perkrovimas fone – klaidos ignoruojamos, paliekama paskutinė žinoma reikšmė. */
+async function reloadTyliai(): Promise<void> {
+  try {
+    await reload();
   } catch {
-    // Klaidos atveju paliekam paskutinę žinomą reikšmę – banerio dingimas nekritinis.
+    // Banerio dingimas nekritinis.
   }
 }
 
 async function init(): Promise<void> {
-  await ensureTable();
-  await reload();
+  try {
+    await reload();
+  } catch (err: any) {
+    // 42P01 = undefined_table. Schema laikoma `dbSchema/`, tad įprastai lentelė
+    // jau yra ir jokio DDL paleidžiant nereikia; kuriam ją tik tada, kai tai
+    // tuščia/nauja DB (anksčiau CREATE TABLE/FUNCTION/TRIGGER sukdavosi per
+    // kiekvieną startą).
+    if (err?.code !== '42P01') throw err;
+    await ensureTable();
+    await reload();
+  }
   subscribe(NOTIFY_CHANNEL, () => {
-    void reload();
+    void reloadTyliai();
   });
   setInterval(() => {
-    void reload();
+    void reloadTyliai();
   }, POLL_INTERVAL_MS).unref?.();
 }
 

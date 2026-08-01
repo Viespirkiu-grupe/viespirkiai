@@ -63,6 +63,7 @@ taskrunneriui.
 | `PG_DATABASE` | `viespirkiai` | DB pavadinimas. |
 | `PG_MAX_CONNECTIONS` | `16` | Maks. vienalaikis pool dydis aplikacijos užklausoms. |
 | `SQL_LOG_FILE` | — | Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą. |
+| `PG_PREPARED` | `true` | Statiškas dažnas užklausas vykdyti kaip prepared statement'us. **Išjungti (`false`), jei `PG_PORT` rodo į pgbouncer transaction pooling režimu be `max_prepared_statements`.** |
 
 Profiliavimui: `SQL_LOG_FILE=/tmp/sql.log` įjungia visų per `postgres.query()` ir
 per `postgres.connect()` paimtus klientus einančių užklausų rašymą į failą.

@@ -1,4 +1,8 @@
 import { postgres } from "../../postgres/postgres.js";
+import {
+    WINDOW_COUNT_SQL,
+    splitWindowCount,
+} from "../../utils/windowCount.js";
 
 export async function gautiRcPranesimusPagalJarKoda(jarKodas, options = {}) {
     let useLimit = false;
@@ -8,27 +12,21 @@ export async function gautiRcPranesimusPagalJarKoda(jarKodas, options = {}) {
         useLimit = true;
     }
 
-    // Run count and fetch in parallel
-    var [rcPranesimaiCountResult, rcPranesimaiResult] = await Promise.all([
-        postgres.query(
-            `SELECT COUNT(*)
-            FROM "rcInformaciniaiLeidiniaiPranesimai"
-            WHERE "jarKodas" = $1`,
-            [jarKodas],
-        ),
-        postgres.query(
-            `SELECT *
+    const rcPranesimaiResult = await postgres.query(
+        `SELECT *, ${WINDOW_COUNT_SQL}
             FROM "rcInformaciniaiLeidiniaiPranesimai"
             WHERE "jarKodas" = $1
             ORDER BY "leidinioData" DESC
            ${useLimit ? "LIMIT $2" : ""};`,
-            useLimit ? [jarKodas, limit] : [jarKodas],
-        ),
-    ]);
+        useLimit ? [jarKodas, limit] : [jarKodas],
+    );
+    const { rows: pranesimai, viso } = splitWindowCount(
+        rcPranesimaiResult.rows,
+    );
 
     return {
         limit: useLimit ? limit : "max",
-        rows: Number(rcPranesimaiCountResult.rows[0]?.count) ?? 0,
-        pranesimai: rcPranesimaiResult.rows,
+        rows: viso,
+        pranesimai,
     };
 }

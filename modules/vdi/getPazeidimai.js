@@ -1,4 +1,8 @@
 import { postgres } from "../../postgres/postgres.js";
+import {
+    WINDOW_COUNT_SQL,
+    splitWindowCount,
+} from "../../utils/windowCount.js";
 import pazeidimaiArticles from "./pazeidimaiArticles.json" with { type: "json" };
 
 const articleMap = new Map(pazeidimaiArticles.map((a) => [a.straipsnis, a]));
@@ -9,18 +13,13 @@ export async function getVdiPazeidimai(jarKodas, options = {}) {
         limit = 10_000_000;
     }
 
-    const [res, countRes] = await Promise.all([
-        postgres.query(
-            `SELECT * FROM "vdiPazeidimai" WHERE "jarKodas" = $1 ORDER BY "straipsnis" LIMIT $2`,
-            [jarKodas, limit],
-        ),
-        postgres.query(
-            `SELECT COUNT(*) FROM "vdiPazeidimai" WHERE "jarKodas" = $1`,
-            [jarKodas],
-        ),
-    ]);
+    const res = await postgres.query(
+        `SELECT *, ${WINDOW_COUNT_SQL} FROM "vdiPazeidimai" WHERE "jarKodas" = $1 ORDER BY "straipsnis" LIMIT $2`,
+        [jarKodas, limit],
+    );
+    const { rows: pazeidimai, viso } = splitWindowCount(res.rows);
 
-    const rows = res.rows.map((row) => {
+    const rows = pazeidimai.map((row) => {
         const article = articleMap.get(row.straipsnis) ?? {};
         return {
             ...row,
@@ -31,7 +30,7 @@ export async function getVdiPazeidimai(jarKodas, options = {}) {
 
     return {
         limit,
-        count: parseInt(countRes.rows[0].count),
+        count: viso,
         rows,
     };
 }

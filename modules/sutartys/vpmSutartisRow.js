@@ -10,6 +10,8 @@ yra sutrumpintas hierarchinis kodas, todėl rodomas kodas sudedamas iš
 `code` ir `checksum`.
 */
 
+import { preparedStatement } from "../../postgres/prepared.js";
+
 export const VPM_SUTARTIS_ROW_SELECT = `
     s."unikalusId" AS "sutartiesUnikalusId",
     s.pavadinimas,
@@ -101,3 +103,68 @@ export const VPM_SUTARTIS_ROW_FROM = `
 export const VPM_SUTARTIS_ROW_SQL = `
     SELECT ${VPM_SUTARTIS_ROW_SELECT}
     FROM ${VPM_SUTARTIS_ROW_FROM}`;
+
+/*
+Dažniausios statiškos užklausos – kaip prepared statement'ai. Užklausos tekstas
+~4 KB, tad planavimas užima didesnę dalį laiko nei pats vykdymas; paruošus planą
+jungčiai, point lookup atpinga ~2,5 karto. Vardai turi būti unikalūs kiekvienam
+skirtingam tekstui.
+*/
+
+/** Viena sutartis pagal `sutartiesUnikalusId`. */
+export const sutartisPagalId = preparedStatement(
+    "vpmSutartisPagalId",
+    `SELECT * FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
+     WHERE "sutartiesUnikalusId" = $1 LIMIT 1`,
+);
+
+/** Panašios sutartys (tas pats pirkėjas, tiekėjas ir vertė). */
+export const panasiosSutartys = preparedStatement(
+    "vpmPanasiosSutartys",
+    `SELECT * FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
+     WHERE "sutartiesUnikalusId" != $1
+       AND "perkanciosiosOrganizacijosKodas" = $2
+       AND "tiekejoKodas" = $3
+       AND verte = $4
+       AND istrinta = false
+     ORDER BY "paskutinioRedagavimoData" DESC`,
+);
+
+/** Sutarties kortelė paieškos panelėje (tik rodomi laukai). */
+export const sutartisPanelei = preparedStatement(
+    "vpmSutartisPanelei",
+    `SELECT
+         "sutartiesUnikalusId"::text AS id,
+         pavadinimas,
+         tipas,
+         "sutartiesNumeris",
+         "pirkimoNumeris",
+         "perkanciojiOrganizacija" AS pirkejas,
+         "perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
+         tiekejas,
+         "tiekejoKodas",
+         verte,
+         "faktineIvykdimoVerte" AS "faktineVerte",
+         "sudarymoData",
+         "galiojimoData",
+         "bvpzKodas",
+         "bvpzPavadinimas",
+         "dokumentuKiekis"
+     FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
+     WHERE "sutartiesUnikalusId" = $1
+       AND istrinta = false
+     LIMIT 1`,
+);
+
+/** Panašios sutartys, tik pagrindiniai laukai (MCP atsakymams). */
+export const panasiosSutartysTrumpai = preparedStatement(
+    "vpmPanasiosSutartysTrumpai",
+    `SELECT "sutartiesUnikalusId", pavadinimas, verte, "faktineIvykdimoVerte", "sudarymoData", tipas
+     FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
+     WHERE "sutartiesUnikalusId" != $1
+       AND "perkanciosiosOrganizacijosKodas" = $2
+       AND "tiekejoKodas" = $3
+       AND verte = $4
+       AND istrinta = false
+     ORDER BY "paskutinioRedagavimoData" DESC`,
+);

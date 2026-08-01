@@ -7,6 +7,25 @@
 // „Sutikti, kad būtų vykdomos neskelbiamos derybos"), tad kablelis jas skaldytų.
 import type { FacetOption } from './searchDokumentai.ts';
 import { postgres } from '@/postgres/postgres.js';
+import { createTtlPromiseCache } from '@/utils/ttlPromiseCache.js';
+
+// Vienas sąrašo puslapis paleidžia 5–9 lygiagrečias užklausas, o naršyklės
+// prefetch'as ar dvigubas užklausimas tą paketą pakartoja beveik tuo pačiu metu
+// (loge — 3–4 kartus per 1–2 s su identiškais parametrais). Kešas sulieja
+// vienu metu vykstančius vienodus krovimus į vieną.
+const filtruotoKesas = createTtlPromiseCache(5_000);
+// Nefiltruotas rodinys yra karštas kelias ir visiems vartotojams vienodas, o jo
+// agregatai brangiausi (GROUP BY per visą lentelę), tad jam TTL ilgesnis.
+const baziniKesas = createTtlPromiseCache(30_000);
+
+/**
+ * Sąrašo puslapio duomenų paketas su trumpu kešu. Raktas — pilnas URL su
+ * paieškos parametrais, tad skirtingi filtrai/puslapiai nesimaišo.
+ */
+export function cachePageData<T>(url: URL, load: () => Promise<T>): Promise<T> {
+  const kesas = url.search ? filtruotoKesas : baziniKesas;
+  return kesas(url.pathname + url.search, load);
+}
 
 /**
  * Visos parametro reikšmės iš URL. Numatytai — kartojami parametrai; `sep`

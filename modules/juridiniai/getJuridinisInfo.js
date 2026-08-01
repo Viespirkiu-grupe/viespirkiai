@@ -1,5 +1,6 @@
 import Timings from "../../utils/timings.js";
 import { postgres } from "../../postgres/postgres.js";
+import { createTtlPromiseCache } from "../../utils/ttlPromiseCache.js";
 import { specialJarCodes } from "./specialJarCodes.js";
 import {
     JAR_ADDRESS_JOINS,
@@ -29,7 +30,22 @@ import { getEsInvesticijosByJar } from "../2014esinvesticijos/getEsInvesticijosB
 import { mvpAprasaiPagalJarKoda } from "../mvpTvarkosAprasai/getByJar.js";
 import { getVdiPazeidimai } from "../vdi/getPazeidimai.js";
 
+// Vienas asmens puslapis paleidžia ~40 lygiagrečių užklausų, o naršyklės
+// prefetch'as ar dvigubas užklausimas tą paketą pakartoja beveik tuo pačiu metu.
+// Trumpas kešas sulieja vienu metu vykstančius vienodus krovimus į vieną
+// (pending įrašą dalinasi visi kviečiantieji), o 5 s TTL padengia ir prefetch →
+// navigacija atvejį. Grąžinamas objektas kviečiančiųjų nemodifikuojamas.
+const juridinioKesas = createTtlPromiseCache(5_000);
+
 export async function getJuridinisInfo(jarKodas, options = {}) {
+    // `timings` yra kiekvienos užklausos objektas – į kešo raktą neįeina.
+    const { timings: _timings, ...kesoOptions } = options;
+    return juridinioKesas(`${jarKodas}|${JSON.stringify(kesoOptions)}`, () =>
+        uzkrautiJuridinioInfo(jarKodas, options),
+    );
+}
+
+async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
     let timings = options.timings || new Timings();
 
     // Check special codes first — pure in-memory, no DB needed

@@ -58,6 +58,11 @@ export default {
     // pasikartojantys placeholder'iai sutraukiami iki vieno ($?).
     sqlLogFile: null,
 
+    // Dažniausios statiškos užklausos vykdomos kaip prepared statement'ai
+    // (planas paruošiamas kartą jungčiai). Išjungti reikia tik jungiantis per
+    // pgbouncer transaction pooling režimu be `max_prepared_statements`.
+    pgPrepared: true,
+
     // ─────────────────────────────────────────────────────────────────────
     // Typesense — paieškos pasiūlymai ir juridinių asmenų paieška
     // ─────────────────────────────────────────────────────────────────────

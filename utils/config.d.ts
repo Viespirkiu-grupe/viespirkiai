@@ -26,6 +26,8 @@ export interface Config {
     pgMaxConnections: number;
     /** Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą. */
     sqlLogFile?: string;
+    /** Ar naudoti prepared statement'us (išjungti prie pgbouncer transaction pooling). */
+    pgPrepared: boolean;
 
     typesenseUp: boolean;
     typesenseNodes: TypesenseNodeConfig[];

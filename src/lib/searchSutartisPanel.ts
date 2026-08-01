@@ -1,6 +1,6 @@
 import { postgres } from '@/postgres/postgres.js';
 import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
-import { VPM_SUTARTIS_ROW_SQL } from '@/modules/sutartys/vpmSutartisRow.js';
+import { sutartisPanelei } from '@/modules/sutartys/vpmSutartisRow.js';
 
 export interface SutartisPanel {
   id: string;
@@ -27,30 +27,7 @@ export async function findSutartisPanel(q: string): Promise<SutartisPanel | null
   if (!/^\d+$/.test(id)) return null;
 
   try {
-    const { rows } = await postgres.query(
-      `SELECT
-         "sutartiesUnikalusId"::text AS id,
-         pavadinimas,
-         tipas,
-         "sutartiesNumeris",
-         "pirkimoNumeris",
-         "perkanciojiOrganizacija" AS pirkejas,
-         "perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
-         tiekejas,
-         "tiekejoKodas",
-         verte,
-         "faktineIvykdimoVerte" AS "faktineVerte",
-         "sudarymoData",
-         "galiojimoData",
-         "bvpzKodas",
-         "bvpzPavadinimas",
-         "dokumentuKiekis"
-       FROM (${VPM_SUTARTIS_ROW_SQL}) sutartys
-       WHERE "sutartiesUnikalusId" = $1
-         AND istrinta = false
-       LIMIT 1`,
-      [id],
-    );
+    const { rows } = await postgres.query(sutartisPanelei([id]));
     if (rows.length !== 1) return null;
 
     const item = rows[0];

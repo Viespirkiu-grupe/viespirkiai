@@ -1,4 +1,8 @@
 import { postgres } from "../../postgres/postgres.js";
+import {
+    WINDOW_COUNT_SQL,
+    splitWindowCount,
+} from "../../utils/windowCount.js";
 
 export async function mvpAprasaiPagalJarKoda(jarKodas, options = {}) {
     let limit = options.limit || 10_000_000;
@@ -6,27 +10,21 @@ export async function mvpAprasaiPagalJarKoda(jarKodas, options = {}) {
         limit = 10_000_000;
     }
 
-    const [aprasaiRes, countRes] = await Promise.all([
-        postgres.query(
-            `SELECT a.*, s."jarKodas", s."pavadinimas" AS "subjektoPavadinimas"
-             FROM "mvpTvarkosAprasai" a
-             JOIN "mvpAprasaiSubjektai" s ON s."id" = a."sbjId"
-             WHERE s."jarKodas" = $1
-             ORDER BY a."paskelbimoData" DESC NULLS LAST
-             LIMIT $2`,
-            [jarKodas, limit],
-        ),
-        postgres.query(
-            `SELECT COUNT(*) FROM "mvpTvarkosAprasai" a
-             JOIN "mvpAprasaiSubjektai" s ON s."id" = a."sbjId"
-             WHERE s."jarKodas" = $1`,
-            [jarKodas],
-        ),
-    ]);
+    const aprasaiRes = await postgres.query(
+        `SELECT a.*, s."jarKodas", s."pavadinimas" AS "subjektoPavadinimas",
+                ${WINDOW_COUNT_SQL}
+         FROM "mvpTvarkosAprasai" a
+         JOIN "mvpAprasaiSubjektai" s ON s."id" = a."sbjId"
+         WHERE s."jarKodas" = $1
+         ORDER BY a."paskelbimoData" DESC NULLS LAST
+         LIMIT $2`,
+        [jarKodas, limit],
+    );
+    const { rows: aprasaiRows, viso } = splitWindowCount(aprasaiRes.rows);
 
     // Collect all saltinioIds to batch-fetch from failai
     const allSaltinioIds = new Set();
-    for (const row of aprasaiRes.rows) {
+    for (const row of aprasaiRows) {
         for (const href of row.rinkmenos || []) {
             if (!href) continue;
             const saltinioId = href
@@ -76,7 +74,7 @@ export async function mvpAprasaiPagalJarKoda(jarKodas, options = {}) {
         };
     };
 
-    const aprasai = aprasaiRes.rows.map((row) => ({
+    const aprasai = aprasaiRows.map((row) => ({
         id: row.id,
         sbjId: row.sbjId,
         subjektoPavadinimas: row.subjektoPavadinimas,
@@ -89,7 +87,7 @@ export async function mvpAprasaiPagalJarKoda(jarKodas, options = {}) {
 
     return {
         limit,
-        count: parseInt(countRes.rows[0].count),
+        count: viso,
         rows: aprasai,
     };
 }
