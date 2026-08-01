@@ -85,13 +85,15 @@
     top: 0;
     bottom: 0;
     border-radius: var(--radius-sm);
+    /* Bazinė spalva — kad nežinomas (ar naujai pridėtas) etapas nedingtų. */
+    background: var(--gray);
   }
 
   .timing-waterfall-tooltip .twt-bar[data-phase="search"] { background: var(--color-info); }
   .timing-waterfall-tooltip .twt-bar[data-phase="filter"] { background: var(--color-warning); }
+  .timing-waterfall-tooltip .twt-bar[data-phase="facets"] { background: var(--color-warning); }
   .timing-waterfall-tooltip .twt-bar[data-phase="pg"]     { background: var(--color-success); }
   .timing-waterfall-tooltip .twt-bar[data-phase="count"]  { background: var(--color-muted); }
-  .timing-waterfall-tooltip .twt-bar:not([data-phase])    { background: var(--gray); }
 
   .timing-waterfall-tooltip .twt-total {
     border-top: var(--border);
