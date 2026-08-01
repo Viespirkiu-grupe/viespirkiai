@@ -8,9 +8,16 @@
 import type { FacetOption } from './searchDokumentai.ts';
 import { postgres } from '@/postgres/postgres.js';
 
-/** Visos parametro reikšmės iš URL (kartojami parametrai). */
-export function parseMultiParam(url: URL, param: string): string[] {
-  return url.searchParams.getAll(param).map((value) => value.trim()).filter(Boolean);
+/**
+ * Visos parametro reikšmės iš URL. Numatytai — kartojami parametrai; `sep`
+ * nurodomas ten, kur formatas jau nusistovėjęs kitur (BVPŽ kodai — tarpais
+ * skiriamas vienas laukas, bendras su BvpzPrefixField, žr. /sutartys).
+ */
+export function parseMultiParam(url: URL, param: string, sep?: string): string[] {
+  const raw = sep
+    ? (url.searchParams.get(param) ?? '').split(sep)
+    : url.searchParams.getAll(param);
+  return raw.map((value) => value.trim()).filter(Boolean);
 }
 
 /**
@@ -48,17 +55,27 @@ export class SqlParams {
  * Reikšmės perjungimo nuoroda facetui: prideda/pašalina reikšmę parametro
  * sąraše, atstato puslapį. Tuščia reikšmė („Visi") išvalo visą parametrą.
  */
-export function makeFacetToggleUrl(url: URL, basePath: string) {
+export function makeFacetToggleUrl(
+  url: URL,
+  basePath: string,
+  /** Parametrai, kurių reikšmės gyvena viename lauke su skirtuku (pvz. BVPŽ). */
+  sepFor: (param: string) => string | undefined = () => undefined,
+) {
   return (param: string, value: string): string => {
     const params = new URLSearchParams(url.search);
-    const current = parseMultiParam(url, param);
+    const sep = sepFor(param);
+    const current = parseMultiParam(url, param, sep);
     let next: string[];
     if (value === '') next = [];
     else if (current.includes(value)) next = current.filter((v) => v !== value);
     else next = [...current, value];
 
     params.delete(param);
-    for (const item of next) params.append(param, item);
+    if (sep) {
+      if (next.length) params.set(param, next.join(sep));
+    } else {
+      for (const item of next) params.append(param, item);
+    }
     params.delete('page');
 
     const search = params.toString();
@@ -98,16 +115,23 @@ export function makeFacet(
 
 /** `SELECT value, count[, label]` eilutes paverčia FacetOption sąrašu. */
 export function toFacetOptions(
-  rows: { value: unknown; count: unknown; label?: unknown }[],
-): FacetOption[] {
+  rows: { value: unknown; count: unknown; label?: unknown; sub?: unknown }[],
+): PgFacetOption[] {
   return rows
     .filter((row) => row.value != null && String(row.value) !== '')
     .map((row) => ({
       value: String(row.value),
       count: Number(row.count),
       ...(row.label != null && String(row.label) !== '' ? { label: String(row.label) } : {}),
+      ...(row.sub != null && String(row.sub) !== '' ? { sub: String(row.sub) } : {}),
     }));
 }
+
+/**
+ * FacetOption su papildoma antros eilutės žyma dialoge (pvz. pirkėjo JAR kodas,
+ * kai pati facetų reikšmė yra pavadinimas). Juostoje `sub` nerodomas.
+ */
+export type PgFacetOption = FacetOption & { sub?: string };
 
 /**
  * Papildo kodinius facetus (JAR kodus) įstaigų pavadinimais iš `jar` lentelės —
@@ -127,6 +151,69 @@ export async function attachJarNames(options: FacetOption[]): Promise<FacetOptio
       ? option
       : { ...option, label: names.get(option.value)! },
   );
+}
+
+/**
+ * Sumų histogramos log-skalės kraštinės (€): ~5 žingsniai dekadai (1,2,3,5,7)
+ * nuo 10 iki 100 mln. Tos pačios kaip /sutartys, kad slankiklis visur elgtųsi
+ * vienodai. Paskutinis kaušas — „nuo 100 mln." (viskas virš).
+ */
+export const AMOUNT_EDGES: number[] = (() => {
+  const edges = [0];
+  for (let decade = 1; decade <= 8; decade++) {
+    for (const step of [1, 2, 3, 5, 7]) {
+      const value = step * 10 ** decade;
+      if (value <= 100_000_000) edges.push(value);
+    }
+  }
+  return edges;
+})();
+
+/**
+ * `width_bucket(kaina, AMOUNT_EDGES)` eilučių pavertimas histogramos kaušais.
+ * Domenas dinamiškas: nukerpam po ~1% masės iš abiejų galų (kad slankiklis
+ * „priartėtų" prie ten, kur duomenys), bet paliekam bent 10 stulpelių.
+ * Kraštinės rankenėlės reiškia „be ribos", tad išskirtys lieka pasiekiamos.
+ */
+export function buildAmountHistogram(rows: { idx: unknown; count: unknown }[]) {
+  const counts = new Map(rows.map((row) => [Number(row.idx), Number(row.count)]));
+  const all = AMOUNT_EDGES.map((from, i) => ({
+    from,
+    to: i + 1 < AMOUNT_EDGES.length ? AMOUNT_EDGES[i + 1] : null,
+    // width_bucket grąžina 1, kai reikšmė patenka į [edges[0], edges[1]).
+    count: counts.get(i + 1) ?? 0,
+  }));
+
+  const total = all.reduce((sum, bucket) => sum + bucket.count, 0);
+  const last = AMOUNT_EDGES[AMOUNT_EDGES.length - 1];
+  if (!total) return { buckets: [], domainMin: 0, domainMax: last };
+
+  let start = 0;
+  let end = all.length - 1;
+  let cumulative = 0;
+  for (let i = 0; i < all.length; i++) {
+    cumulative += all[i].count;
+    if (cumulative > total * 0.01) { start = i; break; }
+  }
+  cumulative = 0;
+  for (let i = 0; i < all.length; i++) {
+    cumulative += all[i].count;
+    if (cumulative >= total * 0.99) { end = i; break; }
+  }
+  if (end < start) end = start;
+
+  const MIN_BARS = 10;
+  while (end - start + 1 < MIN_BARS && (start > 0 || end < all.length - 1)) {
+    if (start > 0) start--;
+    if (end - start + 1 < MIN_BARS && end < all.length - 1) end++;
+  }
+
+  const buckets = all.slice(start, end + 1);
+  return {
+    buckets,
+    domainMin: buckets[0].from,
+    domainMax: buckets[buckets.length - 1].to ?? last,
+  };
 }
 
 const MONTH_TARGET_BARS = 36;
