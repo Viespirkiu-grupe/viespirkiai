@@ -62,22 +62,98 @@ taskrunneriui.
 | `PG_PASSWORD` | `""` | Slaptažodis. |
 | `PG_DATABASE` | `viespirkiai` | DB pavadinimas. |
 | `PG_MAX_CONNECTIONS` | `16` | Maks. vienalaikis pool dydis aplikacijos užklausoms. |
-| `SQL_LOG_FILE` | — | Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą. |
+| `SQL_LOG_FILE` | — | Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą (JSONL). |
+| `SQL_LOG_QUICKWIT` | `false` | Tie patys įrašai rašomi tiesiai į Quickwit indeksą `sqlLog`. Galima kartu su `SQL_LOG_FILE` arba vietoj jo. |
 | `PG_PREPARED` | `true` | Statiškas dažnas užklausas vykdyti kaip prepared statement'us. **Išjungti (`false`), jei `PG_PORT` rodo į pgbouncer transaction pooling režimu be `max_prepared_statements`.** |
 
 Profiliavimui: `SQL_LOG_FILE=/tmp/sql.log` įjungia visų per `postgres.query()` ir
 per `postgres.connect()` paimtus klientus einančių užklausų rašymą į failą.
-Eilutės formatas (stulpeliai atskirti TAB'u):
+Formatas – **JSONL** (po vieną JSON objektą eilutėje):
 
+```json
+{"ts":"2026-08-01T10:12:33.123Z","ms":4.2,"src":"pool","ok":true,"rows":7,
+ "md5":"5496896004b26c9c4a522203a8be3afd","pool":{"total":16,"idle":0,"waiting":3},
+ "queued":true,"sql":"SELECT * FROM sutartys WHERE id IN ($?)"}
 ```
-2026-08-01T10:12:33.123Z	4.2	OK	SELECT * FROM sutartys WHERE id IN ($?)
-```
+
+| Laukas | Reikšmė |
+| --- | --- |
+| `ms` | Trukmė. **`src: "pool"` atveju apima ir laukimą laisvos jungties**, `src: "client"` – tik vykdymą (jungtis jau paimta). |
+| `src` | `pool` (`postgres.query()`) arba `client` (`postgres.connect()` paimtas klientas). |
+| `ok` / `code` | Sėkmė; klaidos atveju – `code` (pvz. `42P01`) vietoj `rows`. |
+| `md5` | Normalizuotos užklausos hash'as – patogus `GROUP BY` raktas. Skaičiuojamas nuo pilno teksto, net kai `sql` nukerpamas ties 10 000 simbolių. |
+| `pool` | Pool'o būsena **užklausos padavimo** metu. |
+| `queued` | `true`, kai padavimo metu laisvų jungčių nebuvo ir pool jau pasiekęs `PG_MAX_CONNECTIONS` – tada į `ms` tikrai įskaičiuotas laukimas eilėje. |
 
 Parametrų **reikšmės nerašomos** (jos ir taip perduodamos atskirai), o
 pasikartojantys placeholder'iai bei inline literalų sąrašai sutraukiami iki
 vieno (`$1, $2, … $5000` → `$?`, `VALUES ($1),($2),($3)` → `VALUES ($?)`) – taip
 vienodos užklausos grupuojasi ir logas neišsipučia. `QueryStream` tipo užklausos
 neloginamos.
+
+Analizės pavyzdys – lėčiausios užklausų grupės:
+
+```bash
+jq -s 'group_by(.md5) | map({n: length, avg: (map(.ms) | add / length),
+       queued: (map(select(.queued)) | length), sql: .[0].sql})
+       | sort_by(-.avg) | .[:10]' /tmp/sql.log
+```
+
+#### `SQL_LOG_QUICKWIT` – logas tiesiai į Quickwit
+
+`SQL_LOG_QUICKWIT=true` rašo tuos pačius dokumentus į Quickwit — **po vieną
+indeksą dienai**: `sqlLog_2026-08-01` (data iš `ts`, UTC).
+
+**Postgres čia nedalyvauja**: jokių shard'ų, `quickwitLenteles`/`quickwitIndeksai`
+įrašų ar schemos versijų. Indekso schema —
+[`quickwit/sqlLogIndexConfig.js`](quickwit/sqlLogIndexConfig.js) (JS eilutė, o ne
+.yaml failas: runtime image'e yra tik `dist`, tad failo ten paprasčiausiai nebūtų);
+indeksą, jei tos dienos dar nėra, sukuria `quickwit/sqlLogIngest.js`.
+
+Paieška per visas dienas — indeksų šablonu `sqlLog_*`. Senienų valymas
+**rankinis**, retention politikos nėra: `pruneSqlLogIndexes({ keepDays: 30 })`
+ištrina senesnių dienų indeksus (`dryRun: true` parodo, ką liestų).
+
+Dienos indeksas sukuriamas vieną kartą su tuo metu galiojančia schema — pakeitus
+`sqlLogIndexConfig.js` nauji laukai atsiras tik kitos dienos indekse. Kol dienos
+turi skirtingas schemas, užklausa `sqlLog_*` dėl naujo lauko grąžins klaidą
+(`field does not exist`), o ne tuščią rezultatą; tokiu atveju arba ieškokite
+konkrečioje dienoje, arba atnaujinkite indeksą per `PUT /api/v1/indexes/<id>`.
+
+Dokumentai kaupiami buferyje ir siunčiami paketais (500 vnt. arba kas 1 s), tad
+logavimas neblokuoja užklausų. Jei Quickwit nepasiekiamas, paketas prarandamas ir
+klaida loginama ne dažniau kaip kartą per minutę — SQL užklausos dėl to nenukenčia.
+Staigiai nutraukus procesą galima prarasti iki ~1 s buferio.
+
+Be `ts`, `ms`, `md5`, `sql`, `src`, `ok`/`code`, `rows`, `pool` ir `queued`,
+kiekvienas įrašas turi: `op` (`select` | `insert` | `update` | `delete` |
+`schema` | `tx` | `other`), `env` (`dev`/`prod`), `role` (`server` |
+`taskRunner` | `worker` | `cli`, perrašoma `APP_ROLE`), o HTTP kelyje – dar
+`host` (pvz. `beta.viespirkiai.org`, už proxy imamas `x-forwarded-host`) ir
+`path`. Fone ar taskRunner'yje `host`/`path` nėra.
+
+Pavyzdžiai (`POST /api/v1/sqlLog_*/search`):
+
+```bash
+# Lėčiausios užklausų grupės (pagal normalizuotos užklausos md5)
+curl -s 'localhost:7280/api/v1/sqlLog_*/search' -H 'Content-Type: application/json' -d '{
+  "query": "*", "max_hits": 0,
+  "aggs": {"grupes": {"terms": {"field": "md5", "size": 10},
+           "aggs": {"vid_ms": {"avg": {"field": "ms"}}, "max_ms": {"max": {"field": "ms"}}}}}}'
+
+# Rašymai gyvoje aplinkoje / vieno puslapio užklausos
+curl -s 'localhost:7280/api/v1/sqlLog_*/search?query=env:prod+AND+NOT+op:select'
+curl -s 'localhost:7280/api/v1/sqlLog_*/search?query=host:"beta.viespirkiai.org"+AND+path:"/asmuo/300055900"'
+
+# Užklausos, kurios laukė eilėje prie laisvos jungties
+curl -s 'localhost:7280/api/v1/sqlLog_*/search' -H 'Content-Type: application/json' \
+  -d '{"query": "queued:true AND ms:>1000", "max_hits": 20, "sort_by": "-ms"}'
+
+# Klaidos ir frazių paieška užklausos tekste
+curl -s 'localhost:7280/api/v1/sqlLog_*/search?query=ok:false'
+curl -s 'localhost:7280/api/v1/sqlLog_*/search' -H 'Content-Type: application/json' \
+  -d '{"query": "sql:\"FROM public.jar\"", "max_hits": 10}'
+```
 
 ### MCP `execute_query` + analitiko rolė
 

@@ -26,6 +26,8 @@ export interface Config {
     pgMaxConnections: number;
     /** Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą. */
     sqlLogFile?: string;
+    /** Tie patys SQL logo įrašai rašomi tiesiai į Quickwit indeksą `sqlLog`. */
+    sqlLogQuickwit: boolean;
     /** Ar naudoti prepared statement'us (išjungti prie pgbouncer transaction pooling). */
     pgPrepared: boolean;
 

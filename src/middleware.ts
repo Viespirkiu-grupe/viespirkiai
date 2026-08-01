@@ -1,6 +1,7 @@
 import { defineMiddleware } from 'astro:middleware';
 import config from './lib/config.ts';
 import { isAtn1Path } from './lib/featureRoutes.ts';
+import { hostFromHeaders, runWithRequestContext } from '@/utils/runtimeContext.js';
 
 /**
  * Onion-Location antraštė.
@@ -15,7 +16,16 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return new Response(null, { status: 404 });
   }
 
-  const response = await next();
+  // Užklausos kontekstas (hostas, kelias) – kad SQL logo įrašus būtų galima
+  // priskirti konkrečiam domenui ir puslapiui. Apgaubiam visą `next()`, nes
+  // puslapių DB užklausos vykdomos būtent jo viduje.
+  const response = await runWithRequestContext(
+    {
+      host: hostFromHeaders(context.request.headers, context.url),
+      path: context.url.pathname,
+    },
+    () => next(),
+  );
 
   if (config.onionAddress) {
     const safeUrl = config.onionAddress + encodeURI(context.url.pathname + context.url.search);

@@ -32,6 +32,7 @@ const configSchema = z.object({
     pgDatabase: z.string().default("viespirkiai"),
     pgMaxConnections: z.number().int().positive().default(16),
     sqlLogFile: z.string().optional(),
+    sqlLogQuickwit: z.boolean().default(false),
     pgPrepared: z.boolean().default(true),
 
     typesenseUp: z.boolean().default(false),

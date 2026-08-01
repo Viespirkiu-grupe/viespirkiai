@@ -1,5 +1,15 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import config from "../utils/config.js";
+import {
+    enqueueSqlLog,
+    sqlLogQuickwitEnabled,
+} from "../quickwit/sqlLogIngest.js";
+import {
+    APP_ENV,
+    APP_ROLE,
+    getRequestContext,
+} from "../utils/runtimeContext.js";
 import pkg from "pg";
 const { Pool, types } = pkg;
 
@@ -29,9 +39,11 @@ export const postgres = new Pool({
 //
 // Atskirai: SQL_LOG_FILE (config.sqlLogFile) – kai nurodytas, VISOS užklausos
 // (ir pool.query(), ir postgres.connect() paimtų klientų) append'inamos į tą
-// failą su trukme. Be jokių parametrų reikšmių, o pasikartojantys placeholder'iai
-// suvedami į vieną (žr. normalizeSql), kad `IN ($1..$5000)` netaptų megabaitine
-// eilute ir kad tokias pačias užklausas būtų galima grupuoti.
+// failą JSONL formatu (po vieną JSON objektą eilutėje) su trukme, normalizuotos
+// užklausos md5 ir pool'o būsena. Be jokių parametrų reikšmių, o pasikartojantys
+// placeholder'iai suvedami į vieną (žr. normalizeSql), kad `IN ($1..$5000)`
+// netaptų megabaitine eilute ir kad tokias pačias užklausas būtų galima grupuoti
+// (`md5` yra tos pačios normalizuotos formos hash'as – patogus GROUP BY raktas).
 //
 // Callback ir Submittable (pvz. QueryStream) formos praleidžiamos nepaliestos.
 const PG_LOG_QUERIES = config.pgLogQueries === true;
@@ -44,15 +56,49 @@ const pgLogFileStream =
 const sqlLogFileStream = config.sqlLogFile
     ? fs.createWriteStream(config.sqlLogFile, { flags: "a" })
     : null;
+// SQL_LOG_QUICKWIT – tie patys dokumentai rašomi tiesiai į Quickwit indeksą
+// `sqlLog` (be Postgres, be shard'ų, be versijų; senienas valo retention).
+const SQL_LOG_ENABLED = Boolean(sqlLogFileStream) || sqlLogQuickwitEnabled;
 
 /** Maks. į SQL_LOG_FILE rašomos (jau normalizuotos) užklausos ilgis. */
 const SQL_LOG_MAX_LEN = 10_000;
+/** Normalizavimo + md5 kešas; ta pati užklausa kartojasi tūkstančius kartų. */
+const SQL_META_CACHE_MAX = 5_000;
+const sqlMetaCache = new Map();
+
+/**
+ * Normalizuota užklausa ir jos md5. Hash'as skaičiuojamas nuo PILNOS
+ * normalizuotos formos – ir tada, kai į logą rašomas tekstas nukerpamas ties
+ * SQL_LOG_MAX_LEN, tad ilgos užklausos vis tiek grupuojasi teisingai.
+ * @param {string} rawSql
+ */
+function sqlMeta(rawSql) {
+    const cached = sqlMetaCache.get(rawSql);
+    if (cached) return cached;
+
+    const normalized = normalizeSql(rawSql);
+    const meta = {
+        sql:
+            normalized.length > SQL_LOG_MAX_LEN
+                ? normalized.slice(0, SQL_LOG_MAX_LEN) + "…"
+                : normalized,
+        md5: crypto.createHash("md5").update(normalized).digest("hex"),
+        op: sqlOperation(normalized),
+    };
+
+    // Paprastas apsauginis limitas – be LRU, tiesiog išvalom prisipildžius.
+    if (sqlMetaCache.size >= SQL_META_CACHE_MAX) sqlMetaCache.clear();
+    sqlMetaCache.set(rawSql, meta);
+    return meta;
+}
 
 /**
  * Apgaubia query funkciją logavimu, išsaugant originalią semantiką.
  * @param {Function} originalQuery - jau .bind()'inta query funkcija.
+ * @param {"pool" | "client"} source - `pool` trukmė apima ir laukimą eilėje
+ *   prie laisvos jungties, `client` – tik vykdymą (jungtis jau paimta).
  */
-function withQueryLogging(originalQuery) {
+function withQueryLogging(originalQuery, source) {
     return function (textOrConfig, values, callback) {
         // Callback forma arba Submittable (turi .submit, pvz. QueryStream) – nepaliesta.
         if (
@@ -67,36 +113,43 @@ function withQueryLogging(originalQuery) {
             typeof textOrConfig === "string"
                 ? textOrConfig
                 : (textOrConfig?.text ?? "");
+        // Pool'o būsena PADAVIMO momentu – iš jos matyti, ar užklausa turėjo
+        // laukti laisvos jungties (žr. `queued` logo lauke).
+        const pool = {
+            total: postgres.totalCount,
+            idle: postgres.idleCount,
+            waiting: postgres.waitingCount,
+        };
         const start = performance.now();
 
         return originalQuery(textOrConfig, values).then(
             (res) => {
-                logPgQuery(sql, start, res, null);
+                logPgQuery(sql, start, res, null, source, pool);
                 return res;
             },
             (err) => {
-                logPgQuery(sql, start, null, err);
+                logPgQuery(sql, start, null, err, source, pool);
                 throw err;
             },
         );
     };
 }
 
-if (PG_LOG_QUERIES || sqlLogFileStream) {
-    postgres.query = withQueryLogging(postgres.query.bind(postgres));
+if (PG_LOG_QUERIES || SQL_LOG_ENABLED) {
+    postgres.query = withQueryLogging(postgres.query.bind(postgres), "pool");
 }
 
 // Pool'o klientai (tranzakcijos, batch'ai) – apgaubiam tik SQL_LOG_FILE režimu,
 // kad "visos užklausos" reikštų tikrai visas. Klientai pool'e naudojami
 // pakartotinai, todėl žymim, kad neapgaubtume to paties kliento du kartus.
-if (sqlLogFileStream) {
+if (SQL_LOG_ENABLED) {
     const WRAPPED = Symbol.for("viespirkiai.sqlLogWrapped");
     const originalConnect = postgres.connect.bind(postgres);
 
     const wrapClient = (client) => {
         if (!client || client[WRAPPED]) return client;
         client[WRAPPED] = true;
-        client.query = withQueryLogging(client.query.bind(client));
+        client.query = withQueryLogging(client.query.bind(client), "client");
         return client;
     };
 
@@ -111,13 +164,163 @@ if (sqlLogFileStream) {
 }
 
 /**
- * Suveda užklausą į vieną eilutę be parametrų reikšmių ir sutraukia
+ * Pašalina SQL komentarus (`-- iki eilutės galo` ir `/* … *\/`), neliesdamas jų
+ * eilučių literaluose, cituotuose identifikatoriuose ar `$$`-blokuose.
+ *
+ * Reikalinga dviem dalykams: (1) suplokštinus eilutes `--` komentaras kitaip
+ * „suvalgytų" likusią užklausą, (2) be komentarų vienodos užklausos gražiau
+ * grupuojasi ir logas nesipučia.
+ *
+ * @param {string} sql
+ */
+export function stripSqlComments(sql) {
+    const text = String(sql ?? "");
+    let out = "";
+    let i = 0;
+
+    while (i < text.length) {
+        const ch = text[i];
+
+        // '…' literalas ('' – pakartotas apostrofas viduje)
+        if (ch === "'") {
+            const start = i++;
+            while (i < text.length) {
+                if (text[i] === "'") {
+                    if (text[i + 1] === "'") i += 2;
+                    else {
+                        i++;
+                        break;
+                    }
+                } else i++;
+            }
+            out += text.slice(start, i);
+            continue;
+        }
+
+        // "…" identifikatorius
+        if (ch === '"') {
+            const start = i++;
+            while (i < text.length) {
+                if (text[i] === '"') {
+                    if (text[i + 1] === '"') i += 2;
+                    else {
+                        i++;
+                        break;
+                    }
+                } else i++;
+            }
+            out += text.slice(start, i);
+            continue;
+        }
+
+        // $$ … $$ arba $tag$ … $tag$ (plpgsql funkcijų kūnai)
+        if (ch === "$") {
+            const tag = /^\$[A-Za-z_]*\$/.exec(text.slice(i));
+            if (tag) {
+                const end = text.indexOf(tag[0], i + tag[0].length);
+                const stop = end === -1 ? text.length : end + tag[0].length;
+                out += text.slice(i, stop);
+                i = stop;
+                continue;
+            }
+        }
+
+        // -- iki eilutės galo
+        if (ch === "-" && text[i + 1] === "-") {
+            const nl = text.indexOf("\n", i);
+            i = nl === -1 ? text.length : nl;
+            out += " ";
+            continue;
+        }
+
+        // /* … */ (Postgres leidžia įdėtinius)
+        if (ch === "/" && text[i + 1] === "*") {
+            let depth = 1;
+            i += 2;
+            while (i < text.length && depth > 0) {
+                if (text[i] === "/" && text[i + 1] === "*") {
+                    depth++;
+                    i += 2;
+                } else if (text[i] === "*" && text[i + 1] === "/") {
+                    depth--;
+                    i += 2;
+                } else i++;
+            }
+            out += " ";
+            continue;
+        }
+
+        out += ch;
+        i++;
+    }
+
+    return out;
+}
+
+/**
+ * Užklausos tipas iš pirmo reikšminio žodžio: `select` | `insert` | `update` |
+ * `delete` | `schema` (DDL) | `tx` (BEGIN/COMMIT/…) | `other`.
+ *
+ * `WITH …` atveju žiūrima, ar CTE viduje/gale yra rašymo veiksmas – toks
+ * sakinys klasifikuojamas kaip rašymas, ne kaip `select`.
+ *
+ * @param {string} normalizedSql - jau be komentarų, viena eilute.
+ */
+export function sqlOperation(normalizedSql) {
+    const sql = normalizedSql.replace(/^[\s(]+/, "").toUpperCase();
+
+    if (sql.startsWith("WITH ")) {
+        if (/\bINSERT\s+INTO\b/.test(sql)) return "insert";
+        if (/\bUPDATE\s+\S+\s+SET\b/.test(sql)) return "update";
+        if (/\bDELETE\s+FROM\b/.test(sql)) return "delete";
+        return "select";
+    }
+
+    const [word] = sql.split(/[^A-Z]/, 1);
+    switch (word) {
+        case "SELECT":
+        case "TABLE":
+        case "VALUES":
+            return "select";
+        case "INSERT":
+            return "insert";
+        case "UPDATE":
+            return "update";
+        case "DELETE":
+            return "delete";
+        case "CREATE":
+        case "ALTER":
+        case "DROP":
+        case "TRUNCATE":
+        case "COMMENT":
+        case "REINDEX":
+        case "REFRESH":
+        case "GRANT":
+        case "REVOKE":
+        case "VACUUM":
+        case "ANALYZE":
+            return "schema";
+        case "BEGIN":
+        case "START":
+        case "COMMIT":
+        case "ROLLBACK":
+        case "SAVEPOINT":
+        case "RELEASE":
+        case "END":
+            return "tx";
+        default:
+            return "other";
+    }
+}
+
+/**
+ * Suveda užklausą į vieną eilutę be komentarų ir parametrų reikšmių, sutraukia
  * pasikartojančius placeholder'ius / literalų sąrašus iki vieno.
  * `IN ($1, $2, ... $999)` → `IN ($?)`, `VALUES ($1),($2),($3)` → `VALUES ($?)`.
  * @param {string} sql
  */
 export function normalizeSql(sql) {
-    return String(sql ?? "")
+    return stripSqlComments(sql)
         .replace(/\s+/g, " ")
         // Visi numeruoti placeholder'iai – į vieną bevardį.
         .replace(/\$\d+/g, "$?")
@@ -143,21 +346,50 @@ function pgPad2(n) {
  * @param {number} start - performance.now() reikšmė prieš užklausą.
  * @param {import("pg").QueryResult | null} res
  * @param {Error | null} err
+ * @param {"pool" | "client"} [source]
+ * @param {{ total: number, idle: number, waiting: number }} [pool] - būsena padavimo metu.
  */
-function logPgQuery(sql, start, res, err) {
+function logPgQuery(sql, start, res, err, source, pool) {
     const ms = performance.now() - start;
     const now = new Date();
 
-    if (sqlLogFileStream) {
-        // Tab'ais atskirti stulpeliai: laikas, trukmė (ms), rezultatas, SQL.
-        let normalized = normalizeSql(sql);
-        if (normalized.length > SQL_LOG_MAX_LEN) {
-            normalized = normalized.slice(0, SQL_LOG_MAX_LEN) + "…";
-        }
-        const status = err ? `ERROR ${err.code ?? ""}`.trim() : "OK";
-        sqlLogFileStream.write(
-            `${now.toISOString()}\t${ms.toFixed(1)}\t${status}\t${normalized}\n`,
-        );
+    if (SQL_LOG_ENABLED) {
+        const meta = sqlMeta(sql);
+        // Vienas dokumentas abiem gavėjams: failui (JSONL, po objektą eilutėje)
+        // ir Quickwit'ui. `ms` reikšmė priklauso nuo `src`:
+        //   pool   – laukimas eilėje prie jungties + vykdymas,
+        //   client – tik vykdymas (jungtis jau buvo paimta).
+        // `queued` = true reiškia, kad padavimo metu laisvų jungčių nebuvo, t. y.
+        // į `ms` tikrai įskaičiuotas laukimas.
+        // Aplinka ir vaidmuo – pastovūs procesui; hostas ir kelias yra tik
+        // aptarnaujant HTTP užklausą (taskRunner'yje/CLI jų nėra).
+        const request = getRequestContext();
+        const doc = {
+            ts: now.toISOString(),
+            ms: Number(ms.toFixed(1)),
+            op: meta.op,
+            env: APP_ENV,
+            role: APP_ROLE,
+            ...(request?.host ? { host: request.host } : {}),
+            ...(request?.path ? { path: request.path } : {}),
+            src: source ?? "pool",
+            ok: !err,
+            ...(err ? { code: err.code ?? null } : { rows: res?.rowCount ?? 0 }),
+            md5: meta.md5,
+            ...(pool
+                ? {
+                      pool,
+                      queued:
+                          source !== "client" &&
+                          pool.idle === 0 &&
+                          pool.total >= (config.pgMaxConnections ?? 0),
+                  }
+                : {}),
+            sql: meta.sql,
+        };
+
+        if (sqlLogFileStream) sqlLogFileStream.write(JSON.stringify(doc) + "\n");
+        if (sqlLogQuickwitEnabled) enqueueSqlLog(doc);
     }
 
     if (!PG_LOG_QUERIES) return;
