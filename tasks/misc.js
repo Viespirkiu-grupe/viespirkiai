@@ -17,6 +17,7 @@ import { nuskaitytiMvpTvarkosAprasuSubjektus } from "../modules/mvpTvarkosAprasa
 import { scrapeMvmUntilNow } from "../modules/mvpTvarkosAprasai/scrapeContent.js";
 import { updateVdiPazeidimai } from "../modules/vdi/scrapePazeidimai.js";
 import { atnaujintiRegitrosDuomenis } from "../modules/regitra/atnaujintiRegitra.js";
+import { atnaujintiSodrosDuomenis } from "../modules/sodra/atnaujintiSodra.js";
 import { processSuggestionQueue } from "../modules/searchSuggestion/processSuggestionQueue.js";
 import { deleteDeadIndexes } from "../quickwit/deleteDeadIndexes.js";
 import { processDomenaiAdpQueue } from "../modules/domenai/processAdpQueue.js";
@@ -149,6 +150,15 @@ export default [
         name: "atnaujintiRegitrosDuomenis",
         schedule: "40 2 * * *",
         job: atnaujintiRegitrosDuomenis,
+    },
+    {
+        // Sodra einamųjų metų failą papildo nauju mėnesiu maždaug kartą per mėnesį,
+        // bet tikslus laikas nežinomas, todėl tikriname kas naktį. Patikra yra pigus
+        // HEAD — siunčiama tik pasikeitus Last-Modified / dydžiui. Sausį–kovą kartu
+        // tikrinami ir praėjusių metų duomenys (gruodis prirašomas jau po Naujųjų).
+        name: "atnaujintiSodrosDuomenis",
+        schedule: "10 3 * * *",
+        job: atnaujintiSodrosDuomenis,
     },
     {
         name: "deleteDeadQuickwitIndexes",

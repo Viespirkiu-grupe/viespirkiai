@@ -24,7 +24,7 @@ import { fileURLToPath } from "node:url";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import { parseArgs } from "../../utils/cliArgs.js";
-import { isarchyvuotiPirmaIrasa } from "./isarchyvuotiZip.js";
+import { isarchyvuotiPirmaIrasa } from "../../utils/isarchyvuotiZip.js";
 import { importuotiCsvIStaginga } from "./importRegitra.js";
 
 const ZIP_URL =

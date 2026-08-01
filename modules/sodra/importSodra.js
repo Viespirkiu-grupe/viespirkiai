@@ -1,6 +1,11 @@
 /*
-Importuoja SODROS duomenis iš CSV failo į Postgress.
+Importuoja SODROS duomenis iš CSV failo į Postgres.
 https://atvira.sodra.lt/imones/rinkiniai/index.html
+
+Rankinis paleidimas:
+    node modules/sodra/importSodra.js <file.csv> [--dry-run]
+
+Automatinį parsiuntimą ir importą suka modules/sodra/atnaujintiSodra.js.
 */
 import fs from "fs";
 import path from "path";
@@ -9,55 +14,61 @@ import readline from "readline";
 import { log } from "../../utils/log.js";
 import { upsertSodraMonthly } from "./upsertSodraMonthly.js";
 
-const filename = process.argv[2];
-const DRY_RUN = process.argv.includes("--dry-run");
-
-if (!filename) {
-    console.error("Usage: node importSodra.js <file.csv> [--dry-run]");
-    process.exit(1);
-}
-
-if (DRY_RUN) log("🔍 DRY RUN — no data will be written");
-
-const rl = readline.createInterface({
-    input: fs.createReadStream(filename),
-    crlfDelay: Infinity,
-});
-
-let isFirstLine = true;
 const BATCH_SIZE = 1_000;
-let batch = [];
-let eilute = 0;
-let skipped = 0;
 
-for await (const line of rl) {
-    if (isFirstLine) {
-        isFirstLine = false;
-        continue;
-    }
+/**
+ * Perskaito Sodros mėnesinį CSV ir sukelia jį į `sodraMonthly` lenteles.
+ *
+ * Failas skaitomas eilutė po eilutės ir keliamas 1000 eilučių paketais — metinis
+ * CSV yra ~95 MB, tad į atmintį jo netraukiam.
+ *
+ * @param {string} kelias - Kelias iki CSV failo.
+ * @param {object} [options]
+ * @param {boolean} [options.dryRun=false] - Tik parsinti, į DB nerašyti.
+ * @param {string} [options.importFile] - Vardas, kuriuo importas registruojamas
+ *   `sodraMonthlyImportai` lentelėje (numatytai — failo vardas).
+ * @returns {Promise<{eiluciuSkaicius: number, praleista: number, irasyta: number, naujausiasMenuo: string|null}>}
+ */
+export async function importuotiSodrosCsv(
+    kelias,
+    { dryRun = false, importFile } = {},
+) {
+    const importoVardas = importFile ?? path.basename(kelias);
 
-    eilute++;
+    const rl = readline.createInterface({
+        input: fs.createReadStream(kelias),
+        crlfDelay: Infinity,
+    });
 
-    const fields = parseCSVLine(line);
-    let code,
-        jarCode,
-        name,
-        municipality,
-        ecoActCode,
-        ecoActCodeStr,
-        ecoActName,
-        month,
-        avgWage,
-        numInsured,
-        avgWage2,
-        numInsured2,
-        tax;
+    let isFirstLine = true;
+    let batch = [];
+    let eilute = 0;
+    let skipped = 0;
+    let irasyta = 0;
+    let naujausiasMenuo = null;
 
-    // Detect format by column count
-    if (fields.length >= 13) {
-        // New format: has ecoActCodeStr at position 5
-        [
-            code,
+    const insertBatch = async (rows) => {
+        if (!rows.length) return;
+        try {
+            irasyta += await upsertSodraMonthly(rows, importoVardas);
+            log(`Inserted ${rows.length} rows (total: ${eilute - skipped})`);
+        } catch (err) {
+            console.error("Insert failed:", err.message);
+            console.error("First row of failed batch:", rows[0]);
+            throw err;
+        }
+    };
+
+    for await (const line of rl) {
+        if (isFirstLine) {
+            isFirstLine = false;
+            continue;
+        }
+
+        eilute++;
+
+        const fields = parseCSVLine(line);
+        let code,
             jarCode,
             name,
             municipality,
@@ -69,86 +80,115 @@ for await (const line of rl) {
             numInsured,
             avgWage2,
             numInsured2,
-            tax,
-        ] = fields.map(clean);
-    } else if (fields.length >= 12) {
-        // Old format: no ecoActCodeStr
-        [
-            code,
-            jarCode,
-            name,
-            municipality,
-            ecoActCode,
-            ecoActName,
-            month,
-            avgWage,
-            numInsured,
-            avgWage2,
-            numInsured2,
-            tax,
-        ] = fields.map(clean);
-        ecoActCodeStr = null;
-    } else {
-        console.warn(
-            `[Line ${eilute}] Skipping malformed line (${fields.length} fields): ${line}`,
-        );
-        skipped++;
-        continue;
+            tax;
+
+        // Detect format by column count
+        if (fields.length >= 13) {
+            // New format: has ecoActCodeStr at position 5
+            [
+                code,
+                jarCode,
+                name,
+                municipality,
+                ecoActCode,
+                ecoActCodeStr,
+                ecoActName,
+                month,
+                avgWage,
+                numInsured,
+                avgWage2,
+                numInsured2,
+                tax,
+            ] = fields.map(clean);
+        } else if (fields.length >= 12) {
+            // Old format: no ecoActCodeStr
+            [
+                code,
+                jarCode,
+                name,
+                municipality,
+                ecoActCode,
+                ecoActName,
+                month,
+                avgWage,
+                numInsured,
+                avgWage2,
+                numInsured2,
+                tax,
+            ] = fields.map(clean);
+            ecoActCodeStr = null;
+        } else {
+            console.warn(
+                `[Line ${eilute}] Skipping malformed line (${fields.length} fields): ${line}`,
+            );
+            skipped++;
+            continue;
+        }
+
+        const parsedMonth = parseMonth(month);
+        if (!parsedMonth) {
+            console.warn(
+                `[Line ${eilute}] Unrecognized month format: "${month}" — skipping`,
+            );
+            skipped++;
+            continue;
+        }
+
+        const parsedCode = toInt(code);
+        if (parsedCode === null) {
+            console.warn(`[Line ${eilute}] Missing draudėjo code — skipping`);
+            skipped++;
+            continue;
+        }
+
+        if (naujausiasMenuo === null || parsedMonth > naujausiasMenuo) {
+            naujausiasMenuo = parsedMonth;
+        }
+
+        const row = {
+            kodas: parsedCode,
+            jarKodas: jarCode,
+            pavadinimas: name,
+            savivaldybe: municipality,
+            ekonominesVeiklosKodas: ecoActCode,
+            ekonominesVeiklosKodasEvrk: ecoActCodeStr, // ← new field, make sure column exists in DB
+            ekonominesVeiklosPavadinimas: ecoActName,
+            data: parsedMonth,
+            vidutinisAtlyginimas: toFloat(avgWage),
+            draustieji: toInt(numInsured) ?? 0,
+            vidutinisAtlyginimas2: toFloat(avgWage2),
+            draustieji2: toInt(numInsured2) ?? 0,
+            imokuSuma: toFloat(tax),
+        };
+
+        if (dryRun) {
+            log(`[Line ${eilute}] ${JSON.stringify(row, null, 2)}`);
+            continue;
+        }
+
+        batch.push(row);
+
+        if (batch.length === BATCH_SIZE) {
+            await insertBatch(batch);
+            batch = [];
+        }
     }
 
-    const parsedMonth = parseMonth(month);
-    if (!parsedMonth) {
-        console.warn(
-            `[Line ${eilute}] Unrecognized month format: "${month}" — skipping`,
-        );
-        skipped++;
-        continue;
-    }
-
-    const parsedCode = toInt(code);
-    if (parsedCode === null) {
-        console.warn(`[Line ${eilute}] Missing draudėjo code — skipping`);
-        skipped++;
-        continue;
-    }
-
-    const row = {
-        kodas: parsedCode,
-        jarKodas: jarCode,
-        pavadinimas: name,
-        savivaldybe: municipality,
-        ekonominesVeiklosKodas: ecoActCode,
-        ekonominesVeiklosKodasEvrk: ecoActCodeStr, // ← new field, make sure column exists in DB
-        ekonominesVeiklosPavadinimas: ecoActName,
-        data: parsedMonth,
-        vidutinisAtlyginimas: toFloat(avgWage),
-        draustieji: toInt(numInsured) ?? 0,
-        vidutinisAtlyginimas2: toFloat(avgWage2),
-        draustieji2: toInt(numInsured2) ?? 0,
-        imokuSuma: toFloat(tax),
-    };
-
-    if (DRY_RUN) {
-        log(`[Line ${eilute}] ${JSON.stringify(row, null, 2)}`);
-        continue;
-    }
-
-    batch.push(row);
-
-    if (batch.length === BATCH_SIZE) {
+    if (!dryRun && batch.length > 0) {
         await insertBatch(batch);
-        batch = [];
     }
-}
 
-if (!DRY_RUN && batch.length > 0) {
-    await insertBatch(batch);
-}
+    log(
+        `Done ${importoVardas}. Processed: ${eilute}, skipped: ${skipped}, written: ${irasyta}`,
+    );
 
-log(
-    `Done. Processed: ${eilute}, skipped: ${skipped}, inserted: ${eilute - skipped}`,
-);
-if (!DRY_RUN) await postgres.end();
+    return {
+        eiluciuSkaicius: eilute,
+        praleista: skipped,
+        irasyta,
+        naujausiasMenuo,
+    };
+}
 
 /* ----------------------- Helpers ----------------------- */
 
@@ -216,15 +256,27 @@ function parseCSVLine(line) {
     return result;
 }
 
-async function insertBatch(rows) {
-    if (!rows.length) return;
+// CLI
+if (
+    import.meta.url === process.argv[1] ||
+    import.meta.url === `file://${process.argv[1]}`
+) {
+    const filename = process.argv[2];
+    const dryRun = process.argv.includes("--dry-run");
+
+    if (!filename) {
+        console.error("Usage: node importSodra.js <file.csv> [--dry-run]");
+        process.exit(1);
+    }
+
+    if (dryRun) log("🔍 DRY RUN — no data will be written");
 
     try {
-        await upsertSodraMonthly(rows, path.basename(filename));
-        log(`Inserted ${rows.length} rows (total: ${eilute - skipped})`);
+        await importuotiSodrosCsv(filename, { dryRun });
     } catch (err) {
-        console.error("Insert failed:", err.message);
-        console.error("First row of failed batch:", rows[0]);
-        throw err;
+        console.error("Klaida importuojant Sodros duomenis:", err);
+        process.exitCode = 1;
+    } finally {
+        await postgres.end();
     }
 }
