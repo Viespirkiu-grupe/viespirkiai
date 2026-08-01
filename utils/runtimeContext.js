@@ -36,13 +36,13 @@ function nustatytiVaidmeni() {
 
 export const APP_ROLE = nustatytiVaidmeni();
 
-/** @typedef {{ host?: string | null, path?: string | null }} RequestContext */
+/** @typedef {{ host?: string | null }} RequestContext */
 
 const storage = new AsyncLocalStorage();
 
 /**
- * Paleidžia `fn` su užklausos kontekstu (hostas, kelias). Viskas, kas vyksta
- * viduje – įskaitant DB užklausas – tą kontekstą mato.
+ * Paleidžia `fn` su užklausos kontekstu (hostas). Viskas, kas vyksta viduje –
+ * įskaitant DB užklausas – tą kontekstą mato.
  *
  * @template T
  * @param {RequestContext} context

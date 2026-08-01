@@ -1,0 +1,181 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
+import Badge from '@design-system/components/Badge.astro';
+import Alert from '@design-system/components/Alert.astro';
+import Field from '@design-system/components/inputs/Field.astro';
+import config from '../../../lib/config.ts';
+import { getColorScheme, getFont } from '../../../lib/failai.ts';
+import {
+  LAIKOTARPIAI,
+  OP_VARIANTAI,
+  arYraTekstuLentele,
+  brangiausiosUzklausos,
+  formatuotiMs,
+  parseLaikotarpis,
+  trumpinti,
+  type UzklausosEilute,
+} from '../../../lib/sqlLogStatistika.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const query = Object.fromEntries(Astro.url.searchParams) as Record<string, string>;
+const laikotarpis = parseLaikotarpis(query.laikotarpis);
+const RODOMA = 100;
+
+let eilutes: UzklausosEilute[] = [];
+let visoUzklausu = 0;
+let visoMs = 0;
+let formuIsViso = 0;
+let klaida: string | null = null;
+let yraTekstuLentele = true;
+
+try {
+  const rezultatas = await brangiausiosUzklausos(laikotarpis, RODOMA);
+  eilutes = rezultatas.eilutes;
+  visoUzklausu = rezultatas.visoUzklausu;
+  visoMs = rezultatas.visoMs;
+  formuIsViso = rezultatas.formuIsViso;
+  yraTekstuLentele = await arYraTekstuLentele();
+} catch (error: any) {
+  klaida = error?.message ?? String(error);
+}
+
+const sk = (n: number) => Number(n || 0).toLocaleString('lt-LT');
+const dalis = (v: number) => (visoMs > 0 ? `${((v / visoMs) * 100).toFixed(1)} %` : '—');
+const nuoroda = (md5: string) => `/statistika/sql/${md5}?laikotarpis=${laikotarpis.raktas}`;
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=15');
+---
+<Layout
+  pageTitle="SQL užklausos"
+  pageDescription="Brangiausios SQL užklausos pagal bendrą duomenų bazės laiką"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      <Fragment slot="subtext"><a href="/statistika">Statistika</a></Fragment>
+      SQL užklausos
+      <form slot="actions" method="get">
+        <Field label="Laikotarpis" name="laikotarpis" className="sql-laikotarpis">
+          <select
+            id="laikotarpis"
+            name="laikotarpis"
+            class="ds-field__control ds-field__control--select"
+            data-autosubmit
+          >
+            {LAIKOTARPIAI.map((l) => (
+              <option value={l.raktas} selected={l.raktas === laikotarpis.raktas}>{l.label}</option>
+            ))}
+          </select>
+        </Field>
+        <noscript><button type="submit" class="btn btn-outline btn-sm mt-2">Rodyti</button></noscript>
+      </form>
+    </PageHeader>
+
+    {klaida && (
+      <Alert variant="danger" title="Nepavyko gauti duomenų">
+        {klaida}
+        <p class="text-sm mb-0 mt-2">
+          Logas rašomas tik įjungus <code>SQL_LOG_QUICKWIT</code>; duomenys guli Quickwit
+          indeksuose <code>sqlLogV2_*</code>.
+        </p>
+      </Alert>
+    )}
+
+    {!klaida && !yraTekstuLentele && (
+      <Alert variant="warning" title="Nėra sqlLogTekstai lentelės">
+        Quickwit'e saugomas tik <code>md5</code>, o tekstai — Postgres lentelėje
+        <code>public."sqlLogTekstai"</code>. Kol jos nėra, sąraše matysite tik hash'us
+        (lentelės kūrimas — <code>sqlLogTekstai.sql</code>).
+      </Alert>
+    )}
+
+    {!klaida && (
+      <MetricCardGrid minWidth="118px" className="mb-8">
+        <MetricCard label="Užklausų"><span class="cell-mono">{sk(visoUzklausu)}</span></MetricCard>
+        <MetricCard label="Bendras DB laikas"><span class="cell-mono">{formatuotiMs(visoMs)}</span></MetricCard>
+        <MetricCard label="Vidutiniškai per užklausą">
+          <span class="cell-mono">{formatuotiMs(visoUzklausu ? visoMs / visoUzklausu : 0)}</span>
+        </MetricCard>
+        <MetricCard label="Skirtingų formų" meta={formuIsViso > RODOMA ? `rodoma ${RODOMA}` : undefined}>
+          <span class="cell-mono">{sk(formuIsViso)}</span>
+        </MetricCard>
+      </MetricCardGrid>
+    )}
+
+    {!klaida && (
+      <section class="page-section">
+        <h2 class="mb-1">TOP {RODOMA} brangiausių</h2>
+        <p class="text-muted text-sm mb-4">Rikiuota pagal bendrą DB laiką (kiekis × trukmė).</p>
+        <DataTable
+          columns={[
+            { label: 'Tipas' },
+            { label: 'Užklausa' },
+            { label: 'Kiekis', className: 'cell-right' },
+            { label: 'Viso', className: 'cell-right' },
+            { label: 'Dalis', className: 'cell-right' },
+            { label: 'Vid.', className: 'cell-right' },
+            { label: 'Maks.', className: 'cell-right' },
+            { label: 'Klaidos', className: 'cell-right' },
+          ]}
+          rows={eilutes}
+          emptyText="Įrašų nerasta — patikrinkite, ar įjungtas SQL_LOG_QUICKWIT ir ar pasirinktame laikotarpyje yra duomenų."
+          size="sm"
+        >
+          {eilutes.map((e) => (
+            <tr>
+              <td class="cell-nowrap">
+                {e.op && <Badge variant={OP_VARIANTAI[e.op] ?? 'default'}>{e.op}</Badge>}
+              </td>
+              <td>
+                <a href={nuoroda(e.md5)} class="sql-eilute cell-mono" title={e.sql ?? e.md5}>
+                  {e.sql ? trumpinti(e.sql, 170) : e.md5}
+                </a>
+              </td>
+              <td class="cell-right cell-mono cell-nowrap">{sk(e.kiekis)}</td>
+              <td class="cell-right cell-mono cell-nowrap">{formatuotiMs(e.visoMs)}</td>
+              <td class="cell-right cell-mono cell-nowrap text-muted">{dalis(e.visoMs)}</td>
+              <td class="cell-right cell-mono cell-nowrap">{formatuotiMs(e.vidMs)}</td>
+              <td class="cell-right cell-mono cell-nowrap">{formatuotiMs(e.maksMs)}</td>
+              <td class="cell-right cell-mono cell-nowrap">
+                {e.klaidos ? <span class="text-danger">{sk(e.klaidos)}</span> : <span class="text-muted">—</span>}
+              </td>
+            </tr>
+          ))}
+        </DataTable>
+      </section>
+    )}
+  </main>
+</Layout>
+
+<style>
+  :global(.ds-field.sql-laikotarpis) {
+    margin-bottom: 0;
+    min-width: 190px;
+  }
+
+  .sql-eilute {
+    display: block;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .sql-eilute:hover {
+    text-decoration: underline;
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLSelectElement>('select[data-autosubmit]').forEach((select) => {
+    select.addEventListener('change', () => select.form?.submit());
+  });
+</script>

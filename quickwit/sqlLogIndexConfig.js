@@ -7,15 +7,20 @@
  * bundle'e, tad schema laikoma čia.
  *
  * `index_id` yra šablonas – `quickwit/sqlLogIngest.js` prieš kurdamas pakeičia
- * jį į tos dienos vardą (`sqlLog_2026-08-01`).
+ * jį į tos dienos vardą (`sqlLogV2_2026-08-01`).
+ *
+ * SVARBU: placeholder'is be apatinio brūkšnio (`sqlLogV2Template`, ne
+ * `sqlLogV2_TEMPLATE`) – kitaip netyčia sukurtas šabloninis indeksas pakliūtų į
+ * `sqlLogV2_*` paiešką ir, turėdamas kitokią schemą, griautų visas užklausas
+ * („field does not exist").
  */
 export const SQL_LOG_INDEX_CONFIG = `# SQL užklausų logas – po vieną Quickwit indeksą kiekvienai dienai, be jokio
 # Postgres tarpininko.
 #
 # \`index_id\` čia yra tik šablonas: \`quickwit/sqlLogIngest.js\` prieš kurdamas
-# pakeičia jį į tos dienos pavadinimą pagal \`ts\` (UTC), pvz. \`sqlLog_2026-08-01\`.
+# pakeičia jį į tos dienos pavadinimą pagal \`ts\` (UTC), pvz. \`sqlLogV2_2026-08-01\`.
 # Todėl:
-#   * paieška per visas dienas – indeksų šablonu \`sqlLog_*\`;
+#   * paieška per visas dienas – indeksų šablonu \`sqlLogV2_*\`;
 #   * senienų valymas – tiesiog ištrinant senų dienų indeksus
 #     (\`pruneSqlLogIndexes()\`), o ne split'ų retention politika.
 #
@@ -26,7 +31,7 @@ export const SQL_LOG_INDEX_CONFIG = `# SQL užklausų logas – po vieną Quickw
 # kitos dienos indeksui (arba per \`PUT /api/v1/indexes/<id>\`).
 version: 0.9
 
-index_id: sqlLog_TEMPLATE
+index_id: sqlLogV2Template
 
 doc_mapping:
   # \`lenient\` – nauji laukai loge nesugriaus ingest'o; nežinomi tiesiog dingsta.
@@ -80,14 +85,6 @@ doc_mapping:
     # beta.viespirkiai.org, 192.168.1.10:5050… Už proxy imamas
     # \`x-forwarded-host\`. taskRunner'yje/CLI lauko nėra.
     - name: host
-      type: text
-      tokenizer: raw
-      indexed: true
-      fast: true
-      stored: true
-
-    # Puslapio kelias (be query), pvz. /asmuo/300055900. Yra tik HTTP kelyje.
-    - name: path
       type: text
       tokenizer: raw
       indexed: true
@@ -159,15 +156,6 @@ doc_mapping:
       fast: true
       stored: true
 
-    # Normalizuota užklausa be parametrų reikšmių. \`position\` – kad veiktų
-    # frazių paieška (pvz. "FROM public.jar").
-    - name: sql
-      type: text
-      tokenizer: default
-      record: position
-      indexed: true
-      stored: true
-
   # Splitų pruning'ui pagal dažniausius filtrus. \`md5\` kardinalumas didesnis,
   # tad Quickwit dalyje splitų tag'ų gali ir nesaugoti – tada tiesiog nebus
   # pruning'o, paieška vis tiek veiks.
@@ -176,7 +164,8 @@ doc_mapping:
   timestamp_field: ts
 
 search_settings:
-  default_search_fields: [sql]
+  # \`sql\` lauko čia nebėra – tekstas gyvena Postgres lentelėje \`sqlLogTekstai\`.
+  default_search_fields: [md5]
 
 indexing_settings:
   # Logas – ne paieškos kritinis kelias, tad rečiau commit'inam ir gaunam

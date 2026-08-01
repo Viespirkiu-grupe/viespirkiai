@@ -56,9 +56,51 @@ const pgLogFileStream =
 const sqlLogFileStream = config.sqlLogFile
     ? fs.createWriteStream(config.sqlLogFile, { flags: "a" })
     : null;
-// SQL_LOG_QUICKWIT – tie patys dokumentai rašomi tiesiai į Quickwit indeksą
-// `sqlLog` (be Postgres, be shard'ų, be versijų; senienas valo retention).
+// SQL_LOG_QUICKWIT – tie patys dokumentai rašomi tiesiai į Quickwit dienos
+// indeksą (be shard'ų ir versijų). Į Quickwit siunčiamas TIK `md5`, be teksto:
+// išmatuota, kad 390 tūkst. dokumentų tenka ~270 skirtingų užklausų formų, tad
+// tekstas ten kartotųsi ~1400 kartų. Patį tekstą laiko `sqlLogTekstai` lentelė.
 const SQL_LOG_ENABLED = Boolean(sqlLogFileStream) || sqlLogQuickwitEnabled;
+
+/** Žyma užklausai, kurios pačios loginti nereikia (išvengiam rekursijos). */
+const SKIP_LOG = Symbol.for("viespirkiai.sqlLogSkip");
+/** Šiame procese jau įrašytos (arba bandytos įrašyti) md5 reikšmės. */
+const zinomiTekstai = new Set();
+let tekstuRasymasIsjungtas = false;
+
+/**
+ * Įsimena md5 → normalizuota užklausa `sqlLogTekstai` lentelėje (insert-only).
+ * Kviečiama tik pirmą kartą pamačius formą, o pati įterpimo užklausa į logą
+ * nepatenka. Klaidos nurijamos – logavimas negali griauti darbo.
+ *
+ * @param {string} md5
+ * @param {string} sql
+ */
+function registruotiSqlTeksta(md5, sql) {
+    if (tekstuRasymasIsjungtas || zinomiTekstai.has(md5)) return;
+    zinomiTekstai.add(md5);
+
+    postgres
+        .query({
+            text: `INSERT INTO public."sqlLogTekstai" ("md5", "sql")
+                   VALUES ($1, $2)
+                   ON CONFLICT ("md5") DO NOTHING`,
+            values: [md5, sql],
+            [SKIP_LOG]: true,
+        })
+        .catch((err) => {
+            // 42P01 – nėra lentelės, 25006 – read-only jungtis: bandyti toliau
+            // nėra prasmės. Kitos klaidos gali būti laikinos, tad leidžiam kartoti.
+            if (err?.code === "42P01" || err?.code === "25006") {
+                tekstuRasymasIsjungtas = true;
+                console.warn(
+                    `[sqlLogTekstai] rašymas išjungtas (${err.code}): ${err.message}`,
+                );
+                return;
+            }
+            zinomiTekstai.delete(md5);
+        });
+}
 
 /** Maks. į SQL_LOG_FILE rašomos (jau normalizuotos) užklausos ilgis. */
 const SQL_LOG_MAX_LEN = 10_000;
@@ -100,11 +142,13 @@ function sqlMeta(rawSql) {
  */
 function withQueryLogging(originalQuery, source) {
     return function (textOrConfig, values, callback) {
-        // Callback forma arba Submittable (turi .submit, pvz. QueryStream) – nepaliesta.
+        // Callback forma, Submittable (turi .submit, pvz. QueryStream) arba
+        // pažymėta kaip neloginama (`sqlLogTekstai` įrašas) – nepaliesta.
         if (
             typeof values === "function" ||
             typeof callback === "function" ||
-            (textOrConfig && typeof textOrConfig.submit === "function")
+            (textOrConfig && typeof textOrConfig.submit === "function") ||
+            textOrConfig?.[SKIP_LOG]
         ) {
             return originalQuery(textOrConfig, values, callback);
         }
@@ -361,8 +405,8 @@ function logPgQuery(sql, start, res, err, source, pool) {
         //   client – tik vykdymas (jungtis jau buvo paimta).
         // `queued` = true reiškia, kad padavimo metu laisvų jungčių nebuvo, t. y.
         // į `ms` tikrai įskaičiuotas laukimas.
-        // Aplinka ir vaidmuo – pastovūs procesui; hostas ir kelias yra tik
-        // aptarnaujant HTTP užklausą (taskRunner'yje/CLI jų nėra).
+        // Aplinka ir vaidmuo – pastovūs procesui; hostas yra tik aptarnaujant
+        // HTTP užklausą (taskRunner'yje/CLI jo nėra).
         const request = getRequestContext();
         const doc = {
             ts: now.toISOString(),
@@ -371,7 +415,6 @@ function logPgQuery(sql, start, res, err, source, pool) {
             env: APP_ENV,
             role: APP_ROLE,
             ...(request?.host ? { host: request.host } : {}),
-            ...(request?.path ? { path: request.path } : {}),
             src: source ?? "pool",
             ok: !err,
             ...(err ? { code: err.code ?? null } : { rows: res?.rowCount ?? 0 }),
@@ -385,11 +428,19 @@ function logPgQuery(sql, start, res, err, source, pool) {
                           pool.total >= (config.pgMaxConnections ?? 0),
                   }
                 : {}),
-            sql: meta.sql,
         };
 
-        if (sqlLogFileStream) sqlLogFileStream.write(JSON.stringify(doc) + "\n");
-        if (sqlLogQuickwitEnabled) enqueueSqlLog(doc);
+        // Faile tekstas patogus (grep'as vietoje), Quickwit'ui siunčiam tik md5,
+        // o tekstą vieną kartą įrašom į `sqlLogTekstai`.
+        if (sqlLogFileStream) {
+            sqlLogFileStream.write(
+                JSON.stringify({ ...doc, sql: meta.sql }) + "\n",
+            );
+        }
+        if (sqlLogQuickwitEnabled) {
+            enqueueSqlLog(doc);
+            registruotiSqlTeksta(meta.md5, meta.sql);
+        }
     }
 
     if (!PG_LOG_QUERIES) return;

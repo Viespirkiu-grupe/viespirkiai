@@ -7,7 +7,7 @@ import { SQL_LOG_INDEX_CONFIG } from "./sqlLogIndexConfig.js";
  *
  * Sąmoningai atsietas nuo `quickwit/quickwit.js`: tas API kiekvienam įrašui
  * eina per `quickwitLenteles`/`quickwitIndeksai`/`quickwitEilutes`, o čia to
- * nereikia. Kiekviena diena turi savo indeksą (`sqlLog_2026-08-01`), tad
+ * nereikia. Kiekviena diena turi savo indeksą (`sqlLogV2_2026-08-01`), tad
  * senienų valymas yra paprastas indekso ištrynimas, o ne split'ų retention.
  *
  * Svarbiausia savybė: logavimas NIEKADA nestabdo ir negriauna užklausų.
@@ -18,9 +18,16 @@ import { SQL_LOG_INDEX_CONFIG } from "./sqlLogIndexConfig.js";
  * Rekursijos rizikos nėra: čia naudojamas tik `fetch`, jokių DB užklausų.
  */
 
-/** Dienos indekso vardo priešdėlis; pilnas vardas – `sqlLog_YYYY-MM-DD`. */
-export const SQL_LOG_INDEX_PREFIX = "sqlLog_";
-// Paieškai per visas dienas: `POST /api/v1/sqlLog_*/search`. 
+/**
+ * Dienos indekso vardo priešdėlis; pilnas vardas – `sqlLogV2_YYYY-MM-DD`.
+ *
+ * V2 – nuo tada, kai dokumentuose nebeliko `sql` ir `path` laukų (tekstas
+ * perkeltas į Postgres `sqlLogTekstai`). Seni `sqlLog_*` indeksai paliekami
+ * ramybėje: jie nebeatitinka naujo šablono, tad į paiešką nemaišosi ir
+ * `pruneSqlLogIndexes()` jų neliečia.
+ */
+export const SQL_LOG_INDEX_PREFIX = "sqlLogV2_";
+/** Paieškai per visas dienas – indeksų šablonas `sqlLogV2_*`. */
 export const SQL_LOG_INDEX_PATTERN = `${SQL_LOG_INDEX_PREFIX}*`;
 
 /** Kiek dokumentų sukaupus siunčiama nelaukiant taimerio. */
@@ -68,6 +75,11 @@ async function ensureIndex(indexId) {
         /^index_id:.*$/m,
         `index_id: ${indexId}`,
     );
+    // Apsauga nuo tylaus placeholder'io pralindimo: toks indeksas atsidurtų
+    // šalia dienos indeksų ir su sena schema griautų `sqlLog_*` užklausas.
+    if (!yaml.includes(`index_id: ${indexId}`)) {
+        throw new Error(`nepavyko įrašyti index_id (${indexId}) į schemą`);
+    }
     const created = await fetch(`${QW_URL}/api/v1/indexes`, {
         method: "POST",
         headers: { "Content-Type": "application/yaml" },
@@ -179,7 +191,7 @@ export function enqueueSqlLog(doc) {
 
 /**
  * Senų dienos indeksų valymas – vietoj retention politikos. Ištrina visus
- * `sqlLog_YYYY-MM-DD` indeksus, senesnius nei `keepDays` dienų.
+ * `sqlLogV2_YYYY-MM-DD` indeksus, senesnius nei `keepDays` dienų.
  *
  * @param {{ keepDays?: number, dryRun?: boolean }} [options]
  * @returns {Promise<{ deleted: string[], kept: string[] }>}
@@ -203,7 +215,7 @@ export async function pruneSqlLogIndexes({ keepDays = 30, dryRun = false } = {})
         const data = indexId.startsWith(SQL_LOG_INDEX_PREFIX)
             ? indexId.slice(SQL_LOG_INDEX_PREFIX.length)
             : null;
-        // Tik `sqlLog_YYYY-MM-DD` – kitokių vardų neliečiam.
+        // Tik `sqlLogV2_YYYY-MM-DD` – kitokių vardų (ir senų `sqlLog_*`) neliečiam.
         if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) continue;
 
         if (data >= riba) {

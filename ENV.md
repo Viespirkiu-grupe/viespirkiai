@@ -63,7 +63,7 @@ taskrunneriui.
 | `PG_DATABASE` | `viespirkiai` | DB pavadinimas. |
 | `PG_MAX_CONNECTIONS` | `16` | Maks. vienalaikis pool dydis aplikacijos užklausoms. |
 | `SQL_LOG_FILE` | — | Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą (JSONL). |
-| `SQL_LOG_QUICKWIT` | `false` | Tie patys įrašai rašomi tiesiai į Quickwit indeksą `sqlLog`. Galima kartu su `SQL_LOG_FILE` arba vietoj jo. |
+| `SQL_LOG_QUICKWIT` | `false` | Tie patys įrašai (be SQL teksto – tik `md5`) rašomi į dienos Quickwit indeksą `sqlLogV2_*`, o tekstas – į `sqlLogTekstai` lentelę. Galima kartu su `SQL_LOG_FILE` arba vietoj jo. |
 | `PG_PREPARED` | `true` | Statiškas dažnas užklausas vykdyti kaip prepared statement'us. **Išjungti (`false`), jei `PG_PORT` rodo į pgbouncer transaction pooling režimu be `max_prepared_statements`.** |
 
 Profiliavimui: `SQL_LOG_FILE=/tmp/sql.log` įjungia visų per `postgres.query()` ir
@@ -101,22 +101,38 @@ jq -s 'group_by(.md5) | map({n: length, avg: (map(.ms) | add / length),
 
 #### `SQL_LOG_QUICKWIT` – logas tiesiai į Quickwit
 
-`SQL_LOG_QUICKWIT=true` rašo tuos pačius dokumentus į Quickwit — **po vieną
-indeksą dienai**: `sqlLog_2026-08-01` (data iš `ts`, UTC).
+`SQL_LOG_QUICKWIT=true` rašo tuos pačius įrašus į Quickwit — **po vieną
+indeksą dienai**: `sqlLogV2_2026-08-01` (data iš `ts`, UTC).
 
-**Postgres čia nedalyvauja**: jokių shard'ų, `quickwitLenteles`/`quickwitIndeksai`
+**Į Quickwit siunčiamas tik `md5`, be paties SQL teksto.** Išmatuota, kad
+390 tūkst. dokumentų tenka ~270 skirtingų užklausų formų (vidutiniškai 2 000
+simbolių), tad tekstas ten kartotųsi ~1 400 kartų — apie 744 MB vietoj 0,5 MB.
+Tekstą laiko Postgres lentelė `sqlLogTekstai` (žr. [`sqlLogTekstai.sql`](sqlLogTekstai.sql)),
+į kurią kiekviena forma įrašoma **vieną kartą** (`INSERT … ON CONFLICT DO NOTHING`,
+pati įrašymo užklausa į logą nepatenka):
+
+```sql
+SELECT "sql" FROM public."sqlLogTekstai" WHERE "md5" = '…';
+```
+
+Jei lentelės nėra (`42P01`) arba jungtis read-only (`25006`), rašymas išsijungia
+su vienu įspėjimu — logavimas dėl to nenutrūksta, tik `md5` liks be teksto.
+
+**Kitaip Postgres nedalyvauja**: jokių shard'ų, `quickwitLenteles`/`quickwitIndeksai`
 įrašų ar schemos versijų. Indekso schema —
 [`quickwit/sqlLogIndexConfig.js`](quickwit/sqlLogIndexConfig.js) (JS eilutė, o ne
 .yaml failas: runtime image'e yra tik `dist`, tad failo ten paprasčiausiai nebūtų);
 indeksą, jei tos dienos dar nėra, sukuria `quickwit/sqlLogIngest.js`.
 
-Paieška per visas dienas — indeksų šablonu `sqlLog_*`. Senienų valymas
+Paieška per visas dienas — indeksų šablonu `sqlLogV2_*`. Senienų valymas
 **rankinis**, retention politikos nėra: `pruneSqlLogIndexes({ keepDays: 30 })`
-ištrina senesnių dienų indeksus (`dryRun: true` parodo, ką liestų).
+ištrina senesnių dienų indeksus (`dryRun: true` parodo, ką liestų). Seni
+`sqlLog_*` (be V2) indeksai su kitokia schema paliekami ramybėje: į naują
+šabloną nepakliūva ir valymo funkcijos neliečiami.
 
 Dienos indeksas sukuriamas vieną kartą su tuo metu galiojančia schema — pakeitus
 `sqlLogIndexConfig.js` nauji laukai atsiras tik kitos dienos indekse. Kol dienos
-turi skirtingas schemas, užklausa `sqlLog_*` dėl naujo lauko grąžins klaidą
+turi skirtingas schemas, užklausa `sqlLogV2_*` dėl naujo lauko grąžins klaidą
 (`field does not exist`), o ne tuščią rezultatą; tokiu atveju arba ieškokite
 konkrečioje dienoje, arba atnaujinkite indeksą per `PUT /api/v1/indexes/<id>`.
 
@@ -125,34 +141,39 @@ logavimas neblokuoja užklausų. Jei Quickwit nepasiekiamas, paketas prarandamas
 klaida loginama ne dažniau kaip kartą per minutę — SQL užklausos dėl to nenukenčia.
 Staigiai nutraukus procesą galima prarasti iki ~1 s buferio.
 
-Be `ts`, `ms`, `md5`, `sql`, `src`, `ok`/`code`, `rows`, `pool` ir `queued`,
-kiekvienas įrašas turi: `op` (`select` | `insert` | `update` | `delete` |
-`schema` | `tx` | `other`), `env` (`dev`/`prod`), `role` (`server` |
+Kiekvienas Quickwit įrašas turi: `ts`, `ms`, `md5`, `src` (`pool`/`client`),
+`ok`/`code`, `rows`, `pool`, `queued`, `op` (`select` | `insert` | `update` |
+`delete` | `schema` | `tx` | `other`), `env` (`dev`/`prod`), `role` (`server` |
 `taskRunner` | `worker` | `cli`, perrašoma `APP_ROLE`), o HTTP kelyje – dar
-`host` (pvz. `beta.viespirkiai.org`, už proxy imamas `x-forwarded-host`) ir
-`path`. Fone ar taskRunner'yje `host`/`path` nėra.
+`host` (pvz. `beta.viespirkiai.org`, už proxy imamas `x-forwarded-host`). Fone ar
+taskRunner'yje `host` lauko nėra. **`sql` teksto Quickwit'e nėra** – jis
+`sqlLogTekstai` lentelėje; `SQL_LOG_FILE` faile tekstas rašomas kaip anksčiau.
 
-Pavyzdžiai (`POST /api/v1/sqlLog_*/search`):
+Pavyzdžiai (`POST /api/v1/sqlLogV2_*/search`):
 
 ```bash
-# Lėčiausios užklausų grupės (pagal normalizuotos užklausos md5)
-curl -s 'localhost:7280/api/v1/sqlLog_*/search' -H 'Content-Type: application/json' -d '{
+# Daugiausiai laiko valgančios užklausų formos (dažnis × trukmė)
+curl -s 'localhost:7280/api/v1/sqlLogV2_*/search' -H 'Content-Type: application/json' -d '{
   "query": "*", "max_hits": 0,
-  "aggs": {"grupes": {"terms": {"field": "md5", "size": 10},
-           "aggs": {"vid_ms": {"avg": {"field": "ms"}}, "max_ms": {"max": {"field": "ms"}}}}}}'
+  "aggs": {"grupes": {"terms": {"field": "md5", "size": 10, "order": {"viso_ms": "desc"}},
+           "aggs": {"viso_ms": {"sum": {"field": "ms"}}, "vid_ms": {"avg": {"field": "ms"}}}}}}'
 
-# Rašymai gyvoje aplinkoje / vieno puslapio užklausos
-curl -s 'localhost:7280/api/v1/sqlLog_*/search?query=env:prod+AND+NOT+op:select'
-curl -s 'localhost:7280/api/v1/sqlLog_*/search?query=host:"beta.viespirkiai.org"+AND+path:"/asmuo/300055900"'
+# Rašymai gyvoje aplinkoje / vieno domeno užklausos
+curl -s 'localhost:7280/api/v1/sqlLogV2_*/search?query=env:prod+AND+NOT+op:select'
+curl -s 'localhost:7280/api/v1/sqlLogV2_*/search?query=host:"beta.viespirkiai.org"'
 
 # Užklausos, kurios laukė eilėje prie laisvos jungties
-curl -s 'localhost:7280/api/v1/sqlLog_*/search' -H 'Content-Type: application/json' \
+curl -s 'localhost:7280/api/v1/sqlLogV2_*/search' -H 'Content-Type: application/json' \
   -d '{"query": "queued:true AND ms:>1000", "max_hits": 20, "sort_by": "-ms"}'
 
-# Klaidos ir frazių paieška užklausos tekste
-curl -s 'localhost:7280/api/v1/sqlLog_*/search?query=ok:false'
-curl -s 'localhost:7280/api/v1/sqlLog_*/search' -H 'Content-Type: application/json' \
-  -d '{"query": "sql:\"FROM public.jar\"", "max_hits": 10}'
+# Klaidos
+curl -s 'localhost:7280/api/v1/sqlLogV2_*/search?query=ok:false'
+```
+
+Gavus `md5`, tekstas imamas iš Postgres:
+
+```sql
+SELECT "md5", "sql" FROM public."sqlLogTekstai" WHERE "md5" = ANY($1);
 ```
 
 ### MCP `execute_query` + analitiko rolė

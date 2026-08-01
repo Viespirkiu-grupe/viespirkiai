@@ -1,0 +1,235 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import PageSection from '@design-system/components/PageSection.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
+import BarList from '@design-system/components/BarList.astro';
+import Badge from '@design-system/components/Badge.astro';
+import Alert from '@design-system/components/Alert.astro';
+import EmptyState from '@design-system/components/EmptyState.astro';
+import Field from '@design-system/components/inputs/Field.astro';
+import { highlightCode } from '@/utils/highlightCode.js';
+import config from '../../../lib/config.ts';
+import { getColorScheme, getFont } from '../../../lib/failai.ts';
+import {
+  LAIKOTARPIAI,
+  OP_VARIANTAI,
+  formatuotiMs,
+  parseLaikotarpis,
+  uzklausosDetales,
+  type Detales,
+} from '../../../lib/sqlLogStatistika.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const md5 = String(Astro.params.md5 ?? '');
+if (!/^[0-9a-f]{32}$/.test(md5)) return Astro.redirect('/statistika/sql');
+
+const query = Object.fromEntries(Astro.url.searchParams) as Record<string, string>;
+const laikotarpis = parseLaikotarpis(query.laikotarpis);
+
+let detales: Detales | null = null;
+let klaida: string | null = null;
+
+try {
+  detales = await uzklausosDetales(md5, laikotarpis);
+} catch (error: any) {
+  klaida = error?.message ?? String(error);
+}
+
+const sk = (n: number) => Number(n || 0).toLocaleString('lt-LT');
+const grizti = `/statistika/sql?laikotarpis=${laikotarpis.raktas}`;
+const paryskintasSql = detales?.sql ? highlightCode(detales.sql, "sql") : null;
+
+// Histograma – inline SVG, be bibliotekų.
+const histW = 960;
+const histH = 96;
+const maksHist = detales ? Math.max(1, ...detales.histograma.map((h) => h.visoMs)) : 1;
+const stulpelis = detales?.histograma.length ? histW / detales.histograma.length : 0;
+const laikas = (ms: number) =>
+  new Date(ms).toLocaleString('lt-LT', { hour12: false, dateStyle: 'short', timeStyle: 'short' });
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=15');
+---
+<Layout
+  pageTitle={`SQL užklausa ${md5.slice(0, 8)}`}
+  pageDescription="Vienos SQL užklausos formos statistika"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      <Fragment slot="subtext">
+        <a href="/statistika">Statistika</a> · <a href={grizti}>SQL užklausos</a>
+      </Fragment>
+      <span class="antrastes-eilute">
+        {detales?.op ? <Badge variant={OP_VARIANTAI[detales.op] ?? 'default'} size="lg">{detales.op}</Badge> : null}
+        <span class="md5-antraste cell-mono">{md5}</span>
+      </span>
+      <form slot="actions" method="get">
+        <Field label="Laikotarpis" name="laikotarpis" className="sql-laikotarpis">
+          <select
+            id="laikotarpis"
+            name="laikotarpis"
+            class="ds-field__control ds-field__control--select"
+            data-autosubmit
+          >
+            {LAIKOTARPIAI.map((l) => (
+              <option value={l.raktas} selected={l.raktas === laikotarpis.raktas}>{l.label}</option>
+            ))}
+          </select>
+        </Field>
+        <noscript><button type="submit" class="btn btn-outline btn-sm mt-2">Rodyti</button></noscript>
+      </form>
+    </PageHeader>
+
+    {klaida && (
+      <Alert variant="danger" title="Nepavyko gauti duomenų">{klaida}</Alert>
+    )}
+
+    {!klaida && !detales && (
+      <EmptyState
+        icon="🔍"
+        title="Šiuo laikotarpiu įrašų nėra"
+        message="Užklausa pasirinktame laikotarpyje nevykdyta. Pabandykite ilgesnį laikotarpį."
+      >
+        <a href={grizti} class="btn btn-outline btn-sm">← Į sąrašą</a>
+      </EmptyState>
+    )}
+
+    {detales && (
+      <Fragment>
+        <MetricCardGrid minWidth="112px" className="mb-8">
+          <MetricCard label="Kiekis"><span class="cell-mono">{sk(detales.kiekis)}</span></MetricCard>
+          <MetricCard label="Viso DB laiko"><span class="cell-mono">{formatuotiMs(detales.visoMs)}</span></MetricCard>
+          <MetricCard label="Vidurkis"><span class="cell-mono">{formatuotiMs(detales.vidMs)}</span></MetricCard>
+          <MetricCard label="p50"><span class="cell-mono">{formatuotiMs(detales.p50)}</span></MetricCard>
+          <MetricCard label="p95"><span class="cell-mono">{formatuotiMs(detales.p95)}</span></MetricCard>
+          <MetricCard label="p99"><span class="cell-mono">{formatuotiMs(detales.p99)}</span></MetricCard>
+          <MetricCard label="Maksimumas"><span class="cell-mono">{formatuotiMs(detales.maksMs)}</span></MetricCard>
+          <MetricCard label="Klaidos">
+            <span class={detales.klaidos ? 'cell-mono text-danger' : 'cell-mono'}>{sk(detales.klaidos)}</span>
+          </MetricCard>
+          <MetricCard label="Laukė eilėje" meta="pool buvo pilnas">
+            <span class="cell-mono">{sk(detales.laukeEileje)}</span>
+          </MetricCard>
+        </MetricCardGrid>
+
+        <PageSection id="uzklausa" title="Užklausa" tag="section">
+          {paryskintasSql
+            ? <pre class="code-block"><code class="hljs language-sql" set:html={paryskintasSql}></code></pre>
+            : (
+              <Alert variant="warning">
+                Teksto nėra: jis saugomas Postgres lentelėje <code>public."sqlLogTekstai"</code>,
+                o ši forma joje dar neužfiksuota.
+              </Alert>
+            )}
+        </PageSection>
+
+        {detales.histograma.length > 0 && (
+          <PageSection
+            id="laike"
+            title="DB laikas per laikotarpį"
+            tag="section"
+            description={`Stulpelis — ${detales.zingsnisTekstas}; aukštis pagal bendrą to intervalo DB laiką.`}
+          >
+            <svg viewBox={`0 0 ${histW} ${histH}`} class="hist" role="img" aria-label="DB laiko histograma">
+              {detales.histograma.map((h, i) => {
+                const auks = Math.max(1, (h.visoMs / maksHist) * histH);
+                return (
+                  <rect x={i * stulpelis} y={histH - auks} width={Math.max(1, stulpelis - 1)} height={auks}>
+                    <title>{`${laikas(h.nuo)} — ${formatuotiMs(h.visoMs)} (${sk(h.kiekis)} užkl.)`}</title>
+                  </rect>
+                );
+              })}
+            </svg>
+          </PageSection>
+        )}
+
+        <div class="grid-2">
+          <PageSection id="vaidmenys" title="Kas vykdo" tag="section" headingTag="h3">
+            <BarList
+              items={detales.pagalRole.map((r) => ({ label: r.reiksme, value: r.kiekis }))}
+              formatValue={(v) => sk(v)}
+            />
+          </PageSection>
+
+          <PageSection id="aplinka" title="Aplinka ir hostai" tag="section" headingTag="h3">
+            <BarList
+              items={[...detales.pagalEnv, ...detales.pagalHost].map((r) => ({
+                label: r.reiksme,
+                value: r.kiekis,
+              }))}
+              formatValue={(v) => sk(v)}
+            />
+          </PageSection>
+        </div>
+      </Fragment>
+    )}
+  </main>
+</Layout>
+
+<style>
+  :global(.ds-field.sql-laikotarpis) {
+    margin-bottom: 0;
+    min-width: 190px;
+  }
+
+  .antrastes-eilute {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .md5-antraste {
+    font-size: 1.05rem;
+    word-break: break-all;
+  }
+
+  .code-block {
+    max-height: 24rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* highlight.js spalvos. BŪTINA :global – set:html įterpti <span> negauna
+     Astro scoped stilių žymos, tad be jo paryškinimas lieka nematomas. */
+  .code-block :global(.hljs) { color: #c9d1d9; background: transparent; }
+  .code-block :global(.hljs-keyword),
+  .code-block :global(.hljs-type),
+  .code-block :global(.hljs-literal),
+  .code-block :global(.hljs-built_in) { color: #ff7b72; }
+  .code-block :global(.hljs-string) { color: #a5d6ff; }
+  .code-block :global(.hljs-number) { color: #79c0ff; }
+  .code-block :global(.hljs-comment) { color: #8b949e; font-style: italic; }
+  .code-block :global(.hljs-title),
+  .code-block :global(.hljs-title.function_) { color: #d2a8ff; }
+  .code-block :global(.hljs-operator) { color: #ff7b72; }
+  .code-block :global(.hljs-variable),
+  .code-block :global(.hljs-attr) { color: #79c0ff; }
+
+  .hist {
+    width: 100%;
+    height: 96px;
+    display: block;
+  }
+
+  .hist rect {
+    fill: var(--accent, #4c8dff);
+    opacity: 0.75;
+  }
+
+  .hist rect:hover {
+    opacity: 1;
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLSelectElement>('select[data-autosubmit]').forEach((select) => {
+    select.addEventListener('change', () => select.form?.submit());
+  });
+</script>

@@ -16,14 +16,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return new Response(null, { status: 404 });
   }
 
-  // Užklausos kontekstas (hostas, kelias) – kad SQL logo įrašus būtų galima
-  // priskirti konkrečiam domenui ir puslapiui. Apgaubiam visą `next()`, nes
-  // puslapių DB užklausos vykdomos būtent jo viduje.
+  // Užklausos kontekstas (hostas) – kad SQL logo įrašus būtų galima priskirti
+  // konkrečiam domenui. Apgaubiam visą `next()`, nes puslapių DB užklausos
+  // vykdomos būtent jo viduje.
   const response = await runWithRequestContext(
-    {
-      host: hostFromHeaders(context.request.headers, context.url),
-      path: context.url.pathname,
-    },
+    { host: hostFromHeaders(context.request.headers, context.url) },
     () => next(),
   );
 
