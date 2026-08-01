@@ -36,13 +36,23 @@ export async function pazymetiScrapeRezultata(id, count) {
 export async function cvpIsScrapeOldestContract() {
     let timings = new Timings();
     timings.start("findOldestScrapedSutartis");
-    let oldestRes = await postgres.query(`SELECT "unikalusId", "atnaujinta"
-      FROM public."vpmSutartysAtnaujinimai"
+    // Seniausią eilutę paima vien indeksu (vpmSutartysAtnaujinimai_atnaujinta_idx,
+    // btree atnaujinta NULLS FIRST) — vienas indekso žingsnis. Amžiaus sąlyga
+    // tikrinama jau ant tos vienos eilutės: sąlyga monotoniška pagal
+    // "atnaujinta" (NULL visada tinka, mažesnės reikšmės tinka labiau), todėl
+    // jei netinka minimumas — netinka niekas. Sąlyga WHERE viduje verstų
+    // planuotoją perskaityti visą indeksą, kai eilėje nieko nėra.
+    let oldestRes = await postgres.query(`WITH seniausia AS (
+        SELECT "unikalusId", "atnaujinta"
+        FROM public."vpmSutartysAtnaujinimai"
+        ORDER BY "atnaujinta" ASC NULLS FIRST
+        LIMIT 1
+      )
+      SELECT "unikalusId", "atnaujinta"
+      FROM seniausia
       WHERE "atnaujinta" IS NULL OR "atnaujinta" < (
         timezone('Europe/Vilnius', now()) - INTERVAL '2 days'
-      )
-      ORDER BY "atnaujinta" ASC NULLS FIRST
-      LIMIT 1;`);
+      );`);
     timings.end("findOldestScrapedSutartis");
 
     if (oldestRes.rows.length === 0) {

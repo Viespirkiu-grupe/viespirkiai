@@ -344,17 +344,43 @@ export async function processOldestCfTDPSWSOffHours(options = {}) {
 
     const { rows } = await postgres.query(
         `
-        WITH candidate AS (
-            SELECT "pirkimoId"
+        -- OR išskaidytas į dvi šakas: viename SELECT'e jis jungia skirtingus
+        -- stulpelius, tad indeksas padengia tik "typeId", o "turinioNuskaitymoData"
+        -- rikiavimui reikia pilno Sort'o per visas to tipo eilutes.
+        -- c_versija naudoja queue_idx ("typeId","turinioNuskaitymas",...),
+        -- c_sena — data_idx ("typeId","turinioNuskaitymoData") WHERE <> -2,
+        -- kur LIMIT 1 paimamas tiesiai iš indekso pradžios.
+        -- Rezultatas tas pats: mažiausia data per abi šakas yra mažesnioji
+        -- iš dviejų šakų minimumų.
+        WITH c_versija AS (
+            SELECT "pirkimoId", "turinioNuskaitymoData"
             FROM public."viesiejiPirkimaiAtnaujinimai"
             WHERE "typeId" = 3 -- CfTDPSWS
               AND "turinioNuskaitymas" != -2
-              AND (
-                  ("turinioNuskaitymas" < ${NUSKAITYMO_VERSIJA} AND "turinioNuskaitymas" >= 0)
-                  OR "turinioNuskaitymoData" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '12 hours'
-              )
+              AND "turinioNuskaitymas" >= 0
+              AND "turinioNuskaitymas" < ${NUSKAITYMO_VERSIJA}
             ORDER BY "turinioNuskaitymoData" ASC NULLS LAST
             FOR UPDATE SKIP LOCKED
+            LIMIT 1
+        ),
+        c_sena AS (
+            SELECT "pirkimoId", "turinioNuskaitymoData"
+            FROM public."viesiejiPirkimaiAtnaujinimai"
+            WHERE "typeId" = 3 -- CfTDPSWS
+              AND "turinioNuskaitymas" != -2
+              AND "turinioNuskaitymoData" <= (now() AT TIME ZONE 'Europe/Vilnius') - interval '12 hours'
+            ORDER BY "turinioNuskaitymoData" ASC NULLS LAST
+            FOR UPDATE SKIP LOCKED
+            LIMIT 1
+        ),
+        candidate AS (
+            SELECT "pirkimoId"
+            FROM (
+                SELECT "pirkimoId", "turinioNuskaitymoData" FROM c_versija
+                UNION ALL
+                SELECT "pirkimoId", "turinioNuskaitymoData" FROM c_sena
+            ) u
+            ORDER BY "turinioNuskaitymoData" ASC NULLS LAST
             LIMIT 1
         )
         UPDATE public."viesiejiPirkimaiAtnaujinimai" v
