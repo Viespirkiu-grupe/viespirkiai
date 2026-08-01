@@ -5,13 +5,18 @@ import ResultCardShell from '@design-system/components/ResultCardShell.astro';
 interface Props {
   results: any[];
   numberOfResults: string;
-  galimaEksportuoti: boolean;
   queryParams: string;
   page: number;
   pageCount: number;
+  sortOptions?: { value: string; label: string }[];
+  sortValue?: string;
 }
 
-const { results, numberOfResults, galimaEksportuoti, queryParams, page, pageCount } = Astro.props;
+const { results, numberOfResults, queryParams, page, pageCount, sortOptions = [], sortValue = '' } = Astro.props;
+const date = (value: unknown) => value == null || value === ''
+  ? null
+  : (typeof value === 'number' ? new Date(value * 1000) : new Date(String(value))).toLocaleDateString('lt-LT');
+const number = (value: unknown) => value == null ? null : Number(value).toLocaleString('lt-LT');
 ---
 
 <ResultPageShell
@@ -20,19 +25,24 @@ const { results, numberOfResults, galimaEksportuoti, queryParams, page, pageCoun
   page={page}
   pageCount={pageCount}
   queryParams={queryParams}
+  flat={true}
+  containerClass="mt-0"
 >
-  {galimaEksportuoti && (
-    <Fragment slot="actions">
-      <a href={`/juridiniai/?${queryParams}&json=true&limit=max`} class="btn btn-outline btn-sm">↗ JSON</a>
-      <a href={`/juridiniai/?${queryParams}&jsonl=true&limit=max`} class="btn btn-outline btn-sm">↗ JSONL</a>
-      <a href={`/juridiniai/?${queryParams}&csv=true&limit=max`} class="btn btn-outline btn-sm">↗ CSV</a>
+  {sortOptions.length > 0 && (
+    <Fragment slot="sort">
+      <label class="sr-only" for="jurSort">Rikiavimas</label>
+      <select id="jurSort" name="sort" value={sortValue} data-autosubmit>
+        {sortOptions.map((option) => <option value={option.value}>{option.label}</option>)}
+      </select>
     </Fragment>
   )}
 
   {results.map((item: any) => (
     <ResultCardShell clickable={true}>
       <dl slot="meta" class="result-card-meta">
-        <div><dt class="sr-only">Tipas</dt><dd>{item.formosPavadinimas}</dd></div>
+        <div><dt class="sr-only">Forma</dt><dd>{item.formosPavadinimas || 'Forma nenurodyta'}</dd></div>
+        <div><dt class="sr-only">Kodas</dt><dd>JAR {item.jarKodas}</dd></div>
+        {item.isregistruotas && <div><dt class="sr-only">Būsena</dt><dd>Išregistruotas</dd></div>}
       </dl>
       <h3 slot="title" class="result-card-title">
         {!item.pavadinimas || item.pavadinimas.length === 0
@@ -41,9 +51,18 @@ const { results, numberOfResults, galimaEksportuoti, queryParams, page, pageCoun
         }
       </h3>
       <div slot="footer" class="result-card-footer">
-        <span><strong>Adresas:</strong> {item.adresas}</span>
-        <span><strong>Registruota:</strong> {item.registravimoData}</span>
+        {item.adresas && <span><strong>Adresas:</strong> {item.adresas}{item.savivaldybe ? ` · ${item.savivaldybe}` : ''}</span>}
+        {item.evrkKodas && <span><strong>EVRK:</strong> {item.evrkKodas}{item.evrkPavadinimas ? ` · ${item.evrkPavadinimas}` : ''}</span>}
+        <span class="jur-stats">
+          {date(item.registravimoData) && <span><strong>Registruota:</strong> {date(item.registravimoData)}</span>}
+          {item.darbuotojai != null && <span><strong>Darbuotojų:</strong> {number(item.darbuotojai)}</span>}
+          {item.vidutinisAtlyginimas != null && <span><strong>Vid. atlyginimas:</strong> {number(Math.round(item.vidutinisAtlyginimas))} €</span>}
+        </span>
       </div>
     </ResultCardShell>
   ))}
 </ResultPageShell>
+
+<style>
+  .jur-stats { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+</style>

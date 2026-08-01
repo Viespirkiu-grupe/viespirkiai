@@ -23,7 +23,7 @@ function toUnixTimestamp(date) {
 ///////////////////////////
 
 const JAR_COLLECTION = "viespirkiaiJAR";
-const JAR_SCHEMA_VERSION = 10;
+const JAR_SCHEMA_VERSION = 11;
 
 const jar_schema = {
     name: JAR_COLLECTION,
@@ -49,13 +49,33 @@ const jar_schema = {
 
 let jarCollectionInitialized = false;
 
+function jarSchemaMatches(existing) {
+    // `id` yra rezervuotas Typesense dokumento laukas ir retrieve() jo
+    // negrąžina kolekcijos `fields` masyve.
+    const expected = new Map(
+        jar_schema.fields
+            .filter((field) => field.name !== "id")
+            .map((field) => [field.name, field]),
+    );
+    const actual = new Map((existing.fields ?? []).map((field) => [field.name, field]));
+    if (actual.size !== expected.size) return false;
+    for (const [name, field] of expected) {
+        const current = actual.get(name);
+        if (!current) return false;
+        if (current.type !== field.type) return false;
+        if (Boolean(current.optional) !== Boolean(field.optional)) return false;
+    }
+    return existing.default_sorting_field === jar_schema.default_sorting_field;
+}
+
 /**
  * Užtikrina, kad JAR Typesense kolekcija būtų sukurta ir atnaujinta.
  * Jei kolekcija jau egzistuoja, bet schema nesutampa, ji bus perrašyta.
  * @returns {Promise<void>}
  */
-export async function ensureJarCollection() {
-    if (!config.typesenseUp) return;
+export async function ensureJarCollection(options = {}) {
+    const { ignoreTypesenseUp = false } = options;
+    if (!config.typesenseUp && !ignoreTypesenseUp) return;
     if (jarCollectionInitialized) return;
 
     try {
@@ -64,8 +84,9 @@ export async function ensureJarCollection() {
 
         const existingVersion = existing.metadata?.version ?? 0;
 
-        if (existingVersion !== JAR_SCHEMA_VERSION) {
-            // Versija nesutampa
+        if (existingVersion !== JAR_SCHEMA_VERSION || !jarSchemaMatches(existing)) {
+            // Versija arba realūs laukai nesutampa. Laukų palyginimas svarbus,
+            // nes kolekcijoje gali būti likusi tos pačios versijos sena schema.
             log(
                 `Existing schema version: ${existingVersion}, Expected: ${JAR_SCHEMA_VERSION}`,
             );
@@ -101,6 +122,7 @@ export async function addDocumentsToJarSearch(givenArray) {
             id: doc.jarKodas?.toString() || doc.pavadinimas,
             jarKodas: doc.jarKodas?.toString() || "",
             pavadinimas: doc.pavadinimas || "",
+            pavadinimasBase: doc.pavadinimasBase || "",
             adresas: doc.adresas || "",
             registravimoData: toUnixTimestamp(doc.registravimoData),
             formosKodas: doc.formosKodas || 0,

@@ -1,237 +1,275 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import Map from '@design-system/components/maps/Map.astro';
-import SearchForm from '@design-system/components/content/SearchForm.astro';
+import Button from '@design-system/components/Button.astro';
+import MapView from '@design-system/components/maps/Map.astro';
+import SearchSuggest from '@design-system/components/content/SearchSuggest.astro';
+import HistogramRangeFilter from '@design-system/components/filters/HistogramRangeFilter.astro';
+import DokFacetSection from '../../components/dokumentai/DokFacetSection.astro';
+import JuridiniaiFacetModal from '../../components/juridiniai/JuridiniaiFacetModal.astro';
 import JuridiniaiResults from '../../components/juridiniai/JuridiniaiResults.astro';
-import { searchJar } from '@/modules/juridiniai/search.js';
-import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
+import { splitFacetOptions } from '../../lib/dokumentaiUrl.ts';
+import { searchJuridiniai } from '@/modules/juridiniai/searchQuickwit.js';
+import { linksniuotiK } from '@/utils/linksniai.js';
 import { getColorScheme, getFont, cleanQuery } from '../../lib/failai.js';
 import config from '../../lib/config.ts';
-import { objectsToJsonlStream } from '@/utils/jsonl.js';
-import { objectsToCsvStream } from '@/utils/csv.js';
-import { Readable as NodeReadable, PassThrough } from 'node:stream';
 
+type FacetOption = { value: string; label?: string; count: number | null };
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
-
 const cleaned = cleanQuery(Astro.url);
 if (cleaned.redirectTo) return Astro.redirect(cleaned.redirectTo);
+const query: Record<string, string> = cleaned.query;
 
-const query = cleaned.query;
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 250;
-const limit = query.limit === 'max' ? MAX_LIMIT : (parseInt(query.limit) || DEFAULT_LIMIT);
-const page = parseInt(query.page) || 1;
-
-const hasSearch = query.search || (query.location && query.locationRadius) || query.adresas;
-
-function buildQueryParams(q: Record<string, string>) {
-  if (q.search) return `&search=${encodeURIComponent(q.search)}`;
-  if (q.location && q.locationRadius) return `&location=${q.location}&locationRadius=${q.locationRadius}`;
-  if (q.adresas) return `&adresas=${encodeURIComponent(q.adresas)}`;
-  return '&';
+if (query.sort?.includes(':')) {
+  const [field, direction] = query.sort.split(':');
+  query.sort = field;
+  query.sortDir = direction || 'desc';
 }
 
-function buildNumberOfResults({ results, total, elapsed, searchEngine }: { results: unknown[]; total: number; elapsed: number; searchEngine: string }) {
-  const trukme = (elapsed / 1000).toFixed(2) + 's';
-  const source = `<span class="inline">(${trukme}, ${searchEngine})</span>`;
-  if (results.length < total) return `Rodomi ${results.length} iš ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`;
-  return `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų'])} ${source}`;
-}
-
+const limit = Math.min(100, Math.max(10, parseInt(query.limit) || 50));
+const page = Math.max(1, parseInt(query.page) || 1);
+const started = performance.now();
 let results: any[] = [];
 let total = 0;
-let searchEngine = '';
-let numberOfResults = '';
-let queryParams = '&';
-let galimaEksportuoti = false;
-let pageCount = 1;
+let facets: any = null;
+let searchError = '';
+try {
+  ({ results, total, facets } = await searchJuridiniai(query, { page, limit, includeFacets: true }));
+} catch (error) {
+  console.error('Juridinių Quickwit paieškos klaida', error);
+  searchError = 'Paieška šiuo metu nepasiekiama.';
+}
+const elapsed = performance.now() - started;
 
-if (hasSearch) {
-  if (query.jsonl || query.json || query.csv) {
-    const { results: allResults } = await searchJar(query, { page, limit: MAX_LIMIT });
-
-    if (query.json) {
-      return new Response(JSON.stringify(allResults), { headers: { 'Content-Type': 'application/json' } });
-    }
-
-    const pass = new PassThrough();
-    const readable = NodeReadable.from(allResults);
-
-    if (query.jsonl) {
-      readable.pipe(objectsToJsonlStream()).pipe(pass);
-      return new Response(NodeReadable.toWeb(pass) as unknown as BodyInit, {
-        headers: {
-          'Content-Type': 'application/x-ndjson',
-          'Content-Disposition': `attachment; filename=viespirkiai-${new Date().toISOString()}.jsonl`,
-        },
-      });
-    }
-
-    if (query.csv) {
-      readable.pipe(objectsToCsvStream()).pipe(pass);
-      return new Response(NodeReadable.toWeb(pass) as unknown as BodyInit, {
-        headers: {
-          'Content-Type': 'text/csv',
-          'Content-Disposition': `attachment; filename=viespirkiai-${new Date().toISOString()}.csv`,
-        },
-      });
-    }
-  }
-
-  const startas = performance.now();
-  ({ results, total, searchEngine } = await searchJar(query, { page, limit }));
-  const elapsed = performance.now() - startas;
-
-  numberOfResults = buildNumberOfResults({ results, total, elapsed, searchEngine });
-  queryParams = buildQueryParams(query);
-  galimaEksportuoti = total > 0 && total <= MAX_LIMIT;
-  pageCount = Math.ceil(total / limit);
+if (!searchError && total === 1 && results[0]?.jarKodas) {
+  return Astro.redirect(`/asmuo/${encodeURIComponent(String(results[0].jarKodas))}`);
 }
 
-const tikRezultatai = !!query.tikRezultatai;
-const juridiniaiMapConfig = {
+const paramsWithoutPage = new URLSearchParams(Astro.url.searchParams);
+paramsWithoutPage.delete('page');
+const queryParams = paramsWithoutPage.toString() ? `&${paramsWithoutPage}` : '';
+const pageCount = Math.max(1, Math.ceil(total / limit));
+const numberOfResults = searchError || `Rodomi ${results.length} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} <span class="inline">(${(elapsed / 1000).toFixed(2)}s, Quickwit)</span>`;
+
+const FACET_PARAMS = ['registracija', 'forma', 'statusas', 'apskritis', 'savivaldybe', 'evrk'];
+const selected: Record<string, string[]> = Object.fromEntries(FACET_PARAMS.map((key) => [
+  key,
+  (Astro.url.searchParams.get(key) ?? '').split(',').map((value) => value.trim()).filter(Boolean),
+]));
+
+function toggleUrl(param: string, value: string) {
+  const params = new URLSearchParams(Astro.url.searchParams);
+  const current = selected[param] ?? [];
+  const next = value === '' ? [] : current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+  if (next.length) params.set(param, next.join(','));
+  else params.delete(param);
+  params.delete('page');
+  return params.toString() ? `/juridiniai?${params}` : '/juridiniai';
+}
+
+function facet(param: string, options: FacetOption[], visibleCount: number) {
+  const selectedValues = selected[param] ?? [];
+  const selectedSet = new Set(selectedValues);
+  const byValue = new Map((options ?? []).map((option) => [option.value, option]));
+  // Pažymėtos reikšmės visada viršuje, net jei jos jau buvo agregacijos sąrašo
+  // 20-oje vietoje. Bendras splitFacetOptions jas tik pridėdavo, jei visai nerado.
+  const ordered = [
+    ...selectedValues.map((value) => byValue.get(value) ?? { value, count: null }),
+    ...(options ?? []).filter((option) => !selectedSet.has(option.value)),
+  ];
+  const split = splitFacetOptions(ordered, selectedValues, visibleCount);
+  return { filter: selectedValues, ...split, toggleUrl: (value: string) => toggleUrl(param, value) };
+}
+
+const activeFilterKeys = [
+  ...FACET_PARAMS, 'registravimoDataNuo', 'registravimoDataIki',
+  'darbuotojaiNuo', 'darbuotojaiIki', 'atlyginimasNuo', 'atlyginimasIki', 'tileZoom', 'tileKey',
+];
+const activeFilterCount = activeFilterKeys.filter((key) => (Astro.url.searchParams.get(key) ?? '').trim()).length;
+
+const mapParams = new URLSearchParams(Astro.url.searchParams);
+for (const key of ['page', 'limit', 'sort', 'sortDir']) mapParams.delete(key);
+const mapSuffix = mapParams.toString() ? `&${mapParams}` : '';
+const detailParams = new URLSearchParams(mapParams);
+detailParams.delete('tileZoom');
+detailParams.delete('tileKey');
+const detailSuffix = detailParams.toString() ? `&${detailParams}` : '';
+const mapConfig = {
   mode: 'juridiniai',
   center: [55.1694, 23.8813],
   zoom: 7,
-  overlayTileUrl: '/juridiniai/map/tiles/{z}/{x}/{y}.json',
-  overlayOpacity: 0.6,
-  maxNativeZoom: 16,
-  maxZoom: 16,
-  overlayBlurPx: 5,
-  detailZoomThreshold: 17,
-  viewportUrlTemplate: '/juridiniai/map/viewport?minLat={minLat}&minLon={minLon}&maxLat={maxLat}&maxLon={maxLon}',
-  detailPointStyle: {
-    radius: 6,
-    color: 'black',
-    fillColor: 'black',
-    fillOpacity: 1,
-    weight: 1,
-  },
-  detailClickUrlTemplate: '/juridiniai?location={lat},{lon}&locationRadius=10',
+  overlayTileUrl: `/juridiniai/map/tiles/{z}/{x}/{y}.json?map=1${mapSuffix}`,
+  overlayOpacity: 0.65,
+  overlayBlurPx: 4,
+  maxNativeZoom: 15,
+  maxZoom: 18,
+  detailZoomThreshold: 16,
+  viewportUrlTemplate: `/juridiniai/map/viewport?minLat={minLat}&minLon={minLon}&maxLat={maxLat}&maxLon={maxLon}${mapSuffix}`,
+  detailPointStyle: { radius: 5, color: 'black', fillColor: 'black', fillOpacity: 0.85, weight: 1 },
+  detailClickUrlTemplate: `/juridiniai?tileZoom=19&tileKey={tileKey}${detailSuffix}`,
 };
+
+const sortOptions = [
+  { value: '', label: 'Daugiausia darbuotojų' },
+  { value: 'registravimoData:desc', label: 'Naujausiai registruoti' },
+  { value: 'registravimoData:asc', label: 'Seniausiai registruoti' },
+  { value: 'vidutinisAtlyginimas:desc', label: 'Didžiausias atlyginimas' },
+];
+const sortValue = query.sort ? `${query.sort}:${query.sortDir ?? 'desc'}` : '';
 
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 ---
 
-{tikRezultatai ? (
-  <JuridiniaiResults
-    results={results}
-    numberOfResults={numberOfResults}
-    galimaEksportuoti={galimaEksportuoti}
-    queryParams={queryParams}
-    page={page}
-    pageCount={pageCount}
-  />
-) : (
-  <Layout
-    pageTitle="Juridinių asmenų paieška"
-    pageImage="https://viespirkiai.org/juridiniai.png"
-    colorScheme={colorScheme}
-    font={font}
-    customHead={config.customHead}
-  >
-    <main>
-      <SearchForm title="Juridinių asmenų paieška" searchValue={query.search} />
+<Layout pageTitle="Juridinių asmenų paieška" pageImage="https://viespirkiai.org/juridiniai.png" colorScheme={colorScheme} font={font} customHead={config.customHead}>
+  <main class="jur-main sidebar-main">
+    <form method="get" role="search" id="searchForm" class="jur-shell">
+      <h1 class="sr-only">Juridinių asmenų paieška</h1>
+      {FACET_PARAMS.map((key) => {
+        const value = Astro.url.searchParams.get(key);
+        return value ? <input type="hidden" name={key} value={value} /> : null;
+      })}
+      {query.tileZoom && <input type="hidden" name="tileZoom" value={query.tileZoom} />}
+      {query.tileKey && <input type="hidden" name="tileKey" value={query.tileKey} />}
 
-      <section class="results" id="juridiniaiRezultatai">
-        {hasSearch ? (
-          <JuridiniaiResults
-            results={results}
-            numberOfResults={numberOfResults}
-            galimaEksportuoti={galimaEksportuoti}
-            queryParams={queryParams}
-            page={page}
-            pageCount={pageCount}
-          />
-        ) : (
-          <>
-            <script>
-              window.addEventListener('DOMContentLoaded', () => {
-                const search = document.getElementById('search');
-                if (search) search.focus();
-              });
-            </script>
-            <br />
-            <Map id="map" class="h-[60vh] rounded-lg" height="60vh" config={juridiniaiMapConfig} />
-          </>
-        )}
-        <br />
-        <div class="flex gap-2 justify-center mb-2">
-          <a href="/juridiniai/topAdresai" class="btn btn-outline btn-sm">↗ Top adresai</a>
+      <aside class="sf-rail" aria-label="Filtrai">
+        <div class="sf-rail-head">
+          <button type="button" class="sf-rail-toggle" id="sfFiltersToggle" aria-expanded="false" aria-controls="sfRailBody">
+            <span>Filtrai</span>
+            {activeFilterCount > 0 && <span class="sf-filters-count">{activeFilterCount}</span>}
+            <span class="sf-filters-chevron" aria-hidden="true"></span>
+          </button>
         </div>
+        <div class="sf-rail-body" id="sfRailBody">
+          {facets && <div class="jur-facets">
+            <DokFacetSection label="Registracija" param="registracija" facet={facet('registracija', facets.registracija, 2)} allLabel="Visi" alwaysAll formatLabel={(value) => value === 'registruoti' ? 'Registruoti' : 'Išregistruoti'} />
+            <HistogramRangeFilter mode="date" legend="Registravimo data" nameFrom="registravimoDataNuo" nameTo="registravimoDataIki" redirectBase="/juridiniai" hist={facets.registravimoData} valueFrom={query.registravimoDataNuo} valueTo={query.registravimoDataIki} />
+            <DokFacetSection label="Teisinė forma" param="forma" facet={facet('forma', facets.formos, 6)} allLabel="Visos" modal={{ field: 'formosPavadinimas', title: 'Teisinė forma', always: true }} />
+            <DokFacetSection label="Teisinis statusas" param="statusas" facet={facet('statusas', facets.statusai, 5)} allLabel="Visi" modal={{ field: 'statusoPavadinimas', title: 'Teisinis statusas', always: true }} />
+            <DokFacetSection label="EVRK" param="evrk" facet={facet('evrk', facets.evrk, 8)} allLabel="Visi" stacked modal={{ field: 'evrkKodas', title: 'EVRK', always: true }} />
+            <HistogramRangeFilter mode="number" legend="Darbuotojai" nameFrom="darbuotojaiNuo" nameTo="darbuotojaiIki" redirectBase="/juridiniai" hist={facets.darbuotojai} valueFrom={query.darbuotojaiNuo} valueTo={query.darbuotojaiIki} />
+            <HistogramRangeFilter mode="number" legend="Vidutinis atlyginimas" unit="€" nameFrom="atlyginimasNuo" nameTo="atlyginimasIki" redirectBase="/juridiniai" hist={facets.atlyginimas} valueFrom={query.atlyginimasNuo} valueTo={query.atlyginimasIki} />
+            <DokFacetSection label="Apskritis" param="apskritis" facet={facet('apskritis', facets.apskritys, 6)} allLabel="Visos" modal={{ field: 'apskritis', title: 'Apskritis', always: true }} />
+            <DokFacetSection label="Savivaldybė" param="savivaldybe" facet={facet('savivaldybe', facets.savivaldybes, 8)} allLabel="Visos" modal={{ field: 'savivaldybe', title: 'Savivaldybė', always: true }} />
+          </div>}
+          <button type="submit" class="sf-rail-search">Ieškoti</button>
+        </div>
+      </aside>
+
+      <div class="sf-search">
+        <div class="search-bar">
+          <label for="search" aria-label="Paieška">
+            <svg class="search-icon" aria-hidden="true" width="20" height="20" viewBox="0 1 24 23" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.502 2a8.5 8.5 0 1 0 5.262 15.176L20.588 22 22 20.586l-4.824-4.824A8.5 8.5 0 0 0 10.502 2Zm-6.5 8.5a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0Z" fill="currentColor"/></svg>
+          </label>
+          <input type="search" name="search" id="search" class="search-bar__input" value={query.search} placeholder="Pavadinimas, JAR kodas, adresas, EVRK…" enterkeyhint="search" />
+          <Button type="submit">Ieškoti</Button>
+        </div>
+      </div>
+
+      <div class="sf-results">
+        <JuridiniaiResults results={results} numberOfResults={numberOfResults} queryParams={queryParams} page={page} pageCount={pageCount} sortOptions={sortOptions} sortValue={sortValue} />
+      </div>
+
+      <section class:list={['jur-map', { 'jur-map--hide-mobile': total < 25 }]} aria-label="Rezultatų žemėlapis">
+        <MapView id="juridiniaiMap" height="400px" config={mapConfig} />
       </section>
+    </form>
+    <JuridiniaiFacetModal />
+    <SearchSuggest saltinis="juridiniai" />
+  </main>
+</Layout>
 
-      <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        const form = document.getElementById('searchForm');
-        const inputElement = document.getElementById('search');
-        const results = document.getElementById('juridiniaiRezultatai');
-        if (!form || !inputElement || !results || !(inputElement instanceof HTMLInputElement)) return;
-        const input = inputElement;
-        let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-        let issuedRequestId = 0;
-        let latestRenderedRequestId = 0;
-        const inFlightControllers = new Map<number, AbortController>();
+<style>
+  .jur-facets :global(.dok-filter-section:first-child) { padding-top: 0; }
+  .jur-facets + :global(.ds-filter-panel--rail) { margin-top: 24px; }
+  #searchForm.jur-shell {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 900px) minmax(400px, 1fr);
+    grid-template-areas:
+      "rail search ."
+      "rail results map";
+    grid-template-rows: 105px auto;
+    column-gap: 32px;
+    justify-content: start;
+    align-items: stretch;
+    max-width: none;
+    width: 100%;
+    margin-inline: 0;
+    padding: 0 16px 40px;
+  }
+  #searchForm.jur-shell :global(.sf-rail) {
+    grid-area: rail;
+    min-width: 0;
+    padding: 24px 16px 24px 0;
+  }
+  #searchForm.jur-shell :global(.sf-search) {
+    grid-area: search;
+    position: relative;
+    z-index: 1100;
+  }
+  #searchForm.jur-shell :global(.sf-results) { grid-area: results; min-width: 0; }
+  #searchForm.jur-shell :global(.sf-results > *) { max-width: none; }
+  .jur-map {
+    grid-area: map;
+    align-self: start;
+    min-width: 0;
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .jur-map :global(.map-container) {
+    height: clamp(340px, 25vw, 460px) !important;
+    border-radius: 0;
+  }
 
-        const renderResponseIfNewest = (requestId: number, html: string) => {
-          if (requestId > latestRenderedRequestId) {
-            results.innerHTML = html;
-            latestRenderedRequestId = requestId;
-            return true;
-          }
-          return false;
-        };
+  @media (max-width: 1400px) {
+    #searchForm.jur-shell {
+      grid-template-columns: 240px minmax(0, 1fr);
+      grid-template-areas:
+        "rail search"
+        "rail results"
+        "rail map";
+      grid-template-rows: 105px auto auto;
+    }
+    .jur-map { margin: 24px 0 48px; }
+    .jur-map :global(.map-container) { height: 340px !important; }
+  }
 
-        const abortOlderInFlight = (requestId: number) => {
-          for (const [olderRequestId, controller] of inFlightControllers.entries()) {
-            if (olderRequestId < requestId) {
-              controller.abort();
-              inFlightControllers.delete(olderRequestId);
-            }
-          }
-        };
+  @media (max-width: 900px) {
+    #searchForm.jur-shell {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: "rail" "search" "map" "results";
+      grid-template-rows: auto;
+      column-gap: 0;
+      padding-inline: 24px;
+    }
+    #searchForm.jur-shell :global(.sf-rail) { padding: 0 0 12px; }
+    .jur-map { margin: 16px 0 24px; }
+    .jur-map--hide-mobile { display: none; }
+  }
+</style>
 
-        input.addEventListener('input', () => {
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(async () => {
-            const requestId = ++issuedRequestId;
-            const query = input.value.trim();
-            if (!query) {
-              const rendered = renderResponseIfNewest(requestId, '');
-              if (rendered) {
-                abortOlderInFlight(requestId);
-                history.replaceState(null, '', window.location.pathname);
-              }
-              return;
-            }
-            const controller = new AbortController();
-            inFlightControllers.set(requestId, controller);
-            try {
-              const base = form.getAttribute('action') || window.location.pathname;
-              const url = new URL(base, window.location.origin);
-              url.searchParams.set('search', query);
-              url.searchParams.set('tikRezultatai', 'true');
-              const res = await fetch(url, { signal: controller.signal });
-              if (!res.ok) throw new Error('Network error');
-              const html = await res.text();
-              const rendered = renderResponseIfNewest(requestId, html);
-              url.searchParams.delete('tikRezultatai');
-              if (rendered) {
-                abortOlderInFlight(requestId);
-                history.replaceState(null, '', url);
-              }
-            } catch (err: unknown) {
-              if (err instanceof DOMException && err.name === 'AbortError') return;
-              const rendered = renderResponseIfNewest(requestId, '<p>Klaida gaunant duomenis.</p>');
-              if (rendered) abortOlderInFlight(requestId);
-            } finally {
-              inFlightControllers.delete(requestId);
-            }
-          }, 100);
-        });
-      });
-      </script>
-    </main>
-  </Layout>
-)}
+<script is:inline>
+  document.querySelectorAll('.jur-facets .dok-more-btn').forEach((button) => {
+    if (button.hasAttribute('data-facet-modal')) return;
+    button.addEventListener('click', () => {
+      const more = button.previousElementSibling;
+      if (more?.classList.contains('dok-more-list')) { more.hidden = false; button.remove(); }
+    });
+  });
+  const toggle = document.getElementById('sfFiltersToggle');
+  const rail = document.querySelector('.sf-rail');
+  toggle?.addEventListener('click', () => {
+    const open = rail?.classList.toggle('is-open') ?? false;
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+</script>
+
+<script>
+  import { initRailFacetBatch } from '@/src/lib/mobileFilterBatch';
+  import { initStickyRail } from '@/src/lib/stickyRail';
+  import { initHistogramRangeFilters } from '@design-system/components/filters/histogramRangeFilter';
+  initRailFacetBatch('.jur-facets', () => ',');
+  initStickyRail();
+  initHistogramRangeFilters();
+  document.querySelectorAll<HTMLSelectElement>('select[data-autosubmit]').forEach((select) => select.addEventListener('change', () => select.form?.requestSubmit()));
+</script>

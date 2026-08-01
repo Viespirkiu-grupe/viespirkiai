@@ -166,7 +166,7 @@ const configElementId = `${id}-map-config`;
         if (detailLayer) map.removeLayer(detailLayer);
         detailLayer = L.layerGroup();
 
-        for (const [lat, lon] of (data.locations || [])) {
+        for (const [lat, lon, tileKey, count] of (data.locations || [])) {
           const circle = L.circleMarker([lat, lon], {
             radius: config.detailPointStyle?.radius ?? 6,
             color: config.detailPointStyle?.color ?? 'black',
@@ -176,9 +176,11 @@ const configElementId = `${id}-map-config`;
             interactive: true,
           }).addTo(detailLayer);
 
+          if (count > 1) circle.bindTooltip(String(count));
+
           if (config.detailClickUrlTemplate) {
             circle.on('click', () => {
-              window.location.href = resolveTemplate(config.detailClickUrlTemplate, { lat, lon });
+              window.location.href = resolveTemplate(config.detailClickUrlTemplate, { lat, lon, tileKey, count });
             });
           }
         }

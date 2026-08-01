@@ -29,8 +29,11 @@ export async function searchSuggestions(
     const { limit = 8, saltinis = "" } = options;
     if (!query.trim()) return [];
 
-    // Kai prašoma konkretaus šaltinio, pasiūlymai lieka tik to šaltinio – JAR
-    // čia nemaišom (pvz. sutarčių paieška su saltinis="sutartysPavadinimai").
+    // Juridiniai gyvena atskiroje JAR kolekcijoje, o ne bendrame
+    // "searchSuggestion" indekse, todėl šį šaltinį maršrutizuojam tiesiai ten.
+    if (saltinis === JURIDINIAI_SALTINIS) return searchJarSuggestions(query, limit);
+
+    // Kiti konkretūs šaltiniai lieka bendrame pasiūlymų indekse.
     if (saltinis) return tsSearchSuggestions(query, options);
 
     const [base, jar] = await Promise.all([
