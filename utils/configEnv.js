@@ -30,6 +30,7 @@ const ENV_MAP = [
     ["PG_PASSWORD", "pgPassword", "string"],
     ["PG_DATABASE", "pgDatabase", "string"],
     ["PG_MAX_CONNECTIONS", "pgMaxConnections", "number"],
+    ["SQL_LOG_FILE", "sqlLogFile", "string"],
 
     ["TYPESENSE_UP", "typesenseUp", "boolean"],
     ["TYPESENSE_NODES", "typesenseNodes", "json"],

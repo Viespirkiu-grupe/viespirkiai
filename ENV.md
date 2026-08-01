@@ -62,6 +62,21 @@ taskrunneriui.
 | `PG_PASSWORD` | `""` | Slaptažodis. |
 | `PG_DATABASE` | `viespirkiai` | DB pavadinimas. |
 | `PG_MAX_CONNECTIONS` | `16` | Maks. vienalaikis pool dydis aplikacijos užklausoms. |
+| `SQL_LOG_FILE` | — | Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą. |
+
+Profiliavimui: `SQL_LOG_FILE=/tmp/sql.log` įjungia visų per `postgres.query()` ir
+per `postgres.connect()` paimtus klientus einančių užklausų rašymą į failą.
+Eilutės formatas (stulpeliai atskirti TAB'u):
+
+```
+2026-08-01T10:12:33.123Z	4.2	OK	SELECT * FROM sutartys WHERE id IN ($?)
+```
+
+Parametrų **reikšmės nerašomos** (jos ir taip perduodamos atskirai), o
+pasikartojantys placeholder'iai bei inline literalų sąrašai sutraukiami iki
+vieno (`$1, $2, … $5000` → `$?`, `VALUES ($1),($2),($3)` → `VALUES ($?)`) – taip
+vienodos užklausos grupuojasi ir logas neišsipučia. `QueryStream` tipo užklausos
+neloginamos.
 
 ### MCP `execute_query` + analitiko rolė
 

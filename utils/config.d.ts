@@ -24,6 +24,8 @@ export interface Config {
     pgPassword: string;
     pgDatabase: string;
     pgMaxConnections: number;
+    /** Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą. */
+    sqlLogFile?: string;
 
     typesenseUp: boolean;
     typesenseNodes: TypesenseNodeConfig[];

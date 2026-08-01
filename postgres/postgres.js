@@ -24,22 +24,36 @@ export const postgres = new Pool({
 });
 
 // Debuginimui: config.pgLogQueries įjungia visų per postgres.query() einančių
-// užklausų logavimą su trukme; loginamos tik trukusios >= config.pgLogQueriesMinMs.
-// Sąmoningai NEapgaubiam postgres.connect() paimtų klientų (streamai, tranzakcijos)
-// – tik paprastą pool.query() promise formą; callback ir Submittable (pvz.
-// QueryStream) formos praleidžiamos nepaliestos.
+// užklausų logavimą į konsolę su trukme; loginamos tik trukusios
+// >= config.pgLogQueriesMinMs.
+//
+// Atskirai: SQL_LOG_FILE (config.sqlLogFile) – kai nurodytas, VISOS užklausos
+// (ir pool.query(), ir postgres.connect() paimtų klientų) append'inamos į tą
+// failą su trukme. Be jokių parametrų reikšmių, o pasikartojantys placeholder'iai
+// suvedami į vieną (žr. normalizeSql), kad `IN ($1..$5000)` netaptų megabaitine
+// eilute ir kad tokias pačias užklausas būtų galima grupuoti.
+//
+// Callback ir Submittable (pvz. QueryStream) formos praleidžiamos nepaliestos.
 const PG_LOG_QUERIES = config.pgLogQueries === true;
 const PG_LOG_QUERIES_MIN_MS = Number(config.pgLogQueriesMinMs) || 0;
-// Neprivalomas failas – atidaromas kartą, rašoma append režimu.
+// Neprivalomi failai – atidaromi kartą, rašoma append režimu.
 const pgLogFileStream =
     PG_LOG_QUERIES && config.pgLogQueriesFile
         ? fs.createWriteStream(config.pgLogQueriesFile, { flags: "a" })
         : null;
+const sqlLogFileStream = config.sqlLogFile
+    ? fs.createWriteStream(config.sqlLogFile, { flags: "a" })
+    : null;
 
-if (PG_LOG_QUERIES) {
-    const originalQuery = postgres.query.bind(postgres);
+/** Maks. į SQL_LOG_FILE rašomos (jau normalizuotos) užklausos ilgis. */
+const SQL_LOG_MAX_LEN = 10_000;
 
-    postgres.query = function (textOrConfig, values, callback) {
+/**
+ * Apgaubia query funkciją logavimu, išsaugant originalią semantiką.
+ * @param {Function} originalQuery - jau .bind()'inta query funkcija.
+ */
+function withQueryLogging(originalQuery) {
+    return function (textOrConfig, values, callback) {
         // Callback forma arba Submittable (turi .submit, pvz. QueryStream) – nepaliesta.
         if (
             typeof values === "function" ||
@@ -68,6 +82,57 @@ if (PG_LOG_QUERIES) {
     };
 }
 
+if (PG_LOG_QUERIES || sqlLogFileStream) {
+    postgres.query = withQueryLogging(postgres.query.bind(postgres));
+}
+
+// Pool'o klientai (tranzakcijos, batch'ai) – apgaubiam tik SQL_LOG_FILE režimu,
+// kad "visos užklausos" reikštų tikrai visas. Klientai pool'e naudojami
+// pakartotinai, todėl žymim, kad neapgaubtume to paties kliento du kartus.
+if (sqlLogFileStream) {
+    const WRAPPED = Symbol.for("viespirkiai.sqlLogWrapped");
+    const originalConnect = postgres.connect.bind(postgres);
+
+    const wrapClient = (client) => {
+        if (!client || client[WRAPPED]) return client;
+        client[WRAPPED] = true;
+        client.query = withQueryLogging(client.query.bind(client));
+        return client;
+    };
+
+    postgres.connect = function (callback) {
+        if (typeof callback === "function") {
+            return originalConnect((err, client, release) =>
+                callback(err, wrapClient(client), release),
+            );
+        }
+        return originalConnect().then(wrapClient);
+    };
+}
+
+/**
+ * Suveda užklausą į vieną eilutę be parametrų reikšmių ir sutraukia
+ * pasikartojančius placeholder'ius / literalų sąrašus iki vieno.
+ * `IN ($1, $2, ... $999)` → `IN ($?)`, `VALUES ($1),($2),($3)` → `VALUES ($?)`.
+ * @param {string} sql
+ */
+export function normalizeSql(sql) {
+    return String(sql ?? "")
+        .replace(/\s+/g, " ")
+        // Visi numeruoti placeholder'iai – į vieną bevardį.
+        .replace(/\$\d+/g, "$?")
+        // $?, $?, $? → $?
+        .replace(/\$\?(?:\s*,\s*\$\?)+/g, "$?")
+        // ($?), ($?), ($?) → ($?)  (daugiaeilis VALUES)
+        .replace(/\(\s*\$\?\s*\)(?:\s*,\s*\(\s*\$\?\s*\))+/g, "($?)")
+        // Inline literalų sąrašai (3+ elementai): (1, 2, 3) / ('a','b','c') → (…)
+        .replace(
+            /\(\s*(?:'(?:[^']|'')*'|-?\d+(?:\.\d+)?)(?:\s*,\s*(?:'(?:[^']|'')*'|-?\d+(?:\.\d+)?)){2,}\s*\)/g,
+            "(…)",
+        )
+        .trim();
+}
+
 function pgPad2(n) {
     return n < 10 ? "0" + n : "" + n;
 }
@@ -81,9 +146,23 @@ function pgPad2(n) {
  */
 function logPgQuery(sql, start, res, err) {
     const ms = performance.now() - start;
+    const now = new Date();
+
+    if (sqlLogFileStream) {
+        // Tab'ais atskirti stulpeliai: laikas, trukmė (ms), rezultatas, SQL.
+        let normalized = normalizeSql(sql);
+        if (normalized.length > SQL_LOG_MAX_LEN) {
+            normalized = normalized.slice(0, SQL_LOG_MAX_LEN) + "…";
+        }
+        const status = err ? `ERROR ${err.code ?? ""}`.trim() : "OK";
+        sqlLogFileStream.write(
+            `${now.toISOString()}\t${ms.toFixed(1)}\t${status}\t${normalized}\n`,
+        );
+    }
+
+    if (!PG_LOG_QUERIES) return;
     // Greitas sėkmingas – praleidžiam; klaidas loginam visada.
     if (!err && ms < PG_LOG_QUERIES_MIN_MS) return;
-    const now = new Date();
     const time = `${pgPad2(now.getHours())}:${pgPad2(now.getMinutes())}:${pgPad2(now.getSeconds())}`;
     const gray = "\x1b[90m";
     const reset = "\x1b[0m";

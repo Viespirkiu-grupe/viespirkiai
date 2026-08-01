@@ -52,6 +52,12 @@ export default {
     // spalvų, su pilna data). null = rašoma tik į konsolę.
     pgLogQueriesFile: null,
 
+    // Profiliavimui: kai nurodytas kelias (arba SQL_LOG_FILE env), VISOS
+    // užklausos (pool ir connect() klientai) append'inamos į šį failą:
+    // laikas<TAB>trukmė ms<TAB>OK/ERROR<TAB>SQL. Parametrų reikšmės nerašomos,
+    // pasikartojantys placeholder'iai sutraukiami iki vieno ($?).
+    sqlLogFile: null,
+
     // ─────────────────────────────────────────────────────────────────────
     // Typesense — paieškos pasiūlymai ir juridinių asmenų paieška
     // ─────────────────────────────────────────────────────────────────────

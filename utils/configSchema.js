@@ -31,6 +31,7 @@ const configSchema = z.object({
     pgPassword: z.string().default(""),
     pgDatabase: z.string().default("viespirkiai"),
     pgMaxConnections: z.number().int().positive().default(16),
+    sqlLogFile: z.string().optional(),
 
     typesenseUp: z.boolean().default(false),
     typesenseNodes: z.array(typesenseNodeSchema).default([]),
