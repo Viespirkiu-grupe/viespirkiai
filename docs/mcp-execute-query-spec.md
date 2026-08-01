@@ -184,10 +184,10 @@ fails fast rather than silently returning incomplete schema.
 
 ### Covered-table redirect
 
-Tables that are fully covered by a view (`jarCsv`, `sutartys`, `viesiejiPirkimai`, `pinregJuridiniaiRysiai`,
+Tables that are fully covered by a view (`jarAsmenys`, `sutartys`, `viesiejiPirkimai`, `pinregJuridiniaiRysiai`,
 `atn1ataskaitos`, `bylosDalyviai`) return a redirect message instead of raw column data:
 
-> *"Table 'jarCsv' is fully covered by view 'v_company'. Call get_schema with 'v_company' to see columns, joins,
+> *"Table 'jarAsmenys' is fully covered by view 'v_company'. Call get_schema with 'v_company' to see columns, joins,
 > and an example query."*
 
 The mapping is defined in [`tempViews.js`](../../modules/mcp/analyst/tempViews.js) as `COVERED_TABLES_BY_VIEWS`.
@@ -355,7 +355,7 @@ recursive graph traversal where full schema control is needed.
 
 | View             | Tags                                                      | Main table               | Key additions                                                       |
 |------------------|-----------------------------------------------------------|--------------------------|---------------------------------------------------------------------|
-| `v_company`      | capacity, blacklist, labor, domains, court                | `jarCsv`                 | Latest Sodra snapshot (LATERAL), compliance flags, count subqueries |
+| `v_company`      | capacity, blacklist, labor, domains, court                | `jarAsmenys`                 | Latest Sodra snapshot (LATERAL), compliance flags, count subqueries |
 | `v_sutartys`     | contracts, buyer-supplier, cpv, value, timing, frameworks | `sutartys`               | Buyer + seller names denormalized; `::text` cast on `jarKodas`      |
 | `v_pirkimas`     | procedures, criteria, lot-count, single-bidder            | `viesiejiPirkimai`       | Organizer name, municipality, short code                            |
 | `v_person_links` | conflict-of-interest, directors, beneficial-owners        | `pinregJuridiniaiRysiai` | Company name joined; `irasoTipas` distinguishes role type           |
@@ -382,7 +382,7 @@ All tables accessible to `execute_query` (Layer 2) and queryable by the analyst 
 
 ```
 sutartys, sutartysAtviriDuomenys, sutartysAtviriDuomenysImp
-jarCsv, jar
+jarAsmenys, jar
 viesiejiPirkimai, viesiejiPirkimaiVykdytojai
 pinregJuridiniaiRysiai, pinreg
 failai
@@ -524,7 +524,7 @@ GRANT USAGE ON SCHEMA public TO analyst;
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
     sutartys, "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
-    "jarCsv", jar,
+    "jarAsmenys", jar,
     "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai",
     "pinregJuridiniaiRysiai", pinreg,
     failai,

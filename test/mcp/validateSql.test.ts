@@ -60,8 +60,8 @@ describe("Layer 2 — table whitelist", () => {
         expect(validateSql("SELECT * FROM sutartys")).toBeNull();
     });
 
-    it("accepts jarCsv (mixed-case)", () => {
-        expect(validateSql('SELECT * FROM "jarCsv"')).toBeNull();
+    it("accepts jarAsmenys (mixed-case)", () => {
+        expect(validateSql('SELECT * FROM "jarAsmenys"')).toBeNull();
     });
 
     it("accepts TEMP view name", () => {
@@ -140,7 +140,7 @@ describe("Layer 3 — function whitelist", () => {
     });
 
     it("accepts ::text cast (not a function)", () => {
-        expect(validateSql('SELECT "jarKodas"::text FROM "jarCsv"')).toBeNull();
+        expect(validateSql('SELECT "jarKodas"::text FROM "jarAsmenys"')).toBeNull();
     });
 
     it("rejects pg_sleep", () => {
@@ -179,7 +179,7 @@ describe("Layer 4 — complexity limits", () => {
     function buildJoinQuery(n: number): string {
         let sql = 'SELECT s."tiekejoKodas" FROM sutartys s';
         for (let i = 1; i <= n; i++) {
-            sql += ` JOIN "jarCsv" j${i} ON j${i}."jarKodas"::text = s."tiekejoKodas"`;
+            sql += ` JOIN "jarAsmenys" j${i} ON j${i}."jarKodas"::text = s."tiekejoKodas"`;
         }
         return sql;
     }

@@ -1,6 +1,11 @@
 import Timings from "../../utils/timings.js";
 import { postgres } from "../../postgres/postgres.js";
 import { specialJarCodes } from "./specialJarCodes.js";
+import {
+    JAR_ADDRESS_JOINS,
+    JAR_ADDRESS_SQL,
+    JAR_LOCATION_SQL,
+} from "./jarReadSql.js";
 
 import { gautiDarboSkelbimus } from "../uzimtumoTarnyba/darboSkelbimai.js";
 import { gautiFinansuDuomenis } from "../finansai/finansuDuomenys.js";
@@ -38,26 +43,32 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
         };
     }
 
-    // Fetch jarCsv, jar, and isregistruoti in parallel — all independent
-    timings.start("jarCsv");
+    // Naujas RC JAR modelis ir senasis data.gov.lt įrašas su UUID yra
+    // nepriklausomi. UUID kol kas reikalingas kelioms istorinėms integracijoms.
+    timings.start("jarAsmenys");
     timings.start("jar");
-    timings.start("isregistruotas");
-    const [{ rows: jarRezultatai }, jarRes, { rows: isrRezultatai }] = await Promise.all([
+    const [{ rows: jarRezultatai }, jarRes] = await Promise.all([
         postgres.query(
-            `SELECT *,
-                        ST_X(location::geometry) AS lon,
-                        ST_Y(location::geometry) AS lat
-                 FROM "jarCsv"
-                 WHERE "jarKodas" = $1
+            `SELECT jar_person.*,
+                    jar_form."pavadinimas" AS "formosPavadinimas",
+                    jar_status."pavadinimas" AS "statusoPavadinimas",
+                    ${JAR_ADDRESS_SQL} AS "adresas",
+                    ST_X((${JAR_LOCATION_SQL})::geometry) AS lon,
+                    ST_Y((${JAR_LOCATION_SQL})::geometry) AS lat
+                 FROM public."jarAsmenys" jar_person
+                 LEFT JOIN public."jarFormos" jar_form
+                    ON jar_form."kodas" = jar_person."formosKodas"
+                 LEFT JOIN public."jarStatusai" jar_status
+                    ON jar_status."kodas" = jar_person."statusoKodas"
+                 ${JAR_ADDRESS_JOINS}
+                 WHERE jar_person."jarKodas" = $1
                  LIMIT 1`,
             [jarKodas],
         ),
         postgres.query(`SELECT * FROM "jar" WHERE "jarKodas" = $1`, [jarKodas]),
-        postgres.query(`SELECT * FROM "jarCsvIsregistruoti" WHERE "jarKodas" = $1 LIMIT 1`, [jarKodas]),
     ]);
-    timings.end("jarCsv");
+    timings.end("jarAsmenys");
     timings.end("jar");
-    timings.end("isregistruotas");
 
     // data.gov.lt ID JAR
     let jarId;
@@ -65,10 +76,10 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
         jarId = jarRes.rows[0]._id;
     }
 
-    // Format isregistruoti dates
+    // Išregistruoti asmenys dabar yra toje pačioje jarAsmenys lentelėje.
     let isregistruotasAsmuo = null;
-    if (isrRezultatai.length > 0) {
-        const isr = isrRezultatai[0];
+    if (jarRezultatai[0]?.isregistravimoData) {
+        const isr = { ...jarRezultatai[0] };
         isr.registravimoData = isr.registravimoData ? new Date(isr.registravimoData).toLtDate() : null;
         isr.isregistravimoData = isr.isregistravimoData ? new Date(isr.isregistravimoData).toLtDate() : null;
         isr.duomenuData = isr.duomenuData ? new Date(isr.duomenuData).toLtDate() : null;
@@ -76,14 +87,15 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
     }
 
     // 404 — not found in any main registry table
+    if (isregistruotasAsmuo) {
+        return {
+            isregistruotas: true,
+            isregistruotasAsmuo,
+            timings,
+        };
+    }
+
     if (jarRezultatai.length === 0 && jarRes.rows.length === 0) {
-        if (isregistruotasAsmuo) {
-            return {
-                isregistruotas: true,
-                isregistruotasAsmuo,
-                timings,
-            };
-        }
 
         // Nėra JAR registre, bet gali turėti sutarčių (pvz. užsienio tiekėjas,
         // fizinis asmuo ar registro lentelėse trūkstamas asmuo) — tada vietoj
@@ -120,9 +132,9 @@ export async function getJuridinisInfo(jarKodas, options = {}) {
     delete jar.lat;
 
     // Formatuojame JAR datas
-    jar.registravimoData = new Date(jar.registravimoData).toLtDate();
-    jar.duomenuData = new Date(jar.duomenuData).toLtDate();
-    jar.statusasNuo = new Date(jar.statusasNuo).toLtDate();
+    jar.registravimoData = jar.registravimoData ? new Date(jar.registravimoData).toLtDate() : null;
+    jar.duomenuData = jar.duomenuData ? new Date(jar.duomenuData).toLtDate() : null;
+    jar.statusasNuo = jar.statusasNuo ? new Date(jar.statusasNuo).toLtDate() : null;
     jar.jarId = jarId;
 
     const taskMap = {

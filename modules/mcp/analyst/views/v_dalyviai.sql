@@ -38,4 +38,4 @@ FROM atn1ataskaitos a
              WHERE COALESCE(e."ataskaitaId", ap."ataskaitaId") = a.id
                AND COALESCE(e."dalyvioKodas", ap."dalyvioKodas") = d.kodas
          ) p ON true
-         LEFT JOIN "jarCsv" j ON j."jarKodas"::text = d.kodas
+         LEFT JOIN "jarAsmenys" j ON j."jarKodas"::text = d.kodas

@@ -65,8 +65,8 @@ LEFT JOIN LATERAL (
     WHERE code.code = s."bvpzKodas"::text
     LIMIT 1
 ) b ON true
-LEFT JOIN "jarCsv" pb ON pb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
-LEFT JOIN "jarCsv" tb ON tb."jarKodas"::text = s."pirmoTiekejoKodas"
+LEFT JOIN "jarAsmenys" pb ON pb."jarKodas"::text = s."perkanciosiosOrganizacijosKodas"
+LEFT JOIN "jarAsmenys" tb ON tb."jarKodas"::text = s."pirmoTiekejoKodas"
 LEFT JOIN LATERAL (
     SELECT array_agg(COALESCE(
                b2.code || CASE WHEN NULLIF(b2.checksum, '') IS NULL THEN '' ELSE '-' || b2.checksum END,

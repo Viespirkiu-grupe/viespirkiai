@@ -7,7 +7,7 @@ import { nuskaitytiDomregDomena } from "../modules/domenai/scrapeDomreg.js";
 import { litekoScrapeLatestDays } from "../modules/liteko/scrape.js";
 import { surastiNuosprendzioDalyvius } from "../modules/liteko/scrapeContent.js";
 import { pravalytiOcrRezervacijas } from "../modules/ocr/pravalytiRezervacijas.js";
-import { geolocateJarCsv } from "../modules/juridiniai/findCoordinates.js";
+import { geolocateJarAddress } from "../modules/juridiniai/findCoordinates.js";
 import { nuskaitytiInformaciniusLeidinius } from "../modules/registruCentrasPranesimai/scrape.js";
 import { nuskaitytiInformaciniLeidini } from "../modules/registruCentrasPranesimai/scrapeContent.js";
 import { nuskaitytiVisasNeskelbiamasDerybas } from "../modules/neskelbiamosDerybos/scrape.js";
@@ -91,12 +91,12 @@ export default [
         job: pravalytiOcrRezervacijas,
     },
     {
-        name: "geolocateJarCsv",
+        name: "geolocateJarAddress",
         mode: "asap",
         priority: 2,
         cooldown: 60,
         errorCooldown: 60,
-        job: geolocateJarCsv,
+        job: geolocateJarAddress,
     },
     {
         name: "nuskaitytiInformaciniusLeidinius",

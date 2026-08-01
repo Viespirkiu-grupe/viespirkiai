@@ -7,7 +7,7 @@ const parser = new Parser();
 
 export const TABLE_WHITELIST: Set<string> = new Set([
     "sutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
-    "jarCsv", "jar",
+    "jarAsmenys", "jar",
     "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai",
     "pinregJuridiniaiRysiai", "pinreg",
     "failai",

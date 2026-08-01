@@ -102,7 +102,7 @@ describe("getMixedCaseMap", () => {
 
     it("includes mixed-case table columns from the DB", async () => {
         const map = await getMixedCaseMap();
-        // jarCsv.jarKodas is a raw table column that must also be in the map
+        // jarAsmenys.jarKodas is a raw table column that must also be in the map
         expect(map.has("jarkodas")).toBe(true);
     });
 

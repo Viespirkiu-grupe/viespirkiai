@@ -36,7 +36,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         tags: ["capacity", "blacklist", "labor", "domains", "court"],
         keys: ["jarKodas", "pavadinimas", "darbuotojai", "melagingisTiekejas", "bylosSkaicius"],
         joins: [
-            ["jarKodas", "jarCsv.jarKodas", "strict"],
+            ["jarKodas", "jarAsmenys.jarKodas", "strict"],
         ],
         columns: [
             "jarKodas: text",

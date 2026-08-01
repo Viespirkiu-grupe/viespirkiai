@@ -49,10 +49,19 @@ export async function findSingleJuridinisPanel(q: string): Promise<JuridinisPane
     const [locationRes, jarRes] = await Promise.all([
       optional(postgres.query(
       `SELECT
-         CASE WHEN location IS NULL THEN NULL ELSE ST_Y(location::geometry) END AS lat,
-         CASE WHEN location IS NULL THEN NULL ELSE ST_X(location::geometry) END AS lon
-       FROM public."jarCsv"
-       WHERE "jarKodas" = $1
+         CASE WHEN resolved.location IS NULL THEN NULL ELSE ST_Y(resolved.location::geometry) END AS lat,
+         CASE WHEN resolved.location IS NULL THEN NULL ELSE ST_X(resolved.location::geometry) END AS lon
+       FROM public."jarAsmenys" jar_person
+       LEFT JOIN public."jarAsmenuAdresai" jar_address
+         ON jar_address."jarKodas" = jar_person."jarKodas"
+       LEFT JOIN public."arPatalposAdresai" jar_room
+         ON jar_room."patKodas" = jar_address."aobKodas"
+       LEFT JOIN public."arAdresai" jar_ar
+         ON jar_ar."kodas" = COALESCE(jar_room."aobKodas", jar_address."aobKodas")
+       CROSS JOIN LATERAL (
+         SELECT COALESCE(jar_ar."geometrija", jar_address."fallbackLocation") AS location
+       ) resolved
+       WHERE jar_person."jarKodas" = $1
        LIMIT 1`,
       [item.jarKodas],
       )),
