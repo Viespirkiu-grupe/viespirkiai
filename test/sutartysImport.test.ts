@@ -6,6 +6,18 @@ vi.mock("../postgres/postgres.js", () => ({
     postgres: { query },
 }));
 
+/*
+`postgres.query` priimamas dviem pavidalais: `(tekstas, reikšmės)` ir vienu
+konfigūracijos objektu `{ name, text, values }` (paruoštos užklausos, žr.
+postgres/prepared.js). Testams svarbus tik SQL ir parametrai, tad suvienodinam.
+*/
+const kvietimai = (): [string, any[]][] =>
+    query.mock.calls.map(([pirmas, antras]) =>
+        pirmas && typeof pirmas === "object"
+            ? [String(pirmas.text), pirmas.values ?? []]
+            : [String(pirmas), antras ?? []],
+    );
+
 describe("sutartys import validation", () => {
     beforeEach(() => {
         query.mockReset();
@@ -63,9 +75,9 @@ describe("sutartys import validation", () => {
             },
         ]);
 
-        const vpmCall = query.mock.calls.find(
+        const vpmCall = kvietimai().find(
             ([sql, params]) =>
-                String(sql).includes('INSERT INTO public."vpmSutartys"') &&
+                sql.includes('INSERT INTO public."vpmSutartys"') &&
                 String(params?.[0]).includes('"unikalusId":1') &&
                 /^[a-f0-9]{32}$/.test(String(params?.[1])),
         );
@@ -98,14 +110,14 @@ describe("sutartys import validation", () => {
             },
         ]);
 
-        const brokasCall = query.mock.calls.find(([sql]) =>
-            String(sql).includes('INSERT INTO public."vpmSutartysBrokas"'),
+        const brokasCall = kvietimai().find(([sql]) =>
+            sql.includes('INSERT INTO public."vpmSutartysBrokas"'),
         );
         expect(brokasCall?.[1]).toEqual([2005493961]);
 
-        const vpmDocs = query.mock.calls
+        const vpmDocs = kvietimai()
             .filter(([sql]) =>
-                String(sql).includes('INSERT INTO public."vpmSutartys"'),
+                sql.includes('INSERT INTO public."vpmSutartys"'),
             )
             .map(([, params]) => JSON.parse(params[0]));
         expect(vpmDocs.map((doc) => doc.unikalusId)).toEqual([1, 2005493961]);

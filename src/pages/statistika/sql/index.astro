@@ -31,6 +31,7 @@ let eilutes: UzklausosEilute[] = [];
 let visoUzklausu = 0;
 let visoMs = 0;
 let formuIsViso = 0;
+let laukeEileje = 0;
 let klaida: string | null = null;
 let yraTekstuLentele = true;
 
@@ -40,6 +41,7 @@ try {
   visoUzklausu = rezultatas.visoUzklausu;
   visoMs = rezultatas.visoMs;
   formuIsViso = rezultatas.formuIsViso;
+  laukeEileje = rezultatas.laukeEileje;
   yraTekstuLentele = await arYraTekstuLentele();
 } catch (error: any) {
   klaida = error?.message ?? String(error);
@@ -99,7 +101,9 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=15');
 
     {!klaida && (
       <MetricCardGrid minWidth="118px" className="mb-8">
-        <MetricCard label="Užklausų"><span class="cell-mono">{sk(visoUzklausu)}</span></MetricCard>
+        <MetricCard label="Užklausų" meta={laukeEileje ? 'be laukusių eilėje' : undefined}>
+          <span class="cell-mono">{sk(visoUzklausu)}</span>
+        </MetricCard>
         <MetricCard label="Bendras DB laikas"><span class="cell-mono">{formatuotiMs(visoMs)}</span></MetricCard>
         <MetricCard label="Vidutiniškai per užklausą">
           <span class="cell-mono">{formatuotiMs(visoUzklausu ? visoMs / visoUzklausu : 0)}</span>
@@ -107,13 +111,19 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=15');
         <MetricCard label="Skirtingų formų" meta={formuIsViso > RODOMA ? `rodoma ${RODOMA}` : undefined}>
           <span class="cell-mono">{sk(formuIsViso)}</span>
         </MetricCard>
+        <MetricCard label="Laukė eilėje" meta="pool pilnas, neskaičiuota">
+          <span class="cell-mono">{sk(laukeEileje)}</span>
+        </MetricCard>
       </MetricCardGrid>
     )}
 
     {!klaida && (
       <section class="page-section">
         <h2 class="mb-1">TOP {RODOMA} brangiausių</h2>
-        <p class="text-muted text-sm mb-4">Rikiuota pagal bendrą DB laiką (kiekis × trukmė).</p>
+        <p class="text-muted text-sm mb-4">
+          Rikiuota pagal bendrą DB laiką (kiekis × trukmė). Neįskaičiuotos užklausos,
+          laukusios laisvos jungties — jų trukmė matuoja pool'o apkrovą, ne pačią užklausą.
+        </p>
         <DataTable
           columns={[
             { label: 'Tipas' },

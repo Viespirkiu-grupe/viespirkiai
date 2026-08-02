@@ -37,10 +37,12 @@ describe("VPM sutartis upsert", () => {
             archived: true,
             tracked: true,
         });
-        expect(query).toHaveBeenCalledWith(
-            UPSERT_SQL,
-            [prepared.json, prepared.md5, searchText],
-        );
+        // Paruošta (prepared) užklausa – vienas konfigūracijos objektas.
+        expect(query).toHaveBeenCalledWith({
+            name: "vpmSutartisUpsert",
+            text: UPSERT_SQL,
+            values: [prepared.json, prepared.md5, searchText],
+        });
         expect(UPSERT_SQL).toContain(
             'WHERE "vpmSutartys".hash IS DISTINCT FROM EXCLUDED.hash',
         );

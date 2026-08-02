@@ -11,9 +11,18 @@ import { SQL_LOG_INDEX_PATTERN } from '@/quickwit/sqlLogIngest.js';
  * Skirtingų užklausų formų yra keli šimtai, tad `terms` agregacija paimama
  * visa (iki `MAX_FORMU`) ir rikiuojama JS pusėje — taip nepriklausom nuo to, ar
  * Quickwit versija moka rikiuoti pagal sub-agregaciją.
+ *
+ * Visos trukmės skaičiuojamos TIK iš `queued = false` įrašų: kai pool'as pilnas,
+ * į `ms` įskaičiuotas laukimas laisvos jungties, tad tokios reikšmės matuoja
+ * apkrovą, o ne pačios užklausos kainą, ir smarkiai iškreipia p95/p99 bei
+ * vidurkį. Laukusių eilėje kiekis rodomas atskirai (`laukeEileje`).
  */
 
 const MAX_FORMU = 1_000;
+
+/** Filtras „be laukusių eilėje“. Seni įrašai `queued` lauko neturi – juos įskaitom. */
+const BE_EILES = 'NOT queued:true';
+const TIK_EILE = 'queued:true';
 
 /** `op` reikšmės → Badge variantas (kad spalvos abiejuose puslapiuose sutaptų). */
 export const OP_VARIANTAI: Record<string, "default" | "primary" | "success" | "warning" | "danger" | "info" | "muted"> = {
@@ -138,24 +147,34 @@ export async function arYraTekstuLentele(): Promise<boolean> {
 export async function brangiausiosUzklausos(
   laikotarpis: Laikotarpis,
   limit = 100,
-): Promise<{ eilutes: UzklausosEilute[]; visoUzklausu: number; visoMs: number; formuIsViso: number }> {
-  const atsakymas: any = await searchIndexPattern(SQL_LOG_INDEX_PATTERN, {
-    query: '*',
-    max_hits: 0,
-    ...laikoRezis(laikotarpis),
-    aggs: {
-      formos: {
-        terms: { field: 'md5', size: MAX_FORMU },
-        aggs: {
-          visoMs: { sum: { field: 'ms' } },
-          vidMs: { avg: { field: 'ms' } },
-          maksMs: { max: { field: 'ms' } },
-          op: { terms: { field: 'op', size: 1 } },
-          klaidos: { terms: { field: 'ok', size: 2 } },
+): Promise<{
+  eilutes: UzklausosEilute[];
+  visoUzklausu: number;
+  visoMs: number;
+  formuIsViso: number;
+  laukeEileje: number;
+}> {
+  const rezis = laikoRezis(laikotarpis);
+  const [atsakymas, eileje]: any[] = await Promise.all([
+    searchIndexPattern(SQL_LOG_INDEX_PATTERN, {
+      query: BE_EILES,
+      max_hits: 0,
+      ...rezis,
+      aggs: {
+        formos: {
+          terms: { field: 'md5', size: MAX_FORMU },
+          aggs: {
+            visoMs: { sum: { field: 'ms' } },
+            vidMs: { avg: { field: 'ms' } },
+            maksMs: { max: { field: 'ms' } },
+            op: { terms: { field: 'op', size: 1 } },
+            klaidos: { terms: { field: 'ok', size: 2 } },
+          },
         },
       },
-    },
-  });
+    }),
+    searchIndexPattern(SQL_LOG_INDEX_PATTERN, { query: TIK_EILE, max_hits: 0, ...rezis }),
+  ]);
 
   const kausai = atsakymas?.aggregations?.formos?.buckets ?? [];
   const visos: UzklausosEilute[] = kausai.map((b: any) => ({
@@ -182,6 +201,7 @@ export async function brangiausiosUzklausos(
     visoUzklausu: visos.reduce((s, e) => s + e.kiekis, 0),
     visoMs: visos.reduce((s, e) => s + e.visoMs, 0),
     formuIsViso: visos.length,
+    laukeEileje: skaicius(eileje?.num_hits),
   };
 }
 
@@ -191,30 +211,39 @@ export async function uzklausosDetales(
   laikotarpis: Laikotarpis,
 ): Promise<Detales | null> {
   const zings = zingsnis(laikotarpis);
-  const atsakymas: any = await searchIndexPattern(SQL_LOG_INDEX_PATTERN, {
-    query: `md5:"${md5.replace(/"/g, '')}"`,
-    max_hits: 0,
-    ...laikoRezis(laikotarpis),
-    aggs: {
-      visoMs: { sum: { field: 'ms' } },
-      vidMs: { avg: { field: 'ms' } },
-      maksMs: { max: { field: 'ms' } },
-      percentiliai: { percentiles: { field: 'ms', percents: [50, 95, 99] } },
-      op: { terms: { field: 'op', size: 1 } },
-      role: { terms: { field: 'role', size: 10 } },
-      host: { terms: { field: 'host', size: 10 } },
-      env: { terms: { field: 'env', size: 5 } },
-      ok: { terms: { field: 'ok', size: 2 } },
-      queued: { terms: { field: 'queued', size: 2 } },
-      laike: {
-        date_histogram: { field: 'ts', fixed_interval: zings.tekstas },
-        aggs: { visoMs: { sum: { field: 'ms' } } },
+  const forma = `md5:"${md5.replace(/"/g, '')}"`;
+  const rezis = laikoRezis(laikotarpis);
+  const [atsakymas, eileje]: any[] = await Promise.all([
+    searchIndexPattern(SQL_LOG_INDEX_PATTERN, {
+      query: `${forma} AND ${BE_EILES}`,
+      max_hits: 0,
+      ...rezis,
+      aggs: {
+        visoMs: { sum: { field: 'ms' } },
+        vidMs: { avg: { field: 'ms' } },
+        maksMs: { max: { field: 'ms' } },
+        percentiliai: { percentiles: { field: 'ms', percents: [50, 95, 99] } },
+        op: { terms: { field: 'op', size: 1 } },
+        role: { terms: { field: 'role', size: 10 } },
+        host: { terms: { field: 'host', size: 10 } },
+        env: { terms: { field: 'env', size: 5 } },
+        ok: { terms: { field: 'ok', size: 2 } },
+        laike: {
+          date_histogram: { field: 'ts', fixed_interval: zings.tekstas },
+          aggs: { visoMs: { sum: { field: 'ms' } } },
+        },
       },
-    },
-  });
+    }),
+    searchIndexPattern(SQL_LOG_INDEX_PATTERN, {
+      query: `${forma} AND ${TIK_EILE}`,
+      max_hits: 0,
+      ...rezis,
+    }),
+  ]);
 
   const kiekis = skaicius(atsakymas?.num_hits);
-  if (!kiekis) return null;
+  const laukeEileje = skaicius(eileje?.num_hits);
+  if (!kiekis && !laukeEileje) return null;
 
   const a = atsakymas.aggregations ?? {};
   const kausaiKaip = (agg: any) =>
@@ -243,9 +272,7 @@ export async function uzklausosDetales(
     klaidos: skaicius(
       (a.ok?.buckets ?? []).find((x: any) => x.key === 0 || x.key === false)?.doc_count,
     ),
-    laukeEileje: skaicius(
-      (a.queued?.buckets ?? []).find((x: any) => x.key === 1 || x.key === true)?.doc_count,
-    ),
+    laukeEileje,
     pagalRole: kausaiKaip(a.role),
     pagalHost: kausaiKaip(a.host),
     pagalEnv: kausaiKaip(a.env),

@@ -103,7 +103,9 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=15');
     {detales && (
       <Fragment>
         <MetricCardGrid minWidth="112px" className="mb-8">
-          <MetricCard label="Kiekis"><span class="cell-mono">{sk(detales.kiekis)}</span></MetricCard>
+          <MetricCard label="Kiekis" meta={detales.laukeEileje ? 'be laukusių eilėje' : undefined}>
+            <span class="cell-mono">{sk(detales.kiekis)}</span>
+          </MetricCard>
           <MetricCard label="Viso DB laiko"><span class="cell-mono">{formatuotiMs(detales.visoMs)}</span></MetricCard>
           <MetricCard label="Vidurkis"><span class="cell-mono">{formatuotiMs(detales.vidMs)}</span></MetricCard>
           <MetricCard label="p50"><span class="cell-mono">{formatuotiMs(detales.p50)}</span></MetricCard>
@@ -113,7 +115,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=15');
           <MetricCard label="Klaidos">
             <span class={detales.klaidos ? 'cell-mono text-danger' : 'cell-mono'}>{sk(detales.klaidos)}</span>
           </MetricCard>
-          <MetricCard label="Laukė eilėje" meta="pool buvo pilnas">
+          <MetricCard label="Laukė eilėje" meta="pool pilnas, neskaičiuota">
             <span class="cell-mono">{sk(detales.laukeEileje)}</span>
           </MetricCard>
         </MetricCardGrid>
