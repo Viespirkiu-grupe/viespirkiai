@@ -4,7 +4,8 @@ import { parsePgArray } from "../../postgres/postgres.js";
 // OCR rezultatų sidecar JSON.
 const store = createSidecarStore({
     locationKey: "ocrRezultataiLocation",
-    extension: "json",
+    sqliteLocationKey: "ocrRezultataiSqliteLocation",
+    sqliteTable: "ocrRezultatai",
     label: "OCR rezultato",
     deserialize: (text) => {
         const rezultatas = JSON.parse(text);
@@ -17,8 +18,6 @@ const store = createSidecarStore({
     },
 });
 
-export const getRezultatasPath = store.getPath;
-
 /**
  * Raktas imamas iš paties rezultato (`rezultatas.md5`), todėl signatūra
  * skiriasi nuo kitų saugyklų.
@@ -28,3 +27,6 @@ export const saveRezultatasFs = (rezultatas) => store.save(rezultatas.md5, rezul
 
 /** @param {string} md5 */
 export const readRezultatasFs = store.read;
+
+export const readRezultatasLocalRaw = store.readLocalRaw;
+export const isOcrRezultataiLocalStoreConfigured = store.localConfigured;

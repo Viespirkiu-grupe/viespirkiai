@@ -3,21 +3,24 @@ import { configFromEnv } from '@/utils/configEnv.js';
 import { normalizeConfig } from '@/utils/configSchema.js';
 
 describe('optional server features', () => {
-  it('keeps request logging and ATN-1 pages disabled by default', () => {
+  it('keeps optional server features disabled by default', () => {
     const config = normalizeConfig({});
 
     expect(config.logRequests).toBe(false);
     expect(config.enableAtn1).toBe(false);
+    expect(config.enableBotChallenge).toBe(false);
   });
 
-  it('reads request logging and ATN-1 switches from environment variables', () => {
+  it('reads optional server switches from environment variables', () => {
     const config = normalizeConfig(configFromEnv({
       LOG_REQUESTS: 'true',
       ENABLE_ATN1: '1',
+      ENABLE_BOT_CHALLENGE: 'yes',
     }));
 
     expect(config.logRequests).toBe(true);
     expect(config.enableAtn1).toBe(true);
+    expect(config.enableBotChallenge).toBe(true);
   });
 });
 
@@ -34,4 +37,19 @@ describe('external source URLs', () => {
     expect(normalizeConfig({}).esInvesticijos2021Url)
       .toBe('https://2021.esinvesticijos.lt');
   });
+});
+
+describe('SQLite sidecar locations', () => {
+  it('reads all three SQLite file paths from the environment', () => {
+    const config = normalizeConfig(configFromEnv({
+      FAILAIINFO_SQLITE_LOCATION: '/data/failaiInfo.sqlite',
+      DOKUMENTAI_SQLITE_LOCATION: '/data/dokumentai.sqlite',
+      OCR_REZULTATAI_SQLITE_LOCATION: '/data/ocr.sqlite',
+    }));
+
+    expect(config.failaiInfoSqliteLocation).toBe('/data/failaiInfo.sqlite');
+    expect(config.dokumentaiSqliteLocation).toBe('/data/dokumentai.sqlite');
+    expect(config.ocrRezultataiSqliteLocation).toBe('/data/ocr.sqlite');
+  });
+
 });

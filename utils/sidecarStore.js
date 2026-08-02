@@ -1,20 +1,13 @@
-import fs from "fs";
-import path from "path";
 import { createHash } from "crypto";
 import config from "./config.js";
+import { createCompressedSqliteStore } from "./sqliteSidecarStore.js";
 
 /*
 Bendra „sidecar" saugyklų logika.
 
-Sidecar — tai šalia DB eilutės gyvenantis failas, adresuojamas turinio hash'u
-(md5). Kelias sudaromas iš pirmų 5 hash'o simbolių: `a/b/c/d/e/abcde….json` —
-taip viename kataloge nesusikaupia milijonai failų.
-
-`config.<locationKey>` gali būti:
-  - katalogas → skaitom/rašom tiesiai į failų sistemą;
-  - `http(s)://…` → tik skaitymas per HTTP (kitas mazgas atiduoda failą per
-    `src/pages/api/.../…Files.ts` endpoint'ą); rašyti nuotoliniu būdu negalima;
-  - nenustatytas → `getPath()` grąžina null, `read()` — null, `save()` meta klaidą.
+Sidecar lokaliai gyvena tik zstd SQLite saugykloje. `config.<locationKey>` gali
+būti HTTP(S) endpoint'as, naudojamas tik kaip nuotolinis read fallback mazguose,
+kurie neturi lokalaus SQLite. Visi write'ai reikalauja `sqliteLocationKey`.
 
 Anksčiau šią logiką turėjo penki failai su savo kopija (`dokumentaiFs`,
 `failaiFs`, `tekstasFs`, `metaduomenysFs`, `rezultataiFs`), ir kopijos buvo
@@ -29,15 +22,17 @@ function isRemoteLocation(location) {
 /**
  * @param {object} p
  * @param {string} p.locationKey - `config` rakto vardas, pvz. „dokumentaiLocation".
- * @param {string} p.extension - failo plėtinys be taško, pvz. „json" arba „txt".
  * @param {string} p.label - kilmininko linksniu, klaidų tekstams: „dokumento", „teksto".
+ * @param {string} [p.sqliteLocationKey] - pilno SQLite failo kelio config raktas.
+ * @param {string} [p.sqliteTable] - lentelė suspaustiems blob'ams.
  * @param {string} [p.keyName] - rakto vardas URL parametre ir klaidų tekstuose („md5"/„hash").
  * @param {(value: unknown) => string} [p.serialize] - reikšmė → failo turinys.
  * @param {(text: string) => unknown} [p.deserialize] - failo turinys → reikšmė.
  * @returns {{
- *   getPath: (key: string) => string|null,
  *   save: (key: string, value: unknown) => Promise<void>,
  *   saveRaw: (key: string, contents: string) => Promise<void>,
+ *   readRaw: (key: string) => Promise<string|null>,
+ *   readLocalRaw: (key: string) => Promise<string|null>,
  *   read: (key: string) => Promise<unknown|null>,
  *   exists: (key: string) => Promise<boolean>,
  *   hash: (value: unknown) => string,
@@ -46,60 +41,79 @@ function isRemoteLocation(location) {
  */
 export function createSidecarStore({
     locationKey,
-    extension,
     label,
+    sqliteLocationKey,
+    sqliteTable,
     keyName = "md5",
     serialize = (value) => JSON.stringify(value),
     deserialize = (text) => JSON.parse(text),
 }) {
     // Vietą skaitom kviečiant, o ne importuojant — konfigūracija gali būti
     // pakeista testuose arba užkrauta vėliau.
-    const location = () => config[locationKey];
+    const remoteLocation = () => isRemoteLocation(config[locationKey])
+        ? config[locationKey]
+        : null;
+    const sqlite = sqliteLocationKey && sqliteTable
+        ? createCompressedSqliteStore({ locationKey: sqliteLocationKey, tableName: sqliteTable })
+        : null;
 
-    function getPath(key) {
-        const loc = location();
-        if (!loc || isRemoteLocation(loc)) return null;
-        return path.join(loc, ...key.slice(0, 5).split(""), `${key}.${extension}`);
+    function localConfigured() {
+        return Boolean(sqlite?.configured());
     }
 
     async function saveRaw(key, contents) {
-        const loc = location();
-        if (isRemoteLocation(loc)) {
+        if (!sqlite?.configured()) {
             throw new Error(
-                `${locationKey} yra nuotolinis URL, negalima išsaugoti lokaliai (${keyName}=${key})`,
+                `${sqliteLocationKey} nenustatytas, negalima išsaugoti ${label} (${keyName}=${key})`,
             );
         }
-        const filePath = getPath(key);
-        if (!filePath) {
-            throw new Error(
-                `${locationKey} nenustatytas, negalima išsaugoti ${label} (${keyName}=${key})`,
-            );
-        }
-        await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-        await fs.promises.writeFile(filePath, contents);
+        return sqlite.saveRaw(key, contents);
     }
 
     async function save(key, value) {
         return saveRaw(key, serialize(value));
     }
 
-    async function read(key) {
+    async function readHttpRaw(key) {
         if (!key) return null;
-        const loc = location();
-        if (isRemoteLocation(loc)) {
-            try {
-                const url = `${loc}?${keyName}=${encodeURIComponent(key)}`;
-                const res = await fetch(url);
-                if (!res.ok) return null;
-                return deserialize(await res.text());
-            } catch {
-                return null;
-            }
-        }
-        const filePath = getPath(key);
-        if (!filePath) return null;
+        const loc = remoteLocation();
+        if (!loc) return null;
         try {
-            return deserialize(await fs.promises.readFile(filePath, "utf8"));
+            const url = `${loc}?${keyName}=${encodeURIComponent(key)}`;
+            const res = await fetch(url);
+            if (!res.ok) return null;
+            return await res.text();
+        } catch {
+            return null;
+        }
+    }
+
+    async function readRawFromSqlite(key) {
+        if (!sqlite?.configured()) return null;
+        try {
+            return await sqlite.readRaw(key);
+        } catch (error) {
+            console.error(`${sqliteLocationKey} SQLite skaitymo klaida (${keyName}=${key}):`, error);
+            return null;
+        }
+    }
+
+    async function readRaw(key) {
+        if (!key) return null;
+        const sqliteValue = await readRawFromSqlite(key);
+        return sqliteValue !== null ? sqliteValue : readHttpRaw(key);
+    }
+
+    async function readLocalRaw(key) {
+        if (!key) return null;
+        return readRawFromSqlite(key);
+    }
+
+    async function read(key) {
+        const text = await readRaw(key);
+        if (text === null) return null;
+        try {
+            return deserialize(text);
         } catch {
             return null;
         }
@@ -107,14 +121,14 @@ export function createSidecarStore({
 
     async function exists(key) {
         if (!key) return false;
-        const filePath = getPath(key);
-        if (!filePath) return false;
-        try {
-            await fs.promises.access(filePath, fs.constants.F_OK);
-            return true;
-        } catch {
-            return false;
+        if (sqlite?.configured()) {
+            try {
+                if (sqlite.exists(key)) return true;
+            } catch (error) {
+                console.error(`${sqliteLocationKey} SQLite exists klaida (${keyName}=${key}):`, error);
+            }
         }
+        return false;
     }
 
     /**
@@ -130,5 +144,16 @@ export function createSidecarStore({
         return prepare(value).hash;
     }
 
-    return { getPath, save, saveRaw, read, exists, hash, prepare };
+    return {
+        save,
+        saveRaw,
+        read,
+        readRaw,
+        readLocalRaw,
+        readHttpRaw,
+        localConfigured,
+        exists,
+        hash,
+        prepare,
+    };
 }

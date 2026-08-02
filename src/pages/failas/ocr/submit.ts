@@ -82,9 +82,12 @@ export const POST: APIRoute = async ({ request }) => {
       [id, user.pavadinimas],
     );
 
-    await client.query('COMMIT');
-
+    // Blob'as turi būti patvariai įrašytas prieš paskelbiant jo resultHash.
+    // Jei SQLite/FS write nepavyksta, PG tranzakcija grąžinama ir darbas gali
+    // būti pakartotas; priešingu atveju DB rodytų į neegzistuojantį rezultatą.
     await saveRezultatasFs({ failas: id, md5, tekstas, node: user.pavadinimas, submitTimestamp: new Date().toISOString(), lockTimestamp: lockedAt, duration, puslapiuSkaicius, zodziuSkaicius });
+
+    await client.query('COMMIT');
 
     return Response.json({ status: 'ok' });
   } catch (e) {

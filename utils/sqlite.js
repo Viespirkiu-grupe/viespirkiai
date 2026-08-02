@@ -21,19 +21,28 @@ export const DEFAULT_SQLITE_PRAGMAS = {
  * @param {boolean} [opts.readonly] - skaitytojams (keli procesai lygiagrečiai)
  * @param {(db: DatabaseSync) => void} [opts.ensureSchema] - kviečiama tik rašymo režimu
  * @param {Partial<typeof DEFAULT_SQLITE_PRAGMAS>} [opts.pragmas]
+ * @param {"OFF"|"NORMAL"|"FULL"} [opts.synchronous] - write patvarumas.
  * @returns {DatabaseSync}
  */
-export function openSqlite({ dbPath, readonly = false, ensureSchema, pragmas } = {}) {
+export function openSqlite({
+    dbPath,
+    readonly = false,
+    ensureSchema,
+    pragmas,
+    synchronous = readonly ? "NORMAL" : "OFF",
+} = {}) {
     const p = { ...DEFAULT_SQLITE_PRAGMAS, ...pragmas };
     if (!readonly) fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
     const db = new DatabaseSync(dbPath, { readOnly: readonly });
 
     if (!readonly) db.exec(`PRAGMA page_size = ${p.pageSize}`);
-    db.exec("PRAGMA journal_mode = WAL");
     db.exec(`PRAGMA busy_timeout = ${p.busyTimeout}`);
-    // synchronous = OFF rašant: bazės atkuriamos iš šaltinio, tad crash'as ne tragedija.
-    db.exec(`PRAGMA synchronous = ${readonly ? "NORMAL" : "OFF"}`);
+    db.exec("PRAGMA journal_mode = WAL");
+    if (!["OFF", "NORMAL", "FULL"].includes(synchronous)) {
+        throw new Error(`Blogas SQLite synchronous režimas: ${synchronous}`);
+    }
+    db.exec(`PRAGMA synchronous = ${synchronous}`);
     db.exec("PRAGMA temp_store = MEMORY");
     db.exec(`PRAGMA cache_size = ${p.cacheSize}`);
     db.exec(`PRAGMA mmap_size = ${p.mmapSize}`);

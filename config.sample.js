@@ -30,6 +30,10 @@ export default {
     // Portas, kuriame klausosi serveris.
     port: 9019,
 
+    // Lengva JavaScript/slapuko patikra brangiems paieškos puslapiams.
+    // Atitinkamas .env kintamasis: ENABLE_BOT_CHALLENGE.
+    enableBotChallenge: false,
+
     // ─────────────────────────────────────────────────────────────────────
     // PostgreSQL — pagrindinė DB
     // ─────────────────────────────────────────────────────────────────────
@@ -106,11 +110,8 @@ export default {
 
     // ─────────────────────────────────────────────────────────────────────
     // Blob saugyklų vietos
-    // Kiekviena reikšmė gali būti:
-    //   - undefined           — funkcija išjungta;
-    //   - absoliutus kelias   — lokalus katalogas (pvz. "/data/ocrRezultatai");
-    //   - HTTPS URL           — nuotolinis sidecar endpoint'as
-    //                           (pvz. "https://host/api/ocr/rezultataiFiles").
+    // `*SqliteLocation` — privalomas pilnas lokalaus SQLite failo kelias writeriui.
+    // Seni `*Location` raktai palaiko tik HTTP(S) read fallback kitame mazge.
     // ─────────────────────────────────────────────────────────────────────
 
     // OCR rezultatų blob saugyklą.
@@ -120,6 +121,11 @@ export default {
     // metaduomenis ir išgautus subjektus (iban, jarKodai, links, emails,
     // domains, telefonai).
     failaiLocation: undefined,
+
+    // Pilni SQLite failų keliai. Visi lokalūs read/write vyksta tik čia.
+    failaiInfoSqliteLocation: undefined,
+    dokumentaiSqliteLocation: undefined,
+    ocrRezultataiSqliteLocation: undefined,
 
     // Dokumentų JSON sidecar failai (raktas: md5).
     dokumentaiLocation: undefined,

@@ -23,6 +23,7 @@ const ENV_MAP = [
     ["PORT", "port", "number"],
     ["LOG_REQUESTS", "logRequests", "boolean"],
     ["ENABLE_ATN1", "enableAtn1", "boolean"],
+    ["ENABLE_BOT_CHALLENGE", "enableBotChallenge", "boolean"],
 
     ["PG_HOST", "pgHost", "string"],
     ["PG_PORT", "pgPort", "number"],
@@ -56,6 +57,9 @@ const ENV_MAP = [
     ["OCR_REZULTATAI_LOCATION", "ocrRezultataiLocation", "string"],
     ["DOKUMENTAI_LOCATION", "dokumentaiLocation", "string"],
     ["FAILAI_LOCATION", "failaiLocation", "string"],
+    ["FAILAIINFO_SQLITE_LOCATION", "failaiInfoSqliteLocation", "string"],
+    ["DOKUMENTAI_SQLITE_LOCATION", "dokumentaiSqliteLocation", "string"],
+    ["OCR_REZULTATAI_SQLITE_LOCATION", "ocrRezultataiSqliteLocation", "string"],
 
     ["ENABLE_GRAPH", "enableGraph", "boolean"],
 
