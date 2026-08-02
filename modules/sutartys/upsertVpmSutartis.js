@@ -1,4 +1,5 @@
 import { postgres } from "../../postgres/postgres.js";
+import { preparedStatement } from "../../postgres/prepared.js";
 import { canonicalJsonMd5 } from "./canonicalSutartis.js";
 
 // Canonical dokumento atstatymas iš normalizuotų lentelių; eilutės alias — "e".
@@ -534,6 +535,15 @@ SELECT
     EXISTS(SELECT 1 FROM tracking) AS tracked;
 `;
 
+/*
+18,7 KB SQL su ~20 CTE – planas 276 eilučių, `Planning Time` 6,9 ms iš 13,4 ms
+vidutinės trukmės. Kadangi upsert'as kviečiamas po kartą kiekvienai sutarčiai
+(5,5 mln./parą), planavimas kainuoja apie pusę viso šios užklausos DB laiko.
+Parametrai yra jsonb/text, o ne selektyvumą lemiančios reikšmės, tad generinis
+planas sutampa su specifiniu.
+*/
+const upsertStatement = preparedStatement("vpmSutartisUpsert", UPSERT_SQL);
+
 /** Build the full-text-search input from the canonical contract JSON. */
 export function buildVpmSutartisSearchText(canonicalJson) {
     const contract = typeof canonicalJson === "string"
@@ -571,11 +581,9 @@ export function buildVpmSutartisSearchText(canonicalJson) {
  */
 export async function upsertVpmSutartis(prepared, db = postgres) {
     const searchText = buildVpmSutartisSearchText(prepared.json);
-    const result = await db.query(UPSERT_SQL, [
-        prepared.json,
-        prepared.md5,
-        searchText,
-    ]);
+    const result = await db.query(
+        upsertStatement([prepared.json, prepared.md5, searchText]),
+    );
     return result.rows[0];
 }
 

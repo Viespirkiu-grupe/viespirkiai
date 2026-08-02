@@ -55,8 +55,14 @@ export const VPM_SUTARTIS_ROW_SELECT = `
     COALESCE(extra_tiekejai.kodai, '{}'::text[]) AS "papildomiTiekejaiKodai",
     COALESCE(extra_bvpz.kodai, '{}'::text[]) AS "papildomiBvpzKodai",
     COALESCE(extra_bvpz.pavadinimai, '{}'::text[]) AS "papildomiBvpzPavadinimai",
-    s.istrinta,
-    search."searchTsv" AS search_tsv`;
+    s.istrinta`;
+/*
+`search."searchTsv"` čia sąmoningai NĖRA: tsvector didelis, rezultatuose
+nereikalingas ir nutekėdavo į MCP/JSON atsakymus. Jungtis su
+`vpmSutartysSearch` FROM'e lieka – ja filtruoja tekstinė paieška
+(`searchSutartys.js`); kai stulpelių iš jos niekas neima, Postgres unikalią
+LEFT JOIN jungtį pašalina pats.
+*/
 
 export const VPM_SUTARTIS_ROW_FROM = `
     public."vpmSutartys" s
