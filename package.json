@@ -45,6 +45,8 @@
         "s3backup:queue": "node modules/s3backup/s3backupQueue.js",
         "s3backup:upload": "node modules/s3backup/s3backupUpload.js",
         "s3backup:status": "node modules/s3backup/s3backupStatus.js",
+        "s3backup:requeue": "node modules/s3backup/s3backupRequeue.js",
+        "s3backup:klaidos": "node modules/s3backup/s3backupKlaidos.js",
         "s3backup:get": "node modules/s3backup/s3backupGet.js",
         "push:domenai": "node modules/domenai/pushToSpinta.js",
         "process:domenai-adp-queue": "node modules/domenai/processAdpQueue.js"
