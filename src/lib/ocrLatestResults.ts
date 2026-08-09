@@ -2,6 +2,9 @@ import { DateTime } from 'luxon';
 import { postgres } from '@/postgres/postgres.js';
 import { formatDuration } from '../../utils/time.js';
 
+/** NATS kanalas: naujas OCR rezultatas priimtas (žr. failas/ocr/submit.ts). */
+export const OCR_RESULTS_CHANNEL = 'ocr_latest_results';
+
 function formatLtDateTime(value: unknown) {
   if (!value) return '—';
   if (value instanceof Date) {

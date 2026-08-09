@@ -1,8 +1,6 @@
 import type { APIRoute } from 'astro';
-import { subscribe } from '../../../../postgres/pgNotifyHub.js';
-import { loadLatestOcrResults } from '../../../lib/ocrLatestResults.ts';
-
-const OCR_RESULTS_CHANNEL = 'ocr_latest_results';
+import { subscribe } from '../../../../utils/natsHub.js';
+import { loadLatestOcrResults, OCR_RESULTS_CHANNEL } from '../../../lib/ocrLatestResults.ts';
 
 export const GET: APIRoute = async ({ request }) => {
   const headers = new Headers({

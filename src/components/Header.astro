@@ -71,7 +71,7 @@ const secondaryMenu: NavMenuItem[] = [
   { label: 'Viešlaiškiai', href: '/vieslaiskiai' },
 ];
 
-// Baneris valdomas per DB lentelę `infoBaneris` (enabled + aplinka), atnaujinamas per pg_notify.
+// Baneris valdomas per DB lentelę `infoBaneris` (enabled + aplinka), cache'as periodiškai perkraunamas.
 const infoBanner = await getInfoBanner();
 ---
 

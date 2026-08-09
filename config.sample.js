@@ -21,7 +21,7 @@ export default {
 
     // Informacinis baneris viršuje valdomas per DB lentelę public."infoBaneris"
     // (laukai: content, type, important, enabled, aplinka [NULL=visur | 'dev' | 'prod']).
-    // Lentelė sukuriama automatiškai; keitimai pasklinda per pg_notify trigger'į.
+    // Lentelė sukuriama automatiškai; keitimai pasiimami periodiniu poll'u.
 
     // ─────────────────────────────────────────────────────────────────────
     // HTTP serveris

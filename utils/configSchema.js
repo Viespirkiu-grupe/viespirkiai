@@ -36,6 +36,11 @@ const configSchema = z.object({
     sqlLogQuickwit: z.boolean().default(false),
     pgPrepared: z.boolean().default(true),
 
+    // Signalų magistralė (SSE, cache invalidacija). Tuščias URL ją išjungia –
+    // kanalai tada tyliai neveikia, o gavėjai krenta į savo fallback'us.
+    natsUrl: z.string().default("nats://127.0.0.1:4222"),
+    natsToken: z.string().default(""),
+
     typesenseUp: z.boolean().default(false),
     typesenseNodes: z.array(typesenseNodeSchema).default([]),
     typesenseApiKey: z.string().default(""),

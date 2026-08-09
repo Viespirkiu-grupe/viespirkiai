@@ -2,17 +2,19 @@
  * Informacinio banerio (viršuje) šaltinis — DB lentelė `public."infoBaneris"`.
  *
  * Anksčiau baneris buvo imamas iš `config.infoBanner`. Dabar jį valdo DB lentelė
- * su laukais `enabled` ir `aplinka` (kur rodyti). Reikšmė cache'inama procese ir
- * atnaujinama per pg_notify (trigger `info_baneris`), su 1 min. poll'u kaip
- * atsargine priemone. Header.astro tik nuskaito jau paruoštą cache'ą.
+ * su laukais `enabled` ir `aplinka` (kur rodyti). Reikšmė cache'inama procese;
+ * atnaujinama poll'u, o `npm run baneris:reload` NATS signalu perkrauna iškart
+ * (lentelė redaguojama ranka per SQL, tad DB pusėje siuntėjo nėra).
+ * Header.astro tik nuskaito jau paruoštą cache'ą.
  */
 import { postgres } from '@/postgres/postgres.js';
-import { subscribe } from '@/postgres/pgNotifyHub.js';
+import { subscribe } from '@/utils/natsHub.js';
 import config from '@/utils/config.js';
 import type { InfoBanner } from './config.ts';
 
-const NOTIFY_CHANNEL = 'info_baneris';
-const POLL_INTERVAL_MS = 60_000;
+/** NATS kanalas: banerio cache'ą reikia perkrauti. */
+export const BANERIS_CHANNEL = 'info_baneris';
+const POLL_INTERVAL_MS = 20_000;
 
 /**
  * Aplinka, kurioje sukasi šis procesas – nustatoma pagal `config.dev`.
@@ -43,21 +45,6 @@ async function ensureTable(): Promise<void> {
         'Kur rodyti: NULL = visur; ''dev'' = tik dev aplinkoje; ''prod'' = tik gyvoje. Aplinka nustatoma pagal config.dev.'
     `);
 
-    // Trigger'is: bet koks pakeitimas -> pg_notify, kad procesai perkrautų cache'ą.
-    await client.query(`
-      CREATE OR REPLACE FUNCTION public."infoBaneris_notify"() RETURNS trigger AS $$
-      BEGIN
-        PERFORM pg_notify('${NOTIFY_CHANNEL}', '');
-        RETURN NULL;
-      END;
-      $$ LANGUAGE plpgsql
-    `);
-    await client.query(`DROP TRIGGER IF EXISTS "infoBaneris_notify" ON public."infoBaneris"`);
-    await client.query(`
-      CREATE TRIGGER "infoBaneris_notify"
-      AFTER INSERT OR UPDATE OR DELETE ON public."infoBaneris"
-      FOR EACH STATEMENT EXECUTE FUNCTION public."infoBaneris_notify"()
-    `);
   } finally {
     client.release();
   }
@@ -105,7 +92,7 @@ async function init(): Promise<void> {
     await ensureTable();
     await reload();
   }
-  subscribe(NOTIFY_CHANNEL, () => {
+  subscribe(BANERIS_CHANNEL, () => {
     void reloadTyliai();
   });
   setInterval(() => {
@@ -115,7 +102,7 @@ async function init(): Promise<void> {
 
 /**
  * Grąžina šiuo metu rodytiną banerį (arba null). Pirmas kvietimas inicijuoja
- * lentelę, užkrauna cache'ą ir prisijungia prie pg_notify; toliau – akimirksniu iš cache.
+ * lentelę, užkrauna cache'ą ir prisijungia prie NATS; toliau – akimirksniu iš cache.
  */
 export async function getInfoBanner(): Promise<InfoBanner | null> {
   if (!initPromise) {

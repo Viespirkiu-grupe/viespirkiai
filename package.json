@@ -77,6 +77,7 @@
         "linkedom": "^0.18.10",
         "luxon": "^3.6.1",
         "mime": "^4.0.7",
+        "nats": "^2.29.3",
         "node-cron": "^4.2.1",
         "node-fetch": "^3.3.2",
         "node-sql-parser": "^5.4.0",

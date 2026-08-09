@@ -33,6 +33,11 @@ export interface Config {
     /** Ar naudoti prepared statement'us (išjungti prie pgbouncer transaction pooling). */
     pgPrepared: boolean;
 
+    /** NATS signalų magistralė; tuščia eilutė ją išjungia. */
+    natsUrl: string;
+    /** NATS autentikacijos token'as (`authorization.token` serveryje). */
+    natsToken: string;
+
     typesenseUp: boolean;
     typesenseNodes: TypesenseNodeConfig[];
     typesenseApiKey: string;

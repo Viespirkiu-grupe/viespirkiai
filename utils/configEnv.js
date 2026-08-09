@@ -35,6 +35,9 @@ const ENV_MAP = [
     ["SQL_LOG_QUICKWIT", "sqlLogQuickwit", "boolean"],
     ["PG_PREPARED", "pgPrepared", "boolean"],
 
+    ["NATS_URL", "natsUrl", "string"],
+    ["NATS_TOKEN", "natsToken", "string"],
+
     ["TYPESENSE_UP", "typesenseUp", "boolean"],
     ["TYPESENSE_NODES", "typesenseNodes", "json"],
     ["TYPESENSE_API_KEY", "typesenseApiKey", "string"],
