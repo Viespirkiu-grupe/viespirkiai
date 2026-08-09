@@ -26,13 +26,14 @@ function laikotarpis(r: Redakcija): string {
   if (r.from && r.to) return `${r.from} → ${r.to}`;
   if (r.from) return `nuo ${r.from}`;
   if (r.to) return `iki ${r.to}`;
-  return 'Suvestinė redakcija';
+  return 'Aktuali suvestinė redakcija';
 }
 
-/** Trumpas tipo ženklelis: kuri iš jų galioja dabar. */
+/** Trumpas ženklelis: kuri iš jų galioja dabar, kuri jau praėjo, kuri dar tik bus. */
 function zenklas(r: Redakcija): { text: string; kind: string } | null {
   if (r.kind === 'consolidated') return { text: 'Galioja', kind: 'ok' };
   if (r.kind === 'historical') return { text: 'Istorinė', kind: 'past' };
+  if (r.kind === 'future') return { text: 'Dar negalioja', kind: 'future' };
   return null;
 }
 
@@ -151,6 +152,12 @@ const others = redakcijos.length - 1;
   .ta-red-badge.is-ok {
     background: var(--color-success-bg);
     color: var(--color-success);
+  }
+  /* Būsimoji redakcija — ne klaida, bet ir ne tai, ką skaitytojas turi taikyti
+     šiandien, tad įspėjamoji, o ne žalia spalva. */
+  .ta-red-badge.is-future {
+    background: var(--color-warning-bg);
+    color: var(--color-warning);
   }
 
   /* Sąrašas iškrenta ANT teksto rėmelio — kitaip jo atidarymas kaskart
