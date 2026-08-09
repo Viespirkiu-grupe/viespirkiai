@@ -306,8 +306,7 @@ Baziniai URL — galima perrašyti į mirror/proxy. Be trailing slash.
 Naujasis e-TAR scraperis eina ne tiesiai į `e-tar.lt`, o į stateless HTML→JSON
 adapterį (jo OpenAPI: `<ETAR_API_URL>/openapi.json`). Normalizuoti duomenys
 guli Postgres `eTar*` lentelėse, o pilnas atsakymo JSON — SQLite sidecar'e,
-adresuojamas `md5` (žr. `modules/eTar/README.md`). Senasis `modules/etar`
-(HTML scraperis į `teisekuraObjektai`) šių kintamųjų nenaudoja.
+adresuojamas `md5` (žr. `modules/eTar/README.md`).
 
 | Kintamasis | Numatyta | Paaiškinimas |
 | --- | --- | --- |

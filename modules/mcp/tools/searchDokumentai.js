@@ -21,7 +21,6 @@ const SOURCE_VALUES = [
     "neskelbiamosderybos",
     "archive",
     "liteko",
-    "etar",
     "eseimas",
 ];
 

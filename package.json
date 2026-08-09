@@ -29,8 +29,6 @@
         "quickwit:top-pdf-metadata": "node quickwit/topPdfMetadata.js",
         "quickwit:juridiniai": "node modules/juridiniai/quickwitProcessIndexQueue.js",
         "juridiniai:backfill": "node modules/juridiniai/backfill.js",
-        "teisekura:backfill": "node modules/teisekura/backfill.js",
-        "teisekura:etar-content": "node modules/etar/scrapeContent.js",
         "teisekura:eseimas-backfill": "node modules/eseimas/scrape.js --all",
         "teisekura:eseimas-content": "node modules/eseimas/scrapeContent.js",
         "teisekura:audit": "node modules/teisekura/audit.js",
