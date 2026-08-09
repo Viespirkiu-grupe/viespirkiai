@@ -3,7 +3,7 @@ import { search as quickwitSearch, countDocs as quickwitCountDocs } from "../../
 import { FilterBuilder } from "../../utils/filter.js";
 import { fixHtmlEntities } from "../../utils/fixHtmlEntities.js";
 import { Transform } from "node:stream";
-import QueryStream from "pg-query-stream";
+import { streamQuery } from "../../postgres/streamQuery.js";
 import { STATUSAS, PIRKIMO_BUDAS } from "./viesiejiPirkimaiEnums.js";
 import { specialJarCodes } from "../juridiniai/specialJarCodes.js";
 import { searchJar } from "../juridiniai/search.js";
@@ -788,21 +788,28 @@ async function searchViesiejiPirkimaiUncached(
         });
 
     if (stream) {
-        const client = await postgres.connect();
+        // Jungtį valdo pats streamQuery (transakcija + release), todėl `client`
+        // grąžinamas null – iškvietėjų `client?.release()` tampa no-op'u.
+        const source = await streamQuery(sql, params);
+        const out = source.pipe(
+            new Transform({
+                objectMode: true,
+                transform(row, _enc, cb) {
+                    cb(null, aptvarkytiRezultata(row));
+                },
+            }),
+        );
+        // pipe() destroy'aus neperduoda pirmyn – be šito nutrauktas atsisiuntimas
+        // paliktų kursorių ir jungtį kaboti iki proceso pabaigos.
+        out.on("close", () => source.destroy());
+
         return {
             results: [],
             total: null,
             values,
             queryParams,
-            stream: client.query(new QueryStream(sql, params)).pipe(
-                new Transform({
-                    objectMode: true,
-                    transform(row, _enc, cb) {
-                        cb(null, aptvarkytiRezultata(row));
-                    },
-                }),
-            ),
-            client,
+            stream: out,
+            client: null,
         };
     }
 

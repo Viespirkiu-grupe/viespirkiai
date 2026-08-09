@@ -63,9 +63,11 @@ taskrunneriui.
 | `PG_PASSWORD` | `""` | Slaptažodis. |
 | `PG_DATABASE` | `viespirkiai` | DB pavadinimas. |
 | `PG_MAX_CONNECTIONS` | `16` | Maks. vienalaikis pool dydis aplikacijos užklausoms. |
+| `PG_DIRECT_HOST` | = `PG_HOST` | Postgres host aplenkiant pgbouncer'į. |
+| `PG_DIRECT_PORT` | = `PG_PORT` | Postgres portas aplenkiant pgbouncer'į. Reikalingas TIK tada, kai `PG_PORT` rodo į bouncer'į: seanso lygio advisory lock'ai (`postgres/sessionLock.js`, JAR importas ir juridinių backfill'as) gyvena jungtyje, tad privalo eiti tiesiai į Postgres. |
 | `SQL_LOG_FILE` | — | Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą (JSONL). |
 | `SQL_LOG_QUICKWIT` | `false` | Tie patys įrašai (be SQL teksto – tik `md5`) rašomi į dienos Quickwit indeksą `sqlLogV2_*`, o tekstas – į `sqlLogTekstai` lentelę. Galima kartu su `SQL_LOG_FILE` arba vietoj jo. |
-| `PG_PREPARED` | `true` | Statiškas dažnas užklausas vykdyti kaip prepared statement'us. **Išjungti (`false`), jei `PG_PORT` rodo į pgbouncer transaction pooling režimu be `max_prepared_statements`.** |
+| `PG_PREPARED` | `true` | Statiškas dažnas užklausas vykdyti kaip prepared statement'us. Su pgbouncer transaction pooling režimu palikti `true` galima – nuo pgbouncer 1.21 užtenka nustatyti `max_prepared_statements` į nenulinę reikšmę (`pg` naudoja protokolo lygio named statements, o bouncer juos paruošia susietoje serverio jungtyje). Išjungti (`false`) reikia tik prie senesnio bouncer'io arba kai `max_prepared_statements = 0`. |
 
 Profiliavimui: `SQL_LOG_FILE=/tmp/sql.log` įjungia visų per `postgres.query()` ir
 per `postgres.connect()` paimtus klientus einančių užklausų rašymą į failą.

@@ -1,5 +1,6 @@
 import { pathToFileURL } from "node:url";
 import { postgres } from "../../postgres/postgres.js";
+import { acquireSessionLock } from "../../postgres/sessionLock.js";
 import {
     JAR_ADDRESS_JOINS,
     JAR_ADDRESS_SQL,
@@ -258,20 +259,19 @@ export const UPSERT_BATCH_SQL = `
 `;
 
 export async function backfillJuridiniai({ batchSize = DEFAULT_BATCH_SIZE } = {}) {
+    // Lock'as – atskiroje tiesioginėje jungtyje, nes jis gyvena per visą
+    // backfill'ą, t. y. per daugybę transakcijų (žr. postgres/sessionLock.js).
+    const lock = await acquireSessionLock(LOCK_KEY);
+    if (!lock) {
+        throw new Error("Kitas juridinių asmenų backfill procesas jau veikia");
+    }
+
     const client = await postgres.connect();
     let lastJarKodas = 0;
     let scannedTotal = 0;
     let changedTotal = 0;
 
     try {
-        const lock = await client.query(
-            "SELECT pg_try_advisory_lock(hashtext($1)::bigint) AS locked",
-            [LOCK_KEY],
-        );
-        if (!lock.rows[0]?.locked) {
-            throw new Error("Kitas juridinių asmenų backfill procesas jau veikia");
-        }
-
         await client.query("BEGIN");
         await upsertDictionaries(client);
         await client.query("COMMIT");
@@ -303,11 +303,8 @@ export async function backfillJuridiniai({ batchSize = DEFAULT_BATCH_SIZE } = {}
         await client.query("ROLLBACK").catch(() => {});
         throw error;
     } finally {
-        await client.query(
-            "SELECT pg_advisory_unlock(hashtext($1)::bigint)",
-            [LOCK_KEY],
-        ).catch(() => {});
         client.release();
+        await lock.release();
     }
 }
 

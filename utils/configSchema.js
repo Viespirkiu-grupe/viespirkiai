@@ -32,6 +32,11 @@ const configSchema = z.object({
     pgPassword: z.string().default(""),
     pgDatabase: z.string().default("viespirkiai"),
     pgMaxConnections: z.number().int().positive().default(16),
+    // Tiesioginė jungtis į Postgres, aplenkiant pgbouncer'į – reikalinga tik
+    // seanso lygio advisory lock'ams (žr. postgres/sessionLock.js). Nenurodžius
+    // krenta į PG_HOST/PG_PORT.
+    pgDirectHost: z.string().optional(),
+    pgDirectPort: z.number().int().positive().optional(),
     sqlLogFile: z.string().optional(),
     sqlLogQuickwit: z.boolean().default(false),
     pgPrepared: z.boolean().default(true),

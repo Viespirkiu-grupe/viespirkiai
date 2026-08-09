@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
-import QueryStream from "pg-query-stream";
 import { postgres } from "../../postgres/postgres.js";
+import { streamQuery } from "../../postgres/streamQuery.js";
 import { log } from "../../utils/log.js";
 import { readRezultatasFs } from "./rezultataiFs.js";
 
@@ -37,13 +37,11 @@ async function run(outputDir) {
 
     openNextFile();
 
-    const client = await postgres.connect();
-    try {
-        // Rezultatų istorijos nebėra — eksportuojamas paskutinis kiekvieno failo
-        // rezultatas iš filesOcrStatus. `md5` čia yra resultHash (raktas į FS),
-        // o puslapių/žodžių skaičiai — iš po OCR atlikto nuskaitymo.
-        const qs = new QueryStream(
-            `SELECT o.id AS failas,
+    // Rezultatų istorijos nebėra — eksportuojamas paskutinis kiekvieno failo
+    // rezultatas iš filesOcrStatus. `md5` čia yra resultHash (raktas į FS),
+    // o puslapių/žodžių skaičiai — iš po OCR atlikto nuskaitymo.
+    const stream = await streamQuery(
+        `SELECT o.id AS failas,
                     o."resultHash" AS md5,
                     n.pavadinimas AS node,
                     o."lockTimestamp",
@@ -57,24 +55,22 @@ async function run(outputDir) {
              LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
              WHERE o."resultHash" IS NOT NULL
              ORDER BY o.id ASC`,
-        );
-        const stream = client.query(qs);
+    );
 
-        for await (const row of stream) {
-            if (rowsInFile >= ROWS_PER_FILE) openNextFile();
-            const rezultatas = await readRezultatasFs(row.md5);
-            fileStream.write(JSON.stringify({ ...row, tekstas: rezultatas?.tekstas ?? null }) + "\n");
-            rowsInFile++;
-            totalRows++;
-            if (totalRows - lastLogAt >= LOG_EVERY) {
-                const elapsed = (Date.now() - startTime) / 1000;
-                const speed = Math.round(totalRows / elapsed);
-                log(`Eksportuota ${totalRows.toLocaleString()} eilučių | greitis: ${speed.toLocaleString()} eil/s | paskutinis failas: ${row.failas}`);
-                lastLogAt = totalRows;
-            }
+    // Jungtį ir transakciją uždaro pats streamQuery – nei `try/finally`, nei
+    // `release()` čia nebereikia.
+    for await (const row of stream) {
+        if (rowsInFile >= ROWS_PER_FILE) openNextFile();
+        const rezultatas = await readRezultatasFs(row.md5);
+        fileStream.write(JSON.stringify({ ...row, tekstas: rezultatas?.tekstas ?? null }) + "\n");
+        rowsInFile++;
+        totalRows++;
+        if (totalRows - lastLogAt >= LOG_EVERY) {
+            const elapsed = (Date.now() - startTime) / 1000;
+            const speed = Math.round(totalRows / elapsed);
+            log(`Eksportuota ${totalRows.toLocaleString()} eilučių | greitis: ${speed.toLocaleString()} eil/s | paskutinis failas: ${row.failas}`);
+            lastLogAt = totalRows;
         }
-    } finally {
-        client.release();
     }
 
     if (fileStream) fileStream.end();

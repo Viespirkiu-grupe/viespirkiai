@@ -9,6 +9,7 @@ import readline from "node:readline";
 import { Readable } from "node:stream";
 import { pathToFileURL } from "node:url";
 import { postgres } from "../../postgres/postgres.js";
+import { acquireSessionLock } from "../../postgres/sessionLock.js";
 import { log } from "../../utils/log.js";
 
 const BASE = "https://www.registrucentras.lt/aduomenys/";
@@ -72,14 +73,17 @@ const SOURCES = [
 ];
 
 export async function importJarCsv() {
+    // Lock'as – atskiroje tiesioginėje jungtyje, nes jis gyvena visą importą,
+    // per daugybę transakcijų (žr. postgres/sessionLock.js).
+    const lock = await acquireSessionLock(LOCK_KEY);
+    if (!lock) throw new Error("Kitas RC JAR CSV importas jau veikia");
+
     const client = await postgres.connect();
     try {
-        const lock = await client.query("SELECT pg_try_advisory_lock(hashtext($1)::bigint) AS locked", [LOCK_KEY]);
-        if (!lock.rows[0]?.locked) throw new Error("Kitas RC JAR CSV importas jau veikia");
         for (const source of SOURCES) await importSource(client, source);
     } finally {
-        await client.query("SELECT pg_advisory_unlock(hashtext($1)::bigint)", [LOCK_KEY]).catch(() => {});
         client.release();
+        await lock.release();
     }
 }
 

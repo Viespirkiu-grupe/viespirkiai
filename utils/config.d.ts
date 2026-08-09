@@ -26,6 +26,10 @@ export interface Config {
     pgPassword: string;
     pgDatabase: string;
     pgMaxConnections: number;
+    /** Postgres host aplenkiant pgbouncer'į (advisory lock'ams). Numatyta – pgHost. */
+    pgDirectHost?: string;
+    /** Postgres portas aplenkiant pgbouncer'į (advisory lock'ams). Numatyta – pgPort. */
+    pgDirectPort?: number;
     /** Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą. */
     sqlLogFile?: string;
     /** Tie patys SQL logo įrašai rašomi tiesiai į Quickwit indeksą `sqlLog`. */

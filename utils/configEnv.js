@@ -31,6 +31,8 @@ const ENV_MAP = [
     ["PG_PASSWORD", "pgPassword", "string"],
     ["PG_DATABASE", "pgDatabase", "string"],
     ["PG_MAX_CONNECTIONS", "pgMaxConnections", "number"],
+    ["PG_DIRECT_HOST", "pgDirectHost", "string"],
+    ["PG_DIRECT_PORT", "pgDirectPort", "number"],
     ["SQL_LOG_FILE", "sqlLogFile", "string"],
     ["SQL_LOG_QUICKWIT", "sqlLogQuickwit", "boolean"],
     ["PG_PREPARED", "pgPrepared", "boolean"],

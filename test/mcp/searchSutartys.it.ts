@@ -128,7 +128,8 @@ describe("searchSutartys (quickwit engine)", () => {
         );
 
         expect(results).toEqual([]);
-        expect(client).not.toBeNull();
+        // Jungtį valdo streamQuery – iškvietėjui `client` nebeperduodamas.
+        expect(client).toBeNull();
         expect(stream).not.toBeNull();
 
         const rows: object[] = [];

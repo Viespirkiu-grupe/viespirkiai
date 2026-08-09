@@ -10,6 +10,12 @@ vi.mock("../../modules/mcp/mcpLogger.js", () => ({
     logToolCall: vi.fn(),
 }));
 
+// ensureAnalystViews eina per postgres.connect() (žemiau mock'inamas tik .query),
+// o be jo handler'is nutrūktų dar nepasiekęs _runQuery.
+vi.mock("../../modules/mcp/analyst/ensureViews.js", () => ({
+    ensureAnalystViews: vi.fn().mockResolvedValue(undefined),
+}));
+
 // columnFixer calls postgres to load table column names; return empty in unit tests
 // so the map only contains view columns (sufficient for these tests).
 vi.mock("../../postgres/postgres.js", () => ({
