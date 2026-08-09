@@ -99,7 +99,7 @@ export async function handler({
         return { content: [{ type: "text", text: message }], isError: true };
     }
 
-    // Tekstas gyvena sujungtame failo turinio JSON'e (FAILAI_LOCATION).
+    // Tekstas gyvena sujungtame failo turinio JSON'e (SQLite arba HTTP fallback).
     const rawTekstas = failas.failasHash
         ? (await readFailaiFs(failas.failasHash))?.tekstas ?? null
         : null;

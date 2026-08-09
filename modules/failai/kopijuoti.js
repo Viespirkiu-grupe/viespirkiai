@@ -10,11 +10,11 @@ const fetchDispatcher = new Agent({
     connectTimeout: FETCH_TIMEOUT_MS,
 });
 
-const DEFAULT_LIMIT = 1;
+const DEFAULT_LIMIT = null;
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_EXTENSION = null;
 const DEFAULT_START_MD5 = null;
-const DEFAULT_DIRECT = false;
+const DEFAULT_DIRECT = true;
 const DEFAULT_DRY_RUN = false;
 
 const BATCH_SIZE = 1_000;
@@ -23,9 +23,11 @@ const DOWNLOAD_URL_PATH = "/download-url";
 const STORAGE_USAGE_PATH = "/storage-usage";
 const PUBLIC_FILE_BASE_URL = "https://failai.viespirkiai.org";
 const MD5_REGEX = /^[a-f0-9]{32}$/i;
+const MAX_MD5_VALUE = (1n << 128n) - 1n;
+const MD5_PROGRESS_SCALE = 1_000_000n;
 
 const CLI_USAGE =
-    "Naudojimas: node modules/failai/kopijuoti.js [iš_dėžės] <į_dėžę> [--extension pdf] [--limit 10] [--concurrency 4] [--start-md5 <md5>] [--direct] [--dry-run]";
+    "Naudojimas: node modules/failai/kopijuoti.js [iš_dėžės] <į_dėžę> [--extension pdf] [--limit 10] [--concurrency 4] [--start-md5 <md5>] [--direct|--no-direct] [--dry-run]";
 
 const ANSI_RESET = "\x1b[0m";
 const ANSI_BOLD = "\x1b[1m";
@@ -66,14 +68,27 @@ function formatBytes(bytes) {
     return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
+function formatMd5Progress(md5) {
+    if (!MD5_REGEX.test(md5)) return "?";
+
+    const value = BigInt(`0x${md5}`);
+    const scaled = (value * MD5_PROGRESS_SCALE) / MAX_MD5_VALUE;
+    return `${(Number(scaled) / 10_000).toFixed(4)}%`;
+}
+
 function formatFailasSummary({ failas, source }) {
     return [
         kv("md5", color(failas.md5, ANSI_CYAN)),
+        kv("progress≈", color(formatMd5Progress(failas.md5), ANSI_CYAN)),
         kv("id", color(failas.firstId, ANSI_YELLOW)),
         kv("ext", color(failas.extension, ANSI_MAGENTA)),
         kv("size", color(formatBytes(failas.dydis), ANSI_BLUE)),
         kv("from", color(source, ANSI_GREEN)),
     ].join(" | ");
+}
+
+function withPath(baseUrl, pathname) {
+    return `${baseUrl.replace(/\/+$/, "")}${pathname}`;
 }
 
 async function getDezeByName(name) {
@@ -98,31 +113,30 @@ async function getKopijuotiniFailai({ from, to, extension, startMd5, limit }) {
     const result = await postgres.query(
         `
         WITH kandidatai AS (
-            SELECT
-                m.md5,
-                sd.pavadinimas AS "sourceDeze",
-                COALESCE(f.filesize, b.filesize, 0) AS dydis
-            FROM public."filesMd5Boxes" b
-            JOIN public."filesMd5" m ON m.id = b."md5Id"
-            JOIN public.dezes sd ON sd.id = b."boxId"
-            JOIN LATERAL (
-                SELECT f.filesize
-                FROM public.files f
-                LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
-                WHERE f."md5Id" = b."md5Id"
-                  AND f."downloadStatus" = 1
-                  AND ($2::text IS NULL OR lower(e.extension) = lower($2))
-                ORDER BY f.id ASC
-                LIMIT 1
-            ) f ON TRUE
-            WHERE ($1::text IS NULL OR sd.pavadinimas = $1)
-              AND COALESCE(f.filesize, b.filesize, 0) > 0
-              AND ($3::text IS NULL OR m.md5 > $3)
+            SELECT m.id AS "md5Id", m.md5
+            FROM public."filesMd5" m
+            WHERE ($3::text IS NULL OR m.md5 > $3)
+              AND EXISTS (
+                  SELECT 1
+                  FROM public."filesMd5Boxes" b
+                  JOIN public.dezes sd ON sd.id = b."boxId"
+                  WHERE b."md5Id" = m.id
+                    AND b.filesize > 0
+                    AND ($1::text IS NULL OR sd.pavadinimas = $1)
+              )
+              AND EXISTS (
+                  SELECT 1
+                  FROM public.files f
+                  LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
+                  WHERE f."md5Id" = m.id
+                    AND f."downloadStatus" = 1
+                    AND ($2::text IS NULL OR lower(e.extension) = lower($2))
+              )
               AND NOT EXISTS (
                   SELECT 1
                   FROM public."filesMd5Boxes" t
                   JOIN public.dezes td ON td.id = t."boxId"
-                  WHERE t."md5Id" = b."md5Id"
+                  WHERE t."md5Id" = m.id
                     AND td.pavadinimas = $4
               )
             ORDER BY m.md5 ASC
@@ -130,14 +144,29 @@ async function getKopijuotiniFailai({ from, to, extension, startMd5, limit }) {
         )
         SELECT
             k.md5,
-            k."sourceDeze",
+            source_box."sourceDeze",
             first_failas."firstId",
             first_failas.pavadinimas,
             first_failas.extension,
-            k.dydis,
+            source_box."storageExtension",
+            source_box.dydis,
             ids."fileIds"
         FROM kandidatai k
-        JOIN public."filesMd5" km ON km.md5 = k.md5
+        JOIN LATERAL (
+            SELECT
+                sd.pavadinimas AS "sourceDeze",
+                b.filesize AS dydis,
+                storage_extension.extension AS "storageExtension"
+            FROM public."filesMd5Boxes" b
+            JOIN public.dezes sd ON sd.id = b."boxId"
+            LEFT JOIN public."filesExtensions" storage_extension
+                   ON storage_extension.id = b."extensionId"
+            WHERE b."md5Id" = k."md5Id"
+              AND b.filesize > 0
+              AND ($1::text IS NULL OR sd.pavadinimas = $1)
+            ORDER BY sd.priority DESC NULLS LAST, b."boxId" ASC
+            LIMIT 1
+        ) source_box ON TRUE
         JOIN LATERAL (
             SELECT
                 f.id AS "firstId",
@@ -146,7 +175,7 @@ async function getKopijuotiniFailai({ from, to, extension, startMd5, limit }) {
             FROM public.files f
             LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
             LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
-            WHERE f."md5Id" = km.id
+            WHERE f."md5Id" = k."md5Id"
               AND f."downloadStatus" = 1
               AND ($2::text IS NULL OR lower(e.extension) = lower($2))
             ORDER BY f.id ASC
@@ -156,7 +185,7 @@ async function getKopijuotiniFailai({ from, to, extension, startMd5, limit }) {
             SELECT ARRAY_AGG(f.id ORDER BY f.id) AS "fileIds"
             FROM public.files f
             LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"
-            WHERE f."md5Id" = km.id
+            WHERE f."md5Id" = k."md5Id"
               AND f."downloadStatus" = 1
               AND ($2::text IS NULL OR lower(e.extension) = lower($2))
         ) ids ON TRUE
@@ -185,7 +214,7 @@ async function getDezesByNames(names) {
 }
 
 async function updateDezeUsage(deze) {
-    const response = await fetch(`${deze.url}${STORAGE_USAGE_PATH}`, {
+    const response = await fetch(withPath(deze.url, STORAGE_USAGE_PATH), {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -212,7 +241,8 @@ async function updateDezeUsage(deze) {
 
 function getSourceUrl({ failas, fromDeze, direct }) {
     if (direct) {
-        return `${fromDeze.url}/file/${failas.md5}.${failas.extension}`;
+        const extension = failas.storageExtension ?? failas.extension;
+        return withPath(fromDeze.url, `/file/${failas.md5}.${extension}`);
     }
 
     return `${PUBLIC_FILE_BASE_URL}/${failas.firstId}`;
@@ -245,7 +275,7 @@ export async function kopijuotiFailus(from, to, options = {}) {
             colorTag("COPY_PLAN", ANSI_BLUE),
             kv("from", color(from ?? "*", ANSI_GREEN)),
             kv("to", color(to, ANSI_GREEN)),
-            kv("limit", color(limit, ANSI_YELLOW)),
+            kv("limit", color(limit ?? "visi", ANSI_YELLOW)),
             kv("conc", color(concurrency, ANSI_YELLOW)),
             kv("ext", color(extension ?? "*", ANSI_MAGENTA)),
             kv("start", color(startMd5 ?? "*", ANSI_CYAN)),
@@ -283,7 +313,7 @@ export async function kopijuotiFailus(from, to, options = {}) {
                 })}`,
             );
             logger.log(
-                `${colorTag("LAST", ANSI_YELLOW)} | ${kv("md5", color(failas.md5, ANSI_CYAN))} | ${kv("id", color(failas.firstId, ANSI_YELLOW))}`,
+                `${colorTag("LAST", ANSI_YELLOW)} | ${kv("md5", color(failas.md5, ANSI_CYAN))} | ${kv("progress≈", color(formatMd5Progress(failas.md5), ANSI_CYAN))} | ${kv("id", color(failas.firstId, ANSI_YELLOW))}`,
             );
             return {
                 md5: failas.md5,
@@ -292,7 +322,7 @@ export async function kopijuotiFailus(from, to, options = {}) {
             };
         }
 
-        const response = await fetch(`${toDeze.url}${DOWNLOAD_URL_PATH}`, {
+        const response = await fetch(withPath(toDeze.url, DOWNLOAD_URL_PATH), {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -328,19 +358,22 @@ export async function kopijuotiFailus(from, to, options = {}) {
             );
         }
 
-        // Naujoje dėžėje objektas vadinasi taip pat, tad plėtinys perimamas iš
-        // pirminio įrašo (filesMd5Boxes."extensionId").
+        // Tiesiogiai kopijuojant iš dėžės išlieka jos fizinis plėtinys. Per viešą
+        // failo URL siunčiamas loginio failo vardas, todėl naudojamas jo plėtinys.
+        const copiedExtension = direct
+            ? (failas.storageExtension ?? failas.extension)
+            : failas.extension;
+
         await postgres.query(
             `
             INSERT INTO public."filesMd5Boxes" ("md5Id", "boxId", filesize, "extensionId")
-            SELECT m.id, $2::int, $3::bigint,
-                   (SELECT b."extensionId" FROM public."filesMd5Boxes" b
-                    WHERE b."md5Id" = m.id AND b."extensionId" IS NOT NULL LIMIT 1)
+            SELECT m.id, $2::int, $3::bigint, e.id
             FROM public."filesMd5" m
+            LEFT JOIN public."filesExtensions" e ON e.extension = $4::text
             WHERE m.md5 = $1
             ON CONFLICT ("md5Id", "boxId") DO NOTHING
             `,
-            [copiedMd5, toDeze.id, copiedSize],
+            [copiedMd5, toDeze.id, copiedSize, copiedExtension],
         );
 
         const used = await updateDezeUsage(toDeze);
@@ -352,7 +385,7 @@ export async function kopijuotiFailus(from, to, options = {}) {
             })} | ${kv("used", color(formatBytes(used), ANSI_BLUE))}`,
         );
         logger.log(
-            `${colorTag("LAST", ANSI_GREEN)} | ${kv("md5", color(failas.md5, ANSI_CYAN))} | ${kv("id", color(failas.firstId, ANSI_YELLOW))}`,
+            `${colorTag("LAST", ANSI_GREEN)} | ${kv("md5", color(failas.md5, ANSI_CYAN))} | ${kv("progress≈", color(formatMd5Progress(failas.md5), ANSI_CYAN))} | ${kv("id", color(failas.firstId, ANSI_YELLOW))}`,
         );
 
         return {
@@ -366,13 +399,16 @@ export async function kopijuotiFailus(from, to, options = {}) {
     let currentMd5 = startMd5;
     let remaining = limit;
 
-    while (remaining > 0) {
+    while (remaining === null || remaining > 0) {
         const failai = await getKopijuotiniFailai({
             from,
             to,
             extension,
             startMd5: currentMd5,
-            limit: Math.min(BATCH_SIZE, remaining),
+            limit:
+                remaining === null
+                    ? BATCH_SIZE
+                    : Math.min(BATCH_SIZE, remaining),
         });
 
         if (!failai.length) {
@@ -409,7 +445,7 @@ export async function kopijuotiFailus(from, to, options = {}) {
             Array.from({ length: Math.min(concurrency, failai.length) }, () => worker()),
         );
 
-        remaining -= failai.length;
+        if (remaining !== null) remaining -= failai.length;
         currentMd5 = failai[failai.length - 1].md5;
     }
 
@@ -436,6 +472,11 @@ function parseArgs(argv) {
 
         if (arg === "--direct") {
             options.direct = true;
+            continue;
+        }
+
+        if (arg === "--no-direct") {
+            options.direct = false;
             continue;
         }
 
@@ -466,7 +507,7 @@ function parseArgs(argv) {
 
         if (arg === "--limit") {
             options.limit = Number.parseInt(
-                argv[++i] ?? String(DEFAULT_LIMIT),
+                argv[++i] ?? "",
                 10,
             );
             continue;
@@ -495,7 +536,7 @@ function parseArgs(argv) {
 
         if (arg === "--kiekis") {
             options.limit = Number.parseInt(
-                argv[++i] ?? String(DEFAULT_LIMIT),
+                argv[++i] ?? "",
                 10,
             );
             continue;
@@ -509,7 +550,10 @@ function parseArgs(argv) {
         positional.push(arg);
     }
 
-    if (!Number.isInteger(options.limit) || options.limit < 1) {
+    if (
+        options.limit !== null &&
+        (!Number.isInteger(options.limit) || options.limit < 1)
+    ) {
         throw new Error("Parametras --limit turi būti teigiamas sveikas skaičius.");
     }
 

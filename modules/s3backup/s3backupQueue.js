@@ -16,12 +16,19 @@ import {
 /*
 Eilės sudarymas: Postgres → SQLite `eile`.
 
-Vyksta atskirai nuo įkėlimo ir yra inkrementinis — kursorius (`bukle.queueCursor`)
-laikomas SQLite'e, tad scriptą galima leisti nuolat, net kol `s3backup:upload`
-jau sukasi (WAL: du procesai, trumpos transakcijos, busy_timeout suderina).
+Vyksta atskirai nuo įkėlimo, tad scriptą galima leisti nuolat, net kol
+`s3backup:upload` jau sukasi (WAL: du procesai, trumpos transakcijos,
+busy_timeout suderina).
+
+Numatytai einam per VISUS md5 nuo pradžių. Kursorius (`bukle.queueCursor`) tinka
+tik atsistatymui po nutrūkimo, bet ne kasdieniam paleidimui: tinkamumo sąlyga
+priklauso nuo `filesMd5Boxes` / `files."downloadStatus"`, o šie atsiranda vėliau
+nei pats `filesMd5` įrašas. Praleidus mažesnius id, seni md5, tapę tinkami po
+praėjusio rato, į eilę nebepatektų niekada. Pilnas ratas pigus — `INSERT … ON
+CONFLICT DO NOTHING`, tad kartotiniai md5 nieko nekainuoja.
 
   npm run s3backup:queue
-  npm run s3backup:queue -- --nuo-pradziu
+  npm run s3backup:queue -- --testi            # tęsti nuo kursoriaus (po nutrūkimo)
   npm run s3backup:queue -- --page 50000 --limit 200000
 
 Šaltinis: md5, kuriems realiai yra baitų — t. y. yra `filesMd5Boxes` įrašas
@@ -39,7 +46,8 @@ const args = parseArgs(process.argv.slice(2));
 
 const PAGE_SIZE = numArg(args.page, 50_000);
 const LIMIT = limitArg(args.limit);
-const NUO_PRADZIU = Boolean(args["nuo-pradziu"]);
+// `--nuo-pradziu` paliktas kaip senas vardas — dabar tai numatytasis elgesys.
+const TESTI = Boolean(args.testi) && !args["nuo-pradziu"];
 const DB_PATH = typeof args.db === "string" ? args.db : getS3backupSqlitePath();
 
 const logger = new Logger(import.meta.url);
@@ -68,10 +76,12 @@ async function main() {
     const db = openS3backupSqlite({ dbPath: DB_PATH });
     const writer = createEileWriter(db);
 
-    const startAfter = NUO_PRADZIU ? null : getQueueCursor(db);
+    const startAfter = TESTI ? getQueueCursor(db) : null;
     logger.log(
         `SQLite: ${DB_PATH}` +
-            (startAfter ? `, tęsiam nuo filesMd5.id > ${nf(startAfter)}` : ", nuo pradžių"),
+            (startAfter
+                ? `, tęsiam nuo filesMd5.id > ${nf(startAfter)}`
+                : ", pilnas ratas nuo pradžių"),
     );
 
     const { rows: countRows } = await postgres.query(

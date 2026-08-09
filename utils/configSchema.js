@@ -24,6 +24,7 @@ const configSchema = z.object({
     port: z.number().int().positive().default(9019),
     logRequests: z.boolean().default(false),
     enableAtn1: z.boolean().default(false),
+    enableBotChallenge: z.boolean().default(false),
 
     pgHost: z.string().default("localhost"),
     pgPort: z.number().int().positive().default(5432),
@@ -64,6 +65,10 @@ const configSchema = z.object({
 
     ocrRezultataiLocation: z.string().optional(),
     dokumentaiLocation: z.string().optional(),
+    failaiLocation: z.string().optional(),
+    failaiInfoSqliteLocation: z.string().optional(),
+    dokumentaiSqliteLocation: z.string().optional(),
+    ocrRezultataiSqliteLocation: z.string().optional(),
 
     enableGraph: z.boolean().default(false),
 

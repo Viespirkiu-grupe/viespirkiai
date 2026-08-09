@@ -287,6 +287,37 @@ export function getPaskutinius(db, mazgas, limit = 5) {
         }));
 }
 
+/**
+ * Klaidų eilutės po vieną — detaliam išrašui (ne tik suvestinei).
+ * `kaip` filtruoja pagal paskutinės klaidos tekstą (SQL LIKE, pvz. `HTTP 404%`).
+ *
+ * @param {import("node:sqlite").DatabaseSync} db
+ * @param {string} mazgas
+ * @param {{kaip?: string|null, limit?: number}} [opts]
+ * @returns {{md5: string, bandymai: number, paskutine: string|null, kada: number, dydis: number}[]}
+ */
+export function getKlaidas(db, mazgas, { kaip = null, limit = Infinity } = {}) {
+    return db
+        .prepare(
+            `SELECT k."md5" AS md5, k."bandymai" AS bandymai, k."paskutine" AS paskutine,
+                    k."kada" AS kada, COALESCE(e."dydis", 0) AS dydis
+             FROM "klaidos" k
+             LEFT JOIN "eile" e ON e."md5" = k."md5"
+             WHERE k."mazgas" = ?
+               AND (? IS NULL OR COALESCE(k."paskutine", '') LIKE ?)
+             ORDER BY k."bandymai" DESC, k."kada" DESC
+             LIMIT ?`,
+        )
+        .all(mazgas, kaip, kaip, Number.isFinite(limit) ? limit : -1)
+        .map((row) => ({
+            md5: row.md5,
+            bandymai: Number(row.bandymai),
+            paskutine: row.paskutine,
+            kada: Number(row.kada),
+            dydis: Number(row.dydis),
+        }));
+}
+
 /** Dažniausios klaidos — kad matytųsi, ar tai 404, timeout ar md5 nesutapimai. */
 export function getKlaiduSuvestine(db, mazgas, limit = 20) {
     return db

@@ -15,6 +15,8 @@ export interface Config {
     logRequests: boolean;
     /** Rodyti CVPP / ATN-1 archyvo puslapius ir navigacijos nuorodą. */
     enableAtn1: boolean;
+    /** Saugoti brangius paieškos maršrutus paprastu JavaScript slapuko patikrinimu. */
+    enableBotChallenge: boolean;
     /** Nustatomas automatiškai pagal NODE_ENV (ne per config/.env). */
     dev: boolean;
 
@@ -47,6 +49,10 @@ export interface Config {
 
     ocrRezultataiLocation?: string;
     dokumentaiLocation?: string;
+    failaiLocation?: string;
+    failaiInfoSqliteLocation?: string;
+    dokumentaiSqliteLocation?: string;
+    ocrRezultataiSqliteLocation?: string;
 
     /** Stateless e-TAR HTML→JSON adapterio bazinis URL (`modules/eTar`). */
     eTarApiUrl: string;

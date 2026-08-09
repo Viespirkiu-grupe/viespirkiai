@@ -11,12 +11,11 @@ reikia lygiai vieną kartą — kitaip hash'as ir įrašyti baitai gali nesutapt
 */
 const store = createSidecarStore({
     locationKey: "failaiLocation",
-    extension: "json",
+    sqliteLocationKey: "failaiInfoSqliteLocation",
+    sqliteTable: "failaiInfo",
     label: "failo turinio",
     keyName: "hash",
 });
-
-export const getFailaiPath = store.getPath;
 
 /**
  * Sujungto failo turinio objekto hash (raktas FS saugykloje).
@@ -40,3 +39,6 @@ export const savePreparedFailaiFs = store.saveRaw;
 
 /** @param {string} hash @returns {Promise<Object|null>} */
 export const readFailaiFs = store.read;
+
+export const readFailaiLocalRaw = store.readLocalRaw;
+export const isFailaiLocalStoreConfigured = store.localConfigured;

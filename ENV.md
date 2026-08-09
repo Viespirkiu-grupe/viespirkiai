@@ -17,7 +17,7 @@ kintamieji krenta į numatytąsias schemos reikšmes (žr. `utils/configSchema.j
 | **Quickwit** | Pilnatekstė sutarčių / viešųjų pirkimų / dokumentų paieška ir facetavimas. | Ne (krenta į lėtesnę Postgres paiešką) |
 | **Tor (SOCKS5)** | Duomenų scrapinimas per Tor (tik taskrunneris). | Tik backend'ui |
 | **Chromium** | OG paveikslėlių atvaizdavimas (jau įdiegtas Docker image'e). | Frontend'ui |
-| **Blob saugykla** | OCR rezultatai, failų tekstas/metaduomenys, dokumentai. Gali būti **lokalus katalogas** (`/flashas/...`) **arba nuotolinis HTTPS sidecar endpoint'as** (kitas host'as, atsakantis į `?md5=...`). | Taip (failų funkcijoms) |
+| **Blob saugykla** | OCR rezultatai, failų tekstas/metaduomenys, dokumentai. Lokaliai laikomi zstd SQLite; kitas host'as gali skaityti per HTTPS sidecar endpoint'ą. | Taip (failų funkcijoms) |
 
 > **PostGIS:** DB turi būti su įjungtu plėtiniu: `CREATE EXTENSION IF NOT EXISTS postgis;`
 
@@ -47,6 +47,7 @@ _(taskrunneris juos irgi naudoja)_
 | `PORT` | `9019` | Portas, kuriame klausosi web serveris. |
 | `LOG_REQUESTS` | `false` | Į `stderr` JSON formatu žurnaluoja kiekvieną HTTP užklausą: metodą, URL, tikrą kliento IP (atsižvelgiant į „Cloudflare“ antraštes) ir `User-Agent`. |
 | `ENABLE_ATN1` | `false` | Įjungia CVPP / ATN-1 archyvo puslapius ir jų nuorodą navigacijoje. Išjungus tiesioginės šių puslapių užklausos grąžina `404`. |
+| `ENABLE_BOT_CHALLENGE` | `false` | Įjungia lengvą JavaScript patikrą maršrutams `/`, `/viesiejiPirkimai`, `/dokumentai` ir `/juridiniai`. Pirma užklausa nustato sesijos slapuką `bot=no` ir perkrauna puslapį; JavaScript nevykdantys scraperiai iki paieškos neprieina. |
 | `GIT_COMMIT` | _(iš `.git` arba `build-info.json`)_ | Paleistos versijos commit'o hash'as – footer'yje rodomas trumpasis hash'as su nuoroda į GitHub. **Paprastai nustatinėti nereikia:** `npm run build` (taip pat ir Docker build'as) hash'ą nuskaito iš `.git` ir įrašo į `build-info.json`, kuris įkepamas į image'ą. Kintamasis reikalingas tik ten, kur `.git` nepasiekiamas (build iš archyvo), arba norint reikšmę perrašyti. Alternatyvūs pavadinimai: `GIT_SHA`, `SOURCE_COMMIT`. |
 
 ### DB prisijungimas
@@ -215,19 +216,17 @@ Pilnatekstė paieška ir facetavimas.
 
 ### Failų / dokumentų vietos
 
-Kiekviena reikšmė gali būti **absoliutus kelias** (lokalus katalogas, pvz.
-`/data/failaiInfo`) arba **HTTPS URL** (nuotolinis sidecar endpoint'as, pvz.
-`https://failai.example.lt/api/dokumentai/dokumentaiFiles`). Tuščia — funkcija išjungta.
+Lokaliam darbui naudojami tik `*_SQLITE_LOCATION`: tai pilni `.sqlite` failų
+keliai. Turinys laikomas zstd suspaustas. SQLite vieta privaloma kiekvienam
+procesui, kuris rašo sidecar'us; be jos write baigiasi klaida.
 
-- **Lokalus kelias** — failai skaitomi/rašomi tiesiai diske (sharding'as pagal
-  rakto pirmus 5 simbolius).
-- **Nuotolinis URL** — turinys **skaitomas** HTTP užklausa (naudinga, kai
-  frontend'as ir duomenų diskas skirtinguose host'uose). Į nuotolinę vietą
-  **rašyti negalima** — tik lokalus kelias palaiko įrašymą (išsaugojimą daro
-  taskrunneris, turintis lokalų diską).
+`FAILAI_LOCATION`, `DOKUMENTAI_LOCATION` ir `OCR_REZULTATAI_LOCATION` nebepalaiko
+lokalių katalogų. Juose galima nurodyti tik HTTP(S) endpoint'ą nuotoliniam read
+fallback. Skaitymo tvarka: lokalus SQLite, tada HTTP(S). Endpoint'ą aptarnaujantis
+mazgas skaito tik savo SQLite ir taip išvengia rekursinių HTTP užklausų.
 
-Nuotolinį režimą aptarnauja šie endpoint'ai (juos rodo tas mazgas, kuris turi
-lokalų diską; kitas mazgas jų URL įsirašo į atitinkamą `*_LOCATION`):
+Nuotolinį režimą aptarnauja šie endpoint'ai (kitas mazgas jų URL įsirašo į
+atitinkamą `*_LOCATION`):
 
 | Kintamasis | Endpoint'as | Užklausa |
 | --- | --- | --- |
@@ -238,9 +237,23 @@ lokalų diską; kitas mazgas jų URL įsirašo į atitinkamą `*_LOCATION`):
 | Kintamasis | Paaiškinimas |
 | --- | --- |
 | `INTERNAL_FILE_BASE` | Vidinio failų CDN bazinis URL — preview nuorodoms sudaryti. Numatyta: `https://failai.viespirkiai.org`. |
-| `OCR_REZULTATAI_LOCATION` | OCR rezultatų blob saugykla. |
-| `DOKUMENTAI_LOCATION` | Dokumentų JSON sidecar failai (raktas: `md5`). |
-| `FAILAI_LOCATION` | Sujungti failo turinio JSON failai (tekstas + metaduomenys + subjektai). |
+| `OCR_REZULTATAI_LOCATION` | Pasirenkamas nuotolinis OCR HTTP(S) read endpoint'as. |
+| `DOKUMENTAI_LOCATION` | Pasirenkamas nuotolinis dokumentų HTTP(S) read endpoint'as. |
+| `FAILAI_LOCATION` | Pasirenkamas nuotolinis failų turinio HTTP(S) read endpoint'as. |
+| `FAILAIINFO_SQLITE_LOCATION` | Pilnas sujungto failų turinio SQLite failo kelias. |
+| `DOKUMENTAI_SQLITE_LOCATION` | Pilnas dokumentų sidecar SQLite failo kelias. |
+| `OCR_REZULTATAI_SQLITE_LOCATION` | Pilnas OCR rezultatų SQLite failo kelias. |
+
+PostgreSQL referencinius hash'us galima paketais palyginti su
+SQLite, neatliekant brangaus bendro `COUNT(DISTINCT ...)`:
+
+```bash
+npm run sidecars:sqlite-missing -- --store dokumentai
+```
+
+Kiekvienas nerastas raktas išvedamas kaip `TRŪKSTA <hash>`. Galimi
+`--store failaiInfo|dokumentai|ocr`, `--db`, `--page`, `--limit` ir
+`--after <hash>`.
 
 ### Kita
 

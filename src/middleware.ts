@@ -1,5 +1,6 @@
 import { defineMiddleware } from 'astro:middleware';
 import config from './lib/config.ts';
+import { botChallengeResponse, isBotChallengePath } from './lib/botChallenge.ts';
 import { isAtn1Path } from './lib/featureRoutes.ts';
 import { hostFromHeaders, runWithRequestContext } from '@/utils/runtimeContext.js';
 
@@ -14,6 +15,15 @@ import { hostFromHeaders, runWithRequestContext } from '@/utils/runtimeContext.j
 export const onRequest = defineMiddleware(async (context, next) => {
   if (!config.enableAtn1 && isAtn1Path(context.url.pathname)) {
     return new Response(null, { status: 404 });
+  }
+
+  if (
+    config.enableBotChallenge
+    && context.request.method === 'GET'
+    && isBotChallengePath(context.url.pathname)
+    && context.cookies.get('bot')?.value !== 'no'
+  ) {
+    return botChallengeResponse();
   }
 
   // Užklausos kontekstas (hostas) – kad SQL logo įrašus būtų galima priskirti
