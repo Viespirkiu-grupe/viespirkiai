@@ -1,0 +1,235 @@
+---
+// Akto redakcijų perjungiklis — virš paties teksto, nes keičia būtent tekstą.
+//
+// Naudotojui redakcija yra LAIKOTARPIS („nuo 2026-06-23 iki 2026-07-08"), o ne
+// e-TAR tokenas: tokenas jam nieko nesako ir puslapyje nebeliko. Vienas šis
+// valdiklis pakeičia ir buvusią „Suvestinės redakcijos" lentelę — tie patys
+// duomenys dukart puslapyje kartotis neturi.
+//
+// Sąrašas yra <details>, tad vienodai gerai atrodo ir su 2, ir su 200
+// redakcijų: uždarytas rodo tik dabartinę, atidarytas — slenkamą sąrašą.
+import type { Redakcija } from '../../lib/teisesAktasPageData.ts';
+
+interface Props {
+  redakcijos: Redakcija[];
+  legalActId: string;
+}
+
+const { redakcijos, legalActId } = Astro.props;
+
+const href = (r: Redakcija) =>
+  `/teisesAktas/${encodeURIComponent(legalActId)}?v=${encodeURIComponent(r.key)}`;
+
+/** „2026-06-23 → 2026-07-08" arba „nuo 2026-07-09"; originalas — be datų. */
+function laikotarpis(r: Redakcija): string {
+  if (r.kind === 'original') return 'Originalus aktas';
+  if (r.from && r.to) return `${r.from} → ${r.to}`;
+  if (r.from) return `nuo ${r.from}`;
+  if (r.to) return `iki ${r.to}`;
+  return 'Suvestinė redakcija';
+}
+
+/** Trumpas tipo ženklelis: kuri iš jų galioja dabar. */
+function zenklas(r: Redakcija): { text: string; kind: string } | null {
+  if (r.kind === 'consolidated') return { text: 'Galioja', kind: 'ok' };
+  if (r.kind === 'historical') return { text: 'Istorinė', kind: 'past' };
+  return null;
+}
+
+const current = redakcijos.find(r => r.isCurrent) ?? redakcijos[0];
+const others = redakcijos.length - 1;
+---
+
+{redakcijos.length > 0 && (
+  redakcijos.length === 1 ? (
+    <p class="ta-red-single">{laikotarpis(redakcijos[0])}</p>
+  ) : (
+    <details class="ta-red">
+      <summary>
+        <span class="ta-red-now">{laikotarpis(current)}</span>
+        {zenklas(current) && (
+          <span class:list={['ta-red-badge', `is-${zenklas(current)!.kind}`]}>{zenklas(current)!.text}</span>
+        )}
+        <span class="ta-red-hint">Kitos redakcijos ({others})</span>
+      </summary>
+
+      <ul class="ta-red-list">
+        {redakcijos.map((r) => (
+          <li class:list={['ta-red-item', r.isCurrent && 'is-current', r.hasText && 'is-clickable']}>
+            {/* Spaudžiama visa eilutė, ne data joje — nuoroda uždengia įrašą,
+                o jo viduje esančios nuorodos į kitus aktus lieka virš jos. */}
+            {r.hasText && (
+              <a href={href(r)} class="ta-red-link" aria-label={`Rodyti redakciją ${laikotarpis(r)}`}></a>
+            )}
+            <div class="ta-red-row">
+              <span class:list={['ta-red-when', !r.hasText && 'is-muted']}>{laikotarpis(r)}</span>
+              {zenklas(r) && (
+                <span class:list={['ta-red-badge', `is-${zenklas(r)!.kind}`]}>{zenklas(r)!.text}</span>
+              )}
+              {!r.hasText && r.sourceUrl && (
+                <a class="ta-red-extern" href={r.sourceUrl} target="_blank" rel="noopener">e-TAR ↗</a>
+              )}
+            </div>
+            {r.changes.length > 0 && (
+              <ul class="ta-red-changes">
+                {r.changes.map((c: any) => (
+                  <li>
+                    Pakeitė <a href={`/teisesAktas/${encodeURIComponent(c.amendingActId)}`}>{c.linkText}</a>
+                    {c.adoptedAt && <span class="text-muted"> · {c.adoptedAt}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+)}
+
+<style>
+  /* Kai redakcija viena, meniu nėra — lieka tik užrašas. Jis vis tiek turi
+     stovėti dešinėje ir turėti tokį patį vidinį tarpą kaip meniu mygtukas,
+     kitaip prilimpa prie rėmo krašto. */
+  .ta-red-single {
+    margin: 0 0 0 auto;
+    padding: 4px 8px;
+    font-size: var(--text-sm);
+    color: var(--dark-gray);
+  }
+
+  .ta-red {
+    position: relative;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+  }
+  .ta-red > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+    list-style: none;
+    font-size: var(--text-sm);
+  }
+  .ta-red > summary::-webkit-details-marker { display: none; }
+  .ta-red > summary::after {
+    content: '▾';
+    margin-left: 4px;
+    color: var(--gray);
+    transition: transform var(--transition);
+  }
+  /* Sukimosi kryptis ta pati kaip „Turinio" mygtuko — abu meniu turi elgtis
+     vienodai. */
+  .ta-red[open] > summary::after { transform: rotate(-180deg); }
+  .ta-red > summary:hover { background: var(--color-muted-bg); }
+
+  .ta-red-now {
+    font-weight: 500;
+    color: var(--black);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ta-red-hint {
+    margin-left: auto;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    white-space: nowrap;
+  }
+
+  .ta-red-badge {
+    flex-shrink: 0;
+    padding: 1px 8px;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    background: var(--lighter-gray);
+    color: var(--dark-gray);
+  }
+  .ta-red-badge.is-ok {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+  }
+
+  /* Sąrašas iškrenta ANT teksto rėmelio — kitaip jo atidarymas kaskart
+     nustumtų patį aktą žemyn. */
+  .ta-red-list {
+    position: absolute;
+    top: calc(100% + 5px);
+    right: 0;
+    left: auto;
+    width: max-content;
+    min-width: 100%;
+    max-width: min(460px, 80vw);
+    z-index: 20;
+    margin: 0;
+    padding: 4px 0;
+    list-style: none;
+    max-height: 55vh;
+    overflow-y: auto;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    box-shadow: var(--shadow-md);
+    animation: ta-red-drop var(--transition);
+  }
+  @keyframes ta-red-drop {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ta-red-list { animation: none; }
+  }
+
+  .ta-red-item {
+    position: relative;
+    padding: 6px 12px;
+  }
+  .ta-red-item + .ta-red-item { border-top: 1px solid var(--light-gray); }
+  .ta-red-item.is-current { background: var(--lighter-gray); }
+  .ta-red-item.is-clickable { cursor: pointer; }
+  .ta-red-item.is-clickable:hover { background: var(--color-muted-bg); }
+
+  /* Nuoroda dengia visą įrašą; turinys virš jos pelės nepagauna, išskyrus
+     tikras nuorodas (pakeitusius aktus, e-TAR). */
+  .ta-red-link {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+  .ta-red-row,
+  .ta-red-changes { pointer-events: none; }
+  .ta-red-row a,
+  .ta-red-changes a {
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
+  }
+
+  .ta-red-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: var(--text-sm);
+  }
+  .ta-red-when {
+    font-variant-numeric: tabular-nums;
+    color: var(--black);
+  }
+  .ta-red-when.is-muted { color: var(--gray); }
+  .ta-red-extern {
+    margin-left: auto;
+    font-size: var(--text-xs);
+  }
+
+  .ta-red-changes {
+    margin: 2px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-xs);
+    color: var(--dark-gray);
+  }
+  .ta-red-changes li { margin-top: 2px; }
+</style>

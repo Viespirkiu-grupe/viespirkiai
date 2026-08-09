@@ -163,6 +163,11 @@
   padding-block: 12px;
   padding-inline: max(16px, calc((100% - 1080px) / 2));
 }
+/* Ilgi pavadinimai (institucijos) — mažiau, bet platesnių stulpelių, kad
+   reikšmė tilptų nenukirsta. Prie 1080px turinio pločio išeina du. */
+.dok-facet-modal__list--wide {
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+}
 /* Įstaigų/įmonių sąrašas — keli stulpeliai per grid `auto-fill minmax`. */
 .dok-facet-modal__list--stack {
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));

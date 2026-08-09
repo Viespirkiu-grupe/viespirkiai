@@ -1,0 +1,150 @@
+---
+import FacetModalBase from '@design-system/components/FacetModalBase.astro';
+---
+
+<FacetModalBase id="taFacetModal" />
+
+<script>
+  // Faceto „rodyti visus" modalas: viso ekrano visų vienos facetos reikšmių
+  // sąrašas (užkraunamas pareikalavus, iki ~1k), su filtravimu vietoje ir
+  // paketiniu pritaikymu. Skirtingai nuo /dokumentai varianto — be „pridėti savo
+  // reikšmę": čia visos reikšmės ateina iš uždaro e-TAR žodyno, tad ranka įvesta
+  // reikšmė tiesiog nieko nerastų.
+  import { params, navigate, getList, setList, facetModal } from '../../scripts/teisesAktaiNav.ts';
+  import { openModal, closeModal } from '@design-system/components/modal.ts';
+
+  const modal = document.getElementById('taFacetModal');
+  if (modal) {
+    const titleEl = modal.querySelector<HTMLElement>('.ds-modal__title')!;
+    const searchEl = modal.querySelector<HTMLInputElement>('.dok-facet-modal__search')!;
+    const listEl = modal.querySelector<HTMLElement>('.dok-facet-modal__list')!;
+    const countEl = modal.querySelector<HTMLElement>('.ds-modal__count')!;
+
+    let field = '';
+    let param = '';
+    let selected = new Set<string>();      // darbinė kopija; įrašoma per „Taikyti"
+    let options: { value: string; count: number | null }[] = [];
+    let display: (value: string) => string = (v) => v;
+    let reqSeq = 0;
+
+    function updateCount() {
+      countEl.textContent = selected.size ? `Pažymėta: ${selected.size}` : '';
+    }
+
+    function toggle(value: string, row?: HTMLElement) {
+      if (selected.has(value)) selected.delete(value);
+      else selected.add(value);
+      const on = selected.has(value);
+      row?.classList.toggle('is-selected', on);
+      row?.setAttribute('aria-selected', String(on));
+      updateCount();
+    }
+
+    function makeRow(o: { value: string; count: number | null }) {
+      const on = selected.has(o.value);
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'dok-facet-row' + (on ? ' is-selected' : '');
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(on));
+      row.title = o.value;
+
+      const label = document.createElement('span');
+      label.className = 'dok-facet-row__label';
+      label.textContent = display(o.value);
+      row.appendChild(label);
+
+      if (o.count != null) {
+        const cnt = document.createElement('span');
+        cnt.className = 'dok-facet-row__count';
+        cnt.textContent = Number(o.count).toLocaleString('lt-LT');
+        row.appendChild(cnt);
+      }
+      row.addEventListener('click', () => toggle(o.value, row));
+      return row;
+    }
+
+    // Institucijų pavadinimuose kablelių pilna („Aplinkos ministerija, Žemės ūkio
+    // ministerija"), tad ištisinės eilutės atitikties reikalauti negalima: skaidom
+    // ir paiešką, ir reikšmę į žodžius (skirtukai — tarpai, kableliai, brūkšneliai)
+    // ir reikalaujam, kad KIEKVIENAS įvestas žodis kur nors reikšmėje būtų.
+    // Diakritikus nulankstom — „ukio" randa „ūkio".
+    const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const tokenize = (s: string) => fold(s).split(/[\s,;.–—-]+/).filter(Boolean);
+
+    function render() {
+      const needles = tokenize(searchEl.value);
+      // Pažymėtos, bet sąraše neesančios reikšmės — viršuje, kad jas visada
+      // būtų galima nusiimti.
+      const listed = new Set(options.map((o) => o.value));
+      const pinned = [...selected].filter((v) => !listed.has(v)).map((v) => ({ value: v, count: null }));
+      const rows = [...pinned, ...options].filter((o) => {
+        if (!needles.length) return true;
+        const hay = `${fold(o.value)} ${fold(display(o.value))}`;
+        return needles.every((n) => hay.includes(n));
+      });
+
+      listEl.textContent = '';
+      const frag = document.createDocumentFragment();
+      for (const o of rows) frag.appendChild(makeRow(o));
+      listEl.appendChild(frag);
+
+      if (!rows.length) {
+        const empty = document.createElement('p');
+        empty.className = 'dok-facet-modal__empty';
+        empty.textContent = 'Nieko nerasta.';
+        listEl.appendChild(empty);
+      }
+    }
+
+    async function load() {
+      const mySeq = ++reqSeq;
+      listEl.innerHTML = '<div class="dok-facet-modal__loading"><span class="spinner spinner-lg"></span></div>';
+      // Apimtis — dabartinė užklausa ir filtrai (API praleidžia šios facetos
+      // savo filtrą), tad kiekviena rodoma reikšmė realiai siaurina rezultatus.
+      const qs = new URLSearchParams(params.toString());
+      qs.set('field', field);
+      qs.delete('page');
+      try {
+        const res = await fetch(`/api/teisesAktaiFacet?${qs.toString()}`);
+        const data = res.ok ? await res.json() : { options: [] };
+        if (mySeq !== reqSeq) return;            // naujesnis atidarymas aplenkė šitą
+        options = Array.isArray(data.options) ? data.options : [];
+      } catch {
+        if (mySeq !== reqSeq) return;
+        options = [];
+      }
+      render();
+    }
+
+    facetModal.open = (opts) => {
+      field = opts.field;
+      param = opts.param;
+      display = opts.formatLabel ?? ((v: string) => v);
+      titleEl.textContent = opts.title;
+      listEl.classList.toggle('dok-facet-modal__list--wide', !!opts.wide);
+      selected = new Set(getList(param));
+      searchEl.value = '';
+      updateCount();
+      openModal(modal);
+      searchEl.focus();
+      load();
+    };
+
+    searchEl.addEventListener('input', render);
+
+    modal.querySelector('[data-facet-clear]')?.addEventListener('click', () => {
+      selected.clear();
+      updateCount();
+      render();
+    });
+
+    modal.querySelector('[data-facet-apply]')?.addEventListener('click', () => {
+      setList(param, [...selected]);
+      params.delete('page');
+      closeModal(modal);
+      navigate(true);
+    });
+    // Foną / ✕ / Escape tvarko bendras Modal.
+  }
+</script>

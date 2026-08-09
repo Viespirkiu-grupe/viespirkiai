@@ -94,6 +94,12 @@ export default {
     viesiejiPirkimaiUrl: "https://viesiejipirkimai.lt",
     esInvesticijos2021Url: "https://2021.esinvesticijos.lt",
 
+    // e-TAR scraperis (modules/eTar) eina ne tiesiai į e-tar.lt, o į stateless
+    // HTML→JSON adapterį. Tuščia reikšmė = scraperis neveikia.
+    eTarApiUrl: "http://10.1.10.24:8080",
+    // Bearer raktas — tik jei adapteryje nustatytas API_KEY.
+    eTarApiKey: "",
+
     // ─────────────────────────────────────────────────────────────────────
     // Failai ir OCR
     // ─────────────────────────────────────────────────────────────────────
@@ -123,6 +129,10 @@ export default {
 
     // Dokumentų JSON sidecar failai (raktas: md5).
     dokumentaiLocation: undefined,
+
+    // e-TAR API atsakymų SQLite sidecar (raktas: md5). Skirtingai nuo aukščiau
+    // esančių — ne failų medis, o viena SQLite bazė kataloge, ir tik lokali.
+    eTarSidecarDir: "/flashas/viespirkiai/eTar",
 
     // ─────────────────────────────────────────────────────────────────────
     // Eksperimentinės / prototipinės funkcijos

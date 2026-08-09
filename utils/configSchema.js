@@ -53,6 +53,12 @@ const configSchema = z.object({
         .string()
         .default("https://2021.esinvesticijos.lt"),
 
+    // e-TAR: ne pats e-tar.lt, o stateless HTML→JSON adapteris prieš jį
+    // (modules/eTar). Raktas reikalingas tik jei adapteryje nustatytas API_KEY.
+    eTarApiUrl: z.string().default(""),
+    eTarApiKey: z.string().default(""),
+    eTarSidecarDir: z.string().default("/flashas/viespirkiai/eTar"),
+
     internalFileBase: z.string().default("https://failai.viespirkiai.org"),
     ocrBandymai: z.number().int().positive().default(5),
 

@@ -50,6 +50,10 @@ const ENV_MAP = [
     ["VIESIEJI_PIRKIMAI_URL", "viesiejiPirkimaiUrl", "string"],
     ["2021_ESINVESTICIJOS", "esInvesticijos2021Url", "string"],
 
+    ["ETAR_API_URL", "eTarApiUrl", "string"],
+    ["ETAR_API_KEY", "eTarApiKey", "string"],
+    ["ETAR_SIDECAR_DIR", "eTarSidecarDir", "string"],
+
     ["INTERNAL_FILE_BASE", "internalFileBase", "string"],
     ["OCR_BANDYMAI", "ocrBandymai", "number"],
 

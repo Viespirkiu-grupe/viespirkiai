@@ -1,0 +1,125 @@
+---
+// Vienos „susijusios informacijos" skilties sąrašas (pakeitimai, susiję
+// dokumentai ir pan.).
+//
+// Buvo penkių stulpelių lentelė, kurioje pavadinimas — 400 simbolių sakinys,
+// tad viena eilutė užimdavo pusę ekrano, o su 50 ryšių puslapis tapdavo
+// nebeskaitomas. Dabar: viena eilutė = viena nuoroda (pavadinimas apkarpomas iki
+// dviejų eilučių) + tyli meta eilutė. Ilga uodega slepiama po „Rodyti dar N".
+import { relationTypeLabel } from '../../lib/teisesAktaiLabels.ts';
+
+interface Props {
+  title: string;
+  items: any[];
+  /** Kiek rodyti iš karto; likę — po „Rodyti dar N". */
+  visible?: number;
+}
+
+const { title, items, visible = 6 } = Astro.props;
+
+// Ryšio tipą rodom tik tada, kai skiltyje jų daugiau nei vienas — kitaip tai
+// tas pats žodis prie kiekvienos eilutės (skilties antraštė jį jau pasako).
+const tipai = new Set(items.map((i: any) => i.rysioTipas));
+const rodytiTipa = tipai.size > 1;
+
+const matomi = items.slice(0, visible);
+const likusieji = items.slice(visible);
+
+const meta = (item: any) => [
+  item.aktoRusis,
+  item.documentNumber ? `Nr. ${item.documentNumber}` : null,
+  item.adoptedAt,
+  item.institutions?.length ? item.institutions.join(', ') : null,
+].filter(Boolean);
+---
+
+{items.length > 0 && (
+  <section class="mb-7">
+    <h2>{title} <span class="text-muted text-base font-normal">({items.length})</span></h2>
+
+    <ul class="ta-rel">
+      {matomi.map((item: any) => (
+        <li class="ta-rel-item">
+          <a class="ta-rel-title" href={`/teisesAktas/${encodeURIComponent(item.targetLegalActId)}`}>
+            {item.title}
+          </a>
+          <p class="ta-rel-meta">
+            {rodytiTipa && <span class="ta-rel-type">{relationTypeLabel(item.rysioTipas)}</span>}
+            {meta(item).map((piece: string) => <span>{piece}</span>)}
+          </p>
+        </li>
+      ))}
+    </ul>
+
+    {likusieji.length > 0 && (
+      <details class="ta-rel-more">
+        <summary>Rodyti dar {likusieji.length}</summary>
+        <ul class="ta-rel">
+          {likusieji.map((item: any) => (
+            <li class="ta-rel-item">
+              <a class="ta-rel-title" href={`/teisesAktas/${encodeURIComponent(item.targetLegalActId)}`}>
+                {item.title}
+              </a>
+              <p class="ta-rel-meta">
+                {rodytiTipa && <span class="ta-rel-type">{relationTypeLabel(item.rysioTipas)}</span>}
+                {meta(item).map((piece: string) => <span>{piece}</span>)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </details>
+    )}
+  </section>
+)}
+
+<style>
+  .ta-rel {
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ta-rel-item {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--light-gray);
+  }
+  .ta-rel-item:last-child { border-bottom: none; }
+
+  .ta-rel-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    font-size: var(--text-sm);
+    line-height: 1.45;
+    color: var(--black);
+    text-decoration: none;
+  }
+  .ta-rel-title:hover { text-decoration: underline; }
+
+  .ta-rel-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    margin: 4px 0 0;
+    font-size: var(--text-xs);
+    color: var(--gray);
+  }
+  /* Taškas tarp meta gabalėlių — tik tarp jų, ne priekyje. */
+  .ta-rel-meta > span + span::before {
+    content: '·';
+    margin-right: 6px;
+  }
+  .ta-rel-type {
+    color: var(--dark-gray);
+    font-weight: 500;
+  }
+
+  .ta-rel-more > summary {
+    margin-top: 8px;
+    font-size: var(--text-sm);
+    color: var(--gray);
+    cursor: pointer;
+  }
+  .ta-rel-more > summary:hover { color: var(--black); }
+</style>

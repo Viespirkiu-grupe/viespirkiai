@@ -23,8 +23,9 @@ interface Props {
   formatLabel?: (value: string) => string;
   /** Two-line label + sub-code rows (įstaiga / JAR). */
   stacked?: boolean;
-  /** Overflow opens the full-screen facet modal instead of an inline reveal. */
-  modal?: { field: string; title: string; always?: boolean };
+  /** Overflow opens the full-screen facet modal instead of an inline reveal.
+   *  `wide` — fewer, wider columns for values with long labels (institutions). */
+  modal?: { field: string; title: string; always?: boolean; wide?: boolean };
   /** Adds an inline "type your own value" form (svetainė / JAR). */
   addForm?: { id: string; inputId: string; placeholder: string; ariaLabel: string };
 }
@@ -122,6 +123,7 @@ const dispSub = (opt: FacetOption) => `${opt.value}${opt.isPrefix ? '*' : ''}`;
       data-facet-modal={modal!.field}
       data-facet-param={param}
       data-facet-title={modal!.title}
+      data-facet-wide={modal!.wide ? '1' : undefined}
     >Daugiau</button>
   )}
 </section>

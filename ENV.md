@@ -275,6 +275,20 @@ Baziniai URL — galima perrašyti į mirror/proxy. Be trailing slash.
 | `VIESIEJI_PIRKIMAI_URL` | `https://viesiejipirkimai.lt` | Viešųjų pirkimų portalo (EPPS) bazinis URL scrapinimui/parsisiuntimui. |
 | `2021_ESINVESTICIJOS` | `https://2021.esinvesticijos.lt` | 2021–2027 ES investicijų portalo bazinis URL CPVA duomenų scrapinimui. |
 
+### e-TAR (`modules/eTar`)
+
+Naujasis e-TAR scraperis eina ne tiesiai į `e-tar.lt`, o į stateless HTML→JSON
+adapterį (jo OpenAPI: `<ETAR_API_URL>/openapi.json`). Normalizuoti duomenys
+guli Postgres `eTar*` lentelėse, o pilnas atsakymo JSON — SQLite sidecar'e,
+adresuojamas `md5` (žr. `modules/eTar/README.md`). Senasis `modules/etar`
+(HTML scraperis į `teisekuraObjektai`) šių kintamųjų nenaudoja.
+
+| Kintamasis | Numatyta | Paaiškinimas |
+| --- | --- | --- |
+| `ETAR_API_URL` | — | Adapterio bazinis URL, pvz. `http://10.1.10.24:8080`. Be trailing slash. Nenustačius scraperis nepasileidžia. |
+| `ETAR_API_KEY` | `""` | Bearer raktas — tik jei adapteryje nustatytas `API_KEY`. |
+| `ETAR_SIDECAR_DIR` | `/flashas/viespirkiai/eTar` | Katalogas, kuriame laikoma `eTar.sqlite` atsakymų saugykla (tik lokalus kelias). |
+
 ### Spinta / Stalčius (atviri duomenys)
 
 Eksportas į „spintos" tipo API serverį (`modules/spinta/`). Klientas pasirenka

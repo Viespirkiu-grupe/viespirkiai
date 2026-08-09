@@ -1,0 +1,588 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import DetailsSection from '@design-system/components/DetailsSection.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import Timeline from '@design-system/components/Timeline.astro';
+import TimelineItem from '@design-system/components/TimelineItem.astro';
+import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
+import FileCardList from '@design-system/components/FileCardList.astro';
+import Alert from '@design-system/components/Alert.astro';
+import TaRedakcijos from '../../components/teisesAktai/TaRedakcijos.astro';
+import TaRysiai from '../../components/teisesAktai/TaRysiai.astro';
+import { loadTeisesAktasPage } from '../../lib/teisesAktasPageData.ts';
+import {
+  METADATA_FIELD_LABEL, RELATED_SECTION_LABEL,
+  statusasLabel, eurovocLabel, beTeksto, beTekstoZinute,
+} from '../../lib/teisesAktaiLabels.ts';
+import { getColorScheme, getFont } from '../../lib/failai.js';
+import config from '../../lib/config.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect('/404');
+
+const data = await loadTeisesAktasPage(id, Astro.url);
+if (!data) return Astro.redirect('/404');
+
+const {
+  act, current, metadata, fields, eurovoc, chronology,
+  attachmentSections, relationSections, redakcijos, textResources,
+  tekstas, turiHtml, turinys, anomalies, scrape,
+} = data;
+
+// Oficialus tekstas rodomas <iframe> — HTML iš sidecar'o per savo adresą.
+// Taip išlaikomos akto lentelės, sąrašai ir numeracija, kurių plokščias tekstas
+// nebeturi, o `sandbox` neleidžia svetimam HTML nieko daryti.
+//
+// `scheme` perduodam tik kai naudotojas temą pasirinko aiškiai; „auto" atveju
+// rėmelis pats klauso `prefers-color-scheme`, ir nebūna šviesaus blyksnio.
+// Vėliau temos jungiklį seka teisesAktoTekstoTema.ts.
+const tekstoBase = turiHtml && current?.md5
+  ? `/teisesAktai/tekstas/html/${encodeURIComponent(current.md5)}`
+  : null;
+const tekstoSrc = tekstoBase
+  && tekstoBase + (colorScheme === 'dark' || colorScheme === 'light' ? `?scheme=${colorScheme}` : '');
+/** Turinio rodyklės nuoroda — krauna tą patį dokumentą į rėmelį ties dalimi. */
+const dalisHref = (partId: string) => `${tekstoSrc}#${encodeURIComponent(partId)}`;
+
+const title = current?.title || act.title || id;
+const etarUrl = current?.sourceUrl || `https://www.e-tar.lt/portal/lt/legalAct/${id}`;
+
+// ── informacinės lentelės laukai
+//
+// Šaltinis atiduoda 14 laukų, tarp jų — tuščių („Nėra") ir tokių, kurie tik
+// kartoja tai, ką puslapis jau rodo geriau (galiojanti redakcija → redakcijų
+// perjungiklis). Ekrane paliekam tik tai, kas pasako ką nors nauja.
+const NEREIKŠMINGA = /^(nėra|nera|—|-|–)$/i;
+const fieldByCode = new Map<string, any>(fields.map((f: any) => [f.code, f]));
+const fieldValue = (code: string): string | null => {
+  const value = String(fieldByCode.get(code)?.value ?? '').trim();
+  return value && !NEREIKŠMINGA.test(value) ? value : null;
+};
+
+const galiojimas = metadata?.effectiveFrom && metadata?.effectiveTo
+  ? `${metadata.effectiveFrom} – ${metadata.effectiveTo}`
+  : metadata?.effectiveFrom ? `nuo ${metadata.effectiveFrom}`
+  : metadata?.effectiveTo ? `iki ${metadata.effectiveTo}` : null;
+
+// Viena santraukos lentelė vietoj buvusių dviejų („Aktas" + „Informacinė
+// lentelė"). Techninių raktų (identifikatoriaus, redakcijos tokeno, atsakymo
+// md5) čia nebėra — jie naudotojui nieko nesako, o adresų juostoje ir taip yra.
+const santrauka = [
+  fieldValue('act_type') && { label: 'Rūšis', value: fieldValue('act_type') },
+  metadata?.statusas && { label: 'Būsena', value: statusasLabel(metadata.statusas) },
+  galiojimas && { label: 'Galiojimas', value: galiojimas },
+  fieldValue('adopted_at') && { label: 'Priimta', value: fieldValue('adopted_at') },
+  fieldValue('adopted_by') && { label: 'Priėmė', value: fieldValue('adopted_by') },
+  fieldValue('institution_number') && { label: 'Įstaigos nr.', value: fieldValue('institution_number') },
+  fieldValue('published') && { label: 'Paskelbta', value: fieldValue('published') },
+  (fieldValue('registration_details') || metadata?.registrationText)
+    && { label: 'Registracija', value: fieldValue('registration_details') || metadata?.registrationText },
+  metadata?.effectiveNote && { label: 'Įsigaliojimo pastaba', value: metadata.effectiveNote },
+  metadata?.effectiveUntilNote && { label: 'Galiojimo pabaigos pastaba', value: metadata.effectiveUntilNote },
+  // Retai užpildyti laukai — rodom tik kai juose tikrai kas nors yra.
+  fieldValue('corrections') && { label: METADATA_FIELD_LABEL.corrections, value: fieldValue('corrections') },
+  fieldValue('eu_legal_act_links') && { label: METADATA_FIELD_LABEL.eu_legal_act_links, value: fieldValue('eu_legal_act_links') },
+  fieldValue('amendment_projects') && { label: METADATA_FIELD_LABEL.amendment_projects, value: fieldValue('amendment_projects') },
+  fieldValue('ex_post_evaluation') && { label: METADATA_FIELD_LABEL.ex_post_evaluation, value: fieldValue('ex_post_evaluation') },
+].filter(Boolean) as any[];
+
+// Priedai ir teksto failai — tos pačios failų kortelės kaip visoje svetainėje.
+const failoPletinys = (name: string) => {
+  const dot = name.lastIndexOf('.');
+  return dot > -1 ? name.slice(dot + 1).toLowerCase() : '';
+};
+const priedoKortele = (item: any) => {
+  const name = item.attachmentName || item.filename || 'Priedas';
+  const resources = item.resources ?? [];
+  return {
+    title: name,
+    href: resources[0]?.url ?? '#',
+    ext: failoPletinys(item.filename || name),
+    meta: item.attachmentName && item.filename !== item.attachmentName ? item.filename : undefined,
+    target: '_blank',
+    rel: 'noopener',
+    titleTwoLines: true,
+    // Kai formatų keli — kiekvienas savo nuoroda; kai vienas, pati kortelė yra nuoroda.
+    actions: resources.length > 1
+      ? resources.map((r: any) => ({
+          href: r.url, text: String(r.formatas).toUpperCase(), target: '_blank', rel: 'noopener',
+        }))
+      : [],
+  };
+};
+const tekstoFailai = textResources.map((r: any) => ({
+  title: `Oficialus tekstas.${String(r.formatas).toLowerCase()}`,
+  href: r.url,
+  ext: String(r.formatas).toLowerCase(),
+  meta: 'e-TAR failas',
+  target: '_blank',
+  rel: 'noopener',
+}));
+
+// Chronologija ilgesniuose aktuose siekia dešimtis įrašų — matomi naujausi,
+// likę po „Rodyti dar N".
+const CHRONO_MATOMI = 6;
+const chronoMatomi = chronology.slice(0, CHRONO_MATOMI);
+const chronoLikę = chronology.slice(CHRONO_MATOMI);
+
+const pageDescription = [
+  metadata?.statusas ? statusasLabel(metadata.statusas) : null,
+  fieldValue('act_type'),
+  fieldValue('adopted_by'),
+].filter(Boolean).join('\n');
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=60');
+---
+
+<Layout
+  pageTitle={title}
+  pageDescription={pageDescription}
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    {/* Puslapis iškart po naršymo juostos dalijasi pusiau: kairėje — viskas apie
+        aktą, dešinėje — pats aktas. Dešinė „prilipusi", tad skaitant ilgą tekstą
+        kairė kolona nenuslenka iš akių, o pasibaigus turiniui abi kartu
+        pasitraukia prieš poraštę. */}
+    <div class="ta-grid">
+    <div class="ta-info">
+
+    {/* Nuoroda į e-TAR sėdi toje pačioje eilutėje kaip „Teisės aktas · Rūšis":
+        pavadinimas dažnai yra kelių eilučių sakinys, tad mygtukas šalia jo tik
+        atimtų plotį ir stumtų vardą žemyn. */}
+    <PageHeader className="ta-header">
+      <Fragment slot="subtext">
+        <span>Teisės aktas{fieldValue('act_type') ? ` · ${fieldValue('act_type')}` : ''}</span>
+        <span class="ta-header-links">
+          <ExternalSourceLink href={etarUrl} source="generic" label="e-TAR" variant="button" size="sm" ariaLabel="Peržiūrėti e-TAR sistemoje" />
+          {tekstoSrc && (
+            <a
+              href={tekstoSrc}
+              target="_blank"
+              rel="noopener"
+              class="btn btn-outline btn-sm"
+              aria-label="Atverti akto tekstą per visą langą"
+            >Padidinti</a>
+          )}
+        </span>
+      </Fragment>
+      {title}
+    </PageHeader>
+
+    {!current && (
+      <Alert variant="info">
+        Šis aktas dar nenuskaitytas — jį žinom tik iš kitų aktų nuorodų.
+        {scrape?.lastError && <span> Paskutinė klaida: {scrape.lastError}</span>}
+      </Alert>
+    )}
+
+    {santrauka.length > 0 && (
+      <DetailsSection title="Apie aktą" items={santrauka} className="mb-7" />
+    )}
+
+    {attachmentSections.map((section: any) => (
+      <FileCardList
+        title={RELATED_SECTION_LABEL[section.code] ?? section.sourceLabel}
+        items={section.items.map(priedoKortele)}
+        sectionClass="mb-7"
+        listClass="ta-files"
+      />
+    ))}
+
+    {relationSections.map((section: any) => (
+      <TaRysiai
+        title={RELATED_SECTION_LABEL[section.code] ?? section.sourceLabel}
+        items={section.items}
+      />
+    ))}
+
+    {chronology.length > 0 && (
+      <DetailsSection title="Chronologija" className="mb-7">
+        <Timeline>
+          {chronoMatomi.map((event: any, index: number) => (
+            <TimelineItem active={true} lineActive={index < chronology.length - 1}>
+              <strong>{event.eventDate ?? '—'}</strong>
+              <span> {event.event}</span>
+            </TimelineItem>
+          ))}
+        </Timeline>
+        {chronoLikę.length > 0 && (
+          <details class="ta-more">
+            <summary>Rodyti dar {chronoLikę.length}</summary>
+            <Timeline>
+              {chronoLikę.map((event: any, index: number) => (
+                <TimelineItem active={true} lineActive={index < chronoLikę.length - 1}>
+                  <strong>{event.eventDate ?? '—'}</strong>
+                  <span> {event.event}</span>
+                </TimelineItem>
+              ))}
+            </Timeline>
+          </details>
+        )}
+      </DetailsSection>
+    )}
+
+    {tekstoFailai.length > 0 && (
+      <FileCardList
+        title="Akto tekstas failais"
+        items={tekstoFailai}
+        sectionClass="mb-7"
+        listClass="ta-files"
+      />
+    )}
+
+    {eurovoc.length > 0 && (
+      <DetailsSection title="EUROVOC terminai" className="mb-7">
+        <ul class="ta-terms">
+          {eurovoc.map((term: string) => (
+            <li>
+              <a href={`/teisesAktai?eurovoc=${encodeURIComponent(term)}`}>{eurovocLabel(term)}</a>
+            </li>
+          ))}
+        </ul>
+      </DetailsSection>
+    )}
+
+    {anomalies.length > 0 && (
+      <details class="ta-anomalies mb-7">
+        <summary>Šaltinio brokas ({anomalies.length})</summary>
+        <p class="text-muted text-sm">
+          e-TAR adapteris šiems laukams grąžino akivaizdžiai sugadintas reikšmes —
+          jos neįrašytos, kad nesugadintų duomenų. Pilnas originalas lieka atsakymo JSON'e.
+        </p>
+        <DataTable columns={[{ label: 'Laukas' }, { label: 'Ilgis' }, { label: 'Pradžia' }]}>
+          {anomalies.map((a: any) => (
+            <tr>
+              <td class="cell-mono">{a.kind}</td>
+              <td class="cell-nowrap">{Number(a.ilgis).toLocaleString('lt-LT')} simb.</td>
+              <td class="ta-anomaly-sample">{a.pavyzdys}</td>
+            </tr>
+          ))}
+        </DataTable>
+      </details>
+    )}
+
+    </div>{/* .ta-info */}
+
+    <div class="ta-text-col">
+      {/* Valdikliai yra paties rėmelio juostelė (kaip naršyklės adreso juosta),
+          o ne atskiras blokas virš jo — kitaip tarp naršymo juostos ir teksto
+          lieka tuščia juosta. */}
+      <div class="ta-panel">
+        {/* Kairėje — turinys (kur akte esi), dešinėje — redakcijos (kurią akto
+            versiją skaitai). Abu sąrašai atsiveria savo pusėje. */}
+        <div class="ta-panel-bar">
+          {turinys.length > 0 && tekstoSrc && (
+            <details class="ta-toc-box">
+              <summary>Turinys ({turinys.length})</summary>
+              <nav class="ta-toc" aria-label="Akto turinys">
+                {turinys.map((dalis: any) => (
+                  <a
+                    href={dalisHref(dalis.partId)}
+                    target="taTekstas"
+                    data-ta-dalis={dalis.partId}
+                    class:list={['ta-toc-item', `ta-toc-d${dalis.depth}`]}
+                  >
+                    <span class="ta-toc-label">{dalis.label}</span>
+                    {dalis.hidden > 0 && <span class="ta-toc-count">{dalis.hidden}</span>}
+                  </a>
+                ))}
+              </nav>
+            </details>
+          )}
+
+          <TaRedakcijos redakcijos={redakcijos} legalActId={id} />
+        </div>
+
+      {tekstoSrc ? (
+        <iframe
+          id="taTekstas"
+          src={tekstoSrc}
+          data-base={tekstoBase}
+          name="taTekstas"
+          title="Oficialus teisės akto tekstas"
+          class="ta-frame"
+          sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        ></iframe>
+      ) : tekstas ? (
+        <article class="ta-tekstas">{tekstas}</article>
+      ) : (
+        <p class="text-muted">
+          {beTeksto(current?.turinioBusena)
+            ? (current!.contentMessage || beTekstoZinute(current!.turinioBusena))
+            : 'Tekstas dar nenuskaitytas.'}
+          {' '}Žr. <a href={etarUrl} target="_blank" rel="noopener">e-TAR</a>.
+        </p>
+      )}
+      </div>{/* .ta-panel */}
+    </div>
+
+    </div>{/* .ta-grid */}
+  </main>
+</Layout>
+
+<script>
+  import { initTeisesAktoJuosta } from '../../scripts/teisesAktoJuosta.ts';
+  import { initTeisesAktoTekstoStulpelis } from '../../scripts/teisesAktoTekstoStulpelis.ts';
+  import { initTeisesAktoTekstoTema, initTeisesAktoTurinioSekimas } from '../../scripts/teisesAktoTekstoTema.ts';
+
+  initTeisesAktoJuosta();
+  initTeisesAktoTekstoStulpelis();
+  initTeisesAktoTekstoTema();
+  initTeisesAktoTurinioSekimas();
+</script>
+
+<style>
+  /* Pusiau perskeltas puslapis. Abi kolonos vienodo pločio: kairė nesutraukta į
+     siaurą juostelę, dešinė — pakankamai plati akto pastraipoms. */
+  .ta-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  .ta-info {
+    min-width: 0;
+    padding-top: 12px;
+    /* Poraštė prasideda iškart po turiniu (žr. žemiau), tad orą po paskutine
+       skiltimi paliekam patys. */
+    padding-bottom: 40px;
+  }
+  /* Poraštė čia turi prasidėti iškart po rėmu — bendras 64px tarpas paliktų
+     tuščią juostą po per visą ekraną nusidriekusiu tekstu. */
+  :global(.site-footer-shell) { margin-block-start: 0; }
+  /* Antraštės eilutė: kairėje „Teisės aktas · Rūšis", dešinėje — mygtukai.
+     `.subtext` yra kursyvinis, tad mygtukams kursyvą grąžinam į normalų. */
+  .ta-info :global(.ta-header .subtext) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .ta-header-links {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-style: normal;
+  }
+
+  /* Teksto stulpelis — tuščias grotelių langelis, rezervuojantis vietą: pats
+     rėmas kabo `position: fixed` (žr. teisesAktoTekstoStulpelis.ts, ten ir
+     paaiškinta, kodėl ne `sticky`). Aukštį JS perrašo tiksliai, CSS reikšmė
+     galioja be JS. */
+  .ta-text-col {
+    --ta-top: calc(var(--site-header-offset, 58px) + 8px);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - var(--ta-top) - 12px);
+  }
+
+  /* Vientisas rėmas: viršuje — valdiklių juostelė, po ja iškart tekstas. */
+  .ta-panel {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+  }
+  /* Kabantis rėmas. Po fiksuota antraštę (jos z-index — var(--z-sticky)), tad
+     savo z-index laikom mažą. Prigludęs prie ekrano kraštų — tad be apvalinimų
+     ir be kraštinių ten, kur jos sutaptų su lango kraštu. */
+  .ta-panel.is-fixed {
+    position: fixed;
+    z-index: 1;
+    border: none;
+    border-left: var(--border);
+    border-radius: 0;
+  }
+  .ta-panel.is-fixed .ta-frame { border-radius: 0; }
+  .ta-panel-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 6px;
+    border-bottom: var(--border);
+  }
+  /* Juostelėje esantys valdikliai savo rėmelių nebeturi — rėmas vienas.
+     Redakcijos glaudžiasi prie dešinio krašto, turinys — prie kairio. */
+  .ta-panel-bar > :global(.ta-red) {
+    margin-left: auto;
+    min-width: 0;
+    border: none;
+    background: transparent;
+  }
+  .ta-frame {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    border: none;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    background: var(--white);
+  }
+
+  @media (max-width: 1100px) {
+    .ta-grid { grid-template-columns: minmax(0, 1fr); }
+    /* Telefone aktas svarbesnis už metaduomenis — keliam jį į viršų. */
+    .ta-text-col {
+      order: -1;
+      height: auto;
+      margin-top: 12px;
+      margin-bottom: 28px;
+    }
+    .ta-panel { height: auto; }
+    .ta-frame { height: 70vh; }
+  }
+
+  /* Turinio rodyklė: kiekvienas įrašas krauna tą pačią akto vietą į šalia
+     esantį rėmelį (target="taTekstas"), tad naršoma be JS. */
+  .ta-toc-box {
+    position: relative;
+    flex: 0 0 auto;
+  }
+  .ta-toc-box > summary {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: var(--text-sm);
+    color: var(--dark-gray);
+    cursor: pointer;
+    list-style: none;
+  }
+  .ta-toc-box > summary::-webkit-details-marker { display: none; }
+  .ta-toc-box > summary::after {
+    content: '▾';
+    color: var(--gray);
+    transition: transform var(--transition);
+  }
+  .ta-toc-box[open] > summary::after { transform: rotate(-180deg); }
+  .ta-toc-box > summary:hover { color: var(--black); }
+  .ta-toc-box[open] .ta-toc { animation: ta-drop var(--transition); }
+
+  /* Meniu neatsiranda staiga — trumpai nukrenta iš po mygtuko. */
+  @keyframes ta-drop {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ta-toc-box[open] .ta-toc { animation: none; }
+  }
+  .ta-toc {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    z-index: 20;
+    width: min(360px, 80vw);
+    display: flex;
+    flex-direction: column;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 4px 6px 8px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    box-shadow: var(--shadow-md);
+  }
+  .ta-toc-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    color: var(--dark-gray);
+    text-decoration: none;
+  }
+  .ta-toc-item:hover { background: var(--lighter-gray); color: var(--black); }
+  /* Skaitoma dalis — pažymima automatiškai, slenkant patį aktą. Kuo tyliau:
+     tik tamsesnis ir tvirtesnis tekstas, jokių juostelių ar fonų (foną turi
+     pelės užvedimas). */
+  .ta-toc-item.is-active {
+    color: var(--black);
+    font-weight: 600;
+  }
+  .ta-toc-d0 { font-weight: 500; color: var(--black); }
+  .ta-toc-d1 { padding-left: 18px; }
+  .ta-toc-d2 { padding-left: 32px; font-size: var(--text-xs); }
+  .ta-toc-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ta-toc-count {
+    flex-shrink: 0;
+    font-size: var(--text-xs);
+    color: var(--gray);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ta-terms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ta-terms a {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    background: var(--lighter-gray);
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+    text-decoration: none;
+  }
+  .ta-terms a:hover { color: var(--black); }
+
+  /* Failų kortelės kairėje kolonoje — dvi per eilę, kol telpa. */
+  .ta-info :global(.ta-files) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .ta-info :global(.ta-files .file-card) { max-width: none; }
+
+  .ta-more > summary,
+  .ta-anomalies > summary {
+    font-size: var(--text-sm);
+    color: var(--gray);
+    cursor: pointer;
+  }
+  .ta-more > summary:hover,
+  .ta-anomalies > summary:hover { color: var(--black); }
+  .ta-more { margin-top: 8px; }
+
+  /* Aktų tekstai turi savo eilučių laužymą — gerbiam jį, kaip ir nuosprendžiuose. */
+  .ta-tekstas {
+    white-space: pre-wrap;
+    line-height: 1.7;
+    max-width: 80ch;
+    overflow-y: auto;
+  }
+
+  .ta-anomaly-sample {
+    max-width: 40ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--gray);
+    font-size: var(--text-xs);
+  }
+</style>

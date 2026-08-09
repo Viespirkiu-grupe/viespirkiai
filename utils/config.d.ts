@@ -48,6 +48,12 @@ export interface Config {
     ocrRezultataiLocation?: string;
     dokumentaiLocation?: string;
 
+    /** Stateless e-TAR HTML→JSON adapterio bazinis URL (`modules/eTar`). */
+    eTarApiUrl: string;
+    eTarApiKey: string;
+    /** SQLite sidecar katalogas e-TAR API atsakymams. */
+    eTarSidecarDir: string;
+
     enableGraph: boolean;
 
     enableExecuteQueryMcp: boolean;
