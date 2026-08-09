@@ -1,4 +1,5 @@
 import { postgres } from '../../postgres/postgres.js';
+import { queryDirect } from '../../postgres/direct.js';
 import { convertUnit } from '../../utils/units.js';
 import '../../utils/linksniai.js';
 
@@ -272,7 +273,15 @@ export async function gautiStatistika() {
     postgres.query(`SELECT "nuskaitytidokumentai", "viesasPavadinimas" FROM "dokNuskaitytojai" ORDER BY "nuskaitytidokumentai" DESC LIMIT 100;`),
     postgres.query(`SELECT current_database() AS db, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, deadlocks, temp_files, temp_bytes, extract(epoch from now() - stats_reset) AS stats_age_seconds, extract(epoch from now() - pg_postmaster_start_time()) AS uptime_seconds FROM pg_stat_database WHERE datname = current_database();`),
     postgres.query(`SELECT * FROM "quickwitIndeksai" ORDER BY "lentele", "seq";`),
-    postgres.query(`SELECT client_addr::text AS client_addr, state, sent_lsn::text AS sent_lsn, write_lsn::text AS write_lsn, flush_lsn::text AS flush_lsn, replay_lsn::text AS replay_lsn, write_lag::text AS write_lag, flush_lag::text AS flush_lag, replay_lag::text AS replay_lag, extract(epoch from write_lag) AS write_lag_seconds, extract(epoch from flush_lag) AS flush_lag_seconds, extract(epoch from replay_lag) AS replay_lag_seconds, pg_current_wal_lsn()::text AS primary_current_lsn, pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_behind FROM pg_stat_replication;`),
+    // Replikacija – TIESIOGINE jungtimi (aplenkiant pgbouncer'į): pg_stat_replication
+    // ir pg_current_wal_lsn() aprašo konkrečią serverio jungtį, o per bouncer'į
+    // neaišku, prie kurio backend'o pataikyta. Nepavykus – rodom tuščią sąrašą, kad
+    // dėl monitoringo eilutės nekristų visas /statistika puslapis.
+    queryDirect(`SELECT client_addr::text AS client_addr, state, sent_lsn::text AS sent_lsn, write_lsn::text AS write_lsn, flush_lsn::text AS flush_lsn, replay_lsn::text AS replay_lsn, write_lag::text AS write_lag, flush_lag::text AS flush_lag, replay_lag::text AS replay_lag, extract(epoch from write_lag) AS write_lag_seconds, extract(epoch from flush_lag) AS flush_lag_seconds, extract(epoch from replay_lag) AS replay_lag_seconds, pg_current_wal_lsn()::text AS primary_current_lsn, pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS bytes_behind FROM pg_stat_replication;`)
+      .catch((err) => {
+        console.warn(`[statistika] replikacijos užklausa nepavyko: ${err.message}`);
+        return { rows: [] };
+      }),
   ]);
 
   // filesStats yra per plėtinį, tad bendros reikšmės — SUM(...) (žr. užklausą aukščiau).

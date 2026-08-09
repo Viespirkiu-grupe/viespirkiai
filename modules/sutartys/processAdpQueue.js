@@ -6,28 +6,53 @@ import {
     syncSutartysToSpinta,
 } from "./spintaSync.js";
 
-export async function processSutartysAdpQueue() {
-    if (!isSutartysSpintaConfigured()) return false;
-
-    // Eilutė laikoma užrakinta transakcijoje ir ištrinama tik po sėkmingo
-    // sync'o — procesui nulūžus bet kuriuo momentu (net SIGKILL/OOM),
-    // rollback'as / atsijungimas grąžina ją į eilę.
-    const client = await postgres.connect();
-    try {
-        await client.query("BEGIN");
-        const { rows } = await client.query(
-            `SELECT "unikalusId"
+/**
+ * Pasiima vieną eilutę VIENU sakiniu ir iš karto atlaisvina jungtį.
+ *
+ * Anksčiau eilutė būdavo laikoma atviroje transakcijoje visą Spinta sync'o
+ * laiką. Tai reiškė, kad jungtis (o prie pgbouncer transaction pooling – ir
+ * serverio jungtis) lieka pririšta per visus HTTP round trip'us, o pats
+ * sync'as viduje dar prašo ANTROS jungties iš to paties pool'o
+ * (`fetchActiveSutartysByIds`). Kai lygiagrečių job'ų tiek pat ar daugiau nei
+ * `PG_MAX_CONNECTIONS`, pool'as užsirakina pats: visi laiko po vieną jungtį ir
+ * visi laukia antros, kol suveikia `connectionTimeoutMillis`.
+ *
+ * Toks pats modelis kaip modules/domenai/processAdpQueue.js.
+ */
+async function claimOne() {
+    const { rows } = await postgres.query(
+        `DELETE FROM public."vpmSutartysAdpQueue"
+         WHERE "unikalusId" = (
+             SELECT "unikalusId"
              FROM public."vpmSutartysAdpQueue"
              ORDER BY "queuedAt"
              FOR UPDATE SKIP LOCKED
-             LIMIT 1`,
-        );
-        if (rows.length === 0) {
-            await client.query("COMMIT");
-            return false;
-        }
+             LIMIT 1
+         )
+         RETURNING "unikalusId"`,
+    );
+    return rows[0] ? Number(rows[0].unikalusId) : null;
+}
 
-        const id = Number(rows[0].unikalusId);
+/** Grąžina eilutę į eilę, jei sync'as nepavyko. */
+async function requeue(id) {
+    await postgres.query(
+        `INSERT INTO public."vpmSutartysAdpQueue" ("unikalusId")
+         SELECT $1::bigint
+         WHERE NOT EXISTS (
+             SELECT 1 FROM public."vpmSutartysAdpQueue" WHERE "unikalusId" = $1::bigint
+         )`,
+        [id],
+    );
+}
+
+export async function processSutartysAdpQueue() {
+    if (!isSutartysSpintaConfigured()) return false;
+
+    const id = await claimOne();
+    if (id === null) return false;
+
+    try {
         const stats = await syncSutartysToSpinta({
             ids: [id],
             spinta: createSutartysSpintaClient(),
@@ -35,19 +60,10 @@ export async function processSutartysAdpQueue() {
         log(
             `vpmSutartysAdpQueue id=${id} | insert=${stats.insert} patch=${stats.patch} delete=${stats.delete} unchanged=${stats.unchanged}`,
         );
-
-        await client.query(
-            `DELETE FROM public."vpmSutartysAdpQueue"
-             WHERE "unikalusId" = $1`,
-            [id],
-        );
-        await client.query("COMMIT");
         return true;
     } catch (error) {
-        await client.query("ROLLBACK").catch(() => {});
+        await requeue(id);
         throw error;
-    } finally {
-        client.release();
     }
 }
 

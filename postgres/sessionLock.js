@@ -1,5 +1,5 @@
 import pkg from "pg";
-import config from "../utils/config.js";
+import { directConnectionConfig } from "./direct.js";
 
 const { Client } = pkg;
 
@@ -27,13 +27,7 @@ const { Client } = pkg;
  *          jau užimtas kito proceso.
  */
 export async function acquireSessionLock(key) {
-    const client = new Client({
-        host: config.pgDirectHost || config.pgHost,
-        port: config.pgDirectPort || config.pgPort,
-        user: config.pgUser,
-        password: config.pgPassword,
-        database: config.pgDatabase,
-    });
+    const client = new Client(directConnectionConfig());
 
     await client.connect();
 
