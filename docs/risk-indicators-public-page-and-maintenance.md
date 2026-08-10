@@ -1,8 +1,11 @@
 # Public procurement risk indicators: page, storage and maintenance draft
 
-Status: detailed design draft  
-Date: 2026-08-10  
-Core methodology: [OCP 2024 Red Flags in Public Procurement](https://www.open-contracting.org/wp-content/uploads/2024/12/OCP2024-RedFlagProcurement.pdf)  
+Status: detailed design draft
+
+Date: 2026-08-11
+
+Core methodology: [OCP 2024 Red Flags in Public Procurement](https://www.open-contracting.org/wp-content/uploads/2024/12/OCP2024-RedFlagProcurement.pdf)
+
 Parent design: [Risk signals for current and recently completed procurements](risky-procurements-initial-design.md)
 
 ## 1. Decisions
@@ -13,15 +16,16 @@ Parent design: [Risk signals for current and recently completed procurements](ri
 4. There is no unexplained corruption probability. The list may have transparent **attention points** for sorting, while signal strength, evidence confidence and data coverage remain separate.
 5. An indicator is a versioned package consisting of metadata, public explanation, parameters, calculation and tests.
 6. A SQL indicator is a pure `SELECT`. It never contains its own `INSERT`, `UPDATE`, `DELETE`, table creation or transaction control.
-7. Risk calculation is an independently deployed analytics plane: **dbt owns SQL transformation and tests; an asset orchestrator owns scheduling, retries, lineage, partitions and backfills**. The existing application task runner is not an architectural dependency.
+7. Risk calculation is an independently deployed **TypeScript risk service** backed by durable PostgreSQL control tables. The existing application task runner is not an architectural dependency.
 8. PostgreSQL views provide canonical facts; they are not the persisted risk result and should not run the complete risk system during a web request.
-9. The public Astro application is a read-only consumer of published read models. It never imports indicator code, launches dbt or calculates a signal in a request.
+9. The public Astro application is a read-only consumer of published read models. It never imports indicator code, starts evaluation work or calculates a signal in a request.
+10. The design uses no separate analytics or orchestration platform. PostgreSQL provides durable coordination and computation; TypeScript provides registry, execution, validation and operational control.
 
 The OCP guide describes an indicator through its definition, reason for being a red flag, required data, method, unit of analysis, procurement stage, example and source. The local indicator package preserves these fields and adds operational fields: implementation version, parameters, lifecycle state, owner, tests, public wording and known limitations.
 
 ### 1.1 Reference architecture
 
-The recommended concrete stack is **dbt Core + Dagster + PostgreSQL**. This is a reference implementation, not a schema-level vendor lock-in: Dagster can be replaced by another asset orchestrator only if it provides data-aware triggering, per-asset lineage, retries, observable checks, partitioned backfills and atomic publication gates. Do not replace it with an application cron script.
+The concrete stack is **TypeScript + PostgreSQL**. A dedicated long-running risk service supplies the operational guarantees normally expected from a data orchestrator: durable jobs, dependency ordering, leases, retries, reconciliation, partitions/backfills, structured run history and publication gates. Those guarantees live in an explicit protocol, not in an in-memory task list or web-process cron callback.
 
 ```mermaid
 flowchart LR
@@ -33,24 +37,26 @@ flowchart LR
         S --> W
     end
 
-    subgraph analytics[Independent risk analytics plane]
-        O[Dagster asset orchestrator]
-        M[dbt manifest and catalogue]
-        C[dbt canonical fact models]
-        I[dbt SQL indicator assets]
-        X[Optional code/ML assets]
-        T[dbt contract and data tests]
-        P[Generic atomic publication asset]
-        O --> M
-        O --> C --> I
-        O --> X
+    subgraph analytics[Independent TypeScript risk service]
+        G[Typed indicator registry]
+        L[Planner and dependency graph]
+        J[(Durable jobs, leases and attempts)]
+        K[Bounded worker pool]
+        I[Pure SQL indicator calculations]
+        X[Optional TypeScript calculations]
+        T[Runtime contract and SQL integrity checks]
+        P[Generic atomic publisher]
+        G --> L --> J
+        J --> K
+        K --> I
+        K --> X
         I --> T
         X --> T
         T -->|all checks pass| P
     end
 
-    E --> C
-    W --> O
+    E --> L
+    W --> L
     P --> H[(Immutable observations)]
     P --> R[(Current signals and public summary)]
 
@@ -64,7 +70,7 @@ flowchart LR
     H -->|detail/history query| A
 ```
 
-The three planes have independent deployments and database roles. A broken ingestion refresh leaves the last successful publication visible with its old watermark. A failed indicator build leaves the last successful risk publication visible. A web deployment cannot mutate risk results.
+The three planes have independent process lifecycles and database roles. A broken ingestion refresh leaves the last successful publication visible with its old watermark. A failed indicator run leaves the last successful risk publication visible. A web deployment cannot mutate risk results. PostgreSQL `LISTEN/NOTIFY` may reduce polling latency, but the notification is only a wake-up hint; the committed outbox and job rows are the durable truth.
 
 ## 2. Public information architecture
 
@@ -283,221 +289,176 @@ An indicator is not one database statement. It is a small versioned package:
 
 ```text
 Indicator R003 v2
-├── stable identity and OCP reference
-├── public Lithuanian name, summary and limitation text
-├── stage, unit of analysis and risk family
-├── required inputs and applicability rules
-├── parameter contract
+├── typed identity, OCP reference and ownership metadata
+├── public Lithuanian explanation and limitations
+├── required inputs, dependencies and applicability rules
+├── effective-dated parameter contract
 ├── calculation implementation
 │   └── normally one pure SQL SELECT
-├── output contract shared by all indicators
-├── fixtures and expected observations
-└── validation/ownership metadata
+├── shared observation output contract
+├── deterministic fixtures and expectations
+└── review, lifecycle and code-hash metadata
 ```
 
 Recommended repository files:
 
 ```text
-analytics/risk_dbt/
-  models/
-    indicators/
-      r003_v2_short_submission_period.sql
-      r003_v2_short_submission_period.yml
-  seeds/
-    indicator_catalogue.csv
-    indicator_parameters.csv
-  tests/
-    r003_v2_as_of_no_future_leakage.sql
-  macros/
-    business_days_between.sql
-  fixtures/
-    r003_v2_expected.csv
-orchestration/risk_assets/
-  definitions.py           # schedules, sensors, partitions and asset checks
-  publish.py               # generic manifest-driven publication transaction
-migrations/risk/
-  observation_schema.sql
-  publication_queries.sql  # static, indicator-independent persistence SQL
+modules/rizika/indikatoriai/R003/
+  definition.ts            # typed metadata, dependencies and public wording
+  calculate.sql            # pure, parameterised SELECT
+  fixtures.ts              # deterministic edge cases
+  calculate.test.ts        # output and boundary tests
+modules/rizika/
+  contracts.ts             # shared observation/run contracts
+  registry.ts              # explicit imports of every indicator version
+  sqlLoader.ts              # loads and hashes packaged SQL at process start
+services/risk-engine/
+  planner.ts               # outbox -> partitioned durable jobs
+  worker.ts                # leases, retries, bounded execution
+  validate.ts              # runtime output and cross-row checks
+  publish.ts               # generic atomic publication
+  reconcile.ts             # repairs expired/missed work
+migrations/rizika/
+  control.sql               # outbox, jobs, attempts, runs and publications
+  storage.sql               # history, current pointers and public summaries
 ```
 
-The SQL and YAML are the indicator's authored definition. dbt compiles them into `manifest.json`, which is the machine-readable deployment catalogue and lineage graph. Dagster reads that manifest and treats every model and test as an asset/check. It does not parse or execute indicator SQL itself. A generic publication asset discovers approved `risk_indicator` relations from manifest metadata and copies their standardized rows into one publication transaction. It contains no formula branches keyed by indicator ID. The database registry is a published copy of approved manifest metadata, public text, effective parameters and hashes; the repository remains the source of truth.
+The explicit TypeScript registry is the deployable catalogue. At process start it validates unique IDs and versions, dependency names, lifecycle state, parameter schema, public text and the existence/hash of every SQL file. The deployed registry is copied into PostgreSQL for audit and public methodology. The repository remains the source of truth.
 
-### 5.1 Example dbt indicator definition
+### 5.1 Example TypeScript definition
 
-The YAML holds metadata, governance and the common column contract. Custom keys belong under `meta`; schema validation in CI checks the project-specific contract.
+The definition contains no scheduling or persistence logic:
 
-```yaml
-version: 2
-
-models:
-  - name: r003_v2_short_submission_period
-    description: One R003 v2 observation per procurement and evaluation cutoff.
-    config:
-      tags: [risk_indicator, ocp_2024, tender]
-      contract:
-        enforced: true
-      meta:
-        indicator_id: R003
-        indicator_version: 2
-        lifecycle: shadow
-        owner: procurement-risk
-        subject_type: procurement
-        standard_url: https://www.open-contracting.org/wp-content/uploads/2024/12/OCP2024-RedFlagProcurement.pdf
-        public_title_lt: Trumpas pasiūlymų pateikimo terminas
-        public_limitation_lt: Trumpesnį laiką gali teisėtai paaiškinti pagreitinta procedūra ar kita išimtis.
-        required_inputs: [publication_date, submission_deadline, procurement_method]
-    columns:
-      - name: observation_key
-        data_type: text
-        data_tests: [not_null, unique]
-      - name: indicator_id
-        data_type: text
-        data_tests: [not_null]
-      - name: indicator_version
-        data_type: integer
-        data_tests: [not_null]
-      - name: subject_type
-        data_type: text
-        data_tests: [not_null]
-      - name: subject_key
-        data_type: text
-        data_tests: [not_null]
-      - name: procurement_source
-        data_type: text
-      - name: procurement_id
-        data_type: text
-      - name: state
-        data_type: text
-        data_tests:
-          - accepted_values:
-              arguments:
-                values: [triggered, not_triggered, insufficient_data, not_applicable, calculation_error]
-      - name: raw_value
-        data_type: numeric
-      - name: threshold_value
-        data_type: numeric
-      - name: parameter_set_id
-        data_type: bigint
-      - name: evidence
-        data_type: jsonb
-        data_tests: [not_null]
-      - name: data_as_of
-        data_type: timestamp with time zone
-        data_tests: [not_null]
+```ts
+export const R003v2: SqlIndicatorDefinition = {
+  id: 'R003',
+  version: 2,
+  engine: 'sql',
+  sqlFile: './calculate.sql',
+  lifecycle: 'shadow',
+  owner: 'procurement-risk',
+  subjectType: 'procurement',
+  stage: 'tender',
+  dependsOn: ['canonical.procurement_lifecycle_versions', 'parameters.R003'],
+  requiredInputs: ['publicationDate', 'submissionDeadline', 'procurementMethod'],
+  outputContract: 'indicator-observation/v1',
+  standard: {
+    name: 'OCP Red Flags in Public Procurement 2024',
+    url: 'https://www.open-contracting.org/wp-content/uploads/2024/12/OCP2024-RedFlagProcurement.pdf',
+  },
+  public: {
+    titleLt: 'Trumpas pasiūlymų pateikimo terminas',
+    limitationLt: 'Trumpesnį laiką gali teisėtai paaiškinti pagreitinta procedūra ar kita išimtis.',
+  },
+};
 ```
 
-Stable values such as stage and subject use controlled code lists. Public text is versioned and reviewed. The application does not infer a public explanation from a raw SQL column name.
+Stable stage, state and subject values are TypeScript unions backed by runtime validation. Public text is versioned and reviewed. The web application does not derive explanations from SQL column names.
 
 ### 5.2 Example SQL calculation
 
-The matching dbt SQL model is declarative: it produces a relation and does not contain hand-written persistence statements. `ref()` declares dependencies, enabling compilation, lineage and selective rebuilding. `var('data_as_of')` makes replay explicit.
+The SQL file is one parameterised, read-only `SELECT`. `$1` is the evaluation run ID and `$2` is the reproducible `data_as_of` cutoff. Candidates are prepared generically from source changes; the indicator never decides its own scheduling or writes its result.
 
 ```sql
-{{ config(materialized='table', schema='risk_calc') }}
-
-with candidates as (
-    select *
-    from {{ ref('fct_procurement_lifecycle_versions') }}
-    where valid_from <= '{{ var("data_as_of") }}'::timestamptz
-      and (valid_to is null or valid_to > '{{ var("data_as_of") }}'::timestamptz)
-), parameters as (
-    select *
-    from {{ ref('dim_indicator_parameters') }}
-    where indicator_id = 'R003'
-      and indicator_version = 2
-      and '{{ var("data_as_of") }}'::date >= valid_from
-      and (valid_to is null or '{{ var("data_as_of") }}'::date < valid_to)
-), evaluated as (
-    select c.*,
-           p.parameter_set_id,
-           p.minimum_days,
-           extract(epoch from (c.submission_deadline - c.publication_date)) / 86400.0
-               as submission_days
-    from candidates c
-    left join parameters p
-      on p.procurement_method = c.procurement_method
+WITH candidates AS (
+    SELECT p.*
+    FROM rizika.v_pirkimo_gyvavimo_ciklo_versijos p
+    JOIN rizika.vertinimo_kandidatai k
+      ON k.vykdymo_id = $1::uuid
+     AND k.subjekto_tipas = 'procurement'
+     AND k.subjekto_raktas = p.subjekto_raktas
+    WHERE p.galioja_nuo <= $2::timestamptz
+      AND (p.galioja_iki IS NULL OR p.galioja_iki > $2::timestamptz)
+), parameters AS (
+    SELECT prm.*
+    FROM rizika.indikatoriu_parametrai prm
+    WHERE prm.indikatoriaus_id = 'R003'
+      AND prm.indikatoriaus_versija = 2
+      AND $2::date >= prm.galioja_nuo
+      AND (prm.galioja_iki IS NULL OR $2::date < prm.galioja_iki)
+), evaluated AS (
+    SELECT c.*,
+           p.id AS parametru_rinkinys_id,
+           (p.parametrai->>'minimumDays')::numeric AS minimum_days,
+           EXTRACT(EPOCH FROM (c.terminas - c.paskelbta)) / 86400.0 AS submission_days
+    FROM candidates c
+    LEFT JOIN parameters p
+      ON p.taikymo_sritis->'methods' ? c.pirkimo_budas
 )
-select md5(concat_ws('|', 'R003', '2', subject_key, '{{ var("data_as_of") }}'))
-           as observation_key,
-       'R003'::text as indicator_id,
-       2::integer as indicator_version,
-       'procurement'::text as subject_type,
-       subject_key,
-       procurement_source,
-       procurement_id,
-       case
-           when minimum_days is null then 'not_applicable'
-           when publication_date is null or submission_deadline is null
-               then 'insufficient_data'
-           when submission_days < minimum_days then 'triggered'
-           else 'not_triggered'
-       end::text as state,
-       submission_days::numeric as raw_value,
-       minimum_days::numeric as threshold_value,
-       parameter_set_id,
+SELECT 'R003'::text AS indicator_id,
+       2::integer AS indicator_version,
+       'procurement'::text AS subject_type,
+       subjekto_raktas AS subject_key,
+       pirkimo_saltinis AS procurement_source,
+       pirkimo_id AS procurement_id,
+       CASE
+           WHEN minimum_days IS NULL THEN 'not_applicable'
+           WHEN paskelbta IS NULL OR terminas IS NULL THEN 'insufficient_data'
+           WHEN submission_days < minimum_days THEN 'triggered'
+           ELSE 'not_triggered'
+       END::text AS state,
+       submission_days::numeric AS raw_value,
+       minimum_days::numeric AS threshold_value,
+       parametru_rinkinys_id,
        jsonb_build_object(
-           'publicationDate', publication_date,
-           'submissionDeadline', submission_deadline,
-           'method', procurement_method
-       ) as evidence,
-       '{{ var("data_as_of") }}'::timestamptz as data_as_of
-from evaluated
+           'publicationDate', paskelbta,
+           'submissionDeadline', terminas,
+           'method', pirkimo_budas
+       ) AS evidence,
+       $2::timestamptz AS data_as_of
+FROM evaluated;
 ```
 
-The production version must support the parameter's day-counting rule and Lithuania timezone. If business days are required, use one shared, tested calendar primitive and an effective-dated holiday table. Do not copy slightly different business-day logic into multiple indicators.
+The calculation role has `SELECT` only, and the worker also starts a read-only transaction with a statement timeout. Correctness does not depend on trying to parse SQL text for forbidden keywords. Business-day counting, when required, is one shared tested PostgreSQL function backed by an effective-dated Lithuanian calendar.
 
-The example deliberately uses a full `table` materialization for clarity and correctness in the first shadow slice. Production runs should build into a run-isolated schema and restrict candidates through a durable change-set relation keyed by evaluation run. Adopt dbt incremental materialization only after late-arriving changes, uniqueness and replay behavior are tested; “incremental” is an optimization, not the indicator contract.
-
-### 5.3 How the YAML, SQL, orchestrator and TypeScript interact
+### 5.3 How the TypeScript and SQL files interact
 
 ```mermaid
 flowchart TD
-    Y[r003...yml<br/>metadata + contract + tests] --> D[dbt parse/compile]
-    Q[r003...sql<br/>formula + ref dependencies] --> D
-    K[Seeds/macros<br/>effective parameters + shared primitives] --> D
-    D --> F[manifest.json<br/>assets + lineage + hashes]
-    F --> O[Dagster selects affected assets]
-    O --> B[dbt build --select r003_v2+]
-    B --> C[(risk_calc.r003_v2<br/>calculated observations)]
-    C --> T{Contract and data tests}
-    T -->|fail| N[Keep prior publication<br/>alert and record failure]
-    T -->|pass| P[Dagster generic publication asset]
-    P --> H[(append-only observation history)]
-    P --> R[(current signal + summary read models)]
-    R --> A[Astro/TypeScript<br/>read and render only]
+    D[definition.ts<br/>identity + dependencies + contract] --> R[Typed registry bootstrap]
+    Q[calculate.sql<br/>pure parameterised SELECT] --> L[SQL loader + content hash]
+    L --> R
+    F[fixtures.ts + tests] --> C[CI and shadow validation]
+    R --> P[Planner creates durable partition jobs]
+    P --> J[(PostgreSQL job table)]
+    J --> W[TypeScript worker claims a lease]
+    W --> X[Execute SQL in read-only transaction]
+    X --> V[Validate rows against shared runtime contract]
+    V --> S[(Run-scoped staging rows)]
+    S --> G{All required jobs and checks passed?}
+    G -->|no| N[Record failure; retain active publication]
+    G -->|yes| A[Generic TypeScript publisher]
+    A --> H[(history + current + summary)]
+    H --> U[Astro/TypeScript reads only]
 ```
 
-The runtime sequence for one source update is:
+Runtime sequence for one source update:
 
 ```mermaid
 sequenceDiagram
     participant S as Source ingestion
-    participant O as Dagster
-    participant D as dbt
-    participant G as Generic publication asset
     participant P as PostgreSQL
+    participant E as TypeScript risk service
+    participant Q as Indicator SQL
     participant A as Astro application
 
-    S->>P: Commit source rows, release record and watermark
-    S-->>O: Data-ready event (or sensor observes watermark)
-    O->>D: Build changed canonical + indicator assets for data_as_of
-    D->>P: Compile and execute canonical model SQL
-    D->>P: Compile and execute R003 SQL
-    D->>P: Run contract, uniqueness and semantic tests
-    alt any publication-gating check fails
-        D-->>O: Failed asset/check with logs and lineage
-        O-->>O: Retry or alert - do not advance publication ID
+    S->>P: Commit source changes and outbox event together
+    E->>P: Poll outbox and create idempotent partition jobs
+    E->>P: Claim ready job with lease using SKIP LOCKED
+    E->>Q: Execute SELECT with run ID and data_as_of
+    Q->>P: Read canonical facts and effective parameters
+    Q-->>E: Return standardized observation rows
+    E->>P: Validate and write run-scoped staging rows
+    alt worker crashes or validation fails
+        P-->>E: Lease expires; retry or mark failed after limit
         A->>P: Continue reading last successful publication
-    else all checks pass
-        D-->>O: Successful materializations and checks
-        O->>G: Launch with approved manifest relations
-        G->>P: Publish history/current/summary in one bounded transaction
-        G-->>O: Publication ID, row counts and timing
-        A->>P: Read new publication by active publication ID
+    else all required jobs succeed
+        E->>P: Append history, update current/summary and pointer in one transaction
+        A->>P: Read the new active publication
     end
 ```
 
-There is no `index.js` that reads `calculate.sql`. dbt compiles the SQL and resolves dependencies; Dagster invokes dbt from its manifest and observes the result; TypeScript reads only published tables. This keeps formula ownership in reviewable SQL and control-plane behavior outside the web application.
+`definition.ts` tells the engine which SQL belongs to R003 and what contract it must return. The shared worker loads and executes it. The SQL calculates only; TypeScript validates and persists through generic code. Astro may share public response types, but it never imports the executable indicator registry.
 
 ### 5.4 Why the indicator does not write its result
 
@@ -505,14 +466,14 @@ Keeping calculation and persistence separate gives:
 
 - safe preview and `EXPLAIN` without data mutation;
 - repeatable backtests with an `as_of` date;
-- one permission model and one transaction strategy;
-- uniform output validation;
+- database-enforced read-only calculation permissions;
+- one output validator and publication transaction strategy;
 - consistent current/history semantics;
 - easier comparison of old and new versions;
 - no half-written results if indicator N of M fails;
-- freedom to run the same dbt selection in CI, shadow, backfill or production.
+- the same execution path in CI, shadow, backfill and production.
 
-The generic publication asset owns history/current persistence. It reads trusted relation identifiers and indicator metadata from the compiled manifest, validates them against the approved registry, and applies the same static `INSERT ... SELECT`/summary SQL to every indicator in one bounded transaction. No maintainer writes indicator-specific `INSERT` or `UPDATE` statements when adding an indicator.
+The generic TypeScript publisher owns history/current persistence. It accepts validated run-scoped staging rows and contains no formula branch keyed by indicator ID. No maintainer writes indicator-specific `INSERT` or `UPDATE` statements when adding an indicator.
 
 ## 6. Choosing SQL, TypeScript or a PostgreSQL function
 
@@ -521,15 +482,15 @@ The generic publication asset owns history/current persistence. It reads trusted
 | Relational filters, joins, windows and aggregates | Pure SQL `SELECT` | R003 short deadline, R018 single bid, R040 buyer share |
 | Reusable canonical field mapping | PostgreSQL view | unified procurement and bidder facts |
 | Stable shared database primitive | SQL/PG function | business days between dates, effective parameter lookup |
-| SQL model contract, documentation and tests | dbt YAML | every SQL indicator |
-| Scheduling, retries, dependencies, partitions and backfills | Asset orchestrator | every analytics asset |
-| Document parsing, OCR evidence spans, embeddings or model inference | Isolated Python/TypeScript asset | restrictive specification text |
-| Graph algorithm awkward/slow in SQL | Isolated code/graph asset | bid rotation/community features |
-| Result persistence and history | Generic orchestrated publication asset, optionally one small atomic DB function | all indicators |
+| Indicator identity, dependencies, contract and public metadata | Typed TypeScript definition | every indicator |
+| Scheduling, leases, retries, dependencies and backfills | Dedicated TypeScript risk service + PostgreSQL control tables | every evaluation job |
+| Document parsing, OCR evidence spans, embeddings or model inference | Isolated TypeScript calculator | restrictive specification text |
+| Graph algorithm awkward/slow in SQL | Isolated TypeScript graph calculator | bid rotation/community features |
+| Result persistence and history | Generic TypeScript publisher, optionally one small atomic DB function | all indicators |
 
-### 6.1 Default: dbt YAML plus SQL SELECT
+### 6.1 Default: TypeScript definition plus SQL SELECT
 
-This should cover most OCP indicators and is the easiest form to review. SQL is set-based and executes close to PostgreSQL data. YAML supplies metadata, documentation, tests and the output contract. dbt supplies compilation, dependency resolution and materialization; the orchestrator supplies operational control.
+This should cover most OCP indicators and is the easiest form to review. SQL is set-based and executes close to PostgreSQL data. TypeScript supplies the typed definition, dependencies and runtime contract. The dedicated risk service supplies durable operational control.
 
 ### 6.2 TypeScript calculator
 
@@ -542,13 +503,13 @@ type IndicatorCalculator = (
 ) => Promise<IndicatorObservation[]>;
 ```
 
-It returns or materializes the same observation schema into an isolated staging relation; it does not update public tables. Dagster declares it as an upstream asset of the same validation and publication gate. Its evidence must contain source references and, for text analysis, exact document/page/span evidence suitable for public verification. Prefer Python for a Dagster-native analytics service; TypeScript is acceptable where existing parsing libraries justify it. Engine choice is metadata, not a public-data contract change.
+It returns the same observation schema to the shared validator and writes only through the same run-scoped staging/publishing path. Its evidence must contain source references and, for text analysis, exact document/page/span evidence suitable for public verification. Engine choice is metadata, not a public-data contract change.
 
 ```mermaid
 flowchart LR
     M[Versioned indicator specification] --> E{Engine}
-    E -->|relational| S[dbt SQL asset]
-    E -->|text/graph/model| C[Isolated code asset]
+    E -->|relational| S[Pure PostgreSQL SELECT]
+    E -->|text/graph/model| C[Isolated TypeScript calculator]
     S --> O[Standard observation relation]
     C --> O
     O --> V[Same schema + semantic checks]
@@ -651,7 +612,7 @@ ON rizika.indikatoriu_parametrai
     (indikatoriaus_id, indikatoriaus_versija, galioja_nuo, galioja_iki);
 ```
 
-Application validation must reject overlapping parameter scopes and validate `parametrai` against the version's `parametru_schema`. Legal threshold changes normally create a new parameter row, not a new calculation version.
+Registry/deployment validation must reject overlapping parameter scopes and validate `parametrai` against the version's `parametru_schema`. Legal threshold changes normally create a new parameter row, not a new calculation version.
 
 ### 7.3 Evaluation runs and publications
 
@@ -675,7 +636,7 @@ CREATE TABLE rizika.vertinimo_vykdymai (
 CREATE TABLE rizika.publikacijos (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     vykdymo_id uuid NOT NULL REFERENCES rizika.vertinimo_vykdymai(id),
-    manifest_hash text NOT NULL,
+    registry_hash text NOT NULL,
     duomenys_iki timestamptz NOT NULL,
     saltiniu_watermarks jsonb NOT NULL,
     busena text NOT NULL CHECK (busena IN ('building', 'published', 'rejected', 'superseded')),
@@ -690,9 +651,111 @@ CREATE TABLE rizika.sistemos_busena (
 );
 ```
 
-One scheduler cycle may create a parent run and one child execution per indicator in a later refinement. For the initial implementation, per-indicator counts in `rezultatu_skaiciai` are sufficient if failures remain attributable. Only a successful publication transaction changes the singleton active-publication pointer.
+One planner cycle may create a parent run and one child execution per indicator in a later refinement. For the initial implementation, per-indicator counts in `rezultatu_skaiciai` are sufficient if failures remain attributable. Only a successful publication transaction changes the singleton active-publication pointer.
 
-### 7.4 Immutable signal observations
+### 7.4 Durable source outbox, candidates and jobs
+
+Source ingestion writes its data changes and one outbox row in the same transaction. Planning consumes the outbox idempotently and creates evaluation runs, candidate subjects and partitioned jobs.
+
+```sql
+CREATE TABLE rizika.saltinio_ivykiai (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    idempotency_key text NOT NULL UNIQUE,
+    saltinis text NOT NULL,
+    objekto_tipas text NOT NULL,
+    objekto_raktas text NOT NULL,
+    ivykio_tipas text NOT NULL,
+    source_watermark jsonb NOT NULL,
+    ivykis_at timestamptz NOT NULL,
+    suplanuota_at timestamptz
+);
+
+CREATE TABLE rizika.vertinimo_kandidatai (
+    vykdymo_id uuid NOT NULL REFERENCES rizika.vertinimo_vykdymai(id),
+    subjekto_tipas text NOT NULL,
+    subjekto_raktas text NOT NULL,
+    priezasties_ivykio_id bigint REFERENCES rizika.saltinio_ivykiai(id),
+    PRIMARY KEY (vykdymo_id, subjekto_tipas, subjekto_raktas)
+);
+
+CREATE TABLE rizika.vertinimo_darbai (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    vykdymo_id uuid NOT NULL REFERENCES rizika.vertinimo_vykdymai(id),
+    idempotency_key text NOT NULL UNIQUE,
+    darbo_tipas text NOT NULL CHECK (
+        darbo_tipas IN ('baseline', 'indicator', 'validate', 'publish', 'reconcile')
+    ),
+    partition_key text NOT NULL,
+    payload jsonb NOT NULL,
+    busena text NOT NULL CHECK (
+        busena IN ('queued', 'leased', 'succeeded', 'failed', 'dead')
+    ),
+    prioritetas integer NOT NULL DEFAULT 0,
+    bandymas integer NOT NULL DEFAULT 0,
+    max_bandymu integer NOT NULL DEFAULT 5,
+    vykdyti_ne_anksciau timestamptz NOT NULL DEFAULT now(),
+    lease_owner text,
+    lease_iki timestamptz,
+    heartbeat_at timestamptz,
+    pradeta_at timestamptz,
+    baigta_at timestamptz,
+    paskutine_klaida text,
+    sukurta_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE rizika.vertinimo_darbu_priklausomybes (
+    darbo_id uuid NOT NULL REFERENCES rizika.vertinimo_darbai(id),
+    priklauso_nuo_darbo_id uuid NOT NULL REFERENCES rizika.vertinimo_darbai(id),
+    PRIMARY KEY (darbo_id, priklauso_nuo_darbo_id),
+    CHECK (darbo_id <> priklauso_nuo_darbo_id)
+);
+
+CREATE TABLE rizika.vertinimo_darbu_bandymai (
+    darbo_id uuid NOT NULL REFERENCES rizika.vertinimo_darbai(id),
+    bandymas integer NOT NULL,
+    worker_id text NOT NULL,
+    busena text NOT NULL CHECK (busena IN ('leased', 'succeeded', 'failed', 'expired')),
+    lease_suteikta_at timestamptz NOT NULL,
+    paskutinis_heartbeat_at timestamptz NOT NULL,
+    baigta_at timestamptz,
+    metrikos jsonb,
+    klaida text,
+    PRIMARY KEY (darbo_id, bandymas)
+);
+
+CREATE INDEX vertinimo_darbai_claim_idx
+ON rizika.vertinimo_darbai (prioritetas DESC, vykdyti_ne_anksciau, id)
+WHERE busena = 'queued';
+
+CREATE TABLE rizika.signalu_tarpiniai_rezultatai (
+    vykdymo_id uuid NOT NULL REFERENCES rizika.vertinimo_vykdymai(id),
+    darbo_id uuid NOT NULL REFERENCES rizika.vertinimo_darbai(id),
+    indikatoriaus_id text NOT NULL,
+    indikatoriaus_versija integer NOT NULL,
+    subjekto_tipas text NOT NULL,
+    subjekto_raktas text NOT NULL,
+    pirkimo_saltinis text,
+    pirkimo_id text,
+    busena text NOT NULL CHECK (
+        busena IN ('triggered', 'not_triggered', 'insufficient_data', 'not_applicable', 'calculation_error')
+    ),
+    neapdorota_reiksme jsonb,
+    riba jsonb,
+    parametru_rinkinys_id bigint REFERENCES rizika.indikatoriu_parametrai(id),
+    irodymai jsonb NOT NULL,
+    trukstami_duomenys jsonb,
+    duomenys_iki timestamptz NOT NULL,
+    patikrinta_at timestamptz NOT NULL,
+    PRIMARY KEY (
+        vykdymo_id, indikatoriaus_id, indikatoriaus_versija,
+        subjekto_tipas, subjekto_raktas
+    )
+);
+```
+
+Workers claim only jobs whose dependencies succeeded, using a short transaction with `FOR UPDATE SKIP LOCKED`. Claiming increments `bandymas`; every heartbeat and completion update must match the claimed attempt and lease owner, which fences off a stale worker after its lease expires. Execution occurs outside the claim transaction. Validated staging upserts and the transition to `succeeded` commit together in one short transaction. Expired leases return to the queue through reconciliation. Delivery is deliberately **at least once**: unique idempotency keys, result uniqueness and atomic publication make repeats safe. `LISTEN/NOTIFY` may wake workers but is never the queue.
+
+### 7.5 Immutable signal observations
 
 ```sql
 CREATE TABLE rizika.signalu_istorija (
@@ -735,7 +798,7 @@ ON rizika.signalu_istorija (indikatoriaus_id, busena, sukurta_at DESC);
 
 Store all applicable states, not only triggers. Otherwise it is impossible to distinguish “evaluated and did not trigger” from “never evaluated”.
 
-### 7.5 Current pointers and last evaluation
+### 7.6 Current pointers and last evaluation
 
 ```sql
 CREATE TABLE rizika.signalai_dabartiniai (
@@ -752,7 +815,7 @@ CREATE TABLE rizika.signalai_dabartiniai (
 
 History need not receive an identical row every hour. The generic persistence step computes `rezultato_hash` from semantic output, excluding run timestamps. If the result is unchanged, it updates only the current row's last-evaluated fields. If state, value, threshold, evidence, confidence, indicator version or parameter version changes, it appends history and moves the pointer.
 
-### 7.6 Page summary read model
+### 7.7 Page summary read model
 
 ```sql
 CREATE TABLE rizika.pirkimu_santraukos (
@@ -888,19 +951,19 @@ Both records are important. The first supports a public signal; the second suppo
 
 ## 9. Calculation and atomic publication flow
 
-Dagster starts from a source watermark or an explicit backfill request and selects the affected dbt asset subgraph. For each partition and `data_as_of`:
+The risk service starts from committed outbox watermarks or an explicit backfill request. For each partition and `data_as_of` it:
 
-1. compiles the approved manifest and refuses contract/schema drift;
-2. builds only the required canonical facts, baselines and indicator assets;
-3. resolves effective parameters as data in the SQL model;
-4. materializes each indicator into its versioned `risk_calc` relation;
-5. runs column contracts, uniqueness, accepted-state, completeness and semantic tests;
-6. Dagster prevents publication if any gating check fails;
-7. the generic publication asset reads approved output relation names from `manifest.json` and computes stable semantic hashes;
-8. it appends changed observations, derives current/read summaries and advances the publication pointer in one bounded transaction;
-9. Dagster records materialization metadata, row counts, timings, source watermark and manifest hash.
+1. loads the approved typed registry and verifies deployed code/SQL hashes;
+2. creates one idempotent evaluation run and its candidate subject set;
+3. expands the dependency graph into durable PostgreSQL jobs;
+4. lets bounded workers claim ready jobs under renewable leases;
+5. executes SQL indicators in read-only transactions and TypeScript indicators in isolated job contexts;
+6. validates column types, allowed states, uniqueness, candidate completeness and semantic invariants;
+7. writes validated results into run-scoped staging and records attempt counts/timings;
+8. prevents publication if any required job or publication-gating validation fails;
+9. computes semantic hashes, appends changed observations, updates current/read summaries and advances the publication pointer in one bounded transaction.
 
-The publication unit receives already validated standardized relations and contains no indicator-specific formula. The public schema exposes an `active_publication_id`; readers see either the previous complete publication or the next complete publication, never a half-refreshed mix. A small PostgreSQL function is acceptable for this final atomic pointer advance, but it is infrastructure, not an indicator implementation.
+The publisher receives already validated standardized staging rows and contains no indicator-specific formula. The public schema exposes an `active_publication_id`; readers see either the previous complete publication or the next complete publication, never a half-refreshed mix. A small PostgreSQL function is acceptable for the final atomic pointer advance, but it is infrastructure, not an indicator implementation.
 
 ## 10. Indicator maintenance workflow
 
@@ -919,7 +982,7 @@ The publication unit receives already validated standardized relations and conta
 
 Adding an indicator is therefore mainly a repository pull request plus a reviewed parameter deployment—not manual editing of a database view or function in production.
 
-The normal maintenance surface for a new SQL indicator is exactly four things: one `.sql` formula, one `.yml` contract/methodology entry, deterministic fixtures/tests, and effective-dated parameter data. `publish.py`, database publication SQL and Astro route code do not change. They change only when the shared observation contract or publication protocol itself changes. An exceptional TypeScript/Python indicator additionally owns its isolated calculator and dependency lockfile, but still does not change publication or UI code.
+The normal maintenance surface for a new SQL indicator is exactly four things: one `.sql` formula, one typed `definition.ts`, deterministic fixtures/tests, and effective-dated parameter data. Shared worker, validator, publisher and Astro route code do not change. They change only when the observation contract or publication protocol itself changes. An exceptional TypeScript indicator additionally owns its calculator, but still does not change publication or UI code.
 
 ### 10.2 What constitutes a new version?
 
@@ -966,8 +1029,8 @@ Activation is an explicit registry transition. Existing history remains linked t
 
 ```mermaid
 flowchart LR
-    PR[Pull request: SQL + YAML + fixtures] --> CI[dbt compile, unit/data tests, SQL lint]
-    CI --> SH[Build v3 in isolated shadow schema]
+    PR[Pull request: SQL + TypeScript definition + fixtures] --> CI[Type-check, registry validation, tests, SQL review]
+    CI --> SH[Run v3 as shadow jobs with isolated staging]
     SH --> CMP[Compare v2 vs v3<br/>coverage, triggers, evidence, cost]
     CMP --> REV[Methodology/legal/data-owner approval]
     REV --> BF[Partitioned historical/current backfill]
@@ -1012,8 +1075,8 @@ Registry-level tests ensure:
 Build one complete vertical slice with R003:
 
 1. create registry/version/parameter/run/history/current/summary tables;
-2. establish the dbt project, manifest contract and Dagster asset deployment independently from the web application;
-3. implement R003 as dbt YAML metadata plus a pure SQL model;
+2. establish the dedicated TypeScript risk-service entry point, PostgreSQL outbox/job protocol and database roles independently from the web application;
+3. implement R003 as a typed definition plus a pure SQL `SELECT`;
 4. use demonstration parameter values until the Lithuanian legal profile is approved;
 5. evaluate current open procurements in shadow mode;
 6. build `/rizikos`, one detail page and the R003 methodology entry from the persisted results;
@@ -1022,10 +1085,18 @@ Build one complete vertical slice with R003:
 
 This slice tests the important architecture boundaries. Adding many SQL snippets before current/history/version/parameter semantics exist would create a catalogue that is quick to start and expensive to maintain.
 
-## 13. Architecture references
+## 13. Why this is not the existing task runner
 
-- [dbt incremental models](https://docs.getdbt.com/docs/build/incremental-models) for selective transformation and merge semantics;
-- [dbt data tests](https://docs.getdbt.com/docs/build/data-tests) for declarative assertions;
-- [dbt manifest artifact](https://docs.getdbt.com/reference/artifacts/manifest-json) for compiled metadata and lineage;
-- [Dagster integration with dbt](https://docs.dagster.io/integrations/libraries/dbt) for representing dbt models as observable assets;
-- [Dagster partitions and backfills](https://docs.dagster.io/guides/build/partitions-and-backfills/partitioning-assets) for bounded replay.
+The risk service is a separate application entry point with a narrow responsibility and explicit PostgreSQL protocol. Its correctness does not rely on one Node process staying alive:
+
+- every source event, candidate, job, dependency, lease, attempt, result and publication is durable;
+- workers are horizontally repeatable and claim work with database locks rather than an in-memory queue;
+- crashed work is reclaimed after a lease expires;
+- processing is at least once and made safe through idempotency keys and uniqueness constraints;
+- backfills are ordinary partitioned jobs, not special scripts;
+- publication is gated and atomic;
+- reconciliation detects missed outbox events, expired leases and incomplete runs;
+- control/attempt tables have retention and indexing policies, and worker concurrency is capped so analytics cannot exhaust PostgreSQL connections;
+- the public application has read-only access and a separate deployment lifecycle.
+
+The only unavoidable external trigger is starting and supervising the long-running TypeScript process. Normal operating schedules, retries and state transitions are implemented in TypeScript and PostgreSQL, not delegated to an analytics product.

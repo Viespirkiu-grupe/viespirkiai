@@ -1,7 +1,9 @@
 # Risk signals for current and recently completed procurements
 
-Status: initial technical design  
-Date: 2026-08-10  
+Status: initial technical design
+
+Date: 2026-08-11
+
 Scope: public-facing discovery and prioritisation page, not an automated finding of corruption
 
 Detailed companion: [public page, storage and indicator maintenance specification](risk-indicators-public-page-and-maintenance.md).
@@ -11,12 +13,12 @@ Detailed companion: [public page, storage and indicator maintenance specificatio
 The recommended solution is a hybrid:
 
 1. **Canonical database views** define procurement, buyer, supplier, bid, award, contract and payment facts consistently.
-2. **Version-controlled indicator data assets** calculate explainable risk signals. Most are dbt SQL models; exceptional text/graph/model indicators are isolated code assets with the same output contract.
+2. **Version-controlled indicator packages** calculate explainable risk signals. Most contain a typed TypeScript definition plus a pure SQL `SELECT`; exceptional text/graph/model indicators use TypeScript with the same output contract.
 3. **Effective-dated business parameters** hold Lithuanian legal thresholds, exclusions, comparison groups and severity settings. They are data, not hard-coded constants scattered through SQL.
 4. **Persisted current and historical signal tables** make evaluation incremental, auditable and fast to serve. The web request never calculates cross-procurement indicators.
 5. **Thin read views and an application service** expose the persisted results to Astro pages.
 6. **Human review and outcome feedback** validate indicators and later provide labels for ranking or machine-learning models.
-7. **Independent orchestration** uses a dedicated asset orchestrator for data-aware scheduling, lineage, checks, retries and backfills. The existing Node task runner and public web process are not part of the calculation control plane.
+7. **Independent execution** uses a dedicated TypeScript risk service and durable PostgreSQL control tables for source events, jobs, dependencies, leases, retries, reconciliation and backfills. The existing Node task runner and public web process are not part of the calculation control plane.
 
 Views alone are insufficient because several indicators require expensive rolling windows, peer-group percentiles, graph analysis, source watermarks and reproducible historical results. Stored procedures are also the wrong primary abstraction: they hide policy logic inside the live database, are awkward to review and test with the application, and make versioned replay harder. Stored procedures are appropriate only for small atomic database operations, such as swapping a completed result set into the current table.
 
@@ -246,46 +248,49 @@ Maintain a denormalised `rizika.pirkimo_santrauka` table for the list page, inde
 | Normal PostgreSQL view | Canonical names/types, safe joins, simple current facts | Large rolling windows or page-time ranking |
 | Materialized view | Nightly peer baselines or stable aggregates where full/concurrent refresh is acceptable | Fast-changing per-procurement state; PostgreSQL has no native incremental MV maintenance |
 | Versioned SQL indicator | Set-based deterministic indicator calculation | Hidden mutable parameters or side effects |
-| dbt model + YAML | SQL transformations, dependencies, contracts, documentation and tests | OCR/model inference or web rendering |
-| Asset orchestrator | Data-aware scheduling, lineage, retries, isolated failures, partitions and backfills | Procurement formula logic |
-| Isolated Python/TypeScript asset | Document/text, graph or model features that do not fit relational SQL | Updating public result tables directly |
+| Typed TypeScript definition | Identity, dependencies, contract, methodology and ownership | Embedding relational formula logic |
+| Dedicated TypeScript risk service | Durable planning, leases, retries, isolated failures, partitions and backfills | Indicator-specific formulas |
+| Isolated TypeScript calculator | Document/text, graph or model features that do not fit relational SQL | Updating public result tables directly |
 | Effective-dated parameter table | Legal thresholds, method mappings, exclusions, weights, peer definitions | Executable arbitrary SQL edited through an admin UI |
 | Stored procedure/function | Small atomic merge/swap or shared deterministic helper with a stable contract | The indicator catalogue, policy ownership or cron orchestration |
 | ML/anomaly model | Later-stage ranking or text/graph patterns after labels and validation exist | Initial public corruption score |
 
-The concrete reference stack is dbt Core for SQL assets and Dagster for orchestration, deployed separately from the application. The durable design requirement is the asset contract—not those product names: an alternative orchestrator must still provide manifest-level lineage, data-aware triggering, observable checks, retries, partitioned backfills and publication gating. A cron/task script embedded in the application does not meet that standard.
+The concrete stack is TypeScript and PostgreSQL only. The risk engine is a separate long-running service, not another function inside the existing task runner. PostgreSQL is the durable coordinator: transactional outbox events, idempotent jobs, dependencies, attempts, leases, staging rows, run history and publication state survive process restarts. TypeScript supplies the typed registry, planner, bounded workers, output validation, reconciliation and generic publisher.
 
 ## 8. Evaluation pipeline
 
 ```mermaid
 flowchart LR
-    S[Source scrapers and imports] --> C[dbt canonical fact assets]
-    S --> H[Append-only source releases + watermark]
-    H --> O[Dagster source sensor]
-    O --> C
-    C --> I[Versioned dbt SQL indicator assets]
-    P[Effective-dated parameter assets] --> I
-    B[Partitioned peer/market baseline assets] --> I
-    O --> X[Optional isolated text/graph assets]
-    I --> V[dbt contracts + data/semantic checks]
+    S[Source scrapers and imports] --> H[Append-only releases + transactional outbox]
+    H --> P[TypeScript planner]
+    P --> J[(PostgreSQL jobs + dependencies + leases)]
+    J --> W[Bounded TypeScript workers]
+    C[Canonical views/version tables] --> I[Pure SQL indicator calculations]
+    PARAM[Effective-dated parameters] --> I
+    B[Peer and market baselines] --> I
+    W --> I
+    W --> X[Optional TypeScript text/graph calculations]
+    I --> V[Runtime contract + semantic validation]
     X --> V
-    V -->|publication gate passes| R[Immutable history + current signals]
+    V --> T[(Run-scoped staging)]
+    T -->|all publication checks pass| R[Atomic history + current publication]
     R --> M[Public procurement summary read model]
     M --> A[Read-only Astro page/API]
     R --> D[Read-only methodology/detail page]
-    U[Human review outcomes] --> E[Validation and later model training]
+    U[Human review outcomes] --> FB[Validation and later model training]
 ```
 
 Recommended scheduling:
 
-- after each committed source refresh, publish a watermark/change record; a Dagster sensor launches only when the data is ready;
+- commit an outbox event with each source refresh; the TypeScript planner polls durable events and may use `LISTEN/NOTIFY` only as a wake-up hint;
 - derive affected procurement/supplier/buyer partitions from immutable source changes rather than coupling to an application callback;
 - recompute local single-procurement indicators incrementally;
 - recompute peer-group and market baselines nightly;
 - re-evaluate dependent signals when a baseline or legal parameter version changes;
-- perform a weekly reconciliation to catch missed queue events.
+- reclaim expired leases continuously and retry with bounded exponential backoff;
+- perform a weekly end-to-end watermark reconciliation to catch missed source events or linkage changes.
 
-Use the orchestrator's run/partition concurrency controls plus database uniqueness constraints for idempotency. Indicator calculation runs with statement timeouts in the isolated analytics schema. Publication occurs only after gating checks and advances the active publication in one short transaction. A failed indicator does not replace the last successful publication and must not block unrelated asset partitions or the page.
+Workers claim ready jobs with `FOR UPDATE SKIP LOCKED`, execute outside the claim transaction under renewable leases and use database uniqueness constraints for idempotency. Expired jobs are reclaimed by reconciliation. Delivery is at least once; repeat execution is safe. Indicator calculation uses a read-only role and statement timeouts. Publication advances the active publication only after gating checks in one short transaction. A failed indicator does not replace the last successful publication or block unrelated partitions or the page.
 
 ## 9. Initial indicator backlog
 
@@ -388,34 +393,34 @@ The current investigation role cannot read `vpmSutartys`, notice child tables, p
 
 ## 13. Repository implementation shape
 
-Suggested structure, separating analytics orchestration from the existing application:
+Suggested structure, separating risk processing from the existing application:
 
 ```text
-analytics/risk_dbt/
-  dbt_project.yml
-  models/staging/
-  models/canonical/
-  models/baselines/
-  models/indicators/
-    r003_v2_short_submission_period.sql
-    r003_v2_short_submission_period.yml
-  seeds/indicator_catalogue.csv
-  seeds/indicator_parameters.csv
-  tests/
-orchestration/risk_assets/
-  definitions.py
-  sensors.py
-  resources.py
-  publish.py
-migrations/risk/
-  observation_schema.sql
-  publication_queries.sql
+modules/rizika/
+  contracts.ts
+  registry.ts
+  sqlLoader.ts
+  indikatoriai/R003/
+    definition.ts
+    calculate.sql
+    fixtures.ts
+    calculate.test.ts
+services/risk-engine/
+  main.ts
+  planner.ts
+  worker.ts
+  validate.ts
+  publish.ts
+  reconcile.ts
+migrations/rizika/
+  control.sql
+  storage.sql
 src/pages/rizikos/index.astro
 src/pages/rizikos/pirkimas/[source]/[id].astro
 src/pages/rizikos/metodika.astro
 ```
 
-Each dbt YAML file describes its SQL model, required parameter set, public metadata, ownership and enforced output contract. dbt compiles this into a manifest; Dagster uses the manifest to infer asset dependencies and execute/select only affected models. A generic `publish.py` asset discovers approved output relations from the manifest and applies indicator-independent publication SQL; it is control-plane infrastructure, not a catalogue of business rules. The public TypeScript code has no dependency on analytics source files and queries only the published schema. Integration tests run against deterministic fixtures and compare complete output rows, including `insufficient_data` cases.
+Each typed definition identifies its calculation, required parameter set, dependencies, public metadata, ownership and output contract. The explicit registry validates and hashes all definitions and packaged SQL at startup. A generic TypeScript publisher accepts validated staging rows and applies indicator-independent publication SQL. The public Astro code has no dependency on the executable registry and queries only the published schema. Integration tests run against deterministic fixtures and compare complete output rows, including `insufficient_data` cases.
 
 Prefer explicit migrations for the new schema. Do not make page startup create or mutate the risk schema. The worker may verify schema/indicator-version compatibility and fail fast.
 
