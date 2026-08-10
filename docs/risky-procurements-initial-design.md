@@ -257,27 +257,29 @@ Maintain a denormalised `rizika.pirkimo_santrauka` table for the list page, inde
 
 The concrete stack is TypeScript and PostgreSQL only. The risk engine is a separate long-running service, not another function inside the existing task runner. PostgreSQL is the durable coordinator: transactional outbox events, idempotent jobs, dependencies, attempts, leases, staging rows, run history and publication state survive process restarts. TypeScript supplies the typed registry, planner, bounded workers, output validation, reconciliation and generic publisher.
 
+The normative component map is the [reference architecture](risk-indicators-public-page-and-maintenance.md#11-reference-architecture); it defines every box and distinguishes labelled runtime data flow from dotted code/configuration dependencies. The pipeline below is only its compact evaluation view.
+
 ## 8. Evaluation pipeline
 
 ```mermaid
 flowchart LR
-    S[Source scrapers and imports] --> H[Append-only releases + transactional outbox]
-    H --> P[TypeScript planner]
-    P --> J[(PostgreSQL jobs + dependencies + leases)]
-    J --> W[Bounded TypeScript workers]
-    C[Canonical views/version tables] --> I[Pure SQL indicator calculations]
-    PARAM[Effective-dated parameters] --> I
-    B[Peer and market baselines] --> I
-    W --> I
-    W --> X[Optional TypeScript text/graph calculations]
-    I --> V[Runtime contract + semantic validation]
-    X --> V
-    V --> T[(Run-scoped staging)]
+    S[Source scrapers and imports] -->|normalised releases and change events| H[Append-only releases + transactional outbox]
+    H -->|unconsumed source-change events| P[TypeScript planner]
+    P -->|idempotent partition jobs| J[(PostgreSQL jobs + dependencies + leases)]
+    J -->|claimed job and fenced lease| W[Bounded TypeScript workers]
+    C[Canonical views/version tables] -->|facts as of run cutoff| I[Pure SQL indicator calculations]
+    PARAM[Effective-dated parameters] -->|applicable threshold and scope values| I
+    B[Peer and market baselines] -->|versioned comparison statistics| I
+    W -->|SQL run context and candidate partition| I
+    W -->|TypeScript run context and candidate partition| X[Optional TypeScript text/graph calculations]
+    I -->|standard observation rows| V[Runtime contract + semantic validation]
+    X -->|standard observation rows| V
+    V -->|validated candidate observations| T[(Run-scoped staging)]
     T -->|all publication checks pass| R[Atomic history + current publication]
-    R --> M[Public procurement summary read model]
-    M --> A[Read-only Astro page/API]
-    R --> D[Read-only methodology/detail page]
-    U[Human review outcomes] --> FB[Validation and later model training]
+    R -->|current signal aggregates| M[Public procurement summary read model]
+    M -->|filtered public rows| A[Read-only Astro page/API]
+    R -->|versioned observations and evidence| D[Read-only methodology/detail page]
+    U[Human review outcomes] -->|labelled validation cases| FB[Validation and later model training]
 ```
 
 Recommended scheduling:
@@ -420,7 +422,9 @@ src/pages/rizikos/pirkimas/[source]/[id].astro
 src/pages/rizikos/metodika.astro
 ```
 
-Each typed definition identifies its calculation, required parameter set, dependencies, public metadata, ownership and output contract. The explicit registry validates and hashes all definitions and packaged SQL at startup. A generic TypeScript publisher accepts validated staging rows and applies indicator-independent publication SQL. The public Astro code has no dependency on the executable registry and queries only the published schema. Integration tests run against deterministic fixtures and compare complete output rows, including `insufficient_data` cases.
+A **typed indicator definition** is an immutable TypeScript object for one exact indicator version; its shared contract identifies the calculation, required parameter set, true indicator dependencies, source relations, public metadata, ownership and output contract. A **typed indicator registry** is the immutable in-process catalogue keyed by `(indicator ID, version)` that validates these definitions and resolves a durable job to exactly one implementation. It is neither a results table nor a scheduler. The detailed design gives the [precise definitions and a TypeScript example](risk-indicators-public-page-and-maintenance.md#51-typed-indicator-and-typed-indicator-registry).
+
+The explicit registry validates and hashes all definitions and packaged SQL at startup. A generic TypeScript publisher accepts validated staging rows and applies indicator-independent publication SQL. The public Astro code has no dependency on the executable registry and queries only the published schema. Integration tests run against deterministic fixtures and compare complete output rows, including `insufficient_data` cases.
 
 Prefer explicit migrations for the new schema. Do not make page startup create or mutate the risk schema. The worker may verify schema/indicator-version compatibility and fail fast.
 

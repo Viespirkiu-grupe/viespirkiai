@@ -31,46 +31,93 @@ The concrete stack is **TypeScript + PostgreSQL**. A dedicated long-running risk
 flowchart LR
     subgraph ingestion[Source ingestion plane]
         S[Scrapers and imports]
-        E[Source release/change log]
-        W[Source watermarks]
-        S --> E
-        S --> W
+        C[(Canonical versioned facts)]
+        E[(Transactional source outbox)]
+        W[(Source watermarks)]
+        S -->|normalised procurement records| C
+        S -->|committed source-change events| E
+        S -->|completed source positions| W
+    end
+
+    subgraph database[PostgreSQL risk data and control plane]
+        M[(Effective-dated indicator parameters)]
+        J[(Durable jobs, leases and attempts)]
+        Z[(Run-scoped staging and validation status)]
+        H[(Immutable published observations)]
+        R[(Current signals and public summary)]
     end
 
     subgraph analytics[Independent TypeScript risk service]
         G[Typed indicator registry]
         L[Planner and dependency graph]
-        J[(Durable jobs, leases and attempts)]
         K[Bounded worker pool]
         I[Pure SQL indicator calculations]
         X[Optional TypeScript calculations]
         T[Runtime contract and SQL integrity checks]
         P[Generic atomic publisher]
-        G --> L --> J
-        J --> K
-        K --> I
-        K --> X
-        I --> T
-        X --> T
-        T -->|all checks pass| P
+        G -.->|declares versions and ordering constraints| L
+        G -.->|maps a job to its implementation| K
+        G -.->|declares expected hash and output contract| T
     end
 
-    E --> L
-    W --> L
-    P --> H[(Immutable observations)]
-    P --> R[(Current signals and public summary)]
+    E -->|unconsumed source-change events| L
+    W -->|latest complete source positions| L
+    L -->|idempotent partition job rows| J
+    J -->|claimed job, lease and fencing token| K
+    K -->|run ID, cutoff and candidate partition| I
+    K -->|run ID, cutoff and candidate partition| X
+    C -->|canonical facts as of cutoff| I
+    C -->|canonical facts as of cutoff| X
+    M -->|effective parameter values| I
+    M -->|effective parameter values| X
+    I -->|standard observation rows| T
+    X -->|standard observation rows| T
+    T -->|validated rows and check status| Z
+    J -->|required-job terminal states| P
+    Z -->|validated run-scoped observations| P
+    P -->|append-only publication rows| H
+    P -->|new active snapshot and aggregates| R
 
     subgraph serving[Public serving plane]
         A[Astro/TypeScript routes]
         U[Public risk pages and API]
-        A --> U
+        A -->|rendered HTML or JSON response| U
     end
 
     R -->|read-only SQL| A
     H -->|detail/history query| A
 ```
 
-The three planes have independent process lifecycles and database roles. A broken ingestion refresh leaves the last successful publication visible with its old watermark. A failed indicator run leaves the last successful risk publication visible. A web deployment cannot mutate risk results. PostgreSQL `LISTEN/NOTIFY` may reduce polling latency, but the notification is only a wake-up hint; the committed outbox and job rows are the durable truth.
+Solid arrows are runtime data flows; their labels name the data crossing the boundary. Dotted arrows are code/configuration dependencies and their labels say what is depended on. An arrow does not mean that two components share a process. In particular, database rows cross between independently deployed ingestion, risk and web processes.
+
+The **source ingestion plane** owns collection and canonical source state. The **PostgreSQL risk data and control plane** is shared durable storage, accessed through separate least-privilege roles rather than deployed as a service process. The **independent TypeScript risk service** owns planning through publication. The **public serving plane** can only read a stable published schema.
+
+#### 1.1.1 Component definitions
+
+Every component in the reference architecture has one concrete role:
+
+| Component | Concrete form | Responsibility and boundary |
+|---|---|---|
+| Scrapers and imports | Existing ingestion processes | Fetch and normalise public source data. In the same database transaction as a source release, write an outbox event and advance the source watermark only when that release is complete. They never calculate or publish risk signals. |
+| Canonical versioned facts | PostgreSQL tables and views | Present procurements, notices, lots, bids, awards, contracts, buyers and suppliers with stable keys and `valid_from`/`valid_to` semantics. They are the reproducible facts read at `data_as_of`. |
+| Transactional source outbox | Append-only PostgreSQL table | Durably records which source entities or partitions changed. It is the hand-off from ingestion to risk planning and prevents a committed source change from being lost between processes. |
+| Source watermarks | PostgreSQL table | Records the latest complete position/time for each source. A run stores the watermarks it used so the public freshness label and a later replay refer to the same source state. |
+| Effective-dated indicator parameters | Versioned PostgreSQL rows | Stores reviewed thresholds, method scopes, legal dates and exclusions separately from executable code. The run cutoff selects the applicable row; editing a parameter never silently rewrites historical results. |
+| Typed indicator registry | Immutable in-process TypeScript catalogue, with an audited snapshot copied to PostgreSQL | Resolves `(indicator ID, version)` to one validated definition: implementation, subject, lifecycle, inputs, dependencies, parameter contract, output contract and public methodology. It contains no procurement result rows and does not schedule work. Section 5 defines it precisely. |
+| Planner and dependency graph | Long-running TypeScript module | Consumes outbox events and watermarks, expands them into affected subjects/partitions, orders true indicator-to-indicator prerequisites, and inserts idempotent job rows. It does not execute formulas. |
+| Durable jobs, leases and attempts | PostgreSQL control tables | Store pending/running/succeeded/failed work, prerequisite edges, retry history, lease owner/expiry and fencing token. This is the recoverable coordination truth; an in-memory queue is only an optimisation. |
+| Bounded worker pool | TypeScript concurrency loop | Claims ready jobs, resolves the exact registry version, renews the lease, invokes the selected calculator with a run ID/cutoff/partition, and records a fenced attempt outcome. It does not contain indicator-specific branches. |
+| Pure SQL indicator calculations | Versioned `.sql` files executed by PostgreSQL | Perform set-based formulas as a read-only, parameterised `SELECT` and return the standard observation shape. They cannot mutate risk or source tables. |
+| Optional TypeScript calculations | Isolated TypeScript calculator modules | Handle a calculation that genuinely does not fit relational SQL, such as document parsing or a graph algorithm. They receive the same bounded execution context and must return the same observation contract; they do not publish directly. |
+| Runtime contract and SQL integrity checks | Shared TypeScript validation module plus database permissions | Before execution, verifies the packaged SQL hash; after execution, validates field types, allowed states, subject/indicator identity, evidence size, duplicate keys and cross-row invariants. SQL safety is enforced by a read-only role, read-only transaction and timeout, not keyword parsing. |
+| Run-scoped staging and validation status | PostgreSQL tables keyed by run, indicator, version, partition and subject | Hold validated candidate observations and gate results before publication. Rows are invisible to the public serving schema until the complete publication passes. |
+| Generic atomic publisher | Shared TypeScript module issuing indicator-independent PostgreSQL statements | Confirms all required jobs and gates succeeded, appends immutable history, rebuilds current/summary rows and advances the singleton active-publication pointer in one short transaction. It has no `if (indicatorId === ...)` formula logic. |
+| Immutable published observations | Append-only PostgreSQL history | Preserve each published state, evidence, indicator/parameter version, source versions, run and `data_as_of` for audit and detail/history queries. |
+| Current signals and public summary | PostgreSQL current-pointer tables and denormalised read model | Expose only the active successful publication, with list-page counts, filters, ordering fields and current signal details. Failed or partial runs never replace it. |
+| Astro/TypeScript routes | Existing web application using a read-only database role | Query only public current/history views, authorise no calculation work, and shape stable page/API responses. They do not import the executable registry. |
+| Public risk pages and API | Browser-visible HTML and public JSON | Display the list, procurement detail and methodology with evidence, freshness and “signal is not proof” wording. They never receive operational tables, credentials or private review notes. |
+
+The ingestion, risk-processing and serving processes have independent lifecycles and database roles. A broken ingestion refresh leaves the last successful publication visible with its old watermark. A failed indicator run leaves the last successful risk publication visible. A web deployment cannot mutate risk results. PostgreSQL `LISTEN/NOTIFY` may reduce polling latency, but the notification is only a wake-up hint; the committed outbox and job rows are the durable truth.
 
 ## 2. Public information architecture
 
@@ -285,11 +332,11 @@ Opening it shows the original OCP definition, the local profile, required data, 
 
 ## 5. What exactly is one indicator?
 
-An indicator is not one database statement. It is a small versioned package:
+An **indicator** is the policy concept and reproducible test that turns public procurement facts into one of four states: `triggered`, `not_triggered`, `insufficient_data` or `not_applicable`. It is not one database statement and it is not the result row. Its maintained implementation is a small versioned package:
 
 ```text
 Indicator R003 v2
-├── typed identity, OCP reference and ownership metadata
+├── typed indicator definition: identity, contracts and metadata
 ├── public Lithuanian explanation and limitations
 ├── required inputs, dependencies and applicability rules
 ├── effective-dated parameter contract
@@ -323,25 +370,125 @@ migrations/rizika/
   storage.sql               # history, current pointers and public summaries
 ```
 
-The explicit TypeScript registry is the deployable catalogue. At process start it validates unique IDs and versions, dependency names, lifecycle state, parameter schema, public text and the existence/hash of every SQL file. The deployed registry is copied into PostgreSQL for audit and public methodology. The repository remains the source of truth.
+### 5.1 “Typed indicator” and “typed indicator registry”
 
-### 5.1 Example TypeScript definition
+“Typed indicator” is shorthand for a **typed indicator definition**. It is a read-only TypeScript object conforming to the shared `IndicatorDefinition` contract. The object describes how one exact indicator version can be planned, executed, validated, explained and audited. It is metadata and executable wiring around the formula; it is neither the formula's observation rows nor a class with its own scheduler or persistence methods.
 
-The definition contains no scheduling or persistence logic:
+“Typed” describes the definition contract, not the language of the formula. R003 can therefore have a typed TypeScript definition while its actual calculation remains a PostgreSQL `SELECT` in `calculate.sql`.
+
+“Typed” provides two layers of protection:
+
+1. **Compile-time TypeScript checks** reject missing fields, misspelled lifecycle/stage/state literals and incompatible calculator or parameter types during development and CI.
+2. **Startup runtime checks** reject problems TypeScript cannot see, such as duplicate IDs, unresolved/cyclic indicator dependencies, an unreadable SQL file, a changed SQL content hash, invalid database-loaded parameters or public text that violates the required contract.
+
+A **typed indicator registry** is the immutable, explicitly constructed in-process catalogue of all deployed typed indicator definitions. Its key is `(indicator_id, implementation_version)`. Given that key, the planner or worker can retrieve exactly one validated definition. The registry also answers which version is `active`, `shadow` or `retired`, and which other indicators must finish first.
+
+The registry is deliberately not:
+
+- a table of calculated signals;
+- arbitrary TypeScript files discovered by scanning a directory at runtime;
+- an admin-editable formula store;
+- the job queue or scheduler;
+- the public web application's source of results.
+
+The repository definition files are the executable source of truth. On risk-service startup, `createIndicatorRegistry` validates them and calculates a deterministic registry/SQL hash. Each run stores that hash, and an audit snapshot of the definitions is copied to PostgreSQL for methodology/history display. PostgreSQL does not reconstruct executable definitions from that snapshot.
+
+Keep three dependency concepts separate:
+
+| Definition field | Meaning | Affects job ordering? |
+|---|---|---:|
+| `indicatorDependencies` | Results/baseline output of another named indicator version must exist first | Yes |
+| `sourceRelations` | Canonical PostgreSQL facts the calculation reads | No; source watermarks control readiness |
+| `parameterSet` | Effective-dated policy/configuration values selected at `data_as_of` | No; a changed parameter creates affected jobs |
+
+### 5.2 Example typed definition and registry
+
+This abbreviated example shows the contracts, one definition, explicit registration and lookup. The shared runtime contracts validate values that cross a trust boundary, including rows returned by PostgreSQL.
 
 ```ts
-export const R003v2: SqlIndicatorDefinition = {
-  id: 'R003',
-  version: 2,
+type IndicatorLifecycle = 'active' | 'shadow' | 'retired';
+type IndicatorStage = 'planning' | 'tender' | 'award' | 'contract';
+type IndicatorState =
+  | 'triggered'
+  | 'not_triggered'
+  | 'insufficient_data'
+  | 'not_applicable';
+
+type RuntimeContract<T> = Readonly<{
+  validate(value: unknown): T;
+}>;
+
+type IndicatorKey = Readonly<{
+  id: `R${number}` | `LT${number}`;
+  version: number;
+}>;
+
+type IndicatorObservationV1 = Readonly<{
+  indicatorId: IndicatorKey['id'];
+  indicatorVersion: number;
+  subjectType: 'procurement';
+  subjectKey: string;
+  state: IndicatorState;
+  rawValue: number | null;
+  thresholdValue: number | null;
+  evidence: Readonly<Record<string, unknown>>;
+  dataAsOf: string;
+}>;
+
+type R003Parameters = Readonly<{
+  minimumDays: number;
+  methods: readonly string[];
+}>;
+
+type SqlIndicatorDefinition<P> = Readonly<{
+  key: IndicatorKey;
+  engine: 'sql';
+  lifecycle: IndicatorLifecycle;
+  subjectType: 'procurement';
+  stage: IndicatorStage;
+  owner: string;
+  indicatorDependencies: readonly IndicatorKey[];
+  sourceRelations: readonly string[];
+  requiredInputs: readonly string[];
+  parameterSet: Readonly<{
+    id: string;
+    runtimeContract: RuntimeContract<P>;
+  }>;
+  calculation: Readonly<{
+    sqlFile: string;
+  }>;
+  outputContract: RuntimeContract<IndicatorObservationV1>;
+  standard: Readonly<{ name: string; url: string }>;
+  public: Readonly<{ titleLt: string; limitationLt: string }>;
+}>;
+
+type TypeScriptIndicatorDefinition<P> = Readonly<
+  Omit<SqlIndicatorDefinition<P>, 'engine' | 'calculation'> & {
+    engine: 'typescript';
+    calculation: Readonly<{ module: string; exportName: string }>;
+  }
+>;
+
+type IndicatorDefinition =
+  | SqlIndicatorDefinition<unknown>
+  | TypeScriptIndicatorDefinition<unknown>;
+
+export const R003v2 = defineSqlIndicator<R003Parameters>({
+  key: { id: 'R003', version: 2 },
   engine: 'sql',
-  sqlFile: './calculate.sql',
   lifecycle: 'shadow',
   owner: 'procurement-risk',
   subjectType: 'procurement',
   stage: 'tender',
-  dependsOn: ['canonical.procurement_lifecycle_versions', 'parameters.R003'],
+  indicatorDependencies: [],
+  sourceRelations: ['rizika.v_pirkimo_gyvavimo_ciklo_versijos'],
   requiredInputs: ['publicationDate', 'submissionDeadline', 'procurementMethod'],
-  outputContract: 'indicator-observation/v1',
+  parameterSet: {
+    id: 'R003/v2',
+    runtimeContract: r003ParametersContract,
+  },
+  calculation: { sqlFile: './calculate.sql' },
+  outputContract: indicatorObservationV1Contract,
   standard: {
     name: 'OCP Red Flags in Public Procurement 2024',
     url: 'https://www.open-contracting.org/wp-content/uploads/2024/12/OCP2024-RedFlagProcurement.pdf',
@@ -350,12 +497,25 @@ export const R003v2: SqlIndicatorDefinition = {
     titleLt: 'Trumpas pasiūlymų pateikimo terminas',
     limitationLt: 'Trumpesnį laiką gali teisėtai paaiškinti pagreitinta procedūra ar kita išimtis.',
   },
-};
+});
+
+// registry.ts: registration is explicit and reviewable in a pull request.
+const deployedDefinitions = [
+  R003v2,
+  LT002v1,
+] as const satisfies readonly IndicatorDefinition[];
+
+export const indicatorRegistry = createIndicatorRegistry(deployedDefinitions);
+
+// worker.ts: a durable job identifies the exact implementation to execute.
+const definition = indicatorRegistry.require({ id: job.indicatorId, version: job.version });
 ```
 
-Stable stage, state and subject values are TypeScript unions backed by runtime validation. Public text is versioned and reviewed. The web application does not derive explanations from SQL column names.
+`defineSqlIndicator` freezes and type-checks one definition. `createIndicatorRegistry` performs cross-definition and filesystem/hash validation once at startup and exposes read-only lookup methods such as `require`, `activeVersions` and `dependentsOf`. The worker is generic: after lookup it uses `definition.engine`, `definition.calculation` and `definition.outputContract`; adding R003 does not add a `switch ('R003')` branch to the worker.
 
-### 5.2 Example SQL calculation
+`RuntimeContract<T>` is a small project-owned interface with a `validate(unknown): T` operation; it is not a third-party product. Stable stage, lifecycle, state and subject values are TypeScript unions backed by those runtime checks. The real shared `IndicatorObservationV1` contract includes the columns shown in the SQL example below. Public text is versioned and reviewed. The web application does not derive explanations from SQL column names.
+
+### 5.3 Example SQL calculation
 
 The SQL file is one parameterised, read-only `SELECT`. `$1` is the evaluation run ID and `$2` is the reproducible `data_as_of` cutoff. Candidates are prepared generically from source changes; the indicator never decides its own scheduling or writes its result.
 
@@ -411,25 +571,25 @@ FROM evaluated;
 
 The calculation role has `SELECT` only, and the worker also starts a read-only transaction with a statement timeout. Correctness does not depend on trying to parse SQL text for forbidden keywords. Business-day counting, when required, is one shared tested PostgreSQL function backed by an effective-dated Lithuanian calendar.
 
-### 5.3 How the TypeScript and SQL files interact
+### 5.4 How the TypeScript and SQL files interact
 
 ```mermaid
 flowchart TD
-    D[definition.ts<br/>identity + dependencies + contract] --> R[Typed registry bootstrap]
-    Q[calculate.sql<br/>pure parameterised SELECT] --> L[SQL loader + content hash]
-    L --> R
-    F[fixtures.ts + tests] --> C[CI and shadow validation]
-    R --> P[Planner creates durable partition jobs]
-    P --> J[(PostgreSQL job table)]
-    J --> W[TypeScript worker claims a lease]
-    W --> X[Execute SQL in read-only transaction]
-    X --> V[Validate rows against shared runtime contract]
-    V --> S[(Run-scoped staging rows)]
-    S --> G{All required jobs and checks passed?}
+    D[definition.ts<br/>identity + dependencies + contract] -.->|provides versioned execution metadata| R[Typed registry bootstrap]
+    Q[calculate.sql<br/>pure parameterised SELECT] -.->|is loaded and hashed by| L[SQL loader + content hash]
+    L -.->|provides verified SQL implementation| R
+    F[fixtures.ts + tests] -.->|defines expected rows and boundaries| C[CI and shadow validation]
+    R -->|validated definitions and dependency metadata| P[Planner creates durable partition jobs]
+    P -->|idempotent job rows| J[(PostgreSQL job table)]
+    J -->|ready job and lease token| W[TypeScript worker claims a lease]
+    W -->|run context and positional parameters| X[Execute SQL in read-only transaction]
+    X -->|untrusted observation rows| V[Validate rows against shared runtime contract]
+    V -->|validated observation rows| S[(Run-scoped staging rows)]
+    S -->|staged rows and gate status| G{All required jobs and checks passed?}
     G -->|no| N[Record failure; retain active publication]
     G -->|yes| A[Generic TypeScript publisher]
-    A --> H[(history + current + summary)]
-    H --> U[Astro/TypeScript reads only]
+    A -->|atomic append, rebuild and pointer switch| H[(history + current + summary)]
+    H -->|published read-model rows| U[Astro/TypeScript reads only]
 ```
 
 Runtime sequence for one source update:
@@ -460,7 +620,7 @@ sequenceDiagram
 
 `definition.ts` tells the engine which SQL belongs to R003 and what contract it must return. The shared worker loads and executes it. The SQL calculates only; TypeScript validates and persists through generic code. Astro may share public response types, but it never imports the executable indicator registry.
 
-### 5.4 Why the indicator does not write its result
+### 5.5 Why the indicator does not write its result
 
 Keeping calculation and persistence separate gives:
 
@@ -507,13 +667,13 @@ It returns the same observation schema to the shared validator and writes only t
 
 ```mermaid
 flowchart LR
-    M[Versioned indicator specification] --> E{Engine}
+    M[Versioned indicator specification] -.->|selects the declared calculator kind| E{Engine}
     E -->|relational| S[Pure PostgreSQL SELECT]
     E -->|text/graph/model| C[Isolated TypeScript calculator]
-    S --> O[Standard observation relation]
-    C --> O
-    O --> V[Same schema + semantic checks]
-    V --> P[Same atomic publication path]
+    S -->|observation rows| O[Standard observation relation]
+    C -->|observation rows| O
+    O -->|untrusted standardized rows| V[Same schema + semantic checks]
+    V -->|validated run-scoped rows| P[Same atomic publication path]
 ```
 
 ### 6.3 PostgreSQL functions
@@ -1029,15 +1189,15 @@ Activation is an explicit registry transition. Existing history remains linked t
 
 ```mermaid
 flowchart LR
-    PR[Pull request: SQL + TypeScript definition + fixtures] --> CI[Type-check, registry validation, tests, SQL review]
-    CI --> SH[Run v3 as shadow jobs with isolated staging]
-    SH --> CMP[Compare v2 vs v3<br/>coverage, triggers, evidence, cost]
-    CMP --> REV[Methodology/legal/data-owner approval]
-    REV --> BF[Partitioned historical/current backfill]
-    BF --> G{Publication checks pass?}
-    G -->|no| SH
+    PR[Pull request: SQL + TypeScript definition + fixtures] -->|candidate version package| CI[Type-check, registry validation, tests, SQL review]
+    CI -->|approved deployable artefact| SH[Run v3 as shadow jobs with isolated staging]
+    SH -->|v2 and v3 observation sets| CMP[Compare v2 vs v3<br/>coverage, triggers, evidence, cost]
+    CMP -->|comparison report| REV[Methodology/legal/data-owner approval]
+    REV -->|approved version and effective date| BF[Partitioned historical/current backfill]
+    BF -->|validated backfill status| G{Publication checks pass?}
+    G -->|no: defects and failed gates| SH
     G -->|yes| SW[Atomic active-version/publication switch]
-    SW --> KEEP[Retain v2 metadata and observations]
+    SW -->|retired version audit trail| KEEP[Retain v2 metadata and observations]
 ```
 
 ### 10.4 Retiring an indicator
