@@ -256,6 +256,8 @@ atitinkamą `*_LOCATION`):
 | `FAILAIINFO_SQLITE_LOCATION` | Pilnas sujungto failų turinio SQLite failo kelias. |
 | `DOKUMENTAI_SQLITE_LOCATION` | Pilnas dokumentų sidecar SQLite failo kelias. |
 | `OCR_REZULTATAI_SQLITE_LOCATION` | Pilnas OCR rezultatų SQLite failo kelias. |
+| `LITEKO2_LOCATION` | Pasirenkamas nuotolinis LITEKO2 sprendimų sidecar HTTP(S) read endpoint'as. |
+| `LITEKO2_SQLITE_LOCATION` | Pilnas LITEKO2 sprendimų sidecar SQLite failo kelias (`modules/liteko2`). |
 
 PostgreSQL referencinius hash'us galima paketais palyginti su
 SQLite, neatliekant brangaus bendro `COUNT(DISTINCT ...)`:

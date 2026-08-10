@@ -136,6 +136,13 @@ export default {
     // Dokumentų JSON sidecar failai (raktas: md5).
     dokumentaiLocation: undefined,
 
+    // LITEKO2 sprendimų sidecar (modules/liteko2): pilnas API atsakymas,
+    // sprendimo HTML ir iš jo ištrauktas tekstas. Raktas: md5('liteko2:<id>').
+    // Rašymui privalomas `liteko2SqliteLocation`; `liteko2Location` – tik
+    // HTTP(S) read fallback mazguose be lokalaus SQLite.
+    liteko2SqliteLocation: undefined,
+    liteko2Location: undefined,
+
     // e-TAR API atsakymų SQLite sidecar (raktas: md5). Skirtingai nuo aukščiau
     // esančių — ne failų medis, o viena SQLite bazė kataloge, ir tik lokali.
     eTarSidecarDir: "/flashas/viespirkiai/eTar",

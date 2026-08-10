@@ -69,6 +69,8 @@ const ENV_MAP = [
     ["FAILAIINFO_SQLITE_LOCATION", "failaiInfoSqliteLocation", "string"],
     ["DOKUMENTAI_SQLITE_LOCATION", "dokumentaiSqliteLocation", "string"],
     ["OCR_REZULTATAI_SQLITE_LOCATION", "ocrRezultataiSqliteLocation", "string"],
+    ["LITEKO2_LOCATION", "liteko2Location", "string"],
+    ["LITEKO2_SQLITE_LOCATION", "liteko2SqliteLocation", "string"],
 
     ["ENABLE_GRAPH", "enableGraph", "boolean"],
 

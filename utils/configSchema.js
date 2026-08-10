@@ -79,6 +79,8 @@ const configSchema = z.object({
     failaiInfoSqliteLocation: z.string().optional(),
     dokumentaiSqliteLocation: z.string().optional(),
     ocrRezultataiSqliteLocation: z.string().optional(),
+    liteko2Location: z.string().optional(),
+    liteko2SqliteLocation: z.string().optional(),
 
     enableGraph: z.boolean().default(false),
 

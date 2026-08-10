@@ -62,6 +62,9 @@ export interface Config {
     failaiInfoSqliteLocation?: string;
     dokumentaiSqliteLocation?: string;
     ocrRezultataiSqliteLocation?: string;
+    /** LITEKO2 sprendimų sidecar (API JSON + HTML + tekstas), raktas: md5. */
+    liteko2Location?: string;
+    liteko2SqliteLocation?: string;
 
     /** Stateless e-TAR HTML→JSON adapterio bazinis URL (`modules/eTar`). */
     eTarApiUrl: string;

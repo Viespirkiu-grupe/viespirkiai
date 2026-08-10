@@ -6,6 +6,9 @@ import { getNewestPinreg } from "../modules/pinreg/scrapeNewest.js";
 import { nuskaitytiDomregDomena } from "../modules/domenai/scrapeDomreg.js";
 import { litekoScrapeLatestDays } from "../modules/liteko/scrape.js";
 import { surastiNuosprendzioDalyvius } from "../modules/liteko/scrapeContent.js";
+import { nuskaitytiNaujausius as litekoNuskaitytiNaujausius } from "../modules/liteko2/scrape.js";
+import { nuskaitytiSprendimuTurini } from "../modules/liteko2/scrapeContent.js";
+import { sinchronizuotiKlasifikatorius } from "../modules/liteko2/klasifikatoriai.js";
 import { pravalytiOcrRezervacijas } from "../modules/ocr/pravalytiRezervacijas.js";
 import { geolocateJarAddress } from "../modules/juridiniai/findCoordinates.js";
 import { nuskaitytiInformaciniusLeidinius } from "../modules/registruCentrasPranesimai/scrape.js";
@@ -82,6 +85,25 @@ export default [
         cooldown: 60,
         errorCooldown: 10,
         job: surastiNuosprendzioDalyvius,
+    },
+    {
+        // LITEKO2 (naujoji sistema, https://liteko-api-pub.teismas.lt) — sąrašas.
+        name: "scrapeLiteko2",
+        schedule: "30 */6 * * *",
+        job: async () => litekoNuskaitytiNaujausius(),
+    },
+    {
+        name: "scrapeLiteko2Turinys",
+        mode: "asap",
+        priority: 5,
+        cooldown: 60,
+        errorCooldown: 10,
+        job: nuskaitytiSprendimuTurini,
+    },
+    {
+        name: "liteko2Klasifikatoriai",
+        schedule: "15 4 * * *",
+        job: sinchronizuotiKlasifikatorius,
     },
     {
         name: "pravalytiOcrRezervacijas",
