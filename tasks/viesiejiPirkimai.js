@@ -81,7 +81,7 @@ export default [
         concurrency: 1,
         staggerMs: 500,
         cooldown: 5,
-        errorCooldown: 60,
+        errorCooldown: 300,
         job: processOldestCfTDPSWSOffHours,
     },
     {
@@ -91,7 +91,7 @@ export default [
         concurrency: 1,
         staggerMs: 500,
         cooldown: 5,
-        errorCooldown: 60,
+        errorCooldown: 300,
         job: processOldestCfTWSOffHours,
     },
     {
@@ -101,7 +101,7 @@ export default [
         concurrency: 1,
         staggerMs: 500,
         cooldown: 5,
-        errorCooldown: 60,
+        errorCooldown: 300,
         job: processOldestPmcOffHours,
     },
     {

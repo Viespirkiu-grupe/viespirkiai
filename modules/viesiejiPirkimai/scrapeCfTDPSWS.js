@@ -135,6 +135,12 @@ async function fetchText(url) {
         throw error;
     }
 
+    if (response.status >= 500) {
+        const error = new Error(`EPPS HTTP ${response.status}: ${url}`);
+        error.httpStatus = response.status;
+        throw error;
+    }
+
     return response.text();
 }
 
@@ -305,6 +311,10 @@ async function processCfTDPSWSRecord(cft, options = {}) {
             `Nuskaitytas CfTDPSWS id ${cft.pirkimoId} | fetch ${timings.humanDuration("fetchMain")}/${timings.humanDuration("fetchFiles")}/${timings.humanDuration("fetchVersions")} | upsert ${timings.humanDuration("upsertFiles")}/${timings.humanDuration("updatePurchase")} | viso ${timings.humanDuration()}`,
         );
     } catch (error) {
+        // EPPS serverio klaidą turi valdyti Worker errorCooldown. Šiuo atveju
+        // pirkimo nuskaitymo būsenos DB nekeičiame.
+        if (error?.httpStatus >= 500) throw error;
+
         console.error(`Klaida apdorojant pirkimą ID ${cft.pirkimoId}:`, error);
 
         const status = error?.casRedirect ? -404 : -1;
