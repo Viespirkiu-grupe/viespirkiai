@@ -1,0 +1,232 @@
+---
+import Button from '@design-system/components/Button.astro';
+import Layout from '../../layouts/Layout.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import StatChip from '@design-system/components/StatChip.astro';
+import { postgres, parseLimit, getColorScheme, getFont, cleanQuery } from '../../lib/failai.js';
+import { fmtNumber } from '../../lib/formatters.ts';
+import { convertUnit } from '@/utils/units.js';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+const cleaned = cleanQuery(Astro.url);
+if ('redirectTo' in cleaned) return Astro.redirect(cleaned.redirectTo);
+const query = cleaned.query;
+const parsedLimit = parseLimit(query, 100, 1000000);
+if ('error' in parsedLimit) return new Response(parsedLimit.error, { status: 400 });
+const limit = parsedLimit.limit;
+const page = Math.max(1, parseInt(query.page) || 1);
+const offset = (page - 1) * limit;
+const saltinis = query.saltinis || null;
+const slaptazodis = query.slaptazodis === 'yra' || query.slaptazodis === 'nera' ? query.slaptazodis : null;
+
+// „Apsaugoti" = arba teksto atpažinimas grąžino -2 („No password given", žr.
+// modules/failai/nuskaitytiTeksta.js), arba failui yra žinomas slaptažodis
+// atskiroje `filesPasswords` lentelėje (tokių pasitaiko ir su kita būsena — jau
+// atrakintų). Sąrašas surenkamas CTE'ju, kad būtų panaudotas dalinis indeksas
+// filesDataExtraction_status_idx (WHERE status <> 0) ir filesPasswords PK, o ne
+// seq scan per visą `files`.
+const CTE = `
+   WITH apsaugoti AS (
+     SELECT id FROM public."filesDataExtraction" WHERE status = -2
+     UNION
+     SELECT id FROM public."filesPasswords"
+   )`;
+const conditions: string[] = [];
+const params: any[] = [];
+if (saltinis) { params.push(saltinis); conditions.push(`st.title = $${params.length}`); }
+if (slaptazodis === 'yra') conditions.push('p.id IS NOT NULL');
+if (slaptazodis === 'nera') conditions.push('p.id IS NULL');
+const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+const FROM_JOINS = `
+     FROM apsaugoti a
+     JOIN public.files f ON f.id = a.id
+     LEFT JOIN public."filesPasswords" p ON p.id = f.id
+     LEFT JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+     LEFT JOIN public."filesFilenames" fn ON fn.id = f."filenameId"
+     LEFT JOIN public."filesExtensions" e ON e.id = f."extensionId"`;
+const SELECT_COLS = `
+     f.id, fn.filename AS pavadinimas, e.extension,
+     COALESCE(st.title, 'sutartys') AS saltinis, f.filesize AS dydis,
+     p.password AS slaptazodis`;
+
+// Bendros sumos — nepriklauso nuo `slaptazodis` filtro (iš jų sudaromos filtro
+// nuorodos), bet paiso šaltinio filtro.
+const bendriParams: any[] = [];
+const bendrasWhere = saltinis ? `WHERE st.title = $${bendriParams.push(saltinis)}` : '';
+
+const [countRes, sumosRes, saltiniaiRes] = await Promise.all([
+  postgres.query(`${CTE} SELECT COUNT(*) AS total ${FROM_JOINS} ${where}`, params),
+  postgres.query(
+    `${CTE}
+     SELECT COUNT(*)::int AS visi,
+            COUNT(p.id)::int AS "suSlaptazodziu"
+     ${FROM_JOINS} ${bendrasWhere}`,
+    bendriParams
+  ),
+  // „Pagal šaltinį" — visada per visus apsaugotus (veikia ir kaip filtro navigacija).
+  postgres.query(
+    `${CTE}
+     SELECT COALESCE(st.title, 'sutartys') AS saltinis, COUNT(*)::int AS n
+     FROM apsaugoti a
+     JOIN public.files f ON f.id = a.id
+     LEFT JOIN public."filesSourceTitles" st ON st.id = f."sourceTitleId"
+     GROUP BY 1 ORDER BY n DESC`
+  ),
+]);
+
+const total = parseInt(countRes.rows[0].total, 10) || 0;
+const visi = Number(sumosRes.rows[0]?.visi ?? 0);
+const suSlaptazodziu = Number(sumosRes.rows[0]?.suSlaptazodziu ?? 0);
+const beSlaptazodzio = visi - suSlaptazodziu;
+const saltiniai = saltiniaiRes.rows as any[];
+
+// Filtrų nuorodos: paspaudus aktyvią reikšmę — ji išvaloma.
+const buildHref = (patch: { saltinis?: string | null; slaptazodis?: string | null }) => {
+  const next = { saltinis, slaptazodis, ...patch };
+  const parts: string[] = [];
+  if (next.saltinis) parts.push(`saltinis=${encodeURIComponent(next.saltinis)}`);
+  if (next.slaptazodis) parts.push(`slaptazodis=${encodeURIComponent(next.slaptazodis)}`);
+  if (query.limit) parts.push(`limit=${encodeURIComponent(query.limit)}`);
+  return `/failai/encrypted${parts.length ? `?${parts.join('&')}` : ''}`;
+};
+const sourceHref = (s: string) => buildHref({ saltinis: s === saltinis ? null : s });
+const passwordHref = (v: string) => buildHref({ slaptazodis: v === slaptazodis ? null : v });
+
+if (typeof query.csv !== 'undefined') {
+  const csvLimit = Math.min(100000, Math.max(1, parseInt(query.csvLimit) || 10000));
+  const rowsRes = await postgres.query(
+    `${CTE}
+     SELECT ${SELECT_COLS}
+     ${FROM_JOINS}
+     ${where}
+     ORDER BY f.id DESC
+     LIMIT $${params.length + 1}`,
+    [...params, csvLimit]
+  );
+
+  const escapeCsv = (value: unknown) => {
+    if (value == null) return '';
+    const stringValue = String(value);
+    return /[",\n\r]/.test(stringValue) ? `"${stringValue.replace(/"/g, '""')}"` : stringValue;
+  };
+
+  const header = ['id', 'pavadinimas', 'plėtinys', 'saltinis', 'dydis', 'slaptazodis'];
+  const lines = [header.join(',')];
+  for (const row of rowsRes.rows) {
+    lines.push([
+      escapeCsv(row.id),
+      escapeCsv(row.pavadinimas),
+      escapeCsv(row.extension),
+      escapeCsv(row.saltinis),
+      escapeCsv(row.dydis),
+      escapeCsv(row.slaptazodis),
+    ].join(','));
+  }
+
+  return new Response('﻿' + lines.join('\r\n'), {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="encrypted_${new Date().toISOString().slice(0, 10)}.csv"`,
+    },
+  });
+}
+
+const result = await postgres.query(
+  `${CTE} SELECT ${SELECT_COLS} ${FROM_JOINS} ${where}
+   ORDER BY f.id DESC
+   LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+  [...params, limit, offset]
+);
+const files = result.rows as any[];
+const pageCount = Math.max(1, Math.ceil(total / limit));
+const queryParamsRaw = [
+  saltinis && `saltinis=${encodeURIComponent(saltinis)}`,
+  slaptazodis && `slaptazodis=${encodeURIComponent(slaptazodis)}`,
+  query.limit && `limit=${encodeURIComponent(query.limit)}`,
+].filter(Boolean).join('&');
+const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
+const filtruojama = !!(saltinis || slaptazodis);
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=60');
+---
+<Layout
+  pageTitle="Slaptažodžiu apsaugoti failai"
+  pageDescription="Failai, kurių teksto neatpažinom dėl slaptažodžio, ir žinomi jų slaptažodžiai"
+  pageImage="https://viespirkiai.org/failai.png"
+  colorScheme={colorScheme}
+  font={font}
+>
+  <main>
+    <PageHeader>
+      Slaptažodžiu apsaugoti failai
+      <Button slot="actions" href={`/failai/encrypted?csv=true${queryParams}&limit=max`} variant="outline" size="sm">↗ CSV</Button>
+    </PageHeader>
+
+    <div class="enc-chips mb-7">
+      <StatChip href={buildHref({ slaptazodis: null })} label="Visi" count={fmtNumber(visi)} variant={slaptazodis ? 'outline' : 'solid'} />
+      <StatChip href={passwordHref('yra')} label="Slaptažodis žinomas" count={fmtNumber(suSlaptazodziu)} variant={slaptazodis === 'yra' ? 'solid' : 'outline'} />
+      <StatChip href={passwordHref('nera')} label="Slaptažodis nežinomas" count={fmtNumber(beSlaptazodzio)} variant={slaptazodis === 'nera' ? 'solid' : 'outline'} />
+      {/* Šaltinio filtras rodomas tik kai jų iš tikrųjų yra keli — kitaip tai tik triukšmas. */}
+      {saltiniai.length > 1 && saltiniai.map((r: any) => (
+        <StatChip href={sourceHref(r.saltinis)} label={r.saltinis} count={fmtNumber(Number(r.n))} variant={r.saltinis === saltinis ? 'solid' : 'outline'} />
+      ))}
+    </div>
+
+    <div class="stack stack-md">
+      <p class="text-muted text-sm mb-0">
+        {total
+          ? <>Rodoma <strong>{fmtNumber(files.length)}</strong> iš <strong>{fmtNumber(total)}</strong> įrašų</>
+          : 'Įrašų nėra'}
+        {filtruojama && <> · <a href="/failai/encrypted">išvalyti filtrus</a></>}
+      </p>
+
+      <DataTable
+        rows={files}
+        emptyText="Apsaugotų failų nėra."
+        columns={[
+          { label: 'Id' },
+          { label: 'Pavadinimas' },
+          { label: 'Plėtinys' },
+          { label: 'Dydis', headerClassName: 'cell-right' },
+          { label: 'Slaptažodis' },
+        ]}
+      >
+        {files.map((file: any) => (
+          <tr>
+            <td class="cell-mono"><a href={`/failas/${file.id}`}>{file.id}</a></td>
+            <td class="enc-col-name"><span class="cell-truncate">{file.pavadinimas || '—'}</span></td>
+            <td class="cell-mono">{file.extension || '—'}</td>
+            <td class="cell-mono cell-right cell-nowrap">{file.dydis != null ? convertUnit(Number(file.dydis), 'B') : '—'}</td>
+            <td class="enc-col-password">
+              {file.slaptazodis
+                ? <span class="cell-mono">{file.slaptazodis}</span>
+                : <span class="text-muted">—</span>}
+            </td>
+          </tr>
+        ))}
+      </DataTable>
+
+      <Pagination currentPage={page} pageCount={pageCount} queryParams={queryParams} />
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .enc-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .enc-col-name {
+    max-width: 48ch;
+  }
+
+  .enc-col-password {
+    max-width: 24ch;
+    word-break: break-all;
+  }
+</style>
