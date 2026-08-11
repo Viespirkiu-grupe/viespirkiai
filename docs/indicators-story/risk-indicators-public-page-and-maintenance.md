@@ -14,7 +14,7 @@ Parent design: [Risk signals for current and recently completed procurements](ri
 2. The OCP code is retained for an OCP indicator, for example `R003`. A Lithuania-specific indicator gets an `LT` code, for example `LT001`; it must not be presented as an OCP indicator.
 3. A public result is called a **risk signal** (`rizikos signalas`), not a finding of corruption or fraud.
 4. There is no unexplained corruption probability. The list may have transparent **attention points** for sorting, while signal strength, evidence confidence and data coverage remain separate.
-5. A **Risk Indicator** is a versioned package consisting of metadata, public explanation, parameters, calculation and tests.
+5. A **Risk Indicator** is a versioned package consisting of metadata, public explanation, effective-dated parameters, calculation and tests. The package lives entirely in the Git repository.
 6. A SQL Risk Indicator is a pure `SELECT`. It never contains its own `INSERT`, `UPDATE`, `DELETE`, table creation or transaction control.
 7. Risk calculation is an independently deployed **Procurement Risk Service** backed by durable PostgreSQL control tables. The existing application task runner is not an architectural dependency.
 8. PostgreSQL views provide canonical facts; they are not the persisted risk result and should not run the complete risk system during a web request.
@@ -22,6 +22,7 @@ Parent design: [Risk signals for current and recently completed procurements](ri
 10. The design uses no separate analytics or orchestration platform. PostgreSQL provides durable coordination and computation; TypeScript provides the registry, execution, validation and operational control.
 11. The system has exactly three processes with separate lifecycles and separate database roles: **Data Ingestion**, **Risk Indicators Processing** and **Risk Indicators Visualisation**. They exchange nothing but committed PostgreSQL rows.
 12. Risk Indicators Processing is one **single sequential job**. It executes the applicable Risk Indicators one after another. Parallel workers, leases, fencing tokens and horizontal scaling are deliberately out of scope for this design; they can be added later without changing any stored contract described here.
+13. **Git is the only home of a Risk Indicator.** There are no database tables for indicator identity, versions, public wording, lifecycle state or parameter values. `git log`, `git blame` and a pull-request diff answer who changed which threshold, when and why. PostgreSQL stores results and run control state; it never stores the definition of an indicator.
 
 The OCP guide describes an indicator through its definition, reason for being a red flag, required data, method, unit of analysis, procurement stage, example and source. The local indicator package preserves these fields and adds operational fields: implementation version, parameters, lifecycle state, owner, tests, public wording and known limitations.
 
@@ -46,10 +47,16 @@ Process 2 supplies the operational guarantees normally expected from a data orch
 
 ### 1.2 Deployment view
 
-Outer boxes with a `Node:` prefix are deployment nodes (hosts). Inner boxes are the three processes and their components. Cylinders are storage areas — the two schemas of the existing `viespirkiai` database. Solid arrows leaving a process are database connections, labelled with the role used and what crosses the wire. Dotted arrows are in-process calls and stay inside one node.
+Outer boxes with a `Node:` prefix are deployment nodes (hosts). Inner boxes are the three processes and their components. Cylinders are storage areas — the two schemas of the existing `viespirkiai` database. Solid arrows leaving a process are database connections, labelled with the role used and what crosses the wire. Dotted arrows are in-process calls and stay inside one node. The Git repository is drawn as a deployment artefact source: it is not reachable at runtime, it is what the two Node processes are built from.
 
 ```mermaid
 flowchart TB
+    subgraph nGit["Artefact source: Git repository"]
+        gDef["modules/rizika/indikatoriai/**<br/>definition.ts · parameters.ts · calculate.sql · tests"]
+        gCat["modules/rizika/katalogas.generated.json<br/>public metadata of every version"]
+        gDef -.->|"generated and verified in CI"| gCat
+    end
+
     subgraph nIngest["Node: ingestion host"]
         subgraph pIng["Process 1 — Data Ingestion (tasks/index.js)"]
             pIngest["Procurement data collectors"]
@@ -58,13 +65,13 @@ flowchart TB
 
     subgraph nRisk["Node: risk host"]
         subgraph pRisk["Process 2 — Risk Indicators Processing (Procurement Risk Service)"]
-            pReg["Risk Indicators Registry"]
+            pReg["Risk Indicators Registry<br/>built in memory at startup"]
             pPlan["Risk Run Planner"]
             pJob["Risk Indicators Run Job<br/>sequential, one indicator at a time"]
             pVal["Risk Signal Validator"]
             pPub["Risk Signals Publisher"]
             pReg -.->|"execution order"| pPlan
-            pReg -.->|"version, calculation, contracts"| pJob
+            pReg -.->|"version, calculation, effective parameters, contracts"| pJob
             pPlan -.-> pJob -.-> pVal -.-> pPub
         end
     end
@@ -81,53 +88,58 @@ flowchart TB
             dView["Canonical views<br/>v_pirkimas, v_sutartys, v_dalyviai"]
             dSrc -.->|"selected by"| dView
         end
-        subgraph sRizika["Schema rizika — risk indicators data"]
-            dCat[("A. Catalogue<br/>indikatoriai<br/>indikatoriu_versijos<br/>indikatoriu_parametrai")]
-            dCtl[("B. Control<br/>saltinio_ivykiai, vertinimo_vykdymai<br/>vertinimo_darbai, vertinimo_darbu_bandymai<br/>publikacijos, sistemos_busena")]
-            dStg[("C. Staging<br/>signalu_tarpiniai_rezultatai")]
-            dRes[("D. Published results<br/>signalu_istorija<br/>signalai_dabartiniai<br/>pirkimu_santraukos")]
+        subgraph sRizika["Schema rizika — risk results and run control only"]
+            dCtl[("A. Control<br/>saltinio_ivykiai, vertinimo_vykdymai<br/>vertinimo_darbai, vertinimo_darbu_bandymai<br/>publikacijos, sistemos_busena")]
+            dStg[("B. Staging<br/>signalu_tarpiniai_rezultatai")]
+            dRes[("C. Published results<br/>signalu_istorija<br/>signalai_dabartiniai<br/>pirkimu_santraukos")]
         end
     end
+
+    gDef ==>|"deployed as code at commit X"| pReg
+    gCat ==>|"imported as static data at build"| pWeb
 
     pIngest -->|"viespirkiai_rw: normalised source rows"| dSrc
     pIngest -->|"viespirkiai_rw: change event + watermark, same transaction"| dCtl
 
     pPlan -->|"rizika_rw: read outbox, open run, insert ordered work items"| dCtl
     pJob -->|"rizika_calc: read-only SELECT of facts as of cutoff"| dView
-    pJob -->|"rizika_calc: indicator version and effective parameters"| dCat
     pJob -->|"rizika_rw: take next work item, record attempt"| dCtl
     pVal -->|"rizika_rw: validated candidate observations"| dStg
     pPub -->|"rizika_rw: read staged rows, gate on run state"| dStg
     pPub -->|"rizika_rw: append history, rebuild current and summary"| dRes
-    pPub -->|"rizika_rw: publication row + active pointer"| dCtl
-    pReg -->|"rizika_rw: audited catalogue snapshot at startup"| dCat
+    pPub -->|"rizika_rw: publication row + active pointer, stamped with commit X"| dCtl
 
     pWeb -->|"rizika_ro: active publication only"| dRes
-    pWeb -->|"rizika_ro: methodology, versions, parameter history"| dCat
     pWeb -->|"viespirkiai_ro: procurement record"| dView
 ```
 
-Four database roles make the separation enforceable rather than conventional:
+Note what is missing from the database: nothing in `rizika` describes what an indicator *is*. The service learns that from the code it was deployed with, and stamps every run and publication with that commit.
+
+Three database roles make the process separation enforceable rather than conventional:
 
 | Role | Used by | Grants |
 |---|---|---|
 | `viespirkiai_rw` | Process 1 | Read/write on `public`; `INSERT` on `rizika.saltinio_ivykiai` and the watermark table only |
-| `rizika_calc` | Process 2, during a calculation | `SELECT` only, on `public` canonical views and `rizika` catalogue; used inside a read-only transaction with a statement timeout |
+| `rizika_calc` | Process 2, during a calculation | `SELECT` only, on the `public` canonical views; used inside a read-only transaction with a statement timeout |
 | `rizika_rw` | Process 2, for planning, staging and publication | Read/write on `rizika` control, staging and published results; no write grant on `public` |
-| `rizika_ro` / `viespirkiai_ro` | Process 3 | `SELECT` on `rizika` published results and catalogue, and on `public` canonical views; nothing else |
+| `rizika_ro` / `viespirkiai_ro` | Process 3 | `SELECT` on `rizika` published results and the `public` canonical views; nothing else |
+
+Because the definition is code, the two Node processes must agree on it. A new indicator version is activated only after both Process 2 and Process 3 run the same commit; §10.1 makes this a step in the workflow. If a page nevertheless meets an observation whose version is absent from its catalogue artefact, it degrades to the indicator code plus the evidence stored on the observation instead of inventing wording.
 
 #### 1.2.1 Storage areas
 
-The `rizika` schema is deliberately split into four areas with different visibility and retention. Section 7 gives the full DDL.
+Risk data lives in four places, and only three of them are in PostgreSQL. Section 5 defines the Git package; section 7 gives the DDL for the rest.
 
-| Area | Tables | Written by | Visible to visualisation | Retention |
-|---|---|---|---|---|
-| **A. Catalogue** | `indikatoriai`, `indikatoriu_versijos`, `indikatoriu_parametrai` | Migrations plus the Risk Indicators Registry snapshot at service startup; parameters by reviewed deployment | Yes — methodology page, version and threshold history | Forever; rows are closed, never edited |
-| **B. Control** | `saltinio_ivykiai`, `vertinimo_vykdymai`, `vertinimo_kandidatai`, `vertinimo_darbai`, `vertinimo_darbu_bandymai`, `publikacijos`, `sistemos_busena` | Data Ingestion (outbox only) and Risk Indicators Processing | Only `publikacijos.duomenys_iki` and watermarks, for the freshness label | Rolling window; old attempts and consumed events are pruned |
-| **C. Staging** | `signalu_tarpiniai_rezultatai` | Risk Indicators Processing | No — never queried by the web process | Deleted after the run publishes or is abandoned |
-| **D. Published results** | `signalu_istorija`, `signalai_dabartiniai`, `pirkimu_santraukos` | Risk Signals Publisher only, in one transaction | Yes — this is the public read model | History forever; current and summary are rebuilt per publication |
+| Area | Where | Contents | Written by | Visible to visualisation | Retention |
+|---|---|---|---|---|---|
+| **Definitions** | Git — `modules/rizika/indikatoriai/**` | Identity, versions, lifecycle, public wording, effective-dated parameters, calculation, tests | A reviewed and merged pull request | Yes, via the generated catalogue artefact built into the web bundle | Forever, as repository history |
+| **A. Control** | `rizika` | `saltinio_ivykiai`, `vertinimo_vykdymai`, `vertinimo_kandidatai`, `vertinimo_darbai`, `vertinimo_darbu_bandymai`, `publikacijos`, `sistemos_busena` | Data Ingestion (outbox only) and Risk Indicators Processing | Only `publikacijos.duomenys_iki` and watermarks, for the freshness label | Rolling window; old attempts and consumed events are pruned |
+| **B. Staging** | `rizika` | `signalu_tarpiniai_rezultatai` | Risk Indicators Processing | No — never queried by the web process | Deleted after the run publishes or is abandoned |
+| **C. Published results** | `rizika` | `signalu_istorija`, `signalai_dabartiniai`, `pirkimu_santraukos` | Risk Signals Publisher only, in one transaction | Yes — this is the public read model | History forever; current and summary are rebuilt per publication |
 
-The important property is the one-way flow **A + facts → B → C → D**. A calculation reads A and the `public` schema, plans through B, stages into C, and only a passing publication gate moves rows into D. Nothing the public can see is ever written by an indicator formula.
+The important property is the one-way flow **definitions + facts → A → B → C**. A calculation reads the deployed definition and the `public` schema, plans through A, stages into B, and only a passing publication gate moves rows into C. Nothing the public can see is ever written by an indicator formula, and nothing in PostgreSQL can change what an indicator means.
+
+Because definitions are not in the database, a published observation must be self-sufficient: it stores the indicator ID, the implementation version, the exact parameter values that were applied, the code commit and the evidence. That row can be re-explained years later even if the indicator has since been retired from the repository.
 
 ### 1.3 Data flow across the three processes
 
@@ -146,6 +158,7 @@ flowchart LR
     end
 
     subgraph processing["Process 2 — Risk Indicators Processing"]
+        M["Git: Risk Indicator definitions<br/>and effective-dated parameters"]
         G["Risk Indicators Registry"]
         L["Risk Run Planner"]
         K["Risk Indicators Run Job"]
@@ -153,13 +166,13 @@ flowchart LR
         X["Risk Indicator TypeScript calculation"]
         T["Risk Signal Validator"]
         P["Risk Signals Publisher"]
+        M -.->|"deployed code, loaded and hashed at startup"| G
         G -.->|"declares versions and execution order"| L
         G -.->|"maps a work item to its implementation"| K
         G -.->|"declares expected SQL hash and output contract"| T
     end
 
     subgraph storage["Schema rizika — written only by Process 2"]
-        M[("Risk Indicator parameters")]
         J[("Evaluation runs and work items")]
         Z[("Run-scoped staging")]
         H[("Risk signal history")]
@@ -176,12 +189,10 @@ flowchart LR
     W -->|"latest complete source positions"| L
     L -->|"one run plus idempotent work items"| J
     J -->|"next ready work item"| K
-    K -->|"run ID, cutoff and candidate set"| I
-    K -->|"run ID, cutoff and candidate set"| X
+    K -->|"run ID, cutoff, candidate set and effective parameters"| I
+    K -->|"run ID, cutoff, candidate set and effective parameters"| X
     C -->|"canonical facts as of cutoff"| I
     C -->|"canonical facts as of cutoff"| X
-    M -->|"effective parameter values"| I
-    M -->|"effective parameter values"| X
     I -->|"standard observation rows"| T
     X -->|"standard observation rows"| T
     T -->|"validated rows and check status"| Z
@@ -204,8 +215,8 @@ Every component named above has one concrete role:
 | Canonical procurement facts | 1 | PostgreSQL tables and views in `public` | Present procurements, notices, lots, bids, awards, contracts, buyers and suppliers with stable keys and `valid_from`/`valid_to` semantics. They are the reproducible facts read at `data_as_of`. |
 | Procurement change outbox | 1 → 2 | Append-only table `rizika.saltinio_ivykiai` | Durably records which source entities changed. It is the hand-off from ingestion to risk planning and prevents a committed source change from being lost between processes. |
 | Ingestion watermarks | 1 → 2 | PostgreSQL rows | Record the latest complete position and time per source. A run stores the watermarks it used, so the public freshness label and a later replay refer to the same source state. |
-| Risk Indicator parameters | 2 | Effective-dated rows in `rizika.indikatoriu_parametrai` | Hold reviewed thresholds, method scopes, legal dates and exclusions separately from executable code. The run cutoff selects the applicable row; editing a parameter never silently rewrites historical results. |
-| Risk Indicators Registry | 2 | Immutable in-process TypeScript catalogue, with an audited snapshot copied to PostgreSQL | Resolves `(indicator ID, version)` to one validated Risk Indicator: implementation, subject, lifecycle, inputs, dependencies, parameter contract, output contract and public methodology. It holds no procurement result rows and schedules nothing. Section 5 defines it precisely. |
+| Risk Indicator parameters | 2 | Effective-dated entries in `parameters.ts`, versioned in Git | Hold reviewed thresholds, method scopes, legal dates and exclusions in a file separate from the formula. The run cutoff selects the applicable entry; adding an entry never rewrites historical results, and `git blame` shows who approved the change. |
+| Risk Indicators Registry | 2 | Immutable in-process TypeScript catalogue, built from the deployed code at startup | Resolves `(indicator ID, version)` to one validated Risk Indicator: implementation, subject, lifecycle, inputs, dependencies, effective parameters, output contract and public methodology. It holds no procurement result rows, writes nothing to the database and schedules nothing. Section 5 defines it precisely. |
 | Risk Run Planner | 2 | TypeScript module inside the Procurement Risk Service | Consumes change events and watermarks, expands them into affected subjects, orders indicators by their declared prerequisites, and inserts idempotent work-item rows. It executes no formula. |
 | Evaluation runs and work items | 2 | PostgreSQL control tables | Store queued/running/succeeded/failed work, retry history and run state. This is the recoverable coordination truth; an in-memory list is only an optimisation. |
 | Risk Indicators Run Job | 2 | One sequential TypeScript loop, single instance guaranteed by an advisory lock | Takes the next ready work item in planned order, resolves the exact registry version, invokes the declared calculation with a run ID, cutoff and candidate set, and records the attempt outcome. It contains no indicator-specific branch and never runs two indicators at once. |
@@ -214,9 +225,9 @@ Every component named above has one concrete role:
 | Risk Signal Validator | 2 | Shared TypeScript validation module plus database permissions | Before execution, verifies the packaged SQL hash. After execution, validates field types, allowed states, subject and indicator identity, evidence size, duplicate keys and cross-row invariants. SQL safety comes from a read-only role, a read-only transaction and a timeout — not from keyword parsing. |
 | Run-scoped staging | 2 | `rizika.signalu_tarpiniai_rezultatai`, keyed by run, indicator, version and subject | Holds validated candidate observations and gates them before publication. Rows are invisible to the visualisation process until the complete publication passes. |
 | Risk Signals Publisher | 2 | Shared TypeScript module issuing indicator-independent PostgreSQL statements | Confirms every required work item and gate succeeded, appends immutable history, rebuilds current and summary rows and advances the singleton active-publication pointer in one short transaction. It contains no `if (indicatorId === ...)` logic. |
-| Risk signal history | 2 → 3 | Append-only `rizika.signalu_istorija` | Preserves each published state, evidence, indicator and parameter version, source watermarks, run and `data_as_of` for audit and history queries. |
+| Risk signal history | 2 → 3 | Append-only `rizika.signalu_istorija` | Preserves each published state, evidence, indicator version, the exact parameter values applied, the code commit, source watermarks, run and `data_as_of` for audit and history queries. |
 | Current signals and procurement summary | 2 → 3 | Current-pointer tables and denormalised read model | Expose only the active successful publication, with list-page counts, filters, ordering fields and current signal details. Failed or partial runs never replace them. |
-| Astro read-only routes | 3 | Existing web application using a read-only role | Query only the published read models and catalogue, authorise no calculation work, and shape stable page and API responses. They do not import the registry. |
+| Astro read-only routes | 3 | Existing web application using a read-only role | Query only the published read models, read indicator wording from the generated catalogue artefact, authorise no calculation work, and shape stable page and API responses. They do not import the registry or any calculation code. |
 | Public risk pages and API | 3 | Browser-visible HTML and public JSON | Display the list, procurement detail and methodology with evidence, freshness and “signal is not proof” wording. They never receive control tables, credentials or private review notes. |
 
 PostgreSQL `LISTEN/NOTIFY` may reduce polling latency between processes, but a notification is only a wake-up hint; the committed outbox and work-item rows are the durable truth.
@@ -384,7 +395,7 @@ Every public signal expands to the same sections:
 - **Kontekstas** — comparison sample, if relevant;
 - **Šaltiniai** — links, identifiers and data-as-of time;
 - **Apribojimai** — common legitimate explanations and known data gaps;
-- **Metodika** — indicator ID, implementation version and parameter version.
+- **Metodika** — indicator ID, implementation version and the effective date of the parameter entry that was applied.
 
 The page renders these fields from structured evidence. Indicator code must not construct arbitrary HTML.
 
@@ -432,49 +443,99 @@ Example catalogue row:
 
 Opening it shows the original OCP definition, the local profile, required data, exact SQL-style formula, exclusions, parameters, example, limitations, owner and validation date.
 
+Everything on this page except the statistics comes from `katalogas.generated.json`, the artefact generated from the indicator directories and shipped inside the web bundle. The statistics come from the published read models. This is what lets the methodology page describe retired versions and versions with zero current signals: the catalogue is the deployed code, not a summary of the results table. Where the repository is public, each entry can link directly to the directory and to the commit history of its thresholds.
+
 ## 5. What exactly is one Risk Indicator?
 
-A **Risk Indicator** is the policy concept and reproducible test that turns public procurement facts into one of four states: `triggered`, `not_triggered`, `insufficient_data` or `not_applicable`. It is not one database statement and it is not the result row. Its maintained implementation is a small versioned package:
+A **Risk Indicator** is the policy concept and reproducible test that turns public procurement facts into one of four states: `triggered`, `not_triggered`, `insufficient_data` or `not_applicable`. It is not one database statement and it is not the result row.
+
+Concretely, **a Risk Indicator is one directory in the Git repository**. Everything that defines it — what it means, when it applies, which thresholds it uses since which date, how it calculates, and what its public explanation says — is a file in that directory. Nothing about it lives in the database. Its whole lifecycle, from `draft` to `retired`, is a sequence of reviewed commits.
+
+### 5.1 The Risk Indicator directory
 
 ```text
-Risk Indicator R003 v2
-├── definition: identity, contracts and metadata
-├── public Lithuanian explanation and limitations
-├── required inputs, dependencies and applicability rules
-├── effective-dated parameter contract
-├── calculation implementation
-│   └── normally one pure SQL SELECT
-├── shared observation output contract
-├── deterministic fixtures and expectations
-└── review, lifecycle and code-hash metadata
+modules/rizika/indikatoriai/R003/          ← one directory = one Risk Indicator
+│
+├── definition.ts        WHAT IT IS. The single exported object all other
+│   │                    components resolve. Contains:
+│   ├── key              identity: { id: 'R003', version: 2 } — stamped on every
+│   │                    observation this indicator ever produces
+│   ├── lifecycle        'draft' | 'shadow' | 'active' | 'retired' — changing this
+│   │                    line is what activates or retires the indicator
+│   ├── engine           'sql' | 'typescript' — exactly one calculation kind
+│   ├── stage            'planning' | 'tender' | 'award' | 'contract'
+│   ├── subjectType      what one result row is about: 'procurement', 'lot', ...
+│   ├── owner            responsible team, mirrored by CODEOWNERS on this directory
+│   ├── standard         OCP citation: document name, URL and page
+│   ├── public           WHAT THE PUBLIC READS. titleLt, descriptionLt,
+│   │                    limitationLt, formulaLt — the only text the web renders
+│   ├── requiredInputs   fields that must be present, else 'insufficient_data'
+│   ├── applicability    scope rules that decide 'not_applicable'
+│   ├── sourceRelations  canonical views the calculation may read
+│   ├── indicatorDeps    other (id, version) that must run before this one
+│   └── outputContract   runtime validation of the rows the calculation returns
+│
+├── parameters.ts        WHAT IT COMPARES AGAINST. An append-only, effective-dated
+│   │                    timeline kept in its own file so a threshold change is a
+│   │                    one-line, reviewable, blameable diff:
+│   └── entries[]        { validFrom, validTo, scope: { methods, objectTypes },
+│                          values: { minimumDays: 10, ... }, source, note }
+│
+├── calculate.sql        HOW IT CALCULATES (engine 'sql'). One pure, parameterised
+│                        SELECT: $1 run ID, $2 data_as_of, $3 effective parameters.
+│                        Never INSERT/UPDATE/DELETE, never its own transaction.
+│   or
+├── calculate.ts         HOW IT CALCULATES (engine 'typescript'). Same inputs, same
+│                        observation contract. Used only for text, graph or model
+│                        work that does not fit relational SQL.
+│
+├── fixtures.ts          PROOF IT IS RIGHT. Deterministic input rows for the
+│                        triggered / not-triggered / insufficient / not-applicable
+│                        cases, boundary values and effective-date transitions.
+├── calculate.test.ts    Assertions over those fixtures, run in CI.
+│
+└── README.md            Optional reviewer context: interpretation notes, known
+                         false positives, decisions taken during review.
 ```
 
-Recommended repository files:
+Read that as the definition of the entity: **identity + lifecycle + public wording + applicability + parameter timeline + exactly one calculation + tests**. A file missing from this directory is a property the indicator does not have; a change to any file in it is a change to the indicator, visible in one `git log modules/rizika/indikatoriai/R003/`.
+
+The rest of the repository is shared machinery that every indicator reuses and no indicator owns:
 
 ```text
-modules/rizika/indikatoriai/R003/
-  definition.ts            # identity, dependencies, contracts and public wording
-  calculate.sql            # pure, parameterised SELECT
-  fixtures.ts              # deterministic edge cases
-  calculate.test.ts        # output and boundary tests
 modules/rizika/
-  contracts.ts             # shared observation and run contracts
-  registry.ts              # explicit imports of every Risk Indicator version
-  sqlLoader.ts             # loads and hashes packaged SQL at process start
+  contracts.ts               # shared observation and run contracts
+  registry.ts                # explicit imports of every Risk Indicator version
+  sqlLoader.ts               # loads and hashes packaged SQL at process start
+  katalogas.generated.json   # public metadata of all versions, generated from the
+                             # definitions, committed, verified in CI, imported by Astro
 services/procurement-risk/
-  index.ts                 # Procurement Risk Service entry point and single-instance lock
-  planner.ts               # change outbox -> durable work items
-  runJob.ts                # sequential execution of Risk Indicators, retries
-  validate.ts              # runtime output and cross-row checks
-  publish.ts               # generic atomic publication
-  reconcile.ts             # repairs abandoned or missed work
+  index.ts                   # service entry point and single-instance advisory lock
+  planner.ts                 # change outbox -> durable work items
+  runJob.ts                  # sequential execution of Risk Indicators, retries
+  validate.ts                # runtime output and cross-row checks
+  publish.ts                 # generic atomic publication
+  reconcile.ts               # repairs abandoned or missed work
 migrations/rizika/
-  catalogue.sql            # indicators, versions and parameters
-  control.sql              # outbox, runs, work items, attempts and publications
-  storage.sql              # history, current pointers and public summaries
+  control.sql                # outbox, runs, work items, attempts and publications
+  storage.sql                # history, current pointers and public summaries
 ```
 
-### 5.1 The Risk Indicator and the Risk Indicators Registry
+There is no `catalogue.sql` migration. The catalogue is the set of directories above.
+
+#### 5.1.1 Why Git and not database tables
+
+An earlier draft of this design mirrored identity, versions and parameters into `rizika` tables. That is removed. Keeping the whole entity in Git gives:
+
+- **One audit trail instead of two.** `git log -p modules/rizika/indikatoriai/R003/parameters.ts` shows who raised a threshold, when, in which pull request, with what justification in the commit message. No separate `patvirtino`/`patvirtinta_at` columns to keep honest.
+- **No drift.** A code hash that must match a database row is a class of incident that now cannot happen, because there is no row to disagree with.
+- **Atomic review.** Formula, threshold, public wording and tests change in one pull request and one CODEOWNERS approval. Previously a threshold could be changed in production without touching the repository.
+- **Trivial rollback.** Reverting a commit reverts the indicator, including its wording and thresholds.
+- **A smaller schema.** Three tables, two foreign-key chains and the startup snapshot step disappear.
+
+The cost is accepted deliberately: a threshold change requires a deployment rather than an `UPDATE`, and the two Node processes must run the same commit before a new version is activated. For a public-transparency system where every threshold must be explainable and attributable, that is the right trade.
+
+### 5.2 The Risk Indicators Registry
 
 A **Risk Indicator definition** is a read-only TypeScript object conforming to the shared `RiskIndicator` contract. It describes how one exact indicator version is planned, executed, validated, explained and audited. It is metadata and executable wiring around the formula; it is neither the formula's observation rows nor a class with its own scheduler or persistence methods.
 
@@ -483,7 +544,7 @@ The definition is written in TypeScript regardless of what language the formula 
 Expressing the definition as a checked TypeScript type gives two layers of protection:
 
 1. **Compile-time checks** reject missing fields, misspelled lifecycle, stage or state literals and incompatible calculator or parameter types during development and CI.
-2. **Startup runtime checks** reject problems the compiler cannot see: duplicate IDs, unresolved or cyclic indicator dependencies, an unreadable SQL file, a changed SQL content hash, invalid database-loaded parameters, or public text that violates the required contract.
+2. **Startup runtime checks** reject problems the compiler cannot see: duplicate IDs, unresolved or cyclic indicator dependencies, an unreadable SQL file, a changed SQL content hash, overlapping or gapped parameter validity ranges, or public text that violates the required contract.
 
 The **Risk Indicators Registry** is the immutable, explicitly constructed in-process catalogue of every deployed Risk Indicator definition. Its key is `(indicator_id, implementation_version)`. Given that key, the Risk Run Planner or the Risk Indicators Run Job retrieves exactly one validated definition. The registry also answers which version is `active`, `shadow` or `retired`, and in which order the indicators must execute.
 
@@ -495,7 +556,7 @@ The registry is deliberately not:
 - the work queue or scheduler;
 - the visualisation process's source of results.
 
-The repository definition files are the executable source of truth. When the Procurement Risk Service starts, `createRiskIndicatorRegistry` validates them and calculates a deterministic registry and SQL hash. Each run stores that hash, and an audit snapshot of the definitions is copied to the `rizika` catalogue for methodology and history display. PostgreSQL does not reconstruct executable definitions from that snapshot.
+The repository definition files are the only source of truth. When the Procurement Risk Service starts, `createRiskIndicatorRegistry` validates them and calculates a deterministic registry hash covering every definition, parameter timeline and SQL file. Each run and publication stores that hash together with the code commit, so any published result can be traced back to the exact repository state that produced it. Nothing is written to a catalogue table, because there is none.
 
 Keep three dependency concepts separate:
 
@@ -503,11 +564,11 @@ Keep three dependency concepts separate:
 |---|---|---:|
 | `indicatorDependencies` | Results or baseline output of another named indicator version must exist first | Yes — the run job executes prerequisites earlier in the same run |
 | `sourceRelations` | Canonical PostgreSQL facts the calculation reads | No; ingestion watermarks control readiness |
-| `parameterSet` | Effective-dated policy values selected at `data_as_of` | No; a changed parameter creates affected work items |
+| `parameters` | Effective-dated policy values from `parameters.ts`, selected at `data_as_of` | No; a deployed parameter change creates affected work items |
 
 Because execution is sequential, `indicatorDependencies` is simply a topological sort applied once by the planner: the run job walks the resulting list in order and stops the run if a prerequisite failed.
 
-### 5.2 Example Risk Indicator definition and registry
+### 5.3 Example Risk Indicator definition and registry
 
 This abbreviated example shows the contracts, one definition, explicit registration and lookup. The shared runtime contracts validate values that cross a trust boundary, including rows returned by PostgreSQL.
 
@@ -543,7 +604,21 @@ type RiskObservationV1 = Readonly<{
 
 type R003Parameters = Readonly<{
   minimumDays: number;
-  methods: readonly string[];
+  dayCounting: 'calendar_days' | 'business_days';
+}>;
+
+// One effective-dated entry of a parameter timeline. Adding an entry is the only
+// way to change a threshold; entries are never edited or deleted.
+type ParameterEntry<P> = Readonly<{
+  validFrom: string;
+  validTo: string | null;
+  scope: Readonly<{
+    methods?: readonly string[];
+    objectTypes?: readonly string[];
+  }>;
+  values: P;
+  source: string;
+  note?: string;
 }>;
 
 type SqlRiskIndicator<P> = Readonly<{
@@ -556,10 +631,8 @@ type SqlRiskIndicator<P> = Readonly<{
   indicatorDependencies: readonly RiskIndicatorKey[];
   sourceRelations: readonly string[];
   requiredInputs: readonly string[];
-  parameterSet: Readonly<{
-    id: string;
-    runtimeContract: RuntimeContract<P>;
-  }>;
+  parameters: readonly ParameterEntry<P>[];
+  parameterContract: RuntimeContract<P>;
   calculation: Readonly<{
     sqlFile: string;
   }>;
@@ -579,6 +652,20 @@ type RiskIndicator =
   | SqlRiskIndicator<unknown>
   | TypeScriptRiskIndicator<unknown>;
 
+// parameters.ts — the effective-dated timeline. Append entries; never edit one.
+// A git diff of this file is the complete history of "who changed which threshold".
+export const r003Parameters: readonly ParameterEntry<R003Parameters>[] = [
+  {
+    validFrom: '2026-07-01',
+    validTo: null,
+    scope: { methods: ['Atviras konkursas'], objectTypes: ['Prekės', 'Paslaugos'] },
+    values: { minimumDays: 10, dayCounting: 'calendar_days' },
+    source: 'approved Lithuanian procurement-rule profile',
+    note: 'Demonstration value pending legal review.',
+  },
+];
+
+// definition.ts
 export const R003v2 = defineSqlRiskIndicator<R003Parameters>({
   key: { id: 'R003', version: 2 },
   engine: 'sql',
@@ -587,12 +674,10 @@ export const R003v2 = defineSqlRiskIndicator<R003Parameters>({
   subjectType: 'procurement',
   stage: 'tender',
   indicatorDependencies: [],
-  sourceRelations: ['rizika.v_pirkimo_gyvavimo_ciklo_versijos'],
+  sourceRelations: ['public.v_pirkimo_gyvavimo_ciklo_versijos'],
   requiredInputs: ['publicationDate', 'submissionDeadline', 'procurementMethod'],
-  parameterSet: {
-    id: 'R003/v2',
-    runtimeContract: r003ParametersContract,
-  },
+  parameters: r003Parameters,
+  parameterContract: r003ParametersContract,
   calculation: { sqlFile: './calculate.sql' },
   outputContract: riskObservationV1Contract,
   standard: {
@@ -613,22 +698,26 @@ const deployedIndicators = [
 
 export const riskIndicatorRegistry = createRiskIndicatorRegistry(deployedIndicators);
 
-// runJob.ts: a durable work item identifies the exact implementation to execute.
+// runJob.ts: a durable work item identifies the exact implementation to execute,
+// and the run cutoff selects the parameter entries that were in force.
 const indicator = riskIndicatorRegistry.require({ id: item.indicatorId, version: item.version });
+const effective = riskIndicatorRegistry.parametersAsOf(indicator.key, run.dataAsOf);
 ```
 
-`defineSqlRiskIndicator` freezes and type-checks one definition. `createRiskIndicatorRegistry` performs cross-definition and filesystem/hash validation once at startup and exposes read-only lookup methods such as `require`, `activeVersions`, `executionOrder` and `dependentsOf`. The Risk Indicators Run Job is generic: after lookup it uses `indicator.engine`, `indicator.calculation` and `indicator.outputContract`; adding R003 does not add a `switch ('R003')` branch to the run job.
+`defineSqlRiskIndicator` freezes and type-checks one definition, and validates every parameter entry against `parameterContract`. `createRiskIndicatorRegistry` performs cross-definition and filesystem/hash validation once at startup and exposes read-only lookup methods such as `require`, `activeVersions`, `executionOrder`, `dependentsOf` and `parametersAsOf`. The Risk Indicators Run Job is generic: after lookup it uses `indicator.engine`, `indicator.calculation` and `indicator.outputContract`; adding R003 does not add a `switch ('R003')` branch to the run job.
+
+`parametersAsOf` returns the entries whose validity range contains the run cutoff. Those entries are passed into the calculation and, crucially, the matched values are copied onto every observation the run produces — so a published signal carries its own threshold rather than a pointer to one.
 
 `RuntimeContract<T>` is a small project-owned interface with a `validate(unknown): T` operation; it is not a third-party product. Stable stage, lifecycle, state and subject values are TypeScript unions backed by those runtime checks. The real shared `RiskObservationV1` contract includes the columns shown in the SQL example below. Public text is versioned and reviewed. The web application does not derive explanations from SQL column names.
 
-### 5.3 Example SQL calculation
+### 5.4 Example SQL calculation
 
-The SQL file is one parameterised, read-only `SELECT`. `$1` is the evaluation run ID and `$2` is the reproducible `data_as_of` cutoff. Candidates are prepared generically from source changes; the Risk Indicator never decides its own scheduling or writes its result.
+The SQL file is one parameterised, read-only `SELECT` with three inputs: `$1` is the evaluation run ID, `$2` is the reproducible `data_as_of` cutoff, and `$3` is the effective parameter entries the registry resolved from `parameters.ts` for that cutoff. The calculation reads no catalogue table — its thresholds arrive as an argument. Candidates are prepared generically from source changes; the Risk Indicator never decides its own scheduling or writes its result.
 
 ```sql
 WITH candidates AS (
     SELECT p.*
-    FROM rizika.v_pirkimo_gyvavimo_ciklo_versijos p
+    FROM public.v_pirkimo_gyvavimo_ciklo_versijos p
     JOIN rizika.vertinimo_kandidatai k
       ON k.vykdymo_id = $1::uuid
      AND k.subjekto_tipas = 'procurement'
@@ -636,20 +725,18 @@ WITH candidates AS (
     WHERE p.galioja_nuo <= $2::timestamptz
       AND (p.galioja_iki IS NULL OR p.galioja_iki > $2::timestamptz)
 ), parameters AS (
-    SELECT prm.*
-    FROM rizika.indikatoriu_parametrai prm
-    WHERE prm.indikatoriaus_id = 'R003'
-      AND prm.indikatoriaus_versija = 2
-      AND $2::date >= prm.galioja_nuo
-      AND (prm.galioja_iki IS NULL OR $2::date < prm.galioja_iki)
+    -- $3 is the JSON array of entries already filtered to the run cutoff by the
+    -- registry; SQL only has to pick the entry whose scope matches each row.
+    SELECT entry.value AS irasas
+    FROM jsonb_array_elements($3::jsonb) AS entry(value)
 ), evaluated AS (
     SELECT c.*,
-           p.id AS parametru_rinkinys_id,
-           (p.parametrai->>'minimumDays')::numeric AS minimum_days,
+           p.irasas->'values' AS panaudoti_parametrai,
+           (p.irasas->'values'->>'minimumDays')::numeric AS minimum_days,
            EXTRACT(EPOCH FROM (c.terminas - c.paskelbta)) / 86400.0 AS submission_days
     FROM candidates c
     LEFT JOIN parameters p
-      ON p.taikymo_sritis->'methods' ? c.pirkimo_budas
+      ON p.irasas->'scope'->'methods' ? c.pirkimo_budas
 )
 SELECT 'R003'::text AS indicator_id,
        2::integer AS indicator_version,
@@ -665,7 +752,7 @@ SELECT 'R003'::text AS indicator_id,
        END::text AS state,
        submission_days::numeric AS raw_value,
        minimum_days::numeric AS threshold_value,
-       parametru_rinkinys_id,
+       panaudoti_parametrai,
        jsonb_build_object(
            'publicationDate', paskelbta,
            'submissionDeadline', terminas,
@@ -675,20 +762,23 @@ SELECT 'R003'::text AS indicator_id,
 FROM evaluated;
 ```
 
+`panaudoti_parametrai` is the exact threshold object that decided this row. Carrying the values instead of a foreign key is what lets an observation stay explainable after the parameter timeline moves on, without a catalogue table to join against.
+
 The calculation role has `SELECT` only, and the run job also starts a read-only transaction with a statement timeout. Correctness does not depend on trying to parse SQL text for forbidden keywords. Business-day counting, when required, is one shared tested PostgreSQL function backed by an effective-dated Lithuanian calendar.
 
-### 5.4 How the TypeScript and SQL files interact
+### 5.5 How the TypeScript and SQL files interact
 
 ```mermaid
 flowchart TD
     D[definition.ts<br/>identity + dependencies + contract] -.->|provides versioned execution metadata| R[Risk Indicators Registry bootstrap]
+    PM[parameters.ts<br/>effective-dated threshold timeline] -.->|provides values applicable at the cutoff| R
     Q[calculate.sql<br/>pure parameterised SELECT] -.->|is loaded and hashed by| L[SQL loader + content hash]
     L -.->|provides verified SQL implementation| R
     F[fixtures.ts + tests] -.->|defines expected rows and boundaries| C[CI and shadow validation]
     R -->|validated indicators in execution order| P[Risk Run Planner creates durable work items]
     P -->|idempotent work-item rows| J[(rizika.vertinimo_darbai)]
     J -->|next ready work item| W[Risk Indicators Run Job takes it in order]
-    W -->|run context and positional parameters| X[Execute SQL in read-only transaction]
+    W -->|run ID, cutoff and effective parameters| X[Execute SQL in read-only transaction]
     X -->|untrusted observation rows| V[Risk Signal Validator checks the shared contract]
     V -->|validated observation rows| S[(Run-scoped staging rows)]
     S -->|staged rows and gate status| G{All required work items and checks passed?}
@@ -712,8 +802,8 @@ sequenceDiagram
     E->>P: Read change outbox, open a run, plan work items in indicator order
     loop one Risk Indicator at a time
         E->>P: Take the next ready work item and record the attempt
-        E->>Q: Execute the calculation with run ID and data_as_of
-        Q->>P: Read canonical facts and effective parameters
+        E->>Q: Execute with run ID, data_as_of and the effective parameters from Git
+        Q->>P: Read canonical facts as of the cutoff
         Q-->>E: Return standardised observation rows
         E->>P: Validate and write run-scoped staging rows
     end
@@ -728,7 +818,7 @@ sequenceDiagram
 
 `definition.ts` tells the service which SQL belongs to R003 and what contract it must return. The shared run job loads and executes it. The SQL calculates only; TypeScript validates and persists through generic code. Astro may share public response types, but it never imports the Risk Indicators Registry.
 
-### 5.5 Why a Risk Indicator does not write its result
+### 5.6 Why a Risk Indicator does not write its result
 
 Keeping calculation and persistence separate gives:
 
@@ -797,92 +887,24 @@ PG procedures/functions are deployment artefacts, not the indicator catalogue or
 
 ## 7. Database schema draft
 
-The following draft is intentionally explicit. Names can be adjusted before migration, but the separation of stable identity, implementation version, parameters, runs, immutable observations and current pointers should remain. Sections 7.1–7.2 are storage area **A. Catalogue**, 7.3–7.4 are **B. Control** and **C. Staging**, and 7.5–7.7 are **D. Published results** as introduced in [§1.2.1](#121-storage-areas).
+The following draft is intentionally explicit. Names can be adjusted before migration, but the separation of runs, immutable observations and current pointers should remain. Sections 7.2–7.3 are storage area **A. Control** and **B. Staging**, and 7.4–7.6 are **C. Published results** as introduced in [§1.2.1](#121-storage-areas).
 
-### 7.1 Indicator identity and versions
+### 7.1 What is deliberately not in the database
+
+There are no `rizika.indikatoriai`, `rizika.indikatoriu_versijos` or `rizika.indikatoriu_parametrai` tables. Indicator identity, implementation version, lifecycle state, engine, public wording, required inputs, applicability rules and threshold values are all properties of the directory described in [§5.1](#51-the-risk-indicator-directory), versioned in Git.
+
+Consequences that shape the rest of the schema:
+
+- Result tables carry `indikatoriaus_id` and `indikatoriaus_versija` as **plain columns with no foreign key**. There is no parent table to reference. A `CHECK` constraint enforces the ID format (`^R[0-9]{3}$` or `^LT[0-9]{3}$`) and a positive version.
+- An observation stores `panaudoti_parametrai jsonb` — the actual values applied — instead of a `parametru_rinkinys_id` pointing at a row.
+- Every run and publication stores `kodo_commit` and `registry_hash`. Those two values replace the entire catalogue snapshot: they identify the repository state that defined every indicator in that publication.
+- "Which version is active" is not a database query. It is `lifecycle: 'active'` in a definition file, and therefore a property of the deployed commit.
 
 ```sql
 CREATE SCHEMA rizika;
-
-CREATE TABLE rizika.indikatoriai (
-    id text PRIMARY KEY,
-    standarto_tipas text NOT NULL CHECK (standarto_tipas IN ('ocp_2024', 'local')),
-    standarto_url text,
-    originalus_pavadinimas text,
-    rizikos_grupe text NOT NULL,
-    etapas text NOT NULL CHECK (
-        etapas IN ('planning', 'tender', 'award', 'contract', 'implementation')
-    ),
-    subjekto_tipas text NOT NULL CHECK (
-        subjekto_tipas IN ('procurement', 'lot', 'bidder', 'supplier', 'buyer', 'market', 'contract')
-    ),
-    savininkas text NOT NULL,
-    sukurta_at timestamptz NOT NULL DEFAULT now(),
-    panaikinta_at timestamptz,
-    CHECK (
-        (standarto_tipas = 'ocp_2024' AND id ~ '^R[0-9]{3}$')
-        OR (standarto_tipas = 'local' AND id ~ '^LT[0-9]{3}$')
-    )
-);
-
-CREATE TABLE rizika.indikatoriu_versijos (
-    indikatoriaus_id text NOT NULL REFERENCES rizika.indikatoriai(id),
-    versija integer NOT NULL CHECK (versija > 0),
-    busena text NOT NULL CHECK (busena IN ('draft', 'shadow', 'active', 'retired')),
-    variklis text NOT NULL CHECK (variklis IN ('sql', 'typescript')),
-    kodo_kelias text NOT NULL,
-    kodo_hash text NOT NULL,
-    viesas_pavadinimas text NOT NULL,
-    viesas_aprasymas text NOT NULL,
-    viesas_apribojimas text NOT NULL,
-    formule text NOT NULL,
-    privalomi_duomenys jsonb NOT NULL,
-    taikymo_taisykles jsonb NOT NULL,
-    parametru_schema jsonb NOT NULL,
-    ocp_puslapis integer,
-    pakeitimu_aprasymas text NOT NULL,
-    patvirtino text,
-    patvirtinta_at timestamptz,
-    aktyvi_nuo timestamptz,
-    aktyvi_iki timestamptz,
-    sukurta_at timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (indikatoriaus_id, versija)
-);
-
-CREATE UNIQUE INDEX indikatoriu_viena_aktyvi_versija_idx
-ON rizika.indikatoriu_versijos (indikatoriaus_id)
-WHERE busena = 'active';
 ```
 
-### 7.2 Effective-dated parameters
-
-```sql
-CREATE TABLE rizika.indikatoriu_parametrai (
-    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    indikatoriaus_id text NOT NULL,
-    indikatoriaus_versija integer NOT NULL,
-    pavadinimas text NOT NULL,
-    taikymo_sritis jsonb NOT NULL,
-    parametrai jsonb NOT NULL,
-    galioja_nuo date NOT NULL,
-    galioja_iki date,
-    saltinis text NOT NULL,
-    patvirtino text NOT NULL,
-    patvirtinta_at timestamptz NOT NULL,
-    sukurta_at timestamptz NOT NULL DEFAULT now(),
-    FOREIGN KEY (indikatoriaus_id, indikatoriaus_versija)
-        REFERENCES rizika.indikatoriu_versijos(indikatoriaus_id, versija),
-    CHECK (galioja_iki IS NULL OR galioja_iki > galioja_nuo)
-);
-
-CREATE INDEX indikatoriu_parametrai_lookup_idx
-ON rizika.indikatoriu_parametrai
-    (indikatoriaus_id, indikatoriaus_versija, galioja_nuo, galioja_iki);
-```
-
-Registry/deployment validation must reject overlapping parameter scopes and validate `parametrai` against the version's `parametru_schema`. Legal threshold changes normally create a new parameter row, not a new calculation version.
-
-### 7.3 Evaluation runs and publications
+### 7.2 Evaluation runs and publications
 
 ```sql
 CREATE TABLE rizika.vertinimo_vykdymai (
@@ -897,13 +919,15 @@ CREATE TABLE rizika.vertinimo_vykdymai (
     busena text NOT NULL CHECK (busena IN ('running', 'succeeded', 'partial', 'failed')),
     kandidatu_skaicius integer NOT NULL DEFAULT 0,
     rezultatu_skaiciai jsonb,
-    kodo_commit text,
+    kodo_commit text NOT NULL,
+    registry_hash text NOT NULL,
     klaida text
 );
 
 CREATE TABLE rizika.publikacijos (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     vykdymo_id uuid NOT NULL REFERENCES rizika.vertinimo_vykdymai(id),
+    kodo_commit text NOT NULL,
     registry_hash text NOT NULL,
     duomenys_iki timestamptz NOT NULL,
     saltiniu_watermarks jsonb NOT NULL,
@@ -921,7 +945,9 @@ CREATE TABLE rizika.sistemos_busena (
 
 One planner cycle creates exactly one run, and that run holds one work item per applicable Risk Indicator. Per-indicator counts in `rezultatu_skaiciai` keep failures attributable without a second run level. Only a successful publication transaction changes the singleton active-publication pointer.
 
-### 7.4 Durable change outbox, candidates and work items
+`kodo_commit` and `registry_hash` are mandatory on both tables. Together they answer "which definitions produced this?" — the question the deleted catalogue tables used to answer, now resolved by looking up one commit in Git.
+
+### 7.3 Durable change outbox, candidates and work items
 
 Data Ingestion writes its data changes and one outbox row in the same transaction. The Risk Run Planner consumes the outbox idempotently and creates evaluation runs, candidate subjects and work items. A work item is one `(run, Risk Indicator version)` unit of execution; the Risk Indicators Run Job processes them strictly one at a time, in the order the planner assigned.
 
@@ -999,7 +1025,7 @@ CREATE TABLE rizika.signalu_tarpiniai_rezultatai (
     ),
     neapdorota_reiksme jsonb,
     riba jsonb,
-    parametru_rinkinys_id bigint REFERENCES rizika.indikatoriu_parametrai(id),
+    panaudoti_parametrai jsonb,
     irodymai jsonb NOT NULL,
     trukstami_duomenys jsonb,
     duomenys_iki timestamptz NOT NULL,
@@ -1020,16 +1046,18 @@ Two rules keep this safe without any concurrency control:
 
 Parallel execution is the obvious later optimisation, and the schema is prepared for it — reintroducing it means adding lease columns and a claim query, not changing the catalogue, staging or published-result contracts.
 
-### 7.5 Immutable signal observations
+### 7.4 Immutable signal observations
 
 ```sql
 CREATE TABLE rizika.signalu_istorija (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     vykdymo_id uuid NOT NULL REFERENCES rizika.vertinimo_vykdymai(id),
     publikacijos_id uuid NOT NULL REFERENCES rizika.publikacijos(id),
-    indikatoriaus_id text NOT NULL,
-    indikatoriaus_versija integer NOT NULL,
-    parametru_rinkinys_id bigint REFERENCES rizika.indikatoriu_parametrai(id),
+    indikatoriaus_id text NOT NULL CHECK (
+        indikatoriaus_id ~ '^R[0-9]{3}$' OR indikatoriaus_id ~ '^LT[0-9]{3}$'
+    ),
+    indikatoriaus_versija integer NOT NULL CHECK (indikatoriaus_versija > 0),
+    panaudoti_parametrai jsonb,
     subjekto_tipas text NOT NULL,
     subjekto_raktas text NOT NULL,
     pirkimo_saltinis text,
@@ -1045,10 +1073,9 @@ CREATE TABLE rizika.signalu_istorija (
     irodymai jsonb NOT NULL,
     trukstami_duomenys jsonb,
     duomenys_iki timestamptz NOT NULL,
+    kodo_commit text NOT NULL,
     rezultato_hash text NOT NULL,
     sukurta_at timestamptz NOT NULL DEFAULT now(),
-    FOREIGN KEY (indikatoriaus_id, indikatoriaus_versija)
-        REFERENCES rizika.indikatoriu_versijos(indikatoriaus_id, versija),
     UNIQUE (vykdymo_id, indikatoriaus_id, indikatoriaus_versija, subjekto_tipas, subjekto_raktas)
 );
 
@@ -1059,11 +1086,13 @@ CREATE INDEX signalu_istorija_aktyvus_idx
 ON rizika.signalu_istorija (indikatoriaus_id, busena, sukurta_at DESC);
 ```
 
-`neapdorota_reiksme`, `riba` and `irodymai` are JSONB because indicator evidence is heterogeneous. Frequently filtered fields—state, stage, severity, subject and procurement key—remain typed columns.
+`neapdorota_reiksme`, `riba`, `panaudoti_parametrai` and `irodymai` are JSONB because indicator evidence is heterogeneous. Frequently filtered fields—state, stage, severity, subject and procurement key—remain typed columns.
+
+The row is intentionally self-contained. `indikatoriaus_id`, `indikatoriaus_versija`, `panaudoti_parametrai` and `kodo_commit` let a reader reconstruct exactly what was applied and check it against the repository at that commit, with no catalogue join and no dependency on the indicator still existing in `main`.
 
 Store all applicable states, not only triggers. Otherwise it is impossible to distinguish “evaluated and did not trigger” from “never evaluated”.
 
-### 7.6 Current pointers and last evaluation
+### 7.5 Current pointers and last evaluation
 
 ```sql
 CREATE TABLE rizika.signalai_dabartiniai (
@@ -1078,9 +1107,11 @@ CREATE TABLE rizika.signalai_dabartiniai (
 );
 ```
 
-History need not receive an identical row every hour. The generic persistence step computes `rezultato_hash` from semantic output, excluding run timestamps. If the result is unchanged, it updates only the current row's last-evaluated fields. If state, value, threshold, evidence, confidence, indicator version or parameter version changes, it appends history and moves the pointer.
+History need not receive an identical row every hour. The generic persistence step computes `rezultato_hash` from semantic output, excluding run timestamps and `kodo_commit`. If the result is unchanged, it updates only the current row's last-evaluated fields. If state, value, threshold, evidence, confidence, indicator version or the applied parameter values change, it appends history and moves the pointer.
 
-### 7.7 Page summary read model
+Excluding `kodo_commit` from the hash matters now that definitions are code: an unrelated commit elsewhere in the repository must not manufacture a fake “signal changed” history entry.
+
+### 7.6 Page summary read model
 
 ```sql
 CREATE TABLE rizika.pirkimu_santraukos (
@@ -1113,44 +1144,54 @@ The query applies `terminas > now()` at runtime. It is intentionally absent from
 
 ## 8. Stored data example
 
-### 8.1 Registry records
+### 8.1 The definition in Git
 
-`rizika.indikatoriai`:
+There is nothing to show from a catalogue table, because there is none. The equivalent state is the content of `modules/rizika/indikatoriai/R003/`.
 
-| id | standarto_tipas | rizikos_grupe | etapas | subjekto_tipas | savininkas |
-|---|---|---|---|---|---|
-| R003 | ocp_2024 | bid_rigging | tender | procurement | procurement-risk |
+`definition.ts`, summarised:
 
-`rizika.indikatoriu_versijos` (selected columns):
+| Field | Value |
+|---|---|
+| `key` | `{ id: 'R003', version: 2 }` |
+| `lifecycle` | `active` |
+| `engine` | `sql` |
+| `stage` / `subjectType` | `tender` / `procurement` |
+| `owner` | `procurement-risk` |
+| `standard` | OCP Red Flags 2024, p. 25 |
+| `public.titleLt` | Trumpas pasiūlymų pateikimo terminas |
+| `public.formulaLt` | `submissionDeadline - publicationDate < applicable minimum` |
 
-| ID/version | State | Engine | Public name | Formula | OCP page |
-|---|---|---|---|---|---:|
-| R003/2 | active | sql | Trumpas pasiūlymų pateikimo terminas | `submissionDeadline - publicationDate < applicable minimum` | 25 |
+`parameters.ts`, one entry of the timeline:
 
-`rizika.indikatoriu_parametrai`:
-
-```json
+```ts
 {
-  "id": 42,
-  "indicator": "R003/2",
-  "name": "Atviro konkurso bazinis terminas",
-  "scope": {
-    "jurisdiction": "LT",
-    "methods": ["Atviras konkursas"],
-    "objectTypes": ["Prekės", "Paslaugos"]
+  validFrom: '2026-07-01',
+  validTo: null,
+  scope: {
+    jurisdiction: 'LT',
+    methods: ['Atviras konkursas'],
+    objectTypes: ['Prekės', 'Paslaugos'],
   },
-  "parameters": {
-    "minimumDays": 10,
-    "dayCounting": "calendar_days",
-    "expeditedProcedureExcluded": true
+  values: {
+    minimumDays: 10,
+    dayCounting: 'calendar_days',
+    expeditedProcedureExcluded: true,
   },
-  "validFrom": "2026-07-01",
-  "validTo": null,
-  "source": "approved Lithuanian procurement-rule profile"
+  source: 'approved Lithuanian procurement-rule profile',
 }
 ```
 
 The number above is demonstration data, not a legal conclusion or a production threshold.
+
+Raising that threshold to 12 days from 2027-01-01 means appending a second entry and closing this one — a four-line pull request whose diff, author, date, reviewer and justification are the audit record:
+
+```text
+$ git log --follow -p modules/rizika/indikatoriai/R003/parameters.ts
+commit 4f1c9ae  2026-12-18  Jonas P.  (PR #412, approved by @teise)
++   { validFrom: '2027-01-01', validTo: null, ... minimumDays: 12 ... }
+-     validTo: null,
++     validTo: '2027-01-01',
+```
 
 ### 8.2 Triggered observation
 
@@ -1161,7 +1202,12 @@ The number above is demonstration data, not a legal conclusion or a production t
   "id": 98122,
   "runId": "697c7cab-d86e-46ea-bec5-4df63c5c5dc0",
   "indicator": "R003/2",
-  "parameterSetId": 42,
+  "codeCommit": "4f1c9ae",
+  "appliedParameters": {
+    "minimumDays": 10,
+    "dayCounting": "calendar_days",
+    "validFrom": "2026-07-01"
+  },
   "subjectType": "procurement",
   "subjectKey": "cvpis:7000000",
   "procurementSource": "cvpis",
@@ -1218,11 +1264,11 @@ Both records are important. The first supports a public signal; the second suppo
 
 The Procurement Risk Service starts from committed outbox watermarks or an explicit backfill request. For one `data_as_of` cutoff it:
 
-1. takes the single-instance advisory lock, loads the Risk Indicators Registry and verifies deployed code and SQL hashes;
+1. takes the single-instance advisory lock, builds the Risk Indicators Registry from the deployed directories and verifies code and SQL hashes;
 2. reconciles any run abandoned by a previous crash;
-3. creates one idempotent evaluation run and its candidate subject set;
+3. creates one idempotent evaluation run, stamped with the code commit and registry hash, and its candidate subject set;
 4. flattens the registry's dependency order into numbered durable work items;
-5. executes the Risk Indicators **one at a time** in that order — SQL ones in read-only transactions, TypeScript ones in an isolated execution context;
+5. resolves each indicator's effective parameter entries at the cutoff and executes the Risk Indicators **one at a time** in that order — SQL ones in read-only transactions, TypeScript ones in an isolated execution context;
 6. validates column types, allowed states, uniqueness, candidate completeness and semantic invariants after each indicator;
 7. writes validated results into run-scoped staging and records attempt counts and timings;
 8. prevents publication if any required work item or publication gate fails;
@@ -1234,24 +1280,26 @@ The Risk Signals Publisher receives already validated standardised staging rows 
 
 ### 10.1 Adding an OCP indicator
 
-1. Select the OCP ID and copy its reference metadata without changing its meaning.
-2. Write a local profile: Lithuanian public text, source-field mapping, applicability, parameters, exclusions and limitations.
+1. Create `modules/rizika/indikatoriai/<ID>/` and select the OCP ID, copying its reference metadata without changing its meaning.
+2. Write `definition.ts`: Lithuanian public text, source-field mapping, applicability, exclusions and limitations, with `lifecycle: 'draft'`.
 3. Decide the unit of analysis and earliest lifecycle point at which it can be known.
-4. Implement the pure calculator and fixtures for triggered, non-triggered, insufficient and not-applicable outcomes.
-5. Add integration tests against realistic database shapes.
-6. Run a historical backtest and publish coverage/trigger-rate diagnostics.
-7. Register as `draft`, then `shadow`.
-8. Review samples and approve a specific code hash plus parameter set.
-9. Activate the version and backfill current subjects.
-10. Add it to the public methodology page before displaying signals.
+4. Write `parameters.ts` with the first effective-dated entry and its `source`.
+5. Implement the pure calculator and fixtures for triggered, non-triggered, insufficient and not-applicable outcomes.
+6. Add integration tests against realistic database shapes.
+7. Add the version to `registry.ts` and regenerate `katalogas.generated.json`; CI verifies the artefact matches the definitions.
+8. Merge with `lifecycle: 'shadow'`, then run a historical backtest and publish coverage/trigger-rate diagnostics.
+9. Review samples; approval is the pull-request approval on the directory, recorded by CODEOWNERS.
+10. Flip `lifecycle` to `'active'` in a second pull request, deploy that commit to **both** the risk service and the web application, then backfill current subjects.
 
-Adding a Risk Indicator is therefore mainly a repository pull request plus a reviewed parameter deployment—not manual editing of a database view or function in production.
+Step 10 is the only ordering constraint the Git-based catalogue introduces: the web application must already carry the new version's public wording when the first signal from it is published.
 
-The normal maintenance surface for a new SQL Risk Indicator is exactly four things: one `.sql` formula, one `definition.ts`, deterministic fixtures and tests, and effective-dated parameter data. The Risk Indicators Run Job, Risk Signal Validator, Risk Signals Publisher and Astro route code do not change. They change only when the observation contract or publication protocol itself changes. An exceptional TypeScript Risk Indicator additionally owns its calculator, but still does not change publication or UI code.
+Adding a Risk Indicator is therefore exactly one reviewed pull request — never manual editing of a database row, view or function in production. There is no separate "parameter deployment" step and no production data entry: merging the branch and deploying the commit to both Node processes is the whole activation procedure.
+
+The normal maintenance surface for a new SQL Risk Indicator is exactly one directory: `definition.ts`, `parameters.ts`, `calculate.sql`, fixtures and tests, plus one line in `registry.ts`. The Risk Indicators Run Job, Risk Signal Validator, Risk Signals Publisher and Astro route code do not change. They change only when the observation contract or publication protocol itself changes. An exceptional TypeScript Risk Indicator additionally owns its calculator, but still does not change publication or UI code.
 
 ### 10.2 What constitutes a new version?
 
-Create a new Risk Indicator implementation version when changing:
+Create a new Risk Indicator implementation version — a new `key.version` and a new definition file — when changing:
 
 - formula or algorithm;
 - required data or source mapping in a way that changes results;
@@ -1260,16 +1308,16 @@ Create a new Risk Indicator implementation version when changing:
 - strength, severity or confidence calculation;
 - material public interpretation of what a trigger means.
 
-Create a new effective-dated parameter row, without changing implementation version, when changing:
+Append a new effective-dated entry to `parameters.ts`, without changing implementation version, when changing:
 
 - a legal numeric threshold;
 - a list of mapped methods or object types supported by the same formula;
-- a comparison window/sample minimum exposed by the parameter schema;
+- a comparison window/sample minimum exposed by the parameter contract;
 - an effective date following a regulatory change.
 
-A spelling-only public-copy correction can update a separately audited metadata revision without recomputing results. If the wording changes interpretation or limitations, issue a new Risk Indicator version.
+A spelling-only public-copy correction is an ordinary commit to `definition.ts`; it changes no result, so no recomputation is needed. If the wording changes interpretation or limitations, issue a new Risk Indicator version.
 
-Never edit an active version or parameter row in place. Retire/close it and add the replacement so old public observations remain reproducible.
+Never edit an active version or an existing parameter entry in place, even though Git would let you. Close the entry with a `validTo` and append the replacement, so old published observations remain reproducible against the values they actually used. The reviewer's job on any `parameters.ts` diff is to check that existing entries were closed rather than rewritten.
 
 ### 10.3 Changing an active Risk Indicator safely
 
@@ -1290,24 +1338,26 @@ The comparison report includes:
 - query/runtime cost;
 - reviewed false-positive explanations.
 
-Activation is an explicit Risk Indicators Registry transition. Existing history remains linked to v2; current pointers move to v3 after the backfill succeeds.
+Activation is a one-line `lifecycle` change in `definition.ts`, reviewed and deployed like any other code change. Existing history remains stamped with version 2; current pointers move to v3 after the backfill succeeds.
 
 ```mermaid
 flowchart LR
-    PR[Pull request: SQL + Risk Indicator definition + fixtures] -->|candidate version package| CI[Type-check, registry validation, tests, SQL review]
+    PR[Pull request: definition.ts + parameters.ts + SQL + fixtures] -->|candidate version package| CI[Type-check, registry validation, tests, catalogue artefact check]
     CI -->|approved deployable artefact| SH[Run v3 as shadow work items with isolated staging]
     SH -->|v2 and v3 observation sets| CMP[Compare v2 vs v3<br/>coverage, triggers, evidence, cost]
     CMP -->|comparison report| REV[Methodology/legal/data-owner approval]
     REV -->|approved version and effective date| BF[Historical and current backfill run]
     BF -->|validated backfill status| G{Publication checks pass?}
     G -->|no: defects and failed gates| SH
-    G -->|yes| SW[Atomic active-version/publication switch]
-    SW -->|retired version audit trail| KEEP[Retain v2 metadata and observations]
+    G -->|yes| SW[Merge lifecycle:'active' and deploy the commit]
+    SW -->|retired version audit trail| KEEP[Retain v2 definition in Git history and its observations]
 ```
 
 ### 10.4 Retiring a Risk Indicator
 
-Retirement stops new public signals from the version but does not delete history or methodology. The methodology page explains why it was retired: data source ended, poor validity, replacement, legal change or excessive false positives.
+Retirement is `lifecycle: 'retired'` in the definition. It stops new public signals from the version but does not delete history or methodology: the directory stays in the repository, the generated catalogue keeps publishing its wording, and every past observation remains valid. The definition's retirement note explains why — data source ended, poor validity, replacement, legal change or excessive false positives.
+
+Deleting the directory outright is the one destructive action to avoid. Published observations reference the version by ID, not by foreign key, so nothing in the database breaks — but the public methodology loses the ability to explain signals it already shows. Retire in place; use the Git history only for reconstruction of what an old commit looked like.
 
 ## 11. Tests and automated safeguards
 
@@ -1320,7 +1370,7 @@ Every Risk Indicator must test:
 - explicit non-applicable method/stage;
 - timezone and daylight-saving boundaries;
 - duplicate source rows and multi-lot/multi-supplier cardinality;
-- effective-date transition between parameter sets;
+- effective-date transition between parameter entries;
 - as-of behavior preventing future-data leakage;
 - stable evidence and result hashes;
 - reasonable query plan and runtime on a representative sample.
@@ -1330,26 +1380,31 @@ Risk Indicators Registry tests ensure:
 - unique IDs and one active version;
 - OCP IDs use the original catalogue code;
 - the declared dependencies form an acyclic graph with a deterministic execution order;
-- parameter JSON matches its schema;
-- active parameters cover intended scopes without overlap;
+- every parameter entry validates against `parameterContract`;
+- parameter entries within one scope neither overlap nor leave gaps, and `validTo` is never earlier than `validFrom`;
 - public text and limitation are non-empty;
-- calculation output contains only requested subjects and allowed states;
-- an active Risk Indicator is included in methodology before public results appear.
+- calculation output contains only requested subjects and allowed states.
+
+Because the catalogue is code, CI carries two checks that a database catalogue would have enforced at runtime:
+
+- `katalogas.generated.json` is regenerated and compared against the definitions; a stale artefact fails the build, so the web application can never describe an indicator differently from the way the service executes it;
+- a pull request touching `parameters.ts` fails if it modifies or deletes an existing entry instead of closing it and appending a new one.
 
 ## 12. Recommended first implementation slice
 
 Build one complete vertical slice with R003:
 
-1. create the four `rizika` storage areas: catalogue, control, staging and published results;
-2. establish the Procurement Risk Service entry point, its single-instance lock, the PostgreSQL outbox and work-item protocol, and the four database roles, independently from the web application;
-3. implement R003 as a Risk Indicator definition plus a pure SQL `SELECT`;
+1. create the three `rizika` storage areas: control, staging and published results;
+2. establish the Procurement Risk Service entry point, its single-instance lock, the PostgreSQL outbox and work-item protocol, and the database roles, independently from the web application;
+3. create `modules/rizika/indikatoriai/R003/` with `definition.ts`, `parameters.ts`, `calculate.sql`, fixtures and tests, plus the registry and the generated catalogue artefact with its CI check;
 4. use demonstration parameter values until the Lithuanian legal profile is approved;
 5. evaluate current open procurements in shadow mode;
-6. build `/rizikos`, one detail page and the R003 methodology entry from the persisted results;
+6. build `/rizikos`, one detail page and the R003 methodology entry, reading results from the database and wording from the catalogue artefact;
 7. verify that changing the deadline creates a new immutable observation and public history item;
-8. verify failed checks preserve the last successful public publication, then add the next two Risk Indicators.
+8. verify that appending a `parameters.ts` entry and deploying produces new observations carrying the new threshold, while old observations keep the old one;
+9. verify failed checks preserve the last successful public publication, then add the next two Risk Indicators.
 
-This slice tests the important architecture boundaries: three separate processes, four storage areas and one sequential run job. Adding many SQL snippets before current/history/version/parameter semantics exist would create a catalogue that is quick to start and expensive to maintain.
+This slice tests the important architecture boundaries: three separate processes, three storage areas, one sequential run job, and a catalogue that lives only in Git. Adding many SQL snippets before current/history/version/parameter semantics exist would create a catalogue that is quick to start and expensive to maintain.
 
 ## 13. Why this is not the existing task runner
 
