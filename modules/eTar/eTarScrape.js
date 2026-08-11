@@ -614,7 +614,6 @@ function formatStatus(status, sidecar) {
     out.push("");
     out.push(`  Aktų iš viso        ${nr(aktai)}`);
     if (status.suKlaidomis > 0) out.push(`  Su klaidomis        ${nr(status.suKlaidomis)}`);
-    out.push(`  Indeksavimo eilėje  ${nr(status.indeksavimoEileje)}`);
     if (status.saltinioBrokas > 0) {
         out.push(`  Šaltinio brokas     ${nr(status.saltinioBrokas)}  (SELECT * FROM "eTarSourceAnomaly")`);
     }

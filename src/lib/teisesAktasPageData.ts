@@ -455,7 +455,7 @@ export async function loadTeisesAktasPage(legalActId: string, url: URL) {
       try {
         const payload: any = readResponse(db, current.md5);
         const html = payload?.official_text?.html;
-        // HTML rodom <iframe> (per /teisesAktai/tekstas/html/<md5>), tekstas lieka kaip
+        // HTML rodom <iframe> per vidinį akto teksto endpointą, tekstas lieka kaip
         // atsarginis variantas, kai HTML nėra.
         turiHtml = typeof html === 'string' && html.trim().length > 0;
         const raw = payload?.official_text?.text;

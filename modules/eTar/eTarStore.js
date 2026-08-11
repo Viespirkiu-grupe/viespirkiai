@@ -690,19 +690,12 @@ function referencedActIds(payload) {
     return ids;
 }
 
-/** Quickwit eilė. Pildoma tik iš tranzakcijos viduje – kartu su duomenimis. */
-async function enqueueForIndexing(client, documentId, keitimas) {
-    await client.query(
-        `INSERT INTO "eTarIndexQueue" ("documentId", "keitimas") VALUES ($1, $2)`,
-        [documentId, keitimas],
-    );
-}
-
 /**
  * Įrašo pilną dokumento atsakymą (`/{id}`, `/{id}/asr` arba `/{id}/{edition}`).
  *
  * Nepakitęs `md5` reiškia, kad normalizuotas turinys identiškas — tokiu atveju
- * atnaujinam tik `fetchedAt`, vaikų neperrašom ir į Quickwit eilę nieko nededam.
+ * atnaujinam tik `fetchedAt`, vaikų neperrašom, o dokumentų eilės trigeris tokį
+ * techninį atnaujinimą sąmoningai ignoruoja.
  * `force: true` apeina šį trumpąjį kelią (reikalinga, kai pasikeitė pati
  * normalizacija, o ne šaltinis).
  *
@@ -806,8 +799,6 @@ export async function saveDocument(payload, { md5, mark = null, force = false } 
         await insertRelatedInformation(client, { documentId }, payload.related_information, vocab, fixed);
         await markInTransaction(client, payload.id, mark);
         await recordAnomalies(client, payload.id, anomalies);
-        await enqueueForIndexing(client, documentId, keitimas);
-
         await client.query("COMMIT");
         return { documentId: Number(documentId), keitimas };
     } catch (error) {
@@ -824,8 +815,8 @@ export async function saveDocument(payload, { md5, mark = null, force = false } 
 
 /**
  * Įrašo `/{id}/editions` atsakymą. Kaip ir `saveDocument`, nepakitęs md5 →
- * atnaujinam tik `fetchedAt`. Į Quickwit eilę redakcijų sąrašai nededami:
- * indeksuojamas vienetas yra dokumentas, o ne sąrašas.
+ * atnaujinam tik `fetchedAt`. Dokumentų paieškoje indeksuojamas pats dokumentas,
+ * o ne redakcijų sąrašas.
  * @returns {Promise<{editionListId: number, keitimas: "insert"|"patch"|null}>}
  */
 export async function saveEditionList(payload, { md5, mark = { stage: "editions" }, force = false } = {}) {
@@ -977,7 +968,6 @@ export async function getScrapeStatus() {
             (SELECT count(*) FROM "eTarEdition") AS "redakcijosViso",
             (SELECT count(*) FROM "eTarEdition" WHERE "scrapedAt" IS NOT NULL) AS "redakcijosAtliktos",
             (SELECT count(*) FROM "eTarLegalActScrape" WHERE "failureCount" > 0) AS "suKlaidomis",
-            (SELECT count(*) FROM "eTarIndexQueue") AS "indeksavimoEileje",
             (SELECT count(*) FROM "eTarSourceAnomaly") AS "saltinioBrokas"
     `);
     return Object.fromEntries(Object.entries(row).map(([key, value]) => [key, Number(value)]));

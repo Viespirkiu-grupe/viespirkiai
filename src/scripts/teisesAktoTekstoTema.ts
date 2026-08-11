@@ -1,7 +1,7 @@
 // Akto teksto rėmelio valdymas: tema, slinkties vieta ir turinio rodyklės
 // sekimas.
 //
-// Tekstas yra <iframe> su savo adresu (/teisesAktai/tekstas/html/<md5>). Jis
+// Tekstas yra izoliuotame <iframe> su atskiru vidiniu adresu. Jis
 // yra to paties kilmės (`allow-same-origin`), tad puslapis gali skaityti jo
 // slinktį ir dalių pozicijas; skriptų tame dokumente nėra ir būti negali —
 // `sandbox` neturi `allow-scripts`, o CSP yra `default-src 'none'`.

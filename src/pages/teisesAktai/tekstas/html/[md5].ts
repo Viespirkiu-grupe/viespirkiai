@@ -4,7 +4,7 @@ import { openETarSidecar, readResponse } from '@/modules/eTar/eTarSidecar.js';
 
 // Oficialaus teisės akto teksto HTML, skirtas įdėti į <iframe> akto puslapyje.
 //
-// Adresas — /teisesAktai/tekstas/html/<md5>: dokumentą nusako pats kelias, o ne
+// Tai vidinis `/teisesAktas/[id]` iframe endpointas: dokumentą nusako kelias, o ne
 // privalomas užklausos parametras. Vienintelis parametras `?scheme=dark|light`
 // yra neprivalomas (be jo sprendžia `prefers-color-scheme`).
 //
