@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
 import { Logger } from "../../utils/log.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 const logger = new Logger();
 
 const CONCURRENCY = 16;
@@ -31,10 +32,16 @@ async function processSavininkas(savininkas) {
         );
     }
 
-    await postgres.query(
+    const updated = await postgres.query(
         `UPDATE domenai SET "savininkoKodas" = $1, "savininkoKodasStatus" = 2 WHERE savininkas = $2;`,
         [jarKodas, savininkas],
     );
+    if (updated.rowCount > 0) {
+        signalWork(WORK_SIGNALS.DOMENAI_ADP_READY, {
+            source: "rastiSavininkuKodus",
+            count: updated.rowCount,
+        });
+    }
     await postgres.query(
         `UPDATE "domenaiScrapes" SET "savininkoKodas" = $1, "savininkoKodasStatus" = 2 WHERE savininkas = $2;`,
         [jarKodas, savininkas],

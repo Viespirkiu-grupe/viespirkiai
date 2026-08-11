@@ -286,6 +286,19 @@ async function irasytiIFiles(klientas, eilutes) {
         }
     }
 
+    // files INSERT trigeriai taip pat sukuria dokumentų projekcijos darbą ir,
+    // sutarčių failams, ADP darbą. Abu vartotojai turi pabusti nelaukdami poll'o.
+    if (klientas === postgres && ids.length > 0) {
+        signalWork(WORK_SIGNALS.FILES_DOCUMENTS_READY, {
+            source: "irasytiFailus",
+            count: ids.length,
+        });
+        signalWork(WORK_SIGNALS.SUTARTYS_CHANGED, {
+            source: "irasytiFailus",
+            count: ids.length,
+        });
+    }
+
     return ids;
 }
 

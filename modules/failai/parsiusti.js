@@ -15,6 +15,7 @@ import {
     pazymetiKlaida,
     pazymetiParsiusta,
 } from "./parsiuntimoEile.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const slowAgent = new Agent({ headersTimeout: 30 * 60_000 }); // 30 min
 const nodeName = process.env.NODE_NAME || "default";
@@ -168,6 +169,15 @@ export async function parsiustiFaila(options = {}) {
             dydis: size,
             dezeId: deze.id,
             extension: failas.extension,
+        });
+        // md5Id pakeitimas per DB trigerius įrašo į abi šias eiles.
+        signalWork(WORK_SIGNALS.FILES_DOCUMENTS_READY, {
+            source: "pazymetiParsiusta",
+            count: 1,
+        });
+        signalWork(WORK_SIGNALS.SUTARTYS_CHANGED, {
+            source: "pazymetiParsiusta",
+            count: 1,
         });
         // Parsisiuntęs failas tampa nuskaitomu
         await iEile([failas.id]);

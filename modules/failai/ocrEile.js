@@ -2,6 +2,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { FILES_JOINS, FILES_SELECT, papildytiFaila } from "./filesSkaitymas.js";
 import { OCR_BANDYMAI, OCR_DOC_EXTS, OCR_IMAGE_EXTS } from "./ocr.js";
 import { atnaujintiFilesPhotos } from "./photosLentele.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 /*
 OCR eilė — `filesOcrQueue`, būsena — `filesOcrStatus`.
@@ -57,6 +58,12 @@ export async function iOcrEile(failuId, klientas = postgres) {
         ],
     );
 
+    if (klientas === postgres && res.rowCount > 0) {
+        signalWork(WORK_SIGNALS.FILES_OCR_READY, {
+            source: "filesOcrQueue",
+            count: res.rowCount,
+        });
+    }
     return res.rowCount;
 }
 

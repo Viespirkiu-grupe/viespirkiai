@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { postgres } from "../../postgres/postgres.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 export const ETAR_QUEUE_KINDS = ["document", "editions", "asr", "historical"];
 
@@ -59,7 +60,15 @@ export async function enqueuePendingETarJobs(kind, { limit = 1000 } = {}) {
          ON CONFLICT (kind, "legalActId", "editionToken") DO NOTHING`,
         [kind, limit],
     );
-    return rowCount ?? 0;
+    const queued = rowCount ?? 0;
+    if (queued > 0) {
+        signalWork(WORK_SIGNALS.ETAR_SCRAPE_READY, {
+            source: "eTarScrapeQueue",
+            kind,
+            count: queued,
+        });
+    }
+    return queued;
 }
 
 /**

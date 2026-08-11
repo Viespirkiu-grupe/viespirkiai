@@ -38,6 +38,10 @@ export async function deleteFile(id) {
             source: "deleteFile",
             count: deleted.rowCount,
         });
+        signalWork(WORK_SIGNALS.SUTARTYS_CHANGED, {
+            source: "deleteFile",
+            count: deleted.rowCount,
+        });
     }
     logger.log(`Deleted file record with id: ${id} (md5=${file.md5}, blobas dėžėse nepaliestas)`);
 }

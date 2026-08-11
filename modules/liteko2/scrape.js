@@ -16,6 +16,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import { numArg, parseArgs } from "../../utils/cliArgs.js";
 import { runPool } from "../../utils/workerPool.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 // LITEKO2 pradėjo publikuoti sprendimus 2026-05, bet ribą imam su atsarga.
 const PRADZIA = "2026-01-01";
@@ -205,11 +206,17 @@ export async function pazymetiAtsauktus() {
 
     // Atšauktas sprendimas nebeturi likti bendroje dokumentų paieškoje.
     // dokumentai DELETE trigeris pats suformuoja Quickwit ištrynimo eilę.
-    await postgres.query(
+    const deleted = await postgres.query(
         `DELETE FROM public.dokumentai
          WHERE source = 'liteko2' AND "saltinioId2" = ANY($1::text[])`,
         [liteko2Ids],
     );
+    if (deleted.rowCount > 0) {
+        signalWork(WORK_SIGNALS.DOCUMENTS_INDEX_READY, {
+            source: "liteko2-canceled",
+            count: deleted.rowCount,
+        });
+    }
 
     log(`LITEKO2: ${liteko2Ids.length} atšauktų sprendimų (${rowCount} nauji)`);
     return liteko2Ids.length;

@@ -1,5 +1,6 @@
 import config from "../utils/config.js";
 import { createETarTaskJobs } from "../modules/eTar/eTarTaskJobs.js";
+import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 // Be adapterio adreso užduočių net neregistruojam: taip frontend'o ar dalinėje
 // backend aplinkoje neatsiras penki nuolat klaidas rašantys workeriai.
@@ -30,6 +31,7 @@ export default config.eTarApiUrl ? [
         priority: 5,
         cooldown: 30,
         errorCooldown: 60,
+        wakeOn: [WORK_SIGNALS.ETAR_SCRAPE_READY],
         job: jobs.scrapeDocument,
     },
     {
@@ -39,6 +41,7 @@ export default config.eTarApiUrl ? [
         priority: 4,
         cooldown: 30,
         errorCooldown: 60,
+        wakeOn: [WORK_SIGNALS.ETAR_SCRAPE_READY],
         job: jobs.scrapeEditionList,
     },
     {
@@ -48,6 +51,7 @@ export default config.eTarApiUrl ? [
         priority: 4,
         cooldown: 30,
         errorCooldown: 60,
+        wakeOn: [WORK_SIGNALS.ETAR_SCRAPE_READY],
         job: jobs.scrapeAsr,
     },
     {
@@ -57,6 +61,7 @@ export default config.eTarApiUrl ? [
         priority: 3,
         cooldown: 30,
         errorCooldown: 60,
+        wakeOn: [WORK_SIGNALS.ETAR_SCRAPE_READY],
         job: jobs.scrapeHistorical,
     },
 ] : [];

@@ -11,6 +11,7 @@ import nodeFetch from "node-fetch";
 import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const SCRAPE_API = "https://www.domreg.lt/api/whois/details/";
 
@@ -285,6 +286,11 @@ async function saveDomainData(domenas, data, scrapeStatus, scrapedAt) {
             s.savininkoKodasStatus,
         ],
     );
+
+    signalWork(WORK_SIGNALS.DOMENAI_ADP_READY, {
+        source: "scrapeDomreg",
+        domain: domenas.domain,
+    });
 }
 
 /**
@@ -346,6 +352,10 @@ export async function nuskaitytiDomregDomena() {
              WHERE id = $3`,
             [STATUS.ERROR, now(), domenas.id],
         );
+        signalWork(WORK_SIGNALS.DOMENAI_ADP_READY, {
+            source: "scrapeDomreg-error",
+            domain: domenas.domain,
+        });
         return true;
     }
 }

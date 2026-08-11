@@ -8,6 +8,7 @@ import {
     sujungtiSaltinioId,
 } from "../failai/failuIrasymas.js";
 import { Logger } from "../../utils/log.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 const logger = new Logger();
 
 const NUSKAITYMO_VERSIJA = 2;
@@ -167,6 +168,13 @@ async function updateLegacyIds(toUpdate) {
            )`,
         [nauji.map((p) => p[0]), nauji.map((p) => p[1]), nauji.map((p) => p[2])],
     );
+
+    if (result.rowCount > 0) {
+        signalWork(WORK_SIGNALS.FILES_DOCUMENTS_READY, {
+            source: "cvpp-updateLegacyIds",
+            count: result.rowCount,
+        });
+    }
 
     return result.rowCount ?? 0;
 }

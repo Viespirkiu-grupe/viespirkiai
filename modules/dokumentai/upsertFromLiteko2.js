@@ -6,6 +6,7 @@ sidecar'o kopija į dokumentų saugyklą ir public.dokumentai eilutės upsert'as
 
 import { postgres } from "../../postgres/postgres.js";
 import { saveDokumentasFs } from "./dokumentaiFs.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const SOURCE = "liteko2";
 
@@ -65,4 +66,10 @@ export async function upsertLiteko2ToDokumentai(sprendimas, sidecar, db = postgr
             sidecar.metadata?.sprendimoData ?? sprendimas.sprendimoData ?? null,
         ],
     );
+    if (db === postgres) {
+        signalWork(WORK_SIGNALS.DOCUMENTS_INDEX_READY, {
+            source: "liteko2",
+            count: 1,
+        });
+    }
 }

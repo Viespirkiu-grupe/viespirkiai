@@ -24,6 +24,8 @@ import { atnaujintiSodrosDuomenis } from "../modules/sodra/atnaujintiSodra.js";
 import { processSuggestionQueue } from "../modules/searchSuggestion/processSuggestionQueue.js";
 import { deleteDeadIndexes } from "../quickwit/deleteDeadIndexes.js";
 import { processDomenaiAdpQueue } from "../modules/domenai/processAdpQueue.js";
+import { processJuridiniaiIndexQueue } from "../modules/juridiniai/quickwitProcessIndexQueue.js";
+import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 export default [
     {
@@ -204,6 +206,17 @@ export default [
         priority: 4,
         cooldown: 30,
         errorCooldown: 60,
+        wakeOn: [WORK_SIGNALS.DOMENAI_ADP_READY],
         job: processDomenaiAdpQueue,
+    },
+    {
+        name: "juridiniaiQuickwitProcessIndexQueue",
+        mode: "asap",
+        priority: 5,
+        concurrency: 2,
+        cooldown: 30,
+        errorCooldown: 30,
+        wakeOn: [WORK_SIGNALS.JURIDINIAI_INDEX_READY],
+        job: processJuridiniaiIndexQueue,
     },
 ];

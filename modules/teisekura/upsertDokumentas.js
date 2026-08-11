@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { postgres } from "../../postgres/postgres.js";
 import { saveDokumentasFs } from "../dokumentai/dokumentaiFs.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 export const TEISEKURA_CLASS = "teisekura";
 
@@ -72,6 +73,11 @@ export async function upsertTeisekuraDokumentas(input) {
             input.createdAt ?? null, input.happenedAt ?? null,
         ],
     );
+
+    signalWork(WORK_SIGNALS.DOCUMENTS_INDEX_READY, {
+        source: input.source,
+        count: rows.length,
+    });
 
     return { row: rows[0], sidecar, md5, contentHash: contentHash(sidecar) };
 }

@@ -9,6 +9,7 @@ import { writeFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { iEile } from "./nuskaitymoEile.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -169,6 +170,10 @@ async function processRows(rows) {
                 UPDATE public.files SET "extensionId" = (SELECT id FROM ext) WHERE id = $2`,
                 [String(detectedExt).toLowerCase(), row.id],
             );
+            signalWork(WORK_SIGNALS.FILES_DOCUMENTS_READY, {
+                source: "pataisytiExtension",
+                count: 1,
+            });
             // Pasikeitęs plėtinys gali failą padaryti nuskaitomu.
             // filesStats skaitikliai persiskaičiuoja per files trigerį, bet
             // extracted/words/ocr* lieka prie seno plėtinio — žr. filesSchema.md §4.

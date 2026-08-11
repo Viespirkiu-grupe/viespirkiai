@@ -9,6 +9,7 @@ o ne failai. Tekstas niekur į DB nepatenka, tik į sidecar.
 
 import { postgres } from "../../postgres/postgres.js";
 import { saveDokumentasFs } from "./dokumentaiFs.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 // Sidecar JSON payload schemos versija (ne nuskaitymo versija — tą seka
 // teismoNuosprendziai.turinioNuskaitymas).
@@ -119,4 +120,8 @@ export async function upsertNuosprendisToDokumentai(nuosprendis, detail = {}) {
             title, "lt", wordCount, characterCount, nuosprendis.data ?? null,
         ],
     );
+    signalWork(WORK_SIGNALS.DOCUMENTS_INDEX_READY, {
+        source: "liteko",
+        count: 1,
+    });
 }

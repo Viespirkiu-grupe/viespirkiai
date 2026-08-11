@@ -6,6 +6,7 @@ import {
     JAR_ADDRESS_SQL,
     JAR_LOCATION_SQL,
 } from "./jarReadSql.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const DEFAULT_BATCH_SIZE = 5_000;
 const LOCK_KEY = "juridiniai-backfill";
@@ -275,6 +276,9 @@ export async function backfillJuridiniai({ batchSize = DEFAULT_BATCH_SIZE } = {}
         await client.query("BEGIN");
         await upsertDictionaries(client);
         await client.query("COMMIT");
+        signalWork(WORK_SIGNALS.JURIDINIAI_INDEX_READY, {
+            source: "juridiniai-backfill-dictionaries",
+        });
 
         while (true) {
             await client.query("BEGIN");
@@ -288,6 +292,13 @@ export async function backfillJuridiniai({ batchSize = DEFAULT_BATCH_SIZE } = {}
             const scanned = Number(result?.scanned ?? 0);
             const changed = Number(result?.changed ?? 0);
             if (!scanned) break;
+
+            if (changed > 0) {
+                signalWork(WORK_SIGNALS.JURIDINIAI_INDEX_READY, {
+                    source: "juridiniai-backfill",
+                    count: changed,
+                });
+            }
 
             lastJarKodas = result.lastJarKodas;
             scannedTotal += scanned;
