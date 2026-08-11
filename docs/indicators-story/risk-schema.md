@@ -23,7 +23,8 @@ site state how fresh its signals are instead of showing stale flags with unearne
 | Column        | Type                                  | Indexed | Description                                                                                                                                                                |
 |---------------|---------------------------------------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `id`          | `bigint GENERATED ALWAYS AS IDENTITY` | PK      | Sequential run number.                                                                                                                                                     |
-| `data_as_of`  | `timestamptz NOT NULL`                |         | Source-data cutoff. Every calculation in this run reads facts as of this instant, so a run is reproducible and cannot leak future data.                                    |
+| `data_as_of`  | `timestamptz NOT NULL`                |         | The run cutoff: the clock read once when the run opened, passed to every calculation as `$2`. Indicators never call `now()`, so one run is internally consistent and a rerun at the same cutoff reproduces the same answers. |
+| `code_commit` | `text NOT NULL`                       |         | The commit the service was deployed from. Runs are kept forever, so a signal's `run_id` is enough to recover the exact indicator code that produced it — which is why no signal row stores a commit of its own. |
 | `started_at`  | `timestamptz NOT NULL DEFAULT now()`  | ✅      |                                                                                                                                                                            |
 | `finished_at` | `timestamptz`                         |         |                                                                                                                                                                            |
 | `status`      | `text NOT NULL`                       | ✅      | One of `'running'`, `'succeeded'`, `'partial'`, `'failed'`.                                                                                                                |
@@ -53,6 +54,12 @@ frozen, so most evaluations repeat the previous run exactly and produce no row.
 `IS DISTINCT FROM`, so a NULL on either side compares correctly. Timestamps, `run_id` and `duration_ms` are excluded,
 which is what stops an unrelated redeploy from registering as a changed signal. `error_info` is excluded too, so a
 failure that retries with a different message does not churn a new row every night.
+
+There is no `result_hash` column: the comparison is over the columns themselves, in the statement that writes them, so
+there is no second encoding of a result to keep in agreement with the result. Advancing `checked_at` needs no
+comparison at all — a full run evaluates the indicator's whole applicable population, so it is one statement per
+indicator (`WHERE indicator_id = $1 AND valid_to IS NULL`) with no rows crossing the wire. That is the largest write
+a run performs.
 
 Result columns are never updated after insert. Only `checked_at` and `valid_to` change.
 

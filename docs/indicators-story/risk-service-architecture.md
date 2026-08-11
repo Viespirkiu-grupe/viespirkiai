@@ -1,4 +1,4 @@
-# Public procurement risk indicators: page, storage and maintenance draft
+# Procurement Risk Service Architecture
 
 Status: detailed design draft
 
@@ -13,7 +13,7 @@ Parent design: [Risk signals for current and recently completed procurements](ri
 1. Published indicator results are public and are displayed with their source facts, calculation, version and limitations.
 2. The OCP code is retained for an OCP indicator, for example `R003`. A Lithuania-specific indicator gets an `LT` code, for example `LT001`; it must not be presented as an OCP indicator.
 3. A public result is called a **risk signal** (`rizikos signalas`), not a finding of corruption or fraud.
-4. There is no unexplained corruption probability. The list may have transparent **attention points** for sorting, while signal strength, evidence confidence and data coverage remain separate.
+4. There is no unexplained corruption probability, and no composite score. A signal row carries no `strength`, `severity` or `confidence`: the list sorts on the number of triggered indicators, severity is a constant of the indicator version living in the Git catalogue, and data coverage is stated from `missing_data` ([`risk-schema.md`](risk-schema.md) §3).
 5. A **Risk Indicator** is a versioned package consisting of metadata, public explanation, effective-dated parameters, calculation and tests. The package lives entirely in the Git repository.
 6. A SQL Risk Indicator is a pure `SELECT`. It never contains its own `INSERT`, `UPDATE`, `DELETE`, table creation or transaction control.
 7. Risk calculation runs in its own process — the **Procurement Risk Service** — primarily so that it holds its own database roles and cannot starve ingestion or the web application. See [§13](#13-why-this-is-not-the-existing-task-runner) for the honest limits of that argument.
@@ -46,7 +46,7 @@ What this separation buys:
 - A web deployment cannot mutate risk results, because its role has no write grant on `risk`.
 - Rewriting how an indicator calculates never touches ingestion or web code.
 
-Process 1 is fully decoupled from `risk`: ingestion holds no grant on the risk schema and does not know the risk system exists. Process 2 derives its execution order from the deployed registry and records each run in one run table ([§7.1](#71-evaluation-runs)). It does **not** run indicators concurrently: exactly one run executes at a time.
+Process 1 is fully decoupled from `risk`: ingestion holds no grant on the risk schema and does not know the risk system exists. Process 2 takes the set of indicators to execute from the deployed registry and records each run in one run table ([§7.1](#71-evaluation-runs)). It does **not** run indicators concurrently: exactly one run executes at a time.
 
 ### 1.2 Deployment view
 
@@ -69,13 +69,11 @@ flowchart TB
     subgraph nRisk["Node: risk host"]
         subgraph pRisk["Process 2 — Risk Indicators Processing (Procurement Risk Service)"]
             pReg["Risk Indicators Registry<br/>built in memory at startup"]
-            pPlan["Risk Run Planner<br/>in-memory order and subject set"]
             pJob["Risk Indicators Run Job<br/>sequential, one indicator at a time"]
             pVal["Risk Signal Validator"]
-            pPub["Risk Signals Writer<br/>compares hashes, closes and appends"]
-            pReg -.->|"execution order"| pPlan
-            pReg -.->|"version, calculation, effective parameters, contracts"| pJob
-            pPlan -.-> pJob -.-> pVal -.-> pPub
+            pPub["Risk Signals Writer<br/>compares result columns,<br/>closes and appends"]
+            pReg -.->|"active versions, calculation, effective parameters, contracts"| pJob
+            pJob -.-> pVal -.-> pPub
         end
     end
 
@@ -104,9 +102,9 @@ flowchart TB
 
     pIngest -->|"viespirkiai_rw: normalised source rows"| dSrc
 
-    pPlan -->|"risk_rw: open the run, stamp cutoff and commit X"| dRun
+    pJob -->|"risk_rw: open the run, stamp cutoff and commit X"| dRun
     pJob -->|"risk_calc: read-only SELECT of facts as of cutoff"| dView
-    pPub -->|"risk_rw: bump last_checked_at, or close row and insert new"| dSig
+    pPub -->|"risk_rw: bump checked_at, or close row and insert new"| dSig
     pPub -->|"risk_rw: close the run with per-indicator statistics"| dRun
 
     pWeb -->|"risk_ro: current signals and history"| dSig
@@ -126,7 +124,7 @@ Database roles make the process separation enforceable rather than conventional:
 | `risk_rw` | Process 2, for recording results | `SELECT`, `INSERT`, `UPDATE` on `risk`; no `DELETE`, and no write grant on `public` |
 | `risk_ro` / `viespirkiai_ro` | Process 3 | `SELECT` on the `risk` tables and view and the `public` canonical views; nothing else |
 
-`risk_rw` has no `DELETE`: signals are never removed by the application, because closed rows are the public change history. Retention is a separate maintenance concern ([`risk-schema.md`](risk-schema.md) §5).
+`risk_rw` has no `DELETE`: signals are never removed by the application, because closed rows are the recent-change history. Ageing them out is a separate scheduled maintenance concern with its own role ([`risk-schema.md`](risk-schema.md) §4).
 
 Because the definition is code, the two Node processes must agree on it. A new indicator version is activated only after both Process 2 and Process 3 run the same commit; §10.1 makes this a step in the workflow. If a page nevertheless meets an observation whose version is absent from its catalogue artefact, it degrades to the indicator code plus the evidence stored on the observation instead of inventing wording.
 
@@ -137,12 +135,12 @@ Risk data lives in three places, and only two of them are in PostgreSQL. Section
 | Area | Where | Contents | Written by | Visible to visualisation | Retention |
 |---|---|---|---|---|---|
 | **Definitions** | Git — `modules/risk/indicators/**` | Identity, versions, lifecycle, public wording, effective-dated parameters, calculation, tests | A reviewed and merged pull request | Yes, via `catalogue.generated.json` built into the web bundle | Forever, as repository history |
-| **Runs** | `risk.evaluation_runs` | One row per evaluation run: cutoff, commit, registry hash, state, per-indicator statistics | Risk Indicators Processing | Yes — the freshness label and the "is the job healthy" check | Forever; ~365 rows a year |
-| **Signals** | `risk.risk_signals` | Every current and historical `(subject, indicator)` result state, with evidence, applied parameters and commit | Risk Indicators Processing | Yes — this is the public read model | Forever; closed rows are the public change history |
+| **Runs** | `risk.evaluation_runs` | One row per evaluation run: cutoff, code commit, state, per-indicator statistics | Risk Indicators Processing | Yes — the freshness label and the "is the job healthy" check | Forever; ~365 rows a year |
+| **Signals** | `risk.risk_signals` | Every current and historical `(subject, indicator)` result state, with evidence, applied parameters and the producing run | Risk Indicators Processing | Yes — this is the public read model | Current rows forever; closed rows are the recent-change history and are deleted after one month |
 
 Two properties matter. First, the one-way flow **definitions + facts → signals**: a calculation reads the deployed definition and the `public` schema and produces rows; nothing in PostgreSQL can change what an indicator means, and no indicator formula writes its own result ([§5.6](#56-why-a-risk-indicator-does-not-write-its-result)).
 
-Second, because definitions are not in the database, a signal row must be self-sufficient: it stores the indicator ID, the implementation version, the exact parameter values applied, the code commit and the structured evidence. That row can be re-explained years later even if the indicator has since been retired from the repository — and, equally important, it stores no display text, so correcting the Lithuanian wording never means rewriting history ([§7.2](#72-risk-signals-current-state-and-history-in-one-table)).
+Second, because definitions are not in the database, a signal row must be self-sufficient: it stores the indicator ID, the implementation version, the exact parameter values applied, the run that produced it — which carries the code commit — and the structured evidence. That row can be re-explained years later even if the indicator has since been retired from the repository — and, equally important, it stores no display text, so correcting the Lithuanian wording never means rewriting history ([§7.2](#72-risk-signals-current-state-and-history-in-one-table)).
 
 ### 1.3 Data flow across the three processes
 
@@ -159,17 +157,14 @@ flowchart LR
     subgraph processing["Process 2 — Risk Indicators Processing"]
         M["Git: Risk Indicator definitions<br/>and effective-dated parameters"]
         G["Risk Indicators Registry"]
-        L["Risk Run Planner"]
         K["Risk Indicators Run Job"]
         I["Risk Indicator SQL calculation"]
         X["Risk Indicator TypeScript calculation"]
         T["Risk Signal Validator"]
         P["Risk Signals Writer"]
-        M -.->|"deployed code, loaded and hashed at startup"| G
-        G -.->|"declares versions and execution order"| L
-        G -.->|"maps an indicator to its implementation"| K
-        G -.->|"declares expected SQL hash and output contract"| T
-        L -->|"cutoff, subject set, indicator order"| K
+        M -.->|"deployed code, loaded and validated at startup"| G
+        G -.->|"active versions and their implementations"| K
+        G -.->|"declares the output contract"| T
     end
 
     subgraph storage["Schema risk — written only by Process 2"]
@@ -185,16 +180,15 @@ flowchart LR
         A -->|"rendered HTML or JSON response"| U
     end
 
-    C -->|"max ingested position sets the cutoff"| L
-    L -->|"one open run, stamped with cutoff and commit"| J
-    K -->|"cutoff, subject set and effective parameters"| I
-    K -->|"cutoff, subject set and effective parameters"| X
+    K -->|"one open run, stamped with cutoff and commit"| J
+    K -->|"cutoff and effective parameters"| I
+    K -->|"cutoff and effective parameters"| X
     C -->|"canonical facts as of cutoff"| I
     C -->|"canonical facts as of cutoff"| X
     I -->|"standard observation rows"| T
     X -->|"standard observation rows"| T
     T -->|"validated rows"| P
-    P -->|"unchanged: bump last_checked_at<br/>changed: close row, insert new"| H
+    P -->|"unchanged: bump checked_at<br/>changed: close row, insert new"| H
     P -->|"per-indicator statistics, terminal state"| J
 
     H -->|"current signals, detail and history"| A
@@ -212,13 +206,12 @@ Every component named above has one concrete role:
 | Canonical procurement facts | 1 | PostgreSQL tables and views in `public` | Present procurements, notices, lots, bids, awards, contracts, buyers and suppliers with stable keys and `valid_from`/`valid_to` semantics. They are the reproducible facts read at `data_as_of`. |
 | Risk Indicator parameters | 2 | Effective-dated entries in `parameters.ts`, versioned in Git | Hold reviewed thresholds, method scopes, legal dates and exclusions in a file separate from the formula. The run cutoff selects the applicable entry; adding an entry never rewrites historical results, and `git blame` shows who approved the change. |
 | Risk Indicators Registry | 2 | Immutable in-process TypeScript catalogue, built from the deployed code at startup | Resolves `(indicator ID, version)` to one validated Risk Indicator: implementation, subject, lifecycle, inputs, dependencies, effective parameters, output contract and public methodology. It holds no procurement result rows, writes nothing to the database and schedules nothing. Section 5 defines it precisely. |
-| Risk Run Planner | 2 | TypeScript module inside the Procurement Risk Service | Chooses the cutoff, resolves the applicable subject set, and orders the active indicators by their declared prerequisites. The order is an in-memory list, not a table: thirty items executed once in a fixed sequence do not need durable work rows. It opens the run and executes no formula. |
-| Evaluation run | 2 | `risk.evaluation_runs` | One durable row per run holding cutoff, commit, registry hash, terminal state and per-indicator statistics. It is how "did the job run and did it succeed" is answered — the failure mode a risk site cannot afford to hide. |
-| Risk Indicators Run Job | 2 | One sequential TypeScript loop, single instance guaranteed by an advisory lock | Walks the planned order, resolves the exact registry version, invokes the declared calculation with the cutoff, subject set and effective parameters, and records the outcome into `statistics`. It contains no indicator-specific branch and never runs two indicators at once. A failing indicator is recorded and the run continues. |
+| Evaluation run | 2 | `risk.evaluation_runs` | One durable row per run holding cutoff, code commit, terminal state and per-indicator statistics. It is how "did the job run and did it succeed" is answered — the failure mode a risk site cannot afford to hide. |
+| Risk Indicators Run Job | 2 | One sequential TypeScript loop, single instance guaranteed by an advisory lock | Takes the advisory lock, opens the run row with the cutoff, then walks the registry's active versions and invokes each declared calculation with the cutoff and the effective parameters, recording the outcome into `statistics`. It contains no indicator-specific branch, resolves no subject sets, and never runs two indicators at once. A failing indicator is recorded and the run continues. |
 | Risk Indicator SQL calculation | 2 | Versioned `.sql` file executed by PostgreSQL | Performs the set-based formula as a read-only parameterised `SELECT` returning the standard observation shape. It cannot mutate risk or source tables. |
 | Risk Indicator TypeScript calculation | 2 | Isolated TypeScript calculator module | Handles a calculation that genuinely does not fit relational SQL, such as document parsing or a graph algorithm. It receives the same execution context, returns the same observation contract, and does not write results. |
-| Risk Signal Validator | 2 | Shared TypeScript validation module plus database permissions | Before execution, verifies the packaged SQL hash. After execution, validates field types, allowed states, subject and indicator identity, evidence size, duplicate keys and cross-row invariants. SQL safety comes from a read-only role, a read-only transaction and a timeout — not from keyword parsing. |
-| Risk Signals Writer | 2 | Shared TypeScript module issuing indicator-independent PostgreSQL statements | For each validated observation, computes `result_hash` and compares it with the current row: identical means bump `last_checked_at`; different means close the old row and insert a new one, in one statement pair per indicator. It contains no `if (indicatorId === ...)` logic. |
+| Risk Signal Validator | 2 | Shared TypeScript validation module plus database permissions | Validates the returned rows: field types, allowed states, subject and indicator identity, evidence size, duplicate keys and cross-row invariants. SQL safety comes from a read-only role, a read-only transaction and a timeout — not from keyword parsing. |
+| Risk Signals Writer | 2 | Shared TypeScript module issuing indicator-independent PostgreSQL statements | Sends the validated observations to PostgreSQL as one set and lets the database decide what changed: it advances `checked_at`, closes every current row whose result columns differ from the incoming one, and inserts the replacements — three statements per indicator, in one transaction. It contains no `if (indicatorId === ...)` logic. |
 | Risk signals | 2 → 3 | `risk.risk_signals` | Holds current and historical state together, distinguished by `valid_to IS NULL`. Preserves state, evidence, indicator version, applied parameter values, code commit and `data_as_of` for audit and history queries. Result columns are never updated after insert. |
 | Procurement summary | 2 → 3 | `risk.v_procurement_summaries` | Aggregates current signals per procurement for list-page counts, ordering and filters. A view, not a maintained table, until measurement justifies otherwise. |
 | Astro read-only routes | 3 | Existing web application using a read-only role | Query only `risk` signals, the summary view and the run row; read all indicator wording from `catalogue.generated.json`; authorise no calculation work. They do not import the registry or any calculation code. |
@@ -254,7 +247,7 @@ All names and values below are fictional demonstration data.
 │                                                                             │
 │ 143 su bent vienu signalu  ·  22 nauji per 24 val.  ·  5 aktyvūs rodikliai │
 ├───────────────┬─────────────────────────────────────────────────────────────┤
-│ FILTRAI       │ Rikiuoti: [Dėmesio prioritetas ▼]                           │
+│ FILTRAI       │ Rikiuoti: [Daugiausiai signalų ▼]                           │
 │               │                                                             │
 │ Signalo grupė │ ┌─────────────────────────────────────────────────────────┐ │
 │ □ Konkurencija│ │ 3 signalai · terminas po 14 val.                       │ │
@@ -330,14 +323,13 @@ Recommended URL-backed filters:
 
 Sort options:
 
-- attention priority, descending (default);
+- number of triggered signals, descending (default);
 - nearest deadline;
 - most recently published/changed;
 - largest value;
-- most signals;
 - lowest data coverage, useful for transparency monitoring.
 
-Attention priority is a work-ordering device. The UI must not label it “corruption risk 82%”.
+The default order is a count of triggered indicators, not a score: it is countable, explainable and needs no calibration ([`risk-schema.md`](risk-schema.md) §3). The UI must not label it “corruption risk 82%”, and there is no weighted attention total behind it to be mistaken for one. Severity filters by expanding the catalogue's severity set into indicator IDs; it does not sort.
 
 ## 3. Procurement risk detail page
 
@@ -418,7 +410,7 @@ The history is derived from the signal rows themselves, not reconstructed from l
 
 Two distinctions the page must preserve, because the data supports them and readers will otherwise assume the wrong one:
 
-- a signal that **stopped** (a new row with a different state) versus one that is merely **stale** (no new row, and `last_checked_at` falling behind);
+- a signal that **stopped** (a new row with a different state) versus one that is merely **stale** (no new row, and `checked_at` falling behind);
 - a change caused by the **procurement** (same indicator version, different measured value) versus one caused by **the methodology** (a new `indicator_version`, or the same version with different `applied_parameters`). Presenting a threshold change as though the buyer's behaviour changed would be a straightforward misrepresentation.
 
 ## 4. Public methodology catalogue
@@ -506,15 +498,14 @@ The rest of the repository is shared machinery that every indicator reuses and n
 modules/risk/
   contracts.ts               # shared observation and run contracts
   registry.ts                # explicit imports of every Risk Indicator version
-  sqlLoader.ts               # loads and hashes packaged SQL at process start
+  sqlLoader.ts               # loads packaged SQL at process start
   catalogue.generated.json   # public metadata of all versions, generated from the
                              # definitions, committed, verified in CI, imported by Astro
 services/procurement-risk/
   index.ts                   # service entry point and single-instance advisory lock
-  planner.ts                 # cutoff, subject set and in-memory execution order
-  runJob.ts                  # sequential execution of Risk Indicators
+  runJob.ts                  # opens the run, executes Risk Indicators one at a time
   validate.ts                # runtime output and cross-row checks
-  write.ts                   # hash comparison, close-and-append into risk.risk_signals
+  write.ts                   # column comparison, close-and-append into risk.risk_signals
 migrations/risk/
   001_risk.sql             # the whole schema: two tables and one view
 ```
@@ -542,9 +533,9 @@ The definition is written in TypeScript regardless of what language the formula 
 Expressing the definition as a checked TypeScript type gives two layers of protection:
 
 1. **Compile-time checks** reject missing fields, misspelled lifecycle, stage or state literals and incompatible calculator or parameter types during development and CI.
-2. **Startup runtime checks** reject problems the compiler cannot see: duplicate IDs, unresolved or cyclic indicator dependencies, an unreadable SQL file, a changed SQL content hash, overlapping or gapped parameter validity ranges, or public text that violates the required contract.
+2. **Startup runtime checks** reject problems the compiler cannot see: duplicate IDs, more than one active version of an indicator, an unreadable SQL file, overlapping or gapped parameter validity ranges, or public text that violates the required contract.
 
-The **Risk Indicators Registry** is the immutable, explicitly constructed in-process catalogue of every deployed Risk Indicator definition. Its key is `(indicator_id, implementation_version)`. Given that key, the Risk Run Planner or the Risk Indicators Run Job retrieves exactly one validated definition. The registry also answers which version is `active`, `shadow` or `retired`, and in which order the indicators must execute.
+The **Risk Indicators Registry** is the immutable, explicitly constructed in-process catalogue of every deployed Risk Indicator definition. Its key is `(indicator_id, implementation_version)`. Given that key, the Risk Indicators Run Job retrieves exactly one validated definition. The registry also answers which version is `active`, `shadow` or `retired`.
 
 The registry is deliberately not:
 
@@ -554,17 +545,33 @@ The registry is deliberately not:
 - the work queue or scheduler;
 - the visualisation process's source of results.
 
-The repository definition files are the only source of truth. When the Procurement Risk Service starts, `createRiskIndicatorRegistry` validates them and calculates a deterministic registry hash covering every definition, parameter timeline and SQL file. Each run stores that hash together with the code commit, so any published result can be traced back to the exact repository state that produced it. Nothing is written to a catalogue table, because there is none.
+The repository definition files are the only source of truth. When the Procurement Risk Service starts, `createRiskIndicatorRegistry` validates them. Each run stores the code commit it was deployed from, so any published result can be traced back to the exact repository state that produced it. Nothing is written to a catalogue table, because there is none.
 
-Keep three dependency concepts separate:
+A definition declares only two kinds of input, and neither of them orders anything:
 
 | Definition field | Meaning | Affects execution order? |
 |---|---|---:|
-| `indicatorDependencies` | Results or baseline output of another named indicator version must exist first | Yes — the run job executes prerequisites earlier in the same run |
 | `sourceRelations` | Canonical PostgreSQL facts the calculation reads | No; the run cutoff controls readiness |
 | `parameters` | Effective-dated policy values from `parameters.ts`, selected at `data_as_of` | No; a deployed parameter change takes effect on the next run |
 
-Because execution is sequential, `indicatorDependencies` is simply a topological sort applied once by the planner: the run job walks the resulting in-memory list in order, and skips an indicator whose prerequisite failed in this run — leaving that indicator's previous signals untouched rather than replacing them with errors.
+#### 5.2.1 There are no indicator dependencies, and therefore no execution order
+
+An earlier draft gave each definition an `indicatorDependencies` list and had the run job topologically sort it. That field cannot exist, because it contradicts [decision 6](#1-decisions) and [§5.6](#56-why-a-risk-indicator-does-not-write-its-result): a calculation reads the `public` schema and nothing in `risk`, which is exactly what lets it run as `risk_calc`. An indicator that cannot read another indicator's signals cannot depend on one.
+
+Nor is the field wanted. Reviewing all 106 canonical indicators, the ones that look derived — LT-PRO-03 institutional use of non-competitive methods, LT-COM-04 buyer–supplier concentration, LT-COM-06 market concentration — aggregate procurement *facts*, not other indicators' *results*. If a genuinely shared intermediate ever appears (a peer median, a market share denominator), the answer is a canonical view in `public`, or a derived table computed once before the loop — a fact, available to every indicator on equal terms, not an edge in a dependency graph.
+
+What remains is an unordered set. The run job iterates the registry's active versions in declaration order because iteration needs some order, not because the order carries meaning; any permutation produces the same signals. There is no topological sort, no cycle check and no "prerequisite failed, skip the dependant" rule.
+
+#### 5.2.2 The run cutoff, and who chooses the subject set
+
+A run has exactly two inputs, and neither needs a planning phase:
+
+- **`data_as_of` is the run's clock**, read once at run start and passed to every calculation as `$2`. It is not derived from ingestion state, and no attempt is made to infer how fresh the source data is. Its two jobs today are to keep one run internally consistent — the first and the thirtieth indicator agree on what "now" means — and to make a rerun with the same cutoff reproducible for every deadline and age comparison. **An indicator's SQL must never call `now()`**; that is the enforceable form of "reproducible", and it is a test.
+- **The subject set is the indicator's own `WHERE` clause.** Nothing outside the indicator can resolve it: each one has its own unit of analysis (procurement, lot, contract, supplier) and its own applicability, so a central resolver would be 106 scoping rules re-implemented outside the definitions that own them. `$4` exists only as an override — an explicit subject array for a backfill or a single-procurement rerun, `NULL` for a normal run.
+
+Genuine as-of time travel — reading the source *as it stood* at an earlier cutoff — is not available yet and is not assumed here. It requires the append-only source-observation table proposed in the [parent design](risky-procurements-initial-design.md) §5.1, because today ingestion upserts rows and replaces decomposed children. When that table exists, `$2` becomes a real filter without any caller changing.
+
+**Nothing skips "stale" subjects, deliberately.** A full run is one set-based query per indicator, not a row-by-row walk, so re-evaluating an unchanged procurement costs almost nothing on the read side; the cost is on the write side and is addressed by writing only on change ([§7.2](#72-risk-signals-current-state-and-history-in-one-table)). Skipping would also require knowing that a subject's facts have not changed, which is not derivable until ingestion stamps a per-procurement change time. If measurement ever justifies it, it belongs in the indicator's own `WHERE` as one shared predicate — never in a scheduler that guesses on behalf of 106 different formulas.
 
 ### 5.3 Example Risk Indicator definition and registry
 
@@ -626,7 +633,6 @@ type SqlRiskIndicator<P> = Readonly<{
   subjectType: 'procurement';
   stage: IndicatorStage;
   owner: string;
-  indicatorDependencies: readonly RiskIndicatorKey[];
   sourceRelations: readonly string[];
   requiredInputs: readonly string[];
   parameters: readonly ParameterEntry<P>[];
@@ -671,7 +677,6 @@ export const R003v2 = defineSqlRiskIndicator<R003Parameters>({
   owner: 'procurement-risk',
   subjectType: 'procurement',
   stage: 'tender',
-  indicatorDependencies: [],
   sourceRelations: ['public.v_pirkimo_gyvavimo_ciklo_versijos'],
   requiredInputs: ['publicationDate', 'submissionDeadline', 'procurementMethod'],
   parameters: r003Parameters,
@@ -696,16 +701,17 @@ const deployedIndicators = [
 
 export const riskIndicatorRegistry = createRiskIndicatorRegistry(deployedIndicators);
 
-// runJob.ts: the planner's in-memory order identifies what to execute next,
-// and the run cutoff selects the parameter entries that were in force.
-for (const key of riskIndicatorRegistry.executionOrder()) {
+// runJob.ts: the whole plan. The set is unordered; the run cutoff selects the
+// parameter entries that were in force, and each indicator scopes its own subjects.
+const run = await openRun({ dataAsOf: new Date(), codeCommit: COMMIT });
+for (const key of riskIndicatorRegistry.activeVersions()) {
   const indicator = riskIndicatorRegistry.require(key);
   const effective = riskIndicatorRegistry.parametersAsOf(key, run.dataAsOf);
   // ... execute, validate, write; record the outcome in run.statistics
 }
 ```
 
-`defineSqlRiskIndicator` freezes and type-checks one definition, and validates every parameter entry against `parameterContract`. `createRiskIndicatorRegistry` performs cross-definition and filesystem/hash validation once at startup and exposes read-only lookup methods such as `require`, `activeVersions`, `executionOrder`, `dependentsOf` and `parametersAsOf`. The Risk Indicators Run Job is generic: after lookup it uses `indicator.engine`, `indicator.calculation` and `indicator.outputContract`; adding R003 does not add a `switch ('R003')` branch to the run job.
+`defineSqlRiskIndicator` freezes and type-checks one definition, and validates every parameter entry against `parameterContract`. `createRiskIndicatorRegistry` performs cross-definition and filesystem validation once at startup and exposes read-only lookup methods such as `require`, `activeVersions` and `parametersAsOf`. The Risk Indicators Run Job is generic: after lookup it uses `indicator.engine`, `indicator.calculation` and `indicator.outputContract`; adding R003 does not add a `switch ('R003')` branch to the run job.
 
 `parametersAsOf` returns the entries whose validity range contains the run cutoff. Those entries are passed into the calculation and, crucially, the matched values are copied onto every observation the run produces — so a published signal carries its own threshold rather than a pointer to one.
 
@@ -770,7 +776,7 @@ The mapping rule is visible in that one statement: everything to the left of an 
 
 `applied_parameters` is the exact threshold object that decided this row. Carrying the values instead of a foreign key is what lets a signal stay explainable after the parameter timeline moves on, without a catalogue table to join against.
 
-Note what the `SELECT` does **not** return: no indicator title, no rendered Lithuanian sentence, no `valid_from`/`valid_to`, no `result_hash`. Wording belongs to `catalogue.generated.json` and the validity interval belongs to the Risk Signals Writer. The calculation states what is true about a subject at a cutoff; deciding whether that constitutes a change is a separate, generic step.
+Note what the `SELECT` does **not** return: no indicator title, no rendered Lithuanian sentence, no `valid_from`/`valid_to`, and no opinion about whether this differs from last night. Wording belongs to `catalogue.generated.json` and the validity interval belongs to the Risk Signals Writer. The calculation states what is true about a subject at a cutoff; deciding whether that constitutes a change is a separate, generic step.
 
 The calculation role has `SELECT` only, and the run job also starts a read-only transaction with a statement timeout. Correctness does not depend on trying to parse SQL text for forbidden keywords. Business-day counting, when required, is one shared tested PostgreSQL function backed by an effective-dated Lithuanian calendar.
 
@@ -780,17 +786,16 @@ The calculation role has `SELECT` only, and the run job also starts a read-only 
 flowchart TD
     D[definition.ts<br/>identity + dependencies + contract] -.->|provides versioned execution metadata| R[Risk Indicators Registry bootstrap]
     PM[parameters.ts<br/>effective-dated threshold timeline] -.->|provides values applicable at the cutoff| R
-    Q[calculate.sql<br/>pure parameterised SELECT] -.->|is loaded and hashed by| L[SQL loader + content hash]
-    L -.->|provides verified SQL implementation| R
+    Q[calculate.sql<br/>pure parameterised SELECT] -.->|is loaded at startup by| L[SQL loader]
+    L -.->|provides the SQL implementation| R
     F[fixtures.ts + tests] -.->|defines expected rows and boundaries| C[CI and shadow validation]
-    R -->|validated indicators in execution order| P[Risk Run Planner opens the run]
-    P -->|run row: cutoff, commit, registry hash| J[(risk.evaluation_runs)]
-    P -->|in-memory order, one indicator at a time| W[Risk Indicators Run Job]
-    W -->|run ID, cutoff, subject filter, effective parameters| X[Execute SQL in read-only transaction]
+    R -->|active indicator versions| W[Risk Indicators Run Job opens the run]
+    W -->|run row: cutoff, code commit| J[(risk.evaluation_runs)]
+    W -->|run ID, cutoff, optional subject filter, effective parameters| X[Execute SQL in read-only transaction]
     X -->|untrusted observation rows| V[Risk Signal Validator checks the shared contract]
-    V -->|validated observation rows| A[Risk Signals Writer computes result_hash]
-    A -->|compare with the current row| G{Hash differs from valid_to IS NULL row?}
-    G -->|no| SAME[UPDATE last_checked_at only]
+    V -->|validated observation rows| A[Risk Signals Writer sends them as one set]
+    A -->|compare result columns with the current row| G{Any result column IS DISTINCT FROM the valid_to IS NULL row?}
+    G -->|no| SAME[UPDATE checked_at only]
     G -->|yes| NEW[Close old row, INSERT new current row]
     SAME --> H[(risk.risk_signals)]
     NEW --> H
@@ -810,14 +815,15 @@ sequenceDiagram
     participant A as Process 3 — Astro visualisation
 
     S->>P: Commit normalised source rows into schema public
-    E->>P: Open one run, stamped with cutoff, commit and registry hash
+    E->>P: Open one run, stamped with the cutoff and the code commit
     loop one Risk Indicator at a time, in registry order
         E->>Q: Execute with run ID, data_as_of and the effective parameters from Git
         Q->>P: Read canonical facts as of the cutoff
         Q-->>E: Return standardised observation rows
-        E->>E: Validate, then compare result_hash with the current row
+        E->>E: Validate the rows against the shared contract
+        E->>P: Send them as one set; PostgreSQL compares the result columns
         alt result unchanged
-            E->>P: UPDATE last_checked_at on the existing current row
+            E->>P: UPDATE checked_at on the existing current row
         else result changed
             E->>P: Close the old row and INSERT the new current row
         end
@@ -848,7 +854,7 @@ Keeping calculation and persistence separate gives:
 - a failed indicator affecting only its own signals;
 - the same execution path in CI, shadow, backfill and production.
 
-The Risk Signals Writer is the only component that knows about `valid_from`, `valid_to`, `result_hash` and the close-and-append rule; an indicator that wrote its own result would have to reimplement that logic correctly thirty times over. It accepts validated observation rows and contains no formula branch keyed by indicator ID. No maintainer writes indicator-specific `INSERT` or `UPDATE` statements when adding a Risk Indicator.
+The Risk Signals Writer is the only component that knows about `valid_from`, `valid_to`, `checked_at` and the close-and-append rule; an indicator that wrote its own result would have to reimplement that logic correctly thirty times over. It accepts validated observation rows and contains no formula branch keyed by indicator ID. No maintainer writes indicator-specific `INSERT` or `UPDATE` statements when adding a Risk Indicator.
 
 ## 6. Choosing SQL, TypeScript or a PostgreSQL function
 
@@ -858,10 +864,10 @@ The Risk Signals Writer is the only component that knows about `valid_from`, `va
 | Reusable canonical field mapping | PostgreSQL view | unified procurement and bidder facts |
 | Stable shared database primitive | SQL/PG function | business days between dates, effective parameter lookup |
 | Indicator identity, dependencies, contract and public metadata | Risk Indicator definition in TypeScript | every Risk Indicator |
-| Scheduling, ordering, retries and backfills | Procurement Risk Service + PostgreSQL control tables | every evaluation run |
+| Scheduling, retries and backfills | Procurement Risk Service + `risk.evaluation_runs` | every evaluation run |
 | Document parsing, OCR evidence spans, embeddings or model inference | Isolated TypeScript calculator | restrictive specification text |
 | Graph algorithm awkward/slow in SQL | Isolated TypeScript graph calculator | bid rotation/community features |
-| Result persistence and history | Risk Signals Writer (hash compare, close and append) | all Risk Indicators |
+| Result persistence and history | Risk Signals Writer (column compare, close and append) | all Risk Indicators |
 
 ### 6.1 Default: TypeScript definition plus SQL SELECT
 
@@ -878,7 +884,7 @@ type RiskIndicatorCalculator = (
 ) => Promise<RiskObservationV1[]>;
 ```
 
-It returns the same observation schema to the shared validator and is written through the same hash-compare path. Its evidence must contain source references and, for text analysis, exact document/page/span evidence suitable for public verification. Engine choice is metadata, not a public-data contract change.
+It returns the same observation schema to the shared validator and is written through the same compare-and-append path. Its evidence must contain source references and, for text analysis, exact document/page/span evidence suitable for public verification. Engine choice is metadata, not a public-data contract change.
 
 ```mermaid
 flowchart LR
@@ -888,7 +894,7 @@ flowchart LR
     S -->|observation rows| O[Standard observation relation]
     C -->|observation rows| O
     O -->|untrusted standardized rows| V[Same schema + semantic checks]
-    V -->|validated rows| P[Same hash-compare and write path]
+    V -->|validated rows| P[Same compare-and-append write path]
 ```
 
 ### 6.3 PostgreSQL functions
@@ -916,9 +922,11 @@ The whole schema is **two tables and one view**:
 
 ### 7.1 Evaluation runs
 
-`risk.evaluation_runs` holds one row per run of the Procurement Risk Service: the source cutoff `data_as_of`, the `code_commit` and `registry_hash` that defined the indicators, start and end times, a terminal state, and per-indicator counts and timings in `statistics`.
+`risk.evaluation_runs` holds one row per run of the Procurement Risk Service: the cutoff `data_as_of`, the `code_commit` the service was deployed from, start and end times, a terminal state, and per-indicator counts and timings in `statistics`.
 
-It answers a question the signal rows cannot: **did the job run, and did it succeed?** A site whose evaluation job has been silently broken for three weeks otherwise keeps displaying its flags with full confidence. One row per run, plus `last_checked_at` on each signal, makes that failure visible. A partial unique index on `status = 'running'` is the database-enforced backstop to the service's advisory lock.
+The commit is stored once per run rather than on every signal row, and runs are kept forever, so a signal's `run_id` is enough to recover the exact code that produced it. There is no `registry_hash`: a hash of the deployed definition files, checked against a literal committed alongside them, would be a second answer to a question `code_commit` already answers.
+
+It answers a question the signal rows cannot: **did the job run, and did it succeed?** A site whose evaluation job has been silently broken for three weeks otherwise keeps displaying its flags with full confidence. One row per run, plus `checked_at` on each signal, makes that failure visible. A partial unique index on `status = 'running'` is the database-enforced backstop to the service's advisory lock.
 
 ### 7.2 Risk signals: current state and history in one table
 
@@ -937,21 +945,34 @@ CREATE UNIQUE INDEX risk_signals_current_idx
 
 That partial unique index *is* the current-state pointer. It serves the procurement page as an index-only lookup and makes a repeated run idempotent — a second identical run physically cannot insert a duplicate current row.
 
-**Write on change, not on every run.** Rough sizing, on estimates rather than measurement: perhaps 200k procurements with live lifecycles × ~30 indicators ≈ 6M evaluations per run. Appending every run nightly would be ~2.2 billion rows a year, almost all byte-identical to the night before — once a procurement is awarded and closed, its indicators are frozen. Writing only when `result_hash` differs reduces that to the few thousand rows a night that genuinely changed.
+**Write on change, not on every run.** Rough sizing, on estimates rather than measurement: perhaps 200k procurements with live lifecycles × ~30 indicators ≈ 6M evaluations per run. Appending every run nightly would be ~2.2 billion rows a year, almost all identical to the night before — once a procurement is awarded and closed, its indicators are frozen. Writing only the rows that differ reduces that to the few thousand a night that genuinely changed. Deleting the excess afterwards by retention is not an alternative: at a one-month TTL that is still ~180 million live rows to serve a public page from.
 
-**Bump `last_checked_at` on every run.** Write-on-change alone leaves "checked last night, unchanged" indistinguishable from "not checked since March". On a site that publishes red flags, "as of when" is a public claim, so each run updates `last_checked_at` on the rows it re-confirms.
+**"Different" is decided in the database, on the result columns.** The writer sends the indicator's validated observations as one set and joins them to the current rows, comparing `indicator_version`, `applied_parameters`, `state`, `raw_value`, `threshold`, `evidence` and `missing_data` with `IS DISTINCT FROM` so that NULLs on either side compare correctly. Timestamps, `run_id`, `duration_ms` and `error_info` are excluded from the comparison, which is what stops an unrelated redeploy — or a failing indicator whose error message changes — from registering as a changed signal.
 
-Result columns are never updated after insert: only `last_checked_at`, `last_checked_run_id` and `valid_to` change. `result_hash` covers the result columns and excludes `code_commit`, run IDs and all timestamps, so an unrelated commit cannot register as a changed signal.
+There is **no `result_hash`**. A hash would be a second encoding of the result columns that has to be kept in agreement with them: recomputed identically in TypeScript and in every backfill, and re-derived for every existing row whenever a column is added. `IS DISTINCT FROM` over the columns themselves cannot drift from the values it compares, and it is one predicate in a statement PostgreSQL already has to execute.
+
+**Advance `checked_at` on every run.** Write-on-change alone leaves "checked last night, unchanged" indistinguishable from "not checked since March". On a site that publishes red flags, "as of when" is a public claim, so each run updates `checked_at` on the rows it re-confirms. On a full run this needs no join against the returned rows at all — the run evaluated the indicator's whole applicable population by construction, so it is one statement:
+
+```sql
+UPDATE risk.risk_signals
+   SET checked_at = $2
+ WHERE indicator_id = $1
+   AND valid_to IS NULL;
+```
+
+That matters, because this is the largest write the run performs — larger than the inserts it saves. A subject-filtered rerun adds the filter to the same statement.
+
+Result columns are never updated after insert: only `checked_at` and `valid_to` change.
 
 Three further properties of the row:
 
 - **All five states are stored**, not only triggers: `triggered`, `not_triggered`, `insufficient_data`, `not_applicable`, `calculation_error`. Without the non-triggering ones the page cannot distinguish "checked, clean" from "never evaluated" from "the calculation crashed", and cannot honestly say "we checked 12 indicators, 2 fired".
 - **Display text is not stored.** Titles and explanation templates come from `catalogue.generated.json`, keyed by `(indicator_id, indicator_version)`. What the row stores is the structured evidence the sentence is rendered from: `raw_value`, `threshold` and `evidence`. A wording correction is then a one-line commit rather than a mass `UPDATE`.
-- **The definition is resolved, not copied.** `(indicator_id, indicator_version, code_commit)` identifies it exactly in Git. `applied_parameters` stores the effective values that decided the row — small, and enough to re-explain the signal years later.
+- **The definition is resolved, not copied.** `(indicator_id, indicator_version)` plus the `code_commit` of the row's run identifies it exactly in Git. `applied_parameters` stores the effective values that decided the row — small, and enough to re-explain the signal years later.
 
 ### 7.3 Vintage and retention
 
-Every row carries `data_as_of` (the source cutoff it was computed from) and `last_checked_at` (the last run that re-confirmed it), and the page states both: *"tikrinta 2026-08-11, duomenys iki 2026-08-10"*. If the service stops, the site keeps showing the last known state with an increasingly old date rather than silently emptying the page.
+Every row carries `data_as_of` (the cutoff it was computed at) and `checked_at` (the last run that re-confirmed it), and the page states both: *"tikrinta 2026-08-11, duomenys iki 2026-08-10"*. If the service stops, the site keeps showing the last known state with an increasingly old date rather than silently emptying the page.
 
 Current rows are never deleted, however old: an untouched procurement keeps its signals until an indicator changes them.
 
@@ -959,7 +980,7 @@ Closed rows — those the GUI no longer shows, because a newer state replaced th
 
 ### 7.4 List-page read model
 
-`risk.v_procurement_summaries` aggregates current signals per procurement: triggered/insufficient/not-applicable/error counts, attention points, top severity and the triggering indicator IDs. Stage, deadline and event date come from joining `public.v_pirkimas` — they are ingestion facts and are not copied into `risk`.
+`risk.v_procurement_summaries` aggregates current signals per procurement: triggered/insufficient/not-applicable/error counts and the triggering indicator IDs. It carries no attention points and no maximum severity — both were aggregates over per-row scores the signal no longer stores, and severity filtering is done by expanding the catalogue's severity set into indicator IDs ([`risk-schema.md`](risk-schema.md) §3). Stage, deadline and event date come from joining `public.v_pirkimas` — they are ingestion facts and are not copied into `risk`.
 
 It is a **view**. If it proves slow on the real corpus, promoting it to a materialised view refreshed at the end of each run is a change to one file and to nothing else.
 
@@ -1016,14 +1037,13 @@ commit 4f1c9ae  2026-12-18  Jonas P.  (PR #412, approved by @teise)
 
 ### 8.2 Triggered signal
 
-One current row of `risk.risk_signals`, represented as JSON. Note `validTo: null` — this is the current state — and the gap between `validFrom` and `lastCheckedAt`: the signal first appeared on 6 August and has been re-confirmed unchanged every run since, which is why no further rows were written.
+One current row of `risk.risk_signals`, represented as JSON. Note `validTo: null` — this is the current state — and the gap between `validFrom` and `checkedAt`: the signal first appeared on 6 August and has been re-confirmed unchanged every run since, which is why no further rows were written.
 
 ```json
 {
   "id": 98122,
-  "runId": "697c7cab-d86e-46ea-bec5-4df63c5c5dc0",
+  "runId": 412,
   "indicator": "R003/2",
-  "codeCommit": "4f1c9ae",
   "appliedParameters": {
     "minimumDays": 10,
     "dayCounting": "calendar_days",
@@ -1043,9 +1063,6 @@ One current row of `risk.risk_signals`, represented as JSON. Note `validTo: null
     "minimumDays": 10,
     "dayCounting": "calendar_days"
   },
-  "strength": 0.52,
-  "severity": "medium",
-  "confidence": 0.98,
   "evidence": {
     "facts": [
       {"field": "publicationDate", "source": "CVP IS notice", "value": "2026-08-06T13:48:00+03:00"},
@@ -1061,12 +1078,11 @@ One current row of `risk.risk_signals`, represented as JSON. Note `validTo: null
   "dataAsOf": "2026-08-10T19:05:00+03:00",
   "validFrom": "2026-08-06T21:14:00+03:00",
   "validTo": null,
-  "lastCheckedAt": "2026-08-11T03:12:00+03:00",
-  "resultHash": "sha256:example"
+  "checkedAt": "2026-08-11T03:12:00+03:00"
 }
 ```
 
-There is deliberately no `title`, no `descriptionLt` and no rendered explanation sentence on this row. The page composes those from `catalogue.generated.json` entry `R003/2` and the structured values above, so a wording correction is a one-line commit rather than a mass `UPDATE`.
+There is deliberately no `title`, no `descriptionLt` and no rendered explanation sentence on this row. There is equally deliberately no `strength`, `severity`, `confidence` or `resultHash`: the first three were uncalibrated scores ([decision 4](#1-decisions)), and the fourth was a redundant encoding of the result columns ([§7.2](#72-risk-signals-current-state-and-history-in-one-table)). The page composes those from `catalogue.generated.json` entry `R003/2` and the structured values above, so a wording correction is a one-line commit rather than a mass `UPDATE`.
 
 ### 8.3 Insufficient-data signal
 
@@ -1077,7 +1093,6 @@ There is deliberately no `title`, no `descriptionLt` and no rendered explanation
   "state": "insufficient_data",
   "rawValue": null,
   "threshold": null,
-  "confidence": null,
   "evidence": {},
   "missingData": ["winningBidAmount", "estimatedValue"],
   "dataAsOf": "2026-08-10T19:05:00+03:00",
@@ -1089,10 +1104,10 @@ Both records are important. The first supports a public signal; the second suppo
 
 ### 8.4 A signal that stopped
 
-When a buyer extends a deadline, the next run computes `not_triggered`, the hash differs, and the writer closes the old row rather than deleting it:
+When a buyer extends a deadline, the next run computes `not_triggered`, the `state` column differs from the current row, and the writer closes the old row rather than deleting it:
 
 ```text
-id      indicator  state          valid_from          valid_to          last_checked_at
+id      indicator  state          valid_from          valid_to          checked_at
 98122   R003/2     triggered      2026-08-06 21:14     2026-08-14 03:09     2026-08-14 03:09
 99871   R003/2     not_triggered  2026-08-14 03:09     NULL                 2026-08-19 03:11
 ```
@@ -1101,23 +1116,24 @@ The procurement page shows row `99871`. The history panel shows both, with the d
 
 ## 9. Calculation and write flow
 
-A run is started by the schedule or by an explicit backfill request. For one `data_as_of` cutoff the Procurement Risk Service:
+A run is started by the schedule or by an explicit backfill request. It has no planning phase: the cutoff is the clock, the order is the registry's, and the subject set belongs to each indicator ([§5.2.2](#522-the-run-cutoff-and-who-chooses-the-subject-set)). The Procurement Risk Service:
 
-1. takes the single-instance advisory lock, builds the Risk Indicators Registry from the deployed directories and verifies code and SQL hashes;
+1. takes the single-instance advisory lock; the Risk Indicators Registry was already built and validated at process start;
 2. closes any run left `running` by a previous crash, marking it `failed`;
-3. opens one run row stamped with the cutoff, the code commit and the registry hash;
-4. topologically sorts the active indicators into an in-memory execution order;
-5. resolves each indicator's effective parameter entries at the cutoff and executes the Risk Indicators **one at a time** in that order — SQL ones in read-only transactions with a statement timeout, TypeScript ones in an isolated execution context;
-6. validates column types, allowed states, subject identity, uniqueness and semantic invariants after each indicator;
-7. computes `result_hash` per observation and, in one transaction per indicator, bumps `last_checked_at` on unchanged rows and closes-and-appends the changed ones;
-8. records that indicator's counts, timings and any error in `statistics`, then continues to the next indicator;
-9. closes the run as `succeeded`, or `partial` if some indicators failed.
+3. reads the clock once as `data_as_of` and opens one run row stamped with that cutoff and the code commit;
+4. resolves each indicator's effective parameter entries at the cutoff and executes the active Risk Indicators **one at a time** — SQL ones in read-only transactions with a statement timeout, TypeScript ones in an isolated execution context;
+5. validates column types, allowed states, subject identity, uniqueness and semantic invariants after each indicator;
+6. in one transaction per indicator, advances `checked_at` on that indicator's current rows, closes the ones whose result columns differ from the returned observation, and inserts the replacements;
+7. records that indicator's counts, timings and any error in `statistics`, then continues to the next indicator;
+8. closes the run as `succeeded`, or `partial` if some indicators failed.
+
+Step 4 is where the cutoff earns its keep: an indicator compares against `$2`, never `now()`, so the thirtieth indicator of a two-hour run measures deadlines against the same instant as the first, and re-running the same cutoff produces the same answer.
 
 Two consequences are worth being explicit about.
 
 **A failing indicator is contained, not fatal.** Its previous signals stay current with their older `data_as_of`, and the page shows them as such. Only the indicators that actually ran get new vintages. This is weaker than an all-or-nothing publication and stronger than the obvious alternative of writing error rows over good results.
 
-**Readers can observe a run in progress.** Between steps 7 and 9 a page may show R003 at tonight's cutoff beside R018 at last night's. Every row carries `data_as_of`, so the mixture is visible rather than silent, and step 9 bounds how long it lasts.
+**Readers can observe a run in progress.** Between steps 6 and 8 a page may show R003 at tonight's cutoff beside R018 at last night's. Every row carries `data_as_of`, so the mixture is visible rather than silent, and step 9 bounds how long it lasts.
 
 The Risk Signals Writer receives already validated standardised rows and contains no indicator-specific formula.
 
@@ -1150,7 +1166,6 @@ Create a new Risk Indicator implementation version — a new `key.version` and a
 - required data or source mapping in a way that changes results;
 - applicability/exclusion logic;
 - subject or market definition;
-- strength, severity or confidence calculation;
 - material public interpretation of what a trigger means.
 
 Append a new effective-dated entry to `parameters.ts`, without changing implementation version, when changing:
@@ -1181,7 +1196,6 @@ The comparison report includes:
 - subjects newly triggered or no longer triggered;
 - state changes involving insufficient data;
 - trigger rate by method, CPV and buyer type;
-- top changes in attention points;
 - query/runtime cost;
 - reviewed false-positive explanations.
 
@@ -1217,15 +1231,14 @@ Every Risk Indicator must test:
 - timezone and daylight-saving boundaries;
 - duplicate source rows and multi-lot/multi-supplier cardinality;
 - effective-date transition between parameter entries;
-- as-of behavior preventing future-data leakage;
-- stable evidence and result hashes;
+- byte-stable output for an unchanged cutoff and unchanged source rows, which is what makes write-on-change work;
+- no use of `now()`, `current_date` or any other implicit clock: every time comparison goes through the `$2` cutoff;
 - reasonable query plan and runtime on a representative sample.
 
 Risk Indicators Registry tests ensure:
 
 - unique IDs and one active version;
 - OCP IDs use the original catalogue code;
-- the declared dependencies form an acyclic graph with a deterministic execution order;
 - every parameter entry validates against `parameterContract`;
 - parameter entries within one scope neither overlap nor leave gaps, and `validTo` is never earlier than `validFrom`;
 - public text and limitation are non-empty;
@@ -1238,10 +1251,11 @@ Because the catalogue is code, CI carries two checks that a database catalogue w
 
 The Risk Signals Writer is generic and therefore tested once, not per indicator. Its tests are the ones that protect the storage decision in [§7.2](#72-risk-signals-current-state-and-history-in-one-table):
 
-- a run whose results are identical to the previous run writes **zero** rows and only advances `last_checked_at` — the assertion the whole table size depends on;
+- a run whose results are identical to the previous run writes **zero** rows and only advances `checked_at` — the assertion the whole table size depends on;
 - a changed result closes the old row with `valid_to` equal to the new row's `valid_from`, leaving no gap and no overlap;
 - the partial unique index rejects a second current row for the same `(subject, indicator)`, so a run accidentally run twice cannot duplicate state;
-- `result_hash` is stable across a commit that changes nothing semantic, and changes when state, value, threshold, evidence, indicator version or applied parameters change;
+- the comparison fires on a change in `state`, `raw_value`, `threshold`, `evidence`, `missing_data`, `indicator_version` or `applied_parameters`, and ignores a change in `run_id`, `data_as_of`, `duration_ms` or `error_info`;
+- a NULL appearing or disappearing on either side of a compared column counts as a change, which is the `IS DISTINCT FROM` case a plain `<>` would silently miss;
 - a `calculation_error` for one indicator leaves other indicators' current rows untouched;
 - an interrupted run leaves the rows it already wrote valid and consistent, and the next start closes the stale `running` run.
 
@@ -1259,7 +1273,7 @@ Build one complete vertical slice with R003:
 8. verify that appending a `parameters.ts` entry and deploying produces new observations carrying the new threshold, while old observations keep the old one;
 9. verify that a deliberately broken indicator writes `calculation_error`, leaves its previous signals current and does not stop the run, then add the next two Risk Indicators.
 
-Two verifications in this list are the ones that actually exercise the schema decision, and they are worth writing first. Step 7 proves the close-and-append rule; running the job twice with no source change proves the other half — the second run must write **zero** new rows and only advance `last_checked_at`. If that assertion fails, the table grows by 6M rows a night and the design is broken.
+Two verifications in this list are the ones that actually exercise the schema decision, and they are worth writing first. Step 7 proves the close-and-append rule; running the job twice with no source change proves the other half — the second run must write **zero** new rows and only advance `checked_at`. If that assertion fails, the table grows by 6M rows a night and the design is broken.
 
 This slice tests the important architecture boundaries: three separate processes, one sequential run, results and history in one table, and a catalogue that lives only in Git. Adding many SQL snippets before the current/history/version/parameter semantics exist would create a catalogue that is quick to start and expensive to maintain.
 
