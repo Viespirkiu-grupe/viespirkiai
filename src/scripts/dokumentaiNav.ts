@@ -25,18 +25,23 @@ export function navigate(immediate = false) {
   else navTimer = setTimeout(go, 350);
 }
 
-// Multi-valued params: author/creator/producer repeat the key; everything else
-// is a single comma-joined value.
+const REPEATED_PARAMS = new Set([
+  'author', 'creator', 'producer', 'teismas', 'bylosRusis', 'kategorija',
+  'teisejas', 'aktoRusis', 'galiojimas', 'redakcija', 'projektoBusena',
+  'eurovoc', 'prieme', 'turinys', 'istaigosNr', 'regNr',
+]);
+
+// Žmogiškos reikšmės gali turėti kablelių, todėl jos kartoja parametrą.
 export function setList(param: string, list: string[]) {
   params.delete(param);
-  if (param === 'author' || param === 'creator' || param === 'producer') {
+  if (REPEATED_PARAMS.has(param)) {
     list.forEach((value) => params.append(param, value));
   } else if (list.length) {
     params.set(param, list.join(','));
   }
 }
 export function getList(param: string) {
-  if (param === 'author' || param === 'creator' || param === 'producer') return params.getAll(param).filter(Boolean);
+  if (REPEATED_PARAMS.has(param)) return params.getAll(param).filter(Boolean);
   return (params.get(param) || '').split(',').map((s) => s.trim()).filter(Boolean);
 }
 

@@ -4,6 +4,7 @@
 // what labels, what overflow" config so the component stays thin.
 import type { DokFacet } from './dokumentaiUrl.ts';
 import { CLASS_OPTS, CLASS_LABEL, TIPAS_OPTS, TYPE_LABEL, SOURCE_LABEL, LANG_LABEL } from './dokumentaiLabels.ts';
+import { eurovocLabel, statusasLabel, turinysLabel, variantasLabel } from './teisesAktaiLabels.ts';
 
 /** The data DokFilters receives (built by loadDokumentaiPage). */
 export interface FiltersData {
@@ -27,6 +28,12 @@ export interface FiltersData {
   editionType: DokFacet;
   projectStatus: DokFacet;
   eurovoc: DokFacet;
+  adoptedBy: DokFacet;
+  contentState: DokFacet;
+  institutionNumber: string | null;
+  registrationNumber: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
   source: DokFacet;
   istaiga: DokFacet;
   host: DokFacet;
@@ -106,10 +113,12 @@ export function buildFilterSections(p: FiltersData): Record<Group, FacetSectionP
 
     // Teisėkūra (rodoma tik su „teisekura" klase / aktyviu filtru).
     { group: 'teisekura', when: any(p.actType), label: 'Teisės akto rūšis', param: 'aktoRusis', facet: p.actType, modal: { field: 'metadata.rusis', title: 'Teisės akto rūšis' } },
-    { group: 'teisekura', when: any(p.validity), label: 'Galiojimas', param: 'galiojimas', facet: p.validity },
-    { group: 'teisekura', when: any(p.editionType), label: 'Redakcija', param: 'redakcija', facet: p.editionType },
+    { group: 'teisekura', when: any(p.validity), label: 'Galiojimas', param: 'galiojimas', facet: p.validity, formatLabel: statusasLabel },
+    { group: 'teisekura', when: any(p.editionType), label: 'Redakcija', param: 'redakcija', facet: p.editionType, formatLabel: variantasLabel },
     { group: 'teisekura', when: any(p.projectStatus), label: 'Projekto būsena', param: 'projektoBusena', facet: p.projectStatus, modal: { field: 'metadata.busena', title: 'Projekto būsena' } },
-    { group: 'teisekura', when: any(p.eurovoc), label: 'Eurovoc', param: 'eurovoc', facet: p.eurovoc, modal: { field: 'metadata.eurovocTerminai', title: 'Eurovoc' } },
+    { group: 'teisekura', when: any(p.eurovoc), label: 'Eurovoc', param: 'eurovoc', facet: p.eurovoc, formatLabel: eurovocLabel, modal: { field: 'metadata.eurovocTerminai', title: 'Eurovoc' } },
+    { group: 'teisekura', when: any(p.adoptedBy), label: 'Priėmė', param: 'prieme', facet: p.adoptedBy, modal: { field: 'metadata.prieme', title: 'Priėmė' } },
+    { group: 'teisekura', when: any(p.contentState), label: 'Teksto būsena', param: 'turinys', facet: p.contentState, formatLabel: turinysLabel },
 
     // Middle: source, agency, site, person, extension.
     { group: 'mid', when: any(p.source), label: 'Šaltinis', param: 'source', facet: p.source, allLabel: 'Visi', formatLabel: sourceLabel },

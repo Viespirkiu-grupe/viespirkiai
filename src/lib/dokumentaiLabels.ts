@@ -16,6 +16,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   liteko: 'LITEKO',
   liteko2: 'LITEKO2',
   eseimas: 'e-Seimas',
+  etar: 'e-TAR',
 };
 
 // Klasė = plati dokumento sritis (viešieji pirkimai vs teisė).

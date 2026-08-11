@@ -89,7 +89,16 @@ export interface DokumentasHit {
   updatedAt: Date | null;
   discoveredAt: Date | null;
   failasId: number | null;
+  saltinioId0: string | null;
+  saltinioId1: string | null;
   saltinioId2: string | null;
+  saltinioId3: string | null;
+  editionType: string | null;
+  galiojimas: string | null;
+  prieme: string | null;
+  turinioBusena: string | null;
+  istaigosNr: string | null;
+  registracijosNr: string | null;
   title: string | null;
   snippet: string | null;
 }
@@ -129,6 +138,12 @@ export interface DokumentaiSearchResult {
   editionTypeFilter: string[];
   projectStatusFilter: string[];
   eurovocFilter: string[];
+  adoptedByFilter: string[];
+  contentStateFilter: string[];
+  institutionNumberFilter: string[];
+  registrationNumberFilter: string[];
+  dateFrom: string | null;
+  dateTo: string | null;
   bbox: Bbox | null;
   typeCountMap: Record<string, number>;
   classCountMap: Record<string, number>;
@@ -152,6 +167,8 @@ export interface DokumentaiSearchResult {
   editionTypeOptions: FacetOption[];
   projectStatusOptions: FacetOption[];
   eurovocOptions: FacetOption[];
+  adoptedByOptions: FacetOption[];
+  contentStateOptions: FacetOption[];
 }
 
 // ── Quickwit helpers ─────────────────────────────────────────────────────────
@@ -284,6 +301,10 @@ const FACETS = [
   { key: 'editionTypes', param: 'redakcija', field: 'metadata.editionType', exclude: 'excludeEditionType', kind: 'term', quote: true, parse: 'array' },
   { key: 'projectStatuses', param: 'projektoBusena', field: 'metadata.busena', exclude: 'excludeProjectStatus', kind: 'term', quote: true, parse: 'array' },
   { key: 'eurovoc', param: 'eurovoc', field: 'metadata.eurovocTerminai', exclude: 'excludeEurovoc', kind: 'term', quote: true, parse: 'array' },
+  { key: 'adoptedBy', param: 'prieme', field: 'metadata.prieme', exclude: 'excludeAdoptedBy', kind: 'term', quote: true, parse: 'array' },
+  { key: 'contentStates', param: 'turinys', field: 'metadata.turinioBusena', exclude: 'excludeContentState', kind: 'term', quote: true, parse: 'array' },
+  { key: 'institutionNumbers', param: 'istaigosNr', field: 'metadata.istaigosNr', exclude: 'excludeInstitutionNumber', kind: 'term', quote: true, parse: 'array' },
+  { key: 'registrationNumbers', param: 'regNr', field: 'metadata.registracijosNr', exclude: 'excludeRegistrationNumber', kind: 'term', quote: true, parse: 'array' },
   { key: 'hosts', param: 'host', field: 'host', exclude: 'excludeHost', kind: 'term', quote: true, parse: 'split', inline: 'hosts' },
   { key: 'jars', param: 'jar', field: 'jarKodai', exclude: 'excludeJar', kind: 'jar', quote: false, parse: 'split', inline: 'jars' },
   // Paskelbusi įstaiga: tiksli atitiktis pagal istaigaJar (raw tokenizer).
@@ -306,6 +327,8 @@ type ExcludeKey = typeof FACETS[number]['exclude'];
 type ParsedParts = {
   textQuery: string;
   bbox: Bbox | null;
+  dateFrom: string | null;
+  dateTo: string | null;
   /** Tiksli frazė: tekstą paduodam Quickwit'ui kabutėse ("…"), kad žodžiai būtų
    *  randami tiksliai greta ir ta pačia tvarka, o ne kaip atskiri terminai. */
   phrase: boolean;
@@ -333,6 +356,16 @@ export function buildPartsExcluding(
       const yrs = vals.map((y) => parseInt(y, 10)).filter((y) => Number.isFinite(y));
       if (yrs.length) p.push(`(${yrs.map((y) => `${f.field}:[${y}-01-01T00:00:00Z TO ${y + 1}-01-01T00:00:00Z}`).join(' OR ')})`);
     }
+  }
+  if (opts.dateFrom || opts.dateTo) {
+    const nextDay = (date: string) => {
+      const value = new Date(`${date}T00:00:00Z`);
+      value.setUTCDate(value.getUTCDate() + 1);
+      return value.toISOString().slice(0, 10);
+    };
+    const from = opts.dateFrom ? `${opts.dateFrom}T00:00:00Z` : '*';
+    const to = opts.dateTo ? `${nextDay(opts.dateTo)}T00:00:00Z` : '*';
+    p.push(`happenedAt:[${from} TO ${to}}`);
   }
   // Sritis: dokumentai, kurių taškas patenka į pasirinktą stačiakampį. Filtruojam
   // per Quickwit lat/lon fast laukų range užklausą (inkliuzyvūs rėžiai).
@@ -403,6 +436,12 @@ export function buildPartsOpts(input: {
   redakcija?: string | string[];
   projektoBusena?: string | string[];
   eurovoc?: string | string[];
+  prieme?: string | string[];
+  turinys?: string | string[];
+  istaigosNr?: string | string[];
+  regNr?: string | string[];
+  nuo?: string;
+  iki?: string;
   minLat?: string | number;
   maxLat?: string | number;
   minLon?: string | number;
@@ -419,6 +458,17 @@ export function buildPartsOpts(input: {
     bbox: parseBbox(input),
     phrase,
   };
+  const validDate = (value: unknown) => {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+    const date = new Date(`${text}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === text ? text : null;
+  };
+  let dateFrom = validDate(input.nuo);
+  let dateTo = validDate(input.iki);
+  if (dateFrom && dateTo && dateFrom > dateTo) [dateFrom, dateTo] = [dateTo, dateFrom];
+  parsed.dateFrom = dateFrom;
+  parsed.dateTo = dateTo;
   for (const f of FACETS as readonly FacetDef[]) {
     let vals = f.parse === 'split' ? splitMulti(src[f.param]) : asArray(src[f.param]);
     if (f.transform) vals = vals.map(f.transform);
@@ -435,7 +485,8 @@ type FacetExcludeKey =
   | 'excludeClass' | 'excludeHost' | 'excludeJar' | 'excludeIstaiga' | 'excludeExt' | 'excludeAuthor' | 'excludeCreator' | 'excludeProducer' | 'excludeLang'
   | 'excludeSav' | 'excludeApskritis' | 'excludeSource'
   | 'excludeCourt' | 'excludeCaseType' | 'excludeCategory' | 'excludeJudge'
-  | 'excludeActType' | 'excludeValidity' | 'excludeEditionType' | 'excludeProjectStatus' | 'excludeEurovoc';
+  | 'excludeActType' | 'excludeValidity' | 'excludeEditionType' | 'excludeProjectStatus' | 'excludeEurovoc'
+  | 'excludeAdoptedBy' | 'excludeContentState' | 'excludeInstitutionNumber' | 'excludeRegistrationNumber';
 const FACET_EXCLUDE: Record<string, FacetExcludeKey> = {
   class: 'excludeClass',
   host: 'excludeHost',
@@ -458,6 +509,10 @@ const FACET_EXCLUDE: Record<string, FacetExcludeKey> = {
   'metadata.editionType': 'excludeEditionType',
   'metadata.busena': 'excludeProjectStatus',
   'metadata.eurovocTerminai': 'excludeEurovoc',
+  'metadata.prieme': 'excludeAdoptedBy',
+  'metadata.turinioBusena': 'excludeContentState',
+  'metadata.istaigosNr': 'excludeInstitutionNumber',
+  'metadata.registracijosNr': 'excludeRegistrationNumber',
 };
 
 /**
@@ -828,6 +883,12 @@ export async function searchDokumentai(input: {
   redakcija?: string | string[];
   projektoBusena?: string | string[];
   eurovoc?: string | string[];
+  prieme?: string | string[];
+  turinys?: string | string[];
+  istaigosNr?: string | string[];
+  regNr?: string | string[];
+  nuo?: string;
+  iki?: string;
   minLat?: string | number;
   maxLat?: string | number;
   minLon?: string | number;
@@ -877,6 +938,8 @@ export async function searchDokumentai(input: {
   const editionTypeFacetQuery = buildPartsExcluding({ ...partsOpts, excludeEditionType: true });
   const projectStatusFacetQuery = buildPartsExcluding({ ...partsOpts, excludeProjectStatus: true });
   const eurovocFacetQuery = buildPartsExcluding({ ...partsOpts, excludeEurovoc: true });
+  const adoptedByFacetQuery = buildPartsExcluding({ ...partsOpts, excludeAdoptedBy: true });
+  const contentStateFacetQuery = buildPartsExcluding({ ...partsOpts, excludeContentState: true });
 
   const t0 = Date.now();
   const mark = () => Date.now() - t0;
@@ -906,6 +969,8 @@ export async function searchDokumentai(input: {
     qwAggregate('metadata.editionType', editionTypeFacetQuery, 10),
     qwAggregate('metadata.busena', projectStatusFacetQuery, 30),
     qwAggregate('metadata.eurovocTerminai', eurovocFacetQuery, 60),
+    qwAggregate('metadata.prieme', adoptedByFacetQuery, 60),
+    qwAggregate('metadata.turinioBusena', contentStateFacetQuery, 20),
     // Sidebar previews only 6 extensions; +1 is enough to know whether to show
     // the "Daugiau" button. The full list is fetched on demand by the modal
     // (/api/dokumentaiFacet), so there's no need to over-aggregate here.
@@ -933,7 +998,7 @@ export async function searchDokumentai(input: {
   if (filterMs > 0) {
     timings.push({ label: 'Gyvų atranka', phase: 'pg', start: searchStart + qwMs, duration: filterMs });
   }
-  const [hostBuckets, jarBuckets, typeBuckets, classBuckets, courtBuckets, caseTypeBuckets, categoryBuckets, judgeBuckets, actTypeBuckets, validityBuckets, editionTypeBuckets, projectStatusBuckets, eurovocBuckets, extBuckets, authorBuckets, creatorBuckets, producerBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets, istaigaBuckets] = await aggsPromise;
+  const [hostBuckets, jarBuckets, typeBuckets, classBuckets, courtBuckets, caseTypeBuckets, categoryBuckets, judgeBuckets, actTypeBuckets, validityBuckets, editionTypeBuckets, projectStatusBuckets, eurovocBuckets, adoptedByBuckets, contentStateBuckets, extBuckets, authorBuckets, creatorBuckets, producerBuckets, langBuckets, savBuckets, apskritisBuckets, sourceBuckets, istaigaBuckets] = await aggsPromise;
   timings.push({ label: 'Facetai', phase: 'filter', start: aggsStart, duration: mark() - aggsStart });
 
   const total = result.numHitsEstimate ?? result.hits.length;
@@ -952,7 +1017,7 @@ export async function searchDokumentai(input: {
          d.extension, d.language, d."pageCount", d."wordCount", d."characterCount",
          d.savivaldybe, d.apskritis, d."istaigaJar", j.pavadinimas AS "istaigaPavadinimas",
          d."happenedAt", d."createdAt", d."updatedAt", d."discoveredAt", d."failasId",
-         d."saltinioId2"
+         d."saltinioId0", d."saltinioId1", d."saltinioId2", d."saltinioId3"
        FROM public.dokumentai d
        LEFT JOIN public.jar j ON j."jarKodas" = d."istaigaJar"
        WHERE d.id = ANY($1)
@@ -983,6 +1048,12 @@ export async function searchDokumentai(input: {
         try {
           const sidecar: any = await readDokumentasFs(row.md5);
           const text = normalizeDocText(sidecar?.text);
+          row.editionType = sidecar?.metadata?.editionType ?? null;
+          row.galiojimas = sidecar?.metadata?.galiojimas ?? null;
+          row.prieme = sidecar?.metadata?.prieme ?? null;
+          row.turinioBusena = sidecar?.metadata?.turinioBusena ?? null;
+          row.istaigosNr = sidecar?.metadata?.istaigosNr ?? null;
+          row.registracijosNr = sidecar?.metadata?.registracijosNr ?? null;
           if (text.length) {
             row.snippet = makeSnippet(text, snippetQuery, phrase ? 'phrase' : 'words');
           }
@@ -1026,6 +1097,8 @@ export async function searchDokumentai(input: {
   const editionTypeOptions = toOptions(editionTypeBuckets);
   const projectStatusOptions = toOptions(projectStatusBuckets);
   const eurovocOptions = toOptions(eurovocBuckets);
+  const adoptedByOptions = toOptions(adoptedByBuckets);
+  const contentStateOptions = toOptions(contentStateBuckets);
   const extOptions = toOptions(extBuckets);
   const authorOptions = toOptions(authorBuckets);
   const creatorOptions = toOptions(creatorBuckets);
@@ -1083,6 +1156,12 @@ export async function searchDokumentai(input: {
     editionTypeFilter: partsOpts.editionTypes,
     projectStatusFilter: partsOpts.projectStatuses,
     eurovocFilter: partsOpts.eurovoc,
+    adoptedByFilter: partsOpts.adoptedBy,
+    contentStateFilter: partsOpts.contentStates,
+    institutionNumberFilter: partsOpts.institutionNumbers,
+    registrationNumberFilter: partsOpts.registrationNumbers,
+    dateFrom: partsOpts.dateFrom,
+    dateTo: partsOpts.dateTo,
     bbox: partsOpts.bbox,
     typeCountMap,
     classCountMap,
@@ -1106,5 +1185,7 @@ export async function searchDokumentai(input: {
     editionTypeOptions,
     projectStatusOptions,
     eurovocOptions,
+    adoptedByOptions,
+    contentStateOptions,
   };
 }

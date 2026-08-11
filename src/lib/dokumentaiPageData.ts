@@ -56,6 +56,12 @@ export async function loadDokumentaiPage(url: URL) {
   const rawEditionTypeFilter = params.getAll('redakcija').filter(Boolean);
   const rawProjectStatusFilter = params.getAll('projektoBusena').filter(Boolean);
   const rawEurovocFilter = params.getAll('eurovoc').filter(Boolean);
+  const rawAdoptedByFilter = params.getAll('prieme').filter(Boolean);
+  const rawContentStateFilter = params.getAll('turinys').filter(Boolean);
+  const rawInstitutionNumberFilter = params.getAll('istaigosNr').filter(Boolean);
+  const rawRegistrationNumberFilter = params.getAll('regNr').filter(Boolean);
+  const rawDateFrom = params.get('nuo') ?? undefined;
+  const rawDateTo = params.get('iki') ?? undefined;
 
   // Geografinė sritis (stačiakampis) — filtruojama per Quickwit lat/lon range.
   const rawArea = {
@@ -97,6 +103,12 @@ export async function loadDokumentaiPage(url: URL) {
       rawEditionTypeFilter.forEach((value) => sp.append('redakcija', value));
       rawProjectStatusFilter.forEach((value) => sp.append('projektoBusena', value));
       rawEurovocFilter.forEach((value) => sp.append('eurovoc', value));
+      rawAdoptedByFilter.forEach((value) => sp.append('prieme', value));
+      rawContentStateFilter.forEach((value) => sp.append('turinys', value));
+      rawInstitutionNumberFilter.forEach((value) => sp.append('istaigosNr', value));
+      rawRegistrationNumberFilter.forEach((value) => sp.append('regNr', value));
+      if (rawDateFrom) sp.set('nuo', rawDateFrom);
+      if (rawDateTo) sp.set('iki', rawDateTo);
       sp.set('mode', mode);
       if (requestedSort && requestedSort !== 'relevance') sp.set('sort', requestedSort);
       if (page > 1) sp.set('page', String(page));
@@ -110,6 +122,8 @@ export async function loadDokumentaiPage(url: URL) {
     || rawLangFilter.length || rawSavFilter.length || rawApskritisFilter.length || rawSourceFilter.length || rawMetaiFilter.length
     || rawCourtFilter.length || rawCaseTypeFilter.length || rawCategoryFilter.length || rawJudgeFilter.length
     || rawActTypeFilter.length || rawValidityFilter.length || rawEditionTypeFilter.length || rawProjectStatusFilter.length || rawEurovocFilter.length
+    || rawAdoptedByFilter.length || rawContentStateFilter.length || rawInstitutionNumberFilter.length || rawRegistrationNumberFilter.length
+    || rawDateFrom || rawDateTo
     || hasArea,
   );
   const showHome = !q && !hasFilters;
@@ -141,6 +155,12 @@ export async function loadDokumentaiPage(url: URL) {
     redakcija: rawEditionTypeFilter,
     projektoBusena: rawProjectStatusFilter,
     eurovoc: rawEurovocFilter,
+    prieme: rawAdoptedByFilter,
+    turinys: rawContentStateFilter,
+    istaigosNr: rawInstitutionNumberFilter,
+    regNr: rawRegistrationNumberFilter,
+    nuo: rawDateFrom,
+    iki: rawDateTo,
     minLat: rawArea.minLat,
     maxLat: rawArea.maxLat,
     minLon: rawArea.minLon,
@@ -236,6 +256,12 @@ export async function loadDokumentaiPage(url: URL) {
   const editionTypeFilter = result?.editionTypeFilter ?? [];
   const projectStatusFilter = result?.projectStatusFilter ?? [];
   const eurovocFilter = result?.eurovocFilter ?? [];
+  const adoptedByFilter = result?.adoptedByFilter ?? [];
+  const contentStateFilter = result?.contentStateFilter ?? [];
+  const institutionNumberFilter = result?.institutionNumberFilter ?? [];
+  const registrationNumberFilter = result?.registrationNumberFilter ?? [];
+  const dateFrom = result?.dateFrom ?? null;
+  const dateTo = result?.dateTo ?? null;
   const typeCountMap = result?.typeCountMap ?? {};
   const classCountMap = result?.classCountMap ?? {};
   const bbox = result?.bbox ?? null;
@@ -268,6 +294,12 @@ export async function loadDokumentaiPage(url: URL) {
     redakcija: editionTypeFilter,
     projektoBusena: projectStatusFilter,
     eurovoc: eurovocFilter,
+    prieme: adoptedByFilter,
+    turinys: contentStateFilter,
+    istaigosNr: institutionNumberFilter,
+    regNr: registrationNumberFilter,
+    nuo: dateFrom,
+    iki: dateTo,
     area: bbox,
   };
   const buildUrl = (overrides: DokumentaiUrlOverrides = {}) => buildDokumentaiUrl(urlState, overrides);
@@ -300,12 +332,17 @@ export async function loadDokumentaiPage(url: URL) {
   const showTeisekuraFacets = classFilter.includes('teisekura')
     || actTypeFilter.length > 0 || validityFilter.length > 0 || editionTypeFilter.length > 0
     || projectStatusFilter.length > 0 || eurovocFilter.length > 0;
+  const hasETarFacets = Boolean(adoptedByFilter.length > 0 || contentStateFilter.length > 0
+    || institutionNumberFilter.length > 0 || registrationNumberFilter.length > 0
+    || dateFrom || dateTo);
 
   const activeFilterCount = classFilter.length + typeFilter.length + hostFilter.length + jarFilter.length + istaigaJarFilter.length + extFilter.length
     + authorFilter.length + creatorFilter.length + producerFilter.length
     + langFilter.length + savFilter.length + apskritisFilter.length + sourceFilter.length + metaiFilter.length
     + courtFilter.length + caseTypeFilter.length + categoryFilter.length + judgeFilter.length
     + actTypeFilter.length + validityFilter.length + editionTypeFilter.length + projectStatusFilter.length + eurovocFilter.length
+    + adoptedByFilter.length + contentStateFilter.length + institutionNumberFilter.length + registrationNumberFilter.length
+    + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
     + (bbox ? 1 : 0);
 
   // Results meta: count + a hoverable duration that reveals the per-phase timing
@@ -348,7 +385,7 @@ export async function loadDokumentaiPage(url: URL) {
       typeFilter,
       typeToggleUrl: toggle('type', typeFilter),
       showVerdictFacets,
-      showTeisekuraFacets,
+      showTeisekuraFacets: showTeisekuraFacets || hasETarFacets,
       court: facet('teismas', courtFilter, result?.courtOptions, 8),
       caseType: facet('bylosRusis', caseTypeFilter, result?.caseTypeOptions, 8),
       category: facet('kategorija', categoryFilter, result?.categoryOptions, 8),
@@ -358,6 +395,12 @@ export async function loadDokumentaiPage(url: URL) {
       editionType: facet('redakcija', editionTypeFilter, result?.editionTypeOptions, 8),
       projectStatus: facet('projektoBusena', projectStatusFilter, result?.projectStatusOptions, 8),
       eurovoc: facet('eurovoc', eurovocFilter, result?.eurovocOptions, 8),
+      adoptedBy: facet('prieme', adoptedByFilter, result?.adoptedByOptions, 8),
+      contentState: facet('turinys', contentStateFilter, result?.contentStateOptions, 8),
+      institutionNumber: institutionNumberFilter[0] ?? null,
+      registrationNumber: registrationNumberFilter[0] ?? null,
+      dateFrom,
+      dateTo,
       source: facet('source', sourceFilter, result?.sourceOptions, 8),
       istaiga: facet('istaiga', istaigaJarFilter, result?.istaigaJarOptions, HOST_LIMIT),
       host: facet('host', hostFilter, result?.hostOptions, HOST_LIMIT),

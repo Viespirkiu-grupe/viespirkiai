@@ -1,10 +1,20 @@
 import { processFailaiDokumentaiQueue } from "../modules/dokumentai/processFailaiDokumentaiQueue.js";
+import { processETarDocumentsQueue } from "../modules/dokumentai/processETarDocumentsQueue.js";
 import { processDokumentaiIndexQueue } from "../modules/dokumentai/quickwitProcessIndexQueue.js";
 import { scrapeLatest as scrapeEseimasLatest } from "../modules/eseimas/scrape.js";
 import { scrapeNextProjectBatch } from "../modules/eseimas/scrapeContent.js";
 import { auditTeisekuraCoverage } from "../modules/teisekura/audit.js";
 
 export default [
+    {
+        // eTarLegalActDocument -> dokumentai (per eTarDocumentsQueue)
+        name: "processETarDocumentsQueue",
+        mode: "asap",
+        priority: 5,
+        cooldown: 30,
+        errorCooldown: 30,
+        job: processETarDocumentsQueue,
+    },
     {
         // failai -> dokumentai (upsert iš failaiDokumentaiQueue)
         name: "processFailaiDokumentaiQueue",
