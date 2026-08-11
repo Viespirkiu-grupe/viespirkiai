@@ -57,7 +57,7 @@ positional — Lithuanian on the left of an `AS`, English on the right ([§5.4](
 
 The OCP guide describes an indicator through its definition, reason for being a red flag, required data, method, unit of
 analysis, procurement stage, example and source. The local indicator package preserves these fields and adds operational
-fields: implementation version, parameters, lifecycle state, owner, tests, public wording and known limitations.
+fields: implementation version, parameters, lifecycle state, tests, public wording and known limitations.
 
 ### 1.1 The three processes
 
@@ -482,7 +482,7 @@ Example catalogue row:
 | LT-PRO-08 | Trumpas pasiūlymų pateikimo terminas | Tender | Procurement |              2 |           98.9% |         7.4% | 2026-07-01 |
 
 Opening a row shows the canonical definition, the source-catalogue references, the local profile, required data, the
-exact SQL-style formula, exclusions, parameters, an example, limitations, owner and validation date.
+exact SQL-style formula, exclusions, parameters, an example and limitations.
 
 Everything on this page except the statistics comes from `catalogue.generated.json`, the artefact generated from the
 indicator directories and shipped inside the web bundle. The statistics come from `risk.risk_signals`. Sourcing wording
@@ -513,7 +513,6 @@ modules/risk/indicators/LT-PRO-08/     ← one directory = one Risk Indicator
 │   │                    activates or retires the indicator
 │   ├── stage            'planning' | 'tender' | 'award' | 'contract'
 │   ├── subjectType      what one result row is about: 'procurement', 'lot', ...
-│   ├── owner            responsible team, mirrored by CODEOWNERS on this directory
 │   ├── references       source catalogue codes: OCP-R003, OLAF-CN29, OT-I04, ...
 │   ├── standard         primary citation: document name, URL and page
 │   ├── public           WHAT THE PUBLIC READS. titleLt, descriptionLt,
@@ -581,10 +580,10 @@ The catalogue is the set of indicator directories; the only migration is the DDL
 Keeping the whole entity in Git gives:
 
 - **One audit trail.** `git log -p modules/risk/indicators/LT-PRO-08/parameters.ts` shows who raised a threshold, when,
-  in which pull request, with what justification in the commit message.
+  in which commit, with what justification in the commit message.
 - **One source of truth.** The deployed commit *is* the definition, and every run records that commit.
-- **Atomic review.** Formula, threshold, public wording and tests change in one pull request under one CODEOWNERS
-  approval.
+- **Atomic change.** Formula, threshold, public wording and tests move together in one commit, so they cannot drift
+  apart.
 - **Trivial rollback.** Reverting a commit reverts the indicator, including its wording and thresholds.
 - **A small schema.** `risk` holds results and run control state: two tables and one view.
 
@@ -729,7 +728,6 @@ type RiskIndicator<P> = Readonly<{
     lifecycle: IndicatorLifecycle;
     subjectType: SubjectType;
     stage: IndicatorStage;
-    owner: string;
     references: readonly string[];
     sourceRelations: readonly string[];
     requiredInputs: readonly string[];
@@ -765,7 +763,6 @@ export const ltPro08Parameters: readonly ParameterEntry<LtPro08Parameters>[] = [
 export const ltPro08v2 = defineRiskIndicator<LtPro08Parameters>({
     key: {id: 'LT-PRO-08', version: 2},
     lifecycle: 'active',
-    owner: 'procurement-risk',
     subjectType: 'procurement',
     stage: 'tender',
     references: ['OCP-R003', 'OCP-R014', 'OLAF-CN29', 'OT-I04'],
@@ -1122,7 +1119,6 @@ The equivalent of a catalogue row is the content of `modules/risk/indicators/LT-
 - `lifecycle` — `active`
 - `calculation` — `{ sqlFile: './calculate.sql' }`
 - `stage` / `subjectType` — `tender` / `procurement`
-- `owner` — `procurement-risk`
 - `references` — `OCP-R003`, `OCP-R014`, `OLAF-CN29`, `OT-I04`
 - `standard` — OCP Red Flags 2024, p. 25
 - `public.titleLt` — Trumpas pasiūlymų pateikimo terminas
@@ -1332,20 +1328,19 @@ long it lasts.
 
 ### 10.1 Adding a Risk Indicator
 
+Adding an indicator is a new directory and one line in the registry. Write it, test it, commit it, deploy it.
+
 1. Create `modules/risk/indicators/<ID>/` using the canonical catalogue ID and record its source-catalogue references.
-2. Write `definition.ts`: Lithuanian public text, source-field mapping, applicability, exclusions and limitations, with
-   `lifecycle: 'draft'`.
+2. Write `definition.ts`: Lithuanian public text, source-field mapping, applicability, exclusions and limitations.
 3. Decide the unit of analysis and the earliest lifecycle point at which it is knowable.
 4. Write `parameters.ts` with the first effective-dated entry and its `source`.
 5. Implement the calculation — one `calculate.sql` where that suffices, otherwise a `calculate.ts` over its own packaged
    SQL — plus fixtures for the triggered, non-triggered, insufficient and not-applicable outcomes.
 6. Add integration tests against realistic database shapes.
-7. Add the version to `registry.ts` and regenerate `catalogue.generated.json`; CI verifies that the artefact matches the
-   definitions.
-8. Merge with `lifecycle: 'shadow'`, then run a historical backtest and publish coverage and trigger-rate diagnostics.
-9. Review samples; approval is the pull-request approval on the directory, recorded by CODEOWNERS.
-10. Flip `lifecycle` to `'active'` in a second pull request, deploy that commit to **both** the risk service and the web
-    application, then backfill current subjects.
+7. Add the version to `registry.ts` as `active` and regenerate `catalogue.generated.json`; CI verifies that the artefact
+   matches the definitions.
+8. Run the tests, commit, and deploy the same commit to **both** the Procurement Risk Service and the web application.
+   The next run computes the indicator for current subjects and publishes its signals.
 
 **Diagram: adding a Risk Indicator, from directory to published signals.**
 
@@ -1353,20 +1348,20 @@ long it lasts.
 flowchart LR
     DIR["Author creates modules/risk/indicators/&lt;ID&gt;/<br/>definition.ts · parameters.ts · calculation · fixtures"]
     REG["Author registers the version in registry.ts<br/>and regenerates catalogue.generated.json"]
-    CI["CI verifies types, registry rules, fixtures,<br/>integration tests and the catalogue artefact"]
-    SH["Merge with lifecycle shadow<br/>historical backtest and diagnostics"]
-    REV["Methodology review of coverage, trigger rate<br/>and sampled cases, approved via CODEOWNERS"]
-    ACT["Second pull request sets lifecycle active"]
-    DEP["Deploy the commit to the Procurement Risk Service<br/>and to the Astro application"]
-    RUN["Next run publishes signals<br/>and backfills current subjects"]
-    DIR --> REG --> CI --> SH --> REV --> ACT --> DEP --> RUN
+    CI["Tests and CI checks: types, registry rules,<br/>fixtures, integration tests, catalogue artefact"]
+    GIT["Commit and deploy the commit to<br/>the risk service and the Astro application"]
+    RUN["Next run computes current subjects<br/>and publishes the signals"]
+    DIR --> REG --> CI --> GIT --> RUN
 ```
 
-Step 10 is the ordering constraint the Git-resident catalogue introduces: the web application carries the new version's
-public wording before the first signal from it is published.
+Step 8 is the one ordering constraint the Git-resident catalogue introduces: both processes run the same commit, so the
+web application carries the new indicator's public wording before the first signal from it is published. Deploying the
+service first would publish signals the site cannot yet describe.
 
-Adding a Risk Indicator is therefore exactly one reviewed pull request per stage, and merging the branch plus deploying
-the commit to both Node processes is the whole activation procedure. The maintenance surface is one directory —
+An indicator whose behaviour is not settled yet can be committed as `lifecycle: 'draft'` or `'shadow'` and flipped to
+`'active'` in a later commit; that is a choice the author makes, not a required stage.
+
+Adding a Risk Indicator is therefore one branch and one deployment. The maintenance surface is one directory —
 `definition.ts`, `parameters.ts`, the calculation, fixtures and tests — plus one line in `registry.ts`. The Risk
 Indicators Run Job, Risk Signal Validator, Risk Signals Writer, Astro route code and the schema stay as they are; a new
 indicator adds rows. They change when the observation contract itself changes.
@@ -1398,44 +1393,41 @@ enforces it ([§11](#11-tests-and-automated-safeguards)).
 
 ### 10.3 Changing an active Risk Indicator
 
-The old and the proposed version run in parallel:
+Changing an indicator is an ordinary code change. Viešpirkiai is an information system, not a regulated ledger: there
+is no parallel run, no comparison report and no promotion ceremony. Open the editor, edit the indicator directory, raise
+the version, commit, deploy.
 
-```text
-LT-PRO-08 v2 active ────────────┐
-                                ├─ compare state/value changes and reviewed samples
-LT-PRO-08 v3 shadow ────────────┘
-```
+1. Copy `modules/risk/indicators/<ID>/` to the new version's files and change what needs changing — the formula, the
+   applicability, the source mapping or the public wording ([§10.2](#102-version-and-parameter-change-rules) decides
+   whether the change needs a new version at all, or just a new `parameters.ts` entry).
+2. Update the fixtures and tests to the intended new behaviour.
+3. In `registry.ts`, mark the new version `active` and the previous one `retired`; one indicator has exactly one active
+   version, and CI enforces that.
+4. Regenerate `catalogue.generated.json` so the public wording matches the code that produces the signals.
+5. Run the tests, commit, and deploy the same commit to the Procurement Risk Service and to the Astro application.
 
-**A shadow version is evaluated in memory.** Shadow execution runs the v3 calculation, holds its rows in memory, diffs
-them against the current v2 rows, and emits a comparison report as a build artefact. The current-state index is unique
-on `(subject_type, subject_key, indicator_id)` and excludes the version, so exactly one version of an indicator is
-published for a subject at any time, and the public read model stays on v2 for the whole shadow period.
+**The switch needs no data migration.** The first run after deployment computes v3 results, and wherever they differ
+from the stored v2 result, the v2 row is closed and a v3 row opens; where they agree, only `checked_at` advances. The
+current-state index is unique on `(subject_type, subject_key, indicator_id)` and excludes the version, so exactly one
+version of an indicator is published for a subject at any time, and the changeover happens row by row as the run
+proceeds. Closed v2 rows keep their version stamp forever, so the history panel shows that a change of methodology —
+rather than of the procurement — moved the signal.
 
-The comparison report includes:
+If a change looks risky enough to want the numbers before the public sees them, merging it as `lifecycle: 'shadow'`
+first keeps the version out of the read model until a later commit flips it to `'active'`. That is a tool, not a
+required stage.
 
-- subjects newly triggered or no longer triggered;
-- state changes involving insufficient data;
-- trigger rate by method, CPV and buyer type;
-- query and runtime cost;
-- reviewed false-positive explanations.
-
-Activation is a one-line `lifecycle` change in `definition.ts`, reviewed and deployed like any other code change. The
-first run after deployment computes v3 results, and wherever they differ from the stored v2 result, the v2 row is closed
-and a v3 row opens. Closed v2 rows keep their version stamp forever, so the history panel shows that a change of
-methodology — rather than of the procurement — moved the signal.
-
-**Diagram: promoting a new indicator version from pull request to published results.**
+**Diagram: changing an active Risk Indicator.**
 
 ```mermaid
 flowchart LR
-    PR["Pull request: definition.ts + parameters.ts + SQL + fixtures"] -->|" candidate version package "| CI["Type-check, registry validation, tests, catalogue artefact check"]
-    CI -->|" approved deployable artefact "| SH["Run v3 in shadow, results held in memory"]
-    SH -->|" v3 rows diffed against current v2 rows "| CMP["Compare v2 vs v3<br/>coverage, triggers, evidence, cost"]
-    CMP -->|" comparison report artefact "| REV["Methodology, legal and data-owner approval"]
-    REV --> G{"Report accepted?"}
-    G -->|" defects or unexplained changes "| SH
-    G -->|" accepted "| SW["Merge lifecycle active and deploy the commit"]
-    SW -->|" next run closes v2 rows, opens v3 rows "| KEEP["Closed v2 rows keep their version stamp forever"]
+    ED["Edit modules/risk/indicators/&lt;ID&gt;/<br/>new version files, fixtures, tests"]
+    REG["registry.ts: new version active,<br/>previous version retired"]
+    CAT["Regenerate catalogue.generated.json"]
+    CI["Tests and CI checks pass"]
+    GIT["Commit and deploy the commit to<br/>the risk service and the Astro application"]
+    RUN["Next run closes changed v2 rows and opens v3 rows;<br/>closed v2 rows keep their version stamp forever"]
+    ED --> REG --> CAT --> CI --> GIT --> RUN
 ```
 
 ### 10.4 Retiring a Risk Indicator
