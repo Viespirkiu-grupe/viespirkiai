@@ -40,16 +40,20 @@ describe('external source URLs', () => {
 });
 
 describe('SQLite sidecar locations', () => {
-  it('reads all three SQLite file paths from the environment', () => {
+  it('reads the one sidecar directory and remote base from the environment', () => {
     const config = normalizeConfig(configFromEnv({
-      FAILAIINFO_SQLITE_LOCATION: '/data/failaiInfo.sqlite',
-      DOKUMENTAI_SQLITE_LOCATION: '/data/dokumentai.sqlite',
-      OCR_REZULTATAI_SQLITE_LOCATION: '/data/ocr.sqlite',
+      SIDECAR_DIR: '/data/sidecars',
+      SIDECAR_REMOTE: 'https://host',
     }));
 
-    expect(config.failaiInfoSqliteLocation).toBe('/data/failaiInfo.sqlite');
-    expect(config.dokumentaiSqliteLocation).toBe('/data/dokumentai.sqlite');
-    expect(config.ocrRezultataiSqliteLocation).toBe('/data/ocr.sqlite');
+    expect(config.sidecarDir).toBe('/data/sidecars');
+    expect(config.sidecarRemote).toBe('https://host');
   });
 
+  it('leaves both unset when the environment does not define them', () => {
+    const config = normalizeConfig(configFromEnv({}));
+
+    expect(config.sidecarDir).toBeUndefined();
+    expect(config.sidecarRemote).toBeUndefined();
+  });
 });

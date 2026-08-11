@@ -12,9 +12,7 @@ propaguosis į `public.dokumentai`, sidecar rakto keisti nereikės.
 */
 
 const store = createSidecarStore({
-    locationKey: "liteko2Location",
-    sqliteLocationKey: "liteko2SqliteLocation",
-    sqliteTable: "liteko2",
+    sidecar: "liteko2",
     label: "LITEKO2 sprendimo",
 });
 

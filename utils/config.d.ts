@@ -62,21 +62,22 @@ export interface Config {
     internalFileBase: string;
     ocrBandymai: number;
 
-    ocrRezultataiLocation?: string;
-    dokumentaiLocation?: string;
-    failaiLocation?: string;
-    failaiInfoSqliteLocation?: string;
-    dokumentaiSqliteLocation?: string;
-    ocrRezultataiSqliteLocation?: string;
-    /** LITEKO2 sprendimų sidecar (API JSON + HTML + tekstas), raktas: md5. */
-    liteko2Location?: string;
-    liteko2SqliteLocation?: string;
+    /**
+     * Katalogas, kuriame guli visos sidecar SQLite bazės — po vieną failą
+     * kiekvienam registro įrašui: `<sidecarDir>/<vardas>.sqlite`.
+     * Žr. `utils/sidecarPaths.js`. Be jo mazgas gali tik skaityti per
+     * `sidecarRemote`.
+     */
+    sidecarDir?: string;
+    /**
+     * Mazgo, turinčio lokalias bazes, bazinis URL. Klientas pats prilipdo
+     * `/api/v1/sidecar/<vardas>`. Naudojamas tik skaitymui.
+     */
+    sidecarRemote?: string;
 
     /** Stateless e-TAR HTML→JSON adapterio bazinis URL (`modules/eTar`). */
     eTarApiUrl: string;
     eTarApiKey: string;
-    /** SQLite sidecar katalogas e-TAR API atsakymams. */
-    eTarSidecarDir: string;
     /** Kiek naujausių kalendorinių dienų periodiškai tikrina TaskRunner. */
     eTarRecentDays: number;
     /** Po kiek valandų radaro diena vėl laikoma tikrintina. */

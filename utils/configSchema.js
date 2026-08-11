@@ -71,7 +71,6 @@ const configSchema = z.object({
     // (modules/eTar). Raktas reikalingas tik jei adapteryje nustatytas API_KEY.
     eTarApiUrl: z.string().default(""),
     eTarApiKey: z.string().default(""),
-    eTarSidecarDir: z.string().default("/flashas/viespirkiai/eTar"),
     eTarRecentDays: z.number().int().positive().default(180),
     eTarRefreshHours: z.number().positive().default(3),
     eTarMaxInflight: z.number().int().positive().default(6),
@@ -79,14 +78,10 @@ const configSchema = z.object({
     internalFileBase: z.string().default("https://failai.viespirkiai.org"),
     ocrBandymai: z.number().int().positive().default(5),
 
-    ocrRezultataiLocation: z.string().optional(),
-    dokumentaiLocation: z.string().optional(),
-    failaiLocation: z.string().optional(),
-    failaiInfoSqliteLocation: z.string().optional(),
-    dokumentaiSqliteLocation: z.string().optional(),
-    ocrRezultataiSqliteLocation: z.string().optional(),
-    liteko2Location: z.string().optional(),
-    liteko2SqliteLocation: z.string().optional(),
+    // Sidecar SQLite bazės: vienas katalogas visoms (`<vardas>.sqlite`), o
+    // mazgai be lokalių failų skaito per vieną nuotolinį bazinį URL.
+    sidecarDir: z.string().optional(),
+    sidecarRemote: z.string().optional(),
 
     enableGraph: z.boolean().default(false),
 

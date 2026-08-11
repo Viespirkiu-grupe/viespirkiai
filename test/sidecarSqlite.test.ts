@@ -10,6 +10,7 @@ import {
   closeCompressedSqliteStores,
   ensureCompressedSidecarSchema,
 } from '../utils/sqliteSidecarStore.js';
+import { SIDECAR_DBS, sidecarDbPath } from '../utils/sidecarPaths.js';
 import { missingFromBatch } from '../modules/sidecars/sqliteMissing.js';
 import {
   prepareFailaiFs,
@@ -21,89 +22,86 @@ import { readRezultatasFs, saveRezultatasFs } from '../modules/ocr/rezultataiFs.
 
 const KEY = '0123456789abcdef0123456789abcdef';
 let tempDir: string;
-let originalSqliteLocations: Record<string, unknown>;
+let originalSidecarDir: string | undefined;
+let originalSidecarRemote: string | undefined;
 
+// Bendram elgesiui tikrinti imam tikrą registro vardą — išgalvotų nebėra,
+// nes kelias ir lentelė išvedami iš registro.
 function store() {
-  return createSidecarStore({
-    locationKey: 'testLegacyLocation',
-    sqliteLocationKey: 'testSqliteLocation',
-    sqliteTable: 'sidecars',
-    label: 'testo',
-  });
+  return createSidecarStore({ sidecar: 'dokumentai', label: 'testo' });
 }
 
 beforeEach(() => {
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sidecar-sqlite-'));
-  originalSqliteLocations = {
-    failaiInfoSqliteLocation: config.failaiInfoSqliteLocation,
-    dokumentaiSqliteLocation: config.dokumentaiSqliteLocation,
-    ocrRezultataiSqliteLocation: config.ocrRezultataiSqliteLocation,
-  };
-  delete config.testLegacyLocation;
-  delete config.testSqliteLocation;
-  delete config.failaiInfoSqliteLocation;
-  delete config.dokumentaiSqliteLocation;
-  delete config.ocrRezultataiSqliteLocation;
+  originalSidecarDir = config.sidecarDir;
+  originalSidecarRemote = config.sidecarRemote;
+  delete config.sidecarDir;
+  delete config.sidecarRemote;
 });
 
 afterEach(() => {
   closeCompressedSqliteStores();
-  delete config.testLegacyLocation;
-  delete config.testSqliteLocation;
-  for (const [key, value] of Object.entries(originalSqliteLocations)) {
-    if (value === undefined) delete config[key];
-    else config[key] = value;
-  }
+  if (originalSidecarDir === undefined) delete config.sidecarDir;
+  else config.sidecarDir = originalSidecarDir;
+  if (originalSidecarRemote === undefined) delete config.sidecarRemote;
+  else config.sidecarRemote = originalSidecarRemote;
   fs.rmSync(tempDir, { recursive: true, force: true });
   vi.unstubAllGlobals();
+});
+
+describe('sidecar registras', () => {
+  it('derives every path from the name inside one flat directory', () => {
+    config.sidecarDir = tempDir;
+    for (const name of Object.keys(SIDECAR_DBS)) {
+      expect(sidecarDbPath(name)).toBe(path.join(tempDir, `${name}.sqlite`));
+    }
+  });
+
+  it('has no path without SIDECAR_DIR and rejects unknown names', () => {
+    expect(sidecarDbPath('dokumentai')).toBeNull();
+    expect(() => sidecarDbPath('nesamas')).toThrow('Nežinomas sidecar');
+  });
 });
 
 describe('SQLite sidecar backend', () => {
   it('requires SQLite for every write', async () => {
     const subject = store();
     await expect(subject.save(KEY, { source: 'legacy' }))
-      .rejects.toThrow('testSqliteLocation nenustatytas');
+      .rejects.toThrow('SIDECAR_DIR nenustatytas');
   });
 
-  it('reads from an HTTP endpoint when local SQLite has no value', async () => {
+  it('reads from the remote endpoint when local SQLite has no value', async () => {
     const subject = store();
-    config.testLegacyLocation = 'https://sidecars.example.test/read';
+    config.sidecarRemote = 'https://sidecars.example.test';
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ source: 'http' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
 
     expect(await subject.read(KEY)).toEqual({ source: 'http' });
-    expect(fetchMock).toHaveBeenCalledWith(`https://sidecars.example.test/read?md5=${KEY}`);
-  });
-
-  it('ignores old local directory locations', async () => {
-    const subject = store();
-    config.testLegacyLocation = path.join(tempDir, 'legacy');
-
-    expect(await subject.read(KEY)).toBeNull();
-    await expect(subject.save(KEY, { source: 'legacy' }))
-      .rejects.toThrow('testSqliteLocation nenustatytas');
-    expect(fs.existsSync(config.testLegacyLocation as string)).toBe(false);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://sidecars.example.test/api/v1/sidecar/dokumentai?md5=${KEY}`,
+    );
   });
 
   it('writes compressed SQLite and gives it priority over HTTP', async () => {
     const subject = store();
-    config.testLegacyLocation = 'https://sidecars.example.test/read';
+    config.sidecarRemote = 'https://sidecars.example.test';
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ source: 'http' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
-    config.testSqliteLocation = path.join(tempDir, 'sidecars.sqlite');
+    config.sidecarDir = tempDir;
+    const dbPath = path.join(tempDir, 'dokumentai.sqlite');
 
-    expect(fs.existsSync(config.testSqliteLocation as string)).toBe(false);
+    expect(fs.existsSync(dbPath)).toBe(false);
     await subject.save(KEY, { source: 'sqlite', text: 'kartojamas '.repeat(100) });
 
     expect(await subject.read(KEY)).toEqual({ source: 'sqlite', text: 'kartojamas '.repeat(100) });
     expect(fetchMock).not.toHaveBeenCalled();
 
-    const db = new DatabaseSync(config.testSqliteLocation as string, { readOnly: true });
-    const row = db.prepare('SELECT dydis, suspaustas, turinys FROM sidecars WHERE hash = ?').get(KEY) as any;
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    const row = db.prepare('SELECT dydis, suspaustas, turinys FROM dokumentai WHERE hash = ?').get(KEY) as any;
     expect(row.suspaustas).toBeLessThan(row.dydis);
     expect(JSON.parse(zstdDecompressSync(row.turinys).toString('utf8')).source).toBe('sqlite');
     db.close();
@@ -114,10 +112,12 @@ describe('SQLite sidecar backend', () => {
 
   it('does not fall back to HTTP after a configured SQLite write error', async () => {
     const subject = store();
-    config.testLegacyLocation = 'https://sidecars.example.test/read';
+    config.sidecarRemote = 'https://sidecars.example.test';
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    config.testSqliteLocation = tempDir; // katalogo negalima atidaryti kaip DB failo
+    config.sidecarDir = tempDir;
+    // Katalogo negalima atidaryti kaip DB failo.
+    fs.mkdirSync(path.join(tempDir, 'dokumentai.sqlite'));
 
     await expect(subject.save(KEY, { source: 'broken' })).rejects.toThrow();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -125,13 +125,24 @@ describe('SQLite sidecar backend', () => {
 
   it('groups concurrent durable writes without losing rows', async () => {
     const subject = store();
-    config.testSqliteLocation = path.join(tempDir, 'batch.sqlite');
+    config.sidecarDir = tempDir;
     const keys = Array.from({ length: 24 }, (_, i) => i.toString(16).padStart(32, '0'));
 
     await Promise.all(keys.map((key, i) => subject.save(key, { i })));
 
     await expect(Promise.all(keys.map((key) => subject.read(key))))
       .resolves.toEqual(keys.map((_, i) => ({ i })));
+  });
+
+  it('reads a batch in one query and skips keys it does not have', async () => {
+    const subject = store();
+    config.sidecarDir = tempDir;
+    const keys = Array.from({ length: 6 }, (_, i) => i.toString(16).padStart(32, '0'));
+    for (const key of keys.slice(0, 4)) await subject.save(key, { key });
+
+    const found = await subject.readLocalManyRaw(keys);
+    expect([...found.keys()].sort()).toEqual(keys.slice(0, 4).sort());
+    expect(JSON.parse(found.get(keys[0])!)).toEqual({ key: keys[0] });
   });
 
   it('finds missing hashes in one indexed SQLite batch', () => {
@@ -147,10 +158,21 @@ describe('SQLite sidecar backend', () => {
     db.close();
   });
 
+  it('audits a table whose key column is md5, like the eTar sidecar', () => {
+    const db = new DatabaseSync(path.join(tempDir, 'etar.sqlite'));
+    ensureCompressedSidecarSchema(db, 'eTarAtsakymai', 'md5');
+    const keys = Array.from({ length: 4 }, (_, i) => i.toString(16).padStart(32, '0'));
+    const insert = db.prepare(
+      'INSERT INTO "eTarAtsakymai" (md5, dydis, suspaustas, turinys) VALUES (?, 1, 1, ?)',
+    );
+    for (const md5 of keys.slice(0, 2)) insert.run(md5, Buffer.from('x'));
+
+    expect(missingFromBatch(db, 'eTarAtsakymai', keys, 'md5')).toEqual(keys.slice(2));
+    db.close();
+  });
+
   it('connects failaiInfo, dokumentai and OCR wrappers to separate databases', async () => {
-    config.failaiInfoSqliteLocation = path.join(tempDir, 'failaiInfo.sqlite');
-    config.dokumentaiSqliteLocation = path.join(tempDir, 'dokumentai.sqlite');
-    config.ocrRezultataiSqliteLocation = path.join(tempDir, 'ocr.sqlite');
+    config.sidecarDir = tempDir;
 
     const failai = prepareFailaiFs({ tekstas: 'failas', metaduomenys: { author: 'A' } });
     await savePreparedFailaiFs(failai.hash, failai.json);
@@ -161,13 +183,10 @@ describe('SQLite sidecar backend', () => {
     expect(await readDokumentasFs(KEY)).toEqual({ md5: KEY, text: 'dokumentas' });
     expect(await readRezultatasFs(KEY)).toEqual({ md5: KEY, tekstas: ['ocr'] });
 
-    for (const [file, table] of [
-      [config.failaiInfoSqliteLocation, 'failaiInfo'],
-      [config.dokumentaiSqliteLocation, 'dokumentai'],
-      [config.ocrRezultataiSqliteLocation, 'ocrRezultatai'],
-    ] as const) {
-      const db = new DatabaseSync(file as string, { readOnly: true });
-      expect((db.prepare(`SELECT COUNT(*) AS c FROM ${table}`).get() as any).c).toBe(1);
+    // Kiekvienas store'as – atskiras failas, kad rašytojai nesirikiuotų prie vieno WAL.
+    for (const name of ['failaiInfo', 'dokumentai', 'ocrRezultatai'] as const) {
+      const db = new DatabaseSync(path.join(tempDir, `${name}.sqlite`), { readOnly: true });
+      expect((db.prepare(`SELECT COUNT(*) AS c FROM "${name}"`).get() as any).c).toBe(1);
       db.close();
     }
   });

@@ -3,9 +3,7 @@ import { parsePgArray } from "../../postgres/postgres.js";
 
 // OCR rezultatų sidecar JSON.
 const store = createSidecarStore({
-    locationKey: "ocrRezultataiLocation",
-    sqliteLocationKey: "ocrRezultataiSqliteLocation",
-    sqliteTable: "ocrRezultatai",
+    sidecar: "ocrRezultatai",
     label: "OCR rezultato",
     deserialize: (text) => {
         const rezultatas = JSON.parse(text);
@@ -27,6 +25,3 @@ export const saveRezultatasFs = (rezultatas) => store.save(rezultatas.md5, rezul
 
 /** @param {string} md5 */
 export const readRezultatasFs = store.read;
-
-export const readRezultatasLocalRaw = store.readLocalRaw;
-export const isOcrRezultataiLocalStoreConfigured = store.localConfigured;

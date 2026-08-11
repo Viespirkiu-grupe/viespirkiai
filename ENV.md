@@ -17,7 +17,7 @@ kintamieji krenta į numatytąsias schemos reikšmes (žr. `utils/configSchema.j
 | **Quickwit** | Pilnatekstė sutarčių / viešųjų pirkimų / dokumentų paieška ir facetavimas. | Ne (krenta į lėtesnę Postgres paiešką) |
 | **Tor (SOCKS5)** | Duomenų scrapinimas per Tor (tik taskrunneris). | Tik backend'ui |
 | **Chromium** | OG paveikslėlių atvaizdavimas (jau įdiegtas Docker image'e). | Frontend'ui |
-| **Blob saugykla** | OCR rezultatai, failų tekstas/metaduomenys, dokumentai. Lokaliai laikomi zstd SQLite; kitas host'as gali skaityti per HTTPS sidecar endpoint'ą. | Taip (failų funkcijoms) |
+| **Sidecar saugykla** | OCR rezultatai, failų tekstas/metaduomenys, dokumentai, LITEKO2, e-TAR. Vienas `SIDECAR_DIR` katalogas su zstd SQLite bazėmis; kitas host'as skaito per `/api/v1/sidecar/<vardas>`. | Taip (failų funkcijoms) |
 
 > **PostGIS:** DB turi būti su įjungtu plėtiniu: `CREATE EXTENSION IF NOT EXISTS postgis;`
 
@@ -257,37 +257,61 @@ Pilnatekstė paieška ir facetavimas.
 | `SUTARTYS_QUICKWIT` | — | Sutarčių paieškai naudoti Quickwit. |
 | `VIESIEJI_PIRKIMAI_QUICKWIT` | — | Viešųjų pirkimų paieškai naudoti Quickwit. |
 
-### Failų / dokumentų vietos
+### Sidecar saugyklos
 
-Lokaliam darbui naudojami tik `*_SQLITE_LOCATION`: tai pilni `.sqlite` failų
-keliai. Turinys laikomas zstd suspaustas. SQLite vieta privaloma kiekvienam
-procesui, kuris rašo sidecar'us; be jos write baigiasi klaida.
+Visos sidecar SQLite bazės guli **viename kataloge**, po vieną failą kiekvienam
+registro įrašui. Vardas yra vienintelis identifikatorius — iš jo išvedamas ir
+failo kelias, ir HTTP kelias:
 
-`FAILAI_LOCATION`, `DOKUMENTAI_LOCATION` ir `OCR_REZULTATAI_LOCATION` nebepalaiko
-lokalių katalogų. Juose galima nurodyti tik HTTP(S) endpoint'ą nuotoliniam read
-fallback. Skaitymo tvarka: lokalus SQLite, tada HTTP(S). Endpoint'ą aptarnaujantis
-mazgas skaito tik savo SQLite ir taip išvengia rekursinių HTTP užklausų.
+```
+failas(vardas) = <SIDECAR_DIR>/<vardas>.sqlite
+URL(vardas)    = <SIDECAR_REMOTE>/api/v1/sidecar/<vardas>?md5=<raktas>
+```
 
-Nuotolinį režimą aptarnauja šie endpoint'ai (kitas mazgas jų URL įsirašo į
-atitinkamą `*_LOCATION`):
+Registras — `utils/sidecarPaths.js`:
 
-| Kintamasis | Endpoint'as | Užklausa |
+| Vardas | Failas | Kas viduje |
 | --- | --- | --- |
-| `FAILAI_LOCATION` | `src/pages/api/failai/failaiInfoFiles.ts` | `<URL>?hash=<hash>` |
-| `DOKUMENTAI_LOCATION` | `src/pages/api/dokumentai/dokumentaiFiles.ts` | `<URL>?md5=<md5>` |
-| `OCR_REZULTATAI_LOCATION` | `src/pages/api/ocr/rezultataiFiles.ts` | `<URL>?md5=<md5>` |
+| `failaiInfo` | `failaiInfo.sqlite` | Sujungtas failo turinio JSON (raktas: turinio hash). |
+| `dokumentai` | `dokumentai.sqlite` | Dokumentų JSON (tekstas, metaduomenys, subjektai). |
+| `ocrRezultatai` | `ocrRezultatai.sqlite` | OCR rezultatai. |
+| `liteko2` | `liteko2.sqlite` | LITEKO2 sprendimai (`modules/liteko2`). |
+| `eTar` | `eTar.sqlite` | e-TAR API atsakymai (`modules/eTar`). |
+
+Kiekviena bazė lieka atskiru failu: SQLite turi vieną rašytoją visai bazei, o
+čia lygiagrečiai rašo skirtingi procesai (OCR darbininkai, scraper'iai, eTar
+taskrunner) — sujungus jie rikiuotųsi eilėje prie to paties WAL.
+
+Turinys laikomas zstd suspaustas. `SIDECAR_DIR` privalomas kiekvienam procesui,
+kuris rašo sidecar'us; be jo write baigiasi klaida.
 
 | Kintamasis | Paaiškinimas |
 | --- | --- |
+| `SIDECAR_DIR` | Katalogas su visomis sidecar SQLite bazėmis. Būtinas rašymui. |
+| `SIDECAR_REMOTE` | Mazgo su lokaliomis bazėmis bazinis URL — nuotolinis read fallback mazgams be `SIDECAR_DIR`. |
 | `INTERNAL_FILE_BASE` | Vidinio failų CDN bazinis URL — preview nuorodoms sudaryti. Numatyta: `https://failai.viespirkiai.org`. |
-| `OCR_REZULTATAI_LOCATION` | Pasirenkamas nuotolinis OCR HTTP(S) read endpoint'as. |
-| `DOKUMENTAI_LOCATION` | Pasirenkamas nuotolinis dokumentų HTTP(S) read endpoint'as. |
-| `FAILAI_LOCATION` | Pasirenkamas nuotolinis failų turinio HTTP(S) read endpoint'as. |
-| `FAILAIINFO_SQLITE_LOCATION` | Pilnas sujungto failų turinio SQLite failo kelias. |
-| `DOKUMENTAI_SQLITE_LOCATION` | Pilnas dokumentų sidecar SQLite failo kelias. |
-| `OCR_REZULTATAI_SQLITE_LOCATION` | Pilnas OCR rezultatų SQLite failo kelias. |
-| `LITEKO2_LOCATION` | Pasirenkamas nuotolinis LITEKO2 sprendimų sidecar HTTP(S) read endpoint'as. |
-| `LITEKO2_SQLITE_LOCATION` | Pilnas LITEKO2 sprendimų sidecar SQLite failo kelias (`modules/liteko2`). |
+
+Skaitymo tvarka: lokalus SQLite, tada `SIDECAR_REMOTE`. Endpoint'ą aptarnaujantis
+mazgas skaito tik savo SQLite ir taip išvengia rekursinių HTTP užklausų.
+
+#### HTTP API (tik skaitymas)
+
+Rašymo per HTTP nėra — rašo tik mazgas, turintis lokalų `SIDECAR_DIR`.
+
+```
+GET  /api/v1/sidecar/<vardas>?md5=<md5>
+     200 application/json — turinys; 404 nerastas; 400 blogas md5;
+     404 nežinomas vardas; 503 SIDECAR_DIR nenustatytas
+
+POST /api/v1/sidecar/<vardas>/batch
+     body: ["<md5>", …] arba md5 per eilutę, daugiausia 500 vienu kartu
+     200 application/x-ndjson — po eilutę {"md5":…,"turinys":…}, tik rastiems
+```
+
+Batch atsakymas streaminamas gabalais, o nerastų raktų eilučių jame nėra — ko
+negrįžo, to nėra.
+
+#### Trūkstamų įrašų patikra
 
 PostgreSQL referencinius hash'us galima paketais palyginti su
 SQLite, neatliekant brangaus bendro `COUNT(DISTINCT ...)`:
@@ -297,8 +321,8 @@ npm run sidecars:sqlite-missing -- --store dokumentai
 ```
 
 Kiekvienas nerastas raktas išvedamas kaip `TRŪKSTA <hash>`. Galimi
-`--store failaiInfo|dokumentai|ocr`, `--db`, `--page`, `--limit` ir
-`--after <hash>`.
+`--store failaiInfo|dokumentai|ocrRezultatai|liteko2|eTar`, `--db`, `--page`,
+`--limit` ir `--after <hash>`.
 
 ### Kita
 
@@ -344,7 +368,6 @@ adresuojamas `md5` (žr. `modules/eTar/README.md`).
 | --- | --- | --- |
 | `ETAR_API_URL` | — | Adapterio bazinis URL, pvz. `http://10.1.10.24:8080`. Be trailing slash. Nenustačius scraperis nepasileidžia. |
 | `ETAR_API_KEY` | `""` | Bearer raktas — tik jei adapteryje nustatytas `API_KEY`. |
-| `ETAR_SIDECAR_DIR` | `/flashas/viespirkiai/eTar` | Katalogas, kuriame laikoma `eTar.sqlite` atsakymų saugykla (tik lokalus kelias). |
 | `ETAR_RECENT_DAYS` | `180` | Kiek naujausių dienų periodiškai iš naujo tikrina TaskRunner radaras. |
 | `ETAR_REFRESH_HOURS` | `3` | Po kiek valandų radaro diena vėl laikoma tikrintina. |
 | `ETAR_MAX_INFLIGHT` | `6` | Bendras lygiagrečių užklausų į e-TAR adapterį limitas visiems etapams. |

@@ -1,8 +1,7 @@
-import path from "node:path";
 import { createHash } from "node:crypto";
 import { zstdCompressSync, zstdDecompressSync } from "node:zlib";
-import config from "../../utils/config.js";
 import { closeSqlite, inTransaction, openSqlite } from "../../utils/sqlite.js";
+import { sidecarDbPath } from "../../utils/sidecarPaths.js";
 
 // e-TAR API atsakymų sidecar saugykla.
 //
@@ -14,14 +13,9 @@ import { closeSqlite, inTransaction, openSqlite } from "../../utils/sqlite.js";
 // Kodėl SQLite, o ne failų medis (kaip utils/sidecarStore.js): milijonas aktų ×
 // kelios redakcijos = milijonai mažų failų, o tai flash'ui skaudu. WAL režimas →
 // daug lygiagrečių skaitytojų iš skirtingų procesų, vienas rašytojas.
-
-export const ETAR_SIDECAR_DIR = "/flashas/viespirkiai/eTar";
-export const ETAR_SIDECAR_FILE = "eTar.sqlite";
-
-/** Katalogas iš konfigūracijos (ETAR_SIDECAR_DIR), su numatytuoju atsarginiu. */
-export function getETarSidecarDir() {
-    return config.eTarSidecarDir || ETAR_SIDECAR_DIR;
-}
+//
+// Kelias — iš bendro registro (`utils/sidecarPaths.js`), kaip ir visų kitų
+// sidecar'ų; skiriasi tik tuo, kad čia rašom tiesiai, ne per `createSidecarStore`.
 
 // Nesaugom nei audito (`http_requests`), nei laiko žymos (`fetched_at` — jis jau
 // yra Postgres'e), nei žalio HTML (`raw_page_html` — didžiausia atsakymo dalis ir
@@ -29,8 +23,9 @@ export function getETarSidecarDir() {
 // todėl nepasikeitęs aktas antrą kartą duoda tą patį md5 ir eilutė nedubliuojama.
 export const VOLATILE_FIELDS = ["http_requests", "fetched_at", "raw_page_html"];
 
-export function getETarSidecarPath(dir = getETarSidecarDir()) {
-    return path.join(dir, ETAR_SIDECAR_FILE);
+/** `<SIDECAR_DIR>/eTar.sqlite`; `null`, jei `SIDECAR_DIR` nenustatytas. */
+export function getETarSidecarPath() {
+    return sidecarDbPath("eTar");
 }
 
 /**
@@ -41,6 +36,7 @@ export function getETarSidecarPath(dir = getETarSidecarDir()) {
  * @returns {import("node:sqlite").DatabaseSync}
  */
 export function openETarSidecar({ dbPath = getETarSidecarPath(), readonly = false } = {}) {
+    if (!dbPath) throw new Error("SIDECAR_DIR nenustatytas, negalima atidaryti eTar sidecar'o");
     return openSqlite({ dbPath, readonly, ensureSchema: ensureETarSidecarSchema });
 }
 

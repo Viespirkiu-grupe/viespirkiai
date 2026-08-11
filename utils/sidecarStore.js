@@ -1,31 +1,27 @@
 import { createHash } from "crypto";
-import config from "./config.js";
 import { createCompressedSqliteStore } from "./sqliteSidecarStore.js";
+import { sidecarRemoteUrl } from "./sidecarPaths.js";
 
 /*
 Bendra „sidecar" saugyklų logika.
 
-Sidecar lokaliai gyvena tik zstd SQLite saugykloje. `config.<locationKey>` gali
-būti HTTP(S) endpoint'as, naudojamas tik kaip nuotolinis read fallback mazguose,
-kurie neturi lokalaus SQLite. Visi write'ai reikalauja `sqliteLocationKey`.
+Sidecar lokaliai gyvena tik zstd SQLite saugykloje, kurios kelias išvedamas iš
+registro vardo (`utils/sidecarPaths.js`). Mazgas be `SIDECAR_DIR` skaito per
+`SIDECAR_REMOTE` — tą patį `/api/v1/sidecar/<vardas>` endpoint'ą, kurį
+aptarnauja mazgas su lokaliais failais. Visi write'ai reikalauja `SIDECAR_DIR`;
+per HTTP rašyti negalima.
 
 Anksčiau šią logiką turėjo penki failai su savo kopija (`dokumentaiFs`,
 `failaiFs`, `tekstasFs`, `metaduomenysFs`, `rezultataiFs`), ir kopijos buvo
 nevienodo pilnumo — dviejose trūko `exists()`, viena naudojo `hash=` vietoj
-`md5=` URL parametro. Dabar skirtumai yra sąmoninga konfigūracija.
+`md5=` URL parametro. Dabar raktas visur `md5`, o skirtumai yra sąmoninga
+konfigūracija.
 */
-
-function isRemoteLocation(location) {
-    return location?.startsWith("http://") || location?.startsWith("https://");
-}
 
 /**
  * @param {object} p
- * @param {string} p.locationKey - `config` rakto vardas, pvz. „dokumentaiLocation".
+ * @param {string} p.sidecar - registro vardas, pvz. „dokumentai" (žr. utils/sidecarPaths.js).
  * @param {string} p.label - kilmininko linksniu, klaidų tekstams: „dokumento", „teksto".
- * @param {string} [p.sqliteLocationKey] - pilno SQLite failo kelio config raktas.
- * @param {string} [p.sqliteTable] - lentelė suspaustiems blob'ams.
- * @param {string} [p.keyName] - rakto vardas URL parametre ir klaidų tekstuose („md5"/„hash").
  * @param {(value: unknown) => string} [p.serialize] - reikšmė → failo turinys.
  * @param {(text: string) => unknown} [p.deserialize] - failo turinys → reikšmė.
  * @returns {{
@@ -33,6 +29,7 @@ function isRemoteLocation(location) {
  *   saveRaw: (key: string, contents: string) => Promise<void>,
  *   readRaw: (key: string) => Promise<string|null>,
  *   readLocalRaw: (key: string) => Promise<string|null>,
+ *   readLocalManyRaw: (keys: string[]) => Promise<Map<string, string>>,
  *   read: (key: string) => Promise<unknown|null>,
  *   exists: (key: string) => Promise<boolean>,
  *   hash: (value: unknown) => string,
@@ -40,31 +37,21 @@ function isRemoteLocation(location) {
  * }}
  */
 export function createSidecarStore({
-    locationKey,
+    sidecar,
     label,
-    sqliteLocationKey,
-    sqliteTable,
-    keyName = "md5",
     serialize = (value) => JSON.stringify(value),
     deserialize = (text) => JSON.parse(text),
 }) {
-    // Vietą skaitom kviečiant, o ne importuojant — konfigūracija gali būti
-    // pakeista testuose arba užkrauta vėliau.
-    const remoteLocation = () => isRemoteLocation(config[locationKey])
-        ? config[locationKey]
-        : null;
-    const sqlite = sqliteLocationKey && sqliteTable
-        ? createCompressedSqliteStore({ locationKey: sqliteLocationKey, tableName: sqliteTable })
-        : null;
+    const sqlite = createCompressedSqliteStore({ sidecar });
 
     function localConfigured() {
-        return Boolean(sqlite?.configured());
+        return sqlite.configured();
     }
 
     async function saveRaw(key, contents) {
-        if (!sqlite?.configured()) {
+        if (!sqlite.configured()) {
             throw new Error(
-                `${sqliteLocationKey} nenustatytas, negalima išsaugoti ${label} (${keyName}=${key})`,
+                `SIDECAR_DIR nenustatytas, negalima išsaugoti ${label} (md5=${key})`,
             );
         }
         return sqlite.saveRaw(key, contents);
@@ -76,11 +63,11 @@ export function createSidecarStore({
 
     async function readHttpRaw(key) {
         if (!key) return null;
-        const loc = remoteLocation();
-        if (!loc) return null;
+        // URL sudarom kviečiant — konfigūracija gali būti pakeista testuose.
+        const url = sidecarRemoteUrl(sidecar);
+        if (!url) return null;
         try {
-            const url = `${loc}?${keyName}=${encodeURIComponent(key)}`;
-            const res = await fetch(url);
+            const res = await fetch(`${url}?md5=${encodeURIComponent(key)}`);
             if (!res.ok) return null;
             return await res.text();
         } catch {
@@ -89,11 +76,11 @@ export function createSidecarStore({
     }
 
     async function readRawFromSqlite(key) {
-        if (!sqlite?.configured()) return null;
+        if (!sqlite.configured()) return null;
         try {
             return await sqlite.readRaw(key);
         } catch (error) {
-            console.error(`${sqliteLocationKey} SQLite skaitymo klaida (${keyName}=${key}):`, error);
+            console.error(`${sidecar} SQLite skaitymo klaida (md5=${key}):`, error);
             return null;
         }
     }
@@ -109,6 +96,12 @@ export function createSidecarStore({
         return readRawFromSqlite(key);
     }
 
+    /** Partija iš lokalaus SQLite; grąžina `Map<md5, tekstas>` tik su rastais. */
+    async function readLocalManyRaw(keys) {
+        if (!sqlite.configured()) return new Map();
+        return sqlite.readManyRaw(keys);
+    }
+
     async function read(key) {
         const text = await readRaw(key);
         if (text === null) return null;
@@ -121,11 +114,11 @@ export function createSidecarStore({
 
     async function exists(key) {
         if (!key) return false;
-        if (sqlite?.configured()) {
+        if (sqlite.configured()) {
             try {
                 if (sqlite.exists(key)) return true;
             } catch (error) {
-                console.error(`${sqliteLocationKey} SQLite exists klaida (${keyName}=${key}):`, error);
+                console.error(`${sidecar} SQLite exists klaida (md5=${key}):`, error);
             }
         }
         return false;
@@ -150,6 +143,7 @@ export function createSidecarStore({
         read,
         readRaw,
         readLocalRaw,
+        readLocalManyRaw,
         readHttpRaw,
         localConfigured,
         exists,

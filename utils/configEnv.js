@@ -61,7 +61,6 @@ const ENV_MAP = [
 
     ["ETAR_API_URL", "eTarApiUrl", "string"],
     ["ETAR_API_KEY", "eTarApiKey", "string"],
-    ["ETAR_SIDECAR_DIR", "eTarSidecarDir", "string"],
     ["ETAR_RECENT_DAYS", "eTarRecentDays", "number"],
     ["ETAR_REFRESH_HOURS", "eTarRefreshHours", "number"],
     ["ETAR_MAX_INFLIGHT", "eTarMaxInflight", "number"],
@@ -69,14 +68,9 @@ const ENV_MAP = [
     ["INTERNAL_FILE_BASE", "internalFileBase", "string"],
     ["OCR_BANDYMAI", "ocrBandymai", "number"],
 
-    ["OCR_REZULTATAI_LOCATION", "ocrRezultataiLocation", "string"],
-    ["DOKUMENTAI_LOCATION", "dokumentaiLocation", "string"],
-    ["FAILAI_LOCATION", "failaiLocation", "string"],
-    ["FAILAIINFO_SQLITE_LOCATION", "failaiInfoSqliteLocation", "string"],
-    ["DOKUMENTAI_SQLITE_LOCATION", "dokumentaiSqliteLocation", "string"],
-    ["OCR_REZULTATAI_SQLITE_LOCATION", "ocrRezultataiSqliteLocation", "string"],
-    ["LITEKO2_LOCATION", "liteko2Location", "string"],
-    ["LITEKO2_SQLITE_LOCATION", "liteko2SqliteLocation", "string"],
+    // Visos sidecar bazės — viename kataloge, po vieną failą; žr. utils/sidecarPaths.js.
+    ["SIDECAR_DIR", "sidecarDir", "string"],
+    ["SIDECAR_REMOTE", "sidecarRemote", "string"],
 
     ["ENABLE_GRAPH", "enableGraph", "boolean"],
 

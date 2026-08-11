@@ -38,7 +38,10 @@ export function openSqlite({
 
     if (!readonly) db.exec(`PRAGMA page_size = ${p.pageSize}`);
     db.exec(`PRAGMA busy_timeout = ${p.busyTimeout}`);
-    db.exec("PRAGMA journal_mode = WAL");
+    // journal_mode keičia failo antraštę, t. y. yra RAŠYMAS — readonly ryšiui jis
+    // nulūžta („attempt to write a readonly database"), jei bazė dar ne WAL.
+    // Skaitytojui jo ir nereikia: režimas yra failo savybė, ne ryšio.
+    if (!readonly) db.exec("PRAGMA journal_mode = WAL");
     if (!["OFF", "NORMAL", "FULL"].includes(synchronous)) {
         throw new Error(`Blogas SQLite synchronous režimas: ${synchronous}`);
     }

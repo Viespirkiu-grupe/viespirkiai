@@ -128,37 +128,25 @@ export default {
     ocrBandymai: 5,
 
     // ─────────────────────────────────────────────────────────────────────
-    // Blob saugyklų vietos
-    // `*SqliteLocation` — privalomas pilnas lokalaus SQLite failo kelias writeriui.
-    // Seni `*Location` raktai palaiko tik HTTP(S) read fallback kitame mazge.
+    // Sidecar saugyklos
+    //
+    // Visos sidecar SQLite bazės guli viename kataloge, po vieną failą
+    // kiekvienam registro įrašui (`utils/sidecarPaths.js`):
+    //
+    //     <sidecarDir>/failaiInfo.sqlite      failo turinio JSON
+    //     <sidecarDir>/dokumentai.sqlite      dokumentų JSON (raktas: md5)
+    //     <sidecarDir>/ocrRezultatai.sqlite   OCR rezultatai
+    //     <sidecarDir>/liteko2.sqlite         LITEKO2 sprendimai
+    //     <sidecarDir>/eTar.sqlite            e-TAR API atsakymai
+    //
+    // Turinys suspaustas zstd. `sidecarDir` privalomas kiekvienam procesui,
+    // kuris rašo sidecar'us; be jo write baigiasi klaida.
     // ─────────────────────────────────────────────────────────────────────
+    sidecarDir: undefined,
 
-    // OCR rezultatų blob saugyklą.
-    ocrRezultataiLocation: undefined,
-
-    // Sujungti failo turinio JSON failai (raktas: failasHash) — apima tekstą,
-    // metaduomenis ir išgautus subjektus (iban, jarKodai, links, emails,
-    // domains, telefonai).
-    failaiLocation: undefined,
-
-    // Pilni SQLite failų keliai. Visi lokalūs read/write vyksta tik čia.
-    failaiInfoSqliteLocation: undefined,
-    dokumentaiSqliteLocation: undefined,
-    ocrRezultataiSqliteLocation: undefined,
-
-    // Dokumentų JSON sidecar failai (raktas: md5).
-    dokumentaiLocation: undefined,
-
-    // LITEKO2 sprendimų sidecar (modules/liteko2): pilnas API atsakymas,
-    // sprendimo HTML ir iš jo ištrauktas tekstas. Raktas: md5('liteko2:<id>').
-    // Rašymui privalomas `liteko2SqliteLocation`; `liteko2Location` – tik
-    // HTTP(S) read fallback mazguose be lokalaus SQLite.
-    liteko2SqliteLocation: undefined,
-    liteko2Location: undefined,
-
-    // e-TAR API atsakymų SQLite sidecar (raktas: md5). Skirtingai nuo aukščiau
-    // esančių — ne failų medis, o viena SQLite bazė kataloge, ir tik lokali.
-    eTarSidecarDir: "/flashas/viespirkiai/eTar",
+    // Mazgui be lokalių failų — bazinis URL mazgo, kuris juos turi. Naudojamas
+    // tik skaitymui; klientas pats prilipdo `/api/v1/sidecar/<vardas>`.
+    sidecarRemote: undefined,
 
     // ─────────────────────────────────────────────────────────────────────
     // Eksperimentinės / prototipinės funkcijos
