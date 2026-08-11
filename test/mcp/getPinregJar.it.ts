@@ -33,29 +33,28 @@ describe("get_pinreg_jar", () => {
         expect(payload.limit).toBe(5);
     });
 
-    it("each asmuo has a single readable name and grouped deklaracijos/irasos", () => {
-        return handler({ jarKodas: KNOWN_JAR_KODAS, limit: 5 }).then((result) => {
-            const payload = parseResult(result as AnyResult);
-            const asmuo = payload.asmenys[0];
+    it("each asmuo has a single readable name and grouped deklaracijos/irasos", async () => {
+        const result = await handler({ jarKodas: KNOWN_JAR_KODAS, limit: 5 });
+        const payload = parseResult(result as AnyResult);
+        const asmuo = payload.asmenys[0];
 
-            expect(typeof asmuo.asmuo).toBe("string");
-            expect(asmuo.asmuo).not.toMatch(/\*/); // not censored
-            expect(["tiesioginis", "sutuoktinis"]).toContain(asmuo.rysys);
-            expect(Array.isArray(asmuo.deklaracijos)).toBe(true);
-            expect(asmuo.deklaracijos.length).toBeGreaterThan(0);
+        expect(typeof asmuo.asmuo).toBe("string");
+        expect(asmuo.asmuo).not.toMatch(/\*/); // not censored
+        expect(["tiesioginis", "sutuoktinis"]).toContain(asmuo.rysys);
+        expect(Array.isArray(asmuo.deklaracijos)).toBe(true);
+        expect(asmuo.deklaracijos.length).toBeGreaterThan(0);
 
-            const dekl = asmuo.deklaracijos[0];
-            expect(typeof dekl.uuid).toBe("string");
-            expect(Array.isArray(dekl.irasos)).toBe(true);
-            expect(dekl.irasos.length).toBeGreaterThan(0);
+        const dekl = asmuo.deklaracijos[0];
+        expect(typeof dekl.uuid).toBe("string");
+        expect(Array.isArray(dekl.irasos)).toBe(true);
+        expect(dekl.irasos.length).toBeGreaterThan(0);
 
-            const iraso = dekl.irasos[0];
-            // raw identity fields must not leak into individual records
-            expect(iraso.vardas).toBeUndefined();
-            expect(iraso.pavarde).toBeUndefined();
-            expect(iraso.asmuo).toBeUndefined();
-            expect(iraso.jarKodas).toBeUndefined();
-        });
+        const iraso = dekl.irasos[0];
+        // raw identity fields must not leak into individual records
+        expect(iraso.vardas).toBeUndefined();
+        expect(iraso.pavarde).toBeUndefined();
+        expect(iraso.asmuo).toBeUndefined();
+        expect(iraso.jarKodas).toBeUndefined();
     });
 
     it("limit caps the number of unique asmenys, not raw rows", async () => {

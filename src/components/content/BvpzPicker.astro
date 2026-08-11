@@ -94,7 +94,7 @@ const syncBtnId = `${instanceId}-sync-btn`;
         placeholder="Pvz. 48 72 3360"
         value={initialCodes}
       />
-      <button class="btn btn-outline" id={applyManualBtnId} type="button">Pritaikyti</button>
+      <button class="btn btn-outline" id={applyManualBtnId} type="button" data-bvpz-apply-manual>Pritaikyti</button>
     </div>
   </div>}
 
@@ -140,11 +140,11 @@ const syncBtnId = `${instanceId}-sync-btn`;
     </div>
     <div class="action-bar-right">
       <button class="btn btn-ghost btn-sm" type="button" data-bvpz-clear>Išvalyti</button>
-      <button class="btn btn-outline btn-sm" type="button" id={copyBtnId}>Kopijuoti</button>
-      {syncInputId && <button class="btn btn-outline btn-sm" type="button" id={syncBtnId}>{syncButtonLabel}</button>}
+      <button class="btn btn-outline btn-sm" type="button" id={copyBtnId} data-bvpz-copy>Kopijuoti</button>
+      {syncInputId && <button class="btn btn-outline btn-sm" type="button" id={syncBtnId} data-bvpz-sync>{syncButtonLabel}</button>}
       {searchTargets.length > 0 && (
         <div class="action-bar-popup-wrap">
-          <button class="btn btn-primary btn-sm" type="button" id={searchBtnId}>Ieškoti ↑</button>
+          <button class="btn btn-primary btn-sm" type="button" id={searchBtnId} data-bvpz-search>Ieškoti ↑</button>
           <div class="action-bar-popup" id={searchDropdownId}>
             {searchTargets.map((target) => (
               <button type="button" class="action-bar-popup-item" data-bvpz-search-target={target.value}>
@@ -158,14 +158,14 @@ const syncBtnId = `${instanceId}-sync-btn`;
   </div>
   </div>
 
-  <script is:inline define:vars={{ rootId }}>
+  <script is:inline>
     // Veiksmų juostos „atvirkštinis" sticky: kabo ekrano apačioje, kol dokas
     // (jos vieta sąrašo gale) dar žemiau matomos srities; nuslinkus iki galo —
     // atsikabina ir atsisėda doke, virš poraštės. Grynas CSS `position: sticky`
     // čia netinka: html/body `overflow-x: hidden` (reset.css) paverčia body
     // slinkties konteineriu ir apatinis sticky nebepakimba.
     (() => {
-      const root = document.getElementById(rootId);
+      const root = document.currentScript?.closest('.bvpz-picker');
       const dock = root?.querySelector('.action-bar-dock');
       const bar = dock?.querySelector('.action-bar');
       if (!dock || !bar) return;
@@ -190,20 +190,20 @@ const syncBtnId = `${instanceId}-sync-btn`;
     })();
   </script>
 
-  <script is:inline define:vars={{ treeUrl, rootId, treeId, selectedCodesId, searchBtnId, searchDropdownId, copyBtnId, manualInputId, applyManualBtnId, syncBtnId, searchInputId, searchClearId, resultsInfoId, initialCodes, autoLoad }}>
+  <script is:inline define:vars={{ treeUrl, initialCodes, autoLoad }}>
     // @ts-nocheck
-    const root = document.getElementById(rootId);
-    const treeEl = document.getElementById(treeId);
-    const codesEl = document.getElementById(selectedCodesId);
-    const manualInput = document.getElementById(manualInputId);
-    const applyManualBtn = document.getElementById(applyManualBtnId);
-    const syncBtn = document.getElementById(syncBtnId);
-    const searchBtn = document.getElementById(searchBtnId);
-    const searchDropdown = document.getElementById(searchDropdownId);
-    const copyBtn = document.getElementById(copyBtnId);
-    const searchInput = document.getElementById(searchInputId);
-    const searchClear = document.getElementById(searchClearId);
-    const resultsInfoEl = document.getElementById(resultsInfoId);
+    const root = document.currentScript?.closest('.bvpz-picker');
+    const treeEl = root?.querySelector('.cpv-tree');
+    const codesEl = root?.querySelector('.action-bar-input');
+    const manualInput = root?.querySelector('.bvpz-manual input');
+    const applyManualBtn = root?.querySelector('[data-bvpz-apply-manual]');
+    const syncBtn = root?.querySelector('[data-bvpz-sync]');
+    const searchBtn = root?.querySelector('[data-bvpz-search]');
+    const searchDropdown = root?.querySelector('.action-bar-popup');
+    const copyBtn = root?.querySelector('[data-bvpz-copy]');
+    const searchInput = root?.querySelector('.bvpz-search input');
+    const searchClear = root?.querySelector('.bvpz-search-clear');
+    const resultsInfoEl = root?.querySelector('.cpv-results-info');
     const syncInputIdValue = root?.dataset.syncInputId ?? "";
     const bvpzFlatIndex = [];
     const BVPZ_MATCH_LIMIT = 400;

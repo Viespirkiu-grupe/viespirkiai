@@ -66,6 +66,10 @@ export async function enqueuePendingETarJobs(kind, { limit = 1000 } = {}) {
  * Atominis lease: HTTP užklausos metu DB tranzakcija nelaikoma atidaryta.
  * claimToken apsaugo nuo seno workerio, grįžusio jau pasibaigus jo lease'ui.
  */
+/**
+ * @param {string} kind
+ * @param {{ leaseMinutes?: number, maxFailures?: number, claimToken?: string }} [options]
+ */
 export async function claimNextETarJob(kind, {
     leaseMinutes = 120,
     maxFailures = 5,

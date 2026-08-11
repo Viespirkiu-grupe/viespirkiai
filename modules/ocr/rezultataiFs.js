@@ -21,7 +21,7 @@ const store = createSidecarStore({
 /**
  * Raktas imamas iš paties rezultato (`rezultatas.md5`), todėl signatūra
  * skiriasi nuo kitų saugyklų.
- * @param {{ md5: string }} rezultatas
+ * @param {{ md5: string, [key: string]: unknown }} rezultatas
  */
 export const saveRezultatasFs = (rezultatas) => store.save(rezultatas.md5, rezultatas);
 

@@ -122,7 +122,7 @@ describe("recent VPM contract changes", () => {
             isTTY = true;
             isRaw = false;
             paused = false;
-            setRawMode(value) {
+            setRawMode(value: boolean) {
                 this.isRaw = value;
             }
             resume() {
@@ -138,7 +138,7 @@ describe("recent VPM contract changes", () => {
         const output = {
             isTTY: true,
             rows: 4,
-            write(value) {
+            write(value: string) {
                 outputText += value;
                 if (!answered && value.includes("-- Daugiau")) {
                     answered = true;

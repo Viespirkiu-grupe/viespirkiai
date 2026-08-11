@@ -6,6 +6,8 @@ import { isVptWorkingHours } from "../sutartys/isWorkingHours.js";
 const JAR_NUSKAITYMO_VERSIJA = 1;
 const defaultLogger = { log, error: log };
 
+/** @typedef {{ query: (...args: any[]) => Promise<any> }} Queryable */
+
 async function reserveVykdytojas(db) {
     const { rows } = await db.query(
         `
@@ -86,6 +88,14 @@ async function refreshSearchForVykdytojas(vykdytojoId, db) {
     );
 }
 
+/**
+ * @param {{
+ *   db?: Queryable,
+ *   findJuridinis?: (name: string) => Promise<any>,
+ *   workingHours?: () => boolean,
+ *   logger?: {log(...args: any[]): void, error?: (...args: any[]) => void}
+ * }} [options]
+ */
 export async function processNextPlanuojamuPirkimuVykdytojas({
     db = postgres,
     findJuridinis = findSingleJuridinis,

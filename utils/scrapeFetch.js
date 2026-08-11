@@ -148,6 +148,7 @@ function nodeCountingBody(body, addBytes, finish) {
  */
 const dynamicGlobalFetch = (...args) => globalThis.fetch(...args);
 
+/** @param {(...args: any[]) => Promise<any>} [fetchImpl] */
 export function createScrapeFetch(fetchImpl = dynamicGlobalFetch, {
     enabled = scrapeLogEnabled,
     emit = enqueueScrapeLog,

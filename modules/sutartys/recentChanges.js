@@ -338,6 +338,10 @@ export function formatRecentChanges(rows, { color = false } = {}) {
     }).join("\n\n");
 }
 
+/**
+ * @param {{limit?: number, id?: number | null, beforeId?: number | null}} [options]
+ * @param {{query: (...args: any[]) => Promise<any>}} [db]
+ */
 export async function fetchRecentChanges(
     { limit = 20, id = null, beforeId = null } = {},
     db = postgres,

@@ -578,6 +578,8 @@ export function buildVpmSutartisSearchText(canonicalJson) {
 /**
  * Upsert one normalized VPM contract. The statement is atomic: an old version
  * is archived before a changed hash replaces the normalized rows.
+ * @param {{json: string, md5: string}} prepared
+ * @param {{query: (...args: any[]) => Promise<any>}} [db]
  */
 export async function upsertVpmSutartis(prepared, db = postgres) {
     const searchText = buildVpmSutartisSearchText(prepared.json);

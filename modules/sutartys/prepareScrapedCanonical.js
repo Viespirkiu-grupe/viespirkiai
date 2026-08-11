@@ -3,6 +3,11 @@ import {
     prepareCanonicalSutartis,
 } from "./canonicalSutartis.js";
 
+/**
+ * @param {unknown} value
+ * @param {string} [field]
+ * @param {string | number} [contractId]
+ */
 export function parseDateOnly(value, field = "date", contractId = "unknown") {
     if (value === null || value === undefined || value === "") return null;
     const match = String(value).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);

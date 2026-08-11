@@ -249,6 +249,10 @@ const columnsFor = (rows: unknown[], sectionKey: string) => {
     return leftIndex - rightIndex;
     });
 };
+const cellValue = (row: unknown, column: string): unknown =>
+  row && typeof row === 'object' && !Array.isArray(row)
+    ? (row as Record<string, unknown>)[column]
+    : undefined;
 ---
 
 <div class="stack stack-xl">
@@ -325,7 +329,7 @@ const columnsFor = (rows: unknown[], sectionKey: string) => {
             {rows.map((row) => (
               <tr>
                 {columns.map((column) => (
-                  <td>{display((row as Record<string, unknown>)[column], column)}</td>
+                  <td>{display(cellValue(row, column), column)}</td>
                 ))}
               </tr>
             ))}

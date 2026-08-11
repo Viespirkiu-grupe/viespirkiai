@@ -17,7 +17,7 @@ const PAD_T = 20;
 const PAD_R = 20;
 
 const data = JSON.parse(readFileSync(IN_PATH, "utf8"));
-const { width, height, xs, ys, ns, maxCell, pxPerDecade, uMin, uMax, dateStart, dateEnd } = data;
+const { width, height, maxCell, pxPerDecade, uMin, uMax, dateStart, dateEnd } = data;
 
 const totalW = width  + PAD_L + PAD_R;
 const totalH = height + PAD_T + PAD_B;

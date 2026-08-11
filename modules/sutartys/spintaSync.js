@@ -177,6 +177,15 @@ async function removeRemoteSutartis(spinta, state, dryRun) {
     return { insert: 0, patch: 0, delete: deleted + 1, unchanged: 0 };
 }
 
+/**
+ * @param {{
+ *   id: number,
+ *   row?: any,
+ *   md5Lookup?: Map<any, any>,
+ *   spinta?: {getAll(model: string, params: any): Promise<any>, batch(model: string, ops: any[]): Promise<any>},
+ *   dryRun?: boolean
+ * }} options
+ */
 export async function syncSutartisToSpinta({
     id,
     row = null,

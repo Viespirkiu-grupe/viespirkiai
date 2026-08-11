@@ -7,7 +7,7 @@
  * X-Forwarded-For is ordered client-first by conventional proxies.
  *
  * @param {Headers} headers
- * @param {string | undefined} socketAddress
+ * @param {string} [socketAddress]
  */
 export function getClientIp(headers, socketAddress) {
   const forwardedFor = headers.get('x-forwarded-for')

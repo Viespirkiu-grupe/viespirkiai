@@ -159,7 +159,7 @@ function grupuotiPagalAsmeni(rows, { rysys } = {}) {
  *
  * @param {object} result - plokščias gautiPinregDeklaracijasPagalJarKoda atsakymas
  * @param {{ limit?: number }} [options]
- * @returns {{ asmenys: Array, rysiaiSuJa: Array, counts: object, limit: number|null }}
+ * @returns {{ asmenys: Array<any>, rysiaiSuJa: Array<any>, counts: {asmenys: number, rysiaiSuJa: number}, limit: number|null }}
  */
 export function pertvarkytiPinregAsmenims(result, options = {}) {
     const limit = options.limit ? Number(options.limit) : null;

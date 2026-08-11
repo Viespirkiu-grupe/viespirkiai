@@ -3,14 +3,15 @@ import { createETarTaskJobs } from "../modules/eTar/eTarTaskJobs.js";
 
 function makeRuntime() {
     const scraper = {
-        scrapeDay: vi.fn(async () => {}),
+        scrapeDay: vi.fn(async () => ({ seen: 0, discovered: 0 })),
         scrapeDocument: vi.fn(async () => {}),
         scrapeEditionList: vi.fn(async () => {}),
         scrapeConsolidated: vi.fn(async () => {}),
         scrapeHistoricalEdition: vi.fn(async () => {}),
+        concurrency: 6,
     };
     const queue = {
-        enqueuePending: vi.fn(async () => 0),
+        enqueuePending: vi.fn(async (_kind: string) => 0),
         claimNext: vi.fn(async (kind: string) => ({
             queueId: `${kind}-1`,
             kind,
