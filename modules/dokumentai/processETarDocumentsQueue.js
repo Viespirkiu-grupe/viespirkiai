@@ -1,5 +1,5 @@
 import { postgres } from "../../postgres/postgres.js";
-import { openETarSidecar, readResponse } from "../eTar/eTarSidecar.js";
+import { readETarSidecarMany } from "../eTar/eTarSidecar.js";
 import { Logger } from "../../utils/log.js";
 import {
     buildETarDokumentas,
@@ -10,8 +10,6 @@ import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const logger = new Logger();
 const BATCH_SIZE = 500;
-let sidecar = null;
-const getSidecar = () => sidecar ??= openETarSidecar({ readonly: true });
 
 export async function processETarDocumentsQueue() {
     const client = await postgres.connect();
@@ -62,9 +60,16 @@ export async function processETarDocumentsQueue() {
             const vanished = toUpsert.filter((id) => !found.has(String(id)));
             deleted += await deleteETarDokumentai(vanished, client);
 
+            // Visa partija vienu skaitymu: eilučių čia iki BATCH_SIZE, o ciklas
+            // sukasi atviroje tranzakcijoje su FOR UPDATE SKIP LOCKED — kuo
+            // trumpiau ją laikom, tuo mažiau blokuojam kitus darbininkus.
+            const sidecarai = await readETarSidecarMany(
+                rows.map((row) => row.md5).filter(Boolean),
+            );
+
             const built = [];
             for (const row of rows) {
-                const payload = row.md5 ? readResponse(getSidecar(), row.md5) : null;
+                const payload = row.md5 ? sidecarai.get(row.md5) : null;
                 if (!payload) {
                     skipped++;
                     continue;

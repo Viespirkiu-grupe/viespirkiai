@@ -3,10 +3,12 @@ import path from "path";
 import { postgres } from "../../postgres/postgres.js";
 import { streamQuery } from "../../postgres/streamQuery.js";
 import { log } from "../../utils/log.js";
-import { readRezultatasFs } from "./rezultataiFs.js";
+import { readManyRezultatasFs } from "./rezultataiFs.js";
 
 const ROWS_PER_FILE = 100_000;
 const LOG_EVERY = 1_000;
+// Kiek eilučių sukaupiam prieš imant sidecar'us — sutampa su SIDECAR_BATCH_LIMIT.
+const LANGAS = 500;
 
 
 async function run(outputDir) {
@@ -57,20 +59,38 @@ async function run(outputDir) {
              ORDER BY o.id ASC`,
     );
 
+    /** Vienas langas: sidecar'ai paimami viena užklausa, tada rašom eilutes. */
+    function rasytiLanga(langas, sidecarai) {
+        for (const row of langas) {
+            if (rowsInFile >= ROWS_PER_FILE) openNextFile();
+            const rezultatas = sidecarai.get(row.md5);
+            fileStream.write(JSON.stringify({ ...row, tekstas: rezultatas?.tekstas ?? null }) + "\n");
+            rowsInFile++;
+            totalRows++;
+            if (totalRows - lastLogAt >= LOG_EVERY) {
+                const elapsed = (Date.now() - startTime) / 1000;
+                const speed = Math.round(totalRows / elapsed);
+                log(`Eksportuota ${totalRows.toLocaleString()} eilučių | greitis: ${speed.toLocaleString()} eil/s | paskutinis failas: ${row.failas}`);
+                lastLogAt = totalRows;
+            }
+        }
+    }
+
     // Jungtį ir transakciją uždaro pats streamQuery – nei `try/finally`, nei
     // `release()` čia nebereikia.
+    //
+    // Srautą kaupiam į langus, nes sekvenciniam `for await` skaitymo grupavimas
+    // nepadeda: per tick'ą ateina po vieną raktą. Su langu vienas `readMany`
+    // pakeičia LANGAS skaitymų, o eilučių tvarka išlieka.
+    let langas = [];
     for await (const row of stream) {
-        if (rowsInFile >= ROWS_PER_FILE) openNextFile();
-        const rezultatas = await readRezultatasFs(row.md5);
-        fileStream.write(JSON.stringify({ ...row, tekstas: rezultatas?.tekstas ?? null }) + "\n");
-        rowsInFile++;
-        totalRows++;
-        if (totalRows - lastLogAt >= LOG_EVERY) {
-            const elapsed = (Date.now() - startTime) / 1000;
-            const speed = Math.round(totalRows / elapsed);
-            log(`Eksportuota ${totalRows.toLocaleString()} eilučių | greitis: ${speed.toLocaleString()} eil/s | paskutinis failas: ${row.failas}`);
-            lastLogAt = totalRows;
-        }
+        langas.push(row);
+        if (langas.length < LANGAS) continue;
+        rasytiLanga(langas, await readManyRezultatasFs(langas.map((r) => r.md5)));
+        langas = [];
+    }
+    if (langas.length) {
+        rasytiLanga(langas, await readManyRezultatasFs(langas.map((r) => r.md5)));
     }
 
     if (fileStream) fileStream.end();

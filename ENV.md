@@ -311,6 +311,16 @@ POST /api/v1/sidecar/<vardas>/batch
 Batch atsakymas streaminamas gabalais, o nerastų raktų eilučių jame nėra — ko
 negrįžo, to nėra.
 
+Klientas šiuos endpoint'us naudoja pats, be atskiro kvietimo: skaitymai, paleisti
+tame pačiame event loop tick'e, sugrupuojami ir iškeliauja viena užklausa
+(gabalais po 500). Vienam raktui lieka paprastas `GET`, keliems — vienas `POST`.
+Todėl indeksavimo drain'as (500 eilučių) ar paieškos rezultatų puslapis
+nuotoliniame mazge kainuoja vieną kelionę, ne N.
+
+Sekvenciniams srautams, kur per tick'ą ateina po vieną raktą, grupavimas
+nepadeda — jiems yra `store.readMany(keys)` (žr. `modules/ocr/eksportuotiRezultatus.js`,
+kuris kaupia srautą į 500 eilučių langus).
+
 #### Trūkstamų įrašų patikra
 
 PostgreSQL referencinius hash'us galima paketais palyginti su

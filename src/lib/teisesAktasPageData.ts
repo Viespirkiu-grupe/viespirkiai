@@ -9,7 +9,7 @@
 // vieną kiekvienai istorinei redakcijai. Puslapis rodo vieną iš jų (`?v=`), o
 // likusius — perjungikliu.
 import { postgres } from '@/postgres/postgres.js';
-import { openETarSidecar, readResponse } from '@/modules/eTar/eTarSidecar.js';
+import { readETarSidecar } from '@/modules/eTar/eTarSidecar.js';
 
 export interface TeisesAktasDocument {
   documentId: number;
@@ -21,18 +21,6 @@ export interface TeisesAktasDocument {
   contentMessage: string | null;
   md5: string | null;
   fetchedAt: string | null;
-}
-
-let sidecarDb: any = null;
-let sidecarFailed = false;
-function getSidecar() {
-  if (sidecarDb || sidecarFailed) return sidecarDb;
-  try {
-    sidecarDb = openETarSidecar({ readonly: true });
-  } catch {
-    sidecarFailed = true;   // sidecar'o nėra (kitas mazgas) — tekstas tiesiog nerodomas
-  }
-  return sidecarDb;
 }
 
 export interface TurinioIrasas {
@@ -450,27 +438,24 @@ export async function loadTeisesAktasPage(legalActId: string, url: URL) {
   let turiHtml = false;
   let struktura: any[] = [];
   if (current?.md5) {
-    const db = getSidecar();
-    if (db) {
-      try {
-        const payload: any = readResponse(db, current.md5);
-        const html = payload?.official_text?.html;
-        // HTML rodom <iframe> per vidinį akto teksto endpointą, tekstas lieka kaip
-        // atsarginis variantas, kai HTML nėra.
-        turiHtml = typeof html === 'string' && html.trim().length > 0;
-        const raw = payload?.official_text?.text;
-        if (typeof raw === 'string' && raw.trim()) {
-          // Nuvalom kaip ir nuosprendžių puslapyje: eilučių pradžios tarpai,
-          // >1 tuščia eilutė → viena.
-          tekstas = raw
-            .replace(/^[ \t]+/gm, '')
-            .replace(/[ \t]+\n/g, '\n')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-        }
-        struktura = payload?.official_text?.structure ?? [];
-      } catch { /* sidecar'o pralaimėjimas puslapio negriauna */ }
-    }
+    try {
+      const payload: any = await readETarSidecar(current.md5);
+      const html = payload?.official_text?.html;
+      // HTML rodom <iframe> per vidinį akto teksto endpointą, tekstas lieka kaip
+      // atsarginis variantas, kai HTML nėra.
+      turiHtml = typeof html === 'string' && html.trim().length > 0;
+      const raw = payload?.official_text?.text;
+      if (typeof raw === 'string' && raw.trim()) {
+        // Nuvalom kaip ir nuosprendžių puslapyje: eilučių pradžios tarpai,
+        // >1 tuščia eilutė → viena.
+        tekstas = raw
+          .replace(/^[ \t]+/gm, '')
+          .replace(/[ \t]+\n/g, '\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+      }
+      struktura = payload?.official_text?.structure ?? [];
+    } catch { /* sidecar'o pralaimėjimas puslapio negriauna */ }
   }
 
   return {

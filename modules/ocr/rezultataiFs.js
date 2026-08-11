@@ -25,3 +25,6 @@ export const saveRezultatasFs = (rezultatas) => store.save(rezultatas.md5, rezul
 
 /** @param {string} md5 */
 export const readRezultatasFs = store.read;
+
+/** Partija: `Map<md5, rezultatas>` tik su rastais. @param {string[]} md5s */
+export const readManyRezultatasFs = store.readMany;

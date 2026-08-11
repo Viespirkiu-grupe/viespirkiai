@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   client: { query: vi.fn(), release: vi.fn() },
-  readResponse: vi.fn(),
+  readETarSidecarMany: vi.fn(),
   buildETarDokumentas: vi.fn(),
   upsertETarBatch: vi.fn(),
   deleteETarDokumentai: vi.fn(),
@@ -18,8 +18,7 @@ vi.mock('../utils/taskSignals.js', () => ({
   signalWork: mocks.signalWork,
 }));
 vi.mock('../modules/eTar/eTarSidecar.js', () => ({
-  openETarSidecar: vi.fn(() => ({ fake: true })),
-  readResponse: mocks.readResponse,
+  readETarSidecarMany: mocks.readETarSidecarMany,
 }));
 vi.mock('../modules/dokumentai/upsertFromETar.js', () => ({
   buildETarDokumentas: mocks.buildETarDokumentas,
@@ -44,7 +43,9 @@ describe('processETarDocumentsQueue', () => {
       }
       return { rows: [] };
     });
-    mocks.readResponse.mockReturnValue({ official_text: { text: 'Tekstas' } });
+    mocks.readETarSidecarMany.mockResolvedValue(
+      new Map([['abc', { official_text: { text: 'Tekstas' } }]]),
+    );
     mocks.buildETarDokumentas.mockReturnValue({ row: { documentId: '42', md5: 'abc' }, sidecar: {} });
     mocks.upsertETarBatch.mockResolvedValue({ upserted: 1, skipped: 0 });
     mocks.deleteETarDokumentai.mockResolvedValue(0);
@@ -52,7 +53,9 @@ describe('processETarDocumentsQueue', () => {
 
   it('deduplikuoja porciją ir ištrina eilės įrašus tik po upsert', async () => {
     await expect(processETarDocumentsQueue()).resolves.toBe(true);
-    expect(mocks.readResponse).toHaveBeenCalledWith(expect.anything(), 'abc');
+    // Visa porcija — vienu skaitymu, ne po vieną raktą.
+    expect(mocks.readETarSidecarMany).toHaveBeenCalledOnce();
+    expect(mocks.readETarSidecarMany).toHaveBeenCalledWith(['abc']);
     expect(mocks.upsertETarBatch).toHaveBeenCalledOnce();
     const sqlCalls = mocks.client.query.mock.calls.map(([sql]) => String(sql));
     const deleteAt = sqlCalls.findIndex((sql) => sql.includes('DELETE FROM public."eTarDocumentsQueue"'));

@@ -171,6 +171,25 @@ describe('SQLite sidecar backend', () => {
     db.close();
   });
 
+  it('reads eTar through the shared store exactly as the writer-side readResponse does', async () => {
+    config.sidecarDir = tempDir;
+    const { openETarSidecar, saveResponse, readResponse, readETarSidecar, readETarSidecarMany } =
+      await import('../modules/eTar/eTarSidecar.js');
+
+    // Rašom senuoju keliu (scraper'io pusė), skaitom nauju (store'as).
+    const db = openETarSidecar();
+    const atsakymas = { official_text: { text: 'Aktas' }, fetched_at: 'nepastovus' };
+    const md5 = saveResponse(db, atsakymas);
+
+    expect(await readETarSidecar(md5)).toEqual(readResponse(db, md5));
+    // `fetched_at` išmetamas prieš skaičiuojant md5 – to store'as keisti neturi.
+    expect(await readETarSidecar(md5)).toEqual({ official_text: { text: 'Aktas' } });
+
+    const many = await readETarSidecarMany([md5, '0'.repeat(32)]);
+    expect([...many.keys()]).toEqual([md5]);
+    db.close();
+  });
+
   it('connects failaiInfo, dokumentai and OCR wrappers to separate databases', async () => {
     config.sidecarDir = tempDir;
 
