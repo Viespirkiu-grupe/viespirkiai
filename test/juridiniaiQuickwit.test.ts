@@ -7,6 +7,20 @@ import {
 } from "../modules/juridiniai/quickwitProcessIndexQueue.js";
 import { buildJuridiniaiQuickwitQuery } from "../modules/juridiniai/searchQuickwit.js";
 import { decodeMorton, mortonKey, tileCenter } from "../modules/juridiniai/quickwitMap.js";
+import { JURIDINIAI_QUICKWIT_INDEX_CONFIG } from "../modules/juridiniai/quickwitIndexConfig.js";
+
+describe("juridiniai Quickwit index config", () => {
+    it("is bundled with the module and defines every indexed document field", () => {
+        expect(JURIDINIAI_QUICKWIT_INDEX_CONFIG).toMatch(/^version: 0\.9/m);
+        expect(JURIDINIAI_QUICKWIT_INDEX_CONFIG).toMatch(/^index_id: juridiniaiTemplate$/m);
+
+        for (const field of Object.keys(buildDoc({ jarKodas: "1" }))) {
+            expect(JURIDINIAI_QUICKWIT_INDEX_CONFIG).toContain(`name: ${field}`);
+        }
+        expect(JURIDINIAI_QUICKWIT_INDEX_CONFIG).toContain("name: quickwitId");
+        expect(JURIDINIAI_QUICKWIT_INDEX_CONFIG).toContain("timestamp_field: atnaujinta");
+    });
+});
 
 describe("juridiniai Morton tile keys", () => {
     it("calculates Web Mercator and Morton values for every z0-z19 level", () => {
