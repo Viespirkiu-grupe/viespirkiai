@@ -14,6 +14,15 @@ const QW_TIMEOUT_MS = config.quickwitTimeoutMs ?? 120_000;
 // search. 60s is a pragmatic tradeoff: long enough to amortize well, short
 // enough that fresh ingest activity is reflected quickly.
 const _deadRatioCache = new Map(); // lentele → { value, expiresAt }
+
+/**
+ * An estimated total may be off by a few rows, but it can never truthfully be
+ * lower than the live matches we have already observed.
+ */
+export function clampHitsEstimate(estimate, observedHits) {
+  if (estimate == null) return observedHits;
+  return Math.max(estimate, observedHits);
+}
 const _tableIdCache = new Map(); // lentele -> id
 
 export async function getDeadRatio(lentele) {
@@ -607,7 +616,10 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
   return {
     hits: liveHits,
     numHitsMax,
-    numHitsEstimate: Math.round(numHitsMax * liveRatio),
+    numHitsEstimate: clampHitsEstimate(
+      Math.round(numHitsMax * liveRatio),
+      liveHits.length,
+    ),
     rawExhausted,
     deadRatio,
     elapsedTimeMicros: totalElapsed,
@@ -683,7 +695,10 @@ export async function searchAll(
   return {
     hits: Number.isFinite(limit) ? liveHits.slice(0, limit) : liveHits,
     numHitsMax,
-    numHitsEstimate: numHitsMax == null ? null : Math.round(numHitsMax * (1 - deadRatio)),
+    numHitsEstimate: clampHitsEstimate(
+      numHitsMax == null ? null : Math.round(numHitsMax * (1 - deadRatio)),
+      liveHits.length,
+    ),
     // Cursor callers must advance past the last raw hit, not the last live hit:
     // the tail of a page may consist entirely of tombstones.
     lastRawHit,
