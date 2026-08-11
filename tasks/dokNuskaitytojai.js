@@ -31,11 +31,16 @@ function buildDokTask(runner, row) {
 }
 
 export function startDokNuskaitytojai(runner) {
+    let stopped = false;
+    let syncPromise = null;
+
     async function sync() {
+        if (stopped) return;
         try {
             const { rows } = await postgres.query(`
                 SELECT * FROM "dokNuskaitytojai" WHERE enabled = true
             `);
+            if (stopped) return;
 
             const desired = new Map(
                 rows.map((row) => {
@@ -61,6 +66,19 @@ export function startDokNuskaitytojai(runner) {
         }
     }
 
-    sync(); // initial
-    setInterval(sync, SYNC_INTERVAL_MS);
+    function runSync() {
+        if (stopped || syncPromise) return;
+        syncPromise = sync().finally(() => {
+            syncPromise = null;
+        });
+    }
+
+    runSync(); // initial
+    const interval = setInterval(runSync, SYNC_INTERVAL_MS);
+
+    return async () => {
+        stopped = true;
+        clearInterval(interval);
+        await syncPromise;
+    };
 }

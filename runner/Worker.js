@@ -10,6 +10,7 @@ export class Worker {
     #onStopped;
 
     #abortController = null;
+    #runPromise = null;
     #stopping = false;
     #wakeWaiters = new Set();
 
@@ -44,19 +45,22 @@ export class Worker {
         if (this.#abortController) return;
         this.#abortController = new AbortController();
         this.#stopping = false;
-        void this.#run(workerIndex).catch((err) => {
+        this.#runPromise = this.#run(workerIndex).catch((err) => {
             console.error(`[${this.#taskName}] worker loop failed:`, err);
         }).finally(() => {
             this.#abortController = null;
             this.#stopping = false;
+            this.#runPromise = null;
             this.#onStopped?.(this);
         });
     }
 
     stop() {
-        if (!this.#abortController || this.#stopping) return;
-        this.#stopping = true;
-        this.#abortController.abort();
+        if (this.#abortController && !this.#stopping) {
+            this.#stopping = true;
+            this.#abortController.abort();
+        }
+        return this.#runPromise ?? Promise.resolve();
     }
 
     wake() {

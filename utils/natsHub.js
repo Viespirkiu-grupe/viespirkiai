@@ -28,8 +28,10 @@ const dec = new TextDecoder();
 let nc = null;
 /** @type {Promise<import("nats").NatsConnection> | null} */
 let connecting = null;
+let closing = false;
 
 async function ensureConnected() {
+    if (closing) throw new Error("natsHub: jungtis uždaroma");
     if (!config.natsUrl) throw new Error("natsHub: NATS_URL nenurodytas");
     if (nc) return nc;
     if (connecting) return connecting;
@@ -57,6 +59,17 @@ async function ensureConnected() {
         });
 
     return connecting;
+}
+
+/** Užbaigia laukiančius publish ir švariai uždaro bendrą NATS jungtį. */
+export async function closeNats() {
+    closing = true;
+    const connection = nc ?? await connecting?.catch(() => null);
+    connecting = null;
+    nc = null;
+    if (connection && !connection.isClosed()) {
+        await connection.drain();
+    }
 }
 
 /**

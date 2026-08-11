@@ -11,12 +11,16 @@ export class TaskRunner {
     #workers = new Map();              // workerKey -> Worker (including stopping workers)
     #desiredWorkerCounts = new Map();  // taskName -> desired count
     #wakeSubscriptions = new Map();    // taskName -> unsubscribe[]
+    #cronTasks = new Set();            // node-cron ScheduledTask handles
+    #cronRuns = new Set();             // currently executing cron promises
     #waitingWorkers = new Set();       // admission entries
     #activeJobs = 0;
     #maxConcurrentJobs;
     #nextQueueSequence = 0;
     #started = false;
     #dispatchPaused = false;
+    #stopping = false;
+    #stopPromise = null;
 
     constructor({ maxConcurrentJobs = 20 } = {}) {
         this.#maxConcurrentJobs = maxConcurrentJobs;
@@ -38,7 +42,7 @@ export class TaskRunner {
     }
 
     start() {
-        if (this.#started) return;
+        if (this.#started || this.#stopping) return;
         this.#started = true;
         this.#dispatchPaused = true;
 
@@ -61,6 +65,39 @@ export class TaskRunner {
     }
 
     /**
+     * Nebepradeda naujų darbų ir palaukia, kol jau pradėti job'ai užsibaigs.
+     * Worker abort signalas nutraukia tik laukimą eilėje/cooldown'ą, ne patį jobFn.
+     */
+    async stop() {
+        if (this.#stopPromise) return this.#stopPromise;
+        if (!this.#started) return Promise.resolve();
+
+        this.#stopping = true;
+        this.#started = false;
+        this.#dispatchPaused = true;
+
+        for (const task of this.#cronTasks) task.stop();
+        this.#cronTasks.clear();
+
+        const workerStops = [];
+        for (const [, def] of this.#tasks) {
+            this.#desiredWorkerCounts.set(def.name, 0);
+            this.#syncWakeSubscriptions(def, 0);
+        }
+        for (const worker of this.#workers.values()) {
+            workerStops.push(worker.stop());
+        }
+
+        this.#stopPromise = Promise.all([
+            ...workerStops,
+            ...this.#cronRuns,
+        ]).then(() => {
+            log("[TaskRunner] stopped");
+        });
+        return this.#stopPromise;
+    }
+
+    /**
      * Scale workers for a task up or down — safe to call at any time.
      * A worker finishing an in-flight job remains tracked until it stops, so a
      * fast down/up sequence cannot create a duplicate worker for the same slot.
@@ -74,6 +111,7 @@ export class TaskRunner {
         if (!Number.isInteger(normalizedCount) || normalizedCount < 0) {
             throw new Error(`Worker count for ${taskName} must be an integer >= 0`);
         }
+        if (this.#stopping && normalizedCount > 0) return;
 
         this.#desiredWorkerCounts.set(taskName, normalizedCount);
         this.#syncWakeSubscriptions(def, normalizedCount);
@@ -253,17 +291,26 @@ export class TaskRunner {
     #scheduleCron(def) {
         if (!def.schedule) return;
         let running = false;
-        cron.schedule(def.schedule, async () => {
-            if (running) return;
+        const task = cron.schedule(def.schedule, async () => {
+            if (this.#stopping || running) return;
             running = true;
+            const run = (async () => {
+                try {
+                    await def.job();
+                } catch (err) {
+                    console.error(`[TaskRunner] cron task "${def.name}" failed:`, err.message);
+                } finally {
+                    running = false;
+                }
+            })();
+            this.#cronRuns.add(run);
             try {
-                await def.job();
-            } catch (err) {
-                console.error(`[TaskRunner] cron task "${def.name}" failed:`, err.message);
+                await run;
             } finally {
-                running = false;
+                this.#cronRuns.delete(run);
             }
         });
+        this.#cronTasks.add(task);
         log(`[TaskRunner] scheduled cron task: ${def.name} (${def.schedule})`);
     }
 }

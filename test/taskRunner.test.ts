@@ -195,4 +195,37 @@ describe("TaskRunner", () => {
         const runner = new TaskRunner();
         expect("nudge" in runner).toBe(false);
     });
+
+    it("graceful stop waits for the active job and starts no next job", async () => {
+        const active = deferred<boolean>();
+        let calls = 0;
+        const runner = new TaskRunner({ maxConcurrentJobs: 1 });
+        runner.register({
+            name: "graceful",
+            mode: "asap",
+            cooldown: 3600,
+            wakeOn: ["work.graceful"],
+            job: async () => {
+                calls++;
+                return active.promise;
+            },
+        });
+
+        runner.start();
+        await flush();
+        expect(calls).toBe(1);
+
+        let stopped = false;
+        const stopPromise = runner.stop().then(() => { stopped = true; });
+        await flush();
+        expect(stopped).toBe(false);
+        expect(nats.subscriptions[0].unsubscribe).toHaveBeenCalledOnce();
+
+        active.resolve(true);
+        await stopPromise;
+        await flush();
+        expect(stopped).toBe(true);
+        expect(calls).toBe(1);
+        expect(runner.activeJobCount()).toBe(0);
+    });
 });
