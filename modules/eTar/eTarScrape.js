@@ -43,8 +43,9 @@ import {
 // (/flashas/viespirkiai/eTar), o Postgres'e lieka normalizuota dalis + md5.
 // Dienos paieška į sidecar'ą nerašoma — ji tik atranda ID.
 //
-// Modulis sąmoningai savarankiškas: niekur neregistruotas, į taskų runner'į
-// neįtrauktas, senas modules/etar lieka nepaliestas.
+// Tas pats branduolys naudojamas dviem režimais: CLI `runPipeline` skirtas
+// rankiniam backfill'ui, o eTarTaskJobs kviečia atskirus scrape metodus po vieną
+// iš lygiagrečių TaskRunner eilių. TaskRunner vidinio pipeline'o nepaleidžia.
 
 const DEFAULT_CONCURRENCY = 4;
 

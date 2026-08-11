@@ -72,6 +72,9 @@ const configSchema = z.object({
     eTarApiUrl: z.string().default(""),
     eTarApiKey: z.string().default(""),
     eTarSidecarDir: z.string().default("/flashas/viespirkiai/eTar"),
+    eTarRecentDays: z.number().int().positive().default(180),
+    eTarRefreshHours: z.number().positive().default(3),
+    eTarMaxInflight: z.number().int().positive().default(6),
 
     internalFileBase: z.string().default("https://failai.viespirkiai.org"),
     ocrBandymai: z.number().int().positive().default(5),

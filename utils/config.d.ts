@@ -77,6 +77,12 @@ export interface Config {
     eTarApiKey: string;
     /** SQLite sidecar katalogas e-TAR API atsakymams. */
     eTarSidecarDir: string;
+    /** Kiek naujausių kalendorinių dienų periodiškai tikrina TaskRunner. */
+    eTarRecentDays: number;
+    /** Po kiek valandų radaro diena vėl laikoma tikrintina. */
+    eTarRefreshHours: number;
+    /** Bendras visų e-TAR etapų vienu metu laikomų API užklausų limitas. */
+    eTarMaxInflight: number;
 
     enableGraph: boolean;
 

@@ -62,6 +62,9 @@ const ENV_MAP = [
     ["ETAR_API_URL", "eTarApiUrl", "string"],
     ["ETAR_API_KEY", "eTarApiKey", "string"],
     ["ETAR_SIDECAR_DIR", "eTarSidecarDir", "string"],
+    ["ETAR_RECENT_DAYS", "eTarRecentDays", "number"],
+    ["ETAR_REFRESH_HOURS", "eTarRefreshHours", "number"],
+    ["ETAR_MAX_INFLIGHT", "eTarMaxInflight", "number"],
 
     ["INTERNAL_FILE_BASE", "internalFileBase", "string"],
     ["OCR_BANDYMAI", "ocrBandymai", "number"],

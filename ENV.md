@@ -341,6 +341,12 @@ adresuojamas `md5` (žr. `modules/eTar/README.md`).
 | `ETAR_API_URL` | — | Adapterio bazinis URL, pvz. `http://10.1.10.24:8080`. Be trailing slash. Nenustačius scraperis nepasileidžia. |
 | `ETAR_API_KEY` | `""` | Bearer raktas — tik jei adapteryje nustatytas `API_KEY`. |
 | `ETAR_SIDECAR_DIR` | `/flashas/viespirkiai/eTar` | Katalogas, kuriame laikoma `eTar.sqlite` atsakymų saugykla (tik lokalus kelias). |
+| `ETAR_RECENT_DAYS` | `180` | Kiek naujausių dienų periodiškai iš naujo tikrina TaskRunner radaras. |
+| `ETAR_REFRESH_HOURS` | `3` | Po kiek valandų radaro diena vėl laikoma tikrintina. |
+| `ETAR_MAX_INFLIGHT` | `6` | Bendras lygiagrečių užklausų į e-TAR adapterį limitas visiems etapams. |
+
+Prieš pirmą naujų TaskRunner e-TAR darbų paleidimą reikia rankiniu būdu
+pritaikyti `modules/eTar/taskRunnerQueue.sql`. TaskRunner pats DB schemos nekeičia.
 
 ### Spinta / Stalčius (atviri duomenys)
 

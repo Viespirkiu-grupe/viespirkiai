@@ -111,6 +111,11 @@ export default {
     eTarApiUrl: "http://10.1.10.24:8080",
     // Bearer raktas — tik jei adapteryje nustatytas API_KEY.
     eTarApiKey: "",
+    // TaskRunner kas 3 val. iš naujo pereina slenkantį paskutinių 180 d. langą.
+    eTarRecentDays: 180,
+    eTarRefreshHours: 3,
+    // Bendras document/editions/asr/historical API srauto limitas.
+    eTarMaxInflight: 6,
 
     // ─────────────────────────────────────────────────────────────────────
     // Failai ir OCR

@@ -8,6 +8,7 @@ import dokumentaiTasks from "./dokumentai.js";
 import viesiejiPirkimaiTasks from "./viesiejiPirkimai.js";
 import adpTasks from "./adp.js";
 import miscTasks from "./misc.js";
+import eTarTasks from "./eTar.js";
 
 // Pool size - 2 reserved for cron jobs and admin queries
 const runner = new TaskRunner({ maxConcurrentJobs: 18 });
@@ -20,6 +21,7 @@ runner.registerAll([
     ...viesiejiPirkimaiTasks,
     ...adpTasks,
     ...miscTasks,
+    ...eTarTasks,
 ]);
 
 runner.start();

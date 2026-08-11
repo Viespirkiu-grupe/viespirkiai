@@ -281,6 +281,47 @@ export async function ensureScrapeDaysForward() {
 }
 
 /**
+ * Užtikrina slenkantį naujausių dienų langą TaskRunner radarui. Senesnių
+ * "eTarScrapeDay" eilučių netrinam — jos lieka istorinio backfill'o būsenai.
+ */
+export async function ensureRecentScrapeDays(days = 180) {
+    const { rowCount } = await postgres.query(
+        `INSERT INTO "eTarScrapeDay" ("day")
+         SELECT d::date
+         FROM generate_series(
+             CURRENT_DATE - ($1::int - 1),
+             CURRENT_DATE,
+             '1 day'
+         ) d
+         ON CONFLICT ("day") DO NOTHING`,
+        [days],
+    );
+    return rowCount ?? 0;
+}
+
+/**
+ * Viena seniausiai tikrinta diena iš slenkančio lango. Kai visas langas
+ * patikrintas per paskutines `refreshHours` valandas, grąžina null ir
+ * TaskRunner workeris pereina į cooldown.
+ */
+export async function pickRecentDayToScrape({ days = 180, refreshHours = 3 } = {}) {
+    const { rows: [row] } = await postgres.query(
+        `SELECT "day"::text AS day
+         FROM "eTarScrapeDay"
+         WHERE "day" >= CURRENT_DATE - ($1::int - 1)
+           AND "day" <= CURRENT_DATE
+           AND (
+               "lastScrapedAt" IS NULL
+               OR "lastScrapedAt" < now() - ($2::double precision * interval '1 hour')
+           )
+         ORDER BY "lastScrapedAt" NULLS FIRST, "day" DESC
+         LIMIT 1`,
+        [days, refreshHours],
+    );
+    return row?.day ?? null;
+}
+
+/**
  * Pažymi dienas, kurias apėmė atradimo langas. Įrašom TIK tas, kuriose iš tikrųjų
  * buvo aktų — tuščių kalendorinių dienų į lentelę nekišam.
  * @param {string[]} days - „yyyy-mm-dd"
