@@ -6,12 +6,17 @@ const mocks = vi.hoisted(() => ({
   buildETarDokumentas: vi.fn(),
   upsertETarBatch: vi.fn(),
   deleteETarDokumentai: vi.fn(),
+  signalWork: vi.fn(),
 }));
 
 vi.mock('../postgres/postgres.js', () => ({
   postgres: { connect: vi.fn(async () => mocks.client) },
 }));
 vi.mock('../utils/log.js', () => ({ Logger: class { log() {} } }));
+vi.mock('../utils/taskSignals.js', () => ({
+  WORK_SIGNALS: { DOCUMENTS_INDEX_READY: 'documents.index.ready' },
+  signalWork: mocks.signalWork,
+}));
 vi.mock('../modules/eTar/eTarSidecar.js', () => ({
   openETarSidecar: vi.fn(() => ({ fake: true })),
   readResponse: mocks.readResponse,
@@ -53,6 +58,13 @@ describe('processETarDocumentsQueue', () => {
     const deleteAt = sqlCalls.findIndex((sql) => sql.includes('DELETE FROM public."eTarDocumentsQueue"'));
     expect(deleteAt).toBeGreaterThan(0);
     expect(sqlCalls.indexOf('COMMIT')).toBeGreaterThan(deleteAt);
+    expect(mocks.signalWork).toHaveBeenCalledWith('documents.index.ready', {
+      source: 'eTarDocumentsQueue',
+      count: 1,
+    });
+    const commitCall = sqlCalls.indexOf('COMMIT');
+    expect(mocks.signalWork.mock.invocationCallOrder[0])
+      .toBeGreaterThan(mocks.client.query.mock.invocationCallOrder[commitCall]);
   });
 
   it('rollback palieka eilę pakartojimui, jei sidecar kopijavimas nepavyksta', async () => {
@@ -61,6 +73,7 @@ describe('processETarDocumentsQueue', () => {
     const sqlCalls = mocks.client.query.mock.calls.map(([sql]) => String(sql));
     expect(sqlCalls).toContain('ROLLBACK');
     expect(sqlCalls.some((sql) => sql.includes('DELETE FROM public."eTarDocumentsQueue"'))).toBe(false);
+    expect(mocks.signalWork).not.toHaveBeenCalled();
     expect(mocks.client.release).toHaveBeenCalledOnce();
   });
 });

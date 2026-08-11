@@ -1,5 +1,6 @@
 import { postgres } from "../../postgres/postgres.js";
 import { FILES_JOINS, FILES_SELECT, papildytiFaila } from "./filesSkaitymas.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 /*
 Failų nuskaitymo eilė — `filesExtractionQueue`.
@@ -58,6 +59,13 @@ export async function iEile(failuId, klientas = postgres) {
          ON CONFLICT (id) DO NOTHING`,
         [failuId, NUSKAITYMO_PLETINIAI, NUSKAITYMO_VERSIJA],
     );
+
+    if (klientas === postgres && res.rowCount > 0) {
+        signalWork(WORK_SIGNALS.FILES_EXTRACTION_READY, {
+            source: "filesExtractionQueue",
+            count: res.rowCount,
+        });
+    }
 
     return res.rowCount;
 }

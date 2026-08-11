@@ -1,4 +1,5 @@
 import { postgres } from "../../postgres/postgres.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 // e-TAR API atsakymo → Postgres normalizacija.
 //
@@ -838,9 +839,18 @@ export async function saveDocument(payload, { md5, mark = null, force = false } 
 
         await insertMetadata(client, { documentId }, payload.metadata, vocab, fixed);
         await insertRelatedInformation(client, { documentId }, payload.related_information, vocab, fixed);
+        await client.query(
+            `INSERT INTO public."eTarDocumentsQueue" ("documentId", change)
+             VALUES ($1, $2)`,
+            [documentId, keitimas],
+        );
         await markInTransaction(client, payload.id, mark);
         await recordAnomalies(client, payload.id, anomalies);
         await client.query("COMMIT");
+        signalWork(WORK_SIGNALS.ETAR_DOCUMENTS_READY, {
+            source: "eTar.saveDocument",
+            count: 1,
+        });
         return { documentId: Number(documentId), keitimas };
     } catch (error) {
         await client.query("ROLLBACK").catch(() => {});

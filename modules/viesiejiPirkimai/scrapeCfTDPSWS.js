@@ -11,6 +11,7 @@ import { persistPirkimoTurinys } from "./persistTurinys.js";
 import { extractTedNoticeNumber } from "./parsers.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
 import { irasytiFailus } from "../failai/failuIrasymas.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 import config from "../../utils/config.js";
 
 const WINDOW_MS = 5000; // fixed smoothing window
@@ -225,7 +226,7 @@ async function processCfTDPSWSRecord(cft, options = {}) {
                 })
                 .join(", ");
 
-            await postgres.query(
+            const tedQueued = await postgres.query(
                 `
                 INSERT INTO "tedNotices" ("tedNoticeNumber")
                 VALUES ${placeholders}
@@ -233,6 +234,12 @@ async function processCfTDPSWSRecord(cft, options = {}) {
                 `,
                 values,
             );
+            if (tedQueued.rowCount > 0) {
+                signalWork(WORK_SIGNALS.TED_NOTICES_READY, {
+                    source: "scrapeCfTDPSWS",
+                    count: tedQueued.rowCount,
+                });
+            }
         }
 
         timings.start("updatePurchase");
@@ -260,7 +267,7 @@ async function processCfTDPSWSRecord(cft, options = {}) {
         }
         // Promoted stulpelius rašom į storąją lentelę tik jei kas nors pasikeitė
         // (IS DISTINCT FROM), kad nekintantis 12h perskaitymas nebloatintų eilutės.
-        await postgres.query(
+        const purchaseChanged = await postgres.query(
             `
             UPDATE public."viesiejiPirkimai"
             SET "numatomaVerteEUR" = $2,
@@ -293,6 +300,12 @@ async function processCfTDPSWSRecord(cft, options = {}) {
                 jarKodas,
             ],
         );
+        if (purchaseChanged.rowCount > 0) {
+            signalWork(WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED, {
+                source: "scrapeCfTDPSWS",
+                count: purchaseChanged.rowCount,
+            });
+        }
         // Turinys → reliacinės lentelės (Keys/Dalys/Failai/Skelbimai).
         await persistPirkimoTurinys(cft.pirkimoId, result);
         // Nuskaitymo būsena/data visada į plonąją lentelę.

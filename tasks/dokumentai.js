@@ -4,6 +4,7 @@ import { processDokumentaiIndexQueue } from "../modules/dokumentai/quickwitProce
 import { scrapeLatest as scrapeEseimasLatest } from "../modules/eseimas/scrape.js";
 import { scrapeNextProjectBatch } from "../modules/eseimas/scrapeContent.js";
 import { auditTeisekuraCoverage } from "../modules/teisekura/audit.js";
+import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 export default [
     {
@@ -13,6 +14,7 @@ export default [
         priority: 5,
         cooldown: 30,
         errorCooldown: 30,
+        wakeOn: [WORK_SIGNALS.ETAR_DOCUMENTS_READY],
         job: processETarDocumentsQueue,
     },
     {
@@ -22,6 +24,7 @@ export default [
         priority: 5,
         cooldown: 30,
         errorCooldown: 30,
+        wakeOn: [WORK_SIGNALS.FILES_DOCUMENTS_READY],
         job: processFailaiDokumentaiQueue,
     },
     {
@@ -32,6 +35,7 @@ export default [
         concurrency: 4,
         cooldown: 30,
         errorCooldown: 30,
+        wakeOn: [WORK_SIGNALS.DOCUMENTS_INDEX_READY],
         job: processDokumentaiIndexQueue,
     },
     {

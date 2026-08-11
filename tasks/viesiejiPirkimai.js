@@ -7,6 +7,7 @@ import { processNextVykdytojas } from "../modules/viesiejiPirkimai/viesiejiPirki
 import { processViesiejiPirkimaiIndexQueue } from "../modules/viesiejiPirkimai/quickwitProcessIndexQueue.js";
 import { updateRecentPlanuojamiPirkimai } from "../modules/viesiejiPirkimai/updatePlanuojamiPirkimai.js";
 import { processNextPlanuojamuPirkimuVykdytojas } from "../modules/viesiejiPirkimai/planuojamiPirkimaiVykdytojai.js";
+import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 export default [
     {
@@ -36,7 +37,6 @@ export default [
         cooldown: 60,
         errorCooldown: 60,
         job: processCfTDPSWS,
-        onSuccess: (runner) => runner.nudge("failuParsiuntimas"),
     },
     {
         name: "processCfTWS",
@@ -45,7 +45,6 @@ export default [
         cooldown: 60,
         errorCooldown: 60,
         job: processCfTWS,
-        onSuccess: (runner) => runner.nudge("failuParsiuntimas"),
     },
     {
         name: "processPmc",
@@ -54,7 +53,6 @@ export default [
         cooldown: 60,
         errorCooldown: 60,
         job: processPmc,
-        onSuccess: (runner) => runner.nudge("failuParsiuntimas"),
     },
     {
         name: "processNextVykdytojas",
@@ -71,6 +69,7 @@ export default [
         concurrency: 2,
         cooldown: 30,
         errorCooldown: 30,
+        wakeOn: [WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED],
         job: processViesiejiPirkimaiIndexQueue,
     },
     {

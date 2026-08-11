@@ -5,6 +5,7 @@ import { cvpIsScrapeOldestDeletedContract } from "../modules/sutartys/scrapeOlde
 import { cvpIsRequestLatest } from "../modules/sutartys/scrape.js";
 import { processSutartysAdpQueue } from "../modules/sutartys/processAdpQueue.js";
 import { processSutartysIndexQueue } from "../modules/sutartys/quickwitProcessIndexQueue.js";
+import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 export default [
     {
@@ -14,8 +15,6 @@ export default [
         cooldown: 60,
         errorCooldown: 60,
         job: cvpIsRequestLatest,
-        // nudges failuParsiuntimas on success — wired up in index.js
-        onSuccess: (runner) => runner.nudge("failuParsiuntimas"),
     },
     {
         name: "sutartysScrapeLeastRecentDate",
@@ -57,6 +56,7 @@ export default [
         cooldown: 30,
         errorCooldown: 60,
         concurrency: 50,
+        wakeOn: [WORK_SIGNALS.SUTARTYS_CHANGED],
         job: processSutartysAdpQueue,
     },
     {
@@ -66,6 +66,7 @@ export default [
         concurrency: 2,
         cooldown: 30,
         errorCooldown: 30,
+        wakeOn: [WORK_SIGNALS.SUTARTYS_CHANGED],
         job: processSutartysIndexQueue,
     },
 ];

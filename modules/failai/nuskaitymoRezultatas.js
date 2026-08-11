@@ -2,6 +2,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { isEiles } from "./nuskaitymoEile.js";
 import { iOcrEile } from "./ocrEile.js";
 import { atnaujintiFilesPhotos } from "./photosLentele.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 /*
 Nuskaitymo rezultato įrašymas.
@@ -127,7 +128,23 @@ export async function pazymetiNuskaityta(
     // arba (jei pernuskaičius atsirado žodžių) išimamas.
     await atnaujintiFilesPhotos(id, dydis, klientas);
 
+    // Pradinis files INSERT gali būti suprojektuotas dar prieš parsisiuntimą ir
+    // teksto išgavimą. Baigtas nuskaitymas todėl visada sukuria naują patch
+    // darbą dokumentų projekcijai.
+    await klientas.query(
+        `INSERT INTO public."filesDocumentsQueue" ("fileId", change)
+         VALUES ($1, 'patch')`,
+        [id],
+    );
+
     await isEiles([id], klientas);
+
+    if (klientas === postgres) {
+        signalWork(WORK_SIGNALS.FILES_DOCUMENTS_READY, {
+            source: "pazymetiNuskaityta",
+            count: 1,
+        });
+    }
 }
 
 /**

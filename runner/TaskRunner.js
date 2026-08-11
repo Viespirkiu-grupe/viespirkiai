@@ -1,5 +1,6 @@
 import { Worker } from "./Worker.js";
 import { log } from "../utils/log.js";
+import { subscribe } from "../utils/natsHub.js";
 import cron from "node-cron";
 
 // The previous scheduler added 0.1 priority every 100 ms.
@@ -9,6 +10,7 @@ export class TaskRunner {
     #tasks = new Map();                // name -> task def
     #workers = new Map();              // workerKey -> Worker (including stopping workers)
     #desiredWorkerCounts = new Map();  // taskName -> desired count
+    #wakeSubscriptions = new Map();    // taskName -> unsubscribe[]
     #waitingWorkers = new Set();       // admission entries
     #activeJobs = 0;
     #maxConcurrentJobs;
@@ -74,25 +76,8 @@ export class TaskRunner {
         }
 
         this.#desiredWorkerCounts.set(taskName, normalizedCount);
+        this.#syncWakeSubscriptions(def, normalizedCount);
         this.#reconcileWorkers(def);
-    }
-
-    /** Wake sleeping workers for a task immediately without respawning them. */
-    nudge(taskName) {
-        const workers = this.#workersForTask(taskName);
-
-        if (workers.length > 0) {
-            for (const [, worker] of workers) worker.wake();
-            return;
-        }
-
-        const def = this.#tasks.get(taskName);
-        const desired = this.#desiredWorkerCounts.get(taskName);
-        // An explicit zero means the task was disabled by dynamic syncing.
-        // Do not let a downstream success hook silently re-enable it.
-        if (def?.mode === "asap" && desired !== 0 && def.concurrency > 0) {
-            this.setWorkerCount(taskName, desired ?? def.concurrency);
-        }
     }
 
     activeJobCount() {
@@ -146,7 +131,6 @@ export class TaskRunner {
             staggerMs: def.staggerMs,
             onAdmit: (w, signal) => this.#waitForAdmission(w, signal),
             onRelease: () => this.#releaseJob(),
-            onSuccess: def.onSuccess ? () => def.onSuccess(this) : null,
             onStopped: (w) => this.#handleWorkerStopped(key, w, def),
         });
 
@@ -168,6 +152,38 @@ export class TaskRunner {
         }
         result.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
         return result;
+    }
+
+    #syncWakeSubscriptions(def, desired) {
+        const existing = this.#wakeSubscriptions.get(def.name);
+        if (desired === 0 || def.mode !== "asap" || def.wakeOn.length === 0) {
+            if (existing) {
+                for (const unsubscribe of existing) unsubscribe();
+                this.#wakeSubscriptions.delete(def.name);
+            }
+            return;
+        }
+        if (existing) return;
+
+        const queue = `taskrunner.${def.name}`;
+        const unsubscribes = def.wakeOn.map((subject) => subscribe(
+            subject,
+            () => this.#wakeLocal(def),
+            { queue },
+        ));
+        this.#wakeSubscriptions.set(def.name, unsubscribes);
+        log(`[TaskRunner] ${def.name} klausosi ${def.wakeOn.join(", ")} (queue=${queue})`);
+    }
+
+    #wakeLocal(def) {
+        const desired = this.#desiredWorkerCounts.get(def.name) ?? 0;
+        if (desired === 0) return;
+        const workers = this.#workersForTask(def.name);
+        if (!workers.length) {
+            this.#reconcileWorkers(def);
+            return;
+        }
+        for (const [, worker] of workers) worker.wake();
     }
 
     /**
@@ -261,6 +277,7 @@ function withDefaults(def) {
         staggerMs: 500,
         mode: null,
         schedule: null,
+        wakeOn: [],
         ...def,
     };
 }

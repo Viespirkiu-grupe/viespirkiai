@@ -7,7 +7,6 @@ export class Worker {
     #staggerMs;
     #onAdmit;
     #onRelease;
-    #onSuccess;
     #onStopped;
 
     #abortController = null;
@@ -23,7 +22,6 @@ export class Worker {
         staggerMs,
         onAdmit,
         onRelease,
-        onSuccess,
         onStopped,
     }) {
         this.#taskName = taskName;
@@ -34,7 +32,6 @@ export class Worker {
         this.#staggerMs = staggerMs;
         this.#onAdmit = onAdmit;
         this.#onRelease = onRelease;
-        this.#onSuccess = onSuccess ?? null;
         this.#onStopped = onStopped ?? null;
     }
 
@@ -97,15 +94,6 @@ export class Worker {
             if (!succeeded) {
                 await this.#sleepWithWake(this.#errorCooldown, signal);
                 continue;
-            }
-
-            if (this.#onSuccess) {
-                try {
-                    await this.#onSuccess();
-                } catch (err) {
-                    // The job already completed. Do not replay it just because its hook failed.
-                    console.error(`[${this.#taskName}] success hook failed:`, err);
-                }
             }
 
             if (hasMore === false) {

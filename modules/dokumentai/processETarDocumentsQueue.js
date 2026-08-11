@@ -6,6 +6,7 @@ import {
     deleteETarDokumentai,
     upsertETarBatch,
 } from "./upsertFromETar.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const logger = new Logger();
 const BATCH_SIZE = 500;
@@ -80,6 +81,12 @@ export async function processETarDocumentsQueue() {
             [queue.map((row) => row.id)],
         );
         await client.query("COMMIT");
+        if (upserted + deleted > 0) {
+            signalWork(WORK_SIGNALS.DOCUMENTS_INDEX_READY, {
+                source: "eTarDocumentsQueue",
+                count: upserted + deleted,
+            });
+        }
         logger.log(
             `eTarDocumentsQueue: paimta ${queue.length} (unikalių ${deduped.size}) | ` +
             `įrašyta ${upserted} | praleista ${skipped} | ištrinta ${deleted}`,

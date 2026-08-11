@@ -2,6 +2,7 @@ import { createScraperFetch } from "../utils/scrapeFetch.js";
 const scrapeFetch = createScraperFetch("ted", { operation: "ted" });
 import { postgres } from "../postgres/postgres.js";
 import { log } from "../utils/log.js";
+import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 const TED_RPS = 1;
 const TED_SCRAPE_VERSION = 2;
@@ -86,6 +87,7 @@ export default [
         priority: 8,
         cooldown: 60,
         errorCooldown: 10,
+        wakeOn: [WORK_SIGNALS.TED_NOTICES_READY],
         job: nuskaitytiSeniausiaTedNotice,
     },
 ];

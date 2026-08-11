@@ -7,6 +7,7 @@ import { log } from "../../utils/log.js";
 import Timings from "../../utils/timings.js";
 import config from "../../utils/config.js";
 import { TIPO_ID } from "./viesiejiPirkimaiEnums.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const PAGE_SIZE = 1000;
 
@@ -80,6 +81,10 @@ async function upsertCFTS(cfts) {
     `;
 
     await postgres.query(query, values);
+    signalWork(WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED, {
+        source: "upsertCFTS",
+        count: cfts.length,
+    });
 
     // Nuskaitymo/rezervacijos metaduomenys gyvena plonojoje "viesiejiPirkimaiAtnaujinimai"
     // lentelėje. Naujiems pirkimams sukuriame eilutę (turinioNuskaitymas lieka NULL, tad

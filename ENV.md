@@ -233,13 +233,17 @@ Paieškos pasiūlymai ir juridinių asmenų paieška.
 
 ### NATS
 
-Signalų magistralė tarp procesų (SSE atnaujinimai, cache invalidacija). Pakeitė
+Signalų magistralė tarp procesų (TaskRunner DB eilių pažadinimai, SSE
+atnaujinimai, cache invalidacija). TaskRunner darbai ir retry būsena lieka
+PostgreSQL, o NATS perduoda tik at-most-once užuominą patikrinti eilę. Pakeitė
 PostgreSQL `pg_notify`/`LISTEN` — dėl to `postgres` pool'as nebeturi seansinių
 priklausomybių ir gali eiti per pgbouncer.
+Gyvą šios magistralės wildcard srautą galima stebėti `/statistika/nats` puslapyje;
+istoriją (iki 1000 eventų) laiko tik atidariusi naršyklė.
 
 | Kintamasis | Numatyta | Paaiškinimas |
 | --- | --- | --- |
-| `NATS_URL` | `nats://127.0.0.1:4222` | NATS serverio adresas. Tuščia reikšmė magistralę išjungia — kanalai tyliai neveikia, gavėjai krenta į savo fallback'us (SSE persijungęs persikrauna, baneris pollinamas). |
+| `NATS_URL` | `nats://127.0.0.1:4222` | NATS serverio adresas. Tuščia reikšmė magistralę išjungia — kanalai tyliai neveikia, gavėjai krenta į savo fallback'us (TaskRunner tikrina DB pasibaigus `cooldown`, SSE persijungęs persikrauna, baneris pollinamas). |
 | `NATS_TOKEN` | `""` | Autentikacijos token'as; turi sutapti su serverio `authorization.token`. |
 
 ### Quickwit

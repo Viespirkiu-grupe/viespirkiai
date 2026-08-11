@@ -7,6 +7,7 @@ import { pazymetiOcrRezultata } from '@/modules/failai/ocrEile.js';
 import { atstatytiNuskaityma } from '@/modules/failai/nuskaitymoRezultatas.js';
 import { publish } from '@/utils/natsHub.js';
 import { OCR_RESULTS_CHANNEL } from '@/src/lib/ocrLatestResults.ts';
+import { signalWork, WORK_SIGNALS } from '@/utils/taskSignals.js';
 
 export const GET: APIRoute = async () => {
   return new Response('Method not allowed', { status: 405 });
@@ -73,7 +74,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Po OCR failą reikia nuskaityti iš naujo — versija nulinama, tik tada eilė jį priims.
     await atstatytiNuskaityma([id], client);
-    await iEile([id], client);
+    const extractionQueued = await iEile([id], client);
 
     await client.query(
       `UPDATE "ocrNuskaitytojai" SET "nuskaitytiDokumentai" = "nuskaitytiDokumentai" + 1 WHERE id = $1`,
@@ -89,6 +90,12 @@ export const POST: APIRoute = async ({ request }) => {
     // TIK po COMMIT: skirtingai nuo pg_notify, NATS publish nėra transakcinis,
     // tad anksčiau paskelbtą signalą SSE gavėjas apdorotų dar nematydamas eilutės.
     publish(OCR_RESULTS_CHANNEL, { failas: id, node: user.pavadinimas });
+    if (extractionQueued > 0) {
+      signalWork(WORK_SIGNALS.FILES_EXTRACTION_READY, {
+        source: 'ocr-submit',
+        count: extractionQueued,
+      });
+    }
 
     return Response.json({ status: 'ok' });
   } catch (e) {

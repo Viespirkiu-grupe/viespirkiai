@@ -1,4 +1,5 @@
 import { postgres } from "../../postgres/postgres.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 /*
 Bendras failų įrašymo taškas — rašoma tik į naują (files) schemą.
@@ -268,13 +269,21 @@ async function irasytiIFiles(klientas, eilutes) {
     // iš archyvo išskleisti (-5) į eilę nepatenka. Filtruojama pačioje užklausoje —
     // taip nereikia sieti grąžintų id su įvesties eilutėmis.
     if (ids.length) {
-        await klientas.query(
+        const queued = await klientas.query(
             `INSERT INTO public."filesDownloadQueue" (id)
              SELECT f.id FROM public.files f
              WHERE f.id = ANY($1::int[]) AND f."downloadStatus" IN (0, -1)
              ON CONFLICT (id) DO NOTHING`,
             [ids],
         );
+        // Su išoriniu transakcijos klientu commit'o čia nežinome, todėl tokio
+        // kvietimo signalą po COMMIT turi paskelbti pats kvietėjas.
+        if (klientas === postgres && queued.rowCount > 0) {
+            signalWork(WORK_SIGNALS.FILES_DOWNLOAD_READY, {
+                source: "irasytiFailus",
+                count: queued.rowCount,
+            });
+        }
     }
 
     return ids;

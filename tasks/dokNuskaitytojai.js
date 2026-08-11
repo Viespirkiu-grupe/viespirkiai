@@ -1,6 +1,7 @@
 import { postgres } from "../postgres/postgres.js";
 import { nuskaitytiVienoDokumentoDuomenis } from "../modules/failai/nuskaitytiTeksta.js";
 import { log } from "../utils/log.js";
+import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 const DOK_TASK_PREFIX = "nuskaitytiDokumenta";
 const SYNC_INTERVAL_MS = 10_000;
@@ -21,6 +22,7 @@ function buildDokTask(runner, row) {
             concurrency: row.concurrency,
             cooldown: 10,
             errorCooldown: 1,
+            wakeOn: [WORK_SIGNALS.FILES_EXTRACTION_READY],
             job: () => nuskaitytiVienoDokumentoDuomenis(row.id),
         });
     }
