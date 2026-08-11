@@ -236,9 +236,9 @@ LEFT JOIN public."liteko2ByluRusys" br     ON br."liteko2Id" = s."bylosRusiesId"
 LEFT JOIN public."liteko2DokumentuTipai" dt ON dt."liteko2Id" = s."sprendimoTipoId";
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Ateičiai: kai sprendimai propaguosis į public.dokumentai (source = 'liteko2'),
--- reikės tokio paties dalinio unikalaus indekso, kokį turi 'liteko':
---
---   CREATE UNIQUE INDEX dokumentai_liteko2_md5 ON public.dokumentai
---       USING btree (md5) WHERE (source = 'liteko2'::text);
+-- Reikalingas LITEKO2 upsert'ui į bendrą dokumentų paiešką. Dalinis indeksas
+-- atskiria šaltinį taip pat, kaip esamas LITEKO1 indeksas.
+CREATE UNIQUE INDEX IF NOT EXISTS dokumentai_liteko2_md5
+    ON public.dokumentai USING btree (md5)
+    WHERE (source = 'liteko2'::text);
 -- ─────────────────────────────────────────────────────────────────────────

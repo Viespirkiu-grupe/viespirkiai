@@ -81,6 +81,7 @@ describe("liteko2 sidecar", () => {
 
     it("išsaugo dokumentų paieškai reikalingus identifikatorius", () => {
         expect(sidecar.source).toBe("liteko2");
+        expect(sidecar.type).toBe("teismoNuosprendis");
         expect(sidecar.saltinioId0).toBe("1-01-1-32513-2022-3");
         expect(sidecar.saltinioId1).toBe("T-1212-718/2026");
         expect(sidecar.saltinioId2).toBe("09002713826d0048");

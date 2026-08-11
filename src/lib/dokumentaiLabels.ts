@@ -14,6 +14,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   mvpaprasai: 'MVP tvarkos',
   neskelbiamosderybos: 'Neskelbiamos derybos',
   liteko: 'LITEKO',
+  liteko2: 'LITEKO2',
   eseimas: 'e-Seimas',
 };
 

@@ -22,16 +22,18 @@ import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import { limitArg, numArg, parseArgs } from "../../utils/cliArgs.js";
 import { runPool } from "../../utils/workerPool.js";
+import { upsertLiteko2ToDokumentai } from "../dokumentai/upsertFromLiteko2.js";
 
 // Turinio nuskaitymo versija (kaip liteko1 teismoNuosprendziai.turinioNuskaitymas).
 // 0/NULL = nenuskaityta; >0 = sėkmingo nuskaitymo versija; -1 = klaida; -2 = vykdoma.
 // Pakėlus šį skaičių, senesnės versijos eilutės vėl tampa tinkamos perskaityti.
-export const TURINIO_VERSIJA = 1;
+// v2: sprendimas taip pat propaguojamas į bendrą dokumentų paiešką.
+export const TURINIO_VERSIJA = 2;
 
 // Sidecar JSON payload schemos versija (atskirai nuo nuskaitymo versijos).
 const SIDECAR_VERSION = "1";
 const CLASS = "teise";
-const TYPE = "teismoSprendimas";
+const TYPE = "teismoNuosprendis";
 const SOURCE = "liteko2";
 
 const CONCURRENCY = 5;
@@ -394,6 +396,17 @@ async function nuskaitytiSprendima(sprendimas) {
                 valyti(detail.decisionStatus),
                 TURINIO_VERSIJA, liteko2SidecarHash(sidecar),
             ],
+        );
+
+        // Sidecar + public.dokumentai. Lentelės trigeris pats įdeda pakeitimą į
+        // dokumentaiIndexQueue, iš kurios jį pasiima Quickwit darbininkas.
+        await upsertLiteko2ToDokumentai(
+            {
+                ...sprendimas,
+                md5: sidecar.md5,
+                sprendimoData,
+            },
+            sidecar,
         );
 
         log(

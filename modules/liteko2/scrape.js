@@ -203,6 +203,14 @@ export async function pazymetiAtsauktus() {
         [liteko2Ids],
     );
 
+    // Atšauktas sprendimas nebeturi likti bendroje dokumentų paieškoje.
+    // dokumentai DELETE trigeris pats suformuoja Quickwit ištrynimo eilę.
+    await postgres.query(
+        `DELETE FROM public.dokumentai
+         WHERE source = 'liteko2' AND "saltinioId2" = ANY($1::text[])`,
+        [liteko2Ids],
+    );
+
     log(`LITEKO2: ${liteko2Ids.length} atšauktų sprendimų (${rowCount} nauji)`);
     return liteko2Ids.length;
 }
