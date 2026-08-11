@@ -11,6 +11,7 @@ const DISPLAY_ORDER = [
     'ND-ContractingParty',
     'ND-ProcedureProcurementScope', 'ND-ProcurementProject',
     'ND-Lot', 'ND-LotsGroup', 'ND-Part',
+    'ND-LotResult',
     'ND-RootExtension', 'ND-Organization',
     'ND-ProcedureTenderingProcess', 'ND-TenderingProcess',
     'ND-ProcedureTerms', 'ND-TenderingTerms',
@@ -70,6 +71,7 @@ const SECTION_TITLES = {
     'ND-ReviewOrganization': 'Peržiūros organizacija',
     'ND-ProcedureProcurementScope': 'Pirkimo objektas',
     'ND-Lot': 'Dalys',
+    'ND-LotResult': 'Rezultatai',
     'ND-LotsGroup': 'Dalių grupės',
     'ND-Part': 'Dalys (part)',
     'ND-ProcedureTenderingProcess': 'Procedūra',
@@ -324,6 +326,10 @@ function getFields() {
     function topLevelAncestor(nodeId) {
         let current = nodeId
         while (current) {
+            // Results live inside ND-RootExtension in eForms XML. Keep them as
+            // their own page section instead of merging them into Organizations,
+            // whose renderer intentionally only displays organization groups.
+            if (current === 'ND-LotResult') return current
             const parent = nodeParent.get(current)
             if (parent === 'ND-Root' || parent === null) return current
             current = parent
