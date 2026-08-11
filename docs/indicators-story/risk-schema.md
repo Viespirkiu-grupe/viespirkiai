@@ -42,14 +42,19 @@ site state how fresh its signals are instead of showing stale flags with unearne
 Current state and recent history in one table, separated by a validity interval:
 
 - current rows have `valid_to IS NULL`
-- a run computing the SAME result only bumps `last_checked_at`
+- a run computing the SAME result only bumps `checked_at`
 - a run computing a DIFFERENT result closes the old row and inserts a new one
 
 Writing only on change is what keeps the table small: once a procurement is awarded and closed its indicators are
 frozen, so most evaluations repeat the previous run exactly and produce no row.
 
-Result columns are never updated after insert. Only `last_checked_at`,
-`last_checked_run_id` and `valid_to` change.
+"Same result" is decided by comparing the new observation against the current row on the result columns only —
+`indicator_version`, `applied_parameters`, `state`, `raw_value`, `threshold`, `evidence`, `missing_data` — using
+`IS DISTINCT FROM`, so a NULL on either side compares correctly. Timestamps, `run_id` and `duration_ms` are excluded,
+which is what stops an unrelated redeploy from registering as a changed signal. `error_info` is excluded too, so a
+failure that retries with a different message does not churn a new row every night.
+
+Result columns are never updated after insert. Only `checked_at` and `valid_to` change.
 
 ### `risk.risk_signals`
 
@@ -62,7 +67,7 @@ Result columns are never updated after insert. Only `last_checked_at`,
 | `procurement_source` | `text`                                       | ✅      | Navigation key for the procurement and list pages. NULL for a supplier-level signal.                                                                                                                                               |
 | `procurement_id`     | `text`                                       | ✅      | Navigation key for the procurement and list pages. NULL for a supplier-level signal.                                                                                                                                               |
 | **WHICH INDICATOR**  |                                              |         |                                                                                                                                                                                                                                    |
-| `indicator_id`       | `text NOT NULL`                              | ✅      | Canonical idicator id such as `LT-SUP-13`                                                                                                                                                                                          |
+| `indicator_id`       | `text NOT NULL`                              | ✅      | Canonical indicator id such as `LT-SUP-13`.                                                                                                                                                                                        |
 | `indicator_version`  | `text NOT NULL`                              |         | Taken from risk indicator definition in `definition.ts`                                                                                                                                                                            |
 | `applied_parameters` | `jsonb`                                      |         | The effective parameter values that were applied, e.g. `{"minimumDays": 10, "dayCounting": "calendar_days", "validFrom": "2026-07-01"}`.                                                                                           |
 | **THE RESULT**       |                                              |         |                                                                                                                                                                                                                                    |
@@ -70,15 +75,15 @@ Result columns are never updated after insert. Only `last_checked_at`,
 | `raw_value`          | `jsonb`                                      |         | What was measured.                                                                                                                                                                                                                 |
 | `threshold`          | `jsonb`                                      |         | What it was compared against.                                                                                                                                                                                                      |
 | `evidence`           | `jsonb`                                      | ✅      | Structured facts the page renders its Lithuanian explanation from. The wording template lives in `catalogue.generated.json`, keyed by indicator and version, so correcting text never touches these rows.                          |
-| `missing_data`       | `jsonb`                                      |         |                                                                                                                                                                                                                                    |
+| `missing_data`       | `jsonb`                                      |         | Input fields that were absent, e.g. `["winningBidAmount", "estimatedValue"]`. This is how the page states data coverage — it is the honest, derivable replacement for a per-signal confidence score.                               |
 | `error_info`         | `jsonb`                                      |         | Only set when `state = 'calculation_error'`.                                                                                                                                                                                       |
 | `duration_ms`        | `integer`                                    |         |                                                                                                                                                                                                                                    |
 | **TIME**             |                                              |         |                                                                                                                                                                                                                                    |
 | `data_as_of`         | `timestamptz NOT NULL`                       | ✅      | Source cutoff of the run that produced this result.                                                                                                                                                                                |
 | `valid_from`         | `timestamptz NOT NULL DEFAULT now()`         | ✅      |                                                                                                                                                                                                                                    |
 | `valid_to`           | `timestamptz`                                | ✅      | NULL means current.                                                                                                                                                                                                                |
-| `checked_at`         | `timestamptz NOT NULL DEFAULT now()`         |         | Checked at. Shown in the GUI as "tikrinta".                                                                                                                                                                                        | |
-| `run_id`             | `bigint REFERENCES risk.evaluation_runs(id)` | ✅      |                                                                                                                                                                                                                                    |
+| `checked_at`         | `timestamptz NOT NULL DEFAULT now()`         |         | Last run that recomputed this result and got the same answer. Shown in the GUI as "tikrinta". Without it, "checked last night, unchanged" would be indistinguishable from "not checked since March".                               |
+| `run_id`             | `bigint REFERENCES risk.evaluation_runs(id)` | ✅      | The run that produced this row. `checked_at` moves on without it, so `run_id` stays the provenance of the result and is not rewritten on re-confirmation.                                                                          |
 
 **Indexes**
 
@@ -102,22 +107,39 @@ too slow.
 Aggregate over `risk.risk_signals` (`WHERE valid_to IS NULL AND procurement_id IS NOT NULL`, grouped by
 `procurement_source, procurement_id`):
 
-| Column                    | Derivation                                                                             | Description                                                                                                                      |
-|---------------------------|----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| `procurement_source`      | group key                                                                              |                                                                                                                                  |
-| `procurement_id`          | group key                                                                              |                                                                                                                                  |
-| `triggered_count`         | `count(*) FILTER (WHERE state = 'triggered')`                                          |                                                                                                                                  |
-| `insufficient_data_count` | `count(*) FILTER (WHERE state = 'insufficient_data')`                                  |                                                                                                                                  |
-| `not_applicable_count`    | `count(*) FILTER (WHERE state = 'not_applicable')`                                     |                                                                                                                                  |
-| `error_count`             | `count(*) FILTER (WHERE state = 'calculation_error')`                                  |                                                                                                                                  |
-| `evaluated_count`         | `count(*)`                                                                             |                                                                                                                                  |
-| `attention_points`        | `coalesce(sum(strength) FILTER (WHERE state = 'triggered'), 0)`                        |                                                                                                                                  |
-| `max_severity`            | ranked lookup over `['info','low','medium','high']`, filtered to `state = 'triggered'` | Ranked explicitly: a text `max()` would order these alphabetically (`high < info < low < medium`) and report the wrong severity. |
-| `triggered_indicators`    | `array_agg(DISTINCT indicator_id) FILTER (WHERE state = 'triggered')`                  |                                                                                                                                  |
-| `data_as_of`              | `max(data_as_of)`                                                                      |                                                                                                                                  |
-| `oldest_checked_at`       | `min(last_checked_at)`                                                                 |                                                                                                                                  |
+| Column                    | Derivation                                                            | Description                                                                              |
+|---------------------------|-----------------------------------------------------------------------|------------------------------------------------------------------------------------------|
+| `procurement_source`      | group key                                                             |                                                                                          |
+| `procurement_id`          | group key                                                             |                                                                                          |
+| `triggered_count`         | `count(*) FILTER (WHERE state = 'triggered')`                         |                                                                                          |
+| `insufficient_data_count` | `count(*) FILTER (WHERE state = 'insufficient_data')`                 |                                                                                          |
+| `not_applicable_count`    | `count(*) FILTER (WHERE state = 'not_applicable')`                    |                                                                                          |
+| `error_count`             | `count(*) FILTER (WHERE state = 'calculation_error')`                 |                                                                                          |
+| `evaluated_count`         | `count(*)`                                                            |                                                                                          |
+| `triggered_indicators`    | `array_agg(DISTINCT indicator_id) FILTER (WHERE state = 'triggered')` | Also the severity handle — see below.                                                    |
+| `data_as_of`              | `max(data_as_of)`                                                     |                                                                                          |
+| `oldest_checked_at`       | `min(checked_at)`                                                     | The weakest freshness claim on the page: the list may say "tikrinta" no later than this. |
 
 Join `public.v_pirkimas` for stage, deadline and event date.
+
+**No `attention_points` and no `max_severity`.** Both were aggregates over per-row `strength` and `severity`, which the
+signal row no longer carries: strength was never comparable between a day-count indicator and a single-bid indicator, so
+summing it produced a ranking that looked calibrated and was not, and severity is a constant of
+`(indicator_id, indicator_version)` that lives in `catalogue.generated.json`. Default ordering is therefore
+`triggered_count DESC, data_as_of DESC` — countable, explainable and requiring no calibration.
+
+**Severity still filters, without being a column.** The page expands a severity filter into the indicator IDs the
+catalogue assigns that severity and matches with array overlap:
+
+```sql
+WHERE triggered_indicators && ARRAY['LT-COM-01', 'LT-SUP-13']  -- the catalogue's 'high' set
+```
+
+Severity thus stays in Git and never becomes a database row. What this does not give is severity-weighted *sorting*
+across a paginated list, since that has to happen in SQL. If the list page proves it needs it, the option that does not
+put an indicator definition in the database is to have the deploy step generate a small
+`risk.indicator_severity(indicator_id, indicator_version, rank)` lookup from `catalogue.generated.json` — a derived
+build artefact, dropped and rebuilt on deploy, never edited. Deferred until measured need.
 
 ## 4. Retention
 
