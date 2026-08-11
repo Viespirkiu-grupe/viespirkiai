@@ -126,13 +126,13 @@ Database roles make the process separation enforceable rather than conventional:
 | `risk_rw` | Process 2, for recording results | `SELECT`, `INSERT`, `UPDATE` on `risk`; no `DELETE`, and no write grant on `public` |
 | `risk_ro` / `viespirkiai_ro` | Process 3 | `SELECT` on the `risk` tables and view and the `public` canonical views; nothing else |
 
-`risk_rw` has no `DELETE`: signals are never removed by the application, because closed rows are the public change history. Retention is a separate maintenance concern ([`risk-schema.sql`](risk-schema.sql) §5).
+`risk_rw` has no `DELETE`: signals are never removed by the application, because closed rows are the public change history. Retention is a separate maintenance concern ([`risk-schema.md`](risk-schema.md) §5).
 
 Because the definition is code, the two Node processes must agree on it. A new indicator version is activated only after both Process 2 and Process 3 run the same commit; §10.1 makes this a step in the workflow. If a page nevertheless meets an observation whose version is absent from its catalogue artefact, it degrades to the indicator code plus the evidence stored on the observation instead of inventing wording.
 
 #### 1.2.1 Storage areas
 
-Risk data lives in three places, and only two of them are in PostgreSQL. Section 5 defines the Git package; section 7 explains the database and links the full DDL in [`risk-schema.sql`](risk-schema.sql).
+Risk data lives in three places, and only two of them are in PostgreSQL. Section 5 defines the Git package; section 7 explains the database and links the full DDL in [`risk-schema.md`](risk-schema.md).
 
 | Area | Where | Contents | Written by | Visible to visualisation | Retention |
 |---|---|---|---|---|---|
@@ -519,7 +519,7 @@ migrations/risk/
   001_risk.sql             # the whole schema: two tables and one view
 ```
 
-The catalogue is the set of directories above; the only migration is the DDL in [`risk-schema.sql`](risk-schema.sql).
+The catalogue is the set of directories above; the only migration is the DDL in [`risk-schema.md`](risk-schema.md).
 
 #### 5.1.1 Why Git and not database tables
 
@@ -904,7 +904,7 @@ PG procedures/functions are deployment artefacts, not the indicator catalogue or
 
 ## 7. Database schema draft
 
-**The complete DDL lives in [`risk-schema.sql`](risk-schema.sql)** — tables, indexes, view and retention. This section explains the reasoning; that file is the artefact to review and to turn into a migration.
+**The complete DDL lives in [`risk-schema.md`](risk-schema.md)** — tables, indexes, view and retention. This section explains the reasoning; that file is the artefact to review and to turn into a migration.
 
 The whole schema is **two tables and one view**:
 
@@ -1249,7 +1249,7 @@ The Risk Signals Writer is generic and therefore tested once, not per indicator.
 
 Build one complete vertical slice with R003:
 
-1. apply [`risk-schema.sql`](risk-schema.sql): two tables, one view, the indexes and the roles;
+1. apply [`risk-schema.md`](risk-schema.md): two tables, one view, the indexes and the roles;
 2. establish the Procurement Risk Service entry point, its single-instance lock and the run-open/run-close protocol, independently from the web application;
 3. create `modules/risk/indicators/R003/` with `definition.ts`, `parameters.ts`, `calculate.sql`, fixtures and tests, plus the registry and the generated catalogue artefact with its CI check;
 4. use demonstration parameter values until the Lithuanian legal profile is approved;
@@ -1272,4 +1272,4 @@ A run is "run about thirty SQL statements in a fixed order on a schedule", which
 - **Deployment lifecycle.** Activating an indicator version requires deploying a specific commit to the calculating process and the web process together ([§10.1](#101-adding-an-ocp-indicator) step 10). Coupling that to the ingestion deployment schedule makes an unrelated ingestion change able to activate an indicator.
 - **The web process must not import indicator code** (decision 9), which is a packaging boundary regardless of where the job runs.
 
-Only the second and third genuinely require a *separate process*; the first requires a separate *connection*, and the fourth a separate *bundle*. So this is a defensible choice rather than a forced one, and running the run as a task in the existing runner with its own database role is a legitimate alternative worth revisiting if operating two Node deployments proves more expensive than the isolation is worth. The stored contract in [`risk-schema.sql`](risk-schema.sql) is identical either way — nothing in the schema knows which process wrote to it.
+Only the second and third genuinely require a *separate process*; the first requires a separate *connection*, and the fourth a separate *bundle*. So this is a defensible choice rather than a forced one, and running the run as a task in the existing runner with its own database role is a legitimate alternative worth revisiting if operating two Node deployments proves more expensive than the isolation is worth. The stored contract in [`risk-schema.md`](risk-schema.md) is identical either way — nothing in the schema knows which process wrote to it.
