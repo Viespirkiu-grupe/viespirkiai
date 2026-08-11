@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("geografija", { operation: "importApskriciuRibos" });
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
@@ -19,7 +21,7 @@ async function updateApskritys() {
     const sources = await getArDataSources();
     const entry = sources.adminUnits.find((r) => r.name === "Apskričių ribos");
 
-    const res = await fetch(entry.geojson);
+    const res = await scrapeFetch(entry.geojson);
     if (!res.ok) throw new Error(`Failed to fetch apskritys: ${res.status}`);
     const data = await res.json();
 

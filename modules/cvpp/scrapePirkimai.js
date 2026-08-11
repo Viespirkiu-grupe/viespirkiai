@@ -13,6 +13,8 @@
 //
 // Būsena valdoma cvppPirkimai."nuskaitymas" (kaip scrapeNotice.js):
 //   null -> dar nesuparsinta, >= 1 -> suparsinta ta versija, -1 -> klaida.
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("cvpp", { operation: "scrapePirkimai" });
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
 import { Logger } from "../../utils/log.js";
@@ -47,7 +49,7 @@ async function ensureLithuanianSession() {
     let next = url;
     // changelanguage nukreipia į save patį, kol EUSSESSION cookie įsitvirtina.
     for (let i = 0; i < 5; i++) {
-        const res = await fetch(next, {
+        const res = await scrapeFetch(next, {
             redirect: "manual",
             headers: cookies.length
                 ? { cookie: cookies.map((c) => c.split(";")[0]).join("; ") }
@@ -70,7 +72,7 @@ async function ensureLithuanianSession() {
 async function fetchPublicPurchase(pid) {
     await ensureLithuanianSession();
     const initialUrl = `${ORIGIN}/ctm/Supplier/PublicPurchase/${pid}?B=PPO`;
-    const initialResponse = await fetch(initialUrl, {
+    const initialResponse = await scrapeFetch(initialUrl, {
         headers: cookieHeader ? { cookie: cookieHeader } : undefined,
     });
     if (!initialResponse.ok) throw new Error(`HTTP ${initialResponse.status}`);
@@ -79,7 +81,7 @@ async function fetchPublicPurchase(pid) {
     const detailsUrl = findPublicPurchaseDetailsUrl(initialHtml, pid);
     if (!detailsUrl) return { url: initialUrl, html: initialHtml };
 
-    const detailsResponse = await fetch(detailsUrl, {
+    const detailsResponse = await scrapeFetch(detailsUrl, {
         headers: cookieHeader ? { cookie: cookieHeader } : undefined,
     });
     if (!detailsResponse.ok)
@@ -94,7 +96,7 @@ async function fetchDocs(pid, lid) {
     const url =
         `${ORIGIN}/app/rfq/publicpurchase_docs.asp` +
         `?PID=${pid}&LID=${lid}&AllowPrint=1`;
-    const res = await fetch(url, {
+    const res = await scrapeFetch(url, {
         headers: cookieHeader ? { cookie: cookieHeader } : undefined,
     });
     if (!res.ok) throw new Error(`docs HTTP ${res.status} (LID=${lid})`);

@@ -29,6 +29,9 @@ export default {
 
     // Portas, kuriame klausosi serveris.
     port: 9019,
+    // Logų aplinkos žyma. Ypač svarbu tiesiogiai paleistam taskrunneriui,
+    // kuriam Dockerfile NODE_ENV=production netaikomas.
+    appEnv: "prod",
 
     // Lengva JavaScript/slapuko patikra brangiems paieškos puslapiams.
     // Atitinkamas .env kintamasis: ENABLE_BOT_CHALLENGE.
@@ -62,6 +65,11 @@ export default {
     // reikšmės nerašomos, pasikartojantys placeholder'iai sutraukiami iki vieno
     // ($?), o `md5` – normalizuotos užklausos hash'as grupavimui. Žr. ENV.md.
     sqlLogFile: null,
+
+    // Outbound duomenų šaltinių HTTP užklausų metaduomenys. Body ir slapti
+    // headeriai niekada neloginami; žr. utils/scrapeFetch.js ir ENV.md.
+    scrapeLogFile: null,
+    scrapeLogQuickwit: false,
 
     // Dažniausios statiškos užklausos vykdomos kaip prepared statement'ai
     // (planas paruošiamas kartą jungčiai). Išjungti reikia tik jungiantis per

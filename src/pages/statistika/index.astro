@@ -28,7 +28,11 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
   <main>
     <PageHeader>
       Statistika
-      <button slot="actions" id="liveUpdate" class="btn btn-outline btn-sm">▶ Tiesioginis atnaujinimas</button>
+      <div slot="actions" class="flex gap-2 flex-wrap">
+        <a href="/statistika/scrapeLog" class="btn btn-outline btn-sm">Scrape logas</a>
+        <a href="/statistika/sql" class="btn btn-outline btn-sm">SQL logas</a>
+        <button id="liveUpdate" class="btn btn-outline btn-sm">▶ Tiesioginis atnaujinimas</button>
+      </div>
     </PageHeader>
 
     <div class="replacableContent">

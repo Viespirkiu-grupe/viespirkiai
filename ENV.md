@@ -45,6 +45,7 @@ _(taskrunneris juos irgi naudoja)_
 | Kintamasis | Numatyta | Paaiškinimas |
 | --- | --- | --- |
 | `PORT` | `9019` | Portas, kuriame klausosi web serveris. |
+| `APP_ENV` | pagal `NODE_ENV` | Logų aplinkos žyma (`dev` arba `prod`), viršesnė už `NODE_ENV`. Tiesiogiai paleistam produkciniam taskrunneriui nustatyti `prod`. |
 | `LOG_REQUESTS` | `false` | Į `stderr` JSON formatu žurnaluoja kiekvieną HTTP užklausą: metodą, URL, tikrą kliento IP (atsižvelgiant į „Cloudflare“ antraštes) ir `User-Agent`. |
 | `ENABLE_ATN1` | `false` | Įjungia CVPP / ATN-1 archyvo puslapius ir jų nuorodą navigacijoje. Išjungus tiesioginės šių puslapių užklausos grąžina `404`. |
 | `ENABLE_BOT_CHALLENGE` | `false` | Įjungia lengvą JavaScript patikrą maršrutams `/`, `/viesiejiPirkimai`, `/dokumentai` ir `/juridiniai`. Pirma užklausa nustato sesijos slapuką `bot=no` ir perkrauna puslapį; JavaScript nevykdantys scraperiai iki paieškos neprieina. |
@@ -67,6 +68,8 @@ taskrunneriui.
 | `PG_DIRECT_PORT` | = `PG_PORT` | Postgres portas aplenkiant pgbouncer'į. Reikalingas TIK tada, kai `PG_PORT` rodo į bouncer'į: seanso lygio advisory lock'ai (`postgres/sessionLock.js`, JAR importas ir juridinių backfill'as) gyvena jungtyje, tad privalo eiti tiesiai į Postgres. |
 | `SQL_LOG_FILE` | — | Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą (JSONL). |
 | `SQL_LOG_QUICKWIT` | `false` | Tie patys įrašai (be SQL teksto – tik `md5`) rašomi į dienos Quickwit indeksą `sqlLogV2_*`, o tekstas – į `sqlLogTekstai` lentelę. Galima kartu su `SQL_LOG_FILE` arba vietoj jo. |
+| `SCRAPE_LOG_FILE` | — | Kai nurodytas – outbound duomenų šaltinių HTTP užklausų metaduomenys append'inami JSONL formatu. |
+| `SCRAPE_LOG_QUICKWIT` | `false` | Tie patys scraping metaduomenys rašomi į dienos Quickwit indeksą `scrapeLogV1_*`. |
 | `PG_PREPARED` | `true` | Statiškas dažnas užklausas vykdyti kaip prepared statement'us. Su pgbouncer transaction pooling režimu palikti `true` galima – nuo pgbouncer 1.21 užtenka nustatyti `max_prepared_statements` į nenulinę reikšmę (`pg` naudoja protokolo lygio named statements, o bouncer juos paruošia susietoje serverio jungtyje). Išjungti (`false`) reikia tik prie senesnio bouncer'io arba kai `max_prepared_statements = 0`. |
 
 Profiliavimui: `SQL_LOG_FILE=/tmp/sql.log` įjungia visų per `postgres.query()` ir
@@ -178,6 +181,29 @@ Gavus `md5`, tekstas imamas iš Postgres:
 ```sql
 SELECT "md5", "sql" FROM public."sqlLogTekstai" WHERE "md5" = ANY($1);
 ```
+
+#### `SCRAPE_LOG_*` – outbound duomenų šaltinių užklausos
+
+Scraperiai naudoja `utils/scrapeFetch.js` wrapperį, todėl neliečiamas globalus
+`fetch` ir į logą nepatenka Quickwit ingest'as, S3, Spinta, Ollama ar frontend
+HTTP srautas. Kiekvienas realus retry bandymas registruojamas atskirai.
+
+`SCRAPE_LOG_QUICKWIT=true` rašo į dieninius `scrapeLogV1_YYYY-MM-DD` indeksus;
+`SCRAPE_LOG_FILE=/tmp/scrape.log` tuos pačius dokumentus append'ina JSONL
+formatu. Logavimas best-effort: Quickwit siunčiama paketais fone, o gedimas
+scraperio nestabdo. Senus indeksus galima valyti su
+`pruneScrapeLogIndexes({ keepDays: 30 })`.
+
+Pilnas URL nesaugomas. Jis išskaidomas į `scheme`, `host`, `domain` ir `path`
+(`pathname + query`); slapti query parametrai maskuojami. `domain` yra paskutiniai
+du hostname segmentai, IP ir `localhost` paliekami nepakeisti. Redirect atveju
+pridedami analogiški `final*` laukai.
+
+Kiti svarbiausi laukai: `scraper`, `operation`, `method`, `status`, `ok`,
+`ttfbMs`, viso body perdavimo `ms`, faktiškai perskaityti `bytes` ir serverio
+deklaruotas `contentLength`. Kai HTTP atsakymo nėra, `status` yra `null`, o
+`errorName`/`errorCode` nusako timeout, DNS ar kitą transporto klaidą. Body,
+Authorization, cookies ir kiti request/response headeriai niekada nesaugomi.
 
 ### MCP `execute_query` + analitiko rolė
 

@@ -22,6 +22,7 @@ const configSchema = z.object({
     infoBanner: infoBannerSchema.optional(),
 
     port: z.number().int().positive().default(9019),
+    appEnv: z.enum(["dev", "prod"]).optional(),
     logRequests: z.boolean().default(false),
     enableAtn1: z.boolean().default(false),
     enableBotChallenge: z.boolean().default(false),
@@ -39,6 +40,8 @@ const configSchema = z.object({
     pgDirectPort: z.number().int().positive().optional(),
     sqlLogFile: z.string().optional(),
     sqlLogQuickwit: z.boolean().default(false),
+    scrapeLogFile: z.string().optional(),
+    scrapeLogQuickwit: z.boolean().default(false),
     pgPrepared: z.boolean().default(true),
 
     // Signalų magistralė (SSE, cache invalidacija). Tuščias URL ją išjungia –

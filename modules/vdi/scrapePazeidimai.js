@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("vdi", { operation: "scrapePazeidimai" });
 import { parseHTML } from "linkedom";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
@@ -94,7 +96,7 @@ async function fetchPage(pageIndex, formFields) {
         __EVENTARGUMENT: `FireCommand:RadGrid1_ctl00;PageSize=20;NewPageIndex=${pageIndex}`,
     });
 
-    const res = await fetch(BASE_URL, {
+    const res = await scrapeFetch(BASE_URL, {
         method: "POST",
         headers: {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -135,7 +137,7 @@ async function insertChunk(rows) {
 }
 
 export async function updateVdiPazeidimai() {
-    const initRes = await fetch(BASE_URL, {
+    const initRes = await scrapeFetch(BASE_URL, {
         headers: {
             "User-Agent":
                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36",

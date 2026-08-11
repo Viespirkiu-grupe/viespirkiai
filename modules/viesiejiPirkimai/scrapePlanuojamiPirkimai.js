@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "scrapePlanuojamiPirkimai" });
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -412,7 +414,7 @@ export class PlannedProcurementsClient {
         const headers = new Headers(options.headers);
         const cookie = this.cookieHeader();
         if (cookie) headers.set("cookie", cookie);
-        const response = await fetch(url, { ...options, headers });
+        const response = await scrapeFetch(url, { ...options, headers });
         this.updateCookies(response);
         if (!response.ok) throw new Error(`EPPS HTTP ${response.status}`);
         return response;

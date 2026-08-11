@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("kotis", { operation: "scrape" });
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
@@ -137,7 +139,7 @@ async function nuskaitytiKotisPuslapi(day, page, minAmount) {
         "aid_submitter",
     ];
 
-    let response = await fetch(url, {
+    let response = await scrapeFetch(url, {
         method: "GET", // or POST if needed
         headers: {
             "Content-Type": "application/json",

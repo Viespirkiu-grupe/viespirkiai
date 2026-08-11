@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("domenai", { operation: "scrapeDomreg", fetchImpl: nodeFetch });
 import { postgres } from "../../postgres/postgres.js";
 import config from "../../utils/config.js";
 import { SocksProxyAgent } from "socks-proxy-agent";
@@ -5,7 +7,7 @@ import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import { findSingleJuridinis } from "../juridiniai/search.js";
 import { sleep } from "../../utils/time.js";
-import fetch from "node-fetch";
+import nodeFetch from "node-fetch";
 import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -132,7 +134,7 @@ async function fetchDomainDetails(domain) {
     let response;
 
     try {
-        response = await fetch(url, {
+        response = await scrapeFetch(url, {
             headers: {
                 "User-Agent":
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

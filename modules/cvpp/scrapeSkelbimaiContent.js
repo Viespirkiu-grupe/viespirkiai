@@ -10,6 +10,8 @@
 //
 // Būsena valdoma cvppSkelbimai."nuskaitymas" (kaip scrapeNotice.js):
 //   null -> dar nesuparsinta, >= 1 -> suparsinta ta versija, -1 -> klaida.
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("cvpp", { operation: "scrapeSkelbimaiContent" });
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
 import { Logger } from "../../utils/log.js";
@@ -50,7 +52,7 @@ async function ensureLithuanianSession() {
     let cookies = [];
     let next = url;
     for (let i = 0; i < 5; i++) {
-        const res = await fetch(next, {
+        const res = await scrapeFetch(next, {
             redirect: "manual",
             headers: cookies.length
                 ? { cookie: cookies.map((c) => c.split(";")[0]).join("; ") }
@@ -77,7 +79,7 @@ function viewNoticeUrl(skelbimoId) {
 async function fetchViewNotice(skelbimoId, link) {
     await ensureLithuanianSession();
     const url = link || viewNoticeUrl(skelbimoId);
-    const res = await fetch(url, {
+    const res = await scrapeFetch(url, {
         headers: cookieHeader ? { cookie: cookieHeader } : undefined,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

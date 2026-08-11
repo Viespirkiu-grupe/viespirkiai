@@ -6,8 +6,11 @@ import config from "./config.js";
  * Quickwit'e būtų galima atskirti dev/prod ir web/taskRunner srautus.
  */
 
-/** `dev` | `prod` – pagal NODE_ENV (žr. utils/configSchema.js `dev`). */
-export const APP_ENV = config.dev ? "dev" : "prod";
+/**
+ * `dev` | `prod`. Aiškus APP_ENV yra viršesnis, nes taskrunneris gali būti
+ * paleistas tiesiai (ne per Docker) ir tada NODE_ENV dažnai apskritai nebūna.
+ */
+export const APP_ENV = config.appEnv ?? (config.dev ? "dev" : "prod");
 
 /**
  * Proceso vaidmuo. Pirmenybė – aiškiam `APP_ROLE` kintamajam; kitaip

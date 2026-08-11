@@ -3,6 +3,8 @@
 Importuoja gyvenamąsias vietoves iš data.gov.lt API į Postgres
 https://data.gov.lt/datasets/1287/
 */
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("geografija", { operation: "importGyvenamojiVietove" });
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 import config from "../../utils/config.js";
@@ -17,7 +19,7 @@ async function fetchPage(pageToken = null) {
     if (pageToken) params.push(`page("${pageToken}")`);
 
     const url = `${BASE}?${params.join("&")}`;
-    const res = await fetch(url);
+    const res = await scrapeFetch(url);
 
     if (!res.ok) {
         throw new Error(`HTTP ${res.status} ${res.statusText}`);

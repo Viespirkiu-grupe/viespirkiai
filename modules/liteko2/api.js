@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("liteko2", { operation: "api" });
 /*
 LITEKO2 viešojo API klientas (https://liteko-api-pub.teismas.lt/v3/api-docs).
 
@@ -33,7 +35,7 @@ async function apiFetch(path, { raw = false } = {}) {
 
     for (let bandymas = 1; bandymas <= BANDYMAI; bandymas++) {
         try {
-            const response = await fetch(url, {
+            const response = await scrapeFetch(url, {
                 headers: HEADERS,
                 signal: AbortSignal.timeout(TIMEOUT_MS),
             });

@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "scrape" });
 import { parseHTML } from "linkedom";
 import PQueue from "p-queue";
 import { postgres } from "../../postgres/postgres.js";
@@ -130,7 +132,7 @@ export async function updateCFTS(options = {}) {
         // d-3680175-p=2 // page 2
 
         timings.start("fetch");
-        const response = await fetch(url, { signal: abortController.signal });
+        const response = await scrapeFetch(url, { signal: abortController.signal });
         const html = await response.text();
         timings.end("fetch");
 

@@ -6,6 +6,8 @@ AtGn-1 https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol/Details/2024-677876?f
 AtGn-2 https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol/Details/2024-650900?formTypeId=5
 Atk-1 https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol/Details/2024-698325?formTypeId=6
 */
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("cvpp", { operation: "scrapeAtaskaitosContent" });
 import { parseHTML } from "linkedom";
 import { postgres } from "../../postgres/postgres.js";
 
@@ -832,7 +834,7 @@ function parseNoticeByType(notice, formTypeId) {
 //   turinysHtml — minifikuotas .tab-content innerHTML (žalias atsarginis variantas).
 export async function scrapeAtaskaitosContent(id, formTypeId) {
     const url = `${ORIGIN}/ReportsOrProtocol/Details/${id}?formTypeId=${formTypeId}`;
-    const response = await fetch(url);
+    const response = await scrapeFetch(url);
     const text = await response.text();
     const { document } = parseHTML(text);
 

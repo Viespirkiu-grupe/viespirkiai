@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("atn1", { operation: "parse" });
 import config from "../../utils/config.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
@@ -266,7 +268,7 @@ function parseXIII(wb) {
 
 export async function parseAtn1File(fileId) {
     const url = `${config.internalFileBase}/${fileId}`;
-    const res = await fetch(url);
+    const res = await scrapeFetch(url);
     if (!res.ok)
         throw new Error(
             `Failed to fetch file ${fileId}: ${res.status} ${res.statusText}`,

@@ -3,6 +3,8 @@
 Importuoja JADIS dalyvių duomenis tiesiai iš data.gov.lt API į PostgreSQL
 https://data.gov.lt/datasets/1732/
 */
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("jadis", { operation: "importJadis" });
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import config from "../../utils/config.js";
@@ -16,7 +18,7 @@ async function fetchPage(pageToken = null) {
     if (pageToken) params.push(`page("${pageToken}")`);
 
     const url = `${BASE}?${params.join("&")}`;
-    const res = await fetch(url);
+    const res = await scrapeFetch(url);
 
     if (!res.ok) {
         throw new Error(`HTTP ${res.status} ${res.statusText}`);

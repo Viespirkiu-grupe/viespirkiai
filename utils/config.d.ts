@@ -1,6 +1,8 @@
 export interface TypesenseNodeConfig {
     host: string;
     port: number;
+    /** Aiški logų aplinkos žyma; turi pirmenybę prieš NODE_ENV. */
+    appEnv?: 'dev' | 'prod';
     protocol: string;
     [key: string]: unknown;
 }
@@ -34,6 +36,10 @@ export interface Config {
     sqlLogFile?: string;
     /** Tie patys SQL logo įrašai rašomi tiesiai į Quickwit indeksą `sqlLog`. */
     sqlLogQuickwit: boolean;
+    /** Kai nurodytas – outbound scraping užklausos append'inamos JSONL formatu. */
+    scrapeLogFile?: string;
+    /** Outbound scraping užklausų metaduomenys rašomi į dieninius Quickwit indeksus. */
+    scrapeLogQuickwit: boolean;
     /** Ar naudoti prepared statement'us (išjungti prie pgbouncer transaction pooling). */
     pgPrepared: boolean;
 

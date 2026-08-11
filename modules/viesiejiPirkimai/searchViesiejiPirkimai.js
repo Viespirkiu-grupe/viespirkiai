@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "searchViesiejiPirkimai" });
 import { postgres } from "../../postgres/postgres.js";
 import { search as quickwitSearch, countDocs as quickwitCountDocs } from "../../quickwit/quickwit.js";
 import { FilterBuilder } from "../../utils/filter.js";
@@ -287,7 +289,7 @@ function quickwitSortBy(query) {
 /** Viena Quickwit term agregacija. Grąžina [{ value, count }]. */
 async function qwFacet(field, query, size) {
     try {
-        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -336,7 +338,7 @@ export async function viesiejiPirkimaiVerteHistogram(query) {
 
     const qwQuery = buildViesiejiPirkimaiQuickwitQuery(query, { exclude: ["verte"] });
     try {
-        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -414,7 +416,7 @@ export async function viesiejiPirkimaiLaikotarpisHistogram(query) {
         `paskelbimoData:[${boundMin} TO ${boundMax}]`,
     ].join(" AND ");
     try {
-        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

@@ -7,6 +7,8 @@
 // puslapiams vienodas -> dedublikuojasi pagal turinio hash'ą), o HTML'as jį referuoja
 // per relative path (../styles.<hash>.css). Paveiksliukai (ir CSS url(...), ir <img>)
 // bei kiti resursai lieka nuorodomis — tik perrašomi į absoliučius CVPP adresus.
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("cvpp", { operation: "downloadAtaskaitos" });
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -76,7 +78,7 @@ async function fetchCss(url) {
     if (cssCache.has(url)) return cssCache.get(url);
     let css = "";
     try {
-        const r = await fetch(url);
+        const r = await scrapeFetch(url);
         if (r.ok) css = await r.text();
     } catch {
         css = "";
@@ -162,7 +164,7 @@ async function fetchAtaskaitosHtml(url, attempts = 3) {
     let lastErr;
     for (let i = 0; i < attempts; i++) {
         try {
-            const r = await fetch(url);
+            const r = await scrapeFetch(url);
             const html = await r.text();
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             // CVPP klaidos puslapis: HTTP 200, bet body yra JSON su "Server error

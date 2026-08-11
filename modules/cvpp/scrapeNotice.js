@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("cvpp", { operation: "scrapeNotice" });
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
 import {
@@ -22,7 +24,7 @@ async function setNoticeStatus(skelbimoKodas, status) {
 }
 
 async function fetchHtmlWithCookies(url) {
-    let firstRes = await fetch(url, { redirect: "manual" });
+    let firstRes = await scrapeFetch(url, { redirect: "manual" });
     const cookies =
         firstRes.headers.getSetCookie?.() ??
         (firstRes.headers.get("set-cookie")
@@ -30,7 +32,7 @@ async function fetchHtmlWithCookies(url) {
             : []);
     const cookieHeader = cookies.map((c) => c.split(";")[0]).join("; ");
 
-    firstRes = await fetch(url, {
+    firstRes = await scrapeFetch(url, {
         headers: cookieHeader ? { cookie: cookieHeader } : undefined,
     });
 

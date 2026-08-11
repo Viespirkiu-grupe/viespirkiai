@@ -2,6 +2,8 @@
 Parsiunčia bylų metaduomenis iš Liteko sistemos ir įterpia jas į Postgres duomenų bazę.
 */
 
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("liteko", { operation: "scrape" });
 import { parseHTML } from "linkedom";
 import { createHash } from "node:crypto";
 import { postgres } from "../../postgres/postgres.js";
@@ -40,7 +42,7 @@ async function nuskaitytiDiena(data) {
     // Build URL
     let url = `https://liteko.teismai.lt/viesasprendimupaieska/paieska.aspx?nuo=${encodedDataNuo}&iki=${encodedDataIki}`;
 
-    let response = await fetch(url);
+    let response = await scrapeFetch(url);
     if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -94,7 +96,7 @@ async function nuskaitytiDiena(data) {
             postBody.append("__VIEWSTATE", viewState);
             postBody.append("__VIEWSTATEGENERATOR", viewStateGen);
 
-            response = await fetch(url, {
+            response = await scrapeFetch(url, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",

@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "viesiejiPirkimaiVykdytojaiScrape" });
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
 import { isVptWorkingHours } from "../sutartys/isWorkingHours.js";
@@ -55,7 +57,7 @@ function parseOrganisation(html) {
 async function processOrganisation(org) {
     try {
         const url = `${HOST}/epps/prepareViewCAOrganisation.do?id=${org.id}`;
-        const response = await fetch(url);
+        const response = await scrapeFetch(url);
         const html = await response.text();
 
         const data = parseOrganisation(html);

@@ -8,6 +8,8 @@ Nuskaito teismo nuosprendžio turinį iš Liteko sistemos:
 Tekstas DB NESAUGOMAS — jis keliauja tik į dokumentų sidecar.
 */
 
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("liteko", { operation: "scrapeContent" });
 import { parseHTML } from "linkedom";
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
@@ -60,7 +62,7 @@ async function nuskaitytiNutarti(fileHref) {
     const url = LITEKO_BASE + fileHref;
     log(`Nuskaitoma byla ${url}`);
 
-    const response = await fetch(url);
+    const response = await scrapeFetch(url);
     if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
     }

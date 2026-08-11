@@ -1,6 +1,8 @@
 // Planuojamų (metinių) pirkimų sąrašo skreiperis.
 // https://cvpp.eviesiejipirkimai.lt/PlannedProcurement/List
 // Paieška filtruojama pagal paskelbimo datą (GET), tad einama diena po dienos.
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("cvpp", { operation: "scrapePlanuojamiPirkimai" });
 import { parseHTML } from "linkedom";
 import { postgres } from "../../postgres/postgres.js";
 
@@ -62,7 +64,7 @@ export async function scrapePlanuojamiPirkimaiPuslapis(day, pageNumber) {
     const url =
         `${BASE}/PlannedProcurement/List?PublishedDateFrom=${day}&PublishedDateTo=${day}` +
         `&pageNumber=${pageNumber}&pageSize=${PAGE_SIZE}&OrderingType=1&OrderingDirection=1`;
-    const response = await fetch(url);
+    const response = await scrapeFetch(url);
     const { document } = parseHTML(await response.text());
 
     return [...document.querySelectorAll(".notice-search-item")].map((el) => {

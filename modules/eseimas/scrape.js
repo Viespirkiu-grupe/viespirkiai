@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("eseimas", { operation: "scrape" });
 import { parseHTML } from "linkedom";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
@@ -101,7 +103,7 @@ function partialUpdates(xml) {
 
 async function initialSearch() {
     logger.log("Kraunama e-Seimo projektų paieškos forma");
-    const res = await fetch(SEARCH_URL, { headers: HEADERS, signal: AbortSignal.timeout(60_000) });
+    const res = await scrapeFetch(SEARCH_URL, { headers: HEADERS, signal: AbortSignal.timeout(60_000) });
     if (!res.ok) throw new Error(`e-Seimas HTTP ${res.status}`);
     const html = await res.text();
     const { document } = parseHTML(html);
@@ -131,7 +133,7 @@ async function initialSearch() {
 
     const action = new URL(form.getAttribute("action") || res.url, res.url).href;
     logger.log("Vykdoma e-Seimo projektų paieška");
-    const post = await fetch(action, {
+    const post = await scrapeFetch(action, {
         method: "POST",
         signal: AbortSignal.timeout(60_000),
         headers: {
@@ -205,7 +207,7 @@ export async function scrapeAllProjects() {
                 [`${formId}_SUBMIT`]: "1",
                 "javax.faces.ViewState": viewState,
             });
-            const page = await fetch(response.url, {
+            const page = await scrapeFetch(response.url, {
                 method: "POST",
                 signal: AbortSignal.timeout(60_000),
                 headers: {

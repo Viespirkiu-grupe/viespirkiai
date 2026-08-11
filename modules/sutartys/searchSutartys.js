@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("sutartys", { operation: "searchSutartys" });
 import { getDeadRatio, search as quickwitSearch, searchAll as quickwitSearchAll, countDocs as quickwitCountDocs } from "../../quickwit/quickwit.js";
 import { specialJarCodes } from "../juridiniai/specialJarCodes.js";
 import { searchJar } from "../juridiniai/search.js";
@@ -320,7 +322,7 @@ function quickwitSortBy(query) {
 /** Viena Quickwit term agregacija. Grąžina [{ value, count }]. */
 async function qwFacet(field, query, size) {
     try {
-        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -345,7 +347,7 @@ async function sutartysQuickwitAggregates(query) {
     try {
         const [deadRatio, res] = await Promise.all([
             getDeadRatio(QUICKWIT_LENTELE),
-            fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+            scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -399,7 +401,7 @@ export async function sutartysSumaHistogram(query) {
 
     const qwQuery = buildSutartysQuickwitQuery(query, { exclude: ["suma"] });
     try {
-        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -494,7 +496,7 @@ export async function sutartysDataHistogram(query) {
         `sudarymoData:[${boundMin} TO ${boundMax}]`,
     ].join(" AND ");
     try {
-        const res = await fetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
+        const res = await scrapeFetch(`${QW_URL}/api/v1/${QUICKWIT_LENTELE}_*/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

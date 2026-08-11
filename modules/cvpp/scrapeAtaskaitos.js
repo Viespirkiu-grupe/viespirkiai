@@ -1,4 +1,6 @@
 // https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol?pageNumber=1317&pageSize=100&OrderingType=1&OrderingDirection=1&ReportsOrProtocolIds=1%2C2%2C3%2C4%2C5%2C6&IncludeExpired=true
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("cvpp", { operation: "scrapeAtaskaitos" });
 import { parseHTML } from "linkedom";
 import { postgres } from "../../postgres/postgres.js";
 
@@ -58,7 +60,7 @@ export async function upsertAtaskaitos(ataskaitos) {
 
 export async function scrapeAtaskaitosPuslapis(pageNumber) {
     const url = `https://cvpp.eviesiejipirkimai.lt/ReportsOrProtocol?pageNumber=${pageNumber}&pageSize=100&OrderingType=1&OrderingDirection=1&ReportsOrProtocolIds=1%2C2%2C3%2C4%2C5%2C6&IncludeExpired=true`;
-    const response = await fetch(url);
+    const response = await scrapeFetch(url);
     const text = await response.text();
     const { document } = parseHTML(text);
 

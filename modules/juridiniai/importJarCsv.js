@@ -5,6 +5,8 @@
  *
  * Typesense čia sąmoningai neliečiamas.
  */
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("juridiniai", { operation: "importJarCsv" });
 import readline from "node:readline";
 import { Readable } from "node:stream";
 import { pathToFileURL } from "node:url";
@@ -90,7 +92,7 @@ export async function importJarCsv() {
 async function importSource(client, source) {
     const url = `${BASE}?byla=${encodeURIComponent(source.file)}`;
     log(`JAR: siunčiama ${source.file}`);
-    const response = await fetch(url, {
+    const response = await scrapeFetch(url, {
         signal: AbortSignal.timeout(30 * 60_000),
         headers: {
             accept: "text/csv, text/plain;q=0.9, */*;q=0.1",

@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("geografija", { operation: "insertCountries" });
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import { buildNodeWayMaps, extractWays, walkWays } from "./utils.js";
@@ -46,7 +48,7 @@ async function updateCountries() {
         );
         const params = new URLSearchParams();
         params.append("data", overpassQuery);
-        const res = await fetch("https://overpass-api.de/api/interpreter", {
+        const res = await scrapeFetch("https://overpass-api.de/api/interpreter", {
             method: "POST",
             headers: {
                 "Content-Type":

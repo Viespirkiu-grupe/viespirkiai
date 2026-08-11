@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("eseimas", { operation: "scrapeContent" });
 import { parseHTML } from "linkedom";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
@@ -74,7 +76,7 @@ export function parseProjectPage(html, pageUrl) {
 }
 
 async function fetchText(url, referer) {
-    const res = await fetch(url, {
+    const res = await scrapeFetch(url, {
         signal: AbortSignal.timeout(60_000),
         headers: {
             "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/136 Safari/537.36",

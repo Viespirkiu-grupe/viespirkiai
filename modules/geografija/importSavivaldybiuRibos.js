@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("geografija", { operation: "importSavivaldybiuRibos" });
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
@@ -21,7 +23,7 @@ async function updateSavivaldybes() {
         (r) => r.name === "Savivaldybių ribos",
     );
 
-    const res = await fetch(entry.geojson);
+    const res = await scrapeFetch(entry.geojson);
     if (!res.ok) throw new Error(`Failed to fetch savivaldybes: ${res.status}`);
     const data = await res.json();
 

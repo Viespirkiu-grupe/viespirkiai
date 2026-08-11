@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("eTar", { operation: "eTarApi" });
 import config from "../../utils/config.js";
 import { log } from "../../utils/log.js";
 import { sleep } from "../../utils/time.js";
@@ -196,7 +198,7 @@ export function createETarApi({
     }
 
     async function requestOnce(url) {
-        const res = await fetch(url, {
+        const res = await scrapeFetch(url, {
             headers: {
                 Accept: "application/json",
                 ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),

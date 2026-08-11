@@ -19,6 +19,8 @@ Rankinis paleidimas:
     npm run sodra:atnaujinti -- --force            # praleisti antraščių/md5 patikrą
     npm run sodra:atnaujinti -- --metai 2019       # konkretūs metai (galima kartoti per kablelį)
 */
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("sodra", { operation: "atnaujintiSodra" });
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -109,7 +111,7 @@ async function irasytiPatikra({
  * @returns {Promise<{md5: string, dydis: number}>}
  */
 async function parsiustiZip(url, kelias) {
-    const atsakymas = await fetch(url);
+    const atsakymas = await scrapeFetch(url);
     if (!atsakymas.ok || !atsakymas.body) {
         throw new Error(
             `Nepavyko parsiųsti ZIP: HTTP ${atsakymas.status} ${atsakymas.statusText}`,
@@ -149,7 +151,7 @@ export async function atnaujintiSodrosMetus(metai, { force = false } = {}) {
     const zipKelias = path.join(DARBO_KATALOGAS, `${failoVardas}.zip`);
     const csvKelias = path.join(DARBO_KATALOGAS, failoVardas);
 
-    const galva = await fetch(url, { method: "HEAD" });
+    const galva = await scrapeFetch(url, { method: "HEAD" });
     if (galva.status === 404) {
         // Sausio pradžioje naujų metų failo dar nebūna — tai ne klaida.
         await irasytiPatikra({

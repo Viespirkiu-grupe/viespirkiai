@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("mvpTvarkosAprasai", { operation: "scrapeContent" });
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
@@ -17,7 +19,7 @@ export async function nuskaitytiMvpTvarkosAprasus(sbjId, options = {}) {
     log(`Subjektas: ${sbjId}`);
 
     timings.start("aprasaiFetch");
-    const response = await fetch(url);
+    const response = await scrapeFetch(url);
     timings.end("aprasaiFetch");
 
     const text = await response.text();

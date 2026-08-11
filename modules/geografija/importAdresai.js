@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("geografija", { operation: "importAdresai" });
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
@@ -28,7 +30,7 @@ async function updateAdresai() {
     const sources = await getArDataSources();
     const entry = sources.addressPoints[0];
 
-    const res = await fetch(entry.geojson);
+    const res = await scrapeFetch(entry.geojson);
     if (!res.ok) throw new Error(`Failed to fetch adresai: ${res.status}`);
 
     await pipeline(res.body, createWriteStream(TMP_ZIP));

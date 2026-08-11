@@ -21,6 +21,7 @@ const ENV_MAP = [
     ["ONION_ADDRESS", "onionAddress", "string"],
 
     ["PORT", "port", "number"],
+    ["APP_ENV", "appEnv", "string"],
     ["LOG_REQUESTS", "logRequests", "boolean"],
     ["ENABLE_ATN1", "enableAtn1", "boolean"],
     ["ENABLE_BOT_CHALLENGE", "enableBotChallenge", "boolean"],
@@ -35,6 +36,8 @@ const ENV_MAP = [
     ["PG_DIRECT_PORT", "pgDirectPort", "number"],
     ["SQL_LOG_FILE", "sqlLogFile", "string"],
     ["SQL_LOG_QUICKWIT", "sqlLogQuickwit", "boolean"],
+    ["SCRAPE_LOG_FILE", "scrapeLogFile", "string"],
+    ["SCRAPE_LOG_QUICKWIT", "scrapeLogQuickwit", "boolean"],
     ["PG_PREPARED", "pgPrepared", "boolean"],
 
     ["NATS_URL", "natsUrl", "string"],

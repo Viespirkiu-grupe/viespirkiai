@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("2014esinvesticijos", { operation: "scrape" });
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import { postgres } from "../../postgres/postgres.js";
@@ -18,7 +20,7 @@ async function getSessionCookie() {
     }
 
     // hit homepage → get PHPSESSID
-    const homeRes = await fetch("https://2014.esinvesticijos.lt/lt");
+    const homeRes = await scrapeFetch("https://2014.esinvesticijos.lt/lt");
     const setCookie = homeRes.headers.get("set-cookie");
     const phpSessId = setCookie?.match(/PHPSESSID=([^;]+)/)?.[1];
 
@@ -29,7 +31,7 @@ async function getSessionCookie() {
     const cookie = `PHPSESSID=${phpSessId}`;
 
     // apply setwrap using SAME session
-    await fetch("https://2014.esinvesticijos.lt/lt/general/setwrap", {
+    await scrapeFetch("https://2014.esinvesticijos.lt/lt/general/setwrap", {
         method: "POST",
         headers: {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -92,7 +94,7 @@ async function nuskaityti2014EsinvesticijosPuslapi(page) {
 
     const cookie = await getSessionCookie();
 
-    let response = await fetch(url, {
+    let response = await scrapeFetch(url, {
         headers: {
             Cookie: cookie,
         },

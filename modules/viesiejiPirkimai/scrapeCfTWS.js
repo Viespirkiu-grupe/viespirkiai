@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "scrapeCfTWS" });
 import { postgres } from "../../postgres/postgres.js";
 import pLimit from "p-limit";
 import Timings from "../../utils/timings.js";
@@ -123,7 +125,7 @@ export async function getNextCft() {
  * @returns {Promise<string>}
  */
 async function fetchText(url) {
-    const response = await fetch(url, { redirect: "follow" });
+    const response = await scrapeFetch(url, { redirect: "follow" });
     markRequest();
 
     const redirectedUrl = response.url || "";

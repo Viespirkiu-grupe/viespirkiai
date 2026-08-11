@@ -2,6 +2,8 @@
 Parsiunčia ir įdeda į duomenų bazę neskelbiamas derybas iš eviesiejipirkimai.lt
 */
 
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("neskelbiamosDerybos", { operation: "scrape" });
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
 import { getProxyBySite } from "../scrapeProxies/getProxyBySite.js";
@@ -28,7 +30,7 @@ async function nuskaitytiNeskelbiamasDerybasNuo(start = 0) {
     let startTime = new Date();
 
     // Atliekama užklausa
-    var response = await fetch(requestUrl, {
+    var response = await scrapeFetch(requestUrl, {
         headers: {
             "User-Agent":
                 "Pilietine iniciatyva Viespirkiai <viespirkiai@viespirkiai.org>",

@@ -3,6 +3,8 @@ Duomenų iš eViesiejiPirkimai.lt nuskaitymas (scrapinimas)
 Kaip argumentą galima pateikti puslapio numerį, nuo kurio pradėti nuskaitymą.
 */
 
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("sutartys", { operation: "scrape" });
 import { postgres } from "../../postgres/postgres.js";
 import { getProxyBySite } from "../scrapeProxies/getProxyBySite.js";
 import { cvpIsImportArray } from "./import.js";
@@ -54,7 +56,7 @@ export async function cvpIsScrapePageContent(url, options = {}) {
     timings.end("findProxy");
 
     timings.start("cvpIsRequest");
-    var response = await fetch(requestUrl, {
+    var response = await scrapeFetch(requestUrl, {
         headers: {
             "User-Agent":
                 "Pilietine iniciatyva Viespirkiai +<viespirkiai@viespirkiai.org>",
