@@ -66,7 +66,9 @@ export class TaskRunner {
 
     /**
      * Nebepradeda naujų darbų ir palaukia, kol jau pradėti job'ai užsibaigs.
-     * Worker abort signalas nutraukia tik laukimą eilėje/cooldown'ą, ne patį jobFn.
+     * Abort signalas nutraukia laukimą eilėje/cooldown'ą, o `jobFn` jį gauna
+     * pirmu argumentu — ilgus retry ciklus turintys darbai privalo jį tikrinti,
+     * kitaip shutdown'as lauks jų iki `FORCE_TIMEOUT_MS`.
      */
     async stop() {
         if (this.#stopPromise) return this.#stopPromise;

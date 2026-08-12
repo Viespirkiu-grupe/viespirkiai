@@ -81,15 +81,27 @@ export function arrayToLithuanianTime(data) {
 /**
  * Palaukia nurodytą milisekundžių skaičių.
  *
- * Nepertraukiamas — jei reikia laukimo, kurį galima nutraukti signalu (ilgai
- * veikiančių darbininkų retry), žr. `runShardedDrain` iš
- * `quickwit/indexQueueDrainer.js`.
+ * Perdavus `signal`, laukimas nutraukiamas anksčiau (be klaidos) — taip
+ * ilgai veikiančių darbininkų retry ciklai nestabdo graceful shutdown'o.
  *
  * @param {number} ms
+ * @param {AbortSignal} [signal] Nutraukia laukimą prieš laiką.
  * @returns {Promise<void>}
  */
-export function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+export function sleep(ms, signal) {
+    return new Promise((resolve) => {
+        if (signal?.aborted) return resolve();
+
+        const timer = setTimeout(finish, ms);
+
+        function finish() {
+            clearTimeout(timer);
+            signal?.removeEventListener("abort", finish);
+            resolve();
+        }
+
+        signal?.addEventListener("abort", finish, { once: true });
+    });
 }
 
 /**

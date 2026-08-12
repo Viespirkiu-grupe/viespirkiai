@@ -69,8 +69,8 @@ export default [
         priority: 2,
         cooldown: 30,
         errorCooldown: 10,
-        job: async () => {
-            const processed = await nuskaitytiDomregDomena();
+        job: async (signal) => {
+            const processed = await nuskaitytiDomregDomena(signal);
             if (processed) await new Promise((r) => setTimeout(r, 500));
             return processed;
         },

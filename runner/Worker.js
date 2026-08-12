@@ -86,7 +86,7 @@ export class Worker {
             let hasMore;
             let succeeded = false;
             try {
-                hasMore = await this.#jobFn();
+                hasMore = await this.#jobFn(signal);
                 succeeded = true;
             } catch (err) {
                 console.error(`[${this.#taskName}] job failed:`, err);

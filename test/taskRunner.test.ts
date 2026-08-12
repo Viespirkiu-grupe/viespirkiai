@@ -228,4 +228,33 @@ describe("TaskRunner", () => {
         expect(calls).toBe(1);
         expect(runner.activeJobCount()).toBe(0);
     });
+
+    it("aborts the running job's signal on stop so long retry loops can bail out", async () => {
+        const active = deferred<boolean>();
+        let jobSignal: AbortSignal | undefined;
+        const runner = new TaskRunner({ maxConcurrentJobs: 1 });
+        runner.register({
+            name: "abortable",
+            mode: "asap",
+            cooldown: 3600,
+            job: async (signal: AbortSignal) => {
+                jobSignal = signal;
+                return active.promise;
+            },
+        });
+
+        runner.start();
+        await flush();
+        expect(jobSignal).toBeInstanceOf(AbortSignal);
+        expect(jobSignal!.aborted).toBe(false);
+
+        const stopPromise = runner.stop();
+        await flush();
+        expect(jobSignal!.aborted).toBe(true);
+
+        active.resolve(false);
+        await stopPromise;
+        await flush();
+        expect(runner.activeJobCount()).toBe(0);
+    });
 });

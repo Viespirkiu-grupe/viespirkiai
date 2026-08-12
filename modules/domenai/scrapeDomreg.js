@@ -23,6 +23,9 @@ const STATUS = {
 
 const RATE_LIMIT_MS = 500;
 const TOR_WAIT_MS = 5000;
+// Ribojame Tor identiteto rotacijas vienam domenui, kad rate limit'as negalėtų
+// neribotai laikyti job'o gyvo ir taip blokuoti graceful shutdown'o.
+const MAX_RATE_LIMIT_ATTEMPTS = 20;
 const FETCH_TIMEOUT_MS = 30_000;
 const TOR_CONTROL_TIMEOUT_MS = 10_000;
 
@@ -295,9 +298,10 @@ async function saveDomainData(domenas, data, scrapeStatus, scrapedAt) {
 
 /**
  * Scrapes and persists one oldest domain record.
+ * @param {AbortSignal} [signal] Nutraukia rate limit retry ciklą per shutdown'ą.
  * @returns {Promise<boolean>} True when a domain was processed.
  */
-export async function nuskaitytiDomregDomena() {
+export async function nuskaitytiDomregDomena(signal) {
     const result = await postgres.query(
         `SELECT id, domain
          FROM public.domenai
@@ -316,48 +320,60 @@ export async function nuskaitytiDomregDomena() {
 
     logger.log(`Scraping: ${domenas.domain}`);
 
-    try {
-        const data = await fetchDomainDetails(domenas.domain);
-        const scrapedAt = now();
-
-        if (data.error === 100) {
-            logger.log(`Rate limited for ${domenas.domain}; rotating Tor identity`);
-            await newTorIdentity();
-            await sleep(TOR_WAIT_MS);
-            return nuskaitytiDomregDomena();
+    for (let attempt = 1; attempt <= MAX_RATE_LIMIT_ATTEMPTS; attempt++) {
+        if (signal?.aborted) {
+            logger.log(`Aborted while scraping ${domenas.domain}`);
+            return false;
         }
 
-        if (data.error === 0) {
-            const savininkas = data.details?.registrant?.org ?? "unknown";
-            await saveDomainData(domenas, data, STATUS.SCRAPED, scrapedAt);
-            logger.log(`Scraped successfully: ${domenas.domain}; savininkas: ${savininkas}`);
+        try {
+            const data = await fetchDomainDetails(domenas.domain);
+            const scrapedAt = now();
+
+            if (data.error === 100) {
+                logger.log(`Rate limited for ${domenas.domain}; rotating Tor identity`);
+                await newTorIdentity();
+                await sleep(TOR_WAIT_MS, signal);
+                continue;
+            }
+
+            if (data.error === 0) {
+                const savininkas = data.details?.registrant?.org ?? "unknown";
+                await saveDomainData(domenas, data, STATUS.SCRAPED, scrapedAt);
+                logger.log(`Scraped successfully: ${domenas.domain}; savininkas: ${savininkas}`);
+                return true;
+            }
+
+            if (data.error === 2) {
+                await saveDomainData(domenas, data, STATUS.NOT_FOUND, scrapedAt);
+                logger.log(`Domain not found: ${domenas.domain}`);
+                return true;
+            }
+
+            await saveDomainData(domenas, data, STATUS.ERROR, scrapedAt);
+            logger.log(`Unexpected API error ${data.error} for ${domenas.domain}`);
+            return true;
+        } catch (error) {
+            logger.log(`Fetch error for ${domenas.domain}: ${error.message}`);
+            await postgres.query(
+                `UPDATE public.domenai
+                 SET "domregNuskaitymas" = $1,
+                     "domregData" = $2
+                 WHERE id = $3`,
+                [STATUS.ERROR, now(), domenas.id],
+            );
+            signalWork(WORK_SIGNALS.DOMENAI_ADP_READY, {
+                source: "scrapeDomreg-error",
+                domain: domenas.domain,
+            });
             return true;
         }
-
-        if (data.error === 2) {
-            await saveDomainData(domenas, data, STATUS.NOT_FOUND, scrapedAt);
-            logger.log(`Domain not found: ${domenas.domain}`);
-            return true;
-        }
-
-        await saveDomainData(domenas, data, STATUS.ERROR, scrapedAt);
-        logger.log(`Unexpected API error ${data.error} for ${domenas.domain}`);
-        return true;
-    } catch (error) {
-        logger.log(`Fetch error for ${domenas.domain}: ${error.message}`);
-        await postgres.query(
-            `UPDATE public.domenai
-             SET "domregNuskaitymas" = $1,
-                 "domregData" = $2
-             WHERE id = $3`,
-            [STATUS.ERROR, now(), domenas.id],
-        );
-        signalWork(WORK_SIGNALS.DOMENAI_ADP_READY, {
-            source: "scrapeDomreg-error",
-            domain: domenas.domain,
-        });
-        return true;
     }
+
+    // Domenas lieka nepažymėtas — jį pasiims kitas ciklas. `false` grąžinimas
+    // nuleidžia darbininką į cooldown'ą, t. y. veikia kaip rate limit backoff.
+    logger.log(`Giving up on ${domenas.domain} after ${MAX_RATE_LIMIT_ATTEMPTS} rate limited attempts`);
+    return false;
 }
 
 /**
