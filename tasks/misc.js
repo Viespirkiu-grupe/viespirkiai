@@ -39,7 +39,7 @@ export default [
     {
         name: "update2014EsInvesticijosData",
         schedule: "47 */3 * * *",
-        job: update2014EsInvesticijosData,
+        job: async () => update2014EsInvesticijosData(),
     },
     {
         name: "nuskaitytiCpvaProjektaiTiekejai",
@@ -86,7 +86,7 @@ export default [
         priority: 5,
         cooldown: 60,
         errorCooldown: 10,
-        job: surastiNuosprendzioDalyvius,
+        job: async () => surastiNuosprendzioDalyvius(),
     },
     {
         // LITEKO2 (naujoji sistema, https://liteko-api-pub.teismas.lt) — sąrašas.
@@ -100,7 +100,8 @@ export default [
         priority: 5,
         cooldown: 60,
         errorCooldown: 10,
-        job: nuskaitytiSprendimuTurini,
+        // Worker'is job'ui paduoda AbortSignal, o funkcija pirmu argumentu laukia batchSize.
+        job: async () => nuskaitytiSprendimuTurini(),
     },
     {
         name: "liteko2Klasifikatoriai",
