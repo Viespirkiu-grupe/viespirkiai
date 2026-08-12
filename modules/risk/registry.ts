@@ -17,17 +17,17 @@ function keyString(key: RiskIndicatorKey): string {
  * throw here, at import time.
  */
 export class RiskIndicatorRegistry {
-    readonly #byKey = new Map<string, RiskIndicator<unknown>>();
-    readonly #activeById = new Map<string, RiskIndicator<unknown>>();
+    private readonly byKey = new Map<string, RiskIndicator<unknown>>();
+    private readonly activeById = new Map<string, RiskIndicator<unknown>>();
 
     constructor(indicators: readonly RiskIndicator<unknown>[]) {
         for (const indicator of indicators) {
-            this.#add(indicator);
+            this.add(indicator);
         }
     }
 
     require(key: RiskIndicatorKey): RiskIndicator<unknown> {
-        const indicator = this.#byKey.get(keyString(key));
+        const indicator = this.byKey.get(keyString(key));
         if (!indicator) {
             throw new Error(`Unknown Risk Indicator: ${keyString(key)}`);
         }
@@ -35,12 +35,12 @@ export class RiskIndicatorRegistry {
     }
 
     all(): readonly RiskIndicator<unknown>[] {
-        return [...this.#byKey.values()];
+        return [...this.byKey.values()];
     }
 
     /** The one `active` version of each indicator — what the read model shows. */
     active(): readonly RiskIndicator<unknown>[] {
-        return [...this.#activeById.values()];
+        return [...this.activeById.values()];
     }
 
     /** `active` + `shadow`: what a run evaluates and writes (see RiskIndicator.isEvaluable). */
@@ -48,21 +48,21 @@ export class RiskIndicatorRegistry {
         return this.all().filter((indicator) => indicator.isEvaluable);
     }
 
-    #add(indicator: RiskIndicator<unknown>): void {
+    private add(indicator: RiskIndicator<unknown>): void {
         const ks = keyString(indicator.key);
-        if (this.#byKey.has(ks)) {
+        if (this.byKey.has(ks)) {
             throw new Error(`Duplicate Risk Indicator key: ${ks}`);
         }
-        this.#byKey.set(ks, indicator);
+        this.byKey.set(ks, indicator);
 
         if (!indicator.isActive) return;
 
-        const existingActive = this.#activeById.get(indicator.id);
+        const existingActive = this.activeById.get(indicator.id);
         if (existingActive) {
             throw new Error(
                 `Risk Indicator ${indicator.id} has more than one active version: ${existingActive.version} and ${indicator.version}`,
             );
         }
-        this.#activeById.set(indicator.id, indicator);
+        this.activeById.set(indicator.id, indicator);
     }
 }

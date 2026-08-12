@@ -19,7 +19,7 @@ export type SqlRiskIndicatorDefinition<P> = RiskIndicatorDefinition<P> &
 
 export class SqlRiskIndicator<P = unknown> extends RiskIndicator<P> {
     readonly sqlFile: string;
-    readonly #definitionUrl: string;
+    private readonly definitionUrl: string;
 
     /**
      * `definitionUrl` resolves `sqlFile` against the indicator's own
@@ -28,20 +28,20 @@ export class SqlRiskIndicator<P = unknown> extends RiskIndicator<P> {
     constructor(definition: SqlRiskIndicatorDefinition<P>, definitionUrl: string) {
         super(definition);
         this.sqlFile = definition.sqlFile;
-        this.#definitionUrl = definitionUrl;
+        this.definitionUrl = definitionUrl;
     }
 
     protected calculate(context: EvaluationContext, data: RiskDataSource): Promise<readonly RiskObservationV1[]> {
-        return data.query<RiskObservationV1>(this.#sql(), this.#bind(context));
+        return data.query<RiskObservationV1>(this.loadSql(), this.bindParameters(context));
     }
 
-    #sql(): string {
-        return loadPackagedSql(this.#definitionUrl, this.sqlFile);
+    private loadSql(): string {
+        return loadPackagedSql(this.definitionUrl, this.sqlFile);
     }
 
     // $1 run id, $2 data_as_of cutoff, $3 effective parameter entries as a
     // jsonb array, $4 optional subject filter (NULL for a full run).
-    #bind(context: EvaluationContext): readonly unknown[] {
+    private bindParameters(context: EvaluationContext): readonly unknown[] {
         return [context.runId, context.dataAsOf, JSON.stringify(context.parameters), context.subjects];
     }
 }

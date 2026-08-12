@@ -72,7 +72,7 @@ export abstract class RiskIndicator<P = unknown> {
      * own contract, or a gapped/overlapping parameter timeline all fail here,
      * at import time, rather than in the middle of a run.
      */
-    constructor(definition: RiskIndicatorDefinition<P>) {
+    protected constructor(definition: RiskIndicatorDefinition<P>) {
         this.key = definition.key;
         this.lifecycle = definition.lifecycle;
         this.subjectType = definition.subjectType;
@@ -86,9 +86,9 @@ export abstract class RiskIndicator<P = unknown> {
         this.standard = definition.standard;
         this.public = definition.public;
 
-        this.#assertIdentity();
-        this.#assertPublicWording();
-        this.#assertParameterTimeline();
+        this.assertIdentity();
+        this.assertPublicWording();
+        this.assertParameterTimeline();
     }
 
     get id(): RiskIndicatorKey["id"] {
@@ -185,13 +185,13 @@ export abstract class RiskIndicator<P = unknown> {
         return validated;
     }
 
-    #assertIdentity(): void {
+    private assertIdentity(): void {
         if (!this.key.id.startsWith("LT-")) {
             throw new Error(`Risk Indicator id must start with 'LT-': ${this.key.id}`);
         }
     }
 
-    #assertPublicWording(): void {
+    private assertPublicWording(): void {
         if (!this.public.titleLt || !this.public.limitationLt) {
             throw new Error(
                 `Risk Indicator ${this.key.id}: public.titleLt and public.limitationLt must be non-empty`,
@@ -202,7 +202,7 @@ export abstract class RiskIndicator<P = unknown> {
     // The timeline is append-only and contiguous: every cutoff resolves to at
     // most one entry, so a gap, an overlap or a backwards range is a
     // definition bug (§10.2).
-    #assertParameterTimeline(): void {
+    private assertParameterTimeline(): void {
         const entries = [...this.parameters].sort((a, b) => a.validFrom.localeCompare(b.validFrom));
 
         for (const entry of entries) {

@@ -20,14 +20,10 @@ export type PgQueryable = {
 };
 
 export class PostgresRiskDataSource implements RiskDataSource {
-    readonly #pool: PgQueryable;
-
-    constructor(pool: PgQueryable) {
-        this.#pool = pool;
-    }
+    constructor(private readonly pool: PgQueryable) {}
 
     async query<T>(sqlText: string, params: readonly unknown[] = []): Promise<readonly T[]> {
-        const { rows } = await this.#pool.query(sqlText, [...params]);
+        const { rows } = await this.pool.query(sqlText, [...params]);
         return rows as readonly T[];
     }
 }
