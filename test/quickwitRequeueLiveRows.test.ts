@@ -1,4 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const signals: { subject: string; payload: any }[] = [];
+vi.mock("../utils/taskSignals.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../utils/taskSignals.js")>();
+  return {
+    ...actual,
+    signalWork: (subject: string, payload: any) => signals.push({ subject, payload }),
+  };
+});
+
 import {
   formatIndexesTable,
   parseArgs,
@@ -6,6 +16,7 @@ import {
   requeueIndexes,
   requeueSelectedIndexes,
 } from "../quickwit/requeueLiveRows.js";
+import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 const indexes = [
   { lentele: "dokumentai", indeksas: "dokumentai_1", gyvosEilutes: 900, mirusiosEilutes: 100, deadRatio: 10, current: true },
@@ -127,6 +138,58 @@ describe("requeueLiveRows transaction", () => {
 
     expect(connectedTables).toEqual(["dokumentai", "sutartys"]);
     expect(result.total).toBe(2);
+  });
+
+  it("requeues juridiniai through the text jarKodas key and wakes the runner", async () => {
+    signals.length = 0;
+    const queries: string[] = [];
+    const client = {
+      async query(sql: string) {
+        const normalized = sql.replace(/\s+/g, " ").trim();
+        queries.push(normalized);
+        if (normalized.startsWith("SELECT COUNT(*)")) return { rows: [{ total: 5 }], rowCount: 1 };
+        if (normalized.startsWith("INSERT INTO \"juridiniaiIndexQueue\"")) return { rows: [], rowCount: 4 };
+        return { rows: [], rowCount: 0 };
+      },
+      release() {},
+    };
+    const db = { async connect() { return client; } } as any;
+
+    await requeueIndexes(
+      [{ id: 3, indeksas: "juridiniai_1" }],
+      { dryRun: false, lentele: "juridiniai" },
+      db,
+    );
+
+    const dataQueries = queries.filter((sql) => sql.includes('"juridiniaiIndexQueue"'));
+    expect(dataQueries).not.toHaveLength(0);
+    expect(dataQueries.every((sql) => sql.includes('e."eilutesId"::text'))).toBe(true);
+    expect(dataQueries.every((sql) => !sql.includes('e."eilutesId"::bigint'))).toBe(true);
+    expect(queries.join("\n")).toContain('s."jarKodas"');
+    expect(signals).toEqual([{
+      subject: WORK_SIGNALS.JURIDINIAI_INDEX_READY,
+      payload: { source: "quickwit-requeue-live-rows", lentele: "juridiniai", indeksai: ["juridiniai_1"] },
+    }]);
+  });
+
+  it("rejects tables without an index queue definition", async () => {
+    const db = { async connect() { throw new Error("neturėtų jungtis"); } } as any;
+    await expect(requeueIndexes([{ id: 1, indeksas: "eTar_1" }], { dryRun: true, lentele: "eTar" }, db))
+      .rejects.toThrow(/nepalaikoma/);
+  });
+
+  it("does not signal on a dry run", async () => {
+    signals.length = 0;
+    const client = {
+      async query(sql: string) {
+        if (sql.replace(/\s+/g, " ").trim().startsWith("SELECT COUNT(*)")) return { rows: [{ total: 1 }], rowCount: 1 };
+        return { rows: [], rowCount: 0 };
+      },
+      release() {},
+    };
+    const db = { async connect() { return client; } } as any;
+    await requeueIndexes([{ id: 1, indeksas: "dokumentai_1" }], { dryRun: true, lentele: "dokumentai" }, db);
+    expect(signals).toEqual([]);
   });
 
   it("requeues viesiejiPirkimai using numeric IDs without locking the queue table", async () => {

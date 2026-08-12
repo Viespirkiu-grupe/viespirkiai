@@ -1,20 +1,42 @@
 import { createInterface } from "node:readline/promises";
 import { pathToFileURL } from "node:url";
 import { postgres } from "../postgres/postgres.js";
+import { closeNats } from "../utils/natsHub.js";
+import { signalWork, WORK_SIGNALS } from "../utils/taskSignals.js";
 
+// `signal` – NATS signalas, kuriuo po commit'o pažadinamas atitinkamas
+// taskRunner'io indeksavimo eilės darbas (žr. tasks/*.js `wakeOn`).
 const TABLES = {
-  dokumentai: { queue: "dokumentaiIndexQueue", queueId: "dokumentoId", source: "dokumentai", sourceId: "id" },
+  dokumentai: {
+    queue: "dokumentaiIndexQueue",
+    queueId: "dokumentoId",
+    source: "dokumentai",
+    sourceId: "id",
+    signal: WORK_SIGNALS.DOCUMENTS_INDEX_READY,
+  },
   sutartys: {
     queue: "vpmSutartysIndexQueue",
     queueId: "unikalusId",
     source: "vpmSutartys",
     sourceId: "unikalusId",
+    signal: WORK_SIGNALS.SUTARTYS_CHANGED,
   },
   viesiejiPirkimai: {
     queue: "viesiejiPirkimaiIndexQueue",
     queueId: "pirkimoId",
     source: "viesiejiPirkimai",
     sourceId: "pirkimoId",
+    signal: WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED,
+  },
+  // jarKodas yra text, o quickwitEilutes."eilutesId" – bigint, tad reikia ::text.
+  juridiniai: {
+    queue: "juridiniaiIndexQueue",
+    queueId: "jarKodas",
+    queueValue: `e."eilutesId"::text`,
+    source: "juridiniai",
+    sourceId: "jarKodas",
+    sourceValue: `e."eilutesId"::text`,
+    signal: WORK_SIGNALS.JURIDINIAI_INDEX_READY,
   },
 };
 
@@ -32,7 +54,7 @@ Pasirinkimas:
   --top-ratio N       N indeksų, turinčių didžiausią mirusių eilučių procentą
   --all               visi filtrus atitinkantys indeksai
   --list              tik parodyti indeksus
-  --lentele PAV       filtruoti pagal dokumentai, sutartys arba viesiejiPirkimai
+  --lentele PAV       filtruoti pagal dokumentai, sutartys, viesiejiPirkimai arba juridiniai
   --min-dead N        tik turintys bent N mirusių eilučių
   --min-dead-ratio N  tik turintys bent N% mirusių eilučių
 
@@ -217,6 +239,12 @@ async function chooseInteractively(indexes) {
 
 export async function requeueIndexes(indexes, { dryRun, lentele }, db = postgres) {
   const table = TABLES[lentele];
+  if (!table) {
+    throw new Error(
+      `Lentelė „${lentele}“ nepalaikoma – nėra indeksavimo eilės aprašo. ` +
+      `Palaikomos: ${Object.keys(TABLES).join(", ")}`,
+    );
+  }
   const names = indexes.map((index) => index.indeksas);
   const indexIds = indexes.map((index) => index.id);
   const client = await db.connect();
@@ -260,6 +288,11 @@ export async function requeueIndexes(indexes, { dryRun, lentele }, db = postgres
       [indexIds],
     );
     await client.query("COMMIT");
+    // Signalas siunčiamas TIK po commit'o – kitaip taskRunner'is pabustų
+    // anksčiau, nei eilės eilutės jam matomos (natsHub publish netransakcinis).
+    if (queuedPatches + queuedDeletes > 0) {
+      signalWork(table.signal, { source: "quickwit-requeue-live-rows", lentele, indeksai: names });
+    }
     return {
       queuedPatches,
       queuedDeletes,
@@ -311,5 +344,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   main().catch((error) => {
     console.error(`Nepavyko perkelti Quickwit eilučių: ${error.message}`);
     process.exitCode = 1;
-  }).finally(async () => postgres.end());
+  }).finally(async () => {
+    // closeNats() drain'ina jungtį – be jo procesas išeitų anksčiau, nei
+    // fire-and-forget publish spėtų išsiųsti signalą.
+    await closeNats().catch(() => {});
+    await postgres.end();
+  });
 }
