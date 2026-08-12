@@ -1,34 +1,38 @@
-import type { EvaluationContext, ParameterEntry } from "./contracts.ts";
+import type { ParameterEntry } from "./contracts.ts";
 
-export type QueryExecutor = <T>(sqlText: string, params?: readonly unknown[]) => Promise<readonly T[]>;
+// One run's inputs, as a value object. A run has exactly two of its own
+// (risk-service-architecture.md §5.2.2) — the `data_as_of` cutoff and the
+// subject set — plus the identity of the run row and the parameter entries
+// the indicator resolved for that cutoff.
+//
+// It carries no database handle: reading is the RiskDataSource's job, passed
+// to a calculation alongside this context. That split is what keeps "what is
+// being evaluated" readable on its own and makes a context trivial to build
+// in a test.
 
-/**
- * Builds the EvaluationContext a Risk Indicator calculation runs against.
- * `query` executes on whatever connection the caller supplies — the run job
- * uses the read-only pool against the real database (§1.2's `risk_calc`
- * stand-in, see postgres/riskDb.js); tests use the same shape against the
- * local Docker Postgres's test schema (§11: "tests exercise the calculation
- * through the same evaluation context the run job supplies").
- */
-export function createEvaluationContext(
-    query: QueryExecutor,
-    opts: {
-        runId: number;
-        dataAsOf: string;
-        parameters: readonly ParameterEntry<unknown>[];
-        subjects: readonly string[] | null;
-    },
-): EvaluationContext {
-    return Object.freeze({
-        runId: opts.runId,
-        dataAsOf: opts.dataAsOf,
-        parameters: opts.parameters,
-        subjects: opts.subjects,
+export type EvaluationRun = Readonly<{
+    runId: number;
+    dataAsOf: string;
+    subjects: readonly string[] | null;
+}>;
 
-        // @Todo: the method should be named either executeSql or query (not just sql).
-        // @Todo: this method is not context responsibility, find another way. Use best OOP practices and separation of concerns.
-        sql<T>(sqlText: string, params?: readonly unknown[]): Promise<readonly T[]> {
-            return query<T>(sqlText, params);
-        },
-    });
+export class EvaluationContext {
+    readonly runId: number;
+    readonly dataAsOf: string;
+    readonly subjects: readonly string[] | null;
+    readonly parameters: readonly ParameterEntry<unknown>[];
+
+    constructor(run: EvaluationRun, parameters: readonly ParameterEntry<unknown>[]) {
+        this.runId = run.runId;
+        this.dataAsOf = run.dataAsOf;
+        this.subjects = run.subjects;
+        this.parameters = parameters;
+        Object.freeze(this);
+    }
+
+    // True for a backfill or a single-procurement rerun, false for a normal
+    // full run — the distinction indicators and logs care about.
+    get isScoped(): boolean {
+        return this.subjects !== null;
+    }
 }

@@ -1,8 +1,13 @@
 import { z } from "zod";
-import { loadPackagedSql } from "./sqlLoader.ts";
 
 // Shared observation and run contracts for the Procurement Risk Service.
 // Mirrors docs/indicators-story/risk-service-architecture.md §5.3.
+//
+// This file holds values only — the vocabulary every other risk module
+// speaks. The behaviour that uses them lives with the object that owns it:
+// riskIndicator.ts (one indicator version), sqlRiskIndicator.ts (the packaged
+// SELECT case), evaluationContext.ts (what one run evaluates),
+// riskDataSource.ts (how a calculation reaches the database).
 
 export type IndicatorLifecycle = "draft" | "shadow" | "active" | "retired";
 export type IndicatorStage = "planning" | "tender" | "award" | "contract";
@@ -66,84 +71,3 @@ export type ParameterEntry<P> = Readonly<{
     source: string;
     note?: string;
 }>;
-
-// The evaluation context is the way a calculation reaches data. `sql` runs a
-// SQL statement packaged in the indicator's own directory (already loaded via
-// sqlLoader.ts's `loadPackagedSql`, keyed by the caller's own import.meta.url
-// so relative paths resolve against that indicator's directory) on the
-// read-only connection, inside the run job's read-only transaction and
-// statement timeout.
-export type EvaluationContext = Readonly<{
-    runId: number;
-    dataAsOf: string;
-    parameters: readonly ParameterEntry<unknown>[];
-    subjects: readonly string[] | null;
-
-    // @Todo: this method is not context responsibility, find another way. Use best OOP practices and separation of concerns.
-    sql<T>(sqlText: string, params?: readonly unknown[]): Promise<readonly T[]>;
-}>;
-
-// One contract, whatever the calculation is made of.
-// @Todo: this should be an abstract method of RiskIndicator.
-export type Calculation = (ctx: EvaluationContext) => Promise<readonly RiskObservationV1[]>;
-
-// @Todo: I'm skeptical having RiskIndicator as a type - it seems like a class would be more appropriate, with methods for calculation and validation. Also, you can manage reading by getters or readonly declarations
-export type RiskIndicator<P> = Readonly<{
-    key: RiskIndicatorKey;
-    lifecycle: IndicatorLifecycle;
-    subjectType: SubjectType;
-    stage: IndicatorStage;
-    references: readonly string[];
-    sourceRelations: readonly string[];
-    requiredInputs: readonly string[];
-    parameters: readonly ParameterEntry<P>[];
-    parameterContract: RuntimeContract<P>;
-    calculation: Calculation;
-    outputContract: RuntimeContract<RiskObservationV1>;
-    standard: Readonly<{ name: string; url: string; page?: number }>;
-    public: Readonly<{
-        titleLt: string;
-        descriptionLt: string;
-        formulaLt: string;
-        limitationLt: string;
-    }>;
-}>;
-
-export type RiskIndicatorInput<P> = Readonly<
-    Omit<RiskIndicator<P>, "calculation" | "outputContract"> & {
-        calculation: Calculation | Readonly<{ sqlFile: string }>;
-        outputContract?: RuntimeContract<RiskObservationV1>;
-    }
->;
-
-/**
- * Freezes and validates one Risk Indicator definition. Expands the
- * `{ sqlFile }` shorthand into `(ctx) => ctx.sql(file)`, resolved relative to
- * the caller's own directory — pass `import.meta.url` from `definition.ts`.
- */
-export function defineRiskIndicator<P>(def: RiskIndicatorInput<P>, definitionUrl: string): RiskIndicator<P> {
-    if (!def.key.id.startsWith("LT-")) {
-        throw new Error(`Risk Indicator id must start with 'LT-': ${def.key.id}`);
-    }
-    if (!def.public.titleLt || !def.public.limitationLt) {
-        throw new Error(`Risk Indicator ${def.key.id}: public.titleLt and public.limitationLt must be non-empty`);
-    }
-    for (const entry of def.parameters) {
-        def.parameterContract.validate(entry.values);
-    }
-
-    // @Todo: below code is confusing and messy. Maybe it would be better to use OOP practices such as an interface and an instance that either calculates, or executes sql or even both if needed.
-    const calculation: Calculation =
-        typeof def.calculation === "function"
-            ? def.calculation
-            : (ctx) => {
-                  const sql = loadPackagedSql(definitionUrl, (def.calculation as { sqlFile: string }).sqlFile);
-                  return ctx.sql(sql, [ctx.runId, ctx.dataAsOf, JSON.stringify(ctx.parameters), ctx.subjects]);
-              };
-
-    return Object.freeze({
-        ...def,
-        calculation,
-        outputContract: def.outputContract ?? riskObservationV1Contract,
-    });
-}

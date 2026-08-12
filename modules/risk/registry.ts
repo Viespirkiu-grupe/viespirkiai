@@ -1,110 +1,68 @@
-import type { ParameterEntry, RiskIndicator, RiskIndicatorKey } from "./contracts.ts";
+import type { RiskIndicatorKey } from "./contracts.ts";
+import type { RiskIndicator } from "./riskIndicator.ts";
 
 function keyString(key: RiskIndicatorKey): string {
     return `${key.id}/${key.version}`;
 }
 
-function validateParameterTimeline(indicator: RiskIndicator<unknown>): void {
-    const entries = [...indicator.parameters].sort((a, b) => a.validFrom.localeCompare(b.validFrom));
-    for (const entry of entries) {
-        if (entry.validTo !== null && entry.validTo < entry.validFrom) {
-            throw new Error(
-                `Risk Indicator ${indicator.key.id}: parameter entry validTo (${entry.validTo}) is earlier than validFrom (${entry.validFrom})`,
-            );
-        }
-    }
-    for (let i = 0; i < entries.length - 1; i++) {
-        const current = entries[i];
-        const next = entries[i + 1];
-        if (current.validTo === null) {
-            throw new Error(
-                `Risk Indicator ${indicator.key.id}: parameter entry starting ${current.validFrom} is open-ended but is followed by another entry starting ${next.validFrom}`,
-            );
-        }
-        if (current.validTo !== next.validFrom) {
-            throw new Error(
-                `Risk Indicator ${indicator.key.id}: parameter entries have a gap or overlap between ${current.validTo} and ${next.validFrom}`,
-            );
-        }
-    }
-}
-
-export type RiskIndicatorRegistry = Readonly<{
-    require(key: RiskIndicatorKey): RiskIndicator<unknown>;
-    activeVersions(): readonly RiskIndicatorKey[];
-    // 'active' + 'shadow': what the run job actually evaluates and writes.
-    // Shadow versions are computed like any other — §10.3: "merging it as
-    // lifecycle: 'shadow' first keeps the version out of the read model
-    // until a later commit flips it to 'active'" implies the numbers exist,
-    // they're just excluded from the public read model (a web-layer
-    // concern, out of scope for this run job). 'draft' isn't ready to run
-    // yet; 'retired' has stopped producing new signals (§10.4).
-    evaluableVersions(): readonly RiskIndicatorKey[];
-    parametersAsOf(key: RiskIndicatorKey, dataAsOf: string): readonly ParameterEntry<unknown>[];
-    all(): readonly RiskIndicator<unknown>[];
-}>;
-
 /**
- * Validates a set of deployed Risk Indicator definitions and builds the
- * immutable, explicitly constructed in-process catalogue described in
- * risk-service-architecture.md §5.2. Throws on: duplicate (id, version)
- * keys, more than one active version per id, or a gapped/overlapping
- * parameter timeline.
+ * The immutable, explicitly constructed in-process catalogue of every
+ * deployed Risk Indicator version (risk-service-architecture.md §5.2). Keyed
+ * by (indicator_id, implementation_version); given that key the run job
+ * retrieves exactly one definition.
+ *
+ * Each indicator validates itself when it is constructed, so what is left for
+ * the registry is what only a *set* of indicators can be wrong about:
+ * duplicate keys and a second active version of the same indicator. Both
+ * throw here, at import time.
  */
-export function createRiskIndicatorRegistry(
-    indicators: readonly RiskIndicator<unknown>[],
-): RiskIndicatorRegistry {
-    const byKey = new Map<string, RiskIndicator<unknown>>();
-    const activeByIndicatorId = new Map<string, RiskIndicatorKey>();
+export class RiskIndicatorRegistry {
+    readonly #byKey = new Map<string, RiskIndicator<unknown>>();
+    readonly #activeById = new Map<string, RiskIndicator<unknown>>();
 
-    for (const indicator of indicators) {
+    constructor(indicators: readonly RiskIndicator<unknown>[]) {
+        for (const indicator of indicators) {
+            this.#add(indicator);
+        }
+    }
+
+    require(key: RiskIndicatorKey): RiskIndicator<unknown> {
+        const indicator = this.#byKey.get(keyString(key));
+        if (!indicator) {
+            throw new Error(`Unknown Risk Indicator: ${keyString(key)}`);
+        }
+        return indicator;
+    }
+
+    all(): readonly RiskIndicator<unknown>[] {
+        return [...this.#byKey.values()];
+    }
+
+    /** The one `active` version of each indicator — what the read model shows. */
+    active(): readonly RiskIndicator<unknown>[] {
+        return [...this.#activeById.values()];
+    }
+
+    /** `active` + `shadow`: what a run evaluates and writes (see RiskIndicator.isEvaluable). */
+    evaluable(): readonly RiskIndicator<unknown>[] {
+        return this.all().filter((indicator) => indicator.isEvaluable);
+    }
+
+    #add(indicator: RiskIndicator<unknown>): void {
         const ks = keyString(indicator.key);
-        if (byKey.has(ks)) {
+        if (this.#byKey.has(ks)) {
             throw new Error(`Duplicate Risk Indicator key: ${ks}`);
         }
-        byKey.set(ks, indicator);
+        this.#byKey.set(ks, indicator);
 
-        if (indicator.lifecycle === "active") {
-            const existingActive = activeByIndicatorId.get(indicator.key.id);
-            if (existingActive) {
-                throw new Error(
-                    `Risk Indicator ${indicator.key.id} has more than one active version: ${existingActive.version} and ${indicator.key.version}`,
-                );
-            }
-            activeByIndicatorId.set(indicator.key.id, indicator.key);
-        }
+        if (!indicator.isActive) return;
 
-        validateParameterTimeline(indicator);
-    }
-
-    return Object.freeze({
-        require(key: RiskIndicatorKey): RiskIndicator<unknown> {
-            const indicator = byKey.get(keyString(key));
-            if (!indicator) {
-                throw new Error(`Unknown Risk Indicator: ${keyString(key)}`);
-            }
-            return indicator;
-        },
-
-        activeVersions(): readonly RiskIndicatorKey[] {
-            return [...activeByIndicatorId.values()];
-        },
-
-        evaluableVersions(): readonly RiskIndicatorKey[] {
-            return indicators
-                .filter((indicator) => indicator.lifecycle === "active" || indicator.lifecycle === "shadow")
-                .map((indicator) => indicator.key);
-        },
-
-        parametersAsOf(key: RiskIndicatorKey, dataAsOf: string): readonly ParameterEntry<unknown>[] {
-            const indicator = this.require(key);
-            return indicator.parameters.filter(
-                (entry) => entry.validFrom <= dataAsOf && (entry.validTo === null || entry.validTo > dataAsOf),
+        const existingActive = this.#activeById.get(indicator.id);
+        if (existingActive) {
+            throw new Error(
+                `Risk Indicator ${indicator.id} has more than one active version: ${existingActive.version} and ${indicator.version}`,
             );
-        },
-
-        all(): readonly RiskIndicator<unknown>[] {
-            return [...byKey.values()];
-        },
-    });
+        }
+        this.#activeById.set(indicator.id, indicator);
+    }
 }

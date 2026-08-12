@@ -1,15 +1,16 @@
-import { defineRiskIndicator } from "../../contracts.ts";
+import { SqlRiskIndicator } from "../../sqlRiskIndicator.ts";
 import { ltCom01Parameters, ltCom01ParametersContract, type LtCom01Parameters } from "./parameters.ts";
 
 // LT-COM-01 — Single valid bid (Vienintelis tinkamas pasiūlymas).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
 // Shape: row-local arithmetic over one subject's own facts
-// (risk-service-architecture.md §5.3.1) — the { sqlFile } shorthand.
+// (risk-service-architecture.md §5.3.1) — one packaged SELECT, so the whole
+// definition is a SqlRiskIndicator and there is no calculate.ts.
 //
 // lifecycle: 'shadow' — the method-scope parameter is a v1 placeholder
 // pending review (see parameters.ts), so this version is committed but kept
 // out of the public read model until flipped to 'active' (§10.1).
-export const ltCom01v1 = defineRiskIndicator<LtCom01Parameters>(
+export const ltCom01v1 = new SqlRiskIndicator<LtCom01Parameters>(
     {
         key: { id: "LT-COM-01", version: 1 },
         lifecycle: "shadow",
@@ -20,7 +21,7 @@ export const ltCom01v1 = defineRiskIndicator<LtCom01Parameters>(
         requiredInputs: ["tiekejoKodas", "atmetimoPriezastis"],
         parameters: ltCom01Parameters,
         parameterContract: ltCom01ParametersContract,
-        calculation: { sqlFile: "./calculate.sql" },
+        sqlFile: "./calculate.sql",
         standard: {
             name: "OCP Red Flags in Public Procurement 2024",
             url: "https://www.open-contracting.org/wp-content/uploads/2024/12/OCP2024-RedFlagProcurement.pdf",

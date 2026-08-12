@@ -8,8 +8,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { riskDb } from "../../../../postgres/riskDb.js";
 import { ensurePublicTestSchema, truncateTestPublicTables } from "../../../../test/risk/testPublicDb.ts";
-import { createEvaluationContext } from "../../evaluationContext.ts";
-import { riskIndicatorRegistry } from "../../deployedIndicators.ts";
+import { PostgresRiskDataSource } from "../../riskDataSource.ts";
 import type { RiskObservationV1 } from "../../contracts.ts";
 import { ltCom01v1 } from "./definition.ts";
 import type { BidderFixture, ProcurementFixture } from "./fixtures.ts";
@@ -65,15 +64,13 @@ async function insertProcurement(fixture: ProcurementFixture): Promise<void> {
     }
 }
 
-async function runCalculation(subjects: readonly string[] | null = null): Promise<readonly RiskObservationV1[]> {
-    const parameters = riskIndicatorRegistry.parametersAsOf(ltCom01v1.key, DATA_AS_OF);
-    const ctx = createEvaluationContext(
-        async (sqlText, params) => (await riskDb.query(sqlText, params as unknown[])).rows,
-        { runId: 1, dataAsOf: DATA_AS_OF, parameters, subjects },
-    );
-    const rows = await ltCom01v1.calculation(ctx);
-    for (const row of rows) ltCom01v1.outputContract.validate(row);
-    return rows;
+// The same call the run job makes: the indicator resolves its own effective
+// parameters, calculates and validates. Only the data source differs — here
+// the local Docker Postgres instead of the real database.
+const testFacts = new PostgresRiskDataSource(riskDb);
+
+function runCalculation(subjects: readonly string[] | null = null): Promise<readonly RiskObservationV1[]> {
+    return ltCom01v1.evaluate({ runId: 1, dataAsOf: DATA_AS_OF, subjects }, testFacts);
 }
 
 function bySubjectKey(rows: readonly RiskObservationV1[], subjectKey: string) {
@@ -145,13 +142,13 @@ describe("LT-COM-01 calculate.sql", () => {
     });
 
     it("resolves the effective-dated parameter entry for a cutoff inside its range", () => {
-        const entries = riskIndicatorRegistry.parametersAsOf(ltCom01v1.key, "2026-06-01");
+        const entries = ltCom01v1.parametersAsOf("2026-06-01");
         expect(entries).toHaveLength(1);
         expect(entries[0].values).toEqual({ requireCompetitiveMethod: false });
     });
 
     it("resolves no parameter entry for a cutoff before the timeline starts", () => {
-        const entries = riskIndicatorRegistry.parametersAsOf(ltCom01v1.key, "2020-01-01");
+        const entries = ltCom01v1.parametersAsOf("2020-01-01");
         expect(entries).toHaveLength(0);
     });
 });
