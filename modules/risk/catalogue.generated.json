@@ -1,0 +1,38 @@
+[
+    {
+        "id": "LT-COM-01",
+        "version": 1,
+        "lifecycle": "shadow",
+        "stage": "award",
+        "subjectType": "lot",
+        "references": [
+            "OCP-R018",
+            "OLAF-CA02",
+            "OT-I01",
+            "STT-I03",
+            "VPT-I01"
+        ],
+        "standard": {
+            "name": "OCP Red Flags in Public Procurement 2024",
+            "url": "https://www.open-contracting.org/wp-content/uploads/2024/12/OCP2024-RedFlagProcurement.pdf"
+        },
+        "public": {
+            "titleLt": "Vienintelis tinkamas pasiūlymas",
+            "descriptionLt": "Pirkimo dalyje po pasiūlymų vertinimo liko tik vienas tinkamas (neatmestas) pasiūlymas.",
+            "formulaLt": "tinkamų pasiūlymų skaičius (po atmetimų) = 1",
+            "limitationLt": "Vienas tinkamas pasiūlymas gali būti paaiškinamas siaura rinka, specifiniu pirkimo objektu arba teisėtu vieno tiekėjo pirkimo būdu. Rodiklis nevertina, ar konkurencijos stoka buvo dirbtinai sukelta."
+        },
+        "parameters": [
+            {
+                "validFrom": "2026-01-01",
+                "validTo": null,
+                "scope": {},
+                "values": {
+                    "requireCompetitiveMethod": false
+                },
+                "source": "demonstration value pending review",
+                "note": "v1 placeholder — applies to every method until the competitive/direct split is confirmed."
+            }
+        ]
+    }
+]
