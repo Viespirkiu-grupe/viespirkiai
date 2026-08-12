@@ -14,6 +14,20 @@ export function isBotChallengePath(pathname: string): boolean {
   return protectedSearchPaths.has(normalizedPath);
 }
 
+/**
+ * Google crawler user agents (Googlebot, AdsBot, Google-InspectionTool ir kt.).
+ *
+ * Tikrinama tik pagal User-Agent — tai lengvai suklastojama, todėl iššūkis
+ * praleidžiamas nuosekliai su tuo, kad jis ir taip yra tik pigus filtras
+ * prieš JS nevykdančius botus, o ne saugumo priemonė.
+ */
+const googleCrawlerUserAgent = /(?:^|[\s(;])(?:Googlebot(?:-\w+)?|AdsBot-Google(?:-\w+)?|APIs-Google|Mediapartners-Google|FeedFetcher-Google|Google-InspectionTool|GoogleOther|Storebot-Google|Google-Safety)(?:[/\s;)]|$)/i;
+
+/** Whether the request comes from a Google crawler, which must see real HTML. */
+export function isGoogleCrawler(userAgent: string | null | undefined): boolean {
+  return !!userAgent && googleCrawlerUserAgent.test(userAgent);
+}
+
 /** A deliberately tiny JavaScript check for bots which do not execute JS. */
 export function botChallengeResponse(): Response {
   return new Response(`<!doctype html>
@@ -58,7 +72,7 @@ export function botChallengeResponse(): Response {
   </script>
 </body>
 </html>`, {
-    status: 418,
+    status: 200,
     headers: {
       'Cache-Control': 'private, no-store',
       'Content-Type': 'text/html; charset=utf-8',

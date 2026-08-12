@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { botChallengeResponse, isBotChallengePath } from '@/src/lib/botChallenge.ts';
+import { botChallengeResponse, isBotChallengePath, isGoogleCrawler } from '@/src/lib/botChallenge.ts';
 
 describe('bot cookie challenge', () => {
   it.each([
@@ -24,11 +24,37 @@ describe('bot cookie challenge', () => {
     expect(isBotChallengePath(pathname)).toBe(false);
   });
 
+  it.each([
+    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+    'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Safari/537.36',
+    'Googlebot-Image/1.0',
+    'Mozilla/5.0 (compatible; Google-InspectionTool/1.0)',
+    'AdsBot-Google (+http://www.google.com/adsbot.html)',
+    'Mozilla/5.0 (compatible; Storebot-Google/1.0)',
+  ])('recognises the Google crawler %s', (userAgent) => {
+    expect(isGoogleCrawler(userAgent)).toBe(true);
+  });
+
+  it.each([
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36',
+    'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+    'NotGooglebot/1.0',
+    'curl/8.5.0',
+    '',
+  ])('does not treat %s as a Google crawler', (userAgent) => {
+    expect(isGoogleCrawler(userAgent)).toBe(false);
+  });
+
+  it('treats a missing user agent as not a Google crawler', () => {
+    expect(isGoogleCrawler(null)).toBe(false);
+    expect(isGoogleCrawler(undefined)).toBe(false);
+  });
+
   it('returns a non-cacheable page which sets bot=no and reloads', async () => {
     const response = botChallengeResponse();
     const html = await response.text();
 
-    expect(response.status).toBe(418);
+    expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(html).toContain('document.cookie = "bot=no; Path=/; SameSite=Lax"');

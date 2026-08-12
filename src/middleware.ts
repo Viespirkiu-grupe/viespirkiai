@@ -1,6 +1,6 @@
 import { defineMiddleware } from 'astro:middleware';
 import config from './lib/config.ts';
-import { botChallengeResponse, isBotChallengePath } from './lib/botChallenge.ts';
+import { botChallengeResponse, isBotChallengePath, isGoogleCrawler } from './lib/botChallenge.ts';
 import { isAtn1Path } from './lib/featureRoutes.ts';
 import { hostFromHeaders, runWithRequestContext } from '@/utils/runtimeContext.js';
 
@@ -22,6 +22,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     && context.request.method === 'GET'
     && isBotChallengePath(context.url.pathname)
     && context.cookies.get('bot')?.value !== 'no'
+    && !isGoogleCrawler(context.request.headers.get('user-agent'))
   ) {
     return botChallengeResponse();
   }
