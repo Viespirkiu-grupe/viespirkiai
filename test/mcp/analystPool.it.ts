@@ -10,7 +10,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pkg from "pg";
 import type { PoolClient } from "pg";
 import config from "../../utils/config.js";
-import { VIEW_DEFINITIONS, VIEW_NAMES } from "../../modules/mcp/analyst/tempViews.js";
+import { VIEW_NAMES } from "../../modules/mcp/analyst/tempViews.js";
+import { ensureAnalystViews } from "../../modules/mcp/analyst/ensureViews.js";
 
 const { Pool } = pkg;
 
@@ -36,11 +37,10 @@ async function getClient() {
 }
 
 beforeAll(async () => {
-    const client = await getClient();
-    for (const definition of Object.values(VIEW_DEFINITIONS)) {
-        // @ts-ignore
-        await client.query(definition);
-    }
+    // Ta pati logika kaip produkcijoje: sukuria view'us, o jei rolė DDL teisių neturi
+    // (juos jau sukūrė admin), pasitikrina, kad esami view'ai nuskaitomi.
+    await ensureAnalystViews();
+    await getClient();
 });
 
 afterAll(async () => {
@@ -182,7 +182,7 @@ describe("v_pirkimas", () => {
 
         // @ts-ignore
         const { rows: sutartysRows } = await client.query(
-            `SELECT DISTINCT "perkanciosiosOrganizacijosKodas" FROM sutartys
+            `SELECT DISTINCT "perkanciosiosOrganizacijosKodas" FROM "vpmSutartys"
              WHERE "pirkimoNumeris" = $1 AND "perkanciosiosOrganizacijosKodas" IS NOT NULL`,
             [row.pirkimoId],
         );
@@ -196,7 +196,9 @@ describe("v_pirkimas", () => {
         const { rows } = await client.query(`
             SELECT count(*) AS cnt FROM v_pirkimas v
             WHERE v.saltinis = 'cvpp'
-              AND EXISTS (SELECT 1 FROM "viesiejiPirkimai" p WHERE p."pirkimoId" = v."pirkimoId")
+              -- v_pirkimas."pirkimoId" yra text (cvpis int ir cvpp eilutė suvienodinti),
+              -- tad lyginam taip pat, kaip pačiame view'e: p."pirkimoId"::text.
+              AND EXISTS (SELECT 1 FROM "viesiejiPirkimai" p WHERE p."pirkimoId"::text = v."pirkimoId")
         `);
         expect(Number(rows[0].cnt)).toBe(0);
     });
@@ -294,7 +296,7 @@ describe("pagination wrapper", () => {
         // @ts-ignore
         const { rows } = await client.query(`
             SELECT q.* FROM (
-                SELECT "sutartiesUnikalusId" FROM sutartys ORDER BY "sutartiesUnikalusId"
+                SELECT "sutartiesUnikalusId" FROM v_sutartys ORDER BY "sutartiesUnikalusId"
             ) AS q LIMIT 51 OFFSET 0
         `);
         expect(rows.length, "expected exactly 51 rows when table has >50 rows").toBe(51);
@@ -306,7 +308,7 @@ describe("pagination wrapper", () => {
 
     it("page 2 returns the next 50 rows", async () => {
         const client = await getClient();
-        const base = `SELECT "sutartiesUnikalusId" FROM sutartys ORDER BY "sutartiesUnikalusId"`;
+        const base = `SELECT "sutartiesUnikalusId" FROM v_sutartys ORDER BY "sutartiesUnikalusId"`;
         const [r1, r2] = await Promise.all([
             // @ts-ignore
             client.query(`SELECT q.* FROM (${base}) AS q LIMIT 51 OFFSET 0`),

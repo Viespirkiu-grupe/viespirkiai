@@ -205,9 +205,9 @@ describe("execute_query — column case auto-fix (integration)", () => {
         expect("tiekejoKodas" in payload.rows[0]).toBe(true);
     });
 
-    it("auto-fixes a raw table column (tiekejoKodas on sutartys)", async () => {
+    it("auto-fixes a raw table column (tiekejoKodas on cpvaProjektuSutartys)", async () => {
         const result = (await handler({
-            query: 'SELECT tiekejoKodas FROM sutartys WHERE tiekejoKodas IS NOT NULL LIMIT 1',
+            query: 'SELECT tiekejoKodas FROM "cpvaProjektuSutartys" WHERE tiekejoKodas IS NOT NULL LIMIT 1',
             purpose: "auto-fix integration: raw table column",
             page: 1,
         })) as AnyResult;

@@ -6,11 +6,10 @@ const { Parser } = pkg;
 const parser = new Parser();
 
 export const TABLE_WHITELIST: Set<string> = new Set([
-    "sutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
+    "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
     "jarAsmenys", "jar",
     "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai",
     "pinregJuridiniaiRysiai", "pinreg",
-    "failai",
     "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos", "sabisSaskaituSalys",
     "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
     "cpvaProjektuSutartys", "cpvaProjektuSarasas",

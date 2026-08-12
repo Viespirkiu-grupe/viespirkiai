@@ -523,27 +523,30 @@ GRANT USAGE ON SCHEMA public TO analyst;
 
 -- SELECT ant whitelistintų lentelių (iš validateSql.ts TABLE_WHITELIST)
 GRANT SELECT ON
-    sutartys, "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
-    "jarAsmenys", jar,
-    "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai",
-    "pinregJuridiniaiRysiai", pinreg,
-    failai,
-    "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos", "sabisSaskaituSalys",
-    "cpvaProjektuSutartys", "cpvaProjektuSarasas",
-    "cvppViesiejiPirkimai",
+    "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp", "jarAsmenys",
+    "jar", "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai", "pinregJuridiniaiRysiai",
+    "pinreg", "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos",
+    "sabisSaskaituSalys", "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
+    "cpvaProjektuSutartys", "cpvaProjektuSarasas", "cvppViesiejiPirkimai",
     "eiluciuSkaiciai", "bvpzKodai",
-    sodra, regitra,
+    "sodraMonthly", "sodraMonthlyEvrk", "sodraMonthlyImportai",
+    "sodraMonthlyPavadinimai", "sodraMonthlySavivaldybes",
+    "regitra", "regitraMatymai", "regitraAtnaujinimai",
     "nepatikimiTiekejai", "melagingiTiekejai",
-    jadis, "rcInformaciniaiLeidiniaiPranesimai",
-    domenai, kotis,
+    "jadis", "rcInformaciniaiLeidiniaiPranesimai",
+    "domenai", "kotis",
     "balansoAtaskaitos", "pelnoNuostoliuAtaskaitos",
     "darboVieta", "istatinisKapitalas",
-    "atn1ataskaitos", atn1dalyviai, "atn1pasiulymuEile", "atn1atmestiPasiulymai",
-    "neskelbiamosDerybos",
-    "vdiPazeidimai",
-    bylos, "bylosDalyviai",
-    mokesciai
+    "neskelbiamosDerybos", "vdiPazeidimai",
+    "teismoNuosprendziai", "teismoNuosprendziaiDalyviai", "mokesciai",
+    "atn1ataskaitos", "atn1dalyviai", "atn1sutartys",
+    "atn1pasiulymuEile", "atn1atmestiPasiulymai"
 TO analyst;
+
+-- v_* view'us sukuria ir SELECT teises jiems suteikia ensureViews.ts (admin pool'u).
+-- Jei programa jungiasi rolė BE DDL teisių, view'us reikia sukurti/atnaujinti admin'u
+-- rankiniu būdu (modules/mcp/analyst/views/*.sql) — ensureViews tada tik pasitikrina,
+-- kad esami view'ai nuskaitomi.
 
 -- Saugiklis: išjungti įrašymą net jei kažkas suteiks per error
 ALTER ROLE analyst SET default_transaction_read_only = on;

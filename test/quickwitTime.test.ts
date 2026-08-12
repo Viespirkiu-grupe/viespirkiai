@@ -11,7 +11,9 @@ describe("toRfc3339", () => {
     });
 
     it("handles fractional seconds", () => {
-        expect(toRfc3339("2026-07-07 10:11:12.345")).toBe("2026-07-07T07:11:12Z");
+        // Milisekundės paliekamos — Quickwit `datetime` jas priima, o `Date`
+        // atvejis irgi grąžina jas (`.000Z`), tad elgsena vienoda.
+        expect(toRfc3339("2026-07-07 10:11:12.345")).toBe("2026-07-07T07:11:12.345Z");
     });
 
     it("keeps date-only values as UTC midnight", () => {
