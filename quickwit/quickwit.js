@@ -293,7 +293,7 @@ export async function indexDoc(lentele, eilutesId, doc, opts) {
  * Per-row behaviour:
  *   - NEW eilutesId: INSERT into quickwitEilutes on the current shard.
  *   - EXISTING on a current shard: UPDATE quickwitEilutes (rotate quickwitIdInt
- *     in place). The old quickwitId/quickwitIdInt becomes a tombstone once the new doc
+ *     in place). The old quickwitIdInt becomes a tombstone once the new doc
  *     lands in Quickwit.
  *   - EXISTING on a non-current shard: migrate — UPDATE quickwitEilutes to
  *     point at the active current shard with a fresh quickwitIdInt.
@@ -408,8 +408,7 @@ export async function indexDocs(lentele, items, opts = {}) {
       const params = toUpdate.flatMap((id) => [id, quickwitIdIntByEilutesId.get(id)]);
       await client.query(
         `UPDATE "quickwitEilutes" AS qe
-         SET "quickwitId" = NULL,
-             "quickwitIdInt" = v."quickwitIdInt",
+         SET "quickwitIdInt" = v."quickwitIdInt",
              "indeksaiId" = $${params.length + 2}
          FROM (VALUES ${vals}) AS v("eilutesId", "quickwitIdInt")
          WHERE qe."lentelesId" = $${params.length + 1}
@@ -435,8 +434,7 @@ export async function indexDocs(lentele, items, opts = {}) {
          SELECT $${params.length + 1}, v."eilutesId", $${params.length + 2}, v."quickwitIdInt"
          FROM (VALUES ${vals}) AS v("eilutesId", "quickwitIdInt")
          ON CONFLICT ("lentelesId", "eilutesId") DO UPDATE
-           SET "quickwitId" = NULL,
-               "quickwitIdInt" = EXCLUDED."quickwitIdInt",
+           SET "quickwitIdInt" = EXCLUDED."quickwitIdInt",
                "indeksaiId" = EXCLUDED."indeksaiId"`,
         [...params, lentelesId, currentShard.id]
       );
@@ -491,9 +489,10 @@ export async function indexDocs(lentele, items, opts = {}) {
 // ── Staleness filter ─────────────────────────────────────────────────────────
 
 /**
- * Given Quickwit search hits, return only those whose quickwitId is still live
- * in Postgres. During the gradual migration, Quickwit stores both legacy UUIDs
- * and new integer ids as strings in the same quickwitId document field.
+ * Given Quickwit search hits, return only those whose id is still live in
+ * Postgres. The Quickwit document field is named quickwitId and holds the
+ * quickwitEilutes."quickwitIdInt" value as a string; anything that isn't a
+ * plain integer is a pre-migration document and counts as dead.
  *
  * @param {string} lentele
  * @param {{ quickwitId: string, [key: string]: any }[]} hits
@@ -503,34 +502,19 @@ export async function filterLive(lentele, hits) {
   const lentelesId = await getQuickwitTableId(lentele);
 
   const quickwitIdInts = [];
-  const quickwitIds = [];
   for (const hit of hits) {
     const id = String(hit.quickwitId);
     if (/^\d+$/.test(id)) quickwitIdInts.push(id);
-    else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-      quickwitIds.push(id);
-    }
   }
+  if (!quickwitIdInts.length) return [];
 
-  const live = new Set();
-  if (quickwitIdInts.length) {
-    const { rows } = await postgres.query(
-      `SELECT "quickwitIdInt"
-       FROM "quickwitEilutes"
-       WHERE "lentelesId" = $1 AND "quickwitIdInt" = ANY($2::int[])`,
-      [lentelesId, quickwitIdInts]
-    );
-    for (const row of rows) live.add(String(row.quickwitIdInt));
-  }
-  if (quickwitIds.length) {
-    const { rows } = await postgres.query(
-      `SELECT "quickwitId"
-       FROM "quickwitEilutes"
-       WHERE "lentelesId" = $1 AND "quickwitId" = ANY($2::uuid[])`,
-      [lentelesId, quickwitIds]
-    );
-    for (const row of rows) live.add(String(row.quickwitId));
-  }
+  const { rows } = await postgres.query(
+    `SELECT "quickwitIdInt"
+     FROM "quickwitEilutes"
+     WHERE "lentelesId" = $1 AND "quickwitIdInt" = ANY($2::int[])`,
+    [lentelesId, quickwitIdInts]
+  );
+  const live = new Set(rows.map((row) => String(row.quickwitIdInt)));
 
   return hits.filter((h) => live.has(String(h.quickwitId)));
 }
