@@ -174,6 +174,21 @@ export default {
     mcpQueryTimeout: 20,
 
     // ─────────────────────────────────────────────────────────────────────
+    // Procurement Risk Service — schema `risk` (žr. modules/risk/,
+    // services/procurement-risk/). Dev aplinkoje tai lokalus Docker Postgres
+    // (docker/risk/compose.yml), atskiras nuo pagrindinio pg* prisijungimo,
+    // kad evaluation run'ai niekada nerašytų į bendrą (public schema)
+    // duomenų bazę. `public` faktai skaitomi per pagrindinį pg* pool'ą.
+    // ─────────────────────────────────────────────────────────────────────
+
+    riskPgHost: "localhost",
+    riskPgPort: 15432,
+    riskPgUser: "risk_rw",
+    riskPgPassword: "risk_rw",
+    riskPgDatabase: "viespirkiai",
+    riskPgMaxConnections: 5,
+
+    // ─────────────────────────────────────────────────────────────────────
     // Spinta / Stalčius (atviri duomenys)
     // Eksportas į „spintos“ tipo API serverį. Žiūrėk modules/spinta/.
     // Palaikomi du serveriai (vienodas rašymo protokolas — NDJSON `_op`):

@@ -88,6 +88,14 @@ const configSchema = z.object({
     pgAnalystMaxConnections: z.number().int().positive().default(16),
     mcpQueryTimeout: z.number().positive().default(20),
 
+    // Procurement Risk Service — `risk` output schema
+    riskPgHost: z.string().default("localhost"),
+    riskPgPort: z.number().int().positive().default(15432),
+    riskPgUser: z.string().default("risk_rw"),
+    riskPgPassword: z.string().default("risk_rw"),
+    riskPgDatabase: z.string().default("viespirkiai"),
+    riskPgMaxConnections: z.number().int().positive().default(5),
+
     spintaServer: z.string().default(""),
     spintaApiKey: z.string().default(""),
     spintaClient: z.string().default(""),
