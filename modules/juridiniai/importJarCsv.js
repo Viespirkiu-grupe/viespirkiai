@@ -8,17 +8,21 @@
 import { createScraperFetch } from "../../utils/scrapeFetch.js";
 const scrapeFetch = createScraperFetch("juridiniai", { operation: "importJarCsv" });
 import readline from "node:readline";
-import { Readable } from "node:stream";
+import { Readable, Transform } from "node:stream";
+import { createHash, randomUUID } from "node:crypto";
+import { createReadStream, createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
 import { pathToFileURL } from "node:url";
 import { postgres } from "../../postgres/postgres.js";
 import { acquireSessionLock } from "../../postgres/sessionLock.js";
 import { log } from "../../utils/log.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const BASE = "https://www.registrucentras.lt/aduomenys/";
 const BATCH_SIZE = 1_000;
 const LOCK_KEY = "jar-rc-csv-import";
 
-const SOURCES = [
+export const SOURCES = [
     {
         name: "iregistruoti",
         file: "JAR_IREGISTRUOTI.csv",
@@ -74,74 +78,260 @@ const SOURCES = [
     },
 ];
 
-export async function importJarCsv() {
+export async function fetchJarMetadata(source) {
+    const response = await scrapeFetch(sourceUrl(source), {
+        method: "HEAD",
+        signal: AbortSignal.timeout(60_000),
+        headers: requestHeaders(),
+    });
+    if (!response.ok) {
+        if (response.status === 405 || response.status === 501) {
+            return { etag: null, lastModified: null, size: null };
+        }
+        throw new Error(`${source.file}: HEAD HTTP ${response.status}`);
+    }
+    return responseMetadata(response);
+}
+
+export async function downloadJarSource(source, path) {
+    const response = await scrapeFetch(sourceUrl(source), {
+        signal: AbortSignal.timeout(30 * 60_000),
+        headers: requestHeaders(),
+    });
+    if (!response.ok || !response.body) {
+        throw new Error(`${source.file}: HTTP ${response.status}`);
+    }
+    const hash = createHash("sha256");
+    const hasher = new Transform({
+        transform(chunk, _encoding, callback) {
+            hash.update(chunk);
+            callback(null, chunk);
+        },
+    });
+    await pipeline(Readable.fromWeb(response.body), hasher, createWriteStream(path));
+    return { sha256: hash.digest("hex"), ...responseMetadata(response) };
+}
+
+export async function importJarCsv({
+    sources = SOURCES,
+    beforeSource,
+    afterSource,
+    onSourceError,
+} = {}) {
     // Lock'as – atskiroje tiesioginėje jungtyje, nes jis gyvena visą importą,
     // per daugybę transakcijų (žr. postgres/sessionLock.js).
     const lock = await acquireSessionLock(LOCK_KEY);
     if (!lock) throw new Error("Kitas RC JAR CSV importas jau veikia");
 
     const client = await postgres.connect();
+    let changedTotal = 0;
     try {
-        for (const source of SOURCES) await importSource(client, source);
+        for (const source of sources) {
+            if (beforeSource && await beforeSource(source) === false) continue;
+            try {
+                const result = await importSource(client, source);
+                changedTotal += result.changed;
+                if (afterSource) await afterSource(source, result, client);
+            } catch (error) {
+                if (onSourceError) await onSourceError(source, error, client);
+                throw error;
+            }
+        }
+        changedTotal += await removeMissingPeople(client);
     } finally {
         client.release();
         await lock.release();
     }
+    if (changedTotal > 0) {
+        signalWork(WORK_SIGNALS.JURIDINIAI_REFRESH_READY, {
+            source: "jar-csv",
+            count: changedTotal,
+        });
+    }
+    return { changed: changedTotal };
 }
 
 async function importSource(client, source) {
-    const url = `${BASE}?byla=${encodeURIComponent(source.file)}`;
-    log(`JAR: siunčiama ${source.file}`);
-    const response = await scrapeFetch(url, {
-        signal: AbortSignal.timeout(30 * 60_000),
-        headers: {
-            accept: "text/csv, text/plain;q=0.9, */*;q=0.1",
-            "user-agent": "Mozilla/5.0 (compatible; viespirkiai.org JAR importer)",
-        },
-    });
-    if (!response.ok || !response.body) throw new Error(`${source.file}: HTTP ${response.status}`);
-
-    const lines = readline.createInterface({ input: Readable.fromWeb(response.body), crlfDelay: Infinity });
+    let lines;
+    let sourceSha256 = source.sha256 ?? null;
+    let metadata = source.downloadMetadata ?? {};
+    if (source.localPath) {
+        log(`JAR: importuojama ${source.file} iš laikino failo`);
+        lines = readline.createInterface({
+            input: createReadStream(source.localPath),
+            crlfDelay: Infinity,
+        });
+    } else {
+        const url = sourceUrl(source);
+        log(`JAR: siunčiama ${source.file}`);
+        const response = await scrapeFetch(url, {
+            signal: AbortSignal.timeout(30 * 60_000),
+            headers: requestHeaders(),
+        });
+        if (!response.ok || !response.body) {
+            throw new Error(`${source.file}: HTTP ${response.status}`);
+        }
+        const hash = createHash("sha256");
+        const hashingBody = response.body.pipeThrough(new TransformStream({
+            transform(chunk, controller) {
+                hash.update(chunk);
+                controller.enqueue(chunk);
+            },
+        }));
+        lines = readline.createInterface({
+            input: Readable.fromWeb(hashingBody),
+            crlfDelay: Infinity,
+        });
+        metadata = responseMetadata(response);
+        sourceSha256 = hash;
+    }
     let headerChecked = false;
     let batch = [];
     let scanned = 0;
     let changed = 0;
+    const tracksPeople = source.name === "iregistruoti" || source.name === "isregistruoti";
+    const importId = tracksPeople ? randomUUID() : null;
+    if (tracksPeople) {
+        await client.query(
+            `DELETE FROM public."jarCsvImportSeen"
+             WHERE "sukurta" < now() - interval '2 days'`,
+        );
+    }
 
     for await (const line of lines) {
+        let normalizedLine = line;
         if (!headerChecked) {
-            const header = parseCsvLine(line.replace(/^\uFEFF/, ""));
-            if (header.join("|") !== source.header.join("|")) {
-                throw new Error(`${source.file}: netikėta antraštė: ${header.join("|")}`);
-            }
+            normalizedLine = line.replace(/^\uFEFF/, "");
+            const firstFields = parseCsvLine(normalizedLine);
             headerChecked = true;
-            continue;
+            if (firstFields.join("|") === source.header.join("|")) continue;
+            log(`${source.file}: antraštės nėra, pradedama nuo pirmos duomenų eilutės`);
         }
-        if (!line.trim()) continue;
-        const fields = parseCsvLine(line).map(clean);
-        if (fields.length !== source.header.length) {
-            throw new Error(`${source.file}: ${scanned + 2} eilutėje ${fields.length}, tikėtasi ${source.header.length} laukų`);
-        }
-        const row = source.map(fields);
-        if (!row.jarKodas) throw new Error(`${source.file}: ${scanned + 2} eilutėje nėra JAR kodo`);
+        if (!normalizedLine.trim()) continue;
+        const row = parseSourceRow(normalizedLine, source, scanned + 1);
         batch.push(row);
         scanned++;
         if (batch.length >= BATCH_SIZE) {
-            changed += await writeBatch(client, source.write, batch);
+            changed += await writeBatch(client, source, batch, importId);
             batch = [];
             if (scanned % 10_000 === 0) log(`${source.name}: perskaityta ${scanned}, pakeista ${changed}`);
         }
     }
     if (!headerChecked) throw new Error(`${source.file}: tuščias atsakymas`);
-    if (batch.length) changed += await writeBatch(client, source.write, batch);
+    if (batch.length) changed += await writeBatch(client, source, batch, importId);
+    if (tracksPeople) await updatePeopleMembership(client, source, importId);
     log(`${source.name}: baigta, perskaityta ${scanned}, pakeista ${changed}`);
+    return {
+        scanned,
+        changed,
+        sha256: typeof sourceSha256 === "string"
+            ? sourceSha256
+            : sourceSha256.digest("hex"),
+        peopleMembershipChanged: tracksPeople,
+        ...metadata,
+    };
 }
 
-async function writeBatch(client, writer, rows) {
+export function parseSourceRow(line, source, lineNumber = 1) {
+    const fields = parseCsvLine(line).map(clean);
+    if (fields.length !== source.header.length) {
+        throw new Error(
+            `${source.file}: ${lineNumber} eilutėje ${fields.length}, ` +
+            `tikėtasi ${source.header.length} laukų`,
+        );
+    }
+    const row = source.map(fields);
+    if (!row.jarKodas) {
+        throw new Error(`${source.file}: ${lineNumber} eilutėje nėra JAR kodo`);
+    }
+    return row;
+}
+
+const sourceUrl = (source) => `${BASE}?byla=${encodeURIComponent(source.file)}`;
+
+function requestHeaders() {
+    return {
+        accept: "text/csv, text/plain;q=0.9, */*;q=0.1",
+        "user-agent": "Mozilla/5.0 (compatible; viespirkiai.org JAR importer)",
+    };
+}
+
+function responseMetadata(response) {
+    const rawSize = response.headers.get("content-length");
+    const size = rawSize == null ? null : Number(rawSize);
+    return {
+        etag: response.headers.get("etag"),
+        lastModified: response.headers.get("last-modified"),
+        size: Number.isSafeInteger(size) && size >= 0 ? size : null,
+    };
+}
+
+async function writeBatch(client, source, rows, importId) {
     await client.query("BEGIN");
     try {
-        const changed = await writer(client, rows);
+        const changed = await source.write(client, rows);
+        if (source.name === "iregistruoti" || source.name === "isregistruoti") {
+            await client.query(
+                `INSERT INTO public."jarCsvImportSeen" ("importoId", "jarKodas")
+                 SELECT $1::uuid, "jarKodas"
+                 FROM jsonb_to_recordset($2::jsonb) AS x("jarKodas" integer)
+                 ON CONFLICT DO NOTHING`,
+                [importId, JSON.stringify(rows)],
+            );
+        }
         await client.query("COMMIT");
         return changed;
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    }
+}
+
+async function updatePeopleMembership(client, source, importId) {
+    await client.query("BEGIN");
+    try {
+        await client.query(
+            `DELETE FROM public."jarCsvAsmenuSaltiniai" WHERE "failas" = $1`,
+            [source.file],
+        );
+        await client.query(
+            `INSERT INTO public."jarCsvAsmenuSaltiniai" ("failas", "jarKodas")
+             SELECT $1, "jarKodas"
+             FROM public."jarCsvImportSeen"
+             WHERE "importoId" = $2`,
+            [source.file, importId],
+        );
+        await client.query(
+            `DELETE FROM public."jarCsvImportSeen" WHERE "importoId" = $1`,
+            [importId],
+        );
+        await client.query("COMMIT");
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    }
+}
+
+async function removeMissingPeople(client) {
+    const files = ["JAR_IREGISTRUOTI.csv", "JAR_ISREGISTRUOTI.csv"];
+    await client.query("BEGIN");
+    try {
+        const removed = await client.query(
+            `DELETE FROM public."jarAsmenys" person
+             WHERE (
+                 SELECT count(DISTINCT "failas")
+                 FROM public."jarCsvAsmenuSaltiniai"
+                 WHERE "failas" = ANY($1::text[])
+             ) = 2
+               AND NOT EXISTS (
+                   SELECT 1 FROM public."jarCsvAsmenuSaltiniai" membership
+                   WHERE membership."jarKodas" = person."jarKodas"
+                     AND membership."failas" = ANY($1::text[])
+               )`,
+            [files],
+        );
+        await client.query("COMMIT");
+        return removed.rowCount;
     } catch (error) {
         await client.query("ROLLBACK");
         throw error;

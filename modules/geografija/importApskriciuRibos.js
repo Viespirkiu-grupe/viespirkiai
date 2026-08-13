@@ -5,6 +5,8 @@ import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import { getArDataSources } from "./adresuRegistrasDataSources.js";
 import proj4 from "proj4";
+import { enqueueAddressLinkedJuridiniai } from "../juridiniai/enqueueRefresh.js";
+import { syncJuridiniaiDictionaries } from "../juridiniai/syncDictionaries.js";
 
 const lks94 =
     "+proj=tmerc +lat_0=0 +lon_0=24 +k=0.9998 +x_0=500000 +y_0=0 +ellps=GRS80 +units=m +no_defs";
@@ -38,6 +40,9 @@ async function updateApskritys() {
             [APS_KODAS, APS_PAV, APS_PLOTAS, JSON.stringify(geojson)],
         );
     }
+
+    await syncJuridiniaiDictionaries(postgres, "apskriciu-ribos-dictionaries");
+    await enqueueAddressLinkedJuridiniai(postgres, "apskriciu-ribos");
 
     logger.log("Atnaujintos apskričių ribos");
     return true;

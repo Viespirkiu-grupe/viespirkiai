@@ -14,6 +14,7 @@ import streamJson from "stream-json";
 import streamJsonArray from "stream-json/streamers/StreamArray.js";
 import streamChain from "stream-chain";
 import streamJsonPick from "stream-json/filters/Pick.js";
+import { enqueueAddressLinkedJuridiniai } from "../juridiniai/enqueueRefresh.js";
 
 const { parser } = streamJson;
 const { streamArray } = streamJsonArray;
@@ -115,6 +116,8 @@ async function updateAdresai() {
     });
 
     await unlink(TMP_JSON);
+
+    await enqueueAddressLinkedJuridiniai(postgres, "adresu-registras");
 
     logger.log("Atnaujinti adresų taškai");
     return true;

@@ -33,6 +33,8 @@ import { log } from "../../utils/log.js";
 import { parseArgs } from "../../utils/cliArgs.js";
 import { isarchyvuotiPirmaIrasa } from "../../utils/isarchyvuotiZip.js";
 import { importuotiSodrosCsv } from "./importSodra.js";
+import { syncJuridiniaiDictionaries } from "../juridiniai/syncDictionaries.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // tmp/ yra gitignore'intas (`tmp/*`).
@@ -306,6 +308,11 @@ export async function atnaujintiSodrosDuomenis({ force = false, metai } = {}) {
 
     if (klaidos.length) {
         throw new Error(`Nepavyko atnaujinti Sodros duomenų — ${klaidos.join("; ")}`);
+    }
+
+    if (rezultatai.some((result) => result.busena === "importuota")) {
+        await syncJuridiniaiDictionaries(postgres, "sodra-dictionaries");
+        signalWork(WORK_SIGNALS.JURIDINIAI_REFRESH_READY, { source: "sodra" });
     }
 
     return rezultatai;

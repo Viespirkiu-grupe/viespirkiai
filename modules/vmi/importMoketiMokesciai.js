@@ -114,6 +114,13 @@ async function insertBatch(rows) {
             menuo = EXCLUDED.menuo,
             suma = EXCLUDED.suma,
             "duomenuData" = EXCLUDED."duomenuData"
+        WHERE ROW(
+            mokesciai."jarKodas", mokesciai.metai, mokesciai.menuo,
+            mokesciai.suma, mokesciai."duomenuData"
+        ) IS DISTINCT FROM ROW(
+            EXCLUDED."jarKodas", EXCLUDED.metai, EXCLUDED.menuo,
+            EXCLUDED.suma, EXCLUDED."duomenuData"
+        )
     `;
 
     try {

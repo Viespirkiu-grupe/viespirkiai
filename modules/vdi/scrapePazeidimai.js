@@ -3,6 +3,7 @@ const scrapeFetch = createScraperFetch("vdi", { operation: "scrapePazeidimai" })
 import { parseHTML } from "linkedom";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const BASE_URL = "https://www.vdi.lt/Forms/ATPK_imones_2024.aspx";
 
@@ -111,7 +112,7 @@ async function fetchPage(pageIndex, formFields) {
     return res.text();
 }
 
-async function insertChunk(rows) {
+async function insertChunk(rows, db = postgres) {
     const cols = [
         "jarKodas",
         "jarTipas",
@@ -130,7 +131,7 @@ async function insertChunk(rows) {
     });
 
     const colList = cols.map((c) => `"${c}"`).join(", ");
-    await postgres.query(
+    await db.query(
         `INSERT INTO "vdiPazeidimai" (${colList}) VALUES ${values.join(", ")}`,
         params,
     );
@@ -170,10 +171,56 @@ export async function updateVdiPazeidimai() {
         `${allRecords.length} records scraped, ${filtered.length} after filter`,
     );
 
-    await postgres.query(`TRUNCATE TABLE "vdiPazeidimai"`);
+    const client = await postgres.connect();
+    let changed = 0;
+    try {
+        await client.query("BEGIN");
+        await client.query(
+            `CREATE TEMP TABLE old_vdi_counts ON COMMIT DROP AS
+             SELECT "jarKodas", count(*)::bigint AS count
+             FROM "vdiPazeidimai" GROUP BY "jarKodas"`,
+        );
+        await client.query(`TRUNCATE TABLE "vdiPazeidimai"`);
 
-    for (let offset = 0; offset < filtered.length; offset += CHUNK_SIZE) {
-        await insertChunk(filtered.slice(offset, offset + CHUNK_SIZE));
+        for (let offset = 0; offset < filtered.length; offset += CHUNK_SIZE) {
+            await insertChunk(filtered.slice(offset, offset + CHUNK_SIZE), client);
+        }
+        const queued = await client.query(
+            `WITH current_counts AS MATERIALIZED (
+                SELECT "jarKodas", count(*)::bigint AS count
+                FROM "vdiPazeidimai" GROUP BY "jarKodas"
+             ), changed AS MATERIALIZED (
+                SELECT COALESCE(old."jarKodas", current."jarKodas") AS "jarKodas"
+                FROM old_vdi_counts old
+                FULL JOIN current_counts current USING ("jarKodas")
+                WHERE old.count IS DISTINCT FROM current.count
+             )
+             INSERT INTO public."juridiniaiRefreshQueue" ("jarKodas", "saltiniai")
+             SELECT "jarKodas"::integer, ARRAY['vdi']
+             FROM changed WHERE "jarKodas" ~ '^[0-9]{9}$'
+             ON CONFLICT ("jarKodas") DO UPDATE SET
+                "saltiniai" = ARRAY(
+                    SELECT DISTINCT value FROM unnest(
+                        public."juridiniaiRefreshQueue"."saltiniai" ||
+                        EXCLUDED."saltiniai"
+                    ) value ORDER BY value
+                ),
+                "atnaujinta" = now()`,
+        );
+        changed = queued.rowCount;
+        await client.query("COMMIT");
+    } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw error;
+    } finally {
+        client.release();
+    }
+
+    if (changed > 0) {
+        signalWork(WORK_SIGNALS.JURIDINIAI_REFRESH_READY, {
+            source: "vdi",
+            count: changed,
+        });
     }
 
     log(`done`);
