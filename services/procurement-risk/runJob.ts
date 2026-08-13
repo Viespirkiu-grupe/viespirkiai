@@ -1,9 +1,8 @@
 import { postgres } from "../../postgres/postgres.js";
 import { riskDb } from "../../postgres/riskDb.js";
 import { log } from "../../utils/log.js";
-import { createEvaluationContext } from "../../modules/risk/evaluationContext.ts";
+import { PostgresRiskDataSource } from "../../modules/risk/riskDataSource.ts";
 import { riskIndicatorRegistry } from "../../modules/risk/deployedIndicators.ts";
-import { validateObservations } from "./validate.ts";
 import { writeObservations } from "./write.ts";
 
 export type RunJobOptions = Readonly<{
@@ -66,28 +65,23 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
 
     const dataAsOf = new Date().toISOString();
     const runId = await openRun(dataAsOf, options.codeCommit);
-    const subjects = options.subjects ?? null;
+    const run = { runId, dataAsOf, subjects: options.subjects ?? null };
+    // Calculations read the real database's `public` canonical facts; only
+    // the Risk Signals Writer touches `riskDb`.
+    const canonicalFacts = new PostgresRiskDataSource(postgres);
     const statistics: Record<string, unknown> = {};
     let anyFailed = false;
 
-    for (const key of riskIndicatorRegistry.evaluableVersions()) {
-        const indicator = riskIndicatorRegistry.require(key);
+    for (const indicator of riskIndicatorRegistry.evaluable()) {
         const startedAt = Date.now();
         try {
-            const parameters = riskIndicatorRegistry.parametersAsOf(key, dataAsOf);
-            const ctx = createEvaluationContext(
-                async (sqlText, params) => (await postgres.query(sqlText, params as unknown[])).rows,
-                { runId, dataAsOf, parameters, subjects },
-            );
-
-            const rawObservations = await indicator.calculation(ctx);
-            const observations = validateObservations(indicator, rawObservations);
+            const observations = await indicator.evaluate(run, canonicalFacts);
 
             const client = await riskDb.connect();
             let writeStats;
             try {
                 await client.query("BEGIN");
-                writeStats = await writeObservations(client, key.id, runId, observations);
+                writeStats = await writeObservations(client, indicator.id, runId, observations);
                 await client.query("COMMIT");
             } catch (err) {
                 await client.query("ROLLBACK");
@@ -96,18 +90,18 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
                 client.release();
             }
 
-            statistics[key.id] = {
+            statistics[indicator.id] = {
                 rows: observations.length,
                 triggered: observations.filter((o) => o.state === "triggered").length,
                 ...writeStats,
                 ms: Date.now() - startedAt,
             };
-            log(`procurement-risk: ${key.id} — ${observations.length} rows, ${Date.now() - startedAt}ms`);
+            log(`procurement-risk: ${indicator.id} — ${observations.length} rows, ${Date.now() - startedAt}ms`);
         } catch (err) {
             anyFailed = true;
             const message = err instanceof Error ? err.message : String(err);
-            statistics[key.id] = { error: message, ms: Date.now() - startedAt };
-            log(`procurement-risk: ${key.id} failed: ${message}`);
+            statistics[indicator.id] = { error: message, ms: Date.now() - startedAt };
+            log(`procurement-risk: ${indicator.id} failed: ${message}`);
         }
     }
 
