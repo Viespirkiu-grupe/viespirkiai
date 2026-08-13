@@ -5,8 +5,8 @@ import { z } from "zod";
 //
 // This file holds values only — the vocabulary every other risk module
 // speaks. The behaviour that uses them lives with the object that owns it:
-// riskIndicator.ts (one indicator version), sqlRiskIndicator.ts (the packaged
-// SELECT case), evaluationContext.ts (what one run evaluates),
+// riskIndicator.ts (one indicator version), rowLocalSqlIndicator.ts (the
+// collect-then-judge case), evaluationContext.ts (what one run evaluates),
 // riskDataSource.ts (how a calculation reaches the database).
 
 export type IndicatorLifecycle = "draft" | "shadow" | "active" | "retired";
@@ -58,16 +58,57 @@ export type RiskObservationV1 = z.infer<typeof riskObservationV1Schema>;
 
 export const riskObservationV1Contract: RuntimeContract<RiskObservationV1> = zodContract(riskObservationV1Schema);
 
+// Which subjects an entry's values apply to. An absent dimension admits
+// everything; a present one is a whitelist. Entries valid at the same time
+// must have pairwise disjoint scopes, which is what makes resolution yield at
+// most one entry per subject (risk-service-architecture.md §5.3.2).
+export type ParameterScope = Readonly<{
+    methods?: readonly string[];
+    objectTypes?: readonly string[];
+}>;
+
 // One effective-dated entry of a parameter timeline. Appending an entry is
 // the way a threshold changes; entries are immutable once merged.
 export type ParameterEntry<P> = Readonly<{
     validFrom: string;
     validTo: string | null;
-    scope: Readonly<{
-        methods?: readonly string[];
-        objectTypes?: readonly string[];
-    }>;
+    scope: ParameterScope;
     values: P;
     source: string;
     note?: string;
+}>;
+
+// The columns every collect.sql returns, whatever else it measures — the half
+// of an observation that is identical for all 106 indicators. The shared
+// machinery fills those fields in, so no verdict() ever mentions them
+// (risk-service-architecture.md §5.4).
+export type SubjectFacts = Readonly<{
+    subjectKey: string;
+    procurementSource: string | null;
+    procurementId: string | null;
+    // Read only by the shared scope test, and only when a parameter entry
+    // narrows the corresponding dimension.
+    method?: string | null;
+    objectType?: string | null;
+}>;
+
+export const subjectFactsSchema = z.looseObject({
+    subjectKey: z.string().min(1),
+    procurementSource: z.string().nullable(),
+    procurementId: z.string().nullable(),
+    method: z.string().nullish(),
+    objectType: z.string().nullish(),
+});
+
+export const subjectFactsContract: RuntimeContract<SubjectFacts> = zodContract(subjectFactsSchema);
+
+// The half of an observation a verdict decides: the state, and the values
+// that explain it. Everything omitted here is assembled from the definition,
+// the resolved parameter entry and the run cutoff.
+export type Verdict = Readonly<{
+    state: IndicatorState;
+    rawValue?: Readonly<Record<string, unknown>> | null;
+    threshold?: Readonly<Record<string, unknown>> | null;
+    evidence?: Readonly<Record<string, unknown>>;
+    missingData?: readonly string[];
 }>;

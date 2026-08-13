@@ -6,9 +6,11 @@ import {
     type RiskIndicatorKey,
     type RiskObservationV1,
     type RuntimeContract,
+    type SubjectFacts,
     type SubjectType,
 } from "./contracts.ts";
 import { EvaluationContext, type EvaluationRun } from "./evaluationContext.ts";
+import { describeScope, scopeAdmits, scopeKey, scopesAreDisjoint } from "./parameterScope.ts";
 import type { RiskDataSource } from "./riskDataSource.ts";
 
 // One deployed Risk Indicator version, as an object that knows how to check
@@ -17,10 +19,19 @@ import type { RiskDataSource } from "./riskDataSource.ts";
 //
 // The base class owns everything every indicator shares; the one thing that
 // differs between indicators — how the observations are produced — is the
-// abstract `calculate`. The common "one packaged SELECT" case is
-// SqlRiskIndicator; an indicator with an internal shape subclasses this
-// directly in its own directory (the doc's `calculate.ts` case) and is free
-// to run several packaged statements and assemble the rows itself.
+// abstract `calculate`. The common "collect facts in SQL, judge them in
+// TypeScript" case is RowLocalSqlIndicator; an indicator whose collection step
+// cannot produce one row per subject subclasses this directly in its own
+// directory (the doc's `calculate.ts` case) and is free to run several
+// packaged statements and assemble the rows itself.
+
+// Half-open validity ranges [validFrom, validTo), where a null validTo is
+// "still in force".
+function overlapInTime(a: ParameterEntry<unknown>, b: ParameterEntry<unknown>): boolean {
+    const aEndsAfterBStarts = a.validTo === null || a.validTo > b.validFrom;
+    const bEndsAfterAStarts = b.validTo === null || b.validTo > a.validFrom;
+    return aEndsAfterBStarts && bEndsAfterAStarts;
+}
 
 export type RiskIndicatorStandard = Readonly<{
     name: string;
@@ -119,11 +130,24 @@ export abstract class RiskIndicator<P = unknown> {
         return `${this.key.id}/${this.key.version}`;
     }
 
-    /** The parameter entries in force at a cutoff — the run's `$3`. */
+    /** The parameter entries in force at a cutoff, across all scopes. */
     parametersAsOf(dataAsOf: string): readonly ParameterEntry<P>[] {
         return this.parameters.filter(
             (entry) => entry.validFrom <= dataAsOf && (entry.validTo === null || entry.validTo > dataAsOf),
         );
+    }
+
+    /**
+     * The one entry that decides a subject at a cutoff: in force by date, and
+     * scoped to admit these facts (§5.3.2). `null` means no reviewed threshold
+     * covers this subject, which the caller reports as `not_applicable` —
+     * never as a verdict computed without parameters.
+     *
+     * The result is unambiguous because `assertParameterTimeline` rejects
+     * concurrently valid entries with overlapping scopes at startup.
+     */
+    parameterEntryFor(dataAsOf: string, facts: SubjectFacts): ParameterEntry<P> | null {
+        return this.parametersAsOf(dataAsOf).find((entry) => scopeAdmits(entry.scope, facts)) ?? null;
     }
 
     /**
@@ -199,9 +223,14 @@ export abstract class RiskIndicator<P = unknown> {
         }
     }
 
-    // The timeline is append-only and contiguous: every cutoff resolves to at
-    // most one entry, so a gap, an overlap or a backwards range is a
-    // definition bug (§10.2).
+    /**
+     * The timeline is append-only, contiguous *within a scope*, and
+     * unambiguous *across scopes* (§10.2, §5.3.2). One indicator version may
+     * carry a different threshold per procedure type — that is several
+     * entries valid at once, distinguished by `scope` — so contiguity is
+     * checked per scope, and what makes resolution deterministic is instead
+     * that concurrently valid scopes never admit the same subject.
+     */
     private assertParameterTimeline(): void {
         const entries = [...this.parameters].sort((a, b) => a.validFrom.localeCompare(b.validFrom));
 
@@ -214,17 +243,48 @@ export abstract class RiskIndicator<P = unknown> {
             }
         }
 
-        for (let i = 0; i < entries.length - 1; i++) {
-            const current = entries[i];
-            const next = entries[i + 1];
-            if (current.validTo === null) {
-                throw new Error(
-                    `Risk Indicator ${this.key.id}: parameter entry starting ${current.validFrom} is open-ended but is followed by another entry starting ${next.validFrom}`,
-                );
+        this.assertContiguousWithinScope(entries);
+        this.assertDisjointWhereConcurrent(entries);
+    }
+
+    private assertContiguousWithinScope(sortedEntries: readonly ParameterEntry<P>[]): void {
+        const byScope = new Map<string, ParameterEntry<P>[]>();
+        for (const entry of sortedEntries) {
+            const key = scopeKey(entry.scope);
+            byScope.set(key, [...(byScope.get(key) ?? []), entry]);
+        }
+
+        for (const group of byScope.values()) {
+            for (let i = 0; i < group.length - 1; i++) {
+                const current = group[i];
+                const next = group[i + 1];
+                const scope = describeScope(current.scope);
+
+                if (current.validTo === null) {
+                    throw new Error(
+                        `Risk Indicator ${this.key.id}: parameter entry starting ${current.validFrom} (${scope}) is open-ended but is followed by another entry starting ${next.validFrom}`,
+                    );
+                }
+                if (current.validTo !== next.validFrom) {
+                    throw new Error(
+                        `Risk Indicator ${this.key.id}: parameter entries for ${scope} have a gap or overlap between ${current.validTo} and ${next.validFrom}`,
+                    );
+                }
             }
-            if (current.validTo !== next.validFrom) {
+        }
+    }
+
+    private assertDisjointWhereConcurrent(sortedEntries: readonly ParameterEntry<P>[]): void {
+        for (let i = 0; i < sortedEntries.length; i++) {
+            for (let j = i + 1; j < sortedEntries.length; j++) {
+                const a = sortedEntries[i];
+                const b = sortedEntries[j];
+                if (scopeKey(a.scope) === scopeKey(b.scope)) continue; // handled as one timeline
+                if (!overlapInTime(a, b)) continue;
+                if (scopesAreDisjoint(a.scope, b.scope)) continue;
+
                 throw new Error(
-                    `Risk Indicator ${this.key.id}: parameter entries have a gap or overlap between ${current.validTo} and ${next.validFrom}`,
+                    `Risk Indicator ${this.key.id}: parameter entries starting ${a.validFrom} (${describeScope(a.scope)}) and ${b.validFrom} (${describeScope(b.scope)}) are valid at the same time with overlapping scopes, so a subject could match both`,
                 );
             }
         }

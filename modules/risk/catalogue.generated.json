@@ -19,7 +19,7 @@
         "public": {
             "titleLt": "Vienintelis tinkamas pasiūlymas",
             "descriptionLt": "Pirkimo dalyje po pasiūlymų vertinimo liko tik vienas tinkamas (neatmestas) pasiūlymas.",
-            "formulaLt": "tinkamų pasiūlymų skaičius (po atmetimų) = 1",
+            "formulaLt": "tinkamų pasiūlymų skaičius (po atmetimų) ≤ taikoma riba",
             "limitationLt": "Vienas tinkamas pasiūlymas gali būti paaiškinamas siaura rinka, specifiniu pirkimo objektu arba teisėtu vieno tiekėjo pirkimo būdu. Rodiklis nevertina, ar konkurencijos stoka buvo dirbtinai sukelta."
         },
         "parameters": [
@@ -28,7 +28,7 @@
                 "validTo": null,
                 "scope": {},
                 "values": {
-                    "requireCompetitiveMethod": false
+                    "maximumValidBids": 1
                 },
                 "source": "demonstration value pending review",
                 "note": "v1 placeholder — applies to every method until the competitive/direct split is confirmed."
