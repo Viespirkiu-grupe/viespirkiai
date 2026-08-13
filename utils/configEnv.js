@@ -64,6 +64,9 @@ const ENV_MAP = [
     ["ETAR_RECENT_DAYS", "eTarRecentDays", "number"],
     ["ETAR_REFRESH_HOURS", "eTarRefreshHours", "number"],
     ["ETAR_MAX_INFLIGHT", "eTarMaxInflight", "number"],
+    ["ESEIMAS_RECENT_DAYS", "eSeimasRecentDays", "number"],
+    ["ESEIMAS_REFRESH_HOURS", "eSeimasRefreshHours", "number"],
+    ["ESEIMAS_MAX_INFLIGHT", "eSeimasMaxInflight", "number"],
 
     ["INTERNAL_FILE_BASE", "internalFileBase", "string"],
     ["OCR_BANDYMAI", "ocrBandymai", "number"],

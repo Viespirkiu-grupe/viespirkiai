@@ -10,6 +10,7 @@ export const WORK_SIGNALS = Object.freeze({
     FILES_OCR_READY: `${PREFIX}.files.ocr.ready`,
     ETAR_DOCUMENTS_READY: `${PREFIX}.etar.documents.ready`,
     ETAR_SCRAPE_READY: `${PREFIX}.etar.scrape.ready`,
+    ESEIMAS_SCRAPE_READY: `${PREFIX}.eseimas.scrape.ready`,
     DOCUMENTS_INDEX_READY: `${PREFIX}.documents.index.ready`,
     DOMENAI_ADP_READY: `${PREFIX}.domenai.adp.ready`,
     JURIDINIAI_INDEX_READY: `${PREFIX}.juridiniai.index.ready`,

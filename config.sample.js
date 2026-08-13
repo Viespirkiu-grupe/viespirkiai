@@ -116,6 +116,10 @@ export default {
     eTarRefreshHours: 3,
     // Bendras document/editions/asr/historical API srauto limitas.
     eTarMaxInflight: 6,
+    // e-Seimas route'ai yra tame pačiame adapteryje, bet scraperis atskiras.
+    eSeimasRecentDays: 180,
+    eSeimasRefreshHours: 3,
+    eSeimasMaxInflight: 6,
 
     // ─────────────────────────────────────────────────────────────────────
     // Failai ir OCR
@@ -138,6 +142,7 @@ export default {
     //     <sidecarDir>/ocrRezultatai.sqlite   OCR rezultatai
     //     <sidecarDir>/liteko2.sqlite         LITEKO2 sprendimai
     //     <sidecarDir>/eTar.sqlite            e-TAR API atsakymai
+    //     <sidecarDir>/eSeimas.sqlite         e-Seimo API atsakymai
     //
     // Turinys suspaustas zstd. `sidecarDir` privalomas kiekvienam procesui,
     // kuris rašo sidecar'us; be jo write baigiasi klaida.

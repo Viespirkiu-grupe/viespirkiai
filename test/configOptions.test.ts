@@ -39,6 +39,24 @@ describe('external source URLs', () => {
   });
 });
 
+describe('e-Seimas scraper options', () => {
+  it('reads independent scheduling limits while sharing the e-TAR adapter address', () => {
+    const config = normalizeConfig(configFromEnv({
+      ETAR_API_URL: 'http://adapter.test',
+      ETAR_API_KEY: 'secret',
+      ESEIMAS_RECENT_DAYS: '90',
+      ESEIMAS_REFRESH_HOURS: '4',
+      ESEIMAS_MAX_INFLIGHT: '3',
+    }));
+
+    expect(config.eTarApiUrl).toBe('http://adapter.test');
+    expect(config.eTarApiKey).toBe('secret');
+    expect(config.eSeimasRecentDays).toBe(90);
+    expect(config.eSeimasRefreshHours).toBe(4);
+    expect(config.eSeimasMaxInflight).toBe(3);
+  });
+});
+
 describe('SQLite sidecar locations', () => {
   it('reads the one sidecar directory and remote base from the environment', () => {
     const config = normalizeConfig(configFromEnv({

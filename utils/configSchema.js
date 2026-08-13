@@ -74,6 +74,10 @@ const configSchema = z.object({
     eTarRecentDays: z.number().int().positive().default(180),
     eTarRefreshHours: z.number().positive().default(3),
     eTarMaxInflight: z.number().int().positive().default(6),
+    // e-Seimas naudoja tą patį adapterio URL/raktą, bet turi atskirą darbo tempą.
+    eSeimasRecentDays: z.number().int().positive().default(180),
+    eSeimasRefreshHours: z.number().positive().default(3),
+    eSeimasMaxInflight: z.number().int().positive().default(6),
 
     internalFileBase: z.string().default("https://failai.viespirkiai.org"),
     ocrBandymai: z.number().int().positive().default(5),

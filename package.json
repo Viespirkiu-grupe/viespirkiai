@@ -32,6 +32,7 @@
         "liteko2:klasifikatoriai": "node modules/liteko2/klasifikatoriai.js",
         "liteko2:scrape": "node modules/liteko2/scrape.js",
         "liteko2:turinys": "node modules/liteko2/scrapeContent.js",
+        "eseimas:scrape": "node modules/eSeimas/eSeimasScrape.js",
         "etar:dokumentai:backfill": "node modules/eTar/backfillDokumentai.js",
         "etar:dokumentai:audit": "node modules/eTar/backfillDokumentai.js --audit",
         "etar:dokumentai:process": "node modules/dokumentai/processETarDocumentsQueue.js",

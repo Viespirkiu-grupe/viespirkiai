@@ -31,6 +31,8 @@ export const SIDECAR_DBS = {
     liteko2: { table: "liteko2", keyColumn: "hash" },
     // eTar rašomas ne per createSidecarStore, o tiesiai (modules/eTar/eTarSidecar.js).
     eTar: { table: "eTarAtsakymai", keyColumn: "md5" },
+    // Atskiras failas, kad e-TAR ir e-Seimo rašytojai nekonkuruotų dėl vieno WAL.
+    eSeimas: { table: "eSeimasAtsakymai", keyColumn: "md5" },
 };
 
 /** Ar toks sidecar'as apskritai egzistuoja (route'ų validacijai). */

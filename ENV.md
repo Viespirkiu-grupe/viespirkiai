@@ -385,6 +385,25 @@ adresuojamas `md5` (žr. `modules/eTar/README.md`).
 Prieš pirmą naujų TaskRunner e-TAR darbų paleidimą reikia rankiniu būdu
 pritaikyti `modules/eTar/taskRunnerQueue.sql`. TaskRunner pats DB schemos nekeičia.
 
+### e-Seimas (`modules/eSeimas`)
+
+e-Seimo scraperis naudoja to paties stateless adapterio `/v1/seimas/legal-acts`
+route'us, tačiau turi visiškai atskiras PostgreSQL `eSeimas*` lenteles ir
+`<SIDECAR_DIR>/eSeimas.sqlite`. Paieška tik atranda aktus; originalai, aktualios
+ir istorinės suvestinės normalizuojamos vėlesniuose etapuose.
+
+| Kintamasis | Numatyta | Paaiškinimas |
+| --- | --- | --- |
+| `ESEIMAS_RECENT_DAYS` | `180` | Periodiškai tikrinamas naujausių priėmimo dienų langas. |
+| `ESEIMAS_REFRESH_HOURS` | `3` | Po kiek valandų diena vėl tikrinama. |
+| `ESEIMAS_MAX_INFLIGHT` | `6` | Atskiras e-Seimo scraperio lygiagretumo limitas. |
+
+Adapterio adresui ir Bearer raktui naudojami `ETAR_API_URL` bei
+`ETAR_API_KEY`. Prieš pirmą paleidimą rankiniu būdu taikomas
+`modules/eSeimas/schema.sql`; naujam `metadata.profile` kontraktui po jo taikomas
+`modules/eSeimas/schema2.sql`. TaskRunner schemos pats nekeičia. FE ir dokumentų
+indeksavimas šiame etape nejungiami.
+
 ### Spinta / Stalčius (atviri duomenys)
 
 Eksportas į „spintos" tipo API serverį (`modules/spinta/`). Klientas pasirenka
