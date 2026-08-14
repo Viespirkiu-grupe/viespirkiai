@@ -58,7 +58,7 @@ database role and its own failure mode. **Committed PostgreSQL rows are the only
 |---|-----------------------------------|----------------------------------------------------------------------------------------|------------------------------------------------|------------------------------------------------|--------------------------------------------------------------------------------------|
 | 1 | **Data Ingestion**                | Fetch, normalise and version public procurement records                                | Existing task runner (`tasks/index.js`)        | `public` schema source tables only             | Public sources: CVP IS, CVPP, TED, JAR, documents                                    |
 | 2 | **Risk Indicators Processing**    | Evaluate every applicable Risk Indicator, one at a time, and record the outcomes       | **Procurement Risk Service**, its own process  | `risk.evaluation_runs` and `risk.risk_signals` | `public` canonical views; the deployed Git catalogue                                 |
-| 3 | **Risk Indicators Visualisation** | Show a procurement's risk signals, methodology and evaluation coverage to the public   | Existing Astro web application                 | Nothing                                        | `risk` tables and views read-only; `catalogue.generated.json`; `public` procurement record |
+| 3 | **Risk Indicators Visualisation** | Show a procurement's risk signals, methodology and evaluation coverage to the public   | Existing Astro web application                 | Nothing                                        | `risk` tables and views read-only; the `riskCatalogue` constant; `public` procurement record |
 
 **Diagram: containers, the schemas they use and the role each connection holds.**
 
@@ -66,8 +66,8 @@ database role and its own failure mode. **Committed PostgreSQL rows are the only
 flowchart TB
     subgraph nGit["Artefact source: Git repository"]
         gDef["modules/risk/indicators/**<br/>definition.ts · parameters.ts · collect.sql · rules.ts · test/"]
-        gCat["modules/risk/catalogue.generated.json<br/>public metadata of every version"]
-        gDef -.->|" generated and verified in CI "| gCat
+        gCat["modules/risk/deployedIndicators.ts<br/>the registry and the riskCatalogue constant"]
+        gDef -.->|" imported and validated at process start "| gCat
     end
 
     subgraph pIng["Process 1 — Data Ingestion (tasks/index.js)"]
@@ -136,8 +136,9 @@ shape would otherwise fit, because four kinds of isolation are load-bearing:
   that work away from ingestion, which is the one thing that must keep working.
 - **Deployment lifecycle.** Activating an indicator version deploys one commit to the risk service and the web
   application together ([§7.2](#72-adding-a-risk-indicator)), on a schedule independent of ingestion releases.
-- **Packaging.** The web bundle excludes the registry and every rule module; it reads public wording from the generated
-  catalogue artefact only.
+- **Packaging.** The web bundle imports the indicator definitions and reads the `riskCatalogue` constant. That import
+  crosses no process boundary: the definitions are plain TypeScript and Zod, they open no database connection, and
+  `collect.sql` is read lazily at calculation time, so nothing in `services/procurement-risk/` reaches the web bundle.
 
 The separation buys four operational properties: a broken ingestion refresh leaves the last computed signals visible,
 labelled with their older cutoff; a failing indicator is contained to its own rows; a web deployment cannot mutate risk
@@ -207,7 +208,7 @@ flowchart LR
 | Evaluation run              | 2       | `risk.evaluation_runs`                                                 | One durable row per run: cutoff, code commit, terminal state, per-indicator statistics. It answers whether the job ran and whether it succeeded.                          |
 | Risk signals                | 2 → 3   | `risk.risk_signals`                                                    | One immutable snapshot per run: outcome, evidence, indicator version, applied parameters and cutoff.                                                                      |
 | Procurement summary         | 2 → 3   | `risk.v_procurement_summaries`                                         | Aggregates the live snapshot per procurement for list-page counts, ordering and filters.                                                                                  |
-| Astro read-only routes      | 3       | Existing web application on a read-only role                           | Query the live snapshot, the summary view and the run row; read all indicator wording from `catalogue.generated.json`.                                                    |
+| Astro read-only routes      | 3       | Existing web application on a read-only role                           | Query the live snapshot, the summary view and the run row; read all indicator wording from the `riskCatalogue` constant.                                                  |
 
 A cron schedule guarantees that a run eventually starts. A PostgreSQL `NOTIFY` from ingestion is an optional wake-up
 hint that shortens the delay between a source refresh and the next run.
@@ -244,7 +245,7 @@ The service uses business rules vocabulary, and each term maps to exactly one ar
 | **Risk Signal**          | The public result of a `triggered` outcome: a reason to review this procurement                                                            | What `/rizikos` publishes                                      |
 | **Observation**          | The stored row recording one decision — every outcome state, not only triggered ones                                                       | `risk.risk_signals`                                            |
 | **Evaluation run**       | One pass of every evaluable indicator over every applicable subject at one cutoff                                                           | `risk.evaluation_runs` plus one snapshot of observations       |
-| **Indicator catalogue**  | The set of deployed indicator versions                                                                                                     | `modules/risk/indicators/`, published as `catalogue.generated.json` |
+| **Indicator catalogue**  | The set of deployed indicator versions                                                                                                     | `modules/risk/indicators/`, published as the `riskCatalogue` constant |
 
 Storing every outcome, not only the matches, is what lets a page distinguish "checked, nothing found" from "not
 evaluated" from "the calculation failed". The service records a fifth state, `calculation_error`, on an indicator's
@@ -423,9 +424,9 @@ samples are safe, known source limitations and freshness, and a change log. Open
 definition, the source-catalogue references, the local profile, required data, the rule expressed as a formula,
 exclusions, parameters, an example and limitations.
 
-Everything on the page except the statistics comes from `catalogue.generated.json`, the artefact generated from the
-indicator directories and shipped inside the web bundle; the statistics come from `risk.risk_signals`. Sourcing wording
-from the deployed catalogue is what lets the page describe retired versions and versions with zero current signals.
+Everything on the page except the statistics comes from `riskCatalogue`, the constant `deployedIndicators.ts` derives
+from the registry and the page imports directly; the statistics come from `risk.risk_signals`. Sourcing wording from the
+deployed catalogue is what lets the page describe retired versions and versions with zero current signals.
 Where the repository is public, each entry links to the indicator directory and to the commit history of its thresholds.
 
 ## 4. The Risk Indicator package
@@ -524,11 +525,9 @@ modules/risk/
   evaluationContext.ts        # what one run evaluates: cutoff, subjects, effective parameters
   riskDataSource.ts           # how an evaluation reaches a database (the only port)
   registry.ts                 # the catalogue class: lookup, active and evaluable sets
-  deployedIndicators.ts       # explicit imports of every deployed Risk Indicator version
+  deployedIndicators.ts       # explicit imports of every deployed version, plus riskCatalogue:
+                              # their public metadata as one constant Astro imports
   sqlLoader.ts                # loads packaged SQL at process start
-  generateCatalogue.ts        # writes catalogue.generated.json from the registry
-  catalogue.generated.json    # public metadata of all versions, committed, verified in CI,
-                              # imported by Astro
 services/procurement-risk/
   index.ts                    # service entry point and single-instance advisory lock
   runJob.ts                   # opens the run, evaluates Risk Indicators one at a time
@@ -888,7 +887,8 @@ version by id.
 6. Write `rules.ts`, plus fixtures and unit tests for all four outcome states and the boundaries between them. These
    need no database, so write them before the SQL runs anywhere.
 7. Add an integration test proving `collect.sql` returns those fact rows against realistic database shapes.
-8. Register the version in `deployedIndicators.ts` and regenerate `catalogue.generated.json`.
+8. Register the version in `deployedIndicators.ts`. `riskCatalogue` is derived from that registration, so the
+   methodology page picks the version up with no further step.
 9. Run the tests, commit, and deploy **the same commit** to both the Procurement Risk Service and the web application.
 
 Step 9 is the one ordering constraint a Git-resident catalogue introduces, and it is the reason the deployment unit is a
@@ -974,10 +974,14 @@ overlapping nor leaving gaps, and `validTo` never earlier than `validFrom`; entr
 pairwise disjoint scopes; non-empty public text and limitation; and output containing only requested subjects and
 allowed states.
 
-**CI carries two checks specific to a Git-resident catalogue**: `catalogue.generated.json` is regenerated and compared
-against the definitions, so a stale artefact fails the build and the web application describes an indicator exactly as
-the service executes it; and a pull request touching `parameters.ts` passes only when it closes an existing entry and
-appends a new one.
+**Catalogue tests** protect the boundary `riskCatalogue` draws: it describes every deployed version whatever its
+lifecycle, and it publishes exactly the declared public fields, so an internal field added to a definition — a source
+relation, a required input, the SQL file — cannot reach the web layer unless someone names it as public. The web
+application describing an indicator exactly as the service executes it needs no check of its own: both read the same
+constant, derived from the definitions at import time, and there is no second copy that could go stale.
+
+**CI carries one check specific to a Git-resident catalogue**: a pull request touching `parameters.ts` passes only when
+it closes an existing entry and appends a new one.
 
 **Writer and retention tests** protect the storage decision of [§6.2](#62-one-insert-only-snapshot-per-run):
 
