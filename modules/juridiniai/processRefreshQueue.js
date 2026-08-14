@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url";
 import { postgres } from "../../postgres/postgres.js";
 import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 import { buildJuridiniaiUpsertSql } from "./backfill.js";
+import { JURIDINIAI_SOURCE_REFRESH_LOCK } from "./locks.js";
 
 const DEFAULT_BATCH_SIZE = 1_000;
 
@@ -33,6 +34,14 @@ export async function processJuridiniaiRefreshQueue(
     const client = await db.connect();
     try {
         await client.query("BEGIN");
+        const lock = await client.query(
+            `SELECT pg_try_advisory_xact_lock(hashtext($1)::bigint) AS locked`,
+            [JURIDINIAI_SOURCE_REFRESH_LOCK],
+        );
+        if (!lock.rows[0]?.locked) {
+            await client.query("COMMIT");
+            return false;
+        }
         const claimed = await client.query(
             `SELECT "jarKodas"
              FROM public."juridiniaiRefreshQueue"

@@ -230,7 +230,10 @@ export default [
         name: "juridiniaiQuickwitProcessIndexQueue",
         mode: "asap",
         priority: 5,
-        concurrency: 2,
+        // TaskRunner workeriai nėra shard'inti: du workeriai gali paimti
+        // skirtingus to paties JAR kodo eilės įvykius ir susikirsti mapping'e.
+        // CLI `--concurrency` lieka saugus, nes ten naudojamas stabilus shard'as.
+        concurrency: 1,
         cooldown: 30,
         errorCooldown: 30,
         wakeOn: [WORK_SIGNALS.JURIDINIAI_INDEX_READY],

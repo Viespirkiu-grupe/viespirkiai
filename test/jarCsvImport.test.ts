@@ -42,3 +42,40 @@ describe('RC JAR CSV parser', () => {
     );
   });
 });
+
+describe('RC JAR CSV related records', () => {
+  it.each(['adresai', 'valdymas', 'kapitalas'])(
+    'imports %s only for people present in jarAsmenys',
+    async (sourceName) => {
+      const source = SOURCES.find((item) => item.name === sourceName)!;
+      const queries: string[] = [];
+      const client = {
+        query: async (sql: string) => {
+          queries.push(sql);
+          return { rowCount: 0 };
+        },
+      };
+      const row = source.map(Array(source.header.length).fill(null));
+      row.jarKodas = 110063950;
+      if (sourceName === 'valdymas') {
+        row.organai = [{
+          jarKodas: row.jarKodas,
+          tipas: 'valdyba',
+          nuo: null,
+          vyruKiekis: null,
+          moteruKiekis: null,
+          lytisNenurodytaKiekis: null,
+          duomenuData: null,
+        }];
+      }
+
+      await source.write(client, [row]);
+
+      const insertQueries = queries.filter((sql) => sql.includes('INSERT INTO'));
+      expect(insertQueries.length).toBeGreaterThan(0);
+      expect(insertQueries.every((sql) =>
+        sql.includes('JOIN public."jarAsmenys" person'),
+      )).toBe(true);
+    },
+  );
+});

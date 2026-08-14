@@ -23,10 +23,11 @@ const { Client } = pkg;
 
 /**
  * @param {string} key - laisvas raktas, hash'inamas per `hashtext`.
- * @returns {Promise<{ release: () => Promise<void> } | null>} null, jei lock'as
- *          jau užimtas kito proceso.
+ * @param {{ wait?: boolean }} [options] - laukti, kol užraktas atsilaisvins.
+ * @returns {Promise<{ release: () => Promise<void> } | null>} `wait: false`
+ *          režime null, jei lock'as jau užimtas kito proceso.
  */
-export async function acquireSessionLock(key) {
+export async function acquireSessionLock(key, { wait = false } = {}) {
     const client = new Client({
         host: config.pgDirectHost || config.pgHost,
         port: config.pgDirectPort || config.pgPort,
@@ -38,11 +39,13 @@ export async function acquireSessionLock(key) {
     await client.connect();
 
     try {
-        const { rows } = await client.query(
-            "SELECT pg_try_advisory_lock(hashtext($1)::bigint) AS locked",
-            [key],
-        );
-        if (!rows[0]?.locked) {
+        const sql = wait
+            ? "SELECT pg_advisory_lock(hashtext($1)::bigint) AS locked"
+            : "SELECT pg_try_advisory_lock(hashtext($1)::bigint) AS locked";
+        const { rows } = await client.query(sql, [key]);
+        // `pg_advisory_lock` grąžina void; sėkmingas užklausos užbaigimas jau
+        // reiškia, kad blocking režime lock'as paimtas.
+        if (!wait && !rows[0]?.locked) {
             await client.end();
             return null;
         }

@@ -17,6 +17,7 @@ import { postgres } from "../../postgres/postgres.js";
 import { acquireSessionLock } from "../../postgres/sessionLock.js";
 import { log } from "../../utils/log.js";
 import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
+import { JURIDINIAI_SOURCE_REFRESH_LOCK } from "./locks.js";
 
 const BASE = "https://www.registrucentras.lt/aduomenys/";
 const BATCH_SIZE = 1_000;
@@ -123,9 +124,17 @@ export async function importJarCsv({
     const lock = await acquireSessionLock(LOCK_KEY);
     if (!lock) throw new Error("Kitas RC JAR CSV importas jau veikia");
 
-    const client = await postgres.connect();
+    let refreshLock;
+    let client;
     let changedTotal = 0;
     try {
+        // Palaukiame tik einamos refresh porcijos. Toliau visą importą saugome
+        // nuo refresh, kad jis neapdorotų dalinio snapshot'o.
+        refreshLock = await acquireSessionLock(
+            JURIDINIAI_SOURCE_REFRESH_LOCK,
+            { wait: true },
+        );
+        client = await postgres.connect();
         for (const source of sources) {
             if (beforeSource && await beforeSource(source) === false) continue;
             try {
@@ -139,7 +148,8 @@ export async function importJarCsv({
         }
         changedTotal += await removeMissingPeople(client);
     } finally {
-        client.release();
+        client?.release();
+        await refreshLock?.release();
         await lock.release();
     }
     if (changedTotal > 0) {
@@ -414,7 +424,11 @@ async function upsertAddresses(client, rows) {
         )
         INSERT INTO public."jarAsmenuAdresai" AS old
             ("jarKodas", "aobKodas", "adresas", "adresasNuo", "duomenuData")
-        SELECT "jarKodas", "aobKodas", "adresas", "adresasNuo", "duomenuData" FROM input
+        SELECT input."jarKodas", input."aobKodas", input."adresas",
+               input."adresasNuo", input."duomenuData"
+        FROM input
+        JOIN public."jarAsmenys" person
+          ON person."jarKodas" = input."jarKodas"
         ON CONFLICT ("jarKodas") DO UPDATE SET
             "aobKodas" = EXCLUDED."aobKodas", "adresas" = EXCLUDED."adresas",
             "adresasNuo" = EXCLUDED."adresasNuo", "duomenuData" = EXCLUDED."duomenuData",
@@ -447,7 +461,11 @@ async function upsertManagement(client, rows) {
         )
         INSERT INTO public."jarValdymas" AS old
             ("jarKodas", "vadovas", "vadovasNuo", "vadovoLytis", "kitiValdymoOrganai", "duomenuData")
-        SELECT "jarKodas", "vadovas", "vadovasNuo", "vadovoLytis", "kitiValdymoOrganai", "duomenuData" FROM input
+        SELECT input."jarKodas", input."vadovas", input."vadovasNuo",
+               input."vadovoLytis", input."kitiValdymoOrganai", input."duomenuData"
+        FROM input
+        JOIN public."jarAsmenys" person
+          ON person."jarKodas" = input."jarKodas"
         ON CONFLICT ("jarKodas") DO UPDATE SET
             "vadovas" = EXCLUDED."vadovas", "vadovasNuo" = EXCLUDED."vadovasNuo",
             "vadovoLytis" = EXCLUDED."vadovoLytis", "kitiValdymoOrganai" = EXCLUDED."kitiValdymoOrganai",
@@ -461,10 +479,13 @@ async function upsertManagement(client, rows) {
     if (organs.length) await client.query(`
         INSERT INTO public."jarValdymoOrganai"
             ("jarKodas", "tipas", "nuo", "vyruKiekis", "moteruKiekis", "lytisNenurodytaKiekis", "duomenuData")
-        SELECT * FROM jsonb_to_recordset($1::jsonb) AS x(
-            "jarKodas" integer, "tipas" text, "nuo" date, "vyruKiekis" integer,
-            "moteruKiekis" integer, "lytisNenurodytaKiekis" integer, "duomenuData" date
-        )
+        SELECT input.*
+        FROM jsonb_to_recordset($1::jsonb) AS input(
+                 "jarKodas" integer, "tipas" text, "nuo" date, "vyruKiekis" integer,
+                 "moteruKiekis" integer, "lytisNenurodytaKiekis" integer, "duomenuData" date
+             )
+        JOIN public."jarAsmenys" person
+          ON person."jarKodas" = input."jarKodas"
     `, [JSON.stringify(organs)]);
     return result.rowCount;
 }
@@ -479,7 +500,11 @@ async function upsertCapital(client, rows) {
         )
         INSERT INTO public."jarKapitalas" AS old
             ("jarKodas", "kapitalasNuo", "kapitalas", "valiuta", "duomenuData")
-        SELECT "jarKodas", "kapitalasNuo", "kapitalas", upper("valiuta"), "duomenuData" FROM input
+        SELECT input."jarKodas", input."kapitalasNuo", input."kapitalas",
+               upper(input."valiuta"), input."duomenuData"
+        FROM input
+        JOIN public."jarAsmenys" person
+          ON person."jarKodas" = input."jarKodas"
         ON CONFLICT ("jarKodas", "kapitalasNuo") DO UPDATE SET
             "kapitalas" = EXCLUDED."kapitalas", "valiuta" = EXCLUDED."valiuta",
             "duomenuData" = EXCLUDED."duomenuData"

@@ -23,6 +23,9 @@ describe("juridiniai refresh queue", () => {
         const client = {
             query: vi.fn(async (sql: string) => {
                 queries.push(sql.replace(/\s+/g, " ").trim());
+                if (sql.includes("pg_try_advisory_xact_lock")) {
+                    return { rows: [{ locked: true }] };
+                }
                 if (sql.includes("FOR UPDATE SKIP LOCKED")) {
                     return { rows: [{ jarKodas: 123456789 }] };
                 }
@@ -63,13 +66,33 @@ describe("juridiniai refresh queue", () => {
     it("returns false without projecting when the queue is empty", async () => {
         const client = {
             query: vi.fn(async (sql: string) => ({
-                rows: sql.includes("FOR UPDATE SKIP LOCKED") ? [] : [],
+                rows: sql.includes("pg_try_advisory_xact_lock")
+                    ? [{ locked: true }]
+                    : [],
                 rowCount: 0,
             })),
             release: vi.fn(),
         };
         const db = { connect: vi.fn(async () => client) };
         await expect(processJuridiniaiRefreshQueue({}, db as never)).resolves.toBe(false);
-        expect(client.query).toHaveBeenCalledTimes(3);
+        expect(client.query).toHaveBeenCalledTimes(4);
+    });
+
+    it("does not claim queue rows while a JAR import is running", async () => {
+        const queries: string[] = [];
+        const client = {
+            query: vi.fn(async (sql: string) => {
+                queries.push(sql);
+                return sql.includes("pg_try_advisory_xact_lock")
+                    ? { rows: [{ locked: false }] }
+                    : { rows: [] };
+            }),
+            release: vi.fn(),
+        };
+        const db = { connect: vi.fn(async () => client) };
+
+        await expect(processJuridiniaiRefreshQueue({}, db as never)).resolves.toBe(false);
+        expect(queries.some((sql) => sql.includes("FOR UPDATE SKIP LOCKED"))).toBe(false);
+        expect(queries.at(-1)).toBe("COMMIT");
     });
 });
