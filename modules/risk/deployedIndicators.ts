@@ -2,10 +2,11 @@ import type { RiskIndicator } from "./riskIndicator.ts";
 import { RiskIndicatorRegistry } from "./registry.ts";
 import { ltCom01v1 } from "./indicators/LT-COM-01/definition.ts";
 import { ltCom02v1 } from "./indicators/LT-COM-02/definition.ts";
+import { ltCom03v1 } from "./indicators/LT-COM-03/definition.ts";
 
 // Explicit registration, reviewable in a pull request — see
 // risk-service-architecture.md §4.3.
-const deployedIndicators = [ltCom01v1, ltCom02v1] as const satisfies readonly RiskIndicator<unknown>[];
+const deployedIndicators = [ltCom01v1, ltCom02v1, ltCom03v1] as const satisfies readonly RiskIndicator<unknown>[];
 
 export const riskIndicatorRegistry = new RiskIndicatorRegistry(deployedIndicators);
 
