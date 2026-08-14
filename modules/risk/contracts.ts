@@ -69,6 +69,14 @@ export type ParameterScope = Readonly<{
 
 // One effective-dated entry of a parameter timeline. Appending an entry is
 // the way a threshold changes; entries are immutable once merged.
+//
+// Both text fields are published verbatim with the entry (deployedIndicators.ts),
+// so they are public copy rather than comments, and they divide as follows:
+// `source` is where the value comes from — a legal citation, a catalogue
+// definition, a review decision — and is required because no value ships
+// without provenance; `note` is a caveat the reader of a published timeline
+// needs, and is absent when there is none. Rationale only a maintainer needs
+// belongs in a comment here or in the indicator's README, not in either field.
 export type ParameterEntry<P> = Readonly<{
     validFrom: string;
     validTo: string | null;

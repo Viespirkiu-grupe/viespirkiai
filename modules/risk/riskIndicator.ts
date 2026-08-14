@@ -1,5 +1,7 @@
+import type { z } from "zod";
 import {
     riskObservationV1Contract,
+    zodContract,
     type IndicatorLifecycle,
     type IndicatorStage,
     type ParameterEntry,
@@ -57,7 +59,14 @@ export type RiskIndicatorDefinition<P> = Readonly<{
     sourceRelations: readonly string[];
     requiredInputs: readonly string[];
     parameters: readonly ParameterEntry<P>[];
-    parameterContract: RuntimeContract<P>;
+    // The shape and value constraints one entry's `values` must satisfy. A
+    // plain schema, so an indicator directory declares what a valid parameter
+    // is and never constructs a contract; the base class does that below.
+    // Only the constraints TypeScript cannot state — `.int()`, `.positive()`,
+    // `.min()` — earn their keep here: the entries are git-maintained literals
+    // typed as ParameterEntry<P>, so the compiler already rejects a wrong
+    // shape. A schema with no such refinement is ceremony.
+    parameterSchema: z.ZodType<P>;
     outputContract?: RuntimeContract<RiskObservationV1>;
     standard: RiskIndicatorStandard;
     public: RiskIndicatorPublicText;
@@ -72,7 +81,7 @@ export abstract class RiskIndicator<P = unknown> {
     readonly sourceRelations: readonly string[];
     readonly requiredInputs: readonly string[];
     readonly parameters: readonly ParameterEntry<P>[];
-    readonly parameterContract: RuntimeContract<P>;
+    private readonly parameterContract: RuntimeContract<P>;
     readonly outputContract: RuntimeContract<RiskObservationV1>;
     readonly standard: RiskIndicatorStandard;
     readonly public: RiskIndicatorPublicText;
@@ -92,7 +101,7 @@ export abstract class RiskIndicator<P = unknown> {
         this.sourceRelations = definition.sourceRelations;
         this.requiredInputs = definition.requiredInputs;
         this.parameters = definition.parameters;
-        this.parameterContract = definition.parameterContract;
+        this.parameterContract = zodContract(definition.parameterSchema);
         this.outputContract = definition.outputContract ?? riskObservationV1Contract;
         this.standard = definition.standard;
         this.public = definition.public;

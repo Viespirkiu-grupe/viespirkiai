@@ -29,6 +29,7 @@ describe("riskCatalogue", () => {
             "sourceRelations",
             "requiredInputs",
             "sqlFile",
+            "parameterSchema",
             "parameterContract",
             "outputContract",
             "decide",

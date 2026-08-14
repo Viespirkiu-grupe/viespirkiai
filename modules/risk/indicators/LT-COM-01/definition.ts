@@ -1,6 +1,6 @@
 import { SubjectFactsIndicator } from "../../subjectFactsIndicator.ts";
 import { ltCom01Decide, type LtCom01Facts } from "./rules.ts";
-import { ltCom01Parameters, ltCom01ParametersContract, type LtCom01Parameters } from "./parameters.ts";
+import { ltCom01Parameters, ltCom01ParametersSchema, type LtCom01Parameters } from "./parameters.ts";
 
 // LT-COM-01 — Single valid bid (Vienintelis tinkamas pasiūlymas).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
@@ -21,7 +21,7 @@ export const ltCom01v1 = new SubjectFactsIndicator<LtCom01Facts, LtCom01Paramete
         sourceRelations: ["public.v_pirkimas", "public.v_dalyviai"],
         requiredInputs: ["tiekejoKodas", "atmetimoPriezastis"],
         parameters: ltCom01Parameters,
-        parameterContract: ltCom01ParametersContract,
+        parameterSchema: ltCom01ParametersSchema,
         sqlFile: "./collect.sql",
         decide: ltCom01Decide,
         standard: {

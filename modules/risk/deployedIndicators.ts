@@ -15,7 +15,7 @@ export const riskIndicatorRegistry = new RiskIndicatorRegistry(deployedIndicator
 // differently from the way the service executes it.
 //
 // The internals stay behind this boundary on purpose — sourceRelations,
-// requiredInputs, sqlFile, parameterContract and decide are absent, and
+// requiredInputs, sqlFile, parameterSchema and decide are absent, and
 // riskCatalogueFields below is what keeps them absent.
 export const riskCatalogue = riskIndicatorRegistry.all().map((indicator) => ({
     id: indicator.key.id,

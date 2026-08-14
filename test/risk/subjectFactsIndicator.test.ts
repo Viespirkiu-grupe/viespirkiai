@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { zodContract, type ParameterEntry, type SubjectFacts, type Decision } from "../../modules/risk/contracts.ts";
+import type { ParameterEntry, SubjectFacts, Decision } from "../../modules/risk/contracts.ts";
 import { SubjectFactsIndicator } from "../../modules/risk/subjectFactsIndicator.ts";
 import type { RiskDataSource } from "../../modules/risk/riskDataSource.ts";
 
@@ -10,7 +10,6 @@ import type { RiskDataSource } from "../../modules/risk/riskDataSource.ts";
 // observation field a decision does not return.
 
 const paramsSchema = z.object({ threshold: z.number() });
-const paramsContract = zodContract(paramsSchema);
 type TestParameters = z.infer<typeof paramsSchema>;
 
 type TestFacts = SubjectFacts & Readonly<{ measured: number }>;
@@ -62,7 +61,7 @@ function makeIndicator(
             sourceRelations: [],
             requiredInputs: [],
             parameters: options.parameters ?? [OPEN_ENDED],
-            parameterContract: paramsContract,
+            parameterSchema: paramsSchema,
             standard: { name: "test", url: "https://example.com" },
             public: {
                 titleLt: "Testinis rodiklis",

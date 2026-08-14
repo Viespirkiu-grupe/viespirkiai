@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { zodContract, type ParameterEntry, type RiskObservationV1 } from "../../modules/risk/contracts.ts";
+import type { ParameterEntry, RiskObservationV1 } from "../../modules/risk/contracts.ts";
 import { RiskIndicator, type RiskIndicatorDefinition } from "../../modules/risk/riskIndicator.ts";
 import { RiskIndicatorRegistry } from "../../modules/risk/registry.ts";
 import { z } from "zod";
 
 const paramsSchema = z.object({ threshold: z.number() });
-const paramsContract = zodContract(paramsSchema);
 
 type TestParameters = z.infer<typeof paramsSchema>;
 
@@ -47,7 +46,7 @@ function makeIndicator(
             parameters: overrides.parameters ?? [
                 { validFrom: "2026-01-01", validTo: null, scope: {}, values: { threshold: 1 }, source: "test" },
             ],
-            parameterContract: paramsContract,
+            parameterSchema: paramsSchema,
             standard: { name: "test", url: "https://example.com" },
             public: overrides.public ?? {
                 titleLt: "Testinis rodiklis",
@@ -90,6 +89,39 @@ describe("RiskIndicator", () => {
                 public: { titleLt: "", descriptionLt: "d", formulaLt: "f", limitationLt: "l" },
             }),
         ).toThrow(/titleLt and public.limitationLt must be non-empty/);
+    });
+
+    // The whole reason a definition carries a parameter schema. Entries are
+    // git-maintained literals typed as ParameterEntry<P>, so tsc already
+    // rejects a wrong shape; what it cannot state is that a threshold must be
+    // a positive integer, and a zero or fractional value is exactly the typo a
+    // review of a one-line threshold diff waves through.
+    it("rejects a parameter value that violates a constraint the type cannot state", () => {
+        const refined = z.object({ threshold: z.number().int().positive() });
+        const withValue = (threshold: number) =>
+            new TestRiskIndicator({
+                key: { id: "LT-TEST-09", version: 1 },
+                lifecycle: "active",
+                subjectType: "procurement",
+                stage: "tender",
+                references: [],
+                sourceRelations: [],
+                requiredInputs: [],
+                parameters: [{ validFrom: "2026-01-01", validTo: null, scope: {}, values: { threshold }, source: "t" }],
+                parameterSchema: refined,
+                standard: { name: "test", url: "https://example.com" },
+                public: {
+                    titleLt: "Testinis rodiklis",
+                    descriptionLt: "desc",
+                    formulaLt: "formula",
+                    limitationLt: "limitation",
+                },
+            });
+
+        expect(() => withValue(0)).toThrow();
+        expect(() => withValue(-1)).toThrow();
+        expect(() => withValue(1.5)).toThrow();
+        expect(() => withValue(2)).not.toThrow();
     });
 
     it("rejects a parameter timeline with a gap", () => {
