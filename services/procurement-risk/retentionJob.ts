@@ -3,7 +3,7 @@ import { log } from "../../utils/log.js";
 import { deleteExpiredSnapshots, RETENTION_INTERVAL } from "./retention.ts";
 
 // Entry point for the scheduled retention job (risk-service-architecture.md
-// §7.3). Runs outside the evaluation run, so a slow sweep never delays a run
+// §6.3). Runs outside the evaluation run, so a slow sweep never delays a run
 // and a failed sweep never fails one.
 //
 // Usage: `npm run risk:retention`.

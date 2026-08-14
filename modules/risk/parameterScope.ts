@@ -1,7 +1,7 @@
 import type { ParameterScope, SubjectFacts } from "./contracts.ts";
 
 // Scope arithmetic for the effective-dated parameter timeline
-// (risk-service-architecture.md §5.3.2). A scope is a whitelist per
+// (risk-service-architecture.md §4.5). A scope is a whitelist per
 // dimension: a dimension the entry does not mention admits everything, a
 // dimension it does mention admits only the listed values.
 //

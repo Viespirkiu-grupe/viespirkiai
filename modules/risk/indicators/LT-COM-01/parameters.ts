@@ -4,7 +4,7 @@ import { zodContract, type ParameterEntry } from "../../contracts.ts";
 // The effective-dated parameter timeline. Append entries; close them with
 // validTo. A git diff of this file is the complete history of "who changed
 // the threshold or its scope, when, and why" — see
-// docs/indicators-story/risk-service-architecture.md §10.2.
+// docs/indicators-story/risk-service-architecture.md §7.3.
 
 export const ltCom01ParametersSchema = z.object({
     // The number of surviving bids at or below which the lot triggers. One is

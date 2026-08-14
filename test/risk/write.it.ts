@@ -1,7 +1,7 @@
 // Integration tests for the Risk Signals Writer (services/procurement-risk/
 // write.ts) and the retention job, against the local risk-dev Postgres.
 // Protects the storage decision docs/indicators-story/risk-service-
-// architecture.md §7.2 depends on: risk_signals is insert-only, one run is one
+// architecture.md §6.2 depends on: risk_signals is insert-only, one run is one
 // immutable snapshot, the site reads exactly one run, and superseded snapshots
 // are deleted whole.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";

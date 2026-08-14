@@ -7,7 +7,7 @@ function keyString(key: RiskIndicatorKey): string {
 
 /**
  * The immutable, explicitly constructed in-process catalogue of every
- * deployed Risk Indicator version (risk-service-architecture.md §5.2). Keyed
+ * deployed Risk Indicator version (risk-service-architecture.md §4.3). Keyed
  * by (indicator_id, implementation_version); given that key the run job
  * retrieves exactly one definition.
  *

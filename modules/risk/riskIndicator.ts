@@ -15,15 +15,15 @@ import type { RiskDataSource } from "./riskDataSource.ts";
 
 // One deployed Risk Indicator version, as an object that knows how to check
 // itself, resolve its own effective parameters, calculate, and validate what
-// it produced (risk-service-architecture.md §5.2).
+// it produced (risk-service-architecture.md §4.3).
 //
 // The base class owns everything every indicator shares; the one thing that
 // differs between indicators — how the observations are produced — is the
-// abstract `calculate`. The common "collect facts in SQL, judge them in
-// TypeScript" case is RowLocalSqlIndicator; an indicator whose collection step
+// abstract `calculate`. The common "collect facts in SQL, decide in
+// TypeScript" case is SubjectFactsIndicator; an indicator whose collection step
 // cannot produce one row per subject subclasses this directly in its own
-// directory (the doc's `calculate.ts` case) and is free to run several
-// packaged statements and assemble the rows itself.
+// directory, implementing `calculate` itself, and is free to run several
+// packaged statements and assemble the rows.
 
 // Half-open validity ranges [validFrom, validTo), where a null validTo is
 // "still in force".
@@ -78,7 +78,7 @@ export abstract class RiskIndicator<P = unknown> {
     readonly public: RiskIndicatorPublicText;
 
     /**
-     * Startup runtime checks (§5.2): an id outside the catalogue namespace,
+     * Startup runtime checks (§4.3): an id outside the catalogue namespace,
      * missing public wording, parameter values that violate the indicator's
      * own contract, or a gapped/overlapping parameter timeline all fail here,
      * at import time, rather than in the middle of a run.
@@ -115,12 +115,10 @@ export abstract class RiskIndicator<P = unknown> {
     }
 
     // 'active' + 'shadow': what the run job actually evaluates and writes.
-    // Shadow versions are computed like any other — §10.3: "merging it as
-    // lifecycle: 'shadow' first keeps the version out of the read model
-    // until a later commit flips it to 'active'" implies the numbers exist,
-    // they're just excluded from the public read model (a web-layer
-    // concern). 'draft' isn't ready to run yet; 'retired' has stopped
-    // producing new signals (§10.4).
+    // A shadow version is computed like any other — §7.1 defines it as
+    // "evaluated and written, excluded from the public read model", so the
+    // numbers exist and excluding them is a web-layer concern. 'draft' isn't
+    // ready to run yet; 'retired' has stopped producing new signals.
     get isEvaluable(): boolean {
         return this.lifecycle === "active" || this.lifecycle === "shadow";
     }
@@ -139,9 +137,9 @@ export abstract class RiskIndicator<P = unknown> {
 
     /**
      * The one entry that decides a subject at a cutoff: in force by date, and
-     * scoped to admit these facts (§5.3.2). `null` means no reviewed threshold
+     * scoped to admit these facts (§4.5). `null` means no reviewed threshold
      * covers this subject, which the caller reports as `not_applicable` —
-     * never as a verdict computed without parameters.
+     * never as a decision computed without parameters.
      *
      * The result is unambiguous because `assertParameterTimeline` rejects
      * concurrently valid entries with overlapping scopes at startup.
@@ -165,7 +163,7 @@ export abstract class RiskIndicator<P = unknown> {
     /**
      * HOW IT CALCULATES. Produces the standard observation rows for this
      * indicator at one cutoff, reading canonical facts through `data`
-     * (§5.3.1). Called only through `evaluate`, which validates the result.
+     * (§4.4). Called only through `evaluate`, which validates the result.
      */
     protected abstract calculate(
         context: EvaluationContext,
@@ -174,7 +172,7 @@ export abstract class RiskIndicator<P = unknown> {
 
     /**
      * Validates rows against the output contract plus the cross-row
-     * invariants §11 lists: subject and indicator identity, and no duplicate
+     * invariants §8 lists: subject and indicator identity, and no duplicate
      * (subjectType, subjectKey) within one indicator's batch — that pair is
      * the current-state unique index (risk-schema.md §2), so a duplicate here
      * would collide at write time.
@@ -225,7 +223,7 @@ export abstract class RiskIndicator<P = unknown> {
 
     /**
      * The timeline is append-only, contiguous *within a scope*, and
-     * unambiguous *across scopes* (§10.2, §5.3.2). One indicator version may
+     * unambiguous *across scopes* (§7.3, §4.5). One indicator version may
      * carry a different threshold per procedure type — that is several
      * entries valid at once, distinguished by `scope` — so contiguity is
      * checked per scope, and what makes resolution deterministic is instead

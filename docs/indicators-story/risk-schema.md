@@ -2,7 +2,7 @@
 
 Status: detailed design
 
-Companion to: [`risk-service-architecture.md`](risk-service-architecture.md) §7, which holds the reasoning behind this
+Companion to: [`risk-service-architecture.md`](risk-service-architecture.md) §6, which holds the reasoning behind this
 structure, the component that writes it and the run flow that fills it.
 
 Identifiers are English throughout, to stay aligned with international and EU procurement-fraud terminology. Lithuanian
@@ -85,7 +85,7 @@ One row per `(run, subject, indicator)`, written once and never touched again:
 
 There is no comparison, no validity interval and no `checked_at`. Freshness comes from the run: every row on a page
 shares one `data_as_of` and one `code_commit`, because they were all produced by the same run.
-[`risk-service-architecture.md`](risk-service-architecture.md) §7.2 holds the reasoning.
+[`risk-service-architecture.md`](risk-service-architecture.md) §6.2 holds the reasoning.
 
 ### `risk.risk_signals`
 

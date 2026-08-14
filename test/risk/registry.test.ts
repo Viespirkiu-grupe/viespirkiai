@@ -10,7 +10,7 @@ const paramsContract = zodContract(paramsSchema);
 type TestParameters = z.infer<typeof paramsSchema>;
 
 // An indicator whose calculation is a plain function — the shape an indicator
-// with an internal structure takes (§5.1's `calculate.ts` case), and the
+// with an internal structure takes (§4.3's own `calculate()` case), and the
 // cheapest subclass to assert the shared behaviour of the base class on.
 class TestRiskIndicator extends RiskIndicator<TestParameters> {
     private readonly observations: readonly RiskObservationV1[];
@@ -114,7 +114,7 @@ describe("RiskIndicator", () => {
         ).toThrow(/gap or overlap/);
     });
 
-    // One implementation version, two legal thresholds — the case §5.3.2
+    // One implementation version, two legal thresholds — the case §4.5
     // exists for. Contiguity is per scope, so these two timelines are checked
     // independently and neither has a gap.
     it("accepts concurrent entries whose scopes are disjoint", () => {

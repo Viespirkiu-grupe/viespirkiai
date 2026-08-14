@@ -3,52 +3,53 @@ import {
     type ParameterEntry,
     type RiskObservationV1,
     type SubjectFacts,
-    type Verdict,
+    type Decision,
 } from "./contracts.ts";
 import type { EvaluationContext } from "./evaluationContext.ts";
 import { RiskIndicator, type RiskIndicatorDefinition } from "./riskIndicator.ts";
 import type { RiskDataSource } from "./riskDataSource.ts";
 import { loadPackagedSql } from "./sqlLoader.ts";
 
-// The common shape (risk-service-architecture.md §5.3.1): collect one fact row
-// per subject with a packaged SELECT, judge each row with a pure function, and
+// The common shape (risk-service-architecture.md §4.4): collect one fact row
+// per subject with a packaged SELECT, decide each row with a pure function, and
 // assemble the observations. Roughly 78 of the 106 catalogue indicators fit it.
 //
 // The division of labour is the point. `collect.sql` states what is true and
-// decides nothing — no indicator identity, no state, no threshold. `verdict`
-// decides what that means and knows nothing about persistence, identity or the
-// parameter timeline. Everything in between — binding $1/$2, choosing the
+// decides nothing — no indicator identity, no state, no threshold. The
+// indicator's rules decide what that means and know nothing about persistence,
+// identity or the parameter timeline. Everything in between — binding $1/$2, choosing the
 // parameter entry, `not_applicable` when none applies, stamping identity and
 // the cutoff onto the row — is here, written once, and therefore cannot be got
 // wrong in an indicator's own directory.
 
-export type RowLocalSqlIndicatorDefinition<F extends SubjectFacts, P> = RiskIndicatorDefinition<P> &
+export type SubjectFactsIndicatorDefinition<F extends SubjectFacts, P> = RiskIndicatorDefinition<P> &
     Readonly<{
         // Path to the collection statement, relative to the definition file,
         // e.g. './collect.sql'.
         sqlFile: string;
-        // HOW IT JUDGES. Pure: no database, no clock, no identity fields. It
+        // HOW IT DECIDES. The indicator's rules, as a pure function: no
+        // database, no clock, no identity fields. It
         // is called only for a subject a reviewed parameter entry covers, so
         // it never has to handle missing parameters.
-        verdict: (facts: F, parameters: P) => Verdict;
+        decide: (facts: F, parameters: P) => Decision;
     }>;
 
-const NOT_APPLICABLE: Verdict = { state: "not_applicable" };
+const NOT_APPLICABLE: Decision = { state: "not_applicable" };
 
-export class RowLocalSqlIndicator<F extends SubjectFacts, P = unknown> extends RiskIndicator<P> {
+export class SubjectFactsIndicator<F extends SubjectFacts, P = unknown> extends RiskIndicator<P> {
     readonly sqlFile: string;
     private readonly definitionUrl: string;
-    private readonly verdict: (facts: F, parameters: P) => Verdict;
+    private readonly decide: (facts: F, parameters: P) => Decision;
 
     /**
      * `definitionUrl` resolves `sqlFile` against the indicator's own
      * directory — pass `import.meta.url` from `definition.ts`.
      */
-    constructor(definition: RowLocalSqlIndicatorDefinition<F, P>, definitionUrl: string) {
+    constructor(definition: SubjectFactsIndicatorDefinition<F, P>, definitionUrl: string) {
         super(definition);
         this.sqlFile = definition.sqlFile;
         this.definitionUrl = definitionUrl;
-        this.verdict = definition.verdict;
+        this.decide = definition.decide;
     }
 
     protected async calculate(context: EvaluationContext, data: RiskDataSource): Promise<readonly RiskObservationV1[]> {
@@ -62,16 +63,16 @@ export class RowLocalSqlIndicator<F extends SubjectFacts, P = unknown> extends R
 
     // $1 the data_as_of cutoff, $2 an optional subject filter (NULL for a full
     // run). Thresholds are deliberately absent: policy is resolved here and
-    // applied by `verdict`, so the collection statement carries none.
+    // applied by `decide`, so the collection statement carries none.
     private bindParameters(context: EvaluationContext): readonly unknown[] {
         return [context.dataAsOf, context.subjects];
     }
 
-    /** One fact row becomes one observation: judge, then fill in the rest. */
+    /** One fact row becomes one observation: decide, then fill in the rest. */
     private observe(row: F, dataAsOf: string): RiskObservationV1 {
         const facts = this.assertSubjectFacts(row);
         const entry = this.parameterEntryFor(dataAsOf, facts);
-        const verdict = entry === null ? NOT_APPLICABLE : this.verdict(row, entry.values);
+        const decision = entry === null ? NOT_APPLICABLE : this.decide(row, entry.values);
 
         return {
             indicatorId: this.key.id,
@@ -80,12 +81,12 @@ export class RowLocalSqlIndicator<F extends SubjectFacts, P = unknown> extends R
             subjectKey: facts.subjectKey,
             procurementSource: facts.procurementSource,
             procurementId: facts.procurementId,
-            state: verdict.state,
-            rawValue: verdict.rawValue ?? null,
-            threshold: verdict.threshold ?? null,
+            state: decision.state,
+            rawValue: decision.rawValue ?? null,
+            threshold: decision.threshold ?? null,
             appliedParameters: applied(entry),
-            evidence: verdict.evidence ?? {},
-            missingData: [...(verdict.missingData ?? [])],
+            evidence: decision.evidence ?? {},
+            missingData: [...(decision.missingData ?? [])],
             dataAsOf,
         };
     }

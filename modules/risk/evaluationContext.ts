@@ -1,7 +1,7 @@
 import type { ParameterEntry } from "./contracts.ts";
 
 // One run's inputs, as a value object. A run has exactly two of its own
-// (risk-service-architecture.md §5.2.2) — the `data_as_of` cutoff and the
+// (risk-service-architecture.md §5) — the `data_as_of` cutoff and the
 // subject set — plus the identity of the run row and the parameter entries
 // the indicator resolved for that cutoff.
 //

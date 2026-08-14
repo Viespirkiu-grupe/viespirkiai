@@ -2,7 +2,7 @@
 --
 -- $1 data_as_of cutoff. An ATN-1 procedure-completion report recorded after
 --    the cutoff is invisible to the run, which is what makes a rerun at an
---    earlier cutoff reproducible (risk-service-architecture.md §5.2.2).
+--    earlier cutoff reproducible (risk-service-architecture.md §5).
 -- $2 optional subject filter: an array of ATN-1 "pirkimoNumeris" values, or
 --    NULL for a normal full run.
 --

@@ -4,7 +4,7 @@ import type { RiskObservationV1 } from "../../modules/risk/contracts.ts";
 export type WriteStats = Readonly<{ inserted: number }>;
 
 /**
- * The Risk Signals Writer (risk-service-architecture.md §5.6 / §7.2): the
+ * The Risk Signals Writer (risk-service-architecture.md §6.2): the
  * single place that turns validated observations into rows.
  *
  * `risk.risk_signals` is insert-only. One run writes one immutable snapshot,

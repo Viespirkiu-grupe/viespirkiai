@@ -5,9 +5,9 @@ import { log } from "../../utils/log.js";
 import { runEvaluation } from "./runJob.ts";
 
 // Procurement Risk Service entry point — one sequential evaluation run per
-// invocation (risk-service-architecture.md §1: "one single sequential job").
+// invocation (risk-service-architecture.md §5: "one single sequential job").
 // Not a long-lived daemon yet; a scheduler wrapper is a later step once more
-// than one indicator exists (§13 discusses process isolation, not
+// than one indicator exists (§1.2 discusses process isolation, not
 // scheduling shape). Usage: `npm run risk:run` or
 // `node services/procurement-risk/index.ts [subject1 subject2 ...]`.
 

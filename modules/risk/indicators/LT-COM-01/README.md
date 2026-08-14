@@ -12,15 +12,15 @@ report, which is the natural grain of `public.v_dalyviai`. A bid is "valid" when
 | File                    | Question it answers                                                              |
 |-------------------------|----------------------------------------------------------------------------------|
 | `collect.sql`           | What is true about each lot — bid counts, method, when the report was recorded   |
-| `calculate.ts`          | What that means — the state, the threshold that decided it, and the evidence     |
+| `rules.ts`              | What that means — the state, the threshold that decided it, and the evidence     |
 | `parameters.ts`         | What it compares against, and since when                                         |
 | `definition.ts`         | Identity, lifecycle, public wording, and the wiring between the three above      |
 | `test/`                 | How we know it works                                                             |
 
 Inside `test/`, `fixtures.ts` states both the source rows and the fact row `collect.sql` must produce from them;
-`calculate.test.ts` judges those fact rows with no database, and `calculate.it.ts` proves the statement really produces
+`rules.test.ts` decides those fact rows with no database, and `collect.it.ts` proves the statement really produces
 them against a real PostgreSQL. Everything else — identity fields, parameter resolution, `not_applicable` when no entry
-applies — belongs to `RowLocalSqlIndicator` and is tested once in `test/risk/rowLocalSqlIndicator.test.ts`.
+applies — belongs to `SubjectFactsIndicator` and is tested once in `test/risk/subjectFactsIndicator.test.ts`.
 
 ## Open question: method scope
 

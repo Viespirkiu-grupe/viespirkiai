@@ -1,10 +1,10 @@
-import type { SubjectFacts, Verdict } from "../../contracts.ts";
+import type { SubjectFacts, Decision } from "../../contracts.ts";
 import type { LtCom01Parameters } from "./parameters.ts";
 
-// LT-COM-01 — HOW IT JUDGES. One fact row from collect.sql plus the parameter
-// values in force for it, in; one verdict, out. No database, no clock, no
-// indicator identity — RowLocalSqlIndicator supplies all of that
-// (risk-service-architecture.md §5.4).
+// LT-COM-01 — HOW IT DECIDES. One fact row from collect.sql plus the parameter
+// values in force for it, in; one decision, out. No database, no clock, no
+// indicator identity — SubjectFactsIndicator supplies all of that
+// (risk-service-architecture.md §4.1).
 
 // What collect.sql returns per lot, on top of the shared SubjectFacts columns.
 export type LtCom01Facts = SubjectFacts &
@@ -14,7 +14,7 @@ export type LtCom01Facts = SubjectFacts &
         reportedAt: string | null;
     }>;
 
-export function ltCom01Verdict(facts: LtCom01Facts, parameters: LtCom01Parameters): Verdict {
+export function ltCom01Decide(facts: LtCom01Facts, parameters: LtCom01Parameters): Decision {
     const evidence = {
         pirkimoBudas: facts.method,
         ataskaitosData: facts.reportedAt,

@@ -5,7 +5,7 @@ import { riskIndicatorRegistry } from "./deployedIndicators.ts";
 
 // Generates catalogue.generated.json: the public metadata of every deployed
 // Risk Indicator version, built from the definitions and committed alongside
-// them. CI verifies this artefact matches the definitions (§5, §11) — no
+// them. CI verifies this artefact matches the definitions (§4.2, §8) — no
 // Astro consumer exists yet (out of scope for this slice), but the
 // generation step and its "matches the definitions" check are cheap to build
 // now and are what CI will enforce once the web catalogue page exists.

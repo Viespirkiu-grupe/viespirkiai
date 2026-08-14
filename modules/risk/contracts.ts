@@ -1,12 +1,12 @@
 import { z } from "zod";
 
 // Shared observation and run contracts for the Procurement Risk Service.
-// Mirrors docs/indicators-story/risk-service-architecture.md §5.3.
+// Mirrors docs/indicators-story/risk-service-architecture.md §4.3.
 //
 // This file holds values only — the vocabulary every other risk module
 // speaks. The behaviour that uses them lives with the object that owns it:
-// riskIndicator.ts (one indicator version), rowLocalSqlIndicator.ts (the
-// collect-then-judge case), evaluationContext.ts (what one run evaluates),
+// riskIndicator.ts (one indicator version), subjectFactsIndicator.ts (the
+// collect-then-decide case), evaluationContext.ts (what one run evaluates),
 // riskDataSource.ts (how a calculation reaches the database).
 
 export type IndicatorLifecycle = "draft" | "shadow" | "active" | "retired";
@@ -61,7 +61,7 @@ export const riskObservationV1Contract: RuntimeContract<RiskObservationV1> = zod
 // Which subjects an entry's values apply to. An absent dimension admits
 // everything; a present one is a whitelist. Entries valid at the same time
 // must have pairwise disjoint scopes, which is what makes resolution yield at
-// most one entry per subject (risk-service-architecture.md §5.3.2).
+// most one entry per subject (risk-service-architecture.md §4.5).
 export type ParameterScope = Readonly<{
     methods?: readonly string[];
     objectTypes?: readonly string[];
@@ -80,8 +80,8 @@ export type ParameterEntry<P> = Readonly<{
 
 // The columns every collect.sql returns, whatever else it measures — the half
 // of an observation that is identical for all 106 indicators. The shared
-// machinery fills those fields in, so no verdict() ever mentions them
-// (risk-service-architecture.md §5.4).
+// machinery fills those fields in, so no decision() ever mentions them
+// (risk-service-architecture.md §4.1).
 export type SubjectFacts = Readonly<{
     subjectKey: string;
     procurementSource: string | null;
@@ -102,10 +102,10 @@ export const subjectFactsSchema = z.looseObject({
 
 export const subjectFactsContract: RuntimeContract<SubjectFacts> = zodContract(subjectFactsSchema);
 
-// The half of an observation a verdict decides: the state, and the values
+// The half of an observation a decision decides: the state, and the values
 // that explain it. Everything omitted here is assembled from the definition,
 // the resolved parameter entry and the run cutoff.
-export type Verdict = Readonly<{
+export type Decision = Readonly<{
     state: IndicatorState;
     rawValue?: Readonly<Record<string, unknown>> | null;
     threshold?: Readonly<Record<string, unknown>> | null;

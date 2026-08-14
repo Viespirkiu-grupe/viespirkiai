@@ -6,7 +6,7 @@
 // real database's `public` canonical facts (§1.2's `risk_calc` stand-in, see
 // postgres/postgres.js); an integration test passes one backed by the local
 // Docker Postgres's test schema. Same interface, so the calculation cannot
-// tell the difference (§11: "tests exercise the calculation through the same
+// tell the difference (§8: "tests exercise the calculation through the same
 // evaluation context the run job supplies").
 
 export interface RiskDataSource {

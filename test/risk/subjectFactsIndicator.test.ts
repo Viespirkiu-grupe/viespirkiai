@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { zodContract, type ParameterEntry, type SubjectFacts, type Verdict } from "../../modules/risk/contracts.ts";
-import { RowLocalSqlIndicator } from "../../modules/risk/rowLocalSqlIndicator.ts";
+import { zodContract, type ParameterEntry, type SubjectFacts, type Decision } from "../../modules/risk/contracts.ts";
+import { SubjectFactsIndicator } from "../../modules/risk/subjectFactsIndicator.ts";
 import type { RiskDataSource } from "../../modules/risk/riskDataSource.ts";
 
 // The shared half of every row-local indicator, tested once here rather than
-// in each indicator's directory (risk-service-architecture.md §11): argument
+// in each indicator's directory (risk-service-architecture.md §8): argument
 // binding, parameter resolution, the not_applicable rule, and every
-// observation field a verdict does not return.
+// observation field a decision does not return.
 
 const paramsSchema = z.object({ threshold: z.number() });
 const paramsContract = zodContract(paramsSchema);
@@ -49,10 +49,10 @@ function facts(overrides: Partial<TestFacts> = {}): TestFacts {
 function makeIndicator(
     options: {
         parameters?: readonly ParameterEntry<TestParameters>[];
-        verdict?: (facts: TestFacts, parameters: TestParameters) => Verdict;
+        decide?: (facts: TestFacts, parameters: TestParameters) => Decision;
     } = {},
 ) {
-    return new RowLocalSqlIndicator<TestFacts, TestParameters>(
+    return new SubjectFactsIndicator<TestFacts, TestParameters>(
         {
             key: { id: "LT-TEST-01", version: 3 },
             lifecycle: "active",
@@ -71,8 +71,8 @@ function makeIndicator(
                 limitationLt: "limitation",
             },
             sqlFile: "./fixtures/collect.sql",
-            verdict:
-                options.verdict ??
+            decide:
+                options.decide ??
                 ((row, parameters) => ({
                     state: row.measured < parameters.threshold ? "triggered" : "not_triggered",
                     rawValue: { measured: row.measured },
@@ -85,7 +85,7 @@ function makeIndicator(
 
 const RUN = { runId: 7, dataAsOf: "2026-08-01", subjects: null } as const;
 
-describe("RowLocalSqlIndicator", () => {
+describe("SubjectFactsIndicator", () => {
     it("binds the cutoff and the subject filter, and nothing else", async () => {
         const data = new StubDataSource([facts()]);
         await makeIndicator().evaluate({ ...RUN, subjects: ["1", "2"] }, data);
@@ -100,7 +100,7 @@ describe("RowLocalSqlIndicator", () => {
         expect(data.calls[0].params).toEqual(["2026-08-01", null]);
     });
 
-    it("assembles the observation fields a verdict does not return", async () => {
+    it("assembles the observation fields a decision does not return", async () => {
         const data = new StubDataSource([facts({ measured: 4 })]);
         const [observation] = await makeIndicator().evaluate(RUN, data);
 
@@ -121,9 +121,9 @@ describe("RowLocalSqlIndicator", () => {
         });
     });
 
-    it("defaults the optional verdict fields rather than leaving them undefined", async () => {
+    it("defaults the optional decision fields rather than leaving them undefined", async () => {
         const data = new StubDataSource([facts()]);
-        const indicator = makeIndicator({ verdict: () => ({ state: "insufficient_data" }) });
+        const indicator = makeIndicator({ decide: () => ({ state: "insufficient_data" }) });
         const [observation] = await indicator.evaluate(RUN, data);
 
         expect(observation.rawValue).toBeNull();
@@ -153,12 +153,12 @@ describe("RowLocalSqlIndicator", () => {
 
     // The rule that most wants a single home: a subject no reviewed threshold
     // covers can never be published as triggered.
-    it("reports not_applicable without calling verdict when no entry applies", async () => {
+    it("reports not_applicable without calling the rules when no entry applies", async () => {
         const data = new StubDataSource([facts({ method: "negotiated" })]);
         const indicator = makeIndicator({
             parameters: [{ ...OPEN_ENDED, scope: { methods: ["open"] } }],
-            verdict: () => {
-                throw new Error("verdict must not be called without an applicable parameter entry");
+            decide: () => {
+                throw new Error("the rules must not be called without an applicable parameter entry");
             },
         });
 

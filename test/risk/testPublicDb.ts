@@ -3,12 +3,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { riskDb } from "../../postgres/riskDb.js";
 
-// Test-only `public` schema shared by every Risk Indicator's calculate.it.ts:
+// Test-only `public` schema shared by every Risk Indicator's collect.it.ts:
 // applies migrations/risk/test/001_public_test_tables.sql plus the real
 // v_pirkimas/v_dalyviai view definitions (the same files the analyst MCP
 // tool uses) onto the local risk-dev Postgres, so calculation tests run the
 // real SQL against fixture rows — never against the real database. See
-// docs/indicators-story/risk-service-architecture.md §11.
+// docs/indicators-story/risk-service-architecture.md §8.
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 

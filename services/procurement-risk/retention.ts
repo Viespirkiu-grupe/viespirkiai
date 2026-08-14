@@ -2,7 +2,7 @@ import type { PoolClient } from "pg";
 import { log } from "../../utils/log.js";
 
 // Retention for the insert-only snapshot model (risk-service-architecture.md
-// §7.3). Every run writes a whole snapshot and the site reads exactly one, so
+// §6.3). Every run writes a whole snapshot and the site reads exactly one, so
 // what expires is a superseded run's rows, not individual signals.
 
 export const RETENTION_INTERVAL = "1 month";

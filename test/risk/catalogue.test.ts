@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildCatalogue } from "../../modules/risk/generateCatalogue.ts";
 
-// CI check per risk-service-architecture.md §11: catalogue.generated.json is
+// CI check per risk-service-architecture.md §8: catalogue.generated.json is
 // regenerated and compared against the definitions; a stale artefact fails
 // the build. Run `npm run risk:catalogue` to regenerate after changing an
 // indicator's public wording, lifecycle or parameters.

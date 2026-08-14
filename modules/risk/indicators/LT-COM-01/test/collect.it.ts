@@ -1,8 +1,8 @@
 // Integration test for LT-COM-01's collect.sql. Runs the real statement
 // against fixture rows in the local risk-dev Postgres's test-only `public`
-// schema, and asserts the *facts* it returns — the verdicts derived from them
-// are calculate.test.ts's job, and need no database
-// (risk-service-architecture.md §11).
+// schema, and asserts the *facts* it returns — the decisions derived from them
+// are rules.test.ts's job, and need no database
+// (risk-service-architecture.md §8).
 //
 // Named `.it.ts` to match this repo's integration-test convention
 // (vitest.integration.config.ts); run via `npm run test:integration`, which
@@ -16,7 +16,7 @@ import { ensurePublicTestSchema, truncateTestPublicTables } from "../../../../..
 import { PostgresRiskDataSource } from "../../../riskDataSource.ts";
 import type { RiskObservationV1 } from "../../../contracts.ts";
 import { ltCom01v1 } from "../definition.ts";
-import type { LtCom01Facts } from "../calculate.ts";
+import type { LtCom01Facts } from "../rules.ts";
 import {
     duplicateBidderRows,
     lateReport,
@@ -165,7 +165,7 @@ describe("LT-COM-01 end to end", () => {
         return ltCom01v1.evaluate({ runId: 1, dataAsOf, subjects: null }, facts);
     }
 
-    it("assembles a complete observation from a fact row and a verdict", async () => {
+    it("assembles a complete observation from a fact row and a decision", async () => {
         await insertProcurement(singleBidder);
         const [observation] = await evaluate();
 

@@ -1,12 +1,12 @@
-import type { LtCom01Facts } from "../calculate.ts";
+import type { LtCom01Facts } from "../rules.ts";
 
 // Deterministic cases shared by both halves of the indicator's tests.
 //
 // Each fixture is a procurement shape *and* the fact rows collect.sql must
-// produce from it. calculate.it.ts asserts the SQL returns exactly `facts`;
-// calculate.test.ts feeds those same rows to ltCom01Verdict. The two tests
+// produce from it. collect.it.ts asserts the SQL returns exactly `facts`;
+// rules.test.ts feeds those same rows to ltCom01Decide. The two tests
 // therefore meet on one value rather than on two independent guesses about
-// what a fact row looks like (risk-service-architecture.md §11).
+// what a fact row looks like (risk-service-architecture.md §8).
 
 export type BidderFixture = Readonly<{ kodas: string; valid: boolean }>;
 export type LotFixture = Readonly<{ daliesNumeris: string | null; bidders: readonly BidderFixture[] }>;
@@ -229,7 +229,7 @@ export const reportedBeforeParameters: ProcurementFixture = {
 
 // A fact row no fixture procurement produces: an ATN-1 report listing no
 // participants at all. It cannot be built through the ingestion tables (a lot
-// exists because a participant row exists), so it is a verdict-only case.
+// exists because a participant row exists), so it is a decision-only case.
 export const emptyReportFacts: LtCom01Facts = {
     subjectKey: "cvpis:900009:0",
     procurementSource: "cvpis",
