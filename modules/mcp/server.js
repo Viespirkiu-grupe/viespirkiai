@@ -4,6 +4,9 @@ import config from "../../utils/config.js";
 import { logToolCall } from "./mcpLogger.js";
 import * as getFailas from "./tools/getFailas.js";
 import * as getFailasTekstas from "./tools/getFailasTekstas.js";
+import * as getDokumentasTekstas from "./tools/getDokumentasTekstas.js";
+import * as getTeisesAktoTekstas from "./tools/getTeisesAktoTekstas.js";
+import * as getTeisesAktoIstrauka from "./tools/getTeisesAktoIstrauka.js";
 import * as getJuridinis from "./tools/getJuridinis.js";
 import * as getPinregAsmuo from "./tools/getPinregAsmuo.js";
 import * as getPinregJar from "./tools/getPinregJar.js";
@@ -43,6 +46,9 @@ const tools = config.enableExecuteQueryMcpOnly
     : [
           getFailas,
           getFailasTekstas,
+          getDokumentasTekstas,
+          getTeisesAktoTekstas,
+          getTeisesAktoIstrauka,
           getJuridinis,
           getPinregAsmuo,
           getPinregJar,

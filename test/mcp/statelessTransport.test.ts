@@ -60,6 +60,9 @@ describe('stateless MCP — 2026-07-28 era', () => {
     expect(payload.id).toBe(1);
     expect(Array.isArray(payload.result.tools)).toBe(true);
     expect(payload.result.tools.length).toBeGreaterThan(0);
+    expect(payload.result.tools.map((tool: any) => tool.name)).toContain('get_dokumentas_tekstas');
+    expect(payload.result.tools.map((tool: any) => tool.name)).toContain('get_teises_akto_tekstas');
+    expect(payload.result.tools.map((tool: any) => tool.name)).toContain('get_teises_akto_istrauka');
   });
 
   it('kiekviena užklausa nepriklausoma — antra be jokio ankstesnio konteksto', async () => {
