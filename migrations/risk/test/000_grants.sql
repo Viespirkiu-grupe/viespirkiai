@@ -5,6 +5,7 @@
 GRANT ALL ON SCHEMA public TO risk_rw;
 
 -- Also local-only: lets test suites DELETE their own fixture rows between
--- runs. Production risk_rw has no DELETE grant (risk-service-architecture.md
--- §1.2) — DELETE on risk.risk_signals is risk_maint's alone there.
+-- runs. Production risk_rw already holds DELETE on risk.risk_signals
+-- (risk-service-architecture.md §1.2); risk.evaluation_runs has no production
+-- DELETE grant, so that part of this grant is test-only.
 GRANT DELETE ON risk.risk_signals, risk.evaluation_runs TO risk_rw;

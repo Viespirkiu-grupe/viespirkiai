@@ -1,12 +1,11 @@
--- Test-only `public` tables: just the columns LT-COM-01's calculate.sql
--- reads, reproduced from the real column types (see dbSchema/, generated via
+-- Test-only `public` tables: just the columns LT-COM-01's collect.sql reads,
+-- reproduced from the real column types (see dbSchema/, generated via
 -- `npm run db:schema:dump` against the real database). No FKs to unrelated
 -- tables, no triggers, no generated/search columns — this schema exists only
--- so modules/risk/indicators/LT-COM-01/calculate.test.ts can run the real
--- SQL (public.v_pirkimas + public.v_dalyviai, applied on top of this file by
--- the test setup) against fixture rows, per risk-service-architecture.md §11
--- ("tests exercise the calculation through the same evaluation context the
--- run job supplies").
+-- so modules/risk/indicators/LT-COM-01/test/calculate.it.ts can run the real
+-- collection statement (public.v_pirkimas + public.v_dalyviai, applied on top
+-- of this file by the test setup) against fixture rows, per
+-- risk-service-architecture.md §11.
 --
 -- This file is applied only to the local risk-dev Postgres container, never
 -- to the real database.

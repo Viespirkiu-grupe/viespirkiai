@@ -29,6 +29,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS evaluation_runs_single_active_idx
 CREATE TABLE IF NOT EXISTS risk.risk_signals (
     id                 bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
+    -- which run produced it
+    run_id             bigint NOT NULL REFERENCES risk.evaluation_runs (id) ON DELETE CASCADE,
+
     -- what it is about
     subject_type       text NOT NULL,
     subject_key        text NOT NULL,
@@ -49,12 +52,8 @@ CREATE TABLE IF NOT EXISTS risk.risk_signals (
     error_info         jsonb,
     duration_ms        integer,
 
-    -- time
+    -- the run's cutoff, copied so a row explains itself without a join
     data_as_of         timestamptz NOT NULL,
-    valid_from         timestamptz NOT NULL DEFAULT now(),
-    valid_to           timestamptz,
-    checked_at         timestamptz NOT NULL DEFAULT now(),
-    run_id             bigint REFERENCES risk.evaluation_runs (id),
 
     CONSTRAINT risk_signals_subject_type_check
         CHECK (subject_type IN ('procurement', 'lot', 'contract', 'supplier')),
@@ -62,41 +61,50 @@ CREATE TABLE IF NOT EXISTS risk.risk_signals (
         CHECK (state IN ('triggered', 'not_triggered', 'insufficient_data', 'not_applicable', 'calculation_error'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS risk_signals_current_idx
-    ON risk.risk_signals (subject_type, subject_key, indicator_id) WHERE valid_to IS NULL;
+-- The integrity rule of a snapshot: one result per subject and indicator
+-- within a run. Its leading run_id also serves the subject lookup below.
+CREATE UNIQUE INDEX IF NOT EXISTS risk_signals_run_subject_idx
+    ON risk.risk_signals (run_id, subject_type, subject_key, indicator_id);
 
-CREATE INDEX IF NOT EXISTS risk_signals_procurement_current_idx
-    ON risk.risk_signals (procurement_source, procurement_id) WHERE valid_to IS NULL;
+-- Procurement detail page: every indicator state for one procurement, in the
+-- run the site is showing.
+CREATE INDEX IF NOT EXISTS risk_signals_run_procurement_idx
+    ON risk.risk_signals (run_id, procurement_source, procurement_id);
 
-CREATE INDEX IF NOT EXISTS risk_signals_procurement_history_idx
-    ON risk.risk_signals (procurement_source, procurement_id, valid_from DESC);
-
-CREATE INDEX IF NOT EXISTS risk_signals_triggered_idx
-    ON risk.risk_signals (indicator_id, data_as_of DESC) WHERE valid_to IS NULL AND state = 'triggered';
-
-CREATE INDEX IF NOT EXISTS risk_signals_closed_idx
-    ON risk.risk_signals (valid_to) WHERE valid_to IS NOT NULL;
-
-CREATE INDEX IF NOT EXISTS risk_signals_run_idx
-    ON risk.risk_signals (run_id);
+-- Methodology page and list filters: subjects one indicator triggered.
+CREATE INDEX IF NOT EXISTS risk_signals_run_triggered_idx
+    ON risk.risk_signals (run_id, indicator_id) WHERE state = 'triggered';
 
 CREATE INDEX IF NOT EXISTS risk_signals_evidence_gin
     ON risk.risk_signals USING gin (evidence jsonb_path_ops);
 
--- 3. List-page read model --------------------------------------------------
+-- 3. The run the site shows -----------------------------------------------
+
+-- One definition of "latest successful run", so the read model, the retention
+-- job and the application cannot disagree about which snapshot is live. A
+-- 'partial' run counts: it completed, and the indicators that failed in it
+-- simply contributed no rows.
+CREATE OR REPLACE VIEW risk.v_latest_run AS
+SELECT *
+FROM risk.evaluation_runs
+WHERE status IN ('succeeded', 'partial')
+ORDER BY started_at DESC
+LIMIT 1;
+
+-- 4. List-page read model --------------------------------------------------
 
 CREATE OR REPLACE VIEW risk.v_procurement_summaries AS
-SELECT procurement_source,
-       procurement_id,
-       count(*) FILTER (WHERE state = 'triggered')                       AS triggered_count,
-       count(*) FILTER (WHERE state = 'insufficient_data')               AS insufficient_data_count,
-       count(*) FILTER (WHERE state = 'not_applicable')                  AS not_applicable_count,
-       count(*) FILTER (WHERE state = 'calculation_error')               AS error_count,
-       count(*)                                                          AS evaluated_count,
-       array_agg(DISTINCT indicator_id) FILTER (WHERE state = 'triggered') AS triggered_indicators,
-       max(data_as_of)                                                   AS data_as_of,
-       min(checked_at)                                                   AS oldest_checked_at
-FROM risk.risk_signals
-WHERE valid_to IS NULL
-  AND procurement_id IS NOT NULL
-GROUP BY procurement_source, procurement_id;
+SELECT s.procurement_source,
+       s.procurement_id,
+       count(*) FILTER (WHERE s.state = 'triggered')                         AS triggered_count,
+       count(*) FILTER (WHERE s.state = 'insufficient_data')                 AS insufficient_data_count,
+       count(*) FILTER (WHERE s.state = 'not_applicable')                    AS not_applicable_count,
+       count(*) FILTER (WHERE s.state = 'calculation_error')                 AS error_count,
+       count(*)                                                              AS evaluated_count,
+       array_agg(DISTINCT s.indicator_id) FILTER (WHERE s.state = 'triggered') AS triggered_indicators,
+       min(s.run_id)                                                         AS run_id,
+       min(s.data_as_of)                                                     AS data_as_of
+FROM risk.risk_signals s
+         JOIN risk.v_latest_run r ON r.id = s.run_id
+WHERE s.procurement_id IS NOT NULL
+GROUP BY s.procurement_source, s.procurement_id;

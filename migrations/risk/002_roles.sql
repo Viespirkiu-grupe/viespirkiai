@@ -14,21 +14,22 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'risk_ro') THEN
         CREATE ROLE risk_ro LOGIN PASSWORD 'risk_ro';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'risk_maint') THEN
-        CREATE ROLE risk_maint LOGIN PASSWORD 'risk_maint';
-    END IF;
 END
 $$;
 
-GRANT USAGE ON SCHEMA risk TO risk_rw, risk_ro, risk_maint;
+GRANT USAGE ON SCHEMA risk TO risk_rw, risk_ro;
 
--- risk_rw: Process 2, recording results — SELECT, INSERT, UPDATE on risk.
-GRANT SELECT, INSERT, UPDATE ON risk.evaluation_runs, risk.risk_signals TO risk_rw;
+-- risk_rw: Process 2, recording results, and the scheduled retention job.
+-- Indicators are derived and can be recalculated at any time, so the writer
+-- and the retention sweep share one role instead of DELETE being fenced off
+-- behind a separate credential: a run row is opened and later closed, so
+-- evaluation_runs needs UPDATE, and risk_signals needs DELETE for retention
+-- to clear superseded run snapshots.
+GRANT SELECT, INSERT, UPDATE ON risk.evaluation_runs TO risk_rw;
+GRANT SELECT, INSERT, DELETE ON risk.risk_signals TO risk_rw;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA risk TO risk_rw;
-GRANT SELECT ON risk.v_procurement_summaries TO risk_rw;
+GRANT SELECT ON risk.v_latest_run, risk.v_procurement_summaries TO risk_rw;
 
 -- risk_ro: Process 3, read-only visualisation.
-GRANT SELECT ON risk.evaluation_runs, risk.risk_signals, risk.v_procurement_summaries TO risk_ro;
-
--- risk_maint: scheduled retention job — DELETE on risk.risk_signals only.
-GRANT SELECT, DELETE ON risk.risk_signals TO risk_maint;
+GRANT SELECT ON risk.evaluation_runs, risk.risk_signals TO risk_ro;
+GRANT SELECT ON risk.v_latest_run, risk.v_procurement_summaries TO risk_ro;

@@ -12,6 +12,7 @@
         "deps:report": "node scripts/dependencySizes.js",
         "db:schema:dump": "node postgres/dumpSchema.js",
         "risk:catalogue": "node modules/risk/generateCatalogue.ts",
+        "risk:retention": "node services/procurement-risk/retentionJob.ts",
         "risk:run": "node services/procurement-risk/index.ts",
         "regitra:atnaujinti": "node modules/regitra/atnaujintiRegitra.js",
         "sodra:atnaujinti": "node modules/sodra/atnaujintiSodra.js",

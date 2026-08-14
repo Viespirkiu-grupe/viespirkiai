@@ -52,8 +52,10 @@ Database schema: [`risk-schema.md`](risk-schema.md)
 
 The naming boundary is exact and worth stating, because the rest of the repository follows the opposite convention: the
 `public` schema is Data Ingestion's and keeps its Lithuanian domain names (`pirkimas`, `tiekejas`, `sutartis`,
-`jarKodas`). A risk calculation reading those views crosses the boundary in a single statement, and the rule is
-positional — Lithuanian on the left of an `AS`, English on the right ([§5.4](#54-sql-calculation-example)).
+`jarKodas`). A risk calculation reading those views crosses the boundary in exactly one place — the collection
+statement — and the rule is positional: Lithuanian on the left of an `AS`, English on the right
+([§5.4](#54-collection-and-judgement-example)). Everything downstream of that statement, including the fact rows it
+returns, is English, because it is already inside the Procurement Risk Service.
 
 The OCP guide describes an indicator through its definition, reason for being a red flag, required data, method, unit of
 analysis, procurement stage, example and source. The local indicator package preserves these fields and adds operational
@@ -95,7 +97,7 @@ processes are built from.
 ```mermaid
 flowchart TB
     subgraph nGit["Artefact source: Git repository"]
-        gDef["modules/risk/indicators/**<br/>definition.ts · parameters.ts · calculate.sql · tests"]
+        gDef["modules/risk/indicators/**<br/>definition.ts · parameters.ts · collect.sql · calculate.ts · test/"]
         gCat["modules/risk/catalogue.generated.json<br/>public metadata of every version"]
         gDef -.->|" generated and verified in CI "| gCat
     end
@@ -131,7 +133,7 @@ flowchart TB
         end
         subgraph sRisk["Schema risk — two tables and one view"]
             dRun[("evaluation_runs<br/>one row per evaluation run")]
-            dSig[("risk_signals<br/>current + history in one table,<br/>current = valid_to IS NULL")]
+            dSig[("risk_signals<br/>one insert-only snapshot per run,<br/>keyed by run_id")]
             dSum["v_procurement_summaries<br/>list-page aggregate"]
             dSig -.->|" aggregated by "| dSum
         end
@@ -142,7 +144,7 @@ flowchart TB
     pIngest -->|" viespirkiai_rw: normalised source rows "| dSrc
     pJob -->|" risk_rw: open the run, stamp cutoff and commit X "| dRun
     pJob -->|" risk_calc: read-only SELECT of facts as of cutoff "| dView
-    pPub -->|" risk_rw: bump checked_at, or close row and insert new "| dSig
+    pPub -->|" risk_rw: INSERT this run's rows; no UPDATE grant "| dSig
     pPub -->|" risk_rw: close the run with per-indicator statistics "| dRun
     pWeb -->|" risk_ro: current signals and history "| dSig
     pWeb -->|" risk_ro: list-page aggregate "| dSum
@@ -152,16 +154,18 @@ flowchart TB
 
 Database roles make the process separation enforceable rather than conventional:
 
-| Role                         | Used by                          | Grants                                                                                                 |
-|------------------------------|----------------------------------|--------------------------------------------------------------------------------------------------------|
-| `viespirkiai_rw`             | Process 1                        | Read/write on `public`                                                                                 |
-| `risk_calc`                  | Process 2, during a calculation  | `SELECT` on the `public` canonical views, used inside a read-only transaction with a statement timeout |
-| `risk_rw`                    | Process 2, for recording results | `SELECT`, `INSERT`, `UPDATE` on `risk`                                                                 |
-| `risk_ro` / `viespirkiai_ro` | Process 3                        | `SELECT` on the `risk` tables and view and on the `public` canonical views                             |
-| `risk_maint`                 | Scheduled retention job          | `DELETE` on `risk.risk_signals` ([`risk-schema.md`](risk-schema.md) §4)                                |
+| Role                         | Used by                                            | Grants                                                                                                          |
+|------------------------------|-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `viespirkiai_rw`             | Process 1                                          | Read/write on `public`                                                                                          |
+| `risk_calc`                  | Process 2, during a calculation                    | `SELECT` on the `public` canonical views, used inside a read-only transaction with a statement timeout          |
+| `risk_rw`                    | Process 2, for recording results, and the scheduled retention job | `SELECT`, `INSERT`, `UPDATE` on `risk.evaluation_runs`; `SELECT`, `INSERT`, `DELETE` on `risk.risk_signals`, no `UPDATE` |
+| `risk_ro` / `viespirkiai_ro` | Process 3                                          | `SELECT` on the `risk` tables and view and on the `public` canonical views                                      |
 
-Closed signal rows are the recent-change history, so removing them is a scheduled maintenance concern held by its own
-role rather than an application capability.
+`risk_rw` writes rows and can never alter one in place — there is no `UPDATE` grant on `risk.risk_signals` — but it
+does hold `DELETE`, because it is also the role the retention job runs as ([`risk-schema.md`](risk-schema.md) §5).
+Indicators are derived and can be recalculated at any time, so deletion of superseded snapshots doesn't need to be
+fenced off behind a separate role: immutability of a *written* row is what matters, not who is allowed to remove a
+whole superseded one.
 
 A new indicator version becomes active once both Process 2 and Process 3 run the same commit;
 [§10.1](#101-adding-a-risk-indicator) makes this a step in the procedure. A page that meets an observation whose version
@@ -176,7 +180,7 @@ summarises the database and links the full DDL in [`risk-schema.md`](risk-schema
 |-----------------|------------------------------------|---------------------------------------------------------------------------------------------------------------------------|------------------------------------|---------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
 | **Definitions** | Git — `modules/risk/indicators/**` | Identity, versions, lifecycle, public wording, effective-dated parameters, calculation, tests                             | A reviewed and merged pull request | Yes, via `catalogue.generated.json` built into the web bundle | Forever, as repository history                                                                  |
 | **Runs**        | `risk.evaluation_runs`             | One row per evaluation run: cutoff, code commit, state, per-indicator statistics                                          | Risk Indicators Processing         | Yes — the freshness label and the "is the job healthy" check  | Forever; ~365 rows a year                                                                       |
-| **Signals**     | `risk.risk_signals`                | Every current and historical `(subject, indicator)` result state, with evidence, applied parameters and the producing run | Risk Indicators Processing         | Yes — this is the public read model                           | Current rows forever; closed rows are the recent-change history and are deleted after one month |
+| **Signals**     | `risk.risk_signals`                | One insert-only snapshot per run: every `(subject, indicator)` result state, with evidence, applied parameters and the producing run | Risk Indicators Processing         | Yes — the newest completed run is the public read model        | Snapshots older than one month are deleted, except the one the site is showing |
 
 The flow is one-way, **definitions + facts → signals**: a calculation reads the deployed definition and the `public`
 schema and produces rows. Because definitions live outside the database, a signal row is self-sufficient — it stores the
@@ -203,7 +207,7 @@ flowchart LR
         M["Git: Risk Indicator definitions<br/>and effective-dated parameters"]
         G["Risk Indicators Registry"]
         K["Risk Indicators Run Job"]
-        I["Risk Indicator calculation<br/>packaged SELECT, or a function over it"]
+        I["Risk Indicator calculation<br/>collect facts in SQL, judge them in TypeScript"]
         T["Risk Signal Validator"]
         P["Risk Signals Writer"]
         M -.->|" deployed code, loaded and validated at startup "| G
@@ -229,7 +233,7 @@ flowchart LR
     C -->|" canonical facts as of cutoff "| I
     I -->|" standard observation rows "| T
     T -->|" validated rows "| P
-    P -->|" unchanged: bump checked_at<br/>changed: close row, insert new "| H
+    P -->|" append this run's snapshot "| H
     P -->|" per-indicator statistics, terminal state "| J
     H -->|" current signals, detail and history "| A
     R -->|" list page ordering and counts "| A
@@ -246,10 +250,10 @@ flowchart LR
 | Risk Indicators Registry    | 2       | Immutable in-process TypeScript catalogue, built from the deployed code at startup                                                                                                                                        | Resolves `(indicator ID, version)` to one validated Risk Indicator: implementation, subject, lifecycle, inputs, effective parameters, output contract and public methodology. Section 5.2 defines it precisely.                                                                                                     |
 | Evaluation run              | 2       | `risk.evaluation_runs`                                                                                                                                                                                                    | One durable row per run holding cutoff, code commit, terminal state and per-indicator statistics. It answers whether the job ran and whether it succeeded.                                                                                                                                                          |
 | Risk Indicators Run Job     | 2       | One sequential TypeScript loop, single instance guaranteed by an advisory lock                                                                                                                                            | Takes the advisory lock, opens the run row with the cutoff, walks the registry's active versions and invokes each declared calculation with the cutoff and the effective parameters, recording the outcome into `statistics`. It is indicator-independent: one failing indicator is recorded and the run continues. |
-| Risk Indicator calculation  | 2       | One function per indicator version, living in its own directory — most often the `{ sqlFile }` shorthand for a single packaged `SELECT`, otherwise a `calculate.ts` that runs its own packaged SQL and processes the rows | Produces the standard observation rows for one indicator at one cutoff, reading canonical facts through the evaluation context ([§5.3.1](#531-the-calculation-contract)).                                                                                                                                           |
+| Risk Indicator calculation  | 2       | One indicator directory: a packaged `SELECT` that collects facts, and a pure TypeScript function that judges them — wired together by the shared `RowLocalSqlIndicator` for the common shape, or by a `RiskIndicator` subclass in `calculate.ts` for a harder one | Produces the standard observation rows for one indicator at one cutoff, reading canonical facts through the evaluation context ([§5.3.1](#531-the-calculation-contract)).                                                                                                                                           |
 | Risk Signal Validator       | 2       | Shared TypeScript validation module plus database permissions                                                                                                                                                             | Validates the returned rows: field types, allowed states, subject and indicator identity, evidence size, duplicate keys and cross-row invariants. SQL safety comes from a read-only role, a read-only transaction and a statement timeout.                                                                          |
-| Risk Signals Writer         | 2       | Shared TypeScript module issuing indicator-independent PostgreSQL statements                                                                                                                                              | Sends the validated observations to PostgreSQL as one set and lets the database decide what changed: it advances `checked_at`, closes every current row whose result columns differ from the incoming one, and inserts the replacements — three statements per indicator, in one transaction.                       |
-| Risk signals                | 2 → 3   | `risk.risk_signals`                                                                                                                                                                                                       | Holds current and historical state together, distinguished by `valid_to IS NULL`. Preserves state, evidence, indicator version, applied parameter values and `data_as_of` for audit and history queries. Result columns are immutable after insert.                                                                 |
+| Risk Signals Writer         | 2       | Shared TypeScript module issuing one indicator-independent `INSERT`                                                                                                                                                       | Appends the validated observations to the open run's snapshot — one statement per indicator, in the caller's transaction. It compares nothing and updates nothing, because `risk_signals` is insert-only.                                                                                                          |
+| Risk signals                | 2 → 3   | `risk.risk_signals`                                                                                                                                                                                                       | Holds one immutable snapshot per run: state, evidence, indicator version, applied parameter values and the run's cutoff. Rows are never modified after insert; a superseded snapshot is deleted whole.                                                                                                             |
 | Procurement summary         | 2 → 3   | `risk.v_procurement_summaries`                                                                                                                                                                                            | Aggregates current signals per procurement for list-page counts, ordering and filters.                                                                                                                                                                                                                              |
 | Astro read-only routes      | 3       | Existing web application using a read-only role                                                                                                                                                                           | Query the `risk` signals, the summary view and the run row, and read all indicator wording from `catalogue.generated.json`. The web bundle excludes the registry and every calculation module.                                                                                                                      |
 | Public risk pages and API   | 3       | Browser-visible HTML and public JSON                                                                                                                                                                                      | Display the list, procurement detail and methodology with evidence, freshness and “signal is not proof” wording.                                                                                                                                                                                                    |
@@ -441,26 +445,23 @@ rather than as a clean bill of health.
 
 ### 3.3 Change history
 
-The page shows a short history of signal appearance, change and clearance:
+**Not in this design.** The page states what is true in the current snapshot and how fresh that snapshot is; it does not
+show when a signal appeared or cleared.
 
-```text
-2026-08-10 19:05  LT-TRA-03 appeared after a new document version was observed
-2026-08-09 18:10  LT-PRO-08 recalculated: deadline extended from 3.8 to 4.8 days
-2026-08-06 14:02  First evaluation completed
-```
+This follows directly from [§7.2](#72-one-insert-only-snapshot-per-run): the site reads exactly one run, and a history
+panel is by definition a question about earlier ones. Answering it from `risk_signals` would mean scanning the previous
+run's snapshot and diffing it — 20M rows against 20M rows — on a page request, and it would go blank as soon as the
+comparison run fell outside the retention window. Neither is acceptable for a public page.
 
-The history derives from the signal rows themselves. It is one query — every row for this procurement ordered by
-`valid_from` — because a closed row (`valid_to IS NOT NULL`) is exactly a state that used to be shown. Each line's
-timestamp is that row's `valid_from`, and the reason for the change follows from comparing its `raw_value` and
-`indicator_version` with the row it replaced.
+The cost is real and worth stating plainly: a reader cannot see that a flag was raised last Tuesday, and cannot tell a
+signal that changed because the *procurement* changed from one that changed because the *methodology* did. The page must
+therefore not imply either — no "new" badges, no "since" wording.
 
-The page preserves two distinctions the data supports:
-
-- a signal that **stopped** (a new row with a different state) against one that is merely **stale** (no new row, and
-  `checked_at` falling behind);
-- a change caused by the **procurement** (same indicator version, different measured value) against one caused by **the
-  methodology** (a new `indicator_version`, or the same version with different `applied_parameters`). Presenting a
-  threshold change as a change in the buyer's behaviour would misrepresent the record.
+Bringing it back is a separate, narrow addition rather than a change to this model: a small append-only
+`risk_signal_changes` table, written by the run job when a subject's state differs from the previous run, holding one
+row per actual change instead of one per evaluation. That is a few thousand rows a night rather than 20M, it survives
+retention independently, and it is a query on its own small table. Deliberately out of scope until the read model exists
+and someone wants the feature.
 
 ## 4. Public methodology catalogue
 
@@ -519,9 +520,10 @@ modules/risk/indicators/LT-PRO-08/     ← one directory = one Risk Indicator
 │   │                    limitationLt, formulaLt — the only text the web renders
 │   ├── requiredInputs   fields that must be present, else 'insufficient_data'
 │   ├── applicability    scope rules that decide 'not_applicable'
-│   ├── sourceRelations  canonical views the calculation reads
-│   ├── calculation      the one function that produces observations, or the
-│   │                    { sqlFile } shorthand for the common one-SELECT case
+│   ├── sourceRelations  canonical views the collection statement reads
+│   ├── sqlFile          the packaged SELECT that collects this indicator's facts
+│   ├── verdict          the pure function that judges one fact row, imported
+│   │                    from calculate.ts
 │   └── outputContract   runtime validation of the rows the calculation returns
 │
 ├── parameters.ts        WHAT IT COMPARES AGAINST. An append-only, effective-dated
@@ -530,44 +532,74 @@ modules/risk/indicators/LT-PRO-08/     ← one directory = one Risk Indicator
 │   └── entries[]        { validFrom, validTo, scope: { methods, objectTypes },
 │                          values: { minimumDays: 10, ... }, source, note }
 │
-├── calculate.sql        HOW IT CALCULATES, for the common case: one pure,
-│                        parameterised SELECT — $1 run ID, $2 data_as_of, $3
-│                        effective parameters, $4 optional subject filter.
-│   and/or
-├── calculate.ts         HOW IT CALCULATES, for an indicator with an internal
-│                        shape: an ordinary function over the evaluation context,
-│                        free to run its own packaged .sql files from this
-│                        directory, process the rows and assemble the
-│                        observations. Same inputs and same output contract
-│                        either way (§5.3.1).
+├── collect.sql          WHAT IS TRUE. One pure, parameterised SELECT returning
+│                        one fact row per subject — $1 data_as_of, $2 optional
+│                        subject filter. It reports measurements; it decides
+│                        nothing. No indicator identity, no state, no thresholds
+│                        (§5.4).
 │
-├── fixtures.ts          PROOF IT IS RIGHT. Deterministic input rows for the
-│                        triggered / not-triggered / insufficient / not-applicable
-│                        cases, boundary values and effective-date transitions.
-├── calculate.test.ts    Assertions over those fixtures, run in CI.
+├── calculate.ts         HOW IT JUDGES. For the common shape, the pure function
+│                        verdict(facts, parameters) => Verdict: state plus the
+│                        rawValue, threshold, evidence and missingData that
+│                        explain it. It touches no database and no clock, so its
+│                        tests need neither. An indicator with an internal shape
+│                        exports a RiskIndicator subclass here instead, free to
+│                        run several packaged .sql files from this directory.
+│                        Same output contract either way (§5.3.1).
+│
+├── test/                PROOF IT IS RIGHT. Everything that only exists to check
+│   │                    the indicator, kept out of the four files that define it,
+│   │                    so `ls` on the directory answers "what is this indicator?"
+│   │                    and one level down answers "how do we know it works?".
+│   ├── fixtures.ts      Deterministic cases for the triggered / not-triggered /
+│   │                    insufficient / not-applicable outcomes, boundary values and
+│   │                    effective-date transitions. Each case states both the source
+│   │                    rows and the fact row collect.sql must produce from them, so
+│   │                    the two test files below meet on one value.
+│   ├── calculate.test.ts  Assertions over those fixtures — verdict() alone, no
+│   │                    database, run on every `npm test`.
+│   └── calculate.it.ts  Integration proof that collect.sql returns the fact rows
+│                        the fixtures describe, run against a real PostgreSQL.
 │
 └── README.md            Optional reviewer context: interpretation notes, known
                          false positives, decisions taken during review.
 ```
 
 Read that as the definition of the entity: **identity + lifecycle + public wording + applicability + parameter
-timeline + exactly one calculation + tests**. A change to any file in the directory is a change to the indicator,
-visible in one `git log modules/risk/indicators/LT-PRO-08/`.
+timeline + exactly one collection + exactly one judgement + tests**. Four files define the indicator and `test/` holds
+everything that only proves it; a change to any of them is a change to the indicator, visible in one
+`git log modules/risk/indicators/LT-PRO-08/`.
+
+The split between `collect.sql` and `calculate.ts` is the load-bearing one, and the rule is a single sentence: **SQL
+states what is true about a subject, TypeScript decides what that means.** Counting, joining, filtering and aggregating
+are what a set-based engine is for; comparing a measurement to a threshold, choosing between four states and assembling
+an explanation are ordinary branching code, and they are the part a reviewer actually needs to read. Keeping them apart
+means neither file has to be read to understand the other, and the judgement half is testable with plain objects.
 
 The rest of the repository is shared machinery that every indicator reuses:
 
 ```text
 modules/risk/
-  contracts.ts               # shared observation and run contracts
-  registry.ts                # explicit imports of every Risk Indicator version
+  contracts.ts               # shared observation, fact-row and verdict contract values
+  riskIndicator.ts           # the RiskIndicator base class: self-checks, effective
+                             # parameters, evaluate(), output and cross-row validation
+  rowLocalSqlIndicator.ts    # collect-then-judge: binds $1/$2, resolves the parameter
+                             # entry per fact row, calls verdict(), assembles observations
+  parameterScope.ts          # scope matching and disjointness, shared by the startup
+                             # check and the per-subject parameter lookup
+  evaluationContext.ts       # what one run evaluates: cutoff, subjects, parameters
+  riskDataSource.ts          # how a calculation reaches a database (the only port)
+  registry.ts                # the catalogue class: lookup, active and evaluable sets
+  deployedIndicators.ts      # explicit imports of every Risk Indicator version
   sqlLoader.ts               # loads packaged SQL at process start
   catalogue.generated.json   # public metadata of all versions, generated from the
                              # definitions, committed, verified in CI, imported by Astro
 services/procurement-risk/
   index.ts                   # service entry point and single-instance advisory lock
   runJob.ts                  # opens the run, executes Risk Indicators one at a time
-  validate.ts                # runtime output and cross-row checks
-  write.ts                   # column comparison, close-and-append into risk.risk_signals
+  write.ts                   # one INSERT of the run's rows into risk.risk_signals
+  retention.ts               # deletes superseded run snapshots, as risk_rw
+  retentionJob.ts            # its entry point: npm run risk:retention
 migrations/risk/
   001_risk.sql               # the whole schema: two tables and one view
 ```
@@ -589,12 +621,13 @@ Keeping the whole entity in Git gives:
 
 ### 5.2 The Risk Indicators Registry
 
-A **Risk Indicator definition** is a read-only TypeScript object conforming to the shared `RiskIndicator` contract. It
-describes how one exact indicator version is executed, validated, explained and audited. It is metadata and executable
-wiring around the formula.
+A **Risk Indicator definition** is a subclass instance of the shared `RiskIndicator` base class, constructed from a
+read-only metadata object. It describes how one exact indicator version is executed, validated, explained and audited.
+It is metadata and executable wiring around the formula.
 
 The definition is written in TypeScript regardless of what language the formula uses. LT-PRO-08 has a TypeScript
-definition while its calculation is a PostgreSQL `SELECT` in `calculate.sql`.
+definition, collects its facts with a PostgreSQL `SELECT` in `collect.sql`, and judges them with a TypeScript function
+in `calculate.ts`.
 
 Expressing the definition as a checked TypeScript type gives two layers of protection:
 
@@ -607,9 +640,9 @@ The **Risk Indicators Registry** is the immutable, explicitly constructed in-pro
 Indicator definition. Its key is `(indicator_id, implementation_version)`. Given that key, the Risk Indicators Run Job
 retrieves exactly one validated definition. The registry also answers which version is `active`, `shadow` or `retired`.
 
-`createRiskIndicatorRegistry` validates the definition files when the Procurement Risk Service starts. Each run stores
-the code commit it was deployed from, so any published result traces back to the exact repository state that produced
-it.
+Each indicator checks itself in its constructor, and `RiskIndicatorRegistry` checks what only a *set* can be wrong
+about; both run at import time, when the Procurement Risk Service starts. Each run stores the code commit it was
+deployed from, so any published result traces back to the exact repository state that produced it.
 
 A definition declares two kinds of input:
 
@@ -632,16 +665,22 @@ loop: a fact available to every indicator on equal terms.
 
 A run has exactly two inputs:
 
-- **`data_as_of` is the run's clock**, read once at run start and passed to every calculation as `$2`. It keeps one run
-  internally consistent — the first and the hundredth indicator agree on what "now" means — and makes a rerun at the
-  same cutoff reproducible for every deadline and age comparison. Every time comparison in an indicator's SQL goes
-  through `$2`, which is the enforceable form of "reproducible", and it is a test.
+- **`data_as_of` is the run's clock**, read once at run start and passed to every collection statement as `$1`. It keeps
+  one run internally consistent — the first and the hundredth indicator agree on what "now" means — and makes a rerun at
+  the same cutoff reproducible for every deadline and age comparison. Every time comparison goes through the cutoff,
+  never through `now()` and never through the process clock, which is the enforceable form of "reproducible", and it is
+  a test.
 - **The subject set is the indicator's own `WHERE` clause.** Each indicator has its own unit of analysis (procurement,
-  lot, contract, supplier) and its own applicability, so scoping belongs to the definition that owns it. `$4` carries an
+  lot, contract, supplier) and its own applicability, so scoping belongs to the definition that owns it. `$2` carries an
   explicit subject array for a backfill or a single-procurement rerun, and `NULL` for a normal full run.
 
+Those two are the collection statement's only arguments. Thresholds are not among them: a parameter entry is resolved in
+TypeScript and applied by `verdict()` ([§5.3.2](#532-parameter-resolution)), so the run cutoff reaches SQL and policy
+does not.
+
 A full run is one set-based query per indicator, so re-evaluating an unchanged procurement costs almost nothing on the
-read side. The write side is bounded by writing only on change ([§7.2](#72-current-state-and-history-in-one-table)).
+read side. Every run rewrites the whole snapshot, so the write side is bounded by the run's own row count and the
+retention window rather than by how much changed ([§7.2](#72-one-insert-only-snapshot-per-run)).
 
 ### 5.3 Definition and registry example
 
@@ -690,6 +729,28 @@ type RiskObservationV1 = Readonly<{
     dataAsOf: string;
 }>;
 
+// The columns every collect.sql returns, whatever else it measures. They are the
+// half of the observation that is the same for all 106 indicators, so the shared
+// class fills them in and no verdict() ever mentions them.
+type SubjectFacts = Readonly<{
+    subjectKey: string;
+    procurementSource: string | null;
+    procurementId: string | null;
+    // Read only by the shared scope test, and only when a parameter entry
+    // narrows the corresponding dimension (§5.3.2).
+    method?: string | null;
+    objectType?: string | null;
+}>;
+
+// The half a verdict decides: the state, and the values that explain it.
+type Verdict = Readonly<{
+    state: IndicatorState;
+    rawValue?: Readonly<Record<string, unknown>> | null;
+    threshold?: Readonly<Record<string, unknown>> | null;
+    evidence?: Readonly<Record<string, unknown>>;
+    missingData?: readonly string[];
+}>;
+
 type LtPro08Parameters = Readonly<{
     minimumDays: number;
     dayCounting: 'calendar_days' | 'business_days';
@@ -709,21 +770,32 @@ type ParameterEntry<P> = Readonly<{
     note?: string;
 }>;
 
-// The evaluation context is the way a calculation reaches data. `sql` runs a .sql
-// file packaged in the indicator's own directory, on the read-only risk_calc
-// connection, inside the run job's read-only transaction and statement timeout.
-type EvaluationContext = Readonly<{
+// What one run evaluates: the cutoff, the subject set, and the parameter entries
+// in force at that cutoff. A value object — it holds no database handle.
+type EvaluationRun = Readonly<{
     runId: number;
     dataAsOf: string;
-    parameters: readonly ParameterEntry<unknown>[];
     subjects: readonly string[] | null;
-    sql<T>(file: string, params?: readonly unknown[]): Promise<readonly T[]>;
 }>;
 
-// One contract, whatever the calculation is made of.
-type Calculation = (ctx: EvaluationContext) => Promise<readonly RiskObservationV1[]>;
+class EvaluationContext {
+    readonly runId: number;
+    readonly dataAsOf: string;
+    readonly subjects: readonly string[] | null;
+    readonly parameters: readonly ParameterEntry<unknown>[];
+    constructor(run: EvaluationRun, parameters: readonly ParameterEntry<unknown>[]);
+}
 
-type RiskIndicator<P> = Readonly<{
+// How a calculation reaches data — the one port between an indicator and a
+// database. The run job passes a source on the read-only risk_calc connection,
+// used inside its read-only transaction and statement timeout; a test passes one
+// on the local Postgres. PostgresRiskDataSource is the shipped implementation.
+interface RiskDataSource {
+    query<T>(sqlText: string, params?: readonly unknown[]): Promise<readonly T[]>;
+}
+
+// WHAT IT IS: the reviewable metadata of one version, with no behaviour of its own.
+type RiskIndicatorDefinition<P> = Readonly<{
     key: RiskIndicatorKey;
     lifecycle: IndicatorLifecycle;
     subjectType: SubjectType;
@@ -733,10 +805,7 @@ type RiskIndicator<P> = Readonly<{
     requiredInputs: readonly string[];
     parameters: readonly ParameterEntry<P>[];
     parameterContract: RuntimeContract<P>;
-    // defineRiskIndicator expands the { sqlFile } shorthand to (ctx) => ctx.sql(sqlFile),
-    // so the run job calls a Calculation and shared code stays implementation-agnostic.
-    calculation: Calculation | Readonly<{ sqlFile: string }>;
-    outputContract: RuntimeContract<RiskObservationV1>;
+    outputContract?: RuntimeContract<RiskObservationV1>;   // defaults to riskObservationV1Contract
     standard: Readonly<{ name: string; url: string; page?: number }>;
     public: Readonly<{
         titleLt: string;
@@ -745,6 +814,49 @@ type RiskIndicator<P> = Readonly<{
         limitationLt: string;
     }>;
 }>;
+
+// One indicator version. The constructor runs the startup checks; the one thing
+// that differs between indicators is the abstract calculate().
+abstract class RiskIndicator<P = unknown> {
+    constructor(definition: RiskIndicatorDefinition<P>);   // + readonly fields of the definition
+
+    get id(): RiskIndicatorKey['id'];
+    get version(): number;
+    get isActive(): boolean;
+    get isEvaluable(): boolean;                            // 'active' | 'shadow'
+
+    parametersAsOf(dataAsOf: string): readonly ParameterEntry<P>[];
+
+    // The one call the run job and the tests make: resolve this indicator's
+    // effective parameters for the cutoff, calculate, validate.
+    evaluate(run: EvaluationRun, data: RiskDataSource): Promise<readonly RiskObservationV1[]>;
+    validateObservations(observations: readonly unknown[]): readonly RiskObservationV1[];
+
+    protected abstract calculate(
+        context: EvaluationContext,
+        data: RiskDataSource,
+    ): Promise<readonly RiskObservationV1[]>;
+}
+
+// The common shape (§5.3.1): collect fact rows with one packaged SELECT, judge
+// each one with a pure function, and assemble the observations. The class owns
+// the $1/$2 calling convention, the parameter-entry lookup and everything on an
+// observation that is not a verdict, so an author writes SQL and a function and
+// nothing else.
+class RowLocalSqlIndicator<F extends SubjectFacts, P> extends RiskIndicator<P> {
+    constructor(
+        definition: RiskIndicatorDefinition<P> & {
+            sqlFile: string;
+            verdict: (facts: F, parameters: P) => Verdict;
+        },
+        definitionUrl: string,
+    );
+
+    protected async calculate(context: EvaluationContext, data: RiskDataSource) {
+        const facts = await data.query<F>(this.loadSql(), [context.dataAsOf, context.subjects]);
+        return facts.map((row) => this.observe(row, context.dataAsOf));
+    }
+}
 
 // parameters.ts — the effective-dated timeline. Append entries; close them with validTo.
 // A git diff of this file is the complete history of "who changed which threshold".
@@ -759,8 +871,37 @@ export const ltPro08Parameters: readonly ParameterEntry<LtPro08Parameters>[] = [
     },
 ];
 
-// definition.ts — the common case: one SELECT, declared as the shorthand.
-export const ltPro08v2 = defineRiskIndicator<LtPro08Parameters>({
+// calculate.ts — HOW IT JUDGES. A pure function over one fact row and the
+// parameter values in force for it. No database, no clock, no identity fields:
+// everything it does not return is assembled by RowLocalSqlIndicator.
+export type LtPro08Facts = SubjectFacts & Readonly<{
+    publicationDate: string | null;
+    submissionDeadline: string | null;
+    submissionDays: number | null;
+}>;
+
+export function ltPro08Verdict(facts: LtPro08Facts, {minimumDays}: LtPro08Parameters): Verdict {
+    const missingData = [
+        ...(facts.publicationDate === null ? ['publicationDate'] : []),
+        ...(facts.submissionDeadline === null ? ['submissionDeadline'] : []),
+    ];
+    const evidence = {
+        publicationDate: facts.publicationDate,
+        submissionDeadline: facts.submissionDeadline,
+        method: facts.method,
+    };
+    if (facts.submissionDays === null) return {state: 'insufficient_data', evidence, missingData};
+
+    return {
+        state: facts.submissionDays < minimumDays ? 'triggered' : 'not_triggered',
+        rawValue: {submissionWindowDays: facts.submissionDays},
+        threshold: {minimumDays},
+        evidence,
+    };
+}
+
+// definition.ts — the common shape: one collection statement and one verdict.
+export const ltPro08v2 = new RowLocalSqlIndicator<LtPro08Facts, LtPro08Parameters>({
     key: {id: 'LT-PRO-08', version: 2},
     lifecycle: 'active',
     subjectType: 'procurement',
@@ -770,8 +911,8 @@ export const ltPro08v2 = defineRiskIndicator<LtPro08Parameters>({
     requiredInputs: ['publicationDate', 'submissionDeadline', 'procurementMethod'],
     parameters: ltPro08Parameters,
     parameterContract: ltPro08ParametersContract,
-    calculation: {sqlFile: './calculate.sql'},
-    outputContract: riskObservationV1Contract,
+    sqlFile: './collect.sql',
+    verdict: ltPro08Verdict,
     standard: {
         name: 'OCP Red Flags in Public Procurement 2024',
         url: 'https://www.open-contracting.org/wp-content/uploads/2024/12/OCP2024-RedFlagProcurement.pdf',
@@ -783,52 +924,61 @@ export const ltPro08v2 = defineRiskIndicator<LtPro08Parameters>({
         formulaLt: 'submissionDeadline − publicationDate < taikoma riba',
         limitationLt: 'Trumpesnį laiką gali teisėtai paaiškinti pagreitinta procedūra ar kita išimtis.',
     },
-});
+}, import.meta.url);   // resolves sqlFile against this indicator's own directory
 
-// definition.ts of an indicator with an internal shape. Everything above the
-// `calculation` line is identical; the calculation itself is a function.
-export const ltCom14v1 = defineRiskIndicator<LtCom14Parameters>({
+// calculate.ts of an indicator with an internal shape: the same metadata, and a
+// calculate() of its own because one fact row per subject is not enough — it
+// collects a sequence per market and derives its subjects from it.
+class LtCom14 extends RiskIndicator<LtCom14Parameters> {
+    protected async calculate(context: EvaluationContext, data: RiskDataSource) {
+        const markets = await data.query<MarketRow>(collectSql, [context.dataAsOf, context.subjects]);
+        return markets.flatMap((market) => rotationObservations(market, context));
+    }
+}
+
+export const ltCom14v1 = new LtCom14({
     key: {id: 'LT-COM-14', version: 1},
     lifecycle: 'shadow',
     // ... same identity, lifecycle, parameters and public wording fields ...
-    calculation: async (ctx) => {
-        const markets = await ctx.sql<MarketRow>('./collect.sql', [ctx.dataAsOf]);
-        return markets.flatMap((m) => rotationObservations(m, ctx));
-    },
 });
 
-// registry.ts: registration is explicit and reviewable in a pull request.
+// deployedIndicators.ts: registration is explicit and reviewable in a pull request.
 const deployedIndicators = [
     ltPro08v2,
     ltCom14v1,
 ] as const satisfies readonly RiskIndicator<unknown>[];
 
-export const riskIndicatorRegistry = createRiskIndicatorRegistry(deployedIndicators);
+export const riskIndicatorRegistry = new RiskIndicatorRegistry(deployedIndicators);
 
 // runJob.ts: the whole plan. The set is unordered, the run cutoff selects the
 // parameter entries in force, and each indicator scopes its own subjects.
 const run = await openRun({dataAsOf: new Date(), codeCommit: COMMIT});
-for (const key of riskIndicatorRegistry.activeVersions()) {
-    const indicator = riskIndicatorRegistry.require(key);
-    const effective = riskIndicatorRegistry.parametersAsOf(key, run.dataAsOf);
-    // ... execute, validate, write; record the outcome in run.statistics
+const canonicalFacts = new PostgresRiskDataSource(readOnlyPool);
+for (const indicator of riskIndicatorRegistry.evaluable()) {
+    const observations = await indicator.evaluate(run, canonicalFacts);
+    // ... write; record the outcome in run.statistics
 }
 ```
 
-`defineRiskIndicator` freezes and type-checks one definition, validates every parameter entry against
-`parameterContract`, and expands a `{ sqlFile }` shorthand into a `Calculation`. `createRiskIndicatorRegistry` performs
-cross-definition and filesystem validation once at startup and exposes read-only lookup methods such as `require`,
-`activeVersions` and `parametersAsOf`. The Risk Indicators Run Job is generic: after lookup it calls
-`indicator.calculation(ctx)` and checks the rows against `indicator.outputContract`, so adding an indicator adds a
-directory and one registry line.
+The `RiskIndicator` constructor type-checks one definition, validates every parameter entry against
+`parameterContract`, and rejects a gapped or overlapping timeline. `RiskIndicatorRegistry` performs the
+cross-definition validation once at startup and exposes read-only lookup: `require`, `all`, `active` and `evaluable`.
+The Risk Indicators Run Job is generic: it calls `indicator.evaluate(run, data)` — which resolves the effective
+parameters, calculates and validates the rows against `outputContract` — so adding an indicator adds a directory and
+one registration line, and no caller can calculate without validating.
 
-`parametersAsOf` returns the entries whose validity range contains the run cutoff. Those entries are passed into the
-calculation, and the matched values are copied onto every observation the run produces, so a published signal carries
-its own threshold.
+`parametersAsOf` returns the entries whose validity range contains the run cutoff. `evaluate` resolves them for the
+indicator it belongs to, passes them into the calculation, and the matched values are copied onto every observation the
+run produces, so a published signal carries its own threshold.
 
 `RuntimeContract<T>` is a small project-owned interface with a `validate(unknown): T` operation. Stable stage,
 lifecycle, state and subject values are TypeScript unions backed by those runtime checks. Public text is versioned and
 reviewed, and the web application renders it from the catalogue artefact.
+
+Notice what `ltPro08Verdict` does not contain: no `indicatorId`, no `indicatorVersion`, no `subjectType`, no
+`subjectKey`, no `appliedParameters`, no `dataAsOf`, and no rule for what happens when no parameter entry applies. Those
+are identical for all 106 indicators, so they are written once in `RowLocalSqlIndicator` and cannot be got wrong in an
+indicator directory. What is left in the function is the indicator itself, and it fits on a screen.
 
 #### 5.3.1 The calculation contract
 
@@ -842,93 +992,150 @@ The [canonical catalogue](indicators-canonical.md) contains 106 indicators in fi
 | Traversal of the ownership and person-link graph  |      ~7 | LT-COI-02/03/06 shared owner or controller, LT-SUP-10 connected bidders, LT-COI-07 politically exposed person                                              |
 | Document text, spans and similarity               |      ~9 | LT-COM-16 similar bid documents, LT-PRO-10 tailored specifications, LT-AWD-07/08 award criteria, LT-EXE-09 delivery differs from specification             |
 
-The first shape is a single `SELECT`. The others have an internal structure — **collect, process, construct**.
+Every one of them is **collect, process, construct**. What differs is only how much structure the collect step has and
+how much work the process step does:
 
-All five satisfy **one** calculation contract, `(ctx) => Promise<RiskObservationV1[]>`, and `{ sqlFile }` is its
-shorthand for the first shape, expanded by `defineRiskIndicator` into `(ctx) => ctx.sql(file)`. Adding an indicator with
-a harder shape adds a directory.
+| Shape                             | Collect                                       | Process                                       | Construct                     |
+|-----------------------------------|-----------------------------------------------|-----------------------------------------------|-------------------------------|
+| Row-local (~60)                   | one fact row per subject                      | `verdict()`, a few branches                   | shared, in `RowLocalSqlIndicator` |
+| Population baseline (~18)         | one fact row per subject, carrying its peer benchmark | `verdict()`, a comparison                     | shared, in `RowLocalSqlIndicator` |
+| Statistic then threshold (~8)     | a sample per subject                          | the statistic, in TypeScript                  | own `calculate.ts`            |
+| Graph traversal (~7)              | edges                                         | traversal, and the path taken as evidence     | own `calculate.ts`            |
+| Text spans and similarity (~9)    | documents and spans                           | comparison, and the spans as evidence         | own `calculate.ts`            |
 
-Three properties follow:
+All five satisfy **one** calculation contract, `calculate(context, data) => Promise<RiskObservationV1[]>`.
+`RowLocalSqlIndicator` implements that contract once for the two shapes whose collect step is "one row per subject" —
+roughly 78 of the 106 — leaving their authors a `SELECT` and a function. The remaining shapes subclass `RiskIndicator`
+in their own `calculate.ts`, which is free to run several packaged statements and assemble the rows itself.
 
-- **The three phases are a convention.** They are how an author writes `calculate.ts` and names the files next to it
-  (`collect.sql`, then processing, then assembly). The steps differ between indicators — per lot, pairwise within a lot,
-  per market sequence, per document span — so the convention stays a naming convention. For the ~60 row-local indicators
-  the three phases collapse into one `SELECT`.
-- **The safety guarantees come from `ctx`.** Its `sql` runs packaged files from the indicator's own directory, on the
-  `risk_calc` role, inside a read-only transaction with a statement timeout. A TypeScript calculation and a SQL
+Four properties follow:
+
+- **The three phases are structural, not a naming convention.** Collection is always SQL, judgement is always
+  TypeScript, and assembly is always shared code. That boundary holds for every shape, which is why an indicator that
+  outgrows the row-local class changes only its middle phase.
+- **A collection statement never decides anything.** It carries no indicator identity, no state, no threshold and no
+  `data_as_of` echo. This is what makes an unreviewable 80-line `SELECT` impossible: the constructs that produced the
+  length — repeated `CASE` over a computed state, `jsonb_build_object` assembly, identity literals — have no place to
+  live in it.
+- **The safety guarantees come from the `RiskDataSource` the run job passes in.** It is the only way to a database,
+  on the `risk_calc` role, inside a read-only transaction with a statement timeout. A TypeScript calculation and a SQL
   calculation obtain identical database capability ([§5.6](#56-delegation-of-persistence-to-the-risk-signals-writer)).
 - **Shared or expensive intermediates become materialised views on measurement.** Several indicators in shapes two, four
   and five share an underlying computation — a peer benchmark per CPV division and method, the closure of the ownership
   graph. It stays a view, promoted to a `MATERIALIZED VIEW` refreshed before the indicator loop once the real corpus
   shows the need. It remains a canonical fact that every indicator reads on equal terms.
 
-### 5.4 SQL calculation example
+The dividing line between the row-local class and an own `calculate.ts` is one question: **is there exactly one fact row
+per subject?** If the collection statement can produce that row — including by aggregating, joining a benchmark, or
+window-functioning over peers — the indicator is row-local, however much SQL that takes. If the judgement needs several
+rows per subject, or produces subjects the statement did not enumerate, it is not.
 
-This is the common case of [§5.3.1](#531-the-calculation-contract): the whole calculation is one file, declared as
-`calculation: { sqlFile: './calculate.sql' }`. A `calculate.ts` indicator runs its own `.sql` files through `ctx.sql`
-with the same four arguments, so the statement below is also the collection step of every other indicator.
+#### 5.3.2 Parameter resolution
 
-The SQL file is one parameterised, read-only `SELECT` with four inputs: `$1` is the evaluation run ID, `$2` is the
-reproducible `data_as_of` cutoff, `$3` is the effective parameter entries the registry resolved from `parameters.ts` for
-that cutoff, and `$4` is an optional subject-key filter — `NULL` for a normal full run, or an explicit array for a
-backfill or a single-procurement rerun.
+A parameter entry is selected in TypeScript, per fact row, by `RowLocalSqlIndicator`, in two steps:
 
-The calculation reads the `public` schema only. Its thresholds arrive as an argument and its scope arrives as an
-argument, which is what makes `risk_calc` a role with grants on `public` alone.
+1. **By time.** `parametersAsOf(dataAsOf)` returns the entries whose validity range contains the run cutoff.
+2. **By scope.** Among those, the entry whose `scope` admits the row wins: `scope.methods`, when present, must contain
+   the row's `method`; `scope.objectTypes`, when present, must contain its `objectType`; an absent dimension admits
+   everything.
+
+Concurrently valid entries must have pairwise disjoint scopes, and entries sharing a scope must form a contiguous
+timeline — both checked in the `RiskIndicator` constructor at startup, so an indicator with an ambiguous or gapped
+timeline never runs. Together those two rules make the result of step 2 **at most one entry**, which is why the resolved
+values can be passed to `verdict()` as a plain `P` rather than a list to be searched.
+
+The two-dimensional selection is what lets one implementation version carry different legal thresholds for different
+procedure types — LT-PRO-08's ten days for an open procedure and a longer window for a restricted one are two
+concurrently valid entries with disjoint `scope.methods`, not two indicator versions.
+
+**When no entry admits a row, the observation is `not_applicable`** with `appliedParameters: null`, and the shared class
+decides that before `verdict()` is ever called. This is the rule that most wants to live in one place: an indicator
+cannot silently publish a `triggered` signal that no reviewed threshold stands behind, because the code path that would
+do so does not exist.
+
+### 5.4 Collection and judgement example
+
+This is LT-PRO-08 end to end, in the common shape of [§5.3.1](#531-the-calculation-contract). The three phases are three
+artefacts: `collect.sql` states what is true, `verdict()` in `calculate.ts` decides what it means, and
+`RowLocalSqlIndicator` assembles the observation. Only the first two live in the indicator's directory.
+
+#### Phase 1 — `collect.sql`: what is true
+
+One parameterised, read-only `SELECT` with two inputs: `$1` is the reproducible `data_as_of` cutoff, and `$2` is an
+optional subject filter — `NULL` for a normal full run, or an explicit array for a backfill or a single-procurement
+rerun. It reads the `public` schema only, which is what makes `risk_calc` a role with grants on `public` alone.
 
 ```sql
+-- LT-PRO-08 facts: one row per procurement, measured but not judged.
 WITH candidates AS (
-    -- The subject set is a predicate, not a table. $4 IS NULL means the whole
+    -- The subject set is a predicate, not a table. $2 IS NULL means the whole
     -- applicable population; an array restricts the run to those subjects.
     -- Columns here belong to the ingestion schema, so they stay Lithuanian.
     SELECT p.*
     FROM public.v_pirkimo_gyvavimo_ciklo_versijos p
-    WHERE p.galioja_nuo <= $2::timestamptz
-      AND (p.galioja_iki IS NULL OR p.galioja_iki > $2::timestamptz)
-      AND ($4:: text [] IS NULL
-       OR p.subjekto_raktas = ANY ($4:: text []))),
-     parameters AS (
-         -- $3 is the JSON array of entries already filtered to the run cutoff by the
-         -- registry; SQL picks the entry whose scope matches each row.
-         SELECT entry.value AS param_entry
-         FROM jsonb_array_elements($3::jsonb) AS entry(value)),
-     evaluated AS (SELECT c.*,
-                          p.param_entry -> 'values' AS applied_parameters,
-                          (p.param_entry -> 'values' ->> 'minimumDays')::numeric   AS minimum_days, EXTRACT(EPOCH FROM (c.terminas - c.paskelbta)) / 86400.0 AS submission_days
-                   FROM candidates c
-                            LEFT JOIN parameters p
-                                      ON p.param_entry -> 'scope' -> 'methods' ? c.pirkimo_budas)
--- The output aliases are the shared observation contract, and are English.
-SELECT 'LT-PRO-08'::text  AS indicator_id, 2::integer         AS indicator_version, 'procurement'::text AS subject_type, subjekto_raktas AS subject_key,
-       pirkimo_saltinis                                AS procurement_source,
-       pirkimo_id                                      AS procurement_id,
-       CASE
-           WHEN minimum_days IS NULL THEN 'not_applicable'
-           WHEN paskelbta IS NULL OR terminas IS NULL THEN 'insufficient_data'
-           WHEN submission_days < minimum_days THEN 'triggered'
-           ELSE 'not_triggered'
-           END::text      AS state, jsonb_build_object('submissionWindowDays', submission_days) AS raw_value,
-       jsonb_build_object('minimumDays', minimum_days) AS threshold,
-       applied_parameters,
-       jsonb_build_object(
-               'publicationDate', paskelbta,
-               'submissionDeadline', terminas,
-               'method', pirkimo_budas
-       )                                               AS evidence,
-       (CASE WHEN paskelbta IS NULL THEN jsonb_build_array('publicationDate') ELSE '[]'::jsonb END
-           || CASE WHEN terminas IS NULL THEN jsonb_build_array('submissionDeadline') ELSE '[]'::jsonb END)
-                                                       AS missing_data,
-       $2::timestamptz    AS data_as_of
-FROM evaluated;
+    WHERE p.galioja_nuo <= $1::timestamptz
+      AND (p.galioja_iki IS NULL OR p.galioja_iki > $1::timestamptz)
+      AND ($2::text[] IS NULL OR p.subjekto_raktas = ANY ($2::text[]))
+)
+-- Every alias is English: past this statement we are inside the risk service.
+SELECT subjekto_raktas                                            AS "subjectKey",
+       pirkimo_saltinis                                           AS "procurementSource",
+       pirkimo_id                                                 AS "procurementId",
+       pirkimo_budas                                              AS "method",
+       pirkimo_objektas                                           AS "objectType",
+       paskelbta                                                  AS "publicationDate",
+       terminas                                                   AS "submissionDeadline",
+       EXTRACT(EPOCH FROM (terminas - paskelbta)) / 86400.0       AS "submissionDays"
+FROM candidates;
 ```
 
 The mapping rule is visible in that one statement: everything to the left of an `AS` may be Lithuanian, because it
-belongs to the ingestion schema; everything to the right is the risk observation contract, and is English.
+belongs to the ingestion schema; everything to the right is the risk service's own vocabulary, and is English. Four of
+the aliases (`subjectKey`, `procurementSource`, `procurementId`, and `method`/`objectType` where a parameter scope needs
+them) are the shared `SubjectFacts` contract; the rest are this indicator's measurements.
 
-`applied_parameters` is the exact threshold object that decided the row. Carrying the values instead of a foreign key is
-what keeps a signal explainable after the parameter timeline moves on.
+`submissionDays` is computed in SQL because the subtraction is relational work over columns the statement already has.
+`minimumDays` is nowhere in the file, because a threshold is policy, and the statement holds no policy.
 
-The statement returns the observation contract and nothing else: identity, subject, state, measured values, evidence,
+#### Phase 2 — `verdict()` in `calculate.ts`: what it means
+
+`ltPro08Verdict` in [§5.3](#53-definition-and-registry-example) is the whole of it: a total function from one fact row
+and one set of parameter values to a state and its explanation. It has no `await`, no `data`, no `now()` and no branch
+for "no parameters" — the shared class has already established that an entry applies before calling it. A test of it is
+a plain object in and a plain object out.
+
+#### Phase 3 — `RowLocalSqlIndicator`: the observation
+
+The shared class binds `$1`/`$2`, resolves the parameter entry for each row ([§5.3.2](#532-parameter-resolution)), calls
+`verdict`, and fills in everything a verdict does not return:
+
+```ts
+const entry = resolveEntry(this.parametersAsOf(dataAsOf), facts);
+const verdict = entry ? this.verdict(facts, entry.values) : {state: 'not_applicable'};
+
+return {
+    indicatorId: this.key.id,              // from the definition, never from SQL
+    indicatorVersion: this.key.version,
+    subjectType: this.subjectType,
+    subjectKey: facts.subjectKey,
+    procurementSource: facts.procurementSource,
+    procurementId: facts.procurementId,
+    state: verdict.state,
+    rawValue: verdict.rawValue ?? null,
+    threshold: verdict.threshold ?? null,
+    appliedParameters: entry?.values ?? null,
+    evidence: verdict.evidence ?? {},
+    missingData: verdict.missingData ?? [],
+    dataAsOf,                              // the run's cutoff, not an echoed argument
+};
+```
+
+`appliedParameters` is the exact threshold object that decided the row. Carrying the values instead of a foreign key is
+what keeps a signal explainable after the parameter timeline moves on — and carrying it here, rather than in each
+indicator's own code, is what makes "every published signal states its threshold" a property of the architecture rather
+than a habit.
+
+The assembled row is the observation contract and nothing else: identity, subject, state, measured values, evidence,
 coverage and the cutoff. Public wording belongs to `catalogue.generated.json` and the validity interval belongs to the
 Risk Signals Writer. The calculation states what is true about a subject at a cutoff, and a separate generic step
 decides whether that constitutes a change.
@@ -943,35 +1150,36 @@ function backed by an effective-dated Lithuanian calendar.
 
 ```mermaid
 flowchart TD
-    D["definition.ts<br/>identity + calculation + contract"] -.->|" versioned execution metadata "| R["Risk Indicators Registry bootstrap"]
+    D["definition.ts<br/>identity + wiring + contract"] -.->|" versioned execution metadata "| R["Risk Indicators Registry bootstrap"]
     PM["parameters.ts<br/>effective-dated threshold timeline"] -.->|" values applicable at the cutoff "| R
-    Q["calculate.sql<br/>parameterised SELECT, run directly<br/>or through calculate.ts"] -.->|" loaded at startup by "| L["SQL loader"]
+    Q["collect.sql<br/>parameterised SELECT, facts only"] -.->|" loaded at startup by "| L["SQL loader"]
+    CT["calculate.ts<br/>verdict(facts, parameters)"] -.->|" the judgement the calculation applies "| R
     L -.->|" the SQL the calculation runs "| R
-    F["fixtures.ts + calculate.test.ts"] -.->|" expected rows and boundaries "| C["CI and shadow validation"]
+    F["test/ — fixtures.ts, calculate.test.ts,<br/>calculate.it.ts"] -.->|" expected verdicts and boundaries "| C["CI and shadow validation"]
     R -->|" active indicator versions "| W["Risk Indicators Run Job opens the run"]
     W -->|" run row: cutoff, code commit "| J[("risk.evaluation_runs")]
-    W -->|" evaluation context: run ID, cutoff, subject filter, effective parameters "| X["Calculation executes in a read-only transaction"]
-    X -->|" observation rows "| V["Risk Signal Validator checks the shared contract"]
+    W -->|" evaluation context: run ID, cutoff, subject filter, effective parameters "| X["Collection executes in a read-only transaction"]
+    X -->|" fact rows "| Y["verdict() per row, then shared observation assembly"]
+    Y -->|" observation rows "| V["Risk Signal Validator checks the shared contract"]
     V -->|" validated observation rows "| A["Risk Signals Writer sends them as one set"]
-    A --> G{"Result column IS DISTINCT FROM<br/>the valid_to IS NULL row?"}
-    G -->|" no "| SAME["UPDATE checked_at only"]
-    G -->|" yes "| NEW["Close the old row, INSERT the new current row"]
-    SAME --> H[("risk.risk_signals")]
-    NEW --> H
+    A --> NEW["INSERT this run's rows"]
+    NEW --> H[("risk.risk_signals")]
     W -->|" per-indicator counts, timings, errors "| J
     H -->|" current signals and history "| U["Risk Indicators Visualisation, read-only"]
     J -->|" freshness label "| U
 ```
 
-`definition.ts` tells the service what LT-PRO-08's calculation is and what contract it returns. The shared run job calls
-it and takes the rows: the calculation calculates, and generic components validate and persist. The Astro application
-shares public response types and reads results from the database.
+`definition.ts` tells the service which statement collects LT-PRO-08's facts, which function judges them, and what
+contract the result satisfies. The shared run job calls it and takes the rows: the calculation calculates, and generic
+components assemble, validate and persist. The Astro application shares public response types and reads results from the
+database.
 
 ### 5.6 Delegation of persistence to the Risk Signals Writer
 
-The Risk Signals Writer is the single component that owns `valid_from`, `valid_to`, `checked_at` and the
-close-and-append rule. It accepts validated observation rows and issues indicator-independent statements, so a
-maintainer adding a Risk Indicator writes no `INSERT` or `UPDATE` at all.
+The Risk Signals Writer is the single component that turns validated observation rows into stored rows. It issues one
+indicator-independent `INSERT` into the open run's snapshot, so a maintainer adding a Risk Indicator writes no SQL of
+their own. It owns nothing else: a written row is never modified, and `risk_rw` holds no `UPDATE` on `risk_signals`
+to enforce that. Deletion of a whole superseded snapshot is the retention job's concern, not the writer's.
 
 Concentrating persistence in one component gives:
 
@@ -989,22 +1197,32 @@ Concentrating persistence in one component gives:
 Every indicator satisfies one calculation contract ([§5.3.1](#531-the-calculation-contract)), so the question for a
 maintainer is which layer a given piece of logic belongs to:
 
-| Logic                                                                   | Belongs in                                                                    | Example                                                                |
-|-------------------------------------------------------------------------|-------------------------------------------------------------------------------|------------------------------------------------------------------------|
-| Relational filters, joins, windows and aggregates over one subject      | A packaged `SELECT`, usually the whole calculation                            | LT-PRO-08 short deadline, LT-COM-01 single valid bid                   |
-| Reusable canonical field mapping                                        | PostgreSQL view in `public`                                                   | unified procurement and bidder facts                                   |
-| Stable shared database primitive                                        | SQL/PG function ([§6.3](#63-shared-postgresql-functions))                     | business days between dates                                            |
-| A shared or expensive intermediate several indicators compare against   | A view, materialised once measurement demands it                              | peer benchmark per CPV division and method; ownership-graph closure    |
-| Statistics, sequences, pairwise comparison, text spans, graph traversal | `calculate.ts` in the indicator's own directory, running its own packaged SQL | LT-PRI-08 Benford, LT-COM-14 bid rotation, LT-COM-16 similar documents |
-| Indicator identity, contract and public metadata                        | `definition.ts`                                                               | every Risk Indicator                                                   |
-| Scheduling, retries and backfills                                       | Procurement Risk Service + `risk.evaluation_runs`                             | every evaluation run                                                   |
-| Result persistence and history                                          | Risk Signals Writer (column compare, close and append)                        | all Risk Indicators                                                    |
+| Logic                                                                       | Belongs in                                                                    | Example                                                                |
+|-----------------------------------------------------------------------------|-------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| Relational filters, joins, windows and aggregates over one subject          | `collect.sql`                                                                 | LT-PRO-08 short deadline, LT-COM-01 single valid bid                   |
+| Threshold comparison, state choice, evidence and `missingData`              | `verdict()` in `calculate.ts`                                                 | every Risk Indicator                                                   |
+| Indicator identity, subject key pass-through, applied parameters, cutoff    | `RowLocalSqlIndicator` — shared, written once                                 | every row-local Risk Indicator                                         |
+| Which parameter entry applies, and `not_applicable` when none does          | `RowLocalSqlIndicator` ([§5.3.2](#532-parameter-resolution))                   | every Risk Indicator with a scoped timeline                            |
+| Reusable canonical field mapping                                            | PostgreSQL view in `public`                                                   | unified procurement and bidder facts                                   |
+| Stable shared database primitive                                            | SQL/PG function ([§6.3](#63-shared-postgresql-functions))                     | business days between dates                                            |
+| A shared or expensive intermediate several indicators compare against       | A view, materialised once measurement demands it                              | peer benchmark per CPV division and method; ownership-graph closure    |
+| Statistics, sequences, pairwise comparison, text spans, graph traversal     | `calculate.ts` in the indicator's own directory, running its own packaged SQL | LT-PRI-08 Benford, LT-COM-14 bid rotation, LT-COM-16 similar documents |
+| Indicator identity, contract and public metadata                            | `definition.ts`                                                               | every Risk Indicator                                                   |
+| Scheduling, retries and backfills                                           | Procurement Risk Service + `risk.evaluation_runs`                             | every evaluation run                                                   |
+| Result persistence and history                                              | Risk Signals Writer (column compare, close and append)                        | all Risk Indicators                                                    |
 
 ### 6.1 Default form of a calculation
 
-`definition.ts` plus `calculate.sql`, declared with the `{ sqlFile }` shorthand, covers roughly sixty of the canonical
-indicators and is the easiest form to review. SQL is set-based and executes close to the data. A `calculate.ts` is the
-right form once the indicator has an internal shape — collect, process, construct.
+`definition.ts` plus `collect.sql` plus a `verdict()` in `calculate.ts`, wired by `RowLocalSqlIndicator`, covers roughly
+78 of the canonical indicators and is the easiest form to review, because each of the two files answers one question.
+SQL is set-based and executes close to the data; the judgement is branching code and belongs where branching code is
+cheap to read and cheap to test. An own `calculate.ts` subclass is the right form only once the collect step stops
+producing one row per subject ([§5.3.1](#531-the-calculation-contract)).
+
+A parameter value is never bound into `collect.sql`. If an indicator seems to need one there — a lookback window, a
+sample minimum — collect the wider set and let `verdict()` narrow it; the discarded rows usually belonged in `evidence`
+anyway. The rare case where that is genuinely too expensive is an own `calculate.ts`, which binds whatever arguments it
+likes, and the cost is then explicit in the diff rather than hidden in a shared calling convention.
 
 ### 6.2 Evidence obligations for text and graph calculations
 
@@ -1035,74 +1253,86 @@ migration.
 
 `risk.evaluation_runs` answers a question the signal rows cannot: **did the job run, and did it succeed?** A site whose
 evaluation job has been silently broken for three weeks would otherwise keep displaying its flags with full confidence.
-One row per run, together with `checked_at` on each signal, makes that failure visible on the page.
+One row per run makes that failure visible on the page: the site keeps serving the last completed snapshot, and states its age.
 
 The commit is stored once per run rather than on every signal row, and runs are kept forever, so a signal's `run_id`
 recovers the exact code that produced it. A partial unique index on `status = 'running'` is the database-enforced
 backstop to the service's advisory lock.
 
-### 7.2 Current state and history in one table
+### 7.2 One insert-only snapshot per run
 
-Current signals and signal history are **the same rows**, distinguished by the validity interval `valid_from` /
-`valid_to`, with `valid_to IS NULL` marking the current state. The partial unique index
-`(subject_type, subject_key, indicator_id) WHERE valid_to IS NULL` *is* the current-state pointer: it serves the
-procurement page as an index-only lookup and makes a repeated run idempotent.
+`risk.risk_signals` is **insert-only**. Each run appends one complete snapshot — one row per `(subject, indicator)` it
+evaluated, changed or not — and no row is ever modified afterwards. There is no validity interval, no current-state
+pointer and no `checked_at`.
 
-**Write on change, not on every run.** Rough sizing, on estimates rather than measurement: perhaps 200k procurements
-with live lifecycles × ~100 indicators ≈ 20M evaluations per run. Appending every run nightly would be ~7 billion rows a
-year, almost all identical to the night before, because an awarded and closed procurement has frozen indicators. Writing
-only the rows that differ reduces that to the few thousand a night that genuinely changed, and keeps the table small
-enough to serve a public page directly.
-
-**Difference is decided in the database, on the result columns.** The writer sends the indicator's validated
-observations as one set and joins them to the current rows, comparing `indicator_version`, `applied_parameters`,
-`state`, `raw_value`, `threshold`, `evidence` and `missing_data` with `IS DISTINCT FROM`, so a NULL on either side
-compares correctly. The comparison covers the result columns themselves, in the statement that writes them, and excludes
-`run_id`, `data_as_of`, `duration_ms` and `error_info` — which is what keeps an unrelated redeploy, or a retried failure
-with a different message, from registering as a changed signal.
-
-**Advance `checked_at` on every run.** On a site that publishes red flags, "as of when" is a public claim, so each run
-updates `checked_at` on the rows it re-confirms, which separates "checked last night, unchanged" from "not checked since
-March". A full run evaluates the indicator's whole applicable population by construction, so this needs no join against
-the returned rows:
+**"Current" is a property of the run, not of the row.** The application resolves the newest completed run once, then
+reads that run's rows:
 
 ```sql
-UPDATE risk.risk_signals
-SET checked_at = $2
-WHERE indicator_id = $1
-  AND valid_to IS NULL;
+SELECT id, data_as_of, code_commit FROM risk.v_latest_run;      -- one row
+SELECT * FROM risk.risk_signals WHERE run_id = $1 AND ...;       -- that snapshot
 ```
 
-That is the largest write a run performs. A subject-filtered rerun adds the filter to the same statement.
+`v_latest_run` ([`risk-schema.md`](risk-schema.md) §3) is the single definition of which snapshot is live, so the read
+model, the retention job and the Astro application cannot disagree. Old runs are never queried and in-flight runs are
+never queried, which is what keeps every read path a `run_id`-leading index scan.
+
+Four properties follow, and they are the reason for the shape:
+
+- **A page is one consistent snapshot.** Every signal a procurement page shows was produced by one run, at one
+  `data_as_of`, from one `code_commit`. The alternative — a per-subject current-state pointer — mixes vintages on a
+  single page, because different indicators last changed at different times.
+- **Nothing can be corrupted in place.** `risk_rw` holds no `UPDATE` on the table ([§1.2](#12-deployment-view)), so a
+  written row can be deleted — whole, by the retention job, superseded run at a time — but never altered.
+  Immutability of a written row is a database permission rather than a convention the writer is trusted to honour.
+- **The writer is one statement.** No comparison, no `IS DISTINCT FROM` over result columns, no close-and-append
+  bookkeeping, and therefore no class of bug where a signal's history develops a gap or an overlap.
+- **A run is atomic per indicator.** Each indicator's rows are inserted in one transaction, so a failure contributes
+  nothing rather than half a result.
+
+**A new run is only visible once it completes.** `v_latest_run` excludes `'running'`, so the site keeps serving the
+previous snapshot while the next one is being written, and switches to it atomically when the run closes. No reader ever
+sees a half-written run.
+
+**A failed indicator is absent from the snapshot rather than stale within it.** If LT-PRI-01 times out, the run closes
+as `'partial'` and that indicator simply has no rows in it, so the page reports it as not evaluated in this run —
+truthfully — instead of showing a result from an older cutoff beside fresh ones. `statistics` on the run row carries the
+error. This is the one behaviour that differs from a current-state model, and it is the honest reading of the data.
+
+**Sizing.** On estimates rather than measurement: perhaps 200k procurements with live lifecycles × ~100 indicators ≈ 20M
+rows per run. The retention window is therefore the direct lever on table size — a one-month window holds ~30 snapshots,
+a one-week window ~7 — and it is the first number to revisit once the real corpus is measured. Because only the newest
+snapshot is ever read, shortening the window costs nothing but the depth of run history available for debugging.
 
 Three further properties of the row:
 
 - **All five states are stored**: `triggered`, `not_triggered`, `insufficient_data`, `not_applicable` and
   `calculation_error`. The full set is what lets the page say "we checked 12 indicators, 2 fired" and keep "checked,
-  clean", "never evaluated" and "the calculation failed" apart.
+  clean", "not evaluated in this run" and "the calculation failed" apart.
 - **Display text stays in the catalogue.** Titles and explanation templates come from `catalogue.generated.json`, keyed
   by `(indicator_id, indicator_version)`. The row stores the structured evidence the sentence is rendered from:
   `raw_value`, `threshold` and `evidence`, so a wording correction is a one-line commit.
 - **The definition is resolved, not copied.** `(indicator_id, indicator_version)` plus the `code_commit` of the row's
   run identifies it exactly in Git, and `applied_parameters` stores the effective values that decided the row.
 
-Result columns are immutable after insert; `checked_at` and `valid_to` are the columns a later run changes.
-
 ### 7.3 Vintage and retention
 
-Every row carries `data_as_of` (the cutoff it was computed at) and `checked_at` (the last run that re-confirmed it), and
-the page states both: *"tikrinta 2026-08-11, duomenys iki 2026-08-10"*. A stopped service leaves the site showing the
-last known state with an increasingly old date.
+Freshness is a statement about the run, and the page makes it once: *"tikrinta 2026-08-11, duomenys iki 2026-08-10"*
+comes from `v_latest_run`'s `finished_at` and `data_as_of`, and applies to every signal on the page because they all
+came from that run. A stopped service leaves the site showing the last completed snapshot with an increasingly old date.
 
-Current rows are kept however old they are: an untouched procurement keeps its signals until an indicator changes them.
-Closed rows — those a newer state replaced — are deleted after one month by the scheduled retention job ([
-`risk-schema.md`](risk-schema.md) §4), because viespirkiai displays risk rather than managing it.
+The scheduled retention job (`services/procurement-risk/retention.ts`, role `risk_rw`) deletes the signals of runs
+that are both older than the window and no longer the live snapshot, one run at a time
+([`risk-schema.md`](risk-schema.md) §5). Excluding `v_latest_run` is the safety belt: after an outage longer than the
+window the live snapshot is itself past the cutoff, and the worst outcome of a long outage must be stale signals, never
+missing ones. Run rows are kept — ~365 a year, each the provenance of the signals it produced.
 
 ### 7.4 List page read model
 
-`risk.v_procurement_summaries` aggregates current signals per procurement: triggered, insufficient, not-applicable and
-error counts, the triggering indicator IDs, and the freshness bounds the page states. Stage, deadline and event date
-come from joining `public.v_pirkimas` — they are ingestion facts, read where they live.
+`risk.v_procurement_summaries` aggregates the live snapshot's signals per procurement: triggered, insufficient,
+not-applicable and error counts, the triggering indicator IDs, and the run they came from. It joins `v_latest_run`
+itself, so the page cannot accidentally aggregate across runs. Stage, deadline and event date come from joining
+`public.v_pirkimas` — they are ingestion facts, read where they live.
 
 It is a **view**. Promoting it to a materialised view refreshed at the end of each run, once the real corpus shows the
 need, is a change to one file.
@@ -1117,7 +1347,7 @@ The equivalent of a catalogue row is the content of `modules/risk/indicators/LT-
 
 - `key` — `{ id: 'LT-PRO-08', version: 2 }`
 - `lifecycle` — `active`
-- `calculation` — `{ sqlFile: './calculate.sql' }`
+- `sqlFile` / `verdict` — `'./collect.sql'` and `ltPro08Verdict` (a `RowLocalSqlIndicator`)
 - `stage` / `subjectType` — `tender` / `procurement`
 - `references` — `OCP-R003`, `OCP-R014`, `OLAF-CN29`, `OT-I04`
 - `standard` — OCP Red Flags 2024, p. 25
@@ -1237,7 +1467,7 @@ above.
     "estimatedValue"
   ],
   "dataAsOf": "2026-08-10T19:05:00+03:00",
-  "validTo": null
+  "runId": 412
 }
 ```
 
@@ -1246,17 +1476,18 @@ all five states is what makes "we checked and found nothing" and "we never check
 
 ### 8.4 A signal that stopped
 
-A buyer extends a deadline, the next run computes `not_triggered`, the `state` column differs from the current row, and
-the writer closes the old row:
+A buyer extends a deadline. The next run computes `not_triggered` and appends it to its own snapshot; the previous run's
+row is untouched and simply stops being read:
 
 ```text
-id      indicator     state          valid_from           valid_to             checked_at
-98122   LT-PRO-08/2   triggered      2026-08-06 21:14     2026-08-14 03:09     2026-08-14 03:09
-99871   LT-PRO-08/2   not_triggered  2026-08-14 03:09     NULL                 2026-08-19 03:11
+id      run_id  indicator     state          data_as_of
+98122   411     LT-PRO-08/2   triggered      2026-08-13 19:05
+99871   412     LT-PRO-08/2   not_triggered  2026-08-14 19:05
 ```
 
-The procurement page shows row `99871`. The history panel shows both, with the date the flag was raised and the date it
-was cleared, and those two rows are what the public change history in [§3.3](#33-change-history) is built from.
+`v_latest_run` returns 412, so the procurement page shows row `99871`. Row `98122` remains readable while run 411 is
+inside the retention window, which is what a "what changed since the last run" comparison would use — but no page
+queries it, because the site reads exactly one run ([§7.2](#72-one-insert-only-snapshot-per-run)).
 
 ## 9. Evaluation run execution
 
@@ -1273,8 +1504,7 @@ The Procurement Risk Service:
    calculations **one at a time**, each with its own evaluation context, inside a read-only transaction with a statement
    timeout;
 5. validates column types, allowed states, subject identity, uniqueness and semantic invariants after each indicator;
-6. in one transaction per indicator, advances `checked_at` on that indicator's current rows, closes the ones whose
-   result columns differ from the returned observation, and inserts the replacements;
+6. in one transaction per indicator, appends that indicator's observations to the open run's snapshot;
 7. records that indicator's counts, timings and any error in `statistics`, then continues to the next indicator;
 8. closes the run as `succeeded`, or `partial` when some indicators failed.
 
@@ -1294,20 +1524,15 @@ sequenceDiagram
         Q ->> P: Read canonical facts as of the cutoff
         Q -->> E: Return standardised observation rows
         E ->> E: Validate the rows against the shared contract
-        E ->> P: Send them as one set, PostgreSQL compares the result columns
-        alt result unchanged
-            E ->> P: UPDATE checked_at on the existing current row
-        else result changed
-            E ->> P: Close the old row and INSERT the new current row
-        end
+        E ->> P: INSERT them into the open run's snapshot, in one transaction
         E ->> P: Record this indicator's counts and timings in statistics
     end
     alt one indicator fails
-        E ->> P: Record the error, that indicator's previous signals stay current
-        A ->> P: Page shows them with their older data_as_of
+        E ->> P: Record the error; that indicator contributes no rows to this run
+        A ->> P: Page reports it as not evaluated in the current snapshot
     else the whole run crashes
         E ->> P: Next service start closes the stale running run as failed
-        A ->> P: Page keeps showing the last computed state, visibly stale
+        A ->> P: v_latest_run still points at the last completed snapshot, visibly stale
     end
     E ->> P: Close the run as succeeded or partial
 ```
@@ -1317,12 +1542,12 @@ run measures deadlines against the same instant as the first, and a rerun at the
 
 Two consequences are worth stating explicitly.
 
-**A failing indicator is contained.** Its previous signals stay current with their older `data_as_of`, and the page
-shows them as such, so only the indicators that actually ran get new vintages.
+**A failing indicator is contained.** It contributes no rows to the snapshot, so the page reports it as not evaluated
+in this run rather than showing a result from an older cutoff beside fresh ones ([§7.2](#72-one-insert-only-snapshot-per-run)).
 
-**Readers observe a run in progress.** Between steps 6 and 8 a page may show LT-PRO-08 at tonight's cutoff beside
-LT-PRI-01 at last night's. Every row carries `data_as_of`, so the mixture is visible on the page, and step 8 bounds how
-long it lasts.
+**Readers never observe a run in progress.** `v_latest_run` excludes `'running'`, so between steps 3 and 8 the site
+keeps serving the previous snapshot in full, and switches to the new one atomically when step 8 closes the run. A page
+never mixes vintages: every signal on it shares one cutoff and one commit.
 
 ## 10. Indicator maintenance
 
@@ -1334,27 +1559,29 @@ Adding an indicator is a new directory and one line in the registry. Write it, t
 2. Write `definition.ts`: Lithuanian public text, source-field mapping, applicability, exclusions and limitations.
 3. Decide the unit of analysis and the earliest lifecycle point at which it is knowable.
 4. Write `parameters.ts` with the first effective-dated entry and its `source`.
-5. Implement the calculation — one `calculate.sql` where that suffices, otherwise a `calculate.ts` over its own packaged
-   SQL — plus fixtures for the triggered, non-triggered, insufficient and not-applicable outcomes.
-6. Add integration tests against realistic database shapes.
-7. Add the version to `registry.ts` as `active` and regenerate `catalogue.generated.json`; CI verifies that the artefact
+5. Write `collect.sql`: one fact row per subject, measured and not judged.
+6. Write `verdict()` in `calculate.ts`, plus fixtures and unit tests for the triggered, non-triggered, insufficient and
+   not-applicable outcomes and the boundary between them. These need no database, so write them before the SQL runs
+   anywhere.
+7. Add an integration test proving `collect.sql` returns those fact rows against realistic database shapes.
+8. Add the version to `registry.ts` as `active` and regenerate `catalogue.generated.json`; CI verifies that the artefact
    matches the definitions.
-8. Run the tests, commit, and deploy the same commit to **both** the Procurement Risk Service and the web application.
+9. Run the tests, commit, and deploy the same commit to **both** the Procurement Risk Service and the web application.
    The next run computes the indicator for current subjects and publishes its signals.
 
 **Diagram: adding a Risk Indicator, from directory to published signals.**
 
 ```mermaid
 flowchart LR
-    DIR["Author creates modules/risk/indicators/&lt;ID&gt;/<br/>definition.ts · parameters.ts · calculation · fixtures"]
+    DIR["Author creates modules/risk/indicators/&lt;ID&gt;/<br/>definition.ts · parameters.ts · collect.sql · calculate.ts · test/"]
     REG["Author registers the version in registry.ts<br/>and regenerates catalogue.generated.json"]
-    CI["Tests and CI checks: types, registry rules,<br/>fixtures, integration tests, catalogue artefact"]
+    CI["Tests and CI checks: types, registry rules,<br/>verdict unit tests, SQL integration tests, catalogue artefact"]
     GIT["Commit and deploy the commit to<br/>the risk service and the Astro application"]
     RUN["Next run computes current subjects<br/>and publishes the signals"]
     DIR --> REG --> CI --> GIT --> RUN
 ```
 
-Step 8 is the one ordering constraint the Git-resident catalogue introduces: both processes run the same commit, so the
+Step 9 is the one ordering constraint the Git-resident catalogue introduces: both processes run the same commit, so the
 web application carries the new indicator's public wording before the first signal from it is published. Deploying the
 service first would publish signals the site cannot yet describe.
 
@@ -1362,7 +1589,7 @@ An indicator whose behaviour is not settled yet can be committed as `lifecycle: 
 `'active'` in a later commit; that is a choice the author makes, not a required stage.
 
 Adding a Risk Indicator is therefore one branch and one deployment. The maintenance surface is one directory —
-`definition.ts`, `parameters.ts`, the calculation, fixtures and tests — plus one line in `registry.ts`. The Risk
+`definition.ts`, `parameters.ts`, `collect.sql`, `calculate.ts` and `test/` — plus one line in `registry.ts`. The Risk
 Indicators Run Job, Risk Signal Validator, Risk Signals Writer, Astro route code and the schema stay as they are; a new
 indicator adds rows. They change when the observation contract itself changes.
 
@@ -1386,6 +1613,11 @@ Append a new effective-dated entry to `parameters.ts`, keeping the implementatio
 A spelling-only public-copy correction is an ordinary commit to `definition.ts`, and it changes no result. Wording that
 alters interpretation or limitations carries a new Risk Indicator version.
 
+A threshold that must differ by procedure type or object type is several concurrently valid entries with disjoint
+`scope`s, not several indicator versions — the formula is the same, only the value it compares against differs
+([§5.3.2](#532-parameter-resolution)). A new entry that overlaps an existing scope in time fails at startup, so the
+reviewer's question on such a diff is whether the new scope is genuinely disjoint from its neighbours.
+
 Every active version and every merged parameter entry is immutable: an entry is closed with a `validTo` and the
 replacement is appended, so published observations stay reproducible against the values they actually used. The
 reviewer's job on any `parameters.ts` diff is to confirm that existing entries were closed rather than rewritten, and CI
@@ -1406,12 +1638,11 @@ the version, commit, deploy.
 4. Regenerate `catalogue.generated.json` so the public wording matches the code that produces the signals.
 5. Run the tests, commit, and deploy the same commit to the Procurement Risk Service and to the Astro application.
 
-**The switch needs no data migration.** The first run after deployment computes v3 results, and wherever they differ
-from the stored v2 result, the v2 row is closed and a v3 row opens; where they agree, only `checked_at` advances. The
-current-state index is unique on `(subject_type, subject_key, indicator_id)` and excludes the version, so exactly one
-version of an indicator is published for a subject at any time, and the changeover happens row by row as the run
-proceeds. Closed v2 rows keep their version stamp forever, so the history panel shows that a change of methodology —
-rather than of the procurement — moved the signal.
+**The switch needs no data migration.** The first run after deployment writes v3 results into its own snapshot, and
+that snapshot becomes live the moment the run closes — so the changeover is atomic for the whole site, not row by row.
+The previous snapshot keeps its v2 stamp until it expires. The uniqueness rule is per run and excludes the version
+(`(run_id, subject_type, subject_key, indicator_id)`), so exactly one version of an indicator is published for a subject
+at any time.
 
 If a change looks risky enough to want the numbers before the public sees them, merging it as `lifecycle: 'shadow'`
 first keeps the version out of the read model until a later commit flips it to `'active'`. That is a tool, not a
@@ -1442,30 +1673,46 @@ observations reference the version by ID.
 
 ## 11. Tests and automated safeguards
 
-Every Risk Indicator tests:
+The split between collection and judgement splits the tests too, and each half gets the kind of test it deserves.
+
+**`verdict()` unit tests** run on every `npm test`, with fixture objects and no database:
 
 - a triggered boundary just below the threshold;
 - exact threshold behaviour;
 - a non-triggered value;
-- each required field missing;
-- an explicit non-applicable method or stage;
-- timezone and daylight-saving boundaries;
-- duplicate source rows and multi-lot/multi-supplier cardinality;
-- the effective-date transition between parameter entries;
-- byte-stable output for an unchanged cutoff and unchanged source rows, which is what makes write-on-change work;
-- that every time comparison goes through the `$2` cutoff;
-- for a `calculate.ts` calculation, that its output is a deterministic function of the rows its packaged SQL returned;
+- each required field missing, and the `missingData` entry it produces;
+- that the function is total: every fact row it can be given returns one of the four states;
+- that it is pure — the same fact row and parameters return a deeply equal verdict on a second call, so a rerun at one
+  cutoff reproduces one snapshot.
+
+**`collect.sql` integration tests** run against a real PostgreSQL, and assert facts rather than verdicts:
+
+- the fact row produced for each fixture procurement, column by column;
+- duplicate source rows and multi-lot/multi-supplier cardinality — exactly one fact row per subject, which is the
+  precondition `RowLocalSqlIndicator` relies on;
+- timezone and daylight-saving boundaries in any date arithmetic the statement performs;
+- that every time comparison goes through the `$1` cutoff, and the statement contains no `now()`, `current_date` or
+  `current_timestamp`;
+- that the statement mentions no state literal, no indicator ID and no threshold — the collection/judgement boundary,
+  enforced rather than reviewed;
 - a reasonable query plan and runtime on a representative sample.
 
-The tests exercise the calculation through the same evaluation context the run job supplies, so one harness covers both
-calculation forms.
+**Shared behaviour is tested once**, against `RowLocalSqlIndicator` rather than in any indicator directory: parameter
+resolution by time and scope, `not_applicable` with `appliedParameters: null` when no entry admits a row, and the
+identity, subject and cutoff fields assembled onto every observation. An indicator with an own `calculate.ts` also tests
+that its output is a deterministic function of the rows its packaged SQL returned.
+
+End-to-end, each indicator has one test that exercises `evaluate()` through the same evaluation context the run job
+supplies, so one harness covers both calculation forms.
 
 Risk Indicators Registry tests ensure:
 
 - unique IDs and one active version per indicator;
 - canonical catalogue IDs, with source-catalogue codes recorded as references;
 - every parameter entry validates against `parameterContract`;
-- parameter entries within one scope neither overlap nor leave gaps, and `validTo` is never earlier than `validFrom`;
+- parameter entries sharing a scope neither overlap nor leave gaps, and `validTo` is never earlier than `validFrom`;
+- parameter entries valid at the same time have pairwise disjoint scopes, so resolution is unambiguous
+  ([§5.3.2](#532-parameter-resolution));
 - public text and limitation are non-empty;
 - calculation output contains only requested subjects and allowed states.
 
@@ -1475,23 +1722,24 @@ CI carries two checks specific to a Git-resident catalogue:
   the web application describes an indicator exactly as the service executes it;
 - a pull request touching `parameters.ts` passes only when it closes an existing entry and appends a new one.
 
-The Risk Signals Writer is generic and therefore tested once. Its tests protect the storage decision in
-[§7.2](#72-current-state-and-history-in-one-table):
+The Risk Signals Writer and the retention job are generic and therefore tested once. Their tests protect the storage
+decision in [§7.2](#72-one-insert-only-snapshot-per-run):
 
-- a run whose results are identical to the previous run writes **zero** rows and only advances `checked_at` — the
-  assertion the whole table size depends on;
-- a changed result closes the old row with `valid_to` equal to the new row's `valid_from`, leaving no gap and no
-  overlap;
-- the partial unique index rejects a second current row for the same `(subject, indicator)`, so a run executed twice
-  keeps state unique;
-- the comparison fires on a change in `state`, `raw_value`, `threshold`, `evidence`, `missing_data`,
-  `indicator_version` or `applied_parameters`, and ignores a change in `run_id`, `data_as_of`, `duration_ms` or
-  `error_info`;
-- a NULL appearing or disappearing on either side of a compared column counts as a change, which is the
-  `IS DISTINCT FROM` case;
-- a `calculation_error` for one indicator leaves other indicators' current rows untouched;
+- an indicator's observations are appended to the open run and the previous run's rows are byte-identical afterwards —
+  the assertion the whole model rests on;
+- the unique index rejects two results for the same `(subject, indicator)` within one run;
+- a failing indicator contributes no rows to the snapshot, and the other indicators' rows in that run are unaffected;
+- `v_latest_run` returns the newest `succeeded`/`partial` run and never a `running` one, so no reader sees a
+  half-written snapshot;
+- retention deletes the signals of a superseded run past the window, and keeps the run row itself;
+- retention never deletes the snapshot `v_latest_run` points at, however old it is — the long-outage case, where the
+  alternative is empty public pages;
 - an interrupted run leaves the rows it already wrote valid and consistent, and the next start closes the stale
-  `running` run.
+  `running` run, whose partial snapshot is never read and expires with the window.
+
+Two of these are enforced by the database rather than asserted: `risk_rw` holds no `UPDATE` on `risk.risk_signals`,
+so no code path in Process 2 can modify a written signal, and `ON DELETE CASCADE` on `run_id` guarantees no signal
+outlives its run.
 
 ## 12. First implementation slice
 
@@ -1500,14 +1748,15 @@ Build one complete vertical slice with LT-PRO-08:
 1. apply [`risk-schema.md`](risk-schema.md): two tables, one view, the indexes and the roles;
 2. establish the Procurement Risk Service entry point, its single-instance lock and the run-open/run-close protocol,
    independently of the web application;
-3. create `modules/risk/indicators/LT-PRO-08/` with `definition.ts`, `parameters.ts`, `calculate.sql`, fixtures and
-   tests, plus the registry and the generated catalogue artefact with its CI check;
+3. create `modules/risk/indicators/LT-PRO-08/` with `definition.ts`, `parameters.ts`, `collect.sql`, `calculate.ts` and
+   its `test/` directory, plus the registry and the generated catalogue artefact with its CI check;
 4. use demonstration parameter values until the Lithuanian legal profile is approved;
 5. evaluate current open procurements in shadow mode;
 6. build `/rizikos`, one detail page and the LT-PRO-08 methodology entry, reading results from the database and wording
    from the catalogue artefact;
-7. verify that changing the deadline creates a new observation and a public history item;
-8. verify that running the job twice with no source change writes **zero** new rows and only advances `checked_at`;
+7. verify that a new run's snapshot becomes live atomically when the run closes, and that the previous snapshot is
+   readable and unchanged until retention removes it;
+8. verify that retention deletes a superseded snapshot and refuses to delete the one `v_latest_run` points at;
 9. verify that appending a `parameters.ts` entry and deploying produces new observations carrying the new threshold,
    while existing observations keep the old one;
 10. verify that a deliberately broken indicator writes `calculation_error`, leaves its previous signals current and lets
@@ -1518,20 +1767,22 @@ Build one complete vertical slice with LT-PRO-08:
 ```mermaid
 flowchart LR
     SCHEMA["1–2 · Schema, roles and the<br/>Procurement Risk Service run protocol"]
-    IND["3–4 · LT-PRO-08 package<br/>definition, parameters, SQL, fixtures, catalogue artefact"]
+    IND["3–4 · LT-PRO-08 package<br/>definition, parameters, collect.sql, verdict, fixtures, catalogue artefact"]
     SHADOW["5 · Shadow evaluation of<br/>current open procurements"]
     WEB["6 · /rizikos list, detail page<br/>and methodology entry"]
-    VERIFY["7–10 · Verify close-and-append, zero-write rerun,<br/>parameter change and contained failure"]
-    NEXT["10 · Add two further Risk Indicators,<br/>one of them a calculate.ts"]
+    VERIFY["7–10 · Verify atomic snapshot switch, retention,<br/>parameter change and contained failure"]
+    NEXT["10 · Add two further Risk Indicators,<br/>one of them with its own calculate.ts subclass"]
     SCHEMA --> IND --> SHADOW --> WEB --> VERIFY --> NEXT
 ```
 
-Make one of those next two a `calculate.ts` indicator. LT-PRO-08 exercises the shorthand, and the value of a single
-calculation contract is that a harder shape adds a directory and nothing else ([§5.3.1](#531-the-calculation-contract));
-that claim is worth testing while the run job is still small enough to change cheaply.
+Make one of those next two an indicator whose `calculate.ts` is a `RiskIndicator` subclass rather than a `verdict()`.
+LT-PRO-08 exercises the row-local shorthand, and the value of a single calculation contract is that a harder shape adds a
+directory and nothing else ([§5.3.1](#531-the-calculation-contract)); that claim is worth testing while the run job is
+still small enough to change cheaply.
 
-Steps 7 and 8 are the ones that exercise the schema decision and are worth writing first: step 7 proves the
-close-and-append rule, and step 8 proves the write-on-change rule the table size depends on.
+Steps 7 and 8 are the ones that exercise the schema decision and are worth writing first: step 7 proves that readers
+only ever see a completed snapshot, and step 8 proves the retention rule the table size depends on — including its
+refusal to delete the live snapshot after a long outage.
 
 This slice tests the important architecture boundaries: three separate processes, one sequential run, results and
 history in one table, and a catalogue that lives only in Git.
@@ -1561,7 +1812,16 @@ wrote a row, not which process hosted it.
   cutoff becomes available with the append-only source-observation table in
   the [parent design](risky-procurements-initial-design.md) §5.1, at which point `$2` becomes a real filter without a
   caller change.
-- The public change history reaches back one month, the retention window for closed signal rows.
+- **There is no public change history.** The site shows the current snapshot only, and cannot say when a signal appeared
+  or cleared ([§3.3](#33-change-history)). A narrow append-only change table would restore it without changing the read
+  model.
+- **An indicator that fails is absent from the snapshot, not stale within it.** The page reports it as not evaluated in
+  this run rather than showing its previous result, which is truthful but loses information a current-state model would
+  have kept.
+- **Table size is set by the retention window, not by how much changes.** Every run writes a full snapshot, so the
+  window is the one lever on storage and is the first number to revisit against the real corpus
+  ([`risk-schema.md`](risk-schema.md) §5). If snapshots outgrow a single table, range-partitioning by `run_id` turns
+  retention into `DROP PARTITION` without changing any read path, because every read is already `run_id`-leading.
 - A threshold change ships as a deployment of both Node processes rather than as a database update.
 - The list page orders by triggered count. Severity narrows the result set through indicator-ID expansion and does not
   participate in ordering.

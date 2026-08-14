@@ -8,31 +8,43 @@ structure, the component that writes it and the run flow that fills it.
 Identifiers are English throughout, to stay aligned with international and EU procurement-fraud terminology. Lithuanian
 appears only as label VALUES that the GUI renders, and those live in the indicator catalogue in Git.
 
-| Object                         | Kind  | Purpose                                  |
-|--------------------------------|-------|------------------------------------------|
-| `risk.evaluation_runs`         | table | one row per evaluation run               |
-| `risk.risk_signals`            | table | current signals and their recent history |
-| `risk.v_procurement_summaries` | view  | list-page aggregate                      |
+| Object                         | Kind  | Purpose                                     |
+|--------------------------------|-------|---------------------------------------------|
+| `risk.evaluation_runs`         | table | one row per evaluation run                  |
+| `risk.risk_signals`            | table | insert-only snapshots, one per run          |
+| `risk.v_latest_run`            | view  | the one run the site reads                  |
+| `risk.v_procurement_summaries` | view  | list-page aggregate over that run           |
+
+**`risk_signals` is insert-only in practice.** A run writes one immutable snapshot of every subject it evaluated; the
+site reads exactly one run — the newest completed one — and superseded snapshots are deleted whole by the retention
+job. There is no current-state pointer, no validity interval and no column a later run modifies. `risk_rw` holds no
+`UPDATE` on this table — a written signal cannot be altered — but does hold `DELETE`, alongside `INSERT`, since it is
+also the role the retention job runs as: indicators are derived and can be recalculated at any time, so there is no
+need to fence deletion behind a separate credential.
 
 **Diagram: objects of the `risk` schema and the components that read and write them.**
 
 ```mermaid
 flowchart LR
     W["Risk Signals Writer<br/>Procurement Risk Service"]
-    M["Retention job<br/>role risk_maint"]
+    M["Retention job<br/>role risk_rw"]
     subgraph risk["Schema risk"]
         R[("evaluation_runs<br/>id, data_as_of, code_commit,<br/>status, statistics")]
-        S[("risk_signals<br/>subject + indicator + result,<br/>current = valid_to IS NULL")]
-        V["v_procurement_summaries<br/>counts per procurement"]
+        S[("risk_signals<br/>run_id + subject + indicator + result,<br/>insert-only")]
+        L["v_latest_run<br/>the newest completed run"]
+        V["v_procurement_summaries<br/>counts per procurement, in that run"]
+        R -.->|" newest succeeded/partial "| L
         S -.->|" aggregated at query time "| V
+        L -.->|" restricts to one snapshot "| V
     end
     P[("Schema public<br/>v_pirkimas")]
     A["Astro read-only routes"]
     W -->|" risk_rw: open and close the run "| R
-    W -->|" risk_rw: bump checked_at, close and append "| S
+    W -->|" risk_rw: INSERT only, never UPDATE "| S
     S -->|" run_id references "| R
-    M -->|" delete rows closed over one month ago "| S
-    A -->|" risk_ro: current signals and history "| S
+    M -->|" risk_rw: delete the signals of superseded runs "| S
+    A -->|" risk_ro: which run to read "| L
+    A -->|" risk_ro: that run's signals "| S
     A -->|" risk_ro: list counts and ordering "| V
     A -->|" risk_ro: freshness label "| R
     P -->|" viespirkiai_ro: stage, deadline, event date "| A
@@ -65,22 +77,22 @@ lets the site state how fresh its signals are.
 
 ## 2. Risk signals
 
-Current state and recent history in one table, separated by a validity interval:
+One row per `(run, subject, indicator)`, written once and never touched again:
 
-- current rows have `valid_to IS NULL`;
-- a run computing the same result advances `checked_at`;
-- a run computing a different result closes the current row and inserts a new one.
+- every run appends a complete snapshot of every subject it evaluated, changed or not;
+- the site reads exactly one run — `v_latest_run` — so "current" is a property of the run, not of the row;
+- superseded snapshots are deleted whole once they fall outside the retention window (§4).
 
-Sameness is decided over the result columns — `indicator_version`, `applied_parameters`, `state`, `raw_value`,
-`threshold`, `evidence`, `missing_data` — with `IS DISTINCT FROM`, in the statement that writes them. Result columns are
-immutable after insert; `checked_at` and `valid_to` are the columns a later run changes. The Risk Signals Writer owns
-this comparison; [`risk-service-architecture.md`](risk-service-architecture.md) §7.2 describes it in full.
+There is no comparison, no validity interval and no `checked_at`. Freshness comes from the run: every row on a page
+shares one `data_as_of` and one `code_commit`, because they were all produced by the same run.
+[`risk-service-architecture.md`](risk-service-architecture.md) §7.2 holds the reasoning.
 
 ### `risk.risk_signals`
 
 | Column               | Type                                         | Indexed | Description                                                                                                                                                                                                                        |
 |----------------------|----------------------------------------------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `id`                 | `bigint GENERATED ALWAYS AS IDENTITY`        | PK      | Surrogate key.                                                                                                                                                                                                                     |
+| `run_id`             | `bigint NOT NULL REFERENCES risk.evaluation_runs(id) ON DELETE CASCADE` | ✅ | The run that produced this row, and the leading column of every read path. `CASCADE` guarantees no signal outlives its run.                                                                   |
 | **WHAT IT IS ABOUT** |                                              |         |                                                                                                                                                                                                                                    |
 | `subject_type`       | `text NOT NULL`                              | ✅       | One of `'procurement'`, `'lot'`, `'contract'`, `'supplier'`.                                                                                                                                                                       |
 | `subject_key`        | `text NOT NULL`                              | ✅       | Canonical key of the subject, e.g. `cvpis:7000000`.                                                                                                                                                                                |
@@ -99,27 +111,40 @@ this comparison; [`risk-service-architecture.md`](risk-service-architecture.md) 
 | `error_info`         | `jsonb`                                      |         | Set when `state = 'calculation_error'`.                                                                                                                                                                                            |
 | `duration_ms`        | `integer`                                    |         | Calculation time attributed to this row's indicator.                                                                                                                                                                               |
 | **TIME**             |                                              |         |                                                                                                                                                                                                                                    |
-| `data_as_of`         | `timestamptz NOT NULL`                       | ✅       | Source cutoff of the run that produced this result.                                                                                                                                                                                |
-| `valid_from`         | `timestamptz NOT NULL DEFAULT now()`         | ✅       | Start of the interval this result has been the current one.                                                                                                                                                                        |
-| `valid_to`           | `timestamptz`                                | ✅       | NULL means current.                                                                                                                                                                                                                |
-| `checked_at`         | `timestamptz NOT NULL DEFAULT now()`         |         | Last run that recomputed this result and got the same answer. Shown in the GUI as "tikrinta", separating "checked last night, unchanged" from "not checked since March".                                                           |
-| `run_id`             | `bigint REFERENCES risk.evaluation_runs(id)` | ✅       | The run that produced this row. `checked_at` advances independently, so `run_id` remains the provenance of the result.                                                                                                             |
+| `data_as_of`         | `timestamptz NOT NULL`                       |         | Source cutoff of the run that produced this result. Equal to the run's own `data_as_of`, copied so a row explains itself without a join.                                                                                           |
 
 **Indexes**
 
-| Name                                   | Definition                                                                                            | Reason                                                                                                                                                                                              |
-|----------------------------------------|-------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `risk_signals_current_idx`             | `UNIQUE ON risk.risk_signals (subject_type, subject_key, indicator_id) WHERE valid_to IS NULL`        | The current-state pointer: one live row per subject and indicator, which also makes a repeated run idempotent. The version is outside the key, so activating a new version closes one row and opens the next. |
-| `risk_signals_procurement_current_idx` | `ON risk.risk_signals (procurement_source, procurement_id) WHERE valid_to IS NULL`                    | Procurement detail page: every current indicator state for one procurement.                                                                                                                         |
-| `risk_signals_procurement_history_idx` | `ON risk.risk_signals (procurement_source, procurement_id, valid_from DESC)`                          | Procurement history panel: recent changes for one procurement.                                                                                                                                      |
-| `risk_signals_triggered_idx`           | `ON risk.risk_signals (indicator_id, data_as_of DESC) WHERE valid_to IS NULL AND state = 'triggered'` | Methodology page and list filters: currently triggered subjects per indicator.                                                                                                                      |
-| `risk_signals_closed_idx`              | `ON risk.risk_signals (valid_to) WHERE valid_to IS NOT NULL`                                          | Retention sweep.                                                                                                                                                                                    |
-| `risk_signals_run_idx`                 | `ON risk.risk_signals (run_id)`                                                                       | "What did this run change".                                                                                                                                                                         |
-| `risk_signals_evidence_gin`            | `USING gin (evidence jsonb_path_ops)`                                                                 | Containment queries over structured evidence.                                                                                                                                                       |
+Every index leads with `run_id`, because every read is scoped to one run and the retention sweep deletes by one.
 
-## 3. List-page read model
+| Name                              | Definition                                                                                        | Reason                                                                                                                                                                     |
+|-----------------------------------|---------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `risk_signals_run_subject_idx`    | `UNIQUE ON risk.risk_signals (run_id, subject_type, subject_key, indicator_id)`                   | The integrity rule of a snapshot: one result per subject and indicator within a run. Also serves subject lookup, and makes the retention `DELETE … WHERE run_id = $1` an index range scan. |
+| `risk_signals_run_procurement_idx`| `ON risk.risk_signals (run_id, procurement_source, procurement_id)`                               | Procurement detail page: every indicator state for one procurement, in the run being shown.                                                                                |
+| `risk_signals_run_triggered_idx`  | `ON risk.risk_signals (run_id, indicator_id) WHERE state = 'triggered'`                           | Methodology page and list filters: subjects one indicator triggered.                                                                                                       |
+| `risk_signals_evidence_gin`       | `USING gin (evidence jsonb_path_ops)`                                                             | Containment queries over structured evidence.                                                                                                                              |
 
-A view over `risk.risk_signals` (`WHERE valid_to IS NULL AND procurement_id IS NOT NULL`, grouped by
+## 3. The run the site shows
+
+### `risk.v_latest_run`
+
+```sql
+SELECT * FROM risk.evaluation_runs
+WHERE status IN ('succeeded', 'partial')
+ORDER BY started_at DESC
+LIMIT 1;
+```
+
+One definition of "latest successful run", so the read model, the retention job and the Astro application cannot
+disagree about which snapshot is live. A `'running'` run is excluded — its snapshot is still being written — and a
+`'failed'` one never produced a usable one. `'partial'` counts: it completed, and the indicators that failed within it
+simply contributed no rows, which the page reports as "not evaluated in this run" rather than as a stale result.
+
+The application reads this view once, then queries `risk_signals` by the `run_id` it returns.
+
+## 4. List-page read model
+
+A view over `risk.risk_signals` joined to `v_latest_run` (`WHERE procurement_id IS NOT NULL`, grouped by
 `procurement_source, procurement_id`). Promote it to a `MATERIALIZED VIEW` refreshed at the end of each run once
 measurement on the real corpus shows the need.
 
@@ -135,8 +160,8 @@ measurement on the real corpus shows the need.
 | `error_count`             | `count(*) FILTER (WHERE state = 'calculation_error')`                 | Drives the temporary data-processing notice.                                             |
 | `evaluated_count`         | `count(*)`                                                            | Denominator of "6 iš 7 rodiklių įvertinti".                                              |
 | `triggered_indicators`    | `array_agg(DISTINCT indicator_id) FILTER (WHERE state = 'triggered')` | Also the severity filter handle — see below.                                             |
-| `data_as_of`              | `max(data_as_of)`                                                     | Newest cutoff among the procurement's current signals.                                   |
-| `oldest_checked_at`       | `min(checked_at)`                                                     | The weakest freshness claim on the page: the list may say "tikrinta" no later than this. |
+| `run_id`                  | `min(run_id)`                                                         | The snapshot these counts come from. Constant across the view, by construction.          |
+| `data_as_of`              | `min(data_as_of)`                                                     | The run's cutoff. Constant across the view: one snapshot, one clock.                     |
 
 Stage, deadline and event date come from joining `public.v_pirkimas`.
 
@@ -149,21 +174,37 @@ assigns that severity and matches with array overlap, so severity stays a consta
 WHERE triggered_indicators && ARRAY['LT-COM-01', 'LT-SUP-13']  -- the catalogue's 'high' set
 ```
 
-## 4. Retention
+## 5. Retention
 
-viespirkiai displays risk, it does not manage it. A closed signal is one the GUI no longer shows as current, so it is
-kept for one month to support the recent-changes panel and then deleted.
+viespirkiai displays risk, it does not manage it. What expires is a whole superseded snapshot, not an individual signal.
 
-The scheduled maintenance job runs under the `risk_maint` role, outside the application path:
+The scheduled maintenance job runs under the `risk_rw` role, outside the application path, deleting one run's rows at
+a time so that each statement is an index range scan and a long sweep never holds one enormous transaction
+(`services/procurement-risk/retention.ts`):
 
 ```sql
-DELETE
-FROM risk.risk_signals
-WHERE valid_to IS NOT NULL
-  AND valid_to < now() - interval '1 month';
+-- the runs to clear
+SELECT r.id
+FROM risk.evaluation_runs r
+WHERE r.started_at < now() - interval '1 month'
+  AND r.id <> (SELECT id FROM risk.v_latest_run)
+  AND EXISTS (SELECT 1 FROM risk.risk_signals s WHERE s.run_id = r.id);
+
+-- then, per run
+DELETE FROM risk.risk_signals WHERE run_id = $1;
 ```
 
-Current rows (`valid_to IS NULL`) are kept however old they are: an untouched procurement keeps its signals until an
-indicator changes them.
+**The `v_latest_run` exclusion is the safety belt, and it is why this is not a plain age sweep.** If the service has
+been broken for longer than the retention window, the newest successful run is itself past the cutoff, and deleting it
+would empty the public pages. Excluding the live snapshot means the worst outcome of a long outage is stale signals,
+never missing ones.
 
-Evaluation runs accumulate at ~365 rows a year and are kept.
+Run rows themselves are kept: ~365 a year, and each is the provenance (`code_commit`, `data_as_of`) of the signals it
+produced. Nothing in the system holds `DELETE` on `risk.evaluation_runs`.
+
+### Sizing
+
+One run writes one row per evaluated `(subject, indicator)` — on the §7.2 estimate, ~20M rows a night. A one-month
+window therefore holds ~30 snapshots, so the retention interval is the direct lever on table size, and it is the number
+to revisit first once the real corpus is measured. Shortening it to a few days costs nothing but the depth of run
+history available for debugging, because the site only ever reads the newest snapshot.

@@ -55,10 +55,13 @@ async function closeRun(runId: number, status: "succeeded" | "partial", statisti
 /**
  * Executes every active Risk Indicator one at a time (risk-service-
  * architecture.md §9): opens one run, evaluates each indicator against the
- * real database's `public` canonical facts, validates the rows, writes them
- * to the local risk DB, and records per-indicator statistics. A failing
- * indicator is contained — its previous signals stay current, and the run
- * continues to the next indicator.
+ * real database's `public` canonical facts, validates the rows, appends them
+ * to the run's snapshot, and records per-indicator statistics.
+ *
+ * A failing indicator is contained to its own rows: it contributes nothing to
+ * this snapshot and the run continues, so the site shows that indicator as not
+ * evaluated in the current run rather than showing a stale result beside fresh
+ * ones. The run closes as `partial`, which `statistics` explains per indicator.
  */
 export async function runEvaluation(options: RunJobOptions): Promise<RunResult> {
     await closeStaleRunningRuns();
