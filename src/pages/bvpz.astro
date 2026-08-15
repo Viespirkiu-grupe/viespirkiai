@@ -3,14 +3,12 @@ import Layout from '../layouts/Layout.astro';
 import BvpzPicker from '../components/content/BvpzPicker.astro';
 import PageHeader from '@design-system/components/PageHeader.astro';
 import { getColorScheme, getFont } from '../lib/failai.ts';
+import { BVPZ_PRESETS } from '../lib/bvpzPresets.ts';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
-const presets = [
-  { label: 'Informacinės technologijos', codes: '48 72' },
-  { label: 'Vaistai', codes: '3360 3361 3362 3363 3364 3365 3366 3367 33690 33691' },
-];
+const presets = BVPZ_PRESETS;
 
 const searchTargets = [
   { label: 'Viešieji pirkimai (pasiūlymų teikimas)', value: 'viesiejiPirkimaiTeikimas' },

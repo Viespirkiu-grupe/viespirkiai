@@ -13,8 +13,7 @@
 import Modal from '@design-system/components/Modal.astro';
 import BvpzPicker from './BvpzPicker.astro';
 import '@design-system/foundation/facet-modal.css';
-
-interface Preset { label: string; codes: string; }
+import { BVPZ_PRESETS, type BvpzPreset as Preset } from '../../lib/bvpzPresets.ts';
 
 interface Props {
   /** Modalo elemento id (pvz. „sutBvpzModal"). */
@@ -35,15 +34,6 @@ interface Props {
   presets?: Preset[];
 }
 
-// Bendri greiti pasirinkimai („Visas medis" skiltyje) — tie patys kaip /bvpz;
-// vienodi visuose puslapiuose (sutartys, viešieji pirkimai).
-const DEFAULT_PRESETS: Preset[] = [
-  { label: 'Informacinės technologijos', codes: '48 72' },
-  { label: 'Vaistai', codes: '3360 3361 3362 3363 3364 3365 3366 3367 33690 33691' },
-  { label: 'Draudimas', codes: '665 667' },
-  { label: 'Draudimo brokeriai', codes: '66518' },
-];
-
 const {
   modalId,
   instanceId,
@@ -52,7 +42,7 @@ const {
   redirectBase,
   facetEndpoint,
   facetTriggerSelector,
-  presets = DEFAULT_PRESETS,
+  presets = BVPZ_PRESETS,
 } = Astro.props;
 ---
 

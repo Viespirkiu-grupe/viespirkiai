@@ -1,11 +1,7 @@
 ---
 import PickerField from '@design-system/components/inputs/PickerField.astro';
 import BvpzPicker from './BvpzPicker.astro';
-
-interface Preset {
-  label: string;
-  codes: string;
-}
+import { BVPZ_PRESETS, type BvpzPreset as Preset } from '../../lib/bvpzPresets.ts';
 
 interface Props {
   values: Record<string, string | number | undefined>;
@@ -20,10 +16,7 @@ const {
   name = 'bvpzPrefiksasKitas',
   legacyName = 'bvpzPrefiksas',
   instanceId = 'sutartys-bvpz',
-  presets = [
-    { label: 'Informacinės technologijos', codes: '48 72' },
-    { label: 'Vaistai', codes: '3360 3361 3362 3363 3364 3365 3366 3367 33690 33691' },
-  ],
+  presets = BVPZ_PRESETS,
 } = Astro.props as Props;
 
 const current = String(values[name] || values[legacyName] || '');
