@@ -3,7 +3,7 @@ export async function upsertAtn1(client, failasId, ppa) {
     try {
         // delete existing (cascades to all child tables)
         await client.query(
-            `delete from "atn1ataskaitos" where "failasId" = $1`,
+            `delete from "xlsxAtn1ataskaitos" where "failasId" = $1`,
             [failasId],
         );
 
@@ -16,7 +16,7 @@ export async function upsertAtn1(client, failasId, ppa) {
             rows: [{ id: ataskaitaId }],
         } = await client.query(
             `
-            insert into "atn1ataskaitos" (
+            insert into "xlsxAtn1ataskaitos" (
                 "failasId",
                 "teisinisPageindas", "ataskaitosTipas", "pirkimoNumeris",
                 "pirkimoObjektoPavadinimas", "pirkimoVerte",
@@ -96,7 +96,7 @@ export async function upsertAtn1(client, failasId, ppa) {
                 })
                 .join(",");
             await client.query(
-                `insert into "atn1pirkimoDalys" ("ataskaitaId","daliesNumeris","daliesPavadinimas","pagrindinisKodasBvpz","papildomiKodaiBvpz") values ${vals}`,
+                `insert into "xlsxAtn1pirkimoDalys" ("ataskaitaId","daliesNumeris","daliesPavadinimas","pagrindinisKodasBvpz","papildomiKodaiBvpz") values ${vals}`,
                 ppa.pirkimoDalys.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
@@ -115,7 +115,7 @@ export async function upsertAtn1(client, failasId, ppa) {
                 })
                 .join(",");
             await client.query(
-                `insert into "atn1dalyviai" ("ataskaitaId","fizinisAsmuo","kodas","pavadinimas","pavadinimoPatikslinimas","adresas","salis","grupe","atrinktoPasirinkomoPriezastys") values ${vals}`,
+                `insert into "xlsxAtn1dalyviai" ("ataskaitaId","fizinisAsmuo","kodas","pavadinimas","pavadinimoPatikslinimas","adresas","salis","grupe","atrinktoPasirinkomoPriezastys") values ${vals}`,
                 ppa.dalyviai.flatMap((d) => [
                     ataskaitaId,
                     d.fizinisAsmuo,
@@ -135,7 +135,7 @@ export async function upsertAtn1(client, failasId, ppa) {
                 .map((_, i) => `($${i * 3 + 1},$${i * 3 + 2},$${i * 3 + 3})`)
                 .join(",");
             await client.query(
-                `insert into "atn1vertinimoKriterjai" ("ataskaitaId","daliesNumeris","vertinimoKriterijus") values ${vals}`,
+                `insert into "xlsxAtn1vertinimoKriterjai" ("ataskaitaId","daliesNumeris","vertinimoKriterijus") values ${vals}`,
                 ppa.vertinimoKriterjai.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
@@ -152,7 +152,7 @@ export async function upsertAtn1(client, failasId, ppa) {
                 })
                 .join(",");
             await client.query(
-                `insert into "atn1atmestiPasiulymai" ("ataskaitaId","daliesNumeris","dalyvioKodas","dalyvioPavadinimas","statusas","nepakviestoPriezastys","atsiemimoPriezastys","atmetimoTeisinisPagrindas","atmetimoPriezastys","pasiulymoKaina","kainosIsraiska") values ${vals}`,
+                `insert into "xlsxAtn1atmestiPasiulymai" ("ataskaitaId","daliesNumeris","dalyvioKodas","dalyvioPavadinimas","statusas","nepakviestoPriezastys","atsiemimoPriezastys","atmetimoTeisinisPagrindas","atmetimoPriezastys","pasiulymoKaina","kainosIsraiska") values ${vals}`,
                 ppa.atmestiPasiulymai.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
@@ -181,7 +181,7 @@ export async function upsertAtn1(client, failasId, ppa) {
                 })
                 .join(",");
             await client.query(
-                `insert into "atn1pasiulymuEile" ("ataskaitaId","daliesNumeris","eileNumeris","dalyvioKodas","dalyvioPavadinimas","kainosSantykis","kaina","kainosIsraiska") values ${vals}`,
+                `insert into "xlsxAtn1pasiulymuEile" ("ataskaitaId","daliesNumeris","eileNumeris","dalyvioKodas","dalyvioPavadinimas","kainosSantykis","kaina","kainosIsraiska") values ${vals}`,
                 ppa.pasiulymuEile.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
@@ -205,7 +205,7 @@ export async function upsertAtn1(client, failasId, ppa) {
                 })
                 .join(",");
             await client.query(
-                `insert into "atn1proceduruPabaiga" ("ataskaitaId","daliesNumeris","proceduruPabaiga","sprendimoPriemimoData","sprendimoPriezastys","nutraukimoPriezastys") values ${vals}`,
+                `insert into "xlsxAtn1proceduruPabaiga" ("ataskaitaId","daliesNumeris","proceduruPabaiga","sprendimoPriemimoData","sprendimoPriezastys","nutraukimoPriezastys") values ${vals}`,
                 ppa.proceduruPabaiga.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,
@@ -225,7 +225,7 @@ export async function upsertAtn1(client, failasId, ppa) {
                 })
                 .join(",");
             await client.query(
-                `insert into "atn1sutartys" ("ataskaitaId","daliesNumeriai","tiekejosKodas","teikejoPavadinimas","sutartisSudarymoData","sutartiesGaliojimas","sutartiesVerte","orientacineVerte","subrangosKetinama","subrangosInfo","centralizuotasPirkimas","centralizacijosTipas","zaliasisPirkimas","energetiniaiReikalavimai","energetikosPriemones","inovatyvusProduktas","kelioTransportoPriemones") values ${vals}`,
+                `insert into "xlsxAtn1sutartys" ("ataskaitaId","daliesNumeriai","tiekejosKodas","teikejoPavadinimas","sutartisSudarymoData","sutartiesGaliojimas","sutartiesVerte","orientacineVerte","subrangosKetinama","subrangosInfo","centralizuotasPirkimas","centralizacijosTipas","zaliasisPirkimas","energetiniaiReikalavimai","energetikosPriemones","inovatyvusProduktas","kelioTransportoPriemones") values ${vals}`,
                 ppa.sutartys.flatMap((d) => [
                     ataskaitaId,
                     d.daliesNumeris,

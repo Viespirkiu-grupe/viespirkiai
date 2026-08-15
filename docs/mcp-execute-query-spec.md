@@ -185,7 +185,7 @@ fails fast rather than silently returning incomplete schema.
 ### Covered-table redirect
 
 Tables that are fully covered by a view (`jarAsmenys`, `sutartys`, `viesiejiPirkimai`, `pinregJuridiniaiRysiai`,
-`atn1ataskaitos`, `bylosDalyviai`) return a redirect message instead of raw column data:
+`xlsxAtn1ataskaitos`, `bylosDalyviai`) return a redirect message instead of raw column data:
 
 > *"Table 'jarAsmenys' is fully covered by view 'v_company'. Call get_schema with 'v_company' to see columns, joins,
 > and an example query."*
@@ -359,7 +359,7 @@ recursive graph traversal where full schema control is needed.
 | `v_sutartys`     | contracts, buyer-supplier, cpv, value, timing, frameworks | `sutartys`               | Buyer + seller names denormalized; `::text` cast on `jarKodas`      |
 | `v_pirkimas`     | procedures, criteria, lot-count, single-bidder            | `viesiejiPirkimai`       | Organizer name, municipality, short code                            |
 | `v_person_links` | conflict-of-interest, directors, beneficial-owners        | `pinregJuridiniaiRysiai` | Company name joined; `irasoTipas` distinguishes role type           |
-| `v_dalyviai`     | bid-ranking, rejections, co-bidding, single-bidder        | `atn1ataskaitos`         | Full bidder list with rank, bid amount, rejection reason            |
+| `v_dalyviai`     | bid-ranking, rejections, co-bidding, single-bidder        | `xlsxAtn1ataskaitos`     | Full bidder list with rank, bid amount, rejection reason            |
 | `v_bylos`        | court, litigation, enforcement                            | `bylosDalyviai`          | Case metadata joined; company name denormalized                     |
 
 `v_dalyviai` is the **only source of non-winner participants** in a procurement. `sutartys` records winners only;
@@ -396,7 +396,7 @@ jadis, rcInformaciniaiLeidiniaiPranesimai
 domenai, kotis
 balansoAtaskaitos, pelnoNuostoliuAtaskaitos
 darboVieta, istatinisKapitalas
-atn1ataskaitos, atn1dalyviai, atn1pasiulymuEile, atn1atmestiPasiulymai
+xlsxAtn1ataskaitos, xlsxAtn1dalyviai, xlsxAtn1pasiulymuEile, xlsxAtn1atmestiPasiulymai
 neskelbiamosDerybos
 vdiPazeidimai
 bylos, bylosDalyviai
@@ -539,8 +539,8 @@ GRANT SELECT ON
     "darboVieta", "istatinisKapitalas",
     "neskelbiamosDerybos", "vdiPazeidimai",
     "teismoNuosprendziai", "teismoNuosprendziaiDalyviai", "mokesciai",
-    "atn1ataskaitos", "atn1dalyviai", "atn1sutartys",
-    "atn1pasiulymuEile", "atn1atmestiPasiulymai"
+    "xlsxAtn1ataskaitos", "xlsxAtn1dalyviai", "xlsxAtn1sutartys",
+    "xlsxAtn1pasiulymuEile", "xlsxAtn1atmestiPasiulymai"
 TO analyst;
 
 -- v_* view'us sukuria ir SELECT teises jiems suteikia ensureViews.ts (admin pool'u).

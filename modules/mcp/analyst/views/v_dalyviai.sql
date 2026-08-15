@@ -23,15 +23,15 @@ SELECT a."pirkimoNumeris",
        p."eileNumeris",
        p."pasiulymoKaina",
        p."atmetimoPriezastis"
-FROM atn1ataskaitos a
-         JOIN atn1dalyviai d ON d."ataskaitaId" = a.id
+FROM "xlsxAtn1ataskaitos" a
+         JOIN "xlsxAtn1dalyviai" d ON d."ataskaitaId" = a.id
          LEFT JOIN LATERAL (
              SELECT COALESCE(e."daliesNumeris", ap."daliesNumeris") AS "daliesNumeris",
                     e."eileNumeris"                                 AS "eileNumeris",
                     e.kaina::numeric                                AS "pasiulymoKaina",
                     ap.statusas                                     AS "atmetimoPriezastis"
-             FROM "atn1pasiulymuEile" e
-                      FULL OUTER JOIN "atn1atmestiPasiulymai" ap
+             FROM "xlsxAtn1pasiulymuEile" e
+                      FULL OUTER JOIN "xlsxAtn1atmestiPasiulymai" ap
                                       ON ap."ataskaitaId" = e."ataskaitaId"
                                           AND ap."dalyvioKodas" = e."dalyvioKodas"
                                           AND ap."daliesNumeris" = e."daliesNumeris"

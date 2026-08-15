@@ -29,8 +29,8 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "teismoNuosprendziai", "teismoNuosprendziaiDalyviai",
     "mokesciai",
 
-    "atn1ataskaitos", "atn1dalyviai", "atn1sutartys",
-    "atn1pasiulymuEile", "atn1atmestiPasiulymai",
+    "xlsxAtn1ataskaitos", "xlsxAtn1dalyviai", "xlsxAtn1sutartys",
+    "xlsxAtn1pasiulymuEile", "xlsxAtn1atmestiPasiulymai",
 ]);
 
 export const FUNCTION_WHITELIST: Set<string> = new Set([

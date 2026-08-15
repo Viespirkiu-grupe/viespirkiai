@@ -251,7 +251,7 @@ describe("v_dalyviai", () => {
                 GROUP BY 1, 2, 3, 4, 5
             ) x
         `);
-        // A handful of duplicate atn1ataskaitos rows exist for the same pirkimoNumeris (re-scraped reports),
+        // A handful of duplicate xlsxAtn1ataskaitos rows exist for the same pirkimoNumeris (re-scraped reports),
         // so small counts are expected. A cartesian fanout across lots would produce counts in the dozens/hundreds.
         expect(Number(rows[0].max_cnt), "unexpected large fanout for a (pirkimas, tiekejas, dalis, eile, atmetimas) combination").toBeLessThan(10);
     });
