@@ -194,7 +194,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             "atmetimoPriezastis užpildytas, jei pasiūlymas tos dalies buvo atmestas. " +
             "Abu gali būti NULL tai pačiai (pirkimas, tiekėjas, dalis) eilutei, jei duomenų nėra.",
     },
-    v_lot: {
+    v_pirkimo_dalis: {
         tags: ["lots", "lot-grain", "risk-subjects", "single-bidder"],
         keys: ["subjektoRaktas", "pirkimoNumeris", "daliesNumeris", "saltinis"],
         joins: [
@@ -207,12 +207,13 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             "saltinis: text",
             "pirkimoNumeris: text",
             "daliesNumeris: text",
+            "daliesPavadinimas: text",
             "pirkimoBudas: text",
             "ataskaitosData: timestamp with time zone",
         ],
         primaryKeys: ["subjektoRaktas"],
         example:
-            'SELECT l."subjektoRaktas", l."pirkimoNumeris", l."daliesNumeris", count(DISTINCT d."tiekejoKodas") AS dalyviu FROM v_lot l JOIN v_dalyviai d ON d."pirkimoNumeris" = l."pirkimoNumeris" AND COALESCE(d."daliesNumeris", \'0\') = l."daliesNumeris" GROUP BY 1, 2, 3 HAVING count(DISTINCT d."tiekejoKodas") = 1',
+            'SELECT l."subjektoRaktas", l."pirkimoNumeris", l."daliesNumeris", count(DISTINCT d."tiekejoKodas") AS dalyviu FROM v_pirkimo_dalis l JOIN v_dalyviai d ON d."pirkimoNumeris" = l."pirkimoNumeris" AND COALESCE(d."daliesNumeris", \'0\') = l."daliesNumeris" GROUP BY 1, 2, 3 HAVING count(DISTINCT d."tiekejoKodas") = 1',
         notes:
             "Vienas eilutė per pirkimo dalį (lot)" +
             "Pirkimo dalis yra savarankiškai vertinama ir laimėtojas skiriamas atskirai, todėl " +
@@ -221,6 +222,8 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             "lygmenyje nesimato).\n" +
             "Dalyvių skaičių, kainas ir atmetimus imk iš v_dalyviai ir agreguok pats — čia jų nėra sąmoningai.\n" +
             "daliesNumeris: NULL v_dalyviai eilutėse virsta '0' ('visas pirkimas = dalis nulis').\n" +
+            "daliesPavadinimas: dalies pavadinimas iš ATN-1 ataskaitos III.5 skilties (atn1pirkimoDalys); " +
+            "NULL, jei ta skiltis nepildyta arba dalies numeris nerastas.\n" +
             "subjektoRaktas formatas 'saltinis:pirkimoNumeris:daliesNumeris' — tai rizikos rodiklių " +
             "(risk.risk_signals) subjekto raktas; saltinis NULL (rakte — 'unknown') jei pirkimo " +
             "skelbimas dar neįkeltas (ATN-1 ataskaita gali aplenkti skelbimą).",

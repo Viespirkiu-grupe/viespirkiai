@@ -15,10 +15,10 @@ const _baseViews = [...new Set(Object.values(COVERED_TABLES_BY_VIEWS))].sort();
 // Views built on other views rather than standing in for a table, so they cover
 // nothing and stay out of the map above. Listed in creation order: ensureViews
 // issues the DDL in iteration order, and a derived view's dependencies must
-// already exist. v_lot selects from v_dalyviai, which sorts before it today —
+// already exist. v_pirkimo_dalis selects from v_dalyviai, which sorts before it today —
 // but appending rather than merging and re-sorting is what keeps that true as
 // derived views are added, instead of leaving it to alphabetical luck.
-const _derivedViews = ["v_lot"];
+const _derivedViews = ["v_pirkimo_dalis"];
 
 const _viewNames = [..._baseViews, ..._derivedViews];
 

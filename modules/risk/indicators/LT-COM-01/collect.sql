@@ -9,9 +9,9 @@
 -- present in atn1atmestiPasiulymai (rejected/withdrawn/not-invited); see
 -- public.v_dalyviai.
 --
--- subjectKey, procurementSource, procurementId come from public.v_lot.
+-- subjectKey, procurementSource, procurementId come from public.v_pirkimo_dalis.
 -- method and reportedAt are aggregated here from rows at or before $1,
--- rather than taken from v_lot's own (not cutoff-filtered) pirkimoBudas
+-- rather than taken from v_pirkimo_dalis's own (not cutoff-filtered) pirkimoBudas
 -- and ataskaitosData.
 --
 -- Columns left of AS are Lithuanian; aliases right of AS are English.
@@ -28,8 +28,8 @@ SELECT l."subjektoRaktas"                                                       
        to_char(max(d."ataskaitosData") AT TIME ZONE 'UTC',
                'YYYY-MM-DD"T"HH24:MI:SS"Z"')                                          AS "reportedAt"
 FROM public.v_dalyviai d
-         -- Inner join: v_lot's rows are built from v_dalyviai (v_lot.sql).
-         JOIN public.v_lot l ON l."pirkimoNumeris" = d."pirkimoNumeris"
+         -- Inner join: v_pirkimo_dalis's rows are built from v_dalyviai (v_pirkimo_dalis.sql).
+         JOIN public.v_pirkimo_dalis l ON l."pirkimoNumeris" = d."pirkimoNumeris"
                             AND l."daliesNumeris" = COALESCE(d."daliesNumeris", '0')
 WHERE d."ataskaitosData" <= $1::timestamptz
   AND ($2::text[] IS NULL OR d."pirkimoNumeris" = ANY ($2::text[]))
