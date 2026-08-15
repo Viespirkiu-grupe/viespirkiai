@@ -78,6 +78,7 @@ flowchart LR
     B[Buyer company] -->|publishes| P[Procurement]
     S[Participant company] -->|submits proposal| L[Lot / bid]
     L -->|belongs to| P
+    P -.->|p.daliesNumeris| L
     P -->|award produces 1 . . n| C[Contract]
     C -->|performed by| W[Winning supplier]
     C -.->|pirkimoNumeris| P
