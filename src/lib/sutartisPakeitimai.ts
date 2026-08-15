@@ -155,10 +155,11 @@ function rowToPakeitimas(row: any): SutartiesPakeitimas | null {
  */
 export async function loadSutartisPakeitimai(
   unikalusId: number,
-  limit = 50,
+  limit: number | null = null,
 ): Promise<SutartiesPakeitimas[]> {
   let rows: any[];
   try {
+    // limit = null → LIMIT NULL, t. y. visa sutarties pakeitimų istorija.
     rows = await fetchRecentChanges({ id: unikalusId, limit } as any);
   } catch {
     return [];
