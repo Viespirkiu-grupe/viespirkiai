@@ -11,15 +11,27 @@
 -- atn1atmestiPasiulymai (rejected/withdrawn/not-invited) for that lot — see
 -- public.v_dalyviai.
 --
+-- Lot identity comes from public.v_lot, which is the single definition of what
+-- a lot is called; spelling `subjectKey` by hand here in each of the 17
+-- lot-grain indicators is how the same lot ends up with two keys that no longer
+-- roll up. v_lot carries identity ONLY — no counts — because a measurement
+-- shared across indicators could change what an already-reviewed
+-- indicatorVersion computes without its version changing (§5).
+--
+-- Note what is NOT taken from v_lot: `method` and `reportedAt` are still
+-- aggregated from the cutoff-filtered rows below. v_lot cannot see $1, so its
+-- own pirkimoBudas/ataskaitosData summarise every report a lot ever had,
+-- including ones after the cutoff. Reading them from there would quietly break
+-- the rerun-reproducibility that $1 exists to provide.
+--
 -- This statement measures and does not judge: no state, no threshold, no
 -- indicator identity. Those belong to calculate.ts and the shared machinery.
 -- Everything left of an AS is the ingestion schema's and stays Lithuanian;
 -- everything right of it is the risk service's and is English.
 
-SELECT (COALESCE(p.saltinis, 'unknown') || ':' || d."pirkimoNumeris" || ':' ||
-        COALESCE(d."daliesNumeris", '0'))                                            AS "subjectKey",
-       p.saltinis                                                                    AS "procurementSource",
-       d."pirkimoNumeris"                                                            AS "procurementId",
+SELECT l."subjektoRaktas"                                                            AS "subjectKey",
+       l.saltinis                                                                    AS "procurementSource",
+       l."pirkimoNumeris"                                                            AS "procurementId",
        min(d."pirkimoBudas")                                                         AS "method",
        count(DISTINCT d."tiekejoKodas")::int                                         AS "totalBids",
        count(DISTINCT d."tiekejoKodas") FILTER (WHERE d."atmetimoPriezastis" IS NULL)::int
@@ -30,7 +42,12 @@ SELECT (COALESCE(p.saltinis, 'unknown') || ':' || d."pirkimoNumeris" || ':' ||
        to_char(max(d."ataskaitosData") AT TIME ZONE 'UTC',
                'YYYY-MM-DD"T"HH24:MI:SS"Z"')                                          AS "reportedAt"
 FROM public.v_dalyviai d
-         LEFT JOIN public.v_pirkimas p ON p."pirkimoId" = d."pirkimoNumeris"
+         -- Inner join, not LEFT: v_lot is built from v_dalyviai, so every bid row
+         -- has a lot. A lot whose notice has not been ingested still appears —
+         -- v_lot gives it procurementSource NULL and an 'unknown:' key, and
+         -- rules.ts turns that into insufficient_data rather than dropping it.
+         JOIN public.v_lot l ON l."pirkimoNumeris" = d."pirkimoNumeris"
+                            AND l."daliesNumeris" = COALESCE(d."daliesNumeris", '0')
 WHERE d."ataskaitosData" <= $1::timestamptz
   AND ($2::text[] IS NULL OR d."pirkimoNumeris" = ANY ($2::text[]))
-GROUP BY p.saltinis, d."pirkimoNumeris", COALESCE(d."daliesNumeris", '0');
+GROUP BY l."subjektoRaktas", l.saltinis, l."pirkimoNumeris";

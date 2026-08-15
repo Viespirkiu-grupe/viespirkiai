@@ -18,7 +18,7 @@ export const ltCom01v1 = new SubjectFactsIndicator<LtCom01Facts, LtCom01Paramete
         subjectType: "lot",
         stage: "award",
         references: ["OCP-R018", "OLAF-CA02", "OT-I01", "STT-I03", "VPT-I01"],
-        sourceRelations: ["public.v_pirkimas", "public.v_dalyviai"],
+        sourceRelations: ["public.v_lot", "public.v_dalyviai"],
         requiredInputs: ["tiekejoKodas", "atmetimoPriezastis"],
         parameters: ltCom01Parameters,
         parameterSchema: ltCom01ParametersSchema,
