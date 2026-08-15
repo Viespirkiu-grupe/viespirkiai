@@ -6,15 +6,11 @@ function keyString(key: RiskIndicatorKey): string {
 }
 
 /**
- * The immutable, explicitly constructed in-process catalogue of every
- * deployed Risk Indicator version (risk-service-architecture.md §4.3). Keyed
- * by (indicator_id, implementation_version); given that key the run job
- * retrieves exactly one definition.
+ * The in-process catalogue of deployed Risk Indicator versions, keyed by
+ * (id, version). See docs/indicators-story/risk-service-architecture.md §4.3.
  *
- * Each indicator validates itself when it is constructed, so what is left for
- * the registry is what only a *set* of indicators can be wrong about:
- * duplicate keys and a second active version of the same indicator. Both
- * throw here, at import time.
+ * The constructor throws on a duplicate key or on more than one active
+ * version of the same indicator id.
  */
 export class RiskIndicatorRegistry {
     private readonly byKey = new Map<string, RiskIndicator<unknown>>();
@@ -38,12 +34,12 @@ export class RiskIndicatorRegistry {
         return [...this.byKey.values()];
     }
 
-    /** The one `active` version of each indicator — what the read model shows. */
+    /** The one `active`-lifecycle version of each indicator. */
     active(): readonly RiskIndicator<unknown>[] {
         return [...this.activeById.values()];
     }
 
-    /** `active` + `shadow`: what a run evaluates and writes (see RiskIndicator.isEvaluable). */
+    /** Indicators whose lifecycle is 'active' or 'shadow'; see RiskIndicator.isEvaluable in riskIndicator.ts. */
     evaluable(): readonly RiskIndicator<unknown>[] {
         return this.all().filter((indicator) => indicator.isEvaluable);
     }

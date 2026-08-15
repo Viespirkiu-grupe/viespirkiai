@@ -4,13 +4,10 @@ import { ltCom01Parameters, ltCom01ParametersSchema, type LtCom01Parameters } fr
 
 // LT-COM-01 — Single valid bid (Vienintelis tinkamas pasiūlymas).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
-// Shape: row-local — collect.sql returns one fact row per lot and
-// ltCom01Decide decides it (risk-service-architecture.md §4.4), so the whole
-// definition is a SubjectFactsIndicator.
+// collect.sql returns one fact row per lot; ltCom01Decide (rules.ts) decides
+// it, so the whole definition is a SubjectFactsIndicator.
 //
-// lifecycle: 'shadow' — the method scope is a v1 placeholder pending review
-// (see parameters.ts), so this version is committed but kept out of the public
-// read model until flipped to 'active' (§7.2).
+// lifecycle: 'shadow'; scope is unscoped pending review — see parameters.ts.
 export const ltCom01v1 = new SubjectFactsIndicator<LtCom01Facts, LtCom01Parameters>(
     {
         key: { id: "LT-COM-01", version: 1 },

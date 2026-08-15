@@ -1,13 +1,10 @@
 import { z } from "zod";
 
-// Shared observation and run contracts for the Procurement Risk Service.
-// Mirrors docs/indicators-story/risk-service-architecture.md §4.3.
+// Shared observation and run contracts for the Procurement Risk Service. See
+// docs/indicators-story/risk-service-architecture.md §4.3.
 //
-// This file holds values only — the vocabulary every other risk module
-// speaks. The behaviour that uses them lives with the object that owns it:
-// riskIndicator.ts (one indicator version), subjectFactsIndicator.ts (the
-// collect-then-decide case), evaluationContext.ts (what one run evaluates),
-// riskDataSource.ts (how a calculation reaches the database).
+// This file holds types and values only. Behaviour lives in riskIndicator.ts,
+// subjectFactsIndicator.ts, evaluationContext.ts, and riskDataSource.ts.
 
 export type IndicatorLifecycle = "draft" | "shadow" | "active" | "retired";
 export type IndicatorStage = "planning" | "tender" | "award" | "contract";
@@ -16,8 +13,7 @@ export type SubjectType = "procurement" | "lot" | "contract" | "supplier";
 // The four states a calculation returns.
 export type IndicatorState = "triggered" | "not_triggered" | "insufficient_data" | "not_applicable";
 
-// The state stored in risk.risk_signals: the four above, plus the one the
-// run job records on behalf of a calculation that failed.
+// The four IndicatorState values, plus "calculation_error".
 export type SignalState = IndicatorState | "calculation_error";
 
 export type RuntimeContract<T> = Readonly<{
@@ -58,25 +54,18 @@ export type RiskObservationV1 = z.infer<typeof riskObservationV1Schema>;
 
 export const riskObservationV1Contract: RuntimeContract<RiskObservationV1> = zodContract(riskObservationV1Schema);
 
-// Which subjects an entry's values apply to. An absent dimension admits
-// everything; a present one is a whitelist. Entries valid at the same time
-// must have pairwise disjoint scopes, which is what makes resolution yield at
-// most one entry per subject (risk-service-architecture.md §4.5).
+// Which subjects an entry's values apply to; see parameterScope.ts and
+// docs/indicators-story/risk-service-architecture.md §4.5.
 export type ParameterScope = Readonly<{
     methods?: readonly string[];
     objectTypes?: readonly string[];
 }>;
 
-// One effective-dated entry of a parameter timeline. Appending an entry is
-// the way a threshold changes; entries are immutable once merged.
+// One effective-dated entry of a parameter timeline. `validTo: null` means
+// still in force.
 //
-// Both text fields are published verbatim with the entry (deployedIndicators.ts),
-// so they are public copy rather than comments, and they divide as follows:
-// `source` is where the value comes from — a legal citation, a catalogue
-// definition, a review decision — and is required because no value ships
-// without provenance; `note` is a caveat the reader of a published timeline
-// needs, and is absent when there is none. Rationale only a maintainer needs
-// belongs in a comment here or in the indicator's README, not in either field.
+// `source` and `note` are published verbatim with the entry
+// (deployedIndicators.ts). `note` is optional.
 export type ParameterEntry<P> = Readonly<{
     validFrom: string;
     validTo: string | null;
@@ -86,16 +75,15 @@ export type ParameterEntry<P> = Readonly<{
     note?: string;
 }>;
 
-// The columns every collect.sql returns, whatever else it measures — the half
-// of an observation that is identical for all 106 indicators. The shared
-// machinery fills those fields in, so no decision() ever mentions them
-// (risk-service-architecture.md §4.1).
+// The columns every collect.sql returns, in addition to whatever else it
+// measures. See subjectFactsIndicator.ts and
+// docs/indicators-story/risk-service-architecture.md §4.1.
 export type SubjectFacts = Readonly<{
     subjectKey: string;
     procurementSource: string | null;
     procurementId: string | null;
-    // Read only by the shared scope test, and only when a parameter entry
-    // narrows the corresponding dimension.
+    // Read by scopeAdmits (parameterScope.ts) when a parameter entry
+    // narrows this dimension.
     method?: string | null;
     objectType?: string | null;
 }>;
@@ -110,9 +98,8 @@ export const subjectFactsSchema = z.looseObject({
 
 export const subjectFactsContract: RuntimeContract<SubjectFacts> = zodContract(subjectFactsSchema);
 
-// The half of an observation a decision decides: the state, and the values
-// that explain it. Everything omitted here is assembled from the definition,
-// the resolved parameter entry and the run cutoff.
+// The fields a decide() function returns; riskIndicator.ts and
+// subjectFactsIndicator.ts assemble the rest of an observation around them.
 export type Decision = Readonly<{
     state: IndicatorState;
     rawValue?: Readonly<Record<string, unknown>> | null;

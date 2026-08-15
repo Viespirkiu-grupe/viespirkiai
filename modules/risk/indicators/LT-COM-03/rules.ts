@@ -1,10 +1,9 @@
 import type { Decision, SubjectFacts } from "../../contracts.ts";
 import type { LtCom03Parameters } from "./parameters.ts";
 
-// LT-COM-03 — HOW IT DECIDES. One fact row from collect.sql plus the parameter
-// values in force for it, in; one decision, out. No database, no clock, no
-// indicator identity — SubjectFactsIndicator supplies all of that
-// (risk-service-architecture.md §4.1).
+// LT-COM-03 — decide(): one fact row (from collect.sql) plus the parameter
+// values in force for it, in; one Decision, out. See
+// docs/indicators-story/risk-service-architecture.md §4.1.
 
 // What collect.sql returns per procurement, on top of the shared SubjectFacts
 // columns.
@@ -21,10 +20,7 @@ export function ltCom03Decide(facts: LtCom03Facts, parameters: LtCom03Parameters
         source: "ATN-1 ataskaita",
     };
 
-    // The procurement's own ATN-1 row(s) exist — that is where totalSuppliers
-    // came from — but without a matching procurement we cannot say which
-    // register it belongs to, so the signal would not be attributable to
-    // anything.
+    // procurementSource is null: no matching procurement register.
     if (facts.procurementSource === null) {
         return {
             state: "insufficient_data",
@@ -33,8 +29,7 @@ export function ltCom03Decide(facts: LtCom03Facts, parameters: LtCom03Parameters
         };
     }
 
-    // A report listing no participants at all is an incomplete report, not a
-    // procurement that nobody was invited to or consulted for.
+    // totalSuppliers === 0: treated as an incomplete report, not zero suppliers.
     if (facts.totalSuppliers === 0) {
         return {
             state: "insufficient_data",

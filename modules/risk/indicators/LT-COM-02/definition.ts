@@ -4,14 +4,11 @@ import { ltCom02Parameters, ltCom02ParametersSchema, type LtCom02Parameters } fr
 
 // LT-COM-02 — Low number of bidders (Mažas dalyvių skaičius).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
-// Shape: row-local — collect.sql returns one fact row per lot and
-// ltCom02Decide decides it (risk-service-architecture.md §4.4), so the whole
-// definition is a SubjectFactsIndicator.
+// collect.sql returns one fact row per lot; ltCom02Decide (rules.ts) decides
+// it, so the whole definition is a SubjectFactsIndicator.
 //
-// lifecycle: 'shadow' — the method scope is a v1 placeholder pending review
-// (see parameters.ts and README.md, "Open question: method scope"), so this
-// version is committed but kept out of the public read model until flipped to
-// 'active' (§7.2).
+// lifecycle: 'shadow'; scope is unscoped pending review — see parameters.ts
+// and README.md.
 export const ltCom02v1 = new SubjectFactsIndicator<LtCom02Facts, LtCom02Parameters>(
     {
         key: { id: "LT-COM-02", version: 1 },

@@ -1,14 +1,12 @@
 import type { ParameterScope, SubjectFacts } from "./contracts.ts";
 
-// Scope arithmetic for the effective-dated parameter timeline
-// (risk-service-architecture.md §4.5). A scope is a whitelist per
-// dimension: a dimension the entry does not mention admits everything, a
-// dimension it does mention admits only the listed values.
+// Scope arithmetic for the effective-dated parameter timeline. A scope is a
+// whitelist per dimension: a dimension the entry does not mention admits
+// everything, a dimension it does mention admits only the listed values. See
+// docs/indicators-story/risk-service-architecture.md §4.5.
 //
-// Two rules depend on this file. `scopeAdmits` picks the entry that decides
-// one subject at run time; `scopesAreDisjoint` is the startup check that makes
-// that pick unambiguous, because two entries valid at the same instant may
-// never both admit the same subject.
+// scopeAdmits picks the entry that decides one subject; scopesAreDisjoint
+// checks whether two entries can never both admit the same subject.
 
 type Dimension = Readonly<{
     // The scope key holding the whitelist, and the fact column it constrains.
@@ -59,7 +57,7 @@ export function scopeKey(scope: ParameterScope): string {
     }).join("|");
 }
 
-/** Human-readable form for the messages the startup checks throw. */
+/** Human-readable form of a scope. */
 export function describeScope(scope: ParameterScope): string {
     const parts = [
         scope.methods && `methods [${scope.methods.join(", ")}]`,

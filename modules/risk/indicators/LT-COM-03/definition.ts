@@ -5,16 +5,11 @@ import { ltCom03Parameters, ltCom03ParametersSchema, type LtCom03Parameters } fr
 // LT-COM-03 — Only one supplier invited or consulted (Konsultuotas ar
 // kviestas tik vienas tiekėjas).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
-// Shape: row-local — collect.sql returns one fact row per procurement and
-// ltCom03Decide decides it (risk-service-architecture.md §4.4), so the whole
-// definition is a SubjectFactsIndicator.
+// collect.sql returns one fact row per procurement; ltCom03Decide (rules.ts)
+// decides it, so the whole definition is a SubjectFactsIndicator.
 //
-// lifecycle: 'shadow' — the method scope is a v1 placeholder pending review
-// (see parameters.ts and README.md, "Open question: method scope"), and the
-// ATN-1 relational pipeline has not yet ingested a single non-"Atviras
-// konkursas" report (README.md, "Real-data sanity run"), so this version is
-// committed but kept out of the public read model until flipped to 'active'
-// (§7.2).
+// lifecycle: 'shadow'; scope is unscoped pending review — see parameters.ts
+// and README.md.
 export const ltCom03v1 = new SubjectFactsIndicator<LtCom03Facts, LtCom03Parameters>(
     {
         key: { id: "LT-COM-03", version: 1 },

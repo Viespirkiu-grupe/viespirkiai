@@ -1,14 +1,8 @@
 import type { ParameterEntry } from "./contracts.ts";
 
-// One run's inputs, as a value object. A run has exactly two of its own
-// (risk-service-architecture.md §5) — the `data_as_of` cutoff and the
-// subject set — plus the identity of the run row and the parameter entries
-// the indicator resolved for that cutoff.
-//
-// It carries no database handle: reading is the RiskDataSource's job, passed
-// to a calculation alongside this context. That split is what keeps "what is
-// being evaluated" readable on its own and makes a context trivial to build
-// in a test.
+// One run's inputs, as a value object: the run id, the data_as_of cutoff,
+// the subject set, and the parameter entries resolved for that cutoff. See
+// riskDataSource.ts and docs/indicators-story/risk-service-architecture.md §5.
 
 export type EvaluationRun = Readonly<{
     runId: number;
@@ -30,8 +24,7 @@ export class EvaluationContext {
         Object.freeze(this);
     }
 
-    // True for a backfill or a single-procurement rerun, false for a normal
-    // full run — the distinction indicators and logs care about.
+    // True when subjects is non-null.
     get isScoped(): boolean {
         return this.subjects !== null;
     }

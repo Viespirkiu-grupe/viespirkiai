@@ -1,6 +1,4 @@
--- Vienas eilutė per (pirkimas, tiekėjas, pirkimo dalis). Naudok get_failas_tekstas su ATN-1
--- xlsx failu (pavadinimas: PPA-*, ATN-*, Atn-1*) jei reikia papildomos detalės:
--- p.4=dalyviai, p.6=atmesti pasiūlymai su kainomis, p.7=pasiūlymų eilė su kainomis.
+-- Viena eilutė per (pirkimas, tiekėjas, pirkimo dalis).
 CREATE OR REPLACE VIEW v_dalyviai AS
 SELECT a."pirkimoNumeris",
        a."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
