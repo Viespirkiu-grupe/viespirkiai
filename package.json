@@ -10,6 +10,7 @@
         "test:integration": "vitest run --config vitest.integration.config.ts",
         "check": "astro check",
         "deps:report": "node scripts/dependencySizes.js",
+        "code:lines": "node scripts/codeLines.js",
         "db:schema:dump": "node postgres/dumpSchema.js",
         "regitra:atnaujinti": "node modules/regitra/atnaujintiRegitra.js",
         "sodra:atnaujinti": "node modules/sodra/atnaujintiSodra.js",
