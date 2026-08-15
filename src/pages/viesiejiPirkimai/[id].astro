@@ -91,7 +91,7 @@ const font = getFont(Astro.cookies);
       <PirkimasVykdytojas pirkimas={pirkimas} />
       <PirkimasTerminai items={timelineItems} />
       <PirkimasKlasifikacija pirkimas={pirkimas} />
-      {pirkimas.atn1 && <PirkimasDalyviai atn1={pirkimas.atn1} />}
+      {pirkimas.ppa && <PirkimasDalyviai ppa={pirkimas.ppa} />}
       <PirkimasVerte pirkimas={pirkimas} />
       <PirkimasSalygos pirkimas={pirkimas} />
     </div>

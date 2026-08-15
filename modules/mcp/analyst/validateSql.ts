@@ -29,8 +29,14 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "teismoNuosprendziai", "teismoNuosprendziaiDalyviai",
     "mokesciai",
 
-    "xlsxAtn1ataskaitos", "xlsxAtn1dalyviai", "xlsxAtn1sutartys",
-    "xlsxAtn1pasiulymuEile", "xlsxAtn1atmestiPasiulymai",
+    "xlsxPPAataskaitos", "xlsxPPAdalyviai", "xlsxPPAsutartys",
+    "xlsxPPApasiulymuEile", "xlsxPPAatmestiPasiulymai",
+    "xlsxPPAteisiniaiPagrindai", "xlsxPPAataskaitosTipai",
+    "xlsxPPApirkimoVertes", "xlsxPPAperkanciosiosOrganizacijosTipai",
+    "xlsxPPAigaliotosiosTipai", "xlsxPPApirkimoBudai",
+    "xlsxPPAatmestuPasiulymuStatusai", "xlsxPPAatmetimoTeisiniaiPagrindai",
+    "xlsxPPAatmetimoPriezastys", "xlsxPPAkainosIsraiskos",
+    "xlsxPPAsalys", "xlsxPPAcentralizacijosTipai", "xlsxPPApirkimoObjektoRusys",
 ]);
 
 export const FUNCTION_WHITELIST: Set<string> = new Set([

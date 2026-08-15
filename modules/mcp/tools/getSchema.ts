@@ -189,7 +189,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         example:
             'SELECT "pirkimoNumeris", "tiekejoKodas", tiekejas, "daliesNumeris", "eileNumeris", "pasiulymoKaina", "interesuKonfliktasNustatytas" FROM v_dalyviai WHERE "pirkimoNumeris" = \'1005158\'',
         notes:
-            "Vienas eilutė per (pirkimas, tiekėjas, pirkimo dalis). Apima ~403 pirkimus (ATN-1 ataskaitos). " +
+            "Vienas eilutė per (pirkimas, tiekėjas, pirkimo dalis). Apima PPA ataskaitas. " +
             "eileNumeris/pasiulymoKaina — laimėtojo/ne atmestų pasiūlymų eilė konkrečioje dalyje (daliesNumeris); " +
             "atmetimoPriezastis užpildytas, jei pasiūlymas tos dalies buvo atmestas. " +
             "Abu gali būti NULL tai pačiai (pirkimas, tiekėjas, dalis) eilutei, jei duomenų nėra.",

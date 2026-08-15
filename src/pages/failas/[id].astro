@@ -16,8 +16,8 @@ import Telefonai from '../../components/failai/Telefonai.astro';
 import IbanNumeriai from '../../components/failai/IbanNumeriai.astro';
 import Parasai from '@design-system/components/content/SignatureList.astro';
 import FailasPasalintas from '../../components/failai/FailasPasalintas.astro';
-import Atn1Ataskaita from '../../components/failai/Atn1Ataskaita.astro';
-import { loadAtn1ByFailasId } from '../../lib/atn1.js';
+import PpaAtaskaita from '../../components/failai/PpaAtaskaita.astro';
+import { loadPpaByFailasId } from '../../lib/ppa.js';
 import { convertUnit } from '@/utils/units.js';
 
 const { id: rawId } = Astro.params;
@@ -48,11 +48,11 @@ if (format === 'json') {
   });
 }
 
-let atn1 = null;
+let ppa = null;
 if (!isPasalintas) {
   failas = await enrichFailas(failas);
-  if (failas.tipas === 'ATN-1') {
-    atn1 = await loadAtn1ByFailasId(failas.id);
+  if (failas.tipas === 'PPA') {
+    ppa = await loadPpaByFailasId(failas.id);
   }
 }
 
@@ -203,14 +203,14 @@ const page = /^\d+$/.test(pageParam) ? pageParam : '';
       </div>
 
       <div>
-        {atn1 ? (
+        {ppa ? (
           <>
             <div class="failas-tabs" role="tablist" aria-label="Failo turinys">
-              <button type="button" class="failas-tab is-active" role="tab" aria-selected="true" aria-controls="panel-ataskaita" data-tab="ataskaita">Ataskaita (ATN-1)</button>
+              <button type="button" class="failas-tab is-active" role="tab" aria-selected="true" aria-controls="panel-ataskaita" data-tab="ataskaita">Ataskaita (PPA)</button>
               <button type="button" class="failas-tab" role="tab" aria-selected="false" aria-controls="panel-failas" data-tab="failas">Failas</button>
             </div>
             <div id="panel-ataskaita" role="tabpanel">
-              <Atn1Ataskaita atn1={atn1} />
+              <PpaAtaskaita ppa={ppa} />
             </div>
             <div id="panel-failas" role="tabpanel" hidden>
               <FailasPreview failas={failas} search={search} page={page} />
@@ -224,7 +224,7 @@ const page = /^\d+$/.test(pageParam) ? pageParam : '';
   </main>
   )}
 
-  {atn1 && (
+  {ppa && (
     <script is:inline>
       (() => {
         const tabs = document.querySelectorAll('.failas-tab');

@@ -64,8 +64,8 @@ describe("Layer 2 — table whitelist", () => {
         expect(validateSql('SELECT * FROM "jarAsmenys"')).toBeNull();
     });
 
-    it("accepts renamed XLSX ATN-1 tables and rejects the old name", () => {
-        expect(validateSql('SELECT * FROM "xlsxAtn1ataskaitos"')).toBeNull();
+    it("accepts XLSX PPA tables and rejects the pre-xlsx name", () => {
+        expect(validateSql('SELECT * FROM "xlsxPPAataskaitos"')).toBeNull();
         expect(validateSql('SELECT * FROM "atn1ataskaitos"')).toBeTypeOf("string");
     });
 

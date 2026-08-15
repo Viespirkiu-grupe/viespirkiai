@@ -1,10 +1,10 @@
--- Vienas eilutė per (pirkimas, tiekėjas, pirkimo dalis). Naudok get_failas_tekstas su ATN-1
+-- Viena eilutė per (pirkimas, tiekėjas, pirkimo dalis). PPA XLSX turinys.
 -- xlsx failu (pavadinimas: PPA-*, ATN-*, Atn-1*) jei reikia papildomos detalės:
 -- p.4=dalyviai, p.6=atmesti pasiūlymai su kainomis, p.7=pasiūlymų eilė su kainomis.
 CREATE OR REPLACE VIEW v_dalyviai AS
 SELECT a."pirkimoNumeris",
        a."perkanciosiosOrganizacijosKodas" AS "pirkejoKodas",
-       a."pirkimoBudas",
+       pb.pavadinimas                        AS "pirkimoBudas",
        a."sukurtaAt"                       AS "ataskaitosData",
        a."pirkimoObjektoPavadinimas",
        a."pagrindinisKodasBvpz",
@@ -18,23 +18,27 @@ SELECT a."pirkimoNumeris",
        d.kodas                             AS "tiekejoKodas",
        j.pavadinimas                       AS tiekejas,
        d."fizinisAsmuo",
-       d.salis,
+       salis.pavadinimas                    AS salis,
        p."daliesNumeris",
        p."eileNumeris",
        p."pasiulymoKaina",
        p."atmetimoPriezastis"
-FROM "xlsxAtn1ataskaitos" a
-         JOIN "xlsxAtn1dalyviai" d ON d."ataskaitaId" = a.id
+FROM "xlsxPPAataskaitos" a
+         LEFT JOIN "xlsxPPApirkimoBudai" pb ON pb.id = a."pirkimoBudasId"
+         JOIN "xlsxPPAdalyviai" d ON d."ataskaitaId" = a.id
+         LEFT JOIN "xlsxPPAsalys" salis ON salis.id = d."salisId"
          LEFT JOIN LATERAL (
              SELECT COALESCE(e."daliesNumeris", ap."daliesNumeris") AS "daliesNumeris",
                     e."eileNumeris"                                 AS "eileNumeris",
                     e.kaina::numeric                                AS "pasiulymoKaina",
-                    ap.statusas                                     AS "atmetimoPriezastis"
-             FROM "xlsxAtn1pasiulymuEile" e
-                      FULL OUTER JOIN "xlsxAtn1atmestiPasiulymai" ap
+                    apr.pavadinimas                                 AS "atmetimoPriezastis"
+             FROM "xlsxPPApasiulymuEile" e
+                      FULL OUTER JOIN "xlsxPPAatmestiPasiulymai" ap
                                       ON ap."ataskaitaId" = e."ataskaitaId"
                                           AND ap."dalyvioKodas" = e."dalyvioKodas"
                                           AND ap."daliesNumeris" = e."daliesNumeris"
+                      LEFT JOIN "xlsxPPAatmetimoPriezastys" apr
+                                ON apr.id = ap."atmetimoPriezastysId"
              WHERE COALESCE(e."ataskaitaId", ap."ataskaitaId") = a.id
                AND COALESCE(e."dalyvioKodas", ap."dalyvioKodas") = d.kodas
          ) p ON true

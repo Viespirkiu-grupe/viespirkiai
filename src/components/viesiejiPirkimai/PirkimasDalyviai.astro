@@ -1,10 +1,10 @@
 ---
 import DataTable from '@design-system/components/DataTable.astro';
-import type { Atn1Santrauka } from '../../lib/atn1.js';
+import type { PpaSantrauka } from '../../lib/ppa.js';
 
-const { atn1 } = Astro.props as { atn1: Atn1Santrauka };
-const dalyviai = atn1.dalyviai ?? [];
-const eile = atn1.pasiulymuEile ?? [];
+const { ppa } = Astro.props as { ppa: PpaSantrauka };
+const dalyviai = ppa.dalyviai ?? [];
+const eile = ppa.pasiulymuEile ?? [];
 const val = (v: any) => (v == null || v === '' ? '—' : v);
 const asmuoLink = (kodas: any, fizinisAsmuo: any, pavadinimas: any) =>
   kodas && fizinisAsmuo !== true ? { href: `/asmuo/${kodas}`, text: val(pavadinimas) } : null;
@@ -14,8 +14,8 @@ const keliosDalys = eile.some((e) => e.daliesNumeris != null && Number(e.daliesN
 <section class="dalyviai-section">
   <div class="flex justify-between items-center mb-4">
     <h2 class="mb-0">Dalyviai</h2>
-    <a href={`/failas/${atn1.failasId}`} class="btn btn-outline btn-sm" aria-label="Atidaryti pilną ATN-1 ataskaitą">
-      <span aria-hidden="true">↗</span> Pilna ATN-1 ataskaita
+    <a href={`/failas/${ppa.failasId}`} class="btn btn-outline btn-sm" aria-label="Atidaryti pilną PPA ataskaitą">
+      <span aria-hidden="true">↗</span> Pilna PPA ataskaita
     </a>
   </div>
 

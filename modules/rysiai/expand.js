@@ -650,7 +650,7 @@ export async function expandContract(pirkimoNumeris) {
              GROUP  BY s."pirmoTiekejoKodas", j."pavadinimas", j."formosKodas", j."registravimoData", j."statusasNuo", j."statusoKodas"`,
             [pirkNr],
         ),
-        // Best-effort losers from ATN1 (Lithuanian bidders only)
+        // Best-effort losers from PPA (Lithuanian bidders only)
         postgres.query(
             `SELECT DISTINCT d."kodas",
                     j."pavadinimas",
@@ -658,8 +658,8 @@ export async function expandContract(pirkimoNumeris) {
                     j."registravimoData",
                     j."statusasNuo",
                     j."statusoKodas"
-             FROM   public."xlsxAtn1dalyviai" d
-             JOIN   public."xlsxAtn1ataskaitos" a ON a."id" = d."ataskaitaId"
+             FROM   public."xlsxPPAdalyviai" d
+             JOIN   public."xlsxPPAataskaitos" a ON a."id" = d."ataskaitaId"
              LEFT JOIN public."jarAsmenys" j ON j."jarKodas"::text = d."kodas"
              WHERE  a."pirkimoNumeris" = $1
                AND  d."salis" = 'LT'`,
