@@ -15,6 +15,10 @@ Tranzakcijos garantija (nepakitusi): eilutės NEnaikinamos iš anksto — porcij
 pasiimama su `SELECT ... FOR UPDATE SKIP LOCKED`, atliekamos šalutinės operacijos ir
 tik po sėkmingo `indexDocs` eilutės ištrinamos bei `COMMIT`'inama. Bet kokia klaida →
 `ROLLBACK`, eilutės lieka eilėje ir bus apdorotos pakartotinai (duomenys neprarandami).
+
+Sakinių tvarka šioje tranzakcijoje NĖRA laisva: nieko, kas paima `quickwitIndeksai`
+eilutės lock'ą, negalima daryti prieš `indexDocs` — plačiau žr. komentarą prie
+trynimų žemiau.
 */
 
 /** Kuris eilės įrašas nusveria, kai tam pačiam raktui susikaupė keli keitimai. */
@@ -111,15 +115,8 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
             else toIndex.push(key);
         }
 
-        // Trynimai — nuimam quickwitEilutes žemėlapį. Paieškos filterLive() po to
-        // nustoja matyti našlaitį Quickwit dokumentą (jis guli shard'e, kol
-        // deleteDeadIndexes išveda visą shard'ą). quickwitEilutesGyvosDel trigeris
-        // sumažina gyvosEilutes, o generuotas mirusiosEilutes pakyla — skaitiklių
-        // rankomis liesti nereikia.
-        if (toDelete.length) {
-            await deleteEilutes(client, lentele, toDelete.map(toEilutesId));
-            logger.log(`${lentele}${zyme}: ištrinta ${toDelete.length} iš Quickwit`);
-        }
+        /** @type {string[]} */
+        let vanished = [];
 
         if (toIndex.length) {
             const rows = await fetchRows(client, toIndex);
@@ -128,7 +125,7 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
             // traktuojam kaip delete. Kitaip jų quickwitEilutes įrašas liktų
             // našlaitis: niekas jo nebeišvalytų, o gyvosEilutes rodytų jį gyvą.
             const found = new Set(rows.map((row) => String(rowId(row))));
-            const vanished = toIndex.filter((id) => !found.has(id));
+            vanished = toIndex.filter((id) => !found.has(id));
 
             if (rows.length) {
                 const items = await Promise.all(
@@ -156,14 +153,37 @@ export async function drainIndexQueue(cfg, { shard, shardCount } = {}) {
                     `${lentele}${zyme}: suindeksuota ${items.length} | vid. ${fmtBytes(avgBytes)} / dok. | viso ${fmtBytes(totalBytes)} per ${elapsedMs}ms = ${mbPerSec.toFixed(2)} MiB/s`,
                 );
             }
+        }
 
-            // NE po `if (rows.length)` — jei dingo visa porcija, žemėlapius vis tiek
-            // reikia išvalyti. Toje pačioje tranzakcijoje → atomiška; jei įrašo nėra,
-            // DELETE tiesiog nieko neranda (saugu).
-            if (vanished.length) {
-                await deleteEilutes(client, lentele, vanished.map(toEilutesId));
-                logger.log(`${lentele}${zyme}: ištrinta ${vanished.length} dingusių iš Quickwit`);
-            }
+        // Trynimai — nuimam quickwitEilutes žemėlapį. Paieškos filterLive() po to
+        // nustoja matyti našlaitį Quickwit dokumentą (jis guli shard'e, kol
+        // deleteDeadIndexes išveda visą shard'ą). quickwitEilutesGyvosDel trigeris
+        // sumažina gyvosEilutes, o generuotas mirusiosEilutes pakyla — skaitiklių
+        // rankomis liesti nereikia.
+        //
+        // SĄMONINGAI po `indexDocs`, ne prieš jį. Tas trigeris daro
+        // `UPDATE "quickwitIndeksai"` ir paima aktyvaus shard'o eilutės lock'ą,
+        // kurį ši tranzakcija laikytų iki COMMIT. `indexDocs` gi dirba ATSKIROJE
+        // pool'o jungtyje ir toje pačioje eilutėje bumpina `iterptosEilutes` —
+        // t. y. lauktų lock'o, kurį laiko jį iškvietusi tranzakcija. Postgres to
+        // neaptinka kaip deadlock'o (pusė ciklo yra Node'e: išorinis backend'as
+        // būna `idle in transaction` / ClientRead, nelaukdamas jokio lock'o), tad
+        // abi jungtys kabo neribotai ir prikala globalų xmin horizontą — vacuum'as
+        // nustoja valyti visą duomenų bazę. Kol niekas iš `quickwitIndeksai` eilutės
+        // lock'ų nepaimamas prieš `indexDocs`, ciklas nesusidaro.
+        //
+        // `vanished` — NE po `if (rows.length)`: jei dingo visa porcija, žemėlapius
+        // vis tiek reikia išvalyti. Vis dar ta pati tranzakcija → atomiška; jei
+        // įrašo nėra, DELETE tiesiog nieko neranda (saugu). `toDelete` ir `toIndex`
+        // nesikerta (`deduped` kiekvieną raktą priskiria tik vienam sąrašui), tad
+        // trynimų perkėlimas į galą rezultato nekeičia.
+        if (toDelete.length) {
+            await deleteEilutes(client, lentele, toDelete.map(toEilutesId));
+            logger.log(`${lentele}${zyme}: ištrinta ${toDelete.length} iš Quickwit`);
+        }
+        if (vanished.length) {
+            await deleteEilutes(client, lentele, vanished.map(toEilutesId));
+            logger.log(`${lentele}${zyme}: ištrinta ${vanished.length} dingusių iš Quickwit`);
         }
 
         // Tik dabar, kai visos šalutinės operacijos pavyko, pašalinam porciją.
