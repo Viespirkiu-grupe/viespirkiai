@@ -67,7 +67,11 @@ export function initStickyRail(railSel = '.sf-rail') {
       rail.style.marginTop = `${Math.max(0, railTop - parentTop)}px`;
     };
 
-    if (dy > 0) {
+    // Pirmas paleidimas jau nuslinkus žemyn (pvz. perkrovus puslapį, kai
+    // naršyklė atkuria slinkimo poziciją) traktuojamas kaip slinkimas žemyn:
+    // juostos statinė pozicija liko virš lango, tad „free" būsena ją įšaldytų
+    // ties neigiamu `top` ir juosta dingtų virš matomos srities.
+    if (dy > 0 || (mode === 'none' && railTop < stickTop)) {
       // Žemyn: leidžiam juostai kilti, kol apačia prilips prie lango apačios.
       if (mode !== 'bottom') {
         freezeStaticPosition();
