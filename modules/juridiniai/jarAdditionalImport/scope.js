@@ -73,6 +73,15 @@ export async function deleteSourceScope(client, source) {
         case "jangis":
             await client.query(`DELETE FROM public."jarJangisTeikimai"`);
             break;
+        case "jadisSarasai":
+            await client.query(`DELETE FROM public."jadisDalyviuSarasai"`);
+            break;
+        case "jadisDalyviai":
+            await client.query(`DELETE FROM public."jadisDalyviuSkaiciai"`);
+            break;
+        case "jadisValstybe":
+            await client.query(`DELETE FROM public."jadisValstybesDalyviai"`);
+            break;
         case "dokumentai":
             if (source.nuoMetu) {
                 await client.query(

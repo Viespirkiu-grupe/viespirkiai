@@ -36,6 +36,17 @@ describe("RC papildomų JAR rinkinių atradimas", () => {
             "savanoryste", "jangis", "dokumentai",
         ]));
     });
+
+    it("atpažįsta JADIS rinkinius", () => {
+        const sources = classifyJarAdditionalFiles([
+            entry("jadis_ad_dalyviu_sarasai.csv"),
+            entry("jadis_ad_ja_dalyviai.csv"),
+            entry("jadis_ad_nja_dalyviai.csv"),
+        ]);
+        expect(sources.map((source) => source.kind)).toEqual([
+            "jadisSarasai", "jadisDalyviai", "jadisValstybe",
+        ]);
+    });
 });
 
 describe("RC papildomų JAR CSV eilučių transformacijos", () => {
@@ -94,6 +105,57 @@ describe("RC papildomų JAR CSV eilučių transformacijos", () => {
         }, source)[0]).toMatchObject({
             sarasasPateiktas: false,
             sarasoBusena: null,
+        });
+    });
+
+    it("JADIS dalyvių sąrašo požymį paverčia boolean", () => {
+        const source = { file: "jadis_ad_dalyviu_sarasai.csv", kind: "jadisSarasai" };
+        expect(mapJarAdditionalRow({
+            obj_kodas: "307481653", obj_pav: "UAB Aftermoon horizon",
+            form_kodas: "310", form_pav_i: "Uždaroji akcinė bendrovė",
+            stat_statusas: "0", stat_pav_i: "Teisinis statusas neįregistruotas",
+            ja_reg_data: "2025-10-23", pateikimo_poz: "1",
+            saraso_data: "2026-03-17", formavimo_data: "2026-08-01",
+        }, source)[0]).toMatchObject({
+            jarKodas: 307481653,
+            formosKodas: 310,
+            statusoKodas: 0,
+            sarasasPateiktas: true,
+            sarasoData: "2026-03-17",
+        });
+    });
+
+    it("JADIS tuščius dalyvių skaičius laiko nuliais", () => {
+        const source = { file: "jadis_ad_ja_dalyviai.csv", kind: "jadisDalyviai" };
+        expect(mapJarAdditionalRow({
+            obj_kodas: "304220986", obj_pav: 'UAB "Localus"', form_kodas: "310",
+            form_pav_i: "Uždaroji akcinė bendrovė", stat_statusas: "0",
+            stat_pav_i: "Teisinis statusas neįregistruotas", lr_fiziniai: "1",
+            lr_juridiniai: "", uzsienio_fiziniai: "", uzsienio_juridiniai: "",
+            formavimo_data: "2026-08-01",
+        }, source)[0]).toMatchObject({
+            jarKodas: 304220986,
+            lrFiziniai: 1,
+            lrJuridiniai: 0,
+            uzsienioFiziniai: 0,
+            uzsienioJuridiniai: 0,
+        });
+    });
+
+    it("JADIS valstybės dalyvio dalį palieka nuo 0 iki 1", () => {
+        const source = { file: "jadis_ad_nja_dalyviai.csv", kind: "jadisValstybe" };
+        expect(mapJarAdditionalRow({
+            obj_kodas: "181705485", obj_pav: 'Uždaroji akcinė bendrovė "VAATC"',
+            form_kodas: "310", form_pav_i: "Uždaroji akcinė bendrovė",
+            stat_statusas: "0", stat_pav_i: "Teisinis statusas neįregistruotas",
+            ja_reg_data: "2003-04-28", nja_kodas: "111104987",
+            nja_pavadinimas: "Vilniaus rajono savivaldybė",
+            dal_dalys: "0.068764334010671", formavimo_data: "2026-08-01",
+        }, source)[0]).toMatchObject({
+            jarKodas: 181705485,
+            njaKodas: 111104987,
+            njaPavadinimas: "Vilniaus rajono savivaldybė",
+            dalis: "0.068764334010671",
         });
     });
 

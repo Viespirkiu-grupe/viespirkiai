@@ -18,7 +18,7 @@ import { gautiIstatiniKapitala } from "../istatinisKapitalas/istatinisKapitalasD
 import { gautiPinregDeklaracijasPagalJarKoda } from "../pinreg/pinregDeklaracijos.js";
 import { gautiNepatikimuTiekejuIrasusPagalJarKoda } from "../vptSarasai/nepatikimiTiekejai.js";
 import { gautiMelaginguTiekejuIrasusPagalJarKoda } from "../vptSarasai/melagingiTiekejai.js";
-import { gautiJadisDalyvius } from "../jadis/jadisDuomenys.js";
+import { gautiJadisDuomenis } from "../jadis/jadisDuomenys.js";
 import { gautiRcPranesimusPagalJarKoda } from "../registruCentrasPranesimai/rcPranesimai.js";
 import {
     gautiSutarciuDuomenisPagalJarKoda,
@@ -174,7 +174,7 @@ async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
             gautiNepatikimuTiekejuIrasusPagalJarKoda(jarKodas),
         melagingi: async () =>
             gautiMelaginguTiekejuIrasusPagalJarKoda(jarKodas),
-        jadis: async () => gautiJadisDalyvius(jarId),
+        jadis: async () => gautiJadisDuomenis(jarKodas),
         rcPranesimai: async () =>
             gautiRcPranesimusPagalJarKoda(jarKodas, options?.rcPranesimai),
         domenai: async () =>

@@ -220,7 +220,7 @@ export default [
     },
     {
         // Papildomi RC JAR rinkiniai (FA, NVO/paramos gavėjai, savanorystė,
-        // JANGIS ir dokumentai) taip pat formuojami kasdien. Pirminį JAR importą
+        // JANGIS, dokumentai ir JADIS dalyviai) taip pat formuojami kasdien. Pirminį JAR importą
         // paleidžiame pirmiau, kad papildomi duomenys visada remtųsi naujausiu JA.
         name: "atnaujintiJarPapildomusDuomenis",
         schedule: "20 2 * * *",

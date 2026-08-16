@@ -105,8 +105,15 @@ function mapFinancial(row, source, lineNumber) {
 
 export function mapJarAdditionalRow(rawRow, source, lineNumber = 1) {
     const row = normalizedRow(rawRow);
-    const jarKodas = () => integer(row.ja_kodas, "ja_kodas", source, lineNumber, true);
-    const pavadinimas = () => required(row.ja_pavadinimas, "ja_pavadinimas", source, lineNumber);
+    // JAR rinkiniai juridinį asmenį vadina `ja_*`, JADIS — `obj_*`.
+    const jarKodas = () =>
+        integer(row.ja_kodas ?? row.obj_kodas, "ja_kodas", source, lineNumber, true);
+    const pavadinimas = () =>
+        required(row.ja_pavadinimas ?? row.obj_pav, "ja_pavadinimas", source, lineNumber);
+    const formosKodas = () =>
+        integer(row.form_kodas, "form_kodas", source, lineNumber);
+    const statusoKodas = () =>
+        integer(row.stat_kodas ?? row.stat_statusas, "stat_kodas", source, lineNumber);
     // JAR_DOKUMENTAI_2009–2024.csv realiai turi tik 6 stulpelius, nors RC
     // dabartinė struktūros XLSX nurodo ir formavimo_data. Kai jo faile nėra,
     // naudojame importo dieną (nustatomą DB current_date), kad neprimestume
@@ -212,6 +219,46 @@ export function mapJarAdditionalRow(rawRow, source, lineNumber = 1) {
                 dokumentoPotipioPavadinimas: row.dokp_pav,
                 dokumentoData: date(row.dok_data, "dok_data", source, lineNumber),
                 dokumentoRegistravimoData: date(row.dok_reg_data, "dok_reg_data", source, lineNumber, true),
+                formavimoData: formavimoData(),
+            }];
+        case "jadisSarasai": {
+            const pateiktas = integer(row.pateikimo_poz, "pateikimo_poz", source, lineNumber, true);
+            if (pateiktas !== 0 && pateiktas !== 1) {
+                throw new Error(`${source.file}: ${lineNumber} eilutėje pateikimo_poz turi būti 0 arba 1`);
+            }
+            return [{
+                jarKodas: jarKodas(), pavadinimas: pavadinimas(),
+                formosKodas: formosKodas(), formosPavadinimas: row.form_pav_i,
+                statusoKodas: statusoKodas(), statusoPavadinimas: row.stat_pav_i,
+                registravimoData: date(row.ja_reg_data, "ja_reg_data", source, lineNumber),
+                sarasasPateiktas: pateiktas === 1,
+                sarasoData: date(row.saraso_data, "saraso_data", source, lineNumber),
+                formavimoData: formavimoData(),
+            }];
+        }
+        case "jadisDalyviai":
+            return [{
+                jarKodas: jarKodas(), pavadinimas: pavadinimas(),
+                formosKodas: formosKodas(), formosPavadinimas: row.form_pav_i,
+                statusoKodas: statusoKodas(), statusoPavadinimas: row.stat_pav_i,
+                // Tušti stulpeliai reiškia, kad tos rūšies dalyvių nėra.
+                lrFiziniai: integer(row.lr_fiziniai, "lr_fiziniai", source, lineNumber) ?? 0,
+                lrJuridiniai: integer(row.lr_juridiniai, "lr_juridiniai", source, lineNumber) ?? 0,
+                uzsienioFiziniai: integer(row.uzsienio_fiziniai, "uzsienio_fiziniai", source, lineNumber) ?? 0,
+                uzsienioJuridiniai: integer(row.uzsienio_juridiniai, "uzsienio_juridiniai", source, lineNumber) ?? 0,
+                formavimoData: formavimoData(),
+            }];
+        case "jadisValstybe":
+            return [{
+                jarKodas: jarKodas(), pavadinimas: pavadinimas(),
+                formosKodas: formosKodas(), formosPavadinimas: row.form_pav_i,
+                statusoKodas: statusoKodas(), statusoPavadinimas: row.stat_pav_i,
+                registravimoData: date(row.ja_reg_data, "ja_reg_data", source, lineNumber),
+                njaKodas: integer(row.nja_kodas, "nja_kodas", source, lineNumber, true),
+                njaPavadinimas: required(row.nja_pavadinimas, "nja_pavadinimas", source, lineNumber),
+                // RC struktūroje `dal_dalys` vadinama procentais, bet faile tai
+                // dalis nuo 0 iki 1 (1 = 100 %). Saugome tokią, kokia yra.
+                dalis: decimal(row.dal_dalys, "dal_dalys", source, lineNumber),
                 formavimoData: formavimoData(),
             }];
         default:

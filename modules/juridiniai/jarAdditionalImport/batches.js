@@ -173,6 +173,58 @@ const BATCH_SQL = {
             "sarasasPateiktas" = EXCLUDED."sarasasPateiktas", "sarasoBusena" = EXCLUDED."sarasoBusena",
             "sarasoPateikimoData" = EXCLUDED."sarasoPateikimoData", "formavimoData" = EXCLUDED."formavimoData",
             "importuota" = now()`,
+    jadisSarasai: `
+        INSERT INTO public."jadisDalyviuSarasai" AS old
+            ("jarKodas", "pavadinimas", "formosKodas", "statusoKodas",
+             "registravimoData", "sarasasPateiktas", "sarasoData", "formavimoData")
+        SELECT DISTINCT ON ("jarKodas") "jarKodas", "pavadinimas", "formosKodas",
+               "statusoKodas", "registravimoData", "sarasasPateiktas",
+               "sarasoData", "formavimoData"
+        FROM jsonb_to_recordset($1::jsonb) AS x(
+            "jarKodas" integer, "pavadinimas" text, "formosKodas" integer,
+            "statusoKodas" integer, "registravimoData" date,
+            "sarasasPateiktas" boolean, "sarasoData" date, "formavimoData" date)
+        ON CONFLICT ("jarKodas") DO UPDATE SET
+            "pavadinimas" = EXCLUDED."pavadinimas", "formosKodas" = EXCLUDED."formosKodas",
+            "statusoKodas" = EXCLUDED."statusoKodas", "registravimoData" = EXCLUDED."registravimoData",
+            "sarasasPateiktas" = EXCLUDED."sarasasPateiktas", "sarasoData" = EXCLUDED."sarasoData",
+            "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
+    jadisDalyviai: `
+        INSERT INTO public."jadisDalyviuSkaiciai" AS old
+            ("jarKodas", "pavadinimas", "formosKodas", "statusoKodas",
+             "lrFiziniai", "lrJuridiniai", "uzsienioFiziniai", "uzsienioJuridiniai",
+             "formavimoData")
+        SELECT DISTINCT ON ("jarKodas") "jarKodas", "pavadinimas", "formosKodas",
+               "statusoKodas", "lrFiziniai", "lrJuridiniai", "uzsienioFiziniai",
+               "uzsienioJuridiniai", "formavimoData"
+        FROM jsonb_to_recordset($1::jsonb) AS x(
+            "jarKodas" integer, "pavadinimas" text, "formosKodas" integer,
+            "statusoKodas" integer, "lrFiziniai" integer, "lrJuridiniai" integer,
+            "uzsienioFiziniai" integer, "uzsienioJuridiniai" integer,
+            "formavimoData" date)
+        ON CONFLICT ("jarKodas") DO UPDATE SET
+            "pavadinimas" = EXCLUDED."pavadinimas", "formosKodas" = EXCLUDED."formosKodas",
+            "statusoKodas" = EXCLUDED."statusoKodas",
+            "lrFiziniai" = EXCLUDED."lrFiziniai", "lrJuridiniai" = EXCLUDED."lrJuridiniai",
+            "uzsienioFiziniai" = EXCLUDED."uzsienioFiziniai",
+            "uzsienioJuridiniai" = EXCLUDED."uzsienioJuridiniai",
+            "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
+    jadisValstybe: `
+        INSERT INTO public."jadisValstybesDalyviai" AS old
+            ("jarKodas", "pavadinimas", "formosKodas", "statusoKodas",
+             "registravimoData", "njaKodas", "njaPavadinimas", "dalis", "formavimoData")
+        SELECT DISTINCT ON ("jarKodas", "njaKodas") "jarKodas", "pavadinimas",
+               "formosKodas", "statusoKodas", "registravimoData", "njaKodas",
+               "njaPavadinimas", "dalis", "formavimoData"
+        FROM jsonb_to_recordset($1::jsonb) AS x(
+            "jarKodas" integer, "pavadinimas" text, "formosKodas" integer,
+            "statusoKodas" integer, "registravimoData" date, "njaKodas" integer,
+            "njaPavadinimas" text, "dalis" numeric, "formavimoData" date)
+        ON CONFLICT ON CONSTRAINT "jadisValstybesDalyviai_natural_key" DO UPDATE SET
+            "pavadinimas" = EXCLUDED."pavadinimas", "formosKodas" = EXCLUDED."formosKodas",
+            "statusoKodas" = EXCLUDED."statusoKodas", "registravimoData" = EXCLUDED."registravimoData",
+            "njaPavadinimas" = EXCLUDED."njaPavadinimas", "dalis" = EXCLUDED."dalis",
+            "formavimoData" = EXCLUDED."formavimoData", "importuota" = now()`,
     dokumentai: `
         INSERT INTO public."jarDokumentai" AS old
             ("jarKodas", "dokumentoTipas", "dokumentoPotipis",

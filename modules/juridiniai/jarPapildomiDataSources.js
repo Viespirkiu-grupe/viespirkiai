@@ -6,7 +6,13 @@ const scrapeFetch = createScraperFetch("juridiniai", {
 });
 
 const BASE = "https://www.registrucentras.lt";
-const SLUG = "jar-pirminiai-duomenys-raw-data";
+// RC atviri duomenys apie juridinius asmenis skaidomi į du puslapius: JAR
+// pirminiai duomenys ir JADIS (juridinių asmenų dalyvių) pirminiai duomenys.
+// Abu naudoja tą pačią CMS struktūrą ir tą patį `/aduomenys/?byla=` atsisiuntimą.
+const SLUGS = [
+    "jar-pirminiai-duomenys-raw-data",
+    "jadis-pirminiai-duomenys-raw-data",
+];
 
 async function getCmsConfig() {
     const res = await scrapeFetch(`${BASE}/config.js`);
@@ -66,6 +72,12 @@ export function classifyJarAdditionalFiles(entries) {
             classified.push({ ...entry, kind: "savanoryste" });
         } else if (/^jangis_sar_teikimas\.csv$/i.test(file)) {
             classified.push({ ...entry, kind: "jangis" });
+        } else if (/^jadis_ad_dalyviu_sarasai\.csv$/i.test(file)) {
+            classified.push({ ...entry, kind: "jadisSarasai" });
+        } else if (/^jadis_ad_ja_dalyviai\.csv$/i.test(file)) {
+            classified.push({ ...entry, kind: "jadisDalyviai" });
+        } else if (/^jadis_ad_nja_dalyviai\.csv$/i.test(file)) {
+            classified.push({ ...entry, kind: "jadisValstybe" });
         } else if ((match = file.match(/^JAR_DOKUMENTAI_(NUO_2025|\d{4})\.csv$/i))) {
             classified.push({
                 ...entry,
@@ -96,10 +108,9 @@ export function classifyJarAdditionalFiles(entries) {
     ].sort((a, b) => a.file.localeCompare(b.file, "lt"));
 }
 
-export async function getJarAdditionalDataSources() {
-    const cms = await getCmsConfig();
+async function getPageCsvEntries(cms, slug) {
     const params = new URLSearchParams({
-        "filters[slug][$eq]": SLUG,
+        "filters[slug][$eq]": slug,
         populate: "*",
     });
     const res = await scrapeFetch(`${cms.url}/api/open-data-pages?${params}`, {
@@ -108,10 +119,10 @@ export async function getJarAdditionalDataSources() {
     if (!res.ok) throw new Error(`CMS API: HTTP ${res.status}`);
     const page = (await res.json()).data?.[0];
     const html = page?.content?.content;
-    if (!html) throw new Error(`CMS API: nerastas puslapio "${SLUG}" turinys`);
+    if (!html) throw new Error(`CMS API: nerastas puslapio "${slug}" turinys`);
 
     const { document } = parseHTML(`<body>${html}</body>`);
-    const entries = [...document.querySelectorAll("table tbody tr")].flatMap((tr) => {
+    return [...document.querySelectorAll("table tbody tr")].flatMap((tr) => {
         const cells = [...tr.querySelectorAll("td")];
         const csvCell = cells.find((cell) =>
             fileNameFromHref(cell.querySelector("a")?.getAttribute("href"))?.toLowerCase().endsWith(".csv"),
@@ -125,6 +136,18 @@ export async function getJarAdditionalDataSources() {
             url: `${BASE}/aduomenys/?byla=${encodeURIComponent(file)}`,
         }];
     });
+}
+
+export async function getJarAdditionalDataSources() {
+    const cms = await getCmsConfig();
+    const entries = [];
+    for (const slug of SLUGS) {
+        const pageEntries = await getPageCsvEntries(cms, slug);
+        if (!pageEntries.length) {
+            throw new Error(`RC CMS puslapyje "${slug}" nerastas nė vienas CSV`);
+        }
+        entries.push(...pageEntries);
+    }
 
     const sources = classifyJarAdditionalFiles(entries);
     if (!sources.length) {
