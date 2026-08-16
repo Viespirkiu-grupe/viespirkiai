@@ -51,7 +51,7 @@ if (format === 'json') {
 let ppa = null;
 if (!isPasalintas) {
   failas = await enrichFailas(failas);
-  if (failas.tipas === 'PPA') {
+  if (failas.specialTypes?.includes('PPA') || failas.tipas === 'PPA') {
     ppa = await loadPpaByFailasId(failas.id);
   }
 }

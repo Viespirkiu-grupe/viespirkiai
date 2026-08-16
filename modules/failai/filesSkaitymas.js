@@ -11,6 +11,7 @@ stulpelius. Kad nereikėtų vienu metu perrašyti ir schemos, ir visų vartotoj�
 čia surenkama ta pati forma:
 
   - žodynai išskleidžiami į tekstą (`pavadinimas`, `extension`, `md5`, `autorius`, `saltinis`);
+  - specialūs failo tipai surenkami į `specialTypes` masyvą;
   - `saltinioId` atkuriamas iš `sourceId0..3` (sujungtiSaltinioId — atvirkštinė
     skaidymo operacija), tad linkų konstruktoriams nieko keisti nereikia;
   - senų stulpelių atitikmenys pervadinami atgal (`downloadStatus` → `parsiustas`,
@@ -47,7 +48,17 @@ export const FILES_SELECT = `
     ocrn.pavadinimas      AS "ocrNode",
     p.password,
     loc.location,
-    i."fileHash"          AS "failasHash"
+    i."fileHash"          AS "failasHash",
+    COALESCE(
+        ARRAY(
+            SELECT tn.type
+            FROM public."filesSpecialTypes" fst
+            JOIN public."filesSpecialTypeNames" tn ON tn.id = fst."typeId"
+            WHERE fst.id = f.id
+            ORDER BY tn.type
+        ),
+        ARRAY[]::text[]
+    )                     AS "specialTypes"
 `;
 
 /** JOIN'ai, kurių reikia FILES_SELECT stulpeliams. */
