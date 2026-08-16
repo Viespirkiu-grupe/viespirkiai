@@ -15,7 +15,7 @@ import SutartisPanasios from '../../components/sutartis/SutartisPanasios.astro';
 import SutartisPakeitimai from '../../components/sutartis/SutartisPakeitimai.astro';
 import DetailsSection from '@design-system/components/DetailsSection.astro';
 import { loadSutartis } from '../../lib/sutartis.js';
-import { loadSutartisPakeitimai } from '../../lib/sutartisPakeitimai.ts';
+import { countSutartisPakeitimai, loadSutartisPakeitimai } from '../../lib/sutartisPakeitimai.ts';
 import { fmtEur } from '../../lib/formatters.ts';
 import { getColorScheme, getFont } from '../../lib/failai.ts';
 import config from '../../lib/config.ts';
@@ -33,7 +33,12 @@ if (Astro.url.pathname.endsWith('.json') || (Astro.request?.headers.get('accept'
   return new Response(JSON.stringify(sutartis, null, 2), { headers: { 'Content-Type': 'application/json' } });
 }
 
-const pakeitimai = await loadSutartisPakeitimai(sutartis.sutartiesUnikalusId);
+const rodytiVisusPakeitimus = Astro.url.searchParams.get('pakeitimaiLimit') === 'max';
+const pakeitimuLimitas = rodytiVisusPakeitimus ? null : 10;
+const [pakeitimai, pakeitimuCount] = await Promise.all([
+  loadSutartisPakeitimai(sutartis.sutartiesUnikalusId, pakeitimuLimitas),
+  countSutartisPakeitimai(sutartis.sutartiesUnikalusId),
+]);
 
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 
@@ -92,7 +97,12 @@ const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
 
     {pakeitimai.length > 0 && (
       <DetailsSection title="Pakeitimai" className="mb-7">
-        <SutartisPakeitimai pakeitimai={pakeitimai} />
+        <SutartisPakeitimai pakeitimai={pakeitimai} rodomiIsKarto={pakeitimai.length} />
+        {!rodytiVisusPakeitimus && pakeitimuCount > 10 && (
+          <p class="pakeitimai-daugiau">
+            <a href="?pakeitimaiLimit=max">Rodyti visus pakeitimus ({pakeitimuCount})</a>
+          </p>
+        )}
       </DetailsSection>
     )}
 
@@ -108,5 +118,11 @@ const showCpvaAll = Astro.url.searchParams.has('cpvaAll');
 <style>
   .sutartis-istrinta-alert {
     margin-top: 24px;
+  }
+
+  .pakeitimai-daugiau {
+    margin: 12px 0 0;
+    font-size: var(--text-sm);
+    font-weight: 600;
   }
 </style>

@@ -3,6 +3,7 @@ import {
   fetchChangedContractsPage,
   countChangedContracts,
   countChanges,
+  countContractChanges,
   diffContractDocuments,
 } from '@/modules/sutartys/recentChanges.js';
 import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
@@ -165,6 +166,15 @@ export async function loadSutartisPakeitimai(
     return [];
   }
   return rows.map(rowToPakeitimas).filter((p): p is SutartiesPakeitimas => p !== null);
+}
+
+/** Grąžina tikslų sutarties pakeitimų eilučių skaičių. */
+export async function countSutartisPakeitimai(unikalusId: number): Promise<number> {
+  try {
+    return await countContractChanges(unikalusId);
+  } catch {
+    return 0;
+  }
 }
 
 export type SutartiesRedagavimai = {
