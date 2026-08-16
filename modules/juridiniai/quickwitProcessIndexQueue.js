@@ -119,6 +119,10 @@ export function buildDoc(row) {
         darbuotojai: toNumber(row.darbuotojai),
         vidutinisAtlyginimas: toNumber(row.vidutinisAtlyginimas),
         rodikliai: withoutNulls({
+            // Skaitinis jarKodas – antrinis rikiavimo laukas (žr. searchQuickwit.js).
+            // Quickwit nerikiuoja pagal `text` laukus, o json laukas leidžia jį
+            // pridėti nekeičiant jau sukurtų shard'ų schemos.
+            jarKodas: toNumber(row.jarKodas),
             vmiMokesciai: toNumber(row.vmiMokesciai),
             istatinisKapitalas: toNumber(row.istatinisKapitalas),
             pirkimuKiekis: toNumber(row.pirkimuKiekis),
