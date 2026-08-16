@@ -29,6 +29,7 @@ import { rastiKotisPagalGavejoKoda } from "../kotis/getByJarKodas.js";
 import { getEsInvesticijosByJar } from "../2014esinvesticijos/getEsInvesticijosByJar.js";
 import { mvpAprasaiPagalJarKoda } from "../mvpTvarkosAprasai/getByJar.js";
 import { getVdiPazeidimai } from "../vdi/getPazeidimai.js";
+import { gautiJarPapildomusDuomenis } from "./jarPapildomiDuomenys.js";
 
 // Vienas asmens puslapis paleidžia ~40 lygiagrečių užklausų, o naršyklės
 // prefetch'as ar dvigubas užklausimas tą paketą pakartoja beveik tuo pačiu metu.
@@ -161,7 +162,9 @@ async function uzkrautiJuridinioInfo(jarKodas, options = {}) {
             gautiTeismoNuosprendzius(jarKodas, options?.teismoNuosprendziai),
         sutartys: async () =>
             gautiSutarciuDuomenisPagalJarKoda(jarKodas, options?.sutartys),
-        finansai: async () => gautiFinansuDuomenis(jarId),
+        finansai: async () => gautiFinansuDuomenis(jarKodas),
+        registruCentras: async () =>
+            gautiJarPapildomusDuomenis(jarKodas, options?.registruCentras),
         istatinisKapitalas: async () => gautiIstatiniKapitala(jarId),
         darboSkelbimai: async () =>
             gautiDarboSkelbimus(jarKodas, options?.darboSkelbimai),

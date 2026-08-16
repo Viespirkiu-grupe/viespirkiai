@@ -32,6 +32,7 @@
         "quickwit:top-pdf-metadata": "node quickwit/topPdfMetadata.js",
         "quickwit:juridiniai": "node modules/juridiniai/quickwitProcessIndexQueue.js",
         "juridiniai:atnaujinti": "node modules/juridiniai/updateJarCsv.js",
+        "juridiniai:papildomi": "node modules/juridiniai/importJarPapildomiDuomenys.js",
         "juridiniai:process": "node modules/juridiniai/processRefreshQueue.js",
         "juridiniai:backfill": "node modules/juridiniai/backfill.js",
         "liteko2:klasifikatoriai": "node modules/liteko2/klasifikatoriai.js",

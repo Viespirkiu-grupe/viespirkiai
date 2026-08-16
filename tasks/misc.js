@@ -27,6 +27,7 @@ import { processDomenaiAdpQueue } from "../modules/domenai/processAdpQueue.js";
 import { processJuridiniaiIndexQueue } from "../modules/juridiniai/quickwitProcessIndexQueue.js";
 import { processJuridiniaiRefreshQueue } from "../modules/juridiniai/processRefreshQueue.js";
 import { atnaujintiJarCsv } from "../modules/juridiniai/updateJarCsv.js";
+import { atnaujintiJarPapildomusDuomenis } from "../modules/juridiniai/importJarPapildomiDuomenys.js";
 import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 export default [
@@ -216,6 +217,14 @@ export default [
         name: "atnaujintiJarCsv",
         schedule: "20 1 * * *",
         job: atnaujintiJarCsv,
+    },
+    {
+        // Papildomi RC JAR rinkiniai (FA, NVO/paramos gavėjai, savanorystė,
+        // JANGIS ir dokumentai) taip pat formuojami kasdien. Pirminį JAR importą
+        // paleidžiame pirmiau, kad papildomi duomenys visada remtųsi naujausiu JA.
+        name: "atnaujintiJarPapildomusDuomenis",
+        schedule: "20 2 * * *",
+        job: atnaujintiJarPapildomusDuomenis,
     },
     {
         name: "juridiniaiRefreshQueue",

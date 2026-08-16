@@ -1,14 +1,11 @@
 ---
 import PageSection from '@design-system/components/PageSection.astro';
 import SectionGrid from '@design-system/components/SectionGrid.astro';
-import KeyValueList from '@design-system/components/KeyValueList.astro';
-import MetricCard from '@design-system/components/MetricCard.astro';
-import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
 import Chart from '@design-system/components/charts/Chart.astro';
 import ChartTile from '@design-system/components/charts/ChartTile.astro';
 import Table from '@design-system/components/Table.astro';
 import TableWrapper from '@design-system/components/TableWrapper.astro';
-const { asmuo, finansaiLimit } = Astro.props;
+const { asmuo } = Astro.props;
 const ataskaitos = asmuo.finansai?.ataskaitos ?? [];
 if (ataskaitos.length === 0) return;
 const lentele = asmuo.finansai?.lentele;
@@ -25,7 +22,7 @@ const mergedRevenueSeries = [
   { name: 'Pardavimo pajamos', data: mergedRevenueLabels.map((label) => financeRevenueByYear[label] ?? null) },
   { name: 'Viešųjų pirkimų pardavimai', data: mergedRevenueLabels.map((label) => procurementRevenueByYear[label] ?? null) },
 ];
-const pelnoSeries = (duomenys['Grynasis pelnas (nuostoliai)'] ?? duomenys['Ataskaitinių metų pelnas (nuostoliai)'] ?? []).map((value: any) => value ?? null);
+const pelnoSeries = (duomenys['Grynasis pelnas (nuostoliai)'] ?? []).map((value: any) => value ?? null);
 const hasNegativeProfit = pelnoSeries.some((value: any) => value !== null && value < 0);
 const profitChartOptions = {
   annotations: hasNegativeProfit
@@ -44,6 +41,22 @@ const profitChartOptions = {
       }
     : {},
 };
+const lineOrder = [
+  'Pardavimo pajamos',
+  'Grynasis pelnas (nuostoliai)',
+  'Pelnas prieš apmokestinimą',
+  'Ilgalaikis turtas',
+  'Trumpalaikis turtas',
+  'Nuosavas kapitalas',
+  'Įsipareigojimai',
+];
+const tableRows = Object.entries(duomenys).sort(([a], [b]) => {
+  if (a === 'Pelningumas') return 1;
+  if (b === 'Pelningumas') return -1;
+  const ai = lineOrder.indexOf(a);
+  const bi = lineOrder.indexOf(b);
+  return (ai < 0 ? lineOrder.length : ai) - (bi < 0 ? lineOrder.length : bi) || a.localeCompare(b, 'lt');
+});
 ---
 
 <PageSection id="finansai" title="Finansinės ataskaitos">
@@ -75,64 +88,38 @@ const profitChartOptions = {
   </SectionGrid>
 
   {metai.length > 0 && (
-    <TableWrapper className="mb-7">
-      <Table>
-        <thead>
-          <tr>
-            <th>Eilutė</th>
-            {metai.map((y: string) => <th class="cell-right">{y}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {Object.entries(duomenys).map(([lineName, values]: [string, any]) => (
+    <>
+      <TableWrapper className="mb-3">
+        <Table>
+          <thead>
             <tr>
-              <td>{lineName}</td>
-              {(values as any[]).map((value: any) => (
-                <td class="cell-mono cell-right">
-                  {value == null
-                    ? <span class="text-muted">—</span>
-                    : lineName === 'Pelningumas'
-                      ? `${value.toFixed(2)}%`
-                      : value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' })
-                  }
-                </td>
-              ))}
+              <th>Eilutė</th>
+              {metai.map((y: string) => <th class="cell-right">{y}</th>)}
             </tr>
-          ))}
-        </tbody>
-      </Table>
-    </TableWrapper>
+          </thead>
+          <tbody>
+            {tableRows.map(([lineName, values]: [string, any]) => (
+              <tr>
+                <td>{lineName}</td>
+                {(values as any[]).map((value: any) => (
+                  <td class="cell-mono cell-right">
+                    {value == null
+                      ? <span class="text-muted">—</span>
+                      : lineName === 'Pelningumas'
+                        ? `${value.toFixed(2)}%`
+                        : value.toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' })
+                    }
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </TableWrapper>
+      {metai.some((year: number) => year < 2015) && (
+        <p class="text-muted text-xs mb-7">Iki 2015 m. ataskaitų sumos perskaičiuotos iš litų oficialiu kursu 1 EUR = 3,4528 LTL.</p>
+      )}
+    </>
   )}
 
-  {ataskaitos.length > finansaiLimit && (
-    <p class="text-muted text-sm mb-4">
-      Rodoma tik paskutinė finansinė ataskaita.
-      <a href="?finansaiLimit=max#finansai">Rodyti visas ({ataskaitos.length})</a>
-    </p>
-  )}
-
-  {ataskaitos.slice(0, finansaiLimit).map((laikotarpis: any) => (
-    <div class="subsection mb-10">
-      <h3>
-        {laikotarpis.templateName}
-        <span class="text-muted text-xs font-normal ml-2">({laikotarpis.templateId}, {laikotarpis.duomenuData})</span>
-      </h3>
-      <p class="text-muted text-sm mb-4">{laikotarpis.laikotarpisNuo} – {laikotarpis.laikotarpisIki}</p>
-      <MetricCardGrid minWidth="300px" maxWidth="480px" className="items-start">
-        {laikotarpis.standards.map((std: any) => (
-          <MetricCard label={std.standardName} labelBaseClassName="section-title mb-3">
-            <p class="text-muted text-xs font-normal mb-3">({std.standardId})</p>
-            <KeyValueList>
-              {std.lines.map((line: any) => (
-                <>
-                  <dt>{line.lineName} <span class="text-muted text-xs">({line.lineTypeId})</span></dt>
-                  <dd><span class="cell-mono">{new Intl.NumberFormat('lt-LT', { style: 'currency', currency: 'EUR' }).format(line.reiksme)}</span></dd>
-                </>
-              ))}
-            </KeyValueList>
-          </MetricCard>
-        ))}
-      </MetricCardGrid>
-    </div>
-  ))}
 </PageSection>

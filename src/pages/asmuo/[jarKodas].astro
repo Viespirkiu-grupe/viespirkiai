@@ -56,7 +56,7 @@ function parseLimitai(q: Record<string, string>) {
     esInvesticijosLimit: 'esInvesticijos', mvpAprasaiLimit: 'mvpAprasai',
     vdiPazeidimaiLimit: 'vdiPazeidimai',
   };
-  return Object.fromEntries(
+  const options = Object.fromEntries(
     Object.entries(map).map(([qk, k]) => {
       const val = q[qk];
       if (val === 'max') return [k, { limit: null }];
@@ -64,6 +64,15 @@ function parseLimitai(q: Record<string, string>) {
       return [k, { limit: defaults[k] }];
     })
   );
+  const dokumentaiLimit = q.jarDokumentaiLimit;
+  options.registruCentras = {
+    dokumentaiLimit: dokumentaiLimit === 'max'
+      ? null
+      : isNaN(Number(dokumentaiLimit)) || dokumentaiLimit === ''
+        ? 10
+        : Number(dokumentaiLimit),
+  };
+  return options;
 }
 
 const juridinioInfo = await getJuridinisInfo(jarKodas, parseLimitai(query));
@@ -106,7 +115,6 @@ if (format === 'png' && asmuo) {
   });
 }
 
-const finansaiLimit = query.finansaiLimit === 'max' ? 9999999 : Number(query.finansaiLimit) || 1;
 const mvpAprasaiLimit = query.mvpAprasaiLimit === 'max' ? 9999999 : Number(query.mvpAprasaiLimit) || 1;
 
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');
@@ -154,7 +162,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
         <Nepatikimi asmuo={asmuo} />
       </div>
 
-      <FinansinesAtaskaitos asmuo={asmuo} finansaiLimit={finansaiLimit} />
+      <FinansinesAtaskaitos asmuo={asmuo} />
 
       <div class="grid-2 mb-10">
         <DarboSkelbimai asmuo={asmuo} />

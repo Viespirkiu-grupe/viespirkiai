@@ -65,7 +65,7 @@ export function aggregateSodra(sodra) {
 // accounting standard versions (BST101 → BST022 → BST122, etc.).
 const FINANSAI_FIELDS = [
     { field: "pajamos",        names: ["Pardavimo pajamos"] },
-    { field: "pelnas",         names: ["Grynasis pelnas (nuostoliai)", "Pelnas (nuostoliai) prieš apmokestinimą"] },
+    { field: "pelnas",         names: ["Grynasis pelnas (nuostoliai)", "Ataskaitinių metų pelnas (nuostoliai)", "Grynasis pelnas", "Pelnas (nuostoliai) prieš apmokestinimą", "Pelnas prieš apmokestinimą"] },
     { field: "ilgalaikis",     names: ["Ilgalaikis turtas"] },
     { field: "trumpalaikis",   names: ["Trumpalaikis turtas"] },
     { field: "kapitalas",      names: ["Nuosavas kapitalas"] },
@@ -82,22 +82,29 @@ export function aggregateFinansai(finansai) {
     const ataskaitos = finansai.ataskaitos;
     if (!Array.isArray(ataskaitos) || ataskaitos.length === 0) return { byYear: [] };
 
-    const byYear = ataskaitos
-        .map((a) => {
+    const byYearMap = new Map();
+    for (const a of ataskaitos) {
             const metai = a.laikotarpisIki ? +a.laikotarpisIki.slice(0, 4) : null;
-            if (!metai) return null;
+            if (!metai) continue;
 
-            // Flatten all lines from all standards in this year's report
             const allLines = (a.standards ?? []).flatMap((s) => s.lines ?? []);
-
-            const row = { metai };
+            const row = byYearMap.get(metai) ?? Object.fromEntries([
+                ["metai", metai],
+                ...FINANSAI_FIELDS.map(({ field }) => [field, null]),
+            ]);
             for (const { field, names } of FINANSAI_FIELDS) {
                 const line = allLines.find((l) => names.includes(l.lineName));
-                row[field] = line?.reiksme ?? null;
+                // Balanso ir pelno ataskaitos yra atskiri RC įrašai. Sujungiame
+                // juos pagal metus, o kelių pateikimo versijų atveju paliekame
+                // pirmą (gautiFinansuDuomenis grąžina naujausią pirmiausia).
+                if (row[field] == null && line?.reiksme != null) {
+                    row[field] = line.reiksme;
+                }
             }
-            return row;
-        })
-        .filter(Boolean)
+            byYearMap.set(metai, row);
+    }
+
+    const byYear = [...byYearMap.values()]
         .sort((a, b) => a.metai - b.metai);
 
     return { byYear };
@@ -107,7 +114,7 @@ const limitSchema = z.number().int().min(1).max(50);
 
 export const name = "get_juridinis";
 export const description =
-    "Grąžina išsamią informaciją apie juridinį asmenį pagal JAR kodą. Apima įmonės duomenis, Sodros statistiką, VMI, sutartis, finansus, PINREG deklaracijas, teismo nuosprendžius ir kt. Duomenys grąžinami su numatytaisiais limitais — nurodykite override parametrus jei reikia daugiau. DĖMESIO dėl `regitra`: anonimizuotuose Regitros duomenyse nėra nei VIN, nei valstybinio numerio, todėl vienodos transporto priemonės sutraukiamos į vieną eilutę su lauku `kiekis` (pvz. `kiekis: 92` reiškia 92 identiškas TP). Bendras TP skaičius yra `regitra.rows` — NE `transportoPriemones` masyvo ilgis. `regitra.atnaujinimoData` rodo, kokios datos yra Regitros nuotrauka.";
+    "Grąžina išsamią informaciją apie juridinį asmenį pagal JAR kodą. Apima įmonės duomenis, Sodros statistiką, VMI, sutartis, RC finansines ataskaitas, NVO ir paramos gavėjo žymas, savanorystę, JANGIS pateikimo būseną, JAR dokumentus, PINREG deklaracijas, teismo nuosprendžius ir kt. Duomenys grąžinami su numatytaisiais limitais — nurodykite override parametrus jei reikia daugiau. DĖMESIO dėl `regitra`: anonimizuotuose Regitros duomenyse nėra nei VIN, nei valstybinio numerio, todėl vienodos transporto priemonės sutraukiamos į vieną eilutę su lauku `kiekis` (pvz. `kiekis: 92` reiškia 92 identiškas TP). Bendras TP skaičius yra `regitra.rows` — NE `transportoPriemones` masyvo ilgis. `regitra.atnaujinimoData` rodo, kokios datos yra Regitros nuotrauka.";
 
 export const schema = {
     jarKodas: z
