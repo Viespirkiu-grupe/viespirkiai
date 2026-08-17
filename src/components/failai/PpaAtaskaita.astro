@@ -1,19 +1,94 @@
 ---
 import KeyValueList from '@design-system/components/KeyValueList.astro';
 import DataTable from '@design-system/components/DataTable.astro';
-import JarKodasLink from './JarKodasLink.astro';
-import type { Ppa } from '../../lib/ppa.js';
+import Badge from '@design-system/components/Badge.astro';
+import EntityLink from '@design-system/components/EntityLink.astro';
+import { fmtEurOrNull } from '../../lib/formatters.js';
+import { grupuotiPagalDalis, sujungtiGretimas, palygintiDalis, type Ppa } from '../../lib/ppa.js';
 
 const { ppa } = Astro.props as { ppa: Ppa };
 const a = ppa.ataskaita;
 
 const yesNo = (v: any) => (v === true ? 'Taip' : v === false ? 'Ne' : '—');
 const val = (v: any) => (v == null || v === '' ? '—' : v);
+const eur = (v: any) => fmtEurOrNull(v) ?? '—';
+
+/** Reikšmė, jei ji vienoda visose eilutėse — tada ją rodom stulpelio antraštėje. */
+const bendraReiksme = (rows: Record<string, any>[], laukas: string): string | null => {
+  const pirma = rows[0]?.[laukas];
+  if (!pirma) return null;
+  return rows.every((r) => r[laukas] === pirma) ? String(pirma) : null;
+};
+
+// Ataskaitos požymiai — vietoj keturių atskirų „Taip/Ne“ eilučių viena žymų juosta.
+const pozymiai = [
+  { label: 'Finansuojamas ES lėšomis', value: a.finansuojamasEsLesomis },
+  { label: 'Elektroninis pirkimas', value: a.elektroninisPirkimas },
+  { label: 'Preliminari sutartis', value: a.preliminariSutartis },
+  { label: 'Dinaminė pirkimų sistema', value: a.dinamineSistema },
+].filter((p) => p.value != null);
+
+// Vienodos eilutės suliejamos į vieną su dalių ruožu („1–12“).
+const dalys = grupuotiPagalDalis(ppa.pirkimoDalys, ['daliesPavadinimas', 'pagrindinisKodasBvpz', 'papildomiKodaiBvpz']);
+const kriterijai = grupuotiPagalDalis(ppa.vertinimoKriterjai, ['vertinimoKriterijus']);
+const pabaiga = grupuotiPagalDalis(ppa.proceduruPabaiga, [
+  'proceduruPabaiga',
+  'sprendimoPriemimoData',
+  'sprendimoPriezastys',
+  'nutraukimoPriezastys',
+]);
+
+// Kai visos dalys vienodos, lentelė iš 12 identiškų eilučių neturi prasmės —
+// rodom vieną santraukos bloką.
+const vienodosDalys = dalys.length === 1 && ppa.pirkimoDalys.length > 1;
+const vienodiKriterijai = kriterijai.length === 1 && ppa.vertinimoKriterjai.length > 1;
+const vienodaPabaiga = pabaiga.length === 1 && ppa.proceduruPabaiga.length > 1;
+
+// Eilutės, kuriose kartojasi tas pats tiekėjas, sulyginamos `rowspan` pagalba.
+const eile = [...ppa.pasiulymuEile].sort(
+  (x, y) => palygintiDalis(x.daliesNumeris, y.daliesNumeris) || palygintiDalis(x.eileNumeris, y.eileNumeris),
+);
+const atmesti = [...ppa.atmestiPasiulymai].sort(
+  (x, y) =>
+    String(x.dalyvioPavadinimas ?? '').localeCompare(String(y.dalyvioPavadinimas ?? ''), 'lt') ||
+    palygintiDalis(x.daliesNumeris, y.daliesNumeris),
+);
+const dalyvioRaktas = (r: Record<string, any>) => `${r.dalyvioKodas ?? ''}|${r.dalyvioPavadinimas ?? ''}`;
+const eileGrupes = sujungtiGretimas(eile, dalyvioRaktas);
+const atmestiGrupes = sujungtiGretimas(atmesti, dalyvioRaktas);
+// Sutarčių lentelėje kartojasi ne tik tiekėjas, bet ir datos bei ta pati mūsų
+// sutartis — kiekvienas toks stulpelis liejamas atskirai, bet visada tiekėjo
+// bloko ribose, kad langeliai neapjungtų skirtingų tiekėjų eilučių.
+const tiekejoRaktas = (r: Record<string, any>) => `${r.tiekejosKodas ?? ''}|${r.teikejoPavadinimas ?? ''}`;
+const sutartysGrupes = sujungtiGretimas(ppa.sutartys, tiekejoRaktas);
+const sudarytaGrupes = sujungtiGretimas(ppa.sutartys, (r) => `${tiekejoRaktas(r)}|${r.sutartisSudarymoData ?? ''}`);
+const galiojimasGrupes = sujungtiGretimas(
+  ppa.sutartys,
+  (r) => `${tiekejoRaktas(r)}|${r.sutartiesGaliojimas ?? r.sutartiesGaliojimoPastaba ?? ''}`,
+);
+const atitikmensGrupes = sujungtiGretimas(
+  ppa.sutartys,
+  (r) => `${tiekejoRaktas(r)}|${ppa.sutarciuAtitikmenys[String(r.id)]?.unikalusId ?? ''}`,
+);
+// Stulpelį su nuoroda į mūsų sutarties įrašą rodom tik kai bent viena atpažinta.
+const turiAtitikmenu = ppa.sutartys.some((s) => ppa.sutarciuAtitikmenys[String(s.id)]);
+
+const eileIsraiska = bendraReiksme(eile, 'kainosIsraiska');
+const atmestiIsraiska = bendraReiksme(atmesti, 'kainosIsraiska');
+
+// Skundų sekcija dažniausiai būna vien „Ne“ — tada užtenka vienos eilutės.
+const skundaiTusti =
+  !a.pretenzijaPateikta &&
+  !a.ieskinysTeismui &&
+  !a.interesuKonfliktasNustatytas &&
+  !a.konkurencijaIskreipiantisAsmuo &&
+  !a.interesuKonfliktoPriemones &&
+  !a.konkurencijosPriemones;
 ---
 
-<div class="flex flex-col gap-8">
+<div class="ppa flex flex-col gap-8">
   <section>
-    <h3 class="mb-3 no-style">Bendra informacija</h3>
+    <h3 class="ppa-head no-style">Bendra informacija</h3>
     <KeyValueList>
       <dt>Ataskaitos tipas</dt>
       <dd>{val(a.ataskaitosTipas)}</dd>
@@ -24,47 +99,47 @@ const val = (v: any) => (v == null || v === '' ? '—' : v);
       <dt>Pirkimo objekto pavadinimas</dt>
       <dd>{val(a.pirkimoObjektoPavadinimas)}</dd>
       <dt>Pirkimo vertė</dt>
-      <dd><span class="cell-mono">{val(a.pirkimoVerte)}</span></dd>
+      <dd>{val(a.pirkimoVerte)}</dd>
       <dt>Pirkimo objekto rūšis</dt>
       <dd>{val(a.pirkimoObjektoRusis)}</dd>
       <dt>Pagrindinis BVPŽ kodas</dt>
       <dd><span class="cell-mono">{val(a.pagrindinisKodasBvpz)}</span></dd>
-      <dt>Papildomi BVPŽ kodai</dt>
-      <dd><span class="cell-mono">{val(a.papildomiKodaiBvpz)}</span></dd>
+      {a.papildomiKodaiBvpz && (<><dt>Papildomi BVPŽ kodai</dt><dd><span class="cell-mono">{a.papildomiKodaiBvpz}</span></dd></>)}
       <dt>Dalių skaičius</dt>
       <dd><span class="cell-mono">{val(a.daliuSkaicius)}</span></dd>
-      <dt>Finansuojamas ES lėšomis</dt>
-      <dd>{yesNo(a.finansuojamasEsLesomis)}</dd>
-      <dt>Elektroninis pirkimas</dt>
-      <dd>{yesNo(a.elektroninisPirkimas)}</dd>
-      <dt>Preliminari sutartis</dt>
-      <dd>{yesNo(a.preliminariSutartis)}</dd>
-      <dt>Dinaminė pirkimų sistema</dt>
-      <dd>{yesNo(a.dinamineSistema)}</dd>
+      {pozymiai.length > 0 && (<>
+        <dt>Požymiai</dt>
+        <dd>
+          <span class="ppa-chips">
+            {pozymiai.map((p) => (
+              <Badge variant={p.value ? 'info' : 'muted'}>
+                <span aria-hidden="true">{p.value ? '✓' : '✕'}</span> {p.label}
+              </Badge>
+            ))}
+          </span>
+        </dd>
+      </>)}
       {a.kitaInformacija && (<><dt>Kita informacija</dt><dd>{a.kitaInformacija}</dd></>)}
     </KeyValueList>
   </section>
 
   <section>
-    <h3 class="mb-3 no-style">Perkančioji organizacija</h3>
+    <h3 class="ppa-head no-style">Perkančioji organizacija</h3>
     <KeyValueList>
       <dt>Pavadinimas</dt>
-      <dd>{val(a.perkanciosiosOrganizacijosPavadinimas)}</dd>
-      <dt>Kodas</dt>
-      <dd><JarKodasLink kodas={a.perkanciosiosOrganizacijosKodas} /></dd>
+      <dd><EntityLink kodas={a.perkanciosiosOrganizacijosKodas} label={val(a.perkanciosiosOrganizacijosPavadinimas)} /></dd>
       <dt>Adresas</dt>
       <dd>{val(a.perkanciosiosOrganizacijosAdresas)}</dd>
-      <dt>Tipas</dt>
-      <dd>{val(a.perkanciosiosOrganizacijosTipas)}</dd>
+      {a.perkanciosiosOrganizacijosTipas && (<><dt>Tipas</dt><dd>{a.perkanciosiosOrganizacijosTipas}</dd></>)}
       {a.igaliotosiosPavadinimas && (<>
         <dt>Įgaliotoji organizacija</dt>
-        <dd>{a.igaliotosiosPavadinimas} {a.igaliotosiosKodas && (<>(<JarKodasLink kodas={a.igaliotosiosKodas} />)</>)}</dd>
+        <dd><EntityLink kodas={a.igaliotosiosKodas} label={a.igaliotosiosPavadinimas} /></dd>
       </>)}
     </KeyValueList>
   </section>
 
   <section>
-    <h3 class="mb-3 no-style">Pirkimo būdas</h3>
+    <h3 class="ppa-head no-style">Pirkimo būdas</h3>
     <KeyValueList>
       <dt>Pirkimo būdas</dt>
       <dd>{val(a.pirkimoBudas)}</dd>
@@ -75,28 +150,42 @@ const val = (v: any) => (v == null || v === '' ? '—' : v);
 
   {ppa.pirkimoDalys.length > 0 && (
     <section>
-      <h3 class="mb-3 no-style">Pirkimo dalys</h3>
-      <DataTable size="sm" columns={[{ label: 'Nr.' }, { label: 'Pavadinimas' }, { label: 'BVPŽ' }, { label: 'Papildomi BVPŽ' }]}>
-        {ppa.pirkimoDalys.map((d) => (
-          <tr>
-            <td class="cell-mono">{val(d.daliesNumeris)}</td>
-            <td>{val(d.daliesPavadinimas)}</td>
-            <td class="cell-mono">{val(d.pagrindinisKodasBvpz)}</td>
-            <td class="cell-mono">{val(d.papildomiKodaiBvpz)}</td>
-          </tr>
-        ))}
-      </DataTable>
+      <h3 class="ppa-head no-style">Pirkimo dalys <span class="ppa-count">{ppa.pirkimoDalys.length}</span></h3>
+      {vienodosDalys ? (
+        <>
+          <p class="ppa-note">Visos dalys aprašytos vienodai.</p>
+          <KeyValueList>
+            <dt>Dalys</dt>
+            <dd><span class="cell-mono">{dalys[0].dalys}</span></dd>
+            <dt>Pavadinimas</dt>
+            <dd>{val(dalys[0].eilute.daliesPavadinimas)}</dd>
+            <dt>BVPŽ</dt>
+            <dd><span class="cell-mono">{val(dalys[0].eilute.pagrindinisKodasBvpz)}</span></dd>
+            {dalys[0].eilute.papildomiKodaiBvpz && (<><dt>Papildomi BVPŽ</dt><dd><span class="cell-mono">{dalys[0].eilute.papildomiKodaiBvpz}</span></dd></>)}
+          </KeyValueList>
+        </>
+      ) : (
+        <DataTable size="sm" columns={[{ label: 'Dalys' }, { label: 'Pavadinimas' }, { label: 'BVPŽ' }, { label: 'Papildomi BVPŽ' }]}>
+          {dalys.map((g) => (
+            <tr>
+              <td class="cell-mono cell-nowrap">{g.dalys}</td>
+              <td>{val(g.eilute.daliesPavadinimas)}</td>
+              <td class="cell-mono">{val(g.eilute.pagrindinisKodasBvpz)}</td>
+              <td class="cell-mono">{val(g.eilute.papildomiKodaiBvpz)}</td>
+            </tr>
+          ))}
+        </DataTable>
+      )}
     </section>
   )}
 
   {ppa.dalyviai.length > 0 && (
     <section>
-      <h3 class="mb-3 no-style">Dalyviai</h3>
-      <DataTable size="sm" columns={[{ label: 'Pavadinimas' }, { label: 'Kodas' }, { label: 'Adresas' }, { label: 'Šalis' }]}>
+      <h3 class="ppa-head no-style">Dalyviai <span class="ppa-count">{ppa.dalyviai.length}</span></h3>
+      <DataTable size="sm" columns={[{ label: 'Pavadinimas' }, { label: 'Adresas' }, { label: 'Šalis' }]}>
         {ppa.dalyviai.map((d) => (
           <tr>
-            <td>{val(d.pavadinimas)}</td>
-            <td><JarKodasLink kodas={d.kodas} link={d.fizinisAsmuo !== true} /></td>
+            <td><EntityLink kodas={d.kodas} label={val(d.pavadinimas)} link={d.fizinisAsmuo !== true} /></td>
             <td>{val(d.adresas)}</td>
             <td>{val(d.salis)}</td>
           </tr>
@@ -107,28 +196,50 @@ const val = (v: any) => (v == null || v === '' ? '—' : v);
 
   {ppa.vertinimoKriterjai.length > 0 && (
     <section>
-      <h3 class="mb-3 no-style">Vertinimo kriterijai</h3>
-      <DataTable size="sm" columns={[{ label: 'Dalies nr.' }, { label: 'Kriterijus' }]}>
-        {ppa.vertinimoKriterjai.map((d) => (
-          <tr>
-            <td class="cell-mono">{val(d.daliesNumeris)}</td>
-            <td>{val(d.vertinimoKriterijus)}</td>
-          </tr>
-        ))}
-      </DataTable>
+      <h3 class="ppa-head no-style">Vertinimo kriterijai <span class="ppa-count">{ppa.vertinimoKriterjai.length}</span></h3>
+      {vienodiKriterijai ? (
+        <>
+          <p class="ppa-note">Visoms dalims taikomas tas pats kriterijus.</p>
+          <KeyValueList>
+            <dt>Dalys</dt>
+            <dd><span class="cell-mono">{kriterijai[0].dalys}</span></dd>
+            <dt>Kriterijus</dt>
+            <dd>{val(kriterijai[0].eilute.vertinimoKriterijus)}</dd>
+          </KeyValueList>
+        </>
+      ) : (
+        <DataTable size="sm" columns={[{ label: 'Dalys' }, { label: 'Kriterijus' }]}>
+          {kriterijai.map((g) => (
+            <tr>
+              <td class="cell-mono cell-nowrap">{g.dalys}</td>
+              <td>{val(g.eilute.vertinimoKriterijus)}</td>
+            </tr>
+          ))}
+        </DataTable>
+      )}
     </section>
   )}
 
-  {ppa.atmestiPasiulymai.length > 0 && (
+  {atmesti.length > 0 && (
     <section>
-      <h3 class="mb-3 no-style">Atmesti pasiūlymai</h3>
-      <DataTable size="sm" columns={[{ label: 'Dalies nr.' }, { label: 'Dalyvis' }, { label: 'Statusas' }, { label: 'Kaina' }, { label: 'Atmetimo priežastys' }]}>
-        {ppa.atmestiPasiulymai.map((d) => (
+      <h3 class="ppa-head no-style">Atmesti pasiūlymai <span class="ppa-count">{atmesti.length}</span></h3>
+      <DataTable size="sm" columns={[
+        { label: 'Dalis' },
+        { label: 'Dalyvis' },
+        { label: 'Statusas' },
+        { label: atmestiIsraiska ? `Kaina (${atmestiIsraiska})` : 'Kaina', headerClassName: 'cell-right' },
+        { label: 'Atmetimo priežastys' },
+      ]}>
+        {atmestiGrupes.map(({ eilute: d, apjungti, rodyti }) => (
           <tr>
             <td class="cell-mono">{val(d.daliesNumeris)}</td>
-            <td>{val(d.dalyvioPavadinimas)} {d.dalyvioKodas && (<>(<JarKodasLink kodas={d.dalyvioKodas} />)</>)}</td>
+            {rodyti && (
+              <td rowspan={apjungti > 1 ? apjungti : undefined} class="ppa-span">
+                <EntityLink kodas={d.dalyvioKodas} label={val(d.dalyvioPavadinimas)} />
+              </td>
+            )}
             <td>{val(d.statusas)}</td>
-            <td class="cell-mono">{val(d.pasiulymoKaina)}</td>
+            <td class="cell-mono cell-right">{eur(d.pasiulymoKaina)}</td>
             <td>{val(d.atmetimoPriezastys)}</td>
           </tr>
         ))}
@@ -136,16 +247,25 @@ const val = (v: any) => (v == null || v === '' ? '—' : v);
     </section>
   )}
 
-  {ppa.pasiulymuEile.length > 0 && (
+  {eile.length > 0 && (
     <section>
-      <h3 class="mb-3 no-style">Pasiūlymų eilė</h3>
-      <DataTable size="sm" columns={[{ label: 'Dalies nr.' }, { label: 'Eilė' }, { label: 'Dalyvis' }, { label: 'Kaina' }]}>
-        {ppa.pasiulymuEile.map((d) => (
+      <h3 class="ppa-head no-style">Pasiūlymų eilė <span class="ppa-count">{eile.length}</span></h3>
+      <DataTable size="sm" columns={[
+        { label: 'Dalis' },
+        { label: 'Eilė' },
+        { label: 'Dalyvis' },
+        { label: eileIsraiska ? `Kaina (${eileIsraiska})` : 'Kaina', headerClassName: 'cell-right' },
+      ]}>
+        {eileGrupes.map(({ eilute: d, apjungti, rodyti }) => (
           <tr>
             <td class="cell-mono">{val(d.daliesNumeris)}</td>
             <td class="cell-mono">{val(d.eileNumeris)}</td>
-            <td>{val(d.dalyvioPavadinimas)} {d.dalyvioKodas && (<>(<JarKodasLink kodas={d.dalyvioKodas} />)</>)}</td>
-            <td class="cell-mono">{val(d.kaina)}</td>
+            {rodyti && (
+              <td rowspan={apjungti > 1 ? apjungti : undefined} class="ppa-span">
+                <EntityLink kodas={d.dalyvioKodas} label={val(d.dalyvioPavadinimas)} />
+              </td>
+            )}
+            <td class="cell-mono cell-right">{eur(d.kaina)}</td>
           </tr>
         ))}
       </DataTable>
@@ -154,62 +274,130 @@ const val = (v: any) => (v == null || v === '' ? '—' : v);
 
   {ppa.proceduruPabaiga.length > 0 && (
     <section>
-      <h3 class="mb-3 no-style">Procedūrų pabaiga</h3>
-      <DataTable size="sm" columns={[{ label: 'Dalies nr.' }, { label: 'Pabaiga' }, { label: 'Sprendimo data' }, { label: 'Priežastys' }]}>
-        {ppa.proceduruPabaiga.map((d) => (
-          <tr>
-            <td class="cell-mono">{val(d.daliesNumeris)}</td>
-            <td>{val(d.proceduruPabaiga)}</td>
-            <td class="cell-mono">{val(d.sprendimoPriemimoData)}</td>
-            <td>{val(d.sprendimoPriezastys) !== '—' ? d.sprendimoPriezastys : val(d.nutraukimoPriezastys)}</td>
-          </tr>
-        ))}
-      </DataTable>
+      <h3 class="ppa-head no-style">Procedūrų pabaiga <span class="ppa-count">{ppa.proceduruPabaiga.length}</span></h3>
+      {vienodaPabaiga ? (
+        <>
+        <p class="ppa-note">Visų dalių procedūros baigėsi vienodai.</p>
+        <KeyValueList>
+          <dt>Dalys</dt>
+          <dd><span class="cell-mono">{pabaiga[0].dalys}</span></dd>
+          <dt>Pabaiga</dt>
+          <dd>{val(pabaiga[0].eilute.proceduruPabaiga)}</dd>
+          <dt>Sprendimo data</dt>
+          <dd><span class="cell-mono">{val(pabaiga[0].eilute.sprendimoPriemimoData)}</span></dd>
+          <dt>Priežastys</dt>
+          <dd>{val(pabaiga[0].eilute.sprendimoPriezastys ?? pabaiga[0].eilute.nutraukimoPriezastys)}</dd>
+        </KeyValueList>
+        </>
+      ) : (
+        <DataTable size="sm" columns={[{ label: 'Dalys' }, { label: 'Pabaiga' }, { label: 'Sprendimo data' }, { label: 'Priežastys' }]}>
+          {pabaiga.map((g) => (
+            <tr>
+              <td class="cell-mono cell-nowrap">{g.dalys}</td>
+              <td>{val(g.eilute.proceduruPabaiga)}</td>
+              <td class="cell-mono cell-nowrap">{val(g.eilute.sprendimoPriemimoData)}</td>
+              <td>{val(g.eilute.sprendimoPriezastys ?? g.eilute.nutraukimoPriezastys)}</td>
+            </tr>
+          ))}
+        </DataTable>
+      )}
     </section>
   )}
 
   {ppa.sutartys.length > 0 && (
     <section>
-      <h3 class="mb-3 no-style">Sutartys</h3>
-      <DataTable size="sm" columns={[{ label: 'Dalys' }, { label: 'Tiekėjas' }, { label: 'Vertė', headerClassName: 'cell-right' }, { label: 'Sudaryta' }, { label: 'Galiojimas' }]}>
-        {ppa.sutartys.map((d) => (
+      <h3 class="ppa-head no-style">Sutartys <span class="ppa-count">{ppa.sutartys.length}</span></h3>
+      <DataTable size="sm" columns={[
+        { label: 'Dalys' },
+        { label: 'Tiekėjas' },
+        { label: 'Vertė', headerClassName: 'cell-right' },
+        { label: 'Sudaryta' },
+        { label: 'Galiojimas' },
+        ...(turiAtitikmenu ? [{ label: 'Sutartis' }] : []),
+      ]}>
+        {sutartysGrupes.map(({ eilute: d, apjungti, rodyti }, i) => {
+          const atitikmuo = ppa.sutarciuAtitikmenys[String(d.id)];
+          const sudaryta = sudarytaGrupes[i];
+          const galiojimas = galiojimasGrupes[i];
+          const nuoroda = atitikmensGrupes[i];
+          return (
           <tr>
-            <td class="cell-mono">{val(d.daliesNumeriai)}</td>
-            <td>{val(d.teikejoPavadinimas)} {d.tiekejosKodas && (<>(<JarKodasLink kodas={d.tiekejosKodas} />)</>)}</td>
-            <td class="cell-mono cell-right">{d.sutartiesVerte != null ? Number(d.sutartiesVerte).toLocaleString('lt-LT', { style: 'currency', currency: 'EUR' }) : '—'}</td>
-            <td class="cell-mono">{val(d.sutartisSudarymoData)}</td>
-            <td>{val(d.sutartiesGaliojimas ?? d.sutartiesGaliojimoPastaba)}</td>
+            <td class="cell-mono cell-nowrap">{val(d.daliesNumeriai)}</td>
+            {rodyti && (
+              <td rowspan={apjungti > 1 ? apjungti : undefined} class="ppa-span">
+                <EntityLink kodas={d.tiekejosKodas} label={val(d.teikejoPavadinimas)} />
+              </td>
+            )}
+            <td class="cell-mono cell-right cell-nowrap">{eur(d.sutartiesVerte)}</td>
+            {sudaryta.rodyti && (
+              <td rowspan={sudaryta.apjungti > 1 ? sudaryta.apjungti : undefined} class="cell-mono cell-nowrap ppa-span">
+                {val(d.sutartisSudarymoData)}
+              </td>
+            )}
+            {galiojimas.rodyti && (
+              <td rowspan={galiojimas.apjungti > 1 ? galiojimas.apjungti : undefined} class="cell-mono cell-nowrap ppa-span">
+                {val(d.sutartiesGaliojimas ?? d.sutartiesGaliojimoPastaba)}
+              </td>
+            )}
+            {turiAtitikmenu && nuoroda.rodyti && (
+              <td rowspan={nuoroda.apjungti > 1 ? nuoroda.apjungti : undefined} class="ppa-span ppa-sutartis">
+                {atitikmuo ? (
+                  <>
+                    <a
+                      href={`/sutartis/${atitikmuo.unikalusId}`}
+                      class={atitikmuo.patikimumas === 'galimas' ? 'ppa-spejimas' : undefined}
+                      title={atitikmuo.sutartiesNumeris || undefined}
+                    >{atitikmuo.sutartiesNumeris || 'Peržiūrėti'}</a>
+                    {atitikmuo.patikimumas === 'galimas' && (
+                      <span
+                        class="ppa-abejone"
+                        title="Sutartis atpažinta pagal pirkimo numerį, tiekėją ir vertę ar datą — atitikimas galimas, bet negarantuotas"
+                      >?</span>
+                    )}
+                  </>
+                ) : (
+                  <span class="text-muted">—</span>
+                )}
+              </td>
+            )}
           </tr>
-        ))}
+          );
+        })}
       </DataTable>
     </section>
   )}
 
   <section>
-    <h3 class="mb-3 no-style">Skundai ir interesų konfliktai</h3>
-    <KeyValueList>
-      <dt>Pateikta pretenzija</dt>
-      <dd>{yesNo(a.pretenzijaPateikta)}</dd>
-      <dt>Pateiktas ieškinys teismui</dt>
-      <dd>{yesNo(a.ieskinysTeismui)}</dd>
-      <dt>Nustatytas interesų konfliktas</dt>
-      <dd>{yesNo(a.interesuKonfliktasNustatytas)}</dd>
-      {a.interesuKonfliktoPriemones && (<><dt>Interesų konflikto priemonės</dt><dd>{a.interesuKonfliktoPriemones}</dd></>)}
-      <dt>Konkurenciją iškreipiantis asmuo</dt>
-      <dd>{yesNo(a.konkurencijaIskreipiantisAsmuo)}</dd>
-      {a.konkurencijosPriemones && (<><dt>Konkurencijos priemonės</dt><dd>{a.konkurencijosPriemones}</dd></>)}
-    </KeyValueList>
+    <h3 class="ppa-head no-style">Skundai ir interesų konfliktai</h3>
+    {skundaiTusti ? (
+      <p class="ppa-note">Pretenzijų, ieškinių, interesų konfliktų ar konkurenciją iškreipiančių asmenų nenurodyta.</p>
+    ) : (
+      <KeyValueList>
+        <dt>Pateikta pretenzija</dt>
+        <dd>{yesNo(a.pretenzijaPateikta)}</dd>
+        <dt>Pateiktas ieškinys teismui</dt>
+        <dd>{yesNo(a.ieskinysTeismui)}</dd>
+        <dt>Nustatytas interesų konfliktas</dt>
+        <dd>{yesNo(a.interesuKonfliktasNustatytas)}</dd>
+        {a.interesuKonfliktoPriemones && (<><dt>Interesų konflikto priemonės</dt><dd>{a.interesuKonfliktoPriemones}</dd></>)}
+        <dt>Konkurenciją iškreipiantis asmuo</dt>
+        <dd>{yesNo(a.konkurencijaIskreipiantisAsmuo)}</dd>
+        {a.konkurencijosPriemones && (<><dt>Konkurencijos priemonės</dt><dd>{a.konkurencijosPriemones}</dd></>)}
+      </KeyValueList>
+    )}
   </section>
 
   <section>
-    <h3 class="mb-3 no-style">Kontaktai</h3>
+    <h3 class="ppa-head no-style">Kontaktai</h3>
     <KeyValueList>
       <dt>Atsakingas asmuo</dt>
       <dd>{val(a.atsakingasAsmuo)}</dd>
-      <dt>Telefonas</dt>
-      <dd><span class="cell-mono">{val(a.telefonas)}</span></dd>
-      <dt>El. paštas</dt>
-      <dd>{val(a.elpastas)}</dd>
+      {a.telefonas && (<><dt>Telefonas</dt><dd><a href={`tel:${String(a.telefonas).replace(/[^+\d]/g, '')}`} class="cell-mono">{a.telefonas}</a></dd></>)}
+      {a.elpastas && (<><dt>El. paštas</dt><dd>
+        {/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(a.elpastas))
+          ? <a href={`mailto:${a.elpastas}`}>{a.elpastas}</a>
+          : a.elpastas}
+      </dd></>)}
       {a.pasirasantisAsmuo && (<>
         <dt>Pasirašantis asmuo</dt>
         <dd>{a.pasirasantisAsmuo}{a.pasirasantisPareigos ? `, ${a.pasirasantisPareigos}` : ''}</dd>
@@ -217,3 +405,66 @@ const val = (v: any) => (v == null || v === '' ? '—' : v);
     </KeyValueList>
   </section>
 </div>
+
+<style>
+  .ppa-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .ppa-count {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--color-muted);
+    background: var(--lighter-gray);
+    border-radius: var(--radius-pill);
+    padding: 2px 8px;
+  }
+
+  .ppa-note {
+    margin: 0 0 12px;
+    font-size: var(--text-sm);
+    color: var(--color-muted);
+  }
+
+  /* Spėjamas sutarties atitikmuo — nuoroda pilkesnė, kad nesumaišytum su tiksliu. */
+  .ppa-spejimas {
+    color: var(--color-muted);
+    text-decoration-style: dotted;
+  }
+
+  .ppa-abejone {
+    margin-left: 4px;
+    color: var(--color-muted);
+    cursor: help;
+  }
+
+  .ppa-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Sulietas („rowspan“) tiekėjo langelis centruojamas per visas savo eilutes. */
+  td.ppa-span {
+    vertical-align: middle;
+    text-align: center;
+  }
+
+  /* Sutarčių numeriai būna ilgi — kerpam, pilną rodo `title`. */
+  td.ppa-sutartis {
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  td.ppa-sutartis a {
+    display: inline-block;
+    max-width: 16ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+  }
+</style>

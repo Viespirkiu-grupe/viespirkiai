@@ -9,7 +9,74 @@ export type Ppa = {
   pasiulymuEile: Record<string, any>[];
   proceduruPabaiga: Record<string, any>[];
   sutartys: Record<string, any>[];
+  /** `xlsxPPAsutartys.id` → the matching `vpmSutartys` record, when one was found. */
+  sutarciuAtitikmenys: Record<string, PpaSutartiesAtitikmuo>;
 };
+
+export type PpaSutartiesAtitikmuo = {
+  unikalusId: string;
+  sutartiesNumeris: string | null;
+  /** `tikslus` — sutampa ir vertė, ir data; `galimas` — sutapo tik dalis požymių. */
+  patikimumas: 'tikslus' | 'galimas';
+};
+
+/**
+ * Match the contracts listed inside a PPA report to our own `vpmSutartys`
+ * records so the report can link straight to the contract page.
+ *
+ * The report gives no contract id — only the procurement number, the buyer, the
+ * supplier, the value and the signing date. Buyer + procurement number +
+ * supplier narrows it down, but a multi-part procurement produces several
+ * contracts with the same supplier, so the remaining ambiguity is resolved in
+ * tiers: value **and** date, then date alone, then value alone, and finally the
+ * case where only one candidate exists at all. Rows that stay ambiguous are
+ * left unlinked rather than guessed.
+ */
+async function loadPpaSutarciuAtitikmenys(ataskaitaId: string | number): Promise<Record<string, PpaSutartiesAtitikmuo>> {
+  const { rows } = await postgres.query(
+    `WITH ppa AS (
+       SELECT s.id, s."tiekejosKodas", s."sutartiesVerte", s."sutartisSudarymoData",
+              a."pirkimoNumeris", a."perkanciosiosOrganizacijosKodas"
+       FROM "xlsxPPAsutartys" s
+       JOIN "xlsxPPAataskaitos" a ON a.id = s."ataskaitaId"
+       WHERE s."ataskaitaId" = $1
+     ), kand AS (
+       SELECT p.id AS "ppaId", v."unikalusId", v."sutartiesNumeris",
+              v.verte = p."sutartiesVerte" AS "verteSutampa",
+              v."sudarymoData" = p."sutartisSudarymoData" AS "dataSutampa"
+       FROM ppa p
+       JOIN "vpmSutartys" v
+         ON v."pirkimoNumeris" = p."pirkimoNumeris"
+        AND v."perkanciosiosOrganizacijosKodas" = p."perkanciosiosOrganizacijosKodas"
+        AND v."pirmoTiekejoKodas" = p."tiekejosKodas"
+        AND NOT v.istrinta
+     ), suvestine AS (
+       SELECT "ppaId",
+              count(DISTINCT "unikalusId") AS viso,
+              count(DISTINCT "unikalusId") FILTER (WHERE "verteSutampa" AND "dataSutampa") AS abu,
+              count(DISTINCT "unikalusId") FILTER (WHERE "dataSutampa") AS data,
+              count(DISTINCT "unikalusId") FILTER (WHERE "verteSutampa") AS verte
+       FROM kand GROUP BY 1
+     )
+     SELECT DISTINCT ON (k."ppaId")
+            k."ppaId", k."unikalusId", k."sutartiesNumeris",
+            CASE WHEN s.abu = 1 THEN 'tikslus' ELSE 'galimas' END AS patikimumas
+     FROM kand k
+     JOIN suvestine s USING ("ppaId")
+     WHERE (s.abu = 1 AND k."verteSutampa" AND k."dataSutampa")
+        OR (s.abu <> 1 AND s.data = 1 AND k."dataSutampa")
+        OR (s.abu <> 1 AND s.data <> 1 AND s.verte = 1 AND k."verteSutampa")
+        OR (s.abu <> 1 AND s.data <> 1 AND s.verte <> 1 AND s.viso = 1)`,
+    [ataskaitaId],
+  );
+
+  return Object.fromEntries(
+    rows.map((r) => [
+      String(r.ppaId),
+      { unikalusId: String(r.unikalusId), sutartiesNumeris: r.sutartiesNumeris ?? null, patikimumas: r.patikimumas },
+    ]),
+  );
+}
 
 /**
  * Load a parsed PPA procurement report (and all its child rows) for a given
@@ -43,7 +110,7 @@ export async function loadPpaByFailasId(failasId: string | number): Promise<Ppa 
   if (!ataskaita) return null;
 
   const id = ataskaita.id;
-  const [pirkimoDalys, dalyviai, vertinimoKriterjai, atmestiPasiulymai, pasiulymuEile, proceduruPabaiga, sutartys] =
+  const [pirkimoDalys, dalyviai, vertinimoKriterjai, atmestiPasiulymai, pasiulymuEile, proceduruPabaiga, sutartys, sutarciuAtitikmenys] =
     await Promise.all([
       postgres.query(`SELECT * FROM "xlsxPPApirkimoDalys" WHERE "ataskaitaId" = $1 ORDER BY id`, [id]),
       postgres.query(`SELECT d.*, s.pavadinimas AS salis FROM "xlsxPPAdalyviai" d LEFT JOIN "xlsxPPAsalys" s ON s.id = d."salisId" WHERE d."ataskaitaId" = $1 ORDER BY d.id`, [id]),
@@ -52,6 +119,7 @@ export async function loadPpaByFailasId(failasId: string | number): Promise<Ppa 
       postgres.query(`SELECT e.*, ki.pavadinimas AS "kainosIsraiska" FROM "xlsxPPApasiulymuEile" e LEFT JOIN "xlsxPPAkainosIsraiskos" ki ON ki.id = e."kainosIsraiskaId" WHERE e."ataskaitaId" = $1 ORDER BY e.id`, [id]),
       postgres.query(`SELECT * FROM "xlsxPPAproceduruPabaiga" WHERE "ataskaitaId" = $1 ORDER BY id`, [id]),
       postgres.query(`SELECT s.*, ct.pavadinimas AS "centralizacijosTipas" FROM "xlsxPPAsutartys" s LEFT JOIN "xlsxPPAcentralizacijosTipai" ct ON ct.id = s."centralizacijosTipasId" WHERE s."ataskaitaId" = $1 ORDER BY s.id`, [id]),
+      loadPpaSutarciuAtitikmenys(id),
     ]);
 
   return {
@@ -63,7 +131,104 @@ export async function loadPpaByFailasId(failasId: string | number): Promise<Ppa 
     pasiulymuEile: pasiulymuEile.rows,
     proceduruPabaiga: proceduruPabaiga.rows,
     sutartys: sutartys.rows,
+    sutarciuAtitikmenys,
   };
+}
+
+/**
+ * Format a set of procurement-part numbers into a compact range string:
+ * `[1, 2, 3, 5, 7, 8]` → `"1–3, 5, 7–8"`.
+ *
+ * PPA reports routinely repeat the same values for every part, so the tables
+ * collapse those rows and label them with a range instead of listing each part
+ * on its own line. Non-numeric labels (e.g. "Visos dalys") are passed through
+ * de-duplicated, since they cannot be ordered meaningfully.
+ */
+export function formatuotiDaliuRuozus(numeriai: unknown[]): string {
+  const tekstai = numeriai.map((n) => (n == null ? '' : String(n).trim())).filter(Boolean);
+  if (tekstai.length === 0) return '—';
+  if (!tekstai.every((t) => /^\d+$/.test(t))) return [...new Set(tekstai)].join(', ');
+
+  const skaiciai = [...new Set(tekstai.map(Number))].sort((a, b) => a - b);
+  const ruozai: string[] = [];
+  let pradzia = skaiciai[0];
+  let pabaiga = skaiciai[0];
+  for (const n of skaiciai.slice(1)) {
+    if (n === pabaiga + 1) {
+      pabaiga = n;
+      continue;
+    }
+    ruozai.push(pradzia === pabaiga ? `${pradzia}` : `${pradzia}–${pabaiga}`);
+    pradzia = pabaiga = n;
+  }
+  ruozai.push(pradzia === pabaiga ? `${pradzia}` : `${pradzia}–${pabaiga}`);
+  return ruozai.join(', ');
+}
+
+export type PpaGrupe<T> = {
+  /** First row of the group — its non-part fields represent the whole group. */
+  eilute: T;
+  /** Compact range label of every part number in the group ("1–12"). */
+  dalys: string;
+  /** How many source rows were merged. */
+  kiekis: number;
+};
+
+/**
+ * Merge rows that differ only by their part number.
+ *
+ * `laukai` lists the fields that actually get rendered; rows sharing identical
+ * values across all of them are folded into a single group. Group order follows
+ * first appearance, so the original row order is preserved.
+ */
+export function grupuotiPagalDalis<T extends Record<string, any>>(
+  rows: T[],
+  laukai: string[],
+  daliesLaukas = 'daliesNumeris',
+): PpaGrupe<T>[] {
+  const grupes = new Map<string, { eilute: T; numeriai: unknown[] }>();
+  for (const row of rows) {
+    const raktas = laukai.map((k) => JSON.stringify(row[k] ?? null)).join(' ');
+    const esama = grupes.get(raktas);
+    if (esama) esama.numeriai.push(row[daliesLaukas]);
+    else grupes.set(raktas, { eilute: row, numeriai: [row[daliesLaukas]] });
+  }
+  return [...grupes.values()].map((g) => ({
+    eilute: g.eilute,
+    dalys: formatuotiDaliuRuozus(g.numeriai),
+    kiekis: g.numeriai.length,
+  }));
+}
+
+export type PpaSuliejimas<T> = {
+  eilute: T;
+  /** `rowspan` for the shared cell; only meaningful when `rodyti` is true. */
+  apjungti: number;
+  /** Whether this row should render the shared cell at all. */
+  rodyti: boolean;
+};
+
+/**
+ * Mark runs of consecutive rows that share the same key so a repeated column
+ * (typically the supplier) can be rendered once with `rowspan` instead of being
+ * printed on every line.
+ */
+export function sujungtiGretimas<T>(rows: T[], raktas: (row: T) => string): PpaSuliejimas<T>[] {
+  return rows.map((eilute, i) => {
+    const k = raktas(eilute);
+    if (i > 0 && raktas(rows[i - 1]) === k) return { eilute, apjungti: 1, rodyti: false };
+    let apjungti = 1;
+    while (i + apjungti < rows.length && raktas(rows[i + apjungti]) === k) apjungti++;
+    return { eilute, apjungti, rodyti: true };
+  });
+}
+
+/** Numeric-aware comparison for part numbers stored as free text. */
+export function palygintiDalis(a: unknown, b: unknown): number {
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+  return String(a ?? '').localeCompare(String(b ?? ''), 'lt');
 }
 
 export type PpaSantrauka = {
