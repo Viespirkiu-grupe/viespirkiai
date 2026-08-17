@@ -3,6 +3,7 @@
 // lenteles pagal gaunamą payload. Iškelta iš statistika/index.astro inline
 // script'o, kad būtų tipizuojama ir atskirta nuo markup'o.
 import { escapeHtml } from '@design-system/lib/html.ts';
+import { refreshSortableTables } from '@design-system/lib/sortableTable.ts';
 
 export function initStatistikaLive() {
   const button = document.getElementById('liveUpdate');
@@ -22,12 +23,14 @@ export function initStatistikaLive() {
     if (fk?.parsiusti !== undefined) setText('failai.kiekiai.parsiusti', fk.parsiusti);
     if (fk?.klaida !== undefined) setText('failai.kiekiai.klaida', fk.klaida);
     if (fk?.neparsiusti !== undefined) setText('failai.kiekiai.neparsiusti', fk.neparsiusti);
+    if (fk?.isArchyvu !== undefined) setText('failai.kiekiai.isArchyvu', fk.isArchyvu);
 
     const fd = payload.failai?.dydziai;
     if (fd?.visi !== undefined) setText('failai.dydziai.visi', fd.visi);
     if (fd?.parsiusti !== undefined) setText('failai.dydziai.parsiusti', fd.parsiusti);
     if (fd?.klaida !== undefined) setText('failai.dydziai.klaida', fd.klaida);
     if (fd?.neparsiusti !== undefined) setText('failai.dydziai.neparsiusti', fd.neparsiusti);
+    if (fd?.isArchyvu !== undefined) setText('failai.dydziai.isArchyvu', fd.isArchyvu);
 
     const z = payload.nuskaitymas?.zodziai;
     if (z?.total !== undefined) setText('nuskaitymas.zodziai.total', z.total);
@@ -56,7 +59,7 @@ export function initStatistikaLive() {
     const lBody = document.getElementById('lentelesBody');
     if (lBody && payload.lenteles) {
       lBody.innerHTML = payload.lenteles.map((l: any) =>
-        `<tr class="${l.isTotal ? 'font-bold' : ''}"><td>${escapeHtml(l.tableName)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.dataSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.indexSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.totalSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.approxRowCount)}</td></tr>`
+        `<tr class="${l.isTotal ? 'font-bold' : ''}"${l.isTotal ? ' data-sort-pin="last"' : ''}><td>${escapeHtml(l.tableName)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.dataSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.indexSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.totalSize)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(l.approxRowCount)}</td></tr>`
       ).join('');
     }
 
@@ -82,6 +85,9 @@ export function initStatistikaLive() {
           `<tr><td class="cell-mono cell-nowrap">${escapeHtml(r.client_addr)}</td><td>${escapeHtml(r.state)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.sent_lsn)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.write_lsn)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.flush_lsn)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.replay_lsn)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.write_lag)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.flush_lag)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.replay_lag)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.primary_current_lsn)}</td><td class="cell-mono cell-right cell-nowrap">${escapeHtml(r.bytes_behind)}</td></tr>`
         ).join('');
     }
+
+    // Perpiešus tbody eilutės grįžta į serverio tvarką – pritaikom pasirinktą rikiavimą.
+    refreshSortableTables();
   };
 
   const stopSSE = () => {
