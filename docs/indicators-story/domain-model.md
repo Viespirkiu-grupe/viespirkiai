@@ -1,0 +1,158 @@
+# Domain model
+
+The MCP analyst exposes seven views (`modules/mcp/analyst/views/*.sql`) as the domain model. This document treats
+each view as a domain entity — no underlying tables are described here, only the views themselves, their key
+attributes, and how they relate to each other.
+
+All counts below were queried live against the dev database (`10.1.10.2:9118`, `viespirkiai`) on 2026-08-17.
+
+> **Note on `v_pirkimo_dalis`:** this view's `daliesPavadinimas` column enriches from `atn1ataskaitos` /
+> `atn1pirkimoDalys`, and those two tables don't exist yet in this dev database (only in a newer, not-yet-migrated
+> schema). The view itself couldn't be created here as a result. Its core logic — grouping `v_dalyviai` by
+> `(pirkimoNumeris, daliesNumeris)` — was run directly instead, which reproduces every column except
+> `daliesPavadinimas` (which would be `NULL` for all rows in this environment anyway, since there's no `atn1` data
+> to enrich from). All lot counts below are exact; `daliesPavadinimas` coverage could not be measured here.
+
+## Entity-relationship diagram
+
+```mermaid
+erDiagram
+    v_pirkimas {
+        text saltinis PK "cvpis or cvpp"
+        text pirkimoNumeris PK
+        text pavadinimas
+        text jarKodas FK "buyer org code"
+        text organizatorius
+        text pirkimoBudas
+        text statusas
+        numeric numatomaVerteEUR
+        date paskelbimoData
+    }
+
+    v_pirkimo_dalis {
+        text subjektoRaktas PK "saltinis:pirkimoNumeris:daliesNumeris"
+        text saltinis
+        text pirkimoNumeris FK
+        text daliesNumeris
+        text daliesPavadinimas
+        text pirkimoBudas
+        date ataskaitosData
+    }
+
+    v_dalyviai {
+        text pirkimoNumeris FK
+        text daliesNumeris FK
+        text pirkejoKodas FK "buyer"
+        text tiekejoKodas FK "bidder"
+        text tiekejas
+        numeric pasiulymoKaina
+        text atmetimoPriezastis
+        boolean interesuKonfliktasNustatytas
+    }
+
+    v_company {
+        text jarKodas PK
+        text pavadinimas
+        text adresas
+        text statusoPavadinimas
+        numeric darbuotojai
+        boolean melagingisTiekejas
+        boolean nepatikimasTiekejas
+        integer vdiPazeidimuSkaicius
+        integer bylosSkaicius
+        integer domenaiSkaicius
+        integer neskelbiamosDerybosSkaicius
+    }
+
+    v_sutartys {
+        text sutartiesUnikalusId PK
+        text sutartiesNumeris
+        text pirkimoNumeris FK
+        text pirkejoKodas FK "buyer"
+        text tiekejoKodas FK "primary supplier"
+        text_array tiekejaiKodai "primary + additional suppliers"
+        numeric suma
+        numeric faktineIvykdimoVerte
+        date sudarymoData
+        boolean istrinta
+    }
+
+    v_bylos {
+        integer bylosId PK
+        text bylosNumeris
+        text bylosRusis
+        text jarKodas FK
+        text dalyvioVardasIrPavarde
+        text bylojeKaip
+    }
+
+    v_person_links {
+        integer id PK
+        text vardas
+        text pavarde
+        text jarKodas FK
+        text pareigos
+        text rysioPobudzioPavadinimas
+        boolean dalyvaujaViesuosePirkimuose
+    }
+
+    v_pirkimas       ||--o{ v_pirkimo_dalis : "pirkimoNumeris = pirkimoNumeris (value match, no FK)"
+    v_pirkimo_dalis   ||--o{ v_dalyviai      : "pirkimoNumeris + daliesNumeris"
+    v_pirkimas       ||--o{ v_dalyviai      : "pirkimoNumeris = pirkimoNumeris (value match, no FK)"
+    v_pirkimas       ||--o{ v_sutartys      : "pirkimoNumeris = pirkimoNumeris (value match, no FK)"
+    v_company        ||--o{ v_pirkimas      : "jarKodas = buyer org code"
+    v_company        ||--o{ v_dalyviai      : "jarKodas = tiekejoKodas (bidder)"
+    v_company        ||--o{ v_sutartys      : "jarKodas = tiekejoKodas (supplier)"
+    v_company        ||--o{ v_sutartys      : "jarKodas = pirkejoKodas (buyer)"
+    v_company        ||--o{ v_bylos         : "jarKodas (court case party)"
+    v_company        ||--o{ v_person_links  : "jarKodas (linked legal entity)"
+```
+
+None of these relationships are enforced foreign keys — every one is a text-value match evaluated at query time
+(see `docs/indicators-story/procurement-number-clarification.md` for the `v_pirkimas` ↔ `v_pirkimo_dalis` ↔
+`v_dalyviai` case specifically). That's exactly why coverage matters: a match can legitimately fail, and the table
+below is how large those gaps actually are.
+
+## Row counts per entity
+
+| Entity | Rows | Notes |
+|---|---:|---|
+| `v_pirkimas` | 264,332 | 50,810 from `cvpis` (primary scrape) + 213,522 from `cvpp` (fallback, no matching `cvpis` row) |
+| `v_pirkimo_dalis` | 13,396 lots | Across 5,464 distinct procurements. 13,238 lots resolve to `cvpis`, 44 to `cvpp`, 114 to neither (`saltinis` unresolved) |
+| `v_dalyviai` | 36,793 | One row per (procurement, lot, bidder) |
+| `v_company` | 547,298 | = row count of `jarAsmenys`; `v_company` is a pure `LEFT JOIN` enrichment, so this is every legal entity in the registry, not just ones active in procurement |
+| `v_sutartys` | 5,904,634 | 5,902,689 not marked `istrinta` (deleted) |
+| `v_bylos` | 2,422,300 | One row per (court case, party) |
+| `v_person_links` | 546,639 | PINREG declared relationships |
+
+## Relationship coverage (the gaps)
+
+| Relationship | Coverage | Reading |
+|---|---:|---|
+| `v_pirkimas` → `v_pirkimo_dalis` | **5,464 / 264,332 procurements (2.1%)** | This is the headline gap: lot data only exists for procurements that have an ATN‑1 report on file. The other 97.9% of procurements have no known lot breakdown at all — not "1 lot", just unmeasured. Of the 5,464 covered, 3,788 turned out to have exactly 1 lot and 1,677 had 2+ (up to dozens). |
+| `v_pirkimo_dalis` → `v_dalyviai` | **100% by construction** | Every lot is derived directly from grouping `v_dalyviai`, so this direction can't have gaps — the question is really "how many bidder-rows per lot": 36,793 rows / 13,396 lots ≈ 2.7 avg. |
+| `v_dalyviai` → `v_pirkimas` | **36,374 / 36,793 rows (98.9%)**; **5,414 / 5,464 distinct procurements (99.1%)** | Almost every ATN‑1-derived lot resolves back to a known procurement notice. The ~1–2% that don't are the `insufficient_data` cases documented in `procurement-number-clarification.md`. |
+| `v_pirkimas` → `v_sutartys` | **372,387 / 5,904,634 contract rows (6.3%)**; **88.5% of contracts have a NULL `pirkimoNumeris` entirely** (5,223,286 rows) | This is the other big gap. Only 307,239 distinct `pirkimoNumeris` values appear across all contracts, and most contract rows carry no procurement number at all — consistent with most contracts being MVP / verbal / in‑house / amendment types (`tipoPavadinimas`) that were never tied to a formal CVP IS notice. |
+| `v_company` → `v_dalyviai` (`tiekejoKodas`) | **34,875 / 36,793 rows (94.8%)**; **3,554 / 4,044 distinct bidders (87.9%)** | 873 rows (2.4%) have no supplier code at all; the rest that fail to match are codes not found in the company registry (foreign suppliers, natural persons, data-entry variants). |
+| `v_company` → `v_sutartys` (`pirkejoKodas`, buyer) | **5,874,080 / 5,904,634 rows (99.5%)** | Buyer-side identification is nearly complete. |
+| `v_company` → `v_sutartys` (`tiekejoKodas`, supplier) | **5,271,364 / 5,904,634 rows (89.3%)** | Supplier-side is weaker than buyer-side — ~10.7% of contracts name a supplier code that isn't in the registry. |
+| `v_company` → `v_bylos` | **2,286,489 / 2,422,300 rows (94.4%)** | Most court-case parties resolve to a known legal entity; the remainder are presumably natural persons or codes outside the registry. |
+| `v_company` → `v_person_links` | **523,520 / 546,639 rows (95.8%)**; of the 533,581 rows that carry a company code at all, 98.1% resolve | 2.4% of PINREG relationship rows have no company code recorded in the first place. |
+
+## `v_company` enrichment coverage (of 547,298 companies)
+
+These are the risk-relevant flags/counters on `v_company` — most are sparse, which matters when using them as
+indicator inputs.
+
+| Field | Companies with data | Share |
+|---|---:|---:|
+| Sodra payroll data (`darbuotojai` / `vidutinisAtlyginimas`) | 164,050 | 30.0% |
+| Own ≥1 domain (`domenaiSkaicius > 0`) | 43,602 | 8.0% |
+| Flagged `nepatikimasTiekejas` (unreliable supplier) | 154 | 0.03% |
+| Flagged `melagingisTiekejas` (false-info supplier) | 198 | 0.04% |
+| Involved in `neskelbiamosDerybos` (unpublished negotiation) | 232 | 0.04% |
+| `vdiPazeidimuSkaicius > 0` (labour-inspection violations) | 20 | 0.004% |
+
+The VDI and blacklist figures in particular are thin: they say more about how much of that source has been
+ingested than about the true prevalence of violations in the supplier base, so treat low counts there as a coverage
+limit, not a clean bill of health.

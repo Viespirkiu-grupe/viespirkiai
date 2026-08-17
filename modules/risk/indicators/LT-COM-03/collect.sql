@@ -23,7 +23,7 @@ SELECT (COALESCE(p.saltinis, 'unknown') || ':' || d."pirkimoNumeris")           
        to_char(max(d."ataskaitosData") AT TIME ZONE 'UTC',
                'YYYY-MM-DD"T"HH24:MI:SS"Z"')                                         AS "reportedAt"
 FROM public.v_dalyviai d
-         LEFT JOIN public.v_pirkimas p ON p."pirkimoId" = d."pirkimoNumeris"
+         LEFT JOIN public.v_pirkimas p ON p."pirkimoNumeris" = d."pirkimoNumeris"
 WHERE d."ataskaitosData" <= $1::timestamptz
   AND ($2::text[] IS NULL OR d."pirkimoNumeris" = ANY ($2::text[]))
 GROUP BY p.saltinis, d."pirkimoNumeris";

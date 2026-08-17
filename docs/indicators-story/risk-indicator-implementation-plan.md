@@ -78,7 +78,7 @@ covers ~1,272 lots), and it is far cheaper to discover that here than in `collec
   distribution of the measured quantity looks like. Use the analyst MCP `executeQuery` tool or a read-only
   `psql`. Write the numbers down — they justify the threshold in Phase 4 and predict the trigger rate in Phase 12.
 - [ ] Decide the **unit of analysis** (one row = one what?) and write the exact `subjectKey` formula, e.g.
-  `saltinis:pirkimoId:daliesNumeris`. The key must be stable across runs and unique within the indicator —
+  `saltinis:pirkimoNumeris:daliesNumeris`. The key must be stable across runs and unique within the indicator —
   `RiskIndicator.validateObservations` rejects duplicates, and the schema's
   `(run_id, subject_type, subject_key, indicator_id)` index would collide at write time.
 - [ ] Enumerate the **`insufficient_data` cases** the real data produces: which join can miss, which field can be null,

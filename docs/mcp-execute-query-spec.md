@@ -155,7 +155,7 @@ rather than reasoning from prose descriptions.
     ],
     [
       "pirkimoNumeris",
-      "v_pirkimas.pirkimoId",
+      "v_pirkimas.pirkimoNumeris",
       "semantic"
     ]
   ],
@@ -172,8 +172,8 @@ rather than reasoning from prose descriptions.
 | `"sparse"`   | FK exists but large fraction of rows have no match |
 
 This prevents incorrect multi-table inferences in risk investigations (e.g. `v_sutartys.pirkimoNumeris →
-v_pirkimas.pirkimoId` is semantic — contracts imported from the old CVP IS do not have a matching `viesiejiPirkimai`
-row).
+v_pirkimas.pirkimoNumeris` is semantic — contracts imported from the old CVP IS do not have a matching
+`viesiejiPirkimai` row).
 
 ### View metadata
 

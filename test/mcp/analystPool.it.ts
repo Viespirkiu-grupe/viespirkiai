@@ -122,7 +122,7 @@ describe("v_pirkimas", () => {
         expect(rows.length, "v_pirkimas returned no rows").toBeGreaterThan(0);
         const row = rows[0];
         expect("saltinis" in row, "missing saltinis").toBe(true);
-        expect("pirkimoId" in row, "missing pirkimoId").toBe(true);
+        expect("pirkimoNumeris" in row, "missing pirkimoNumeris").toBe(true);
         expect("jarKodasSaltinis" in row, "missing jarKodasSaltinis").toBe(true);
         expect("organizatorius" in row, "missing organizatorius (joined from viesiejiPirkimaiVykdytojai)").toBe(true);
         expect("numatomaVerteEUR" in row, "missing numatomaVerteEUR").toBe(true);
@@ -172,7 +172,7 @@ describe("v_pirkimas", () => {
         const client = await getClient();
         // @ts-ignore
         const { rows } = await client.query(
-            `SELECT "pirkimoId", "jarKodas", "jarKodasSaltinis" FROM v_pirkimas
+            `SELECT "pirkimoNumeris", "jarKodas", "jarKodasSaltinis" FROM v_pirkimas
              WHERE saltinis = 'cvpp' AND "jarKodasSaltinis" = 'sutartys-join' LIMIT 1`,
         );
         expect(rows.length, "expected at least one cvpp row enriched via sutartys join").toBeGreaterThan(0);
@@ -184,7 +184,7 @@ describe("v_pirkimas", () => {
         const { rows: sutartysRows } = await client.query(
             `SELECT DISTINCT "perkanciosiosOrganizacijosKodas" FROM "vpmSutartys"
              WHERE "pirkimoNumeris" = $1 AND "perkanciosiosOrganizacijosKodas" IS NOT NULL`,
-            [row.pirkimoId],
+            [row.pirkimoNumeris],
         );
         const kodai = sutartysRows.map((r: { perkanciosiosOrganizacijosKodas: string }) => r.perkanciosiosOrganizacijosKodas);
         expect(kodai, "jarKodas should come from a matching sutartys row").toContain(row.jarKodas);
@@ -196,9 +196,9 @@ describe("v_pirkimas", () => {
         const { rows } = await client.query(`
             SELECT count(*) AS cnt FROM v_pirkimas v
             WHERE v.saltinis = 'cvpp'
-              -- v_pirkimas."pirkimoId" yra text (cvpis int ir cvpp eilutė suvienodinti),
+              -- v_pirkimas."pirkimoNumeris" yra text (cvpis int ir cvpp eilutė suvienodinti),
               -- tad lyginam taip pat, kaip pačiame view'e: p."pirkimoId"::text.
-              AND EXISTS (SELECT 1 FROM "viesiejiPirkimai" p WHERE p."pirkimoId"::text = v."pirkimoId")
+              AND EXISTS (SELECT 1 FROM "viesiejiPirkimai" p WHERE p."pirkimoId"::text = v."pirkimoNumeris")
         `);
         expect(Number(rows[0].cnt)).toBe(0);
     });
@@ -209,7 +209,7 @@ describe("v_pirkimas", () => {
         const { rows } = await client.query(`
             SELECT count(*) AS cnt FROM v_pirkimas v
             WHERE v.saltinis = 'cvpp'
-              AND v."pirkimoId" NOT IN (
+              AND v."pirkimoNumeris" NOT IN (
                   SELECT "pirkimoNumeris" FROM "cvppViesiejiPirkimai" WHERE "skelbimoTipas" = 'Skelbimas apie pirkimą'
               )
         `);

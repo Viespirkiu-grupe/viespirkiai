@@ -67,7 +67,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         joins: [
             ["pirkejoKodas", "v_company.jarKodas", "strict"],
             ["tiekejoKodas", "v_company.jarKodas", "strict"],
-            ["pirkimoNumeris", "v_pirkimas.pirkimoId", "semantic"],
+            ["pirkimoNumeris", "v_pirkimas.pirkimoNumeris", "semantic"],
             ["pirkimoNumeris", "v_dalyviai.pirkimoNumeris", "semantic"],
         ],
         columns: [
@@ -114,15 +114,15 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
     },
     v_pirkimas: {
         tags: ["procedures", "criteria", "lot-count", "single-bidder", "cvpp-archive"],
-        keys: ["pirkimoId", "saltinis", "jarKodas", "pirkimoBudas", "statusas", "numatomaVerteEUR"],
+        keys: ["pirkimoNumeris", "saltinis", "jarKodas", "pirkimoBudas", "statusas", "numatomaVerteEUR"],
         joins: [
             ["jarKodas", "v_company.jarKodas", "strict"],
-            ["pirkimoId", "v_sutartys.pirkimoNumeris", "semantic"],
-            ["pirkimoId", "v_dalyviai.pirkimoNumeris", "semantic"],
+            ["pirkimoNumeris", "v_sutartys.pirkimoNumeris", "semantic"],
+            ["pirkimoNumeris", "v_dalyviai.pirkimoNumeris", "semantic"],
         ],
         columns: [
             "saltinis: text",
-            "pirkimoId: text",
+            "pirkimoNumeris: text",
             "pavadinimas: text",
             "jarKodas: text",
             "jarKodasSaltinis: text",
@@ -140,9 +140,9 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             "bvpzKodai: text[]",
             "informacija: text",
         ],
-        primaryKeys: ["pirkimoId"],
+        primaryKeys: ["pirkimoNumeris"],
         example:
-            'SELECT "pirkimoId", pavadinimas, organizatorius, statusas, "numatomaVerteEUR" FROM v_pirkimas WHERE statusas = \'Paskelbtas\'',
+            'SELECT "pirkimoNumeris", pavadinimas, organizatorius, statusas, "numatomaVerteEUR" FROM v_pirkimas WHERE statusas = \'Paskelbtas\'',
         notes:
             "Du šaltiniai (saltinis):\n" +
             "- 'cvpis': CVP IS, ~2022-09–dabar. jarKodas tiesioginis, jarKodasSaltinis=NULL.\n" +
@@ -159,7 +159,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         joins: [
             ["pirkejoKodas", "v_company.jarKodas", "strict"],
             ["tiekejoKodas", "v_company.jarKodas", "sparse"],
-            ["pirkimoNumeris", "v_pirkimas.pirkimoId", "semantic"],
+            ["pirkimoNumeris", "v_pirkimas.pirkimoNumeris", "semantic"],
             ["pirkimoNumeris", "v_sutartys.pirkimoNumeris", "semantic"],
         ],
         columns: [
@@ -199,7 +199,7 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
         keys: ["subjektoRaktas", "pirkimoNumeris", "daliesNumeris", "saltinis"],
         joins: [
             ["pirkimoNumeris", "v_dalyviai.pirkimoNumeris", "strict"],
-            ["pirkimoNumeris", "v_pirkimas.pirkimoId", "semantic"],
+            ["pirkimoNumeris", "v_pirkimas.pirkimoNumeris", "semantic"],
             ["pirkimoNumeris", "v_sutartys.pirkimoNumeris", "semantic"],
         ],
         columns: [
