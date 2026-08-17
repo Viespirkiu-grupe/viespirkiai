@@ -139,7 +139,9 @@ is how large those gaps actually are.
 | `v_company` → `v_bylos`                               |                                                                                      **2,286,489 / 2,422,300 rows (94.4%)** | Most court-case parties resolve to a known legal entity; the remainder are presumably natural persons or codes outside the registry.                                                                                                                                                                                 |
 | `v_company` → `v_person_links`                        |                     **523,520 / 546,639 rows (95.8%)**; of the 533,581 rows that carry a company code at all, 98.1% resolve | 2.4% of PINREG relationship rows have no company code recorded in the first place.                                                                                                                                                                                                                                   |
 
-## `v_company` enrichment coverage (of 547,298 companies)
+## Data Problems
+
+### (low) Problem 1: `v_company` enrichment coverage (of 547,298 companies)
 
 These are the risk-relevant flags/counters on `v_company` — most are sparse, which matters when using them as indicator
 inputs.
@@ -157,7 +159,7 @@ The VDI and blacklist figures in particular are thin: they say more about how mu
 about the true prevalence of violations in the supplier base, so treat low counts there as a coverage limit, not a clean
 bill of health.
 
-## Dirty pirkimoNumeris
+### (high) Problem 1: Dirty pirkimoNumeris
 
 Every table/view with a `pirkimoNumeris` column was queried live (`10.1.10.2:9118`, `viespirkiai`, 2026-08-17) for
 values that don't match `^[0-9]+$` — i.e. not a plain positive integer. "Dirty" below is measured against **non-NULL**
@@ -176,5 +178,26 @@ is excluded — it can't be dirty by construction.
 | `xlsxPPAataskaitos` (per report-row)                    |         6,560 |      22 | **0.34%** | same patterns as `v_dalyviai`, one row per report instead of per bidder                                                                                                                                                           |
 | `cvppAtaskaitos`                                        |       104,008 |       0 |        0% | —                                                                                                                                                                                                                                 |
 | `cvppViesiejiPirkimai`                                  |       257,535 |       0 |        0% | declared `text`, but every non-null value is currently a clean 6-digit number — this is the table `v_pirkimas` casts `viesiejiPirkimai."pirkimoId"` to `text` against for `UNION ALL`                                             |
+
+### (high) Problem 3: Missing v_sutartys.pirkimoNumeris
+
+| tipas                                                               |      rows |      NULL |      % NULL | Pirkimo numeris privalomas?                                                                                                                                 |
+|---------------------------------------------------------------------|----------:|----------:|------------:|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| MVPŽ — Mažos vertės pirkimas (žodinė sutartis)                      | 4,281,331 | 4,082,227 |       95.3% | **Ne** — low-value, verbal; legally exempt from CVP IS                                                                                                      |
+| MVP — Mažos vertės pirkimas                                         |   998,503 |   861,643 |       86.3% | **Ne** — low-value; CVP IS use is optional, buyer's choice (explains the ~14% that do have one)                                                             |
+| PPS — Pagrindinė pirkimo sutartis (preliminariosios/DPS pagrindu)   |   308,965 |   136,442 | (!!!) 44.2% | **Taip** — the framework/DPS itself is a formal CVP IS procedure; missing values here are a real data gap, not an exemption                                 |
+| TSP — Tarptautinis arba supaprastintas pirkimas                     |   157,173 |    49,678 | (!!!) 31.6% | **Taip** — formal procedure, always run through CVP IS; the 31.6% missing is a genuine gap                                                                  |
+| SP — Sutarties pakeitimas                                           |   129,967 |    65,738 |       50.6% | **Paveldi iš pirminės sutarties** — amendments follow the same "filled only if CVP IS" rule as their parent contract, no independent number                 |
+| Ilgalaikė MVPŽ — Ilgalaikis mažos vertės pirkimas (žodinė sutartis) |    21,752 |    21,520 |       98.9% | **Ne** — same exemption as MVPŽ                                                                                                                             |
+| SPŽ — Supaprastintas pirkimas (žodinė sutartis)                     |     3,754 |     3,691 |       98.3% | **Ne** — verbal, same CVP IS-optional exemption                                                                                                             |
+| ŽS — Žodinė sutartis                                                |     2,599 |     1,805 |       69.4% | **Ne** — verbal contract                                                                                                                                    |
+| VS — Vidaus sandoris                                                |       499 |       478 |       95.8% | **Ne** — VPĮ Art. 10 exemption; the contract itself must still be published in CVP IS, but no competitive procedure (and thus no procurement number) exists |
+| PSĮ — Pirkimas iš susijusios įmonės                                 |        79 |        57 |       72.2% | **Ne** — related-party exemption, same structure as `VS`                                                                                                    |
+| Nenurodyta (type not set)                                           |        17 |        12 |       70.6% | — (no type recorded)                                                                                                                                        |
+| KSS                                                                 |         1 |         0 |        0.0% | — (not in `CONTRACT_TYPES`/`vpmSutartysTipai` dictionary, 1 row, unclassified)                                                                              |
+
+The genuine gap is `TSP` and `PPS` — both are *required* to run through CVP IS and get a number, yet 31.6% and 44.2% are
+missing one respectively; that's ~186,000 rows worth investigating as an actual data-quality problem rather than an
+expected absence.
 
 
