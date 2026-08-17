@@ -2,6 +2,7 @@ import { parsiustiFaila } from "../modules/failai/parsiusti.js";
 import { pravalytiParsiuntimoRezervacijas } from "../modules/failai/pravalytiParsiuntimuRezervacijas.js";
 import { pravalytiNuskaitymoRezervacijas } from "../modules/failai/pravalytiNuskaitymoRezervacijas.js";
 import { pravalytiOcrRezervacijas } from "../modules/failai/pravalytiOcrRezervacijas.js";
+import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 export default [
     {
@@ -10,14 +11,8 @@ export default [
         priority: 10,
         cooldown: 5,
         errorCooldown: 0,
+        wakeOn: [WORK_SIGNALS.FILES_DOWNLOAD_READY],
         job: parsiustiFaila,
-        onSuccess: (runner) => {
-            for (const taskName of runner.taskNames()) {
-                if (taskName.startsWith("nuskaitytiDokumenta")) {
-                    runner.nudge(taskName);
-                }
-            }
-        },
     },
     {
         name: "pravalytiParsiuntimoRezervacijas",

@@ -22,6 +22,7 @@ const configSchema = z.object({
     infoBanner: infoBannerSchema.optional(),
 
     port: z.number().int().positive().default(9019),
+    appEnv: z.enum(["dev", "prod"]).optional(),
     logRequests: z.boolean().default(false),
     enableAtn1: z.boolean().default(false),
     enableBotChallenge: z.boolean().default(false),
@@ -32,8 +33,15 @@ const configSchema = z.object({
     pgPassword: z.string().default(""),
     pgDatabase: z.string().default("viespirkiai"),
     pgMaxConnections: z.number().int().positive().default(16),
+    // Tiesioginė jungtis į Postgres, aplenkiant pgbouncer'į – reikalinga tik
+    // seanso lygio advisory lock'ams (žr. postgres/sessionLock.js). Nenurodžius
+    // krenta į PG_HOST/PG_PORT.
+    pgDirectHost: z.string().optional(),
+    pgDirectPort: z.number().int().positive().optional(),
     sqlLogFile: z.string().optional(),
     sqlLogQuickwit: z.boolean().default(false),
+    scrapeLogFile: z.string().optional(),
+    scrapeLogQuickwit: z.boolean().default(false),
     pgPrepared: z.boolean().default(true),
 
     // Signalų magistralė (SSE, cache invalidacija). Tuščias URL ją išjungia –
@@ -63,17 +71,21 @@ const configSchema = z.object({
     // (modules/eTar). Raktas reikalingas tik jei adapteryje nustatytas API_KEY.
     eTarApiUrl: z.string().default(""),
     eTarApiKey: z.string().default(""),
-    eTarSidecarDir: z.string().default("/flashas/viespirkiai/eTar"),
+    eTarRecentDays: z.number().int().positive().default(180),
+    eTarRefreshHours: z.number().positive().default(3),
+    eTarMaxInflight: z.number().int().positive().default(6),
+    // e-Seimas naudoja tą patį adapterio URL/raktą, bet turi atskirą darbo tempą.
+    eSeimasRecentDays: z.number().int().positive().default(180),
+    eSeimasRefreshHours: z.number().positive().default(3),
+    eSeimasMaxInflight: z.number().int().positive().default(6),
 
     internalFileBase: z.string().default("https://failai.viespirkiai.org"),
     ocrBandymai: z.number().int().positive().default(5),
 
-    ocrRezultataiLocation: z.string().optional(),
-    dokumentaiLocation: z.string().optional(),
-    failaiLocation: z.string().optional(),
-    failaiInfoSqliteLocation: z.string().optional(),
-    dokumentaiSqliteLocation: z.string().optional(),
-    ocrRezultataiSqliteLocation: z.string().optional(),
+    // Sidecar SQLite bazės: vienas katalogas visoms (`<vardas>.sqlite`), o
+    // mazgai be lokalių failų skaito per vieną nuotolinį bazinį URL.
+    sidecarDir: z.string().optional(),
+    sidecarRemote: z.string().optional(),
 
     enableGraph: z.boolean().default(false),
 

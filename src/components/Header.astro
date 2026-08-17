@@ -41,7 +41,7 @@ const primaryMenu: NavMenuItem[] = [
     children: [
       { href: '/dokumentai?klase=viesiejiPirkimai', label: 'Viešųjų pirkimų dokumentai', desc: 'Sutartys, pirkimai, neskelbiamos derybos...' },
       { href: '/dokumentai?klase=teise',            label: 'Teismo nuosprendžiai',          desc: 'Senos LITEKO viešų teismo nuosprendžių paieška' },
-      { href: '/teisesAktai',                       label: 'Teisės aktai',                  desc: 'e-TAR teisės aktai su suvestinėmis redakcijomis' },
+      { href: '/dokumentai?klase=teisekura',         label: 'Teisėkūra',                     desc: 'e-TAR ir e-Seimo teisėkūros dokumentai' },
       {
         href: '/failai', label: 'Failai', desc: 'Viešųjų pirkimų dokumentų archyvas',
         children: [
@@ -49,6 +49,7 @@ const primaryMenu: NavMenuItem[] = [
           { href: '/failai/map',           label: 'Žemėlapis',      desc: 'Failų su GPS koordinatėmis žemėlapis' },
           { href: '/failai/topExtension',  label: 'Plėtiniai',      desc: 'Dažniausi failų tipai archyve' },
           { href: '/failai/neparsiunciami', label: 'Neparsiunčiami', desc: 'Failai, kurių nepavyko parsiųsti' },
+          { href: '/failai/encrypted',     label: 'Apsaugoti',      desc: 'Slaptažodžiu apsaugoti failai ir žinomi slaptažodžiai' },
           { href: '/failai/ocr',           label: 'OCR būsena',     desc: 'OCR statistika ir dokumentų teksto atpažinimo būsena' },
         ],
       },

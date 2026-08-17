@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("cvpp", { operation: "scrapeNotice" });
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
 import {
@@ -6,6 +8,7 @@ import {
     sujungtiSaltinioId,
 } from "../failai/failuIrasymas.js";
 import { Logger } from "../../utils/log.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 const logger = new Logger();
 
 const NUSKAITYMO_VERSIJA = 2;
@@ -22,7 +25,7 @@ async function setNoticeStatus(skelbimoKodas, status) {
 }
 
 async function fetchHtmlWithCookies(url) {
-    let firstRes = await fetch(url, { redirect: "manual" });
+    let firstRes = await scrapeFetch(url, { redirect: "manual" });
     const cookies =
         firstRes.headers.getSetCookie?.() ??
         (firstRes.headers.get("set-cookie")
@@ -30,7 +33,7 @@ async function fetchHtmlWithCookies(url) {
             : []);
     const cookieHeader = cookies.map((c) => c.split(";")[0]).join("; ");
 
-    firstRes = await fetch(url, {
+    firstRes = await scrapeFetch(url, {
         headers: cookieHeader ? { cookie: cookieHeader } : undefined,
     });
 
@@ -165,6 +168,13 @@ async function updateLegacyIds(toUpdate) {
            )`,
         [nauji.map((p) => p[0]), nauji.map((p) => p[1]), nauji.map((p) => p[2])],
     );
+
+    if (result.rowCount > 0) {
+        signalWork(WORK_SIGNALS.FILES_DOCUMENTS_READY, {
+            source: "cvpp-updateLegacyIds",
+            count: result.rowCount,
+        });
+    }
 
     return result.rowCount ?? 0;
 }

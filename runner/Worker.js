@@ -7,10 +7,10 @@ export class Worker {
     #staggerMs;
     #onAdmit;
     #onRelease;
-    #onSuccess;
     #onStopped;
 
     #abortController = null;
+    #runPromise = null;
     #stopping = false;
     #wakeWaiters = new Set();
 
@@ -23,7 +23,6 @@ export class Worker {
         staggerMs,
         onAdmit,
         onRelease,
-        onSuccess,
         onStopped,
     }) {
         this.#taskName = taskName;
@@ -34,7 +33,6 @@ export class Worker {
         this.#staggerMs = staggerMs;
         this.#onAdmit = onAdmit;
         this.#onRelease = onRelease;
-        this.#onSuccess = onSuccess ?? null;
         this.#onStopped = onStopped ?? null;
     }
 
@@ -47,19 +45,22 @@ export class Worker {
         if (this.#abortController) return;
         this.#abortController = new AbortController();
         this.#stopping = false;
-        void this.#run(workerIndex).catch((err) => {
+        this.#runPromise = this.#run(workerIndex).catch((err) => {
             console.error(`[${this.#taskName}] worker loop failed:`, err);
         }).finally(() => {
             this.#abortController = null;
             this.#stopping = false;
+            this.#runPromise = null;
             this.#onStopped?.(this);
         });
     }
 
     stop() {
-        if (!this.#abortController || this.#stopping) return;
-        this.#stopping = true;
-        this.#abortController.abort();
+        if (this.#abortController && !this.#stopping) {
+            this.#stopping = true;
+            this.#abortController.abort();
+        }
+        return this.#runPromise ?? Promise.resolve();
     }
 
     wake() {
@@ -85,7 +86,7 @@ export class Worker {
             let hasMore;
             let succeeded = false;
             try {
-                hasMore = await this.#jobFn();
+                hasMore = await this.#jobFn(signal);
                 succeeded = true;
             } catch (err) {
                 console.error(`[${this.#taskName}] job failed:`, err);
@@ -97,15 +98,6 @@ export class Worker {
             if (!succeeded) {
                 await this.#sleepWithWake(this.#errorCooldown, signal);
                 continue;
-            }
-
-            if (this.#onSuccess) {
-                try {
-                    await this.#onSuccess();
-                } catch (err) {
-                    // The job already completed. Do not replay it just because its hook failed.
-                    console.error(`[${this.#taskName}] success hook failed:`, err);
-                }
             }
 
             if (hasMore === false) {

@@ -2,6 +2,7 @@ import { postgres } from "../../postgres/postgres.js";
 import fs from "fs";
 import readline from "readline";
 import { Logger } from "../../utils/log.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 const logger = new Logger();
 
 const [, , filename, saltinioPavadinimas] = process.argv;
@@ -27,6 +28,10 @@ async function upsertDomain(domain, lineNumber) {
                 updated = NOW()`,
             [domain, saltinioPavadinimas],
         );
+        signalWork(WORK_SIGNALS.DOMENAI_ADP_READY, {
+            source: "insertDomains",
+            domain,
+        });
         logger.log(`Line ${lineNumber}: upserted ${domain}`);
     } catch (err) {
         console.error(

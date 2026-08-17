@@ -14,6 +14,8 @@ Rankinis paleidimas:
     npm run regitra:atnaujinti
     npm run regitra:atnaujinti -- --force     # praleisti etag/md5 patikrą
 */
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("regitra", { operation: "atnaujintiRegitra" });
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -84,7 +86,7 @@ async function irasytiPatikra({
  * @returns {Promise<{md5: string, dydis: number}>}
  */
 async function parsiustiZip(url, kelias) {
-    const atsakymas = await fetch(url);
+    const atsakymas = await scrapeFetch(url);
     if (!atsakymas.ok || !atsakymas.body) {
         throw new Error(
             `Nepavyko parsiųsti ZIP: HTTP ${atsakymas.status} ${atsakymas.statusText}`,
@@ -169,7 +171,7 @@ async function istrinti(kelias) {
  * @returns {Promise<{busena: string, naujuSkaicius?: number}>}
  */
 export async function atnaujintiRegitrosDuomenis({ force = false } = {}) {
-    const galva = await fetch(ZIP_URL, { method: "HEAD" });
+    const galva = await scrapeFetch(ZIP_URL, { method: "HEAD" });
     if (!galva.ok) {
         throw new Error(
             `Nepavyko patikrinti ZIP: HTTP ${galva.status} ${galva.statusText}`,

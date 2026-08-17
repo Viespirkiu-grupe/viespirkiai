@@ -34,17 +34,68 @@ function _quoteIdent(name: string): string {
     return `"${name}"`;
 }
 
+// PostgreSQL klaidos kodas: „insufficient_privilege". Nuo PG15 `public` schema
+// nebeturi CREATE teisės rolei PUBLIC, o `CREATE OR REPLACE VIEW` ant kito
+// vartotojo view'o reikalauja jo nuosavybės — abu atvejai grąžina 42501.
+const INSUFFICIENT_PRIVILEGE = "42501";
+
+function _isInsufficientPrivilege(err: unknown): boolean {
+    return (err as { code?: string } | null)?.code === INSUFFICIENT_PRIVILEGE;
+}
+
+/**
+ * Sukuria (arba atnaujina) vieną view'ą.
+ *
+ * Jei prisijungusi rolė DDL teisių neturi — pvz. programa jungiasi ribotu vartotoju,
+ * o v_* view'us iš anksto sukūrė DBA/admin — DDL praleidžiamas, jei view'as jau
+ * egzistuoja ir yra nuskaitomas. Jei view'o nėra, klaida keliaujama toliau: tada
+ * teisių trūkumas yra tikra problema, o ne tik neveiksni „refresh" pastanga.
+ *
+ * @returns `true`, jei DDL buvo įvykdytas (vadinasi, view'as mūsų, galim ir GRANT'inti).
+ */
+async function _applyDefinition(
+    client: { query: (sql: string) => Promise<unknown> },
+    name: string,
+    definition: string,
+): Promise<boolean> {
+    try {
+        await client.query(definition);
+        return true;
+    } catch (err: unknown) {
+        if (!_isInsufficientPrivilege(err)) throw err;
+
+        try {
+            await client.query(`SELECT 1 FROM ${name} LIMIT 0`);
+        } catch {
+            throw err;
+        }
+
+        return false;
+    }
+}
+
 async function _createViews(): Promise<void> {
     const analystRole = config.pgAnalystUser;
     const client = await postgres.connect();
     try {
+        const reused: string[] = [];
         for (const [name, definition] of Object.entries(VIEW_DEFINITIONS)) {
-            await client.query(definition);
+            // Neperkurtiems (svetimiems) view'ams GRANT'as irgi nepavyktų — jų teisės
+            // yra tos rolės, kuri juos sukūrė, atsakomybė.
+            if (!(await _applyDefinition(client, name, definition))) {
+                reused.push(name);
+                continue;
+            }
             if (analystRole) {
                 await client.query(`GRANT SELECT ON ${name} TO ${_quoteIdent(analystRole)}`);
             }
         }
-        log(`analyst views: ensured ${VIEW_NAMES.size} persistent views${analystRole ? `, granted SELECT to ${analystRole}` : ""}`);
+        const appliedCount = VIEW_NAMES.size - reused.length;
+        log(
+            `analyst views: ensured ${VIEW_NAMES.size} persistent views (${appliedCount} via DDL)` +
+                (reused.length ? `, be DDL teisių — naudojam esamus: ${reused.join(", ")}` : "") +
+                (analystRole ? `, granted SELECT to ${analystRole}` : ""),
+        );
     } finally {
         client.release();
     }

@@ -234,6 +234,10 @@ describe("search_dokumentai", () => {
 
         const row = payload.dokumentai[0];
         expect(row).toHaveProperty("id");
+        expect(row.dokumentoId).toBe(row.id);
+        expect(row).toHaveProperty("failoId");
+        expect(row).toHaveProperty("teisesAktoId");
+        expect(row).toHaveProperty("versijosId");
         expect(row.pletinys).toBe("pdf");
         // Heavy fields never leak through the handler.
         expect(row).not.toHaveProperty("tekstas");

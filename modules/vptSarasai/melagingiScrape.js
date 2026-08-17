@@ -2,6 +2,8 @@
 Parsiunčia ir importuoja nepatikimų melagingą informaciją pateikusių tiekėjų sąrašą iš VPT XLSX į PostgreSQL duomenų bazę.
 */
 
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("vptSarasai", { operation: "melagingiScrape" });
 import * as XLSX from "xlsx";
 import path from "node:path";
 import { postgres } from "../../postgres/postgres.js";
@@ -12,7 +14,7 @@ const FILE_URL =
 
 export async function importuotiMelagingusTiekejus() {
     // Atliekame užklausą
-    const firstResponse = await fetch(FILE_URL, {
+    const firstResponse = await scrapeFetch(FILE_URL, {
         method: "GET",
         redirect: "manual",
     });
@@ -22,7 +24,7 @@ export async function importuotiMelagingusTiekejus() {
 
     if (!location) throw new Error("No redirect location returned");
 
-    const secondResponse = await fetch(
+    const secondResponse = await scrapeFetch(
         `https://${new URL(FILE_URL).host}${location}`,
         {
             method: "GET",

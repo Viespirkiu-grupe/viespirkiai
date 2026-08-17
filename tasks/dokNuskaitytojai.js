@@ -1,6 +1,7 @@
 import { postgres } from "../postgres/postgres.js";
 import { nuskaitytiVienoDokumentoDuomenis } from "../modules/failai/nuskaitytiTeksta.js";
 import { log } from "../utils/log.js";
+import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 const DOK_TASK_PREFIX = "nuskaitytiDokumenta";
 const SYNC_INTERVAL_MS = 10_000;
@@ -21,6 +22,7 @@ function buildDokTask(runner, row) {
             concurrency: row.concurrency,
             cooldown: 10,
             errorCooldown: 1,
+            wakeOn: [WORK_SIGNALS.FILES_EXTRACTION_READY],
             job: () => nuskaitytiVienoDokumentoDuomenis(row.id),
         });
     }
@@ -29,11 +31,16 @@ function buildDokTask(runner, row) {
 }
 
 export function startDokNuskaitytojai(runner) {
+    let stopped = false;
+    let syncPromise = null;
+
     async function sync() {
+        if (stopped) return;
         try {
             const { rows } = await postgres.query(`
                 SELECT * FROM "dokNuskaitytojai" WHERE enabled = true
             `);
+            if (stopped) return;
 
             const desired = new Map(
                 rows.map((row) => {
@@ -59,6 +66,19 @@ export function startDokNuskaitytojai(runner) {
         }
     }
 
-    sync(); // initial
-    setInterval(sync, SYNC_INTERVAL_MS);
+    function runSync() {
+        if (stopped || syncPromise) return;
+        syncPromise = sync().finally(() => {
+            syncPromise = null;
+        });
+    }
+
+    runSync(); // initial
+    const interval = setInterval(runSync, SYNC_INTERVAL_MS);
+
+    return async () => {
+        stopped = true;
+        clearInterval(interval);
+        await syncPromise;
+    };
 }

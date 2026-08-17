@@ -375,19 +375,6 @@ const ADP_DATASETS = [
         },
     },
     {
-        name: "syncAdpJadis",
-        table: "jadis",
-        dataset: "datasets/gov/rc/jadis/dalyviai/Dalyvis",
-        limit: 1000,
-        mapping: {
-            _id: "_id",
-            "juridinis_asmuo._id": "jarId", "form_kodas._id": "formaId",
-            "stat_statusas._id": "statusasId",
-            lr_fiziniai: "lrFiziniai", lr_juridiniai: "lrJuridiniai",
-            uzsienio_fiziniai: "uzsienioFiziniai", uzsienio_juridiniai: "uzsienioJuridiniai",
-        },
-    },
-    {
         name: "syncAdpJar",
         table: "jar",
         dataset: "datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo",

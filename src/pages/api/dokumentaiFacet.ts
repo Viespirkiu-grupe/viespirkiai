@@ -11,6 +11,7 @@ const ALLOWED = new Set([
   'metadata.creator', 'metadata.producer',
   'class', 'metadata.teismas', 'metadata.bylosRusis', 'metadata.kategorijos', 'metadata.teisejai',
   'metadata.rusis', 'metadata.galiojimas', 'metadata.editionType', 'metadata.busena', 'metadata.eurovocTerminai',
+  'metadata.prieme', 'metadata.turinioBusena',
 ]);
 
 export const GET: APIRoute = async ({ url }) => {
@@ -51,6 +52,12 @@ export const GET: APIRoute = async ({ url }) => {
         redakcija: p.getAll('redakcija'),
         projektoBusena: p.getAll('projektoBusena'),
         eurovoc: p.getAll('eurovoc'),
+        prieme: p.getAll('prieme'),
+        turinys: p.getAll('turinys'),
+        istaigosNr: p.getAll('istaigosNr'),
+        regNr: p.getAll('regNr'),
+        nuo: p.get('nuo') ?? undefined,
+        iki: p.get('iki') ?? undefined,
         minLat: p.get('minLat') ?? undefined,
         maxLat: p.get('maxLat') ?? undefined,
         minLon: p.get('minLon') ?? undefined,
@@ -60,6 +67,10 @@ export const GET: APIRoute = async ({ url }) => {
       size,
     );
     const optionSearch = p.get('optionSearch')?.trim() || '';
+    if (optionSearch && field !== 'jarKodai') {
+      const needle = optionSearch.toLocaleLowerCase('lt');
+      return json({ options: options.filter((option) => option.value.toLocaleLowerCase('lt').includes(needle)) });
+    }
     if (field === 'jarKodai' && optionSearch) {
       // Pirmiausia — facetuoti pasirinkimai (su skaičiais pagal esamą užklausą),
       // atitinkantys paiešką. Tik jei tokių nėra, krentam į registro paiešką.

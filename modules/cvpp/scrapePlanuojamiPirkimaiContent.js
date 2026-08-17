@@ -4,6 +4,8 @@
 //   null  -> dar nenuskaityta,
 //   >= 1  -> nuskaityta ta versija,
 //   -1    -> klaida.
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("cvpp", { operation: "scrapePlanuojamiPirkimaiContent" });
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
 import { Logger } from "../../utils/log.js";
@@ -151,7 +153,7 @@ export async function scrapeVienaPlanuojamaPirkima() {
             return true;
         }
 
-        const response = await fetch(link);
+        const response = await scrapeFetch(link);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }

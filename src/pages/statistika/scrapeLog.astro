@@ -1,0 +1,274 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Alert from '@design-system/components/Alert.astro';
+import Badge from '@design-system/components/Badge.astro';
+import Button from '@design-system/components/Button.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
+import Pagination from '@design-system/components/Pagination.astro';
+import ResultsSummary from '@design-system/components/ResultsSummary.astro';
+import DokFacetSection from '../../components/dokumentai/DokFacetSection.astro';
+import { splitFacetOptions, type DokFacet } from '../../lib/dokumentaiUrl.ts';
+import {
+  SCRAPE_LOG_PAGE_SIZE,
+  SCRAPE_LOG_PERIODS,
+  parseScrapeLogFilters,
+  searchScrapeLog,
+  type ScrapeLogFacet,
+  type ScrapeLogRow,
+} from '../../lib/scrapeLogStatistika.ts';
+import config from '../../lib/config.ts';
+import { getColorScheme, getFont } from '../../lib/failai.ts';
+import { fmtBytes } from '@/utils/units.js';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+const filters = parseScrapeLogFilters(Astro.url.searchParams);
+
+let result: Awaited<ReturnType<typeof searchScrapeLog>> | null = null;
+let error: string | null = null;
+try {
+  result = await searchScrapeLog(filters);
+} catch (cause: any) {
+  error = cause?.message ?? String(cause);
+}
+
+const FACET_PARAMS: ScrapeLogFacet[] = [
+  'scraper', 'operation', 'domain', 'host', 'status', 'method', 'env', 'role', 'ok',
+];
+const activeFilterCount = FACET_PARAMS.reduce((sum, key) => sum + filters[key].length, 0);
+
+function toggleUrl(param: ScrapeLogFacet, value: string): string {
+  const params = new URLSearchParams(Astro.url.search);
+  const current = filters[param];
+  const next = value === ''
+    ? []
+    : current.includes(value)
+      ? current.filter((item) => item !== value)
+      : [...current, value];
+  if (next.length) params.set(param, next.join(','));
+  else params.delete(param);
+  params.delete('page');
+  const query = params.toString();
+  return query ? `/statistika/scrapeLog?${query}` : '/statistika/scrapeLog';
+}
+
+function makeFacet(param: ScrapeLogFacet, limit = 7): DokFacet {
+  const selected = filters[param];
+  const { visible, hidden } = splitFacetOptions(result?.facets[param] ?? [], selected, limit);
+  return { filter: selected, visible, hidden, toggleUrl: (value) => toggleUrl(param, value) };
+}
+
+const numberFormat = (value: number) => Number(value || 0).toLocaleString('lt-LT');
+const percent = (part: number, total: number) => total > 0
+  ? `${((part / total) * 100).toLocaleString('lt-LT', { maximumFractionDigits: 1 })} %`
+  : '—';
+const formatMs = (value: number | null | undefined) => {
+  if (value == null || !Number.isFinite(value)) return '—';
+  if (value >= 60_000) return `${(value / 60_000).toLocaleString('lt-LT', { maximumFractionDigits: 1 })} min`;
+  if (value >= 1_000) return `${(value / 1_000).toLocaleString('lt-LT', { maximumFractionDigits: 2 })} s`;
+  return `${value.toLocaleString('lt-LT', { maximumFractionDigits: 1 })} ms`;
+};
+const formatTime = (value: string) => new Date(value).toLocaleString('lt-LT', {
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+});
+const statusVariant = (row: ScrapeLogRow) => row.status == null || row.status >= 500
+  ? 'danger'
+  : row.status >= 400
+    ? 'warning'
+    : row.ok
+      ? 'success'
+      : 'default';
+const requestUrl = (row: ScrapeLogRow) => `${row.scheme}://${row.host}${row.path}`;
+
+const pageCount = Math.max(1, Math.min(200, Math.ceil((result?.total ?? 0) / SCRAPE_LOG_PAGE_SIZE)));
+const queryWithoutPage = new URLSearchParams(Astro.url.search);
+queryWithoutPage.delete('page');
+const paginationQuery = queryWithoutPage.size ? `&${queryWithoutPage.toString()}` : '';
+const hiddenParams = FACET_PARAMS
+  .filter((key) => filters[key].length > 0)
+  .map((key) => ({ key, value: filters[key].join(',') }));
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=10');
+---
+
+<Layout
+  pageTitle="Scraping užklausos"
+  pageDescription="Outbound duomenų rinkimo HTTP užklausų statistika"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main class="scrape-log-main sidebar-main">
+    <form method="get" role="search" id="searchForm" class="searchform-sidebar">
+      <h1 class="sr-only">Scraping užklausų statistika</h1>
+      {hiddenParams.map(({ key, value }) => <input type="hidden" name={key} value={value} />)}
+
+      <aside class="sf-rail" aria-label="Filtrai">
+        <div class="sf-rail-head">
+          <button type="button" class="sf-rail-toggle" id="sfFiltersToggle" aria-expanded="false" aria-controls="sfRailBody">
+            <span class="sf-rail-toggle-label">Filtrai</span>
+            {activeFilterCount > 0 && <span class="sf-filters-count">{activeFilterCount}</span>}
+            <span class="sf-filters-chevron" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="sf-rail-body" id="sfRailBody">
+          <div class="scrape-period">
+            <label for="laikotarpis">Laikotarpis</label>
+            <select id="laikotarpis" name="laikotarpis" data-autosubmit>
+              {SCRAPE_LOG_PERIODS.map((period) => (
+                <option value={period.key} selected={period.key === filters.period.key}>{period.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div class="scrape-facets">
+            <DokFacetSection label="Scraperis" param="scraper" facet={makeFacet('scraper')} allLabel="Visi" alwaysAll />
+            <DokFacetSection label="Operacija" param="operation" facet={makeFacet('operation')} allLabel="Visos" />
+            <DokFacetSection label="Domenas" param="domain" facet={makeFacet('domain')} allLabel="Visi" />
+            <DokFacetSection label="Hostas" param="host" facet={makeFacet('host')} allLabel="Visi" />
+            <DokFacetSection label="HTTP statusas" param="status" facet={makeFacet('status')} allLabel="Visi" />
+            <DokFacetSection label="Rezultatas" param="ok" facet={makeFacet('ok')} allLabel="Visi" formatLabel={(v) => v === 'true' ? 'Sėkminga' : v === 'false' ? 'Klaida' : v} />
+            <DokFacetSection label="Metodas" param="method" facet={makeFacet('method')} allLabel="Visi" />
+            <DokFacetSection label="Aplinka" param="env" facet={makeFacet('env')} allLabel="Visos" />
+            <DokFacetSection label="Proceso vaidmuo" param="role" facet={makeFacet('role')} allLabel="Visi" />
+          </div>
+
+          {activeFilterCount > 0 && <a class="scrape-clear" href={`/statistika/scrapeLog?laikotarpis=${filters.period.key}`}>Išvalyti filtrus</a>}
+          <button type="submit" class="sf-rail-search">Ieškoti</button>
+        </div>
+      </aside>
+
+      <div class="sf-search">
+        <div class="search-bar">
+          <label for="search">
+            <svg class="search-icon" aria-hidden="true" width="20" height="20" viewBox="0 1 24 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M10.502 2C5.80753 2 2.00195 5.80558 2.00195 10.5C2.00195 15.1944 5.80753 19 10.502 19C12.4884 19 14.3169 18.3176 15.7637 17.176L20.5877 22C20.9783 22.3905 21.6114 22.3905 22.002 22C22.3925 21.6095 22.3925 20.9763 22.002 20.5858L17.1779 15.7618C18.3196 14.3149 19.002 12.4865 19.002 10.5C19.002 5.80558 15.1964 2 10.502 2ZM4.00195 10.5C4.00195 6.91015 6.9121 4 10.502 4C14.0918 4 17.002 6.91015 17.002 10.5C17.002 12.2952 16.2755 13.9188 15.0981 15.0962C13.9208 16.2736 12.2972 17 10.502 17C6.9121 17 4.00195 14.0899 4.00195 10.5Z" fill="currentColor" />
+            </svg>
+            <span class="sr-only">Paieška loge</span>
+          </label>
+          <input type="search" name="search" id="search" class="search-bar__input" value={filters.search} placeholder="Quickwit paieška" enterkeyhint="search" />
+          <Button type="submit">Ieškoti</Button>
+        </div>
+      </div>
+
+      <div class="sf-results">
+        {error && (
+          <Alert variant="danger" title="Nepavyko gauti scrape logo">
+            {error}
+            <p class="text-sm mb-0 mt-2">Patikrinkite <code>SCRAPE_LOG_QUICKWIT</code> ir <code>scrapeLogV1_*</code> indeksus.</p>
+          </Alert>
+        )}
+
+        {result && (
+          <>
+            <MetricCardGrid minWidth="130px" className="mb-8">
+              <MetricCard label="Užklausų"><span class="cell-mono">{numberFormat(result.summary.requests)}</span></MetricCard>
+              <MetricCard label="Klaidų" meta={percent(result.summary.errors, result.summary.requests)}>
+                <span class={`cell-mono${result.summary.errors ? ' text-danger' : ''}`}>{numberFormat(result.summary.errors)}</span>
+              </MetricCard>
+              <MetricCard label="Parsiųsta"><span class="cell-mono">{fmtBytes(result.summary.bytes)}</span></MetricCard>
+              <MetricCard label="Vid. trukmė"><span class="cell-mono">{formatMs(result.summary.avgMs)}</span></MetricCard>
+              <MetricCard label="p95 trukmė"><span class="cell-mono">{formatMs(result.summary.p95Ms)}</span></MetricCard>
+              <MetricCard label="Vid. TTFB"><span class="cell-mono">{formatMs(result.summary.avgTtfbMs)}</span></MetricCard>
+            </MetricCardGrid>
+
+            <section class="page-section">
+              <div class="scrape-results-toolbar">
+                <ResultsSummary html={`Rodomi ${result.rows.length} iš ${numberFormat(result.total)} užklausų`} />
+              </div>
+              <DataTable
+                columns={[
+                  { label: 'Laikas' },
+                  { label: 'Scraperis / operacija' },
+                  { label: 'Užklausa' },
+                  { label: 'Statusas' },
+                  { label: 'TTFB', className: 'cell-right' },
+                  { label: 'Trukmė', className: 'cell-right' },
+                  { label: 'Baitai', className: 'cell-right' },
+                ]}
+                rows={result.rows}
+                emptyText="Pasirinktame laikotarpyje užklausų nerasta."
+                size="sm"
+                className="scrape-log-table"
+              >
+                {result.rows.map((row) => (
+                  <tr>
+                    <td class="cell-nowrap cell-mono text-xs">{formatTime(row.ts)}</td>
+                    <td>
+                      <strong>{row.scraper}</strong>
+                      <span class="scrape-operation">{row.operation}</span>
+                    </td>
+                    <td class="scrape-request-cell">
+                      <span class="scrape-method">{row.method}</span>
+                      <a href={requestUrl(row)} target="_blank" rel="noreferrer" title={requestUrl(row)}>
+                        <span class="scrape-host">{row.host}</span><span class="scrape-path">{row.path}</span>
+                      </a>
+                      {(row.errorName || row.errorCode) && <span class="scrape-error">{[row.errorName, row.errorCode].filter(Boolean).join(' · ')}</span>}
+                    </td>
+                    <td class="cell-nowrap"><Badge variant={statusVariant(row)}>{row.status ?? 'NET'}</Badge></td>
+                    <td class="cell-right cell-mono cell-nowrap">{formatMs(row.ttfbMs)}</td>
+                    <td class="cell-right cell-mono cell-nowrap">{formatMs(row.ms)}</td>
+                    <td class="cell-right cell-mono cell-nowrap">{fmtBytes(row.bytes)}</td>
+                  </tr>
+                ))}
+              </DataTable>
+              {pageCount > 1 && <div class="scrape-pagination"><Pagination currentPage={filters.page} pageCount={pageCount} queryParams={paginationQuery} /></div>}
+            </section>
+          </>
+        )}
+      </div>
+    </form>
+  </main>
+</Layout>
+
+<style>
+  .scrape-log-main :global(.sf-results > *) { width: 100%; max-width: none; }
+  .scrape-period { padding-bottom: 2px; }
+  .scrape-period label { display: block; padding-bottom: 6px; color: var(--gray); font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+  .scrape-period select { width: 100%; padding: 7px 9px; border: var(--border); border-radius: var(--radius-md); background: var(--white); color: var(--black); }
+  .scrape-facets :global(.dok-filter-section:first-child) { padding-top: 18px; }
+  .scrape-clear { display: inline-block; margin-top: 20px; font-size: var(--text-sm); }
+  .scrape-results-toolbar { margin-bottom: 14px; }
+  .scrape-operation { display: block; color: var(--gray); font-family: var(--font-mono); font-size: var(--text-xs); }
+  .scrape-request-cell { min-width: 300px; max-width: 620px; }
+  .scrape-request-cell a { display: block; overflow: hidden; color: inherit; font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.45; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+  .scrape-request-cell a:hover { text-decoration: underline; }
+  .scrape-method { float: left; min-width: 38px; margin-right: 8px; color: var(--gray); font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 600; }
+  .scrape-host { font-weight: 600; }
+  .scrape-path { color: var(--gray); }
+  .scrape-error { display: block; margin-left: 46px; color: var(--color-danger); font-family: var(--font-mono); font-size: var(--text-xs); }
+  .scrape-pagination { display: flex; justify-content: center; margin-top: 28px; }
+  @media (max-width: 720px) {
+    .scrape-request-cell { min-width: 240px; }
+  }
+</style>
+
+<script is:inline>
+  document.querySelectorAll('.scrape-facets .dok-more-btn').forEach((button) => {
+    button.addEventListener('click', () => {
+      const more = button.previousElementSibling;
+      if (more?.classList.contains('dok-more-list')) {
+        more.hidden = false;
+        button.remove();
+      }
+    });
+  });
+  const toggle = document.getElementById('sfFiltersToggle');
+  const rail = document.querySelector('.sf-rail');
+  toggle?.addEventListener('click', () => {
+    const open = rail?.classList.toggle('is-open') ?? false;
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+  document.querySelectorAll('select[data-autosubmit]').forEach((select) => {
+    select.addEventListener('change', () => select.form?.requestSubmit());
+  });
+</script>
+
+<script>
+  import { initRailFacetBatch } from '@/src/lib/mobileFilterBatch';
+  import { initStickyRail } from '@/src/lib/stickyRail';
+  initRailFacetBatch('.scrape-facets', () => ',');
+  initStickyRail();
+</script>

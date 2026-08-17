@@ -156,6 +156,20 @@ export async function countChanges(db = postgres) {
     return Number(result.rows[0].count);
 }
 
+/**
+ * @param {number} unikalusId
+ * @param {{query: (...args: any[]) => Promise<any>}} [db]
+ */
+export async function countContractChanges(unikalusId, db = postgres) {
+    const result = await db.query(
+        `SELECT COUNT(*)::bigint AS count
+         FROM public."vpmSutartysChanges"
+         WHERE "unikalusId" = $1`,
+        [unikalusId],
+    );
+    return Number(result.rows[0].count);
+}
+
 function positiveInteger(value, option) {
     if (!/^\d+$/.test(value ?? "") || Number(value) < 1) {
         throw new Error(`${option} turi būti teigiamas sveikasis skaičius`);
@@ -338,6 +352,10 @@ export function formatRecentChanges(rows, { color = false } = {}) {
     }).join("\n\n");
 }
 
+/**
+ * @param {{limit?: number, id?: number | null, beforeId?: number | null}} [options]
+ * @param {{query: (...args: any[]) => Promise<any>}} [db]
+ */
 export async function fetchRecentChanges(
     { limit = 20, id = null, beforeId = null } = {},
     db = postgres,

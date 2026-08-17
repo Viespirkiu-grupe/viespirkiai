@@ -11,6 +11,7 @@ import { splitFacetOptions } from '../../lib/dokumentaiUrl.ts';
 import { searchJuridiniai } from '@/modules/juridiniai/searchQuickwit.js';
 import { linksniuotiK } from '@/utils/linksniai.js';
 import { getColorScheme, getFont, cleanQuery } from '../../lib/failai.js';
+import { describeSearchQuery } from '../../lib/searchOgMeta.ts';
 import config from '../../lib/config.ts';
 
 type FacetOption = { value: string; label?: string; count: number | null };
@@ -118,9 +119,13 @@ const sortOptions = [
 const sortValue = query.sort ? `${query.sort}:${query.sortDir ?? 'desc'}` : '';
 
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');
+
+// OG/`<title>` tekstai iš užklausos — ta pati funkcija, kurią naudoja peržiūros
+// crawleriams skirtas middleware ir /juridiniai.png.
+const ogMeta = describeSearchQuery('/juridiniai', Astro.url.searchParams)!;
 ---
 
-<Layout pageTitle="Juridinių asmenų paieška" pageImage="https://viespirkiai.org/juridiniai.png" colorScheme={colorScheme} font={font} customHead={config.customHead}>
+<Layout pageTitle={ogMeta.pageTitle} pageDescription={ogMeta.pageDescription} pageImage={ogMeta.ogImageUrl} colorScheme={colorScheme} font={font} customHead={config.customHead}>
   <main class="jur-main sidebar-main">
     <form method="get" role="search" id="searchForm" class="jur-shell">
       <h1 class="sr-only">Juridinių asmenų paieška</h1>

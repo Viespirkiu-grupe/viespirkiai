@@ -21,6 +21,7 @@ const ENV_MAP = [
     ["ONION_ADDRESS", "onionAddress", "string"],
 
     ["PORT", "port", "number"],
+    ["APP_ENV", "appEnv", "string"],
     ["LOG_REQUESTS", "logRequests", "boolean"],
     ["ENABLE_ATN1", "enableAtn1", "boolean"],
     ["ENABLE_BOT_CHALLENGE", "enableBotChallenge", "boolean"],
@@ -31,8 +32,12 @@ const ENV_MAP = [
     ["PG_PASSWORD", "pgPassword", "string"],
     ["PG_DATABASE", "pgDatabase", "string"],
     ["PG_MAX_CONNECTIONS", "pgMaxConnections", "number"],
+    ["PG_DIRECT_HOST", "pgDirectHost", "string"],
+    ["PG_DIRECT_PORT", "pgDirectPort", "number"],
     ["SQL_LOG_FILE", "sqlLogFile", "string"],
     ["SQL_LOG_QUICKWIT", "sqlLogQuickwit", "boolean"],
+    ["SCRAPE_LOG_FILE", "scrapeLogFile", "string"],
+    ["SCRAPE_LOG_QUICKWIT", "scrapeLogQuickwit", "boolean"],
     ["PG_PREPARED", "pgPrepared", "boolean"],
 
     ["NATS_URL", "natsUrl", "string"],
@@ -56,17 +61,19 @@ const ENV_MAP = [
 
     ["ETAR_API_URL", "eTarApiUrl", "string"],
     ["ETAR_API_KEY", "eTarApiKey", "string"],
-    ["ETAR_SIDECAR_DIR", "eTarSidecarDir", "string"],
+    ["ETAR_RECENT_DAYS", "eTarRecentDays", "number"],
+    ["ETAR_REFRESH_HOURS", "eTarRefreshHours", "number"],
+    ["ETAR_MAX_INFLIGHT", "eTarMaxInflight", "number"],
+    ["ESEIMAS_RECENT_DAYS", "eSeimasRecentDays", "number"],
+    ["ESEIMAS_REFRESH_HOURS", "eSeimasRefreshHours", "number"],
+    ["ESEIMAS_MAX_INFLIGHT", "eSeimasMaxInflight", "number"],
 
     ["INTERNAL_FILE_BASE", "internalFileBase", "string"],
     ["OCR_BANDYMAI", "ocrBandymai", "number"],
 
-    ["OCR_REZULTATAI_LOCATION", "ocrRezultataiLocation", "string"],
-    ["DOKUMENTAI_LOCATION", "dokumentaiLocation", "string"],
-    ["FAILAI_LOCATION", "failaiLocation", "string"],
-    ["FAILAIINFO_SQLITE_LOCATION", "failaiInfoSqliteLocation", "string"],
-    ["DOKUMENTAI_SQLITE_LOCATION", "dokumentaiSqliteLocation", "string"],
-    ["OCR_REZULTATAI_SQLITE_LOCATION", "ocrRezultataiSqliteLocation", "string"],
+    // Visos sidecar bazės — viename kataloge, po vieną failą; žr. utils/sidecarPaths.js.
+    ["SIDECAR_DIR", "sidecarDir", "string"],
+    ["SIDECAR_REMOTE", "sidecarRemote", "string"],
 
     ["ENABLE_GRAPH", "enableGraph", "boolean"],
 

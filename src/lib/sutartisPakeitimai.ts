@@ -3,6 +3,7 @@ import {
   fetchChangedContractsPage,
   countChangedContracts,
   countChanges,
+  countContractChanges,
   diffContractDocuments,
 } from '@/modules/sutartys/recentChanges.js';
 import { CONTRACT_TYPES } from '@/modules/sutartys/contractTypes.js';
@@ -155,15 +156,25 @@ function rowToPakeitimas(row: any): SutartiesPakeitimas | null {
  */
 export async function loadSutartisPakeitimai(
   unikalusId: number,
-  limit = 50,
+  limit: number | null = null,
 ): Promise<SutartiesPakeitimas[]> {
   let rows: any[];
   try {
+    // limit = null → LIMIT NULL, t. y. visa sutarties pakeitimų istorija.
     rows = await fetchRecentChanges({ id: unikalusId, limit } as any);
   } catch {
     return [];
   }
   return rows.map(rowToPakeitimas).filter((p): p is SutartiesPakeitimas => p !== null);
+}
+
+/** Grąžina tikslų sutarties pakeitimų eilučių skaičių. */
+export async function countSutartisPakeitimai(unikalusId: number): Promise<number> {
+  try {
+    return await countContractChanges(unikalusId);
+  } catch {
+    return 0;
+  }
 }
 
 export type SutartiesRedagavimai = {
@@ -197,9 +208,9 @@ export async function loadRedagavimuSarasas(
     grupes.map(async (g: any): Promise<SutartiesRedagavimai> => {
       // Paimame kelis atsargai – dalis pakeitimų gali neturėti matomų skirtumų.
       const rows = await fetchRecentChanges({ id: g.unikalusId, limit: perSutarti + 4 } as any);
-      const visi = rows
-        .map(rowToPakeitimas)
-        .filter((p): p is SutartiesPakeitimas => p !== null);
+      const visi: SutartiesPakeitimas[] = rows
+        .map((row: any): SutartiesPakeitimas | null => rowToPakeitimas(row))
+        .filter((p: SutartiesPakeitimas | null): p is SutartiesPakeitimas => p !== null);
       const pakeitimai = visi.slice(0, perSutarti);
       return {
         unikalusId: g.unikalusId,

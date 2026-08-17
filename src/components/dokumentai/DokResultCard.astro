@@ -7,6 +7,7 @@ import ResultCardMeta from '@design-system/components/ResultCardMeta.astro';
 import type { DokumentasHit } from '../../lib/searchDokumentai.ts';
 import { fmt, fmtDate, dateKey } from '../../lib/dokumentaiFormat.ts';
 import { TYPE_LABEL, SOURCE_LABEL, LANG_LABEL } from '../../lib/dokumentaiLabels.ts';
+import { statusasLabel, turinysLabel, variantasLabel } from '../../lib/teisesAktaiLabels.ts';
 
 interface Props {
   hit: DokumentasHit;
@@ -14,17 +15,20 @@ interface Props {
 
 const { hit } = Astro.props;
 
-const isVerdict = hit.class === 'teise';
+const isETar = hit.source?.toLowerCase() === 'etar';
+const hasInternalDetail = hit.type === 'teismoNuosprendis' || (isETar && hit.type === 'teisesAktas');
 let domain = (hit.host || hit.domain || '').replace(/^www\./, '');
 if (!domain && hit.url) {
   try { domain = new URL(hit.url).host.replace(/^www\./, ''); } catch { /* ignore */ }
 }
 // Nuosprendžių URL kelias yra ASP id — neinformatyvus, todėl jo nerodom.
-const pathPart = isVerdict ? '' : (hit.url ? hit.url.replace(/^https?:\/\/[^/]+/, '').replace(/^\//, '') : '');
+const pathPart = hasInternalDetail ? '' : (hit.url ? hit.url.replace(/^https?:\/\/[^/]+/, '').replace(/^\//, '') : '');
 const title = hit.title || hit.url || hit.md5 || `Dokumentas #${hit.id}`;
 const externalUrl = hit.url || null;
 const internalUrl = hit.type === 'teismoNuosprendis' && hit.saltinioId2
   ? `/teismoNuosprendis/${hit.saltinioId2}`
+  : isETar && hit.type === 'teisesAktas' && hit.saltinioId0
+    ? `/teisesAktas/${encodeURIComponent(hit.saltinioId0)}${hit.saltinioId3 || hit.saltinioId1 ? `?v=${encodeURIComponent(hit.saltinioId3 || hit.saltinioId1 || '')}` : ''}`
   : hit.failasId ? `/failas/${hit.failasId}` : null;
 const targetUrl = internalUrl || externalUrl || '#';
 const isExternal = !internalUrl && !!externalUrl;
@@ -42,6 +46,12 @@ const location = [hit.savivaldybe, hit.apskritis]
 const footerMetaItems: any[] = [
   hit.type && { label: 'Tipas', value: TYPE_LABEL[hit.type] || hit.type },
   hit.source && { label: 'Šaltinis', value: SOURCE_LABEL[hit.source.toLowerCase()] || hit.source, title: 'Šaltinis' },
+  hit.editionType && { label: 'Redakcija', value: variantasLabel(hit.editionType) },
+  hit.galiojimas && { label: 'Galiojimas', value: statusasLabel(hit.galiojimas) },
+  hit.turinioBusena && { label: 'Teksto būsena', value: turinysLabel(hit.turinioBusena) },
+  hit.prieme && { label: 'Priėmė', value: hit.prieme },
+  hit.istaigosNr && { label: 'Įstaigos nr.', value: hit.istaigosNr },
+  hit.registracijosNr && { label: 'Registracijos nr.', value: hit.registracijosNr },
   hit.extension && { label: 'Plėtinys', value: String(hit.extension).toUpperCase() },
   hit.language && { label: 'Kalba', value: LANG_LABEL[hit.language] || hit.language.toUpperCase() },
   hit.pageCount != null && hit.pageCount > 0 && { label: 'Puslapiai', value: `${fmt(hit.pageCount)} psl.` },

@@ -12,8 +12,8 @@ function readKey(input) {
 /**
  * @param {string} text
  * @param {Object} [opts]
- * @param {NodeJS.ReadStream} [opts.input]
- * @param {NodeJS.WriteStream} [opts.output]
+ * @param {{isTTY?: boolean, isRaw?: boolean, once(event: string, listener: (value: any) => void): any, setRawMode(value: boolean): any, resume(): any, pause(): any}} [opts.input]
+ * @param {{isTTY?: boolean, rows?: number, write(value: string): any}} [opts.output]
  * @param {boolean} [opts.enabled] - `false` išjungia puslapiavimą priverstinai
  * @param {number|null} [opts.pageSize] - eilučių puslapyje (numatyta – terminalo aukštis)
  * @param {boolean} [opts.hasMore] - ar iškvietėjas turi dar duomenų po šio gabalo

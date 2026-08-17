@@ -1,8 +1,21 @@
 import { defineMiddleware } from 'astro:middleware';
 import config from './lib/config.ts';
-import { botChallengeResponse, isBotChallengePath } from './lib/botChallenge.ts';
+import { botChallengeResponse, isBotChallengePath, isGoogleCrawler } from './lib/botChallenge.ts';
+import { describeSearchQuery } from './lib/searchOgMeta.ts';
 import { isAtn1Path } from './lib/featureRoutes.ts';
 import { hostFromHeaders, runWithRequestContext } from '@/utils/runtimeContext.js';
+
+/**
+ * Absoliutus adresas OG antraštėms. Už proxy tikrasis vardas lieka
+ * `x-forwarded-host`/`x-forwarded-proto`, o `context.url` rodo vidinį adresą.
+ */
+function originFromRequest(headers: Headers, url: URL): string {
+  const host = hostFromHeaders(headers, url);
+  if (!host) return url.origin;
+  const proto = headers.get('x-forwarded-proto')?.split(',', 1)[0]?.trim()
+    || url.protocol.replace(':', '');
+  return `${proto}://${host}`;
+}
 
 /**
  * Onion-Location antraštė.
@@ -22,8 +35,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
     && context.request.method === 'GET'
     && isBotChallengePath(context.url.pathname)
     && context.cookies.get('bot')?.value !== 'no'
+    && !isGoogleCrawler(context.request.headers.get('user-agent'))
   ) {
-    return botChallengeResponse();
+    // Iššūkis lieka visiems (išskyrus Googlebot), bet pats jo puslapis nešasi
+    // užklausą aprašančias OG antraštes — sudarytas vien iš URL parametrų, be nė
+    // vienos DB užklausos. Taip nuorodų peržiūra veikia ir tiems crawleriams, kurie
+    // JavaScript nevykdo, o atpažinti juos pagal User-Agent nereikia.
+    return botChallengeResponse(describeSearchQuery(
+      context.url.pathname,
+      context.url.searchParams,
+      originFromRequest(context.request.headers, context.url),
+    ));
   }
 
   // Užklausos kontekstas (hostas) – kad SQL logo įrašus būtų galima priskirti

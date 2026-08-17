@@ -84,17 +84,45 @@ function formatBytes(bytes) {
 
 function markdownTable(rows) {
     const lines = [
-        "| Dependency | Type | Own size | Tree size | Unique size | Packages |",
-        "|---|---:|---:|---:|---:|---:|",
+        "| Dependency | Own size | Tree size | Unique size | Packages |",
+        "|---|---:|---:|---:|---:|",
     ];
 
     for (const row of rows) {
         lines.push(
-            `| \`${row.name}\` | ${row.type} | ${formatBytes(row.ownSize)} | ${formatBytes(row.treeSize)} | ${formatBytes(row.uniqueSize)} | ${row.packageCount} |`,
+            `| \`${row.name}\` | ${formatBytes(row.ownSize)} | ${formatBytes(row.treeSize)} | ${formatBytes(row.uniqueSize)} | ${row.packageCount} |`,
         );
     }
 
     return lines.join("\n");
+}
+
+function terminalTable(rows) {
+    const columns = [
+        { title: "Dependency", value: (row) => row.name, align: "left" },
+        { title: "Own size", value: (row) => formatBytes(row.ownSize), align: "right" },
+        { title: "Tree size", value: (row) => formatBytes(row.treeSize), align: "right" },
+        { title: "Unique size", value: (row) => formatBytes(row.uniqueSize), align: "right" },
+        { title: "Packages", value: (row) => String(row.packageCount), align: "right" },
+    ];
+    const values = rows.map((row) => columns.map((column) => column.value(row)));
+    const widths = columns.map((column, index) => Math.max(
+        column.title.length,
+        ...values.map((row) => row[index].length),
+    ));
+    const border = (left, middle, right) => left + widths.map((width) => "─".repeat(width + 2)).join(middle) + right;
+    const renderRow = (cells) => `│ ${cells.map((cell, index) => {
+        const padding = columns[index].align === "right" ? "padStart" : "padEnd";
+        return cell[padding](widths[index]);
+    }).join(" │ ")} │`;
+
+    return [
+        border("┌", "┬", "┐"),
+        renderRow(columns.map((column) => column.title)),
+        border("├", "┼", "┤"),
+        ...values.map(renderRow),
+        border("└", "┴", "┘"),
+    ].join("\n");
 }
 
 function packageLabel(locator) {
@@ -160,6 +188,8 @@ const report = roots.map(({ name, type }) => {
 }).sort((a, b) => b.treeSize - a.treeSize);
 
 const installedSize = [...packageSizes.values()].reduce((sum, size) => sum + size, 0);
+const runtimeReport = report.filter(({ type }) => type === "runtime");
+const devReport = report.filter(({ type }) => type === "dev");
 const treeText = report.map(({ name, type, treeSize, uniqueSize }) => [
     `## ${name} (${type})`,
     "",
@@ -178,7 +208,13 @@ const markdown = [
     "",
     "`Tree size` includes shared packages and therefore must not be summed. `Unique size` is the disk space reachable from only that direct dependency.",
     "",
-    markdownTable(report),
+    "## Runtime dependencies",
+    "",
+    markdownTable(runtimeReport),
+    "",
+    "## Development dependencies",
+    "",
+    markdownTable(devReport),
     "",
     "# Trees",
     "",
@@ -196,6 +232,9 @@ await Promise.all([
     }, null, 2)}\n`),
 ]);
 
-console.log(markdownTable(report.slice(0, 15)));
+console.log("Runtime dependencies");
+console.log(terminalTable(runtimeReport));
+console.log("\nDevelopment dependencies");
+console.log(terminalTable(devReport));
 console.log(`\nWrote ${path.relative(ROOT, path.join(OUTPUT_DIR, "dependency-sizes.md"))}`);
 console.log(`Wrote ${path.relative(ROOT, path.join(OUTPUT_DIR, "dependency-sizes.json"))}`);

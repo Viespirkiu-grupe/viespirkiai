@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import readline from "node:readline";
 import { Readable, Transform } from "node:stream";
 import process from "node:process";
 
@@ -76,14 +75,17 @@ function parseLine(line, delimiter) {
  */
 export async function* parseCSV(path, encoding = "utf8") {
     const stream = fs.createReadStream(path, { encoding });
-    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
 
     let headers = undefined;
     let delimiter = ",";
     let buffer = "";
 
     try {
-        for await (const line of rl) {
+        // `readline` async iteratorius gali užsidaryti ties EOF, kol lėtas
+        // vartotojas laukia DB batch'o, o po to mesti ERR_USE_AFTER_CLOSE per
+        // kitą `next()`. Tiesioginis failo chunk'ų skaidymas išlaiko likusias
+        // eilutes mūsų buferyje ir natūraliai taiko stream backpressure.
+        for await (const line of streamLines(stream)) {
             if (!headers) {
                 delimiter = detectDelimiter(line);
                 headers = parseLine(line, delimiter).map((h) =>
@@ -92,7 +94,7 @@ export async function* parseCSV(path, encoding = "utf8") {
                 continue;
             }
 
-            if (!line.trim()) continue;
+            if (!line.trim() && !buffer) continue;
 
             buffer += (buffer ? "\n" : "") + line;
 
@@ -109,9 +111,30 @@ export async function* parseCSV(path, encoding = "utf8") {
             yield row;
             buffer = "";
         }
+        if (buffer) throw new Error("CSV baigėsi neuždarytomis kabutėmis");
     } finally {
-        rl.close();
         stream.destroy();
+    }
+}
+
+/**
+ * @param {import("node:fs").ReadStream} stream
+ * @yields {string}
+ */
+async function* streamLines(stream) {
+    let pending = "";
+    for await (const chunk of stream) {
+        pending += chunk;
+        let newline;
+        while ((newline = pending.indexOf("\n")) !== -1) {
+            let line = pending.slice(0, newline);
+            pending = pending.slice(newline + 1);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            yield line;
+        }
+    }
+    if (pending) {
+        yield pending.endsWith("\r") ? pending.slice(0, -1) : pending;
     }
 }
 

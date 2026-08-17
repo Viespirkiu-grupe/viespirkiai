@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("geografija", { operation: "adresuRegistrasDataSources" });
 import { parseHTML } from "linkedom";
 
 const BASE = "https://www.registrucentras.lt";
@@ -23,7 +25,7 @@ const COLUMN_MAP = {
  * Viešas CMS adresas ir token'as publikuojami pačių RC /config.js faile.
  */
 async function getCmsConfig() {
-    const res = await fetch(`${BASE}/config.js`);
+    const res = await scrapeFetch(`${BASE}/config.js`);
     if (!res.ok) throw new Error(`config.js: HTTP ${res.status}`);
     const text = await res.text();
     const url = text.match(/ENV_FRONTEND_CMS_URL:\s*"([^"]+)"/)?.[1];
@@ -35,7 +37,7 @@ async function getCmsConfig() {
 
 export async function getArDataSources() {
     const cms = await getCmsConfig();
-    const res = await fetch(
+    const res = await scrapeFetch(
         `${cms.url}/api/open-data-pages?` +
             new URLSearchParams({
                 "filters[slug][$eq]": SLUG,

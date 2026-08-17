@@ -267,9 +267,10 @@ describe('buildParts characterization (query-string stability)', () => {
   it('produces identical parsed structures and query strings', () => {
     const parsed = buildPartsOpts(RICH);
     const parsedPhrase = buildPartsOpts(PHRASE);
+    const withoutETarFacets = ({ adoptedBy: _a, contentStates: _c, institutionNumbers: _i, registrationNumbers: _r, dateFrom: _f, dateTo: _t, ...rest }: any) => rest;
     const out: Record<string, unknown> = {
-      parsed,
-      parsedPhrase,
+      parsed: withoutETarFacets(parsed),
+      parsedPhrase: withoutETarFacets(parsedPhrase),
       base: buildPartsExcluding(parsed as any),
       phraseBase: buildPartsExcluding(parsedPhrase as any),
     };
@@ -277,5 +278,30 @@ describe('buildParts characterization (query-string stability)', () => {
       out['ex_' + k] = buildPartsExcluding({ ...(parsed as any), [k]: true });
     }
     expect(out).toEqual(BASELINE);
+  });
+
+  it('filtruoja dinaminius e-TAR metadata laukus tikslia reikšme', () => {
+    const parsed = buildPartsOpts({
+      prieme: ['Lietuvos Respublikos Seimas'],
+      turinys: ['provided'],
+      istaigosNr: ['XIV-123'],
+      regNr: ['2026-001'],
+    });
+    expect(buildPartsExcluding(parsed)).toBe(
+      '(metadata.prieme:"Lietuvos Respublikos Seimas") AND ' +
+      '(metadata.turinioBusena:"provided") AND ' +
+      '(metadata.istaigosNr:"XIV-123") AND ' +
+      '(metadata.registracijosNr:"2026-001")',
+    );
+    expect(buildPartsExcluding({ ...parsed, excludeInstitutionNumber: true })).not.toContain('metadata.istaigosNr');
+  });
+
+  it('dokumento datos intervalo pabaigą traktuoja imtinai', () => {
+    const parsed = buildPartsOpts({ nuo: '2026-01-02', iki: '2026-01-31' });
+    expect(buildPartsExcluding(parsed)).toBe(
+      'happenedAt:[2026-01-02T00:00:00Z TO 2026-02-01T00:00:00Z}',
+    );
+    expect(parsed.dateFrom).toBe('2026-01-02');
+    expect(parsed.dateTo).toBe('2026-01-31');
   });
 });

@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("registruCentrasPranesimai", { operation: "scrape" });
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
@@ -7,7 +9,7 @@ export async function nuskaitytiInformaciniusLeidinius() {
         "https://www.registrucentras.lt/jar/infleid/publications.do?activePage=1&pageSize=100000&persist=yes";
     log(`Nuskaitymas iš ${url}`);
 
-    let response = await fetch(url);
+    let response = await scrapeFetch(url);
     let text = await response.text();
     let { document } = parseHTML(text);
 

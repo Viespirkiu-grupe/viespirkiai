@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { preparedStatement } from "../../postgres/prepared.js";
 import { canonicalJsonMd5 } from "./canonicalSutartis.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 // Canonical dokumento atstatymas iš normalizuotų lentelių; eilutės alias — "e".
 // Naudojama ir UPSERT_SQL old_document CTE, ir markVpmSutartisIstrinta selecte.
@@ -578,13 +579,22 @@ export function buildVpmSutartisSearchText(canonicalJson) {
 /**
  * Upsert one normalized VPM contract. The statement is atomic: an old version
  * is archived before a changed hash replaces the normalized rows.
+ * @param {{json: string, md5: string}} prepared
+ * @param {{query: (...args: any[]) => Promise<any>}} [db]
  */
 export async function upsertVpmSutartis(prepared, db = postgres) {
     const searchText = buildVpmSutartisSearchText(prepared.json);
     const result = await db.query(
         upsertStatement([prepared.json, prepared.md5, searchText]),
     );
-    return result.rows[0];
+    const outcome = result.rows[0];
+    if (db === postgres && outcome?.written) {
+        signalWork(WORK_SIGNALS.SUTARTYS_CHANGED, {
+            source: "upsertVpmSutartis",
+            count: 1,
+        });
+    }
+    return outcome;
 }
 
 /**

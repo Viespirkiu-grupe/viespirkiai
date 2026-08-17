@@ -103,7 +103,7 @@ describe("planuojamų pirkimų eksportas", () => {
     it("per didelį mėnesį pirmiausia skaido dienomis", async () => {
         const start = parseLocalMinute("2026-06-01T00:00");
         const end = parseLocalMinute("2026-06-30T23:59");
-        const calls = [];
+        const calls: Array<{ start: number; end: number }> = [];
         const intervals = await planExportIntervals({
             start,
             end,
@@ -203,13 +203,13 @@ describe("planuojamų pirkimų eksportas", () => {
             count: vi.fn().mockResolvedValue(1),
             export: vi.fn().mockResolvedValue(rows),
         };
-        const received = [];
+        const received: Array<ReturnType<typeof normalizePlanRow>> = [];
         const result = await processPlanuojamiPirkimai({
             from: "2026-07-31T00:00",
             to: "2026-07-31T23:59",
             client,
             logger: { log: vi.fn() },
-            onRecords: async (records) => received.push(...records),
+            onRecords: async (records) => { received.push(...records); },
         });
         expect(result).toEqual({ total: 1, intervals: 1 });
         expect(received).toHaveLength(1);

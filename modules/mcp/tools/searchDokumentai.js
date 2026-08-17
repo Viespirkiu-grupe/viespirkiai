@@ -3,7 +3,10 @@ import { searchDokumentai } from "../../../src/lib/searchDokumentai.js";
 
 export const name = "search_dokumentai";
 export const description =
-    "Ieško viešųjų pirkimų ir kitų dokumentų (sutartys, CVP IS, neskelbiamos derybos, MVP tvarkos, teisės aktai, teismo nuosprendžiai) pagal pavadinimą, autorių ir turinį. Jeigu jau žinomas *failo* ID arba md5 — naudok get_failas.";
+    "Ieško viešųjų pirkimų ir kitų dokumentų (sutartys, CVP IS, neskelbiamos derybos, MVP tvarkos, teisės aktai, teismo nuosprendžiai) pagal pavadinimą, autorių ir turinį. " +
+    "Teisės aktų ir jų projektų tekstą skaityk su get_teises_akto_tekstas: jis trumpą tekstą grąžina visą, o ilgam parenka turinį arba dalis. " +
+    "Kitų rezultatų tekstą skaityk su get_dokumentas_tekstas, perduodamas dokumentoId. " +
+    "get_failas naudok tik tada, kai turi failoId arba MD5 ir reikia failo metaduomenų.";
 
 const TYPE_VALUES = [
     "crawledPage",
@@ -21,7 +24,6 @@ const SOURCE_VALUES = [
     "neskelbiamosderybos",
     "archive",
     "liteko",
-    "etar",
     "eseimas",
 ];
 
@@ -129,6 +131,14 @@ export async function handler(params) {
 
     const dokumentai = result.hits.map((h) => ({
         id: h.id,
+        dokumentoId: h.id,
+        failoId: h.failasId ?? null,
+        teisesAktoId: h.type === "teisesAktas" || h.type === "teisesAktoProjektas"
+            ? h.saltinioId0 ?? null
+            : null,
+        versijosId: h.type === "teisesAktas" || h.type === "teisesAktoProjektas"
+            ? h.saltinioId3 || h.saltinioId1 || "original"
+            : null,
         md5: h.md5,
         pavadinimas: h.title || h.pavadinimas,
         tipas: h.type,

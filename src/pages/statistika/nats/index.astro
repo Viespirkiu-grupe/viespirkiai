@@ -1,0 +1,200 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import PageHeader from '@design-system/components/PageHeader.astro';
+import Badge from '@design-system/components/Badge.astro';
+import Button from '@design-system/components/Button.astro';
+import DataTable from '@design-system/components/DataTable.astro';
+import MetricCard from '@design-system/components/MetricCard.astro';
+import MetricCardGrid from '@design-system/components/MetricCardGrid.astro';
+import SectionToolbar from '@design-system/components/SectionToolbar.astro';
+import config from '../../../lib/config.ts';
+import { getColorScheme, getFont } from '../../../lib/failai.ts';
+
+const colorScheme = getColorScheme(Astro.cookies);
+const font = getFont(Astro.cookies);
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+<Layout
+  pageTitle="NATS eventai"
+  pageDescription="Tiesioginis NATS signalų magistralės eventų srautas"
+  colorScheme={colorScheme}
+  font={font}
+  customHead={config.customHead}
+>
+  <main>
+    <PageHeader>
+      <Fragment slot="subtext"><a href="/statistika">Statistika</a></Fragment>
+      NATS eventai
+    </PageHeader>
+
+    <MetricCardGrid minWidth="180px" maxWidth="260px" className="mb-8">
+      <MetricCard label="Ryšys">
+        <Badge variant="warning" size="lg" className="nats-status-badge">
+          <span id="natsStatus">Jungiamasi…</span>
+        </Badge>
+      </MetricCard>
+      <MetricCard label="Naršyklės buferis">
+        <span class="text-xl font-bold cell-mono"><span id="natsCount">0</span> / 1000</span>
+        <p class="text-muted text-sm mb-0 mt-1">Saugomi tik naujausi eventai</p>
+      </MetricCard>
+    </MetricCardGrid>
+
+    <section class="page-section mb-10" aria-labelledby="nats-title">
+      <SectionToolbar title="Tiesioginis srautas" titleTag="h3">
+        <p class="text-muted text-sm mb-0">Naujausi eventai rodomi viršuje.</p>
+        <Fragment slot="actions">
+          <Button id="natsToggle" variant="outline" size="sm">Stabdyti</Button>
+          <Button id="natsClear" variant="outline" size="sm">Išvalyti</Button>
+        </Fragment>
+      </SectionToolbar>
+      <span id="nats-title" class="sr-only">NATS eventų srautas</span>
+      <DataTable
+        columns={[
+          { label: 'Gauta' },
+          { label: 'Subject' },
+          { label: 'Payload' },
+        ]}
+        size="sm"
+        className="nats-events-table"
+        wrapperClassName="nats-events-wrapper"
+        bodyAttributes={{ id: 'natsEvents' }}
+      >
+        <tr><td colspan="3" class="text-muted">Laukiama eventų…</td></tr>
+      </DataTable>
+    </section>
+  </main>
+</Layout>
+
+<script>
+  type NatsEvent = { receivedAt: number; subject: string; payload: unknown };
+
+  const MAX_EVENTS = 1000;
+  const events: NatsEvent[] = [];
+  const body = document.querySelector<HTMLTableSectionElement>('#natsEvents')!;
+  const count = document.querySelector<HTMLElement>('#natsCount')!;
+  const status = document.querySelector<HTMLElement>('#natsStatus')!;
+  const statusBadge = status.closest<HTMLElement>('.ds-badge')!;
+  const toggle = document.querySelector<HTMLButtonElement>('#natsToggle')!;
+  const clear = document.querySelector<HTMLButtonElement>('#natsClear')!;
+
+  let source: EventSource | null = null;
+  let paused = false;
+
+  function payloadText(payload: unknown) {
+    if (typeof payload === 'string') return payload;
+    try { return JSON.stringify(payload); } catch { return String(payload); }
+  }
+
+  function eventRow(event: NatsEvent) {
+    const row = document.createElement('tr');
+    const received = document.createElement('td');
+    const subject = document.createElement('td');
+    const payload = document.createElement('td');
+
+    const date = new Date(event.receivedAt);
+    received.className = 'cell-mono cell-nowrap text-xs nats-event-time';
+    received.textContent = date.toLocaleString('lt-LT', {
+      hour12: false,
+      fractionalSecondDigits: 3,
+    });
+    subject.className = 'cell-mono text-xs nats-event-subject';
+    subject.textContent = event.subject;
+    payload.className = 'cell-mono text-xs nats-event-payload';
+    payload.textContent = payloadText(event.payload);
+    row.append(received, subject, payload);
+    return row;
+  }
+
+  function render() {
+    const fragment = document.createDocumentFragment();
+    for (const event of events) fragment.append(eventRow(event));
+    body.replaceChildren(fragment);
+    if (events.length === 0) {
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 3;
+      cell.className = 'text-muted';
+      cell.textContent = 'Laukiama eventų…';
+      row.append(cell);
+      body.append(row);
+    }
+    count.textContent = String(events.length);
+  }
+
+  function addEvent(event: NatsEvent) {
+    events.unshift(event);
+    if (events.length > MAX_EVENTS) events.length = MAX_EVENTS;
+
+    const placeholder = body.querySelector('td[colspan="3"]')?.parentElement;
+    placeholder?.remove();
+    body.prepend(eventRow(event));
+    while (body.children.length > MAX_EVENTS) body.lastElementChild?.remove();
+    count.textContent = String(events.length);
+  }
+
+  function setStatus(text: string, state: 'connecting' | 'connected' | 'paused') {
+    status.textContent = text;
+    statusBadge.classList.remove('ds-badge--success', 'ds-badge--warning', 'ds-badge--muted');
+    statusBadge.classList.add(
+      state === 'connected' ? 'ds-badge--success' : state === 'paused' ? 'ds-badge--muted' : 'ds-badge--warning',
+    );
+  }
+
+  function connect() {
+    source?.close();
+    setStatus('Jungiamasi…', 'connecting');
+    source = new EventSource('/statistika/nats/sse');
+    source.onopen = () => setStatus('Prisijungta', 'connected');
+    source.onerror = () => {
+      if (!paused) setStatus('Ryšys nutrūko, jungiamasi iš naujo…', 'connecting');
+    };
+    source.onmessage = (message) => {
+      try {
+        const event = JSON.parse(message.data) as NatsEvent;
+        addEvent(event);
+      } catch {
+        // Sugadinta viena žinutė neturi sustabdyti likusio srauto.
+      }
+    };
+  }
+
+  toggle.addEventListener('click', () => {
+    paused = !paused;
+    if (paused) {
+      source?.close();
+      source = null;
+      toggle.textContent = 'Tęsti';
+      setStatus('Sustabdyta', 'paused');
+    } else {
+      toggle.textContent = 'Stabdyti';
+      connect();
+    }
+  });
+
+  clear.addEventListener('click', () => {
+    events.length = 0;
+    render();
+  });
+  window.addEventListener('beforeunload', () => source?.close(), { once: true });
+
+  connect();
+</script>
+
+<style>
+  :global(.nats-events-wrapper) { max-height: 70vh; overflow: auto; }
+  :global(.nats-events-table thead th) {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+  }
+  :global(.nats-event-time) { width: 170px; }
+  :global(.nats-event-subject) { min-width: 250px; }
+  :global(.nats-event-payload) {
+    min-width: 320px;
+    max-width: 720px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+</style>

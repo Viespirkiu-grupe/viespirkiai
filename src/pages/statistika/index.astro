@@ -28,7 +28,12 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
   <main>
     <PageHeader>
       Statistika
-      <button slot="actions" id="liveUpdate" class="btn btn-outline btn-sm">▶ Tiesioginis atnaujinimas</button>
+      <div slot="actions" class="flex gap-2 flex-wrap">
+        <a href="/statistika/scrapeLog" class="btn btn-outline btn-sm">Scrape logas</a>
+        <a href="/statistika/sql" class="btn btn-outline btn-sm">SQL logas</a>
+        <a href="/statistika/nats" class="btn btn-outline btn-sm">NATS eventai</a>
+        <button id="liveUpdate" class="btn btn-outline btn-sm">▶ Tiesioginis atnaujinimas</button>
+      </div>
     </PageHeader>
 
     <div class="replacableContent">
@@ -66,6 +71,7 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
               <div>
                 <p class="text-sm font-bold mb-3">Pagal nuskaitytoją</p>
                 <DataTable
+                  sortable
                   bodyAttributes={{ id: 'topNuskaitytojaiBody' }}
                   columns={[
                     { label: 'Nuskaitytojas' },
@@ -110,7 +116,7 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
               <MetricCard label="Visi failai" labelBaseClassName="section-title mb-3">
                 <KeyValueList>
                   <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.visi">{statistika.failai.kiekiai.visi}</span></dd>
-                  <dt>Dydis *</dt><dd><span class="cell-mono" data-stat="failai.dydziai.visi">{statistika.failai.dydziai.visi}</span></dd>
+                  <dt>Dydis</dt><dd><span class="cell-mono" data-stat="failai.dydziai.visi">{statistika.failai.dydziai.visi}</span></dd>
                 </KeyValueList>
               </MetricCard>
               <MetricCard label="Parsiųsti failai" labelBaseClassName="section-title mb-3">
@@ -122,13 +128,19 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
               <MetricCard label="Neparsiųsti (klaida)" labelBaseClassName="section-title mb-3">
                 <KeyValueList>
                   <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.klaida">{statistika.failai.kiekiai.klaida}</span></dd>
-                  <dt>Dydis *</dt><dd><span class="cell-mono" data-stat="failai.dydziai.klaida">{statistika.failai.dydziai.klaida}</span></dd>
+                  <dt>Dydis</dt><dd><span class="cell-mono" data-stat="failai.dydziai.klaida">{statistika.failai.dydziai.klaida}</span></dd>
                 </KeyValueList>
               </MetricCard>
-              <MetricCard label="Neparsiųsti" labelBaseClassName="section-title mb-3">
+              <MetricCard label="Neparsiųsti (eilėje)" labelBaseClassName="section-title mb-3">
                 <KeyValueList>
                   <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.neparsiusti">{statistika.failai.kiekiai.neparsiusti}</span></dd>
-                  <dt>Dydis *</dt><dd><span class="cell-mono" data-stat="failai.dydziai.neparsiusti">{statistika.failai.dydziai.neparsiusti}</span></dd>
+                  <dt>Dydis</dt><dd><span class="cell-mono" data-stat="failai.dydziai.neparsiusti">{statistika.failai.dydziai.neparsiusti}</span></dd>
+                </KeyValueList>
+              </MetricCard>
+              <MetricCard label="Iš archyvų" labelBaseClassName="section-title mb-3">
+                <KeyValueList>
+                  <dt>Kiekis</dt><dd><span class="cell-mono" data-stat="failai.kiekiai.isArchyvu">{statistika.failai.kiekiai.isArchyvu}</span></dd>
+                  <dt>Dydis</dt><dd><span class="cell-mono" data-stat="failai.dydziai.isArchyvu">{statistika.failai.dydziai.isArchyvu}</span></dd>
                 </KeyValueList>
               </MetricCard>
             </MetricCardGrid>
@@ -154,6 +166,7 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
         <h2 class="mb-1"><a href="#quickwit-indeksai" id="quickwit-indeksai" class="no-style">Quickwit indeksai</a></h2>
         <p class="text-muted text-sm mb-4">Paieškos indeksų shardai ir jų eilučių būsena</p>
         <DataTable
+          sortable
           bodyAttributes={{ id: 'quickwitIndeksaiBody' }}
           columns={[
             { label: 'ID' },
@@ -205,6 +218,7 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
         </div>
         <h3 class="text-sm font-bold mb-3">Lentelės</h3>
         <DataTable
+          sortable
           bodyAttributes={{ id: 'lentelesBody' }}
           columns={[
             { label: 'Pavadinimas' },
@@ -215,7 +229,7 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
           ]}
         >
           {statistika.lenteles.map((l: any) => (
-            <tr class={l.tableName === 'Iš viso' ? 'font-bold' : ''}>
+            <tr class={l.tableName === 'Iš viso' ? 'font-bold' : ''} data-sort-pin={l.tableName === 'Iš viso' ? 'last' : undefined}>
               <td>{l.tableName}</td>
               <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.dataSize), 'B')}</td>
               <td class="cell-mono cell-right cell-nowrap">{convertUnit(Number(l.indexSize), 'B')}</td>
@@ -231,6 +245,7 @@ const atnaujintaFormatted = new Date(statistika.atnaujinta).toLocaleString('lt-L
         <h2 class="mb-1"><a href="#replikacija" id="replikacija" class="no-style">Replikacija</a></h2>
         <p class="text-muted text-sm mb-4">Prisijungusių replikų būsena ir atsilikimas nuo pagrindinės DB (pg_stat_replication)</p>
         <DataTable
+          sortable
           rows={statistika.replikacija}
           emptyText="Nėra prisijungusių replikų"
           emptyClassName="text-muted"

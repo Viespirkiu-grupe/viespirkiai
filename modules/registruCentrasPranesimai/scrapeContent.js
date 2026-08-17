@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("registruCentrasPranesimai", { operation: "scrapeContent" });
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
@@ -158,7 +160,7 @@ async function insertRows(parsed) {
 }
 
 async function parseInformacinisLeidinys(url) {
-    const res = await fetch(url);
+    const res = await scrapeFetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const data = new Uint8Array(await res.arrayBuffer());

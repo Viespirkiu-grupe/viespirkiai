@@ -14,8 +14,9 @@ export const SOURCE_LABEL: Record<string, string> = {
   mvpaprasai: 'MVP tvarkos',
   neskelbiamosderybos: 'Neskelbiamos derybos',
   liteko: 'LITEKO',
-  etar: 'e-TAR',
+  liteko2: 'LITEKO2',
   eseimas: 'e-Seimas',
+  etar: 'e-TAR',
 };
 
 // Klasė = plati dokumento sritis (viešieji pirkimai vs teisė).
@@ -44,3 +45,42 @@ export const TIPAS_OPTS = [
 export const TYPE_LABEL: Record<string, string> = Object.fromEntries(
   TIPAS_OPTS.map((o) => [o.value, o.label]),
 );
+
+/**
+ * URL parametro → žmogui skirtas pavadinimas. Vienas šaltinis šoninės juostos
+ * fasetų sekcijoms (dokumentaiSections.ts) ir OG antraštėms (searchOgMeta.ts).
+ * Raktai atitinka `loadDokumentaiPage` skaitomus parametrus.
+ */
+export const DOKUMENTAI_PARAM_LABELS: Record<string, string> = {
+  klase: 'Sritis',
+  type: 'Tipas',
+  teismas: 'Teismas',
+  bylosRusis: 'Bylos rūšis',
+  kategorija: 'Kategorija',
+  teisejas: 'Teisėjas',
+  aktoRusis: 'Teisės akto rūšis',
+  galiojimas: 'Galiojimas',
+  redakcija: 'Redakcija',
+  projektoBusena: 'Projekto būsena',
+  eurovoc: 'Eurovoc',
+  prieme: 'Priėmė',
+  turinys: 'Teksto būsena',
+  source: 'Šaltinis',
+  istaiga: 'Paskelbusi įstaiga',
+  host: 'Svetainė',
+  jar: 'Asmuo (JAR)',
+  ext: 'Plėtinys',
+  author: 'Autorius',
+  creator: 'Creator',
+  producer: 'Producer',
+  lang: 'Kalba',
+  sav: 'Savivaldybė',
+  apskritis: 'Apskritis',
+  metai: 'Metai',
+  istaigosNr: 'Įstaigos numeris',
+  regNr: 'Registracijos numeris',
+  nuo: 'Data nuo',
+  iki: 'Data iki',
+  mode: 'Paieškos režimas',
+  sort: 'Rikiavimas',
+};

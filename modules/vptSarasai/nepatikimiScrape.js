@@ -2,6 +2,8 @@
 Parsiunčia ir importuoja nepatikimų tiekėjų sąrašą iš VPT XLSX į PostgreSQL duomenų bazę.
 */
 
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("vptSarasai", { operation: "nepatikimiScrape" });
 import * as XLSX from "xlsx";
 import path from "node:path";
 import { postgres } from "../../postgres/postgres.js";
@@ -69,7 +71,7 @@ export function normalizeVptDate(value) {
 
 export async function importuotiNepatikimusTiekejus() {
     // Atliekama užklausa
-    const firstResponse = await fetch(FILE_URL, {
+    const firstResponse = await scrapeFetch(FILE_URL, {
         method: "GET",
         redirect: "manual",
     });
@@ -79,7 +81,7 @@ export async function importuotiNepatikimusTiekejus() {
 
     if (!location) throw new Error("No redirect location returned");
 
-    const secondResponse = await fetch(
+    const secondResponse = await scrapeFetch(
         `https://${new URL(FILE_URL).host}${location}`,
         {
             method: "GET",

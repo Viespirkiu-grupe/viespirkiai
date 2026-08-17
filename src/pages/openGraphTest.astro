@@ -36,8 +36,6 @@ const [sutartys, pirkimai, failai, asmenys] = await Promise.all([
 
 const staticPages = [
   '/statistika.png',
-  '/viesiejiPirkimai.png',
-  '/juridiniai.png',
   '/nepatikimi.png',
   '/neskelbiamos.png',
   '/bvpz.png',
@@ -50,11 +48,24 @@ const staticPages = [
   '/pinreg/scrape.png',
 ];
 
+// Paieškos maršrutų OG piešiamas iš užklausos, tad tikrinam ir su filtrais.
+const paieskos = [
+  '/sutartys.png',
+  '/sutartys.png?search=asfaltas&perkanciosiosOrganizacijosKodas=111950679&sumaNuo=100000&sudarymoDataNuo=2024-01-01',
+  '/viesiejiPirkimai.png',
+  '/viesiejiPirkimai.png?search=kelio+remontas&statusas=atlikta&verteNuo=50000',
+  '/dokumentai.png',
+  '/dokumentai.png?search=asfaltas&klase=teisekura&ext=pdf&lang=lt',
+  '/juridiniai.png',
+  '/juridiniai.png?search=Vilniaus&forma=Uždaroji+akcinė+bendrovė&darbuotojaiNuo=10',
+];
+
 const groups: { label: string; urls: string[] }[] = [
   { label: 'Sutartys (atsitiktinės)', urls: sutartys.map((id) => `/sutartis/${id}.png`) },
   { label: 'Viešieji pirkimai (atsitiktiniai)', urls: pirkimai.map((id) => `/viesiejiPirkimai/${id}.png`) },
   { label: 'Failai (atsitiktiniai)', urls: failai.map((id) => `/failas/${id}.png`) },
   { label: 'Asmenys (atsitiktiniai)', urls: asmenys.map((k) => `/asmuo/${k}.png`) },
+  { label: 'Paieškos (pagal užklausą)', urls: paieskos },
   { label: 'Statiniai puslapiai', urls: staticPages },
 ];
 ---

@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "scrape" });
 import { parseHTML } from "linkedom";
 import PQueue from "p-queue";
 import { postgres } from "../../postgres/postgres.js";
@@ -5,6 +7,7 @@ import { log } from "../../utils/log.js";
 import Timings from "../../utils/timings.js";
 import config from "../../utils/config.js";
 import { TIPO_ID } from "./viesiejiPirkimaiEnums.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const PAGE_SIZE = 1000;
 
@@ -78,6 +81,10 @@ async function upsertCFTS(cfts) {
     `;
 
     await postgres.query(query, values);
+    signalWork(WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED, {
+        source: "upsertCFTS",
+        count: cfts.length,
+    });
 
     // Nuskaitymo/rezervacijos metaduomenys gyvena plonojoje "viesiejiPirkimaiAtnaujinimai"
     // lentelėje. Naujiems pirkimams sukuriame eilutę (turinioNuskaitymas lieka NULL, tad
@@ -130,7 +137,7 @@ export async function updateCFTS(options = {}) {
         // d-3680175-p=2 // page 2
 
         timings.start("fetch");
-        const response = await fetch(url, { signal: abortController.signal });
+        const response = await scrapeFetch(url, { signal: abortController.signal });
         const html = await response.text();
         timings.end("fetch");
 

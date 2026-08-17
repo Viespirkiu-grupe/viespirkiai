@@ -9,7 +9,7 @@
 // vieną kiekvienai istorinei redakcijai. Puslapis rodo vieną iš jų (`?v=`), o
 // likusius — perjungikliu.
 import { postgres } from '@/postgres/postgres.js';
-import { openETarSidecar, readResponse } from '@/modules/eTar/eTarSidecar.js';
+import { readETarSidecar } from '@/modules/eTar/eTarSidecar.js';
 
 export interface TeisesAktasDocument {
   documentId: number;
@@ -21,18 +21,6 @@ export interface TeisesAktasDocument {
   contentMessage: string | null;
   md5: string | null;
   fetchedAt: string | null;
-}
-
-let sidecarDb: any = null;
-let sidecarFailed = false;
-function getSidecar() {
-  if (sidecarDb || sidecarFailed) return sidecarDb;
-  try {
-    sidecarDb = openETarSidecar({ readonly: true });
-  } catch {
-    sidecarFailed = true;   // sidecar'o nėra (kitas mazgas) — tekstas tiesiog nerodomas
-  }
-  return sidecarDb;
 }
 
 export interface TurinioIrasas {
@@ -85,7 +73,11 @@ export function flattenStructure(nodes: any[], maxDepth = 2): TurinioIrasas[] {
 export interface Redakcija {
   /** `?v=` reikšmė. */
   key: string;
-  kind: 'original' | 'consolidated' | 'historical';
+  /**
+   * Kas ši redakcija yra ŠIANDIEN: originalas, šiuo metu galiojanti, jau
+   * pasibaigusi ar dar tik įsigaliosianti.
+   */
+  kind: 'original' | 'consolidated' | 'historical' | 'future';
   from: string | null;
   to: string | null;
   /** Ją nulėmę pakeitimai (kokie aktai šitą redakciją padarė). */
@@ -95,6 +87,34 @@ export interface Redakcija {
   /** e-TAR adresas (kai savo teksto neturim). */
   sourceUrl: string | null;
   isCurrent: boolean;
+}
+
+/** Šiandiena Lietuvos laiku „YYYY-MM-DD" — redakcijų datos yra be laiko zonos. */
+function siandien(): string {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Vilnius' });
+}
+
+/**
+ * Ar redakcija galioja, jau baigėsi, ar dar tik įsigalios — sprendžiam PAGAL
+ * DATAS, ne pagal e-TAR variantą.
+ *
+ * e-TAR „suvestine redakcija" vadina ir tą, kuri įsigalios po metų, o visas
+ * turinčias pabaigos datą — „istorinėmis". Tai reiškia, kad pagal variantą
+ * dabar galiojanti redakcija (ji turi pabaigos datą, nes jau žinom, kada ją
+ * pakeis) atrodytų istorinė, o būsimoji — kaip galiojanti. Datos tokios
+ * painiavos nekelia.
+ */
+function redakcijosBusena(
+  from: string | null,
+  to: string | null,
+  variantas: string | undefined,
+  now: string,
+): Redakcija['kind'] {
+  if (from && from > now) return 'future';
+  if (to && to < now) return 'historical';
+  if (from || to) return 'consolidated';
+  // Be datų telieka e-TAR variantas (pvz., redakcijų sąrašas dar nenuskaitytas).
+  return variantas === 'consolidated_edition' ? 'consolidated' : 'historical';
 }
 
 /**
@@ -116,7 +136,11 @@ export function buildRedakcijos(
     if (doc.editionToken) docByToken.set(doc.editionToken, doc);
   }
   const used = new Set<string>();
+  // Datuotų redakcijų eilė; aktuali suvestinė prie jos prikabinama tik pabaigoje,
+  // nes ji turi stovėti pačiame sąrašo viršuje.
   const out: Redakcija[] = [];
+  const aktuali: Redakcija[] = [];
+  const now = siandien();
 
   const original = documents.find(d => d.variantas === 'original');
   if (original) {
@@ -137,8 +161,12 @@ export function buildRedakcijos(
     if (doc?.editionToken) used.add(doc.editionToken);
     out.push({
       key: edition.editionToken,
-      kind: doc?.variantas === 'consolidated_edition' || !edition.effectiveTo
-        ? 'consolidated' : 'historical',
+      kind: redakcijosBusena(
+        edition.effectiveFrom ?? null,
+        edition.effectiveTo ?? null,
+        doc?.variantas,
+        now,
+      ),
       from: edition.effectiveFrom ?? null,
       to: edition.effectiveTo ?? null,
       changes: edition.changes ?? [],
@@ -148,14 +176,15 @@ export function buildRedakcijos(
     });
   }
 
-  // Suvestinė, kurios redakcijų sąraše nėra (pasitaiko, kai e-TAR sąrašas dar
-  // nenuskaitytas) — vis tiek turi būti pasiekiama.
+  // Suvestinė, kurios redakcijų sąraše nėra — e-TAR ją laiko atskiru dokumentu
+  // („aktuali suvestinė redakcija"), be savo laikotarpio. Naudotojui tai
+  // dažniausiai ir yra ieškomas tekstas, tad ji eina į patį viršų.
   for (const doc of documents) {
     if (doc.variantas === 'original') continue;
     if (doc.editionToken && used.has(doc.editionToken)) continue;
-    out.push({
+    aktuali.push({
       key: doc.editionToken || doc.variantas,
-      kind: doc.variantas === 'consolidated_edition' ? 'consolidated' : 'historical',
+      kind: redakcijosBusena(null, null, doc.variantas, now),
       from: null,
       to: null,
       changes: [],
@@ -165,7 +194,7 @@ export function buildRedakcijos(
     });
   }
 
-  return out;
+  return [...aktuali, ...out];
 }
 
 /** Grupuoja eilutes pagal raktą į Map. */
@@ -409,27 +438,24 @@ export async function loadTeisesAktasPage(legalActId: string, url: URL) {
   let turiHtml = false;
   let struktura: any[] = [];
   if (current?.md5) {
-    const db = getSidecar();
-    if (db) {
-      try {
-        const payload: any = readResponse(db, current.md5);
-        const html = payload?.official_text?.html;
-        // HTML rodom <iframe> (per /teisesAktai/tekstas/html/<md5>), tekstas lieka kaip
-        // atsarginis variantas, kai HTML nėra.
-        turiHtml = typeof html === 'string' && html.trim().length > 0;
-        const raw = payload?.official_text?.text;
-        if (typeof raw === 'string' && raw.trim()) {
-          // Nuvalom kaip ir nuosprendžių puslapyje: eilučių pradžios tarpai,
-          // >1 tuščia eilutė → viena.
-          tekstas = raw
-            .replace(/^[ \t]+/gm, '')
-            .replace(/[ \t]+\n/g, '\n')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-        }
-        struktura = payload?.official_text?.structure ?? [];
-      } catch { /* sidecar'o pralaimėjimas puslapio negriauna */ }
-    }
+    try {
+      const payload: any = await readETarSidecar(current.md5);
+      const html = payload?.official_text?.html;
+      // HTML rodom <iframe> per vidinį akto teksto endpointą, tekstas lieka kaip
+      // atsarginis variantas, kai HTML nėra.
+      turiHtml = typeof html === 'string' && html.trim().length > 0;
+      const raw = payload?.official_text?.text;
+      if (typeof raw === 'string' && raw.trim()) {
+        // Nuvalom kaip ir nuosprendžių puslapyje: eilučių pradžios tarpai,
+        // >1 tuščia eilutė → viena.
+        tekstas = raw
+          .replace(/^[ \t]+/gm, '')
+          .replace(/[ \t]+\n/g, '\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+      }
+      struktura = payload?.official_text?.structure ?? [];
+    } catch { /* sidecar'o pralaimėjimas puslapio negriauna */ }
   }
 
   return {

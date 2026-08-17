@@ -5,11 +5,27 @@ import '../../utils/linksniai.js';
 let cache = null;
 let cacheTime = 0;
 
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+
+// Baitai → artimiausias vienetas (iki PB — kolekcija jau seniai peraugo GB) su
+// lt-LT skaitmenų formatavimu: „13,53 TB", „5 386 416 B".
 function formatBytes(value) {
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(2)} KB`;
-  if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(2)} MB`;
-  return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  let val = Number(value) || 0;
+  let i = 0;
+  while (val >= 1024 && i < BYTE_UNITS.length - 1) {
+    val /= 1024;
+    i++;
+  }
+  const skaitmenys = i === 0 ? 0 : 2;
+  const formatted = val.toLocaleString('lt-LT', {
+    minimumFractionDigits: skaitmenys,
+    maximumFractionDigits: skaitmenys,
+  });
+  return `${formatted} ${BYTE_UNITS[i]}`;
+}
+
+function formatCount(value) {
+  return (Number(value) || 0).toLocaleString('lt-LT');
 }
 
 function formatDateTime(dateInput) {
@@ -18,8 +34,12 @@ function formatDateTime(dateInput) {
 
 export function humanizeStatistika(statistika) {
   const h = structuredClone(statistika);
+  const apytiksliai = h.failai.apytiksliai ?? {};
   h.failai.dydziai = Object.fromEntries(
-    Object.entries(h.failai.dydziai).map(([k, v]) => [k, formatBytes(v)]),
+    Object.entries(h.failai.dydziai).map(([k, v]) => [k, formatBytes(v) + (apytiksliai[k] ? ' *' : '')]),
+  );
+  h.failai.kiekiai = Object.fromEntries(
+    Object.entries(h.failai.kiekiai).map(([k, v]) => [k, formatCount(v)]),
   );
   return h;
 }
@@ -126,7 +146,7 @@ export function buildPrometheusMetrics(statistika) {
   const { failai, nuskaitymas, lenteles, database, quickwitIndeksai, replikacija, topDokNuskaitytojai } = statistika;
 
   // Failų kiekiai ir dydžiai pagal būseną
-  const busenos = ['visi', 'klaida', 'parsiusti', 'neparsiusti'];
+  const busenos = ['visi', 'klaida', 'parsiusti', 'neparsiusti', 'isArchyvu'];
   metric('failai_kiekis', 'gauge', 'Failų kiekis pagal būseną',
     busenos.map((b) => ({ labels: { busena: b }, value: failai.kiekiai[b] })));
   metric('failai_dydis_bytes', 'gauge', 'Failų dydis baitais pagal būseną',
@@ -258,10 +278,16 @@ export async function gautiStatistika() {
 
   const [failaiCountsRes, lentelesRes, topRes, dbRes, quickwitIndeksaiRes, replikacijaRes] = await Promise.all([
     postgres.query(`SELECT
-        COALESCE(SUM(files), 0)            AS visi,
-        COALESCE(SUM(bytes), 0)            AS dydis,
+        COALESCE(SUM(files), 0)                 AS visi,
+        COALESCE(SUM(bytes), 0)                 AS "visiBaitai",
+        COALESCE(SUM("downloadedBytes"), 0)     AS "parsiustuBaitai",
+        COALESCE(SUM("downloadFailedBytes"), 0) AS "klaidosBaitai",
+        COALESCE(SUM("pendingBytes"), 0)        AS "neparsiustuBaitai",
+        COALESCE(SUM("unarchivedBytes"), 0)      AS "isarchyvuBaitai",
         COALESCE(SUM(downloaded), 0)       AS parsiusti,
         COALESCE(SUM("downloadFailed"), 0) AS klaida,
+        COALESCE(SUM(pending), 0)          AS neparsiusti,
+        COALESCE(SUM(unarchived), 0)       AS "isArchyvu",
         COALESCE(SUM(extracted), 0)        AS nuskaityti,
         COALESCE(SUM("extractFailed"), 0)  AS "nuskaitymoKlaidos",
         COALESCE(SUM(words), 0)            AS "zodziuSuma",
@@ -282,24 +308,43 @@ export async function gautiStatistika() {
 
   const statistika = {};
 
-  const neparsiusti = counts.visi - counts.parsiusti - counts.klaida;
-  const baitasFailui = counts.parsiusti > 0 ? counts.dydis / counts.parsiusti : 0;
-
-  statistika.failai = {
-    kiekiai: {
-      visi: counts.visi,
-      klaida: counts.klaida,
-      parsiusti: counts.parsiusti,
-      neparsiusti,
-    },
-    dydziai: {
-      // Tikras dydis žinomas tik parsiųstiems, likusiems ekstrapoliuojama.
-      visi: baitasFailui * counts.visi,
-      klaida: baitasFailui * counts.klaida,
-      parsiusti: counts.dydis,
-      neparsiusti: baitasFailui * neparsiusti,
-    },
+  // Būsenos nesidubliuoja ir sudaro visumą: parsiusti + klaida + neparsiusti
+  // (dar eilėje) + isArchyvu (išskleisti iš archyvo, downloadStatus = -5) = visi.
+  // `filesStats` laiko tikrus baitus pagal būseną — nebeekstrapoliuojam iš
+  // vidutinio parsiųsto failo dydžio (žr. ir /failai statistiką).
+  const kiekiai = {
+    visi: counts.visi,
+    klaida: counts.klaida,
+    parsiusti: counts.parsiusti,
+    neparsiusti: counts.neparsiusti,
+    isArchyvu: counts.isArchyvu,
   };
+  const dydziai = {
+    visi: counts.visiBaitai,
+    klaida: counts.klaidosBaitai,
+    parsiusti: counts.parsiustuBaitai,
+    neparsiusti: counts.neparsiustuBaitai,
+    isArchyvu: counts.isarchyvuBaitai,
+  };
+
+  // Neparsiųsto failo dydžio DB nežino (filesize užpildomas parsiuntus), tad
+  // tokioms būsenoms jį įvertinam pagal vidutinį parsiųsto failo dydį. Įvertintos
+  // reikšmės pažymimos, kad puslapyje būtų su „*".
+  const apytiksliai = {};
+  const baitasFailui = counts.parsiusti > 0 ? counts.parsiustuBaitai / counts.parsiusti : 0;
+  let ivertintiBaitai = 0;
+  for (const [key, kiekis] of Object.entries(kiekiai)) {
+    if (key === 'visi' || dydziai[key] > 0 || kiekis <= 0) continue;
+    dydziai[key] = baitasFailui * kiekis;
+    apytiksliai[key] = true;
+    ivertintiBaitai += dydziai[key];
+  }
+  if (ivertintiBaitai > 0) {
+    dydziai.visi += ivertintiBaitai;
+    apytiksliai.visi = true;
+  }
+
+  statistika.failai = { kiekiai, dydziai, apytiksliai };
 
   statistika.eiles = lentelesRes.rows.filter((lentele) => lentele.tableName.endsWith('Queue'));
   statistika.lenteles = lentelesRes.rows;

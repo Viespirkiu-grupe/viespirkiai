@@ -31,8 +31,10 @@ const number = (value: unknown) => value == null ? null : Number(value).toLocale
   {sortOptions.length > 0 && (
     <Fragment slot="sort">
       <label class="sr-only" for="jurSort">Rikiavimas</label>
-      <select id="jurSort" name="sort" value={sortValue} data-autosubmit>
-        {sortOptions.map((option) => <option value={option.value}>{option.label}</option>)}
+      <select id="jurSort" name="sort" data-autosubmit>
+        {sortOptions.map((option) => (
+          <option value={option.value} selected={sortValue === option.value}>{option.label}</option>
+        ))}
       </select>
     </Fragment>
   )}

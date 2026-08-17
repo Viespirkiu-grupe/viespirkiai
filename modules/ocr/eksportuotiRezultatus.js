@@ -1,12 +1,14 @@
 import fs from "fs";
 import path from "path";
-import QueryStream from "pg-query-stream";
 import { postgres } from "../../postgres/postgres.js";
+import { streamQuery } from "../../postgres/streamQuery.js";
 import { log } from "../../utils/log.js";
-import { readRezultatasFs } from "./rezultataiFs.js";
+import { readManyRezultatasFs } from "./rezultataiFs.js";
 
 const ROWS_PER_FILE = 100_000;
 const LOG_EVERY = 1_000;
+// Kiek eilučių sukaupiam prieš imant sidecar'us — sutampa su SIDECAR_BATCH_LIMIT.
+const LANGAS = 500;
 
 
 async function run(outputDir) {
@@ -37,13 +39,11 @@ async function run(outputDir) {
 
     openNextFile();
 
-    const client = await postgres.connect();
-    try {
-        // Rezultatų istorijos nebėra — eksportuojamas paskutinis kiekvieno failo
-        // rezultatas iš filesOcrStatus. `md5` čia yra resultHash (raktas į FS),
-        // o puslapių/žodžių skaičiai — iš po OCR atlikto nuskaitymo.
-        const qs = new QueryStream(
-            `SELECT o.id AS failas,
+    // Rezultatų istorijos nebėra — eksportuojamas paskutinis kiekvieno failo
+    // rezultatas iš filesOcrStatus. `md5` čia yra resultHash (raktas į FS),
+    // o puslapių/žodžių skaičiai — iš po OCR atlikto nuskaitymo.
+    const stream = await streamQuery(
+        `SELECT o.id AS failas,
                     o."resultHash" AS md5,
                     n.pavadinimas AS node,
                     o."lockTimestamp",
@@ -57,12 +57,13 @@ async function run(outputDir) {
              LEFT JOIN public."filesDataExtraction" d ON d.id = o.id
              WHERE o."resultHash" IS NOT NULL
              ORDER BY o.id ASC`,
-        );
-        const stream = client.query(qs);
+    );
 
-        for await (const row of stream) {
+    /** Vienas langas: sidecar'ai paimami viena užklausa, tada rašom eilutes. */
+    function rasytiLanga(langas, sidecarai) {
+        for (const row of langas) {
             if (rowsInFile >= ROWS_PER_FILE) openNextFile();
-            const rezultatas = await readRezultatasFs(row.md5);
+            const rezultatas = sidecarai.get(row.md5);
             fileStream.write(JSON.stringify({ ...row, tekstas: rezultatas?.tekstas ?? null }) + "\n");
             rowsInFile++;
             totalRows++;
@@ -73,8 +74,23 @@ async function run(outputDir) {
                 lastLogAt = totalRows;
             }
         }
-    } finally {
-        client.release();
+    }
+
+    // Jungtį ir transakciją uždaro pats streamQuery – nei `try/finally`, nei
+    // `release()` čia nebereikia.
+    //
+    // Srautą kaupiam į langus, nes sekvenciniam `for await` skaitymo grupavimas
+    // nepadeda: per tick'ą ateina po vieną raktą. Su langu vienas `readMany`
+    // pakeičia LANGAS skaitymų, o eilučių tvarka išlieka.
+    let langas = [];
+    for await (const row of stream) {
+        langas.push(row);
+        if (langas.length < LANGAS) continue;
+        rasytiLanga(langas, await readManyRezultatasFs(langas.map((r) => r.md5)));
+        langas = [];
+    }
+    if (langas.length) {
+        rasytiLanga(langas, await readManyRezultatasFs(langas.map((r) => r.md5)));
     }
 
     if (fileStream) fileStream.end();

@@ -6,6 +6,9 @@ import { getNewestPinreg } from "../modules/pinreg/scrapeNewest.js";
 import { nuskaitytiDomregDomena } from "../modules/domenai/scrapeDomreg.js";
 import { litekoScrapeLatestDays } from "../modules/liteko/scrape.js";
 import { surastiNuosprendzioDalyvius } from "../modules/liteko/scrapeContent.js";
+import { nuskaitytiNaujausius as litekoNuskaitytiNaujausius } from "../modules/liteko2/scrape.js";
+import { nuskaitytiSprendimuTurini } from "../modules/liteko2/scrapeContent.js";
+import { sinchronizuotiKlasifikatorius } from "../modules/liteko2/klasifikatoriai.js";
 import { pravalytiOcrRezervacijas } from "../modules/ocr/pravalytiRezervacijas.js";
 import { geolocateJarAddress } from "../modules/juridiniai/findCoordinates.js";
 import { nuskaitytiInformaciniusLeidinius } from "../modules/registruCentrasPranesimai/scrape.js";
@@ -21,6 +24,11 @@ import { atnaujintiSodrosDuomenis } from "../modules/sodra/atnaujintiSodra.js";
 import { processSuggestionQueue } from "../modules/searchSuggestion/processSuggestionQueue.js";
 import { deleteDeadIndexes } from "../quickwit/deleteDeadIndexes.js";
 import { processDomenaiAdpQueue } from "../modules/domenai/processAdpQueue.js";
+import { processJuridiniaiIndexQueue } from "../modules/juridiniai/quickwitProcessIndexQueue.js";
+import { processJuridiniaiRefreshQueue } from "../modules/juridiniai/processRefreshQueue.js";
+import { atnaujintiJarCsv } from "../modules/juridiniai/updateJarCsv.js";
+import { atnaujintiJarPapildomusDuomenis } from "../modules/juridiniai/importJarPapildomiDuomenys.js";
+import { WORK_SIGNALS } from "../utils/taskSignals.js";
 
 export default [
     {
@@ -34,7 +42,7 @@ export default [
     {
         name: "update2014EsInvesticijosData",
         schedule: "47 */3 * * *",
-        job: update2014EsInvesticijosData,
+        job: async () => update2014EsInvesticijosData(),
     },
     {
         name: "nuskaitytiCpvaProjektaiTiekejai",
@@ -64,8 +72,8 @@ export default [
         priority: 2,
         cooldown: 30,
         errorCooldown: 10,
-        job: async () => {
-            const processed = await nuskaitytiDomregDomena();
+        job: async (signal) => {
+            const processed = await nuskaitytiDomregDomena(signal);
             if (processed) await new Promise((r) => setTimeout(r, 500));
             return processed;
         },
@@ -81,7 +89,27 @@ export default [
         priority: 5,
         cooldown: 60,
         errorCooldown: 10,
-        job: surastiNuosprendzioDalyvius,
+        job: async () => surastiNuosprendzioDalyvius(),
+    },
+    {
+        // LITEKO2 (naujoji sistema, https://liteko-api-pub.teismas.lt) — sąrašas.
+        name: "scrapeLiteko2",
+        schedule: "30 */6 * * *",
+        job: async () => litekoNuskaitytiNaujausius(),
+    },
+    {
+        name: "scrapeLiteko2Turinys",
+        mode: "asap",
+        priority: 5,
+        cooldown: 60,
+        errorCooldown: 10,
+        // Worker'is job'ui paduoda AbortSignal, o funkcija pirmu argumentu laukia batchSize.
+        job: async () => nuskaitytiSprendimuTurini(),
+    },
+    {
+        name: "liteko2Klasifikatoriai",
+        schedule: "15 4 * * *",
+        job: sinchronizuotiKlasifikatorius,
     },
     {
         name: "pravalytiOcrRezervacijas",
@@ -182,6 +210,42 @@ export default [
         priority: 4,
         cooldown: 30,
         errorCooldown: 60,
+        wakeOn: [WORK_SIGNALS.DOMENAI_ADP_READY],
         job: processDomenaiAdpQueue,
+    },
+    {
+        name: "atnaujintiJarCsv",
+        schedule: "20 1 * * *",
+        job: atnaujintiJarCsv,
+    },
+    {
+        // Papildomi RC JAR rinkiniai (FA, NVO/paramos gavėjai, savanorystė,
+        // JANGIS, dokumentai ir JADIS dalyviai) taip pat formuojami kasdien. Pirminį JAR importą
+        // paleidžiame pirmiau, kad papildomi duomenys visada remtųsi naujausiu JA.
+        name: "atnaujintiJarPapildomusDuomenis",
+        schedule: "20 2 * * *",
+        job: atnaujintiJarPapildomusDuomenis,
+    },
+    {
+        name: "juridiniaiRefreshQueue",
+        mode: "asap",
+        priority: 5,
+        cooldown: 30,
+        errorCooldown: 30,
+        wakeOn: [WORK_SIGNALS.JURIDINIAI_REFRESH_READY],
+        job: processJuridiniaiRefreshQueue,
+    },
+    {
+        name: "juridiniaiQuickwitProcessIndexQueue",
+        mode: "asap",
+        priority: 5,
+        // TaskRunner workeriai nėra shard'inti: du workeriai gali paimti
+        // skirtingus to paties JAR kodo eilės įvykius ir susikirsti mapping'e.
+        // CLI `--concurrency` lieka saugus, nes ten naudojamas stabilus shard'as.
+        concurrency: 1,
+        cooldown: 30,
+        errorCooldown: 30,
+        wakeOn: [WORK_SIGNALS.JURIDINIAI_INDEX_READY],
+        job: processJuridiniaiIndexQueue,
     },
 ];

@@ -8,21 +8,6 @@ import SourceGroup from '@design-system/components/content/SourceGroup.astro';
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
-const apiSections = [
-  {
-    title: 'Sutartys',
-    description: 'Pavienių sutarčių duomenys pasiekiami <code>.json</code> formatu pagal sutarties unikalų ID:',
-    href: 'https://viespirkiai.org/sutartis/2007700250.json',
-    hrefHtml: 'https://viespirkiai.org/sutartis/<strong>2007700250</strong>.json',
-  },
-  {
-    title: 'Juridiniai asmenys',
-    description: 'Juridinių asmenų duomenys pasiekiami <code>.json</code> formatu pagal juridinio asmens JAR kodą:',
-    href: 'https://viespirkiai.org/asmuo/110053842.json',
-    hrefHtml: 'https://viespirkiai.org/asmuo/<strong>110053842</strong>.json',
-  },
-];
-
 const legalEntitySources = [
   {
     title: 'Įregistruoti asmenys',
@@ -41,6 +26,12 @@ const legalEntitySources = [
     links: [
       { href: 'https://data.gov.lt/datasets/1806/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0' },
       { href: 'https://data.gov.lt/datasets/1666/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0' },
+      {
+        href: 'https://www.registrucentras.lt/atviri-duomenys-ir-statistika/jar-pirminiai-duomenys-raw-data',
+        label: 'JAR pirminiai duomenys / Registrų centras',
+        badge: 'CC BY 4.0',
+        suffixHtml: '- finansinių ataskaitų rodikliai, anuliavimai, vėlavimai',
+      },
     ],
   },
   {
@@ -49,7 +40,19 @@ const legalEntitySources = [
   },
   {
     title: 'Dalyviai',
-    links: [{ href: 'https://data.gov.lt/datasets/1732/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0' }],
+    links: [
+      { href: 'https://data.gov.lt/datasets/1732/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0' },
+      {
+        href: 'https://www.registrucentras.lt/atviri-duomenys-ir-statistika/jadis-pirminiai-duomenys-raw-data',
+        label: 'JADIS pirminiai duomenys / Registrų centras',
+        badge: 'CC BY 4.0',
+        suffixHtml: '- dalyvių sąrašai, valstybės ir savivaldybių dalys',
+      },
+    ],
+  },
+  {
+    title: 'Teisinės formos ir statusai',
+    links: [{ href: 'https://data.gov.lt/datasets/gov/rc/jar/formos_statusai/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0' }],
   },
   {
     title: 'Transporto priemonės',
@@ -57,7 +60,10 @@ const legalEntitySources = [
   },
   {
     title: 'Teismo nuosprendžiai',
-    links: [{ href: 'https://liteko.teismai.lt/viesasprendimupaieska/detalipaieska.aspx?detali=2', label: 'LITEKO' }],
+    links: [
+      { href: 'https://liteko.teismai.lt/viesasprendimupaieska/detalipaieska.aspx?detali=2', label: 'LITEKO' },
+      { href: 'https://liteko-api-pub.teismas.lt/v3/api-docs', label: 'LITEKO viešasis API / Nacionalinė teismų administracija' },
+    ],
   },
   {
     title: 'Privačių interesų deklaracijos',
@@ -69,7 +75,10 @@ const legalEntitySources = [
   },
   {
     title: 'Darbo teisės pažeidimai',
-    links: [{ href: 'https://vdi.lrv.lt/lt/informacija-apie-darbdaviu-padarytus-teises-pazeidimus/', label: 'Valstybinė darbo inspekcija' }],
+    links: [
+      { href: 'https://vdi.lrv.lt/lt/informacija-apie-darbdaviu-padarytus-teises-pazeidimus/', label: 'Valstybinė darbo inspekcija' },
+      { href: 'https://www.vdi.lt/Forms/ATPK_imones_2024.aspx', label: 'Nubaustų įmonių sąrašai / Valstybinė darbo inspekcija' },
+    ],
   },
   {
     title: 'Pranešimai apie steigimą, reorganizavimą, likvidavimą',
@@ -88,8 +97,25 @@ const sourceLists = [
       { href: 'https://vpt.lrv.lt/lt/nuorodos/kiti-duomenys/powerbi/melaginga-informacija-pateikusiu-tiekeju-sarasas-3/', label: 'Melagingą informaciją pateikusių tiekėjų sąrašas / VPT' },
       { href: 'https://vpt.lrv.lt/lt/nuorodos/kiti-duomenys/powerbi/nepatikimi-tiekejai-1/', label: 'Nepatikimų tiekėjų sąrašas / VPT' },
       { href: 'https://cvpp.eviesiejipirkimai.lt/', label: 'Centrinė viešųjų pirkimų platforma (CVPP) / VPT' },
+      { href: 'https://pirkimai.eviesiejipirkimai.lt/', label: 'Tiekėjų ir pirkimo vykdytojų profiliai / CVP IS' },
       { href: 'https://ted.europa.eu/', label: 'Tenders Electronic Daily (TED) / Europos Sąjunga' },
       { href: 'https://mw.eviesiejipirkimai.lt/vpm/SVPTS/svpts_paieska.asp', label: 'Mažos vertės pirkimų tvarkos aprašai / VPT' },
+    ],
+  },
+  {
+    title: 'Teisės aktai ir teisėkūra',
+    items: [
+      { href: 'https://www.e-tar.lt/portal/lt/index', label: 'Teisės aktų registras (TAR) / Registrų centras' },
+      { href: 'https://e-seimas.lrs.lt/portal/documentSearch/lt', label: 'Teisės aktų informacinė sistema (TAIS) / LR Seimas' },
+    ],
+  },
+  {
+    title: 'BVPŽ (CPV) kodai',
+    items: [
+      {
+        href: 'https://simap.ted.europa.eu/web/simap/cpv',
+        label: 'Bendrasis viešųjų pirkimų žodynas / Europos Komisija',
+      },
     ],
   },
   {
@@ -104,6 +130,7 @@ const sourceLists = [
     items: [
       { href: 'https://nominatim.org/', label: 'Nominatim', suffixHtml: '(© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>)' },
       { href: 'https://openstreetmap.org/', label: 'OpenStreetMap', suffixHtml: '(© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>)' },
+      { href: 'https://overpass-api.de/', label: 'Overpass API', suffixHtml: '(© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>)' },
       { href: 'https://data.gov.lt/datasets/1287/', label: 'Registrų centras / data.gov.lt', badge: 'CC BY 4.0', suffixHtml: '- vietovių linksniavimas' },
     ],
   },
@@ -127,19 +154,50 @@ const softwareSections = [
     items: [{ href: 'https://ubuntu.com/download/server', label: 'Ubuntu Server 24.04 LTS' }],
   },
   {
-    title: 'Duomenų bazės',
+    title: 'Duomenų bazės ir paieška',
     items: [
       { href: 'https://www.postgresql.org/', label: 'PostgreSQL' },
       { href: 'https://typesense.org/', label: 'Typesense' },
+      { href: 'https://quickwit.io/', label: 'Quickwit', suffixHtml: '- pilnatekstė dokumentų paieška' },
+      { href: 'https://www.sqlite.org/', label: 'SQLite', suffixHtml: '- dokumentų saugyklos' },
     ],
   },
   {
-    title: 'Programavimo kalbos',
-    items: [{ href: 'https://nodejs.org/en', label: 'JavaScript / NodeJS' }],
+    title: 'Programavimo kalbos ir karkasai',
+    items: [
+      { href: 'https://nodejs.org/en', label: 'JavaScript / NodeJS' },
+      { href: 'https://astro.build/', label: 'Astro' },
+    ],
   },
   {
-    title: 'Failų sistema',
-    items: [{ href: 'https://en.wikipedia.org/wiki/ZFS', label: 'ZFS' }],
+    title: 'Infrastruktūra',
+    items: [
+      { href: 'https://www.docker.com/', label: 'Docker' },
+      { href: 'https://nats.io/', label: 'NATS', suffixHtml: '- vidinis žinučių srautas' },
+      { href: 'https://www.torproject.org/', label: 'Tor' },
+    ],
+  },
+  {
+    title: 'Failų sistema ir saugyklos',
+    items: [
+      { href: 'https://en.wikipedia.org/wiki/ZFS', label: 'ZFS' },
+      { href: 'https://en.wikipedia.org/wiki/Amazon_S3#S3_API_and_competing_services', label: 'S3 suderinama objektų saugykla', suffixHtml: '- atsarginės kopijos' },
+    ],
+  },
+  {
+    title: 'Dokumentų apdorojimas',
+    items: [
+      { href: 'https://mozilla.github.io/pdf.js/', label: 'pdf.js' },
+      { href: 'https://sharp.pixelplumbing.com/', label: 'sharp' },
+      { href: 'https://github.com/vercel/satori', label: 'Satori', suffixHtml: '+ <a href="https://github.com/yisibl/resvg-js">resvg</a>' },
+    ],
+  },
+  {
+    title: 'Vizualizacijos',
+    items: [
+      { href: 'https://www.sigmajs.org/', label: 'Sigma.js' },
+      { href: 'https://graphology.github.io/', label: 'Graphology', suffixHtml: '- ryšių grafai' },
+    ],
   },
   {
     title: 'Komunikavimo priemonės',
@@ -177,25 +235,10 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
       Jokiems šioje svetainėje pateiktiems duomenims nėra taikomas jokios rūšies garantijos. Jie yra bendrinami siekiant padidinti viešųjų pirkimų skaidrumą ir padidinti valstybinių duomenų prieinamumą.
     </Alert>
 
-    <section class="page-section" id="api">
-      <h2>API</h2>
-
-      <div class="grid-2">
-        {apiSections.map((item) => (
-          <section>
-            <h3>{item.title}</h3>
-            <p set:html={item.description} />
-            <a href={item.href} set:html={item.hrefHtml} />
-          </section>
-        ))}
-      </div>
-    </section>
-
-    <hr class="my-7" />
-
     <section class="page-section" id="duomenu-eksportas">
       <h2>Duomenų eksportai</h2>
-      <p><a href="/kontaktai">Susisiekite</a></p>
+      <p>Mūsų surinkti duomenys mašininiu formatu prieinami adresu <a href="https://data.viespirkiai.org/">data.viespirkiai.org</a>.</p>
+      <p>Dėl kitokių eksportų <a href="/kontaktai">susisiekite</a>.</p>
     </section>
 
     <hr class="my-7" />

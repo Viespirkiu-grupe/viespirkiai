@@ -81,8 +81,8 @@ describe("searchSutartys (quickwit engine)", () => {
         expect(page1.results.length).toBeGreaterThan(0);
         expect(page2.results.length).toBeGreaterThan(0);
 
-        const ids1 = page1.results.map((r) => r.sutartiesUnikalusId);
-        const ids2 = page2.results.map((r) => r.sutartiesUnikalusId);
+        const ids1 = page1.results.map((r: any) => r.sutartiesUnikalusId);
+        const ids2 = page2.results.map((r: any) => r.sutartiesUnikalusId);
         for (const id of ids2) {
             expect(ids1).not.toContain(id);
         }
@@ -128,7 +128,8 @@ describe("searchSutartys (quickwit engine)", () => {
         );
 
         expect(results).toEqual([]);
-        expect(client).not.toBeNull();
+        // Jungtį valdo streamQuery – iškvietėjui `client` nebeperduodamas.
+        expect(client).toBeNull();
         expect(stream).not.toBeNull();
 
         const rows: object[] = [];

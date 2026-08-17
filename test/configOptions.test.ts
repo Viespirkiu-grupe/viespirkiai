@@ -39,17 +39,39 @@ describe('external source URLs', () => {
   });
 });
 
-describe('SQLite sidecar locations', () => {
-  it('reads all three SQLite file paths from the environment', () => {
+describe('e-Seimas scraper options', () => {
+  it('reads independent scheduling limits while sharing the e-TAR adapter address', () => {
     const config = normalizeConfig(configFromEnv({
-      FAILAIINFO_SQLITE_LOCATION: '/data/failaiInfo.sqlite',
-      DOKUMENTAI_SQLITE_LOCATION: '/data/dokumentai.sqlite',
-      OCR_REZULTATAI_SQLITE_LOCATION: '/data/ocr.sqlite',
+      ETAR_API_URL: 'http://adapter.test',
+      ETAR_API_KEY: 'secret',
+      ESEIMAS_RECENT_DAYS: '90',
+      ESEIMAS_REFRESH_HOURS: '4',
+      ESEIMAS_MAX_INFLIGHT: '3',
     }));
 
-    expect(config.failaiInfoSqliteLocation).toBe('/data/failaiInfo.sqlite');
-    expect(config.dokumentaiSqliteLocation).toBe('/data/dokumentai.sqlite');
-    expect(config.ocrRezultataiSqliteLocation).toBe('/data/ocr.sqlite');
+    expect(config.eTarApiUrl).toBe('http://adapter.test');
+    expect(config.eTarApiKey).toBe('secret');
+    expect(config.eSeimasRecentDays).toBe(90);
+    expect(config.eSeimasRefreshHours).toBe(4);
+    expect(config.eSeimasMaxInflight).toBe(3);
+  });
+});
+
+describe('SQLite sidecar locations', () => {
+  it('reads the one sidecar directory and remote base from the environment', () => {
+    const config = normalizeConfig(configFromEnv({
+      SIDECAR_DIR: '/data/sidecars',
+      SIDECAR_REMOTE: 'https://host',
+    }));
+
+    expect(config.sidecarDir).toBe('/data/sidecars');
+    expect(config.sidecarRemote).toBe('https://host');
   });
 
+  it('leaves both unset when the environment does not define them', () => {
+    const config = normalizeConfig(configFromEnv({}));
+
+    expect(config.sidecarDir).toBeUndefined();
+    expect(config.sidecarRemote).toBeUndefined();
+  });
 });

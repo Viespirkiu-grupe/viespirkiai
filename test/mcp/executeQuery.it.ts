@@ -36,7 +36,7 @@ describe("execute_query — validation rejection", () => {
 describe("execute_query — happy path without pagination", () => {
     it("returns rows, page metadata, and no hasMore for a small result set", async () => {
         const result = (await handler({
-            query: "SELECT \"sutartiesUnikalusId\" FROM sutartys ORDER BY \"sutartiesUnikalusId\" LIMIT 5",
+            query: "SELECT \"sutartiesUnikalusId\" FROM v_sutartys ORDER BY \"sutartiesUnikalusId\" LIMIT 5",
             purpose: "smoke test: fetch 5 contracts",
             page: 1,
         })) as AnyResult;
@@ -128,7 +128,7 @@ describe("execute_query — v_sutartys happy path", () => {
 
 describe("execute_query — happy path with pagination", () => {
     it("page 1 signals hasMore and page 2 returns the next slice", async () => {
-        const query = "SELECT \"sutartiesUnikalusId\" FROM sutartys ORDER BY \"sutartiesUnikalusId\"";
+        const query = "SELECT \"sutartiesUnikalusId\" FROM v_sutartys ORDER BY \"sutartiesUnikalusId\"";
         const purpose = "pagination test";
 
         const [page1Result, page2Result] = await Promise.all([

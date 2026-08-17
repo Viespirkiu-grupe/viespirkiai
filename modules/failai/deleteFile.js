@@ -1,6 +1,7 @@
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 import { gautiFaila } from "./filesSkaitymas.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 const logger = new Logger();
 
 export async function deleteFile(id) {
@@ -28,7 +29,20 @@ export async function deleteFile(id) {
     //
     // Trinamas tik DB įrašas; blobas dėžėse lieka (žr. komentarą aukščiau).
     // Šoninės lentelės ir eilės nusitrina per ON DELETE CASCADE.
-    await postgres.query(`DELETE FROM public.files WHERE id = $1;`, [id]);
+    const deleted = await postgres.query(
+        `DELETE FROM public.files WHERE id = $1;`,
+        [id],
+    );
+    if (deleted.rowCount > 0) {
+        signalWork(WORK_SIGNALS.FILES_DOCUMENTS_READY, {
+            source: "deleteFile",
+            count: deleted.rowCount,
+        });
+        signalWork(WORK_SIGNALS.SUTARTYS_CHANGED, {
+            source: "deleteFile",
+            count: deleted.rowCount,
+        });
+    }
     logger.log(`Deleted file record with id: ${id} (md5=${file.md5}, blobas dėžėse nepaliestas)`);
 }
 

@@ -21,6 +21,8 @@ const SCHEMA_TABLES = [
     'public."planuojamiPirkimaiBudai"',
 ];
 
+/** @typedef {{ query: (...args: any[]) => Promise<any> }} Queryable */
+
 function pad(value) {
     return String(value).padStart(2, "0");
 }
@@ -57,6 +59,7 @@ export function recentPublicationRange(now = new Date(), days = DEFAULT_DAYS) {
     };
 }
 
+/** @param {Queryable} [db] */
 export async function assertPlanuojamiPirkimaiSchema(db = postgres) {
     const { rows } = await db.query(
         `SELECT name, to_regclass(name) AS relation FROM unnest($1::text[]) name`,
@@ -73,6 +76,10 @@ export async function assertPlanuojamiPirkimaiSchema(db = postgres) {
     );
 }
 
+/**
+ * @param {Array<{md5: string, [key: string]: unknown}>} records
+ * @param {Queryable} [db]
+ */
 export async function upsertPlanuojamiPirkimai(records, db = postgres) {
     if (!records.length) return 0;
     // EPPS CSV neturi stabilaus ID ir kartais grąžina kelias visiškai vienodas
@@ -238,6 +245,16 @@ export async function upsertPlanuojamiPirkimai(records, db = postgres) {
     return rows[0]?.count ?? 0;
 }
 
+/**
+ * @param {{
+ *   now?: Date,
+ *   days?: number,
+ *   workingHours?: () => boolean,
+ *   processRecords?: Function,
+ *   db?: Queryable,
+ *   logger?: {log(...args: any[]): void}
+ * }} [options]
+ */
 export async function updateRecentPlanuojamiPirkimai({
     now = new Date(),
     days = DEFAULT_DAYS,
@@ -261,6 +278,15 @@ export async function updateRecentPlanuojamiPirkimai({
     return { skipped: false, ...result };
 }
 
+/**
+ * @param {{
+ *   db?: Queryable,
+ *   processRecords?: Function,
+ *   assertSchema?: (db: Queryable) => Promise<void>,
+ *   logger?: {log(...args: any[]): void},
+ *   [key: string]: any
+ * }} [options]
+ */
 export async function backfillPlanuojamiPirkimai({
     db = postgres,
     processRecords = processPlanuojamiPirkimai,

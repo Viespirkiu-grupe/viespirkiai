@@ -278,6 +278,27 @@ describe("aggregateFinansai", () => {
         expect(result.byYear[0].ilgalaikis).toBe(25000);
     });
 
+    it("sujungia atskiras balanso ir pelno ataskaitas pagal metus", () => {
+        const result = aggregateFinansai({
+            ataskaitos: [
+                {
+                    laikotarpisIki: "2024-12-31",
+                    standards: [{ lines: [{ lineName: "Pardavimo pajamos", reiksme: 90000 }] }],
+                },
+                {
+                    laikotarpisIki: "2024-12-31",
+                    standards: [{ lines: [{ lineName: "Ilgalaikis turtas", reiksme: 45000 }] }],
+                },
+            ],
+        });
+        expect(result.byYear).toHaveLength(1);
+        expect(result.byYear[0]).toMatchObject({
+            metai: 2024,
+            pajamos: 90000,
+            ilgalaikis: 45000,
+        });
+    });
+
     it("handles missing standards property gracefully", () => {
         const result = aggregateFinansai({
             ataskaitos: [{ laikotarpisIki: "2023-12-31" }],

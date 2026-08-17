@@ -149,6 +149,15 @@ monthly_upsert AS (
         draustieji2 = EXCLUDED.draustieji2,
         "imokuSuma" = EXCLUDED."imokuSuma",
         "importoId" = EXCLUDED."importoId"
+    WHERE ROW(
+        "sodraMonthly"."jarKodas", "sodraMonthly"."evrkId",
+        "sodraMonthly"."vidutinisAtlyginimas", "sodraMonthly".draustieji,
+        "sodraMonthly"."vidutinisAtlyginimas2", "sodraMonthly".draustieji2
+    ) IS DISTINCT FROM ROW(
+        EXCLUDED."jarKodas", EXCLUDED."evrkId",
+        EXCLUDED."vidutinisAtlyginimas", EXCLUDED.draustieji,
+        EXCLUDED."vidutinisAtlyginimas2", EXCLUDED.draustieji2
+    )
     RETURNING id
 )
 SELECT count(*)::integer AS written FROM monthly_upsert;

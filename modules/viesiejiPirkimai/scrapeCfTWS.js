@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "scrapeCfTWS" });
 import { postgres } from "../../postgres/postgres.js";
 import pLimit from "p-limit";
 import Timings from "../../utils/timings.js";
@@ -8,6 +10,7 @@ import { persistPirkimoTurinys } from "./persistTurinys.js";
 import { extractTedNoticeNumber } from "./parsers.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
 import { irasytiFailus } from "../failai/failuIrasymas.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 import {
     parseCfTWS,
     parseFailai,
@@ -123,7 +126,7 @@ export async function getNextCft() {
  * @returns {Promise<string>}
  */
 async function fetchText(url) {
-    const response = await fetch(url, { redirect: "follow" });
+    const response = await scrapeFetch(url, { redirect: "follow" });
     markRequest();
 
     const redirectedUrl = response.url || "";
@@ -137,6 +140,12 @@ async function fetchText(url) {
         const error = new Error("CAS redirect");
         error.casRedirect = true;
         error.casLocation = redirectedUrl;
+        throw error;
+    }
+
+    if (response.status >= 500) {
+        const error = new Error(`EPPS HTTP ${response.status}: ${url}`);
+        error.httpStatus = response.status;
         throw error;
     }
 
@@ -228,7 +237,7 @@ async function processCfTWSRecord(cft, options = {}) {
                 })
                 .join(", ");
 
-            await postgres.query(
+            const tedQueued = await postgres.query(
                 `
                 INSERT INTO "tedNotices" ("tedNoticeNumber")
                 VALUES ${placeholders}
@@ -236,6 +245,12 @@ async function processCfTWSRecord(cft, options = {}) {
                 `,
                 values,
             );
+            if (tedQueued.rowCount > 0) {
+                signalWork(WORK_SIGNALS.TED_NOTICES_READY, {
+                    source: "scrapeCfTWS",
+                    count: tedQueued.rowCount,
+                });
+            }
         }
 
         timings.start("updatePurchase");
@@ -263,7 +278,7 @@ async function processCfTWSRecord(cft, options = {}) {
         }
         // Promoted stulpelius rašom į storąją lentelę tik jei kas nors pasikeitė
         // (IS DISTINCT FROM), kad nekintantis 12h perskaitymas nebloatintų eilutės.
-        await postgres.query(
+        const purchaseChanged = await postgres.query(
             `
             UPDATE public."viesiejiPirkimai"
             SET "numatomaVerteEUR" = $2,
@@ -296,6 +311,12 @@ async function processCfTWSRecord(cft, options = {}) {
                 jarKodas,
             ],
         );
+        if (purchaseChanged.rowCount > 0) {
+            signalWork(WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED, {
+                source: "scrapeCfTWS",
+                count: purchaseChanged.rowCount,
+            });
+        }
         // Turinys → reliacinės lentelės (Keys/Dalys/Failai/Skelbimai).
         await persistPirkimoTurinys(cft.pirkimoId, result);
         // Nuskaitymo būsena/data visada į plonąją lentelę.
@@ -316,6 +337,10 @@ async function processCfTWSRecord(cft, options = {}) {
             `Nuskaitytas CfTWS id ${cft.pirkimoId} | fetch ${timings.humanDuration("fetchMain")}/${timings.humanDuration("fetchNotices")}/${timings.humanDuration("fetchFiles")}/${timings.humanDuration("fetchVersions")} | upsert ${timings.humanDuration("upsertFiles")}/${timings.humanDuration("updatePurchase")} | viso ${timings.humanDuration()}`,
         );
     } catch (error) {
+        // EPPS serverio klaidą turi valdyti Worker errorCooldown. Šiuo atveju
+        // pirkimo nuskaitymo būsenos DB nekeičiame.
+        if (error?.httpStatus >= 500) throw error;
+
         console.error(`Klaida apdorojant pirkimą ID ${cft.pirkimoId}:`, error);
 
         const status = error?.casRedirect ? -404 : -1;

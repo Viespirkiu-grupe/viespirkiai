@@ -3,6 +3,7 @@ import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import fs from "fs";
 import readline from "readline";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const [, , filename] = process.argv;
 
@@ -29,12 +30,18 @@ async function updateDomain(domain, lineNumber) {
             return;
         }
 
-        await postgres.query(
+        const updated = await postgres.query(
             `UPDATE domenai
              SET "domregNuskaitymas" = -404
              WHERE domain = $1`,
             [domain],
         );
+        if (updated.rowCount > 0) {
+            signalWork(WORK_SIGNALS.DOMENAI_ADP_READY, {
+                source: "zymetiNeegzistuojancius",
+                domain,
+            });
+        }
         logger.log(`Line ${lineNumber}: updated ${domain} to -404`);
     } catch (err) {
         console.error(

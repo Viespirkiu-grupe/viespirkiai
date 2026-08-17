@@ -10,6 +10,12 @@ vi.mock("../../modules/mcp/mcpLogger.js", () => ({
     logToolCall: vi.fn(),
 }));
 
+// ensureAnalystViews eina per postgres.connect() (žemiau mock'inamas tik .query),
+// o be jo handler'is nutrūktų dar nepasiekęs _runQuery.
+vi.mock("../../modules/mcp/analyst/ensureViews.js", () => ({
+    ensureAnalystViews: vi.fn().mockResolvedValue(undefined),
+}));
+
 // columnFixer calls postgres to load table column names; return empty in unit tests
 // so the map only contains view columns (sufficient for these tests).
 vi.mock("../../postgres/postgres.js", () => ({
@@ -28,7 +34,7 @@ import { analystPool } from "../../modules/mcp/analyst/pool.js";
 import { validateSql } from "../../modules/mcp/analyst/validateSql.js";
 import { handler, QUERY_TIMEOUT_SECONDS } from "../../modules/mcp/tools/executeQuery.js";
 
-const VALID_QUERY = "SELECT id FROM sutartys LIMIT 1";
+const VALID_QUERY = "SELECT id FROM vpmSutartys LIMIT 1";
 const VALID_PURPOSE = "unit test";
 
 function makeClient(rows: object[] = []) {
@@ -104,7 +110,7 @@ describe("executeQuery handler — column-not-found hint", () => {
     });
 
     it("does not append HINT for unrelated DB errors", async () => {
-        const err = Object.assign(new Error("permission denied for table sutartys"), { code: "42501" });
+        const err = Object.assign(new Error("permission denied for table vpmSutartys"), { code: "42501" });
         const client = {
             query: vi.fn()
                 .mockResolvedValueOnce(undefined)
@@ -131,7 +137,7 @@ describe("executeQuery handler — SQL normalization (whitespace + IS DISTINCT F
         vi.mocked(analystPool.connect).mockResolvedValue(client as never);
 
         const multiLineQuery = `SELECT id
-FROM sutartys
+FROM vpmSutartys
 LIMIT 1`;
         const result = await handler({ query: multiLineQuery, purpose: VALID_PURPOSE, page: 1 });
 
@@ -139,8 +145,8 @@ LIMIT 1`;
         // The pool should receive the collapsed single-line SQL (wrapped in pagination subquery)
         const executedSql: string = client.query.mock.calls
             .map((args) => String(args[0]))
-            .find((s) => s.includes("SELECT id FROM sutartys")) ?? "";
-        expect(executedSql).toContain("SELECT id FROM sutartys LIMIT 1");
+            .find((s) => s.includes("SELECT id FROM vpmSutartys")) ?? "";
+        expect(executedSql).toContain("SELECT id FROM vpmSutartys LIMIT 1");
     });
 
     it("rewrites IS DISTINCT FROM true → IS NOT TRUE before executing", async () => {
@@ -148,7 +154,7 @@ LIMIT 1`;
         vi.mocked(analystPool.connect).mockResolvedValue(client as never);
 
         const result = await handler({
-            query: "SELECT id FROM sutartys WHERE istrinta IS DISTINCT FROM true LIMIT 1",
+            query: "SELECT id FROM vpmSutartys WHERE istrinta IS DISTINCT FROM true LIMIT 1",
             purpose: VALID_PURPOSE,
             page: 1,
         });
@@ -165,7 +171,7 @@ LIMIT 1`;
         vi.mocked(analystPool.connect).mockResolvedValue(client as never);
 
         const result = await handler({
-            query: "SELECT id FROM sutartys WHERE istrinta IS DISTINCT FROM false LIMIT 1",
+            query: "SELECT id FROM vpmSutartys WHERE istrinta IS DISTINCT FROM false LIMIT 1",
             purpose: VALID_PURPOSE,
             page: 1,
         });

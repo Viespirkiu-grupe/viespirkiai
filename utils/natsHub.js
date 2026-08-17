@@ -28,8 +28,10 @@ const dec = new TextDecoder();
 let nc = null;
 /** @type {Promise<import("nats").NatsConnection> | null} */
 let connecting = null;
+let closing = false;
 
 async function ensureConnected() {
+    if (closing) throw new Error("natsHub: jungtis uždaroma");
     if (!config.natsUrl) throw new Error("natsHub: NATS_URL nenurodytas");
     if (nc) return nc;
     if (connecting) return connecting;
@@ -59,48 +61,70 @@ async function ensureConnected() {
     return connecting;
 }
 
+/** Užbaigia laukiančius publish ir švariai uždaro bendrą NATS jungtį. */
+export async function closeNats() {
+    closing = true;
+    const connection = nc ?? await connecting?.catch(() => null);
+    connecting = null;
+    nc = null;
+    if (connection && !connection.isClosed()) {
+        await connection.drain();
+    }
+}
+
 /**
  * Prenumeruoti kanalą. Grąžina `unsubscribe` funkciją.
  *
  * @param {string} channel - kanalo (NATS subject'o) pavadinimas.
- * @param {(payload: unknown, raw: string) => void} onMessage - kviečiama gavus
- *        žinutę; `payload` – JSON.parse'inta reikšmė (arba pati eilutė, jei ne JSON).
+ * @param {(payload: unknown, raw: string, subject: string) => void} onMessage -
+ *        kviečiama gavus žinutę; `payload` – JSON.parse'inta reikšmė (arba pati
+ *        eilutė, jei ne JSON), `subject` – tikras žinutės subject'as (svarbu
+ *        wildcard prenumeratoms).
+ * @param {{queue?: string}} [options] - NATS queue group.
  * @returns {() => void}
  */
-export function subscribe(channel, onMessage) {
+export function subscribe(channel, onMessage, options = {}) {
     /** @type {import("nats").Subscription | null} */
     let sub = null;
     let stopped = false;
+    let retryTimer = null;
 
-    void ensureConnected()
-        .then((c) => {
-            if (stopped) return;
-            sub = c.subscribe(channel);
-            void (async () => {
-                for await (const m of sub) {
-                    const raw = dec.decode(m.data);
-                    let parsed = raw;
-                    if (raw) {
+    const connectSubscription = () => {
+        void ensureConnected()
+            .then((c) => {
+                if (stopped) return;
+                sub = c.subscribe(channel, { queue: options.queue || undefined });
+                void (async () => {
+                    for await (const m of sub) {
+                        const raw = dec.decode(m.data);
+                        let parsed = raw;
+                        if (raw) {
+                            try {
+                                parsed = JSON.parse(raw);
+                            } catch {
+                                parsed = raw;
+                            }
+                        }
                         try {
-                            parsed = JSON.parse(raw);
+                            onMessage(parsed, raw, m.subject);
                         } catch {
-                            parsed = raw;
+                            // Prenumeratoriaus klaida neturi nutraukti fan-out'o kitiems.
                         }
                     }
-                    try {
-                        onMessage(parsed, raw);
-                    } catch {
-                        // Prenumeratoriaus klaida neturi nutraukti fan-out'o kitiems.
-                    }
-                }
-            })();
-        })
-        .catch(() => {
-            // Jungties nėra – kanalas tyliai neveikia, gavėjai turi fallback'ą.
-        });
+                })();
+            })
+            .catch(() => {
+                // Pirmas connect, skirtingai nuo reconnect, gali iškart
+                // nepavykti. Prenumeratą bandome kurti tol, kol ji atšaukiama.
+                if (!stopped) retryTimer = setTimeout(connectSubscription, 1000);
+            });
+    };
+    connectSubscription();
 
     return () => {
         stopped = true;
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = null;
         sub?.unsubscribe();
         sub = null;
     };

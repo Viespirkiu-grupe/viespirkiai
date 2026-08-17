@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("mvpTvarkosAprasai", { operation: "scrape" });
 import { log } from "../../utils/log.js";
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
@@ -19,7 +21,7 @@ export async function nuskaitytiMvpTvarkosAprasuSubjektuPage(
 
     timings.start("subjektaiPageFetch");
     // Post LIST_CURRENT_PAGE=$PAGE&SBJ_SKODAS=&SBJ_PAV=
-    let response = await fetch(url, {
+    let response = await scrapeFetch(url, {
         method: "POST",
         headers: {
             "Content-Type": "application/x-www-form-urlencoded",

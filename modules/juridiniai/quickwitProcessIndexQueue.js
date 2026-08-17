@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { postgres } from "../../postgres/postgres.js";
 import {
@@ -9,22 +8,17 @@ import { Logger } from "../../utils/log.js";
 import { toNumber } from "../../utils/coerce.js";
 import { foldLithuanian } from "../../utils/text.js";
 import { toRfc3339 } from "../../utils/time.js";
+import { JURIDINIAI_QUICKWIT_INDEX_CONFIG } from "./quickwitIndexConfig.js";
 
 const logger = new Logger();
 const LENTELE = "juridiniai";
 const BATCH_SIZE = 2_500;
 const MAX_ZOOM = 19;
 const MAX_MERCATOR_LAT = 85.0511287798066;
-const INDEX_CONFIG_URL = new URL(
-    "../../docs/juridiniai-quickwit.yaml",
-    import.meta.url,
-);
-
 let configRegistered = false;
 
 export async function ensureJuridiniaiQuickwitConfig() {
     if (configRegistered) return;
-    const indexConfig = await fs.readFile(INDEX_CONFIG_URL, "utf8");
     await postgres.query(
         `INSERT INTO public."quickwitLenteles"
             ("lentele", "defaultShardSize", "indexConfig")
@@ -39,7 +33,7 @@ export async function ensureJuridiniaiQuickwitConfig() {
             EXCLUDED."defaultShardSize",
             EXCLUDED."indexConfig"
          )`,
-        [LENTELE, 250_000, indexConfig],
+        [LENTELE, 250_000, JURIDINIAI_QUICKWIT_INDEX_CONFIG],
     );
     configRegistered = true;
 }
@@ -125,6 +119,10 @@ export function buildDoc(row) {
         darbuotojai: toNumber(row.darbuotojai),
         vidutinisAtlyginimas: toNumber(row.vidutinisAtlyginimas),
         rodikliai: withoutNulls({
+            // Skaitinis jarKodas – antrinis rikiavimo laukas (žr. searchQuickwit.js).
+            // Quickwit nerikiuoja pagal `text` laukus, o json laukas leidžia jį
+            // pridėti nekeičiant jau sukurtų shard'ų schemos.
+            jarKodas: toNumber(row.jarKodas),
             vmiMokesciai: toNumber(row.vmiMokesciai),
             istatinisKapitalas: toNumber(row.istatinisKapitalas),
             pirkimuKiekis: toNumber(row.pirkimuKiekis),

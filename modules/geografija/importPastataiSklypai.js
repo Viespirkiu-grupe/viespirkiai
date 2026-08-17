@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("geografija", { operation: "importPastataiSklypai" });
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
@@ -17,7 +19,7 @@ async function updatePastataiSklypaiAdresai() {
             "Žemės sklypams ir / ar pastatams suteikti adresai visoje LR teritorijoje",
     );
 
-    const res = await fetch(entry.csv);
+    const res = await scrapeFetch(entry.csv);
     if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
 
     const rl = createInterface({

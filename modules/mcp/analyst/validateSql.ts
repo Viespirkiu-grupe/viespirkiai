@@ -6,11 +6,10 @@ const { Parser } = pkg;
 const parser = new Parser();
 
 export const TABLE_WHITELIST: Set<string> = new Set([
-    "sutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
+    "vpmSutartys", "sutartysAtviriDuomenys", "sutartysAtviriDuomenysImp",
     "jarAsmenys", "jar",
     "viesiejiPirkimai", "viesiejiPirkimaiVykdytojai",
     "pinregJuridiniaiRysiai", "pinreg",
-    "failai",
     "sabisSutartys", "sabisSutarciuSalys", "sabisSaskaitos", "sabisSaskaituSalys",
     "sabisSaskaituSalysTipai", "sabisSaskaituSalysVeiklosVieta",
     "cpvaProjektuSutartys", "cpvaProjektuSarasas",
@@ -20,7 +19,8 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "sodraMonthlyPavadinimai", "sodraMonthlySavivaldybes",
     "regitra", "regitraMatymai", "regitraAtnaujinimai",
     "nepatikimiTiekejai", "melagingiTiekejai",
-    "jadis", "rcInformaciniaiLeidiniaiPranesimai",
+    "jadisDalyviuSkaiciai", "jadisDalyviuSarasai", "jadisValstybesDalyviai",
+    "rcInformaciniaiLeidiniaiPranesimai",
     "domenai", "kotis",
     "balansoAtaskaitos", "pelnoNuostoliuAtaskaitos",
     "darboVieta", "istatinisKapitalas",
@@ -30,8 +30,14 @@ export const TABLE_WHITELIST: Set<string> = new Set([
     "teismoNuosprendziai", "teismoNuosprendziaiDalyviai",
     "mokesciai",
 
-    "atn1ataskaitos", "atn1dalyviai", "atn1sutartys",
-    "atn1pasiulymuEile", "atn1atmestiPasiulymai",
+    "xlsxPPAataskaitos", "xlsxPPAdalyviai", "xlsxPPAsutartys",
+    "xlsxPPApasiulymuEile", "xlsxPPAatmestiPasiulymai",
+    "xlsxPPAteisiniaiPagrindai", "xlsxPPAataskaitosTipai",
+    "xlsxPPApirkimoVertes", "xlsxPPAperkanciosiosOrganizacijosTipai",
+    "xlsxPPAigaliotosiosTipai", "xlsxPPApirkimoBudai",
+    "xlsxPPAatmestuPasiulymuStatusai", "xlsxPPAatmetimoTeisiniaiPagrindai",
+    "xlsxPPAatmetimoPriezastys", "xlsxPPAkainosIsraiskos",
+    "xlsxPPAsalys", "xlsxPPAcentralizacijosTipai", "xlsxPPApirkimoObjektoRusys",
 ]);
 
 export const FUNCTION_WHITELIST: Set<string> = new Set([

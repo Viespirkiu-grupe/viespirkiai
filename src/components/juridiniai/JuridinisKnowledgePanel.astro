@@ -3,13 +3,14 @@ import KnowledgePanelShell from '@design-system/components/KnowledgePanelShell.a
 import Map from '@design-system/components/maps/Map.astro';
 import { fmtEur, fmtNumber } from '../../lib/formatters.ts';
 import type { JuridinisPanel } from '../../lib/searchJuridinisPanel.ts';
+import { arAktyvusStatusas } from '../../lib/jarStatusas.ts';
 
 interface Props {
   juridinis: JuridinisPanel;
 }
 
 const { juridinis } = Astro.props;
-const isActive = juridinis.statusoPavadinimas === 'Teisinis stat neįregistruotas';
+const isActive = arAktyvusStatusas(juridinis.statusoPavadinimas);
 const money = (value: number | null) => value != null ? `${fmtEur(value)} €` : null;
 const hasStats = juridinis.darbuotojai != null || juridinis.vidutinisAtlyginimas != null
   || juridinis.pirkimuSuma != null || juridinis.pardavimuSuma != null;

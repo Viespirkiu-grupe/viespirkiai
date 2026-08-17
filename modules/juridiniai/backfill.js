@@ -1,10 +1,12 @@
 import { pathToFileURL } from "node:url";
 import { postgres } from "../../postgres/postgres.js";
+import { acquireSessionLock } from "../../postgres/sessionLock.js";
 import {
     JAR_ADDRESS_JOINS,
     JAR_ADDRESS_SQL,
     JAR_LOCATION_SQL,
 } from "./jarReadSql.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const DEFAULT_BATCH_SIZE = 5_000;
 const LOCK_KEY = "juridiniai-backfill";
@@ -21,7 +23,7 @@ function parseBatchSize(argv) {
     return value;
 }
 
-async function upsertDictionaries(client) {
+export async function upsertDictionaries(client) {
     await client.query(`
         INSERT INTO public."juridiniaiSavivaldybesPavadinimai" ("pavadinimas")
         SELECT DISTINCT "pavadinimas"
@@ -83,13 +85,10 @@ async function upsertDictionaries(client) {
 
 }
 
-export const UPSERT_BATCH_SQL = `
+export function buildJuridiniaiUpsertSql(batchSql, resultSql) {
+    return `
     WITH batch AS MATERIALIZED (
-        SELECT jar_person.*
-        FROM public."jarAsmenys" jar_person
-        WHERE jar_person."jarKodas" > $1
-        ORDER BY jar_person."jarKodas"
-        LIMIT $2
+        ${batchSql}
     ),
     source AS MATERIALIZED (
         SELECT
@@ -251,30 +250,42 @@ export const UPSERT_BATCH_SQL = `
         )
         RETURNING 1
     )
-    SELECT
+    ${resultSql}
+`;
+}
+
+export const UPSERT_BATCH_SQL = buildJuridiniaiUpsertSql(
+    `SELECT jar_person.*
+     FROM public."jarAsmenys" jar_person
+     WHERE jar_person."jarKodas" > $1
+     ORDER BY jar_person."jarKodas"
+     LIMIT $2`,
+    `SELECT
         (SELECT max("jarKodas") FROM batch) AS "lastJarKodas",
         (SELECT count(*)::integer FROM batch) AS "scanned",
-        (SELECT count(*)::integer FROM upserted) AS "changed"
-`;
+        (SELECT count(*)::integer FROM upserted) AS "changed"`,
+);
 
 export async function backfillJuridiniai({ batchSize = DEFAULT_BATCH_SIZE } = {}) {
+    // Lock'as – atskiroje tiesioginėje jungtyje, nes jis gyvena per visą
+    // backfill'ą, t. y. per daugybę transakcijų (žr. postgres/sessionLock.js).
+    const lock = await acquireSessionLock(LOCK_KEY);
+    if (!lock) {
+        throw new Error("Kitas juridinių asmenų backfill procesas jau veikia");
+    }
+
     const client = await postgres.connect();
     let lastJarKodas = 0;
     let scannedTotal = 0;
     let changedTotal = 0;
 
     try {
-        const lock = await client.query(
-            "SELECT pg_try_advisory_lock(hashtext($1)::bigint) AS locked",
-            [LOCK_KEY],
-        );
-        if (!lock.rows[0]?.locked) {
-            throw new Error("Kitas juridinių asmenų backfill procesas jau veikia");
-        }
-
         await client.query("BEGIN");
         await upsertDictionaries(client);
         await client.query("COMMIT");
+        signalWork(WORK_SIGNALS.JURIDINIAI_INDEX_READY, {
+            source: "juridiniai-backfill-dictionaries",
+        });
 
         while (true) {
             await client.query("BEGIN");
@@ -289,6 +300,13 @@ export async function backfillJuridiniai({ batchSize = DEFAULT_BATCH_SIZE } = {}
             const changed = Number(result?.changed ?? 0);
             if (!scanned) break;
 
+            if (changed > 0) {
+                signalWork(WORK_SIGNALS.JURIDINIAI_INDEX_READY, {
+                    source: "juridiniai-backfill",
+                    count: changed,
+                });
+            }
+
             lastJarKodas = result.lastJarKodas;
             scannedTotal += scanned;
             changedTotal += changed;
@@ -298,16 +316,25 @@ export async function backfillJuridiniai({ batchSize = DEFAULT_BATCH_SIZE } = {}
             );
         }
 
+        await client.query("BEGIN");
+        const removed = await client.query(
+            `DELETE FROM public."juridiniai" target
+             WHERE target."jarKodas" ~ '^[0-9]{9}$'
+               AND NOT EXISTS (
+                   SELECT 1 FROM public."jarAsmenys" source
+                   WHERE source."jarKodas"::text = target."jarKodas"
+               )`,
+        );
+        await client.query("COMMIT");
+        changedTotal += removed.rowCount;
+
         return { scanned: scannedTotal, changed: changedTotal };
     } catch (error) {
         await client.query("ROLLBACK").catch(() => {});
         throw error;
     } finally {
-        await client.query(
-            "SELECT pg_advisory_unlock(hashtext($1)::bigint)",
-            [LOCK_KEY],
-        ).catch(() => {});
         client.release();
+        await lock.release();
     }
 }
 

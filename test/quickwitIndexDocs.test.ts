@@ -1,48 +1,53 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const makeClient = (
-  events: string[],
-  opts: {
-    existingRows?: { eilutesId: string | number; indeksaiId: number; indeksas: string }[];
-    nextIds?: (string | number)[];
-    currentShardRows?: { id: number; indeksas: string }[];
-  } = {},
-) => ({
+type QueryOpts = {
+  existingRows?: { eilutesId: string | number; indeksaiId: number; indeksas: string }[];
+  nextIds?: (string | number)[];
+  currentShardRows?: { id: number; indeksas: string }[];
+};
+
+// Shared routing for both the transaction client and the pool: indexDocs reads
+// some rows through postgres.query (table id, id allocation) and writes the rest
+// through a connect()ed client, so both mocks must answer the same statements.
+const routeQuery = (normalized: string, params: any[] | undefined, opts: QueryOpts) => {
+  if (normalized.startsWith("SELECT e.\"eilutesId\", e.\"indeksaiId\", i.\"indeksas\"")) {
+    return { rows: opts.existingRows ?? [] };
+  }
+  if (normalized.startsWith("SELECT id FROM \"quickwitLenteles\"")) {
+    return { rows: [{ id: 7 }] };
+  }
+  if (normalized.startsWith("SELECT nextval")) {
+    const count = params?.[0] ?? 0;
+    const nextIds = opts.nextIds ?? Array.from({ length: count }, (_, i) => i + 101);
+    return { rows: nextIds.slice(0, count).map((id) => ({ id })) };
+  }
+  if (normalized.startsWith("SELECT id, \"indeksas\" FROM \"quickwitIndeksai\"")) {
+    return { rows: opts.currentShardRows ?? [] };
+  }
+  if (normalized.startsWith("INSERT INTO \"quickwitIndeksai\"")) {
+    return { rows: [{ id: 1, indeksas: "test_1" }] };
+  }
+  if (normalized.startsWith("SELECT \"defaultShardSize\"")) {
+    return {
+      rows: [{
+        defaultShardSize: 1000,
+        indexConfig: "index_id: template\n",
+        indexConfigHash: "hash",
+      }],
+    };
+  }
+  if (normalized.startsWith("SELECT COALESCE(MAX(\"seq\"), 0) + 1")) {
+    return { rows: [{ nextSeq: 1 }] };
+  }
+  return { rows: [] };
+};
+
+const makeClient = (events: string[], opts: QueryOpts = {}) => ({
   release: vi.fn(() => events.push("release")),
   query: vi.fn(async (sql: string, params?: any[]) => {
     const normalized = sql.replace(/\s+/g, " ").trim();
     events.push(normalized);
-
-    if (normalized.startsWith("SELECT e.\"eilutesId\", e.\"indeksaiId\", i.\"indeksas\"")) {
-      return { rows: opts.existingRows ?? [] };
-    }
-    if (normalized.startsWith("SELECT id FROM \"quickwitLenteles\"")) {
-      return { rows: [{ id: 7 }] };
-    }
-    if (normalized.startsWith("SELECT nextval")) {
-      const count = params?.[0] ?? 0;
-      const nextIds = opts.nextIds ?? Array.from({ length: count }, (_, i) => i + 101);
-      return { rows: nextIds.slice(0, count).map((id) => ({ id })) };
-    }
-    if (normalized.startsWith("SELECT id, \"indeksas\" FROM \"quickwitIndeksai\"")) {
-      return { rows: opts.currentShardRows ?? [] };
-    }
-    if (normalized.startsWith("INSERT INTO \"quickwitIndeksai\"")) {
-      return { rows: [{ id: 1, indeksas: "test_1" }] };
-    }
-    if (normalized.startsWith("SELECT \"defaultShardSize\"")) {
-      return {
-        rows: [{
-          defaultShardSize: 1000,
-          indexConfig: "index_id: template\n",
-          indexConfigHash: "hash",
-        }],
-      };
-    }
-    if (normalized.startsWith("SELECT COALESCE(MAX(\"seq\"), 0) + 1")) {
-      return { rows: [{ nextSeq: 1 }] };
-    }
-    return { rows: [] };
+    return routeQuery(normalized, params, opts);
   }),
 });
 
@@ -63,9 +68,10 @@ async function loadQuickwit(
     postgres: {
       connect: vi.fn(async () => client),
       query: vi.fn(async (sql: string, params?: any[]) => {
-        events.push(`pool:${sql.replace(/\s+/g, " ").trim()}`);
+        const normalized = sql.replace(/\s+/g, " ").trim();
+        events.push(`pool:${normalized}`);
         if (opts.poolQuery) return opts.poolQuery(sql, params);
-        return { rows: [] };
+        return routeQuery(normalized, params, opts);
       }),
     },
   }));
@@ -124,7 +130,9 @@ describe("indexDocs", () => {
     const ingestAt = events.indexOf("fetch:ingest");
     const insertAt = events.findIndex((event) => event.startsWith("INSERT INTO \"quickwitEilutes\""));
     const iterptosAt = events.findIndex((event) => event.startsWith("UPDATE \"quickwitIndeksai\" i SET \"iterptosEilutes\""));
-    const commitAt = events.indexOf("COMMIT");
+    // lastIndexOf: shard creation runs in its own earlier transaction, so the
+    // publish COMMIT is the second one.
+    const commitAt = events.lastIndexOf("COMMIT");
 
     expect(ingestAt).toBeGreaterThan(-1);
     expect(insertAt).toBeGreaterThan(ingestAt);
@@ -141,7 +149,7 @@ describe("indexDocs", () => {
     });
   });
 
-  it("rolls back without publishing quickwitEilutes when ingest fails", async () => {
+  it("does not publish quickwitEilutes when ingest fails", async () => {
     const events: string[] = [];
     const fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith("/api/v1/indexes/test_1")) {
@@ -166,8 +174,10 @@ describe("indexDocs", () => {
 
     expect(events.some((event) => event.startsWith("INSERT INTO \"quickwitEilutes\""))).toBe(false);
     expect(events.some((event) => event.startsWith("UPDATE \"quickwitIndeksai\" i SET \"iterptosEilutes\""))).toBe(false);
-    expect(events).toContain("ROLLBACK");
-    expect(events).not.toContain("COMMIT");
+    // Ingest happens before the publish transaction opens, so a failure means
+    // the only transaction on record is the earlier shard creation one.
+    expect(events.filter((event) => event === "BEGIN")).toHaveLength(1);
+    expect(events.indexOf("fetch:ingest")).toBeGreaterThan(events.lastIndexOf("COMMIT"));
   });
 
   it("rotates existing UUID mappings to integer ids", async () => {
@@ -193,11 +203,11 @@ describe("indexDocs", () => {
     await indexDocs("test", [{ eilutesId: "10", doc: { title: "updated" } }]);
 
     const update = events.find((event) => event.startsWith("UPDATE \"quickwitEilutes\" AS qe"));
-    expect(update).toContain("\"quickwitId\" = NULL");
     expect(update).toContain("\"quickwitIdInt\" = v.\"quickwitIdInt\"");
+    expect(update).not.toContain("\"quickwitId\" =");
   });
 
-  it("filters live hits across integer and legacy UUID ids", async () => {
+  it("filters live hits by integer id and drops pre-migration UUID ids", async () => {
     const events: string[] = [];
     const uuid = "018f0f8e-0e7a-7c0a-9b44-28dfc5ce0a21";
     const fetchMock = vi.fn();
@@ -207,10 +217,6 @@ describe("indexDocs", () => {
         if (sql.includes("\"quickwitIdInt\"")) {
           expect(params).toEqual([7, ["101", "303"]]);
           return { rows: [{ quickwitIdInt: "303" }] };
-        }
-        if (sql.includes("\"quickwitId\"")) {
-          expect(params).toEqual([7, [uuid]]);
-          return { rows: [{ quickwitId: uuid }] };
         }
         if (sql.includes("FROM \"quickwitLenteles\"")) {
           expect(params).toEqual(["test"]);
@@ -222,12 +228,11 @@ describe("indexDocs", () => {
 
     const hits = [
       { quickwitId: "101", title: "stale-int" },
-      { quickwitId: uuid, title: "live-uuid" },
+      { quickwitId: uuid, title: "pre-migration-uuid" },
       { quickwitId: "303", title: "live-int" },
     ];
 
     await expect(filterLive("test", hits)).resolves.toEqual([
-      { quickwitId: uuid, title: "live-uuid" },
       { quickwitId: "303", title: "live-int" },
     ]);
   });

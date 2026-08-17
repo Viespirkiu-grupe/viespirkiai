@@ -1,8 +1,12 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("geografija", { operation: "importApskriciuRibos" });
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import { getArDataSources } from "./adresuRegistrasDataSources.js";
 import proj4 from "proj4";
+import { enqueueAddressLinkedJuridiniai } from "../juridiniai/enqueueRefresh.js";
+import { syncJuridiniaiDictionaries } from "../juridiniai/syncDictionaries.js";
 
 const lks94 =
     "+proj=tmerc +lat_0=0 +lon_0=24 +k=0.9998 +x_0=500000 +y_0=0 +ellps=GRS80 +units=m +no_defs";
@@ -19,7 +23,7 @@ async function updateApskritys() {
     const sources = await getArDataSources();
     const entry = sources.adminUnits.find((r) => r.name === "Apskričių ribos");
 
-    const res = await fetch(entry.geojson);
+    const res = await scrapeFetch(entry.geojson);
     if (!res.ok) throw new Error(`Failed to fetch apskritys: ${res.status}`);
     const data = await res.json();
 
@@ -36,6 +40,9 @@ async function updateApskritys() {
             [APS_KODAS, APS_PAV, APS_PLOTAS, JSON.stringify(geojson)],
         );
     }
+
+    await syncJuridiniaiDictionaries(postgres, "apskriciu-ribos-dictionaries");
+    await enqueueAddressLinkedJuridiniai(postgres, "apskriciu-ribos");
 
     logger.log("Atnaujintos apskričių ribos");
     return true;

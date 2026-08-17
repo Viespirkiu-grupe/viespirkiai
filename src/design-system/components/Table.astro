@@ -4,6 +4,8 @@ interface Props {
   striped?: boolean;
   fixed?: boolean;
   size?: 'md' | 'sm' | 'lg';
+  /** Įjungia rikiavimą paspaudus ant `th.sortable` antraščių. */
+  sortable?: boolean;
 }
 
 const {
@@ -11,6 +13,7 @@ const {
   striped = false,
   fixed = false,
   size = 'md',
+  sortable = false,
 } = Astro.props;
 
 const classes = [
@@ -22,6 +25,12 @@ const classes = [
 ].filter(Boolean).join(' ');
 ---
 
-<table class={classes}>
+<table class={classes} data-sortable={sortable ? '' : undefined}>
   <slot />
 </table>
+
+<!-- Skriptas hoistinamas visam puslapiui; be `data-sortable` lentelių jis nieko nedaro. -->
+<script>
+  import { initSortableTables } from '@design-system/lib/sortableTable.ts';
+  initSortableTables();
+</script>

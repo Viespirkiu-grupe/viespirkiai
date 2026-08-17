@@ -1,0 +1,165 @@
+---
+import DateValue from '@design-system/components/DateValue.astro';
+import TimelineItem from '@design-system/components/TimelineItem.astro';
+import type { SutartiesPakeitimas } from '../../lib/sutartisPakeitimai.ts';
+
+interface Props {
+  pakeitimas: SutartiesPakeitimas;
+  /** Ar tęsti laiko juostos liniją žemyn (yra dar įrašų). */
+  lineActive?: boolean;
+}
+
+const { pakeitimas, lineActive = false } = Astro.props;
+
+const kryptiesZenklas: Record<string, string> = {
+  pridėta: '+',
+  pašalinta: '−',
+  pakeista: '↝',
+};
+---
+
+<TimelineItem active lineActive={lineActive}>
+  <div class="pakeitimas-antraste">
+    <DateValue value={pakeitimas.data} mode="datetime" />
+  </div>
+  <ul class="pakeitimas-eilutes">
+    {pakeitimas.eilutes.map((e) => e.busena ? (
+      <li class={`pakeitimas-busena pakeitimas-busena--${e.busena}`}>
+        {e.busena === 'istrinta' ? '🗑 Sutartis ištrinta' : '♻ Sutartis atkurta'}
+      </li>
+    ) : (
+      <li class={`pakeitimas-eilute pakeitimas-eilute--${e.kryptis}`}>
+        <span class={`pakeitimas-zenklas pakeitimas-zenklas--${e.kryptis}`} aria-hidden="true">
+          {kryptiesZenklas[e.kryptis]}
+        </span>
+        <span class="pakeitimas-laukas">{e.laukas}</span>
+        <span class="pakeitimas-reiksmes">
+          {e.before !== null && (
+            <span class="pakeitimas-val pakeitimas-val--senas">{e.before}</span>
+          )}
+          {e.before !== null && e.after !== null && (
+            <span class="pakeitimas-rodykle" aria-hidden="true">→</span>
+          )}
+          {e.after !== null && (
+            <span class="pakeitimas-val pakeitimas-val--naujas">{e.after}</span>
+          )}
+          {e.after === null && (
+            <span class="pakeitimas-val pakeitimas-val--tuscias">pašalinta</span>
+          )}
+        </span>
+      </li>
+    ))}
+  </ul>
+</TimelineItem>
+
+<style>
+  .pakeitimas-antraste {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .pakeitimas-busena {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    font-weight: 700;
+  }
+
+  .pakeitimas-busena--istrinta {
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    border: 1px solid currentColor;
+  }
+
+  .pakeitimas-busena--atkurta {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    border: 1px solid currentColor;
+  }
+
+  .pakeitimas-eilutes {
+    list-style: none;
+    margin: 0 0 4px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .pakeitimas-eilute {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    font-size: var(--text-sm);
+  }
+
+  .pakeitimas-zenklas {
+    flex: none;
+    width: 1.1em;
+    text-align: center;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .pakeitimas-zenklas--pridėta {
+    color: var(--color-success);
+  }
+
+  .pakeitimas-zenklas--pašalinta {
+    color: var(--color-danger);
+  }
+
+  .pakeitimas-zenklas--pakeista {
+    color: var(--color-info);
+  }
+
+  .pakeitimas-laukas {
+    font-weight: 600;
+    color: var(--dark-gray);
+  }
+
+  .pakeitimas-laukas::after {
+    content: ':';
+  }
+
+  .pakeitimas-reiksmes {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .pakeitimas-val {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pakeitimas-val--senas {
+    color: var(--color-danger);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+
+  .pakeitimas-val--naujas {
+    color: var(--color-success);
+    font-weight: 600;
+  }
+
+  .pakeitimas-val--tuscias {
+    color: var(--color-muted);
+    font-style: italic;
+  }
+
+  .pakeitimas-rodykle {
+    color: var(--color-muted);
+  }
+</style>

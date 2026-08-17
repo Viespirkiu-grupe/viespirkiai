@@ -17,7 +17,7 @@ kintamieji krenta į numatytąsias schemos reikšmes (žr. `utils/configSchema.j
 | **Quickwit** | Pilnatekstė sutarčių / viešųjų pirkimų / dokumentų paieška ir facetavimas. | Ne (krenta į lėtesnę Postgres paiešką) |
 | **Tor (SOCKS5)** | Duomenų scrapinimas per Tor (tik taskrunneris). | Tik backend'ui |
 | **Chromium** | OG paveikslėlių atvaizdavimas (jau įdiegtas Docker image'e). | Frontend'ui |
-| **Blob saugykla** | OCR rezultatai, failų tekstas/metaduomenys, dokumentai. Lokaliai laikomi zstd SQLite; kitas host'as gali skaityti per HTTPS sidecar endpoint'ą. | Taip (failų funkcijoms) |
+| **Sidecar saugykla** | OCR rezultatai, failų tekstas/metaduomenys, dokumentai, LITEKO2, e-TAR. Vienas `SIDECAR_DIR` katalogas su zstd SQLite bazėmis; kitas host'as skaito per `/api/v1/sidecar/<vardas>`. | Taip (failų funkcijoms) |
 
 > **PostGIS:** DB turi būti su įjungtu plėtiniu: `CREATE EXTENSION IF NOT EXISTS postgis;`
 
@@ -45,9 +45,10 @@ _(taskrunneris juos irgi naudoja)_
 | Kintamasis | Numatyta | Paaiškinimas |
 | --- | --- | --- |
 | `PORT` | `9019` | Portas, kuriame klausosi web serveris. |
+| `APP_ENV` | pagal `NODE_ENV` | Logų aplinkos žyma (`dev` arba `prod`), viršesnė už `NODE_ENV`. Tiesiogiai paleistam produkciniam taskrunneriui nustatyti `prod`. |
 | `LOG_REQUESTS` | `false` | Į `stderr` JSON formatu žurnaluoja kiekvieną HTTP užklausą: metodą, URL, tikrą kliento IP (atsižvelgiant į „Cloudflare“ antraštes) ir `User-Agent`. |
 | `ENABLE_ATN1` | `false` | Įjungia CVPP / ATN-1 archyvo puslapius ir jų nuorodą navigacijoje. Išjungus tiesioginės šių puslapių užklausos grąžina `404`. |
-| `ENABLE_BOT_CHALLENGE` | `false` | Įjungia lengvą JavaScript patikrą maršrutams `/`, `/viesiejiPirkimai`, `/dokumentai` ir `/juridiniai`. Pirma užklausa nustato sesijos slapuką `bot=no` ir perkrauna puslapį; JavaScript nevykdantys scraperiai iki paieškos neprieina. |
+| `ENABLE_BOT_CHALLENGE` | `false` | Įjungia lengvą JavaScript patikrą maršrutams `/`, `/viesiejiPirkimai`, `/dokumentai` ir `/juridiniai`. Pirma užklausa nustato sesijos slapuką `bot=no` ir perkrauna puslapį; JavaScript nevykdantys scraperiai iki paieškos neprieina. Nuorodų peržiūros crawleriai (Facebook, Slack, Signal, Telegram, Mastodon…) patikros negauna – jiems visada, nepriklausomai nuo šio kintamojo, grąžinamas pigus tik iš URL parametrų sudarytas OG dokumentas be DB užklausų. Paieškos crawleriai (Googlebot, Applebot) gauna tikrą puslapį. |
 | `GIT_COMMIT` | _(iš `.git` arba `build-info.json`)_ | Paleistos versijos commit'o hash'as – footer'yje rodomas trumpasis hash'as su nuoroda į GitHub. **Paprastai nustatinėti nereikia:** `npm run build` (taip pat ir Docker build'as) hash'ą nuskaito iš `.git` ir įrašo į `build-info.json`, kuris įkepamas į image'ą. Kintamasis reikalingas tik ten, kur `.git` nepasiekiamas (build iš archyvo), arba norint reikšmę perrašyti. Alternatyvūs pavadinimai: `GIT_SHA`, `SOURCE_COMMIT`. |
 
 ### DB prisijungimas
@@ -63,9 +64,13 @@ taskrunneriui.
 | `PG_PASSWORD` | `""` | Slaptažodis. |
 | `PG_DATABASE` | `viespirkiai` | DB pavadinimas. |
 | `PG_MAX_CONNECTIONS` | `16` | Maks. vienalaikis pool dydis aplikacijos užklausoms. |
+| `PG_DIRECT_HOST` | = `PG_HOST` | Postgres host aplenkiant pgbouncer'į. |
+| `PG_DIRECT_PORT` | = `PG_PORT` | Postgres portas aplenkiant pgbouncer'į. Reikalingas TIK tada, kai `PG_PORT` rodo į bouncer'į: seanso lygio advisory lock'ai (`postgres/sessionLock.js`, JAR importas ir juridinių backfill'as) gyvena jungtyje, tad privalo eiti tiesiai į Postgres. |
 | `SQL_LOG_FILE` | — | Kai nurodytas – visos SQL užklausos su trukme append'inamos į šį failą (JSONL). |
 | `SQL_LOG_QUICKWIT` | `false` | Tie patys įrašai (be SQL teksto – tik `md5`) rašomi į dienos Quickwit indeksą `sqlLogV2_*`, o tekstas – į `sqlLogTekstai` lentelę. Galima kartu su `SQL_LOG_FILE` arba vietoj jo. |
-| `PG_PREPARED` | `true` | Statiškas dažnas užklausas vykdyti kaip prepared statement'us. **Išjungti (`false`), jei `PG_PORT` rodo į pgbouncer transaction pooling režimu be `max_prepared_statements`.** |
+| `SCRAPE_LOG_FILE` | — | Kai nurodytas – outbound duomenų šaltinių HTTP užklausų metaduomenys append'inami JSONL formatu. |
+| `SCRAPE_LOG_QUICKWIT` | `false` | Tie patys scraping metaduomenys rašomi į dienos Quickwit indeksą `scrapeLogV1_*`. |
+| `PG_PREPARED` | `true` | Statiškas dažnas užklausas vykdyti kaip prepared statement'us. Su pgbouncer transaction pooling režimu palikti `true` galima – nuo pgbouncer 1.21 užtenka nustatyti `max_prepared_statements` į nenulinę reikšmę (`pg` naudoja protokolo lygio named statements, o bouncer juos paruošia susietoje serverio jungtyje). Išjungti (`false`) reikia tik prie senesnio bouncer'io arba kai `max_prepared_statements = 0`. |
 
 Profiliavimui: `SQL_LOG_FILE=/tmp/sql.log` įjungia visų per `postgres.query()` ir
 per `postgres.connect()` paimtus klientus einančių užklausų rašymą į failą.
@@ -177,6 +182,29 @@ Gavus `md5`, tekstas imamas iš Postgres:
 SELECT "md5", "sql" FROM public."sqlLogTekstai" WHERE "md5" = ANY($1);
 ```
 
+#### `SCRAPE_LOG_*` – outbound duomenų šaltinių užklausos
+
+Scraperiai naudoja `utils/scrapeFetch.js` wrapperį, todėl neliečiamas globalus
+`fetch` ir į logą nepatenka Quickwit ingest'as, S3, Spinta, Ollama ar frontend
+HTTP srautas. Kiekvienas realus retry bandymas registruojamas atskirai.
+
+`SCRAPE_LOG_QUICKWIT=true` rašo į dieninius `scrapeLogV1_YYYY-MM-DD` indeksus;
+`SCRAPE_LOG_FILE=/tmp/scrape.log` tuos pačius dokumentus append'ina JSONL
+formatu. Logavimas best-effort: Quickwit siunčiama paketais fone, o gedimas
+scraperio nestabdo. Senus indeksus galima valyti su
+`pruneScrapeLogIndexes({ keepDays: 30 })`.
+
+Pilnas URL nesaugomas. Jis išskaidomas į `scheme`, `host`, `domain` ir `path`
+(`pathname + query`); slapti query parametrai maskuojami. `domain` yra paskutiniai
+du hostname segmentai, IP ir `localhost` paliekami nepakeisti. Redirect atveju
+pridedami analogiški `final*` laukai.
+
+Kiti svarbiausi laukai: `scraper`, `operation`, `method`, `status`, `ok`,
+`ttfbMs`, viso body perdavimo `ms`, faktiškai perskaityti `bytes` ir serverio
+deklaruotas `contentLength`. Kai HTTP atsakymo nėra, `status` yra `null`, o
+`errorName`/`errorCode` nusako timeout, DNS ar kitą transporto klaidą. Body,
+Authorization, cookies ir kiti request/response headeriai niekada nesaugomi.
+
 ### MCP `execute_query` + analitiko rolė
 
 Read-only SQL prieiga per MCP (`src/lib/mcp.ts`). Analitikas naudoja **atskirą**
@@ -205,13 +233,17 @@ Paieškos pasiūlymai ir juridinių asmenų paieška.
 
 ### NATS
 
-Signalų magistralė tarp procesų (SSE atnaujinimai, cache invalidacija). Pakeitė
+Signalų magistralė tarp procesų (TaskRunner DB eilių pažadinimai, SSE
+atnaujinimai, cache invalidacija). TaskRunner darbai ir retry būsena lieka
+PostgreSQL, o NATS perduoda tik at-most-once užuominą patikrinti eilę. Pakeitė
 PostgreSQL `pg_notify`/`LISTEN` — dėl to `postgres` pool'as nebeturi seansinių
 priklausomybių ir gali eiti per pgbouncer.
+Gyvą šios magistralės wildcard srautą galima stebėti `/statistika/nats` puslapyje;
+istoriją (iki 1000 eventų) laiko tik atidariusi naršyklė.
 
 | Kintamasis | Numatyta | Paaiškinimas |
 | --- | --- | --- |
-| `NATS_URL` | `nats://127.0.0.1:4222` | NATS serverio adresas. Tuščia reikšmė magistralę išjungia — kanalai tyliai neveikia, gavėjai krenta į savo fallback'us (SSE persijungęs persikrauna, baneris pollinamas). |
+| `NATS_URL` | `nats://127.0.0.1:4222` | NATS serverio adresas. Tuščia reikšmė magistralę išjungia — kanalai tyliai neveikia, gavėjai krenta į savo fallback'us (TaskRunner tikrina DB pasibaigus `cooldown`, SSE persijungęs persikrauna, baneris pollinamas). |
 | `NATS_TOKEN` | `""` | Autentikacijos token'as; turi sutapti su serverio `authorization.token`. |
 
 ### Quickwit
@@ -225,35 +257,71 @@ Pilnatekstė paieška ir facetavimas.
 | `SUTARTYS_QUICKWIT` | — | Sutarčių paieškai naudoti Quickwit. |
 | `VIESIEJI_PIRKIMAI_QUICKWIT` | — | Viešųjų pirkimų paieškai naudoti Quickwit. |
 
-### Failų / dokumentų vietos
+### Sidecar saugyklos
 
-Lokaliam darbui naudojami tik `*_SQLITE_LOCATION`: tai pilni `.sqlite` failų
-keliai. Turinys laikomas zstd suspaustas. SQLite vieta privaloma kiekvienam
-procesui, kuris rašo sidecar'us; be jos write baigiasi klaida.
+Visos sidecar SQLite bazės guli **viename kataloge**, po vieną failą kiekvienam
+registro įrašui. Vardas yra vienintelis identifikatorius — iš jo išvedamas ir
+failo kelias, ir HTTP kelias:
 
-`FAILAI_LOCATION`, `DOKUMENTAI_LOCATION` ir `OCR_REZULTATAI_LOCATION` nebepalaiko
-lokalių katalogų. Juose galima nurodyti tik HTTP(S) endpoint'ą nuotoliniam read
-fallback. Skaitymo tvarka: lokalus SQLite, tada HTTP(S). Endpoint'ą aptarnaujantis
-mazgas skaito tik savo SQLite ir taip išvengia rekursinių HTTP užklausų.
+```
+failas(vardas) = <SIDECAR_DIR>/<vardas>.sqlite
+URL(vardas)    = <SIDECAR_REMOTE>/api/v1/sidecar/<vardas>?md5=<raktas>
+```
 
-Nuotolinį režimą aptarnauja šie endpoint'ai (kitas mazgas jų URL įsirašo į
-atitinkamą `*_LOCATION`):
+Registras — `utils/sidecarPaths.js`:
 
-| Kintamasis | Endpoint'as | Užklausa |
+| Vardas | Failas | Kas viduje |
 | --- | --- | --- |
-| `FAILAI_LOCATION` | `src/pages/api/failai/failaiInfoFiles.ts` | `<URL>?hash=<hash>` |
-| `DOKUMENTAI_LOCATION` | `src/pages/api/dokumentai/dokumentaiFiles.ts` | `<URL>?md5=<md5>` |
-| `OCR_REZULTATAI_LOCATION` | `src/pages/api/ocr/rezultataiFiles.ts` | `<URL>?md5=<md5>` |
+| `failaiInfo` | `failaiInfo.sqlite` | Sujungtas failo turinio JSON (raktas: turinio hash). |
+| `dokumentai` | `dokumentai.sqlite` | Dokumentų JSON (tekstas, metaduomenys, subjektai). |
+| `ocrRezultatai` | `ocrRezultatai.sqlite` | OCR rezultatai. |
+| `liteko2` | `liteko2.sqlite` | LITEKO2 sprendimai (`modules/liteko2`). |
+| `eTar` | `eTar.sqlite` | e-TAR API atsakymai (`modules/eTar`). |
+
+Kiekviena bazė lieka atskiru failu: SQLite turi vieną rašytoją visai bazei, o
+čia lygiagrečiai rašo skirtingi procesai (OCR darbininkai, scraper'iai, eTar
+taskrunner) — sujungus jie rikiuotųsi eilėje prie to paties WAL.
+
+Turinys laikomas zstd suspaustas. `SIDECAR_DIR` privalomas kiekvienam procesui,
+kuris rašo sidecar'us; be jo write baigiasi klaida.
 
 | Kintamasis | Paaiškinimas |
 | --- | --- |
+| `SIDECAR_DIR` | Katalogas su visomis sidecar SQLite bazėmis. Būtinas rašymui. |
+| `SIDECAR_REMOTE` | Mazgo su lokaliomis bazėmis bazinis URL — nuotolinis read fallback mazgams be `SIDECAR_DIR`. |
 | `INTERNAL_FILE_BASE` | Vidinio failų CDN bazinis URL — preview nuorodoms sudaryti. Numatyta: `https://failai.viespirkiai.org`. |
-| `OCR_REZULTATAI_LOCATION` | Pasirenkamas nuotolinis OCR HTTP(S) read endpoint'as. |
-| `DOKUMENTAI_LOCATION` | Pasirenkamas nuotolinis dokumentų HTTP(S) read endpoint'as. |
-| `FAILAI_LOCATION` | Pasirenkamas nuotolinis failų turinio HTTP(S) read endpoint'as. |
-| `FAILAIINFO_SQLITE_LOCATION` | Pilnas sujungto failų turinio SQLite failo kelias. |
-| `DOKUMENTAI_SQLITE_LOCATION` | Pilnas dokumentų sidecar SQLite failo kelias. |
-| `OCR_REZULTATAI_SQLITE_LOCATION` | Pilnas OCR rezultatų SQLite failo kelias. |
+
+Skaitymo tvarka: lokalus SQLite, tada `SIDECAR_REMOTE`. Endpoint'ą aptarnaujantis
+mazgas skaito tik savo SQLite ir taip išvengia rekursinių HTTP užklausų.
+
+#### HTTP API (tik skaitymas)
+
+Rašymo per HTTP nėra — rašo tik mazgas, turintis lokalų `SIDECAR_DIR`.
+
+```
+GET  /api/v1/sidecar/<vardas>?md5=<md5>
+     200 application/json — turinys; 404 nerastas; 400 blogas md5;
+     404 nežinomas vardas; 503 SIDECAR_DIR nenustatytas
+
+POST /api/v1/sidecar/<vardas>/batch
+     body: ["<md5>", …] arba md5 per eilutę, daugiausia 500 vienu kartu
+     200 application/x-ndjson — po eilutę {"md5":…,"turinys":…}, tik rastiems
+```
+
+Batch atsakymas streaminamas gabalais, o nerastų raktų eilučių jame nėra — ko
+negrįžo, to nėra.
+
+Klientas šiuos endpoint'us naudoja pats, be atskiro kvietimo: skaitymai, paleisti
+tame pačiame event loop tick'e, sugrupuojami ir iškeliauja viena užklausa
+(gabalais po 500). Vienam raktui lieka paprastas `GET`, keliems — vienas `POST`.
+Todėl indeksavimo drain'as (500 eilučių) ar paieškos rezultatų puslapis
+nuotoliniame mazge kainuoja vieną kelionę, ne N.
+
+Sekvenciniams srautams, kur per tick'ą ateina po vieną raktą, grupavimas
+nepadeda — jiems yra `store.readMany(keys)` (žr. `modules/ocr/eksportuotiRezultatus.js`,
+kuris kaupia srautą į 500 eilučių langus).
+
+#### Trūkstamų įrašų patikra
 
 PostgreSQL referencinius hash'us galima paketais palyginti su
 SQLite, neatliekant brangaus bendro `COUNT(DISTINCT ...)`:
@@ -263,8 +331,8 @@ npm run sidecars:sqlite-missing -- --store dokumentai
 ```
 
 Kiekvienas nerastas raktas išvedamas kaip `TRŪKSTA <hash>`. Galimi
-`--store failaiInfo|dokumentai|ocr`, `--db`, `--page`, `--limit` ir
-`--after <hash>`.
+`--store failaiInfo|dokumentai|ocrRezultatai|liteko2|eTar`, `--db`, `--page`,
+`--limit` ir `--after <hash>`.
 
 ### Kita
 
@@ -304,14 +372,37 @@ Baziniai URL — galima perrašyti į mirror/proxy. Be trailing slash.
 Naujasis e-TAR scraperis eina ne tiesiai į `e-tar.lt`, o į stateless HTML→JSON
 adapterį (jo OpenAPI: `<ETAR_API_URL>/openapi.json`). Normalizuoti duomenys
 guli Postgres `eTar*` lentelėse, o pilnas atsakymo JSON — SQLite sidecar'e,
-adresuojamas `md5` (žr. `modules/eTar/README.md`). Senasis `modules/etar`
-(HTML scraperis į `teisekuraObjektai`) šių kintamųjų nenaudoja.
+adresuojamas `md5` (žr. `modules/eTar/README.md`).
 
 | Kintamasis | Numatyta | Paaiškinimas |
 | --- | --- | --- |
 | `ETAR_API_URL` | — | Adapterio bazinis URL, pvz. `http://10.1.10.24:8080`. Be trailing slash. Nenustačius scraperis nepasileidžia. |
 | `ETAR_API_KEY` | `""` | Bearer raktas — tik jei adapteryje nustatytas `API_KEY`. |
-| `ETAR_SIDECAR_DIR` | `/flashas/viespirkiai/eTar` | Katalogas, kuriame laikoma `eTar.sqlite` atsakymų saugykla (tik lokalus kelias). |
+| `ETAR_RECENT_DAYS` | `180` | Kiek naujausių dienų periodiškai iš naujo tikrina TaskRunner radaras. |
+| `ETAR_REFRESH_HOURS` | `3` | Po kiek valandų radaro diena vėl laikoma tikrintina. |
+| `ETAR_MAX_INFLIGHT` | `6` | Bendras lygiagrečių užklausų į e-TAR adapterį limitas visiems etapams. |
+
+Prieš pirmą naujų TaskRunner e-TAR darbų paleidimą reikia rankiniu būdu
+pritaikyti `modules/eTar/taskRunnerQueue.sql`. TaskRunner pats DB schemos nekeičia.
+
+### e-Seimas (`modules/eSeimas`)
+
+e-Seimo scraperis naudoja to paties stateless adapterio `/v1/seimas/legal-acts`
+route'us, tačiau turi visiškai atskiras PostgreSQL `eSeimas*` lenteles ir
+`<SIDECAR_DIR>/eSeimas.sqlite`. Paieška tik atranda aktus; originalai, aktualios
+ir istorinės suvestinės normalizuojamos vėlesniuose etapuose.
+
+| Kintamasis | Numatyta | Paaiškinimas |
+| --- | --- | --- |
+| `ESEIMAS_RECENT_DAYS` | `180` | Periodiškai tikrinamas naujausių priėmimo dienų langas. |
+| `ESEIMAS_REFRESH_HOURS` | `3` | Po kiek valandų diena vėl tikrinama. |
+| `ESEIMAS_MAX_INFLIGHT` | `6` | Atskiras e-Seimo scraperio lygiagretumo limitas. |
+
+Adapterio adresui ir Bearer raktui naudojami `ETAR_API_URL` bei
+`ETAR_API_KEY`. Prieš pirmą paleidimą rankiniu būdu taikomas
+`modules/eSeimas/schema.sql`; naujam `metadata.profile` kontraktui po jo taikomas
+`modules/eSeimas/schema2.sql`. TaskRunner schemos pats nekeičia. FE ir dokumentų
+indeksavimas šiame etape nejungiami.
 
 ### Spinta / Stalčius (atviri duomenys)
 

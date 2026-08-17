@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "scrapePlanuojamiPirkimai" });
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -283,10 +285,10 @@ export function normalizePlanRow(row) {
         ),
         preliminariPirkimoSukurimoData: preliminary,
     };
-    record.md5 = createHash("md5")
+    const md5 = createHash("md5")
         .update(JSON.stringify(record))
         .digest("hex");
-    return record;
+    return { ...record, md5 };
 }
 
 function splitOversizedInterval(interval) {
@@ -353,6 +355,14 @@ function splitIntoDays({ start, end }) {
     return parts;
 }
 
+/**
+ * @param {{
+ *   start: number,
+ *   end: number,
+ *   limit: number,
+ *   count: (interval: {start: number, end: number}) => Promise<number>
+ * }} options
+ */
 export async function planExportIntervals({ start, end, limit, count }) {
     const accepted = [];
     // Scraperis čia perduoda visą mėnesį. Tik viršijusį limitą skaidome į
@@ -412,7 +422,7 @@ export class PlannedProcurementsClient {
         const headers = new Headers(options.headers);
         const cookie = this.cookieHeader();
         if (cookie) headers.set("cookie", cookie);
-        const response = await fetch(url, { ...options, headers });
+        const response = await scrapeFetch(url, { ...options, headers });
         this.updateCookies(response);
         if (!response.ok) throw new Error(`EPPS HTTP ${response.status}`);
         return response;
@@ -455,6 +465,17 @@ export class PlannedProcurementsClient {
     }
 }
 
+/**
+ * @param {{
+ *   from?: string,
+ *   to?: string,
+ *   limit?: number,
+ *   delayMs?: number,
+ *   client?: { count(interval: {start: number, end: number}): Promise<number>, export(interval: {start: number, end: number}): Promise<Record<string, string>[]> },
+ *   logger?: { log(...args: any[]): void },
+ *   onRecords?: (records: ReturnType<typeof normalizePlanRow>[]) => void | Promise<void>
+ * }} [options]
+ */
 export async function processPlanuojamiPirkimai({
     from = FIRST_PUBLICATION_MINUTE,
     to,

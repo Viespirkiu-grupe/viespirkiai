@@ -1,201 +1,176 @@
 import { postgres } from "../../postgres/postgres.js";
 
-export async function gautiFinansuDuomenis(jarId) {
-    let finansai = {};
+const LITAI_UZ_EURA = 3.4528;
 
-    if (jarId) {
-        const balansoRes = await postgres.query(
-            `SELECT a.*,
-                    template."templateName",
-                    standard."standardName",
-                    line."lineName"
-               FROM "balansoAtaskaitos" a
-               LEFT JOIN "balansoAtaskaitosTemplatePavadinimai" template
-                 ON template."templateId" = a."templateId"
-               LEFT JOIN "balansoAtaskaitosStandardPavadinimai" standard
-                 ON standard."standardId" = a."standardId"
-               LEFT JOIN "balansoAtaskaitosLinePavadinimai" line
-                 ON line."lineTypeId" = a."lineTypeId"
-               WHERE a."jarId" = $1
-               ORDER BY a."laikotarpisNuo" DESC, a."lineTypeId" ASC`,
-            [jarId],
-        );
+const sentenceCase = (text) =>
+    text
+        .replace(/([^.!?]*[.!?]*)/g, (sentence) =>
+            sentence.trim()
+                ? sentence.trim().charAt(0).toUpperCase() +
+                  sentence.trim().slice(1).toLowerCase() + " "
+                : "",
+        )
+        .trim();
 
-        if (balansoRes.rows && balansoRes.rows.length > 0) {
-            finansai.balansai = balansoRes.rows;
-        }
+const canonicalLineNames = new Map([
+    ["Mokėtinos sumos ir įsipareigojimai", "Įsipareigojimai"],
+    ["Mokėtinos sumos ir kiti įsipareigojimai", "Įsipareigojimai"],
+    ["Grynasis pelnas", "Grynasis pelnas (nuostoliai)"],
+    ["Ataskaitinių metų pelnas (nuostoliai)", "Grynasis pelnas (nuostoliai)"],
+    ["Pelnas (nuostoliai) prieš apmokestinimą", "Pelnas prieš apmokestinimą"],
+]);
 
-        const pelnoNuostoliuRes = await postgres.query(
-            `SELECT a.*,
-                    template."templateName",
-                    standard."standardName",
-                    line."lineName"
-               FROM "pelnoNuostoliuAtaskaitos" a
-               LEFT JOIN "pelnoNuostoliuAtaskaitosTemplatePavadinimai" template
-                 ON template."templateId" = a."templateId"
-               LEFT JOIN "pelnoNuostoliuAtaskaitosStandardPavadinimai" standard
-                 ON standard."standardId" = a."standardId"
-               LEFT JOIN "pelnoNuostoliuAtaskaitosLinePavadinimai" line
-                 ON line."lineTypeId" = a."lineTypeId"
-               WHERE a."jarId" = $1
-               ORDER BY a."laikotarpisNuo" DESC, a."lineTypeId" ASC`,
-            [jarId],
-        );
+const canonicalLineName = (lineName) => canonicalLineNames.get(lineName) ?? lineName;
 
-        if (pelnoNuostoliuRes.rows && pelnoNuostoliuRes.rows.length > 0) {
-            finansai.pelnasNuostoliai = pelnoNuostoliuRes.rows;
-        }
+const reiksmeEurais = (entry) => {
+    if (entry.reiksme == null) return null;
+    const value = Number(entry.reiksme);
+    if (!Number.isFinite(value)) return null;
+    // Iki euro įvedimo pasibaigusių laikotarpių RC ataskaitų reikšmės yra
+    // litais. Pirminę DB reikšmę paliekame nepakeistą, o skaitydami pateikiame
+    // vienodą EUR laiko eilutę.
+    if (String(entry.laikotarpisIki).slice(0, 10) < "2015-01-01") {
+        return Math.round((value / LITAI_UZ_EURA) * 100) / 100;
+    }
+    return value;
+};
 
-        const sentenceCase = (text) =>
-            text
-                .replace(/([^.!?]*[.!?]*)/g, (sentence) =>
-                    sentence.trim()
-                        ? sentence.trim().charAt(0).toUpperCase() +
-                          sentence.trim().slice(1).toLowerCase() +
-                          " "
-                        : "",
-                )
-                .trim();
+export function formuotiFinansuDuomenis(rows) {
+    if (!rows.length) return {};
 
-        const grouped = {};
-
-        // iterate both types
-        for (const type of ["balansai", "pelnasNuostoliai"]) {
-            for (const entry of finansai?.[type] || []) {
-                // key by period + submission date + template
-                const key = `${entry.laikotarpisNuo}_${entry.laikotarpisIki}_${entry.duomenuData}_${entry.templateId}`;
-
-                // create or overwrite period object
-                grouped[key] = grouped[key] || {
-                    laikotarpisNuo: entry.laikotarpisNuo,
-                    laikotarpisIki: entry.laikotarpisIki,
-                    duomenuData: entry.duomenuData,
-                    templateId: entry.templateId,
-                    templateName: sentenceCase(entry.templateName),
-                    standards: {},
-                };
-
-                // ensure standard object exists
-                const standards = grouped[key].standards;
-                standards[entry.standardId] = standards[entry.standardId] || {
-                    standardId: entry.standardId,
-                    standardName: sentenceCase(entry.standardName),
-                    lines: [],
-                };
-
-                // push only relevant fields
-                standards[entry.standardId].lines.push({
-                    lineTypeId: entry.lineTypeId,
-                    lineName: sentenceCase(entry.lineName),
-                    reiksme: entry.reiksme,
-                });
-            }
-        }
-
-        finansai.ataskaitos = Object.values(grouped).map((period) => ({
-            ...period,
-            standards: Object.values(period.standards),
-        }));
-
-        finansai.pagalEilute = {};
-
-        finansai.ataskaitos.forEach((report) => {
-            const reportMeta = {
-                laikotarpisNuo: report.laikotarpisNuo,
-                laikotarpisIki: report.laikotarpisIki,
-                duomenuData: report.duomenuData,
-                templateId: report.templateId,
-                templateName: report.templateName,
-            };
-
-            if (report.standards) {
-                report.standards.forEach((standard) => {
-                    if (standard.lines) {
-                        standard.lines.forEach((line) => {
-                            if (!finansai.pagalEilute[line.lineName]) {
-                                finansai.pagalEilute[line.lineName] = [];
-                            }
-                            // Merge line with report metadata
-                            finansai.pagalEilute[line.lineName].push({
-                                ...line,
-                                ...reportMeta,
-                            });
-                        });
-                    }
-                });
-            }
+    const grouped = new Map();
+    for (const entry of rows) {
+        const key = entry.ataskaitaId ??
+            `${entry.ataskaitosTipas}_${entry.laikotarpisNuo}_${entry.laikotarpisIki}_${entry.duomenuData}_${entry.templateId}`;
+        if (!grouped.has(key)) grouped.set(key, {
+            ataskaitaId: entry.ataskaitaId,
+            ataskaitosTipas: entry.ataskaitosTipas,
+            ataskaitosTipoKodas: entry.ataskaitosTipoKodas,
+            ataskaitosTipoPavadinimas: entry.ataskaitosTipoPavadinimas,
+            laikotarpisNuo: entry.laikotarpisNuo,
+            laikotarpisIki: entry.laikotarpisIki,
+            duomenuData: entry.duomenuData,
+            templateId: entry.templateId,
+            templateKodas: entry.templateKodas,
+            templateName: sentenceCase(entry.templateName),
+            standards: {},
         });
 
-        // Step 1: Collect all years
-        const allYearsSet = new Set();
-        finansai.ataskaitos.forEach((report) => {
-            const year = new Date(report.laikotarpisNuo).getFullYear();
-            allYearsSet.add(year);
-        });
-        const metai = Array.from(allYearsSet).sort((a, b) => a - b);
-
-        // Step 2: Build duomenys
-        let duomenys = {};
-        finansai.ataskaitos.forEach((report) => {
-            const year = new Date(report.laikotarpisNuo).getFullYear();
-
-            if (report.standards) {
-                report.standards.forEach((standard) => {
-                    if (standard.lines) {
-                        standard.lines.forEach((line) => {
-                            if (!duomenys[line.lineName]) {
-                                // initialize array with undefined for all years
-                                duomenys[line.lineName] = Array(
-                                    metai.length,
-                                ).fill(undefined);
-                            }
-
-                            const yearIndex = metai.indexOf(year);
-                            if (yearIndex !== -1) {
-                                duomenys[line.lineName][yearIndex] =
-                                    line.reiksme;
-                            }
-                        });
-                    }
-                });
-            }
-        });
-
-        // Apskaičiuojame pelningumą
-        const pelnoRaktas =
-            duomenys["Grynasis pelnas (nuostoliai)"] != null
-                ? "Grynasis pelnas (nuostoliai)"
-                : duomenys["Ataskaitinių metų pelnas (nuostoliai)"] != null
-                  ? "Ataskaitinių metų pelnas (nuostoliai)"
-                  : null;
-
-        // Determine the length of the result (match Pardavimo pajamos length)
-        const length = duomenys["Pardavimo pajamos"]?.length || 0;
-
-        // Build Pelningumas safely
-        duomenys["Pelningumas"] = Array.from({ length }, (_, i) => {
-            if (!pelnoRaktas) return null; // no profit column
-
-            const pelnas = duomenys[pelnoRaktas]?.[i];
-            const pardavimai = duomenys["Pardavimo pajamos"]?.[i];
-
-            if (
-                typeof pelnas !== "number" ||
-                typeof pardavimai !== "number" ||
-                pardavimai === 0
-            ) {
-                return null;
-            }
-
-            return Number(((pelnas / pardavimai) * 100).toFixed(2));
-        });
-
-        // Step 3: Assign to finansai.lentele
-        finansai.lentele = {
-            metai,
-            duomenys,
+        const standards = grouped.get(key).standards;
+        standards[entry.standardId] = standards[entry.standardId] || {
+            standardId: entry.standardId,
+            standardKodas: entry.standardKodas,
+            standardName: sentenceCase(entry.standardName),
+            lines: [],
         };
+        standards[entry.standardId].lines.push({
+            lineTypeId: entry.lineTypeId,
+            lineTypeKodas: entry.lineTypeKodas,
+            lineName: sentenceCase(entry.lineName),
+            reiksme: reiksmeEurais(entry),
+        });
     }
 
-    return finansai;
+    const ataskaitos = [...grouped.values()].map((report) => ({
+        ...report,
+        standards: Object.values(report.standards),
+    }));
+
+    const pagalEilute = {};
+    for (const report of ataskaitos) {
+        const reportMeta = {
+            ataskaitaId: report.ataskaitaId,
+            ataskaitosTipas: report.ataskaitosTipas,
+            ataskaitosTipoKodas: report.ataskaitosTipoKodas,
+            ataskaitosTipoPavadinimas: report.ataskaitosTipoPavadinimas,
+            laikotarpisNuo: report.laikotarpisNuo,
+            laikotarpisIki: report.laikotarpisIki,
+            duomenuData: report.duomenuData,
+            templateId: report.templateId,
+            templateKodas: report.templateKodas,
+            templateName: report.templateName,
+        };
+        for (const standard of report.standards) {
+            for (const line of standard.lines) {
+                pagalEilute[line.lineName] ??= [];
+                pagalEilute[line.lineName].push({ ...line, ...reportMeta });
+            }
+        }
+    }
+
+    const metai = [...new Set(ataskaitos.map((report) =>
+        new Date(report.laikotarpisNuo).getFullYear()))]
+        .sort((a, b) => a - b);
+    const duomenys = {};
+
+    // SQL grąžina naujausias registravimo datas pirmiausia. Jei tais pačiais
+    // finansiniais metais yra kelios pateikimo versijos, paliekame pirmąją –
+    // naujausią, o ne leidžiame senesnei ją perrašyti.
+    for (const report of ataskaitos) {
+        const year = new Date(report.laikotarpisNuo).getFullYear();
+        const yearIndex = metai.indexOf(year);
+        for (const standard of report.standards) {
+            for (const line of standard.lines) {
+                const lineName = canonicalLineName(line.lineName);
+                duomenys[lineName] ??= Array(metai.length).fill(undefined);
+                if (duomenys[lineName][yearIndex] === undefined) {
+                    duomenys[lineName][yearIndex] = line.reiksme;
+                }
+            }
+        }
+    }
+
+    const pelnoRaktas = duomenys["Grynasis pelnas (nuostoliai)"]
+        ? "Grynasis pelnas (nuostoliai)"
+        : null;
+    const length = duomenys["Pardavimo pajamos"]?.length || 0;
+    duomenys.Pelningumas = Array.from({ length }, (_, index) => {
+        if (!pelnoRaktas) return null;
+        const pelnas = duomenys[pelnoRaktas]?.[index];
+        const pardavimai = duomenys["Pardavimo pajamos"]?.[index];
+        if (typeof pelnas !== "number" || typeof pardavimai !== "number" || pardavimai === 0) {
+            return null;
+        }
+        return Number(((pelnas / pardavimai) * 100).toFixed(2));
+    });
+
+    return {
+        ataskaitos,
+        pagalEilute,
+        lentele: { metai, duomenys },
+    };
+}
+
+export async function gautiFinansuDuomenis(jarKodas, db = postgres) {
+    if (!jarKodas) return {};
+    const { rows } = await db.query(
+        `SELECT
+             a."id" AS "ataskaitaId", a."ataskaitosTipas",
+             tipas."kodas" AS "ataskaitosTipoKodas",
+             tipas."pavadinimas" AS "ataskaitosTipoPavadinimas",
+             a."templateId", template."kodas" AS "templateKodas",
+             template."pavadinimas" AS "templateName",
+             a."standardId", standartas."kodas" AS "standardKodas",
+             standartas."pavadinimas" AS "standardName",
+             rodiklis."lineTypeId", rodiklio_tipas."kodas" AS "lineTypeKodas",
+             rodiklio_tipas."pavadinimas" AS "lineName",
+             rodiklis."reiksme", a."laikotarpisNuo", a."laikotarpisIki",
+             a."registravimoData" AS "duomenuData", a."formavimoData"
+         FROM public."jarFinansinesAtaskaitos" a
+         JOIN public."jarFinansiniuAtaskaituTipai" tipas
+           ON tipas."id" = a."ataskaitosTipas"
+         JOIN public."jarFinansiniuAtaskaituTemplate" template
+           ON template."id" = a."templateId"
+         JOIN public."jarFinansiniuAtaskaituStandartai" standartas
+           ON standartas."id" = a."standardId"
+         JOIN public."jarFinansiniuAtaskaituRodikliai" rodiklis
+           ON rodiklis."ataskaitaId" = a."id"
+         JOIN public."jarFinansiniuAtaskaituRodikliuTipai" rodiklio_tipas
+           ON rodiklio_tipas."id" = rodiklis."lineTypeId"
+         WHERE a."jarKodas" = $1
+         ORDER BY a."registravimoData" DESC, a."laikotarpisNuo" DESC,
+                  a."ataskaitosTipas", rodiklis."lineTypeId"`,
+        [jarKodas],
+    );
+    return formuotiFinansuDuomenis(rows);
 }

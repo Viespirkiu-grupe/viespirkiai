@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
     fetchFailaiByIds: vi.fn(),
     upsertBatch: vi.fn(),
     deleteDokumentaiByFailasIds: vi.fn(),
+    signalWork: vi.fn(),
     client: {
         query: vi.fn(),
         release: vi.fn(),
@@ -16,6 +17,10 @@ vi.mock("../postgres/postgres.js", () => ({
 
 vi.mock("../utils/log.js", () => ({
     Logger: class { log() {} },
+}));
+vi.mock("../utils/taskSignals.js", () => ({
+    WORK_SIGNALS: { DOCUMENTS_INDEX_READY: "documents.index.ready" },
+    signalWork: mocks.signalWork,
 }));
 
 vi.mock("../modules/dokumentai/upsertFromFailai.js", () => ({
@@ -49,6 +54,12 @@ describe("processFailaiDokumentaiQueue", () => {
         const commitAt = sqlCalls.indexOf("COMMIT");
         expect(deleteAt).toBeGreaterThan(0);
         expect(commitAt).toBeGreaterThan(deleteAt);
+        expect(mocks.signalWork).toHaveBeenCalledWith("documents.index.ready", {
+            source: "filesDocumentsQueue",
+            count: 1,
+        });
+        expect(mocks.signalWork.mock.invocationCallOrder[0])
+            .toBeGreaterThan(mocks.client.query.mock.invocationCallOrder[commitAt]);
         expect(mocks.client.release).toHaveBeenCalledOnce();
     });
 
@@ -60,6 +71,7 @@ describe("processFailaiDokumentaiQueue", () => {
         const sqlCalls = mocks.client.query.mock.calls.map(([sql]) => String(sql));
         expect(sqlCalls).toContain("ROLLBACK");
         expect(sqlCalls.some((sql) => sql.includes('DELETE FROM public."filesDocumentsQueue"'))).toBe(false);
+        expect(mocks.signalWork).not.toHaveBeenCalled();
         expect(mocks.client.release).toHaveBeenCalledOnce();
     });
 });

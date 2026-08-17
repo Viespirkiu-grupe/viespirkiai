@@ -40,11 +40,12 @@ import {
 // vienu metu be pertrūkių (žr. runPipeline).
 //
 // Kiekvieno dokumento/sąrašo atsakymas keliauja į SQLite sidecar'ą
-// (/flashas/viespirkiai/eTar), o Postgres'e lieka normalizuota dalis + md5.
+// (`<SIDECAR_DIR>/eTar.sqlite`), o Postgres'e lieka normalizuota dalis + md5.
 // Dienos paieška į sidecar'ą nerašoma — ji tik atranda ID.
 //
-// Modulis sąmoningai savarankiškas: niekur neregistruotas, į taskų runner'į
-// neįtrauktas, senas modules/etar lieka nepaliestas.
+// Tas pats branduolys naudojamas dviem režimais: CLI `runPipeline` skirtas
+// rankiniam backfill'ui, o eTarTaskJobs kviečia atskirus scrape metodus po vieną
+// iš lygiagrečių TaskRunner eilių. TaskRunner vidinio pipeline'o nepaleidžia.
 
 const DEFAULT_CONCURRENCY = 4;
 
@@ -614,7 +615,6 @@ function formatStatus(status, sidecar) {
     out.push("");
     out.push(`  Aktų iš viso        ${nr(aktai)}`);
     if (status.suKlaidomis > 0) out.push(`  Su klaidomis        ${nr(status.suKlaidomis)}`);
-    out.push(`  Indeksavimo eilėje  ${nr(status.indeksavimoEileje)}`);
     if (status.saltinioBrokas > 0) {
         out.push(`  Šaltinio brokas     ${nr(status.saltinioBrokas)}  (SELECT * FROM "eTarSourceAnomaly")`);
     }
@@ -630,7 +630,7 @@ function formatStatus(status, sidecar) {
 }
 
 const USAGE = `
-e-TAR scraper (sidecar: /flashas/viespirkiai/eTar)
+e-TAR scraper (sidecar: <SIDECAR_DIR>/eTar.sqlite)
 
   node modules/eTar/eTarScrape.js --stage days [--limit N] [--rescrape-days N]
   node modules/eTar/eTarScrape.js --stage documents|editions|asr|historical [--limit N]
@@ -653,7 +653,7 @@ e-TAR scraper (sidecar: /flashas/viespirkiai/eTar)
     --floor DATA    neprivaloma apatinė riba; be jos eina iki duomenų pabaigos
     --limit N       apriboti dienų skaičių (tik pasižvalgymui)
 
-Konfigūracija (config.js arba .env): ETAR_API_URL, ETAR_API_KEY, ETAR_SIDECAR_DIR
+Konfigūracija (.env): ETAR_API_URL, ETAR_API_KEY, SIDECAR_DIR
 
 Prieš pirmą paleidimą: psql -f modules/eTar/schema.sql
 `;

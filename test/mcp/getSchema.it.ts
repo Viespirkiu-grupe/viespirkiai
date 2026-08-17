@@ -8,7 +8,8 @@
 import { describe, it, expect } from "vitest";
 import { handler } from "../../modules/mcp/tools/getSchema.js";
 import { postgres } from "../../postgres/postgres.js";
-import { VIEW_DEFINITIONS, VIEW_NAMES } from "../../modules/mcp/analyst/tempViews.js";
+import { VIEW_NAMES } from "../../modules/mcp/analyst/tempViews.js";
+import { ensureAnalystViews } from "../../modules/mcp/analyst/ensureViews.js";
 
 function printResult(label: string, payload: unknown) {
     const text = JSON.stringify(payload, null, 2);
@@ -155,9 +156,9 @@ describe("MCP get_schema — mode:'examples'", () => {
 });
 
 describe("MCP get_schema — covered table redirect", () => {
-    it("returns redirect message for sutartys (covered by v_sutartys)", async () => {
-        const result = (await handler({ table: "sutartys" })) as AnyResult;
-        printResult('handler({ table: "sutartys" })', result);
+    it("returns redirect message for vpmSutartys (covered by v_sutartys)", async () => {
+        const result = (await handler({ table: "vpmSutartys" })) as AnyResult;
+        printResult('handler({ table: "vpmSutartys" })', result);
         const text: string = result?.content?.[0]?.text ?? "";
         expect(text).toContain("v_sutartys");
         expect(text.toLowerCase()).toMatch(/covered|view/);
@@ -185,11 +186,9 @@ describe("MCP get_schema — uncovered table detail", () => {
 
 describe("MCP get_schema — curated metadata matches DB columns", () => {
     it("all view columns match information_schema for each view", async () => {
+        await ensureAnalystViews();
         const client = await postgres.connect();
         try {
-            for (const definition of Object.values(VIEW_DEFINITIONS)) {
-                await client.query(definition);
-            }
             for (const viewName of VIEW_NAMES) {
                 const toolResult = (await handler({ table: viewName })) as AnyResult;
                 const sc = toolResult?.structuredContent as AnyResult;

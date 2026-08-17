@@ -1,6 +1,7 @@
 ---
 import KeyValueList from '@design-system/components/KeyValueList.astro';
 import Badge from '@design-system/components/Badge.astro';
+import { rodomasStatusas } from '../../lib/jarStatusas.ts';
 
 interface Props {
   asmuo: any;
@@ -8,13 +9,33 @@ interface Props {
 
 const { asmuo } = Astro.props;
 const jadis = asmuo.jadis ?? {};
-const hasJadis = Object.values(jadis).some((v: any) => Number(v) > 0);
+const dalyviai = jadis.dalyviuSkaiciai ?? {};
+const hasJadis = Object.values(dalyviai).some((v: any) => Number(v) > 0);
+const valstybesDalyviai = jadis.valstybesDalyviai ?? [];
+const jadisSarasas = jadis.sarasas;
+const dalisProcentais = (dalis: any) =>
+  dalis == null ? null : (Number(dalis) * 100).toLocaleString('lt-LT', { maximumFractionDigits: 4 });
+
+// JADIS „nejuridinio asmens“ kodas 111105555 yra Lietuvos Respublika, visi kiti
+// šio rinkinio dalyviai — savivaldybės.
+const LIETUVOS_RESPUBLIKA = 111105555;
+const turiValstybe = valstybesDalyviai.some((d: any) => Number(d.njaKodas) === LIETUVOS_RESPUBLIKA);
+const turiSavivaldybe = valstybesDalyviai.some((d: any) => Number(d.njaKodas) !== LIETUVOS_RESPUBLIKA);
+const valdymoZyma = !valstybesDalyviai.length
+  ? null
+  : turiValstybe && turiSavivaldybe
+    ? 'Valstybės ir savivaldybių valdoma'
+    : turiValstybe
+      ? 'Valstybės valdoma'
+      : 'Savivaldybės valdoma';
+// Dalys gali nesudaryti 100 % — likusi dalis priklauso privatiems dalyviams.
+const bendraDalis = valstybesDalyviai.every((d: any) => d.dalis != null)
+  ? valstybesDalyviai.reduce((suma: number, d: any) => suma + Number(d.dalis), 0)
+  : null;
 const istatinis = asmuo.istatinisKapitalas;
 const isr = asmuo.isregistruotasAsmuo;
 
-const AKTYVUS_STATUSAS = 'Teisinis stat neįregistruotas';
-const statusas = asmuo.jar.statusoPavadinimas;
-const neaktyvusStatusas = statusas && statusas !== AKTYVUS_STATUSAS ? statusas : null;
+const neaktyvusStatusas = rodomasStatusas(asmuo.jar.statusoPavadinimas);
 
 const BANKROTO_STATUSAI = new Set(['Bankrutuojantis', 'Bankrutavęs', 'Likviduojamas dėl bankroto', 'Likviduojamas']);
 const statusoVariantas = neaktyvusStatusas && BANKROTO_STATUSAI.has(neaktyvusStatusas) ? 'danger' : 'warning';
@@ -26,6 +47,7 @@ const statusoVariantas = neaktyvusStatusas && BANKROTO_STATUSAI.has(neaktyvusSta
     <span class="cell-mono">{asmuo.jar.jarKodas}</span> · {asmuo.jar.formosPavadinimas}
     {isr && <Badge variant="danger" className="ml-1">Išregistruotas</Badge>}
     {neaktyvusStatusas && <Badge variant={statusoVariantas} className="ml-1">{neaktyvusStatusas}</Badge>}
+    {valdymoZyma && <Badge variant="info" className="ml-1">{valdymoZyma}</Badge>}
   </dd>
 
   {asmuo.sodra?.kodas && <>
@@ -76,11 +98,40 @@ const statusoVariantas = neaktyvusStatusas && BANKROTO_STATUSAI.has(neaktyvusSta
     <dt>Dalyviai</dt>
     <dd>
       <div class="flex flex-col gap-1">
-        {jadis.lrFiziniai > 0 && <span>{jadis.lrFiziniai} asmuo(-enys) — fiziniai (LT)</span>}
-        {jadis.lrJuridiniai > 0 && <span>{jadis.lrJuridiniai} asmuo(-enys) — juridiniai (LT)</span>}
-        {jadis.uzsienioFiziniai > 0 && <span>{jadis.uzsienioFiziniai} asmuo(-enys) — fiziniai (užsienis)</span>}
-        {jadis.uzsienioJuridiniai > 0 && <span>{jadis.uzsienioJuridiniai} asmuo(-enys) — juridiniai (užsienis)</span>}
+        {dalyviai.lrFiziniai > 0 && <span>{dalyviai.lrFiziniai} asmuo(-enys) — fiziniai (LT)</span>}
+        {dalyviai.lrJuridiniai > 0 && <span>{dalyviai.lrJuridiniai} asmuo(-enys) — juridiniai (LT)</span>}
+        {dalyviai.uzsienioFiziniai > 0 && <span>{dalyviai.uzsienioFiziniai} asmuo(-enys) — fiziniai (užsienis)</span>}
+        {dalyviai.uzsienioJuridiniai > 0 && <span>{dalyviai.uzsienioJuridiniai} asmuo(-enys) — juridiniai (užsienis)</span>}
       </div>
     </dd>
+  </>}
+
+  {valstybesDalyviai.length > 0 && <>
+    <dt>Valstybės / savivaldybių dalyvavimas</dt>
+    <dd>
+      <div class="flex flex-col gap-1">
+        {valstybesDalyviai.map((dalyvis: any) => (
+          <span>
+            {dalyvis.administracijosJarKodas
+              ? <a href={`/asmuo/${dalyvis.administracijosJarKodas}`}>{dalyvis.njaPavadinimas}</a>
+              : dalyvis.njaPavadinimas}
+            {dalyvis.dalis != null && <span class="ml-1">– {dalisProcentais(dalyvis.dalis)} %</span>}
+          </span>
+        ))}
+        {bendraDalis != null && valstybesDalyviai.length > 1 && (
+          <span class="text-muted text-xs">Iš viso {dalisProcentais(bendraDalis)} %</span>
+        )}
+      </div>
+    </dd>
+  </>}
+
+  {jadisSarasas?.sarasasPateiktas && jadisSarasas.sarasoData && <>
+    <dt>JADIS data</dt>
+    <dd>{jadisSarasas.sarasoData}</dd>
+  </>}
+
+  {jadisSarasas && !jadisSarasas.sarasasPateiktas && <>
+    <dt>JADIS dalyvių sąrašas</dt>
+    <dd><Badge variant="warning">Nepateiktas</Badge></dd>
   </>}
 </KeyValueList>

@@ -3,6 +3,8 @@
 Importuoja JAR duomenis tiesiai iš data.gov.lt API į PostgreSQL su puslapiavimu
 https://get.data.gov.lt/datasets/gov/rc/jar/iregistruoti/JuridinisAsmuo
 */
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("juridiniai", { operation: "importJar" });
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import config from "../../utils/config.js";
@@ -16,7 +18,7 @@ async function fetchPage(pageToken = null) {
     if (pageToken) params.push(`page("${pageToken}")`);
 
     const url = `${BASE}?${params.join("&")}`;
-    const res = await fetch(url);
+    const res = await scrapeFetch(url);
 
     if (!res.ok) {
         throw new Error(`HTTP ${res.status} ${res.statusText}`);

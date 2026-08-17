@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("geografija", { operation: "importAdresai" });
 import { postgres } from "../../postgres/postgres.js";
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
@@ -12,6 +14,7 @@ import streamJson from "stream-json";
 import streamJsonArray from "stream-json/streamers/StreamArray.js";
 import streamChain from "stream-chain";
 import streamJsonPick from "stream-json/filters/Pick.js";
+import { enqueueAddressLinkedJuridiniai } from "../juridiniai/enqueueRefresh.js";
 
 const { parser } = streamJson;
 const { streamArray } = streamJsonArray;
@@ -28,7 +31,7 @@ async function updateAdresai() {
     const sources = await getArDataSources();
     const entry = sources.addressPoints[0];
 
-    const res = await fetch(entry.geojson);
+    const res = await scrapeFetch(entry.geojson);
     if (!res.ok) throw new Error(`Failed to fetch adresai: ${res.status}`);
 
     await pipeline(res.body, createWriteStream(TMP_ZIP));
@@ -113,6 +116,8 @@ async function updateAdresai() {
     });
 
     await unlink(TMP_JSON);
+
+    await enqueueAddressLinkedJuridiniai(postgres, "adresu-registras");
 
     logger.log("Atnaujinti adresų taškai");
     return true;

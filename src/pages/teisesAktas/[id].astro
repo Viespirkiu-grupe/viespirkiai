@@ -242,7 +242,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=60');
         <ul class="ta-terms">
           {eurovoc.map((term: string) => (
             <li>
-              <a href={`/teisesAktai?eurovoc=${encodeURIComponent(term)}`}>{eurovocLabel(term)}</a>
+              <a href={`/dokumentai?klase=teisekura&eurovoc=${encodeURIComponent(term)}`}>{eurovocLabel(term)}</a>
             </li>
           ))}
         </ul>

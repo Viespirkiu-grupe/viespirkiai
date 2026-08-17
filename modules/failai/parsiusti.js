@@ -15,9 +15,15 @@ import {
     pazymetiKlaida,
     pazymetiParsiusta,
 } from "./parsiuntimoEile.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const slowAgent = new Agent({ headersTimeout: 30 * 60_000 }); // 30 min
 const nodeName = process.env.NODE_NAME || "default";
+
+/** Sujungia dėžės url su keliu — dėžės url gali turėti brūkšnį gale (pvz. lempa2). */
+function dezesUrl(baseUrl, pathname) {
+    return `${baseUrl.replace(/\/+$/, "")}${pathname}`;
+}
 
 /**
  * Parsiunčia vieną neparsiųstą failą į viešdėžę.
@@ -126,7 +132,7 @@ export async function parsiustiFaila(options = {}) {
         const controller = new AbortController();
         const fetchTimeout = setTimeout(() => controller.abort(), 1000 * 60 * 9); // 9min
         try {
-            response = await fetch(`${deze.url}/download-url`, {
+            response = await fetch(dezesUrl(deze.url, "/download-url"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -164,6 +170,15 @@ export async function parsiustiFaila(options = {}) {
             dezeId: deze.id,
             extension: failas.extension,
         });
+        // md5Id pakeitimas per DB trigerius įrašo į abi šias eiles.
+        signalWork(WORK_SIGNALS.FILES_DOCUMENTS_READY, {
+            source: "pazymetiParsiusta",
+            count: 1,
+        });
+        signalWork(WORK_SIGNALS.SUTARTYS_CHANGED, {
+            source: "pazymetiParsiusta",
+            count: 1,
+        });
         // Parsisiuntęs failas tampa nuskaitomu
         await iEile([failas.id]);
         timings.end("updateFailas");
@@ -181,7 +196,7 @@ export async function parsiustiFaila(options = {}) {
 
     // Atnaujiname dėžės dydį
     timings.start("updateDezeUsage");
-    let usedReq = await fetch(`${deze.url}/storage-usage`, {
+    let usedReq = await fetch(dezesUrl(deze.url, "/storage-usage"), {
         method: "GET",
         headers: {
             "Content-Type": "application/json",

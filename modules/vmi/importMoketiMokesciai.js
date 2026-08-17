@@ -3,6 +3,8 @@
 Importuoja mokėtų mokesčių duomenis tiesiai iš data.gov.lt API į Postgres
 https://data.gov.lt/datasets/673/
 */
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("vmi", { operation: "importMoketiMokesciai" });
 import { postgres } from "../../postgres/postgres.js";
 import { log } from "../../utils/log.js";
 import config from "../../utils/config.js";
@@ -16,7 +18,7 @@ async function fetchPage(pageToken = null) {
     if (pageToken) params.push(`page("${pageToken}")`);
 
     const url = `${BASE}?${params.join("&")}`;
-    const res = await fetch(url);
+    const res = await scrapeFetch(url);
 
     if (!res.ok) {
         throw new Error(`HTTP ${res.status} ${res.statusText}`);
@@ -112,6 +114,13 @@ async function insertBatch(rows) {
             menuo = EXCLUDED.menuo,
             suma = EXCLUDED.suma,
             "duomenuData" = EXCLUDED."duomenuData"
+        WHERE ROW(
+            mokesciai."jarKodas", mokesciai.metai, mokesciai.menuo,
+            mokesciai.suma, mokesciai."duomenuData"
+        ) IS DISTINCT FROM ROW(
+            EXCLUDED."jarKodas", EXCLUDED.metai, EXCLUDED.menuo,
+            EXCLUDED.suma, EXCLUDED."duomenuData"
+        )
     `;
 
     try {

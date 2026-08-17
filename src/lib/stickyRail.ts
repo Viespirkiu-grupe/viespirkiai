@@ -7,8 +7,18 @@
 //
 // Mechanika: `top` perjungiamas pagal slinkimo kryptį, o `margin-top` „įšaldo"
 // statinę poziciją ties dabartine vieta, kad perjungimo momentu nebūtų šuolio.
-// Prilipus viršuje margin kas kadrą mažinamas, tad grįžus į puslapio viršų
-// neliktų tarpo.
+//
+// SVARBU: stiliai rašomi TIK keičiantis būsenai (kryptis / prilipimo taškas),
+// niekada kas kadrą. Chrome slinkimą apdoroja kompozitoriuje, tad kas kadrą
+// rašomas `top`/`margin-top` nusėda kadru vėliau nei pats slinkimas — juosta
+// ima virpėti (matėsi tik Chrome ir tik slenkant aukštyn, nes ten anksčiau
+// buvo perskaičiuojama kas kadrą). Būsenose stiliai savaime teisingi:
+//  - `bottom`: top = vh - railH → prilipusi apačia, slenkant žemyn nekinta;
+//  - `free`:   top „įšaldytas" ties dabartine vieta, o margin sulygina statinę
+//              poziciją su ja, tad slenkant aukštyn juosta natūraliai atlimpa
+//              ir keliauja su turiniu — be jokių papildomų rašymų;
+//  - `top`:    top = navbar aukštis, margin = 0 → prilipusi po navbar'u; grįžus
+//              į puslapio viršų sticky atlimpa savaime, tarpo nelieka.
 export function initStickyRail(railSel = '.sf-rail') {
   const rail = document.querySelector<HTMLElement>(railSel);
   const parent = rail?.parentElement;
@@ -17,6 +27,8 @@ export function initStickyRail(railSel = '.sf-rail') {
   const nav = document.querySelector<HTMLElement>('.site-header-shell .navbar');
   const mq = window.matchMedia('(min-width: 901px)');
   let lastY = window.scrollY;
+  type Mode = 'none' | 'mobile' | 'fit' | 'top' | 'bottom' | 'free';
+  let mode: Mode = 'none';
 
   const update = () => {
     const y = window.scrollY;
@@ -25,45 +37,68 @@ export function initStickyRail(railSel = '.sf-rail') {
 
     if (!mq.matches) {
       // Mobilus vieno stulpelio maketas — sticky nedalyvauja.
-      rail.style.top = '';
-      rail.style.marginTop = '';
+      if (mode !== 'mobile') {
+        rail.style.top = '';
+        rail.style.marginTop = '';
+        mode = 'mobile';
+      }
       return;
     }
 
     const stickTop = nav?.offsetHeight ?? 0;
     const vh = window.innerHeight;
     const railH = rail.offsetHeight;
-    const parentTop = parent.getBoundingClientRect().top;
-    const railTop = rail.getBoundingClientRect().top;
 
     // Juosta telpa ekrane — paprastas top-sticky po navbar'u.
     if (railH + stickTop <= vh) {
-      rail.style.top = `${stickTop}px`;
-      rail.style.marginTop = '0px';
+      if (mode !== 'fit') {
+        rail.style.top = `${stickTop}px`;
+        rail.style.marginTop = '0px';
+        mode = 'fit';
+      }
       return;
     }
 
-    if (dy > 0) {
+    const railTop = rail.getBoundingClientRect().top;
+    const parentTop = parent.getBoundingClientRect().top;
+    // „Įšaldo" statinę poziciją ties dabartine matoma vieta, kad perjungiant
+    // prilipimo tašką nebūtų šuolio.
+    const freezeStaticPosition = () => {
+      rail.style.marginTop = `${Math.max(0, railTop - parentTop)}px`;
+    };
+
+    // Pirmas paleidimas jau nuslinkus žemyn (pvz. perkrovus puslapį, kai
+    // naršyklė atkuria slinkimo poziciją) traktuojamas kaip slinkimas žemyn:
+    // juostos statinė pozicija liko virš lango, tad „free" būsena ją įšaldytų
+    // ties neigiamu `top` ir juosta dingtų virš matomos srities.
+    if (dy > 0 || (mode === 'none' && railTop < stickTop)) {
       // Žemyn: leidžiam juostai kilti, kol apačia prilips prie lango apačios.
-      // margin paliekam įšaldytą — statinė pozicija lieka kur buvusi, tad
-      // perjungiant iš viršaus prilipimo šuolio nėra.
-      rail.style.top = `${vh - railH}px`;
-    } else if (dy < 0) {
+      if (mode !== 'bottom') {
+        freezeStaticPosition();
+        rail.style.top = `${vh - railH}px`;
+        mode = 'bottom';
+      }
+    } else if (dy < 0 || mode === 'none') {
       if (railTop >= stickTop) {
-        // Pasiekė navbar'ą — prilimpa viršumi. margin sekamas kas kadrą, kad
-        // statinė pozicija liktų ties linija ir grįžus į viršų tarpo neliktų.
-        rail.style.top = `${stickTop}px`;
-        rail.style.marginTop = `${Math.max(0, stickTop - parentTop)}px`;
-      } else {
+        // Pasiekė navbar'ą — prilimpa viršumi. margin nebereikalingas: statinė
+        // pozicija lieka aukščiau prilipimo taško, o puslapio viršuje sticky
+        // atlimpa pati, tad tarpo neatsiranda.
+        if (mode !== 'top') {
+          rail.style.top = `${stickTop}px`;
+          rail.style.marginTop = '0px';
+          mode = 'top';
+        }
+      } else if (mode !== 'free') {
         // Dar nepasiekė: „įšaldom" vietoje (top = dabartinė pozicija) ir
         // inkaruojam statinę poziciją čia — juosta slenka žemyn su turiniu.
+        freezeStaticPosition();
         rail.style.top = `${railTop}px`;
-        rail.style.marginTop = `${Math.max(0, railTop - parentTop)}px`;
+        mode = 'free';
       }
     }
   };
 
   window.addEventListener('scroll', update, { passive: true });
-  window.addEventListener('resize', update);
+  window.addEventListener('resize', () => { mode = 'none'; update(); });
   update();
 }

@@ -6,6 +6,7 @@ import {
     upsertBatch,
     deleteDokumentaiByFailasIds,
 } from "./upsertFromFailai.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const BATCH_SIZE = 500;
 
@@ -73,6 +74,13 @@ export async function processFailaiDokumentaiQueue() {
             [queue.map((row) => row.id)],
         );
         await client.query("COMMIT");
+
+        if (inserted + deleted > 0) {
+            signalWork(WORK_SIGNALS.DOCUMENTS_INDEX_READY, {
+                source: "filesDocumentsQueue",
+                count: inserted + deleted,
+            });
+        }
 
         logger.log(
             `filesDocumentsQueue: claimed ${queue.length} (deduped ${deduped.size}) | upserted ${inserted} | skipped ${skipped} | deleted ${deleted}`,

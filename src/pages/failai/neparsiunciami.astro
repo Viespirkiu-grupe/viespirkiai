@@ -7,6 +7,7 @@ import DataTable from '@design-system/components/DataTable.astro';
 import SelectInput from '@design-system/components/inputs/SelectInput.astro';
 import { postgres, parseLimit, enrichFailasRow, getColorScheme, getFont, cleanQuery, buildSaltinioLink } from '../../lib/failai.js';
 import { sujungtiSaltinioId } from '@/modules/failai/failuIrasymas.js';
+import { DateTime } from 'luxon';
 import '@/utils/linksniai.js';
 
 // Šaltinio nuoroda atkuriama iš pozicinių sourceId0..3 (cvpp/cvpIs — sudėtiniai raktai,
@@ -23,6 +24,16 @@ function withLinkFields(row: any) {
     dokId: null,
     fileId: null,
   };
+}
+
+// `nextAttempt` yra timestamptz, o serveris veikia UTC laiku — rodom Vilniaus laiku.
+function formatVilnius(value: unknown): string | null {
+  if (!value) return null;
+  const dt = value instanceof Date
+    ? DateTime.fromJSDate(value)
+    : DateTime.fromISO(String(value).replace(' ', 'T'), { zone: 'utc' });
+  if (!dt.isValid) return null;
+  return dt.setZone('Europe/Vilnius').toFormat('yyyy-MM-dd HH:mm:ss');
 }
 
 const colorScheme = getColorScheme(Astro.cookies);
@@ -128,7 +139,7 @@ if (typeof query.csv !== 'undefined') {
       escapeCsv(row.saltinis || 'sutartys'),
       escapeCsv(buildSaltinioLink(withLinkFields(row))),
       escapeCsv(row.parsiuntimoBandymai),
-      escapeCsv(row.kitasBandymas),
+      escapeCsv(formatVilnius(row.kitasBandymas)),
     ].join(','));
   }
 
@@ -239,7 +250,7 @@ const queryParams = queryParamsRaw ? `&${queryParamsRaw}` : '';
               ) : ''}
             </td>
             <td class="cell-mono cell-right">{file.parsiuntimoBandymai ?? 0}</td>
-            <td class="cell-nowrap">{file.kitasBandymas ? String(new Date(file.kitasBandymas).toLocaleString('lt-LT')) : '—'}</td>
+            <td class="cell-nowrap">{formatVilnius(file.kitasBandymas) || '—'}</td>
           </tr>
         ))}
       </DataTable>

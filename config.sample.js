@@ -29,6 +29,9 @@ export default {
 
     // Portas, kuriame klausosi serveris.
     port: 9019,
+    // Logų aplinkos žyma. Ypač svarbu tiesiogiai paleistam taskrunneriui,
+    // kuriam Dockerfile NODE_ENV=production netaikomas.
+    appEnv: "prod",
 
     // Lengva JavaScript/slapuko patikra brangiems paieškos puslapiams.
     // Atitinkamas .env kintamasis: ENABLE_BOT_CHALLENGE.
@@ -62,6 +65,11 @@ export default {
     // reikšmės nerašomos, pasikartojantys placeholder'iai sutraukiami iki vieno
     // ($?), o `md5` – normalizuotos užklausos hash'as grupavimui. Žr. ENV.md.
     sqlLogFile: null,
+
+    // Outbound duomenų šaltinių HTTP užklausų metaduomenys. Body ir slapti
+    // headeriai niekada neloginami; žr. utils/scrapeFetch.js ir ENV.md.
+    scrapeLogFile: null,
+    scrapeLogQuickwit: false,
 
     // Dažniausios statiškos užklausos vykdomos kaip prepared statement'ai
     // (planas paruošiamas kartą jungčiai). Išjungti reikia tik jungiantis per
@@ -103,6 +111,15 @@ export default {
     eTarApiUrl: "http://10.1.10.24:8080",
     // Bearer raktas — tik jei adapteryje nustatytas API_KEY.
     eTarApiKey: "",
+    // TaskRunner kas 3 val. iš naujo pereina slenkantį paskutinių 180 d. langą.
+    eTarRecentDays: 180,
+    eTarRefreshHours: 3,
+    // Bendras document/editions/asr/historical API srauto limitas.
+    eTarMaxInflight: 6,
+    // e-Seimas route'ai yra tame pačiame adapteryje, bet scraperis atskiras.
+    eSeimasRecentDays: 180,
+    eSeimasRefreshHours: 3,
+    eSeimasMaxInflight: 6,
 
     // ─────────────────────────────────────────────────────────────────────
     // Failai ir OCR
@@ -115,30 +132,26 @@ export default {
     ocrBandymai: 5,
 
     // ─────────────────────────────────────────────────────────────────────
-    // Blob saugyklų vietos
-    // `*SqliteLocation` — privalomas pilnas lokalaus SQLite failo kelias writeriui.
-    // Seni `*Location` raktai palaiko tik HTTP(S) read fallback kitame mazge.
+    // Sidecar saugyklos
+    //
+    // Visos sidecar SQLite bazės guli viename kataloge, po vieną failą
+    // kiekvienam registro įrašui (`utils/sidecarPaths.js`):
+    //
+    //     <sidecarDir>/failaiInfo.sqlite      failo turinio JSON
+    //     <sidecarDir>/dokumentai.sqlite      dokumentų JSON (raktas: md5)
+    //     <sidecarDir>/ocrRezultatai.sqlite   OCR rezultatai
+    //     <sidecarDir>/liteko2.sqlite         LITEKO2 sprendimai
+    //     <sidecarDir>/eTar.sqlite            e-TAR API atsakymai
+    //     <sidecarDir>/eSeimas.sqlite         e-Seimo API atsakymai
+    //
+    // Turinys suspaustas zstd. `sidecarDir` privalomas kiekvienam procesui,
+    // kuris rašo sidecar'us; be jo write baigiasi klaida.
     // ─────────────────────────────────────────────────────────────────────
+    sidecarDir: undefined,
 
-    // OCR rezultatų blob saugyklą.
-    ocrRezultataiLocation: undefined,
-
-    // Sujungti failo turinio JSON failai (raktas: failasHash) — apima tekstą,
-    // metaduomenis ir išgautus subjektus (iban, jarKodai, links, emails,
-    // domains, telefonai).
-    failaiLocation: undefined,
-
-    // Pilni SQLite failų keliai. Visi lokalūs read/write vyksta tik čia.
-    failaiInfoSqliteLocation: undefined,
-    dokumentaiSqliteLocation: undefined,
-    ocrRezultataiSqliteLocation: undefined,
-
-    // Dokumentų JSON sidecar failai (raktas: md5).
-    dokumentaiLocation: undefined,
-
-    // e-TAR API atsakymų SQLite sidecar (raktas: md5). Skirtingai nuo aukščiau
-    // esančių — ne failų medis, o viena SQLite bazė kataloge, ir tik lokali.
-    eTarSidecarDir: "/flashas/viespirkiai/eTar",
+    // Mazgui be lokalių failų — bazinis URL mazgo, kuris juos turi. Naudojamas
+    // tik skaitymui; klientas pats prilipdo `/api/v1/sidecar/<vardas>`.
+    sidecarRemote: undefined,
 
     // ─────────────────────────────────────────────────────────────────────
     // Eksperimentinės / prototipinės funkcijos

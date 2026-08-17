@@ -89,6 +89,37 @@ wireAddForm('dok-host-form', 'dok-host-input', 'host', (s) => s.toLowerCase());
 wireAddForm('dok-jar-form', 'dok-jar-input', 'jar');
 // Plėtinio savo įvedimas dabar gyvena „Daugiau" modale, ne sidebar'e.
 
+document.getElementById('dok-date-form')?.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  for (const name of ['nuo', 'iki']) {
+    const value = (form.elements.namedItem(name) as HTMLInputElement | null)?.value.trim() ?? '';
+    if (value) params.set(name, value); else params.delete(name);
+  }
+  params.delete('page');
+  navigate(true);
+});
+
+document.querySelectorAll<HTMLFormElement>('form[data-dok-text-filter]').forEach((form) => {
+  const input = form.querySelector<HTMLInputElement>('input[name]');
+  if (!input) return;
+  const apply = (immediate: boolean) => {
+    const value = input.value.trim();
+    params.delete(input.name);
+    if (value) params.set(input.name, value);
+    params.delete('page');
+    navigate(immediate);
+  };
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    apply(true);
+  });
+  input.addEventListener('blur', () => {
+    if (input.value.trim() === (new URLSearchParams(window.location.search).get(input.name) ?? '')) return;
+    apply(false);
+  });
+});
+
 document.querySelectorAll<HTMLButtonElement>('.dok-more-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     // Facets with a `data-facet-modal` open the full-screen "show all" modal

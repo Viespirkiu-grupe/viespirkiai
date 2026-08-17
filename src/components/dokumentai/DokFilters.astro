@@ -25,7 +25,54 @@ const otherCount = p.author.filter.length + p.creator.filter.length + p.producer
   <div class="dok-filters-body" id="dokFiltersBody">
     {s.top.map((x) => <DokFacetSection {...x} />)}
     {p.showVerdictFacets && s.verdict.map((x) => <DokFacetSection {...x} />)}
-    {p.showTeisekuraFacets && s.teisekura.map((x) => <DokFacetSection {...x} />)}
+    {p.showTeisekuraFacets && (
+      <>
+        {s.teisekura.map((x) => <DokFacetSection {...x} />)}
+        <section class="dok-filter-section">
+          <span class="dok-filter-section-label">Dokumento data</span>
+          <form class="dok-date-form" id="dok-date-form" autocomplete="off">
+            <label>
+              <span>Nuo</span>
+              <input type="date" class="dok-input" name="nuo" value={p.dateFrom ?? ''} aria-label="Dokumento data nuo" />
+            </label>
+            <label>
+              <span>Iki</span>
+              <input type="date" class="dok-input" name="iki" value={p.dateTo ?? ''} aria-label="Dokumento data iki" />
+            </label>
+            <button type="submit" class="dok-input-btn" aria-label="Taikyti datos filtrą">→</button>
+          </form>
+        </section>
+        {[
+          {
+            label: 'Įstaigos suteiktas numeris',
+            param: 'istaigosNr',
+            value: p.institutionNumber,
+            placeholder: 'pvz. 49',
+          },
+          {
+            label: 'Registracijos numeris',
+            param: 'regNr',
+            value: p.registrationNumber,
+            placeholder: 'pvz. 2021-00375',
+          },
+        ].map((field) => (
+          <section class="dok-filter-section">
+            <span class="dok-filter-section-label">{field.label}</span>
+            <form class="dok-input-form" data-dok-text-filter={field.param} autocomplete="off">
+              <input
+                type="text"
+                class="dok-input"
+                name={field.param}
+                value={field.value ?? ''}
+                placeholder={field.placeholder}
+                aria-label={field.label}
+              />
+              <button type="submit" class="dok-input-btn" aria-label="Taikyti">→</button>
+            </form>
+          </section>
+        ))}
+      </>
+    )}
     {s.mid.map((x) => <DokFacetSection {...x} />)}
 
     <details class="dok-other-filters" open={otherOpen}>
@@ -159,6 +206,20 @@ const otherCount = p.author.filter.length + p.creator.filter.length + p.producer
     font-size: 10px;
     letter-spacing: 0;
   }
+  .dok-date-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    align-items: end;
+    gap: 6px;
+  }
+  .dok-date-form label { min-width: 0; }
+  .dok-date-form label span {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--gray);
+    font-size: var(--text-xs);
+  }
+  .dok-date-form .dok-input { width: 100%; min-width: 0; }
 
   @media (max-width: 900px) {
     /* Filters collapse behind the header so results sit near the top instead

@@ -103,8 +103,15 @@ async function _runQuery(query: string, _purpose: string, page: number): Promise
     const client = await analystPool.connect();
 
     try {
-        await client.query(`SET statement_timeout = '${QUERY_TIMEOUT_SECONDS}s'`);
+        // Viskas vienoje transakcijoje su SET LOCAL: pgbouncer transaction
+        // pooling režime paprastas `SET` be transakcijos pritaikytų timeout'ą
+        // ne tai serverio jungčiai, kurioje vėliau suksis pati užklausa (arba
+        // nutekėtų kitam klientui). READ ONLY – analitiko rolė ir taip
+        // read-only, bet taip rašymo bandymas nulūžta anksčiau ir aiškiau.
+        await client.query("BEGIN READ ONLY");
+        await client.query(`SET LOCAL statement_timeout = '${QUERY_TIMEOUT_SECONDS}s'`);
         const result = await client.query(wrappedSql);
+        await client.query("COMMIT");
 
         const durationMs = Date.now() - start;
         const hasMore = result.rows.length > PAGE_SIZE;
@@ -125,6 +132,11 @@ async function _runQuery(query: string, _purpose: string, page: number): Promise
             content: [{ type: "text", text: JSON.stringify(payload) }],
         };
     } catch (err: unknown) {
+        try {
+            await client.query("ROLLBACK");
+        } catch {
+            // Jungtis jau gali būti nutraukta – tada rollback'as nebeaktualus.
+        }
         const msg = (err as Error & { code?: string }).code === "42703" || (err as Error).message.includes("does not exist")
             ? (err as Error).message + "\n\nHINT: Column names differ between tables and views. Call get_schema with the exact table/view name and mode:'detail' to see the correct column list before retrying."
             : (err as Error).message;

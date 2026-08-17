@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import {
+    countContractChanges,
     diffContractDocuments,
     fetchRecentChanges,
     formatRecentChanges,
@@ -122,7 +123,7 @@ describe("recent VPM contract changes", () => {
             isTTY = true;
             isRaw = false;
             paused = false;
-            setRawMode(value) {
+            setRawMode(value: boolean) {
                 this.isRaw = value;
             }
             resume() {
@@ -138,7 +139,7 @@ describe("recent VPM contract changes", () => {
         const output = {
             isTTY: true,
             rows: 4,
-            write(value) {
+            write(value: string) {
                 outputText += value;
                 if (!answered && value.includes("-- Daugiau")) {
                     answered = true;
@@ -172,6 +173,16 @@ describe("recent VPM contract changes", () => {
         expect(query).toHaveBeenCalledWith(RECENT_CHANGES_SQL, [3, 42, 100]);
         expect(RECENT_CHANGES_SQL).toMatch(
             /later\."unikalusId" = recent\."unikalusId"[\s\S]*later\.id > recent\.id/,
+        );
+    });
+
+    it("counts all changes for one contract", async () => {
+        const query = vi.fn().mockResolvedValue({ rows: [{ count: "123" }] });
+
+        await expect(countContractChanges(42, { query })).resolves.toBe(123);
+        expect(query).toHaveBeenCalledWith(
+            expect.stringMatching(/COUNT\(\*\)[\s\S]*WHERE "unikalusId" = \$1/),
+            [42],
         );
     });
 });

@@ -1,9 +1,12 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("viesiejiPirkimai", { operation: "viesiejiPirkimaiVykdytojaiScrape" });
 import { postgres } from "../../postgres/postgres.js";
 import { parseHTML } from "linkedom";
 import { isVptWorkingHours } from "../sutartys/isWorkingHours.js";
 import { log } from "../../utils/log.js";
 import { findSingleJuridinis } from "../juridiniai/search.js";
 import config from "../../utils/config.js";
+import { signalWork, WORK_SIGNALS } from "../../utils/taskSignals.js";
 
 const HOST = config.viesiejiPirkimaiUrl;
 const NUSKAITYMO_VERSIJA = 9;
@@ -55,7 +58,7 @@ function parseOrganisation(html) {
 async function processOrganisation(org) {
     try {
         const url = `${HOST}/epps/prepareViewCAOrganisation.do?id=${org.id}`;
-        const response = await fetch(url);
+        const response = await scrapeFetch(url);
         const html = await response.text();
 
         const data = parseOrganisation(html);
@@ -119,7 +122,7 @@ async function processOrganisation(org) {
             ],
         );
 
-        await postgres.query(
+        const updated = await postgres.query(
             `
             UPDATE public."viesiejiPirkimai"
             SET "jarKodas" = $1
@@ -127,6 +130,12 @@ async function processOrganisation(org) {
             `,
             [juridinis?.jarKodas ?? null, org.id],
         );
+        if (updated.rowCount > 0) {
+            signalWork(WORK_SIGNALS.VIESIEJI_PIRKIMAI_CHANGED, {
+                source: "viesiejiPirkimaiVykdytojai",
+                count: updated.rowCount,
+            });
+        }
 
         log(
             `Nuskaitytas vykdytojas ID ${org.id}: ${data.pavadinimas} t.y. ${juridinis?.pavadinimas} (${juridinis?.jarKodas})`,

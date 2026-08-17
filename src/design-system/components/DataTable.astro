@@ -9,10 +9,16 @@ interface DataTableColumn {
   className?: string;
   headerClassName?: string;
   cellClassName?: string;
+  /** Ar stulpelis rikiuojamas paspaudus antraštę (kai lentelė `sortable`). */
+  sortable?: boolean;
+  /** Reikšmių tipas rikiavimui; `auto` atpažįsta skaičius, dydžius ir datas. */
+  sortType?: 'auto' | 'number' | 'text' | 'date';
 }
 
 interface Props {
   columns: DataTableColumn[];
+  /** Įjungia rikiavimą paspaudus ant stulpelių antraščių. */
+  sortable?: boolean;
   rows?: any[];
   emptyText?: string;
   emptyClassName?: string;
@@ -26,6 +32,7 @@ interface Props {
 
 const {
   columns,
+  sortable = false,
   rows,
   emptyText,
   emptyClassName,
@@ -42,12 +49,20 @@ const showEmpty = Array.isArray(rows) && rows.length === 0 && !!emptyText;
 ---
 
 <TableWrapper className={wrapperClassName}>
-  <Table size={size} className={className} striped={striped} fixed={fixed}>
+  <Table size={size} className={className} striped={striped} fixed={fixed} sortable={sortable}>
     <thead>
       <tr>
-        {columns.map((column) => (
-          <th class={column.headerClassName ?? column.className}>{column.label}</th>
-        ))}
+        {columns.map((column) => {
+          const isSortable = sortable && column.sortable !== false;
+          return (
+            <th
+              class={[column.headerClassName ?? column.className, isSortable ? 'sortable' : '']
+                .filter(Boolean).join(' ') || undefined}
+              data-sort-type={isSortable && column.sortType && column.sortType !== 'auto' ? column.sortType : undefined}
+              title={isSortable ? 'Rikiuoti pagal šį stulpelį' : undefined}
+            >{column.label}</th>
+          );
+        })}
       </tr>
     </thead>
     <tbody {...bodyAttributes}>

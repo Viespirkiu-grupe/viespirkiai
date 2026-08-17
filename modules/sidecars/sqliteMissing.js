@@ -1,66 +1,75 @@
 import fs from "node:fs";
 import { performance } from "node:perf_hooks";
-import { DatabaseSync } from "node:sqlite";
 import { postgres } from "../../postgres/postgres.js";
-import config from "../../utils/config.js";
 import { limitArg, numArg, parseArgs } from "../../utils/cliArgs.js";
+import { openSqlite } from "../../utils/sqlite.js";
+import { quoteIdentifier } from "../../utils/sqliteSidecarStore.js";
+import { sidecarDbPath, sidecarKeyColumn, sidecarTable } from "../../utils/sidecarPaths.js";
 
-const SIDECAR_STORES = {
+// Kelias, lentelė ir rakto stulpelis imami iš bendro registro
+// (`utils/sidecarPaths.js`) — čia lieka tik tai, ko registras nežino: iš kur
+// Postgres'e paimti referencinius hash'us.
+const SIDECAR_SALTINIAI = {
     failaiInfo: {
-        table: "failaiInfo",
-        sqliteConfigKey: "failaiInfoSqliteLocation",
         fromSql: `FROM public."filesInfoFiles" WHERE "fileHash" IS NOT NULL`,
         keySql: `"fileHash"`,
     },
     dokumentai: {
-        table: "dokumentai",
-        sqliteConfigKey: "dokumentaiSqliteLocation",
         fromSql: `FROM public.dokumentai WHERE md5 IS NOT NULL`,
         keySql: `md5`,
     },
-    ocr: {
-        table: "ocrRezultatai",
-        sqliteConfigKey: "ocrRezultataiSqliteLocation",
+    ocrRezultatai: {
         fromSql: `FROM public."filesOcrStatus" WHERE "resultHash" IS NOT NULL`,
         keySql: `"resultHash"`,
     },
+    liteko2: {
+        fromSql: `FROM public."liteko2Sprendimai" WHERE md5 IS NOT NULL`,
+        keySql: `md5`,
+    },
+    eTar: {
+        // Aktų dokumentai ir redakcijų sąrašai rašo į tą pačią sidecar lentelę,
+        // tad referencinė aibė yra jų md5 sąjunga.
+        fromSql: `FROM (
+                      SELECT md5 FROM public."eTarLegalActDocument"
+                      UNION
+                      SELECT md5 FROM public."eTarEditionList"
+                  ) t WHERE md5 IS NOT NULL`,
+        keySql: `md5`,
+    },
 };
 
-function quoteIdentifier(value) {
-    if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(value)) throw new Error(`Bloga lentelė: ${value}`);
-    return `"${value}"`;
-}
-
 /** Grąžina tuos batch'o hash'us, kurių nėra SQLite. */
-export function missingFromBatch(db, tableName, hashes) {
+export function missingFromBatch(db, tableName, hashes, keyColumn = "hash") {
     if (!hashes.length) return [];
     const table = quoteIdentifier(tableName);
+    const key = quoteIdentifier(keyColumn);
     // json_each leidžia vienu indexed query patikrinti visą batch'ą ir neatsiremti
     // į SQLite bind parametrų limitą. JSON masyve hash'ai lieka paprastos reikšmės.
     const rows = db.prepare(
-        `SELECT "hash" FROM ${table}
-         WHERE "hash" IN (SELECT value FROM json_each(?))`,
+        `SELECT ${key} AS "raktas" FROM ${table}
+         WHERE ${key} IN (SELECT value FROM json_each(?))`,
     ).all(JSON.stringify(hashes));
-    const found = new Set(rows.map((row) => row.hash));
+    const found = new Set(rows.map((row) => row.raktas));
     return hashes.filter((hash) => !found.has(hash));
 }
 
 export async function runSqliteMissingAudit({ argv = process.argv.slice(2) } = {}) {
     const args = parseArgs(argv);
     const storeName = args.store;
-    const definition = SIDECAR_STORES[storeName];
+    const definition = SIDECAR_SALTINIAI[storeName];
     if (!definition) {
-        throw new Error(`--store turi būti vienas iš: ${Object.keys(SIDECAR_STORES).join(", ")}`);
+        throw new Error(`--store turi būti vienas iš: ${Object.keys(SIDECAR_SALTINIAI).join(", ")}`);
     }
 
     const pageSize = numArg(args.page, 50000);
     const limit = limitArg(args.limit);
-    const dbPath = typeof args.db === "string" ? args.db : config[definition.sqliteConfigKey];
-    if (!dbPath) throw new Error(`${definition.sqliteConfigKey} nenustatytas (arba naudokite --db)`);
+    const dbPath = typeof args.db === "string" ? args.db : sidecarDbPath(storeName);
+    if (!dbPath) throw new Error("SIDECAR_DIR nenustatytas (arba naudokite --db)");
     if (!fs.existsSync(dbPath)) throw new Error(`SQLite failas nerastas: ${dbPath}`);
 
-    const db = new DatabaseSync(dbPath, { readOnly: true });
-    db.exec("PRAGMA busy_timeout = 15000");
+    const table = sidecarTable(storeName);
+    const keyColumn = sidecarKeyColumn(storeName);
+    const db = openSqlite({ dbPath, readonly: true });
 
     let cursor = typeof args.after === "string" ? args.after : null;
     let checked = 0;
@@ -81,7 +90,7 @@ export async function runSqliteMissingAudit({ argv = process.argv.slice(2) } = {
             if (!rows.length) break;
 
             const hashes = rows.map((row) => row.hash);
-            const absent = missingFromBatch(db, definition.table, hashes);
+            const absent = missingFromBatch(db, table, hashes, keyColumn);
             for (const hash of absent) {
                 console.log(`TRŪKSTA ${hash}`);
                 if (examples.length < 20) examples.push(hash);

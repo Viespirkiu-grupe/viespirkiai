@@ -13,6 +13,7 @@ import DokFacetModal from '../../components/dokumentai/DokFacetModal.astro';
 import DokAreaModal from '../../components/dokumentai/DokAreaModal.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
 import { loadDokumentaiPage } from '../../lib/dokumentaiPageData.ts';
+import { describeSearchQuery } from '../../lib/searchOgMeta.ts';
 
 const data = await loadDokumentaiPage(Astro.url);
 if (data.redirect) return Astro.redirect(data.redirect);
@@ -25,11 +26,16 @@ const {
   sutartisPanel, juridinisPanel, bvpzPanel, filterStats,
   filtersProps, resultsProps,
 } = data;
+
+// OG/`<title>` tekstai iš užklausos — ta pati funkcija, kurią naudoja peržiūros
+// crawleriams skirtas middleware ir /dokumentai.png.
+const ogMeta = describeSearchQuery('/dokumentai', Astro.url.searchParams)!;
 ---
 
 <Layout
-  pageTitle="Dokumentų paieška"
-  pageDescription="Viešųjų pirkimų ir su jais susijusių dokumentų paieška pagal pavadinimą, autorių ir turinį."
+  pageTitle={ogMeta.pageTitle}
+  pageDescription={ogMeta.pageDescription}
+  pageImage={ogMeta.ogImageUrl}
   colorScheme={colorScheme}
   font={font}
 >

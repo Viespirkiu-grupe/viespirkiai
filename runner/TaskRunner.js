@@ -1,5 +1,6 @@
 import { Worker } from "./Worker.js";
 import { log } from "../utils/log.js";
+import { subscribe } from "../utils/natsHub.js";
 import cron from "node-cron";
 
 // The previous scheduler added 0.1 priority every 100 ms.
@@ -9,12 +10,17 @@ export class TaskRunner {
     #tasks = new Map();                // name -> task def
     #workers = new Map();              // workerKey -> Worker (including stopping workers)
     #desiredWorkerCounts = new Map();  // taskName -> desired count
+    #wakeSubscriptions = new Map();    // taskName -> unsubscribe[]
+    #cronTasks = new Set();            // node-cron ScheduledTask handles
+    #cronRuns = new Set();             // currently executing cron promises
     #waitingWorkers = new Set();       // admission entries
     #activeJobs = 0;
     #maxConcurrentJobs;
     #nextQueueSequence = 0;
     #started = false;
     #dispatchPaused = false;
+    #stopping = false;
+    #stopPromise = null;
 
     constructor({ maxConcurrentJobs = 20 } = {}) {
         this.#maxConcurrentJobs = maxConcurrentJobs;
@@ -36,7 +42,7 @@ export class TaskRunner {
     }
 
     start() {
-        if (this.#started) return;
+        if (this.#started || this.#stopping) return;
         this.#started = true;
         this.#dispatchPaused = true;
 
@@ -59,6 +65,41 @@ export class TaskRunner {
     }
 
     /**
+     * Nebepradeda naujų darbų ir palaukia, kol jau pradėti job'ai užsibaigs.
+     * Abort signalas nutraukia laukimą eilėje/cooldown'ą, o `jobFn` jį gauna
+     * pirmu argumentu — ilgus retry ciklus turintys darbai privalo jį tikrinti,
+     * kitaip shutdown'as lauks jų iki `FORCE_TIMEOUT_MS`.
+     */
+    async stop() {
+        if (this.#stopPromise) return this.#stopPromise;
+        if (!this.#started) return Promise.resolve();
+
+        this.#stopping = true;
+        this.#started = false;
+        this.#dispatchPaused = true;
+
+        for (const task of this.#cronTasks) task.stop();
+        this.#cronTasks.clear();
+
+        const workerStops = [];
+        for (const [, def] of this.#tasks) {
+            this.#desiredWorkerCounts.set(def.name, 0);
+            this.#syncWakeSubscriptions(def, 0);
+        }
+        for (const worker of this.#workers.values()) {
+            workerStops.push(worker.stop());
+        }
+
+        this.#stopPromise = Promise.all([
+            ...workerStops,
+            ...this.#cronRuns,
+        ]).then(() => {
+            log("[TaskRunner] stopped");
+        });
+        return this.#stopPromise;
+    }
+
+    /**
      * Scale workers for a task up or down — safe to call at any time.
      * A worker finishing an in-flight job remains tracked until it stops, so a
      * fast down/up sequence cannot create a duplicate worker for the same slot.
@@ -72,27 +113,11 @@ export class TaskRunner {
         if (!Number.isInteger(normalizedCount) || normalizedCount < 0) {
             throw new Error(`Worker count for ${taskName} must be an integer >= 0`);
         }
+        if (this.#stopping && normalizedCount > 0) return;
 
         this.#desiredWorkerCounts.set(taskName, normalizedCount);
+        this.#syncWakeSubscriptions(def, normalizedCount);
         this.#reconcileWorkers(def);
-    }
-
-    /** Wake sleeping workers for a task immediately without respawning them. */
-    nudge(taskName) {
-        const workers = this.#workersForTask(taskName);
-
-        if (workers.length > 0) {
-            for (const [, worker] of workers) worker.wake();
-            return;
-        }
-
-        const def = this.#tasks.get(taskName);
-        const desired = this.#desiredWorkerCounts.get(taskName);
-        // An explicit zero means the task was disabled by dynamic syncing.
-        // Do not let a downstream success hook silently re-enable it.
-        if (def?.mode === "asap" && desired !== 0 && def.concurrency > 0) {
-            this.setWorkerCount(taskName, desired ?? def.concurrency);
-        }
     }
 
     activeJobCount() {
@@ -146,7 +171,6 @@ export class TaskRunner {
             staggerMs: def.staggerMs,
             onAdmit: (w, signal) => this.#waitForAdmission(w, signal),
             onRelease: () => this.#releaseJob(),
-            onSuccess: def.onSuccess ? () => def.onSuccess(this) : null,
             onStopped: (w) => this.#handleWorkerStopped(key, w, def),
         });
 
@@ -168,6 +192,38 @@ export class TaskRunner {
         }
         result.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
         return result;
+    }
+
+    #syncWakeSubscriptions(def, desired) {
+        const existing = this.#wakeSubscriptions.get(def.name);
+        if (desired === 0 || def.mode !== "asap" || def.wakeOn.length === 0) {
+            if (existing) {
+                for (const unsubscribe of existing) unsubscribe();
+                this.#wakeSubscriptions.delete(def.name);
+            }
+            return;
+        }
+        if (existing) return;
+
+        const queue = `taskrunner.${def.name}`;
+        const unsubscribes = def.wakeOn.map((subject) => subscribe(
+            subject,
+            () => this.#wakeLocal(def),
+            { queue },
+        ));
+        this.#wakeSubscriptions.set(def.name, unsubscribes);
+        log(`[TaskRunner] ${def.name} klausosi ${def.wakeOn.join(", ")} (queue=${queue})`);
+    }
+
+    #wakeLocal(def) {
+        const desired = this.#desiredWorkerCounts.get(def.name) ?? 0;
+        if (desired === 0) return;
+        const workers = this.#workersForTask(def.name);
+        if (!workers.length) {
+            this.#reconcileWorkers(def);
+            return;
+        }
+        for (const [, worker] of workers) worker.wake();
     }
 
     /**
@@ -237,17 +293,26 @@ export class TaskRunner {
     #scheduleCron(def) {
         if (!def.schedule) return;
         let running = false;
-        cron.schedule(def.schedule, async () => {
-            if (running) return;
+        const task = cron.schedule(def.schedule, async () => {
+            if (this.#stopping || running) return;
             running = true;
+            const run = (async () => {
+                try {
+                    await def.job();
+                } catch (err) {
+                    console.error(`[TaskRunner] cron task "${def.name}" failed:`, err.message);
+                } finally {
+                    running = false;
+                }
+            })();
+            this.#cronRuns.add(run);
             try {
-                await def.job();
-            } catch (err) {
-                console.error(`[TaskRunner] cron task "${def.name}" failed:`, err.message);
+                await run;
             } finally {
-                running = false;
+                this.#cronRuns.delete(run);
             }
         });
+        this.#cronTasks.add(task);
         log(`[TaskRunner] scheduled cron task: ${def.name} (${def.schedule})`);
     }
 }
@@ -261,6 +326,7 @@ function withDefaults(def) {
         staggerMs: 500,
         mode: null,
         schedule: null,
+        wakeOn: [],
         ...def,
     };
 }

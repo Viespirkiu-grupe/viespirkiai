@@ -73,10 +73,16 @@ export function buildJuridiniaiQuickwitQuery(query = {}, { exclude = [] } = {}) 
     return parts.join(" AND ") || "*";
 }
 
+// Antrinis rikiavimo laukas, kad vienodų reikšmių eilutės nešokinėtų tarp
+// puslapių. Quickwit nerikiuoja pagal `text` laukus, todėl jarKodas skaičius
+// papildomai indeksuojamas į `rodikliai.jarKodas` (žr. quickwitProcessIndexQueue.js).
+const TIE_BREAKER = "rodikliai.jarKodas";
+
 function sortBy(query) {
     const allowed = new Set(["atnaujinta", "registravimoData", "darbuotojai", "vidutinisAtlyginimas"]);
     const field = allowed.has(query.sort) ? query.sort : "darbuotojai";
-    return query.sortDir === "asc" ? `-${field}` : field;
+    // Be minuso Quickwit rikiuoja mažėjančiai, su minusu – didėjančiai.
+    return `${query.sortDir === "asc" ? `-${field}` : field},${TIE_BREAKER}`;
 }
 
 async function aggregate(query, aggs) {

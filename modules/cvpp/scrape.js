@@ -1,3 +1,5 @@
+import { createScraperFetch } from "../../utils/scrapeFetch.js";
+const scrapeFetch = createScraperFetch("cvpp", { operation: "scrape" });
 import { Logger } from "../../utils/log.js";
 const logger = new Logger();
 import { postgres } from "../../postgres/postgres.js";
@@ -22,7 +24,7 @@ async function nuskaitytiDienosCvppViesuosiusPirkimus(data) {
     let url = `https://cvpp.eviesiejipirkimai.lt/?IncludeExpired=true&PublishedFromDate=${data}&PublishedToDate=${data}&PageSize=1000`;
     logger.log(`Nuskaitymas iš ${url}`);
 
-    let response = await fetch(url);
+    let response = await scrapeFetch(url);
     let text = await response.text();
     let { document } = parseHTML(text);
 

@@ -1,4 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const nats = vi.hoisted(() => ({
+    subscriptions: [] as Array<{
+        subject: string;
+        handler: () => void;
+        options: { queue?: string };
+        unsubscribe: ReturnType<typeof vi.fn>;
+    }>,
+}));
+
+vi.mock("../utils/natsHub.js", () => ({
+    subscribe: vi.fn((subject: string, handler: () => void, options: { queue?: string }) => {
+        const unsubscribe = vi.fn();
+        nats.subscriptions.push({ subject, handler, options, unsubscribe });
+        return unsubscribe;
+    }),
+}));
+
 import { TaskRunner } from "../runner/TaskRunner.js";
 
 function deferred<T>() {
@@ -13,6 +31,7 @@ async function flush() {
 
 describe("TaskRunner", () => {
     beforeEach(() => {
+        nats.subscriptions.length = 0;
         vi.useFakeTimers();
         vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
     });
@@ -84,33 +103,6 @@ describe("TaskRunner", () => {
         await flush();
     });
 
-    it("releases once when a success hook throws", async () => {
-        const order: string[] = [];
-        const error = vi.spyOn(console, "error").mockImplementation(() => {});
-        const runner = new TaskRunner({ maxConcurrentJobs: 1 });
-        runner.registerAll([
-            {
-                name: "hook",
-                mode: "asap",
-                priority: 10,
-                cooldown: 3600,
-                job: async () => { order.push("hook"); return false; },
-                onSuccess: () => { throw new Error("hook failed"); },
-            },
-            { name: "next", mode: "asap", priority: 1, cooldown: 3600, job: async () => { order.push("next"); return false; } },
-        ]);
-        runner.start();
-        await flush();
-
-        expect(order).toEqual(["hook", "next"]);
-        expect(runner.activeJobCount()).toBe(0);
-        expect(error).toHaveBeenCalledWith(expect.stringContaining("success hook failed"), expect.any(Error));
-        runner.setWorkerCount("hook", 0);
-        runner.setWorkerCount("next", 0);
-        await flush();
-        error.mockRestore();
-    });
-
     it("waits for a stopping job before replacing it during rapid down/up scaling", async () => {
         const first = deferred<boolean>();
         let calls = 0;
@@ -171,24 +163,98 @@ describe("TaskRunner", () => {
         await flush();
     });
 
-    it("does not let nudge re-enable a task explicitly scaled to zero", async () => {
+    it("wakes a sleeping task from its NATS queue subscription", async () => {
         let calls = 0;
         const runner = new TaskRunner({ maxConcurrentJobs: 1 });
         runner.register({
-            name: "disabled",
+            name: "signalled",
             mode: "asap",
             cooldown: 3600,
+            wakeOn: ["work.ready"],
             job: async () => { calls++; return false; },
         });
         runner.start();
         await flush();
         expect(calls).toBe(1);
 
-        runner.setWorkerCount("disabled", 0);
+        expect(nats.subscriptions).toHaveLength(1);
+        expect(nats.subscriptions[0]).toMatchObject({
+            subject: "work.ready",
+            options: { queue: "taskrunner.signalled" },
+        });
+        nats.subscriptions[0].handler();
         await flush();
-        runner.nudge("disabled");
-        await flush();
+        expect(calls).toBe(2);
 
+        runner.setWorkerCount("signalled", 0);
+        await flush();
+        expect(nats.subscriptions[0].unsubscribe).toHaveBeenCalledOnce();
+    });
+
+    it("has no public local nudge API", () => {
+        const runner = new TaskRunner();
+        expect("nudge" in runner).toBe(false);
+    });
+
+    it("graceful stop waits for the active job and starts no next job", async () => {
+        const active = deferred<boolean>();
+        let calls = 0;
+        const runner = new TaskRunner({ maxConcurrentJobs: 1 });
+        runner.register({
+            name: "graceful",
+            mode: "asap",
+            cooldown: 3600,
+            wakeOn: ["work.graceful"],
+            job: async () => {
+                calls++;
+                return active.promise;
+            },
+        });
+
+        runner.start();
+        await flush();
         expect(calls).toBe(1);
+
+        let stopped = false;
+        const stopPromise = runner.stop().then(() => { stopped = true; });
+        await flush();
+        expect(stopped).toBe(false);
+        expect(nats.subscriptions[0].unsubscribe).toHaveBeenCalledOnce();
+
+        active.resolve(true);
+        await stopPromise;
+        await flush();
+        expect(stopped).toBe(true);
+        expect(calls).toBe(1);
+        expect(runner.activeJobCount()).toBe(0);
+    });
+
+    it("aborts the running job's signal on stop so long retry loops can bail out", async () => {
+        const active = deferred<boolean>();
+        let jobSignal: AbortSignal | undefined;
+        const runner = new TaskRunner({ maxConcurrentJobs: 1 });
+        runner.register({
+            name: "abortable",
+            mode: "asap",
+            cooldown: 3600,
+            job: async (signal: AbortSignal) => {
+                jobSignal = signal;
+                return active.promise;
+            },
+        });
+
+        runner.start();
+        await flush();
+        expect(jobSignal).toBeInstanceOf(AbortSignal);
+        expect(jobSignal!.aborted).toBe(false);
+
+        const stopPromise = runner.stop();
+        await flush();
+        expect(jobSignal!.aborted).toBe(true);
+
+        active.resolve(false);
+        await stopPromise;
+        await flush();
+        expect(runner.activeJobCount()).toBe(0);
     });
 });

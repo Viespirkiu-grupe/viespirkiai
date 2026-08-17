@@ -1,8 +1,7 @@
-// Žmogui skirti /teisesAktai facetų reikšmių pavadinimai.
+// Žmogui skirti e-TAR reikšmių pavadinimai dokumentų paieškai ir akto detalei.
 //
-// Atskiras modulis (ne searchTeisesAktai.ts), nes šias funkcijas naudoja ir
-// naršyklė — „Daugiau" modalas. searchTeisesAktai.ts tempia Quickwit ir SQLite
-// importus, tad į kliento bundle jam kelio nėra.
+// Modulis sąmoningai neturi serverinių priklausomybių, nes dalį funkcijų naudoja
+// ir naršyklėje atvaizduojami dokumentų filtrai.
 //
 // Visos šios funkcijos keičia TIK atvaizdavimą — reikšmė URL'e ir Quickwit
 // užklausoje lieka tokia, kokia yra indekse.

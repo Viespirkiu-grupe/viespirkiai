@@ -1,10 +1,10 @@
 import type { APIRoute } from 'astro';
 import { postgres } from '@/postgres/postgres.js';
-import { openETarSidecar, readResponse } from '@/modules/eTar/eTarSidecar.js';
+import { readETarSidecar } from '@/modules/eTar/eTarSidecar.js';
 
 // Oficialaus teisės akto teksto HTML, skirtas įdėti į <iframe> akto puslapyje.
 //
-// Adresas — /teisesAktai/tekstas/html/<md5>: dokumentą nusako pats kelias, o ne
+// Tai vidinis `/teisesAktas/[id]` iframe endpointas: dokumentą nusako kelias, o ne
 // privalomas užklausos parametras. Vienintelis parametras `?scheme=dark|light`
 // yra neprivalomas (be jo sprendžia `prefers-color-scheme`).
 //
@@ -13,12 +13,6 @@ import { openETarSidecar, readResponse } from '@/modules/eTar/eTarSidecar.js';
 //   • `md5` privalo egzistuoti "eTarLegalActDocument" lentelėje (ne bet kas iš sidecar'o);
 //   • CSP uždraudžia skriptus, formas ir bet kokį išorinį krovimą;
 //   • `sandbox` ant paties <iframe> (žr. puslapį) papildomai nuima JS ir same-origin.
-
-let sidecarDb: any = null;
-function getSidecar() {
-  if (!sidecarDb) sidecarDb = openETarSidecar({ readonly: true });
-  return sidecarDb;
-}
 
 /**
  * e-TAR aktai ateina iš Word'o ir kiekvienam elementui prirašo `color: black`
@@ -106,7 +100,7 @@ export const GET: APIRoute = async ({ params, url }) => {
 
   let html: string | null = null;
   try {
-    const payload: any = readResponse(getSidecar(), md5);
+    const payload: any = await readETarSidecar(md5);
     const raw = payload?.official_text?.html;
     if (typeof raw === 'string' && raw.trim()) html = raw;
   } catch { /* sidecar'o nėra arba įrašas dingęs */ }
