@@ -1,3 +1,5 @@
+import type { SearchOgMeta } from './searchOgMeta.ts';
+
 const protectedSearchPaths = new Set([
   '/',
   '/viesiejiPirkimai',
@@ -28,15 +30,65 @@ export function isGoogleCrawler(userAgent: string | null | undefined): boolean {
   return !!userAgent && googleCrawlerUserAgent.test(userAgent);
 }
 
-/** A deliberately tiny JavaScript check for bots which do not execute JS. */
-export function botChallengeResponse(): Response {
+/** HTML atributams — iššūkio dokumentas sudaromas rankomis. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * OG antraštės iššūkio puslapiui — sudarytos vien iš URL parametrų, be nė vienos DB
+ * ar Quickwit užklausos (žr. `searchOgMeta.ts`).
+ *
+ * Jos gyvena būtent čia, o ne atskirame crawleriams skirtame atsakyme: peržiūros
+ * crawleriai (Facebook, Slack, Signal…) JavaScript nevykdo, tad iššūkio niekada
+ * neišspręs, o atpažinti juos pagal User-Agent reikštų laikyti sąrašą, kurio niekada
+ * nepakaks. Vietoj to iššūkis lieka visiems (išskyrus Googlebot), o tą patį puslapį
+ * gavęs crawleris `<head>` randa teisingą nuorodos peržiūrą.
+ */
+function ogTags(meta: SearchOgMeta | null | undefined): string {
+  if (!meta) return '';
+
+  const title = escapeHtml(meta.pageTitle);
+  const description = escapeHtml(meta.pageDescription);
+  const image = escapeHtml(meta.ogImageUrl);
+  const url = escapeHtml(meta.canonicalUrl);
+
+  return `
+  <link rel="canonical" href="${url}">
+  <meta name="description" content="${description}">
+  <meta property="og:site_name" content="Viešpirkiai">
+  <meta property="og:locale" content="lt_LT">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${url}">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${description}">
+  <meta property="og:image" content="${image}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${description}">
+  <meta name="twitter:image" content="${image}">`;
+}
+
+/**
+ * A deliberately tiny JavaScript check for bots which do not execute JS.
+ *
+ * @param meta - paieškos užklausos OG duomenys; su jais puslapis lieka tinkama
+ *   nuorodos peržiūra net ir tada, kai iššūkio niekas neišsprendžia.
+ */
+export function botChallengeResponse(meta?: SearchOgMeta | null): Response {
   return new Response(`<!doctype html>
 <html lang="lt">
 <head>
   <meta charset="utf-8">
   <meta name="robots" content="noindex">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tikrinama naršyklė…</title>
+  <title>${meta ? `${escapeHtml(meta.pageTitle)} – Viešpirkiai` : 'Tikrinama naršyklė…'}</title>${ogTags(meta)}
   <style>
     :root { color-scheme: light dark; }
     body {

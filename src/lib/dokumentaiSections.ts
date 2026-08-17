@@ -3,7 +3,7 @@
 // maps the result onto DokFacetSection — this module holds the "which facets,
 // what labels, what overflow" config so the component stays thin.
 import type { DokFacet } from './dokumentaiUrl.ts';
-import { CLASS_OPTS, CLASS_LABEL, TIPAS_OPTS, TYPE_LABEL, SOURCE_LABEL, LANG_LABEL } from './dokumentaiLabels.ts';
+import { CLASS_OPTS, CLASS_LABEL, TIPAS_OPTS, TYPE_LABEL, SOURCE_LABEL, LANG_LABEL, DOKUMENTAI_PARAM_LABELS } from './dokumentaiLabels.ts';
 import { eurovocLabel, statusasLabel, turinysLabel, variantasLabel } from './teisesAktaiLabels.ts';
 
 /** The data DokFilters receives (built by loadDokumentaiPage). */
@@ -65,7 +65,9 @@ export interface FacetSectionProps {
 }
 
 type Group = 'top' | 'verdict' | 'teisekura' | 'mid' | 'other' | 'geo';
-type Section = FacetSectionProps & { group: Group; when?: boolean };
+// `label` praleidžiama — jį pagal `param` užpildo DOKUMENTAI_PARAM_LABELS, kad ta
+// pati lietuviška etiketė negyventų ir čia, ir OG antraštėse.
+type Section = Omit<FacetSectionProps, 'label'> & { group: Group; when?: boolean; label?: string };
 
 // A facet appears once it has options or an active selection.
 const any = (f: DokFacet) => f.visible.length > 0 || f.filter.length > 0;
@@ -102,46 +104,48 @@ export function buildFilterSections(p: FiltersData): Record<Group, FacetSectionP
 
   const sections: Section[] = [
     // Top: broad document class + type (from count maps; always visible).
-    { group: 'top', when: Object.keys(p.classCountMap).length > 0 || p.classFilter.length > 0, label: 'Sritis', param: 'klase', facet: classFacet, allLabel: 'Visos', alwaysAll: true, formatLabel: classLabel },
-    { group: 'top', label: 'Tipas', param: 'type', facet: typeFacet, allLabel: 'Visi', alwaysAll: true, formatLabel: typeLabel },
+    { group: 'top', when: Object.keys(p.classCountMap).length > 0 || p.classFilter.length > 0, param: 'klase', facet: classFacet, allLabel: 'Visos', alwaysAll: true, formatLabel: classLabel },
+    { group: 'top', param: 'type', facet: typeFacet, allLabel: 'Visi', alwaysAll: true, formatLabel: typeLabel },
 
     // Teismų nuosprendžiai (rodoma tik su „teise" klase / aktyviu filtru).
-    { group: 'verdict', label: 'Teismas', param: 'teismas', facet: p.court, allLabel: 'Visi', modal: { field: 'metadata.teismas', title: 'Teismas' } },
-    { group: 'verdict', when: any(p.caseType), label: 'Bylos rūšis', param: 'bylosRusis', facet: p.caseType, allLabel: 'Visos' },
-    { group: 'verdict', label: 'Kategorija', param: 'kategorija', facet: p.category, allLabel: 'Visos', modal: { field: 'metadata.kategorijos', title: 'Kategorija' } },
-    { group: 'verdict', label: 'Teisėjas', param: 'teisejas', facet: p.judge, allLabel: 'Visi', modal: { field: 'metadata.teisejai', title: 'Teisėjas' } },
+    { group: 'verdict', param: 'teismas', facet: p.court, allLabel: 'Visi', modal: { field: 'metadata.teismas', title: 'Teismas' } },
+    { group: 'verdict', when: any(p.caseType), param: 'bylosRusis', facet: p.caseType, allLabel: 'Visos' },
+    { group: 'verdict', param: 'kategorija', facet: p.category, allLabel: 'Visos', modal: { field: 'metadata.kategorijos', title: 'Kategorija' } },
+    { group: 'verdict', param: 'teisejas', facet: p.judge, allLabel: 'Visi', modal: { field: 'metadata.teisejai', title: 'Teisėjas' } },
 
     // Teisėkūra (rodoma tik su „teisekura" klase / aktyviu filtru).
-    { group: 'teisekura', when: any(p.actType), label: 'Teisės akto rūšis', param: 'aktoRusis', facet: p.actType, modal: { field: 'metadata.rusis', title: 'Teisės akto rūšis' } },
-    { group: 'teisekura', when: any(p.validity), label: 'Galiojimas', param: 'galiojimas', facet: p.validity, formatLabel: statusasLabel },
-    { group: 'teisekura', when: any(p.editionType), label: 'Redakcija', param: 'redakcija', facet: p.editionType, formatLabel: variantasLabel },
-    { group: 'teisekura', when: any(p.projectStatus), label: 'Projekto būsena', param: 'projektoBusena', facet: p.projectStatus, modal: { field: 'metadata.busena', title: 'Projekto būsena' } },
-    { group: 'teisekura', when: any(p.eurovoc), label: 'Eurovoc', param: 'eurovoc', facet: p.eurovoc, formatLabel: eurovocLabel, modal: { field: 'metadata.eurovocTerminai', title: 'Eurovoc' } },
-    { group: 'teisekura', when: any(p.adoptedBy), label: 'Priėmė', param: 'prieme', facet: p.adoptedBy, modal: { field: 'metadata.prieme', title: 'Priėmė' } },
-    { group: 'teisekura', when: any(p.contentState), label: 'Teksto būsena', param: 'turinys', facet: p.contentState, formatLabel: turinysLabel },
+    { group: 'teisekura', when: any(p.actType), param: 'aktoRusis', facet: p.actType, modal: { field: 'metadata.rusis', title: 'Teisės akto rūšis' } },
+    { group: 'teisekura', when: any(p.validity), param: 'galiojimas', facet: p.validity, formatLabel: statusasLabel },
+    { group: 'teisekura', when: any(p.editionType), param: 'redakcija', facet: p.editionType, formatLabel: variantasLabel },
+    { group: 'teisekura', when: any(p.projectStatus), param: 'projektoBusena', facet: p.projectStatus, modal: { field: 'metadata.busena', title: 'Projekto būsena' } },
+    { group: 'teisekura', when: any(p.eurovoc), param: 'eurovoc', facet: p.eurovoc, formatLabel: eurovocLabel, modal: { field: 'metadata.eurovocTerminai', title: 'Eurovoc' } },
+    { group: 'teisekura', when: any(p.adoptedBy), param: 'prieme', facet: p.adoptedBy, modal: { field: 'metadata.prieme', title: 'Priėmė' } },
+    { group: 'teisekura', when: any(p.contentState), param: 'turinys', facet: p.contentState, formatLabel: turinysLabel },
 
     // Middle: source, agency, site, person, extension.
-    { group: 'mid', when: any(p.source), label: 'Šaltinis', param: 'source', facet: p.source, allLabel: 'Visi', formatLabel: sourceLabel },
-    { group: 'mid', when: any(p.istaiga), label: 'Paskelbusi įstaiga', param: 'istaiga', facet: p.istaiga, allLabel: 'Visos', stacked: true, modal: { field: 'istaigaJar', title: 'Paskelbusi įstaiga' } },
-    { group: 'mid', label: 'Svetainė', param: 'host', facet: p.host, allLabel: 'Visi', formatLabel: stripWww, addForm: { id: 'dok-host-form', inputId: 'dok-host-input', placeholder: 'pvz. vpt.lrv.lt', ariaLabel: 'Įvesti svetainę' } },
-    { group: 'mid', label: 'Asmuo (JAR)', param: 'jar', facet: p.jar, allLabel: 'Visi', stacked: true, modal: { field: 'jarKodai', title: 'Asmuo (JAR)', always: true }, addForm: { id: 'dok-jar-form', inputId: 'dok-jar-input', placeholder: 'pvz. 123456789', ariaLabel: 'Įvesti JAR kodą' } },
-    { group: 'mid', label: 'Plėtinys', param: 'ext', facet: p.ext, allLabel: 'Visi', formatLabel: extLabel, modal: { field: 'extension', title: 'Plėtinys' } },
+    { group: 'mid', when: any(p.source), param: 'source', facet: p.source, allLabel: 'Visi', formatLabel: sourceLabel },
+    { group: 'mid', when: any(p.istaiga), param: 'istaiga', facet: p.istaiga, allLabel: 'Visos', stacked: true, modal: { field: 'istaigaJar', title: 'Paskelbusi įstaiga' } },
+    { group: 'mid', param: 'host', facet: p.host, allLabel: 'Visi', formatLabel: stripWww, addForm: { id: 'dok-host-form', inputId: 'dok-host-input', placeholder: 'pvz. vpt.lrv.lt', ariaLabel: 'Įvesti svetainę' } },
+    { group: 'mid', param: 'jar', facet: p.jar, allLabel: 'Visi', stacked: true, modal: { field: 'jarKodai', title: 'Asmuo (JAR)', always: true }, addForm: { id: 'dok-jar-form', inputId: 'dok-jar-input', placeholder: 'pvz. 123456789', ariaLabel: 'Įvesti JAR kodą' } },
+    { group: 'mid', param: 'ext', facet: p.ext, allLabel: 'Visi', formatLabel: extLabel, modal: { field: 'extension', title: 'Plėtinys' } },
 
     // "Kiti filtrai" (collapsible): PDF metadata authors.
-    { group: 'other', label: 'Autorius', param: 'author', facet: p.author, allLabel: 'Visi', modal: { field: 'author', title: 'Autorius' } },
-    { group: 'other', label: 'Creator', param: 'creator', facet: p.creator, allLabel: 'Visi', modal: { field: 'metadata.creator', title: 'Creator' } },
-    { group: 'other', label: 'Producer', param: 'producer', facet: p.producer, allLabel: 'Visi', modal: { field: 'metadata.producer', title: 'Producer' } },
+    { group: 'other', param: 'author', facet: p.author, allLabel: 'Visi', modal: { field: 'author', title: 'Autorius' } },
+    { group: 'other', param: 'creator', facet: p.creator, allLabel: 'Visi', modal: { field: 'metadata.creator', title: 'Creator' } },
+    { group: 'other', param: 'producer', facet: p.producer, allLabel: 'Visi', modal: { field: 'metadata.producer', title: 'Producer' } },
 
     // Geo + time.
-    { group: 'geo', when: any(p.lang), label: 'Kalba', param: 'lang', facet: p.lang, allLabel: 'Visi', formatLabel: langLabel },
-    { group: 'geo', when: any(p.sav), label: 'Savivaldybė', param: 'sav', facet: p.sav, allLabel: 'Visi' },
-    { group: 'geo', when: any(p.apskritis), label: 'Apskritis', param: 'apskritis', facet: p.apskritis, allLabel: 'Visi' },
-    { group: 'geo', when: p.metaiFilter.length > 0, label: 'Metai', param: 'metai', facet: metaiFacet, allLabel: 'Visi' },
+    { group: 'geo', when: any(p.lang), param: 'lang', facet: p.lang, allLabel: 'Visi', formatLabel: langLabel },
+    { group: 'geo', when: any(p.sav), param: 'sav', facet: p.sav, allLabel: 'Visi' },
+    { group: 'geo', when: any(p.apskritis), param: 'apskritis', facet: p.apskritis, allLabel: 'Visi' },
+    { group: 'geo', when: p.metaiFilter.length > 0, param: 'metai', facet: metaiFacet, allLabel: 'Visi' },
   ];
 
   const groups = { top: [], verdict: [], teisekura: [], mid: [], other: [], geo: [] } as Record<Group, FacetSectionProps[]>;
-  for (const { group, when, ...props } of sections) {
-    if (when ?? true) groups[group].push(props);
+  for (const { group, when, label, ...props } of sections) {
+    if (when ?? true) {
+      groups[group].push({ ...props, label: label ?? DOKUMENTAI_PARAM_LABELS[props.param] ?? props.param });
+    }
   }
   return groups;
 }

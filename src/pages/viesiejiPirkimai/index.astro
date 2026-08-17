@@ -23,6 +23,7 @@ import { objectsToJsonlStream } from '@/utils/jsonl.js';
 import { Transform } from 'node:stream';
 import { Readable } from 'node:stream';
 import { cleanQuery, getColorScheme, getFont } from '../../lib/failai.js';
+import { describeSearchQuery } from '../../lib/searchOgMeta.ts';
 
 const DEFAULT_LIMIT = 50;
 const MAX_POSTGRES_LIMIT = 1_000_000;
@@ -234,12 +235,16 @@ const reklama = Astro.cookies.get('reklamosPaslepta')?.value === '1'
   : await pickReklama('viesiejiPirkimai');
 
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');
+
+// OG/`<title>` tekstai iš užklausos — ta pati funkcija, kurią naudoja peržiūros
+// crawleriams skirtas middleware ir /viesiejiPirkimai.png.
+const ogMeta = describeSearchQuery('/viesiejiPirkimai', Astro.url.searchParams)!;
 ---
 
 <Layout
-  pageTitle="Viešųjų pirkimų paieška"
-  pageDescription="Pilietinė viešųjų pirkimų analizės iniciatyva. Prieinamai patiekiami viešieji pirkimai bei kita susijusi informacija."
-  pageImage="https://viespirkiai.org/viesiejiPirkimai.png"
+  pageTitle={ogMeta.pageTitle}
+  pageDescription={ogMeta.pageDescription}
+  pageImage={ogMeta.ogImageUrl}
   colorScheme={colorScheme}
   font={font}
 >

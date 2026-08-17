@@ -19,6 +19,8 @@ import { objectsToCsvStream } from '@/utils/csv.js';
 import { buildAnalizeXlsx, canExportAnalizeXlsx, XLSX_EXPORT_LIMIT } from '@/modules/sutartys/analize.js';
 import { Readable as NodeReadable, PassThrough, Transform } from 'node:stream';
 import { cleanQuery, getColorScheme, getFont } from '../lib/failai.ts';
+import { sutartysFilterSummary } from '../lib/sutartysFilterLabels.ts';
+import { describeSearchQuery } from '../lib/searchOgMeta.ts';
 
 void NodeReadable;
 
@@ -246,7 +248,7 @@ if ((query.jsonl || query.csv || query.xlsx) && query.exportStream) {
             const viewUrl = new URL(Astro.url);
             viewUrl.protocol = 'https:';
             ['xlsx', 'csv', 'jsonl', 'exportStream', 'limit', 'page'].forEach((key) => viewUrl.searchParams.delete(key));
-            const xlsx = new Uint8Array(buildAnalizeXlsx(rows, { exportedAt: new Date(), viewUrl: viewUrl.toString(), filters: viewUrl.searchParams.toString() }));
+            const xlsx = new Uint8Array(buildAnalizeXlsx(rows, { exportedAt: new Date(), viewUrl: viewUrl.toString(), filters: sutartysFilterSummary(viewUrl.searchParams) }));
             controller.enqueue(exportFrame(EXPORT_FRAME.fileStart, { filename, contentType, size: xlsx.byteLength }));
             for (let offset = 0; offset < xlsx.byteLength; offset += 64 * 1024) {
               const chunk = xlsx.subarray(offset, offset + 64 * 1024);
@@ -326,31 +328,10 @@ if (query.jsonl || query.csv || query.xlsx) {
     const viewUrl = new URL(Astro.url);
     viewUrl.protocol = 'https:';
     ['xlsx', 'csv', 'jsonl', 'limit', 'page'].forEach(key => viewUrl.searchParams.delete(key));
-    const filterLabels: Record<string, string> = {
-      search: 'Paieška',
-      perkanciosiosOrganizacijosKodas: 'Pirkėjo kodas',
-      tiekejoKodas: 'Tiekėjo kodas',
-      sutartiesNumeris: 'Sutarties numeris',
-      pirkimoNumeris: 'Pirkimo numeris',
-      sutartiesUnikalusID: 'Sutarties ID',
-      tipas: 'Sutarties tipas',
-      sudarymoDataNuo: 'Sudaryta nuo',
-      sudarymoDataIki: 'Sudaryta iki',
-      verteNuo: 'Vertė nuo',
-      verteIki: 'Vertė iki',
-      bvpzPrefiksas: 'BVPŽ kodas',
-      tikSuDokumentais: 'Tik su dokumentais',
-      ignoruotiSp: 'Be pakeitimų',
-      sort: 'Rikiavimas',
-      dir: 'Rikiavimo kryptis',
-    };
-    const filters = [...viewUrl.searchParams.entries()]
-      .map(([key, value]) => `${filterLabels[key] ?? key}: ${value}`)
-      .join('; ');
     const metadata = {
       exportedAt: new Date(),
       viewUrl: viewUrl.toString(),
-      filters,
+      filters: sutartysFilterSummary(viewUrl.searchParams),
     };
     const body = buildAnalizeXlsx(rows, metadata);
     void body;
@@ -554,12 +535,16 @@ const sortValue = values.sort
   : '';
 
 Astro.response.headers.set('Cache-Control', 'private, max-age=10');
+
+// OG/`<title>` tekstai iš užklausos — ta pati funkcija, kurią naudoja peržiūros
+// crawleriams skirtas middleware ir /sutartys.png.
+const ogMeta = describeSearchQuery('/', Astro.url.searchParams)!;
 ---
 
 <Layout
-  pageTitle="Sutarčių paieška"
-  pageDescription="Pilietinė viešųjų pirkimų analizės iniciatyva. Prieinamai patiekiamos viešųjų pirkimų sutartys bei kita susijusi informacija."
-  pageImage="https://viespirkiai.org/sutartys.png"
+  pageTitle={ogMeta.pageTitle}
+  pageDescription={ogMeta.pageDescription}
+  pageImage={ogMeta.ogImageUrl}
   colorScheme={colorScheme}
   font={font}
   customHead={config.customHead}
