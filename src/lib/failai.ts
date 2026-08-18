@@ -1,5 +1,6 @@
 import { postgres } from '@/postgres/postgres.js';
 import { OCR_STATES } from '@/modules/failai/ocr.js';
+import { linksniuoti, linksniuotiK, linksniuotiOnly } from '@/utils/linksniai.js';
 
 export const DEFAULT_LIMIT = 25;
 export const MAX_LIMIT = 250;
@@ -31,31 +32,6 @@ type CookieJarLike = {
   get(name: string): { value?: string } | undefined;
 };
 
-function formatPlural(number: number, cases: [string, string, string, string]) {
-  const n = Math.abs(Number(number));
-  const str = number.toString();
-  const hasFraction = str.includes('.') || str.includes(',');
-
-  let form: string;
-  if (hasFraction && n !== 0) {
-    form = cases[3];
-  } else if (n % 10 === 1 && !(n % 100 >= 11 && n % 100 <= 19)) {
-    form = cases[0];
-  } else if (n % 10 >= 2 && n % 10 <= 9 && !(n % 100 >= 11 && n % 100 <= 19)) {
-    form = cases[1];
-  } else {
-    form = cases[2];
-  }
-
-  return `${n.toLocaleString('lt-LT').replace(/\u00A0/g, ' ')} ${form}`;
-}
-
-function formatPluralK(number: number, cases: [string, string]) {
-  const n = Math.abs(Number(number));
-  const form = n % 10 === 1 && n % 100 !== 11 ? cases[0] : cases[1];
-  return `${n.toLocaleString('lt-LT').replace(/\u00A0/g, ' ')} ${form}`;
-}
-
 export function parseLimit(query: Record<string, string>, defaultLimit = DEFAULT_LIMIT, maxLimit = MAX_LIMIT) {
   if (query.limit === 'max') return { limit: maxLimit };
   const n = parseInt(query.limit);
@@ -72,10 +48,10 @@ export function buildNumberOfResults({ rows, total, elapsed, engine = 'PostgreSQ
   const source = `<span class="inline timing-source" data-duration="${trukme}"${timingsAttr}>(${trukme}s, ${engine})</span>`;
   if (approximate) {
     const rounded = Math.round(total / 100) * 100 || total;
-    return `Apie ${formatPluralK(rounded, ['rezultato', 'rezultatų'])} ${source}`;
+    return `Apie ${linksniuotiK(rounded, ['rezultato', 'rezultatų'])} ${source}`;
   }
-  if (rows.length < total) return `Rodomi ${rows.length} iš ${formatPluralK(total, ['rezultato', 'rezultatų'])} ${source}`;
-  return `${formatPlural(total, ['rezultatas', 'rezultatai', 'rezultatų', 'rezultato'])} ${source}`;
+  if (rows.length < total) return `${linksniuotiOnly(rows.length, ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'])} ${rows.length} iš ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`;
+  return `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų', 'rezultato'])} ${source}`;
 }
 
 export function buildSaltinioLink(row: any) {

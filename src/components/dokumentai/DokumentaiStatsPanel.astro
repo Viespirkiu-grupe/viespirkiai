@@ -11,6 +11,8 @@ import BarList from '@design-system/components/BarList.astro';
 import StatChip from '@design-system/components/StatChip.astro';
 import TimelineColumnChart from '@design-system/components/charts/TimelineColumnChart.astro';
 import SegmentedBar from '@design-system/components/charts/SegmentedBar.astro';
+import Linksnis from '@design-system/components/Linksnis.astro';
+import { linksniuotiOnly } from '@/utils/linksniai.js';
 
 interface Props {
   stats: DokumentaiStats;
@@ -77,7 +79,7 @@ const timelineBars = timeline.map((t) => ({
   countText: fmtCompact(t.count),
   href: yearUrl(t.year),
   active: activeYears.has(t.year),
-  ariaLabel: `${t.year}: ${fmt(t.count)} dokumentų${activeYears.has(t.year) ? ' (pasirinkta)' : ''}`,
+  ariaLabel: `${t.year}: ${fmt(t.count)} ${linksniuotiOnly(t.count, ['dokumentas', 'dokumentai', 'dokumentų', 'dokumento'])}${activeYears.has(t.year) ? ' (pasirinkta)' : ''}`,
 }));
 const typeSegments = typeShown.map((t) => ({
   label: TYPE_LABEL[t.value] || t.value,
@@ -94,7 +96,7 @@ const typeSegments = typeShown.map((t) => ({
     <header class="dok-stats__head">
       <div class="dok-stats__hero">
         <span class="dok-stats__hero-num">{fmtCompact(stats.total)}</span>
-        <span class="dok-stats__hero-unit">{stats.total === 1 ? 'dokumentas' : 'dokumentų'}</span>
+        <span class="dok-stats__hero-unit"><Linksnis n={stats.total} forms={['dokumentas', 'dokumentai', 'dokumentų', 'dokumento']} showNumber={false} /></span>
       </div>
       {(stats.totalPages > 0 || stats.totalWords > 0) && (
         <p class="dok-stats__hero-sub">

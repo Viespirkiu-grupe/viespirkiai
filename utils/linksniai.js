@@ -88,6 +88,18 @@ export function linksniuotiK(number, cases = ["įrašo", "įrašų"]) {
     return `${formattedNumber} ${form}`;
 }
 
+/**
+ * Kaip `linksniuotiK`, tik grąžina vien žodį (be skaičiaus) — kai skaičius
+ * jau atvaizduotas atskirai (pvz. su savo žymėjimu ar formatavimu).
+ * @param {number} number - Skaičius, pagal kurį parenkama forma
+ * @param {string[]} cases - Linksnių formos masyvas: ["įrašo", "įrašų"]
+ * @returns {string} - Tinkama kilmininko forma
+ */
+export function linksniuotiKOnly(number, cases = ["įrašo", "įrašų"]) {
+    const n = Math.abs(Number(number));
+    return n % 10 === 1 && n % 100 !== 11 ? cases[0] : cases[1];
+}
+
 Number.prototype.linksniuoti = function (cases) {
     return linksniuoti(this.valueOf(), cases);
 };

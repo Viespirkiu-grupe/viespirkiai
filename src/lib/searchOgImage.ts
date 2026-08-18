@@ -19,6 +19,7 @@
 import { getOpenGraphImage } from '@/utils/openGraphImage.js';
 import { createTtlPromiseCache } from '@/utils/ttlPromiseCache.js';
 import RPSCounter from '@/utils/rpsCounter.js';
+import { linksniuoti } from '@/utils/linksniai.js';
 import { describeSearchQuery, type SearchOgMeta } from './searchOgMeta.ts';
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
@@ -35,7 +36,7 @@ function imageParts(meta: SearchOgMeta, pathname: string) {
   const filters = meta.filters.slice(0, MAX_IMAGE_FILTERS)
     .map(({ label, value }) => `${label}: ${value}`);
   const hidden = meta.filters.length - MAX_IMAGE_FILTERS;
-  if (hidden > 0) filters.push(`ir dar ${hidden} filtrai`);
+  if (hidden > 0) filters.push(`ir dar ${linksniuoti(hidden, ['filtras', 'filtrai', 'filtrų', 'filtro'])}`);
 
   return {
     tipas: meta.baseTitle,

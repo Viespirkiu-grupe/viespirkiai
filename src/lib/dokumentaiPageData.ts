@@ -17,6 +17,7 @@ import {
   extractInlineTokens,
   type FacetOption,
 } from './searchDokumentai.ts';
+import { linksniuotiK, linksniuotiOnly } from '@/utils/linksniai.js';
 import { findSingleBvpzPanel } from './searchBvpzPanel.ts';
 import { findSingleJuridinisPanel } from './searchJuridinisPanel.ts';
 import { findSutartisPanel } from './searchSutartisPanel.ts';
@@ -350,7 +351,7 @@ export async function loadDokumentaiPage(url: URL) {
   const resultsMetaHtml = (() => {
     const shown = result?.hits.length ?? 0;
     const prefix = result?.approximate ? 'apie ' : '';
-    const count = (result?.total ?? 0).toLocaleString('lt-LT');
+    const count = linksniuotiK(result?.total ?? 0, ['rezultato', 'rezultatų']);
     const elapsed = result?.elapsed ?? '';
     const engine = result?.engine ?? '';
     const timings = result?.timings ?? [];
@@ -358,7 +359,7 @@ export async function loadDokumentaiPage(url: URL) {
       ? ` data-timings='${JSON.stringify(timings).replace(/'/g, '&#39;')}'`
       : '';
     const source = `<span class="timing-source"${timingsAttr}>(${elapsed} s · ${engine})</span>`;
-    return `Rodomi ${shown} iš ${prefix}${count} rezultatų ${source}`;
+    return `${linksniuotiOnly(shown, ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'])} ${shown} iš ${prefix}${count} ${source}`;
   })();
 
   return {

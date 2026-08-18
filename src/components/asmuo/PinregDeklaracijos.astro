@@ -1,6 +1,7 @@
 ---
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
 import SectionHeading from '@design-system/components/SectionHeading.astro';
+import Linksnis from '@design-system/components/Linksnis.astro';
 
 const { asmuo } = Astro.props;
 const pinreg = asmuo.pinreg;
@@ -15,8 +16,8 @@ const anyTruncated =
   <SectionHeading id="pinreg" title="Privačių interesų deklaracijos" />
   {anyTruncated && (
     <p class="text-muted text-sm mb-4">
-      Rodomos tik po {pinreg.limit} deklaracijos.
-      <a href="?pinregLimit=max#pinreg">Rodyti visas ({pinreg.total})</a>
+      Kiekvienoje grupėje rodomi po <Linksnis n={pinreg.limit} forms={['įrašas', 'įrašai', 'įrašų', 'įrašo']} />.{' '}
+      <a href="?pinregLimit=max#pinreg">Rodyti visus ({pinreg.total})</a>
     </p>
   )}
   <div class="grid-3">

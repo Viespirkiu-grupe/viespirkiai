@@ -13,7 +13,7 @@ const { count, rows } = asmuo.kotis;
   count={count}
   shown={rows.length}
   paramName="kotisLimit"
-  label="įrašai"
+  forms={['įrašas', 'įrašai', 'įrašų', 'įrašo']}
 >
   {rows.map((item: any) => (
     <ResultCardShell clickable={true}>

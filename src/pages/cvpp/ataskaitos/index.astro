@@ -15,6 +15,7 @@ import FilterPanel from '@design-system/components/filters/FilterPanel.astro';
 import SelectInput from '@design-system/components/inputs/SelectInput.astro';
 import TextInput from '@design-system/components/inputs/TextInput.astro';
 import { buildNumberOfResults, getColorScheme, getFont } from '../../../lib/failai.js';
+import { linksniuoti } from '@/utils/linksniai.js';
 import {
   searchCvppDumpAtn1,
   type CvppDumpAtn1SearchInput,
@@ -315,8 +316,8 @@ const font = getFont(Astro.cookies);
                   },
                   (row.tenderersCount > 0 || row.contractsCount > 0) && {
                     value: [
-                      row.tenderersCount > 0 ? `${row.tenderersCount} dalyvių` : '',
-                      row.contractsCount > 0 ? `${row.contractsCount} sutarčių` : '',
+                      row.tenderersCount > 0 ? linksniuoti(row.tenderersCount, ['dalyvis', 'dalyviai', 'dalyvių', 'dalyvio']) : '',
+                      row.contractsCount > 0 ? linksniuoti(row.contractsCount, ['sutartis', 'sutartys', 'sutarčių', 'sutarties']) : '',
                     ].filter(Boolean).join(' · '),
                     className: 'text-muted',
                   },

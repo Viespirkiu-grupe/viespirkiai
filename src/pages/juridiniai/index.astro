@@ -9,7 +9,7 @@ import JuridiniaiFacetModal from '../../components/juridiniai/JuridiniaiFacetMod
 import JuridiniaiResults from '../../components/juridiniai/JuridiniaiResults.astro';
 import { splitFacetOptions } from '../../lib/dokumentaiUrl.ts';
 import { searchJuridiniai } from '@/modules/juridiniai/searchQuickwit.js';
-import { linksniuotiK } from '@/utils/linksniai.js';
+import { linksniuotiK, linksniuotiOnly } from '@/utils/linksniai.js';
 import { getColorScheme, getFont, cleanQuery } from '../../lib/failai.js';
 import { describeSearchQuery } from '../../lib/searchOgMeta.ts';
 import config from '../../lib/config.ts';
@@ -50,7 +50,7 @@ const paramsWithoutPage = new URLSearchParams(Astro.url.searchParams);
 paramsWithoutPage.delete('page');
 const queryParams = paramsWithoutPage.toString() ? `&${paramsWithoutPage}` : '';
 const pageCount = Math.max(1, Math.ceil(total / limit));
-const numberOfResults = searchError || `Rodomi ${results.length} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} <span class="inline">(${(elapsed / 1000).toFixed(2)}s, Quickwit)</span>`;
+const numberOfResults = searchError || `${linksniuotiOnly(results.length, ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'])} ${results.length} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} <span class="inline">(${(elapsed / 1000).toFixed(2)}s, Quickwit)</span>`;
 
 const FACET_PARAMS = ['registracija', 'forma', 'statusas', 'apskritis', 'savivaldybe', 'evrk'];
 const selected: Record<string, string[]> = Object.fromEntries(FACET_PARAMS.map((key) => [

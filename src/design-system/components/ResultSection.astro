@@ -11,7 +11,7 @@ interface Props {
   count?: number;
   shown?: number;
   paramName?: string;
-  label?: string;
+  forms?: [string, string, string, string];
   gender?: 'm' | 'f';
 }
 
@@ -23,14 +23,14 @@ const {
   count,
   shown,
   paramName,
-  label,
+  forms,
   gender = 'm',
 } = Astro.props as Props;
 
 const hasNotice = typeof count === 'number'
   && typeof shown === 'number'
   && Boolean(paramName)
-  && Boolean(label);
+  && Boolean(forms);
 ---
 
 <div class={className} id={id}>
@@ -42,7 +42,7 @@ const hasNotice = typeof count === 'number'
       shown={shown}
       anchor={id}
       paramName={paramName!}
-      label={label!}
+      forms={forms!}
       gender={gender}
     />
   )}

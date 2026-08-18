@@ -12,7 +12,7 @@ import SearchResults from '../components/content/SearchResults.astro';
 import Reklama from '../components/reklamos/Reklama.astro';
 import { pickReklama } from '@/modules/reklamos/pickReklama.js';
 import { searchSutartys, countSutartys, countSutartysQuickwit, getSutartysQueryMetadata, iterateSutartysQuickwitExport } from '@/modules/sutartys/searchSutartys.js';
-import { linksniuoti, linksniuotiK } from '@/utils/linksniai.js';
+import { linksniuoti, linksniuotiK, linksniuotiOnly } from '@/utils/linksniai.js';
 import config from '../lib/config.ts';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
 import { objectsToCsvStream } from '@/utils/csv.js';
@@ -85,16 +85,16 @@ function buildNumberOfResults({ shown, total, elapsed, engine, timings }: { show
   const timingsAttr = timings && timings.length ? ` data-timings='${JSON.stringify(timings).replace(/'/g, '&#39;')}'` : '';
   const source = `<span class="inline timing-source" data-duration="${durationMs}"${timingsAttr}>(${trukme}s, ${engine})</span>`;
   if (total == null) {
-    return `Rodomi ${shown} iš apie <span class="rezultatai-nezinomas-total"> ? </span> rezultatų ${source}`;
+    return `${linksniuotiOnly(shown, ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'])} ${shown} iš apie <span class="rezultatai-nezinomas-total"> ? </span> rezultatų ${source}`;
   }
   if (shown < total) {
     const approximate = engine === 'quickwit' ? 'apie ' : '';
-    return `Rodomi ${shown} iš ${approximate}${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`;
+    return `${linksniuotiOnly(shown, ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'])} ${shown} iš ${approximate}${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`;
   }
   if (engine === 'quickwit') {
-    return `Rodomi ${shown} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`;
+    return `${linksniuotiOnly(shown, ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'])} ${shown} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`;
   }
-  return `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų'])} ${source}`;
+  return `${linksniuoti(total, ['rezultatas', 'rezultatai', 'rezultatų', 'rezultato'])} ${source}`;
 }
 
 async function timed<T>(promise: Promise<T>): Promise<{ value: T; ms: number }> {

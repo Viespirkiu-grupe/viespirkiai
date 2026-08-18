@@ -7,16 +7,11 @@
  * so the client-side updater can swap text nodes in place.
  */
 
+import { linksniuotiOnly } from '@/utils/linksniai.js';
+
 /** Returns the correct Lithuanian plural form for a number, with 4 forms. */
 export function formatPluralOnly(number: number, forms: [string, string, string, string]): string {
-  const n = Math.abs(Number(number));
-  const stringValue = number.toString();
-  const hasFraction = stringValue.includes('.') || stringValue.includes(',');
-
-  if (hasFraction && n !== 0) return forms[3];
-  if (n % 10 === 1 && !(n % 100 >= 11 && n % 100 <= 19)) return forms[0];
-  if (n % 10 >= 2 && n % 10 <= 9 && !(n % 100 >= 11 && n % 100 <= 19)) return forms[1];
-  return forms[2];
+  return linksniuotiOnly(number, forms);
 }
 
 /** Format an ISO-ish timestamp into a Lithuanian-locale "YYYY-MM-DD HH:MM:SS" string. */
