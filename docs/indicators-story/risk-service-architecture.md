@@ -52,13 +52,20 @@ IS/CVPP documents, which stay authoritative.
 ### 1.2 Containers
 
 The system has exactly three processes, each with a single business purpose, its own deployment lifecycle, its own
-database role and its own failure mode. **Committed PostgreSQL rows are the only integration between them.**
+database role and its own failure mode. **Committed PostgreSQL rows are the only integration between them, and the
+domain model is the only vocabulary in which they are read.**
 
 | # | Process                           | Business purpose                                                                       | Deployed as                                    | Writes                                         | Reads                                                                                |
 |---|-----------------------------------|----------------------------------------------------------------------------------------|------------------------------------------------|------------------------------------------------|--------------------------------------------------------------------------------------|
-| 1 | **Data Ingestion**                | Fetch, normalise and version public procurement records                                | Existing task runner (`tasks/index.js`)        | `public` schema source tables only             | Public sources: CVP IS, CVPP, TED, JAR, documents                                    |
-| 2 | **Risk Indicators Processing**    | Evaluate every applicable Risk Indicator, one at a time, and record the outcomes       | **Procurement Risk Service**, its own process  | `risk.evaluation_runs` and `risk.risk_signals` | `public` canonical views; the deployed Git catalogue                                 |
-| 3 | **Risk Indicators Visualisation** | Show a procurement's risk signals, methodology and evaluation coverage to the public   | Existing Astro web application                 | Nothing                                        | `risk` tables and views read-only; the `riskCatalogue` constant; `public` procurement record |
+| 1 | **Data Ingestion**                | Fetch, normalise and version public procurement records                                | Existing task runner (`tasks/index.js`)        | `public` ingestion tables only                 | Public sources: CVP IS, CVPP, TED, JAR, documents                                    |
+| 2 | **Risk Indicators Processing**    | Evaluate every applicable Risk Indicator, one at a time, and record the outcomes       | **Procurement Risk Service**, its own process  | `risk.evaluation_runs` and `risk.risk_signals` | `public` domain model views; the deployed Git catalogue                                 |
+| 3 | **Risk Indicators Visualisation** | Show a procurement's risk signals, methodology and evaluation coverage to the public   | Existing Astro web application                 | Nothing                                        | `risk` tables and views read-only; the `riskCatalogue` constant; the procurement record via the domain model |
+
+**Process 2 never reads an ingestion table.** It reads the domain model views defined in
+[`domain-model.md`](domain-model.md), and that is a contract rather than a habit: ingestion owns its table layout and
+changes it — a source gets replaced, a table family gets renamed — while the domain model's entity names, keys and
+grains stay put. An indicator written against `v_pirkimo_dalis` and `daliesNumeris` survives that; one written against
+whichever tables happened to back it that quarter does not.
 
 **Diagram: containers, the schemas they use and the role each connection holds.**
 
@@ -88,8 +95,8 @@ flowchart TB
 
     subgraph nDb["PostgreSQL — database viespirkiai"]
         subgraph sPublic["Schema public — viešųjų pirkimų duomenys"]
-            dSrc[("Source tables<br/>cvppViesiejiPirkimai, atn1*, dokumentai, jar, ...")]
-            dView["Canonical views<br/>v_pirkimas, v_dalyviai, v_sutartys"]
+            dSrc[("Ingestion tables<br/>notices, procedure reports, contracts, registers, documents")]
+            dView["Domain model views<br/>v_pirkimas, v_pirkimo_dalis, v_dalyviai, v_sutartys, ..."]
             dSrc -.->|" selected by "| dView
         end
         subgraph sRisk["Schema risk"]
@@ -119,9 +126,9 @@ Database roles make the separation enforceable rather than conventional
 | Role                         | Used by                                                          | Grants                                                                                                                  |
 |------------------------------|------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
 | `viespirkiai_rw`             | Process 1                                                        | Read/write on `public`                                                                                                  |
-| `risk_calc`                  | Process 2, during a calculation                                  | `SELECT` on the `public` canonical views, used inside a read-only transaction with a statement timeout                  |
+| `risk_calc`                  | Process 2, during a calculation                                  | `SELECT` on the `public` domain model views, used inside a read-only transaction with a statement timeout                  |
 | `risk_rw`                    | Process 2, for recording results, and the scheduled retention job | `SELECT`, `INSERT`, `UPDATE` on `risk.evaluation_runs`; `SELECT`, `INSERT`, `DELETE` on `risk.risk_signals`, no `UPDATE` |
-| `risk_ro` / `viespirkiai_ro` | Process 3                                                        | `SELECT` on the `risk` tables and views and on the `public` canonical views                                             |
+| `risk_ro` / `viespirkiai_ro` | Process 3                                                        | `SELECT` on the `risk` tables and views and on the `public` domain model views                                             |
 
 `risk_rw` can never alter a written signal in place — there is no `UPDATE` grant on `risk.risk_signals` — but it does
 hold `DELETE`, because it is also the role the retention job runs as. Indicator results are derived and recalculable, so
@@ -155,7 +162,7 @@ configuration dependencies.
 flowchart LR
     subgraph ingestion["Process 1 — Data Ingestion and the state it publishes"]
         S["Procurement data collectors"]
-        C[("Canonical procurement facts<br/>schema public")]
+        C[("Domain model facts<br/>schema public")]
         S -->|" normalised procurement records "| C
     end
 
@@ -186,7 +193,7 @@ flowchart LR
 
     K -->|" one open run, stamped with cutoff and commit "| J
     K -->|" cutoff, subject filter and effective parameters "| I
-    C -->|" canonical facts as of the cutoff "| I
+    C -->|" domain model facts as of the cutoff "| I
     I -->|" observation rows "| T
     T -->|" validated rows "| P
     P -->|" append this run's snapshot "| H
@@ -199,10 +206,10 @@ flowchart LR
 | Component                   | Process | Concrete form                                                          | Responsibility and boundary                                                                                                                                              |
 |-----------------------------|---------|------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Procurement data collectors | 1       | Existing scrapers and importers                                        | Fetch and normalise public source data into `public`. They hold no permission on `risk`.                                                                                 |
-| Canonical procurement facts | 1       | Tables and views in `public`                                           | Present procurements, notices, lots, bids, awards, contracts, buyers and suppliers with stable keys and validity semantics. These are the reproducible facts read at the cutoff. |
+| Domain model facts          | 1       | The views of [`domain-model.md`](domain-model.md)                       | Present procurements, notices, lots, bids, contracts, relationships, markets, buyers and suppliers as business entities with stable keys, so an indicator never names an ingestion table and survives the warehouse being restructured. These are the reproducible facts read at the cutoff. |
 | Risk Indicators Registry    | 2       | `modules/risk/registry.ts`, built from the deployed code at startup    | Resolves `(indicator id, version)` to one validated Risk Indicator, and answers which versions are active, shadow or retired ([§5.3](#53-the-risk-indicator-class-model)). |
 | Risk Indicators Run Job     | 2       | `services/procurement-risk/runJob.ts`                                  | Opens the run, evaluates each registered indicator in turn, records per-indicator statistics, closes the run. Indicator-independent: one failure is recorded and the run continues. |
-| Risk Indicator evaluation   | 2       | One indicator directory ([§5.1](#51-the-risk-indicator-directory))     | Collects one subject's facts and decides its outcome at one cutoff, reading canonical facts only through the injected data source.                                        |
+| Risk Indicator evaluation   | 2       | One indicator directory ([§5.1](#51-the-risk-indicator-directory))     | Collects one subject's facts and decides its outcome at one cutoff, reading domain model facts only through the injected data source.                                        |
 | Risk Signal Validator       | 2       | `RiskIndicator.validateObservations` plus the output contract          | Validates field types, allowed states, subject and indicator identity, and duplicate subject keys, before any row reaches the writer. SQL safety comes from the read-only role, transaction and statement timeout. |
 | Risk Signals Writer         | 2       | `services/procurement-risk/write.ts`                                   | Appends validated rows to the open run's snapshot with one indicator-independent `INSERT`, inside the caller's transaction. It compares nothing and updates nothing.      |
 | Evaluation run              | 2       | `risk.evaluation_runs`                                                 | One durable row per run: cutoff, code commit, terminal state, per-indicator statistics. It answers whether the job ran and whether it succeeded.                          |
@@ -270,11 +277,16 @@ aliases, roles, module paths and enum values. The concepts already have settled 
 procurement-fraud terminology, and the service should use them. Lithuanian survives as **label values** the GUI renders
 (`titleLt`, `descriptionLt`, `limitationLt`, `formulaLt`), which live in the indicator catalogue in Git.
 
-The rest of the repository follows the opposite convention, so the boundary is worth stating exactly: the `public`
-schema belongs to Data Ingestion and keeps its Lithuanian domain names (`pirkimas`, `tiekejas`, `sutartis`, `jarKodas`).
-A collection statement crosses the boundary in exactly one place, and the rule is positional: **Lithuanian on the left
-of an `AS`, English on the right**. Everything downstream of that statement is English, because it is already inside the
-risk service.
+The rest of the repository follows the opposite convention, so the boundary is worth stating exactly: the **domain
+model** keeps its Lithuanian business names (`v_pirkimas`, `pirkimoNumeris`, `tiekejoKodas`, `daliesNumeris`), because
+those are the names the domain actually has and translating them would invent a second vocabulary for the same
+concepts. A collection statement crosses the boundary in exactly one place, and the rule is positional: **Lithuanian on
+the left of an `AS`, English on the right**. Everything downstream of that statement is English, because it is already
+inside the risk service.
+
+That boundary sits on the domain model, not on the warehouse. A collection statement names `v_pirkimo_dalis` and
+`daliesNumeris`; it never names the ingestion tables underneath, and it does not have to know whether those were
+renamed last week ([§3.3](#33-gate-0--the-subject-universe)).
 
 ### 2.3 The decision model of one indicator
 
@@ -348,36 +360,35 @@ it as a chain of null checks rather than as a policy. This section makes it shar
 
 ### 3.1 The measurement that forces the design
 
-Live database snapshot: **2026-08-18, `viespirkiai` on `10.1.10.2:9118`.** The counts below are `count(*)`, not planner
-estimates.
+Measured against `viespirkiai` on **2026-08-18**; the counts are `count(*)`, not planner estimates. Full measurement in
+[`domain-model.md` §5](domain-model.md#5-measured-coverage).
 
-`v_pirkimas` is a `UNION ALL` of two sources with radically different column coverage. Every column below is counted
+`v_pirkimas` combines two publication sources whose column coverage is not comparable. Every column below is counted
 non-null:
 
-| Profile               |     Rows | `pirkimoBudas` | `statusas` | `numatomaVerteEUR` | `pasiulymuPateikimoTerminas` | `bvpzKodai` | `esFinansavimas` |
-|-----------------------|---------:|---------------:|-----------:|-------------------:|-----------------------------:|------------:|-----------------:|
-| `cvpis` (primary)     |   50,893 |           100% |       100% |              33.8% |                        98.4% |       99.9% |            76.6% |
-| `cvpp` (fallback)     |  213,522 |             0% |         0% |                 0% |                       100.0% |          0% |               0% |
+| `saltinis`            |     Rows | Procedure method | Status | Estimated value | Submission deadline | CPV codes | EU funding |
+|-----------------------|---------:|-----------------:|-------:|----------------:|--------------------:|----------:|-----------:|
+| `cvpis` (primary)     |   50,893 |             100% |   100% |           33.8% |               98.4% |     99.9% |      76.6% |
+| `cvpp` (fallback)     |  213,522 |               0% |     0% |              0% |              100.0% |        0% |         0% |
 
 A `cvpp` procurement carries a title, a buyer, a publication date and a submission deadline. It carries **no method, no
-status, no estimated value, no CPV and no funding flag, and it never will** — the fallback branch of `v_pirkimas.sql`
-selects those columns as literal `NULL`. Of the 28 procurement-grain canonical indicators, the ones that read a method,
-a value, an object type or a CPV code therefore have a real population of **50,893**, not 264,415 — and, where the
-estimated value is required, of **17,200**.
+status, no estimated value, no CPV and no funding flag, and it never will** — the fallback source does not publish
+them. Of the 28 procurement-grain canonical indicators, the ones that read a method, a value, an object type or a CPV
+code therefore have a real population of **50,893**, not 264,415 — and, where the estimated value is required, of
+**17,200**.
 
-The contract side is the case that prompted this section. Non-deleted contracts by type, with how their
-`pirkimoNumeris` resolves:
+The contract side is the case that prompted this section. Non-deleted contracts by type, with how their link to a
+procurement resolves:
 
-| Type                     |      Rows | Number required?   |  Resolves to `cvpis` | Resolves to `cvpp` only | Present but unresolvable |      NULL |
-|--------------------------|----------:|--------------------|---------------------:|------------------------:|-------------------------:|----------:|
-| `PPS`                    |   309,116 | **yes**            |                6,434 |                 129,041 |                   37,156 |   136,485 |
-| `TSP`                    |   157,242 | **yes**            |               21,933 |                  74,148 |                   11,471 |    49,690 |
-| `SP` (amendment)         |   130,009 | inherited          |                    — |                       — |                        — |    65,760 |
+| Contract type            |      Rows | Number required?            | Resolves to `cvpis` | Resolves to `cvpp` only | Present but unresolvable |      NULL |
+|--------------------------|----------:|-----------------------------|--------------------:|------------------------:|-------------------------:|----------:|
+| `PPS`                    |   309,116 | **yes**                     |               6,434 |                 129,041 |                   37,156 |   136,485 |
+| `TSP`                    |   157,242 | **yes**                     |              21,933 |                  74,148 |                   11,471 |    49,690 |
+| `SP` (amendment)         |   130,009 | inherited                   |                   — |                       — |                        — |    65,760 |
 | `MVPŽ`, `MVP`, `ŽS`, `SPŽ`, `Ilgalaikė MVPŽ`, `VS`, `PSĮ`, unset | 5,309,875 | **no — exempt or optional** | — | — | — | 4,971,171 |
-| **Total non-deleted**    | 5,906,242 |                    |                      |                         |                          |           |
 
-Read the two rows that matter together. Only **28,367 of 5,906,242 contracts (0.48%)** are both legally obliged to carry
-a procurement number and actually resolve to a `cvpis` notice — the only notice source that carries the procedure facts
+Read the two rows that matter together. Only **28,367 of 5,906,258 contracts (0.48%)** are both legally obliged to
+carry a procurement number and actually resolve to a `cvpis` notice — the only source that carries the procedure facts
 a contract-versus-procedure rule needs. A further **234,802** are obliged to carry one and do not: 186,175 with no value
 at all and 48,627 with a value that resolves to nothing. And **5,309,875** are either exempt from CVP IS or use it only
 at the buyer's option, so their missing number is not a gap at all.
@@ -386,8 +397,9 @@ Those three groups must not receive the same answer, and today they would:
 
 - the 5,309,875 exempt-or-optional contracts are **not subjects of this indicator** — saying "insufficient data" about
   them asserts a gap that does not exist and buries the real one under a hundredfold larger number;
-- the 234,802 obliged-but-absent contracts are **exactly the finding** — this is Problem 3 of
-  [`domain-model.md`](domain-model.md), and the risk service is the natural place for it to become visible;
+- the 234,802 obliged-but-absent contracts are **exactly the finding** — this is
+  [`domain-model.md` §6.3](domain-model.md#63-high-missing-procurement-number-on-contracts), and the risk service is the
+  natural place for it to become visible;
 - the 28,367 linked contracts are the only ones a rule can actually decide.
 
 **The same absent value means three different things depending on facts the indicator itself does not carry.** That is
@@ -457,7 +469,7 @@ flowchart TB
 ```
 
 The gates fall either side of the fetch, and that is what decides where each one runs. **Gates 0 and 1 run in SQL**,
-because they decide which rows are read at all — the universe view is the statement's `FROM` and the declared profiles
+because they decide which rows are read at all — the subject's domain model view is the statement's `FROM` and the declared profiles
 are bound as `$3`, so a subject with no observation is never fetched. **Gates 2, 3 and 4 run in TypeScript**, over rows
 that were fetched, because each of them produces a stored row. The rule is therefore simple to hold: *if it stores
 nothing, it happens in SQL; if it stores a row, it happens in TypeScript.* That extends the split
@@ -466,40 +478,48 @@ narrows the population, TypeScript judges the individual.
 
 ### 3.3 Gate 0 — the subject universe
 
-Each of the nine catalogue subject types gets **one view that enumerates its subjects**, and every collection statement
-reads from that view instead of re-deriving the population. This is the single change that answers "which entities does
-this indicator run on", because after it there is exactly one definition per subject type rather than one per indicator.
+Each of the nine catalogue subject types resolves to **exactly one entity of the
+[domain model](domain-model.md)**, and every collection statement reads from that entity. This is the single change
+that answers "which entities does this indicator run on", because after it there is one definition per subject type
+rather than one per indicator — and because the entity is a business concept, an indicator survives the warehouse
+being restructured underneath it.
 
-| Subject type                  | Universe view                  | Derived from                                                     | Measured rows                                     |
-|-------------------------------|--------------------------------|------------------------------------------------------------------|---------------------------------------------------|
-| `procurement`                 | `v_subject_procurement`        | `v_pirkimas`                                                     | 264,415                                           |
-| `lot`                         | `v_subject_lot`                | `v_pirkimo_dalis`                                                | 13,396                                             |
-| `bid`                         | `v_subject_bid`                | `v_dalyviai`                                                     | 36,793                                            |
-| `contract`                    | `v_subject_contract`           | `v_sutartys` where `istrinta = false`                            | 5,906,242                                         |
-| `supplier`                    | `v_subject_supplier`           | `v_company` restricted to codes appearing as a supplier          | to be measured                                    |
-| `buyer`                       | `v_subject_buyer`              | `v_company` restricted to codes appearing as a buyer             | to be measured                                    |
-| `buyer_supplier_relationship` | `v_subject_buyer_supplier`     | `v_sutartys` grouped by (buyer, supplier)                        | **view does not exist**                           |
-| `bidder_relationship`         | `v_subject_bidder_pair`        | `v_dalyviai` self-joined within a lot, order-independent pairs    | **view does not exist**                           |
-| `market`                      | `v_subject_market`             | CPV codes from `v_pirkimas.bvpzKodai` / `v_sutartys.bvpzKodai`   | **view does not exist**                           |
+| Subject type                  | Domain model view         | Subjects  | Indicators |
+|-------------------------------|---------------------------|----------:|-----------:|
+| `procurement`                 | `v_pirkimas`              |   264,415 |         28 |
+| `lot`                         | `v_pirkimo_dalis`         |    48,564 |         17 |
+| `bid`                         | `v_dalyviai`              |    36,793 |         11 |
+| `contract`                    | `v_sutartys`              | 5,906,258 |         17 |
+| `supplier`                    | `v_company`, as supplier  |    80,479 |         10 |
+| `buyer`                       | `v_company`, as buyer     |     6,103 |          3 |
+| `buyer_supplier_relationship` | `v_pirkejo_tiekejo_rysys` | 1,090,112 |          5 |
+| `bidder_relationship`         | `v_dalyviu_pora`          |    19,989 |         12 |
+| `market`                      | `v_rinka`                 |        45 |          3 |
 
-Three of the nine subject types the catalogue already assigns indicators to have no canonical view behind them at all,
-and a fourth — `lot` — has one that cannot currently be created. That is the concrete form of "the domain model does not
-cover all the data" on the subject axis: the 12 bidder-relationship, 5 buyer–supplier and 3 market indicators cannot be
-scoped, let alone evaluated, and the 17 lot indicators are blocked behind a repair. **37 of the 106 canonical
-indicators — 35% — have no subject to run on today**, and no amount of indicator authoring changes that.
+**Every canonical indicator now has a subject to run on.** Buyer and supplier are roles of one entity rather than two
+more views, so a company that both buys and sells is one subject with one identity
+([domain model §1.1](domain-model.md#11-subject-entities)).
 
-Every `v_subject_*` view exposes the same three column groups, and nothing else:
+Each subject entity exposes three column groups the gates depend on, on top of the business attributes an indicator
+measures:
 
 | Group           | Columns                                                                                                                                 | Purpose                                                              |
 |-----------------|-----------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| **Identity**    | `subject_type`, `subject_key`, `procurement_source`, `procurement_id`                                                                   | Stamped onto the observation; `subject_key` is the durable composite  |
-| **Classifiers** | `source_profile`, `procedure_type`, `contract_type`, `object_type`, `stage`, `event_date`, `value_eur`, `eu_funded`, `cpv_division`      | The only facts gates 1 and 2 may test                                |
-| **Presence**    | `has_bids`, `has_lots`, `has_price`, `has_estimate`, `has_deadline`, `has_documents`, `has_linked_procurement`, `has_linked_plan`         | Whether the row carries a fact class, as a named fact rather than a null check |
+| **Identity**    | `subject_key`, and the procurement source and number where the subject has one                                                          | Stamped onto the observation; `subject_key` is the durable composite  |
+| **Classifiers** | `source_profile`, procedure type, contract type, object type, stage, event date, value, EU funding, CPV division                          | The only facts gates 1 and 2 may test                                |
+| **Presence**    | one named flag per fact class the entity may or may not carry — whether a lot was declared, whether its bidders were observed, whether a price is recorded | Whether the row carries a fact class, as a named fact rather than a null check |
 
 The presence group is the direct answer to *"indicators are not able to simply understand that it is applicable to
-certain data elements."* Today every indicator rediscovers that with its own `IS NOT NULL` predicates, phrased
-slightly differently, and a reviewer cannot tell whether an omission was deliberate. Named on the universe view, the
-same question is asked once, tested once, and reads the same way in every indicator.
+certain data elements."* Without it every indicator rediscovers the same thing through its own `IS NOT NULL`
+predicates, phrased slightly differently, and a reviewer cannot tell whether an omission was deliberate. Named on the
+entity, the question is asked once, tested once, and reads the same way in every indicator.
+
+`v_pirkimo_dalis` is the worked example, because a lot becomes known two independent ways. `deklaruota` says the buyer
+declared the lot in the procurement notice; `stebeta` says participants were observed competing in it. Of 48,564 known
+lots, 43,755 were declared, 13,396 have observed participation, and 8,510 have both. A rule about competition needs
+`stebeta`; a rule
+about how a procurement was structured needs only `deklaruota`. Before those flags existed, both rules would have read
+the same null and drawn different conclusions from it — and the second would have been wrong.
 
 **Classifiers are a closed vocabulary.** Gates 1 and 2 may test nothing else. That restriction is what keeps
 applicability reviewable as a table: if an exclusion needs a fact outside this list, it is not applicability, it is a
@@ -507,21 +527,23 @@ rule, and it belongs in `rules.ts` where it will be explained to the public.
 
 ### 3.4 Gate 1 — scope is a property of the source profile
 
-A **source profile** is a named, stable statement about *which fact classes a row can carry*, decided by which pipeline
-produced it. It is not a data-quality score and not a per-row null pattern: a `cvpp` procurement lacks the method
-because the fallback branch selects `NULL`, for every row, forever.
+A **source profile** is a named, stable statement about *which fact classes a subject can carry*, decided by which
+publication route produced it. It is not a data-quality score and not a per-row null pattern: a `cvpp` procurement
+lacks the method because the fallback source never publishes one, for every row, forever.
 
 The profiles the measurement in [§3.1](#31-the-measurement-that-forces-the-design) establishes:
 
-| Subject type  | `source_profile`             | Definition                                                              | Rows      | Carries                                            |
-|---------------|------------------------------|--------------------------------------------------------------------------|----------:|----------------------------------------------------|
-| `procurement` | `cvpis`                      | Row from `viesiejiPirkimai`                                             |    50,893 | Method, status, object type, CPV, funding, deadline |
-| `procurement` | `cvpp`                       | Fallback row from `cvppViesiejiPirkimai`                                |   213,522 | Title, buyer, publication date, deadline — nothing else |
-| `contract`    | `procedure_linked_cvpis`     | `TSP`/`PPS` whose number resolves to a `cvpis` notice                   |    28,367 | The contract, and its full procedure context       |
-| `contract`    | `procedure_linked_cvpp`      | `TSP`/`PPS` whose number resolves only to a `cvpp` notice               |   203,189 | The contract, and a notice with no procedure facts |
-| `contract`    | `procedure_expected_missing` | `TSP`/`PPS` with a number that is absent or resolves to nothing         |   234,802 | The contract only — **and this is a finding**      |
-| `contract`    | `procedure_exempt`           | Types exempt from CVP IS or using it at the buyer's option, plus unset  | 5,309,875 | The contract only, legitimately                    |
-| `contract`    | `amendment`                  | `SP` — disposition inherited from the amended contract                  |   130,009 | The amendment; context via its parent              |
+| Subject type  | `source_profile`             | Definition                                                             | Rows      | Carries                                                 |
+|---------------|------------------------------|-------------------------------------------------------------------------|----------:|---------------------------------------------------------|
+| `procurement` | `cvpis`                      | Published through CVP IS                                               |    50,893 | Method, status, object type, CPV, funding, deadline     |
+| `procurement` | `cvpp`                       | Known only through the CVPP fallback                                   |   213,522 | Title, buyer, publication date, deadline — nothing else |
+| `contract`    | `procedure_linked_cvpis`     | `TSP`/`PPS` whose number resolves to a `cvpis` procurement             |    28,367 | The contract, and its full procedure context            |
+| `contract`    | `procedure_linked_cvpp`      | `TSP`/`PPS` whose number resolves only to a `cvpp` procurement         |   203,189 | The contract, and a procurement with no procedure facts |
+| `contract`    | `procedure_expected_missing` | `TSP`/`PPS` with a number that is absent or resolves to nothing        |   234,802 | The contract only — **and this is a finding**           |
+| `contract`    | `procedure_exempt`           | Types exempt from CVP IS or using it at the buyer's option, plus unset | 5,309,875 | The contract only, legitimately                         |
+| `contract`    | `amendment`                  | `SP` — disposition inherited from the amended contract                 |   130,009 | The amendment; context via its parent                   |
+| `lot`         | `deklaruota`                 | Declared in the procurement notice, participation never observed       |    35,168 | The lot and its name — no bidders, prices or rejections |
+| `lot`         | `stebeta`                    | Participation observed through a procedure report                      |    13,396 | Bidders, offer ranking, prices, rejection reasons       |
 
 An indicator declares the profiles it evaluates. Everything else is scoped out, silently but not invisibly: the count
 and the reason land in the run's `statistics`, and the methodology page publishes them
@@ -673,7 +695,7 @@ impossible.
 
 | Change                                    | Before                                                | After                                                                    |
 |-------------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------------|
-| Population definition                     | Each `collect.sql` wrote its own `FROM` and `WHERE`   | `FROM public.v_subject_<type>`, one definition per subject type          |
+| Population definition                     | Each `collect.sql` wrote its own `FROM` and `WHERE`   | `FROM` the subject type's domain model view, one definition per subject type |
 | Scope                                     | Implicit in that `WHERE`, invisible to review          | `scope.profiles` in `definition.ts`, bound as `$3`, counted on the run   |
 | Applicability                             | Null checks in `rules.ts`, or the parameter timeline   | A decision table in `definition.ts`; the parameter timeline is one rule in it |
 | Sufficiency                               | Ad-hoc null checks returning `insufficient_data`       | `requiredInputs` paired with `risk.data_obligations`                     |
@@ -702,7 +724,7 @@ input data, and the dashed shapes are the reviewed knowledge the decisions are j
 
 ```mermaid
 flowchart BT
-    ID1[/"v_subject_contract<br/>identity · classifiers · presence"/]
+    ID1[/"v_sutartys<br/>identity · classifiers · presence"/]
     ID2[/"collect.sql fact row<br/>the indicator's own measurements"/]
 
     KS1["VPĮ and the source catalogues<br/>OCP · OLAF · VPT"]
@@ -794,32 +816,6 @@ would add a second place for logic to live and a second thing to version. And th
 scoring across indicators of wildly different coverage is exactly the error the coverage table exists to prevent — an
 entity with three signals out of ninety evaluated indicators is not comparable to one with three out of six, and no
 weighting recovers that.
-
-### 3.11 Domain-model coverage this section assumes
-
-The missing subject views of [§3.3](#33-gate-0--the-subject-universe) are the gap on the *subject* axis. This is the gap
-on the *fact* axis: the seven canonical views cover a fraction of the ingested corpus, and the uncovered part is not
-incidental — it is where several catalogue areas get their facts. Verified against `information_schema` on 2026-08-18;
-row counts are `count(*)`.
-
-| Fact class needed by the catalogue | Source tables, present and unexposed                                                                                             | Rows                 | Canonical areas blocked                       |
-|------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|---------------------:|-----------------------------------------------|
-| Procurement plans                  | `planuojamiPirkimai` + its 9 satellite tables                                                                                     |               91,838 | LT-PRO-02, LT-TRA-01, LT-OTH-01               |
-| Notice and publication events      | `viesiejiPirkimaiSkelbimai`, `cvppSkelbimai`, `tedNotices`                                                                        |     to be measured   | LT-PRO-04, LT-PRO-08, LT-TRA-02, LT-OTH-03/04 |
-| Declared lots (notice side)        | `viesiejiPirkimaiDalys` — lots as *declared*, independent of whether a PPA report exists                                          |               43,755 | Would raise lot coverage far above the 13,396 reconstructed from bids |
-| Procedure outcome                  | `xlsxPPAproceduruPabaiga`, `xlsxPPAsutartys`, `xlsxPPAvertinimoKriterijai`, `cvppDumpAtn1ProcedureEnds`                            | 11,484 (dump alone)  | LT-OTH-05, LT-AWD-07, LT-AWD-08               |
-| Subcontracting                     | `cvppDumpAtn1ContractSubcontractors`, `cvppDumpAtn1ContractUnknownSubcontractors`, `xlsxPPAsutartys.subrangosInfo`                 |                  227 | LT-EXE-11, LT-EXE-12, LT-EXE-13               |
-| Contract amendments                | `vpmSutartysChanges`, plus the `SP` contract type                                                                                 |     to be measured   | LT-EXE-01 … LT-EXE-06                         |
-| Payments against contracts         | `sabisSaskaitos`, `sabisSutartys`                                                                                                 |     to be measured   | LT-EXE-07                                     |
-| Ownership and control              | `jarValdymas`, `jarValdymoOrganai`, `istatinisKapitalas`, `jadis` — beyond the declared links `v_person_links` already exposes    |     to be measured   | LT-COI-02, LT-COI-03, LT-COI-06, LT-SUP-10    |
-| Company financials                 | `balansoAtaskaitos`, `pelnoNuostoliuAtaskaitos`, `mokesciai`                                                                      |     to be measured   | LT-SUP-13                                     |
-| Documents and their text           | `dokumentai`, `files*`, `viesiejiPirkimaiFailai`, `vpmSutartysFailai`, `cvppFailai`                                               |     to be measured   | LT-TRA-03, LT-PRO-10, LT-COM-16               |
-| EU funding                         | `cpvaProjektuSutartys`, `2014Esinvesticijos`                                                                                      |     to be measured   | The ARACHNE-referenced supplier indicators    |
-| Court proceedings, current source  | `liteko2*` — `v_bylos` reads the older `teismoNuosprendziai`                                                                      |     to be measured   | LT-TRA-08                                     |
-
-Each row of that table is one canonical view and one profile declaration away from being usable, and none of it needs a
-change to this section's model — which is the point of putting scope in the universe views rather than in the
-indicators. Adding a fact class adds a view and a profile; it does not touch a single existing indicator.
 
 ## 4. Public information architecture
 
@@ -991,7 +987,7 @@ modules/risk/indicators/LT-COM-01/     ← one directory = one Risk Indicator
 │   │                    carrying a reason code (§3.6)
 │   ├── requiredInputs   fields paired with the risk.data_obligations rule that
 │   │                    makes their absence a gap rather than a normal state (§3.7)
-│   ├── sourceRelations  canonical views the collection statement reads
+│   ├── sourceRelations  domain model views the collection statement reads
 │   ├── sqlFile          the packaged SELECT that collects this indicator's facts
 │   ├── decide           the rules that judge one fact row, from rules.ts
 │   └── outputContract   runtime validation of the rows evaluation returns
@@ -1078,7 +1074,7 @@ services/procurement-risk/
   retention.ts                # deletes superseded run snapshots, as risk_rw
   retentionJob.ts             # its entry point: npm run risk:retention
 migrations/public/
-  0NN_subject_views.sql       # the nine v_subject_* universe views of §3.3
+  0NN_domain_model.sql        # the domain model views of §3.3, per domain-model.md
 migrations/risk/
   001_risk.sql                # two tables and one view
   002_roles.sql               # the roles and grants of §1.2
@@ -1144,7 +1140,7 @@ classDiagram
     RiskIndicator <|-- SubjectFactsIndicator : about 78 of 106 indicators
     RiskIndicator <|-- OwnCalculateIndicator : the remaining shapes
     RiskIndicatorRegistry o-- "1..*" RiskIndicator : validated at startup
-    RiskIndicator ..> RiskDataSource : reads canonical facts through
+    RiskIndicator ..> RiskDataSource : reads domain model facts through
     RiskIndicator ..> EvaluationContext : evaluates at one cutoff
 ```
 
@@ -1200,7 +1196,7 @@ Four properties follow:
 - **Database capability comes from the injected data source**, not from the indicator. It is the only way to a database,
   on the `risk_calc` role, inside a read-only transaction with a statement timeout. Every indicator obtains identical
   capability whatever shape it is.
-- **Shared or expensive intermediates become canonical facts.** A peer benchmark per CPV division and method, or the
+- **Shared or expensive intermediates become domain model facts.** A peer benchmark per CPV division and method, or the
   closure of the ownership graph, is a view in `public`, promoted to a `MATERIALIZED VIEW` refreshed before the
   indicator loop once measurement demands it. It stays a fact every indicator reads on equal terms, which is what keeps
   indicators independent of each other and their execution order irrelevant.
@@ -1244,10 +1240,10 @@ the architecture rather than a habit.
 | Which subjects the concept applies to, and why not                       | `applicability` in `definition.ts` ([§3.6](#36-gate-2--applicability-as-a-decision-table))          | every Risk Indicator                     |
 | Reviewed thresholds and their validity and scope                         | `parameters.ts`                                                           | every Risk Indicator                                                   |
 | Whether a missing fact is a gap or a normal absence                      | `risk.data_obligations` ([§3.5](#35-expected-absence-and-unexpected-absence))                       | every Risk Indicator with required inputs |
-| Which subject rows exist at all, their classifiers and fact presence     | `public.v_subject_*` ([§3.3](#33-gate-0--the-subject-universe))            | one per subject type, shared by every indicator                        |
+| Which subject rows exist at all, their classifiers and fact presence     | A domain model view ([§3.3](#33-gate-0--the-subject-universe))             | one per subject type, shared by every indicator                        |
 | Running the gates, and `not_applicable`/`insufficient_data` from them    | `SubjectFactsIndicator` ([§2.3](#23-the-decision-model-of-one-indicator))  | every Risk Indicator                                                   |
 | Identity, subject key pass-through, applied parameters, cutoff           | `SubjectFactsIndicator` — shared, written once                            | every row-per-subject Risk Indicator                                   |
-| Reusable canonical field mapping                                         | A view in `public`                                                        | unified procurement and bidder facts                                   |
+| A business concept several indicators need                               | A new domain model entity ([`domain-model.md`](domain-model.md))          | the buyer–supplier relationship; the co-bidder pair                    |
 | Stable shared database primitive                                         | A SQL/PG function                                                         | business days between dates                                            |
 | A shared or expensive intermediate several indicators compare against    | A view, materialised once measurement demands it                          | peer benchmark per CPV division and method; ownership-graph closure    |
 | Scheduling, retries and backfills                                        | Procurement Risk Service and `risk.evaluation_runs`                       | every evaluation run                                                   |
@@ -1286,7 +1282,7 @@ has exactly two inputs of its own.
   through the cutoff, never through `now()` and never through the process clock. That is the enforceable form of
   "reproducible", and it is a test ([§9](#9-tests-and-automated-safeguards)).
 - **The subject set comes from the universe view and the indicator's declared scope.** Each indicator has its own unit
-  of analysis — procurement, lot, contract, supplier — and reads `public.v_subject_<type>`, so the population is defined
+  of analysis — procurement, lot, contract, supplier — and reads that subject type's domain model view, so the population is defined
   once per subject type rather than once per indicator ([§3.3](#33-gate-0--the-subject-universe)). `$2` carries an
   explicit subject array for a backfill or a single-procurement rerun, and `NULL` for a normal full run. `$3` carries the
   `scope.profiles` array from the definition.
@@ -1294,7 +1290,7 @@ has exactly two inputs of its own.
 Those three are the collection statement's only arguments. Thresholds are not among them: a parameter entry is resolved
 in TypeScript and applied by the rules, so the cutoff and the population reach SQL and policy does not.
 
-The registry's evaluable versions form an unordered set, since every indicator reads canonical facts plus its own
+The registry's evaluable versions form an unordered set, since every indicator reads domain model facts plus its own
 parameters and nothing another indicator produced. The run job iterates them in declaration order because iteration
 needs an order; any permutation produces the same signals.
 
@@ -1382,10 +1378,12 @@ direction, and by wildly different factors:
 | Indicator kind                                                    | Population                                                  | Rows per run  |
 |-------------------------------------------------------------------|-------------------------------------------------------------|--------------:|
 | Contract rule needing a linked procedure (LT-PRI-04, LT-EXE-05, …) | `TSP`/`PPS` only — the exempt 5,309,875 are out of scope    |     ~263,000  |
-| Contract rule reading only the contract row (LT-PRI-07, LT-OTH-02) | Every non-deleted contract                                  |    5,906,242  |
+| Contract rule reading only the contract row (LT-PRI-07, LT-OTH-02) | Every non-deleted contract                                  |    5,906,258  |
 | Procurement rule needing a method or a value                       | `cvpis` profile only                                        |       50,893  |
 | Procurement rule needing only a publication date and deadline      | Both profiles                                               |      264,415  |
-| Lot and bid rules                                                  | Whatever PPA reporting covers                               | 13,396 / 36,793 |
+| Lot rule needing observed bidders                                  | Lots whose participation was observed                       |        13,396 |
+| Lot rule reading only the declared lot                             | Every known lot                                             |        48,564 |
+| Bid rules                                                          | Every observed participation                                |        36,793 |
 
 So the lever is scope first and the retention window second. Neither number is worth guessing further: each indicator's
 `statistics` reports its own population at the end of its first run, and the window — a one-month window holds ~30
@@ -1547,7 +1545,8 @@ sharpest failure mode is caught ([§3](#3-evaluation-scope-and-applicability)):
   `current_timestamp` — **including in every view the statement reads**;
 - that the statement mentions no state literal, no indicator id and no threshold — the collection/decision boundary,
   enforced rather than reviewed;
-- that the statement's `FROM` is a `v_subject_*` view, so no indicator quietly defines its own population;
+- that the statement's `FROM` is a domain model view and mentions no ingestion table, so no indicator quietly defines
+  its own population or binds itself to a warehouse layout that is free to change;
 - a reasonable query plan and runtime on a representative sample.
 
 **Subject-universe tests** are owned by the views, not by any indicator: `subject_key` is unique and stable across
@@ -1632,3 +1631,12 @@ its run.
   a fact, and that reading has not been reviewed by a procurement lawyer. Every row carries a `legal_basis` so the
   interpretation is challengeable, and getting one wrong misclassifies a whole population between `not_applicable` and
   `insufficient_data` — the most consequential single error this design admits.
+- **Eight domain model entities are specified but not implemented**
+  ([`domain-model.md` §1.3](domain-model.md#13-entities-specified-but-not-yet-implemented)). Every subject type has an
+  entity, so every indicator has a population to run on; but indicators reading documents, amendments, subcontracting,
+  ownership, financials or payments are scoped out until those evidence entities exist. The run says so rather than
+  failing, which is the design working — it is still 30-odd indicators publishing nothing.
+- **The domain model is a stability contract, not a stability guarantee.** An entity whose grain or key has to change —
+  as `v_pirkimo_dalis` did when declared lots were added alongside observed ones — does move the ground under the
+  indicators that read it. What the model buys is that such a change is *visible and reviewed*, in one file, instead of
+  arriving as a renamed ingestion table nobody connected to a risk result.

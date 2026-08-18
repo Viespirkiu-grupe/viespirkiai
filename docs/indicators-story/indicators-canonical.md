@@ -53,58 +53,87 @@ identifiers.
 
 The current `risk.risk_signals.subject_type` constraint supports only `procurement`, `lot`, `contract`, and
 `supplier`. The catalogue needs additional first-class subjects before every indicator can be implemented without
-attaching a decision to the wrong entity:
+attaching a decision to the wrong entity. Each stored subject type resolves to exactly one entity of the
+[domain model](domain-model.md), and that entity — never a warehouse table — is what an indicator is specified
+against:
 
-| Catalogue subject           | Recommended stored subject type                                 |
-|-----------------------------|-----------------------------------------------------------------|
-| Procurement                 | `procurement`                                                   |
-| Lot                         | `lot`                                                           |
-| Bid / bidder participation  | `bid` (key includes procurement, lot, and participant)          |
-| Contract                    | `contract`                                                      |
-| Supplier company            | `supplier`                                                      |
-| Buyer institution           | `buyer`                                                         |
-| Buyer–supplier relationship | `buyer_supplier_relationship`                                   |
-| Bidder group / relationship | `bidder_relationship` (canonical, order-independent party keys) |
-| Market / category portfolio | `market` (key includes the market/category and analysis window) |
+| Catalogue subject           | Stored subject type                                             | Domain model entity                                    |
+|-----------------------------|-----------------------------------------------------------------|--------------------------------------------------------|
+| Procurement                 | `procurement`                                                   | `v_pirkimas`                                           |
+| Lot                         | `lot`                                                           | `v_pirkimo_dalis`                                      |
+| Bid / bidder participation  | `bid` (key includes procurement, lot, and participant)          | `v_dalyviai`                                           |
+| Contract                    | `contract`                                                      | `v_sutartys`                                           |
+| Supplier company            | `supplier`                                                      | `v_company`, restricted to codes that have supplied    |
+| Buyer institution           | `buyer`                                                         | `v_company`, restricted to codes that have purchased   |
+| Buyer–supplier relationship | `buyer_supplier_relationship`                                   | `v_pirkejo_tiekejo_rysys`                              |
+| Bidder group / relationship | `bidder_relationship` (canonical, order-independent party keys) | `v_dalyviu_pora`                                       |
+| Market / category portfolio | `market` (key includes the market/category and analysis window) | `v_rinka`                                              |
 
 `procurement_source` and `procurement_id` should remain optional context/navigation keys, not part of the subject's
 identity. For example, a supplier sanction is one company-level result that may be shown as context on many
 procurements; duplicating it as a separate procurement decision would distort counts and history.
 
-### Procurement lifecycle in the current data model
+### Procurement lifecycle in the domain model
+
+Entities, not tables. Solid arrows are the sequence a purchase moves through; dashed arrows are links the sources do
+not enforce and that can legitimately fail to resolve.
 
 ```mermaid
 flowchart LR
-    B[Buyer company] -->|publishes| P[Procurement]
-    S[Participant company] -->|submits proposal| L[Lot / bid]
-    L -->|belongs to| P
-    P -.->|daliesNumeris| L
-    C -.->|daliesNumeriai| L
-    P -->|award produces 1 . . n| C[Contract\n«atn1sutartys»]
-    C -->|performed by| W[Winning supplier]
-    C -.->|pirkimoNumeris| P
+    PR(["Pirkėjas"])
+    TK(["Tiekėjas"])
+    PL["Pirkimo planas"]
+    P["Pirkimas"]
+    SK["Skelbimas"]
+    D["Pirkimo dalis"]
+    B["Dalyvis"]
+    S["Sutartis"]
+    R["Pirkėjo–tiekėjo ryšys"]
+    PO["Dalyvių pora"]
+
+    PR -->|" plans "| PL
+    PL -.->|" no key: matched on buyer, object, period "| P
+    PR -->|" publishes "| P
+    P -->|" advertised through "| SK
+    P -->|" split into 1..n "| D
+    TK -->|" submits a proposal "| B
+    B -->|" competes in "| D
+    B -.->|" co-bids with "| PO
+    D -->|" awarded, producing 1..n "| S
+    S -.->|" links back by procurement number "| P
+    S -->|" performed by "| TK
+    S -.->|" summarised into "| R
 ```
 
-Live database snapshot: **2026-08-13 11:18 Europe/Vilnius**. Counts use the identity in the sixth column; they are
-not PostgreSQL planner estimates.
+The two dashed links out of `Pirkimas` are the model's weak points and the reason `insufficient_data` exists as an
+outcome: a plan carries no procurement number at all, and a contract's procurement number is free text that resolves
+only 6.1% of the time even among contracts legally obliged to carry one. Both are measured in
+[`domain-model.md`](domain-model.md).
 
-| Lifecycle entity or transition | Canonical view | Backing table(s) | Current entity count | Canonical LT-* indicators | Projected signal rows | Identity or join mapping | Coverage / cardinality |
-|---|---|---|---:|---:|---:|---|---|
-| Buyer company | `v_pirkimas` | `viesiejiPirkimai`, `viesiejiPirkimaiVykdytojai`; CVPP fallback via `cvppViesiejiPirkimai` and `vpmSutartys` | 2,792 | 3 | 8,376 | Distinct non-null `v_pirkimas.jarKodas` | One buyer per procurement when the company code is available |
-| Procurement | `v_pirkimas` | `viesiejiPirkimai`; fallback `cvppViesiejiPirkimai` | 264,037 | 28 | 7,393,036 | `(saltinis, pirkimoNumeris)` | One row per source procurement; CVP IS takes precedence over a matching CVPP notice |
-| Procurement lot | `v_dalyviai` | `atn1ataskaitos`, `atn1pasiulymuEile`, `atn1atmestiPasiulymai` | 1,272 | 17 | 21,624 | `(pirkimoNumeris, COALESCE(daliesNumeris, '0'))` | Only where structured ATN-1 detail was ingested |
-| Participant / supplier company | `v_dalyviai`, `v_sutartys` | `atn1dalyviai`, `vpmSutartys`, optionally `jarAsmenys` | 80,434 | 10 | 804,340 | Union of distinct non-null ATN-1 and primary-contract `tiekejoKodas` | 559 occur in structured ATN-1 participation and 80,407 as primary contract suppliers; additional contract suppliers are excluded from this conservative count |
-| Bid / proposal in a lot | `v_dalyviai` | `atn1pasiulymuEile`, `atn1atmestiPasiulymai` | 2,989 | 11 | 32,879 | `(pirkimoNumeris, COALESCE(daliesNumeris, '0'), tiekejoKodas)` | Best-effort ATN-1 data, not complete for every procurement |
-| Award → buyer–supplier relationship | `v_sutartys` | `vpmSutartys`, `vpmSutartysPapildomiTiekejai`, `vpmSutartysSalys` | 5,893,501 contract-award records | 5 | ≤29,467,505 | Buyer and supplier codes identify the relationship; `pirkimoNumeris` links to procurement | Upper bound uses contract-award records. The real total is lower after materializing and deduplicating buyer–supplier relationship subjects |
-| Co-bidder group / relationship | `v_dalyviai` | `atn1dalyviai`, `atn1pasiulymuEile` | 1,756 observed bidder pairs | 12 | 21,072 | Order-independent pairs of `tiekejoKodas` co-occurring in one lot | Counts pairs, not every larger group; limited by ATN-1 coverage |
-| Contract | `v_sutartys` | `vpmSutartys` and its type, category, party, CPV, and update tables | 5,893,501 | 17 | 100,189,517 | Distinct non-deleted `sutartiesUnikalusId`; `pirkimoNumeris` links back to procurement | A contract is the execution-stage result of an award and does not replace the procurement |
-| CPV market / category | `v_pirkimas` | `viesiejiPirkimai.bvpzKodai` | 4,189 CPV codes | 3 | 12,567 | Distinct non-null code from `unnest(v_pirkimas.bvpzKodai)` | The executable subject key must also include market level and analysis window |
+### Subject populations
 
-Assuming all **106 canonical indicators** are implemented and every indicator emits a stored state for every subject
-in its row, one initial Procurement Risk run would create **up to 137,950,916 current signal rows**. Contracts account
-for **100,189,517** of them. This is a sizing upper bound, not an expected triggered-risk count: applicability rules
-can reduce the evaluated subject universe, and deduplicating buyer–supplier relationships will reduce the total.
-Later unchanged runs update `checked_at` instead of inserting another current row.
+Live database snapshot: **2026-08-18**. Counts are `count(*)`, not planner estimates.
+
+| Subject type                  | Domain model entity       | Subjects  | Canonical LT-* indicators | Identity                                             |
+|-------------------------------|---------------------------|----------:|--------------------------:|------------------------------------------------------|
+| `procurement`                 | `v_pirkimas`              |   264,415 |                        28 | `(saltinis, pirkimoNumeris)`                         |
+| `lot`                         | `v_pirkimo_dalis`         |    48,564 |                        17 | `subjektoRaktas`                                     |
+| `bid`                         | `v_dalyviai`              |    36,793 |                        11 | `(pirkimoNumeris, daliesNumeris, tiekejoKodas)`      |
+| `contract`                    | `v_sutartys`              | 5,906,258 |                        17 | `sutartiesUnikalusId`, not deleted                   |
+| `supplier`                    | `v_company` as supplier   |    80,479 |                        10 | `jarKodas` that has supplied under a contract or bid |
+| `buyer`                       | `v_company` as buyer      |     6,103 |                         3 | `jarKodas` that has purchased under a contract       |
+| `buyer_supplier_relationship` | `v_pirkejo_tiekejo_rysys` | 1,090,112 |                         5 | `rysioRaktas`                                        |
+| `bidder_relationship`         | `v_dalyviu_pora`          |    19,989 |                        12 | `porosRaktas`, order-independent                     |
+| `market`                      | `v_rinka`                 |        45 |                         3 | `rinkosRaktas` (BVPŽ division)                       |
+| **Total**                     |                           |           |                   **106** |                                                      |
+
+**These are subject populations, not projected signal counts.** Multiplying a population by its indicator count gives a
+number the service will never write: an indicator declares which part of the population it speaks about, and everything
+outside that declaration is counted on the run rather than stored as a row. The contract population in particular
+splits sharply — a rule needing a linked procedure addresses roughly 263,000 contracts, while one reading only the
+contract row addresses all 5.9 million. Sizing is therefore a per-indicator measurement taken from its first run, and
+the mechanism is specified in
+[`risk-service-architecture.md` §3](risk-service-architecture.md#3-evaluation-scope-and-applicability).
 
 ## Competition (24)
 
