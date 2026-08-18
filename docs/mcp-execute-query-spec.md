@@ -88,7 +88,7 @@ Default is `"inventory"` when no `table` is given; `"detail"` when a `table` is 
         "jarKodas",
         "pavadinimas",
         "darbuotojai",
-        "melagingisTiekejas",
+        "nepatikimasTiekejasIki",
         "bylosSkaicius"
       ]
     },
@@ -449,8 +449,8 @@ SELECT "jarKodas",
        pavadinimas,
        darbuotojai,
        "vidutinisAtlyginimas",
-       "melagingisTiekejas",
-       "nepatikimasTiekejas",
+       "melagingisTiekejasNuo", "melagingisTiekejasIki",
+       "nepatikimasTiekejasNuo", "nepatikimasTiekejasIki",
        "vdiPazeidimuSkaicius",
        "bylosSkaicius"
 FROM v_company

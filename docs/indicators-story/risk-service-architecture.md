@@ -473,7 +473,7 @@ this indicator run on", because after it there is exactly one definition per sub
 | Subject type                  | Universe view                  | Derived from                                                     | Measured rows                                     |
 |-------------------------------|--------------------------------|------------------------------------------------------------------|---------------------------------------------------|
 | `procurement`                 | `v_subject_procurement`        | `v_pirkimas`                                                     | 264,415                                           |
-| `lot`                         | `v_subject_lot`                | `v_pirkimo_dalis`                                                | 13,396 — see [§3.11](#311-known-defects-this-section-depends-on) (fixed) |
+| `lot`                         | `v_subject_lot`                | `v_pirkimo_dalis`                                                | 13,396                                             |
 | `bid`                         | `v_subject_bid`                | `v_dalyviai`                                                     | 36,793                                            |
 | `contract`                    | `v_subject_contract`           | `v_sutartys` where `istrinta = false`                            | 5,906,242                                         |
 | `supplier`                    | `v_subject_supplier`           | `v_company` restricted to codes appearing as a supplier          | to be measured                                    |
@@ -795,20 +795,7 @@ scoring across indicators of wildly different coverage is exactly the error the 
 entity with three signals out of ninety evaluated indicators is not comparable to one with three out of six, and no
 weighting recovers that.
 
-### 3.11 Known defects this section depends on
-
-This model is specified against the canonical views as they should be. Four gaps stood between it and a run, found by
-querying the live database on 2026-08-18. They were data-layer work, not risk-service work, but the risk service could
-not be built past the design stage without them.
-
-| # | Defect                                                                                                                                                                      | Effect                                                            | Status |
-|---|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|--------|
-| 1 | `v_pirkimo_dalis.sql` read `atn1ataskaitos` and `atn1pirkimoDalys`. Those tables no longer exist — the family was replaced by `xlsxPPA*`, which is what `v_dalyviai` already reads. | The view could not be created; the whole `lot` subject type was blocked, and with it 17 canonical indicators | **Fixed** — now reads `xlsxPPAataskaitos`/`xlsxPPApirkimoDalys`, same value-match pattern as `v_dalyviai` |
-| 2 | `v_pirkimo_dalis.sql` cast `pirkimoNumeris::integer` to compare against `viesiejiPirkimai.pirkimoId`. Real values exceed `int4` — `3782102904` is in the data today.        | The view errored at query time on the real corpus, not just returned wrong rows | **Fixed** — compares as text (`vp."pirkimoId"::text = d."pirkimoNumeris"`), matching `v_pirkimas.sql`'s own pattern |
-| 3 | The deployed `v_pirkimas` exposed the key as `pirkimoId`; the repository file already renamed it to `pirkimoNumeris`.                                                        | Every join documented as `p."pirkimoNumeris" = d."pirkimoNumeris"` failed against the database as it stood | **Not a separate defect** — `ensureAnalystViews` (`ensureViews.ts`) issues `CREATE OR REPLACE VIEW` for every view on every process start, using the app's own DB role, which owns these views. Defect 1 made that call throw on `v_pirkimo_dalis` before it ever completed a pass, and the memoized promise stayed rejected, so `v_pirkimas` was never actually redeployed with the current repo definition. Fixing defect 1 removes that block; the next process start redeploys `v_pirkimas` (and every other view) with `pirkimoNumeris`, no code change needed here |
-| 4 | `v_company` decided `melagingisTiekejas` and `nepatikimasTiekejas` with `CURRENT_DATE`.                                                                                      | Violated the cutoff rule of [§6](#6-evaluation-run): the same run at the same `data_as_of` gave different answers on different days | **Fixed** — replaced by `melagingisTiekejasNuo`/`melagingisTiekejasIki` and `nepatikimasTiekejasNuo`/`nepatikimasTiekejasIki`, each the most-current entry's validity interval (open-ended when `*Iki IS NULL`); an indicator compares these to `$1` itself instead of the view deciding against the wall clock |
-
-### 3.12 Domain-model coverage this section assumes
+### 3.11 Domain-model coverage this section assumes
 
 The missing subject views of [§3.3](#33-gate-0--the-subject-universe) are the gap on the *subject* axis. This is the gap
 on the *fact* axis: the seven canonical views cover a fraction of the ingested corpus, and the uncovered part is not
@@ -1557,9 +1544,7 @@ sharpest failure mode is caught ([§3](#3-evaluation-scope-and-applicability)):
   precondition `SubjectFactsIndicator` relies on;
 - timezone and daylight-saving boundaries in any date arithmetic the statement performs;
 - that every time comparison goes through the `$1` cutoff, and the statement contains no `now()`, `current_date` or
-  `current_timestamp` — **including in every view the statement reads**; `v_company` was the one canonical view that
-  violated this ([§3.11](#311-known-defects-this-section-depends-on), defect 4) until it was fixed to expose validity
-  intervals instead;
+  `current_timestamp` — **including in every view the statement reads**;
 - that the statement mentions no state literal, no indicator id and no threshold — the collection/decision boundary,
   enforced rather than reviewed;
 - that the statement's `FROM` is a `v_subject_*` view, so no indicator quietly defines its own population;
@@ -1647,7 +1632,3 @@ its run.
   a fact, and that reading has not been reviewed by a procurement lawyer. Every row carries a `legal_basis` so the
   interpretation is challengeable, and getting one wrong misclassifies a whole population between `not_applicable` and
   `insufficient_data` — the most consequential single error this design admits.
-- **Four canonical-view defects blocked the model as specified** ([§3.11](#311-known-defects-this-section-depends-on)),
-  including the `lot` subject type — 17 canonical indicators — which could not be evaluated at all until
-  `v_pirkimo_dalis` was repaired. All four are fixed; `v_pirkimo_dalis` still needs a live-DB integration test run to
-  confirm against real data before the `lot` subject type is trusted in production.

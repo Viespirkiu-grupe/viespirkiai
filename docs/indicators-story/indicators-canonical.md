@@ -78,8 +78,9 @@ flowchart LR
     B[Buyer company] -->|publishes| P[Procurement]
     S[Participant company] -->|submits proposal| L[Lot / bid]
     L -->|belongs to| P
-    P -.->|p.daliesNumeris| L
-    P -->|award produces 1 . . n| C[Contract]
+    P -.->|daliesNumeris| L
+    C -.->|daliesNumeriai| L
+    P -->|award produces 1 . . n| C[Contract\n«atn1sutartys»]
     C -->|performed by| W[Winning supplier]
     C -.->|pirkimoNumeris| P
 ```
@@ -90,7 +91,7 @@ not PostgreSQL planner estimates.
 | Lifecycle entity or transition | Canonical view | Backing table(s) | Current entity count | Canonical LT-* indicators | Projected signal rows | Identity or join mapping | Coverage / cardinality |
 |---|---|---|---:|---:|---:|---|---|
 | Buyer company | `v_pirkimas` | `viesiejiPirkimai`, `viesiejiPirkimaiVykdytojai`; CVPP fallback via `cvppViesiejiPirkimai` and `vpmSutartys` | 2,792 | 3 | 8,376 | Distinct non-null `v_pirkimas.jarKodas` | One buyer per procurement when the company code is available |
-| Procurement | `v_pirkimas` | `viesiejiPirkimai`; fallback `cvppViesiejiPirkimai` | 264,037 | 28 | 7,393,036 | `(saltinis, pirkimoId)` | One row per source procurement; CVP IS takes precedence over a matching CVPP notice |
+| Procurement | `v_pirkimas` | `viesiejiPirkimai`; fallback `cvppViesiejiPirkimai` | 264,037 | 28 | 7,393,036 | `(saltinis, pirkimoNumeris)` | One row per source procurement; CVP IS takes precedence over a matching CVPP notice |
 | Procurement lot | `v_dalyviai` | `atn1ataskaitos`, `atn1pasiulymuEile`, `atn1atmestiPasiulymai` | 1,272 | 17 | 21,624 | `(pirkimoNumeris, COALESCE(daliesNumeris, '0'))` | Only where structured ATN-1 detail was ingested |
 | Participant / supplier company | `v_dalyviai`, `v_sutartys` | `atn1dalyviai`, `vpmSutartys`, optionally `jarAsmenys` | 80,434 | 10 | 804,340 | Union of distinct non-null ATN-1 and primary-contract `tiekejoKodas` | 559 occur in structured ATN-1 participation and 80,407 as primary contract suppliers; additional contract suppliers are excluded from this conservative count |
 | Bid / proposal in a lot | `v_dalyviai` | `atn1pasiulymuEile`, `atn1atmestiPasiulymai` | 2,989 | 11 | 32,879 | `(pirkimoNumeris, COALESCE(daliesNumeris, '0'), tiekejoKodas)` | Best-effort ATN-1 data, not complete for every procurement |
