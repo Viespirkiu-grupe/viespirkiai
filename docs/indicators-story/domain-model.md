@@ -70,21 +70,26 @@ of them is scoped out until it does, and the run says so — that is the ordinar
 [scope mechanism](risk-service-architecture.md#34-gate-1--scope-is-a-property-of-the-source-profile), not a special
 case.
 
-| Entity                   | Business concept                                                  | Blocks                                     |
-|--------------------------|-------------------------------------------------------------------|--------------------------------------------|
-| `v_dokumentas`           | **Dokumentas** — one document attached to a procurement or contract | LT-TRA-03, LT-PRO-09, LT-PRO-10, LT-PRO-11, LT-COM-16 |
-| `v_sutarties_pakeitimas` | **Sutarties pakeitimas** — one amendment to a contract            | LT-EXE-01 … LT-EXE-06                      |
-| `v_subranga`             | **Subranga** — one subcontracting arrangement under a contract    | LT-EXE-11, LT-EXE-12, LT-EXE-13            |
-| `v_proceduros_pabaiga`   | **Procedūros pabaiga** — how a procedure ended, per lot           | LT-OTH-05, LT-AWD-03                       |
-| `v_vertinimo_kriterijai` | **Vertinimo kriterijai** — the award criteria applied to a lot    | LT-AWD-07, LT-AWD-08                       |
-| `v_valdymas`             | **Valdymas** — one ownership or control link between parties      | LT-COI-02, LT-COI-03, LT-COI-06, LT-SUP-10 |
-| `v_imones_finansai`      | **Įmonės finansai** — one company's financial statement period    | LT-SUP-13                                  |
-| `v_mokejimai`            | **Mokėjimas** — one payment made against a contract               | LT-EXE-07                                  |
+| Entity                   | Business concept                                                    | Key                  | Foreign keys                                          | Blocks                                     |
+|--------------------------|---------------------------------------------------------------------|----------------------|-------------------------------------------------------|--------------------------------------------|
+| `v_dokumentas`           | **Dokumentas** — one document attached to a procurement or contract | `dokumentoRaktas`    | `pirkimoNumeris` → `v_pirkimas`; `sutartiesUnikalusId` → `v_sutartys` | LT-TRA-03, LT-PRO-09, LT-PRO-10, LT-PRO-11, LT-COM-16 |
+| `v_sutarties_pakeitimas` | **Sutarties pakeitimas** — one amendment to a contract              | `pakeitimoRaktas`    | `sutartiesUnikalusId` → `v_sutartys`                  | LT-EXE-01 … LT-EXE-06                      |
+| `v_subranga`             | **Subranga** — one subcontracting arrangement under a contract      | `subrangosRaktas`    | `sutartiesUnikalusId` → `v_sutartys`; `subrangovoKodas` → `v_company` | LT-EXE-11, LT-EXE-12, LT-EXE-13            |
+| `v_proceduros_pabaiga`   | **Procedūros pabaiga** — how a procedure ended, per lot             | `pabaigosRaktas`     | `pirkimoNumeris` + `daliesNumeris` → `v_pirkimo_dalis` | LT-OTH-05, LT-AWD-03                       |
+| `v_vertinimo_kriterijai` | **Vertinimo kriterijai** — the award criteria applied to a lot      | `kriterijausRaktas`  | `pirkimoNumeris` + `daliesNumeris` → `v_pirkimo_dalis` | LT-AWD-07, LT-AWD-08                       |
+| `v_valdymas`             | **Valdymas** — one ownership or control link between parties        | `valdymoRaktas`      | `jarKodas` → `v_company` (controlled); `valdytojoKodas` → `v_company` (controlling) | LT-COI-02, LT-COI-03, LT-COI-06, LT-SUP-10 |
+| `v_imones_finansai`      | **Įmonės finansai** — one company's financial statement period      | `finansuRaktas`      | `jarKodas` → `v_company`                              | LT-SUP-13                                  |
+| `v_mokejimai`            | **Mokėjimas** — one payment made against a contract                 | `mokejimoRaktas`     | `sutartiesUnikalusId` → `v_sutartys`                  | LT-EXE-07                                  |
+
+The keys and foreign keys above are the committed part. An indicator may be specified against them today; the
+attributes each entity will additionally carry are decided when the view is written.
 
 ## 2. Entity-relationship diagram
 
 Only the attributes indicators actually read are listed. Every relationship below is a **value match evaluated at query
-time**, not an enforced foreign key — see [§3](#3-how-entities-relate).
+time**, not an enforced foreign key — see [§3](#3-how-entities-relate). Entities whose key carries the comment
+`planuojama` are specified but not yet implemented ([§1.3](#13-entities-specified-but-not-yet-implemented)); their keys
+and links are settled, their remaining attributes are not.
 
 ```mermaid
 erDiagram
@@ -220,6 +225,59 @@ erDiagram
         boolean dalyvaujaViesuosePirkimuose
     }
 
+    v_dokumentas {
+        text dokumentoRaktas PK "planuojama"
+        text pirkimoNumeris FK
+        text sutartiesUnikalusId FK
+        text kitiLaukai "..."
+    }
+
+    v_sutarties_pakeitimas {
+        text pakeitimoRaktas PK "planuojama"
+        text sutartiesUnikalusId FK
+        text kitiLaukai "..."
+    }
+
+    v_subranga {
+        text subrangosRaktas PK "planuojama"
+        text sutartiesUnikalusId FK
+        text subrangovoKodas FK
+        text kitiLaukai "..."
+    }
+
+    v_proceduros_pabaiga {
+        text pabaigosRaktas PK "planuojama"
+        text pirkimoNumeris FK
+        text daliesNumeris FK
+        text kitiLaukai "..."
+    }
+
+    v_vertinimo_kriterijai {
+        text kriterijausRaktas PK "planuojama"
+        text pirkimoNumeris FK
+        text daliesNumeris FK
+        text kitiLaukai "..."
+    }
+
+    v_valdymas {
+        text valdymoRaktas PK "planuojama"
+        text jarKodas FK "valdoma imone"
+        text valdytojoKodas FK "valdanti salis"
+        text kitiLaukai "..."
+    }
+
+    v_imones_finansai {
+        text finansuRaktas PK "planuojama"
+        text jarKodas FK
+        text kitiLaukai "..."
+    }
+
+    v_mokejimai {
+        text mokejimoRaktas PK "planuojama"
+        text sutartiesUnikalusId FK
+        text kitiLaukai "..."
+    }
+
     v_pirkimas ||--o{ v_skelbimas: "paskelbta per"
     v_pirkimas ||--o{ v_pirkimo_dalis: "suskaidytas i"
     v_pirkimo_dalis ||--o{ v_dalyviai: "varzosi"
@@ -233,7 +291,32 @@ erDiagram
     v_company ||--o{ v_bylos: "byloje"
     v_company ||--o{ v_person_links: "susijusi su asmeniu"
     v_pirkimas }o--o{ v_rinka: "priklauso rinkai"
+
+    v_pirkimas ||--o{ v_dokumentas: "pirkimo dokumentai"
+    v_sutartys ||--o{ v_dokumentas: "sutarties dokumentai"
+    v_sutartys ||--o{ v_sutarties_pakeitimas: "keiciama"
+    v_sutartys ||--o{ v_subranga: "vykdoma per subranga"
+    v_sutartys ||--o{ v_mokejimai: "apmokama"
+    v_company ||--o{ v_subranga: "subrangovas"
+    v_pirkimo_dalis ||--o| v_proceduros_pabaiga: "baigiasi"
+    v_pirkimo_dalis ||--o{ v_vertinimo_kriterijai: "vertinama pagal"
+    v_company ||--o{ v_valdymas: "valdo arba yra valdoma"
+    v_company ||--o{ v_imones_finansai: "atsiskaito"
 ```
+
+Entities marked `planuojama` are the eight of [§1.3](#13-entities-specified-but-not-yet-implemented): their identity and
+their links into the model are fixed here so an indicator can be specified against them, while their remaining
+attributes (`kitiLaukai`) stay open until the view is written. Fixing the foreign keys first is the part that matters —
+it settles which subject a result attaches to and which grain the entity is read at, and those are the decisions an
+indicator depends on. Adding an attribute later changes no indicator; changing an entity's grain changes every
+indicator that reads it.
+
+Two of those links are worth reading closely. **`v_dokumentas` attaches to either a procurement or a contract**, never
+to both at once, because a tender document and a signed-contract PDF are published by different processes at different
+stages — an indicator about tender transparency and one about contract publication must not see the same population.
+And **`v_valdymas` points at `v_company` twice**, as the controlled entity and as the controlling party, which is what
+makes it a graph rather than an attribute: the conflict-of-interest indicators traverse it, and traversal needs both
+ends named.
 
 ## 3. How entities relate
 
