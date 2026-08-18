@@ -34,7 +34,7 @@ interface ViewMetadata {
 export const VIEW_METADATA: Record<string, ViewMetadata> = {
     v_company: {
         tags: ["capacity", "blacklist", "labor", "domains", "court"],
-        keys: ["jarKodas", "pavadinimas", "darbuotojai", "melagingisTiekejas", "bylosSkaicius"],
+        keys: ["jarKodas", "pavadinimas", "darbuotojai", "nepatikimasTiekejasIki", "bylosSkaicius"],
         joins: [
             ["jarKodas", "jarAsmenys.jarKodas", "strict"],
         ],
@@ -50,8 +50,11 @@ export const VIEW_METADATA: Record<string, ViewMetadata> = {
             "darbuotojai: integer",
             "vidutinisAtlyginimas: numeric",
             "imokuSuma: numeric",
-            "melagingisTiekejas: boolean",
-            "nepatikimasTiekejas: boolean",
+            "melagingisTiekejasNuo: date -- validity interval, not a boolean: " +
+                "in force at cutoff $c iff melagingisTiekejasNuo <= $c AND (melagingisTiekejasIki IS NULL OR melagingisTiekejasIki >= $c)",
+            "melagingisTiekejasIki: date -- NULL means still in force (open-ended)",
+            "nepatikimasTiekejasNuo: date -- validity interval, same rule as melagingisTiekejas*",
+            "nepatikimasTiekejasIki: date -- NULL means still in force (open-ended)",
             "vdiPazeidimuSkaicius: bigint",
             "bylosSkaicius: bigint",
             "domenaiSkaicius: bigint",

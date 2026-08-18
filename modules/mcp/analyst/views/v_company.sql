@@ -27,14 +27,10 @@ SELECT j."jarKodas"::text,
        (COALESCE(s.draustieji, 0) + COALESCE(s.draustieji2, 0))                     AS darbuotojai,
        s."vidutinisAtlyginimas",
        s."imokuSuma",
-       EXISTS(SELECT 1
-              FROM "melagingiTiekejai" m
-              WHERE m."tiekejoJarKodas" = j."jarKodas"::text
-                AND (m."itrauktasIki" IS NULL OR m."itrauktasIki" >= CURRENT_DATE)) AS "melagingisTiekejas",
-       EXISTS(SELECT 1
-              FROM "nepatikimiTiekejai" n
-              WHERE n."tiekejoJarKodas" = j."jarKodas"::text
-                AND (n."itrauktaIki" IS NULL OR n."itrauktaIki" >= CURRENT_DATE))   AS "nepatikimasTiekejas",
+       melagingas."nuo"                                                             AS "melagingisTiekejasNuo",
+       melagingas."iki"                                                             AS "melagingisTiekejasIki",
+       nepatikimas."nuo"                                                            AS "nepatikimasTiekejasNuo",
+       nepatikimas."iki"                                                            AS "nepatikimasTiekejasIki",
        (SELECT COUNT(*)
         FROM "vdiPazeidimai" v
         WHERE v."jarKodas" = j."jarKodas"::text)                                    AS "vdiPazeidimuSkaicius",
@@ -65,3 +61,23 @@ FROM "jarAsmenys" j
     ORDER BY data DESC NULLS LAST
     LIMIT 1
     ) s ON true
+         -- Time-bounded facts, exposed as their own validity interval rather than a
+         -- CURRENT_DATE-evaluated boolean: a run at a given data_as_of cutoff must
+         -- be able to decide "in force at that cutoff" for itself (compare cutoff
+         -- against nuo/iki), not get an answer baked in against today's wall clock.
+         -- A company can have more than one entry (one per case); this picks the
+         -- most current one -- open-ended (iki IS NULL) first, else the latest iki.
+         LEFT JOIN LATERAL (
+    SELECT "dataNuoKuriosSkaiciuojamasTerminas" AS "nuo", "itrauktasIki" AS "iki"
+    FROM "melagingiTiekejai"
+    WHERE "tiekejoJarKodas" = j."jarKodas"::text
+    ORDER BY ("itrauktasIki" IS NULL) DESC, "itrauktasIki" DESC, "dataNuoKuriosSkaiciuojamasTerminas" DESC
+    LIMIT 1
+    ) melagingas ON true
+         LEFT JOIN LATERAL (
+    SELECT "dataNuoKuriosSkaiciuojama" AS "nuo", "itrauktaIki" AS "iki"
+    FROM "nepatikimiTiekejai"
+    WHERE "tiekejoJarKodas" = j."jarKodas"::text
+    ORDER BY ("itrauktaIki" IS NULL) DESC, "itrauktaIki" DESC, "dataNuoKuriosSkaiciuojama" DESC
+    LIMIT 1
+    ) nepatikimas ON true

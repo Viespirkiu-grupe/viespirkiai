@@ -96,8 +96,10 @@ describe("v_company", () => {
         expect("jarKodas" in row, "missing jarKodas").toBe(true);
         expect("pavadinimas" in row, "missing pavadinimas").toBe(true);
         expect("darbuotojai" in row, "missing darbuotojai").toBe(true);
-        expect("melagingisTiekejas" in row, "missing melagingisTiekejas").toBe(true);
-        expect("nepatikimasTiekejas" in row, "missing nepatikimasTiekejas").toBe(true);
+        expect("melagingisTiekejasNuo" in row, "missing melagingisTiekejasNuo").toBe(true);
+        expect("melagingisTiekejasIki" in row, "missing melagingisTiekejasIki").toBe(true);
+        expect("nepatikimasTiekejasNuo" in row, "missing nepatikimasTiekejasNuo").toBe(true);
+        expect("nepatikimasTiekejasIki" in row, "missing nepatikimasTiekejasIki").toBe(true);
     });
 });
 
