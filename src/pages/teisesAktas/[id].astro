@@ -49,6 +49,13 @@ const tekstoSrc = tekstoBase
 const dalisHref = (partId: string) => `${tekstoSrc}#${encodeURIComponent(partId)}`;
 
 const title = current?.title || act.title || id;
+
+// Kokia `?v=` reikšmė pažymi dabartinę rodomą redakciją — ją atkartojam į
+// `og:image` adresą, kad crawlerio paveikslėlis atitiktų skaitomą versiją.
+// `current` jau atspindi `Astro.url` parinktą redakciją (žr. loadTeisesAktasPage).
+const ogV = current?.editionToken
+  ?? (current?.variantas !== 'original' ? current?.variantas : '')
+  ?? '';
 const etarUrl = current?.sourceUrl || `https://www.e-tar.lt/portal/lt/legalAct/${id}`;
 
 // ── informacinės lentelės laukai
@@ -141,6 +148,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=60');
 <Layout
   pageTitle={title}
   pageDescription={pageDescription}
+  pageImage={`https://viespirkiai.org/teisesAktas/${encodeURIComponent(id)}.png${ogV ? `?v=${encodeURIComponent(ogV)}` : ''}`}
   colorScheme={colorScheme}
   font={font}
   customHead={config.customHead}
