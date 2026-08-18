@@ -72,7 +72,7 @@ whichever tables happened to back it that quarter does not.
 ```mermaid
 flowchart TB
     subgraph nGit["Artefact source: Git repository"]
-        gDef["modules/risk/indicators/**<br/>definition.ts · parameters.ts · collect.sql · rules.ts · test/"]
+        gDef["modules/risk/indicators/**<br/>definition.ts · parameters.ts · rules.ts · test/<br/>modules/risk/factSets/**"]
         gCat["modules/risk/deployedIndicators.ts<br/>the registry and the riskCatalogue constant"]
         gDef -.->|" imported and validated at process start "| gCat
     end
@@ -83,10 +83,12 @@ flowchart TB
 
     subgraph pRisk["Process 2 — Procurement Risk Service (services/procurement-risk)"]
         pReg["Risk Indicators Registry<br/>built and validated at startup"]
-        pJob["Risk Indicators Run Job<br/>sequential, one indicator at a time"]
+        pJob["Evaluation pipeline<br/>census · groups · batched streaming"]
+        pDec["Decision service<br/>in memory, no connection"]
         pPub["Risk Signals Writer"]
         pReg -.->|" evaluable versions and their rules "| pJob
-        pJob -.-> pPub
+        pJob -.->|" fetched batches "| pDec
+        pDec -.-> pPub
     end
 
     subgraph pVis["Process 3 — Risk Indicators Visualisation (Astro server)"]
@@ -145,7 +147,7 @@ shape would otherwise fit, because four kinds of isolation are load-bearing:
   application together ([§8.2](#82-adding-a-risk-indicator)), on a schedule independent of ingestion releases.
 - **Packaging.** The web bundle imports the indicator definitions and reads the `riskCatalogue` constant. That import
   crosses no process boundary: the definitions are plain TypeScript and Zod, they open no database connection, and
-  `collect.sql` is read lazily at calculation time, so nothing in `services/procurement-risk/` reaches the web bundle.
+  fact-set SQL is read lazily at calculation time, so nothing in `services/procurement-risk/` reaches the web bundle.
 
 The separation buys four operational properties: a broken ingestion refresh leaves the last computed signals visible,
 labelled with their older cutoff; a failing indicator is contained to its own rows; a web deployment cannot mutate risk
@@ -208,10 +210,11 @@ flowchart LR
 | Procurement data collectors | 1       | Existing scrapers and importers                                        | Fetch and normalise public source data into `public`. They hold no permission on `risk`.                                                                                 |
 | Domain model facts          | 1       | The views of [`domain-model.md`](domain-model.md)                       | Present procurements, notices, lots, bids, contracts, relationships, markets, buyers and suppliers as business entities with stable keys, so an indicator never names an ingestion table and survives the warehouse being restructured. These are the reproducible facts read at the cutoff. |
 | Risk Indicators Registry    | 2       | `modules/risk/registry.ts`, built from the deployed code at startup    | Resolves `(indicator id, version)` to one validated Risk Indicator, and answers which versions are active, shadow or retired ([§5.3](#53-the-risk-indicator-class-model)). |
-| Risk Indicators Run Job     | 2       | `services/procurement-risk/runJob.ts`                                  | Opens the run, evaluates each registered indicator in turn, records per-indicator statistics, closes the run. Indicator-independent: one failure is recorded and the run continues. |
-| Risk Indicator evaluation   | 2       | One indicator directory ([§5.1](#51-the-risk-indicator-directory))     | Collects one subject's facts and decides its outcome at one cutoff, reading domain model facts only through the injected data source.                                        |
+| Risk Indicators Run Job     | 2       | `services/procurement-risk/runJob.ts`                                  | Opens the run, takes the census, plans the evaluation groups, executes them, records per-indicator statistics, closes the run. Indicator-independent: one failure is recorded and the run continues ([§6.5](#65-the-run-job)). |
+| Evaluation group pass       | 2       | `services/procurement-risk/groupPass.ts`                               | Streams one `(subject type, profile)` population in keyset batches and fetches its deduplicated fact sets. Holds no policy ([§6.4](#64-one-group-pass)).                   |
+| Decision service            | 2       | `modules/risk/decisionService.ts` plus one indicator directory ([§5.1](#51-the-risk-indicator-directory)) | Decides eligibility, data eligibility and the rules over rows already fetched. Pure: it opens no connection and reads no clock ([§6.1](#61-the-pipeline-and-the-decision-service)). |
 | Risk Signal Validator       | 2       | `RiskIndicator.validateObservations` plus the output contract          | Validates field types, allowed states, subject and indicator identity, and duplicate subject keys, before any row reaches the writer. SQL safety comes from the read-only role, transaction and statement timeout. |
-| Risk Signals Writer         | 2       | `services/procurement-risk/write.ts`                                   | Appends validated rows to the open run's snapshot with one indicator-independent `INSERT`, inside the caller's transaction. It compares nothing and updates nothing.      |
+| Risk Signals Writer         | 2       | `services/procurement-risk/write.ts`                                   | `COPY`s validated rows into the open run's partition, one batch at a time. It compares nothing and updates nothing.                                                        |
 | Evaluation run              | 2       | `risk.evaluation_runs`                                                 | One durable row per run: cutoff, code commit, terminal state, per-indicator statistics. It answers whether the job ran and whether it succeeded.                          |
 | Risk signals                | 2 → 3   | `risk.risk_signals`                                                    | One immutable snapshot per run: outcome, evidence, indicator version, applied parameters and cutoff.                                                                      |
 | Procurement summary         | 2 → 3   | `risk.v_procurement_summaries`                                         | Aggregates the live snapshot per procurement for list-page counts, ordering and filters.                                                                                  |
@@ -226,9 +229,9 @@ Risk state lives in four places, and only one of them is outside PostgreSQL.
 
 | Area            | Where                              | Contents                                                                                              | Written by                     | Retention                                                                |
 |-----------------|------------------------------------|-------------------------------------------------------------------------------------------------------|--------------------------------|--------------------------------------------------------------------------|
-| **Definitions** | Git — `modules/risk/indicators/**` | Identity, versions, lifecycle, public wording, scope, applicability, effective-dated parameters, rules, tests | A reviewed, merged pull request | Forever, as repository history                                    |
+| **Definitions** | Git — `modules/risk/indicators/**`, `modules/risk/factSets/**` | Identity, versions, lifecycle, public wording, selection, eligibility, effective-dated parameters, measurement statements, rules, tests | A reviewed, merged pull request | Forever, as repository history                                    |
 | **Obligations** | `risk.data_obligations`            | When Lithuanian law requires a fact to exist, effective-dated, with its legal basis                   | A reviewed migration            | Forever; append-only, entries are closed rather than rewritten           |
-| **Runs**        | `risk.evaluation_runs`             | One row per run: cutoff, code commit, state, per-indicator and per-gate statistics                    | Process 2                      | Forever; ~365 rows a year                                                |
+| **Runs**        | `risk.evaluation_runs`             | One row per run: cutoff, code commit, state, the census, per-indicator coverage statistics            | Process 2                      | Forever; ~365 rows a year                                                |
 | **Signals**     | `risk.risk_signals`                | One insert-only snapshot per run: every in-scope `(subject, indicator)` outcome with its evidence and parameters | Process 2            | Snapshots older than the window are deleted, except the live one         |
 
 The flow is one-way — **definitions + obligations + facts → outcomes** — and it is what makes a stored row
@@ -241,7 +244,7 @@ Obligations are the one thing that lives in PostgreSQL rather than in Git, and t
 set-wise: deciding whether 466,358 contracts were obliged to carry a procurement number is a join, not a lookup, and it
 is the same join for every indicator that needs the answer. They keep the Git-resident discipline anyway — a reviewed
 migration, append-only, entries closed rather than rewritten — so `git log` still answers who changed an obligation and
-why ([§3.5](#35-expected-absence-and-unexpected-absence)).
+why ([§3.3](#33-obligation--the-reviewed-artefact-the-exclusions-are-gated-on)).
 
 ## 2. Domain language
 
@@ -286,27 +289,39 @@ inside the risk service.
 
 That boundary sits on the domain model, not on the warehouse. A collection statement names `v_pirkimo_dalis` and
 `daliesNumeris`; it never names the ingestion tables underneath, and it does not have to know whether those were
-renamed last week ([§3.3](#33-gate-0--the-subject-universe)).
+renamed last week ([§3.4](#34-selection--the-subject-population)).
 
 ### 2.3 The decision model of one indicator
 
-Evaluating one indicator against one subject is a chain of decisions, not a single rule test. Four decisions run before
-the indicator's own rules, and each has its own disposition, which is why an absent signal is readable.
+Evaluating one indicator against one subject is a chain of decisions, not a single rule test. One **selection** step and
+two **eligibility decisions** run before the indicator's own rules, and each has its own disposition, which is why an
+absent signal is readable.
+
+The four steps are named for what they do rather than numbered, because the first is categorically unlike the other
+three: **a selection removes a population and stores nothing; a decision judges one subject and stores a row that says
+why.**
+
+| Step                              | Kind      | Removes / decides                                          | Leaves behind                        |
+|-----------------------------------|-----------|------------------------------------------------------------|--------------------------------------|
+| **Selection**                     | filter    | Rows that are not subjects, and populations that can never carry the facts | a counted, reasoned population statement |
+| **Subject Eligibility Decision**  | decision  | Subjects the indicator's concept does not cover             | `not_applicable` + reason code       |
+| **Data Eligibility Decision**     | decision  | Subjects missing a fact they were obliged to have           | `insufficient_data` + missing fields |
+| **Indicator Evaluation Decision** | decision  | Whether the facts match the effective parameters            | `triggered` / `not_triggered`        |
 
 **Diagram: the decisions that produce one observation.**
 
 ```mermaid
 flowchart TB
-    U[/"Subject universe row<br/>identity · classifiers · presence"/]
-    F[/"Subject facts<br/>one row from collect.sql"/]
+    U[/"Subject row<br/>identity · classifiers · presence"/]
+    F[/"Subject facts<br/>one row from the declared fact sets"/]
     O[/"Obligation timeline<br/>risk.data_obligations"/]
     P[/"Parameter timeline<br/>parameters.ts"/]
-    D0{"Scope<br/>does the indicator evaluate<br/>this source profile?"}
-    D1{"Applicability<br/>does the decision table, or a parameter<br/>entry in force, admit this subject?"}
-    D2{"Data sufficiency<br/>is every obliged input present?"}
-    D3{"Indicator rules<br/>do the facts match, given<br/>the effective parameters?"}
+    D0{"Selection<br/>is this a subject, and can this<br/>population carry the facts?"}
+    D1{"Subject Eligibility Decision<br/>does the decision table, or a parameter<br/>entry in force, admit this subject?"}
+    D2{"Data Eligibility Decision<br/>is every obliged input present?"}
+    D3{"Indicator Evaluation Decision<br/>do the facts match, given<br/>the effective parameters?"}
     D4["Explanation<br/>raw value · threshold ·<br/>evidence · missing inputs"]
-    OS(["out of scope<br/>counted on the run"])
+    OS(["selected out<br/>counted on the run"])
     NA(["not_applicable"])
     ID(["insufficient_data"])
     TR(["triggered → published as a Risk Signal"])
@@ -315,11 +330,12 @@ flowchart TB
     RUN[("risk.evaluation_runs")]
 
     U --> D0
-    D0 -->|" profile not declared "| OS
-    D0 -->|" declared "| D1
+    O --> D0
+    D0 -->|" not a subject, or an unobliged<br/>population absence "| OS
+    D0 -->|" selected "| D1
     P --> D1
     D1 -->|" nothing admits it "| NA
-    D1 -->|" applicable "| D2
+    D1 -->|" eligible "| D2
     O --> D2
     F --> D2
     D2 -->|" an obliged input is missing "| ID
@@ -336,17 +352,18 @@ flowchart TB
     D4 -.->|" attached to the outcome "| OBS
 ```
 
-Ownership of each decision is deliberate. **Scope, applicability and sufficiency are decided by shared code**, from
+Ownership of each step is deliberate. **Selection and both eligibility decisions are executed by shared code**, from
 declarations the indicator makes and reviewed artefacts it does not own, so an indicator cannot publish a `triggered`
 signal that no reviewed threshold stands behind, and cannot report a data gap about a fact its subject was never obliged
 to have — the code paths that would do so do not exist. **The rules and the explanation are the indicator's own**, and
 live in its `rules.ts` because they are the part a reviewer actually reads. **Identity, subject, applied parameters and
 the cutoff are shared too**, stamped onto the observation by the machinery, so no indicator can get them wrong.
 
-[§3](#3-evaluation-scope-and-applicability) specifies the four gates before the rules, and why the difference between
-them is the difference between an honest absence and a fabricated one.
+[§3](#3-evaluation-population-and-eligibility) specifies the three steps before the rules and the reviewed artefact that
+gates them, and why the difference between them is the difference between an honest absence and a fabricated one.
+[§6](#6-evaluation-run) specifies the pipeline that executes them.
 
-## 3. Evaluation scope and applicability
+## 3. Evaluation population and eligibility
 
 An indicator is a statement about a kind of subject, and the corpus contains many subjects that kind does not cover. A
 rule about how a competitive procedure was run has nothing to say about a verbal low-value purchase that never had a
@@ -357,6 +374,10 @@ difference is the whole of this section.
 Left to each indicator, that reasoning is written 106 times, inconsistently, inside `rules.ts`, where a reviewer meets
 it as a chain of null checks rather than as a policy. This section makes it shared, declarative and measurable:
 **an indicator declares the population it speaks about and the facts it needs, and the machinery decides the rest.**
+
+The section is the **decision model** — what decides what, from which reviewed artefact, and with which disposition. It
+says nothing about how the work is executed; that is [§6](#6-evaluation-run), and the separation is deliberate
+([§6.1](#61-the-pipeline-and-the-decision-service)).
 
 ### 3.1 The measurement that forces the design
 
@@ -403,45 +424,46 @@ Those three groups must not receive the same answer, and today they would:
 - the 28,367 linked contracts are the only ones a rule can actually decide.
 
 **The same absent value means three different things depending on facts the indicator itself does not carry.** That is
-why applicability cannot live in `rules.ts`.
+why eligibility cannot live in `rules.ts`.
 
-### 3.2 The five dispositions of a subject
+### 3.2 The four dispositions of a subject
 
-Evaluating one indicator against one candidate row now resolves to one of five dispositions. Three of them produce a
-stored observation; two of them are population statements recorded once per run.
+Evaluating one indicator against one candidate row resolves to one of four dispositions. Three produce a stored
+observation; one is a population statement recorded once per run.
 
-| Disposition           | Stored?                    | Means                                                                                       | Carries                        |
-|-----------------------|----------------------------|---------------------------------------------------------------------------------------------|--------------------------------|
-| **out of universe**   | no                         | The row is not a subject of this type at all — a deleted contract, a non-notice CVPP record | nothing                        |
-| **out of scope**      | no; counted on the run     | The source profile this row belongs to can never carry the facts the indicator needs         | a per-run count and reason     |
-| **`not_applicable`**  | yes                        | In scope, but the indicator's concept does not apply to this subject                          | a reason code                  |
-| **`insufficient_data`** | yes                      | Applies, and a fact this subject was obliged to have is missing                              | the missing fields and why     |
-| **`triggered` / `not_triggered`** | yes            | Decided                                                                                       | raw value, threshold, evidence |
+| Disposition           | Stored?                    | Means                                                                                                                | Carries                        |
+|-----------------------|----------------------------|------------------------------------------------------------------------------------------------------------------------|--------------------------------|
+| **selected out**      | no; counted on the run     | The row is not a subject of this type, or belongs to a population that can never carry the facts — and no obligation was breached by that absence | a per-run count and reason     |
+| **`not_applicable`**  | yes                        | Selected in, but the indicator's concept does not apply to this subject                                                | a reason code                  |
+| **`insufficient_data`** | yes                      | Applies, and a fact this subject was obliged to have is missing                                                        | the missing fields and why     |
+| **`triggered` / `not_triggered`** | yes            | Decided                                                                                                                | raw value, threshold, evidence |
 
-The line between the two silent dispositions and `not_applicable` is the one worth stating precisely, because it is
-what keeps the snapshot from being dominated by rows that say nothing:
+The line between the silent disposition and `not_applicable` is the one worth stating precisely, because it is what
+keeps the snapshot from being dominated by rows that say nothing:
 
-> **Scope removes a population. Applicability judges an individual.**
+> **Selection removes a population. Eligibility judges an individual.**
 
-Scope is decided from the profile a row belongs to and is the same answer for every row in that profile, so enumerating
-it 5.3 million times per indicator per run stores no information a single sentence on the methodology page does not
-already carry. Applicability is decided from this subject's own classifier values, differs row by row, and is something
-a reader of one procurement page legitimately wants to see: *this indicator was considered here and does not apply,
-because…*
+Selection is decided from the profile a row belongs to, or from whether it is a subject at all, and is the same answer
+for every row in that population, so enumerating it 5.3 million times per indicator per run stores no information a
+single sentence on the methodology page does not already carry. Eligibility is decided from this subject's own
+classifier values, differs row by row, and is something a reader of one procurement page legitimately wants to see:
+*this indicator was considered here and does not apply, because…*
 
-**Diagram: the gates one candidate row passes, and where each disposition leaves it.**
+Left there, that line would be a matter of taste, and the most consequential mistake this design admits is drawing it
+one population too wide — selecting out the subjects whose missing fact is the finding. [§3.3](#33-obligation--the-reviewed-artefact-the-exclusions-are-gated-on)
+is what makes it checkable instead.
+
+**Diagram: the steps one candidate row passes, and where each disposition leaves it.**
 
 ```mermaid
 flowchart TB
-    R[/"Candidate row<br/>from a subject universe view"/]
-    G0{"Gate 0 — universe<br/>is this a subject of this type?"}
-    G1{"Gate 1 — scope<br/>does the indicator evaluate<br/>this source profile?"}
-    G2{"Gate 2 — applicability<br/>does the concept apply to<br/>this subject's classifiers?"}
-    G3{"Gate 3 — sufficiency<br/>is every obliged input present?"}
-    G4{"Gate 4 — rules<br/>do the facts match the<br/>effective parameters?"}
+    R[/"Candidate row<br/>from a subject type's domain model view"/]
+    G0{"Selection<br/>is this a subject, and can this population<br/>carry the facts without breaching an obligation?"}
+    G2{"Subject Eligibility Decision<br/>does the concept apply to<br/>this subject's classifiers?"}
+    G3{"Data Eligibility Decision<br/>is every obliged input present?"}
+    G4{"Indicator Evaluation Decision<br/>do the facts match the<br/>effective parameters?"}
 
-    OU(["no subject<br/>— no row —"])
-    OS(["out of scope<br/>— counted on the run —"])
+    OS(["selected out<br/>— counted on the run —"])
     NA(["not_applicable<br/>+ reason code"])
     ID(["insufficient_data<br/>+ missing fields"])
     TR(["triggered"])
@@ -450,12 +472,10 @@ flowchart TB
     RUN[("risk.evaluation_runs<br/>statistics")]
 
     R --> G0
-    G0 -->|" no "| OU
-    G0 -->|" yes "| G1
-    G1 -->|" profile not declared "| OS
-    G1 -->|" declared "| G2
+    G0 -->|" no "| OS
+    G0 -->|" yes "| G2
     G2 -->|" no rule admits it "| NA
-    G2 -->|" applicable "| G3
+    G2 -->|" eligible "| G3
     G3 -->|" an obliged input is missing "| ID
     G3 -->|" complete "| G4
     G4 -->|" matched "| TR
@@ -468,15 +488,100 @@ flowchart TB
     NT --> OBS
 ```
 
-The gates fall either side of the fetch, and that is what decides where each one runs. **Gates 0 and 1 run in SQL**,
-because they decide which rows are read at all — the subject's domain model view is the statement's `FROM` and the declared profiles
-are bound as `$3`, so a subject with no observation is never fetched. **Gates 2, 3 and 4 run in TypeScript**, over rows
-that were fetched, because each of them produces a stored row. The rule is therefore simple to hold: *if it stores
-nothing, it happens in SQL; if it stores a row, it happens in TypeScript.* That extends the split
-[§5.1](#51-the-risk-indicator-directory) already draws between `collect.sql` and `rules.ts` one step earlier — SQL
-narrows the population, TypeScript judges the individual.
+The steps fall either side of the fetch, and that is what decides where each one runs. **Selection runs in SQL**,
+because it decides which rows are read at all — the subject type's domain model view is the statement's `FROM` and the
+declared population is compiled into its `WHERE`, so a subject with no observation is never fetched. **The three
+decisions run in TypeScript**, over rows that were fetched, because each of them produces a stored row. The rule is
+therefore simple to hold: *if it stores nothing, it happens in SQL; if it stores a row, it happens in TypeScript.* That
+extends the split [§5.1](#51-the-risk-indicator-directory) already draws between measurement and decision one step
+earlier — SQL narrows the population, TypeScript judges the individual.
 
-### 3.3 Gate 0 — the subject universe
+The one qualification is an optimisation, not an exception: the Subject Eligibility Decision is a finite decision table
+over a closed vocabulary, so its *eligible* region also compiles to SQL, and the pipeline uses that compiled form to
+avoid computing measurements for rows it is about to decline. The decision itself still runs in TypeScript, over every
+selected row, and a test proves the two forms agree ([§6.4](#64-one-group-pass)).
+
+### 3.3 Obligation — the reviewed artefact the exclusions are gated on
+
+All three ways a subject can leave the pipeline without a decision — selected out, `not_applicable`,
+`insufficient_data` — turn on one question, and it is not a question about our data: **was this subject obliged to have
+the fact it lacks?** The rule that follows from it is one sentence in two halves:
+
+> **Expected absence is `not_applicable`. Unexpected absence is `insufficient_data`.**
+> An indicator may report `insufficient_data` only about a fact this subject was **obliged** to have.
+
+"Obliged" is a legal fact about Lithuanian procurement, not a property of the pipeline, so it belongs in a reviewed
+artefact rather than in an indicator author's judgement. `risk.data_obligations` is that artefact: a small,
+effective-dated table seeded by migration, one row per rule.
+
+| Column                | Meaning                                                                              |
+|-----------------------|----------------------------------------------------------------------------------------|
+| `subject_type`        | `procurement`, `contract`, `lot`, …                                                  |
+| `fact`                | The canonical fact name, matching a `requiredInputs` entry                           |
+| `classifier`          | Which classifier column the rule keys on — `contract_type`, `procedure_type`, `source_profile`, … |
+| `classifier_value`    | The value it applies to                                                              |
+| `valid_from`/`valid_to` | The period the obligation was in force; law changes, and old subjects keep old rules |
+| `obligation`          | `mandatory` \| `conditional` \| `optional` \| `exempt` \| `not_published` \| `inherited` |
+| `legal_basis`         | The VPĮ article or source document the row is justified by                            |
+| `note`                | Free text for the reviewer                                                            |
+
+Seeded from the analysis already written up in [`domain-model.md`](domain-model.md), the procurement-number rules read:
+
+| `subject_type` | `fact`          | `classifier`    | `classifier_value`                                     | `obligation` | Consequence when absent |
+|----------------|-----------------|-----------------|--------------------------------------------------------|--------------|--------------------------|
+| `contract`     | `procurementId` | `contract_type` | `TSP`, `PPS`                                           | `mandatory`  | `insufficient_data`      |
+| `contract`     | `procurementId` | `contract_type` | `SP`                                                   | `inherited`  | resolve the parent first |
+| `contract`     | `procurementId` | `contract_type` | `MVP`                                                  | `optional`   | `not_applicable`         |
+| `contract`     | `procurementId` | `contract_type` | `MVPŽ`, `Ilgalaikė MVPŽ`, `SPŽ`, `ŽS`, `VS`, `PSĮ`     | `exempt`     | `not_applicable`         |
+
+The table has a second, quieter use: it is the definition against which "how bad is the gap?" is measured. `TSP` and
+`PPS` are 31.6% and 44.2% missing against an obligation of `mandatory`; `MVPŽ` is 95.3% missing against `exempt`. Only
+the first pair is a defect, and only a stored obligation makes that statement checkable rather than editorial.
+
+#### `not_published` — an obligation on the publication route, not on the buyer
+
+Five of the six obligation values are statements about a party. `not_published` is a statement about a **route**: the
+publication channel this subject reached us through does not carry the fact, for every row in that channel, and no
+Lithuanian rule requires it to. A `cvpp` procurement has no procedure method for that reason, and no buyer failed to
+supply one.
+
+The value is deliberately distinct from `exempt`, because the two say different things in public. `exempt` means the law
+asks nothing here. `not_published` means the law may well ask it somewhere, but the transparency channel does not show
+it — which is a gap worth naming on the methodology page even though nobody is answerable for it.
+
+It is also the value most capable of quietly hiding a real defect, so it carries two constraints the others do not.
+**It is an assertion about the source, never about our ingestion** — a fact that exists in CVP IS and that we have simply
+not ingested is `insufficient_data`, because the state means "we cannot tell", and we cannot. And **it is falsifiable**:
+the row records the measured coverage that justified it, and a test fails if that fact is ever observed non-null within
+the profile ([§9](#9-tests-and-automated-safeguards)).
+
+#### The gate on Selection
+
+The obligation table is what stops Selection from being a matter of taste:
+
+> **Selection may exclude a population only where the obligation for the fact it lacks resolves to `exempt`, `optional`
+> or `not_published`. Where it resolves to `mandatory` or `conditional`, the rows must survive Selection and be judged
+> by the Data Eligibility Decision — because that decline is the finding.**
+
+Applied to the contract measurement of [§3.1](#31-the-measurement-that-forces-the-design), the rule sorts the three
+populations without anyone exercising judgement:
+
+| Population                                     |      Rows | Obligation for `procurementId` | Selection may exclude? | Disposition          |
+|------------------------------------------------|----------:|--------------------------------|------------------------|----------------------|
+| Exempt or optional contract types              | 5,309,875 | `exempt` / `optional`          | **yes**                | selected out, counted |
+| `TSP`/`PPS` whose number resolves only to `cvpp` | 203,189 | `not_published` on the procedure facts | **yes**        | selected out, counted |
+| `TSP`/`PPS` obliged to carry a number and lacking one | 234,802 | `mandatory`               | **no**                 | `insufficient_data`   |
+
+This is checkable before a run starts, not after. For every profile an indicator excludes, the registry resolves the
+obligation for each of its `requiredInputs` facts at the classifier values that define the profile, and **fails at
+startup if any resolves to `mandatory` or `conditional`**. An indicator cannot be deployed that silently drops the
+population its own data gap lives in.
+
+One boundary is worth naming, because it is tempting to get wrong. `not_applicable` is reserved for absences the world
+itself contains. Where an entire route is affected, the honest treatment is neither `not_applicable` nor
+`insufficient_data` but Selection: we do not evaluate that population and we say so once, with a count.
+
+### 3.4 Selection — the subject population
 
 Each of the nine catalogue subject types resolves to **exactly one entity of the
 [domain model](domain-model.md)**, and every collection statement reads from that entity. This is the single change
@@ -500,13 +605,13 @@ being restructured underneath it.
 more views, so a company that both buys and sells is one subject with one identity
 ([domain model §1.1](domain-model.md#11-subject-entities)).
 
-Each subject entity exposes three column groups the gates depend on, on top of the business attributes an indicator
-measures:
+Each subject entity exposes three column groups Selection and the eligibility decisions depend on, on top of the
+business attributes an indicator measures:
 
 | Group           | Columns                                                                                                                                 | Purpose                                                              |
 |-----------------|-----------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
 | **Identity**    | `subject_key`, and the procurement source and number where the subject has one                                                          | Stamped onto the observation; `subject_key` is the durable composite  |
-| **Classifiers** | `source_profile`, procedure type, contract type, object type, stage, event date, value, EU funding, CPV division                          | The only facts gates 1 and 2 may test                                |
+| **Classifiers** | `source_profile`, procedure type, contract type, object type, stage, event date, value, EU funding, CPV division                          | The only facts Selection and the Subject Eligibility Decision may test |
 | **Presence**    | one named flag per fact class the entity may or may not carry — whether a lot was declared, whether its bidders were observed, whether a price is recorded | Whether the row carries a fact class, as a named fact rather than a null check |
 
 The presence group is the direct answer to *"indicators are not able to simply understand that it is applicable to
@@ -521,11 +626,11 @@ lots, 43,755 were declared, 13,396 have observed participation, and 8,510 have b
 about how a procurement was structured needs only `deklaruota`. Before those flags existed, both rules would have read
 the same null and drawn different conclusions from it — and the second would have been wrong.
 
-**Classifiers are a closed vocabulary.** Gates 1 and 2 may test nothing else. That restriction is what keeps
-applicability reviewable as a table: if an exclusion needs a fact outside this list, it is not applicability, it is a
-rule, and it belongs in `rules.ts` where it will be explained to the public.
+**Classifiers are a closed vocabulary.** Selection and the Subject Eligibility Decision may test nothing else. That
+restriction is what keeps eligibility reviewable as a table: if an exclusion needs a fact outside this list, it is not
+eligibility, it is a rule, and it belongs in `rules.ts` where it will be explained to the public.
 
-### 3.4 Gate 1 — scope is a property of the source profile
+#### Source profiles
 
 A **source profile** is a named, stable statement about *which fact classes a subject can carry*, decided by which
 publication route produced it. It is not a data-quality score and not a per-row null pattern: a `cvpp` procurement
@@ -545,78 +650,67 @@ The profiles the measurement in [§3.1](#31-the-measurement-that-forces-the-desi
 | `lot`         | `deklaruota`                 | Declared in the procurement notice, participation never observed       |    35,168 | The lot and its name — no bidders, prices or rejections |
 | `lot`         | `stebeta`                    | Participation observed through a procedure report                      |    13,396 | Bidders, offer ranking, prices, rejection reasons       |
 
-An indicator declares the profiles it evaluates. Everything else is scoped out, silently but not invisibly: the count
-and the reason land in the run's `statistics`, and the methodology page publishes them
-([§3.9](#39-coverage-is-a-published-number)).
+**Every row of a subject type carries exactly one profile**, and the profiles of a subject type are exhaustive. That
+partition property is not a tidiness preference: it is what makes the coverage arithmetic of
+[§3.8](#38-coverage-is-a-published-number) additive and what lets the pipeline treat a profile as the unit of one data
+pass ([§6.2](#62-evaluation-groups)). A view test enforces it.
 
-A worked example, for a contract indicator that compares the final contract value against the procedure's estimate:
+#### Selection is declared, never hand-written
 
-| Profile                      |      Rows | Disposition                                                             |
-|------------------------------|----------:|--------------------------------------------------------------------------|
-| `procedure_exempt`           | 5,309,875 | **out of scope** — no CVP IS procedure exists to compare against        |
-| `procedure_linked_cvpp`      |   203,189 | **out of scope** — the linked notice carries no estimated value, ever   |
-| `procedure_expected_missing` |   234,802 | in scope → `insufficient_data`, missing `procurementId`                 |
-| `procedure_linked_cvpis`     |    28,367 | in scope → decided, or `insufficient_data` where the estimate is absent |
-| `amendment`                  |   130,009 | in scope → inherits the parent contract's disposition                   |
-
-The snapshot for that indicator falls from 5.9 million rows to roughly 263,000 with a further 130,000 inherited, and —
-the point of the exercise — **the 234,802 rows that remain are the ones a reader should see.** Scope is not an
-optimisation that hides work; it is what makes the residue legible.
-
-**Not every indicator shrinks.** A rule that reads only the contract row — a long framework duration, a high final
-value — is in scope for the whole non-deleted population, and its snapshot stays in the millions. Scope is a per-indicator
-measurement, not a blanket reduction, which is why [§7.2](#72-one-insert-only-snapshot-per-run)'s sizing estimate must
-be recomputed per indicator from its declared profiles rather than from the subject count.
-
-### 3.5 Expected absence and unexpected absence
-
-Gates 2 and 3 both fire on a missing value, and the rule that tells them apart is one sentence:
-
-> **Expected absence is `not_applicable`. Unexpected absence is `insufficient_data`.**
-> An indicator may report `insufficient_data` only about a fact this subject was **obliged** to have.
-
-"Obliged" is a legal fact about Lithuanian procurement, not a property of the pipeline, so it belongs in a reviewed
-artefact rather than in an indicator author's judgement. `risk.data_obligations` is that artefact: a small,
-effective-dated table seeded by migration, one row per rule.
-
-| Column                | Meaning                                                                              |
-|-----------------------|----------------------------------------------------------------------------------------|
-| `subject_type`        | `procurement`, `contract`, `lot`, …                                                  |
-| `fact`                | The canonical fact name, matching a `requiredInputs` entry                           |
-| `classifier`          | Which classifier column the rule keys on — `contract_type`, `procedure_type`, …       |
-| `classifier_value`    | The value it applies to                                                              |
-| `valid_from`/`valid_to` | The period the obligation was in force; law changes, and old subjects keep old rules |
-| `obligation`          | `mandatory` \| `conditional` \| `optional` \| `exempt` \| `inherited`                  |
-| `legal_basis`         | The VPĮ article or source document the row is justified by                            |
-| `note`                | Free text for the reviewer                                                            |
-
-Seeded from the analysis already written up in [`domain-model.md`](domain-model.md), the procurement-number rules read:
-
-| `subject_type` | `fact`          | `classifier`    | `classifier_value`                                     | `obligation` | Consequence when absent |
-|----------------|-----------------|-----------------|--------------------------------------------------------|--------------|--------------------------|
-| `contract`     | `procurementId` | `contract_type` | `TSP`, `PPS`                                           | `mandatory`  | `insufficient_data`      |
-| `contract`     | `procurementId` | `contract_type` | `SP`                                                   | `inherited`  | resolve the parent first |
-| `contract`     | `procurementId` | `contract_type` | `MVP`                                                  | `optional`   | `not_applicable`         |
-| `contract`     | `procurementId` | `contract_type` | `MVPŽ`, `Ilgalaikė MVPŽ`, `SPŽ`, `ŽS`, `VS`, `PSĮ`     | `exempt`     | `not_applicable`         |
-
-The table has a second, quieter use: it is the definition against which "how bad is the gap?" is measured. `TSP` and
-`PPS` are 31.6% and 44.2% missing against an obligation of `mandatory`; `MVPŽ` is 95.3% missing against `exempt`. Only
-the first pair is a defect, and only a stored obligation makes that statement checkable rather than editorial.
-
-One boundary is worth naming, because it is tempting to get wrong. **A fact our pipeline has not ingested, but which
-exists in the source system, is `insufficient_data`, not `not_applicable`.** The state means "we cannot tell", and we
-cannot. `not_applicable` is reserved for absences the world itself contains. Where an entire profile is affected —
-`cvpp` and the procurement method — the honest treatment is neither state but scope: we do not evaluate that population
-and we say so once.
-
-### 3.6 Gate 2 — applicability as a decision table
-
-Applicability is expressed as a **decision table over classifier columns**, in `definition.ts`, evaluated by shared
-code. It is not a predicate function, and that is deliberate: a table can be diffed, reviewed, checked for overlap and
-rendered on the methodology page, and a function cannot.
+An indicator declares the population it speaks about; it does not write the query that fetches it. The declaration is
+data in `definition.ts`, and shared code compiles it into the `WHERE` clause of the subject type's view:
 
 ```ts
-applicability: {
+selection: {
+  profiles: ['procedure_linked_cvpis', 'procedure_expected_missing', 'amendment'],
+  require:  ['contractSigned'],   // presence flags only — the closed vocabulary of §3.4
+},
+```
+
+Two things follow from it being a declaration rather than a statement. The **population is defined once per subject
+type** rather than once per indicator, so 106 indicators cannot drift into 106 slightly different ideas of what a
+contract is, and an indicator survives the warehouse being restructured underneath it. And the declaration is
+**mechanically checkable** — against the obligation gate of [§3.3](#33-obligation--the-reviewed-artefact-the-exclusions-are-gated-on)
+at startup, and against the census at run time.
+
+`require` names presence flags, never arbitrary predicates. A flag makes a row *not a subject* — an unsigned contract is
+not yet a contract to judge — and each named flag is counted separately by the census, so "how many rows did this
+exclusion remove?" is always answerable. An exclusion that cannot be expressed as a profile or a presence flag is not
+Selection; it is an eligibility decision and it stores a row.
+
+Everything not selected is removed silently but not invisibly: the count and the reason land in the run's `statistics`,
+and the methodology page publishes them ([§3.8](#38-coverage-is-a-published-number)).
+
+#### A worked example
+
+For a contract indicator that compares the final contract value against the procedure's estimate:
+
+| Profile                      |      Rows | Obligation | Disposition                                                             |
+|------------------------------|----------:|------------|--------------------------------------------------------------------------|
+| `procedure_exempt`           | 5,309,875 | `exempt`   | **selected out** — no CVP IS procedure exists to compare against        |
+| `procedure_linked_cvpp`      |   203,189 | `not_published` | **selected out** — the linked notice carries no estimated value, ever |
+| `procedure_expected_missing` |   234,802 | `mandatory` | selected → `insufficient_data`, missing `procurementId`                |
+| `procedure_linked_cvpis`     |    28,367 | `mandatory` | selected → decided, or `insufficient_data` where the estimate is absent |
+| `amendment`                  |   130,009 | `inherited` | selected → inherits the parent contract's disposition                   |
+
+The snapshot for that indicator falls from 5.9 million rows to roughly 263,000 with a further 130,000 inherited, and —
+the point of the exercise — **the 234,802 rows that remain are the ones a reader should see.** Note which two rows the
+obligation column authorised for removal and which it did not: the reduction is 20-fold and it is not a judgement call.
+Selection is not an optimisation that hides work; it is what makes the residue legible.
+
+**Not every indicator shrinks.** A rule that reads only the contract row — a long framework duration, a high final
+value — selects the whole non-deleted population, and its snapshot stays in the millions. Selection is a per-indicator
+measurement, not a blanket reduction, which is why [§7.2](#72-one-insert-only-snapshot-per-run)'s sizing estimate must
+be recomputed per indicator from its declared population rather than from the subject count.
+
+### 3.5 The Subject Eligibility Decision
+
+Eligibility is expressed as a **decision table over classifier columns**, in `definition.ts`, evaluated by shared
+code. It is not a predicate function, and that is deliberate: a table can be diffed, reviewed, checked for overlap,
+compiled to SQL and rendered on the methodology page, and a function cannot.
+
+```ts
+eligibility: {
   dimensions: ['contractType'],
   hitPolicy: 'unique',
   rules: [
@@ -647,22 +741,34 @@ methodology page can count it:
 | `stage_not_reached`        | The subject has not reached the lifecycle stage the rule judges                |
 | `subject_shape`            | The subject lacks the structure the rule needs — a cross-lot rule on one lot   |
 | `no_parameter_entry`       | No reviewed parameter entry is in force for this subject at the cutoff         |
+| `not_published_by_source`  | The publication route carries no such fact, and the indicator selected the profile in anyway |
 | `inherited_not_applicable` | Inherited from a parent subject that is itself not applicable                  |
 
-Two of those deserve a note. `no_parameter_entry` is the applicability rule the architecture already had
+Three of those deserve a note. `no_parameter_entry` is the eligibility rule the architecture already had
 ([§2.3](#23-the-decision-model-of-one-indicator)) — it survives unchanged, now as one reason among several rather than
-the only one. And `stage_not_reached` is genuinely temporary: the subject will become applicable in a later run. That is
+the only one. `stage_not_reached` is genuinely temporary: the subject will become eligible in a later run. That is
 consistent rather than misleading only because every run re-decides every subject from scratch
-([§7.2](#72-one-insert-only-snapshot-per-run)); a current-state model would have had to age the row out.
+([§7.2](#72-one-insert-only-snapshot-per-run)); a current-state model would have had to age the row out. And
+`not_published_by_source` should normally be unreachable, because Selection removes those populations
+([§3.3](#33-obligation--the-reviewed-artefact-the-exclusions-are-gated-on)); it exists as the defensive arm for an
+indicator that deliberately selects such a profile in, and a run in which it is common is a signal that the indicator's
+declared population is wrong.
 
 **Inheritance is one hop and it is not recursive.** An `SP` amendment resolves its parent contract, takes the parent's
 disposition, and stops. If the parent cannot be resolved the amendment is `insufficient_data` with the missing parent
 recorded — not `not_applicable`, because the parent's existence is not in doubt, only our link to it.
 
-### 3.7 Gate 3 — sufficiency
+Because the hop is single and non-recursive, **the parent's classifiers are carried as columns on `v_sutartys`**, beside
+the amendment's own. Inheritance is then decided in memory from the row already fetched: no second query, no dependency
+between one evaluation pass and another, and no ordering constraint on the pipeline
+([§6.2](#62-evaluation-groups)).
 
-Only after a subject is in scope and applicable does the question "do we have the inputs?" become meaningful.
-`requiredInputs` grows from a flat list of field names into the pairing that makes the answer mechanical:
+### 3.6 The Data Eligibility Decision
+
+Only after a subject is selected and eligible does the question "do we have the inputs?" become meaningful. Asking it
+earlier manufactures a false gap: a data decline about a subject the indicator was never going to decide is noise in
+exactly the channel this decision exists to keep clean. `requiredInputs` grows from a flat list of field names into the
+pairing that makes the answer mechanical:
 
 ```ts
 requiredInputs: [
@@ -681,6 +787,7 @@ obligation for this subject's classifiers at the cutoff and applies one rule:
 | `conditional`              | continue      | `insufficient_data` if the condition holds, else `not_applicable` |
 | `optional`                 | continue      | `not_applicable`, reason `cvpis_use_optional`   |
 | `exempt`                   | continue      | `not_applicable`, reason `out_of_legal_regime`  |
+| `not_published`            | continue      | `not_applicable`, reason `not_published_by_source` |
 | `inherited`                | continue      | resolve the parent, then re-apply this table    |
 
 `missing_data` entries carry the field, the obligation that made it required and the legal basis, so
@@ -688,36 +795,54 @@ obligation for this subject's classifiers at the cutoff and applies one rule:
 normal state. That is a materially stronger public statement than a bare field name, and it costs nothing at render time
 because the obligation was already resolved to decide the row.
 
-### 3.8 What this changes in the indicator package
+#### The data-gap read model
 
-The package of [§5.1](#51-the-risk-indicator-directory) keeps its shape. Four things move, and one thing becomes
+This decision has a second audience, and it is not the public. `insufficient_data` is the service telling the warehouse
+team exactly which facts, for which populations, are blocking which indicators — the 234,802 contracts of
+[§3.1](#31-the-measurement-that-forces-the-design) are a work item before they are a publication. But that audience
+needs the numbers aggregated the other way from the way an indicator produces them.
+
+`risk.v_data_gaps` aggregates the live snapshot by `(subject_type, missing_field, obligation, source_profile)` across
+**all** indicators, with the count of affected subjects, the indicators blocked by each gap and the `legal_basis` the
+obligation cites. One query answers "what is the single highest-leverage fact to fix, and what would it unblock?", which
+per-indicator `statistics` cannot: a fact missing for one indicator is a curiosity, and the same fact blocking nine is a
+roadmap entry. It is a view over `v_latest_run`, so it costs nothing to keep and cannot drift from what is published.
+
+### 3.7 What this changes in the indicator package
+
+The package of [§5.1](#51-the-risk-indicator-directory) keeps its shape. Five things move, and one thing becomes
 impossible.
 
 | Change                                    | Before                                                | After                                                                    |
 |-------------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------------|
 | Population definition                     | Each `collect.sql` wrote its own `FROM` and `WHERE`   | `FROM` the subject type's domain model view, one definition per subject type |
-| Scope                                     | Implicit in that `WHERE`, invisible to review          | `scope.profiles` in `definition.ts`, bound as `$3`, counted on the run   |
-| Applicability                             | Null checks in `rules.ts`, or the parameter timeline   | A decision table in `definition.ts`; the parameter timeline is one rule in it |
-| Sufficiency                               | Ad-hoc null checks returning `insufficient_data`       | `requiredInputs` paired with `risk.data_obligations`                     |
+| Selection                                 | Implicit in that `WHERE`, invisible to review          | `selection` in `definition.ts`, compiled by shared code, counted on the run, gated on the obligation table |
+| Eligibility                               | Null checks in `rules.ts`, or the parameter timeline   | A decision table in `definition.ts`; the parameter timeline is one rule in it |
+| Data eligibility                          | Ad-hoc null checks returning `insufficient_data`       | `requiredInputs` paired with `risk.data_obligations`                     |
+| Measurement                               | One `collect.sql` per indicator, run once per indicator | Named fact sets, declared by reference and fetched once per group ([§6.4](#64-one-group-pass)) |
 | **`rules.ts` returning `not_applicable`** | Possible                                               | **Removed from the `Decision` type it may return**                       |
 
-That last row is the enforceable form of the whole section. A `rules.ts` reached at gate 4 has already been told the
-subject is in scope, applicable and sufficiently supplied; the only outcomes left to it are `triggered` and
-`not_triggered`, and the type system says so. An indicator author cannot accidentally answer an applicability question
-with a data-quality state, because there is no return value for it.
+That last row is the enforceable form of the whole section. A `rules.ts` reached by the Indicator Evaluation Decision
+has already been told the subject is selected, eligible and sufficiently supplied; the only outcomes left to it are
+`triggered` and `not_triggered`, and the type system says so. An indicator author cannot accidentally answer an
+eligibility question with a data-quality state, because there is no return value for it.
 
-Collection statements now take three arguments rather than two, and the distinction between them and a parameter is
-worth stating exactly, since [§5.6](#56-where-each-kind-of-logic-belongs) forbids binding parameters into SQL:
+What reaches SQL is worth stating exactly, since [§5.6](#56-where-each-kind-of-logic-belongs) forbids binding parameters
+into it:
 
-| Argument | Carries                                            | Category                       |
-|----------|----------------------------------------------------|--------------------------------|
-| `$1`     | The run cutoff                                     | *When* the facts are read      |
-| `$2`     | An explicit subject filter, or `NULL`              | *Whom* to evaluate             |
-| `$3`     | The declared `source_profile` array                | *Whom* to evaluate             |
-| —        | Thresholds                                         | **Never** — resolved in TypeScript |
+| Bound into a statement | Carries                                                        | Category                       |
+|------------------------|----------------------------------------------------------------|--------------------------------|
+| Cutoff                 | The run's clock                                                | *When* the facts are read      |
+| Subject filter         | An explicit subject array for a backfill, or `NULL`            | *Whom* to evaluate             |
+| Population             | The compiled `selection` predicate — profiles and presence flags | *Whom* to evaluate           |
+| Eligible region        | The compiled eligibility predicate, on fact-set statements only | *Whom* it is worth measuring   |
+| Keyset bounds          | The batch window ([§6.4](#64-one-group-pass))                  | *How much* at a time           |
+| —                      | Thresholds                                                     | **Never** — resolved in TypeScript |
 
-All three answer *which facts, about whom, as of when*. None of them answers *is that bad*. The prohibition is on
-policy reaching SQL, and a population declaration is not policy.
+All of them answer *which facts, about whom, as of when*. None answers *is that bad*. The prohibition is on policy
+reaching SQL, and a population declaration is not policy. The compiled eligibility predicate is the one that looks like
+a borderline case and is not: it removes no row from any stored outcome, it only spares the database from computing
+measurements for rows already declined in memory, and a test proves it agrees with the table it was compiled from.
 
 **Diagram: the decision requirements of one indicator, in DMN terms.** Rectangles are decisions, parallelograms are
 input data, and the dashed shapes are the reviewed knowledge the decisions are justified by.
@@ -725,15 +850,15 @@ input data, and the dashed shapes are the reviewed knowledge the decisions are j
 ```mermaid
 flowchart BT
     ID1[/"v_sutartys<br/>identity · classifiers · presence"/]
-    ID2[/"collect.sql fact row<br/>the indicator's own measurements"/]
+    ID2[/"fact set row<br/>the indicator's own measurements"/]
 
     KS1["VPĮ and the source catalogues<br/>OCP · OLAF · VPT"]
     KS2["risk.data_obligations<br/>effective-dated, per fact"]
     KS3["parameters.ts<br/>effective-dated thresholds"]
 
-    D1["Scope<br/>declared profiles"]
-    D2["Applicability<br/>decision table, hit policy U"]
-    D3["Sufficiency<br/>requiredInputs × obligation"]
+    D1["Selection<br/>declared population"]
+    D2["Subject Eligibility<br/>decision table, hit policy U"]
+    D3["Data Eligibility<br/>requiredInputs × obligation"]
     D4["Rule outcome<br/>rules.ts"]
     D0["Observation"]
 
@@ -748,60 +873,77 @@ flowchart BT
     D4 --> D0
 
     KS1 -.-> KS2
+    KS2 -.-> D1
     KS2 -.-> D3
     KS1 -.-> D2
     KS3 -.-> D2
     KS3 -.-> D4
 ```
 
-The diagram is worth drawing because it makes one property visible: **no decision reads an input or a knowledge source
-belonging to a later gate.** Scope reads only the universe row; applicability never reads a measurement; sufficiency
-never reads a threshold. That layering is what allows each gate to be tested on its own, and it is why gate ordering can
-be asserted as a test rather than left to review ([§9](#9-tests-and-automated-safeguards)).
+The diagram is worth drawing because it makes two properties visible. **No decision reads an input or a knowledge source
+belonging to a later step**: Selection reads only the subject row, eligibility never reads a measurement, data
+eligibility never reads a threshold. That layering is what allows each step to be tested on its own, and it is why the
+ordering can be asserted as a test rather than left to review ([§9](#9-tests-and-automated-safeguards)). And
+**`risk.data_obligations` feeds both the first step and the third**, which is the structural reason the two cannot
+disagree about the same absent fact.
 
-### 3.9 Coverage is a published number
+### 3.8 Coverage is a published number
 
 An indicator that silently evaluates 0.5% of its subject type is worse than one that does not run, because the page
-looks the same. Every gate therefore reports a count, and the run row carries them:
+looks the same. Every step therefore reports a count, and the run row carries them:
 
 ```
 statistics[indicator] = {
-  universe,                                   // rows in the subject universe view
-  scoped_out:        { <profile>: n, ... },   // gate 1
-  in_scope,
-  not_applicable:    { <reason>: n, ... },    // gate 2
-  insufficient_data: { <field>: n, ... },     // gate 3
-  not_triggered, triggered,                   // gate 4
+  universe,                                   // rows in the subject type's view, from the census
+  selected_out:      { <reason>: n, ... },    // selection — per profile and per presence flag
+  selected,
+  not_applicable:    { <reason>: n, ... },    // subject eligibility
+  insufficient_data: { <field>: n, ... },     // data eligibility
+  not_triggered, triggered,                   // indicator evaluation
   calculation_error,
   duration_ms, error
 }
 ```
 
-Those counts satisfy one arithmetic identity on a full run — one where `$2` is `NULL`, so the universe is not narrowed
-by a backfill filter — and it is a test:
+Those counts satisfy one arithmetic identity on a full run — one with no backfill subject filter narrowing the
+population — and it is a test:
 
 ```
-universe = Σ scoped_out
+universe = Σ selected_out
          + Σ not_applicable
          + Σ insufficient_data
          + not_triggered + triggered + calculation_error
 ```
 
-A gate that loses rows fails that identity, which is the cheapest possible detector for the failure mode this section
-exists to prevent — a population quietly falling out of evaluation. The methodology page
-([§4.3](#43-methodology-catalogue)) publishes the same numbers per indicator as a coverage table: the population, what
-was excluded and why, and the share of the population that was actually decidable. Publishing "we can decide this for
-0.5% of contracts, and here is which 0.5%" is a stronger transparency claim than any signal count, and it is the claim
-the measurement in [§3.1](#31-the-measurement-that-forces-the-design) obliges the service to make.
+A step that loses rows fails that identity, which is the cheapest possible detector for the failure mode this section
+exists to prevent — a population quietly falling out of evaluation.
 
-### 3.10 Practices this borrows, and what it leaves out
+**The identity is stronger than it looks, because its two sides have independent origins.** `universe` and every
+`selected_out` term come from the census ([§6.3](#63-the-census)), an aggregate the database computes without fetching a
+row; every other term is counted by the decision service as it produces observations. Nothing derives one side from the
+other, so the check is a genuine reconciliation rather than a restatement — a fetch that silently drops a batch, a
+keyset bound that skips a range, or a compiled predicate that disagrees with its table all show up as a shortfall.
+
+That is not hypothetical. The profile counts of [§3.4](#34-selection--the-subject-population) sum to 5,906,242 against a
+measured contract total of 5,906,258: **16 rows are in no profile**, and the census would have refused the run rather
+than let one indicator quietly not speak about them. Resolving those 16 is a prerequisite for the first contract-grain
+indicator, and finding them is the identity doing its job before it is even built.
+
+The methodology page ([§4.3](#43-methodology-catalogue)) publishes the same numbers per indicator as a coverage table:
+the population, what was excluded and why, and the share of the population that was actually decidable. Publishing "we
+can decide this for 0.5% of contracts, and here is which 0.5%" is a stronger transparency claim than any signal count,
+and it is the claim the measurement in [§3.1](#31-the-measurement-that-forces-the-design) obliges the service to make.
+
+### 3.9 Practices this borrows, and what it leaves out
 
 The model is assembled from established business-rules and data-validation practice rather than invented, and the
 borrowings are deliberate and partial.
 
 | Practice                                                                 | Taken                                                                                                            | Left out                                                                                        |
 |--------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| **DMN** — decision tables, hit policies, decision requirements diagrams | Applicability as a table with hit policy `unique`; the DRD as the diagram of an indicator's data requirements    | FEEL, the XML interchange format, and any DMN engine — the tables are TypeScript literals        |
+| **DMN** — decision tables, hit policies, decision requirements diagrams, the decision service | Eligibility as a table with hit policy `unique`; the DRD as the diagram of an indicator's data requirements; the decision service as a pure function of its inputs, holding no I/O ([§6.1](#61-the-pipeline-and-the-decision-service)) | FEEL, the XML interchange format, and any DMN engine — the tables are TypeScript literals        |
+| **BPMN** — process orchestration distinct from decision logic | The pipeline owns fetching, batching, transactions and writing; it holds no policy, and the decision service holds no connection | Process modelling notation, engines and human tasks — the pipeline is one job in TypeScript |
+| **Decision Solutions practice** (FICO and equivalents) — selection before eligibility before scoring | Population selection as a distinct, counted step that stores nothing; eligibility declines that carry a reason code back to the operator | Champion/challenger deployment and runtime rule authoring |
 | **The Decision Model** (von Halle & Goldberg) — rule families, inferential integrity | Gate ordering: no rule fires until the facts it depends on are established                              | The full rule-family normalisation discipline                                                     |
 | **Business Rules Manifesto / RuleSpeak**                                 | Rules are declarative, separate from process, and expressed over a named fact model — hence the closed classifier vocabulary | Natural-language rule authoring                                                          |
 | **ARACHNE** and EU fund risk scoring                                     | Entities with insufficient data are reported as unscored, never as low-risk                                       | Composite scoring — this service publishes countable signals, not an index                        |
@@ -915,13 +1057,13 @@ count and available in the methodology detail, and `calculation_error` shown as 
 raised to maintainers. Stating coverage explicitly is what keeps an absent signal readable as "checked, nothing found"
 or "not evaluated" rather than as a clean bill of health.
 
-Two of those sections get their wording from the gates rather than from the catalogue. **"Nepakanka duomenų" names the
-obligation, not just the field** — *"pirkimo numeris privalomas TSP tipo sutartims, bet nenurodytas"* — because
-`missing_data` carries the obligation and its legal basis alongside the field name
-([§3.7](#37-gate-3--sufficiency)). And **`not_applicable` states its reason code in Lithuanian** rather than being
-silently omitted, since *"netaikoma: žodinė mažos vertės sutartis"* is a genuinely useful thing for a reader to learn
-about a contract they were looking at. Indicators that scoped this subject's whole population out appear on neither
-list; they are described once, on the methodology page.
+Two of those sections get their wording from the eligibility decisions rather than from the catalogue. **"Nepakanka
+duomenų" names the obligation, not just the field** — *"pirkimo numeris privalomas TSP tipo sutartims, bet
+nenurodytas"* — because `missing_data` carries the obligation and its legal basis alongside the field name
+([§3.6](#36-the-data-eligibility-decision)). And **`not_applicable` states its reason code in Lithuanian** rather than
+being silently omitted, since *"netaikoma: žodinė mažos vertės sutartis"* is a genuinely useful thing for a reader to
+learn about a contract they were looking at. Indicators that selected this subject's whole population out appear on
+neither list; they are described once, on the methodology page.
 
 The page states what is true in the live snapshot and how fresh it is. It carries no "new" badge and no "since" wording,
 because it reads exactly one run and cannot honestly say when a signal appeared ([§10](#10-limitations)).
@@ -935,9 +1077,10 @@ samples are safe, known source limitations and freshness, and a change log. Open
 definition, the source-catalogue references, the local profile, required data, the rule expressed as a formula,
 exclusions, parameters, an example and limitations.
 
-**Every catalogue row carries its coverage table** ([§3.9](#39-coverage-is-a-published-number)): the subject population,
-which source profiles were evaluated and which were scoped out with the reason, the `not_applicable` breakdown by reason
-code, the `insufficient_data` breakdown by missing field, and the share of the population that was actually decidable.
+**Every catalogue row carries its coverage table** ([§3.8](#38-coverage-is-a-published-number)): the subject population,
+which source profiles were evaluated and which were selected out with the reason, the `not_applicable` breakdown by
+reason code, the `insufficient_data` breakdown by missing field, and the share of the population that was actually
+decidable.
 That table is the most load-bearing thing on the page. An indicator that can decide 0.5% of its subject type is not a
 weak indicator, it is a narrow one, and a reader who does not know which 0.5% will read its silence as a clean result
 for the other 99.5%.
@@ -979,16 +1122,16 @@ modules/risk/indicators/LT-COM-01/     ← one directory = one Risk Indicator
 │   ├── standard         primary citation: document name, URL and page
 │   ├── public           WHAT THE PUBLIC READS. titleLt, descriptionLt,
 │   │                    limitationLt, formulaLt — the only text the web renders
-│   ├── scope            WHOM IT SPEAKS ABOUT. The source profiles of the subject
-│   │                    universe this indicator evaluates; everything else is
-│   │                    counted on the run and stores no row (§3.4)
-│   ├── applicability    A decision table over the universe view's classifier
-│   │                    columns, hit policy 'unique', each non-applicable arm
-│   │                    carrying a reason code (§3.6)
+│   ├── selection        WHOM IT SPEAKS ABOUT. The source profiles and presence
+│   │                    flags that define this indicator's population; everything
+│   │                    else is counted on the run and stores no row (§3.4)
+│   ├── eligibility      A decision table over the subject view's classifier
+│   │                    columns, hit policy 'unique', each ineligible arm
+│   │                    carrying a reason code (§3.5)
 │   ├── requiredInputs   fields paired with the risk.data_obligations rule that
-│   │                    makes their absence a gap rather than a normal state (§3.7)
-│   ├── sourceRelations  domain model views the collection statement reads
-│   ├── sqlFile          the packaged SELECT that collects this indicator's facts
+│   │                    makes their absence a gap rather than a normal state (§3.6)
+│   ├── factSets         the named fact sets this indicator measures from, by
+│   │                    reference — fetched once per evaluation group (§5.2)
 │   ├── decide           the rules that judge one fact row, from rules.ts
 │   └── outputContract   runtime validation of the rows evaluation returns
 │
@@ -997,19 +1140,13 @@ modules/risk/indicators/LT-COM-01/     ← one directory = one Risk Indicator
 │   │                    threshold change is a one-line, blameable diff:
 │   └── entries[]        { validFrom, validTo, scope, values, source, note }
 │
-├── collect.sql          WHAT IS TRUE. One pure, parameterised SELECT returning
-│                        one fact row per subject, read FROM the subject universe
-│                        view — $1 the cutoff, $2 an optional subject filter,
-│                        $3 the declared source profiles. It measures; it decides
-│                        nothing. No indicator identity, no state, no thresholds.
-│
 ├── rules.ts             HOW IT DECIDES. A pure function of one fact row and the
 │                        parameter values in force for it, returning a Decision:
 │                        'triggered' or 'not_triggered' plus the rawValue,
-│                        threshold and evidence that explain it. Scope,
-│                        applicability and sufficiency were settled before it ran,
-│                        and are not in its return type. It touches no database
-│                        and no clock, so its tests need neither.
+│                        threshold and evidence that explain it. Selection and both
+│                        eligibility decisions were settled before it ran, and are
+│                        not in its return type. It touches no database and no
+│                        clock, so its tests need neither.
 │
 ├── test/                PROOF IT IS RIGHT. Kept out of the four files that
 │   │                    define the indicator, so `ls` answers "what is this
@@ -1017,31 +1154,48 @@ modules/risk/indicators/LT-COM-01/     ← one directory = one Risk Indicator
 │   │                    it works?".
 │   ├── fixtures.ts      Deterministic cases for each outcome state, boundary
 │   │                    values and effective-date transitions. Each case states
-│   │                    both the source rows and the fact row collect.sql must
-│   │                    produce from them, so the two test files meet on one value.
-│   ├── rules.test.ts    Assertions over those fixtures — the rules alone, no
-│   │                    database, run on every `npm test`.
-│   └── collect.it.ts    Integration proof that collect.sql returns the fact rows
-│                        the fixtures describe, against a real PostgreSQL.
+│   │                    both the source rows and the fact row the declared fact
+│   │                    sets must produce, so the two test files meet on one value.
+│   └── rules.test.ts    Assertions over those fixtures — the rules alone, no
+│                        database, run on every `npm test`.
 │
 └── README.md            Optional reviewer context: interpretation notes, known
                          false positives, decisions taken during review.
 ```
 
-Read that as the definition of the entity: **identity + lifecycle + public wording + scope + applicability + required
-inputs + parameter timeline + exactly one collection + exactly one rule set + tests**.
+Read that as the definition of the entity: **identity + lifecycle + public wording + selection + eligibility + required
+inputs + parameter timeline + the fact sets it measures from + exactly one rule set + tests**.
 
-The split between `collect.sql` and `rules.ts` is the load-bearing one, and the rule is a single sentence: **SQL states
-what is true about a subject, TypeScript decides what that means.** Counting, joining, filtering and aggregating are
-what a set-based engine is for; comparing a measurement to a threshold, choosing an outcome state and assembling an
-explanation are ordinary branching code. Keeping them apart means neither file has to be read to understand the other,
-and the deciding half is testable with plain objects.
+The split between measurement and decision is the load-bearing one, and the rule is a single sentence: **SQL states what
+is true about a subject, TypeScript decides what that means.** Counting, joining, filtering and aggregating are what a
+set-based engine is for; comparing a measurement to a threshold, choosing an outcome state and assembling an explanation
+are ordinary branching code. Keeping them apart means neither has to be read to understand the other, and the deciding
+half is testable with plain objects.
 
-`scope`, `applicability` and `requiredInputs` are the three declarations that let shared code answer *whom this
+`selection`, `eligibility` and `requiredInputs` are the three declarations that let shared code answer *whom this
 indicator speaks about* without reading its SQL or its rules. They are data, not code, for the same reason
 `parameters.ts` is: a reviewer can diff them, the registry can check them for overlap and gaps at startup, and the
 methodology page can render them. An indicator that expressed the same thing as branching inside `rules.ts` would be
 reviewable only by reading the branches, and countable only by running it.
+
+**Measurement statements live outside the indicator directory**, and that is the one thing an indicator does not own
+outright. A fact set is a named artefact in `modules/risk/factSets/`, referenced by name:
+
+```ts
+factSets: ['contract.valueAgainstProcedureEstimate'],
+```
+
+The reason is [§6.2](#62-evaluation-groups): a group fetches each distinct fact set once, however many of its member
+indicators want it, so sharing must be *identity* rather than coincidence. Two copies of the same statement in two
+directories are two fetches and, worse, two things that drift when one is edited. Naming them makes the sharing
+explicit, reviewable and countable, and it turns the "shared or expensive intermediate" advice of
+[§5.6](#56-where-each-kind-of-logic-belongs) into an artefact with an owner.
+
+The trade is real and worth stating: an indicator directory is no longer entirely self-contained, and editing a fact set
+changes the inputs of every indicator referencing it. Three things contain that. A fact set declares the subject types
+and profiles it is valid for, so it cannot be referenced from a population it does not cover. Its own integration test
+lives with it rather than in any indicator's directory. And a pull request touching a fact set lists every indicator
+that reads it, so the blast radius is on the diff rather than in the reviewer's memory.
 
 ### 5.2 Shared machinery
 
@@ -1052,36 +1206,50 @@ modules/risk/
   contracts.ts                # observation, subject-facts, decision and parameter contract values
   riskIndicator.ts            # the RiskIndicator base class: self-checks, effective parameters,
                               # evaluate(), output and cross-row validation
-  subjectFactsIndicator.ts    # collect-then-decide: binds $1/$2/$3, runs the gates of §3, resolves
-                              # the parameter entry per fact row, applies the rules, assembles observations
-  applicabilityTable.ts       # the §3.6 decision table: matching, hit-policy 'unique' and
-                              # completeness checks, shared by the startup check and the per-row lookup
+  decisionService.ts          # the pure decision layer of §6.1: eligibility, data eligibility and
+                              # the rules over one fetched batch. Holds no connection.
+  eligibilityTable.ts         # the §3.5 decision table: matching, hit-policy 'unique', completeness
+                              # checks, and compilation to the SQL predicate of §6.4
   obligations.ts              # resolves risk.data_obligations for a subject's classifiers at the
-                              # cutoff; the only thing allowed to decide 'obliged' (§3.5)
+                              # cutoff; the only thing allowed to decide 'obliged' (§3.3)
+  selection.ts                # compiles a declared selection into a predicate, and gates it against
+                              # the obligation table at startup (§3.3)
   parameterScope.ts           # scope matching and disjointness, shared by the startup check and
                               # the per-subject parameter lookup
-  evaluationContext.ts        # what one run evaluates: cutoff, subjects, profiles, effective parameters
-  coverage.ts                 # per-gate counters and the §3.9 arithmetic identity
+  evaluationContext.ts        # what one run evaluates: cutoff, subjects, population, effective parameters
+  coverage.ts                 # the counters and the §3.8 arithmetic identity
   riskDataSource.ts           # how an evaluation reaches a database (the only port)
   registry.ts                 # the catalogue class: lookup, active and evaluable sets
   deployedIndicators.ts       # explicit imports of every deployed version, plus riskCatalogue:
                               # their public metadata as one constant Astro imports
+  factSets/                   # named measurement statements, shared across indicators (§5.1)
+    <name>.sql                # one parameterised SELECT, one fact row per subject
+    <name>.ts                 # its declared subject types, profiles, columns and validity
+    <name>.it.ts              # its integration test, against a real PostgreSQL
   sqlLoader.ts                # loads packaged SQL at process start
 services/procurement-risk/
   index.ts                    # service entry point and single-instance advisory lock
-  runJob.ts                   # opens the run, evaluates Risk Indicators one at a time
-  write.ts                    # one INSERT of the run's rows into risk.risk_signals
-  retention.ts                # deletes superseded run snapshots, as risk_rw
+  runJob.ts                   # the pipeline of §6.5: census, group planning, execution, closure
+  census.ts                   # the per-subject-type aggregate of §6.3
+  groupPlanner.ts             # derives the (subject type, profile) groups and their fact sets
+  groupPass.ts                # streams one group in keyset batches and drives the decision service
+  write.ts                    # COPY of a batch's rows into the run's partition of risk.risk_signals
+  retention.ts                # drops superseded run partitions, as risk_rw
   retentionJob.ts             # its entry point: npm run risk:retention
 migrations/public/
-  0NN_domain_model.sql        # the domain model views of §3.3, per domain-model.md
+  0NN_domain_model.sql        # the domain model views of §3.4, per domain-model.md
 migrations/risk/
-  001_risk.sql                # two tables and one view
+  001_risk.sql                # the partitioned signals table, the run table and the views
   002_roles.sql               # the roles and grants of §1.2
-  003_data_obligations.sql    # the obligation matrix of §3.5, seeded from domain-model.md
+  003_data_obligations.sql    # the obligation matrix of §3.3, seeded from domain-model.md
 ```
 
 The catalogue is the set of indicator directories; the complete DDL is in [`risk-schema.md`](risk-schema.md).
+
+Two modules carry the weight of [§6](#6-evaluation-run) and are worth locating precisely. `decisionService.ts` is the
+only place an outcome state is produced, and it imports no database module at all — a lint rule enforces that, because
+it is the boundary the whole testing strategy rests on. `groupPass.ts` is the only place that fetches, batches and
+writes, and it knows nothing about what any indicator means.
 
 ### 5.3 The Risk Indicator class model
 
@@ -1110,7 +1278,7 @@ classDiagram
     }
 
     class SubjectFactsIndicator {
-        +string sqlFile
+        +string[] factSets
         +decide(facts, parameters) Decision
         #calculate(context, data) RiskObservationV1[]
     }
@@ -1273,54 +1441,188 @@ service and out of the public data contract.
 
 ## 6. Evaluation run
 
-An evaluation run is **one single sequential job**: it executes the evaluable Risk Indicators one after another. A run
-has exactly two inputs of its own.
+[§3](#3-evaluation-population-and-eligibility) is the decision model: what decides what, and from which reviewed
+artefact. This section is the process model: how one run executes it over 5.9 million contracts without fetching them
+106 times.
 
-- **The cutoff is the run's clock.** `data_as_of` is read once at run start and passed to every collection statement as
-  `$1`. It keeps one run internally consistent — the first and the hundredth indicator agree on what "now" means — and
-  makes a rerun at the same cutoff reproducible for every deadline and age comparison. Every time comparison goes
-  through the cutoff, never through `now()` and never through the process clock. That is the enforceable form of
-  "reproducible", and it is a test ([§9](#9-tests-and-automated-safeguards)).
-- **The subject set comes from the universe view and the indicator's declared scope.** Each indicator has its own unit
-  of analysis — procurement, lot, contract, supplier — and reads that subject type's domain model view, so the population is defined
-  once per subject type rather than once per indicator ([§3.3](#33-gate-0--the-subject-universe)). `$2` carries an
-  explicit subject array for a backfill or a single-procurement rerun, and `NULL` for a normal full run. `$3` carries the
-  `scope.profiles` array from the definition.
+### 6.1 The pipeline and the decision service
 
-Those three are the collection statement's only arguments. Thresholds are not among them: a parameter entry is resolved
-in TypeScript and applied by the rules, so the cutoff and the population reach SQL and policy does not.
+The run is built from two layers with a hard boundary between them, and the boundary is the design's main performance
+and testability lever at once:
 
-The registry's evaluable versions form an unordered set, since every indicator reads domain model facts plus its own
-parameters and nothing another indicator produced. The run job iterates them in declaration order because iteration
-needs an order; any permutation produces the same signals.
+> **The pipeline touches the database and holds no policy. The decision service holds all policy and never opens a
+> connection.**
+
+| Layer                | Owns                                                                                                  | Never does                                    |
+|----------------------|-------------------------------------------------------------------------------------------------------|-----------------------------------------------|
+| **Pipeline** (BPMN)  | Census, selection statements, fact-set statements, batching, transactions, retries, writing, statistics | Decide an outcome, resolve a threshold, interpret an obligation |
+| **Decision service** (DMN) | Both eligibility decisions, parameter resolution, the rules, evidence assembly                    | Open a connection, read a clock, perform I/O of any kind |
+
+The decision service is one pure function — `(subjectRow, facts, parameters, obligations) → Decision[]` — evaluated in
+memory over rows the pipeline already fetched. Three consequences follow, and they are the reasons for the split rather
+than pleasant side effects. Every indicator is testable with plain objects and no database, which is what makes 106
+indicators tractable to review. Nothing about *which* indicators run together can change *what* any of them decides, so
+the grouping below is a pure execution concern. And a run is reproducible from `(cutoff, commit)` alone, because the
+only clock is the cutoff the pipeline passes in.
+
+**Diagram: the two layers and the four steps, for one evaluation group.**
+
+```mermaid
+flowchart TB
+    subgraph pipe["Pipeline — holds no policy"]
+        CEN["Census<br/>one aggregate per subject type"]
+        SEL["Selection statement<br/>compiled from the declared population"]
+        BAT["Keyset batch<br/>~25k subject rows"]
+        FS["Fact-set statements<br/>deduplicated across the group,<br/>narrowed by the compiled eligibility predicate"]
+        WR["Writer<br/>COPY into the run's partition"]
+    end
+
+    subgraph dec["Decision service — holds no connection"]
+        E1["Subject Eligibility Decision"]
+        E2["Data Eligibility Decision"]
+        E3["Indicator Evaluation Decision"]
+    end
+
+    CEN -->|" universe and selected_out counts "| WR
+    SEL --> BAT
+    BAT -->|" subject rows "| E1
+    BAT --> FS
+    FS -->|" measurements, keyed by subject "| E2
+    E1 -->|" eligible "| E2
+    E1 -.->|" not_applicable "| WR
+    E2 -->|" complete "| E3
+    E2 -.->|" insufficient_data "| WR
+    E3 -->|" triggered / not_triggered "| WR
+```
+
+### 6.2 Evaluation groups
+
+Running one collection statement per indicator means 106 scans of the same views per run, most of them over the same
+rows. The fix follows from a property [§3.4](#34-selection--the-subject-population) already establishes: **`source_profile`
+partitions each subject type — every row carries exactly one.** So the natural unit of one data pass is:
+
+> **An evaluation group is one `(subject type, source profile)` pair. Its members are every indicator that selected that
+> profile.**
+
+An indicator declaring three profiles is a member of three groups, and its counts sum across them — exactly, with no
+double counting, because the profiles partition. The group is **derived at startup from the declarations**, never
+declared by hand, so adding an indicator changes the grouping automatically and no one maintains a second list.
+
+| | Per-indicator collection | Evaluation groups |
+|---|---|---|
+| Subject scans per run | 106 | one per declared `(subject type, profile)` — **~15 today**: 2 procurement, 5 contract, 2 lot, and one default profile for each of the six remaining subject types |
+| Rows fetched | once per indicator | once per group, judged by every member |
+| Wasted rows | rows an indicator selected but another did not need | none — a group's rows were selected by every member |
+
+Grouping by profile rather than by subject type is what buys the last row. A subject-type group would have to fetch the
+union of its members' populations, dragging the 5,309,875 exempt contracts into a pass for the benefit of the two
+indicators that want them; profile groups fetch exactly what was selected.
+
+**Groups are independent.** No indicator reads what another produced, and amendment inheritance resolves in memory from
+the parent classifiers carried on the subject row ([§3.5](#35-the-subject-eligibility-decision)), so no group waits for
+another. Group-level concurrency is therefore safe and order-independent, and the run is reproducible whatever the
+interleaving. The pool defaults to 1 and is a configuration value: the case for raising it is measured, not assumed,
+because these are analytical scans competing for the same I/O.
+
+### 6.3 The census
+
+Coverage requires knowing what Selection removed, and materialising 5.3 million rows to count them would defeat the
+point. The census answers it as an aggregate instead — **one statement per subject type per run**, no rows crossing the
+wire:
+
+```sql
+SELECT source_profile,
+       count(*)                                        AS in_profile,
+       count(*) FILTER (WHERE NOT <subject predicate>)  AS not_subject,
+       count(*) FILTER (WHERE NOT "contractSigned")     AS excluded_contractSigned,
+       ...                                              -- one filter per declared presence flag
+FROM public.v_sutartys
+GROUP BY source_profile;
+```
+
+One scan yields the universe and every exclusion term for **all 17 contract indicators at once**. Each indicator's
+`selected_out` is then arithmetic over that result — the profiles it did not select, plus the presence flags it
+required — with no per-indicator query at all.
+
+The census is stored on the run row, so the coverage identity of [§3.8](#38-coverage-is-a-published-number) reconciles
+two independently produced numbers rather than restating one of them. It runs **before** the group passes, and a census
+that fails its own internal identity — profile counts not summing to the universe — aborts the run before any indicator
+writes a row.
+
+### 6.4 One group pass
+
+Each group runs on a `risk_calc` connection, inside a read-only `REPEATABLE READ` transaction with a per-statement
+timeout. Repeatable read is what makes batch 400 consistent with batch 1 while ingestion keeps writing; the cutoff is
+what makes the whole run reproducible later. Both, and neither substitutes for the other.
+
+1. **Stream the subject rows in keyset batches.** `WHERE <compiled selection> AND subject_key > $last ORDER BY
+   subject_key LIMIT $batch`, batch ~25k. Memory is bounded by the batch, not by the corpus, so a 5.9-million-row group
+   and a 28,000-row group have the same footprint. Keyset paging rather than `OFFSET` keeps every batch an index range
+   scan instead of degrading linearly.
+2. **Decide subject eligibility in memory**, for every member indicator, over the batch just fetched. This is cheap —
+   a decision table over a handful of classifier columns — and it is what makes step 3 worth doing.
+3. **Fetch the batch's fact sets.** Each is bound to the *same keyset bounds* as the batch — `subject_key > $last AND
+   subject_key <= $upper` — never to a 25,000-element `IN` list, so the statement stays an index range scan with a
+   stable plan. Two things shrink this step, which is where nearly all the database cost of a run lives:
+   - **Deduplication.** Fact sets are named artefacts referenced by indicators ([§5.1](#51-the-risk-indicator-directory)),
+     so the group fetches each distinct fact set once however many members want it.
+   - **The compiled eligibility predicate.** The union of the members' eligible regions is compiled to SQL and ANDed in,
+     so measurements are never computed for rows already declined `not_applicable` in step 2.
+4. **Decide data eligibility and run the rules**, in memory, per member indicator.
+5. **Write the batch's observations** on a separate `risk_rw` connection — a different role, therefore necessarily a
+   different connection — with `COPY … FROM STDIN` into the run's partition ([§7.2](#72-one-insert-only-snapshot-per-run)).
+   `COPY` rather than multi-row `INSERT` is what keeps a multi-million-row snapshot a bulk load instead of a bottleneck.
+
+**The eligibility table is compiled to SQL and interpreted in TypeScript, and the two must agree.** They come from one
+artefact, and because the classifier dimensions are finite the agreement is *decidable*: a test enumerates the full
+classifier cross-product and asserts that the compiled predicate admits exactly the rows the interpreted table calls
+eligible ([§9](#9-tests-and-automated-safeguards)). Compiling policy into SQL is normally how policy escapes review;
+here it stays reviewable because the SQL is generated, never written, and proven equivalent to the table a reviewer
+reads.
+
+### 6.5 The run job
+
+A run has one input of its own: **the cutoff is the run's clock.** `data_as_of` is read once at run start and bound into
+every statement. It keeps one run internally consistent — the first and the hundredth indicator agree on what "now"
+means — and makes a rerun at the same cutoff reproducible for every deadline and age comparison. Every time comparison
+goes through the cutoff, never through `now()` and never through the process clock. That is the enforceable form of
+"reproducible", and it is a test ([§9](#9-tests-and-automated-safeguards)).
+
+A backfill or single-procurement rerun adds a subject filter, which narrows the population without changing any
+decision; the coverage identity is asserted only on full runs, where nothing narrows it.
 
 The Procurement Risk Service:
 
-1. takes the single-instance advisory lock, the registry having been built and validated at process start;
+1. takes the single-instance advisory lock, the registry having been built and validated at process start — including
+   the obligation gate on every declared selection ([§3.3](#33-obligation--the-reviewed-artefact-the-exclusions-are-gated-on));
 2. closes any run left `running` by a previous crash, marking it `failed`;
-3. reads the clock once as `data_as_of` and opens one run row stamped with that cutoff and the code commit;
-4. for each evaluable indicator in turn, resolves its effective parameter entries and its obligation rules at the cutoff
-   and evaluates it inside a read-only transaction with a statement timeout, running the gates of
-   [§3.2](#32-the-five-dispositions-of-a-subject) before the rules;
-5. validates the returned rows: column types, allowed states, subject and indicator identity, and duplicate subject
-   keys, and checks the per-gate counters against the coverage identity of
-   [§3.9](#39-coverage-is-a-published-number);
-6. appends that indicator's observations to the open run's snapshot, in one transaction per indicator;
-7. records that indicator's per-gate counts, timings and any error in `statistics`, then continues to the next
-   indicator;
-8. closes the run as `succeeded`, or `partial` when some indicators failed.
+3. reads the clock once as `data_as_of` and opens one run row stamped with that cutoff and the code commit, and creates
+   the run's partition of `risk.risk_signals`;
+4. runs the census for every subject type any evaluable indicator selects, and stores it on the run;
+5. plans the evaluation groups from the deployed declarations, and resolves each indicator's effective parameter entries
+   and obligation rules at the cutoff, once, before any group starts;
+6. executes the groups, each as [§6.4](#64-one-group-pass) describes, writing per batch;
+7. validates as it writes: column types, allowed states, subject and indicator identity, and duplicate subject keys
+   within the run;
+8. on completion of every group, checks each indicator's counters against the coverage identity of
+   [§3.8](#38-coverage-is-a-published-number), and records its counts, timings and any error in `statistics`;
+9. closes the run as `succeeded`, or `partial` when some indicators failed.
 
-A full run is one set-based query per indicator, so re-evaluating an unchanged procurement costs almost nothing on the
-read side. Every run rewrites the whole snapshot, so the write side is bounded by the run's own row count and the
-retention window rather than by how much changed ([§7.2](#72-one-insert-only-snapshot-per-run)).
+Steps 4 and 5 before step 6 is the ordering that matters: everything reviewed is resolved before anything is decided, so
+a run cannot begin writing under one parameter timeline and finish under another.
 
-**A failing indicator is contained.** It contributes no rows to the snapshot, so the page reports it as not evaluated in
+**A failing indicator is contained.** Failure is per indicator, not per group: an indicator that throws is dropped from
+the group's remaining batches, its already-written rows are deleted from the run's partition, and its fellow members
+carry on over the same fetched rows. It contributes no rows to the snapshot, so the page reports it as not evaluated in
 this run rather than showing a result from an older cutoff beside fresh ones. The run closes as `partial` and
-`statistics` carries the error.
+`statistics` carries the error. A failure in the *pipeline* — a lost connection, a statement timeout — fails the group,
+and the run closes `partial` with every member indicator marked not evaluated.
 
-**Readers never observe a run in progress.** `v_latest_run` excludes `running`, so between steps 3 and 8 the site keeps
-serving the previous snapshot in full and switches to the new one atomically when step 8 closes the run. A page never
-mixes vintages: every signal on it shares one cutoff and one commit.
+**Readers never observe a run in progress.** `v_latest_run` excludes `running`, so between steps 3 and 9 the site keeps
+serving the previous snapshot in full and switches to the new one atomically when step 9 closes the run. A page never
+mixes vintages: every signal on it shares one cutoff and one commit. This is what makes per-batch writing safe despite
+the snapshot being incomplete for most of the run: incompleteness is invisible, because completion is a property of the
+run row.
 
 ## 7. Stored results
 
