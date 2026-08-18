@@ -210,8 +210,103 @@ The genuine gap is `TSP` and `PPS` — both are *required* to run through CVP IS
 missing one respectively; that's ~186,000 rows worth investigating as an actual data-quality problem rather than an
 expected absence.
 
-> RESPONSE: This problem depends on Problem 2.
-> In practice the dependency is on the pirkimoNumeris dirty-data/matching work above (`(high) Problem 1: Dirty
-> pirkimoNumeris`): once procurement numbers can be matched with a confidence score instead of exact-string equality,
-> the real `TSP`/`PPS` NULL rate should be re-measured against those fuzzy matches rather than against raw `NULL`
-> counts — some of the "missing" ~186,000 rows may turn out to be matchable once that lands.
+> RESPONSE (superseded, see below): the original response here framed this as depending on Problem 1's
+> dirty-string/fuzzy-matching work. That framing doesn't hold up: these rows aren't dirty strings, they're real SQL
+> `NULL`s (confirmed against `modules/sutartys/parsePage.js:270-279` — `pirkimoNumeris` is only ever set when the CVP
+> IS contract page has a table row labeled "Pirkimo numeris"; there's no default, so an absent row on the source page
+> leaves the field `undefined` → `NULL`). There is no raw value to normalize. See the investigation below for what was
+> actually tested and found.
+
+**Root cause, verified against live data:** this is a historical gap in the CVP IS source pages, not scattered per-row
+noise. Breaking the NULLs down by `sudarymoData` year:
+
+| Years     | PPS NULL rate | TSP NULL rate |
+|-----------|--------------:|--------------:|
+| 2015–2019 |       90–100% |       90–100% |
+| 2020–2026 |        26–37% |         7–15% |
+
+Something changed in the source (or the scraper) around 2019/2020 — CVP IS began actually carrying the "Pirkimo numeris"
+row for most PPS/TSP contract pages from that point on. The bulk of the ~186,000 missing rows are pre-2020 legacy
+records; the field's presence is a property of *when* the contract was scraped, not something broken per-row.
+
+**Recovery actually tested, not just proposed:** the natural next question — can these be reconstructed by matching the
+contract to a procurement notice on other fields (buyer code, title, date), the way `v_pirkimo_dalis` already does fuzzy
+resolution elsewhere — was tested directly against the live database rather than assumed:
+
+- Exact `jarKodas` + exact `pavadinimas` match against the primary procurement table (`viesiejiPirkimai`):
+  **1,456 of 186,188 rows recovered (0.8%)** (787 PPS, 669 TSP).
+- Relaxed to `jarKodas` + "procurement `paskelbimoData` within 2 years before contract `sudarymoData`" (title ignored):
+  only 1,436 rows get a *unique* candidate; **~12,484 become ambiguous** (the same buyer published multiple notices in
+  that window, so there's no way to pick one without more information); and **~172,000 rows (92%) have zero candidate
+  procurement notice from that buyer in the primary table at all** — nothing to match against, unique or ambiguous.
+- The `cvpp` fallback table (`cvppViesiejiPirkimai`) contributes **zero** additional matches — it carries no buyer code
+  to join on directly, and matching by buyer name text + title found nothing.
+
+The dominant number is the 92% with no candidate at all: for the great majority of these rows the procurement notice
+itself was never ingested/published in a linkable form, not that a matching algorithm is too strict to find it. A
+confidence-scored matching table (as proposed for Problem 1) would recover well under 1% of this gap — it is not a
+meaningful mitigation for Problem 3, and the NULL rate should be reported as a real, largely-unrecoverable data-quality
+gap in pre-2020 CVP IS records rather than something blocked on future matching infrastructure.
+
+## Mitigations
+
+Traced against the actual view definitions (`modules/mcp/analyst/views/*.sql`) and the domain-ownership pipeline
+(`modules/domenai/`), to separate what's fixable at the SQL/view level from what's a genuine ceiling on the source data.
+
+### Dirty / unmatched `pirkimoNumeris` (Problems 1 and 3)
+
+Root cause: `v_dalyviai.sql:5` passes `xlsxPPAataskaitos."pirkimoNumeris"` straight through with no cleaning, and
+`v_sutartys.sql:4` does the same for `vpmSutartys."pirkimoNumeris"` — that's where both the free-text garbage
+(`'Nr.1174796'`, `'ID 693110'`, `'1,218,908'`) and the verbal-contract sentinels (`'Žodinė sutartis'`, `'-'`, `'+'`)
+enter. `v_pirkimo_dalis.sql:31` already validates `pirkimoNumeris ~ '^[0-9]+$'` before trusting it for `saltinis`
+resolution — dirty values fall through to `saltinis = NULL` (the 114 "unresolved" rows) — so there's existing precedent
+in this codebase for "validate, don't blindly join."
+
+**Cheap, view-level (no new infra):**
+
+- Add a normalized derived column in `v_dalyviai`/`v_pirkimo_dalis` — `regexp_replace` to strip `Nr.`/`ID ` prefixes,
+  stray whitespace/tabs, and Excel thousands-separator commas (`^\d{1,3}(,\d{3})+$` → digits only). Recovers roughly 101
+  of the 154 dirty `v_dalyviai` rows without touching any matching logic.
+- In `v_sutartys`, map the known verbal-contract sentinel strings to real `NULL` via a `CASE`. This doesn't recover
+  data, but it makes the Problem 3 NULL-rate honest — right now "missing" conflates true `NULL` with strings that were
+  never a number — and stops those sentinels from being silently compared against `v_pirkimas.pirkimoNumeris`.
+
+**Harder, structural fix:** a side table of `(raw_value, saltinis, candidate_pirkimoNumeris, confidence, method)`,
+populated by porting the FE's existing matching logic into SQL/a batch job, with views doing a `LEFT JOIN` against it
+instead of raw string equality. Multi-ref values (`'701969+542538'`) need to fan out into multiple rows, which a plain
+view can't express — this needs a materialized table, refreshed like other ingestion tasks in `tasks/`. This is a real
+fix for Problem 1's dirty *strings*, where a raw value exists to normalize and match.
+
+**It does not meaningfully fix Problem 3.** That gap is real `NULL`, not a dirty string — there's nothing to normalize.
+Reconstructing it means matching a contract to a procurement notice on *other* fields (buyer, title, date), which was
+tested directly against the live database rather than left as a hypothesis: exact buyer+title match recovers 0.8%
+(1,456/186,188); a looser buyer+date-proximity match still leaves 92% of rows with zero candidate procurement notice to
+match against at all, because most of the gap is pre-2020 CVP IS pages that never carried the field.
+See [Problem 3](#high-problem-3-missing-v_sutartyspirkimonumeris) above for the full breakdown. Treat this ~186,000-row
+gap as a largely permanent ceiling on the source data, not a matching-infrastructure backlog item.
+
+### `v_company.domenaiSkaicius` reliability (low-priority Problem 1)
+
+Traced the pipeline: `v_company.sql:44-46` counts `domenai` rows where `savininkoKodas = jarKodas`. `savininkoKodas`
+is populated by `modules/domenai/rastiSavininkuKodus.js:35`, which calls `findSingleJuridinis(savininkas)`
+(`modules/juridiniai/search.js:140`) — a Typesense name search over the free-text DOMREG registrant name, ranked by
+Levenshtein distance, accepted only if `distance ≤ similarityThreshold` (default **1**). This confirms DOMREG genuinely
+doesn't hand back a `jarKodas` — this is already a best-effort fuzzy name match, not a lookup, matching the
+"reikia matchinti pagal ten privestas pievas iki juridinio" response above.
+
+**Cheap fix:** `findSingleJuridinis` computes `distance` (`search.js:174`) and then discards it — only pass/fail is
+persisted (`rastiSavininkuKodus.js:36`). Persisting that distance alongside `savininkoKodas` (e.g. a new
+`domenai."savininkoKodasAtstumas"` column) would let `v_company` expose a quality-gated `domenaiSkaicius` — e.g.
+"count only where distance = 0 (exact name match)" — turning the current blanket advice ("don't use this field")
+into "usable if filtered to high-confidence matches." It won't make the field denser — DOMREG names will still be
+abbreviated/misspelled — but it stops good matches from being lumped in with bad ones.
+
+### Summary
+
+| Problem                                                                 | Mitigable?                   | Effort                                                   |
+|-------------------------------------------------------------------------|------------------------------|----------------------------------------------------------|
+| `v_dalyviai`/`v_pirkimo_dalis` dirty values (`Nr.`, `ID`, commas, tabs) | Yes                          | Low — regex cleanup in the view                          |
+| `v_sutartys` verbal-contract sentinels counted as "dirty"               | Yes (clarity, not recovery)  | Low — `CASE` → `NULL` in the view                        |
+| Multi-ref (`+`/`-`-joined) `pirkimoNumeris` values                      | Partially                    | High — needs a real matching table, not a plain view     |
+| Problem 3's TSP/PPS genuine gap                                         | No — tested, <1% recoverable | Not worth pursuing; source-data ceiling, mostly pre-2020 |
+| `domenaiSkaicius` reliability                                           | Partially                    | Low — persist the already-computed Levenshtein distance  |
