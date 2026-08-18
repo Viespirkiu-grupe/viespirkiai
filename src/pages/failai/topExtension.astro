@@ -8,6 +8,7 @@ import MetricCard from '@design-system/components/MetricCard.astro';
 import { postgres, getColorScheme, getFont } from '../../lib/failai.js';
 import { fmtNumber } from '../../lib/formatters.ts';
 import { convertUnit } from '@/utils/units.js';
+import { linksniuoti } from '@/utils/linksniai.js';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
@@ -70,7 +71,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=60');
     <MetricCardGrid className="mb-7" minWidth="150px" maxWidth="200px">
       <MetricCard label="Plėtinių" value={fmtNumber(totalExt)} />
       <MetricCard label="Apdorojami" value={fmtNumber(processedExt)} meta={`padengia ${fmtPct(coverage)} failų`} />
-      <MetricCard label="Neapdorojami" value={fmtNumber(unprocessedExt)} meta={`${fmtNumber(unprocessedFiles)} failų`} />
+      <MetricCard label="Neapdorojami" value={fmtNumber(unprocessedExt)} meta={linksniuoti(unprocessedFiles, ['failas', 'failai', 'failų', 'failo'])} />
     </MetricCardGrid>
 
     <div class="stack stack-md">

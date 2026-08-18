@@ -13,7 +13,7 @@ const { rows, skelbimai } = asmuo.darboSkelbimai;
   count={rows}
   shown={skelbimai.length}
   paramName="darboSkelbimaiLimit"
-  label="naujausi skelbimai"
+  forms={['naujausias skelbimas', 'naujausi skelbimai', 'naujausių skelbimų', 'naujausio skelbimo']}
 >
   {skelbimai.map((s: any) => (
     <ResultCardShell>

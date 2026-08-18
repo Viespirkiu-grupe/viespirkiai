@@ -7,10 +7,13 @@
  * query param and jumps to the section anchor, expanding the section to
  * its full row count.
  *
- * Lithuanian has gendered plural forms; the `gender` prop selects between
- * masculine ("Rodomi tik" / "Rodyti visus") and feminine ("Rodomos tik" /
- * "Rodyti visas") so the surrounding noun agrees correctly.
+ * Lithuanian declines both the noun and the participle by the shown count
+ * ("Rodomas tik 1 domenas" / "Rodomi tik 3 domenai" / "Rodoma tik 11 domenų"),
+ * so `forms` carries all four forms of the noun phrase and `gender` selects
+ * the participle set plus the "Rodyti visus/visas" verb.
  */
+import { linksniuotiOnly } from '@/utils/linksniai.js';
+
 interface Props {
   /** Total row count available. */
   count: number;
@@ -23,20 +26,30 @@ interface Props {
    * Convention: `<sectionLimit>` (e.g. `kotisLimit`, `domenaiLimit`).
    */
   paramName: string;
-  /** Plural noun describing the rows (e.g. "domenai", "naujausi pranešimai"). */
-  label: string;
-  /** Grammatical gender of the noun in `label` — defaults to masculine. */
+  /**
+   * Noun phrase describing the rows, all four forms:
+   * [vienas, keli (2–9), daug (0, 10–20, …), trupmena].
+   * E.g. `['domenas', 'domenai', 'domenų', 'domeno']`.
+   */
+  forms: [string, string, string, string];
+  /** Grammatical gender of the noun in `forms` — defaults to masculine. */
   gender?: 'm' | 'f';
 }
 
-const { count, shown, anchor, paramName, label, gender = 'm' } = Astro.props;
-const showingPrefix = gender === 'f' ? 'Rodomos tik' : 'Rodomi tik';
+const { count, shown, anchor, paramName, forms, gender = 'm' } = Astro.props;
+
+// Su kilmininku (0, 10–20, …) tarinys eina beasmenis: „Rodoma tik 11 domenų".
+const showingForms: [string, string, string, string] = gender === 'f'
+  ? ['Rodoma', 'Rodomos', 'Rodoma', 'Rodoma']
+  : ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'];
+const showingPrefix = linksniuotiOnly(shown, showingForms);
+const noun = linksniuotiOnly(shown, forms);
 const showAllVerb = gender === 'f' ? 'Rodyti visas' : 'Rodyti visus';
 ---
 
 {count > shown && (
   <p class="text-muted text-sm mb-4">
-    {showingPrefix}{' '}{shown}{' '}{label}.{` `}
+    {showingPrefix}{' '}tik{' '}{shown}{' '}{noun}.{' '}
     <a href={`?${paramName}=max#${anchor}`}>{showAllVerb} ({count})</a>
   </p>
 )}

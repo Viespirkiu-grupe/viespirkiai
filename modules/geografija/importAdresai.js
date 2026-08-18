@@ -10,16 +10,11 @@ import { createWriteStream, createReadStream } from "fs";
 import { unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import streamJson from "stream-json";
-import streamJsonArray from "stream-json/streamers/StreamArray.js";
-import streamChain from "stream-chain";
-import streamJsonPick from "stream-json/filters/Pick.js";
+import { parser } from "stream-json";
+import { streamArray } from "stream-json/streamers/stream-array.js";
+import { chain } from "stream-chain";
+import { pick } from "stream-json/filters/pick.js";
 import { enqueueAddressLinkedJuridiniai } from "../juridiniai/enqueueRefresh.js";
-
-const { parser } = streamJson;
-const { streamArray } = streamJsonArray;
-const { chain } = streamChain;
-const { pick } = streamJsonPick;
 
 const BATCH_SIZE = 1000;
 const TMP_ZIP = join(tmpdir(), "arAdresai.zip");

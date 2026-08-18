@@ -16,7 +16,7 @@ const rodomaTp = transportoPriemones.reduce((suma: number, auto: any) => suma + 
 ---
 
 <PageSection id="transportoPriemones" title="Transporto priemonės">
-  <TruncationNotice count={rows} shown={rodomaTp} anchor="transportoPriemones" paramName="transportoPriemonesLimit" label="transporto priemonės" gender="f" />
+  <TruncationNotice count={rows} shown={rodomaTp} anchor="transportoPriemones" paramName="transportoPriemonesLimit" forms={['transporto priemonė', 'transporto priemonės', 'transporto priemonių', 'transporto priemonės']} gender="f" />
   <DataTable
     columns={[
       { label: 'Markė' },

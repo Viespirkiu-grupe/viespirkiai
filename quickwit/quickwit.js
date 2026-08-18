@@ -527,43 +527,60 @@ export async function filterLive(lentele, hits) {
  *
  * Over-fetch math: if deadRatio is e.g. 0.2, fetching N hits yields ~0.8N
  * live ones on average, so size the first fetch as ceil(minHits / (1-dead))
- * plus a small buffer. If that underestimates, the loop keeps paging.
+ * plus a small buffer. That average is only a starting guess — tombstones are
+ * not spread evenly, and a sort can pile them all at one end (e.g. juridiniai
+ * sorted by `darbuotojai` puts dozens of stale copies of the largest employers
+ * on top, so the first 63 raw hits can yield 2 live ones). So every follow-up
+ * request is sized from the live ratio *observed so far* instead of the global
+ * one, which lets a tombstone-heavy stretch be cleared in one wide fetch rather
+ * than by many fixed-size steps that never catch up.
  *
  * @param {string} lentele
  * @param {object} params                - Quickwit search body
  * @param {object} [opts]
  * @param {number} [opts.minHits]        - minimum live hits; Infinity = exhaust
+ * @param {number} [opts.maxScan]        - raw-document budget; caps how far a
+ *                                          pathological stretch is chased
  */
-export async function search(lentele, params, { minHits = Infinity } = {}) {
+export async function search(
+  lentele,
+  params,
+  { minHits = Infinity, maxScan = DEFAULT_MAX_SCAN } = {},
+) {
   const deadRatio = await getDeadRatio(lentele);
 
   // Guard against deadRatio being 1 (everything dead — div-by-zero) or >1
   // (shouldn't happen but cheap to defend against).
   const liveRatio = Math.max(0.01, 1 - deadRatio);
-  const fetchSize = Number.isFinite(minHits)
-    ? Math.ceil(minHits / liveRatio) + 10
-    : 100;
 
   const liveHits = [];
   let offset = 0;
+  let scanned = 0;
   let numHitsMax = null;
   let requests = 0;
   let totalElapsed = 0;
   let qwMs = 0;
   let filterMs = 0;
   let rawExhausted = false;
+  let scanBudgetSpent = false;
 
   // Quickwit 0.8 has no `search_after` (the body only accepts `start_offset`),
   // so we page forward with start_offset until we've gathered `minHits` live
-  // hits or run out. The first page already over-fetches for the average dead
-  // ratio, so this normally completes in one request; extra pages only kick in
-  // when a stretch is unusually tombstone-heavy. Cap the page count so a
-  // pathological run can't loop indefinitely. NOTE: offset paging assumes a
-  // stable order across requests, so callers paging deep must sort by a
-  // concrete field — an all-equal `_score` (match-all) gives an arbitrary order.
-  const MAX_PAGES = 12;
+  // hits or run out. NOTE: offset paging assumes a stable order across
+  // requests, so callers paging deep must sort by a concrete field — an
+  // all-equal `_score` (match-all) gives an arbitrary order.
+  //
+  // `sizeFetch` turns "how many live hits do I still need" into "how many raw
+  // docs to ask for", using `ratio` (the global estimate first, the observed
+  // one afterwards) and clamped to Quickwit's own max_hits ceiling.
+  const sizeFetch = (needed, ratio) =>
+    Math.max(1, Math.min(QW_MAX_HITS, Math.ceil(needed / ratio) + 10));
 
-  while (liveHits.length < minHits && requests < MAX_PAGES) {
+  let fetchSize = Number.isFinite(minHits)
+    ? Math.min(sizeFetch(minHits, liveRatio), maxScan)
+    : 100;
+
+  while (liveHits.length < minHits) {
     requests++;
     const reqParams = {
       ...params,
@@ -577,6 +594,7 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
     qwMs += Date.now() - qwStart;
     totalElapsed += data.elapsed_time_micros ?? 0;
     const hits = data.hits ?? [];
+    scanned += hits.length;
 
     if (numHitsMax === null) numHitsMax = data.num_hits ?? 0;
 
@@ -594,7 +612,30 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
       rawExhausted = true;
       break;
     }
-    offset += fetchSize;
+
+    offset += hits.length;
+    // Next offset would exceed Quickwit's start_offset ceiling → 400.
+    if (offset > QW_MAX_START_OFFSET) break;
+
+    const needed = minHits - liveHits.length;
+    if (needed <= 0) break;
+
+    // Stop chasing once the raw-document budget is spent, so a stretch that is
+    // dead end-to-end cannot walk the whole index.
+    if (scanned >= maxScan) {
+      scanBudgetSpent = true;
+      break;
+    }
+
+    // Re-size from what this run actually saw. Falling back to `liveRatio`
+    // while nothing is live yet would repeat the same too-small fetch, so use
+    // a floor of one live hit per page scanned instead.
+    const observedRatio = Math.max(1 / scanned, liveHits.length / scanned);
+    fetchSize = Math.min(sizeFetch(needed, observedRatio), maxScan - scanned);
+    if (fetchSize < 1) {
+      scanBudgetSpent = true;
+      break;
+    }
   }
 
   return {
@@ -605,6 +646,11 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
       liveHits.length,
     ),
     rawExhausted,
+    // True when the loop gave up with fewer than `minHits` live hits because
+    // the scan budget ran out — the caller got a short page, not the end of
+    // the index. Worth surfacing/logging rather than silently showing "19".
+    scanBudgetSpent,
+    scanned,
     deadRatio,
     elapsedTimeMicros: totalElapsed,
     requests,
@@ -619,6 +665,13 @@ export async function search(lentele, params, { minHits = Infinity } = {}) {
 const QW_MAX_HITS = 10_000;
 const QW_MAX_START_OFFSET = 10_000;
 export const QW_EXPORT_CEILING = QW_MAX_HITS + QW_MAX_START_OFFSET;
+
+// Raw-document budget for one `search` call. Because start_offset tops out at
+// 10 000, no offset walk can reach past QW_EXPORT_CEILING anyway, so this is
+// simply "as far as Quickwit lets us look". It exists to bound a stretch that
+// is dead end-to-end; the adaptive re-sizing normally clears such a stretch in
+// one extra request, long before the budget matters.
+const DEFAULT_MAX_SCAN = QW_EXPORT_CEILING;
 
 /**
  * Page a table's shards `QW_MAX_HITS` hits at a time (Quickwit's hard `max_hits`

@@ -14,7 +14,7 @@ const dokumentaiUrl = `/dokumentai?mode=phrase&type=teismoNuosprendis&jar=${enco
 
 <PageSection id="teismai" title="Teismo nuosprendžiai">
   <p><Button href={dokumentaiUrl} variant="secondary" size="sm">Atverti dokumentų paieškoje</Button></p>
-  <TruncationNotice count={rows} shown={nuosprendziai.length} anchor="teismai" paramName="teismoNuosprendziaiLimit" label="naujausi nuosprendžiai" />
+  <TruncationNotice count={rows} shown={nuosprendziai.length} anchor="teismai" paramName="teismoNuosprendziaiLimit" forms={['naujausias nuosprendis', 'naujausi nuosprendžiai', 'naujausių nuosprendžių', 'naujausio nuosprendžio']} />
   <DataTable
     columns={[
       { label: 'Bylos numeris' },

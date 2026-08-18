@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-// adm-zip does not publish TypeScript declarations.
-// @ts-expect-error
 import AdmZip from "adm-zip";
 import {
     buildAnalize,

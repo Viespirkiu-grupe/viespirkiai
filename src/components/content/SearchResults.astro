@@ -142,6 +142,7 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
   });
 
   import { openModal } from '@design-system/components/modal.ts';
+  import { linksniuotiKOnly } from '@/utils/linksniai.js';
 
   const dialog = document.querySelector<HTMLElement>('#sutExportModal');
   const title = dialog?.querySelector<HTMLElement>('.ds-modal__title');
@@ -194,7 +195,7 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
   const showCorrectedEstimate = (expected: number, actual: number) => {
     if (!dialog || !count || !estimateNote || expected === actual) return;
     const update = () => {
-      count.innerHTML = `${actual.toLocaleString('lt-LT')} iš <del>${expected.toLocaleString('lt-LT')}</del> <strong>${actual.toLocaleString('lt-LT')}</strong> sutarčių (100 %)`;
+      count.innerHTML = `${actual.toLocaleString('lt-LT')} iš <del>${expected.toLocaleString('lt-LT')}</del> <strong>${actual.toLocaleString('lt-LT')}</strong> ${linksniuotiKOnly(actual, ['sutarties', 'sutarčių'])} (100 %)`;
       estimateNote.hidden = false;
     };
     const transitionDocument = document as Document & { startViewTransition?: (callback: () => void) => unknown };
@@ -263,7 +264,7 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
               correctedEstimate = true;
               showCorrectedEstimate(expectedTotal, processed);
             } else if (!correctedEstimate && data.phase !== 'downloading') {
-              count.textContent = `${processed.toLocaleString('lt-LT')} iš ${total.toLocaleString('lt-LT')} sutarčių (${Number(data.percent) || 0} %)`;
+              count.textContent = `${processed.toLocaleString('lt-LT')} iš ${total.toLocaleString('lt-LT')} ${linksniuotiKOnly(total, ['sutarties', 'sutarčių'])} (${Number(data.percent) || 0} %)`;
             }
             if (data.phase === 'downloading' && Number.isFinite(data.totalBytes)) {
               downloadStatus.hidden = false;

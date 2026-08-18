@@ -13,6 +13,7 @@
  * (`sutartysFilterLabels.ts`, `dokumentaiLabels.ts`), kad tekstas neišsiskirtų.
  */
 import { SUTARTYS_FILTER_LABELS } from './sutartysFilterLabels.ts';
+import { linksniuoti } from '@/utils/linksniai.js';
 import {
   CLASS_LABEL,
   DOKUMENTAI_PARAM_LABELS,
@@ -409,7 +410,7 @@ export function describeSearchQuery(
     .join(', ');
   const hidden = filters.length - MAX_LISTED_FILTERS;
   const filtersSentence = listed
-    ? `Filtrai: ${listed}${hidden > 0 ? ` ir dar ${hidden} filtrai` : ''}.`
+    ? `Filtrai: ${listed}${hidden > 0 ? ` ir dar ${linksniuoti(hidden, ['filtras', 'filtrai', 'filtrų', 'filtro'])}` : ''}.`
     : '';
 
   const hasQuery = Boolean(queryText || filters.length);

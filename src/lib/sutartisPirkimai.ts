@@ -1,4 +1,5 @@
 import { postgres } from '@/postgres/postgres.js';
+import { linksniuoti } from '@/utils/linksniai.js';
 
 /**
  * Sutarties „pirkimo numerio" atitikmenys.
@@ -265,7 +266,7 @@ function cvppAtitikmuo(sutartis: SutartiesKontekstas, grupe: any): PirkimoAtitik
     vidineNuoroda: null,
     isorineNuoroda: pirkimas?.link || pirmasSkelbimas?.link || null,
     papildoma: skelbimuSkaicius > 1
-      ? `${skelbimuSkaicius} skelbimai`
+      ? linksniuoti(skelbimuSkaicius, ['skelbimas', 'skelbimai', 'skelbimų', 'skelbimo'])
       : pirmasSkelbimas?.skelbimoTipas || null,
     detales: pirkimas?.pasiulymoPateikimoTerminas
       ? [{ label: 'Pasiūlymų terminas', value: String(pirkimas.pasiulymoPateikimoTerminas).slice(0, 10) }]

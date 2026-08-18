@@ -2,6 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import Chart from '@design-system/components/charts/Chart.astro';
 import ResultCardShell from '@design-system/components/ResultCardShell.astro';
+import Linksnis from '@design-system/components/Linksnis.astro';
 import { getColorScheme, getFont } from '../../lib/failai.js';
 import { postgres } from '@/postgres/postgres.js';
 
@@ -216,8 +217,8 @@ function formatDuration(d: any): string {
           <ResultCardShell>
             <div slot="meta" class="result-card-meta">
               <span>{toIsoDay(new Date(diena.day))}</span>
-              <span>{Number(diena.merged_incidents)} {Number(diena.merged_incidents) === 1 ? 'gedimas' : 'gedimai'}</span>
-              <span>{Number(diena.unmerged_events)} {Number(diena.unmerged_events) === 1 ? 'fiksavimas' : 'fiksavimai'}</span>
+              <span><Linksnis n={Number(diena.merged_incidents)} forms={['gedimas', 'gedimai', 'gedimų', 'gedimo']} /></span>
+              <span><Linksnis n={Number(diena.unmerged_events)} forms={['fiksavimas', 'fiksavimai', 'fiksavimų', 'fiksavimo']} /></span>
             </div>
 
             <h3 slot="title" class="result-card-title">

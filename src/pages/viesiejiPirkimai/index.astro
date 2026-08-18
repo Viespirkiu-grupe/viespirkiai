@@ -16,7 +16,7 @@ import { searchViesiejiPirkimai, countViesiejiPirkimai } from '@/modules/viesiej
 import Reklama from '../../components/reklamos/Reklama.astro';
 import { pickReklama } from '@/modules/reklamos/pickReklama.js';
 import { STATUSAS, PIRKIMO_BUDAS } from '@/modules/viesiejiPirkimai/viesiejiPirkimaiEnums.js';
-import { linksniuotiK } from '@/utils/linksniai.js';
+import { linksniuotiK, linksniuotiOnly } from '@/utils/linksniai.js';
 import config from '../../lib/config.ts';
 import { objectsToCsvStream } from '@/utils/csv.js';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
@@ -67,17 +67,17 @@ function buildNumberOfResults({ shown, total, elapsed, timings }: { shown: numbe
   const source = `<span class="inline timing-source"${timingsAttr}>(${trukme}, ${engine})</span>`;
   if (total == null) {
     return {
-      numberOfResults: `Rodomi ${shown} iš apie <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <span class="inline timing-source"${timingsAttr}> (${trukme}, ${engine})</span>`,
+      numberOfResults: `${linksniuotiOnly(shown, ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'])} ${shown} iš apie <span class="rezultatai-nezinomas-total"> ? </span> rezultatų <span class="inline timing-source"${timingsAttr}> (${trukme}, ${engine})</span>`,
       total: 10_000,
     };
   }
   if (shown < total)
     return {
-      numberOfResults: `Rodomi ${shown} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`,
+      numberOfResults: `${linksniuotiOnly(shown, ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'])} ${shown} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`,
       total,
     };
   return {
-    numberOfResults: `Rodomi ${shown} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`,
+    numberOfResults: `${linksniuotiOnly(shown, ['Rodomas', 'Rodomi', 'Rodoma', 'Rodoma'])} ${shown} iš apie ${linksniuotiK(total, ['rezultato', 'rezultatų'])} ${source}`,
     total,
   };
 }

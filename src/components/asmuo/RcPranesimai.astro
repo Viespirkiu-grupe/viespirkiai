@@ -13,7 +13,7 @@ const { rows, pranesimai } = asmuo.rcPranesimai;
   count={rows}
   shown={pranesimai.length}
   paramName="rcPranesimaiLimit"
-  label="naujausi pranešimai"
+  forms={['naujausias pranešimas', 'naujausi pranešimai', 'naujausių pranešimų', 'naujausio pranešimo']}
 >
   {pranesimai.map((p: any) => (
     <ResultCardShell>

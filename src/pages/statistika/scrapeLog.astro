@@ -21,6 +21,7 @@ import {
 import config from '../../lib/config.ts';
 import { getColorScheme, getFont } from '../../lib/failai.ts';
 import { fmtBytes } from '@/utils/units.js';
+import { linksniuotiK, linksniuotiOnly } from '@/utils/linksniai.js';
 
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
@@ -176,7 +177,7 @@ Astro.response.headers.set('Cache-Control', 'private, max-age=10');
 
             <section class="page-section">
               <div class="scrape-results-toolbar">
-                <ResultsSummary html={`Rodomi ${result.rows.length} iš ${numberFormat(result.total)} užklausų`} />
+                <ResultsSummary html={`${linksniuotiOnly(result.rows.length, ['Rodoma', 'Rodomos', 'Rodoma', 'Rodoma'])} ${result.rows.length} iš ${linksniuotiK(result.total, ['užklausos', 'užklausų'])}`} />
               </div>
               <DataTable
                 columns={[
