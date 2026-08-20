@@ -10,12 +10,24 @@ Status: draft
 flowchart LR
     CRON["Task Scheduler<br/>(triggers batch run)"]
     READER["Procurement Reader<br/>(loads valid procurements)"]
-    ENGINE["Risk Decision Engine<br/>(evaluates risk rules)"]
+
+    subgraph ENGINE["Risk Decision Engine — per Risk Indicator, per subject"]
+        direction LR
+        ELIG{"isEligible(subject)"}
+        ASSESS["assessRisk(subject)"]
+        SIGE(["RiskSignal<br/>insufficient_data / not_applicable"])
+        SIGA(["RiskSignal<br/>triggered / not_triggered"])
+        ELIG -->|" not eligible "| SIGE
+        ELIG -->|" eligible "| ASSESS
+        ASSESS --> SIGA
+    end
+
     WRITER["Signal Writer<br/>(persists risk signals)"]
     STORE[("risk.risk_signals")]
     CRON -->|" run trigger "| READER
-    READER -->|" Procurement + Lots "| ENGINE
-    ENGINE -->|" Risk Indicator outcomes "| WRITER
+    READER -->|" Procurement + Lots "| ELIG
+    SIGE --> WRITER
+    SIGA --> WRITER
     WRITER -->|" risk_signals rows "| STORE
 ```
 
@@ -66,8 +78,8 @@ classDiagram
 
 ### Decision Areas
 
-- **Procurement Risk Decision Service** (subject: `procurement`) 
-- **Procurement Lot Risk Decision Service** (subject: `lot`). 
+- **Procurement Risk Decision Service** (subject: `procurement`)
+- **Procurement Lot Risk Decision Service** (subject: `lot`).
 
 ### 3.1 Legend
 
@@ -122,7 +134,6 @@ flowchart BT
     P4 --> RDP
     PREST --> RDP
     EDP --> RDP
-
     IDL --> EDL
     IDL --> L1
     IDL --> L2
@@ -163,7 +174,8 @@ classDiagram
         +ParameterEntry[] parameters
         +RiskIndicatorStandard standard
         +RiskIndicatorPublicText public
-        +apply(subject: Subject) RiskSignal
+        +isEligible(subject: Subject) EligibilityOutcome
+        +assessRisk(subject: Subject) RiskSignal
     }
     class RiskIndicatorStandard {
         <<interface>>
@@ -191,6 +203,11 @@ classDiagram
         <<enumeration>>
         procurement, lot,
         contract, supplier
+    }
+    class EligibilityOutcome {
+        <<type>>
+        eligible
+        RiskSignal
     }
     class Subject {
         <<interface>>
@@ -227,20 +244,13 @@ classDiagram
     RiskIndicatorDefinition "1" *-- "1" RiskIndicatorStandard: standard
     RiskIndicatorDefinition "1" *-- "1" RiskIndicatorPublicText: public
     RiskIndicatorDefinition "1" *-- "0..*" ParameterEntry: parameters
-    RiskIndicatorDefinition "1" ..> "1" Subject: apply(subject)
-    RiskIndicatorDefinition "1" ..> "1" RiskSignal: apply() returns
+    RiskIndicatorDefinition "1" ..> "1" Subject: isEligible(subject)
+    RiskIndicatorDefinition "1" ..> "1" Subject: assessRisk(subject)
+    RiskIndicatorDefinition "1" ..> "1" EligibilityOutcome: isEligible() returns
+    RiskIndicatorDefinition "1" ..> "1" RiskSignal: assessRisk() returns
+    EligibilityOutcome "1" ..> "0..1" RiskSignal: when not eligible
     RiskSignal "1" --> "1" SignalState: state
 ```
-
-Notes:
-
-- `<<class>>` marks the one class with behaviour (`apply()`); everything else is `<<type>>` — a `Readonly<{...}>` shape
-  (`RiskIndicatorStandard`, `RiskIndicatorPublicText`, `ParameterEntry`, `Subject`, `RiskSignal`) or a closed
-  string-literal union (`SubjectType`, `SignalState`). No native TS `enum` — the codebase never uses one
-  (`modules/risk/contracts.ts`), and a string-literal union is the better default: no runtime object, safer to narrow,
-  and it's what `SubjectType`/`SignalState` already are in code.
-
-- `apply(subject)` is the one method. There is no `evaluate()` → `calculate()` → `decide()` split.
 
 ## 4. Risk Indicators
 
@@ -279,31 +289,29 @@ Notes:
 
 ### 4.2 Procurement Lot Risk Indicators (17)
 
-| Code      | Canonical Indicator                                   |
-|-----------|---------------------------------------------------------|
-| LT-COM-01 | Single valid bid                                       |
-| LT-COM-02 | Low number of bidders                                  |
-| LT-COM-07 | Missing expected bidder                                |
-| LT-COM-10 | Identical bid prices                                   |
-| LT-COM-11 | Fixed-multiple bid prices                              |
-| LT-COM-12 | Suspiciously close bid prices                          |
-| LT-COM-13 | Wide disparity in bid prices                           |
-| LT-PRI-01 | Estimated value anomalous against market benchmark     |
-| LT-PRI-03 | Winning price close to or above estimate               |
-| LT-PRI-08 | Bid prices deviate from Benford's Law                  |
+| Code      | Canonical Indicator                                           |
+|-----------|---------------------------------------------------------------|
+| LT-COM-01 | Single valid bid                                              |
+| LT-COM-02 | Low number of bidders                                         |
+| LT-COM-07 | Missing expected bidder                                       |
+| LT-COM-10 | Identical bid prices                                          |
+| LT-COM-11 | Fixed-multiple bid prices                                     |
+| LT-COM-12 | Suspiciously close bid prices                                 |
+| LT-COM-13 | Wide disparity in bid prices                                  |
+| LT-PRI-01 | Estimated value anomalous against market benchmark            |
+| LT-PRI-03 | Winning price close to or above estimate                      |
+| LT-PRI-08 | Bid prices deviate from Benford's Law                         |
 | LT-PRI-10 | Bid-price or discount movements inconsistent with competition |
-| LT-AWD-01 | All bids except winner disqualified                    |
-| LT-AWD-02 | Lowest bid disqualified                                |
-| LT-AWD-03 | Poorly supported disqualification                      |
-| LT-AWD-04 | Excessive share of disqualified bids                   |
-| LT-AWD-07 | Evaluation criteria excessively discretionary          |
-| LT-AWD-08 | Award criteria or scoring method incomplete            |
+| LT-AWD-01 | All bids except winner disqualified                           |
+| LT-AWD-02 | Lowest bid disqualified                                       |
+| LT-AWD-03 | Poorly supported disqualification                             |
+| LT-AWD-04 | Excessive share of disqualified bids                          |
+| LT-AWD-07 | Evaluation criteria excessively discretionary                 |
+| LT-AWD-08 | Award criteria or scoring method incomplete                   |
 
 ## 5. Open Questions
 
-| # | Question                                                                                                                                                                           |
-|---|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | Is one shared Procurement Eligibility Decision sufficient for all 28 indicators, or do some need their own additional eligibility rule?                                            |
-| 2 | Where does `requiredInputs` / Data Eligibility Decision sit in this v2 model — inside each Risk Indicator, or as a second shared decision beside Procurement Eligibility Decision? |
-| 3 | Does `Rule` (the TS method) get its own node, or does it stay boxed logic inside each Procurement Risk Indicator decision?                                                         |
-| 4 | §3.2 gives Lot its own Eligibility Decision, mirroring Procurement's, but §3.3 only defines the decision table for the Procurement one. Does Lot need its own table now, and does the same pattern (one shared Eligibility Decision per subject type) extend to the other 7 subject types? |
+| # | Question                                                                                                                                                                                                                                                                                   |
+|---|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | Is one shared Procurement Eligibility Decision sufficient for all 28 indicators, or do some need their own additional eligibility rule? ANSWER: you will extend DRD on demand.                                                                                                             |
+| 2 | Where does `requiredInputs` / Data Eligibility Decision sit in this v2 model — inside each Risk Indicator, or as a second shared decision beside Procurement Eligibility Decision? ANSWER: you will read all domain element view data.                                                     |
