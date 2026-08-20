@@ -91,6 +91,13 @@ export type ParsedParts = {
   phrase: boolean;
 } & Record<FacetKey, string[]>;
 
+// Pavadinimas naudotojui svarbesnis už turinį, bet Quickwit neturi rerank'o
+// etapo — vienintelis svertas yra boost'as. Kadangi `title` indeksuotas su
+// `fieldnorms: false`, BM25 neturi ir lauko ilgio normalizacijos, tad boost'as
+// atstoja abu dalykus: be jo atitiktis 4 žodžių pavadinime sveria tiek pat,
+// kiek viena užuomina 300 psl. PDF'e.
+const TITLE_BOOST = 6;
+
 const asArray = (value: string | string[] | undefined): string[] =>
   Array.isArray(value) ? value.filter(Boolean) : value ? [value] : [];
 
@@ -128,8 +135,24 @@ export function buildPartsExcluding(
     parts.push(`lon:[${bbox.minLon} TO ${bbox.maxLon}]`);
   }
   if (textQuery && textQuery !== '*') {
-    const terms = qwUserText(foldLithuanian(textQuery), { phrase: opts.phrase });
-    if (terms) parts.push(opts.phrase ? terms : `(${terms})`);
+    const folded = qwUserText(foldLithuanian(textQuery), { phrase: opts.phrase });
+    const raw = qwUserText(textQuery, { phrase: opts.phrase });
+    if (folded) {
+      // Bazinė sąlyga — tokia pat kaip anksčiau: be lauko prefikso, tad ieškoma
+      // per `default_search_fields` (text/author/title) kryžmai. Ji lieka PIRMA
+      // OR nariu, kad likusieji nariai rinkinį tik PLĖSTŲ: `title:(a b)` reikalauja
+      // visų terminų viename lauke, tad vien per-lauko OR nutrauktų atitiktį,
+      // kai „a" yra pavadinime, o „b" — tekste.
+      const clauses = [`(${folded})`, `title:(${folded})^${TITLE_BOOST}`];
+      // `title` ir `author` indeksuojami NEsulietuvinti (skirtingai nei `text`,
+      // žr. modules/dokumentai/quickwitProcessIndexQueue.js buildDoc), o
+      // Quickwit `default` tokenizatorius diakritikos nenuima — tad sulietuvinta
+      // užklausa jų nepasiekia. Pridedam žalią formą.
+      if (raw && raw !== folded) {
+        clauses.push(`title:(${raw})^${TITLE_BOOST}`, `author:(${raw})`);
+      }
+      parts.push(`(${clauses.join(' OR ')})`);
+    }
   }
   return parts.join(' AND ') || '*';
 }
