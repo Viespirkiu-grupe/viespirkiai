@@ -7,6 +7,7 @@
 // nebeskaitomas. Dabar: viena eilutė = viena nuoroda (pavadinimas apkarpomas iki
 // dviejų eilučių) + tyli meta eilutė. Ilga uodega slepiama po „Rodyti dar N".
 import { relationTypeLabel } from '../../lib/teisesAktaiLabels.ts';
+import { teisesAktoKelias } from '../../lib/teisesAktasPageData.ts';
 
 interface Props {
   title: string;
@@ -40,7 +41,7 @@ const meta = (item: any) => [
     <ul class="ta-rel">
       {matomi.map((item: any) => (
         <li class="ta-rel-item">
-          <a class="ta-rel-title" href={`/teisesAktas/${encodeURIComponent(item.targetLegalActId)}`}>
+          <a class="ta-rel-title" href={teisesAktoKelias(item.targetLegalActId)}>
             {item.title}
           </a>
           <p class="ta-rel-meta">
@@ -57,7 +58,7 @@ const meta = (item: any) => [
         <ul class="ta-rel">
           {likusieji.map((item: any) => (
             <li class="ta-rel-item">
-              <a class="ta-rel-title" href={`/teisesAktas/${encodeURIComponent(item.targetLegalActId)}`}>
+              <a class="ta-rel-title" href={teisesAktoKelias(item.targetLegalActId)}>
                 {item.title}
               </a>
               <p class="ta-rel-meta">

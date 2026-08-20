@@ -8,9 +8,9 @@ import TimelineItem from '@design-system/components/TimelineItem.astro';
 import ExternalSourceLink from '@design-system/components/ExternalSourceLink.astro';
 import FileCardList from '@design-system/components/FileCardList.astro';
 import Alert from '@design-system/components/Alert.astro';
-import TaRedakcijos from '../../components/teisesAktai/TaRedakcijos.astro';
-import TaRysiai from '../../components/teisesAktai/TaRysiai.astro';
-import { loadTeisesAktasPage } from '../../lib/teisesAktasPageData.ts';
+import TaRedakcijos from './TaRedakcijos.astro';
+import TaRysiai from './TaRysiai.astro';
+import type { loadTeisesAktasPage } from '../../lib/teisesAktasPageData.ts';
 import {
   METADATA_FIELD_LABEL, RELATED_SECTION_LABEL,
   statusasLabel, eurovocLabel, beTeksto, beTekstoZinute,
@@ -21,11 +21,15 @@ import config from '../../lib/config.ts';
 const colorScheme = getColorScheme(Astro.cookies);
 const font = getFont(Astro.cookies);
 
-const { id } = Astro.params;
-if (!id) return Astro.redirect('/404');
-
-const data = await loadTeisesAktasPage(id, Astro.url);
-if (!data) return Astro.redirect('/404');
+// Patį akto puslapį piešia šis komponentas, o ne pats maršrutas: tas pats vaizdas
+// pasiekiamas dviem adresais — `/teisesAktas/:id` (originalas) ir
+// `/teisesAktas/:id/:versija`. Duomenis paduoda maršrutas, nes tik jis gali
+// nukreipti (`Astro.redirect`), kai akto ar redakcijos nėra.
+interface Props {
+  id: string;
+  data: NonNullable<Awaited<ReturnType<typeof loadTeisesAktasPage>>>;
+}
+const { id, data } = Astro.props;
 
 const {
   act, current, metadata, fields, eurovoc, chronology,
@@ -52,7 +56,7 @@ const title = current?.title || act.title || id;
 
 // Kokia `?v=` reikšmė pažymi dabartinę rodomą redakciją — ją atkartojam į
 // `og:image` adresą, kad crawlerio paveikslėlis atitiktų skaitomą versiją.
-// `current` jau atspindi `Astro.url` parinktą redakciją (žr. loadTeisesAktasPage).
+// Paveikslėlio endpointas versiją tebeima iš `?v=`, o ne iš kelio.
 const ogV = current?.editionToken
   ?? (current?.variantas !== 'original' ? current?.variantas : '')
   ?? '';
@@ -141,8 +145,6 @@ const pageDescription = [
   fieldValue('act_type'),
   fieldValue('adopted_by'),
 ].filter(Boolean).join('\n');
-
-Astro.response.headers.set('Cache-Control', 'private, max-age=60');
 ---
 
 <Layout

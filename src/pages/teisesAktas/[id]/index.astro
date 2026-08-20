@@ -1,0 +1,25 @@
+---
+// Akto originalas: /teisesAktas/:id — versijos segmento nėra, nes originalas
+// yra numatytoji akto versija.
+//
+// Čia gyvena ir senųjų `?v=` adresų nukreipimai: iki šiol redakcija buvo
+// užklausos parametras, o dabar — kelio dalis, tad visos išorėje išlikusios
+// nuorodos vienu 301 pervedamos į naują pavidalą.
+import TeisesAktoPuslapis from '../../../components/teisesAktai/TeisesAktoPuslapis.astro';
+import { loadTeisesAktasPage, teisesAktoKelias } from '../../../lib/teisesAktasPageData.ts';
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect('/404');
+
+const senaVersija = Astro.url.searchParams.get('v');
+if (senaVersija != null) {
+  return Astro.redirect(teisesAktoKelias(id, senaVersija), 301);
+}
+
+const data = await loadTeisesAktasPage(id);
+if (!data) return Astro.redirect('/404');
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=60');
+---
+
+<TeisesAktoPuslapis id={id} data={data} />

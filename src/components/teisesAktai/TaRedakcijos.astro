@@ -8,7 +8,7 @@
 //
 // Sąrašas yra <details>, tad vienodai gerai atrodo ir su 2, ir su 200
 // redakcijų: uždarytas rodo tik dabartinę, atidarytas — slenkamą sąrašą.
-import type { Redakcija } from '../../lib/teisesAktasPageData.ts';
+import { teisesAktoKelias, type Redakcija } from '../../lib/teisesAktasPageData.ts';
 
 interface Props {
   redakcijos: Redakcija[];
@@ -17,8 +17,7 @@ interface Props {
 
 const { redakcijos, legalActId } = Astro.props;
 
-const href = (r: Redakcija) =>
-  `/teisesAktas/${encodeURIComponent(legalActId)}?v=${encodeURIComponent(r.key)}`;
+const href = (r: Redakcija) => teisesAktoKelias(legalActId, r.key);
 
 /** „2026-06-23 → 2026-07-08" arba „nuo 2026-07-09"; originalas — be datų. */
 function laikotarpis(r: Redakcija): string {
@@ -75,7 +74,7 @@ const others = redakcijos.length - 1;
               <ul class="ta-red-changes">
                 {r.changes.map((c: any) => (
                   <li>
-                    Pakeitė <a href={`/teisesAktas/${encodeURIComponent(c.amendingActId)}`}>{c.linkText}</a>
+                    Pakeitė <a href={teisesAktoKelias(c.amendingActId)}>{c.linkText}</a>
                     {c.adoptedAt && <span class="text-muted"> · {c.adoptedAt}</span>}
                   </li>
                 ))}

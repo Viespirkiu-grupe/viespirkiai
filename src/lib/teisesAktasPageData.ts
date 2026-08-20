@@ -6,10 +6,31 @@
 //   sidecar   — oficialus tekstas (indekse ir Postgres'e jo nėra, tik md5)
 //
 // Vienas aktas turi kelis DOKUMENTUS: originalą, galiojančią suvestinę ir po
-// vieną kiekvienai istorinei redakcijai. Puslapis rodo vieną iš jų (`?v=`), o
-// likusius — perjungikliu.
+// vieną kiekvienai istorinei redakcijai. Puslapis rodo vieną iš jų (kelio
+// segmentas po akto id), o likusius — perjungikliu.
 import { postgres } from '@/postgres/postgres.js';
 import { readETarSidecar } from '@/modules/eTar/eTarSidecar.js';
+
+/**
+ * Aktualią suvestinę redakciją adrese žymim `asr` — taip ją vadina ir pats
+ * e-TAR API. Originalas segmento neturi (`/teisesAktas/:id`), istorinės
+ * redakcijos adrese eina savo tokenu (`/teisesAktas/:id/:tokenas`).
+ */
+export const ASR_SEGMENTAS = 'asr';
+
+/** Redakcijos raktas (`editionToken` arba varianto kodas) → adreso segmentas. */
+export function versijosSegmentas(key: string | null | undefined): string {
+  if (!key || key === 'original') return '';
+  if (key === 'consolidated_edition') return ASR_SEGMENTAS;
+  return key;
+}
+
+/** Akto adresas: `/teisesAktas/:id` arba `/teisesAktas/:id/:versija`. */
+export function teisesAktoKelias(legalActId: string, key?: string | null): string {
+  const segmentas = versijosSegmentas(key);
+  return `/teisesAktas/${encodeURIComponent(legalActId)}`
+    + (segmentas ? `/${encodeURIComponent(segmentas)}` : '');
+}
 
 export interface TeisesAktasDocument {
   documentId: number;
@@ -71,7 +92,7 @@ export function flattenStructure(nodes: any[], maxDepth = 2): TurinioIrasas[] {
  * laikotarpis, nuo kada iki kada tas tekstas galiojo.
  */
 export interface Redakcija {
-  /** `?v=` reikšmė. */
+  /** Redakcijos tokenas arba varianto kodas; į adresą verčiam `teisesAktoKelias`. */
   key: string;
   /**
    * Kas ši redakcija yra ŠIANDIEN: originalas, šiuo metu galiojanti, jau
@@ -209,7 +230,11 @@ function groupBy<T>(rows: T[], key: (row: T) => string | number): Map<string, T[
   return out;
 }
 
-export async function loadTeisesAktasPage(legalActId: string, url: URL) {
+/**
+ * @param versija adreso segmentas po akto id: tuščias — originalas, `asr` —
+ *   aktuali suvestinė redakcija, kitkas — istorinės redakcijos tokenas.
+ */
+export async function loadTeisesAktasPage(legalActId: string, versija = '') {
   const { rows: actRows } = await postgres.query(
     `SELECT "legalActId", "title", "firstSeenAt", "fetchedAt" FROM "eTarLegalAct" WHERE "legalActId" = $1`,
     [legalActId],
@@ -232,13 +257,19 @@ export async function loadTeisesAktasPage(legalActId: string, url: URL) {
     documentId: Number(r.documentId),
   }));
 
-  // Pasirinktas dokumentas: `?v=original|consolidated_edition|<redakcijos tokenas>`.
-  const wanted = url.searchParams.get('v') ?? '';
-  const current = documents.find(d => d.editionToken === wanted)
-    ?? documents.find(d => d.variantas === wanted)
-    ?? documents.find(d => d.variantas === 'original')
-    ?? documents[0]
-    ?? null;
+  // Pasirinktas dokumentas. Be segmento rodom originalą; su segmentu — tik tai,
+  // ko prašyta: jei tokios redakcijos neturim, puslapis ne tyliai parodo kitą
+  // tekstą, o nusiunčia į akto pradžią (žr. `versijaNerasta`).
+  const wanted = versija === ASR_SEGMENTAS ? 'consolidated_edition' : versija;
+  const prašoma = wanted
+    ? documents.find(d => d.editionToken === wanted)
+      ?? documents.find(d => d.variantas === wanted)
+      ?? null
+    : null;
+  const current = wanted
+    ? prašoma
+    : documents.find(d => d.variantas === 'original') ?? documents[0] ?? null;
+  const versijaNerasta = Boolean(wanted) && prašoma == null;
 
   // Aktas gali būti stub'as (paminėtas nuorodose, bet dar nenuskaitytas) — tada
   // dokumentų nėra, bet puslapį vis tiek rodom su tuo, ką turim.
@@ -462,6 +493,7 @@ export async function loadTeisesAktasPage(legalActId: string, url: URL) {
     act,
     documents,
     current,
+    versijaNerasta,
     metadata,
     fields,
     eurovoc,

@@ -1,0 +1,28 @@
+---
+// Viena akto redakcija: /teisesAktas/:id/asr — aktuali suvestinė,
+// /teisesAktas/:id/:tokenas — istorinė.
+//
+// Originalas savo segmento neturi, tad `original` (ir jam lygiavertis
+// `consolidated_edition`) čia tik nukreipia į kanoninį adresą — kad tas pats
+// tekstas neturėtų dviejų adresų.
+import TeisesAktoPuslapis from '../../../components/teisesAktai/TeisesAktoPuslapis.astro';
+import { loadTeisesAktasPage, teisesAktoKelias, versijosSegmentas } from '../../../lib/teisesAktasPageData.ts';
+
+const { id, v } = Astro.params;
+if (!id || !v) return Astro.redirect('/404');
+
+// Segmentu atėję e-TAR variantų kodai (`original`, `consolidated_edition`) —
+// ne mūsų adresai; vedam į tuos, kurie mūsų.
+const kanoninis = versijosSegmentas(v);
+if (kanoninis !== v) return Astro.redirect(teisesAktoKelias(id, v), 301);
+
+const data = await loadTeisesAktasPage(id, v);
+if (!data) return Astro.redirect('/404');
+// Tokios redakcijos neturim (pasenusi nuoroda, klaidingas tokenas) — vietoj
+// tylaus kitos versijos teksto vedam į patį aktą.
+if (data.versijaNerasta) return Astro.redirect(teisesAktoKelias(id), 302);
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=60');
+---
+
+<TeisesAktoPuslapis id={id} data={data} />
