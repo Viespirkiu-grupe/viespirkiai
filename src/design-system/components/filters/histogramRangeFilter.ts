@@ -80,6 +80,7 @@ function initOne(root: HTMLElement) {
   const fmt = (v: number): string => {
     if (mode === 'date') return new Date(v).toLocaleDateString('lt-LT');
     const suffix = unit ? ' ' + unit : '';
+    if (v < 0) return '-' + fmt(-v);
     if (v >= 1e6) return (v / 1e6).toLocaleString('lt-LT', { maximumFractionDigits: 1 }) + ' mln.' + suffix;
     if (v >= 1e3) return Math.round(v / 1e3).toLocaleString('lt-LT') + ' tūkst.' + suffix;
     return Math.round(v).toLocaleString('lt-LT') + suffix;
@@ -126,9 +127,11 @@ function initOne(root: HTMLElement) {
     paint();
   }
   function syncFromInputs() {
-    minVal = Math.max(domainMin, readInput(inMin) ?? domainMin);
+    // Reikšmių nekarpom pagal domeną: domenas dinamiškas (apkarpytas pagal kitus
+    // filtrus), tad įvesta riba teisėtai gali būti už jo — pvz. neigiama suma.
+    // „Nėra ribos" reiškia tik tuščias / netaisyklingas laukelis.
+    minVal = readInput(inMin) ?? domainMin;
     maxVal = readInput(inMax) ?? domainMax;
-    if (maxVal <= 0) maxVal = domainMax;
     if (minVal > maxVal) minVal = maxVal;
     hMin.value = String(valToPos(minVal));
     hMax.value = String(maxVal >= domainMax ? STEPS : valToPos(maxVal));
@@ -137,8 +140,13 @@ function initOne(root: HTMLElement) {
   function commit() {
     if (window.matchMedia('(max-width: 900px)').matches) return;
     const p = new URLSearchParams(location.search);
-    if (minVal > domainMin) p.set(nameFrom, toFieldValue(Math.round(minVal))); else p.delete(nameFrom);
-    if (maxVal < domainMax) p.set(nameTo, toFieldValue(Math.round(maxVal))); else p.delete(nameTo);
+    // Ribą į URL dedam pagal laukelį (slankiklis kraštuose jį ištuština), o ne
+    // pagal palyginimą su domenu — kitaip už domeno esanti riba (pvz. neigiama)
+    // dingtų.
+    const rawMin = readInput(inMin);
+    const rawMax = readInput(inMax);
+    if (rawMin != null) p.set(nameFrom, toFieldValue(Math.round(rawMin))); else p.delete(nameFrom);
+    if (rawMax != null) p.set(nameTo, toFieldValue(Math.round(rawMax))); else p.delete(nameTo);
     p.delete('page');
     location.href = redirectBase + '?' + p.toString();
   }

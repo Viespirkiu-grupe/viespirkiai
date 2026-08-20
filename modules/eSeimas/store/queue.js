@@ -152,15 +152,23 @@ export async function extendScrapeDaysBackward({ count = 30, floor = null } = {}
     return rows.map(row => row.day).sort().reverse();
 }
 
-/** @returns {string[]} dienos (yyyy-mm-dd), kurių dar netraukėm arba traukėm seniausiai. */
-export async function pickDaysToScrape({ limit = 50, rescrapeOlderThanDays = null } = {}) {
+/**
+ * @param {Object} [opts]
+ * @param {string[]} [opts.exclude] - dienos, kurių NEgrąžinti (šiame paleidime jau
+ *   nepavykusios). "eSeimasScrapeDay" klaidų skaitiklio neturi, tad nepavykusi
+ *   diena lieka `lastScrapedAt IS NULL` ir be šito amžinai stovėtų rikiuotės
+ *   priekyje — užimtų visą LIMIT langą ir kitos dienos nebebūtų pasiekiamos.
+ * @returns {string[]} dienos (yyyy-mm-dd), kurių dar netraukėm arba traukėm seniausiai.
+ */
+export async function pickDaysToScrape({ limit = 50, rescrapeOlderThanDays = null, exclude = [] } = {}) {
     const { rows } = await postgres.query(
         `SELECT "day"::text AS day FROM "eSeimasScrapeDay"
-         WHERE "lastScrapedAt" IS NULL
-            OR ($2::int IS NOT NULL AND "lastScrapedAt" < now() - ($2 || ' days')::interval)
+         WHERE ("lastScrapedAt" IS NULL
+            OR ($2::int IS NOT NULL AND "lastScrapedAt" < now() - ($2 || ' days')::interval))
+           AND "day"::text <> ALL($3::text[])
          ORDER BY "lastScrapedAt" NULLS FIRST, "day" DESC
          LIMIT $1`,
-        [limit, rescrapeOlderThanDays],
+        [limit, rescrapeOlderThanDays, exclude],
     );
     return rows.map(row => row.day);
 }
@@ -168,8 +176,12 @@ export async function pickDaysToScrape({ limit = 50, rescrapeOlderThanDays = nul
 /**
  * Paima kitą darbo porciją vienam etapui.
  * @param {"document"|"editions"|"asr"} stage
+ * @param {Object} [opts]
+ * @param {Array<{category: string, legalActId: string}>} [opts.exclude] - aktai, kurių
+ *   NEgrąžinti: šiame paleidime jau nepavykę. Jų `retryAfter` kada nors ateina, o
+ *   iškviečiančioji pusė jų vis tiek neima — be šito jie atgal užimtų LIMIT langą.
  */
-export async function pickActsToScrape(stage, { limit = 100, maxFailures = 5 } = {}) {
+export async function pickActsToScrape(stage, { limit = 100, maxFailures = 5, exclude = [] } = {}) {
     const column = { document: "documentScrapedAt", editions: "editionsScrapedAt", asr: "asrScrapedAt" }[stage];
     if (!column) throw new Error(`Nežinomas etapas: ${stage}`);
 
@@ -178,11 +190,12 @@ export async function pickActsToScrape(stage, { limit = 100, maxFailures = 5 } =
          WHERE "${column}" IS NULL
            AND "failureCount" < $2
            AND ("retryAfter" IS NULL OR "retryAfter" <= now())
+           AND ("category", "legalActId") NOT IN (SELECT * FROM unnest($3::text[], $4::text[]))
          -- "legalActId" kaip antrinis raktas: visa dienos porcija turi vienodą
          -- "discoveredAt", tad be jo eilė tarp paleidimų būtų nedeterministinė.
          ORDER BY "discoveredAt", "category", "legalActId"
          LIMIT $1`,
-        [limit, maxFailures],
+        [limit, maxFailures, exclude.map(act => act.category), exclude.map(act => act.legalActId)],
     );
     return rows;
 }
@@ -192,6 +205,8 @@ export async function pickEditionsToScrape({
     limit = 100, category = null, legalActId = null, maxFailures = 5,
     /** Rankiniam paleidimui: paimam ir tas, kurios laukia savo backoff'o. */
     ignoreBackoff = false,
+    /** Redakcijos, kurios šiame paleidime jau nepavyko — žr. `pickActsToScrape`. */
+    exclude = [],
 } = {}) {
     const { rows } = await postgres.query(
         `SELECT "category", "legalActId", "editionToken" FROM "eSeimasEdition"
@@ -199,9 +214,16 @@ export async function pickEditionsToScrape({
            AND ($2::text IS NULL OR "category" = $2)
            AND ($3::text IS NULL OR "legalActId" = $3)
            AND ($5 OR ("failureCount" < $4 AND ("retryAfter" IS NULL OR "retryAfter" <= now())))
+           AND ("category", "legalActId", "editionToken")
+               NOT IN (SELECT * FROM unnest($6::text[], $7::text[], $8::text[]))
          ORDER BY "category", "legalActId", "ordinal"
          LIMIT $1`,
-        [limit, category, legalActId, maxFailures, ignoreBackoff],
+        [
+            limit, category, legalActId, maxFailures, ignoreBackoff,
+            exclude.map(edition => edition.category),
+            exclude.map(edition => edition.legalActId),
+            exclude.map(edition => edition.editionToken),
+        ],
     );
     return rows;
 }

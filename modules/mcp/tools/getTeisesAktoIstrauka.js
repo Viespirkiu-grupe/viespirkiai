@@ -19,14 +19,14 @@ export const schema = {
         .string()
         .min(1)
         .describe(
-            "Teisės akto ID iš /teisesAktas/{teisesAktoId}; pvz. URL /teisesAktas/TAR.1776DF569DAF?v=jiiUPSqGbP reiškia teisesAktoId=TAR.1776DF569DAF, versijosId=jiiUPSqGbP",
+            "Teisės akto ID iš /teisesAktas/{teisesAktoId}; pvz. URL /teisesAktas/TAR.1776DF569DAF/jiiUPSqGbP reiškia teisesAktoId=TAR.1776DF569DAF, versijosId=jiiUPSqGbP",
         ),
     versijosId: z
         .string()
         .min(1)
         .default("original")
         .describe(
-            "URL parametro ?v= reikšmė; pvz. ?v=jiiUPSqGbP reiškia versijosId=jiiUPSqGbP. Kai ?v nėra – original",
+            "Versijos segmentas URL'e po akto ID; pvz. /teisesAktas/TAR.1776DF569DAF/jiiUPSqGbP reiškia versijosId=jiiUPSqGbP. Aktuali suvestinė redakcija – asr; kai segmento nėra – original",
         ),
     dalys: z
         .array(z.string().min(1))

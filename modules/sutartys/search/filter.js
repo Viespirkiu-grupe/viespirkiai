@@ -1,4 +1,5 @@
 import { FilterBuilder } from "../../../utils/filter.js";
+import { SUMA_BAZES_ENUM, sumaBaze } from "./sumaBaze.js";
 import {
     VPM_SUTARTIS_ROW_FROM,
     VPM_SUTARTIS_ROW_SELECT,
@@ -89,8 +90,31 @@ export const sutartysFilter = new FilterBuilder({
         },
         { key: "verteNuo", col: `s."numatomaVerte"`, tsCol: "verte", type: "gte_number", hidden: true },
         { key: "verteIki", col: `s."numatomaVerte"`, tsCol: "verte", type: "lte_number", hidden: true },
-        { key: "sumaNuo", col: `s.verte`, tsCol: "suma", type: "gte_number", hidden: true },
-        { key: "sumaIki", col: `s.verte`, tsCol: "suma", type: "lte_number", hidden: true },
+        // Suma — pagal pasirinktą sumos bazę (žr. sumaBaze.js): faktinė arba
+        // numatyta, tik faktinė, tik numatyta.
+        {
+            key: "sumaNuo",
+            type: "gte_number",
+            hidden: true,
+            pgOverride: (addParam, val, query) => `${sumaBaze(query).pg} >= ${addParam(val)}`,
+            tsOverride: () => null,
+        },
+        {
+            key: "sumaIki",
+            type: "lte_number",
+            hidden: true,
+            pgOverride: (addParam, val, query) => `${sumaBaze(query).pg} <= ${addParam(val)}`,
+            tsOverride: () => null,
+        },
+        // Ne filtras, o režimas: pats įrašų neatrenka, bet keliauja URL'e
+        // (puslapiavimas, eksportas) ir nulemia sumos stulpelį filtrui/rikiavimui.
+        // `auto` neregistruojam — enum jo neatpažįsta, tad URL lieka švarus.
+        {
+            key: "sumaBaze",
+            enum: SUMA_BAZES_ENUM,
+            pgOverride: () => null,
+            tsOverride: () => null,
+        },
         {
             key: "tikSuDokumentais",
             isBoolean: true,
@@ -132,6 +156,9 @@ export const sutartysFilter = new FilterBuilder({
             "suma",
         ],
         nullsLast: true,
+        // Rikiavimas pagal sumą seka tą pačią sumos bazę kaip filtras.
+        pgAliases: { suma: (query) => sumaBaze(query).pgAlias },
+        tsAliases: { suma: (query) => sumaBaze(query).qw },
     },
 });
 

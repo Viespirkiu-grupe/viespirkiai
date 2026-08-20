@@ -21,6 +21,7 @@ export const SUTARTYS_FILTER_LABELS: Record<string, string> = {
   verteIki: 'Numatoma vertė iki',
   sumaNuo: 'Suma nuo',
   sumaIki: 'Suma iki',
+  sumaBaze: 'Suma laikyti',
   bvpzPrefiksas: 'BVPŽ kodas',
   bvpzPrefiksasKitas: 'BVPŽ kodas',
   tikSuDokumentais: 'Tik su dokumentais',

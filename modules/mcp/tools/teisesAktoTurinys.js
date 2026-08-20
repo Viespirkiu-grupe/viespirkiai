@@ -78,6 +78,9 @@ export function visibleRootNodes(structure) {
 }
 
 export async function loadLegalActDocument(teisesAktoId, versijosId = "original") {
+    // Viešame URL aktuali suvestinė redakcija vadinasi `asr` (/teisesAktas/:id/asr),
+    // o dokumentų lentelėje – e-TAR varianto kodu.
+    if (versijosId === "asr") versijosId = "consolidated_edition";
     const { rows } = await postgres.query(
         `SELECT d.id, d.md5, d.type, d.source, d.pavadinimas, d.url, d."failasId",
                 EXISTS (

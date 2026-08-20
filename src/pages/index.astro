@@ -11,7 +11,7 @@ import { splitFacetOptions } from '../lib/dokumentaiUrl.ts';
 import SearchResults from '../components/content/SearchResults.astro';
 import Reklama from '../components/reklamos/Reklama.astro';
 import { pickReklama } from '@/modules/reklamos/pickReklama.js';
-import { searchSutartys, countSutartys, countSutartysQuickwit, getSutartysQueryMetadata, iterateSutartysQuickwitExport } from '@/modules/sutartys/searchSutartys.js';
+import { searchSutartys, countSutartys, countSutartysQuickwit, getSutartysQueryMetadata, iterateSutartysQuickwitExport, SUMA_BAZES, sumaBaze } from '@/modules/sutartys/searchSutartys.js';
 import { linksniuoti, linksniuotiK, linksniuotiOnly } from '@/utils/linksniai.js';
 import config from '../lib/config.ts';
 import { objectsToJsonlStream } from '@/utils/jsonl.js';
@@ -512,6 +512,10 @@ const eksportasPerDaug = quickwitTotalZinomas
   && total <= EXPORT_GUIDANCE_LIMIT;
 values.limit = limit;
 
+// „Suma laikyti": kurią sutarties vertę laikom suma — filtrui, rikiavimui ir
+// kortelėse rodomai sumai (žr. modules/sutartys/search/sumaBaze.js).
+const sumaBazesRaktas = sumaBaze(query).raktas as 'auto' | 'faktine' | 'numatoma';
+
 // Kiekviena parinktis koduoja lauką ir kryptį (`laukas:kryptis`); numatytoji
 // (naujausiai redaguotos) turi tuščią reikšmę — sistemos numatytasis rikiavimas.
 const sortOptions = [
@@ -589,7 +593,15 @@ const ogMeta = describeSearchQuery('/', Astro.url.searchParams)!;
                 stacked
                 modal={{ field: 'tiekejaiKodai', title: 'Tiekėjas', always: true }}
               />
-              <HistogramRangeFilter mode="number" legend="Suma" unit="€" nameFrom="sumaNuo" nameTo="sumaIki" redirectBase="/" hist={facets.suma} valueFrom={values.sumaNuo as string | undefined} valueTo={values.sumaIki as string | undefined} ariaFrom="Suma nuo" ariaTo="Suma iki" />
+              <HistogramRangeFilter mode="number" legend="Suma" unit="€" nameFrom="sumaNuo" nameTo="sumaIki" allowNegative redirectBase="/" hist={facets.suma} valueFrom={values.sumaNuo as string | undefined} valueTo={values.sumaIki as string | undefined} ariaFrom="Suma nuo" ariaTo="Suma iki" />
+              <div class="dok-filter-section sut-suma-baze-sekcija">
+                <label class="dok-filter-section-label" for="sutSumaBaze">Suma laikyti</label>
+                <select id="sutSumaBaze" name="sumaBaze" class="form-control form-control-sm sut-suma-baze" data-autosubmit>
+                  {Object.values(SUMA_BAZES).map((b: any) => (
+                    <option value={b.raktas === 'auto' ? '' : b.raktas} selected={sumaBazesRaktas === b.raktas}>{b.label}</option>
+                  ))}
+                </select>
+              </div>
               <HistogramRangeFilter mode="date" legend="Laikotarpis" nameFrom="sudarymoDataNuo" nameTo="sudarymoDataIki" redirectBase="/" hist={facets.laikotarpis} valueFrom={values.sudarymoDataNuo as string | undefined} valueTo={values.sudarymoDataIki as string | undefined} ariaFrom="Sudaryta nuo" ariaTo="Sudaryta iki" />
               <DokFacetSection label="BVPŽ" param="bvpzPrefiksasKitas" facet={mkFacet('bvpzPrefiksasKitas', facets.bvpz, 8)} allLabel="Visi" stacked modal={{ field: 'bvpzKodai', title: 'BVPŽ klasifikacija', always: true }} />
               <DokFacetSection label="Tipas" param="tipas" facet={mkFacet('tipas', facets.tipas, 5)} allLabel="Visi" alwaysAll />
@@ -637,6 +649,7 @@ const ogMeta = describeSearchQuery('/', Astro.url.searchParams)!;
           flat={true}
           sortOptions={sortOptions}
           sortValue={sortValue}
+          sumaBaze={sumaBazesRaktas}
         />
         {reklama && <Reklama reklama={reklama} />}
       </div>
@@ -652,6 +665,17 @@ const ogMeta = describeSearchQuery('/', Astro.url.searchParams)!;
      padding-top:20px kiekvienai sekcijai, bet viršuje jis palieka tuščią plyšį. */
   .sut-facets :global(.dok-filter-section:first-child) {
     padding-top: 0;
+  }
+
+  /* „Suma laikyti" — kurią sutarties vertę laikom suma (filtrui, rikiavimui,
+     kortelėse rodomai sumai). Eina iškart po „Suma" rėžiu, tad tarpas mažesnis
+     nei tarp atskirų facetų sekcijų. */
+  .sut-facets :global(.sut-suma-baze-sekcija) {
+    padding-top: 10px;
+  }
+
+  .sut-suma-baze {
+    width: 100%;
   }
 
   /* Tarpas tarp Quickwit facetų ir tikslių įvesties filtrų apačioje (be linijos). */

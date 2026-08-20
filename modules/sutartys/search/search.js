@@ -17,6 +17,7 @@ import {
     SUTARTYS_EXPORT_LIMIT,
 } from "./quickwitQuery.js";
 import { sutartysFacets, sutartysQuickwitAggregates } from "./facets.js";
+import { sumaBaze } from "./sumaBaze.js";
 import { iterateSutartysQuickwitExport } from "./export.js";
 import { aptvarkytiRezultata, loadSearchRowsFromPostgres } from "./rows.js";
 
@@ -221,13 +222,14 @@ async function searchSutartysUncached(
     const needsAgg =
         includeAggregates && SELECTIVE_KEYS.some((k) => query[k] != null);
 
-    // "suma" = faktineIvykdimoVerte when settled, otherwise verte.
+    // Suma — pagal pasirinktą sumos bazę: `s.verte` (faktinė, o jos nesant
+    // numatyta), tik faktinė arba tik numatyta (žr. sumaBaze.js).
     const mainQuery = postgres.query(sql, params);
     const aggQuery = needsAgg
         ? postgres.query(
               sqlCount.replace(
                   "SELECT COUNT(*)",
-                  `SELECT COUNT(*) AS kiekis, COALESCE(SUM(s.verte), 0) AS "bendraVerte"`,
+                  `SELECT COUNT(*) AS kiekis, COALESCE(SUM(${sumaBaze(query).pg}), 0) AS "bendraVerte"`,
               ),
               paramsCount,
           )

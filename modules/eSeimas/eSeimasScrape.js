@@ -243,6 +243,11 @@ export const STAGES = ["days", "documents", "editions", "asr", "historical"];
  * Etapo aprašas: iš kur imti darbą, ką su juo daryti ir kaip vadinti elementą.
  * `key` reikalingas pipeline režimui — pagal jį atmetami elementai, kurie jau
  * yra darbe (DB žyma uždedama tik po sėkmės, tad `pick` juos vis dar grąžintų).
+ *
+ * `pick(take, praleisti)`: `praleisti` — šiame paleidime jau nepavykę elementai.
+ * Jie perduodami PAČIAI užklausai, o ne filtruojami po jos: kitaip jie stovėtų
+ * rikiuotės priekyje, užimtų visą `LIMIT` langą ir planuoklis gautų tuščią
+ * porciją, nors darbo dar apstu (žr. runPipeline pabaigos sąlygą).
  */
 function stageSpecs(runner, { rescrapeDays }) {
     return {
@@ -251,15 +256,16 @@ function stageSpecs(runner, { rescrapeDays }) {
             batchSize: 50,
             key: day => day,
             // "eSeimasScrapeDay" klaidų skaitiklio neturi, tad nepavykusi diena
-            // lieka nepažymėta — pakartotinį ėmimą stabdo planuoklio `skipped`.
-            pick: take => pickDaysToScrape({ limit: take, rescrapeOlderThanDays: rescrapeDays }),
+            // lieka nepažymėta — pakartotinį ėmimą stabdo `exclude`.
+            pick: (take, praleisti) =>
+                pickDaysToScrape({ limit: take, rescrapeOlderThanDays: rescrapeDays, exclude: praleisti }),
             work: day => runner.scrapeDay(day),
             onError: (day, error) => log(`Diena ${day} nepavyko: ${error.message}`),
         },
         documents: {
             label: "dokumentai",
             key: act => `${act.category}\0${act.legalActId}`,
-            pick: take => pickActsToScrape("document", { limit: take }),
+            pick: (take, praleisti) => pickActsToScrape("document", { limit: take, exclude: praleisti }),
             work: act => runner.scrapeDocument(act.category, act.legalActId),
             onError: async (act, error) => {
                 log(`dokumentas ${act.category}/${act.legalActId} nepavyko: ${error.message}`);
@@ -269,7 +275,7 @@ function stageSpecs(runner, { rescrapeDays }) {
         editions: {
             label: "redakcijų sąrašai",
             key: act => `${act.category}\0${act.legalActId}`,
-            pick: take => pickActsToScrape("editions", { limit: take }),
+            pick: (take, praleisti) => pickActsToScrape("editions", { limit: take, exclude: praleisti }),
             work: act => runner.scrapeEditionList(act.category, act.legalActId),
             onError: async (act, error) => {
                 log(`redakcijų sąrašas ${act.category}/${act.legalActId} nepavyko: ${error.message}`);
@@ -279,7 +285,7 @@ function stageSpecs(runner, { rescrapeDays }) {
         asr: {
             label: "galiojančios suvestinės",
             key: act => `${act.category}\0${act.legalActId}`,
-            pick: take => pickActsToScrape("asr", { limit: take }),
+            pick: (take, praleisti) => pickActsToScrape("asr", { limit: take, exclude: praleisti }),
             work: act => runner.scrapeConsolidated(act.category, act.legalActId),
             onError: async (act, error) => {
                 log(`suvestinė ${act.category}/${act.legalActId} nepavyko: ${error.message}`);
@@ -289,7 +295,7 @@ function stageSpecs(runner, { rescrapeDays }) {
         historical: {
             label: "istorinės suvestinės",
             key: edition => `${edition.category}\0${edition.legalActId}\0${edition.editionToken}`,
-            pick: take => pickEditionsToScrape({ limit: take }),
+            pick: (take, praleisti) => pickEditionsToScrape({ limit: take, exclude: praleisti }),
             work: edition => runner.scrapeHistoricalEdition(edition),
             onError: async (edition, error) => {
                 log(`istorinė redakcija ${edition.category}/${edition.legalActId}/${edition.editionToken} nepavyko: ${error.message}`);
@@ -301,6 +307,12 @@ function stageSpecs(runner, { rescrapeDays }) {
 
 const POLL_MS = 250;
 const PIPELINE_LOG_EVERY = 50;
+/** Kiek nepavykusių elementų daugiausia perduodam `pick` užklausai (žr. stageSpecs). */
+const MAX_EXCLUDE = 1000;
+/** Pauzė prieš kartojant nepavykusią `pick` užklausą. */
+const REFILL_RETRY_MS = 5_000;
+/** Po tiek `pick` klaidų iš eilės pasiduodam — su klaida, o ne tyliai „baigta". */
+const REFILL_MAX_ERRORS = 12;
 
 /**
  * Vienas planuoklis visiems etapams: `concurrency` darbininkų, kurie NUOLAT
@@ -317,19 +329,29 @@ const PIPELINE_LOG_EVERY = 50;
  * Paleidus vieną etapą (`--stage documents`) veikia lygiai tas pats planuoklis —
  * tiesiog su viena eile.
  *
- * Pabaiga: visi buferiai tušti, `pick` nieko negrąžina IR niekas nedirba — tik
- * tada naujo darbo nebegali atsirasti (dirbantis darbininkas dar gali atrasti
- * naujų aktų per susijusių aktų nuorodas).
+ * Pabaiga: visi buferiai tušti, niekas nedirba IR `pick` nieko negrąžino
+ * užklausoje, PRADĖTOJE niekam nedirbant. Paskutinė sąlyga svarbi: porcija,
+ * paimta elementams tebeesant ore, grąžina juos pačius, planuoklis juos atmeta
+ * kaip `inFlight` ir buferis lieka tuščias — tai atrodo lygiai kaip darbo
+ * pabaiga, nors darbo dar pilna. Dėl to pravažiavimas ir nutrūkdavo viduryje
+ * „lyg baigęs". Be to, dirbantis darbininkas dar gali atrasti naujo darbo
+ * (diena — aktų, redakcijų sąrašas — redakcijų).
  */
 export async function runPipeline(specs, { concurrency, limit = Infinity }) {
     const state = Object.entries(specs).map(([name, spec]) => ({
-        ...spec, name, buffer: [], inFlight: new Set(), skipped: new Set(),
-        done: 0, failed: 0, logged: 0,
+        ...spec, name, buffer: [], inFlight: new Set(), skipped: new Map(),
+        done: 0, failed: 0, logged: 0, perpildyta: false,
     }));
 
     let busy = 0;
     let cursor = 0;
     let refilling = null;
+    let refillErrors = 0;
+    // Didėja kaskart, kai darbininkas baigia elementą. Papildymo rezultatas,
+    // paimtas SU sena šio skaitiklio reikšme, apie darbo pabaigą nieko nesako:
+    // tuo metu elementai dar buvo ore ir `pick` juos grąžino kaip užimtus.
+    let darboVersija = 0;
+    let refillVersija = 0;
 
     // Naujas darbas atsiranda tik kai kuris nors darbininkas baigia savo darbą
     // (diena atranda aktų, redakcijų sąrašas — redakcijų). Todėl vietoj aklo
@@ -348,21 +370,49 @@ export async function runPipeline(specs, { concurrency, limit = Infinity }) {
             const taken = s.done + s.failed + s.inFlight.size;
             const take = Math.min(s.batchSize ?? 200, limit - taken);
             if (take <= 0) return;
-            const items = await s.pick(take);
+            // Šiame paleidime nulūžę elementai atmetami PAČIOJE užklausoje: jų
+            // DB backoff'as (`retryAfter`) kada nors baigiasi, o dienos jo iš
+            // viso neturi, tad kitaip jie grįžtų į `LIMIT` langą ir porcija
+            // ateitų tuščia — planuoklis tai palaikytų darbo pabaiga.
+            if (s.skipped.size > MAX_EXCLUDE && !s.perpildyta) {
+                s.perpildyta = true;
+                log(`${s.label}: šiame paleidime nepavykusių jau ${s.skipped.size}`
+                    + ` — į užklausą telpa ${MAX_EXCLUDE}, tolesnės porcijos gali retėti`);
+            }
+            const items = await s.pick(take, [...s.skipped.values()].slice(0, MAX_EXCLUDE));
             for (const item of items) {
                 // Elementas, kuris jau yra darbe arba buferyje: DB žymos dar nėra,
                 // tad `pick` jį grąžina pakartotinai. Be šito du darbininkai imtų
                 // tą patį aktą.
                 const key = s.key(item);
-                // `skipped` — šiame paleidime jau nulūžę elementai. DB backoff'as
-                // (`retryAfter`) uždedamas tik po klaidos, tad tarp lūžimo ir
-                // `recordFailure` pabaigos `pick` tą patį elementą dar spėja
-                // grąžinti; dienos savo skaitiklio iš viso neturi.
+                // `skipped` čia vis tiek tikrinam: tarp lūžimo ir `recordFailure`
+                // pabaigos užklausa galėjo išeiti su dar senu sąrašu.
                 if (s.inFlight.has(key) || s.skipped.has(key)) continue;
                 s.inFlight.add(key);
                 s.buffer.push(item);
             }
         }));
+    }
+
+    /**
+     * Vienas bendras papildymas visiems darbininkams. Klaidos NEmeta: laikinas DB
+     * trikdis neturi nei nužudyti darbininko, nei atrodyti kaip „darbo nebėra" —
+     * grąžinam `false` ir kartojam. Nuolatinę bėdą pagauna `REFILL_MAX_ERRORS`.
+     * @returns {Promise<boolean>} ar porcija paimta sėkmingai
+     */
+    function refillOnce() {
+        if (!refilling) {
+            refillVersija = darboVersija;
+            refilling = refillAll().then(
+                () => { refillErrors = 0; return true; },
+                (error) => {
+                    refillErrors += 1;
+                    log(`Darbo porcijos paimti nepavyko (${refillErrors}/${REFILL_MAX_ERRORS}): ${error.message}`);
+                    return false;
+                },
+            ).finally(() => { refilling = null; wakeAll(); });
+        }
+        return refilling;
     }
 
     /**
@@ -374,11 +424,18 @@ export async function runPipeline(specs, { concurrency, limit = Infinity }) {
         if (refilling) return;
         const stock = state.reduce((sum, s) => sum + s.buffer.length, 0);
         if (stock > concurrency) return;
-        refilling = refillAll()
-            .catch(() => {})            // laikina DB klaida — bandom kitą kartą
-            .finally(() => { refilling = null; wakeAll(); });
+        void refillOnce();
     }
 
+    /**
+     * Grąžina darbą arba `null`, kai jo tikrai nebėra.
+     *
+     * `busy` didinam ČIA, o ne darbininke: tarp `nextJob` grįžimo ir darbininko
+     * `busy++` yra microtask'o tarpas, per kurį kitas darbininkas pamatytų
+     * `busy === 0` su tuščiais buferiais ir išeitų kaip po darbo pabaigos. Taip
+     * baseinas tirpdavo po vieną darbininką, o nelaimingu atveju — visas iškart,
+     * ir procesas nutildavo „lyg baigęs" viduryje darbo.
+     */
     async function nextJob() {
         for (;;) {
             for (let i = 0; i < state.length; i++) {
@@ -386,19 +443,37 @@ export async function runPipeline(specs, { concurrency, limit = Infinity }) {
                 if (s.buffer.length) {
                     cursor = (cursor + i + 1) % state.length;
                     const item = s.buffer.shift();
+                    busy++;              // atomiškai su elemento paėmimu
                     maybePrefetch();     // atsargas pildom fone, darbo nestabdom
                     return { stage: s, item };
                 }
             }
 
-            // Buferiai tušti — čia jau laukiam papildymo.
-            if (!refilling) {
-                refilling = refillAll().finally(() => { refilling = null; });
-            }
-            await refilling;
+            // Buferiai tušti — čia jau laukiam papildymo. Versiją pasižymim
+            // PRIEŠ laukimą: po jo ji jau gali būti kito, naujesnio papildymo.
+            const papildymas = refillOnce();
+            const pradėtaVersijoje = refillVersija;
+            const ok = await papildymas;
             if (state.some(s => s.buffer.length)) continue;
 
-            if (busy === 0) return null;
+            if (!ok) {
+                // Nežinom, ar darbo nebėra — žinom tik, kad nepavyko paklausti.
+                if (refillErrors >= REFILL_MAX_ERRORS) {
+                    throw new Error(`Darbo porcijos paimti nepavyko ${refillErrors} kartus iš eilės — stabdoma`);
+                }
+                await sleep(REFILL_RETRY_MS);
+                continue;
+            }
+
+            // Tuščia porcija dar nereiškia pabaigos: dirbantis darbininkas gali
+            // atrasti naujo darbo (diena — aktų, redakcijų sąrašas — redakcijų).
+            if (busy === 0) {
+                // Ši porcija paimta, kol elementai dar buvo ore: `pick` juos
+                // grąžino, o mes atmetėm kaip `inFlight`, ir buferis liko tuščias
+                // ne dėl darbo pabaigos. Klausiam DB iš naujo — švariai.
+                if (pradėtaVersijoje !== darboVersija) continue;
+                return null;
+            }
             await waitForWork();
         }
     }
@@ -408,16 +483,16 @@ export async function runPipeline(specs, { concurrency, limit = Infinity }) {
             const job = await nextJob();
             if (!job) return;
             const { stage, item } = job;
-            busy++;
             try {
                 await stage.work(item);
                 stage.done++;
             } catch (error) {
                 stage.failed++;
-                stage.skipped.add(stage.key(item));
+                stage.skipped.set(stage.key(item), item);
                 await stage.onError(item, error);
             } finally {
                 busy--;
+                darboVersija++;
                 stage.inFlight.delete(stage.key(item));
                 wakeAll();
             }
@@ -429,6 +504,15 @@ export async function runPipeline(specs, { concurrency, limit = Infinity }) {
     }
 
     await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+
+    // Aiškiai pasakom, kodėl sustojom: anksčiau pravažiavimas galėjo nutrūkti
+    // viduryje ir tai atrodė lygiai taip pat, kaip tvarkinga pabaiga.
+    log(
+        `Pabaiga: darbo eilėse nebeliko (${state.map(s => `${s.label} ${s.done}/${s.done + s.failed}`).join(", ")})`
+        + (state.some(s => s.skipped.size)
+            ? `; šiame paleidime praleista po klaidų: ${state.filter(s => s.skipped.size).map(s => `${s.label} ${s.skipped.size}`).join(", ")}`
+            : ""),
+    );
 
     return Object.fromEntries(state.map(s => [s.name, { done: s.done, failed: s.failed }]));
 }

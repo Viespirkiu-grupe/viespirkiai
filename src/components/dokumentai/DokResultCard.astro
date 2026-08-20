@@ -8,6 +8,7 @@ import type { DokumentasHit } from '../../lib/searchDokumentai.ts';
 import { fmt, fmtDate, dateKey } from '../../lib/dokumentaiFormat.ts';
 import { TYPE_LABEL, SOURCE_LABEL, LANG_LABEL } from '../../lib/dokumentaiLabels.ts';
 import { statusasLabel, turinysLabel, variantasLabel } from '../../lib/teisesAktaiLabels.ts';
+import { teisesAktoKelias } from '../../lib/teisesAktasPageData.ts';
 
 interface Props {
   hit: DokumentasHit;
@@ -28,7 +29,7 @@ const externalUrl = hit.url || null;
 const internalUrl = hit.type === 'teismoNuosprendis' && hit.saltinioId2
   ? `/teismoNuosprendis/${hit.saltinioId2}`
   : isETar && hit.type === 'teisesAktas' && hit.saltinioId0
-    ? `/teisesAktas/${encodeURIComponent(hit.saltinioId0)}${hit.saltinioId3 || hit.saltinioId1 ? `?v=${encodeURIComponent(hit.saltinioId3 || hit.saltinioId1 || '')}` : ''}`
+    ? teisesAktoKelias(hit.saltinioId0, hit.saltinioId3 || hit.saltinioId1)
   : hit.failasId ? `/failas/${hit.failasId}` : null;
 const targetUrl = internalUrl || externalUrl || '#';
 const isExternal = !internalUrl && !!externalUrl;

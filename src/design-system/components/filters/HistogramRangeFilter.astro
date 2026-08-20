@@ -23,11 +23,14 @@ interface Props {
   unit?: string;
   ariaFrom?: string;
   ariaTo?: string;
+  /** number režime leisti neigiamas reikšmes (pvz. sutarčių suma būna ir minusinė). */
+  allowNegative?: boolean;
 }
 const {
   legend, nameFrom, nameTo, mode, hist,
   valueFrom, valueTo, redirectBase, unit = '',
   ariaFrom = `${legend} nuo`, ariaTo = `${legend} iki`,
+  allowNegative = false,
 } = Astro.props;
 
 const isDate = mode === 'date';
@@ -36,7 +39,7 @@ const DAY = 86_400_000;
 
 const domainMin = isDate
   ? (hist.domainMin || now - 365 * DAY)
-  : Math.max(0, hist.domainMin || 0);
+  : (allowNegative ? (hist.domainMin || 0) : Math.max(0, hist.domainMin || 0));
 const domainMax = isDate
   ? (hist.domainMax && hist.domainMax > domainMin ? hist.domainMax : now)
   : Math.max(domainMin + 1, hist.domainMax || 100_000_000);
@@ -59,6 +62,7 @@ const toDateStr = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const fmtData = (ms: number) => new Date(ms).toLocaleDateString('lt-LT');
 // Kompaktiškas skaičiaus formatas burbulams / vietaženkliams.
 const fmtNum = (n: number): string => {
+  if (n < 0) return `-${fmtNum(-n)}`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString('lt-LT', { maximumFractionDigits: 1 })} mln.`;
   if (n >= 1_000) return `${Math.round(n / 1_000).toLocaleString('lt-LT')} tūkst.`;
   return String(Math.round(n));
@@ -157,14 +161,14 @@ const bubMaxText = !isDate && maxVal >= domainMax ? fmt(domainMax) + '+' : fmt(m
 
   <div class={`hrf-inputs hrf-inputs--${mode}`}>
     <label class="hrf-box hrf-box--min">
-      <input type={inputType} name={nameFrom} min={isDate ? undefined : '0'} step="1"
-             inputmode={isDate ? undefined : 'numeric'} placeholder={placeholderMin}
+      <input type={inputType} name={nameFrom} min={isDate || allowNegative ? undefined : '0'} step="1"
+             inputmode={isDate || allowNegative ? undefined : 'numeric'} placeholder={placeholderMin}
              value={hasNuo ? fieldValue(minVal) : ''} aria-label={ariaFrom} class="hrf-input--min" />
       {unit && !isDate && <span class="hrf-box-unit">{unit}</span>}
     </label>
     <label class="hrf-box hrf-box--max">
-      <input type={inputType} name={nameTo} min={isDate ? undefined : '0'} step="1"
-             inputmode={isDate ? undefined : 'numeric'} placeholder={placeholderMax}
+      <input type={inputType} name={nameTo} min={isDate || allowNegative ? undefined : '0'} step="1"
+             inputmode={isDate || allowNegative ? undefined : 'numeric'} placeholder={placeholderMax}
              value={hasIki ? fieldValue(maxVal) : ''} aria-label={ariaTo} class="hrf-input--max" />
       {unit && !isDate && <span class="hrf-box-unit">{unit}</span>}
     </label>
