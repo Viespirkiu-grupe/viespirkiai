@@ -6,6 +6,7 @@ import { specialJarCodes } from "../../juridiniai/specialJarCodes.js";
 import { searchJar } from "../../juridiniai/search.js";
 import { splitCsv } from "./filter.js";
 import { sutartysDataHistogram, sutartysSumaHistogram } from "./histograms.js";
+import { sumaBaze } from "./sumaBaze.js";
 import {
     buildSutartysQuickwitQuery,
     QUICKWIT_LENTELE,
@@ -53,7 +54,8 @@ export async function sutartysQuickwitAggregates(query) {
                 body: JSON.stringify({
                     query: buildSutartysQuickwitQuery(query),
                     max_hits: 0,
-                    aggs: { suma: { sum: { field: "suma" } } },
+                    // Bendra vertė sumuojama pagal pasirinktą vertės bazę.
+                    aggs: { suma: { sum: { field: sumaBaze(query).qw } } },
                     format: "json",
                 }),
             }),

@@ -209,8 +209,8 @@ const COMPARISON_TYPES = {
  * @property {string} default - Default sort column.
  * @property {string} [defaultDir="desc"] - Default sort direction.
  * @property {string[]} allowed - Allowed sort column names.
- * @property {Record<string, string>} [pgAliases] - Maps query column names to Postgres column names.
- * @property {Record<string, string>} [tsAliases] - Maps query column names to Typesense field names.
+ * @property {Record<string, string | ((query: object) => string)>} [pgAliases] - Maps query column names to Postgres column names (or a resolver taking the query).
+ * @property {Record<string, string | ((query: object) => string)>} [tsAliases] - Maps query column names to Typesense field names (or a resolver taking the query).
  * @property {boolean} [nullsLast=false] - Appends NULLS LAST to Postgres sorting.
  */
 
@@ -418,8 +418,12 @@ export class FilterBuilder {
             );
         }
 
-        const pgCol = pgAliases[col] ?? col;
-        const tsCol = tsAliases[col] ?? col;
+        // Alias'as gali būti ir funkcija — kai stulpelis priklauso nuo užklausos
+        // (pvz. sutarčių „Suma laikyti" režimas keičia sumos stulpelį).
+        const resolveAlias = (alias) =>
+            typeof alias === "function" ? alias(query) : alias;
+        const pgCol = resolveAlias(pgAliases[col]) ?? col;
+        const tsCol = resolveAlias(tsAliases[col]) ?? col;
 
         return {
             orderBy: `"${pgCol}" ${dir.toUpperCase()}${nullsLast ? " NULLS LAST" : ""}`,

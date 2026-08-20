@@ -35,9 +35,11 @@ interface Props {
   flat?: boolean;
   sortOptions?: SortOption[];
   sortValue?: string;
+  /** „Suma laikyti" režimas — kortelėse rodoma suma seka paieškos pasirinkimą. */
+  sumaBaze?: 'auto' | 'faktine' | 'numatoma';
 }
 
-const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti, eksportasPerDaug = false, eksportoRiba = 20_000, containerClass, flat = false, sortOptions = [], sortValue = '' } = Astro.props;
+const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuoti, eksportasPerDaug = false, eksportoRiba = 20_000, containerClass, flat = false, sortOptions = [], sortValue = '', sumaBaze = 'auto' } = Astro.props;
 ---
 
 <ResultPageShell
@@ -82,7 +84,7 @@ const { numberOfResults, results, page, pageCount, queryParams, galimaEksportuot
     </Fragment>
   )}
   {results.map(item => (
-    <SutartisCard item={item} />
+    <SutartisCard item={item} sumaBaze={sumaBaze} />
   ))}
 </ResultPageShell>
 

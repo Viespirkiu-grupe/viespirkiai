@@ -1,5 +1,6 @@
 import { foldLithuanian } from "../../../utils/text.js";
 import { qwUserText } from "../../../quickwit/qwUserText.js";
+import { sumaBaze } from "./sumaBaze.js";
 
 export const QUICKWIT_LENTELE = "sutartys";
 export const QUICKWIT_PAGE_SIZE = 50;
@@ -105,10 +106,12 @@ export function buildSutartysQuickwitQuery(query, { exclude = [] } = {}) {
     if (Number.isFinite(verteIki)) parts.push(`verte:[* TO ${verteIki}]`);
 
     if (!skip("suma")) {
+        // Sumos laukas priklauso nuo „Suma laikyti" režimo (žr. sumaBaze.js).
+        const sumaLaukas = sumaBaze(query).qw;
         const sumaNuo = query.sumaNuo != null && parseFloat(String(query.sumaNuo).replace(",", "."));
         const sumaIki = query.sumaIki != null && parseFloat(String(query.sumaIki).replace(",", "."));
-        if (Number.isFinite(sumaNuo)) parts.push(`suma:[${sumaNuo} TO *]`);
-        if (Number.isFinite(sumaIki)) parts.push(`suma:[* TO ${sumaIki}]`);
+        if (Number.isFinite(sumaNuo)) parts.push(`${sumaLaukas}:[${sumaNuo} TO *]`);
+        if (Number.isFinite(sumaIki)) parts.push(`${sumaLaukas}:[* TO ${sumaIki}]`);
     }
 
     if (query.tikSuDokumentais !== undefined) parts.push(`dokumentuKiekis:>0`);
@@ -142,7 +145,9 @@ export function quickwitSortBy(query) {
         "paskelbimoData",
         "suma",
     ]);
-    const col = allowed.has(query.sort) ? query.sort : "paskutinioRedagavimoData";
+    const raw = allowed.has(query.sort) ? query.sort : "paskutinioRedagavimoData";
+    // Rikiavimas pagal sumą seka tą pačią vertės bazę kaip filtras.
+    const col = raw === "suma" ? sumaBaze(query).qw : raw;
     const dir = ["asc", "desc"].includes((query.sortDir || "").toLowerCase())
         ? query.sortDir.toLowerCase()
         : "desc";

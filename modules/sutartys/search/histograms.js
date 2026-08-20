@@ -5,14 +5,19 @@ import {
     QUICKWIT_LENTELE,
     qwDate,
 } from "./quickwitQuery.js";
+import { sumaBaze } from "./sumaBaze.js";
 
 const scrapeFetch = createScraperFetch("sutartys", { operation: "searchSutartys" });
 
 // Sumos pasiskirstymo (histogramos) log-skalės kraštinės (€): ~5 žingsniai
 // dekadai (1,2,3,5,7) nuo 10 iki 100 mln. Paskutinis kaušas — „nuo 100 mln."
-// (viskas virš). Slankiklio domenas: [0, paskutinė kraštinė].
+// (viskas virš). Slankiklio domenas: [pirmoji kraštinė, paskutinė kraštinė].
+// Pirmoji kraštinė neigiama: sutarčių suma būna ir minusinė (pvz. koreguojantys
+// pakeitimai), tad joms reikia savo kaušo — kitaip jos nematomos histogramoje ir
+// nepasiekiamos slankikliu.
+const SUMA_MIN_EDGE = -100_000_000;
 const SUMA_EDGES = (() => {
-    const edges = [0];
+    const edges = [SUMA_MIN_EDGE, 0];
     for (let d = 1; d <= 8; d++) {
         for (const m of [1, 2, 3, 5, 7]) {
             const v = m * 10 ** d;
@@ -45,7 +50,8 @@ export async function sutartysSumaHistogram(query) {
             body: JSON.stringify({
                 query: qwQuery,
                 max_hits: 0,
-                aggs: { suma: { range: { field: "suma", ranges } } },
+                // Histograma — pagal tą pačią sumos bazę kaip filtras („Suma laikyti").
+                aggs: { suma: { range: { field: sumaBaze(query).qw, ranges } } },
                 format: "json",
             }),
         });

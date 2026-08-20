@@ -28,9 +28,11 @@ interface SutartisCardItem {
 interface Props {
   item: SutartisCardItem;
   showRedagavimoData?: boolean;
+  /** „Suma laikyti" režimas iš paieškos (žr. modules/sutartys/search/sumaBaze.js). */
+  sumaBaze?: 'auto' | 'faktine' | 'numatoma';
 }
 
-const { item, showRedagavimoData = true } = Astro.props;
+const { item, showRedagavimoData = true, sumaBaze = 'auto' } = Astro.props;
 
 const tiekejai = item.tiekejai && item.tiekejai.length > 0
   ? item.tiekejai
@@ -44,7 +46,27 @@ const truncate = (s: string | null | undefined, n = 80) => {
   return v.length > n ? v.slice(0, n) + '…' : v;
 };
 
-const verte = Number(item.faktineIvykdimoVerte || item.verte);
+// Vertė: `verte` — numatoma (sudarant sutartį), `faktineIvykdimoVerte` — faktinė
+// įvykdymo vertė. Faktinę rodom ir tada, kai ji 0 (sutartis neįvykdyta) — anksčiau
+// nulis „iškrisdavo" per `||` ir vietoj jo matėsi numatoma vertė.
+const skaicius = (v: number | string | null | undefined): number | null => {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const numatoma = skaicius(item.verte);
+const faktine = skaicius(item.faktineIvykdimoVerte);
+// „Suma laikyti" režimas: tik faktinė / tik numatyta rodo būtent ją (nėra — „—"),
+// numatytasis (auto) — faktinę, o jos nesant numatytą.
+const verte = sumaBaze === 'faktine'
+  ? faktine
+  : sumaBaze === 'numatoma'
+    ? numatoma
+    : faktine ?? numatoma;
+// Kai faktinė skiriasi nuo numatytos, numatytą rodom perbrauktą prieš faktinę
+// (pvz. „26 000,00 € 0,00 €" — sutartis liko neįvykdyta).
+const rodytiNumatoma = sumaBaze === 'auto' && faktine != null && numatoma != null
+  && Math.round(faktine * 100) !== Math.round(numatoma * 100);
 const sudaryta = item.sudarymoData ? String(item.sudarymoData).slice(0, 10) : '';
 const galioja = item.galiojimoData ? String(item.galiojimoData).slice(0, 10) : '';
 const metaItems = [
@@ -76,7 +98,12 @@ const metaItems = [
   <div slot="title" class="flex align-baseline gap-3">
     <h3 class="result-card-title">
       <a href={`/sutartis/${item.sutartiesUnikalusId}`}>
-        <span class={`amount${verte > 10000 ? ' font-bold' : ''}`}>
+        {rodytiNumatoma && (
+          <s class="verte-numatoma" title="Numatoma sutarties vertė">
+            <MoneyValue value={numatoma} suffix={'\u00A0€'} mono={false} />
+          </s>
+        )}
+        <span class={`amount${(verte ?? 0) > 10000 ? ' font-bold' : ''}`} title={rodytiNumatoma ? 'Faktinė įvykdymo vertė' : undefined}>
           <MoneyValue value={verte} suffix={'\u00A0€'} mono={false} />
         </span>
         {item.pavadinimas.length < 1 ? <em>Nenurodyta</em> : item.pavadinimas}
@@ -118,3 +145,15 @@ const metaItems = [
     </div>
   )}
 </ResultCardShell>
+
+<style>
+  /* Perbraukta numatoma vertė prieš faktinę (pvz. „2̶6̶ ̶0̶0̶0̶ ̶€̶ 0 €" —
+     sutartis liko neįvykdyta). Antraeilė, bet įskaitoma. */
+  .verte-numatoma {
+    color: var(--gray);
+    font-weight: 400;
+    white-space: nowrap;
+    text-decoration-thickness: 1px;
+    margin-right: 4px;
+  }
+</style>

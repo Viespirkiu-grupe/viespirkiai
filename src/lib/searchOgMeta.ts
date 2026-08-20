@@ -13,6 +13,7 @@
  * (`sutartysFilterLabels.ts`, `dokumentaiLabels.ts`), kad tekstas neišsiskirtų.
  */
 import { SUTARTYS_FILTER_LABELS } from './sutartysFilterLabels.ts';
+import { SUMA_BAZES } from '@/modules/sutartys/search/sumaBaze.js';
 import { linksniuoti } from '@/utils/linksniai.js';
 import {
   CLASS_LABEL,
@@ -184,6 +185,7 @@ const ROUTES: Record<SearchRoute, RouteSpec> = {
       kategorija: { multi: true },
       bvpzPrefiksas: { multi: true, separator: ' ' },
       bvpzPrefiksasKitas: { multi: true, separator: ' ' },
+      sumaBaze: { format: (v: string) => (SUMA_BAZES as Record<string, { label: string }>)[v]?.label ?? v },
       sumaNuo: { format: eur },
       sumaIki: { format: eur },
       verteNuo: { format: eur },

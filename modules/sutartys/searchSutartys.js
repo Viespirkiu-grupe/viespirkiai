@@ -22,3 +22,4 @@ export {
     searchSutartys,
 } from "./search/search.js";
 export { aptvarkytiRezultata } from "./search/rows.js";
+export { SUMA_BAZES, sumaBaze } from "./search/sumaBaze.js";
