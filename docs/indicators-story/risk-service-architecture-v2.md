@@ -62,7 +62,12 @@ classDiagram
 | Procurement     | `v_pirkimas`      | `saltinis` + `pirkimoNumeris` |
 | Lot             | `v_pirkimo_dalis` | `subjektoRaktas`              |
 
-## 3. Procurement Risk Decision Service (DRD)
+## 3. Risk Decision Services (DRD)
+
+### Decision Areas
+
+- **Procurement Risk Decision Service** (subject: `procurement`) 
+- **Procurement Lot Risk Decision Service** (subject: `lot`). 
 
 ### 3.1 Legend
 
@@ -78,35 +83,60 @@ classDiagram
 
 ```mermaid
 flowchart BT
-    ID1(["Procurement<br/>+ Lots"])
+    IDP(["Procurement"])
+    IDL(["Lot"])
 
-    subgraph DS["Procurement Risk Decision Service"]
-        ED["Procurement Eligibility Decision"]
-        I1["LT-PRO-08<br/>Short submission period"]
-        I2["LT-PRI-05<br/>High estimated value"]
-        I3["LT-TRA-01<br/>Planning documents unavailable"]
-        I4["LT-COM-03<br/>Only one supplier invited"]
-        IREST["24 more Procurement Risk Indicators"]
-        RD["Procurement Risk Decision"]
+    subgraph DSP["Procurement Risk Decision Service"]
+        EDP["Procurement Eligibility Decision"]
+        P1["LT-PRO-08<br/>Short submission period"]
+        P2["LT-PRI-05<br/>High estimated value"]
+        P3["LT-TRA-01<br/>Planning documents unavailable"]
+        P4["LT-COM-03<br/>Only one supplier invited"]
+        PREST["24 more Procurement Risk Indicators"]
+        RDP["Procurement Risk Decision"]
     end
 
-    ID1 --> ED
-    ID1 --> I1
-    ID1 --> I2
-    ID1 --> I3
-    ID1 --> I4
-    ID1 --> IREST
-    ED --> I1
-    ED --> I2
-    ED --> I3
-    ED --> I4
-    ED --> IREST
-    I1 --> RD
-    I2 --> RD
-    I3 --> RD
-    I4 --> RD
-    IREST --> RD
-    ED --> RD
+    subgraph DSL["Procurement Lot Risk Decision Service"]
+        EDL["Lot Eligibility Decision"]
+        L1["LT-COM-01<br/>Single valid bid"]
+        L2["LT-COM-02<br/>Low number of bidders"]
+        L3["LT-PRI-01<br/>Value vs market benchmark"]
+        LREST["14 more Lot Risk Indicators"]
+        RDL["Lot Risk Decision"]
+    end
+
+    IDP --> EDP
+    IDP --> P1
+    IDP --> P2
+    IDP --> P3
+    IDP --> P4
+    IDP --> PREST
+    EDP --> P1
+    EDP --> P2
+    EDP --> P3
+    EDP --> P4
+    EDP --> PREST
+    P1 --> RDP
+    P2 --> RDP
+    P3 --> RDP
+    P4 --> RDP
+    PREST --> RDP
+    EDP --> RDP
+
+    IDL --> EDL
+    IDL --> L1
+    IDL --> L2
+    IDL --> L3
+    IDL --> LREST
+    EDL --> L1
+    EDL --> L2
+    EDL --> L3
+    EDL --> LREST
+    L1 --> RDL
+    L2 --> RDL
+    L3 --> RDL
+    LREST --> RDL
+    EDL --> RDL
 ```
 
 ### 3.3 Decision Table: Procurement Eligibility Decision
@@ -117,10 +147,6 @@ flowchart BT
 | no                            | `cvpp`            | not eligible        |
 
 ### 3.4 Risk Indicator Definition
-
-Every node `I1`…`IREST` in §3.2 is one deployed instance of this class, e.g. `ltCom01v1`
-(`modules/risk/indicators/LT-COM-01/definition.ts`). It is applied to exactly one subject at a time and always gives
-birth to exactly one Risk Signal — never zero, never more than one.
 
 ```mermaid
 classDiagram
@@ -215,12 +241,10 @@ Notes:
   and it's what `SubjectType`/`SignalState` already are in code.
 
 - `apply(subject)` is the one method. There is no `evaluate()` → `calculate()` → `decide()` split.
-- `Subject` is `procurement` \| `lot` \| `contract` \| `supplier` (§4, Open Question 4). Section 2's `Procurement` and
-  `Lot` are its only two subject shapes defined so far.
-- `RiskSignal` becomes one row of `risk.risk_signals` (§1.1's `Signal Writer`) once the run attaches `run_id`, `id`, and
-  `duration_ms` — those three columns belong to persistence, not to what `apply()` produces.
 
-## 4. Procurement Risk Indicators (28)
+## 4. Risk Indicators
+
+### 4.1 Procurement Risk Indicators (28)
 
 | Code      | Canonical Indicator                                   |
 |-----------|-------------------------------------------------------|
@@ -253,6 +277,28 @@ Notes:
 | LT-OTH-05 | Procedure unsuccessful or award not contracted        |
 | LT-OTH-06 | Strategic-policy objective not applied where relevant |
 
+### 4.2 Procurement Lot Risk Indicators (17)
+
+| Code      | Canonical Indicator                                   |
+|-----------|---------------------------------------------------------|
+| LT-COM-01 | Single valid bid                                       |
+| LT-COM-02 | Low number of bidders                                  |
+| LT-COM-07 | Missing expected bidder                                |
+| LT-COM-10 | Identical bid prices                                   |
+| LT-COM-11 | Fixed-multiple bid prices                              |
+| LT-COM-12 | Suspiciously close bid prices                          |
+| LT-COM-13 | Wide disparity in bid prices                           |
+| LT-PRI-01 | Estimated value anomalous against market benchmark     |
+| LT-PRI-03 | Winning price close to or above estimate               |
+| LT-PRI-08 | Bid prices deviate from Benford's Law                  |
+| LT-PRI-10 | Bid-price or discount movements inconsistent with competition |
+| LT-AWD-01 | All bids except winner disqualified                    |
+| LT-AWD-02 | Lowest bid disqualified                                |
+| LT-AWD-03 | Poorly supported disqualification                      |
+| LT-AWD-04 | Excessive share of disqualified bids                   |
+| LT-AWD-07 | Evaluation criteria excessively discretionary          |
+| LT-AWD-08 | Award criteria or scoring method incomplete            |
+
 ## 5. Open Questions
 
 | # | Question                                                                                                                                                                           |
@@ -260,4 +306,4 @@ Notes:
 | 1 | Is one shared Procurement Eligibility Decision sufficient for all 28 indicators, or do some need their own additional eligibility rule?                                            |
 | 2 | Where does `requiredInputs` / Data Eligibility Decision sit in this v2 model — inside each Risk Indicator, or as a second shared decision beside Procurement Eligibility Decision? |
 | 3 | Does `Rule` (the TS method) get its own node, or does it stay boxed logic inside each Procurement Risk Indicator decision?                                                         |
-| 4 | Same pattern for the other 8 subject types — one shared Eligibility Decision per subject type?                                                                                     |
+| 4 | §3.2 gives Lot its own Eligibility Decision, mirroring Procurement's, but §3.3 only defines the decision table for the Procurement one. Does Lot need its own table now, and does the same pattern (one shared Eligibility Decision per subject type) extend to the other 7 subject types? |
