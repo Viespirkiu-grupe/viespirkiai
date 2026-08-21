@@ -18,6 +18,45 @@ function frameEl() {
   return document.getElementById('taTekstas') as HTMLIFrameElement | null;
 }
 
+/**
+ * Telefono akto puslapyje rėmelis yra tik paspaudžiama ištrauka, ne antras
+ * slinkties konteineris. Užrakinam patį iframe dokumentą, nes vien tėvinio
+ * elemento `pointer-events` Android naršyklėse vizualios scrollbar nepaslepia.
+ */
+export function initTeisesAktoMobiliaPerziura() {
+  const frame = document.querySelector<HTMLIFrameElement>('.ta-panel:not(.is-reader) #taTekstas');
+  if (!frame) return;
+
+  const mq = window.matchMedia('(max-width: 640px)');
+  const apply = () => {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    const overflow = mq.matches ? 'hidden' : '';
+    doc.documentElement.style.overflow = overflow;
+    if (doc.body) doc.body.style.overflow = overflow;
+  };
+
+  frame.addEventListener('load', apply);
+  mq.addEventListener('change', apply);
+  if (frame.contentDocument?.readyState === 'complete') apply();
+}
+
+/** Per MPA navigaciją perduoda jau ekrane pritaikytą temą naujam skaitytuvui. */
+export function initTeisesAktoSkaitytuvoNuorodas() {
+  const links = document.querySelectorAll<HTMLAnchorElement>('a[data-ta-skaitytuvas]');
+  const sync = (link: HTMLAnchorElement) => {
+    const url = new URL(link.href, window.location.origin);
+    url.searchParams.set('scheme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    link.href = `${url.pathname}${url.search}${url.hash}`;
+  };
+
+  links.forEach((link) => {
+    link.addEventListener('pointerdown', () => sync(link));
+    link.addEventListener('click', () => sync(link));
+    link.addEventListener('focus', () => sync(link));
+  });
+}
+
 export function initTeisesAktoTekstoTema() {
   const frame = frameEl();
   const base = frame?.dataset.base;
@@ -49,7 +88,9 @@ export function initTeisesAktoTekstoTema() {
     // temos dokumentas atsikrauna.
     const y = frame.contentWindow?.scrollY ?? 0;
     frame.addEventListener('load', () => frame.contentWindow?.scrollTo(0, y), { once: true });
-    frame.src = `${base}?scheme=${scheme}`;
+    const url = new URL(base, window.location.origin);
+    url.searchParams.set('scheme', scheme);
+    frame.src = `${url.pathname}${url.search}`;
   };
 
   new MutationObserver(apply).observe(document.documentElement, {

@@ -1,0 +1,17 @@
+---
+import TeisesAktoTekstoPuslapis from '../../../components/teisesAktai/TeisesAktoTekstoPuslapis.astro';
+import { loadTeisesAktasPage, teisesAktoTekstoKelias } from '../../../lib/teisesAktasPageData.ts';
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect('/404');
+
+const senaVersija = Astro.url.searchParams.get('v');
+if (senaVersija != null) return Astro.redirect(teisesAktoTekstoKelias(id, senaVersija), 301);
+
+const data = await loadTeisesAktasPage(id);
+if (!data) return Astro.redirect('/404');
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=60');
+---
+
+<TeisesAktoTekstoPuslapis id={id} data={data} />

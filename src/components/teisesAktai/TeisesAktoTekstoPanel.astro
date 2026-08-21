@@ -1,0 +1,316 @@
+---
+import TaRedakcijos from './TaRedakcijos.astro';
+import type { Redakcija, TurinioIrasas } from '../../lib/teisesAktasPageData.ts';
+
+interface Props {
+  legalActId: string;
+  tekstoBase: string | null;
+  tekstoSrc: string | null;
+  tekstas: string | null;
+  turinys: TurinioIrasas[];
+  redakcijos: Redakcija[];
+  tusciasTekstas: string;
+  etarUrl: string;
+  skaitytuvoHref?: string;
+  aktoHref?: string;
+  pilnas?: boolean;
+}
+
+const {
+  legalActId, tekstoBase, tekstoSrc, tekstas, turinys, redakcijos,
+  tusciasTekstas, etarUrl, skaitytuvoHref, aktoHref, pilnas = false,
+} = Astro.props;
+
+const dalisHref = (partId: string) => `${tekstoSrc}#${encodeURIComponent(partId)}`;
+
+const TEAR_TEETH = 16;
+const TEAR_UNIT = 20;
+const TEAR_W = TEAR_TEETH * TEAR_UNIT;
+const TEAR_H = 10;
+let tearZig = 'M0 1';
+for (let i = 0; i < TEAR_TEETH; i++) {
+  tearZig += ` L${i * TEAR_UNIT + TEAR_UNIT / 2} 8 L${(i + 1) * TEAR_UNIT} 1`;
+}
+const tearFill = `${tearZig} L${TEAR_W} ${TEAR_H} L0 ${TEAR_H} Z`;
+---
+
+<div class:list={['ta-panel', pilnas && 'is-reader']}>
+  <div class="ta-panel-bar">
+    {pilnas && aktoHref && (
+      <a class="ta-reader-back" href={aktoHref} aria-label="Grįžti į teisės akto informaciją">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5" />
+          <path d="m12 19-7-7 7-7" />
+        </svg>
+        <span>Apie aktą</span>
+      </a>
+    )}
+
+    {turinys.length > 0 && tekstoSrc && (
+      <details class="ta-toc-box">
+        <summary>Turinys ({turinys.length})</summary>
+        <nav class="ta-toc" aria-label="Akto turinys">
+          {turinys.map((dalis) => (
+            <a
+              href={dalisHref(dalis.partId)}
+              target="taTekstas"
+              data-ta-dalis={dalis.partId}
+              class:list={['ta-toc-item', `ta-toc-d${dalis.depth}`]}
+            >
+              <span class="ta-toc-label">{dalis.label}</span>
+              {dalis.hidden > 0 && <span class="ta-toc-count">{dalis.hidden}</span>}
+            </a>
+          ))}
+        </nav>
+      </details>
+    )}
+
+    <TaRedakcijos redakcijos={redakcijos} legalActId={legalActId} skaitytuvas={pilnas} />
+  </div>
+
+  {tekstoSrc ? (
+    <div class="ta-frame-wrap">
+      <iframe
+        id="taTekstas"
+        src={tekstoSrc}
+        data-base={tekstoBase}
+        name="taTekstas"
+        title="Oficialus teisės akto tekstas"
+        class="ta-frame"
+        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+      ></iframe>
+
+      {!pilnas && skaitytuvoHref && (
+        <>
+          <svg class="ta-preview-tear" aria-hidden="true" viewBox={`0 0 ${TEAR_W} ${TEAR_H}`} preserveAspectRatio="none">
+            <path class="ta-preview-tear-fill" d={tearFill} />
+            <path class="ta-preview-tear-line" d={tearZig} vector-effect="non-scaling-stroke" />
+          </svg>
+          <a class="ta-preview-open" href={skaitytuvoHref} data-ta-skaitytuvas aria-label="Skaityti teisės aktą per visą ekraną">
+            <span>Padidinti</span>
+          </a>
+        </>
+      )}
+    </div>
+  ) : tekstas ? (
+    <article class="ta-tekstas">{tekstas}</article>
+  ) : (
+    <p class="ta-empty text-muted">
+      {tusciasTekstas} Žr. <a href={etarUrl} target="_blank" rel="noopener">e-TAR</a>.
+    </p>
+  )}
+</div>
+
+<style>
+  .ta-panel {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    view-transition-name: teises-akto-tekstas;
+  }
+  .ta-panel.is-fixed {
+    position: fixed;
+    z-index: 1;
+    border: none;
+    border-left: var(--border);
+    border-radius: 0;
+  }
+  .ta-panel.is-fixed .ta-frame { border-radius: 0; }
+  .ta-panel.is-reader {
+    border: 0;
+    border-radius: 0;
+  }
+  .ta-panel.is-reader .ta-frame-wrap { border-radius: 0; }
+  .ta-panel-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 39px;
+    padding: 5px 6px;
+    border-bottom: var(--border);
+  }
+  .ta-panel-bar > :global(.ta-red) {
+    margin-left: auto;
+    min-width: 0;
+    border: none;
+    background: transparent;
+  }
+  .ta-frame-wrap {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+  }
+  .ta-frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: none;
+    background: var(--white);
+  }
+  .ta-reader-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    color: var(--dark-gray);
+    font-size: var(--text-sm);
+    text-decoration: none;
+  }
+  .ta-reader-back svg { display: block; flex: 0 0 auto; }
+  .ta-reader-back:hover { color: var(--black); }
+
+  .ta-preview-tear,
+  .ta-preview-open { display: none; }
+
+  .ta-toc-box { position: relative; flex: 0 0 auto; }
+  .ta-toc-box > summary {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: var(--text-sm);
+    color: var(--dark-gray);
+    cursor: pointer;
+    list-style: none;
+  }
+  .ta-toc-box > summary::-webkit-details-marker { display: none; }
+  .ta-toc-box > summary::after {
+    content: '▾';
+    color: var(--gray);
+    transition: transform var(--transition);
+  }
+  .ta-toc-box[open] > summary::after { transform: rotate(-180deg); }
+  .ta-toc-box > summary:hover { color: var(--black); }
+  .ta-toc-box[open] .ta-toc { animation: ta-drop var(--transition); }
+  @keyframes ta-drop {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: none; }
+  }
+  .ta-toc {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    z-index: 20;
+    width: min(360px, 80vw);
+    display: flex;
+    flex-direction: column;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 4px 6px 8px;
+    border: var(--border);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    box-shadow: var(--shadow-md);
+  }
+  .ta-toc-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    color: var(--dark-gray);
+    text-decoration: none;
+  }
+  .ta-toc-item:hover { background: var(--lighter-gray); color: var(--black); }
+  .ta-toc-item.is-active { color: var(--black); font-weight: 600; }
+  .ta-toc-d0 { font-weight: 500; color: var(--black); }
+  .ta-toc-d1 { padding-left: 18px; }
+  .ta-toc-d2 { padding-left: 32px; font-size: var(--text-xs); }
+  .ta-toc-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ta-toc-count { flex-shrink: 0; font-size: var(--text-xs); color: var(--gray); font-variant-numeric: tabular-nums; }
+
+  .ta-tekstas {
+    flex: 1;
+    margin: 0;
+    padding: 24px;
+    white-space: pre-wrap;
+    line-height: 1.7;
+    overflow-y: auto;
+  }
+  .ta-empty { padding: 16px; }
+
+  @media (max-width: 1100px) {
+    .ta-panel:not(.is-reader) {
+      flex: none;
+      height: calc(18rem + 40px);
+    }
+    /* Jokio vh: Android naršyklės chromui susitraukiant viewport aukštis
+       perskaičiuojamas ir visa peržiūros kortelė kitaip matomai pašoka. */
+    .ta-panel:not(.is-reader) .ta-frame-wrap {
+      flex: none;
+      height: 18rem;
+      min-height: 0;
+      contain: layout paint;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .ta-panel:not(.is-reader) {
+      margin-bottom: 16px;
+      border-bottom: 0;
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+    }
+    .ta-panel:not(.is-reader) .ta-frame-wrap {
+      overflow: visible;
+      border-radius: 0;
+      contain: layout;
+    }
+    .ta-panel:not(.is-reader) .ta-frame { pointer-events: none; }
+    .ta-preview-tear {
+      display: block;
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 2;
+      width: 100%;
+      height: 10px;
+    }
+    .ta-preview-tear-fill { fill: var(--white); }
+    .ta-preview-tear-line {
+      fill: none;
+      stroke: var(--light-gray);
+      stroke-width: 1;
+      stroke-linejoin: round;
+    }
+    .ta-preview-open {
+      display: block;
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      text-decoration: none;
+    }
+    .ta-preview-open span {
+      position: absolute;
+      left: 50%;
+      bottom: -13px;
+      transform: translateX(-50%);
+      padding: 7px 16px;
+      border: var(--border);
+      border-radius: var(--radius-pill);
+      color: var(--black);
+      background: var(--white);
+      box-shadow: var(--shadow-md);
+      font-size: var(--text-sm);
+      font-weight: 500;
+    }
+    .ta-preview-open span::after { content: ' ↗'; font-size: var(--text-xs); }
+    .ta-panel-bar { gap: 2px; }
+    .ta-reader-back span { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ta-toc-box[open] .ta-toc { animation: none; }
+  }
+</style>

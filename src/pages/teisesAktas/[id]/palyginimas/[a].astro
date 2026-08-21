@@ -1,0 +1,18 @@
+---
+// Pasirinkta tik senesnė redakcija: /teisesAktas/:id/palyginimas/:a.
+import TaPalyginimas from '../../../../components/teisesAktai/TaPalyginimas.astro';
+import { loadPalyginimas, palyginimoKelias } from '../../../../lib/redakcijuPalyginimas.ts';
+
+const { id, a } = Astro.params;
+if (!id || !a) return Astro.redirect('/404');
+
+const data = await loadPalyginimas(id, a);
+if (!data) return Astro.redirect('/404');
+// Tokios redakcijos nėra arba jos teksto neturim — vedam į patį rinkimąsi,
+// o ne rodom pusiau tuščią puslapį su nesuprantamu tokenu adrese.
+if (!data.a && !data.klaida) return Astro.redirect(palyginimoKelias(id), 302);
+
+Astro.response.headers.set('Cache-Control', 'private, max-age=60');
+---
+
+<TaPalyginimas id={id} data={data} />

@@ -22,7 +22,7 @@ const faviconSVGURLEncoded = encodeURIComponent(faviconSVG);
 ---
 
 <!DOCTYPE html>
-<html lang="lt" class={colorScheme === 'dark' ? 'dark' : ''}>
+<html lang="lt" class={colorScheme === 'dark' ? 'dark' : ''} data-color-scheme={colorScheme}>
 <head>
   <meta charset="UTF-8" />
   <meta name="color-scheme" content={colorScheme === 'dark' ? 'dark' : colorScheme === 'light' ? 'light' : 'light dark'}>
@@ -56,7 +56,10 @@ const faviconSVGURLEncoded = encodeURIComponent(faviconSVG);
   <script is:inline>
     (function() {
       var cookie = document.cookie.split(';').map(function(c){ return c.trim(); }).find(function(c){ return c.startsWith('colorScheme='); });
-      var scheme = cookie ? cookie.split('=')[1] : 'auto';
+      var renderedScheme = document.documentElement.dataset.colorScheme;
+      var scheme = renderedScheme === 'dark' || renderedScheme === 'light'
+        ? renderedScheme
+        : (cookie ? cookie.split('=')[1] : 'auto');
       var isDark = scheme === 'dark' || (scheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.classList.toggle('dark', isDark);
       var colorSchemeMeta = document.querySelector('meta[name="color-scheme"]');
