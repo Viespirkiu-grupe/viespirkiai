@@ -31,6 +31,39 @@ flowchart LR
     WRITER -->|" risk_signals rows "| STORE
 ```
 
+### 1.2 Procurement Reader and Procurement Writer Components Class Diagram
+
+```mermaid
+classDiagram
+    class ProcurementReader {
+        <<class>>
+        -PROCUREMENT_SQL
+        -LOT_SQL
+        +loadProcurements()$ Procurement[]
+    }
+
+    class SignalWriter {
+        <<class>>
+        -EvaluationRun evaluationRun
+        +writeRiskSignals(signals: RiskSignal[])$ number
+        +updateEvaluationRun(update: Partial EvaluationRun)$ EvaluationRun
+    }
+
+    class RunJob {
+        <<module runJob.ts>>
+        +runEvaluation(options)$ RunResult
+    }
+
+    class RiskDecisionEngine {
+        -riskIndicators: RiskIndicatorDecision[]
+        evaluateProcurement(procurement: Procurement)$ RiskSignal[]
+    }
+
+    RunJob ..> ProcurementReader : loads batch of procurements
+    RunJob ..> RiskDecisionEngine : evaluates a single procurement
+    RunJob ..> SignalWriter : writes risk signals and updates evaluation run
+```
+
 ## 2. Procurement Business Object
 
 ### 2.1 Diagram
