@@ -11,9 +11,9 @@ import { toRfc3339 } from "../../utils/time.js";
 /*
 MCP įrankių iškvietimų logas → Quickwit.
 
-Schema NĖRA JS konstantoje (kitaip nei juridiniuose): ji gyvena
-`modules/mcp/mcpToolCalls.quickwit.yaml` ir į `quickwitLenteles` įdedama ranka.
-Todėl čia nėra `ensureConfig()` — tik patikra, kad įrašas egzistuoja.
+Indekso schema gyvena tik DB — `quickwitLenteles."indexConfig"` stulpelyje
+(`quickwit/quickwit.js` iš ten ją ir paima kurdamas shard'ą), tad kode jos
+nedubliuojame; čia lieka tik patikra, kad įrašas egzistuoja.
 
 `mcpToolCalls` skaidymas į žodynines lenteles vyksta dviem dalimis
 (`sql/mcpToolCallsSplit1.sql`, `sql/mcpToolCallsSplit2.sql`), tad šaltinio lentelė
@@ -38,10 +38,7 @@ async function ensureConfigRegistered() {
         [LENTELE],
     );
     if (!rows.length) {
-        throw new Error(
-            `quickwitLenteles neturi „${LENTELE}" įrašo — įdėkite ` +
-            "modules/mcp/mcpToolCalls.quickwit.yaml turinį į stulpelį \"indexConfig\"",
-        );
+        throw new Error(`quickwitLenteles neturi „${LENTELE}" įrašo`);
     }
     configChecked = true;
 }
