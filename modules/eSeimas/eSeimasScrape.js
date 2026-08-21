@@ -307,8 +307,6 @@ function stageSpecs(runner, { rescrapeDays }) {
 
 const POLL_MS = 250;
 const PIPELINE_LOG_EVERY = 50;
-/** Kiek nepavykusių elementų daugiausia perduodam `pick` užklausai (žr. stageSpecs). */
-const MAX_EXCLUDE = 1000;
 /** Pauzė prieš kartojant nepavykusią `pick` užklausą. */
 const REFILL_RETRY_MS = 5_000;
 /** Po tiek `pick` klaidų iš eilės pasiduodam — su klaida, o ne tyliai „baigta". */
@@ -340,7 +338,7 @@ const REFILL_MAX_ERRORS = 12;
 export async function runPipeline(specs, { concurrency, limit = Infinity }) {
     const state = Object.entries(specs).map(([name, spec]) => ({
         ...spec, name, buffer: [], inFlight: new Set(), skipped: new Map(),
-        done: 0, failed: 0, logged: 0, perpildyta: false,
+        done: 0, failed: 0, logged: 0,
     }));
 
     let busy = 0;
@@ -374,12 +372,11 @@ export async function runPipeline(specs, { concurrency, limit = Infinity }) {
             // DB backoff'as (`retryAfter`) kada nors baigiasi, o dienos jo iš
             // viso neturi, tad kitaip jie grįžtų į `LIMIT` langą ir porcija
             // ateitų tuščia — planuoklis tai palaikytų darbo pabaiga.
-            if (s.skipped.size > MAX_EXCLUDE && !s.perpildyta) {
-                s.perpildyta = true;
-                log(`${s.label}: šiame paleidime nepavykusių jau ${s.skipped.size}`
-                    + ` — į užklausą telpa ${MAX_EXCLUDE}, tolesnės porcijos gali retėti`);
-            }
-            const items = await s.pick(take, [...s.skipped.values()].slice(0, MAX_EXCLUDE));
+            // Perduodam VISUS šiame paleidime nepavykusius elementus. Čia negali
+            // būti fiksuotos ribos: pirmi neperduoti elementai vėl užpildytų visą
+            // SQL LIMIT langą, atmintyje būtų atmesti kaip `skipped`, o tuščias
+            // buferis būtų klaidingai palaikytas darbo pabaiga.
+            const items = await s.pick(take, [...s.skipped.values()]);
             for (const item of items) {
                 // Elementas, kuris jau yra darbe arba buferyje: DB žymos dar nėra,
                 // tad `pick` jį grąžina pakartotinai. Be šito du darbininkai imtų
