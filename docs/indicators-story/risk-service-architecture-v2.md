@@ -41,6 +41,8 @@ classDiagram
         -LOT_SQL
         +loadProcurements(subjects: string[], cursor: string, pageSize: number)$ Page~Procurement~
     }
+    note for ProcurementReader "Orphan lots (no matching procurement) can't happen by business invariant.
+    If LOT_SQL still returns one, log its count at WARNING and drop it — it is not a Subject."
 
     class Page~T~ {
         <<type>>
@@ -54,9 +56,8 @@ classDiagram
         +writeRiskSignals(signals: RiskSignal[])$ number
         +updateEvaluationRun(update: Partial EvaluationRun)$ EvaluationRun
     }
-    note for SignalWriter "updateEvaluationRun upserts: 
-    first call inserts the run row,later calls update it. 
-    No crash recovery, no retry."
+    note for SignalWriter "updateEvaluationRun upserts: first call inserts the run row, later calls update it —
+    accumulating per-indicator stats across pages. No crash recovery, no retry."
 
     class RunJob {
         <<module runJob.ts>>
@@ -65,13 +66,14 @@ classDiagram
 
     class RiskDecisionEngine {
         -riskIndicators: RiskIndicatorDecision[]
-        +evaluateProcurement(procurement: Procurement)$ RiskSignal[]
-        +evaluateLot(lot: Lot)$ RiskSignal[]
+        +evaluateAll(lot: Procurement[])$ RiskSignal[]
+        -evaluateProcurement(procurement: Procurement)$ RiskSignal[]
+        -evaluateLot(lot: Lot)$ RiskSignal[]        
     }
 
     RunJob ..> ProcurementReader : loop — loads next page (subjects filter, cursor) until nextCursor is null
     ProcurementReader --> Page : returns
-    RunJob ..> RiskDecisionEngine : evaluates each page's procurements + their lots
+    RunJob ..> RiskDecisionEngine : evaluates single batch of procurements
     RunJob ..> SignalWriter : writes page's signals
     RunJob ..> SignalWriter : updateEvaluationRun(status, stats) — inserts on first call, updates after
 ```
@@ -231,7 +233,6 @@ classDiagram
         +D definition
         +isEligible(subject: Subject) EligibilityOutcome*
         +assessRisk(subject: Subject) RiskSignal
-        +evaluate(subjects: Subject[]) RiskSignal[]
     }
     class AProcurementIndicatorDecision~F D~ {
         <<abstract>>
