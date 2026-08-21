@@ -66,10 +66,43 @@ classDiagram
 
     class RiskDecisionEngine {
         -riskIndicators: RiskIndicatorDecision[]
-        +evaluateAll(lot: Procurement[])$ RiskSignal[]
+        +evaluateAll(procurements: Procurement[])$ RiskSignal[]
         -evaluateProcurement(procurement: Procurement)$ RiskSignal[]
-        -evaluateLot(lot: Lot)$ RiskSignal[]        
+        -evaluateLot(lot: ProcurementLot)$ RiskSignal[]
     }
+
+    class RunJobOptions {
+        <<type>>
+        +string[] subjects
+        +number pageSize
+    }
+
+    class RunResult {
+        <<type>>
+        +number runId
+        +RunStatus status
+    }
+
+    class EvaluationRun {
+        <<type>>
+        +number runId
+        +RunStatus status
+        +timestamp dataAsOf
+        +object statistics
+    }
+
+    class RunStatus {
+        <<enumeration>>
+        running
+        succeeded
+        partial
+        failed
+    }
+
+    EvaluationRun "1" --> "1" RunStatus: status
+    RunResult "1" --> "1" RunStatus: status
+    RunJob ..> RunJobOptions: options
+    RunJob --> RunResult: returns
 
     RunJob ..> ProcurementReader : loop — loads next page (subjects filter, cursor) until nextCursor is null
     ProcurementReader --> Page : returns
@@ -97,9 +130,9 @@ classDiagram
         +timestamp pasiulymuPateikimoTerminas
         +text[] bvpzKodai
         +boolean esFinansavimas
-        +Lot[] lots
+        +ProcurementLot[] lots
     }
-    class Lot {
+    class ProcurementLot {
         +text subjektoRaktas
         +text saltinis
         +text pirkimoNumeris
@@ -111,15 +144,15 @@ classDiagram
         +integer kainuSkaicius
         +integer atmestuSkaicius
     }
-    Procurement "1" *-- "0..*" Lot: lots
+    Procurement "1" *-- "0..*" ProcurementLot: lots
 ```
 
 ### 2.2 Field Provenance
 
 | Business Object | Domain Model View | Key                           |
-|-----------------|-------------------|-------------------------------|
-| Procurement     | `v_pirkimas`      | `saltinis` + `pirkimoNumeris` |
-| Lot             | `v_pirkimo_dalis` | `subjektoRaktas`              |
+|------------------|-------------------|-------------------------------|
+| Procurement      | `v_pirkimas`      | `saltinis` + `pirkimoNumeris` |
+| ProcurementLot    | `v_pirkimo_dalis` | `subjektoRaktas`              |
 
 ## 3. Risk Decision Services (DRD)
 
@@ -143,7 +176,7 @@ classDiagram
 ```mermaid
 flowchart BT
     IDP(["Procurement"])
-    IDL(["Lot"])
+    IDL(["ProcurementLot"])
 
     subgraph DSP["Procurement Risk Decision Service"]
         EDP["Procurement Eligibility Decision"]
@@ -197,12 +230,22 @@ flowchart BT
     EDL --> RDL
 ```
 
-### 3.3 Decision Table: Procurement Eligibility Decision
+### 3.3 Decision Tables: Eligibility Decisions
+
+#### Procurement Eligibility Decision
 
 | Input: `pirkimoBudas` present | Input: `saltinis` | Output: Eligibility |
 |-------------------------------|-------------------|---------------------|
 | yes                           | `cvpis`           | eligible            |
 | no                            | `cvpp`            | not eligible        |
+
+#### Lot Eligibility Decision
+
+| Input: Parent Procurement Eligibility | Input: `deklaruota` | Output: Eligibility |
+|----------------------------------------|----------------------|----------------------|
+| eligible                               | true                  | eligible             |
+| eligible                               | false                 | not eligible         |
+| not eligible                           | any                   | not eligible         |
 
 ### 3.4 Risk Indicator Definition
 
@@ -275,12 +318,14 @@ classDiagram
         RiskSignal
     }
     class Subject {
-        <<interface>>
-        +SubjectType subjectType
-        +string subjectKey
-        +string procurementSource
-        +string procurementId
+        <<type>>
+        Procurement
+        ProcurementLot
     }
+    note for Subject "Procurement | ProcurementLot — full fields in §2.1.
+    subjectType/subjectKey/procurementSource/procurementId (carried by RiskSignal below) are
+    derived from each object's own key (§2.2: saltinis+pirkimoNumeris for Procurement,
+    subjektoRaktas for ProcurementLot), not stored as separate fields on the object itself."
     class RiskSignal {
         <<interface>>
         +string indicatorId
