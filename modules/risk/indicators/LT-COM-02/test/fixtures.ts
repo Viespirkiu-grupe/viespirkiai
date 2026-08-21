@@ -1,10 +1,10 @@
-import type { LtCom02Facts } from "../rules.ts";
+import type { LtCom02Facts } from "../decision.ts";
 
 // Deterministic cases shared by both halves of the indicator's tests.
 //
 // Each fixture is a procurement shape *and* the fact rows collect.sql must
 // produce from it. collect.it.ts asserts the SQL returns exactly `facts`;
-// rules.test.ts feeds those same rows to ltCom02Decide. The two tests
+// decision.test.ts feeds those same rows to LtCom02Decision.decide. The two tests
 // therefore meet on one value rather than on two independent guesses about
 // what a fact row looks like
 // (docs/indicators-story/risk-service-architecture-v2.md).

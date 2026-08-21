@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Lot, Procurement } from "./contracts.ts";
+import type { Lot, Procurement } from "./types.ts";
 import { lotEligibility, procurementEligibility } from "./procurementEligibility.ts";
 
 function procurement(overrides: Partial<Procurement> = {}): Procurement {

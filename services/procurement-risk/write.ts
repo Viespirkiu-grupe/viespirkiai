@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import type { RiskObservationV1 } from "../../modules/risk/contracts.ts";
+import type { RiskSignal } from "../../modules/risk/types.ts";
 
 export type WriteStats = Readonly<{ inserted: number }>;
 
@@ -22,7 +22,7 @@ export async function writeObservations(
     client: PoolClient,
     indicatorId: string,
     runId: number,
-    observations: readonly RiskObservationV1[],
+    observations: readonly RiskSignal[],
 ): Promise<WriteStats> {
     if (observations.length === 0) {
         return { inserted: 0 };

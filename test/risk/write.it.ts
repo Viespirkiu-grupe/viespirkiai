@@ -9,11 +9,11 @@ import type { PoolClient } from "pg";
 import { riskDb } from "../../postgres/riskDb.js";
 import { writeObservations } from "../../services/procurement-risk/write.ts";
 import { deleteExpiredSnapshots } from "../../services/procurement-risk/retention.ts";
-import type { RiskObservationV1 } from "../../modules/risk/contracts.ts";
+import type { RiskSignal } from "../../modules/risk/types.ts";
 
 const INDICATOR_ID = "LT-WRITE-TEST-01";
 
-function observation(overrides: Partial<RiskObservationV1> = {}): RiskObservationV1 {
+function observation(overrides: Partial<RiskSignal> = {}): RiskSignal {
     return {
         indicatorId: INDICATOR_ID,
         indicatorVersion: 1,

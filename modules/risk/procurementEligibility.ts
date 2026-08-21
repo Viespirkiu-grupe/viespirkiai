@@ -1,4 +1,4 @@
-import type { Decision, Lot, Procurement } from "./contracts.ts";
+import type { Decision, Lot, Procurement } from "./types.ts";
 
 // The Procurement Eligibility Decision and its lot-level equivalent
 // (docs/indicators-story/risk-service-architecture-v2.md §3.3): the shared

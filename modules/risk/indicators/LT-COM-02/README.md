@@ -12,15 +12,15 @@ report, the same grain as [`LT-COM-01`](../LT-COM-01/README.md) and the natural 
 | File                    | Question it answers                                                              |
 |-------------------------|------------------------------------------------------------------------------------|
 | `collect.sql`           | What is true about each lot — the participant count, method, when reported        |
-| `rules.ts`              | What that means — the state, the threshold that decided it, and the evidence      |
 | `parameters.ts`         | What it compares against, and since when                                          |
-| `definition.ts`         | Identity, lifecycle, public wording, and the wiring between the three above       |
+| `definition.ts`         | Identity, lifecycle, public wording — pure metadata, no behaviour                 |
+| `decision.ts`           | What the facts mean — the state, the threshold that decided it, the evidence — plus the `ALotIndicatorDecision` wiring, with `static decide()` as its judgement method (replaces `rules.ts`) |
 | `test/`                 | How we know it works                                                              |
 
 Inside `test/`, `fixtures.ts` states both the source rows and the fact row `collect.sql` must produce from them;
-`rules.test.ts` decides those fact rows with no database, and `collect.it.ts` proves the statement really produces
+`decision.test.ts` decides those fact rows with no database, and `collect.it.ts` proves the statement really produces
 them against a real PostgreSQL. Everything else — identity fields, parameter resolution, `not_applicable` when no entry
-applies — belongs to `SubjectFactsIndicator` and is tested once in `test/risk/subjectFactsIndicator.test.ts`.
+applies — belongs to `ARiskIndicatorDecision`/`ALotIndicatorDecision` and is tested once in `test/risk/procurementLotDecision.test.ts`.
 
 ## How this differs from LT-COM-01
 

@@ -4,7 +4,7 @@ import { log } from "../../utils/log.js";
 import { PostgresRiskDataSource } from "../../modules/risk/riskDataSource.ts";
 import { riskIndicatorRegistry } from "../../modules/risk/deployedIndicators.ts";
 import { loadProcurements } from "../../modules/risk/procurementReader.ts";
-import type { Subject } from "../../modules/risk/contracts.ts";
+import type { Subject } from "../../modules/risk/types.ts";
 import { writeObservations } from "./write.ts";
 
 export type RunJobOptions = Readonly<{

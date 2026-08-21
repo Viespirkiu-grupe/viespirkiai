@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ParameterEntry } from "../../contracts.ts";
+import type { ParameterEntry } from "../../types.ts";
 
 // The effective-dated parameter timeline. See
 // docs/indicators-story/risk-service-architecture.md §7.3.

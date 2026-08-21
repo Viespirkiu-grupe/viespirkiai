@@ -1,7 +1,7 @@
 // Integration test for LT-COM-03's collect.sql. Runs the real statement
 // against fixture rows in the local risk-dev Postgres's test-only `public`
 // schema, and asserts the *facts* it returns — the decisions derived from them
-// are rules.test.ts's job, and need no database
+// are decision.test.ts's job, and need no database
 // (docs/indicators-story/risk-service-architecture-v2.md). The "end to end"
 // describe block below additionally proves the Procurement Reader +
 // isEligible()/assessRisk() wiring, which collect.sql alone no longer covers
@@ -18,10 +18,9 @@ import { riskDb } from "../../../../../postgres/riskDb.js";
 import { ensurePublicTestSchema, truncateTestPublicTables } from "../../../../../test/risk/testPublicDb.ts";
 import { insertAtaskaita, insertDalyvis, insertPasiulymas } from "../../test/xlsxPPAFixtures.ts";
 import { PostgresRiskDataSource } from "../../../riskDataSource.ts";
-import type { RiskObservationV1 } from "../../../contracts.ts";
+import type { RiskSignal } from "../../../types.ts";
 import { loadProcurements } from "../../../procurementReader.ts";
-import { ltCom03v1 } from "../definition.ts";
-import type { LtCom03Facts } from "../rules.ts";
+import { ltCom03v1, type LtCom03Facts } from "../decision.ts";
 import {
     differentSuppliersAcrossTwoLots,
     duplicateSupplierRows,
@@ -155,7 +154,7 @@ describe("LT-COM-03 end to end", () => {
     // subject universe, then the indicator prefetches, resolves its own
     // effective parameters, judges and validates. Only the data source
     // differs — here the local Docker Postgres instead of the real database.
-    async function evaluateInsertedFixture(dataAsOf = DATA_AS_OF): Promise<readonly RiskObservationV1[]> {
+    async function evaluateInsertedFixture(dataAsOf = DATA_AS_OF): Promise<readonly RiskSignal[]> {
         const { procurementSubjects } = await loadProcurements(facts, null);
         return ltCom03v1.evaluate({ runId: 1, dataAsOf, subjects: null }, procurementSubjects, facts);
     }

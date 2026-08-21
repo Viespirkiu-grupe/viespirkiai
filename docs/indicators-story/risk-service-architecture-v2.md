@@ -161,7 +161,7 @@ flowchart BT
 
 ```mermaid
 classDiagram
-    class RiskIndicatorDefinition {
+    class RiskIndicatorDefinition~P~ {
         <<interface>>
         +string id
         +number version
@@ -171,11 +171,30 @@ classDiagram
         +string[] references
         +string[] sourceRelations
         +string[] requiredInputs
-        +ParameterEntry[] parameters
+        +ParameterEntry~P~[] parameters
+        +ZodType~P~ parameterSchema
         +RiskIndicatorStandard standard
         +RiskIndicatorPublicText public
+    }
+    class RiskIndicatorDecision {
+        <<interface>>
         +isEligible(subject: Subject) EligibilityOutcome
         +assessRisk(subject: Subject) RiskSignal
+    }
+    class ARiskIndicatorDecision~F D~ {
+        <<abstract>>
+        +D definition
+        +isEligible(subject: Subject) EligibilityOutcome*
+        +assessRisk(subject: Subject) RiskSignal
+        +evaluate(subjects: Subject[]) RiskSignal[]
+    }
+    class AProcurementIndicatorDecision~F D~ {
+        <<abstract>>
+        +isEligible(subject: Subject) EligibilityOutcome
+    }
+    class ALotIndicatorDecision~F D~ {
+        <<abstract>>
+        +isEligible(subject: Subject) EligibilityOutcome
     }
     class RiskIndicatorStandard {
         <<interface>>
@@ -244,13 +263,27 @@ classDiagram
     RiskIndicatorDefinition "1" *-- "1" RiskIndicatorStandard: standard
     RiskIndicatorDefinition "1" *-- "1" RiskIndicatorPublicText: public
     RiskIndicatorDefinition "1" *-- "0..*" ParameterEntry: parameters
-    RiskIndicatorDefinition "1" ..> "1" Subject: isEligible(subject)
-    RiskIndicatorDefinition "1" ..> "1" Subject: assessRisk(subject)
-    RiskIndicatorDefinition "1" ..> "1" EligibilityOutcome: isEligible() returns
-    RiskIndicatorDefinition "1" ..> "1" RiskSignal: assessRisk() returns
+    ARiskIndicatorDecision ..|> RiskIndicatorDecision
+    ARiskIndicatorDecision "1" *-- "1" RiskIndicatorDefinition: definition
+    AProcurementIndicatorDecision --|> ARiskIndicatorDecision
+    ALotIndicatorDecision --|> ARiskIndicatorDecision
+    RiskIndicatorDecision "1" ..> "1" Subject: isEligible(subject)
+    RiskIndicatorDecision "1" ..> "1" Subject: assessRisk(subject)
+    RiskIndicatorDecision "1" ..> "1" EligibilityOutcome: isEligible() returns
+    RiskIndicatorDecision "1" ..> "1" RiskSignal: assessRisk() returns
     EligibilityOutcome "1" ..> "0..1" RiskSignal: when not eligible
     RiskSignal "1" --> "1" SignalState: state
 ```
+
+### 3.5 Per-Indicator File Layout
+
+Each deployed indicator version is one directory under `modules/risk/indicators/<CODE>/`:
+
+| File            | Holds                                                                                                                                                                                   |
+|-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `definition.ts` | The `RiskIndicatorDefinition` object — identity, lifecycle, references, standard, public wording. Pure data; no imports of `ARiskIndicatorDecision`. Used in GUI and found in registry. |
+| `decision.ts`   | The `ARiskIndicatorDecision` subclass that exposes `isEligible` and `assessRisk`                                                                                                        |
+| `test/`         | Unit tests against risk indicator class                                                                                                                                                 |
 
 ## 4. Risk Indicators
 
@@ -311,7 +344,7 @@ classDiagram
 
 ## 5. Open Questions
 
-| # | Question                                                                                                                                                                                                                                                                                   |
-|---|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | Is one shared Procurement Eligibility Decision sufficient for all 28 indicators, or do some need their own additional eligibility rule? ANSWER: you will extend DRD on demand.                                                                                                             |
-| 2 | Where does `requiredInputs` / Data Eligibility Decision sit in this v2 model — inside each Risk Indicator, or as a second shared decision beside Procurement Eligibility Decision? ANSWER: you will read all domain element view data.                                                     |
+| # | Question                                                                                                                                                                                                                               |
+|---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | Is one shared Procurement Eligibility Decision sufficient for all 28 indicators, or do some need their own additional eligibility rule? ANSWER: you will extend DRD on demand.                                                         |
+| 2 | Where does `requiredInputs` / Data Eligibility Decision sit in this v2 model — inside each Risk Indicator, or as a second shared decision beside Procurement Eligibility Decision? ANSWER: you will read all domain element view data. |

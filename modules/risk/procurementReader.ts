@@ -1,4 +1,4 @@
-import type { Lot, LotSubject, Procurement, ProcurementSubject } from "./contracts.ts";
+import type { Lot, LotSubject, Procurement, ProcurementSubject } from "./types.ts";
 import type { RiskDataSource } from "./riskDataSource.ts";
 
 // The Procurement Reader (docs/indicators-story/risk-service-architecture-v2.md

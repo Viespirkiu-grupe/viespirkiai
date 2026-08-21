@@ -1,4 +1,4 @@
-import type { ParameterScope, SubjectFacts } from "./contracts.ts";
+import type { ParameterScope, SubjectFacts } from "./types.ts";
 
 // Scope arithmetic for the effective-dated parameter timeline. A scope is a
 // whitelist per dimension: a dimension the entry does not mention admits

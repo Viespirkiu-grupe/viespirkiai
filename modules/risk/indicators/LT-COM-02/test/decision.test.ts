@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ltCom02Decide, type LtCom02Facts } from "../rules.ts";
+import { LtCom02Decision, type LtCom02Facts } from "../decision.ts";
 import { ltCom02Parameters } from "../parameters.ts";
 import {
     duplicateBidderRows,
@@ -17,15 +17,15 @@ import {
 // produces them. The procurementSource === null → insufficient_data case
 // moved to modules/risk/procurementEligibility.test.ts and
 // collect.it.ts's "end to end" describe block — the shared eligibility gate
-// decides that now, before ltCom02Decide ever runs.
+// decides that now, before LtCom02Decision.decide ever runs.
 
 const PARAMETERS = ltCom02Parameters[0].values;
 
 function decisionFor(facts: LtCom02Facts) {
-    return ltCom02Decide(facts, PARAMETERS);
+    return LtCom02Decision.decide(facts, PARAMETERS);
 }
 
-describe("ltCom02Decide", () => {
+describe("LtCom02Decision.decide", () => {
     it("triggers when only two participants are recorded", () => {
         const decision = decisionFor(twoBidders.facts[0]);
         expect(decision.state).toBe("triggered");
@@ -47,8 +47,8 @@ describe("ltCom02Decide", () => {
 
     it("judges the exact threshold boundary", () => {
         const facts = threeBidders.facts[0];
-        expect(ltCom02Decide(facts, { minimumBidders: 3 }).state).toBe("not_triggered");
-        expect(ltCom02Decide(facts, { minimumBidders: 4 }).state).toBe("triggered");
+        expect(LtCom02Decision.decide(facts, { minimumBidders: 3 }).state).toBe("not_triggered");
+        expect(LtCom02Decision.decide(facts, { minimumBidders: 4 }).state).toBe("triggered");
     });
 
     it("judges each lot of a multi-lot procurement independently", () => {

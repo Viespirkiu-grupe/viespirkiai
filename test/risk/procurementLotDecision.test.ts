@@ -1,20 +1,57 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import type { Decision, ParameterEntry, Procurement, ProcurementSubject, Subject } from "../../modules/risk/contracts.ts";
-import { RelationFactsIndicator } from "../../modules/risk/relationFactsIndicator.ts";
+import type { Decision, ParameterEntry, Procurement, ProcurementSubject, RiskIndicatorDefinition, Subject } from "../../modules/risk/types.ts";
+import { AProcurementIndicatorDecision } from "../../modules/risk/procurementLotDecision.ts";
 import type { RiskDataSource } from "../../modules/risk/riskDataSource.ts";
 
-// The shared half of every relation-facts indicator, tested once here rather
-// than in each indicator's directory (mirrors how subjectFactsIndicator.test.ts
-// covered SubjectFactsIndicator before the v2 port): bulk-query argument
+// The shared half of every bulk-facts decision (ARiskIndicatorDecision,
+// riskIndicatorDecision.ts) plus the procurement-subject eligibility gate
+// (AProcurementIndicatorDecision, procurementLotDecision.ts), tested once
+// here rather than in each indicator's directory: bulk-query argument
 // binding, parameter resolution, the shared eligibility gate short-circuiting
 // before decide() runs, the insufficient_data rule when the bulk query has no
 // row for a subject, and every observation field a decision does not return.
+// ALotIndicatorDecision's own gate (lotEligibility instead of
+// procurementEligibility) is exercised by the LT-COM-01/02 indicator tests,
+// which are both lot-subject.
 
 const paramsSchema = z.object({ threshold: z.number() });
 type TestParameters = z.infer<typeof paramsSchema>;
+type TestDefinition = RiskIndicatorDefinition<TestParameters>;
 
 type TestFacts = Readonly<{ key: string; method: string | null; measured: number }>;
+
+// A minimal AProcurementIndicatorDecision subclass — factKey/subjectKey/
+// methodOf fixed to what these tests need, decide() delegated to whatever
+// function makeIndicator() was given.
+class TestProcurementDecision extends AProcurementIndicatorDecision<TestFacts, TestDefinition> {
+    protected readonly missingDataWhenAbsent = ["tiekejoKodas"];
+    private readonly decideFn: (subject: Subject, facts: TestFacts, parameters: TestParameters) => Decision;
+
+    constructor(
+        definition: TestDefinition,
+        decideFn: (subject: Subject, facts: TestFacts, parameters: TestParameters) => Decision,
+    ) {
+        super(definition, import.meta.url, "./fixtures/collect.sql");
+        this.decideFn = decideFn;
+    }
+
+    protected factKey(row: TestFacts): string {
+        return row.key;
+    }
+
+    protected subjectKey(subject: Subject): string {
+        return subject.subjectKey;
+    }
+
+    protected methodOf(row: TestFacts): string | null {
+        return row.method;
+    }
+
+    protected decide(subject: Subject, facts: TestFacts, parameters: TestParameters): Decision {
+        return this.decideFn(subject, facts, parameters);
+    }
+}
 
 const OPEN_ENDED: ParameterEntry<TestParameters> = {
     validFrom: "2026-01-01",
@@ -79,7 +116,7 @@ function makeIndicator(
         decide?: (subject: Subject, facts: TestFacts, parameters: TestParameters) => Decision;
     } = {},
 ) {
-    return new RelationFactsIndicator<TestFacts, TestParameters>(
+    return new TestProcurementDecision(
         {
             key: { id: "LT-TEST-01", version: 3 },
             lifecycle: "active",
@@ -97,26 +134,19 @@ function makeIndicator(
                 formulaLt: "formula",
                 limitationLt: "limitation",
             },
-            sqlFile: "./fixtures/collect.sql",
-            factKey: (row) => row.key,
-            subjectKey: (s) => s.subjectKey,
-            methodOf: (row) => row.method,
-            missingDataWhenAbsent: ["tiekejoKodas"],
-            decide:
-                options.decide ??
-                ((_s, row, parameters) => ({
-                    state: row.measured < parameters.threshold ? "triggered" : "not_triggered",
-                    rawValue: { measured: row.measured },
-                    threshold: { threshold: parameters.threshold },
-                })),
         },
-        import.meta.url,
+        options.decide ??
+            ((_s, row, parameters) => ({
+                state: row.measured < parameters.threshold ? "triggered" : "not_triggered",
+                rawValue: { measured: row.measured },
+                threshold: { threshold: parameters.threshold },
+            })),
     );
 }
 
 const RUN = { runId: 7, dataAsOf: "2026-08-01", subjects: null } as const;
 
-describe("RelationFactsIndicator", () => {
+describe("AProcurementIndicatorDecision", () => {
     it("binds the cutoff and the subject filter, and nothing else", async () => {
         const data = new StubDataSource([facts()]);
         await makeIndicator().evaluate({ ...RUN, subjects: ["1", "2"] }, [subject()], data);
@@ -188,12 +218,12 @@ describe("RelationFactsIndicator", () => {
 
     // The rule that most wants a single home: a subject no reviewed threshold
     // covers can never be published as triggered.
-    it("reports not_applicable without calling the rules when no entry applies", async () => {
+    it("reports not_applicable without calling decide() when no entry applies", async () => {
         const data = new StubDataSource([facts({ method: "negotiated" })]);
         const indicator = makeIndicator({
             parameters: [{ ...OPEN_ENDED, scope: { methods: ["open"] } }],
             decide: () => {
-                throw new Error("the rules must not be called without an applicable parameter entry");
+                throw new Error("decide() must not be called without an applicable parameter entry");
             },
         });
 
@@ -209,13 +239,11 @@ describe("RelationFactsIndicator", () => {
         expect(observation.state).toBe("not_applicable");
     });
 
-    // New in the v2 port: the shared Procurement/Lot Eligibility Decision
-    // runs before the rules ever see the subject.
-    it("reports the shared eligibility gate's signal without calling the rules, for an ineligible subject", async () => {
+    it("reports the shared eligibility gate's signal without calling decide(), for an ineligible subject", async () => {
         const data = new StubDataSource([facts()]);
         const indicator = makeIndicator({
             decide: () => {
-                throw new Error("the rules must not be called for an ineligible subject");
+                throw new Error("decide() must not be called for an ineligible subject");
             },
         });
         const cvppSubject = subject({ procurement: { saltinis: "cvpp", pirkimoBudas: null } });
@@ -224,11 +252,11 @@ describe("RelationFactsIndicator", () => {
         expect(observation.state).toBe("not_applicable");
     });
 
-    it("reports insufficient_data without calling the rules when the bulk query has no row for a subject", async () => {
+    it("reports insufficient_data without calling decide() when the bulk query has no row for a subject", async () => {
         const data = new StubDataSource([]); // no facts row for any subject
         const indicator = makeIndicator({
             decide: () => {
-                throw new Error("the rules must not be called when no fact row was found");
+                throw new Error("decide() must not be called when no fact row was found");
             },
         });
 

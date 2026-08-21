@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ltCom03Decide, type LtCom03Facts } from "../rules.ts";
+import { LtCom03Decision, type LtCom03Facts } from "../decision.ts";
 import { ltCom03Parameters } from "../parameters.ts";
 import {
     differentSuppliersAcrossTwoLots,
@@ -18,15 +18,15 @@ import {
 // produces them. The procurementSource === null → insufficient_data case
 // moved to modules/risk/procurementEligibility.test.ts and
 // collect.it.ts's "end to end" describe block — the shared eligibility gate
-// decides that now, before ltCom03Decide ever runs.
+// decides that now, before LtCom03Decision.decide ever runs.
 
 const PARAMETERS = ltCom03Parameters[0].values;
 
 function decisionFor(facts: LtCom03Facts) {
-    return ltCom03Decide(facts, PARAMETERS);
+    return LtCom03Decision.decide(facts, PARAMETERS);
 }
 
-describe("ltCom03Decide", () => {
+describe("LtCom03Decision.decide", () => {
     it("triggers when only one supplier is recorded for the whole procurement", () => {
         const decision = decisionFor(oneSupplier.facts[0]);
         expect(decision.state).toBe("triggered");
@@ -48,8 +48,8 @@ describe("ltCom03Decide", () => {
 
     it("judges the exact threshold boundary", () => {
         const facts = twoSuppliers.facts[0];
-        expect(ltCom03Decide(facts, { minimumSuppliers: 2 }).state).toBe("not_triggered");
-        expect(ltCom03Decide(facts, { minimumSuppliers: 3 }).state).toBe("triggered");
+        expect(LtCom03Decision.decide(facts, { minimumSuppliers: 2 }).state).toBe("not_triggered");
+        expect(LtCom03Decision.decide(facts, { minimumSuppliers: 3 }).state).toBe("triggered");
     });
 
     it("counts the same supplier once when it appears in two lots of one procurement", () => {

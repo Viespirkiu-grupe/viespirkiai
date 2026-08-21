@@ -1,5 +1,5 @@
-import type { RiskIndicatorKey } from "./contracts.ts";
-import type { RiskIndicator } from "./riskIndicator.ts";
+import type { RiskIndicatorKey } from "./types.ts";
+import type { ARiskIndicatorDecision } from "./riskIndicatorDecision.ts";
 
 function keyString(key: RiskIndicatorKey): string {
     return `${key.id}/${key.version}`;
@@ -13,16 +13,16 @@ function keyString(key: RiskIndicatorKey): string {
  * version of the same indicator id.
  */
 export class RiskIndicatorRegistry {
-    private readonly byKey = new Map<string, RiskIndicator<unknown>>();
-    private readonly activeById = new Map<string, RiskIndicator<unknown>>();
+    private readonly byKey = new Map<string, ARiskIndicatorDecision>();
+    private readonly activeById = new Map<string, ARiskIndicatorDecision>();
 
-    constructor(indicators: readonly RiskIndicator<unknown>[]) {
+    constructor(indicators: readonly ARiskIndicatorDecision[]) {
         for (const indicator of indicators) {
             this.add(indicator);
         }
     }
 
-    require(key: RiskIndicatorKey): RiskIndicator<unknown> {
+    require(key: RiskIndicatorKey): ARiskIndicatorDecision {
         const indicator = this.byKey.get(keyString(key));
         if (!indicator) {
             throw new Error(`Unknown Risk Indicator: ${keyString(key)}`);
@@ -30,21 +30,21 @@ export class RiskIndicatorRegistry {
         return indicator;
     }
 
-    all(): readonly RiskIndicator<unknown>[] {
+    all(): readonly ARiskIndicatorDecision[] {
         return [...this.byKey.values()];
     }
 
     /** The one `active`-lifecycle version of each indicator. */
-    active(): readonly RiskIndicator<unknown>[] {
+    active(): readonly ARiskIndicatorDecision[] {
         return [...this.activeById.values()];
     }
 
-    /** Indicators whose lifecycle is 'active' or 'shadow'; see RiskIndicator.isEvaluable in riskIndicator.ts. */
-    evaluable(): readonly RiskIndicator<unknown>[] {
+    /** Indicators whose lifecycle is 'active' or 'shadow'; see ARiskIndicatorDecision.isEvaluable in riskIndicatorDecision.ts. */
+    evaluable(): readonly ARiskIndicatorDecision[] {
         return this.all().filter((indicator) => indicator.isEvaluable);
     }
 
-    private add(indicator: RiskIndicator<unknown>): void {
+    private add(indicator: ARiskIndicatorDecision): void {
         const ks = keyString(indicator.key);
         if (this.byKey.has(ks)) {
             throw new Error(`Duplicate Risk Indicator key: ${ks}`);

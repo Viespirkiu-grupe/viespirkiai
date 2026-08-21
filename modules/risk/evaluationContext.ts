@@ -1,4 +1,4 @@
-import type { ParameterEntry } from "./contracts.ts";
+import type { ParameterEntry } from "./types.ts";
 
 // One run's inputs, as a value object: the run id, the data_as_of cutoff,
 // the subject set, and the parameter entries resolved for that cutoff. See

@@ -1,36 +1,50 @@
 import { describe, expect, it } from "vitest";
-import type { EligibilityOutcome, ParameterEntry, Procurement, RiskObservationV1, Subject } from "../../modules/risk/contracts.ts";
-import { RiskIndicator, type RiskIndicatorDefinition } from "../../modules/risk/riskIndicator.ts";
+import type { Decision, EligibilityOutcome, ParameterEntry, Procurement, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
+import { ARiskIndicatorDecision } from "../../modules/risk/riskIndicatorDecision.ts";
 import { RiskIndicatorRegistry } from "../../modules/risk/registry.ts";
 import { z } from "zod";
 
 const paramsSchema = z.object({ threshold: z.number() });
 
 type TestParameters = z.infer<typeof paramsSchema>;
+type TestDefinition = RiskIndicatorDefinition<TestParameters>;
 
-// An indicator whose calculation is a plain lookup — the shape an indicator
+// A decision whose calculation is a plain lookup — the shape an indicator
 // with an internal structure takes (§3.4's own isEligible/assessRisk case),
 // and the cheapest subclass to assert the shared behaviour of the base class
 // on. Always eligible; assessRisk() replays the canned observations in
-// order, one per subject evaluate() is asked to decide.
-class TestRiskIndicator extends RiskIndicator<TestParameters> {
-    private readonly observations: readonly RiskObservationV1[];
+// order, one per subject evaluate() is asked to decide. Overrides
+// assessRisk() directly rather than going through the bulk-facts abstract
+// members (factKey/subjectKey/methodOf/decide), which this test has no use
+// for — they're stubbed to satisfy the abstract contract only.
+class TestDecision extends ARiskIndicatorDecision<never, TestDefinition> {
+    private readonly observations: readonly RiskSignal[];
     private cursor = 0;
 
-    constructor(definition: RiskIndicatorDefinition<TestParameters>, observations: readonly RiskObservationV1[] = []) {
-        super(definition);
+    constructor(definition: TestDefinition, observations: readonly RiskSignal[] = []) {
+        super(definition, import.meta.url, "./fixtures/collect.sql");
         this.observations = observations;
     }
 
-    protected async prepare(): Promise<void> {
-        this.cursor = 0;
+    protected readonly missingDataWhenAbsent: readonly string[] = [];
+    protected factKey(): string {
+        return "";
+    }
+    protected subjectKey(): string {
+        return "";
+    }
+    protected methodOf(): string | null {
+        return null;
+    }
+    protected decide(): Decision {
+        throw new Error("not used: assessRisk() is overridden directly");
     }
 
-    protected isEligible(): EligibilityOutcome {
+    isEligible(): EligibilityOutcome {
         return { eligible: true };
     }
 
-    protected assessRisk(): RiskObservationV1 {
+    assessRisk(): RiskSignal {
         return this.observations[this.cursor++];
     }
 }
@@ -43,9 +57,9 @@ function makeIndicator(
         parameters?: readonly ParameterEntry<TestParameters>[];
         public?: { titleLt: string; descriptionLt: string; formulaLt: string; limitationLt: string };
     },
-    observations: readonly RiskObservationV1[] = [],
-): TestRiskIndicator {
-    return new TestRiskIndicator(
+    observations: readonly RiskSignal[] = [],
+): TestDecision {
+    return new TestDecision(
         {
             key: { id: (overrides.id ?? "LT-TEST-01") as `LT-${string}`, version: overrides.version ?? 1 },
             lifecycle: overrides.lifecycle ?? "active",
@@ -70,7 +84,7 @@ function makeIndicator(
     );
 }
 
-function observation(overrides: Partial<RiskObservationV1> = {}): RiskObservationV1 {
+function observation(overrides: Partial<RiskSignal> = {}): RiskSignal {
     return {
         indicatorId: "LT-TEST-01",
         indicatorVersion: 1,
@@ -109,7 +123,7 @@ function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
 }
 
 // evaluate() decides one subject per element of this array, in order, and
-// TestRiskIndicator.assessRisk() replays the canned observations in the same
+// TestDecision.assessRisk() replays the canned observations in the same
 // order — content doesn't matter beyond subjectType/count for these tests.
 function subjects(count: number): readonly Subject[] {
     return Array.from({ length: count }, (_, i) => ({
@@ -124,7 +138,7 @@ function subjects(count: number): readonly Subject[] {
 const RUN = { runId: 1, dataAsOf: "2026-08-01", subjects: null } as const;
 const NO_DATA = { query: async () => [] };
 
-describe("RiskIndicator", () => {
+describe("ARiskIndicatorDecision", () => {
     it("rejects a definition with empty public wording", () => {
         expect(() =>
             makeIndicator({
@@ -142,7 +156,7 @@ describe("RiskIndicator", () => {
     it("rejects a parameter value that violates a constraint the type cannot state", () => {
         const refined = z.object({ threshold: z.number().int().positive() });
         const withValue = (threshold: number) =>
-            new TestRiskIndicator({
+            new TestDecision({
                 key: { id: "LT-TEST-09", version: 1 },
                 lifecycle: "active",
                 subjectType: "procurement",
