@@ -1,8 +1,8 @@
 import { riskDb } from "../../../../postgres/riskDb.js";
 
-// Shared row-insertion helpers for every indicator's collect.it.ts against
-// the real xlsxPPA* tables (public.v_dalyviai's real source, replacing the
-// old atn1* fixture tables — see migrations/risk/test/001_public_test_tables.sql).
+// Shared row-insertion helpers for integration tests against the real
+// xlsxPPA* tables (public.v_dalyviai's real source — see
+// migrations/risk/test/001_public_test_tables.sql).
 // xlsxPPApirkimoBudai/xlsxPPAatmetimoPriezastys are lookup tables: a fixture
 // names a value, and these helpers resolve-or-create the row backing it.
 
@@ -62,7 +62,7 @@ export async function insertPasiulymas(params: {
     );
 }
 
-/** A rejected bid — any non-null reason text; decide()/collect.sql only check IS NULL. */
+/** A rejected bid — any non-null reason text; assessRisk() only checks atmetimoPriezastis IS NULL. */
 export async function insertAtmestasPasiulymas(params: {
     ataskaitaId: number;
     daliesNumeris: string | null;

@@ -2,7 +2,7 @@ import type { ParameterEntry } from "./types.ts";
 
 // One run's inputs, as a value object: the run id, the data_as_of cutoff,
 // the subject set, and the parameter entries resolved for that cutoff. See
-// riskDataSource.ts and docs/indicators-story/risk-service-architecture.md §5.
+// riskDataSource.ts and docs/indicators-story/risk-service-architecture-v2.md §1.2.
 
 export type EvaluationRun = Readonly<{
     runId: number;
@@ -24,7 +24,6 @@ export class EvaluationContext {
         Object.freeze(this);
     }
 
-    // True when subjects is non-null.
     get isScoped(): boolean {
         return this.subjects !== null;
     }

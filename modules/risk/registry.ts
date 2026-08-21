@@ -7,7 +7,7 @@ function keyString(key: RiskIndicatorKey): string {
 
 /**
  * The in-process catalogue of deployed Risk Indicator versions, keyed by
- * (id, version). See docs/indicators-story/risk-service-architecture.md §4.3.
+ * (id, version). See docs/indicators-story/risk-service-architecture-v2.md §3.5.
  *
  * The constructor throws on a duplicate key or on more than one active
  * version of the same indicator id.

@@ -4,14 +4,14 @@ import { ltCom01v1 } from "./indicators/LT-COM-01/decision.ts";
 import { ltCom02v1 } from "./indicators/LT-COM-02/decision.ts";
 import { ltCom03v1 } from "./indicators/LT-COM-03/decision.ts";
 
-// See docs/indicators-story/risk-service-architecture.md §4.3.
+// See docs/indicators-story/risk-service-architecture-v2.md §3.5.
 const deployedIndicators = [ltCom01v1, ltCom02v1, ltCom03v1] as const satisfies readonly ARiskIndicatorDecision[];
 
 export const riskIndicatorRegistry = new RiskIndicatorRegistry(deployedIndicators);
 
 // A projection of riskIndicatorRegistry.all() over the fields listed in
 // riskCatalogueFields below. See
-// docs/indicators-story/risk-service-architecture.md §3.3.
+// docs/indicators-story/risk-service-architecture-v2.md §3.5.
 export const riskCatalogue = riskIndicatorRegistry.all().map((indicator) => ({
     id: indicator.key.id,
     version: indicator.key.version,

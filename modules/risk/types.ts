@@ -48,7 +48,7 @@ export type RiskSignal = Readonly<{
 }>;
 
 // Which subjects an entry's values apply to; see parameterScope.ts and
-// docs/indicators-story/risk-service-architecture.md §4.5.
+// docs/indicators-story/risk-service-architecture-v2.md §3.4.
 export type ParameterScope = Readonly<{
     methods?: readonly string[];
     objectTypes?: readonly string[];
@@ -68,8 +68,9 @@ export type ParameterEntry<P> = Readonly<{
     note?: string;
 }>;
 
-// The columns every collect.sql returns, in addition to whatever else it
-// measures. See docs/indicators-story/risk-service-architecture.md §4.1.
+// The scope-matching facts an indicator derives for one subject, used to
+// pick the applicable parameter entry. See
+// docs/indicators-story/risk-service-architecture-v2.md §3.4.
 export type SubjectFacts = Readonly<{
     subjectKey: string;
     procurementSource: string | null;
@@ -80,13 +81,10 @@ export type SubjectFacts = Readonly<{
     objectType?: string | null;
 }>;
 
-// The fields a decide() method returns; ARiskIndicatorDecision
-// (riskIndicatorDecision.ts) assembles the rest of a RiskSignal around them.
-// What a Risk Indicator's assessRisk() returns when it cannot (or need not)
-// assemble every RiskSignal field itself — the indicator-specific fields
-// only; ARiskIndicatorDecision.signalFor() fills in the rest (identity,
-// subject fields, dataAsOf) around it. `state` is the one field every branch
-// must supply; everything else defaults when omitted.
+// What a Risk Indicator's assessRisk() (or isEligible()) returns — the
+// indicator-specific fields only; ARiskIndicatorDecision.signalFor() fills in
+// the rest (identity, subject fields, dataAsOf) around it. `state` is the one
+// field every branch must supply; everything else defaults when omitted.
 export type PartialRiskSignal = Readonly<{
     state: IndicatorState;
     rawValue?: Readonly<Record<string, unknown>> | null;
@@ -119,12 +117,10 @@ export type Procurement = Readonly<{
 }>;
 
 // Distinct-tiekejoKodas participation facts from public.v_dalyviai_v2, merged
-// onto a Lot/Procurement by the Procurement Reader's own batch query (the
-// consolidated successor to LT-COM-01/02/03's former per-indicator
-// collect.sql). null means no ATN-1 participation was observed at all for
-// this lot/procurement; a non-null object with totalBids/totalSuppliers: 0 is
-// a real, rarer case — a participant row exists but every tiekejoKodas in it
-// is NULL (~1.5% of procurements; see LT-COM-03/README.md's real-data run).
+// onto a Lot/Procurement by the Procurement Reader's own batch query. null
+// means no ATN-1 participation was observed at all for this lot/procurement;
+// a non-null object with totalBids/totalSuppliers: 0 is a real, rarer case —
+// a participant row exists but every tiekejoKodas in it is NULL.
 export type LotParticipation = Readonly<{
     totalBids: number;
     validBids: number;
@@ -165,9 +161,7 @@ export type ProcurementSubject = Readonly<{
 // LotSubject from a Lot already nested inside its parent Procurement.lots. An
 // orphan lot — a v_pirkimo_dalis_v2 row whose pirkimoNumeris has no matching
 // v_pirkimas_v2 row — never reaches this far; the Reader logs its count and
-// drops it before any Subject is built (architecture-v2.md §1.2's
-// ProcurementReader note: "can't happen by business invariant... it is not a
-// Subject").
+// drops it before any Subject is built.
 export type LotSubject = Readonly<{
     subjectType: "lot";
     subjectKey: string;

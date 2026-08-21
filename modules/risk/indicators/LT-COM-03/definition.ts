@@ -4,8 +4,6 @@ import { ltCom03Parameters, ltCom03ParametersSchema, type LtCom03Parameters } fr
 // LT-COM-03 — Only one supplier invited or consulted (Konsultuotas ar
 // kviestas tik vienas tiekėjas).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
-// Pure metadata; decision.ts constructs the ARiskIndicatorDecision around
-// this object.
 //
 // lifecycle: 'shadow'; scope is unscoped pending review — see parameters.ts
 // and README.md.

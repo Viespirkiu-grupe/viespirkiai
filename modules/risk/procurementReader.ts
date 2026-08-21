@@ -50,10 +50,8 @@ const LOT_SQL = `
     WHERE ($1::text[] IS NULL OR "pirkimoNumeris" = ANY ($1::text[]))
 `;
 
-// Lot-grain participation facts, merged onto Lot by the Reader. Consolidates
-// what LT-COM-01's and LT-COM-02's former per-indicator collect.sql each
-// computed independently (identical GROUP BY; LT-COM-01 was simply a
-// superset that also filtered on atmetimoPriezastis). One row per
+// Lot-grain participation facts, merged onto Lot by the Reader and shared by
+// every lot-grain indicator (LT-COM-01, LT-COM-02). One row per
 // (pirkimoNumeris, daliesNumeris) with at least one participant recorded in
 // v_dalyviai_v2 at or before the cutoff.
 const LOT_PARTICIPATION_SQL = `
@@ -70,11 +68,10 @@ const LOT_PARTICIPATION_SQL = `
     GROUP BY d."pirkimoNumeris", COALESCE(d."daliesNumeris", '0')
 `;
 
-// Procurement-grain participation facts — the cross-lot union LT-COM-03's
-// former collect.sql computed: a supplier bidding on two lots of the same
-// procurement counts once, not twice. No "method" column here — a lot's
-// (and a procurement's) method is Procurement.pirkimoBudas, never derived
-// from the ATN-1 report itself.
+// Procurement-grain participation facts — the cross-lot union: a supplier
+// bidding on two lots of the same procurement counts once, not twice. No
+// "method" column here — a lot's (and a procurement's) method is
+// Procurement.pirkimoBudas, never derived from the ATN-1 report itself.
 const PROCUREMENT_PARTICIPATION_SQL = `
     SELECT d."pirkimoNumeris"                                                            AS "pirkimoNumeris",
            count(DISTINCT d."tiekejoKodas")::int                                         AS "totalSuppliers",

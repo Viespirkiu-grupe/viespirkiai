@@ -3,7 +3,7 @@ import type { RiskSignal, RuntimeContract, SubjectFacts } from "./types.ts";
 
 // Runtime validation for the Procurement Risk Service: zod schemas and the
 // RuntimeContract wrapper around them. Types live in types.ts. See
-// docs/indicators-story/risk-service-architecture.md §4.3.
+// docs/indicators-story/risk-service-architecture-v2.md §3.4.
 
 export function zodContract<T>(schema: z.ZodType<T>): RuntimeContract<T> {
     return Object.freeze({

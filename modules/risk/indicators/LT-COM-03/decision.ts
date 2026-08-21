@@ -6,8 +6,7 @@ import { ltCom03Definition } from "./definition.ts";
 // LT-COM-03 — Only one supplier invited or consulted: judges a whole
 // procurement from the cross-lot participation counts the Procurement Reader
 // already merged onto Subject.procurement.participation. See
-// docs/indicators-story/risk-service-architecture-v2.md §1.2/§3.4. Replaces
-// rules.ts.
+// docs/indicators-story/risk-service-architecture-v2.md §1.2/§3.4.
 
 export class LtCom03Decision extends AProcurementIndicatorDecision<typeof ltCom03Definition> {
     protected readonly missingDataWhenAbsent = ["tiekejoKodas"];

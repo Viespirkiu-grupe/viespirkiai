@@ -3,8 +3,6 @@ import { ltCom02Parameters, ltCom02ParametersSchema, type LtCom02Parameters } fr
 
 // LT-COM-02 — Low number of bidders (Mažas dalyvių skaičius).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
-// Pure metadata; decision.ts constructs the ARiskIndicatorDecision around
-// this object.
 //
 // lifecycle: 'shadow'; scope is unscoped pending review — see parameters.ts
 // and README.md.

@@ -5,8 +5,7 @@ import { ltCom01Definition } from "./definition.ts";
 
 // LT-COM-01 — Single valid bid: judges a lot from the participation counts
 // the Procurement Reader already merged onto Subject.lot.participation. See
-// docs/indicators-story/risk-service-architecture-v2.md §1.2/§3.4. Replaces
-// rules.ts.
+// docs/indicators-story/risk-service-architecture-v2.md §1.2/§3.4.
 
 export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definition> {
     protected readonly missingDataWhenAbsent = ["tiekejoKodas"];

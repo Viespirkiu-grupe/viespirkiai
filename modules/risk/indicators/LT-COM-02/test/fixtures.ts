@@ -1,11 +1,11 @@
 import type { LotParticipation } from "../../../types.ts";
 
-// Named participation scenarios shared by decision.test.ts. Since the v2
-// port, a Subject's participation counts come from the Procurement Reader's
-// own consolidated batch query (modules/risk/procurementReader.ts) — the
-// same query LT-COM-01 uses, since totalBids is identical between them —
-// not from this indicator's own SQL. The query's own correctness is tested
-// once, for every lot-grain indicator, in test/risk/procurementReader.it.ts.
+// Named participation scenarios shared by decision.test.ts. A Subject's
+// participation counts come from the Procurement Reader's own consolidated
+// batch query (modules/risk/procurementReader.ts) — the same query
+// LT-COM-01 uses, since totalBids is identical between them. The query's own
+// correctness is tested once, for every lot-grain indicator, in
+// test/risk/procurementReader.it.ts.
 //
 // Unlike LT-COM-01, validBids has no bearing here: totalBids counts every
 // distinct participant regardless of whether their bid was later rejected.
@@ -26,6 +26,6 @@ export const fiveBidders: LotParticipation = { totalBids: 5, validBids: 5, repor
 
 // A participation row real ingestion cannot produce on its own (every
 // tiekejoKodas would have to be NULL) — a decision-only case pinning what
-// decide() does with it regardless: treated as an incomplete report, not
+// assessRisk() does with it regardless: treated as an incomplete report, not
 // zero participation.
 export const emptyReport: LotParticipation = { totalBids: 0, validBids: 0, reportedAt: REPORTED_AT };

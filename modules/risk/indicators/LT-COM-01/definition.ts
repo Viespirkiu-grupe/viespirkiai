@@ -3,8 +3,6 @@ import { ltCom01Parameters, ltCom01ParametersSchema, type LtCom01Parameters } fr
 
 // LT-COM-01 — Single valid bid (Vienintelis tinkamas pasiūlymas).
 // Source catalogue: docs/indicators-story/indicators-canonical.md.
-// Pure metadata; decision.ts constructs the ARiskIndicatorDecision around
-// this object.
 //
 // lifecycle: 'shadow'; scope is unscoped pending review — see parameters.ts.
 export const ltCom01Definition: RiskIndicatorDefinition<LtCom01Parameters> = {

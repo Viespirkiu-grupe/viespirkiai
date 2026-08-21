@@ -12,13 +12,8 @@ export type EligibilityGate =
 
 /**
  * Eligible when pirkimoBudas is present and saltinis is 'cvpis' (§3.3's
- * decision table). cvpp rows never carry pirkimoBudas (v_pirkimas.sql), so
- * they are the documented not-eligible case: not_applicable, not a data gap.
- *
- * Takes a non-null Procurement: the Procurement Reader drops orphan lots
- * before any Subject is built (types.ts's LotSubject comment), and a
- * ProcurementSubject's own procurement was never nullable, so both callers
- * (procurementLotDecision.ts) always have one to pass.
+ * decision table). cvpp rows never carry pirkimoBudas, so they are the
+ * documented not-eligible case: not_applicable, not a data gap.
  */
 export function procurementEligibility(procurement: Procurement): EligibilityGate {
     if (procurement.saltinis === "cvpis" && procurement.pirkimoBudas !== null) {
@@ -30,9 +25,7 @@ export function procurementEligibility(procurement: Procurement): EligibilityGat
 /**
  * No lot-specific narrowing exists yet — delegates entirely to its parent
  * procurement's gate. Extend THIS function (not procurementEligibility
- * above) when a lot-level indicator needs its own rule, per
- * risk-service-architecture-v2.md §5's answered open question #1 ("you will
- * extend DRD on demand").
+ * above) when a lot-level indicator needs its own rule.
  */
 export function lotEligibility(_lot: Lot, procurement: Procurement): EligibilityGate {
     return procurementEligibility(procurement);

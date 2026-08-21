@@ -47,18 +47,7 @@ export interface RiskIndicatorDecision {
  *
  * A Risk Indicator decides exactly one subject at a time — batching over the
  * whole subject universe belongs to RiskDecisionEngine
- * (riskDecisionEngine.ts), not here (architecture-v2.md §1.2's
- * RiskDecisionEngine.evaluateAll/evaluateProcurement/evaluateLot). This class
- * therefore exposes only `isEligible`/`assessRisk`, both single-subject; no
- * bulk per-indicator SQL prefetch either, since the Procurement Reader
- * (procurementReader.ts) already loaded everything an indicator needs onto
- * Subject.procurement/Subject.lot.
- * `isEligible`/`assessRisk` are abstract on purpose: the eligibility gate
- * differs by subject type (procurement vs lot), so it belongs to a
- * subject-type-specific subclass, not this generic one — see
- * procurementLotDecision.ts. `assessRisk` is abstract because judging a
- * subject is each indicator's own job; concrete indicators call the
- * protected helpers below (resolveParameters, signalFor) to build it. See
+ * (riskDecisionEngine.ts), not here. See
  * docs/indicators-story/risk-service-architecture-v2.md §3.4.
  */
 export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition = RiskIndicatorDefinition>
@@ -72,7 +61,7 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
      * Throws on an id outside the catalogue namespace, missing public
      * wording, parameter values that violate the indicator's own contract,
      * or a gapped/overlapping parameter timeline. See
-     * docs/indicators-story/risk-service-architecture.md §4.3.
+     * docs/indicators-story/risk-service-architecture-v2.md §3.4.
      */
     protected constructor(definition: D) {
         this.definition = definition;
@@ -137,7 +126,7 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
     }
 
     // True when lifecycle is 'active' or 'shadow'. See
-    // docs/indicators-story/risk-service-architecture.md §7.1.
+    // docs/indicators-story/risk-service-architecture-v2.md §3.4.
     get isEvaluable(): boolean {
         return this.lifecycle === "active" || this.lifecycle === "shadow";
     }
@@ -158,7 +147,7 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
      * The one entry that decides a subject at a cutoff: in force by date, and
      * scoped to admit these facts. `null` means no parameter entry covers
      * this subject. See
-     * docs/indicators-story/risk-service-architecture.md §4.5.
+     * docs/indicators-story/risk-service-architecture-v2.md §3.4.
      *
      * assertParameterTimeline (below) rejects concurrently valid entries with
      * overlapping scopes, so at most one entry can match.
@@ -315,11 +304,7 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
         }
     }
 
-    /**
-     * Calls assertContiguousWithinScope and assertDisjointWhereConcurrent
-     * (below) on the sorted parameter entries. See
-     * docs/indicators-story/risk-service-architecture.md §7.3, §4.5.
-     */
+    // See docs/indicators-story/risk-service-architecture-v2.md §3.4.
     private assertParameterTimeline(): void {
         const entries = [...this.parameters].sort((a, b) => a.validFrom.localeCompare(b.validFrom));
 

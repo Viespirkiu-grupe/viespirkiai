@@ -3,7 +3,7 @@ import type { ParameterScope, SubjectFacts } from "./types.ts";
 // Scope arithmetic for the effective-dated parameter timeline. A scope is a
 // whitelist per dimension: a dimension the entry does not mention admits
 // everything, a dimension it does mention admits only the listed values. See
-// docs/indicators-story/risk-service-architecture.md §4.5.
+// docs/indicators-story/risk-service-architecture-v2.md §3.4.
 //
 // scopeAdmits picks the entry that decides one subject; scopesAreDisjoint
 // checks whether two entries can never both admit the same subject.

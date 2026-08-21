@@ -5,22 +5,13 @@ import type { Lot, Procurement, RiskSignal, Subject } from "./types.ts";
 
 /**
  * The Risk Decision Engine
- * (docs/indicators-story/risk-service-architecture-v2.md §1.2):
- *
- *     class RiskDecisionEngine {
- *         -riskIndicators: RiskIndicatorDecision[]
- *         +evaluateAll(procurements: Procurement[])$ RiskSignal[]
- *         -evaluateProcurement(procurement: Procurement)$ RiskSignal[]
- *         -evaluateLot(lot: ProcurementLot)$ RiskSignal[]
- *     }
- *
- * The only place that loops indicators over the subject universe. A Risk
- * Indicator's own responsibility ends at isEligible(subject)/
- * assessRisk(subject) — one subject at a time (riskIndicatorDecision.ts);
- * batching over every procurement and lot, and assembling the run's signal
- * list, belongs here. Pure — no I/O — it only ever touches the
- * already-loaded Procurements the Procurement Reader (procurementReader.ts)
- * handed it.
+ * (docs/indicators-story/risk-service-architecture-v2.md §1.2): the only
+ * place that loops indicators over the subject universe. A Risk Indicator's
+ * own responsibility ends at isEligible(subject)/assessRisk(subject) — one
+ * subject at a time (riskIndicatorDecision.ts); batching over every
+ * procurement and lot, and assembling the run's signal list, belongs here.
+ * Pure — no I/O — it only ever touches the already-loaded Procurements the
+ * Procurement Reader (procurementReader.ts) handed it.
  */
 export class RiskDecisionEngine {
     private readonly indicators: readonly ARiskIndicatorDecision[];
@@ -30,10 +21,9 @@ export class RiskDecisionEngine {
     }
 
     /**
-     * `run` is the one addition beyond the diagram's `evaluateAll(procurements)`
-     * signature: an EvaluationContext needs a cutoff to resolve each
-     * indicator's effective parameters against, and that cutoff is the run's,
-     * not any one subject's.
+     * `run` carries the cutoff an EvaluationContext needs to resolve each
+     * indicator's effective parameters against — the run's cutoff, not any
+     * one subject's.
      *
      * Builds one EvaluationContext per indicator up front — dataAsOf-effective
      * parameters depend only on the indicator and the run, never on which
@@ -98,9 +88,7 @@ export class RiskDecisionEngine {
      * isEligible then, if eligible, assessRisk — the two-step protocol
      * riskIndicatorDecision.ts's RiskIndicatorDecision interface declares.
      * A failing indicator is contained to this one subject: logged, and
-     * contributes nothing for it, rather than aborting the whole run — a
-     * pre-existing operational requirement (services/procurement-risk/
-     * runJob.ts), not shown in the architecture diagram itself.
+     * contributes nothing for it, rather than aborting the whole run.
      */
     private decide(
         indicator: ARiskIndicatorDecision,

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ParameterEntry } from "../../types.ts";
 
 // The effective-dated parameter timeline. See
-// docs/indicators-story/risk-service-architecture.md §7.3.
+// docs/indicators-story/risk-service-architecture-v2.md §3.4.
 
 export const ltCom02ParametersSchema = z.object({
     minimumBidders: z.number().int().positive(),
@@ -14,8 +14,7 @@ export const ltCom02Parameters: readonly ParameterEntry<LtCom02Parameters>[] = [
     {
         validFrom: "2026-01-01",
         validTo: null,
-        // Unscoped: scope: {} admits every method. See README.md, "Open
-        // question: method scope".
+        // Unscoped: scope: {} admits every method. See README.md, "Scope".
         scope: {},
         values: { minimumBidders: 3 },
         source:

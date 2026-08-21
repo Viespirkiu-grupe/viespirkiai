@@ -1,5 +1,8 @@
 # Procurement Risk Service Architecture
 
+> DEPRECATED. Replaced by [risk-service-architecture-v2.md](risk-service-architecture-v2.md)
+> Use this document only for the legacy notes.
+
 Status: architecture
 
 Core

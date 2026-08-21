@@ -6,8 +6,7 @@ import { ltCom02Definition } from "./definition.ts";
 // LT-COM-02 — Low number of bidders: judges a lot from the participation
 // counts the Procurement Reader already merged onto
 // Subject.lot.participation. See
-// docs/indicators-story/risk-service-architecture-v2.md §1.2/§3.4. Replaces
-// rules.ts.
+// docs/indicators-story/risk-service-architecture-v2.md §1.2/§3.4.
 
 export class LtCom02Decision extends ALotIndicatorDecision<typeof ltCom02Definition> {
     protected readonly missingDataWhenAbsent = ["tiekejoKodas"];

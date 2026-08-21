@@ -1,13 +1,12 @@
 import type { ProcurementParticipation } from "../../../types.ts";
 
-// Named participation scenarios shared by decision.test.ts. Since the v2
-// port, a Subject's participation counts come from the Procurement Reader's
-// own consolidated procurement-grain batch query
-// (modules/risk/procurementReader.ts), not from this indicator's own SQL —
-// these fixtures describe the expected Procurement.participation shape
-// directly. The query's own cross-lot union correctness (the same supplier
-// across two lots counting once, different suppliers per lot both counting)
-// is tested once, in test/risk/procurementReader.it.ts.
+// Named participation scenarios shared by decision.test.ts. A Subject's
+// participation counts come from the Procurement Reader's own consolidated
+// procurement-grain batch query (modules/risk/procurementReader.ts) — these
+// fixtures describe the expected Procurement.participation shape directly.
+// The query's own cross-lot union correctness (the same supplier across two
+// lots counting once, different suppliers per lot both counting) is tested
+// once, in test/risk/procurementReader.it.ts.
 
 export const REPORTED_AT = "2026-05-04T09:30:00Z";
 
@@ -25,6 +24,6 @@ export const fiveSuppliers: ProcurementParticipation = { totalSuppliers: 5, repo
 
 // A participation row real ingestion cannot produce on its own (every
 // tiekejoKodas would have to be NULL) — a decision-only case pinning what
-// decide() does with it regardless: treated as an incomplete report, not
+// assessRisk() does with it regardless: treated as an incomplete report, not
 // zero suppliers.
 export const emptyReport: ProcurementParticipation = { totalSuppliers: 0, reportedAt: REPORTED_AT };
