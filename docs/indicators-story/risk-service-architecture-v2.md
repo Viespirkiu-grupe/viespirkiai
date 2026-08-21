@@ -39,7 +39,13 @@ classDiagram
         <<class>>
         -PROCUREMENT_SQL
         -LOT_SQL
-        +loadProcurements()$ Procurement[]
+        +loadProcurements(subjects: string[], cursor: string, pageSize: number)$ Page~Procurement~
+    }
+
+    class Page~T~ {
+        <<type>>
+        +T[] items
+        +string nextCursor
     }
 
     class SignalWriter {
@@ -48,20 +54,26 @@ classDiagram
         +writeRiskSignals(signals: RiskSignal[])$ number
         +updateEvaluationRun(update: Partial EvaluationRun)$ EvaluationRun
     }
+    note for SignalWriter "updateEvaluationRun upserts: 
+    first call inserts the run row,later calls update it. 
+    No crash recovery, no retry."
 
     class RunJob {
         <<module runJob.ts>>
-        +runEvaluation(options)$ RunResult
+        +runEvaluation(options: RunJobOptions)$ RunResult
     }
 
     class RiskDecisionEngine {
         -riskIndicators: RiskIndicatorDecision[]
-        evaluateProcurement(procurement: Procurement)$ RiskSignal[]
+        +evaluateProcurement(procurement: Procurement)$ RiskSignal[]
+        +evaluateLot(lot: Lot)$ RiskSignal[]
     }
 
-    RunJob ..> ProcurementReader : loads batch of procurements
-    RunJob ..> RiskDecisionEngine : evaluates a single procurement
-    RunJob ..> SignalWriter : writes risk signals and updates evaluation run
+    RunJob ..> ProcurementReader : loop — loads next page (subjects filter, cursor) until nextCursor is null
+    ProcurementReader --> Page : returns
+    RunJob ..> RiskDecisionEngine : evaluates each page's procurements + their lots
+    RunJob ..> SignalWriter : writes page's signals
+    RunJob ..> SignalWriter : updateEvaluationRun(status, stats) — inserts on first call, updates after
 ```
 
 ## 2. Procurement Business Object
