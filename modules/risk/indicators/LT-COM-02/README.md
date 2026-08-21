@@ -13,7 +13,7 @@ report, the same grain as [`LT-COM-01`](../LT-COM-01/README.md) and the natural 
 |-------------------------|------------------------------------------------------------------------------------|
 | `parameters.ts`         | What it compares against, and since when                                          |
 | `definition.ts`         | Identity, lifecycle, public wording — pure metadata, no behaviour                 |
-| `decision.ts`           | What the facts mean — the state, the threshold that decided it, the evidence — plus the `ALotIndicatorDecision` wiring, with `static decide()` as its judgement method (replaces `rules.ts`) |
+| `decision.ts`           | What the facts mean — the state, the threshold that decided it, the evidence — the `ALotIndicatorDecision` subclass whose own `assessRisk()` is the judgement method (replaces `rules.ts`) |
 | `test/`                 | How we know it works                                                              |
 
 There is no `collect.sql` here (v2 architecture — see below): participation counts (`totalBids`/`reportedAt`) come

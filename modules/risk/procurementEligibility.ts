@@ -1,4 +1,4 @@
-import type { Decision, Lot, Procurement } from "./types.ts";
+import type { Lot, PartialRiskSignal, Procurement } from "./types.ts";
 
 // The Procurement Eligibility Decision and its lot-level equivalent
 // (docs/indicators-story/risk-service-architecture-v2.md §3.3): the shared
@@ -8,7 +8,7 @@ import type { Decision, Lot, Procurement } from "./types.ts";
 
 export type EligibilityGate =
     | Readonly<{ eligible: true }>
-    | Readonly<{ eligible: false; decision: Decision }>;
+    | Readonly<{ eligible: false; decision: PartialRiskSignal }>;
 
 /**
  * Eligible when pirkimoBudas is present and saltinis is 'cvpis' (§3.3's

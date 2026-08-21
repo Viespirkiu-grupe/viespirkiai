@@ -1,7 +1,7 @@
-import type { Decision, Subject } from "../../types.ts";
+import type { RiskSignal, Subject } from "../../types.ts";
 import { ALotIndicatorDecision } from "../../procurementLotDecision.ts";
+import type { EvaluationContext } from "../../evaluationContext.ts";
 import { ltCom01Definition } from "./definition.ts";
-import type { LtCom01Parameters } from "./parameters.ts";
 
 // LT-COM-01 — Single valid bid: judges a lot from the participation counts
 // the Procurement Reader already merged onto Subject.lot.participation. See
@@ -19,11 +19,7 @@ export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definit
         return subject.subjectType === "lot" && subject.lot.participation !== null;
     }
 
-    protected decide(subject: Subject, parameters: LtCom01Parameters): Decision {
-        return LtCom01Decision.decide(subject, parameters);
-    }
-
-    static decide(subject: Subject, parameters: LtCom01Parameters): Decision {
+    assessRisk(subject: Subject, context: EvaluationContext): RiskSignal {
         if (subject.subjectType !== "lot") {
             throw new Error("LT-COM-01: expected a lot subject");
         }
@@ -36,24 +32,31 @@ export class LtCom01Decision extends ALotIndicatorDecision<typeof ltCom01Definit
             source: "ATN-1 ataskaita",
         };
 
+        const resolved = this.resolveParameters(subject, context);
+        if (resolved === null) {
+            return this.signalFor(subject, context, { state: "not_applicable" });
+        }
+
         // totalBids === 0: a real, rarer case distinct from "no participation
         // observed" (hasRequiredData's null check) — a participant row
         // exists but every tiekejoKodas in it is NULL. Treated as an
         // incomplete report, not zero participation.
         if (participation.totalBids === 0) {
-            return {
+            return this.signalFor(subject, context, {
                 state: "insufficient_data",
                 evidence,
                 missingData: ["tiekejoKodas"],
-            };
+            });
         }
 
-        return {
-            state: participation.validBids <= parameters.maximumValidBids ? "triggered" : "not_triggered",
+        const { maximumValidBids } = resolved.values;
+        return this.signalFor(subject, context, {
+            state: participation.validBids <= maximumValidBids ? "triggered" : "not_triggered",
             rawValue: { totalBids: participation.totalBids, validBids: participation.validBids },
-            threshold: { maximumValidBids: parameters.maximumValidBids },
+            threshold: { maximumValidBids },
             evidence,
-        };
+            appliedParameters: resolved.appliedParameters,
+        });
     }
 }
 

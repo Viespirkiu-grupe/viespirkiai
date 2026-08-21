@@ -1,9 +1,9 @@
 import { riskSignalContract, zodContract } from "./contracts.ts";
-import { EvaluationContext, type EvaluationRun } from "./evaluationContext.ts";
+import type { EvaluationContext } from "./evaluationContext.ts";
 import { describeScope, scopeAdmits, scopeKey, scopesAreDisjoint } from "./parameterScope.ts";
 import type {
-    Decision,
     EligibilityOutcome,
+    PartialRiskSignal,
     ParameterEntry,
     ParametersOf,
     RiskIndicatorDefinition,
@@ -45,15 +45,20 @@ export interface RiskIndicatorDecision {
  * `this.definition` and the parameter-timeline helpers below are typed to
  * that indicator's own parameter type, not `unknown`.
  *
- * Validates the definition it's constructed with, resolves its own effective
- * parameters, and decides every subject of its own subjectType. No bulk
- * per-indicator SQL prefetch: the Procurement Reader (procurementReader.ts)
- * already loaded everything an indicator needs onto Subject.procurement/
- * Subject.lot, so evaluate() is synchronous.
+ * A Risk Indicator decides exactly one subject at a time — batching over the
+ * whole subject universe belongs to RiskDecisionEngine
+ * (riskDecisionEngine.ts), not here (architecture-v2.md §1.2's
+ * RiskDecisionEngine.evaluateAll/evaluateProcurement/evaluateLot). This class
+ * therefore exposes only `isEligible`/`assessRisk`, both single-subject; no
+ * bulk per-indicator SQL prefetch either, since the Procurement Reader
+ * (procurementReader.ts) already loaded everything an indicator needs onto
+ * Subject.procurement/Subject.lot.
  * `isEligible`/`assessRisk` are abstract on purpose: the eligibility gate
  * differs by subject type (procurement vs lot), so it belongs to a
  * subject-type-specific subclass, not this generic one — see
- * procurementLotDecision.ts. See
+ * procurementLotDecision.ts. `assessRisk` is abstract because judging a
+ * subject is each indicator's own job; concrete indicators call the
+ * protected helpers below (resolveParameters, signalFor) to build it. See
  * docs/indicators-story/risk-service-architecture-v2.md §3.4.
  */
 export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition = RiskIndicatorDefinition>
@@ -185,7 +190,6 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
     protected abstract hasRequiredData(subject: Subject): boolean;
     // isEligible's insufficient_data reason when hasRequiredData is false.
     protected abstract readonly missingDataWhenAbsent: readonly string[];
-    protected abstract decide(subject: Subject, parameters: ParametersOf<D>): Decision;
 
     /**
      * Business + data eligibility gate for one subject (architecture-v2.md
@@ -202,11 +206,26 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
 
     /**
      * Risk assessment for one subject isEligible() already found eligible.
-     * Never called otherwise. Subject-type-agnostic — it only needs
-     * hasRequiredData() to already hold — so it's concrete here rather than
-     * duplicated per subject type.
+     * Never called otherwise (RiskDecisionEngine only calls this after a
+     * successful isEligible()). Abstract: judging a subject — what it means,
+     * which parameter entry applies, what counts as triggered — is each
+     * indicator's own job. A concrete indicator's assessRisk() typically
+     * calls resolveParameters() then signalFor() (both below) rather than
+     * assembling a RiskSignal by hand.
      */
-    assessRisk(subject: Subject, context: EvaluationContext): RiskSignal {
+    abstract assessRisk(subject: Subject, context: EvaluationContext): RiskSignal;
+
+    /**
+     * Resolves the one parameter entry that applies to this subject at the
+     * run's cutoff, or `null` when none does (the subject is not_applicable
+     * — see signalFor's caller). Wraps parameterEntryFor with the scope
+     * facts every indicator derives the same way (methodOf/objectTypeOf), so
+     * a concrete assessRisk() need not rebuild SubjectFacts itself.
+     */
+    protected resolveParameters(
+        subject: Subject,
+        context: EvaluationContext,
+    ): Readonly<{ values: ParametersOf<D>; appliedParameters: Readonly<Record<string, unknown>> }> | null {
         const scopeFacts: SubjectFacts = {
             subjectKey: subject.subjectKey,
             procurementSource: subject.procurementSource,
@@ -215,23 +234,19 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
             objectType: this.objectTypeOf(subject),
         };
         const entry = this.parameterEntryFor(context.dataAsOf, scopeFacts);
-        const decision: Decision = entry === null ? { state: "not_applicable" } : this.decide(subject, entry.values);
-        const appliedParameters = entry === null ? null : (entry.values as Readonly<Record<string, unknown>>);
-
-        return this.signalFor(subject, context, decision, appliedParameters);
+        if (entry === null) return null;
+        return { values: entry.values, appliedParameters: entry.values as Readonly<Record<string, unknown>> };
     }
 
     /**
-     * Assembles a full observation around a partial Decision — the fields
-     * neither isEligible's ineligible branch nor assessRisk's decide() step
-     * needs to repeat every time.
+     * Assembles a full RiskSignal around a PartialRiskSignal — the fields an
+     * indicator's assessRisk() (or isEligible()'s ineligible branch) does
+     * not need to repeat every time. If an indicator cannot construct every
+     * field itself (no applicable parameter entry, missing data), it returns
+     * only what it knows (typically just `state`, plus `evidence`/
+     * `missingData`) and this fills in the rest.
      */
-    protected signalFor(
-        subject: Subject,
-        context: EvaluationContext,
-        decision: Decision,
-        appliedParameters: Readonly<Record<string, unknown>> | null,
-    ): RiskSignal {
+    protected signalFor(subject: Subject, context: EvaluationContext, partial: PartialRiskSignal): RiskSignal {
         return {
             indicatorId: this.id,
             indicatorVersion: this.version,
@@ -239,38 +254,23 @@ export abstract class ARiskIndicatorDecision<D extends RiskIndicatorDefinition =
             subjectKey: subject.subjectKey,
             procurementSource: subject.procurementSource,
             procurementId: subject.procurementId,
-            state: decision.state,
-            rawValue: decision.rawValue ?? null,
-            threshold: decision.threshold ?? null,
-            appliedParameters,
-            evidence: decision.evidence ?? {},
-            missingData: [...(decision.missingData ?? [])],
+            state: partial.state,
+            rawValue: partial.rawValue ?? null,
+            threshold: partial.threshold ?? null,
+            appliedParameters: partial.appliedParameters ?? null,
+            evidence: partial.evidence ?? {},
+            missingData: [...(partial.missingData ?? [])],
             dataAsOf: context.dataAsOf,
         };
     }
 
     /**
-     * Resolves this indicator's effective parameters for the run's cutoff,
-     * decides every subject of this indicator's own subjectType (isEligible,
-     * then assessRisk when eligible), and validates the batch via
-     * validateObservations().
-     */
-    evaluate(run: EvaluationRun, subjects: readonly Subject[]): readonly RiskSignal[] {
-        const context = new EvaluationContext(run, this.parametersAsOf(run.dataAsOf) as readonly ParameterEntry<unknown>[]);
-
-        const mine = subjects.filter((subject) => subject.subjectType === this.subjectType);
-        const signals = mine.map((subject) => {
-            const outcome = this.isEligible(subject, context);
-            return outcome.eligible ? this.assessRisk(subject, context) : outcome.signal;
-        });
-
-        return this.validateObservations(signals);
-    }
-
-    /**
      * Validates rows against the output contract, then checks that each
      * row's indicatorId/indicatorVersion match this indicator's key and that
-     * no (subjectType, subjectKey) pair repeats within the batch. See
+     * no (subjectType, subjectKey) pair repeats within the batch. Called by
+     * RiskDecisionEngine once per indicator, over everything that indicator
+     * produced across a whole evaluateAll() run — not by this class itself,
+     * which only ever decides one subject at a time. See
      * docs/indicators-story/risk-schema.md §2.
      */
     validateObservations(observations: readonly unknown[]): readonly RiskSignal[] {

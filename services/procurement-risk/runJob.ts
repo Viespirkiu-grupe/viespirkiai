@@ -6,14 +6,16 @@ import { riskIndicatorRegistry } from "../../modules/risk/deployedIndicators.ts"
 import { ProcurementReader } from "../../modules/risk/procurementReader.ts";
 import { RiskDecisionEngine } from "../../modules/risk/riskDecisionEngine.ts";
 import type { EvaluationRun } from "../../modules/risk/evaluationContext.ts";
+import type { RiskSignal } from "../../modules/risk/types.ts";
 import { SignalWriter } from "./signalWriter.ts";
 
 export type RunJobOptions = Readonly<{
     codeCommit: string;
     subjects?: readonly string[] | null;
-    // Rows per Procurement Reader page. See loadLotUniverse's comment in
-    // procurementReader.ts for why this bounds evaluation+write working set,
-    // not query count — lots/participation are still loaded once per run.
+    // Rows per Procurement Reader page. See ensureLotUniverseLoaded's
+    // comment in procurementReader.ts for why this bounds evaluation+write
+    // working set, not query count — lots/participation are still loaded
+    // once per run.
     pageSize?: number;
 }>;
 
@@ -25,34 +27,37 @@ export type RunResult = Readonly<{
 
 const DEFAULT_PAGE_SIZE = 500;
 
-type IndicatorStats = Readonly<{
-    rows: number;
-    triggered: number;
-    inserted: number;
-    ms: number;
-    errors?: readonly string[];
-}>;
+type IndicatorStats = Readonly<{ rows: number; triggered: number; inserted: number }>;
 
 /**
- * Accumulates one page's stats into the running per-indicator total. A
- * page's failure for indicator X must not erase an earlier page's
- * already-written success for X, and vice versa — risk.risk_signals is
- * insert-only, so a partially-written snapshot across pages is the expected,
- * documented shape (SignalWriter's "no crash recovery, no retry").
+ * Groups one page's flat signal list by indicatorId and accumulates each
+ * indicator's rows/triggered/inserted into the running per-indicator total.
+ * RiskDecisionEngine.evaluateAll (riskDecisionEngine.ts) already isolates a
+ * failing indicator's own computation per subject — it just contributes no
+ * signal for that subject, logged, not surfaced here — so the only failure
+ * this job itself still observes is a page's write failing as a whole (see
+ * writePage below), which is why `inserted` can differ from `rows`.
  */
 function mergeIndicatorStats(
     into: Record<string, IndicatorStats>,
-    indicatorId: string,
-    page: { rows: number; triggered: number; inserted: number; ms: number; error?: string },
+    pageSignals: readonly RiskSignal[],
+    inserted: boolean,
 ): void {
-    const prev = into[indicatorId] ?? { rows: 0, triggered: 0, inserted: 0, ms: 0 };
-    into[indicatorId] = {
-        rows: prev.rows + page.rows,
-        triggered: prev.triggered + page.triggered,
-        inserted: prev.inserted + page.inserted,
-        ms: prev.ms + page.ms,
-        ...(page.error ? { errors: [...(prev.errors ?? []), page.error] } : prev.errors ? { errors: prev.errors } : {}),
-    };
+    const byIndicator = new Map<string, RiskSignal[]>();
+    for (const signal of pageSignals) {
+        const bucket = byIndicator.get(signal.indicatorId) ?? [];
+        bucket.push(signal);
+        byIndicator.set(signal.indicatorId, bucket);
+    }
+
+    for (const [indicatorId, signals] of byIndicator) {
+        const prev = into[indicatorId] ?? { rows: 0, triggered: 0, inserted: 0 };
+        into[indicatorId] = {
+            rows: prev.rows + signals.length,
+            triggered: prev.triggered + signals.filter((s) => s.state === "triggered").length,
+            inserted: prev.inserted + (inserted ? signals.length : 0),
+        };
+    }
 }
 
 /**
@@ -76,15 +81,15 @@ async function closeStaleRunningRuns(): Promise<void> {
  * Executes every active/shadow Risk Indicator against every page the
  * Procurement Reader loads (risk-service-architecture-v2.md §1.2): opens one
  * run, loops pages until nextCursor is null, evaluates each page's
- * Procurements through the RiskDecisionEngine, writes each page's signals,
- * and checkpoints per-indicator statistics after every page.
+ * Procurements through the RiskDecisionEngine (one flat signal list per
+ * page, spanning every indicator), writes that page's signals in one
+ * transaction, and checkpoints per-indicator statistics after every page.
  *
- * A failing indicator is contained to its own rows within a page (see
- * RiskDecisionEngine) and its own write (caught separately below): it
- * contributes nothing for that page but the run continues, other indicators'
- * rows for that page are unaffected, and earlier pages' already-written rows
- * for the failing indicator stay written. The run closes as `partial` if any
- * page had any indicator error.
+ * Per-indicator computation failures are contained by RiskDecisionEngine
+ * itself (logged, that subject's signal just doesn't appear) and never reach
+ * this job. What this job still isolates is a page's *write* failing as a
+ * whole — the run closes `partial`, not `failed`, so already-written pages
+ * for this and other runs stay untouched (risk.risk_signals is insert-only).
  */
 export async function runEvaluation(options: RunJobOptions): Promise<RunResult> {
     await closeStaleRunningRuns();
@@ -114,32 +119,21 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
 
     do {
         const page = await reader.loadProcurements(cursor, pageSize);
-        const results = engine.evaluateAll(evaluationRun, page.items);
+        const signals = engine.evaluateAll(evaluationRun, page.items);
 
-        for (const result of results) {
-            let inserted = 0;
-            let writeError: string | undefined;
-            if (result.signals.length > 0) {
-                try {
-                    inserted = await writer.writeRiskSignals(result.signals);
-                } catch (err) {
-                    writeError = err instanceof Error ? err.message : String(err);
-                }
-            }
-
-            mergeIndicatorStats(statistics, result.indicatorId, {
-                rows: result.signals.length,
-                triggered: result.signals.filter((s) => s.state === "triggered").length,
-                inserted,
-                ms: result.ms,
-                error: result.error ?? writeError,
-            });
-            if (result.error || writeError) {
+        let inserted = true;
+        if (signals.length > 0) {
+            try {
+                await writer.writeRiskSignals(signals);
+            } catch (err) {
+                inserted = false;
                 anyFailed = true;
-                log(`procurement-risk: ${result.indicatorId} failed on this page: ${result.error ?? writeError}`);
+                const message = err instanceof Error ? err.message : String(err);
+                log(`procurement-risk: failed writing a page's signals: ${message}`);
             }
         }
 
+        mergeIndicatorStats(statistics, signals, inserted);
         await writer.updateEvaluationRun({ statistics });
         cursor = page.nextCursor;
     } while (cursor !== null);

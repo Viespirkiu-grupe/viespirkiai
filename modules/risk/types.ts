@@ -82,10 +82,16 @@ export type SubjectFacts = Readonly<{
 
 // The fields a decide() method returns; ARiskIndicatorDecision
 // (riskIndicatorDecision.ts) assembles the rest of a RiskSignal around them.
-export type Decision = Readonly<{
+// What a Risk Indicator's assessRisk() returns when it cannot (or need not)
+// assemble every RiskSignal field itself — the indicator-specific fields
+// only; ARiskIndicatorDecision.signalFor() fills in the rest (identity,
+// subject fields, dataAsOf) around it. `state` is the one field every branch
+// must supply; everything else defaults when omitted.
+export type PartialRiskSignal = Readonly<{
     state: IndicatorState;
     rawValue?: Readonly<Record<string, unknown>> | null;
     threshold?: Readonly<Record<string, unknown>> | null;
+    appliedParameters?: Readonly<Record<string, unknown>> | null;
     evidence?: Readonly<Record<string, unknown>>;
     missingData?: readonly string[];
 }>;

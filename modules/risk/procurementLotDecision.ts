@@ -1,6 +1,6 @@
 import { ARiskIndicatorDecision } from "./riskIndicatorDecision.ts";
 import { lotEligibility, procurementEligibility } from "./procurementEligibility.ts";
-import type { Decision, EligibilityOutcome, RiskIndicatorDefinition, Subject } from "./types.ts";
+import type { EligibilityOutcome, PartialRiskSignal, RiskIndicatorDefinition, Subject } from "./types.ts";
 import type { EvaluationContext } from "./evaluationContext.ts";
 
 // The two subject-type specializations of ARiskIndicatorDecision
@@ -21,15 +21,15 @@ export abstract class AProcurementIndicatorDecision<D extends RiskIndicatorDefin
 
         const gate = procurementEligibility(subject.procurement);
         if (!gate.eligible) {
-            return { eligible: false, signal: this.signalFor(subject, context, gate.decision, null) };
+            return { eligible: false, signal: this.signalFor(subject, context, gate.decision) };
         }
 
         if (!this.hasRequiredData(subject)) {
-            const decision: Decision = {
+            const partial: PartialRiskSignal = {
                 state: "insufficient_data",
                 missingData: [...this.missingDataWhenAbsent],
             };
-            return { eligible: false, signal: this.signalFor(subject, context, decision, null) };
+            return { eligible: false, signal: this.signalFor(subject, context, partial) };
         }
 
         return { eligible: true };
@@ -45,15 +45,15 @@ export abstract class ALotIndicatorDecision<D extends RiskIndicatorDefinition> e
 
         const gate = lotEligibility(subject.lot, subject.procurement);
         if (!gate.eligible) {
-            return { eligible: false, signal: this.signalFor(subject, context, gate.decision, null) };
+            return { eligible: false, signal: this.signalFor(subject, context, gate.decision) };
         }
 
         if (!this.hasRequiredData(subject)) {
-            const decision: Decision = {
+            const partial: PartialRiskSignal = {
                 state: "insufficient_data",
                 missingData: [...this.missingDataWhenAbsent],
             };
-            return { eligible: false, signal: this.signalFor(subject, context, decision, null) };
+            return { eligible: false, signal: this.signalFor(subject, context, partial) };
         }
 
         return { eligible: true };

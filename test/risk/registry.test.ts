@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Decision, EligibilityOutcome, ParameterEntry, Procurement, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
+import type { EligibilityOutcome, ParameterEntry, RiskIndicatorDefinition, RiskSignal } from "../../modules/risk/types.ts";
 import { ARiskIndicatorDecision } from "../../modules/risk/riskIndicatorDecision.ts";
 import { RiskIndicatorRegistry } from "../../modules/risk/registry.ts";
 import { z } from "zod";
@@ -9,73 +9,56 @@ const paramsSchema = z.object({ threshold: z.number() });
 type TestParameters = z.infer<typeof paramsSchema>;
 type TestDefinition = RiskIndicatorDefinition<TestParameters>;
 
-// A decision whose calculation is a plain lookup — the shape an indicator
-// with an internal structure takes (§3.4's own isEligible/assessRisk case),
-// and the cheapest subclass to assert the shared behaviour of the base class
-// on. Always eligible; assessRisk() replays the canned observations in
-// order, one per subject evaluate() is asked to decide. Overrides
-// assessRisk() directly rather than going through hasRequiredData/decide,
-// which this test has no use for — they're stubbed to satisfy the abstract
-// contract only.
+// A minimal ARiskIndicatorDecision subclass — isEligible/assessRisk stubbed
+// to satisfy the abstract contract, since these tests exercise only the
+// shared parameter-timeline machinery and validateObservations(), neither of
+// which is per-indicator behaviour. RiskDecisionEngine (riskDecisionEngine.ts)
+// is what actually calls isEligible/assessRisk per subject; that wiring is
+// tested there, not here.
 class TestDecision extends ARiskIndicatorDecision<TestDefinition> {
-    private readonly observations: readonly RiskSignal[];
-    private cursor = 0;
-
-    constructor(definition: TestDefinition, observations: readonly RiskSignal[] = []) {
+    constructor(definition: TestDefinition) {
         super(definition);
-        this.observations = observations;
     }
 
     protected readonly missingDataWhenAbsent: readonly string[] = [];
     protected hasRequiredData(): boolean {
         return true;
     }
-    protected decide(): Decision {
-        throw new Error("not used: assessRisk() is overridden directly");
-    }
-
     isEligible(): EligibilityOutcome {
         return { eligible: true };
     }
-
     assessRisk(): RiskSignal {
-        return this.observations[this.cursor++];
+        throw new Error("not used: these tests call validateObservations() directly");
     }
 }
 
-function makeIndicator(
-    overrides: {
-        id?: string;
-        version?: number;
-        lifecycle?: "draft" | "shadow" | "active" | "retired";
-        parameters?: readonly ParameterEntry<TestParameters>[];
-        public?: { titleLt: string; descriptionLt: string; formulaLt: string; limitationLt: string };
-    },
-    observations: readonly RiskSignal[] = [],
-): TestDecision {
-    return new TestDecision(
-        {
-            key: { id: (overrides.id ?? "LT-TEST-01") as `LT-${string}`, version: overrides.version ?? 1 },
-            lifecycle: overrides.lifecycle ?? "active",
-            subjectType: "procurement",
-            stage: "tender",
-            references: [],
-            sourceRelations: [],
-            requiredInputs: [],
-            parameters: overrides.parameters ?? [
-                { validFrom: "2026-01-01", validTo: null, scope: {}, values: { threshold: 1 }, source: "test" },
-            ],
-            parameterSchema: paramsSchema,
-            standard: { name: "test", url: "https://example.com" },
-            public: overrides.public ?? {
-                titleLt: "Testinis rodiklis",
-                descriptionLt: "desc",
-                formulaLt: "formula",
-                limitationLt: "limitation",
-            },
+function makeIndicator(overrides: {
+    id?: string;
+    version?: number;
+    lifecycle?: "draft" | "shadow" | "active" | "retired";
+    parameters?: readonly ParameterEntry<TestParameters>[];
+    public?: { titleLt: string; descriptionLt: string; formulaLt: string; limitationLt: string };
+}): TestDecision {
+    return new TestDecision({
+        key: { id: (overrides.id ?? "LT-TEST-01") as `LT-${string}`, version: overrides.version ?? 1 },
+        lifecycle: overrides.lifecycle ?? "active",
+        subjectType: "procurement",
+        stage: "tender",
+        references: [],
+        sourceRelations: [],
+        requiredInputs: [],
+        parameters: overrides.parameters ?? [
+            { validFrom: "2026-01-01", validTo: null, scope: {}, values: { threshold: 1 }, source: "test" },
+        ],
+        parameterSchema: paramsSchema,
+        standard: { name: "test", url: "https://example.com" },
+        public: overrides.public ?? {
+            titleLt: "Testinis rodiklis",
+            descriptionLt: "desc",
+            formulaLt: "formula",
+            limitationLt: "limitation",
         },
-        observations,
-    );
+    });
 }
 
 function observation(overrides: Partial<RiskSignal> = {}): RiskSignal {
@@ -96,41 +79,6 @@ function observation(overrides: Partial<RiskSignal> = {}): RiskSignal {
         ...overrides,
     };
 }
-
-function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
-    return {
-        saltinis: "cvpis",
-        pirkimoNumeris: "1",
-        pavadinimas: null,
-        jarKodas: null,
-        pirkimoBudas: "Atviras konkursas",
-        statusas: null,
-        pirkimoObjektoTipas: null,
-        numatomaVerteEUR: null,
-        paskelbimoData: null,
-        pasiulymuPateikimoTerminas: null,
-        bvpzKodai: null,
-        esFinansavimas: null,
-        lots: [],
-        participation: null,
-        ...overrides,
-    };
-}
-
-// evaluate() decides one subject per element of this array, in order, and
-// TestDecision.assessRisk() replays the canned observations in the same
-// order — content doesn't matter beyond subjectType/count for these tests.
-function subjects(count: number): readonly Subject[] {
-    return Array.from({ length: count }, (_, i) => ({
-        subjectType: "procurement" as const,
-        subjectKey: `cvpis:${i + 1}`,
-        procurementSource: "cvpis",
-        procurementId: `${i + 1}`,
-        procurement: testProcurement({ pirkimoNumeris: `${i + 1}` }),
-    }));
-}
-
-const RUN = { runId: 1, dataAsOf: "2026-08-01", subjects: null } as const;
 
 describe("ARiskIndicatorDecision", () => {
     it("rejects a definition with empty public wording", () => {
@@ -288,24 +236,30 @@ describe("ARiskIndicatorDecision", () => {
         expect(indicator.parametersAsOf("2026-03-01")).toEqual([indicator.parameters[0]]);
     });
 
-    it("validates the rows assessRisk() returned against the output contract", () => {
-        const indicator = makeIndicator({}, [observation()]);
-        expect(indicator.evaluate(RUN, subjects(1))).toEqual([observation()]);
+    it("validates rows against the output contract", () => {
+        const indicator = makeIndicator({});
+        expect(indicator.validateObservations([observation()])).toEqual([observation()]);
     });
 
     it("rejects an observation carrying another indicator's identity", () => {
-        const indicator = makeIndicator({}, [observation({ indicatorVersion: 2 })]);
-        expect(() => indicator.evaluate(RUN, subjects(1))).toThrow(/observation carries indicator identity/);
+        const indicator = makeIndicator({});
+        expect(() => indicator.validateObservations([observation({ indicatorVersion: 2 })])).toThrow(
+            /observation carries indicator identity/,
+        );
     });
 
     it("rejects an observation whose subjectType differs from the declared one", () => {
-        const indicator = makeIndicator({}, [observation({ subjectType: "lot" })]);
-        expect(() => indicator.evaluate(RUN, subjects(1))).toThrow(/does not match the indicator's declared/);
+        const indicator = makeIndicator({});
+        expect(() => indicator.validateObservations([observation({ subjectType: "lot" })])).toThrow(
+            /does not match the indicator's declared/,
+        );
     });
 
     it("rejects two observations about the same subject", () => {
-        const indicator = makeIndicator({}, [observation(), observation()]);
-        expect(() => indicator.evaluate(RUN, subjects(2))).toThrow(/duplicate observation for subject/);
+        const indicator = makeIndicator({});
+        expect(() => indicator.validateObservations([observation(), observation()])).toThrow(
+            /duplicate observation for subject/,
+        );
     });
 });
 

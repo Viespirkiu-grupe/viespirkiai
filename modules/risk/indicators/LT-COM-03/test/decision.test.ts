@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { LtCom03Decision, ltCom03v1 } from "../decision.ts";
-import { ltCom03Parameters } from "../parameters.ts";
+import { ltCom03v1 } from "../decision.ts";
 import type { LotSubject, Procurement, ProcurementParticipation, ProcurementSubject } from "../../../types.ts";
+import { EvaluationContext, type EvaluationRun } from "../../../evaluationContext.ts";
+import { RiskDecisionEngine } from "../../../riskDecisionEngine.ts";
 import { emptyReport, fiveSuppliers, oneSupplier, REPORTED_AT, twoSuppliers } from "./fixtures.ts";
 
 // Unit tests for the judgement half of LT-COM-03: plain objects in, plain
@@ -10,8 +11,16 @@ import { emptyReport, fiveSuppliers, oneSupplier, REPORTED_AT, twoSuppliers } fr
 // scenarios come from fixtures.ts; procurementReader.it.ts proves the
 // consolidated procurement-grain participation query (including its
 // cross-lot union) actually produces them.
+//
+// assessRisk() assumes isEligible() already passed (riskIndicatorDecision.ts)
+// — the "assessRisk" describe block below calls it directly, the way
+// RiskDecisionEngine does once eligibility is settled. The eligibility-gate
+// and hasRequiredData cases belong to the "end to end" describe block, which
+// goes through RiskDecisionEngine itself, since that is genuinely how a
+// ProcurementSubject reaches assessRisk in production.
 
-const PARAMETERS = ltCom03Parameters[0].values;
+const RUN: EvaluationRun = { runId: 1, dataAsOf: "2026-08-01", subjects: null };
+const CONTEXT = new EvaluationContext(RUN, ltCom03v1.parametersAsOf(RUN.dataAsOf));
 
 function testProcurement(participation: ProcurementParticipation | null, overrides: Partial<Procurement> = {}): Procurement {
     return {
@@ -33,7 +42,7 @@ function testProcurement(participation: ProcurementParticipation | null, overrid
     };
 }
 
-function procurementSubject(participation: ProcurementParticipation | null, overrides: Partial<Procurement> = {}): ProcurementSubject {
+function procurementSubject(participation: ProcurementParticipation, overrides: Partial<Procurement> = {}): ProcurementSubject {
     const procurement = testProcurement(participation, overrides);
     return {
         subjectType: "procurement",
@@ -44,44 +53,39 @@ function procurementSubject(participation: ProcurementParticipation | null, over
     };
 }
 
-function decisionFor(participation: ProcurementParticipation) {
-    return LtCom03Decision.decide(procurementSubject(participation), PARAMETERS);
+function assessRiskFor(participation: ProcurementParticipation) {
+    return ltCom03v1.assessRisk(procurementSubject(participation), CONTEXT);
 }
 
-describe("LtCom03Decision.decide", () => {
+describe("LtCom03Decision.assessRisk", () => {
     it("triggers when only one supplier is recorded for the whole procurement", () => {
-        const decision = decisionFor(oneSupplier);
-        expect(decision.state).toBe("triggered");
-        expect(decision.rawValue).toEqual({ totalSuppliers: 1 });
-        expect(decision.threshold).toEqual({ minimumSuppliers: 2 });
+        const signal = assessRiskFor(oneSupplier);
+        expect(signal.state).toBe("triggered");
+        expect(signal.rawValue).toEqual({ totalSuppliers: 1 });
+        expect(signal.threshold).toEqual({ minimumSuppliers: 2 });
     });
 
-    it("does not trigger at exactly the minimum number of suppliers", () => {
-        const decision = decisionFor(twoSuppliers);
-        expect(decision.state).toBe("not_triggered");
-        expect(decision.rawValue).toEqual({ totalSuppliers: 2 });
+    it("does not trigger at exactly the minimum number of suppliers — the boundary at minimumSuppliers: 2", () => {
+        const signal = assessRiskFor(twoSuppliers);
+        expect(signal.state).toBe("not_triggered");
+        expect(signal.rawValue).toEqual({ totalSuppliers: 2 });
     });
 
     it("does not trigger with plenty of suppliers", () => {
-        const decision = decisionFor(fiveSuppliers);
-        expect(decision.state).toBe("not_triggered");
-        expect(decision.rawValue).toEqual({ totalSuppliers: 5 });
-    });
-
-    it("judges the exact threshold boundary", () => {
-        expect(LtCom03Decision.decide(procurementSubject(twoSuppliers), { minimumSuppliers: 2 }).state).toBe("not_triggered");
-        expect(LtCom03Decision.decide(procurementSubject(twoSuppliers), { minimumSuppliers: 3 }).state).toBe("triggered");
+        const signal = assessRiskFor(fiveSuppliers);
+        expect(signal.state).toBe("not_triggered");
+        expect(signal.rawValue).toEqual({ totalSuppliers: 5 });
     });
 
     it("reports insufficient_data for a report that lists no participants", () => {
-        const decision = decisionFor(emptyReport);
-        expect(decision.state).toBe("insufficient_data");
-        expect(decision.missingData).toEqual(["tiekejoKodas"]);
+        const signal = assessRiskFor(emptyReport);
+        expect(signal.state).toBe("insufficient_data");
+        expect(signal.missingData).toEqual(["tiekejoKodas"]);
     });
 
     it("carries the report's own evidence, sourced from the procurement's own pirkimoBudas", () => {
         for (const participation of [oneSupplier, fiveSuppliers, twoSuppliers]) {
-            expect(decisionFor(participation).evidence).toEqual({
+            expect(assessRiskFor(participation).evidence).toEqual({
                 pirkimoBudas: "Atviras konkursas",
                 ataskaitosData: participation.reportedAt,
                 source: "ATN-1 ataskaita",
@@ -89,16 +93,16 @@ describe("LtCom03Decision.decide", () => {
         }
     });
 
-    it("is total: every fact row returns one of the four states", () => {
+    it("is total: every participation shape returns one of the four states", () => {
         const states = new Set(["triggered", "not_triggered", "insufficient_data", "not_applicable"]);
         for (const totalSuppliers of [0, 1, 2, 3, 7]) {
-            const decision = decisionFor({ totalSuppliers, reportedAt: REPORTED_AT });
-            expect(states).toContain(decision.state);
+            const signal = assessRiskFor({ totalSuppliers, reportedAt: REPORTED_AT });
+            expect(states).toContain(signal.state);
         }
     });
 
-    it("is pure: the same fact row returns a deeply equal decision every time", () => {
-        expect(decisionFor(twoSuppliers)).toEqual(decisionFor(twoSuppliers));
+    it("is pure: the same participation shape returns a deeply equal signal every time", () => {
+        expect(assessRiskFor(twoSuppliers)).toEqual(assessRiskFor(twoSuppliers));
     });
 
     it("throws when given a lot subject instead of a procurement subject", () => {
@@ -122,15 +126,16 @@ describe("LtCom03Decision.decide", () => {
                 participation: null,
             },
         };
-        expect(() => LtCom03Decision.decide(lotSubject, PARAMETERS)).toThrow(/expected a procurement subject/);
+        expect(() => ltCom03v1.assessRisk(lotSubject, CONTEXT)).toThrow(/expected a procurement subject/);
     });
 });
 
-describe("LtCom03Decision end to end (no database)", () => {
-    const RUN = { runId: 1, dataAsOf: "2026-08-01", subjects: null } as const;
+describe("LtCom03Decision end to end (through RiskDecisionEngine, no database)", () => {
+    const engine = new RiskDecisionEngine([ltCom03v1]);
 
-    it("assembles a complete signal from a Subject carrying merged participation", () => {
-        const [signal] = ltCom03v1.evaluate(RUN, [procurementSubject(oneSupplier)]);
+    it("assembles a complete signal from a Procurement carrying merged cross-lot participation", () => {
+        const procurement = testProcurement(oneSupplier);
+        const [signal] = engine.evaluateAll(RUN, [procurement]);
         expect(signal).toMatchObject({
             indicatorId: "LT-COM-03",
             subjectType: "procurement",
@@ -140,7 +145,8 @@ describe("LtCom03Decision end to end (no database)", () => {
     });
 
     it("reports insufficient_data when no participation was observed for the procurement", () => {
-        const [signal] = ltCom03v1.evaluate(RUN, [procurementSubject(null)]);
+        const procurement = testProcurement(null);
+        const [signal] = engine.evaluateAll(RUN, [procurement]);
         expect(signal.state).toBe("insufficient_data");
         expect(signal.missingData).toEqual(["tiekejoKodas"]);
     });

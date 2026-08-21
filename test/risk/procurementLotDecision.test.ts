@@ -1,42 +1,48 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import type { Decision, ParameterEntry, Procurement, ProcurementSubject, RiskIndicatorDefinition, Subject } from "../../modules/risk/types.ts";
+import type { PartialRiskSignal, ParameterEntry, Procurement, ProcurementSubject, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
 import { AProcurementIndicatorDecision } from "../../modules/risk/procurementLotDecision.ts";
+import { EvaluationContext, type EvaluationRun } from "../../modules/risk/evaluationContext.ts";
 
 // The shared half of every decision (ARiskIndicatorDecision,
 // riskIndicatorDecision.ts) plus the procurement-subject eligibility gate
 // (AProcurementIndicatorDecision, procurementLotDecision.ts), tested once
-// here rather than in each indicator's directory: parameter resolution, the
-// shared eligibility gate short-circuiting before decide() runs, the
-// insufficient_data rule when hasRequiredData() is false, and every
-// observation field a decision does not return.
+// here rather than in each indicator's directory: parameter resolution
+// (resolveParameters), the shared eligibility gate short-circuiting before
+// assessRisk() runs, the insufficient_data rule when hasRequiredData() is
+// false, and every observation field a partial signal does not return.
 // ALotIndicatorDecision's own gate (lotEligibility instead of
 // procurementEligibility) is exercised by the LT-COM-01/02 indicator tests,
 // which are both lot-subject.
+//
+// Batching over a subject universe is RiskDecisionEngine's job, not this
+// class's (riskDecisionEngine.ts) — decideSubject() below replays only the
+// two-step per-subject protocol the Engine itself uses (isEligible, then
+// assessRisk if eligible), against one subject at a time.
 
 const paramsSchema = z.object({ threshold: z.number() });
 type TestParameters = z.infer<typeof paramsSchema>;
 type TestDefinition = RiskIndicatorDefinition<TestParameters>;
 
-// A minimal AProcurementIndicatorDecision subclass — hasRequiredData/decide
-// delegated to whatever makeIndicator() was given. The default decide()
-// reads subject.procurement.numatomaVerteEUR directly (a real Procurement
-// field) as a stand-in "measured" value, so no synthetic fact-row type is
-// needed — every indicator now reads straight off Subject.procurement/
-// Subject.lot, which this test mirrors.
+// A minimal AProcurementIndicatorDecision subclass — hasRequiredData/assessRisk
+// delegated to whatever makeIndicator() was given. The default judgeFn reads
+// subject.procurement.numatomaVerteEUR directly (a real Procurement field) as
+// a stand-in "measured" value, so no synthetic fact-row type is needed —
+// every indicator now reads straight off Subject.procurement/Subject.lot,
+// which this test mirrors.
 class TestProcurementDecision extends AProcurementIndicatorDecision<TestDefinition> {
     protected readonly missingDataWhenAbsent = ["numatomaVerteEUR"];
-    private readonly decideFn: (subject: Subject, parameters: TestParameters) => Decision;
+    private readonly judgeFn: (subject: Subject, parameters: TestParameters) => PartialRiskSignal;
     private readonly hasRequiredDataFn: (subject: Subject) => boolean;
 
     constructor(
         definition: TestDefinition,
-        decideFn: (subject: Subject, parameters: TestParameters) => Decision,
+        judgeFn: (subject: Subject, parameters: TestParameters) => PartialRiskSignal,
         hasRequiredDataFn: (subject: Subject) => boolean = (subject) =>
             subject.subjectType === "procurement" && subject.procurement.numatomaVerteEUR !== null,
     ) {
         super(definition);
-        this.decideFn = decideFn;
+        this.judgeFn = judgeFn;
         this.hasRequiredDataFn = hasRequiredDataFn;
     }
 
@@ -44,8 +50,13 @@ class TestProcurementDecision extends AProcurementIndicatorDecision<TestDefiniti
         return this.hasRequiredDataFn(subject);
     }
 
-    protected decide(subject: Subject, parameters: TestParameters): Decision {
-        return this.decideFn(subject, parameters);
+    assessRisk(subject: Subject, context: EvaluationContext): RiskSignal {
+        const resolved = this.resolveParameters(subject, context);
+        if (resolved === null) {
+            return this.signalFor(subject, context, { state: "not_applicable" });
+        }
+        const partial = this.judgeFn(subject, resolved.values);
+        return this.signalFor(subject, context, { ...partial, appliedParameters: resolved.appliedParameters });
     }
 }
 
@@ -94,7 +105,7 @@ function subject(
 function makeIndicator(
     options: {
         parameters?: readonly ParameterEntry<TestParameters>[];
-        decide?: (subject: Subject, parameters: TestParameters) => Decision;
+        judge?: (subject: Subject, parameters: TestParameters) => PartialRiskSignal;
         hasRequiredData?: (subject: Subject) => boolean;
     } = {},
 ): TestProcurementDecision {
@@ -117,9 +128,9 @@ function makeIndicator(
                 limitationLt: "limitation",
             },
         },
-        options.decide ??
-            ((decidedSubject, parameters) => {
-                const measured = decidedSubject.subjectType === "procurement" ? decidedSubject.procurement.numatomaVerteEUR! : 0;
+        options.judge ??
+            ((judgedSubject, parameters) => {
+                const measured = judgedSubject.subjectType === "procurement" ? judgedSubject.procurement.numatomaVerteEUR! : 0;
                 return {
                     state: measured < parameters.threshold ? "triggered" : "not_triggered",
                     rawValue: { measured },
@@ -130,11 +141,21 @@ function makeIndicator(
     );
 }
 
-const RUN = { runId: 7, dataAsOf: "2026-08-01", subjects: null } as const;
+const RUN: EvaluationRun = { runId: 7, dataAsOf: "2026-08-01", subjects: null };
+
+// The per-subject protocol RiskDecisionEngine itself uses
+// (riskDecisionEngine.ts's private decide()) — isEligible, then assessRisk
+// only if eligible — replayed here against one subject, with a context built
+// the same way the Engine builds one per indicator.
+function decideSubject(indicator: TestProcurementDecision, subject: ProcurementSubject, run: EvaluationRun = RUN): RiskSignal {
+    const context = new EvaluationContext(run, indicator.parametersAsOf(run.dataAsOf));
+    const outcome = indicator.isEligible(subject, context);
+    return outcome.eligible ? indicator.assessRisk(subject, context) : outcome.signal;
+}
 
 describe("AProcurementIndicatorDecision", () => {
-    it("assembles the observation fields a decision does not return", () => {
-        const [observation] = makeIndicator().evaluate(RUN, [subject({ procurement: { numatomaVerteEUR: 4 } })]);
+    it("assembles the observation fields a partial signal does not return", () => {
+        const observation = decideSubject(makeIndicator(), subject({ procurement: { numatomaVerteEUR: 4 } }));
 
         expect(observation).toEqual({
             indicatorId: "LT-TEST-01",
@@ -153,9 +174,9 @@ describe("AProcurementIndicatorDecision", () => {
         });
     });
 
-    it("defaults the optional decision fields rather than leaving them undefined", () => {
-        const indicator = makeIndicator({ decide: () => ({ state: "insufficient_data" }) });
-        const [observation] = indicator.evaluate(RUN, [subject()]);
+    it("defaults the optional signal fields rather than leaving them undefined", () => {
+        const indicator = makeIndicator({ judge: () => ({ state: "insufficient_data" }) });
+        const observation = decideSubject(indicator, subject());
 
         expect(observation.rawValue).toBeNull();
         expect(observation.threshold).toBeNull();
@@ -170,60 +191,61 @@ describe("AProcurementIndicatorDecision", () => {
                 { ...OPEN_ENDED, scope: { methods: ["restricted"] }, values: { threshold: 1 } },
             ],
         });
-        const subjects = [
-            subject({ subjectKey: "cvpis:1", procurementId: "1", procurement: { pirkimoBudas: "open" } }),
-            subject({ subjectKey: "cvpis:2", procurementId: "2", procurement: { pirkimoBudas: "restricted" } }),
-        ];
 
-        const [open, restricted] = indicator.evaluate(RUN, subjects);
+        const open = decideSubject(indicator, subject({ subjectKey: "cvpis:1", procurementId: "1", procurement: { pirkimoBudas: "open" } }));
         expect(open.state).toBe("triggered");
         expect(open.appliedParameters).toEqual({ threshold: 10 });
+
+        const restricted = decideSubject(
+            indicator,
+            subject({ subjectKey: "cvpis:2", procurementId: "2", procurement: { pirkimoBudas: "restricted" } }),
+        );
         expect(restricted.state).toBe("not_triggered");
         expect(restricted.appliedParameters).toEqual({ threshold: 1 });
     });
 
     // The rule that most wants a single home: a subject no reviewed threshold
     // covers can never be published as triggered.
-    it("reports not_applicable without calling decide() when no entry applies", () => {
+    it("reports not_applicable without calling judge() when no entry applies", () => {
         const indicator = makeIndicator({
             parameters: [{ ...OPEN_ENDED, scope: { methods: ["open"] } }],
-            decide: () => {
-                throw new Error("decide() must not be called without an applicable parameter entry");
+            judge: () => {
+                throw new Error("judge() must not be called without an applicable parameter entry");
             },
         });
 
-        const [observation] = indicator.evaluate(RUN, [subject({ procurement: { pirkimoBudas: "negotiated" } })]);
+        const observation = decideSubject(indicator, subject({ procurement: { pirkimoBudas: "negotiated" } }));
         expect(observation.state).toBe("not_applicable");
         expect(observation.appliedParameters).toBeNull();
         expect(observation.rawValue).toBeNull();
     });
 
     it("reports not_applicable at a cutoff before the timeline starts", () => {
-        const [observation] = makeIndicator().evaluate({ ...RUN, dataAsOf: "2025-01-01" }, [subject()]);
+        const observation = decideSubject(makeIndicator(), subject(), { ...RUN, dataAsOf: "2025-01-01" });
         expect(observation.state).toBe("not_applicable");
     });
 
-    it("reports the shared eligibility gate's signal without calling decide(), for an ineligible subject", () => {
+    it("reports the shared eligibility gate's signal without calling judge(), for an ineligible subject", () => {
         const indicator = makeIndicator({
-            decide: () => {
-                throw new Error("decide() must not be called for an ineligible subject");
+            judge: () => {
+                throw new Error("judge() must not be called for an ineligible subject");
             },
         });
         const cvppSubject = subject({ procurement: { saltinis: "cvpp", pirkimoBudas: null } });
 
-        const [observation] = indicator.evaluate(RUN, [cvppSubject]);
+        const observation = decideSubject(indicator, cvppSubject);
         expect(observation.state).toBe("not_applicable");
     });
 
-    it("reports insufficient_data without calling decide() when hasRequiredData is false", () => {
+    it("reports insufficient_data without calling judge() when hasRequiredData is false", () => {
         const indicator = makeIndicator({
-            decide: () => {
-                throw new Error("decide() must not be called when required data is absent");
+            judge: () => {
+                throw new Error("judge() must not be called when required data is absent");
             },
             hasRequiredData: () => false,
         });
 
-        const [observation] = indicator.evaluate(RUN, [subject()]);
+        const observation = decideSubject(indicator, subject());
         expect(observation.state).toBe("insufficient_data");
         expect(observation.missingData).toEqual(["numatomaVerteEUR"]);
     });

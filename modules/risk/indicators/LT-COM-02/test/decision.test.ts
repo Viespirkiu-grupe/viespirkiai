@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { LtCom02Decision, ltCom02v1 } from "../decision.ts";
-import { ltCom02Parameters } from "../parameters.ts";
-import type { LotParticipation, LotSubject, Procurement, ProcurementSubject } from "../../../types.ts";
+import { ltCom02v1 } from "../decision.ts";
+import type { Lot, LotParticipation, LotSubject, Procurement, ProcurementSubject } from "../../../types.ts";
+import { EvaluationContext, type EvaluationRun } from "../../../evaluationContext.ts";
+import { RiskDecisionEngine } from "../../../riskDecisionEngine.ts";
 import { emptyReport, fiveBidders, REPORTED_AT, threeBidders, twoBidders } from "./fixtures.ts";
 
 // Unit tests for the judgement half of LT-COM-02: plain objects in, plain
@@ -9,8 +10,16 @@ import { emptyReport, fiveBidders, REPORTED_AT, threeBidders, twoBidders } from 
 // (docs/indicators-story/risk-service-architecture-v2.md). Participation
 // scenarios come from fixtures.ts; procurementReader.it.ts proves the
 // consolidated participation query actually produces them.
+//
+// assessRisk() assumes isEligible() already passed (riskIndicatorDecision.ts)
+// — the "assessRisk" describe block below calls it directly, the way
+// RiskDecisionEngine does once eligibility is settled. The eligibility-gate
+// and hasRequiredData cases belong to the "end to end" describe block, which
+// goes through RiskDecisionEngine itself, since that is genuinely how a
+// LotSubject reaches assessRisk in production.
 
-const PARAMETERS = ltCom02Parameters[0].values;
+const RUN: EvaluationRun = { runId: 1, dataAsOf: "2026-08-01", subjects: null };
+const CONTEXT = new EvaluationContext(RUN, ltCom02v1.parametersAsOf(RUN.dataAsOf));
 
 function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
     return {
@@ -32,7 +41,23 @@ function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
     };
 }
 
-function lotSubject(participation: LotParticipation | null, procurementOverrides: Partial<Procurement> = {}): LotSubject {
+function testLot(participation: LotParticipation | null): Lot {
+    return {
+        subjektoRaktas: "cvpis:900101:0",
+        saltinis: "cvpis",
+        pirkimoNumeris: "900101",
+        daliesNumeris: "0",
+        daliesPavadinimas: null,
+        deklaruota: false,
+        stebeta: true,
+        dalyviuSkaicius: null,
+        kainuSkaicius: null,
+        atmestuSkaicius: null,
+        participation,
+    };
+}
+
+function lotSubject(participation: LotParticipation, procurementOverrides: Partial<Procurement> = {}): LotSubject {
     const procurement = testProcurement(procurementOverrides);
     return {
         subjectType: "lot",
@@ -40,60 +65,43 @@ function lotSubject(participation: LotParticipation | null, procurementOverrides
         procurementSource: "cvpis",
         procurementId: "900101",
         procurement,
-        lot: {
-            subjektoRaktas: "cvpis:900101:0",
-            saltinis: "cvpis",
-            pirkimoNumeris: "900101",
-            daliesNumeris: "0",
-            daliesPavadinimas: null,
-            deklaruota: false,
-            stebeta: true,
-            dalyviuSkaicius: null,
-            kainuSkaicius: null,
-            atmestuSkaicius: null,
-            participation,
-        },
+        lot: testLot(participation),
     };
 }
 
-function decisionFor(participation: LotParticipation) {
-    return LtCom02Decision.decide(lotSubject(participation), PARAMETERS);
+function assessRiskFor(participation: LotParticipation) {
+    return ltCom02v1.assessRisk(lotSubject(participation), CONTEXT);
 }
 
-describe("LtCom02Decision.decide", () => {
+describe("LtCom02Decision.assessRisk", () => {
     it("triggers when only two participants are recorded", () => {
-        const decision = decisionFor(twoBidders);
-        expect(decision.state).toBe("triggered");
-        expect(decision.rawValue).toEqual({ totalBids: 2 });
-        expect(decision.threshold).toEqual({ minimumBidders: 3 });
+        const signal = assessRiskFor(twoBidders);
+        expect(signal.state).toBe("triggered");
+        expect(signal.rawValue).toEqual({ totalBids: 2 });
+        expect(signal.threshold).toEqual({ minimumBidders: 3 });
     });
 
-    it("does not trigger at exactly the minimum number of bidders", () => {
-        const decision = decisionFor(threeBidders);
-        expect(decision.state).toBe("not_triggered");
-        expect(decision.rawValue).toEqual({ totalBids: 3 });
+    it("does not trigger at exactly the minimum number of bidders — the boundary at minimumBidders: 3", () => {
+        const signal = assessRiskFor(threeBidders);
+        expect(signal.state).toBe("not_triggered");
+        expect(signal.rawValue).toEqual({ totalBids: 3 });
     });
 
     it("does not trigger with plenty of participants", () => {
-        const decision = decisionFor(fiveBidders);
-        expect(decision.state).toBe("not_triggered");
-        expect(decision.rawValue).toEqual({ totalBids: 5 });
-    });
-
-    it("judges the exact threshold boundary", () => {
-        expect(LtCom02Decision.decide(lotSubject(threeBidders), { minimumBidders: 3 }).state).toBe("not_triggered");
-        expect(LtCom02Decision.decide(lotSubject(threeBidders), { minimumBidders: 4 }).state).toBe("triggered");
+        const signal = assessRiskFor(fiveBidders);
+        expect(signal.state).toBe("not_triggered");
+        expect(signal.rawValue).toEqual({ totalBids: 5 });
     });
 
     it("reports insufficient_data for a report that lists no participants", () => {
-        const decision = decisionFor(emptyReport);
-        expect(decision.state).toBe("insufficient_data");
-        expect(decision.missingData).toEqual(["tiekejoKodas"]);
+        const signal = assessRiskFor(emptyReport);
+        expect(signal.state).toBe("insufficient_data");
+        expect(signal.missingData).toEqual(["tiekejoKodas"]);
     });
 
     it("carries the report's own evidence, sourced from the parent procurement's pirkimoBudas", () => {
         for (const participation of [twoBidders, fiveBidders, threeBidders]) {
-            expect(decisionFor(participation).evidence).toEqual({
+            expect(assessRiskFor(participation).evidence).toEqual({
                 pirkimoBudas: "Atviras konkursas",
                 ataskaitosData: participation.reportedAt,
                 source: "ATN-1 ataskaita",
@@ -101,16 +109,16 @@ describe("LtCom02Decision.decide", () => {
         }
     });
 
-    it("is total: every fact row returns one of the four states", () => {
+    it("is total: every participation shape returns one of the four states", () => {
         const states = new Set(["triggered", "not_triggered", "insufficient_data", "not_applicable"]);
         for (const totalBids of [0, 1, 2, 3, 7]) {
-            const decision = decisionFor({ totalBids, validBids: totalBids, reportedAt: REPORTED_AT });
-            expect(states).toContain(decision.state);
+            const signal = assessRiskFor({ totalBids, validBids: totalBids, reportedAt: REPORTED_AT });
+            expect(states).toContain(signal.state);
         }
     });
 
-    it("is pure: the same fact row returns a deeply equal decision every time", () => {
-        expect(decisionFor(fiveBidders)).toEqual(decisionFor(fiveBidders));
+    it("is pure: the same participation shape returns a deeply equal signal every time", () => {
+        expect(assessRiskFor(fiveBidders)).toEqual(assessRiskFor(fiveBidders));
     });
 
     it("throws when given a procurement subject instead of a lot subject", () => {
@@ -121,15 +129,16 @@ describe("LtCom02Decision.decide", () => {
             procurementId: "1",
             procurement: testProcurement(),
         };
-        expect(() => LtCom02Decision.decide(procurementSubject, PARAMETERS)).toThrow(/expected a lot subject/);
+        expect(() => ltCom02v1.assessRisk(procurementSubject, CONTEXT)).toThrow(/expected a lot subject/);
     });
 });
 
-describe("LtCom02Decision end to end (no database)", () => {
-    const RUN = { runId: 1, dataAsOf: "2026-08-01", subjects: null } as const;
+describe("LtCom02Decision end to end (through RiskDecisionEngine, no database)", () => {
+    const engine = new RiskDecisionEngine([ltCom02v1]);
 
-    it("assembles a complete signal from a Subject carrying merged participation", () => {
-        const [signal] = ltCom02v1.evaluate(RUN, [lotSubject(twoBidders)]);
+    it("assembles a complete signal from a Procurement carrying a merged-participation lot", () => {
+        const procurement = testProcurement({ lots: [testLot(twoBidders)] });
+        const [signal] = engine.evaluateAll(RUN, [procurement]);
         expect(signal).toMatchObject({
             indicatorId: "LT-COM-02",
             subjectType: "lot",
@@ -139,7 +148,8 @@ describe("LtCom02Decision end to end (no database)", () => {
     });
 
     it("reports insufficient_data when no participation was observed for the lot", () => {
-        const [signal] = ltCom02v1.evaluate(RUN, [lotSubject(null)]);
+        const procurement = testProcurement({ lots: [testLot(null)] });
+        const [signal] = engine.evaluateAll(RUN, [procurement]);
         expect(signal.state).toBe("insufficient_data");
         expect(signal.missingData).toEqual(["tiekejoKodas"]);
     });

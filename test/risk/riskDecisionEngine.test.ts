@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import type { Decision, EligibilityOutcome, Procurement, RiskIndicatorDefinition, Subject } from "../../modules/risk/types.ts";
+import type { EligibilityOutcome, Lot, Procurement, RiskIndicatorDefinition, RiskSignal, Subject } from "../../modules/risk/types.ts";
 import { ARiskIndicatorDecision } from "../../modules/risk/riskIndicatorDecision.ts";
 import { RiskDecisionEngine } from "../../modules/risk/riskDecisionEngine.ts";
-import type { EvaluationRun } from "../../modules/risk/evaluationContext.ts";
+import type { EvaluationContext, EvaluationRun } from "../../modules/risk/evaluationContext.ts";
 
-// Pure, no DB — RiskDecisionEngine only builds Subjects from already-loaded
-// Procurements and calls each indicator's own evaluate(). See
-// docs/indicators-story/risk-service-architecture-v2.md §1.2.
+// Pure, no DB — RiskDecisionEngine is the only place that batches over
+// Procurements/lots and every registered indicator
+// (docs/indicators-story/risk-service-architecture-v2.md §1.2:
+// evaluateAll/evaluateProcurement/evaluateLot). A Risk Indicator itself only
+// ever decides one subject at a time (isEligible/assessRisk) — these tests
+// exist to prove the Engine, not the indicator base class, owns the loop.
 
 const paramsSchema = z.object({});
 type TestDefinition = RiskIndicatorDefinition<Record<string, never>>;
@@ -29,33 +32,36 @@ function definition(overrides: Partial<TestDefinition> = {}): TestDefinition {
     };
 }
 
-// Always eligible; assessRisk() emits one not_triggered signal per subject,
-// or throws when constructed with shouldThrow — the case that proves the
-// engine isolates a failing indicator from the others in the same call.
+// Always eligible; assessRisk() records every subject it was called with (so
+// tests can assert which subjects the Engine routed to it), and either
+// throws, returns a caller-supplied signal, or defaults to not_triggered.
 class TestIndicator extends ARiskIndicatorDecision<TestDefinition> {
-    readonly evaluateCalls: { subjects: readonly Subject[] }[] = [];
+    readonly assessRiskCalls: Subject[] = [];
     private readonly shouldThrow: boolean;
+    private readonly signalOverride?: (subject: Subject) => RiskSignal;
 
-    constructor(overrides: Partial<TestDefinition> = {}, shouldThrow = false) {
+    constructor(
+        overrides: Partial<TestDefinition> = {},
+        options: { shouldThrow?: boolean; signalOverride?: (subject: Subject) => RiskSignal } = {},
+    ) {
         super(definition(overrides));
-        this.shouldThrow = shouldThrow;
+        this.shouldThrow = options.shouldThrow ?? false;
+        this.signalOverride = options.signalOverride;
     }
 
     protected readonly missingDataWhenAbsent: readonly string[] = [];
     protected hasRequiredData(): boolean {
         return true;
     }
-    protected decide(): Decision {
-        return { state: "not_triggered" };
-    }
     isEligible(): EligibilityOutcome {
         return { eligible: true };
     }
 
-    evaluate(run: EvaluationRun, subjects: readonly Subject[]) {
-        this.evaluateCalls.push({ subjects });
+    assessRisk(subject: Subject, context: EvaluationContext): RiskSignal {
+        this.assessRiskCalls.push(subject);
         if (this.shouldThrow) throw new Error("boom");
-        return super.evaluate(run, subjects);
+        if (this.signalOverride) return this.signalOverride(subject);
+        return this.signalFor(subject, context, { state: "not_triggered" });
     }
 }
 
@@ -79,35 +85,38 @@ function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
     };
 }
 
-const RUN = { runId: 1, dataAsOf: "2026-08-01", subjects: null } as const;
+function testLot(pirkimoNumeris: string, daliesNumeris: string): Lot {
+    return {
+        subjektoRaktas: `cvpis:${pirkimoNumeris}:${daliesNumeris}`,
+        saltinis: "cvpis",
+        pirkimoNumeris,
+        daliesNumeris,
+        daliesPavadinimas: null,
+        deklaruota: true,
+        stebeta: false,
+        dalyviuSkaicius: null,
+        kainuSkaicius: null,
+        atmestuSkaicius: null,
+        participation: null,
+    };
+}
+
+const RUN: EvaluationRun = { runId: 1, dataAsOf: "2026-08-01", subjects: null };
 
 describe("RiskDecisionEngine", () => {
     it("builds one ProcurementSubject and one LotSubject per lot, each carrying its non-null parent", () => {
-        const procurement = testProcurement({
-            pirkimoNumeris: "10",
-            lots: [
-                { subjektoRaktas: "cvpis:10:1", saltinis: "cvpis", pirkimoNumeris: "10", daliesNumeris: "1", daliesPavadinimas: null, deklaruota: true, stebeta: false, dalyviuSkaicius: null, kainuSkaicius: null, atmestuSkaicius: null, participation: null },
-                { subjektoRaktas: "cvpis:10:2", saltinis: "cvpis", pirkimoNumeris: "10", daliesNumeris: "2", daliesPavadinimas: null, deklaruota: true, stebeta: false, dalyviuSkaicius: null, kainuSkaicius: null, atmestuSkaicius: null, participation: null },
-            ],
-        });
+        const procurement = testProcurement({ pirkimoNumeris: "10", lots: [testLot("10", "1"), testLot("10", "2")] });
         const procurementIndicator = new TestIndicator({ subjectType: "procurement" });
         const lotIndicator = new TestIndicator({ key: { id: "LT-TEST-02", version: 1 }, subjectType: "lot" });
         const engine = new RiskDecisionEngine([procurementIndicator, lotIndicator]);
 
         engine.evaluateAll(RUN, [procurement]);
 
-        // Every indicator is handed the same full subject universe — see the
-        // next test — so both indicators' evaluateCalls carry all 3 subjects;
-        // filtering by subjectType is ARiskIndicatorDecision.evaluate()'s own
-        // job, not the engine's.
-        const allSubjects = procurementIndicator.evaluateCalls[0].subjects;
-        const procurementSubjects = allSubjects.filter((s) => s.subjectType === "procurement");
-        expect(procurementSubjects).toHaveLength(1);
-        expect(procurementSubjects[0]).toMatchObject({ subjectType: "procurement", subjectKey: "cvpis:10" });
+        expect(procurementIndicator.assessRiskCalls).toHaveLength(1);
+        expect(procurementIndicator.assessRiskCalls[0]).toMatchObject({ subjectType: "procurement", subjectKey: "cvpis:10" });
 
-        const lotSubjects = allSubjects.filter((s) => s.subjectType === "lot");
-        expect(lotSubjects).toHaveLength(2);
-        for (const lotSubject of lotSubjects) {
+        expect(lotIndicator.assessRiskCalls).toHaveLength(2);
+        for (const lotSubject of lotIndicator.assessRiskCalls) {
             expect(lotSubject.subjectType).toBe("lot");
             if (lotSubject.subjectType === "lot") {
                 expect(lotSubject.procurement).toBe(procurement);
@@ -116,48 +125,64 @@ describe("RiskDecisionEngine", () => {
     });
 
     it("isolates a failing indicator: the other indicator's signals are unaffected", () => {
-        const failing = new TestIndicator({ key: { id: "LT-TEST-FAIL", version: 1 } }, true);
+        const failing = new TestIndicator({ key: { id: "LT-TEST-FAIL", version: 1 } }, { shouldThrow: true });
         const healthy = new TestIndicator();
         const engine = new RiskDecisionEngine([failing, healthy]);
 
-        const results = engine.evaluateAll(RUN, [testProcurement()]);
+        const signals = engine.evaluateAll(RUN, [testProcurement()]);
 
-        const failingResult = results.find((r) => r.indicatorId === "LT-TEST-FAIL")!;
-        expect(failingResult.error).toBe("boom");
-        expect(failingResult.signals).toEqual([]);
-
-        const healthyResult = results.find((r) => r.indicatorId === "LT-TEST-01")!;
-        expect(healthyResult.error).toBeUndefined();
-        expect(healthyResult.signals).toHaveLength(1);
-        expect(healthyResult.signals[0].state).toBe("not_triggered");
+        expect(signals.find((s) => s.indicatorId === "LT-TEST-FAIL")).toBeUndefined();
+        const healthySignal = signals.find((s) => s.indicatorId === "LT-TEST-01");
+        expect(healthySignal?.state).toBe("not_triggered");
     });
 
-    it("hands every indicator the same full subject universe, and each still only signals its own subjectType", () => {
-        const procurement = testProcurement({
-            pirkimoNumeris: "20",
-            lots: [{ subjektoRaktas: "cvpis:20:1", saltinis: "cvpis", pirkimoNumeris: "20", daliesNumeris: "1", daliesPavadinimas: null, deklaruota: true, stebeta: false, dalyviuSkaicius: null, kainuSkaicius: null, atmestuSkaicius: null, participation: null }],
-        });
+    it("only routes procurement subjects to a procurement-subjectType indicator, and lot subjects to a lot-subjectType one", () => {
+        const procurement = testProcurement({ pirkimoNumeris: "20", lots: [testLot("20", "1")] });
         const procurementIndicator = new TestIndicator({ subjectType: "procurement" });
         const lotIndicator = new TestIndicator({ key: { id: "LT-TEST-02", version: 1 }, subjectType: "lot" });
         const engine = new RiskDecisionEngine([procurementIndicator, lotIndicator]);
 
-        const results = engine.evaluateAll(RUN, [procurement]);
+        engine.evaluateAll(RUN, [procurement]);
 
-        expect(procurementIndicator.evaluateCalls[0].subjects).toEqual(lotIndicator.evaluateCalls[0].subjects);
-
-        const procurementResult = results.find((r) => r.indicatorId === "LT-TEST-01")!;
-        expect(procurementResult.signals.every((s) => s.subjectType === "procurement")).toBe(true);
-        const lotResult = results.find((r) => r.indicatorId === "LT-TEST-02")!;
-        expect(lotResult.signals.every((s) => s.subjectType === "lot")).toBe(true);
+        expect(procurementIndicator.assessRiskCalls.every((s) => s.subjectType === "procurement")).toBe(true);
+        expect(lotIndicator.assessRiskCalls.every((s) => s.subjectType === "lot")).toBe(true);
     });
 
-    it("calls each indicator's evaluate() exactly once per evaluateAll() call, not once per subject", () => {
+    it("calls assessRisk exactly once per (indicator, subject) pair across the whole run", () => {
         const indicator = new TestIndicator();
         const engine = new RiskDecisionEngine([indicator]);
 
         engine.evaluateAll(RUN, [testProcurement({ pirkimoNumeris: "1" }), testProcurement({ pirkimoNumeris: "2" })]);
 
-        expect(indicator.evaluateCalls).toHaveLength(1);
-        expect(indicator.evaluateCalls[0].subjects).toHaveLength(2);
+        expect(indicator.assessRiskCalls).toHaveLength(2);
+    });
+
+    it("validates each indicator's own signals at the end — a duplicate subject observation still throws", () => {
+        const duplicateKey = "cvpis:DUPLICATE";
+        const indicator = new TestIndicator(
+            {},
+            {
+                signalOverride: () => ({
+                    indicatorId: "LT-TEST-01",
+                    indicatorVersion: 1,
+                    subjectType: "procurement",
+                    subjectKey: duplicateKey,
+                    procurementSource: "cvpis",
+                    procurementId: "1",
+                    state: "not_triggered",
+                    rawValue: null,
+                    threshold: null,
+                    appliedParameters: null,
+                    evidence: {},
+                    missingData: [],
+                    dataAsOf: RUN.dataAsOf,
+                }),
+            },
+        );
+        const engine = new RiskDecisionEngine([indicator]);
+
+        expect(() =>
+            engine.evaluateAll(RUN, [testProcurement({ pirkimoNumeris: "1" }), testProcurement({ pirkimoNumeris: "2" })]),
+        ).toThrow(/duplicate observation for subject/);
     });
 });

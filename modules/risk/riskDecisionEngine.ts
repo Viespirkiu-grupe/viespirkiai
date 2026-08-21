@@ -1,30 +1,26 @@
-import type { EvaluationRun } from "./evaluationContext.ts";
+import { log } from "../../utils/log.js";
+import { EvaluationContext, type EvaluationRun } from "./evaluationContext.ts";
 import type { ARiskIndicatorDecision } from "./riskIndicatorDecision.ts";
 import type { Lot, Procurement, RiskSignal, Subject } from "./types.ts";
 
-export type IndicatorEvaluationResult = Readonly<{
-    indicatorId: string;
-    signals: readonly RiskSignal[];
-    error?: string;
-    ms: number;
-}>;
-
 /**
- * Pure evaluation logic — no I/O. Receives one page of already-loaded
- * Procurements (Procurement Reader, procurementReader.ts) and the deployed
- * indicators, and decides every subject of every indicator's own
- * subjectType. See docs/indicators-story/risk-service-architecture-v2.md
- * §1.2.
+ * The Risk Decision Engine
+ * (docs/indicators-story/risk-service-architecture-v2.md §1.2):
  *
- * Loops indicators as the outer/error-isolation dimension: one
- * `indicator.evaluate(run, subjects)` call per indicator, catching its own
- * failure so it contributes no signals for this page without stopping the
- * others (services/procurement-risk/runJob.ts then merges per-indicator
- * stats/errors across pages). This preserves ARiskIndicatorDecision's
- * existing batch contract — duplicate-subject rejection and one
- * validateObservations() call per indicator — rather than the alternative of
- * decomposing per subject, which would require re-implementing that
- * contract here.
+ *     class RiskDecisionEngine {
+ *         -riskIndicators: RiskIndicatorDecision[]
+ *         +evaluateAll(procurements: Procurement[])$ RiskSignal[]
+ *         -evaluateProcurement(procurement: Procurement)$ RiskSignal[]
+ *         -evaluateLot(lot: ProcurementLot)$ RiskSignal[]
+ *     }
+ *
+ * The only place that loops indicators over the subject universe. A Risk
+ * Indicator's own responsibility ends at isEligible(subject)/
+ * assessRisk(subject) — one subject at a time (riskIndicatorDecision.ts);
+ * batching over every procurement and lot, and assembling the run's signal
+ * list, belongs here. Pure — no I/O — it only ever touches the
+ * already-loaded Procurements the Procurement Reader (procurementReader.ts)
+ * handed it.
  */
 export class RiskDecisionEngine {
     private readonly indicators: readonly ARiskIndicatorDecision[];
@@ -33,34 +29,96 @@ export class RiskDecisionEngine {
         this.indicators = indicators;
     }
 
-    evaluateAll(run: EvaluationRun, procurements: readonly Procurement[]): readonly IndicatorEvaluationResult[] {
-        const subjects = this.subjectsFor(procurements);
+    /**
+     * `run` is the one addition beyond the diagram's `evaluateAll(procurements)`
+     * signature: an EvaluationContext needs a cutoff to resolve each
+     * indicator's effective parameters against, and that cutoff is the run's,
+     * not any one subject's.
+     *
+     * Builds one EvaluationContext per indicator up front — dataAsOf-effective
+     * parameters depend only on the indicator and the run, never on which
+     * subject is being decided, so this is done once per call, not once per
+     * subject. Then walks every procurement (evaluateProcurement) and its
+     * lots (evaluateLot), and validates each indicator's own observations
+     * once at the end via ARiskIndicatorDecision.validateObservations —
+     * identity/duplicate checks are the indicator's own concern, but only
+     * meaningful over everything it decided this call, not one subject at a
+     * time.
+     */
+    evaluateAll(run: EvaluationRun, procurements: readonly Procurement[]): readonly RiskSignal[] {
+        const contexts = new Map<ARiskIndicatorDecision, EvaluationContext>(
+            this.indicators.map((indicator) => [indicator, new EvaluationContext(run, indicator.parametersAsOf(run.dataAsOf))]),
+        );
+        const observationsByIndicator = new Map<ARiskIndicatorDecision, unknown[]>(
+            this.indicators.map((indicator) => [indicator, []]),
+        );
 
-        return this.indicators.map((indicator) => {
-            const startedAt = Date.now();
-            try {
-                const signals = indicator.evaluate(run, subjects);
-                return { indicatorId: indicator.id, signals, ms: Date.now() - startedAt };
-            } catch (err) {
-                const message = err instanceof Error ? err.message : String(err);
-                return { indicatorId: indicator.id, signals: [], error: message, ms: Date.now() - startedAt };
+        for (const procurement of procurements) {
+            this.evaluateProcurement(procurement, contexts, observationsByIndicator);
+            for (const lot of procurement.lots) {
+                this.evaluateLot(lot, procurement, contexts, observationsByIndicator);
             }
-        });
+        }
+
+        const signals: RiskSignal[] = [];
+        for (const indicator of this.indicators) {
+            signals.push(...indicator.validateObservations(observationsByIndicator.get(indicator)!));
+        }
+        return signals;
+    }
+
+    /** Every procurement-subjectType indicator's signal for this one procurement. */
+    private evaluateProcurement(
+        procurement: Procurement,
+        contexts: ReadonlyMap<ARiskIndicatorDecision, EvaluationContext>,
+        observationsByIndicator: Map<ARiskIndicatorDecision, unknown[]>,
+    ): void {
+        const subject = this.subjectForProcurement(procurement);
+        for (const indicator of this.indicators) {
+            if (indicator.subjectType !== "procurement") continue;
+            this.decide(indicator, subject, contexts.get(indicator)!, observationsByIndicator);
+        }
+    }
+
+    /** Every lot-subjectType indicator's signal for this one lot. */
+    private evaluateLot(
+        lot: Lot,
+        procurement: Procurement,
+        contexts: ReadonlyMap<ARiskIndicatorDecision, EvaluationContext>,
+        observationsByIndicator: Map<ARiskIndicatorDecision, unknown[]>,
+    ): void {
+        const subject = this.subjectForLot(lot, procurement);
+        for (const indicator of this.indicators) {
+            if (indicator.subjectType !== "lot") continue;
+            this.decide(indicator, subject, contexts.get(indicator)!, observationsByIndicator);
+        }
     }
 
     /**
-     * Builds the flat Subject universe for one page: one ProcurementSubject
-     * per procurement, one LotSubject per lot — each lot's parent is the
-     * procurement it came nested under, never null (types.ts's LotSubject).
+     * isEligible then, if eligible, assessRisk — the two-step protocol
+     * riskIndicatorDecision.ts's RiskIndicatorDecision interface declares.
+     * A failing indicator is contained to this one subject: logged, and
+     * contributes nothing for it, rather than aborting the whole run — a
+     * pre-existing operational requirement (services/procurement-risk/
+     * runJob.ts), not shown in the architecture diagram itself.
      */
-    private subjectsFor(procurements: readonly Procurement[]): readonly Subject[] {
-        return procurements.flatMap((procurement) => [
-            this.evaluateProcurement(procurement),
-            ...procurement.lots.map((lot) => this.evaluateLot(lot, procurement)),
-        ]);
+    private decide(
+        indicator: ARiskIndicatorDecision,
+        subject: Subject,
+        context: EvaluationContext,
+        observationsByIndicator: Map<ARiskIndicatorDecision, unknown[]>,
+    ): void {
+        try {
+            const outcome = indicator.isEligible(subject, context);
+            const signal = outcome.eligible ? indicator.assessRisk(subject, context) : outcome.signal;
+            observationsByIndicator.get(indicator)!.push(signal);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            log(`riskDecisionEngine: ${indicator.id} failed for subject ${subject.subjectKey}: ${message}`);
+        }
     }
 
-    private evaluateProcurement(procurement: Procurement): Subject {
+    private subjectForProcurement(procurement: Procurement): Subject {
         return {
             subjectType: "procurement",
             subjectKey: `${procurement.saltinis ?? "unknown"}:${procurement.pirkimoNumeris}`,
@@ -70,7 +128,7 @@ export class RiskDecisionEngine {
         };
     }
 
-    private evaluateLot(lot: Lot, procurement: Procurement): Subject {
+    private subjectForLot(lot: Lot, procurement: Procurement): Subject {
         return {
             subjectType: "lot",
             subjectKey: lot.subjektoRaktas,
