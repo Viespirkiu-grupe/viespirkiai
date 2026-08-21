@@ -59,6 +59,7 @@ backup
 !LICENSE.txt
 
 compose.yml
+!docker/risk/compose.yml
 
 s3backup/s3backup.sqlite*
 

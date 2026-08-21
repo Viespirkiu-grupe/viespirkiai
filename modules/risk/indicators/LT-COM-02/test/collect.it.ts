@@ -2,7 +2,10 @@
 // against fixture rows in the local risk-dev Postgres's test-only `public`
 // schema, and asserts the *facts* it returns — the decisions derived from them
 // are rules.test.ts's job, and need no database
-// (risk-service-architecture.md §8).
+// (docs/indicators-story/risk-service-architecture-v2.md). The "end to end"
+// describe block below additionally proves the Procurement Reader +
+// isEligible()/assessRisk() wiring, which collect.sql alone no longer covers
+// since it dropped its join to v_pirkimo_dalis.
 //
 // Named `.it.ts` to match this repo's integration-test convention
 // (vitest.integration.config.ts); run via `npm run test:integration`, which
@@ -13,8 +16,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { riskDb } from "../../../../../postgres/riskDb.js";
 import { ensurePublicTestSchema, truncateTestPublicTables } from "../../../../../test/risk/testPublicDb.ts";
+import { insertAtaskaita, insertDalyvis, insertPasiulymas } from "../../test/xlsxPPAFixtures.ts";
 import { PostgresRiskDataSource } from "../../../riskDataSource.ts";
 import type { RiskObservationV1 } from "../../../contracts.ts";
+import { loadProcurements } from "../../../procurementReader.ts";
 import { ltCom02v1 } from "../definition.ts";
 import type { LtCom02Facts } from "../rules.ts";
 import {
@@ -53,35 +58,31 @@ async function insertProcurement(fixture: ProcurementFixture): Promise<void> {
         );
     }
 
-    const { rows } = await riskDb.query<{ id: number }>(
-        `INSERT INTO public."atn1ataskaitos" ("pirkimoNumeris", "pirkimoBudas", "daliuSkaicius", "sukurtaAt")
-         VALUES ($1, $2, $3, $4)
-         RETURNING id`,
-        [pirkimoNumeris, fixture.pirkimoBudas, fixture.lots.length, fixture.reportedAt],
-    );
-    const ataskaitaId = rows[0].id;
+    const ataskaitaId = await insertAtaskaita({
+        pirkimoNumeris,
+        pirkimoBudas: fixture.pirkimoBudas,
+        daliuSkaicius: fixture.lots.length,
+        sukurtaAt: fixture.reportedAt,
+    });
 
     for (const lot of fixture.lots as readonly LotFixture[]) {
         for (const kodas of lot.bidders) {
-            await riskDb.query(
-                `INSERT INTO public."atn1dalyviai" ("ataskaitaId", "kodas") VALUES ($1, $2)`,
-                [ataskaitaId, kodas],
-            );
+            await insertDalyvis({ ataskaitaId, kodas });
             // Rejection status has no bearing on this indicator — every
             // participant is recorded as a submitted, unrejected bid.
-            await riskDb.query(
-                `INSERT INTO public."atn1pasiulymuEile" ("ataskaitaId", "daliesNumeris", "dalyvioKodas", "kaina")
-                 VALUES ($1, $2, $3, '1000')`,
-                [ataskaitaId, lot.daliesNumeris, kodas],
-            );
+            await insertPasiulymas({ ataskaitaId, daliesNumeris: lot.daliesNumeris, dalyvioKodas: kodas });
         }
     }
+}
+
+function sortKey(row: LtCom02Facts): string {
+    return `${row.pirkimoNumeris}:${row.daliesNumeris}`;
 }
 
 /** collect.sql on its own, with the two arguments the shared class binds. */
 async function collect(subjects: readonly string[] | null = null): Promise<readonly LtCom02Facts[]> {
     const rows = await facts.query<LtCom02Facts>(COLLECT_SQL, [DATA_AS_OF, subjects]);
-    return [...rows].sort((a, b) => a.subjectKey.localeCompare(b.subjectKey));
+    return [...rows].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
 }
 
 async function collectFor(fixture: ProcurementFixture): Promise<readonly LtCom02Facts[]> {
@@ -121,7 +122,7 @@ describe("LT-COM-02 collect.sql", () => {
         await insertProcurement(twoLotsDifferentBidderCounts);
         await insertProcurement(duplicateBidderRows);
         const rows = await collect();
-        expect(new Set(rows.map((row) => row.subjectKey)).size).toBe(rows.length);
+        expect(new Set(rows.map(sortKey)).size).toBe(rows.length);
         expect(rows).toHaveLength(3);
     });
 
@@ -129,7 +130,7 @@ describe("LT-COM-02 collect.sql", () => {
         await insertProcurement(twoBidders);
         await insertProcurement(fiveBidders);
         const rows = await collect(["900101"]);
-        expect(rows.map((row) => row.subjectKey)).toEqual(["cvpis:900101:0"]);
+        expect(rows.map((row) => row.pirkimoNumeris)).toEqual(["900101"]);
     });
 
     it("hides a report recorded after the cutoff, and shows it at a later one", async () => {
@@ -137,7 +138,7 @@ describe("LT-COM-02 collect.sql", () => {
         expect(await collect()).toEqual([]);
 
         const later = await facts.query<LtCom02Facts>(COLLECT_SQL, ["2026-10-01T00:00:00.000Z", null]);
-        expect(later.map((row) => row.subjectKey)).toEqual(["cvpis:900107:0"]);
+        expect(later.map((row) => row.pirkimoNumeris)).toEqual(["900107"]);
     });
 
     it("makes no time comparison outside the $1 cutoff", () => {
@@ -152,16 +153,18 @@ describe("LT-COM-02 collect.sql", () => {
 });
 
 describe("LT-COM-02 end to end", () => {
-    // The same call the run job makes: the indicator collects, resolves its
-    // own effective parameters, judges and validates. Only the data source
+    // The same call the run job makes: the Procurement Reader loads the
+    // subject universe, then the indicator prefetches, resolves its own
+    // effective parameters, judges and validates. Only the data source
     // differs — here the local Docker Postgres instead of the real database.
-    function evaluate(dataAsOf = DATA_AS_OF): Promise<readonly RiskObservationV1[]> {
-        return ltCom02v1.evaluate({ runId: 1, dataAsOf, subjects: null }, facts);
+    async function evaluateInsertedFixture(dataAsOf = DATA_AS_OF): Promise<readonly RiskObservationV1[]> {
+        const { lotSubjects } = await loadProcurements(facts, null);
+        return ltCom02v1.evaluate({ runId: 1, dataAsOf, subjects: null }, lotSubjects, facts);
     }
 
     it("assembles a complete observation from a fact row and a decision", async () => {
         await insertProcurement(twoBidders);
-        const [observation] = await evaluate();
+        const [observation] = await evaluateInsertedFixture();
 
         expect(observation).toEqual({
             indicatorId: "LT-COM-02",
@@ -184,11 +187,24 @@ describe("LT-COM-02 end to end", () => {
         });
     });
 
+    // No viesiejiPirkimai row exists for this pirkimoNumeris, so the
+    // Procurement Reader's LotSubject.procurement is null and the shared
+    // eligibility gate — not ltCom02Decide — reports insufficient_data.
+    it("reports insufficient_data via the shared eligibility gate for an unregistered procurement", async () => {
+        await insertProcurement(unmatchedProcurement);
+        const [observation] = await evaluateInsertedFixture();
+
+        expect(observation.subjectKey).toBe("unknown:900104:0");
+        expect(observation.state).toBe("insufficient_data");
+        expect(observation.missingData).toEqual(["procurementSource"]);
+        expect(observation.rawValue).toBeNull();
+    });
+
     // The report is collected — it predates the cutoff — but no reviewed
     // threshold covers it, and the shared class refuses to judge without one.
     it("reports not_applicable with no applied parameters before the timeline starts", async () => {
         await insertProcurement(reportedBeforeParameters);
-        const [observation] = await evaluate("2025-12-01T00:00:00.000Z");
+        const [observation] = await evaluateInsertedFixture("2025-12-01T00:00:00.000Z");
 
         expect(observation.subjectKey).toBe("cvpis:900108:0");
         expect(observation.state).toBe("not_applicable");
@@ -199,6 +215,6 @@ describe("LT-COM-02 end to end", () => {
 
     it("writes the same observations for an unchanged cutoff and unchanged rows", async () => {
         await insertProcurement(twoLotsDifferentBidderCounts);
-        expect(await evaluate()).toEqual(await evaluate());
+        expect(await evaluateInsertedFixture()).toEqual(await evaluateInsertedFixture());
     });
 });

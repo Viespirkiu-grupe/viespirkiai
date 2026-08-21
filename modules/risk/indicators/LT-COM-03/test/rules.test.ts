@@ -9,13 +9,16 @@ import {
     oneSupplier,
     sameSupplierAcrossTwoLots,
     twoSuppliers,
-    unmatchedProcurement,
 } from "./fixtures.ts";
 
 // Unit tests for the judgement half of LT-COM-03: plain objects in, plain
-// objects out, no database and no clock (risk-service-architecture.md §8).
-// The fact rows come from fixtures.ts, and collect.it.ts proves collect.sql
-// actually produces them.
+// objects out, no database and no clock
+// (docs/indicators-story/risk-service-architecture-v2.md). The fact rows
+// come from fixtures.ts, and collect.it.ts proves collect.sql actually
+// produces them. The procurementSource === null → insufficient_data case
+// moved to modules/risk/procurementEligibility.test.ts and
+// collect.it.ts's "end to end" describe block — the shared eligibility gate
+// decides that now, before ltCom03Decide ever runs.
 
 const PARAMETERS = ltCom03Parameters[0].values;
 
@@ -61,14 +64,6 @@ describe("ltCom03Decide", () => {
         expect(decision.rawValue).toEqual({ totalSuppliers: 2 });
     });
 
-    it("reports insufficient_data when the procurement source can't be resolved", () => {
-        const decision = decisionFor(unmatchedProcurement.facts[0]);
-        expect(decision.state).toBe("insufficient_data");
-        expect(decision.missingData).toEqual(["procurementSource"]);
-        expect(decision.rawValue).toBeUndefined();
-        expect(decision.threshold).toBeUndefined();
-    });
-
     it("reports insufficient_data for a report that lists no participants", () => {
         const decision = decisionFor(emptyReportFacts);
         expect(decision.state).toBe("insufficient_data");
@@ -76,7 +71,7 @@ describe("ltCom03Decide", () => {
     });
 
     it("carries the report's own evidence on every state it returns", () => {
-        for (const facts of [oneSupplier.facts[0], fiveSuppliers.facts[0], unmatchedProcurement.facts[0]]) {
+        for (const facts of [oneSupplier.facts[0], fiveSuppliers.facts[0], twoSuppliers.facts[0]]) {
             expect(decisionFor(facts).evidence).toEqual({
                 pirkimoBudas: facts.method,
                 ataskaitosData: facts.reportedAt,
@@ -94,10 +89,8 @@ describe("ltCom03Decide", () => {
     it("is total: every fact row returns one of the four states", () => {
         const states = new Set(["triggered", "not_triggered", "insufficient_data", "not_applicable"]);
         for (const totalSuppliers of [0, 1, 2, 3, 7]) {
-            for (const procurementSource of ["cvpis", null]) {
-                const facts = { ...oneSupplier.facts[0], totalSuppliers, procurementSource };
-                expect(states).toContain(decisionFor(facts).state);
-            }
+            const facts = { ...oneSupplier.facts[0], totalSuppliers };
+            expect(states).toContain(decisionFor(facts).state);
         }
     });
 

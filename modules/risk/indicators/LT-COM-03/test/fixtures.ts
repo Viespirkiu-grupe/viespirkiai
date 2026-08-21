@@ -6,13 +6,18 @@ import type { LtCom03Facts } from "../rules.ts";
 // produce from it. collect.it.ts asserts the SQL returns exactly `facts`;
 // rules.test.ts feeds those same rows to ltCom03Decide. The two tests
 // therefore meet on one value rather than on two independent guesses about
-// what a fact row looks like (risk-service-architecture.md §8).
+// what a fact row looks like
+// (docs/indicators-story/risk-service-architecture-v2.md).
 //
 // Unlike LT-COM-01/LT-COM-02, the unit of analysis here is the whole
 // procurement, not one lot: every lot's ATN-1 report rolls up into a single
 // fact row, and totalSuppliers is the count of distinct suppliers recorded
 // anywhere in the procurement. Rejection status has no bearing on this
 // indicator, so bidders carry no validity flag.
+//
+// Since the v2 port, a fact row no longer carries subject identity
+// (subjectKey/procurementSource/procurementId) — that comes from the
+// ProcurementSubject the Procurement Reader loads.
 
 export type LotFixture = Readonly<{ daliesNumeris: string | null; bidders: readonly string[] }>;
 
@@ -20,7 +25,10 @@ export type ProcurementFixture = Readonly<{
     pirkimoId: number;
     pirkimoBudas: string;
     // false reproduces a real ingestion-lag gap: an ATN-1 report whose
-    // pirkimoNumeris has no matching viesiejiPirkimai row yet.
+    // pirkimoNumeris has no matching viesiejiPirkimai row yet. Since the v2
+    // port, such a pirkimoNumeris has no ProcurementSubject at all (the
+    // Procurement Reader's subject universe is exactly what v_pirkimas
+    // produces) — see collect.it.ts's "end to end" describe block.
     registerProcurement: boolean;
     // When the ATN-1 report was recorded, compared against the run cutoff.
     reportedAt: string;
@@ -44,9 +52,7 @@ export const oneSupplier: ProcurementFixture = {
     lots: [{ daliesNumeris: null, bidders: ["B1"] }],
     facts: [
         {
-            subjectKey: "cvpis:900201",
-            procurementSource: "cvpis",
-            procurementId: "900201",
+            pirkimoNumeris: "900201",
             method: METHOD,
             totalSuppliers: 1,
             reportedAt: REPORTED_AT,
@@ -64,9 +70,7 @@ export const twoSuppliers: ProcurementFixture = {
     lots: [{ daliesNumeris: null, bidders: ["B1", "B2"] }],
     facts: [
         {
-            subjectKey: "cvpis:900202",
-            procurementSource: "cvpis",
-            procurementId: "900202",
+            pirkimoNumeris: "900202",
             method: METHOD,
             totalSuppliers: 2,
             reportedAt: REPORTED_AT,
@@ -84,9 +88,7 @@ export const fiveSuppliers: ProcurementFixture = {
     lots: [{ daliesNumeris: null, bidders: ["B1", "B2", "B3", "B4", "B5"] }],
     facts: [
         {
-            subjectKey: "cvpis:900203",
-            procurementSource: "cvpis",
-            procurementId: "900203",
+            pirkimoNumeris: "900203",
             method: METHOD,
             totalSuppliers: 5,
             reportedAt: REPORTED_AT,
@@ -95,8 +97,10 @@ export const fiveSuppliers: ProcurementFixture = {
 };
 
 // An ATN-1 report with real participant data whose pirkimoNumeris never got a
-// matching viesiejiPirkimai row — insufficient_data, because the procurement
-// source can't be resolved.
+// matching viesiejiPirkimai row. collect.sql's own aggregation no longer
+// depends on registration at all, so it still produces a fact row — but this
+// pirkimoNumeris will have no ProcurementSubject once the Procurement Reader
+// is involved (see collect.it.ts's "end to end" describe block).
 export const unmatchedProcurement: ProcurementFixture = {
     pirkimoId: 900204,
     pirkimoBudas: METHOD,
@@ -105,9 +109,7 @@ export const unmatchedProcurement: ProcurementFixture = {
     lots: [{ daliesNumeris: null, bidders: ["B1"] }],
     facts: [
         {
-            subjectKey: "unknown:900204",
-            procurementSource: null,
-            procurementId: "900204",
+            pirkimoNumeris: "900204",
             method: METHOD,
             totalSuppliers: 1,
             reportedAt: REPORTED_AT,
@@ -130,9 +132,7 @@ export const sameSupplierAcrossTwoLots: ProcurementFixture = {
     ],
     facts: [
         {
-            subjectKey: "cvpis:900205",
-            procurementSource: "cvpis",
-            procurementId: "900205",
+            pirkimoNumeris: "900205",
             method: METHOD,
             totalSuppliers: 1,
             reportedAt: REPORTED_AT,
@@ -154,9 +154,7 @@ export const differentSuppliersAcrossTwoLots: ProcurementFixture = {
     ],
     facts: [
         {
-            subjectKey: "cvpis:900206",
-            procurementSource: "cvpis",
-            procurementId: "900206",
+            pirkimoNumeris: "900206",
             method: METHOD,
             totalSuppliers: 2,
             reportedAt: REPORTED_AT,
@@ -174,9 +172,7 @@ export const duplicateSupplierRows: ProcurementFixture = {
     lots: [{ daliesNumeris: null, bidders: ["B1", "B1"] }],
     facts: [
         {
-            subjectKey: "cvpis:900207",
-            procurementSource: "cvpis",
-            procurementId: "900207",
+            pirkimoNumeris: "900207",
             method: METHOD,
             totalSuppliers: 1,
             reportedAt: REPORTED_AT,
@@ -204,9 +200,7 @@ export const reportedBeforeParameters: ProcurementFixture = {
     lots: [{ daliesNumeris: null, bidders: ["B1"] }],
     facts: [
         {
-            subjectKey: "cvpis:900209",
-            procurementSource: "cvpis",
-            procurementId: "900209",
+            pirkimoNumeris: "900209",
             method: METHOD,
             totalSuppliers: 1,
             reportedAt: "2025-11-02T08:00:00Z",
@@ -218,9 +212,7 @@ export const reportedBeforeParameters: ProcurementFixture = {
 // participants at all. It cannot be built through the ingestion tables (a lot
 // exists because a participant row exists), so it is a decision-only case.
 export const emptyReportFacts: LtCom03Facts = {
-    subjectKey: "cvpis:900210",
-    procurementSource: "cvpis",
-    procurementId: "900210",
+    pirkimoNumeris: "900210",
     method: METHOD,
     totalSuppliers: 0,
     reportedAt: REPORTED_AT,

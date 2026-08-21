@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ParameterEntry, RiskObservationV1 } from "../../modules/risk/contracts.ts";
+import type { EligibilityOutcome, ParameterEntry, Procurement, RiskObservationV1, Subject } from "../../modules/risk/contracts.ts";
 import { RiskIndicator, type RiskIndicatorDefinition } from "../../modules/risk/riskIndicator.ts";
 import { RiskIndicatorRegistry } from "../../modules/risk/registry.ts";
 import { z } from "zod";
@@ -8,19 +8,30 @@ const paramsSchema = z.object({ threshold: z.number() });
 
 type TestParameters = z.infer<typeof paramsSchema>;
 
-// An indicator whose calculation is a plain function — the shape an indicator
-// with an internal structure takes (§4.3's own `calculate()` case), and the
-// cheapest subclass to assert the shared behaviour of the base class on.
+// An indicator whose calculation is a plain lookup — the shape an indicator
+// with an internal structure takes (§3.4's own isEligible/assessRisk case),
+// and the cheapest subclass to assert the shared behaviour of the base class
+// on. Always eligible; assessRisk() replays the canned observations in
+// order, one per subject evaluate() is asked to decide.
 class TestRiskIndicator extends RiskIndicator<TestParameters> {
     private readonly observations: readonly RiskObservationV1[];
+    private cursor = 0;
 
     constructor(definition: RiskIndicatorDefinition<TestParameters>, observations: readonly RiskObservationV1[] = []) {
         super(definition);
         this.observations = observations;
     }
 
-    protected async calculate(): Promise<readonly RiskObservationV1[]> {
-        return this.observations;
+    protected async prepare(): Promise<void> {
+        this.cursor = 0;
+    }
+
+    protected isEligible(): EligibilityOutcome {
+        return { eligible: true };
+    }
+
+    protected assessRisk(): RiskObservationV1 {
+        return this.observations[this.cursor++];
     }
 }
 
@@ -76,6 +87,38 @@ function observation(overrides: Partial<RiskObservationV1> = {}): RiskObservatio
         dataAsOf: "2026-08-01",
         ...overrides,
     };
+}
+
+function testProcurement(overrides: Partial<Procurement> = {}): Procurement {
+    return {
+        saltinis: "cvpis",
+        pirkimoNumeris: "1",
+        pavadinimas: null,
+        jarKodas: null,
+        pirkimoBudas: "Atviras konkursas",
+        statusas: null,
+        pirkimoObjektoTipas: null,
+        numatomaVerteEUR: null,
+        paskelbimoData: null,
+        pasiulymuPateikimoTerminas: null,
+        bvpzKodai: null,
+        esFinansavimas: null,
+        lots: [],
+        ...overrides,
+    };
+}
+
+// evaluate() decides one subject per element of this array, in order, and
+// TestRiskIndicator.assessRisk() replays the canned observations in the same
+// order — content doesn't matter beyond subjectType/count for these tests.
+function subjects(count: number): readonly Subject[] {
+    return Array.from({ length: count }, (_, i) => ({
+        subjectType: "procurement" as const,
+        subjectKey: `cvpis:${i + 1}`,
+        procurementSource: "cvpis",
+        procurementId: `${i + 1}`,
+        procurement: testProcurement({ pirkimoNumeris: `${i + 1}` }),
+    }));
 }
 
 const RUN = { runId: 1, dataAsOf: "2026-08-01", subjects: null } as const;
@@ -199,21 +242,21 @@ describe("RiskIndicator", () => {
                 { validFrom: "2026-01-01", validTo: null, scope: { methods: ["restricted"] }, values: { threshold: 2 }, source: "t" },
             ],
         });
-        const subject = { subjectKey: "cvpis:1", procurementSource: "cvpis", procurementId: "1" };
+        const facts = { subjectKey: "cvpis:1", procurementSource: "cvpis", procurementId: "1" };
 
-        expect(indicator.parameterEntryFor("2026-08-01", { ...subject, method: "restricted" })?.values).toEqual({
+        expect(indicator.parameterEntryFor("2026-08-01", { ...facts, method: "restricted" })?.values).toEqual({
             threshold: 2,
         });
         // A constrained dimension the subject cannot answer matches nothing,
         // so the caller reports not_applicable rather than guessing.
-        expect(indicator.parameterEntryFor("2026-08-01", { ...subject, method: null })).toBeNull();
-        expect(indicator.parameterEntryFor("2026-08-01", { ...subject, method: "negotiated" })).toBeNull();
+        expect(indicator.parameterEntryFor("2026-08-01", { ...facts, method: null })).toBeNull();
+        expect(indicator.parameterEntryFor("2026-08-01", { ...facts, method: "negotiated" })).toBeNull();
     });
 
     it("resolves no entry at a cutoff outside the timeline", () => {
         const indicator = makeIndicator({});
-        const subject = { subjectKey: "cvpis:1", procurementSource: "cvpis", procurementId: "1" };
-        expect(indicator.parameterEntryFor("2020-01-01", subject)).toBeNull();
+        const facts = { subjectKey: "cvpis:1", procurementSource: "cvpis", procurementId: "1" };
+        expect(indicator.parameterEntryFor("2020-01-01", facts)).toBeNull();
     });
 
     it("rejects validTo earlier than validFrom", () => {
@@ -237,24 +280,24 @@ describe("RiskIndicator", () => {
         expect(indicator.parametersAsOf("2026-03-01")).toEqual([indicator.parameters[0]]);
     });
 
-    it("validates the rows a calculation returned against the output contract", async () => {
+    it("validates the rows assessRisk() returned against the output contract", async () => {
         const indicator = makeIndicator({}, [observation()]);
-        await expect(indicator.evaluate(RUN, NO_DATA)).resolves.toEqual([observation()]);
+        await expect(indicator.evaluate(RUN, subjects(1), NO_DATA)).resolves.toEqual([observation()]);
     });
 
     it("rejects an observation carrying another indicator's identity", async () => {
         const indicator = makeIndicator({}, [observation({ indicatorVersion: 2 })]);
-        await expect(indicator.evaluate(RUN, NO_DATA)).rejects.toThrow(/observation carries indicator identity/);
+        await expect(indicator.evaluate(RUN, subjects(1), NO_DATA)).rejects.toThrow(/observation carries indicator identity/);
     });
 
     it("rejects an observation whose subjectType differs from the declared one", async () => {
         const indicator = makeIndicator({}, [observation({ subjectType: "lot" })]);
-        await expect(indicator.evaluate(RUN, NO_DATA)).rejects.toThrow(/does not match the indicator's declared/);
+        await expect(indicator.evaluate(RUN, subjects(1), NO_DATA)).rejects.toThrow(/does not match the indicator's declared/);
     });
 
     it("rejects two observations about the same subject", async () => {
         const indicator = makeIndicator({}, [observation(), observation()]);
-        await expect(indicator.evaluate(RUN, NO_DATA)).rejects.toThrow(/duplicate observation for subject/);
+        await expect(indicator.evaluate(RUN, subjects(2), NO_DATA)).rejects.toThrow(/duplicate observation for subject/);
     });
 });
 

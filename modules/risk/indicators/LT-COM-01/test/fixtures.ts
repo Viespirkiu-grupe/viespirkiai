@@ -6,7 +6,14 @@ import type { LtCom01Facts } from "../rules.ts";
 // produce from it. collect.it.ts asserts the SQL returns exactly `facts`;
 // rules.test.ts feeds those same rows to ltCom01Decide. The two tests
 // therefore meet on one value rather than on two independent guesses about
-// what a fact row looks like (risk-service-architecture.md §8).
+// what a fact row looks like
+// (docs/indicators-story/risk-service-architecture-v2.md).
+//
+// Since the v2 port, a fact row no longer carries subject identity
+// (subjectKey/procurementSource/procurementId) — that comes from the Subject
+// the Procurement Reader loads. daliesNumeris is always the lot's own value,
+// defaulting to "0" for an unnumbered lot, matching collect.sql's own
+// COALESCE(d."daliesNumeris", '0').
 
 export type BidderFixture = Readonly<{ kodas: string; valid: boolean }>;
 export type LotFixture = Readonly<{ daliesNumeris: string | null; bidders: readonly BidderFixture[] }>;
@@ -38,9 +45,8 @@ export const singleBidder: ProcurementFixture = {
     lots: [{ daliesNumeris: null, bidders: [{ kodas: "B1", valid: true }] }],
     facts: [
         {
-            subjectKey: "cvpis:900001:0",
-            procurementSource: "cvpis",
-            procurementId: "900001",
+            pirkimoNumeris: "900001",
+            daliesNumeris: "0",
             method: METHOD,
             totalBids: 1,
             validBids: 1,
@@ -67,9 +73,8 @@ export const oneOfTwoRejected: ProcurementFixture = {
     ],
     facts: [
         {
-            subjectKey: "cvpis:900002:0",
-            procurementSource: "cvpis",
-            procurementId: "900002",
+            pirkimoNumeris: "900002",
+            daliesNumeris: "0",
             method: METHOD,
             totalBids: 2,
             validBids: 1,
@@ -95,9 +100,8 @@ export const twoValidBidders: ProcurementFixture = {
     ],
     facts: [
         {
-            subjectKey: "cvpis:900003:0",
-            procurementSource: "cvpis",
-            procurementId: "900003",
+            pirkimoNumeris: "900003",
+            daliesNumeris: "0",
             method: METHOD,
             totalBids: 2,
             validBids: 2,
@@ -107,8 +111,10 @@ export const twoValidBidders: ProcurementFixture = {
 };
 
 // An ATN-1 report with real participant data whose pirkimoNumeris never got a
-// matching viesiejiPirkimai row — insufficient_data, because the procurement
-// source can't be resolved.
+// matching viesiejiPirkimai row. collect.sql's own aggregation no longer
+// depends on registration at all, so it still produces a fact row — it's the
+// Procurement Reader/eligibility gate (collect.it.ts's "end to end" describe
+// block) that reports insufficient_data for this case now, not collect.sql.
 export const unmatchedProcurement: ProcurementFixture = {
     pirkimoId: 900004,
     pirkimoBudas: METHOD,
@@ -117,9 +123,8 @@ export const unmatchedProcurement: ProcurementFixture = {
     lots: [{ daliesNumeris: null, bidders: [{ kodas: "B1", valid: true }] }],
     facts: [
         {
-            subjectKey: "unknown:900004:0",
-            procurementSource: null,
-            procurementId: "900004",
+            pirkimoNumeris: "900004",
+            daliesNumeris: "0",
             method: METHOD,
             totalBids: 1,
             validBids: 1,
@@ -147,18 +152,16 @@ export const twoLotsDifferentOutcomes: ProcurementFixture = {
     ],
     facts: [
         {
-            subjectKey: "cvpis:900005:1",
-            procurementSource: "cvpis",
-            procurementId: "900005",
+            pirkimoNumeris: "900005",
+            daliesNumeris: "1",
             method: METHOD,
             totalBids: 1,
             validBids: 1,
             reportedAt: REPORTED_AT,
         },
         {
-            subjectKey: "cvpis:900005:2",
-            procurementSource: "cvpis",
-            procurementId: "900005",
+            pirkimoNumeris: "900005",
+            daliesNumeris: "2",
             method: METHOD,
             totalBids: 2,
             validBids: 2,
@@ -185,9 +188,8 @@ export const duplicateBidderRows: ProcurementFixture = {
     ],
     facts: [
         {
-            subjectKey: "cvpis:900006:0",
-            procurementSource: "cvpis",
-            procurementId: "900006",
+            pirkimoNumeris: "900006",
+            daliesNumeris: "0",
             method: METHOD,
             totalBids: 1,
             validBids: 1,
@@ -216,9 +218,8 @@ export const reportedBeforeParameters: ProcurementFixture = {
     lots: [{ daliesNumeris: null, bidders: [{ kodas: "B1", valid: true }] }],
     facts: [
         {
-            subjectKey: "cvpis:900008:0",
-            procurementSource: "cvpis",
-            procurementId: "900008",
+            pirkimoNumeris: "900008",
+            daliesNumeris: "0",
             method: METHOD,
             totalBids: 1,
             validBids: 1,
@@ -231,9 +232,8 @@ export const reportedBeforeParameters: ProcurementFixture = {
 // participants at all. It cannot be built through the ingestion tables (a lot
 // exists because a participant row exists), so it is a decision-only case.
 export const emptyReportFacts: LtCom01Facts = {
-    subjectKey: "cvpis:900009:0",
-    procurementSource: "cvpis",
-    procurementId: "900009",
+    pirkimoNumeris: "900009",
+    daliesNumeris: "0",
     method: METHOD,
     totalBids: 0,
     validBids: 0,

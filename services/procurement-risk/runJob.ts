@@ -3,6 +3,8 @@ import { riskDb } from "../../postgres/riskDb.js";
 import { log } from "../../utils/log.js";
 import { PostgresRiskDataSource } from "../../modules/risk/riskDataSource.ts";
 import { riskIndicatorRegistry } from "../../modules/risk/deployedIndicators.ts";
+import { loadProcurements } from "../../modules/risk/procurementReader.ts";
+import type { Subject } from "../../modules/risk/contracts.ts";
 import { writeObservations } from "./write.ts";
 
 export type RunJobOptions = Readonly<{
@@ -72,13 +74,20 @@ export async function runEvaluation(options: RunJobOptions): Promise<RunResult> 
     // Calculations read the real database's `public` canonical facts; only
     // the Risk Signals Writer touches `riskDb`.
     const canonicalFacts = new PostgresRiskDataSource(postgres);
+
+    // Procurement Reader (risk-service-architecture-v2.md §1): one pass per
+    // run, not per indicator — every indicator below decides against the
+    // same loaded subject universe.
+    const { procurementSubjects, lotSubjects } = await loadProcurements(canonicalFacts, run.subjects);
+    const subjects: readonly Subject[] = [...procurementSubjects, ...lotSubjects];
+
     const statistics: Record<string, unknown> = {};
     let anyFailed = false;
 
     for (const indicator of riskIndicatorRegistry.evaluable()) {
         const startedAt = Date.now();
         try {
-            const observations = await indicator.evaluate(run, canonicalFacts);
+            const observations = await indicator.evaluate(run, subjects, canonicalFacts);
 
             const client = await riskDb.connect();
             let writeStats;

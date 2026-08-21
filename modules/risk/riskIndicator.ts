@@ -2,12 +2,15 @@ import type { z } from "zod";
 import {
     riskObservationV1Contract,
     zodContract,
+    type Decision,
+    type EligibilityOutcome,
     type IndicatorLifecycle,
     type IndicatorStage,
     type ParameterEntry,
     type RiskIndicatorKey,
     type RiskObservationV1,
     type RuntimeContract,
+    type Subject,
     type SubjectFacts,
     type SubjectType,
 } from "./contracts.ts";
@@ -16,11 +19,13 @@ import { describeScope, scopeAdmits, scopeKey, scopesAreDisjoint } from "./param
 import type { RiskDataSource } from "./riskDataSource.ts";
 
 // One deployed Risk Indicator version: validates itself, resolves its own
-// effective parameters, calculates, and validates what it produced. See
-// docs/indicators-story/risk-service-architecture.md §4.3.
+// effective parameters, decides every subject of its own subjectType, and
+// validates what it produced. See
+// docs/indicators-story/risk-service-architecture-v2.md §3.4.
 //
-// `calculate` is abstract; SubjectFactsIndicator (subjectFactsIndicator.ts)
-// is the common "collect facts in SQL, decide in TypeScript" implementation.
+// `isEligible`/`assessRisk` are abstract; RelationFactsIndicator
+// (relationFactsIndicator.ts) is the common "prefetch bulk facts once, then
+// decide per subject" implementation.
 
 // Half-open validity ranges [validFrom, validTo), where a null validTo is
 // "still in force".
@@ -145,24 +150,78 @@ export abstract class RiskIndicator<P = unknown> {
     }
 
     /**
-     * Resolves this indicator's effective parameters for the run's cutoff,
-     * calls calculate(), and validates the result via validateObservations().
+     * Optional one-time bulk prefetch, called once per evaluate() before the
+     * subject loop below. Default: no-op. A concrete indicator that needs
+     * supplemental facts (e.g. a v_dalyviai aggregate) runs one query here —
+     * not one per subject — and caches the result for isEligible/assessRisk
+     * to read synchronously. See
+     * docs/indicators-story/risk-service-architecture-v2.md §1.
      */
-    async evaluate(run: EvaluationRun, data: RiskDataSource): Promise<readonly RiskObservationV1[]> {
-        const context = new EvaluationContext(run, this.parametersAsOf(run.dataAsOf));
-        return this.validateObservations(await this.calculate(context, data));
+    protected async prepare(_context: EvaluationContext, _data: RiskDataSource): Promise<void> {}
+
+    /**
+     * Business + data eligibility gate for one subject (architecture-v2.md
+     * §3.3/§3.4). Synchronous: reads only from whatever prepare() cached,
+     * never the database directly.
+     */
+    protected abstract isEligible(subject: Subject, context: EvaluationContext): EligibilityOutcome;
+
+    /**
+     * Risk assessment for one subject isEligible() already found eligible.
+     * Never called otherwise.
+     */
+    protected abstract assessRisk(subject: Subject, context: EvaluationContext): RiskObservationV1;
+
+    /**
+     * Assembles a full observation around a partial Decision — the fields
+     * neither isEligible's ineligible branch nor assessRisk's decide() step
+     * needs to repeat every time.
+     */
+    protected signalFor(
+        subject: Subject,
+        context: EvaluationContext,
+        decision: Decision,
+        appliedParameters: Readonly<Record<string, unknown>> | null,
+    ): RiskObservationV1 {
+        return {
+            indicatorId: this.key.id,
+            indicatorVersion: this.key.version,
+            subjectType: subject.subjectType,
+            subjectKey: subject.subjectKey,
+            procurementSource: subject.procurementSource,
+            procurementId: subject.procurementId,
+            state: decision.state,
+            rawValue: decision.rawValue ?? null,
+            threshold: decision.threshold ?? null,
+            appliedParameters,
+            evidence: decision.evidence ?? {},
+            missingData: [...(decision.missingData ?? [])],
+            dataAsOf: context.dataAsOf,
+        };
     }
 
     /**
-     * Produces this indicator's observation rows for one cutoff, reading
-     * canonical facts through `data`. Called only from evaluate() above,
-     * which validates the result. See
-     * docs/indicators-story/risk-service-architecture.md §4.4.
+     * Resolves this indicator's effective parameters for the run's cutoff,
+     * prefetches once via prepare(), decides every subject of this
+     * indicator's own subjectType (isEligible, then assessRisk when
+     * eligible), and validates the batch via validateObservations().
      */
-    protected abstract calculate(
-        context: EvaluationContext,
+    async evaluate(
+        run: EvaluationRun,
+        subjects: readonly Subject[],
         data: RiskDataSource,
-    ): Promise<readonly RiskObservationV1[]>;
+    ): Promise<readonly RiskObservationV1[]> {
+        const context = new EvaluationContext(run, this.parametersAsOf(run.dataAsOf));
+        await this.prepare(context, data);
+
+        const mine = subjects.filter((subject) => subject.subjectType === this.subjectType);
+        const signals = mine.map((subject) => {
+            const outcome = this.isEligible(subject, context);
+            return outcome.eligible ? this.assessRisk(subject, context) : outcome.signal;
+        });
+
+        return this.validateObservations(signals);
+    }
 
     /**
      * Validates rows against the output contract, then checks that each

@@ -83,6 +83,16 @@ broader signal is what LT-COM-02 already covers at lot grain. It is a parameter 
 reviewer may later decide the line belongs elsewhere for a particular scope — that argument should be a new
 effective-dated entry, not a new implementation version.
 
+## v2 architecture note: subject universe now comes from the Procurement Reader
+
+As of the [v2 architecture](../../../../docs/indicators-story/risk-service-architecture-v2.md) port, this
+indicator's subject universe is exactly the procurements the Procurement Reader loads from `v_pirkimas` —
+not, as before, every distinct `pirkimoNumeris` `collect.sql` itself could find in ATN-1 data via a
+`LEFT JOIN`. The ~0.5% of subjects below with "no matching procurement" (2 of 403) no longer appear at all
+(not even as `insufficient_data`): a `pirkimoNumeris` with no `v_pirkimas` row is not a Procurement Reader
+subject to begin with. A real-data run after the port should show **≈401**, not 403, subjects — this is the
+expected, documented consequence of the Reader owning the subject universe, not a regression.
+
 ## Real-data sanity run
 
 Read-only run of `collect.sql` against the real database, cutoff **2026-08-14T11:01:45Z** (`data_as_of` = query time):

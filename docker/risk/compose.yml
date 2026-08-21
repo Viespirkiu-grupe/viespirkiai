@@ -1,0 +1,16 @@
+services:
+    postgres:
+        image: postgres:18
+        container_name: viespirkiai_risk_postgres
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: admin
+            POSTGRES_DB: viespirkiai
+        ports:
+            - "15432:5432"
+        volumes:
+            - risk-pgdata:/var/lib/postgresql
+
+volumes:
+    risk-pgdata:
